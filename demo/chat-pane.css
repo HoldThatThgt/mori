@@ -1,0 +1,35 @@
+.chat-group { display: flex; flex: 1; min-width: 0; min-height: 0; position: relative; overflow-x: auto; }
+.chat-pane { min-width: 280px; container-type: inline-size; }
+.chat-pane-header { height: 43px; flex-shrink: 0; display: flex; gap: 8px; align-items: center; }
+.chat-pane-header { border-bottom: 1px solid var(--line); padding: 0 15px; background: #fcfcfd; }
+.chat-pane-title { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; text-align: left; }
+.chat-pane-title { font-size: 11px; color: #7f8998; cursor: grab; padding: 7px 0; }
+.chat-pane-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-pane-title svg { width: 14px; height: 14px; color: #9da8b8; }
+.chat-pane.is-active .chat-pane-header { background: #f7f9fd; box-shadow: inset 0 -2px #91afe9; }
+.chat-pane.is-active .chat-pane-title { color: #46668f; }
+.chat-pane .conversation { padding-top: 23px; }
+.session-references { display: flex; flex-direction: column; gap: 5px; margin-bottom: 11px; }
+.session-reference { display: flex; border: 1px solid #dce6f8; border-radius: 8px; background: #f4f7fd; }
+.session-reference > button:first-child { display: flex; flex: 1; gap: 7px; align-items: center; min-width: 0; }
+.session-reference > button:first-child { color: #5778a9; font-size: 10px; text-align: left; padding: 7px 9px; }
+.session-reference span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-reference svg { width: 13px; height: 13px; }
+.session-reference .icon-button { width: 28px; height: 28px; }
+.composer-reference .reference-heading { font-size: 9px; color: #98a3b4; justify-content: space-between; }
+.composer-reference .sent-reference { border: none; margin: 2px 11px 8px; padding: 0; }
+.composer-reference .sent-reference blockquote { max-height: 66px; }
+.sent-session-reference { margin-bottom: 7px; }
+.sent-session-reference button { color: #5d7fae; display: flex; align-items: center; gap: 6px; }
+.sent-session-reference button { font-size: 10px; text-align: left; padding: 0; }
+.sent-session-reference svg { width: 13px; height: 13px; }
+.chat-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.breadcrumb { min-width: 0; }
+.topbar-actions { flex-shrink: 0; }
+@container (max-width: 450px) {
+  .conversation { padding-right: 20px; padding-left: 20px; }
+  .composer-area { padding-right: 14px; padding-left: 14px; }
+  .composer-option.permission { display: none; }
+  .trace-time, .role-label { display: none; }
+  .artifact-open { display: none; }
+}

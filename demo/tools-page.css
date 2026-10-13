@@ -1,0 +1,77 @@
+.tool-categories { display: flex; gap: 6px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.tool-categories button { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-radius: 8px; }
+.tool-categories button { color: #7b8799; font-size: 13px; border: 1px solid transparent; }
+.tool-categories button.selected { color: #3f70bd; background: #edf3fd; border-color: transparent; }
+.tool-categories button svg { width: 16px; }
+.tool-categories button small { color: #9aa9bf; font-size: 10px; }
+.tool-category-heading { margin: 26px 0 20px; }
+.tool-category-heading h2 { font-size: 17px; font-weight: 600; margin: 0 0 8px; }
+.tool-category-heading p { font-size: 12px; color: #8894a5; margin: 0; }
+.tool-demo-label { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #98a2b0; margin-bottom: 12px; }
+.tool-demo-label svg { width: 12px; height: 12px; }
+.tool-catalog-list { display: flex; flex-direction: column; gap: 14px; }
+.tool-card {
+  display: block;
+  text-align: left;
+  width: 100%;
+  padding: 20px;
+  border: 1px solid #e4e9f0;
+  border-radius: 10px;
+}
+.tool-card-top { display: flex; align-items: center; gap: 11px; }
+.tool-card-top strong { font-size: 15px; font-weight: 500; }
+.tool-card-top .status-tag { margin-left: auto; }
+.tool-card-icon { display: inline-flex; align-items: center; justify-content: center; }
+.tool-card-icon { width: 34px; height: 34px; color: #7592bc; background: #edf2fa; border-radius: 8px; flex-shrink: 0; }
+.plugin-icon { background: #eeedf9; color: #8b80b6; }
+.tool-card p { font-size: 12px; color: #8591a1; line-height: 1.8; margin: 14px 0 18px; }
+.tool-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tool-card-bottom > span { display: flex; align-items: center; gap: 5px; color: #8d9eb6; font-size: 10px; }
+.tool-card-bottom svg { width: 13px; height: 13px; }
+.tool-explanation { margin-top: 22px; }
+.mcp-service { border: 1px solid #e4e9f0; border-radius: 10px; overflow: hidden; }
+.mcp-service > .tool-card { border-radius: 9px 9px 0 0; border-width: 0 0 1px; }
+.mcp-tool-list { padding: 0 12px; }
+.mcp-tool-caption { margin: 19px 12px 3px; color: #8c99ac; font-size: 10px; }
+.mcp-tool-list .page-list-row:last-child { border-bottom-color: transparent; }
+.plugin-contents { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 20px; }
+.plugin-contents > span { background: #e9eff8; color: #6f86aa; padding: 5px 8px; border-radius: 5px; font-size: 10px; }
+.tool-source-link { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #5b82ba; padding: 8px 0; }
+.tool-source-link svg { width: 14px; height: 14px; }
+.tool-source-link svg:last-child { margin-left: 5px; }
+.plugin-component-list { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.plugin-component-list button {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  align-items: center;
+  padding: 15px;
+  text-align: left;
+}
+.plugin-component-list button + button { border-top: 1px solid var(--line); }
+.plugin-component-list button > svg { width: 16px; color: #91a1b7; }
+.plugin-component-list button > svg:last-child { width: 13px; margin-left: auto; }
+.plugin-component-list button > span { display: flex; flex-direction: column; gap: 3px; }
+.plugin-component-list strong { font-size: 12px; font-weight: 500; color: #5d6d84; }
+.plugin-component-list small { font-size: 10px; color: #929eb0; }
+.plugin-impact { display: flex; gap: 10px; background: #f1f4f9; border-radius: 8px; padding: 14px; margin-top: 22px; }
+.plugin-impact svg { width: 16px; color: #8ea1bc; margin-top: 4px; }
+.plugin-impact p { font-size: 11px; color: #8695aa; line-height: 1.9; margin: 0; }
+@container (max-width: 500px) {
+  .tool-categories { gap: 4px; justify-content: space-between; }
+  .tool-categories button { gap: 5px; padding: 10px; }
+  .tool-card { padding: 16px; }
+  .tool-card-top { flex-wrap: wrap; gap: 8px; }
+  .tool-card-top strong { font-size: 14px; }
+}
+@container (max-width: 340px) {
+  .tool-categories button { padding: 10px 7px; }
+  .tool-categories button > svg { display: none; }
+  .tool-card-bottom { flex-wrap: wrap; row-gap: 10px; }
+}
+.tools-project-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 24px 0 10px; }
+.tools-project-row label { display: flex; flex-direction: column; gap: 8px; flex: 1; color: #8794a7; font-size: 11px; }
+.tools-project-row select { min-width: 140px; padding: 10px 12px; border: 1px solid #dce3ed; border-radius: 7px; }
+.tools-project-row select { background: white; color: #4b6080; font-size: 12px; }
+.tools-project-row .button { display: flex; gap: 6px; align-items: center; min-height: 37px; font-size: 11px; }
+.tools-project-row .button svg { width: 13px; }

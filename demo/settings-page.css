@@ -1,0 +1,68 @@
+.settings-categories { display: flex; flex-wrap: wrap; gap: 5px; border-bottom: 1px solid var(--line); }
+.settings-categories { padding-bottom: 10px; }
+.settings-categories button { padding: 10px 12px; border-radius: 7px; font-size: 12px; color: #8391a4; }
+.settings-categories button.selected { color: #4377c5; background: #edf3fd; }
+.settings-categories small { margin-left: 4px; font-size: 9px; opacity: .65; }
+.settings-field { display: flex; flex-direction: column; gap: 9px; margin-top: 20px; min-width: 0; }
+.settings-field > span { font-size: 11px; color: #718098; }
+.settings-field input, .settings-field select, .settings-field textarea { width: 100%; }
+.settings-field input, .settings-field select, .settings-field textarea {
+  padding: 11px 12px;
+  border: 1px solid #dfe5ed;
+  border-radius: 7px;
+  background: white;
+  color: #576b88;
+  font-size: 12px;
+  outline: none;
+}
+.settings-field :focus { border-color: #91b0e0; box-shadow: 0 0 0 3px #edf3fc; }
+.settings-editor { min-height: 275px; line-height: 1.9; resize: vertical; font-family: inherit; }
+.settings-save-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.settings-save-bar { margin-top: 26px; padding-top: 20px; }
+.settings-save-bar { border-top: 1px solid var(--line); }
+.settings-save-bar > div { display: flex; gap: 9px; margin-left: auto; }
+.settings-save-status { font-size: 10px; color: #94a0b1; }
+.settings-save-bar .button { font-size: 11px; }
+.tool-scope-heading { display: flex; justify-content: space-between; color: #8a99ae; font-size: 10px; }
+.tool-scope-heading { margin: 22px 0 10px; }
+.user-capability { margin-bottom: 24px; }
+.user-capability .tool-card-top strong { font-size: 13px; }
+.pool-settings-link { display: flex; align-items: center; gap: 6px; color: #6d8cbb; font-size: 11px; }
+.pool-settings-link { padding: 6px 0 10px; }
+.pool-settings-link svg { width: 13px; height: 13px; }
+@container (max-width: 500px) {
+  .settings-categories { flex-wrap: wrap; gap: 2px; }
+  .settings-categories button { padding: 10px 9px; }
+}
+.settings-active { background: #e7eefb; color: var(--blue); }
+.settings-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.settings-list-heading { margin: 28px 0 16px; }
+.settings-list-heading h2 { font-size: 14px; font-weight: 600; margin: 0 0 5px; }
+.settings-list-heading span { color: #8d99aa; font-size: 10px; }
+.settings-list-heading .button { display: flex; gap: 5px; align-items: center; font-size: 11px; }
+.settings-list-heading svg { width: 13px; }
+.settings-list { display: flex; flex-direction: column; gap: 12px; }
+.setting-row { display: flex; flex-direction: column; width: 100%; gap: 13px; text-align: left; padding: 20px; }
+.setting-row { border: 1px solid #e2e7ef; border-radius: 10px; background: white; }
+.setting-row:hover { border-color: #bbcdeb; }
+.setting-row-heading, .setting-row-meta { display: flex; align-items: center; justify-content: space-between; }
+.setting-row-heading, .setting-row-meta { gap: 10px; }
+.setting-row-heading strong { font-size: 14px; font-weight: 500; color: #3c4d64; overflow-wrap: anywhere; }
+.setting-row-description { font-size: 12px; color: #7b899c; line-height: 1.8; }
+.setting-row-meta { font-size: 10px; color: #8b99ac; flex-wrap: wrap; }
+.setting-row-meta > span:last-child { display: flex; align-items: center; gap: 4px; color: #6389c2; }
+.setting-row-meta svg { width: 12px; height: 12px; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 23px; }
+.settings-actions .button { font-size: 11px; }
+.settings-remove { color: #a76c6c; }
+.settings-content { font: inherit; font-size: 12px; line-height: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.settings-content { margin: 0; background: #f3f5f8; color: #62748d; border-radius: 8px; padding: 18px; }
+.settings-scope-note { display: flex; gap: 10px; color: #8794a7; font-size: 11px; line-height: 1.9; margin-top: 28px; }
+.settings-scope-note svg { width: 15px; flex-shrink: 0; margin-top: 3px; }
+.settings-scope-note p { margin: 0; }
+.settings-empty { padding: 28px 14px; color: #8b98aa; font-size: 12px; line-height: 1.8; }
+.settings-pending, .settings-removed { padding: 14px; background: #f1f5fb; border-radius: 8px; margin-top: 16px; }
+.settings-pending, .settings-removed { display: flex; align-items: center; gap: 12px; font-size: 11px; color: #6a85ad; }
+.settings-pending { width: 100%; justify-content: space-between; }
+.settings-pending svg { width: 12px; }
+.settings-removed button { color: #3972c5; white-space: nowrap; margin-left: auto; }
