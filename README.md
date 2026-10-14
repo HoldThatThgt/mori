@@ -15,7 +15,7 @@ Agent 向权限范围内的共享区追加简短结果、来源和更正；其�
 
 基座选择：DeepSeek Harness 官方桌面工程，保留桌面界面和原生运行时，在现有扩展点增加业务能力。
 
-当前阶段：方案设计。基座选型和产品名称已确定，具体实现尚未开始。
+当前阶段：方案设计与界面 Demo。基座选型和产品名称已确定，DSH 运行时接入尚未开始。
 
 设计入口：[Mori 产品与技术 Proposal](docs/proposal.md)。
 
@@ -26,10 +26,12 @@ Agent 向权限范围内的共享区追加简短结果、来源和更正；其�
 - [Agent 角色定义与生命周期 Proposal](docs/proposals/agent-lifecycle.md)
 - [Chrome DevTools 内嵌工具 Proposal](docs/proposals/chrome-devtools.md)
 - [内网模型资源可靠性 Proposal](docs/proposals/model-reliability.md)
+- [界面与运行记录 Proposal](docs/proposals/interface.md)
 
 ## 界面 Demo
 
-已提供基于 proposal 和 DSH 当前界面结构的本地交互演示：[demo](demo/README.md)。
+已提供参照 proposal 与固定 DSH 界面风格的本地交互演示：[demo](demo/README.md)。
 
 在 PowerShell 中运行 `./demo/start.ps1`，浏览器打开 <http://127.0.0.1:4173>。
 模型请求、工具调用、测试输出与维护流程均为演示数据，尚未接入 DSH 运行时。
+可查看任务阶段、两层 Agent 与独立子会话、工具调用树和请求轨迹，并体验登录等待、结果核对及休眠恢复。

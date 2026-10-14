@@ -1,6 +1,8 @@
 import { icon } from './icons.js';
 import { escapeHtml } from './feedback.js';
 import { renderConversation, progressLabel, referenceMarkup } from './conversation.js';
+import { canAdvanceTask } from './task-state.js';
+import { getModelPool } from './pool.js';
 
 /** @brief 输出可拖动并支持键盘操作的布局分隔线。 */
 export function resizeHandle(target, label) {
@@ -25,8 +27,7 @@ export function renderChatPane(state, session) {
 
 /** @brief 在每个会话窗口内保留独立的输入区。 */
 function composer(state) {
-  const active = state.session === 'research' || (state.session === 'coding' && state.phase !== 'completed');
-  const running = active && !['error', 'warning', 'idle'].includes(state.poolState);
+  const running = getModelPool(state).requests.some(item => item.session === state.session && item.state === 'active');
   const placeholder = state.references[state.session]
     ? '针对选中内容提问，或描述你希望怎样修改…' : '继续提问，或拖入会话作为参考…';
   return `<div class="composer-area"><div class="task-strip">
@@ -47,8 +48,10 @@ function composer(state) {
         <button type="button" class="composer-option" data-action="toggle-pool">快速模型 ${icon('down')}</button>
         <button type="submit" class="icon-button send-button" aria-label="发送消息">${icon('arrow')}</button></div>
     </form><div class="composer-caption">交互演示 · 未连接模型
-      <span> · </span><button data-action="${state.session === 'coding' ? 'advance' : 'start-coding'}">
+      <span> · </span><button data-action="${state.session === 'coding' ? 'advance' : 'start-coding'}"
+        ${state.session === 'coding' && !canAdvanceTask(state) ? 'disabled' : ''}>
         ${state.session === 'coding' ? advanceLabel(state) : '演示编码任务'}</button>
+      <span> · </span><button data-action="show-runtime">运行记录</button>
       <span> · </span><button data-action="reset">重置演示</button></div></div>`;
 }
 
@@ -75,6 +78,5 @@ function sessionReferences(state) {
 function advanceLabel(state) {
   if (state.phase === 'completed') return '重新演示';
   if (state.phase === 'review') return '演示验收完成';
-  if (state.phase === 'paused') return '演示继续推进';
   return '演示独立验收';
 }

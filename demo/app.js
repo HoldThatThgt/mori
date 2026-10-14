@@ -14,26 +14,28 @@ import { initialProjects, initialSessions, currentProject, createProject } from 
 import { createSession, renderProjectSessions } from './projects.js';
 import { openNewSession } from './session-create.js';
 import { openNewProject } from './project-create.js';
+import { renderRuntimePanel } from './runtime-panel.js';
+import { initialRuntimeState, selectRuntimeScenario, resolveRuntimeScenario, canAdvanceTask } from './task-state.js';
 
 const state = {
   ...initialProjects(), ...initialTools(), ...initialSettings(), ...initialSessions(),
   view: 'chat', pageDetailsOpen: true,
   reviewSelection: { kind: 'run', id: 'example' },
-  chatScrolls: {}, pageScrolls: {}, fileScroll: { top: 0, left: 0 },
+  chatScrolls: {}, pageScrolls: {}, workspaceScrolls: {}, fileScroll: { top: 0, left: 0 },
   session: 'coding', panel: window.innerWidth >= 800 ? 'files' : null,
   fileId: 'dispatch', fileHighlight: null,
-  phase: 'running', revision: 1,
+  phase: 'acceptance', revision: 1, ...initialRuntimeState(),
   panes: ['coding'],
   sidebarWidth: window.innerWidth <= 1150 ? 220 : 260,
   workspaceWidth: window.innerWidth <= 1150 ? 400 : 450, splitRatio: 0.5,
   feedbacks: [],
-  poolOpen: false, poolFilter: 'all', poolState: 'full', collapsed: window.innerWidth < 1024,
+  poolOpen: false, poolFilter: 'all', poolState: 'normal', collapsed: window.innerWidth < 1024,
 };
 const panelNames = {
-  files: '任务与文件', terminal: '终端',
+  files: '任务与文件', terminal: '终端', runtime: '运行记录',
 };
 const panelIcons = {
-  files: 'folder', terminal: 'terminal',
+  files: 'folder', terminal: 'terminal', runtime: 'clock',
 };
 let toastTimer;
 const toolTimers = new Map();
@@ -93,15 +95,17 @@ function topbar() {
 /** @brief 渲染可以按需关闭的文件和任务面板。 */
 function rightPanel() {
   if (!state.panel) return '';
-  const content = state.panel === 'files' ? renderFileWorkspace(state) : renderPanel(state);
-  const tabs = [['files', '任务与文件'], ['terminal', '终端']];
+  const content = state.panel === 'files' ? renderFileWorkspace(state)
+    : state.panel === 'runtime' ? renderRuntimePanel(state) : renderPanel(state);
+  const tabs = Object.entries(panelNames);
   return `<aside class="right-panel" aria-label="工作区面板">
     ${resizeHandle('workspace', '调整右侧工作区宽度')}
     <div class="panel-header">${icon(panelIcons[state.panel])}${panelNames[state.panel]}
       <button class="icon-button" data-action="close-panel" aria-label="关闭工作区面板">${icon('close')}</button></div>
     <div class="panel-tabs">${tabs.map(([id,label]) => `<button data-action="show-${id}"
       class="panel-tab ${state.panel === id ? 'active' : ''}">${label}</button>`).join('')}</div>
-    <div class="panel-body ${state.panel === 'files' ? 'file-panel-body' : ''}">${content}</div></aside>`;
+    <div class="panel-body ${state.panel === 'files' ? 'file-panel-body' : ''}"
+      data-workspace-key="${state.session}-${state.panel}">${content}</div></aside>`;
 }
 
 /** @brief 在切换页面前保存会话和文件的阅读位置。 */
@@ -113,6 +117,8 @@ function saveReadingPositions() {
   if (reader) state.fileScroll = { top: reader.scrollTop, left: reader.scrollLeft };
   const page = document.querySelector('.feature-main');
   if (page) state.pageScrolls[page.dataset.page] = page.scrollTop;
+  const workspace = document.querySelector('.panel-body');
+  if (workspace) state.workspaceScrolls[workspace.dataset.workspaceKey] = workspace.scrollTop;
 }
 
 /** @brief 创建会话区，独立功能页面不复用聊天或文件容器。 */
@@ -137,6 +143,8 @@ function render() {
   if (reader) { reader.scrollTop = state.fileScroll.top; reader.scrollLeft = state.fileScroll.left; }
   const page = document.querySelector('.feature-main');
   if (page) page.scrollTop = state.pageScrolls[page.dataset.page] ?? 0;
+  const workspace = document.querySelector('.panel-body');
+  if (workspace) workspace.scrollTop = state.workspaceScrolls[workspace.dataset.workspaceKey] ?? 0;
   document.querySelector('#pool-layer').innerHTML = state.poolOpen ? renderPool(state) : '';
 }
 
@@ -300,9 +308,14 @@ function refreshTools() {
 /** @brief 通过显式交互推进示例任务的独立验收。 */
 function advance() {
   if (state.session !== 'coding') switchSession('coding');
-  const next = { running: 'review', review: 'completed', completed: 'running', paused: 'running' };
+  if (!canAdvanceTask(state)) {
+    state.panel = 'runtime';
+    render();
+    return toast('演示仍在等待，请先处理运行记录中的等待原因。');
+  }
+  const next = { acceptance: 'review', review: 'completed', completed: 'acceptance' };
+  if (state.phase === 'completed') Object.assign(state, initialRuntimeState());
   state.phase = next[state.phase];
-  state.poolState = state.phase === 'completed' ? 'normal' : 'full';
   state.panel = 'files';
   render();
   toast(state.phase === 'completed' ? '演示：独立验收通过，任务已完成。' : '演示：已推进到下一阶段。');
@@ -314,9 +327,12 @@ function reset() {
   toolTimers.clear();
   Object.assign(state, { ...initialProjects(), ...initialTools(), ...initialSettings(), ...initialSessions(),
     view: 'chat', pageDetailsOpen: true,
-    reviewSelection: { kind: 'run', id: 'example' }, session: 'coding', panel: 'files', phase: 'running', revision: 1,
+    ...initialRuntimeState(),
+    reviewSelection: { kind: 'run', id: 'example' }, session: 'coding', panel: 'files',
+    phase: 'acceptance', revision: 1,
     fileId: 'dispatch', fileHighlight: null, panes: ['coding'],
-    feedbacks: [], chatScrolls: {}, pageScrolls: {}, poolState: 'full', poolOpen: false });
+    feedbacks: [], chatScrolls: {}, pageScrolls: {}, workspaceScrolls: {}, fileScroll: { top: 0, left: 0 },
+    poolState: 'normal', poolOpen: false, poolFilter: 'all' });
   render();
   toast('已重置演示。');
 }
@@ -409,6 +425,7 @@ function selectReview(dataset) {
 
 /** @brief 处理本地界面的按钮动作。 */
 function handleAction(action, dataset) {
+  if (action.startsWith('runtime-')) return handleRuntimeAction(action, dataset);
   if (action === 'new-project') return newProject();
   if (action === 'open-project') return openProject(dataset.project);
   if (action === 'new-chat') return newChat(dataset.project || currentProject(state));
@@ -447,6 +464,13 @@ function handleAction(action, dataset) {
     'copy': () => copyReply(dataset),
   };
   if (actions[action]) actions[action]();
+}
+
+/** @brief 运行记录只改变当前示例，实际登录、外部操作和定时任务均不执行。 */
+function handleRuntimeAction(action, dataset) {
+  if (action === 'runtime-select-agent') state.runtimeAgent = dataset.agent;
+  if (action === 'runtime-resolve' && !resolveRuntimeScenario(state, dataset.resolution)) return;
+  render();
 }
 
 /** @brief 按按钮绑定的会话和消息复制对应回复。 */
@@ -488,6 +512,10 @@ function bindEvents() {
     updateSettingsDraft(state, event.target);
     if (event.target.id === 'tool-project') handleAction('tool-project', { project: event.target.value });
     if (event.target.id === 'pool-state') { state.poolState = event.target.value; render(); }
+    if (event.target.id === 'runtime-scenario') {
+      selectRuntimeScenario(state, event.target.value);
+      render();
+    }
   });
   document.addEventListener('submit', event => {
     if (event.target.matches('.user-settings-form')) {

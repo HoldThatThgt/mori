@@ -1,0 +1,6 @@
+.pool-popover { max-height: calc(100vh - 156px); overflow-y: auto; }
+.pool-heading strong { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.pool-heading > span:last-child { flex-shrink: 0; }
+.request-content { min-width: 0; overflow-wrap: anywhere; }
+.request-role { flex-shrink: 0; }
+.request-status { flex-shrink: 0; }

@@ -1,4 +1,5 @@
 import { renderPanel } from './panels.js';
+import { codingTask } from './task-state.js';
 
 /** 可选中、可关联到聊天上下文的示例文件；内容只保存在当前页面。 */
 export const demoFiles = {
@@ -141,7 +142,7 @@ export function renderFileWorkspace(state) {
   const attributes = `data-file-id="${file.id}" data-file-path="${escapeText(file.path)}" `
     + `data-version="${file.version}" data-session="${file.session}"`;
   return `<section class="file-workspace" data-language="${file.language}" aria-label="示例文件阅读器">
-    ${renderTaskFiles(state, file)}${renderFileHeading(file, state.phase)}
+    ${renderTaskFiles(state, file)}${renderFileHeading(file, codingTask(state).evidence)}
     <div class="file-reader" tabindex="0" aria-label="${escapeText(file.name)} 文件内容">
       <pre class="file-code"><code class="file-content" ${attributes}>${content}</code></pre>
     </div>
@@ -159,9 +160,9 @@ export function renderFileWorkspace(state) {
  */
 function renderTaskFiles(state, file) {
   const taskState = { ...state, panel: 'task', session: file.session };
-  const stages = taskStages(state.phase);
+  const stages = taskStages(state);
   return `<div class="task-file-overview">
-    <header class="task-file-heading"><span class="file-demo-label">演示任务 · 版本 ${state.revision}</span>
+    <header class="task-file-heading"><span class="file-demo-label">演示任务 · 目标版本 ${state.revision}</span>
       <h3>${escapeText(state.titles[file.session])}</h3></header>
     <div class="task-file-stages" aria-label="任务阶段与文件">
       ${stages.map(stage => renderStage(stage, file.id)).join('')}</div>
@@ -172,20 +173,15 @@ function renderTaskFiles(state, file) {
 
 /**
  * 按真实演示进度标明执行完成和独立验收的区别。
- * @param {string} phase 当前任务状态。
+ * @param {Object} state 当前演示状态。
  * @returns {Object[]} 任务阶段及文件归属。
  */
-function taskStages(phase) {
-  const acceptance = {
-    running: ['待核对', 'pending'],
-    review: ['核对中', 'current'],
-    completed: ['已通过', 'done'],
-    paused: ['已暂停', 'pending'],
-  }[phase];
+function taskStages(state) {
+  const task = codingTask(state);
   return [
     { id: 'goal', name: '目标整理', status: '已确认', style: 'done', note: '旧参数不能进入更新后的工具' },
     { id: 'execution', name: '执行', status: '已完成', style: 'done' },
-    { id: 'acceptance', name: '独立验收', status: acceptance[0], style: acceptance[1] },
+    { id: 'acceptance', name: '独立验收', status: task.evidence, style: task.style },
   ];
 }
 
@@ -224,12 +220,11 @@ function fileButton(file, selected) {
 /**
  * 在正文上方标明文件位置和发生改动的阶段。
  * @param {Object} file 当前文件。
- * @param {string} phase 当前任务状态。
+ * @param {string} recordStatus 当前验收记录状态。
  * @returns {string} 文件位置与阶段说明。
  */
-function renderFileHeading(file, phase) {
+function renderFileHeading(file, recordStatus) {
   const folder = file.path.slice(0, file.path.lastIndexOf('/'));
-  const recordStatus = { running: '待核对', review: '核对中', completed: '已通过', paused: '已暂停' }[phase];
   const stage = file.stage === 'execution' ? '执行阶段修改' : `独立验收记录 · ${recordStatus}`;
   return `<div class="file-workspace-toolbar">
     <div class="file-heading-row"><strong>${escapeText(file.name)}</strong>
