@@ -1,3 +1,5 @@
+import { codingTask, researchTask } from './task-state.js';
+
 /** 输出面板中重复使用的小图标。 */
 function icon(name) {
   const paths = {
@@ -58,18 +60,13 @@ function checkItem(title, description, passed) {
 /** 展示验收条件和监督依据，区分执行结束与完成。 */
 function renderTask(state) {
   if (state.session === 'research') return renderResearchTask(state);
-  const statuses = { running: '待验收', review: '待验收', completed: '已完成', paused: '已暂停' };
+  const task = codingTask(state);
   const completed = state.phase === 'completed';
-  const current = {
-    running: '准备独立验收 · 示例代码已修改，检查已通过',
-    review: '独立验收中 · 正在核对完成条件、文件内容与检查记录',
-    completed: '完成条件均有证据，独立验收已通过',
-    paused: '停止发起新操作，等待继续',
-  };
   return panel(`${intro('为工具热更新补上版本检查', '目标随任务保存，执行者可以更换上下文继续工作。')}
     <div class="task-status-row"><span class="panel-badge ${completed ? 'success' : 'active'}">
-      ${statuses[state.phase]}</span><span class="panel-secondary">任务版本 ${state.revision}</span></div>
-    <p class="task-current">${current[state.phase]}</p>
+      ${task.status}</span><span class="panel-secondary">目标版本 ${state.revision}</span></div>
+    <p class="task-current">${task.progress}</p>
+    <button class="text-link" data-action="show-runtime">查看 Agent、工具调用与等待原因</button>
     <div class="panel-section"><h4>完成条件</h4>
       ${checkItem('旧调用不会误用新定义', '派发前核对请求记录与当前工具版本。', true)}
       ${checkItem('后续请求使用最新定义', '示例检查通过，只重新准备受影响的调用。', true)}
@@ -89,13 +86,13 @@ function renderTask(state) {
 
 /** 展示资料研究任务的独立进度与验收条件。 */
 function renderResearchTask(state) {
+  const task = researchTask(state);
   return panel(`${intro('MCP 连接更新方案对比', '查证成熟方案的连接交接方式，并保留可核对的来源。')}
-    <div class="task-status-row"><span class="panel-badge active">等待</span>
-      <span class="panel-secondary">任务版本 ${state.revision}</span></div>
-    <p class="task-current">参考检索 · 等待响应</p>
+    <div class="task-status-row"><span class="panel-badge active">${task.status}</span>
+      <span class="panel-secondary">目标版本 ${state.revision}</span></div>
+    <p class="task-current">${task.progress}</p>
     <div class="panel-section"><h4>当前片段</h4><p class="panel-plain-text">
-      参考检索使用独立上下文，正在等待模型返回连接更新方案与来源。
-      请求仍在约定等待时间内，不标记为网络异常。</p></div>
+      ${task.detail}</p></div>
     <div class="panel-section"><h4>完成条件</h4>
       ${checkItem('整理可核对的参考方案', '保留官方文档或源码来源，区分已验证能力与假设。', false)}
       ${checkItem('比较连接交接边界', '说明新连接初始化、旧调用收尾与失败后的状态。', false)}

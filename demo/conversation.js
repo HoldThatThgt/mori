@@ -1,5 +1,6 @@
 import { icon } from './icons.js';
 import { escapeHtml } from './feedback.js';
+import { codingTask, researchTask } from './task-state.js';
 
 /** @brief 创建展示工具执行证据的可展开行。 */
 function traceRow(title, time, detail) {
@@ -68,7 +69,8 @@ function artifactCard() {
 }
 
 /** @brief 渲染第二个运行中的用户会话。 */
-function researchConversation() {
+function researchConversation(state) {
+  const task = researchTask(state);
   return `<div class="day-line">今天 · 09:38</div>
     <div class="user-message">帮我对比现有的 MCP 连接更新方案，整理一下适用边界。</div>
     <div class="assistant-heading"><span class="mori-symbol">ⅿ</span>Mori
@@ -76,16 +78,15 @@ function researchConversation() {
     <div class="prose" data-message-id="research-plan" data-version="1">
       <p>我正在核对现有实现的连接生命周期。重点看两件事：
       <strong>新连接什么时候接收请求，以及旧调用如何安全结束。</strong></p>
-      <p>资料检索正在另一个角色会话里进行。你可以继续聊，也可以切回编码任务。</p>
+      <p>资料检索使用独立角色会话。你可以继续聊，也可以切回编码任务。</p>
     </div>
     <div class="context-chips"><span class="context-chip">${icon('folder')} 资料研究</span>
       <span class="context-chip">${icon('shield')} 只读检索</span></div>
     <div class="trace">
       ${traceRow('已确认比较范围', '目标整理 · 4s', '覆盖工具定义、认证、连接交接与正在运行的调用。')}
-      ${traceRow('正在核对参考资料', '参考检索', '演示：资料检索与编码任务共享同一模型池。')}
     </div>
-    <div class="guard-note"><div class="guard-title">${icon('clock')} 等待模型响应</div>
-      <p>请求仍在约定的等待时间内。当前没有已确认的网络异常。</p></div>`;
+    <div class="guard-note"><div class="guard-title">${icon('clock')} ${task.progress}</div>
+      <p>${task.detail}</p></div>`;
 }
 
 /** @brief 渲染新会话的输入提示。 */
@@ -143,7 +144,7 @@ function renderFollowup(message, index, titles) {
 /** @brief 按当前用户会话生成聊天视图。 */
 export function renderConversation(state) {
   const content = state.session === 'coding' ? codingConversation(state)
-    : state.session === 'research' ? researchConversation()
+    : state.session === 'research' ? researchConversation(state)
       : state.messages[state.session].length ? '' : emptyConversation(state);
   return `<div class="conversation-inner">${content}${followups(state)}</div>`;
 }
@@ -154,10 +155,6 @@ export function progressLabel(state) {
     return state.messages[state.session].length ? '已记录消息 · 演示模式' : '准备好开始';
   }
   if (state.session === 'coding' && state.phase === 'completed') return '已完成';
-  if (state.poolState === 'error') return '模型认证失败 · 请求已停止';
-  if (state.poolState === 'warning') return '服务限流 · 等待重试';
-  if (state.poolState === 'idle') return '模型池空闲 · 暂无请求';
-  if (state.session === 'research') return '参考检索中';
-  const labels = { running: '准备独立验收', review: '独立验收中', completed: '已完成', paused: '已暂停推进' };
-  return labels[state.phase];
+  if (state.session === 'coding') return codingTask(state).progress;
+  return researchTask(state).progress;
 }

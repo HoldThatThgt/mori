@@ -1,6 +1,7 @@
 import { escapeHtml } from './feedback.js';
 import { icon } from './icons.js';
 import { createToolState } from './tool-catalog.js';
+import { codingTask, researchTask } from './task-state.js';
 
 /** @brief 项目集合保存在演示状态中，重置时恢复初始项目。 */
 export function initialProjects() {
@@ -70,9 +71,10 @@ export function renderProjectSessions(state) {
 /** @brief 通过会话身份生成侧栏入口，新增会话与示例会话使用相同操作。 */
 function sessionItem(state, id) {
   const label = escapeHtml(state.titles[id]);
-  const running = id === 'research' || (id === 'coding' && !['completed', 'paused'].includes(state.phase));
+  const status = id === 'coding' ? codingTask(state).status : id === 'research' ? researchTask(state).status : '就绪';
+  const running = ['待验收', '执行中'].includes(status);
   return `<button class="session-item ${state.view === 'chat' && state.session === id ? 'active' : ''}"
     data-action="session-${id}" draggable="true" data-session-id="${id}" data-session-title="${label}"
     title="右键改名，拖动引用或分屏"><span class="dot ${running ? '' : 'idle'}"></span>
-    <span class="session-label">${label}</span><span class="session-time">${running ? '进行中' : '就绪'}</span></button>`;
+    <span class="session-label">${label}</span><span class="session-time">${status}</span></button>`;
 }

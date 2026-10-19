@@ -16,7 +16,7 @@ Agent 向权限范围内的共享区追加简短结果、来源和更正；其�
 当前方案（v0）：Electron 桌面 App，后端原样使用 pi-coding-agent SDK（1.3.0），Mori 只做界面、离线安装包和进程桥。
 方案见 [Mori App v0 方案](docs/app-v0.md)，代码在 [app/](app/README.md)。
 
-当前阶段：M0（外壳、后台进程与离线安装包），检查记录见 [M0 预检与走查记录](docs/v0/m0-checks.md)。
+当前阶段：M1（对话界面）已完成，等待走查签收。检查记录见 [M0](docs/v0/m0-checks.md) 和 [M1](docs/v0/m1-checks.md)。
 
 原设计入口：[Mori 产品与技术 Proposal](docs/proposal.md)。其中以 DSH 为基座的选择和多 agent 机制本轮暂停，见 v0 方案第 9 节。
 
@@ -27,6 +27,7 @@ Agent 向权限范围内的共享区追加简短结果、来源和更正；其�
 - [Agent 角色定义与生命周期 Proposal](docs/proposals/agent-lifecycle.md)
 - [Chrome DevTools 内嵌工具 Proposal](docs/proposals/chrome-devtools.md)
 - [内网模型资源可靠性 Proposal](docs/proposals/model-reliability.md)
+- [界面与运行记录 Proposal](docs/proposals/interface.md)
 
 重设计草案（2026-10-19，待评审；确认后替代上面文档中的相应部分）：
 
@@ -39,3 +40,4 @@ Agent 向权限范围内的共享区追加简短结果、来源和更正；其�
 
 在 PowerShell 中运行 `./demo/start.ps1`，浏览器打开 <http://127.0.0.1:4173>。
 模型请求、工具调用、测试输出与维护流程均为演示数据，尚未接入 DSH 运行时。
+可查看任务阶段、两层 Agent 与独立子会话、工具调用树和请求轨迹，并体验登录等待、结果核对及休眠恢复。
