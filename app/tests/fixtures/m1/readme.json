@@ -1,0 +1,5001 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m1-record.mjs; do not edit by hand.",
+ "name": "readme",
+ "description": "总结 README：思考、读取工具、Markdown 回复",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-19T11:53:07.338Z",
+ "steps": [
+  {
+   "t": 0,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-record-JSDJIm\\project"
+   }
+  },
+  {
+   "t": 3162,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-record-JSDJIm\\project",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-a2ZKOZ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m1-record-JSDJIm-project--\\2026-10-19T11-53-01-521Z_01a15402-0750-77d9-a50c-7e28fae21dc6.jsonl",
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3163,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "text": "总结一下 README.md"
+   }
+  },
+  {
+   "t": 3174,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 3175,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 3175,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 3176,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m1-record-JSDJIm/project\n</cwd>"
+      },
+      "timestamp": 1792410781585,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 3176,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m1-record-JSDJIm/project\n</cwd>"
+      },
+      "timestamp": 1792410781585,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 3176,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "总结一下 README.md"
+       }
+      ],
+      "timestamp": 1792410781583
+     }
+    }
+   }
+  },
+  {
+   "t": 3176,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "总结一下 README.md"
+       }
+      ],
+      "timestamp": 1792410781583
+     }
+    }
+   }
+  },
+  {
+   "t": 3776,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792410781882
+     }
+    }
+   }
+  },
+  {
+   "t": 4361,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 0,
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4361,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4376,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4376,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4376,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "command",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4376,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ": ",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "ls",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ";",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4402,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " echo",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4413,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " \\\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4413,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "---",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4413,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\\\";",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4413,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " ls",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4427,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " *.",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4427,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "md",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4427,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " ",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4427,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "2",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4440,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ">/",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4440,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "dev",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4440,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "/null",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4440,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4454,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "}",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319"
+     }
+    }
+   }
+  },
+  {
+   "t": 4477,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 0,
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+      "args": {
+       "command": "ls; echo \"---\"; ls *.md 2>/dev/null"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 4477,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+        "name": "bash",
+        "arguments": {
+         "command": "ls; echo \"---\"; ls *.md 2>/dev/null"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1550,
+       "output": 50,
+       "cacheRead": 128,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1728,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792410781882,
+      "responseId": "c78d957e-3baa-43bf-97a0-8a80fbacdc07",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1012,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 4479,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+     "toolName": "bash",
+     "args": {
+      "command": "ls; echo \"---\"; ls *.md 2>/dev/null"
+     }
+    }
+   }
+  },
+  {
+   "t": 4484,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+     "toolName": "bash",
+     "args": {
+      "command": "ls; echo \"---\"; ls *.md 2>/dev/null"
+     },
+     "partialResult": {
+      "content": []
+     }
+    }
+   }
+  },
+  {
+   "t": 4653,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+     "toolName": "bash",
+     "args": {
+      "command": "ls; echo \"---\"; ls *.md 2>/dev/null"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "README.md\nsrc\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 4722,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+     "toolName": "bash",
+     "args": {
+      "command": "ls; echo \"---\"; ls *.md 2>/dev/null"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "README.md\nsrc\n---\nREADME.md\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 4723,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+     "toolName": "bash",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "README.md\nsrc\n---\nREADME.md\n"
+       }
+      ],
+      "structuredContent": {
+       "output": "README.md\nsrc\n---\nREADME.md\n",
+       "truncated": false,
+       "exit_code": 0,
+       "wall_time_seconds": 0.2
+      }
+     },
+     "isError": false,
+     "durationMs": 241
+    }
+   }
+  },
+  {
+   "t": 4723,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "README.md\nsrc\n---\nREADME.md\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 241,
+      "timestamp": 1792410783140
+     }
+    }
+   }
+  },
+  {
+   "t": 4724,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "README.md\nsrc\n---\nREADME.md\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 241,
+      "timestamp": 1792410783140
+     }
+    }
+   }
+  },
+  {
+   "t": 4724,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+        "name": "bash",
+        "arguments": {
+         "command": "ls; echo \"---\"; ls *.md 2>/dev/null"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1550,
+       "output": 50,
+       "cacheRead": 128,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1728,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792410781882,
+      "responseId": "c78d957e-3baa-43bf-97a0-8a80fbacdc07",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1012,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "README.md\nsrc\n---\nREADME.md\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 241,
+       "timestamp": 1792410783140
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 4724,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6"
+   }
+  },
+  {
+   "t": 4727,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 4733,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1735,
+      "contextWindow": 1000000,
+      "percent": 0.1735
+     }
+    }
+   }
+  },
+  {
+   "t": 4864,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792410783145
+     }
+    }
+   }
+  },
+  {
+   "t": 5757,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 0,
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5757,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5778,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5778,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5778,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "path",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5778,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5782,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ": ",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5782,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5782,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "README",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5782,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ".md",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5796,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5797,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "}",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581"
+     }
+    }
+   }
+  },
+  {
+   "t": 5823,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 0,
+      "toolName": "read",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581",
+      "args": {
+       "path": "README.md"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 5823,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581",
+        "name": "read",
+        "arguments": {
+         "path": "README.md"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 213,
+       "output": 38,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1787,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792410783145,
+      "responseId": "f6f4c300-79cb-4900-8cf9-95956e1e04ce",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1095,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 5824,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581",
+     "toolName": "read",
+     "args": {
+      "path": "README.md"
+     }
+    }
+   }
+  },
+  {
+   "t": 5828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581",
+     "toolName": "read",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+       }
+      ],
+      "structuredContent": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+     },
+     "isError": false,
+     "durationMs": 3
+    }
+   }
+  },
+  {
+   "t": 5828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581",
+      "toolName": "read",
+      "content": [
+       {
+        "type": "text",
+        "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 3,
+      "timestamp": 1792410784245
+     }
+    }
+   }
+  },
+  {
+   "t": 5828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581",
+      "toolName": "read",
+      "content": [
+       {
+        "type": "text",
+        "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 3,
+      "timestamp": 1792410784245
+     }
+    }
+   }
+  },
+  {
+   "t": 5828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581",
+        "name": "read",
+        "arguments": {
+         "path": "README.md"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 213,
+       "output": 38,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1787,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792410783145,
+      "responseId": "f6f4c300-79cb-4900-8cf9-95956e1e04ce",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1095,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 3,
+       "timestamp": 1792410784245
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 5828,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6"
+   }
+  },
+  {
+   "t": 5830,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 5834,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1821,
+      "contextWindow": 1000000,
+      "percent": 0.18209999999999998
+     }
+    }
+   }
+  },
+  {
+   "t": 6085,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792410784248
+     }
+    }
+   }
+  },
+  {
+   "t": 6659,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 6659,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Summar"
+     }
+    }
+   }
+  },
+  {
+   "t": 6738,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "ize"
+     }
+    }
+   }
+  },
+  {
+   "t": 6739,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 6739,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Maybe"
+     }
+    }
+   }
+  },
+  {
+   "t": 6739,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " check"
+     }
+    }
+   }
+  },
+  {
+   "t": 6748,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " src"
+     }
+    }
+   }
+  },
+  {
+   "t": 6748,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " briefly"
+     }
+    }
+   }
+  },
+  {
+   "t": 6748,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 6774,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6774,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6790,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6790,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6790,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "command",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6808,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6808,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ": ",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6808,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6808,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "ls",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " -",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "la",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " src",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ";",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6827,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " echo",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6841,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " \\\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6841,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "---",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6841,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\\\";",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6841,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " cat",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6841,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " src",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6842,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "/*",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6859,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " ",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6859,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "2",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6859,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ">/",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6860,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "dev",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6860,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "/null",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6860,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " |",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6869,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " head",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6869,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " -",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6869,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "40",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6881,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6881,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "}",
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721"
+     }
+    }
+   }
+  },
+  {
+   "t": 6912,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 6912,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721",
+      "args": {
+       "command": "ls -la src; echo \"---\"; cat src/* 2>/dev/null | head -40"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 6912,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Summarize. Maybe check src briefly.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_khEzjJrUG8BehLdGku8c4721",
+        "name": "bash",
+        "arguments": {
+         "command": "ls -la src; echo \"---\"; cat src/* 2>/dev/null | head -40"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 169,
+       "output": 65,
+       "cacheRead": 1664,
+       "cacheWrite": 0,
+       "reasoning": 8,
+       "totalTokens": 1898,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792410784248,
+      "responseId": "591d80e3-2d66-46e5-91b5-67dbfa83dd01",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1081,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 6913,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721",
+     "toolName": "bash",
+     "args": {
+      "command": "ls -la src; echo \"---\"; cat src/* 2>/dev/null | head -40"
+     }
+    }
+   }
+  },
+  {
+   "t": 6914,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721",
+     "toolName": "bash",
+     "args": {
+      "command": "ls -la src; echo \"---\"; cat src/* 2>/dev/null | head -40"
+     },
+     "partialResult": {
+      "content": []
+     }
+    }
+   }
+  },
+  {
+   "t": 7062,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721",
+     "toolName": "bash",
+     "args": {
+      "command": "ls -la src; echo \"---\"; cat src/* 2>/dev/null | head -40"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "total 1\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 .\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 ..\n-rw-r--r-- 1 56865 197609 70 Oct 19 19:52 a.ts\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 7147,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721",
+     "toolName": "bash",
+     "args": {
+      "command": "ls -la src; echo \"---\"; cat src/* 2>/dev/null | head -40"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "total 1\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 .\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 ..\n-rw-r--r-- 1 56865 197609 70 Oct 19 19:52 a.ts\n---\nexport function add(a: number, b: number): number {\n  return a + b;\n}\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 7147,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721",
+     "toolName": "bash",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "total 1\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 .\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 ..\n-rw-r--r-- 1 56865 197609 70 Oct 19 19:52 a.ts\n---\nexport function add(a: number, b: number): number {\n  return a + b;\n}\n"
+       }
+      ],
+      "structuredContent": {
+       "output": "total 1\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 .\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 ..\n-rw-r--r-- 1 56865 197609 70 Oct 19 19:52 a.ts\n---\nexport function add(a: number, b: number): number {\n  return a + b;\n}\n",
+       "truncated": false,
+       "exit_code": 0,
+       "wall_time_seconds": 0.2
+      }
+     },
+     "isError": false,
+     "durationMs": 234
+    }
+   }
+  },
+  {
+   "t": 7148,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "total 1\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 .\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 ..\n-rw-r--r-- 1 56865 197609 70 Oct 19 19:52 a.ts\n---\nexport function add(a: number, b: number): number {\n  return a + b;\n}\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 234,
+      "timestamp": 1792410785565
+     }
+    }
+   }
+  },
+  {
+   "t": 7148,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "total 1\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 .\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 ..\n-rw-r--r-- 1 56865 197609 70 Oct 19 19:52 a.ts\n---\nexport function add(a: number, b: number): number {\n  return a + b;\n}\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 234,
+      "timestamp": 1792410785565
+     }
+    }
+   }
+  },
+  {
+   "t": 7148,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Summarize. Maybe check src briefly.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_khEzjJrUG8BehLdGku8c4721",
+        "name": "bash",
+        "arguments": {
+         "command": "ls -la src; echo \"---\"; cat src/* 2>/dev/null | head -40"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 169,
+       "output": 65,
+       "cacheRead": 1664,
+       "cacheWrite": 0,
+       "reasoning": 8,
+       "totalTokens": 1898,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792410784248,
+      "responseId": "591d80e3-2d66-46e5-91b5-67dbfa83dd01",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1081,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "total 1\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 .\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 ..\n-rw-r--r-- 1 56865 197609 70 Oct 19 19:52 a.ts\n---\nexport function add(a: number, b: number): number {\n  return a + b;\n}\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 234,
+       "timestamp": 1792410785565
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 7148,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6"
+   }
+  },
+  {
+   "t": 7150,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 7153,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1953,
+      "contextWindow": 1000000,
+      "percent": 0.1953
+     }
+    }
+   }
+  },
+  {
+   "t": 7281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792410785568
+     }
+    }
+   }
+  },
+  {
+   "t": 7876,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 7877,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 7877,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "README"
+     }
+    }
+   }
+  },
+  {
+   "t": 7877,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ".md"
+     }
+    }
+   }
+  },
+  {
+   "t": 7877,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 7877,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 7877,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "内容"
+     }
+    }
+   }
+  },
+  {
+   "t": 7877,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "很短"
+     }
+    }
+   }
+  },
+  {
+   "t": 7903,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 7903,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "总结"
+     }
+    }
+   }
+  },
+  {
+   "t": 7903,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "如下"
+     }
+    }
+   }
+  },
+  {
+   "t": 7903,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "：\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 7903,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 7903,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "项目"
+     }
+    }
+   }
+  },
+  {
+   "t": 7904,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "名称"
+     }
+    }
+   }
+  },
+  {
+   "t": 7963,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 7964,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "："
+     }
+    }
+   }
+  },
+  {
+   "t": 7964,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "M"
+     }
+    }
+   }
+  },
+  {
+   "t": 7964,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "ori"
+     }
+    }
+   }
+  },
+  {
+   "t": 7964,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " fixture"
+     }
+    }
+   }
+  },
+  {
+   "t": 7965,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " project"
+     }
+    }
+   }
+  },
+  {
+   "t": 7965,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "（"
+     }
+    }
+   }
+  },
+  {
+   "t": 7965,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "M"
+     }
+    }
+   }
+  },
+  {
+   "t": 7965,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "ori"
+     }
+    }
+   }
+  },
+  {
+   "t": 7965,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 7966,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "测试"
+     }
+    }
+   }
+  },
+  {
+   "t": 7966,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "夹具"
+     }
+    }
+   }
+  },
+  {
+   "t": 7966,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "项目"
+     }
+    }
+   }
+  },
+  {
+   "t": 7966,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "）\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 7966,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 7966,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "用途"
+     }
+    }
+   }
+  },
+  {
+   "t": 7967,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 7967,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "："
+     }
+    }
+   }
+  },
+  {
+   "t": 7967,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "这个"
+     }
+    }
+   }
+  },
+  {
+   "t": 7975,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "文件夹"
+     }
+    }
+   }
+  },
+  {
+   "t": 7975,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "用来"
+     }
+    }
+   }
+  },
+  {
+   "t": 7989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "验证"
+     }
+    }
+   }
+  },
+  {
+   "t": 7990,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " Mori"
+     }
+    }
+   }
+  },
+  {
+   "t": 7990,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 7990,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "与"
+     }
+    }
+   }
+  },
+  {
+   "t": 8003,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "模型的"
+     }
+    }
+   }
+  },
+  {
+   "t": 8003,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "配合"
+     }
+    }
+   }
+  },
+  {
+   "t": 8013,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "情况"
+     }
+    }
+   }
+  },
+  {
+   "t": 8013,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 8013,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "即"
+     }
+    }
+   }
+  },
+  {
+   "t": 8026,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 8041,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "用于"
+     }
+    }
+   }
+  },
+  {
+   "t": 8041,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "对照"
+     }
+    }
+   }
+  },
+  {
+   "t": 8057,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "模型"
+     }
+    }
+   }
+  },
+  {
+   "t": 8067,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "行为的"
+     }
+    }
+   }
+  },
+  {
+   "t": 8080,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "测试"
+     }
+    }
+   }
+  },
+  {
+   "t": 8080,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "样例"
+     }
+    }
+   }
+  },
+  {
+   "t": 8097,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "工程"
+     }
+    }
+   }
+  },
+  {
+   "t": 8110,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "。\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 8111,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 8111,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "结构"
+     }
+    }
+   }
+  },
+  {
+   "t": 8111,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 8145,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "：\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 8145,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "-"
+     }
+    }
+   }
+  },
+  {
+   "t": 8145,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 8145,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 8146,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 8146,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "README"
+     }
+    }
+   }
+  },
+  {
+   "t": 8146,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ".md"
+     }
+    }
+   }
+  },
+  {
+   "t": 8146,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 8160,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 8160,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "说明"
+     }
+    }
+   }
+  },
+  {
+   "t": 8160,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "文件"
+     }
+    }
+   }
+  },
+  {
+   "t": 8160,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 8161,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "-"
+     }
+    }
+   }
+  },
+  {
+   "t": 8161,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 8161,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "src"
+     }
+    }
+   }
+  },
+  {
+   "t": 8161,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "/"
+     }
+    }
+   }
+  },
+  {
+   "t": 8301,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 8301,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 8301,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "目录"
+     }
+    }
+   }
+  },
+  {
+   "t": 8301,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "下"
+     }
+    }
+   }
+  },
+  {
+   "t": 8302,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "有一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 8302,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "源"
+     }
+    }
+   }
+  },
+  {
+   "t": 8302,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "文件"
+     }
+    }
+   }
+  },
+  {
+   "t": 8302,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 8302,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "实际"
+     }
+    }
+   }
+  },
+  {
+   "t": 8302,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "看"
+     }
+    }
+   }
+  },
+  {
+   "t": 8302,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "下来"
+     }
+    }
+   }
+  },
+  {
+   "t": 8316,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 8317,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 8317,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "src"
+     }
+    }
+   }
+  },
+  {
+   "t": 8317,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "/"
+     }
+    }
+   }
+  },
+  {
+   "t": 8318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 8318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 8318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "里"
+     }
+    }
+   }
+  },
+  {
+   "t": 8318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "只有一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 8318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 8318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "a"
+     }
+    }
+   }
+  },
+  {
+   "t": 8319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ".ts"
+     }
+    }
+   }
+  },
+  {
+   "t": 8319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 8319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 8319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "导"
+     }
+    }
+   }
+  },
+  {
+   "t": 8319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "出一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 8319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 8319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "add"
+     }
+    }
+   }
+  },
+  {
+   "t": 8320,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "(a"
+     }
+    }
+   }
+  },
+  {
+   "t": 8323,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 8323,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " b"
+     }
+    }
+   }
+  },
+  {
+   "t": 8323,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ")`"
+     }
+    }
+   }
+  },
+  {
+   "t": 8323,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 8324,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "函数"
+     }
+    }
+   }
+  },
+  {
+   "t": 8324,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "做"
+     }
+    }
+   }
+  },
+  {
+   "t": 8324,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "两"
+     }
+    }
+   }
+  },
+  {
+   "t": 8326,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "数"
+     }
+    }
+   }
+  },
+  {
+   "t": 8326,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "相加"
+     }
+    }
+   }
+  },
+  {
+   "t": 8326,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 8326,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "整体"
+     }
+    }
+   }
+  },
+  {
+   "t": 8345,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "就是一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 8345,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "最小"
+     }
+    }
+   }
+  },
+  {
+   "t": 8346,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "化的"
+     }
+    }
+   }
+  },
+  {
+   "t": 8346,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "验证"
+     }
+    }
+   }
+  },
+  {
+   "t": 8357,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "/"
+     }
+    }
+   }
+  },
+  {
+   "t": 8363,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "演示"
+     }
+    }
+   }
+  },
+  {
+   "t": 8377,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "工程"
+     }
+    }
+   }
+  },
+  {
+   "t": 8393,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 8414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 8414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "`README.md` 内容很短，总结如下：\n\n**项目名称**：Mori fixture project（Mori 测试夹具项目）\n\n**用途**：这个文件夹用来验证 Mori 与模型的配合情况，即一个用于对照模型行为的测试样例工程。\n\n**结构**：\n- 一个 `README.md` 说明文件\n- `src/` 目录下有一个源文件\n\n实际看下来，`src/` 里只有一个 `a.ts`，导出一个 `add(a, b)` 函数做两数相加。整体就是一个最小化的验证/演示工程。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 217,
+       "output": 121,
+       "cacheRead": 1792,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 2130,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792410785568,
+      "responseId": "29c0c667-69fc-4cd2-8040-a9d2dfdb178b",
+      "rawStopReason": "stop",
+      "durationMs": 1263,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 8415,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "`README.md` 内容很短，总结如下：\n\n**项目名称**：Mori fixture project（Mori 测试夹具项目）\n\n**用途**：这个文件夹用来验证 Mori 与模型的配合情况，即一个用于对照模型行为的测试样例工程。\n\n**结构**：\n- 一个 `README.md` 说明文件\n- `src/` 目录下有一个源文件\n\n实际看下来，`src/` 里只有一个 `a.ts`，导出一个 `add(a, b)` 函数做两数相加。整体就是一个最小化的验证/演示工程。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 217,
+       "output": 121,
+       "cacheRead": 1792,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 2130,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792410785568,
+      "responseId": "29c0c667-69fc-4cd2-8040-a9d2dfdb178b",
+      "rawStopReason": "stop",
+      "durationMs": 1263,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 8415,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6"
+   }
+  },
+  {
+   "t": 8416,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m1-record-JSDJIm/project\n</cwd>"
+       },
+       "timestamp": 1792410781585,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "总结一下 README.md"
+        }
+       ],
+       "timestamp": 1792410781583
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+         "name": "bash",
+         "arguments": {
+          "command": "ls; echo \"---\"; ls *.md 2>/dev/null"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1550,
+        "output": 50,
+        "cacheRead": 128,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1728,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792410781882,
+       "responseId": "c78d957e-3baa-43bf-97a0-8a80fbacdc07",
+       "rawStopReason": "tool_calls",
+       "durationMs": 1012,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_uOrVc32OqPkBshNiotuT8319",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "README.md\nsrc\n---\nREADME.md\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 241,
+       "timestamp": 1792410783140
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581",
+         "name": "read",
+         "arguments": {
+          "path": "README.md"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 213,
+        "output": 38,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1787,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792410783145,
+       "responseId": "f6f4c300-79cb-4900-8cf9-95956e1e04ce",
+       "rawStopReason": "tool_calls",
+       "durationMs": 1095,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_4fmCQOdTV7noMMtL9Kte9581",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 3,
+       "timestamp": 1792410784245
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "Summarize. Maybe check src briefly.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "toolCall",
+         "id": "call_00_khEzjJrUG8BehLdGku8c4721",
+         "name": "bash",
+         "arguments": {
+          "command": "ls -la src; echo \"---\"; cat src/* 2>/dev/null | head -40"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 169,
+        "output": 65,
+        "cacheRead": 1664,
+        "cacheWrite": 0,
+        "reasoning": 8,
+        "totalTokens": 1898,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792410784248,
+       "responseId": "591d80e3-2d66-46e5-91b5-67dbfa83dd01",
+       "rawStopReason": "tool_calls",
+       "durationMs": 1081,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_khEzjJrUG8BehLdGku8c4721",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "total 1\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 .\ndrwxr-xr-x 1 56865 197609  0 Oct 19 19:52 ..\n-rw-r--r-- 1 56865 197609 70 Oct 19 19:52 a.ts\n---\nexport function add(a: number, b: number): number {\n  return a + b;\n}\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 234,
+       "timestamp": 1792410785565
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "`README.md` 内容很短，总结如下：\n\n**项目名称**：Mori fixture project（Mori 测试夹具项目）\n\n**用途**：这个文件夹用来验证 Mori 与模型的配合情况，即一个用于对照模型行为的测试样例工程。\n\n**结构**：\n- 一个 `README.md` 说明文件\n- `src/` 目录下有一个源文件\n\n实际看下来，`src/` 里只有一个 `a.ts`，导出一个 `add(a, b)` 函数做两数相加。整体就是一个最小化的验证/演示工程。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 217,
+        "output": 121,
+        "cacheRead": 1792,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 2130,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792410785568,
+       "responseId": "29c0c667-69fc-4cd2-8040-a9d2dfdb178b",
+       "rawStopReason": "stop",
+       "durationMs": 1263,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 8416,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15402-0750-77d9-a50c-7e28fae21dc6",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 8417,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2130,
+      "contextWindow": 1000000,
+      "percent": 0.213
+     }
+    }
+   }
+  }
+ ]
+}

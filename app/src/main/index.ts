@@ -80,6 +80,13 @@ ipcMain.handle('mori:pick-folder', async (event: IpcMainInvokeEvent) => {
   return result.canceled ? null : (result.filePaths[0] ?? null);
 });
 
+// 后台进程意外退出后，界面上的"重新载入"重启它并重连通道；页面不刷新，草稿等界面状态保留。
+ipcMain.handle('mori:restart-kernel', (event: IpcMainInvokeEvent) => {
+  if (!event.senderFrame || !isAppPage(event.senderFrame.url)) throw new Error('Not allowed');
+  if (!currentKernel()) startKernel(notifyKernelExit);
+  if (mainWindow) connectWindow(mainWindow);
+});
+
 void app.whenReady().then(() => {
   startKernel(notifyKernelExit);
   mainWindow = createWindow();

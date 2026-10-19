@@ -2,9 +2,13 @@
 // 实现 OpenAI 兼容的 /v1/models 与流式 /v1/chat/completions，回复内容由下列规则决定：
 //   - 最后一条是工具结果：流式返回一段摘要文字后结束。
 //   - 用户消息含 "run: <命令>"：调用 bash 工具执行该命令，可加 "timeout=<秒>"。
-//   - 用户消息含 "edit README"：调用 edit 工具修改 README.md 的标题。
+//   - 用户消息含 "edit README"：调用 edit 工具修改 README.md 的标题（"# Smoke project" 或 "# Mori fixture project"，
+//     由 "edit README: <原标题>" 指定，默认 "# Smoke project"）。
 //   - 用户消息含 "code block"：返回一段带 ts 代码块的 Markdown。
 //   - 用户消息含 "plain"：只返回文字。
+//   - 用户消息含 "http-<状态码>"：直接以该状态码返回错误（例如 http-500 触发 pi 的自动重试，http-400 不重试）。
+//   - 模型 ID 为 "fake-slow"：第一个分块前等 8 秒（测试"测试连接 → 取消"）。
+//   - 用量：prompt_tokens 按请求消息的字数估算，随对话增长。
 //   - 其他：先说一句话，再调用 read 工具读取 README.md。
 // 环境变量：FAKE_PORT（默认 4319）、FAKE_CHUNK_DELAY_MS（默认 20）、FAKE_FIRST_DELAY_MS（默认 0）、
 // FAKE_REQUIRE_KEY（设置后要求 Authorization: Bearer <该值>）。
@@ -52,7 +56,8 @@ function planReply(messages) {
     return { text: '我来运行这条命令。', toolCall: { name: 'bash', args } };
   }
   if (userText.includes('edit README')) {
-    const edits = [{ oldText: '# Smoke project', newText: '# Smoke project (edited)' }];
+    const title = /edit README:\s*(.+)$/m.exec(userText)?.[1]?.trim() ?? '# Smoke project';
+    const edits = [{ oldText: title, newText: `${title} (edited)` }];
     return { text: '我来改一下标题。', toolCall: { name: 'edit', args: { path: 'README.md', edits } } };
   }
   if (userText.includes('code block')) return { text: codeReply, toolCall: null };
@@ -68,12 +73,12 @@ function pieces(text, size) {
 }
 
 /** @brief 以 SSE 方式发送一次流式回复。 */
-async function streamReply(res, reply, includeUsage) {
+async function streamReply(res, reply, includeUsage, promptTokens, slow) {
   const id = `chatcmpl-fake-${Date.now()}`;
   const base = { id, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model: modelId };
   const send = (choice) => res.write(`data: ${JSON.stringify({ ...base, choices: [choice] })}\n\n`);
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
-  await sleep(firstDelayMs);
+  await sleep(slow ? 8000 : firstDelayMs);
   send({ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null });
   for (const piece of pieces(reply.text, 2)) {
     send({ index: 0, delta: { content: piece }, finish_reason: null });
@@ -90,7 +95,7 @@ async function streamReply(res, reply, includeUsage) {
   }
   send({ index: 0, delta: {}, finish_reason: reply.toolCall ? 'tool_calls' : 'stop' });
   if (includeUsage) {
-    const usage = { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 };
+    const usage = { prompt_tokens: promptTokens, completion_tokens: 20, total_tokens: promptTokens + 20 };
     res.write(`data: ${JSON.stringify({ ...base, choices: [], usage })}\n\n`);
   }
   res.write('data: [DONE]\n\n');
@@ -124,8 +129,16 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url?.endsWith('/chat/completions')) {
     try {
       const body = await readJson(req);
-      const reply = planReply(body.messages ?? []);
-      await streamReply(res, reply, Boolean(body.stream_options?.include_usage));
+      const messages = body.messages ?? [];
+      const status = /http-(\d{3})/.exec(contentText(messages[messages.length - 1]?.content))?.[1];
+      if (status && messages[messages.length - 1]?.role === 'user') {
+        res.writeHead(Number(status), { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { message: `Synthetic HTTP ${status} for testing`, type: 'synthetic_error' } }));
+        return;
+      }
+      const reply = planReply(messages);
+      const promptTokens = Math.ceil(JSON.stringify(messages).length / 4);
+      await streamReply(res, reply, Boolean(body.stream_options?.include_usage), promptTokens, body.model === 'fake-slow');
     } catch (error) {
       console.error('[fake-endpoint] error', error);
       res.writeHead(400, { 'Content-Type': 'application/json' });

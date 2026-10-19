@@ -1,7 +1,8 @@
 # Mori App
 
-Windows 桌面 App。方案见 [../docs/app-v0.md](../docs/app-v0.md)，M0 的检查记录见 [../docs/v0/m0-checks.md](../docs/v0/m0-checks.md)。
-当前处于 M0：Electron 外壳、pi 后台进程、进程桥和离线安装包，界面是一个临时的最简对话窗口，M1 会替换它。
+Windows 桌面 App。方案见 [../docs/app-v0.md](../docs/app-v0.md)，检查记录见 [../docs/v0/](../docs/v0/)
+（[M0](../docs/v0/m0-checks.md)、[M1](../docs/v0/m1-checks.md)），每屏的状态表见 [../docs/v0/screens/](../docs/v0/screens/)。
+当前处于 M1：三栏界面、首次启动连接表单、对话流与工具卡、阶段行、停止/排队/插话、错误与后台进程退出提示。
 
 ## 准备
 
@@ -26,7 +27,11 @@ npm ci
 | `npm run dist` | 构建 NSIS 安装包到 `dist/` |
 | `npm run dist:dir` | 构建免安装目录 `dist/win-unpacked/` |
 | `npm run fake-endpoint` | 启动合成端点 `http://127.0.0.1:4319/v1`（模型 `fake-coder`，只用于测试） |
-| `npm run smoke` | 构建后用合成端点跑冒烟测试；测打包结果用 `node tests/ui/m0-smoke.mjs --exe dist/win-unpacked/Mori.exe` |
+| `npm run smoke` | 构建后用合成端点跑 M0 冒烟测试；测打包结果用 `node tests/ui/m0-smoke.mjs --exe dist/win-unpacked/Mori.exe` |
+| `npm run test:replay` | M1 界面测试：在 Electron 里载入界面，回放 `tests/fixtures/m1/` 里从真实会话录下的事件 |
+| `npm run test:app` | M1 整机测试：真正的 Mori 对合成端点；测打包结果加 `--exe dist/win-unpacked/Mori.exe` |
+| `node tests/ui/m1-real.mjs --source <走查数据目录> [--exe …]` | M1 真实端点走查（走查 1–10）；脚本只复制加密的 key，不读取它 |
+| `node tests/ui/m1-record.mjs --source <走查数据目录>` | 从真实会话重新录制 `tests/fixtures/m1/` |
 | `npx electron tests/prechecks/esm-utility/main.cjs` | 预检：utilityProcess 能否运行 ESM 入口 |
 | `node tests/ui/m0-real.mjs --user-data <目录> [--setup]` | 真实端点走查（M0 走查 2–3）；`--setup` 先打开 Mori 让你填连接，脚本不接触 key |
 

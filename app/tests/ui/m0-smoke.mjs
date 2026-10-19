@@ -1,4 +1,5 @@
 // M0 冒烟测试：用合成端点（tests/fake-endpoint）驱动真实的 Mori 界面与后台进程。
+// M1 起界面换成正式界面，这里只改了找元素的方式，检查的内容与 M0 相同（"未保存时不能测试连接"改为"测试连接会先保存"）。
 // 用法：
 //   node tests/ui/m0-smoke.mjs                         测开发构建（先 npm run build）
 //   node tests/ui/m0-smoke.mjs --exe <Mori.exe 路径>   测打包后的程序
@@ -10,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
 import { startNetWatch } from './net-watch.mjs';
+import { pageHelpers } from './page.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
 const exeIndex = process.argv.indexOf('--exe');
@@ -51,25 +53,26 @@ function prepareDirs() {
   return { project, userData: join(root, 'user-data') };
 }
 
-/** @brief 用给定的 key 保存连接并测试，返回结果文字与是否成功。 */
+/** @brief 在首次启动的表单里用给定的 key 测试连接（会先保存），返回结果文字与是否成功。 */
 async function saveAndTest(page, apiKey) {
-  const fields = page.locator('.panel label input');
-  await fields.nth(0).fill('合成端点');
-  await fields.nth(1).fill(`http://127.0.0.1:${port}/v1`);
-  await fields.nth(2).fill(apiKey);
-  await fields.nth(3).fill('fake-coder');
-  await page.getByRole('button', { name: '保存' }).click();
-  await page.getByText('已保存').waitFor({ timeout: 15000 });
+  const h = pageHelpers(page);
+  await h.fillConnection({ name: '合成端点', baseUrl: `http://127.0.0.1:${port}/v1`, apiKey, modelId: 'fake-coder' });
+  const previous = await page.getByTestId('form-message').innerText().catch(() => null);
   await page.getByRole('button', { name: '测试连接' }).click();
-  const result = page.locator('.panel .ok, .panel .error').first();
-  await result.waitFor({ timeout: 40000 });
-  return { ok: (await result.getAttribute('class')) === 'ok', text: oneLine(await result.innerText()) };
+  await page.waitForFunction((old) => document.querySelector('[data-testid="test-result"]')
+    || (document.querySelector('[data-testid="form-message"]')?.textContent?.startsWith('连接失败')
+      && document.querySelector('[data-testid="form-message"]')?.textContent !== old), previous, { timeout: 40000 });
+  const success = page.getByTestId('test-result');
+  if (await success.count()) return { ok: true, text: oneLine(await success.innerText()) };
+  return { ok: false, text: oneLine(await page.getByTestId('form-message').innerText()) };
 }
 
-/** @brief 连接表单：错误的 key 显示错误原文；$环境变量和明文 key 都能连上。 */
-async function connect(page, userData) {
-  const disabled = await page.getByRole('button', { name: '测试连接' }).isDisabled();
-  record('还没保存连接时不能测试连接', disabled);
+/** @brief 连接表单：错误的 key 显示错误原文；正确的 key 能连上；key 加密保存；改服务地址必须重填 key。 */
+async function connect(app, page, userData, project) {
+  await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
+  await page.getByRole('button', { name: '测试连接' }).click();
+  const empty = await page.getByTestId('form-message').innerText();
+  record('没填连接时不发请求，给出说明（M1：测试连接会先保存）', empty.includes('请填写'), empty);
   const wrong = await saveAndTest(page, 'wrong-key');
   record('错误的 key 显示错误原文', !wrong.ok && wrong.text.includes('401'), wrong.text.slice(0, 160));
   const literal = await saveAndTest(page, testKey);
@@ -81,49 +84,46 @@ async function connect(page, userData) {
     !('apiKey' in provider) && !models.includes(testKey) && !credentials.includes(testKey) &&
       Boolean(JSON.parse(credentials)['mori-endpoint']),
     `models.json 有 apiKey 字段=${'apiKey' in provider}；credentials.json 含明文=${credentials.includes(testKey)}`);
-  await page.locator('.panel label input').nth(1).fill(`http://localhost:${port}/v1`);
-  await page.locator('.panel label input').nth(2).fill('');
+  await pageHelpers(page).openFolder(app, project);
+  await page.getByRole('button', { name: '设置' }).click();
+  await pageHelpers(page).fillConnection({ baseUrl: `http://localhost:${port}/v1`, apiKey: '' });
   await page.getByRole('button', { name: '保存' }).click();
   const refused = await page.getByText('API key is required').waitFor({ timeout: 10000 }).then(() => true, () => false);
   record('改了服务地址而没有重填 key 时拒绝保存', refused);
-  await saveAndTest(page, testKey);
+  await pageHelpers(page).fillConnection({ baseUrl: `http://127.0.0.1:${port}/v1` });
+  await page.getByRole('button', { name: '返回会话' }).click();
 }
 
 /** @brief 模型运行的命令读不到 key：key 只在 pi 的内存里，不在环境变量里。 */
 async function commandEnvCheck(page) {
   // 对照：Mori 的进程环境里放了一个无害的标记变量，命令能读到它（1），但读不到 key（0）。
   const card = await sendAndWait(page, `run: env | grep -c ${testKey}; env | grep -c ${canary}; true`);
-  record('命令的环境里没有 key（对照变量可见）', /完成/.test(card) && /^\s*0\s+1\s*$/.test(card.split('}').pop() ?? ''),
+  record('命令的环境里没有 key（对照变量可见）', /完成/.test(card) && /输出\s*0\s+1\s*$/.test(card),
     card.slice(0, 200));
 }
 
-/** @brief 通过界面发一条消息，等本轮结束，返回最后一张工具卡的文字（没有时为空串）。 */
+/** @brief 通过界面发一条消息，等本轮结束，返回最后一张工具卡展开后的文字（没有时为空串）。 */
 async function sendAndWait(page, text) {
-  await page.locator('.composer textarea').fill(text);
-  await page.locator('.composer textarea').press('Enter');
-  await page.getByRole('button', { name: '停止' }).waitFor({ timeout: 10000 }).catch(() => {});
-  await page.getByRole('button', { name: '发送' }).waitFor({ timeout: 60000 });
+  const h = pageHelpers(page);
+  const before = await page.getByTestId('tool-card').count();
+  await h.send(text);
+  await h.idle(60000);
   const card = page.getByTestId('tool-card').last();
-  if ((await card.count()) === 0) return '';
+  if ((await page.getByTestId('tool-card').count()) === before) return '';
   await card.locator('summary').click();
+  await card.locator('.tool-body').waitFor();
   return oneLine(await card.innerText(), 400);
 }
 
-/** @brief 打开临时文件夹并检查读取、代码高亮、编辑 diff 与 shell。 */
+/** @brief 在已打开的会话里检查读取、代码高亮、编辑 diff 与 shell。 */
 async function chatChecks(app, page, project) {
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] });
-  }, project);
-  await page.getByRole('button', { name: '打开文件夹…' }).click();
-  await page.locator('.chat-head').waitFor({ timeout: 20000 });
-
   const readCard = await sendAndWait(page, '总结 README');
   const transcript = await page.getByTestId('transcript').innerText();
   record('流式文字', transcript.includes('我先读一下 README.md') && transcript.includes('工具已返回'));
-  record('读取工具卡完成', /read.*完成.*Smoke project/.test(readCard), readCard.slice(0, 200));
+  record('读取工具卡完成', /读取.*完成.*Smoke project/.test(readCard), readCard.slice(0, 200));
 
   await sendAndWait(page, 'code block');
-  const tokens = await page.locator('.assistant pre span[style*="--sdm-c"]').count();
+  const tokens = await page.locator('.prose pre span[style*="--sdm-c"]').count();
   record('代码块由 shiki 高亮（离线）', tokens > 3, `带颜色的 token ${tokens} 个`);
 
   const editCard = await sendAndWait(page, 'edit README');
@@ -133,7 +133,7 @@ async function chatChecks(app, page, project) {
     return `${pre?.textContent ?? ''} [带颜色的 token ${colored} 个]`;
   }).catch(() => ''), 200);
   const edited = readFileSync(join(project, 'README.md'), 'utf8').includes('(edited)');
-  record('编辑工具显示 diff', /edit.*完成/.test(editCard) && edited && diffText.includes('edited'),
+  record('编辑工具显示 diff', /修改.*完成/.test(editCard) && edited && diffText.includes('edited'),
     `文件已修改=${edited}；diff：${diffText}`);
 
   const shellCard = await sendAndWait(page, 'run: echo "bash=$BASH_VERSION"; uname -s; command -v bash');
@@ -182,8 +182,7 @@ async function concurrencyCheck(page, project) {
 /** @brief 命令运行中关闭窗口：程序应自行退出、不弹错误框，并结束命令留下的进程。 */
 async function closeWhileRunning(app, page) {
   const before = new Set(sleepProcessIds());
-  await page.locator('.composer textarea').fill('run: sleep 120');
-  await page.locator('.composer textarea').press('Enter');
+  await pageHelpers(page).send('run: sleep 120');
   await page.getByTestId('tool-card').last().getByText('执行中').waitFor({ timeout: 20000 });
   await sleep(1000);
   const started = sleepProcessIds().filter((pid) => !before.has(pid));
@@ -219,13 +218,12 @@ async function crashCheck(env) {
   const app = await electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
   try {
     const page = await app.firstWindow();
-    await page.locator('.panel').first().waitFor();
+    await page.getByRole('button', { name: '设置' }).click();
     await page.getByRole('button', { name: '测试连接' }).click();
-    const test = page.locator('.panel .ok, .panel .error').first();
-    await test.waitFor({ timeout: 40000 });
-    const placeholder = await page.locator('.panel label input').nth(2).getAttribute('placeholder');
-    record('重启后不用重填 key 也能连接', (await test.getAttribute('class')) === 'ok' && /已加密保存/.test(placeholder ?? ''),
-      `${oneLine(await test.innerText(), 120)}；key 输入框提示：${placeholder}`);
+    const test = await pageHelpers(page).formMessage(null, { test: true, timeout: 40000 });
+    const placeholder = await page.getByTestId('connection-form').locator('input[type=password]').getAttribute('placeholder');
+    record('重启后不用重填 key 也能连接', test.startsWith('连接成功') && /已加密保存/.test(placeholder ?? ''),
+      `${oneLine(test, 120)}；key 输入框提示：${placeholder}`);
     const pid = kernelPid(app.process().pid);
     execFileSync('taskkill', ['/PID', String(pid), '/F']);
     await page.getByText('后台进程意外退出').waitFor({ timeout: 10000 });
@@ -266,7 +264,7 @@ let closed = false;
 try {
   const page = await app.firstWindow();
   while (net.seen.samples === 0) await sleep(200);
-  await connect(page, userData);
+  await connect(app, page, userData, project);
   await chatChecks(app, page, project);
   await commandEnvCheck(page);
   await timeoutCheck(page);

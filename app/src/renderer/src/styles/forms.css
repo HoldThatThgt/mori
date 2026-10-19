@@ -1,0 +1,83 @@
+/* 连接表单、首次启动、设置页、打开文件夹。 */
+.first-run {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px 16px;
+  overflow-y: auto;
+  background: var(--color-surface);
+}
+body:has(.first-run) { overflow: auto; }
+.first-run-card {
+  width: min(560px, 100%);
+  padding: 28px 32px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-composer);
+}
+.first-run-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.first-run h2, .settings-body h2, .open-folder h2 { margin: 0 0 6px; font-size: 17px; font-weight: 600; }
+.first-run-card > .muted { margin: 0 0 18px; }
+
+.connection-form { display: grid; gap: 10px; margin-top: 12px; }
+.connection-form > label {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: var(--color-muted);
+}
+.connection-form input:not([type='checkbox']), .connection-form select {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-canvas);
+  font-size: var(--fs-body);
+}
+.connection-form input:focus, .connection-form select:focus { outline: 2px solid #b8c9eb; outline-offset: 0; }
+.compat-options {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+}
+.compat-options summary { color: var(--color-muted); cursor: pointer; }
+.compat-options[open] summary { margin-bottom: 6px; }
+.field-hint { margin: 0 0 6px; color: var(--color-faint); font-size: var(--fs-small); }
+.check-row { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; cursor: pointer; }
+.check-row input { margin-top: 3px; }
+.check-row small { display: block; color: var(--color-faint); font-size: var(--fs-small); }
+.form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.form-message {
+  margin: 4px 0 0;
+  font-size: var(--fs-small);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.form-message.ok { color: var(--color-ok); }
+.form-message.error { color: var(--color-danger); }
+.form-message.info { color: var(--color-muted); }
+
+.settings-page { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.settings-page .topbar { gap: 14px; }
+.settings-body { flex: 1; overflow-y: auto; width: 100%; max-width: 680px; margin: 0 auto; padding: 24px 32px; }
+.settings-body > .muted { margin: 0; }
+
+.open-folder {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 32px;
+}
+.open-folder .muted { margin: 0; }
+.sidebar-spacer { width: var(--rail-width); flex: 0 0 var(--rail-width); }

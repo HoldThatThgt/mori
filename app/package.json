@@ -13,6 +13,8 @@
     "dist": "npm run check && electron-vite build && electron-builder --win nsis --publish never",
     "dist:dir": "npm run check && electron-vite build && electron-builder --win dir --publish never",
     "smoke": "electron-vite build && node tests/ui/m0-smoke.mjs",
+    "test:replay": "node tests/ui/m1-replay.mjs",
+    "test:app": "electron-vite build && node tests/ui/m1-app.mjs",
     "check": "npm run typecheck && node tests/check.mjs"
   },
   "engines": {
@@ -26,7 +28,6 @@
     "react-dom": "19.3.1",
     "shiki": "4.5.0",
     "streamdown": "2.7.1",
-    "virtua": "0.53.5",
     "zod": "4.6.7",
     "zustand": "5.0.15"
   },

@@ -1,143 +1,148 @@
-// M0 的临时界面：连接、选文件夹、最简对话。M1 会用正式界面替换它。
+// 根组件：读取连接 → 首次启动或三栏工作区；全局 Esc（先关浮层，再停止当前会话）。
 
 import { useEffect, useState } from 'react';
-import type { ConfigInfo, Connection, SessionInfo, TestResult } from '../../shared/protocol';
-import { Chat } from './Chat';
+import { stop } from './state/actions';
+import { clamp, limitsFor, NARROW_WIDTH, RAIL_WIDTH, setLayout, useLayout, type DividerKind } from './state/layout';
+import { closeTopOverlay, useOverlay } from './state/overlays';
+import { activeTab, updateTab, useApp, type Tab } from './state/store';
+import { ChangesPanel, collectChanges } from './components/ChangesPanel';
+import { ChatPane, KernelExitBanner } from './components/ChatPane';
+import { Divider } from './components/Divider';
+import { FirstRun, OpenFolderPrompt, SettingsPage } from './components/Pages';
+import { Sidebar } from './components/Sidebar';
 
-// 上下文长度的默认值是临时默认值，见 docs/v0/defaults.md
-const emptyForm: Connection = { name: '', baseUrl: '', apiKey: '', modelId: '', contextWindow: 128000 };
+/** 窄于此宽度时右栏浮在中栏上层（方案 5.1） */
+const OVERLAY_RIGHT_WIDTH = 800;
 
-/** @brief 把异常转成一行文字，并记录到控制台。 */
-function describe(what: string, error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`[renderer] ${what} failed: ${message}`);
-  return message;
-}
-
-/** @brief 连接表单的状态与操作。 */
-function useConnectionForm(onSaved: (saved: boolean) => void) {
-  const [form, setForm] = useState<Connection>(emptyForm);
-  const [keySaved, setKeySaved] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [message, setMessage] = useState('');
-  const [test, setTest] = useState<TestResult | null>(null);
-  const [busy, setBusy] = useState(false);
-
+/** @brief 当前窗口宽度。 */
+function useWindowWidth(): number {
+  const [width, setWidth] = useState(window.innerWidth);
   useEffect(() => {
-    window.mori.request<ConfigInfo>({ type: 'config.get' }).then(
-      (info) => {
-        if (!info.saved) return;
-        setForm(info.saved.connection);
-        setKeySaved(info.saved.keySaved);
-        setSaved(true);
-        onSaved(true);
-      },
-      (error: unknown) => setMessage(`读取配置失败：${describe('config.get', error)}`),
-    );
-  }, [onSaved]);
-
-  async function run(what: string, action: () => Promise<void>) {
-    setBusy(true);
-    try {
-      await action();
-    } catch (error) {
-      setMessage(`${what}失败：${describe(what, error)}`);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const save = () => run('保存', async () => {
-    setTest(null);
-    const result = await window.mori.request<{ error: string | null }>({ type: 'connection.save', connection: form });
-    setMessage(result.error ? `已保存，但配置有错误：${result.error}` : '已保存');
-    // key 已交给后台进程加密保存，界面里不再留着它。
-    setKeySaved(true);
-    setForm((current) => ({ ...current, apiKey: '' }));
-    setSaved(true);
-    onSaved(true);
-  });
-  const runTest = () => run('测试', async () => {
-    setMessage('测试中…');
-    setTest(await window.mori.request<TestResult>({ type: 'connection.test' }));
-    setMessage('');
-  });
-  return { form, setForm, keySaved, saved, message, test, busy, save, runTest };
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return width;
 }
 
-/** @brief 测试连接的结果。 */
-function TestView({ result }: { result: TestResult }) {
-  if (!result.ok) return <p className="error">连接失败：{result.error ?? '没有收到回复'}</p>;
-  const thinking = result.thinking ? ' · 有思考内容' : '';
+/** @brief Esc：先关闭最上层的浮层；没有浮层、显示的是会话且焦点在会话面板里时停止生成。 */
+function useEscape(): void {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (closeTopOverlay()) {
+        event.preventDefault();
+        return;
+      }
+      const state = useApp.getState();
+      const tab = activeTab(state);
+      if (state.view !== 'chat' || !tab?.transcript.running) return;
+      const focused = document.activeElement;
+      const pane = document.querySelector('[data-testid="chat-pane"]');
+      if (focused && focused !== document.body && !pane?.contains(focused)) return;
+      event.preventDefault();
+      void stop(tab.key);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+}
+
+/** @brief 实际栏宽：保存的宽度按当前空间收紧（不改保存值，窗口变宽后恢复）。 */
+function useColumns(width: number, collapsed: boolean, floating: boolean, rightOpen: boolean) {
+  const layout = useLayout();
+  const overlayRight = width < OVERLAY_RIGHT_WIDTH;
+  const sidebarLimits = collapsed || floating ? null
+    : limitsFor('sidebar', { width, sidebar: 0, workspace: rightOpen && !overlayRight ? layout.workspace : 0 });
+  const sidebar = sidebarLimits ? clamp(layout.sidebar, sidebarLimits) : Math.min(layout.sidebar, 360);
+  const sidebarSpace = collapsed || floating ? RAIL_WIDTH : sidebar;
+  const workspaceLimits = !rightOpen ? null : overlayRight
+    ? { min: 260, max: Math.max(260, Math.min(800, width - RAIL_WIDTH)) }
+    : limitsFor('workspace', { width, sidebar: sidebarSpace, workspace: 0 });
+  const workspace = workspaceLimits ? clamp(layout.workspace, workspaceLimits) : 260;
+  return { sidebar, sidebarLimits, workspace, workspaceLimits };
+}
+
+/** @brief 分隔线拖动中只改内存，松开或键盘调整时保存。 */
+function resize(kind: DividerKind, value: number, commit: boolean): void {
+  if (commit) setLayout({ [kind]: value });
+  else useLayout.setState({ [kind]: value });
+}
+
+/** @brief 中栏：会话面板保持挂载（设置页只是把它藏起来，返回时滚动位置和草稿都在）。 */
+function Center({ tabs, activeKey, view, rightOpen, onToggleRight }: {
+  tabs: Tab[]; activeKey: string | null; view: 'chat' | 'settings'; rightOpen: boolean; onToggleRight: () => void;
+}) {
   return (
-    <p className="ok">
-      连接成功 · 首字 {result.firstTokenMs} ms · 共 {result.totalMs} ms{thinking} · 回复：{result.text}
-    </p>
+    <div className="center">
+      {tabs.map((tab) => (
+        <div key={tab.key} className="pane-slot" hidden={view !== 'chat' || tab.key !== activeKey}>
+          <ChatPane tab={tab} rightOpen={rightOpen} onToggleRight={onToggleRight} />
+        </div>
+      ))}
+      {view === 'chat' && tabs.length === 0 && <OpenFolderPrompt heading="打开一个文件夹" />}
+      {view === 'settings' && <SettingsPage />}
+    </div>
   );
 }
 
-/** @brief 连接表单：保存到 pi 的 models.json，并测试一次真实请求。 */
-function ConnectionPanel({ onSaved }: { onSaved: (saved: boolean) => void }) {
-  const { form, setForm, keySaved, saved, message, test, busy, save, runTest } = useConnectionForm(onSaved);
-  const field = (key: keyof Connection) => (event: React.ChangeEvent<HTMLInputElement>) =>
-    setForm({ ...form, [key]: key === 'contextWindow' ? Number(event.target.value) : event.target.value });
-  const keyHint = keySaved ? '已加密保存（不显示）；改了服务地址就要重新填写' : '保存后由 Mori 加密存放在本机';
+/** @brief 三栏工作区。 */
+function Workspace() {
+  const { tabs, activeKey, view, kernel } = useApp();
+  const sidebarCollapsed = useLayout((state) => state.sidebarCollapsed);
+  const width = useWindowWidth();
+  const [floating, setFloating] = useState(false);
+  const narrow = width < NARROW_WIDTH;
+  useOverlay(narrow && floating, () => setFloating(false));
+  const collapsed = narrow ? !floating : sidebarCollapsed;
+  const tab = tabs.find((item) => item.key === activeKey);
+  const changes = tab ? collectChanges(tab.transcript, tab.cwd).length > 0 : false;
+  const rightOpen = Boolean(tab) && view === 'chat' && (tab?.rightOpen ?? changes);
+  const columns = useColumns(width, collapsed, narrow && floating, rightOpen);
+  const toggleRight = () => tab && updateTab(tab.key, (current) => ({ ...current, rightOpen: !rightOpen }));
+  const style = { '--sidebar-width': `${columns.sidebar}px`, '--workspace-width': `${columns.workspace}px` };
   return (
-    <section className="panel">
-      <h2>连接</h2>
-      <label>名称<input value={form.name} onChange={field('name')} placeholder="内网模型" /></label>
-      <label>服务地址<input value={form.baseUrl} onChange={field('baseUrl')} placeholder="http://host:8000/v1" /></label>
-      <label>
-        API key
-        <input type="password" value={form.apiKey} onChange={field('apiKey')} placeholder={keyHint} />
-      </label>
-      <label>模型 ID<input value={form.modelId} onChange={field('modelId')} placeholder="qwen3-coder" /></label>
-      <label>上下文长度<input type="number" value={form.contextWindow} onChange={field('contextWindow')} /></label>
-      <div className="row">
-        <button onClick={save} disabled={busy}>保存</button>
-        <button onClick={runTest} disabled={busy || !saved} title={saved ? '' : '先保存连接'}>测试连接</button>
-        <span className="hint">{message}</span>
-      </div>
-      {test && <TestView result={test} />}
-    </section>
-  );
-}
-
-/** @brief 选文件夹并新建会话；新会话替换当前对话。 */
-function FolderPanel({ onSession }: { onSession: (session: SessionInfo) => void }) {
-  const [error, setError] = useState('');
-  async function open() {
-    try {
-      const cwd = await window.mori.pickFolder();
-      if (!cwd) return;
-      onSession(await window.mori.request<SessionInfo>({ type: 'session.create', cwd }));
-      setError('');
-    } catch (err) {
-      setError(`打开失败：${describe('session.create', err)}`);
-    }
-  }
-  return (
-    <section className="panel">
-      <button onClick={open}>打开文件夹…</button>
-      {error && <p className="error">{error}</p>}
-    </section>
+    <div className="app" style={style as React.CSSProperties}>
+      {narrow && floating && <div className="sidebar-spacer" />}
+      <Sidebar collapsed={collapsed && !(narrow && floating)} floating={narrow && floating}
+        onToggle={() => (narrow ? setFloating(!floating) : setLayout({ sidebarCollapsed: !sidebarCollapsed }))}>
+        {!collapsed && !floating && <Divider kind="sidebar" label="调整左栏宽度" value={columns.sidebar}
+          limits={columns.sidebarLimits} onChange={(value, commit) => resize('sidebar', value, commit)} />}
+      </Sidebar>
+      <main className="main">
+        {kernel === 'exited' && (view !== 'chat' || !tab) && <div className="global-banner"><KernelExitBanner /></div>}
+        <div className="body">
+          <Center tabs={tabs} activeKey={activeKey} view={view} rightOpen={rightOpen} onToggleRight={toggleRight} />
+          {rightOpen && tab && (
+            <aside className="right-panel" aria-label="本会话的改动" data-testid="right-panel">
+              <Divider kind="workspace" label="调整右栏宽度" value={columns.workspace} limits={columns.workspaceLimits}
+                onChange={(value, commit) => resize('workspace', value, commit)} />
+              <ChangesPanel transcript={tab.transcript} cwd={tab.cwd} onClose={toggleRight} />
+            </aside>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }
 
 /** @brief 根组件。 */
 export function App() {
-  const [hasConnection, setHasConnection] = useState(false);
-  const [session, setSession] = useState<SessionInfo | null>(null);
-  const [exitCode, setExitCode] = useState<number | null>(null);
-
-  useEffect(() => window.mori.onKernelExit(setExitCode), []);
-
-  return (
-    <main className="app">
-      {exitCode !== null && <p className="error">Mori 的后台进程意外退出（{exitCode}）· 请重新启动 Mori</p>}
-      <ConnectionPanel onSaved={setHasConnection} />
-      {hasConnection && <FolderPanel onSession={setSession} />}
-      {session && <Chat key={session.sessionId} session={session} />}
-    </main>
-  );
+  const config = useApp((state) => state.config);
+  const configError = useApp((state) => state.configError);
+  const firstRun = useApp((state) => state.firstRun);
+  const kernel = useApp((state) => state.kernel);
+  useEscape();
+  if (configError) {
+    return (
+      <main className="first-run">
+        <div className="first-run-card">
+          {kernel === 'exited' ? <KernelExitBanner /> : <p className="form-message error">读取连接失败：{configError}</p>}
+        </div>
+      </main>
+    );
+  }
+  if (!config) return <main className="first-run"><p className="muted">正在读取连接…</p></main>;
+  if (firstRun) return <FirstRun exited={kernel === 'exited'} />;
+  return <Workspace />;
 }

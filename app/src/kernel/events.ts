@@ -3,7 +3,7 @@
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent';
 import type { ForwardedEvent, SlimMessageUpdate } from '../shared/protocol';
 
-/** @brief 把 message_update 精简为类型、序号和增量，其余事件原样返回。 */
+/** @brief 把 message_update 精简为类型、序号、增量和工具调用标识，其余事件原样返回。 */
 export function slimEvent(event: AgentSessionEvent): ForwardedEvent {
   if (event.type !== 'message_update') return event;
   const source = event.assistantMessageEvent;
@@ -12,9 +12,16 @@ export function slimEvent(event: AgentSessionEvent): ForwardedEvent {
   if ('delta' in source) update.delta = source.delta;
   if (source.type === 'toolcall_start' || source.type === 'toolcall_delta') {
     const block = source.partial.content[source.contentIndex];
-    if (block?.type === 'toolCall') update.toolName = block.name;
+    if (block?.type === 'toolCall') {
+      update.toolName = block.name;
+      update.toolCallId = block.id;
+    }
   }
-  if (source.type === 'toolcall_end') update.toolName = source.toolCall.name;
+  if (source.type === 'toolcall_end') {
+    update.toolName = source.toolCall.name;
+    update.toolCallId = source.toolCall.id;
+    update.args = source.toolCall.arguments;
+  }
   if (source.type === 'done') update.reason = source.reason;
   if (source.type === 'error') {
     update.reason = source.reason;

@@ -4,7 +4,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { ModelRuntime } from '@earendil-works/pi-coding-agent';
-import type { Connection, SavedConnection, TestResult } from '../shared/protocol';
+import { API_TYPES, COMPAT_OPTIONS, type Connection, type SavedConnection, type TestResult } from '../shared/protocol';
 import { requestStoreKey } from './credentials';
 import { getRuntime, globalSettings } from './pi';
 
@@ -14,6 +14,9 @@ export const PROVIDER_ID = 'mori-endpoint';
 /** 测试连接的上限，见 docs/v0/defaults.md */
 const TEST_TIMEOUT_MS = 30_000;
 const TEST_MAX_TOKENS = 512;
+
+/** 正在进行的测试连接；你点"取消"时中止它 */
+let runningTest: AbortController | null = null;
 
 type JsonObject = Record<string, unknown>;
 type ModelsFile = JsonObject & { providers?: Record<string, JsonObject> };
@@ -53,16 +56,31 @@ export async function readConnection(agentDir: string): Promise<SavedConnection 
   const provider = file.providers?.[PROVIDER_ID];
   const model = (provider?.models as JsonObject[] | undefined)?.[0];
   if (!provider || !model) return null;
+  const api = API_TYPES.find((type) => type === provider.api) ?? 'openai-completions';
+  const compat = (provider.compat ?? {}) as JsonObject;
   return {
     keySaved: hasKey(await getRuntime()),
     connection: {
       name: String(provider.name ?? PROVIDER_ID),
       baseUrl: String(provider.baseUrl ?? ''),
+      api,
       apiKey: '',
       modelId: String(model.id ?? ''),
       contextWindow: Number(model.contextWindow ?? 128000),
+      compat: COMPAT_OPTIONS.filter((option) => compat[option.field] === option.value).map((option) => option.id),
     },
   };
+}
+
+/** @brief 按勾选的兼容选项改写 compat：勾选的写入，没勾选的删除，其他手写字段保留。只对 openai-completions 生效。 */
+function mergeCompat(previous: unknown, connection: Connection): JsonObject | undefined {
+  const compat: JsonObject = { ...(previous as JsonObject | undefined) };
+  if (connection.api !== 'openai-completions') return Object.keys(compat).length ? compat : undefined;
+  for (const option of COMPAT_OPTIONS) {
+    if (connection.compat.includes(option.id)) compat[option.field] = option.value;
+    else delete compat[option.field];
+  }
+  return Object.keys(compat).length ? compat : undefined;
 }
 
 /** @brief 把连接合并进 models.json 的 Mori provider：保留手写的 compat、headers 等字段和其他模型，去掉 apiKey 字段。 */
@@ -78,7 +96,8 @@ async function writeConnection(path: string, file: ModelsFile, connection: Conne
       ...previous,
       name: connection.name,
       baseUrl: connection.baseUrl,
-      api: previous.api ?? 'openai-completions',
+      api: connection.api,
+      compat: mergeCompat(previous.compat, connection),
       models: [model, ...previousModels.filter((item) => item.id !== connection.modelId)],
     },
   };
@@ -110,24 +129,29 @@ export async function saveConnection(agentDir: string, connection: Connection): 
   return [runtime.getError(), ...settingsErrors].filter(Boolean).join('; ') || null;
 }
 
-/** @brief 用默认模型发一条短消息，记录到第一个增量（正文或思考）的时间。 */
+/** @brief 用默认模型发一条短消息，记录到第一个增量（正文或思考）的时间；你点"取消"或超时都会中止。 */
 export async function testConnection(): Promise<TestResult> {
   const started = Date.now();
   const runtime = await getRuntime();
   const settings = await globalSettings();
   const provider = settings.getDefaultProvider();
   const modelId = settings.getDefaultModel();
-  const result: TestResult = { ok: false, firstTokenMs: null, totalMs: 0, text: '', thinking: false, error: null };
+  const result: TestResult = { ok: false, cancelled: false, firstTokenMs: null, totalMs: 0, text: '', thinking: false,
+    error: null };
   if (!provider || !modelId) return { ...result, error: 'No connection saved yet; save the connection first' };
   const model = runtime.getModel(provider, modelId);
   if (!model) {
     return { ...result, error: runtime.getError() ?? `Model ${provider}/${modelId} not found in models.json` };
   }
   const message = { role: 'user' as const, content: 'Reply with one short sentence.', timestamp: started };
-  const context = { messages: [message] };
-  const signal = AbortSignal.timeout(TEST_TIMEOUT_MS);
+  const controller = new AbortController();
+  runningTest?.abort();
+  runningTest = controller;
+  const timeout = AbortSignal.timeout(TEST_TIMEOUT_MS);
+  const signal = AbortSignal.any([timeout, controller.signal]);
   try {
-    for await (const event of runtime.streamSimple(model, context, { maxTokens: TEST_MAX_TOKENS, signal })) {
+    const options = { maxTokens: TEST_MAX_TOKENS, signal };
+    for await (const event of runtime.streamSimple(model, { messages: [message] }, options)) {
       if (event.type === 'text_delta' || event.type === 'thinking_delta') result.firstTokenMs ??= Date.now() - started;
       if (event.type === 'text_delta') result.text += event.delta;
       if (event.type === 'thinking_delta') result.thinking = true;
@@ -135,9 +159,20 @@ export async function testConnection(): Promise<TestResult> {
     }
   } catch (error) {
     result.error = (error as Error).message;
+  } finally {
+    if (runningTest === controller) runningTest = null;
   }
-  if (signal.aborted) result.error = `No response within ${TEST_TIMEOUT_MS / 1000} seconds`;
-  if (result.error) console.error(`[kernel] connection test failed: ${result.error}`);
+  result.cancelled = controller.signal.aborted;
+  if (result.cancelled) result.error = 'Cancelled';
+  else if (timeout.aborted) result.error = `No response within ${TEST_TIMEOUT_MS / 1000} seconds`;
+  if (result.error && !result.cancelled) console.error(`[kernel] connection test failed: ${result.error}`);
   const ok = result.error === null && (result.text.length > 0 || result.thinking);
   return { ...result, ok, totalMs: Date.now() - started, text: result.text.slice(0, 200) };
+}
+
+/** @brief 取消正在进行的测试连接；没有在测试时返回 false。 */
+export function cancelTest(): boolean {
+  if (!runningTest) return false;
+  runningTest.abort();
+  return true;
 }

@@ -12,6 +12,7 @@ const pending = new Map<number, Pending>();
 const queued: RequestEnvelope[] = [];
 const eventListeners = new Set<(envelope: EventEnvelope) => void>();
 const exitListeners = new Set<(code: number) => void>();
+const readyListeners = new Set<() => void>();
 
 /** @brief 分发后台进程发来的回复与事件。 */
 function dispatch(message: KernelMessage): void {
@@ -39,10 +40,14 @@ function onKernelExit(code: number): void {
 }
 
 ipcRenderer.on('mori:port', (event) => {
+  port?.close();
   port = event.ports[0] ?? null;
   if (!port) return;
+  // 新通道（启动或重新载入后）：之前的退出状态作废。
+  exitCode = null;
   port.onmessage = (message) => dispatch(message.data as KernelMessage);
   for (const request of queued.splice(0)) port.postMessage(request);
+  for (const listener of readyListeners) listener();
 });
 
 ipcRenderer.on('mori:kernel-exit', (_event, code: number) => onKernelExit(code));
@@ -68,6 +73,16 @@ contextBridge.exposeInMainWorld('mori', {
     exitListeners.add(listener);
     if (exitCode !== null) queueMicrotask(() => listener(exitCode ?? -1));
     return () => exitListeners.delete(listener);
+  },
+  /** @brief 订阅"通道已连上"（启动或重新载入后）；已经连上时立即回调一次。 */
+  onKernelReady(listener: () => void): () => void {
+    readyListeners.add(listener);
+    if (port) queueMicrotask(listener);
+    return () => readyListeners.delete(listener);
+  },
+  /** @brief 后台进程退出后重新启动它；新通道连上时触发 onKernelReady。 */
+  restartKernel(): Promise<void> {
+    return ipcRenderer.invoke('mori:restart-kernel');
   },
   /** @brief 打开系统的选择文件夹对话框。 */
   pickFolder(): Promise<string | null> {
