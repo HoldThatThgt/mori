@@ -16,6 +16,8 @@ const paths = {
   chat: 'M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 4V6a2 2 0 0 1 2-2Z',
   refresh: 'M20 7v5h-5M4 17v-5h5M5 8a8 8 0 0 1 14-3l1 7M4 12l1 7a8 8 0 0 0 14-3',
   back: 'm15 5-7 7 7 7',
+  flag: 'M5 21V4h12l-2.5 4.5L17 13H5',
+  shield: 'm12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Zm-4 9 3 3 5-6',
 } as const;
 
 export type IconName = keyof typeof paths;

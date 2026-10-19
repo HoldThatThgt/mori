@@ -1,8 +1,10 @@
 // 界面上的操作：每个操作对应 pi 的一个调用（经后台进程），结果与失败都回到界面状态。
 
 import type {
-  ClearedQueue, Command, ConfigInfo, EventEnvelope, OpenedSession, SessionInfo, SessionState,
+  ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, Command, ConfigInfo, EventEnvelope, OpenedSession,
+  SessionInfo, SessionState,
 } from '../../../shared/protocol';
+import { logCommand, recordAction } from './actionLog';
 import { transcriptFromEntries } from './history';
 import { emptyTranscript, pushItem, type Transcript } from './model';
 import { applyEvent, finishOpenTools } from './transcript';
@@ -21,8 +23,9 @@ export function describe(what: string, error: unknown): string {
   return message;
 }
 
-/** @brief 发一条命令给后台进程。 */
+/** @brief 发一条命令给后台进程，并记进最近的操作（F8 报告用，不含机密）。 */
 export function request<T>(command: Command): Promise<T> {
+  logCommand(command);
   return window.mori.request<T>(command);
 }
 
@@ -49,10 +52,11 @@ export async function loadConfig(): Promise<void> {
   }
 }
 
-/** @brief 把会话信息写进会话。 */
+/** @brief 把会话信息写进会话。批准设置以后台进程返回的为准（新建和重新打开的会话都是"每次询问"）。 */
 function withInfo(tab: Tab, info: SessionInfo): Tab {
   return { ...tab, sessionId: info.sessionId, sessionFile: info.sessionFile, model: info.model,
-    modelNotice: info.modelNotice, contextUsage: info.contextUsage, phase: 'ready', error: null };
+    modelNotice: info.modelNotice, contextUsage: info.contextUsage, approval: info.approval, phase: 'ready',
+    error: null };
 }
 
 /** @brief 选文件夹并在其中新建会话。 */
@@ -126,6 +130,59 @@ export async function stop(key: string): Promise<void> {
   }
 }
 
+/**
+ * @brief 发一条批准命令，把后台进程返回的批准设置记到会话上。
+ *        失败时在对话流里显示原文；请求已经结束（例如你刚按了停止，卡已收到结束事件）只记日志。
+ */
+async function sendApproval(key: string, command: Command): Promise<void> {
+  try {
+    const approval = await request<ApprovalState>(command);
+    updateTab(key, (tab) => ({ ...tab, approval }));
+  } catch (error) {
+    const message = describe(command.type, error);
+    if (message.includes('is no longer pending')) return;
+    updateTranscript(key, (t) => pushItem(t, { kind: 'error', text: message, restore: null, live: true }));
+  }
+}
+
+/** @brief 会话的 pi 会话 id；还没打开时为 null。 */
+function sessionIdOf(key: string): string | null {
+  return useApp.getState().tabs.find((tab) => tab.key === key)?.sessionId ?? null;
+}
+
+/**
+ * @brief 你在批准卡上的选择。
+ * @param reason 拒绝理由，只在拒绝时带上；空串等于没写
+ */
+export async function answerApproval(key: string, requestId: string, decision: ApprovalDecision,
+  reason?: string): Promise<void> {
+  const sessionId = sessionIdOf(key);
+  if (!sessionId) return;
+  await sendApproval(key, { type: 'approval.answer', sessionId, requestId, decision,
+    reason: decision === 'reject' ? reason : undefined });
+}
+
+/** @brief 切换会话的权限（每次询问 / 全部允许）。 */
+export async function setApprovalMode(key: string, mode: ApprovalMode): Promise<void> {
+  const sessionId = sessionIdOf(key);
+  if (sessionId) await sendApproval(key, { type: 'approval.setMode', sessionId, mode });
+}
+
+/** @brief 从"本会话已允许"里清除一个工具名。 */
+export async function forgetApproval(key: string, toolName: string): Promise<void> {
+  const sessionId = sessionIdOf(key);
+  if (sessionId) await sendApproval(key, { type: 'approval.forget', sessionId, toolName });
+}
+
+/** @brief 窗口不在前台时让任务栏闪烁（出现批准卡时）。 */
+async function requestAttention(): Promise<void> {
+  try {
+    await window.mori.requestAttention();
+  } catch (error) {
+    describe('requestAttention', error);
+  }
+}
+
 /** @brief 读取上下文用量。 */
 export async function refreshUsage(key: string): Promise<void> {
   const sessionId = useApp.getState().tabs.find((tab) => tab.key === key)?.sessionId;
@@ -144,6 +201,7 @@ export function handleEvent(envelope: EventEnvelope): void {
   if (!tab) return;
   updateTranscript(tab.key, (t) => applyEvent(t, envelope.event, Date.now()));
   if (['turn_end', 'compaction_end', 'agent_settled'].includes(envelope.event.type)) void refreshUsage(tab.key);
+  if (envelope.event.type === 'mori.approval_request') void requestAttention();
 }
 
 /** @brief 后台进程意外退出：没结束的工具标"已中断"，运行状态清空，草稿不动。 */
@@ -157,6 +215,7 @@ export function handleKernelExit(): void {
 
 /** @brief "重新载入"：重启后台进程；新通道连上后由 handleKernelReady 重新打开会话。 */
 export async function reload(): Promise<void> {
+  recordAction('重新载入后台进程');
   useApp.setState({ kernel: 'reloading' });
   try {
     await window.mori.restartKernel();
@@ -206,8 +265,15 @@ export function handleKernelReady(): void {
 
 /** @brief 打开设置页；fromError 为真时焦点放到 API key（"去设置"）。 */
 export function openSettings(fromError = false): void {
+  recordAction(fromError ? '去设置' : '打开设置');
   useApp.setState((state) => ({ view: 'settings',
     settingsFocus: fromError ? state.settingsFocus + 1 : state.settingsFocus }));
+}
+
+/** @brief 回到会话页：key 为左栏点的会话；不传时回到当前会话（设置页的"返回会话"）。 */
+export function showChat(key?: string): void {
+  recordAction(key ? '切换会话' : '返回会话');
+  useApp.setState((state) => ({ view: 'chat', activeKey: key ?? state.activeKey }));
 }
 
 /** @brief 订阅后台进程的事件、退出与就绪。 */

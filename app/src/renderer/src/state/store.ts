@@ -2,7 +2,7 @@
 // 会话内容只有 pi 的会话文件一份；这里只是本次运行里界面上的副本。
 
 import { create } from 'zustand';
-import type { ConfigInfo, ContextUsage } from '../../../shared/protocol';
+import { DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextUsage } from '../../../shared/protocol';
 import { emptyTranscript, type Transcript } from './model';
 
 /** @brief 一个打开的会话。 */
@@ -21,6 +21,8 @@ export interface Tab {
   modelNotice: string | null;
   /** 上下文用量 */
   contextUsage: ContextUsage | null;
+  /** 批准设置（权限与"本会话已允许"），以后台进程返回的为准 */
+  approval: ApprovalState;
   /** 对话流 */
   transcript: Transcript;
   /** 输入框草稿 */
@@ -69,8 +71,8 @@ let tabCounter = 0;
 export function newTab(cwd: string): Tab {
   tabCounter += 1;
   return { key: `t${tabCounter}`, sessionId: null, cwd, sessionFile: null, model: null, modelNotice: null,
-    contextUsage: null, transcript: emptyTranscript, draft: '', startIndex: 0, rightOpen: null, phase: 'opening',
-    error: null };
+    contextUsage: null, approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '', startIndex: 0,
+    rightOpen: null, phase: 'opening', error: null };
 }
 
 /** @brief 更新一个会话。 */

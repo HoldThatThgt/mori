@@ -1,9 +1,13 @@
-// 左栏（M1 范围）：品牌与收起、"打开文件夹…"、本次运行打开过的会话（按文件夹分组）、设置。
+// 左栏：品牌与收起、"打开文件夹…"、本次运行打开过的会话（按文件夹分组）、报告界面问题（F8）、设置。
 
-import { openFolder, openSettings } from '../state/actions';
+import { openFolder, openSettings, showChat } from '../state/actions';
 import { useApp, type Tab } from '../state/store';
 import { BrandMark, Icon } from '../icons';
 import { folderName, sessionTitle } from './ChatPane';
+import { openIssueReport } from './IssueDialog';
+
+/** F8 入口的文字；收起为图标栏时作为按钮的名称 */
+const REPORT_LABEL = '报告界面问题（F8）';
 
 /** @brief 按文件夹分组，保持打开顺序。 */
 function groupByFolder(tabs: Tab[]): Array<{ cwd: string; tabs: Tab[] }> {
@@ -42,7 +46,7 @@ export function Sidebar({ collapsed, floating, onToggle, children }: {
             {group.tabs.map((tab) => (
               <button key={tab.key}
                 className={`session-item${view === 'chat' && tab.key === activeKey ? ' active' : ''}`}
-                onClick={() => useApp.setState({ activeKey: tab.key, view: 'chat' })}>
+                onClick={() => showChat(tab.key)}>
                 <Icon name="chat" /><span className="session-label">{sessionTitle(tab)}</span>
               </button>
             ))}
@@ -50,6 +54,10 @@ export function Sidebar({ collapsed, floating, onToggle, children }: {
         ))}
       </div>
       <div className="sidebar-bottom">
+        <button className="nav-item" onClick={() => void openIssueReport()} title={REPORT_LABEL}
+          aria-label={REPORT_LABEL}>
+          <Icon name="flag" /><span className="nav-label">{REPORT_LABEL}</span>
+        </button>
         <button className={`nav-item${view === 'settings' ? ' active' : ''}`} onClick={() => openSettings()} title="设置">
           <Icon name="settings" /><span className="nav-label">设置</span>
         </button>

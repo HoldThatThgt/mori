@@ -2,7 +2,8 @@
 
 Windows 桌面 App。方案见 [../docs/app-v0.md](../docs/app-v0.md)，检查记录见 [../docs/v0/](../docs/v0/)
 （[M0](../docs/v0/m0-checks.md)、[M1](../docs/v0/m1-checks.md)），每屏的状态表见 [../docs/v0/screens/](../docs/v0/screens/)。
-当前处于 M1：三栏界面、首次启动连接表单、对话流与工具卡、阶段行、停止/排队/插话、错误与后台进程退出提示。
+M1：三栏界面、首次启动连接表单、对话流与工具卡、阶段行、停止/排队/插话、错误与后台进程退出提示。
+当前处于 M2：批准卡与权限菜单、任务栏闪烁、F8 报告界面问题（[检查记录](../docs/v0/m2-checks.md)）。
 
 ## 准备
 
@@ -32,6 +33,10 @@ npm ci
 | `npm run test:app` | M1 整机测试：真正的 Mori 对合成端点；测打包结果加 `--exe dist/win-unpacked/Mori.exe` |
 | `node tests/ui/m1-real.mjs --source <走查数据目录> [--exe …]` | M1 真实端点走查（走查 1–10）；脚本只复制加密的 key，不读取它 |
 | `node tests/ui/m1-record.mjs --source <走查数据目录>` | 从真实会话重新录制 `tests/fixtures/m1/` |
+| `npm run test:m2-app` | M2 整机测试：真正的 Mori 对合成端点，批准卡、权限菜单、任务栏闪烁、F8；测打包结果加 `--exe …` |
+| `node tests/ui/m2-record.mjs --source <走查数据目录> [--only …]` | 从真实会话录制 `tests/fixtures/m2/`（批准相关的场景）；录下的不合要求时不写入，打印 FAIL |
+| `npm run test:m2-replay` | M2 界面测试：回放 `tests/fixtures/m2/` |
+| `node tests/ui/m2-real.mjs --source <走查数据目录> [--exe …] [--only …]` | M2 真实端点走查（走查 1–8 与反例） |
 | `npx electron tests/prechecks/esm-utility/main.cjs` | 预检：utilityProcess 能否运行 ESM 入口 |
 | `npx electron tests/prechecks/job-object/main.cjs` | 预检：后台进程放进 Windows 作业对象后，它留下的孤儿进程能随作业一起结束 |
 | `node tests/ui/m0-real.mjs --user-data <目录> [--setup]` | 真实端点走查（M0 走查 2–3）；`--setup` 先打开 Mori 让你填连接，脚本不接触 key |

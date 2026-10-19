@@ -10,9 +10,10 @@
 | 项目名 | 会话的工作目录（`session.create` / `session.open` 的返回值）末级文件夹名 | 同上 |
 | 模型 | 会话返回值里的 `model`（provider/id），显示 id | 没有可用模型时"没有可用模型"，并显示 pi 给出的说明 |
 | 上下文用量 | `session.state` → pi `getContextUsage()`；在打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新 | "上下文 12%"，悬停显示"约 15,360 / 128,000 token"；pi 返回未知（刚压缩完）时"上下文 —"并说明要等下一次回复 |
+| 权限（M2） | 后台进程批准扩展的设置（`session.create` / `session.open` 返回值里的 `approval`，以及 `approval.*` 命令的结果） | "每次询问"或"全部允许"（警示色）；菜单见 [approval.md](approval.md) |
 | 右栏开关 | 你的操作 | 按钮，显示右栏是否打开 |
 
-思考强度（M6）与权限菜单（M2）不在 M1。
+思考强度在 M6。
 
 ## 对话流
 
@@ -41,7 +42,7 @@
 | 思考中 5s | `thinking_start` / `thinking_delta` | 出现正文或工具调用增量 |
 | 生成中 | `text_delta`；`toolcall_start` / `toolcall_delta`（模型在写工具参数） | 回复结束（`message_end`） |
 | 运行 npm test 8s | `tool_execution_start`（文字与工具卡标题相同，见 tool-cards.md） | 该工具的 `tool_execution_end`；同时有别的工具在跑就显示那一个 |
-| 等你批准 | 批准扩展的请求（M2 接通） | 你作出选择 |
+| 等你批准 | `mori.tool_gate` 为 `ask` 的 `tool_execution_start`，或批准扩展的 `mori.approval_request`（M2）；有挂起的卡时优先显示它 | 你作出选择（`mori.approval_end`） |
 | 重试 1/3 · 原因 | `auto_retry_start` | 下一次 `turn_start` 或 `auto_retry_end` |
 | 正在压缩较早的对话 | `compaction_start` | `compaction_end` |
 | （不显示） | `message_end` 之后、下一个事件之前；没有运行时 | — |
@@ -61,8 +62,10 @@
 | 排队送达 | 本轮结束后 pi 依次送出 | 同上 | — |
 
 停止（按钮或 Esc）的顺序：先 `clearQueue`，把排队消息放回输入框（放在已有草稿之前），再 `abort`。
+M2 起，有挂起的批准卡时，后台进程在 `abort` 里先把它按拒绝处理（工具卡"已拒绝 · 你按了停止"），等 pi 记下拒绝后再停止。
 
-Esc 的顺序：先关闭最上层的浮层或菜单（M1 只有"排队发送"的下拉）；没有浮层、当前显示的是会话面板且正在生成时才停止。
+Esc 的顺序：先关闭最上层的浮层、菜单或对话框（"排队发送"的下拉、权限菜单、切到"全部允许"的确认框、F8 报告框）；
+焦点在批准卡上时只拒绝这张卡（见 approval.md）；没有浮层、当前显示的是会话面板且正在生成时才停止。
 
 ## 错误
 

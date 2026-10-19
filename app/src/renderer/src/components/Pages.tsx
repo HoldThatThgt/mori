@@ -1,7 +1,7 @@
 // 首次启动、设置页、还没有打开会话时的中栏。
 
 import { useState } from 'react';
-import { openFolder } from '../state/actions';
+import { openFolder, showChat } from '../state/actions';
 import { useApp } from '../state/store';
 import { BrandMark, Icon } from '../icons';
 import { ConnectionForm } from './ConnectionForm';
@@ -52,7 +52,7 @@ export function SettingsPage() {
   return (
     <section className="settings-page" data-testid="settings-page">
       <header className="topbar">
-        <button className="button" onClick={() => useApp.setState({ view: 'chat' })}><Icon name="back" />返回会话</button>
+        <button className="button" onClick={() => showChat()}><Icon name="back" />返回会话</button>
         <span className="chat-title">设置</span>
       </header>
       <div className="settings-body">

@@ -60,7 +60,8 @@ function EmptyChat({ cwd }: { cwd: string }) {
 }
 
 /**
- * @brief 跟随与"有新内容"：内容变高时在底部就跟到底部；你发消息时回到底部。
+ * @brief 跟随与"有新内容"：内容变高、或对话流本身变矮（输入框上方出现批准卡、排队区、阶段行）时，
+ *        在底部就跟到底部；你发消息时回到底部。
  *        只有你往上滚（比上次自动滚到底的位置更靠上）才算离开底部：流式输出很快时，
  *        自动滚动触发的 scroll 事件可能晚到、那时内容又长了一截，不能据此认为你离开了。
  */
@@ -77,11 +78,12 @@ function useFollow(scroller: React.RefObject<HTMLDivElement | null>, inner: Reac
     atBottom.current = true;
   }, [scroller]);
   useLayoutEffect(() => {
-    if (!inner.current) return;
+    if (!inner.current || !scroller.current) return;
     const observer = new ResizeObserver(() => atBottom.current && toBottom());
     observer.observe(inner.current);
+    observer.observe(scroller.current);
     return () => observer.disconnect();
-  }, [inner, toBottom]);
+  }, [inner, scroller, toBottom]);
   useEffect(() => {
     if (!atBottom.current) setHasNew(true);
   }, [tab.transcript.items, tab.transcript.tools]);

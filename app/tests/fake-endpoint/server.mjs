@@ -1,7 +1,11 @@
 // 合成测试端点（synthetic）：只用于本地验证管线，不是真实模型。
 // 实现 OpenAI 兼容的 /v1/models 与流式 /v1/chat/completions，回复内容由下列规则决定：
-//   - 最后一条是工具结果：流式返回一段摘要文字后结束。
+//   - 最后一条是工具结果，且以 "Rejected" 开头（Mori 拒绝时回给模型的固定写法）：回复"收到拒绝："加结果的前 60 个字。
+//   - 最后一条是其他工具结果：流式返回一段摘要文字后结束。
+//   - 用户消息含 "two commands: <命令一> ;; <命令二>"：同一条回复里调用两次 bash 工具
+//     （tool_calls 的 index 为 0 和 1，id 不同），用来测一条回复里的多个调用。
 //   - 用户消息含 "run: <命令>"：调用 bash 工具执行该命令，可加 "timeout=<秒>"。
+//   - 用户消息含 "write file: <路径>"：调用 write 工具，把 "hello from mori\n" 写入该路径。
 //   - 用户消息含 "edit README"：调用 edit 工具修改 README.md 的标题（"# Smoke project" 或 "# Mori fixture project"，
 //     由 "edit README: <原标题>" 指定，默认 "# Smoke project"）。
 //   - 用户消息含 "code block"：返回一段带 ts 代码块的 Markdown。
@@ -41,28 +45,47 @@ function contentText(content) {
   return '';
 }
 
-/** @brief 根据对话末尾决定本次回复：文字与可选的工具调用。 */
-function planReply(messages) {
-  const last = messages[messages.length - 1] ?? {};
-  if (last.role === 'tool') {
-    const head = contentText(last.content).replace(/\s+/g, ' ').slice(0, 80);
-    return { text: `工具已返回。开头内容：${head}`, toolCall: null };
+/** @brief 最后一条是工具结果时的回复：被拒绝时复述拒绝原文的开头，否则给出结果开头的摘要。 */
+function toolResultReply(last) {
+  const flat = contentText(last.content).replace(/\s+/g, ' ');
+  const trimmed = flat.trimStart();
+  if (trimmed.startsWith('Rejected')) return { text: `收到拒绝：${trimmed.slice(0, 60)}`, toolCalls: [] };
+  return { text: `工具已返回。开头内容：${flat.slice(0, 80)}`, toolCalls: [] };
+}
+
+/** @brief 按用户消息里的关键词决定回复（规则见文件开头）。 */
+function userReply(userText) {
+  const two = /two commands:\s*(.+?)\s*;;\s*(.+?)\s*$/m.exec(userText);
+  if (two) {
+    const toolCalls = [{ name: 'bash', args: { command: two[1] } }, { name: 'bash', args: { command: two[2] } }];
+    return { text: '我来依次运行这两条命令。', toolCalls };
   }
-  const userText = contentText(last.content);
   const run = /run:\s*(.+?)(?:\s+timeout=(\d+))?\s*$/m.exec(userText);
   if (run) {
     const args = { command: run[1] };
     if (run[2]) args.timeout = Number(run[2]);
-    return { text: '我来运行这条命令。', toolCall: { name: 'bash', args } };
+    return { text: '我来运行这条命令。', toolCalls: [{ name: 'bash', args }] };
+  }
+  const write = /write file:\s*(.+?)\s*$/m.exec(userText);
+  if (write) {
+    const args = { path: write[1], content: 'hello from mori\n' };
+    return { text: '我来写一个文件。', toolCalls: [{ name: 'write', args }] };
   }
   if (userText.includes('edit README')) {
     const title = /edit README:\s*(.+)$/m.exec(userText)?.[1]?.trim() ?? '# Smoke project';
     const edits = [{ oldText: title, newText: `${title} (edited)` }];
-    return { text: '我来改一下标题。', toolCall: { name: 'edit', args: { path: 'README.md', edits } } };
+    return { text: '我来改一下标题。', toolCalls: [{ name: 'edit', args: { path: 'README.md', edits } }] };
   }
-  if (userText.includes('code block')) return { text: codeReply, toolCall: null };
-  if (userText.includes('plain')) return { text: '这是一段只有文字的回复，用来测试流式输出。', toolCall: null };
-  return { text: '我先读一下 README.md。', toolCall: { name: 'read', args: { path: 'README.md' } } };
+  if (userText.includes('code block')) return { text: codeReply, toolCalls: [] };
+  if (userText.includes('plain')) return { text: '这是一段只有文字的回复，用来测试流式输出。', toolCalls: [] };
+  return { text: '我先读一下 README.md。', toolCalls: [{ name: 'read', args: { path: 'README.md' } }] };
+}
+
+/** @brief 根据对话末尾决定本次回复：文字与零到多个工具调用。 */
+function planReply(messages) {
+  const last = messages[messages.length - 1] ?? {};
+  if (last.role === 'tool') return toolResultReply(last);
+  return userReply(contentText(last.content));
 }
 
 /** @brief 把字符串切成小段，模拟逐字流式输出。 */
@@ -84,16 +107,18 @@ async function streamReply(res, reply, includeUsage, promptTokens, slow) {
     send({ index: 0, delta: { content: piece }, finish_reason: null });
     await sleep(chunkDelayMs);
   }
-  if (reply.toolCall) {
-    const callId = `call_fake_${Date.now()}`;
-    const head = { index: 0, id: callId, type: 'function', function: { name: reply.toolCall.name, arguments: '' } };
+  // 多个调用按 OpenAI 的分块格式：每个调用先发带 id 和名字的头，再分段发参数；tool_calls[].index 区分是第几个调用。
+  const stamp = Date.now();
+  for (const [index, call] of reply.toolCalls.entries()) {
+    const fn = { name: call.name, arguments: '' };
+    const head = { index, id: `call_fake_${stamp}_${index}`, type: 'function', function: fn };
     send({ index: 0, delta: { tool_calls: [head] }, finish_reason: null });
-    for (const piece of pieces(JSON.stringify(reply.toolCall.args), 8)) {
-      send({ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: piece } }] }, finish_reason: null });
+    for (const piece of pieces(JSON.stringify(call.args), 8)) {
+      send({ index: 0, delta: { tool_calls: [{ index, function: { arguments: piece } }] }, finish_reason: null });
       await sleep(chunkDelayMs);
     }
   }
-  send({ index: 0, delta: {}, finish_reason: reply.toolCall ? 'tool_calls' : 'stop' });
+  send({ index: 0, delta: {}, finish_reason: reply.toolCalls.length > 0 ? 'tool_calls' : 'stop' });
   if (includeUsage) {
     const usage = { prompt_tokens: promptTokens, completion_tokens: 20, total_tokens: promptTokens + 20 };
     res.write(`data: ${JSON.stringify({ ...base, choices: [], usage })}\n\n`);

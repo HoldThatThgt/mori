@@ -39,7 +39,8 @@
 .icon-button[aria-pressed='true'] { color: var(--color-accent); background: var(--color-accent-soft); }
 
 /* 对话流 */
-.transcript-wrap { position: relative; display: flex; flex: 1; min-height: 0; }
+/* 输入区占满面板时对话流可以变成 0 高，裁掉它的内边距，免得盖住阶段行 */
+.transcript-wrap { position: relative; display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .conversation { flex: 1; overflow-y: auto; padding: 24px 32px 16px; }
 .conversation-inner { max-width: 780px; margin: 0 auto; }
 .load-earlier { margin-bottom: 16px; color: var(--color-faint); font-size: var(--fs-small); text-align: center; }
@@ -208,7 +209,15 @@
 .tool-target { overflow: hidden; color: var(--color-text); font-family: var(--font-mono); text-overflow: ellipsis; }
 .tool-suffix { color: var(--color-faint); flex-shrink: 0; }
 .tool-badge { padding: 1px 6px; border-radius: 5px; background: #f1f5ff; color: #4d75c3; font-size: var(--fs-small); }
-.tool-status { flex-shrink: 0; color: var(--color-faint); white-space: nowrap; }
+/* 状态文字不挤掉标题：理由和失败原文已经截断，这里再兜底，最多占一行的 60%，超出显示省略号 */
+.tool-status {
+  flex-shrink: 0;
+  max-width: 60%;
+  overflow: hidden;
+  color: var(--color-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .status-running .tool-status, .status-preparing .tool-status { color: var(--color-accent); }
 .status-done .tool-status { color: var(--color-ok); }
 .status-failed .tool-status, .status-rejected .tool-status { color: var(--color-danger); }
@@ -235,8 +244,20 @@
   font-size: var(--fs-small);
 }
 
-/* 输入区 */
-.composer-area { width: 100%; max-width: 860px; margin: 0 auto; padding: 8px 24px 16px; flex-shrink: 0; }
+/* 输入区。窗口很矮时（最小 800×600）输入区可以比内容矮，这时只有批准卡收缩：先是卡的内容区变矮，
+   再不够就整张卡在卡内滚动；阶段行、排队区和输入框（连同它的按钮）不收缩，总在面板内 */
+.composer-area {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 1;
+  width: 100%;
+  max-width: 860px;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 8px 24px 16px;
+}
+.composer-area > * { flex-shrink: 0; }
+.composer-area > .approval-card { flex-shrink: 1; }
 .stage-line {
   display: flex;
   align-items: center;
@@ -337,6 +358,166 @@
 }
 .menu-hint { color: var(--color-faint); font-size: var(--fs-small); }
 
+/* 批准卡：停靠在输入框上方，超长的内容在卡内滚动。输入区放不下时内容区先变矮（至少留一行），
+   还放不下就整张卡滚动，输入框始终可见 */
+.approval-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0 0 8px;
+  overflow-y: auto;
+  border: 1px solid color-mix(in srgb, var(--color-warn) 35%, var(--color-line));
+  border-radius: var(--radius-m);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-composer);
+  font-size: var(--fs-small);
+}
+.approval-card > * { flex-shrink: 0; }
+.approval-head { display: flex; align-items: baseline; gap: 10px; min-width: 0; padding: 8px 12px 6px; }
+/* 标题里的路径完整显示：长路径折行，不截断 */
+.approval-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.approval-title code { font-family: var(--font-mono); font-weight: 400; }
+.approval-more { flex-shrink: 0; color: var(--color-warn); }
+.approval-warnings { display: grid; gap: 2px; padding: 0 12px 6px; }
+.approval-warn { margin: 0; color: var(--color-warn); font-weight: 500; }
+.approval-card > .approval-body {
+  display: grid;
+  flex-shrink: 1;
+  gap: 6px;
+  min-height: 36px;
+  max-height: min(240px, 30vh);
+  overflow: auto;
+  padding: 0 12px 8px;
+}
+.approval-path { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.approval-path .approval-meta { flex-shrink: 0; }
+.approval-path code { min-width: 0; color: var(--color-text); font-family: var(--font-mono); overflow-wrap: anywhere; }
+.approval-edit { display: grid; gap: 4px; }
+.approval-pre {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  color: var(--color-prose);
+  font: var(--fs-small) / 1.6 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.approval-old {
+  border-left: 3px solid var(--color-danger);
+  background: var(--color-danger-soft);
+  color: color-mix(in srgb, var(--color-danger) 80%, var(--color-text));
+}
+.approval-new {
+  border-left: 3px solid var(--color-ok);
+  background: color-mix(in srgb, var(--color-ok) 7%, var(--color-canvas));
+  color: color-mix(in srgb, var(--color-ok) 80%, var(--color-text));
+}
+.approval-meta { color: var(--color-faint); }
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 0;
+  border-top: 1px solid var(--color-line);
+}
+.approval-actions .button { padding: 5px 10px; }
+.approval-session { max-width: 100%; white-space: normal; text-align: left; }
+.approval-key { color: var(--color-faint); font-size: var(--fs-small); }
+.approval-reason {
+  flex: 1 1 160px;
+  min-width: 120px;
+  padding: 5px 10px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-canvas);
+  font-size: var(--fs-small);
+}
+.approval-reason:focus { outline: 2px solid #b8c9eb; outline-offset: 0; }
+.approval-hint { margin: 0; padding: 4px 12px 8px; color: var(--color-faint); }
+
+/* 顶栏的权限菜单；"全部允许"用警示色 */
+.permission { position: relative; flex-shrink: 0; }
+.permission-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 8px;
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.permission-button svg { width: 14px; height: 14px; }
+.permission-button.all {
+  background: color-mix(in srgb, var(--color-warn) 12%, var(--color-canvas));
+  color: var(--color-warn);
+  font-weight: 500;
+}
+.permission-button.all:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--color-warn) 20%, var(--color-canvas));
+}
+/* 菜单居中在按钮下方：中栏最窄（300px）时按钮靠左，右对齐会伸出窗口 */
+.permission-menu {
+  top: calc(100% + 6px);
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  width: 220px;
+  font-size: var(--fs-body);
+  transform: translateX(-50%);
+}
+.permission-menu [role='menuitemradio'] { align-items: center; }
+.permission-menu [role='menuitemradio'] svg { width: 15px; height: 15px; color: var(--color-accent); }
+.menu-caption {
+  margin: 6px 10px 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-line);
+  color: var(--color-faint);
+}
+.menu-caption, .menu-empty, .menu-note { font-size: var(--fs-small); }
+.permission-allowed { margin: 0; padding: 0; list-style: none; }
+.permission-allowed li { display: flex; align-items: center; gap: 8px; padding: 4px 10px; }
+.permission-allowed span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu .permission-allowed button { width: auto; padding: 2px 4px; }
+.menu-empty { padding: 4px 10px; color: var(--color-faint); }
+.menu-note { margin: 6px 10px 4px; color: var(--color-faint); line-height: 1.6; }
+
+/* 确认对话框：盖住整个窗口，在菜单和浮层之上 */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #0f111540;
+}
+.dialog {
+  width: min(400px, 100%);
+  padding: 20px 22px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-pop);
+}
+.dialog h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.dialog p { margin: 0; color: var(--color-muted); line-height: 1.7; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.button.warn { border-color: var(--color-warn); background: var(--color-warn); color: #fff; }
+.button.warn:not(:disabled):hover { background: color-mix(in srgb, var(--color-warn) 88%, #000); }
+
 /* 右栏：改动 */
 .panel-note { margin: 0 0 12px; color: var(--color-faint); font-size: var(--fs-small); }
 .change-file { margin-bottom: 10px; border: 1px solid var(--color-line); border-radius: var(--radius-m); }
@@ -355,6 +536,12 @@
   .composer-area { padding-left: 12px; padding-right: 12px; }
 }
 .chat-pane { container-type: inline-size; }
+/* 顶栏多了权限按钮：中栏较窄时按钮只留文字、模型名收短，会话名不被挤出去 */
+@container (max-width: 560px) {
+  .model-chip { max-width: 110px; }
+  .permission-button { padding: 3px 8px; }
+  .permission-button svg { display: none; }
+}
 @container (max-width: 460px) {
   .model-chip { display: none; }
   .topbar { padding-left: 16px; gap: 8px; }

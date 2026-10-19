@@ -64,6 +64,8 @@ async function firstRun({ app, page, h, project }) {
   const empty = await page.locator('.empty-chat').innerText();
   record('首次启动：打开文件夹后是新会话的空状态（项目名和输入提示）',
     empty.includes('project') && empty.includes('Enter 发送 · Shift+Enter 换行'), oneLine(empty));
+  // M2 起命令和编辑要先批准；这里测的是 M1 的行为，先切到全部允许。
+  await h.allowAll();
 }
 
 /** @brief 发第一条消息：先"等待模型响应"，再流式文字；读取卡完成；上下文用量随对话增长。 */
@@ -241,6 +243,7 @@ async function mainKilled({ project }) {
   await crashPage.getByRole('button', { name: '测试连接' }).click();
   await crashPage.getByTestId('open-folder').waitFor({ timeout: 60000 });
   await helpers.openFolder(crashApp, project);
+  await helpers.allowAll();
   const before = new Set(sleepProcessIds(['63']));
   await helpers.send('run: sleep 63');
   await crashPage.locator('[data-testid="tool-card"][data-status="running"]').waitFor({ timeout: 30000 });

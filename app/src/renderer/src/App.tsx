@@ -1,10 +1,14 @@
-// 根组件：读取连接 → 首次启动或三栏工作区；全局 Esc（先关浮层，再停止当前会话）。
+// 根组件：读取连接 → 首次启动或三栏工作区；全局 Esc（先关浮层，再停止当前会话）；
+// 全局 Alt+1 / Alt+2 / Alt+3（当前会话最前面的批准卡；有浮层开着时不起作用）。
 
 import { useEffect, useState } from 'react';
+import type { ApprovalDecision } from '../../shared/protocol';
 import { stop } from './state/actions';
+import { recordAction } from './state/actionLog';
 import { clamp, limitsFor, NARROW_WIDTH, RAIL_WIDTH, setLayout, useLayout, type DividerKind } from './state/layout';
-import { closeTopOverlay, useOverlay } from './state/overlays';
+import { closeTopOverlay, hasOverlay, useOverlay } from './state/overlays';
 import { activeTab, updateTab, useApp, type Tab } from './state/store';
+import { answerFrontApproval } from './components/ApprovalCard';
 import { ChangesPanel, collectChanges } from './components/ChangesPanel';
 import { ChatPane, KernelExitBanner } from './components/ChatPane';
 import { Divider } from './components/Divider';
@@ -25,7 +29,17 @@ function useWindowWidth(): number {
   return width;
 }
 
-/** @brief Esc：先关闭最上层的浮层；没有浮层、显示的是会话且焦点在会话面板里时停止生成。 */
+/** @brief 焦点是否在这个会话的面板里（或不在任何元素上）。 */
+function focusInPane(tabKey: string): boolean {
+  const focused = document.activeElement;
+  if (!focused || focused === document.body) return true;
+  return Boolean(document.querySelector(`[data-testid="chat-pane"][data-tab="${tabKey}"]`)?.contains(focused));
+}
+
+/**
+ * @brief Esc：先关闭最上层的浮层；没有浮层、显示的是会话且焦点在会话面板里时停止生成。
+ *        焦点在批准卡上时卡片自己处理（先关浮层，没有浮层才拒绝这张卡），这里看到 defaultPrevented 就跳过。
+ */
 function useEscape(): void {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -36,12 +50,38 @@ function useEscape(): void {
       }
       const state = useApp.getState();
       const tab = activeTab(state);
-      if (state.view !== 'chat' || !tab?.transcript.running) return;
-      const focused = document.activeElement;
-      const pane = document.querySelector('[data-testid="chat-pane"]');
-      if (focused && focused !== document.body && !pane?.contains(focused)) return;
+      if (state.view !== 'chat' || !tab?.transcript.running || !focusInPane(tab.key)) return;
       event.preventDefault();
+      recordAction('按 Esc 停止');
       void stop(tab.key);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+}
+
+/** Alt+数字对应的批准卡选项：只认主键盘的数字行（按物理键位），数字键区不算（Alt+数字键区是 Windows 输入字符的方式） */
+const APPROVAL_KEYS: Record<string, ApprovalDecision> = { Digit1: 'allow', Digit2: 'allowSession', Digit3: 'reject' };
+
+/** @brief 按键对应的批准卡选项；不是 Alt+1 / Alt+2 / Alt+3 时为 null。按住不放的重复按键不算。 */
+function approvalDecision(event: KeyboardEvent): ApprovalDecision | null {
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.repeat) return null;
+  return APPROVAL_KEYS[event.code] ?? null;
+}
+
+/**
+ * @brief Alt+1 / Alt+2 / Alt+3：显示的是会话、焦点在当前会话面板里（包括输入框）时，选择最前面那张批准卡；
+ *        有菜单、对话框或报告框开着时不起作用（不能在它们背后批准）。
+ */
+function useApprovalKeys(): void {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const decision = approvalDecision(event);
+      if (!decision || event.defaultPrevented || hasOverlay()) return;
+      const state = useApp.getState();
+      const tab = activeTab(state);
+      if (state.view !== 'chat' || !tab || !focusInPane(tab.key)) return;
+      if (answerFrontApproval(tab.key, decision)) event.preventDefault();
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -133,6 +173,7 @@ export function App() {
   const firstRun = useApp((state) => state.firstRun);
   const kernel = useApp((state) => state.kernel);
   useEscape();
+  useApprovalKeys();
   if (configError) {
     return (
       <main className="first-run">

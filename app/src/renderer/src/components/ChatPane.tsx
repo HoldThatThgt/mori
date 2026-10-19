@@ -1,10 +1,13 @@
-// 会话面板：顶栏（会话名、模型、上下文用量、右栏开关）、对话流、阶段行、后台进程退出提示、排队区与输入框。
+// 会话面板：顶栏（会话名、模型、权限、上下文用量、右栏开关）、对话流、阶段行、后台进程退出提示、
+// 批准卡、排队区与输入框。
 
 import { reload } from '../state/actions';
 import type { ContextUsage } from '../../../shared/protocol';
 import { useApp, type KernelStatus, type Tab } from '../state/store';
 import { Icon } from '../icons';
+import { ApprovalCard } from './ApprovalCard';
 import { Composer, QueueArea } from './Composer';
+import { PermissionMenu } from './PermissionMenu';
 import { StageLine } from './StageLine';
 import { Transcript } from './Transcript';
 
@@ -65,6 +68,7 @@ function KernelBanner({ kernel, tab }: { kernel: KernelStatus; tab: Tab }) {
 
 /** @brief 顶栏。 */
 function TopBar({ tab, rightOpen, onToggleRight }: { tab: Tab; rightOpen: boolean; onToggleRight: () => void }) {
+  const kernel = useApp((state) => state.kernel);
   return (
     <header className="topbar">
       <div className="breadcrumb">
@@ -74,6 +78,7 @@ function TopBar({ tab, rightOpen, onToggleRight }: { tab: Tab; rightOpen: boolea
       </div>
       <div className="topbar-actions">
         <span className="model-chip" title={tab.model ?? ''}>{tab.model?.split('/').pop() ?? '没有可用模型'}</span>
+        <PermissionMenu tab={tab} disabled={notReadyText(kernel, tab) !== null} />
         <UsageChip usage={tab.contextUsage} />
         <button className="icon-button" onClick={onToggleRight} aria-pressed={rightOpen} aria-label="右栏：本会话的改动"
           title="本会话的改动"><Icon name="right" /></button>
@@ -88,7 +93,7 @@ export function ChatPane({ tab, rightOpen, onToggleRight }: {
 }) {
   const kernel = useApp((state) => state.kernel);
   return (
-    <section className="chat-pane" aria-label={sessionTitle(tab)} data-testid="chat-pane"
+    <section className="chat-pane" aria-label={sessionTitle(tab)} data-testid="chat-pane" data-tab={tab.key}
       data-running={tab.transcript.running} data-sending={tab.transcript.sending}>
       <TopBar tab={tab} rightOpen={rightOpen} onToggleRight={onToggleRight} />
       {tab.modelNotice && <div className="banner">{tab.modelNotice}</div>}
@@ -96,6 +101,7 @@ export function ChatPane({ tab, rightOpen, onToggleRight }: {
       <div className="composer-area">
         <KernelBanner kernel={kernel} tab={tab} />
         <StageLine transcript={tab.transcript} cwd={tab.cwd} />
+        <ApprovalCard tab={tab} />
         <QueueArea tab={tab} />
         <Composer tab={tab} notReady={notReadyText(kernel, tab)} />
       </div>

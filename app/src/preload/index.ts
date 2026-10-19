@@ -2,6 +2,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type { Command, EventEnvelope, KernelMessage, RequestEnvelope } from '../shared/protocol';
+import type { IssueReport, SavedIssue, WindowCapture } from '../shared/issues';
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 
@@ -87,5 +88,21 @@ contextBridge.exposeInMainWorld('mori', {
   /** @brief 打开系统的选择文件夹对话框。 */
   pickFolder(): Promise<string | null> {
     return ipcRenderer.invoke('mori:pick-folder');
+  },
+  /** @brief 窗口不在前台时让任务栏按钮闪烁，窗口获得焦点后停止（批准卡）。 */
+  requestAttention(): Promise<void> {
+    return ipcRenderer.invoke('mori:attention');
+  },
+  /** @brief F8：截下当前窗口。 */
+  captureWindow(): Promise<WindowCapture> {
+    return ipcRenderer.invoke('mori:capture-window');
+  },
+  /** @brief F8：保存一份界面问题报告，返回 Markdown 文件的路径。 */
+  saveIssue(report: IssueReport): Promise<SavedIssue> {
+    return ipcRenderer.invoke('mori:save-issue', report);
+  },
+  /** @brief F8：在资源管理器里选中已保存的报告。 */
+  showIssueInFolder(file: string): Promise<void> {
+    return ipcRenderer.invoke('mori:show-issue', file);
   },
 });

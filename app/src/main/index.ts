@@ -2,7 +2,8 @@
 
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, type IpcMainInvokeEvent } from 'electron';
+import { registerFeedbackHandlers } from './feedback';
 import { currentKernel, lastKernelExitCode, shutdownKernel, startKernel } from './kernel-process';
 
 // 测试可以用 MORI_USER_DATA 把数据放到独立目录，避免碰到日常使用的配置。
@@ -61,10 +62,13 @@ function createWindow(): BrowserWindow {
     minWidth: 800,
     minHeight: 600,
     title: 'Mori',
-    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true },
+    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true,
+      spellcheck: false },
   });
   lockDown(window);
   window.webContents.on('did-finish-load', () => connectWindow(window));
+  // 批准卡让任务栏闪烁（mori:attention），切回窗口时停止。
+  window.on('focus', () => window.flashFrame(false));
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null;
   });
@@ -87,7 +91,17 @@ ipcMain.handle('mori:restart-kernel', (event: IpcMainInvokeEvent) => {
   if (mainWindow) connectWindow(mainWindow);
 });
 
+// 出现批准卡时，窗口不在前台就让任务栏按钮闪烁（方案 5.7）。
+ipcMain.handle('mori:attention', (event: IpcMainInvokeEvent) => {
+  if (!event.senderFrame || !isAppPage(event.senderFrame.url)) throw new Error('Not allowed');
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) mainWindow.flashFrame(true);
+});
+
+registerFeedbackHandlers(isAppPage);
+
 void app.whenReady().then(() => {
+  // 不用拼写检查：Chromium 默认按系统语言从 redirector.gvt1.com 下载词典，离线使用时不能有这种对外连接。
+  session.defaultSession.setSpellCheckerLanguages([]);
   startKernel(notifyKernelExit);
   mainWindow = createWindow();
 });

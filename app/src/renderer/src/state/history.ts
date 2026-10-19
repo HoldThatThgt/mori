@@ -2,7 +2,9 @@
 // 系统消息、用量、模型切换等记录不显示。
 
 import type { SessionEntry } from '../../../shared/protocol';
-import { blocksFromContent, contentText, emptyTranscript, pushItem, resultPatch, type Transcript } from './model';
+import {
+  blocksFromContent, contentText, emptyTranscript, parseRejection, pushItem, resultPatch, type Transcript,
+} from './model';
 
 type Message = Record<string, unknown>;
 
@@ -28,15 +30,19 @@ function addAssistant(state: Transcript, message: Message): Transcript {
   return next;
 }
 
-/** @brief 把工具结果合并到对应的工具调用。 */
+/**
+ * @brief 把工具结果合并到对应的工具调用。Mori 拒绝的固定写法（parseRejection）显示"已拒绝"，
+ *        先于"已停止"的原文判断：你按停止时挂着的卡回给模型的也是拒绝。
+ */
 function addToolResult(state: Transcript, message: Message): Transcript {
   const id = String(message.toolCallId);
   const tool = state.tools[id];
   if (!tool) return state;
   const output = contentText(message.content);
+  const rejected = message.isError ? parseRejection(output) : null;
   const failed = ABORTED_TOOL.test(output) ? 'stopped' as const : 'failed' as const;
-  const status = message.isError ? failed : 'done' as const;
-  const done = { ...tool, status, output, patch: resultPatch(message) };
+  const status = rejected ? 'rejected' as const : message.isError ? failed : 'done' as const;
+  const done = { ...tool, status, output, patch: resultPatch(message), reason: rejected?.reason ?? null };
   return { ...state, tools: { ...state.tools, [id]: done } };
 }
 
