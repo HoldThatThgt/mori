@@ -63,7 +63,8 @@ async function item1({ app, page, h, project, connection }) {
     }, 50);
   });
   await h.send('先读一下 README.md，再用 Markdown 列表总结它，最后给一个小标题。');
-  record('1 发出第一条消息', await page.getByTestId('user-message').count() === 1);
+  const sent = await page.getByTestId('user-message').first().waitFor({ timeout: 30000 }).then(() => true, () => false);
+  record('1 发出第一条消息（出现在对话流里）', sent && await page.getByTestId('user-message').count() === 1);
   return {};
 }
 
@@ -253,7 +254,7 @@ async function item10({ page, h }) {
 
 /** @brief 走查 6：key 填错 → 原文和"去设置"；key 写成没设置的 $变量 → 同样（$ 写法已不再特殊）；没有 key → 找不到 key 的原文和"去设置"。 */
 async function item6({ page, h }, wrongKey) {
-  await page.getByRole('button', { name: '设置' }).click();
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   await h.fillConnection({ apiKey: wrongKey });
   await page.getByRole('button', { name: '保存' }).click();
   await h.formMessage();

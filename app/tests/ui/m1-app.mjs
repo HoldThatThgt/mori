@@ -82,7 +82,7 @@ async function firstMessage({ page, h }) {
 
 /** @brief 设置 → 连接：测试中可以取消；改回原模型。 */
 async function cancelTest({ page, h }) {
-  await page.getByRole('button', { name: '设置' }).click();
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByTestId('settings-page').waitFor();
   await h.fillConnection({ modelId: 'fake-slow' });
   await page.getByRole('button', { name: '测试连接' }).click();
@@ -152,7 +152,7 @@ async function errors({ page, h }) {
   text = await card.innerText();
   record('错误：自动重试时阶段行显示"重试 1/3 · 原因"', stages.some((s) => s.startsWith('重试 1/3 · ')), stages.join(' → '));
   record('错误：自动重试最终失败显示原文', text.includes('500') && text.includes('把上一条消息放回输入框'), oneLine(text));
-  await page.getByRole('button', { name: '设置' }).click();
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   await h.fillConnection({ apiKey: 'wrong-key' });
   await page.getByRole('button', { name: '保存' }).click();
   await h.formMessage();

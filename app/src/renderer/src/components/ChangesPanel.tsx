@@ -1,8 +1,8 @@
 // 右栏：本会话编辑或写入过的文件，按时间顺序显示每次编辑的 diff，写入显示新内容（方案 5.9；阅读器在 M4）。
 
-import { PatchDiff } from '@pierre/diffs/react';
 import type { ToolCall, Transcript } from '../state/model';
 import { Icon } from '../icons';
+import { Diff } from './Diff';
 import { displayPath } from './toolTitle';
 
 /** @brief 一个文件的全部改动。 */
@@ -33,7 +33,7 @@ export function collectChanges(transcript: Transcript, cwd: string): FileChanges
 /** @brief 一次改动：编辑显示 diff，写入显示新内容。 */
 function Change({ tool }: { tool: ToolCall }) {
   if (tool.name === 'edit') {
-    return tool.patch ? <div className="change-diff"><PatchDiff patch={tool.patch} disableWorkerPool /></div>
+    return tool.patch ? <div className="change-diff"><Diff patch={tool.patch} /></div>
       : <p className="muted">pi 没有返回这次编辑的 diff</p>;
   }
   return (

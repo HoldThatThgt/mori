@@ -217,6 +217,13 @@ async function stopCheck(page, h) {
   record('stop：排队消息回到输入框', (await h.textarea.inputValue()).includes('排队：这条会被撤回'));
   record('stop：先撤回排队（clearQueue）再停止（abort）', (await h.replayErrors()).length === 0, (await h.replayErrors()).join('; '));
   await page.screenshot({ path: join(shots, 'stop.png') });
+  await page.evaluate(() => window.__replay.exit(1));
+  await page.getByRole('button', { name: '重新载入' }).click();
+  await page.getByText('已重新载入', { exact: false }).first().waitFor({ timeout: 10000 });
+  const reloaded = await h.cards();
+  record('stop：从会话记录重新打开后，停止的命令仍显示"已停止"、提示仍在、没有错误卡',
+    reloaded[0]?.status === 'stopped' && await page.getByText('已停止 · 已经做出的修改不会自动撤销').count() === 1
+      && await page.getByTestId('error-card').count() === 0, JSON.stringify(reloaded));
 }
 
 /** @brief 没有 key：发送时就失败，原文 + "去设置"；点它进设置页且焦点在 API key。 */

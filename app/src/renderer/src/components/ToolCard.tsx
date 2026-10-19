@@ -1,8 +1,8 @@
 // 工具卡：标题用人话，状态来自 pi 的工具事件（批准相关状态在 M2 接通）。默认折叠，展开看参数、输出和 diff。
 
 import { memo, useEffect, useState } from 'react';
-import { PatchDiff } from '@pierre/diffs/react';
 import type { ToolCall, ToolStatus } from '../state/model';
+import { Diff } from './Diff';
 import { toolTitle } from './toolTitle';
 
 /** 展开后输出最多显示的字数（取最后一段），临时默认值，见 docs/v0/defaults.md */
@@ -60,7 +60,7 @@ function ToolBody({ tool }: { tool: ToolCall }) {
         <><div className="tool-section-label">写入的内容</div><pre className="tool-pre">{content}</pre></>
       )}
       {tool.patch && (
-        <div className="tool-diff" data-testid="tool-diff"><PatchDiff patch={tool.patch} disableWorkerPool /></div>
+        <div className="tool-diff" data-testid="tool-diff"><Diff patch={tool.patch} /></div>
       )}
       {output && <><div className="tool-section-label">输出</div><pre className="tool-pre">{output}</pre></>}
     </div>

@@ -13,6 +13,7 @@
 | 退出时等后台进程释放会话 | 3 秒 | `app/src/main/kernel-process.ts` `SHUTDOWN_TIMEOUT_MS` | 超时后直接结束整个进程树；M1 没有发现需要调整的情况 | M6 |
 | 兼容选项列表 | 端点不支持 developer 角色（`supportsDeveloperRole: false`）、不接受 store（`supportsStore: false`）、最大输出用 `max_tokens`（`maxTokensField`）、不支持流式用量（`supportsUsageInStreaming: false`）、不支持 strict 模式（`supportsStrictMode: false`）、工具结果需要带工具名（`requiresToolResultName: true`） | `app/src/shared/protocol.ts` `COMPAT_OPTIONS` | 方案 5.2 要求每项配中文说明；挑的是 OpenAI 兼容端点最常见的几处差异，与思考有关的（需要 `reasoning: true` 才生效）留到 M6 | 拿到内网端点时 |
 | 错误卡附"去设置"的文字匹配 | 原文含 `401`、`unauthorized` 或 `api key`（不区分大小写） | `app/src/renderer/src/components/Transcript.tsx` `SETTINGS_HINT` | 方案 5.8；其他错误附"把上一条消息放回输入框" | 拿到内网端点的错误原文时 |
+| 从会话记录载入时识别"你按过停止" | 工具结果以 `Command aborted` / `Operation aborted` 结尾，或回复的错误原文以 `This operation was aborted` / `Request was aborted` / `Operation aborted` 开头 | `app/src/renderer/src/state/history.ts` `ABORTED_TOOL`、`ABORTED_REPLY` | 实时运行时按你按了停止判断；pi 的会话记录里没有"被停止"的标记，停止后的回复记为 `stopReason: error`，只能看原文 | pi 升级时复查原文 |
 | 工具卡展开后输出最多显示 | 最后 20,000 字 | `app/src/renderer/src/components/ToolCard.tsx` `OUTPUT_MAX` | 避免超长输出卡住渲染；pi 的命令输出本身已截到 50KB 左右 | M4（文件阅读器） |
 | "在底部"的判定 | 离底部不超过 24px | `app/src/renderer/src/components/Transcript.tsx` `BOTTOM_SLACK` | 小于一行字，滚轮停在差几像素处也算在底部 | 你走查时觉得跟随不对再调 |
 | 输入框最高 | 220px，之后在框内滚动 | `app/src/renderer/src/components/Composer.tsx` `MAX_INPUT_HEIGHT` | 约 9 行；再高会挤掉对话流 | 同上 |

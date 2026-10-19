@@ -136,7 +136,7 @@ const scenarios = [
       await args.say(rec, s, '插话：结果用英文写。', 'steer');
       await rec.settled(s.sessionId);
     } },
-  { name: 'stop', description: '命令运行中排队一条，然后按停止：先撤回排队，再停止',
+  { name: 'stop', description: '命令运行中排队一条，然后按停止：先撤回排队，再停止；结束后用会话文件重新打开',
     body: async (rec, args) => {
       const s = await args.create(rec, args);
       await args.say(rec, s, '运行命令 `sleep 30; echo late`，然后告诉我输出。');
@@ -147,6 +147,7 @@ const scenarios = [
       await rec.cmd({ type: 'session.clearQueue', sessionId: s.sessionId });
       await rec.cmd({ type: 'session.abort', sessionId: s.sessionId });
       await rec.settled(s.sessionId);
+      await rec.cmd({ type: 'session.open', sessionFile: s.sessionFile });
     } },
 ];
 
