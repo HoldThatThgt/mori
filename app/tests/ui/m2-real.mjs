@@ -148,11 +148,16 @@ async function allowedRows(page) {
     .map((button) => button.parentElement.textContent.replace('清除', '').trim()));
 }
 
-/** @brief 在权限菜单里清除一项"本会话已允许"。 */
+/**
+ * @brief 在权限菜单里清除一项"本会话已允许"，并等这一行消失（最多 5 秒）：列表在后台进程答复 approval.forget 之后才变。
+ *        没等到时不报错，由调用方的检查记下失败。
+ */
 async function forgetRow(page, label) {
   await openMenu(page);
   await page.getByTestId('permission-allowed').locator('*').filter({ hasText: label })
     .filter({ has: page.getByRole('button', { name: '清除' }) }).last().getByRole('button', { name: '清除' }).click();
+  await page.waitForFunction((text) => !document.querySelector('[data-testid="permission-allowed"]')?.textContent
+    ?.includes(text), label, { timeout: 5000 }).catch(() => {});
 }
 
 /** @brief 等本轮结束：不在生成、不在发送、阶段行消失（本轮已经结束时立即返回）。 */
@@ -182,6 +187,15 @@ async function switchSession(page, title) {
 /** @brief 权限按钮上的文字。 */
 const permissionText = (page) => page.locator(`${P}[data-testid="permission-button"]`).innerText()
   .then((text) => text.trim());
+
+/**
+ * @brief 等顶栏权限按钮变成 want（最多 5 秒）：按钮在后台进程答复 approval.setMode 之后才变，不能点完马上读。
+ * @return 是否等到了
+ */
+function permissionBecomes(page, want) {
+  return page.waitForFunction(({ selector, text }) => document.querySelector(selector)?.textContent?.trim() === text,
+    { selector: `${P}[data-testid="permission-button"]`, text: want }, { timeout: 5000 }).then(() => true, () => false);
+}
 
 /** @brief 已拒绝的卡之后有没有一条带文字的助手回复。 */
 function repliedAfterRejected(page) {
@@ -327,7 +341,7 @@ async function confirmAll(page) {
     text.includes('切换到全部允许？') && text.includes('编辑、写入和命令都不再询问。') && focused === '取消', oneLine(text));
   await shot(page, '5-confirm');
   await dialog.getByRole('button', { name: '全部允许', exact: true }).click();
-  record('5 确认后顶栏按钮显示"全部允许"', await permissionText(page) === '全部允许');
+  record('5 确认后顶栏按钮显示"全部允许"', await permissionBecomes(page, '全部允许'), await permissionText(page));
 }
 
 /** @brief 走查 5：切到"全部允许"先弹确认；之后改文件不出卡；切回后又出卡。 */
@@ -341,8 +355,9 @@ async function item5({ page, h }) {
   await shot(page, '5-all-allowed');
   const menu = await openMenu(page);
   await menu.getByRole('menuitemradio', { name: '每次询问' }).click();
-  record('5 切回"每次询问"不需要确认', await page.getByTestId('confirm-dialog').count() === 0
-    && await permissionText(page) === '每次询问');
+  const switched = await permissionBecomes(page, '每次询问');
+  record('5 切回"每次询问"不需要确认', await page.getByTestId('confirm-dialog').count() === 0 && switched,
+    await permissionText(page));
   await h.send('运行命令 `echo back`，然后告诉我输出。');
   const back = await answerCards(page, allowAll(page, h));
   record('5 切回后又出卡', back.length >= 1);
