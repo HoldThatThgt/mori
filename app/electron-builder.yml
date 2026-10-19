@@ -1,0 +1,20 @@
+# Mori 的 Windows 打包配置：NSIS 安装包（可选安装目录）与免安装目录版；不签名、不发布、不自动更新。
+appId: com.holdthatthgt.mori
+productName: Mori
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+asar: true
+npmRebuild: false
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+publish: null
