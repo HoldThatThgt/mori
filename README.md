@@ -16,7 +16,8 @@ Agent 向权限范围内的共享区追加简短结果、来源和更正；其�
 当前方案（v0）：Electron 桌面 App，后端原样使用 pi-coding-agent SDK（1.3.0），Mori 只做界面、离线安装包和进程桥。
 方案见 [Mori App v0 方案](docs/app-v0.md)，代码在 [app/](app/README.md)。
 
-当前阶段：M1（对话界面）已完成，等待走查签收。检查记录见 [M0](docs/v0/m0-checks.md) 和 [M1](docs/v0/m1-checks.md)。
+当前阶段：M2（批准与 F8）开发中：界面、后台进程与合成端点测试已完成，真实会话录制与真实模型走查等你提供走查数据目录。
+检查记录见 [M0](docs/v0/m0-checks.md)、[M1](docs/v0/m1-checks.md) 和 [M2](docs/v0/m2-checks.md)。
 
 原设计入口：[Mori 产品与技术 Proposal](docs/proposal.md)。其中以 DSH 为基座的选择和多 agent 机制本轮暂停，见 v0 方案第 9 节。
 
