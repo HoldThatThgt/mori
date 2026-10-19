@@ -1,9 +1,9 @@
 // 把后台进程转发的 pi 事件归并成对话流。纯函数：时间由调用方传入，界面测试用录制的事件回放同一条路径。
-// 每个状态的来源见 docs/v0/screens/chat.md 与 tool-cards.md。
+// 每个状态的来源见 docs/v0/screens/chat.md、tool-cards.md 与 approval.md。
 
-import type { ForwardedEvent, SlimMessageUpdate } from '../../../shared/protocol';
+import type { ApprovalEndBy, ForwardedEvent, SlimMessageUpdate, ToolGate } from '../../../shared/protocol';
 import {
-  blocksFromContent, contentText, newTool, pushItem, resultPatch,
+  blocksFromContent, contentText, newTool, parseRejection, pushItem, resultPatch,
   type Block, type Item, type Stage, type ToolCall, type Transcript,
 } from './model';
 
@@ -29,6 +29,12 @@ function updateLastAssistant(state: Transcript, fn: (item: Assistant) => Assista
 function updateTool(state: Transcript, id: string, name: string, fn: (tool: ToolCall) => ToolCall): Transcript {
   const tool = state.tools[id] ?? newTool(id, name);
   return { ...state, tools: { ...state.tools, [id]: fn(tool) } };
+}
+
+/** @brief 更新一次已有的工具调用；没有时原样返回（例如扩展里嵌套的调用没有工具卡）。 */
+function patchTool(state: Transcript, id: string, fn: (tool: ToolCall) => ToolCall): Transcript {
+  const tool = state.tools[id];
+  return tool ? { ...state, tools: { ...state.tools, [id]: fn(tool) } } : state;
 }
 
 /** @brief 正文或工具调用开始后，之前的思考自动收起。 */
@@ -83,13 +89,16 @@ function applyUpdate(state: Transcript, event: SlimMessageUpdate, now: number): 
   return state;
 }
 
-/** @brief 助手回复结束：以 pi 给出的完整内容为准，思考收起，记下错误等 agent_end 决定是否显示。 */
+/**
+ * @brief 助手回复结束：以 pi 给出的完整内容为准，思考收起，记下错误等 agent_end 决定是否显示。
+ *        参数已经完整、pi 还没开始执行的调用从"准备中"变成"等待执行"（一条回复里的调用按顺序执行）。
+ */
 function applyAssistantEnd(state: Transcript, message: Record<string, unknown>): Transcript {
   const { blocks, tools } = blocksFromContent(message.content);
   let next = updateLastAssistant(state, (item) => ({ ...item, blocks, streaming: false }));
   for (const tool of tools) {
     next = updateTool(next, tool.id, tool.name, (current) => ({ ...current, args: tool.args,
-      argsText: tool.argsText }));
+      argsText: tool.argsText, status: current.status === 'preparing' ? 'queued' : current.status }));
   }
   if (message.stopReason === 'error') {
     next = { ...next, pendingError: String(message.errorMessage ?? 'The model returned an error') };
@@ -118,49 +127,116 @@ function runningToolStage(state: Transcript): Stage | null {
   return running ? { kind: 'tool', since: running.startedAt ?? 0, detail: running.id } : null;
 }
 
-/** @brief 处理工具执行事件。 */
+/** @brief 一件事结束后的阶段：有挂起的批准时总是"等你批准"，否则是还在执行的工具，都没有时不显示。 */
+function nextStage(state: Transcript, now: number): Stage | null {
+  if (state.approvals.length === 0) return runningToolStage(state);
+  return state.stage?.kind === 'approval' ? state.stage : { kind: 'approval', since: now, detail: '' };
+}
+
+/** @brief 自动放行的原因：本会话已允许 / 全部允许；只读工具和要批准的调用没有。 */
+function autoAllowed(gate: ToolGate | ApprovalEndBy | null): ToolCall['allowedBy'] {
+  return gate === 'session' || gate === 'all' ? gate : null;
+}
+
+/** @brief 最后一条助手回复里是否已有这次调用的工具卡。 */
+function hasToolBlock(state: Transcript, id: string): boolean {
+  const last = state.items.findLast((item) => item.kind === 'assistant');
+  return last?.kind === 'assistant' && last.blocks.some((block) => block.type === 'tool' && block.id === id);
+}
+
+/**
+ * @brief 工具开始执行。mori.tool_gate 为 ask 的调用先"等你批准"（pi 先发这个事件、再调用批准处理器），
+ *        其余的直接"执行中"，本会话已允许 / 全部允许的标出原因。
+ */
+function applyToolStart(state: Transcript, event: EventOf<'tool_execution_start'>, now: number): Transcript {
+  const id = event.toolCallId;
+  let next = state;
+  if (!hasToolBlock(state, id)) {
+    next = updateLastAssistant(state, (item) => ({ ...item, blocks: [...item.blocks, { type: 'tool', id }] }));
+  }
+  const ask = state.tools[id]?.gate === 'ask';
+  next = updateTool(next, id, event.toolName, (tool) => ({
+    ...tool, args: (event.args as Record<string, unknown>) ?? tool.args, status: ask ? 'awaiting' : 'running',
+    startedAt: ask ? null : now, allowedBy: autoAllowed(tool.gate),
+  }));
+  if (ask || next.approvals.length > 0) return setStage(next, 'approval', now);
+  return { ...next, stage: { kind: 'tool', since: now, detail: id } };
+}
+
+/**
+ * @brief mori.tool_gate。tool_execution_start 之前收到的只记下来；之后再收到的是后台进程的更正：
+ *        预告要批准、实际已不用批准（例如排队的嵌套调用轮到时，你已选了"本会话不再询问"），
+ *        还在"等你批准"且没有挂起请求的卡直接变"执行中"，标出放行原因。
+ */
+function applyToolGate(state: Transcript, event: EventOf<'mori.tool_gate'>, now: number): Transcript {
+  const id = event.toolCallId;
+  const tool = state.tools[id];
+  const pending = state.approvals.some((item) => item.toolCallId === id);
+  if (tool?.status !== 'awaiting' || pending || event.gate === 'ask') {
+    return updateTool(state, id, event.toolName, (current) => ({ ...current, gate: event.gate }));
+  }
+  const next = patchTool(state, id, (current) => ({ ...current, gate: event.gate, status: 'running', startedAt: now,
+    allowedBy: autoAllowed(event.gate) }));
+  if (next.approvals.length > 0) return setStage(next, 'approval', now);
+  return { ...next, stage: { kind: 'tool', since: now, detail: id } };
+}
+
+/** @brief 处理工具执行事件。已拒绝的调用之后的 tool_execution_end（isError）只记下输出，不改变状态。 */
 function applyToolExecution(state: Transcript, event: EventOf<'tool_execution_start' | 'tool_execution_update'
   | 'tool_execution_end'>, now: number): Transcript {
-  if (event.type === 'tool_execution_start') {
-    let next = state;
-    if (!state.tools[event.toolCallId]) {
-      const block = { type: 'tool' as const, id: event.toolCallId };
-      next = updateLastAssistant(state, (item) => ({ ...item, blocks: [...item.blocks, block] }));
-    }
-    next = updateTool(next, event.toolCallId, event.toolName, (tool) => ({
-      ...tool, args: (event.args as Record<string, unknown>) ?? tool.args, status: 'running', startedAt: now,
-    }));
-    return { ...next, stage: { kind: 'tool', since: now, detail: event.toolCallId } };
-  }
+  if (event.type === 'tool_execution_start') return applyToolStart(state, event, now);
   if (event.type === 'tool_execution_update') {
     return updateTool(state, event.toolCallId, event.toolName, (tool) => ({ ...tool,
       output: contentText((event.partialResult as { content?: unknown } | undefined)?.content) }));
   }
   const status = event.isError ? (state.stopRequested ? 'stopped' : 'failed') : 'done';
   const next = updateTool(state, event.toolCallId, event.toolName, (tool) => ({
-    ...tool, status, output: contentText((event.result as { content?: unknown } | undefined)?.content),
+    ...tool, status: tool.status === 'rejected' ? 'rejected' : status,
+    output: contentText((event.result as { content?: unknown } | undefined)?.content),
     patch: resultPatch(event.result), durationMs: event.durationMs ?? (tool.startedAt ? now - tool.startedAt : null),
   }));
-  return { ...next, stage: runningToolStage(next) };
+  return { ...next, stage: nextStage(next, now) };
 }
 
-/** @brief 把还没结束的工具调用标成 status（停止或中断时）。 */
+/**
+ * @brief 批准请求开始与结束。允许后从这一刻开始计时；你在卡上允许的不标原因，
+ *        "本会话不再询问"或切到"全部允许"顺带放行的标出原因。拒绝后等模型收到拒绝再回复。
+ */
+function applyApproval(state: Transcript, event: EventOf<'mori.approval_request' | 'mori.approval_end'>,
+  now: number): Transcript {
+  if (event.type === 'mori.approval_request') {
+    if (state.approvals.some((item) => item.requestId === event.requestId)) return state;
+    const { requestId, toolCallId, toolName, args } = event;
+    const next = patchTool({ ...state, approvals: [...state.approvals, { requestId, toolCallId, toolName, args }] },
+      toolCallId, (tool) => ({ ...tool, status: 'awaiting', startedAt: null }));
+    return setStage(next, 'approval', now);
+  }
+  const approvals = state.approvals.filter((item) => item.requestId !== event.requestId);
+  const next = patchTool({ ...state, approvals }, event.toolCallId, (tool) => (event.decision === 'allow'
+    ? { ...tool, status: 'running', startedAt: now, allowedBy: autoAllowed(event.by) }
+    : { ...tool, status: 'rejected', reason: parseRejection(event.reason ?? '')?.reason ?? null }));
+  return { ...next, stage: nextStage(next, now) };
+}
+
+/** @brief 把还没结束的工具调用（准备中、等待执行、等你批准、执行中）标成 status（停止或中断时）；挂起的批准一并清掉。 */
 export function finishOpenTools(state: Transcript, status: 'stopped' | 'interrupted'): Transcript {
   const tools = { ...state.tools };
   for (const tool of Object.values(tools)) {
-    if (['preparing', 'awaiting', 'running'].includes(tool.status)) tools[tool.id] = { ...tool, status };
+    if (['preparing', 'queued', 'awaiting', 'running'].includes(tool.status)) tools[tool.id] = { ...tool, status };
   }
   const items = state.items.map((item) => (item.kind === 'assistant' && item.streaming
     ? { ...item, streaming: false, blocks: collapseThinking(item.blocks) } : item));
-  return { ...state, tools, items };
+  return { ...state, tools, items, approvals: [] };
 }
 
-/** @brief 本轮结束：清掉运行状态；停止过就留一行"已停止"。 */
+/** @brief 本轮结束：清掉运行状态和挂起的批准；停止过就留一行"已停止"，没执行的调用标"已停止"或"已中断"。 */
 function applySettled(state: Transcript, aborted: boolean): Transcript {
   let next = state;
   if (aborted || state.stopRequested) next = pushItem(finishOpenTools(next, 'stopped'), { kind: 'stopped' });
+  // 本轮正常结束时还没执行的调用（例如回复出错，pi 不执行其中的调用）：与从会话记录载入时一样显示"已中断"。
+  else next = finishOpenTools(next, 'interrupted');
   return { ...next, running: false, sending: false, stage: null, stopRequested: false, retrying: false,
-    pendingError: null };
+    pendingError: null, approvals: [] };
 }
 
 /** @brief 追加一张错误卡；restore 是"放回输入框"的内容。 */
@@ -218,6 +294,11 @@ export function applyEvent(state: Transcript, event: ForwardedEvent, now: number
       return applyToolExecution(state, event, now);
     case 'queue_update':
       return { ...state, steering: [...event.steering], followUp: [...event.followUp] };
+    case 'mori.tool_gate':
+      return applyToolGate(state, event, now);
+    case 'mori.approval_request':
+    case 'mori.approval_end':
+      return applyApproval(state, event, now);
     case 'mori.prompt_error':
       return pushError({ ...state, sending: false }, event.message, event.text);
     default:

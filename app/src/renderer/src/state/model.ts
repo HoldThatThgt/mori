@@ -1,8 +1,10 @@
 // 对话流的数据模型：由 pi 事件（transcript.ts）或会话记录（history.ts）归并而来，界面只读它。
 
+import { REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type ToolGate } from '../../../shared/protocol';
+
 /** @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md。 */
 export type ToolStatus =
-  | 'preparing' | 'awaiting' | 'running' | 'done' | 'failed' | 'rejected' | 'stopped' | 'interrupted';
+  | 'preparing' | 'queued' | 'awaiting' | 'running' | 'done' | 'failed' | 'rejected' | 'stopped' | 'interrupted';
 
 /** @brief 一次工具调用。 */
 export interface ToolCall {
@@ -24,10 +26,24 @@ export interface ToolCall {
   startedAt: number | null;
   /** 实时运行时的耗时（ms）；从会话记录载入时为 null */
   durationMs: number | null;
-  /** 已拒绝时你写的理由（M2） */
+  /** 已拒绝时工具卡上显示的理由：你写的理由，或"你按了停止"；没写理由时为 null */
   reason: string | null;
-  /** 自动放行的原因（M2）：本会话已允许 / 全部允许 */
+  /** 自动放行的原因：本会话已允许 / 全部允许；你在卡上允许的、只读工具和会话记录里的为 null */
   allowedBy: 'session' | 'all' | null;
+  /** 后台进程说这次调用会怎样处理（mori.tool_gate）；还没收到或从会话记录载入时为 null */
+  gate: ToolGate | null;
+}
+
+/** @brief 一个等你选择的批准请求（mori.approval_request）。 */
+export interface PendingApproval {
+  /** 请求 id，approval.answer 用它答复 */
+  requestId: string;
+  /** pi 的 toolCallId */
+  toolCallId: string;
+  /** 工具名 */
+  toolName: string;
+  /** 完整的调用参数 */
+  args: Record<string, unknown>;
 }
 
 /** @brief 助手回复里的一段：正文、思考或一次工具调用；下标与 pi 的 contentIndex 一致。 */
@@ -71,6 +87,8 @@ export interface Transcript {
   steering: string[];
   /** pi 排队区：排队 */
   followUp: string[];
+  /** 挂起的批准请求，按到达顺序；批准卡显示第一张 */
+  approvals: PendingApproval[];
   /** 你按了停止，本轮还没结束 */
   stopRequested: boolean;
   /** 正在自动重试 */
@@ -86,7 +104,7 @@ export interface Transcript {
 }
 
 export const emptyTranscript: Transcript = {
-  items: [], tools: {}, running: false, sending: false, stage: null, steering: [], followUp: [],
+  items: [], tools: {}, running: false, sending: false, stage: null, steering: [], followUp: [], approvals: [],
   stopRequested: false, retrying: false, pendingError: null, lastUserText: null, firstUserText: null, seq: 0,
 };
 
@@ -99,7 +117,21 @@ export function pushItem(state: Transcript, item: DistributiveOmit<Item, 'key'>)
 /** @brief 新建一次工具调用。 */
 export function newTool(id: string, name: string): ToolCall {
   return { id, name, argsText: '', args: null, status: 'preparing', output: '', patch: null, startedAt: null,
-    durationMs: null, reason: null, allowedBy: null };
+    durationMs: null, reason: null, allowedBy: null, gate: null };
+}
+
+/** 卡还挂着时你按了停止：工具卡上显示的理由 */
+const STOPPED_REASON = '你按了停止';
+
+/**
+ * @brief 认出 Mori 拒绝时回给模型的工具结果（固定写法见 protocol.ts 的 REJECTED_*）。
+ * @return 不是拒绝时为 null；是拒绝时 reason 为工具卡上显示的理由（没写理由时为 null）
+ */
+export function parseRejection(text: string): { reason: string | null } | null {
+  if (text === REJECTED_BY_STOP) return { reason: STOPPED_REASON };
+  if (text.startsWith(REJECTED_REASON_PREFIX)) return { reason: text.slice(REJECTED_REASON_PREFIX.length) };
+  if (text === REJECTED_TEXT) return { reason: null };
+  return null;
 }
 
 /** @brief 对联合类型逐个成员做 Omit。 */

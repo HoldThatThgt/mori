@@ -3,7 +3,9 @@
 import type { Command, ConfigInfo, EventEnvelope } from '../shared/protocol';
 import { cancelTest, readConnection, saveConnection, testConnection } from './config';
 import { loadPi } from './pi';
-import { abort, clearQueue, createSession, openSession, prompt, sessionState } from './sessions';
+import {
+  abort, answerApproval, clearQueue, createSession, forgetApproval, openSession, prompt, sessionState, setApprovalMode,
+} from './sessions';
 
 /** @brief 执行一条命令并返回结果；失败时抛错，由调用方回复给界面。 */
 export async function handleCommand(command: Command, emit: (envelope: EventEnvelope) => void): Promise<unknown> {
@@ -32,5 +34,11 @@ export async function handleCommand(command: Command, emit: (envelope: EventEnve
       return abort(command.sessionId);
     case 'session.state':
       return sessionState(command.sessionId);
+    case 'approval.answer':
+      return answerApproval(command.sessionId, command.requestId, command.decision, command.reason);
+    case 'approval.setMode':
+      return setApprovalMode(command.sessionId, command.mode);
+    case 'approval.forget':
+      return forgetApproval(command.sessionId, command.toolName);
   }
 }

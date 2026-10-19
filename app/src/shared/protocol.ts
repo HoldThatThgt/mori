@@ -60,6 +60,37 @@ export type Connection = z.infer<typeof ConnectionSchema>;
 
 const sessionId = z.string().min(1);
 
+/** @brief 批准权限：每次询问 / 全部允许（方案 5.7，只作用于一个会话）。 */
+export type ApprovalMode = 'ask' | 'all';
+
+/** @brief 一个会话的批准设置；只存在后台进程的内存里，重新载入后回到默认值。 */
+export interface ApprovalState {
+  /** 权限 */
+  mode: ApprovalMode;
+  /** "本会话不再询问"记下的工具名，按记下的顺序 */
+  allowed: string[];
+}
+
+/** @brief 新会话的批准设置。 */
+export const DEFAULT_APPROVAL: ApprovalState = { mode: 'ask', allowed: [] };
+
+/** @brief "每次询问"时也直接执行的只读工具（方案 5.7：放行名单是一个常量）。 */
+export const READ_ONLY_TOOLS: readonly string[] = ['read', 'grep', 'find', 'ls'];
+
+/**
+ * 拒绝时回给模型的工具结果的固定写法（临时默认值，见 docs/v0/defaults.md）。
+ * 从会话记录载入时，界面按这几种写法认出"已拒绝"。
+ */
+export const REJECTED_TEXT = 'Rejected by the user.';
+/** @brief 你写了理由时：前缀加理由原文。 */
+export const REJECTED_REASON_PREFIX = 'Rejected by the user. Reason: ';
+/** @brief 你按了停止、卡还挂着时。 */
+export const REJECTED_BY_STOP = 'Rejected: the user stopped the run.';
+
+/** @brief 你在批准卡上的选择：允许一次 / 本会话不再询问此工具 / 拒绝。 */
+export const APPROVAL_DECISIONS = ['allow', 'allowSession', 'reject'] as const;
+export type ApprovalDecision = (typeof APPROVAL_DECISIONS)[number];
+
 /** @brief 界面发给后台进程的全部命令。 */
 export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('config.get') }),
@@ -78,6 +109,18 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.clearQueue'), sessionId }),
   z.object({ type: z.literal('session.abort'), sessionId }),
   z.object({ type: z.literal('session.state'), sessionId }),
+  z.object({
+    type: z.literal('approval.answer'),
+    sessionId,
+    /** 批准请求 id（mori.approval_request） */
+    requestId: z.string().min(1),
+    decision: z.enum(APPROVAL_DECISIONS),
+    /** 拒绝理由；只在拒绝时有意义，空串等于没写 */
+    reason: z.string().optional(),
+  }),
+  z.object({ type: z.literal('approval.setMode'), sessionId, mode: z.enum(['ask', 'all']) }),
+  /** 从"本会话已允许"里清除一个工具名 */
+  z.object({ type: z.literal('approval.forget'), sessionId, toolName: z.string().min(1) }),
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 
@@ -131,6 +174,8 @@ export interface SessionInfo {
   modelNotice: string | null;
   /** 上下文用量（pi getContextUsage） */
   contextUsage: ContextUsage | null;
+  /** 批准设置；新建和重新打开的会话都是"每次询问" */
+  approval: ApprovalState;
 }
 
 /** @brief session.open 的结果：会话信息加 pi 记录的当前分支（SessionManager.getBranch）。 */
@@ -178,8 +223,65 @@ export interface SlimMessageUpdate {
   };
 }
 
-/** @brief Mori 后台进程自己产生的事件：发出提示时就失败（例如没有可用模型）。 */
-export type KernelEvent = { type: 'mori.prompt_error'; message: string; text: string };
+/**
+ * @brief 一次工具调用会怎样处理：ask 要批准；session 本会话已允许；all 全部允许；free 只读工具。
+ *        在 pi 的 tool_execution_start 转发之前紧挨着发出，界面据此决定工具卡是"等你批准"还是"执行中"；
+ *        批准处理器后来判断不同时再发一次更正（见 KernelEvent 的 mori.tool_gate）。
+ */
+export type ToolGate = 'ask' | 'session' | 'all' | 'free';
+
+/** @brief 批准请求由谁结束：你、"本会话不再询问"、切到"全部允许"、你按了停止、会话被中止或释放。 */
+export type ApprovalEndBy = 'user' | 'session' | 'all' | 'stop' | 'closed';
+
+/** @brief Mori 后台进程自己产生的事件。 */
+export type KernelEvent =
+  /** 发出提示时就失败（例如没有可用模型） */
+  | {
+    type: 'mori.prompt_error';
+    /** 错误原文 */
+    message: string;
+    /** 没发出去的提示原文，界面放回输入框 */
+    text: string;
+  }
+  /**
+   * 这次调用会怎样处理，见 ToolGate。每个调用在 tool_execution_start 之前发一次；批准处理器后来的判断
+   * 与预告不同（预告 ask，实际已不用批准）时，同一 toolCallId 会再发一次更正，不带批准请求。
+   */
+  | {
+    type: 'mori.tool_gate';
+    /** pi 的 toolCallId */
+    toolCallId: string;
+    /** 工具名 */
+    toolName: string;
+    /** 处理方式；更正时为处理器实际的判断 */
+    gate: ToolGate;
+  }
+  /** 批准扩展在等你选择 */
+  | {
+    type: 'mori.approval_request';
+    /** 请求 id，approval.answer 用它答复 */
+    requestId: string;
+    /** pi 的 toolCallId */
+    toolCallId: string;
+    /** 工具名 */
+    toolName: string;
+    /** 完整的调用参数 */
+    args: Record<string, unknown>;
+  }
+  /** 批准请求结束：允许或拒绝 */
+  | {
+    type: 'mori.approval_end';
+    /** 结束的请求 id（mori.approval_request） */
+    requestId: string;
+    /** pi 的 toolCallId */
+    toolCallId: string;
+    /** 允许或拒绝 */
+    decision: 'allow' | 'reject';
+    /** 由谁结束，见 ApprovalEndBy */
+    by: ApprovalEndBy;
+    /** 拒绝时回给模型的工具结果原文；允许时为 null */
+    reason: string | null;
+  };
 
 /** @brief 转发给界面的事件。 */
 export type ForwardedEvent = Exclude<AgentSessionEvent, { type: 'message_update' }> | SlimMessageUpdate | KernelEvent;
