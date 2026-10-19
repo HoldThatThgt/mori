@@ -76,6 +76,19 @@ export function pageHelpers(page) {
       }, { old: previous, onlyTest: test }, { timeout });
       return page.getByTestId('form-message').innerText();
     },
+    /**
+     * @brief 把当前会话切到"全部允许"（权限菜单 → 全部允许 → 确认）。M2 起命令和编辑先要批准，
+     *        M0/M1 的测试测的是批准之外的行为，打开会话后先切到全部允许。
+     */
+    async allowAll() {
+      const pane = page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]');
+      await pane.getByTestId('permission-button').click();
+      await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: '全部允许' }).click();
+      await page.getByTestId('confirm-dialog').getByRole('button', { name: '全部允许' }).click();
+      await page.waitForFunction(() => document.querySelector(
+        '.pane-slot:not([hidden]) [data-testid="permission-button"]')?.textContent?.includes('全部允许'),
+      null, { timeout: 10000 });
+    },
     /** @brief 让系统的选文件夹对话框直接返回 folder，再点"打开文件夹…"。 */
     async openFolder(app, folder) {
       await app.evaluate(({ dialog }, path) => {

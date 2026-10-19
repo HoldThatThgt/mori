@@ -53,6 +53,8 @@ async function item1({ app, page, h, project, connection }) {
   record('1 测试连接成功（显示首字耗时），进入"打开文件夹…"', /连接成功 · 首字 \d+ ms/.test(result), oneLine(result));
   await shot(page, '1-test-ok');
   await h.openFolder(app, project);
+  // M2 起命令和编辑要先批准；这里走查的是 M1 的行为，先切到全部允许。
+  await h.allowAll();
   await h.sampleStages();
   await h.watchThinking();
   await page.evaluate(() => {
@@ -303,6 +305,7 @@ async function item8(project) {
     const h = pageHelpers(page);
     await page.getByRole('button', { name: '打开文件夹…' }).first().waitFor({ timeout: 60000 });
     await h.openFolder(app, project);
+    await h.allowAll();
     await h.sampleStages();
     for (const text of ['读一下 README.md 和 src/a.ts，然后详细介绍这个项目。', '再详细解释 add 函数，并给出三个使用例子。']) {
       await h.send(text);

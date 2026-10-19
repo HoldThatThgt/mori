@@ -1,16 +1,33 @@
 // 回放界面测试的入口：先装好回放进程桥（window.mori），再载入真正的界面（src/renderer/src/main.tsx）。
-// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>。synthetic-long-history 是手写拼出的长会话（synthetic），
-// 由真实录制的 queue-steer 会话记录重复 15 次得到，只用来测"先显示 50 条、上滚载入更早的"。
+// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>。录制文件来自 tests/fixtures/m1 与 m2，两处的名字不能重复。
+// synthetic-long-history 是手写拼出的长会话（synthetic），由真实录制的 queue-steer 会话记录重复 15 次得到，
+// 只用来测"先显示 50 条、上滚载入更早的"。
 
 import { createReplayBridge } from './replay.js';
 
-const fixtures = import.meta.glob('../../fixtures/m1/*.json', { eager: true, import: 'default' });
+const globbed = {
+  ...import.meta.glob('../../fixtures/m1/*.json', { eager: true, import: 'default' }),
+  ...import.meta.glob('../../fixtures/m2/*.json', { eager: true, import: 'default' }),
+};
 const params = new URLSearchParams(location.search);
 const name = params.get('fixture') ?? 'readme';
 
+/** @brief 按文件名（不含目录和扩展名）索引录制文件；m1 与 m2 里有同名文件时报错。 */
+function indexByName(files) {
+  const byName = new Map();
+  for (const [path, data] of Object.entries(files)) {
+    const key = path.split('/').pop().replace(/\.json$/, '');
+    if (byName.has(key)) throw new Error(`Duplicate fixture name ${key}`);
+    byName.set(key, data);
+  }
+  return byName;
+}
+
+const fixtures = indexByName(globbed);
+
 /** @brief 按名字取录制文件。 */
 function fixture(fixtureName) {
-  const found = fixtures[`../../fixtures/m1/${fixtureName}.json`];
+  const found = fixtures.get(fixtureName);
   if (!found) throw new Error(`Unknown fixture ${fixtureName}`);
   return found;
 }

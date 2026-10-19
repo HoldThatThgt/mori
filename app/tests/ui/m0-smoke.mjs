@@ -86,6 +86,8 @@ async function connect(app, page, userData, project) {
       Boolean(JSON.parse(credentials)['mori-endpoint']),
     `models.json 有 apiKey 字段=${'apiKey' in provider}；credentials.json 含明文=${credentials.includes(testKey)}`);
   await pageHelpers(page).openFolder(app, project);
+  // M2 起命令要先批准；冒烟测的是批准之外的行为，先切到全部允许。
+  await pageHelpers(page).allowAll();
   await page.getByRole('button', { name: '设置' }).click();
   await pageHelpers(page).fillConnection({ baseUrl: `http://localhost:${port}/v1`, apiKey: '' });
   await page.getByRole('button', { name: '保存' }).click();
