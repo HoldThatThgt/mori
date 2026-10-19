@@ -6,7 +6,6 @@ import { Chat } from './Chat';
 
 // 上下文长度的默认值是临时默认值，见 docs/v0/defaults.md
 const emptyForm: Connection = { name: '', baseUrl: '', apiKey: '', modelId: '', contextWindow: 128000 };
-const ENV_REFERENCE = /^\$(?:\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)$/;
 
 /** @brief 把异常转成一行文字，并记录到控制台。 */
 function describe(what: string, error: unknown): string {
@@ -28,7 +27,7 @@ function useConnectionForm(onSaved: (saved: boolean) => void) {
       (info) => {
         if (!info.saved) return;
         setForm(info.saved.connection);
-        setKeySaved(info.saved.apiKeyKind === 'literal');
+        setKeySaved(info.saved.keySaved);
         onSaved(true);
       },
       (error: unknown) => setMessage(`读取配置失败：${describe('config.get', error)}`),
@@ -50,7 +49,9 @@ function useConnectionForm(onSaved: (saved: boolean) => void) {
     setTest(null);
     const result = await window.mori.request<{ error: string | null }>({ type: 'connection.save', connection: form });
     setMessage(result.error ? `已保存，但配置有错误：${result.error}` : '已保存');
-    setKeySaved(form.apiKey ? !ENV_REFERENCE.test(form.apiKey) : keySaved);
+    // key 已交给后台进程加密保存，界面里不再留着它。
+    setKeySaved(true);
+    setForm((current) => ({ ...current, apiKey: '' }));
     onSaved(true);
   });
   const runTest = () => run('测试', async () => {
@@ -77,13 +78,16 @@ function ConnectionPanel({ onSaved }: { onSaved: (saved: boolean) => void }) {
   const { form, setForm, keySaved, message, test, busy, save, runTest } = useConnectionForm(onSaved);
   const field = (key: keyof Connection) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [key]: key === 'contextWindow' ? Number(event.target.value) : event.target.value });
-  const keyHint = keySaved ? '已保存（不显示）；改了服务地址就要重新填写' : 'key 本身，或 $环境变量名';
+  const keyHint = keySaved ? '已加密保存（不显示）；改了服务地址就要重新填写' : '保存后由 Mori 加密存放在本机';
   return (
     <section className="panel">
       <h2>连接</h2>
       <label>名称<input value={form.name} onChange={field('name')} placeholder="内网模型" /></label>
       <label>服务地址<input value={form.baseUrl} onChange={field('baseUrl')} placeholder="http://host:8000/v1" /></label>
-      <label>API key<input value={form.apiKey} onChange={field('apiKey')} placeholder={keyHint} /></label>
+      <label>
+        API key
+        <input type="password" value={form.apiKey} onChange={field('apiKey')} placeholder={keyHint} />
+      </label>
       <label>模型 ID<input value={form.modelId} onChange={field('modelId')} placeholder="qwen3-coder" /></label>
       <label>上下文长度<input type="number" value={form.contextWindow} onChange={field('contextWindow')} /></label>
       <div className="row">

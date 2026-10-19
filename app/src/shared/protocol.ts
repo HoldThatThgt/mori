@@ -9,7 +9,7 @@ export const ConnectionSchema = z.object({
   name: z.string().trim().min(1),
   /** 服务地址，例如 http://host:8000/v1 */
   baseUrl: z.string().trim().url(),
-  /** API key 本身，或 pi 支持的 "$环境变量名"；留空表示沿用已保存的 key（仅限服务地址 origin 不变） */
+  /** API key；留空表示沿用已保存的 key（仅限服务地址 origin 不变）。Mori 加密保存，不写进 models.json */
   apiKey: z.string().trim(),
   /** 发给端点的模型 ID */
   modelId: z.string().trim().min(1),
@@ -29,12 +29,12 @@ export const CommandSchema = z.discriminatedUnion('type', [
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 
-/** @brief 已保存连接的公开信息；明文 key 不回传界面。 */
+/** @brief 已保存连接的公开信息；key 不回传界面。 */
 export interface SavedConnection {
-  /** 连接本身；apiKeyKind 为 literal 时 apiKey 被置空 */
+  /** 连接本身；apiKey 总是空串 */
   connection: Connection;
-  /** key 的保存方式：明文，或纯粹的环境变量引用 */
-  apiKeyKind: 'literal' | 'env';
+  /** 是否已有保存的 key */
+  keySaved: boolean;
 }
 
 /** @brief config.get 的结果。 */

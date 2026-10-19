@@ -1,8 +1,11 @@
 // 读写 pi 自己的 models.json 与默认模型，并通过 pi 的 ModelRuntime 测试连接。
+// API key 不写进 models.json：由主进程加密保存，pi 只在内存里持有（runtime API key）。
 
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import type { ModelRuntime } from '@earendil-works/pi-coding-agent';
 import type { Connection, SavedConnection, TestResult } from '../shared/protocol';
+import { requestStoreKey } from './credentials';
 import { defaultModel, getRuntime, globalSettings } from './pi';
 
 /** Mori 在 models.json 中使用的 provider id */
@@ -12,21 +15,8 @@ export const PROVIDER_ID = 'mori-endpoint';
 const TEST_TIMEOUT_MS = 30_000;
 const TEST_MAX_TOKENS = 512;
 
-/** pi 配置语法里纯粹的环境变量引用：$NAME 或 ${NAME} */
-const ENV_REFERENCE = /^\$(?:\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)$/;
-
 type JsonObject = Record<string, unknown>;
 type ModelsFile = JsonObject & { providers?: Record<string, JsonObject> };
-
-/** @brief 判断 key 是否为环境变量引用。 */
-export function isEnvReference(value: string): boolean {
-  return ENV_REFERENCE.test(value);
-}
-
-/** @brief 把明文 key 转成 pi 配置语法里的字面值："$" 写成 "$$"，开头的 "!" 写成 "$!"，避免被当作变量或命令。 */
-function toPiLiteral(key: string): string {
-  return key.replace(/\$/g, '$$$$').replace(/^!/, '$!');
-}
 
 /** @brief 读取 models.json；文件不存在时返回空对象，无法解析时报错且不改动文件。 */
 async function readModelsFile(path: string): Promise<ModelsFile> {
@@ -52,42 +42,33 @@ async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
   await rename(temp, path);
 }
 
-/** @brief 从 models.json 中取出 Mori 保存的连接；明文 key 不返回。 */
+/** @brief pi 内存里是否有这个 provider 的 key。 */
+function hasKey(runtime: ModelRuntime): boolean {
+  return runtime.getProviderAuthStatus(PROVIDER_ID).source === 'runtime';
+}
+
+/** @brief 从 models.json 中取出 Mori 保存的连接；key 不回传，只说明是否已保存。 */
 export async function readConnection(agentDir: string): Promise<SavedConnection | null> {
   const file = await readModelsFile(join(agentDir, 'models.json'));
   const provider = file.providers?.[PROVIDER_ID];
   const model = (provider?.models as JsonObject[] | undefined)?.[0];
   if (!provider || !model) return null;
-  const apiKey = String(provider.apiKey ?? '');
-  const apiKeyKind = isEnvReference(apiKey) ? 'env' : 'literal';
   return {
-    apiKeyKind,
+    keySaved: hasKey(await getRuntime()),
     connection: {
       name: String(provider.name ?? PROVIDER_ID),
       baseUrl: String(provider.baseUrl ?? ''),
-      apiKey: apiKeyKind === 'env' ? apiKey : '',
+      apiKey: '',
       modelId: String(model.id ?? ''),
       contextWindow: Number(model.contextWindow ?? 128000),
     },
   };
 }
 
-/** @brief 决定写入的 key：留空时只在服务地址的 origin 不变时沿用旧 key。 */
-function resolveApiKey(connection: Connection, previous: JsonObject | undefined): string {
-  if (connection.apiKey) return isEnvReference(connection.apiKey) ? connection.apiKey : toPiLiteral(connection.apiKey);
-  const previousKey = String(previous?.apiKey ?? '');
-  const previousOrigin = previous?.baseUrl ? new URL(String(previous.baseUrl)).origin : null;
-  const sameOrigin = previousOrigin === new URL(connection.baseUrl).origin;
-  if (!previousKey || !sameOrigin) throw new Error('API key is required when the service address changes');
-  return previousKey;
-}
-
-/** @brief 把连接合并进 models.json 的 Mori provider，保留手写的 compat、headers 等字段和其他模型。 */
-export async function writeConnection(agentDir: string, connection: Connection): Promise<void> {
-  const path = join(agentDir, 'models.json');
-  const file = await readModelsFile(path);
-  const previous = file.providers?.[PROVIDER_ID];
-  const previousModels = (previous?.models as JsonObject[] | undefined) ?? [];
+/** @brief 把连接合并进 models.json 的 Mori provider：保留手写的 compat、headers 等字段和其他模型，去掉 apiKey 字段。 */
+async function writeConnection(path: string, file: ModelsFile, connection: Connection): Promise<void> {
+  const { apiKey: _droppedKey, ...previous } = file.providers?.[PROVIDER_ID] ?? {};
+  const previousModels = (previous.models as JsonObject[] | undefined) ?? [];
   const previousModel = previousModels.find((model) => model.id === connection.modelId) ?? {};
   const model = { ...previousModel, id: connection.modelId, name: previousModel.name ?? connection.modelId,
     contextWindow: connection.contextWindow };
@@ -97,19 +78,31 @@ export async function writeConnection(agentDir: string, connection: Connection):
       ...previous,
       name: connection.name,
       baseUrl: connection.baseUrl,
-      api: previous?.api ?? 'openai-completions',
-      apiKey: resolveApiKey(connection, previous),
+      api: previous.api ?? 'openai-completions',
       models: [model, ...previousModels.filter((item) => item.id !== connection.modelId)],
     },
   };
   await writeJsonAtomic(path, file);
 }
 
-/** @brief 保存连接、重读 models.json，并把它设为 pi 的默认模型。返回 pi 报告的配置错误。 */
+/** @brief 没填 key 时只允许沿用已保存的 key，而且服务地址的 origin 不能变。 */
+function requireReusableKey(runtime: ModelRuntime, previousBaseUrl: unknown, baseUrl: string): void {
+  const previousOrigin = previousBaseUrl ? new URL(String(previousBaseUrl)).origin : null;
+  if (!hasKey(runtime) || previousOrigin !== new URL(baseUrl).origin) {
+    throw new Error('API key is required when the service address changes');
+  }
+}
+
+/** @brief 保存连接：先加密保存 key，再写 models.json、交给 pi，最后设为默认模型。返回 pi 报告的配置错误。 */
 export async function saveConnection(agentDir: string, connection: Connection): Promise<string | null> {
-  await writeConnection(agentDir, connection);
   const runtime = await getRuntime();
+  const path = join(agentDir, 'models.json');
+  const file = await readModelsFile(path);
+  if (connection.apiKey) await requestStoreKey(PROVIDER_ID, connection.apiKey);
+  else requireReusableKey(runtime, file.providers?.[PROVIDER_ID]?.baseUrl, connection.baseUrl);
+  await writeConnection(path, file, connection);
   await runtime.refresh({ allowNetwork: false });
+  if (connection.apiKey) await runtime.setRuntimeApiKey(PROVIDER_ID, connection.apiKey);
   const settings = await globalSettings();
   settings.setDefaultModelAndProvider(PROVIDER_ID, connection.modelId);
   await settings.flush();

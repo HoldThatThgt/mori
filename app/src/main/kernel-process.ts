@@ -3,6 +3,7 @@
 import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { app, utilityProcess, type UtilityProcess } from 'electron';
+import { loadKeys, storeKey } from './credentials';
 
 /** 等后台进程释放会话的上限，见 docs/v0/defaults.md */
 const SHUTDOWN_TIMEOUT_MS = 3000;
@@ -42,8 +43,38 @@ export function startKernel(onExit: KernelExitListener): UtilityProcess {
     lastExitCode = code;
     onExit(code, quitting);
   });
+  child.on('message', (message: KernelToMain) => handleKernelMessage(child, message));
+  child.postMessage({ type: 'keys', keys: loadStoredKeys() });
   kernel = child;
   return child;
+}
+
+/** @brief 后台进程发给主进程的消息。 */
+type KernelToMain =
+  | { type: 'shutdown-done' }
+  | { type: 'store-key'; id: number; providerId: string; key: string };
+
+/** @brief 读取并解密已保存的 key；失败时记录错误，后台进程按"没有 key"启动。 */
+function loadStoredKeys(): Record<string, string> {
+  try {
+    return loadKeys();
+  } catch (error) {
+    console.error(`[main] cannot load stored keys: ${(error as Error).message}`);
+    return {};
+  }
+}
+
+/** @brief 处理后台进程的请求：目前只有"加密保存 key"。 */
+function handleKernelMessage(child: UtilityProcess, message: KernelToMain): void {
+  if (message?.type !== 'store-key') return;
+  let error: string | null = null;
+  try {
+    storeKey(message.providerId, message.key);
+  } catch (cause) {
+    error = (cause as Error).message;
+    console.error(`[main] cannot store the key for ${message.providerId}: ${error}`);
+  }
+  child.postMessage({ type: 'store-key-result', id: message.id, error });
 }
 
 /** @brief 结束后台进程及其全部子进程（命令留下的进程也一起结束）。 */

@@ -17,7 +17,7 @@ const exePath = exeIndex > 0 ? resolve(process.argv[exeIndex + 1]) : null;
 const port = 4319;
 // 合成端点要求的 key：只是测试值，与任何真实服务无关。
 const testKey = 'synthetic-test-key';
-const keyEnvName = 'MORI_SMOKE_KEY';
+const canary = 'mori-smoke-canary';
 const results = { target: exePath ?? 'dev build', checks: [] };
 const oneLine = (text, max = 200) => String(text).replace(/\s+/g, ' ').slice(0, max);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -67,13 +67,32 @@ async function saveAndTest(page, apiKey) {
 }
 
 /** @brief 连接表单：错误的 key 显示错误原文；$环境变量和明文 key 都能连上。 */
-async function connect(page) {
+async function connect(page, userData) {
   const wrong = await saveAndTest(page, 'wrong-key');
   record('错误的 key 显示错误原文', !wrong.ok && wrong.text.includes('401'), wrong.text.slice(0, 160));
-  const viaEnv = await saveAndTest(page, `$${keyEnvName}`);
-  record('API key 用 $环境变量 引用', viaEnv.ok, viaEnv.text.slice(0, 160));
   const literal = await saveAndTest(page, testKey);
   record('测试连接', literal.ok, literal.text.slice(0, 160));
+  const models = readFileSync(join(userData, 'pi', 'models.json'), 'utf8');
+  const credentials = readFileSync(join(userData, 'credentials.json'), 'utf8');
+  const provider = JSON.parse(models).providers?.['mori-endpoint'] ?? {};
+  record('key 加密保存：models.json 没有 key，credentials.json 只有密文',
+    !('apiKey' in provider) && !models.includes(testKey) && !credentials.includes(testKey) &&
+      Boolean(JSON.parse(credentials)['mori-endpoint']),
+    `models.json 有 apiKey 字段=${'apiKey' in provider}；credentials.json 含明文=${credentials.includes(testKey)}`);
+  await page.locator('.panel label input').nth(1).fill(`http://localhost:${port}/v1`);
+  await page.locator('.panel label input').nth(2).fill('');
+  await page.getByRole('button', { name: '保存' }).click();
+  const refused = await page.getByText('API key is required').waitFor({ timeout: 10000 }).then(() => true, () => false);
+  record('改了服务地址而没有重填 key 时拒绝保存', refused);
+  await saveAndTest(page, testKey);
+}
+
+/** @brief 模型运行的命令读不到 key：key 只在 pi 的内存里，不在环境变量里。 */
+async function commandEnvCheck(page) {
+  // 对照：Mori 的进程环境里放了一个无害的标记变量，命令能读到它（1），但读不到 key（0）。
+  const card = await sendAndWait(page, `run: env | grep -c ${testKey}; env | grep -c ${canary}; true`);
+  record('命令的环境里没有 key（对照变量可见）', /完成/.test(card) && /^\s*0\s+1\s*$/.test(card.split('}').pop() ?? ''),
+    card.slice(0, 200));
 }
 
 /** @brief 通过界面发一条消息，等本轮结束，返回最后一张工具卡的文字（没有时为空串）。 */
@@ -199,6 +218,12 @@ async function crashCheck(env) {
   try {
     const page = await app.firstWindow();
     await page.locator('.panel').first().waitFor();
+    await page.getByRole('button', { name: '测试连接' }).click();
+    const test = page.locator('.panel .ok, .panel .error').first();
+    await test.waitFor({ timeout: 40000 });
+    const placeholder = await page.locator('.panel label input').nth(2).getAttribute('placeholder');
+    record('重启后不用重填 key 也能连接', (await test.getAttribute('class')) === 'ok' && /已加密保存/.test(placeholder ?? ''),
+      `${oneLine(await test.innerText(), 120)}；key 输入框提示：${placeholder}`);
     const pid = kernelPid(app.process().pid);
     execFileSync('taskkill', ['/PID', String(pid), '/F']);
     await page.getByText('后台进程意外退出').waitFor({ timeout: 10000 });
@@ -229,7 +254,7 @@ function netCheck(seen) {
 
 const fake = await startFakeEndpoint();
 const { project, userData } = prepareDirs();
-const env = { ...process.env, MORI_USER_DATA: userData, [keyEnvName]: testKey };
+const env = { ...process.env, MORI_USER_DATA: userData, MORI_SMOKE_CANARY: canary };
 const app = await electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
 const net = startNetWatch(app.process().pid);
 const log = [];
@@ -239,8 +264,9 @@ let closed = false;
 try {
   const page = await app.firstWindow();
   while (net.seen.samples === 0) await sleep(200);
-  await connect(page);
+  await connect(page, userData);
   await chatChecks(app, page, project);
+  await commandEnvCheck(page);
   await timeoutCheck(page);
   await concurrencyCheck(page, project);
   netCheck(net.seen);

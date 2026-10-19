@@ -3,6 +3,8 @@
 import type { MessagePortMain } from 'electron';
 import { CommandSchema, type EventEnvelope, type KernelMessage } from '../shared/protocol';
 import { handleCommand } from './commands';
+import { onStoreKeyResult } from './credentials';
+import { applyStoredKeys } from './pi';
 import { shutdownSessions } from './sessions';
 
 const ports = new Set<MessagePortMain>();
@@ -53,10 +55,19 @@ function attachPort(port: MessagePortMain): void {
   port.start();
 }
 
+/** @brief 主进程发给后台进程的消息。 */
+type MainToKernel =
+  | { type: 'port' }
+  | { type: 'keys'; keys: Record<string, string> }
+  | { type: 'store-key-result'; id: number; error: string | null }
+  | { type: 'shutdown' };
+
 process.parentPort.on('message', (event) => {
-  const type = (event.data as { type?: string })?.type;
-  if (type === 'port' && event.ports[0]) attachPort(event.ports[0]);
-  if (type === 'shutdown') {
+  const message = event.data as MainToKernel;
+  if (message?.type === 'port' && event.ports[0]) attachPort(event.ports[0]);
+  if (message?.type === 'keys') void applyStoredKeys(message.keys);
+  if (message?.type === 'store-key-result') onStoreKeyResult(message.id, message.error);
+  if (message?.type === 'shutdown') {
     // 先停止并释放所有会话，再通知主进程；主进程随后结束整个进程树，清掉命令留下的子进程（pi #9129）。
     void shutdownSessions().finally(() => process.parentPort.postMessage({ type: 'shutdown-done' }));
   }
