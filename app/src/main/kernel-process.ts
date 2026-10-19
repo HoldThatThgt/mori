@@ -1,9 +1,10 @@
-// 后台进程的启动与有序退出。
+// 后台进程的启动与有序退出。后台进程放在一个作业对象里（见 job.ts）：它和它启动的所有进程（包括父进程已经不在的孤儿进程）
+// 在 Mori 退出、后台进程意外退出、Mori 被强行结束时都会被结束，关闭 Mori 后不留下任何进程。
 
-import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { app, utilityProcess, type UtilityProcess } from 'electron';
 import { loadKeys, storeKey } from './credentials';
+import { putInJob, type ProcessJob } from './job';
 
 /** 等后台进程释放会话的上限，见 docs/v0/defaults.md */
 const SHUTDOWN_TIMEOUT_MS = 3000;
@@ -12,6 +13,7 @@ const SHUTDOWN_TIMEOUT_MS = 3000;
 export type KernelExitListener = (code: number, quitting: boolean) => void;
 
 let kernel: UtilityProcess | null = null;
+let kernelJob: ProcessJob | null = null;
 let quitting = false;
 let lastExitCode: number | null = null;
 
@@ -37,16 +39,35 @@ export function startKernel(onExit: KernelExitListener): UtilityProcess {
   });
   child.stdout?.on('data', (chunk: Buffer) => process.stdout.write(chunk));
   child.stderr?.on('data', (chunk: Buffer) => process.stderr.write(chunk));
+  let job: ProcessJob | null = null;
+  // 先放进作业再给 key：后台进程拿到 key 之前不会执行任何命令，所以它启动的进程都在作业里。
+  child.once('spawn', () => {
+    job = jobFor(child);
+    kernelJob = job;
+    child.postMessage({ type: 'keys', keys: loadStoredKeys() });
+  });
   child.on('exit', (code) => {
     if (!quitting) console.error(`[main] kernel exited unexpectedly with code ${code}`);
+    // 后台进程不在了：结束它的作业，正在运行的命令（刚才没完成的回复）也一起结束。
+    job?.terminate();
+    if (kernelJob === job) kernelJob = null;
     kernel = null;
     lastExitCode = code;
     onExit(code, quitting);
   });
   child.on('message', (message: KernelToMain) => handleKernelMessage(child, message));
-  child.postMessage({ type: 'keys', keys: loadStoredKeys() });
   kernel = child;
   return child;
+}
+
+/** @brief 把刚启动的后台进程放进作业；失败时记录错误（这时退出后可能留下命令进程）。 */
+function jobFor(child: UtilityProcess): ProcessJob | null {
+  try {
+    return putInJob(child.pid ?? 0);
+  } catch (error) {
+    console.error(`[main] cannot put the kernel in a job object: ${(error as Error).message}`);
+    return null;
+  }
 }
 
 /** @brief 后台进程发给主进程的消息。 */
@@ -77,17 +98,7 @@ function handleKernelMessage(child: UtilityProcess, message: KernelToMain): void
   child.postMessage({ type: 'store-key-result', id: message.id, error });
 }
 
-/** @brief 结束后台进程及其全部子进程（命令留下的进程也一起结束）。 */
-function killTree(pid: number): Promise<void> {
-  return new Promise((resolve) => {
-    execFile('taskkill', ['/PID', String(pid), '/T', '/F'], (error) => {
-      if (error) console.error(`[main] taskkill failed for ${pid}: ${error.message}`);
-      resolve();
-    });
-  });
-}
-
-/** @brief 有序退出：先让后台进程停止并释放会话，再结束整个进程树。 */
+/** @brief 有序退出：先让后台进程停止并释放会话，再结束它的作业（后台进程和它启动的所有进程）。 */
 export async function shutdownKernel(): Promise<void> {
   const child = kernel;
   quitting = true;
@@ -105,5 +116,5 @@ export async function shutdownKernel(): Promise<void> {
   });
   child.postMessage({ type: 'shutdown' });
   await released;
-  await killTree(child.pid);
+  kernelJob?.terminate();
 }

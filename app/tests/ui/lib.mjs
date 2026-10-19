@@ -6,6 +6,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
+import koffi from 'koffi';
 
 export const appRoot = resolve(import.meta.dirname, '../..');
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -101,3 +102,95 @@ export function killKernel(app) {
   execFileSync('taskkill', ['/PID', String(pid), '/F']);
   return pid;
 }
+
+/**
+ * @brief 测试自己启动的 sleep.exe 的 PID：只认命令行是 `sleep <秒数>` 且秒数在 durations 里的。
+ *        测试用少见的秒数（37、127 等），机器上别的程序（例如开发时的等待脚本）运行的 sleep 不会被算进来。
+ */
+export function sleepProcessIds(durations) {
+  const script = 'Get-CimInstance Win32_Process -Filter "Name=\'sleep.exe\'" | ForEach-Object { "$($_.ProcessId)|$($_.CommandLine)" }';
+  return execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8' })
+    .split(/\r?\n/).filter(Boolean).map((line) => line.split('|'))
+    .filter(([, command]) => durations.includes(command?.trim().split(/\s+/).pop() ?? ''))
+    .map(([pid]) => pid);
+}
+
+/** @brief 等到 pids 里的进程都不在了，最多 timeoutMs；返回还在的。 */
+export async function waitGone(pids, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  let left = stillAlive(pids.map(Number));
+  while (left.length && Date.now() < deadline) {
+    await sleep(250);
+    left = stillAlive(pids.map(Number));
+  }
+  return left;
+}
+
+/** @brief 全部进程：PID、父 PID、名字、命令行。 */
+function processRowsAll() {
+  const script = 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)|$($_.ParentProcessId)|$($_.Name)|$($_.CommandLine)" }';
+  return execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', maxBuffer: 1 << 24 })
+    .split(/\r?\n/).filter(Boolean).map((line) => line.split('|'));
+}
+
+/** @brief rootPid 及其全部子孙进程的 PID 和名字。 */
+export function processTree(rootPid) {
+  const rows = processRowsAll();
+  const tree = new Set([rootPid]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const [pid, parent] of rows) {
+      if (tree.has(Number(parent)) && !tree.has(Number(pid))) { tree.add(Number(pid)); grew = true; }
+    }
+  }
+  return rows.filter(([pid]) => tree.has(Number(pid))).map(([pid, , name]) => ({ pid: Number(pid), name }));
+}
+
+/** @brief pids 里还活着的进程。 */
+export function stillAlive(pids) {
+  const alive = new Set(processRowsAll().map(([pid]) => Number(pid)));
+  return pids.filter((pid) => alive.has(pid));
+}
+
+/** @brief Mori 主进程（浏览器进程）的 PID：进程树里没有 --type= 参数的那个 Electron 进程。 */
+export function mainPid(rootPid) {
+  const script = 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)|$($_.ParentProcessId)|$($_.Name)|$($_.CommandLine)" }';
+  const rows = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', maxBuffer: 1 << 24 })
+    .split(/\r?\n/).filter(Boolean).map((line) => line.split('|'));
+  const tree = new Set([rootPid]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const [pid, parent] of rows) {
+      if (tree.has(Number(parent)) && !tree.has(Number(pid))) { tree.add(Number(pid)); grew = true; }
+    }
+  }
+  const main = rows.find(([pid, , name, command]) => tree.has(Number(pid)) && /^(electron|mori)\.exe$/i.test(name)
+    && !command?.includes('--type='));
+  if (!main) throw new Error('main process not found');
+  return Number(main[0]);
+}
+
+/** @brief 诊断用：进程、父进程、是否在某个作业里。 */
+const kernel32 = koffi.load('kernel32.dll');
+const OpenProcess = kernel32.func('void* __stdcall OpenProcess(uint32_t, bool, uint32_t)');
+const IsProcessInJob = kernel32.func('bool __stdcall IsProcessInJob(void*, void*, _Out_ bool*)');
+const CloseHandle = kernel32.func('bool __stdcall CloseHandle(void*)');
+function inJob(pid) {
+  const h = OpenProcess(0x1000, false, Number(pid)); // PROCESS_QUERY_LIMITED_INFORMATION
+  if (!h) return 'cannot open';
+  const out = [false];
+  IsProcessInJob(h, null, out);
+  CloseHandle(h);
+  return out[0];
+}
+export function describeProcesses(pids) {
+  const script = 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)|$($_.ParentProcessId)|$($_.Name)|$($_.CommandLine)" }';
+  const all = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', maxBuffer: 1 << 24 }).split(/\r?\n/);
+  return pids.map((pid) => {
+    const row = all.find((r) => r.startsWith(`${pid}|`)) ?? `${pid}|?`;
+    const parent = row.split('|')[1];
+    const prow = all.find((r) => r.startsWith(`${parent}|`)) ?? `${parent}|(gone)`;
+    return `${row.slice(0, 120)} inJob=${inJob(pid)} parent=[${prow.slice(0, 100)}]`;
+  });
+}
+

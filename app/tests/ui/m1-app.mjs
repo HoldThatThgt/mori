@@ -5,11 +5,14 @@
 //   node tests/ui/m1-app.mjs --exe <Mori.exe 路径>   测打包后的程序
 // 结果写到 test-results/m1-app.json（文件名带 -packaged 后缀区分），截图在 test-results/m1-app/。
 
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { appRoot, arg, createRecorder, killKernel, launch, oneLine, prepareProject, sleep } from './lib.mjs';
+import {
+  appRoot, arg, createRecorder, killKernel, launch, mainPid, oneLine, prepareProject, processTree, sleep, sleepProcessIds,
+  stillAlive, waitGone,
+} from './lib.mjs';
 import { smallText } from './m1-layout.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -173,11 +176,16 @@ async function errors({ page, h }) {
 
 /** @brief 结束后台进程：退出提示和"重新载入"，执行中的卡"已中断"，草稿还在；重新载入后从会话文件恢复。 */
 async function kernelExit({ app, page, h }) {
-  await h.send('run: sleep 30');
+  const before = new Set(sleepProcessIds(['33']));
+  await h.send('run: sleep 33');
   await page.locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 30000 });
+  const running = sleepProcessIds(['33']).filter((id) => !before.has(id));
   await h.textarea.fill('还没发出的草稿');
   const pid = killKernel(app);
   await page.getByTestId('kernel-exit').waitFor({ timeout: 10000 });
+  const left = await waitGone(running);
+  record('退出：后台进程被强行结束时，它正在运行的命令也一起结束', running.length > 0 && left.length === 0,
+    `运行中的 sleep.exe ${running.length} 个，3 秒内剩 ${left.length} 个`);
   const last = (await h.cards()).at(-1);
   record('退出：显示"Mori 的后台进程意外退出 · 刚才没完成的回复已中断"和"重新载入"',
     (await page.getByTestId('kernel-exit').innerText()).includes('刚才没完成的回复已中断'), `后台进程 PID ${pid}`);
@@ -221,6 +229,35 @@ async function layoutRestart({ page, h, app, project, userData }) {
   return { app: next, page: nextPage, h: helpers };
 }
 
+/** @brief Mori 主进程被强行结束（模拟崩溃）时，后台进程和正在运行的命令也都结束，不留下任何 Mori 的进程。 */
+async function mainKilled({ project }) {
+  const dir = mkdtempSync(join(tmpdir(), 'mori-m1-app-crash-'));
+  fastRetry(dir);
+  const crashApp = await launch({ exePath, userData: dir });
+  const crashPage = await crashApp.firstWindow();
+  const helpers = pageHelpers(crashPage);
+  await crashPage.getByTestId('connection-form').waitFor({ timeout: 60000 });
+  await helpers.fillConnection({ name: '合成端点', baseUrl, apiKey: testKey, modelId: 'fake-coder' });
+  await crashPage.getByRole('button', { name: '测试连接' }).click();
+  await crashPage.getByTestId('open-folder').waitFor({ timeout: 60000 });
+  await helpers.openFolder(crashApp, project);
+  const before = new Set(sleepProcessIds(['63']));
+  await helpers.send('run: sleep 63');
+  await crashPage.locator('[data-testid="tool-card"][data-status="running"]').waitFor({ timeout: 30000 });
+  const running = sleepProcessIds(['63']).filter((id) => !before.has(id));
+  const pid = mainPid(crashApp.process().pid);
+  const tree = processTree(pid).filter((item) => item.pid !== pid);
+  execFileSync('taskkill', ['/PID', String(pid), '/F']);
+  const left = await waitGone(running, 8000);
+  await sleep(2000);
+  const alive = stillAlive(tree.map((item) => item.pid));
+  const names = tree.filter((item) => alive.includes(item.pid)).map((item) => `${item.name}(${item.pid})`);
+  record('崩溃：主进程被强行结束时，命令和后台进程都结束，不留下任何 Mori 的进程', running.length > 0 && left.length === 0
+    && tree.length > 2 && alive.length === 0,
+  `主进程 PID ${pid}，子孙进程 ${tree.length} 个；sleep.exe ${running.length} 个，剩 ${left.length} 个；残留：${names.join(', ') || '无'}`);
+  await crashApp.close().catch(() => {});
+}
+
 const fake = await startFakeEndpoint();
 const { project } = prepareProject('mori-m1-app-');
 const userData = mkdtempSync(join(tmpdir(), 'mori-m1-app-data-'));
@@ -243,6 +280,8 @@ try {
   Object.assign(ctx, await layoutRestart(ctx));
   app = ctx.app;
   page = ctx.page;
+  await app.close().catch(() => {});
+  await mainKilled(ctx).catch((error) => record('崩溃：流程', false, oneLine(error, 400)));
 } catch (error) {
   record('布局重启：流程', false, oneLine(error, 400));
 } finally {

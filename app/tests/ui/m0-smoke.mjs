@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
 import { startNetWatch } from './net-watch.mjs';
+import { describeProcesses, sleepProcessIds as testSleeps } from './lib.mjs';
 import { pageHelpers } from './page.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
@@ -141,16 +142,18 @@ async function chatChecks(app, page, project) {
     shellCard.slice(0, 300));
 }
 
-/** @brief 当前所有 sleep.exe 进程的 PID。 */
+/** 这个脚本里的命令用的秒数：37 是 #9129 检查，127 是关窗检查 */
+const SLEEPS = ['37', '127'];
+
+/** @brief 这个脚本启动的 sleep.exe 的 PID。 */
 function sleepProcessIds() {
-  const out = execFileSync('tasklist', ['/FI', 'IMAGENAME eq sleep.exe', '/FO', 'CSV', '/NH'], { encoding: 'utf8' });
-  return out.split('\n').filter((line) => line.toLowerCase().includes('sleep.exe')).map((line) => line.split('","')[1]);
+  return testSleeps(SLEEPS);
 }
 
 /** @brief pi #9129：命令超时后是否留下进程。 */
 async function timeoutCheck(page) {
   const before = new Set(sleepProcessIds());
-  const card = await sendAndWait(page, 'run: sleep 30 | cat timeout=2');
+  const card = await sendAndWait(page, 'run: sleep 37 | cat timeout=2');
   await sleep(3000);
   const orphans = sleepProcessIds().filter((pid) => !before.has(pid));
   record('命令超时后没有遗留 sleep 进程（pi #9129）', orphans.length === 0,
@@ -179,32 +182,28 @@ async function concurrencyCheck(page, project) {
     `两边都结束=${outcome.both}，增量交替次数=${outcome.switches}，工具调用 A=${outcome.toolsA} B=${outcome.toolsB}`);
 }
 
-/** @brief 命令运行中关闭窗口：程序应自行退出、不弹错误框，并结束命令留下的进程。 */
-async function closeWhileRunning(app, page) {
-  // 先等前面 #9129 检查留下的 sleep 30 自己结束，否则它可能晚一点才出现在进程列表里，被算成这次的命令进程。
-  for (let i = 0; i < 25 && sleepProcessIds().length > 0; i += 1) await sleep(2000);
+/**
+ * @brief 命令运行中关闭窗口：程序应自行退出、不弹错误框，并且不留下任何命令进程——
+ *        包括这次的 sleep 127，以及前面 #9129 检查里 pi 留下的孤儿进程（M1 起后台进程放在作业对象里）。
+ * @param baseline 启动 Mori 之前就已存在的 sleep.exe
+ */
+async function closeWhileRunning(app, page, baseline) {
   const before = new Set(sleepProcessIds());
-  await pageHelpers(page).send('run: sleep 120');
+  await pageHelpers(page).send('run: sleep 127');
   await page.getByTestId('tool-card').last().getByText('执行中').waitFor({ timeout: 20000 });
   await sleep(1000);
   const started = sleepProcessIds().filter((pid) => !before.has(pid));
-  if (process.env.MORI_DIAG) console.log('DIAG started', processRows(started));
+  const fromRun = sleepProcessIds().filter((pid) => !baseline.has(pid));
+  const diagBefore = describeProcesses(fromRun);
   const exited = new Promise((r) => app.process().once('exit', () => r(true)));
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
   const ok = await Promise.race([exited, sleep(10000).then(() => false)]);
   await sleep(1000);
-  const left = sleepProcessIds().filter((pid) => started.includes(pid));
-  if (process.env.MORI_DIAG) console.log('DIAG left', processRows(left));
-  record('运行中关闭窗口：程序退出且不留下命令进程', ok && started.length > 0 && left.length === 0,
-    `10 秒内退出=${ok}；运行中的 sleep.exe ${started.length} 个，退出后剩 ${left.length} 个`);
+  const left = sleepProcessIds().filter((pid) => !baseline.has(pid));
+  if (left.length) console.log(`DIAG before close:\n  ${diagBefore.join('\n  ')}\nDIAG left:\n  ${describeProcesses(left).join('\n  ')}`);
+  record('运行中关闭窗口：程序退出且不留下任何命令进程（含 #9129 留下的）', ok && started.length > 0 && left.length === 0,
+    `10 秒内退出=${ok}；这次的 sleep.exe ${started.length} 个，本次运行启动的共 ${fromRun.length} 个，退出后剩 ${left.length} 个`);
   return ok;
-}
-
-/** @brief 诊断用（MORI_DIAG=1）：给定 PID 的父进程、创建时间和命令行。 */
-function processRows(pids) {
-  const script = 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)|$($_.ParentProcessId)|$($_.CreationDate)|$($_.CommandLine)" }';
-  return execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', maxBuffer: 1 << 24 })
-    .split(/\r?\n/).filter((row) => pids.some((pid) => row.startsWith(`${pid}|`)));
 }
 
 /** @brief 找到后台进程（utilityProcess）的 PID。Playwright 在 Windows 上经 cmd.exe 启动程序，所以要在整棵进程树里找。 */
@@ -263,6 +262,7 @@ function netCheck(seen) {
     (seen.errors.length ? `；采样错误：${oneLine(seen.errors[0], 120)}` : ''));
 }
 
+const baseline = new Set(sleepProcessIds());
 const fake = await startFakeEndpoint();
 const { project, userData } = prepareDirs();
 const env = { ...process.env, MORI_USER_DATA: userData, MORI_SMOKE_CANARY: canary };
@@ -281,7 +281,7 @@ try {
   await timeoutCheck(page);
   await concurrencyCheck(page, project);
   netCheck(net.seen);
-  closed = await closeWhileRunning(app, page);
+  closed = await closeWhileRunning(app, page, baseline);
 } catch (error) {
   record('冒烟流程', false, oneLine(error, 300));
 } finally {
