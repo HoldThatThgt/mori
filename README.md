@@ -30,8 +30,8 @@ Agent 向权限范围内的共享区追加简短结果、来源和更正；其�
 
 重设计草案（2026-10-19，待评审；确认后替代上面文档中的相应部分）：
 
-- [平行 Agent 与 TaskBoard Proposal](docs/proposals/parallel-agents-taskboard.md)
-- [统一模型提供商 Proposal](docs/proposals/model-providers.md)
+- [平行 Agent 与 TaskBoard Proposal](docs/proposals/parallel-agents-taskboard.md)（细节见[构建规格](docs/specs/parallel-agents-taskboard.md)）
+- [统一模型提供商 Proposal](docs/proposals/model-providers.md)（细节见[构建规格](docs/specs/model-providers.md)）
 
 ## 界面 Demo（已冻结）
 
