@@ -1,6 +1,6 @@
 // 对话流：先显示最近 50 条消息，滚到顶部时载入更早的；你在底部时跟随新内容，不在底部时显示"有新内容 ↓"。
 
-import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { openSettings, PAGE_SIZE, putBack, startIndexFor } from '../state/actions';
 import type { Item, ToolCall } from '../state/model';
 import { updateTab, type Tab } from '../state/store';
@@ -59,30 +59,53 @@ function EmptyChat({ cwd }: { cwd: string }) {
   );
 }
 
-/** @brief 跟随与"有新内容"：内容变高时在底部就跟到底部；你发消息时回到底部。 */
+/**
+ * @brief 跟随与"有新内容"：内容变高时在底部就跟到底部；你发消息时回到底部。
+ *        只有你往上滚（比上次自动滚到底的位置更靠上）才算离开底部：流式输出很快时，
+ *        自动滚动触发的 scroll 事件可能晚到、那时内容又长了一截，不能据此认为你离开了。
+ */
 function useFollow(scroller: React.RefObject<HTMLDivElement | null>, inner: React.RefObject<HTMLDivElement | null>,
   tab: Tab) {
   const atBottom = useRef(true);
+  const lastAutoTop = useRef(0);
   const [hasNew, setHasNew] = useState(false);
-  useLayoutEffect(() => {
+  const toBottom = useCallback(() => {
     const element = scroller.current;
-    if (!element || !inner.current) return;
-    const observer = new ResizeObserver(() => {
-      if (atBottom.current) element.scrollTop = element.scrollHeight;
-    });
+    if (!element) return;
+    element.scrollTop = element.scrollHeight;
+    lastAutoTop.current = element.scrollTop;
+    atBottom.current = true;
+  }, [scroller]);
+  useLayoutEffect(() => {
+    if (!inner.current) return;
+    const observer = new ResizeObserver(() => atBottom.current && toBottom());
     observer.observe(inner.current);
     return () => observer.disconnect();
-  }, [scroller, inner]);
+  }, [inner, toBottom]);
   useEffect(() => {
     if (!atBottom.current) setHasNew(true);
   }, [tab.transcript.items, tab.transcript.tools]);
   useEffect(() => {
-    if (!tab.transcript.sending || !scroller.current) return;
-    atBottom.current = true;
-    scroller.current.scrollTop = scroller.current.scrollHeight;
+    if (!tab.transcript.sending) return;
+    toBottom();
     setHasNew(false);
-  }, [tab.transcript.sending, scroller]);
-  return { atBottom, hasNew, setHasNew };
+  }, [tab.transcript.sending, toBottom]);
+  const track = () => {
+    const element = scroller.current;
+    if (!element) return;
+    if (element.scrollHeight - element.scrollTop - element.clientHeight <= BOTTOM_SLACK) {
+      atBottom.current = true;
+      setHasNew(false);
+    } else if (element.scrollTop < lastAutoTop.current - 1) {
+      atBottom.current = false;
+      lastAutoTop.current = Infinity;
+    }
+  };
+  const jump = () => {
+    toBottom();
+    setHasNew(false);
+  };
+  return { hasNew, track, jump };
 }
 
 /** @brief 滚到顶部时载入更早的消息，并让原来最上面那条消息留在原位置（之后的异步变高由浏览器的滚动锚定处理）。 */
@@ -112,24 +135,13 @@ function useLoadEarlier(scroller: React.RefObject<HTMLDivElement | null>, inner:
 export function Transcript({ tab }: { tab: Tab }) {
   const scroller = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
-  const { atBottom, hasNew, setHasNew } = useFollow(scroller, inner, tab);
+  const { hasNew, track, jump } = useFollow(scroller, inner, tab);
   const loadEarlier = useLoadEarlier(scroller, inner, tab);
   const { items, tools } = tab.transcript;
 
   function onScroll() {
-    const element = scroller.current;
-    if (!element) return;
-    atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight <= BOTTOM_SLACK;
-    if (atBottom.current) setHasNew(false);
+    track();
     loadEarlier();
-  }
-
-  function jumpToBottom() {
-    const element = scroller.current;
-    if (!element) return;
-    atBottom.current = true;
-    element.scrollTop = element.scrollHeight;
-    setHasNew(false);
   }
 
   return (
@@ -146,7 +158,7 @@ export function Transcript({ tab }: { tab: Tab }) {
         </div>
       </div>
       {hasNew && (
-        <button className="new-content" onClick={jumpToBottom} data-testid="new-content">
+        <button className="new-content" onClick={jump} data-testid="new-content">
           有新内容 <Icon name="down" />
         </button>
       )}

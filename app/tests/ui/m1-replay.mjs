@@ -76,6 +76,12 @@ async function readmeCheck(page, h) {
 async function markdownCheck(page, h) {
   await h.load('markdown', { speed: 1 });
   await page.evaluate(() => {
+    window.__newContentSeen = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="new-content"]')) window.__newContentSeen = true;
+    }).observe(document.body, { subtree: true, childList: true });
+  });
+  await page.evaluate(() => {
     window.__lengths = new Set();
     window.__lengthTimer = setInterval(() => {
       const text = document.querySelector('.prose')?.textContent;
@@ -87,6 +93,8 @@ async function markdownCheck(page, h) {
   await h.idle();
   const lengths = await page.evaluate(() => window.__lengths.size);
   record('markdown：正文是流式出现的', lengths > 3, `采样到 ${lengths} 种长度`);
+  record('scroll：你在底部时一直跟随，不出现"有新内容"', !(await page.evaluate(() => window.__newContentSeen))
+    && await page.getByTestId('transcript').evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight < 30));
   record('markdown：思考流入时展开，正文开始后收起', (await h.thinkingOpened())
     && await page.locator('details.thinking').evaluateAll((items) => items.every((d) => !d.open)));
   const counts = await page.evaluate(() => ({

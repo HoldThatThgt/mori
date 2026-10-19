@@ -310,6 +310,7 @@ async function item8(project) {
     }
     const stages = await h.stages();
     const notices = await page.getByText('已压缩较早的对话', { exact: true }).count();
+    record('8 一直在底部时不出现"有新内容"', await page.getByTestId('new-content').count() === 0);
     record('8 阶段行显示"正在压缩较早的对话"', stages.includes('正在压缩较早的对话'), stages.join(' → '));
     record('8 对话流留下"已压缩较早的对话"', notices >= 1, `${notices} 处`);
     await shot(page, '8-compaction');
