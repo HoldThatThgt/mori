@@ -1,0 +1,2399 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m2-record.mjs; do not edit by hand.",
+ "name": "two-tools",
+ "description": "要求一条回复里调用两次 bash（echo first、echo second）：逐张出卡，各允许一次（实际：同一条回复里 2 个调用，按顺序逐张出卡）",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-19T19:50:29.698Z",
+ "steps": [
+  {
+   "t": 0,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-Uzq2nH\\project"
+   }
+  },
+  {
+   "t": 6,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-Uzq2nH\\project",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-LAvD4R\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m2-record-Uzq2nH-project--\\2026-10-19T19-50-25-767Z_01a155b7-1ae7-7623-a63b-55c30466ee17.jsonl",
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 6,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first`，第二次运行 `echo second`。两个都完成后告诉我结果。"
+   }
+  },
+  {
+   "t": 7,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 7,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 7,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 7,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-Uzq2nH/project\n</cwd>"
+      },
+      "timestamp": 1792439425772,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 7,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-Uzq2nH/project\n</cwd>"
+      },
+      "timestamp": 1792439425772,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 7,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first`，第二次运行 `echo second`。两个都完成后告诉我结果。"
+       }
+      ],
+      "timestamp": 1792439425772
+     }
+    }
+   }
+  },
+  {
+   "t": 7,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first`，第二次运行 `echo second`。两个都完成后告诉我结果。"
+       }
+      ],
+      "timestamp": 1792439425772
+     }
+    }
+   }
+  },
+  {
+   "t": 114,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792439425775
+     }
+    }
+   }
+  },
+  {
+   "t": 1665,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 0,
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1665,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1697,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1697,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1697,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "command",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1697,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1697,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ": ",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1697,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1697,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "echo",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1697,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " first",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1710,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1710,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "}",
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417"
+     }
+    }
+   }
+  },
+  {
+   "t": 1727,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1727,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{",
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "command",
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ": ",
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1776,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1776,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "echo",
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1777,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " second",
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1777,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1777,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "}",
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002"
+     }
+    }
+   }
+  },
+  {
+   "t": 1780,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 0,
+      "toolName": "bash",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+      "args": {
+       "command": "echo first"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 1780,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+      "args": {
+       "command": "echo second"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 1780,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+        "name": "bash",
+        "arguments": {
+         "command": "echo first"
+        }
+       },
+       {
+        "type": "toolCall",
+        "id": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+        "name": "bash",
+        "arguments": {
+         "command": "echo second"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1108,
+       "output": 66,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1686,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792439425775,
+      "responseId": "479455a0-76c4-4255-a684-3966e995c889",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1770,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 1781,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+     "toolName": "bash",
+     "gate": "ask"
+    }
+   }
+  },
+  {
+   "t": 1781,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+     "toolName": "bash",
+     "args": {
+      "command": "echo first"
+     }
+    }
+   }
+  },
+  {
+   "t": 1781,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "mori.approval_request",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+     "toolName": "bash",
+     "args": {
+      "command": "echo first"
+     }
+    }
+   }
+  },
+  {
+   "t": 1803,
+   "command": {
+    "type": "approval.answer",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "requestId": "approval-1",
+    "decision": "allow"
+   }
+  },
+  {
+   "t": 1804,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "mori.approval_end",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+     "decision": "allow",
+     "by": "user",
+     "reason": null
+    }
+   }
+  },
+  {
+   "t": 1804,
+   "result": {
+    "type": "approval.answer",
+    "value": {
+     "mode": "ask",
+     "allowed": []
+    }
+   }
+  },
+  {
+   "t": 1888,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+     "toolName": "bash",
+     "args": {
+      "command": "echo first"
+     },
+     "partialResult": {
+      "content": []
+     }
+    }
+   }
+  },
+  {
+   "t": 1928,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+     "toolName": "bash",
+     "args": {
+      "command": "echo first"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "first\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 1931,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+     "toolName": "bash",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "first\n"
+       }
+      ],
+      "structuredContent": {
+       "output": "first\n",
+       "truncated": false,
+       "exit_code": 0,
+       "wall_time_seconds": 0.1
+      }
+     },
+     "isError": false,
+     "durationMs": 126
+    }
+   }
+  },
+  {
+   "t": 1931,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "first\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 126,
+      "timestamp": 1792439427696
+     }
+    }
+   }
+  },
+  {
+   "t": 1931,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "first\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 126,
+      "timestamp": 1792439427696
+     }
+    }
+   }
+  },
+  {
+   "t": 1931,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+     "toolName": "bash",
+     "gate": "ask"
+    }
+   }
+  },
+  {
+   "t": 1931,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+     "toolName": "bash",
+     "args": {
+      "command": "echo second"
+     }
+    }
+   }
+  },
+  {
+   "t": 1931,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "mori.approval_request",
+     "requestId": "approval-2",
+     "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+     "toolName": "bash",
+     "args": {
+      "command": "echo second"
+     }
+    }
+   }
+  },
+  {
+   "t": 1989,
+   "command": {
+    "type": "approval.answer",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "requestId": "approval-2",
+    "decision": "allow"
+   }
+  },
+  {
+   "t": 1989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "mori.approval_end",
+     "requestId": "approval-2",
+     "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+     "decision": "allow",
+     "by": "user",
+     "reason": null
+    }
+   }
+  },
+  {
+   "t": 1989,
+   "result": {
+    "type": "approval.answer",
+    "value": {
+     "mode": "ask",
+     "allowed": []
+    }
+   }
+  },
+  {
+   "t": 2069,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+     "toolName": "bash",
+     "args": {
+      "command": "echo second"
+     },
+     "partialResult": {
+      "content": []
+     }
+    }
+   }
+  },
+  {
+   "t": 2107,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+     "toolName": "bash",
+     "args": {
+      "command": "echo second"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "second\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 2109,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+     "toolName": "bash",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "second\n"
+       }
+      ],
+      "structuredContent": {
+       "output": "second\n",
+       "truncated": false,
+       "exit_code": 0,
+       "wall_time_seconds": 0.1
+      }
+     },
+     "isError": false,
+     "durationMs": 120
+    }
+   }
+  },
+  {
+   "t": 2109,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "second\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 120,
+      "timestamp": 1792439427875
+     }
+    }
+   }
+  },
+  {
+   "t": 2109,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "second\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 120,
+      "timestamp": 1792439427875
+     }
+    }
+   }
+  },
+  {
+   "t": 2110,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+        "name": "bash",
+        "arguments": {
+         "command": "echo first"
+        }
+       },
+       {
+        "type": "toolCall",
+        "id": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+        "name": "bash",
+        "arguments": {
+         "command": "echo second"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1108,
+       "output": 66,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1686,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792439425775,
+      "responseId": "479455a0-76c4-4255-a684-3966e995c889",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1770,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "first\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 126,
+       "timestamp": 1792439427696
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "second\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 120,
+       "timestamp": 1792439427875
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2110,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17"
+   }
+  },
+  {
+   "t": 2111,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 2113,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1690,
+      "contextWindow": 1000000,
+      "percent": 0.169
+     }
+    }
+   }
+  },
+  {
+   "t": 2208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792439427877
+     }
+    }
+   }
+  },
+  {
+   "t": 3417,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3417,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "两个"
+     }
+    }
+   }
+  },
+  {
+   "t": 3433,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "命令"
+     }
+    }
+   }
+  },
+  {
+   "t": 3443,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "都已"
+     }
+    }
+   }
+  },
+  {
+   "t": 3449,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "执行"
+     }
+    }
+   }
+  },
+  {
+   "t": 3449,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "完成"
+     }
+    }
+   }
+  },
+  {
+   "t": 3463,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "：\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3463,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "-"
+     }
+    }
+   }
+  },
+  {
+   "t": 3463,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3463,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "第一次"
+     }
+    }
+   }
+  },
+  {
+   "t": 3463,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "："
+     }
+    }
+   }
+  },
+  {
+   "t": 3464,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 3475,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "echo"
+     }
+    }
+   }
+  },
+  {
+   "t": 3489,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " first"
+     }
+    }
+   }
+  },
+  {
+   "t": 3489,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 3489,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " →"
+     }
+    }
+   }
+  },
+  {
+   "t": 3489,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3489,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "输出"
+     }
+    }
+   }
+  },
+  {
+   "t": 3506,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 3506,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "first"
+     }
+    }
+   }
+  },
+  {
+   "t": 3506,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3506,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "-"
+     }
+    }
+   }
+  },
+  {
+   "t": 3506,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3506,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "第二次"
+     }
+    }
+   }
+  },
+  {
+   "t": 3514,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "："
+     }
+    }
+   }
+  },
+  {
+   "t": 3514,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 3514,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "echo"
+     }
+    }
+   }
+  },
+  {
+   "t": 3514,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " second"
+     }
+    }
+   }
+  },
+  {
+   "t": 3514,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 3514,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " →"
+     }
+    }
+   }
+  },
+  {
+   "t": 3526,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3526,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "输出"
+     }
+    }
+   }
+  },
+  {
+   "t": 3526,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 3526,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "second"
+     }
+    }
+   }
+  },
+  {
+   "t": 3526,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 3528,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3528,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "两个命令都已执行完成：\n\n- 第一次：`echo first` → 输出 `first`\n- 第二次：`echo second` → 输出 `second`"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 174,
+       "output": 35,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1745,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792439427877,
+      "responseId": "090da03d-494c-4e1f-930f-812eea7642f9",
+      "rawStopReason": "stop",
+      "durationMs": 1417,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 3529,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "两个命令都已执行完成：\n\n- 第一次：`echo first` → 输出 `first`\n- 第二次：`echo second` → 输出 `second`"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 174,
+       "output": 35,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1745,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792439427877,
+      "responseId": "090da03d-494c-4e1f-930f-812eea7642f9",
+      "rawStopReason": "stop",
+      "durationMs": 1417,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 3529,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17"
+   }
+  },
+  {
+   "t": 3529,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-Uzq2nH/project\n</cwd>"
+       },
+       "timestamp": 1792439425772,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first`，第二次运行 `echo second`。两个都完成后告诉我结果。"
+        }
+       ],
+       "timestamp": 1792439425772
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+         "name": "bash",
+         "arguments": {
+          "command": "echo first"
+         }
+        },
+        {
+         "type": "toolCall",
+         "id": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+         "name": "bash",
+         "arguments": {
+          "command": "echo second"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1108,
+        "output": 66,
+        "cacheRead": 512,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1686,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792439425775,
+       "responseId": "479455a0-76c4-4255-a684-3966e995c889",
+       "rawStopReason": "tool_calls",
+       "durationMs": 1770,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_cEn2fmxgfcQMAzH5JI473417",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "first\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 126,
+       "timestamp": 1792439427696
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_01_ET_CP9Ub3dMBC5YkTE6uMpq4002",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "second\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 120,
+       "timestamp": 1792439427875
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "两个命令都已执行完成：\n\n- 第一次：`echo first` → 输出 `first`\n- 第二次：`echo second` → 输出 `second`"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 174,
+        "output": 35,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1745,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792439427877,
+       "responseId": "090da03d-494c-4e1f-930f-812eea7642f9",
+       "rawStopReason": "stop",
+       "durationMs": 1417,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 3529,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-1ae7-7623-a63b-55c30466ee17",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 3529,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1745,
+      "contextWindow": 1000000,
+      "percent": 0.1745
+     }
+    }
+   }
+  }
+ ]
+}

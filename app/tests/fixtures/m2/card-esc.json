@@ -1,0 +1,2015 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m2-record.mjs; do not edit by hand.",
+ "name": "card-esc",
+ "description": "焦点在批准卡上按 Esc：带理由拒绝这张卡，生成继续，模型收到拒绝后回复",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-19T19:50:22.357Z",
+ "steps": [
+  {
+   "t": 0,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-RfLh4w\\project"
+   }
+  },
+  {
+   "t": 5,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-RfLh4w\\project",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-LAvD4R\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m2-record-RfLh4w-project--\\2026-10-19T19-50-20-212Z_01a155b7-0534-7623-a63b-55be8f09d525.jsonl",
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 5,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "text": "运行命令 `echo skipped`，然后告诉我输出。"
+   }
+  },
+  {
+   "t": 6,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 6,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 6,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 6,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-RfLh4w/project\n</cwd>"
+      },
+      "timestamp": 1792439420217,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 6,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-RfLh4w/project\n</cwd>"
+      },
+      "timestamp": 1792439420217,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 7,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "运行命令 `echo skipped`，然后告诉我输出。"
+       }
+      ],
+      "timestamp": 1792439420217
+     }
+    }
+   }
+  },
+  {
+   "t": 7,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "运行命令 `echo skipped`，然后告诉我输出。"
+       }
+      ],
+      "timestamp": 1792439420217
+     }
+    }
+   }
+  },
+  {
+   "t": 103,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792439420219
+     }
+    }
+   }
+  },
+  {
+   "t": 639,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 640,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "The"
+     }
+    }
+   }
+  },
+  {
+   "t": 698,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user"
+     }
+    }
+   }
+  },
+  {
+   "t": 714,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " asks"
+     }
+    }
+   }
+  },
+  {
+   "t": 723,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 723,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " run"
+     }
+    }
+   }
+  },
+  {
+   "t": 723,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 731,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "echo"
+     }
+    }
+   }
+  },
+  {
+   "t": 731,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skipped"
+     }
+    }
+   }
+  },
+  {
+   "t": 731,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "`."
+     }
+    }
+   }
+  },
+  {
+   "t": 732,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Simple"
+     }
+    }
+   }
+  },
+  {
+   "t": 745,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 771,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 771,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 787,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{",
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 787,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 787,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "command",
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 803,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 803,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ": ",
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 803,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 803,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "echo",
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 810,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " skipped",
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 811,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 831,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "}",
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+     }
+    }
+   }
+  },
+  {
+   "t": 839,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 839,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+      "args": {
+       "command": "echo skipped"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 840,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asks to run `echo skipped`. Simple.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+        "name": "bash",
+        "arguments": {
+         "command": "echo skipped"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1089,
+       "output": 49,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 11,
+       "totalTokens": 1650,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792439420219,
+      "responseId": "9036ff29-94cf-4f98-a3f4-9dbedf524513",
+      "rawStopReason": "tool_calls",
+      "durationMs": 832,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 840,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+     "toolName": "bash",
+     "gate": "ask"
+    }
+   }
+  },
+  {
+   "t": 840,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+     "toolName": "bash",
+     "args": {
+      "command": "echo skipped"
+     }
+    }
+   }
+  },
+  {
+   "t": 840,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "mori.approval_request",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+     "toolName": "bash",
+     "args": {
+      "command": "echo skipped"
+     }
+    }
+   }
+  },
+  {
+   "t": 858,
+   "command": {
+    "type": "approval.answer",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "requestId": "approval-1",
+    "decision": "reject",
+    "reason": "先不要运行"
+   }
+  },
+  {
+   "t": 859,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "mori.approval_end",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+     "decision": "reject",
+     "by": "user",
+     "reason": "Rejected by the user. Reason: 先不要运行"
+    }
+   }
+  },
+  {
+   "t": 859,
+   "result": {
+    "type": "approval.answer",
+    "value": {
+     "mode": "ask",
+     "allowed": []
+    }
+   }
+  },
+  {
+   "t": 859,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+     "toolName": "bash",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "Rejected by the user. Reason: 先不要运行"
+       }
+      ],
+      "details": {}
+     },
+     "isError": true
+    }
+   }
+  },
+  {
+   "t": 859,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "Rejected by the user. Reason: 先不要运行"
+       }
+      ],
+      "details": {},
+      "isError": true,
+      "timestamp": 1792439421070
+     }
+    }
+   }
+  },
+  {
+   "t": 859,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "Rejected by the user. Reason: 先不要运行"
+       }
+      ],
+      "details": {},
+      "isError": true,
+      "timestamp": 1792439421070
+     }
+    }
+   }
+  },
+  {
+   "t": 859,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asks to run `echo skipped`. Simple.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+        "name": "bash",
+        "arguments": {
+         "command": "echo skipped"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1089,
+       "output": 49,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 11,
+       "totalTokens": 1650,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792439420219,
+      "responseId": "9036ff29-94cf-4f98-a3f4-9dbedf524513",
+      "rawStopReason": "tool_calls",
+      "durationMs": 832,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "Rejected by the user. Reason: 先不要运行"
+        }
+       ],
+       "details": {},
+       "isError": true,
+       "timestamp": 1792439421070
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 859,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525"
+   }
+  },
+  {
+   "t": 860,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 861,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1659,
+      "contextWindow": 1000000,
+      "percent": 0.16590000000000002
+     }
+    }
+   }
+  },
+  {
+   "t": 974,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792439421071
+     }
+    }
+   }
+  },
+  {
+   "t": 1617,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 1618,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "命令"
+     }
+    }
+   }
+  },
+  {
+   "t": 1626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "没有"
+     }
+    }
+   }
+  },
+  {
+   "t": 1649,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "执行"
+     }
+    }
+   }
+  },
+  {
+   "t": 1649,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "——"
+     }
+    }
+   }
+  },
+  {
+   "t": 1653,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "被"
+     }
+    }
+   }
+  },
+  {
+   "t": 1653,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "拒绝了"
+     }
+    }
+   }
+  },
+  {
+   "t": 1653,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "（"
+     }
+    }
+   }
+  },
+  {
+   "t": 1664,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "原因"
+     }
+    }
+   }
+  },
+  {
+   "t": 1664,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "：「"
+     }
+    }
+   }
+  },
+  {
+   "t": 1682,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "先"
+     }
+    }
+   }
+  },
+  {
+   "t": 1682,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "不要"
+     }
+    }
+   }
+  },
+  {
+   "t": 1682,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "运行"
+     }
+    }
+   }
+  },
+  {
+   "t": 1682,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "」"
+     }
+    }
+   }
+  },
+  {
+   "t": 1682,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "）。"
+     }
+    }
+   }
+  },
+  {
+   "t": 1682,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "所以"
+     }
+    }
+   }
+  },
+  {
+   "t": 1696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "我没有"
+     }
+    }
+   }
+  },
+  {
+   "t": 1696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "输出"
+     }
+    }
+   }
+  },
+  {
+   "t": 1704,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "可以"
+     }
+    }
+   }
+  },
+  {
+   "t": 1718,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "告诉你"
+     }
+    }
+   }
+  },
+  {
+   "t": 1734,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "。\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 1734,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "如果"
+     }
+    }
+   }
+  },
+  {
+   "t": 1734,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "之后"
+     }
+    }
+   }
+  },
+  {
+   "t": 1744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "想"
+     }
+    }
+   }
+  },
+  {
+   "t": 1744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "运行"
+     }
+    }
+   }
+  },
+  {
+   "t": 1744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "直接"
+     }
+    }
+   }
+  },
+  {
+   "t": 1756,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "告诉我"
+     }
+    }
+   }
+  },
+  {
+   "t": 1769,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "即可"
+     }
+    }
+   }
+  },
+  {
+   "t": 1769,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 1769,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 1769,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "命令没有执行——被拒绝了（原因：「先不要运行」）。所以我没有输出可以告诉你。\n\n如果之后想运行，直接告诉我即可。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 138,
+       "output": 30,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1704,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792439421071,
+      "responseId": "e283c967-46e4-4d3a-91b5-68e8618b1330",
+      "rawStopReason": "stop",
+      "durationMs": 909,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 1769,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "命令没有执行——被拒绝了（原因：「先不要运行」）。所以我没有输出可以告诉你。\n\n如果之后想运行，直接告诉我即可。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 138,
+       "output": 30,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1704,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792439421071,
+      "responseId": "e283c967-46e4-4d3a-91b5-68e8618b1330",
+      "rawStopReason": "stop",
+      "durationMs": 909,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 1769,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525"
+   }
+  },
+  {
+   "t": 1770,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-RfLh4w/project\n</cwd>"
+       },
+       "timestamp": 1792439420217,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "运行命令 `echo skipped`，然后告诉我输出。"
+        }
+       ],
+       "timestamp": 1792439420217
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The user asks to run `echo skipped`. Simple.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "toolCall",
+         "id": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+         "name": "bash",
+         "arguments": {
+          "command": "echo skipped"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1089,
+        "output": 49,
+        "cacheRead": 512,
+        "cacheWrite": 0,
+        "reasoning": 11,
+        "totalTokens": 1650,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792439420219,
+       "responseId": "9036ff29-94cf-4f98-a3f4-9dbedf524513",
+       "rawStopReason": "tool_calls",
+       "durationMs": 832,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "Rejected by the user. Reason: 先不要运行"
+        }
+       ],
+       "details": {},
+       "isError": true,
+       "timestamp": 1792439421070
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "命令没有执行——被拒绝了（原因：「先不要运行」）。所以我没有输出可以告诉你。\n\n如果之后想运行，直接告诉我即可。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 138,
+        "output": 30,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1704,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792439421071,
+       "responseId": "e283c967-46e4-4d3a-91b5-68e8618b1330",
+       "rawStopReason": "stop",
+       "durationMs": 909,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 1770,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 1770,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1704,
+      "contextWindow": 1000000,
+      "percent": 0.1704
+     }
+    }
+   }
+  }
+ ]
+}
