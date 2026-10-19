@@ -17,4 +17,10 @@
 | 工具卡展开后输出最多显示 | 最后 20,000 字 | `app/src/renderer/src/components/ToolCard.tsx` `OUTPUT_MAX` | 避免超长输出卡住渲染；pi 的命令输出本身已截到 50KB 左右 | M4（文件阅读器） |
 | "在底部"的判定 | 离底部不超过 24px | `app/src/renderer/src/components/Transcript.tsx` `BOTTOM_SLACK` | 小于一行字，滚轮停在差几像素处也算在底部 | 你走查时觉得跟随不对再调 |
 | 输入框最高 | 220px，之后在框内滚动 | `app/src/renderer/src/components/Composer.tsx` `MAX_INPUT_HEIGHT` | 约 9 行；再高会挤掉对话流 | 同上 |
+| 一条回复里的多个工具调用按顺序执行 | pi 的 `toolExecution: "sequential"`（pi 默认是 `parallel`） | `app/src/kernel/sessions.ts` `startSession` | pi 默认并行时，一条回复里的调用先逐个经过批准处理器，全部放行后才一起执行：允许第一张卡后它并不马上执行，要等后面的卡也答复，而且多条命令会同时运行。按顺序执行时允许一张就执行一张，你看到上一条的结果再决定下一张（方案 5.7"逐张出卡"） | M2 签收时请你确认；只读工具多时可能变慢 |
+| 停止时等 pi 记下拒绝的上限 | 2 秒 | `app/src/kernel/approval.ts` `STOP_SETTLE_MS` | 有挂着的卡时按停止，先拒绝、等这次调用在 pi 里结束再中止；先中止的话 pi 只记"Operation aborted"，重新打开会话就认不出"已拒绝"。正常不到 10 毫秒就结束，超时后照样中止 | 你走查时停止变慢再调 |
+| 工具卡上拒绝理由显示的长度 | 40 字，超出部分用"…"，悬停看全文 | `app/src/renderer/src/components/ToolCard.tsx` | 长理由会挤掉工具卡的标题；展开工具卡能看到完整理由 | 你走查时觉得不够再调 |
+| 拒绝时回给模型的工具结果 | `Rejected by the user.`；写了理由时 `Rejected by the user. Reason: <理由>`；你按了停止时 `Rejected: the user stopped the run.` | `app/src/shared/protocol.ts` `REJECTED_*` | pi 把扩展给的 reason 原样作为工具结果；固定写法让模型明白是你拒绝的，从会话记录载入时也能据此显示"已拒绝" | 内网模型对英文提示的理解不好时 |
+| 界面问题报告的保存位置 | `<userData>/ui-issues/<YYYY-MM-DD-HHmmss>.md` 和同名 `.png` | `app/src/main/feedback.ts` | 一个文件夹里平铺，"打开所在文件夹"就能看到全部报告；M7 的收件箱读同一个文件夹 | M7 |
+| 界面问题报告里"最近的操作"的条数 | 30 条（只在本次运行的内存里） | `app/src/renderer/src/state/actionLog.ts` `ACTION_LOG_SIZE` | 够看清出问题前做了什么，文件不会太长 | 你用 F8 时觉得不够再调 |
 | 右栏在出现改动时自动打开 | 本会话第一次有编辑或写入结果时打开；你手动开关之后以你为准 | `app/src/renderer/src/App.tsx` `Workspace` | 方案 5.9 只说"没有改动时默认收起"，有改动时按"默认打开"理解 | M4 |

@@ -9,6 +9,8 @@
 | [layout.md](layout.md) | 三栏布局、分隔线、窄窗口、侧栏、右栏、设置页外框 | M1 |
 | [chat.md](chat.md) | 顶栏、对话流、阶段行、排队区、输入框、停止、错误、后台进程退出 | M1 |
 | [tool-cards.md](tool-cards.md) | 工具卡状态与标题对照表 | M1（批准相关状态在 M2 接通） |
+| [approval.md](approval.md) | 哪些调用要批准、批准卡、工具卡与阶段行的批准状态、权限菜单、任务栏闪烁 | M2 |
+| [f8.md](f8.md) | F8 报告界面问题：入口、报告框、保存的内容 | M2 |
 
 pi 事件名以 `@earendil-works/pi-coding-agent` 1.3.0 的 `AgentSessionEvent` 为准；
 `message_update` 经后台进程精简为 `{ type, contentIndex, delta, toolCallId, toolName, args }`（见 `app/src/kernel/events.ts`）。
