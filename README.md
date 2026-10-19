@@ -27,6 +27,11 @@ Agent 向权限范围内的共享区追加简短结果、来源和更正；其�
 - [Chrome DevTools 内嵌工具 Proposal](docs/proposals/chrome-devtools.md)
 - [内网模型资源可靠性 Proposal](docs/proposals/model-reliability.md)
 
+重设计草案（2026-10-19，待评审；确认后替代上面文档中的相应部分）：
+
+- [平行 Agent 与 TaskBoard Proposal](docs/proposals/parallel-agents-taskboard.md)
+- [统一模型提供商 Proposal](docs/proposals/model-providers.md)
+
 ## 界面 Demo
 
 已提供基于 proposal 和 DSH 当前界面结构的本地交互演示：[demo](demo/README.md)。
