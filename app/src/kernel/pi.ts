@@ -50,12 +50,3 @@ export async function globalSettings() {
   const pi = await loadPi();
   return pi.SettingsManager.create(pi.getAgentDir(), pi.getAgentDir());
 }
-
-/** @brief pi 设置中的默认模型。 */
-export async function defaultModel(): Promise<ReturnType<ModelRuntime['getModel']>> {
-  const settings = await globalSettings();
-  const provider = settings.getDefaultProvider();
-  const modelId = settings.getDefaultModel();
-  if (!provider || !modelId) return undefined;
-  return (await getRuntime()).getModel(provider, modelId);
-}

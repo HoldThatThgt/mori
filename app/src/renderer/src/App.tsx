@@ -18,6 +18,7 @@ function describe(what: string, error: unknown): string {
 function useConnectionForm(onSaved: (saved: boolean) => void) {
   const [form, setForm] = useState<Connection>(emptyForm);
   const [keySaved, setKeySaved] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState('');
   const [test, setTest] = useState<TestResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -28,6 +29,7 @@ function useConnectionForm(onSaved: (saved: boolean) => void) {
         if (!info.saved) return;
         setForm(info.saved.connection);
         setKeySaved(info.saved.keySaved);
+        setSaved(true);
         onSaved(true);
       },
       (error: unknown) => setMessage(`读取配置失败：${describe('config.get', error)}`),
@@ -52,6 +54,7 @@ function useConnectionForm(onSaved: (saved: boolean) => void) {
     // key 已交给后台进程加密保存，界面里不再留着它。
     setKeySaved(true);
     setForm((current) => ({ ...current, apiKey: '' }));
+    setSaved(true);
     onSaved(true);
   });
   const runTest = () => run('测试', async () => {
@@ -59,7 +62,7 @@ function useConnectionForm(onSaved: (saved: boolean) => void) {
     setTest(await window.mori.request<TestResult>({ type: 'connection.test' }));
     setMessage('');
   });
-  return { form, setForm, keySaved, message, test, busy, save, runTest };
+  return { form, setForm, keySaved, saved, message, test, busy, save, runTest };
 }
 
 /** @brief 测试连接的结果。 */
@@ -75,7 +78,7 @@ function TestView({ result }: { result: TestResult }) {
 
 /** @brief 连接表单：保存到 pi 的 models.json，并测试一次真实请求。 */
 function ConnectionPanel({ onSaved }: { onSaved: (saved: boolean) => void }) {
-  const { form, setForm, keySaved, message, test, busy, save, runTest } = useConnectionForm(onSaved);
+  const { form, setForm, keySaved, saved, message, test, busy, save, runTest } = useConnectionForm(onSaved);
   const field = (key: keyof Connection) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [key]: key === 'contextWindow' ? Number(event.target.value) : event.target.value });
   const keyHint = keySaved ? '已加密保存（不显示）；改了服务地址就要重新填写' : '保存后由 Mori 加密存放在本机';
@@ -92,7 +95,7 @@ function ConnectionPanel({ onSaved }: { onSaved: (saved: boolean) => void }) {
       <label>上下文长度<input type="number" value={form.contextWindow} onChange={field('contextWindow')} /></label>
       <div className="row">
         <button onClick={save} disabled={busy}>保存</button>
-        <button onClick={runTest} disabled={busy}>测试连接</button>
+        <button onClick={runTest} disabled={busy || !saved} title={saved ? '' : '先保存连接'}>测试连接</button>
         <span className="hint">{message}</span>
       </div>
       {test && <TestView result={test} />}

@@ -68,6 +68,8 @@ async function saveAndTest(page, apiKey) {
 
 /** @brief 连接表单：错误的 key 显示错误原文；$环境变量和明文 key 都能连上。 */
 async function connect(page, userData) {
+  const disabled = await page.getByRole('button', { name: '测试连接' }).isDisabled();
+  record('还没保存连接时不能测试连接', disabled);
   const wrong = await saveAndTest(page, 'wrong-key');
   record('错误的 key 显示错误原文', !wrong.ok && wrong.text.includes('401'), wrong.text.slice(0, 160));
   const literal = await saveAndTest(page, testKey);

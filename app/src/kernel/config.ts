@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import type { ModelRuntime } from '@earendil-works/pi-coding-agent';
 import type { Connection, SavedConnection, TestResult } from '../shared/protocol';
 import { requestStoreKey } from './credentials';
-import { defaultModel, getRuntime, globalSettings } from './pi';
+import { getRuntime, globalSettings } from './pi';
 
 /** Mori 在 models.json 中使用的 provider id */
 export const PROVIDER_ID = 'mori-endpoint';
@@ -113,10 +113,16 @@ export async function saveConnection(agentDir: string, connection: Connection): 
 /** @brief 用默认模型发一条短消息，记录到第一个增量（正文或思考）的时间。 */
 export async function testConnection(): Promise<TestResult> {
   const started = Date.now();
-  const model = await defaultModel();
   const runtime = await getRuntime();
+  const settings = await globalSettings();
+  const provider = settings.getDefaultProvider();
+  const modelId = settings.getDefaultModel();
   const result: TestResult = { ok: false, firstTokenMs: null, totalMs: 0, text: '', thinking: false, error: null };
-  if (!model) return { ...result, error: runtime.getError() ?? 'No default model configured' };
+  if (!provider || !modelId) return { ...result, error: 'No connection saved yet; save the connection first' };
+  const model = runtime.getModel(provider, modelId);
+  if (!model) {
+    return { ...result, error: runtime.getError() ?? `Model ${provider}/${modelId} not found in models.json` };
+  }
   const message = { role: 'user' as const, content: 'Reply with one short sentence.', timestamp: started };
   const context = { messages: [message] };
   const signal = AbortSignal.timeout(TEST_TIMEOUT_MS);
