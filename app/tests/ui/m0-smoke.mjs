@@ -181,19 +181,30 @@ async function concurrencyCheck(page, project) {
 
 /** @brief 命令运行中关闭窗口：程序应自行退出、不弹错误框，并结束命令留下的进程。 */
 async function closeWhileRunning(app, page) {
+  // 先等前面 #9129 检查留下的 sleep 30 自己结束，否则它可能晚一点才出现在进程列表里，被算成这次的命令进程。
+  for (let i = 0; i < 25 && sleepProcessIds().length > 0; i += 1) await sleep(2000);
   const before = new Set(sleepProcessIds());
   await pageHelpers(page).send('run: sleep 120');
   await page.getByTestId('tool-card').last().getByText('执行中').waitFor({ timeout: 20000 });
   await sleep(1000);
   const started = sleepProcessIds().filter((pid) => !before.has(pid));
+  if (process.env.MORI_DIAG) console.log('DIAG started', processRows(started));
   const exited = new Promise((r) => app.process().once('exit', () => r(true)));
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
   const ok = await Promise.race([exited, sleep(10000).then(() => false)]);
   await sleep(1000);
   const left = sleepProcessIds().filter((pid) => started.includes(pid));
+  if (process.env.MORI_DIAG) console.log('DIAG left', processRows(left));
   record('运行中关闭窗口：程序退出且不留下命令进程', ok && started.length > 0 && left.length === 0,
     `10 秒内退出=${ok}；运行中的 sleep.exe ${started.length} 个，退出后剩 ${left.length} 个`);
   return ok;
+}
+
+/** @brief 诊断用（MORI_DIAG=1）：给定 PID 的父进程、创建时间和命令行。 */
+function processRows(pids) {
+  const script = 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)|$($_.ParentProcessId)|$($_.CreationDate)|$($_.CommandLine)" }';
+  return execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', maxBuffer: 1 << 24 })
+    .split(/\r?\n/).filter((row) => pids.some((pid) => row.startsWith(`${pid}|`)));
 }
 
 /** @brief 找到后台进程（utilityProcess）的 PID。Playwright 在 Windows 上经 cmd.exe 启动程序，所以要在整棵进程树里找。 */
