@@ -28,6 +28,7 @@ npm ci
 | `npm run fake-endpoint` | 启动合成端点 `http://127.0.0.1:4319/v1`（模型 `fake-coder`，只用于测试） |
 | `npm run smoke` | 构建后用合成端点跑冒烟测试；测打包结果用 `node tests/ui/m0-smoke.mjs --exe dist/win-unpacked/Mori.exe` |
 | `npx electron tests/prechecks/esm-utility/main.cjs` | 预检：utilityProcess 能否运行 ESM 入口 |
+| `node tests/ui/m0-real.mjs --env-file <路径> --key-var <变量名> --base-url <地址> --model <模型 ID>` | 真实端点走查（M0 走查 2–3）；key 只经 `$变量名` 传给 Mori，脚本不打印 key |
 
 ## 数据位置
 
