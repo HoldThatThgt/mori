@@ -18,6 +18,10 @@ const paths = {
   back: 'm15 5-7 7 7 7',
   flag: 'M5 21V4h12l-2.5 4.5L17 13H5',
   shield: 'm12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Zm-4 9 3 3 5-6',
+  quote: 'M5 7h5v5H7a3 3 0 0 0 0 0v1a3 3 0 0 1-2 3M14 7h5v5h-3v1a3 3 0 0 1-2 3',
+  copy: 'M9 9h10v11H9ZM5 15V4h10',
+  external: 'M14 4h6v6M20 4l-9 9M18 14v5H5V6h5',
+  feedback: 'M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 4V6a2 2 0 0 1 2-2Zm7 4v4m0 3v.5',
 } as const;
 
 export type IconName = keyof typeof paths;

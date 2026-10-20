@@ -1,4 +1,4 @@
-// 界面测试用的回放进程桥：代替 preload 提供 window.mori，回放 tests/fixtures/m1、m2、m3 里从真实会话录下的命令与事件。
+// 界面测试用的回放进程桥：代替 preload 提供 window.mori，回放 tests/fixtures/m1–m4 里从真实会话录下的命令与事件。
 // 界面发出的每条命令都要与录制时的下一条命令一致（类型、送达方式、文字、批准的选择、文件夹、会话文件、信任回答、
 // 名字），否则记为不一致并拒绝；一致时按录制的时间间隔（可加速）发出这条命令之后、下一条命令之前的事件，
 // 并在录制时的位置回复结果。
@@ -8,6 +8,8 @@
 // 由测试检查这里没有它。
 // 只用于测试，不在 src/ 中。
 // 任务栏闪烁、F8 和删除会话文件不经过后台进程：这里只记下调用，截图和保存的结果由测试通过 window.__replay.f8 控制。
+// M4：文件阅读器读文件按录制里的 file 步骤回答（同一个文件按录下的顺序，取完后重复最后一个）；用系统编辑器打开、复制、
+// 保存反馈只记下调用，保存反馈的失败与延迟由测试通过 window.__replay.feedback 控制。session.prompt 还比较 refs。
 
 /** 截图返回的 1×1 PNG */
 const PIXEL = 'data:image/png;base64,'
@@ -34,6 +36,38 @@ function withEventDefaults(envelope) {
   const { event } = envelope;
   if (event.type !== 'mori.prompt_error' || 'running' in event) return envelope;
   return { ...envelope, event: { ...event, running: false } };
+}
+
+/** @brief 按键名排序后的 JSON（比较 refs：界面和录制器拼对象时键的先后可能不同）。 */
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+/** @brief 文件的比较形式：相对路径接在工作目录后面，统一反斜杠、不分大小写（与主进程解析后的绝对路径比较）。 */
+function fileKey(path, cwd) {
+  const absolute = /^[a-zA-Z]:[\\/]/.test(path) ? path : `${cwd.replace(/[\\/]+$/, '')}\\${path}`;
+  return absolute.replace(/\//g, '\\').toLowerCase();
+}
+
+/**
+ * @brief 按录制里的 file 步骤回答 readFile：同一个文件（按主进程解析后的路径）按录下的顺序，取完后重复最后一个。
+ *        synthetic：没录过的文件按"文件已被删除或移动"回答，测试不该用到。
+ */
+function fileReader(fixture) {
+  const reads = fixture.steps.filter((step) => step.file).map((step) => step.file);
+  const taken = new Map();
+  return (path, cwd) => {
+    const key = fileKey(path, cwd);
+    const matching = reads.filter((read) => read.result.path.toLowerCase() === key);
+    const count = taken.get(key) ?? 0;
+    taken.set(key, count + 1);
+    const pick = matching[Math.min(count, matching.length - 1)];
+    return pick ? structuredClone(pick.result) : { status: 'missing', path: key };
+  };
 }
 
 /** 不占回放顺序的只读查询 */
@@ -63,7 +97,8 @@ function sameCommand(expected, actual) {
   if (expected.type !== actual.type) return false;
   switch (expected.type) {
     case 'session.prompt':
-      return expected.text === actual.text && (expected.behavior ?? null) === (actual.behavior ?? null);
+      return expected.text === actual.text && (expected.behavior ?? null) === (actual.behavior ?? null)
+        && canonical(expected.refs) === canonical(actual.refs);
     case 'approval.answer':
       return expected.requestId === actual.requestId && expected.decision === actual.decision
         && reasonText(expected.reason) === reasonText(actual.reason);
@@ -91,8 +126,10 @@ function sameCommand(expected, actual) {
  * @brief 不经过后台进程的桌面能力（任务栏闪烁、F8 截图与保存、打开所在文件夹）：只记下调用。
  *        返回的 f8 由测试改写，制造截图失败、保存失败或较慢的截图与保存。
  */
-function desktopStubs(status) {
+function desktopStubs(status, fixture) {
   const f8 = { captureDelayMs: 0, captureError: null, saveDelayMs: 0, saveError: null };
+  const feedback = { delayMs: 0, error: null };
+  const files = fileReader(fixture);
   const wait = (ms) => (ms ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve());
   const stubs = {
     requestAttention() {
@@ -121,8 +158,26 @@ function desktopStubs(status) {
       status.deleted.push(file);
       return Promise.resolve({ deleted: true, error: null });
     },
+    readFile(path, cwd) {
+      status.reads.push({ path, cwd });
+      return Promise.resolve(files(path, cwd));
+    },
+    openPath(path, cwd) {
+      status.opened.push({ path, cwd });
+      return Promise.resolve({ error: null, revealed: false });
+    },
+    copyText(text) {
+      status.copied.push(text);
+      return Promise.resolve();
+    },
+    async saveFeedback(record) {
+      await wait(feedback.delayMs);
+      if (feedback.error) throw new Error(feedback.error);
+      status.feedback.push(structuredClone(record));
+      return { file: `C:\\replay\\feedback\\replay-${status.feedback.length}.json` };
+    },
   };
-  return { f8, stubs };
+  return { f8, feedback, stubs };
 }
 
 /**
@@ -138,8 +193,8 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
   // played：已经放完的段数（每条命令之后、下一条命令之前算一段）；played 等于 cursor 时回放桥在等界面的下一条命令。
   const status = { cursor: 0, played: 0, clock: 0, exited: false, errors: [], commands: [], queries: [],
     playing: Promise.resolve(), idle: true, attention: 0, captures: 0, dialogAtCapture: [], issues: [], shown: [],
-    deleted: [] };
-  const { f8, stubs } = desktopStubs(status);
+    deleted: [], reads: [], opened: [], copied: [], feedback: [], failed: [] };
+  const { f8, feedback, stubs } = desktopStubs(status, fixture);
   const created = steps.find((step) => step.result?.type === 'session.create')?.result.value;
   const saved = { connection: { name: 'replay', baseUrl: fixture.endpoint, api: 'openai-completions', apiKey: '',
     modelId: fixture.model.split('/').pop(), contextWindow: created?.contextUsage?.contextWindow ?? 128000,
@@ -210,8 +265,14 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
     return index === undefined ? created?.cwd ?? null : steps[index].command.cwd;
   }
 
-  /** @brief 按录制回放一条界面命令。 */
+  /** @brief 按录制回放一条界面命令。control.failNext 有值时（synthetic）这一条直接以它失败，不占回放顺序。 */
   function replayCommand(command) {
+    if (control.failNext) {
+      const message = control.failNext;
+      control.failNext = null;
+      status.failed.push(command);
+      return Promise.reject(new Error(message));
+    }
     const index = marks[status.cursor];
     const expected = index === undefined ? null : steps[index].command;
     status.commands.push(command);
@@ -272,6 +333,9 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
   const control = {
     status,
     f8,
+    feedback,
+    /** synthetic：下一条界面命令直接以这段原文失败（测发送时就失败）；null 表示照常回放 */
+    failNext: null,
     /** @brief 模拟后台进程退出。 */
     exit(code = 1) {
       status.exited = true;

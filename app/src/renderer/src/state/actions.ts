@@ -3,13 +3,14 @@
 
 import type {
   ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, Command, ConfigInfo, EventEnvelope, ForwardedEvent,
-  LiveStatus, SavedSession, SessionState,
+  LiveStatus, QuoteRef, SavedSession, SessionState,
 } from '../../../shared/protocol';
 import { recordAction } from './actionLog';
 import { describe, request } from './bridge';
 import { persistDrafts } from './drafts';
 import { pushItem, type Transcript } from './model';
 import { loadSessions, reopenAll } from './projects';
+import { addQuote, composePrompt, stripQuotes } from './quotes';
 import { applyEvent, finishOpenTools } from './transcript';
 import { sameFile, tabByFile, tabBySession, updateTab, useApp } from './store';
 
@@ -36,21 +37,36 @@ export function putBack(key: string, texts: string[]): void {
 }
 
 /**
- * @brief 发送输入框里的文字。
+ * @brief 把没发出去的带引用的消息放回输入框：引用芯片放回芯片（已有的不重复），全文去掉引用块只放回你写的字；
+ *        引用块对不上时放回全文。
+ */
+export function putBackQuoted(key: string, text: string, refs: QuoteRef[]): void {
+  const tab = useApp.getState().tabs.find((item) => item.key === key);
+  if (!tab) return;
+  putBack(key, [stripQuotes(text, refs, tab.cwd) ?? text]);
+  for (const ref of refs) addQuote(key, ref);
+}
+
+/**
+ * @brief 发送输入框里的文字和引用芯片：发给模型的全文是引用块加你的文字（quotes.ts composePrompt），
+ *        芯片随命令带给后台进程，pi 记下这条消息后写成 mori.ref 条目。
  * @param behavior 生成中时：steer 插话，followUp 排队；空闲时不传
  */
 export async function send(key: string, behavior?: 'steer' | 'followUp'): Promise<void> {
   const tab = useApp.getState().tabs.find((item) => item.key === key);
-  const text = tab?.draft.trim();
-  if (!tab?.sessionId || !text) return;
-  updateTab(key, (current) => ({ ...current, draft: '', activity: Date.now(),
+  if (!tab?.sessionId) return;
+  const refs = tab.draftRefs;
+  const text = composePrompt(refs, tab.draft, tab.cwd);
+  if (!text) return;
+  updateTab(key, (current) => ({ ...current, draft: '', draftRefs: [], activity: Date.now(),
     transcript: behavior ? current.transcript : { ...current.transcript, sending: true } }));
   try {
-    await request({ type: 'session.prompt', sessionId: tab.sessionId, text, behavior });
+    await request({ type: 'session.prompt', sessionId: tab.sessionId, text, behavior,
+      refs: refs.length > 0 ? refs : undefined });
   } catch (error) {
     const message = describe('session.prompt', error);
     updateTranscript(key, (t) => pushItem({ ...t, sending: false },
-      { kind: 'error', text: message, restore: text, live: true }));
+      { kind: 'error', text: message, restore: text, live: true, ...(refs.length ? { refs } : {}) }));
   }
 }
 

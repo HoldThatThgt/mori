@@ -19,6 +19,8 @@
     "test:m2-replay": "node tests/ui/m2-replay.mjs",
     "test:m3-app": "electron-vite build && node tests/ui/m3-app.mjs",
     "test:m3-replay": "node tests/ui/m3-replay.mjs",
+    "test:m4-app": "electron-vite build && node tests/ui/m4-app.mjs",
+    "test:m4-replay": "node tests/ui/m4-replay.mjs",
     "check": "npm run typecheck && node tests/check.mjs"
   },
   "engines": {

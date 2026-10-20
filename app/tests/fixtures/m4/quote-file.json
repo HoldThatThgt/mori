@@ -1,0 +1,6117 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m4-record.mjs; do not edit by hand.",
+ "name": "quote-file",
+ "description": "模型读取 src/a.ts；在阅读器里读到同一个文件，引用第 1–3 行问问题（带 refs 发出）",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-20T04:55:04.098Z",
+ "steps": [
+  {
+   "t": 1,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 2723,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 2723,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m4-record-Ld6bP0\\m4-quote-file"
+   }
+  },
+  {
+   "t": 2728,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 2728,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m4-record-Ld6bP0\\m4-quote-file"
+   }
+  },
+  {
+   "t": 2774,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m4-record-Ld6bP0\\m4-quote-file",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-sESgI1\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m4-record-Ld6bP0-m4-quote-file--\\2026-10-20T04-54-59-798Z_01a157a9-abd5-7724-9967-5524e499869c.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 2774,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "text": "请读取 src/a.ts，然后用一句话说明它做什么。不要修改任何文件。"
+   }
+  },
+  {
+   "t": 2845,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 2845,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 2845,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 2846,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m4-record-Ld6bP0/m4-quote-file\n</cwd>"
+      },
+      "timestamp": 1792472099844,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2846,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m4-record-Ld6bP0/m4-quote-file\n</cwd>"
+      },
+      "timestamp": 1792472099844,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2846,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请读取 src/a.ts，然后用一句话说明它做什么。不要修改任何文件。"
+       }
+      ],
+      "timestamp": 1792472099843
+     }
+    }
+   }
+  },
+  {
+   "t": 2846,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请读取 src/a.ts，然后用一句话说明它做什么。不要修改任何文件。"
+       }
+      ],
+      "timestamp": 1792472099843
+     }
+    }
+   }
+  },
+  {
+   "t": 2846,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "419fac6a",
+     "time": 1792472099843,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3282,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792472100132
+     }
+    }
+   }
+  },
+  {
+   "t": 3774,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 0,
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3774,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3774,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3775,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3775,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "path",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3775,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3797,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ": ",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3797,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3797,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "src",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3797,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "/a",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3799,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ".ts",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3799,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3799,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "}",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388"
+     }
+    }
+   }
+  },
+  {
+   "t": 3801,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 0,
+      "toolName": "read",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388",
+      "args": {
+       "path": "src/a.ts"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 3801,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_lMx9QpDRl8DUOATa27VP6388",
+        "name": "read",
+        "arguments": {
+         "path": "src/a.ts"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1061,
+       "output": 39,
+       "cacheRead": 640,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1740,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792472100132,
+      "responseId": "15b989ad-ebac-46d8-be47-7f1ca8906185",
+      "rawStopReason": "tool_calls",
+      "durationMs": 735,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 3802,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "452b969f",
+     "time": 1792472100132,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3802,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388",
+     "toolName": "read",
+     "gate": "free"
+    }
+   }
+  },
+  {
+   "t": 3802,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388",
+     "toolName": "read",
+     "args": {
+      "path": "src/a.ts"
+     }
+    }
+   }
+  },
+  {
+   "t": 3807,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388",
+     "toolName": "read",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "export function add(a: number, b: number): number {\n  return a + b;\n}\n"
+       }
+      ],
+      "structuredContent": "export function add(a: number, b: number): number {\n  return a + b;\n}\n"
+     },
+     "isError": false,
+     "durationMs": 4
+    }
+   }
+  },
+  {
+   "t": 3807,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388",
+      "toolName": "read",
+      "content": [
+       {
+        "type": "text",
+        "text": "export function add(a: number, b: number): number {\n  return a + b;\n}\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 4,
+      "timestamp": 1792472100874
+     }
+    }
+   }
+  },
+  {
+   "t": 3807,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388",
+      "toolName": "read",
+      "content": [
+       {
+        "type": "text",
+        "text": "export function add(a: number, b: number): number {\n  return a + b;\n}\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 4,
+      "timestamp": 1792472100874
+     }
+    }
+   }
+  },
+  {
+   "t": 3808,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_lMx9QpDRl8DUOATa27VP6388",
+        "name": "read",
+        "arguments": {
+         "path": "src/a.ts"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1061,
+       "output": 39,
+       "cacheRead": 640,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1740,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792472100132,
+      "responseId": "15b989ad-ebac-46d8-be47-7f1ca8906185",
+      "rawStopReason": "tool_calls",
+      "durationMs": 735,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "export function add(a: number, b: number): number {\n  return a + b;\n}\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 4,
+       "timestamp": 1792472100874
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3808,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c"
+   }
+  },
+  {
+   "t": 3809,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 3813,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1758,
+      "contextWindow": 1000000,
+      "percent": 0.1758
+     }
+    }
+   }
+  },
+  {
+   "t": 3982,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792472100876
+     }
+    }
+   }
+  },
+  {
+   "t": 4563,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4563,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Simple"
+     }
+    }
+   }
+  },
+  {
+   "t": 4629,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " response"
+     }
+    }
+   }
+  },
+  {
+   "t": 4641,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " in"
+     }
+    }
+   }
+  },
+  {
+   "t": 4656,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Chinese"
+     }
+    }
+   }
+  },
+  {
+   "t": 4656,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 4657,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 4657,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 4657,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "src"
+     }
+    }
+   }
+  },
+  {
+   "t": 4657,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "/a"
+     }
+    }
+   }
+  },
+  {
+   "t": 4668,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": ".ts"
+     }
+    }
+   }
+  },
+  {
+   "t": 4668,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 4668,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 4668,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "导"
+     }
+    }
+   }
+  },
+  {
+   "t": 4669,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "出了一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 4690,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 4690,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "add"
+     }
+    }
+   }
+  },
+  {
+   "t": 4690,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 4702,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 4702,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "函数"
+     }
+    }
+   }
+  },
+  {
+   "t": 4702,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4702,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "接收"
+     }
+    }
+   }
+  },
+  {
+   "t": 4703,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "两个"
+     }
+    }
+   }
+  },
+  {
+   "t": 4703,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "数字"
+     }
+    }
+   }
+  },
+  {
+   "t": 4707,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "并"
+     }
+    }
+   }
+  },
+  {
+   "t": 4707,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "返回"
+     }
+    }
+   }
+  },
+  {
+   "t": 4707,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "它们的"
+     }
+    }
+   }
+  },
+  {
+   "t": 4724,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "和"
+     }
+    }
+   }
+  },
+  {
+   "t": 4724,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 4724,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "未"
+     }
+    }
+   }
+  },
+  {
+   "t": 4740,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "修改"
+     }
+    }
+   }
+  },
+  {
+   "t": 4740,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "任何"
+     }
+    }
+   }
+  },
+  {
+   "t": 4740,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "文件"
+     }
+    }
+   }
+  },
+  {
+   "t": 4740,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 4741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 4741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Simple response in Chinese.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "`src/a.ts` 导出了一个 `add` 函数，接收两个数字并返回它们的和。未修改任何文件。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 236,
+       "output": 33,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 5,
+       "totalTokens": 1805,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792472100876,
+      "responseId": "2620eab5-75f3-40eb-8160-47b27431ea93",
+      "rawStopReason": "stop",
+      "durationMs": 931,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 4742,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "32c8547d",
+     "time": 1792472100876,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 4742,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Simple response in Chinese.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "`src/a.ts` 导出了一个 `add` 函数，接收两个数字并返回它们的和。未修改任何文件。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 236,
+       "output": 33,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 5,
+       "totalTokens": 1805,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792472100876,
+      "responseId": "2620eab5-75f3-40eb-8160-47b27431ea93",
+      "rawStopReason": "stop",
+      "durationMs": 931,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 4742,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c"
+   }
+  },
+  {
+   "t": 4742,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m4-record-Ld6bP0/m4-quote-file\n</cwd>"
+       },
+       "timestamp": 1792472099844,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "请读取 src/a.ts，然后用一句话说明它做什么。不要修改任何文件。"
+        }
+       ],
+       "timestamp": 1792472099843
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_lMx9QpDRl8DUOATa27VP6388",
+         "name": "read",
+         "arguments": {
+          "path": "src/a.ts"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1061,
+        "output": 39,
+        "cacheRead": 640,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1740,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792472100132,
+       "responseId": "15b989ad-ebac-46d8-be47-7f1ca8906185",
+       "rawStopReason": "tool_calls",
+       "durationMs": 735,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_lMx9QpDRl8DUOATa27VP6388",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "export function add(a: number, b: number): number {\n  return a + b;\n}\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 4,
+       "timestamp": 1792472100874
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "Simple response in Chinese.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "text",
+         "text": "`src/a.ts` 导出了一个 `add` 函数，接收两个数字并返回它们的和。未修改任何文件。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 236,
+        "output": 33,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "reasoning": 5,
+        "totalTokens": 1805,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792472100876,
+       "responseId": "2620eab5-75f3-40eb-8160-47b27431ea93",
+       "rawStopReason": "stop",
+       "durationMs": 931,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 4742,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 4742,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 4743,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1805,
+      "contextWindow": 1000000,
+      "percent": 0.1805
+     }
+    }
+   }
+  },
+  {
+   "t": 4756,
+   "file": {
+    "path": "src/a.ts",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m4-record-Ld6bP0\\m4-quote-file",
+    "result": {
+     "status": "ok",
+     "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m4-record-Ld6bP0\\m4-quote-file\\src\\a.ts",
+     "text": "export function add(a: number, b: number): number {\n  return a + b;\n}\n",
+     "sha256": "9a30ac96b5d5c1b67eca69e1e2cf0798817d9578c8d7d904a81a67b983b35cba",
+     "size": 70
+    }
+   }
+  },
+  {
+   "t": 4756,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "refs": [
+     {
+      "quote": "export function add(a: number, b: number): number {\n  return a + b;\n}",
+      "source": {
+       "kind": "file",
+       "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m4-record-Ld6bP0\\m4-quote-file\\src\\a.ts",
+       "sha256": "9a30ac96b5d5c1b67eca69e1e2cf0798817d9578c8d7d904a81a67b983b35cba",
+       "startLine": 1,
+       "endLine": 3
+      }
+     }
+    ],
+    "text": "引用 src/a.ts 第 1–3 行：\n> export function add(a: number, b: number): number {\n>   return a + b;\n> }\n\n这段代码有什么可以改进的地方？用一两句话回答，不要调用任何工具。"
+   }
+  },
+  {
+   "t": 4758,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 4759,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 4759,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 4759,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "引用 src/a.ts 第 1–3 行：\n> export function add(a: number, b: number): number {\n>   return a + b;\n> }\n\n这段代码有什么可以改进的地方？用一两句话回答，不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792472101824
+     }
+    }
+   }
+  },
+  {
+   "t": 4759,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "引用 src/a.ts 第 1–3 行：\n> export function add(a: number, b: number): number {\n>   return a + b;\n> }\n\n这段代码有什么可以改进的地方？用一两句话回答，不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792472101824
+     }
+    }
+   }
+  },
+  {
+   "t": 4760,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "f98fabba",
+     "time": 1792472101824,
+     "refs": [
+      {
+       "quote": "export function add(a: number, b: number): number {\n  return a + b;\n}",
+       "source": {
+        "kind": "file",
+        "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m4-record-Ld6bP0\\m4-quote-file\\src\\a.ts",
+        "sha256": "9a30ac96b5d5c1b67eca69e1e2cf0798817d9578c8d7d904a81a67b983b35cba",
+        "startLine": 1,
+        "endLine": 3
+       }
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 5606,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792472101827
+     }
+    }
+   }
+  },
+  {
+   "t": 5613,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 5613,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "The"
+     }
+    }
+   }
+  },
+  {
+   "t": 5618,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user"
+     }
+    }
+   }
+  },
+  {
+   "t": 5621,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " asks"
+     }
+    }
+   }
+  },
+  {
+   "t": 5621,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " me"
+     }
+    }
+   }
+  },
+  {
+   "t": 5621,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 5622,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " quote"
+     }
+    }
+   }
+  },
+  {
+   "t": 5622,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " lines"
+     }
+    }
+   }
+  },
+  {
+   "t": 5626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "1"
+     }
+    }
+   }
+  },
+  {
+   "t": 5626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "-"
+     }
+    }
+   }
+  },
+  {
+   "t": 5626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "3"
+     }
+    }
+   }
+  },
+  {
+   "t": 5626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " and"
+     }
+    }
+   }
+  },
+  {
+   "t": 5626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " comment"
+     }
+    }
+   }
+  },
+  {
+   "t": 5626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " briefly"
+     }
+    }
+   }
+  },
+  {
+   "t": 5626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 5627,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " They"
+     }
+    }
+   }
+  },
+  {
+   "t": 5627,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " quote"
+     }
+    }
+   }
+  },
+  {
+   "t": 5627,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " content"
+     }
+    }
+   }
+  },
+  {
+   "t": 5627,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " that"
+     }
+    }
+   }
+  },
+  {
+   "t": 5633,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " om"
+     }
+    }
+   }
+  },
+  {
+   "t": 5637,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "its"
+     }
+    }
+   }
+  },
+  {
+   "t": 5637,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 5637,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " closing"
+     }
+    }
+   }
+  },
+  {
+   "t": 5649,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " brace"
+     }
+    }
+   }
+  },
+  {
+   "t": 5649,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 5649,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "}`"
+     }
+    }
+   }
+  },
+  {
+   "t": 5649,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " —"
+     }
+    }
+   }
+  },
+  {
+   "t": 5650,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 5658,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " file"
+     }
+    }
+   }
+  },
+  {
+   "t": 5668,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " has"
+     }
+    }
+   }
+  },
+  {
+   "t": 5668,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5668,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "3"
+     }
+    }
+   }
+  },
+  {
+   "t": 5668,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " lines"
+     }
+    }
+   }
+  },
+  {
+   "t": 5668,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " total"
+     }
+    }
+   }
+  },
+  {
+   "t": 5669,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "?"
+     }
+    }
+   }
+  },
+  {
+   "t": 5682,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Let"
+     }
+    }
+   }
+  },
+  {
+   "t": 5695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'s"
+     }
+    }
+   }
+  },
+  {
+   "t": 5695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " check"
+     }
+    }
+   }
+  },
+  {
+   "t": 5695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 5695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " file"
+     }
+    }
+   }
+  },
+  {
+   "t": 5730,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " content"
+     }
+    }
+   }
+  },
+  {
+   "t": 5730,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 5730,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "```\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 5730,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "export"
+     }
+    }
+   }
+  },
+  {
+   "t": 5730,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " function"
+     }
+    }
+   }
+  },
+  {
+   "t": 5730,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " add"
+     }
+    }
+   }
+  },
+  {
+   "t": 5730,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "(a"
+     }
+    }
+   }
+  },
+  {
+   "t": 5730,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 5730,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " number"
+     }
+    }
+   }
+  },
+  {
+   "t": 5743,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 5743,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " b"
+     }
+    }
+   }
+  },
+  {
+   "t": 5744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 5744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " number"
+     }
+    }
+   }
+  },
+  {
+   "t": 5744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "):"
+     }
+    }
+   }
+  },
+  {
+   "t": 5745,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " number"
+     }
+    }
+   }
+  },
+  {
+   "t": 5748,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " {\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 5748,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5748,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " return"
+     }
+    }
+   }
+  },
+  {
+   "t": 5748,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " a"
+     }
+    }
+   }
+  },
+  {
+   "t": 5748,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " +"
+     }
+    }
+   }
+  },
+  {
+   "t": 5748,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " b"
+     }
+    }
+   }
+  },
+  {
+   "t": 5761,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ";\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 5761,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "}\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 5761,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "```\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 5761,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Line"
+     }
+    }
+   }
+  },
+  {
+   "t": 5761,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5762,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "1"
+     }
+    }
+   }
+  },
+  {
+   "t": 5774,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 5774,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 5788,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "export"
+     }
+    }
+   }
+  },
+  {
+   "t": 5788,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " function"
+     }
+    }
+   }
+  },
+  {
+   "t": 5788,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " add"
+     }
+    }
+   }
+  },
+  {
+   "t": 5788,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "(a"
+     }
+    }
+   }
+  },
+  {
+   "t": 5802,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 5802,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " number"
+     }
+    }
+   }
+  },
+  {
+   "t": 5802,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 5802,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " b"
+     }
+    }
+   }
+  },
+  {
+   "t": 5802,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 5802,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " number"
+     }
+    }
+   }
+  },
+  {
+   "t": 5815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "):"
+     }
+    }
+   }
+  },
+  {
+   "t": 5816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " number"
+     }
+    }
+   }
+  },
+  {
+   "t": 5816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " {"
+     }
+    }
+   }
+  },
+  {
+   "t": 5816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "`\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 5816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Line"
+     }
+    }
+   }
+  },
+  {
+   "t": 5816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5830,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "2"
+     }
+    }
+   }
+  },
+  {
+   "t": 5830,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 5830,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 5830,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5830,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " return"
+     }
+    }
+   }
+  },
+  {
+   "t": 5830,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " a"
+     }
+    }
+   }
+  },
+  {
+   "t": 5845,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " +"
+     }
+    }
+   }
+  },
+  {
+   "t": 5845,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " b"
+     }
+    }
+   }
+  },
+  {
+   "t": 5845,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ";"
+     }
+    }
+   }
+  },
+  {
+   "t": 5845,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "`\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 5845,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Line"
+     }
+    }
+   }
+  },
+  {
+   "t": 5845,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5856,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "3"
+     }
+    }
+   }
+  },
+  {
+   "t": 5856,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 5856,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 5856,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "}`"
+     }
+    }
+   }
+  },
+  {
+   "t": 5868,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 5868,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "So"
+     }
+    }
+   }
+  },
+  {
+   "t": 5868,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " lines"
+     }
+    }
+   }
+  },
+  {
+   "t": 5882,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5882,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "1"
+     }
+    }
+   }
+  },
+  {
+   "t": 5882,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "–"
+     }
+    }
+   }
+  },
+  {
+   "t": 5895,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "3"
+     }
+    }
+   }
+  },
+  {
+   "t": 5895,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " include"
+     }
+    }
+   }
+  },
+  {
+   "t": 5895,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 5934,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " closing"
+     }
+    }
+   }
+  },
+  {
+   "t": 5934,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " brace"
+     }
+    }
+   }
+  },
+  {
+   "t": 5934,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 5988,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " but"
+     }
+    }
+   }
+  },
+  {
+   "t": 5988,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " their"
+     }
+    }
+   }
+  },
+  {
+   "t": 5988,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " quote"
+     }
+    }
+   }
+  },
+  {
+   "t": 5988,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " shows"
+     }
+    }
+   }
+  },
+  {
+   "t": 5989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " only"
+     }
+    }
+   }
+  },
+  {
+   "t": 5989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "2"
+     }
+    }
+   }
+  },
+  {
+   "t": 5989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " lines"
+     }
+    }
+   }
+  },
+  {
+   "t": 5989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " ("
+     }
+    }
+   }
+  },
+  {
+   "t": 5989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "the"
+     }
+    }
+   }
+  },
+  {
+   "t": 5989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " closing"
+     }
+    }
+   }
+  },
+  {
+   "t": 5989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " brace"
+     }
+    }
+   }
+  },
+  {
+   "t": 5989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " missing"
+     }
+    }
+   }
+  },
+  {
+   "t": 5989,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ")."
+     }
+    }
+   }
+  },
+  {
+   "t": 6015,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " This"
+     }
+    }
+   }
+  },
+  {
+   "t": 6015,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " is"
+     }
+    }
+   }
+  },
+  {
+   "t": 6015,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " a"
+     }
+    }
+   }
+  },
+  {
+   "t": 6015,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " subtle"
+     }
+    }
+   }
+  },
+  {
+   "t": 6015,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " discrepancy"
+     }
+    }
+   }
+  },
+  {
+   "t": 6028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 6028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " should"
+     }
+    }
+   }
+  },
+  {
+   "t": 6028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " note"
+     }
+    }
+   }
+  },
+  {
+   "t": 6028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " —"
+     }
+    }
+   }
+  },
+  {
+   "t": 6063,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 6063,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " quote"
+     }
+    }
+   }
+  },
+  {
+   "t": 6063,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " is"
+     }
+    }
+   }
+  },
+  {
+   "t": 6063,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " missing"
+     }
+    }
+   }
+  },
+  {
+   "t": 6068,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 6068,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " closing"
+     }
+    }
+   }
+  },
+  {
+   "t": 6068,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 6082,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "}`"
+     }
+    }
+   }
+  },
+  {
+   "t": 6082,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 6082,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Point"
+     }
+    }
+   }
+  },
+  {
+   "t": 6094,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " that"
+     }
+    }
+   }
+  },
+  {
+   "t": 6107,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " out"
+     }
+    }
+   }
+  },
+  {
+   "t": 6108,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " briefly"
+     }
+    }
+   }
+  },
+  {
+   "t": 6122,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " and"
+     }
+    }
+   }
+  },
+  {
+   "t": 6122,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " answer"
+     }
+    }
+   }
+  },
+  {
+   "t": 6135,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 6135,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " improvement"
+     }
+    }
+   }
+  },
+  {
+   "t": 6135,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " question"
+     }
+    }
+   }
+  },
+  {
+   "t": 6148,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " in"
+     }
+    }
+   }
+  },
+  {
+   "t": 6161,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " one"
+     }
+    }
+   }
+  },
+  {
+   "t": 6175,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " or"
+     }
+    }
+   }
+  },
+  {
+   "t": 6175,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " two"
+     }
+    }
+   }
+  },
+  {
+   "t": 6175,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " sentences"
+     }
+    }
+   }
+  },
+  {
+   "t": 6175,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 6175,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " No"
+     }
+    }
+   }
+  },
+  {
+   "t": 6175,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tools"
+     }
+    }
+   }
+  },
+  {
+   "t": 6188,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 6201,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 6201,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "你"
+     }
+    }
+   }
+  },
+  {
+   "t": 6216,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "引"
+     }
+    }
+   }
+  },
+  {
+   "t": 6216,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "用的"
+     }
+    }
+   }
+  },
+  {
+   "t": 6216,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "第"
+     }
+    }
+   }
+  },
+  {
+   "t": 6216,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 6228,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "1"
+     }
+    }
+   }
+  },
+  {
+   "t": 6228,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "–"
+     }
+    }
+   }
+  },
+  {
+   "t": 6228,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6228,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 6228,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "行"
+     }
+    }
+   }
+  },
+  {
+   "t": 6228,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "里"
+     }
+    }
+   }
+  },
+  {
+   "t": 6248,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "缺少"
+     }
+    }
+   }
+  },
+  {
+   "t": 6249,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "了"
+     }
+    }
+   }
+  },
+  {
+   "t": 6249,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "第"
+     }
+    }
+   }
+  },
+  {
+   "t": 6255,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 6255,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6255,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 6255,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "行的"
+     }
+    }
+   }
+  },
+  {
+   "t": 6255,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "闭合"
+     }
+    }
+   }
+  },
+  {
+   "t": 6268,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "花"
+     }
+    }
+   }
+  },
+  {
+   "t": 6281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "括号"
+     }
+    }
+   }
+  },
+  {
+   "t": 6281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 6281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "}`"
+     }
+    }
+   }
+  },
+  {
+   "t": 6281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "（"
+     }
+    }
+   }
+  },
+  {
+   "t": 6281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "实际"
+     }
+    }
+   }
+  },
+  {
+   "t": 6295,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "文件"
+     }
+    }
+   }
+  },
+  {
+   "t": 6295,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "第"
+     }
+    }
+   }
+  },
+  {
+   "t": 6308,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 6308,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6308,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 6308,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "行"
+     }
+    }
+   }
+  },
+  {
+   "t": 6308,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "是"
+     }
+    }
+   }
+  },
+  {
+   "t": 6308,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 6321,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "}`"
+     }
+    }
+   }
+  },
+  {
+   "t": 6322,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "），"
+     }
+    }
+   }
+  },
+  {
+   "t": 6322,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "所以"
+     }
+    }
+   }
+  },
+  {
+   "t": 6322,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "引用"
+     }
+    }
+   }
+  },
+  {
+   "t": 6334,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "不"
+     }
+    }
+   }
+  },
+  {
+   "t": 6334,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "完整"
+     }
+    }
+   }
+  },
+  {
+   "t": 6334,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 6335,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "至于"
+     }
+    }
+   }
+  },
+  {
+   "t": 6348,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "改进"
+     }
+    }
+   }
+  },
+  {
+   "t": 6348,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "："
+     }
+    }
+   }
+  },
+  {
+   "t": 6348,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "这段"
+     }
+    }
+   }
+  },
+  {
+   "t": 6348,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "代码"
+     }
+    }
+   }
+  },
+  {
+   "t": 6361,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "本身"
+     }
+    }
+   }
+  },
+  {
+   "t": 6361,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "已经"
+     }
+    }
+   }
+  },
+  {
+   "t": 6374,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "很简单"
+     }
+    }
+   }
+  },
+  {
+   "t": 6374,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 6374,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "主要"
+     }
+    }
+   }
+  },
+  {
+   "t": 6388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "可"
+     }
+    }
+   }
+  },
+  {
+   "t": 6388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "考虑"
+     }
+    }
+   }
+  },
+  {
+   "t": 6388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "加"
+     }
+    }
+   }
+  },
+  {
+   "t": 6401,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " J"
+     }
+    }
+   }
+  },
+  {
+   "t": 6414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "SD"
+     }
+    }
+   }
+  },
+  {
+   "t": 6414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "oc"
+     }
+    }
+   }
+  },
+  {
+   "t": 6414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 6414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "注释"
+     }
+    }
+   }
+  },
+  {
+   "t": 6430,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "说明"
+     }
+    }
+   }
+  },
+  {
+   "t": 6441,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "行为"
+     }
+    }
+   }
+  },
+  {
+   "t": 6460,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 6460,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "或在"
+     }
+    }
+   }
+  },
+  {
+   "t": 6468,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "需要"
+     }
+    }
+   }
+  },
+  {
+   "t": 6481,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "时"
+     }
+    }
+   }
+  },
+  {
+   "t": 6481,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "处理"
+     }
+    }
+   }
+  },
+  {
+   "t": 6494,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "非"
+     }
+    }
+   }
+  },
+  {
+   "t": 6508,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "数字"
+     }
+    }
+   }
+  },
+  {
+   "t": 6508,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "/"
+     }
+    }
+   }
+  },
+  {
+   "t": 6521,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "浮"
+     }
+    }
+   }
+  },
+  {
+   "t": 6521,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "点"
+     }
+    }
+   }
+  },
+  {
+   "t": 6521,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "精度"
+     }
+    }
+   }
+  },
+  {
+   "t": 6539,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "等"
+     }
+    }
+   }
+  },
+  {
+   "t": 6547,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "边界"
+     }
+    }
+   }
+  },
+  {
+   "t": 6547,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "情况"
+     }
+    }
+   }
+  },
+  {
+   "t": 6547,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "；"
+     }
+    }
+   }
+  },
+  {
+   "t": 6561,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "若"
+     }
+    }
+   }
+  },
+  {
+   "t": 6561,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "只"
+     }
+    }
+   }
+  },
+  {
+   "t": 6575,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "做"
+     }
+    }
+   }
+  },
+  {
+   "t": 6587,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "两个"
+     }
+    }
+   }
+  },
+  {
+   "t": 6604,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "数"
+     }
+    }
+   }
+  },
+  {
+   "t": 6604,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "相加"
+     }
+    }
+   }
+  },
+  {
+   "t": 6604,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 6604,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "保持"
+     }
+    }
+   }
+  },
+  {
+   "t": 6625,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "现状"
+     }
+    }
+   }
+  },
+  {
+   "t": 6625,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "即可"
+     }
+    }
+   }
+  },
+  {
+   "t": 6625,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 6626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 6626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 6626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asks me to quote lines 1-3 and comment briefly. They quote content that omits the closing brace `}` — the file has 3 lines total? Let's check: file content:\n\n```\nexport function add(a: number, b: number): number {\n  return a + b;\n}\n```\nLine 1: `export function add(a: number, b: number): number {`\nLine 2: `  return a + b;`\nLine 3: `}`\n\nSo lines 1–3 include the closing brace, but their quote shows only 2 lines (the closing brace missing). This is a subtle discrepancy I should note — the quote is missing the closing `}`. Point that out briefly and answer the improvement question in one or two sentences. No tools.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "你引用的第 1–3 行里缺少了第 3 行的闭合花括号 `}`（实际文件第 3 行是 `}`），所以引用不完整。\n\n至于改进：这段代码本身已经很简单，主要可考虑加 JSDoc 注释说明行为，或在需要时处理非数字/浮点精度等边界情况；若只做两个数相加，保持现状即可。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 198,
+       "output": 250,
+       "cacheRead": 1664,
+       "cacheWrite": 0,
+       "reasoning": 163,
+       "totalTokens": 2112,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792472101827,
+      "responseId": "cc355425-8c3d-434d-910c-d520b612fa35",
+      "rawStopReason": "stop",
+      "durationMs": 1865,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 6626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "ec0f1c90",
+     "time": 1792472101827,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 6626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asks me to quote lines 1-3 and comment briefly. They quote content that omits the closing brace `}` — the file has 3 lines total? Let's check: file content:\n\n```\nexport function add(a: number, b: number): number {\n  return a + b;\n}\n```\nLine 1: `export function add(a: number, b: number): number {`\nLine 2: `  return a + b;`\nLine 3: `}`\n\nSo lines 1–3 include the closing brace, but their quote shows only 2 lines (the closing brace missing). This is a subtle discrepancy I should note — the quote is missing the closing `}`. Point that out briefly and answer the improvement question in one or two sentences. No tools.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "你引用的第 1–3 行里缺少了第 3 行的闭合花括号 `}`（实际文件第 3 行是 `}`），所以引用不完整。\n\n至于改进：这段代码本身已经很简单，主要可考虑加 JSDoc 注释说明行为，或在需要时处理非数字/浮点精度等边界情况；若只做两个数相加，保持现状即可。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 198,
+       "output": 250,
+       "cacheRead": 1664,
+       "cacheWrite": 0,
+       "reasoning": 163,
+       "totalTokens": 2112,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792472101827,
+      "responseId": "cc355425-8c3d-434d-910c-d520b612fa35",
+      "rawStopReason": "stop",
+      "durationMs": 1865,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 6626,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c"
+   }
+  },
+  {
+   "t": 6627,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "引用 src/a.ts 第 1–3 行：\n> export function add(a: number, b: number): number {\n>   return a + b;\n> }\n\n这段代码有什么可以改进的地方？用一两句话回答，不要调用任何工具。"
+        }
+       ],
+       "timestamp": 1792472101824
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The user asks me to quote lines 1-3 and comment briefly. They quote content that omits the closing brace `}` — the file has 3 lines total? Let's check: file content:\n\n```\nexport function add(a: number, b: number): number {\n  return a + b;\n}\n```\nLine 1: `export function add(a: number, b: number): number {`\nLine 2: `  return a + b;`\nLine 3: `}`\n\nSo lines 1–3 include the closing brace, but their quote shows only 2 lines (the closing brace missing). This is a subtle discrepancy I should note — the quote is missing the closing `}`. Point that out briefly and answer the improvement question in one or two sentences. No tools.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "text",
+         "text": "你引用的第 1–3 行里缺少了第 3 行的闭合花括号 `}`（实际文件第 3 行是 `}`），所以引用不完整。\n\n至于改进：这段代码本身已经很简单，主要可考虑加 JSDoc 注释说明行为，或在需要时处理非数字/浮点精度等边界情况；若只做两个数相加，保持现状即可。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 198,
+        "output": 250,
+        "cacheRead": 1664,
+        "cacheWrite": 0,
+        "reasoning": 163,
+        "totalTokens": 2112,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792472101827,
+       "responseId": "cc355425-8c3d-434d-910c-d520b612fa35",
+       "rawStopReason": "stop",
+       "durationMs": 1865,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 6627,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 6627,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157a9-abd5-7724-9967-5524e499869c",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 6627,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2112,
+      "contextWindow": 1000000,
+      "percent": 0.21120000000000003
+     }
+    }
+   }
+  }
+ ]
+}

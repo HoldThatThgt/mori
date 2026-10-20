@@ -5,9 +5,10 @@ Windows 桌面 App。方案见 [../docs/app-v0.md](../docs/app-v0.md)，检查�
 每屏的状态表见 [../docs/v0/screens/](../docs/v0/screens/)。
 M1：三栏界面、首次启动连接表单、对话流与工具卡、阶段行、停止/排队/插话、错误与后台进程退出提示。
 M2：批准卡与权限菜单、任务栏闪烁、F8 报告界面问题。
-当前处于 M3：左栏的项目 → 会话树、新建 / 打开 / 改名 / 归档 / 删除会话、右键菜单、会话状态、按会话保存草稿、项目信任询问、
-扩展的询问；界面重新加载后接上还在运行的会话
-（[检查记录](../docs/v0/m3-checks.md)）。
+M3：左栏的项目 → 会话树、新建 / 打开 / 改名 / 归档 / 删除会话、右键菜单、会话状态、按会话保存草稿、项目信任询问、
+扩展的询问；界面重新加载后接上还在运行的会话（[检查记录](../docs/v0/m3-checks.md)）。
+当前处于 M4：右栏的改动列表与只读文件阅读器、选区"问 Mori"（引用芯片、回到原位置）与"反馈"、回复下的复制 / 引用 / 反馈
+（[检查记录](../docs/v0/m4-checks.md)）。
 
 ## 准备
 
@@ -45,6 +46,10 @@ npm ci
 | `node tests/ui/m3-record.mjs --source <走查数据目录> [--only …]` | 从真实会话录制 `tests/fixtures/m3/`（项目、改名、删除、信任、后台生成、归档、界面重新加载后接上、扩展的询问） |
 | `npm run test:m3-replay` | M3 界面测试：回放 `tests/fixtures/m3/` |
 | `node tests/ui/m3-real.mjs --source <走查数据目录> [--exe …] [--only …]` | M3 真实端点走查（走查 1–7、扩展的询问、界面重新加载与反例）；只删临时数据目录里的测试会话 |
+| `npm run test:m4-app` | M4 整机测试：真正的 Mori 对合成端点，改动列表、文件阅读器、选区浮层、引用芯片与回到原位置、反馈、回复下的操作；测打包结果加 `--exe …` |
+| `node tests/ui/m4-record.mjs --source <走查数据目录> [--only …]` | 从真实会话录制 `tests/fixtures/m4/`（改两个文件、写入后删除、文件引用、重启后的引用、原文已变化、引用整轮回复、长回复） |
+| `npm run test:m4-replay` | M4 界面测试：回放 `tests/fixtures/m4/`（带引用的消息连全文和 refs 一起核对） |
+| `node tests/ui/m4-real.mjs --source <走查数据目录> [--exe …] [--only …]` | M4 真实端点走查（走查 1–5 与反例） |
 | `npx electron tests/prechecks/esm-utility/main.cjs` | 预检：utilityProcess 能否运行 ESM 入口 |
 | `npx electron tests/prechecks/job-object/main.cjs` | 预检：后台进程放进 Windows 作业对象后，它留下的孤儿进程能随作业一起结束 |
 | `node tests/ui/m0-real.mjs --user-data <目录> [--setup]` | 真实端点走查（M0 走查 2–3）；`--setup` 先打开 Mori 让你填连接，脚本不接触 key |
@@ -52,7 +57,8 @@ npm ci
 ## 数据位置
 
 - pi 的配置与会话：`%APPDATA%\Mori\pi`（`models.json`、`sessions/`、`trust.json` 等，格式与 pi 命令行相同）。
-- 各会话的草稿、已归档的会话列表和栏宽：Mori 窗口的本机存储（`localStorage`，在 `%APPDATA%\Mori` 下）。
+- 各会话的草稿（含引用芯片）、已归档的会话列表和栏宽：Mori 窗口的本机存储（`localStorage`，在 `%APPDATA%\Mori` 下）。
+- 对内容的反馈：`%APPDATA%\Mori\feedback\*.json`，每份一个文件，只记录、不发给模型；F8 报告在 `%APPDATA%\Mori\ui-issues\`。
   删除会话是永久的（照 Claude 桌面版）；想留着以后再看的会话用"归档"。
 - 测试时用环境变量 `MORI_USER_DATA` 指向临时目录，不会碰到日常使用的数据。
 

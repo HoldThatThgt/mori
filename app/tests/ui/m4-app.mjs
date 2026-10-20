@@ -1,0 +1,779 @@
+// M4 整机测试：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint，synthetic），
+// 覆盖改动与选区（docs/v0/screens/changes.md、selection.md；方案第 7 节 M4 走查 1–5 与反例）：
+// 右栏改动列表（自动打开、注明命令改动不在此列、按时间顺序的 diff、写入的内容、命令改的和被拒绝的不列出）；
+// 文件阅读器（工具卡路径和"打开"进入、行号、改动后自动重读、"重新读取"、用系统编辑器打开及失败、二进制、超过 1MB、
+// 删除、读取失败、文件夹、按 pi 的规则解析路径）；选区浮层（阅读器和回复里出现，你的消息、跨回复、工具卡标题里不出现，
+// Esc 先关浮层不停止、浮层开着时 Alt+1 照常）；问 Mori（芯片、焦点、判重、移除、草稿与重启、只有芯片也能发、
+// 模型收到引用块、mori.ref 条目、发出的引用、回到原位置：没变、挪了行、原文已变化、文件已删除、回复里的高亮、重启后）；
+// 反馈（表单、Ctrl+Enter、已记录、JSON 记录、不发给模型、保存失败保留文字、生成中选字反馈不被打断）；
+// 回复下的操作（每轮一行、最新一轮常显、悬停与聚焦、Tab 顺序、复制进剪贴板、引用到输入框、反馈这条回复、生成中不显示）；
+// 新加的界面没有小于 12px 的字；页面没有报错。
+// 用法（在 app/ 下，先 npm run build）：
+//   node tests/ui/m4-app.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
+// 结果写到 test-results/m4-app(-packaged).json，截图在 test-results/m4-app(-packaged)/。
+// 用系统编辑器打开：经 app.evaluate 换掉主进程的 shell.openPath，只记下路径（不真的打开程序）。
+// 读取失败：用 Win32 CreateFileW 独占打开文件（不给任何共享），主进程读时报 EBUSY。
+
+import { spawn } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import koffi from 'koffi';
+import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
+import { activeFile, ctrlN, openRow, paneOf, stubFolder, until, waitIdle, waitReady, waitRunning } from './m3-helpers.mjs';
+import {
+  assistantIndexWith, changeList, clearSelection, lastReplyHasActions, composerChips, dragSelect, expandChange, jumpHighlight, messageCounts, PANE,
+  popoverButtons, popoverShown, refEntries, sessionEntries, replyActionRows, savedDraftRefs, savedFeedback, selectBetween, selectLines,
+  sentQuotes, viewerState, waitViewer,
+} from './m4-helpers.mjs';
+import { pageHelpers } from './page.mjs';
+
+const exePath = arg('exe') ? resolve(arg('exe')) : null;
+const only = arg('only')?.split(',');
+const suffix = exePath ? '-packaged' : '';
+const port = 4325;
+const baseUrl = `http://127.0.0.1:${port}/v1`;
+// 合成端点要求的 key：只是测试值，与任何真实服务无关。
+const testKey = 'synthetic-test-key-m4-not-a-real-key';
+const shots = join(appRoot, `test-results/m4-app${suffix}`);
+mkdirSync(shots, { recursive: true });
+const { record, write } = createRecorder(exePath ?? 'dev build');
+const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) }).catch(() => {});
+
+const TITLE = '# Mori fixture project';
+const NOTE = '只含编辑和写入，命令改动的文件不在此列。';
+const FEEDBACK_NOTE = '只记录，不会发给模型；想让它改，用"问 Mori"';
+
+// ---------- 准备 ----------
+
+/** @brief 启动合成端点，最多等 15 秒。 */
+function startFakeEndpoint() {
+  const child = spawn(process.execPath, [join(appRoot, 'tests/fake-endpoint/server.mjs')], {
+    env: { ...process.env, FAKE_PORT: String(port), FAKE_CHUNK_DELAY_MS: '15', FAKE_FIRST_DELAY_MS: '200',
+      FAKE_REQUIRE_KEY: testKey },
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  return new Promise((done, fail) => {
+    const timer = setTimeout(() => fail(new Error('fake endpoint did not start within 15 s')), 15000);
+    child.stdout.on('data', (chunk) => {
+      if (!String(chunk).includes('synthetic')) return;
+      clearTimeout(timer);
+      done(child);
+    });
+  });
+}
+
+/** @brief 测试用的项目：README、src/a.ts、docs/。 */
+function makeProject() {
+  const root = mkdtempSync(join(tmpdir(), 'mori-m4-app-'));
+  const project = join(root, 'm4proj');
+  mkdirSync(join(project, 'src'), { recursive: true });
+  mkdirSync(join(project, 'docs'), { recursive: true });
+  writeFileSync(join(project, 'README.md'), `${TITLE}\n\nThis folder is used to check Mori against a model.\n\n`
+    + '- It has one README file.\n- It has one source file in src/.\n');
+  writeFileSync(join(project, 'src', 'a.ts'), 'export function add(a: number, b: number): number {\n  return a + b;\n}\n');
+  return { root, project };
+}
+
+const kernel32 = koffi.load('kernel32.dll');
+const CreateFileW = kernel32.func(
+  'void* __stdcall CreateFileW(str16, uint32_t, uint32_t, void*, uint32_t, uint32_t, void*)');
+const CloseHandle = kernel32.func('bool __stdcall CloseHandle(void*)');
+
+/** @brief 独占打开文件（不给任何共享），别人读不了；返回放开它的函数。 */
+function lockFile(file) {
+  const handle = CreateFileW(file, 0x80000000, 0, null, 3, 0x80, null);
+  const address = handle ? koffi.address(handle) : 0n;
+  if (address === 0n || address === 0xFFFFFFFFFFFFFFFFn) throw new Error(`cannot lock ${file}`);
+  return () => CloseHandle(handle);
+}
+
+/** @brief 用 ctx.userData 启动 Mori，记下页面报错。 */
+async function startApp(ctx) {
+  ctx.app = await launch({ exePath, userData: ctx.userData });
+  ctx.page = await ctx.app.firstWindow();
+  ctx.page.on('pageerror', (error) => ctx.pageErrors.push(error.message));
+  ctx.h = pageHelpers(ctx.page);
+}
+
+/** @brief 发一条消息；approve 为真时每出一张批准卡就按 Alt+1，'reject' 时按 Alt+3；等本轮结束。 */
+async function sendAnd(ctx, text, approve = false) {
+  const { page, h } = ctx;
+  await h.send(text);
+  await waitRunning(page).catch(() => {});
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline && await paneOf(page).getAttribute('data-running') === 'true') {
+    if (approve && await paneOf(page).getByTestId('approval-card').count() > 0) {
+      await h.textarea.press(approve === 'reject' ? 'Alt+3' : 'Alt+1');
+    }
+    await sleep(200);
+  }
+  await waitIdle(page, 30000);
+}
+
+/** @brief 当前会话里标题以 verb 开头、包含 target 的工具卡（最后一张）。 */
+const toolCard = (page, verb, target) => page.locator(`${PANE} [data-testid="tool-card"]`)
+  .filter({ has: page.locator('.tool-verb', { hasText: verb }) })
+  .filter({ has: page.locator('.tool-target', { hasText: target }) }).last();
+
+/** @brief 阅读器顶部的"← 改动"。 */
+const backToChanges = (page) => page.getByTestId('right-panel').getByRole('button', { name: '改动', exact: true }).click();
+
+/** @brief 点工具卡标题里的路径，等阅读器读完。 */
+async function openFromCard(page, verb, target) {
+  await toolCard(page, verb, target).getByTestId('tool-path').click();
+  await waitViewer(page);
+  return viewerState(page);
+}
+
+// ---------- 主进程里运行的函数（经 app.evaluate） ----------
+
+/** @brief 换掉 shell.openPath 和 shell.showItemInFolder：只记下路径，openPath 按 fail 返回错误文字。 */
+function stubOpenPath({ shell }, fail) {
+  globalThis.__opened = globalThis.__opened ?? [];
+  globalThis.__revealed = globalThis.__revealed ?? [];
+  shell.openPath = async (path) => {
+    globalThis.__opened.push(path);
+    return fail ?? '';
+  };
+  shell.showItemInFolder = (path) => { globalThis.__revealed.push(path); };
+}
+
+// ---------- 步骤 ----------
+
+/**
+ * @brief 首次启动：填连接、测试成功、打开项目文件夹；右栏默认关闭，手动打开时"本会话还没有改动"。
+ *        手动开关过的会话以你为准（不再自动打开），所以之后的步骤用 Ctrl+N 新建的会话。
+ */
+async function setup(ctx) {
+  const { app, page, h } = ctx;
+  await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
+  await h.fillConnection({ name: '合成端点', baseUrl, apiKey: testKey, modelId: 'fake-coder' });
+  await page.getByRole('button', { name: '测试连接' }).click();
+  await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
+  await stubFolder(app, ctx.project);
+  await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await waitReady(page);
+  const closed = await page.getByTestId('right-panel').count() === 0;
+  await paneOf(page).getByRole('button', { name: '右栏：本会话的改动' }).click();
+  const empty = await changeList(page);
+  record('右栏：没有改动时默认关闭；手动打开显示"本会话还没有改动"', closed && empty?.empty === '本会话还没有改动',
+    JSON.stringify(empty));
+  await paneOf(page).getByRole('button', { name: '右栏：本会话的改动' }).click();
+  ctx.file = await ctrlN(page);
+}
+
+/** @brief 走查 1：改两个文件（README 两次、新写一个），命令改的、被拒绝的不列出。 */
+async function changes(ctx) {
+  const { page } = ctx;
+  await sendAnd(ctx, `edit README: ${TITLE}`, true);
+  const auto = await changeList(page);
+  record('右栏：本会话第一次有编辑结果时自动打开，列出文件并注明命令改动不在此列', auto?.note === NOTE
+    && auto.files.some((file) => file.path === 'README.md'), JSON.stringify(auto));
+  await sendAnd(ctx, 'write file: docs/new.md', true);
+  await sendAnd(ctx, `edit README: ${TITLE} (edited)`, true);
+  await sendAnd(ctx, 'run: echo cmd > cmd.txt', true);
+  await sendAnd(ctx, 'edit README: # rejected title', 'reject');
+  await expandChange(page, 'README.md');
+  await expandChange(page, 'docs/new.md');
+  const list = await changeList(page);
+  const readme = list.files.find((file) => file.path === 'README.md');
+  const written = list.files.find((file) => file.path === 'docs/new.md');
+  record('改动列表：按文件列出（README.md、docs/new.md），按第一次改动排序', JSON.stringify(list.files.map((f) => f.path))
+    === JSON.stringify(['README.md', 'docs/new.md']), JSON.stringify(list.files.map((f) => [f.path, f.count])));
+  record('改动列表：同一文件按时间顺序显示每次编辑的 diff（第 1 次、第 2 次）', readme?.count === '2 次'
+    && readme.entries[0]?.label === '第 1 次 · 修改' && readme.entries[1]?.label === '第 2 次 · 修改'
+    && readme.entries[0].diff.includes('(edited)') && readme.entries[1].diff.includes('(edited) (edited)')
+    && !readme.entries[0].diff.includes('(edited) (edited)'), JSON.stringify(readme));
+  record('改动列表：写入显示新内容', written?.entries[0]?.label === '第 1 次 · 写入'
+    && written.entries[0].content === 'hello from mori\n', JSON.stringify(written));
+  record('改动列表：命令改的文件（cmd.txt）、被拒绝的编辑都不列出', existsSync(join(ctx.project, 'cmd.txt'))
+    && !list.files.some((file) => file.path.includes('cmd.txt')) && readme?.count === '2 次', JSON.stringify(list.files));
+  await shot(page, '1-changes');
+}
+
+/** @brief 走查 2 前半：点工具卡里的路径打开阅读器（不展开工具卡）；"← 改动"回列表；列表的"打开"。 */
+async function toolPath(ctx) {
+  const { page } = ctx;
+  const card = toolCard(page, '修改', 'README.md').first();
+  const state = await openFromCard(page, '修改', 'README.md');
+  const expanded = await card.evaluate((el) => el.open);
+  record('阅读器：点工具卡里的路径在右栏打开文件（行号、只读），工具卡不展开', state?.path === 'README.md'
+    && state.first[0] === `${TITLE} (edited) (edited)` && state.gutter === '"1"' && !expanded
+    && await page.locator('[data-testid="file-content"] textarea, [data-testid="file-content"] [contenteditable]')
+      .count() === 0, JSON.stringify({ state, expanded }));
+  await backToChanges(page);
+  const back = await changeList(page);
+  await page.getByRole('button', { name: '打开 docs/new.md' }).click();
+  await waitViewer(page);
+  const opened = await viewerState(page);
+  record('阅读器："← 改动"回到列表；列表里的"打开"打开文件', back?.files.length === 2 && opened?.path === 'docs/new.md'
+    && opened.first[0] === 'hello from mori', JSON.stringify({ files: back?.files.length, opened }));
+  await shot(page, '2-viewer');
+}
+
+/** @brief 阅读器打开时本会话改了这个文件就自动重读；外部改的要点"重新读取"。 */
+async function reread(ctx) {
+  const { page } = ctx;
+  await openFromCard(page, '修改', 'README.md');
+  await sendAnd(ctx, `edit README: ${TITLE} (edited) (edited)`, true);
+  const auto = await until(async () => (await viewerState(page))?.first[0]?.endsWith('(edited) (edited) (edited)'), 5000);
+  const file = join(ctx.project, 'README.md');
+  writeFileSync(file, `${readFileSync(file, 'utf8')}外部加的一行\n`);
+  await sleep(800);
+  const before = await viewerState(page);
+  await page.getByRole('button', { name: '重新读取' }).click();
+  await waitViewer(page);
+  const after = await viewerState(page);
+  record('阅读器：本会话改了这个文件后自动重新读取', Boolean(auto), JSON.stringify((await viewerState(page))?.first));
+  record('阅读器：外部改的不自动读（不监视文件），点"重新读取"后显示新内容', before.lineCount + 1 === after.lineCount,
+    `${before.lineCount} → ${after.lineCount}`);
+}
+
+/** @brief 用系统编辑器打开：记下绝对路径；失败时显示原文。 */
+async function openExternal(ctx) {
+  const { app, page } = ctx;
+  await app.evaluate(stubOpenPath, null);
+  await page.getByRole('button', { name: '用系统编辑器打开' }).click();
+  const opened = await until(() => app.evaluate(() => globalThis.__opened), 3000);
+  await app.evaluate(stubOpenPath, 'Synthetic open failure');
+  await page.getByRole('button', { name: '用系统编辑器打开' }).click();
+  await page.locator('.panel-error').waitFor({ timeout: 3000 }).catch(() => {});
+  const state = await viewerState(page);
+  record('用系统编辑器打开：交给系统的是文件的绝对路径', opened?.[0]?.toLowerCase() === join(ctx.project, 'README.md')
+    .toLowerCase(), JSON.stringify(opened));
+  record('用系统编辑器打开失败：显示"没能用系统编辑器打开："和原文', state?.error
+    === '没能用系统编辑器打开：Synthetic open failure', state?.error);
+  await sendAnd(ctx, 'write file: docs/run.bat', true);
+  await openFromCard(page, '写入', 'docs/run.bat');
+  await app.evaluate(stubOpenPath, null);
+  const before = (await app.evaluate(() => globalThis.__opened)).length;
+  await page.getByRole('button', { name: '用系统编辑器打开' }).click();
+  const notice = await page.getByTestId('open-revealed').innerText({ timeout: 3000 }).catch(() => '');
+  const calls = await app.evaluate(() => ({ opened: globalThis.__opened, revealed: globalThis.__revealed }));
+  record('会被运行的文件（.bat）不打开，改为在资源管理器里选中并说明原因', calls.opened.length === before
+    && calls.revealed.at(-1)?.toLowerCase() === join(ctx.project, 'docs', 'run.bat').toLowerCase()
+    && notice === '这类文件直接打开会运行它，已在资源管理器里选中，请用编辑器打开', JSON.stringify({ calls, notice }));
+}
+
+/** @brief 走查 2 后半与各种读不出的情况：删除、二进制、超过 1MB、读取失败、文件夹、路径规则。 */
+async function viewerStates(ctx) {
+  const { page } = ctx;
+  for (const name of ['bin.dat', 'big.txt', 'locked.txt']) await sendAnd(ctx, `write file: docs/${name}`, true);
+  writeFileSync(join(ctx.project, 'docs', 'bin.dat'), Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x08]));
+  writeFileSync(join(ctx.project, 'docs', 'big.txt'), 'x'.repeat(1258291));
+  rmSync(join(ctx.project, 'docs', 'new.md'));
+  const missing = await openFromCard(page, '写入', 'docs/new.md');
+  record('阅读器：文件删掉后再点，显示"文件已被删除或移动"和路径，不能用系统编辑器打开',
+    missing?.state.startsWith('文件已被删除或移动') && missing.state.includes(join(ctx.project, 'docs', 'new.md'))
+    && missing.externalDisabled === true && missing.lineCount === 0, JSON.stringify(missing));
+  await shot(page, '2-deleted');
+  const binary = await openFromCard(page, '写入', 'docs/bin.dat');
+  const big = await openFromCard(page, '写入', 'docs/big.txt');
+  record('阅读器：二进制文件"无法预览 · 这是二进制文件"', binary?.state === '无法预览 · 这是二进制文件', binary?.state);
+  record('阅读器：超过 1MB"无法预览 · 文件超过 1MB（实际 1.2 MB）"', big?.state === '无法预览 · 文件超过 1MB（实际 1.2 MB）',
+    big?.state);
+  const release = lockFile(join(ctx.project, 'docs', 'locked.txt'));
+  let locked;
+  try {
+    locked = await openFromCard(page, '写入', 'docs/locked.txt');
+  } finally {
+    release();
+  }
+  record('阅读器：读不出来时"读取失败："和原文', locked?.state.startsWith('读取失败：') && /EBUSY|resource busy/i
+    .test(locked.state), locked?.state);
+  const api = await page.evaluate(async (cwd) => ({ dir: await window.mori.readFile('docs', cwd),
+    at: await window.mori.readFile('@README.md', cwd), bash: await window.mori.readFile(
+      `/${cwd[0].toLowerCase()}/${cwd.slice(3).replaceAll('\\', '/')}/src/a.ts`, cwd),
+    unc: await window.mori.readFile('\\\\m4-no-such-host\\share\\x.txt', cwd) }), ctx.project);
+  record('读文件：文件夹为 directory；按 pi 的规则解析 @路径 和 Git Bash 的 /c/... 路径', api.dir.status === 'directory'
+    && api.at.status === 'ok' && api.at.text.startsWith(TITLE) && api.bash.status === 'ok'
+    && api.bash.text.startsWith('export function add'), JSON.stringify({ dir: api.dir.status, at: api.at.status,
+    bash: api.bash.status }));
+  record('读文件：网络路径（\\\\主机\\共享）不读', api.unc.status === 'error'
+    && api.unc.message.startsWith('Network paths are not opened'), JSON.stringify(api.unc));
+}
+
+/** @brief 走查 3 前半：在阅读器里选两行点"问 Mori"：芯片、焦点、选区清掉；判重、移除；真的拖鼠标也出浮层。 */
+async function viewerQuote(ctx) {
+  const { page } = ctx;
+  await openFromCard(page, '修改', 'README.md');
+  await selectLines(page, 1, 2);
+  const shown = await popoverShown(page);
+  const buttons = await popoverButtons(page);
+  await page.getByTestId('selection-popover').getByRole('button', { name: '问 Mori' }).click();
+  const chips = await composerChips(page);
+  const focused = await page.evaluate(() => document.activeElement?.matches('.composer textarea'));
+  const cleared = await page.evaluate(() => window.getSelection().isCollapsed);
+  record('阅读器选区：浮层"问 Mori""反馈"；点"问 Mori"后输入框出现带来源的芯片，焦点到输入框，选区清除', shown
+    && JSON.stringify(buttons) === JSON.stringify(['问 Mori', '反馈']) && chips.length === 1
+    && chips[0].label === 'README.md · 第 1–2 行' && chips[0].text.startsWith(TITLE) && focused && cleared
+    && chips[0].title === `${TITLE} (edited) (edited) (edited)\n`, JSON.stringify({ shown, buttons, chips, focused }));
+  await shot(page, '3-chip');
+  await selectLines(page, 1, 2);
+  await page.getByTestId('selection-popover').getByRole('button', { name: '问 Mori' }).click();
+  await selectLines(page, 3, 3);
+  await page.getByTestId('selection-popover').getByRole('button', { name: '问 Mori' }).click();
+  const two = await composerChips(page);
+  await paneOf(page).getByRole('button', { name: /^移除引用 · README\.md · 第 3 行/ }).click();
+  const left = await composerChips(page);
+  record('芯片：同一段不重复加入；× 移除', two.length === 2 && left.length === 1 && left[0].label.includes('第 1–2 行'),
+    JSON.stringify({ two, left }));
+  await page.evaluate(() => {
+    const content = document.querySelector('[data-testid="file-content"]');
+    const range = document.createRange();
+    range.setStart(content, 2);
+    range.setEnd(content, 3);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+  await page.getByTestId('selection-popover').getByRole('button', { name: '问 Mori' }).click();
+  const between = await composerChips(page);
+  record('阅读器选区的端点落在两行之间时按行算（第 3 行整行），不会跑到文件开头或结尾', between.length === 2
+    && between[1].label === 'README.md · 第 3 行' && between[1].title === 'This folder is used to check Mori against a model.',
+  JSON.stringify(between));
+  await paneOf(page).getByRole('button', { name: /^移除引用 · README\.md · 第 3 行/ }).click();
+  const dragged = await dragSelect(page, '[data-testid="file-content"]', 'This folder is used');
+  record('阅读器：真的用鼠标拖选也出浮层', dragged && await popoverShown(page));
+  await page.keyboard.press('Escape');
+  record('Esc 先关浮层并清掉选区', await page.getByTestId('selection-popover').count() === 0
+    && await page.evaluate(() => window.getSelection().isCollapsed));
+}
+
+/** @brief 芯片随草稿保存：去设置页再回来还在，本机存了。 */
+async function chipDraft(ctx) {
+  const { page } = ctx;
+  await page.getByRole('button', { name: '设置' }).first().click();
+  await page.getByRole('button', { name: '返回会话' }).click();
+  const chips = await composerChips(page);
+  const saved = await savedDraftRefs(page);
+  const key = Object.keys(saved).find((file) => file.toLowerCase() === ctx.file.toLowerCase());
+  record('芯片：去设置页再回来还在，按会话文件存在本机（mori.draftRefs）', chips.length === 1 && saved[key]?.length === 1
+    && saved[key][0].source.kind === 'file', JSON.stringify({ chips, saved: Object.keys(saved) }));
+}
+
+/** @brief 发送带芯片的消息：引用显示在消息上方，模型收到引用块，会话文件里有 mori.ref 条目。 */
+async function sendQuote(ctx) {
+  const { page } = ctx;
+  await sendAnd(ctx, 'echo back 这两行是什么？');
+  const quotes = await sentQuotes(page);
+  const bubble = await paneOf(page).getByTestId('user-message').last().innerText();
+  // 回复按 Markdown 显示（"> # 标题"会画成引用里的标题），所以从会话文件里取模型回复的原文。
+  const replies = sessionEntries(ctx.file).filter((entry) => entry.message?.role === 'assistant');
+  const reply = (replies.at(-1)?.message.content ?? []).map((part) => part.text ?? '').join('');
+  const refs = refEntries(ctx.file);
+  const saved = await savedDraftRefs(page);
+  record('发送后：你的消息上方显示引用（来源和原文），气泡里只有你写的字；芯片清空', quotes.length === 1
+    && quotes[0].label === 'README.md · 第 1–2 行' && quotes[0].text.startsWith(TITLE) && bubble === 'echo back 这两行是什么？'
+    && (await composerChips(page)).length === 0 && Object.keys(saved).length === 0, JSON.stringify({ quotes, bubble }));
+  record('发给模型的全文：引用块（"引用 README.md 第 1–2 行："和 > 原文）加你的文字', reply.includes(
+    `引用 README.md 第 1–2 行：\n> ${TITLE} (edited) (edited) (edited)\n>\n\necho back 这两行是什么？`), oneLine(reply, 300));
+  const last = refs.at(-1);
+  record('会话文件：pi 记下消息后写入 mori.ref 条目，messageId 指向这条你的消息，紧接在它后面', refs.length === 1
+    && last.role === 'user' && last.text.startsWith('引用 README.md 第 1–2 行：') && last.parentIsMessage
+    && last.refs?.[0]?.source.kind === 'file' && last.refs[0].source.startLine === 1, JSON.stringify(last));
+  await shot(page, '3-sent');
+}
+
+/** @brief 点发出的引用回到阅读器：没变时原来的行；挪了行跳到新位置；原文改了标"原文已变化"。 */
+async function jumpFile(ctx) {
+  const { page } = ctx;
+  const file = join(ctx.project, 'README.md');
+  const click = async () => {
+    await paneOf(page).getByTestId('sent-quote').first().click();
+    await waitViewer(page);
+    await sleep(300);
+    return viewerState(page);
+  };
+  await backToChanges(page);
+  const same = await click();
+  record('回到原位置：右栏打开阅读器，引用的两行高亮', JSON.stringify(same?.target) === '[1,2]' && !same.changed
+    && (await sentQuotes(page))[0].status === null, JSON.stringify(same));
+  writeFileSync(file, `新加的第一行\n${readFileSync(file, 'utf8')}`);
+  const moved = await click();
+  record('文件别处改了、原文还在：跳到它现在的位置（第 2–3 行），不提示', JSON.stringify(moved?.target) === '[2,3]'
+    && !moved.changed && (await sentQuotes(page))[0].status === null, JSON.stringify(moved));
+  writeFileSync(file, readFileSync(file, 'utf8').replace(`${TITLE} (edited)`, '# 改过的标题'));
+  const changed = await click();
+  const quote = (await sentQuotes(page))[0];
+  record('反例：原文已变化时芯片保留当时的原文并提示"原文已变化"；阅读器顶部给出引用时的原文，停在原来的行',
+    quote.status === '原文已变化' && quote.text.startsWith(`${TITLE} (edited)`) && changed.changed.startsWith(
+      '原文已变化 · 引用时的原文：') && changed.changed.includes(`${TITLE} (edited)`)
+    && JSON.stringify(changed.target) === '[1,2]', JSON.stringify({ quote, changed }));
+  await shot(page, 'c-changed');
+  await sendAnd(ctx, 'edit README: # 改过的标题 (edited) (edited)', true);
+  const reread = await until(async () => (await viewerState(page))?.first[1] === '# 改过的标题 (edited) (edited) (edited)',
+    5000);
+  record('阅读器是从引用芯片（绝对路径）打开的，工具用相对路径改了这个文件，也自动重新读取', Boolean(reread),
+    JSON.stringify((await viewerState(page))?.first));
+}
+
+/** @brief 文件删掉后点芯片：芯片标"文件已被删除或移动"。 */
+async function jumpDeleted(ctx) {
+  const { page } = ctx;
+  await sendAnd(ctx, 'write file: src/b.ts', true);
+  await openFromCard(page, '写入', 'src/b.ts');
+  await selectLines(page, 1, 1);
+  await page.getByTestId('selection-popover').getByRole('button', { name: '问 Mori' }).click();
+  rmSync(join(ctx.project, 'src', 'b.ts'));
+  await paneOf(page).getByTestId('quote-chip').locator('.quote-chip-main').click();
+  await waitViewer(page);
+  await sleep(300);
+  const chip = (await composerChips(page))[0];
+  const state = await viewerState(page);
+  record('点芯片时文件已删除：芯片标"文件已被删除或移动"，阅读器显示同样的字', chip?.status === '文件已被删除或移动'
+    && state?.state.startsWith('文件已被删除或移动'), JSON.stringify({ chip, state: state?.state }));
+  await paneOf(page).getByRole('button', { name: /^移除引用/ }).click();
+}
+
+/** @brief 选区浮层不出现的地方：你的消息、跨两条回复、工具卡标题。 */
+async function noPopover(ctx) {
+  const { page } = ctx;
+  const cases = [];
+  await clearSelection(page);
+  cases.push(['你的消息', await selectBetween(page, `${PANE} [data-testid="user-message"]`, 'edit', 'README')]);
+  cases.push(['你的消息', await popoverShown(page, 800)]);
+  await clearSelection(page);
+  const replies = await paneOf(page).getByTestId('assistant').count();
+  await page.evaluate((count) => {
+    const all = document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="assistant"]');
+    const range = document.createRange();
+    range.setStart(all[0], 0);
+    range.setEnd(all[Math.min(1, count - 1)], 1);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  }, replies);
+  cases.push(['跨两条回复', await popoverShown(page, 800)]);
+  await clearSelection(page);
+  await selectBetween(page, `${PANE} [data-testid="tool-card"] summary`, '修改', 'README');
+  cases.push(['工具卡标题', await popoverShown(page, 800)]);
+  await clearSelection(page);
+  record('选区浮层不出现：你的消息、跨两条回复、工具卡标题', cases[0][1] && !cases[1][1] && !cases[2][1] && !cases[3][1],
+    JSON.stringify(cases));
+}
+
+/** @brief 回复里选字点"问 Mori"：芯片"助手回复"；发出后点它滚回去高亮引用的文字，约 4 秒后消失。 */
+async function transcriptQuote(ctx) {
+  const { page } = ctx;
+  await sendAnd(ctx, 'plain 先回一段话');
+  const dragged = await dragSelect(page, `${PANE} [data-testid="assistant"]`, '只有文字的回复',
+    await paneOf(page).getByTestId('assistant').count() - 1);
+  const shown = await popoverShown(page);
+  await page.getByTestId('selection-popover').getByRole('button', { name: '问 Mori' }).click();
+  const chips = await composerChips(page);
+  record('回复里选字点"问 Mori"：芯片"助手回复"，原文是选中的字', dragged && shown && chips.length === 1
+    && chips[0].label === '助手回复' && chips[0].title === '只有文字的回复', JSON.stringify(chips));
+  await sendAnd(ctx, 'plain 解释一下');
+  await paneOf(page).locator('.conversation').evaluate((el) => { el.scrollTop = 0; });
+  await paneOf(page).getByTestId('sent-quote').last().click();
+  await sleep(300);
+  const lit = await jumpHighlight(page);
+  const visible = await page.evaluate(() => {
+    const range = [...(CSS.highlights.get('mori-jump') ?? [])][0];
+    const rect = range?.getBoundingClientRect();
+    const box = document.querySelector('.pane-slot:not([hidden]) .conversation')?.getBoundingClientRect();
+    return Boolean(rect && box && rect.top >= box.top && rect.bottom <= box.bottom);
+  });
+  await sleep(4300);
+  const gone = await jumpHighlight(page);
+  record('点回复里的引用：滚回那条回复并高亮引用的文字，约 4 秒后消失', lit.text === '只有文字的回复' && visible
+    && gone.text === '', JSON.stringify({ lit, visible, gone }));
+}
+
+/** @brief 走查 5 与回复下的操作：每轮一行、最新一轮常显、悬停与聚焦、Tab 顺序、复制、引用到输入框、反馈这条回复。 */
+async function replyActions(ctx) {
+  const { app, page } = ctx;
+  const rows = await replyActionRows(page);
+  const counts = await messageCounts(page);
+  const turnsWithText = rows.length;
+  record('回复下的操作：每轮一行（多次工具调用的一轮也只在最后），按钮是复制、引用到输入框、反馈这条回复',
+    turnsWithText > 0 && turnsWithText <= counts.user && rows.every((row) => JSON.stringify(row.buttons)
+      === JSON.stringify(['复制', '引用到输入框', '反馈这条回复'])), JSON.stringify({ rows: rows.length, counts }));
+  record('回复下的操作：最新一轮一直显示，较早的默认不显示', rows.at(-1)?.latest && rows.at(-1).opacity === '1'
+    && rows.slice(0, -1).every((row) => !row.latest && row.opacity === '0'), JSON.stringify(rows.map((r) => r.opacity)));
+  const first = paneOf(page).getByTestId('reply-actions').first();
+  await first.getByRole('button', { name: '复制' }).focus();
+  const focusShown = await first.evaluate((el) => getComputedStyle(el).opacity);
+  await page.keyboard.press('Tab');
+  const second = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+  await page.keyboard.press('Tab');
+  const third = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+  record('回复下的操作：键盘聚焦时显示，Tab 依次到复制、引用到输入框、反馈这条回复', focusShown === '1'
+    && second === '引用到输入框' && third === '反馈这条回复', JSON.stringify({ focusShown, second, third }));
+  const last = paneOf(page).getByTestId('reply-actions').last();
+  await last.getByRole('button', { name: '复制' }).click();
+  await last.getByRole('button', { name: '已复制' }).waitFor({ timeout: 3000 }).catch(() => {});
+  const copied = await app.evaluate(({ clipboard }) => clipboard.readText());
+  const label = await last.locator('.reply-action').first().innerText();
+  const lastReply = await paneOf(page).getByTestId('assistant').last().innerText();
+  record('复制：这一轮的正文进系统剪贴板，按钮短暂显示"已复制"', copied.trim() === lastReply.trim() && label === '已复制',
+    JSON.stringify({ copied: oneLine(copied), label }));
+  await last.getByRole('button', { name: '引用到输入框' }).focus();
+  await page.keyboard.press('Enter');
+  const chips = await composerChips(page);
+  const focused = await page.evaluate(() => document.activeElement?.matches('.composer textarea'));
+  record('走查 5：不用鼠标，用回复下的"引用到输入框"完成引用（芯片"助手回复"，焦点到输入框）', chips.length === 1
+    && chips[0].label === '助手回复' && chips[0].title.trim() === lastReply.trim() && focused, JSON.stringify(chips));
+  await paneOf(page).getByRole('button', { name: /^移除引用/ }).click();
+  await shot(page, '5-actions');
+}
+
+/** @brief 反馈：表单内容、Ctrl+Enter、已记录、JSON 记录、不发给模型；保存失败保留文字。 */
+async function feedback(ctx) {
+  const { page } = ctx;
+  const before = await messageCounts(page);
+  const index = await paneOf(page).getByTestId('assistant').count() - 1;
+  await dragSelect(page, `${PANE} [data-testid="assistant"]`, '只有文字的回复', index);
+  await page.getByTestId('selection-popover').getByRole('button', { name: '反馈' }).click();
+  const form = page.getByTestId('feedback-form');
+  await form.waitFor({ timeout: 3000 });
+  const view = await form.evaluate((el) => ({ quote: el.querySelector('.feedback-quote')?.textContent,
+    label: el.querySelector('.feedback-label')?.childNodes[0]?.textContent, note: el.querySelector('.feedback-note')
+      ?.textContent, focused: document.activeElement === el.querySelector('textarea'),
+    disabled: [...el.querySelectorAll('button')].find((b) => b.textContent === '记录')?.disabled,
+    highlight: CSS.highlights.has('mori-quote') }));
+  record('反馈表单：引用的原文、"希望得到什么结果？"、焦点在输入框、没写字时"记录"不可用、底部说明、选区保持高亮',
+    view.quote === '只有文字的回复' && view.label === '希望得到什么结果？' && view.note === FEEDBACK_NOTE && view.focused
+    && view.disabled && view.highlight, JSON.stringify(view));
+  const dir = join(ctx.userData, 'feedback');
+  if (existsSync(dir)) renameSync(dir, `${dir}-away`);
+  writeFileSync(dir, 'not a folder');
+  await page.getByTestId('feedback-input').fill('希望先给结论');
+  await page.getByTestId('feedback-input').press('Control+Enter');
+  const error = await page.getByTestId('feedback-error').innerText({ timeout: 5000 }).catch(() => '');
+  const kept = await page.getByTestId('feedback-input').inputValue().catch(() => '');
+  record('保存失败：保留已输入的文字并显示"没有记录："和原文', error.startsWith('没有记录：') && kept === '希望先给结论',
+    JSON.stringify({ error, kept }));
+  rmSync(dir);
+  if (existsSync(`${dir}-away`)) renameSync(`${dir}-away`, dir);
+  await form.getByRole('button', { name: '记录' }).click();
+  const saved = await page.getByTestId('feedback-saved').innerText({ timeout: 5000 }).catch(() => '');
+  const records = savedFeedback(ctx.userData);
+  const latest = records.at(-1);
+  const after = await messageCounts(page);
+  record('走查 4：提交后提示"已记录 · 在工作回顾中查看"，当前会话没有新消息', saved === '已记录 · 在工作回顾中查看'
+    && JSON.stringify(before) === JSON.stringify(after), JSON.stringify({ saved, before, after }));
+  record('反馈记录（JSON）：期望、原文、锚点（会话文件、条目 id、消息时间）、会话', latest?.expected === '希望先给结论'
+    && latest.quote === '只有文字的回复' && latest.source.kind === 'message' && typeof latest.source.entryId === 'string'
+    && typeof latest.source.time === 'number' && latest.session.file?.toLowerCase() === ctx.file.toLowerCase()
+    && Boolean(latest.createdAt), JSON.stringify(latest));
+  await form.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+  record('已记录约 3 秒后表单关闭', await form.count() === 0);
+}
+
+/** @brief 回复下的"反馈这条回复"：表单里是这一轮的正文；Esc 关闭。 */
+async function feedbackReply(ctx) {
+  const { page } = ctx;
+  await paneOf(page).getByTestId('reply-actions').last().getByRole('button', { name: '反馈这条回复' }).click();
+  const quote = await page.getByTestId('feedback-form').locator('.feedback-quote').innerText({ timeout: 3000 });
+  const reply = await paneOf(page).getByTestId('assistant').last().innerText();
+  await page.getByTestId('feedback-input').fill('写了一半');
+  await paneOf(page).getByTestId('reply-actions').first().getByRole('button', { name: '反馈这条回复' }).click();
+  const kept = await page.getByTestId('feedback-input').inputValue();
+  const focused = await page.evaluate(() => document.activeElement?.dataset.testid === 'feedback-input');
+  const formQuote = await page.getByTestId('feedback-form').locator('.feedback-quote').innerText();
+  await dragSelect(page, `${PANE} [data-testid="assistant"]`, '只有文字的回复',
+    await assistantIndexWith(page, '只有文字的回复'));
+  const noPopover = !await popoverShown(page, 800);
+  await clearSelection(page);
+  await page.getByTestId('feedback-input').focus();
+  await page.keyboard.press('Escape');
+  record('反馈这条回复：表单里是这一轮的正文；Esc 关闭', quote.trim() === reply.trim()
+    && await page.getByTestId('feedback-form').count() === 0, oneLine(quote));
+  record('已有一张在写的反馈表单时，再点"反馈这条回复"不换掉它（字还在、焦点回到输入框），也不出选区浮层',
+    kept === '写了一半' && focused && formQuote === quote && noPopover, JSON.stringify({ kept, focused, noPopover }));
+}
+
+/** @brief 走查 4：流式输出时选中一句话点"反馈"：选区不被打断，写字不被打断，提交后"已记录"，没有新消息。 */
+async function streamingFeedback(ctx) {
+  const { page, h } = ctx;
+  await h.send('long reply 写四段');
+  await page.waitForFunction(() => [...document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="assistant"]')]
+    .at(-1)?.textContent?.includes('第二段'), null, { timeout: 20000 });
+  const index = await paneOf(page).getByTestId('assistant').count() - 1;
+  const scroller = paneOf(page).locator('.conversation');
+  const gap = () => scroller.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
+  // 等内容超出对话流的高度（前面步骤的对话已经够长），这时在底部、正在跟随。
+  await page.waitForFunction((p) => {
+    const el = document.querySelector(`${p} .conversation`);
+    return el.scrollHeight > el.clientHeight + 100;
+  }, PANE, { timeout: 8000 }).catch(() => {});
+  const box = await scroller.boundingBox();
+  await page.mouse.move(box.x + box.width - 12, box.y + 20);
+  await page.mouse.down();
+  const atDown = await gap();
+  await sleep(1200);
+  const whileHeld = await gap();
+  const hasNew = await paneOf(page).getByTestId('new-content').count();
+  await page.mouse.up();
+  record('生成中在对话流里按住鼠标：暂停自动跟随（下面的字不被滚走），显示"有新内容"', atDown <= 24 && whileHeld > atDown
+    && hasNew === 1, JSON.stringify({ atDown, whileHeld, hasNew }));
+  // 像你一样先往上滚一点看前面的字（离开底部，不再自动跟随），再拖选。
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, -200);
+  await sleep(300);
+  await dragSelect(page, `${PANE} [data-testid="assistant"]`, '河边的柳树发了新芽', index);
+  const shown = await popoverShown(page);
+  const running = await paneOf(page).getAttribute('data-running');
+  await sleep(600);
+  const kept = await page.evaluate(() => window.getSelection().toString());
+  const actions = await lastReplyHasActions(page) ? 1 : 0;
+  await page.getByTestId('selection-popover').getByRole('button', { name: '反馈' }).click();
+  await page.getByTestId('feedback-input').pressSequentially('希望每段更短', { delay: 60 });
+  const typed = await page.getByTestId('feedback-input').inputValue();
+  const highlight = await page.evaluate(() => [...(CSS.highlights.get('mori-quote') ?? [])].map(String).join(''));
+  record('走查 4：生成中选中一句话，浮层出现，新流入的文字不清掉选区；这一轮还没结束时不显示回复下的操作',
+    shown && running === 'true' && kept.includes('河边的柳树发了新芽') && actions === 0, JSON.stringify({ shown, running,
+      kept: oneLine(kept), actions }));
+  record('生成中写反馈：输入不被打断，选区保持高亮', typed === '希望每段更短' && highlight.includes('河边的柳树发了新芽'),
+    JSON.stringify({ typed, highlight }));
+  const before = await messageCounts(page);
+  await page.getByTestId('feedback-form').getByRole('button', { name: '记录' }).click();
+  const saved = await page.getByTestId('feedback-saved').innerText({ timeout: 5000 }).catch(() => '');
+  await waitIdle(page, 60000);
+  const after = await messageCounts(page);
+  const latest = savedFeedback(ctx.userData).at(-1);
+  record('生成中提交反馈："已记录"，会话没有多出消息；记录里有消息时间（这时还没有条目 id）', saved.startsWith('已记录')
+    && before.user === after.user && latest?.quote.includes('河边的柳树发了新芽') && typeof latest.source.time === 'number',
+  JSON.stringify({ saved, before, after, source: latest?.source }));
+  record('本轮结束后显示回复下的操作', (await replyActionRows(page)).at(-1)?.latest === true);
+}
+
+/** @brief Esc 与快捷键：浮层开着时 Esc 只关浮层（不停止生成）；浮层不挡 Alt+1。 */
+async function keysWithPopover(ctx) {
+  const { page, h } = ctx;
+  await h.send('long reply 再写一遍');
+  await page.waitForFunction(() => [...document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="assistant"]')]
+    .at(-1)?.textContent?.includes('第一段'), null, { timeout: 20000 });
+  const index = await paneOf(page).getByTestId('assistant').count() - 1;
+  await dragSelect(page, `${PANE} [data-testid="assistant"]`, '春天来了', index);
+  await popoverShown(page);
+  await page.keyboard.press('Escape');
+  await sleep(300);
+  const stillRunning = await paneOf(page).getAttribute('data-running');
+  const closed = await page.getByTestId('selection-popover').count() === 0;
+  await h.textarea.focus();
+  await page.keyboard.press('Escape');
+  await waitIdle(page, 30000);
+  record('浮层开着时 Esc 只关浮层，不停止生成；再按 Esc 才停止', closed && stillRunning === 'true', JSON.stringify({ closed,
+    stillRunning }));
+  await h.send(`edit README: ${TITLE} (edited) (edited) (edited)`);
+  await paneOf(page).getByTestId('approval-card').waitFor({ timeout: 20000 });
+  await dragSelect(page, `${PANE} [data-testid="assistant"]`, '只有文字的回复',
+    await assistantIndexWith(page, '只有文字的回复'));
+  const shown = await popoverShown(page);
+  await page.keyboard.press('Alt+1');
+  const answered = await paneOf(page).getByTestId('approval-card').waitFor({ state: 'detached', timeout: 5000 })
+    .then(() => true, () => false);
+  await waitIdle(page, 30000);
+  record('选区浮层开着时 Alt+1 照常批准（浮层不挡快捷键）', shown && answered, JSON.stringify({ shown, answered }));
+  await clearSelection(page);
+}
+
+/** @brief 重启后：发出的引用仍能点回（文件、回复），输入框里的芯片还在。 */
+async function restart(ctx) {
+  const { page } = ctx;
+  await openFromCard(page, '修改', 'README.md');
+  await selectLines(page, 2, 2);
+  await page.getByTestId('selection-popover').getByRole('button', { name: '问 Mori' }).click();
+  await ctx.app.close();
+  await startApp(ctx);
+  await ctx.page.getByTestId('session-tree').waitFor({ timeout: 60000 });
+  await sleep(1500);
+  await openRow(ctx.page, ctx.file);
+  const p = ctx.page;
+  const quotes = await sentQuotes(p);
+  const chips = await composerChips(p);
+  record('重启后：发出的引用还在（来自会话文件的 mori.ref），输入框里的芯片还在', quotes.length === 2
+    && quotes[0].label === 'README.md · 第 1–2 行' && quotes[1].label === '助手回复' && chips.length === 1
+    && chips[0].label === 'README.md · 第 2 行', JSON.stringify({ quotes, chips }));
+  await paneOf(p).getByTestId('sent-quote').first().click();
+  await waitViewer(p);
+  await sleep(300);
+  const state = await viewerState(p);
+  record('走查 3：重启后点发出的文件引用仍能回到原位置（打开阅读器，原文已变化时照样提示）', state?.path === 'README.md'
+    && state.changed.startsWith('原文已变化'), JSON.stringify(state));
+  await paneOf(p).locator('.conversation').evaluate((el) => { el.scrollTop = 0; });
+  await paneOf(p).getByTestId('sent-quote').last().click();
+  await sleep(300);
+  const lit = await jumpHighlight(p);
+  record('重启后点回复里的引用：滚回去并高亮引用的文字', lit.text === '只有文字的回复', JSON.stringify(lit));
+  await shot(p, '3-restart');
+}
+
+/** @brief 新加的界面没有小于 12px 的字：右栏（列表和阅读器）、芯片、发出的引用、回复下的操作、浮层、反馈表单。 */
+async function smallText(ctx) {
+  const { page } = ctx;
+  await selectLines(page, 1, 1);
+  await popoverShown(page);
+  const selectors = ['[data-testid="right-panel"]', '[data-testid="quote-chips"]', '.sent-quotes',
+    '[data-testid="reply-actions"]', '[data-testid="selection-popover"]'];
+  const small = await page.evaluate((list) => list.flatMap((selector) => [...document.querySelectorAll(selector)])
+    .flatMap((root) => [root, ...root.querySelectorAll('*')]).filter((el) => el.textContent?.trim()
+      && parseFloat(getComputedStyle(el).fontSize) < 12).map((el) => `${el.className}:${getComputedStyle(el).fontSize}`),
+  selectors);
+  record('新加的界面没有小于 12px 的文字', small.length === 0, small.slice(0, 5).join('; '));
+  await clearSelection(page);
+}
+
+/** @brief 原位置不在已载入的 50 条里：26 轮的会话重启后只载入最近 50 条，点指向第一轮的芯片先载入到它，再滚过去高亮。 */
+async function longHistory(ctx) {
+  const { page } = ctx;
+  ctx.longFile = await ctrlN(page);
+  for (let round = 1; round <= 26; round += 1) await sendAnd(ctx, `plain 第 ${round} 轮`);
+  await paneOf(page).getByTestId('reply-actions').first().getByRole('button', { name: '引用到输入框' }).click();
+  await ctx.app.close();
+  await startApp(ctx);
+  await ctx.page.getByTestId('session-tree').waitFor({ timeout: 60000 });
+  await sleep(1500);
+  await openRow(ctx.page, ctx.longFile);
+  const p = ctx.page;
+  const before = await messageCounts(p);
+  const hint = await paneOf(p).getByText('向上滚动载入更早的消息').count();
+  await paneOf(p).getByTestId('quote-chip').locator('.quote-chip-main').click();
+  await sleep(400);
+  const after = await messageCounts(p);
+  const target = await p.locator(PANE).evaluate((pane) => {
+    const first = pane.querySelector('[data-item="assistant"]');
+    const box = pane.querySelector('.conversation').getBoundingClientRect();
+    const rect = first?.getBoundingClientRect();
+    return { flashed: first?.classList.contains('jump-flash'), visible: Boolean(rect && rect.top < box.bottom
+      && rect.bottom > box.top), firstUser: pane.querySelector('[data-testid="user-message"]')?.textContent };
+  });
+  record('原位置不在已载入范围：重启后先显示最近 50 条，点芯片自动载入到第一轮并滚过去高亮', before.user + before.assistant === 50
+    && hint === 1 && after.user === 26 && target.flashed && target.visible && target.firstUser === 'plain 第 1 轮',
+  JSON.stringify({ before, hint, after, target }));
+}
+
+const steps = {
+  setup, changes, toolPath, reread, openExternal, viewerStates, viewerQuote, chipDraft, sendQuote, jumpFile,
+  jumpDeleted, noPopover, transcriptQuote, replyActions, feedback, feedbackReply, streamingFeedback, keysWithPopover,
+  restart, smallText, longHistory,
+};
+
+const fake = await startFakeEndpoint();
+const { root, project } = makeProject();
+const userData = mkdtempSync(join(tmpdir(), 'mori-m4-app-data-'));
+const ctx = { userData, root, project, pageErrors: [] };
+await startApp(ctx);
+try {
+  for (const [name, step] of Object.entries(steps)) {
+    if (only && name !== 'setup' && !only.includes(name)) continue;
+    try {
+      await step(ctx);
+    } catch (error) {
+      record(`${name}：流程`, false, oneLine(error, 400));
+      await shot(ctx.page, `${name}-error`);
+      await ctx.page.keyboard.press('Escape').catch(() => {});
+    }
+  }
+} finally {
+  record('页面没有报错', ctx.pageErrors.length === 0, ctx.pageErrors.slice(0, 3).join(' | '));
+  await ctx.app.close().catch(() => {});
+  fake.kill();
+}
+console.log(`[m4-app] project in ${project}; data in ${userData}`);
+await sleep(200);
+process.exitCode = write(`m4-app${suffix}.json`) ? 0 : 1;

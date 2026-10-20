@@ -1,0 +1,213 @@
+/* M4：选区浮层、反馈表单、引用芯片、回复下的操作、文件阅读器、回到原位置的高亮。
+   浮层样式移植自 demo/feedback.js（字号按方案 5.1 不小于 12px）。 */
+
+/* 选区浮层：选区上方的一行按钮 */
+.selection-popover {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 10px;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-pop);
+  white-space: nowrap;
+}
+.selection-popover button {
+  padding: 6px 10px;
+  border-radius: 7px;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+}
+.selection-popover button:hover { background: var(--color-accent-soft); color: var(--color-accent-strong); }
+
+/* 反馈表单 */
+.feedback-form {
+  position: fixed;
+  z-index: 70;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-l);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-pop);
+}
+.feedback-quote {
+  max-height: 88px;
+  margin: 0 0 12px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-left: 2px solid #a9bfeb;
+  border-radius: 0 7px 7px 0;
+  background: #f6f8fc;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.feedback-label { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-small); font-weight: 500; }
+.feedback-label textarea {
+  min-height: 72px;
+  max-height: 180px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-m);
+  font: var(--fs-body) / 1.6 var(--font-ui);
+  resize: vertical;
+}
+.feedback-note { margin: 8px 0 0; color: var(--color-faint); font-size: var(--fs-small); line-height: 1.6; }
+.feedback-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.feedback-saved { margin: 0; color: var(--color-ok); font-size: var(--fs-body); }
+
+/* 输入框上方的引用芯片 */
+.quote-chips { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.quote-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  border-left: 2px solid #a9bfeb;
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+  background: #f6f8fc;
+}
+.quote-chip .icon-button { width: 26px; height: 26px; }
+.quote-chip .icon-button svg { width: 13px; }
+.quote-chip-main, .sent-quote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  text-align: left;
+}
+.quote-chip-main svg, .sent-quote svg { width: 13px; height: 13px; flex-shrink: 0; }
+.quote-chip-label { flex-shrink: 0; color: var(--color-text); font-family: var(--font-mono); }
+.quote-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quote-status {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: #fff4e0;
+  color: var(--color-warn);
+}
+
+/* 发出的消息上方的引用 */
+.user-turn { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin: 0 0 24px; }
+.user-turn .user-message { margin: 0 0 0 auto; }
+.sent-quotes { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: 87%; }
+.user-turn > .sent-quotes:only-child { margin-bottom: 0; }
+.sent-quote {
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 100%;
+  border-left: 2px solid #a9bfeb;
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+  background: #f6f8fc;
+}
+.sent-quote-head { display: flex; align-items: center; gap: 6px; }
+.sent-quote-text {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-muted);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* 回复下的操作：最新一轮一直显示，较早的悬停或聚焦时显示 */
+.reply-actions { display: flex; align-items: center; gap: 2px; margin: -16px 0 20px; opacity: 0; }
+.reply-actions.latest, [data-item]:hover > .reply-actions, .reply-actions:focus-within { opacity: 1; }
+.reply-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 6px;
+  border-radius: 7px;
+  color: var(--color-faint);
+  font-size: var(--fs-small);
+}
+.reply-action svg { width: 15px; height: 15px; }
+.reply-action:hover { color: var(--color-text); }
+.reply-action-error { color: var(--color-danger); font-size: var(--fs-small); }
+
+/* 工具卡标题里的路径：按钮，看起来仍是标题里的路径 */
+.tool-path { display: inline-flex; min-width: 0; padding: 0; border-radius: 4px; text-align: left; }
+.tool-path .tool-target { text-decoration: underline dotted var(--color-faint); text-underline-offset: 3px; }
+.tool-path:hover .tool-target { color: var(--color-accent); }
+
+/* 改动列表 */
+.change-file summary { align-items: center; }
+.change-path { flex: 1; min-width: 0; }
+.change-open { flex-shrink: 0; }
+.change-entry + .change-entry { margin-top: 12px; }
+
+/* 文件阅读器 */
+.file-header { gap: 6px; padding-left: 10px; }
+.file-header .icon-button { margin-left: 0; }
+.back-link { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; font-size: var(--fs-small); }
+.back-link svg { width: 14px; height: 14px; }
+.file-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.panel-error { margin: 8px 16px 0; font-size: var(--fs-small); }
+.file-body { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.file-state { margin: 16px; font-size: var(--fs-body); }
+.file-path-full { font-family: var(--font-mono); overflow-wrap: anywhere; }
+.file-changed {
+  flex-direction: column;
+  align-items: stretch;
+  margin: 10px 12px 0;
+  background: #fff8e6;
+  color: #8a5a12;
+}
+.file-changed-quote {
+  max-height: 120px;
+  margin: 4px 0 0;
+  overflow: auto;
+  font: var(--fs-small) / 1.6 var(--font-mono);
+  white-space: pre-wrap;
+}
+.file-scroll { flex: 1; min-height: 0; overflow: auto; }
+.file-content {
+  width: max-content;
+  min-width: 100%;
+  padding: 8px 0;
+  font: var(--fs-small) / 1.7 var(--font-mono);
+  white-space: pre;
+  counter-reset: none;
+}
+.file-line { min-height: 1.7em; padding: 0 16px 0 0; }
+.file-line::before {
+  content: attr(data-line);
+  display: inline-block;
+  width: 3.6em;
+  margin-right: 12px;
+  padding-right: 8px;
+  color: var(--color-faint);
+  text-align: right;
+  user-select: none;
+}
+.file-line.target { background: #fff6d6; }
+
+/* 回到原位置与反馈时的高亮 */
+::highlight(mori-jump) { background-color: #ffe7a3; }
+::highlight(mori-quote) { background-color: var(--color-selection); }
+.jump-flash > .assistant-message { border-radius: var(--radius-m); box-shadow: 0 0 0 6px #fff1c4; background: #fff1c4; }

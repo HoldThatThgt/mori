@@ -1,11 +1,15 @@
-// 把 pi 记录的当前分支（SessionManager.getBranch 的条目）转成对话流：你的消息、助手回复、工具结果、压缩处。
-// 系统消息、用量、模型切换等记录不显示。
+// 把 pi 记录的当前分支（SessionManager.getBranch 的条目）转成对话流：你的消息、助手回复、工具结果、压缩处，
+// 以及 Mori 写的引用来源（mori.ref 条目，记到它指向的你的消息上）。系统消息、用量、模型切换等记录不显示。
 
-import type { LiveSnapshot, SessionEntry } from '../../../shared/protocol';
+import { z } from 'zod';
+import { QuoteRefSchema, REF_ENTRY_TYPE, type LiveSnapshot, type SessionEntry } from '../../../shared/protocol';
 import {
-  blocksFromContent, contentText, emptyTranscript, parseRejection, pushItem, resultPatch, type ToolCall,
+  blocksFromContent, contentText, emptyTranscript, messageTime, parseRejection, pushItem, resultPatch, type ToolCall,
   type Transcript,
 } from './model';
+
+/** mori.ref 条目的内容（会话文件里读出来的，先校验） */
+const RefDataSchema = z.object({ messageId: z.string(), refs: z.array(QuoteRefSchema) });
 
 type Message = Record<string, unknown>;
 
@@ -18,9 +22,9 @@ const ABORTED_TOOL = /(^|\n)(Command aborted|Operation aborted)\s*$/;
 const ABORTED_REPLY = /^(This operation was aborted|Request was aborted|Operation aborted)/;
 
 /** @brief 加入一条助手回复及其工具调用；出错或被停止的回复后面跟一行说明（不带操作，它已经过去了）。 */
-function addAssistant(state: Transcript, message: Message): Transcript {
+function addAssistant(state: Transcript, message: Message, entryId: string): Transcript {
   const { blocks, tools } = blocksFromContent(message.content);
-  let next = pushItem(state, { kind: 'assistant', blocks, streaming: false });
+  let next = pushItem(state, { kind: 'assistant', blocks, streaming: false, entryId, time: messageTime(message) });
   const all = { ...next.tools };
   for (const tool of tools) all[tool.id] = { ...tool, status: 'interrupted' };
   next = { ...next, tools: all };
@@ -47,17 +51,30 @@ function addToolResult(state: Transcript, message: Message): Transcript {
   return { ...state, tools: { ...state.tools, [id]: done } };
 }
 
+/** @brief mori.ref 条目：把引用记到它指向的你的消息上；内容不对时记录错误、不显示引用。 */
+function addRefs(state: Transcript, data: unknown): Transcript {
+  const parsed = RefDataSchema.safeParse(data);
+  if (!parsed.success) {
+    console.error(`[renderer] ignored a malformed ${REF_ENTRY_TYPE} entry: ${parsed.error.message}`);
+    return state;
+  }
+  const { messageId, refs } = parsed.data;
+  return { ...state, items: state.items.map((item) => (item.kind === 'user' && item.entryId === messageId
+    ? { ...item, refs } : item)) };
+}
+
 /** @brief 一条会话记录。 */
 function addEntry(state: Transcript, entry: SessionEntry): Transcript {
   if (entry.type === 'compaction') return pushItem(state, { kind: 'compaction' });
+  if (entry.type === 'custom' && entry.customType === REF_ENTRY_TYPE) return addRefs(state, entry.data);
   if (entry.type !== 'message') return state;
   const message = entry.message as unknown as Message;
   if (message.role === 'user') {
     const text = contentText(message.content);
-    const next = pushItem(state, { kind: 'user', text });
+    const next = pushItem(state, { kind: 'user', text, refs: null, entryId: entry.id, time: messageTime(message) });
     return { ...next, lastUserText: text, firstUserText: state.firstUserText ?? text };
   }
-  if (message.role === 'assistant') return addAssistant(state, message);
+  if (message.role === 'assistant') return addAssistant(state, message, entry.id);
   if (message.role === 'toolResult') return addToolResult(state, message);
   return state;
 }
@@ -84,7 +101,8 @@ function resumeTools(state: Transcript, running: LiveSnapshot['runningTools']): 
 /** @brief 正在生成、还没写进会话文件的助手回复：作为流入中的回复接在后面，之后的增量照常写进它。 */
 function resumeStreaming(state: Transcript, message: unknown): Transcript {
   const { blocks, tools } = blocksFromContent((message as { content?: unknown } | null)?.content);
-  const next = pushItem(state, { kind: 'assistant', blocks, streaming: true });
+  const next = pushItem(state, { kind: 'assistant', blocks, streaming: true, entryId: null,
+    time: messageTime(message) });
   const all: Record<string, ToolCall> = { ...next.tools };
   for (const tool of tools) all[tool.id] = { ...tool, status: 'preparing' };
   return { ...next, tools: all };

@@ -1,9 +1,9 @@
 // 把后台进程转发的 pi 事件归并成对话流。纯函数：时间由调用方传入，界面测试用录制的事件回放同一条路径。
 // 每个状态的来源见 docs/v0/screens/chat.md、tool-cards.md 与 approval.md。
 
-import type { ApprovalEndBy, ForwardedEvent, SlimMessageUpdate, ToolGate } from '../../../shared/protocol';
+import type { ApprovalEndBy, ForwardedEvent, QuoteRef, SlimMessageUpdate, ToolGate } from '../../../shared/protocol';
 import {
-  blocksFromContent, contentText, newTool, parseRejection, pushItem, resultPatch,
+  blocksFromContent, contentText, messageTime, newTool, parseRejection, pushItem, resultPatch,
   type Block, type Item, type Stage, type ToolCall, type Transcript,
 } from './model';
 
@@ -111,14 +111,32 @@ function applyMessage(state: Transcript, event: EventOf<'message_start' | 'messa
   const message = event.message as unknown as Record<string, unknown>;
   if (event.type === 'message_start' && message.role === 'user') {
     const text = contentText(message.content);
-    const next = pushItem(state, { kind: 'user', text });
+    const next = pushItem(state, { kind: 'user', text, refs: null, entryId: null, time: messageTime(message) });
     return { ...next, lastUserText: text, firstUserText: state.firstUserText ?? text };
   }
   if (event.type === 'message_start' && message.role === 'assistant') {
-    return pushItem(state, { kind: 'assistant', blocks: [], streaming: true });
+    return pushItem(state, { kind: 'assistant', blocks: [], streaming: true, entryId: null,
+      time: messageTime(message) });
   }
   if (event.type === 'message_end' && message.role === 'assistant') return applyAssistantEnd(state, message);
   return state;
+}
+
+/**
+ * @brief 补发的条目 id（mori.entry_id）：记到同一角色、同一时间的那一项上（找不到时取这个角色最后一条还没有 id 的）；
+ *        你的消息带着已写进会话的引用时一并记下。
+ */
+function applyEntryId(state: Transcript, event: EventOf<'mori.entry_id'>): Transcript {
+  const matches = (item: Item) => (item.kind === 'user' || item.kind === 'assistant') && item.kind === event.role
+    && item.entryId === null;
+  let index = state.items.findLastIndex((item) => matches(item) && 'time' in item && item.time === event.time);
+  if (index < 0) index = state.items.findLastIndex(matches);
+  const item = state.items[index];
+  if (!item || (item.kind !== 'user' && item.kind !== 'assistant')) return state;
+  const items = [...state.items];
+  items[index] = item.kind === 'user' ? { ...item, entryId: event.entryId, refs: event.refs ?? item.refs }
+    : { ...item, entryId: event.entryId };
+  return { ...state, items };
 }
 
 /** @brief 当前还在执行的工具（阶段行显示它）。 */
@@ -256,8 +274,8 @@ function applyQuestion(state: Transcript,
 }
 
 /** @brief 追加一张错误卡；restore 是"放回输入框"的内容。 */
-function pushError(state: Transcript, text: string, restore: string | null): Transcript {
-  return pushItem(state, { kind: 'error', text, restore, live: true });
+function pushError(state: Transcript, text: string, restore: string | null, refs?: QuoteRef[] | null): Transcript {
+  return pushItem(state, { kind: 'error', text, restore, live: true, ...(refs?.length ? { refs } : {}) });
 }
 
 /** @brief 处理一轮的开始、结束、重试和压缩。 */
@@ -316,7 +334,9 @@ export function applyEvent(state: Transcript, event: ForwardedEvent, now: number
     case 'mori.approval_end':
       return applyApproval(state, event, now);
     case 'mori.prompt_error':
-      return pushError({ ...state, sending: false }, event.message, event.text);
+      return pushError({ ...state, sending: false }, event.message, event.text, event.refs);
+    case 'mori.entry_id':
+      return applyEntryId(state, event);
     case 'mori.ui_request':
     case 'mori.ui_end':
     case 'mori.notify':

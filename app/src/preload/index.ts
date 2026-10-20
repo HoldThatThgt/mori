@@ -2,6 +2,8 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type { Command, EventEnvelope, KernelMessage, RequestEnvelope } from '../shared/protocol';
+import type { Feedback, SavedFeedback } from '../shared/feedback';
+import type { FileRead } from '../shared/files';
 import type { IssueReport, SavedIssue, WindowCapture } from '../shared/issues';
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
@@ -108,5 +110,21 @@ contextBridge.exposeInMainWorld('mori', {
   /** @brief F8：在资源管理器里选中已保存的报告。 */
   showIssueInFolder(file: string): Promise<void> {
     return ipcRenderer.invoke('mori:show-issue', file);
+  },
+  /** @brief 文件阅读器：按 pi 工具的规则（相对 cwd）解析路径，只读地读出文件。 */
+  readFile(path: string, cwd: string): Promise<FileRead> {
+    return ipcRenderer.invoke('mori:read-file', path, cwd);
+  },
+  /** @brief 用系统默认程序打开文件；失败时 error 为原文；会被运行的文件改为在资源管理器里选中（revealed）。 */
+  openPath(path: string, cwd: string): Promise<{ error: string | null; revealed: boolean }> {
+    return ipcRenderer.invoke('mori:open-path', path, cwd);
+  },
+  /** @brief 把文字写进系统剪贴板（回复下的"复制"）。 */
+  copyText(text: string): Promise<void> {
+    return ipcRenderer.invoke('mori:copy-text', text);
+  },
+  /** @brief 保存一份对内容的反馈（只记录，不发给模型），返回 JSON 文件的路径。 */
+  saveFeedback(feedback: Feedback): Promise<SavedFeedback> {
+    return ipcRenderer.invoke('mori:save-feedback', feedback);
   },
 });

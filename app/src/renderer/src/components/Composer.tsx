@@ -5,6 +5,7 @@ import { send, stop, withdraw } from '../state/actions';
 import { useOverlay } from '../state/overlays';
 import { updateTab, type Tab } from '../state/store';
 import { Icon } from '../icons';
+import { ComposerQuotes } from './QuoteChips';
 
 /** 输入框最高（px），超过后在框内滚动 */
 const MAX_INPUT_HEIGHT = 220;
@@ -56,7 +57,8 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
   const input = useRef<HTMLTextAreaElement>(null);
   const composing = useRef(false);
   const { running, sending } = tab.transcript;
-  const hasText = tab.draft.trim().length > 0;
+  // 只有引用芯片、没有字时也能发送（docs/v0/screens/selection.md）。
+  const hasText = tab.draft.trim().length > 0 || tab.draftRefs.length > 0;
 
   useLayoutEffect(() => {
     const element = input.current;
@@ -77,28 +79,37 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
 
   return (
     <div className="composer" data-testid="composer">
+      <ComposerQuotes tab={tab} />
       <textarea ref={input} value={tab.draft} rows={2} aria-label="给 Mori 的消息" autoFocus
         placeholder={running ? 'Enter 排队 · Ctrl+Enter 插话 · Shift+Enter 换行' : 'Enter 发送 · Shift+Enter 换行'}
         onChange={(event) => { const draft = event.target.value; updateTab(tab.key, (t) => ({ ...t, draft })); }}
         onCompositionStart={() => { composing.current = true; }}
         onCompositionEnd={() => { composing.current = false; }}
         onKeyDown={onKeyDown} />
-      <div className="composer-bottom">
-        <span className="composer-spacer" />
-        {notReady && <span className="composer-wait" data-testid="not-ready">{notReady}</span>}
-        {!notReady && running && hasText && <QueueButton tabKey={tab.key} />}
-        {!notReady && running && (
-          <button className="button stop-button" onClick={() => void stop(tab.key)} title="停止（Esc）">
-            <Icon name="stop" />停止
-          </button>
-        )}
-        {!notReady && !running && (
-          <button className="button primary send-button" disabled={!hasText || sending}
-            onClick={() => void send(tab.key)}>
-            <Icon name="arrow" />发送
-          </button>
-        )}
-      </div>
+      <ComposerButtons tab={tab} notReady={notReady} hasText={hasText} />
+    </div>
+  );
+}
+
+/** @brief 输入框下方的按钮区：不能发送时的说明；生成中的"排队发送"和"停止"；空闲时的"发送"。 */
+function ComposerButtons({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
+  const { running, sending } = tab.transcript;
+  return (
+    <div className="composer-bottom">
+      <span className="composer-spacer" />
+      {notReady && <span className="composer-wait" data-testid="not-ready">{notReady}</span>}
+      {!notReady && running && hasText && <QueueButton tabKey={tab.key} />}
+      {!notReady && running && (
+        <button className="button stop-button" onClick={() => void stop(tab.key)} title="停止（Esc）">
+          <Icon name="stop" />停止
+        </button>
+      )}
+      {!notReady && !running && (
+        <button className="button primary send-button" disabled={!hasText || sending}
+          onClick={() => void send(tab.key)}>
+          <Icon name="arrow" />发送
+        </button>
+      )}
     </div>
   );
 }

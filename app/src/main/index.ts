@@ -6,6 +6,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, type IpcMainInvokeEvent } from 'electron';
 import { registerFeedbackHandlers } from './feedback';
+import { registerFileHandlers } from './files';
 import { currentKernel, lastKernelExitCode, piAgentDir, shutdownKernel, startKernel } from './kernel-process';
 
 // 测试可以用 MORI_USER_DATA 把数据放到独立目录，避免碰到日常使用的配置。
@@ -127,6 +128,7 @@ ipcMain.handle('mori:attention', (event: IpcMainInvokeEvent) => {
 });
 
 registerFeedbackHandlers(isAppPage);
+registerFileHandlers(isAppPage);
 
 void app.whenReady().then(() => {
   // 不用拼写检查：Chromium 默认按系统语言从 redirector.gvt1.com 下载词典，离线使用时不能有这种对外连接。

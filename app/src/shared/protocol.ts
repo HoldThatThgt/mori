@@ -100,6 +100,55 @@ export const REJECTED_BY_STOP = 'Rejected: the user stopped the run.';
 export const APPROVAL_DECISIONS = ['allow', 'allowSession', 'reject'] as const;
 export type ApprovalDecision = (typeof APPROVAL_DECISIONS)[number];
 
+/** @brief 引用的来源：一条助手回复里的选区或整轮回复（docs/v0/screens/selection.md "回到原位置"）。 */
+export const MessageSourceSchema = z.object({
+  kind: z.literal('message'),
+  /** 会话文件；还没有时为 null */
+  sessionFile: z.string().nullable(),
+  /** 这条助手消息的条目 id（mori.entry_id 补发）；还在生成时为 null */
+  entryId: z.string().nullable(),
+  /** 这条助手消息的时间（pi 消息的 timestamp，ms）；没有 id 时用它找 */
+  time: z.number().nullable(),
+  /** 选区，或整轮回复（回复下的"引用到输入框"、"反馈这条回复"） */
+  scope: z.enum(['selection', 'reply']),
+});
+
+/** @brief 引用的来源：文件阅读器里的选区。 */
+export const FileSourceSchema = z.object({
+  kind: z.literal('file'),
+  /** 绝对路径（主进程解析后的） */
+  path: z.string().min(1),
+  /** 引用时文件内容的 SHA-256（十六进制） */
+  sha256: z.string(),
+  /** 第一行（从 1 起） */
+  startLine: z.number().int().positive(),
+  /** 最后一行 */
+  endLine: z.number().int().positive(),
+});
+
+/** @brief 一个引用：引用时的原文和来源。 */
+export const QuoteRefSchema = z.object({
+  /** 引用时的原文 */
+  quote: z.string().min(1),
+  /** 来源 */
+  source: z.discriminatedUnion('kind', [MessageSourceSchema, FileSourceSchema]),
+});
+export type QuoteRef = z.infer<typeof QuoteRefSchema>;
+export type QuoteSource = QuoteRef['source'];
+export type MessageSource = z.infer<typeof MessageSourceSchema>;
+export type FileSource = z.infer<typeof FileSourceSchema>;
+
+/** @brief 引用来源写进 pi 会话文件时自定义条目的类型（方案第 6 节）。 */
+export const REF_ENTRY_TYPE = 'mori.ref';
+
+/** @brief mori.ref 条目的内容：带引用的那条你的消息和它的引用。 */
+export interface RefEntryData {
+  /** 你的消息的条目 id */
+  messageId: string;
+  /** 引用，按芯片顺序 */
+  refs: QuoteRef[];
+}
+
 /** @brief 界面发给后台进程的全部命令。 */
 export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('config.get') }),
@@ -137,6 +186,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
     text: z.string().min(1),
     /** 生成中时怎样送达：steer 插话，followUp 排队；空闲时两者都等于直接发送 */
     behavior: z.enum(['steer', 'followUp']).optional(),
+    /** 输入框里的引用芯片；pi 记下这条消息后写成 mori.ref 条目 */
+    refs: z.array(QuoteRefSchema).optional(),
   }),
   z.object({ type: z.literal('session.clearQueue'), sessionId }),
   z.object({ type: z.literal('session.abort'), sessionId }),
@@ -388,6 +439,8 @@ export type KernelEvent =
     message: string;
     /** 没发出去的提示原文，界面放回输入框 */
     text: string;
+    /** 这条提示带的引用芯片，界面连同芯片一起放回；没有时为 null（M3 之前的录制里没有这个字段） */
+    refs?: QuoteRef[] | null;
     /** 这时会话是否还在运行（插话、排队的提示失败时本轮可能还在继续） */
     running: boolean;
   }
@@ -418,6 +471,21 @@ export type KernelEvent =
   }
   /** 扩展的通知（ctx.ui.notify） */
   | ({ type: 'mori.notify' } & ExtensionNotice)
+  /**
+   * 补充条目 id（方案第 6 节第 4 件）：pi 先发 message_end、再把消息写进会话；写入后补发这条消息的条目 id。
+   * 你的消息带了引用时，refs 是已经写成 mori.ref 条目的引用。
+   */
+  | {
+    type: 'mori.entry_id';
+    /** 消息的角色 */
+    role: 'user' | 'assistant';
+    /** 条目 id */
+    entryId: string;
+    /** 消息的时间（pi 消息的 timestamp，ms），界面用它对上对话流里的那一项 */
+    time: number;
+    /** 写进 mori.ref 条目的引用；没有时为 null */
+    refs: QuoteRef[] | null;
+  }
   /**
    * pi 的 prompt() 结束：通常在本轮结束（agent_settled）之后；pi 把提示交给扩展命令或输入处理器、没有开始运行时，
    * 只有这一个事件（界面据此清掉"刚发出"）。running 为这时会话是否还在运行（插话、排队的提示送进队列就结束）

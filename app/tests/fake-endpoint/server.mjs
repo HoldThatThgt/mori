@@ -13,6 +13,8 @@
 //   - 用户消息含 "wait <秒数>s then run: <命令>"：等这么多秒再调用 bash 工具执行该命令（测界面重新加载后才来的批准请求）。
 //   - 用户消息含 "wait <秒数>s"：等这么多秒再回复一段文字（测生成中切走、"有新结果"）。
 //   - 用户消息含 "code block"：返回一段带 ts 代码块的 Markdown。
+//   - 用户消息含 "echo back"：回复"收到的全文："加这条用户消息的全文（测引用块确实发给了模型）。
+//   - 用户消息含 "long reply"：流式返回四段较长的文字（测生成中选字、反馈）。
 //   - 用户消息含 "plain"：只返回文字。
 //   - 用户消息含 "http-<状态码>"：直接以该状态码返回错误（例如 http-500 触发 pi 的自动重试，http-400 不重试）。
 //   - 模型 ID 为 "fake-slow"：第一个分块前等 8 秒（测试"测试连接 → 取消"）。
@@ -30,6 +32,11 @@ const requiredKey = process.env.FAKE_REQUIRE_KEY;
 const modelId = 'fake-coder';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** "long reply" 的回复：四段，每段一句开头不同的话重复几次 */
+const longReply = ['第一段：春天来了，河边的柳树发了新芽。', '第二段：夏天的午后，蝉在树上一直叫。',
+  '第三段：秋天的稻田一片金黄，风吹过沙沙作响。', '第四段：冬天下了第一场雪，屋顶都白了。']
+  .map((sentence) => sentence.repeat(8)).join('\n\n');
 
 const codeReply = [
   '下面是一段代码：',
@@ -94,6 +101,8 @@ function userReply(userText, tools) {
     return { text: '我来改一下标题。', toolCalls: [{ name: 'edit', args: { path: 'README.md', edits } }] };
   }
   if (userText.includes('code block')) return { text: codeReply, toolCalls: [] };
+  if (userText.includes('echo back')) return { text: `收到的全文：\n\n${userText}`, toolCalls: [] };
+  if (userText.includes('long reply')) return { text: longReply, toolCalls: [] };
   if (userText.includes('plain')) return { text: '这是一段只有文字的回复，用来测试流式输出。', toolCalls: [] };
   return { text: '我先读一下 README.md。', toolCalls: [{ name: 'read', args: { path: 'README.md' } }] };
 }

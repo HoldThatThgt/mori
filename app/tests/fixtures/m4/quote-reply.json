@@ -1,0 +1,2979 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m4-record.mjs; do not edit by hand.",
+ "name": "quote-reply",
+ "description": "问一个问题，再用\"引用到输入框\"的做法引用整轮回复（带 refs 发出）",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-20T04:55:31.665Z",
+ "steps": [
+  {
+   "t": 1,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 2482,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 2482,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m4-record-CwYCf9\\m4-quote-reply"
+   }
+  },
+  {
+   "t": 2490,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 2490,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m4-record-CwYCf9\\m4-quote-reply"
+   }
+  },
+  {
+   "t": 2636,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m4-record-CwYCf9\\m4-quote-reply",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-VNxqfn\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m4-record-CwYCf9-m4-quote-reply--\\2026-10-20T04-55-28-136Z_01a157aa-1a86-760c-aae9-6bf97874fb6c.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 2636,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "text": "用两三句话介绍一下什么是单元测试。不要调用任何工具。"
+   }
+  },
+  {
+   "t": 2638,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 2641,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 2641,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 2642,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m4-record-CwYCf9/m4-quote-reply\n</cwd>"
+      },
+      "timestamp": 1792472128279,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2642,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m4-record-CwYCf9/m4-quote-reply\n</cwd>"
+      },
+      "timestamp": 1792472128279,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2642,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "用两三句话介绍一下什么是单元测试。不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792472128277
+     }
+    }
+   }
+  },
+  {
+   "t": 2642,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "用两三句话介绍一下什么是单元测试。不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792472128277
+     }
+    }
+   }
+  },
+  {
+   "t": 2643,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "e1ba40e5",
+     "time": 1792472128277,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3351,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792472128515
+     }
+    }
+   }
+  },
+  {
+   "t": 4022,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4022,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "The"
+     }
+    }
+   }
+  },
+  {
+   "t": 4128,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user"
+     }
+    }
+   }
+  },
+  {
+   "t": 4140,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " asks"
+     }
+    }
+   }
+  },
+  {
+   "t": 4140,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 4141,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " introduce"
+     }
+    }
+   }
+  },
+  {
+   "t": 4155,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " what"
+     }
+    }
+   }
+  },
+  {
+   "t": 4168,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " unit"
+     }
+    }
+   }
+  },
+  {
+   "t": 4168,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " testing"
+     }
+    }
+   }
+  },
+  {
+   "t": 4180,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " is"
+     }
+    }
+   }
+  },
+  {
+   "t": 4181,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " in"
+     }
+    }
+   }
+  },
+  {
+   "t": 4181,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " two"
+     }
+    }
+   }
+  },
+  {
+   "t": 4195,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " or"
+     }
+    }
+   }
+  },
+  {
+   "t": 4195,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " three"
+     }
+    }
+   }
+  },
+  {
+   "t": 4195,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " sentences"
+     }
+    }
+   }
+  },
+  {
+   "t": 4195,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 4195,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Don"
+     }
+    }
+   }
+  },
+  {
+   "t": 4211,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 4211,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " call"
+     }
+    }
+   }
+  },
+  {
+   "t": 4211,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " any"
+     }
+    }
+   }
+  },
+  {
+   "t": 4211,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tools"
+     }
+    }
+   }
+  },
+  {
+   "t": 4211,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 4222,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 4223,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "单元"
+     }
+    }
+   }
+  },
+  {
+   "t": 4223,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "测试"
+     }
+    }
+   }
+  },
+  {
+   "t": 4223,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "是"
+     }
+    }
+   }
+  },
+  {
+   "t": 4223,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "针对"
+     }
+    }
+   }
+  },
+  {
+   "t": 4235,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "代码"
+     }
+    }
+   }
+  },
+  {
+   "t": 4249,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "中最"
+     }
+    }
+   }
+  },
+  {
+   "t": 4249,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "小的"
+     }
+    }
+   }
+  },
+  {
+   "t": 4249,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "可"
+     }
+    }
+   }
+  },
+  {
+   "t": 4264,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "验证"
+     }
+    }
+   }
+  },
+  {
+   "t": 4282,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "单元"
+     }
+    }
+   }
+  },
+  {
+   "t": 4282,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "（"
+     }
+    }
+   }
+  },
+  {
+   "t": 4282,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "通常"
+     }
+    }
+   }
+  },
+  {
+   "t": 4291,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "是一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 4291,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "函数"
+     }
+    }
+   }
+  },
+  {
+   "t": 4291,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "或"
+     }
+    }
+   }
+  },
+  {
+   "t": 4291,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "方法"
+     }
+    }
+   }
+  },
+  {
+   "t": 4291,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "）"
+     }
+    }
+   }
+  },
+  {
+   "t": 4306,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "编写"
+     }
+    }
+   }
+  },
+  {
+   "t": 4306,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "并"
+     }
+    }
+   }
+  },
+  {
+   "t": 4316,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "自动"
+     }
+    }
+   }
+  },
+  {
+   "t": 4333,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "运行的"
+     }
+    }
+   }
+  },
+  {
+   "t": 4348,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "测试"
+     }
+    }
+   }
+  },
+  {
+   "t": 4348,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4355,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "用来"
+     }
+    }
+   }
+  },
+  {
+   "t": 4356,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "确认"
+     }
+    }
+   }
+  },
+  {
+   "t": 4400,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "它在"
+     }
+    }
+   }
+  },
+  {
+   "t": 4400,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "给定"
+     }
+    }
+   }
+  },
+  {
+   "t": 4400,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "输入"
+     }
+    }
+   }
+  },
+  {
+   "t": 4400,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "下"
+     }
+    }
+   }
+  },
+  {
+   "t": 4401,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "产生"
+     }
+    }
+   }
+  },
+  {
+   "t": 4409,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "预期"
+     }
+    }
+   }
+  },
+  {
+   "t": 4410,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "输出"
+     }
+    }
+   }
+  },
+  {
+   "t": 4445,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 4445,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "它"
+     }
+    }
+   }
+  },
+  {
+   "t": 4445,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "通常"
+     }
+    }
+   }
+  },
+  {
+   "t": 4445,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "由"
+     }
+    }
+   }
+  },
+  {
+   "t": 4445,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "开发者"
+     }
+    }
+   }
+  },
+  {
+   "t": 4449,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "编写"
+     }
+    }
+   }
+  },
+  {
+   "t": 4449,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "、"
+     }
+    }
+   }
+  },
+  {
+   "t": 4462,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "运行"
+     }
+    }
+   }
+  },
+  {
+   "t": 4476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "速度快"
+     }
+    }
+   }
+  },
+  {
+   "t": 4476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4490,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "能在"
+     }
+    }
+   }
+  },
+  {
+   "t": 4505,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "改动"
+     }
+    }
+   }
+  },
+  {
+   "t": 4517,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "代码"
+     }
+    }
+   }
+  },
+  {
+   "t": 4552,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "时"
+     }
+    }
+   }
+  },
+  {
+   "t": 4552,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "快速"
+     }
+    }
+   }
+  },
+  {
+   "t": 4552,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "暴露"
+     }
+    }
+   }
+  },
+  {
+   "t": 4592,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "问题"
+     }
+    }
+   }
+  },
+  {
+   "t": 4592,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4592,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "是"
+     }
+    }
+   }
+  },
+  {
+   "t": 4592,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "重构"
+     }
+    }
+   }
+  },
+  {
+   "t": 4593,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "和"
+     }
+    }
+   }
+  },
+  {
+   "t": 4593,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "持续"
+     }
+    }
+   }
+  },
+  {
+   "t": 4593,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "集"
+     }
+    }
+   }
+  },
+  {
+   "t": 4660,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "成的"
+     }
+    }
+   }
+  },
+  {
+   "t": 4660,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "安全"
+     }
+    }
+   }
+  },
+  {
+   "t": 4660,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "网"
+     }
+    }
+   }
+  },
+  {
+   "t": 4661,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 4665,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4665,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 4665,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asks: introduce what unit testing is in two or three sentences. Don't call any tools.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "单元测试是针对代码中最小的可验证单元（通常是一个函数或方法）编写并自动运行的测试，用来确认它在给定输入下产生预期输出。它通常由开发者编写、运行速度快，能在改动代码时快速暴露问题，是重构和持续集成的安全网。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1057,
+       "output": 80,
+       "cacheRead": 640,
+       "cacheWrite": 0,
+       "reasoning": 21,
+       "totalTokens": 1777,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792472128515,
+      "responseId": "92ff1893-d369-4a7d-ba73-82d0794502b1",
+      "rawStopReason": "stop",
+      "durationMs": 1790,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 4665,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "fde5ebde",
+     "time": 1792472128515,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 4666,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asks: introduce what unit testing is in two or three sentences. Don't call any tools.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "单元测试是针对代码中最小的可验证单元（通常是一个函数或方法）编写并自动运行的测试，用来确认它在给定输入下产生预期输出。它通常由开发者编写、运行速度快，能在改动代码时快速暴露问题，是重构和持续集成的安全网。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1057,
+       "output": 80,
+       "cacheRead": 640,
+       "cacheWrite": 0,
+       "reasoning": 21,
+       "totalTokens": 1777,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792472128515,
+      "responseId": "92ff1893-d369-4a7d-ba73-82d0794502b1",
+      "rawStopReason": "stop",
+      "durationMs": 1790,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 4666,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c"
+   }
+  },
+  {
+   "t": 4666,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m4-changes-selection-243230\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m4-record-CwYCf9/m4-quote-reply\n</cwd>"
+       },
+       "timestamp": 1792472128279,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "用两三句话介绍一下什么是单元测试。不要调用任何工具。"
+        }
+       ],
+       "timestamp": 1792472128277
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The user asks: introduce what unit testing is in two or three sentences. Don't call any tools.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "text",
+         "text": "单元测试是针对代码中最小的可验证单元（通常是一个函数或方法）编写并自动运行的测试，用来确认它在给定输入下产生预期输出。它通常由开发者编写、运行速度快，能在改动代码时快速暴露问题，是重构和持续集成的安全网。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1057,
+        "output": 80,
+        "cacheRead": 640,
+        "cacheWrite": 0,
+        "reasoning": 21,
+        "totalTokens": 1777,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792472128515,
+       "responseId": "92ff1893-d369-4a7d-ba73-82d0794502b1",
+       "rawStopReason": "stop",
+       "durationMs": 1790,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 4667,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 4667,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 4669,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1777,
+      "contextWindow": 1000000,
+      "percent": 0.1777
+     }
+    }
+   }
+  },
+  {
+   "t": 5000,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "refs": [
+     {
+      "quote": "单元测试是针对代码中最小的可验证单元（通常是一个函数或方法）编写并自动运行的测试，用来确认它在给定输入下产生预期输出。它通常由开发者编写、运行速度快，能在改动代码时快速暴露问题，是重构和持续集成的安全网。",
+      "source": {
+       "kind": "message",
+       "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-VNxqfn\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m4-record-CwYCf9-m4-quote-reply--\\2026-10-20T04-55-28-136Z_01a157aa-1a86-760c-aae9-6bf97874fb6c.jsonl",
+       "entryId": "fde5ebde",
+       "time": 1792472128515,
+       "scope": "reply"
+      }
+     }
+    ],
+    "text": "引用你之前的回复：\n> 单元测试是针对代码中最小的可验证单元（通常是一个函数或方法）编写并自动运行的测试，用来确认它在给定输入下产生预期输出。它通常由开发者编写、运行速度快，能在改动代码时快速暴露问题，是重构和持续集成的安全网。\n\n请把上面这段话缩短成一句。不要调用任何工具。"
+   }
+  },
+  {
+   "t": 5002,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 5003,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 5003,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 5003,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "引用你之前的回复：\n> 单元测试是针对代码中最小的可验证单元（通常是一个函数或方法）编写并自动运行的测试，用来确认它在给定输入下产生预期输出。它通常由开发者编写、运行速度快，能在改动代码时快速暴露问题，是重构和持续集成的安全网。\n\n请把上面这段话缩短成一句。不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792472130641
+     }
+    }
+   }
+  },
+  {
+   "t": 5003,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "引用你之前的回复：\n> 单元测试是针对代码中最小的可验证单元（通常是一个函数或方法）编写并自动运行的测试，用来确认它在给定输入下产生预期输出。它通常由开发者编写、运行速度快，能在改动代码时快速暴露问题，是重构和持续集成的安全网。\n\n请把上面这段话缩短成一句。不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792472130641
+     }
+    }
+   }
+  },
+  {
+   "t": 5004,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "eacbea7e",
+     "time": 1792472130641,
+     "refs": [
+      {
+       "quote": "单元测试是针对代码中最小的可验证单元（通常是一个函数或方法）编写并自动运行的测试，用来确认它在给定输入下产生预期输出。它通常由开发者编写、运行速度快，能在改动代码时快速暴露问题，是重构和持续集成的安全网。",
+       "source": {
+        "kind": "message",
+        "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-VNxqfn\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m4-record-CwYCf9-m4-quote-reply--\\2026-10-20T04-55-28-136Z_01a157aa-1a86-760c-aae9-6bf97874fb6c.jsonl",
+        "entryId": "fde5ebde",
+        "time": 1792472128515,
+        "scope": "reply"
+       }
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 5157,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792472130644
+     }
+    }
+   }
+  },
+  {
+   "t": 5462,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 5462,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "单元"
+     }
+    }
+   }
+  },
+  {
+   "t": 5475,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "测试"
+     }
+    }
+   }
+  },
+  {
+   "t": 5475,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "是针对"
+     }
+    }
+   }
+  },
+  {
+   "t": 5475,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "最小"
+     }
+    }
+   }
+  },
+  {
+   "t": 5491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "可"
+     }
+    }
+   }
+  },
+  {
+   "t": 5491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "验证"
+     }
+    }
+   }
+  },
+  {
+   "t": 5491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "单元"
+     }
+    }
+   }
+  },
+  {
+   "t": 5491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "（"
+     }
+    }
+   }
+  },
+  {
+   "t": 5491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "通常"
+     }
+    }
+   }
+  },
+  {
+   "t": 5502,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "是一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 5502,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "函数"
+     }
+    }
+   }
+  },
+  {
+   "t": 5502,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "）"
+     }
+    }
+   }
+  },
+  {
+   "t": 5514,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "编写"
+     }
+    }
+   }
+  },
+  {
+   "t": 5515,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "并"
+     }
+    }
+   }
+  },
+  {
+   "t": 5515,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "自动"
+     }
+    }
+   }
+  },
+  {
+   "t": 5529,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "运行的"
+     }
+    }
+   }
+  },
+  {
+   "t": 5529,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "测试"
+     }
+    }
+   }
+  },
+  {
+   "t": 5529,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 5529,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "用来"
+     }
+    }
+   }
+  },
+  {
+   "t": 5529,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "确认"
+     }
+    }
+   }
+  },
+  {
+   "t": 5544,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "其"
+     }
+    }
+   }
+  },
+  {
+   "t": 5608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "输出"
+     }
+    }
+   }
+  },
+  {
+   "t": 5608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "符合"
+     }
+    }
+   }
+  },
+  {
+   "t": 5608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "预期"
+     }
+    }
+   }
+  },
+  {
+   "t": 5608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 5608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "从而"
+     }
+    }
+   }
+  },
+  {
+   "t": 5608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "在"
+     }
+    }
+   }
+  },
+  {
+   "t": 5608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "改动"
+     }
+    }
+   }
+  },
+  {
+   "t": 5608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "代码"
+     }
+    }
+   }
+  },
+  {
+   "t": 5611,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "时"
+     }
+    }
+   }
+  },
+  {
+   "t": 5611,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "快速"
+     }
+    }
+   }
+  },
+  {
+   "t": 5611,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "暴露"
+     }
+    }
+   }
+  },
+  {
+   "t": 5625,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "问题"
+     }
+    }
+   }
+  },
+  {
+   "t": 5625,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 5639,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 5639,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "单元测试是针对最小可验证单元（通常是一个函数）编写并自动运行的测试，用来确认其输出符合预期，从而在改动代码时快速暴露问题。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 195,
+       "output": 35,
+       "cacheRead": 1664,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1894,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792472130644,
+      "responseId": "ce2cf2ac-1baf-4d7b-9465-2350fddd02ba",
+      "rawStopReason": "stop",
+      "durationMs": 635,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 5640,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "4e0775b9",
+     "time": 1792472130644,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 5640,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "单元测试是针对最小可验证单元（通常是一个函数）编写并自动运行的测试，用来确认其输出符合预期，从而在改动代码时快速暴露问题。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 195,
+       "output": 35,
+       "cacheRead": 1664,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1894,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792472130644,
+      "responseId": "ce2cf2ac-1baf-4d7b-9465-2350fddd02ba",
+      "rawStopReason": "stop",
+      "durationMs": 635,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 5640,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c"
+   }
+  },
+  {
+   "t": 5640,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "引用你之前的回复：\n> 单元测试是针对代码中最小的可验证单元（通常是一个函数或方法）编写并自动运行的测试，用来确认它在给定输入下产生预期输出。它通常由开发者编写、运行速度快，能在改动代码时快速暴露问题，是重构和持续集成的安全网。\n\n请把上面这段话缩短成一句。不要调用任何工具。"
+        }
+       ],
+       "timestamp": 1792472130641
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "单元测试是针对最小可验证单元（通常是一个函数）编写并自动运行的测试，用来确认其输出符合预期，从而在改动代码时快速暴露问题。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 195,
+        "output": 35,
+        "cacheRead": 1664,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1894,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792472130644,
+       "responseId": "ce2cf2ac-1baf-4d7b-9465-2350fddd02ba",
+       "rawStopReason": "stop",
+       "durationMs": 635,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 5640,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 5640,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a157aa-1a86-760c-aae9-6bf97874fb6c",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 5640,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1894,
+      "contextWindow": 1000000,
+      "percent": 0.1894
+     }
+    }
+   }
+  }
+ ]
+}

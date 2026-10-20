@@ -3,10 +3,32 @@
 
 import { create } from 'zustand';
 import {
-  DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextUsage, type ProjectTrust, type SavedSession,
+  DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextUsage, type ProjectTrust, type QuoteRef,
+  type SavedSession,
 } from '../../../shared/protocol';
 import { loadArchived } from './archive';
 import { emptyTranscript, type Transcript } from './model';
+
+/** @brief 一次"回到原位置"的请求：引用和请求序号（同一个引用再点一次也要再跳）。 */
+export interface QuoteJump {
+  /** 引用 */
+  ref: QuoteRef;
+  /** 请求序号 */
+  nonce: number;
+}
+
+/** @brief 右栏显示什么（docs/v0/screens/changes.md）。 */
+export type RightView =
+  | { kind: 'changes' }
+  | {
+    kind: 'file';
+    /** 文件路径：工具参数里的原文或引用里的绝对路径，由主进程相对工作目录解析 */
+    path: string;
+    /** 打开它的引用芯片；从路径或改动列表打开时为 null */
+    jump: QuoteJump | null;
+    /** 每次打开加一，同一个文件再打开时重新读取 */
+    nonce: number;
+  };
 
 /** @brief 一个打开的会话。 */
 export interface Tab {
@@ -48,10 +70,16 @@ export interface Tab {
   transcript: Transcript;
   /** 输入框草稿 */
   draft: string;
+  /** 输入框里的引用芯片（随草稿保存） */
+  draftRefs: QuoteRef[];
   /** 对话流从第几项开始显示；更早的在滚到顶部时载入 */
   startIndex: number;
   /** 右栏是否打开；null 表示跟随"有没有改动" */
   rightOpen: boolean | null;
+  /** 右栏的视图 */
+  rightView: RightView;
+  /** 等对话流处理的"回到原位置"（回复里的引用）；itemKey 是要跳到的那一项 */
+  transcriptJump: (QuoteJump & { itemKey: string }) | null;
   /** 打开中、可用、打开失败 */
   phase: 'opening' | 'ready' | 'failed';
   /** 打开失败或重新载入失败的原文 */
@@ -127,7 +155,8 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
     activity: Date.now(), unseen: false, interrupted: false, projectTrust: 'none', trustRemembered: false,
     trustSaveError: null, extensionErrors: [], model: null,
     modelNotice: null, contextUsage: null, approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '',
-    startIndex: 0, rightOpen: null, phase: 'opening', error: null, ...fields };
+    draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
+    phase: 'opening', error: null, ...fields };
 }
 
 /** @brief 更新一个会话。 */

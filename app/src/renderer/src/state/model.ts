@@ -1,7 +1,7 @@
 // 对话流的数据模型：由 pi 事件（transcript.ts）或会话记录（history.ts）归并而来，界面只读它。
 
 import {
-  REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type ToolGate, type UiRequest,
+  REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type QuoteRef, type ToolGate, type UiRequest,
 } from '../../../shared/protocol';
 
 /** @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md。 */
@@ -57,13 +57,25 @@ export type Block =
   | { type: 'thinking'; text: string; streaming: boolean }
   | { type: 'tool'; id: string };
 
+/** @brief 一条你的消息或助手回复在会话记录里的位置：条目 id（mori.entry_id 补发或会话记录）和消息时间。 */
+export interface MessageMark {
+  /** 条目 id；还没写进会话时为 null */
+  entryId: string | null;
+  /** pi 消息的 timestamp（ms）；没有时为 null */
+  time: number | null;
+}
+
 /** @brief 对话流中的一项。 */
 export type Item =
-  | { kind: 'user'; key: string; text: string }
-  | { kind: 'assistant'; key: string; blocks: Block[]; streaming: boolean }
+  | ({ kind: 'user'; key: string; text: string; refs: QuoteRef[] | null } & MessageMark)
+  | ({ kind: 'assistant'; key: string; blocks: Block[]; streaming: boolean } & MessageMark)
   | { kind: 'compaction'; key: string }
   | { kind: 'stopped'; key: string }
-  | { kind: 'error'; key: string; text: string; restore: string | null; live: boolean }
+  | {
+    kind: 'error'; key: string; text: string; restore: string | null; live: boolean;
+    /** 没发出去的消息带的引用芯片："放回输入框"时连芯片一起放回（restore 是含引用块的全文） */
+    refs?: QuoteRef[];
+  }
   | { kind: 'note'; key: string; text: string }
   | { kind: 'notify'; key: string; text: string; level: 'info' | 'warning' | 'error' };
 
@@ -159,6 +171,12 @@ export function parseRejection(text: string): { reason: string | null } | null {
 
 /** @brief 对联合类型逐个成员做 Omit。 */
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/** @brief pi 消息的时间（timestamp，ms）；没有时为 null。 */
+export function messageTime(message: unknown): number | null {
+  const time = (message as { timestamp?: unknown } | null)?.timestamp;
+  return typeof time === 'number' ? time : null;
+}
 
 /** @brief 把消息内容（字符串或分段数组）转成纯文本。 */
 export function contentText(content: unknown): string {

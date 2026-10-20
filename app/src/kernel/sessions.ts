@@ -7,9 +7,10 @@ import { existsSync } from 'node:fs';
 import type { AgentSession, AgentSessionEvent, SessionManager } from '@earendil-works/pi-coding-agent';
 import type {
   ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, EventEnvelope, ExtensionNotice, LiveSnapshot, LiveStatus,
-  OpenedSession, SavedSession, SessionInfo, SessionState, TrustAnswer,
+  OpenedSession, QuoteRef, SavedSession, SessionInfo, SessionState, TrustAnswer,
 } from '../shared/protocol';
 import { ApprovalGate } from './approval';
+import { PendingRefs, supplementEntry } from './entries';
 import { ExtensionUi } from './extensionUi';
 import { slimEvent } from './events';
 import { getRuntime, loadPi } from './pi';
@@ -41,6 +42,8 @@ interface Entry {
   trust: TrustDecision;
   /** 加载失败的扩展（批准扩展以外） */
   extensionErrors: string[];
+  /** 发出了、pi 还没记下的带引用的消息 */
+  refs: PendingRefs;
 }
 
 const sessions = new Map<string, Entry>();
@@ -66,6 +69,7 @@ function forward(entry: Entry, sessionId: string, event: AgentSessionEvent, emit
     entry.gate.announce(event.toolCallId, event.toolName);
   }
   emit({ kind: 'event', sessionId, event: slimEvent(event) });
+  if (event.type === 'message_end') supplementEntry(entry.session, sessionId, entry.refs, event.message, emit);
   if (event.type === 'tool_execution_end') {
     entry.toolStarts.delete(event.toolCallId);
     entry.gate.noteToolEnd(event.toolCallId);
@@ -144,7 +148,7 @@ async function startSession(cwd: string, sessionManager: SessionManager, emit: E
   });
   const entry: Entry = { session, gate, ui, cwd, running: false, openedAt: Date.now(), toolStarts: new Map(),
     notices: ui.ready(), modelNotice: result.modelFallbackMessage ?? null, trust: decision,
-    extensionErrors: errors.map((error) => `${error.path}: ${error.error}`) };
+    extensionErrors: errors.map((error) => `${error.path}: ${error.error}`), refs: new PendingRefs() };
   gate.attach(sessionId);
   sessions.set(sessionId, entry);
   session.subscribe((event) => forward(entry, sessionId, event, emit));
@@ -305,29 +309,43 @@ export async function closeSession(sessionId: string): Promise<{ closed: true }>
   return { closed: true };
 }
 
-/**
- * @brief 发出提示；不等本轮结束，结果和失败都通过事件回到界面。
- * @param behavior 生成中时的送达方式（steer 插话 / followUp 排队），交给 pi 的 prompt；空闲时 pi 直接发送
- */
-export function prompt(sessionId: string, text: string, behavior: 'steer' | 'followUp' | undefined, emit: Emit) {
+/** @brief 发出提示时的选项。 */
+interface PromptOptions {
+  /** 生成中时的送达方式（steer 插话 / followUp 排队），交给 pi 的 prompt；空闲时 pi 直接发送 */
+  behavior?: 'steer' | 'followUp';
+  /** 输入框里的引用芯片：pi 记下这条消息后写成 mori.ref 条目（entries.ts） */
+  refs?: QuoteRef[];
+}
+
+/** @brief 发出提示；不等本轮结束，结果和失败都通过事件回到界面。 */
+export function prompt(sessionId: string, text: string, options: PromptOptions, emit: Emit) {
   const entry = requireEntry(sessionId);
+  const queued = entry.running || entry.session.isStreaming;
+  const pending = options.refs?.length ? entry.refs.add(text, options.refs) : null;
   entry.running = true;
   // pi 处理了提示却没有开始运行时（扩展命令、输入处理器接手）不会发 agent_settled：结束后按 pi 的状态重设。
-  entry.session.prompt(text, behavior ? { streamingBehavior: behavior } : undefined).then(() => {
+  const streaming = options.behavior ? { streamingBehavior: options.behavior } : undefined;
+  entry.session.prompt(text, streaming).then(() => {
+    // 空闲时发出的提示，prompt() 结束时消息早该记下了；还在等就是没有送达（例如交给了扩展命令）。
+    if (pending && !queued && entry.refs.has(pending)) entry.refs.drop(pending);
     entry.running = entry.session.isStreaming;
     emit({ kind: 'event', sessionId, event: { type: 'mori.prompt_done', running: entry.running } });
   }, (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[kernel] prompt failed for ${sessionId}: ${message}`);
+    if (pending) entry.refs.drop(pending);
     entry.running = entry.session.isStreaming;
-    emit({ kind: 'event', sessionId, event: { type: 'mori.prompt_error', message, text, running: entry.running } });
+    emit({ kind: 'event', sessionId, event: { type: 'mori.prompt_error', message, text, running: entry.running,
+      refs: options.refs ?? null } });
   });
   return { accepted: true };
 }
 
-/** @brief 撤回排队与插话的消息，返回它们的原文。 */
+/** @brief 撤回排队与插话的消息，返回它们的原文；它们的引用不再写进会话（芯片不恢复）。 */
 export function clearQueue(sessionId: string): ClearedQueue {
-  const { steering, followUp } = requireEntry(sessionId).session.clearQueue();
+  const entry = requireEntry(sessionId);
+  const { steering, followUp } = entry.session.clearQueue();
+  entry.refs.dropTexts([...steering, ...followUp]);
   return { steering, followUp };
 }
 
