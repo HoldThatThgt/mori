@@ -89,6 +89,10 @@ contextBridge.exposeInMainWorld('mori', {
   pickFolder(): Promise<string | null> {
     return ipcRenderer.invoke('mori:pick-folder');
   },
+  /** @brief 删除会话：永久删除会话文件；文件还不存在时 deleted 为 false，删不掉时 error 为原文。 */
+  deleteSessionFile(file: string): Promise<{ deleted: boolean; error: string | null }> {
+    return ipcRenderer.invoke('mori:delete-session', file);
+  },
   /** @brief 窗口不在前台时让任务栏按钮闪烁，窗口获得焦点后停止（批准卡）。 */
   requestAttention(): Promise<void> {
     return ipcRenderer.invoke('mori:attention');

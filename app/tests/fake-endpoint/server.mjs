@@ -8,6 +8,10 @@
 //   - 用户消息含 "write file: <路径>"：调用 write 工具，把 "hello from mori\n" 写入该路径。
 //   - 用户消息含 "edit README"：调用 edit 工具修改 README.md 的标题（"# Smoke project" 或 "# Mori fixture project"，
 //     由 "edit README: <原标题>" 指定，默认 "# Smoke project"）。
+//   - 用户消息含 "list tools"：回复"可用的工具："加请求里 tools 的全部工具名（逗号分隔），用来测项目扩展的工具有没有加载。
+//   - 用户消息含 "call tool: <工具名>"：调用该工具，参数为空对象（例如项目扩展注册的 project_hello）。
+//   - 用户消息含 "wait <秒数>s then run: <命令>"：等这么多秒再调用 bash 工具执行该命令（测界面重新加载后才来的批准请求）。
+//   - 用户消息含 "wait <秒数>s"：等这么多秒再回复一段文字（测生成中切走、"有新结果"）。
 //   - 用户消息含 "code block"：返回一段带 ts 代码块的 Markdown。
 //   - 用户消息含 "plain"：只返回文字。
 //   - 用户消息含 "http-<状态码>"：直接以该状态码返回错误（例如 http-500 触发 pi 的自动重试，http-400 不重试）。
@@ -53,8 +57,21 @@ function toolResultReply(last) {
   return { text: `工具已返回。开头内容：${flat.slice(0, 80)}`, toolCalls: [] };
 }
 
-/** @brief 按用户消息里的关键词决定回复（规则见文件开头）。 */
-function userReply(userText) {
+/** @brief 按用户消息里的关键词决定回复（规则见文件开头）；tools 是请求里的工具定义。 */
+function userReply(userText, tools) {
+  if (userText.includes('list tools')) {
+    const names = (tools ?? []).map((tool) => tool.function?.name).filter(Boolean);
+    return { text: `可用的工具：${names.join(', ')}`, toolCalls: [] };
+  }
+  const call = /call tool:\s*([\w-]+)/.exec(userText);
+  if (call) return { text: '我来调用这个工具。', toolCalls: [{ name: call[1], args: {} }] };
+  const late = /wait (\d+)s then run:\s*(.+?)\s*$/m.exec(userText);
+  if (late) {
+    return { text: '我来运行这条命令。', toolCalls: [{ name: 'bash', args: { command: late[2] } }],
+      delayMs: Number(late[1]) * 1000 };
+  }
+  const wait = /wait (\d+)s/.exec(userText);
+  if (wait) return { text: `等了 ${wait[1]} 秒，这是回复。`, toolCalls: [], delayMs: Number(wait[1]) * 1000 };
   const two = /two commands:\s*(.+?)\s*;;\s*(.+?)\s*$/m.exec(userText);
   if (two) {
     const toolCalls = [{ name: 'bash', args: { command: two[1] } }, { name: 'bash', args: { command: two[2] } }];
@@ -82,10 +99,10 @@ function userReply(userText) {
 }
 
 /** @brief 根据对话末尾决定本次回复：文字与零到多个工具调用。 */
-function planReply(messages) {
+function planReply(messages, tools) {
   const last = messages[messages.length - 1] ?? {};
   if (last.role === 'tool') return toolResultReply(last);
-  return userReply(contentText(last.content));
+  return userReply(contentText(last.content), tools);
 }
 
 /** @brief 把字符串切成小段，模拟逐字流式输出。 */
@@ -101,7 +118,7 @@ async function streamReply(res, reply, includeUsage, promptTokens, slow) {
   const base = { id, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model: modelId };
   const send = (choice) => res.write(`data: ${JSON.stringify({ ...base, choices: [choice] })}\n\n`);
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
-  await sleep(slow ? 8000 : firstDelayMs);
+  await sleep(slow ? 8000 : firstDelayMs + (reply.delayMs ?? 0));
   send({ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null });
   for (const piece of pieces(reply.text, 2)) {
     send({ index: 0, delta: { content: piece }, finish_reason: null });
@@ -161,7 +178,7 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: { message: `Synthetic HTTP ${status} for testing`, type: 'synthetic_error' } }));
         return;
       }
-      const reply = planReply(messages);
+      const reply = planReply(messages, body.tools);
       const promptTokens = Math.ceil(JSON.stringify(messages).length / 4);
       await streamReply(res, reply, Boolean(body.stream_options?.include_usage), promptTokens, body.model === 'fake-slow');
     } catch (error) {

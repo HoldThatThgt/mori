@@ -1,5 +1,6 @@
 // 回放界面测试的入口：先装好回放进程桥（window.mori），再载入真正的界面（src/renderer/src/main.tsx）。
-// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>。录制文件来自 tests/fixtures/m1 与 m2，两处的名字不能重复。
+// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>&keepDrafts=1。录制文件来自 tests/fixtures/m1、m2 与 m3，名字不能重复。
+// 每次载入先清掉上一个录制留下的草稿和已归档列表（localStorage），keepDrafts=1 时保留（测"重启后草稿还在"）。
 // synthetic-long-history 是手写拼出的长会话（synthetic），由真实录制的 queue-steer 会话记录重复 15 次得到，
 // 只用来测"先显示 50 条、上滚载入更早的"。
 
@@ -8,6 +9,7 @@ import { createReplayBridge } from './replay.js';
 const globbed = {
   ...import.meta.glob('../../fixtures/m1/*.json', { eager: true, import: 'default' }),
   ...import.meta.glob('../../fixtures/m2/*.json', { eager: true, import: 'default' }),
+  ...import.meta.glob('../../fixtures/m3/*.json', { eager: true, import: 'default' }),
 };
 const params = new URLSearchParams(location.search);
 const name = params.get('fixture') ?? 'readme';
@@ -58,11 +60,15 @@ function longHistory() {
   return { ...base, source: 'synthetic', name: 'synthetic-long-history', steps: [
     { t: 0, command: { type: 'session.create', cwd: created.result.value.cwd } },
     { t: 1, result: created.result },
-    { t: 2, command: { type: 'session.open', sessionFile: 'synthetic' } },
+    { t: 2, command: { type: 'session.open', sessionFile: created.result.value.sessionFile } },
     { t: 3, result: { type: 'session.open', value: { ...opened.result.value, entries } } },
   ] };
 }
 
+if (params.get('keepDrafts') !== '1') {
+  localStorage.removeItem('mori.drafts');
+  localStorage.removeItem('mori.archived');
+}
 const data = name === 'synthetic-long-history' ? longHistory() : fixture(name);
 const { bridge, control } = createReplayBridge(data, {
   speed: Number(params.get('speed') ?? 1),

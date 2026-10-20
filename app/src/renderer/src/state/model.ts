@@ -1,6 +1,8 @@
 // 对话流的数据模型：由 pi 事件（transcript.ts）或会话记录（history.ts）归并而来，界面只读它。
 
-import { REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type ToolGate } from '../../../shared/protocol';
+import {
+  REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type ToolGate, type UiRequest,
+} from '../../../shared/protocol';
 
 /** @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md。 */
 export type ToolStatus =
@@ -46,6 +48,9 @@ export interface PendingApproval {
   args: Record<string, unknown>;
 }
 
+/** @brief 一个等你回答的扩展询问（mori.ui_request，超时从它的 askedAt 算起）。 */
+export type PendingQuestion = UiRequest;
+
 /** @brief 助手回复里的一段：正文、思考或一次工具调用；下标与 pi 的 contentIndex 一致。 */
 export type Block =
   | { type: 'text'; text: string }
@@ -59,7 +64,8 @@ export type Item =
   | { kind: 'compaction'; key: string }
   | { kind: 'stopped'; key: string }
   | { kind: 'error'; key: string; text: string; restore: string | null; live: boolean }
-  | { kind: 'note'; key: string; text: string };
+  | { kind: 'note'; key: string; text: string }
+  | { kind: 'notify'; key: string; text: string; level: 'info' | 'warning' | 'error' };
 
 /** @brief 阶段行。tool 阶段的文字由界面按工具标题生成。 */
 export interface Stage {
@@ -89,6 +95,8 @@ export interface Transcript {
   followUp: string[];
   /** 挂起的批准请求，按到达顺序；批准卡显示第一张 */
   approvals: PendingApproval[];
+  /** 挂起的扩展询问，按到达顺序；询问卡显示第一个（docs/v0/screens/extension-ui.md） */
+  questions: PendingQuestion[];
   /** 你按了停止，本轮还没结束 */
   stopRequested: boolean;
   /** 正在自动重试 */
@@ -105,8 +113,23 @@ export interface Transcript {
 
 export const emptyTranscript: Transcript = {
   items: [], tools: {}, running: false, sending: false, stage: null, steering: [], followUp: [], approvals: [],
-  stopRequested: false, retrying: false, pendingError: null, lastUserText: null, firstUserText: null, seq: 0,
+  questions: [], stopRequested: false, retrying: false, pendingError: null, lastUserText: null, firstUserText: null,
+  seq: 0,
 };
+
+/** 对话流每次载入的消息数（一条你的消息或一条助手回复算一条），见方案 5.4 */
+export const PAGE_SIZE = 50;
+
+/** @brief 让对话流先显示最近 count 条消息，返回起始下标。 */
+export function startIndexFor(transcript: Transcript, count = PAGE_SIZE): number {
+  let seen = 0;
+  for (let index = transcript.items.length - 1; index >= 0; index -= 1) {
+    const kind = transcript.items[index]?.kind;
+    if (kind === 'user' || kind === 'assistant') seen += 1;
+    if (seen > count) return index + 1;
+  }
+  return 0;
+}
 
 /** @brief 追加一项并分配 key。 */
 export function pushItem(state: Transcript, item: DistributiveOmit<Item, 'key'>): Transcript {

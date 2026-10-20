@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import type { IssueAction, IssueField, WindowCapture } from '../../../shared/issues';
-import { describe } from '../state/actions';
+import { describe } from '../state/bridge';
 import { recentActions, recordAction } from '../state/actionLog';
 import { useLayout } from '../state/layout';
 import { useOverlay } from '../state/overlays';

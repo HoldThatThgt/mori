@@ -1,8 +1,11 @@
-// 界面状态：后台进程连接状态、已打开的会话（含各自的对话流和草稿）、当前页面。
+// 界面状态：后台进程连接状态、pi 的会话列表、已打开的会话（含各自的对话流和草稿）、信任询问、当前页面。
 // 会话内容只有 pi 的会话文件一份；这里只是本次运行里界面上的副本。
 
 import { create } from 'zustand';
-import { DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextUsage } from '../../../shared/protocol';
+import {
+  DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextUsage, type ProjectTrust, type SavedSession,
+} from '../../../shared/protocol';
+import { loadArchived } from './archive';
 import { emptyTranscript, type Transcript } from './model';
 
 /** @brief 一个打开的会话。 */
@@ -13,8 +16,26 @@ export interface Tab {
   sessionId: string | null;
   /** 工作目录 */
   cwd: string;
-  /** pi 会话文件 */
+  /** pi 会话文件（新会话在第一条消息之前文件还不存在） */
   sessionFile: string | null;
+  /** 会话名（pi 的 session_info）；没有时为 null */
+  name: string | null;
+  /** 从会话列表打开时列表里的第一条消息，对话流载入前用来显示会话名 */
+  preview: string | null;
+  /** 最后活动时间（ms）：新建、打开时列表里的时间、你发消息的时间；侧栏按它排序 */
+  activity: number;
+  /** 不可见时完成了一轮（"有新结果"），点开后清除 */
+  unseen: boolean;
+  /** 后台进程意外退出时它正在生成（侧栏状态"出错"），重新打开后清除 */
+  interrupted: boolean;
+  /** 文件夹的信任状态 */
+  projectTrust: ProjectTrust;
+  /** 信任状态来自 trust.json 里记住的选择 */
+  trustRemembered: boolean;
+  /** 没能记住信任选择时的原文 */
+  trustSaveError: string | null;
+  /** 加载失败的扩展 */
+  extensionErrors: string[];
   /** 模型（provider/id） */
   model: string | null;
   /** pi 选不到默认模型时的说明 */
@@ -40,6 +61,26 @@ export interface Tab {
 /** @brief 后台进程状态。 */
 export type KernelStatus = 'connecting' | 'ready' | 'exited' | 'reloading';
 
+/** @brief pi 会话列表的读取状态。 */
+export interface SavedList {
+  /** 读取中、已读到、读取失败 */
+  status: 'loading' | 'ready' | 'failed';
+  /** 会话，按最后活动时间从新到旧 */
+  sessions: SavedSession[];
+  /** 读取失败的原文 */
+  error: string | null;
+}
+
+/** @brief 一个等你回答的信任询问。 */
+export interface TrustPrompt {
+  /** 询问 id */
+  id: number;
+  /** 文件夹 */
+  cwd: string;
+  /** 读不出已记住的选择（trust.json）时的原文 */
+  readError: string | null;
+}
+
 /** @brief 整个界面的状态。 */
 export interface AppState {
   /** 后台进程状态 */
@@ -50,6 +91,8 @@ export interface AppState {
   configError: string | null;
   /** 首次启动：启动时没有已保存的连接，测试成功并打开文件夹前一直显示首次启动页 */
   firstRun: boolean;
+  /** pi 的会话列表 */
+  saved: SavedList;
   /** 打开的会话 */
   tabs: Tab[];
   /** 当前会话 */
@@ -58,21 +101,33 @@ export interface AppState {
   view: 'chat' | 'settings';
   /** 每次"去设置"加一，设置页据此把焦点放到 API key */
   settingsFocus: number;
+  /** 等你回答的信任询问，一次显示第一个 */
+  trustPrompts: TrustPrompt[];
+  /** 已归档的会话文件（本机记下的，见 archive.ts） */
+  archived: string[];
+  /**
+   * 界面重新加载后还没点开的、后台进程里的会话结束时留下的状态（按会话文件）：不可见时本轮结束为"有新结果"，
+   * 后台进程退出时它正在生成为"出错"；点开后清除，不跨重启保存
+   */
+  rowMarks: Record<string, 'unseen' | 'error'>;
 }
 
 export const useApp = create<AppState>(() => ({
-  kernel: 'connecting', config: null, configError: null, firstRun: false, tabs: [], activeKey: null, view: 'chat',
-  settingsFocus: 0,
+  kernel: 'connecting', config: null, configError: null, firstRun: false,
+  saved: { status: 'loading', sessions: [], error: null }, tabs: [], activeKey: null, view: 'chat', settingsFocus: 0,
+  trustPrompts: [], archived: loadArchived(), rowMarks: {},
 }));
 
 let tabCounter = 0;
 
-/** @brief 新建一个"打开中"的会话。 */
-export function newTab(cwd: string): Tab {
+/** @brief 新建一个"打开中"的会话；fields 覆盖默认值（从会话列表打开时带上文件、名字、草稿等）。 */
+export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
   tabCounter += 1;
-  return { key: `t${tabCounter}`, sessionId: null, cwd, sessionFile: null, model: null, modelNotice: null,
-    contextUsage: null, approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '', startIndex: 0,
-    rightOpen: null, phase: 'opening', error: null };
+  return { key: `t${tabCounter}`, sessionId: null, cwd, sessionFile: null, name: null, preview: null,
+    activity: Date.now(), unseen: false, interrupted: false, projectTrust: 'none', trustRemembered: false,
+    trustSaveError: null, extensionErrors: [], model: null,
+    modelNotice: null, contextUsage: null, approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '',
+    startIndex: 0, rightOpen: null, phase: 'opening', error: null, ...fields };
 }
 
 /** @brief 更新一个会话。 */
@@ -83,6 +138,16 @@ export function updateTab(key: string, fn: (tab: Tab) => Tab): void {
 /** @brief 按 pi 会话 id 找会话。 */
 export function tabBySession(sessionId: string): Tab | undefined {
   return useApp.getState().tabs.find((tab) => tab.sessionId === sessionId);
+}
+
+/** @brief 两个会话文件路径是否相同（都来自 pi，同一个文件写法相同）。 */
+export function sameFile(a: string | null, b: string | null): boolean {
+  return a !== null && a === b;
+}
+
+/** @brief 按会话文件找已打开的会话。 */
+export function tabByFile(sessionFile: string): Tab | undefined {
+  return useApp.getState().tabs.find((tab) => sameFile(tab.sessionFile, sessionFile));
 }
 
 /** @brief 取当前会话。 */

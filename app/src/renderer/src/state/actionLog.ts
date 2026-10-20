@@ -28,11 +28,19 @@ export function recordAction(text: string): void {
   if (entries.length > ACTION_LOG_SIZE) entries.splice(0, entries.length - ACTION_LOG_SIZE);
 }
 
+/** @brief 信任回答的说明；没问时为空串。 */
+function trustText(trust: { trusted: boolean; remember: boolean } | undefined): string {
+  if (!trust) return '';
+  return `（${trust.trusted ? '信任' : '不信任'}${trust.remember ? '，记住' : ''}）`;
+}
+
 /** @brief 一条发给后台进程的命令的摘要；不需要记的（例如读取上下文用量）返回 null。 */
 export function describeCommand(command: Command): string | null {
   switch (command.type) {
     case 'config.get':
     case 'session.state':
+    case 'session.list':
+    case 'trust.check':
       return null;
     case 'connection.save':
       return '保存连接';
@@ -41,9 +49,15 @@ export function describeCommand(command: Command): string | null {
     case 'connection.testCancel':
       return '取消测试连接';
     case 'session.create':
-      return `打开文件夹 ${command.cwd}`;
+      return `新建会话 ${command.cwd}${trustText(command.trust)}`;
     case 'session.open':
-      return `重新打开会话 ${command.sessionFile}`;
+      return `打开会话 ${command.sessionFile}${trustText(command.trust)}`;
+    case 'session.rename':
+      return `改名：${preview(command.name)}`;
+    case 'session.close':
+      return '关闭会话（归档或删除前）';
+    case 'ui.answer':
+      return command.value === null ? '扩展询问：取消' : '扩展询问：作答';
     case 'session.prompt': {
       const how = command.behavior === 'steer' ? '插话' : command.behavior === 'followUp' ? '排队' : '发送';
       return `${how}：${preview(command.text)}`;

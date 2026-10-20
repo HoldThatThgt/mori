@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   API_TYPES, COMPAT_OPTIONS, ConnectionSchema, type Connection, type TestResult,
 } from '../../../shared/protocol';
-import { describe, loadConfig, request } from '../state/actions';
+import { loadConfig } from '../state/actions';
+import { describe, request } from '../state/bridge';
 import { useApp } from '../state/store';
 
 // 上下文长度的默认值是临时默认值，见 docs/v0/defaults.md

@@ -226,7 +226,7 @@ export function finishOpenTools(state: Transcript, status: 'stopped' | 'interrup
   }
   const items = state.items.map((item) => (item.kind === 'assistant' && item.streaming
     ? { ...item, streaming: false, blocks: collapseThinking(item.blocks) } : item));
-  return { ...state, tools, items, approvals: [] };
+  return { ...state, tools, items, approvals: [], questions: [] };
 }
 
 /** @brief 本轮结束：清掉运行状态和挂起的批准；停止过就留一行"已停止"，没执行的调用标"已停止"或"已中断"。 */
@@ -236,7 +236,23 @@ function applySettled(state: Transcript, aborted: boolean): Transcript {
   // 本轮正常结束时还没执行的调用（例如回复出错，pi 不执行其中的调用）：与从会话记录载入时一样显示"已中断"。
   else next = finishOpenTools(next, 'interrupted');
   return { ...next, running: false, sending: false, stage: null, stopRequested: false, retrying: false,
-    pendingError: null, approvals: [] };
+    pendingError: null, approvals: [], questions: [] };
+}
+
+/**
+ * @brief 扩展的询问开始与结束、扩展的通知（docs/v0/screens/extension-ui.md）；pi 的 prompt() 结束时，没有开始运行的提示
+ *        （交给了扩展命令或输入处理器）清掉"刚发出"。
+ */
+function applyQuestion(state: Transcript,
+  event: EventOf<'mori.ui_request' | 'mori.ui_end' | 'mori.notify' | 'mori.prompt_done'>): Transcript {
+  if (event.type === 'mori.prompt_done') return state.running ? state : { ...state, sending: false };
+  if (event.type === 'mori.notify') return pushItem(state, { kind: 'notify', text: event.message, level: event.level });
+  if (event.type === 'mori.ui_end') {
+    return { ...state, questions: state.questions.filter((item) => item.requestId !== event.requestId) };
+  }
+  if (state.questions.some((item) => item.requestId === event.requestId)) return state;
+  const { type: _type, ...request } = event;
+  return { ...state, questions: [...state.questions, request] };
 }
 
 /** @brief 追加一张错误卡；restore 是"放回输入框"的内容。 */
@@ -301,6 +317,11 @@ export function applyEvent(state: Transcript, event: ForwardedEvent, now: number
       return applyApproval(state, event, now);
     case 'mori.prompt_error':
       return pushError({ ...state, sending: false }, event.message, event.text);
+    case 'mori.ui_request':
+    case 'mori.ui_end':
+    case 'mori.notify':
+    case 'mori.prompt_done':
+      return applyQuestion(state, event);
     default:
       return applyRun(state, event, now);
   }

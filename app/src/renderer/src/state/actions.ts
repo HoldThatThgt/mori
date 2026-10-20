@@ -1,44 +1,17 @@
-// 界面上的操作：每个操作对应 pi 的一个调用（经后台进程），结果与失败都回到界面状态。
+// 会话里的操作：每个操作对应 pi 的一个调用（经后台进程），结果与失败都回到界面状态。
+// 项目与会话的新建、打开、改名、删除在 projects.ts，信任询问在 trust.ts。
 
 import type {
-  ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, Command, ConfigInfo, EventEnvelope, OpenedSession,
-  SessionInfo, SessionState,
+  ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, Command, ConfigInfo, EventEnvelope, ForwardedEvent,
+  LiveStatus, SavedSession, SessionState,
 } from '../../../shared/protocol';
-import { logCommand, recordAction } from './actionLog';
-import { transcriptFromEntries } from './history';
-import { emptyTranscript, pushItem, type Transcript } from './model';
+import { recordAction } from './actionLog';
+import { describe, request } from './bridge';
+import { persistDrafts } from './drafts';
+import { pushItem, type Transcript } from './model';
+import { loadSessions, reopenAll } from './projects';
 import { applyEvent, finishOpenTools } from './transcript';
-import { newTab, tabBySession, updateTab, useApp, type Tab } from './store';
-
-/** 对话流每次载入的消息数（一条你的消息或一条助手回复算一条），见方案 5.4 */
-export const PAGE_SIZE = 50;
-
-/** 重新载入后在对话流里说明哪些没有恢复（方案 5.8） */
-const RELOADED_NOTE = '已重新载入 · 排队消息、批准卡和"本会话已允许"不会恢复';
-
-/** @brief 把异常转成一行原文，并记录到控制台。 */
-export function describe(what: string, error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`[renderer] ${what} failed: ${message}`);
-  return message;
-}
-
-/** @brief 发一条命令给后台进程，并记进最近的操作（F8 报告用，不含机密）。 */
-export function request<T>(command: Command): Promise<T> {
-  logCommand(command);
-  return window.mori.request<T>(command);
-}
-
-/** @brief 让对话流先显示最近 PAGE_SIZE 条消息，返回起始下标。 */
-export function startIndexFor(transcript: Transcript, count = PAGE_SIZE): number {
-  let seen = 0;
-  for (let index = transcript.items.length - 1; index >= 0; index -= 1) {
-    const kind = transcript.items[index]?.kind;
-    if (kind === 'user' || kind === 'assistant') seen += 1;
-    if (seen > count) return index + 1;
-  }
-  return 0;
-}
+import { sameFile, tabByFile, tabBySession, updateTab, useApp } from './store';
 
 /** @brief 读取已保存的连接；没有时进入首次启动。 */
 export async function loadConfig(): Promise<void> {
@@ -49,29 +22,6 @@ export async function loadConfig(): Promise<void> {
       firstRun: state.config === null ? config.saved === null : state.firstRun }));
   } catch (error) {
     useApp.setState({ configError: describe('config.get', error) });
-  }
-}
-
-/** @brief 把会话信息写进会话。批准设置以后台进程返回的为准（新建和重新打开的会话都是"每次询问"）。 */
-function withInfo(tab: Tab, info: SessionInfo): Tab {
-  return { ...tab, sessionId: info.sessionId, sessionFile: info.sessionFile, model: info.model,
-    modelNotice: info.modelNotice, contextUsage: info.contextUsage, approval: info.approval, phase: 'ready',
-    error: null };
-}
-
-/** @brief 选文件夹并在其中新建会话。 */
-export async function openFolder(): Promise<void> {
-  const cwd = await window.mori.pickFolder();
-  if (!cwd) return;
-  const tab = newTab(cwd);
-  useApp.setState((state) => ({ tabs: [...state.tabs, tab], activeKey: tab.key, view: 'chat' }));
-  try {
-    const info = await request<SessionInfo>({ type: 'session.create', cwd });
-    updateTab(tab.key, (current) => withInfo(current, info));
-    useApp.setState({ firstRun: false });
-  } catch (error) {
-    const message = describe('session.create', error);
-    updateTab(tab.key, (current) => ({ ...current, phase: 'failed', error: message }));
   }
 }
 
@@ -93,7 +43,7 @@ export async function send(key: string, behavior?: 'steer' | 'followUp'): Promis
   const tab = useApp.getState().tabs.find((item) => item.key === key);
   const text = tab?.draft.trim();
   if (!tab?.sessionId || !text) return;
-  updateTab(key, (current) => ({ ...current, draft: '',
+  updateTab(key, (current) => ({ ...current, draft: '', activity: Date.now(),
     transcript: behavior ? current.transcript : { ...current.transcript, sending: true } }));
   try {
     await request({ type: 'session.prompt', sessionId: tab.sessionId, text, behavior });
@@ -162,6 +112,21 @@ export async function answerApproval(key: string, requestId: string, decision: A
     reason: decision === 'reject' ? reason : undefined });
 }
 
+/**
+ * @brief 你对扩展询问的回答；value 为 null 表示取消。询问已经结束（例如刚超时）只记日志，其他失败在对话流里显示原文。
+ */
+export async function answerQuestion(key: string, requestId: string, value: boolean | string | null): Promise<void> {
+  const sessionId = sessionIdOf(key);
+  if (!sessionId) return;
+  try {
+    await request({ type: 'ui.answer', sessionId, requestId, value });
+  } catch (error) {
+    const message = describe('ui.answer', error);
+    if (message.includes('is no longer pending')) return;
+    updateTranscript(key, (t) => pushItem(t, { kind: 'error', text: message, restore: null, live: true }));
+  }
+}
+
 /** @brief 切换会话的权限（每次询问 / 全部允许）。 */
 export async function setApprovalMode(key: string, mode: ApprovalMode): Promise<void> {
   const sessionId = sessionIdOf(key);
@@ -195,21 +160,99 @@ export async function refreshUsage(key: string): Promise<void> {
   }
 }
 
-/** @brief 归并一个后台进程事件；本轮或压缩结束后刷新上下文用量。 */
-export function handleEvent(envelope: EventEnvelope): void {
-  const tab = tabBySession(envelope.sessionId);
-  if (!tab) return;
-  updateTranscript(tab.key, (t) => applyEvent(t, envelope.event, Date.now()));
-  if (['turn_end', 'compaction_end', 'agent_settled'].includes(envelope.event.type)) void refreshUsage(tab.key);
-  if (envelope.event.type === 'mori.approval_request') void requestAttention();
+/** @brief 会话现在是否显示在中栏。 */
+function isVisible(key: string): boolean {
+  const { view, activeKey } = useApp.getState();
+  return view === 'chat' && activeKey === key;
 }
 
-/** @brief 后台进程意外退出：没结束的工具标"已中断"，运行状态清空，草稿不动。 */
+/** @brief 一个事件对还开着的会话的状态（侧栏）的改变；不改变时为 null。 */
+function liveChange(live: LiveStatus, event: ForwardedEvent): LiveStatus | null {
+  switch (event.type) {
+    case 'agent_start': return { ...live, running: true };
+    case 'agent_settled': return { ...live, running: false, approval: false, question: false };
+    case 'mori.approval_request': return { ...live, approval: true };
+    case 'mori.approval_end': return { ...live, approval: false };
+    case 'mori.ui_request': return { ...live, question: true };
+    case 'mori.ui_end': return { ...live, question: false };
+    // 扩展命令等没有开始运行的提示只有这一个结束事件。
+    case 'mori.prompt_done':
+    case 'mori.prompt_error': return { ...live, running: event.running };
+    default: return null;
+  }
+}
+
+/** @brief 一个事件对还没点开的会话（侧栏的行）的改变：名字、最后活动时间、状态；不改变时为 null。 */
+function untabbedChange(saved: SavedSession, event: ForwardedEvent): Partial<SavedSession> | null {
+  if (event.type === 'session_info_changed') return { name: event.name ?? null };
+  if (event.type === 'message_end' && (event.message.role === 'user' || event.message.role === 'assistant')) {
+    return { modified: Date.now() };
+  }
+  const live = saved.live ? liveChange(saved.live, event) : null;
+  return live ? { live } : null;
+}
+
+/**
+ * @brief 界面重新加载后还没点开、但还在后台进程里的会话的事件：更新侧栏的行（列表带回的 live、名字、排序）；
+ *        本轮结束时标"有新结果"，要批准时让任务栏闪烁。正在打开（还没拿到会话标识）的由打开结果接上，这里不记。
+ *        一个会话可能同时有几个询问，结束一个时这里按"没有了"处理，下一个询问到来时再标上。
+ */
+function handleUntabbed(envelope: EventEnvelope): void {
+  const { sessionId, event } = envelope;
+  const saved = useApp.getState().saved.sessions.find((item) => item.sessionId === sessionId && item.live);
+  if (!saved || tabByFile(saved.sessionFile)) return;
+  const change = untabbedChange(saved, event);
+  if (!change) return;
+  useApp.setState((state) => ({
+    saved: { ...state.saved,
+      sessions: state.saved.sessions.map((item) => (item === saved ? { ...item, ...change } : item)) },
+    rowMarks: event.type === 'agent_settled' ? { ...state.rowMarks, [saved.sessionFile]: 'unseen' } : state.rowMarks,
+  }));
+  if (event.type === 'mori.approval_request') void requestAttention();
+}
+
+/**
+ * @brief 归并一个后台进程事件；本轮或压缩结束后刷新上下文用量。改名事件更新会话名；
+ *        不可见的会话本轮结束时标"有新结果"。界面重新加载后还没点开的会话只更新侧栏状态。
+ */
+export function handleEvent(envelope: EventEnvelope): void {
+  const tab = tabBySession(envelope.sessionId);
+  if (!tab) {
+    handleUntabbed(envelope);
+    return;
+  }
+  const { event } = envelope;
+  updateTranscript(tab.key, (t) => applyEvent(t, event, Date.now()));
+  if (event.type === 'session_info_changed') {
+    updateTab(tab.key, (current) => ({ ...current, name: event.name ?? null }));
+  }
+  if (event.type === 'agent_settled' && !isVisible(tab.key)) {
+    updateTab(tab.key, (current) => ({ ...current, unseen: true }));
+  }
+  // 侧栏按最后一条你的消息或助手回复的时间排序，与 pi 会话列表的 modified 同一规则。
+  if (event.type === 'message_end' && (event.message.role === 'user' || event.message.role === 'assistant')) {
+    updateTab(tab.key, (current) => ({ ...current, activity: Date.now() }));
+  }
+  if (['turn_end', 'compaction_end', 'agent_settled'].includes(event.type)) void refreshUsage(tab.key);
+  if (event.type === 'mori.approval_request') void requestAttention();
+}
+
+/**
+ * @brief 后台进程意外退出：没结束的工具标"已中断"，运行状态清空，草稿不动；正在生成的会话在侧栏标"出错"。
+ *        pi 会话随后台进程一起没了，会话标识清掉，之后的命令不会用到它（重新载入后换成新的）。
+ */
 export function handleKernelExit(): void {
   useApp.setState((state) => ({
     kernel: 'exited',
-    tabs: state.tabs.map((tab) => ({ ...tab, transcript: { ...finishOpenTools(tab.transcript, 'interrupted'),
-      running: false, sending: false, stage: null, steering: [], followUp: [], stopRequested: false } })),
+    // 还没点开的会话：后台进程里的状态随它一起没了，退出时正在生成的标"出错"（打开着的看它自己的对话流）。
+    saved: { ...state.saved, sessions: state.saved.sessions.map((item) => ({ ...item, live: null })) },
+    rowMarks: { ...state.rowMarks, ...Object.fromEntries(state.saved.sessions.filter((item) => item.live?.running
+      && !state.tabs.some((tab) => sameFile(tab.sessionFile, item.sessionFile)))
+      .map((item) => [item.sessionFile, 'error' as const])) },
+    tabs: state.tabs.map((tab) => ({ ...tab, sessionId: null,
+      interrupted: tab.interrupted || tab.transcript.running || tab.transcript.sending,
+      transcript: { ...finishOpenTools(tab.transcript, 'interrupted'), running: false, sending: false, stage: null,
+        steering: [], followUp: [], stopRequested: false } })),
   }));
 }
 
@@ -225,42 +268,13 @@ export async function reload(): Promise<void> {
   }
 }
 
-/** @brief 从会话文件重新打开一个会话，按 pi 记录的当前分支重画对话流。 */
-async function reopenFromFile(tab: Tab, sessionFile: string): Promise<void> {
-  const opened = await request<OpenedSession>({ type: 'session.open', sessionFile });
-  const transcript = pushItem(transcriptFromEntries(opened.entries), { kind: 'note', text: RELOADED_NOTE });
-  const startIndex = startIndexFor(transcript);
-  updateTab(tab.key, (current) => ({ ...withInfo(current, opened), transcript, startIndex }));
-}
-
-/** @brief 重新打开一个会话；会话文件还不存在（没发过消息）时在同一文件夹新建。 */
-async function reopen(tab: Tab): Promise<void> {
-  try {
-    try {
-      if (!tab.sessionFile) throw new Error('Session file not found');
-      await reopenFromFile(tab, tab.sessionFile);
-      return;
-    } catch (error) {
-      if (!String((error as Error).message).includes('Session file not found')) throw error;
-    }
-    const info = await request<SessionInfo>({ type: 'session.create', cwd: tab.cwd });
-    const transcript = pushItem(emptyTranscript, { kind: 'note', text: '已重新载入 · 这个会话还没有消息，已重新打开' });
-    updateTab(tab.key, (current) => ({ ...withInfo(current, info), transcript, startIndex: 0 }));
-  } catch (error) {
-    const message = describe('reopen', error);
-    updateTab(tab.key, (current) => ({ ...current, phase: 'failed', error: message }));
-  }
-}
-
-/** @brief 通道连上：启动时读取配置；重新载入时重新打开全部会话。 */
+/** @brief 通道连上：启动时读取配置；重新载入时重新读取会话列表并重新打开全部会话。 */
 export function handleKernelReady(): void {
-  const { kernel, tabs, config } = useApp.getState();
+  const { kernel, config } = useApp.getState();
   useApp.setState({ kernel: 'ready' });
   // 启动时后台进程就已退出过（例如刷新页面时），配置还没读到：重新读取。
   if (!config && kernel !== 'connecting') void loadConfig();
-  if (kernel === 'reloading') {
-    for (const tab of tabs) void reopen(tab);
-  }
+  if (kernel === 'reloading') reopenAll();
 }
 
 /** @brief 打开设置页；fromError 为真时焦点放到 API key（"去设置"）。 */
@@ -270,16 +284,12 @@ export function openSettings(fromError = false): void {
     settingsFocus: fromError ? state.settingsFocus + 1 : state.settingsFocus }));
 }
 
-/** @brief 回到会话页：key 为左栏点的会话；不传时回到当前会话（设置页的"返回会话"）。 */
-export function showChat(key?: string): void {
-  recordAction(key ? '切换会话' : '返回会话');
-  useApp.setState((state) => ({ view: 'chat', activeKey: key ?? state.activeKey }));
-}
-
-/** @brief 订阅后台进程的事件、退出与就绪。 */
+/** @brief 订阅后台进程的事件、退出与就绪；读取配置和会话列表；草稿一变就保存。 */
 export function connectKernel(): void {
+  persistDrafts();
   window.mori.onEvent(handleEvent);
   window.mori.onKernelExit(handleKernelExit);
   window.mori.onKernelReady(handleKernelReady);
   void loadConfig();
+  void loadSessions();
 }

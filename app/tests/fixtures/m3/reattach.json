@@ -1,0 +1,8724 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m3-record.mjs; do not edit by hand.",
+ "name": "reattach",
+ "description": "界面重新加载之后：会话列表里那个会话还在后台进程里生成（live.running）；不问信任直接打开，带回这一刻的样子，回复接着流入直到结束（准备阶段新建会话、发一个长问题，回复开始流入后像 Ctrl+R 一样重新加载页面，不录）（实际：打开时回复正在流入，带回了已生成的部分）",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-20T00:57:13.433Z",
+ "steps": [
+  {
+   "t": 0,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 3,
+   "result": {
+    "type": "session.list",
+    "value": [
+     {
+      "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-T4yBQW\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m3-record-bqZMwR-m3-reattach--\\2026-10-20T00-57-06-888Z_01a156cf-e247-7242-81e3-46ed42539e40.jsonl",
+      "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-bqZMwR\\m3-reattach",
+      "name": null,
+      "firstMessage": "不要调用任何工具。请写五段文字，每段四到五句话：第一段讲春天，第二段讲夏天，第三段讲秋天，第四段讲冬天，第五段讲四季轮回给人的启发。",
+      "modified": 1792457826922,
+      "live": {
+       "running": true,
+       "approval": false,
+       "question": false
+      }
+     }
+    ]
+   }
+  },
+  {
+   "t": 3,
+   "command": {
+    "type": "session.open",
+    "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-T4yBQW\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m3-record-bqZMwR-m3-reattach--\\2026-10-20T00-57-06-888Z_01a156cf-e247-7242-81e3-46ed42539e40.jsonl"
+   }
+  },
+  {
+   "t": 4,
+   "result": {
+    "type": "session.open",
+    "value": {
+     "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-bqZMwR\\m3-reattach",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-T4yBQW\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m3-record-bqZMwR-m3-reattach--\\2026-10-20T00-57-06-888Z_01a156cf-e247-7242-81e3-46ed42539e40.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 1447,
+      "contextWindow": 1000000,
+      "percent": 0.1447
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     },
+     "entries": [
+      {
+       "type": "model_change",
+       "id": "7f2314ea",
+       "parentId": null,
+       "timestamp": "2026-10-20T00:57:06.916Z",
+       "provider": "mori-endpoint",
+       "modelId": "deepseek-flash"
+      },
+      {
+       "type": "thinking_level_change",
+       "id": "ae99bb61",
+       "parentId": "7f2314ea",
+       "timestamp": "2026-10-20T00:57:06.916Z",
+       "thinkingLevel": "off"
+      },
+      {
+       "type": "message",
+       "id": "571c8cc5",
+       "parentId": "ae99bb61",
+       "timestamp": "2026-10-20T00:57:06.923Z",
+       "message": {
+        "role": "system",
+        "content": "",
+        "sections": {
+         "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+         "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+         "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+         "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+         "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m3-record-bqZMwR/m3-reattach\n</cwd>"
+        },
+        "timestamp": 1792457826922,
+        "toolsAdded": [
+         {
+          "name": "read",
+          "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to read (relative or absolute)"
+            },
+            "offset": {
+             "type": "number",
+             "description": "Line number to start reading from (1-indexed)"
+            },
+            "limit": {
+             "type": "number",
+             "description": "Maximum number of lines to read"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "bash",
+          "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "command"
+           ],
+           "properties": {
+            "command": {
+             "type": "string",
+             "description": "Shell command to execute"
+            },
+            "timeout": {
+             "type": "number",
+             "description": "Timeout in seconds (optional, no default timeout)"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "edit",
+          "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path",
+            "edits"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to edit (relative or absolute)"
+            },
+            "edits": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "required": [
+               "oldText",
+               "newText"
+              ],
+              "properties": {
+               "oldText": {
+                "type": "string",
+                "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+               },
+               "newText": {
+                "type": "string",
+                "description": "Replacement text for this targeted edit."
+               }
+              }
+             },
+             "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "write",
+          "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path",
+            "content"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to write (relative or absolute)"
+            },
+            "content": {
+             "type": "string",
+             "description": "Content to write to the file"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "type": "message",
+       "id": "1e04b7ad",
+       "parentId": "571c8cc5",
+       "timestamp": "2026-10-20T00:57:06.924Z",
+       "message": {
+        "role": "user",
+        "content": [
+         {
+          "type": "text",
+          "text": "不要调用任何工具。请写五段文字，每段四到五句话：第一段讲春天，第二段讲夏天，第三段讲秋天，第四段讲冬天，第五段讲四季轮回给人的启发。"
+         }
+        ],
+        "timestamp": 1792457826922
+       }
+      }
+     ],
+     "live": {
+      "running": true,
+      "streaming": {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The user wants five paragraphs, each 4-5 sentences. No tools. Just write in Chinese.\n\nLet me write carefully, each paragraph 4-5 sentences about spring, summer, autumn, winter, and the inspiration of the cycle.\n\nLet me count sentences carefully (。！？ as sentence enders).\n\nParagraph 1: spring — 5 sentences.\nParagraph 2: summer — 5 sentences.\nParagraph 3: autumn — 5 sentences.\nParagraph 4: winter — 5 sentences.\nParagraph 5: inspiration — 5 sentences.\n\nWrite with some literary quality.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "text",
+         "text": "**一、春**\n\n残雪化尽的那几天，风忽然就软了下来，吹在脸上像谁的手掌轻轻拂过。柳枝最先知道消息，先泛起一层朦胧的鹅黄，随后才抽出细长的叶子。屋后的桃花开得没有章法，一树接"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 0,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "pending",
+       "timestamp": 1792457827022,
+       "responseId": "30f2959f-c4f7-48ed-bd3f-139406933957"
+      },
+      "runningTools": [],
+      "approvals": [],
+      "questions": [],
+      "steering": [],
+      "followUp": []
+     }
+    }
+   }
+  },
+  {
+   "t": 20,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一"
+     }
+    }
+   }
+  },
+  {
+   "t": 20,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "树"
+     }
+    }
+   }
+  },
+  {
+   "t": 63,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "地"
+     }
+    }
+   }
+  },
+  {
+   "t": 63,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "喧"
+     }
+    }
+   }
+  },
+  {
+   "t": 63,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "闹"
+     }
+    }
+   }
+  },
+  {
+   "t": 63,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 63,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "把"
+     }
+    }
+   }
+  },
+  {
+   "t": 63,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "整"
+     }
+    }
+   }
+  },
+  {
+   "t": 63,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "条"
+     }
+    }
+   }
+  },
+  {
+   "t": 63,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "巷"
+     }
+    }
+   }
+  },
+  {
+   "t": 63,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "子"
+     }
+    }
+   }
+  },
+  {
+   "t": 74,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "都"
+     }
+    }
+   }
+  },
+  {
+   "t": 75,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "染"
+     }
+    }
+   }
+  },
+  {
+   "t": 75,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "得"
+     }
+    }
+   }
+  },
+  {
+   "t": 87,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "发"
+     }
+    }
+   }
+  },
+  {
+   "t": 87,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "甜"
+     }
+    }
+   }
+  },
+  {
+   "t": 100,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 100,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "春雨"
+     }
+    }
+   }
+  },
+  {
+   "t": 114,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "是"
+     }
+    }
+   }
+  },
+  {
+   "t": 129,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "细"
+     }
+    }
+   }
+  },
+  {
+   "t": 141,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的"
+     }
+    }
+   }
+  },
+  {
+   "t": 141,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 155,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "落在"
+     }
+    }
+   }
+  },
+  {
+   "t": 170,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "瓦"
+     }
+    }
+   }
+  },
+  {
+   "t": 180,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "上"
+     }
+    }
+   }
+  },
+  {
+   "t": 181,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "几乎没有"
+     }
+    }
+   }
+  },
+  {
+   "t": 197,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "声音"
+     }
+    }
+   }
+  },
+  {
+   "t": 245,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 245,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "只在"
+     }
+    }
+   }
+  },
+  {
+   "t": 245,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "清晨"
+     }
+    }
+   }
+  },
+  {
+   "t": 245,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "让人"
+     }
+    }
+   }
+  },
+  {
+   "t": 245,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "发现"
+     }
+    }
+   }
+  },
+  {
+   "t": 251,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "地面"
+     }
+    }
+   }
+  },
+  {
+   "t": 278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "湿"
+     }
+    }
+   }
+  },
+  {
+   "t": 278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "了一层"
+     }
+    }
+   }
+  },
+  {
+   "t": 292,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 307,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "人们在"
+     }
+    }
+   }
+  },
+  {
+   "t": 328,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "这样的"
+     }
+    }
+   }
+  },
+  {
+   "t": 336,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "天气"
+     }
+    }
+   }
+  },
+  {
+   "t": 347,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "里"
+     }
+    }
+   }
+  },
+  {
+   "t": 347,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "总"
+     }
+    }
+   }
+  },
+  {
+   "t": 361,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "忍不住"
+     }
+    }
+   }
+  },
+  {
+   "t": 361,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "把"
+     }
+    }
+   }
+  },
+  {
+   "t": 374,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "窗户"
+     }
+    }
+   }
+  },
+  {
+   "t": 392,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "推开"
+     }
+    }
+   }
+  },
+  {
+   "t": 392,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 408,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "仿佛"
+     }
+    }
+   }
+  },
+  {
+   "t": 415,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "日子"
+     }
+    }
+   }
+  },
+  {
+   "t": 428,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "也跟着"
+     }
+    }
+   }
+  },
+  {
+   "t": 442,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "透"
+     }
+    }
+   }
+  },
+  {
+   "t": 457,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "了口气"
+     }
+    }
+   }
+  },
+  {
+   "t": 471,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 471,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 471,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "二"
+     }
+    }
+   }
+  },
+  {
+   "t": 471,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "、"
+     }
+    }
+   }
+  },
+  {
+   "t": 471,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "夏"
+     }
+    }
+   }
+  },
+  {
+   "t": 487,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "**\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 487,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "夏天的"
+     }
+    }
+   }
+  },
+  {
+   "t": 499,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "太阳"
+     }
+    }
+   }
+  },
+  {
+   "t": 517,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一旦"
+     }
+    }
+   }
+  },
+  {
+   "t": 530,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "升"
+     }
+    }
+   }
+  },
+  {
+   "t": 542,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "起来"
+     }
+    }
+   }
+  },
+  {
+   "t": 542,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 543,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "整个"
+     }
+    }
+   }
+  },
+  {
+   "t": 554,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "上午"
+     }
+    }
+   }
+  },
+  {
+   "t": 570,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "都"
+     }
+    }
+   }
+  },
+  {
+   "t": 570,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "像"
+     }
+    }
+   }
+  },
+  {
+   "t": 588,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "被"
+     }
+    }
+   }
+  },
+  {
+   "t": 588,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "白"
+     }
+    }
+   }
+  },
+  {
+   "t": 626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "铁"
+     }
+    }
+   }
+  },
+  {
+   "t": 626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "皮"
+     }
+    }
+   }
+  },
+  {
+   "t": 626,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "罩"
+     }
+    }
+   }
+  },
+  {
+   "t": 654,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "住"
+     }
+    }
+   }
+  },
+  {
+   "t": 654,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 655,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "热气"
+     }
+    }
+   }
+  },
+  {
+   "t": 678,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "从"
+     }
+    }
+   }
+  },
+  {
+   "t": 685,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "地面"
+     }
+    }
+   }
+  },
+  {
+   "t": 699,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一直"
+     }
+    }
+   }
+  },
+  {
+   "t": 699,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "漫"
+     }
+    }
+   }
+  },
+  {
+   "t": 715,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "到"
+     }
+    }
+   }
+  },
+  {
+   "t": 729,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "人的"
+     }
+    }
+   }
+  },
+  {
+   "t": 743,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "脖颈"
+     }
+    }
+   }
+  },
+  {
+   "t": 755,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 755,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "蝉"
+     }
+    }
+   }
+  },
+  {
+   "t": 755,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "在"
+     }
+    }
+   }
+  },
+  {
+   "t": 766,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "树上"
+     }
+    }
+   }
+  },
+  {
+   "t": 778,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "叫"
+     }
+    }
+   }
+  },
+  {
+   "t": 778,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "得"
+     }
+    }
+   }
+  },
+  {
+   "t": 797,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "不知"
+     }
+    }
+   }
+  },
+  {
+   "t": 797,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "疲倦"
+     }
+    }
+   }
+  },
+  {
+   "t": 815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "越"
+     }
+    }
+   }
+  },
+  {
+   "t": 825,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "热"
+     }
+    }
+   }
+  },
+  {
+   "t": 842,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "越"
+     }
+    }
+   }
+  },
+  {
+   "t": 842,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "响"
+     }
+    }
+   }
+  },
+  {
+   "t": 851,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 851,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "把"
+     }
+    }
+   }
+  },
+  {
+   "t": 894,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "午"
+     }
+    }
+   }
+  },
+  {
+   "t": 894,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "后的"
+     }
+    }
+   }
+  },
+  {
+   "t": 894,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "安静"
+     }
+    }
+   }
+  },
+  {
+   "t": 894,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "撕"
+     }
+    }
+   }
+  },
+  {
+   "t": 903,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "得"
+     }
+    }
+   }
+  },
+  {
+   "t": 903,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "零零"
+     }
+    }
+   }
+  },
+  {
+   "t": 926,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "碎"
+     }
+    }
+   }
+  },
+  {
+   "t": 926,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "碎"
+     }
+    }
+   }
+  },
+  {
+   "t": 926,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 942,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "只有"
+     }
+    }
+   }
+  },
+  {
+   "t": 945,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "雷"
+     }
+    }
+   }
+  },
+  {
+   "t": 959,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "雨"
+     }
+    }
+   }
+  },
+  {
+   "t": 959,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "来"
+     }
+    }
+   }
+  },
+  {
+   "t": 974,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "时才"
+     }
+    }
+   }
+  },
+  {
+   "t": 1006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "痛快"
+     }
+    }
+   }
+  },
+  {
+   "t": 1006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一阵"
+     }
+    }
+   }
+  },
+  {
+   "t": 1006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1019,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "乌云"
+     }
+    }
+   }
+  },
+  {
+   "t": 1030,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "压"
+     }
+    }
+   }
+  },
+  {
+   "t": 1043,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "得很"
+     }
+    }
+   }
+  },
+  {
+   "t": 1067,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "低"
+     }
+    }
+   }
+  },
+  {
+   "t": 1067,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1067,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "雨"
+     }
+    }
+   }
+  },
+  {
+   "t": 1070,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "点"
+     }
+    }
+   }
+  },
+  {
+   "t": 1070,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "砸"
+     }
+    }
+   }
+  },
+  {
+   "t": 1084,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "在地上"
+     }
+    }
+   }
+  },
+  {
+   "t": 1098,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "溅"
+     }
+    }
+   }
+  },
+  {
+   "t": 1118,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "起"
+     }
+    }
+   }
+  },
+  {
+   "t": 1118,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "白"
+     }
+    }
+   }
+  },
+  {
+   "t": 1135,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "烟"
+     }
+    }
+   }
+  },
+  {
+   "t": 1135,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1135,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "转"
+     }
+    }
+   }
+  },
+  {
+   "t": 1155,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "瞬"
+     }
+    }
+   }
+  },
+  {
+   "t": 1157,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "又把"
+     }
+    }
+   }
+  },
+  {
+   "t": 1171,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "天"
+     }
+    }
+   }
+  },
+  {
+   "t": 1184,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "洗"
+     }
+    }
+   }
+  },
+  {
+   "t": 1197,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "回"
+     }
+    }
+   }
+  },
+  {
+   "t": 1211,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "蓝色"
+     }
+    }
+   }
+  },
+  {
+   "t": 1231,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 1231,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "西瓜"
+     }
+    }
+   }
+  },
+  {
+   "t": 1243,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "在"
+     }
+    }
+   }
+  },
+  {
+   "t": 1256,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "井"
+     }
+    }
+   }
+  },
+  {
+   "t": 1269,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "水里"
+     }
+    }
+   }
+  },
+  {
+   "t": 1270,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "冰"
+     }
+    }
+   }
+  },
+  {
+   "t": 1281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "过"
+     }
+    }
+   }
+  },
+  {
+   "t": 1281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1294,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "切开"
+     }
+    }
+   }
+  },
+  {
+   "t": 1294,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "时"
+     }
+    }
+   }
+  },
+  {
+   "t": 1349,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "那股"
+     }
+    }
+   }
+  },
+  {
+   "t": 1349,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "凉"
+     }
+    }
+   }
+  },
+  {
+   "t": 1349,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "意"
+     }
+    }
+   }
+  },
+  {
+   "t": 1349,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "比"
+     }
+    }
+   }
+  },
+  {
+   "t": 1349,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "风"
+     }
+    }
+   }
+  },
+  {
+   "t": 1349,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "还"
+     }
+    }
+   }
+  },
+  {
+   "t": 1349,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "解"
+     }
+    }
+   }
+  },
+  {
+   "t": 1363,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "暑"
+     }
+    }
+   }
+  },
+  {
+   "t": 1380,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 1380,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "到了"
+     }
+    }
+   }
+  },
+  {
+   "t": 1393,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "夜里"
+     }
+    }
+   }
+  },
+  {
+   "t": 1393,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1393,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "人们"
+     }
+    }
+   }
+  },
+  {
+   "t": 1411,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "搬"
+     }
+    }
+   }
+  },
+  {
+   "t": 1411,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "出"
+     }
+    }
+   }
+  },
+  {
+   "t": 1436,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "竹"
+     }
+    }
+   }
+  },
+  {
+   "t": 1436,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "椅"
+     }
+    }
+   }
+  },
+  {
+   "t": 1436,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "坐在"
+     }
+    }
+   }
+  },
+  {
+   "t": 1441,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "院子里"
+     }
+    }
+   }
+  },
+  {
+   "t": 1476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "慢慢"
+     }
+    }
+   }
+  },
+  {
+   "t": 1476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "摇"
+     }
+    }
+   }
+  },
+  {
+   "t": 1476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "着"
+     }
+    }
+   }
+  },
+  {
+   "t": 1476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "扇"
+     }
+    }
+   }
+  },
+  {
+   "t": 1491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "子"
+     }
+    }
+   }
+  },
+  {
+   "t": 1491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "把"
+     }
+    }
+   }
+  },
+  {
+   "t": 1525,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一"
+     }
+    }
+   }
+  },
+  {
+   "t": 1525,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "整天"
+     }
+    }
+   }
+  },
+  {
+   "t": 1569,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的话"
+     }
+    }
+   }
+  },
+  {
+   "t": 1569,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "都"
+     }
+    }
+   }
+  },
+  {
+   "t": 1569,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "留"
+     }
+    }
+   }
+  },
+  {
+   "t": 1569,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "到"
+     }
+    }
+   }
+  },
+  {
+   "t": 1569,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "这时候"
+     }
+    }
+   }
+  },
+  {
+   "t": 1575,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "说"
+     }
+    }
+   }
+  },
+  {
+   "t": 1601,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 1601,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 1601,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "三"
+     }
+    }
+   }
+  },
+  {
+   "t": 1601,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "、"
+     }
+    }
+   }
+  },
+  {
+   "t": 1601,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "秋"
+     }
+    }
+   }
+  },
+  {
+   "t": 1606,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "**\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 1606,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "秋天"
+     }
+    }
+   }
+  },
+  {
+   "t": 1606,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "来得"
+     }
+    }
+   }
+  },
+  {
+   "t": 1615,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "并不"
+     }
+    }
+   }
+  },
+  {
+   "t": 1636,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "急"
+     }
+    }
+   }
+  },
+  {
+   "t": 1637,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1644,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "先是"
+     }
+    }
+   }
+  },
+  {
+   "t": 1667,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "早晚"
+     }
+    }
+   }
+  },
+  {
+   "t": 1667,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "凉"
+     }
+    }
+   }
+  },
+  {
+   "t": 1814,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "了一点"
+     }
+    }
+   }
+  },
+  {
+   "t": 1814,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1814,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "接着"
+     }
+    }
+   }
+  },
+  {
+   "t": 1814,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "天空"
+     }
+    }
+   }
+  },
+  {
+   "t": 1814,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "变得"
+     }
+    }
+   }
+  },
+  {
+   "t": 1814,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "格外"
+     }
+    }
+   }
+  },
+  {
+   "t": 1814,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "高"
+     }
+    }
+   }
+  },
+  {
+   "t": 1815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "远"
+     }
+    }
+   }
+  },
+  {
+   "t": 1815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "蓝"
+     }
+    }
+   }
+  },
+  {
+   "t": 1815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "得像"
+     }
+    }
+   }
+  },
+  {
+   "t": 1815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "被"
+     }
+    }
+   }
+  },
+  {
+   "t": 1815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "谁"
+     }
+    }
+   }
+  },
+  {
+   "t": 1815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "擦"
+     }
+    }
+   }
+  },
+  {
+   "t": 1815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "干净"
+     }
+    }
+   }
+  },
+  {
+   "t": 1855,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "了"
+     }
+    }
+   }
+  },
+  {
+   "t": 1864,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 1864,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "路"
+     }
+    }
+   }
+  },
+  {
+   "t": 1865,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "边的"
+     }
+    }
+   }
+  },
+  {
+   "t": 1865,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "银杏"
+     }
+    }
+   }
+  },
+  {
+   "t": 1867,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "黄"
+     }
+    }
+   }
+  },
+  {
+   "t": 1867,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "得"
+     }
+    }
+   }
+  },
+  {
+   "t": 1883,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "最早"
+     }
+    }
+   }
+  },
+  {
+   "t": 1883,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1895,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "风"
+     }
+    }
+   }
+  },
+  {
+   "t": 1907,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一"
+     }
+    }
+   }
+  },
+  {
+   "t": 1907,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "过"
+     }
+    }
+   }
+  },
+  {
+   "t": 1920,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "就"
+     }
+    }
+   }
+  },
+  {
+   "t": 1933,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "落"
+     }
+    }
+   }
+  },
+  {
+   "t": 1933,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "下一"
+     }
+    }
+   }
+  },
+  {
+   "t": 1933,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "小"
+     }
+    }
+   }
+  },
+  {
+   "t": 1945,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "片"
+     }
+    }
+   }
+  },
+  {
+   "t": 1945,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 1945,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "踩"
+     }
+    }
+   }
+  },
+  {
+   "t": 1960,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "上去"
+     }
+    }
+   }
+  },
+  {
+   "t": 1961,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "有"
+     }
+    }
+   }
+  },
+  {
+   "t": 1981,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "脆"
+     }
+    }
+   }
+  },
+  {
+   "t": 1992,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "响"
+     }
+    }
+   }
+  },
+  {
+   "t": 1992,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 2002,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "稻田"
+     }
+    }
+   }
+  },
+  {
+   "t": 2002,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一片"
+     }
+    }
+   }
+  },
+  {
+   "t": 2015,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "片"
+     }
+    }
+   }
+  },
+  {
+   "t": 2015,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "地被"
+     }
+    }
+   }
+  },
+  {
+   "t": 2062,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "收割"
+     }
+    }
+   }
+  },
+  {
+   "t": 2062,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2062,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "露出"
+     }
+    }
+   }
+  },
+  {
+   "t": 2062,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "整齐"
+     }
+    }
+   }
+  },
+  {
+   "t": 2080,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的"
+     }
+    }
+   }
+  },
+  {
+   "t": 2080,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "稻"
+     }
+    }
+   }
+  },
+  {
+   "t": 2083,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "茬"
+     }
+    }
+   }
+  },
+  {
+   "t": 2083,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "和"
+     }
+    }
+   }
+  },
+  {
+   "t": 2083,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "空旷"
+     }
+    }
+   }
+  },
+  {
+   "t": 2097,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的"
+     }
+    }
+   }
+  },
+  {
+   "t": 2097,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "田野"
+     }
+    }
+   }
+  },
+  {
+   "t": 2113,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2113,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "空气"
+     }
+    }
+   }
+  },
+  {
+   "t": 2156,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "里"
+     }
+    }
+   }
+  },
+  {
+   "t": 2156,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "混"
+     }
+    }
+   }
+  },
+  {
+   "t": 2156,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "着"
+     }
+    }
+   }
+  },
+  {
+   "t": 2156,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "稻草"
+     }
+    }
+   }
+  },
+  {
+   "t": 2156,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "和"
+     }
+    }
+   }
+  },
+  {
+   "t": 2156,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "泥土"
+     }
+    }
+   }
+  },
+  {
+   "t": 2156,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的味道"
+     }
+    }
+   }
+  },
+  {
+   "t": 2173,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 2173,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "果"
+     }
+    }
+   }
+  },
+  {
+   "t": 2184,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "子的"
+     }
+    }
+   }
+  },
+  {
+   "t": 2184,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "香气"
+     }
+    }
+   }
+  },
+  {
+   "t": 2196,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "和"
+     }
+    }
+   }
+  },
+  {
+   "t": 2211,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "落叶"
+     }
+    }
+   }
+  },
+  {
+   "t": 2225,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "腐败"
+     }
+    }
+   }
+  },
+  {
+   "t": 2279,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的气"
+     }
+    }
+   }
+  },
+  {
+   "t": 2281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "味"
+     }
+    }
+   }
+  },
+  {
+   "t": 2281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "同时"
+     }
+    }
+   }
+  },
+  {
+   "t": 2281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "存在"
+     }
+    }
+   }
+  },
+  {
+   "t": 2281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2281,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "甜"
+     }
+    }
+   }
+  },
+  {
+   "t": 2292,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "里"
+     }
+    }
+   }
+  },
+  {
+   "t": 2292,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "带着"
+     }
+    }
+   }
+  },
+  {
+   "t": 2314,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一点"
+     }
+    }
+   }
+  },
+  {
+   "t": 2315,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "怅"
+     }
+    }
+   }
+  },
+  {
+   "t": 2322,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "然"
+     }
+    }
+   }
+  },
+  {
+   "t": 2322,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2322,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "这"
+     }
+    }
+   }
+  },
+  {
+   "t": 2338,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "大概是"
+     }
+    }
+   }
+  },
+  {
+   "t": 2338,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "秋天"
+     }
+    }
+   }
+  },
+  {
+   "t": 2351,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "独有的"
+     }
+    }
+   }
+  },
+  {
+   "t": 2381,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "气味"
+     }
+    }
+   }
+  },
+  {
+   "t": 2381,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 2381,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "人们"
+     }
+    }
+   }
+  },
+  {
+   "t": 2390,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "常"
+     }
+    }
+   }
+  },
+  {
+   "t": 2410,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "在这个时候"
+     }
+    }
+   }
+  },
+  {
+   "t": 2410,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "抬头"
+     }
+    }
+   }
+  },
+  {
+   "t": 2427,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "看"
+     }
+    }
+   }
+  },
+  {
+   "t": 2427,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "天"
+     }
+    }
+   }
+  },
+  {
+   "t": 2428,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2428,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "说不出"
+     }
+    }
+   }
+  },
+  {
+   "t": 2469,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "为什么"
+     }
+    }
+   }
+  },
+  {
+   "t": 2469,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2469,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "心里"
+     }
+    }
+   }
+  },
+  {
+   "t": 2469,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "却"
+     }
+    }
+   }
+  },
+  {
+   "t": 2471,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "总"
+     }
+    }
+   }
+  },
+  {
+   "t": 2471,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "有些"
+     }
+    }
+   }
+  },
+  {
+   "t": 2486,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "东西"
+     }
+    }
+   }
+  },
+  {
+   "t": 2501,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "被"
+     }
+    }
+   }
+  },
+  {
+   "t": 2501,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "轻轻"
+     }
+    }
+   }
+  },
+  {
+   "t": 2515,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "放下"
+     }
+    }
+   }
+  },
+  {
+   "t": 2530,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 2530,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 2530,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "四"
+     }
+    }
+   }
+  },
+  {
+   "t": 2530,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "、"
+     }
+    }
+   }
+  },
+  {
+   "t": 2530,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "冬"
+     }
+    }
+   }
+  },
+  {
+   "t": 2530,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "**\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 2530,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "冬天"
+     }
+    }
+   }
+  },
+  {
+   "t": 2544,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "最"
+     }
+    }
+   }
+  },
+  {
+   "t": 2544,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "明显"
+     }
+    }
+   }
+  },
+  {
+   "t": 2557,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的变化"
+     }
+    }
+   }
+  },
+  {
+   "t": 2575,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "是"
+     }
+    }
+   }
+  },
+  {
+   "t": 2575,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "声音"
+     }
+    }
+   }
+  },
+  {
+   "t": 2695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "变"
+     }
+    }
+   }
+  },
+  {
+   "t": 2695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "少了"
+     }
+    }
+   }
+  },
+  {
+   "t": 2695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "鸟"
+     }
+    }
+   }
+  },
+  {
+   "t": 2695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "叫"
+     }
+    }
+   }
+  },
+  {
+   "t": 2695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "稀疏"
+     }
+    }
+   }
+  },
+  {
+   "t": 2695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "人"
+     }
+    }
+   }
+  },
+  {
+   "t": 2696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "说话"
+     }
+    }
+   }
+  },
+  {
+   "t": 2696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "也"
+     }
+    }
+   }
+  },
+  {
+   "t": 2696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "低了"
+     }
+    }
+   }
+  },
+  {
+   "t": 2696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "半"
+     }
+    }
+   }
+  },
+  {
+   "t": 2696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "度"
+     }
+    }
+   }
+  },
+  {
+   "t": 2696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "连"
+     }
+    }
+   }
+  },
+  {
+   "t": 2699,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "脚步"
+     }
+    }
+   }
+  },
+  {
+   "t": 2711,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "都"
+     }
+    }
+   }
+  },
+  {
+   "t": 2711,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "显得"
+     }
+    }
+   }
+  },
+  {
+   "t": 2723,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "谨慎"
+     }
+    }
+   }
+  },
+  {
+   "t": 2744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 2744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "早晨"
+     }
+    }
+   }
+  },
+  {
+   "t": 2759,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "推"
+     }
+    }
+   }
+  },
+  {
+   "t": 2769,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "开门"
+     }
+    }
+   }
+  },
+  {
+   "t": 2787,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2787,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "霜"
+     }
+    }
+   }
+  },
+  {
+   "t": 2795,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "落在"
+     }
+    }
+   }
+  },
+  {
+   "t": 2795,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "草"
+     }
+    }
+   }
+  },
+  {
+   "t": 2810,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "叶"
+     }
+    }
+   }
+  },
+  {
+   "t": 2810,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "和"
+     }
+    }
+   }
+  },
+  {
+   "t": 2828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "车"
+     }
+    }
+   }
+  },
+  {
+   "t": 2828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "顶上"
+     }
+    }
+   }
+  },
+  {
+   "t": 2833,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2833,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "薄"
+     }
+    }
+   }
+  },
+  {
+   "t": 2849,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "薄"
+     }
+    }
+   }
+  },
+  {
+   "t": 2849,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一层"
+     }
+    }
+   }
+  },
+  {
+   "t": 2849,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "白"
+     }
+    }
+   }
+  },
+  {
+   "t": 2866,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2866,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "像"
+     }
+    }
+   }
+  },
+  {
+   "t": 2866,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "夜里"
+     }
+    }
+   }
+  },
+  {
+   "t": 2877,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "有人"
+     }
+    }
+   }
+  },
+  {
+   "t": 2896,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "悄悄"
+     }
+    }
+   }
+  },
+  {
+   "t": 2896,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "撒"
+     }
+    }
+   }
+  },
+  {
+   "t": 2902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "过"
+     }
+    }
+   }
+  },
+  {
+   "t": 2902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "盐"
+     }
+    }
+   }
+  },
+  {
+   "t": 2923,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 2923,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "树"
+     }
+    }
+   }
+  },
+  {
+   "t": 2923,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "都"
+     }
+    }
+   }
+  },
+  {
+   "t": 2932,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "空"
+     }
+    }
+   }
+  },
+  {
+   "t": 2949,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "着"
+     }
+    }
+   }
+  },
+  {
+   "t": 2949,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "枝"
+     }
+    }
+   }
+  },
+  {
+   "t": 2964,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "丫"
+     }
+    }
+   }
+  },
+  {
+   "t": 2964,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 2964,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "可"
+     }
+    }
+   }
+  },
+  {
+   "t": 2977,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "就是"
+     }
+    }
+   }
+  },
+  {
+   "t": 2985,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "这"
+     }
+    }
+   }
+  },
+  {
+   "t": 3005,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "空"
+     }
+    }
+   }
+  },
+  {
+   "t": 3014,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3037,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "才"
+     }
+    }
+   }
+  },
+  {
+   "t": 3037,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "让"
+     }
+    }
+   }
+  },
+  {
+   "t": 3040,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "光"
+     }
+    }
+   }
+  },
+  {
+   "t": 3040,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "斜"
+     }
+    }
+   }
+  },
+  {
+   "t": 3066,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "斜"
+     }
+    }
+   }
+  },
+  {
+   "t": 3066,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "地"
+     }
+    }
+   }
+  },
+  {
+   "t": 3066,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "穿"
+     }
+    }
+   }
+  },
+  {
+   "t": 3073,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "过来"
+     }
+    }
+   }
+  },
+  {
+   "t": 3084,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3084,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "落在"
+     }
+    }
+   }
+  },
+  {
+   "t": 3096,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "墙上"
+     }
+    }
+   }
+  },
+  {
+   "t": 3111,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "显出"
+     }
+    }
+   }
+  },
+  {
+   "t": 3111,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "清楚的"
+     }
+    }
+   }
+  },
+  {
+   "t": 3127,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "形状"
+     }
+    }
+   }
+  },
+  {
+   "t": 3127,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 3127,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "雪"
+     }
+    }
+   }
+  },
+  {
+   "t": 3145,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "来得"
+     }
+    }
+   }
+  },
+  {
+   "t": 3151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "不"
+     }
+    }
+   }
+  },
+  {
+   "t": 3151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "常有"
+     }
+    }
+   }
+  },
+  {
+   "t": 3171,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3171,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一旦"
+     }
+    }
+   }
+  },
+  {
+   "t": 3190,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "落下"
+     }
+    }
+   }
+  },
+  {
+   "t": 3305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "整个世界"
+     }
+    }
+   }
+  },
+  {
+   "t": 3305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "就"
+     }
+    }
+   }
+  },
+  {
+   "t": 3305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "安静"
+     }
+    }
+   }
+  },
+  {
+   "t": 3305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "下来"
+     }
+    }
+   }
+  },
+  {
+   "t": 3305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "连"
+     }
+    }
+   }
+  },
+  {
+   "t": 3305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "嘈杂"
+     }
+    }
+   }
+  },
+  {
+   "t": 3305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的"
+     }
+    }
+   }
+  },
+  {
+   "t": 3305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "街道"
+     }
+    }
+   }
+  },
+  {
+   "t": 3305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "都"
+     }
+    }
+   }
+  },
+  {
+   "t": 3306,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "像"
+     }
+    }
+   }
+  },
+  {
+   "t": 3317,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "被"
+     }
+    }
+   }
+  },
+  {
+   "t": 3317,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "蒙"
+     }
+    }
+   }
+  },
+  {
+   "t": 3317,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "了一层"
+     }
+    }
+   }
+  },
+  {
+   "t": 3318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "棉"
+     }
+    }
+   }
+  },
+  {
+   "t": 3318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 3321,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "这时候"
+     }
+    }
+   }
+  },
+  {
+   "t": 3336,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "最"
+     }
+    }
+   }
+  },
+  {
+   "t": 3350,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "暖"
+     }
+    }
+   }
+  },
+  {
+   "t": 3388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的是"
+     }
+    }
+   }
+  },
+  {
+   "t": 3388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "屋"
+     }
+    }
+   }
+  },
+  {
+   "t": 3388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "里的"
+     }
+    }
+   }
+  },
+  {
+   "t": 3388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "灯"
+     }
+    }
+   }
+  },
+  {
+   "t": 3388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "和"
+     }
+    }
+   }
+  },
+  {
+   "t": 3394,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一碗"
+     }
+    }
+   }
+  },
+  {
+   "t": 3411,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "热"
+     }
+    }
+   }
+  },
+  {
+   "t": 3411,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "汤"
+     }
+    }
+   }
+  },
+  {
+   "t": 3411,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3431,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "人"
+     }
+    }
+   }
+  },
+  {
+   "t": 3438,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "也就"
+     }
+    }
+   }
+  },
+  {
+   "t": 3445,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "明白"
+     }
+    }
+   }
+  },
+  {
+   "t": 3445,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3475,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "寒冷"
+     }
+    }
+   }
+  },
+  {
+   "t": 3483,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "让人"
+     }
+    }
+   }
+  },
+  {
+   "t": 3496,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "格外"
+     }
+    }
+   }
+  },
+  {
+   "t": 3508,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "珍惜"
+     }
+    }
+   }
+  },
+  {
+   "t": 3508,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "靠近"
+     }
+    }
+   }
+  },
+  {
+   "t": 3545,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的东西"
+     }
+    }
+   }
+  },
+  {
+   "t": 3545,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3545,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 3551,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "五"
+     }
+    }
+   }
+  },
+  {
+   "t": 3551,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "、"
+     }
+    }
+   }
+  },
+  {
+   "t": 3551,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "四季"
+     }
+    }
+   }
+  },
+  {
+   "t": 3552,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "轮回"
+     }
+    }
+   }
+  },
+  {
+   "t": 3552,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的"
+     }
+    }
+   }
+  },
+  {
+   "t": 3552,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "启发"
+     }
+    }
+   }
+  },
+  {
+   "t": 3648,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "**\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3648,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "四季"
+     }
+    }
+   }
+  },
+  {
+   "t": 3649,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "从来"
+     }
+    }
+   }
+  },
+  {
+   "t": 3650,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "不需要"
+     }
+    }
+   }
+  },
+  {
+   "t": 3650,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "谁来"
+     }
+    }
+   }
+  },
+  {
+   "t": 3650,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "催促"
+     }
+    }
+   }
+  },
+  {
+   "t": 3650,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3650,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "该"
+     }
+    }
+   }
+  },
+  {
+   "t": 3663,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "来"
+     }
+    }
+   }
+  },
+  {
+   "t": 3663,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的时候"
+     }
+    }
+   }
+  },
+  {
+   "t": 3663,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "来"
+     }
+    }
+   }
+  },
+  {
+   "t": 3663,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3663,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "该"
+     }
+    }
+   }
+  },
+  {
+   "t": 3670,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "走"
+     }
+    }
+   }
+  },
+  {
+   "t": 3670,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的时候"
+     }
+    }
+   }
+  },
+  {
+   "t": 3670,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "走"
+     }
+    }
+   }
+  },
+  {
+   "t": 3680,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3680,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "这份"
+     }
+    }
+   }
+  },
+  {
+   "t": 3695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "从容"
+     }
+    }
+   }
+  },
+  {
+   "t": 3695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "本身就是"
+     }
+    }
+   }
+  },
+  {
+   "t": 3711,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一种"
+     }
+    }
+   }
+  },
+  {
+   "t": 3711,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "智慧"
+     }
+    }
+   }
+  },
+  {
+   "t": 3734,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 3734,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "春天的"
+     }
+    }
+   }
+  },
+  {
+   "t": 3740,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "生长"
+     }
+    }
+   }
+  },
+  {
+   "t": 3751,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "和"
+     }
+    }
+   }
+  },
+  {
+   "t": 3763,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "冬天的"
+     }
+    }
+   }
+  },
+  {
+   "t": 3779,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "收敛"
+     }
+    }
+   }
+  },
+  {
+   "t": 3790,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "看似"
+     }
+    }
+   }
+  },
+  {
+   "t": 3790,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "相反"
+     }
+    }
+   }
+  },
+  {
+   "t": 3806,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3806,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "其实是"
+     }
+    }
+   }
+  },
+  {
+   "t": 3806,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "同一"
+     }
+    }
+   }
+  },
+  {
+   "t": 3820,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "件事"
+     }
+    }
+   }
+  },
+  {
+   "t": 3820,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的两"
+     }
+    }
+   }
+  },
+  {
+   "t": 3820,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "面"
+     }
+    }
+   }
+  },
+  {
+   "t": 3834,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "："
+     }
+    }
+   }
+  },
+  {
+   "t": 3834,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "没有"
+     }
+    }
+   }
+  },
+  {
+   "t": 3848,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "积"
+     }
+    }
+   }
+  },
+  {
+   "t": 3860,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "攒"
+     }
+    }
+   }
+  },
+  {
+   "t": 3860,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3874,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "就"
+     }
+    }
+   }
+  },
+  {
+   "t": 3874,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "无从"
+     }
+    }
+   }
+  },
+  {
+   "t": 3888,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "萌"
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "发"
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "人也"
+     }
+    }
+   }
+  },
+  {
+   "t": 3916,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一样"
+     }
+    }
+   }
+  },
+  {
+   "t": 3916,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3916,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "不能"
+     }
+    }
+   }
+  },
+  {
+   "t": 3930,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "总"
+     }
+    }
+   }
+  },
+  {
+   "t": 3930,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "处在"
+     }
+    }
+   }
+  },
+  {
+   "t": 3947,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "繁"
+     }
+    }
+   }
+  },
+  {
+   "t": 3958,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "盛"
+     }
+    }
+   }
+  },
+  {
+   "t": 3958,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "里"
+     }
+    }
+   }
+  },
+  {
+   "t": 3970,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3970,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "低谷"
+     }
+    }
+   }
+  },
+  {
+   "t": 3985,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "不是"
+     }
+    }
+   }
+  },
+  {
+   "t": 4028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "失败"
+     }
+    }
+   }
+  },
+  {
+   "t": 4028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "而是"
+     }
+    }
+   }
+  },
+  {
+   "t": 4028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "让自己"
+     }
+    }
+   }
+  },
+  {
+   "t": 4028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "重新"
+     }
+    }
+   }
+  },
+  {
+   "t": 4041,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "扎根"
+     }
+    }
+   }
+  },
+  {
+   "t": 4056,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的时间"
+     }
+    }
+   }
+  },
+  {
+   "t": 4072,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 4072,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "理解了"
+     }
+    }
+   }
+  },
+  {
+   "t": 4081,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "轮回"
+     }
+    }
+   }
+  },
+  {
+   "t": 4081,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4081,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "就"
+     }
+    }
+   }
+  },
+  {
+   "t": 4096,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "懂得"
+     }
+    }
+   }
+  },
+  {
+   "t": 4111,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "不必"
+     }
+    }
+   }
+  },
+  {
+   "t": 4111,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "为一"
+     }
+    }
+   }
+  },
+  {
+   "t": 4122,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "时的"
+     }
+    }
+   }
+  },
+  {
+   "t": 4141,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "得意"
+     }
+    }
+   }
+  },
+  {
+   "t": 4152,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "忘"
+     }
+    }
+   }
+  },
+  {
+   "t": 4152,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "形"
+     }
+    }
+   }
+  },
+  {
+   "t": 4165,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4165,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "也不必"
+     }
+    }
+   }
+  },
+  {
+   "t": 4165,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "为"
+     }
+    }
+   }
+  },
+  {
+   "t": 4179,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "片刻"
+     }
+    }
+   }
+  },
+  {
+   "t": 4192,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "的"
+     }
+    }
+   }
+  },
+  {
+   "t": 4192,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "凋"
+     }
+    }
+   }
+  },
+  {
+   "t": 4208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "零"
+     }
+    }
+   }
+  },
+  {
+   "t": 4208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "绝望"
+     }
+    }
+   }
+  },
+  {
+   "t": 4226,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 4226,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "真正的"
+     }
+    }
+   }
+  },
+  {
+   "t": 4236,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "耐心"
+     }
+    }
+   }
+  },
+  {
+   "t": 4249,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4286,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "是"
+     }
+    }
+   }
+  },
+  {
+   "t": 4286,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "相信"
+     }
+    }
+   }
+  },
+  {
+   "t": 4286,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "季节"
+     }
+    }
+   }
+  },
+  {
+   "t": 4292,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "还在"
+     }
+    }
+   }
+  },
+  {
+   "t": 4292,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "往前走"
+     }
+    }
+   }
+  },
+  {
+   "t": 4319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "也"
+     }
+    }
+   }
+  },
+  {
+   "t": 4319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "相信"
+     }
+    }
+   }
+  },
+  {
+   "t": 4319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "自己在"
+     }
+    }
+   }
+  },
+  {
+   "t": 4332,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "其中"
+     }
+    }
+   }
+  },
+  {
+   "t": 4351,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 4355,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4355,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 4355,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user wants five paragraphs, each 4-5 sentences. No tools. Just write in Chinese.\n\nLet me write carefully, each paragraph 4-5 sentences about spring, summer, autumn, winter, and the inspiration of the cycle.\n\nLet me count sentences carefully (。！？ as sentence enders).\n\nParagraph 1: spring — 5 sentences.\nParagraph 2: summer — 5 sentences.\nParagraph 3: autumn — 5 sentences.\nParagraph 4: winter — 5 sentences.\nParagraph 5: inspiration — 5 sentences.\n\nWrite with some literary quality.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "**一、春**\n\n残雪化尽的那几天，风忽然就软了下来，吹在脸上像谁的手掌轻轻拂过。柳枝最先知道消息，先泛起一层朦胧的鹅黄，随后才抽出细长的叶子。屋后的桃花开得没有章法，一树接一树地喧闹，把整条巷子都染得发甜。春雨是细的，落在瓦上几乎没有声音，只在清晨让人发现地面湿了一层。人们在这样的天气里总忍不住把窗户推开，仿佛日子也跟着透了口气。\n\n**二、夏**\n\n夏天的太阳一旦升起来，整个上午都像被白铁皮罩住，热气从地面一直漫到人的脖颈。蝉在树上叫得不知疲倦，越热越响，把午后的安静撕得零零碎碎。只有雷雨来时才痛快一阵，乌云压得很低，雨点砸在地上溅起白烟，转瞬又把天洗回蓝色。西瓜在井水里冰过，切开时那股凉意比风还解暑。到了夜里，人们搬出竹椅坐在院子里，慢慢摇着扇子，把一整天的话都留到这时候说。\n\n**三、秋**\n\n秋天来得并不急，先是早晚凉了一点，接着天空变得格外高远，蓝得像被谁擦干净了。路边的银杏黄得最早，风一过就落下一小片，踩上去有脆响。稻田一片片地被收割，露出整齐的稻茬和空旷的田野，空气里混着稻草和泥土的味道。果子的香气和落叶腐败的气味同时存在，甜里带着一点怅然，这大概是秋天独有的气味。人们常在这个时候抬头看天，说不出为什么，心里却总有些东西被轻轻放下。\n\n**四、冬**\n\n冬天最明显的变化是声音变少了，鸟叫稀疏，人说话也低了半度，连脚步都显得谨慎。早晨推开门，霜落在草叶和车顶上，薄薄一层白，像夜里有人悄悄撒过盐。树都空着枝丫，可就是这空，才让光斜斜地穿过来，落在墙上显出清楚的形状。雪来得不常有，一旦落下，整个世界就安静下来，连嘈杂的街道都像被蒙了一层棉。这时候最暖的是屋里的灯和一碗热汤，人也就明白，寒冷让人格外珍惜靠近的东西。\n\n**五、四季轮回的启发**\n\n四季从来不需要谁来催促，该来的时候来，该走的时候走，这份从容本身就是一种智慧。春天的生长和冬天的收敛看似相反，其实是同一件事的两面：没有积攒，就无从萌发。人也一样，不能总处在繁盛里，低谷不是失败，而是让自己重新扎根的时间。理解了轮回，就懂得不必为一时的得意忘形，也不必为片刻的凋零绝望。真正的耐心，是相信季节还在往前走，也相信自己在其中。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1127,
+       "output": 720,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 119,
+       "totalTokens": 2359,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792457827022,
+      "responseId": "30f2959f-c4f7-48ed-bd3f-139406933957",
+      "rawStopReason": "stop",
+      "durationMs": 5960,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 4356,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user wants five paragraphs, each 4-5 sentences. No tools. Just write in Chinese.\n\nLet me write carefully, each paragraph 4-5 sentences about spring, summer, autumn, winter, and the inspiration of the cycle.\n\nLet me count sentences carefully (。！？ as sentence enders).\n\nParagraph 1: spring — 5 sentences.\nParagraph 2: summer — 5 sentences.\nParagraph 3: autumn — 5 sentences.\nParagraph 4: winter — 5 sentences.\nParagraph 5: inspiration — 5 sentences.\n\nWrite with some literary quality.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "**一、春**\n\n残雪化尽的那几天，风忽然就软了下来，吹在脸上像谁的手掌轻轻拂过。柳枝最先知道消息，先泛起一层朦胧的鹅黄，随后才抽出细长的叶子。屋后的桃花开得没有章法，一树接一树地喧闹，把整条巷子都染得发甜。春雨是细的，落在瓦上几乎没有声音，只在清晨让人发现地面湿了一层。人们在这样的天气里总忍不住把窗户推开，仿佛日子也跟着透了口气。\n\n**二、夏**\n\n夏天的太阳一旦升起来，整个上午都像被白铁皮罩住，热气从地面一直漫到人的脖颈。蝉在树上叫得不知疲倦，越热越响，把午后的安静撕得零零碎碎。只有雷雨来时才痛快一阵，乌云压得很低，雨点砸在地上溅起白烟，转瞬又把天洗回蓝色。西瓜在井水里冰过，切开时那股凉意比风还解暑。到了夜里，人们搬出竹椅坐在院子里，慢慢摇着扇子，把一整天的话都留到这时候说。\n\n**三、秋**\n\n秋天来得并不急，先是早晚凉了一点，接着天空变得格外高远，蓝得像被谁擦干净了。路边的银杏黄得最早，风一过就落下一小片，踩上去有脆响。稻田一片片地被收割，露出整齐的稻茬和空旷的田野，空气里混着稻草和泥土的味道。果子的香气和落叶腐败的气味同时存在，甜里带着一点怅然，这大概是秋天独有的气味。人们常在这个时候抬头看天，说不出为什么，心里却总有些东西被轻轻放下。\n\n**四、冬**\n\n冬天最明显的变化是声音变少了，鸟叫稀疏，人说话也低了半度，连脚步都显得谨慎。早晨推开门，霜落在草叶和车顶上，薄薄一层白，像夜里有人悄悄撒过盐。树都空着枝丫，可就是这空，才让光斜斜地穿过来，落在墙上显出清楚的形状。雪来得不常有，一旦落下，整个世界就安静下来，连嘈杂的街道都像被蒙了一层棉。这时候最暖的是屋里的灯和一碗热汤，人也就明白，寒冷让人格外珍惜靠近的东西。\n\n**五、四季轮回的启发**\n\n四季从来不需要谁来催促，该来的时候来，该走的时候走，这份从容本身就是一种智慧。春天的生长和冬天的收敛看似相反，其实是同一件事的两面：没有积攒，就无从萌发。人也一样，不能总处在繁盛里，低谷不是失败，而是让自己重新扎根的时间。理解了轮回，就懂得不必为一时的得意忘形，也不必为片刻的凋零绝望。真正的耐心，是相信季节还在往前走，也相信自己在其中。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1127,
+       "output": 720,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 119,
+       "totalTokens": 2359,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792457827022,
+      "responseId": "30f2959f-c4f7-48ed-bd3f-139406933957",
+      "rawStopReason": "stop",
+      "durationMs": 5960,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 4356,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40"
+   }
+  },
+  {
+   "t": 4356,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m3-record-bqZMwR/m3-reattach\n</cwd>"
+       },
+       "timestamp": 1792457826922,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "不要调用任何工具。请写五段文字，每段四到五句话：第一段讲春天，第二段讲夏天，第三段讲秋天，第四段讲冬天，第五段讲四季轮回给人的启发。"
+        }
+       ],
+       "timestamp": 1792457826922
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The user wants five paragraphs, each 4-5 sentences. No tools. Just write in Chinese.\n\nLet me write carefully, each paragraph 4-5 sentences about spring, summer, autumn, winter, and the inspiration of the cycle.\n\nLet me count sentences carefully (。！？ as sentence enders).\n\nParagraph 1: spring — 5 sentences.\nParagraph 2: summer — 5 sentences.\nParagraph 3: autumn — 5 sentences.\nParagraph 4: winter — 5 sentences.\nParagraph 5: inspiration — 5 sentences.\n\nWrite with some literary quality.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "text",
+         "text": "**一、春**\n\n残雪化尽的那几天，风忽然就软了下来，吹在脸上像谁的手掌轻轻拂过。柳枝最先知道消息，先泛起一层朦胧的鹅黄，随后才抽出细长的叶子。屋后的桃花开得没有章法，一树接一树地喧闹，把整条巷子都染得发甜。春雨是细的，落在瓦上几乎没有声音，只在清晨让人发现地面湿了一层。人们在这样的天气里总忍不住把窗户推开，仿佛日子也跟着透了口气。\n\n**二、夏**\n\n夏天的太阳一旦升起来，整个上午都像被白铁皮罩住，热气从地面一直漫到人的脖颈。蝉在树上叫得不知疲倦，越热越响，把午后的安静撕得零零碎碎。只有雷雨来时才痛快一阵，乌云压得很低，雨点砸在地上溅起白烟，转瞬又把天洗回蓝色。西瓜在井水里冰过，切开时那股凉意比风还解暑。到了夜里，人们搬出竹椅坐在院子里，慢慢摇着扇子，把一整天的话都留到这时候说。\n\n**三、秋**\n\n秋天来得并不急，先是早晚凉了一点，接着天空变得格外高远，蓝得像被谁擦干净了。路边的银杏黄得最早，风一过就落下一小片，踩上去有脆响。稻田一片片地被收割，露出整齐的稻茬和空旷的田野，空气里混着稻草和泥土的味道。果子的香气和落叶腐败的气味同时存在，甜里带着一点怅然，这大概是秋天独有的气味。人们常在这个时候抬头看天，说不出为什么，心里却总有些东西被轻轻放下。\n\n**四、冬**\n\n冬天最明显的变化是声音变少了，鸟叫稀疏，人说话也低了半度，连脚步都显得谨慎。早晨推开门，霜落在草叶和车顶上，薄薄一层白，像夜里有人悄悄撒过盐。树都空着枝丫，可就是这空，才让光斜斜地穿过来，落在墙上显出清楚的形状。雪来得不常有，一旦落下，整个世界就安静下来，连嘈杂的街道都像被蒙了一层棉。这时候最暖的是屋里的灯和一碗热汤，人也就明白，寒冷让人格外珍惜靠近的东西。\n\n**五、四季轮回的启发**\n\n四季从来不需要谁来催促，该来的时候来，该走的时候走，这份从容本身就是一种智慧。春天的生长和冬天的收敛看似相反，其实是同一件事的两面：没有积攒，就无从萌发。人也一样，不能总处在繁盛里，低谷不是失败，而是让自己重新扎根的时间。理解了轮回，就懂得不必为一时的得意忘形，也不必为片刻的凋零绝望。真正的耐心，是相信季节还在往前走，也相信自己在其中。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1127,
+        "output": 720,
+        "cacheRead": 512,
+        "cacheWrite": 0,
+        "reasoning": 119,
+        "totalTokens": 2359,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792457827022,
+       "responseId": "30f2959f-c4f7-48ed-bd3f-139406933957",
+       "rawStopReason": "stop",
+       "durationMs": 5960,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 4357,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 4359,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-e247-7242-81e3-46ed42539e40",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 4360,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2359,
+      "contextWindow": 1000000,
+      "percent": 0.2359
+     }
+    }
+   }
+  }
+ ]
+}

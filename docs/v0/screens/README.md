@@ -1,7 +1,7 @@
 # 屏幕状态表
 
 每屏一张状态表：状态 ｜ 来源 ｜ 必须可见 ｜ 可做的操作。实现该屏之前写好，实现与测试都以它为准。
-"来源"只能是 pi 的事件、pi SDK 的返回值、批准扩展的请求（M2 起），或你刚做的操作；没有来源的状态不显示。
+"来源"只能是 pi 的事件、pi SDK 的返回值、批准扩展的请求（M2 起）、主进程的系统操作结果（M3 起：删除会话文件），或你刚做的操作；没有来源的状态不显示。
 
 | 文件 | 内容 | 里程碑 |
 | --- | --- | --- |
@@ -11,6 +11,8 @@
 | [tool-cards.md](tool-cards.md) | 工具卡状态与标题对照表 | M1（批准相关状态在 M2 接通） |
 | [approval.md](approval.md) | 哪些调用要批准、批准卡、工具卡与阶段行的批准状态、权限菜单、任务栏闪烁 | M2 |
 | [f8.md](f8.md) | F8 报告界面问题：入口、报告框、保存的内容 | M2 |
+| [sessions.md](sessions.md) | 左栏的项目 → 会话树、新建、打开、改名、删除、右键菜单、状态、草稿、项目信任询问 | M3 |
+| [extension-ui.md](extension-ui.md) | 扩展的询问（确认、选择、输入）与通知 | M3（从 M6 提前） |
 
 pi 事件名以 `@earendil-works/pi-coding-agent` 1.3.0 的 `AgentSessionEvent` 为准；
 `message_update` 经后台进程精简为 `{ type, contentIndex, delta, toolCallId, toolName, args }`（见 `app/src/kernel/events.ts`）。

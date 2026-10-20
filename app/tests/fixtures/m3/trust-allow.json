@@ -1,0 +1,1675 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m3-record.mjs; do not edit by hand.",
+ "name": "trust-allow",
+ "description": "同样的文件夹：信任并记住；project_hello 在工具里，调用时出批准卡，允许后返回 hello from project",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-20T00:56:52.339Z",
+ "steps": [
+  {
+   "t": 0,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 859,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 859,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-2rn3aq\\m3-trust-allow"
+   }
+  },
+  {
+   "t": 863,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": true,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 863,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-2rn3aq\\m3-trust-allow",
+    "trust": {
+     "trusted": true,
+     "remember": true
+    }
+   }
+  },
+  {
+   "t": 1060,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-2rn3aq\\m3-trust-allow",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-T3W0cs\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m3-record-2rn3aq-m3-trust-allow--\\2026-10-20T00-56-50-526Z_01a156cf-a25e-77d0-9944-42f9e9e79e3b.jsonl",
+     "name": null,
+     "projectTrust": "trusted",
+     "trustRemembered": true,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "project_hello"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 1060,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "text": "请调用 project_hello 工具，然后告诉我它返回了什么。"
+   }
+  },
+  {
+   "t": 1062,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 1063,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 1064,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 1064,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m3-record-2rn3aq/m3-trust-allow\n</cwd>"
+      },
+      "timestamp": 1792457810723,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "project_hello",
+        "description": "Returns a greeting from the project extension (test tool).",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 1064,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m3-record-2rn3aq/m3-trust-allow\n</cwd>"
+      },
+      "timestamp": 1792457810723,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "project_hello",
+        "description": "Returns a greeting from the project extension (test tool).",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 1064,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请调用 project_hello 工具，然后告诉我它返回了什么。"
+       }
+      ],
+      "timestamp": 1792457810722
+     }
+    }
+   }
+  },
+  {
+   "t": 1064,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请调用 project_hello 工具，然后告诉我它返回了什么。"
+       }
+      ],
+      "timestamp": 1792457810722
+     }
+    }
+   }
+  },
+  {
+   "t": 1336,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792457810813
+     }
+    }
+   }
+  },
+  {
+   "t": 1617,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 1617,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "I"
+     }
+    }
+   }
+  },
+  {
+   "t": 1617,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "'ll"
+     }
+    }
+   }
+  },
+  {
+   "t": 1617,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " call"
+     }
+    }
+   }
+  },
+  {
+   "t": 1617,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 1617,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " tool"
+     }
+    }
+   }
+  },
+  {
+   "t": 1618,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " now"
+     }
+    }
+   }
+  },
+  {
+   "t": 1618,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 1655,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "project_hello",
+      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783"
+     }
+    }
+   }
+  },
+  {
+   "t": 1655,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "project_hello",
+      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783"
+     }
+    }
+   }
+  },
+  {
+   "t": 1655,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{}",
+      "toolName": "project_hello",
+      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783"
+     }
+    }
+   }
+  },
+  {
+   "t": 1711,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 1711,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "project_hello",
+      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+      "args": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 1711,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "I'll call the tool now."
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+        "name": "project_hello",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1138,
+       "output": 29,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1679,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792457810813,
+      "responseId": "9555e27e-db71-44ad-820d-f65e76cf23e6",
+      "rawStopReason": "tool_calls",
+      "durationMs": 559,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 1712,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+     "toolName": "project_hello",
+     "gate": "ask"
+    }
+   }
+  },
+  {
+   "t": 1712,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+     "toolName": "project_hello",
+     "args": {}
+    }
+   }
+  },
+  {
+   "t": 1713,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "mori.approval_request",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+     "toolName": "project_hello",
+     "args": {}
+    }
+   }
+  },
+  {
+   "t": 1744,
+   "command": {
+    "type": "approval.answer",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "requestId": "approval-1",
+    "decision": "allow"
+   }
+  },
+  {
+   "t": 1745,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "mori.approval_end",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+     "decision": "allow",
+     "by": "user",
+     "reason": null
+    }
+   }
+  },
+  {
+   "t": 1745,
+   "result": {
+    "type": "approval.answer",
+    "value": {
+     "mode": "ask",
+     "allowed": []
+    }
+   }
+  },
+  {
+   "t": 1746,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+     "toolName": "project_hello",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "hello from project"
+       }
+      ],
+      "details": {}
+     },
+     "isError": false,
+     "durationMs": 0
+    }
+   }
+  },
+  {
+   "t": 1746,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+      "toolName": "project_hello",
+      "content": [
+       {
+        "type": "text",
+        "text": "hello from project"
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1792457811406
+     }
+    }
+   }
+  },
+  {
+   "t": 1746,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+      "toolName": "project_hello",
+      "content": [
+       {
+        "type": "text",
+        "text": "hello from project"
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1792457811406
+     }
+    }
+   }
+  },
+  {
+   "t": 1747,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "I'll call the tool now."
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+        "name": "project_hello",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1138,
+       "output": 29,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1679,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792457810813,
+      "responseId": "9555e27e-db71-44ad-820d-f65e76cf23e6",
+      "rawStopReason": "tool_calls",
+      "durationMs": 559,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+       "toolName": "project_hello",
+       "content": [
+        {
+         "type": "text",
+         "text": "hello from project"
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1792457811406
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1747,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b"
+   }
+  },
+  {
+   "t": 1748,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 1751,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1684,
+      "contextWindow": 1000000,
+      "percent": 0.1684
+     }
+    }
+   }
+  },
+  {
+   "t": 1873,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792457811410
+     }
+    }
+   }
+  },
+  {
+   "t": 2278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 2278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 2283,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "project"
+     }
+    }
+   }
+  },
+  {
+   "t": 2283,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "_"
+     }
+    }
+   }
+  },
+  {
+   "t": 2283,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "hello"
+     }
+    }
+   }
+  },
+  {
+   "t": 2283,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 2284,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 2284,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "返回"
+     }
+    }
+   }
+  },
+  {
+   "t": 2286,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "了"
+     }
+    }
+   }
+  },
+  {
+   "t": 2287,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "："
+     }
+    }
+   }
+  },
+  {
+   "t": 2287,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 2287,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 2287,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "hello"
+     }
+    }
+   }
+  },
+  {
+   "t": 2287,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " from"
+     }
+    }
+   }
+  },
+  {
+   "t": 2287,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " project"
+     }
+    }
+   }
+  },
+  {
+   "t": 2287,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 2287,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 2289,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 2290,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "`project_hello` 返回了：**`hello from project`**"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 158,
+       "output": 17,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1711,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792457811410,
+      "responseId": "a9ecd23b-0f62-4a4f-a9a3-5fe8f880db52",
+      "rawStopReason": "stop",
+      "durationMs": 540,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 2290,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "`project_hello` 返回了：**`hello from project`**"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 158,
+       "output": 17,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1711,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792457811410,
+      "responseId": "a9ecd23b-0f62-4a4f-a9a3-5fe8f880db52",
+      "rawStopReason": "stop",
+      "durationMs": 540,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 2290,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b"
+   }
+  },
+  {
+   "t": 2291,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m3-record-2rn3aq/m3-trust-allow\n</cwd>"
+       },
+       "timestamp": 1792457810723,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "project_hello",
+         "description": "Returns a greeting from the project extension (test tool).",
+         "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "请调用 project_hello 工具，然后告诉我它返回了什么。"
+        }
+       ],
+       "timestamp": 1792457810722
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "I'll call the tool now."
+        },
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+         "name": "project_hello",
+         "arguments": {}
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1138,
+        "output": 29,
+        "cacheRead": 512,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1679,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792457810813,
+       "responseId": "9555e27e-db71-44ad-820d-f65e76cf23e6",
+       "rawStopReason": "tool_calls",
+       "durationMs": 559,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+       "toolName": "project_hello",
+       "content": [
+        {
+         "type": "text",
+         "text": "hello from project"
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1792457811406
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "`project_hello` 返回了：**`hello from project`**"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 158,
+        "output": 17,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1711,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792457811410,
+       "responseId": "a9ecd23b-0f62-4a4f-a9a3-5fe8f880db52",
+       "rawStopReason": "stop",
+       "durationMs": 540,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 2291,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 2291,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 2291,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1711,
+      "contextWindow": 1000000,
+      "percent": 0.1711
+     }
+    }
+   }
+  }
+ ]
+}

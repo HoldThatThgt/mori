@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import type { ApprovalDecision } from '../../shared/protocol';
 import { stop } from './state/actions';
 import { recordAction } from './state/actionLog';
+import { newSession } from './state/projects';
 import { clamp, limitsFor, NARROW_WIDTH, RAIL_WIDTH, setLayout, useLayout, type DividerKind } from './state/layout';
 import { closeTopOverlay, hasOverlay, useOverlay } from './state/overlays';
 import { activeTab, updateTab, useApp, type Tab } from './state/store';
@@ -88,6 +89,23 @@ function useApprovalKeys(): void {
   }, []);
 }
 
+/** @brief Ctrl+N：新会话（在当前会话所在的项目里新建）；有菜单、对话框或报告框开着时不起作用。 */
+function useNewSessionKey(): void {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.code !== 'KeyN' || !event.ctrlKey || event.altKey || event.shiftKey || event.metaKey) return;
+      if (event.defaultPrevented || event.repeat || hasOverlay()) return;
+      const state = useApp.getState();
+      // 首次启动页、后台进程已退出、上一个新会话还在打开时不新建。
+      if (!state.config || state.firstRun || state.kernel === 'exited' || activeTab(state)?.phase === 'opening') return;
+      event.preventDefault();
+      void newSession();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+}
+
 /** @brief 实际栏宽：保存的宽度按当前空间收紧（不改保存值，窗口变宽后恢复）。 */
 function useColumns(width: number, collapsed: boolean, floating: boolean, rightOpen: boolean) {
   const layout = useLayout();
@@ -109,10 +127,14 @@ function resize(kind: DividerKind, value: number, commit: boolean): void {
   else useLayout.setState({ [kind]: value });
 }
 
+/** 中栏没有会话、侧栏有会话时的说明 */
+const PICK_HINT = '从左侧选一个会话继续，或打开一个文件夹开始新的会话。';
+
 /** @brief 中栏：会话面板保持挂载（设置页只是把它藏起来，返回时滚动位置和草稿都在）。 */
 function Center({ tabs, activeKey, view, rightOpen, onToggleRight }: {
   tabs: Tab[]; activeKey: string | null; view: 'chat' | 'settings'; rightOpen: boolean; onToggleRight: () => void;
 }) {
+  const hasSaved = useApp((state) => state.saved.sessions.length > 0);
   return (
     <div className="center">
       {tabs.map((tab) => (
@@ -120,7 +142,9 @@ function Center({ tabs, activeKey, view, rightOpen, onToggleRight }: {
           <ChatPane tab={tab} rightOpen={rightOpen} onToggleRight={onToggleRight} />
         </div>
       ))}
-      {view === 'chat' && tabs.length === 0 && <OpenFolderPrompt heading="打开一个文件夹" />}
+      {view === 'chat' && !tabs.some((tab) => tab.key === activeKey) && (
+        <OpenFolderPrompt heading="打开一个文件夹" hint={hasSaved || tabs.length > 0 ? PICK_HINT : undefined} />
+      )}
       {view === 'settings' && <SettingsPage />}
     </div>
   );
@@ -145,7 +169,8 @@ function Workspace() {
     <div className="app" style={style as React.CSSProperties}>
       {narrow && floating && <div className="sidebar-spacer" />}
       <Sidebar collapsed={collapsed && !(narrow && floating)} floating={narrow && floating}
-        onToggle={() => (narrow ? setFloating(!floating) : setLayout({ sidebarCollapsed: !sidebarCollapsed }))}>
+        onToggle={() => (narrow ? setFloating(!floating) : setLayout({ sidebarCollapsed: !sidebarCollapsed }))}
+        onNavigate={() => setFloating(false)}>
         {!collapsed && !floating && <Divider kind="sidebar" label="调整左栏宽度" value={columns.sidebar}
           limits={columns.sidebarLimits} onChange={(value, commit) => resize('sidebar', value, commit)} />}
       </Sidebar>
@@ -174,6 +199,7 @@ export function App() {
   const kernel = useApp((state) => state.kernel);
   useEscape();
   useApprovalKeys();
+  useNewSessionKey();
   if (configError) {
     return (
       <main className="first-run">

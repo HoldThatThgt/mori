@@ -60,6 +60,15 @@ export type Connection = z.infer<typeof ConnectionSchema>;
 
 const sessionId = z.string().min(1);
 
+/** @brief 你对项目信任询问的回答（方案 5.3）；只在 trust.check 说要问时由界面带上。 */
+export const TrustAnswerSchema = z.object({
+  /** 信任 / 不信任 */
+  trusted: z.boolean(),
+  /** 勾了"记住"：写进 pi 的 trust.json */
+  remember: z.boolean(),
+});
+export type TrustAnswer = z.infer<typeof TrustAnswerSchema>;
+
 /** @brief 批准权限：每次询问 / 全部允许（方案 5.7，只作用于一个会话）。 */
 export type ApprovalMode = 'ask' | 'all';
 
@@ -97,8 +106,31 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('connection.save'), connection: ConnectionSchema }),
   z.object({ type: z.literal('connection.test') }),
   z.object({ type: z.literal('connection.testCancel') }),
-  z.object({ type: z.literal('session.create'), cwd: z.string().min(1) }),
-  z.object({ type: z.literal('session.open'), sessionFile: z.string().min(1) }),
+  /** 问后台进程：打开这个文件夹里的会话之前要不要先问你是否信任它 */
+  z.object({ type: z.literal('trust.check'), cwd: z.string().min(1) }),
+  z.object({ type: z.literal('session.create'), cwd: z.string().min(1), trust: TrustAnswerSchema.optional() }),
+  z.object({ type: z.literal('session.open'), sessionFile: z.string().min(1), trust: TrustAnswerSchema.optional() }),
+  /** pi 的会话列表（全部项目） */
+  z.object({ type: z.literal('session.list') }),
+  /**
+   * 改名：打开中的会话用 sessionId（经 pi 的 setSessionName）；没打开的用 sessionFile（写进会话文件）。
+   * 两个都给时以打开中的会话为准。
+   */
+  z.object({
+    type: z.literal('session.rename'),
+    sessionId: sessionId.optional(),
+    sessionFile: z.string().min(1).optional(),
+    name: z.string().trim().min(1),
+  }),
+  /** 关闭并释放一个打开中的会话（归档、删除前）；正在生成时拒绝 */
+  z.object({ type: z.literal('session.close'), sessionId }),
+  /** 你对扩展询问的回答；value 为 null 表示取消（docs/v0/screens/extension-ui.md） */
+  z.object({
+    type: z.literal('ui.answer'),
+    sessionId,
+    requestId: z.string().min(1),
+    value: z.union([z.boolean(), z.string(), z.null()]),
+  }),
   z.object({
     type: z.literal('session.prompt'),
     sessionId,
@@ -158,6 +190,48 @@ export interface TestResult {
   error: string | null;
 }
 
+/**
+ * @brief 会话所在文件夹的信任状态：none 文件夹没有要信任的内容；trusted / untrusted 按你的回答或 trust.json 的记录；
+ *        unasked 文件夹有要信任的内容却没有回答（问过之后才出现），按不信任打开。
+ */
+export type ProjectTrust = 'none' | 'trusted' | 'untrusted' | 'unasked';
+
+/** @brief trust.check 的结果。 */
+export interface TrustCheck {
+  /** 要不要先问你：文件夹有要信任的内容，且 trust.json 没有本文件夹或上层文件夹的记录 */
+  ask: boolean;
+  /** 读不出 trust.json 时的原文（这时按没有记录处理，会问你） */
+  readError: string | null;
+}
+
+/** @brief 后台进程里还开着的会话的状态（界面重新加载后，侧栏据此显示状态）。 */
+export interface LiveStatus {
+  /** 正在生成 */
+  running: boolean;
+  /** 有挂起的批准请求 */
+  approval: boolean;
+  /** 有挂起的扩展询问 */
+  question: boolean;
+}
+
+/** @brief pi 会话列表里的一个会话（SessionManager.listAll 的一项，去掉了全文）。 */
+export interface SavedSession {
+  /** 会话文件 */
+  sessionFile: string;
+  /** pi 会话 id */
+  sessionId: string;
+  /** 工作目录 */
+  cwd: string;
+  /** 名字（最后一条 session_info）；没有时为 null */
+  name: string | null;
+  /** 第一条你的消息；没有时为 null */
+  firstMessage: string | null;
+  /** 最后一条你的消息或助手回复的时间（毫秒） */
+  modified: number;
+  /** 后台进程里还开着这个会话时的状态；没开着时为 null */
+  live: LiveStatus | null;
+}
+
 /** @brief session.create / session.open 的结果。 */
 export interface SessionInfo {
   /** pi 会话 id */
@@ -166,6 +240,18 @@ export interface SessionInfo {
   cwd: string;
   /** 会话文件；第一条消息之前文件还不存在 */
   sessionFile: string | null;
+  /** 会话名（pi 的 session_info）；没有时为 null */
+  name: string | null;
+  /** 文件夹的信任状态 */
+  projectTrust: ProjectTrust;
+  /** 信任状态已经记在 trust.json 里（原有的记录，或这次勾了"记住"并写进去了） */
+  trustRemembered: boolean;
+  /** 没能把"记住"写进 trust.json 时的原文 */
+  trustSaveError: string | null;
+  /** 加载失败的扩展：路径和原文 */
+  extensionErrors: string[];
+  /** 扩展在会话打开过程中（session_start）发的通知，打开后显示在对话流里 */
+  extensionNotices: ExtensionNotice[];
   /** 当前启用的工具名 */
   tools: string[];
   /** 会话使用的模型（provider/id），没有可用模型时为 null */
@@ -178,10 +264,70 @@ export interface SessionInfo {
   approval: ApprovalState;
 }
 
+/** @brief 一个等你回答的扩展询问（mori.ui_request）。 */
+export interface UiRequest {
+  /** 询问 id，ui.answer 用它答复 */
+  requestId: string;
+  /** 种类：确认 / 选择 / 输入 */
+  method: 'confirm' | 'select' | 'input';
+  /** 标题 */
+  title: string;
+  /** 确认的说明 */
+  message?: string;
+  /** 选择的选项 */
+  options?: string[];
+  /** 输入框的提示文字 */
+  placeholder?: string;
+  /** 超时（毫秒）；没有时为 undefined */
+  timeoutMs?: number;
+  /** 扩展提出询问的时刻（ms，同一台机器的时钟）；超时从这时算起 */
+  askedAt: number;
+}
+
+/** @brief 扩展的一条通知（ctx.ui.notify）。 */
+export interface ExtensionNotice {
+  /** 原文 */
+  message: string;
+  /** 级别 */
+  level: 'info' | 'warning' | 'error';
+}
+
+/** @brief 一个挂起的批准请求（与 mori.approval_request 相同）。 */
+export interface ApprovalRequestInfo {
+  /** 请求 id */
+  requestId: string;
+  /** pi 的 toolCallId */
+  toolCallId: string;
+  /** 工具名 */
+  toolName: string;
+  /** 完整的调用参数 */
+  args: Record<string, unknown>;
+}
+
+/** @brief 还开着的会话这一刻的样子（界面重新加载后接上它）。 */
+export interface LiveSnapshot {
+  /** 正在生成 */
+  running: boolean;
+  /** 正在生成、还没写进会话文件的助手回复（pi 的 state.streamingMessage）；没有时为 null */
+  streaming: unknown;
+  /** 正在执行的工具调用（pi 的 state.pendingToolCalls）和开始执行的时刻（ms） */
+  runningTools: Array<{ toolCallId: string; startedAt: number }>;
+  /** 挂起的批准请求 */
+  approvals: ApprovalRequestInfo[];
+  /** 挂起的扩展询问 */
+  questions: UiRequest[];
+  /** 排队区：插话（pi 的 getSteeringMessages） */
+  steering: string[];
+  /** 排队区：排队（pi 的 getFollowUpMessages） */
+  followUp: string[];
+}
+
 /** @brief session.open 的结果：会话信息加 pi 记录的当前分支（SessionManager.getBranch）。 */
 export interface OpenedSession extends SessionInfo {
   /** 从根到当前叶子的条目 */
   entries: SessionEntry[];
+  /** 会话本来就在后台进程里开着时这一刻的样子；新打开的为 null */
+  live: LiveSnapshot | null;
 }
 
 /** @brief session.state 的结果。 */
@@ -242,6 +388,8 @@ export type KernelEvent =
     message: string;
     /** 没发出去的提示原文，界面放回输入框 */
     text: string;
+    /** 这时会话是否还在运行（插话、排队的提示失败时本轮可能还在继续） */
+    running: boolean;
   }
   /**
    * 这次调用会怎样处理，见 ToolGate。每个调用在 tool_execution_start 之前发一次；批准处理器后来的判断
@@ -267,6 +415,21 @@ export type KernelEvent =
     toolName: string;
     /** 完整的调用参数 */
     args: Record<string, unknown>;
+  }
+  /** 扩展的通知（ctx.ui.notify） */
+  | ({ type: 'mori.notify' } & ExtensionNotice)
+  /**
+   * pi 的 prompt() 结束：通常在本轮结束（agent_settled）之后；pi 把提示交给扩展命令或输入处理器、没有开始运行时，
+   * 只有这一个事件（界面据此清掉"刚发出"）。running 为这时会话是否还在运行（插话、排队的提示送进队列就结束）
+   */
+  | { type: 'mori.prompt_done'; running: boolean }
+  /** 扩展在等你回答（ctx.ui.confirm / select / input） */
+  | ({ type: 'mori.ui_request' } & UiRequest)
+  /** 扩展的询问结束：你回答了、超时、扩展取消、停止或会话关闭 */
+  | {
+    type: 'mori.ui_end';
+    /** 询问 id */
+    requestId: string;
   }
   /** 批准请求结束：允许或拒绝 */
   | {

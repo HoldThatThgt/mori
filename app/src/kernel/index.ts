@@ -47,7 +47,10 @@ async function handleRequest(port: MessagePortMain, data: unknown): Promise<void
   }
 }
 
-/** @brief 接入一个页面的通道。 */
+/**
+ * @brief 接入一个页面的通道。通道关闭（界面重新加载，例如 Ctrl+R）时会话照常运行：照 Claude 桌面版，会话不因窗口而停；
+ *        重新加载后的界面经 session.list / session.open 接上它们（docs/v0/screens/sessions.md）。
+ */
 function attachPort(port: MessagePortMain): void {
   ports.add(port);
   port.on('message', (message) => void handleRequest(port, message.data));
