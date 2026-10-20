@@ -347,7 +347,7 @@ export interface ModelInfo {
 
 /** @brief 一个连接（models.json 里 Mori 的一个 provider）和它下面的模型。 */
 export interface ConnectionInfo {
-  /** provider id（mori-endpoint、mori-endpoint-2……） */
+  /** provider id：第一个连接 mori-endpoint，之后 mori-endpoint-<数字>（删掉的不再用） */
   providerId: string;
   /** 连接本身；apiKey 总是空串 */
   endpoint: Endpoint;
@@ -483,6 +483,8 @@ export interface McpServerEntry {
   tools: string[] | null;
   /** 不能在这里改的原因（本项目的）；能改时为 null */
   readOnly: string | null;
+  /** pi 不加载这个条目的原因（照 pi validateMcpServerConfig 和读配置时的检查，原文同 pi）；pi 会加载时为 null */
+  problem: string | null;
 }
 
 /** @brief tools.get 的结果（docs/v0/screens/tools.md）。 */
@@ -525,6 +527,11 @@ export interface ConfigInfo {
   models: AvailableModel[];
   /** pi 读 models.json 时报告的错误（modelRuntime.getError）；没有时为 null */
   modelsError: string | null;
+  /**
+   * pi 读设置文件（`<agentDir>/settings.json`）时报告的错误，带文件路径（SettingsManager.drainErrors）；没有时为 null。
+   * 有错误时 pi 按空设置处理：默认模型读不到、思考强度是 pi 的默认值，模型照常能用
+   */
+  settingsError: string | null;
   /** pi 设置的 defaultThinkingLevel（没有时为 medium）：新模型的"新会话默认的思考强度"的初始值 */
   defaultThinkingLevel: ThinkingLevel;
 }

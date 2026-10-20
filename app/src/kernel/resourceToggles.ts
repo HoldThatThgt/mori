@@ -3,10 +3,14 @@
 // 以及它们用到的 getResourcePattern、getPackageResourcePattern、getTopLevelBaseDir。
 // pi 没有导出这个组件，这里改成普通函数：组件里的 this.settingsManager / this.cwd / this.agentDir 由参数带进来，
 // 写出的条目与 pi config 逐字节相同（路径用 path.relative，Windows 上是反斜杠；包的过滤数组为空时还原成字符串）。
+// 唯一的不同是 Mori 加的：包的某类过滤是 []（"停用整个包"写的）时先放 "!**"，见 togglePackageResource。
 
 import { dirname, join, relative } from 'node:path';
 import type { PackageSource, PathMetadata, SettingsManager } from '@earendil-works/pi-coding-agent';
 import { RESOURCE_KINDS, type ResourceKind } from '../shared/protocol';
+
+/** 包的过滤里"排除全部"的条目（Mori 加的，见 togglePackageResource） */
+const EXCLUDE_ALL = '!**';
 
 /** @brief 要启停的一项（pi config 的 ResourceItem 中写入用到的部分）。 */
 export interface ResourceItem {
@@ -90,6 +94,9 @@ export function toggleTopLevelResource(item: ResourceItem, enabled: boolean, con
 /**
  * @brief 启停包里的一个资源（pi togglePackageResource）：改 packages 里这个包的过滤数组，相对包的根目录；
  *        四类都没有过滤时还原成字符串。设置里找不到这个包时什么也不写（同 pi）并返回 false。
+ *        Mori 加的一处：这一类的过滤是 []（这一类全部停用，"停用整个包"写的；pi config 自己不写 []）时，
+ *        先放 "!**" 再加 +路径 / -路径。照 pi 的写法得到只有 "+路径" 的数组，pi 的 applyPatterns 没有普通包含时
+ *        从全部文件开始，这一类的资源全都回来；"!**" 先排除全部，之后的 +、- 条目照常生效，包里以后新加的资源也仍是停用。
  */
 export function togglePackageResource(item: ResourceItem, enabled: boolean, context: ToggleContext): boolean {
   const scope = item.metadata.scope as 'user' | 'project';
@@ -102,7 +109,8 @@ export function togglePackageResource(item: ResourceItem, enabled: boolean, cont
     pkg = { source: pkg };
     packages[pkgIndex] = pkg;
   }
-  const current = (pkg[item.resourceType] ?? []) as string[];
+  const listed = pkg[item.resourceType] as string[] | undefined;
+  const current = listed?.length === 0 ? [EXCLUDE_ALL] : (listed ?? []);
   const updated = withPattern(current, getPackageResourcePattern(item), enabled);
   pkg[item.resourceType] = updated.length > 0 ? updated : undefined;
   const filtered = pkg;

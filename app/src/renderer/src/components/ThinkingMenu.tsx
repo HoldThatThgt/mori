@@ -60,7 +60,7 @@ function ThinkingPanel({ levels, current, reasoning, onChoose, onSettings }: Thi
 /**
  * @brief 顶栏的思考强度按钮和菜单。disabled 为真时（会话没打开、后台进程不可用）不能切换；生成中也不能切换。
  *        换强度或换模型的请求还没返回时按钮显示你选的强度、不可用（仍可聚焦）。
- *        旧的会话数据没有思考强度时按"关"、不支持思考处理。
+ *        旧的会话数据没有思考强度时按"关"、不支持思考处理。面板窄于 600px 时按钮只显示强度（models.md"窄栏"）。
  */
 export function ThinkingMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
   const pending = usePendingSwitch((state) => state[tab.key]);
@@ -69,7 +69,7 @@ export function ThinkingMenu({ tab, disabled }: { tab: Tab; disabled: boolean })
   const level = pending?.level ?? current;
   const running = tab.transcript.running || tab.transcript.sending;
   const menu = useSwitchMenu(disabled || running);
-  const text = `思考：${reasoning ? THINKING_LABELS[level] : '不可选'}`;
+  const label = reasoning ? THINKING_LABELS[level] : '不可选';
   const title = running ? '生成中不能切换思考强度'
     : reasoning ? '思考强度：只作用于这个会话' : "这个模型没有标'支持思考'";
 
@@ -88,8 +88,9 @@ export function ThinkingMenu({ tab, disabled }: { tab: Tab; disabled: boolean })
       <button ref={menu.button} className={`thinking-button${reasoning ? '' : ' unsupported'}`}
         data-testid="thinking-button" data-level={level} data-reasoning={String(reasoning)} aria-haspopup="menu"
         aria-expanded={menu.open} disabled={disabled || running} aria-disabled={pending ? true : undefined}
-        title={title} onClick={() => { if (!pending) menu.setOpen(!menu.open); }}>
-        {text}<Icon name="down" />
+        aria-label={`思考：${label}`} title={title} onClick={() => { if (!pending) menu.setOpen(!menu.open); }}>
+        {/* 窄栏里不显示"思考："（models.css），读屏名称仍是完整的 */}
+        <span className="switch-text"><span className="thinking-prefix">思考：</span>{label}</span><Icon name="down" />
       </button>
       {menu.open && <ThinkingPanel levels={tab.thinkingLevels ?? []} current={current} reasoning={reasoning}
         onChoose={choose} onSettings={settings} />}

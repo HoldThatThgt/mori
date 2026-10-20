@@ -13,7 +13,8 @@
   flex-shrink: 0;
   min-width: 0;
 }
-.breadcrumb { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; color: var(--color-faint); }
+/* 会话名至少留 36px（两个字加省略号）：按钮区放不下时先收短模型按钮（models.css），不把会话名挤没 */
+.breadcrumb { display: flex; align-items: center; gap: 8px; min-width: 36px; flex: 1; color: var(--color-faint); }
 .breadcrumb svg { width: 13px; height: 13px; }
 .chat-project { flex-shrink: 1; min-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-title {
@@ -24,8 +25,9 @@
   color: #242a33;
   font-weight: 500;
 }
-.topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 1; min-width: 0; }
 .usage-chip {
+  flex-shrink: 0;
   max-width: 160px;
   overflow: hidden;
   padding: 3px 8px;
@@ -467,7 +469,7 @@
 .permission-button.all:not(:disabled):hover {
   background-color: color-mix(in srgb, var(--color-warn) 20%, var(--color-canvas));
 }
-/* 菜单居中在按钮下方：中栏最窄（300px）时按钮靠左，右对齐会伸出窗口 */
+/* 菜单居中在按钮下方；面板 ≤ 600px 时改为贴着面板右边打开（本文件末尾的 @container） */
 .permission-menu {
   top: calc(100% + 6px);
   right: auto;
@@ -550,15 +552,30 @@
   .composer-area { padding-left: 12px; padding-right: 12px; }
 }
 .chat-pane { container-type: inline-size; }
-/* 顶栏有模型、思考强度、权限按钮：中栏较窄时权限按钮只留文字、模型名收短（models.css）；再窄时模型和思考强度
-   一起藏起，会话名不被挤出去（阈值按最宽的文字估算：模型名 120px、"思考：不可选"、"上下文 100%"） */
+/* 顶栏随会话面板变窄分步收紧，模型和思考强度按钮一直在（最窄：分屏每栏 280px、800 宽右栏打开时中栏 300px），
+   收起的文字都在悬停说明和读屏名称里（models.md"窄栏"）。阈值按最宽的文字估算："思考：不可选"、"全部允许"、
+   "上下文 100%"；放不下时模型按钮再收短（models.css）。分屏的内边距和间距在 split.css。 */
 @container (max-width: 720px) {
   .permission-button { padding: 3px 8px; }
   .permission-button svg { display: none; }
 }
+/* 600px 以下不显示项目名（模型和思考按钮各档的样子在 models.css）；权限菜单同模型和思考菜单，贴着面板右边打开
+   （模型和思考按钮在它左边，按钮靠右，居中会伸出面板、被右栏或窗口边挡住）。480px 以下不显示上下文用量 */
 @container (max-width: 600px) {
-  .model-switch, .thinking-switch { display: none; }
-  .topbar { padding-left: 16px; gap: 8px; }
+  .chat-pane > .topbar { padding-left: 16px; gap: 8px; }
+  .chat-project, .breadcrumb > svg { display: none; }
+  .permission { position: static; }
+  .permission-menu { top: calc(var(--topbar-height) - 12px); right: 8px; left: auto; transform: none; }
+}
+@container (max-width: 480px) {
+  .usage-chip { display: none; }
+}
+/* 400px 以下：内边距和间距收小 */
+@container (max-width: 400px) {
+  .chat-pane > .topbar { padding: 0 10px 0 12px; gap: 4px; }
+  .topbar-actions { gap: 4px; }
+  .topbar-actions .icon-button { width: 28px; }
+  .permission-button { padding: 3px 6px; }
 }
 
 /* 扩展的询问卡（extension-ui.md）：与批准卡同一位置、同一外观 */

@@ -107,7 +107,8 @@ export async function handleCommand(command: Command, emit: Emit): Promise<unkno
   const agentDir = pi.getAgentDir();
   switch (command.type) {
     case 'config.get':
-      return readConfig(agentDir);
+      // 重读 models.json 之后打开着的会话也换成新的模型对象（与保存之后相同）。
+      return afterModelsChange(readConfig(agentDir), emit);
     case 'connection.test':
       return testConnection(command.providerId, command.modelId);
     case 'connection.testCancel':

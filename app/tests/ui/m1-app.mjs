@@ -101,20 +101,57 @@ async function copyCode({ app, page, h }) {
     && copied.includes('return a + b;') && !copied.includes('下面是一段代码'), oneLine(copied));
 }
 
-/** @brief 设置 → 连接：测试中可以取消；改回原模型。 */
+/**
+ * @brief 设置 → 连接与模型：测试中可以取消。M6 起设置页是连接列表，测试在模型行上（settings.md"默认、测试与删除"：
+ *        测试中 / 已取消，结果写在这一行下面）；所以先在连接卡上"添加模型"加一个 fake-slow（合成端点对它第一个分块前等
+ *        8 秒），再用这一行的"测试"和"取消"。默认模型仍是 fake-coder（检查），之后的步骤不受影响。
+ *        接着在"添加连接"的表单上测 connection.md 的"测试连接 → 取消"（cancelFormTest）。
+ */
 async function cancelTest({ page, h }) {
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByTestId('settings-page').waitFor();
-  await h.fillConnection({ modelId: 'fake-slow' });
-  await page.getByRole('button', { name: '测试连接' }).click();
-  await page.getByRole('button', { name: '测试中…' }).waitFor({ timeout: 10000 });
-  await page.getByRole('button', { name: '取消' }).click();
-  const text = await h.formMessage(null, { test: true, timeout: 15000 });
-  record('设置：测试连接时按钮变为"测试中…"，可以取消', text === '已取消测试', text);
-  await h.fillConnection({ modelId: 'fake-coder' });
-  await page.getByRole('button', { name: '保存' }).click();
-  await h.formMessage(text);
+  const card = page.locator('[data-testid="connection-card"][data-provider="mori-endpoint"]');
+  await card.getByRole('button', { name: '添加模型' }).click();
+  const form = page.getByTestId('model-form');
+  await form.locator('input').first().fill('fake-slow');
+  await form.getByRole('button', { name: '保存', exact: true }).click();
+  const row = page.locator('[data-testid="model-row"][data-model="mori-endpoint/fake-slow"]');
+  await row.waitFor({ timeout: 15000 });
+  await row.getByRole('button', { name: '测试', exact: true }).click();
+  await row.getByRole('button', { name: '测试中…' }).waitFor({ timeout: 10000 });
+  await row.getByRole('button', { name: '取消', exact: true }).click();
+  const result = row.getByTestId('model-test');
+  await result.waitFor({ timeout: 15000 });
+  const text = await result.innerText();
+  record('设置：模型行的"测试"在测试中变为"测试中…"，可以取消，结果写在这一行下面', text === '已取消测试', text);
+  // settings.md 添加连接"默认模型"：只有保存时还没有默认模型才让新模型成为默认；这里已有默认，之后的步骤靠它仍是 fake-coder。
+  const defaults = await page.locator('[data-testid="model-row"][data-default="true"]')
+    .evaluateAll((rows) => rows.map((item) => item.dataset.model));
+  record('设置：已有默认模型时"添加模型"不改默认：只有 fake-coder 一行标"默认"，新加的 fake-slow 不标',
+    defaults.join() === 'mori-endpoint/fake-coder', defaults.join() || '没有标"默认"的行');
+  await cancelFormTest({ page, h });
   await page.getByRole('button', { name: '返回会话' }).click();
+}
+
+/**
+ * @brief connection.md（M1）的"测试中 → 取消"在连接表单上：M6 起完整的连接表单在"添加连接"里（settings.md"添加连接"，
+ *        与首次启动同一张表单）。测试连接会先保存（新连接排在最后，模型 fake-slow，合成端点对它第一个分块前等 8 秒），
+ *        测试中按钮变为"测试中…"，旁边"取消"；取消后表单下方"已取消测试"。之后点"返回列表"。
+ */
+async function cancelFormTest({ page, h }) {
+  await page.getByRole('button', { name: '添加连接' }).click();
+  const form = page.getByTestId('connection-form');
+  await form.waitFor({ timeout: 10000 });
+  await h.fillConnection({ name: '慢的合成端点', baseUrl, apiKey: testKey, modelId: 'fake-slow' });
+  await form.getByRole('button', { name: '测试连接' }).click();
+  const testing = await form.getByRole('button', { name: '测试中…' }).waitFor({ timeout: 10000 })
+    .then(() => true, () => false);
+  if (testing) await form.getByRole('button', { name: '取消', exact: true }).click();
+  const text = await h.formMessage(null, { test: true, timeout: 15000 }).catch(() => '');
+  record('设置 → 添加连接：测试连接时按钮变为"测试中…"，可以取消，表单下方"已取消测试"（connection.md）',
+    testing && text === '已取消测试', `测试中… 出现 ${testing}；${text}`);
+  await form.getByRole('button', { name: '返回列表' }).click();
+  await page.getByTestId('connection-form').waitFor({ state: 'detached', timeout: 10000 });
 }
 
 /** @brief 运行耗时命令时排队一条，然后按 Esc：命令卡"已停止"，提示，排队消息回到输入框。 */
@@ -173,9 +210,10 @@ async function errors({ page, h }) {
   text = await card.innerText();
   record('错误：自动重试时阶段行显示"重试 1/3 · 原因"', stages.some((s) => s.startsWith('重试 1/3 · ')), stages.join(' → '));
   record('错误：自动重试最终失败显示原文', text.includes('500') && text.includes('把上一条消息放回输入框'), oneLine(text));
-  await page.getByRole('button', { name: '设置', exact: true }).click();
+  // M6：设置页先是连接列表，改 key 在连接卡的"编辑连接"里（settings.md"编辑连接"）。
+  await h.editConnection();
   await h.fillConnection({ apiKey: 'wrong-key' });
-  await page.getByRole('button', { name: '保存' }).click();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
   await h.formMessage();
   await page.getByRole('button', { name: '返回会话' }).click();
   await h.send('plain 你好');
@@ -184,10 +222,12 @@ async function errors({ page, h }) {
   text = await card.innerText();
   record('错误：key 错误时显示原文和"去设置"', text.includes('401') && text.includes('去设置'), oneLine(text));
   await card.getByRole('button', { name: '去设置' }).click();
-  const focused = await page.evaluate(() => document.activeElement?.getAttribute('type'));
-  record('错误："去设置"打开连接表单，焦点在 API key', focused === 'password');
+  // settings.md 外框："去设置"落在出错会话所用模型的连接（mori-endpoint，名称"合成端点"）上，打开"编辑连接"，焦点在 API key。
+  const focus = await h.keyFocus();
+  record('错误："去设置"打开出错会话所用连接的"编辑连接 · 合成端点"，焦点在它的 API key 框',
+    focus.type === 'password' && focus.inForm && focus.title === '编辑连接 · 合成端点', JSON.stringify(focus));
   await h.fillConnection({ apiKey: testKey });
-  await page.getByRole('button', { name: '保存' }).click();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
   await h.formMessage();
   await page.getByRole('button', { name: '返回会话' }).click();
 }

@@ -256,9 +256,10 @@ async function item10({ page, h }) {
 
 /** @brief 走查 6：key 填错 → 原文和"去设置"；key 写成没设置的 $变量 → 同样（$ 写法已不再特殊）；没有 key → 找不到 key 的原文和"去设置"。 */
 async function item6({ page, h }, wrongKey) {
-  await page.getByRole('button', { name: '设置', exact: true }).click();
+  // M6：设置页先是连接列表，改 key 在连接卡的"编辑连接"里（settings.md"编辑连接"）。
+  await h.editConnection();
   await h.fillConnection({ apiKey: wrongKey });
-  await page.getByRole('button', { name: '保存' }).click();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
   await h.formMessage();
   await page.getByRole('button', { name: '返回会话' }).click();
   await h.send('你好');

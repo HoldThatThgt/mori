@@ -14,7 +14,7 @@ import {
 import { requestStoreKey } from './credentials';
 import { getRuntime, globalSettings } from './pi';
 
-/** Mori 第一个连接的 provider id（M0 起沿用）；之后的连接是 mori-endpoint-2、mori-endpoint-3…… */
+/** Mori 第一个连接的 provider id（M0 起沿用）；之后的连接是 mori-endpoint-<毫秒时间戳>，见 nextProviderId */
 const PROVIDER_ID = 'mori-endpoint';
 /** Mori 的 provider id */
 const MORI_PROVIDER = /^mori-endpoint(?:-\d+)?$/;
@@ -29,9 +29,27 @@ const TEST_MAX_TOKENS = 512;
 
 /** 正在进行的测试连接；你点"取消"时中止它 */
 let runningTest: AbortController | null = null;
+/**
+ * 改 models.json 和默认模型的命令排成的队（后台进程同时处理多条命令）：保存连接要在读和写之间等主进程存 key，
+ * 两次保存交错时后写的会盖掉先写的改动，还会争用同一个临时文件。
+ */
+let editQueue: Promise<unknown> = Promise.resolve();
+
+/** 字符串字面量或 // 行注释；照搬 pi 1.3.0 stripJsonComments（dist/utils/json.js）的第一个正则 */
+const LINE_COMMENT = /"(?:\\.|[^"\\])*"|\/\/[^\n]*/g;
+/** 字符串字面量或 } ] 前多余的逗号；同上的第二个正则 */
+const TRAILING_COMMA = /"(?:\\.|[^"\\])*"|,(\s*[}\]])/g;
 
 type JsonObject = Record<string, unknown>;
 type ModelsFile = JsonObject & { providers?: Record<string, JsonObject> };
+
+/** @brief 读到的 models.json。 */
+interface ModelsText {
+  /** 解析结果；文件不存在时为空对象 */
+  file: ModelsFile;
+  /** 文件里有 // 注释（Mori 重新写出整个文件时会丢掉） */
+  commented: boolean;
+}
 /** pi 的聊天模型（ModelRuntime.getModel 的结果） */
 type PiModel = NonNullable<ReturnType<ModelRuntime['getModel']>>;
 
@@ -74,20 +92,50 @@ function modelsPath(agentDir: string): string {
   return join(agentDir, 'models.json');
 }
 
-/** @brief 读取 models.json；文件不存在时返回空对象，无法解析时报错且不改动文件。 */
-async function readModelsFile(path: string): Promise<ModelsFile> {
+/** @brief 去掉 // 行注释，字符串里的不动（pi 1.3.0 stripJsonComments 的前一半）。 */
+function stripLineComments(text: string): string {
+  return text.replace(LINE_COMMENT, (match) => (match[0] === '"' ? match : ''));
+}
+
+/** @brief 去掉 } ] 前多余的逗号，字符串里的不动（pi 1.3.0 stripJsonComments 的后一半）。 */
+function stripTrailingCommas(text: string): string {
+  return text.replace(TRAILING_COMMA, (match, tail?: string) => tail ?? (match[0] === '"' ? match : ''));
+}
+
+/**
+ * @brief 读取 models.json，和 pi 一样去掉 BOM、// 注释和多余的逗号再解析（core/model-config.js ModelConfig.load：
+ *        pi 读得了的文件这里也读得了）；文件不存在时返回空对象，无法解析时报错且不改动文件。
+ */
+async function readModelsFile(path: string): Promise<ModelsText> {
   let text: string;
   try {
-    text = await readFile(path, 'utf8');
+    text = (await readFile(path, 'utf8')).replace(/^﻿/, '');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {};
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { file: {}, commented: false };
     throw error;
   }
+  const uncommented = stripLineComments(text);
   try {
-    return JSON.parse(text.replace(/^﻿/, '')) as ModelsFile;
+    return { file: JSON.parse(stripTrailingCommas(uncommented)) as ModelsFile, commented: uncommented !== text };
   } catch (error) {
     throw new Error(`Cannot parse ${path}: ${(error as Error).message}`);
   }
+}
+
+/** @brief 要改写时读取 models.json：有 // 注释时拒绝并记录（Mori 重新写出整个文件，注释会丢掉）。多余的逗号不影响。 */
+async function readModelsForEdit(path: string): Promise<ModelsFile> {
+  const { file, commented } = await readModelsFile(path);
+  if (!commented) return file;
+  const message = `${path} contains // comments that saving would remove; remove them or edit the file by hand`;
+  console.error(`[kernel] ${message}`);
+  throw new Error(message);
+}
+
+/** @brief 改 models.json 和默认模型的命令排队执行：等前一个做完（成功或失败）再做这一个。 */
+function serialize<T>(task: () => Promise<T>): Promise<T> {
+  const next = editQueue.then(task, task);
+  editQueue = next.catch(() => undefined);
+  return next;
 }
 
 /** @brief 先写临时文件再改名，避免写到一半留下损坏的 models.json。 */
@@ -103,11 +151,15 @@ function moriProviderIds(file: ModelsFile): string[] {
   return Object.keys(file.providers ?? {}).filter((id) => MORI_PROVIDER.test(id));
 }
 
-/** @brief 新连接的 provider id：mori-endpoint 没用过就用它，否则用最小的没用过的 mori-endpoint-<N>（N ≥ 2）。 */
+/**
+ * @brief 新连接的 provider id，删掉的 id 不再用：pi 按 provider id 找 key 和模型，会话文件记的是 provider/模型，
+ *        重用会让打开着的和关掉的会话悄悄连到新的端点。models.json 里还没有 Mori 的连接时用 mori-endpoint，
+ *        否则用 mori-endpoint-<毫秒时间戳>（已被占用时加一）。
+ */
 function nextProviderId(file: ModelsFile): string {
+  if (moriProviderIds(file).length === 0) return PROVIDER_ID;
   const used = new Set(Object.keys(file.providers ?? {}));
-  if (!used.has(PROVIDER_ID)) return PROVIDER_ID;
-  let n = 2;
+  let n = Date.now();
   while (used.has(`${PROVIDER_ID}-${n}`)) n += 1;
   return `${PROVIDER_ID}-${n}`;
 }
@@ -190,11 +242,33 @@ function availableModels(file: ModelsFile, runtime: ModelRuntime): AvailableMode
   });
 }
 
-/** @brief 设置页、首次启动和顶栏模型菜单要的配置：连接和模型、默认模型、pi 能用的模型、pi 读 models.json 的错误。 */
-export async function readConfig(agentDir: string): Promise<ConfigInfo> {
-  const file = await readModelsFile(modelsPath(agentDir));
-  const runtime = await getRuntime();
+/** @brief pi 读设置文件时报告的错误（带文件路径），有时记录；没有时为 null。 */
+function settingsLoadError(settings: SettingsManager): string | null {
+  const errors = settings.drainErrors().map((item) => `${item.path ?? item.scope}: ${item.error.message}`);
+  if (errors.length === 0) return null;
+  console.error(`[kernel] cannot read pi settings: ${errors.join('; ')}`);
+  return errors.join('; ');
+}
+
+/**
+ * @brief 设置页、首次启动和顶栏模型菜单要的配置：连接和模型、默认模型、pi 能用的模型，
+ *        以及 pi 读 models.json 和 settings.json 的错误。
+ */
+export function readConfig(agentDir: string): Promise<ConfigInfo> {
+  // pi 只在 refresh 时读 models.json：每次读取前先让它重读，你手工修好了文件或加了 provider，重新打开设置页就看得到
+  // （排在写入后面，不与保存交错）。
+  return serialize(async () => {
+    const runtime = await getRuntime();
+    await runtime.refresh({ allowNetwork: false });
+    return describeConfig(agentDir, runtime);
+  });
+}
+
+/** @brief config.get 的内容：pi 已经读过的 models.json、设置和它们的错误。 */
+async function describeConfig(agentDir: string, runtime: ModelRuntime): Promise<ConfigInfo> {
+  const { file } = await readModelsFile(modelsPath(agentDir));
   const settings = await globalSettings();
+  const settingsError = settingsLoadError(settings);
   const connections = describeConnections(file, runtime, settings);
   const provider = settings.getDefaultProvider();
   const model = settings.getDefaultModel();
@@ -205,6 +279,7 @@ export async function readConfig(agentDir: string): Promise<ConfigInfo> {
     defaultModel: provider && model ? `${provider}/${model}` : null,
     models: availableModels(file, runtime),
     modelsError: runtime.getError() ?? null,
+    settingsError,
     defaultThinkingLevel: (settings.getDefaultThinkingLevel() as ThinkingLevel | undefined) ?? DEFAULT_THINKING_LEVEL,
   };
 }
@@ -246,9 +321,37 @@ function requireReusableKey(runtime: ModelRuntime, providerId: string, previousB
   }
 }
 
+/** @brief pi 内存里这个 provider 的 key（runtime API key）；没有时为 null，读不出时记录并返回 null。 */
+async function runtimeKey(runtime: ModelRuntime, providerId: string): Promise<string | null> {
+  if (!hasKey(runtime, providerId)) return null;
+  try {
+    const key = (await runtime.getAuth(providerId))?.auth.apiKey;
+    if (key) return key;
+    console.error(`[kernel] pi returned no key for ${providerId}`);
+  } catch (error) {
+    console.error(`[kernel] cannot read the key of ${providerId}: ${(error as Error).message}`);
+  }
+  return null;
+}
+
+/**
+ * @brief 写 models.json 失败后撤回刚加密保存的新 key，免得重启后它和旧的服务地址配在一起：恢复成 pi 内存里原来的 key
+ *        （启动时从 credentials.json 读入；这时新 key 还没放进 pi 的内存）；原来没有（新连接）或读不出时删掉。
+ *        撤回失败只记录，不盖过写 models.json 的错误。
+ */
+async function restoreKey(runtime: ModelRuntime, providerId: string): Promise<void> {
+  try {
+    const previous = await runtimeKey(runtime, providerId);
+    await requestStoreKey(providerId, previous);
+    if (!previous) console.error(`[kernel] deleted the new key of ${providerId}; no previous key to restore`);
+  } catch (error) {
+    console.error(`[kernel] cannot restore the key of ${providerId}: ${(error as Error).message}`);
+  }
+}
+
 /**
  * @brief 写入一个 provider 并交给 pi：填了 key 时先请主进程加密保存（失败就不写），没填时只能沿用已保存的 key；
- *        写 models.json 后 pi 重读，再把新 key 放进 pi 的内存。
+ *        写 models.json 后 pi 重读，再把新 key 放进 pi 的内存。写 models.json 失败时撤回新 key（restoreKey）再报错。
  */
 async function writeProvider(path: string, file: ModelsFile, providerId: string, provider: JsonObject,
   endpoint: Endpoint): Promise<ModelRuntime> {
@@ -256,7 +359,13 @@ async function writeProvider(path: string, file: ModelsFile, providerId: string,
   if (endpoint.apiKey) await requestStoreKey(providerId, endpoint.apiKey);
   else requireReusableKey(runtime, providerId, file.providers?.[providerId]?.baseUrl, endpoint.baseUrl);
   file.providers = { ...file.providers, [providerId]: provider };
-  await writeJsonAtomic(path, file);
+  try {
+    await writeJsonAtomic(path, file);
+  } catch (error) {
+    console.error(`[kernel] cannot write ${path}: ${(error as Error).message}`);
+    if (endpoint.apiKey) await restoreKey(runtime, providerId);
+    throw error;
+  }
   await runtime.refresh({ allowNetwork: false });
   if (endpoint.apiKey) await runtime.setRuntimeApiKey(providerId, endpoint.apiKey);
   return runtime;
@@ -301,44 +410,50 @@ async function settle(runtime: ModelRuntime, settings?: SettingsManager): Promis
  *        （或更新）表单里的模型。没有默认模型时它成为默认；默认模型就在这个连接上时也换成它：首次启动测试失败、
  *        改了模型 ID 再保存测试，打开文件夹后的会话才用测试过的那个模型。返回保存到的连接和 pi 报告的配置错误。
  */
-export async function saveConnection(agentDir: string, providerId: string | null,
+export function saveConnection(agentDir: string, providerId: string | null,
   connection: Connection): Promise<ConnectionSaveResult> {
-  const path = modelsPath(agentDir);
-  const file = await readModelsFile(path);
-  const id = providerId ?? nextProviderId(file);
-  const previous = providerId ? requireProvider(file, providerId) : {};
-  const provider = upsertModel(mergeEndpoint(previous, connection), connection);
-  const runtime = await writeProvider(path, file, id, provider, connection);
-  const settings = await globalSettings();
-  applyModelThinking(settings, id, connection);
-  adoptDefault(runtime, settings, id, connection.modelId, true);
-  return { providerId: id, error: await settle(runtime, settings) };
+  return serialize(async () => {
+    const path = modelsPath(agentDir);
+    const file = await readModelsForEdit(path);
+    const id = providerId ?? nextProviderId(file);
+    const previous = providerId ? requireProvider(file, providerId) : {};
+    const provider = upsertModel(mergeEndpoint(previous, connection), connection);
+    const runtime = await writeProvider(path, file, id, provider, connection);
+    const settings = await globalSettings();
+    applyModelThinking(settings, id, connection);
+    adoptDefault(runtime, settings, id, connection.modelId, true);
+    return { providerId: id, error: await settle(runtime, settings) };
+  });
 }
 
 /** @brief 只改连接（地址、接口类型、key、兼容选项），不动它下面的模型。 */
-export async function saveEndpoint(agentDir: string, providerId: string, endpoint: Endpoint): Promise<SaveResult> {
-  const path = modelsPath(agentDir);
-  const file = await readModelsFile(path);
-  const provider = mergeEndpoint(requireProvider(file, providerId), endpoint);
-  const runtime = await writeProvider(path, file, providerId, provider, endpoint);
-  return { error: await settle(runtime) };
+export function saveEndpoint(agentDir: string, providerId: string, endpoint: Endpoint): Promise<SaveResult> {
+  return serialize(async () => {
+    const path = modelsPath(agentDir);
+    const file = await readModelsForEdit(path);
+    const provider = mergeEndpoint(requireProvider(file, providerId), endpoint);
+    const runtime = await writeProvider(path, file, providerId, provider, endpoint);
+    return { error: await settle(runtime) };
+  });
 }
 
 /** @brief 添加（adding 为真；ID 已存在时报错）或修改连接下的一个模型；不改 key。没有默认模型时它成为默认。 */
-export async function saveModel(agentDir: string, providerId: string, model: ModelForm,
+export function saveModel(agentDir: string, providerId: string, model: ModelForm,
   adding: boolean): Promise<SaveResult> {
-  const path = modelsPath(agentDir);
-  const file = await readModelsFile(path);
-  const provider = requireProvider(file, providerId);
-  const exists = modelsOf(provider).some((item) => item.id === model.modelId);
-  if (adding && exists) throw new Error(`Model ${model.modelId} already exists in this connection`);
-  if (!adding && !exists) throw new Error(`Model ${providerId}/${model.modelId} not found in models.json`);
-  file.providers = { ...file.providers, [providerId]: upsertModel(provider, model) };
-  const runtime = await writeModels(path, file);
-  const settings = await globalSettings();
-  applyModelThinking(settings, providerId, model);
-  adoptDefault(runtime, settings, providerId, model.modelId, false);
-  return { error: await settle(runtime, settings) };
+  return serialize(async () => {
+    const path = modelsPath(agentDir);
+    const file = await readModelsForEdit(path);
+    const provider = requireProvider(file, providerId);
+    const exists = modelsOf(provider).some((item) => item.id === model.modelId);
+    if (adding && exists) throw new Error(`Model ${model.modelId} already exists in this connection`);
+    if (!adding && !exists) throw new Error(`Model ${providerId}/${model.modelId} not found in models.json`);
+    file.providers = { ...file.providers, [providerId]: upsertModel(provider, model) };
+    const runtime = await writeModels(path, file);
+    const settings = await globalSettings();
+    applyModelThinking(settings, providerId, model);
+    adoptDefault(runtime, settings, providerId, model.modelId, false);
+    return { error: await settle(runtime, settings) };
+  });
 }
 
 /** @brief 默认模型（还有别的模型时）和唯一的模型不能删除（settings.md "不能删除"）。 */
@@ -370,32 +485,36 @@ async function forgetKey(runtime: ModelRuntime, providerId: string): Promise<str
  * @brief 删除模型和它的新会话思考强度设置；是连接的最后一个模型时连接和它的 key 一起删除。
  *        默认模型（还有别的模型时）和唯一的模型不能删。
  */
-export async function deleteModel(agentDir: string, providerId: string, modelId: string): Promise<SaveResult> {
-  const path = modelsPath(agentDir);
-  const file = await readModelsFile(path);
-  const provider = requireProvider(file, providerId);
-  const models = modelsOf(provider);
-  if (!models.some((item) => item.id === modelId)) {
-    throw new Error(`Model ${providerId}/${modelId} not found in models.json`);
-  }
-  const settings = await globalSettings();
-  refuseDelete(file, settings, `${providerId}/${modelId}`);
-  const rest = models.filter((item) => item.id !== modelId);
-  const { [providerId]: _removed, ...others } = file.providers ?? {};
-  file.providers = rest.length ? { ...file.providers, [providerId]: { ...provider, models: rest } } : others;
-  const runtime = await writeModels(path, file);
-  settings.removeModelThinkingLevel(providerId, modelId);
-  const keyError = rest.length ? null : await forgetKey(runtime, providerId);
-  return { error: [await settle(runtime, settings), keyError].filter(Boolean).join('; ') || null };
+export function deleteModel(agentDir: string, providerId: string, modelId: string): Promise<SaveResult> {
+  return serialize(async () => {
+    const path = modelsPath(agentDir);
+    const file = await readModelsForEdit(path);
+    const provider = requireProvider(file, providerId);
+    const models = modelsOf(provider);
+    if (!models.some((item) => item.id === modelId)) {
+      throw new Error(`Model ${providerId}/${modelId} not found in models.json`);
+    }
+    const settings = await globalSettings();
+    refuseDelete(file, settings, `${providerId}/${modelId}`);
+    const rest = models.filter((item) => item.id !== modelId);
+    const { [providerId]: _removed, ...others } = file.providers ?? {};
+    file.providers = rest.length ? { ...file.providers, [providerId]: { ...provider, models: rest } } : others;
+    const runtime = await writeModels(path, file);
+    settings.removeModelThinkingLevel(providerId, modelId);
+    const keyError = rest.length ? null : await forgetKey(runtime, providerId);
+    return { error: [await settle(runtime, settings), keyError].filter(Boolean).join('; ') || null };
+  });
 }
 
 /** @brief 设为默认模型（pi 设置的 defaultProvider / defaultModel）；新会话用它，已经打开的会话不变。 */
-export async function setDefaultModel(providerId: string, modelId: string): Promise<SaveResult> {
-  const runtime = await getRuntime();
-  if (!runtime.getModel(providerId, modelId)) throw new Error(`Model ${providerId}/${modelId} not found`);
-  const settings = await globalSettings();
-  settings.setDefaultModelAndProvider(providerId, modelId);
-  return { error: await settle(runtime, settings) };
+export function setDefaultModel(providerId: string, modelId: string): Promise<SaveResult> {
+  return serialize(async () => {
+    const runtime = await getRuntime();
+    if (!runtime.getModel(providerId, modelId)) throw new Error(`Model ${providerId}/${modelId} not found`);
+    const settings = await globalSettings();
+    settings.setDefaultModelAndProvider(providerId, modelId);
+    return { error: await settle(runtime, settings) };
+  });
 }
 
 /** @brief 要测试的模型：给了 provider 和模型就测它，否则测默认模型；找不到时返回错误原文。 */

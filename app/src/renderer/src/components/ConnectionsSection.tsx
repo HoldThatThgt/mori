@@ -76,22 +76,32 @@ function SectionContent({ config, view }: { config: ConfigInfo; view: Connection
 }
 
 /**
- * @brief "连接与模型"一节：读取中、读取失败（config.get 报错时只显示原文；pi 读 models.json 的错误显示在列表上方，
- *        列表照常显示，表单里保存的结果自己带着原文）、列表或表单。
+ * @brief 上方要显示的错误原文：config.get 报错时只有它；显示列表时还有 pi 读 models.json 和 settings.json 的错误
+ *        （表单里保存的结果自己带着原文）。
+ */
+function sectionErrors(readError: string | null, config: ConfigInfo | null, view: ConnectionsView): string[] {
+  if (readError) return [readError];
+  if (!config || view.kind !== 'list') return [];
+  return [config.modelsError, config.settingsError].filter((item): item is string => Boolean(item));
+}
+
+/**
+ * @brief "连接与模型"一节：读取中、读取失败（config.get 报错时只显示原文；pi 读 models.json、settings.json 的错误
+ *        显示在列表上方，列表照常显示）、列表或表单。
  */
 export function ConnectionsSection() {
   const config = useApp((state) => state.config);
   const view = useSettings((state) => state.view);
   const readError = useSettings((state) => state.readError);
-  const error = readError ?? (view.kind === 'list' ? config?.modelsError ?? null : null);
+  const errors = sectionErrors(readError, config, view);
   return (
     <div className="settings-section" data-section="connections">
       <h2>连接与模型</h2>
       <p className="muted">每个连接是一个服务地址和它的 key，下面可以有多个模型。</p>
       {!config && <p className="muted" role="status">正在读取…</p>}
-      {error && (
+      {errors.length > 0 && (
         <div className="settings-error" role="alert">
-          <p className="form-message error">{error}</p>
+          {errors.map((text, index) => <p key={index} className="form-message error">{text}</p>)}
           <p className="muted">修好文件后重新打开设置页。</p>
         </div>
       )}

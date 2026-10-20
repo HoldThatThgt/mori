@@ -1,8 +1,9 @@
 // 回放界面测试的入口：先装好回放进程桥（window.mori），再载入真正的界面（src/renderer/src/main.tsx）。
-// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>&keepDrafts=1。录制文件来自 tests/fixtures/m1–m5，名字不能重复。
+// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>&keepDrafts=1。录制文件来自 tests/fixtures/m1–m6，名字不能重复。
 // 每次载入先清掉上一个录制留下的草稿和已归档列表（localStorage），keepDrafts=1 时保留（测"重启后草稿还在"）。
 // synthetic-long-history 是手写拼出的长会话（synthetic），由真实录制的 queue-steer 会话记录重复 15 次得到，
-// 只用来测"先显示 50 条、上滚载入更早的"。
+// 只用来测"先显示 50 条、上滚载入更早的"。synthetic-mcp-setup 是 m6 的 mcp 录制前面补一个先打开的会话（synthetic，
+// 见 mcpSetup），让界面能照录制的顺序在工具页里添加 MCP 服务。
 
 import { createReplayBridge } from './replay.js';
 
@@ -68,12 +69,48 @@ function longHistory() {
   ] };
 }
 
+/**
+ * @brief synthetic：mcp 的录制在打开任何会话之前就用 mcp.save 加了三个服务，而界面只在有会话时才有"MCP"一节
+ *        （docs/v0/screens/tools.md），照录制的顺序点不出来。这里在第一条 mcp.save 之前补一个先打开的会话（同一个
+ *        文件夹；会话信息照录制的 session.create 结果，换一个 id 和会话文件），并补上它在工具页读到的内容：照录制里
+ *        第一个 tools.get 的结果（那时新会话还没连上任何服务），MCP 服务按保存的进度列出（保存前没有，每保存一个多一个），
+ *        工具名为空（补上的会话打开时还没有这些服务）。其余的命令、结果和事件都是录制的原样：界面在补上的会话的工具页里
+ *        添加服务，再点"新建会话"建出录制里的会话。
+ */
+function mcpSetup() {
+  const base = fixture('mcp');
+  const created = base.steps.find((step) => step.result?.type === 'session.create').result.value;
+  const firstTools = base.steps.find((step) => step.result?.type === 'tools.get').result.value;
+  const id = 'synthetic-setup-session';
+  const setup = { ...created, sessionId: id, sessionFile: created.sessionFile.replace(created.sessionId, id) };
+  const toolsWith = (t, count) => ({ t, synthetic: true, result: { type: 'tools.get', value: { ...firstTools,
+    mcp: { ...firstTools.mcp, servers: firstTools.mcp.servers.slice(0, count) } } } });
+  const firstSave = base.steps.findIndex((step) => step.command?.type === 'mcp.save');
+  const steps = [];
+  let saved = 0;
+  for (const [index, step] of base.steps.entries()) {
+    if (index === firstSave) {
+      steps.push({ t: step.t, synthetic: true, command: { type: 'session.create', cwd: created.cwd } },
+        { t: step.t, synthetic: true, result: { type: 'session.create', value: setup } }, toolsWith(step.t, 0));
+    }
+    steps.push(step);
+    if (step.result?.type === 'mcp.save') {
+      saved += 1;
+      steps.push(toolsWith(step.t, saved));
+    }
+  }
+  return { ...base, source: 'synthetic', name: 'synthetic-mcp-setup', steps };
+}
+
+/** synthetic 的录制：名字 → 拼法 */
+const SYNTHETIC = { 'synthetic-long-history': longHistory, 'synthetic-mcp-setup': mcpSetup };
+
 if (params.get('keepDrafts') !== '1') {
   localStorage.removeItem('mori.drafts');
   localStorage.removeItem('mori.draftRefs');
   localStorage.removeItem('mori.archived');
 }
-const data = name === 'synthetic-long-history' ? longHistory() : fixture(name);
+const data = Object.hasOwn(SYNTHETIC, name) ? SYNTHETIC[name]() : fixture(name);
 const { bridge, control } = createReplayBridge(data, {
   speed: Number(params.get('speed') ?? 1),
   maxGap: Number(params.get('maxGap') ?? 1500),

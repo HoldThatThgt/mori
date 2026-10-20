@@ -4,8 +4,13 @@
 
 import { create } from 'zustand';
 
-/** 登记的检查：有未保存的改动时返回确认框的说明，没有时返回 null */
-type Guard = () => string | null;
+/** @brief 编辑器有未保存的改动时登记的检查。 */
+interface Guard {
+  /** 确认框的说明 */
+  text: string;
+  /** 你选"放弃改动"时丢掉改动：编辑器回到读到的内容（离开没有发生时，例如取消了选文件夹，也不留下改动） */
+  discard: () => void;
+}
 
 /** @brief 等你回答的离开确认。 */
 interface LeaveState {
@@ -17,6 +22,7 @@ interface LeaveState {
   text: string;
 }
 
+/** @brief 等你回答的离开确认，LeaveDialog 读取；没有在问时 proceed 为 null。 */
 export const useLeave = create<LeaveState>(() => ({ proceed: null, stay: null, text: '' }));
 
 let guard: Guard | null = null;
@@ -28,31 +34,35 @@ export function setLeaveGuard(next: Guard | null): void {
 
 /** @brief 离开之前：没有未保存的改动时立即执行 proceed（同步）；有时先问，你选"放弃改动"后再执行。 */
 export function guardLeave(proceed: () => void): void {
-  const text = guard?.() ?? null;
-  if (!text) {
+  if (!guard) {
     proceed();
     return;
   }
-  useLeave.setState({ proceed, stay: null, text });
+  useLeave.setState({ proceed, stay: null, text: guard.text });
 }
 
 /** @brief 异步入口用：可以离开时为 true（没有未保存的改动，或你选了"放弃改动"）。 */
 export function leaveAllowed(): Promise<boolean> {
-  const text = guard?.() ?? null;
-  if (!text) return Promise.resolve(true);
+  if (!guard) return Promise.resolve(true);
+  const { text } = guard;
   return new Promise((resolve) => {
     useLeave.setState({ proceed: () => resolve(true), stay: () => resolve(false), text });
   });
 }
 
-/** @brief 你在确认框里的选择：放弃改动时先取消检查（编辑器随页面离开而卸载），再离开。 */
+/**
+ * @brief 你在确认框里的选择。放弃改动时先取消检查（同一次离开里后面的入口不再问）并丢掉改动，再离开；
+ *        离开没有发生时（例如取消了选文件夹）编辑器已经回到读到的内容，不会留下没有检查的改动。
+ */
 export function answerLeave(discard: boolean): void {
   const { proceed, stay } = useLeave.getState();
   useLeave.setState({ proceed: null, stay: null, text: '' });
-  if (discard) {
-    guard = null;
-    proceed?.();
-  } else {
+  if (!discard) {
     stay?.();
+    return;
   }
+  const dropped = guard;
+  guard = null;
+  dropped?.discard();
+  proceed?.();
 }

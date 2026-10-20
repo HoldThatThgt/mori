@@ -7,7 +7,7 @@ const waiting = new Map<number, Waiting>();
 
 /**
  * @brief 请主进程加密保存一个 provider 的 key，等它回复结果。
- * @param key 要保存的 key；为 null 时删除这个 provider 已保存的 key（连接删掉时）
+ * @param key 要保存的 key；为 null 时删除这个 provider 已保存的 key（连接删掉时，或写 models.json 失败后撤回新 key 时）
  */
 export function requestStoreKey(providerId: string, key: string | null): Promise<void> {
   const id = nextId++;

@@ -35,7 +35,7 @@ function withDefaults(type, value) {
 /** @brief synthetic：没录过的 M6 只读查询的空结果。 */
 function m6Empty(type) {
   if (type === 'session.commands') return [];
-  if (type === 'agents.get') return { userPath: 'replay\AGENTS.md', content: null, effectivePath: null, loaded: null };
+  if (type === 'agents.get') return { userPath: 'replay\\AGENTS.md', content: null, effectivePath: null, loaded: null };
   return { cwd: null, projectTrust: null, tools: null, skills: [], packages: [], mcp: null, diagnostics: [] };
 }
 

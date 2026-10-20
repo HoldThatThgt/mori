@@ -94,8 +94,12 @@ function forward(entry: Entry, sessionId: string, event: AgentSessionEvent, emit
 
 /** @brief 会话的模型和思考强度（顶栏）：pi 的当前模型、思考强度、这个模型可选的强度、是否支持思考。 */
 function modelState(session: AgentSession): ModelState {
+  const { model } = session;
+  // pi 选不到模型时（例如没有 key）会话里是 pi-agent-core 的占位模型（agent.js DEFAULT_MODEL：provider 和 api 都是
+  // "unknown"），不是真的模型：按"没有可用模型"交给界面。
+  const placeholder = model?.provider === 'unknown' && model.api === 'unknown';
   return {
-    model: session.model ? `${session.model.provider}/${session.model.id}` : null,
+    model: model && !placeholder ? `${model.provider}/${model.id}` : null,
     thinkingLevel: session.thinkingLevel,
     thinkingLevels: session.getAvailableThinkingLevels(),
     reasoning: session.supportsThinking(),

@@ -269,19 +269,23 @@ async function checkTree(ctx) {
 
 // ---------- 走查 2：键盘 ----------
 
-/** @brief Shift+Tab 直到焦点进入会话树（最多 10 次），返回按了几次和焦点。 */
+/** @brief Shift+Tab 直到焦点进入会话树（最多 12 次），返回按了几次、经过的元素（文字和 data-testid）和焦点。 */
 async function shiftTabIntoTree(page) {
-  for (let presses = 1; presses <= 10; presses += 1) {
+  const path = [];
+  const testids = [];
+  for (let presses = 1; presses <= 12; presses += 1) {
     await page.keyboard.press('Shift+Tab');
     const focus = await focusInfo(page);
-    if (focus.file !== null) return { presses, focus };
+    path.push(focus.label ?? focus.testid ?? focus.text);
+    testids.push(focus.testid);
+    if (focus.file !== null) return { presses, path, testids, focus };
   }
-  return { presses: 10, focus: await focusInfo(page) };
+  return { presses: 12, path, testids, focus: await focusInfo(page) };
 }
 
 /**
- * @brief 走查 2：Ctrl+N（焦点在输入框）→ Shift+Tab 几次（经过顶栏的两个按钮、左栏分隔线、左栏底部的两个按钮）回到会话树，
- *        落在新会话行；整棵树一个 Tab 停靠点。
+ * @brief 走查 2：Ctrl+N（焦点在输入框）→ Shift+Tab 几次（经过顶栏的四个按钮：右栏开关、权限、M6 加的思考强度和模型，
+ *        左栏分隔线、左栏底部的两个按钮）回到会话树，落在新会话行；整棵树一个 Tab 停靠点。
  */
 async function keyboardPath(ctx) {
   const { page } = ctx;
@@ -291,9 +295,15 @@ async function keyboardPath(ctx) {
   record('走查 2：Ctrl+N 在当前会话所在的项目（beta）新建会话，名为"新会话"，焦点在新会话的输入框', k?.active
     && k.title === '新会话' && samePath(k.cwd, ctx.folders.beta) && composer, JSON.stringify(k));
   const entered = await shiftTabIntoTree(page);
-  record('走查 2：从新会话的输入框 Shift+Tab 几次回到会话树（不超过 6 次），落在新会话行（中间不在别的会话行停）',
-    samePath(entered.focus.file, ctx.files.K) && entered.presses <= 6,
-    `按了 ${entered.presses} 次，焦点：${JSON.stringify(entered.focus)}`);
+  // M6 顶栏加了模型和思考强度两个按钮（models.md），多两个 Tab 停靠点：6 次改为 8 次。
+  record('走查 2：从新会话的输入框 Shift+Tab 几次回到会话树（不超过 8 次），落在新会话行（中间不在别的会话行停）',
+    samePath(entered.focus.file, ctx.files.K) && entered.presses <= 8,
+    `按了 ${entered.presses} 次：${entered.path.join(' → ')}；焦点：${JSON.stringify(entered.focus)}`);
+  // sessions.md 走查 2 的路径：权限按钮之后依次是思考强度按钮和模型按钮（models.md 的两个新按钮都能用键盘到达）。
+  const order = ['permission-button', 'thinking-button', 'model-button'].map((id) => entered.testids.indexOf(id));
+  record('走查 2（M6）：Shift+Tab 的路径依次经过顶栏的权限、思考强度、模型按钮（sessions.md 写的路径）',
+    order.every((index, i) => index >= 0 && (i === 0 || index === order[i - 1] + 1)),
+    `data-testid 顺序：${entered.testids.map((id) => id ?? '—').join(' → ')}`);
   const stops = (await allRows(page)).filter((row) => row.tabIndex === 0);
   await page.keyboard.press('Tab');
   const out = await focusInfo(page);

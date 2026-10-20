@@ -12,6 +12,7 @@ import { pushItem, type Transcript } from './model';
 import { loadSessions, reopenAll } from './projects';
 import { addQuote, composePrompt, stripQuotes } from './quotes';
 import { guardLeave } from './leaveGuard';
+import { skillCommandText } from './skillText';
 import { applyEvent, finishOpenTools } from './transcript';
 import { activeTab, isShown, sameFile, tabByFile, tabBySession, updateTab, useApp, type Tab } from './store';
 
@@ -71,13 +72,16 @@ export async function send(key: string, behavior?: 'steer' | 'followUp'): Promis
   }
 }
 
-/** @brief 撤回排队区里的全部消息，放回输入框。 */
+/**
+ * @brief 撤回排队区里的全部消息，放回输入框。pi 排队的是展开后的文字：技能命令按排队区的写法
+ *        放回"/skill:名字 参数"，不放回展开后的 <skill> 块（docs/v0/screens/slash.md）。
+ */
 export async function withdraw(key: string): Promise<void> {
   const sessionId = useApp.getState().tabs.find((tab) => tab.key === key)?.sessionId;
   if (!sessionId) return;
   try {
     const cleared = await request<ClearedQueue>({ type: 'session.clearQueue', sessionId });
-    putBack(key, [...cleared.steering, ...cleared.followUp]);
+    putBack(key, [...cleared.steering, ...cleared.followUp].map(skillCommandText));
   } catch (error) {
     describe('session.clearQueue', error);
   }

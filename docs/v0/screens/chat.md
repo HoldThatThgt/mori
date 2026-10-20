@@ -10,7 +10,7 @@
 | 项目名 | 会话的工作目录（`session.create` / `session.open` 的返回值）末级文件夹名 | 同上 |
 | 模型 | 会话返回值里的 `model`（provider/id），显示 id；M6 起是可以切换的菜单，见 [models.md](models.md) | 没有可用模型时"没有可用模型"，并显示 pi 给出的说明 |
 | 思考强度（M6） | 见 [models.md](models.md) | "思考：高 ▾"；模型没标支持思考时"思考：不可选" |
-| 上下文用量 | `session.state` → pi `getContextUsage()`；在打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新 | "上下文 12%"，悬停显示"约 15,360 / 128,000 token"；pi 返回未知（刚压缩完）时"上下文 —"并说明要等下一次回复 |
+| 上下文用量 | `session.state` → pi `getContextUsage()`；在打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新 | "上下文 12%"，悬停显示"约 15,360 / 128,000 token"；pi 返回未知（刚压缩完）时"上下文 —"并说明要等下一次回复。M6 起会话面板窄于 480px 时藏起（见 [models.md](models.md)"窄栏"） |
 | 权限（M2） | 后台进程批准扩展的设置（`session.create` / `session.open` 返回值里的 `approval`，以及 `approval.*` 命令的结果） | "每次询问"或"全部允许"（警示色）；菜单见 [approval.md](approval.md) |
 | 右栏开关 | 你的操作 | 按钮，显示右栏是否打开 |
 

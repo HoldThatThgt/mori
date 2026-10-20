@@ -1,5 +1,6 @@
 // 工具页的"MCP"一节（docs/v0/screens/tools.md）：用户级 mcp.json 和项目的 .pi/mcp.json 里的服务。
 // 工具名来自跟随的会话（getAllTools），错误来自它对话流里 pi 的 MCP 通知；pi 不提供连接状态，所以不显示"已连接"。
+// pi 不会加载的条目（后台进程照 pi 的检查，McpServerEntry.problem）也列出，说明原因。
 // 改动只对新建的会话生效。
 
 import { useRef, useState } from 'react';
@@ -29,7 +30,10 @@ function commandLine(server: McpServerEntry): string {
   return server.url ?? '';
 }
 
-/** @brief 正在添加或编辑哪个服务；重新读取后按名字找回它，表单不随之关闭。 */
+/**
+ * @brief 正在添加或编辑哪个服务；重新读取后按名字找回用户级的那一行（只有用户级的能编辑；同名的本项目一行不算），
+ *        表单不随之关闭。
+ */
 interface Editing {
   /** 编辑的服务的名字；添加时为 null */
   name: string | null;
@@ -69,17 +73,24 @@ function lockReason(server: McpServerEntry): string | null {
   return server.readOnly;
 }
 
-/** @brief 这个服务那一行的"编辑"按钮（行里的第一个按钮）；没有时为 null。 */
+/**
+ * @brief 这个用户级服务那一行的"编辑"按钮（行里的第一个按钮）；没有时为 null。
+ *        同名的还可能有本项目的一行（pi 不加载的条目也列出），只找用户级的。
+ */
 function editButton(name: string): HTMLButtonElement | null {
   return document.querySelector<HTMLButtonElement>(
-    `[data-testid="mcp-row"][data-server="${CSS.escape(name)}"] .tools-row-actions button`);
+    `[data-testid="mcp-row"][data-scope="user"][data-server="${CSS.escape(name)}"] .tools-row-actions button`);
 }
 
-/** @brief 通知里以"<服务名>:"开头的行（警示色），完整通知可以展开。 */
-function McpErrors({ name, notices }: { name: string; notices: string[] }) {
-  const related = notices.filter((notice) => serverLines(notice, name).length > 0);
-  if (related.length === 0) return null;
-  const lines = [...new Set(related.flatMap((notice) => serverLines(notice, name)))];
+/**
+ * @brief 通知里关于这个服务的行（警示色）：连接错误和 pi 的 "config:" 配置问题，完整通知可以展开。
+ *        与这一行已经显示的"pi 不会加载它"原因相同的配置问题不再重复。
+ */
+function McpErrors({ server, notices }: { server: McpServerEntry; notices: string[] }) {
+  const related = notices.filter((notice) => serverLines(notice, server.name).length > 0);
+  const lines = [...new Set(related.flatMap((notice) => serverLines(notice, server.name)))]
+    .filter((line) => !server.problem || !line.endsWith(server.problem));
+  if (lines.length === 0) return null;
   return (
     <div className="tools-warn" data-testid="mcp-error">
       {lines.map((line) => <p key={line}>{line}</p>)}
@@ -91,26 +102,30 @@ function McpErrors({ name, notices }: { name: string; notices: string[] }) {
   );
 }
 
-/** @brief 服务行的说明：注册的工具、调用方式的警示、错误、不能改的原因、项目的覆盖、没能保存的原文。 */
+/**
+ * @brief 服务行的说明：pi 不会加载它的原因、注册的工具、调用方式的警示、错误、不能改的原因、项目的覆盖、没能保存的原文。
+ *        pi 不会加载的条目只说原因，不显示工具名和调用方式的警示。
+ */
 function McpNotes({ server, notices, locked, error, onDirect }: {
   server: McpServerEntry; notices: string[]; locked: boolean; error: string | null; onDirect: () => void;
 }) {
-  const tools = server.tools;
+  const tools = server.problem ? null : server.tools;
   return (
     <>
-      <p className="tools-mono">{commandLine(server)}</p>
+      {commandLine(server) && <p className="tools-mono">{commandLine(server)}</p>}
+      {server.problem && <p className="tools-warn" data-testid="mcp-problem">pi 不会加载它：{server.problem}</p>}
       {tools && (
         <p className="tools-row-note" data-testid="mcp-tools">
           {tools.length > 0 ? `当前会话里注册的工具：${tools.join('、')}` : '当前会话里它没有注册工具'}</p>
       )}
-      {server.exposure !== 'direct' && (
+      {server.exposure !== 'direct' && !server.problem && (
         <p className="tools-warn">
           v0 只支持直接调用（现在是 {exposureText(server.exposure)}）：模型调用不到它的工具
           <button type="button" className="text-link" data-testid="mcp-direct" disabled={locked}
             onClick={onDirect}>改为直接调用</button>
         </p>
       )}
-      <McpErrors name={server.name} notices={notices} />
+      <McpErrors server={server} notices={notices} />
       {lockReason(server) && <p className="tools-row-note">{lockReason(server)}</p>}
       {error && <p className="form-message error" role="alert">没能保存：{error}</p>}
     </>
@@ -120,6 +135,7 @@ function McpNotes({ server, notices, locked, error, onDirect }: {
 /**
  * @brief 一个服务：名字、来源、调用方式、开关；命令行、工具名、错误；编辑、以 JSON 编辑、移除。
  *        它的表单开着时这一行的开关和按钮不可用（表单里切换写法；免得保存时盖掉刚做的启停）。
+ *        pi 不会加载的条目开关关上、不可用（启停救不了它），不显示调用方式；编辑、以 JSON 编辑、移除照常（用户级的）。
  */
 function McpRow({ server, notices, editing, onEdit, onRemove }: {
   server: McpServerEntry; notices: string[]; editing: boolean; onEdit: (mode: McpFormMode) => void;
@@ -130,18 +146,20 @@ function McpRow({ server, notices, editing, onEdit, onRemove }: {
     (enabled) => ({ type: 'mcp.setEnabled', name: server.name, enabled }));
   const reason = lockReason(server);
   const locked = change.busy || editing || reason !== null;
+  const checked = power.checked && !server.problem;
   // 表单没有地址一栏：HTTP 服务的"编辑"直接以 JSON 编辑。
   const editMode: McpFormMode = server.command === null ? 'json' : 'fields';
   return (
-    <li className={`tools-row${power.checked ? '' : ' off'}`} data-testid="mcp-row" data-server={server.name}>
+    <li className={`tools-row${checked ? '' : ' off'}`} data-testid="mcp-row" data-server={server.name}
+      data-scope={server.scope}>
       <div className="tools-row-head">
         <div className="tools-row-main">
           <span className="tools-row-name">{server.name}</span>
           <span className="tools-tag">{server.scope === 'user' ? '用户级' : '本项目'}</span>
-          <span className="tools-tag">{exposureText(server.exposure)}</span>
+          {!server.problem && <span className="tools-tag">{exposureText(server.exposure)}</span>}
         </div>
-        <ToolSwitch checked={power.checked} label={`启用 MCP 服务 ${server.name}`} disabled={locked}
-          title={reason ?? undefined} onChange={power.toggle} />
+        <ToolSwitch checked={checked} label={`启用 MCP 服务 ${server.name}`} disabled={locked || Boolean(server.problem)}
+          title={reason ?? server.problem ?? undefined} onChange={power.toggle} />
       </div>
       <McpNotes server={server} notices={notices} locked={locked} error={change.error}
         onDirect={() => void change.run({ type: 'mcp.setDirect', name: server.name })} />
@@ -220,7 +238,7 @@ export function McpSection({ mcp, tabKey, cwd }: {
       <ul className="tools-list">
         {mcp.servers.map((server) => (
           <McpServerItem key={`${server.scope}:${server.name}`} server={server} notices={notices}
-            form={form(server.name)}
+            form={server.scope === 'user' && form(server.name)}
             onEdit={(mode) => open({ name: server.name, server, mode })} onRemove={() => setRemoving(server.name)} />
         ))}
       </ul>

@@ -1,6 +1,6 @@
 // 工具页（docs/v0/screens/tools.md）：中栏换成工具页，顶部"返回会话"、标题和跟随的会话，下面一行说明改动对新建的会话生效；
-// 左边分节（内置工具、技能、MCP、插件），右边这一节的内容。跟随的是打开工具页之前的当前会话（分屏时焦点所在的那一栏），
-// 还在打开中时等它打开；没有会话时只列出技能和插件（用户级）。
+// 左边分节（内置工具、技能、MCP、插件），右边这一节的内容。跟随的是当前会话（分屏时焦点所在的那一栏）；工具页开着时
+// 在侧栏归档或删除了它，跟到剩下的那一栏。还在打开中时等它打开；没有会话时只列出技能和插件（用户级）。
 
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -54,7 +54,10 @@ function useToolsLoad(followed: Followed | null): void {
   useEffect(() => resetTools, []);
 }
 
-/** @brief 左边的分节列表：Tab 进入，↑ ↓ 切换；当前分节 aria-current。 */
+/**
+ * @brief 左边的分节列表：Tab 进入、在按钮之间移动，↑ ↓ 从焦点所在的按钮切到上一节 / 下一节（焦点不在分节按钮上时
+ *        从当前分节算）；当前分节 aria-current。
+ */
 function SectionNav({ sections, current, onSelect }: {
   sections: Section[]; current: Section; onSelect: (section: Section) => void;
 }) {
@@ -62,7 +65,10 @@ function SectionNav({ sections, current, onSelect }: {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     event.preventDefault();
     const step = event.key === 'ArrowDown' ? 1 : -1;
-    const next = sections[(sections.indexOf(current) + step + sections.length) % sections.length];
+    const focused = (event.target as HTMLElement).closest<HTMLElement>('[data-section]')?.dataset.section;
+    const at = sections.indexOf(focused as Section);
+    const from = at >= 0 ? at : sections.indexOf(current);
+    const next = sections[(from + step + sections.length) % sections.length];
     onSelect(next);
     event.currentTarget.querySelector<HTMLButtonElement>(`[data-section="${next}"]`)?.focus();
   }
@@ -114,8 +120,7 @@ function ToolsContent({ section, tabKey }: { section: Section; tabKey: string | 
 
 /** @brief 工具页。 */
 export function ToolsPage() {
-  const [key] = useState(() => useApp.getState().activeKey);
-  const followed = useApp(useShallow((state) => followedOf(state, key)));
+  const followed = useApp(useShallow((state) => followedOf(state, state.activeKey)));
   const exited = useApp((state) => state.kernel === 'exited');
   const trust = useTools((state) => state.info?.projectTrust ?? null);
   const sections: Section[] = followed ? ['builtin', 'skills', 'mcp', 'plugins'] : ['skills', 'plugins'];

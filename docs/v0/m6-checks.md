@@ -7,6 +7,38 @@
 
 进行中。
 
+## 照 Claude 桌面版
+
+方案没定、按你的规则照 Claude 桌面版做的交互：
+
+| 交互 | 照 Claude 桌面版的做法 |
+| --- | --- |
+| 设置页、工具页的结构 | 左边分节列表、右边内容，顶部"返回会话"；中栏窄于 620px 时分节列表移到内容上方 |
+| 设置里的表单 | 在原位替换列表（不弹对话框），焦点放在第一个可以填的字段；编辑表单开着时这一行的其他按钮不可用，关闭后焦点回到打开它的按钮 |
+| 模型菜单 | 一个按钮显示当前模型，点开按连接分组列出模型，当前的打勾，默认模型标"默认"，最后一项"管理模型…"进设置；只作用于这个会话 |
+| 思考强度 | 与模型分开的一个按钮，菜单形式同上（方案 5.1 把它们列为顶栏的两项） |
+| 工具页的列表 | 每项一个开关，点了马上切换，之后以重新读到的为准；技能点开看 SKILL.md 的内容；MCP 服务看它注册的工具 |
+| 以 JSON 编辑 MCP 服务 | 与 Claude 桌面版 `claude_desktop_config.json`、pi 的 `mcp.json` 相同的 `mcpServers` 条目写法 |
+| 改了 MCP 等配置之后 | Claude 桌面版改了本地 MCP 配置要重启才生效；Mori 对新建的会话生效，页面上明说，并给一个"新建会话"按钮 |
+| 输入框的"/" | 打出 `/` 弹出命令列表，随打字过滤；↑ ↓ 选择，Enter / Tab 插入（不发送，方案"选中后插入"），Esc 关闭；列表只在输入框有焦点时出现，Esc 或插入之后直到第一个词变了才再出现 |
+| 有未保存的改动时离开 | 先问，默认按钮是留下（"继续编辑"） |
+
+## 需要你确认的地方（都已按推荐做法实现，走查时可以改）
+
+1. **停用项目自己的技能写在项目的 `.pi/settings.json`**：方案 5.13 和第 6 节写"v0 只支持用户级启停"，但走查 3 要停用项目 `.pi/skills` 里的技能，
+   而 pi 只按项目设置启停项目自己的资源（用户级设置停不了它，`package-manager.js` `addAutoDiscoveredResources`）。现在的做法：照搬的
+   `toggleTopLevelResource` 对项目资源写项目的 `.pi/settings.json`，写出的条目与 `pi config -l` 完全相同（`tests/fixtures/m6/pi-config-toggles.json`
+   用 pi 自己的组件录下对照）。项目设置对用户级资源的覆盖、项目里配置的包和 MCP 服务仍然只显示、不能改。
+   另一种做法：项目资源也只显示，走查 3 改成停用用户级技能。推荐现在的做法；注意这个文件常常会提交进项目的 git。
+2. **多个模型的存法**：`models.json` 里一个 provider 是一个"连接"（地址、接口类型、兼容选项、key），下面可以有多个模型，所以在同一个端点上
+   "添加模型"不用再填 key。第一个连接沿用 `mori-endpoint`，之后的连接用 `mori-endpoint-<数字>`，删掉的 id 不再用（pi 按 provider id 找 key、
+   会话文件记的是 `provider/模型`，重用会让旧会话悄悄连到新的端点）。
+3. **改动何时生效**：AGENTS.md、技能、MCP、插件的改动只对之后新建的会话生效（pi 只在会话创建时读它们），界面上明说；连接和模型的改动对打开着的
+   会话立刻生效（后台进程把它们换成新的模型对象）。
+4. **顶栏按会话换模型、思考强度不改默认**：新会话仍用设置里的默认模型和它的默认强度（pi `setModel` / `setThinkingLevel` 不 persist，与 pi 的
+   RPC 模式相同）。生成中这两个按钮不可用。
+5. **键盘路径多了两步**：顶栏多了模型和思考两个按钮，M3 走查 2 的"从输入框 Shift+Tab 回到会话树"从 6 次变成 8 次（方案没有规定次数）。
+
 ## 开工前查的 pi 1.3.0 行为（"先确认"一列，对照源码，并用脚本实测）
 
 ### "/名称"在 `prompt()` 里怎样展开
@@ -30,7 +62,7 @@ pi 的 MCP 扩展经 `ctx.ui.notify` 发出的通知都到了 Mori 的界面上�
 | 什么时候 | 原文（实测） |
 | --- | --- |
 | 有服务是 codemode 或延迟加载方式、而 codemode 和 tool_search 都没有加载（Mori 不加载它们） | `MCP tools are only reachable from the codemode or tool_search tool, but neither is active; they cannot be called.`（warning） |
-| 全部启用的服务连上或失败之后一次 | `MCP servers need attention:\n  broken: failed: MCP connection closed\n  initfail: failed: synthetic init failure\nRun /mcp to fix.`（warning）；每个出错的服务一行 `<名字>: failed: <错误第一行>` |
+| 全部启用的服务连上或失败之后一次 | `MCP servers need attention:\n  broken: failed: MCP connection closed\n  initfail: failed: synthetic init failure\nRun /mcp to fix.`（warning）；每个出错的服务一行 `<名字>: failed: <错误第一行>`；pi 读配置时跳过的条目一行 `config: <文件>: server "<名字>": <原因>`（还有 `invalid server name "<名字>"`、`server "<名字>" conflicts with "<另一个>"`） |
 | 第一次发提示时还有服务没连上 | `MCP servers are still connecting; their tools become available once connected.`（info） |
 | 运行时加载失败 | `MCP failed to load: <原文>`（error） |
 
@@ -76,7 +108,7 @@ pi 的 MCP 扩展经 `ctx.ui.notify` 发出的通知都到了 Mori 的界面上�
 
 | 事实 | 依据 | 影响 |
 | --- | --- | --- |
-| `pi config` 的写入在没有导出的 `ConfigSelectorComponent`（`modes/interactive/components/config-selector.ts`）：用户级启停是 `toggleTopLevelResource`（改设置里的 `extensions` / `skills` / `prompts` / `themes` 数组，先去掉同一路径原有的 `+`、`-`、`!` 条目，再加 `-路径` 或 `+路径`，路径相对设置文件所在的目录）和 `togglePackageResource`（改 `packages` 里那一项的过滤数组，相对包的根目录） | config-selector.js 426–521（源码在 `.js.map` 里） | 照搬这两个函数（注明出处），`app/src/kernel/resourceToggles.ts` |
+| `pi config` 的写入在没有导出的 `ConfigSelectorComponent`（`modes/interactive/components/config-selector.ts`）：用户级启停是 `toggleTopLevelResource`（改设置里的 `extensions` / `skills` / `prompts` / `themes` 数组，先去掉同一路径原有的 `+`、`-`、`!` 条目，再加 `-路径` 或 `+路径`，路径相对设置文件所在的目录）和 `togglePackageResource`（改 `packages` 里那一项的过滤数组，相对包的根目录） | config-selector.js 426–521（源码在 `.js.map` 里） | 照搬这两个函数（注明出处），`app/src/kernel/resourceToggles.ts`；只多一处：停用整个包写的 `[]` 后再单独打开一个资源时先写 `"!**"`（`pi config` 自己不写 `[]`，见 defaults.md） |
 | `toggleTopLevelResource` 对项目自己的资源（`.pi/skills` 等）写项目的 `.pi/settings.json`，写出的条目与 `pi config -l` 一样（`-skills\x\SKILL.md`、`+skills\x\SKILL.md`） | 对照 config-selector.ts 671–760 `setProjectTopLevelOverride` | 走查 3 停用项目技能：写进这个项目的 `.pi/settings.json`（用户级设置停不了项目的技能），见"需要你确认" |
 | 列表用 `DefaultPackageManager.resolve()`：每项带 `enabled` 和来源（`scope` 用户级 / 项目、`origin` 顶层 / 包、`source`、`baseDir`），停用的也在；不传回调时会去下载缺的 npm / git 包（`PI_OFFLINE=1` 时不会） | package-manager.js 704–745、1014–1028 | 只读地列出时传 `async () => "skip"` |
 | `resourceLoader.getSkills()` 只有启用的技能 | resource-loader.js 380–393 | 技能列表用 `resolve()` 的路径加 pi 导出的 `loadSkills` 取名字和说明 |
@@ -87,10 +119,34 @@ pi 的 MCP 扩展经 `ctx.ui.notify` 发出的通知都到了 Mori 的界面上�
 
 | 事实 | 依据 | 影响 |
 | --- | --- | --- |
-| 每个目录只取第一个存在的：`AGENTS.override.md`、`AGENTS.md`、`AGENTS.MD`、`CLAUDE.md`、`CLAUDE.MD`；顺序是 agentDir 一个，再从文件系统根到工作目录逐级 | resource-loader.js 115–196 | 用户级编辑 `<agentDir>/AGENTS.md`；agentDir 里有 `AGENTS.override.md` 时它才生效，界面标出 |
+| 每个目录只取第一个存在的：`AGENTS.override.md`、`AGENTS.md`、`AGENTS.MD`、`CLAUDE.md`、`CLAUDE.MD`；顺序是 agentDir 一个，再从文件系统根到工作目录逐级 | resource-loader.js 115–196 | 用户级编辑 `<agentDir>/AGENTS.md`；agentDir 里有 `AGENTS.override.md` 时它才生效，界面标出；agentDir 里只有 `CLAUDE.md` 时，保存 `AGENTS.md` 后 `CLAUDE.md` 不再加载，界面也标出 |
 | 不受项目信任控制；会话创建时读一次 | docs/configuration.md、security.md | 保存后新会话才读到，界面明说 |
 | `resourceLoader.getAgentsFiles()` 给出这个会话实际加载的文件（路径和内容） | resource-loader.js 465–474 | 项目级列表取焦点会话加载的文件 |
 
-### 打开很多会话时 MCP 的内存与进程
+### 打开很多会话时 MCP 的内存与进程（需要你决定）
 
-（实测数字见下"测试"。）
+pi 的 MCP 扩展每个会话各连一次：每个启用的 stdio 服务，每个打开着的会话起一个子进程（Windows 上另带一个 `conhost.exe`）。
+M3 起会话一直开着，直到归档、删除或退出，所以成本随打开过的会话数线性增长。实测（`tests/ui/m6-mcp-cost.mjs`，开发构建，
+一个合成 MCP 服务 `tests/mcp-server/server.mjs`，会话只打开、不发消息；数字是工作集）：
+
+| 打开的会话 | MCP 子进程 | 子进程合计内存 | 后台进程自己 |
+| --- | --- | --- | --- |
+| 0 | — | — | 131 MB |
+| 1 | node.exe ×1、conhost.exe ×1 | 52 MB | 134 MB |
+| 5 | node.exe ×5、conhost.exe ×5 | 262 MB | 135 MB |
+| 10 | node.exe ×10、conhost.exe ×10 | 525 MB | 135 MB |
+
+合成服务是最小的 Node 脚本；真实服务常经 `npx` / `uvx` 启动（多一层进程），每个会更重。
+
+Claude 桌面版的做法：本地 MCP 服务是整个 App 一份，每个服务一个进程，启动 App 时连上，所有对话共用；改了配置要重启 App。
+
+选项：
+
+| 选项 | 做法 | 代价 |
+| --- | --- | --- |
+| A（推荐，现在的做法） | 保持 pi 的做法，v0 不改；用不到的服务在工具页停用 | 打开的会话多、服务多时内存和进程多；你说过"不拿内存和 CPU 换性能"（2026-10-20） |
+| B | 只给显示着的会话（或最近 N 个）连 MCP | pi 没有只断开 MCP 的接口，要 `session.reload()` 重跑全部扩展；也违背 M3 定的"会话不因不在屏幕上而停" |
+| C | 照 Claude 桌面版：每个服务一个进程，所有会话共用 | 要在 pi 的 MCP 扩展下面接一层 Mori 自己的共享连接（`createMcpExtension` 的 `createTransport` 选项），是 pi 没有的后端（方案第 8 节第 4 条），要你同意 |
+| D | 限制同时开着的会话数，超过时关掉最早的 | 违背 M3 时你定的"会话一直开着" |
+
+推荐 A：v0 先不加后端；等你真的同时开很多会话、用多个服务时，再考虑 C。

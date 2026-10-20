@@ -8,9 +8,9 @@
 | 测试连接的最大输出 | 512 token | `app/src/kernel/config.ts` `TEST_MAX_TOKENS` | 推理模型先输出思考，太小时只收到思考、没有正文 | 拿到内网端点时 |
 | 测试连接的超时 | 30 秒 | `app/src/kernel/config.ts` `TEST_TIMEOUT_MS` | 端点接受连接却不回复时，按钮不至于一直处于"测试中" | 拿到内网端点时 |
 | 测试连接的提示词 | `Reply with one short sentence.` | `app/src/kernel/config.ts` `testConnection` | 短、任何模型都能回答；M1 用 DeepSeek 两个模型都正常 | 拿到内网端点时 |
-| Mori 在 `models.json` 中的 provider id | `mori-endpoint` | `app/src/kernel/config.ts` `PROVIDER_ID` | 与 pi 内置 provider 不冲突 | M6（多模型） |
+| Mori 在 `models.json` 中的 provider id | `models.json` 里还没有 Mori 的连接时用 `mori-endpoint`（M0 起沿用）；否则用 `mori-endpoint-<毫秒时间戳>`（已被占用时加一）。删掉的 id 不再用 | `app/src/kernel/config.ts` `nextProviderId` | 与 pi 内置 provider 不冲突，一个连接下可以有多个模型。不重用：pi 按 provider id 找 key 和模型，会话文件记的是 `provider/模型`，重用删掉的 id 会让打开着的会话和重新打开的旧会话悄悄连到新的端点（M6 复查发现）；时间戳不用另存"用过的最大编号" | 你想给连接起有意义的 id 时 |
 | 打开信任询问之前按不信任创建 | `projectTrusted: false`，pi 在加载项目资源前调用 `resolveProjectTrust` 再定 | `app/src/kernel/sessions.ts` `loadResources` | 与 pi 自己的 `loadProjectTrustExtensions` 相同；M3 起接上信任询问（见 [screens/sessions.md](screens/sessions.md)） | — |
-| 文件夹没有要信任的内容时直接按信任处理、不问 | `resolveProjectTrust` 返回 true | `app/src/kernel/trust.ts` `decideTrust` | 与 pi 命令行相同；这时没有项目资源可加载 | M6（工具页） |
+| 文件夹没有要信任的内容时直接按信任处理、不问 | `resolveProjectTrust` 返回 true | `app/src/kernel/trust.ts` `decideTrust` | 与 pi 命令行相同；这时没有项目资源可加载 | — （M6 已复查：工具页每次重新判断，见"工具页对'没有要信任的内容'的文件夹重新判断"） |
 | 信任判断不看扩展的 `project_trust` 事件和 `defaultProjectTrust` 设置 | 只按"有没有要信任的内容 → trust.json → 你的回答" | `app/src/kernel/trust.ts` | pi 没有导出 `resolveProjectTrusted` / `emitProjectTrustEvent`；`defaultProjectTrust` 设为 always 会与 M3 反例"任何情况下都不会不经询问就加载扩展"冲突 | M6 或 pi 升级时 |
 | 本次运行里同一文件夹只问一次（没勾"记住"时） | 界面记下回答，后台进程重新载入后沿用；只记"信任 / 不信任" | `app/src/renderer/src/state/trust.ts` | 与 pi 命令行的 `projectTrustByCwd` 相同（每个进程问一次） | 你走查时 |
 | 信任询问里 Esc 的含义 | 等于"不信任"，不记住 | `app/src/renderer/src/components/TrustDialog.tsx` | 与 pi 取消询问时相同（按不信任、不保存） | 你走查时 |
@@ -53,3 +53,17 @@
 | 分屏时右栏放得下的条件 | 中栏放得下两栏各 280px 加右栏最窄的 260px；放不下时右栏先收起，点开关才浮在上层 | `app/src/renderer/src/App.tsx` `useColumns`、`RIGHT_MIN` | 方案 5.11"两栏各不足 280px 时先收起右栏"；260px 是右栏原有的最小宽度 | 你走查时觉得两栏太挤再调 |
 | 重启后不恢复分屏 | 只保留分屏的比例；哪两个会话在分屏里不保存 | `app/src/renderer/src/state/store.ts` `split` | M3 起启动后不自动打开任何会话（照 Claude 桌面版），分屏也一样 | 你走查时 |
 | 打开或切换会话后把焦点放进输入框时等菜单退出的帧数 | 最多 5 帧，仍有浮层（例如信任询问）就不动焦点 | `app/src/renderer/src/state/split.ts` `FOCUS_RETRY_FRAMES` | 菜单关闭后它在浮层栈里的登记要到下一次提交之后才去掉 | — |
+| 生成中不能换模型和思考强度 | 顶栏的两个按钮在本轮运行中（含"刚发出"）不可用，后台进程也拒绝 | `ModelMenu.tsx`、`ThinkingMenu.tsx`；`app/src/kernel/sessions.ts` `requireIdle` | pi 允许运行中换，下一次请求才用新的；界面上不清楚这一轮到底用的哪个，先不允许 | 你走查时觉得要能在生成中切换 |
+| 顶栏在窄栏里怎样收紧 | 按会话面板宽度分步，单栏、分屏相同，模型和思考按钮任何宽度都在：≤ 720px 权限按钮去掉图标、模型按钮最长 120px；≤ 600px 不显示项目名（分屏 ≤ 640px 起）、思考按钮只显示强度（"高 ▾"）、模型、思考和权限菜单贴着面板右边打开；≤ 480px 不显示上下文用量；≤ 400px 模型和思考按钮去掉 ▾、间距收小；再放不下时模型按钮收短，最窄 40px（先截模型 ID，"（已删除）"最后截），会话名至少留 36px。收起的文字在悬停说明和读屏名称里（models.md"窄栏"） | `app/src/renderer/src/styles/chat.css`、`models.css`、`split.css` 的 `@container` | 最窄的两种：分屏每栏 280px，M1 的 800 宽、右栏打开时中栏 300px；阈值按最宽的文字估算（"思考：不可选"、"全部允许"、"上下文 100%"、"<ID>（已删除）"）。上下文用量只是显示，先让给能操作的按钮 | 你走查时觉得窄栏里哪一项该留、哪一项该收 |
+| 不支持思考的模型的思考菜单 | 列出关–高（pi 对支持思考、没有映射的模型给出的那一组），全部不可用，没有打勾的 | `ThinkingMenu.tsx` | 让你看到标了"支持思考"以后能选什么；方案只要求"不可选"并说明原因 | 你走查时 |
+| 新模型的上下文长度 | 128000（与连接表单相同） | `ConnectionForm.tsx` `emptyModel` | 与 pi 的默认值相同 | 拿到内网端点时 |
+| MCP 服务的错误原文怎样找 | 跟随的会话对话流里以 `MCP ` 开头的扩展通知，取其中以 `<服务名>:` 开头的行；完整通知可以展开 | `app/src/renderer/src/state/tools.ts` `mcpNotices` / `serverLines` | pi 只经通知报告连接错误（`MCP servers need attention:` 每个服务一行），没有结构化的状态；按 pi 的原文格式认行 | pi 升级时复查原文格式 |
+| 技能正文在工具页最多显示 | 20,000 字 | `app/src/kernel/resources.ts` `BODY_LIMIT` | 技能一般很短；不让一个很大的 SKILL.md 撑大工具页 | 你走查时 |
+| "/"补全的排序 | 名字以你打的字开头的在前，包含它的在后，不分大小写；分"提示词模板""技能"两组 | `app/src/renderer/src/state/slash.ts` `filterCommands` | 照 Claude 桌面版的命令列表随打字过滤；pi 终端用模糊匹配 | 你走查时觉得找不到再调 |
+| `mcp.json` 写入的格式 | 两个空格缩进，末尾换行；只改那一个服务，其他内容和顺序不变 | `app/src/kernel/mcpConfig.ts` | pi 自己改 `mcp.json` 时保留原来的缩进；Mori 写的与 pi 读到的内容相同，只是缩进可能变 | 你介意格式变化时 |
+| "启用整个包"的写法 | 把这个包在设置里写回只有来源的字符串（去掉全部过滤，单独停用过的资源也一起启用） | `app/src/kernel/resources.ts` `setPackageEnabled` | pi 文档里"全部加载"就是字符串写法；`pi config` 没有整包启停 | 你走查时 |
+| 离开有未保存改动的页面时先问 | 只问用户级 AGENTS.md 的编辑框；连接、模型、MCP 表单没保存就离开时不问；关闭 Mori 窗口不问 | `app/src/renderer/src/state/leaveGuard.ts` | 方案 5.12 只对 AGENTS.md 有要求；表单都很短 | 你走查时 |
+| 工具页、设置页的改动何时生效 | 启停、添加、AGENTS.md 都只对之后新建的会话生效，界面上明说；模型和连接的改动对打开着的会话立刻生效（后台进程换模型对象） | `ToolsPage.tsx`、`AgentsSection.tsx`；`app/src/kernel/sessions.ts` `refreshSessionModels` | pi 只在会话创建时读资源、AGENTS.md 和 `mcp.json`，要重新读得 `session.reload()`（会重跑全部扩展，生成中不安全）；照 Claude 桌面版改了本地 MCP 配置要重启才生效 | 你走查时觉得要在打开着的会话里立刻生效 |
+| 停用整个包后单独打开一个资源的写法 | 这一类的过滤是 `[]` 时先写 `"!**"`，再照 `pi config` 加 `+路径` / `-路径`（例如 `["!**", "+skills\a\SKILL.md"]`） | `app/src/kernel/resourceToggles.ts` `togglePackageResource` | 照搬 `pi config` 会得到只有 `+路径` 的数组，pi 的 `applyPatterns` 没有普通包含时从全部文件开始，这一类的资源全都回来（扩展也一样）；`pi config` 自己不写 `[]`，是 Mori 的"停用整个包"写的。`"!**"` 先排除全部，之后的 `+`、`-` 照常生效，包里以后新加的资源仍是停用 | 你走查时；pi 升级时 |
+| 不是本地文件夹的包（`npm:` `git:` `github:` `http:` `https:` `ssh:` 来源） | 工具页上卡只读，说明"内网只支持本地文件夹的包；这一项不会被安装，可以移除"，只能移除 | `app/src/kernel/resources.ts` `isRemote`、`packageReadOnly`；`ToolsPlugins.tsx` | Mori 只能添加本地文件夹，这种来源只会是手改 `<userData>\pi\settings.json` 写进来的，`PI_OFFLINE` 下 pi 不安装。它留在设置里时，pi 每次 `resolve()` 都同步跑一次 `npm root -g`（本机约 0.9 秒，后台进程这段时间停住，所有栏的输出都停）：工具页每次读取 1–2 次、每次启停 3–6 次（含写入后的确认），每个新会话 1 次（pi 自己的） | 内网要用 npm / git 包时 |
+| 工具页对"没有要信任的内容"的文件夹重新判断 | 跟随的会话打开时是 none 的，工具页每次读取照新会话的判断再算一次（`decideTrust`，不带回答）：仍然没有 → 照旧；trust.json 有记录 → 按记录；否则按没有回答，不列出项目内容、显示"没有信任这个文件夹" | `app/src/kernel/resources.ts` `toolsTrust` | 上面"直接按信任处理"的理由是"那时没有项目资源可加载"；之后出现的项目配置没有人信任过，不能列出、不能改，也不能让 pi 读项目的 `npmCommand` | 你走查时 |

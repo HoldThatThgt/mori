@@ -1,5 +1,6 @@
 // 工具页的"插件"一节（docs/v0/screens/tools.md）：pi 设置里的包（用户级和信任后的本项目），每个包一张卡，
 // 包里的资源按扩展、技能、提示词、主题分组，每个资源一个开关；添加本地包、停用 / 启用整个包、移除（不删文件夹）。
+// 不是本地文件夹的包（npm / git）只读，卡上说明内网不会安装它，只能移除。
 
 import { useState } from 'react';
 import { RESOURCE_KINDS, type PackageEntry, type ResourceEntry, type ResourceKind } from '../../../shared/protocol';
@@ -73,11 +74,13 @@ function RemovePackage({ source, onClose }: { source: string; onClose: () => voi
   );
 }
 
-/** @brief 一个包：来源、解析后的文件夹、用户级 / 本项目；资源分组；停用或启用整个包、移除。 */
+/**
+ * @brief 一个包：来源、解析后的文件夹、用户级 / 本项目；资源分组；停用或启用整个包、移除。
+ *        卡只读（readOnly）时不能整包启停；用户级的包（含内网不会安装的 npm / git 包）总能移除，本项目的不能。
+ */
 function PackageCard({ pkg }: { pkg: PackageEntry }) {
   const change = useChange();
   const [removing, setRemoving] = useState(false);
-  const locked = change.busy || pkg.readOnly !== null;
   const allOff = pkg.resources.length > 0 && pkg.resources.every((resource) => !resource.enabled);
   return (
     <article className="tools-card" data-testid="package-card" data-source={pkg.source}>
@@ -86,11 +89,11 @@ function PackageCard({ pkg }: { pkg: PackageEntry }) {
         <span className="tools-tag">{pkg.scope === 'user' ? '用户级' : '本项目'}</span>
         <div className="tools-row-actions">
           {pkg.resources.length > 0 && (
-            <button type="button" className="text-link" disabled={locked}
+            <button type="button" className="text-link" disabled={change.busy || pkg.readOnly !== null}
               onClick={() => void change.run({ type: 'package.setAll', source: pkg.source, enabled: allOff })}>
               {allOff ? '启用整个包' : '停用整个包'}</button>
           )}
-          <button type="button" className="text-link danger" disabled={locked}
+          <button type="button" className="text-link danger" disabled={change.busy || pkg.scope === 'project'}
             onClick={() => setRemoving(true)}>移除</button>
         </div>
       </header>

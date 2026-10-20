@@ -38,19 +38,19 @@ function useAgentsInfo(session: FocusedSession | null) {
 }
 
 /**
- * @brief 有未保存的改动时登记离开检查；你选"继续编辑"后焦点回到编辑框。
- * @param value 编辑框里的文字：每次改动都重新登记
+ * @brief 有未保存的改动时登记离开检查；你选"放弃改动"时 discard 丢掉改动，选"继续编辑"后焦点回到编辑框。
+ * @param discard 回到读到的内容（不随渲染变化）
  */
-function useLeaveCheck(dirty: boolean, value: string, editor: RefObject<HTMLTextAreaElement | null>): void {
+function useLeaveCheck(dirty: boolean, editor: RefObject<HTMLTextAreaElement | null>, discard: () => void): void {
   const asking = useLeave((state) => state.proceed !== null);
   const wasAsking = useRef(false);
-  // 你选"放弃改动"时 leaveGuard 已经取消了检查，离开途中不再登记（同一次离开不会再问第二遍）；
-  // 离开没有发生（例如"打开文件夹"时取消了选择）时，你再改一次编辑框就重新登记。
+  // 你选"放弃改动"时 leaveGuard 先取消检查再丢掉改动：编辑框回到读到的内容，不再有未保存的改动。
+  // 离开没有发生（例如"打开文件夹"时取消了选择）时也一样，屏幕上不会留下没有检查的改动。
   useEffect(() => {
     if (!dirty) return;
-    setLeaveGuard(() => LEAVE_TEXT);
+    setLeaveGuard({ text: LEAVE_TEXT, discard });
     return () => setLeaveGuard(null);
-  }, [dirty, value]);
+  }, [dirty, discard]);
   useEffect(() => {
     if (wasAsking.current && !asking && dirty) editor.current?.focus();
     wasAsking.current = asking;
@@ -80,7 +80,12 @@ function useAgentsEditor(info: AgentsInfo | null, onSaved: (content: string) => 
     setDraft(next);
     if (status.kind !== 'saving') setStatus({ kind: 'idle' });
   }
-  return { value, dirty, status, save, change, revert: () => change(saved) };
+  // 撤销改动、放弃改动：回到读到的内容。只用 setState，登记离开检查时拿到的函数一直可用。
+  const revert = useCallback(() => {
+    setDraft(null);
+    setStatus((current) => (current.kind === 'saving' ? current : { kind: 'idle' }));
+  }, []);
+  return { value, dirty, status, save, change, revert };
 }
 
 /** @brief 编辑框旁边的一行：保存中、保存失败、有未保存的改动、已保存。 */
@@ -109,16 +114,28 @@ function OpenInEditor({ path, cwd }: { path: string; cwd: string }) {
   );
 }
 
-/** @brief 生效的文件：是用户级 AGENTS.md 时"生效中"，不是时（例如有 AGENTS.override.md）警示这里写的不会生效。 */
+/** pi 在一个目录里排在 AGENTS.md 前面的只有它（resource-loader.js loadContextFileFromDir 的候选顺序） */
+const OVERRIDE_FILE = /[\\/]AGENTS\.override\.md$/;
+
+/**
+ * @brief 生效的文件那一行的文字。pi 在 agentDir 里取 AGENTS.override.md、AGENTS.md、AGENTS.MD、CLAUDE.md、CLAUDE.MD
+ *        中第一个存在的：是用户级 AGENTS.md 时"生效中"；是 AGENTS.override.md 时这里写的不会生效；
+ *        是 CLAUDE.md（还没有 AGENTS.md）时保存后改读 AGENTS.md，它不再加载。
+ */
+function effectiveText(path: string, userPath: string): { warn: boolean; text: string } {
+  if (path === userPath) return { warn: false, text: `生效中：${path}` };
+  if (OVERRIDE_FILE.test(path)) return { warn: true, text: `生效的是 ${path}，这里写的不会生效` };
+  return { warn: true, text: `现在生效的是 ${path}；保存后改读这里的 AGENTS.md，它不再加载` };
+}
+
+/** @brief 生效的文件：文字见 effectiveText；可以用系统编辑器打开它（例如先把 CLAUDE.md 的内容抄过来）。 */
 function EffectiveFile({ info }: { info: AgentsInfo }) {
   const path = info.effectivePath;
   if (!path) return null;
-  const same = path === info.userPath;
+  const { warn, text } = effectiveText(path, info.userPath);
   return (
     <div className="agents-line">
-      <span className={same ? 'agents-effective' : 'agents-effective warn'} data-testid="agents-effective">
-        {same ? `生效中：${path}` : `生效的是 ${path}，这里写的不会生效`}
-      </span>
+      <span className={warn ? 'agents-effective warn' : 'agents-effective'} data-testid="agents-effective">{text}</span>
       <OpenInEditor path={path} cwd={parentDir(path)} />
     </div>
   );
@@ -128,7 +145,7 @@ function EffectiveFile({ info }: { info: AgentsInfo }) {
 function UserAgents({ info, onSaved }: { info: AgentsInfo | null; onSaved: (content: string) => void }) {
   const editor = useRef<HTMLTextAreaElement>(null);
   const { value, dirty, status, save, change, revert } = useAgentsEditor(info, onSaved);
-  useLeaveCheck(dirty, value, editor);
+  useLeaveCheck(dirty, editor, revert);
   const notice = statusNotice(status, dirty);
   function onKeyDown(event: React.KeyboardEvent) {
     if (event.code !== 'KeyS' || !event.ctrlKey || event.altKey || event.shiftKey || event.metaKey) return;

@@ -62,18 +62,28 @@ function groupByConnection(models: AvailableModel[]): AvailableModel[][] {
   return [...groups.values()];
 }
 
+/** @brief 模型按钮上显示的内容。 */
+interface ModelLabel {
+  /** 模型 ID；没有模型时"没有可用模型" */
+  id: string;
+  /** 后面标"（已删除）"时的文字；没删时为空串 */
+  deleted: string;
+  /** 悬停说明 */
+  title: string;
+}
+
 /**
- * @brief 按钮上的文字和悬停说明。模型不在列表里（在设置里删掉了）时标"（已删除）"；
+ * @brief 按钮上的文字和悬停说明。模型不在列表里（在设置里删掉了）时标"（已删除）"，悬停说明里也有；
  *        还没读到列表（models 为 undefined）时不判断。
  */
-function modelLabel(ref: string | null, models: AvailableModel[] | undefined): { text: string; title: string } {
-  if (!ref) return { text: '没有可用模型', title: '选择模型' };
+function modelLabel(ref: string | null, models: AvailableModel[] | undefined): ModelLabel {
+  if (!ref) return { id: '没有可用模型', deleted: '', title: '选择模型' };
   const listed = models?.find((model) => model.ref === ref);
   const provider = listed?.provider ?? ref.slice(0, ref.indexOf('/'));
   const id = listed?.id ?? ref.slice(provider.length + 1);
   const connection = listed?.providerName ?? models?.find((model) => model.provider === provider)?.providerName;
-  const deleted = models !== undefined && !listed;
-  return { text: deleted ? `${id}（已删除）` : id, title: `${connection ?? provider} · ${id}` };
+  const deleted = models !== undefined && !listed ? '（已删除）' : '';
+  return { id, deleted, title: `${connection ?? provider} · ${id}${deleted}` };
 }
 
 /** @brief 模型菜单的内容。 */
@@ -120,6 +130,7 @@ function ModelPanel({ models, current, defaultModel, onChoose, onManage }: Model
 /**
  * @brief 顶栏的模型按钮和菜单。disabled 为真时（会话没打开、后台进程不可用）不能切换；生成中也不能切换。
  *        换模型的请求还没返回时按钮显示你选的模型、不可用（仍可聚焦，焦点留在按钮上）。
+ *        面板窄时按钮收短（省略号），完整的文字在悬停说明和读屏名称里（models.md"窄栏"）。
  */
 export function ModelMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
   const models = useApp((state) => state.config?.models);
@@ -144,10 +155,13 @@ export function ModelMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
   return (
     <div className="model-switch" ref={menu.root}>
       <button ref={menu.button} className="model-button" data-testid="model-button" aria-haspopup="menu"
-        aria-expanded={menu.open} aria-label={`模型：${shown.text}`} disabled={disabled || running}
+        aria-expanded={menu.open} aria-label={`模型：${shown.id}${shown.deleted}`} disabled={disabled || running}
         aria-disabled={pending ? true : undefined} title={running ? '生成中不能切换模型' : shown.title}
         onClick={() => { if (!pending) menu.setOpen(!menu.open); }}>
-        <span className="switch-text">{shown.text}</span><Icon name="down" />
+        {/* 窄栏里按钮收短时先截模型 ID，"（已删除）"留到最后（models.css） */}
+        <span className="switch-text">{shown.id}</span>
+        {shown.deleted && <span className="switch-text model-deleted">{shown.deleted}</span>}
+        <Icon name="down" />
       </button>
       {menu.open && <ModelPanel models={models ?? NO_MODELS} current={tab.model} defaultModel={defaultModel}
         onChoose={choose} onManage={manage} />}

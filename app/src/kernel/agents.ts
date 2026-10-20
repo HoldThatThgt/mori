@@ -9,7 +9,7 @@ import { loadPi } from './pi';
 import { sessionContext } from './sessions';
 
 /**
- * @brief 先写临时文件再改名，避免写到一半留下损坏的文件；目录不存在时先创建。mcp.json 也用它写。
+ * @brief 先写临时文件再改名，避免写到一半留下损坏的文件；目录不存在时先创建。
  * @param text 以 UTF-8 写入的全文
  */
 export async function writeFileAtomic(path: string, text: string): Promise<void> {

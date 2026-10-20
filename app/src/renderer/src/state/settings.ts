@@ -23,7 +23,11 @@ export type SettingsSection = 'connections' | 'agents';
 
 /** @brief "连接与模型"里显示什么：列表、添加连接、编辑连接、添加或编辑模型。 */
 export type ConnectionsView =
-  | { kind: 'list' }
+  | {
+    kind: 'list';
+    /** 从表单回到列表时把焦点放到的按钮（选择器，见 ConnectionsList 的 modelButton、connectionButton）；不带时不动 */
+    focus?: string;
+  }
   | { kind: 'add' }
   | {
     kind: 'edit';
@@ -156,16 +160,21 @@ export function cancelTest(): void {
   void request({ type: 'connection.testCancel' }).catch((error) => describe('connection.testCancel', error));
 }
 
-/** @brief 设为默认模型；结果写在列表上方，pi 报告写设置的错误时显示原文。 */
-export async function setDefaultModel(providerId: string, modelId: string): Promise<void> {
+/**
+ * @brief 设为默认模型；结果写在列表上方，pi 报告写设置的错误时显示原文。
+ * @return 写入了时为 true；"设为默认失败"时为 false（这一行的"设为默认"还在）
+ */
+export async function setDefaultModel(providerId: string, modelId: string): Promise<boolean> {
   try {
     const result = await request<SaveResult>({ type: 'model.setDefault', providerId, modelId });
     await loadConfig();
     const text = `已把 ${modelId} 设为默认`;
     showView({ kind: 'list' }, result.error ? { tone: 'error', text: `${text}，但配置有错误：${result.error}` }
       : { tone: 'ok', text: `${text} · 新会话用默认模型；已经打开的会话不变` });
+    return true;
   } catch (error) {
     showView({ kind: 'list' }, { tone: 'error', text: `设为默认失败：${describe('model.setDefault', error)}` });
+    return false;
   }
 }
 

@@ -234,9 +234,25 @@ async function stopCheck(page, h) {
       && await page.getByTestId('error-card').count() === 0, JSON.stringify(reloaded));
 }
 
-/** @brief 没有 key：发送时就失败，原文 + "去设置"；点它进设置页且焦点在 API key。 */
+/**
+ * @brief 没有 key 时的顶栏（chat.md 顶栏"模型"、models.md"没有可用模型"，M1 起）：模型按钮"没有可用模型"，
+ *        pi 给出的说明（录制里 session.create 的 modelNotice）显示在会话里；M6 起不显示思考按钮。
+ */
+async function noModelTopBar(page) {
+  const top = await page.evaluate(() => {
+    const pane = document.querySelector('[data-testid="chat-pane"]');
+    return { model: pane?.querySelector('[data-testid="model-button"]')?.textContent?.trim() ?? null,
+      thinking: pane?.querySelectorAll('[data-testid="thinking-button"]').length ?? null,
+      notice: pane?.textContent?.includes('No models available') ?? false };
+  });
+  record('no-key：没有可用模型时顶栏模型按钮显示"没有可用模型"、不显示思考按钮，会话里显示 pi 给出的说明',
+    top.model?.includes('没有可用模型') && top.thinking === 0 && top.notice, JSON.stringify(top));
+}
+
+/** @brief 没有 key：顶栏"没有可用模型"；发送时就失败，原文 + "去设置"；点它进设置页的"编辑连接"且焦点在 API key。 */
 async function noKeyCheck(page, h) {
   await h.load('no-key');
+  await noModelTopBar(page);
   await h.send('你好');
   const card = page.getByTestId('error-card');
   await card.waitFor({ timeout: 10000 });
@@ -244,8 +260,12 @@ async function noKeyCheck(page, h) {
   record('no-key：显示找不到 key 的原文和"去设置"', text.includes('No API key found') && text.includes('去设置'), oneLine(text));
   await card.getByRole('button', { name: '去设置' }).click();
   await page.getByTestId('settings-page').waitFor();
-  const focused = await page.evaluate(() => document.activeElement?.getAttribute('type'));
-  record('no-key："去设置"打开设置页的连接表单，焦点在 API key', focused === 'password');
+  // settings.md 外框："去设置"打开"编辑连接"，焦点在 API key。会话没有可用模型（pi 的占位模型 unknown/unknown），
+  // 回放里只有一个连接（synthetic，harness 按录制的端点拼出），应打开它。
+  const focus = await h.keyFocus();
+  record('no-key："去设置"打开设置页里那个连接的"编辑连接"，焦点在 API key 框',
+    focus.type === 'password' && focus.inForm && /^编辑连接 · /.test(focus.title ?? ''), JSON.stringify(focus));
+  await page.screenshot({ path: join(shots, 'no-key-settings.png') });
   await page.getByRole('button', { name: '返回会话' }).click();
   record('no-key：返回会话后错误卡还在', await page.getByTestId('error-card').isVisible());
 }

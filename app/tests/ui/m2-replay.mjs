@@ -694,12 +694,20 @@ async function twoToolsCheck(page, h) {
   await shot(page, 'two-tools');
 }
 
-/** @brief F8 前：在设置页的连接表单里填一个 key 并保存（回放桥直接回答 connection.save），之后检查它不进报告。 */
+/**
+ * @brief F8 前：在设置页的连接表单里填一个 key 并保存（回放桥直接回答 connection.save），之后检查它不进报告。
+ *        M6 起设置页先是连接列表；用"添加连接"（与首次启动同一张表单，connection.save 带 providerId null，
+ *        settings.md"添加连接"），保存后回到列表，上方一行"已保存"。连接的名称、地址和模型 ID 是 synthetic。
+ */
 async function saveFakeKey(page, h, key) {
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await h.fillConnection({ apiKey: key });
+  await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
+  await page.getByRole('button', { name: '添加连接' }).click();
+  await page.getByTestId('connection-form').waitFor({ timeout: 10000 });
+  await h.fillConnection({ name: 'synthetic 连接', baseUrl: 'http://127.0.0.1:9/v1', apiKey: key,
+    modelId: 'synthetic-model' });
   await page.getByRole('button', { name: '保存', exact: true }).click();
-  await h.formMessage();
+  await page.getByTestId('settings-notice').filter({ hasText: '已保存' }).waitFor({ timeout: 10000 });
   await page.getByRole('button', { name: '返回会话' }).click();
 }
 

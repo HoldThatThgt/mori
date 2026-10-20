@@ -1,0 +1,2422 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m6-record.mjs; do not edit by hand.",
+ "name": "mcp",
+ "description": "在用户级 mcp.json 添加合成 MCP 服务 mori-test（直接调用）、命令写错的 mori-broken、不注册工具的 mori-empty；新会话的工具页看到 mori-test 的工具名，调用 mcp__mori_test__echo 出批准卡、允许后返回；pi 的通知给出 mori-broken 的错误原文",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-20T11:21:48.793Z",
+ "steps": [
+  {
+   "t": 0,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 2450,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 2450,
+   "command": {
+    "type": "mcp.save",
+    "name": "mori-test",
+    "previousName": null,
+    "entry": {
+     "command": "node",
+     "args": [
+      "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+     ],
+     "exposure": "direct"
+    }
+   }
+  },
+  {
+   "t": 2550,
+   "result": {
+    "type": "mcp.save",
+    "value": {
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 2550,
+   "command": {
+    "type": "mcp.save",
+    "name": "mori-broken",
+    "previousName": null,
+    "entry": {
+     "command": "no-such-command-mori",
+     "args": [],
+     "exposure": "direct"
+    }
+   }
+  },
+  {
+   "t": 2554,
+   "result": {
+    "type": "mcp.save",
+    "value": {
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 2554,
+   "command": {
+    "type": "mcp.save",
+    "name": "mori-empty",
+    "previousName": null,
+    "entry": {
+     "command": "node",
+     "args": [
+      "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+     ],
+     "env": {
+      "MORI_MCP_TOOLS": "none"
+     },
+     "exposure": "direct"
+    }
+   }
+  },
+  {
+   "t": 2558,
+   "result": {
+    "type": "mcp.save",
+    "value": {
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 2558,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-4pyIBB\\m6-mcp"
+   }
+  },
+  {
+   "t": 2562,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 2562,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-4pyIBB\\m6-mcp"
+   }
+  },
+  {
+   "t": 2611,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-4pyIBB\\m6-mcp",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-A0DYOL\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m6-record-4pyIBB-m6-mcp--\\2026-10-20T11-21-46-346Z_01a1590b-c669-718a-a3f2-10f04d81dbbf.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 2611,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf"
+   }
+  },
+  {
+   "t": 2785,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-4pyIBB\\m6-mcp",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      }
+     ],
+     "skills": [],
+     "packages": [],
+     "mcp": {
+      "errors": [],
+      "servers": [
+       {
+        "name": "mori-test",
+        "scope": "user",
+        "enabled": true,
+        "exposure": "direct",
+        "command": "node",
+        "args": [
+         "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+        ],
+        "url": null,
+        "entry": {
+         "command": "node",
+         "args": [
+          "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+         ],
+         "exposure": "direct"
+        },
+        "overrides": [],
+        "tools": [],
+        "readOnly": null
+       },
+       {
+        "name": "mori-broken",
+        "scope": "user",
+        "enabled": true,
+        "exposure": "direct",
+        "command": "no-such-command-mori",
+        "args": [],
+        "url": null,
+        "entry": {
+         "command": "no-such-command-mori",
+         "args": [],
+         "exposure": "direct"
+        },
+        "overrides": [],
+        "tools": [],
+        "readOnly": null
+       },
+       {
+        "name": "mori-empty",
+        "scope": "user",
+        "enabled": true,
+        "exposure": "direct",
+        "command": "node",
+        "args": [
+         "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+        ],
+        "url": null,
+        "entry": {
+         "command": "node",
+         "args": [
+          "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+         ],
+         "env": {
+          "MORI_MCP_TOOLS": "none"
+         },
+         "exposure": "direct"
+        },
+        "overrides": [],
+        "tools": [],
+        "readOnly": null
+       }
+      ]
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 2894,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf"
+   }
+  },
+  {
+   "t": 2894,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "mori.notify",
+     "message": "MCP servers need attention:\n  mori-broken: failed: MCP connection closed\nRun /mcp to fix.",
+     "level": "warning"
+    }
+   }
+  },
+  {
+   "t": 2903,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-4pyIBB\\m6-mcp",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "mcp__mori_test__echo",
+       "description": "Echo the given text back (synthetic test tool).",
+       "active": true,
+       "exposure": "direct",
+       "source": "mcp",
+       "sourceLabel": "mori-test"
+      },
+      {
+       "name": "mcp__mori_test__add",
+       "description": "Add two numbers (synthetic test tool).",
+       "active": true,
+       "exposure": "direct",
+       "source": "mcp",
+       "sourceLabel": "mori-test"
+      }
+     ],
+     "skills": [],
+     "packages": [],
+     "mcp": {
+      "errors": [],
+      "servers": [
+       {
+        "name": "mori-test",
+        "scope": "user",
+        "enabled": true,
+        "exposure": "direct",
+        "command": "node",
+        "args": [
+         "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+        ],
+        "url": null,
+        "entry": {
+         "command": "node",
+         "args": [
+          "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+         ],
+         "exposure": "direct"
+        },
+        "overrides": [],
+        "tools": [
+         "mcp__mori_test__echo",
+         "mcp__mori_test__add"
+        ],
+        "readOnly": null
+       },
+       {
+        "name": "mori-broken",
+        "scope": "user",
+        "enabled": true,
+        "exposure": "direct",
+        "command": "no-such-command-mori",
+        "args": [],
+        "url": null,
+        "entry": {
+         "command": "no-such-command-mori",
+         "args": [],
+         "exposure": "direct"
+        },
+        "overrides": [],
+        "tools": [],
+        "readOnly": null
+       },
+       {
+        "name": "mori-empty",
+        "scope": "user",
+        "enabled": true,
+        "exposure": "direct",
+        "command": "node",
+        "args": [
+         "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+        ],
+        "url": null,
+        "entry": {
+         "command": "node",
+         "args": [
+          "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+         ],
+         "env": {
+          "MORI_MCP_TOOLS": "none"
+         },
+         "exposure": "direct"
+        },
+        "overrides": [],
+        "tools": [],
+        "readOnly": null
+       }
+      ]
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 2903,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "text": "请调用 mcp__mori_test__echo 工具，参数 text 为 hello-mori，然后用一句话告诉我它返回了什么。"
+   }
+  },
+  {
+   "t": 2906,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 2910,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 2910,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 2910,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-4pyIBB/m6-mcp\n</cwd>"
+      },
+      "timestamp": 1792495306688,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "mcp__mori_test__echo",
+        "description": "Echo the given text back (synthetic test tool).",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "text": {
+           "type": "string",
+           "description": "Text to echo"
+          }
+         },
+         "required": [
+          "text"
+         ]
+        }
+       },
+       {
+        "name": "mcp__mori_test__add",
+        "description": "Add two numbers (synthetic test tool).",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "a": {
+           "type": "number"
+          },
+          "b": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "a",
+          "b"
+         ]
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2911,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-4pyIBB/m6-mcp\n</cwd>"
+      },
+      "timestamp": 1792495306688,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "mcp__mori_test__echo",
+        "description": "Echo the given text back (synthetic test tool).",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "text": {
+           "type": "string",
+           "description": "Text to echo"
+          }
+         },
+         "required": [
+          "text"
+         ]
+        }
+       },
+       {
+        "name": "mcp__mori_test__add",
+        "description": "Add two numbers (synthetic test tool).",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "a": {
+           "type": "number"
+          },
+          "b": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "a",
+          "b"
+         ]
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2911,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请调用 mcp__mori_test__echo 工具，参数 text 为 hello-mori，然后用一句话告诉我它返回了什么。"
+       }
+      ],
+      "timestamp": 1792495306687
+     }
+    }
+   }
+  },
+  {
+   "t": 2911,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请调用 mcp__mori_test__echo 工具，参数 text 为 hello-mori，然后用一句话告诉我它返回了什么。"
+       }
+      ],
+      "timestamp": 1792495306687
+     }
+    }
+   }
+  },
+  {
+   "t": 2912,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "b72c1e9a",
+     "time": 1792495306687,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3586,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792495306977
+     }
+    }
+   }
+  },
+  {
+   "t": 4042,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 0,
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4042,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4057,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4057,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4057,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "text",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4068,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4068,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ": ",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4068,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4068,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "hello",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4087,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "-m",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4087,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "ori",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4087,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4096,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "}",
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428"
+     }
+    }
+   }
+  },
+  {
+   "t": 4113,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 0,
+      "toolName": "mcp__mori_test__echo",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+      "args": {
+       "text": "hello-mori"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 4113,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+        "name": "mcp__mori_test__echo",
+        "arguments": {
+         "text": "hello-mori"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1208,
+       "output": 46,
+       "cacheRead": 640,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1894,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792495306977,
+      "responseId": "08f500fa-7832-4383-9ccb-02f7d876be6d",
+      "rawStopReason": "tool_calls",
+      "durationMs": 916,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 4114,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "36f2db27",
+     "time": 1792495306977,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 4114,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+     "toolName": "mcp__mori_test__echo",
+     "gate": "ask"
+    }
+   }
+  },
+  {
+   "t": 4114,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+     "toolName": "mcp__mori_test__echo",
+     "args": {
+      "text": "hello-mori"
+     }
+    }
+   }
+  },
+  {
+   "t": 4116,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "mori.approval_request",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+     "toolName": "mcp__mori_test__echo",
+     "args": {
+      "text": "hello-mori"
+     }
+    }
+   }
+  },
+  {
+   "t": 4143,
+   "command": {
+    "type": "approval.answer",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "requestId": "approval-1",
+    "decision": "allow"
+   }
+  },
+  {
+   "t": 4144,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "mori.approval_end",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+     "decision": "allow",
+     "by": "user",
+     "reason": null
+    }
+   }
+  },
+  {
+   "t": 4144,
+   "result": {
+    "type": "approval.answer",
+    "value": {
+     "mode": "ask",
+     "allowed": []
+    }
+   }
+  },
+  {
+   "t": 4147,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+     "toolName": "mcp__mori_test__echo",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "mori-mcp echo: hello-mori"
+       }
+      ],
+      "details": {
+       "server": "mori-test",
+       "tool": "echo"
+      },
+      "structuredContent": {
+       "content": [
+        {
+         "type": "text",
+         "text": "mori-mcp echo: hello-mori"
+        }
+       ]
+      }
+     },
+     "isError": false,
+     "durationMs": 2
+    }
+   }
+  },
+  {
+   "t": 4147,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+      "toolName": "mcp__mori_test__echo",
+      "content": [
+       {
+        "type": "text",
+        "text": "mori-mcp echo: hello-mori"
+       }
+      ],
+      "details": {
+       "server": "mori-test",
+       "tool": "echo"
+      },
+      "isError": false,
+      "durationMs": 2,
+      "timestamp": 1792495307927
+     }
+    }
+   }
+  },
+  {
+   "t": 4147,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+      "toolName": "mcp__mori_test__echo",
+      "content": [
+       {
+        "type": "text",
+        "text": "mori-mcp echo: hello-mori"
+       }
+      ],
+      "details": {
+       "server": "mori-test",
+       "tool": "echo"
+      },
+      "isError": false,
+      "durationMs": 2,
+      "timestamp": 1792495307927
+     }
+    }
+   }
+  },
+  {
+   "t": 4148,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+        "name": "mcp__mori_test__echo",
+        "arguments": {
+         "text": "hello-mori"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1208,
+       "output": 46,
+       "cacheRead": 640,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1894,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792495306977,
+      "responseId": "08f500fa-7832-4383-9ccb-02f7d876be6d",
+      "rawStopReason": "tool_calls",
+      "durationMs": 916,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+       "toolName": "mcp__mori_test__echo",
+       "content": [
+        {
+         "type": "text",
+         "text": "mori-mcp echo: hello-mori"
+        }
+       ],
+       "details": {
+        "server": "mori-test",
+        "tool": "echo"
+       },
+       "isError": false,
+       "durationMs": 2,
+       "timestamp": 1792495307927
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 4148,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf"
+   }
+  },
+  {
+   "t": 4149,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 4154,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1901,
+      "contextWindow": 1000000,
+      "percent": 0.1901
+     }
+    }
+   }
+  },
+  {
+   "t": 4278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792495307930
+     }
+    }
+   }
+  },
+  {
+   "t": 4541,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4541,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "它"
+     }
+    }
+   }
+  },
+  {
+   "t": 4550,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "返回"
+     }
+    }
+   }
+  },
+  {
+   "t": 4550,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "了"
+     }
+    }
+   }
+  },
+  {
+   "t": 4550,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 4550,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "m"
+     }
+    }
+   }
+  },
+  {
+   "t": 4550,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "ori"
+     }
+    }
+   }
+  },
+  {
+   "t": 4550,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "-m"
+     }
+    }
+   }
+  },
+  {
+   "t": 4564,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "cp"
+     }
+    }
+   }
+  },
+  {
+   "t": 4564,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " echo"
+     }
+    }
+   }
+  },
+  {
+   "t": 4564,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 4564,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " hello"
+     }
+    }
+   }
+  },
+  {
+   "t": 4564,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "-m"
+     }
+    }
+   }
+  },
+  {
+   "t": 4564,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "ori"
+     }
+    }
+   }
+  },
+  {
+   "t": 4576,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 4577,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 4594,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4594,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "它返回了 `mori-mcp echo: hello-mori`。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 251,
+       "output": 16,
+       "cacheRead": 1664,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1931,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792495307930,
+      "responseId": "8ab5fd86-3099-4370-873d-33e5e3fd1653",
+      "rawStopReason": "stop",
+      "durationMs": 444,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 4594,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "1cc45725",
+     "time": 1792495307930,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 4595,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "它返回了 `mori-mcp echo: hello-mori`。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 251,
+       "output": 16,
+       "cacheRead": 1664,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1931,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792495307930,
+      "responseId": "8ab5fd86-3099-4370-873d-33e5e3fd1653",
+      "rawStopReason": "stop",
+      "durationMs": 444,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 4595,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf"
+   }
+  },
+  {
+   "t": 4595,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-4pyIBB/m6-mcp\n</cwd>"
+       },
+       "timestamp": 1792495306688,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "mcp__mori_test__echo",
+         "description": "Echo the given text back (synthetic test tool).",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "text": {
+            "type": "string",
+            "description": "Text to echo"
+           }
+          },
+          "required": [
+           "text"
+          ]
+         }
+        },
+        {
+         "name": "mcp__mori_test__add",
+         "description": "Add two numbers (synthetic test tool).",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "a": {
+            "type": "number"
+           },
+           "b": {
+            "type": "number"
+           }
+          },
+          "required": [
+           "a",
+           "b"
+          ]
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "请调用 mcp__mori_test__echo 工具，参数 text 为 hello-mori，然后用一句话告诉我它返回了什么。"
+        }
+       ],
+       "timestamp": 1792495306687
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+         "name": "mcp__mori_test__echo",
+         "arguments": {
+          "text": "hello-mori"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1208,
+        "output": 46,
+        "cacheRead": 640,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1894,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792495306977,
+       "responseId": "08f500fa-7832-4383-9ccb-02f7d876be6d",
+       "rawStopReason": "tool_calls",
+       "durationMs": 916,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_GXzYzGj0ySYMZE1jaZ2a1428",
+       "toolName": "mcp__mori_test__echo",
+       "content": [
+        {
+         "type": "text",
+         "text": "mori-mcp echo: hello-mori"
+        }
+       ],
+       "details": {
+        "server": "mori-test",
+        "tool": "echo"
+       },
+       "isError": false,
+       "durationMs": 2,
+       "timestamp": 1792495307927
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "它返回了 `mori-mcp echo: hello-mori`。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 251,
+        "output": 16,
+        "cacheRead": 1664,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1931,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792495307930,
+       "responseId": "8ab5fd86-3099-4370-873d-33e5e3fd1653",
+       "rawStopReason": "stop",
+       "durationMs": 444,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 4596,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 4596,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 4596,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1931,
+      "contextWindow": 1000000,
+      "percent": 0.1931
+     }
+    }
+   }
+  },
+  {
+   "t": 4640,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a1590b-c669-718a-a3f2-10f04d81dbbf"
+   }
+  },
+  {
+   "t": 4646,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-4pyIBB\\m6-mcp",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "mcp__mori_test__echo",
+       "description": "Echo the given text back (synthetic test tool).",
+       "active": true,
+       "exposure": "direct",
+       "source": "mcp",
+       "sourceLabel": "mori-test"
+      },
+      {
+       "name": "mcp__mori_test__add",
+       "description": "Add two numbers (synthetic test tool).",
+       "active": true,
+       "exposure": "direct",
+       "source": "mcp",
+       "sourceLabel": "mori-test"
+      }
+     ],
+     "skills": [],
+     "packages": [],
+     "mcp": {
+      "errors": [],
+      "servers": [
+       {
+        "name": "mori-test",
+        "scope": "user",
+        "enabled": true,
+        "exposure": "direct",
+        "command": "node",
+        "args": [
+         "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+        ],
+        "url": null,
+        "entry": {
+         "command": "node",
+         "args": [
+          "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+         ],
+         "exposure": "direct"
+        },
+        "overrides": [],
+        "tools": [
+         "mcp__mori_test__echo",
+         "mcp__mori_test__add"
+        ],
+        "readOnly": null
+       },
+       {
+        "name": "mori-broken",
+        "scope": "user",
+        "enabled": true,
+        "exposure": "direct",
+        "command": "no-such-command-mori",
+        "args": [],
+        "url": null,
+        "entry": {
+         "command": "no-such-command-mori",
+         "args": [],
+         "exposure": "direct"
+        },
+        "overrides": [],
+        "tools": [],
+        "readOnly": null
+       },
+       {
+        "name": "mori-empty",
+        "scope": "user",
+        "enabled": true,
+        "exposure": "direct",
+        "command": "node",
+        "args": [
+         "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+        ],
+        "url": null,
+        "entry": {
+         "command": "node",
+         "args": [
+          "C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\tests\\mcp-server\\server.mjs"
+         ],
+         "env": {
+          "MORI_MCP_TOOLS": "none"
+         },
+         "exposure": "direct"
+        },
+        "overrides": [],
+        "tools": [],
+        "readOnly": null
+       }
+      ]
+     },
+     "diagnostics": []
+    }
+   }
+  }
+ ]
+}

@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { describe } from '../state/bridge';
+import { guardLeave } from '../state/leaveGuard';
 import { archiveSession, loadSessions, openSaved, restoreSession, retryOpen, showChat } from '../state/projects';
 import { referenceSession } from '../state/refActions';
 import { focusComposer, openInSplit } from '../state/split';
@@ -182,7 +183,7 @@ export function sessionAction(row: Row, action: 'reference' | 'split'): void {
 }
 
 /**
- * @brief 会话树上的操作：打开（已归档的先恢复，打开失败的重试）、菜单里的重命名、归档、恢复、删除。
+ * @brief 会话树上的操作：打开（先过离开确认；已归档的先恢复，打开失败的重试）、菜单里的重命名、归档、恢复、删除。
  *        删除、归档后焦点移到屏幕上排在下面（没有时上面）的会话行。
  */
 function useTreeActions(onNavigate: () => void) {
@@ -195,12 +196,15 @@ function useTreeActions(onNavigate: () => void) {
   const handlers: RowHandlers = {
     onOpen: (row) => {
       setProblem(null);
-      if (row.archived && row.saved) restoreSession(row.saved, true);
-      else if (row.tab?.phase === 'failed') retryOpen(row.tab.key);
-      if (row.tab) showChat(row.tab.key);
-      else if (row.saved && !row.archived) void openSaved(row.saved);
-      onNavigate();
-      focusComposer();
+      // 先过离开确认（AGENTS.md 有未保存的改动时）：你选"继续编辑"时什么都不变，已归档的不恢复、失败的不重试。
+      guardLeave(() => {
+        if (row.archived && row.saved) restoreSession(row.saved, true);
+        else if (row.tab?.phase === 'failed') retryOpen(row.tab.key);
+        if (row.tab) showChat(row.tab.key);
+        else if (row.saved && !row.archived) void openSaved(row.saved);
+        onNavigate();
+        focusComposer();
+      });
     },
     onFocus: (row) => setFocused(row.id),
     onMenu: (row, at) => setMenu({ id: row.id, at }),

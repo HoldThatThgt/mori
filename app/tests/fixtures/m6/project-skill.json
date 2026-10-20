@@ -1,0 +1,7681 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m6-record.mjs; do not edit by hand.",
+ "name": "project-skill",
+ "description": "项目 .pi/skills 里放技能 m6-proj-skill，信任后打开：工具页列出它（本项目），模型能说出它；停用后（写项目的 .pi/settings.json，与 pi config -l 相同）新会话的\"/\"补全和模型的回答里都没有它",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-20T11:20:51.393Z",
+ "steps": [
+  {
+   "t": 0,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 2664,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 2664,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill"
+   }
+  },
+  {
+   "t": 2673,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": true,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 2673,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill",
+    "trust": {
+     "trusted": true,
+     "remember": false
+    }
+   }
+  },
+  {
+   "t": 2763,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-6S5Zqp\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m6-record-K3fB2z-m6-project-skill--\\2026-10-20T11-20-47-160Z_01a1590a-df37-70b0-ad63-a5c9817d50f0.jsonl",
+     "name": null,
+     "projectTrust": "trusted",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 2763,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0"
+   }
+  },
+  {
+   "t": 2857,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill",
+     "projectTrust": "trusted",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      }
+     ],
+     "skills": [
+      {
+       "kind": "skills",
+       "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill\\.pi\\skills\\m6-proj-skill\\SKILL.md",
+       "name": "m6-proj-skill",
+       "description": "Synthetic project skill for the Mori M6 walkthrough. Use it when asked about M6 project checks.",
+       "body": "# m6-proj-skill\n\nReply with M6-PROJECT-SKILL-OK.",
+       "enabled": true,
+       "scope": "project",
+       "origin": "top-level",
+       "packageSource": null,
+       "readOnly": null
+      }
+     ],
+     "packages": [],
+     "mcp": {
+      "errors": [],
+      "servers": []
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 2857,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "text": "你现在能用哪些技能（skills）？只列出技能名，不要调用任何工具。"
+   }
+  },
+  {
+   "t": 2862,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 2868,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 2869,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 2869,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "skills": "<skills>\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>m6-proj-skill</name>\n    <description>Synthetic project skill for the Mori M6 walkthrough. Use it when asked about M6 project checks.</description>\n    <location>C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill\\.pi\\skills\\m6-proj-skill\\SKILL.md</location>\n  </skill>\n</available_skills>\n</skills>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-K3fB2z/m6-project-skill\n</cwd>"
+      },
+      "timestamp": 1792495247347,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2869,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "skills": "<skills>\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>m6-proj-skill</name>\n    <description>Synthetic project skill for the Mori M6 walkthrough. Use it when asked about M6 project checks.</description>\n    <location>C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill\\.pi\\skills\\m6-proj-skill\\SKILL.md</location>\n  </skill>\n</available_skills>\n</skills>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-K3fB2z/m6-project-skill\n</cwd>"
+      },
+      "timestamp": 1792495247347,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2870,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "你现在能用哪些技能（skills）？只列出技能名，不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792495247344
+     }
+    }
+   }
+  },
+  {
+   "t": 2870,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "你现在能用哪些技能（skills）？只列出技能名，不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792495247344
+     }
+    }
+   }
+  },
+  {
+   "t": 2872,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "f70a3ee1",
+     "time": 1792495247344,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3495,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792495247727
+     }
+    }
+   }
+  },
+  {
+   "t": 3897,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3898,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "The"
+     }
+    }
+   }
+  },
+  {
+   "t": 3898,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user"
+     }
+    }
+   }
+  },
+  {
+   "t": 3901,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " asks"
+     }
+    }
+   }
+  },
+  {
+   "t": 3901,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " which"
+     }
+    }
+   }
+  },
+  {
+   "t": 3901,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skills"
+     }
+    }
+   }
+  },
+  {
+   "t": 3901,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " are"
+     }
+    }
+   }
+  },
+  {
+   "t": 3901,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " available"
+     }
+    }
+   }
+  },
+  {
+   "t": 3901,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3901,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " They"
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " say"
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " don"
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " call"
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " any"
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tools"
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " But"
+     }
+    }
+   }
+  },
+  {
+   "t": 3902,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 3903,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " system"
+     }
+    }
+   }
+  },
+  {
+   "t": 3912,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " prompt"
+     }
+    }
+   }
+  },
+  {
+   "t": 3924,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " lists"
+     }
+    }
+   }
+  },
+  {
+   "t": 3938,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " one"
+     }
+    }
+   }
+  },
+  {
+   "t": 3951,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skill"
+     }
+    }
+   }
+  },
+  {
+   "t": 3965,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 3965,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " m"
+     }
+    }
+   }
+  },
+  {
+   "t": 3965,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "6"
+     }
+    }
+   }
+  },
+  {
+   "t": 3965,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "-pro"
+     }
+    }
+   }
+  },
+  {
+   "t": 3980,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "j"
+     }
+    }
+   }
+  },
+  {
+   "t": 3980,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "-s"
+     }
+    }
+   }
+  },
+  {
+   "t": 3980,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "kill"
+     }
+    }
+   }
+  },
+  {
+   "t": 3980,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3980,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Should"
+     }
+    }
+   }
+  },
+  {
+   "t": 3980,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 3993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " read"
+     }
+    }
+   }
+  },
+  {
+   "t": 3994,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 4007,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skill"
+     }
+    }
+   }
+  },
+  {
+   "t": 4007,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " file"
+     }
+    }
+   }
+  },
+  {
+   "t": 4007,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "?"
+     }
+    }
+   }
+  },
+  {
+   "t": 4007,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " They"
+     }
+    }
+   }
+  },
+  {
+   "t": 4020,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " said"
+     }
+    }
+   }
+  },
+  {
+   "t": 4033,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " don"
+     }
+    }
+   }
+  },
+  {
+   "t": 4033,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 4033,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " call"
+     }
+    }
+   }
+  },
+  {
+   "t": 4033,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " any"
+     }
+    }
+   }
+  },
+  {
+   "t": 4033,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tools"
+     }
+    }
+   }
+  },
+  {
+   "t": 4033,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 4057,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " So"
+     }
+    }
+   }
+  },
+  {
+   "t": 4057,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " just"
+     }
+    }
+   }
+  },
+  {
+   "t": 4058,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " list"
+     }
+    }
+   }
+  },
+  {
+   "t": 4058,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 4058,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " name"
+     }
+    }
+   }
+  },
+  {
+   "t": 4060,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 4060,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "But"
+     }
+    }
+   }
+  },
+  {
+   "t": 4073,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " wait"
+     }
+    }
+   }
+  },
+  {
+   "t": 4073,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " —"
+     }
+    }
+   }
+  },
+  {
+   "t": 4074,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " there"
+     }
+    }
+   }
+  },
+  {
+   "t": 4108,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'s"
+     }
+    }
+   }
+  },
+  {
+   "t": 4108,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " a"
+     }
+    }
+   }
+  },
+  {
+   "t": 4108,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tension"
+     }
+    }
+   }
+  },
+  {
+   "t": 4108,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 4108,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 4109,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skill"
+     }
+    }
+   }
+  },
+  {
+   "t": 4109,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " description"
+     }
+    }
+   }
+  },
+  {
+   "t": 4113,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " says"
+     }
+    }
+   }
+  },
+  {
+   "t": 4113,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " use"
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " it"
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " when"
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " asked"
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " about"
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " M"
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "6"
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " project"
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " checks"
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " The"
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user"
+     }
+    }
+   }
+  },
+  {
+   "t": 4151,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " asks"
+     }
+    }
+   }
+  },
+  {
+   "t": 4152,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " \""
+     }
+    }
+   }
+  },
+  {
+   "t": 4152,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "what"
+     }
+    }
+   }
+  },
+  {
+   "t": 4167,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skills"
+     }
+    }
+   }
+  },
+  {
+   "t": 4167,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " can"
+     }
+    }
+   }
+  },
+  {
+   "t": 4167,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " you"
+     }
+    }
+   }
+  },
+  {
+   "t": 4167,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " use"
+     }
+    }
+   }
+  },
+  {
+   "t": 4167,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "\""
+     }
+    }
+   }
+  },
+  {
+   "t": 4167,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " —"
+     }
+    }
+   }
+  },
+  {
+   "t": 4203,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " that"
+     }
+    }
+   }
+  },
+  {
+   "t": 4203,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'s"
+     }
+    }
+   }
+  },
+  {
+   "t": 4203,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " about"
+     }
+    }
+   }
+  },
+  {
+   "t": 4203,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skills"
+     }
+    }
+   }
+  },
+  {
+   "t": 4203,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 4203,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " not"
+     }
+    }
+   }
+  },
+  {
+   "t": 4203,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " M"
+     }
+    }
+   }
+  },
+  {
+   "t": 4207,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "6"
+     }
+    }
+   }
+  },
+  {
+   "t": 4207,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " project"
+     }
+    }
+   }
+  },
+  {
+   "t": 4220,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " checks"
+     }
+    }
+   }
+  },
+  {
+   "t": 4220,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 4220,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " So"
+     }
+    }
+   }
+  },
+  {
+   "t": 4220,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " just"
+     }
+    }
+   }
+  },
+  {
+   "t": 4240,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " list"
+     }
+    }
+   }
+  },
+  {
+   "t": 4240,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 4240,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Just"
+     }
+    }
+   }
+  },
+  {
+   "t": 4248,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " list"
+     }
+    }
+   }
+  },
+  {
+   "t": 4259,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 4273,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " m"
+     }
+    }
+   }
+  },
+  {
+   "t": 4274,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "6"
+     }
+    }
+   }
+  },
+  {
+   "t": 4274,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "-pro"
+     }
+    }
+   }
+  },
+  {
+   "t": 4274,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "j"
+     }
+    }
+   }
+  },
+  {
+   "t": 4274,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "-s"
+     }
+    }
+   }
+  },
+  {
+   "t": 4274,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "kill"
+     }
+    }
+   }
+  },
+  {
+   "t": 4286,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 4286,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 4286,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "m"
+     }
+    }
+   }
+  },
+  {
+   "t": 4286,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "6"
+     }
+    }
+   }
+  },
+  {
+   "t": 4286,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "-pro"
+     }
+    }
+   }
+  },
+  {
+   "t": 4299,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "j"
+     }
+    }
+   }
+  },
+  {
+   "t": 4299,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "-s"
+     }
+    }
+   }
+  },
+  {
+   "t": 4299,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "kill"
+     }
+    }
+   }
+  },
+  {
+   "t": 4305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 4305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asks which skills are available. They say don't call any tools. But the system prompt lists one skill: m6-proj-skill. Should I read the skill file? They said don't call any tools. So just list the name.\n\nBut wait — there's a tension: the skill description says use it when asked about M6 project checks. The user asks \"what skills can you use\" — that's about skills, not M6 project checks. So just list.\n\nJust list: m6-proj-skill.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "m6-proj-skill"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1373,
+       "output": 117,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 110,
+       "totalTokens": 2002,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792495247727,
+      "responseId": "604c6574-3cbe-420d-9008-a74002f52e47",
+      "rawStopReason": "stop",
+      "durationMs": 1060,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 4306,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "cd95b754",
+     "time": 1792495247727,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 4306,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asks which skills are available. They say don't call any tools. But the system prompt lists one skill: m6-proj-skill. Should I read the skill file? They said don't call any tools. So just list the name.\n\nBut wait — there's a tension: the skill description says use it when asked about M6 project checks. The user asks \"what skills can you use\" — that's about skills, not M6 project checks. So just list.\n\nJust list: m6-proj-skill.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "m6-proj-skill"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1373,
+       "output": 117,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 110,
+       "totalTokens": 2002,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792495247727,
+      "responseId": "604c6574-3cbe-420d-9008-a74002f52e47",
+      "rawStopReason": "stop",
+      "durationMs": 1060,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 4306,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0"
+   }
+  },
+  {
+   "t": 4307,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "skills": "<skills>\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>m6-proj-skill</name>\n    <description>Synthetic project skill for the Mori M6 walkthrough. Use it when asked about M6 project checks.</description>\n    <location>C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill\\.pi\\skills\\m6-proj-skill\\SKILL.md</location>\n  </skill>\n</available_skills>\n</skills>",
+        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-K3fB2z/m6-project-skill\n</cwd>"
+       },
+       "timestamp": 1792495247347,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "你现在能用哪些技能（skills）？只列出技能名，不要调用任何工具。"
+        }
+       ],
+       "timestamp": 1792495247344
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The user asks which skills are available. They say don't call any tools. But the system prompt lists one skill: m6-proj-skill. Should I read the skill file? They said don't call any tools. So just list the name.\n\nBut wait — there's a tension: the skill description says use it when asked about M6 project checks. The user asks \"what skills can you use\" — that's about skills, not M6 project checks. So just list.\n\nJust list: m6-proj-skill.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "text",
+         "text": "m6-proj-skill"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1373,
+        "output": 117,
+        "cacheRead": 512,
+        "cacheWrite": 0,
+        "reasoning": 110,
+        "totalTokens": 2002,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792495247727,
+       "responseId": "604c6574-3cbe-420d-9008-a74002f52e47",
+       "rawStopReason": "stop",
+       "durationMs": 1060,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 4307,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 4308,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 4309,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2002,
+      "contextWindow": 1000000,
+      "percent": 0.2002
+     }
+    }
+   }
+  },
+  {
+   "t": 4330,
+   "command": {
+    "type": "resource.toggle",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0",
+    "kind": "skills",
+    "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill\\.pi\\skills\\m6-proj-skill\\SKILL.md",
+    "enabled": false
+   }
+  },
+  {
+   "t": 4341,
+   "result": {
+    "type": "resource.toggle",
+    "value": {
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 4341,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a1590a-df37-70b0-ad63-a5c9817d50f0"
+   }
+  },
+  {
+   "t": 4358,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill",
+     "projectTrust": "trusted",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      }
+     ],
+     "skills": [
+      {
+       "kind": "skills",
+       "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill\\.pi\\skills\\m6-proj-skill\\SKILL.md",
+       "name": "m6-proj-skill",
+       "description": "Synthetic project skill for the Mori M6 walkthrough. Use it when asked about M6 project checks.",
+       "body": "# m6-proj-skill\n\nReply with M6-PROJECT-SKILL-OK.",
+       "enabled": false,
+       "scope": "project",
+       "origin": "top-level",
+       "packageSource": null,
+       "readOnly": null
+      }
+     ],
+     "packages": [],
+     "mcp": {
+      "errors": [],
+      "servers": []
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 4358,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill"
+   }
+  },
+  {
+   "t": 4362,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": true,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 4362,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill",
+    "trust": {
+     "trusted": true,
+     "remember": false
+    }
+   }
+  },
+  {
+   "t": 4385,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-K3fB2z\\m6-project-skill",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-6S5Zqp\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m6-record-K3fB2z-m6-project-skill--\\2026-10-20T11-20-48-844Z_01a1590a-e5cc-70b0-ad63-a5cadebb2623.jsonl",
+     "name": null,
+     "projectTrust": "trusted",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 4385,
+   "command": {
+    "type": "session.commands",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623"
+   }
+  },
+  {
+   "t": 4386,
+   "result": {
+    "type": "session.commands",
+    "value": []
+   }
+  },
+  {
+   "t": 4386,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "text": "你现在能用哪些技能（skills）？只列出技能名，不要调用任何工具。"
+   }
+  },
+  {
+   "t": 4386,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 4387,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 4388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 4388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-K3fB2z/m6-project-skill\n</cwd>"
+      },
+      "timestamp": 1792495248869,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 4388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-K3fB2z/m6-project-skill\n</cwd>"
+      },
+      "timestamp": 1792495248869,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 4388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "你现在能用哪些技能（skills）？只列出技能名，不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792495248868
+     }
+    }
+   }
+  },
+  {
+   "t": 4388,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "你现在能用哪些技能（skills）？只列出技能名，不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792495248868
+     }
+    }
+   }
+  },
+  {
+   "t": 4390,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "36e77ec1",
+     "time": 1792495248868,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 4527,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792495248872
+     }
+    }
+   }
+  },
+  {
+   "t": 5132,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 5132,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "The"
+     }
+    }
+   }
+  },
+  {
+   "t": 5212,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user"
+     }
+    }
+   }
+  },
+  {
+   "t": 5226,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " asks"
+     }
+    }
+   }
+  },
+  {
+   "t": 5226,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 5226,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " what"
+     }
+    }
+   }
+  },
+  {
+   "t": 5240,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skills"
+     }
+    }
+   }
+  },
+  {
+   "t": 5240,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " are"
+     }
+    }
+   }
+  },
+  {
+   "t": 5251,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " available"
+     }
+    }
+   }
+  },
+  {
+   "t": 5251,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "?"
+     }
+    }
+   }
+  },
+  {
+   "t": 5265,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Only"
+     }
+    }
+   }
+  },
+  {
+   "t": 5278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " list"
+     }
+    }
+   }
+  },
+  {
+   "t": 5278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skill"
+     }
+    }
+   }
+  },
+  {
+   "t": 5278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " names"
+     }
+    }
+   }
+  },
+  {
+   "t": 5278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 5278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " don"
+     }
+    }
+   }
+  },
+  {
+   "t": 5278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 5298,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " call"
+     }
+    }
+   }
+  },
+  {
+   "t": 5298,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " any"
+     }
+    }
+   }
+  },
+  {
+   "t": 5298,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tools"
+     }
+    }
+   }
+  },
+  {
+   "t": 5298,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 5298,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " But"
+     }
+    }
+   }
+  },
+  {
+   "t": 5298,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 5304,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " don"
+     }
+    }
+   }
+  },
+  {
+   "t": 5305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 5305,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " have"
+     }
+    }
+   }
+  },
+  {
+   "t": 5317,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " a"
+     }
+    }
+   }
+  },
+  {
+   "t": 5331,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skills"
+     }
+    }
+   }
+  },
+  {
+   "t": 5331,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " list"
+     }
+    }
+   }
+  },
+  {
+   "t": 5331,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tool"
+     }
+    }
+   }
+  },
+  {
+   "t": 5344,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "..."
+     }
+    }
+   }
+  },
+  {
+   "t": 5344,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 5344,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'m"
+     }
+    }
+   }
+  },
+  {
+   "t": 5368,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " told"
+     }
+    }
+   }
+  },
+  {
+   "t": 5368,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " not"
+     }
+    }
+   }
+  },
+  {
+   "t": 5371,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 5371,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " call"
+     }
+    }
+   }
+  },
+  {
+   "t": 5371,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tools"
+     }
+    }
+   }
+  },
+  {
+   "t": 5371,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 5371,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " So"
+     }
+    }
+   }
+  },
+  {
+   "t": 5384,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 5384,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " should"
+     }
+    }
+   }
+  },
+  {
+   "t": 5384,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " answer"
+     }
+    }
+   }
+  },
+  {
+   "t": 5397,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " from"
+     }
+    }
+   }
+  },
+  {
+   "t": 5397,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " what"
+     }
+    }
+   }
+  },
+  {
+   "t": 5398,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 5398,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " know"
+     }
+    }
+   }
+  },
+  {
+   "t": 5426,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " —"
+     }
+    }
+   }
+  },
+  {
+   "t": 5426,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " but"
+     }
+    }
+   }
+  },
+  {
+   "t": 5426,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 5438,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " don"
+     }
+    }
+   }
+  },
+  {
+   "t": 5438,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 5438,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " actually"
+     }
+    }
+   }
+  },
+  {
+   "t": 5438,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " know"
+     }
+    }
+   }
+  },
+  {
+   "t": 5488,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " what"
+     }
+    }
+   }
+  },
+  {
+   "t": 5488,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skills"
+     }
+    }
+   }
+  },
+  {
+   "t": 5488,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " are"
+     }
+    }
+   }
+  },
+  {
+   "t": 5488,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " available"
+     }
+    }
+   }
+  },
+  {
+   "t": 5488,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " without"
+     }
+    }
+   }
+  },
+  {
+   "t": 5488,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " checking"
+     }
+    }
+   }
+  },
+  {
+   "t": 5493,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 5493,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " However"
+     }
+    }
+   }
+  },
+  {
+   "t": 5493,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 5504,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " instruction"
+     }
+    }
+   }
+  },
+  {
+   "t": 5504,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " says"
+     }
+    }
+   }
+  },
+  {
+   "t": 5504,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " don"
+     }
+    }
+   }
+  },
+  {
+   "t": 5504,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 5505,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " call"
+     }
+    }
+   }
+  },
+  {
+   "t": 5505,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tools"
+     }
+    }
+   }
+  },
+  {
+   "t": 5533,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 5534,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 5534,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " should"
+     }
+    }
+   }
+  },
+  {
+   "t": 5534,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " say"
+     }
+    }
+   }
+  },
+  {
+   "t": 5534,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 5534,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " don"
+     }
+    }
+   }
+  },
+  {
+   "t": 5534,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 5534,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " have"
+     }
+    }
+   }
+  },
+  {
+   "t": 5546,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " a"
+     }
+    }
+   }
+  },
+  {
+   "t": 5546,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " list"
+     }
+    }
+   }
+  },
+  {
+   "t": 5546,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " available"
+     }
+    }
+   }
+  },
+  {
+   "t": 5558,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " without"
+     }
+    }
+   }
+  },
+  {
+   "t": 5558,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " checking"
+     }
+    }
+   }
+  },
+  {
+   "t": 5583,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 5583,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " but"
+     }
+    }
+   }
+  },
+  {
+   "t": 5583,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "..."
+     }
+    }
+   }
+  },
+  {
+   "t": 5583,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Let"
+     }
+    }
+   }
+  },
+  {
+   "t": 5598,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " me"
+     }
+    }
+   }
+  },
+  {
+   "t": 5598,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " think"
+     }
+    }
+   }
+  },
+  {
+   "t": 5598,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 5598,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 5611,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " honest"
+     }
+    }
+   }
+  },
+  {
+   "t": 5630,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " answer"
+     }
+    }
+   }
+  },
+  {
+   "t": 5630,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " is"
+     }
+    }
+   }
+  },
+  {
+   "t": 5630,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " that"
+     }
+    }
+   }
+  },
+  {
+   "t": 5630,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 5640,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " can"
+     }
+    }
+   }
+  },
+  {
+   "t": 5640,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 5640,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " enumerate"
+     }
+    }
+   }
+  },
+  {
+   "t": 5655,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skills"
+     }
+    }
+   }
+  },
+  {
+   "t": 5655,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " without"
+     }
+    }
+   }
+  },
+  {
+   "t": 5655,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " inspecting"
+     }
+    }
+   }
+  },
+  {
+   "t": 5665,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 5665,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " files"
+     }
+    }
+   }
+  },
+  {
+   "t": 5665,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "ystem"
+     }
+    }
+   }
+  },
+  {
+   "t": 5665,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 5678,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " But"
+     }
+    }
+   }
+  },
+  {
+   "t": 5695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " maybe"
+     }
+    }
+   }
+  },
+  {
+   "t": 5695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " there"
+     }
+    }
+   }
+  },
+  {
+   "t": 5695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'s"
+     }
+    }
+   }
+  },
+  {
+   "t": 5695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " a"
+     }
+    }
+   }
+  },
+  {
+   "t": 5705,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skill"
+     }
+    }
+   }
+  },
+  {
+   "t": 5705,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " list"
+     }
+    }
+   }
+  },
+  {
+   "t": 5717,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " in"
+     }
+    }
+   }
+  },
+  {
+   "t": 5717,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " my"
+     }
+    }
+   }
+  },
+  {
+   "t": 5759,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " system"
+     }
+    }
+   }
+  },
+  {
+   "t": 5759,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " prompt"
+     }
+    }
+   }
+  },
+  {
+   "t": 5759,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "?"
+     }
+    }
+   }
+  },
+  {
+   "t": 5759,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " No"
+     }
+    }
+   }
+  },
+  {
+   "t": 5760,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 5760,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " there"
+     }
+    }
+   }
+  },
+  {
+   "t": 5772,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " isn"
+     }
+    }
+   }
+  },
+  {
+   "t": 5772,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 5772,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 5772,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "So"
+     }
+    }
+   }
+  },
+  {
+   "t": 5772,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 5785,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " should"
+     }
+    }
+   }
+  },
+  {
+   "t": 5785,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " comply"
+     }
+    }
+   }
+  },
+  {
+   "t": 5785,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " reasonably"
+     }
+    }
+   }
+  },
+  {
+   "t": 5798,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 5798,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " state"
+     }
+    }
+   }
+  },
+  {
+   "t": 5798,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " that"
+     }
+    }
+   }
+  },
+  {
+   "t": 5811,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " no"
+     }
+    }
+   }
+  },
+  {
+   "t": 5825,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " skills"
+     }
+    }
+   }
+  },
+  {
+   "t": 5846,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " are"
+     }
+    }
+   }
+  },
+  {
+   "t": 5847,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " listed"
+     }
+    }
+   }
+  },
+  {
+   "t": 5847,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " in"
+     }
+    }
+   }
+  },
+  {
+   "t": 5851,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " my"
+     }
+    }
+   }
+  },
+  {
+   "t": 5851,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " context"
+     }
+    }
+   }
+  },
+  {
+   "t": 5851,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 5851,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " so"
+     }
+    }
+   }
+  },
+  {
+   "t": 5852,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 5852,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " can"
+     }
+    }
+   }
+  },
+  {
+   "t": 5864,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 5865,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " enumerate"
+     }
+    }
+   }
+  },
+  {
+   "t": 5865,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " them"
+     }
+    }
+   }
+  },
+  {
+   "t": 5878,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " without"
+     }
+    }
+   }
+  },
+  {
+   "t": 5878,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " reading"
+     }
+    }
+   }
+  },
+  {
+   "t": 5891,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " files"
+     }
+    }
+   }
+  },
+  {
+   "t": 5891,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 5907,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " which"
+     }
+    }
+   }
+  },
+  {
+   "t": 5907,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 5907,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'m"
+     }
+    }
+   }
+  },
+  {
+   "t": 5907,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " told"
+     }
+    }
+   }
+  },
+  {
+   "t": 5919,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " not"
+     }
+    }
+   }
+  },
+  {
+   "t": 5919,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 5919,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " do"
+     }
+    }
+   }
+  },
+  {
+   "t": 5919,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 5935,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " That"
+     }
+    }
+   }
+  },
+  {
+   "t": 5935,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'s"
+     }
+    }
+   }
+  },
+  {
+   "t": 5935,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 5945,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " honest"
+     }
+    }
+   }
+  },
+  {
+   "t": 5945,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " answer"
+     }
+    }
+   }
+  },
+  {
+   "t": 5945,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 5945,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Keep"
+     }
+    }
+   }
+  },
+  {
+   "t": 5961,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " concise"
+     }
+    }
+   }
+  },
+  {
+   "t": 5971,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 5971,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Maybe"
+     }
+    }
+   }
+  },
+  {
+   "t": 5971,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " mention"
+     }
+    }
+   }
+  },
+  {
+   "t": 5984,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " if"
+     }
+    }
+   }
+  },
+  {
+   "t": 5997,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " they"
+     }
+    }
+   }
+  },
+  {
+   "t": 6014,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " allow"
+     }
+    }
+   }
+  },
+  {
+   "t": 6026,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 6026,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 6026,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " can"
+     }
+    }
+   }
+  },
+  {
+   "t": 6026,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " read"
+     }
+    }
+   }
+  },
+  {
+   "t": 6026,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " ."
+     }
+    }
+   }
+  },
+  {
+   "t": 6039,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "cl"
+     }
+    }
+   }
+  },
+  {
+   "t": 6050,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "aude"
+     }
+    }
+   }
+  },
+  {
+   "t": 6050,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "/s"
+     }
+    }
+   }
+  },
+  {
+   "t": 6050,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "k"
+     }
+    }
+   }
+  },
+  {
+   "t": 6050,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "ills"
+     }
+    }
+   }
+  },
+  {
+   "t": 6050,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " or"
+     }
+    }
+   }
+  },
+  {
+   "t": 6064,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " similar"
+     }
+    }
+   }
+  },
+  {
+   "t": 6064,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 6077,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 6077,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "我"
+     }
+    }
+   }
+  },
+  {
+   "t": 6091,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "无法"
+     }
+    }
+   }
+  },
+  {
+   "t": 6091,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "列出"
+     }
+    }
+   }
+  },
+  {
+   "t": 6103,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "技能"
+     }
+    }
+   }
+  },
+  {
+   "t": 6103,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "名"
+     }
+    }
+   }
+  },
+  {
+   "t": 6132,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 6132,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "因为"
+     }
+    }
+   }
+  },
+  {
+   "t": 6132,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "本次"
+     }
+    }
+   }
+  },
+  {
+   "t": 6132,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "对话"
+     }
+    }
+   }
+  },
+  {
+   "t": 6133,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "里"
+     }
+    }
+   }
+  },
+  {
+   "t": 6133,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "没有任何"
+     }
+    }
+   }
+  },
+  {
+   "t": 6144,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "技能"
+     }
+    }
+   }
+  },
+  {
+   "t": 6144,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "清单"
+     }
+    }
+   }
+  },
+  {
+   "t": 6144,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "被"
+     }
+    }
+   }
+  },
+  {
+   "t": 6157,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "加载"
+     }
+    }
+   }
+  },
+  {
+   "t": 6171,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "到"
+     }
+    }
+   }
+  },
+  {
+   "t": 6171,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "我的"
+     }
+    }
+   }
+  },
+  {
+   "t": 6171,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "上下"
+     }
+    }
+   }
+  },
+  {
+   "t": 6184,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "文中"
+     }
+    }
+   }
+  },
+  {
+   "t": 6184,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "；"
+     }
+    }
+   }
+  },
+  {
+   "t": 6184,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "同时"
+     }
+    }
+   }
+  },
+  {
+   "t": 6206,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "你"
+     }
+    }
+   }
+  },
+  {
+   "t": 6213,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "要求"
+     }
+    }
+   }
+  },
+  {
+   "t": 6213,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "我不要"
+     }
+    }
+   }
+  },
+  {
+   "t": 6213,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "调用"
+     }
+    }
+   }
+  },
+  {
+   "t": 6213,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "工具"
+     }
+    }
+   }
+  },
+  {
+   "t": 6213,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 6213,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "所以我"
+     }
+    }
+   }
+  },
+  {
+   "t": 6223,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "不能"
+     }
+    }
+   }
+  },
+  {
+   "t": 6236,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "去"
+     }
+    }
+   }
+  },
+  {
+   "t": 6236,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "读取"
+     }
+    }
+   }
+  },
+  {
+   "t": 6260,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " `."
+     }
+    }
+   }
+  },
+  {
+   "t": 6261,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "cl"
+     }
+    }
+   }
+  },
+  {
+   "t": 6261,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "aude"
+     }
+    }
+   }
+  },
+  {
+   "t": 6261,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "/s"
+     }
+    }
+   }
+  },
+  {
+   "t": 6261,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "k"
+     }
+    }
+   }
+  },
+  {
+   "t": 6261,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "ills"
+     }
+    }
+   }
+  },
+  {
+   "t": 6263,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 6263,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "、"
+     }
+    }
+   }
+  },
+  {
+   "t": 6263,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "`."
+     }
+    }
+   }
+  },
+  {
+   "t": 6278,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "pi"
+     }
+    }
+   }
+  },
+  {
+   "t": 6295,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "/s"
+     }
+    }
+   }
+  },
+  {
+   "t": 6295,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "k"
+     }
+    }
+   }
+  },
+  {
+   "t": 6295,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "ills"
+     }
+    }
+   }
+  },
+  {
+   "t": 6295,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 6295,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 6295,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "之类的"
+     }
+    }
+   }
+  },
+  {
+   "t": 6313,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "目录"
+     }
+    }
+   }
+  },
+  {
+   "t": 6313,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "来"
+     }
+    }
+   }
+  },
+  {
+   "t": 6313,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "确认"
+     }
+    }
+   }
+  },
+  {
+   "t": 6323,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 6323,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "如果你"
+     }
+    }
+   }
+  },
+  {
+   "t": 6323,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "允许"
+     }
+    }
+   }
+  },
+  {
+   "t": 6332,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "我看"
+     }
+    }
+   }
+  },
+  {
+   "t": 6332,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一下"
+     }
+    }
+   }
+  },
+  {
+   "t": 6332,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "文件"
+     }
+    }
+   }
+  },
+  {
+   "t": 6346,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "系统"
+     }
+    }
+   }
+  },
+  {
+   "t": 6347,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "（"
+     }
+    }
+   }
+  },
+  {
+   "t": 6347,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "一条"
+     }
+    }
+   }
+  },
+  {
+   "t": 6360,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 6374,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "ls"
+     }
+    }
+   }
+  },
+  {
+   "t": 6375,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 6375,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "/"
+     }
+    }
+   }
+  },
+  {
+   "t": 6375,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 6375,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "find"
+     }
+    }
+   }
+  },
+  {
+   "t": 6375,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 6390,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 6390,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "即可"
+     }
+    }
+   }
+  },
+  {
+   "t": 6390,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "），"
+     }
+    }
+   }
+  },
+  {
+   "t": 6390,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "我"
+     }
+    }
+   }
+  },
+  {
+   "t": 6390,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "就能"
+     }
+    }
+   }
+  },
+  {
+   "t": 6401,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "把"
+     }
+    }
+   }
+  },
+  {
+   "t": 6401,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "实际"
+     }
+    }
+   }
+  },
+  {
+   "t": 6401,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "存在的"
+     }
+    }
+   }
+  },
+  {
+   "t": 6416,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "技能"
+     }
+    }
+   }
+  },
+  {
+   "t": 6416,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "名"
+     }
+    }
+   }
+  },
+  {
+   "t": 6416,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "给你"
+     }
+    }
+   }
+  },
+  {
+   "t": 6416,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 6429,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 6429,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 6429,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asks: what skills are available? Only list skill names, don't call any tools. But I don't have a skills list tool... I'm told not to call tools. So I should answer from what I know — but I don't actually know what skills are available without checking. However the instruction says don't call tools. I should say I don't have a list available without checking, but... Let me think: the honest answer is that I can't enumerate skills without inspecting the filesystem. But maybe there's a skill list in my system prompt? No, there isn't.\n\nSo I should comply reasonably: state that no skills are listed in my context, so I can't enumerate them without reading files, which I'm told not to do. That's the honest answer. Keep concise.\n\nMaybe mention if they allow, I can read .claude/skills or similar.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "我无法列出技能名，因为本次对话里没有任何技能清单被加载到我的上下文中；同时你要求我不要调用工具，所以我不能去读取 `.claude/skills`、`.pi/skills` 之类的目录来确认。\n\n如果你允许我看一下文件系统（一条 `ls`/`find` 即可），我就能把实际存在的技能名给你。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1065,
+       "output": 262,
+       "cacheRead": 640,
+       "cacheWrite": 0,
+       "reasoning": 183,
+       "totalTokens": 1967,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792495248872,
+      "responseId": "fdce602a-6ba1-4bb9-84d1-26ab1e4a7ceb",
+      "rawStopReason": "stop",
+      "durationMs": 2038,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 6430,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "90efbf36",
+     "time": 1792495248872,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 6430,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asks: what skills are available? Only list skill names, don't call any tools. But I don't have a skills list tool... I'm told not to call tools. So I should answer from what I know — but I don't actually know what skills are available without checking. However the instruction says don't call tools. I should say I don't have a list available without checking, but... Let me think: the honest answer is that I can't enumerate skills without inspecting the filesystem. But maybe there's a skill list in my system prompt? No, there isn't.\n\nSo I should comply reasonably: state that no skills are listed in my context, so I can't enumerate them without reading files, which I'm told not to do. That's the honest answer. Keep concise.\n\nMaybe mention if they allow, I can read .claude/skills or similar.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "我无法列出技能名，因为本次对话里没有任何技能清单被加载到我的上下文中；同时你要求我不要调用工具，所以我不能去读取 `.claude/skills`、`.pi/skills` 之类的目录来确认。\n\n如果你允许我看一下文件系统（一条 `ls`/`find` 即可），我就能把实际存在的技能名给你。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1065,
+       "output": 262,
+       "cacheRead": 640,
+       "cacheWrite": 0,
+       "reasoning": 183,
+       "totalTokens": 1967,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792495248872,
+      "responseId": "fdce602a-6ba1-4bb9-84d1-26ab1e4a7ceb",
+      "rawStopReason": "stop",
+      "durationMs": 2038,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 6430,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623"
+   }
+  },
+  {
+   "t": 6430,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-K3fB2z/m6-project-skill\n</cwd>"
+       },
+       "timestamp": 1792495248869,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "你现在能用哪些技能（skills）？只列出技能名，不要调用任何工具。"
+        }
+       ],
+       "timestamp": 1792495248868
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The user asks: what skills are available? Only list skill names, don't call any tools. But I don't have a skills list tool... I'm told not to call tools. So I should answer from what I know — but I don't actually know what skills are available without checking. However the instruction says don't call tools. I should say I don't have a list available without checking, but... Let me think: the honest answer is that I can't enumerate skills without inspecting the filesystem. But maybe there's a skill list in my system prompt? No, there isn't.\n\nSo I should comply reasonably: state that no skills are listed in my context, so I can't enumerate them without reading files, which I'm told not to do. That's the honest answer. Keep concise.\n\nMaybe mention if they allow, I can read .claude/skills or similar.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "text",
+         "text": "我无法列出技能名，因为本次对话里没有任何技能清单被加载到我的上下文中；同时你要求我不要调用工具，所以我不能去读取 `.claude/skills`、`.pi/skills` 之类的目录来确认。\n\n如果你允许我看一下文件系统（一条 `ls`/`find` 即可），我就能把实际存在的技能名给你。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1065,
+        "output": 262,
+        "cacheRead": 640,
+        "cacheWrite": 0,
+        "reasoning": 183,
+        "totalTokens": 1967,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792495248872,
+       "responseId": "fdce602a-6ba1-4bb9-84d1-26ab1e4a7ceb",
+       "rawStopReason": "stop",
+       "durationMs": 2038,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 6430,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 6430,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590a-e5cc-70b0-ad63-a5cadebb2623",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 6430,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1967,
+      "contextWindow": 1000000,
+      "percent": 0.19669999999999999
+     }
+    }
+   }
+  }
+ ]
+}

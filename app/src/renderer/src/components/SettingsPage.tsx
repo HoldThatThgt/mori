@@ -14,14 +14,19 @@ const SECTIONS: ReadonlyArray<{ id: SettingsSection; label: string }> = [
   { id: 'agents', label: 'AGENTS.md' },
 ];
 
-/** @brief 分节列表：Tab 在按钮之间移动，↑ ↓ 换到上一节、下一节；当前分节带 aria-current。 */
+/**
+ * @brief 分节列表：Tab 在按钮之间移动，↑ ↓ 从焦点所在的按钮换到上一节、下一节（焦点不在按钮上时从当前分节算）；
+ *        当前分节带 aria-current。
+ */
 function SettingsNav() {
   const section = useSettings((state) => state.section);
   const nav = useRef<HTMLElement>(null);
   function onKeyDown(event: React.KeyboardEvent) {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     event.preventDefault();
-    const index = SECTIONS.findIndex((item) => item.id === section);
+    const from = (event.target as HTMLElement).closest<HTMLElement>('[data-section]')?.dataset.section;
+    const at = SECTIONS.findIndex((item) => item.id === from);
+    const index = at >= 0 ? at : SECTIONS.findIndex((item) => item.id === section);
     const next = SECTIONS[(index + (event.key === 'ArrowDown' ? 1 : -1) + SECTIONS.length) % SECTIONS.length];
     nav.current?.querySelector<HTMLButtonElement>(`[data-section="${next.id}"]`)?.focus();
     selectSection(next.id);

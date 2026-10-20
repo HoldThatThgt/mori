@@ -1,6 +1,8 @@
 /* M6：models（docs/v0/screens/models.md）。顶栏的模型与思考强度按钮外观同权限按钮，菜单同权限菜单。
-   窄栏时藏起两个按钮的规则在 chat.css 的 @container 里。 */
+   面板变窄时两个按钮分步收紧、不藏起（本文件末尾的 @container；顶栏其余部分在 chat.css）：模型按钮在顶栏放不下时
+   先收短（省略号，最窄 40px），完整的文字在悬停说明和读屏名称里。 */
 .model-switch, .thinking-switch { position: relative; flex-shrink: 0; }
+.model-switch { flex-shrink: 1; min-width: 40px; max-width: 160px; }
 .model-button, .thinking-button {
   display: inline-flex;
   align-items: center;
@@ -12,13 +14,16 @@
   font-size: var(--fs-small);
   white-space: nowrap;
 }
-.model-button { max-width: 160px; }
+.model-button { max-width: 100%; }
 /* 与 chat.css 里权限按钮收窄的阈值相同 */
 @container (max-width: 720px) {
-  .model-button { max-width: 120px; }
+  .model-switch { max-width: 120px; }
 }
 .model-button svg, .thinking-button svg { width: 14px; height: 14px; }
 .switch-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 按钮收短时先截模型 ID（它从 0 宽长到放得下为止），截完了才截"（已删除）"；后者抵消按钮里的间距，与 ID 连在一起 */
+.model-button > .switch-text { flex: 1 1 0; }
+.model-button > .model-deleted { flex: 0 1 auto; margin-left: -4px; }
 /* 模型没标支持思考：变淡，但可以点开看说明 */
 .thinking-button.unsupported { color: var(--color-faint); }
 /* 切换中：不可用，但焦点留在按钮上 */
@@ -58,3 +63,21 @@
   font-size: var(--fs-small);
 }
 .switch-menu .menu-note { padding-top: 8px; border-top: 1px solid var(--color-line); }
+
+/* 窄栏（models.md"窄栏"）。600px 以下：思考按钮只显示强度（"高 ▾"）；菜单改以会话面板定位，贴着面板右边，
+   不伸出面板（按钮可能贴着窗口或右栏）。400px 以下：两个按钮去掉 ▾、内边距收小 */
+@container (max-width: 600px) {
+  .thinking-prefix { display: none; }
+  .model-switch, .thinking-switch { position: static; }
+  .switch-menu {
+    top: calc(var(--topbar-height) - 12px);
+    right: 8px;
+    left: auto;
+    max-width: calc(100% - 16px);
+    transform: none;
+  }
+}
+@container (max-width: 400px) {
+  .model-button, .thinking-button { padding: 3px 6px; }
+  .model-button > svg, .thinking-button > svg { display: none; }
+}

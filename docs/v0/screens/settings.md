@@ -18,7 +18,8 @@
 ## 连接与模型
 
 pi 的 `models.json` 里一个 provider 就是一个"连接"（服务地址、接口类型、兼容选项、key），它下面可以有多个模型。
-Mori 的连接用 provider id `mori-endpoint`、`mori-endpoint-2`、`mori-endpoint-3`……（第一个沿用 M0 起的 `mori-endpoint`）。
+Mori 的连接用 provider id `mori-endpoint`（`models.json` 里还没有 Mori 的连接时，M0 起沿用），之后的连接用
+`mori-endpoint-<毫秒时间戳>`；删掉的 id 不再用（理由见 [../defaults.md](../defaults.md)）。
 key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。默认模型写 pi 设置的 `defaultProvider` / `defaultModel`。
 
 ### 列表
@@ -27,6 +28,8 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 | --- | --- | --- | --- |
 | 读取中 | `config.get` 还没返回 | "正在读取…" | — |
 | 读取失败 | `config.get` 报错，或返回的 `modelsError`（pi `modelRuntime.getError()`，例如 `models.json` 写坏了） | 原文 | 修好文件后重新打开设置页 |
+| 设置读不出 | `config.get` 返回的 `settingsError`（pi `SettingsManager` 读 `settings.json` 的错误，例如手工改坏了；pi 这时按空设置处理） | 列表上方原文（带文件路径），与 `modelsError` 同一处、同一句"修好文件后重新打开设置页。"；列表照常显示，没有"默认"标记，思考强度是 pi 的默认值 | 修好文件后重新打开设置页 |
+| `models.json` 里有 `//` 注释 | 手工加的注释（pi 读 `models.json` 时允许 `//` 注释和多余的逗号，Mori 读法相同） | 列表照常显示；保存连接、保存模型、删除模型时"保存失败：" / "删除失败："+ 原文（`<路径> contains // comments that saving would remove; …`），文件不改，key 不改 | 删掉注释后再保存；或用编辑器手工改 |
 | 列表 | `config.get` 的 `connections` | 每个连接一张卡：名称、服务地址、接口类型、key 状态（"key 已加密保存" / "没有 key"）；卡里每个模型一行：模型 ID、上下文长度、思考（"支持思考 · 新会话默认 高" 或 "不支持思考"）；默认模型标"默认" | 编辑连接、添加模型；每个模型：设为默认（不是默认时）、测试、编辑、删除 |
 | 没有模型 | `connections` 为空（只在 `models.json` 被手工改空时出现；首次启动走 connection.md 的首次启动页） | "还没有模型" | 添加连接 |
 | 有不是 Mori 写的 provider | `models.json` 里 `mori-endpoint*` 以外的 provider | 不列出（pi 照样能用它们，顶栏模型菜单也列出 pi 能用的全部模型，见 [models.md](models.md)） | — |
@@ -53,7 +56,7 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 编辑 | 你点了"编辑连接" | 名称、服务地址、接口类型、API key、兼容选项（不含模型字段）；说明"这个连接下的 N 个模型都用这里的地址和 key"；key 框同 connection.md（已保存时"已加密保存（不显示）；改了服务地址就要重新填写"） | 保存、测试（测这个连接的第一个模型）、取消 |
-| 保存 | `endpoint.save` | 同 connection.md 的保存状态；改了服务地址的 origin 又没填 key 时"保存失败：API key is required when the service address changes" | — |
+| 保存 | `endpoint.save` | 同 connection.md 的保存状态；改了服务地址的 origin 又没填 key 时"保存失败：API key is required when the service address changes"；写 `models.json` 失败时"保存失败："+ 原文，刚填的 key 撤回（`credentials.json` 恢复成原来的 key，添加连接时删掉），重启后不会和旧的服务地址配在一起 | — |
 | 已经打开的会话 | 保存后后台进程把打开着的会话换成新的模型对象（m6-checks.md） | 列表上方一行"已保存 · 已经打开的会话下一条消息起用新的设置" | — |
 
 ### 添加模型 / 编辑模型
@@ -93,10 +96,12 @@ pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AG
 | 读取失败 | `agents.get` 报错 | 原文 | 重新打开这一节 |
 | 文件不存在 | `agents.get` 的 `content` 为 null | 路径 `<agentDir>\AGENTS.md`；"还没有这个文件，保存后创建"；空编辑框 | 编辑、保存 |
 | 已有文件 | `content` | 路径；编辑框里是文件内容 | 编辑 |
-| 生效的文件 | `agents.get` 的 `effectivePath`（agentDir 里第一个存在的） | 是这个文件时"生效中：<路径>"；不是时（例如有 `AGENTS.override.md`）警示色"生效的是 <路径>，这里写的不会生效" | 用系统编辑器打开生效的那个文件 |
+| 生效的是这个文件 | `agents.get` 的 `effectivePath`（agentDir 里第一个存在的）就是 `<agentDir>\AGENTS.md` | "生效中：<路径>" | 用系统编辑器打开它 |
+| 被 AGENTS.override.md 盖住 | `effectivePath` 是 `AGENTS.override.md`（pi 的顺序里只有它排在 `AGENTS.md` 前面） | 警示色"生效的是 <路径>，这里写的不会生效" | 用系统编辑器打开它 |
+| 现在生效的是 CLAUDE.md | 还没有 `AGENTS.md`，`effectivePath` 是 `CLAUDE.md` / `CLAUDE.MD`（排在 `AGENTS.md` 后面） | 警示色"现在生效的是 <路径>；保存后改读这里的 AGENTS.md，它不再加载"；保存后变成"生效中：<agentDir>\AGENTS.md" | 用系统编辑器打开它（可以先把内容抄过来） |
 | 有未保存的改动 | 你改了编辑框 | "保存"可用，旁边"有未保存的改动" | 保存（Ctrl+S 也可以）；撤销改动（回到读到的内容） |
 | 保存中 / 已保存 / 保存失败 | `agents.save` | "保存中…"、"已保存 · 新建的会话才会读到"、"保存失败："+ 原文（保留你写的字） | — |
-| 离开时有未保存的改动 | 你点了"返回会话"、换到另一节、点了侧栏的会话 / 新会话 / 打开文件夹 / 工具、按 Ctrl+N、把会话拖到中栏 | 确认框"放弃对 AGENTS.md 的改动？"，说明"你改的内容还没有保存。"；按钮"放弃改动"和"继续编辑"，焦点在"继续编辑"，Esc 等于继续编辑 | 放弃改动（照常离开）；继续编辑（留在这里，焦点回到编辑框） |
+| 离开时有未保存的改动 | 你点了"返回会话"、换到另一节、点了侧栏的会话 / 新会话 / 打开文件夹 / 工具、按 Ctrl+N（把会话拖到设置页上不能放下，见 [split.md](split.md)，所以不会离开） | 确认框"放弃对 AGENTS.md 的改动？"，说明"你改的内容还没有保存。"；按钮"放弃改动"和"继续编辑"，焦点在"继续编辑"，Esc 等于继续编辑 | 放弃改动（编辑框回到读到的内容，照常离开；离开没有发生时，例如取消了选文件夹，留在这里，没有未保存的改动）；继续编辑（留在这里，什么都不变：点的已归档会话不恢复，焦点回到编辑框） |
 
 关闭 Mori 窗口时不问（交付说明列出）。
 
@@ -124,7 +129,7 @@ pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AG
 | 元素 | 标识 |
 | --- | --- |
 | 设置页 | `data-testid="settings-page"`；分节按钮 `data-testid="settings-nav"` 里的 `button[data-section]`（`connections` / `agents`） |
-| 连接卡 | `[data-testid="connection-card"][data-provider]`；模型行 `[data-testid="model-row"][data-model]`（`provider/id`），默认的带 `data-default="true"` |
+| 连接卡 | `[data-testid="connection-card"][data-provider]`；模型行 `[data-testid="model-row"][data-model]`（`provider/id`），默认的带 `data-default="true"`；行里的"编辑""删除"带 `data-action`（`edit`、`delete`），卡上的带 `edit-connection`、`add-model`，底部"添加连接"带 `add-connection` |
 | 表单 | 添加连接、编辑连接都是 `data-testid="connection-form"`（M1 的测试沿用）；添加 / 编辑模型 `data-testid="model-form"` |
 | 结果文字 | 表单里 `data-testid="form-message"`（M1 沿用）；模型行里的测试结果 `data-testid="model-test"` |
 | AGENTS.md | 编辑框 `data-testid="agents-editor"`；生效的文件 `data-testid="agents-effective"`；项目级列表 `data-testid="agents-loaded"` |

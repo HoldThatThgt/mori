@@ -14,6 +14,8 @@ import { updateTab, type Tab } from '../state/store';
 export interface SlashMenuState {
   /** 列表是否开着 */
   open: boolean;
+  /** 输入框里有引用芯片：pi 不展开带引用的消息里的命令，列表只有一行说明、没有可选项 */
+  quoted: boolean;
   /** 读取状态 */
   load: SlashLoad;
   /** 过滤后的分组 */
@@ -37,6 +39,14 @@ export interface SlashMenuState {
 /** @brief 一项的元素 id。 */
 function optionId(menuId: string, index: number): string {
   return `${menuId}-option-${index}`;
+}
+
+/**
+ * @brief 输入框里有引用芯片（含正在读取的会话引用）：发出的全文以引用块开头，pi 只展开以 / 开头的消息，
+ *        所以这时不提供命令（docs/v0/screens/slash.md）。没能加入的会话引用不随消息发出，不算。
+ */
+function hasQuotes(tab: Tab): boolean {
+  return tab.draftRefs.length > 0 || tab.refPending.some((item) => item.problem === null);
 }
 
 /**
@@ -68,8 +78,9 @@ export function useSlashMenu(tab: Tab, notReady: string | null,
   const menuId = useId();
   const trigger = useSlashTrigger(tab, notReady);
   const open = trigger.query !== null;
-  const load = useSlashCommands(open, tab.sessionId);
-  const groups = open && load.status === 'ready' ? filterCommands(load.commands, trigger.query ?? '') : [];
+  const quoted = hasQuotes(tab);
+  const load = useSlashCommands(open && !quoted, tab.sessionId);
+  const groups = open && !quoted && load.status === 'ready' ? filterCommands(load.commands, trigger.query ?? '') : [];
   const items = groups.flatMap((group) => group.items);
   // 高亮位置跟着筛选词：筛选词变了回到第一项
   const [chosen, setChosen] = useState<{ query: string | null; index: number }>({ query: null, index: 0 });
@@ -102,7 +113,7 @@ export function useSlashMenu(tab: Tab, notReady: string | null,
     onFocus: (event) => trigger.track(event.currentTarget),
     onBlur: () => { trigger.setFocused(false); setChosen({ query: null, index: 0 }); },
   };
-  return { open, load, groups, items, active, menuId, inputProps, insert, track: trigger.track,
+  return { open, quoted, load, groups, items, active, menuId, inputProps, insert, track: trigger.track,
     highlight: (index) => setChosen({ query: trigger.query, index }) };
 }
 
@@ -121,8 +132,11 @@ export function handleSlashKey(menu: SlashMenuState, event: React.KeyboardEvent,
   }
   const tabKey = event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey && count > 0;
   if (!tabKey && (event.key !== 'Enter' || event.shiftKey)) return false;
+  // 没有可选的项（读取中、没有匹配、会话没有模板和技能、带引用芯片）时 Enter 照常发送：照 Claude 桌面版，
+  // 例如扩展命令 /名字 不在列表里，也能直接发出去。
+  if (count === 0) return false;
   event.preventDefault();
-  if (count > 0) menu.insert(menu.items[menu.active]);
+  menu.insert(menu.items[menu.active]);
   return true;
 }
 
@@ -141,9 +155,12 @@ function SlashOption({ menu, command, index }: { menu: SlashMenuState; command: 
   );
 }
 
-/** @brief 列表内容：读取中、读取失败、会话没有任何项、没有匹配，或分组的项。 */
+/** @brief 列表内容：有引用芯片时的说明、读取中、读取失败、会话没有任何项、没有匹配，或分组的项。 */
 function SlashBody({ menu }: { menu: SlashMenuState }) {
   const { load } = menu;
+  if (menu.quoted) {
+    return <div className="slash-note" data-testid="slash-quoted">带引用的消息不会展开提示词模板和技能命令（先移除引用）</div>;
+  }
   if (load.status === 'loading') return <div className="slash-note" role="status">正在读取…</div>;
   if (load.status === 'error') return <div className="slash-note slash-error" role="alert">{load.message}</div>;
   if (load.commands.length === 0) {

@@ -8,6 +8,7 @@ import { describe } from '../state/bridge';
 import { SAVED_NOTICE, saveModel, showView, type Notice } from '../state/settings';
 import { useApp } from '../state/store';
 import { defaultLevel, levelOptions, modelFields, ThinkingFields, validate } from './ConnectionForm';
+import { connectionButton, modelButton } from './ConnectionsList';
 
 /** @brief 保存前的检查：必填项，添加时 ID 不能与这个连接下已有的模型相同；通过时返回 null。 */
 function problemOf(fields: ModelFields, connection: ConnectionInfo, adding: boolean): string | null {
@@ -15,6 +16,14 @@ function problemOf(fields: ModelFields, connection: ConnectionInfo, adding: bool
   if (problem) return problem;
   const id = fields.modelId.trim();
   return adding && connection.models.some((item) => item.id === id) ? `保存失败：这个连接下已经有模型 ${id}` : null;
+}
+
+/**
+ * @brief 回到列表时焦点去的按钮：这个模型的"编辑"（编辑时、保存过之后）；添加时没保存就取消，去这个连接的"添加模型"。
+ * @param modelId 模型 ID；列表里还没有这个模型时为 null
+ */
+function returnFocus(providerId: string, modelId: string | null): string {
+  return modelId === null ? connectionButton(providerId, 'add-model') : modelButton(`${providerId}/${modelId}`, 'edit');
 }
 
 /** @brief 表单状态与保存：保存成功回到列表；pi 报告配置错误时留在表单里显示原文（模型已经写入，之后按编辑保存）。 */
@@ -37,7 +46,8 @@ function useModelForm(connection: ConnectionInfo, model: ModelInfo | undefined) 
       const result = await saveModel(connection.providerId, fields, adding);
       setAdding(false);
       setEverSaved(true);
-      if (!result.error) showView({ kind: 'list' }, { tone: 'ok', text: SAVED_NOTICE });
+      const focus = returnFocus(connection.providerId, fields.modelId.trim());
+      if (!result.error) showView({ kind: 'list', focus }, { tone: 'ok', text: SAVED_NOTICE });
       else setMessage({ tone: 'error', text: `已保存，但配置有错误：${result.error}` });
     } catch (error) {
       setMessage({ tone: 'error', text: `保存失败：${describe('model.save', error)}` });
@@ -51,7 +61,8 @@ function useModelForm(connection: ConnectionInfo, model: ModelInfo | undefined) 
 /** @brief 添加（model 为 undefined）或编辑连接下的一个模型；编辑时模型 ID 只读。 */
 export function ModelForm({ connection, model }: { connection: ConnectionInfo; model: ModelInfo | undefined }) {
   const { fields, edit, adding, saving, everSaved, message, save } = useModelForm(connection, model);
-  const close = () => showView({ kind: 'list' }, everSaved ? { tone: 'ok', text: SAVED_NOTICE } : null);
+  const focus = returnFocus(connection.providerId, adding ? null : fields.modelId.trim());
+  const close = () => showView({ kind: 'list', focus }, everSaved ? { tone: 'ok', text: SAVED_NOTICE } : null);
   return (
     <form className="connection-form model-form" data-testid="model-form"
       onSubmit={(event) => { event.preventDefault(); void save(); }}>

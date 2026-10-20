@@ -20,6 +20,7 @@ export interface ToolsState {
 /** 离开工具页后的状态：下次进入时先显示"正在读取…" */
 const EMPTY: ToolsState = { sessionId: null, info: null, error: null };
 
+/** @brief 工具页读到的内容（跟随的会话的 tools.get 结果）；离开工具页时由 resetTools 清空。 */
 export const useTools = create<ToolsState>(() => EMPTY);
 
 /** 读取的序号：只有最后一次读取的结果生效 */
@@ -105,7 +106,13 @@ export function mcpNotices(items: Item[] | undefined): string[] {
   return (items ?? []).flatMap((item) => (item.kind === 'notify' && item.text.startsWith('MCP ') ? [item.text] : []));
 }
 
-/** @brief 通知里关于一个服务的行：去掉缩进后以 "<服务名>:" 开头的行，例如 "broken: failed: MCP connection closed"。 */
+/**
+ * @brief 通知里关于一个服务的行（去掉缩进）：以 "<服务名>:" 开头的连接错误，例如 "broken: failed: MCP connection closed"；
+ *        以 "config: " 开头、提到 `server "<服务名>"` 或 `invalid server name "<服务名>"` 的配置问题，例如
+ *        `config: C:\…\mcp.json: server "x": args must be an array of strings`（pi 没有加载它）。
+ */
 export function serverLines(notice: string, name: string): string[] {
-  return notice.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.startsWith(`${name}:`));
+  const quoted = `"${name}"`;
+  return notice.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.startsWith(`${name}:`)
+    || (line.startsWith('config: ') && (line.includes(`server ${quoted}`) || line.includes(`server name ${quoted}`))));
 }

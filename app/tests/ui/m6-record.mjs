@@ -410,15 +410,12 @@ async function runPhases(scenario, args, state) {
 /** @brief 一个场景：准备项目，依次执行各段，核对后写出 fixture（不符合时写到 rejected）。 */
 async function runScenario(scenario, context, state) {
   const made = prepareProject('mori-m6-record-');
+  // 项目文件夹在 Mori 关闭之后才删（MCP 服务以它为工作目录，开着时删不掉），见 recordFresh。
+  state.root = made.root;
   const cwd = join(made.root, `m6-${scenario.name}`);
   renameSync(made.project, cwd);
-  let steps = [];
-  try {
-    const args = { ...prompts, cwd, mcpServer, pkg: join(made.root, 'pkg'), agentDir: join(state.userData, 'pi') };
-    steps = await runPhases(scenario, args, state);
-  } finally {
-    rmSync(made.root, { recursive: true, force: true });
-  }
+  const args = { ...prompts, cwd, mcpServer, pkg: join(made.root, 'pkg'), agentDir: join(state.userData, 'pi') };
+  const steps = await runPhases(scenario, args, state);
   const fixture = { source: 'real', note: 'Recorded from a real session by tests/ui/m6-record.mjs; do not edit by hand.',
     name: scenario.name, description: scenario.description, endpoint: context.endpoint, model: context.model,
     recordedAt: new Date().toISOString(), steps };
@@ -439,7 +436,7 @@ async function runScenario(scenario, context, state) {
 /** @brief 每个场景一个新的临时数据目录和一次新的启动；出错也会关掉 Mori、删掉临时目录。 */
 async function recordFresh(scenario, context) {
   const userData = scratchUserData(source);
-  const state = { userData, mori: null };
+  const state = { userData, mori: null, root: null };
   try {
     state.mori = await startMori(userData);
     await runScenario(scenario, context, state);
@@ -448,7 +445,13 @@ async function recordFresh(scenario, context) {
     process.exitCode = 1;
   } finally {
     await state.mori?.app.close().catch(() => {});
-    rmSync(userData, { recursive: true, force: true });
+    for (const dir of [userData, state.root].filter(Boolean)) {
+      try {
+        rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+      } catch (error) {
+        console.error(`cannot remove ${dir}: ${oneLine(error)}`);
+      }
+    }
   }
 }
 
