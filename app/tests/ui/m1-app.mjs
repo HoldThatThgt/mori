@@ -1,5 +1,6 @@
 // M1 整机测试：真正的 Mori（界面 + 后台进程 + pi）对合成端点（tests/fake-endpoint，synthetic），
-// 覆盖首次启动、测试连接与取消、停止、排队与插话、三种错误来源、后台进程退出与重新载入、重启后布局还在。
+// 覆盖首次启动、测试连接与取消、代码块的"复制代码"、停止、排队与插话、三种错误来源、后台进程退出与重新载入、
+// 重启后布局还在。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m1-app.mjs                         测开发构建
 //   node tests/ui/m1-app.mjs --exe <Mori.exe 路径>   测打包后的程序
@@ -83,6 +84,21 @@ async function firstMessage({ page, h }) {
   await h.idle();
   const after = await h.usageTokens();
   record('对话：顶栏上下文用量随对话增长', before !== null && after !== null && after > before, `${before} → ${after}`);
+}
+
+/** @brief 代码块上的"复制代码"：代码进系统剪贴板（Mori 只放行自己页面写剪贴板这一项权限）。 */
+async function copyCode({ app, page, h }) {
+  await h.send('code block 给我一段代码');
+  await h.idle();
+  await app.evaluate(({ clipboard }) => clipboard.writeText('剪贴板原来的内容'));
+  await page.getByRole('button', { name: '复制代码' }).last().click();
+  let copied = '';
+  for (let tries = 0; tries < 10 && !copied.includes('export function add'); tries += 1) {
+    await sleep(200);
+    copied = await app.evaluate(({ clipboard }) => clipboard.readText());
+  }
+  record('代码块：点"复制代码"后代码进系统剪贴板', copied.includes('export function add(a: number, b: number): number {')
+    && copied.includes('return a + b;') && !copied.includes('下面是一段代码'), oneLine(copied));
 }
 
 /** @brief 设置 → 连接：测试中可以取消；改回原模型。 */
@@ -270,7 +286,7 @@ let page = await app.firstWindow();
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(error.message));
 const ctx = { app, page, h: pageHelpers(page), project, userData };
-const steps = { firstRun, firstMessage, cancelTest, escStop, queueSteer, errors, kernelExit };
+const steps = { firstRun, firstMessage, copyCode, cancelTest, escStop, queueSteer, errors, kernelExit };
 try {
   for (const [name, step] of Object.entries(steps)) {
     try {
