@@ -2,14 +2,16 @@
 // 覆盖 docs/v0/screens/slash.md（方案第 7 节 M6 走查 7）和 M6 的布局限制（models.md、split.md、layout.md、defaults.md）：
 // 打出 "/" 的读取中（只有一行"正在读取…"）、列表（两组各列各的项、只有第一项高亮、/名字、argument-hint、说明、浮在输入框上方
 // 且在最上层）、筛选（先开头再包含、不分大小写）、↑ ↓ 首尾循环、Enter / Tab 插入高亮项、点一项插入且不发送、插入时保留后面的字、
-// 没有匹配（继续打字、Enter 不发送、Esc）、光标在第一个空白之后关闭、输入法组字中 Enter 不插入也不关列表；
-// 生成中：Esc 只关列表不停止生成、列表开着时 Enter 不排队（没有匹配时什么都不做，有项时插入）、排队的技能命令写回
+// 没有匹配（继续打字、Esc；没有可选的项时 Enter 照常发送，在新建的会话里发、不动会话 A 的名字）、光标在第一个空白之后关闭、
+// 输入法组字中 Enter 不插入也不关列表；
+// 生成中：Esc 只关列表不停止生成、列表开着时有项 Enter 插入（不排队）、没有可选的项时 Enter 照常排队、排队的技能命令写回
 // "/skill:名字 参数"；发出技能命令（气泡"技能 · 名字"+参数、展开 / 收起、侧栏和标题行的会话名、模型收到展开后的 <skill> 块）
-// 与提示词模板（气泡是展开后的全文）；会话没有任何模板和技能、只列这个会话加载了的（启用的、信任的项目里的）、
+// 与提示词模板（气泡是展开后的全文）；会话没有任何模板和技能（Enter 照常发送）、只列这个会话加载了的（启用的、信任的项目里的）、
 // 关闭 enableSkillCommands 时不列技能、读取失败显示原文（synthetic 做法：在后台进程里关掉会话而界面不知道）、
 // 后台进程退出 / 重新载入中 / 会话重新打开中不出列表，就绪后照常出列表；
-// 布局：1280 宽单栏、1400 宽右栏开（面板 600–720px：权限按钮去掉图标、模型名最长 120px）、800×600 打开右栏、
-// 1200 宽分屏（右栏关 / 开）、800×600 分屏时顶栏不溢出不裁切，窄栏藏起模型和思考按钮；聊天页没有小于 12px 的字；
+// 布局（models.md"窄栏"：模型和思考按钮任何宽度都在，按面板宽度分步收紧）：1280 宽单栏、1400 宽右栏开（面板 600–720px）、
+// 800×600 打开右栏（300px）、1280 和 1200 宽分屏（右栏关 / 开，最窄 280px）、800×600 分屏；每处顶栏不溢出不裁切、
+// 各档该收的收起、会话名（长名字）至少留 36px、模型 / 思考 / 权限菜单在这一栏里打开；聊天页没有小于 12px 的字；
 // 从新会话的输入框 Shift+Tab 回到会话树的次数（M3 是 6 次，M6 多两个按钮，应为 8 次）。
 // 用户级的提示词模板和技能是本测试在启动前写进 <agentDir>/prompts、<agentDir>/skills 的（synthetic），
 // 项目级的写在第二个测试项目的 .pi/ 里（synthetic）。
@@ -58,6 +60,12 @@ const SKILL_COMMAND = '/skill:fmt echo back';
 const WAIT_SECONDS = 6;
 /** 生成中排队的技能命令（参数里的 plain 让合成端点只回文字） */
 const QUEUED_SKILL = '/skill:fmt plain queued';
+/** 连接里的模型 ID：故意很长（合成端点接受任何 ID），宽栏时模型按钮停在最长 160px / 120px，窄栏时收短（models.md） */
+const MODEL_ID = 'fake-coder-synthetic-long-model-id-for-layout';
+/** 列表里没有匹配的项、按 Enter 照常发出的消息（像一个不在列表里的扩展命令；plain 让合成端点只回文字） */
+const NO_MATCH_SEND = '/zzz-plain';
+/** 布局检查用的会话 C 的第一条消息（会话名取前 20 个字，足够长，窄栏时会被挤到省略号） */
+const LONG_NAME_MESSAGE = 'plain long session name for the narrow layout checks';
 
 /**
  * 写进 <agentDir> 的用户级模板和技能（synthetic）：名字安排成筛选 "rev" 时 review（开头）排在 a-review（包含）前面；
@@ -160,9 +168,21 @@ function staysUnsent(page, before, ms = 500) {
   }, { focused: FOCUSED, count: before }, ms);
 }
 
-/** @brief 焦点所在的一栏在 ms 毫秒内没有出现排队区。 */
-const staysUnqueued = (page, ms = 400) => neverWithin(page,
-  (focused) => Boolean(document.querySelector(`${focused} [data-testid="queue"]`)), FOCUSED, ms);
+/** @brief 焦点所在的一栏排队区里每一条的文字（没有排队区时为空数组）。 */
+const queueTexts = (page) => page.locator(`${FOCUSED} [data-testid="queue"] .queue-text`).allInnerTexts();
+
+/** @brief 等焦点所在的一栏排队区里出现 text 这一条（最多 timeout 毫秒），返回此刻排队区每一条的文字。 */
+async function waitQueued(page, text, timeout = 5000) {
+  await settled(page.waitForFunction(({ focused, want }) => [...document
+    .querySelectorAll(`${focused} [data-testid="queue"] .queue-text`)].some((item) => item.textContent === want),
+  { focused: FOCUSED, want: text }, { timeout }));
+  return queueTexts(page);
+}
+
+/** @brief 焦点所在的一栏在 ms 毫秒内排队区的条数一直不多于 count（没有排进新的一条）。 */
+const queueStays = (page, count, ms = 400) => neverWithin(page, ({ focused, most }) => document
+  .querySelectorAll(`${focused} [data-testid="queue"] .queue-text`).length > most,
+{ focused: FOCUSED, most: count }, ms);
 
 /** @brief 改窗口内容区的大小，等界面量到新的大小、再等两帧。 */
 async function resizeTo(ctx, width, height) {
@@ -336,7 +356,7 @@ async function withSettings(ctx, patch, body) {
 /** @brief 准备：写模板和技能、首次启动填连接、打开项目（会话 A，还没有消息），窗口 1280×800。 */
 async function setup(ctx) {
   await resizeWindow(ctx.app, 1280, 800);
-  await firstRunAndOpen(ctx, { baseUrl, apiKey: testKey, project: ctx.project });
+  await firstRunAndOpen(ctx, { baseUrl, apiKey: testKey, modelId: MODEL_ID, project: ctx.project });
   ctx.a = await activeFile(ctx.page);
   record('准备：首次启动、打开项目，会话 A 就绪（用户级两个模板、两个技能在启动前写好）', Boolean(ctx.a), ctx.a ?? '');
 }
@@ -476,7 +496,10 @@ async function insertKeepsRest(ctx) {
     JSON.stringify({ closed: closed.open, reopened, first, draft: kept.draft, caret: kept.caret }));
 }
 
-/** @brief 没有匹配："没有匹配的提示词模板或技能"；Enter 不发送、不改字；继续打字；Esc 关闭列表、字还在。 */
+/**
+ * @brief 没有匹配："没有匹配的提示词模板或技能"；继续打字；Esc 关闭列表、字还在（会话 A 里，不按 Enter：
+ *        没有可选的项时 Enter 照常发送，发出的消息会成为会话 A 的名字，见 noMatchSends）。
+ */
 async function noMatch(ctx) {
   const { page } = ctx;
   await typeFresh(page, '/zzz');
@@ -484,8 +507,6 @@ async function noMatch(ctx) {
   const view = await slashView(page);
   await noteSmall(ctx, '"/"没有匹配');
   await shot(page, '7-slash-nomatch');
-  const enter = await pressAndView(page, 'Enter');
-  const unsent = await staysUnsent(page, 0);
   for (let count = 0; count < 3; count += 1) await page.keyboard.press('Backspace');
   await settle(page);
   const back = await slashView(page);
@@ -493,13 +514,51 @@ async function noMatch(ctx) {
   await settle(page);
   const again = await slashView(page);
   const esc = await pressAndView(page, 'Escape');
+  const unsent = await staysUnsent(page, 0);
   record('没有匹配：列表里"没有匹配的提示词模板或技能"，没有项', view.open && view.note === NO_MATCH
     && view.items.length === 0, brief(view));
-  record('列表开着时 Enter 不发送：没有匹配时按 Enter，列表还在，输入框仍是 "/zzz"，没有发出消息', enter.draft === '/zzz'
-    && enter.open && unsent, `${brief(enter)} unsent=${unsent}`);
   record('没有匹配时继续打字：删掉 "zzz" 又列出全部四项，再打 "zzz" 又是没有匹配', back.open && back.draft === '/'
     && sortedNames(names(back)) === USER_NAMES && again.note === NO_MATCH, `${brief(back)} → ${brief(again)}`);
-  record('Esc 关闭列表，输入框的字还在、焦点还在', !esc.open && esc.draft === '/zzz' && esc.focused, brief(esc));
+  record('Esc 关闭列表，输入框的字还在、焦点还在，没有发出消息', !esc.open && esc.draft === '/zzz' && esc.focused && unsent,
+    `${brief(esc)} unsent=${unsent}`);
+  await typeFresh(page, '');
+}
+
+/**
+ * @brief 输入框里打 text（列表出现，没有可选的项）后按 Enter，等这一轮结束。返回按之前的列表、发出的你的消息
+ *        （没有发出时为 null）和按之后的列表与输入框。
+ */
+async function enterSends(ctx, text) {
+  const { page, h } = ctx;
+  await typeFresh(page, text);
+  await waitMenu(page);
+  const listed = await slashView(page);
+  const bubbles = page.locator(`${FOCUSED} [data-testid="user-message"]`);
+  const before = await bubbles.count();
+  await page.keyboard.press('Enter');
+  const sent = await settled(bubbles.nth(before).waitFor({ timeout: 10000 }));
+  await settle(page);
+  const after = await slashView(page);
+  await h.idle(60000);
+  return { listed, sent: sent ? (await bubbles.nth(before).innerText()).trim() : null, after };
+}
+
+/**
+ * @brief 没有匹配时 Enter 照常发送（slash.md"没有匹配"：照 Claude 桌面版，不在列表里的扩展命令 /名字 直接发出）。
+ *        在 Ctrl+N 新建的会话 N 里做：发出的消息成为 N 的名字，会话 A 仍没有消息（之后的会话名检查测的是技能命令）。
+ */
+async function noMatchSends(ctx) {
+  const { page } = ctx;
+  ctx.n = await ctrlN(page);
+  const { listed, sent, after } = await enterSends(ctx, NO_MATCH_SEND);
+  const title = await page.locator(`${FOCUSED} [data-testid="session-title"]`).innerText();
+  record(`没有匹配时 Enter 照常发送：列表是"没有匹配…"，按 Enter 发出原样的 "${NO_MATCH_SEND}"（不当作命令展开），`
+    + '列表关闭、输入框清空；它成为这个新会话的名字', listed.open && listed.note === NO_MATCH && listed.items.length === 0
+    && sent === NO_MATCH_SEND && !after.open && after.draft === '' && title === NO_MATCH_SEND,
+  `${brief(listed)} → sent=${sent} ${brief(after)} title=${title}`);
+  await openRow(page, ctx.a);
+  const inA = await sentCount(page);
+  record('回到会话 A：它仍没有消息（"/"的检查都没有发出东西）', inA === 0, `messages in A: ${inA}`);
 }
 
 /**
@@ -681,8 +740,8 @@ async function sendTemplate(ctx) {
 }
 
 /**
- * @brief 生成中（"wait 6s"）：打出 "/" 出列表；Esc 只关闭列表；列表开着时 Enter 不排队：没有匹配时什么都不做，
- *        有项时插入高亮项。接着 queuedSkill 排一条技能命令，再一起记录。
+ * @brief 生成中（"wait 6s"）：打出 "/" 出列表；Esc 只关闭列表；列表开着、没有可选的项时 Enter 照常排队（生成中 Enter
+ *        是排队）；有项时 Enter 插入高亮项、不排队。接着 queuedSkill 排一条技能命令，再一起记录。
  */
 async function escWhileRunning(ctx) {
   const { page, h } = ctx;
@@ -693,34 +752,40 @@ async function escWhileRunning(ctx) {
   const open = await menuShown(page);
   const esc = await pressAndView(page, 'Escape');
   const busy = await paneBusy(page);
-  await page.keyboard.type('zzz');
+  await page.keyboard.type(NO_MATCH_SEND.slice(1));
   const reopened = await menuShown(page);
-  const noMatchEnter = await pressAndView(page, 'Enter');
-  const unqueued = await staysUnqueued(page);
+  const noMatchView = await slashView(page);
+  await page.keyboard.press('Enter');
+  const queuedNoMatch = await waitQueued(page, NO_MATCH_SEND);
+  await settle(page);
+  const noMatchEnter = await slashView(page);
   await composer(page).fill('/rev');
   await menuShown(page);
   const inserted = await pressAndView(page, 'Enter');
-  const unqueuedInsert = await staysUnqueued(page, 300);
+  const queueKept = await queueStays(page, queuedNoMatch.length, 300);
   const running = (await paneBusy(page)).running;
-  ctx.running = { open, esc, busy, reopened, noMatchEnter, unqueued, inserted, unqueuedInsert, running };
+  ctx.running = { open, esc, busy, reopened, noMatchView, queuedNoMatch, noMatchEnter, inserted, queueKept, running };
   await queuedSkill(ctx);
 }
 
-/** @brief 接着 escWhileRunning（仍在生成）：写一条技能命令按 Enter 排队；排队区写回 "/skill:fmt 参数"；两轮都照常结束。 */
+/**
+ * @brief 接着 escWhileRunning（仍在生成）：写一条技能命令按 Enter 排队；排队区写回 "/skill:fmt 参数"；本轮结束后
+ *        排队的两条（没有匹配的那条和技能命令）都发出，都照常结束。
+ */
 async function queuedSkill(ctx) {
   const { page } = ctx;
   await composer(page).fill(QUEUED_SKILL);
   await settle(page);
   const closed = !(await slashView(page)).open;
   await page.keyboard.press('Enter');
-  const queue = page.locator(`${FOCUSED} [data-testid="queue"]`);
-  const queued = await settled(queue.waitFor({ timeout: 5000 })) ? await queue.innerText() : '';
+  const queued = (await waitQueued(page, QUEUED_SKILL)).join(' | ');
   const bubbles = page.locator(`${FOCUSED} [data-testid="skill-invocation"]`);
   await bubbles.nth(1).waitFor({ timeout: 30000 });
   await waitIdle(page, 30000);
   const final = { closed, queued, second: await skillBubble(bubbles.nth(1)),
     stopped: await page.locator(`${FOCUSED} [data-testid="notice"]`).filter({ hasText: STOPPED }).count(),
-    replies: await page.locator(`${FOCUSED} [data-testid="assistant"]`).allInnerTexts() };
+    replies: await page.locator(`${FOCUSED} [data-testid="assistant"]`).allInnerTexts(),
+    sent: (await page.locator(`${FOCUSED} [data-testid="user-message"]`).allInnerTexts()).map((text) => text.trim()) };
   recordRunning(ctx.running, final);
 }
 
@@ -731,12 +796,15 @@ function recordRunning(state, final) {
     && !state.esc.open && state.esc.draft === '/' && state.busy.running && final.stopped === 0 && waited,
   JSON.stringify({ open: state.open, esc: state.esc.open, running: state.busy.running, stopped: final.stopped,
     waited }));
-  record('生成中列表开着时 Enter 不排队：改了第一个词列表再出现（没有匹配），Enter 后列表还在、字还是 "/zzz"、没有排队区',
-    state.reopened && state.noMatchEnter.open && state.noMatchEnter.draft === '/zzz' && state.unqueued,
-    `${brief(state.noMatchEnter)} unqueued=${state.unqueued}`);
+  record(`生成中列表开着、没有可选的项时 Enter 照常排队：改了第一个词列表再出现（没有匹配），Enter 后排队区多了 `
+    + `"${NO_MATCH_SEND}"，列表关闭、输入框清空；本轮结束后它原样发出`, state.reopened
+    && state.noMatchView.note === NO_MATCH && state.queuedNoMatch.includes(NO_MATCH_SEND) && !state.noMatchEnter.open
+    && state.noMatchEnter.draft === '' && final.sent.includes(NO_MATCH_SEND),
+  `${brief(state.noMatchView)} → ${brief(state.noMatchEnter)} queue=${JSON.stringify(state.queuedNoMatch)} `
+    + `sent=${JSON.stringify(final.sent)}`);
   record('生成中列表开着、有项时 Enter 插入高亮项 "/review "（不排队），仍在生成', state.inserted.draft === '/review '
-    && !state.inserted.open && state.unqueuedInsert && state.running,
-  `${brief(state.inserted)} unqueued=${state.unqueuedInsert} running=${state.running}`);
+    && !state.inserted.open && state.queueKept && state.running,
+  `${brief(state.inserted)} queueKept=${state.queueKept} running=${state.running}`);
   record(`生成中排队的技能命令：写好参数后列表关闭，Enter 排队；排队区写回 "${QUEUED_SKILL}"，不显示展开后的 <skill> 原文`,
     final.closed && final.queued.includes(QUEUED_SKILL) && !final.queued.includes('<skill')
     && !final.queued.includes(SKILL_MARKER), oneLine(final.queued));
@@ -746,53 +814,153 @@ function recordRunning(state, final) {
 
 // ---------- 步骤：布局 ----------
 
-/** @brief 中栏各栏的顶栏：宽度、模型 / 思考 / 权限按钮、溢出、裁切、会话名宽度、输入框底边；以及窗口、左栏、中栏、右栏。 */
-function layoutReport(page) {
-  return page.evaluate(() => {
-    const visible = (el) => Boolean(el) && el.getClientRects().length > 0
-      && getComputedStyle(el).visibility !== 'hidden';
+/** 会话名至少留这么宽（chat.css 面包屑 min-width 36px："两个字加省略号"；models.md"放不下"） */
+const TITLE_MIN = 36;
+/** 模型按钮最窄（models.css .model-switch 的 min-width；models.md"放不下"） */
+const MODEL_MIN = 40;
+/** 模型按钮的读屏名称和悬停说明（models.md"窄栏"：收起的文字都在读屏名称里） */
+const MODEL_LABEL = `模型：${MODEL_ID}`;
+const MODEL_TIP = `合成端点 · ${MODEL_ID}`;
+
+/**
+ * @brief 每一栏顶栏此刻的样子（在页面里执行，不引用外面的变量）：宽度、是不是分屏、模型 / 思考 / 权限按钮、
+ *        各档收起的部分（权限按钮的图标、"思考："、两个 ▾、项目名和 ›、上下文用量）、模型按钮的宽度、读屏名称和悬停说明、
+ *        思考按钮显示的字和读屏名称、会话名的宽度和全宽（scrollWidth）、溢出、裁切、输入框底边。
+ */
+function paneBars(panes) {
+  const visible = (el) => Boolean(el) && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+  const width = (el) => (el ? Math.round(el.getBoundingClientRect().width) : 0);
+  return panes.map((pane) => {
+    const q = (css) => pane.querySelector(css);
+    const bar = q('.topbar');
+    const box = bar.getBoundingClientRect();
+    const overflow = [bar, ...bar.querySelectorAll('.breadcrumb, .topbar-actions')]
+      .filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.className);
+    const clipped = [...bar.querySelectorAll('.breadcrumb > *, .topbar-actions > *, .topbar-actions button')]
+      .filter(visible).filter((el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.left < box.left - 1 || rect.right > box.right + 1 || rect.right > innerWidth + 1;
+      }).map((el) => el.getAttribute('aria-label') || el.className || el.tagName);
+    const model = q('[data-testid="model-button"]');
+    const thinking = q('[data-testid="thinking-button"]');
+    const title = q('[data-testid="session-title"]');
+    return { width: width(pane), split: Boolean(pane.closest('.center[data-split]')), model: visible(model),
+      thinking: visible(thinking), permission: visible(q('[data-testid="permission-button"]')),
+      permissionIcon: visible(q('[data-testid="permission-button"] svg')), prefix: visible(q('.thinking-prefix')),
+      modelArrow: visible(q('.model-button > svg')), thinkingArrow: visible(q('.thinking-button > svg')),
+      project: visible(q('.chat-project')), chevron: visible(q('.breadcrumb > svg')),
+      usage: visible(q('[data-testid="usage"]')), usageInDom: Boolean(q('[data-testid="usage"]')),
+      modelWidth: width(model), modelLabel: model?.getAttribute('aria-label') ?? null,
+      modelTip: model?.getAttribute('title') ?? null, thinkingText: thinking?.innerText.trim() ?? null,
+      thinkingLabel: thinking?.getAttribute('aria-label') ?? null, title: width(title),
+      titleFull: title?.scrollWidth ?? 0, titleText: title?.textContent ?? '', overflow, clipped,
+      actions: [...bar.querySelectorAll('.topbar-actions button')].filter(visible)
+        .map((el) => el.dataset.testid || el.getAttribute('aria-label') || el.className),
+      composerBottom: Math.round(q('.composer')?.getBoundingClientRect().bottom ?? 0) };
+  });
+}
+
+/** @brief 窗口、左栏、中栏、右栏的宽度，页面有没有溢出、有没有元素出窗口，和每一栏的顶栏（paneBars）。 */
+async function layoutReport(page) {
+  const panes = await page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]').evaluateAll(paneBars);
+  const frame = await page.evaluate(() => {
     const width = (el) => (el ? Math.round(el.getBoundingClientRect().width) : 0);
-    const panes = [...document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="chat-pane"]')].map((pane) => {
-      const bar = pane.querySelector('.topbar');
-      const box = bar.getBoundingClientRect();
-      const overflow = [bar, ...bar.querySelectorAll('.breadcrumb, .topbar-actions')]
-        .filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.className);
-      const clipped = [...bar.querySelectorAll('.breadcrumb > *, .topbar-actions > *, .topbar-actions button')]
-        .filter(visible).filter((el) => {
-          const rect = el.getBoundingClientRect();
-          return rect.left < box.left - 1 || rect.right > box.right + 1 || rect.right > innerWidth + 1;
-        }).map((el) => el.getAttribute('aria-label') || el.className || el.tagName);
-      return { width: width(pane), model: visible(pane.querySelector('[data-testid="model-button"]')),
-        thinking: visible(pane.querySelector('[data-testid="thinking-button"]')),
-        permission: visible(pane.querySelector('[data-testid="permission-button"]')),
-        permissionIcon: visible(pane.querySelector('[data-testid="permission-button"] svg')),
-        modelWidth: width(pane.querySelector('[data-testid="model-button"]')),
-        title: width(pane.querySelector('[data-testid="session-title"]')), overflow, clipped,
-        crumb: width(bar.querySelector('.breadcrumb')), project: width(bar.querySelector('.chat-project')),
-        actionsWidth: width(bar.querySelector('.topbar-actions')),
-        composerBottom: Math.round(pane.querySelector('.composer')?.getBoundingClientRect().bottom ?? 0),
-        actions: [...bar.querySelectorAll('.topbar-actions button')].filter(visible)
-          .map((el) => el.dataset.testid || el.getAttribute('aria-label') || el.className) };
-    });
     const outside = [...document.querySelectorAll('.app *')].filter((el) => {
       const rect = el.getBoundingClientRect();
       return rect.width > 0 && rect.right > innerWidth + 1 && !el.closest('.conversation, .panel-body');
     }).map((el) => el.className || el.tagName).slice(0, 5);
     return { window: innerWidth, height: innerHeight, page: document.documentElement.scrollWidth,
-      pageHeight: document.documentElement.scrollHeight,
-      sidebar: width(document.querySelector('.sidebar')), center: width(document.querySelector('.center')),
-      right: width(document.querySelector('[data-testid="right-panel"]')), panes, outside };
+      pageHeight: document.documentElement.scrollHeight, sidebar: width(document.querySelector('.sidebar')),
+      center: width(document.querySelector('.center')),
+      right: width(document.querySelector('[data-testid="right-panel"]')), outside };
   });
+  return { ...frame, panes };
 }
 
-/** @brief 一栏的顶栏放得下：不溢出、不裁切；按钮按面板宽度显示（≤ 600px 藏起模型和思考，defaults.md），权限按钮还在。 */
-function barFits(pane) {
-  const buttons = pane.width > 600 ? pane.model && pane.thinking : !pane.model && !pane.thinking;
-  return pane.overflow.length === 0 && pane.clipped.length === 0 && pane.permission && buttons;
+/**
+ * @brief 一栏的顶栏是否照 models.md"窄栏"分步收紧，返回不符合的项（空数组为符合）：模型和思考按钮任何宽度都显示；
+ *        > 720px 权限按钮带图标、模型按钮最宽 160px；≤ 720px 去掉图标、最宽 120px；≤ 600px 思考按钮只显示强度，
+ *        不显示项目名和 ›（分屏时 ≤ 640px 就不显示，split.css）；≤ 480px 不显示上下文用量；≤ 400px 两个按钮去掉 ▾。
+ *        模型按钮不窄于 40px；读屏名称是完整的"模型：<ID>""思考：<强度>"，悬停说明"<连接名> · <ID>"；
+ *        不溢出、不裁切；会话名至少 36px（名字本身更短时完整显示）。
+ */
+function barProblems(pane) {
+  const narrow = (limit) => pane.width <= limit;
+  const crumbLimit = pane.split ? 640 : 600;
+  const want = { model: true, thinking: true, permission: true, permissionIcon: !narrow(720), prefix: !narrow(600),
+    project: !narrow(crumbLimit), chevron: !narrow(crumbLimit), modelArrow: !narrow(400), thinkingArrow: !narrow(400),
+    usage: narrow(480) ? false : pane.usageInDom };
+  const problems = Object.entries(want).filter(([key, value]) => pane[key] !== value)
+    .map(([key, value]) => `${key} should be ${value}`);
+  const widest = narrow(720) ? 120 : 160;
+  if (pane.modelWidth > widest + 1 || pane.modelWidth < MODEL_MIN - 1) problems.push(`model width ${pane.modelWidth}`);
+  const shown = pane.prefix ? pane.thinkingText : `思考：${pane.thinkingText}`;
+  if (pane.modelLabel !== MODEL_LABEL || pane.modelTip !== MODEL_TIP || shown !== pane.thinkingLabel) {
+    problems.push('labels');
+  }
+  if (pane.overflow.length || pane.clipped.length) problems.push('overflow or clipped');
+  if (pane.title < Math.min(TITLE_MIN, pane.titleFull) - 1) problems.push(`title ${pane.title}px`);
+  return problems;
 }
 
-/** 会话名至少这么宽才算"省略号截断"而不是被挤没（两个字加省略号） */
-const TITLE_MIN = 30;
+/**
+ * @brief 记一条顶栏检查：有 count 栏，每一栏 barProblems 都符合，页面不横向溢出、没有元素出窗口；
+ *        extra 是这一处另外的条件（面板宽度落在哪一档等）。
+ */
+function recordBars(name, report, count, extra) {
+  const problems = report.panes.map((pane) => `${pane.width}px: ${barProblems(pane).join(', ') || 'ok'}`);
+  record(name, report.panes.length === count && report.panes.every((pane) => barProblems(pane).length === 0)
+    && report.page <= report.window && report.outside.length === 0 && extra,
+  `${problems.join(' | ')} ${JSON.stringify(report)}`);
+}
+
+/** 中栏里显示着的会话面板（分屏时两个） */
+const PANES = '.pane-slot:not([hidden]) [data-testid="chat-pane"]';
+
+/**
+ * @brief 点第 index 栏的输入框，焦点换到这一栏（右栏跟随焦点：换成这一栏会话自己的开关状态，split.md），再等两帧。
+ */
+async function focusPane(page, index) {
+  await page.locator(PANES).nth(index).locator('.composer textarea').click();
+  await page.waitForFunction(({ css, at }) => document.querySelectorAll(css)[at]?.closest('.pane-slot')
+    ?.dataset.focused === 'true', { css: PANES, at: index }, { timeout: 5000 });
+  await settle(page);
+}
+
+/**
+ * @brief 在每一栏（先把焦点换到这一栏，免得点按钮时焦点换栏、右栏跟着开关、按钮移位）依次点开模型、思考和权限菜单，
+ *        量菜单是否完整在这一栏里（models.md"窄栏"：≤ 600px 时贴着面板右边打开，不伸出面板），量完按 Esc 关掉。
+ *        返回不在里面的菜单（空数组为都在）。
+ */
+async function menusOutside(page) {
+  const panes = page.locator(PANES);
+  const outside = [];
+  const count = await panes.count();
+  for (let index = 0; index < count; index += 1) {
+    if (count > 1) await focusPane(page, index);
+    for (const id of ['model', 'thinking', 'permission']) {
+      await panes.nth(index).getByTestId(`${id}-button`).click();
+      const menu = page.getByTestId(`${id}-menu`);
+      await menu.waitFor({ timeout: 5000 });
+      const area = await panes.nth(index).boundingBox();
+      const box = await menu.boundingBox();
+      const inside = box.x >= area.x - 1 && box.x + box.width <= area.x + area.width + 1 && box.y >= area.y - 1
+        && box.y + box.height <= area.y + area.height + 1;
+      const round = (rect) => [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height].map(Math.round);
+      if (!inside) outside.push({ pane: index, menu: id, paneBox: round(area), menuBox: round(box) });
+      await page.keyboard.press('Escape');
+      await menu.waitFor({ state: 'detached', timeout: 5000 });
+    }
+  }
+  return outside;
+}
+
+/** @brief 记一条菜单检查：每一栏的模型、思考、权限菜单都完整地在这一栏里打开。 */
+async function recordMenus(ctx, where) {
+  const outside = await menusOutside(ctx.page);
+  record(`${where}：每一栏的模型、思考和权限菜单都完整地在这一栏里打开（不伸出面板、不出窗口）`, outside.length === 0,
+    JSON.stringify(outside));
+}
 
 /** @brief 把焦点所在一栏的右栏开关切到 open，等右栏出现或消失、再等两帧。 */
 async function setRight(page, open) {
@@ -805,16 +973,17 @@ async function setRight(page, open) {
   await settle(page);
 }
 
-/** @brief 1280 宽单栏（右栏关）：模型、思考按钮和权限按钮的图标都显示；顶栏放得下；各种浮层打开时没有小于 12px 的字。 */
+/**
+ * @brief 1280 宽单栏（右栏关，会话 A）：顶栏各项都完整显示；菜单在面板里；各种浮层打开时没有小于 12px 的字。
+ */
 async function wideLayout(ctx) {
   const { page } = ctx;
   await resizeTo(ctx, 1280, 800);
   await setRight(page, false);
   const report = await layoutReport(page);
-  const pane = report.panes[0];
-  record('1280 宽单栏：顶栏显示模型和思考按钮（面板宽于 720px，权限按钮带图标），不溢出、不裁切，会话名看得到',
-    report.panes.length === 1 && pane.width > 720 && pane.model && pane.thinking && pane.permissionIcon && barFits(pane)
-    && pane.title >= TITLE_MIN && report.page <= report.window, JSON.stringify(report));
+  recordBars('1280 宽单栏（面板宽于 720px）：模型按钮（最宽 160px）、"思考：<强度> ▾"、项目名和 ›、权限按钮的图标、'
+    + '上下文用量都显示；长模型 ID 截在 160px；顶栏不溢出、不裁切，会话名完整', report, 1, report.panes[0]?.width > 720
+    && report.panes[0].modelWidth >= 159);
   await shot(page, 'layout-1280');
   const toggle = page.locator(`${FOCUSED} [data-testid="skill-invocation"] .skill-toggle`).first();
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
@@ -830,21 +999,22 @@ async function wideLayout(ctx) {
     await page.keyboard.press('Escape');
     await page.getByTestId(`${id}-menu`).waitFor({ state: 'detached', timeout: 5000 });
   }
+  await recordMenus(ctx, '1280 宽单栏');
 }
 
-/** @brief 1400 宽、右栏打开（面板 600–720px）：模型和思考按钮还在；权限按钮去掉图标、模型按钮最宽 120px（defaults.md）。 */
+/** @brief 1400 宽、右栏打开（面板 600–720px）：权限按钮去掉图标、模型按钮最宽 120px，其余照常（models.md"较窄"）。 */
 async function midLayout(ctx) {
   const { page } = ctx;
   await resizeTo(ctx, 1400, 800);
   await setRight(page, true);
   const report = await layoutReport(page);
   const pane = report.panes[0];
-  record('1400 宽、右栏打开（面板宽 600–720px）：模型和思考按钮显示，权限按钮去掉图标，模型按钮最宽 120px；'
-    + '顶栏不溢出、不裁切，会话名看得到', report.panes.length === 1 && pane.width > 600 && pane.width <= 720
-    && pane.model && pane.thinking && !pane.permissionIcon && pane.modelWidth <= 121 && barFits(pane)
-    && pane.title >= TITLE_MIN && report.page <= report.window, JSON.stringify(report));
+  recordBars('1400 宽、右栏打开（面板宽 600–720px）：模型和思考按钮显示，权限按钮去掉图标，模型按钮最宽 120px，'
+    + '"思考："、项目名和上下文用量还在；长模型 ID 截在 120px；顶栏不溢出、不裁切，会话名完整', report, 1,
+  pane?.width > 600 && pane.width <= 720 && pane.modelWidth >= 119);
   await shot(page, 'layout-1400-right');
   await noteSmall(ctx, '1400 右栏打开');
+  await recordMenus(ctx, '1400 宽、右栏打开');
   await setRight(page, false);
   await resizeTo(ctx, 1280, 800);
 }
@@ -852,9 +1022,10 @@ async function midLayout(ctx) {
 /**
  * @brief Shift+Tab 路径：Ctrl+N 新建会话 C（焦点在输入框）后按 Shift+Tab 直到焦点进入会话树；M3 是 6 次，
  *        M6 顶栏多了模型和思考两个按钮，应为 8 次，落在新会话行。记下次数和经过的元素。
+ *        之后在 C 里发一条长消息，让 C 有一个长名字（分屏的布局检查量的是长名字被挤窄）。
  */
 async function shiftTabPath(ctx) {
-  const { page } = ctx;
+  const { page, h } = ctx;
   ctx.c = await ctrlN(page);
   const focused = await waitComposerFocus(page);
   const path = [];
@@ -869,9 +1040,11 @@ async function shiftTabPath(ctx) {
   record(`Shift+Tab：从新会话的输入框按 ${landed?.presses ?? '12+'} 次回到会话树（M3 是 6 次；M6 多模型、思考两个按钮，`
     + '应为 8 次），落在新会话行', focused && landed?.presses === 8 && samePath(landed.focus.file, ctx.c),
   `路径：${path.join(' → ')}`);
+  await h.send(LONG_NAME_MESSAGE);
+  await h.idle(60000);
 }
 
-/** @brief 最小窗口 800×600、右栏打开：图标栏 + 中栏 + 右栏都完整，顶栏不溢出，模型和思考按钮藏起；"/"列表不被裁掉。 */
+/** @brief 最小窗口 800×600、右栏打开（中栏 300px）：图标栏 + 中栏 + 右栏都完整；顶栏收到最紧；菜单和"/"列表不被裁掉。 */
 async function narrowLayout(ctx) {
   const { page } = ctx;
   await openRow(page, ctx.a);
@@ -883,14 +1056,15 @@ async function narrowLayout(ctx) {
     + '输入框完整在窗口里', report.window === 800 && report.sidebar === 60 && report.center >= 300 && report.right > 0
     && report.page <= 800 && report.pageHeight <= report.height && report.outside.length === 0
     && pane?.composerBottom > 0 && pane.composerBottom <= report.height, JSON.stringify(report));
-  record('800×600、右栏打开：顶栏不溢出、按钮不裁切；面板窄于 600px，模型和思考按钮藏起，权限按钮还在',
-    report.panes.length === 1 && pane.width <= 600 && barFits(pane), JSON.stringify(pane));
-  record('800×600、右栏打开：顶栏的会话名省略号截断、仍看得到（layout.md 最小窗口"顶栏文字省略号截断而不溢出"；'
-    + `chat.css"会话名不被挤出去"），宽度至少 ${TITLE_MIN}px`, pane?.title >= TITLE_MIN,
-  `会话名宽 ${pane?.title}px；面包屑 ${pane?.crumb}px（项目名 ${pane?.project}px）；按钮区 ${pane?.actionsWidth}px：`
-  + `${pane?.actions.join(', ')}`);
+  recordBars('800×600、右栏打开（面板 300px，≤ 400px）：模型和思考按钮仍显示（思考只显示强度、两个都去掉 ▾），'
+    + '项目名、上下文用量和权限按钮的图标不显示；顶栏不溢出、不裁切', report, 1, pane?.width <= 400);
+  record(`800×600、右栏打开：会话 A 的长名字省略号截断、仍看得到，宽度至少 ${TITLE_MIN}px（layout.md 最小窗口`
+    + '"顶栏文字省略号截断而不溢出"；models.md"放不下"会话名至少留 36px）', pane?.title >= TITLE_MIN
+    && pane.titleFull > pane.title, `会话名"${pane?.titleText}"宽 ${pane?.title}px（全宽 ${pane?.titleFull}px）；`
+    + `模型按钮 ${pane?.modelWidth}px；按钮：${pane?.actions.join(', ')}`);
   await shot(page, 'layout-800-right');
   await noteSmall(ctx, '800×600 右栏打开');
+  await recordMenus(ctx, '800×600、右栏打开');
   await typeFresh(page, '/');
   await waitMenu(page);
   const geometry = await menuGeometry(page);
@@ -919,45 +1093,69 @@ async function splitOpen(page, file) {
   await waitPaneReady(page, 'right');
 }
 
-/** @brief 1200 宽分屏（A 在左、C 在右）：右栏关、右栏开两种情况下两栏的顶栏都放得下。 */
+/** @brief 分屏（A 在左、C 在右，两个都是长名字）：1280 宽（每栏约 510px）和 1200 宽（每栏约 470px），右栏关。 */
 async function splitLayout(ctx) {
   const { page } = ctx;
-  await resizeTo(ctx, 1200, 800);
+  await resizeTo(ctx, 1280, 800);
   await splitOpen(page, ctx.c);
+  const wide = await layoutReport(page);
+  recordBars('1280 宽分屏、右栏关（每栏约 510px，480–600px）：两栏都有模型和思考按钮（思考只显示强度）和上下文用量，'
+    + '不显示项目名和 ›、权限按钮的图标；顶栏不溢出、不裁切，会话名完整或至少 36px', wide, 2,
+  wide.panes.every((pane) => pane.width > 480 && pane.width <= 600));
+  await shot(page, 'layout-1280-split');
+  await noteSmall(ctx, '1280 分屏');
+  await recordMenus(ctx, '1280 宽分屏');
+  await resizeTo(ctx, 1200, 800);
   const closed = await layoutReport(page);
-  const titled = (report) => report.panes.every((pane) => pane.title >= TITLE_MIN);
-  record('1200 宽分屏、右栏关：两栏的顶栏都不溢出、不裁切，会话名没被挤没；面板窄于 600px 时模型和思考按钮藏起',
-    closed.panes.length === 2 && closed.panes.every(barFits) && titled(closed) && closed.page <= 1200
-    && closed.outside.length === 0, JSON.stringify(closed));
+  recordBars('1200 宽分屏、右栏关（每栏约 470px，400–480px）：两栏都有模型和思考按钮（带 ▾），不显示上下文用量；'
+    + '顶栏不溢出、不裁切，会话名至少 36px', closed, 2, closed.panes.every((pane) => pane.width > 400 && pane.width <= 480));
   await shot(page, 'layout-1200-split');
   await noteSmall(ctx, '1200 分屏');
-  await setRight(page, true);
-  const open = await layoutReport(page);
-  const state = await splitState(page);
-  record('1200 宽分屏、右栏开：右栏贴在右边、两栏各至少 280px，两栏的顶栏都不溢出、不裁切，会话名没被挤没',
-    open.panes.length === 2 && open.right > 0 && state.slots.every((slot) => slot.width >= 280)
-    && open.panes.every(barFits) && titled(open) && open.page <= 1200 && open.outside.length === 0,
-    JSON.stringify(open));
-  await shot(page, 'layout-1200-split-right');
-  await noteSmall(ctx, '1200 分屏右栏开');
-  await setRight(page, false);
+  await recordMenus(ctx, '1200 宽分屏');
+  await splitRight(ctx);
   await narrowSplit(ctx);
   await page.locator(`${FOCUSED} [data-testid="close-pane"]`).click();
   await waitSplit(page, false);
   await resizeTo(ctx, 1280, 800);
 }
 
-/** @brief 接着 splitLayout（分屏、右栏关）：最小窗口 800×600 时两栏的顶栏也放得下（split.md"最小 800px"）。 */
+/** @brief 分屏时两栏的会话都把右栏开关切到 open（右栏跟随焦点，各会话各自记住开关，split.md）。 */
+async function setRightBoth(page, open) {
+  for (const index of [0, 1]) {
+    await focusPane(page, index);
+    await setRight(page, open);
+  }
+}
+
+/**
+ * @brief 接着 splitLayout：1200 宽分屏、右栏开（两栏的会话都打开右栏，焦点在哪一栏右栏都开着），两栏各 280px（最窄）：
+ *        模型和思考按钮仍在、可以点，菜单在栏里。
+ */
+async function splitRight(ctx) {
+  const { page } = ctx;
+  await setRightBoth(page, true);
+  const open = await layoutReport(page);
+  const state = await splitState(page);
+  recordBars('1200 宽分屏、右栏开：右栏贴在右边、两栏各至少 280px（最窄的一种）；两栏的模型和思考按钮仍显示（去掉 ▾），'
+    + '模型按钮收短但不窄于 40px；顶栏不溢出、不裁切，会话名至少 36px', open, 2, open.right > 0
+    && state.slots.every((slot) => slot.width >= 280) && open.panes.every((pane) => pane.width <= 400));
+  await shot(page, 'layout-1200-split-right');
+  await noteSmall(ctx, '1200 分屏右栏开');
+  await recordMenus(ctx, '1200 宽分屏、右栏开（每栏 280px）');
+  await setRightBoth(page, false);
+}
+
+/** @brief 接着 splitRight（分屏、右栏关）：最小窗口 800×600 时两栏（各约 370px）的顶栏也放得下（split.md"最小 800px"）。 */
 async function narrowSplit(ctx) {
   const { page } = ctx;
   await resizeTo(ctx, 800, 600);
   const report = await layoutReport(page);
-  record('800×600 分屏、右栏关：图标栏 60px，两栏各约 370px，两栏的顶栏都不溢出、不裁切，会话名看得到，模型和思考按钮藏起',
-    report.sidebar === 60 && report.panes.length === 2 && report.panes.every((pane) => pane.width >= 360
-    && barFits(pane) && pane.title >= TITLE_MIN) && report.page <= 800 && report.outside.length === 0,
-    JSON.stringify(report));
+  recordBars('800×600 分屏、右栏关：图标栏 60px，两栏各约 370px（≤ 400px）；两栏的模型和思考按钮仍显示（去掉 ▾）；'
+    + '顶栏不溢出、不裁切，会话名至少 36px', report, 2, report.sidebar === 60
+    && report.panes.every((pane) => pane.width >= 360 && pane.width <= 400));
   await shot(page, 'layout-800-split');
   await noteSmall(ctx, '800×600 分屏');
+  await recordMenus(ctx, '800×600 分屏');
   await resizeTo(ctx, 1200, 800);
 }
 
@@ -979,7 +1177,10 @@ async function emptySession(ctx) {
     record('会话没有任何模板和技能：列表里"这个会话没有提示词模板或技能（在工具页添加）"；Esc 关闭', empty.note === EMPTY_NOTE
       && empty.items.length === 0 && !esc.open && esc.draft === '/', `${brief(empty)} → ${brief(esc)}`);
     await shot(page, '7-slash-empty');
-    await typeFresh(page, '');
+    const sends = await enterSends(ctx, '/plain');
+    record('会话没有任何模板和技能时 Enter 照常发送：列表是这条说明（没有可选的项），按 Enter 发出原样的 "/plain"，'
+      + '列表关闭、输入框清空', sends.listed.note === EMPTY_NOTE && sends.sent === '/plain' && !sends.after.open
+      && sends.after.draft === '', `${brief(sends.listed)} → sent=${sends.sent} ${brief(sends.after)}`);
     await openRow(page, ctx.a);
     await typeFresh(page, '/');
     await waitMenu(page);
@@ -1155,15 +1356,15 @@ async function reloadKernel(ctx) {
 
 /** @brief 聊天页（各种状态下）没有小于 12px 的字。 */
 async function fontSizes(ctx) {
-  record('聊天页没有小于 12px 的文字（1280 单栏与菜单、"/"列表各状态、1400 右栏开、800 宽右栏开、1200 和 800 宽分屏）',
+  record('聊天页没有小于 12px 的文字（1280 单栏与菜单、"/"列表各状态、1400 右栏开、800 宽右栏开、1280、1200 和 800 宽分屏）',
     ctx.small.length === 0 && ctx.smallChecked.length > 0, ctx.small.length ? ctx.small.slice(0, 5).join('; ')
       : `checked: ${ctx.smallChecked.join(' / ')}`);
 }
 
 const steps = { setup, menuList, menuArrows, menuFilter, insertEnter, insertTabClick, insertKeepsRest, noMatch,
-  caretRule, imeComposition, sendSkill, sendTemplate, escWhileRunning, wideLayout, midLayout, shiftTabPath,
-  narrowLayout, splitLayout, emptySession, skillCommandsOff, disabledResources, projectTrust, commandsError,
-  kernelExited, fontSizes };
+  noMatchSends, caretRule, imeComposition, sendSkill, sendTemplate, escWhileRunning, wideLayout, midLayout,
+  shiftTabPath, narrowLayout, splitLayout, emptySession, skillCommandsOff, disabledResources, projectTrust,
+  commandsError, kernelExited, fontSizes };
 
 const fake = await startFakeEndpoint(port, testKey);
 const { root, project, untrusty, trusty } = makeProject();

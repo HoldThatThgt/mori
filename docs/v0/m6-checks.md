@@ -150,3 +150,69 @@ Claude 桌面版的做法：本地 MCP 服务是整个 App 一份，每个服务
 | D | 限制同时开着的会话数，超过时关掉最早的 | 违背 M3 时你定的"会话一直开着" |
 
 推荐 A：v0 先不加后端；等你真的同时开很多会话、用多个服务时，再考虑 C。
+
+## 交付了什么
+
+| 方案要求（第 7 节 M6、5.12、5.13） | 实现 |
+| --- | --- |
+| 多个模型：列表、添加、编辑、删除；默认模型 | 设置页"连接与模型"（`SettingsPage.tsx`、`ConnectionsSection.tsx`、`ConnectionsList.tsx`、`ConnectionForm.tsx`、`ModelForm.tsx`）；后台进程 `config.ts`：连接 = `models.json` 里 Mori 的一个 provider，下面多个模型；添加连接（与首次启动同一张表单）、编辑连接、添加 / 编辑模型（不用再填 key）、删除（最后一个模型连同连接和 key）、设为默认（pi `setDefaultModelAndProvider`）、每个模型的"测试" |
+| 顶栏按栏换模型，新回复来自新模型 | `ModelMenu.tsx` + `session.setModel`（pi `setModel`，不改默认）；后台进程发 `mori.model_state`；改了设置里的模型后，打开着的会话换成新的模型对象（`refreshSessionModels`） |
+| 思考强度（设置页与顶栏，写法与 pi 相同） | 模型"支持思考"写 `models.json` 的 `reasoning: true`；"新会话默认的思考强度"写 pi 设置的 `modelThinkingLevels`；顶栏 `ThinkingMenu.tsx` + `session.setThinking`（pi `setThinkingLevel`，pi 记进会话、重新打开时恢复）；不支持思考时不可选并说明原因 |
+| 用户级 AGENTS.md | `AgentsSection.tsx` + 后台进程 `agents.ts`：读写 `<agentDir>/AGENTS.md`，生效的文件取 pi `loadProjectContextFiles`，标出 `AGENTS.override.md` 盖过它、`CLAUDE.md` 会被它盖过；离开时有未保存的改动先问（`leaveGuard.ts`、`LeaveDialog.tsx`，所有换页面、换会话的入口都经过它）；项目级列出焦点会话实际加载的文件（`getAgentsFiles`），"用系统编辑器打开" |
+| 工具页：内置工具 | `ToolsBuiltin.tsx`；后台进程 `resources.ts` `readTools`：`getAllTools` 去掉 hidden，启用取 `getActiveToolNames`，来源分内置 / 扩展 / MCP / 插件 |
+| 工具页：Skill | `ToolsSkills.tsx`：pi `DefaultPackageManager.resolve()` 的全部技能（含停用的）加 `loadSkills` 的名字、用途、正文；来源用户级 / 本项目 / 插件；启停照搬 `pi config` 的写法（`resourceToggles.ts`）；本项目设置改了的用户级技能只读 |
+| 工具页：MCP | MCP 照 pi 命令行作为内置扩展加入每个会话（`sessions.ts`）；`ToolsMcp.tsx`、`ToolsMcpForm.tsx` + 后台进程 `mcpConfig.ts`：添加表单和以 JSON 编辑（Mori 添加的写 `exposure: direct`）、`enabled` 开关、"改为直接调用"、移除；照搬 pi 的配置检查，pi 不会加载的条目标出原因；工具名取 `getAllTools`；错误取 pi 通知的原文；不显示"已连接" |
+| 工具页：Plugin | `ToolsPlugins.tsx` + `resources.ts`：添加本地包（pi `addSourceToSettings`）、按资源启停（`togglePackageResource`）、停用 / 启用整个包、移除；主题标"Mori 不使用"；本项目的包和不是本地文件夹的来源只读 |
+| 只支持用户级启停，项目级的覆盖只显示 | 见上"需要你确认"第 1 条（项目自己的技能按 `pi config -l` 写项目的设置） |
+| 输入框"/" | `SlashMenu.tsx`、`state/slash.ts` + `session.commands`（`promptTemplates` 和技能命令）；技能调用的气泡缩成一行"技能 · 名字"（`skillText.ts`），会话名、排队区、放回输入框都写成 `/skill:名字 参数` |
+| 左栏入口 | 侧栏"工具"（收起为图标栏时是图标按钮） |
+
+后台进程新增的命令（全部是方案第 6 节第 1 件"调用 pi SDK：……读写配置"）：`connection.save`（带 provider）、`endpoint.save`、`model.save`、
+`model.delete`、`model.setDefault`、`connection.test`（带模型）、`session.setModel`、`session.setThinking`、`session.commands`、`agents.get`、
+`agents.save`、`tools.get`、`resource.toggle`、`package.add`、`package.setAll`、`package.remove`、`mcp.save`、`mcp.setEnabled`、`mcp.setDirect`、
+`mcp.remove`；新事件 `mori.model_state`。主进程只多了"删除一个 provider 的 key"（删除连接时）。
+状态表：新增 [screens/settings.md](screens/settings.md)、[screens/models.md](screens/models.md)、[screens/tools.md](screens/tools.md)、
+[screens/slash.md](screens/slash.md)；改了 connection.md、chat.md、layout.md、approval.md、sessions.md（键盘路径）、README.md。
+
+## 与方案不同、或需要你注意的地方
+
+1. **照搬了 pi 没有导出的几段代码**（都注明出处，pi 升级时要对照）：`pi config` 的两个启停函数（多加一处 `"!**"`，见临时默认值）、
+   pi-ai 的 `getSupportedThinkingLevels` / `clampThinkingLevel`、`utils/json.js` 去注释的两个正则、`validateMcpServerConfig`（MCP 条目的检查）、
+   `isLocalPath` 的前缀；界面里照抄了 pi 认技能调用的正则（`parseSkillBlock`）。
+2. **打开着的会话换模型对象**：pi 重读 `models.json` 后会话仍拿着旧的模型对象，后台进程照 pi 私有的 `_refreshCurrentModelFromRegistry`
+   直接改 `session.agent.state.model`；打开设置页（`config.get`）也会让 pi 重读 `models.json`。
+3. **MCP 的错误靠认 pi 通知的原文**：pi 没有结构化的连接状态，工具页从对话流里以 `MCP ` 开头的扩展通知里取以 `<服务名>:` 开头的行和
+   `config:` 行；pi 改了通知的写法就认不出（登记为临时默认值）。命令写错时 Windows 上 pi 的原文是 `failed: MCP connection closed`
+   （有时是 `write EPIPE`），cmd 的中文报错只在 pi 的 `/mcp` 状态里、而且是乱码。
+4. **带引用芯片时"/"命令不会展开**：发给模型的全文以引用块开头，pi 只展开以 `/` 开头的消息；这时列表里只有一行说明。先输入命令再加芯片的
+   情况没有提示（照常发出、不展开）。
+5. **提示词模板发出后气泡里是展开后的全文**（pi 不保留原来的 `/名字`，与 pi 终端相同）；技能命令缩成一行。
+6. **"/"列表里没有可选的项时 Enter 照常发送**（照 Claude 桌面版）：扩展命令（例如 M3 的 `/mori-ask`）不在列表里，也能直接发出。
+7. **删除一个会话正在用的连接**：顶栏显示"<模型>（已删除）"；连接没了时 pi 的下一条消息报 `No API key found for …`，错误卡附"去设置"，
+   落在连接列表上。
+8. **`models.json` 里有 `//` 注释时不能在设置页保存**（pi 读得了，但 Mori 写回去会丢掉注释），保存失败并说明；只有结尾逗号的照常保存。
+9. **不是本地文件夹的包**（`npm:`、`git:`）：内网用不了，卡片只读、说明"这一项不会被安装，可以移除"；它在设置里时 pi 每次读列表都会运行
+   `npm root -g`。
+10. **pi 把一个空的本地文件夹当成一个扩展**（`resolveLocalExtensionSource`），"包里没有资源"只在 `package.json` 写了空的 `pi` 字段时出现。
+11. **MCP 每个会话各连一次**：见上"打开很多会话时 MCP 的内存与进程（需要你决定）"。
+
+## fixture（从真实会话录制）
+
+`tests/ui/m6-record.mjs` 经界面用的进程桥对 DeepSeek 发命令，录下命令、结果和全部事件；每个场景用新的临时数据目录和一次新的启动，
+录完先自查，不合要求的不写入。7 个场景，录下的文件里没有 key（已扫描）。MCP 场景第一次录完后清理临时文件夹失败（MCP 服务以项目文件夹为
+工作目录，Mori 关掉之前删不掉），改为关掉 Mori 后再删，重录。M1 的 `no-key` 用 M6 的后台进程重录了一次（M6 起没有可用模型时会话信息里的
+模型是空，不再是 pi 的占位模型 `unknown/unknown`）。
+
+| fixture | 内容 |
+| --- | --- |
+| `model-switch` | 在 DeepSeek 连接下添加 deepseek-v4-pro（不填 key）；新会话先用 deepseek-flash 回答，顶栏换成 deepseek-v4-pro 后再回答（pi 记下的回复模型先后是 flash、v4-pro） |
+| `thinking` | 把 deepseek-flash 标为支持思考（默认"中"）；新会话顶栏切到"高"问鸡兔同笼，回复有思考；切到"关"再问，没有思考 |
+| `agents-md` | 写用户级 AGENTS.md"每次回答都以'收到'两个字开头"；新会话的第一条回复以"收到"开头 |
+| `project-skill` | 信任的项目 `.pi/skills/m6-proj-skill`：工具页列为本项目，模型说得出它；停用后新会话的"/"列表和模型的回答里都没有它 |
+| `mcp` | 添加合成 MCP 服务 mori-test、命令写错的 mori-broken、不注册工具的 mori-empty；新会话的工具页有 mori-test 的工具名、mori-empty 没有；pi 的通知里有 `mori-broken: failed`；DeepSeek 调用 `mcp__mori_test__echo` 出批准卡，允许后返回 `mori-mcp echo: hello-mori` |
+| `plugin` | 添加 `tests/pi-package` 的副本：扩展、技能、提示词、主题四类；停用包里的技能、停用整个包、再启用；新会话里 `package_hello` 出批准卡，允许后返回 |
+| `slash` | 用户级技能 m6-hello 和模板 m6-summary：`session.commands` 列出二者；发出 `/skill:m6-hello`（pi 展开成技能正文，回复 M6-SKILL-OK）和 `/m6-summary README.md`（展开成模板） |
+
+另有 `tests/fixtures/m6/pi-config-toggles.json`：不是会话录制，是 `tests/ui/m6-pi-config.mjs` 用 pi 自己的 `ConfigSelectorComponent`
+（`pi config` 的组件）在固定的目录布局里依次启停用户级技能、包里的技能、用户级模板、项目技能后读出的 `settings.json`；
+`m6-app-tools` 在同样的布局里经 Mori 的界面做同样的启停，逐字比较。

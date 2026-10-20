@@ -5,13 +5,15 @@
 // 新建会话、不监视文件；内置工具（启用的正是发给模型的、扩展的来源和两行说明）；
 // 技能（没有技能、来源标记、展开看正文和路径、用系统编辑器打开、收起、与 pi config 相同的写入——逐步对照
 // tests/fixtures/m6/pi-config-toggles.json、写入失败与再试、本项目设置停用 / 启用的用户级技能只读、技能的问题列表、
-// 未信任项目的技能不列出、停用后新会话的"/"和系统提示里没有它）；
+// 未信任项目的技能不列出、停用后新会话的"/"和系统提示里没有它、设置里另有同一项的别的写法时"启停没有生效"）；
 // 用户级提示词模板在页面上没有开关，STEPS 里那一步经开关用的同一条后台进程命令 resource.toggle 发出；
 // MCP（没有服务、表单添加、编辑与改名、以 JSON 编辑新的和已有的、HTTP 服务、几种保存失败、v0 调用方式的警示与"改为直接调用"、
 // 启停、移除、新会话注册的工具名、命令写错时 pi 的原文和完整通知、没有注册工具的服务不显示"已连接"、调用出批准卡、
-// 本项目的服务只读、mcp.json 读不出与用系统编辑器打开）；
+// 本项目的服务只读、mcp.json 读不出与用系统编辑器打开、pi 不会加载的条目（原因、排在后面、config: 行不重复、改写和移除、
+// 本项目里同名的条目被跳过时两行按 data-scope 分开、表单接在用户级那一行下面））；
 // 插件（添加本地包不复制文件、添加失败、按资源启停、停用 / 启用整个包、移除、包里扩展的工具与批准卡、包里没有资源、本项目的包、
-// 未信任项目的包和扩展不列出）；
+// 未信任项目的包和扩展不列出、不是本地文件夹的 npm 包只能移除）；
+// 工具页开着时归档它跟随的会话（跟到剩下的一栏，或"没有打开的会话"）；
 // 键盘（Tab 走到开关和按钮、↑ ↓ 切分节、Esc 关表单和确认框）；没有小于 12px 的字；页面没有报错。
 // "用系统编辑器打开"只在主进程的 shell.openPath 换成记录路径之后才点（不真的打开编辑器）。
 // 布局与 tests/ui/m6-pi-config.mjs 相同（prepareLayout、STEPS）：MORI_USER_DATA=<根>/data，agentDir=<根>/data/pi。
@@ -73,6 +75,22 @@ const MULTI_FIRST = 'First line of the synthetic override tool.';
 const MULTI_DESC = `${MULTI_FIRST}\nSecond line, only shown when expanded.`;
 /** 用户级 mcp.json 里一个 HTTP 服务的地址（synthetic，停用，从不连接） */
 const REMOTE_URL = 'http://127.0.0.1:9/mcp';
+/** 手写进用户级 mcp.json、pi 不接受的三个条目（synthetic）：args 不是字符串数组、旧的 SSE 写法、不是对象 */
+const REJECTED = {
+  badargs: { command: 'node', args: 'not-a-list', exposure: 'direct' },
+  oldsse: { type: 'sse', url: REMOTE_URL, exposure: 'direct' },
+  notobj: 'synthetic: not an object',
+};
+/** 它们不被加载的原因：pi 1.3.0 validateMcpServerConfig 的原文（后台进程照搬，mcpConfig.ts） */
+const REJECTED_WHY = {
+  badargs: 'server "badargs": args must be an array of strings',
+  oldsse: 'server "oldsse": legacy SSE transport is not supported; use the streamable HTTP URL',
+  notobj: 'server "notobj" must be an object',
+};
+/** 手写进用户级设置 packages 的 npm 来源（synthetic；内网不会安装，也从没装过） */
+const NPM_SOURCE = 'npm:@synthetic/mori-remote-package';
+/** 不是本地文件夹的包的卡上说明 */
+const NOT_LOCAL = '内网只支持本地文件夹的包；这一项不会被安装，可以移除';
 
 // ---------- 准备 ----------
 
@@ -261,7 +279,8 @@ function mcpRows(page) {
     const text = (element) => element?.textContent?.trim() ?? '';
     const sw = (row) => row.querySelector('[role="switch"]');
     return [...document.querySelectorAll('[data-testid="mcp-row"]')].map((row) => ({
-      name: row.dataset.server, tags: [...row.querySelectorAll('.tools-tag')].map(text),
+      name: row.dataset.server, scope: row.dataset.scope, tags: [...row.querySelectorAll('.tools-tag')].map(text),
+      problem: text(row.querySelector('[data-testid="mcp-problem"]')),
       off: row.classList.contains('off'),
       checked: sw(row)?.getAttribute('aria-checked') === 'true', disabled: sw(row)?.disabled ?? null,
       command: text(row.querySelector('.tools-mono')), tools: text(row.querySelector('[data-testid="mcp-tools"]')),
@@ -1139,7 +1158,7 @@ async function mcpForm(ctx) {
     && x.command === `node ${MCP_SERVER}` && x.checked, JSON.stringify(x));
 }
 
-/** @brief 表单开着时的几种保存失败；每次 mcp.json 都不变。最后把 JSON 改好、回到表单（命令和参数回来）。 */
+/** @brief 表单开着时的几种保存失败（名字、重名、没有命令、环境变量）；每次 mcp.json 都不变。 */
 async function mcpFailures(ctx) {
   const { page } = ctx;
   const form = page.getByTestId('mcp-form');
@@ -1147,9 +1166,9 @@ async function mcpFailures(ctx) {
   const kept = () => readFileSync(mcpPath(ctx), 'utf8') === original;
   await fillFields(page, { name: 'bad name!', command: 'node', args: MCP_SERVER });
   const bad = await submitForm(page);
-  record('名字不合规（有空格和 !）："保存失败："加原文，表单保留你写的（名称、命令、参数），mcp.json 不变', bad.open
-    && same(bad.values.slice(0, 3), ['bad name!', 'node', MCP_SERVER])
-    && bad.error.startsWith('保存失败：') && bad.error.includes('Invalid server name') && kept(), JSON.stringify(bad));
+  record('名字不合规（有空格和 !）："保存失败："加 pi 的原文，表单保留你写的（名称、命令、参数），mcp.json 不变', bad.open
+    && same(bad.values.slice(0, 3), ['bad name!', 'node', MCP_SERVER]) && kept()
+    && bad.error === '保存失败：invalid server name "bad name!" (use letters, digits, "_" and "-")', JSON.stringify(bad));
   await field(form, '名称').fill('my_tool');
   const clash = await submitForm(page);
   record('与已有的 my-tool 重名（- 和 _ 算同一个，同 pi）：保存失败，mcp.json 不变', clash.open
@@ -1166,6 +1185,15 @@ async function mcpFailures(ctx) {
   record('环境变量有一行不是 名字=值："保存失败：环境变量"BADLINE"要写成 名字=值"，mcp.json 不变', badEnv.open
     && badEnv.error === '保存失败：环境变量"BADLINE"要写成 名字=值' && kept(), badEnv.error);
   await field(form, '环境变量').fill('');
+  await mcpJsonFailures(ctx);
+}
+
+/** @brief 接着上面：以 JSON 编辑时的保存失败（codemode、不能解析），最后改好 JSON、回到表单。mcp.json 都不变。 */
+async function mcpJsonFailures(ctx) {
+  const { page } = ctx;
+  const form = page.getByTestId('mcp-form');
+  const original = readFileSync(mcpPath(ctx), 'utf8');
+  const kept = () => readFileSync(mcpPath(ctx), 'utf8') === original;
   await form.getByRole('button', { name: '以 JSON 编辑' }).click();
   const json = page.getByTestId('mcp-json');
   await json.waitFor({ timeout: 5000 });
@@ -1367,6 +1395,95 @@ async function fullNotice(page, name) {
     text: await details.locator('pre').first().innerText({ timeout: 5000 }) };
 }
 
+/**
+ * @brief pi 不会加载的条目（tools.md"pi 不会加载"）：往用户级 mcp.json 手写三个 pi 不接受的条目（REJECTED），在工具页
+ *        "新建会话"（pi 读配置时跳过它们，在 MCP 通知里以 "config: …" 报告），再看 MCP 一节：它们照样列出、排在 pi 会加载的
+ *        服务后面，行下面"pi 不会加载它：<原文>"，开关关上且不可用，没有调用方式、工具名和"改为直接调用"，编辑、以 JSON 编辑、
+ *        移除照常；与"pi 不会加载它"原因相同的 config: 行不在这一行重复。
+ */
+async function mcpProblems(ctx) {
+  const { page } = ctx;
+  ctx.mcpBefore = readJson(mcpPath(ctx));
+  writeJson(mcpPath(ctx), { ...ctx.mcpBefore, mcpServers: { ...ctx.mcpBefore.mcpServers, ...REJECTED } });
+  await openToolsSection(page, 'mcp');
+  ctx.p5 = await newFromTools(page);
+  await page.waitForFunction(() => [...document
+    .querySelectorAll('.pane-slot:not([hidden]) [data-testid="ext-notify"]')]
+    .some((item) => item.textContent.includes('broken: failed')), null, { timeout: 45000 });
+  const reported = (await paneOf(page).getByTestId('ext-notify').allInnerTexts()).join('\n');
+  await openToolsSection(page, 'mcp');
+  const rows = await mcpRows(page);
+  const names = rows.map((row) => row.name);
+  const rejected = rows.filter((row) => Object.hasOwn(REJECTED, row.name));
+  await shot(page, '3-mcp-problems');
+  record('pi 不会加载的条目也列出，排在 pi 会加载的服务后面、按 mcp.json 里的顺序（badargs、oldsse、notobj）；'
+    + '前面的服务都没有"pi 不会加载它"', same(names.slice(-3), Object.keys(REJECTED))
+    && rows.slice(0, -3).every((row) => !row.problem), JSON.stringify(names));
+  const buttons = [['编辑', false], ['以 JSON 编辑', false], ['移除', false]];
+  record('pi 不会加载的条目：行下面警示色"pi 不会加载它：<pi 的原文>"（args 不是字符串数组、旧的 SSE 写法、不是对象）；'
+    + '用户级（data-scope="user"），开关关上、不可用、行变淡；不显示调用方式、工具名和"改为直接调用"；编辑、以 JSON 编辑、'
+    + '移除可用', rejected.length === 3 && rejected.every((row) => row.problem === `pi 不会加载它：${REJECTED_WHY[row.name]}`
+    && row.scope === 'user' && !row.checked && row.disabled && row.off && same(row.tags, ['用户级']) && !row.tools
+    && !row.direct && same(row.buttons.map((button) => [button.text, button.disabled]), buttons)),
+  JSON.stringify(rejected));
+  record('新建的会话里 pi 的 MCP 通知以 "config: …" 报告了跳过的三个条目；这些行与"pi 不会加载它"原因相同，'
+    + '不在这一行重复（行下面没有再写一遍的 mcp-error）', Object.values(REJECTED_WHY).every((why) => reported.includes(why))
+    && rejected.every((row) => row.error.every((line) => !line.includes(REJECTED_WHY[row.name]))),
+  JSON.stringify({ reported: oneLine(reported, 600), errors: rejected.map((row) => [row.name, row.error]) }));
+  await noteSmall(ctx, 'MCP · pi 不会加载');
+}
+
+/**
+ * @brief 接着 mcpProblems：oldsse 的"以 JSON 编辑"原样保存，保存失败、显示 pi 的原文，mcp.json 不变；badargs 用
+ *        "以 JSON 编辑"改好后不再有问题；移除三个（不是对象的 notobj 也能移除），mcp.json 回到加它们之前的样子
+ *        （出错时也恢复，免得影响之后的步骤）。
+ */
+async function mcpProblemFix(ctx) {
+  const { page } = ctx;
+  const form = page.getByTestId('mcp-form');
+  const json = page.getByTestId('mcp-json');
+  try {
+    await openToolsSection(page, 'mcp');
+    const written = readFileSync(mcpPath(ctx), 'utf8');
+    await mcpRow(page, 'oldsse').getByRole('button', { name: '以 JSON 编辑', exact: true }).click();
+    await json.waitFor({ timeout: 5000 });
+    const shown = JSON.parse(await json.inputValue());
+    const sse = await submitForm(page);
+    record('保存失败（pi 不接受的条目）：oldsse 的"以 JSON 编辑"是它的条目，原样保存时"保存失败：server "oldsse": legacy SSE '
+      + 'transport is not supported; use the streamable HTTP URL"，表单留着，mcp.json 不变',
+    same(canon(shown), canon(REJECTED.oldsse)) && sse.open && sse.error === `保存失败：${REJECTED_WHY.oldsse}`
+      && readFileSync(mcpPath(ctx), 'utf8') === written, JSON.stringify({ shown, error: sse.error }));
+    await form.getByRole('button', { name: '取消', exact: true }).click();
+    await form.waitFor({ state: 'detached', timeout: 5000 });
+    await fixBadArgs(ctx);
+    for (const name of Object.keys(REJECTED)) {
+      await mcpRow(page, name).getByRole('button', { name: '移除' }).click();
+      await page.getByTestId('remove-dialog').getByRole('button', { name: '移除' }).click();
+      await mcpRow(page, name).waitFor({ state: 'detached', timeout: 15000 });
+    }
+    record('移除这三个（不是对象的 notobj 也能移除）：确认后行消失，mcp.json 回到加它们之前的样子',
+      same(readJson(mcpPath(ctx)), ctx.mcpBefore), JSON.stringify(readJson(mcpPath(ctx))));
+    await backToChat(page);
+  } finally {
+    if (ctx.mcpBefore && !same(readJson(mcpPath(ctx)), ctx.mcpBefore)) writeJson(mcpPath(ctx), ctx.mcpBefore);
+  }
+}
+
+/** @brief 用"以 JSON 编辑"把 badargs 的 args 改成数组再保存：mcp.json 里换成写的条目，行里不再有"pi 不会加载它"。 */
+async function fixBadArgs(ctx) {
+  const { page } = ctx;
+  await mcpRow(page, 'badargs').getByRole('button', { name: '以 JSON 编辑', exact: true }).click();
+  const json = page.getByTestId('mcp-json');
+  await json.waitFor({ timeout: 5000 });
+  const fixed = { ...REJECTED.badargs, args: [MCP_SERVER] };
+  await json.fill(JSON.stringify(fixed, null, 2));
+  const saved = await submitForm(page);
+  const row = (await mcpRows(page)).find((item) => item.name === 'badargs');
+  record('pi 不会加载的条目可以改写："以 JSON 编辑"把 badargs 的 args 写成数组、保存：mcp.json 里换成写的条目，'
+    + '行里不再有"pi 不会加载它"，开关打开、可用', !saved.open && same(readJson(mcpPath(ctx)).mcpServers.badargs, fixed)
+    && Boolean(row) && !row.problem && row.checked && !row.disabled, JSON.stringify({ saved, row }));
+}
+
 /** @brief mcp.json 不能解析：显示原文和"用系统编辑器打开"，"添加"不可用；之后恢复文件。 */
 async function mcpBroken(ctx) {
   const { page } = ctx;
@@ -1460,6 +1577,48 @@ async function sidebarLeaves(ctx) {
     lit: await page.getByTestId('nav-tools').evaluate((element) => element.classList.contains('active')) };
   record('工具页开着时点左栏的另一个会话：回到会话页并显示那个会话，"工具"不再高亮', left && state.file === ctx.p1
     && !state.lit, JSON.stringify(state));
+}
+
+/**
+ * @brief 本项目里同名的条目被跳过（tools.md"pi 不会加载"）：给 override 项目的 .pi/mcp.json 加一个对用户级 legacy 的覆盖，
+ *        但写了覆盖不能写的 description（synthetic）。工具页里 legacy 有两行：用户级的照常（data-scope="user"），本项目的
+ *        （data-scope="project"）说明 pi 不会加载它；点用户级那一行的"编辑"，表单只接在用户级那一行下面。之后恢复文件。
+ */
+async function mcpSameName(ctx) {
+  const { page } = ctx;
+  const file = join(ctx.override, '.pi', 'mcp.json');
+  const original = readFileSync(file, 'utf8');
+  const config = JSON.parse(original);
+  const skipped = { enabled: false, description: 'synthetic: an override may not set this' };
+  writeJson(file, { ...config, mcpServers: { ...config.mcpServers, legacy: skipped } });
+  try {
+    await rowOf(page, ctx.overrideFile).first().click();
+    await waitReady(page);
+    await openToolsSection(page, 'mcp');
+    const rows = (await mcpRows(page)).filter((row) => row.name === 'legacy');
+    const user = rows.find((row) => row.scope === 'user');
+    const project = rows.find((row) => row.scope === 'project');
+    const why = 'pi 不会加载它：server "legacy": an override can only set enabled, exposure, toolExposure';
+    record('本项目里同名的覆盖被跳过：legacy 有两行，用户级的（data-scope="user"）照常、开关打开；本项目的'
+      + `（data-scope="project"）标"本项目"、"${why}"，开关和按钮都不可用`, rows.length === 2 && Boolean(user)
+      && !user.problem && user.checked && !user.disabled && project?.tags[0] === '本项目' && project.problem === why
+      && project.disabled && project.buttons.every((button) => button.disabled), JSON.stringify(rows));
+    await page.locator('[data-testid="mcp-row"][data-scope="user"][data-server="legacy"]')
+      .getByRole('button', { name: '编辑', exact: true }).click();
+    await page.getByTestId('mcp-form').waitFor({ timeout: 5000 });
+    const placed = await page.evaluate(() => {
+      const above = document.querySelector('[data-testid="mcp-form"]')?.closest('li')?.previousElementSibling;
+      return { forms: document.querySelectorAll('[data-testid="mcp-form"]').length,
+        scope: above?.dataset.scope ?? null, server: above?.dataset.server ?? null };
+    });
+    record('同名的两行时点用户级 legacy 的"编辑"：只有一个表单，接在用户级那一行下面',
+      same(placed, { forms: 1, scope: 'user', server: 'legacy' }), JSON.stringify(placed));
+    await page.keyboard.press('Escape');
+    await page.getByTestId('mcp-form').waitFor({ state: 'detached', timeout: 5000 });
+    await backToChat(page);
+  } finally {
+    writeFileSync(file, original);
+  }
 }
 
 /** @brief 没有信任的项目：顶部的说明；它 .pi/skills 里的技能、.pi/mcp.json 里的服务都不列出。 */
@@ -1640,6 +1799,113 @@ async function lateConfig(ctx) {
   await backToChat(page);
 }
 
+/**
+ * @brief 启停没有生效（tools.md 插件表"启停没有生效"，技能同"按资源启停"）：此刻用户级设置按 SKILL.md 的路径停用了
+ *        user-skill（writeFailure 那一步），再手写同一项的另一种写法：它的文件夹 "-skills/user-skill"（synthetic）。
+ *        打开开关：Mori 照 pi config 写入后重新 resolve，user-skill 仍是停用（pi 最后看 "-" 条目）：这一行下面"没能保存："
+ *        加原文（指出用户级 settings.json 和 skills 列表，请你去掉那一条），开关回到关上。之后恢复设置文件。
+ */
+async function toggleOverridden(ctx) {
+  const { page } = ctx;
+  const file = join(ctx.agentDir, 'settings.json');
+  const good = readFileSync(file, 'utf8');
+  const settings = JSON.parse(good);
+  writeJson(file, { ...settings, skills: [...(settings.skills ?? []), '-skills/user-skill'] });
+  try {
+    await openToolsSection(page, 'skills');
+    const before = (await skillRows(page)).find((row) => row.name === 'user-skill');
+    await skillRow(page, 'user-skill').getByRole('switch').click();
+    await page.waitForFunction(() => {
+      const row = document.querySelector('[data-testid="skill-row"][data-name="user-skill"]');
+      const toggle = row?.querySelector('[role="switch"]');
+      return Boolean(toggle) && !toggle.disabled && Boolean(row.querySelector('.form-message.error'));
+    }, null, { timeout: 15000 });
+    const row = (await skillRows(page)).find((item) => item.name === 'user-skill');
+    const error = row?.error.toLowerCase() ?? '';
+    record('启停没有生效：用户级设置里另有同一项的另一种写法（文件夹 "-skills/user-skill"）时打开 user-skill 的开关：'
+      + '这一行下面"没能保存："加原文（仍是停用，用户级 settings.json 的 "skills" 列表里另一条盖过了它，请去掉那一条），'
+      + '开关回到关上', Boolean(before) && !before.checked && row.error.startsWith('没能保存：')
+      && error.includes('is still disabled after saving') && error.includes(file.toLowerCase())
+      && error.includes('"skills" list') && !row.checked && row.off,
+    JSON.stringify({ before, row, skills: readJson(file)?.skills }));
+    await shot(page, '9-toggle-overridden');
+  } finally {
+    writeFileSync(file, good);
+  }
+  await backToChat(page);
+}
+
+/**
+ * @brief 不是本地文件夹的包（tools.md 插件表）：往用户级设置的 packages 手写一个 npm 来源（synthetic，从没装过）。插件一节
+ *        有它的卡：用户级，文件夹一行"找不到这个文件夹"，说明"内网只支持本地文件夹的包；这一项不会被安装，可以移除"，
+ *        没有资源开关和"停用整个包"，只有"移除"；移除后用户级设置的 packages 回到原样。
+ */
+async function remotePackage(ctx) {
+  const { page } = ctx;
+  const file = join(ctx.agentDir, 'settings.json');
+  const good = readFileSync(file, 'utf8');
+  const settings = JSON.parse(good);
+  writeJson(file, { ...settings, packages: [...(settings.packages ?? []), NPM_SOURCE] });
+  try {
+    await openToolsSection(page, 'plugins');
+    const card = page.locator(`[data-testid="package-card"][data-source="${NPM_SOURCE}"]`);
+    await card.waitFor({ timeout: 15000 });
+    const entry = (await packageCards(page)).find((item) => item.source === NPM_SOURCE);
+    const text = await card.innerText();
+    record(`不是本地文件夹的包（${NPM_SOURCE}）：卡标"用户级"，文件夹一行"找不到这个文件夹"，说明"${NOT_LOCAL}"；`
+      + '没有资源开关和"停用整个包"，只有"移除"', entry?.tag === '用户级' && entry.root === '找不到这个文件夹'
+      && text.includes(NOT_LOCAL) && entry.resources.length === 0
+      && same(entry.actions, [{ text: '移除', disabled: false }]), JSON.stringify({ entry, text }));
+    await shot(page, '10-npm-package');
+    await noteSmall(ctx, '插件 · 不是本地文件夹的包');
+    await card.getByRole('button', { name: '移除' }).click();
+    await page.getByTestId('remove-dialog').getByRole('button', { name: '移除' }).click();
+    await card.waitFor({ state: 'detached', timeout: 15000 });
+    record('移除这个 npm 包：卡消失，用户级设置的 packages 回到原样',
+      same(readJson(file)?.packages ?? [], settings.packages ?? []), JSON.stringify(readJson(file)));
+  } finally {
+    if (readJson(file)?.packages?.includes(NPM_SOURCE)) writeFileSync(file, good);
+  }
+  await backToChat(page);
+}
+
+/** @brief 等工具页顶部跟随的会话变成 text（最多 10 秒；等不到也返回，由调用方的检查记下）。 */
+const waitFollow = (page, text) => page.waitForFunction((want) => document
+  .querySelector('[data-testid="tools-follow"]')?.textContent?.trim() === want, text, { timeout: 10000 })
+  .catch(() => {});
+
+/**
+ * @brief 工具页开着时在侧栏归档它跟随的会话（tools.md"跟随哪个会话"）：分屏（左 override、右 p1，焦点在右）时打开工具页，
+ *        跟随 p1；在侧栏归档 p1（这一栏关闭），工具页跟到剩下的 override；再归档 override（没有剩下的一栏），
+ *        工具页变成"没有打开的会话"，只有技能和插件两节。
+ */
+async function archiveFollow(ctx) {
+  const { page } = ctx;
+  await rowOf(page, ctx.overrideFile).first().click();
+  await waitReady(page);
+  await chooseMenuItem(page, ctx.p1, '在右侧分屏打开');
+  await waitSplit(page);
+  await waitPaneReady(page, 'right');
+  const [left, right] = (await splitState(page)).slots.map((slot) => slot.title);
+  await openToolsSection(page, 'skills');
+  const before = (await toolsHead(page)).follow;
+  await chooseMenuItem(page, ctx.p1, '归档');
+  await waitFollow(page, `override · ${left}`);
+  const after = await toolsHead(page);
+  record('工具页开着时在侧栏归档它跟随的会话（分屏右边的 p1）：工具页还开着，跟到剩下的一栏（"override · <它的名字>"），'
+    + '仍有四个分节', before === `project · ${right}` && after?.follow === `override · ${left}`
+    && same(after.sections, ['builtin', 'skills', 'mcp', 'plugins']), JSON.stringify({ before, after: after?.follow,
+    sections: after?.sections }));
+  await chooseMenuItem(page, ctx.overrideFile, '归档');
+  await waitFollow(page, NO_SESSION);
+  const none = await toolsHead(page);
+  record(`再归档剩下的 override（没有剩下的一栏）：工具页变成"${NO_SESSION}"，只有技能和插件两节`,
+    none?.follow === NO_SESSION && same(none.sections, ['skills', 'plugins']),
+    JSON.stringify({ follow: none?.follow, sections: none?.sections }));
+  await shot(page, '11-archive-follow');
+  await backToChat(page);
+}
+
 /** @brief 工具页各处没有小于 12px 的字。 */
 async function fontSizes(ctx) {
   record(`工具页（${ctx.smallChecked.join('、')}）没有小于 12px 的文字`, ctx.small.length === 0 && ctx.smallChecked.length > 0,
@@ -1647,7 +1913,8 @@ async function fontSizes(ctx) {
 }
 
 const steps = { setup, noSession, entry, skills, splitFollow, plugins, mcpList, mcpForm, mcpEdits, mcpSession,
-  mcpBroken, overrideProject, untrustedProject, keyboard, readFailure, writeFailure, lateConfig, fontSizes };
+  mcpProblems, mcpProblemFix, mcpBroken, overrideProject, mcpSameName, untrustedProject, keyboard, readFailure,
+  writeFailure, lateConfig, toggleOverridden, remotePackage, archiveFollow, fontSizes };
 
 const fake = await startFakeEndpoint(port, testKey);
 const layout = makeLayout();

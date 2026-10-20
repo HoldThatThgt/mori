@@ -71,8 +71,8 @@ function toolResultReply(last) {
   return { text: `工具已返回。开头内容：${flat.slice(0, 80)}`, toolCalls: [] };
 }
 
-/** @brief 按用户消息里的关键词决定回复（规则见文件开头）；tools 是请求里的工具定义。 */
-function userReply(userText, tools, body = {}) {
+/** @brief M6 的规则（which model、agents check、thinking check）：看请求本身；不是这几条时为 null。 */
+function requestReply(userText, body) {
   if (userText.includes('which model')) return { text: `模型：${body.model}`, toolCalls: [] };
   if (userText.includes('agents check')) {
     const system = (body.messages ?? []).filter((m) => m.role === 'system' || m.role === 'developer')
@@ -85,6 +85,13 @@ function userReply(userText, tools, body = {}) {
     if (!effort) return { text: '没有思考参数', toolCalls: [] };
     return { thinking: `思考强度参数 ${effort}，这是思考内容。`, text: `收到思考参数：${effort}`, toolCalls: [] };
   }
+  return null;
+}
+
+/** @brief 按用户消息里的关键词决定回复（规则见文件开头）；tools 是请求里的工具定义。 */
+function userReply(userText, tools, body = {}) {
+  const fromRequest = requestReply(userText, body);
+  if (fromRequest) return fromRequest;
   if (userText.includes('list tools')) {
     const names = (tools ?? []).map((tool) => tool.function?.name).filter(Boolean);
     return { text: `可用的工具：${names.join(', ')}`, toolCalls: [] };

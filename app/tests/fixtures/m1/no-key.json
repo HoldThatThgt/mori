@@ -5,45 +5,60 @@
  "description": "没有保存 key：发送时就失败",
  "endpoint": "https://api.deepseek.com",
  "model": "mori-endpoint/deepseek-flash",
- "recordedAt": "2026-10-19T11:56:07.396Z",
+ "recordedAt": "2026-10-20T13:00:39.538Z",
  "steps": [
   {
-   "t": 0,
+   "t": 1,
    "command": {
     "type": "session.create",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-record-Cu9hli\\project"
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-record-XbvG6j\\project"
    }
   },
   {
-   "t": 3049,
+   "t": 2745,
    "result": {
     "type": "session.create",
     "value": {
-     "sessionId": "01a15404-db9f-71ca-baf2-fcc895655b6b",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-record-Cu9hli\\project",
-     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-BIsGNm\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m1-record-Cu9hli-project--\\2026-10-19T11-56-06-946Z_01a15404-db9f-71ca-baf2-fcc895655b6b.jsonl",
+     "sessionId": "01a15966-4d00-7649-9ba4-cb5e807d5fcd",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-record-XbvG6j\\project",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-C5uq3k\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m1-record-XbvG6j-project--\\2026-10-20T13-00-39-041Z_01a15966-4d00-7649-9ba4-cb5e807d5fcd.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
      "tools": [
       "read",
       "bash",
       "edit",
       "write"
      ],
-     "model": "unknown/unknown",
-     "modelNotice": "No models available. Use /login to log into a provider via OAuth or API key. See:\n  C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\\providers.md\n  C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\\models.md",
-     "contextUsage": null
+     "model": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "modelNotice": "No models available. Use /login to log into a provider via OAuth or API key. See:\n  C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\\providers.md\n  C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\\models.md",
+     "contextUsage": null,
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
     }
    }
   },
   {
-   "t": 3049,
+   "t": 2747,
    "command": {
     "type": "session.prompt",
-    "sessionId": "01a15404-db9f-71ca-baf2-fcc895655b6b",
+    "sessionId": "01a15966-4d00-7649-9ba4-cb5e807d5fcd",
     "text": "你好"
    }
   },
   {
-   "t": 3058,
+   "t": 2750,
    "result": {
     "type": "session.prompt",
     "value": {
@@ -52,14 +67,16 @@
    }
   },
   {
-   "t": 3060,
+   "t": 2751,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a15404-db9f-71ca-baf2-fcc895655b6b",
+    "sessionId": "01a15966-4d00-7649-9ba4-cb5e807d5fcd",
     "event": {
      "type": "mori.prompt_error",
-     "message": "No API key found for the selected model.\n\nUse /login to log into a provider via OAuth or API key. See:\n  C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\\providers.md\n  C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m1-chat-990174\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\\models.md",
-     "text": "你好"
+     "message": "No API key found for the selected model.\n\nUse /login to log into a provider via OAuth or API key. See:\n  C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\\providers.md\n  C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\\models.md",
+     "text": "你好",
+     "running": false,
+     "refs": null
     }
    }
   }

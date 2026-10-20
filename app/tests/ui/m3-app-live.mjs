@@ -143,14 +143,10 @@ async function sendExtCommand(ctx, text) {
     ?.textContent?.includes('正在读取…'), PANE, { timeout: 10000 });
   const view = await menu.evaluate((el) => ({ options: el.querySelectorAll('[role="option"]').length,
     text: el.textContent?.trim() ?? '' }));
+  // 列表里没有可选的项时 Enter 照常发送（slash.md，照 Claude 桌面版）：扩展命令直接发出，输入框清空、列表关闭。
   await h.textarea.press('Enter');
-  const held = { open: await menu.count() === 1, draft: await h.textarea.inputValue() };
-  if (held.open) {
-    await h.textarea.press('Escape');
-    await menu.waitFor({ state: 'detached', timeout: 5000 });
-    await h.textarea.press('Enter');
-  }
-  return { ...view, held };
+  const sent = { closed: await menu.count() === 0, draft: await h.textarea.inputValue() };
+  return { ...view, sent };
 }
 
 /** @brief 让模型调用项目扩展的 tool：批准卡出来后 Alt+1 允许一次，等确认询问卡出现，返回内容。 */
@@ -369,9 +365,9 @@ async function extCommand(ctx) {
   const { page, record } = ctx;
   const slash = await sendExtCommand(ctx, '/mori-ask');
   record('扩展命令（M6 起有"/"补全）：打出 "/mori-ask" 时列表里没有它（扩展命令不在列表里，只有一行说明）；'
-    + '列表开着时 Enter 不发送，字还在；Esc 关掉列表后 Enter 才发出（slash.md）', slash.options === 0
+    + '没有可选的项，Enter 照常发出，输入框清空（slash.md）', slash.options === 0
     && /^(没有匹配的提示词模板或技能|这个会话没有提示词模板或技能（在工具页添加）)$/.test(slash.text)
-    && slash.held.open && slash.held.draft === '/mori-ask', JSON.stringify(slash));
+    && slash.sent.closed && slash.sent.draft === '', JSON.stringify(slash));
   const card = await waitCard(page, 'confirm');
   const stage = await stageOf(page);
   const running = await paneOf(page).getAttribute('data-running');
