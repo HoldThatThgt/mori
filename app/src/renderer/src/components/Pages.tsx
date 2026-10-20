@@ -1,14 +1,14 @@
 // 首次启动、设置页、还没有打开会话时的中栏。
 
 import { useState } from 'react';
-import { openFolder, showChat } from '../state/actions';
+import { openFolder, showChat } from '../state/projects';
 import { useApp } from '../state/store';
 import { BrandMark, Icon } from '../icons';
 import { ConnectionForm } from './ConnectionForm';
 import { folderName, KernelExitBanner } from './ChatPane';
 
-/** @brief "打开文件夹…"：正在打开时显示文件夹名，失败时显示原文。 */
-export function OpenFolderPrompt({ heading, detail }: { heading: string; detail?: string }) {
+/** @brief "打开文件夹…"：正在打开时显示文件夹名，失败时显示原文；hint 替换默认的说明。 */
+export function OpenFolderPrompt({ heading, detail, hint }: { heading: string; detail?: string; hint?: string }) {
   const tabs = useApp((state) => state.tabs);
   const last = tabs[tabs.length - 1];
   const opening = last?.phase === 'opening';
@@ -16,7 +16,7 @@ export function OpenFolderPrompt({ heading, detail }: { heading: string; detail?
     <div className="open-folder" data-testid="open-folder">
       <h2>{heading}</h2>
       {detail && <p className="form-message ok" data-testid="test-result">{detail}</p>}
-      <p className="muted">选择一个项目文件夹开始对话。</p>
+      <p className="muted">{hint ?? '选择一个项目文件夹开始对话。'}</p>
       <button className="button primary" disabled={opening} onClick={() => void openFolder()}>
         <Icon name="folder" />打开文件夹…
       </button>

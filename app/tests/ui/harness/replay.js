@@ -1,25 +1,52 @@
-// 界面测试用的回放进程桥：代替 preload 提供 window.mori，回放 tests/fixtures/m1、m2 里从真实会话录下的命令与事件。
-// 界面发出的每条命令都要与录制时的下一条命令一致（类型、送达方式、文字、批准的选择），否则记为不一致并拒绝；
-// 一致时按录制的时间间隔（可加速）发出这条命令之后、下一条命令之前的事件，并在录制时的位置回复结果。
-// session.state 是界面按事件自己发的，用录制时最近一次的结果回答。只用于测试，不在 src/ 中。
-// 任务栏闪烁与 F8 不经过后台进程：这里只记下调用，截图和保存的结果由测试通过 window.__replay.f8 控制。
+// 界面测试用的回放进程桥：代替 preload 提供 window.mori，回放 tests/fixtures/m1、m2、m3 里从真实会话录下的命令与事件。
+// 界面发出的每条命令都要与录制时的下一条命令一致（类型、送达方式、文字、批准的选择、文件夹、会话文件、信任回答、
+// 名字），否则记为不一致并拒绝；一致时按录制的时间间隔（可加速）发出这条命令之后、下一条命令之前的事件，
+// 并在录制时的位置回复结果。
+// 只读的查询不占顺序，用录制里的结果回答：session.state（录制时这一刻之后的第一个结果）、session.list（界面所在这一段
+// 及之前录下的最后一个结果；开头那个即启动时的列表）、trust.check（同一文件夹按顺序取录制的结果；没录过时"不用问"）。
+// 界面发过的查询记在 status.queries：接上还在后台进程里的会话时不该问信任，回放桥不会拒绝多出的 trust.check，
+// 由测试检查这里没有它。
+// 只用于测试，不在 src/ 中。
+// 任务栏闪烁、F8 和删除会话文件不经过后台进程：这里只记下调用，截图和保存的结果由测试通过 window.__replay.f8 控制。
 
 /** 截图返回的 1×1 PNG */
 const PIXEL = 'data:image/png;base64,'
   + 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
+/** synthetic：M3 才加进会话信息的字段，M1/M2 录制里没有时按后台进程对没有项目资源的文件夹的取值补上 */
+const M3_INFO = { name: null, projectTrust: 'none', trustRemembered: false, trustSaveError: null, extensionErrors: [],
+  extensionNotices: [] };
+
 /**
- * @brief synthetic：M1 录下的 session.create / session.open 结果里还没有批准设置（M2 才加），
- *        按后台进程对新会话的默认值（每次询问、没有已允许的工具）补上；M2 录下的原样返回。
+ * @brief synthetic：M1 录下的 session.create / session.open 结果里还没有批准设置（M2 才加），按后台进程对新会话的
+ *        默认值（每次询问、没有已允许的工具）补上；M3 的字段同样按 M3_INFO 补上。新录的原样返回。
  */
-function withApproval(type, value) {
-  if ((type !== 'session.create' && type !== 'session.open') || !value || value.approval) return value;
-  return { ...value, approval: { mode: 'ask', allowed: [] } };
+function withDefaults(type, value) {
+  if ((type !== 'session.create' && type !== 'session.open') || !value) return value;
+  return { ...M3_INFO, approval: { mode: 'ask', allowed: [] }, ...value };
 }
 
-/** @brief 录制里由界面主动发出的命令（session.state 除外）的下标。 */
+/**
+ * @brief synthetic：M1/M2 录下的 mori.prompt_error 还没有 running（M3 才加）；那时发出时就失败、没有开始运行，
+ *        按 false 补上。新录的原样转发。
+ */
+function withEventDefaults(envelope) {
+  const { event } = envelope;
+  if (event.type !== 'mori.prompt_error' || 'running' in event) return envelope;
+  return { ...envelope, event: { ...event, running: false } };
+}
+
+/** 不占回放顺序的只读查询 */
+const QUERIES = ['session.state', 'session.list', 'trust.check'];
+
+/** @brief 录制里由界面主动发出的命令（只读查询除外）的下标。 */
 function boundaries(steps) {
-  return steps.flatMap((step, index) => (step.command && step.command.type !== 'session.state' ? [index] : []));
+  return steps.flatMap((step, index) => (step.command && !QUERIES.includes(step.command.type) ? [index] : []));
+}
+
+/** @brief 信任回答的比较形式；没带时为空串。 */
+function trustText(trust) {
+  return trust ? `${trust.trusted}/${trust.remember}` : '';
 }
 
 /** @brief 拒绝理由的比较形式：去掉首尾空白，空串等于没写。 */
@@ -29,7 +56,8 @@ function reasonText(reason) {
 
 /**
  * @brief 两条命令是否一致。
- *        approval.answer 也比较 requestId：界面只能答复回放发出的请求，id 与录制时相同；比较它能发现答错了卡。
+ *        approval.answer、ui.answer 也比较 requestId：界面只能答复回放发出的请求，id 与录制时相同；比较它能发现答错了卡。
+ *        ui.answer 的回答（真假、选中的那一项、输入的文字，取消为 null）要完全相同。
  */
 function sameCommand(expected, actual) {
   if (expected.type !== actual.type) return false;
@@ -39,10 +67,21 @@ function sameCommand(expected, actual) {
     case 'approval.answer':
       return expected.requestId === actual.requestId && expected.decision === actual.decision
         && reasonText(expected.reason) === reasonText(actual.reason);
+    case 'ui.answer':
+      return expected.requestId === actual.requestId && expected.value === actual.value;
     case 'approval.setMode':
       return expected.mode === actual.mode;
     case 'approval.forget':
       return expected.toolName === actual.toolName;
+    case 'session.create':
+      return expected.cwd === actual.cwd && trustText(expected.trust) === trustText(actual.trust);
+    case 'session.open':
+      return expected.sessionFile === actual.sessionFile && trustText(expected.trust) === trustText(actual.trust);
+    case 'session.rename':
+      return expected.name === actual.name && (expected.sessionId ?? null) === (actual.sessionId ?? null)
+        && (expected.sessionFile ?? null) === (actual.sessionFile ?? null);
+    case 'session.close':
+      return expected.sessionId === actual.sessionId;
     default:
       return true;
   }
@@ -78,6 +117,10 @@ function desktopStubs(status) {
       status.shown.push(file);
       return Promise.resolve();
     },
+    deleteSessionFile(file) {
+      status.deleted.push(file);
+      return Promise.resolve({ deleted: true, error: null });
+    },
   };
   return { f8, stubs };
 }
@@ -93,8 +136,9 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
   const marks = boundaries(steps);
   const listeners = { event: new Set(), exit: new Set(), ready: new Set() };
   // played：已经放完的段数（每条命令之后、下一条命令之前算一段）；played 等于 cursor 时回放桥在等界面的下一条命令。
-  const status = { cursor: 0, played: 0, clock: 0, exited: false, errors: [], commands: [],
-    playing: Promise.resolve(), idle: true, attention: 0, captures: 0, dialogAtCapture: [], issues: [], shown: [] };
+  const status = { cursor: 0, played: 0, clock: 0, exited: false, errors: [], commands: [], queries: [],
+    playing: Promise.resolve(), idle: true, attention: 0, captures: 0, dialogAtCapture: [], issues: [], shown: [],
+    deleted: [] };
   const { f8, stubs } = desktopStubs(status);
   const created = steps.find((step) => step.result?.type === 'session.create')?.result.value;
   const saved = { connection: { name: 'replay', baseUrl: fixture.endpoint, api: 'openai-completions', apiKey: '',
@@ -113,7 +157,9 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
       previous = step.t;
       if (gap > 0) await sleep(gap);
       status.clock = step.t;
-      if (step.envelope) for (const listener of listeners.event) listener(structuredClone(step.envelope));
+      if (step.envelope) {
+        for (const listener of listeners.event) listener(withEventDefaults(structuredClone(step.envelope)));
+      }
       if (step.result && !resolved && step.result.type === commandType) {
         resolved = true;
         resolve(step.result);
@@ -127,6 +173,41 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
     const results = steps.filter((step) => step.result?.type === 'session.state');
     const next = results.find((step) => step.t >= status.clock) ?? results.at(-1);
     return next?.result.value ?? { contextUsage: created?.contextUsage ?? null };
+  }
+
+  /**
+   * @brief 回答 session.list：界面现在所在的这一段（上一条已回放的命令之后、下一条命令之前）里录下的最后一个结果，
+   *        这一段没有时取更早的；还没回放任何命令时就是录制开头的那个（启动时的列表）。按段而不按回放时钟取，
+   *        界面在一条命令之后马上读列表（例如删除之后）时也能拿到这一段录下的结果。
+   */
+  function listResult() {
+    const end = marks[status.cursor] ?? steps.length;
+    const found = steps.slice(0, end).filter((step) => step.result?.type === 'session.list' && !step.result.error);
+    return structuredClone(found.at(-1)?.result.value ?? []);
+  }
+
+  /** 每个文件夹已经取走的 trust.check 结果数 */
+  const trustTaken = new Map();
+
+  /** @brief 录制里某个文件夹的 trust.check 结果，按顺序。 */
+  function trustResults(cwd) {
+    return steps.filter((step, index) => step.result?.type === 'trust.check'
+      && steps.slice(0, index).reverse().find((s) => s.command?.type === 'trust.check')?.command.cwd === cwd);
+  }
+
+  /** @brief 回答 trust.check：同一文件夹按录制顺序取结果，取完后重复最后一个；没录过时"不用问"。 */
+  function trustResult(cwd) {
+    const recorded = trustResults(cwd);
+    const taken = trustTaken.get(cwd) ?? 0;
+    trustTaken.set(cwd, taken + 1);
+    const step = recorded[Math.min(taken, recorded.length - 1)];
+    return structuredClone(step?.result.value ?? { ask: false, readError: null });
+  }
+
+  /** @brief 下一条还没回放的 session.create 的文件夹（系统选文件夹对话框的结果）。 */
+  function nextFolder() {
+    const index = marks.slice(status.cursor).find((mark) => steps[mark].command.type === 'session.create');
+    return index === undefined ? created?.cwd ?? null : steps[index].command.cwd;
   }
 
   /** @brief 按录制回放一条界面命令。 */
@@ -145,7 +226,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
       status.idle = false;
       status.playing = status.playing.then(() => play(index, end, command.type, (result) => {
         if (result.error) reject(new Error(result.error));
-        else resolve(withApproval(command.type, result.value));
+        else resolve(withDefaults(command.type, result.value));
       })).finally(() => {
         status.played += 1;
         status.idle = status.cursor >= marks.length;
@@ -164,6 +245,12 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
           return Promise.resolve({ ok: true, cancelled: false, firstTokenMs: 1, totalMs: 2, text: 'ok', thinking: false,
             error: null });
         case 'session.state': return Promise.resolve(stateResult());
+        case 'session.list':
+          status.queries.push(command);
+          return Promise.resolve(listResult());
+        case 'trust.check':
+          status.queries.push(command);
+          return Promise.resolve(trustResult(command.cwd));
         default: return replayCommand(command);
       }
     },
@@ -179,7 +266,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
       setTimeout(() => { for (const listener of listeners.ready) listener(); }, 50);
       return Promise.resolve();
     },
-    pickFolder() { return Promise.resolve(created?.cwd ?? null); },
+    pickFolder() { return Promise.resolve(nextFolder()); },
     ...stubs,
   };
   const control = {

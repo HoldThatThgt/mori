@@ -4,11 +4,16 @@ import type { Transcript } from '../state/model';
 import { seconds, useNow } from './ToolCard';
 import { toolTitleText } from './toolTitle';
 
-/** @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"等你批准"，不显示"生成中"或"执行中"。 */
+/**
+ * @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"等你批准"，其次有挂起的扩展询问时"等你回答"，
+ *        都不显示"生成中"或"执行中"。
+ */
 export function stageText(transcript: Transcript, cwd: string, now: number): string | null {
   const stage = transcript.stage;
+  if (transcript.running && transcript.approvals.length > 0) return '等你批准';
+  // 扩展命令等不经过一轮运行的询问也要看得到。
+  if (transcript.questions.length > 0) return '等你回答';
   if (!transcript.running) return null;
-  if (transcript.approvals.length > 0) return '等你批准';
   if (!stage) return null;
   const elapsed = seconds(Math.max(0, now - stage.since)).replace(/\.\d+s$/, 's');
   switch (stage.kind) {

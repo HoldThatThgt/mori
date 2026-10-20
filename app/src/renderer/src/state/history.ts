@@ -1,9 +1,10 @@
 // 把 pi 记录的当前分支（SessionManager.getBranch 的条目）转成对话流：你的消息、助手回复、工具结果、压缩处。
 // 系统消息、用量、模型切换等记录不显示。
 
-import type { SessionEntry } from '../../../shared/protocol';
+import type { LiveSnapshot, SessionEntry } from '../../../shared/protocol';
 import {
-  blocksFromContent, contentText, emptyTranscript, parseRejection, pushItem, resultPatch, type Transcript,
+  blocksFromContent, contentText, emptyTranscript, parseRejection, pushItem, resultPatch, type ToolCall,
+  type Transcript,
 } from './model';
 
 type Message = Record<string, unknown>;
@@ -64,4 +65,60 @@ function addEntry(state: Transcript, entry: SessionEntry): Transcript {
 /** @brief 由会话记录重建对话流。没有结果的工具调用保持"已中断"。 */
 export function transcriptFromEntries(entries: SessionEntry[]): Transcript {
   return entries.reduce(addEntry, emptyTranscript);
+}
+
+/** @brief 最后一条助手回复里还没有结果的调用：正在执行的标"执行中"（从开始执行的时刻计时），其余"等待执行"。 */
+function resumeTools(state: Transcript, running: LiveSnapshot['runningTools']): Transcript {
+  const last = state.items.findLast((item) => item.kind === 'assistant');
+  if (last?.kind !== 'assistant') return state;
+  const tools = { ...state.tools };
+  for (const block of last.blocks) {
+    const tool = block.type === 'tool' ? tools[block.id] : undefined;
+    if (tool?.status !== 'interrupted') continue;
+    const started = running.find((item) => item.toolCallId === tool.id)?.startedAt ?? null;
+    tools[tool.id] = { ...tool, status: started === null ? 'queued' : 'running', startedAt: started };
+  }
+  return { ...state, tools };
+}
+
+/** @brief 正在生成、还没写进会话文件的助手回复：作为流入中的回复接在后面，之后的增量照常写进它。 */
+function resumeStreaming(state: Transcript, message: unknown): Transcript {
+  const { blocks, tools } = blocksFromContent((message as { content?: unknown } | null)?.content);
+  const next = pushItem(state, { kind: 'assistant', blocks, streaming: true });
+  const all: Record<string, ToolCall> = { ...next.tools };
+  for (const tool of tools) all[tool.id] = { ...tool, status: 'preparing' };
+  return { ...next, tools: all };
+}
+
+/** @brief 接上时没有工具在执行、也不在等批准：按正在生成的回复里已有的内容定阶段（还没有内容时是等待模型）。 */
+function streamStage(streaming: unknown): 'generating' | 'thinking' | 'waiting' {
+  const parts = (streaming as { content?: Array<{ type?: string }> } | null)?.content ?? [];
+  if (parts.some((part) => part.type === 'text' || part.type === 'toolCall')) return 'generating';
+  return parts.some((part) => part.type === 'thinking') ? 'thinking' : 'waiting';
+}
+
+/** @brief 在生成时的部分：运行状态、正在执行的工具、正在生成的回复、阶段行。 */
+function resumeRun(state: Transcript, live: LiveSnapshot, now: number): Transcript {
+  let next: Transcript = resumeTools({ ...state, running: true }, live.runningTools);
+  if (live.streaming) next = resumeStreaming(next, live.streaming);
+  const tools = { ...next.tools };
+  for (const request of live.approvals) {
+    const tool = tools[request.toolCallId];
+    if (tool) tools[request.toolCallId] = { ...tool, status: 'awaiting', startedAt: null };
+  }
+  const running = Object.values(tools).find((tool) => tool.status === 'running');
+  const stage = live.approvals.length > 0 ? { kind: 'approval' as const, since: now, detail: '' }
+    : running ? { kind: 'tool' as const, since: running.startedAt ?? now, detail: running.id }
+      : { kind: streamStage(live.streaming), since: now, detail: '' };
+  return { ...next, tools, stage };
+}
+
+/**
+ * @brief 接上后台进程里还开着的会话（界面重新加载后）：会话记录重建的对话流，加上这一刻的样子——在生成时的回复、
+ *        工具和阶段，以及（不论是否在生成）挂起的批准请求和扩展询问、排队区。之后的事件照常归并。
+ */
+export function attachLive(state: Transcript, live: LiveSnapshot, now: number): Transcript {
+  const next = live.running ? resumeRun(state, live, now) : state;
+  return { ...next, approvals: [...live.approvals], questions: [...live.questions], steering: [...live.steering],
+    followUp: [...live.followUp] };
 }

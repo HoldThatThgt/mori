@@ -1,7 +1,8 @@
 // 对话流：先显示最近 50 条消息，滚到顶部时载入更早的；你在底部时跟随新内容，不在底部时显示"有新内容 ↓"。
 
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { openSettings, PAGE_SIZE, putBack, startIndexFor } from '../state/actions';
+import { openSettings, putBack } from '../state/actions';
+import { PAGE_SIZE, startIndexFor } from '../state/model';
 import type { Item, ToolCall } from '../state/model';
 import { updateTab, type Tab } from '../state/store';
 import { Icon } from '../icons';
@@ -43,6 +44,8 @@ const ItemView = memo(function ItemView(
       return <div className="notice stopped" data-testid="notice">已停止 · 已经做出的修改不会自动撤销</div>;
     case 'note':
       return <div className="notice" data-testid="notice">{item.text}</div>;
+    case 'notify':
+      return <div className={`notice ext-notify ${item.level}`} data-testid="ext-notify">扩展：{item.text}</div>;
     case 'error':
       return <ErrorCard item={item} tabKey={tabKey} />;
   }

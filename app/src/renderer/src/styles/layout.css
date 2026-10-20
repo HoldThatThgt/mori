@@ -111,7 +111,62 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
   text-align: left;
 }
 .session-item.active { background: var(--color-accent-tint); color: #283a60; }
-.session-label { flex: 1; }
+.session-label { flex: 1; min-width: 0; }
+.session-item:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+/* 会话状态：圆点加文字，跟在会话名右边（sessions.md） */
+.session-status {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.session-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.session-status.running { color: var(--color-accent); }
+.session-status.approval, .session-status.question { color: var(--color-warn); }
+/* 侧栏底部的"已归档" */
+.archived { margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--color-line); }
+.archived-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  text-align: left;
+}
+.archived-toggle svg { width: 14px; height: 14px; }
+.session-item.archived { color: var(--color-faint); }
+.session-status.error { color: var(--color-danger); }
+.session-status.unseen { color: var(--color-ok); }
+.session-rename { padding: 2px 0; }
+.session-rename input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  background: var(--color-canvas);
+  font: inherit;
+  font-size: var(--fs-body);
+}
+.rename-error { margin: 4px 4px 2px; color: var(--color-danger); font-size: var(--fs-small); line-height: 1.5; }
+.sidebar-note { margin: 0; padding: 4px 12px 8px; color: var(--color-faint); font-size: var(--fs-small); }
+.sidebar-note.error { display: grid; gap: 4px; justify-items: start; color: var(--color-danger); }
+.nav-hint { margin-left: auto; color: var(--color-faint); font-size: var(--fs-small); font-weight: 400; }
+.sidebar.collapsed .nav-hint { display: none; }
+/* 收起为图标栏时"展开"按钮上的状态点：不在中栏显示的会话里最要紧的状态 */
+.rail-toggle { position: relative; }
+.rail-dot { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; }
+.rail-dot.approval, .rail-dot.question { background: var(--color-warn); }
+.rail-dot.error { background: var(--color-danger); }
+.rail-dot.unseen { background: var(--color-ok); }
+.nav-item:disabled { opacity: .5; cursor: default; }
+/* 右键菜单挂在 body 上，贴着会话行或鼠标位置 */
+.menu.session-menu { position: fixed; right: auto; bottom: auto; }
 .sidebar-bottom { margin-top: auto; padding: 12px 12px 16px; }
 
 /* 中栏 */

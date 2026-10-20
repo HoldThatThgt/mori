@@ -164,7 +164,7 @@ function useAnswer(tabKey: string, requestId: string, reason: string): (decision
  * @brief 卡片消失（处理完，或换成下一张）时焦点如果在卡上，回到这个会话的输入框。
  *        卸载时的 layout effect 清理在卡片的 DOM 移除之前执行，此时还能判断焦点在不在卡上。
  */
-function useFocusBack(ref: React.RefObject<HTMLDivElement | null>): void {
+export function useFocusBack(ref: React.RefObject<HTMLDivElement | null>): void {
   useLayoutEffect(() => {
     const card = ref.current;
     return () => {

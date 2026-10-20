@@ -8,17 +8,24 @@ import { Icon } from '../icons';
 import { ApprovalCard } from './ApprovalCard';
 import { Composer, QueueArea } from './Composer';
 import { PermissionMenu } from './PermissionMenu';
+import { QuestionCard } from './QuestionCard';
 import { StageLine } from './StageLine';
 import { Transcript } from './Transcript';
 
-/** 会话名取第一条消息的前几个字（方案 5.3） */
-const TITLE_LENGTH = 20;
+/** 没有名字时会话名取第一条消息的前几个字（方案 5.3） */
+export const TITLE_LENGTH = 20;
 
-/** @brief 会话名。 */
-export function sessionTitle(tab: Tab): string {
-  const first = tab.transcript.firstUserText?.replace(/\s+/g, ' ').trim();
+/** @brief 显示的会话名：名字；没有时第一条消息的前 TITLE_LENGTH 个字；都没有时"新会话"。 */
+export function displayTitle(name: string | null, firstMessage: string | null): string {
+  if (name?.trim()) return name;
+  const first = firstMessage?.replace(/\s+/g, ' ').trim();
   if (!first) return '新会话';
   return [...first].length > TITLE_LENGTH ? `${[...first].slice(0, TITLE_LENGTH).join('')}…` : first;
+}
+
+/** @brief 会话名（打开前用会话列表里的第一条消息）。 */
+export function sessionTitle(tab: Tab): string {
+  return displayTitle(tab.name, tab.transcript.firstUserText ?? tab.preview);
 }
 
 /** @brief 文件夹名。 */
@@ -66,6 +73,34 @@ function KernelBanner({ kernel, tab }: { kernel: KernelStatus; tab: Tab }) {
   return null;
 }
 
+/** @brief 没有加载文件夹自带的扩展和配置时的说明，以及怎样改回；加载了或文件夹没有这些内容时为 null。 */
+function trustText(tab: Tab, agentDir: string): string | null {
+  if (tab.projectTrust === 'unasked') return '这个文件夹刚出现了自带的扩展或配置，这次没有加载 · 新建会话时会问你';
+  if (tab.projectTrust !== 'untrusted') return null;
+  const how = tab.trustRemembered
+    ? `你选过记住；要改回，删掉 ${agentDir}\\trust.json 里这个文件夹的记录后重新打开`
+    : '重启 Mori 后会再问';
+  return `没有信任这个文件夹，它自带的扩展和配置没有加载 · ${how}`;
+}
+
+/** @brief 信任与扩展的横幅（sessions.md "项目信任"）。 */
+function SessionBanners({ tab }: { tab: Tab }) {
+  const agentDir = useApp((state) => state.config?.agentDir ?? '');
+  const trust = trustText(tab, agentDir);
+  return (
+    <>
+      {trust && <div className="banner" data-testid="trust-banner">{trust}</div>}
+      {tab.trustSaveError && <div className="banner danger" role="alert">没能记住你的选择：{tab.trustSaveError}</div>}
+      {tab.extensionErrors.length > 0 && (
+        <div className="banner danger" role="alert" data-testid="extension-errors">
+          <span>有扩展没有加载：</span>
+          {tab.extensionErrors.map((error) => <span key={error} className="banner-detail">{error}</span>)}
+        </div>
+      )}
+    </>
+  );
+}
+
 /** @brief 顶栏。 */
 function TopBar({ tab, rightOpen, onToggleRight }: { tab: Tab; rightOpen: boolean; onToggleRight: () => void }) {
   const kernel = useApp((state) => state.kernel);
@@ -77,7 +112,9 @@ function TopBar({ tab, rightOpen, onToggleRight }: { tab: Tab; rightOpen: boolea
         <span className="chat-title" data-testid="session-title">{sessionTitle(tab)}</span>
       </div>
       <div className="topbar-actions">
-        <span className="model-chip" title={tab.model ?? ''}>{tab.model?.split('/').pop() ?? '没有可用模型'}</span>
+        {tab.phase !== 'opening' && (
+          <span className="model-chip" title={tab.model ?? ''}>{tab.model?.split('/').pop() ?? '没有可用模型'}</span>
+        )}
         <PermissionMenu tab={tab} disabled={notReadyText(kernel, tab) !== null} />
         <UsageChip usage={tab.contextUsage} />
         <button className="icon-button" onClick={onToggleRight} aria-pressed={rightOpen} aria-label="右栏：本会话的改动"
@@ -97,11 +134,13 @@ export function ChatPane({ tab, rightOpen, onToggleRight }: {
       data-running={tab.transcript.running} data-sending={tab.transcript.sending}>
       <TopBar tab={tab} rightOpen={rightOpen} onToggleRight={onToggleRight} />
       {tab.modelNotice && <div className="banner">{tab.modelNotice}</div>}
+      <SessionBanners tab={tab} />
       <Transcript tab={tab} />
       <div className="composer-area">
         <KernelBanner kernel={kernel} tab={tab} />
         <StageLine transcript={tab.transcript} cwd={tab.cwd} />
         <ApprovalCard tab={tab} />
+        <QuestionCard tab={tab} />
         <QueueArea tab={tab} />
         <Composer tab={tab} notReady={notReadyText(kernel, tab)} />
       </div>

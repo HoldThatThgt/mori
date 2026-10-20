@@ -8,8 +8,8 @@ import type {
 } from '@earendil-works/pi-coding-agent';
 import {
   DEFAULT_APPROVAL, READ_ONLY_TOOLS, REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT,
-  type ApprovalDecision, type ApprovalEndBy, type ApprovalMode, type ApprovalState, type EventEnvelope,
-  type KernelEvent, type ToolGate,
+  type ApprovalDecision, type ApprovalEndBy, type ApprovalMode, type ApprovalRequestInfo, type ApprovalState,
+  type EventEnvelope, type KernelEvent, type ToolGate,
 } from '../shared/protocol';
 
 type Emit = (envelope: EventEnvelope) => void;
@@ -23,6 +23,8 @@ interface Pending {
   toolCallId: string;
   /** 工具名 */
   toolName: string;
+  /** 完整的调用参数（界面重新加载后接上时再交给界面） */
+  args: Record<string, unknown>;
   /** 把答复交还给 pi */
   resolve: (result: ToolCallEventResult | undefined) => void;
   /** 解除对 ctx.signal 的监听 */
@@ -119,10 +121,11 @@ export class ApprovalGate {
       const onAbort = () => this.finish(requestId, 'reject', 'closed', REJECTED_BY_STOP);
       signal?.addEventListener('abort', onAbort, { once: true });
       const release = () => signal?.removeEventListener('abort', onAbort);
-      this.pending.set(requestId, { toolCallId: event.toolCallId, toolName: event.toolName, resolve, release });
       // 参数取 event.input：先加载的扩展可能改过它，执行的是改过之后的参数。
+      const args = { ...(event.input as Record<string, unknown>) };
+      this.pending.set(requestId, { toolCallId: event.toolCallId, toolName: event.toolName, args, resolve, release });
       this.send({ type: 'mori.approval_request', requestId, toolCallId: event.toolCallId, toolName: event.toolName,
-        args: { ...(event.input as Record<string, unknown>) } });
+        args });
     });
   }
 
@@ -201,6 +204,12 @@ export class ApprovalGate {
   noteToolEnd(toolCallId: string): void {
     this.announced.delete(toolCallId);
     this.endWaiters.get(toolCallId)?.();
+  }
+
+  /** @brief 挂起的批准请求，按提出的顺序（界面重新加载后接上会话时用）。 */
+  requests(): ApprovalRequestInfo[] {
+    return [...this.pending.entries()].map(([requestId, item]) => ({ requestId, toolCallId: item.toolCallId,
+      toolName: item.toolName, args: item.args }));
   }
 
   /** @brief 会话释放前：挂起的请求按拒绝处理，pi 不会卡在等待上。 */

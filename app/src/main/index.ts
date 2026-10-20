@@ -1,10 +1,12 @@
 // 主进程：窗口与安全限制、原生对话框，把 MessagePort 分给后台进程与界面，退出时有序关闭后台进程。
 
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, type IpcMainInvokeEvent } from 'electron';
 import { registerFeedbackHandlers } from './feedback';
-import { currentKernel, lastKernelExitCode, shutdownKernel, startKernel } from './kernel-process';
+import { currentKernel, lastKernelExitCode, piAgentDir, shutdownKernel, startKernel } from './kernel-process';
 
 // 测试可以用 MORI_USER_DATA 把数据放到独立目录，避免碰到日常使用的配置。
 if (process.env.MORI_USER_DATA) app.setPath('userData', process.env.MORI_USER_DATA);
@@ -82,6 +84,33 @@ ipcMain.handle('mori:pick-folder', async (event: IpcMainInvokeEvent) => {
   const options: Electron.OpenDialogOptions = { properties: ['openDirectory'] };
   const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
   return result.canceled ? null : (result.filePaths[0] ?? null);
+});
+
+/** @brief 检查路径是 pi 会话目录（`<agentDir>/sessions`）里的会话文件，返回绝对路径；不是时抛错。 */
+function sessionFilePath(file: unknown): string {
+  const sessionsDir = join(piAgentDir(), 'sessions');
+  const target = typeof file === 'string' ? resolve(file) : '';
+  const inside = relative(sessionsDir, target);
+  if (!target.toLowerCase().endsWith('.jsonl') || !inside || inside.startsWith('..') || isAbsolute(inside)) {
+    throw new Error(`Not a session file: ${String(file)}`);
+  }
+  return target;
+}
+
+// 删除会话：照 Claude 桌面版永久删除会话文件（方案第 4 节"会话归档与删除"由 Mori 负责；归档只在界面记下）。
+// 后台进程已先关闭这个会话；文件不存在（还没发过消息的新会话）时什么都不做。删不掉时把原文交回界面。
+ipcMain.handle('mori:delete-session', async (event: IpcMainInvokeEvent, file: unknown) => {
+  if (!event.senderFrame || !isAppPage(event.senderFrame.url)) throw new Error('Not allowed');
+  const target = sessionFilePath(file);
+  if (!existsSync(target)) return { deleted: false, error: null };
+  try {
+    await rm(target);
+  } catch (error) {
+    const message = (error as Error).message;
+    console.error(`[main] cannot delete ${target}: ${message}`);
+    return { deleted: false, error: message };
+  }
+  return { deleted: true, error: null };
 });
 
 // 后台进程意外退出后，界面上的"重新载入"重启它并重连通道；页面不刷新，草稿等界面状态保留。

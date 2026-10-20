@@ -515,6 +515,20 @@
 .dialog h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
 .dialog p { margin: 0; color: var(--color-muted); line-height: 1.7; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.dialog .dialog-path {
+  margin-top: 8px;
+  color: var(--color-prose);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  word-break: break-all;
+}
+.dialog .check-row { margin-top: 10px; }
+.dialog .dialog-status, .dialog .form-message { margin-top: 10px; font-size: var(--fs-small); }
+.dialog .button.danger:not(:disabled) {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: #fff;
+}
 .button.warn { border-color: var(--color-warn); background: var(--color-warn); color: #fff; }
 .button.warn:not(:disabled):hover { background: color-mix(in srgb, var(--color-warn) 88%, #000); }
 
@@ -546,3 +560,13 @@
   .model-chip { display: none; }
   .topbar { padding-left: 16px; gap: 8px; }
 }
+
+/* 扩展的询问卡（extension-ui.md）：与批准卡同一位置、同一外观 */
+.question-body { padding: 0 12px 6px; }
+.question-body p { margin: 0 0 4px; }
+.question-title { color: var(--color-text); font-weight: 600; }
+.question-message { color: var(--color-prose); white-space: pre-wrap; }
+.question-timeout { color: var(--color-faint); font-size: var(--fs-small); }
+/* 扩展的通知 */
+.notice.ext-notify.warning { color: var(--color-warn); }
+.notice.ext-notify.error { color: var(--color-danger); }

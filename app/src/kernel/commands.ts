@@ -4,8 +4,10 @@ import type { Command, ConfigInfo, EventEnvelope } from '../shared/protocol';
 import { cancelTest, readConnection, saveConnection, testConnection } from './config';
 import { loadPi } from './pi';
 import {
-  abort, answerApproval, clearQueue, createSession, forgetApproval, openSession, prompt, sessionState, setApprovalMode,
+  abort, answerApproval, answerQuestion, clearQueue, closeSession, createSession, forgetApproval, listSessions,
+  openSession, prompt, renameSession, sessionState, setApprovalMode,
 } from './sessions';
+import { checkTrust } from './trust';
 
 /** @brief 执行一条命令并返回结果；失败时抛错，由调用方回复给界面。 */
 export async function handleCommand(command: Command, emit: (envelope: EventEnvelope) => void): Promise<unknown> {
@@ -22,10 +24,20 @@ export async function handleCommand(command: Command, emit: (envelope: EventEnve
       return testConnection();
     case 'connection.testCancel':
       return { cancelled: cancelTest() };
+    case 'trust.check':
+      return checkTrust(command.cwd);
     case 'session.create':
-      return createSession(command.cwd, emit);
+      return createSession(command.cwd, emit, command.trust);
     case 'session.open':
-      return openSession(command.sessionFile, emit);
+      return openSession(command.sessionFile, emit, command.trust);
+    case 'session.list':
+      return listSessions();
+    case 'session.rename':
+      return renameSession(command.sessionId, command.sessionFile, command.name);
+    case 'session.close':
+      return closeSession(command.sessionId);
+    case 'ui.answer':
+      return answerQuestion(command.sessionId, command.requestId, command.value);
     case 'session.prompt':
       return prompt(command.sessionId, command.text, command.behavior, emit);
     case 'session.clearQueue':

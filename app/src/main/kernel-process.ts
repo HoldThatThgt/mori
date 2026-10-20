@@ -27,11 +27,16 @@ export function lastKernelExitCode(): number | null {
   return lastExitCode;
 }
 
+/** @brief pi 的配置目录（PI_CODING_AGENT_DIR）：`<userData>/pi`。 */
+export function piAgentDir(): string {
+  return join(app.getPath('userData'), 'pi');
+}
+
 /** @brief 启动后台进程；pi 的离线开关与配置目录在它加载前通过环境变量设好。 */
 export function startKernel(onExit: KernelExitListener): UtilityProcess {
   // 开发服务器地址只给主进程用，不传给后台进程及其命令。
   const { ELECTRON_RENDERER_URL: _rendererUrl, ...baseEnv } = process.env;
-  const agentDir = join(app.getPath('userData'), 'pi');
+  const agentDir = piAgentDir();
   const child = utilityProcess.fork(join(__dirname, 'kernel.js'), [], {
     serviceName: 'Mori Kernel',
     stdio: 'pipe',
