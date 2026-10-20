@@ -648,12 +648,17 @@ async function keysWithPopover(ctx) {
   await page.waitForFunction(() => [...document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="assistant"]')]
     .at(-1)?.textContent?.includes('第一段'), null, { timeout: 20000 });
   const index = await paneOf(page).getByTestId('assistant').count() - 1;
+  // 像你一样先往上滚一点（离开底部，不再自动跟随），再拖选。
+  const box = await paneOf(page).locator('.conversation').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, -200);
+  await sleep(300);
   await dragSelect(page, `${PANE} [data-testid="assistant"]`, '春天来了', index);
-  await popoverShown(page);
+  const opened = await popoverShown(page);
   await page.keyboard.press('Escape');
   await sleep(300);
   const stillRunning = await paneOf(page).getAttribute('data-running');
-  const closed = await page.getByTestId('selection-popover').count() === 0;
+  const closed = opened && await page.getByTestId('selection-popover').count() === 0;
   await h.textarea.focus();
   await page.keyboard.press('Escape');
   await waitIdle(page, 30000);
