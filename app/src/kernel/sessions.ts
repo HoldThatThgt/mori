@@ -4,11 +4,12 @@
 // 重新加载后的界面经 session.list 的 live 和 session.open 交出的这一刻的样子接上它们（docs/v0/screens/sessions.md）。
 
 import { existsSync } from 'node:fs';
-import type { AgentSession, AgentSessionEvent, SessionManager } from '@earendil-works/pi-coding-agent';
+import type { AgentSession, AgentSessionEvent, SessionEntry, SessionManager } from '@earendil-works/pi-coding-agent';
 import type {
   ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, EventEnvelope, ExtensionNotice, LiveSnapshot, LiveStatus,
-  OpenedSession, QuoteRef, SavedSession, SessionInfo, SessionState, TrustAnswer,
+  OpenedSession, QuoteRef, SavedSession, SessionContent, SessionInfo, SessionState, TrustAnswer,
 } from '../shared/protocol';
+import { REF_ENTRY_TYPE } from '../shared/protocol';
 import { ApprovalGate } from './approval';
 import { PendingRefs, supplementEntry } from './entries';
 import { ExtensionUi } from './extensionUi';
@@ -44,6 +45,11 @@ interface Entry {
   extensionErrors: string[];
   /** 发出了、pi 还没记下的带引用的消息 */
   refs: PendingRefs;
+  /**
+   * 本轮开始时会话的叶子条目 id（会话引用只取到这里为止，即已完成的轮次）；会话还没有条目时为 null，
+   * 不在生成时为 undefined
+   */
+  runStart: string | null | undefined;
 }
 
 const sessions = new Map<string, Entry>();
@@ -62,8 +68,15 @@ const NO_MESSAGES = '(no messages)';
  *        处理器后来判断不同时由批准扩展发更正。
  */
 function forward(entry: Entry, sessionId: string, event: AgentSessionEvent, emit: Emit): void {
-  if (event.type === 'agent_start') entry.running = true;
-  if (event.type === 'agent_settled') entry.running = false;
+  if (event.type === 'agent_start') {
+    entry.running = true;
+    // 扩展发起的一轮没有经过 prompt()：这时才记下本轮开始时的叶子（你的消息还没写入）。
+    if (entry.runStart === undefined) entry.runStart = entry.session.sessionManager.getLeafId();
+  }
+  if (event.type === 'agent_settled') {
+    entry.running = false;
+    entry.runStart = undefined;
+  }
   if (event.type === 'tool_execution_start') {
     entry.toolStarts.set(event.toolCallId, Date.now());
     entry.gate.announce(event.toolCallId, event.toolName);
@@ -148,7 +161,8 @@ async function startSession(cwd: string, sessionManager: SessionManager, emit: E
   });
   const entry: Entry = { session, gate, ui, cwd, running: false, openedAt: Date.now(), toolStarts: new Map(),
     notices: ui.ready(), modelNotice: result.modelFallbackMessage ?? null, trust: decision,
-    extensionErrors: errors.map((error) => `${error.path}: ${error.error}`), refs: new PendingRefs() };
+    extensionErrors: errors.map((error) => `${error.path}: ${error.error}`), refs: new PendingRefs(),
+    runStart: undefined };
   gate.attach(sessionId);
   sessions.set(sessionId, entry);
   session.subscribe((event) => forward(entry, sessionId, event, emit));
@@ -227,6 +241,49 @@ async function openFromFile(sessionFile: string, emit: Emit, trust?: TrustAnswer
   if (!existsSync(cwd)) throw new Error(`Project folder not found: ${cwd}`);
   const info = await startSession(cwd, manager, emit, trust, true);
   return { ...info, entries: manager.getBranch(), live: null };
+}
+
+/**
+ * @brief 生成中的会话已完成的部分：本轮开始时的叶子（leafId，会话还没有条目时为 null）之后写进来的你的消息里，
+ *        最后一条开始的是还在生成的那一轮；它之前的都已完成（插话、排队送达的消息开始新的一轮，前一轮就完了）。
+ *        本轮的你的消息还没写进来时，到 leafId 为止。
+ */
+function completedPart(branch: SessionEntry[], leafId: string | null): SessionEntry[] {
+  const start = leafId === null ? -1 : branch.findIndex((item) => item.id === leafId);
+  // 本轮开始时的叶子不在当前分支上了（扩展在运行中换了分支）：分不清哪些已完成，一条也不交。
+  if (leafId !== null && start < 0) return [];
+  const isUser = (item: SessionEntry) => item.type === 'message' && item.message.role === 'user';
+  const current = branch.findLastIndex((item, index) => index > start && isUser(item));
+  return branch.slice(0, current < 0 ? start + 1 : current);
+}
+
+/**
+ * @brief 会话引用用得到的条目：你的消息、助手回复和 mori.ref 条目。工具结果（文件内容、命令输出、图片）等引用里不取的
+ *        不交给界面，免得每次引用、每次打开预览都把整段会话搬过去。
+ */
+function quotable(entries: SessionEntry[]): SessionEntry[] {
+  return entries.filter((item) => (item.type === 'message'
+    && (item.message.role === 'user' || item.message.role === 'assistant'))
+    || (item.type === 'custom' && item.customType === REF_ENTRY_TYPE));
+}
+
+/**
+ * @brief 读出一个会话已完成的部分（会话引用，docs/v0/screens/session-refs.md）。后台进程里开着的会话读它自己的分支，
+ *        在生成时只交出已完成的轮次；没开着的用 SessionManager.open 读（不创建会话、不加载扩展、不问信任）。
+ */
+export async function readSession(sessionFile: string): Promise<SessionContent> {
+  const live = entryByFile(sessionFile);
+  if (live) {
+    const branch = live.session.sessionManager.getBranch();
+    const unfinished = live.runStart !== undefined;
+    return { sessionFile, cwd: live.cwd, name: live.session.sessionName ?? null, unfinished,
+      entries: quotable(unfinished ? completedPart(branch, live.runStart ?? null) : branch) };
+  }
+  if (!existsSync(sessionFile)) throw new Error(`Session file not found: ${sessionFile}`);
+  const pi = await loadPi();
+  const manager = pi.SessionManager.open(sessionFile);
+  return { sessionFile, cwd: manager.getCwd(), name: manager.getSessionName() ?? null,
+    entries: quotable(manager.getBranch()), unfinished: false };
 }
 
 /** @brief 还开着、但还没保存（没有会话文件）的会话：界面重新加载后也能在侧栏看到、打开、删除。 */
@@ -322,6 +379,8 @@ export function prompt(sessionId: string, text: string, options: PromptOptions, 
   const entry = requireEntry(sessionId);
   const queued = entry.running || entry.session.isStreaming;
   const pending = options.refs?.length ? entry.refs.add(text, options.refs) : null;
+  // 空闲时发出的提示开始新的一轮：记下这时的叶子，会话引用只取到这里（已完成的轮次）。
+  if (!queued) entry.runStart = entry.session.sessionManager.getLeafId();
   entry.running = true;
   // pi 处理了提示却没有开始运行时（扩展命令、输入处理器接手）不会发 agent_settled：结束后按 pi 的状态重设。
   const streaming = options.behavior ? { streamingBehavior: options.behavior } : undefined;
@@ -329,12 +388,14 @@ export function prompt(sessionId: string, text: string, options: PromptOptions, 
     // 空闲时发出的提示，prompt() 结束时消息早该记下了；还在等就是没有送达（例如交给了扩展命令）。
     if (pending && !queued && entry.refs.has(pending)) entry.refs.drop(pending);
     entry.running = entry.session.isStreaming;
+    if (!entry.running) entry.runStart = undefined;
     emit({ kind: 'event', sessionId, event: { type: 'mori.prompt_done', running: entry.running } });
   }, (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[kernel] prompt failed for ${sessionId}: ${message}`);
     if (pending) entry.refs.drop(pending);
     entry.running = entry.session.isStreaming;
+    if (!entry.running) entry.runStart = undefined;
     emit({ kind: 'event', sessionId, event: { type: 'mori.prompt_error', message, text, running: entry.running,
       refs: options.refs ?? null } });
   });

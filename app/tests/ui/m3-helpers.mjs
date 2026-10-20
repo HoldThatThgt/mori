@@ -341,11 +341,15 @@ export async function openMenuByMouse(page, file) {
   return { menu, at: { x: box.x + position.x, y: box.y + position.y }, rowBox: box };
 }
 
-/** @brief 菜单项：文字（不含小字）、旁边的小字、是否不可用。 */
-export function menuItems(menu) {
-  return menu.getByRole('menuitem').evaluateAll((items) => items.map((item) => ({
+/** M5 加进会话菜单的两项（由 M5 的测试检查）；M3 的检查只看 M3 的重命名、归档、删除（恢复） */
+export const M5_MENU_ITEMS = ['引用到当前会话', '在右侧分屏打开'];
+
+/** @brief 菜单项：文字（不含小字）、旁边的小字、是否不可用。不含 M5 加的两项（见 M5_MENU_ITEMS）。 */
+export async function menuItems(menu) {
+  const items = await menu.getByRole('menuitem').evaluateAll((elements) => elements.map((item) => ({
     label: item.firstChild?.nodeType === 3 ? item.firstChild.textContent : '',
     hint: item.querySelector('.menu-hint')?.textContent ?? '', disabled: item.disabled })));
+  return items.filter((item) => !M5_MENU_ITEMS.includes(item.label));
 }
 
 /** @brief 菜单项列成一行文字（失败时的说明用）。 */
@@ -355,7 +359,8 @@ export const menuText = (items) => items.map((item) => `${item.label}${item.disa
 /** @brief 键盘打开会话行的菜单，↓ 移到文字为 label 的菜单项再按 Enter；走不到时抛错。 */
 export async function chooseMenuItem(page, file, label) {
   await openMenuByKey(page, file);
-  for (let step = 0; step < 4; step += 1) {
+  // M5 起菜单里多了两项（M5_MENU_ITEMS），最多要走 6 步。
+  for (let step = 0; step < 6; step += 1) {
     const focus = await focusInfo(page);
     if (focus.role === 'menuitem' && focus.text === label) {
       await page.keyboard.press('Enter');

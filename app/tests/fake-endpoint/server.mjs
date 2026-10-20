@@ -15,6 +15,7 @@
 //   - 用户消息含 "code block"：返回一段带 ts 代码块的 Markdown。
 //   - 用户消息含 "echo back"：回复"收到的全文："加这条用户消息的全文（测引用块确实发给了模型）。
 //   - 用户消息含 "long reply"：流式返回四段较长的文字（测生成中选字、反馈）。
+//   - 用户消息含 "think first"：先流式返回一段思考（reasoning_content），再返回一句文字（测会话引用不含思考）。
 //   - 用户消息含 "plain"：只返回文字。
 //   - 用户消息含 "http-<状态码>"：直接以该状态码返回错误（例如 http-500 触发 pi 的自动重试，http-400 不重试）。
 //   - 模型 ID 为 "fake-slow"：第一个分块前等 8 秒（测试"测试连接 → 取消"）。
@@ -103,6 +104,9 @@ function userReply(userText, tools) {
   if (userText.includes('code block')) return { text: codeReply, toolCalls: [] };
   if (userText.includes('echo back')) return { text: `收到的全文：\n\n${userText}`, toolCalls: [] };
   if (userText.includes('long reply')) return { text: longReply, toolCalls: [] };
+  if (userText.includes('think first')) {
+    return { thinking: '这是只在思考里出现的内容 THINKING-ONLY-MARKER。', text: '想好了，这是正文。', toolCalls: [] };
+  }
   if (userText.includes('plain')) return { text: '这是一段只有文字的回复，用来测试流式输出。', toolCalls: [] };
   return { text: '我先读一下 README.md。', toolCalls: [{ name: 'read', args: { path: 'README.md' } }] };
 }
@@ -129,6 +133,10 @@ async function streamReply(res, reply, includeUsage, promptTokens, slow) {
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
   await sleep(slow ? 8000 : firstDelayMs + (reply.delayMs ?? 0));
   send({ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null });
+  for (const piece of pieces(reply.thinking ?? '', 4)) {
+    send({ index: 0, delta: { reasoning_content: piece }, finish_reason: null });
+    await sleep(chunkDelayMs);
+  }
   for (const piece of pieces(reply.text, 2)) {
     send({ index: 0, delta: { content: piece }, finish_reason: null });
     await sleep(chunkDelayMs);

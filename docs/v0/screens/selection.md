@@ -2,7 +2,7 @@
 
 依据：方案 5.4（每条助手回复下的操作）、5.10、5.3（草稿含引用芯片）、第 4 节"选区反馈 · Mori"、
 第 6 节（补充条目 id、`appendCustomEntry("mori.ref", …)`、Mori 自己保存的东西）。
-右栏与文件阅读器见 [changes.md](changes.md)。
+右栏与文件阅读器见 [changes.md](changes.md)。M5 的会话引用（来源是另一个会话的几轮）见 [session-refs.md](session-refs.md)。
 
 2026-10-20 负责人决定：
 

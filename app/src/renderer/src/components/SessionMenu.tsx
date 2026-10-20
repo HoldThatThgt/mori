@@ -1,14 +1,16 @@
-// 会话行的右键菜单（docs/v0/screens/sessions.md "右键菜单"）：重命名、归档、删除；已归档的会话是恢复、删除。
+// 会话行的右键菜单（docs/v0/screens/sessions.md "右键菜单"）：重命名、引用到当前会话、在右侧分屏打开（M5）、归档、删除；
+// 已归档的会话是恢复、删除。分屏标题行上的会话名用同一个菜单。
 // 贴着会话行（或鼠标位置），放不下时往上、往左挪；↑ ↓ 移动，Enter 执行，Esc、Tab 或点别处关闭。
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useOverlay } from '../state/overlays';
+import { sameFile, useApp, type AppState } from '../state/store';
 import { moveMenuFocus, useOutsideClose } from './menu';
 import { isBusy, isUnsaved, type Row } from './sessionRows';
 
 /** @brief 菜单项。 */
-export type MenuAction = 'rename' | 'archive' | 'restore' | 'delete';
+export type MenuAction = 'rename' | 'reference' | 'split' | 'archive' | 'restore' | 'delete';
 
 /** @brief 一个菜单项：文字，以及不能用时的原因（能用时为 null）。 */
 interface MenuItem {
@@ -20,8 +22,21 @@ interface MenuItem {
   blocked: string | null;
 }
 
+/** @brief "引用到当前会话"不能用的原因（docs/v0/screens/session-refs.md）；能用时为 null。 */
+function referenceBlocked(row: Row, state: AppState): string | null {
+  const current = state.view === 'chat' ? state.tabs.find((tab) => tab.key === state.activeKey) : undefined;
+  if (!current) return '没有打开的会话';
+  if (row.tab?.key === current.key || sameFile(row.file, current.sessionFile)) return '就是当前会话';
+  return isUnsaved(row) || !row.file ? '还没有消息' : null;
+}
+
+/** @brief "在右侧分屏打开"不能用的原因：这一行就是单栏里显示的会话（docs/v0/screens/split.md）。 */
+function splitBlocked(row: Row, state: AppState): string | null {
+  return !state.split && state.view === 'chat' && row.tab && row.tab.key === state.activeKey ? '已经打开' : null;
+}
+
 /** @brief 这一行的菜单项。 */
-function menuItems(row: Row): MenuItem[] {
+function menuItems(row: Row, state: AppState): MenuItem[] {
   if (row.archived) {
     return [{ action: 'restore', label: '恢复', blocked: null }, { action: 'delete', label: '删除', blocked: null }];
   }
@@ -29,6 +44,8 @@ function menuItems(row: Row): MenuItem[] {
   const busy = opening ?? (isBusy(row) ? '正在生成' : null);
   const unsaved = isUnsaved(row) ? '还没有消息' : null;
   return [{ action: 'rename', label: '重命名', blocked: opening },
+    { action: 'reference', label: '引用到当前会话', blocked: referenceBlocked(row, state) },
+    { action: 'split', label: '在右侧分屏打开', blocked: splitBlocked(row, state) },
     { action: 'archive', label: '归档', blocked: busy ?? unsaved },
     { action: 'delete', label: '删除', blocked: busy }];
 }
@@ -39,6 +56,7 @@ export function SessionMenu({ at, row, onAction, onClose }: {
 }) {
   const menu = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState(at);
+  const items = menuItems(row, useApp());
   useOverlay(true, onClose);
   useOutsideClose(true, menu, onClose);
   useLayoutEffect(() => {
@@ -60,7 +78,7 @@ export function SessionMenu({ at, row, onAction, onClose }: {
   return createPortal(
     <div ref={menu} className="menu session-menu" role="menu" aria-label="会话" data-testid="session-menu"
       style={{ left: position.x, top: position.y }} onKeyDown={onKeyDown}>
-      {menuItems(row).map((item) => (
+      {items.map((item) => (
         <button key={item.action} role="menuitem" disabled={item.blocked !== null}
           onClick={() => onAction(item.action)}>
           {item.label}{item.blocked && <span className="menu-hint">{item.blocked}</span>}

@@ -12,7 +12,7 @@ import { pushItem, type Transcript } from './model';
 import { loadSessions, reopenAll } from './projects';
 import { addQuote, composePrompt, stripQuotes } from './quotes';
 import { applyEvent, finishOpenTools } from './transcript';
-import { sameFile, tabByFile, tabBySession, updateTab, useApp } from './store';
+import { isShown, sameFile, tabByFile, tabBySession, updateTab, useApp } from './store';
 
 /** @brief 读取已保存的连接；没有时进入首次启动。 */
 export async function loadConfig(): Promise<void> {
@@ -176,12 +176,6 @@ export async function refreshUsage(key: string): Promise<void> {
   }
 }
 
-/** @brief 会话现在是否显示在中栏。 */
-function isVisible(key: string): boolean {
-  const { view, activeKey } = useApp.getState();
-  return view === 'chat' && activeKey === key;
-}
-
 /** @brief 一个事件对还开着的会话的状态（侧栏）的改变；不改变时为 null。 */
 function liveChange(live: LiveStatus, event: ForwardedEvent): LiveStatus | null {
   switch (event.type) {
@@ -242,7 +236,7 @@ export function handleEvent(envelope: EventEnvelope): void {
   if (event.type === 'session_info_changed') {
     updateTab(tab.key, (current) => ({ ...current, name: event.name ?? null }));
   }
-  if (event.type === 'agent_settled' && !isVisible(tab.key)) {
+  if (event.type === 'agent_settled' && !isShown(tab.key)) {
     updateTab(tab.key, (current) => ({ ...current, unseen: true }));
   }
   // 侧栏按最后一条你的消息或助手回复的时间排序，与 pi 会话列表的 modified 同一规则。

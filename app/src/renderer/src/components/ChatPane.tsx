@@ -1,12 +1,14 @@
-// 会话面板：顶栏（会话名、模型、权限、上下文用量、右栏开关）、对话流、阶段行、后台进程退出提示、
-// 批准卡、排队区与输入框。
+// 会话面板：顶栏（会话名、模型、权限、上下文用量、右栏开关；分屏时"关闭这一栏"）、对话流、阶段行、后台进程退出提示、
+// 批准卡、排队区与输入框。分屏时每一栏是一个完整的会话面板；在面板里按下鼠标或焦点进入它，焦点就切到这一栏（split.md）。
 
 import { reload } from '../state/actions';
 import type { ContextUsage } from '../../../shared/protocol';
+import { closePane, focusComposer, focusPane } from '../state/split';
 import { useApp, type KernelStatus, type Tab } from '../state/store';
 import { Icon } from '../icons';
 import { ApprovalCard } from './ApprovalCard';
 import { Composer, QueueArea } from './Composer';
+import { PaneTitle } from './PaneTitle';
 import { PermissionMenu } from './PermissionMenu';
 import { QuestionCard } from './QuestionCard';
 import { StageLine } from './StageLine';
@@ -101,15 +103,25 @@ function SessionBanners({ tab }: { tab: Tab }) {
   );
 }
 
+/** @brief 面板的显示方式：分屏时在哪一侧，以及这一栏的右栏开关。 */
+export interface PaneProps {
+  /** 是否在分屏里 */
+  split: boolean;
+  /** 这一栏有焦点时右栏是否打开（右栏开关的按下状态） */
+  rightOpen: boolean;
+  /** 点了这一栏的右栏开关 */
+  onToggleRight: () => void;
+}
+
 /** @brief 顶栏。 */
-function TopBar({ tab, rightOpen, onToggleRight }: { tab: Tab; rightOpen: boolean; onToggleRight: () => void }) {
+function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab }) {
   const kernel = useApp((state) => state.kernel);
   return (
     <header className="topbar">
       <div className="breadcrumb">
         <span className="chat-project" title={tab.cwd}>{folderName(tab.cwd)}</span>
         <Icon name="chevron" />
-        <span className="chat-title" data-testid="session-title">{sessionTitle(tab)}</span>
+        <PaneTitle tab={tab} />
       </div>
       <div className="topbar-actions">
         {tab.phase !== 'opening' && (
@@ -119,20 +131,25 @@ function TopBar({ tab, rightOpen, onToggleRight }: { tab: Tab; rightOpen: boolea
         <UsageChip usage={tab.contextUsage} />
         <button className="icon-button" onClick={onToggleRight} aria-pressed={rightOpen} aria-label="右栏：本会话的改动"
           title="本会话的改动"><Icon name="right" /></button>
+        {split && (
+          <button className="icon-button close-pane" data-testid="close-pane" aria-label="关闭这一栏"
+            title="关闭这一栏（不会停止生成）" onClick={() => { closePane(tab.key); focusComposer(); }}>
+            <Icon name="close" />
+          </button>
+        )}
       </div>
     </header>
   );
 }
 
 /** @brief 一个会话的面板。 */
-export function ChatPane({ tab, rightOpen, onToggleRight }: {
-  tab: Tab; rightOpen: boolean; onToggleRight: () => void;
-}) {
+export function ChatPane({ tab, ...pane }: PaneProps & { tab: Tab }) {
   const kernel = useApp((state) => state.kernel);
   return (
     <section className="chat-pane" aria-label={sessionTitle(tab)} data-testid="chat-pane" data-tab={tab.key}
-      data-running={tab.transcript.running} data-sending={tab.transcript.sending}>
-      <TopBar tab={tab} rightOpen={rightOpen} onToggleRight={onToggleRight} />
+      data-running={tab.transcript.running} data-sending={tab.transcript.sending}
+      onPointerDownCapture={() => focusPane(tab.key)} onFocusCapture={() => focusPane(tab.key)}>
+      <TopBar tab={tab} {...pane} />
       {tab.modelNotice && <div className="banner">{tab.modelNotice}</div>}
       <SessionBanners tab={tab} />
       <Transcript tab={tab} />

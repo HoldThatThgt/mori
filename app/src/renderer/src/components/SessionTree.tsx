@@ -3,28 +3,22 @@
 
 import { useState } from 'react';
 import { describe } from '../state/bridge';
-import { hasOverlay } from '../state/overlays';
 import { archiveSession, loadSessions, openSaved, restoreSession, retryOpen, showChat } from '../state/projects';
+import { referenceSession } from '../state/refActions';
+import { focusComposer, openInSplit } from '../state/split';
 import { useApp } from '../state/store';
 import { Icon } from '../icons';
 import { folderName } from './ChatPane';
 import { DeleteDialog, RenameInput } from './SessionEdits';
+import { dragProps, useDragging } from './SessionDrag';
 import { SessionMenu, type MenuAction } from './SessionMenu';
-import { buildRows, groupRows, rowStatus, STATUS_TEXT, type Row } from './sessionRows';
+import { buildRows, groupRows, isUnsaved, rowStatus, STATUS_TEXT, type Row } from './sessionRows';
 
 /** @brief 把焦点放到某个会话行；找不到时放到"新会话"。 */
 function focusRow(id: string | null): void {
   requestAnimationFrame(() => {
     const row = id ? document.querySelector<HTMLElement>(`.session-item[data-row="${CSS.escape(id)}"]`) : null;
     (row ?? document.querySelector<HTMLElement>('[data-testid="new-session"]'))?.focus();
-  });
-}
-
-/** @brief 把焦点放进中栏当前会话的输入框（打开或切换会话之后）；这时已经弹出询问框等浮层就不动焦点。 */
-function focusComposer(): void {
-  requestAnimationFrame(() => {
-    if (hasOverlay()) return;
-    document.querySelector<HTMLElement>('.pane-slot:not([hidden]) .composer textarea')?.focus();
   });
 }
 
@@ -55,11 +49,18 @@ interface RowHandlers {
   onMenu: (row: Row, at: { x: number; y: number }) => void;
 }
 
-/** @brief 一个会话行。tabStop 为真时它是整棵树的 Tab 停靠点。 */
-function SessionRow({ row, active, tabStop, onMenu, onOpen, onFocus }: RowHandlers & {
-  row: Row; active: boolean; tabStop: boolean;
+/** @brief 拖会话行时带的东西（已归档的不能拖）。 */
+function rowSource(row: Row) {
+  if (row.archived) return null;
+  return { tabKey: row.tab?.key, saved: row.saved, file: row.file, title: row.title, hasMessages: !isUnsaved(row) };
+}
+
+/** @brief 一个会话行。tabStop 为真时它是整棵树的 Tab 停靠点；inSplit 为真时它显示在分屏的另一栏里。 */
+function SessionRow({ row, active, inSplit, tabStop, onMenu, onOpen, onFocus }: RowHandlers & {
+  row: Row; active: boolean; inSplit: boolean; tabStop: boolean;
 }) {
   const status = rowStatus(row);
+  const dragging = useDragging(row.file, row.tab?.key);
   const menuAt = (element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
     return { x: rect.left + 12, y: rect.bottom + 2 };
@@ -76,8 +77,10 @@ function SessionRow({ row, active, tabStop, onMenu, onOpen, onFocus }: RowHandle
     onMenu(row, event.clientX || event.clientY ? { x: event.clientX, y: event.clientY } : menuAt(event.currentTarget));
   }
   const title = row.archived ? `${folderName(row.cwd)} · ${row.full}` : row.full;
+  const classes = ['session-item', active && 'active', inSplit && 'in-split', row.archived && 'archived',
+    dragging && 'dragging'].filter(Boolean).join(' ');
   return (
-    <button className={`session-item${active ? ' active' : ''}${row.archived ? ' archived' : ''}`} role="treeitem"
+    <button className={classes} role="treeitem" {...dragProps(rowSource(row))}
       aria-selected={active} data-row={row.id} data-file={row.file ?? ''} title={title} tabIndex={tabStop ? 0 : -1}
       onClick={() => onOpen(row)} onKeyDown={onKeyDown} onContextMenu={onContextMenu} onFocus={() => onFocus(row)}>
       <Icon name="chat" /><span className="session-label">{row.title}</span>
@@ -117,13 +120,15 @@ function useTreeRows() {
   const shelved = all.filter((row) => row.archived).sort((a, b) => b.activity - a.activity);
   const rows = [...groups.flatMap((group) => group.rows), ...shelved];
   const activeRow = view === 'chat' ? rows.find((row) => row.tab && row.tab.key === activeKey) : undefined;
-  return { groups, shelved, rows, activeRow };
+  const split = useApp((state) => state.split);
+  const others = view === 'chat' && split ? split.filter((key) => key !== activeKey) : [];
+  return { groups, shelved, rows, activeRow, others };
 }
 
-/** @brief 一个项目：项目行和它的会话行（正在改名的那一行换成改名框）。 */
-function ProjectGroup({ cwd, rows, activeRow, tabStop, renaming, onRenamed, ...handlers }: RowHandlers & {
-  cwd: string; rows: Row[]; activeRow: Row | undefined; tabStop: string | undefined; renaming: string | null;
-  onRenamed: (row: Row, keepFocus: boolean) => void;
+/** @brief 一个项目：项目行和它的会话行（正在改名的那一行换成改名框）。others 为分屏另一栏的会话。 */
+function ProjectGroup({ cwd, rows, activeRow, others, tabStop, renaming, onRenamed, ...handlers }: RowHandlers & {
+  cwd: string; rows: Row[]; activeRow: Row | undefined; others: string[]; tabStop: string | undefined;
+  renaming: string | null; onRenamed: (row: Row, keepFocus: boolean) => void;
 }) {
   return (
     <div className="project-group" role="group" aria-label={folderName(cwd)} data-cwd={cwd}>
@@ -133,7 +138,7 @@ function ProjectGroup({ cwd, rows, activeRow, tabStop, renaming, onRenamed, ...h
       {rows.map((row) => (renaming === row.id
         ? <RenameInput key={row.id} row={row} onDone={(keep) => onRenamed(row, keep)} />
         : <SessionRow key={row.id} row={row} active={row === activeRow} tabStop={row.id === tabStop}
-          {...handlers} />))}
+          inSplit={Boolean(row.tab && others.includes(row.tab.key))} {...handlers} />))}
     </div>
   );
 }
@@ -150,12 +155,30 @@ function ArchivedList({ rows, tabStop, ...handlers }: RowHandlers & { rows: Row[
       </button>
       {open && (
         <div data-testid="archived-list">
-          {rows.map((row) => <SessionRow key={row.id} row={row} active={false} tabStop={row.id === tabStop}
-            {...handlers} />)}
+          {rows.map((row) => <SessionRow key={row.id} row={row} active={false} inSplit={false}
+            tabStop={row.id === tabStop} {...handlers} />)}
         </div>
       )}
     </div>
   );
+}
+
+/**
+ * @brief 菜单里的"引用到当前会话"和"在右侧分屏打开"：与把会话拖进输入框、拖到中栏右半边相同（M5）。
+ *        会话行和分屏标题行上的菜单共用。
+ */
+export function sessionAction(row: Row, action: 'reference' | 'split'): void {
+  const { activeKey } = useApp.getState();
+  if (action === 'reference') {
+    if (activeKey && row.file) void referenceSession(activeKey, row.file, row.title);
+    return;
+  }
+  if (row.tab) {
+    openInSplit(row.tab.key, 'right');
+    focusComposer();
+  } else if (row.saved) {
+    void openSaved(row.saved, 'right').then(() => focusComposer());
+  }
 }
 
 /**
@@ -185,6 +208,10 @@ function useTreeActions(onNavigate: () => void) {
   function act(row: Row, action: MenuAction) {
     setMenu(null);
     setProblem(null);
+    if (action === 'reference' || action === 'split') {
+      sessionAction(row, action);
+      return;
+    }
     if (action === 'rename') setRenaming(row.id);
     if (action === 'delete') setDeleting({ row, next: nextOf(row) });
     if (action === 'restore' && row.saved) restoreSession(row.saved, false);
@@ -199,7 +226,7 @@ function useTreeActions(onNavigate: () => void) {
 
 /** @brief 项目 → 会话树与已归档。onNavigate 在打开或切换会话后调用（浮动的左栏据此收起）。 */
 export function SessionTree({ onNavigate }: { onNavigate: () => void }) {
-  const { groups, shelved, rows, activeRow } = useTreeRows();
+  const { groups, shelved, rows, activeRow, others } = useTreeRows();
   const { menu, setMenu, renaming, setRenaming, deleting, setDeleting, focused, setFocused, problem, handlers, act }
     = useTreeActions(onNavigate);
   const menuRow = menu ? rows.find((row) => row.id === menu.id) : undefined;
@@ -209,7 +236,8 @@ export function SessionTree({ onNavigate }: { onNavigate: () => void }) {
       onBlur={(event) => !event.currentTarget.contains(event.relatedTarget) && setFocused(null)}>
       <ListNote problem={problem} />
       {groups.map((group) => (
-        <ProjectGroup key={group.cwd} cwd={group.cwd} rows={group.rows} activeRow={activeRow} tabStop={tabStop}
+        <ProjectGroup key={group.cwd} cwd={group.cwd} rows={group.rows} activeRow={activeRow} others={others}
+          tabStop={tabStop}
           renaming={renaming} {...handlers} onRenamed={(row, keep) => {
             setRenaming(null);
             if (keep) focusRow(row.id);

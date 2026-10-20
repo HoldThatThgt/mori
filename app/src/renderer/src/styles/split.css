@@ -1,0 +1,132 @@
+/* M5：分屏（两栏、焦点、中线、关闭一栏、右栏浮出）、拖会话的放下提示、会话引用的芯片与预览对话框。
+   分屏与放下提示的视觉移植自 demo/chat-pane.css、demo/resize.css、demo/session-actions.css（字号不小于 12px）。 */
+
+/* 两栏：左栏占中栏的比例来自分屏中线（--split-ratio），两栏各至少 280px；右栏占剩下的 */
+.center[data-split] {
+  --split-left: clamp(280px, calc(var(--split-ratio, .5) * 100%), calc(100% - 280px));
+}
+.center[data-split] > .pane-slot[data-side='left'] { flex: 0 0 var(--split-left); order: 1; min-width: 0; }
+.center[data-split] > .pane-slot[data-side='right'] {
+  flex: 1 1 0;
+  order: 2;
+  min-width: 0;
+  border-left: 1px solid var(--color-line);
+}
+.center[data-split] .topbar { padding: 0 10px 0 16px; gap: 8px; }
+.center[data-split] .pane-slot[data-focused] .topbar { background: #f7f9fd; box-shadow: inset 0 -2px #91afe9; }
+.center[data-split] .pane-slot[data-focused] .chat-title { color: #2f4f80; }
+[data-resize='split'] { left: var(--split-left); margin-left: -4px; }
+
+/* 标题行上的会话名：可拖、可右键 */
+/* 不加左右内边距：800 宽、右栏打开时中栏只有 300px，标题行不能比原来的文字更宽（m1-layout 的窄窗口检查） */
+.chat-title { padding: 2px 0; border-radius: 6px; text-align: left; cursor: grab; }
+.chat-title:active { cursor: grabbing; }
+.topbar .session-rename { min-width: 120px; flex: 1; }
+.pane-title-problem { flex-shrink: 1; min-width: 0; color: var(--color-danger); font-size: var(--fs-small); }
+.close-pane svg { width: 15px; height: 15px; }
+
+/* 侧栏：分屏另一栏的会话行浅色标出；拖动中的行变淡 */
+.session-item.in-split { background: #f3f5f9; color: #3f4f69; }
+.session-item.dragging { opacity: .55; }
+
+/* 右栏：分屏放不下时你点开的，浮在两栏上层（与窄于 800px 时相同） */
+.right-panel.floating {
+  position: absolute;
+  z-index: 15;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  max-width: calc(100vw - var(--rail-width));
+  box-shadow: -10px 0 35px #20365612;
+}
+
+/* 放下提示：盖在目标上的一层，不挡住拖放 */
+.drop-hint {
+  position: fixed;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  border: 1.5px solid #9cb9eb;
+  border-radius: 12px;
+  background: #e8effbd6;
+  box-shadow: inset 0 0 0 1px #ffffffa6;
+  color: #5477b6;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  text-align: center;
+  pointer-events: none;
+}
+.drop-hint.reference { border-style: dashed; border-color: #93acd7; border-radius: 13px; background: #f0f5ffed; }
+.drop-hint.focus { background: #f3f6fbe6; color: var(--color-muted); }
+
+/* 会话引用的芯片：会话名可能很长，省略号截断 */
+.quote-chip[data-kind='session'] .quote-chip-label,
+.sent-quote[data-kind='session'] .quote-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  flex-shrink: 1;
+  font-family: var(--font-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quote-chip[data-pending] .quote-chip-label { color: var(--color-muted); }
+.ref-problem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 2px 2px 10px;
+  border-left: 2px solid var(--color-danger);
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+}
+.ref-problem span { flex: 1; min-width: 0; }
+.ref-problem .icon-button { width: 26px; height: 26px; }
+.ref-problem .icon-button svg { width: 13px; }
+
+/* 预览对话框 */
+.dialog.ref-preview { display: flex; flex-direction: column; width: min(720px, 100%); max-height: calc(100vh - 32px); }
+.ref-preview h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ref-preview .ref-note { margin: 6px 0 0; color: var(--color-muted); font-size: var(--fs-small); }
+.ref-range { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 10px; }
+.ref-range select {
+  padding: 4px 8px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-s);
+  background: var(--color-canvas);
+}
+.ref-total { margin-left: auto; color: var(--color-muted); font-size: var(--fs-small); }
+.ref-turns {
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}
+.ref-turn { padding: 10px 14px; border-bottom: 1px solid var(--color-line); }
+.ref-turn:last-child { border-bottom: 0; }
+.ref-turn h3 { margin: 0 0 6px; color: var(--color-muted); font-size: var(--fs-small); font-weight: 600; }
+.ref-turn.excluded { opacity: .45; }
+.ref-turns pre {
+  margin: 0;
+  color: var(--color-prose);
+  font: var(--fs-body) / 1.7 var(--font-ui);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ref-turns .ref-stored { padding: 10px 14px; }
+
+/* 分屏时每一栏较窄：先藏项目名，再藏模型名、上下文用量，会话名不被挤掉（关闭分屏或拉宽这一栏后又会显示） */
+@container (max-width: 640px) {
+  .center[data-split] .chat-project, .center[data-split] .breadcrumb > svg { display: none; }
+}
+@container (max-width: 560px) {
+  .center[data-split] .model-chip { display: none; }
+}
+@container (max-width: 400px) {
+  .center[data-split] .usage-chip { display: none; }
+}

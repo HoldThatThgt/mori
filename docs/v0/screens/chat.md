@@ -69,6 +69,7 @@ Esc 的顺序：先关闭最上层的浮层、菜单或对话框（"排队发送
 M3 起还有会话的右键菜单、改名框、删除确认框、信任询问，见 [sessions.md](sessions.md)；M4 起还有选区浮层和反馈表单，
 见 [selection.md](selection.md)。选区浮层不挡 Alt+数字和 Ctrl+N）；
 焦点在批准卡上时只拒绝这张卡（见 approval.md）；没有浮层、当前显示的是会话面板且正在生成时才停止。
+M5 起分屏时 Esc、Alt+数字、F8 都以焦点所在的一栏为准，见 [split.md](split.md)。
 
 ## 错误
 

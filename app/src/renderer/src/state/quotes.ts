@@ -3,13 +3,19 @@
 
 import { create } from 'zustand';
 import type { FileSource, MessageSource, QuoteRef } from '../../../shared/protocol';
-import { displayPath } from '../components/toolTitle';
 import { recordAction } from './actionLog';
 import type { Item, Transcript } from './model';
+import { jumpToSession } from './refActions';
 import { updateTab, useApp, type QuoteJump } from './store';
 
-/** @brief 点芯片之后查出来的来源状态：原文已变化 / 文件已被删除或移动；没有问题时不记。 */
-export type QuoteStatus = 'changed' | 'missing';
+// 引用的文字在 quoteText.ts（纯函数，录制脚本也用它）。
+export { composePrompt, excerpt, quoteBlock, refLabel, stripQuotes } from './quoteText';
+
+/**
+ * @brief 来源的状态：原文已变化 / 文件已被删除或移动（点芯片之后查出来的，记在这里）/ 原会话已删除（会话引用，
+ *        按会话列表算出来，不记在这里）；没有问题时不记。
+ */
+export type QuoteStatus = 'changed' | 'missing' | 'gone';
 
 /** @brief 点过的芯片的检查结果（按 refKey），只在这次运行的内存里。 */
 export const useQuoteStatus = create<Record<string, QuoteStatus>>(() => ({}));
@@ -28,49 +34,10 @@ export function refKey(ref: QuoteRef): string {
   return JSON.stringify([ref.source, ref.quote]);
 }
 
-/** @brief 行范围的文字："第 3 行"或"第 3–5 行"。 */
-function lineText(start: number, end: number): string {
-  return start === end ? `第 ${start} 行` : `第 ${start}–${end} 行`;
-}
-
-/** @brief 芯片上的来源："src/a.ts · 第 3–5 行"或"助手回复"。 */
-export function refLabel(ref: QuoteRef, cwd: string): string {
-  const { source } = ref;
-  if (source.kind === 'message') return '助手回复';
-  return `${displayPath(source.path, cwd)} · ${lineText(source.startLine, source.endLine)}`;
-}
-
-/** @brief 发给模型的一段引用块（格式是临时默认值，见 docs/v0/defaults.md）。 */
-export function quoteBlock(ref: QuoteRef, cwd: string): string {
-  const { source } = ref;
-  const heading = source.kind === 'message' ? '引用你之前的回复：'
-    : `引用 ${displayPath(source.path, cwd)} ${lineText(source.startLine, source.endLine)}：`;
-  const lines = ref.quote.split(/\r?\n/).map((line) => (line ? `> ${line}` : '>'));
-  return [heading, ...lines].join('\n');
-}
-
-/** @brief 发给模型的全文：每个芯片一段引用块，之后接你的文字，段之间空一行。 */
-export function composePrompt(refs: QuoteRef[], text: string, cwd: string): string {
-  return [...refs.map((ref) => quoteBlock(ref, cwd)), text.trim()].filter(Boolean).join('\n\n');
-}
-
-/** @brief 从你的消息里去掉按 refs 拼出的引用块，剩下你写的字；开头对不上时为 null（按原文显示）。 */
-export function stripQuotes(text: string, refs: QuoteRef[], cwd: string): string | null {
-  const prefix = refs.map((ref) => quoteBlock(ref, cwd)).join('\n\n');
-  if (text === prefix) return '';
-  return text.startsWith(`${prefix}\n\n`) ? text.slice(prefix.length + 2) : null;
-}
-
-/** @brief 把文字的第一行截到 max 个字（芯片上的摘要）。 */
-export function excerpt(text: string, max = 60): string {
-  const first = text.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? '';
-  const chars = [...first];
-  return chars.length > max ? `${chars.slice(0, max).join('')}…` : first;
-}
-
 /** @brief 加一个引用芯片到会话的输入框；来源和原文都一样的不再加。 */
 export function addQuote(tabKey: string, ref: QuoteRef): void {
-  recordAction(ref.source.kind === 'file' ? '问 Mori（文件）' : '问 Mori（回复）');
+  // 会话引用在开始读原会话时已经记过（refActions.ts referenceSession）。
+  if (ref.source.kind !== 'session') recordAction(ref.source.kind === 'file' ? '问 Mori（文件）' : '问 Mori（回复）');
   updateTab(tabKey, (tab) => (tab.draftRefs.some((item) => refKey(item) === refKey(ref)) ? tab
     : { ...tab, draftRefs: [...tab.draftRefs, ref] }));
 }
@@ -135,7 +102,7 @@ export function locateFileQuote(text: string, sha256: string, source: FileSource
 let jumpNonce = 0;
 
 /** @brief 新的跳转请求。 */
-function nextJump(ref: QuoteRef): QuoteJump {
+export function nextJump(ref: QuoteRef): QuoteJump {
   jumpNonce += 1;
   return { ref, nonce: jumpNonce };
 }
@@ -169,6 +136,10 @@ function turnStart(transcript: Transcript, index: number): number {
 export function jumpToQuote(tabKey: string, ref: QuoteRef): void {
   if (ref.source.kind === 'file') {
     openFile(tabKey, ref.source.path, ref);
+    return;
+  }
+  if (ref.source.kind === 'session') {
+    void jumpToSession(tabKey, ref);
     return;
   }
   recordAction('点引用回到回复');

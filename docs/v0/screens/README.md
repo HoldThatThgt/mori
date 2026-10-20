@@ -15,6 +15,8 @@
 | [extension-ui.md](extension-ui.md) | 扩展的询问（确认、选择、输入）与通知 | M3（从 M6 提前） |
 | [changes.md](changes.md) | 右栏：改动列表、文件阅读器、打开阅读器的入口 | M4 |
 | [selection.md](selection.md) | 选区浮层、问 Mori 的引用芯片与回到原位置、反馈、回复下的操作 | M4 |
+| [split.md](split.md) | 左右分屏：拖会话到中栏、焦点所在的一栏、分屏中线、右栏跟随焦点与收起、关闭一栏 | M5 |
+| [session-refs.md](session-refs.md) | 会话引用：拖会话进输入框、按轮预览与调整范围、发出后跳回原会话、原会话已删除 | M5 |
 
 pi 事件名以 `@earendil-works/pi-coding-agent` 1.3.0 的 `AgentSessionEvent` 为准；
 `message_update` 经后台进程精简为 `{ type, contentIndex, delta, toolCallId, toolName, args }`（见 `app/src/kernel/events.ts`）。

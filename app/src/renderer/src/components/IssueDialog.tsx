@@ -78,6 +78,15 @@ function tabFields(state: AppState): IssueField[] {
   ];
 }
 
+/** @brief 分屏时左右两栏的会话名和焦点在哪边（docs/v0/screens/split.md）；单栏时没有这一项。 */
+function splitFields(state: AppState): IssueField[] {
+  if (!state.split || state.view !== 'chat') return [];
+  const [left, right] = state.split.map((key) => state.tabs.find((tab) => tab.key === key));
+  const focus = state.activeKey === state.split[0] ? '左' : '右';
+  const names = `左：${left ? sessionTitle(left) : '没有'} · 右：${right ? sessionTitle(right) : '没有'}`;
+  return [{ label: '分屏', value: `${names}（焦点在${focus}栏）` }];
+}
+
 /** @brief "当前界面"：界面状态与窗口、栏宽。 */
 function currentView(): IssueField[] {
   const state = useApp.getState();
@@ -85,6 +94,7 @@ function currentView(): IssueField[] {
   return [
     { label: '页面', value: pageName(state) },
     ...tabFields(state),
+    ...splitFields(state),
     { label: '右栏', value: document.querySelector('[data-testid="right-panel"]') ? '打开' : '关闭' },
     { label: '窗口大小', value: `${window.innerWidth}×${window.innerHeight}` },
     { label: '左栏宽度', value: columnWidth('sidebar', layout.sidebar) },

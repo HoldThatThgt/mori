@@ -214,6 +214,12 @@ function useQuoteJump(inner: React.RefObject<HTMLDivElement | null>, tab: Tab, t
     const element = jump && root?.querySelector<HTMLElement>(`[data-item-key="${jump.itemKey}"]`);
     if (!jump || !root || !element) return;
     updateTab(tab.key, (current) => ({ ...current, transcriptJump: null }));
+    // 会话引用的原会话：滚到引用的第一轮你的消息，高亮引用的几轮（docs/v0/screens/session-refs.md）。
+    if (jump.keys) {
+      element.scrollIntoView({ block: 'start' });
+      flashElements(jump.keys.flatMap((key) => [...root.querySelectorAll(`[data-item-key="${key}"]`)]));
+      return;
+    }
     element.scrollIntoView({ block: 'center' });
     const source = jump.ref.source;
     const range = source.kind === 'message' && source.scope === 'selection' ? findText(element, jump.ref.quote) : null;

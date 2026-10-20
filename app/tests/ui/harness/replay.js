@@ -10,6 +10,7 @@
 // 任务栏闪烁、F8 和删除会话文件不经过后台进程：这里只记下调用，截图和保存的结果由测试通过 window.__replay.f8 控制。
 // M4：文件阅读器读文件按录制里的 file 步骤回答（同一个文件按录下的顺序，取完后重复最后一个）；用系统编辑器打开、复制、
 // 保存反馈只记下调用，保存反馈的失败与延迟由测试通过 window.__replay.feedback 控制。session.prompt 还比较 refs。
+// M5：会话引用读原会话（session.read）也是只读查询，同一个会话文件按录制顺序取结果，取完后重复最后一个。
 
 /** 截图返回的 1×1 PNG */
 const PIXEL = 'data:image/png;base64,'
@@ -71,7 +72,7 @@ function fileReader(fixture) {
 }
 
 /** 不占回放顺序的只读查询 */
-const QUERIES = ['session.state', 'session.list', 'trust.check'];
+const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read'];
 
 /** @brief 录制里由界面主动发出的命令（只读查询除外）的下标。 */
 function boundaries(steps) {
@@ -259,6 +260,26 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
     return structuredClone(step?.result.value ?? { ask: false, readError: null });
   }
 
+  /** 每个会话文件已经取走的 session.read 结果数 */
+  const readTaken = new Map();
+
+  /**
+   * @brief 回答 session.read：同一会话文件按录制顺序取结果，取完后重复最后一个。
+   *        synthetic：没录过的会话文件按"会话文件不在了"回答（与后台进程的原文相同），测试不该用到。
+   */
+  function readResult(sessionFile) {
+    const recorded = steps.filter((step, index) => step.result?.type === 'session.read'
+      && steps.slice(0, index).reverse().find((s) => s.command?.type === 'session.read')?.command.sessionFile
+        === sessionFile);
+    const taken = readTaken.get(sessionFile) ?? 0;
+    readTaken.set(sessionFile, taken + 1);
+    const step = recorded[Math.min(taken, recorded.length - 1)];
+    if (!step || step.result.error) {
+      return Promise.reject(new Error(step?.result.error ?? `Session file not found: ${sessionFile}`));
+    }
+    return Promise.resolve(structuredClone(step.result.value));
+  }
+
   /** @brief 下一条还没回放的 session.create 的文件夹（系统选文件夹对话框的结果）。 */
   function nextFolder() {
     const index = marks.slice(status.cursor).find((mark) => steps[mark].command.type === 'session.create');
@@ -312,6 +333,9 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
         case 'trust.check':
           status.queries.push(command);
           return Promise.resolve(trustResult(command.cwd));
+        case 'session.read':
+          status.queries.push(command);
+          return readResult(command.sessionFile);
         default: return replayCommand(command);
       }
     },
