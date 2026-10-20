@@ -75,6 +75,30 @@ export function describeCommand(command: Command): string | null {
       return `权限切到${command.mode === 'all' ? '全部允许' : '每次询问'}`;
     case 'approval.forget':
       return `清除本会话已允许：${command.toolName}`;
+    default:
+      return describeM6Command(command);
+  }
+}
+
+/** @brief M6 的命令（设置页、顶栏、工具页）的摘要；只读的查询返回 null。 */
+function describeM6Command(command: Command): string | null {
+  switch (command.type) {
+    case 'endpoint.save': return `保存连接 ${command.providerId}`;
+    case 'model.save': return `${command.adding ? '添加' : '保存'}模型 ${command.providerId}/${command.model.modelId}`;
+    case 'model.delete': return `删除模型 ${command.providerId}/${command.modelId}`;
+    case 'model.setDefault': return `设为默认模型 ${command.providerId}/${command.modelId}`;
+    case 'session.setModel': return `这个会话换模型 ${command.model}`;
+    case 'session.setThinking': return `这个会话换思考强度 ${command.level}`;
+    case 'agents.save': return '保存用户级 AGENTS.md';
+    case 'resource.toggle': return `${command.enabled ? '启用' : '停用'} ${command.kind} ${command.path}`;
+    case 'package.add': return `添加本地包 ${command.path}`;
+    case 'package.setAll': return `${command.enabled ? '启用' : '停用'}整个包 ${command.source}`;
+    case 'package.remove': return `移除包 ${command.source}`;
+    case 'mcp.save': return `保存 MCP 服务 ${command.name}`;
+    case 'mcp.setEnabled': return `${command.enabled ? '启用' : '停用'} MCP 服务 ${command.name}`;
+    case 'mcp.setDirect': return `MCP 服务改为直接调用 ${command.name}`;
+    case 'mcp.remove': return `移除 MCP 服务 ${command.name}`;
+    default: return null;
   }
 }
 

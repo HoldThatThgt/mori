@@ -50,7 +50,8 @@ function pageName(state: AppState): string {
   if (state.configError) return '读取连接失败';
   if (!state.config) return '正在读取连接';
   if (state.firstRun) return '首次启动';
-  return state.view === 'settings' ? '设置' : '会话';
+  if (state.view === 'settings') return '设置';
+  return state.view === 'tools' ? '工具' : '会话';
 }
 
 /** @brief 一栏的实际宽度；与保存的宽度不同（被收紧或收起）时一并写出。 */

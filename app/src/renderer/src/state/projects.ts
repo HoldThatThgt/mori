@@ -8,6 +8,7 @@ import { describe, request } from './bridge';
 import { saveArchived } from './archive';
 import { dropDraft, savedDraft, savedDraftRefs } from './drafts';
 import { attachLive, transcriptFromEntries } from './history';
+import { guardLeave, leaveAllowed } from './leaveGuard';
 import { emptyTranscript, pushItem, startIndexFor, type Transcript } from './model';
 import { openInSplit, placeInSplit, showInFocused, withoutPane, type Side } from './split';
 import { activeTab, newTab, sameFile, tabByFile, updateTab, useApp, type AppState, type Tab } from './store';
@@ -34,6 +35,8 @@ export function withInfo(tab: Tab, info: SessionInfo): Tab {
   return { ...tab, sessionId: info.sessionId, cwd: info.cwd, sessionFile: info.sessionFile, name: info.name,
     projectTrust: info.projectTrust, trustRemembered: info.trustRemembered, trustSaveError: info.trustSaveError,
     extensionErrors: info.extensionErrors, model: info.model, modelNotice: info.modelNotice,
+    thinkingLevel: info.thinkingLevel ?? 'off', thinkingLevels: info.thinkingLevels ?? ['off'],
+    reasoning: info.reasoning ?? false,
     contextUsage: info.contextUsage, approval: info.approval, phase: 'ready', error: null, interrupted: false };
 }
 
@@ -82,12 +85,14 @@ export async function createSessionIn(cwd: string): Promise<void> {
 
 /** @brief 选文件夹并在其中新建会话。 */
 export async function openFolder(): Promise<void> {
+  if (!(await leaveAllowed())) return;
   const cwd = await window.mori.pickFolder();
   if (cwd) await createSessionIn(cwd);
 }
 
 /** @brief 新会话（Ctrl+N）：在当前会话所在的项目里新建；没有当前会话时等于"打开文件夹…"。 */
 export async function newSession(): Promise<void> {
+  if (!(await leaveAllowed())) return;
   recordAction('新会话');
   const current = activeTab();
   if (current) await createSessionIn(current.cwd);
@@ -99,6 +104,11 @@ export async function newSession(): Promise<void> {
  *        （设置页的"返回会话"，分屏也恢复）。显示出来的会话清掉"有新结果"。
  */
 export function showChat(key?: string): void {
+  guardLeave(() => placeChat(key));
+}
+
+/** @brief showChat 的实际切换（已经确认可以离开）。 */
+function placeChat(key?: string): void {
   recordAction(key ? '切换会话' : '返回会话');
   useApp.setState((state) => {
     const placed = key ? showInFocused(state, key) : { activeKey: state.activeKey, split: state.split };
@@ -113,6 +123,7 @@ export function showChat(key?: string): void {
  *        （列表带 live）不问信任，直接接上它这一刻的样子。side 为空时放进焦点所在的那一栏，否则在这一侧分屏打开。
  */
 export async function openSaved(saved: SavedSession, side?: Side): Promise<void> {
+  if (!(await leaveAllowed())) return;
   const existing = tabByFile(saved.sessionFile);
   if (existing) {
     if (side) openInSplit(existing.key, side);

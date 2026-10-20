@@ -11,8 +11,9 @@ import { persistDrafts } from './drafts';
 import { pushItem, type Transcript } from './model';
 import { loadSessions, reopenAll } from './projects';
 import { addQuote, composePrompt, stripQuotes } from './quotes';
+import { guardLeave } from './leaveGuard';
 import { applyEvent, finishOpenTools } from './transcript';
-import { isShown, sameFile, tabByFile, tabBySession, updateTab, useApp } from './store';
+import { activeTab, isShown, sameFile, tabByFile, tabBySession, updateTab, useApp, type Tab } from './store';
 
 /** @brief 读取已保存的连接；没有时进入首次启动。 */
 export async function loadConfig(): Promise<void> {
@@ -176,6 +177,14 @@ export async function refreshUsage(key: string): Promise<void> {
   }
 }
 
+/** @brief 模型与思考强度的事件（docs/v0/screens/models.md）：mori.model_state 带全部四项，pi 的事件只带新的强度。 */
+function withModelEvent(tab: Tab, event: ForwardedEvent): Tab {
+  if (event.type === 'thinking_level_changed') return { ...tab, thinkingLevel: event.level };
+  if (event.type !== 'mori.model_state') return tab;
+  return { ...tab, model: event.model, thinkingLevel: event.thinkingLevel, thinkingLevels: event.thinkingLevels,
+    reasoning: event.reasoning };
+}
+
 /** @brief 一个事件对还开着的会话的状态（侧栏）的改变；不改变时为 null。 */
 function liveChange(live: LiveStatus, event: ForwardedEvent): LiveStatus | null {
   switch (event.type) {
@@ -236,6 +245,9 @@ export function handleEvent(envelope: EventEnvelope): void {
   if (event.type === 'session_info_changed') {
     updateTab(tab.key, (current) => ({ ...current, name: event.name ?? null }));
   }
+  if (event.type === 'mori.model_state' || event.type === 'thinking_level_changed') {
+    updateTab(tab.key, (current) => withModelEvent(current, event));
+  }
   if (event.type === 'agent_settled' && !isShown(tab.key)) {
     updateTab(tab.key, (current) => ({ ...current, unseen: true }));
   }
@@ -287,11 +299,24 @@ export function handleKernelReady(): void {
   if (kernel === 'reloading') reopenAll();
 }
 
-/** @brief 打开设置页；fromError 为真时焦点放到 API key（"去设置"）。 */
+/**
+ * @brief 打开设置页；fromError 为真时（"去设置"）设置页打开当前会话所用模型的连接的"编辑连接"、焦点放到 API key。
+ *        从工具页过来时不用问（有未保存改动的编辑器只在设置页里）。
+ */
 export function openSettings(fromError = false): void {
   recordAction(fromError ? '去设置' : '打开设置');
+  const provider = activeTab()?.model?.split('/')[0] ?? null;
   useApp.setState((state) => ({ view: 'settings',
-    settingsFocus: fromError ? state.settingsFocus + 1 : state.settingsFocus }));
+    settingsFocus: fromError ? state.settingsFocus + 1 : state.settingsFocus,
+    settingsProvider: fromError ? provider : state.settingsProvider }));
+}
+
+/** @brief 打开工具页（docs/v0/screens/tools.md）；从有未保存改动的设置页过来时先问。 */
+export function openTools(): void {
+  guardLeave(() => {
+    recordAction('打开工具页');
+    useApp.setState({ view: 'tools' });
+  });
 }
 
 /** @brief 订阅后台进程的事件、退出与就绪；读取配置和会话列表；草稿一变就保存。 */

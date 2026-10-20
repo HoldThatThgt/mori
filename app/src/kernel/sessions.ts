@@ -116,8 +116,11 @@ async function loadResources(cwd: string, gate: ApprovalGate, trust: TrustAnswer
   const agentDir = pi.getAgentDir();
   // 先按"不信任"创建；pi 在加载项目资源之前调用 resolveProjectTrust，由它决定（trust.ts）。
   const settingsManager = pi.SettingsManager.create(cwd, agentDir, { projectTrusted: false });
+  // MCP 照 pi 命令行的注册方式作为内置扩展加入（方案第 6 节）：`pi config` 和设置里的 -builtin:mcp 对它有效；
+  // bindExtensions 发 session_start 时它在后台连接服务。codemode 不进 v0，所以服务要用直接调用方式。
+  const mcp = { name: 'mcp', factory: pi.createMcpExtension(), replaceable: true, builtin: true };
   const resourceLoader = new pi.DefaultResourceLoader({ cwd, agentDir, settingsManager,
-    extensionFactories: [{ name: APPROVAL_EXTENSION, factory: gate.extension() }] });
+    extensionFactories: [{ name: APPROVAL_EXTENSION, factory: gate.extension() }, mcp] });
   let decision: TrustDecision = { trusted: false, projectTrust: 'unasked', remembered: false, saveError: null };
   await resourceLoader.reload({
     resolveProjectTrust: async () => {
@@ -337,6 +340,22 @@ function requireEntry(sessionId: string): Entry {
   const entry = sessions.get(sessionId);
   if (!entry) throw new Error(`Unknown session ${sessionId}`);
   return entry;
+}
+
+/** @brief 打开着的会话的只读信息（工具页、AGENTS.md 用）：pi 会话、工作目录、文件夹是否信任。 */
+export interface SessionContext {
+  /** pi 会话：只读它的工具、资源加载器，不经这里改会话 */
+  session: AgentSession;
+  /** 工作目录 */
+  cwd: string;
+  /** 打开时是否加载了项目自带的资源（pi resolveProjectTrust 的结果） */
+  trusted: boolean;
+}
+
+/** @brief 取出打开着的会话的只读信息；没有这个会话时报错。 */
+export function sessionContext(sessionId: string): SessionContext {
+  const entry = requireEntry(sessionId);
+  return { session: entry.session, cwd: entry.cwd, trusted: entry.trust.trusted };
 }
 
 /**

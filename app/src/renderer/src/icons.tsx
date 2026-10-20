@@ -22,6 +22,9 @@ const paths = {
   copy: 'M9 9h10v11H9ZM5 15V4h10',
   external: 'M14 4h6v6M20 4l-9 9M18 14v5H5V6h5',
   feedback: 'M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 4V6a2 2 0 0 1 2-2Zm7 4v4m0 3v.5',
+  tools: 'M14.5 4.5a4 4 0 0 0-5 5L4 15v5h5l5.5-5.5a4 4 0 0 0 5-5L17 12l-3-3 2.5-2.5Z',
+  spark: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6',
+  trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
 } as const;
 
 export type IconName = keyof typeof paths;

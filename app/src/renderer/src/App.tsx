@@ -12,16 +12,19 @@ import {
 } from './state/layout';
 import { closeTopOverlay, hasOverlay, useOverlay } from './state/overlays';
 import { focusPane } from './state/split';
-import { activeTab, updateTab, useApp, type Tab } from './state/store';
+import { activeTab, updateTab, useApp, type Tab, type View } from './state/store';
 import { answerFrontApproval } from './components/ApprovalCard';
 import { collectChanges, RightPanel } from './components/ChangesPanel';
 import { ChatPane, KernelExitBanner } from './components/ChatPane';
 import { Divider } from './components/Divider';
-import { FirstRun, OpenFolderPrompt, SettingsPage } from './components/Pages';
+import { LeaveDialog } from './components/LeaveDialog';
+import { FirstRun, OpenFolderPrompt } from './components/Pages';
 import { PaneDeleteDialog } from './components/PaneTitle';
 import { RefPreview } from './components/RefPreview';
 import { DropHint, useSessionDrop } from './components/SessionDrag';
+import { SettingsPage } from './components/SettingsPage';
 import { Sidebar } from './components/Sidebar';
+import { ToolsPage } from './components/ToolsPage';
 
 /** 窄于此宽度时右栏浮在中栏上层（方案 5.1） */
 const OVERLAY_RIGHT_WIDTH = 800;
@@ -190,7 +193,7 @@ function SplitDivider({ width, left }: { width: number; left: number }) {
  * @brief 中栏：会话面板保持挂载（设置页只是把它藏起来，返回时滚动位置和草稿都在）；分屏时左右两栏并排，
  *        中间一条分隔线（docs/v0/screens/split.md）。
  */
-function Center({ tabs, view, right }: { tabs: Tab[]; view: 'chat' | 'settings'; right: RightToggle }) {
+function Center({ tabs, view, right }: { tabs: Tab[]; view: View; right: RightToggle }) {
   const activeKey = useApp((state) => state.activeKey);
   const split = useApp((state) => (view === 'chat' ? state.split : null));
   const ratio = useLayout((state) => state.split);
@@ -219,6 +222,7 @@ function Center({ tabs, view, right }: { tabs: Tab[]; view: 'chat' | 'settings';
         <OpenFolderPrompt heading="打开一个文件夹" hint={hasSaved || tabs.length > 0 ? PICK_HINT : undefined} />
       )}
       {view === 'settings' && <SettingsPage />}
+      {view === 'tools' && <ToolsPage />}
     </div>
   );
 }
@@ -232,7 +236,7 @@ function hasChanges(tab: Tab): boolean {
  * @brief 右栏怎么显示：贴在右边、浮在上层（窄窗口，或分屏放不下时你点开的）、不显示。右栏跟随焦点所在的一栏；
  *        分屏放不下时先收起，你点右栏开关才浮出来，回到放得下时恢复原来的开关状态。
  */
-function useRightPanel(tab: Tab | undefined, view: 'chat' | 'settings', cramped: boolean) {
+function useRightPanel(tab: Tab | undefined, view: View, cramped: boolean) {
   const split = useApp((state) => state.split);
   const [floatRight, setFloatRight] = useState(false);
   const splitId = split?.join('|') ?? '';
@@ -312,5 +316,5 @@ export function App() {
   }
   if (!config) return <main className="first-run"><p className="muted">正在读取连接…</p></main>;
   if (firstRun) return <FirstRun exited={kernel === 'exited'} />;
-  return <><Workspace /><RefPreview /><PaneDeleteDialog /></>;
+  return <><Workspace /><RefPreview /><PaneDeleteDialog /><LeaveDialog /></>;
 }
