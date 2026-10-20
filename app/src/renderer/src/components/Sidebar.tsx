@@ -2,7 +2,7 @@
 
 import { openSettings } from '../state/actions';
 import { newSession, openFolder } from '../state/projects';
-import { sameFile, useApp, type AppState } from '../state/store';
+import { isShown, sameFile, useApp, type AppState } from '../state/store';
 import { BrandMark, Icon } from '../icons';
 import { openIssueReport } from './IssueDialog';
 import { savedStatus, sessionStatus, STATUS_TEXT, type SessionStatus } from './sessionRows';
@@ -18,7 +18,7 @@ const RAIL_ORDER: SessionStatus[] = ['approval', 'question', 'error', 'unseen'];
 
 /** @brief 不在中栏显示的会话里最要紧的状态（收起为图标栏时看不到会话行）；包括界面重新加载后还没点开的会话。 */
 function hiddenStatus(state: AppState): SessionStatus | null {
-  const hidden = state.tabs.filter((tab) => state.view !== 'chat' || tab.key !== state.activeKey);
+  const hidden = state.tabs.filter((tab) => !isShown(tab.key, state));
   const untabbed = state.saved.sessions
     .filter((item) => !state.tabs.some((tab) => sameFile(tab.sessionFile, item.sessionFile)));
   const statuses = [...hidden.map((tab) => sessionStatus(tab)),

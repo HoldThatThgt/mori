@@ -46,3 +46,10 @@
 | "用系统编辑器打开"时当作会被运行的文件 | 扩展名在 `PATHEXT` 里，或是 .com .exe .bat .cmd .vbs .vbe .js .jse .wsf .wsh .msc .ps1 .psm1 .py .pyw .lnk .url .hta .msi .msp .scr .cpl .reg .jar .appref-ms .application .website .settingcontent-ms；这些改为在资源管理器里选中 | `app/src/main/files.ts` `RUNNABLE` | Windows 的"打开"对这类文件就是运行，文件可能是模型刚写的；Electron 没有"编辑"动作 | 你觉得哪类文件该能直接打开时 |
 | 在文件里找引用的原文 | 最多看 1000 处出现的地方，取离原来的行最近的一处 | `app/src/renderer/src/state/quotes.ts` `SEARCH_MAX` | 很短的原文在大文件里会出现很多次，不让一次点击无限地搜下去 | 你走查时 |
 | 几个提示停留的时间 | 回到原位置的高亮约 4 秒；"已记录"约 3 秒后关闭表单；"已复制"约 2 秒 | `quoteHighlight.ts` `HIGHLIGHT_MS`、`FeedbackForm.tsx` `SAVED_MS`、`ReplyActions.tsx` `COPIED_MS` | 看得见、又不一直挡着 | 你走查时 |
+| 会话引用的默认范围 | 全部已完成的轮次；全部超过 20,000 字时最近 5 轮 | `app/src/renderer/src/state/sessionRefs.ts` `REF_FULL_LIMIT`、`REF_RECENT_TURNS` | 方案 5.11 定的临时默认值；字数按引用内容的字符数（含"第 N 轮"标题） | 你走查时；内网模型上下文较小时 |
+| 会话引用的内容格式 | 每轮以"第 N 轮"开头，你的消息写"用户："、助手的正文写"助手："，工具调用一行"[工具] 工具卡标题"，你的消息里的引用一行"[引用] 来源"；轮之间空一行。发给模型的引用块第一行"引用会话“会话名”第 a–b 轮："，内容每行前加 `> ` | `app/src/renderer/src/state/sessionRefs.ts` `sessionTurns`、`app/src/renderer/src/state/quoteText.ts` `quoteBlock` | 内容要给另一个模型读，用"用户 / 助手"比界面上的"你"清楚；与 M4 的引用块同一种拼法 | 内网模型对引用的理解不好时 |
+| 芯片上的"约 X 字" | 1,000 以上取整到百，100–999 取整到十，100 以下照实 | `app/src/renderer/src/state/quoteText.ts` `approxChars` | 方案的例子是"约 3,200 字" | 你走查时 |
+| 分屏的初始比例 | 两栏各一半；拖动后的比例存在本机（`localStorage` 的 `mori.layout`，`split`），重启后保留 | `app/src/renderer/src/state/layout.ts` | 与 demo/resize.js 相同 | 你走查时 |
+| 分屏时右栏放得下的条件 | 中栏放得下两栏各 280px 加右栏最窄的 260px；放不下时右栏先收起，点开关才浮在上层 | `app/src/renderer/src/App.tsx` `useColumns`、`RIGHT_MIN` | 方案 5.11"两栏各不足 280px 时先收起右栏"；260px 是右栏原有的最小宽度 | 你走查时觉得两栏太挤再调 |
+| 重启后不恢复分屏 | 只保留分屏的比例；哪两个会话在分屏里不保存 | `app/src/renderer/src/state/store.ts` `split` | M3 起启动后不自动打开任何会话（照 Claude 桌面版），分屏也一样 | 你走查时 |
+| 打开或切换会话后把焦点放进输入框时等菜单退出的帧数 | 最多 5 帧，仍有浮层（例如信任询问）就不动焦点 | `app/src/renderer/src/state/split.ts` `FOCUS_RETRY_FRAMES` | 菜单关闭后它在浮层栈里的登记要到下一次提交之后才去掉 | — |

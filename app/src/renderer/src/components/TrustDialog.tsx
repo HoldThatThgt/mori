@@ -32,7 +32,7 @@ function TrustPromptDialog({ prompt }: { prompt: TrustPrompt }) {
     answerTrust(prompt.id, { trusted, remember: keep });
     requestAnimationFrame(() => {
       if (document.activeElement && document.activeElement !== document.body) return;
-      document.querySelector<HTMLElement>('.pane-slot:not([hidden]) .composer textarea')?.focus();
+      document.querySelector<HTMLElement>('.pane-slot[data-focused="true"] .composer textarea')?.focus();
     });
   }
 

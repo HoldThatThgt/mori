@@ -378,14 +378,18 @@ async function background(page, h) {
 
 // ---------- 归档 ----------
 
-/** @brief 在会话行上右键，返回菜单项：文字、是否不可用、旁边的小字。菜单保持打开。 */
+/**
+ * @brief 在会话行上右键，返回菜单项：文字、是否不可用、旁边的小字。菜单保持打开。
+ *        M5 加的"引用到当前会话""在右侧分屏打开"由 M5 的测试检查，这里不含它们。
+ */
 async function menuItems(page, file) {
   await rowOf(page, file).click({ button: 'right' });
   const menu = page.getByTestId('session-menu');
   await menu.waitFor({ timeout: 5000 });
-  return menu.getByRole('menuitem').evaluateAll((items) => items.map((item) => ({
+  const items = await menu.getByRole('menuitem').evaluateAll((elements) => elements.map((item) => ({
     label: item.firstChild?.textContent ?? '', disabled: item.disabled,
     hint: item.querySelector('.menu-hint')?.textContent ?? null })));
+  return items.filter((item) => !['引用到当前会话', '在右侧分屏打开'].includes(item.label));
 }
 
 /** @brief 菜单项的简短写法，例如"重命名 / 归档(还没有消息) / 删除"。 */

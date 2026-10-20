@@ -78,12 +78,29 @@ export interface Tab {
   rightOpen: boolean | null;
   /** 右栏的视图 */
   rightView: RightView;
-  /** 等对话流处理的"回到原位置"（回复里的引用）；itemKey 是要跳到的那一项 */
-  transcriptJump: (QuoteJump & { itemKey: string }) | null;
+  /**
+   * 等对话流处理的"回到原位置"（回复里的引用、会话引用的原会话）；itemKey 是要跳到的那一项，
+   * keys 为要高亮的各项（会话引用的几轮）；没有时按引用的范围高亮
+   */
+  transcriptJump: (QuoteJump & { itemKey: string; keys?: string[] }) | null;
+  /** 正在读取或没能加入的会话引用（输入框上方，不随草稿保存；docs/v0/screens/session-refs.md） */
+  refPending: PendingRef[];
   /** 打开中、可用、打开失败 */
   phase: 'opening' | 'ready' | 'failed';
   /** 打开失败或重新载入失败的原文 */
   error: string | null;
+}
+
+/** @brief 一个正在读取或没能加入的会话引用。 */
+export interface PendingRef {
+  /** 标识 */
+  id: number;
+  /** 原会话的会话文件 */
+  sessionFile: string;
+  /** 原会话的名字 */
+  title: string;
+  /** 没能加入的说明；正在读取时为 null */
+  problem: string | null;
 }
 
 /** @brief 后台进程状态。 */
@@ -123,8 +140,10 @@ export interface AppState {
   saved: SavedList;
   /** 打开的会话 */
   tabs: Tab[];
-  /** 当前会话 */
+  /** 当前会话：单栏时显示的会话，分屏时焦点所在的那一栏（docs/v0/screens/split.md） */
   activeKey: string | null;
+  /** 分屏时左右两栏的会话（界面里的标识），单栏时为 null */
+  split: [string, string] | null;
   /** 中栏显示会话还是设置页 */
   view: 'chat' | 'settings';
   /** 每次"去设置"加一，设置页据此把焦点放到 API key */
@@ -142,7 +161,8 @@ export interface AppState {
 
 export const useApp = create<AppState>(() => ({
   kernel: 'connecting', config: null, configError: null, firstRun: false,
-  saved: { status: 'loading', sessions: [], error: null }, tabs: [], activeKey: null, view: 'chat', settingsFocus: 0,
+  saved: { status: 'loading', sessions: [], error: null }, tabs: [], activeKey: null, split: null, view: 'chat',
+  settingsFocus: 0,
   trustPrompts: [], archived: loadArchived(), rowMarks: {},
 }));
 
@@ -156,7 +176,7 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
     trustSaveError: null, extensionErrors: [], model: null,
     modelNotice: null, contextUsage: null, approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '',
     draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
-    phase: 'opening', error: null, ...fields };
+    refPending: [], phase: 'opening', error: null, ...fields };
 }
 
 /** @brief 更新一个会话。 */
@@ -179,7 +199,18 @@ export function tabByFile(sessionFile: string): Tab | undefined {
   return useApp.getState().tabs.find((tab) => sameFile(tab.sessionFile, sessionFile));
 }
 
-/** @brief 取当前会话。 */
+/** @brief 取当前会话（分屏时焦点所在的那一栏）。 */
 export function activeTab(state: AppState = useApp.getState()): Tab | undefined {
   return state.tabs.find((tab) => tab.key === state.activeKey);
+}
+
+/** @brief 中栏里显示的会话（界面里的标识）：分屏时左右两栏，单栏时当前会话；不管中栏是不是设置页。 */
+export function shownKeys(state: AppState = useApp.getState()): string[] {
+  if (state.split) return [...state.split];
+  return state.activeKey ? [state.activeKey] : [];
+}
+
+/** @brief 会话现在是否显示在中栏（在任一栏里，且中栏不是设置页）。 */
+export function isShown(key: string, state: AppState = useApp.getState()): boolean {
+  return state.view === 'chat' && shownKeys(state).includes(key);
 }

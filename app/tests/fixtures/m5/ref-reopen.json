@@ -1,0 +1,722 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m5-record.mjs; do not edit by hand.",
+ "name": "ref-reopen",
+ "description": "先建会话 C（3 轮）和会话 A（引用 C 的第 1–2 轮发出），重启；打开 A，点消息里的引用打开 C",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-20T08:34:49.507Z",
+ "steps": [
+  {
+   "t": 0,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 2723,
+   "result": {
+    "type": "session.list",
+    "value": [
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-YCgVXG\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m5-record-m2fn0d-m5-ref-reopen--\\2026-10-20T08-34-43-507Z_01a15872-d6b2-72d6-847c-da760a28df4a.jsonl",
+      "sessionId": "01a15872-d6b2-72d6-847c-da760a28df4a",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-m2fn0d\\m5-ref-reopen",
+      "name": null,
+      "firstMessage": "引用会话“用一句话介绍你自己。不要调用任何工具。”第 1–2 轮：\n> 第 1 轮\n> 用户：用一句话介绍你自己。不要调用任何工具。\n> 助手：我是 pi 编程助手，可以帮你读写代码、执行命令和解决开发任务。\n>\n> 第 2 轮\n> 用户：我们来讨论一个小功能：给 src/a.ts 加一个减法函数。先用两句话说说思路，不要调用任何工具。\n> 助手：思路：在 src/a.ts 中参照现有加法函数的风格新增一个 subtract 函数，保持参数类型和导出方式一致。随后补充对应的简单用例或注释，确保与现有代码约定统一。\n\n根据上面引用的讨论，用一句话说明我们定下来的函数名。不要调用任何工具。",
+      "modified": 1792485283885,
+      "live": null
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-YCgVXG\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m5-record-m2fn0d-m5-ref-reopen--\\2026-10-20T08-34-39-875Z_01a15872-c882-72d6-847c-da75315298aa.jsonl",
+      "sessionId": "01a15872-c882-72d6-847c-da75315298aa",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-m2fn0d\\m5-ref-reopen",
+      "name": null,
+      "firstMessage": "用一句话介绍你自己。不要调用任何工具。",
+      "modified": 1792485282394,
+      "live": null
+     }
+    ]
+   }
+  },
+  {
+   "t": 2723,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-m2fn0d\\m5-ref-reopen"
+   }
+  },
+  {
+   "t": 2736,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 2736,
+   "command": {
+    "type": "session.open",
+    "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-YCgVXG\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m5-record-m2fn0d-m5-ref-reopen--\\2026-10-20T08-34-43-507Z_01a15872-d6b2-72d6-847c-da760a28df4a.jsonl"
+   }
+  },
+  {
+   "t": 2783,
+   "result": {
+    "type": "session.open",
+    "value": {
+     "sessionId": "01a15872-d6b2-72d6-847c-da760a28df4a",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-m2fn0d\\m5-ref-reopen",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-YCgVXG\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m5-record-m2fn0d-m5-ref-reopen--\\2026-10-20T08-34-43-507Z_01a15872-d6b2-72d6-847c-da760a28df4a.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 1967,
+      "contextWindow": 1000000,
+      "percent": 0.19669999999999999
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     },
+     "entries": [
+      {
+       "type": "model_change",
+       "id": "7208dd1a",
+       "parentId": null,
+       "timestamp": "2026-10-20T08:34:43.524Z",
+       "provider": "mori-endpoint",
+       "modelId": "deepseek-flash"
+      },
+      {
+       "type": "thinking_level_change",
+       "id": "6e3fd1df",
+       "parentId": "7208dd1a",
+       "timestamp": "2026-10-20T08:34:43.524Z",
+       "thinkingLevel": "off"
+      },
+      {
+       "type": "message",
+       "id": "64cc49a4",
+       "parentId": "6e3fd1df",
+       "timestamp": "2026-10-20T08:34:43.882Z",
+       "message": {
+        "role": "system",
+        "content": "",
+        "sections": {
+         "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+         "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+         "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+         "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+         "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m5-record-m2fn0d/m5-ref-reopen\n</cwd>"
+        },
+        "timestamp": 1792485283881,
+        "toolsAdded": [
+         {
+          "name": "read",
+          "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to read (relative or absolute)"
+            },
+            "offset": {
+             "type": "number",
+             "description": "Line number to start reading from (1-indexed)"
+            },
+            "limit": {
+             "type": "number",
+             "description": "Maximum number of lines to read"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "bash",
+          "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "command"
+           ],
+           "properties": {
+            "command": {
+             "type": "string",
+             "description": "Shell command to execute"
+            },
+            "timeout": {
+             "type": "number",
+             "description": "Timeout in seconds (optional, no default timeout)"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "edit",
+          "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path",
+            "edits"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to edit (relative or absolute)"
+            },
+            "edits": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "required": [
+               "oldText",
+               "newText"
+              ],
+              "properties": {
+               "oldText": {
+                "type": "string",
+                "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+               },
+               "newText": {
+                "type": "string",
+                "description": "Replacement text for this targeted edit."
+               }
+              }
+             },
+             "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "write",
+          "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path",
+            "content"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to write (relative or absolute)"
+            },
+            "content": {
+             "type": "string",
+             "description": "Content to write to the file"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "type": "message",
+       "id": "eb06d2cc",
+       "parentId": "64cc49a4",
+       "timestamp": "2026-10-20T08:34:43.882Z",
+       "message": {
+        "role": "user",
+        "content": [
+         {
+          "type": "text",
+          "text": "引用会话“用一句话介绍你自己。不要调用任何工具。”第 1–2 轮：\n> 第 1 轮\n> 用户：用一句话介绍你自己。不要调用任何工具。\n> 助手：我是 pi 编程助手，可以帮你读写代码、执行命令和解决开发任务。\n>\n> 第 2 轮\n> 用户：我们来讨论一个小功能：给 src/a.ts 加一个减法函数。先用两句话说说思路，不要调用任何工具。\n> 助手：思路：在 src/a.ts 中参照现有加法函数的风格新增一个 subtract 函数，保持参数类型和导出方式一致。随后补充对应的简单用例或注释，确保与现有代码约定统一。\n\n根据上面引用的讨论，用一句话说明我们定下来的函数名。不要调用任何工具。"
+         }
+        ],
+        "timestamp": 1792485283881
+       }
+      },
+      {
+       "type": "custom",
+       "customType": "mori.ref",
+       "data": {
+        "messageId": "eb06d2cc",
+        "refs": [
+         {
+          "quote": "第 1 轮\n用户：用一句话介绍你自己。不要调用任何工具。\n助手：我是 pi 编程助手，可以帮你读写代码、执行命令和解决开发任务。\n\n第 2 轮\n用户：我们来讨论一个小功能：给 src/a.ts 加一个减法函数。先用两句话说说思路，不要调用任何工具。\n助手：思路：在 src/a.ts 中参照现有加法函数的风格新增一个 subtract 函数，保持参数类型和导出方式一致。随后补充对应的简单用例或注释，确保与现有代码约定统一。",
+          "source": {
+           "kind": "session",
+           "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-YCgVXG\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m5-record-m2fn0d-m5-ref-reopen--\\2026-10-20T08-34-39-875Z_01a15872-c882-72d6-847c-da75315298aa.jsonl",
+           "name": "用一句话介绍你自己。不要调用任何工具。",
+           "fromTurn": 1,
+           "toTurn": 2,
+           "fromEntryId": "37dd0cec",
+           "toEntryId": "8426efe2"
+          }
+         }
+        ]
+       },
+       "id": "e3f8eec1",
+       "parentId": "eb06d2cc",
+       "timestamp": "2026-10-20T08:34:43.884Z"
+      },
+      {
+       "type": "message",
+       "id": "101f2d57",
+       "parentId": "e3f8eec1",
+       "timestamp": "2026-10-20T08:34:45.003Z",
+       "message": {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "thinking",
+          "thinking": "The user asks: based on the quoted discussion, state the function name we settled on in one sentence. The quoted turns mention \"subtract\" as the proposed name in turn 2, but nothing was settled/confirmed — no decision was made. So the honest answer: no function name was actually decided; the only name proposed was subtract.\n\nAnswer in one sentence, no tools.",
+          "thinkingSignature": "reasoning_content"
+         },
+         {
+          "type": "text",
+          "text": "引用内容里其实并没有真正“定下来”——第 2 轮只是提出了 `subtract` 这个候选函数名，你还没有回应或确认。"
+         }
+        ],
+        "api": "openai-completions",
+        "provider": "mori-endpoint",
+        "model": "deepseek-flash",
+        "usage": {
+         "input": 192,
+         "output": 111,
+         "cacheRead": 1664,
+         "cacheWrite": 0,
+         "reasoning": 77,
+         "totalTokens": 1967,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "stop",
+        "timestamp": 1792485283885,
+        "responseId": "87d1655d-e3a7-45c8-967b-e4852503e9bd",
+        "rawStopReason": "stop",
+        "durationMs": 1118,
+        "thinkingLevel": "off"
+       }
+      }
+     ],
+     "live": null
+    }
+   }
+  },
+  {
+   "t": 2783,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-m2fn0d\\m5-ref-reopen"
+   }
+  },
+  {
+   "t": 2786,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 2786,
+   "command": {
+    "type": "session.open",
+    "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-YCgVXG\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m5-record-m2fn0d-m5-ref-reopen--\\2026-10-20T08-34-39-875Z_01a15872-c882-72d6-847c-da75315298aa.jsonl"
+   }
+  },
+  {
+   "t": 2804,
+   "result": {
+    "type": "session.open",
+    "value": {
+     "sessionId": "01a15872-c882-72d6-847c-da75315298aa",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-m2fn0d\\m5-ref-reopen",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-YCgVXG\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m5-record-m2fn0d-m5-ref-reopen--\\2026-10-20T08-34-39-875Z_01a15872-c882-72d6-847c-da75315298aa.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 1830,
+      "contextWindow": 1000000,
+      "percent": 0.183
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     },
+     "entries": [
+      {
+       "type": "model_change",
+       "id": "47714193",
+       "parentId": null,
+       "timestamp": "2026-10-20T08:34:39.921Z",
+       "provider": "mori-endpoint",
+       "modelId": "deepseek-flash"
+      },
+      {
+       "type": "thinking_level_change",
+       "id": "0c731e5d",
+       "parentId": "47714193",
+       "timestamp": "2026-10-20T08:34:39.921Z",
+       "thinkingLevel": "off"
+      },
+      {
+       "type": "message",
+       "id": "ea76aba0",
+       "parentId": "0c731e5d",
+       "timestamp": "2026-10-20T08:34:39.931Z",
+       "message": {
+        "role": "system",
+        "content": "",
+        "sections": {
+         "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+         "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+         "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+         "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+         "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m5-record-m2fn0d/m5-ref-reopen\n</cwd>"
+        },
+        "timestamp": 1792485279930,
+        "toolsAdded": [
+         {
+          "name": "read",
+          "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to read (relative or absolute)"
+            },
+            "offset": {
+             "type": "number",
+             "description": "Line number to start reading from (1-indexed)"
+            },
+            "limit": {
+             "type": "number",
+             "description": "Maximum number of lines to read"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "bash",
+          "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "command"
+           ],
+           "properties": {
+            "command": {
+             "type": "string",
+             "description": "Shell command to execute"
+            },
+            "timeout": {
+             "type": "number",
+             "description": "Timeout in seconds (optional, no default timeout)"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "edit",
+          "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path",
+            "edits"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to edit (relative or absolute)"
+            },
+            "edits": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "required": [
+               "oldText",
+               "newText"
+              ],
+              "properties": {
+               "oldText": {
+                "type": "string",
+                "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+               },
+               "newText": {
+                "type": "string",
+                "description": "Replacement text for this targeted edit."
+               }
+              }
+             },
+             "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "write",
+          "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path",
+            "content"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to write (relative or absolute)"
+            },
+            "content": {
+             "type": "string",
+             "description": "Content to write to the file"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "type": "message",
+       "id": "37dd0cec",
+       "parentId": "ea76aba0",
+       "timestamp": "2026-10-20T08:34:39.932Z",
+       "message": {
+        "role": "user",
+        "content": [
+         {
+          "type": "text",
+          "text": "用一句话介绍你自己。不要调用任何工具。"
+         }
+        ],
+        "timestamp": 1792485279928
+       }
+      },
+      {
+       "type": "message",
+       "id": "dc180ae1",
+       "parentId": "37dd0cec",
+       "timestamp": "2026-10-20T08:34:41.387Z",
+       "message": {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "text",
+          "text": "我是 pi 编程助手，可以帮你读写代码、执行命令和解决开发任务。"
+         }
+        ],
+        "api": "openai-completions",
+        "provider": "mori-endpoint",
+        "model": "deepseek-flash",
+        "usage": {
+         "input": 1056,
+         "output": 19,
+         "cacheRead": 640,
+         "cacheWrite": 0,
+         "reasoning": 0,
+         "totalTokens": 1715,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "stop",
+        "timestamp": 1792485280257,
+        "responseId": "e82465b9-b897-4d37-9fcb-8d938a3b6491",
+        "rawStopReason": "stop",
+        "durationMs": 1130,
+        "thinkingLevel": "off"
+       }
+      },
+      {
+       "type": "message",
+       "id": "8426efe2",
+       "parentId": "dc180ae1",
+       "timestamp": "2026-10-20T08:34:41.443Z",
+       "message": {
+        "role": "user",
+        "content": [
+         {
+          "type": "text",
+          "text": "我们来讨论一个小功能：给 src/a.ts 加一个减法函数。先用两句话说说思路，不要调用任何工具。"
+         }
+        ],
+        "timestamp": 1792485281442
+       }
+      },
+      {
+       "type": "message",
+       "id": "814e59d1",
+       "parentId": "8426efe2",
+       "timestamp": "2026-10-20T08:34:42.342Z",
+       "message": {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "text",
+          "text": "思路：在 src/a.ts 中参照现有加法函数的风格新增一个 subtract 函数，保持参数类型和导出方式一致。随后补充对应的简单用例或注释，确保与现有代码约定统一。"
+         }
+        ],
+        "api": "openai-completions",
+        "provider": "mori-endpoint",
+        "model": "deepseek-flash",
+        "usage": {
+         "input": 209,
+         "output": 43,
+         "cacheRead": 1536,
+         "cacheWrite": 0,
+         "reasoning": 0,
+         "totalTokens": 1788,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "stop",
+        "timestamp": 1792485281444,
+        "responseId": "c32a56f6-a78e-4bb0-b1a4-0af47502d25e",
+        "rawStopReason": "stop",
+        "durationMs": 898,
+        "thinkingLevel": "off"
+       }
+      },
+      {
+       "type": "message",
+       "id": "cf01555c",
+       "parentId": "814e59d1",
+       "timestamp": "2026-10-20T08:34:42.393Z",
+       "message": {
+        "role": "user",
+        "content": [
+         {
+          "type": "text",
+          "text": "函数名用 sub 还是 subtract 好？一句话回答，不要调用任何工具。"
+         }
+        ],
+        "timestamp": 1792485282392
+       }
+      },
+      {
+       "type": "message",
+       "id": "042a1af6",
+       "parentId": "cf01555c",
+       "timestamp": "2026-10-20T08:34:43.444Z",
+       "message": {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "text",
+          "text": "建议用 `subtract`，语义更清晰、与常见 API 命名习惯一致。"
+         }
+        ],
+        "api": "openai-completions",
+        "provider": "mori-endpoint",
+        "model": "deepseek-flash",
+        "usage": {
+         "input": 146,
+         "output": 20,
+         "cacheRead": 1664,
+         "cacheWrite": 0,
+         "reasoning": 0,
+         "totalTokens": 1830,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "stop",
+        "timestamp": 1792485282394,
+        "responseId": "36b789be-c9cc-4eec-a7ea-9cf6795e1166",
+        "rawStopReason": "stop",
+        "durationMs": 1050,
+        "thinkingLevel": "off"
+       }
+      }
+     ],
+     "live": null
+    }
+   }
+  }
+ ]
+}

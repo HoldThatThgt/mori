@@ -1,7 +1,7 @@
 // 读出当前选区能不能引用、引用什么（docs/v0/screens/selection.md "选区浮层"）：
 // 起止都在 pi 的同一条助手回复里（data-quote-source="message"），或都在文件阅读器的内容里（data-quote-source="file"）。
 
-import type { QuoteRef } from '../../../shared/protocol';
+import type { FeedbackRef } from '../state/feedbackForm';
 import { useApp } from '../state/store';
 
 /** @brief 一个能引用的选区。 */
@@ -9,7 +9,7 @@ export interface SelectionPick {
   /** 选区所在的会话（界面里的标识） */
   tabKey: string;
   /** 原文和来源 */
-  ref: QuoteRef;
+  ref: FeedbackRef;
   /** 选区（浮层定位、反馈时保持高亮） */
   range: Range;
 }

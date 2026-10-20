@@ -78,7 +78,7 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
   }
 
   return (
-    <div className="composer" data-testid="composer">
+    <div className="composer" data-testid="composer" data-drop="composer" data-tab={tab.key}>
       <ComposerQuotes tab={tab} />
       <textarea ref={input} value={tab.draft} rows={2} aria-label="给 Mori 的消息" autoFocus
         placeholder={running ? 'Enter 排队 · Ctrl+Enter 插话 · Shift+Enter 换行' : 'Enter 发送 · Shift+Enter 换行'}

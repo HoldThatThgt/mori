@@ -40,6 +40,7 @@ export function describeCommand(command: Command): string | null {
     case 'config.get':
     case 'session.state':
     case 'session.list':
+    case 'session.read':
     case 'trust.check':
       return null;
     case 'connection.save':

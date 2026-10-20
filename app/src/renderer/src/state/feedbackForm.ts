@@ -1,18 +1,26 @@
 // 对内容的反馈（docs/v0/screens/selection.md "反馈"）：哪个引用要反馈、表单放在哪；保存交给主进程，只记录、不发给模型。
 
 import { create } from 'zustand';
-import type { QuoteRef } from '../../../shared/protocol';
+import type { FileSource, MessageSource } from '../../../shared/protocol';
 import { recordAction } from './actionLog';
 
 /** 反馈时保持选区高亮用的 CSS 高亮名（表单里的输入框拿走焦点后，原来的选区就看不见了） */
 export const QUOTE_HIGHLIGHT = 'mori-quote';
+
+/** @brief 能反馈的引用：回复或文件里的（会话引用不能反馈）。 */
+export interface FeedbackRef {
+  /** 原文 */
+  quote: string;
+  /** 来源 */
+  source: MessageSource | FileSource;
+}
 
 /** @brief 一次反馈请求。 */
 export interface FeedbackRequest {
   /** 所在的会话（界面里的标识） */
   tabKey: string;
   /** 引用的原文和来源 */
-  ref: QuoteRef;
+  ref: FeedbackRef;
   /** 表单放在这个矩形附近（选区或按钮） */
   anchor: { left: number; top: number; bottom: number };
   /** 打开前有焦点的元素，关闭后还给它 */

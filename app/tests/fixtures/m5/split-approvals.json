@@ -1,0 +1,6355 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m5-record.mjs; do not edit by hand.",
+ "name": "split-approvals",
+ "description": "同一项目的两个会话（界面上左右分屏）各发一条要批准的消息：左边用 edit 改 README.md，右边用 write 新建 notes.md；两张批准卡按到达顺序各自允许",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-20T07:39:31.419Z",
+ "steps": [
+  {
+   "t": 0,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 2062,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 2062,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-As2kw8\\m5-split-approvals"
+   }
+  },
+  {
+   "t": 2066,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 2066,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-As2kw8\\m5-split-approvals"
+   }
+  },
+  {
+   "t": 2114,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-As2kw8\\m5-split-approvals",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-gwpIBN\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m5-record-As2kw8-m5-split-approvals--\\2026-10-20T07-39-27-707Z_01a15840-3e5a-764a-9652-8190c1ea0039.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 2114,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-As2kw8\\m5-split-approvals"
+   }
+  },
+  {
+   "t": 2169,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 2169,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-As2kw8\\m5-split-approvals"
+   }
+  },
+  {
+   "t": 2183,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m5-record-As2kw8\\m5-split-approvals",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-gwpIBN\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m5-record-As2kw8-m5-split-approvals--\\2026-10-20T07-39-27-807Z_01a15840-3ebf-764a-9652-819346f0cd98.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 2183,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "text": "请用 edit 工具把 README.md 的第一行改成 \"# Mori M5 左栏\"。不要运行命令，改完用一句话告诉我。"
+   }
+  },
+  {
+   "t": 2185,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 2185,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "text": "请用 write 工具新建 notes.md，内容只有一行 \"Mori M5 右栏\"。不要运行命令，写完用一句话告诉我。"
+   }
+  },
+  {
+   "t": 2188,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 2188,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 2188,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m5-record-As2kw8/m5-split-approvals\n</cwd>"
+      },
+      "timestamp": 1792481967824,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2188,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m5-record-As2kw8/m5-split-approvals\n</cwd>"
+      },
+      "timestamp": 1792481967824,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2188,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请用 edit 工具把 README.md 的第一行改成 \"# Mori M5 左栏\"。不要运行命令，改完用一句话告诉我。"
+       }
+      ],
+      "timestamp": 1792481967822
+     }
+    }
+   }
+  },
+  {
+   "t": 2188,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请用 edit 工具把 README.md 的第一行改成 \"# Mori M5 左栏\"。不要运行命令，改完用一句话告诉我。"
+       }
+      ],
+      "timestamp": 1792481967822
+     }
+    }
+   }
+  },
+  {
+   "t": 2190,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "10dfad2c",
+     "time": 1792481967822,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 2450,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 2451,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 2451,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 2452,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m5-record-As2kw8/m5-split-approvals\n</cwd>"
+      },
+      "timestamp": 1792481968088,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2452,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m5-record-As2kw8/m5-split-approvals\n</cwd>"
+      },
+      "timestamp": 1792481968088,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 2452,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请用 write 工具新建 notes.md，内容只有一行 \"Mori M5 右栏\"。不要运行命令，写完用一句话告诉我。"
+       }
+      ],
+      "timestamp": 1792481968088
+     }
+    }
+   }
+  },
+  {
+   "t": 2452,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请用 write 工具新建 notes.md，内容只有一行 \"Mori M5 右栏\"。不要运行命令，写完用一句话告诉我。"
+       }
+      ],
+      "timestamp": 1792481968088
+     }
+    }
+   }
+  },
+  {
+   "t": 2453,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "2e2522b3",
+     "time": 1792481968088,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 2630,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792481968066
+     }
+    }
+   }
+  },
+  {
+   "t": 2632,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792481968091
+     }
+    }
+   }
+  },
+  {
+   "t": 3119,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 0,
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3119,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3131,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3131,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3131,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "path",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3131,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3150,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ": ",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3150,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3150,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "notes",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3150,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ".md",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3153,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3153,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "The"
+     }
+    }
+   }
+  },
+  {
+   "t": 3168,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3187,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ", ",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3187,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3187,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "content",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3187,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3187,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ": ",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3192,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3192,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "M",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3192,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "ori",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3192,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " M",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3206,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "5",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3206,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " ",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3206,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "右",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3206,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "栏",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3207,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\\n",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user"
+     }
+    }
+   }
+  },
+  {
+   "t": 3218,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3218,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "}",
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759"
+     }
+    }
+   }
+  },
+  {
+   "t": 3220,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " wants"
+     }
+    }
+   }
+  },
+  {
+   "t": 3220,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " me"
+     }
+    }
+   }
+  },
+  {
+   "t": 3238,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 0,
+      "toolName": "write",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+      "args": {
+       "path": "notes.md",
+       "content": "Mori M5 右栏\n"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 3238,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+        "name": "write",
+        "arguments": {
+         "path": "notes.md",
+         "content": "Mori M5 右栏\n"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1590,
+       "output": 61,
+       "cacheRead": 128,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1779,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792481968091,
+      "responseId": "b04484c0-f205-473a-87ec-e39dd761e70e",
+      "rawStopReason": "tool_calls",
+      "durationMs": 784,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 3239,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "23a233b8",
+     "time": 1792481968091,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3239,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+     "toolName": "write",
+     "gate": "ask"
+    }
+   }
+  },
+  {
+   "t": 3239,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+     "toolName": "write",
+     "args": {
+      "path": "notes.md",
+      "content": "Mori M5 右栏\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3241,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "mori.approval_request",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+     "toolName": "write",
+     "args": {
+      "path": "notes.md",
+      "content": "Mori M5 右栏\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 3242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " edit"
+     }
+    }
+   }
+  },
+  {
+   "t": 3242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " READ"
+     }
+    }
+   }
+  },
+  {
+   "t": 3242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "ME"
+     }
+    }
+   }
+  },
+  {
+   "t": 3242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".md"
+     }
+    }
+   }
+  },
+  {
+   "t": 3242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " first"
+     }
+    }
+   }
+  },
+  {
+   "t": 3247,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " line"
+     }
+    }
+   }
+  },
+  {
+   "t": 3247,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3247,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " But"
+     }
+    }
+   }
+  },
+  {
+   "t": 3247,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 3265,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " should"
+     }
+    }
+   }
+  },
+  {
+   "t": 3265,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " read"
+     }
+    }
+   }
+  },
+  {
+   "t": 3277,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " it"
+     }
+    }
+   }
+  },
+  {
+   "t": 3291,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " first"
+     }
+    }
+   }
+  },
+  {
+   "t": 3291,
+   "command": {
+    "type": "approval.answer",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "requestId": "approval-1",
+    "decision": "allow"
+   }
+  },
+  {
+   "t": 3292,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "?"
+     }
+    }
+   }
+  },
+  {
+   "t": 3292,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " They"
+     }
+    }
+   }
+  },
+  {
+   "t": 3293,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "mori.approval_end",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+     "decision": "allow",
+     "by": "user",
+     "reason": null
+    }
+   }
+  },
+  {
+   "t": 3293,
+   "result": {
+    "type": "approval.answer",
+    "value": {
+     "mode": "ask",
+     "allowed": []
+    }
+   }
+  },
+  {
+   "t": 3297,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+     "toolName": "write",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "Successfully wrote to notes.md"
+       }
+      ]
+     },
+     "isError": false,
+     "durationMs": 3
+    }
+   }
+  },
+  {
+   "t": 3297,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+      "toolName": "write",
+      "content": [
+       {
+        "type": "text",
+        "text": "Successfully wrote to notes.md"
+       }
+      ],
+      "isError": false,
+      "durationMs": 3,
+      "timestamp": 1792481968934
+     }
+    }
+   }
+  },
+  {
+   "t": 3297,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+      "toolName": "write",
+      "content": [
+       {
+        "type": "text",
+        "text": "Successfully wrote to notes.md"
+       }
+      ],
+      "isError": false,
+      "durationMs": 3,
+      "timestamp": 1792481968934
+     }
+    }
+   }
+  },
+  {
+   "t": 3298,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+        "name": "write",
+        "arguments": {
+         "path": "notes.md",
+         "content": "Mori M5 右栏\n"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1590,
+       "output": 61,
+       "cacheRead": 128,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1779,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792481968091,
+      "responseId": "b04484c0-f205-473a-87ec-e39dd761e70e",
+      "rawStopReason": "tool_calls",
+      "durationMs": 784,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+       "toolName": "write",
+       "content": [
+        {
+         "type": "text",
+         "text": "Successfully wrote to notes.md"
+        }
+       ],
+       "isError": false,
+       "durationMs": 3,
+       "timestamp": 1792481968934
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3298,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98"
+   }
+  },
+  {
+   "t": 3301,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 3307,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1787,
+      "contextWindow": 1000000,
+      "percent": 0.1787
+     }
+    }
+   }
+  },
+  {
+   "t": 3308,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " said"
+     }
+    }
+   }
+  },
+  {
+   "t": 3308,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " don"
+     }
+    }
+   }
+  },
+  {
+   "t": 3309,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 3309,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " run"
+     }
+    }
+   }
+  },
+  {
+   "t": 3320,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " commands"
+     }
+    }
+   }
+  },
+  {
+   "t": 3320,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3320,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Reading"
+     }
+    }
+   }
+  },
+  {
+   "t": 3332,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " is"
+     }
+    }
+   }
+  },
+  {
+   "t": 3332,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " not"
+     }
+    }
+   }
+  },
+  {
+   "t": 3332,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " running"
+     }
+    }
+   }
+  },
+  {
+   "t": 3348,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " commands"
+     }
+    }
+   }
+  },
+  {
+   "t": 3361,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "..."
+     }
+    }
+   }
+  },
+  {
+   "t": 3362,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " but"
+     }
+    }
+   }
+  },
+  {
+   "t": 3362,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " \""
+     }
+    }
+   }
+  },
+  {
+   "t": 3376,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "不要"
+     }
+    }
+   }
+  },
+  {
+   "t": 3376,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "运行"
+     }
+    }
+   }
+  },
+  {
+   "t": 3389,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "命令"
+     }
+    }
+   }
+  },
+  {
+   "t": 3389,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "\""
+     }
+    }
+   }
+  },
+  {
+   "t": 3389,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " -"
+     }
+    }
+   }
+  },
+  {
+   "t": 3390,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " don"
+     }
+    }
+   }
+  },
+  {
+   "t": 3390,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'t"
+     }
+    }
+   }
+  },
+  {
+   "t": 3390,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " run"
+     }
+    }
+   }
+  },
+  {
+   "t": 3405,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " commands"
+     }
+    }
+   }
+  },
+  {
+   "t": 3405,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3405,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 3405,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " could"
+     }
+    }
+   }
+  },
+  {
+   "t": 3419,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " use"
+     }
+    }
+   }
+  },
+  {
+   "t": 3419,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " read"
+     }
+    }
+   }
+  },
+  {
+   "t": 3419,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tool"
+     }
+    }
+   }
+  },
+  {
+   "t": 3419,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 3432,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " check"
+     }
+    }
+   }
+  },
+  {
+   "t": 3433,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3433,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " But"
+     }
+    }
+   }
+  },
+  {
+   "t": 3433,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " maybe"
+     }
+    }
+   }
+  },
+  {
+   "t": 3450,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " just"
+     }
+    }
+   }
+  },
+  {
+   "t": 3462,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " edit"
+     }
+    }
+   }
+  },
+  {
+   "t": 3462,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " directly"
+     }
+    }
+   }
+  },
+  {
+   "t": 3477,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3477,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Let"
+     }
+    }
+   }
+  },
+  {
+   "t": 3487,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792481968940
+     }
+    }
+   }
+  },
+  {
+   "t": 3520,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " me"
+     }
+    }
+   }
+  },
+  {
+   "t": 3520,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " check"
+     }
+    }
+   }
+  },
+  {
+   "t": 3520,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " with"
+     }
+    }
+   }
+  },
+  {
+   "t": 3520,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " read"
+     }
+    }
+   }
+  },
+  {
+   "t": 3520,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tool"
+     }
+    }
+   }
+  },
+  {
+   "t": 3521,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " ("
+     }
+    }
+   }
+  },
+  {
+   "t": 3533,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "not"
+     }
+    }
+   }
+  },
+  {
+   "t": 3533,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " bash"
+     }
+    }
+   }
+  },
+  {
+   "t": 3542,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ").\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3543,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Actually"
+     }
+    }
+   }
+  },
+  {
+   "t": 3558,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 3558,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " edit"
+     }
+    }
+   }
+  },
+  {
+   "t": 3558,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tool"
+     }
+    }
+   }
+  },
+  {
+   "t": 3579,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " requires"
+     }
+    }
+   }
+  },
+  {
+   "t": 3579,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " exact"
+     }
+    }
+   }
+  },
+  {
+   "t": 3579,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " old"
+     }
+    }
+   }
+  },
+  {
+   "t": 3579,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Text"
+     }
+    }
+   }
+  },
+  {
+   "t": 3585,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3599,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 3599,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " need"
+     }
+    }
+   }
+  },
+  {
+   "t": 3599,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 3599,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " know"
+     }
+    }
+   }
+  },
+  {
+   "t": 3615,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 3615,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " first"
+     }
+    }
+   }
+  },
+  {
+   "t": 3615,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " line"
+     }
+    }
+   }
+  },
+  {
+   "t": 3615,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3616,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Use"
+     }
+    }
+   }
+  },
+  {
+   "t": 3631,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " read"
+     }
+    }
+   }
+  },
+  {
+   "t": 3631,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tool"
+     }
+    }
+   }
+  },
+  {
+   "t": 3649,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3681,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3681,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3687,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3688,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3688,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "path",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3688,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3688,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ": ",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3698,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3698,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "README",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3699,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ".md",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3699,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3713,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ", ",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3713,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3725,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "limit",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3726,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3726,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ": ",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3751,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "5",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3753,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "}",
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489"
+     }
+    }
+   }
+  },
+  {
+   "t": 3786,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3786,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "read",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489",
+      "args": {
+       "path": "README.md",
+       "limit": 5
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 3787,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user wants me to edit README.md first line. But I should read it first? They said don't run commands. Reading is not running commands... but \"不要运行命令\" - don't run commands. I could use read tool to check. But maybe just edit directly. Let me check with read tool (not bash).\n\nActually the edit tool requires exact oldText. I need to know the first line. Use read tool.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_hmQygIujsPGDP9iMYDky8489",
+        "name": "read",
+        "arguments": {
+         "path": "README.md",
+         "limit": 5
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1591,
+       "output": 143,
+       "cacheRead": 128,
+       "cacheWrite": 0,
+       "reasoning": 89,
+       "totalTokens": 1862,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792481968066,
+      "responseId": "bd6683e0-e722-42cb-8141-eaddbf720211",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1358,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 3788,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "e3576996",
+     "time": 1792481968066,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3788,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489",
+     "toolName": "read",
+     "gate": "free"
+    }
+   }
+  },
+  {
+   "t": 3788,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489",
+     "toolName": "read",
+     "args": {
+      "path": "README.md",
+      "limit": 5
+     }
+    }
+   }
+  },
+  {
+   "t": 3814,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489",
+     "toolName": "read",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n\n[2 more lines in file. Use offset=6 to continue.]"
+       }
+      ],
+      "structuredContent": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n\n[2 more lines in file. Use offset=6 to continue.]"
+     },
+     "isError": false,
+     "durationMs": 24
+    }
+   }
+  },
+  {
+   "t": 3814,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489",
+      "toolName": "read",
+      "content": [
+       {
+        "type": "text",
+        "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n\n[2 more lines in file. Use offset=6 to continue.]"
+       }
+      ],
+      "isError": false,
+      "durationMs": 24,
+      "timestamp": 1792481969451
+     }
+    }
+   }
+  },
+  {
+   "t": 3814,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489",
+      "toolName": "read",
+      "content": [
+       {
+        "type": "text",
+        "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n\n[2 more lines in file. Use offset=6 to continue.]"
+       }
+      ],
+      "isError": false,
+      "durationMs": 24,
+      "timestamp": 1792481969451
+     }
+    }
+   }
+  },
+  {
+   "t": 3815,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user wants me to edit README.md first line. But I should read it first? They said don't run commands. Reading is not running commands... but \"不要运行命令\" - don't run commands. I could use read tool to check. But maybe just edit directly. Let me check with read tool (not bash).\n\nActually the edit tool requires exact oldText. I need to know the first line. Use read tool.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_hmQygIujsPGDP9iMYDky8489",
+        "name": "read",
+        "arguments": {
+         "path": "README.md",
+         "limit": 5
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1591,
+       "output": 143,
+       "cacheRead": 128,
+       "cacheWrite": 0,
+       "reasoning": 89,
+       "totalTokens": 1862,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792481968066,
+      "responseId": "bd6683e0-e722-42cb-8141-eaddbf720211",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1358,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n\n[2 more lines in file. Use offset=6 to continue.]"
+        }
+       ],
+       "isError": false,
+       "durationMs": 24,
+       "timestamp": 1792481969451
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3815,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039"
+   }
+  },
+  {
+   "t": 3817,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 3821,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1900,
+      "contextWindow": 1000000,
+      "percent": 0.19
+     }
+    }
+   }
+  },
+  {
+   "t": 4028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792481969455
+     }
+    }
+   }
+  },
+  {
+   "t": 4076,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4076,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "已"
+     }
+    }
+   }
+  },
+  {
+   "t": 4092,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "用"
+     }
+    }
+   }
+  },
+  {
+   "t": 4092,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " write"
+     }
+    }
+   }
+  },
+  {
+   "t": 4107,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 4107,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "工具"
+     }
+    }
+   }
+  },
+  {
+   "t": 4107,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "新建"
+     }
+    }
+   }
+  },
+  {
+   "t": 4107,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " notes"
+     }
+    }
+   }
+  },
+  {
+   "t": 4107,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ".md"
+     }
+    }
+   }
+  },
+  {
+   "t": 4108,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4113,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "其"
+     }
+    }
+   }
+  },
+  {
+   "t": 4113,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "内容"
+     }
+    }
+   }
+  },
+  {
+   "t": 4113,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "只有"
+     }
+    }
+   }
+  },
+  {
+   "t": 4113,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "一行"
+     }
+    }
+   }
+  },
+  {
+   "t": 4128,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " \""
+     }
+    }
+   }
+  },
+  {
+   "t": 4128,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "M"
+     }
+    }
+   }
+  },
+  {
+   "t": 4128,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "ori"
+     }
+    }
+   }
+  },
+  {
+   "t": 4128,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " M"
+     }
+    }
+   }
+  },
+  {
+   "t": 4128,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "5"
+     }
+    }
+   }
+  },
+  {
+   "t": 4129,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 4142,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "右"
+     }
+    }
+   }
+  },
+  {
+   "t": 4142,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "栏"
+     }
+    }
+   }
+  },
+  {
+   "t": 4142,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "\"。"
+     }
+    }
+   }
+  },
+  {
+   "t": 4143,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4143,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "已用 write 工具新建 notes.md，其内容只有一行 \"Mori M5 右栏\"。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 261,
+       "output": 23,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1820,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792481968940,
+      "responseId": "26e6ee31-e6b3-4b98-a1ef-915d9c089ae0",
+      "rawStopReason": "stop",
+      "durationMs": 841,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 4144,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "05532d4c",
+     "time": 1792481968940,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 4144,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "已用 write 工具新建 notes.md，其内容只有一行 \"Mori M5 右栏\"。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 261,
+       "output": 23,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1820,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792481968940,
+      "responseId": "26e6ee31-e6b3-4b98-a1ef-915d9c089ae0",
+      "rawStopReason": "stop",
+      "durationMs": 841,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 4144,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98"
+   }
+  },
+  {
+   "t": 4144,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m5-record-As2kw8/m5-split-approvals\n</cwd>"
+       },
+       "timestamp": 1792481968088,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "请用 write 工具新建 notes.md，内容只有一行 \"Mori M5 右栏\"。不要运行命令，写完用一句话告诉我。"
+        }
+       ],
+       "timestamp": 1792481968088
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+         "name": "write",
+         "arguments": {
+          "path": "notes.md",
+          "content": "Mori M5 右栏\n"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1590,
+        "output": 61,
+        "cacheRead": 128,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1779,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792481968091,
+       "responseId": "b04484c0-f205-473a-87ec-e39dd761e70e",
+       "rawStopReason": "tool_calls",
+       "durationMs": 784,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_gZ07cVQ3GNQYerCyQ9Zj5759",
+       "toolName": "write",
+       "content": [
+        {
+         "type": "text",
+         "text": "Successfully wrote to notes.md"
+        }
+       ],
+       "isError": false,
+       "durationMs": 3,
+       "timestamp": 1792481968934
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "已用 write 工具新建 notes.md，其内容只有一行 \"Mori M5 右栏\"。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 261,
+        "output": 23,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1820,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792481968940,
+       "responseId": "26e6ee31-e6b3-4b98-a1ef-915d9c089ae0",
+       "rawStopReason": "stop",
+       "durationMs": 841,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 4144,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 4145,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3ebf-764a-9652-819346f0cd98",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 4145,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1820,
+      "contextWindow": 1000000,
+      "percent": 0.182
+     }
+    }
+   }
+  },
+  {
+   "t": 4414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 0,
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "path",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4439,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ": ",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4439,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4439,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "README",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4439,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ".md",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4440,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4467,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ", ",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4467,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4467,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "ed",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4467,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "its",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4467,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4481,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ": ",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4481,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "[",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4481,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{\"",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4495,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "old",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4495,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "Text",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4495,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\":",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4495,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " \"#",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4495,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " Mori",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4495,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " fixture",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4519,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " project",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4519,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\",",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4519,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " \"",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4519,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "new",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4519,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "Text",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4519,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\":",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4519,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " \"#",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4519,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " Mori",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4519,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " M",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4519,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "5",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4519,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": " ",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4549,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "左",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4549,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "栏",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4549,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4549,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "}]",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4549,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "}",
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268"
+     }
+    }
+   }
+  },
+  {
+   "t": 4563,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 0,
+      "toolName": "edit",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+      "args": {
+       "path": "README.md",
+       "edits": [
+        {
+         "oldText": "# Mori fixture project",
+         "newText": "# Mori M5 左栏"
+        }
+       ]
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 4563,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+        "name": "edit",
+        "arguments": {
+         "path": "README.md",
+         "edits": [
+          {
+           "oldText": "# Mori fixture project",
+           "newText": "# Mori M5 左栏"
+          }
+         ]
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 248,
+       "output": 77,
+       "cacheRead": 1664,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1989,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792481969455,
+      "responseId": "5178a2ed-4029-4c4f-8441-052acbee0b0a",
+      "rawStopReason": "tool_calls",
+      "durationMs": 745,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 4563,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "768ee77e",
+     "time": 1792481969455,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 4563,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+     "toolName": "edit",
+     "gate": "ask"
+    }
+   }
+  },
+  {
+   "t": 4563,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+     "toolName": "edit",
+     "args": {
+      "path": "README.md",
+      "edits": [
+       {
+        "oldText": "# Mori fixture project",
+        "newText": "# Mori M5 左栏"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 4564,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "mori.approval_request",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+     "toolName": "edit",
+     "args": {
+      "path": "README.md",
+      "edits": [
+       {
+        "oldText": "# Mori fixture project",
+        "newText": "# Mori M5 左栏"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 4569,
+   "command": {
+    "type": "approval.answer",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "requestId": "approval-1",
+    "decision": "allow"
+   }
+  },
+  {
+   "t": 4569,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "mori.approval_end",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+     "decision": "allow",
+     "by": "user",
+     "reason": null
+    }
+   }
+  },
+  {
+   "t": 4569,
+   "result": {
+    "type": "approval.answer",
+    "value": {
+     "mode": "ask",
+     "allowed": []
+    }
+   }
+  },
+  {
+   "t": 4572,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+     "toolName": "edit",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "Successfully replaced 1 block(s) in README.md."
+       }
+      ],
+      "details": {
+       "diff": "-1 # Mori fixture project\n+1 # Mori M5 左栏\n 2 \n 3 This folder is used to check Mori against a model.\n 4 \n 5 - It has one README file.\n   ...",
+       "patch": "--- README.md\n+++ README.md\n@@ -1,5 +1,5 @@\n-# Mori fixture project\n+# Mori M5 左栏\n \n This folder is used to check Mori against a model.\n \n - It has one README file.\n",
+       "firstChangedLine": 1
+      }
+     },
+     "isError": false,
+     "durationMs": 3
+    }
+   }
+  },
+  {
+   "t": 4572,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+      "toolName": "edit",
+      "content": [
+       {
+        "type": "text",
+        "text": "Successfully replaced 1 block(s) in README.md."
+       }
+      ],
+      "details": {
+       "diff": "-1 # Mori fixture project\n+1 # Mori M5 左栏\n 2 \n 3 This folder is used to check Mori against a model.\n 4 \n 5 - It has one README file.\n   ...",
+       "patch": "--- README.md\n+++ README.md\n@@ -1,5 +1,5 @@\n-# Mori fixture project\n+# Mori M5 左栏\n \n This folder is used to check Mori against a model.\n \n - It has one README file.\n",
+       "firstChangedLine": 1
+      },
+      "isError": false,
+      "durationMs": 3,
+      "timestamp": 1792481970210
+     }
+    }
+   }
+  },
+  {
+   "t": 4572,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+      "toolName": "edit",
+      "content": [
+       {
+        "type": "text",
+        "text": "Successfully replaced 1 block(s) in README.md."
+       }
+      ],
+      "details": {
+       "diff": "-1 # Mori fixture project\n+1 # Mori M5 左栏\n 2 \n 3 This folder is used to check Mori against a model.\n 4 \n 5 - It has one README file.\n   ...",
+       "patch": "--- README.md\n+++ README.md\n@@ -1,5 +1,5 @@\n-# Mori fixture project\n+# Mori M5 左栏\n \n This folder is used to check Mori against a model.\n \n - It has one README file.\n",
+       "firstChangedLine": 1
+      },
+      "isError": false,
+      "durationMs": 3,
+      "timestamp": 1792481970210
+     }
+    }
+   }
+  },
+  {
+   "t": 4573,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+        "name": "edit",
+        "arguments": {
+         "path": "README.md",
+         "edits": [
+          {
+           "oldText": "# Mori fixture project",
+           "newText": "# Mori M5 左栏"
+          }
+         ]
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 248,
+       "output": 77,
+       "cacheRead": 1664,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1989,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792481969455,
+      "responseId": "5178a2ed-4029-4c4f-8441-052acbee0b0a",
+      "rawStopReason": "tool_calls",
+      "durationMs": 745,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+       "toolName": "edit",
+       "content": [
+        {
+         "type": "text",
+         "text": "Successfully replaced 1 block(s) in README.md."
+        }
+       ],
+       "details": {
+        "diff": "-1 # Mori fixture project\n+1 # Mori M5 左栏\n 2 \n 3 This folder is used to check Mori against a model.\n 4 \n 5 - It has one README file.\n   ...",
+        "patch": "--- README.md\n+++ README.md\n@@ -1,5 +1,5 @@\n-# Mori fixture project\n+# Mori M5 左栏\n \n This folder is used to check Mori against a model.\n \n - It has one README file.\n",
+        "firstChangedLine": 1
+       },
+       "isError": false,
+       "durationMs": 3,
+       "timestamp": 1792481970210
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 4573,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039"
+   }
+  },
+  {
+   "t": 4574,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 4576,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2001,
+      "contextWindow": 1000000,
+      "percent": 0.20010000000000003
+     }
+    }
+   }
+  },
+  {
+   "t": 4796,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792481970211
+     }
+    }
+   }
+  },
+  {
+   "t": 5276,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 5276,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "已"
+     }
+    }
+   }
+  },
+  {
+   "t": 5352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "把"
+     }
+    }
+   }
+  },
+  {
+   "t": 5352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " READ"
+     }
+    }
+   }
+  },
+  {
+   "t": 5352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "ME"
+     }
+    }
+   }
+  },
+  {
+   "t": 5352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ".md"
+     }
+    }
+   }
+  },
+  {
+   "t": 5352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "的第一"
+     }
+    }
+   }
+  },
+  {
+   "t": 5352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "行"
+     }
+    }
+   }
+  },
+  {
+   "t": 5352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "改为"
+     }
+    }
+   }
+  },
+  {
+   "t": 5352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " “"
+     }
+    }
+   }
+  },
+  {
+   "t": 5354,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "#"
+     }
+    }
+   }
+  },
+  {
+   "t": 5354,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " Mori"
+     }
+    }
+   }
+  },
+  {
+   "t": 5354,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " M"
+     }
+    }
+   }
+  },
+  {
+   "t": 5354,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "5"
+     }
+    }
+   }
+  },
+  {
+   "t": 5354,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5354,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "左"
+     }
+    }
+   }
+  },
+  {
+   "t": 5354,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "栏"
+     }
+    }
+   }
+  },
+  {
+   "t": 5356,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "”。"
+     }
+    }
+   }
+  },
+  {
+   "t": 5356,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 5356,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "已把 README.md 的第一行改为 “# Mori M5 左栏”。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 221,
+       "output": 19,
+       "cacheRead": 1792,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 2032,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792481970211,
+      "responseId": "3a42b78b-ac65-4943-af18-5e38918efada",
+      "rawStopReason": "stop",
+      "durationMs": 782,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 5356,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "ecd90908",
+     "time": 1792481970211,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 5356,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "已把 README.md 的第一行改为 “# Mori M5 左栏”。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 221,
+       "output": 19,
+       "cacheRead": 1792,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 2032,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792481970211,
+      "responseId": "3a42b78b-ac65-4943-af18-5e38918efada",
+      "rawStopReason": "stop",
+      "durationMs": 782,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 5356,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039"
+   }
+  },
+  {
+   "t": 5357,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m5-split-references-119e00\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m5-record-As2kw8/m5-split-approvals\n</cwd>"
+       },
+       "timestamp": 1792481967824,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "请用 edit 工具把 README.md 的第一行改成 \"# Mori M5 左栏\"。不要运行命令，改完用一句话告诉我。"
+        }
+       ],
+       "timestamp": 1792481967822
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The user wants me to edit README.md first line. But I should read it first? They said don't run commands. Reading is not running commands... but \"不要运行命令\" - don't run commands. I could use read tool to check. But maybe just edit directly. Let me check with read tool (not bash).\n\nActually the edit tool requires exact oldText. I need to know the first line. Use read tool.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "toolCall",
+         "id": "call_00_hmQygIujsPGDP9iMYDky8489",
+         "name": "read",
+         "arguments": {
+          "path": "README.md",
+          "limit": 5
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1591,
+        "output": 143,
+        "cacheRead": 128,
+        "cacheWrite": 0,
+        "reasoning": 89,
+        "totalTokens": 1862,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792481968066,
+       "responseId": "bd6683e0-e722-42cb-8141-eaddbf720211",
+       "rawStopReason": "tool_calls",
+       "durationMs": 1358,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_hmQygIujsPGDP9iMYDky8489",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n\n[2 more lines in file. Use offset=6 to continue.]"
+        }
+       ],
+       "isError": false,
+       "durationMs": 24,
+       "timestamp": 1792481969451
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+         "name": "edit",
+         "arguments": {
+          "path": "README.md",
+          "edits": [
+           {
+            "oldText": "# Mori fixture project",
+            "newText": "# Mori M5 左栏"
+           }
+          ]
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 248,
+        "output": 77,
+        "cacheRead": 1664,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1989,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792481969455,
+       "responseId": "5178a2ed-4029-4c4f-8441-052acbee0b0a",
+       "rawStopReason": "tool_calls",
+       "durationMs": 745,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_MoNA1bu12mFfPD9f9XjL5268",
+       "toolName": "edit",
+       "content": [
+        {
+         "type": "text",
+         "text": "Successfully replaced 1 block(s) in README.md."
+        }
+       ],
+       "details": {
+        "diff": "-1 # Mori fixture project\n+1 # Mori M5 左栏\n 2 \n 3 This folder is used to check Mori against a model.\n 4 \n 5 - It has one README file.\n   ...",
+        "patch": "--- README.md\n+++ README.md\n@@ -1,5 +1,5 @@\n-# Mori fixture project\n+# Mori M5 左栏\n \n This folder is used to check Mori against a model.\n \n - It has one README file.\n",
+        "firstChangedLine": 1
+       },
+       "isError": false,
+       "durationMs": 3,
+       "timestamp": 1792481970210
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "已把 README.md 的第一行改为 “# Mori M5 左栏”。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 221,
+        "output": 19,
+        "cacheRead": 1792,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 2032,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792481970211,
+       "responseId": "3a42b78b-ac65-4943-af18-5e38918efada",
+       "rawStopReason": "stop",
+       "durationMs": 782,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 5357,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 5357,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15840-3e5a-764a-9652-8190c1ea0039",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 5357,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2032,
+      "contextWindow": 1000000,
+      "percent": 0.2032
+     }
+    }
+   }
+  }
+ ]
+}

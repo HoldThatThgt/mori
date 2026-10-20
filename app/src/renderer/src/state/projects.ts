@@ -9,6 +9,7 @@ import { saveArchived } from './archive';
 import { dropDraft, savedDraft, savedDraftRefs } from './drafts';
 import { attachLive, transcriptFromEntries } from './history';
 import { emptyTranscript, pushItem, startIndexFor, type Transcript } from './model';
+import { openInSplit, placeInSplit, showInFocused, withoutPane, type Side } from './split';
 import { activeTab, newTab, sameFile, tabByFile, updateTab, useApp, type AppState, type Tab } from './store';
 import { trustFor } from './trust';
 
@@ -49,9 +50,13 @@ function withoutMark(marks: AppState['rowMarks'], file: string | null): AppState
   return rest;
 }
 
-/** @brief 加入一个会话并切到它。 */
-function addTab(tab: Tab): void {
-  useApp.setState((state) => ({ tabs: [...state.tabs, tab], activeKey: tab.key, view: 'chat' }));
+/** @brief 加入一个会话并切到它：side 为空时放进焦点所在的那一栏，否则在这一侧分屏打开（docs/v0/screens/split.md）。 */
+function addTab(tab: Tab, side?: Side): void {
+  useApp.setState((state) => {
+    const next = { ...state, tabs: [...state.tabs, tab] };
+    return { tabs: next.tabs, ...(side ? placeInSplit(next, tab.key, side) : showInFocused(next, tab.key)),
+      view: 'chat' };
+  });
 }
 
 /** @brief 打开失败：会话留在侧栏，状态"出错"，中栏显示原文；没有打开的 pi 会话（后台进程里没有它）。 */
@@ -89,31 +94,36 @@ export async function newSession(): Promise<void> {
   else await openFolder();
 }
 
-/** @brief 回到会话页：key 为左栏点的会话；不传时回到当前会话（设置页的"返回会话"）。看到的会话清掉"有新结果"。 */
+/**
+ * @brief 回到会话页：key 为左栏点的会话（已在某一栏的只切焦点，否则放进焦点所在的那一栏）；不传时回到原来的样子
+ *        （设置页的"返回会话"，分屏也恢复）。显示出来的会话清掉"有新结果"。
+ */
 export function showChat(key?: string): void {
   recordAction(key ? '切换会话' : '返回会话');
   useApp.setState((state) => {
-    const target = key ?? state.activeKey;
-    return { view: 'chat', activeKey: target,
-      tabs: state.tabs.map((tab) => (tab.key === target && tab.unseen ? { ...tab, unseen: false } : tab)) };
+    const placed = key ? showInFocused(state, key) : { activeKey: state.activeKey, split: state.split };
+    const shown: string[] = placed.split ?? (placed.activeKey ? [placed.activeKey] : []);
+    return { view: 'chat', ...placed,
+      tabs: state.tabs.map((tab) => (shown.includes(tab.key) && tab.unseen ? { ...tab, unseen: false } : tab)) };
   });
 }
 
 /**
  * @brief 打开会话列表里的一个会话；本次已经打开的直接切过去。需要时先问信任；界面重新加载前就在后台进程里开着的会话
- *        （列表带 live）不问信任，直接接上它这一刻的样子。
+ *        （列表带 live）不问信任，直接接上它这一刻的样子。side 为空时放进焦点所在的那一栏，否则在这一侧分屏打开。
  */
-export async function openSaved(saved: SavedSession): Promise<void> {
+export async function openSaved(saved: SavedSession, side?: Side): Promise<void> {
   const existing = tabByFile(saved.sessionFile);
   if (existing) {
-    showChat(existing.key);
+    if (side) openInSplit(existing.key, side);
+    else showChat(existing.key);
     return;
   }
   recordAction('打开会话');
   useApp.setState((state) => ({ rowMarks: withoutMark(state.rowMarks, saved.sessionFile) }));
   const tab = newTab(saved.cwd, { sessionFile: saved.sessionFile, name: saved.name, preview: saved.firstMessage,
     activity: saved.modified, draft: savedDraft(saved.sessionFile), draftRefs: savedDraftRefs(saved.sessionFile) });
-  addTab(tab);
+  addTab(tab, side);
   try {
     const trust = saved.live ? undefined : await trustFor(saved.cwd);
     await reopenFromFile(tab, saved.sessionFile, trust, null);
@@ -163,7 +173,8 @@ async function closeForRemoval(ref: SessionRef): Promise<string | null> {
   const file = tab?.sessionFile ?? ref.sessionFile;
   useApp.setState((current) => ({
     tabs: current.tabs.filter((item) => item.key !== tab?.key),
-    activeKey: tab && current.activeKey === tab.key ? null : current.activeKey,
+    // 分屏中的会话：这一栏关闭，另一栏占满中栏（方案 5.3）。
+    ...(tab ? withoutPane(current, tab.key) : {}),
     rowMarks: withoutMark(current.rowMarks, file),
     saved: { ...current.saved, sessions: current.saved.sessions.map((item) =>
       (sameFile(item.sessionFile, file) ? { ...item, live: null } : item)) },

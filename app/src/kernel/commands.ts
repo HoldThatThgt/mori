@@ -5,7 +5,7 @@ import { cancelTest, readConnection, saveConnection, testConnection } from './co
 import { loadPi } from './pi';
 import {
   abort, answerApproval, answerQuestion, clearQueue, closeSession, createSession, forgetApproval, listSessions,
-  openSession, prompt, renameSession, sessionState, setApprovalMode,
+  openSession, prompt, readSession, renameSession, sessionState, setApprovalMode,
 } from './sessions';
 import { checkTrust } from './trust';
 
@@ -32,6 +32,8 @@ export async function handleCommand(command: Command, emit: (envelope: EventEnve
       return openSession(command.sessionFile, emit, command.trust);
     case 'session.list':
       return listSessions();
+    case 'session.read':
+      return readSession(command.sessionFile);
     case 'session.rename':
       return renameSession(command.sessionId, command.sessionFile, command.name);
     case 'session.close':

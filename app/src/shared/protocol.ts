@@ -126,17 +126,35 @@ export const FileSourceSchema = z.object({
   endLine: z.number().int().positive(),
 });
 
+/** @brief 引用的来源：另一个会话的几轮（docs/v0/screens/session-refs.md）。 */
+export const SessionSourceSchema = z.object({
+  kind: z.literal('session'),
+  /** 原会话的会话文件（改名不变） */
+  sessionFile: z.string().min(1),
+  /** 引用时显示的会话名 */
+  name: z.string(),
+  /** 第一轮（从 1 起） */
+  fromTurn: z.number().int().positive(),
+  /** 最后一轮 */
+  toTurn: z.number().int().positive(),
+  /** 第一轮你的消息的条目 id */
+  fromEntryId: z.string().min(1),
+  /** 最后一轮你的消息的条目 id */
+  toEntryId: z.string().min(1),
+});
+
 /** @brief 一个引用：引用时的原文和来源。 */
 export const QuoteRefSchema = z.object({
-  /** 引用时的原文 */
+  /** 引用时的原文；会话引用是按轮整理的内容 */
   quote: z.string().min(1),
   /** 来源 */
-  source: z.discriminatedUnion('kind', [MessageSourceSchema, FileSourceSchema]),
+  source: z.discriminatedUnion('kind', [MessageSourceSchema, FileSourceSchema, SessionSourceSchema]),
 });
 export type QuoteRef = z.infer<typeof QuoteRefSchema>;
 export type QuoteSource = QuoteRef['source'];
 export type MessageSource = z.infer<typeof MessageSourceSchema>;
 export type FileSource = z.infer<typeof FileSourceSchema>;
+export type SessionSource = z.infer<typeof SessionSourceSchema>;
 
 /** @brief 引用来源写进 pi 会话文件时自定义条目的类型（方案第 6 节）。 */
 export const REF_ENTRY_TYPE = 'mori.ref';
@@ -161,6 +179,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.open'), sessionFile: z.string().min(1), trust: TrustAnswerSchema.optional() }),
   /** pi 的会话列表（全部项目） */
   z.object({ type: z.literal('session.list') }),
+  /** 读出一个会话当前分支的条目（会话引用）；不打开会话，在生成时只给已完成的轮次 */
+  z.object({ type: z.literal('session.read'), sessionFile: z.string().min(1) }),
   /**
    * 改名：打开中的会话用 sessionId（经 pi 的 setSessionName）；没打开的用 sessionFile（写进会话文件）。
    * 两个都给时以打开中的会话为准。
@@ -379,6 +399,20 @@ export interface OpenedSession extends SessionInfo {
   entries: SessionEntry[];
   /** 会话本来就在后台进程里开着时这一刻的样子；新打开的为 null */
   live: LiveSnapshot | null;
+}
+
+/** @brief session.read 的结果：一个会话已完成的部分（docs/v0/screens/session-refs.md）。 */
+export interface SessionContent {
+  /** 会话文件 */
+  sessionFile: string;
+  /** 工作目录 */
+  cwd: string;
+  /** 会话名（pi 的 session_info）；没有时为 null */
+  name: string | null;
+  /** 当前分支上引用用得到的条目（你的消息、助手回复、mori.ref），从根起；会话在生成时只到已完成的轮次为止 */
+  entries: SessionEntry[];
+  /** 会话在生成，最后一轮还没完成、没有交出 */
+  unfinished: boolean;
 }
 
 /** @brief session.state 的结果。 */

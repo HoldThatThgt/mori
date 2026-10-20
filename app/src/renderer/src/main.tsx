@@ -14,6 +14,7 @@ import './styles/chat.css';
 import './styles/forms.css';
 import './styles/issues.css';
 import './styles/quotes.css';
+import './styles/split.css';
 
 connectKernel();
 
