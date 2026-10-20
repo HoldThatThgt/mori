@@ -485,6 +485,18 @@ export interface McpServerEntry {
   readOnly: string | null;
   /** pi 不加载这个条目的原因（照 pi validateMcpServerConfig 和读配置时的检查，原文同 pi）；pi 会加载时为 null */
   problem: string | null;
+  /** 共享连接的状态（docs/v0/m6-mcp-shared.md）；还没有这个服务的共享连接时为 null */
+  shared: SharedServerState | null;
+}
+
+/** @brief 一个共享的 MCP 服务连接（后台进程的共享服务表，照 Claude 桌面版每个服务一份）。 */
+export interface SharedServerState {
+  /** 启动中（起进程、握手）/ 运行中 / 启动失败或连接断了 / 已经停了 */
+  state: 'starting' | 'running' | 'failed' | 'stopped';
+  /** 正在用它的会话数 */
+  sessions: number;
+  /** 失败时的原文（错误第一行，stdio 时接上 stderr 的末尾）；没有时为 null */
+  error: string | null;
 }
 
 /** @brief tools.get 的结果（docs/v0/screens/tools.md）。 */
