@@ -23,6 +23,8 @@
     "test:m4-replay": "node tests/ui/m4-replay.mjs",
     "test:m5-app": "electron-vite build && node tests/ui/m5-app.mjs",
     "test:m5-replay": "node tests/ui/m5-replay.mjs",
+    "test:m6-app": "electron-vite build && node tests/ui/m6-app-settings.mjs && node tests/ui/m6-app-tools.mjs && node tests/ui/m6-app-slash.mjs",
+    "test:m6-replay": "node tests/ui/m6-replay.mjs",
     "check": "npm run typecheck && node tests/check.mjs"
   },
   "engines": {
