@@ -1,12 +1,18 @@
 // 对话流：先显示最近 50 条消息，滚到顶部时载入更早的；你在底部时跟随新内容，不在底部时显示"有新内容 ↓"。
+// M4：你的消息上方显示引用，每轮回复末尾一行操作，点引用回到原位置时滚过去高亮（docs/v0/screens/selection.md）。
 
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { openSettings, putBack } from '../state/actions';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { openSettings, putBack, putBackQuoted } from '../state/actions';
 import { PAGE_SIZE, startIndexFor } from '../state/model';
 import type { Item, ToolCall } from '../state/model';
+import { stripQuotes } from '../state/quotes';
 import { updateTab, type Tab } from '../state/store';
+import { replyTurns, type ReplyTurn } from '../state/turns';
 import { Icon } from '../icons';
 import { AssistantMessage } from './AssistantMessage';
+import { SentQuotes } from './QuoteChips';
+import { findText, flashElements, flashRange } from './quoteHighlight';
+import { ReplyActions } from './ReplyActions';
 
 /** 离底部不超过这么多像素就算"在底部" */
 const BOTTOM_SLACK = 24;
@@ -23,8 +29,21 @@ function ErrorCard({ item, tabKey }: { item: Extract<Item, { kind: 'error' }>; t
       <pre className="error-text">{item.text}</pre>
       {item.live && settings && <button className="text-link" onClick={() => openSettings(true)}>去设置</button>}
       {item.live && !settings && item.restore !== null && (
-        <button className="text-link" onClick={() => putBack(tabKey, [item.restore ?? ''])}>把上一条消息放回输入框</button>
+        <button className="text-link" onClick={() => (item.refs ? putBackQuoted(tabKey, item.restore ?? '', item.refs)
+          : putBack(tabKey, [item.restore ?? '']))}>把上一条消息放回输入框</button>
       )}
+    </div>
+  );
+}
+
+/** @brief 你的消息：带引用时引用显示在气泡上方，气泡里只有你写的字；引用块对不上时按原文显示。 */
+function UserMessage({ item, cwd, tabKey }: { item: Extract<Item, { kind: 'user' }>; cwd: string; tabKey: string }) {
+  const own = item.refs?.length ? stripQuotes(item.text, item.refs, cwd) : null;
+  if (!item.refs || own === null) return <div className="user-message" data-testid="user-message">{item.text}</div>;
+  return (
+    <div className="user-turn">
+      <SentQuotes refs={item.refs} tabKey={tabKey} cwd={cwd} />
+      {own && <div className="user-message" data-testid="user-message">{own}</div>}
     </div>
   );
 }
@@ -35,9 +54,9 @@ const ItemView = memo(function ItemView(
 ) {
   switch (item.kind) {
     case 'user':
-      return <div className="user-message" data-testid="user-message">{item.text}</div>;
+      return <UserMessage item={item} cwd={cwd} tabKey={tabKey} />;
     case 'assistant':
-      return <AssistantMessage item={item} tools={tools} cwd={cwd} />;
+      return <AssistantMessage item={item} tools={tools} cwd={cwd} tabKey={tabKey} />;
     case 'compaction':
       return <div className="notice" data-testid="notice">已压缩较早的对话</div>;
     case 'stopped':
@@ -62,9 +81,53 @@ function EmptyChat({ cwd }: { cwd: string }) {
   );
 }
 
+/** @brief 选区是否在这个元素里（选中文字时暂停自动跟随，免得选区和浮层被滚走）。 */
+function selectionWithin(element: HTMLElement | null): boolean {
+  const selection = window.getSelection();
+  return Boolean(element && selection && !selection.isCollapsed && selection.anchorNode
+    && element.contains(selection.anchorNode));
+}
+
+/** @brief 滚动位置离底部还有多少像素。 */
+function gapBelow(element: HTMLElement): number {
+  return element.scrollHeight - element.scrollTop - element.clientHeight;
+}
+
+/** @brief 内容变高、或对话流本身变矮（输入框上方出现批准卡、排队区、阶段行）时调 onResize。 */
+function useResize(scroller: React.RefObject<HTMLDivElement | null>, inner: React.RefObject<HTMLDivElement | null>,
+  onResize: () => void): void {
+  const latest = useRef(onResize);
+  latest.current = onResize;
+  useLayoutEffect(() => {
+    if (!inner.current || !scroller.current) return;
+    const observer = new ResizeObserver(() => latest.current());
+    observer.observe(inner.current);
+    observer.observe(scroller.current);
+    return () => observer.disconnect();
+  }, [inner, scroller]);
+}
+
+/** @brief 鼠标是否按在对话流里（开始拖选或拖滚动条）：按住期间暂停跟随，免得刚按下，下面的字就被滚走。 */
+function useHolding(scroller: React.RefObject<HTMLDivElement | null>): React.RefObject<boolean> {
+  const holding = useRef(false);
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element) return;
+    const down = () => { holding.current = true; };
+    const up = () => { holding.current = false; };
+    element.addEventListener('mousedown', down);
+    window.addEventListener('mouseup', up);
+    return () => {
+      element.removeEventListener('mousedown', down);
+      window.removeEventListener('mouseup', up);
+    };
+  }, [scroller]);
+  return holding;
+}
+
 /**
  * @brief 跟随与"有新内容"：内容变高、或对话流本身变矮（输入框上方出现批准卡、排队区、阶段行）时，
- *        在底部就跟到底部；你发消息时回到底部。
+ *        在底部就跟到底部；你发消息时回到底部。对话流里按着鼠标或有选区时暂停跟随，显示"有新内容"。
  *        只有你往上滚（比上次自动滚到底的位置更靠上）才算离开底部：流式输出很快时，
  *        自动滚动触发的 scroll 事件可能晚到、那时内容又长了一截，不能据此认为你离开了。
  */
@@ -73,6 +136,7 @@ function useFollow(scroller: React.RefObject<HTMLDivElement | null>, inner: Reac
   const atBottom = useRef(true);
   const lastAutoTop = useRef(0);
   const [hasNew, setHasNew] = useState(false);
+  const holding = useHolding(scroller);
   const toBottom = useCallback(() => {
     const element = scroller.current;
     if (!element) return;
@@ -80,13 +144,16 @@ function useFollow(scroller: React.RefObject<HTMLDivElement | null>, inner: Reac
     lastAutoTop.current = element.scrollTop;
     atBottom.current = true;
   }, [scroller]);
-  useLayoutEffect(() => {
-    if (!inner.current || !scroller.current) return;
-    const observer = new ResizeObserver(() => atBottom.current && toBottom());
-    observer.observe(inner.current);
-    observer.observe(scroller.current);
-    return () => observer.disconnect();
-  }, [inner, scroller, toBottom]);
+  useResize(scroller, inner, () => {
+    if (!atBottom.current) return;
+    const element = scroller.current;
+    if (holding.current || selectionWithin(element)) {
+      if (element && gapBelow(element) > BOTTOM_SLACK) setHasNew(true);
+      return;
+    }
+    toBottom();
+    setHasNew(false);
+  });
   useEffect(() => {
     if (!atBottom.current) setHasNew(true);
   }, [tab.transcript.items, tab.transcript.tools]);
@@ -98,7 +165,7 @@ function useFollow(scroller: React.RefObject<HTMLDivElement | null>, inner: Reac
   const track = () => {
     const element = scroller.current;
     if (!element) return;
-    if (element.scrollHeight - element.scrollTop - element.clientHeight <= BOTTOM_SLACK) {
+    if (gapBelow(element) <= BOTTOM_SLACK) {
       atBottom.current = true;
       setHasNew(false);
     } else if (element.scrollTop < lastAutoTop.current - 1) {
@@ -136,12 +203,53 @@ function useLoadEarlier(scroller: React.RefObject<HTMLDivElement | null>, inner:
   };
 }
 
+/**
+ * @brief 点引用回到原位置（回复里的引用，见 quotes.ts jumpToQuote）：等那一项渲染出来，滚过去，
+ *        选区高亮引用的文字，整条回复或找不到对应文字时高亮整轮回复。
+ */
+function useQuoteJump(inner: React.RefObject<HTMLDivElement | null>, tab: Tab, turns: Map<string, ReplyTurn>) {
+  useLayoutEffect(() => {
+    const jump = tab.transcriptJump;
+    const root = inner.current;
+    const element = jump && root?.querySelector<HTMLElement>(`[data-item-key="${jump.itemKey}"]`);
+    if (!jump || !root || !element) return;
+    updateTab(tab.key, (current) => ({ ...current, transcriptJump: null }));
+    element.scrollIntoView({ block: 'center' });
+    const source = jump.ref.source;
+    const range = source.kind === 'message' && source.scope === 'selection' ? findText(element, jump.ref.quote) : null;
+    if (range) {
+      flashRange(range);
+      return;
+    }
+    // 整轮回复高亮整轮；选区找不到对应文字时只高亮那一条回复。
+    const turnKeys = [...turns.values()].find((turn) => turn.keys.includes(jump.itemKey))?.keys;
+    const keys = source.kind === 'message' && source.scope === 'reply' && turnKeys ? turnKeys : [jump.itemKey];
+    flashElements(keys.flatMap((key) => [...root.querySelectorAll(`[data-item-key="${key}"]`)]));
+  }, [tab.transcriptJump, tab.startIndex, tab.key, inner, turns]);
+}
+
+/**
+ * @brief 每轮回复末尾的操作行放在哪些项下面：这一轮有正文、不在生成（最后一轮在本轮运行中、或最后一条回复还在流入时不放）；
+ *        最新的一轮标出来（一直显示）。
+ */
+function useReplyActions(tab: Tab) {
+  const { items, running } = tab.transcript;
+  const turns = useMemo(() => replyTurns(items), [items]);
+  const last = items.findLast((item) => item.kind === 'assistant');
+  const lastTurnEnd = items.at(-1)?.kind === 'user' ? undefined : last?.key;
+  const live = running || (last?.kind === 'assistant' && last.streaming);
+  const shown = [...turns.entries()].filter(([key, turn]) => turn.text && !(live && key === lastTurnEnd));
+  return { turns, shown: new Map(shown), latest: shown.at(-1)?.[0] };
+}
+
 /** @brief 一个会话的对话流。 */
 export function Transcript({ tab }: { tab: Tab }) {
   const scroller = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const { hasNew, track, jump } = useFollow(scroller, inner, tab);
   const loadEarlier = useLoadEarlier(scroller, inner, tab);
+  const { turns, shown, latest } = useReplyActions(tab);
+  useQuoteJump(inner, tab, turns);
   const { items, tools } = tab.transcript;
 
   function onScroll() {
@@ -155,11 +263,16 @@ export function Transcript({ tab }: { tab: Tab }) {
         <div className="conversation-inner" ref={inner}>
           {items.length === 0 && tab.phase === 'ready' && <EmptyChat cwd={tab.cwd} />}
           {tab.startIndex > 0 && <div className="load-earlier">向上滚动载入更早的消息</div>}
-          {items.slice(tab.startIndex).map((item) => (
-            <div key={item.key} data-item={item.kind}>
-              <ItemView item={item} tools={tools} cwd={tab.cwd} tabKey={tab.key} />
-            </div>
-          ))}
+          {items.slice(tab.startIndex).map((item) => {
+            const turn = shown.get(item.key);
+            return (
+              <div key={item.key} data-item={item.kind} data-item-key={item.key}>
+                <ItemView item={item} tools={tools} cwd={tab.cwd} tabKey={tab.key} />
+                {turn && <ReplyActions turn={turn} tabKey={tab.key} sessionFile={tab.sessionFile}
+                  latest={item.key === latest} />}
+              </div>
+            );
+          })}
         </div>
       </div>
       {hasNew && (

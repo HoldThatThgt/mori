@@ -1,12 +1,14 @@
 // F8 报告界面问题（方案 5.15，状态表见 docs/v0/screens/f8.md）：截下当前窗口、保存报告、在资源管理器里选中。
+// 对内容的反馈（方案 5.10，M4，见 docs/v0/screens/selection.md）：每份存成一个 JSON 文件，只记录、不发给模型。
 // 截图与保存都在主进程里完成，不经过后台进程和 pi，后台进程退出后也能报告。
-// 报告只写界面交来的字段（IssueReport），界面从不交 API key。
+// 报告只写界面交来的字段（IssueReport、Feedback），界面从不交 API key。
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { release } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { app, ipcMain, shell, type IpcMainInvokeEvent, type WebContents } from 'electron';
+import { FeedbackSchema, type SavedFeedback } from '../shared/feedback';
 import type { IssueReport, SavedIssue, WindowCapture } from '../shared/issues';
 
 /** 暂存的截图最多几张；只有最近打开的报告框会用到，更早的丢掉 */
@@ -20,6 +22,11 @@ const captures = new Map<string, Buffer>();
 /** @brief 报告保存的文件夹（临时默认值，见 docs/v0/defaults.md）。 */
 function issuesDir(): string {
   return join(app.getPath('userData'), 'ui-issues');
+}
+
+/** @brief 对内容的反馈保存的文件夹（临时默认值，见 docs/v0/defaults.md）。 */
+function feedbackDir(): string {
+  return join(app.getPath('userData'), 'feedback');
 }
 
 /** @brief 两位数字。 */
@@ -126,11 +133,28 @@ function reportShot(report: IssueReport): { png: Buffer | null; error: string } 
   return { png: null, error: report.captureError ?? 'No screenshot was taken' };
 }
 
-/** @brief 文件夹里还没用过的文件名：同一秒内再保存时加 -2、-3。 */
-function freeName(dir: string, stamp: string): string {
+/** @brief 文件夹里还没用过的文件名（看 extensions 里的每种扩展名）：同一秒内再保存时加 -2、-3。 */
+function freeName(dir: string, stamp: string, extensions: readonly string[] = ['.md', '.png']): string {
   for (let index = 1; ; index += 1) {
     const name = index === 1 ? stamp : `${stamp}-${index}`;
-    if (!existsSync(join(dir, `${name}.md`)) && !existsSync(join(dir, `${name}.png`))) return name;
+    if (extensions.every((extension) => !existsSync(join(dir, `${name}${extension}`)))) return name;
+  }
+}
+
+/** @brief 保存一份对内容的反馈；形状不对或没写期望时报错。返回 JSON 文件的完整路径。 */
+function saveFeedback(value: unknown): SavedFeedback {
+  try {
+    const feedback = FeedbackSchema.parse(value);
+    const now = new Date();
+    const dir = feedbackDir();
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `${freeName(dir, fileStamp(now), ['.json'])}.json`);
+    const record = { createdAt: now.toISOString(), ...feedback };
+    writeFileSync(file, `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+    return { file };
+  } catch (error) {
+    console.error(`[main] cannot save the feedback: ${(error as Error).message}`);
+    throw error;
   }
 }
 
@@ -171,7 +195,7 @@ function showIssue(file: unknown): void {
 }
 
 /**
- * @brief 注册 F8 用的三个通道；只有 Mori 自己的页面能调用。
+ * @brief 注册 F8 用的三个通道和保存反馈的通道；只有 Mori 自己的页面能调用。
  * @param isAppPage 判断地址是否是 Mori 自己的页面
  */
 export function registerFeedbackHandlers(isAppPage: (url: string) => boolean): void {
@@ -189,5 +213,9 @@ export function registerFeedbackHandlers(isAppPage: (url: string) => boolean): v
   ipcMain.handle('mori:show-issue', (event: IpcMainInvokeEvent, file: unknown) => {
     check(event);
     showIssue(file);
+  });
+  ipcMain.handle('mori:save-feedback', (event: IpcMainInvokeEvent, feedback: unknown) => {
+    check(event);
+    return saveFeedback(feedback);
   });
 }

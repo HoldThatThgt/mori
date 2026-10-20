@@ -6,6 +6,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, type IpcMainInvokeEvent } from 'electron';
 import { registerFeedbackHandlers } from './feedback';
+import { registerFileHandlers } from './files';
 import { currentKernel, lastKernelExitCode, piAgentDir, shutdownKernel, startKernel } from './kernel-process';
 
 // 测试可以用 MORI_USER_DATA 把数据放到独立目录，避免碰到日常使用的配置。
@@ -46,14 +47,19 @@ function connectWindow(window: BrowserWindow): void {
   window.webContents.postMessage('mori:port', null, [port2]);
 }
 
-/** @brief 禁止页面跳转、弹新窗口、嵌入 webview 和申请权限。 */
+/**
+ * @brief 禁止页面跳转、弹新窗口、嵌入 webview 和申请权限。唯一的例外：Mori 自己的页面写剪贴板
+ *        （代码块上的"复制代码"用浏览器的剪贴板接口，Chromium 按 clipboard-sanitized-write 申请）。
+ */
 function lockDown(window: BrowserWindow): void {
   const contents = window.webContents;
   contents.setWindowOpenHandler(() => ({ action: 'deny' }));
   contents.on('will-navigate', (event) => event.preventDefault());
   contents.on('will-redirect', (event) => event.preventDefault());
   contents.on('will-attach-webview', (event) => event.preventDefault());
-  contents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+  contents.session.setPermissionRequestHandler((_contents, permission, callback, details) => {
+    callback(permission === 'clipboard-sanitized-write' && isAppPage(details.requestingUrl));
+  });
 }
 
 /** @brief 创建主窗口。 */
@@ -127,6 +133,7 @@ ipcMain.handle('mori:attention', (event: IpcMainInvokeEvent) => {
 });
 
 registerFeedbackHandlers(isAppPage);
+registerFileHandlers(isAppPage);
 
 void app.whenReady().then(() => {
   // 不用拼写检查：Chromium 默认按系统语言从 redirector.gvt1.com 下载词典，离线使用时不能有这种对外连接。

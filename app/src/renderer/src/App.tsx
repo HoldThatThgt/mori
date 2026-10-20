@@ -10,7 +10,7 @@ import { clamp, limitsFor, NARROW_WIDTH, RAIL_WIDTH, setLayout, useLayout, type 
 import { closeTopOverlay, hasOverlay, useOverlay } from './state/overlays';
 import { activeTab, updateTab, useApp, type Tab } from './state/store';
 import { answerFrontApproval } from './components/ApprovalCard';
-import { ChangesPanel, collectChanges } from './components/ChangesPanel';
+import { collectChanges, RightPanel } from './components/ChangesPanel';
 import { ChatPane, KernelExitBanner } from './components/ChatPane';
 import { Divider } from './components/Divider';
 import { FirstRun, OpenFolderPrompt, SettingsPage } from './components/Pages';
@@ -179,10 +179,10 @@ function Workspace() {
         <div className="body">
           <Center tabs={tabs} activeKey={activeKey} view={view} rightOpen={rightOpen} onToggleRight={toggleRight} />
           {rightOpen && tab && (
-            <aside className="right-panel" aria-label="本会话的改动" data-testid="right-panel">
+            <aside className="right-panel" aria-label="本会话的改动与文件" data-testid="right-panel">
               <Divider kind="workspace" label="调整右栏宽度" value={columns.workspace} limits={columns.workspaceLimits}
                 onChange={(value, commit) => resize('workspace', value, commit)} />
-              <ChangesPanel transcript={tab.transcript} cwd={tab.cwd} onClose={toggleRight} />
+              <RightPanel tab={tab} onClose={toggleRight} />
             </aside>
           )}
         </div>

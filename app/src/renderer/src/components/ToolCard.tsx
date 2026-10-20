@@ -1,10 +1,14 @@
 // 工具卡：标题用人话，状态来自 pi 的工具事件和批准事件（等你批准、已拒绝、自动放行的原因）。
-// 默认折叠，展开看参数、输出和 diff。
+// 默认折叠，展开看参数、输出和 diff。读取、修改、写入的标题里的路径是按钮，点它在右栏打开文件阅读器（M4）。
 
 import { memo, useEffect, useState } from 'react';
 import type { ToolCall, ToolStatus } from '../state/model';
+import { openFile } from '../state/quotes';
 import { Diff } from './Diff';
 import { toolTitle } from './toolTitle';
+
+/** 标题里的路径能打开阅读器的工具（参数里有 path 的文件工具） */
+const FILE_TOOLS = ['read', 'edit', 'write'];
 
 /** 展开后输出最多显示的字数（取最后一段），临时默认值，见 docs/v0/defaults.md */
 export const OUTPUT_MAX = 20_000;
@@ -79,25 +83,40 @@ function ToolBody({ tool }: { tool: ToolCall }) {
         <><div className="tool-section-label">写入的内容</div><pre className="tool-pre">{content}</pre></>
       )}
       {tool.patch && (
-        <div className="tool-diff" data-testid="tool-diff"><Diff patch={tool.patch} /></div>
+        // diff 画在 shadow DOM 里，页面的选区读不到里面的字：不当作引用来源（docs/v0/screens/selection.md）。
+        <div className="tool-diff" data-testid="tool-diff" data-no-quote><Diff patch={tool.patch} /></div>
       )}
       {output && <><div className="tool-section-label">输出</div><pre className="tool-pre">{output}</pre></>}
     </div>
   );
 }
 
+/** @brief 标题里的对象：文件工具的完整路径是打开阅读器的按钮（点它不展开工具卡），其余是等宽文字。 */
+function TitleTarget({ tool, target, tabKey }: { tool: ToolCall; target: string; tabKey: string }) {
+  const path = tool.args?.path;
+  if (!FILE_TOOLS.includes(tool.name) || typeof path !== 'string' || !path) {
+    return <code className="tool-target">{target}</code>;
+  }
+  return (
+    <button className="tool-path" title={`在右栏打开 ${target}`} data-testid="tool-path"
+      onClick={(event) => { event.preventDefault(); openFile(tabKey, path); }}>
+      <code className="tool-target">{target}</code>
+    </button>
+  );
+}
+
 /** @brief 一张工具卡。 */
-export const ToolCard = memo(function ToolCard({ tool, cwd }: { tool: ToolCall; cwd: string }) {
+export const ToolCard = memo(function ToolCard({ tool, cwd, tabKey }: { tool: ToolCall; cwd: string; tabKey: string }) {
   const now = useNow(tool.status === 'running');
   const [open, setOpen] = useState(false);
   const title = toolTitle(tool, cwd);
   return (
     <details className={`tool-card status-${tool.status}`} data-testid="tool-card" data-status={tool.status}
       onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>
+      <summary data-no-quote>
         <span className="tool-title">
           <span className="tool-verb">{title.verb}</span>
-          {title.target && <code className="tool-target">{title.target}</code>}
+          {title.target && <TitleTarget tool={tool} target={title.target} tabKey={tabKey} />}
           {title.suffix && <span className="tool-suffix">{title.suffix}</span>}
         </span>
         {tool.allowedBy && <span className="tool-badge" data-testid="tool-badge">{badgeText[tool.allowedBy]}</span>}

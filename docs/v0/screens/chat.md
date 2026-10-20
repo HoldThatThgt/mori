@@ -20,11 +20,12 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 空会话 | 新建的会话，还没有消息 | 项目名，以及"Enter 发送 · Shift+Enter 换行" | 输入 |
-| 你的消息 | pi `message_start`（role=user），含插话和排队消息被送达时 | 右侧气泡，保留换行 | 选中文字 |
+| 你的消息 | pi `message_start`（role=user），含插话和排队消息被送达时 | 右侧气泡，保留换行；带引用时引用显示在气泡上方（M4，见 [selection.md](selection.md)） | 点引用回到原位置 |
 | 等待回复 | pi `message_start`（role=assistant）之后还没有任何增量 | 只有阶段行变化，对话流不出现空气泡 | — |
 | 思考流入 | `thinking_start` / `thinking_delta` | "思考"折叠块，流入时展开，文字逐段出现 | 收起 |
 | 正文开始 | 同一条回复出现 `text_start` / `toolcall_start`，或回复结束（`message_end`） | 之前的思考块自动折叠；正文按 Markdown 渲染（代码块高亮、表格、列表） | 再次展开思考 |
-| 正文流入 | `text_delta` | 文字逐段出现，不打断你的输入、选区和滚动位置 | 选中文字 |
+| 正文流入 | `text_delta` | 文字逐段出现，不打断你的输入、选区和滚动位置 | 选中文字（M4 起出"问 Mori / 反馈"浮层，见 selection.md） |
+| 一轮结束（M4） | 本轮不在生成、这一轮有正文 | 这一轮最后一条助手回复下：复制、引用到输入框、反馈这条回复（见 selection.md） | Tab、Enter |
 | 工具调用 | `toolcall_*`、`tool_execution_*` | 工具卡，按调用顺序排在这条回复里（见 tool-cards.md） | 展开、收起 |
 | 已压缩 | `compaction_end`（有 result 且没有中止）；会话记录里的 compaction 条目 | 一行"已压缩较早的对话" | — |
 | 已停止 | `agent_settled` 且 `aborted` 为真，或你按了停止之后本轮结束 | 一行"已停止 · 已经做出的修改不会自动撤销" | — |
@@ -65,7 +66,8 @@
 M2 起，有挂起的批准卡时，后台进程在 `abort` 里先把它按拒绝处理（工具卡"已拒绝 · 你按了停止"），等 pi 记下拒绝后再停止。
 
 Esc 的顺序：先关闭最上层的浮层、菜单或对话框（"排队发送"的下拉、权限菜单、切到"全部允许"的确认框、F8 报告框；
-M3 起还有会话的右键菜单、改名框、删除确认框、信任询问，见 [sessions.md](sessions.md)）；
+M3 起还有会话的右键菜单、改名框、删除确认框、信任询问，见 [sessions.md](sessions.md)；M4 起还有选区浮层和反馈表单，
+见 [selection.md](selection.md)。选区浮层不挡 Alt+数字和 Ctrl+N）；
 焦点在批准卡上时只拒绝这张卡（见 approval.md）；没有浮层、当前显示的是会话面板且正在生成时才停止。
 
 ## 错误

@@ -27,6 +27,23 @@ export function displayPath(path: string, cwd: string): string {
   return path;
 }
 
+/**
+ * @brief 比较两个路径是否指同一个文件用的写法：去掉开头的 @、Git Bash 的 /c/... 换成 c:/...、相对路径接在工作目录后面、
+ *        去掉 . 和 ..，统一斜杠、不分大小写（与主进程按 pi 规则解析的结果一致；~ 开头的不展开，界面拿不到用户目录）。
+ */
+export function pathKey(path: string, cwd: string): string {
+  let normalized = path.trim().replace(/^@/, '').replace(/\\/g, '/');
+  const drive = /^\/(?:mnt\/|cygdrive\/)?([a-z])(\/.*)?$/i.exec(normalized);
+  if (drive && !normalized.startsWith('//')) normalized = `${drive[1]}:${drive[2] ?? '/'}`;
+  if (!/^[a-z]:\//i.test(normalized)) normalized = `${cwd.replace(/\\/g, '/').replace(/\/+$/, '')}/${normalized}`;
+  const parts: string[] = [];
+  for (const part of normalized.split('/')) {
+    if (part === '..') parts.pop();
+    else if (part && part !== '.') parts.push(part);
+  }
+  return parts.join('/').toLowerCase();
+}
+
 /** @brief 命令只取第一行并截断。 */
 function commandLine(command: string): string {
   const lines = command.trim().split(/\r?\n/);

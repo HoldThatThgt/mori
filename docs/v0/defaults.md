@@ -24,12 +24,12 @@
 | 界面重新加载后列出的还没保存的会话 | 后台进程里开着、会话文件还不存在的会话补在 `session.list` 后面，最后活动时间取打开它的时刻 | `app/src/kernel/sessions.ts` `unsavedLive` | pi 的列表只读会话文件；不列出就点不回这个会话 | 你走查时 |
 | 侧栏排序 | 按最后一条你的消息或助手回复的时间，项目按其中最新的会话 | `app/src/renderer/src/components/sessionRows.ts` `groupRows` | 与 pi 会话列表的 `modified` 同一规则 | 你走查时觉得顺序乱跳再调 |
 | 改名：起过名字后不能清除 | 名字为空时什么都不写 | `app/src/renderer/src/components/SessionEdits.tsx` `useRename` | 方案没有要求清除；pi 的会话选择器同样不能清除 | 你走查时 |
-| 草稿存放 | 本机 `localStorage`（`mori.drafts`），按会话文件；不按会话列表清理 | `app/src/renderer/src/state/drafts.ts` | 方案第 6 节"界面状态（……各会话草稿）"；pi 读不出会话目录时列表为空，按它清理会误删全部草稿 | M4（引用芯片） |
+| 草稿存放 | 本机 `localStorage`：文字在 `mori.drafts`，引用芯片在 `mori.draftRefs`（M4），都按会话文件；不按会话列表清理 | `app/src/renderer/src/state/drafts.ts` | 方案第 6 节"界面状态（……各会话草稿）"；pi 读不出会话目录时列表为空，按它清理会误删全部草稿；芯片另存一个键，M3 存下的文字草稿不用转换 | 你走查时 |
 | 退出时等后台进程释放会话 | 3 秒 | `app/src/main/kernel-process.ts` `SHUTDOWN_TIMEOUT_MS` | 超时后直接结束后台进程的作业（后台进程和它启动的所有进程）；M1 没有发现需要调整的情况 | M6 |
 | 兼容选项列表 | 端点不支持 developer 角色（`supportsDeveloperRole: false`）、不接受 store（`supportsStore: false`）、最大输出用 `max_tokens`（`maxTokensField`）、不支持流式用量（`supportsUsageInStreaming: false`）、不支持 strict 模式（`supportsStrictMode: false`）、工具结果需要带工具名（`requiresToolResultName: true`） | `app/src/shared/protocol.ts` `COMPAT_OPTIONS` | 方案 5.2 要求每项配中文说明；挑的是 OpenAI 兼容端点最常见的几处差异，与思考有关的（需要 `reasoning: true` 才生效）留到 M6 | 拿到内网端点时 |
 | 错误卡附"去设置"的文字匹配 | 原文含 `401`、`unauthorized` 或 `api key`（不区分大小写） | `app/src/renderer/src/components/Transcript.tsx` `SETTINGS_HINT` | 方案 5.8；其他错误附"把上一条消息放回输入框" | 拿到内网端点的错误原文时 |
 | 从会话记录载入时识别"你按过停止" | 工具结果以 `Command aborted` / `Operation aborted` 结尾，或回复的错误原文以 `This operation was aborted` / `Request was aborted` / `Operation aborted` 开头 | `app/src/renderer/src/state/history.ts` `ABORTED_TOOL`、`ABORTED_REPLY` | 实时运行时按你按了停止判断；pi 的会话记录里没有"被停止"的标记，停止后的回复记为 `stopReason: error`，只能看原文 | pi 升级时复查原文 |
-| 工具卡展开后输出最多显示 | 最后 20,000 字 | `app/src/renderer/src/components/ToolCard.tsx` `OUTPUT_MAX` | 避免超长输出卡住渲染；pi 的命令输出本身已截到 50KB 左右 | M4（文件阅读器） |
+| 工具卡展开后输出最多显示 | 最后 20,000 字 | `app/src/renderer/src/components/ToolCard.tsx` `OUTPUT_MAX` | 避免超长输出卡住渲染；pi 的命令输出本身已截到 50KB 左右；M4 的文件阅读器只看文件，不改这里 | 你走查时 |
 | "在底部"的判定 | 离底部不超过 24px | `app/src/renderer/src/components/Transcript.tsx` `BOTTOM_SLACK` | 小于一行字，滚轮停在差几像素处也算在底部 | 你走查时觉得跟随不对再调 |
 | 输入框最高 | 220px，之后在框内滚动 | `app/src/renderer/src/components/Composer.tsx` `MAX_INPUT_HEIGHT` | 约 9 行；再高会挤掉对话流 | 同上 |
 | 一条回复里的多个工具调用按顺序执行 | pi 的 `toolExecution: "sequential"`（pi 默认是 `parallel`） | `app/src/kernel/sessions.ts` `startSession` | pi 默认并行时，一条回复里的调用先逐个经过批准处理器，全部放行后才一起执行：允许第一张卡后它并不马上执行，要等后面的卡也答复，而且多条命令会同时运行。按顺序执行时允许一张就执行一张，你看到上一条的结果再决定下一张（方案 5.7"逐张出卡"） | M2 签收时请你确认；只读工具多时可能变慢 |
@@ -38,4 +38,11 @@
 | 拒绝时回给模型的工具结果 | `Rejected by the user.`；写了理由时 `Rejected by the user. Reason: <理由>`；你按了停止时 `Rejected: the user stopped the run.` | `app/src/shared/protocol.ts` `REJECTED_*` | pi 把扩展给的 reason 原样作为工具结果；固定写法让模型明白是你拒绝的，从会话记录载入时也能据此显示"已拒绝" | 内网模型对英文提示的理解不好时 |
 | 界面问题报告的保存位置 | `<userData>/ui-issues/<YYYY-MM-DD-HHmmss>.md` 和同名 `.png` | `app/src/main/feedback.ts` | 一个文件夹里平铺，"打开所在文件夹"就能看到全部报告；M7 的收件箱读同一个文件夹 | M7 |
 | 界面问题报告里"最近的操作"的条数 | 30 条（只在本次运行的内存里） | `app/src/renderer/src/state/actionLog.ts` `ACTION_LOG_SIZE` | 够看清出问题前做了什么，文件不会太长 | 你用 F8 时觉得不够再调 |
-| 右栏在出现改动时自动打开 | 本会话第一次有编辑或写入结果时打开；你手动开关之后以你为准 | `app/src/renderer/src/App.tsx` `Workspace` | 方案 5.9 只说"没有改动时默认收起"，有改动时按"默认打开"理解 | M4 |
+| 右栏在出现改动时自动打开 | 本会话第一次有编辑或写入结果时打开；你手动开关之后以你为准 | `app/src/renderer/src/App.tsx` `Workspace` | 方案 5.9 只说"没有改动时默认收起"，有改动时按"默认打开"理解；M4 沿用 | 你走查时 |
+| 发给模型的引用块 | 每个芯片一段："引用 <路径> 第 a–b 行："（回复里的是"引用你之前的回复："），下面每行原文前加 `> `，段之间空一行，之后空一行接你的文字 | `app/src/renderer/src/state/quotes.ts` `quoteBlock`、`composePrompt` | 模型要看到原文才能回答；Markdown 引用格式各家模型都认识；显示时按同一格式认出引用块、只在气泡里留你写的字 | 内网模型对引用的理解不好时 |
+| 对内容的反馈保存位置 | `<userData>/feedback/<YYYY-MM-DD-HHmmss>.json`，每份一个文件 | `app/src/main/feedback.ts` `feedbackDir` | 与 F8 的报告放在同一个数据目录下；JSON 带锚点，M7 的工作回顾读同一个文件夹 | M7 |
+| 阅读器语法高亮的上限 | 不超过 200KB 的文件按扩展名高亮，更大的只显示原文 | `app/src/renderer/src/components/FileViewer.tsx` `HIGHLIGHT_MAX` | 你要求不拿内存和 CPU 换性能（2026-10-20）；高亮的缓存由 @streamdown/code 自己限量 | 你走查时觉得慢再调 |
+| 判断二进制文件 | 开头 8000 字节里有 0 字节 | `app/src/main/files.ts` `BINARY_PROBE_BYTES` | 与 git 的做法相同 | 遇到误判时 |
+| "用系统编辑器打开"时当作会被运行的文件 | 扩展名在 `PATHEXT` 里，或是 .com .exe .bat .cmd .vbs .vbe .js .jse .wsf .wsh .msc .ps1 .psm1 .py .pyw .lnk .url .hta .msi .msp .scr .cpl .reg .jar .appref-ms .application .website .settingcontent-ms；这些改为在资源管理器里选中 | `app/src/main/files.ts` `RUNNABLE` | Windows 的"打开"对这类文件就是运行，文件可能是模型刚写的；Electron 没有"编辑"动作 | 你觉得哪类文件该能直接打开时 |
+| 在文件里找引用的原文 | 最多看 1000 处出现的地方，取离原来的行最近的一处 | `app/src/renderer/src/state/quotes.ts` `SEARCH_MAX` | 很短的原文在大文件里会出现很多次，不让一次点击无限地搜下去 | 你走查时 |
+| 几个提示停留的时间 | 回到原位置的高亮约 4 秒；"已记录"约 3 秒后关闭表单；"已复制"约 2 秒 | `quoteHighlight.ts` `HIGHLIGHT_MS`、`FeedbackForm.tsx` `SAVED_MS`、`ReplyActions.tsx` `COPIED_MS` | 看得见、又不一直挡着 | 你走查时 |

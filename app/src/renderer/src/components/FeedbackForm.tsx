@@ -1,0 +1,105 @@
+// 反馈表单（docs/v0/screens/selection.md "反馈"）：只问"希望得到什么结果？"，只记录、不发给模型。
+// 主进程把它存成 <userData>/feedback/<时间>.json；保存失败时保留写好的字。在根组件旁挂一次。
+
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { closeFeedback, useFeedbackForm, type FeedbackRequest } from '../state/feedbackForm';
+import { useOverlay } from '../state/overlays';
+import { useApp } from '../state/store';
+import { describe } from '../state/bridge';
+import { sessionTitle } from './ChatPane';
+
+/** "已记录"停留的毫秒数 */
+const SAVED_MS = 3000;
+const GAP = 8;
+const MARGIN = 12;
+
+/** @brief 表单的位置：锚点下方，放不下时上方，夹在窗口里。 */
+function placement(anchor: FeedbackRequest['anchor'], box: HTMLElement): { left: number; top: number } {
+  const height = box.offsetHeight;
+  const width = box.offsetWidth;
+  const below = anchor.bottom + GAP;
+  const top = below + height <= window.innerHeight - MARGIN ? below : anchor.top - height - GAP;
+  return { left: Math.max(MARGIN, Math.min(anchor.left, window.innerWidth - width - MARGIN)),
+    top: Math.max(MARGIN, Math.min(top, window.innerHeight - height - MARGIN)) };
+}
+
+/** @brief 保存这份反馈；失败时抛错。 */
+async function save(request: FeedbackRequest, expected: string): Promise<void> {
+  const tab = useApp.getState().tabs.find((item) => item.key === request.tabKey);
+  const session = { file: tab?.sessionFile ?? null, cwd: tab?.cwd ?? '', title: tab ? sessionTitle(tab) : '' };
+  await window.mori.saveFeedback({ expected: expected.trim(), quote: request.ref.quote, source: request.ref.source,
+    session });
+}
+
+/** @brief 表单里写字的部分：引用的原文、输入框、说明、错误、按钮。 */
+function Editing({ quote, saving, error, onSubmit }: {
+  quote: string; saving: boolean; error: string | null; onSubmit: (expected: string) => void;
+}) {
+  const [expected, setExpected] = useState('');
+  return (
+    <>
+      <blockquote className="feedback-quote">{quote}</blockquote>
+      <label className="feedback-label">希望得到什么结果？
+        <textarea rows={3} value={expected} autoFocus disabled={saving} data-testid="feedback-input"
+          onChange={(event) => setExpected(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || !event.ctrlKey) return;
+            event.preventDefault();
+            if (expected.trim()) onSubmit(expected);
+          }} />
+      </label>
+      <p className="feedback-note">只记录，不会发给模型；想让它改，用"问 Mori"</p>
+      {error && <p className="form-message error" role="alert" data-testid="feedback-error">没有记录：{error}</p>}
+      <div className="feedback-actions">
+        <button className="button" disabled={saving} onClick={closeFeedback}>取消</button>
+        <button className="button primary" disabled={!expected.trim() || saving}
+          onClick={() => onSubmit(expected)}>{saving ? '保存中…' : '记录'}</button>
+      </div>
+    </>
+  );
+}
+
+/** @brief 一次反馈的表单：写字 → 保存中 → 已记录（约 3 秒后关闭）；保存失败回到写字，字还在。 */
+function Form({ request }: { request: FeedbackRequest }) {
+  const [phase, setPhase] = useState<'editing' | 'saving' | 'saved'>('editing');
+  const [error, setError] = useState<string | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  useOverlay(true, () => (phase === 'saving' ? false : closeFeedback()));
+  useLayoutEffect(() => {
+    if (box.current) setPosition(placement(request.anchor, box.current));
+  }, [request, phase]);
+  useEffect(() => {
+    if (phase !== 'saved') return;
+    const timer = setTimeout(closeFeedback, SAVED_MS);
+    return () => clearTimeout(timer);
+  }, [phase]);
+  async function submit(expected: string) {
+    if (phase !== 'editing') return;
+    setPhase('saving');
+    setError(null);
+    try {
+      await save(request, expected);
+      setPhase('saved');
+    } catch (failure) {
+      setError(describe('saveFeedback', failure));
+      setPhase('editing');
+    }
+  }
+  return (
+    <div ref={box} className="feedback-form" role="dialog" aria-label="反馈" data-testid="feedback-form"
+      style={{ left: position?.left ?? -9999, top: position?.top ?? -9999 }}>
+      {phase === 'saved'
+        ? <p className="feedback-saved" role="status" data-testid="feedback-saved">已记录 · 在工作回顾中查看</p>
+        : <Editing quote={request.ref.quote} saving={phase === 'saving'} error={error}
+          onSubmit={(expected) => void submit(expected)} />}
+    </div>
+  );
+}
+
+/** @brief 反馈表单：有反馈请求时显示；每次打开换一个表单。 */
+export function FeedbackForm() {
+  const { request, seq } = useFeedbackForm();
+  if (!request) return null;
+  return <Form key={seq} request={request} />;
+}

@@ -39,7 +39,7 @@ export async function handleCommand(command: Command, emit: (envelope: EventEnve
     case 'ui.answer':
       return answerQuestion(command.sessionId, command.requestId, command.value);
     case 'session.prompt':
-      return prompt(command.sessionId, command.text, command.behavior, emit);
+      return prompt(command.sessionId, command.text, { behavior: command.behavior, refs: command.refs }, emit);
     case 'session.clearQueue':
       return clearQueue(command.sessionId);
     case 'session.abort':

@@ -18,7 +18,7 @@ function Thinking({ block }: { block: Extract<Block, { type: 'thinking' }> }) {
   const open = chosen ?? block.streaming;
   return (
     <details className="thinking" open={open} data-testid="thinking">
-      <summary onClick={(event) => { event.preventDefault(); setChosen(!open); }}>
+      <summary data-no-quote onClick={(event) => { event.preventDefault(); setChosen(!open); }}>
         {block.streaming ? '思考中…' : '思考'}
       </summary>
       <div className="thinking-text">{block.text}</div>
@@ -36,19 +36,22 @@ const Markdown = memo(function Markdown({ text }: { text: string }) {
   );
 });
 
-/** @brief 一条助手回复。 */
-export const AssistantMessage = memo(function AssistantMessage(
-  { item, tools, cwd }: { item: Extract<Item, { kind: 'assistant' }>; tools: Record<string, ToolCall>; cwd: string },
-) {
+/**
+ * @brief 一条助手回复（pi 的一条助手消息）。整条是一个引用来源：选区起止都在这里时出"问 Mori / 反馈"浮层
+ *        （docs/v0/screens/selection.md）。
+ */
+export const AssistantMessage = memo(function AssistantMessage({ item, tools, cwd, tabKey }: {
+  item: Extract<Item, { kind: 'assistant' }>; tools: Record<string, ToolCall>; cwd: string; tabKey: string;
+}) {
   const visible = item.blocks.filter((block) => block.type === 'tool' || block.text.trim());
   if (visible.length === 0) return null;
   return (
-    <div className="assistant-message" data-testid="assistant">
+    <div className="assistant-message" data-testid="assistant" data-quote-source="message" data-item-key={item.key}>
       {item.blocks.map((block, index) => {
         if (block.type === 'thinking') return block.text.trim() ? <Thinking key={index} block={block} /> : null;
         if (block.type === 'text') return block.text.trim() ? <Markdown key={index} text={block.text} /> : null;
         const tool = tools[block.id];
-        return tool ? <ToolCard key={block.id} tool={tool} cwd={cwd} /> : null;
+        return tool ? <ToolCard key={block.id} tool={tool} cwd={cwd} tabKey={tabKey} /> : null;
       })}
     </div>
   );

@@ -6,7 +6,7 @@ import type { ExtensionNotice, OpenedSession, SavedSession, SessionInfo, TrustAn
 import { recordAction } from './actionLog';
 import { describe, request } from './bridge';
 import { saveArchived } from './archive';
-import { dropDraft, savedDraft } from './drafts';
+import { dropDraft, savedDraft, savedDraftRefs } from './drafts';
 import { attachLive, transcriptFromEntries } from './history';
 import { emptyTranscript, pushItem, startIndexFor, type Transcript } from './model';
 import { activeTab, newTab, sameFile, tabByFile, updateTab, useApp, type AppState, type Tab } from './store';
@@ -112,7 +112,7 @@ export async function openSaved(saved: SavedSession): Promise<void> {
   recordAction('打开会话');
   useApp.setState((state) => ({ rowMarks: withoutMark(state.rowMarks, saved.sessionFile) }));
   const tab = newTab(saved.cwd, { sessionFile: saved.sessionFile, name: saved.name, preview: saved.firstMessage,
-    activity: saved.modified, draft: savedDraft(saved.sessionFile) });
+    activity: saved.modified, draft: savedDraft(saved.sessionFile), draftRefs: savedDraftRefs(saved.sessionFile) });
   addTab(tab);
   try {
     const trust = saved.live ? undefined : await trustFor(saved.cwd);
