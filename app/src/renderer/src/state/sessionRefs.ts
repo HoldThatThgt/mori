@@ -9,6 +9,7 @@ import {
 import { displayPath, toolTitleText } from '../components/toolTitle';
 import { blocksFromContent, contentText } from './model';
 import { charCount, stripQuotes, turnsText } from './quoteText';
+import { skillCommandText } from './skillText';
 
 export { approxChars, charCount } from './quoteText';
 
@@ -42,7 +43,7 @@ function refMarker(ref: QuoteRef, cwd: string): string {
 
 /** @brief 你的消息的几行：你写的字（带引用时去掉引用块），每个引用一行标记。 */
 function userLines(text: string, refs: QuoteRef[] | undefined, cwd: string): string[] {
-  const own = refs?.length ? stripQuotes(text, refs, cwd) ?? text : text;
+  const own = skillCommandText(refs?.length ? stripQuotes(text, refs, cwd) ?? text : text);
   return [`用户：${own.trim()}`, ...(refs ?? []).map((ref) => refMarker(ref, cwd))];
 }
 

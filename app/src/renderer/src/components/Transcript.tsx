@@ -1,11 +1,13 @@
 // 对话流：先显示最近 50 条消息，滚到顶部时载入更早的；你在底部时跟随新内容，不在底部时显示"有新内容 ↓"。
 // M4：你的消息上方显示引用，每轮回复末尾一行操作，点引用回到原位置时滚过去高亮（docs/v0/screens/selection.md）。
+// M6：pi 展开的技能命令缩成一行"技能 · 名字"加参数，可以展开看正文（docs/v0/screens/slash.md）。
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { openSettings, putBack, putBackQuoted } from '../state/actions';
 import { PAGE_SIZE, startIndexFor } from '../state/model';
 import type { Item, ToolCall } from '../state/model';
 import { stripQuotes } from '../state/quotes';
+import { parseSkillInvocation, type SkillInvocation } from '../state/skillText';
 import { updateTab, type Tab } from '../state/store';
 import { replyTurns, type ReplyTurn } from '../state/turns';
 import { Icon } from '../icons';
@@ -36,10 +38,41 @@ function ErrorCard({ item, tabKey }: { item: Extract<Item, { kind: 'error' }>; t
   );
 }
 
-/** @brief 你的消息：带引用时引用显示在气泡上方，气泡里只有你写的字；引用块对不上时按原文显示。 */
+/**
+ * @brief 技能调用（照 pi 终端 SkillInvocationMessageComponent）：气泡里一行"技能 · 名字"，下面是你写的参数；
+ *        "展开"看 SKILL.md 的路径和技能正文。
+ */
+function SkillMessage({ skill }: { skill: SkillInvocation }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="user-message skill-invocation" data-testid="skill-invocation" data-skill={skill.name}>
+      <div className="skill-head">
+        <span className="skill-label">技能 · {skill.name}</span>
+        <button className="text-link skill-toggle" aria-expanded={open} data-no-quote
+          onClick={() => setOpen(!open)}>{open ? '收起' : '展开'}</button>
+      </div>
+      {skill.args && <div className="skill-args">{skill.args}</div>}
+      {open && (
+        <div className="skill-body">
+          <div className="skill-location">{skill.location}</div>
+          {skill.body}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * @brief 你的消息：带引用时引用显示在气泡上方，气泡里只有你写的字；引用块对不上时按原文显示。
+ *        pi 展开的技能命令显示成技能调用（带引用的消息 pi 不展开，不会是技能调用）。
+ */
 function UserMessage({ item, cwd, tabKey }: { item: Extract<Item, { kind: 'user' }>; cwd: string; tabKey: string }) {
   const own = item.refs?.length ? stripQuotes(item.text, item.refs, cwd) : null;
-  if (!item.refs || own === null) return <div className="user-message" data-testid="user-message">{item.text}</div>;
+  if (!item.refs || own === null) {
+    const skill = parseSkillInvocation(item.text);
+    if (skill) return <SkillMessage skill={skill} />;
+    return <div className="user-message" data-testid="user-message">{item.text}</div>;
+  }
   return (
     <div className="user-turn">
       <SentQuotes refs={item.refs} tabKey={tabKey} cwd={cwd} />

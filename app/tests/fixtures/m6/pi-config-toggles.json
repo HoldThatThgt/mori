@@ -1,0 +1,169 @@
+{
+  "pi": "1.3.0",
+  "steps": [
+    {
+      "scope": "global",
+      "kind": "skills",
+      "path": "data/pi/skills/user-skill/SKILL.md",
+      "what": "停用用户级技能"
+    },
+    {
+      "scope": "global",
+      "kind": "skills",
+      "path": "pkg/skills/package-review/SKILL.md",
+      "what": "停用包里的技能"
+    },
+    {
+      "scope": "global",
+      "kind": "prompts",
+      "path": "data/pi/prompts/user-prompt.md",
+      "what": "停用用户级提示词模板"
+    },
+    {
+      "scope": "global",
+      "kind": "skills",
+      "path": "data/pi/skills/user-skill/SKILL.md",
+      "what": "重新启用用户级技能"
+    },
+    {
+      "scope": "project",
+      "kind": "skills",
+      "path": "project/.pi/skills/proj-skill/SKILL.md",
+      "what": "停用项目技能"
+    },
+    {
+      "scope": "project",
+      "kind": "skills",
+      "path": "project/.pi/skills/proj-skill/SKILL.md",
+      "what": "重新启用项目技能"
+    }
+  ],
+  "snapshots": [
+    {
+      "what": "加入本地包之后",
+      "user": {
+        "packages": [
+          "..\\..\\pkg"
+        ]
+      },
+      "project": null
+    },
+    {
+      "what": "停用用户级技能",
+      "user": {
+        "packages": [
+          "..\\..\\pkg"
+        ],
+        "skills": [
+          "-skills\\user-skill\\SKILL.md"
+        ]
+      },
+      "project": null
+    },
+    {
+      "what": "停用包里的技能",
+      "user": {
+        "packages": [
+          {
+            "source": "..\\..\\pkg",
+            "skills": [
+              "-skills\\package-review\\SKILL.md"
+            ]
+          }
+        ],
+        "skills": [
+          "-skills\\user-skill\\SKILL.md"
+        ]
+      },
+      "project": null
+    },
+    {
+      "what": "停用用户级提示词模板",
+      "user": {
+        "packages": [
+          {
+            "source": "..\\..\\pkg",
+            "skills": [
+              "-skills\\package-review\\SKILL.md"
+            ]
+          }
+        ],
+        "skills": [
+          "-skills\\user-skill\\SKILL.md"
+        ],
+        "prompts": [
+          "-prompts\\user-prompt.md"
+        ]
+      },
+      "project": null
+    },
+    {
+      "what": "重新启用用户级技能",
+      "user": {
+        "packages": [
+          {
+            "source": "..\\..\\pkg",
+            "skills": [
+              "-skills\\package-review\\SKILL.md"
+            ]
+          }
+        ],
+        "skills": [
+          "+skills\\user-skill\\SKILL.md"
+        ],
+        "prompts": [
+          "-prompts\\user-prompt.md"
+        ]
+      },
+      "project": null
+    },
+    {
+      "what": "停用项目技能",
+      "user": {
+        "packages": [
+          {
+            "source": "..\\..\\pkg",
+            "skills": [
+              "-skills\\package-review\\SKILL.md"
+            ]
+          }
+        ],
+        "skills": [
+          "+skills\\user-skill\\SKILL.md"
+        ],
+        "prompts": [
+          "-prompts\\user-prompt.md"
+        ]
+      },
+      "project": {
+        "skills": [
+          "-skills\\proj-skill\\SKILL.md"
+        ]
+      }
+    },
+    {
+      "what": "重新启用项目技能",
+      "user": {
+        "packages": [
+          {
+            "source": "..\\..\\pkg",
+            "skills": [
+              "-skills\\package-review\\SKILL.md"
+            ]
+          }
+        ],
+        "skills": [
+          "+skills\\user-skill\\SKILL.md"
+        ],
+        "prompts": [
+          "-prompts\\user-prompt.md"
+        ]
+      },
+      "project": {
+        "skills": [
+          "+skills\\proj-skill\\SKILL.md"
+        ]
+      }
+    }
+  ]
+}

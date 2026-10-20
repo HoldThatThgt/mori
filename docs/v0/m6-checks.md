@@ -1,7 +1,7 @@
 # M6 检查记录（设置与工具页）
 
 日期：2026-10-20。机器：Windows 11（10.0.26300），Node 24.19.0；Electron 44.9.0；pi 1.3.0。
-分支 `claude/m6-settings-tools-c46a07`（基于 M5 的 `5f484e8`，M5 还没有合并进 `app-v0`）。
+分支 `claude/m6-settings-tools-c46a07`（基于 `app-v0` 的 `9240114`，即 M5 合并之后；开工时基于 M5 的 `5f484e8`，两者内容相同，你让 M5 先合并后改到 `app-v0` 上）。
 
 ## 状态
 

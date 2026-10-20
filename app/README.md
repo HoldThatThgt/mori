@@ -9,8 +9,10 @@ M3：左栏的项目 → 会话树、新建 / 打开 / 改名 / 归档 / 删除�
 扩展的询问；界面重新加载后接上还在运行的会话（[检查记录](../docs/v0/m3-checks.md)）。
 M4：右栏的改动列表与只读文件阅读器、选区"问 Mori"（引用芯片、回到原位置）与"反馈"、回复下的复制 / 引用 / 反馈
 （[检查记录](../docs/v0/m4-checks.md)）。
-当前处于 M5：左右分屏（拖会话到中栏、右键菜单、焦点所在的一栏、分屏中线）与会话引用（拖会话进输入框、按轮预览与调整范围、
+M5：左右分屏（拖会话到中栏、右键菜单、焦点所在的一栏、分屏中线）与会话引用（拖会话进输入框、按轮预览与调整范围、
 发出后跳回原会话）（[检查记录](../docs/v0/m5-checks.md)）。
+当前处于 M6：设置页（多个连接与模型、默认模型、思考强度、用户级 AGENTS.md）、顶栏按会话换模型和思考强度、
+工具页（内置工具、技能、MCP、插件）、输入框的"/"补全（[检查记录](../docs/v0/m6-checks.md)）。
 
 ## 准备
 
@@ -56,6 +58,9 @@ npm ci
 | `node tests/ui/m5-record.mjs --source <走查数据目录> [--only …]` | 从真实会话录制 `tests/fixtures/m5/`（两栏各自批准、只停一栏、引用第 3–5 轮、重启后的引用、引用正在生成的会话、超过 2 万字）；引用的全文用界面的代码算（esbuild 打包 `sessionRefs.ts`） |
 | `npm run test:m5-replay` | M5 界面测试：回放 `tests/fixtures/m5/`（带会话引用的消息连全文和 refs 一起核对） |
 | `node tests/ui/m5-real.mjs --source <走查数据目录> [--exe …] [--only …]` | M5 真实端点走查（走查 1–6 与反例） |
+| `node tests/ui/m6-record.mjs --source <走查数据目录> [--only …]` | 从真实会话录制 `tests/fixtures/m6/`（换模型、思考强度、AGENTS.md、项目技能、MCP、插件、"/"命令） |
+| `node tests/ui/m6-pi-config.mjs [--check]` | 用 pi 自己的 `pi config` 组件录下启停的写法（`tests/fixtures/m6/pi-config-toggles.json`），M6 测试拿 Mori 的写入与它比较；`--check` 在 pi 升级时核对 |
+| `node tests/ui/m6-mcp-cost.mjs [--servers N] [--exe …]` | 测量打开 1、5、10 个会话时 MCP 服务的进程数和内存 |
 | `npx electron tests/prechecks/esm-utility/main.cjs` | 预检：utilityProcess 能否运行 ESM 入口 |
 | `npx electron tests/prechecks/job-object/main.cjs` | 预检：后台进程放进 Windows 作业对象后，它留下的孤儿进程能随作业一起结束 |
 | `node tests/ui/m0-real.mjs --user-data <目录> [--setup]` | 真实端点走查（M0 走查 2–3）；`--setup` 先打开 Mori 让你填连接，脚本不接触 key |

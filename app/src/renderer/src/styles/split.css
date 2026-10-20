@@ -120,12 +120,10 @@
 }
 .ref-turns .ref-stored { padding: 10px 14px; }
 
-/* 分屏时每一栏较窄：先藏项目名，再藏模型名、上下文用量，会话名不被挤掉（关闭分屏或拉宽这一栏后又会显示） */
+/* 分屏时每一栏较窄：先藏项目名，再藏模型和思考强度（chat.css，600px 以下），再藏上下文用量，会话名不被挤掉
+   （关闭分屏或拉宽这一栏后又会显示） */
 @container (max-width: 640px) {
   .center[data-split] .chat-project, .center[data-split] .breadcrumb > svg { display: none; }
-}
-@container (max-width: 560px) {
-  .center[data-split] .model-chip { display: none; }
 }
 @container (max-width: 400px) {
   .center[data-split] .usage-chip { display: none; }

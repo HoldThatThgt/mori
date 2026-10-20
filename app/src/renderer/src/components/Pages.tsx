@@ -1,7 +1,7 @@
-// 首次启动、设置页、还没有打开会话时的中栏。
+// 首次启动、还没有打开会话时的中栏。设置页在 SettingsPage.tsx。
 
 import { useState } from 'react';
-import { openFolder, showChat } from '../state/projects';
+import { openFolder } from '../state/projects';
 import { useApp } from '../state/store';
 import { BrandMark, Icon } from '../icons';
 import { ConnectionForm } from './ConnectionForm';
@@ -26,9 +26,13 @@ export function OpenFolderPrompt({ heading, detail, hint }: { heading: string; d
   );
 }
 
-/** @brief 首次启动：只有连接表单；测试成功后进入"打开文件夹…"。exited 为真时提示后台进程退出。 */
+/**
+ * @brief 首次启动：只有连接表单；测试成功后进入"打开文件夹…"。exited 为真时提示后台进程退出。
+ *        表单保存到第一个连接（还没有时新建），保存两次改的是同一个连接。
+ */
 export function FirstRun({ exited }: { exited: boolean }) {
   const [tested, setTested] = useState<string | null>(null);
+  const providerId = useApp((state) => state.config?.connections?.[0]?.providerId ?? null);
   return (
     <main className="first-run">
       <div className="first-run-card">
@@ -38,28 +42,10 @@ export function FirstRun({ exited }: { exited: boolean }) {
           <>
             <h2>连接模型</h2>
             <p className="muted">填好服务地址、API key 和模型 ID，先测试连接。</p>
-            <ConnectionForm onTested={(ok, text) => ok && setTested(text)} />
+            <ConnectionForm mode="full" providerId={providerId} onTested={(ok, text) => ok && setTested(text)} />
           </>
         )}
       </div>
     </main>
-  );
-}
-
-/** @brief 设置页：M1 只有"连接"。顶部"返回会话"。 */
-export function SettingsPage() {
-  const focus = useApp((state) => state.settingsFocus);
-  return (
-    <section className="settings-page" data-testid="settings-page">
-      <header className="topbar">
-        <button className="button" onClick={() => showChat()}><Icon name="back" />返回会话</button>
-        <span className="chat-title">设置</span>
-      </header>
-      <div className="settings-body">
-        <h2>连接</h2>
-        <p className="muted">保存后，已经打开的会话也用新的连接。</p>
-        <ConnectionForm focusKey={focus} />
-      </div>
-    </section>
   );
 }

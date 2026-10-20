@@ -25,7 +25,7 @@
   font-weight: 500;
 }
 .topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.model-chip, .usage-chip {
+.usage-chip {
   max-width: 160px;
   overflow: hidden;
   padding: 3px 8px;
@@ -550,14 +550,14 @@
   .composer-area { padding-left: 12px; padding-right: 12px; }
 }
 .chat-pane { container-type: inline-size; }
-/* 顶栏多了权限按钮：中栏较窄时按钮只留文字、模型名收短，会话名不被挤出去 */
-@container (max-width: 560px) {
-  .model-chip { max-width: 110px; }
+/* 顶栏有模型、思考强度、权限按钮：中栏较窄时权限按钮只留文字、模型名收短（models.css）；再窄时模型和思考强度
+   一起藏起，会话名不被挤出去（阈值按最宽的文字估算：模型名 120px、"思考：不可选"、"上下文 100%"） */
+@container (max-width: 720px) {
   .permission-button { padding: 3px 8px; }
   .permission-button svg { display: none; }
 }
-@container (max-width: 460px) {
-  .model-chip { display: none; }
+@container (max-width: 600px) {
+  .model-switch, .thinking-switch { display: none; }
   .topbar { padding-left: 16px; gap: 8px; }
 }
 

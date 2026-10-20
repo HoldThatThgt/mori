@@ -1,6 +1,6 @@
-// 左栏：品牌与收起、"新会话"（Ctrl+N）、"打开文件夹…"、项目 → 会话树（SessionTree）、报告界面问题（F8）、设置。
+// 左栏：品牌与收起、"新会话"（Ctrl+N）、"打开文件夹…"、"工具"（M6）、项目 → 会话树（SessionTree）、报告界面问题（F8）、设置。
 
-import { openSettings } from '../state/actions';
+import { openSettings, openTools } from '../state/actions';
 import { newSession, openFolder } from '../state/projects';
 import { isShown, sameFile, useApp, type AppState } from '../state/store';
 import { BrandMark, Icon } from '../icons';
@@ -55,6 +55,10 @@ export function Sidebar({ collapsed, floating, onToggle, onNavigate, children }:
         <button className="nav-item" onClick={() => void openFolder()} title={unavailable ?? '打开文件夹…'}
           aria-label="打开文件夹…" disabled={exited}>
           <Icon name="folder" /><span className="nav-label">打开文件夹…</span>
+        </button>
+        <button className={`nav-item${view === 'tools' ? ' active' : ''}`} onClick={openTools}
+          title={unavailable ?? '工具'} aria-label="工具" data-testid="nav-tools" disabled={exited}>
+          <Icon name="tools" /><span className="nav-label">工具</span>
         </button>
       </nav>
       <div className="sidebar-sessions">

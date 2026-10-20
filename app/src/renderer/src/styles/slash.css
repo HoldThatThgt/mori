@@ -1,1 +1,68 @@
-/* M6：slash（docs/v0/screens/slash.md）。 */
+/* M6：slash（docs/v0/screens/slash.md）。"/"补全列表浮在输入框上方、与输入框同宽；技能调用的气泡缩成一行。 */
+
+/* 列表以输入框定位 */
+.composer { position: relative; }
+.slash-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  max-height: min(320px, 45vh);
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--fs-body);
+}
+.slash-group + .slash-group { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--color-line); }
+.slash-group-label { padding: 4px 10px 2px; color: var(--color-faint); font-size: var(--fs-small); }
+.slash-option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+.slash-option[aria-selected='true'] { background: var(--color-hover); }
+.slash-name, .slash-hint {
+  flex-shrink: 0;
+  max-width: 50%;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slash-name { color: var(--color-text); }
+.slash-hint { color: var(--color-faint); font-size: var(--fs-small); }
+.slash-description {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slash-note { padding: 6px 10px; color: var(--color-faint); font-size: var(--fs-small); }
+.slash-note.slash-error { color: #a54a3a; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* 技能调用：一行"技能 · 名字"和"展开"，下面是你写的参数；展开后是 SKILL.md 的路径和正文 */
+.skill-head { display: flex; align-items: baseline; gap: 12px; }
+.skill-label { color: #4c638d; font-size: var(--fs-small); font-weight: 600; }
+.skill-args { margin-top: 4px; }
+.skill-body {
+  max-height: 320px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  overflow-y: auto;
+  border-radius: var(--radius-s);
+  background: var(--color-canvas);
+  color: var(--color-prose);
+  font-size: var(--fs-small);
+  line-height: 1.7;
+}
+.skill-location { margin-bottom: 6px; color: var(--color-faint); font-family: var(--font-mono); }

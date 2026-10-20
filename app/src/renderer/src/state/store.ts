@@ -185,7 +185,8 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
   return { key: `t${tabCounter}`, sessionId: null, cwd, sessionFile: null, name: null, preview: null,
     activity: Date.now(), unseen: false, interrupted: false, projectTrust: 'none', trustRemembered: false,
     trustSaveError: null, extensionErrors: [], model: null,
-    modelNotice: null, thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, contextUsage: null, approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '',
+    modelNotice: null, thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, contextUsage: null,
+    approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '',
     draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
     refPending: [], phase: 'opening', error: null, ...fields };
 }

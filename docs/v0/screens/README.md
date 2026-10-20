@@ -1,7 +1,7 @@
 # 屏幕状态表
 
 每屏一张状态表：状态 ｜ 来源 ｜ 必须可见 ｜ 可做的操作。实现该屏之前写好，实现与测试都以它为准。
-"来源"只能是 pi 的事件、pi SDK 的返回值、批准扩展的请求（M2 起）、主进程的系统操作结果（M3 起：删除会话文件；M4 起：读文件、用系统程序打开、写剪贴板、保存反馈），或你刚做的操作；没有来源的状态不显示。
+"来源"只能是 pi 的事件、pi SDK 的返回值、批准扩展的请求（M2 起）、主进程的系统操作结果（M3 起：删除会话文件；M4 起：读文件、用系统程序打开、写剪贴板、保存反馈），pi 的配置文件（M6 起：后台进程读写 `models.json`、`settings.json`、`mcp.json`、`AGENTS.md`），或你刚做的操作；没有来源的状态不显示。
 
 | 文件 | 内容 | 里程碑 |
 | --- | --- | --- |
@@ -17,6 +17,10 @@
 | [selection.md](selection.md) | 选区浮层、问 Mori 的引用芯片与回到原位置、反馈、回复下的操作 | M4 |
 | [split.md](split.md) | 左右分屏：拖会话到中栏、焦点所在的一栏、分屏中线、右栏跟随焦点与收起、关闭一栏 | M5 |
 | [session-refs.md](session-refs.md) | 会话引用：拖会话进输入框、按轮预览与调整范围、发出后跳回原会话、原会话已删除 | M5 |
+| [settings.md](settings.md) | 设置页：连接与多个模型、默认模型、支持思考与新会话默认的思考强度、用户级 AGENTS.md、离开时有未保存的改动 | M6 |
+| [models.md](models.md) | 顶栏的模型菜单与思考强度（每一栏各一组） | M6 |
+| [tools.md](tools.md) | 工具页：内置工具、技能、MCP、插件（pi 包）；启停照 pi config 的写法 | M6 |
+| [slash.md](slash.md) | 输入框的"/"补全（提示词模板、技能命令）与技能调用的显示 | M6 |
 
 pi 事件名以 `@earendil-works/pi-coding-agent` 1.3.0 的 `AgentSessionEvent` 为准；
 `message_update` 经后台进程精简为 `{ type, contentIndex, delta, toolCallId, toolName, args }`（见 `app/src/kernel/events.ts`）。

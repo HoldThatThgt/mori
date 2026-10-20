@@ -256,11 +256,20 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('approval.forget'), sessionId, toolName: z.string().min(1) }),
   // ---- M6：连接与模型（docs/v0/screens/settings.md） ----
   /** 保存连接表单：providerId 为 null 时新建一个连接，否则改这个连接并写入（或更新）表单里的模型 */
-  z.object({ type: z.literal('connection.save'), providerId: z.string().min(1).nullable(), connection: ConnectionSchema }),
+  z.object({
+    type: z.literal('connection.save'),
+    providerId: z.string().min(1).nullable(),
+    connection: ConnectionSchema,
+  }),
   /** 只改连接（地址、接口类型、key、兼容选项），不动它下面的模型 */
   z.object({ type: z.literal('endpoint.save'), providerId: z.string().min(1), endpoint: EndpointSchema }),
   /** 添加（adding 为真；ID 已存在时报错）或修改连接下的一个模型 */
-  z.object({ type: z.literal('model.save'), providerId: z.string().min(1), model: ModelFormSchema, adding: z.boolean() }),
+  z.object({
+    type: z.literal('model.save'),
+    providerId: z.string().min(1),
+    model: ModelFormSchema,
+    adding: z.boolean(),
+  }),
   /** 删除模型；是连接的最后一个模型时连接和它的 key 一起删除；默认模型（还有别的模型时）和唯一的模型不能删 */
   z.object({ type: z.literal('model.delete'), providerId: z.string().min(1), modelId: z.string().min(1) }),
   /** 设为默认模型（pi 设置的 defaultProvider / defaultModel） */
@@ -516,6 +525,8 @@ export interface ConfigInfo {
   models: AvailableModel[];
   /** pi 读 models.json 时报告的错误（modelRuntime.getError）；没有时为 null */
   modelsError: string | null;
+  /** pi 设置的 defaultThinkingLevel（没有时为 medium）：新模型的"新会话默认的思考强度"的初始值 */
+  defaultThinkingLevel: ThinkingLevel;
 }
 
 /** @brief connection.test 的结果。 */

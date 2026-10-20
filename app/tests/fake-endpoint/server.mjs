@@ -9,7 +9,13 @@
 //   - 用户消息含 "edit README"：调用 edit 工具修改 README.md 的标题（"# Smoke project" 或 "# Mori fixture project"，
 //     由 "edit README: <原标题>" 指定，默认 "# Smoke project"）。
 //   - 用户消息含 "list tools"：回复"可用的工具："加请求里 tools 的全部工具名（逗号分隔），用来测项目扩展的工具有没有加载。
-//   - 用户消息含 "call tool: <工具名>"：调用该工具，参数为空对象（例如项目扩展注册的 project_hello）。
+//   - 用户消息含 "call tool: <工具名>"：调用该工具，参数为空对象（例如项目扩展注册的 project_hello）；
+//     工具名后面跟一段 JSON 对象时（"call tool: mcp__x__echo {"text":"hi"}"）用它作参数（M6）。
+//   - 用户消息含 "agents check"：系统提示里有 MORI-AGENTS-<字母数字> 时回复"系统提示里有 <它>"，否则"系统提示里没有标记"
+//     （M6：测用户级 AGENTS.md 进了新会话的系统提示）。
+//   - 用户消息含 "which model"：回复"模型：<请求里的 model>"（M6：测顶栏换模型后新回复来自新模型）。
+//   - 用户消息含 "thinking check"：请求带 reasoning_effort 时先流式返回一段思考，再回复"收到思考参数：<值>"；
+//     不带时只回复"没有思考参数"（M6：测思考强度，pi 对 OpenAI 兼容端点在模型标了支持思考时才发这个参数）。
 //   - 用户消息含 "wait <秒数>s then run: <命令>"：等这么多秒再调用 bash 工具执行该命令（测界面重新加载后才来的批准请求）。
 //   - 用户消息含 "wait <秒数>s"：等这么多秒再回复一段文字（测生成中切走、"有新结果"）。
 //   - 用户消息含 "code block"：返回一段带 ts 代码块的 Markdown。
@@ -66,13 +72,25 @@ function toolResultReply(last) {
 }
 
 /** @brief 按用户消息里的关键词决定回复（规则见文件开头）；tools 是请求里的工具定义。 */
-function userReply(userText, tools) {
+function userReply(userText, tools, body = {}) {
+  if (userText.includes('which model')) return { text: `模型：${body.model}`, toolCalls: [] };
+  if (userText.includes('agents check')) {
+    const system = (body.messages ?? []).filter((m) => m.role === 'system' || m.role === 'developer')
+      .map((m) => contentText(m.content)).join(' ');
+    const marker = /MORI-AGENTS-\w+/.exec(system)?.[0];
+    return { text: marker ? `系统提示里有 ${marker}` : '系统提示里没有标记', toolCalls: [] };
+  }
+  if (userText.includes('thinking check')) {
+    const effort = body.reasoning_effort;
+    if (!effort) return { text: '没有思考参数', toolCalls: [] };
+    return { thinking: `思考强度参数 ${effort}，这是思考内容。`, text: `收到思考参数：${effort}`, toolCalls: [] };
+  }
   if (userText.includes('list tools')) {
     const names = (tools ?? []).map((tool) => tool.function?.name).filter(Boolean);
     return { text: `可用的工具：${names.join(', ')}`, toolCalls: [] };
   }
-  const call = /call tool:\s*([\w-]+)/.exec(userText);
-  if (call) return { text: '我来调用这个工具。', toolCalls: [{ name: call[1], args: {} }] };
+  const call = /call tool:\s*([\w-]+)(?:\s+(\{.*\}))?/.exec(userText);
+  if (call) return { text: '我来调用这个工具。', toolCalls: [{ name: call[1], args: call[2] ? JSON.parse(call[2]) : {} }] };
   const late = /wait (\d+)s then run:\s*(.+?)\s*$/m.exec(userText);
   if (late) {
     return { text: '我来运行这条命令。', toolCalls: [{ name: 'bash', args: { command: late[2] } }],
@@ -112,10 +130,10 @@ function userReply(userText, tools) {
 }
 
 /** @brief 根据对话末尾决定本次回复：文字与零到多个工具调用。 */
-function planReply(messages, tools) {
+function planReply(messages, tools, body) {
   const last = messages[messages.length - 1] ?? {};
   if (last.role === 'tool') return toolResultReply(last);
-  return userReply(contentText(last.content), tools);
+  return userReply(contentText(last.content), tools, body);
 }
 
 /** @brief 把字符串切成小段，模拟逐字流式输出。 */
@@ -195,7 +213,7 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: { message: `Synthetic HTTP ${status} for testing`, type: 'synthetic_error' } }));
         return;
       }
-      const reply = planReply(messages, body.tools);
+      const reply = planReply(messages, body.tools, body);
       const promptTokens = Math.ceil(JSON.stringify(messages).length / 4);
       await streamReply(res, reply, Boolean(body.stream_options?.include_usage), promptTokens, body.model === 'fake-slow');
     } catch (error) {

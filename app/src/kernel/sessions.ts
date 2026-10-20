@@ -2,12 +2,15 @@
 // 每个会话带一个最小批准扩展（approval.ts）和扩展的界面上下文（extensionUi.ts），批准状态和挂起的询问只在这里的内存里。
 // 照 Claude 桌面版，本次运行里打开过的会话一直保持打开，直到界面要求关闭（归档、删除前）或退出；界面重新加载也不停，
 // 重新加载后的界面经 session.list 的 live 和 session.open 交出的这一刻的样子接上它们（docs/v0/screens/sessions.md）。
+// M6：顶栏换模型、换思考强度只作用于一个会话（pi 不 persist）；设置里改了模型后把打开着的会话换成新的模型对象；
+// "/"补全取会话的提示词模板和技能命令（docs/v0/screens/models.md、slash.md）。
 
 import { existsSync } from 'node:fs';
 import type { AgentSession, AgentSessionEvent, SessionEntry, SessionManager } from '@earendil-works/pi-coding-agent';
 import type {
   ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, EventEnvelope, ExtensionNotice, LiveSnapshot, LiveStatus,
-  OpenedSession, QuoteRef, SavedSession, SessionContent, SessionInfo, SessionState, TrustAnswer,
+  ModelState, OpenedSession, ProjectTrust, QuoteRef, SavedSession, SessionContent, SessionInfo, SessionState,
+  SlashCommand, ThinkingLevel, TrustAnswer,
 } from '../shared/protocol';
 import { REF_ENTRY_TYPE } from '../shared/protocol';
 import { ApprovalGate } from './approval';
@@ -89,6 +92,23 @@ function forward(entry: Entry, sessionId: string, event: AgentSessionEvent, emit
   }
 }
 
+/** @brief 会话的模型和思考强度（顶栏）：pi 的当前模型、思考强度、这个模型可选的强度、是否支持思考。 */
+function modelState(session: AgentSession): ModelState {
+  return {
+    model: session.model ? `${session.model.provider}/${session.model.id}` : null,
+    thinkingLevel: session.thinkingLevel,
+    thinkingLevels: session.getAvailableThinkingLevels(),
+    reasoning: session.supportsThinking(),
+  };
+}
+
+/** @brief 告诉界面会话的模型或思考强度变了（mori.model_state），并返回这时的状态。 */
+function emitModelState(sessionId: string, session: AgentSession, emit: Emit): ModelState {
+  const state = modelState(session);
+  emit({ kind: 'event', sessionId, event: { type: 'mori.model_state', ...state } });
+  return state;
+}
+
 /** @brief 打开中的会话的信息。 */
 function describeEntry(entry: Entry): SessionInfo {
   const { session } = entry;
@@ -103,7 +123,7 @@ function describeEntry(entry: Entry): SessionInfo {
     extensionErrors: entry.extensionErrors,
     extensionNotices: entry.notices,
     tools: session.getActiveToolNames(),
-    model: session.model ? `${session.model.provider}/${session.model.id}` : null,
+    ...modelState(session),
     modelNotice: entry.modelNotice,
     contextUsage: session.getContextUsage() ?? null,
     approval: entry.gate.state(),
@@ -350,12 +370,15 @@ export interface SessionContext {
   cwd: string;
   /** 打开时是否加载了项目自带的资源（pi resolveProjectTrust 的结果） */
   trusted: boolean;
+  /** 文件夹的信任状态（与会话信息的 projectTrust 相同） */
+  projectTrust: ProjectTrust;
 }
 
 /** @brief 取出打开着的会话的只读信息；没有这个会话时报错。 */
 export function sessionContext(sessionId: string): SessionContext {
   const entry = requireEntry(sessionId);
-  return { session: entry.session, cwd: entry.cwd, trusted: entry.trust.trusted };
+  return { session: entry.session, cwd: entry.cwd, trusted: entry.trust.trusted,
+    projectTrust: entry.trust.projectTrust };
 }
 
 /**
@@ -376,10 +399,15 @@ async function release(entry: Entry): Promise<void> {
   session.dispose();
 }
 
+/** @brief 正在生成时拒绝（关闭、换模型、换思考强度），不替你停止。 */
+function requireIdle(entry: Entry): void {
+  if (entry.running || entry.session.isStreaming) throw new Error('The session is generating; stop it first');
+}
+
 /** @brief 关闭并释放一个会话（归档、删除前）；正在生成时拒绝，不替你停止。 */
 export async function closeSession(sessionId: string): Promise<{ closed: true }> {
   const entry = requireEntry(sessionId);
-  if (entry.running || entry.session.isStreaming) throw new Error('The session is generating; stop it first');
+  requireIdle(entry);
   sessions.delete(sessionId);
   await release(entry);
   return { closed: true };
@@ -471,6 +499,65 @@ export function setApprovalMode(sessionId: string, mode: ApprovalMode): Approval
 /** @brief 从"本会话已允许"里清除一个工具名。 */
 export function forgetApproval(sessionId: string, toolName: string): ApprovalState {
   return requireEntry(sessionId).gate.forget(toolName);
+}
+
+/**
+ * @brief 这个会话换模型（pi setModel，不 persist：不改默认模型）；pi 随后按 modelThinkingLevels → defaultThinkingLevel
+ *        → 原来的强度重定思考强度。设置页经另一个 SettingsManager 写设置，会话自己的还是打开时读的：先 reload，
+ *        pi 才用到设置页里改过的按模型强度。正在生成时拒绝。
+ * @param ref provider/id
+ */
+export async function setSessionModel(sessionId: string, ref: string, emit: Emit): Promise<ModelState> {
+  const entry = requireEntry(sessionId);
+  requireIdle(entry);
+  const slash = ref.indexOf('/');
+  const runtime = await getRuntime();
+  const model = slash > 0 ? runtime.getModel(ref.slice(0, slash), ref.slice(slash + 1)) : undefined;
+  if (!model) throw new Error(`Model ${ref} not found`);
+  await entry.session.settingsManager.reload();
+  await entry.session.setModel(model);
+  return emitModelState(sessionId, entry.session, emit);
+}
+
+/** @brief 这个会话换思考强度（pi setThinkingLevel，不 persist；pi 按模型收紧）。正在生成时拒绝。 */
+export function setSessionThinking(sessionId: string, level: ThinkingLevel, emit: Emit): ModelState {
+  const entry = requireEntry(sessionId);
+  requireIdle(entry);
+  entry.session.setThinkingLevel(level);
+  return emitModelState(sessionId, entry.session, emit);
+}
+
+/**
+ * @brief pi 重读 models.json 之后，把打开着的会话换成新的模型对象（地址、上下文长度、是否支持思考），做法与 pi 自己的
+ *        _refreshCurrentModelFromRegistry 相同（agent-session.js 2702–2712：agent.state.model = runtime.getModel(...)）。
+ *        当前的思考强度新模型不再支持时，再用 setThinkingLevel 交给 pi 收紧（会话里记一条 thinking_level_change）。
+ *        换了的会话发 mori.model_state；模型已经不在的会话不动，下一条消息仍用打开时的设置。
+ */
+export async function refreshSessionModels(emit: Emit): Promise<void> {
+  const runtime = await getRuntime();
+  for (const [sessionId, { session }] of sessions) {
+    const current = session.model;
+    const refreshed = current ? runtime.getModel(current.provider, current.id) : undefined;
+    if (!refreshed || refreshed === current) continue;
+    session.agent.state.model = refreshed;
+    const level = session.thinkingLevel;
+    if (!session.getAvailableThinkingLevels().includes(level)) session.setThinkingLevel(level);
+    emitModelState(sessionId, session, emit);
+  }
+}
+
+/**
+ * @brief "/"补全：这个会话加载了的提示词模板和技能命令，照 pi RPC 的 get_commands（rpc-mode.js 540–567）但不含扩展命令；
+ *        会话的设置 enableSkillCommands 为 false 时不列技能命令（与 pi 终端的补全相同）。
+ */
+export function sessionCommands(sessionId: string): SlashCommand[] {
+  const { session } = requireEntry(sessionId);
+  const prompts = session.promptTemplates.map((template): SlashCommand => ({ name: template.name, kind: 'prompt',
+    description: template.description, argumentHint: template.argumentHint ?? null }));
+  if (!session.settingsManager.getEnableSkillCommands()) return prompts;
+  const skills = session.resourceLoader.getSkills().skills.map((skill): SlashCommand => ({
+    name: `skill:${skill.name}`, kind: 'skill', description: skill.description, argumentHint: null }));
+  return [...prompts, ...skills];
 }
 
 /** @brief 退出前停止并释放所有会话；挂起的批准先按拒绝处理，pi 才不会卡在等待上。 */

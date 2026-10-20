@@ -12,6 +12,7 @@ const globbed = {
   ...import.meta.glob('../../fixtures/m3/*.json', { eager: true, import: 'default' }),
   ...import.meta.glob('../../fixtures/m4/*.json', { eager: true, import: 'default' }),
   ...import.meta.glob('../../fixtures/m5/*.json', { eager: true, import: 'default' }),
+  ...import.meta.glob('../../fixtures/m6/*.json', { eager: true, import: 'default' }),
 };
 const params = new URLSearchParams(location.search);
 const name = params.get('fixture') ?? 'readme';

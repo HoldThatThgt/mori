@@ -8,12 +8,13 @@
 | --- | --- | --- |
 | 会话名 | 会话名（pi 的 `session_info`：`session.create` / `session.open` 返回的 `name`、`session_info_changed`，M3 起）；没有名字时第一条用户消息（pi 的 `message_start`，role=user）前 20 个字；都没有时"新会话"。规则与侧栏会话行相同（[sessions.md](sessions.md)），会话面板的读屏名称和 F8 报告里的"当前会话"也用它 | 省略号截断，不换行 |
 | 项目名 | 会话的工作目录（`session.create` / `session.open` 的返回值）末级文件夹名 | 同上 |
-| 模型 | 会话返回值里的 `model`（provider/id），显示 id | 没有可用模型时"没有可用模型"，并显示 pi 给出的说明 |
+| 模型 | 会话返回值里的 `model`（provider/id），显示 id；M6 起是可以切换的菜单，见 [models.md](models.md) | 没有可用模型时"没有可用模型"，并显示 pi 给出的说明 |
+| 思考强度（M6） | 见 [models.md](models.md) | "思考：高 ▾"；模型没标支持思考时"思考：不可选" |
 | 上下文用量 | `session.state` → pi `getContextUsage()`；在打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新 | "上下文 12%"，悬停显示"约 15,360 / 128,000 token"；pi 返回未知（刚压缩完）时"上下文 —"并说明要等下一次回复 |
 | 权限（M2） | 后台进程批准扩展的设置（`session.create` / `session.open` 返回值里的 `approval`，以及 `approval.*` 命令的结果） | "每次询问"或"全部允许"（警示色）；菜单见 [approval.md](approval.md) |
 | 右栏开关 | 你的操作 | 按钮，显示右栏是否打开 |
 
-思考强度在 M6。
+M6 起的模型菜单和思考强度见 [models.md](models.md)；输入框的"/"补全见 [slash.md](slash.md)。
 
 ## 对话流
 

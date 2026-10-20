@@ -1,11 +1,14 @@
 // 输入框与按钮区：空闲时发送；生成中可以停止、排队（Enter）或插话（Ctrl+Enter）。输入法组字时 Enter 只选词。
+// M6：以 / 开头时输入框上方出"/"补全列表（SlashMenu.tsx），列表开着时 Enter 不发送。
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import { send, stop, withdraw } from '../state/actions';
 import { useOverlay } from '../state/overlays';
 import { updateTab, type Tab } from '../state/store';
 import { Icon } from '../icons';
+import { skillCommandText } from '../state/skillText';
 import { ComposerQuotes } from './QuoteChips';
+import { handleSlashKey, SlashMenu, useSlashMenu } from './SlashMenu';
 
 /** 输入框最高（px），超过后在框内滚动 */
 const MAX_INPUT_HEIGHT = 220;
@@ -14,7 +17,9 @@ const MAX_INPUT_HEIGHT = 220;
 export function QueueArea({ tab }: { tab: Tab }) {
   const { steering, followUp } = tab.transcript;
   if (steering.length + followUp.length === 0) return null;
-  const rows = [...steering.map((text) => ({ kind: '插话', text })), ...followUp.map((text) => ({ kind: '排队', text }))];
+  // 技能命令在 pi 的队列里已经是展开后的正文，显示时写回"/skill:名字 参数"（slash.md）。
+  const rows = [...steering.map((text) => ({ kind: '插话', text })), ...followUp.map((text) => ({ kind: '排队', text }))]
+    .map((row) => ({ ...row, text: skillCommandText(row.text) }));
   return (
     <div className="queue-area" data-testid="queue">
       <ul>
@@ -56,6 +61,7 @@ function QueueButton({ tabKey }: { tabKey: string }) {
 export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null }) {
   const input = useRef<HTMLTextAreaElement>(null);
   const composing = useRef(false);
+  const slash = useSlashMenu(tab, notReady, input);
   const { running, sending } = tab.transcript;
   // 只有引用芯片、没有字时也能发送（docs/v0/screens/selection.md）。
   const hasText = tab.draft.trim().length > 0 || tab.draftRefs.length > 0;
@@ -68,9 +74,10 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
   }, [tab.draft]);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== 'Enter' || event.shiftKey) return;
-    // 输入法组字时 Enter 是选词：isComposing、keyCode 229 或我们记录的组字状态任一成立都不发送。
-    if (event.nativeEvent.isComposing || event.keyCode === 229 || composing.current) return;
+    // 输入法组字时 Enter 是选词：isComposing、keyCode 229 或我们记录的组字状态任一成立都不发送，也不动补全列表。
+    const imeActive = event.nativeEvent.isComposing || event.keyCode === 229 || composing.current;
+    if (handleSlashKey(slash, event, imeActive)) return;
+    if (event.key !== 'Enter' || event.shiftKey || imeActive) return;
     event.preventDefault();
     if (notReady || !hasText) return;
     if (running) void send(tab.key, event.ctrlKey ? 'steer' : 'followUp');
@@ -79,10 +86,15 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
 
   return (
     <div className="composer" data-testid="composer" data-drop="composer" data-tab={tab.key}>
+      {slash.open && <SlashMenu menu={slash} />}
       <ComposerQuotes tab={tab} />
-      <textarea ref={input} value={tab.draft} rows={2} aria-label="给 Mori 的消息" autoFocus
+      <textarea ref={input} value={tab.draft} rows={2} aria-label="给 Mori 的消息" autoFocus {...slash.inputProps}
         placeholder={running ? 'Enter 排队 · Ctrl+Enter 插话 · Shift+Enter 换行' : 'Enter 发送 · Shift+Enter 换行'}
-        onChange={(event) => { const draft = event.target.value; updateTab(tab.key, (t) => ({ ...t, draft })); }}
+        onChange={(event) => {
+          const draft = event.target.value;
+          updateTab(tab.key, (t) => ({ ...t, draft }));
+          slash.track(event.target);
+        }}
         onCompositionStart={() => { composing.current = true; }}
         onCompositionEnd={() => { composing.current = false; }}
         onKeyDown={onKeyDown} />
