@@ -15,6 +15,10 @@ import './styles/forms.css';
 import './styles/issues.css';
 import './styles/quotes.css';
 import './styles/split.css';
+import './styles/settings.css';
+import './styles/models.css';
+import './styles/tools.css';
+import './styles/slash.css';
 
 connectKernel();
 

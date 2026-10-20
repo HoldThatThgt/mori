@@ -1,5 +1,5 @@
 // 确认对话框：盖住整个窗口；焦点先在"取消"，Tab 只在两个按钮之间切换，Esc 等于取消（进行中不能关）。
-// 用于切到"全部允许"（approval.md）和删除会话（sessions.md）。
+// 用于切到"全部允许"（approval.md）、删除会话（sessions.md）和离开有未保存改动的页面（settings.md）。
 
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -13,6 +13,8 @@ export interface ConfirmDialogProps {
   text: string;
   /** 确认按钮的文字 */
   confirmLabel: string;
+  /** 取消按钮的文字；默认"取消" */
+  cancelLabel?: string;
   /** 确认按钮的样式：warn 警示色（黄），danger 危险色（红） */
   tone: 'warn' | 'danger';
   /** 测试标识 */
@@ -39,7 +41,8 @@ function trapTab(event: React.KeyboardEvent<HTMLDivElement>): void {
 
 /** @brief 确认对话框。 */
 export function ConfirmDialog(props: ConfirmDialogProps) {
-  const { title, text, confirmLabel, tone, testId, busyText = null, error = null, onConfirm, onCancel } = props;
+  const { title, text, confirmLabel, cancelLabel = '取消', tone, testId, busyText = null, error = null, onConfirm,
+    onCancel } = props;
   const cancel = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const textId = useId();
@@ -65,7 +68,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
         {error && <p className="form-message error" role="alert">{error}</p>}
         <div className="dialog-actions">
           <button className={`button ${tone}`} disabled={busy} onClick={onConfirm}>{confirmLabel}</button>
-          <button ref={cancel} className="button" disabled={busy} onClick={onCancel}>取消</button>
+          <button ref={cancel} className="button" disabled={busy} onClick={onCancel}>{cancelLabel}</button>
         </div>
       </div>
     </div>,

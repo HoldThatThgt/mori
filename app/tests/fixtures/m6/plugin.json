@@ -1,0 +1,2737 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m6-record.mjs; do not edit by hand.",
+ "name": "plugin",
+ "description": "添加本地文件夹的 pi 包（tests/pi-package 的副本）：工具页列出扩展、技能、提示词、主题；停用包里的技能，停用整个包、再启用整个包；新会话里包的扩展注册的 package_hello 出批准卡、允许后返回",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-20T11:21:05.409Z",
+ "steps": [
+  {
+   "t": 1,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 2528,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 2528,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin"
+   }
+  },
+  {
+   "t": 2535,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 2535,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin"
+   }
+  },
+  {
+   "t": 2616,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a1590b-186d-7708-8e8c-ba5ec9037b74",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-5fjsf6\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m6-record-yLQxot-m6-plugin--\\2026-10-20T11-21-01-807Z_01a1590b-186d-7708-8e8c-ba5ec9037b74.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 2616,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a1590b-186d-7708-8e8c-ba5ec9037b74"
+   }
+  },
+  {
+   "t": 2712,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      }
+     ],
+     "skills": [],
+     "packages": [],
+     "mcp": {
+      "errors": [],
+      "servers": []
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 2712,
+   "command": {
+    "type": "package.add",
+    "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg"
+   }
+  },
+  {
+   "t": 2722,
+   "result": {
+    "type": "package.add",
+    "value": {
+     "source": "..\\..\\mori-m6-record-yLQxot\\pkg",
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 2722,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a1590b-186d-7708-8e8c-ba5ec9037b74"
+   }
+  },
+  {
+   "t": 2811,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      }
+     ],
+     "skills": [
+      {
+       "kind": "skills",
+       "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md",
+       "name": "package-review",
+       "description": "Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.",
+       "body": "# Package review (synthetic)\n\nWhen this skill is used, reply with exactly one line: PACKAGE-REVIEW-OK.",
+       "enabled": true,
+       "scope": "user",
+       "origin": "package",
+       "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+       "readOnly": null
+      }
+     ],
+     "packages": [
+      {
+       "source": "..\\..\\mori-m6-record-yLQxot\\pkg",
+       "scope": "user",
+       "root": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg",
+       "resources": [
+        {
+         "kind": "extensions",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\extensions\\package-hello.ts",
+         "name": "package-hello.ts",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "skills",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md",
+         "name": "package-review",
+         "description": "Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.",
+         "body": "# Package review (synthetic)\n\nWhen this skill is used, reply with exactly one line: PACKAGE-REVIEW-OK.",
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "prompts",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\prompts\\package-summary.md",
+         "name": "package-summary.md",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "themes",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\themes\\package-theme.json",
+         "name": "package-theme.json",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        }
+       ],
+       "readOnly": null
+      }
+     ],
+     "mcp": {
+      "errors": [],
+      "servers": []
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 2811,
+   "command": {
+    "type": "resource.toggle",
+    "sessionId": "01a1590b-186d-7708-8e8c-ba5ec9037b74",
+    "kind": "skills",
+    "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md",
+    "enabled": false
+   }
+  },
+  {
+   "t": 2843,
+   "result": {
+    "type": "resource.toggle",
+    "value": {
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 2843,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a1590b-186d-7708-8e8c-ba5ec9037b74"
+   }
+  },
+  {
+   "t": 2888,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      }
+     ],
+     "skills": [
+      {
+       "kind": "skills",
+       "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md",
+       "name": "package-review",
+       "description": "Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.",
+       "body": "# Package review (synthetic)\n\nWhen this skill is used, reply with exactly one line: PACKAGE-REVIEW-OK.",
+       "enabled": false,
+       "scope": "user",
+       "origin": "package",
+       "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+       "readOnly": null
+      }
+     ],
+     "packages": [
+      {
+       "source": "..\\..\\mori-m6-record-yLQxot\\pkg",
+       "scope": "user",
+       "root": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg",
+       "resources": [
+        {
+         "kind": "extensions",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\extensions\\package-hello.ts",
+         "name": "package-hello.ts",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "skills",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md",
+         "name": "package-review",
+         "description": "Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.",
+         "body": "# Package review (synthetic)\n\nWhen this skill is used, reply with exactly one line: PACKAGE-REVIEW-OK.",
+         "enabled": false,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "prompts",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\prompts\\package-summary.md",
+         "name": "package-summary.md",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "themes",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\themes\\package-theme.json",
+         "name": "package-theme.json",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        }
+       ],
+       "readOnly": null
+      }
+     ],
+     "mcp": {
+      "errors": [],
+      "servers": []
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 2888,
+   "command": {
+    "type": "package.setAll",
+    "source": "..\\..\\mori-m6-record-yLQxot\\pkg",
+    "enabled": false
+   }
+  },
+  {
+   "t": 2893,
+   "result": {
+    "type": "package.setAll",
+    "value": {
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 2893,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a1590b-186d-7708-8e8c-ba5ec9037b74"
+   }
+  },
+  {
+   "t": 2936,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      }
+     ],
+     "skills": [
+      {
+       "kind": "skills",
+       "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md",
+       "name": "package-review",
+       "description": "Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.",
+       "body": "# Package review (synthetic)\n\nWhen this skill is used, reply with exactly one line: PACKAGE-REVIEW-OK.",
+       "enabled": false,
+       "scope": "user",
+       "origin": "package",
+       "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+       "readOnly": null
+      }
+     ],
+     "packages": [
+      {
+       "source": "..\\..\\mori-m6-record-yLQxot\\pkg",
+       "scope": "user",
+       "root": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg",
+       "resources": [
+        {
+         "kind": "extensions",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\extensions\\package-hello.ts",
+         "name": "package-hello.ts",
+         "description": null,
+         "body": null,
+         "enabled": false,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "skills",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md",
+         "name": "package-review",
+         "description": "Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.",
+         "body": "# Package review (synthetic)\n\nWhen this skill is used, reply with exactly one line: PACKAGE-REVIEW-OK.",
+         "enabled": false,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "prompts",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\prompts\\package-summary.md",
+         "name": "package-summary.md",
+         "description": null,
+         "body": null,
+         "enabled": false,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "themes",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\themes\\package-theme.json",
+         "name": "package-theme.json",
+         "description": null,
+         "body": null,
+         "enabled": false,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        }
+       ],
+       "readOnly": null
+      }
+     ],
+     "mcp": {
+      "errors": [],
+      "servers": []
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 2936,
+   "command": {
+    "type": "package.setAll",
+    "source": "..\\..\\mori-m6-record-yLQxot\\pkg",
+    "enabled": true
+   }
+  },
+  {
+   "t": 2941,
+   "result": {
+    "type": "package.setAll",
+    "value": {
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 2941,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a1590b-186d-7708-8e8c-ba5ec9037b74"
+   }
+  },
+  {
+   "t": 2981,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      }
+     ],
+     "skills": [
+      {
+       "kind": "skills",
+       "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md",
+       "name": "package-review",
+       "description": "Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.",
+       "body": "# Package review (synthetic)\n\nWhen this skill is used, reply with exactly one line: PACKAGE-REVIEW-OK.",
+       "enabled": true,
+       "scope": "user",
+       "origin": "package",
+       "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+       "readOnly": null
+      }
+     ],
+     "packages": [
+      {
+       "source": "..\\..\\mori-m6-record-yLQxot\\pkg",
+       "scope": "user",
+       "root": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg",
+       "resources": [
+        {
+         "kind": "extensions",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\extensions\\package-hello.ts",
+         "name": "package-hello.ts",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "skills",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md",
+         "name": "package-review",
+         "description": "Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.",
+         "body": "# Package review (synthetic)\n\nWhen this skill is used, reply with exactly one line: PACKAGE-REVIEW-OK.",
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "prompts",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\prompts\\package-summary.md",
+         "name": "package-summary.md",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "themes",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\themes\\package-theme.json",
+         "name": "package-theme.json",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        }
+       ],
+       "readOnly": null
+      }
+     ],
+     "mcp": {
+      "errors": [],
+      "servers": []
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 2981,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin"
+   }
+  },
+  {
+   "t": 2985,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 2985,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin"
+   }
+  },
+  {
+   "t": 3303,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-5fjsf6\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-m6-record-yLQxot-m6-plugin--\\2026-10-20T11-21-02-250Z_01a1590b-1a29-7708-8e8c-ba613fe3edf6.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "package_hello"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 3303,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6"
+   }
+  },
+  {
+   "t": 3337,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\m6-plugin",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": ""
+      },
+      {
+       "name": "package_hello",
+       "description": "Says hello from the synthetic test package.",
+       "active": true,
+       "exposure": "direct",
+       "source": "package",
+       "sourceLabel": "..\\..\\mori-m6-record-yLQxot\\pkg"
+      }
+     ],
+     "skills": [
+      {
+       "kind": "skills",
+       "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md",
+       "name": "package-review",
+       "description": "Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.",
+       "body": "# Package review (synthetic)\n\nWhen this skill is used, reply with exactly one line: PACKAGE-REVIEW-OK.",
+       "enabled": true,
+       "scope": "user",
+       "origin": "package",
+       "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+       "readOnly": null
+      }
+     ],
+     "packages": [
+      {
+       "source": "..\\..\\mori-m6-record-yLQxot\\pkg",
+       "scope": "user",
+       "root": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg",
+       "resources": [
+        {
+         "kind": "extensions",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\extensions\\package-hello.ts",
+         "name": "package-hello.ts",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "skills",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md",
+         "name": "package-review",
+         "description": "Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.",
+         "body": "# Package review (synthetic)\n\nWhen this skill is used, reply with exactly one line: PACKAGE-REVIEW-OK.",
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "prompts",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\prompts\\package-summary.md",
+         "name": "package-summary.md",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        },
+        {
+         "kind": "themes",
+         "path": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\themes\\package-theme.json",
+         "name": "package-theme.json",
+         "description": null,
+         "body": null,
+         "enabled": true,
+         "scope": "user",
+         "origin": "package",
+         "packageSource": "..\\..\\mori-m6-record-yLQxot\\pkg",
+         "readOnly": null
+        }
+       ],
+       "readOnly": null
+      }
+     ],
+     "mcp": {
+      "errors": [],
+      "servers": []
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 3338,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "text": "请调用 package_hello 工具（不需要参数），然后用一句话告诉我它返回了什么。"
+   }
+  },
+  {
+   "t": 3341,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 3346,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 3346,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 3346,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "skills": "<skills>\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>package-review</name>\n    <description>Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.</description>\n    <location>C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md</location>\n  </skill>\n</available_skills>\n</skills>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-yLQxot/m6-plugin\n</cwd>"
+      },
+      "timestamp": 1792495262607,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "package_hello",
+        "description": "Says hello from the synthetic test package.",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 3347,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "skills": "<skills>\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>package-review</name>\n    <description>Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.</description>\n    <location>C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md</location>\n  </skill>\n</available_skills>\n</skills>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-yLQxot/m6-plugin\n</cwd>"
+      },
+      "timestamp": 1792495262607,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "package_hello",
+        "description": "Says hello from the synthetic test package.",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 3347,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请调用 package_hello 工具（不需要参数），然后用一句话告诉我它返回了什么。"
+       }
+      ],
+      "timestamp": 1792495262605
+     }
+    }
+   }
+  },
+  {
+   "t": 3347,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请调用 package_hello 工具（不需要参数），然后用一句话告诉我它返回了什么。"
+       }
+      ],
+      "timestamp": 1792495262605
+     }
+    }
+   }
+  },
+  {
+   "t": 3350,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "d36eeeb9",
+     "time": 1792495262605,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 4028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792495262943
+     }
+    }
+   }
+  },
+  {
+   "t": 4765,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4765,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "I"
+     }
+    }
+   }
+  },
+  {
+   "t": 4769,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "'ll"
+     }
+    }
+   }
+  },
+  {
+   "t": 4770,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " call"
+     }
+    }
+   }
+  },
+  {
+   "t": 4770,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 4770,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " tool"
+     }
+    }
+   }
+  },
+  {
+   "t": 4781,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " now"
+     }
+    }
+   }
+  },
+  {
+   "t": 4793,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 4819,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "package_hello",
+      "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128"
+     }
+    }
+   }
+  },
+  {
+   "t": 4819,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "package_hello",
+      "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128"
+     }
+    }
+   }
+  },
+  {
+   "t": 4819,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{}",
+      "toolName": "package_hello",
+      "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128"
+     }
+    }
+   }
+  },
+  {
+   "t": 4837,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 4837,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "package_hello",
+      "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+      "args": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 4837,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "I'll call the tool now."
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+        "name": "package_hello",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1271,
+       "output": 29,
+       "cacheRead": 640,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1940,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792495262943,
+      "responseId": "36daa53c-92c2-4343-8f0f-9817de05adbc",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1158,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 4838,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "c4acbc64",
+     "time": 1792495262943,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 4838,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+     "toolName": "package_hello",
+     "gate": "ask"
+    }
+   }
+  },
+  {
+   "t": 4838,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+     "toolName": "package_hello",
+     "args": {}
+    }
+   }
+  },
+  {
+   "t": 4840,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "mori.approval_request",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+     "toolName": "package_hello",
+     "args": {}
+    }
+   }
+  },
+  {
+   "t": 4872,
+   "command": {
+    "type": "approval.answer",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "requestId": "approval-1",
+    "decision": "allow"
+   }
+  },
+  {
+   "t": 4873,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "mori.approval_end",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+     "decision": "allow",
+     "by": "user",
+     "reason": null
+    }
+   }
+  },
+  {
+   "t": 4873,
+   "result": {
+    "type": "approval.answer",
+    "value": {
+     "mode": "ask",
+     "allowed": []
+    }
+   }
+  },
+  {
+   "t": 4873,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+     "toolName": "package_hello",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "hello from package"
+       }
+      ],
+      "details": {}
+     },
+     "isError": false,
+     "durationMs": 0
+    }
+   }
+  },
+  {
+   "t": 4874,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+      "toolName": "package_hello",
+      "content": [
+       {
+        "type": "text",
+        "text": "hello from package"
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1792495264137
+     }
+    }
+   }
+  },
+  {
+   "t": 4874,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+      "toolName": "package_hello",
+      "content": [
+       {
+        "type": "text",
+        "text": "hello from package"
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1792495264137
+     }
+    }
+   }
+  },
+  {
+   "t": 4874,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "I'll call the tool now."
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+        "name": "package_hello",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1271,
+       "output": 29,
+       "cacheRead": 640,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1940,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792495262943,
+      "responseId": "36daa53c-92c2-4343-8f0f-9817de05adbc",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1158,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+       "toolName": "package_hello",
+       "content": [
+        {
+         "type": "text",
+         "text": "hello from package"
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1792495264137
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 4875,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6"
+   }
+  },
+  {
+   "t": 4876,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 4879,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1945,
+      "contextWindow": 1000000,
+      "percent": 0.19449999999999998
+     }
+    }
+   }
+  },
+  {
+   "t": 5028,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792495264140
+     }
+    }
+   }
+  },
+  {
+   "t": 5700,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 5700,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 5714,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "package"
+     }
+    }
+   }
+  },
+  {
+   "t": 5714,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "_"
+     }
+    }
+   }
+  },
+  {
+   "t": 5714,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "hello"
+     }
+    }
+   }
+  },
+  {
+   "t": 5714,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 5714,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 5714,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "返回"
+     }
+    }
+   }
+  },
+  {
+   "t": 5728,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "了"
+     }
+    }
+   }
+  },
+  {
+   "t": 5728,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "："
+     }
+    }
+   }
+  },
+  {
+   "t": 5753,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 5756,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "hello"
+     }
+    }
+   }
+  },
+  {
+   "t": 5756,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " from"
+     }
+    }
+   }
+  },
+  {
+   "t": 5756,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " package"
+     }
+    }
+   }
+  },
+  {
+   "t": 5756,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "**"
+     }
+    }
+   }
+  },
+  {
+   "t": 5756,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 5757,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 5757,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "`package_hello` 返回了：**hello from package**。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 163,
+       "output": 16,
+       "cacheRead": 1792,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1971,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792495264140,
+      "responseId": "9363a8b7-0d7c-4b41-adb3-10c1c691acdf",
+      "rawStopReason": "stop",
+      "durationMs": 880,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 5758,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "09ace4a1",
+     "time": 1792495264140,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 5758,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "`package_hello` 返回了：**hello from package**。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 163,
+       "output": 16,
+       "cacheRead": 1792,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1971,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792495264140,
+      "responseId": "9363a8b7-0d7c-4b41-adb3-10c1c691acdf",
+      "rawStopReason": "stop",
+      "durationMs": 880,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 5758,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6"
+   }
+  },
+  {
+   "t": 5758,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: C:\\Users\\56865\\OneDrive\\Documents\\HoldThatThgt\\mori\\.claude\\worktrees\\m6-settings-tools-c46a07\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "skills": "<skills>\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>package-review</name>\n    <description>Synthetic test skill from the Mori test package; reply with the word PACKAGE-REVIEW-OK when used.</description>\n    <location>C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m6-record-yLQxot\\pkg\\skills\\package-review\\SKILL.md</location>\n  </skill>\n</available_skills>\n</skills>",
+        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-m6-record-yLQxot/m6-plugin\n</cwd>"
+       },
+       "timestamp": 1792495262607,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "package_hello",
+         "description": "Says hello from the synthetic test package.",
+         "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "请调用 package_hello 工具（不需要参数），然后用一句话告诉我它返回了什么。"
+        }
+       ],
+       "timestamp": 1792495262605
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "I'll call the tool now."
+        },
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+         "name": "package_hello",
+         "arguments": {}
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1271,
+        "output": 29,
+        "cacheRead": 640,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1940,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792495262943,
+       "responseId": "36daa53c-92c2-4343-8f0f-9817de05adbc",
+       "rawStopReason": "tool_calls",
+       "durationMs": 1158,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_CjXmbLKVnvYCn7MOLqu44128",
+       "toolName": "package_hello",
+       "content": [
+        {
+         "type": "text",
+         "text": "hello from package"
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1792495264137
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "`package_hello` 返回了：**hello from package**。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 163,
+        "output": 16,
+        "cacheRead": 1792,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1971,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792495264140,
+       "responseId": "9363a8b7-0d7c-4b41-adb3-10c1c691acdf",
+       "rawStopReason": "stop",
+       "durationMs": 880,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 5759,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 5759,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1590b-1a29-7708-8e8c-ba613fe3edf6",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 5759,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1971,
+      "contextWindow": 1000000,
+      "percent": 0.1971
+     }
+    }
+   }
+  }
+ ]
+}

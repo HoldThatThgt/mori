@@ -2,6 +2,7 @@
 // 会话在哪一栏只是界面状态：打开过的会话一直开在后台进程里，关闭一栏不发任何命令，生成照常进行。
 
 import { recordAction } from './actionLog';
+import { guardLeave } from './leaveGuard';
 import { hasOverlay } from './overlays';
 import { shownKeys, useApp, type AppState } from './store';
 
@@ -40,8 +41,10 @@ export function placeInSplit(state: AppState, key: string, side: Side): Pick<App
 
 /** @brief 在某一侧分屏打开一个已在界面里的会话。 */
 export function openInSplit(key: string, side: Side): void {
-  recordAction(side === 'left' ? '在左侧分屏打开' : '在右侧分屏打开');
-  useApp.setState((state) => ({ ...placeInSplit(state, key, side), ...seen(state, key), view: 'chat' }));
+  guardLeave(() => {
+    recordAction(side === 'left' ? '在左侧分屏打开' : '在右侧分屏打开');
+    useApp.setState((state) => ({ ...placeInSplit(state, key, side), ...seen(state, key), view: 'chat' }));
+  });
 }
 
 /** @brief 焦点切到某一栏（你在这一栏里按下鼠标或焦点进入它）；它不在中栏或已有焦点时不变。 */

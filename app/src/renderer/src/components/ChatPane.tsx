@@ -1,17 +1,20 @@
-// 会话面板：顶栏（会话名、模型、权限、上下文用量、右栏开关；分屏时"关闭这一栏"）、对话流、阶段行、后台进程退出提示、
+// 会话面板：顶栏（会话名、模型、思考强度、权限、上下文用量、右栏开关；分屏时"关闭这一栏"）、对话流、阶段行、后台进程退出提示、
 // 批准卡、排队区与输入框。分屏时每一栏是一个完整的会话面板；在面板里按下鼠标或焦点进入它，焦点就切到这一栏（split.md）。
 
 import { reload } from '../state/actions';
 import type { ContextUsage } from '../../../shared/protocol';
+import { skillCommandText } from '../state/skillText';
 import { closePane, focusComposer, focusPane } from '../state/split';
 import { useApp, type KernelStatus, type Tab } from '../state/store';
 import { Icon } from '../icons';
 import { ApprovalCard } from './ApprovalCard';
 import { Composer, QueueArea } from './Composer';
+import { ModelMenu } from './ModelMenu';
 import { PaneTitle } from './PaneTitle';
 import { PermissionMenu } from './PermissionMenu';
 import { QuestionCard } from './QuestionCard';
 import { StageLine } from './StageLine';
+import { ThinkingMenu } from './ThinkingMenu';
 import { Transcript } from './Transcript';
 
 /** 没有名字时会话名取第一条消息的前几个字（方案 5.3） */
@@ -20,7 +23,8 @@ export const TITLE_LENGTH = 20;
 /** @brief 显示的会话名：名字；没有时第一条消息的前 TITLE_LENGTH 个字；都没有时"新会话"。 */
 export function displayTitle(name: string | null, firstMessage: string | null): string {
   if (name?.trim()) return name;
-  const first = firstMessage?.replace(/\s+/g, ' ').trim();
+  // 技能调用（pi 展开后的 <skill …> 块）按"/skill:名字 参数"算（docs/v0/screens/slash.md）。
+  const first = (firstMessage && skillCommandText(firstMessage))?.replace(/\s+/g, ' ').trim();
   if (!first) return '新会话';
   return [...first].length > TITLE_LENGTH ? `${[...first].slice(0, TITLE_LENGTH).join('')}…` : first;
 }
@@ -113,9 +117,10 @@ export interface PaneProps {
   onToggleRight: () => void;
 }
 
-/** @brief 顶栏。 */
+/** @brief 顶栏；模型和思考强度在会话打开之后才显示（docs/v0/screens/models.md）。 */
 function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab }) {
   const kernel = useApp((state) => state.kernel);
+  const notReady = notReadyText(kernel, tab) !== null;
   return (
     <header className="topbar">
       <div className="breadcrumb">
@@ -125,9 +130,12 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
       </div>
       <div className="topbar-actions">
         {tab.phase !== 'opening' && (
-          <span className="model-chip" title={tab.model ?? ''}>{tab.model?.split('/').pop() ?? '没有可用模型'}</span>
+          <>
+            <ModelMenu tab={tab} disabled={notReady} />
+            {tab.model && <ThinkingMenu tab={tab} disabled={notReady} />}
+          </>
         )}
-        <PermissionMenu tab={tab} disabled={notReadyText(kernel, tab) !== null} />
+        <PermissionMenu tab={tab} disabled={notReady} />
         <UsageChip usage={tab.contextUsage} />
         <button className="icon-button" onClick={onToggleRight} aria-pressed={rightOpen} aria-label="右栏：本会话的改动"
           title="本会话的改动"><Icon name="right" /></button>

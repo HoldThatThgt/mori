@@ -1,4 +1,4 @@
-// 界面测试共用的页面操作：发消息、等本轮结束、采样阶段行、读工具卡、填连接表单、打开文件夹。
+// 界面测试共用的页面操作：发消息、等本轮结束、采样阶段行、读工具卡、打开并填连接表单、打开文件夹。
 
 /** @brief 一个页面上的常用操作。 */
 export function pageHelpers(page) {
@@ -63,6 +63,34 @@ export function pageHelpers(page) {
       if (apiKey !== null && apiKey !== undefined) await inputs.nth(2).fill(apiKey);
       if (modelId !== undefined) await inputs.nth(3).fill(modelId);
       if (contextWindow !== undefined) await inputs.nth(4).fill(String(contextWindow));
+    },
+    /**
+     * @brief 打开设置页，在连接卡上点"编辑连接"，等连接表单出现。M6 起设置页先是连接列表（settings.md"列表"），
+     *        编辑连接的表单只有名称、服务地址、接口类型、API key 和兼容选项（输入框 0–2 仍是名称、服务地址、key）。
+     * @param provider 连接的 provider id（第一个连接是 mori-endpoint）
+     */
+    async editConnection(provider = 'mori-endpoint') {
+      await page.getByRole('button', { name: '设置', exact: true }).click();
+      await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
+      const card = page.locator(`[data-testid="connection-card"][data-provider="${provider}"]`);
+      await card.getByRole('button', { name: '编辑连接' }).click();
+      await page.getByTestId('connection-form').waitFor({ timeout: 10000 });
+    },
+    /**
+     * @brief 点了错误卡的"去设置"之后：等焦点落到连接表单的 API key 框（最多 timeout 毫秒，等不到也照常返回），
+     *        返回焦点所在元素的类型、它在不在连接表单里，以及表单的标题（settings.md 外框："去设置"打开"编辑连接"，
+     *        焦点在 API key；标题"编辑连接 · <连接名>"）。设置页里没有连接表单时 title 为 null。
+     */
+    async keyFocus(timeout = 5000) {
+      await page.waitForFunction(() => document.activeElement
+        ?.matches('[data-testid="connection-form"] input[type="password"]'), null, { timeout }).catch(() => {});
+      return page.evaluate(() => {
+        const el = document.activeElement;
+        const form = document.querySelector('[data-testid="settings-page"] [data-testid="connection-form"]');
+        return { type: el?.getAttribute('type') ?? null, tag: el?.tagName?.toLowerCase() ?? null,
+          inForm: Boolean(el?.closest('[data-testid="connection-form"]')),
+          title: form?.closest('.settings-form')?.querySelector('h3')?.textContent ?? null };
+      });
     },
     /**
      * @brief 等表单下方出现一条新的结果文字并返回它。

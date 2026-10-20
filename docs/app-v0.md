@@ -78,7 +78,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | 模型与端点 | pi（`models.json`） | 连接表单、"测试连接" |
 | AGENTS.md | pi（每个目录取 AGENTS.override.md、AGENTS.md、CLAUDE.md 中第一个存在的） | 用户级编辑，项目级只显示加载了哪些文件 |
 | Skill | pi（`SKILL.md`，Agent Skills 规范） | 工具页列出、查看、启停 |
-| MCP | pi（`mcp.json` 加 pi 的 MCP 扩展） | 工具页添加、启停、看工具和错误原文 |
+| MCP | pi（`mcp.json` 加 pi 的 MCP 扩展）；**Mori 共享连接**：每个服务一个进程，所有会话共用（2026-10-20 改为照 Claude 桌面版，[v0/m6-mcp-shared.md](v0/m6-mcp-shared.md)） | 工具页添加、启停、看工具、进程状态和错误原文 |
 | Plugin | pi packages（一个包打包扩展、技能、提示词、主题） | 工具页添加本地包、按资源启停 |
 | 项目信任 | pi 提供判断与存储（`hasTrustRequiringProjectResources`、`trust.json`） | 何时弹窗由 Mori 接线（SDK 默认不问，见第 6 节） |
 | 批准 | **Mori 最小扩展** | 批准卡、权限切换 |
@@ -91,7 +91,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - 按命令前缀放行、复合命令识别等批准规则。
 - 端点并发排队：端点忙时由 pi 的自动重试处理，界面如实显示。
 - 完整模型体检（v0 只有"测试连接"）、原始请求轨迹、后台进程重启后的自动恢复。
-- MCP 结构化连接状态：pi 没有提供，v0 只显示 pi 给出的工具列表和错误原文。
+- MCP 每个会话的连接状态：pi 没有提供；v0 显示 pi 给出的工具列表和错误原文，加上共享连接的进程状态，不显示"已连接"。
 - MCP 的 codemode 和延迟加载方式：v0 只支持直接调用。
 
 **界面上 v0 不做的**：任务记录、多 agent、监督、模型判决式验收、定时回顾、模型池、内嵌浏览器、交互式终端、
@@ -271,6 +271,9 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   - Mori 添加的服务都写成直接调用方式。已有的服务如果是 codemode 或延迟加载方式，显示"v0 只支持直接调用"，
     并提供一键改为直接调用。
   - 显示该服务注册的工具名；连接出错时显示 pi 给出的错误原文。没有结构化的"已连接"标记，因为 pi 不提供。
+  - 每个服务一个进程，所有会话共用（照 Claude 桌面版）：用户级启用的 stdio 服务在 Mori 启动时起、开到退出，HTTP 服务第一次用时才连；
+    项目的服务在项目文件夹里运行，这个项目最后一个会话关闭后关掉；
+    显示共享连接的进程状态（运行中和在用的会话数、启动中、失败原文）。
 - **Plugin**：
   - "添加本地包…"选择文件夹，写入 pi 设置的 packages。
   - 列出包内的扩展、技能、提示词和主题，按资源启停；"停用整个包"即全部资源停用。
@@ -312,7 +315,7 @@ app/
 docs/v0/                     screens/（每屏一张状态表）、defaults.md
 ```
 
-**后台进程（utilityProcess）只做四件事**：
+**后台进程（utilityProcess）只做五件事**（第 5 件 2026-10-20 加）：
 
 1. 调用 pi SDK：新建或打开会话、`prompt`、`steer`、`followUp`、`clearQueue`、`abort`、改名、读写配置。
 2. 转发事件：`session.subscribe` 收到的事件原样转发，外面包一层 `{ sessionId, event }`。
@@ -320,6 +323,9 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
 3. 转达批准请求，以及 pi 扩展的界面请求（通知、确认、选择、输入；pi 的 RPC 模式另外还转达的编辑器、状态栏、小部件、标题 v0 不做）。
 4. 补充条目 id：pi 先发 `message_end` 再写入会话文件，后台进程随后从当前分支找到这条消息的 id 补发给界面，
    供反馈和引用做锚点。
+5. MCP 共享连接（`mcpShare.ts`，[v0/m6-mcp-shared.md](v0/m6-mcp-shared.md)）：pi 的 MCP 扩展给每个会话要传输时，
+   交给它挂在共享服务上的虚拟传输；每个服务一个真连接（pi 自己起进程、连 HTTP 的方式），各会话的请求按编号转发。
+   pi 的 MCP 扩展不改。
 
 **会话与数据**
 
@@ -348,6 +354,9 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
   （`{ name: "mcp", factory: createMcpExtension(), replaceable: true, builtin: true }`），
   这样 `pi config` 和设置里的启停对它有效；再对每个会话调用 `bindExtensions()`，服务才开始连接。
   codemode 不进 v0，所以服务要用直接调用方式。
+  `createMcpExtension` 多传 `{ createTransport }`：用户级、项目级的服务走 Mori 的共享连接（第 5 件事），
+  扩展注册的服务照 pi 原来的方式直连。pi 起进程的 `createDefaultTransport` 和读配置的 `loadMcpConfig` 没有导出，
+  按 pi 1.3.0 包里的文件路径载入，pi 升级时复查。
 - **扩展界面**：`bindExtensions` 时传入 Mori 实现的界面上下文，把通知、确认、选择、输入转给界面；
   其余能力按 pi RPC 模式的范围不实现。MCP 的错误原文就是从通知里来的。
 - **Shell**：不传 `shellPath`，靠 pi 自己的查找顺序（先找 Program Files 下的 Git Bash）。
@@ -395,7 +404,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 2. **完成顺序**：写状态表 → 从真实会话录 fixture → 界面测试 → 实现 → 用真实模型走一遍 → 你走查。缺一步不算完成。
 3. **每一步都可以走查**：一步只做一屏的状态或一族事件，每步都有你能在 App 里看到的变化。
 4. **不造后端**：pi 有的能力直接用；pi 没有的，先回到第 4 节确认是否在 v0 范围内，不在就不写。
-   每加一段非界面代码，都要能指向第 6 节"后台进程只做四件事"或第 4 节表中标 Mori 的行。
+   每加一段非界面代码，都要能指向第 6 节"后台进程只做五件事"或第 4 节表中标 Mori 的行。
 5. **CI 把关**：`src/` 中出现"示例/演示/mock"即失败；界面测试回放的事件必须来自真实录制，手写的要标明。
 6. **诚实交付**：交付说明列出未验证的项；遇到阻塞就停下来报告并给出选项，不写假实现，不静默换路线。
    临时默认值（2 万字、兼容选项说明、401 文字匹配等）登记在 `docs/v0/defaults.md`。

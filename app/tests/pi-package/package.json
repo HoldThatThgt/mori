@@ -1,0 +1,7 @@
+{
+  "name": "mori-test-package",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Synthetic pi package for Mori UI tests (not a real plugin).",
+  "keywords": ["pi-package"]
+}

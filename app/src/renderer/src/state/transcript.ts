@@ -6,6 +6,7 @@ import {
   blocksFromContent, contentText, messageTime, newTool, parseRejection, pushItem, resultPatch,
   type Block, type Item, type Stage, type ToolCall, type Transcript,
 } from './model';
+import { skillCommandText } from './skillText';
 
 type Assistant = Extract<Item, { kind: 'assistant' }>;
 type EventOf<T extends ForwardedEvent['type']> = Extract<ForwardedEvent, { type: T }>;
@@ -273,9 +274,13 @@ function applyQuestion(state: Transcript,
   return { ...state, questions: [...state.questions, request] };
 }
 
-/** @brief 追加一张错误卡；restore 是"放回输入框"的内容。 */
+/**
+ * @brief 追加一张错误卡；restore 是"放回输入框"的内容。pi 记下的是展开后的文字：技能调用放回
+ *        "/skill:名字 参数"，与气泡里显示的一致（docs/v0/screens/slash.md）。
+ */
 function pushError(state: Transcript, text: string, restore: string | null, refs?: QuoteRef[] | null): Transcript {
-  return pushItem(state, { kind: 'error', text, restore, live: true, ...(refs?.length ? { refs } : {}) });
+  const back = restore === null ? null : skillCommandText(restore);
+  return pushItem(state, { kind: 'error', text, restore: back, live: true, ...(refs?.length ? { refs } : {}) });
 }
 
 /** @brief 处理一轮的开始、结束、重试和压缩。 */

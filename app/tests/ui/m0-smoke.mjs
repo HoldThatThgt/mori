@@ -88,11 +88,16 @@ async function connect(app, page, userData, project) {
   await pageHelpers(page).openFolder(app, project);
   // M2 起命令要先批准；冒烟测的是批准之外的行为，先切到全部允许。
   await pageHelpers(page).allowAll();
-  await page.getByRole('button', { name: '设置' }).click();
+  // M6 起设置页先是连接列表，改服务地址在连接卡的"编辑连接"里（settings.md"编辑连接"）。
+  await pageHelpers(page).editConnection();
   await pageHelpers(page).fillConnection({ baseUrl: `http://localhost:${port}/v1`, apiKey: '' });
-  await page.getByRole('button', { name: '保存' }).click();
-  const refused = await page.getByText('API key is required').waitFor({ timeout: 10000 }).then(() => true, () => false);
-  record('改了服务地址而没有重填 key 时拒绝保存', refused);
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  // settings.md 编辑连接"保存"：改了服务地址的 origin 又没填 key 时显示后台进程的原文，models.json 里的地址不变。
+  const refusal = await pageHelpers(page).formMessage(null, { timeout: 10000 }).catch(() => '');
+  const saved = JSON.parse(readFileSync(join(userData, 'pi', 'models.json'), 'utf8'));
+  const kept = saved.providers?.['mori-endpoint']?.baseUrl;
+  record('改了服务地址而没有重填 key 时拒绝保存', refusal === '保存失败：API key is required when the service address changes'
+    && kept === `http://127.0.0.1:${port}/v1`, `表单下方：${refusal}；models.json 的服务地址：${kept}`);
   await pageHelpers(page).fillConnection({ baseUrl: `http://127.0.0.1:${port}/v1` });
   await page.getByRole('button', { name: '返回会话' }).click();
 }
@@ -230,7 +235,8 @@ async function crashCheck(env) {
   const app = await electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
   try {
     const page = await app.firstWindow();
-    await page.getByRole('button', { name: '设置' }).click();
+    // M6：设置页先是连接列表；"编辑连接"里的"测试连接"测这个连接的第一个模型（settings.md"编辑连接"）。
+    await pageHelpers(page).editConnection();
     await page.getByRole('button', { name: '测试连接' }).click();
     const test = await pageHelpers(page).formMessage(null, { test: true, timeout: 40000 });
     const placeholder = await page.getByTestId('connection-form').locator('input[type=password]').getAttribute('placeholder');

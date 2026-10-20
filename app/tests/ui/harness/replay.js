@@ -11,6 +11,9 @@
 // M4：文件阅读器读文件按录制里的 file 步骤回答（同一个文件按录下的顺序，取完后重复最后一个）；用系统编辑器打开、复制、
 // 保存反馈只记下调用，保存反馈的失败与延迟由测试通过 window.__replay.feedback 控制。session.prompt 还比较 refs。
 // M5：会话引用读原会话（session.read）也是只读查询，同一个会话文件按录制顺序取结果，取完后重复最后一个。
+// M6：config.get、tools.get、agents.get、session.commands 也是只读查询，按 session.list 的做法取界面所在这一段（或更早）录下的
+// 最后一个结果；没录过时 config.get 用 synthetic 的连接（下面 m6Config），其余给空结果。新命令（换模型、思考强度、设置页、
+// 工具页的写入）都要与录制一致。M1–M5 的录制里会话信息没有思考强度，按后台进程对不支持思考的模型的取值补上（synthetic）。
 
 /** 截图返回的 1×1 PNG */
 const PIXEL = 'data:image/png;base64,'
@@ -26,7 +29,30 @@ const M3_INFO = { name: null, projectTrust: 'none', trustRemembered: false, trus
  */
 function withDefaults(type, value) {
   if ((type !== 'session.create' && type !== 'session.open') || !value) return value;
-  return { ...M3_INFO, approval: { mode: 'ask', allowed: [] }, ...value };
+  return { ...M3_INFO, approval: { mode: 'ask', allowed: [] }, ...M6_INFO, ...value };
+}
+
+/** @brief synthetic：没录过的 M6 只读查询的空结果。 */
+function m6Empty(type) {
+  if (type === 'session.commands') return [];
+  if (type === 'agents.get') return { userPath: 'replay\\AGENTS.md', content: null, effectivePath: null, loaded: null };
+  return { cwd: null, projectTrust: null, tools: null, skills: [], packages: [], mcp: null, diagnostics: [] };
+}
+
+/** synthetic：M6 才加进会话信息的字段，按后台进程对没标"支持思考"的模型的取值 */
+const M6_INFO = { thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false };
+
+/**
+ * @brief synthetic：M1–M5 的录制里没有 config.get 的结果，按录制的端点和模型拼出一个连接（与后台进程的写法相同：
+ *        provider id mori-endpoint，一个不支持思考的模型，它是默认模型）。
+ */
+function m6Config(fixture, saved) {
+  const [provider, id] = fixture.model.split('/');
+  const { apiKey: _key, modelId: _id, contextWindow, reasoning: _r, thinkingLevel: _t, ...endpoint } = saved.connection;
+  const model = { id, contextWindow, reasoning: false, thinkingLevel: 'off', thinkingLevels: ['off'] };
+  return { agentDir: 'replay', saved, connections: [{ providerId: provider, endpoint: { ...endpoint, apiKey: '' },
+    keySaved: true, models: [model] }], defaultModel: fixture.model,
+  models: [{ ref: fixture.model, provider, id, providerName: endpoint.name }], modelsError: null };
 }
 
 /**
@@ -72,7 +98,8 @@ function fileReader(fixture) {
 }
 
 /** 不占回放顺序的只读查询 */
-const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read'];
+const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
+  'agents.get', 'session.commands'];
 
 /** @brief 录制里由界面主动发出的命令（只读查询除外）的下标。 */
 function boundaries(steps) {
@@ -119,8 +146,31 @@ function sameCommand(expected, actual) {
     case 'session.close':
       return expected.sessionId === actual.sessionId;
     default:
-      return true;
+      return sameM6Command(expected, actual);
   }
+}
+
+/** @brief M6 的命令（换模型、思考强度、设置页、工具页的写入）是否一致：除 type 以外的字段全部相同（键的先后不计）。 */
+function sameM6Command(expected, actual) {
+  const { type: _a, ...rest } = m6Normal(expected);
+  const { type: _b, ...other } = m6Normal(actual);
+  return canonical(rest) === canonical(other);
+}
+
+/**
+ * @brief 比较前把等价的写法统一：model.save 不支持思考时思考强度不写进任何文件（不比较）；mcp.save 的条目没写 exposure
+ *        等于 direct（后台进程补上），空的 args、env 等于没写。
+ */
+function m6Normal(command) {
+  if (command.type === 'model.save' && !command.model.reasoning) {
+    const { thinkingLevel: _level, ...model } = command.model;
+    return { ...command, model };
+  }
+  if (command.type !== 'mcp.save') return command;
+  const entry = { exposure: 'direct', ...command.entry };
+  if (Array.isArray(entry.args) && entry.args.length === 0) delete entry.args;
+  if (entry.env && Object.keys(entry.env).length === 0) delete entry.env;
+  return { ...command, entry };
 }
 
 /**
@@ -237,9 +287,17 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
    *        界面在一条命令之后马上读列表（例如删除之后）时也能拿到这一段录下的结果。
    */
   function listResult() {
+    return latestResult('session.list', []);
+  }
+
+  /**
+   * @brief 只读查询的结果：界面现在所在的这一段（及之前）录下的最后一个成功结果（M6：config.get、tools.get、agents.get、
+   *        session.commands 与 session.list 同样取）；没录过时用 fallback。
+   */
+  function latestResult(type, fallback) {
     const end = marks[status.cursor] ?? steps.length;
-    const found = steps.slice(0, end).filter((step) => step.result?.type === 'session.list' && !step.result.error);
-    return structuredClone(found.at(-1)?.result.value ?? []);
+    const found = steps.slice(0, end).filter((step) => step.result?.type === type && !step.result.error);
+    return structuredClone(found.at(-1)?.result.value ?? fallback);
   }
 
   /** 每个文件夹已经取走的 trust.check 结果数 */
@@ -280,8 +338,10 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
     return Promise.resolve(structuredClone(step.result.value));
   }
 
-  /** @brief 下一条还没回放的 session.create 的文件夹（系统选文件夹对话框的结果）。 */
+  /** @brief 系统选文件夹对话框的结果：下一条命令是 package.add 时是它的文件夹（M6），否则是下一条 session.create 的文件夹。 */
   function nextFolder() {
+    const next = marks[status.cursor] === undefined ? null : steps[marks[status.cursor]].command;
+    if (next?.type === 'package.add') return next.path;
     const index = marks.slice(status.cursor).find((mark) => steps[mark].command.type === 'session.create');
     return index === undefined ? created?.cwd ?? null : steps[index].command.cwd;
   }
@@ -320,7 +380,12 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500 } = {}) {
     request(command) {
       if (status.exited) return Promise.reject(new Error('Mori kernel exited (code 1)'));
       switch (command.type) {
-        case 'config.get': return Promise.resolve({ agentDir: 'replay', saved });
+        case 'config.get': return Promise.resolve(latestResult('config.get', m6Config(fixture, saved)));
+        case 'tools.get':
+        case 'agents.get':
+        case 'session.commands':
+          status.queries.push(command);
+          return Promise.resolve(latestResult(command.type, m6Empty(command.type)));
         case 'connection.save': return Promise.resolve({ error: null });
         case 'connection.testCancel': return Promise.resolve({ cancelled: false });
         case 'connection.test':

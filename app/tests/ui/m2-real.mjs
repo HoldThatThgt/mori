@@ -606,7 +606,8 @@ async function f8WhileWaiting(ctx) {
 
 /** @brief 走查 8 后半：在连接表单里填一个假 key 并保存，再从左栏按钮报告：key 不进报告。放在最后（之后不再请求模型）。 */
 async function f8KeyNotInReport({ page, h }) {
-  await page.getByRole('button', { name: '设置', exact: true }).click();
+  // M6：设置页先是连接列表，填 key 在连接卡的"编辑连接"里（settings.md"编辑连接"；最近的操作记"保存连接 <provider>"）。
+  await h.editConnection();
   await h.fillConnection({ apiKey: FAKE_KEY });
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await h.formMessage();

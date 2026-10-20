@@ -1,9 +1,10 @@
 // 后台进程的启动与有序退出。后台进程放在一个作业对象里（见 job.ts）：它和它启动的所有进程（包括父进程已经不在的孤儿进程）
 // 在 Mori 退出、后台进程意外退出、Mori 被强行结束时都会被结束，关闭 Mori 后不留下任何进程。
+// 启动时把解密后的 key 交给后台进程；之后按它的请求加密保存或删除 key（credentials.ts）。
 
 import { join } from 'node:path';
 import { app, utilityProcess, type UtilityProcess } from 'electron';
-import { loadKeys, storeKey } from './credentials';
+import { deleteKey, loadKeys, storeKey } from './credentials';
 import { putInJob, type ProcessJob } from './job';
 
 /** 等后台进程释放会话的上限，见 docs/v0/defaults.md */
@@ -75,10 +76,10 @@ function jobFor(child: UtilityProcess): ProcessJob | null {
   }
 }
 
-/** @brief 后台进程发给主进程的消息。 */
+/** @brief 后台进程发给主进程的消息。store-key 的 key 为 null 时删除这个 provider 已保存的 key（连接删掉时）。 */
 type KernelToMain =
   | { type: 'shutdown-done' }
-  | { type: 'store-key'; id: number; providerId: string; key: string };
+  | { type: 'store-key'; id: number; providerId: string; key: string | null };
 
 /** @brief 读取并解密已保存的 key；失败时记录错误，后台进程按"没有 key"启动。 */
 function loadStoredKeys(): Record<string, string> {
@@ -90,15 +91,17 @@ function loadStoredKeys(): Record<string, string> {
   }
 }
 
-/** @brief 处理后台进程的请求：目前只有"加密保存 key"。 */
+/** @brief 处理后台进程的请求：目前只有"加密保存 key"和"删除 key"。 */
 function handleKernelMessage(child: UtilityProcess, message: KernelToMain): void {
   if (message?.type !== 'store-key') return;
   let error: string | null = null;
   try {
-    storeKey(message.providerId, message.key);
+    if (message.key === null) deleteKey(message.providerId);
+    else storeKey(message.providerId, message.key);
   } catch (cause) {
     error = (cause as Error).message;
-    console.error(`[main] cannot store the key for ${message.providerId}: ${error}`);
+    const action = message.key === null ? 'delete' : 'store';
+    console.error(`[main] cannot ${action} the key for ${message.providerId}: ${error}`);
   }
   child.postMessage({ type: 'store-key-result', id: message.id, error });
 }

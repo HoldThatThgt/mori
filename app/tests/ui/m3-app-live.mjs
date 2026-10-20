@@ -128,6 +128,27 @@ async function waitCard(page, method, timeout = 15000) {
   return cardView(page);
 }
 
+/**
+ * @brief 发出扩展命令（"/mori-ask" 之类）。M6 起输入框以 "/" 开头时出"/"补全列表，列表只列提示词模板和技能，
+ *        扩展命令不在里面（"没有匹配"）；列表开着时 Enter 不发送，Esc 先关闭列表（slash.md 状态表与表下说明）。
+ *        所以先等列表读完，记下它的样子，按一次 Enter（应不发送），再按 Esc 关掉、按 Enter 发送。
+ * @return 列表读完时的项数和文字，以及列表开着时按 Enter 之后列表还在不在、输入框里的字
+ */
+async function sendExtCommand(ctx, text) {
+  const { page, h } = ctx;
+  await h.textarea.fill(text);
+  const menu = paneOf(page).getByTestId('slash-menu');
+  await menu.waitFor({ timeout: 10000 });
+  await page.waitForFunction((selector) => !document.querySelector(`${selector} [data-testid="slash-menu"]`)
+    ?.textContent?.includes('正在读取…'), PANE, { timeout: 10000 });
+  const view = await menu.evaluate((el) => ({ options: el.querySelectorAll('[role="option"]').length,
+    text: el.textContent?.trim() ?? '' }));
+  // 列表里没有可选的项时 Enter 照常发送（slash.md，照 Claude 桌面版）：扩展命令直接发出，输入框清空、列表关闭。
+  await h.textarea.press('Enter');
+  const sent = { closed: await menu.count() === 0, draft: await h.textarea.inputValue() };
+  return { ...view, sent };
+}
+
 /** @brief 让模型调用项目扩展的 tool：批准卡出来后 Alt+1 允许一次，等确认询问卡出现，返回内容。 */
 async function askTool(ctx, tool) {
   const { page } = ctx;
@@ -342,7 +363,11 @@ async function extStopChain(ctx) {
  */
 async function extCommand(ctx) {
   const { page, record } = ctx;
-  await ctx.h.send('/mori-ask');
+  const slash = await sendExtCommand(ctx, '/mori-ask');
+  record('扩展命令（M6 起有"/"补全）：打出 "/mori-ask" 时列表里没有它（扩展命令不在列表里，只有一行说明）；'
+    + '没有可选的项，Enter 照常发出，输入框清空（slash.md）', slash.options === 0
+    && /^(没有匹配的提示词模板或技能|这个会话没有提示词模板或技能（在工具页添加）)$/.test(slash.text)
+    && slash.sent.closed && slash.sent.draft === '', JSON.stringify(slash));
   const card = await waitCard(page, 'confirm');
   const stage = await stageOf(page);
   const running = await paneOf(page).getAttribute('data-running');
@@ -418,7 +443,7 @@ async function reloadSetup(ctx) {
   await h.textarea.fill(RELOAD_DRAFT);
   await openRow(page, E1);
   ctx.files.W = await ctrlN(page);
-  await h.send('/mori-wait');
+  await sendExtCommand(ctx, '/mori-wait');
   await waitCard(page, 'confirm');
   await openRow(page, A1);
   await h.send('wait 8s');

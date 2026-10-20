@@ -3,6 +3,7 @@
 
 import type { SavedSession } from '../../../shared/protocol';
 import { sameFile, type Tab } from '../state/store';
+import { skillCommandText } from '../state/skillText';
 import { displayTitle, sessionTitle, TITLE_LENGTH } from './ChatPane';
 
 /** @brief 侧栏里的一个会话。 */
@@ -84,9 +85,10 @@ function editNameOf(name: string | null, first: string | null): string {
 
 /** @brief 会话列表里的一个会话的行。 */
 function savedRow(saved: SavedSession, archived: boolean, mark: 'unseen' | 'error' | null): Row {
+  const first = saved.firstMessage && skillCommandText(saved.firstMessage);
   return { id: saved.sessionFile, cwd: saved.cwd, file: saved.sessionFile, saved,
-    title: displayTitle(saved.name, saved.firstMessage), full: saved.name ?? saved.firstMessage ?? '新会话',
-    editName: editNameOf(saved.name, saved.firstMessage), activity: saved.modified, archived, mark };
+    title: displayTitle(saved.name, saved.firstMessage), full: saved.name ?? first ?? '新会话',
+    editName: editNameOf(saved.name, first), activity: saved.modified, archived, mark };
 }
 
 /** @brief 合成行用到的界面状态：已归档的会话文件、还没点开的会话留下的状态。 */
@@ -99,7 +101,8 @@ export interface RowState {
 export function buildRows(tabs: Tab[], sessions: SavedSession[], state: RowState): Row[] {
   const rows: Row[] = tabs.map((tab) => {
     const saved = sessions.find((session) => sameFile(session.sessionFile, tab.sessionFile));
-    const first = tab.transcript.firstUserText ?? tab.preview;
+    const raw = tab.transcript.firstUserText ?? tab.preview;
+    const first = raw && skillCommandText(raw);
     return { id: tab.key, cwd: tab.cwd, file: tab.sessionFile, tab, saved, title: sessionTitle(tab),
       full: tab.name ?? first ?? '新会话', editName: editNameOf(tab.name, first),
       activity: Math.max(tab.activity, saved?.modified ?? 0), archived: false, mark: null };

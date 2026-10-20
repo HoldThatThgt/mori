@@ -4,7 +4,7 @@
 import { create } from 'zustand';
 import {
   DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextUsage, type ProjectTrust, type QuoteRef,
-  type SavedSession,
+  type SavedSession, type ThinkingLevel,
 } from '../../../shared/protocol';
 import { loadArchived } from './archive';
 import { emptyTranscript, type Transcript } from './model';
@@ -62,6 +62,12 @@ export interface Tab {
   model: string | null;
   /** pi 选不到默认模型时的说明 */
   modelNotice: string | null;
+  /** 思考强度（M6） */
+  thinkingLevel: ThinkingLevel;
+  /** 这个模型可选的思考强度 */
+  thinkingLevels: ThinkingLevel[];
+  /** 模型标了支持思考 */
+  reasoning: boolean;
   /** 上下文用量 */
   contextUsage: ContextUsage | null;
   /** 批准设置（权限与"本会话已允许"），以后台进程返回的为准 */
@@ -102,6 +108,9 @@ export interface PendingRef {
   /** 没能加入的说明；正在读取时为 null */
   problem: string | null;
 }
+
+/** @brief 中栏显示什么：会话、设置页或工具页（M6）。 */
+export type View = 'chat' | 'settings' | 'tools';
 
 /** @brief 后台进程状态。 */
 export type KernelStatus = 'connecting' | 'ready' | 'exited' | 'reloading';
@@ -144,10 +153,12 @@ export interface AppState {
   activeKey: string | null;
   /** 分屏时左右两栏的会话（界面里的标识），单栏时为 null */
   split: [string, string] | null;
-  /** 中栏显示会话还是设置页 */
-  view: 'chat' | 'settings';
-  /** 每次"去设置"加一，设置页据此把焦点放到 API key */
+  /** 中栏显示会话、设置页还是工具页 */
+  view: View;
+  /** 每次"去设置"加一，设置页据此打开这个连接的"编辑连接"、把焦点放到 API key */
   settingsFocus: number;
+  /** "去设置"时出错会话所用模型的连接（provider id）；不知道时为 null */
+  settingsProvider: string | null;
   /** 等你回答的信任询问，一次显示第一个 */
   trustPrompts: TrustPrompt[];
   /** 已归档的会话文件（本机记下的，见 archive.ts） */
@@ -162,7 +173,7 @@ export interface AppState {
 export const useApp = create<AppState>(() => ({
   kernel: 'connecting', config: null, configError: null, firstRun: false,
   saved: { status: 'loading', sessions: [], error: null }, tabs: [], activeKey: null, split: null, view: 'chat',
-  settingsFocus: 0,
+  settingsFocus: 0, settingsProvider: null,
   trustPrompts: [], archived: loadArchived(), rowMarks: {},
 }));
 
@@ -174,7 +185,8 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
   return { key: `t${tabCounter}`, sessionId: null, cwd, sessionFile: null, name: null, preview: null,
     activity: Date.now(), unseen: false, interrupted: false, projectTrust: 'none', trustRemembered: false,
     trustSaveError: null, extensionErrors: [], model: null,
-    modelNotice: null, contextUsage: null, approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '',
+    modelNotice: null, thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, contextUsage: null,
+    approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '',
     draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
     refPending: [], phase: 'opening', error: null, ...fields };
 }

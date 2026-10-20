@@ -1092,8 +1092,8 @@ async function showInFolder({ app, page, issue }) {
  *        这样"报告里没有 key"才真的检查到了"保存连接"这一条。
  */
 async function saveKeyAgain({ page, h }) {
-  await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByTestId('connection-form').waitFor({ timeout: 10000 });
+  // M6：设置页先是连接列表，填 key 在连接卡的"编辑连接"里（settings.md"编辑连接"；最近的操作记"保存连接 <provider>"）。
+  await h.editConnection();
   await h.fillConnection({ apiKey: testKey });
   await page.getByRole('button', { name: '保存', exact: true }).click();
   const message = await h.formMessage();
