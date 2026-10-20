@@ -98,8 +98,8 @@ function fileReader(fixture) {
 }
 
 /** 不占回放顺序的只读查询 */
-const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get', 'agents.get',
-  'session.commands'];
+const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
+  'agents.get', 'session.commands'];
 
 /** @brief 录制里由界面主动发出的命令（只读查询除外）的下标。 */
 function boundaries(steps) {

@@ -491,8 +491,8 @@ export interface McpServerEntry {
 
 /** @brief 一个共享的 MCP 服务连接（后台进程的共享服务表，照 Claude 桌面版每个服务一份）。 */
 export interface SharedServerState {
-  /** 启动中（起进程、握手）/ 运行中 / 启动失败或连接断了 / 已经停了 */
-  state: 'starting' | 'running' | 'failed' | 'stopped';
+  /** 启动中（起进程、握手）/ 运行中 / 启动失败或连接断了（关掉的服务不在共享服务表里，不会读到） */
+  state: 'starting' | 'running' | 'failed';
   /** 正在用它的会话数 */
   sessions: number;
   /** 失败时的原文（错误第一行，stdio 时接上 stderr 的末尾）；没有时为 null */

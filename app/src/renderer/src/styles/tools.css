@@ -183,7 +183,9 @@ button.tools-row-main, summary.tools-row-main { cursor: pointer; }
 }
 .tools-switch[aria-checked='true'] .tools-switch-knob { transform: translateX(14px); }
 
-/* MCP：完整通知、添加与编辑的表单 */
+/* MCP：进程状态（共享服务表；失败时完整原文可以展开）、完整通知、添加与编辑的表单 */
+.tools-process p { margin: 0 0 2px; }
+.tools-process[data-state='running'] { color: var(--color-ok); }
 .tools-full-notice summary { width: fit-content; color: var(--color-muted); cursor: pointer; }
 .tools-full-notice pre {
   margin: 4px 0 0;

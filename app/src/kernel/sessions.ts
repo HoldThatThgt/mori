@@ -17,6 +17,7 @@ import { ApprovalGate } from './approval';
 import { PendingRefs, supplementEntry } from './entries';
 import { ExtensionUi } from './extensionUi';
 import { slimEvent } from './events';
+import { createSharedTransport, loadMcpShare } from './mcpShare';
 import { getRuntime, loadPi } from './pi';
 import { decideTrust, type TrustDecision } from './trust';
 
@@ -142,7 +143,10 @@ async function loadResources(cwd: string, gate: ApprovalGate, trust: TrustAnswer
   const settingsManager = pi.SettingsManager.create(cwd, agentDir, { projectTrusted: false });
   // MCP 照 pi 命令行的注册方式作为内置扩展加入（方案第 6 节）：`pi config` 和设置里的 -builtin:mcp 对它有效；
   // bindExtensions 发 session_start 时它在后台连接服务。codemode 不进 v0，所以服务要用直接调用方式。
-  const mcp = { name: 'mcp', factory: pi.createMcpExtension(), replaceable: true, builtin: true };
+  // 传输交给 Mori 的共享连接（mcpShare.ts，docs/v0/m6-mcp-shared.md）：每个服务一个进程，所有会话共用。
+  await loadMcpShare();
+  const mcp = { name: 'mcp', factory: pi.createMcpExtension({ createTransport: createSharedTransport }),
+    replaceable: true, builtin: true };
   const resourceLoader = new pi.DefaultResourceLoader({ cwd, agentDir, settingsManager,
     extensionFactories: [{ name: APPROVAL_EXTENSION, factory: gate.extension() }, mcp] });
   let decision: TrustDecision = { trusted: false, projectTrust: 'unasked', remembered: false, saveError: null };

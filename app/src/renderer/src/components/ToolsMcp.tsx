@@ -1,11 +1,12 @@
 // 工具页的"MCP"一节（docs/v0/screens/tools.md）：用户级 mcp.json 和项目的 .pi/mcp.json 里的服务。
-// 工具名来自跟随的会话（getAllTools），错误来自它对话流里 pi 的 MCP 通知；pi 不提供连接状态，所以不显示"已连接"。
+// 工具名来自跟随的会话（getAllTools），错误来自它对话流里 pi 的 MCP 通知；进程状态来自后台进程的共享服务表
+// （McpServerEntry.shared，docs/v0/m6-mcp-shared.md）。不显示"已连接"，也不凭工具列表推断连接状态。
 // pi 不会加载的条目（后台进程照 pi 的检查，McpServerEntry.problem）也列出，说明原因。
 // 改动只对新建的会话生效。
 
 import { useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import type { McpServerEntry } from '../../../shared/protocol';
+import type { McpServerEntry, SharedServerState } from '../../../shared/protocol';
 import { newSession } from '../state/projects';
 import type { Item } from '../state/model';
 import { useApp, type AppState } from '../state/store';
@@ -103,8 +104,42 @@ function McpErrors({ server, notices }: { server: McpServerEntry; notices: strin
 }
 
 /**
- * @brief 服务行的说明：pi 不会加载它的原因、注册的工具、调用方式的警示、错误、不能改的原因、项目的覆盖、没能保存的原文。
- *        pi 不会加载的条目只说原因，不显示工具名和调用方式的警示。
+ * @brief 进程状态的文字（照 Claude 桌面版设置 → 开发者里每个本地服务的 running / failed）；失败时接上原文的第一行。
+ *        failed 包括启动失败和运行后连接断了（SharedServerState 的定义），原文说明是哪一种（如 "Connection closed"）。
+ */
+function processText(shared: SharedServerState): string {
+  if (shared.state === 'running') {
+    return shared.sessions > 0 ? `运行中 · ${shared.sessions} 个会话在用` : '运行中 · 没有会话在用';
+  }
+  if (shared.state === 'starting') return '启动中…';
+  return shared.error ? `失败：${shared.error.split(/\r?\n/)[0]}` : '失败';
+}
+
+/**
+ * @brief 共享连接的进程状态（后台进程的共享服务表里的真实状态）：运行中和在用的会话数、启动中、失败和原文第一行
+ *        （警示色）。原文不止一行（stdio 时接上的 stderr 末尾）时可以展开看完整原文，照 Claude 桌面版状态一行、
+ *        详情另看。还没有共享连接时不显示；旧的回放录制里没有这个字段（undefined），同样不显示。
+ */
+function McpProcess({ shared }: { shared: SharedServerState | null | undefined }) {
+  if (!shared) return null;
+  const tone = shared.state === 'failed' ? 'tools-warn' : 'tools-row-note';
+  const full = shared.state === 'failed' && shared.error && /\r?\n/.test(shared.error) ? shared.error : null;
+  return (
+    <div className={`${tone} tools-process`} data-testid="mcp-process" data-state={shared.state}>
+      <p>{processText(shared)}</p>
+      {full && (
+        <details className="tools-full-notice">
+          <summary>完整原文</summary>
+          <pre>{full}</pre>
+        </details>
+      )}
+    </div>
+  );
+}
+
+/**
+ * @brief 服务行的说明：命令行、进程状态、pi 不会加载它的原因、注册的工具、调用方式的警示、错误、不能改的原因、
+ *        项目的覆盖、没能保存的原文。pi 不会加载的条目只说原因，不显示工具名和调用方式的警示。
  */
 function McpNotes({ server, notices, locked, error, onDirect }: {
   server: McpServerEntry; notices: string[]; locked: boolean; error: string | null; onDirect: () => void;
@@ -113,6 +148,7 @@ function McpNotes({ server, notices, locked, error, onDirect }: {
   return (
     <>
       {commandLine(server) && <p className="tools-mono">{commandLine(server)}</p>}
+      <McpProcess shared={server.shared} />
       {server.problem && <p className="tools-warn" data-testid="mcp-problem">pi 不会加载它：{server.problem}</p>}
       {tools && (
         <p className="tools-row-note" data-testid="mcp-tools">

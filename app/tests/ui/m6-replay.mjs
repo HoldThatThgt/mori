@@ -10,7 +10,7 @@
 // 用法（在 app/ 下）：node tests/ui/m6-replay.mjs [--only model-switch,slash]
 // 结果写到 test-results/m6-replay.json；截图在 test-results/m6-replay/。
 
-import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -1060,7 +1060,10 @@ async function toolsWithoutSession(page) {
   await toolsButton(page, '返回会话').click();
 }
 
-/** @brief 工具页"MCP"一节每个服务的样子：名字、命令行、工具名、错误行、标签、开关、按钮、完整通知、整行文字。 */
+/**
+ * @brief 工具页"MCP"一节每个服务的样子：名字、命令行、工具名、错误行、标签、开关、按钮、完整通知（错误行下面的；
+ *        进程状态失败时下面的"完整原文"也是 .tools-full-notice，不算在里面）、有没有进程状态那一行、整行文字。
+ */
 function mcpRows(page) {
   return page.locator('[data-testid="mcp-row"]').evaluateAll((rows) => rows.map((row) => {
     const power = row.querySelector('[role="switch"]');
@@ -1070,7 +1073,8 @@ function mcpRows(page) {
       tags: [...row.querySelectorAll('.tools-tag')].map((tag) => tag.textContent),
       power: `${power?.getAttribute('aria-checked')}:${power?.disabled ? 'locked' : 'usable'}`,
       actions: [...row.querySelectorAll('.tools-row-actions button')].map((b) => `${b.textContent}:${!b.disabled}`),
-      full: row.querySelector('.tools-full-notice summary')?.textContent ?? null, text: row.textContent };
+      full: row.querySelector('[data-testid="mcp-error"] .tools-full-notice summary')?.textContent ?? null,
+      process: Boolean(row.querySelector('[data-testid="mcp-process"]')), text: row.textContent };
   }));
 }
 
@@ -1124,6 +1128,10 @@ async function checkMcpServers(page, h, fx) {
   record('mcp：新会话的工具页列出 mori-test 注册的工具名"当前会话里注册的工具：mcp__mori_test__echo、mcp__mori_test__add"',
     row('mori-test')?.tools === '当前会话里注册的工具：mcp__mori_test__echo、mcp__mori_test__add',
     JSON.stringify(row('mori-test')));
+  record('mcp：录制里的 tools.get 没有 shared 字段（录制早于共享服务表，界面按没有共享连接处理）：'
+    + '每一行都没有进程状态那一行（mcp-process），不凭工具列表推断连接状态', servers.length === rows.length
+    && servers.every((server) => !Object.hasOwn(server, 'shared')) && rows.every((item) => !item.process),
+  JSON.stringify(rows.map((item) => [item.name, item.process])));
   await fullNotice(page, row('mori-broken'), fx);
   record('mcp：反例：没有注册任何工具的 mori-empty 显示"当前会话里它没有注册工具"，整页不出现"已连接"',
     row('mori-empty')?.tools === '当前会话里它没有注册工具' && !page_.includes('已连接'),
@@ -1136,7 +1144,8 @@ async function checkMcpServers(page, h, fx) {
 /** @brief mori-broken 下面是 pi 通知里的原文那一行；"完整通知"展开后是整条通知。 */
 async function fullNotice(page, broken, fx) {
   const notify = fx.steps.find((step) => step.envelope?.event.type === 'mori.notify').envelope.event.message;
-  const details = page.locator('[data-testid="mcp-row"][data-server="mori-broken"] .tools-full-notice');
+  const details = page.locator('[data-testid="mcp-row"][data-server="mori-broken"] [data-testid="mcp-error"]'
+    + ' .tools-full-notice');
   await details.locator('summary').click().catch(() => {});
   const full = await details.evaluate((el) => ({ open: el.open, text: el.querySelector('pre')?.textContent }))
     .catch(() => null);
@@ -1531,9 +1540,10 @@ const checks = { 'model-switch': modelSwitch, thinking, 'agents-md': agentsMd, '
   plugin, slash };
 
 await buildHarness();
+/** 回放窗口的临时数据目录：关掉窗口之后删掉 */
+const harnessData = mkdtempSync(join(tmpdir(), 'mori-m6-harness-'));
 const app = await electron.launch({ args: [join(harnessDir, 'main.cjs')], env: { ...process.env,
-  MORI_HARNESS_INDEX: join(outDir, 'index.html'),
-  MORI_HARNESS_DATA: mkdtempSync(join(tmpdir(), 'mori-m6-harness-')) } });
+  MORI_HARNESS_INDEX: join(outDir, 'index.html'), MORI_HARNESS_DATA: harnessData } });
 const page = await app.firstWindow();
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -1553,3 +1563,8 @@ try {
   await app.close();
 }
 process.exitCode = write('m6-replay.json') ? 0 : 1;
+try {
+  rmSync(harnessData, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+} catch (error) {
+  console.error(`[m6-replay] cannot remove ${harnessData}: ${error.message}`);
+}

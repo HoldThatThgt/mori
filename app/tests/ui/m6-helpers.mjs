@@ -2,7 +2,7 @@
 // 设置页（连接卡、模型行、AGENTS.md）、工具页的分节、顶栏的模型和思考菜单、"/"补全列表。
 // 只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。标识见 docs/v0/screens/settings.md、models.md、tools.md、slash.md。
 
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { appRoot, sleep } from './lib.mjs';
 import { PANE, paneOf, stubFolder, waitReady } from './m3-helpers.mjs';
@@ -207,4 +207,35 @@ export async function menuInside(page, buttonId, menuId) {
   await page.keyboard.press('Escape');
   await menuGone(page, menuId);
   return inside;
+}
+
+// ---------- m6-app-mcp-shared.mjs 加的：带命令行的进程列表 ----------
+
+/** Win32_Process 的一行：PID、父 PID、名字、命令行，用 | 分开 */
+const PROCESS_QUERY = 'Get-CimInstance Win32_Process | ForEach-Object '
+  + '{ "$($_.ProcessId)|$($_.ParentProcessId)|$($_.Name)|$($_.CommandLine)" }';
+
+/** @brief 全部进程：pid、parent、name、command（命令行；读不到时为空串）。 */
+export function processList() {
+  return execFileSync('powershell', ['-NoProfile', '-Command', PROCESS_QUERY], { encoding: 'utf8', maxBuffer: 1 << 24 })
+    .split(/\r?\n/).filter(Boolean).map((line) => {
+      const [pid, parent, name, ...command] = line.split('|');
+      return { pid: Number(pid), parent: Number(parent), name, command: command.join('|') };
+    });
+}
+
+/** @brief rootPid 的全部子孙进程（不含它自己），带命令行；rows 不给时现读一次进程列表。 */
+export function descendantsOf(rootPid, rows = processList()) {
+  const tree = new Set([rootPid]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const row of rows) {
+      if (tree.has(row.parent) && !tree.has(row.pid)) {
+        tree.add(row.pid);
+        grew = true;
+      }
+    }
+  }
+  tree.delete(rootPid);
+  return rows.filter((row) => tree.has(row.pid));
 }

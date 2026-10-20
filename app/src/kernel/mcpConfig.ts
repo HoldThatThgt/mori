@@ -8,6 +8,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { McpServerEntry, SaveResult, ToolsInfo } from '../shared/protocol';
+import { forgetStaleServers, sharedServerStates } from './mcpShare';
 import { loadPi } from './pi';
 
 /** @brief mcp.json 里的一个 JSON 对象。 */
@@ -261,6 +262,7 @@ function describeServer(name: string, scope: 'user' | 'project', merged: JsonObj
     tools: null,
     readOnly: scope === 'project' ? PROJECT_READ_ONLY : null,
     problem: null,
+    shared: null,
   };
 }
 
@@ -329,6 +331,7 @@ function addFile(source: Source, state: ReadState): void {
 
 /**
  * @brief 两处 mcp.json 的服务（工具名由调用方从会话里补上）：pi 会加载的在前，pi 不加载的（带原因）在后。
+ *        pi 会加载的服务带上共享服务表里它的进程状态（用户级的在用户目录里运行，本项目的在这个项目文件夹里）。
  * @param cwd 跟随的会话的工作目录；为 null 或不信任时不读项目的 .pi/mcp.json
  */
 export async function readMcpServers(cwd: string | null, trusted: boolean): Promise<McpList> {
@@ -336,13 +339,16 @@ export async function readMcpServers(cwd: string | null, trusted: boolean): Prom
   const state: ReadState = { servers: new Map(), rejected: [], errors: [] };
   addFile({ path: join(pi.getAgentDir(), 'mcp.json'), scope: 'user' }, state);
   if (cwd !== null && trusted) addFile({ path: join(cwd, pi.CONFIG_DIR_NAME, 'mcp.json'), scope: 'project' }, state);
-  return { servers: [...state.servers.values(), ...state.rejected], errors: state.errors };
+  const shared = sharedServerStates(cwd, trusted);
+  const servers = [...state.servers.values()].map((server) => ({ ...server,
+    shared: shared.get(`${server.scope}:${server.name}`) ?? null }));
+  return { servers: [...servers, ...state.rejected], errors: state.errors };
 }
 
 /**
  * @brief 改用户级 mcp.json 的 mcpServers 并写回（2 空格缩进加换行）；文件不存在时新建，读不出时报错、不写。
  *        读、改、写临时文件、改名都同步做完（同 pi 的 editMcpServers）：后台进程同时收到的几条命令不会交错，
- *        不会互相盖掉改动，也不会同时写同一个临时文件。
+ *        不会互相盖掉改动，也不会同时写同一个临时文件。写完后关掉配置已经不在、没有会话用的共享服务（mcpShare.ts）。
  * @param edit 收到 mcpServers 和文件路径，返回新的 mcpServers；拒绝时抛错
  */
 async function editUserServers(edit: (servers: JsonObject, path: string) => JsonObject): Promise<SaveResult> {
@@ -354,6 +360,7 @@ async function editUserServers(edit: (servers: JsonObject, path: string) => Json
   const temp = `${path}.tmp`;
   writeFileSync(temp, `${JSON.stringify(file, null, 2)}\n`, 'utf8');
   renameSync(temp, path);
+  forgetStaleServers();
   return { error: null };
 }
 

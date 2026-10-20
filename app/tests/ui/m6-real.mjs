@@ -696,9 +696,11 @@ async function item4(ctx) {
   await callMcpTool(page);
 }
 
-/** @brief 展开 MCP 一行下面的"完整通知"；返回展开后看得见没有，和通知原文。 */
+/**
+ * @brief 展开 MCP 一行下面 pi 通知的"完整通知"（不是进程状态的"完整原文"）；返回展开后看得见没有，和通知原文。
+ */
 async function expandNotice(page, name) {
-  const details = page.locator(`[data-testid="mcp-row"][data-server="${name}"] .tools-full-notice`);
+  const details = page.locator(`[data-testid="mcp-row"][data-server="${name}"] [data-testid="mcp-error"] .tools-full-notice`);
   if (await details.count() === 0) return { open: false, texts: [] };
   await details.locator('summary').click();
   const open = await details.locator('pre').first().waitFor({ state: 'visible', timeout: 3000 })

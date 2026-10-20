@@ -43,13 +43,21 @@
 
 ## MCP（只在有会话时）
 
-服务来自 `<agentDir>/mcp.json`（用户级）和项目的 `.pi/mcp.json`（项目信任后）；工具名来自跟随的会话的 `getAllTools()`。
+服务来自 `<agentDir>/mcp.json`（用户级）和项目的 `.pi/mcp.json`（项目信任后）；工具名来自跟随的会话的 `getAllTools()`；
+进程状态来自后台进程的共享服务表。
+
+**共享连接**（[../m6-mcp-shared.md](../m6-mcp-shared.md)，照 Claude 桌面版）：每个服务一个进程（HTTP 服务一个连接），所有会话共用。
+用户级的服务整个 Mori 一份、在你的用户目录里运行，启用的 stdio 服务在 Mori 启动时就起、一直开到退出 Mori，
+HTTP 服务第一次有会话用时才连、最后一个会话关闭后断开；
+项目 `.pi/mcp.json` 里的服务按项目文件夹共用、在项目文件夹里运行，这个项目最后一个用它的会话关闭后关掉；扩展用 `pi.registerMcpServer()` 注册的服务不共用（不在这一节里）。
+配置改了、删了或停用了的服务，没有会话用它之后才关掉。进程状态是读取那一刻的，不自动刷新（不轮询），每次读取时更新。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 列表 | `tools.get` 的 `mcp.servers` | 每个服务一行：名字、来源（用户级 / 本项目）、命令行（`command` 加 `args`）或地址、启用开关、调用方式；pi 不会加载的条目也列出（见下一行），排在 pi 会加载的服务后面 | 启停（用户级）；编辑；以 JSON 编辑；移除 |
 | pi 不会加载 | `mcp.servers[].problem`：后台进程照 pi 1.3.0 读 `mcp.json` 的检查（照搬 `validateMcpServerConfig`：名字、字段类型、`url` 只能 http / https、不支持 SSE、oauth / auth 的写法；再加 `-` 和 `_` 算同名的冲突、项目里不能写 `auth`、项目覆盖没有被覆盖的服务或写了别的字段），原文同 pi | 这一行下面警示色"pi 不会加载它：<原文>"，例如"pi 不会加载它：server "x": args must be an array of strings"；开关关上、不可用；不显示调用方式、工具名和"改为直接调用"。本项目里同名的条目被跳过时，用户级的那个服务照常是另一行，编辑它时表单只接在用户级那一行下面 | 编辑；以 JSON 编辑；移除（用户级的；条目不是对象时也能改写、移除） |
-| 工具名 | 跟随的会话里 `sourceInfo.path` 为 `builtin:mcp`、`namespace.aliases` 里有这个服务名、不是 `hidden` 的工具 | "当前会话里注册的工具：mcp__x__echo、mcp__x__add"；一个都没有时"当前会话里它没有注册工具"。**不显示"已连接"**（pi 不提供连接状态） | — |
+| 进程状态 | `tools.get` 的 `mcp.servers[].shared`：后台进程的共享服务表（[../m6-mcp-shared.md](../m6-mcp-shared.md)）里这个服务按现在的配置的那个共享连接（旧配置还在给旧会话用的进程不算）的状态、在用的会话数、失败原文 | 命令行下面一行："运行中 · N 个会话在用"（没有会话在用时"运行中 · 没有会话在用"）、"启动中…"、"失败：<原文>"（警示色；`failed` 包括启动失败和运行后连接断了，原文说明是哪一种，如 `Connection closed`；只显示原文第一行；原文不止一行（stdio 时接上的 stderr 末尾）时下面有"完整原文"可以展开）；`shared` 为 null（还没有这个服务的共享连接）时这一行不出现。这是共享服务表里的真实状态，不是"已连接"，也不凭工具列表推断 | — |
+| 工具名 | 跟随的会话里 `sourceInfo.path` 为 `builtin:mcp`、`namespace.aliases` 里有这个服务名、不是 `hidden` 的工具 | "当前会话里注册的工具：mcp__x__echo、mcp__x__add"；一个都没有时"当前会话里它没有注册工具"。**不显示"已连接"**：不凭工具列表猜连接状态，进程状态只来自共享服务表（上一行） | — |
 | 出错 | 跟随的会话对话流里 pi 的 MCP 通知（以 `MCP ` 开头的扩展通知）里以 `<服务名>:` 开头的行（连接错误），和以 `config: ` 开头、含 `server "<服务名>"` 或 `invalid server name "<服务名>"` 的行（pi 读配置时跳过了它） | 这一行下面警示色显示原文，例如"broken: failed: MCP connection closed"、"config: C:\…\mcp.json: server "x": url must be an http or https URL"；与"pi 不会加载它"原因相同的 `config:` 行不重复；完整通知可以展开 | — |
 | 不是直接调用 | 条目的 `exposure` 不是 `direct`（没写时 pi 按 `codemode`） | 警示色"v0 只支持直接调用（现在是 codemode / 延迟加载 / 隐藏）：模型调用不到它的工具" | "改为直接调用"（`mcp.setDirect`，只改这个服务的 `exposure`，其他字段和别的服务原样保留） |
 | 停用 | 你关了开关：`mcp.setEnabled`（写 `enabled: false`；打开时删掉这个字段） | 开关关上、行变淡 | 再打开 |
@@ -67,7 +75,8 @@
 | 保存失败 | pi 不接受的条目（照搬 pi `validateMcpServerConfig`，原文同 pi：名字不合规、没有命令也没有地址、`args` 不是字符串数组、`env` / `headers` 的值不是字符串、`url` 不是 http / https、`type: "sse"`、`enabled` 不是 true / false 等）、与已有的重名（`-` 和 `_` 算同一个，同 pi）、JSON 不能解析、`exposure` 写了 direct 以外的值 | "保存失败："+ 说明或原文，例如"保存失败：server "x": legacy SSE transport is not supported; use the streamable HTTP URL"；表单保留你写的；`mcp.json` 不变 | 改后再存 |
 | 移除 | 你点了"移除"并确认 | 确认框"移除 MCP 服务 <名字>？已经打开的会话不受影响。" | 移除；取消 |
 
-反例：没有注册任何工具的服务不显示"已连接"；调用 MCP 服务的工具会出批准卡（标题"<服务> · <工具>"，M2 起）。
+反例：工具页不凭工具列表猜连接状态：没有注册任何工具的服务不显示"已连接"，注册了工具的也不显示；进程状态只来自共享服务表，
+显示的是"运行中"等进程状态，不是"已连接"；调用 MCP 服务的工具会出批准卡（标题"<服务> · <工具>"，M2 起）。
 
 ## 插件（pi 包）
 
@@ -93,7 +102,9 @@
 | 页面结构 | 左边分节、右边列表，每项一个开关（Claude 桌面版的"连接器"和"技能"列表） |
 | 技能 | 列表里开关启停，点开看 SKILL.md 内容 |
 | MCP 服务 | 列表里开关启停、看这个服务的工具；本地服务的配置用与 Claude 桌面版 `claude_desktop_config.json` 相同的 `mcpServers` 条目写法（"以 JSON 编辑"） |
-| 改了 MCP 配置之后 | Claude 桌面版改了本地 MCP 配置要重启才生效；Mori 对新建的会话生效、界面明说 |
+| MCP 进程状态 | Claude 桌面版设置 → 开发者里每个本地服务显示 running / failed 和失败原文；Mori 每个服务一行"运行中 · N 个会话在用""启动中…""失败：<原文第一行>"（完整原文展开看），来源是共享服务表 |
+| MCP 进程共用 | Claude 桌面版每个本地服务整个 App 一个进程，启动 App 时起、退出时关；Mori 同样（用户级服务，[../m6-mcp-shared.md](../m6-mcp-shared.md)） |
+| 改了 MCP 配置之后 | Claude 桌面版改了本地 MCP 配置要重启才生效；Mori 对新建的会话生效、界面明说；旧进程没有会话用了才关 |
 
 ## 界面测试用的标识
 
@@ -102,5 +113,5 @@
 | 工具页 | `data-testid="tools-page"`；左栏入口 `data-testid="nav-tools"`；分节按钮 `button[data-section]`（`builtin` / `skills` / `mcp` / `plugins`） |
 | 内置工具 | `[data-testid="tool-row"][data-tool]`，`data-active` |
 | 技能 | `[data-testid="skill-row"][data-name]`，`data-scope`（`user` / `project` / `package`），开关 `role="switch"` |
-| MCP | `[data-testid="mcp-row"][data-server]`，`data-scope`（`user` / `project`；同名的服务可能各有一行）；工具名 `data-testid="mcp-tools"`；错误 `data-testid="mcp-error"`；pi 不会加载的原因 `data-testid="mcp-problem"`；"改为直接调用" `data-testid="mcp-direct"`；表单 `data-testid="mcp-form"`，JSON `data-testid="mcp-json"` |
+| MCP | `[data-testid="mcp-row"][data-server]`，`data-scope`（`user` / `project`；同名的服务可能各有一行）；工具名 `data-testid="mcp-tools"`；进程状态 `data-testid="mcp-process"`，`data-state`（`starting` / `running` / `failed`；`shared` 为 null 时没有这个元素）；错误 `data-testid="mcp-error"`；pi 不会加载的原因 `data-testid="mcp-problem"`；"改为直接调用" `data-testid="mcp-direct"`；表单 `data-testid="mcp-form"`，JSON `data-testid="mcp-json"` |
 | 插件 | `[data-testid="package-card"][data-source]`；资源行 `[data-testid="package-resource"][data-kind][data-path]` |

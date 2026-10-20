@@ -13,9 +13,18 @@ const keysApplied = new Promise<void>((resolve) => {
   markKeysApplied = resolve;
 });
 
-/** @brief 动态加载 pi（pi 只提供 ESM，后台进程入口是 CJS）。 */
+/**
+ * @brief 动态加载 pi（pi 只提供 ESM，后台进程入口是 CJS）。加载前去掉 PI_PACKAGE_DIR：pi 会按它到别处找自己的包目录，
+ *        MCP 共享连接也按这个目录载入 pi 的内部文件（mcpShare.ts）；后台进程只用 Mori 自带的 pi。Windows 上环境变量名
+ *        不分大小写，从 Git Bash 启动时还可能同时带着几种写法，所以每种写法都去掉；后台进程起的命令和 MCP 服务也就不再继承它。
+ */
 export function loadPi(): Promise<Pi> {
-  piModule ??= import('@earendil-works/pi-coding-agent');
+  if (!piModule) {
+    for (const name of Object.keys(process.env)) {
+      if (name.toUpperCase() === 'PI_PACKAGE_DIR') delete process.env[name];
+    }
+    piModule = import('@earendil-works/pi-coding-agent');
+  }
   return piModule;
 }
 

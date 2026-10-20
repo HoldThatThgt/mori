@@ -58,12 +58,12 @@ npm ci
 | `node tests/ui/m5-record.mjs --source <走查数据目录> [--only …]` | 从真实会话录制 `tests/fixtures/m5/`（两栏各自批准、只停一栏、引用第 3–5 轮、重启后的引用、引用正在生成的会话、超过 2 万字）；引用的全文用界面的代码算（esbuild 打包 `sessionRefs.ts`） |
 | `npm run test:m5-replay` | M5 界面测试：回放 `tests/fixtures/m5/`（带会话引用的消息连全文和 refs 一起核对） |
 | `node tests/ui/m5-real.mjs --source <走查数据目录> [--exe …] [--only …]` | M5 真实端点走查（走查 1–6 与反例） |
-| `npm run test:m6-app` | M6 整机测试：真正的 Mori 对合成端点，设置页（连接与多个模型、默认模型、思考强度、AGENTS.md、离开时先问）与顶栏的模型和思考菜单（`m6-app-settings`）、工具页（内置工具、技能、MCP、插件，启停与 pi config 逐字比较）（`m6-app-tools`）、"/"补全与窄栏（`m6-app-slash`）；测打包结果分别加 `--exe …` |
+| `npm run test:m6-app` | M6 整机测试：真正的 Mori 对合成端点，设置页（连接与多个模型、默认模型、思考强度、AGENTS.md、离开时先问）与顶栏的模型和思考菜单（`m6-app-settings`）、工具页（内置工具、技能、MCP、插件，启停与 pi config 逐字比较）（`m6-app-tools`）、"/"补全与窄栏（`m6-app-slash`）、MCP 共享连接（`m6-app-mcp-shared`：每个服务一个进程、所有会话共用，运行目录、roots、并发、取消、崩溃重连、改配置、退出）；测打包结果分别加 `--exe …` |
 | `npm run test:m6-replay` | M6 界面测试：回放 `tests/fixtures/m6/` 里从 DeepSeek 录下的 7 个场景 |
 | `node tests/ui/m6-real.mjs --source <走查数据目录> [--exe …] [--only …]` | M6 真实端点走查（走查 1–8 与反例） |
 | `node tests/ui/m6-record.mjs --source <走查数据目录> [--only …]` | 从真实会话录制 `tests/fixtures/m6/`（换模型、思考强度、AGENTS.md、项目技能、MCP、插件、"/"命令） |
 | `node tests/ui/m6-pi-config.mjs [--check]` | 用 pi 自己的 `pi config` 组件录下启停的写法（`tests/fixtures/m6/pi-config-toggles.json`），M6 测试拿 Mori 的写入与它比较；`--check` 在 pi 升级时核对 |
-| `node tests/ui/m6-mcp-cost.mjs [--servers N] [--exe …]` | 测量打开 1、5、10 个会话时 MCP 服务的进程数和内存 |
+| `node tests/ui/m6-mcp-cost.mjs [--servers N] [--exe …]` | 测量打开 1、5、10 个会话时 MCP 服务的进程数和内存（共享连接：每个服务始终 1 个进程） |
 | `npx electron tests/prechecks/esm-utility/main.cjs` | 预检：utilityProcess 能否运行 ESM 入口 |
 | `npx electron tests/prechecks/job-object/main.cjs` | 预检：后台进程放进 Windows 作业对象后，它留下的孤儿进程能随作业一起结束 |
 | `node tests/ui/m0-real.mjs --user-data <目录> [--setup]` | 真实端点走查（M0 走查 2–3）；`--setup` 先打开 Mori 让你填连接，脚本不接触 key |

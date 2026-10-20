@@ -10,7 +10,10 @@
 // MCP（没有服务、表单添加、编辑与改名、以 JSON 编辑新的和已有的、HTTP 服务、几种保存失败、v0 调用方式的警示与"改为直接调用"、
 // 启停、移除、新会话注册的工具名、命令写错时 pi 的原文和完整通知、没有注册工具的服务不显示"已连接"、调用出批准卡、
 // 本项目的服务只读、mcp.json 读不出与用系统编辑器打开、pi 不会加载的条目（原因、排在后面、config: 行不重复、改写和移除、
-// 本项目里同名的条目被跳过时两行按 data-scope 分开、表单接在用户级那一行下面））；
+// 本项目里同名的条目被跳过时两行按 data-scope 分开、表单接在用户级那一行下面）、进程状态那一行（共享服务表，
+// docs/v0/m6-mcp-shared.md：还没有会话用过时没有这一行、"运行中 · N 个会话在用"、命令写错时"失败："和原文第一行、
+// 原文不止一行时下面可以展开的"完整原文"（只有一行时没有，哪一种看时机、记进结果）、本项目的服务、pi 不会加载的条目
+// 没有这一行；Mori 启动时起服务、会话之间共用一个进程、退出时关掉等由 m6-app-mcp-shared.mjs 负责））；
 // 插件（添加本地包不复制文件、添加失败、按资源启停、停用 / 启用整个包、移除、包里扩展的工具与批准卡、包里没有资源、本项目的包、
 // 未信任项目的包和扩展不列出、不是本地文件夹的 npm 包只能移除）；
 // 工具页开着时归档它跟随的会话（跟到剩下的一栏，或"没有打开的会话"）；
@@ -20,11 +23,11 @@
 // 合成的东西：端点、MCP 服务（tests/mcp-server）、pi 包（tests/pi-package 的副本）、下面写的技能和配置文件都是 synthetic。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m6-app-tools.mjs [--exe <Mori.exe 路径>]
-// 结果写到 test-results/m6-app-tools(-packaged).json，截图在 test-results/m6-app-tools(-packaged)/。
+// 结果写到 test-results/m6-app-tools(-packaged).json，截图在 test-results/m6-app-tools(-packaged)/；全部通过时删掉临时目录。
 // 各步骤按顺序依赖前一步留下的配置（pi config 的对照是累积的），所以不提供 --only。
 
 import {
-  chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, writeFileSync,
+  chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -36,6 +39,7 @@ import {
 import { composerAt, paneAt, sendAt, splitState, waitPaneIdle, waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import { openToolsSection, slashItems, startFakeEndpoint } from './m6-helpers.mjs';
 import { prepareLayout, STEPS } from './m6-pi-config.mjs';
+import { mcpRows, packageCards, skillRows, toolRows, toolsHead } from './m6-tools-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -46,7 +50,7 @@ const baseUrl = `http://127.0.0.1:${port}/v1`;
 const testKey = 'synthetic-test-key-m6-tools-not-a-real-key';
 const shots = join(appRoot, `test-results/m6-app-tools${suffix}`);
 mkdirSync(shots, { recursive: true });
-const { record, write } = createRecorder(exePath ?? 'dev build');
+const { record, write, results } = createRecorder(exePath ?? 'dev build');
 const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) }).catch(() => {});
 
 /** pi config 的写入（m6-pi-config.mjs 录制） */
@@ -226,94 +230,6 @@ function expectSnapshot(ctx, index, how) {
 }
 
 // ---------- 页面 ----------
-
-/** @brief 工具页的外框：分节、当前分节、跟随的会话、说明、信任说明、整页文字；不在工具页时为 null。 */
-function toolsHead(page) {
-  return page.evaluate(() => {
-    const root = document.querySelector('[data-testid="tools-page"]');
-    if (!root) return null;
-    const text = (element) => element?.textContent?.trim() ?? '';
-    return {
-      sections: [...root.querySelectorAll('[data-testid="tools-nav"] button[data-section]')]
-        .map((b) => b.dataset.section),
-      current: root.querySelector('[data-testid="tools-nav"] [aria-current="page"]')?.dataset.section ?? null,
-      follow: text(root.querySelector('[data-testid="tools-follow"]')),
-      notice: text(root.querySelector('.tools-notice span')),
-      newSession: [...root.querySelectorAll('.tools-notice button')].some((b) => b.textContent.includes('新建会话')),
-      trust: text(root.querySelector('[data-testid="tools-trust"]')) || null,
-      title: text(root.querySelector('.topbar .chat-title')),
-      back: [...root.querySelectorAll('.topbar button')].some((b) => b.textContent.includes('返回会话')),
-      text: root.innerText,
-    };
-  });
-}
-
-/** @brief "技能"一节的行（开关：aria-checked、是否不可用）。 */
-function skillRows(page) {
-  return page.evaluate(() => {
-    const text = (element) => element?.textContent?.trim() ?? '';
-    const sw = (row) => row.querySelector('[role="switch"]');
-    return [...document.querySelectorAll('[data-testid="skill-row"]')].map((row) => ({
-      name: row.dataset.name, scope: row.dataset.scope, tag: text(row.querySelector('.tools-tag')),
-      desc: text(row.querySelector('.tools-row-desc')), off: row.classList.contains('off'),
-      checked: sw(row)?.getAttribute('aria-checked') === 'true', disabled: sw(row)?.disabled ?? null,
-      notes: [...row.querySelectorAll('.tools-row-note')].map(text),
-      error: text(row.querySelector('.form-message.error')),
-    }));
-  });
-}
-
-/** @brief "内置工具"一节的行。 */
-function toolRows(page) {
-  return page.evaluate(() => {
-    const text = (element) => element?.textContent?.trim() ?? '';
-    return [...document.querySelectorAll('[data-testid="tool-row"]')].map((row) => ({
-      name: row.dataset.tool, active: row.dataset.active, tag: text(row.querySelector('.tools-tag')),
-      state: text(row.querySelector('.tools-state')), desc: text(row.querySelector('.tools-row-desc')) }));
-  });
-}
-
-/** @brief "MCP"一节的行。 */
-function mcpRows(page) {
-  return page.evaluate(() => {
-    const text = (element) => element?.textContent?.trim() ?? '';
-    const sw = (row) => row.querySelector('[role="switch"]');
-    return [...document.querySelectorAll('[data-testid="mcp-row"]')].map((row) => ({
-      name: row.dataset.server, scope: row.dataset.scope, tags: [...row.querySelectorAll('.tools-tag')].map(text),
-      problem: text(row.querySelector('[data-testid="mcp-problem"]')),
-      off: row.classList.contains('off'),
-      checked: sw(row)?.getAttribute('aria-checked') === 'true', disabled: sw(row)?.disabled ?? null,
-      command: text(row.querySelector('.tools-mono')), tools: text(row.querySelector('[data-testid="mcp-tools"]')),
-      error: [...row.querySelectorAll('[data-testid="mcp-error"] > p')].map(text),
-      fullNotice: Boolean(row.querySelector('[data-testid="mcp-error"] details')),
-      warn: [...row.querySelectorAll('.tools-warn')].map(text).join(' | '),
-      direct: Boolean(row.querySelector('[data-testid="mcp-direct"]')),
-      notes: [...row.querySelectorAll('.tools-row-note:not([data-testid])')].map(text),
-      buttons: [...row.querySelectorAll('.tools-row-actions button')]
-        .map((b) => ({ text: text(b), disabled: b.disabled })),
-    }));
-  });
-}
-
-/** @brief "插件"一节的卡。 */
-function packageCards(page) {
-  return page.evaluate(() => {
-    const text = (element) => element?.textContent?.trim() ?? '';
-    const sw = (row) => row.querySelector('[role="switch"]');
-    return [...document.querySelectorAll('[data-testid="package-card"]')].map((card) => ({
-      source: card.dataset.source, tag: text(card.querySelector('.tools-card-head .tools-tag')),
-      root: text(card.querySelector(':scope > .tools-mono')),
-      groups: [...card.querySelectorAll('.tools-group h3')].map(text),
-      actions: [...card.querySelectorAll('.tools-card-head button')]
-        .map((b) => ({ text: text(b), disabled: b.disabled })),
-      resources: [...card.querySelectorAll('[data-testid="package-resource"]')].map((row) => ({
-        kind: row.dataset.kind, path: row.dataset.path, name: text(row.querySelector('.tools-row-name')),
-        tags: [...row.querySelectorAll('.tools-tag')].map(text),
-        checked: sw(row)?.getAttribute('aria-checked') === 'true',
-        disabled: sw(row)?.disabled ?? null })),
-    }));
-  });
-}
 
 /** @brief 工具页里一个技能行。 */
 const skillRow = (page, name) => page.locator(`[data-testid="skill-row"][data-name="${name}"]`);
@@ -1096,6 +1012,9 @@ async function mcpListRows(ctx, rows) {
   record('写 mcp.json 之前创建的会话：每个服务都是"当前会话里它没有注册工具"（改动只对新建的会话生效），没有"已连接"',
     rows.every((row) => row.tools === '当前会话里它没有注册工具') && !(await toolsHead(page)).text.includes('已连接'),
     JSON.stringify(rows.map((row) => row.tools)));
+  record('进程状态：Mori 启动时还没有 mcp.json（启动时只起那时配置里的服务），之后写进去的服务还没有会话用过，'
+    + '共享服务表里没有它们：每一行都没有进程状态那一行（mcp-process）', rows.every((row) => row.process === null),
+  JSON.stringify(rows.map((row) => [row.name, row.process])));
 }
 
 /** @brief HTTP 服务的"编辑"：表单没有地址一栏，直接以 JSON 编辑，内容是 mcp.json 里它的条目；Esc 关上，焦点回到"编辑"。 */
@@ -1344,21 +1263,130 @@ async function removeServer(ctx, name) {
 }
 
 /**
+ * @brief 等显示的一栏的对话流里出现 pi 的 MCP 通知里 broken 的失败（pi 在全部启用的服务连上或失败之后发一次，
+ *        m6-checks.md）：这时这个会话的每个服务都已经挂到共享连接上或失败了。
+ */
+function waitMcpNotice(page) {
+  return page.waitForFunction(() => [...document
+    .querySelectorAll('.pane-slot:not([hidden]) [data-testid="ext-notify"]')]
+    .some((item) => item.textContent.includes('broken: failed')), null, { timeout: 45000 });
+}
+
+/**
+ * @brief 进程状态那一行（tools.md"进程状态"，来源是后台进程的共享服务表，docs/v0/m6-mcp-shared.md）：用户级 mcp.json 里
+ *        启用、连得上的 x、legacy、empty 各共用一个进程，命令行下面"运行中 · <count> 个会话在用"，不是警示色
+ *        （没有 tools-warn，实际颜色也与 broken 下面 pi 通知原文的警示色不同），没有"完整原文"；
+ *        命令写错的 broken 见 brokenProcessChecks；停用的 remote 没有共享连接，没有这一行。
+ * @param count 写好用户级 mcp.json 之后新建的、还开着的会话数（它们都挂在同一个共享连接上）
+ * @param when 检查名里写的时机
+ */
+function mcpProcessChecks(rows, count, when) {
+  const by = (name) => rows.find((row) => row.name === name) ?? {};
+  const warnColor = by('broken').errorColor;
+  const running = ['x', 'legacy', 'empty'].every((name) => {
+    const line = by(name).process;
+    return line?.state === 'running' && line.text === `运行中 · ${count} 个会话在用` && line.afterCommand
+      && !line.warn && Boolean(warnColor) && line.color !== warnColor && line.full === null;
+  });
+  record(`进程状态（${when}）：x、legacy、empty 在命令行下面是"运行中 · ${count} 个会话在用"（data-state="running"，`
+    + '不是警示色：颜色与 broken 下面 pi 通知原文的不同；没有"完整原文"）；不注册工具的 empty 也是"运行中"'
+    + '（进程状态，不是"已连接"）；停用的 remote 没有进程状态', running && by('remote').process === null,
+  JSON.stringify({ warnColor, rows: rows.map((row) => [row.name, row.process]) }));
+  brokenProcessChecks(by('broken'), when);
+}
+
+/**
+ * @brief 命令写错的 broken 的进程状态：命令行下面 p 里"失败：<原文第一行>"（警示色：tools-warn，实际颜色与下面 pi 通知原文的
+ *        相同；只有一行），这一行就是 pi 通知里"broken: failed: "后面的那一句（pi 只取第一行）；"完整原文"见 brokenFullChecks。
+ * @param row mcpRows 里 broken 那一行
+ * @param when 检查名里写的时机
+ */
+function brokenProcessChecks(row, when) {
+  const line = row.process;
+  const first = line?.text.startsWith('失败：') ? line.text.slice('失败：'.length) : '';
+  const notice = (row.error ?? []).find((text) => text.startsWith('broken: failed: ')) ?? '';
+  record(`进程状态（${when}）：命令写错的 broken 在命令行下面是"失败：<原文第一行>"（data-state="failed"，只有一行；`
+    + '警示色：颜色与下面 pi 通知原文的相同）；与 pi 通知里"broken: failed: "后面的那一句相同',
+  line?.state === 'failed' && line.afterCommand && line.warn && Boolean(row.errorColor)
+    && line.color === row.errorColor && first.length > 0 && !/\n/.test(first)
+    && notice === `broken: failed: ${first}`.trim(), JSON.stringify({ process: line, notice, color: row.errorColor }));
+  brokenFullChecks(line, first, when);
+}
+
+/**
+ * @brief broken 的"完整原文"。原文有几行看这一次的时机：通常 pi-mcp 读到了 stderr，原文接上 stderr 末尾（不止一行），
+ *        下面有收起的"完整原文"，pre 的第一行就是 p 里"失败："后面那一句；有时 pi-mcp 读到 stderr 之前写入就失败了
+ *        （"write EPIPE"），原文只有一行，界面不显示"完整原文"。所以按看到的分两种检查，并把这一次是哪一种记进
+ *        结果（results.brokenFull）。stderr 的内容不比较：pi-mcp 把 stderr 当 UTF-8 解码，中文 Windows 上 cmd 的报错
+ *        （GBK）是乱码（defaults.md）。
+ * @param line mcpRows 里 broken 那一行的进程状态
+ * @param first p 里"失败："后面的那一句
+ * @param when 检查名里写的时机
+ */
+function brokenFullChecks(line, first, when) {
+  const full = line?.full ?? null;
+  (results.brokenFull ??= []).push({ when, case: full ? 'multi-line' : 'one-line', first });
+  if (!full) {
+    record(`进程状态（${when}）：broken 这次的原文只有一行（pi-mcp 读到 stderr 之前就失败了），下面没有"完整原文"`
+      + '（这一行里没有 details.tools-full-notice，也没有"完整原文"几个字）',
+    line?.state === 'failed' && first.length > 0 && line.fullWord === false,
+    JSON.stringify({ case: 'one-line', first, process: line ?? null }));
+    return;
+  }
+  const lines = typeof full.pre === 'string' ? full.pre.split(/\r?\n/) : [];
+  record(`进程状态（${when}）：broken 这次的原文不止一行（接上了 stderr 末尾），下面有收起的"完整原文"`
+    + '（details.tools-full-notice），其中的 pre 是完整原文：不止一行，第一行就是"失败："后面那一句（stderr 的内容不比较）',
+  full.summary === '完整原文' && full.open === false && lines.length > 1 && lines[0].trim() === first
+    && first.length > 0, JSON.stringify({ case: 'multi-line', full }));
+}
+
+/**
+ * @brief 点开服务行进程状态下面的"完整原文"：返回点之前（before）和点之后是否展开、原文看不看得见；
+ *        没有"完整原文"时 before 为 null，其余为 false。
+ */
+async function openFullError(page, name) {
+  const details = mcpRow(page, name).locator('[data-testid="mcp-process"] > details.tools-full-notice');
+  if ((await details.count()) === 0) return { before: null, open: false, visible: false };
+  const pre = details.locator('pre');
+  const before = { open: await details.evaluate((element) => element.open), visible: await pre.isVisible() };
+  await details.locator('summary').click();
+  return { before, open: await details.evaluate((element) => element.open), visible: await pre.isVisible() };
+}
+
+/**
+ * @brief 点开 broken 的"完整原文"（原文不止一行时）：点之前收起、看不见，点之后展开、看得见。这次原文只有一行时
+ *        （brokenFullChecks）没有可点的，照实记下这一条没有走到，不算通过展开。
+ * @param row 点之前 mcpRows 里 broken 那一行
+ */
+async function expandFullError(page, row) {
+  if (!row.process?.full) {
+    const seen = await openFullError(page, 'broken');
+    record('点 broken 进程状态下面的"完整原文"：这次原文只有一行，没有"完整原文"可点，展开这一步没有走到（未验证）',
+      seen.before === null, JSON.stringify({ process: row.process ?? null, seen }));
+    return;
+  }
+  const expanded = await openFullError(page, 'broken');
+  record('点 broken 进程状态下面的"完整原文"：点之前收起、完整原文看不见；点之后展开，完整原文看得见',
+    expanded.before?.open === false && expanded.before.visible === false && expanded.open && expanded.visible,
+    JSON.stringify(expanded));
+}
+
+/**
  * @brief 新建的会话：等 pi 的 MCP 通知（全部启用的服务连上或失败之后发一次，m6-checks.md）出现在对话流里，
- *        再看工具名、错误原文、没有工具的服务；内置工具里的来源；调用 x 的工具出批准卡。
+ *        再看工具名、错误原文、没有工具的服务、进程状态；内置工具里的来源；调用 x 的工具出批准卡。
  */
 async function mcpSession(ctx) {
   const { page } = ctx;
   await openToolsSection(page, 'mcp');
   ctx.p4 = await newFromSaved(ctx);
-  await page.waitForFunction(() => [...document
-    .querySelectorAll('.pane-slot:not([hidden]) [data-testid="ext-notify"]')]
-    .some((item) => item.textContent.includes('broken: failed')), null, { timeout: 45000 });
+  await waitMcpNotice(page);
   await openToolsSection(page, 'mcp');
   const rows = await mcpRows(page);
   const by = (name) => rows.find((row) => row.name === name) ?? {};
   const text = (await toolsHead(page)).text;
   await shot(page, '3-mcp-session');
+  mcpProcessChecks(rows, 1, '写好 mcp.json 之后新建的第一个会话');
+  await expandFullError(page, by('broken'));
   record('走查 4：新建的会话里 x 下面"当前会话里注册的工具：mcp__x__echo、mcp__x__add"',
     by('x').tools === '当前会话里注册的工具：mcp__x__echo、mcp__x__add', by('x').tools);
   record('改为直接调用的 legacy 在新会话里也注册了工具，不再有 v0 警示', by('legacy').tools?.includes('mcp__legacy__echo')
@@ -1407,9 +1435,7 @@ async function mcpProblems(ctx) {
   writeJson(mcpPath(ctx), { ...ctx.mcpBefore, mcpServers: { ...ctx.mcpBefore.mcpServers, ...REJECTED } });
   await openToolsSection(page, 'mcp');
   ctx.p5 = await newFromTools(page);
-  await page.waitForFunction(() => [...document
-    .querySelectorAll('.pane-slot:not([hidden]) [data-testid="ext-notify"]')]
-    .some((item) => item.textContent.includes('broken: failed')), null, { timeout: 45000 });
+  await waitMcpNotice(page);
   const reported = (await paneOf(page).getByTestId('ext-notify').allInnerTexts()).join('\n');
   await openToolsSection(page, 'mcp');
   const rows = await mcpRows(page);
@@ -1430,6 +1456,11 @@ async function mcpProblems(ctx) {
     + '不在这一行重复（行下面没有再写一遍的 mcp-error）', Object.values(REJECTED_WHY).every((why) => reported.includes(why))
     && rejected.every((row) => row.error.every((line) => !line.includes(REJECTED_WHY[row.name]))),
   JSON.stringify({ reported: oneLine(reported, 600), errors: rejected.map((row) => [row.name, row.error]) }));
+  // 第二个新建的会话挂到同一个共享连接上（会话数变成 2）；broken 再连一次，同样失败
+  mcpProcessChecks(rows, 2, '写好 mcp.json 之后新建的第二个会话');
+  record('进程状态：pi 不会加载的三个条目没有进程状态（pi 不连它们，共享服务表里没有）',
+    rejected.length === 3 && rejected.every((row) => row.process === null),
+    JSON.stringify(rejected.map((row) => [row.name, row.process])));
   await noteSmall(ctx, 'MCP · pi 不会加载');
 }
 
@@ -1517,6 +1548,8 @@ async function overrideProject(ctx) {
   await h.send('plain hello');
   await h.idle(60000);
   ctx.overrideFile = await activeFile(page);
+  // 用户级的 broken 在这个会话里也失败：等到 pi 的 MCP 通知，这个会话的服务（含本项目的 projsrv）就都连好了
+  await waitMcpNotice(page).catch(() => console.error('[m6-app-tools] no MCP notice in the override session in 45 s'));
   await extensionTool(ctx);
   await openToolsSection(page, 'skills');
   const rows = await skillRows(page);
@@ -1534,6 +1567,11 @@ async function overrideProject(ctx) {
   record('本项目 .pi/mcp.json 的服务：标"本项目"，开关和编辑、移除都不可用，说明"本项目的 .pi/mcp.json，只能在项目里改"',
     project?.tags[0] === '本项目' && project.disabled && project.buttons.every((button) => button.disabled)
     && project.notes.includes(PROJECT_MCP), JSON.stringify(project ?? servers));
+  record('进程状态：本项目 .pi/mcp.json 的 projsrv 有自己的共享连接（按项目文件夹共用）：命令行下面'
+    + '"运行中 · 1 个会话在用"（data-state="running"，不是警示色，没有"完整原文"）',
+  project?.process?.state === 'running' && project.process.text === '运行中 · 1 个会话在用'
+    && project.process.afterCommand && !project.process.warn && project.process.full === null,
+  JSON.stringify(project?.process ?? null));
   record('项目覆盖了用户级服务 x 的 enabled：开关关上且不可用，说明"本项目改了它的 enabled"', Boolean(x) && !x.checked
     && x.disabled && x.notes.includes('本项目改了它的 enabled'), JSON.stringify(x ?? null));
   await shot(page, '4-override');
@@ -1934,6 +1972,13 @@ try {
   await ctx.app?.close().catch(() => {});
   fake.kill();
 }
-console.log(`[m6-app-tools] layout in ${layout.root}`);
 await sleep(200);
-process.exitCode = write(`m6-app-tools${suffix}.json`) ? 0 : 1;
+const passed = write(`m6-app-tools${suffix}.json`);
+// Mori 已经关了：全部通过时删掉临时目录；有失败时留着，以便查看
+try {
+  if (passed) rmSync(layout.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+  else console.log(`[m6-app-tools] layout kept in ${layout.root}`);
+} catch (error) {
+  console.error(`[m6-app-tools] cannot remove ${layout.root}: ${error.message}`);
+}
+process.exitCode = passed ? 0 : 1;

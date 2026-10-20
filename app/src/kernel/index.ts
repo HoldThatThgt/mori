@@ -4,6 +4,7 @@ import type { MessagePortMain } from 'electron';
 import { CommandSchema, type EventEnvelope, type KernelMessage } from '../shared/protocol';
 import { handleCommand } from './commands';
 import { onStoreKeyResult } from './credentials';
+import { closeSharedServers, startSharedServers } from './mcpShare';
 import { applyStoredKeys } from './pi';
 import { shutdownSessions } from './sessions';
 
@@ -68,11 +69,20 @@ type MainToKernel =
 process.parentPort.on('message', (event) => {
   const message = event.data as MainToKernel;
   if (message?.type === 'port' && event.ports[0]) attachPort(event.ports[0]);
-  if (message?.type === 'keys') void applyStoredKeys(message.keys);
+  if (message?.type === 'keys') {
+    void applyStoredKeys(message.keys);
+    // 照 Claude 桌面版，启动时就起用户级启用的 stdio MCP 服务（docs/v0/m6-mcp-shared.md），在后台连接、不挡住命令。
+    // 主进程把后台进程放进作业对象之后才发 key（kernel-process.ts），这之后起的服务进程都在作业里。
+    void startSharedServers();
+  }
   if (message?.type === 'store-key-result') onStoreKeyResult(message.id, message.error);
   if (message?.type === 'shutdown') {
-    // 先停止并释放所有会话，再通知主进程；主进程随后结束整个进程树，清掉命令留下的子进程（pi #9129）。
-    void shutdownSessions().finally(() => process.parentPort.postMessage({ type: 'shutdown-done' }));
+    // 先停止并释放所有会话，再关掉共享的 MCP 服务（照 pi 的做法结束进程树），然后通知主进程；
+    // 主进程随后结束整个进程树，清掉命令留下的子进程（pi #9129）。
+    void shutdownSessions()
+      .catch((error: unknown) => console.error(`[kernel] releasing the sessions failed: ${String(error)}`))
+      .then(() => closeSharedServers())
+      .finally(() => process.parentPort.postMessage({ type: 'shutdown-done' }));
   }
 });
 
