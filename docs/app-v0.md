@@ -119,8 +119,11 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   - 项目→会话树。
   - 底部："Settings"和"Report a UI issue (F8)"。
 - **中栏**：
-  - 顶栏：会话名、模型、思考强度（Effort）、权限（"Ask each time" / "Allow all"）、上下文用量、右栏开关。
-  - 下方依次是对话流、阶段行、排队区和输入框。发送和停止按钮在同一位置。
+  - 顶栏：会话名（"项目名 › 会话名"）、右栏开关，分屏时还有"Close pane"。
+  - 下方依次是对话流、阶段行、批准卡或询问卡、排队区和输入框。
+  - 输入框下面一行（照 Claude 桌面版 prompt box 下面那一行；2026-10-21 起，原来在顶栏）：左端权限（"Ask each time" / "Allow all"，
+    照 Claude 的模式选择只有文字，窄时截断）；靠右依次是模型、思考强度（Effort，单独一个按钮）、上下文用量的小圆环，
+    最右是发送和停止（同一位置）。
 - **右栏**：本会话的改动和文件阅读，见 5.9。
 - 工具、设置、工作回顾这几个独立页面顶部都有"Back to app"。
   返回时恢复分屏、滚动位置、右栏打开的文件和各会话草稿。
@@ -205,7 +208,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **焦点**：卡片出现时不抢输入框焦点，没有默认按钮，Enter 不会批准。
   用 Tab 或 Alt+1 / Alt+2 / Alt+3 选择；焦点在卡片上时 Esc 等于拒绝。
 - **提醒**：窗口不在前台时任务栏闪烁。
-- **权限菜单**（顶栏）：
+- **权限菜单**（输入框下面一行的左端；2026-10-21 前在顶栏）：
+  - 按钮只有文字（"Ask each time ▾" / "Allow all ▾"，"Allow all"用警示色），没有图标；窄时模式名截断，全名在悬停说明和读屏名里。
   - 只作用于当前会话；新会话都从"Ask each time"开始。（2026-10-21：作用于这个会话的全部 Agent，菜单说明改为"Applies to all agents in this session. New sessions start at Ask each time."，后台实例的批准卡标出角色和 task，[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) §11）
   - 菜单里在"Allowed for this session:"下列出"Run commands"、"Write files"等，每项可以"Forget"。
   - 切到"Allow all"前确认一次（"Switch to “Allow all”?"，文案为"Edits, writes, and commands will run without asking."）；
@@ -255,7 +259,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **分屏**：
   - 把会话名拖到聊天区左侧或右侧，放下前提示"Drop to open in split view on the right"；
     也可以用右键菜单的"Open in split view"。
-  - 最多左右两栏。每栏有自己的标题行（可右键、可拖）、模型、权限、上下文用量、输入框、草稿和批准卡。
+  - 最多左右两栏。每栏有自己的标题行（可右键、可拖）、输入框（下面一行有权限、模型、Effort 和上下文用量）、草稿和批准卡。
   - Esc、F8 和右栏都以焦点所在的一栏为准。分屏中线可以拖动。
   - 拖入已经打开的会话只切换焦点。两栏各不足 280px 时先收起右栏。
   - 关闭分屏不会停止正在生成的会话。
@@ -272,7 +276,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **连接**（"Connections and models"）：与首次启动同一张表单；可以添加多个模型，并设定默认模型。（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §9.1：由设置页 Models 分节取代）
 - **思考**：每个模型可以标"Supports thinking"（写入 `models.json` 的 `reasoning: true`，pi 才会发送思考参数），
   并设定新会话默认的思考强度（"Default effort for new sessions"，pi 的 thinking level）。
-  顶栏按会话切换思考强度（"Effort: High"）；模型不支持思考时这一项不可选，并说明原因。
+  输入框下的 Effort 按钮按会话切换思考强度（"Effort: High"；2026-10-21 前在顶栏）；模型不支持思考时这一项不可选，并说明原因。
 - **用户级 AGENTS.md**：编辑 `<agentDir>/AGENTS.md`，标出当前实际生效的是哪个文件。有未保存改动时离开，先询问。
 
 ### 5.13 工具页（Customize）
@@ -412,7 +416,7 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
 | M3 项目与会话 | 侧栏项目→会话树；新建、改名、归档、删除、恢复；右键菜单；项目信任弹窗；状态点；按会话保存草稿；扩展的询问（从 M6 提前）；界面重新加载后接上后台进程里的会话（2026-10-19 加） | — | 1. 打开两个文件夹，各建两个会话并各发一条消息：侧栏按项目分组，会话名取第一条消息的前 20 个字<br>2. 只用键盘：Ctrl+N 新建，Shift+F10 打开右键菜单改名<br>3. 改名后重启 App：名字和完整对话都在<br>4. 归档一个会话：侧栏移到"Archived"，可以恢复；删除一个会话：确认后永久删除，重启后不再出现；正在生成的会话不能归档或删除（2026-10-19 改）<br>5. 打开带 `.pi/extensions` 的仓库：先弹信任询问；选"Don’t trust"后该扩展注册的工具不出现；勾"Remember my choice"后重启不再询问<br>6. 在 A 写半句话，切到 B 再回 A，草稿还在；重启后也在<br>7. 不可见的会话生成完成时，侧栏显示"Unread"，点开后消失<br><br>反例：打开带 `.pi/extensions` 的仓库，任何情况下都不会不经询问就加载扩展 |
 | M4 改动与选区 | 右栏改动列表与 diff；只读文件阅读器；选区"Attach as context"（问 Mori）与"Feedback"；回复下的"Copy"、"Attach message as context"、"Give feedback" | — | 1. 让它改两个文件：右栏列出两个文件，点开按时间显示每次编辑的 diff，顶部注明命令改动不在此列<br>2. 点工具卡里的文件路径打开阅读器；删掉这个文件再点，显示"File not found"<br>3. 在阅读器里选一段点"Attach as context"：输入框出现带来源的芯片；发送后点芯片回到原位置；重启后仍能点回<br>4. 流式输出时选中一句话点"Feedback"：选区不被打断；提交后提示"Saved · View in Review"，当前会话没有新消息<br>5. 不用鼠标选字，用回复下的"Attach message as context"完成同样的引用<br><br>反例：原文已变化时，芯片保留当时的原文并提示"Source changed" |
 | M5 分屏与会话引用 | 左右分屏；拖会话引用；右键菜单的"Open in split view"和"Attach as context" | — | 1. 把会话 B 拖到 A 的右侧：放下前出现"Drop to open in split view on the right"；两边各自发消息、各自批准<br>2. 在左栏按 Esc 只停止左栏；F8 和右栏跟随焦点所在的一栏<br>3. 拖动分屏中线调整比例<br>4. 把会话 C 拖进输入框：预览按"Turn N"标出内容和总字数；改成第 3–5 轮后发送<br>5. 点消息里的引用跳回 C；C 改名后仍有效；C 删除后芯片显示"Session deleted"，原文仍可查看<br>6. 用右键菜单完成同样的分屏和引用<br><br>反例：关闭分屏不停止正在生成的会话；预览里没有按钮文字等界面文字 |
-| M6 设置与工具页 | 多个模型与切换；思考强度（Effort）；用户级 AGENTS.md；工具页（Customize：内置工具、Skill、MCP、Plugin）；输入框 "/" 补全 | pi 如何在 prompt 中展开 "/名称"；MCP 扩展的通知在 SDK 下能否拿到 | 1. 加第二个模型，在顶栏切换，新回复来自新模型<br>2. 在用户级 AGENTS.md 写"每次回答以'收到'开头"：新会话的第一条回复符合；设置页标出生效的文件<br>3. 在已信任项目的 `.pi/skills` 放一个技能：工具页出现并标"Project"；停用后 `settings.json` 出现与 `pi config` 相同的条目，新会话问"你能用哪些技能"时没有它<br>4. 用表单添加一个 stdio MCP 服务：保存后看到它注册的工具名；调用它的工具会出批准卡<br>5. MCP 服务的命令写错：看到 pi 给出的错误原文<br>6. 添加一个本地文件夹的 pi 包：列出包内资源，可以按资源启停<br>7. 输入 "/"：列出提示词模板和技能命令<br>8. 把模型标为"Supports thinking"，顶栏切到"High"：回复带思考内容；切到"Off"：不再有思考内容<br><br>反例：模型没标"Supports thinking"时，思考强度不可选；项目未信任时项目技能不出现；没有注册任何工具的 MCP 服务不显示"Connected" |
+| M6 设置与工具页 | 多个模型与切换；思考强度（Effort）；用户级 AGENTS.md；工具页（Customize：内置工具、Skill、MCP、Plugin）；输入框 "/" 补全 | pi 如何在 prompt 中展开 "/名称"；MCP 扩展的通知在 SDK 下能否拿到 | 1. 加第二个模型，在顶栏切换（2026-10-21 改到输入框下方一行），新回复来自新模型<br>2. 在用户级 AGENTS.md 写"每次回答以'收到'开头"：新会话的第一条回复符合；设置页标出生效的文件<br>3. 在已信任项目的 `.pi/skills` 放一个技能：工具页出现并标"Project"；停用后 `settings.json` 出现与 `pi config` 相同的条目，新会话问"你能用哪些技能"时没有它<br>4. 用表单添加一个 stdio MCP 服务：保存后看到它注册的工具名；调用它的工具会出批准卡<br>5. MCP 服务的命令写错：看到 pi 给出的错误原文<br>6. 添加一个本地文件夹的 pi 包：列出包内资源，可以按资源启停<br>7. 输入 "/"：列出提示词模板和技能命令<br>8. 把模型标为"Supports thinking"，顶栏切到"High"（2026-10-21 改到输入框下方一行的 Effort 按钮）：回复带思考内容；切到"Off"：不再有思考内容<br><br>反例：模型没标"Supports thinking"时，思考强度不可选；项目未信任时项目技能不出现；没有注册任何工具的 MCP 服务不显示"Connected" |
 | M7 工作回顾（Review） | 反馈收件箱（Feedback）、界面问题收件箱（UI issues）、"Resolved"、导出；一键导出安装包（2026-10-21 加） | — | 1. M4 起写的反馈都在，点开跳回原位置<br>2. M2 起的 F8 报告都在"UI issues"里，带截图<br>3. 点"Resolve"标为已处理后，可以用"Hide resolved"筛掉<br>4. 两类都能导出为 Markdown（"Export as Markdown…"）<br>5. 双击 `build-installer.cmd`：结束时打开 `release\`，里面是安装包；任何一步失败时停下并说明哪一步 |
 
 界面改为英文之后（第 11 节"显示语言"，不兼容旧的中文记录），M4 走查 3、M5 走查 5、M7 走查 1–2 要用英文构建新建的会话、
@@ -475,7 +479,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 
 - 后端：pi 原样作为后端，Mori 只做界面、安装包、进程桥和最小批准扩展。
 - API key：由 Mori 用系统加密保存，经 pi 的 runtime API key 只在内存里交给 pi；不写进 `models.json`，不用环境变量。
-- 思考强度：要，在 M6 的设置页和顶栏提供。
+- 思考强度：要，在 M6 的设置页和顶栏提供（2026-10-21 起在输入框下面一行）。
 - 批准：允许一次 / 本会话不再询问此工具 / 拒绝（"Allow once" / "Allow “<工具>” for this session" / "Deny"），不做规则引擎。
 - 使用环境：在有外网的机器上构建，在公司内网机器上离线安装。
 - 任务记录：暂不做。（2026-10-21：由协作模式的 TaskBoard 取代）
@@ -492,7 +496,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
   M7 之后在 `english-ui` 分支上改：`app/src` 里的界面文字、读屏名、悬停提示、对话框、F8 报告、工作回顾的导出、
   操作记录、引用块和会话引用都改成英文，逐条的术语、写法和 Mori 写出的固定格式见 [v0/ui-strings.md](v0/ui-strings.md)；
   `npm run check` 在 `src/` 的字符串、正则、JSX 文本和 .html / .css 里发现中文就失败（注释不查）；
-  NSIS 安装包只带英文界面，`build-installer.cmd` 只输出英文；顶栏、侧栏等按英文字宽重新定了窄栏的宽度阈值。
+  NSIS 安装包只带英文界面，`build-installer.cmd` 只输出英文；顶栏、侧栏等按英文字宽重新定了窄栏的宽度阈值（顶栏的几档 2026-10-21 随按钮移到输入框下面一行重新定，见下一条）。
   你在 2026-10-20 / 21 定的用词：
   - 有 Claude 桌面版对应的地方照 Claude 英文界面的用词（"我最常用 Claude，想保持同样的说法"）；没有对应的按 ui-strings.md 的写法自己写。
   - 轮 = turn（"Turn 3"、"turns 3–4"）；插话 = Steer（排队用 Claude 的 Queue）。
@@ -506,6 +510,15 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 - 模型层（2026-10-21）：按统一模型提供商 proposal 第四版和构建规格（[specs/model-providers.md](specs/model-providers.md)）实现普通模式的模型层；
   界面文字是英文，与 `english-ui` 合并后按 [v0/ui-strings.md](v0/ui-strings.md) 的术语表统一（例如思考强度写 Effort、"Model ID"、"Base URL"）。
 - 平行 Agent 与 TaskBoard（2026-10-21）：按 proposal 第四版和构建规格（[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md)）实现；新写的界面用英文，按 [v0/ui-strings.md](v0/ui-strings.md) 的术语表。负责人不在时定下的选择列在 [v1/team-checks.md](v1/team-checks.md)。
+- 输入框下面一行（2026-10-21，照 Claude 桌面版）：会话面板顶栏上的模型、思考强度（Effort）、权限三个按钮移到输入框里、
+  文字框下面那一行（Claude 的 prompt box 下面一行：左边模式选择，靠右是模型，用量圆环在旁边）。Effort 仍是单独一个按钮
+  （你的选择；Claude 的文档把 effort 放在模型菜单里）。右边的顺序：模型、Effort、圆环，然后是发送（你定的，同装在本机的
+  Claude）。上下文用量改成小圆环，
+  悬停说明、读屏名和点开的详情里有原来"Context 12%"和"About 15,360 / 128,000 tokens"的信息（用 Claude 的写法，估算的数前面加"≈"，
+  见 [v0/screens/models.md](v0/screens/models.md)）。权限按钮照 Claude 的模式选择只有文字、任何宽度都没有盾牌图标，
+  窄时模式名截断加"…"（全名在悬停说明和读屏名里），即使模型按钮因此更挤；"Allow all"保留警示色和文字。
+  顶栏只留会话名（"项目名 › 会话名"）和这一栏的按钮（"Toggle changes"、分屏时"Close pane"），让分屏时的会话名有地方显示
+  （原来 460px 的一栏里只剩约 2 个字母）。设计说明见 [v0/composer-pickers.md](v0/composer-pickers.md)；不加后台进程命令，事件和命令不变，所以有意不重录 fixture。
 - 实现者：全部由 Claude 实现，你按界面走查签收。
 
 **待确认**（括号里是默认推荐，没有异议就按默认执行）

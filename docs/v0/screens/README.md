@@ -7,7 +7,7 @@
 | --- | --- | --- |
 | [connection.md](connection.md) | 首次启动、连接表单（也是"Settings → Connections and models"和"Go to settings"的落点）、打开文件夹 | M1 |
 | [layout.md](layout.md) | 三栏布局、分隔线、窄窗口、侧栏、右栏、设置页外框 | M1 |
-| [chat.md](chat.md) | 顶栏、对话流、阶段行、排队区、输入框、停止、错误、后台进程退出 | M1 |
+| [chat.md](chat.md) | 顶栏、对话流、阶段行、排队区、输入框和它下面一行、停止、错误、后台进程退出 | M1 |
 | [tool-cards.md](tool-cards.md) | 工具卡状态与标题对照表 | M1（批准相关状态在 M2 接通） |
 | [approval.md](approval.md) | 哪些调用要批准、批准卡、工具卡与阶段行的批准状态、权限菜单、任务栏闪烁 | M2 |
 | [f8.md](f8.md) | F8 报告界面问题（Report a UI issue）：入口、报告框、保存的内容 | M2 |
@@ -18,7 +18,7 @@
 | [split.md](split.md) | 左右分屏：拖会话到中栏、焦点所在的一栏、分屏中线、右栏跟随焦点与收起、关闭一栏 | M5 |
 | [session-refs.md](session-refs.md) | 会话引用：拖会话进输入框、按轮预览与调整范围、发出后跳回原会话、原会话已删除 | M5 |
 | [settings.md](settings.md) | 设置页：连接与多个模型、默认模型、支持思考与新会话默认的思考强度（Effort）、用户级 AGENTS.md、离开时有未保存的改动 | M6 |
-| [models.md](models.md) | 顶栏的模型菜单与思考强度（Effort，每一栏各一组） | M6 |
+| [models.md](models.md) | 输入框下面一行的模型菜单、思考强度（Effort）和上下文用量的圆环，菜单的位置与窄栏（每一栏各一组；2026-10-21 从顶栏移来） | M6 |
 | [tools.md](tools.md) | Customize 页（工具页）：内置工具、技能、MCP、插件（pi 包）；启停照 pi config 的写法 | M6 |
 | [slash.md](slash.md) | 输入框的"/"补全（提示词模板、技能命令）与技能调用的显示 | M6 |
 | [review.md](review.md) | 工作回顾（Review）：对内容的反馈与界面问题的列表、详情、已处理与隐藏、回到原位置、导出为 Markdown | M7 |
