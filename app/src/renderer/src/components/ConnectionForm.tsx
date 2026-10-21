@@ -1,4 +1,4 @@
-// 连接表单（方案 5.2）：首次启动和"添加连接"填连接和它的第一个模型（full），"编辑连接"只改连接（endpoint）。
+// 连接表单（方案 5.2）：首次启动和"Add connection"填连接和它的第一个模型（full），"Edit connection"只改连接（endpoint）。
 // 状态表见 docs/v0/screens/connection.md 和 settings.md。
 
 import { useEffect, useRef, useState } from 'react';
@@ -21,7 +21,7 @@ function emptyModel(level: ThinkingLevel): ModelFields {
   return { modelId: '', contextWindow: 128000, reasoning: false, thinkingLevel: level };
 }
 
-/** @brief 首次启动、"添加连接"的空表单。 */
+/** @brief 首次启动、"Add connection"的空表单。 */
 function emptyForm(level: ThinkingLevel): Connection {
   return { name: '', baseUrl: '', api: 'openai-completions', apiKey: '', compat: [], ...emptyModel(level) };
 }
@@ -33,36 +33,36 @@ export function defaultLevel(config: ConfigInfo | null): ThinkingLevel {
 
 /** @brief 接口类型的界面文字。 */
 export const apiLabels: Record<(typeof API_TYPES)[number], string> = {
-  'openai-completions': 'OpenAI 兼容（Chat Completions）',
+  'openai-completions': 'OpenAI-compatible (Chat Completions)',
   'openai-responses': 'OpenAI Responses',
   'anthropic-messages': 'Anthropic Messages',
 };
 
 /** 必填项的界面文字（保存前的检查用） */
 const fieldLabels: Record<string, string> = {
-  name: '名称', baseUrl: '服务地址', modelId: '模型 ID', contextWindow: '上下文长度',
+  name: 'Name', baseUrl: 'Base URL', modelId: 'Model ID', contextWindow: 'Context window',
 };
 
 /** 标了支持思考、没有 thinkingLevelMap 的模型可选的强度：off–high（m6-checks.md） */
 const BASIC_LEVELS: ThinkingLevel[] = THINKING_LEVELS.slice(0, THINKING_LEVELS.indexOf('high') + 1);
 
-/** @brief 表单可选的思考强度：已经支持思考的模型用 pi 给出的，新模型和刚勾上"支持思考"的用 off–high。 */
+/** @brief 表单可选的思考强度：已经支持思考的模型用 pi 给出的，新模型和刚勾上"Supports thinking"的用 off–high。 */
 export function levelOptions(model: ModelInfo | undefined): ThinkingLevel[] {
   return model?.reasoning ? model.thinkingLevels : BASIC_LEVELS;
 }
 
-/** @brief 在界面上先检查必填项，给出中文说明；通过时返回 null。 */
+/** @brief 在界面上先检查必填项，给出说明；通过时返回 null。 */
 export function validate(schema: ZodType, form: Partial<Connection>): string | null {
   const parsed = schema.safeParse(form);
   if (parsed.success) return null;
   const field = String(parsed.error.issues[0]?.path[0] ?? '');
-  if (field === 'baseUrl' && form.baseUrl?.trim()) return '服务地址不是有效的网址，例如 http://host:8000/v1';
-  if (field === 'contextWindow') return '上下文长度要填正整数';
-  return `请填写${fieldLabels[field] ?? field}`;
+  if (field === 'baseUrl' && form.baseUrl?.trim()) return 'Enter a valid URL (e.g. http://host:8000/v1).';
+  if (field === 'contextWindow') return 'Context window must be a whole number above 0.';
+  return `${fieldLabels[field] ?? field} is required.`;
 }
 
 /**
- * @brief 已有模型的字段（不支持思考时强度先放 level，勾上"支持思考"时用）；没有模型时为新模型的字段。
+ * @brief 已有模型的字段（不支持思考时强度先放 level，勾上"Supports thinking"时用）；没有模型时为新模型的字段。
  * @param level 新模型的思考强度初始值（defaultLevel）
  */
 export function modelFields(model: ModelInfo | undefined, level: ThinkingLevel): ModelFields {
@@ -78,15 +78,15 @@ function formFrom(info: ConnectionInfo | undefined, level: ThinkingLevel): Conne
 
 /** @brief 表单的参数。 */
 export interface ConnectionFormProps {
-  /** 保存到的连接；null 表示新建（首次启动、"添加连接"） */
+  /** 保存到的连接；null 表示新建（首次启动、"Add connection"） */
   providerId: string | null;
-  /** full：连接和它的一个模型；endpoint：只改连接（"编辑连接"，不含模型字段） */
+  /** full：连接和它的一个模型；endpoint：只改连接（"Edit connection"，不含模型字段） */
   mode: 'full' | 'endpoint';
-  /** 测试结束（首次启动据此进入"打开文件夹…"） */
+  /** 测试结束（首次启动据此进入"Open folder…"） */
   onTested?: (ok: boolean, text: string) => void;
-  /** 大于 0 且变化时把焦点放到 API key（"去设置"） */
+  /** 大于 0 且变化时把焦点放到 API key（"Go to settings"） */
   focusKey?: number;
-  /** 用"保存"按钮保存成功、pi 没有报告配置错误时 */
+  /** 用"Save"按钮保存成功、pi 没有报告配置错误时 */
   onSaved?: () => void;
   /** 回到列表；saved 为这张表单保存过。不传时没有这个按钮（首次启动） */
   onClose?: (saved: boolean) => void;
@@ -107,8 +107,12 @@ async function saveForm(mode: ConnectionFormProps['mode'], target: string | null
 
 /** @brief 保存成功时表单下方的文字：pi 报告了配置错误时显示原文。 */
 function savedMessage(saved: Saved): Notice {
-  return saved.error ? { tone: 'error', text: `已保存，但配置有错误：${saved.error}` } : { tone: 'ok', text: '已保存' };
+  return saved.error ? { tone: 'error', text: `Saved, but the configuration has an error: ${saved.error}` }
+    : { tone: 'ok', text: 'Saved' };
 }
+
+/** 编辑连接时测试、这个连接下还没有模型时的提示 */
+const NO_MODEL_TEXT = 'This connection has no models yet. Add a model first.';
 
 /** @brief 表单状态与保存、测试。 */
 function useConnectionForm({ providerId, mode, onTested }: ConnectionFormProps) {
@@ -137,7 +141,7 @@ function useConnectionForm({ providerId, mode, onTested }: ConnectionFormProps) 
       return saved;
     } catch (error) {
       const command = mode === 'full' ? 'connection.save' : 'endpoint.save';
-      setMessage({ tone: 'error', text: `保存失败：${describe(command, error)}` });
+      setMessage({ tone: 'error', text: `Couldn’t save: ${describe(command, error)}` });
       return null;
     } finally {
       setPhase('idle');
@@ -147,7 +151,7 @@ function useConnectionForm({ providerId, mode, onTested }: ConnectionFormProps) 
     // full 测表单里的模型（没填时经保存前的检查提示）；endpoint 测这个连接的第一个模型，
     // 没有模型时不测（不带模型时后台进程会测默认模型）。
     const modelId = mode === 'full' ? form.modelId.trim() : info?.models[0]?.id;
-    if (!modelId && mode === 'endpoint') return setMessage({ tone: 'error', text: '这个连接下还没有模型，先添加模型' });
+    if (!modelId && mode === 'endpoint') return setMessage({ tone: 'error', text: NO_MODEL_TEXT });
     const saved = dirty || !target || !modelId ? await save() : { providerId: target, error: null };
     if (!saved) return;
     setPhase('testing');
@@ -166,8 +170,10 @@ function useConnectionForm({ providerId, mode, onTested }: ConnectionFormProps) 
 function CompatOptions({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
   return (
     <details className="compat-options" open={value.length > 0}>
-      <summary>兼容选项{value.length > 0 ? `（已选 ${value.length} 项）` : ''}</summary>
-      <p className="field-hint">只在端点确实不支持时勾选；不勾选时由 pi 自动判断。</p>
+      <summary>Compatibility options{value.length > 0 ? ` (${value.length} selected)` : ''}</summary>
+      <p className="field-hint">
+        Check an option only if the endpoint really needs it. Otherwise pi works it out automatically.
+      </p>
       {COMPAT_OPTIONS.map((option) => (
         <label key={option.id} className="check-row">
           <input type="checkbox" checked={value.includes(option.id)}
@@ -180,7 +186,7 @@ function CompatOptions({ value, onChange }: { value: string[]; onChange: (next: 
   );
 }
 
-/** @brief "支持思考"和"新会话默认的思考强度"（只在勾了支持思考时出现）。 */
+/** @brief "Supports thinking"和"Default effort for new sessions"（只在勾了支持思考时出现）。 */
 export function ThinkingFields({ reasoning, level, levels, onChange }: {
   reasoning: boolean; level: ThinkingLevel; levels: ThinkingLevel[];
   onChange: (patch: { reasoning?: boolean; thinkingLevel?: ThinkingLevel }) => void;
@@ -190,12 +196,15 @@ export function ThinkingFields({ reasoning, level, levels, onChange }: {
       <label className="check-row">
         <input type="checkbox" checked={reasoning}
           onChange={(event) => onChange({ reasoning: event.target.checked })} />
-        <span>支持思考
-          <small>勾选后 pi 才会发送思考参数；不勾时端点按自己的默认处理（DeepSeek 默认会思考，但不能控制）</small>
+        <span>Supports thinking
+          <small>
+            pi sends thinking parameters only when this is checked. When it isn’t, the endpoint uses its own default
+            (DeepSeek thinks by default, but you can’t control it).
+          </small>
         </span>
       </label>
       {reasoning && (
-        <label className="thinking-level">新会话默认的思考强度
+        <label className="thinking-level">Default effort for new sessions
           <select value={level} onChange={(event) => onChange({ thinkingLevel: event.target.value as ThinkingLevel })}>
             {levels.map((item) => <option key={item} value={item}>{THINKING_LABELS[item]}</option>)}
           </select>
@@ -212,10 +221,10 @@ function ModelInputs({ form, info, edit }: {
   const model = info?.models.find((item) => item.id === form.modelId.trim());
   return (
     <>
-      <label>模型 ID
+      <label>Model ID
         <input value={form.modelId} onChange={(e) => edit({ modelId: e.target.value })} placeholder="qwen3-coder" />
       </label>
-      <label>上下文长度
+      <label>Context window
         <input type="number" min={1} value={form.contextWindow}
           onChange={(e) => edit({ contextWindow: Number(e.target.value) })} />
       </label>
@@ -233,13 +242,17 @@ function FormActions({ phase, dirty, everSaved, onTest, onClose }: {
   const busy = phase !== 'idle';
   return (
     <div className="form-actions">
-      <button type="submit" className="button" disabled={busy || !dirty}>{phase === 'saving' ? '保存中…' : '保存'}</button>
-      <button type="button" className="button primary" disabled={busy} onClick={onTest}>
-        {phase === 'testing' ? '测试中…' : '测试连接'}
+      <button type="submit" className="button" disabled={busy || !dirty}>
+        {phase === 'saving' ? 'Saving…' : 'Save'}
       </button>
-      {phase === 'testing' && <button type="button" className="button" onClick={cancelTest}>取消</button>}
+      <button type="button" className="button primary" disabled={busy} onClick={onTest}>
+        {phase === 'testing' ? 'Testing…' : 'Test connection'}
+      </button>
+      {phase === 'testing' && <button type="button" className="button" onClick={cancelTest}>Cancel</button>}
       {onClose && !busy && (
-        <button type="button" className="button" onClick={() => onClose(everSaved)}>{everSaved ? '返回列表' : '取消'}</button>
+        <button type="button" className="button" onClick={() => onClose(everSaved)}>
+          {everSaved ? 'Back to list' : 'Cancel'}
+        </button>
       )}
     </div>
   );
@@ -253,20 +266,24 @@ export function ConnectionForm(props: ConnectionFormProps) {
   useEffect(() => {
     if (focusKey > 0) keyInput.current?.focus();
   }, [focusKey]);
-  const keyHint = keySaved ? '已加密保存（不显示）；改了服务地址就要重新填写' : '保存后由 Mori 加密存放在本机';
+  const keyHint = keySaved ? 'Saved and encrypted · Re-enter it if you change the base URL'
+    : 'Kept encrypted on this computer after you save';
   async function submit() {
     const saved = await save();
     if (saved && !saved.error) onSaved?.();
   }
+  // noValidate：上下文长度的 min={1} 不交给 Chromium 拦（它的校验气泡跟系统语言走），说明一律由 validate 给出。
   return (
-    <form className="connection-form" data-testid="connection-form"
+    <form className="connection-form" data-testid="connection-form" noValidate
       onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-      <label>名称<input value={form.name} onChange={(e) => edit({ name: e.target.value })} placeholder="内网模型" /></label>
-      <label>服务地址
+      <label>Name
+        <input value={form.name} onChange={(e) => edit({ name: e.target.value })} placeholder="Internal models" />
+      </label>
+      <label>Base URL
         <input value={form.baseUrl} onChange={(e) => edit({ baseUrl: e.target.value })}
           placeholder="http://host:8000/v1" />
       </label>
-      <label>接口类型
+      <label>API type
         <select value={form.api} onChange={(e) => edit({ api: e.target.value as Connection['api'] })}>
           {API_TYPES.map((type) => <option key={type} value={type}>{apiLabels[type]}</option>)}
         </select>

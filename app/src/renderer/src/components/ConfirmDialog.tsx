@@ -1,5 +1,5 @@
-// 确认对话框：盖住整个窗口；焦点先在"取消"，Tab 只在两个按钮之间切换，Esc 等于取消（进行中不能关）。
-// 用于切到"全部允许"（approval.md）、删除会话（sessions.md）和离开有未保存改动的页面（settings.md）。
+// 确认对话框：盖住整个窗口；焦点先在"Cancel"，Tab 只在两个按钮之间切换，Esc 等于取消（进行中不能关）。
+// 用于切到"Allow all"（approval.md）、删除会话（sessions.md）和离开有未保存改动的页面（settings.md）。
 
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -13,7 +13,7 @@ export interface ConfirmDialogProps {
   text: string;
   /** 确认按钮的文字 */
   confirmLabel: string;
-  /** 取消按钮的文字；默认"取消" */
+  /** 取消按钮的文字；默认"Cancel" */
   cancelLabel?: string;
   /** 确认按钮的样式：warn 警示色（黄），danger 危险色（红） */
   tone: 'warn' | 'danger';
@@ -41,7 +41,7 @@ function trapTab(event: React.KeyboardEvent<HTMLDivElement>): void {
 
 /** @brief 确认对话框。 */
 export function ConfirmDialog(props: ConfirmDialogProps) {
-  const { title, text, confirmLabel, cancelLabel = '取消', tone, testId, busyText = null, error = null, onConfirm,
+  const { title, text, confirmLabel, cancelLabel = 'Cancel', tone, testId, busyText = null, error = null, onConfirm,
     onCancel } = props;
   const cancel = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -51,7 +51,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
     if (busy) return false;
     onCancel();
   });
-  // 打开时、失败后（按钮重新可用）焦点回到"取消"。
+  // 打开时、失败后（按钮重新可用）焦点回到"Cancel"。
   useEffect(() => {
     if (!busy) cancel.current?.focus();
   }, [busy, error]);

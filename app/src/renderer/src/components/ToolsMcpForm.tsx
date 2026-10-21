@@ -1,4 +1,4 @@
-// MCP 服务的添加与编辑（docs/v0/screens/tools.md "添加与编辑"）：表单（名称、命令、参数、环境变量），或"以 JSON 编辑"
+// MCP 服务的添加与编辑（docs/v0/screens/tools.md "添加与编辑"）：表单（名称、命令、参数、环境变量），或"Edit as JSON"
 // （名称加 mcpServers 条目的 JSON，与 Claude 桌面版、pi 的写法相同）；两种都发 mcp.save。保存失败时表单保留你写的；
 // Esc 等于取消。
 
@@ -19,7 +19,7 @@ interface Fields {
   command: string;
   /** 参数，每行一个 */
   args: string;
-  /** 环境变量，每行"名字=值" */
+  /** 环境变量，每行"NAME=value" */
   env: string;
 }
 
@@ -51,13 +51,13 @@ function setField(entry: Entry, key: string, value: unknown): void {
 
 /**
  * @brief 表单写回条目：在原来的条目上改 command、args、env（空的删掉），调用方式写成直接调用，其他字段原样保留。
- *        环境变量有一行不是"名字=值"时返回说明。
+ *        环境变量有一行不是"NAME=value"时返回说明。
  */
 function entryOf(base: Entry, fields: Fields): Entry | string {
   const env: Record<string, string> = {};
   for (const line of lines(fields.env)) {
     const at = line.indexOf('=');
-    if (at <= 0) return `环境变量"${line}"要写成 名字=值`;
+    if (at <= 0) return `Environment variable “${line}” must be written as NAME=value.`;
     env[line.slice(0, at).trim()] = line.slice(at + 1);
   }
   const args = lines(fields.args);
@@ -69,11 +69,12 @@ function entryOf(base: Entry, fields: Fields): Entry | string {
   return entry;
 }
 
-/** @brief 解析"以 JSON 编辑"的内容；不是 JSON 对象时返回原文或说明。 */
+/** @brief 解析"Edit as JSON"的内容；不是 JSON 对象时返回原文或说明。 */
 function parseEntry(text: string): Entry | string {
   try {
     const value: unknown = JSON.parse(text);
-    return isRecord(value) ? value : '条目要是一个 JSON 对象，例如 {"command": "node", "args": ["server.mjs"]}';
+    if (isRecord(value)) return value;
+    return 'The server config must be a JSON object, e.g. {"command": "node", "args": ["server.mjs"]}';
   } catch (error) {
     return (error as Error).message;
   }
@@ -83,14 +84,14 @@ function parseEntry(text: string): Entry | string {
 function FieldInputs({ fields, onChange }: { fields: Fields; onChange: (next: Fields) => void }) {
   return (
     <>
-      <label><span>命令</span>
-        <input value={fields.command} spellCheck={false} placeholder="例如 node 或 npx"
+      <label><span>Command</span>
+        <input value={fields.command} spellCheck={false} placeholder="e.g. node or npx"
           onChange={(event) => onChange({ ...fields, command: event.target.value })} /></label>
-      <label><span>参数</span>
-        <textarea rows={3} value={fields.args} spellCheck={false} placeholder="每行一个"
+      <label><span>Arguments</span>
+        <textarea rows={3} value={fields.args} spellCheck={false} placeholder="One per line"
           onChange={(event) => onChange({ ...fields, args: event.target.value })} /></label>
-      <label><span>环境变量</span>
-        <textarea rows={3} value={fields.env} spellCheck={false} placeholder="每行 名字=值"
+      <label><span>Environment variables</span>
+        <textarea rows={3} value={fields.env} spellCheck={false} placeholder="NAME=value, one per line"
           onChange={(event) => onChange({ ...fields, env: event.target.value })} /></label>
     </>
   );
@@ -139,7 +140,7 @@ export function McpForm({ server, mode, onSaved, onCancel }: {
   async function save(event: React.FormEvent) {
     event.preventDefault();
     const entry = draft.entry();
-    const problem = !name.trim() ? '名称不能为空' : typeof entry === 'string' ? entry : null;
+    const problem = !name.trim() ? 'Name is required.' : typeof entry === 'string' ? entry : null;
     draft.setProblem(problem);
     change.clear();
     if (problem || typeof entry === 'string') return;
@@ -148,22 +149,22 @@ export function McpForm({ server, mode, onSaved, onCancel }: {
   const failure = draft.problem ?? change.error;
   return (
     <form className="tools-form" data-testid="mcp-form" data-mode={draft.mode} onSubmit={(event) => void save(event)}>
-      <label><span>名称</span>
-        <input ref={first} value={name} spellCheck={false} placeholder="字母、数字、_ 和 -"
+      <label><span>Name</span>
+        <input ref={first} value={name} spellCheck={false} placeholder="Letters, numbers, _, and -"
           onChange={(event) => setName(event.target.value)} /></label>
       {draft.mode === 'fields' ? <FieldInputs fields={draft.fields} onChange={draft.setFields} /> : (
-        <label><span>条目 JSON</span>
+        <label><span>Server config (JSON)</span>
           <textarea data-testid="mcp-json" rows={10} value={draft.json} spellCheck={false}
             onChange={(event) => draft.setJson(event.target.value)} /></label>
       )}
-      <p className="field-hint">Mori 添加的服务都用直接调用方式（exposure: direct）</p>
-      {failure && <p className="form-message error" role="alert">保存失败：{failure}</p>}
+      <p className="field-hint">Servers you add here always use direct calls (exposure: direct)</p>
+      {failure && <p className="form-message error" role="alert">Couldn’t save: {failure}</p>}
       <div className="form-actions">
         <button type="submit" className="button primary" disabled={change.busy}>
-          {change.busy ? '正在保存…' : '保存'}</button>
-        <button type="button" className="button" disabled={change.busy} onClick={onCancel}>取消</button>
+          {change.busy ? 'Saving…' : 'Save'}</button>
+        <button type="button" className="button" disabled={change.busy} onClick={onCancel}>Cancel</button>
         <button type="button" className="text-link" disabled={change.busy} onClick={draft.switchMode}>
-          {draft.mode === 'fields' ? '以 JSON 编辑' : '回到表单'}</button>
+          {draft.mode === 'fields' ? 'Edit as JSON' : 'Back to form'}</button>
       </div>
     </form>
   );

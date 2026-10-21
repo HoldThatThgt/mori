@@ -12,8 +12,8 @@ import { updateTab, useApp, type QuoteJump } from './store';
 export { composePrompt, excerpt, quoteBlock, refLabel, stripQuotes } from './quoteText';
 
 /**
- * @brief 来源的状态：原文已变化 / 文件已被删除或移动（点芯片之后查出来的，记在这里）/ 原会话已删除（会话引用，
- *        按会话列表算出来，不记在这里）；没有问题时不记。
+ * @brief 来源的状态："Source changed" / "File not found"（点芯片之后查出来的，记在这里）/ "Session deleted"
+ *        （会话引用，按会话列表算出来，不记在这里）；没有问题时不记。
  */
 export type QuoteStatus = 'changed' | 'missing' | 'gone';
 
@@ -37,7 +37,9 @@ export function refKey(ref: QuoteRef): string {
 /** @brief 加一个引用芯片到会话的输入框；来源和原文都一样的不再加。 */
 export function addQuote(tabKey: string, ref: QuoteRef): void {
   // 会话引用在开始读原会话时已经记过（refActions.ts referenceSession）。
-  if (ref.source.kind !== 'session') recordAction(ref.source.kind === 'file' ? '问 Mori（文件）' : '问 Mori（回复）');
+  if (ref.source.kind !== 'session') {
+    recordAction(ref.source.kind === 'file' ? 'Attach as context (file)' : 'Attach as context (response)');
+  }
   updateTab(tabKey, (tab) => (tab.draftRefs.some((item) => refKey(item) === refKey(ref)) ? tab
     : { ...tab, draftRefs: [...tab.draftRefs, ref] }));
 }
@@ -76,7 +78,7 @@ function lineOffset(content: string, line: number): number {
 }
 
 /**
- * @brief 文件引用现在在哪几行（docs/v0/screens/selection.md "回到原位置"）：内容哈希没变时就是原来的行；
+ * @brief 文件引用现在在哪几行（docs/v0/screens/selection.md "Jump to source"）：内容哈希没变时就是原来的行；
  *        变了时在文件里找原文，取离原来的行最近的一处；找不到（原文已变化）时为 null。
  */
 export function locateFileQuote(text: string, sha256: string, source: FileSource,
@@ -109,7 +111,7 @@ export function nextJump(ref: QuoteRef): QuoteJump {
 
 /** @brief 在右栏打开文件阅读器；ref 为打开它的文件引用芯片（跳到引用的行），从路径或改动列表打开时为 null。 */
 export function openFile(tabKey: string, path: string, ref: QuoteRef | null = null): void {
-  recordAction(ref ? '点引用打开文件' : '打开文件');
+  recordAction(ref ? 'Open file from attached context' : 'Open file');
   jumpNonce += 1;
   const jump = ref ? { ref, nonce: jumpNonce } : null;
   updateTab(tabKey, (tab) => ({ ...tab, rightOpen: true,
@@ -131,7 +133,7 @@ function turnStart(transcript: Transcript, index: number): number {
 
 /**
  * @brief 点芯片回到原位置。文件里的引用在右栏打开阅读器（阅读器检查原文）；回复里的引用找到那条回复，
- *        不在已载入范围时先载入到它所在的一轮，再交给对话流滚过去高亮；找不到时标"原文已变化"。
+ *        不在已载入范围时先载入到它所在的一轮，再交给对话流滚过去高亮；找不到时标"Source changed"。
  */
 export function jumpToQuote(tabKey: string, ref: QuoteRef): void {
   if (ref.source.kind === 'file') {
@@ -142,7 +144,7 @@ export function jumpToQuote(tabKey: string, ref: QuoteRef): void {
     void jumpToSession(tabKey, ref);
     return;
   }
-  recordAction('点引用回到回复');
+  recordAction('Jump to response from attached context');
   const tab = useApp.getState().tabs.find((item) => item.key === tabKey);
   if (!tab) return;
   const index = findSourceIndex(tab.transcript.items, ref.source);

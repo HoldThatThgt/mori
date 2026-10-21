@@ -1,5 +1,5 @@
 // 项目信任询问（docs/v0/screens/sessions.md "项目信任"）：打开带自己扩展或配置的文件夹前问你一次。
-// 焦点先在"不信任"，Tab 在复选框和两个按钮之间切换，Esc 等于不信任（不记住）。回答之后焦点回到当前会话的输入框。
+// 焦点先在"Don’t trust"，Tab 在复选框和两个按钮之间切换，Esc 等于"Don’t trust"（不记住）。回答之后焦点回到当前会话的输入框。
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -41,17 +41,21 @@ function TrustPromptDialog({ prompt }: { prompt: TrustPrompt }) {
       && event.preventDefault()}>
       <div className="dialog" role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={textId}
         data-testid="trust-dialog" onKeyDown={trapTab}>
-        <h2 id={titleId}>信任这个文件夹？</h2>
-        <p id={textId}>这个文件夹带有自己的扩展或配置，信任后它们会在你的电脑上运行。</p>
+        <h2 id={titleId}>Trust this workspace?</h2>
+        <p id={textId}>
+          This workspace has its own extensions or settings. If you trust it, they’ll run on your computer.
+        </p>
         <p className="dialog-path" data-testid="trust-path">{prompt.cwd}</p>
-        {prompt.readError && <p className="form-message error">读取已记住的选择失败：{prompt.readError}</p>}
+        {prompt.readError && (
+          <p className="form-message error">Couldn’t check whether this workspace is trusted: {prompt.readError}</p>
+        )}
         <label className="check-row">
           <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-          <span>记住</span>
+          <span>Remember my choice</span>
         </label>
         <div className="dialog-actions">
-          <button className="button warn" onClick={() => answer(true, remember)}>信任</button>
-          <button ref={deny} className="button" onClick={() => answer(false, remember)}>不信任</button>
+          <button className="button warn" onClick={() => answer(true, remember)}>Trust workspace</button>
+          <button ref={deny} className="button" onClick={() => answer(false, remember)}>Don’t trust</button>
         </div>
       </div>
     </div>,

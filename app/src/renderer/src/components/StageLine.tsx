@@ -5,34 +5,34 @@ import { seconds, useNow } from './ToolCard';
 import { toolTitleText } from './toolTitle';
 
 /**
- * @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"等你批准"，其次有挂起的扩展询问时"等你回答"，
- *        都不显示"生成中"或"执行中"。
+ * @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"Waiting for your approval"，其次有挂起的扩展询问时
+ *        "Waiting for your answer"，都不显示"Responding…"或工具的"<标题> Ns"。
  */
 export function stageText(transcript: Transcript, cwd: string, now: number): string | null {
   const stage = transcript.stage;
-  if (transcript.running && transcript.approvals.length > 0) return '等你批准';
+  if (transcript.running && transcript.approvals.length > 0) return 'Waiting for your approval';
   // 扩展命令等不经过一轮运行的询问也要看得到。
-  if (transcript.questions.length > 0) return '等你回答';
+  if (transcript.questions.length > 0) return 'Waiting for your answer';
   if (!transcript.running) return null;
   if (!stage) return null;
   const elapsed = seconds(Math.max(0, now - stage.since)).replace(/\.\d+s$/, 's');
   switch (stage.kind) {
     case 'waiting':
-      return `等待模型响应 ${elapsed}`;
+      return `Waiting for the model… ${elapsed}`;
     case 'thinking':
-      return `思考中 ${elapsed}`;
+      return `Thinking… ${elapsed}`;
     case 'generating':
-      return '生成中';
+      return 'Responding…';
     case 'tool': {
       const tool = transcript.tools[stage.detail];
       return tool ? `${toolTitleText(tool, cwd)} ${elapsed}` : null;
     }
     case 'approval':
-      return '等你批准';
+      return 'Waiting for your approval';
     case 'retry':
-      return `重试 ${stage.detail}`;
+      return `Retrying ${stage.detail}`;
     case 'compacting':
-      return '正在压缩较早的对话';
+      return 'Compacting session…';
   }
 }
 

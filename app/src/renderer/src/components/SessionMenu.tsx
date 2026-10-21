@@ -1,5 +1,5 @@
-// 会话行的右键菜单（docs/v0/screens/sessions.md "右键菜单"）：重命名、引用到当前会话、在右侧分屏打开（M5）、归档、删除；
-// 已归档的会话是恢复、删除。分屏标题行上的会话名用同一个菜单。
+// 会话行的右键菜单（docs/v0/screens/sessions.md "右键菜单"）："Rename"、"Attach as context"、"Open in split view"（M5）、
+// "Archive"、"Delete…"；已归档的会话是"Unarchive"、"Delete…"。分屏标题行上的会话名用同一个菜单。
 // 贴着会话行（或鼠标位置），放不下时往上、往左挪；↑ ↓ 移动，Enter 执行，Esc、Tab 或点别处关闭。
 
 import { useLayoutEffect, useRef, useState } from 'react';
@@ -22,32 +22,33 @@ interface MenuItem {
   blocked: string | null;
 }
 
-/** @brief "引用到当前会话"不能用的原因（docs/v0/screens/session-refs.md）；能用时为 null。 */
+/** @brief "Attach as context"不能用的原因（docs/v0/screens/session-refs.md）；能用时为 null。 */
 function referenceBlocked(row: Row, state: AppState): string | null {
   const current = state.view === 'chat' ? state.tabs.find((tab) => tab.key === state.activeKey) : undefined;
-  if (!current) return '没有打开的会话';
-  if (row.tab?.key === current.key || sameFile(row.file, current.sessionFile)) return '就是当前会话';
-  return isUnsaved(row) || !row.file ? '还没有消息' : null;
+  if (!current) return 'No active session';
+  if (row.tab?.key === current.key || sameFile(row.file, current.sessionFile)) return 'This is the current session';
+  return isUnsaved(row) || !row.file ? 'No messages yet' : null;
 }
 
-/** @brief "在右侧分屏打开"不能用的原因：这一行就是单栏里显示的会话（docs/v0/screens/split.md）。 */
+/** @brief "Open in split view"不能用的原因：这一行就是单栏里显示的会话（docs/v0/screens/split.md）。 */
 function splitBlocked(row: Row, state: AppState): string | null {
-  return !state.split && state.view === 'chat' && row.tab && row.tab.key === state.activeKey ? '已经打开' : null;
+  return !state.split && state.view === 'chat' && row.tab && row.tab.key === state.activeKey ? 'Already open' : null;
 }
 
 /** @brief 这一行的菜单项。 */
 function menuItems(row: Row, state: AppState): MenuItem[] {
   if (row.archived) {
-    return [{ action: 'restore', label: '恢复', blocked: null }, { action: 'delete', label: '删除', blocked: null }];
+    return [{ action: 'restore', label: 'Unarchive', blocked: null },
+      { action: 'delete', label: 'Delete…', blocked: null }];
   }
-  const opening = row.tab?.phase === 'opening' ? '正在打开' : null;
-  const busy = opening ?? (isBusy(row) ? '正在生成' : null);
-  const unsaved = isUnsaved(row) ? '还没有消息' : null;
-  return [{ action: 'rename', label: '重命名', blocked: opening },
-    { action: 'reference', label: '引用到当前会话', blocked: referenceBlocked(row, state) },
-    { action: 'split', label: '在右侧分屏打开', blocked: splitBlocked(row, state) },
-    { action: 'archive', label: '归档', blocked: busy ?? unsaved },
-    { action: 'delete', label: '删除', blocked: busy }];
+  const opening = row.tab?.phase === 'opening' ? 'Opening…' : null;
+  const busy = opening ?? (isBusy(row) ? 'Still running' : null);
+  const unsaved = isUnsaved(row) ? 'No messages yet' : null;
+  return [{ action: 'rename', label: 'Rename', blocked: opening },
+    { action: 'reference', label: 'Attach as context', blocked: referenceBlocked(row, state) },
+    { action: 'split', label: 'Open in split view', blocked: splitBlocked(row, state) },
+    { action: 'archive', label: 'Archive', blocked: busy ?? unsaved },
+    { action: 'delete', label: 'Delete…', blocked: busy }];
 }
 
 /** @brief 右键菜单。 */
@@ -76,7 +77,7 @@ export function SessionMenu({ at, row, onAction, onClose }: {
     moveMenuFocus(event);
   }
   return createPortal(
-    <div ref={menu} className="menu session-menu" role="menu" aria-label="会话" data-testid="session-menu"
+    <div ref={menu} className="menu session-menu" role="menu" aria-label="Session actions" data-testid="session-menu"
       style={{ left: position.x, top: position.y }} onKeyDown={onKeyDown}>
       {items.map((item) => (
         <button key={item.action} role="menuitem" disabled={item.blocked !== null}

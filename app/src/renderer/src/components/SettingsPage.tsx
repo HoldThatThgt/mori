@@ -1,5 +1,5 @@
-// 设置页（docs/v0/screens/settings.md），照 Claude 桌面版：左边分节列表，右边这一节的内容，顶部"返回会话"。
-// 打开时落在"连接与模型"；"去设置"落在出错会话所用模型的连接的"编辑连接"（state/settings.ts）。
+// 设置页（docs/v0/screens/settings.md），照 Claude 桌面版：左边分节列表，右边这一节的内容，顶部"Back to app"。
+// 打开时落在"Connections and models"；"Go to settings"落在出错会话所用模型的连接的"Edit connection"（state/settings.ts）。
 
 import { useRef } from 'react';
 import { Icon } from '../icons';
@@ -10,7 +10,7 @@ import { ConnectionsSection } from './ConnectionsSection';
 
 /** 分节，按列表顺序 */
 const SECTIONS: ReadonlyArray<{ id: SettingsSection; label: string }> = [
-  { id: 'connections', label: '连接与模型' },
+  { id: 'connections', label: 'Connections and models' },
   { id: 'agents', label: 'AGENTS.md' },
 ];
 
@@ -32,7 +32,8 @@ function SettingsNav() {
     selectSection(next.id);
   }
   return (
-    <nav ref={nav} className="settings-nav" data-testid="settings-nav" aria-label="设置分节" onKeyDown={onKeyDown}>
+    <nav ref={nav} className="settings-nav" data-testid="settings-nav" aria-label="Settings sections"
+      onKeyDown={onKeyDown}>
       {SECTIONS.map((item) => (
         <button key={item.id} className={`nav-item${item.id === section ? ' active' : ''}`} data-section={item.id}
           aria-current={item.id === section ? 'page' : undefined} onClick={() => selectSection(item.id)}>
@@ -49,8 +50,8 @@ export function SettingsPage() {
   return (
     <section className="settings-page" data-testid="settings-page">
       <header className="topbar">
-        <button className="button" onClick={() => showChat()}><Icon name="back" />返回会话</button>
-        <span className="chat-title">设置</span>
+        <button className="button" onClick={() => showChat()}><Icon name="back" />Back to app</button>
+        <span className="chat-title">Settings</span>
       </header>
       <div className="settings-layout">
         <SettingsNav />

@@ -39,13 +39,14 @@ function useTitleMenu(tab: Tab, row: Row) {
     if (action === 'reference' || action === 'split') sessionAction(row, action);
     if (action !== 'archive') return;
     archiveSession({ tabKey: tab.key, sessionFile: tab.sessionFile }).then(() => focusComposer(),
-      (cause: unknown) => setProblem(`归档失败：${describe('archive session', cause)}`));
+      (cause: unknown) => setProblem(`Couldn’t archive this session: ${describe('archive session', cause)}`));
   }
   return { menu, setMenu, renaming, setRenaming, problem, act };
 }
 
 /** 会话名按钮的悬停说明 */
-const TITLE_HINT = '右键打开菜单；拖到另一栏的输入框是引用，拖到中栏一侧是分屏';
+const TITLE_HINT = 'Right-click for the session menu. Drag to the other pane’s message box to attach it as context, '
+  + 'or to one side to open it in split view.';
 
 /** @brief 标题行上的会话名。 */
 export function PaneTitle({ tab }: { tab: Tab }) {

@@ -1,7 +1,7 @@
-// 工作回顾的中栏（方案 5.14，状态表见 docs/v0/screens/review.md "页面"）：顶部"返回会话"和标题；两个分节（各带未处理的
-// 条数）；工具行（隐藏已处理、导出为 Markdown、打开文件夹）和它下面的结果；读取中 / 读取失败 / 空 / 都已隐藏；
-// 每条记录一行摘要的列表，↑ ↓ 在行之间移动焦点，Enter 或点击在右栏打开详情（ReviewDetail）。记录只读不改。
-// 重新读取时上一次的列表留着（滚动位置不丢），顶部标题旁显示"正在读取…"，读完之前不能导出。
+// 工作回顾的中栏（方案 5.14，状态表见 docs/v0/screens/review.md "页面"）：顶部"Back to app"和标题；两个分节（各带
+// 未处理的条数）；工具行（Hide resolved、Export as Markdown…、Open folder）和它下面的结果；读取中 / 读取失败 / 空 /
+// 都已隐藏；每条记录一行摘要的列表，↑ ↓ 在行之间移动焦点，Enter 或点击在右栏打开详情（ReviewDetail）。记录只读不改。
+// 重新读取时上一次的列表留着（滚动位置不丢），顶部标题旁显示"Loading…"，读完之前不能导出。
 
 import { useLayoutEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -21,8 +21,9 @@ import { feedbackScope, issueTitle, recordTime } from './reviewText';
 
 /** 这一节没有记录时的说明 */
 const EMPTY_TEXT: Record<ReviewKind, string> = {
-  feedback: "还没有反馈。在助手回复或文件阅读器里选中文字点'反馈'，或用回复下的'反馈这条回复'。",
-  issues: '还没有界面问题。按 F8 报告界面问题。',
+  feedback: 'No feedback yet. Select text in a response or the file viewer and click “Feedback”, '
+    + 'or use “Give feedback” under a response.',
+  issues: 'No UI issues yet. Press F8 to report one.',
 };
 
 /** 各分节列表的滚动位置：只在这次运行的内存里，离开工作回顾再回来时恢复 */
@@ -32,10 +33,10 @@ const scrollTops: Record<ReviewKind, number> = { feedback: 0, issues: 0 };
 function SectionSwitch({ section }: { section: ReviewKind }) {
   const counts = useReview(useShallow((state) => REVIEW_KINDS.map((kind) => unhandledCount(state, kind))));
   return (
-    <div className="review-tabs" role="group" aria-label="分节">
+    <div className="review-tabs" role="group" aria-label="Sections">
       {REVIEW_KINDS.map((kind, index) => (
         <button key={kind} type="button" data-testid={`review-tab-${kind}`} aria-pressed={kind === section}
-          aria-label={`${KIND_LABEL[kind]}，${counts[index]} 条未处理`}
+          aria-label={`${KIND_LABEL[kind]}, ${counts[index]} unresolved`}
           onClick={() => kind !== section && chooseSection(kind)}>
           {KIND_LABEL[kind]}
           {counts[index] > 0 && <span className="review-count" data-testid="review-count">{counts[index]}</span>}
@@ -46,8 +47,8 @@ function SectionSwitch({ section }: { section: ReviewKind }) {
 }
 
 /**
- * @brief 工具行："隐藏已处理"开关（两个分节共用）、"导出为 Markdown…"（这一节没有列出的记录、或正在读取时不可用）、
- *        "打开文件夹"。
+ * @brief 工具行："Hide resolved"开关（两个分节共用）、"Export as Markdown…"（这一节没有列出的记录、或正在读取时
+ *        不可用）、"Open folder"。
  */
 function Toolbar({ section, listed }: { section: ReviewKind; listed: number }) {
   const hideHandled = useReview((state) => state.hideHandled);
@@ -56,17 +57,17 @@ function Toolbar({ section, listed }: { section: ReviewKind; listed: number }) {
     <div className="review-toolbar">
       <button type="button" className="review-switch" role="switch" aria-checked={hideHandled}
         data-testid="review-hide-handled" onClick={() => setHideHandled(!hideHandled)}>
-        <span className="tools-switch" aria-hidden="true"><span className="tools-switch-knob" /></span>隐藏已处理
+        <span className="tools-switch" aria-hidden="true"><span className="tools-switch-knob" /></span>Hide resolved
       </button>
       <button type="button" className="button" data-testid="review-export" disabled={listed === 0 || loading}
-        onClick={() => void exportKind(section)}>导出为 Markdown…</button>
+        onClick={() => void exportKind(section)}>Export as Markdown…</button>
       <button type="button" className="button" data-testid="review-open-folder"
-        onClick={() => void openKindFolder(section)}><Icon name="folder" />打开文件夹</button>
+        onClick={() => void openKindFolder(section)}><Icon name="folder" />Open folder</button>
     </div>
   );
 }
 
-/** @brief 工具行下面的一行：已导出（路径和"打开所在文件夹"），或导出、打开文件夹失败的原文。 */
+/** @brief 工具行下面的一行：已导出（路径和"Show in Explorer"），或导出、打开文件夹失败的原文。 */
 function Notice({ section }: { section: ReviewKind }) {
   const notice = useReview((state) => state.notices[section]);
   if (!notice) return null;
@@ -75,16 +76,16 @@ function Notice({ section }: { section: ReviewKind }) {
   }
   return (
     <p className="review-notice form-message ok" role="status" data-testid="review-notice">
-      已导出 {notice.count} 条到 {notice.file}
+      Exported {notice.count} {notice.count === 1 ? 'record' : 'records'} to {notice.file}
       <button type="button" className="text-link" onClick={() => void showExported(section, notice.file)}>
-        打开所在文件夹</button>
+        Show in Explorer</button>
     </p>
   );
 }
 
-/** @brief 已处理的标签。 */
+/** @brief 已处理的标签"Resolved"。 */
 function HandledTag({ handled }: { handled: boolean }) {
-  return handled ? <span className="review-tag done" data-testid="review-row-handled">已处理</span> : null;
+  return handled ? <span className="review-tag done" data-testid="review-row-handled">Resolved</span> : null;
 }
 
 /** @brief 反馈的一行摘要：你的期望、原文的第一行、来源和时间。会话名用侧栏现在的名字。 */
@@ -105,14 +106,14 @@ function FeedbackSummary({ record, handled }: { record: FeedbackRecord; handled:
   );
 }
 
-/** @brief 界面问题的一行摘要："哪里不对"（没有填写时用"你期望什么"）、时间、没有截图时标"没有截图"。 */
+/** @brief 界面问题的一行摘要："What went wrong"（没有填写时用"What you expected"）、时间、没有截图时标"No screenshot"。 */
 function IssueSummary({ record, handled }: { record: IssueRecord; handled: boolean }) {
   return (
     <>
       <span className="review-row-title">{issueTitle(record)}</span>
       <span className="review-row-meta">
         <span className="review-row-time">{recordTime(record, false)}</span>
-        {!record.shot && <span className="review-tag">没有截图</span>}
+        {!record.shot && <span className="review-tag">No screenshot</span>}
         <HandledTag handled={handled} />
       </span>
     </>
@@ -127,14 +128,14 @@ function Summary({ item, handled }: { item: ReviewItem; handled: boolean }) {
   }
   return (
     <>
-      <span className="review-row-title broken">读不出这份记录：{item.name}</span>
+      <span className="review-row-title broken">Couldn’t read the record {item.name}</span>
       <span className="review-row-error">{item.error}</span>
       {handled && <span className="review-row-meta"><HandledTag handled /></span>}
     </>
   );
 }
 
-/** @brief 列表里的一行；已处理的变淡并标"已处理"，选中的高亮。 */
+/** @brief 列表里的一行；已处理的变淡并标"Resolved"，选中的高亮。 */
 function Row({ section, item }: { section: ReviewKind; item: ReviewItem }) {
   const selected = useReview((state) => state.selected[section] === item.name);
   const handled = useReview((state) => isHandled(state, section, item.name));
@@ -148,7 +149,7 @@ function Row({ section, item }: { section: ReviewKind; item: ReviewItem }) {
 }
 
 /**
- * @brief 进入一节时恢复这一节的滚动位置；从"在工作回顾中查看"过来时，把刚记下的那一行滚到看得见的地方（只滚一次，
+ * @brief 进入一节时恢复这一节的滚动位置；从"View in Review"过来时，把刚记下的那一行滚到看得见的地方（只滚一次，
  *        平常进入一节、重新读取时不动你的滚动位置）。
  * @param count 列出的条数（刚记下的那一行要等读完才在列表里）
  */
@@ -166,12 +167,13 @@ function useListScroll(section: ReviewKind, element: React.RefObject<HTMLDivElem
   }, [reveal, count, element]);
 }
 
-/** @brief "隐藏已处理"开着、这一节的记录都已处理。 */
+/** @brief "Hide resolved"开着、这一节的记录都已处理。 */
 function AllHidden({ count }: { count: number }) {
   return (
     <div className="review-hidden">
-      <p className="review-state" data-testid="review-all-hidden">没有未处理的记录 · 已处理的 {count} 条已隐藏</p>
-      <button type="button" className="text-link" onClick={() => setHideHandled(false)}>显示已处理</button>
+      <p className="review-state" data-testid="review-all-hidden">
+        No unresolved records · {count} resolved {count === 1 ? 'record' : 'records'} hidden</p>
+      <button type="button" className="text-link" onClick={() => setHideHandled(false)}>Show resolved</button>
     </div>
   );
 }
@@ -189,9 +191,9 @@ function SectionContent({ section, listed }: { section: ReviewKind; listed: Revi
     }}>
       {error && (
         <p className="form-message error" role="alert" data-testid="review-error">{error}
-          <button type="button" className="text-link" onClick={() => void loadReview()}>重新读取</button></p>
+          <button type="button" className="text-link" onClick={() => void loadReview()}>Retry</button></p>
       )}
-      {!loaded && !error && <p className="review-state" role="status" data-testid="review-loading">正在读取…</p>}
+      {!loaded && !error && <p className="review-state" role="status" data-testid="review-loading">Loading…</p>}
       {loaded && total === 0 && <p className="review-state" data-testid="review-empty">{EMPTY_TEXT[section]}</p>}
       {loaded && total > 0 && listed.length === 0 && <AllHidden count={total} />}
       {listed.length > 0 && (
@@ -204,7 +206,7 @@ function SectionContent({ section, listed }: { section: ReviewKind; listed: Revi
   );
 }
 
-/** @brief 工作回顾页（中栏）。重新读取时（已经有列表）标题旁显示"正在读取…"。 */
+/** @brief 工作回顾页（中栏）。重新读取时（已经有列表）标题旁显示"Loading…"。 */
 export function ReviewPage() {
   const section = useReview((state) => state.section);
   const listed = useReview(useShallow((state) => visibleRecords(state, section)));
@@ -212,9 +214,9 @@ export function ReviewPage() {
   return (
     <section className="review-page" data-testid="review-page">
       <header className="topbar">
-        <button type="button" className="button" onClick={() => showChat()}><Icon name="back" />返回会话</button>
-        <span className="chat-title">工作回顾</span>
-        {rereading && <span className="review-reading" role="status" data-testid="review-loading">正在读取…</span>}
+        <button type="button" className="button" onClick={() => showChat()}><Icon name="back" />Back to app</button>
+        <span className="chat-title">Review</span>
+        {rereading && <span className="review-reading" role="status" data-testid="review-loading">Loading…</span>}
       </header>
       <div className="review-controls">
         <SectionSwitch section={section} />

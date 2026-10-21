@@ -19,24 +19,28 @@ export interface CompatOption {
   value: boolean | string;
   /** 选项文字 */
   label: string;
-  /** 中文说明 */
+  /** 说明 */
   hint: string;
 }
 
 /** @brief OpenAI 兼容端点的兼容选项，登记在 docs/v0/defaults.md。 */
 export const COMPAT_OPTIONS: readonly CompatOption[] = [
-  { id: 'noDeveloperRole', field: 'supportsDeveloperRole', value: false, label: '端点不支持 developer 角色',
-    hint: '系统提示改用 system 角色发送' },
-  { id: 'noStore', field: 'supportsStore', value: false, label: '端点不接受 store 字段',
-    hint: '请求里不带 store' },
-  { id: 'maxTokens', field: 'maxTokensField', value: 'max_tokens', label: '最大输出用 max_tokens 字段',
-    hint: '较老的端点不认识 max_completion_tokens' },
-  { id: 'noStreamUsage', field: 'supportsUsageInStreaming', value: false, label: '端点不支持流式用量',
-    hint: '不发送 stream_options；上下文用量会显示不准' },
-  { id: 'noStrict', field: 'supportsStrictMode', value: false, label: '端点不支持工具参数的 strict 模式',
-    hint: '工具定义里不带 strict' },
-  { id: 'toolResultName', field: 'requiresToolResultName', value: true, label: '工具结果需要带工具名',
-    hint: '部分端点要求工具结果消息带 name 字段' },
+  { id: 'noDeveloperRole', field: 'supportsDeveloperRole', value: false,
+    label: 'Endpoint doesn’t support the developer role',
+    hint: 'Sends the system prompt with the system role instead' },
+  { id: 'noStore', field: 'supportsStore', value: false, label: 'Endpoint doesn’t accept the store field',
+    hint: 'Leaves store out of requests' },
+  { id: 'maxTokens', field: 'maxTokensField', value: 'max_tokens',
+    label: 'Endpoint needs max_tokens instead of max_completion_tokens',
+    hint: 'Older endpoints don’t recognize max_completion_tokens' },
+  { id: 'noStreamUsage', field: 'supportsUsageInStreaming', value: false,
+    label: 'Endpoint doesn’t report usage while streaming',
+    hint: 'Doesn’t send stream_options, so the context usage shown will be inaccurate' },
+  { id: 'noStrict', field: 'supportsStrictMode', value: false,
+    label: 'Endpoint doesn’t support strict mode for tool parameters', hint: 'Leaves strict out of tool definitions' },
+  { id: 'toolResultName', field: 'requiresToolResultName', value: true,
+    label: 'Tool results must include the tool name',
+    hint: 'Some endpoints require a name field on tool result messages' },
 ];
 
 /** @brief pi 的思考强度（pi-agent-core ThinkingLevel），从低到高。 */
@@ -45,7 +49,7 @@ export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
 /** @brief 思考强度的界面文字（docs/v0/screens/models.md）。 */
 export const THINKING_LABELS: Record<ThinkingLevel, string> = {
-  off: '关', minimal: '最低', low: '低', medium: '中', high: '高', xhigh: '很高', max: '最高',
+  off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max',
 };
 
 /** @brief 连接（pi models.json 里 Mori 的一个 provider）：服务地址、接口类型、key 和兼容选项，下面的模型共用。 */
@@ -76,13 +80,17 @@ export const ModelFormSchema = z.object({
 });
 export type ModelForm = z.infer<typeof ModelFormSchema>;
 
-/** @brief 连接表单（首次启动、"添加连接"）：一个连接和它的第一个模型。 */
+/** @brief 连接表单（首次启动、"Add connection"）：一个连接和它的第一个模型。 */
 export const ConnectionSchema = EndpointSchema.extend(ModelFormSchema.shape);
 export type Connection = z.infer<typeof ConnectionSchema>;
 
 /** @brief pi 资源的四类（pi 设置里的 extensions / skills / prompts / themes）。 */
 export const RESOURCE_KINDS = ['extensions', 'skills', 'prompts', 'themes'] as const;
 export type ResourceKind = (typeof RESOURCE_KINDS)[number];
+/** 资源种类的单数（小写），用在工具页开关的读屏名和操作记录里（"Enable skill review"） */
+export const KIND_ONE: Record<ResourceKind, string> = {
+  extensions: 'extension', skills: 'skill', prompts: 'prompt template', themes: 'theme',
+};
 
 const sessionId = z.string().min(1);
 
@@ -90,7 +98,7 @@ const sessionId = z.string().min(1);
 export const TrustAnswerSchema = z.object({
   /** 信任 / 不信任 */
   trusted: z.boolean(),
-  /** 勾了"记住"：写进 pi 的 trust.json */
+  /** 勾了"Remember my choice"：写进 pi 的 trust.json */
   remember: z.boolean(),
 });
 export type TrustAnswer = z.infer<typeof TrustAnswerSchema>;
@@ -102,19 +110,19 @@ export type ApprovalMode = 'ask' | 'all';
 export interface ApprovalState {
   /** 权限 */
   mode: ApprovalMode;
-  /** "本会话不再询问"记下的工具名，按记下的顺序 */
+  /** "Allow for this session"记下的工具名，按记下的顺序 */
   allowed: string[];
 }
 
 /** @brief 新会话的批准设置。 */
 export const DEFAULT_APPROVAL: ApprovalState = { mode: 'ask', allowed: [] };
 
-/** @brief "每次询问"时也直接执行的只读工具（方案 5.7：放行名单是一个常量）。 */
+/** @brief "Ask each time"时也直接执行的只读工具（方案 5.7：放行名单是一个常量）。 */
 export const READ_ONLY_TOOLS: readonly string[] = ['read', 'grep', 'find', 'ls'];
 
 /**
  * 拒绝时回给模型的工具结果的固定写法（临时默认值，见 docs/v0/defaults.md）。
- * 从会话记录载入时，界面按这几种写法认出"已拒绝"。
+ * 从会话记录载入时，界面按这几种写法认出"Denied"。
  */
 export const REJECTED_TEXT = 'Rejected by the user.';
 /** @brief 你写了理由时：前缀加理由原文。 */
@@ -122,11 +130,11 @@ export const REJECTED_REASON_PREFIX = 'Rejected by the user. Reason: ';
 /** @brief 你按了停止、卡还挂着时。 */
 export const REJECTED_BY_STOP = 'Rejected: the user stopped the run.';
 
-/** @brief 你在批准卡上的选择：允许一次 / 本会话不再询问此工具 / 拒绝。 */
+/** @brief 你在批准卡上的选择："Allow once" / "Allow “<工具>” for this session" / "Deny"。 */
 export const APPROVAL_DECISIONS = ['allow', 'allowSession', 'reject'] as const;
 export type ApprovalDecision = (typeof APPROVAL_DECISIONS)[number];
 
-/** @brief 引用的来源：一条助手回复里的选区或整轮回复（docs/v0/screens/selection.md "回到原位置"）。 */
+/** @brief 引用的来源：一条助手回复里的选区或整轮回复（docs/v0/screens/selection.md "Jump to source"）。 */
 export const MessageSourceSchema = z.object({
   kind: z.literal('message'),
   /** 会话文件；还没有时为 null */
@@ -135,7 +143,7 @@ export const MessageSourceSchema = z.object({
   entryId: z.string().nullable(),
   /** 这条助手消息的时间（pi 消息的 timestamp，ms）；没有 id 时用它找 */
   time: z.number().nullable(),
-  /** 选区，或整轮回复（回复下的"引用到输入框"、"反馈这条回复"） */
+  /** 选区，或整轮回复（回复下的"Attach message as context"、"Give feedback"） */
   scope: z.enum(['selection', 'reply']),
 });
 
@@ -252,7 +260,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
     reason: z.string().optional(),
   }),
   z.object({ type: z.literal('approval.setMode'), sessionId, mode: z.enum(['ask', 'all']) }),
-  /** 从"本会话已允许"里清除一个工具名 */
+  /** 从"Allowed for this session"里清除一个工具名 */
   z.object({ type: z.literal('approval.forget'), sessionId, toolName: z.string().min(1) }),
   // ---- M6：连接与模型（docs/v0/screens/settings.md） ----
   /** 保存连接表单：providerId 为 null 时新建一个连接，否则改这个连接并写入（或更新）表单里的模型 */
@@ -544,7 +552,7 @@ export interface ConfigInfo {
    * 有错误时 pi 按空设置处理：默认模型读不到、思考强度是 pi 的默认值，模型照常能用
    */
   settingsError: string | null;
-  /** pi 设置的 defaultThinkingLevel（没有时为 medium）：新模型的"新会话默认的思考强度"的初始值 */
+  /** pi 设置的 defaultThinkingLevel（没有时为 medium）：新模型的"Default effort for new sessions"的初始值 */
   defaultThinkingLevel: ThinkingLevel;
 }
 
@@ -620,9 +628,9 @@ export interface SessionInfo {
   name: string | null;
   /** 文件夹的信任状态 */
   projectTrust: ProjectTrust;
-  /** 信任状态已经记在 trust.json 里（原有的记录，或这次勾了"记住"并写进去了） */
+  /** 信任状态已经记在 trust.json 里（原有的记录，或这次勾了"Remember my choice"并写进去了） */
   trustRemembered: boolean;
-  /** 没能把"记住"写进 trust.json 时的原文 */
+  /** 没能把"Remember my choice"写进 trust.json 时的原文 */
   trustSaveError: string | null;
   /** 加载失败的扩展：路径和原文 */
   extensionErrors: string[];
@@ -636,7 +644,7 @@ export interface SessionInfo {
   modelNotice: string | null;
   /** 上下文用量（pi getContextUsage） */
   contextUsage: ContextUsage | null;
-  /** 批准设置；新建和重新打开的会话都是"每次询问" */
+  /** 批准设置；新建和重新打开的会话都是"Ask each time" */
   approval: ApprovalState;
   /** 思考强度（M6，docs/v0/screens/models.md） */
   thinkingLevel: ThinkingLevel;
@@ -767,12 +775,12 @@ export interface SlimMessageUpdate {
 
 /**
  * @brief 一次工具调用会怎样处理：ask 要批准；session 本会话已允许；all 全部允许；free 只读工具。
- *        在 pi 的 tool_execution_start 转发之前紧挨着发出，界面据此决定工具卡是"等你批准"还是"执行中"；
+ *        在 pi 的 tool_execution_start 转发之前紧挨着发出，界面据此决定工具卡是"Waiting for your approval"还是"Running…"；
  *        批准处理器后来判断不同时再发一次更正（见 KernelEvent 的 mori.tool_gate）。
  */
 export type ToolGate = 'ask' | 'session' | 'all' | 'free';
 
-/** @brief 批准请求由谁结束：你、"本会话不再询问"、切到"全部允许"、你按了停止、会话被中止或释放。 */
+/** @brief 批准请求由谁结束：你、"Allow for this session"、切到"Allow all"、你按了停止、会话被中止或释放。 */
 export type ApprovalEndBy = 'user' | 'session' | 'all' | 'stop' | 'closed';
 
 /** @brief Mori 后台进程自己产生的事件。 */

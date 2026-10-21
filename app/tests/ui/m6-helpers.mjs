@@ -1,5 +1,5 @@
 // M6 测试（m6-app-*.mjs、m6-replay.mjs、m6-real.mjs）共用的准备与页面操作：合成端点、首次启动填连接并打开项目、
-// 设置页（连接卡、模型行、AGENTS.md）、工具页的分节、顶栏的模型和思考菜单、"/"补全列表。
+// 设置页（连接卡、模型行、AGENTS.md）、Customize 页的分节、顶栏的模型和思考菜单、"/"补全列表。
 // 只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。标识见 docs/v0/screens/settings.md、models.md、tools.md、slash.md。
 
 import { execFileSync, spawn } from 'node:child_process';
@@ -36,27 +36,27 @@ export async function resizeWindow(app, width, height) {
 
 /**
  * @brief 首次启动：填连接表单、测试连接，再打开 project（系统对话框换成直接返回它）。
- *        trust 为 true / false 时在信任询问里选"信任" / "不信任"；undefined 表示不会问。
+ *        trust 为 true / false 时在信任询问里选"Trust workspace" / "Don’t trust"；undefined 表示不会问。
  */
 export async function firstRunAndOpen(ctx, { name = '合成端点', baseUrl, apiKey, modelId = 'fake-coder', project,
   trust }) {
   const { app, page, h } = ctx;
   await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
   await h.fillConnection({ name, baseUrl, apiKey, modelId });
-  await page.getByRole('button', { name: '测试连接' }).click();
+  await page.getByRole('button', { name: 'Test connection' }).click();
   await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
   await openProject(ctx, project, trust);
 }
 
-/** @brief 打开一个项目文件夹（"打开文件夹…"）；trust 同 firstRunAndOpen。 */
+/** @brief 打开一个项目文件夹（"Open folder…"）；trust 同 firstRunAndOpen。 */
 export async function openProject(ctx, project, trust) {
   const { app, page } = ctx;
   await stubFolder(app, project);
-  await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await page.getByRole('button', { name: 'Open folder…' }).first().click();
   if (trust !== undefined) {
     const dialog = page.getByTestId('trust-dialog');
     await dialog.waitFor({ timeout: 15000 });
-    await dialog.getByRole('button', { name: trust ? '信任' : '不信任', exact: true }).click();
+    await dialog.getByRole('button', { name: trust ? 'Trust workspace' : 'Don’t trust', exact: true }).click();
   }
   await waitReady(page);
 }
@@ -67,7 +67,7 @@ export const focusedPane = (page) => page.locator('.pane-slot[data-focused="true
 
 /** @brief 打开设置页并切到某一节（connections / agents）。 */
 export async function openSettingsSection(page, section = 'connections') {
-  await page.getByRole('button', { name: '设置' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
   await page.locator(`[data-testid="settings-nav"] button[data-section="${section}"]`).click();
 }
@@ -77,13 +77,13 @@ export const connectionCard = (page, provider) => page.locator(`[data-testid="co
 /** @brief 设置页的模型行（provider/id）。 */
 export const modelRow = (page, ref) => page.locator(`[data-testid="model-row"][data-model="${ref}"]`);
 
-/** @brief 打开工具页并切到某一节（builtin / skills / mcp / plugins），等读取结束。 */
+/** @brief 打开 Customize 页并切到某一节（builtin / skills / mcp / plugins），等读取结束（没有"Loading…"）。 */
 export async function openToolsSection(page, section) {
   if (!(await page.getByTestId('tools-page').isVisible().catch(() => false))) await page.getByTestId('nav-tools').click();
   await page.getByTestId('tools-page').waitFor({ timeout: 10000 });
   await page.locator(`[data-testid="tools-page"] button[data-section="${section}"]`).first().click();
-  await page.waitForFunction(() => !document.querySelector('[data-testid="tools-page"]')?.textContent?.includes('正在读取…'),
-    null, { timeout: 30000 });
+  await page.waitForFunction(() => !document.querySelector('[data-testid="tools-page"]')?.textContent
+    ?.includes('Loading…'), null, { timeout: 30000 });
 }
 
 /** @brief 在当前一栏的顶栏打开模型菜单，选 ref（provider/id），等按钮显示新模型。 */
@@ -131,7 +131,7 @@ export function lastReply(page) {
  * @brief 在页面里装一个 MutationObserver，每次 DOM 变化时记下 kind 的一个快照（与上一个相同时不记），用来抓只持续
  *        几毫秒的中间状态（切换中、读取中、保存中）；做法同 page.mjs 的 watchThinking。
  * @param kind model / thinking：当前一栏顶栏按钮的文字或 data-level 和 aria-disabled；agents：AGENTS.md 一节的
- *        "正在读取…"、编辑框是否不可用、旁边的一行；modelForm：模型表单"保存"按钮的文字和是否不可用
+ *        "Loading…"、编辑框是否不可用、旁边的一行；modelForm：模型表单"Save"按钮的文字和是否不可用
  */
 export async function watchStates(page, kind) {
   await page.evaluate(({ which, pane }) => {

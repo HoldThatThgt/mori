@@ -1,5 +1,5 @@
 // 工作回顾（方案 5.14，状态表见 docs/v0/screens/review.md）：主进程读出的两类记录、当前分节、各分节选中的记录、
-// 已处理与"隐藏已处理"（本机 localStorage，与已归档相同）、回到原位置的检查结果、导出与打开文件夹的结果。
+// 已处理与"Hide resolved"（本机 localStorage，与已归档相同）、回到原位置的检查结果、导出与打开文件夹的结果。
 // 记录只读不改；只有回到原位置要用后台进程（读会话、打开会话）。
 
 import { create } from 'zustand';
@@ -15,13 +15,15 @@ import { findSourceIndex, jumpToQuote } from './quotes';
 import { sessionGone, showSession } from './refActions';
 import { sameFile, tabByFile, useApp, type AppState } from './store';
 
-/** 本机存放已处理标记和"隐藏已处理"的键 */
+/** 本机存放已处理标记和"Hide resolved"的键 */
 const STORAGE_KEY = 'mori.review';
 /** 原会话不在了时 session.read 报的原文开头（kernel/sessions.ts readSession） */
 const NOT_FOUND = 'Session file not found';
 /** 会话列表还没读好、原会话也没打开时，回到原位置打不开它的说明（按会话列表的状态） */
 const LIST_NOT_READY: Record<AppState['saved']['status'], string> = {
-  loading: '会话列表还没读完，稍后再试', failed: '会话列表读取失败，无法打开原会话', ready: '会话列表里找不到原会话',
+  loading: 'Sessions are still loading. Try again in a moment.',
+  failed: 'Couldn’t load sessions, so the original session can’t be opened.',
+  ready: 'The original session isn’t in your session list.',
 };
 
 /** @brief 列表里的一条记录。 */
@@ -48,11 +50,11 @@ interface ReviewState {
   section: ReviewKind;
   /** 各分节选中的记录（文件名）；没有选中时为 null */
   selected: Record<ReviewKind, string | null>;
-  /** 从"在工作回顾中查看"过来、要滚到看得见的地方的记录（文件名）；列表滚过去后清掉，平常为 null */
+  /** 从"View in Review"过来、要滚到看得见的地方的记录（文件名）；列表滚过去后清掉，平常为 null */
   reveal: string | null;
   /** 已处理的记录："feedback/<文件名>" 或 "ui-issues/<文件名>"（本机保存） */
   handled: string[];
-  /** 隐藏已处理（两个分节共用，本机保存） */
+  /** Hide resolved（两个分节共用，本机保存） */
   hideHandled: boolean;
   /** 回到原位置的检查结果（按反馈的文件名），只在这次运行的内存里 */
   jumps: Record<string, JumpState>;
@@ -102,7 +104,7 @@ export function recordsOf(state: ReviewState, kind: ReviewKind): ReviewItem[] {
   return state.records?.[kind] ?? [];
 }
 
-/** @brief 一个分节列出的记录："隐藏已处理"开着时不含已处理的。 */
+/** @brief 一个分节列出的记录："Hide resolved"开着时不含已处理的。 */
 export function visibleRecords(state: ReviewState, kind: ReviewKind): ReviewItem[] {
   const all = recordsOf(state, kind);
   return state.hideHandled ? all.filter((item) => !isHandled(state, kind, item.name)) : all;
@@ -119,7 +121,7 @@ export function selectedRecord(state: ReviewState): ReviewItem | null {
   return (name && recordsOf(state, state.section).find((item) => item.name === name)) || null;
 }
 
-/** @brief 完整路径里的文件名（"在工作回顾中查看"按文件名选中刚保存的记录）。 */
+/** @brief 完整路径里的文件名（"View in Review"按文件名选中刚保存的记录）。 */
 export function fileName(path: string): string {
   return path.split(/[\\/]/).pop() ?? path;
 }
@@ -133,7 +135,7 @@ function keptSelection(state: ReviewState, records: ReviewRecords): Record<Revie
   return { feedback: keep('feedback'), issues: keep('issues') };
 }
 
-/** @brief 读出两类记录（打开工作回顾、保存了新报告、"重新读取"时）。 */
+/** @brief 读出两类记录（打开工作回顾、保存了新报告、"Retry"时）。 */
 export async function loadReview(): Promise<void> {
   useReview.setState({ loading: true, error: null });
   try {
@@ -145,14 +147,14 @@ export async function loadReview(): Promise<void> {
 }
 
 /**
- * @brief 打开工作回顾；从"在工作回顾中查看"过来时切到那一节、选中那一条并滚到看得见的地方。
+ * @brief 打开工作回顾；从"View in Review"过来时切到那一节、选中那一条并滚到看得见的地方。
  *        从有未保存改动的设置页过来时先问。
  * @param section 要显示的分节；不给时保持上次的
  * @param name 要选中的记录（文件名）
  */
 export function openReview(section?: ReviewKind, name?: string): void {
   guardLeave(() => {
-    recordAction(name ? '在工作回顾中查看' : '打开工作回顾');
+    recordAction(name ? 'View in Review' : 'Open Review');
     useReview.setState((state) => ({ section: section ?? state.section, reveal: name ?? null,
       selected: section && name ? { ...state.selected, [section]: name } : state.selected }));
     useApp.setState({ view: 'review' });
@@ -167,19 +169,19 @@ export function reviewChanged(): void {
 
 /** @brief 切换分节。 */
 export function chooseSection(section: ReviewKind): void {
-  recordAction(`工作回顾：${KIND_LABEL[section]}`);
+  recordAction(`Review: ${KIND_LABEL[section]}`);
   useReview.setState({ section });
 }
 
 /** @brief 选中一条记录（右栏显示详情）；name 为 null 时关闭详情。 */
 export function selectRecord(kind: ReviewKind, name: string | null): void {
-  if (name) recordAction(`查看${KIND_LABEL[kind]}`);
+  if (name) recordAction(`View record: ${KIND_LABEL[kind]}`);
   useReview.setState((state) => ({ selected: { ...state.selected, [kind]: name } }));
 }
 
 /** @brief 标为已处理或未处理。 */
 export function setHandled(kind: ReviewKind, name: string, done: boolean): void {
-  recordAction(done ? '标为已处理' : '标为未处理');
+  recordAction(done ? 'Resolve' : 'Reopen');
   const key = handledKey(kind, name);
   useReview.setState((state) => {
     const handled = done ? [...state.handled.filter((item) => item !== key), key]
@@ -189,9 +191,9 @@ export function setHandled(kind: ReviewKind, name: string, done: boolean): void 
   });
 }
 
-/** @brief 打开或关掉"隐藏已处理"。 */
+/** @brief 打开或关掉"Hide resolved"。 */
 export function setHideHandled(hideHandled: boolean): void {
-  recordAction(hideHandled ? '隐藏已处理' : '显示已处理');
+  recordAction(hideHandled ? 'Hide resolved' : 'Show resolved');
   useReview.setState((state) => {
     saveStored({ handled: state.handled, hideHandled });
     return { hideHandled };
@@ -210,10 +212,10 @@ export function feedbackSessionName(state: AppState, record: FeedbackRecord): st
   const tab = file ? state.tabs.find((item) => sameFile(item.sessionFile, file)) : undefined;
   if (tab) return sessionTitle(tab);
   const saved = file ? state.saved.sessions.find((item) => sameFile(item.sessionFile, file)) : undefined;
-  return saved ? displayTitle(saved.name, saved.firstMessage) : record.feedback.session.title || '（没有名字）';
+  return saved ? displayTitle(saved.name, saved.firstMessage) : record.feedback.session.title || 'Untitled session';
 }
 
-/** 点"回到原位置"的次数：检查期间你又点了别的"回到原位置"时，先点的那次检查完不再打开会话 */
+/** 点"Jump to source"的次数：检查期间你又点了别的"Jump to source"时，先点的那次检查完不再打开会话 */
 let jumpSeq = 0;
 
 /** @brief 记下一条反馈回到原位置的检查结果；null 为清掉。 */
@@ -252,14 +254,15 @@ function sessionNotListed(record: FeedbackRecord, file: string): void {
 }
 
 /**
- * @brief 回到原位置：原会话已删除时不打开；回复里的先确认那条回复还在，不在时留在工作回顾、标"原文已变化"；
- *        否则打开原会话（与在侧栏点它相同），交给 M4 的点芯片回到原位置滚过去高亮（文件里的在右栏打开阅读器）。
- *        检查期间你离开了工作回顾或点了别的"回到原位置"时，检查完只记下结果，不再打开会话。
+ * @brief 回到原位置：原会话已删除时不打开；回复里的先确认那条回复还在，不在时留在工作回顾、说明
+ *        "This response is no longer in the session."；否则打开原会话（与在侧栏点它相同），交给 M4 的点芯片回到原位置
+ *        滚过去高亮（文件里的在右栏打开阅读器）。检查期间你离开了工作回顾或点了别的"Jump to source"时，检查完只记下结果，
+ *        不再打开会话。
  */
 export async function jumpBack(record: FeedbackRecord): Promise<void> {
   const file = feedbackSessionFile(record);
   if (!file) return;
-  recordAction('从工作回顾回到原位置');
+  recordAction('Jump to source from Review');
   const seq = ++jumpSeq;
   setJump(record.name, null);
   const { source, quote } = record.feedback;
@@ -288,13 +291,13 @@ export async function exportKind(kind: ReviewKind): Promise<void> {
   const state = useReview.getState();
   const names = visibleRecords(state, kind).map((item) => item.name);
   if (!names.length) return;
-  recordAction(`导出${KIND_LABEL[kind]}`);
+  recordAction(`Export: ${KIND_LABEL[kind]}`);
   const handled = names.filter((name) => isHandled(state, kind, name));
   try {
     const { file } = await window.mori.exportReview({ kind, names, handled });
     if (file) setNotice(kind, { kind: 'exported', file, count: names.length });
   } catch (error) {
-    setNotice(kind, { kind: 'error', text: `没有导出：${mainError('exportReview', error)}` });
+    setNotice(kind, { kind: 'error', text: `Couldn’t export: ${mainError('exportReview', error)}` });
   }
 }
 
@@ -307,14 +310,14 @@ export async function showExported(kind: ReviewKind, file: string): Promise<void
   }
 }
 
-/** @brief 在资源管理器里打开这一节的文件夹；打开了时清掉上一次打不开的原文（"已导出"那一行留着）。 */
+/** @brief 在资源管理器里打开这一节的文件夹；打开了时清掉上一次打不开的原文（"Exported …"那一行留着）。 */
 export async function openKindFolder(kind: ReviewKind): Promise<void> {
-  recordAction(`打开${KIND_LABEL[kind]}的文件夹`);
+  recordAction(`Open folder: ${KIND_LABEL[kind]}`);
   try {
     const { error } = await window.mori.openReviewFolder(kind);
-    if (error) setNotice(kind, { kind: 'error', text: `打不开文件夹：${error}` });
+    if (error) setNotice(kind, { kind: 'error', text: `Couldn’t open the folder: ${error}` });
     else if (useReview.getState().notices[kind]?.kind === 'error') setNotice(kind, null);
   } catch (error) {
-    setNotice(kind, { kind: 'error', text: `打不开文件夹：${mainError('openReviewFolder', error)}` });
+    setNotice(kind, { kind: 'error', text: `Couldn’t open the folder: ${mainError('openReviewFolder', error)}` });
   }
 }

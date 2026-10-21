@@ -1,4 +1,4 @@
-// 反馈表单（docs/v0/screens/selection.md "反馈"）：只问"希望得到什么结果？"，只记录、不发给模型。
+// 反馈表单（docs/v0/screens/selection.md "反馈"）：只问"What result were you hoping for?"，只记录、不发给模型。
 // 主进程把它存成 <userData>/feedback/<时间>.json；保存失败时保留写好的字。在根组件旁挂一次。
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -9,7 +9,7 @@ import { useApp } from '../state/store';
 import { mainError } from '../state/bridge';
 import { sessionTitle } from './ChatPane';
 
-/** "已记录"停留的毫秒数 */
+/** "Saved"停留的毫秒数 */
 const SAVED_MS = 3000;
 const GAP = 8;
 const MARGIN = 12;
@@ -34,14 +34,14 @@ async function save(request: FeedbackRequest, expected: string): Promise<string>
   return saved.file;
 }
 
-/** @brief "已记录 · 在工作回顾中查看"：点链接关闭表单，打开工作回顾的"对内容的反馈"，选中刚记下的这一条。 */
+/** @brief "Saved · View in Review"：点链接关闭表单，打开工作回顾的"Feedback"一节，选中刚记下的这一条。 */
 function Saved({ file }: { file: string }) {
   return (
-    <p className="feedback-saved" role="status" data-testid="feedback-saved">已记录 · <button type="button"
+    <p className="feedback-saved" role="status" data-testid="feedback-saved">Saved · <button type="button"
       className="text-link" data-testid="feedback-open-review" onClick={() => {
         closeFeedback();
         openReview('feedback', fileName(file));
-      }}>在工作回顾中查看</button></p>
+      }}>View in Review</button></p>
   );
 }
 
@@ -53,7 +53,7 @@ function Editing({ quote, saving, error, onSubmit }: {
   return (
     <>
       <blockquote className="feedback-quote">{quote}</blockquote>
-      <label className="feedback-label">希望得到什么结果？
+      <label className="feedback-label">What result were you hoping for?
         <textarea rows={3} value={expected} autoFocus disabled={saving} data-testid="feedback-input"
           onChange={(event) => setExpected(event.target.value)}
           onKeyDown={(event) => {
@@ -62,18 +62,22 @@ function Editing({ quote, saving, error, onSubmit }: {
             if (expected.trim()) onSubmit(expected);
           }} />
       </label>
-      <p className="feedback-note">只记录，不会发给模型；想让它改，用"问 Mori"</p>
-      {error && <p className="form-message error" role="alert" data-testid="feedback-error">没有记录：{error}</p>}
+      <p className="feedback-note">
+        This is only saved to Review and isn’t sent to the model.
+        To have Mori act on it, use “Attach as context” instead.
+      </p>
+      {error && <p className="form-message error" role="alert" data-testid="feedback-error">
+        Couldn’t save your feedback: {error}</p>}
       <div className="feedback-actions">
-        <button className="button" disabled={saving} onClick={closeFeedback}>取消</button>
+        <button className="button" disabled={saving} onClick={closeFeedback}>Cancel</button>
         <button className="button primary" disabled={!expected.trim() || saving}
-          onClick={() => onSubmit(expected)}>{saving ? '保存中…' : '记录'}</button>
+          onClick={() => onSubmit(expected)}>{saving ? 'Saving…' : 'Save'}</button>
       </div>
     </>
   );
 }
 
-/** @brief 一次反馈的表单：写字 → 保存中 → 已记录（约 3 秒后关闭）；保存失败回到写字，字还在。 */
+/** @brief 一次反馈的表单：写字 → "Saving…" → "Saved"（约 3 秒后关闭）；保存失败回到写字，字还在。 */
 function Form({ request }: { request: FeedbackRequest }) {
   const [phase, setPhase] = useState<'editing' | 'saving' | 'saved'>('editing');
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +106,7 @@ function Form({ request }: { request: FeedbackRequest }) {
     }
   }
   return (
-    <div ref={box} className="feedback-form" role="dialog" aria-label="反馈" data-testid="feedback-form"
+    <div ref={box} className="feedback-form" role="dialog" aria-label="Feedback" data-testid="feedback-form"
       style={{ left: position?.left ?? -9999, top: position?.top ?? -9999 }}>
       {phase === 'saved'
         ? <Saved file={savedFile} />

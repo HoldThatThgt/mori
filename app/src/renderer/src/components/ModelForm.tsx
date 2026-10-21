@@ -15,11 +15,12 @@ function problemOf(fields: ModelFields, connection: ConnectionInfo, adding: bool
   const problem = validate(ModelFormSchema, fields);
   if (problem) return problem;
   const id = fields.modelId.trim();
-  return adding && connection.models.some((item) => item.id === id) ? `保存失败：这个连接下已经有模型 ${id}` : null;
+  return adding && connection.models.some((item) => item.id === id)
+    ? `Couldn’t save: this connection already has a model with ID ${id}` : null;
 }
 
 /**
- * @brief 回到列表时焦点去的按钮：这个模型的"编辑"（编辑时、保存过之后）；添加时没保存就取消，去这个连接的"添加模型"。
+ * @brief 回到列表时焦点去的按钮：这个模型的"Edit"（编辑时、保存过之后）；添加时没保存就取消，去这个连接的"Add model"。
  * @param modelId 模型 ID；列表里还没有这个模型时为 null
  */
 function returnFocus(providerId: string, modelId: string | null): string {
@@ -48,9 +49,9 @@ function useModelForm(connection: ConnectionInfo, model: ModelInfo | undefined) 
       setEverSaved(true);
       const focus = returnFocus(connection.providerId, fields.modelId.trim());
       if (!result.error) showView({ kind: 'list', focus }, { tone: 'ok', text: SAVED_NOTICE });
-      else setMessage({ tone: 'error', text: `已保存，但配置有错误：${result.error}` });
+      else setMessage({ tone: 'error', text: `Saved, but the configuration has an error: ${result.error}` });
     } catch (error) {
-      setMessage({ tone: 'error', text: `保存失败：${describe('model.save', error)}` });
+      setMessage({ tone: 'error', text: `Couldn’t save: ${describe('model.save', error)}` });
     } finally {
       setSaving(false);
     }
@@ -63,23 +64,28 @@ export function ModelForm({ connection, model }: { connection: ConnectionInfo; m
   const { fields, edit, adding, saving, everSaved, message, save } = useModelForm(connection, model);
   const focus = returnFocus(connection.providerId, adding ? null : fields.modelId.trim());
   const close = () => showView({ kind: 'list', focus }, everSaved ? { tone: 'ok', text: SAVED_NOTICE } : null);
+  // noValidate：上下文长度的 min={1} 不交给 Chromium 拦（它的校验气泡跟系统语言走），说明一律由 problemOf 给出。
   return (
-    <form className="connection-form model-form" data-testid="model-form"
+    <form className="connection-form model-form" data-testid="model-form" noValidate
       onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <label>模型 ID
+      <label>Model ID
         <input value={fields.modelId} readOnly={!adding} onChange={(e) => edit({ modelId: e.target.value })}
           placeholder="qwen3-coder" />
       </label>
-      {!adding && <p className="field-hint field-indent">要换模型 ID，删掉这个模型再添加</p>}
-      <label>上下文长度
+      {!adding && (
+        <p className="field-hint field-indent">To change the model ID, delete this model and add it again</p>
+      )}
+      <label>Context window
         <input type="number" min={1} value={fields.contextWindow}
           onChange={(e) => edit({ contextWindow: Number(e.target.value) })} />
       </label>
       <ThinkingFields reasoning={fields.reasoning} level={fields.thinkingLevel} levels={levelOptions(model)}
         onChange={edit} />
       <div className="form-actions">
-        <button type="submit" className="button primary" disabled={saving}>{saving ? '保存中…' : '保存'}</button>
-        <button type="button" className="button" disabled={saving} onClick={close}>{everSaved ? '返回列表' : '取消'}</button>
+        <button type="submit" className="button primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+        <button type="button" className="button" disabled={saving} onClick={close}>
+          {everSaved ? 'Back to list' : 'Cancel'}
+        </button>
       </div>
       {message && (
         <p className={`form-message ${message.tone}`} role="status" data-testid="form-message">{message.text}</p>

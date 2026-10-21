@@ -4,11 +4,11 @@
 // M7 多录的几种步骤（回放桥按它们回答界面）：
 // 1. file：文件阅读器读到的内容（同 M4），{ file: { path, cwd, result } }。
 // 2. feedback：交给主进程保存的反馈和主进程的结果，{ feedback: { record, result } }。record 与界面拼出的一样：
-//    "反馈这条回复"照搬 src/renderer/src/state/turns.ts；回复里的选区照搬 components/selectionSource.ts 的 messagePick，
+//    "Give feedback"照搬 src/renderer/src/state/turns.ts；回复里的选区照搬 components/selectionSource.ts 的 messagePick，
 //    选的是回复原文里不含 Markdown 记号的一句（界面里选中它得到的字与原文相同）；阅读器里的选区是 filePick 选整行时的结果；
 //    session 照搬 components/FeedbackForm.tsx 的 save 和 ChatPane.tsx 的 displayTitle。
-// 3. issue：F8 报告。window.mori 是冻结的，录制器包不住界面自己的调用，所以这一步真的在界面里按 F8、填两栏、点"保存"，
-//    记下填的字、截图是否成功和报告框显示的"已保存到 <路径>"（主进程 saveIssue 的结果）；"当前界面""最近的操作"由界面
+// 3. issue：F8 报告。window.mori 是冻结的，录制器包不住界面自己的调用，所以这一步真的在界面里按 F8、填两栏、点"Save"，
+//    记下填的字、截图是否成功和报告框显示的"Saved to <路径>"（主进程 saveIssue 的结果）；"Current view""Recent activity"由界面
 //    生成，报告的原文在随后的 review 步骤里。截图时界面上没有录制器建的会话（录制器不经过界面），截图里是空的工作区。
 // 4. review：主进程 listReview 的结果（两类记录），{ review: { result } }。
 // 5. shot：主进程 reviewShot 的结果（截图的 data URL，原样记下，fixture 因此较大），{ shot: { name, result } }。
@@ -155,7 +155,7 @@ const contentText = (content) => {
 const displayTitle = (name, firstMessage) => {
   if (name?.trim()) return name;
   const first = firstMessage?.replace(/\s+/g, ' ').trim();
-  if (!first) return '新会话';
+  if (!first) return 'New session';
   return [...first].length > 20 ? `${[...first].slice(0, 20).join('')}…` : first;
 };
 /** @brief 反馈里的 session（照搬 FeedbackForm.tsx 的 save：会话文件、工作目录、侧栏同一规则的会话名）。 */
@@ -331,8 +331,8 @@ function checkChanged(steps) {
 // ---------- node 里的段 ----------
 
 /**
- * @brief 在界面里按 F8，填"哪里不对""你期望什么"后保存（同 m7-app.mjs 的 saveReport），关掉报告框；
- *        返回要记下的 issue 步骤（"已保存到"后面的路径是主进程 saveIssue 的结果）。
+ * @brief 在界面里按 F8，填"What went wrong""What you expected"后保存（同 m7-app.mjs 的 saveReport），关掉报告框；
+ *        返回要记下的 issue 步骤（"Saved to"后面的路径是主进程 saveIssue 的结果）。
  */
 async function pressF8({ state, args }) {
   const { page } = state.mori;
@@ -343,11 +343,11 @@ async function pressF8({ state, args }) {
   const capture = { error: failed ? (await dialog.getByTestId('issue-error').innerText()).trim() : null };
   await dialog.getByTestId('issue-what').fill(args.ISSUE_WHAT);
   await dialog.getByTestId('issue-expect').fill(args.ISSUE_EXPECT);
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   const saved = page.getByTestId('issue-saved');
   await saved.waitFor({ timeout: 15000 });
-  const file = /已保存到\s*(.+?\.md)\s*$/.exec(await saved.innerText())?.[1]?.trim() ?? null;
-  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  const file = /Saved to\s*(.+?\.md)\s*$/.exec(await saved.innerText())?.[1]?.trim() ?? null;
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 5000 });
   return { issue: { what: args.ISSUE_WHAT, expect: args.ISSUE_EXPECT, capture, result: { file } } };
 }
@@ -380,7 +380,7 @@ function setupOf(steps) {
 
 // ---------- 场景 ----------
 
-/** @brief review-reply 重启前：读 README 概括；三份反馈；F8 报告；像"在工作回顾中查看"一样读一次记录。 */
+/** @brief review-reply 重启前：读 README 概括；三份反馈；F8 报告；像"View in Review"一样读一次记录。 */
 const replyPhases = [{ page: async (rec, args) => {
   await args.list(rec);
   const s = await args.create(rec, args.cwd);

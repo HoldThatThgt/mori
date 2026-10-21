@@ -1,4 +1,4 @@
-// 工具页各节共用的小部件：开关、"用系统编辑器打开"、资源的启停行（技能和插件里的资源，docs/v0/screens/tools.md）。
+// 工具页各节共用的小部件：开关、"Open in default app"、资源的启停行（技能和插件里的资源，docs/v0/screens/tools.md）。
 
 import { useState } from 'react';
 import type { Command } from '../../../shared/protocol';
@@ -17,7 +17,7 @@ export function ToolSwitch({ checked, label, disabled, title, onChange }: {
   );
 }
 
-/** @brief "用系统编辑器打开"：失败时在按钮后面显示原文。cwd 只用于解析相对路径。 */
+/** @brief "Open in default app"：失败时在按钮后面显示原文。cwd 只用于解析相对路径。 */
 export function OpenInEditor({ path, cwd }: { path: string; cwd: string }) {
   const [error, setError] = useState<string | null>(null);
   async function open() {
@@ -30,8 +30,9 @@ export function OpenInEditor({ path, cwd }: { path: string; cwd: string }) {
   }
   return (
     <>
-      <button type="button" className="text-link" onClick={() => void open()}>用系统编辑器打开</button>
-      {error && <span className="form-message error" role="alert">没能打开：{error}</span>}
+      <button type="button" className="text-link" onClick={() => void open()}>Open in default app</button>
+      {error && (
+        <span className="form-message error" role="alert">Couldn’t open this file with the default app: {error}</span>)}
     </>
   );
 }
@@ -60,12 +61,12 @@ export function useSwitch(change: Change, enabled: boolean, command: (next: bool
   return { checked: target ?? enabled, toggle: (next) => void flip(next) };
 }
 
-/** @brief 资源行下面的说明：不能在这里改的原因、"没能保存："加原文。 */
+/** @brief 资源行下面的说明：不能在这里改的原因、"Couldn’t save: "加原文。 */
 export function ResourceNotes({ readOnly, error }: { readOnly: string | null; error: string | null }) {
   return (
     <>
       {readOnly && <p className="tools-row-note">{readOnly}</p>}
-      {error && <p className="form-message error" role="alert">没能保存：{error}</p>}
+      {error && <p className="form-message error" role="alert">Couldn’t save: {error}</p>}
     </>
   );
 }

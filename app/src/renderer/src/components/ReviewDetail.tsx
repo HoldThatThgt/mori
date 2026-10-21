@@ -1,7 +1,7 @@
 // 工作回顾的详情（右栏，docs/v0/screens/review.md "详情"、"回到原位置"）：选中的一条反馈、界面问题报告或读不出来的记录。
-// 反馈：时间、来源、你希望得到的结果、引用的原文、回到原位置（只在点它时检查）；界面问题：时间、两段原文、截图
-// （点开浮层按原尺寸看）、可以展开的当前界面 / 最近的操作 / 版本、打开所在文件夹；读不出来的记录：文件名、原文、
-// 打开所在文件夹；都可以标为已处理或未处理。
+// 反馈：时间、来源、What you hoped for、Quoted text、Jump to source（只在点它时检查）；界面问题：时间、两段原文、
+// 截图（点开浮层按原尺寸看）、可以展开的 Current view / Recent activity / Versions、Show in Explorer；读不出来的记录：
+// 文件名、原文、Show in Explorer；都可以 Resolve 或 Reopen。
 // 右栏的宽度与会话的右栏共用（App.tsx 传进分隔线）。
 
 import { useEffect, useRef, useState } from 'react';
@@ -21,24 +21,24 @@ import { useApp } from '../state/store';
 import { Icon } from '../icons';
 import { feedbackScope, recordTime } from './reviewText';
 
-/** @brief "标为已处理" / "标为未处理"。 */
+/** @brief "Resolve" / "Reopen"。 */
 function HandledButton({ section, name }: { section: ReviewKind; name: string }) {
   const handled = useReview((state) => isHandled(state, section, name));
   return (
     <button type="button" className="button" data-testid="detail-handled"
       onClick={() => setHandled(section, name, !handled)}>
-      <Icon name="check" />{handled ? '标为未处理' : '标为已处理'}</button>
+      <Icon name="check" />{handled ? 'Reopen' : 'Resolve'}</button>
   );
 }
 
 /**
- * @brief 详情底部的按钮：界面问题和读不出来的记录有"打开所在文件夹"（资源管理器里选中这个文件）；都有标已处理。
- * @param reveal 是否有"打开所在文件夹"
+ * @brief 详情底部的按钮：界面问题和读不出来的记录有"Show in Explorer"（资源管理器里选中这个文件）；都有标已处理。
+ * @param reveal 是否有"Show in Explorer"
  */
 function RecordActions({ section, name, reveal }: { section: ReviewKind; name: string; reveal: boolean }) {
   const [error, setError] = useState<string | null>(null);
   async function showFile() {
-    recordAction('打开记录所在文件夹');
+    recordAction('Show record in Explorer');
     setError(null);
     try {
       await window.mori.showReviewRecord(section, name);
@@ -52,7 +52,7 @@ function RecordActions({ section, name, reveal }: { section: ReviewKind; name: s
       <div className="review-detail-actions">
         {reveal && (
           <button type="button" className="button" data-testid="detail-show-file" onClick={() => void showFile()}>
-            <Icon name="folder" />打开所在文件夹</button>
+            <Icon name="folder" />Show in Explorer</button>
         )}
         <HandledButton section={section} name={name} />
       </div>
@@ -66,24 +66,24 @@ function FeedbackSource({ record }: { record: FeedbackRecord }) {
   const { source, session } = record.feedback;
   return (
     <dl className="review-detail-source" data-testid="detail-source">
-      <dt>会话</dt><dd>{name}</dd>
-      <dt>{source.kind === 'file' ? '文件' : '范围'}</dt>
+      <dt>Session</dt><dd>{name}</dd>
+      <dt>{source.kind === 'file' ? 'File' : 'Scope'}</dt>
       <dd title={source.kind === 'file' ? source.path : undefined}>{feedbackScope(record.feedback)}</dd>
-      <dt>工作目录</dt><dd>{session.cwd || '（没有记录）'}</dd>
+      <dt>Working directory</dt><dd>{session.cwd || '(not recorded)'}</dd>
     </dl>
   );
 }
 
 /** @brief 回到原位置不可用或没有成功的说明；可以回去时为 null。 */
 function jumpStatus(file: string | null, gone: boolean, exited: boolean, jump: JumpState | undefined): string | null {
-  if (!file) return '原会话没有保存，无法回到原位置';
-  if (gone) return '原会话已删除';
-  if (exited) return '后台进程已退出，先重新载入';
-  if (jump?.kind === 'changed') return '原文已变化：会话里找不到这条回复了';
+  if (!file) return 'The session wasn’t saved, so there’s no source to jump to.';
+  if (gone) return 'Session deleted';
+  if (exited) return 'Mori’s background process crashed. Restart it to continue.';
+  if (jump?.kind === 'changed') return 'This response is no longer in the session.';
   return jump?.kind === 'error' ? jump.text : null;
 }
 
-/** @brief "回到原位置"和它的结果：正在检查时"正在打开…"；原会话没有保存、已删除、后台进程已退出时不可用。 */
+/** @brief "Jump to source"和它的结果：正在检查时"Opening…"；原会话没有保存、已删除、后台进程已退出时不可用。 */
 function JumpBack({ record }: { record: FeedbackRecord }) {
   const file = feedbackSessionFile(record);
   const listedGone = useApp((state) => file !== null && sessionGone(state, file));
@@ -97,7 +97,7 @@ function JumpBack({ record }: { record: FeedbackRecord }) {
     <div className="review-jump">
       <button type="button" className="button" data-testid="detail-jump" disabled={blocked || checking}
         title={blocked ? status ?? undefined : undefined} onClick={() => void jumpBack(record)}>
-        <Icon name="back" />{checking ? '正在打开…' : '回到原位置'}</button>
+        <Icon name="back" />{checking ? 'Opening…' : 'Jump to source'}</button>
       {status && (
         <p className={`form-message ${jump?.kind === 'error' ? 'error' : 'review-warn'}`} role="status"
           data-testid="detail-jump-status">{status}</p>
@@ -113,10 +113,10 @@ function FeedbackDetail({ record }: { record: FeedbackRecord }) {
     <>
       <p className="review-detail-time" data-testid="detail-time">{recordTime(record, true)}</p>
       <FeedbackSource record={record} />
-      <h3 className="review-detail-label">你希望得到的结果</h3>
+      <h3 className="review-detail-label">What you hoped for</h3>
       <p className="review-detail-text" data-testid="detail-expected">{feedback.expected}</p>
-      <h3 className="review-detail-label">引用的原文</h3>
-      <blockquote className="review-detail-quote" data-testid="detail-quote" tabIndex={0} aria-label="引用的原文">
+      <h3 className="review-detail-label">Quoted text</h3>
+      <blockquote className="review-detail-quote" data-testid="detail-quote" tabIndex={0} aria-label="Quoted text">
         {feedback.quote}</blockquote>
       <JumpBack record={record} />
       <RecordActions section="feedback" name={record.name} reveal={false} />
@@ -149,7 +149,7 @@ function useShot(shot: string): ShotState {
   return state;
 }
 
-/** @brief 截图浮层：按原尺寸显示，大于窗口时缩到窗口内；Esc、"关闭"或点截图外面关闭。 */
+/** @brief 截图浮层：按原尺寸显示，大于窗口时缩到窗口内；Esc、"Close"或点截图外面关闭。 */
 function ShotViewer({ url, onClose }: { url: string; onClose: () => void }) {
   const close = useRef<HTMLButtonElement>(null);
   useOverlay(true, onClose);
@@ -159,14 +159,14 @@ function ShotViewer({ url, onClose }: { url: string; onClose: () => void }) {
   return createPortal(
     <div className="shot-backdrop" onMouseDown={(event) => outside(event.target) && event.preventDefault()}
       onClick={(event) => outside(event.target) && onClose()}>
-      <div className="shot-viewer" role="dialog" aria-modal="true" aria-label="截图" data-testid="shot-viewer"
+      <div className="shot-viewer" role="dialog" aria-modal="true" aria-label="Screenshot" data-testid="shot-viewer"
         onKeyDown={(event) => {
           if (event.key !== 'Tab') return;
           event.preventDefault();
           close.current?.focus();
         }}>
-        <img src={url} alt="报告时的窗口截图" />
-        <button ref={close} type="button" className="button" onClick={onClose}>关闭</button>
+        <img src={url} alt="Screenshot of the window when this was reported" />
+        <button ref={close} type="button" className="button" onClick={onClose}>Close</button>
       </div>
     </div>,
     document.body,
@@ -182,21 +182,24 @@ function Shot({ shot }: { shot: string }) {
     setOpen(false);
     button.current?.focus();
   };
-  if (error) return <p className="form-message error" data-testid="detail-shot-error">截图读不出来：{error}</p>;
+  if (error) {
+    return <p className="form-message error" data-testid="detail-shot-error">Couldn’t load the screenshot: {error}</p>;
+  }
   if (!url) {
-    return <p className="review-detail-loading" role="status" data-testid="detail-shot-loading">正在读取截图…</p>;
+    return <p className="review-detail-loading" role="status" data-testid="detail-shot-loading">Loading screenshot…</p>;
   }
   return (
     <>
-      <button ref={button} type="button" className="review-shot" aria-label="放大截图" onClick={() => setOpen(true)}>
-        <img src={url} alt="报告时的窗口截图" data-testid="detail-shot" />
+      <button ref={button} type="button" className="review-shot" aria-label="View full screenshot"
+        onClick={() => setOpen(true)}>
+        <img src={url} alt="Screenshot of the window when this was reported" data-testid="detail-shot" />
       </button>
       {open && <ShotViewer url={url} onClose={closeViewer} />}
     </>
   );
 }
 
-/** @brief 可以展开的一节原文（当前界面、最近的操作、版本）。 */
+/** @brief 可以展开的一节原文（Current view、Recent activity、Versions）。 */
 function MoreSection({ testId, summary, text }: { testId: string; summary: string; text: string }) {
   return (
     <details className="review-detail-more" data-testid={testId}>
@@ -211,27 +214,29 @@ function IssueDetail({ record }: { record: IssueRecord }) {
   return (
     <>
       <p className="review-detail-time" data-testid="detail-time">{recordTime(record, true)}</p>
-      <h3 className="review-detail-label">哪里不对</h3>
+      <h3 className="review-detail-label">What went wrong</h3>
       <p className="review-detail-text" data-testid="detail-what">{record.what}</p>
-      <h3 className="review-detail-label">你期望什么</h3>
+      <h3 className="review-detail-label">What you expected</h3>
       <p className="review-detail-text" data-testid="detail-expect">{record.expect}</p>
-      <h3 className="review-detail-label">截图</h3>
-      {record.shot ? <Shot shot={record.shot} />
-        : <p className="form-message error" data-testid="detail-shot-error">截图失败：{record.shotError}</p>}
-      <MoreSection testId="detail-view" summary="当前界面" text={record.view} />
-      <MoreSection testId="detail-actions" summary="最近的操作" text={record.actions} />
-      <MoreSection testId="detail-versions" summary="版本" text={record.versions} />
+      <h3 className="review-detail-label">Screenshot</h3>
+      {record.shot ? <Shot shot={record.shot} /> : (
+        <p className="form-message error" data-testid="detail-shot-error">
+          Couldn’t capture a screenshot: {record.shotError}</p>
+      )}
+      <MoreSection testId="detail-view" summary="Current view" text={record.view} />
+      <MoreSection testId="detail-actions" summary="Recent activity" text={record.actions} />
+      <MoreSection testId="detail-versions" summary="Versions" text={record.versions} />
       <RecordActions section="issues" name={record.name} reveal />
     </>
   );
 }
 
-/** @brief 读不出来的记录：文件名和原文、"打开所在文件夹"（两类都有，好去改或删掉它）。 */
+/** @brief 读不出来的记录：文件名和原文、"Show in Explorer"（两类都有，好去改或删掉它）。 */
 function BrokenDetail({ section, item }: { section: ReviewKind; item: BrokenRecord }) {
   return (
     <>
       <div className="review-detail-broken" data-testid="detail-broken">
-        <p className="review-detail-text">读不出这份记录：{item.name}</p>
+        <p className="review-detail-text">Couldn’t read the record {item.name}</p>
         <pre>{item.error}</pre>
       </div>
       <RecordActions section={section} name={item.name} reveal />
@@ -245,7 +250,7 @@ function DetailContent({ section, item }: { section: ReviewKind; item: ReviewIte
   return 'feedback' in item ? <FeedbackDetail record={item} /> : <IssueDetail record={item} />;
 }
 
-/** @brief 关闭详情，焦点回到列表里的那一行；那一行没有列出（"隐藏已处理"开着时标了已处理）时回到这一节的按钮。 */
+/** @brief 关闭详情，焦点回到列表里的那一行；那一行没有列出（"Hide resolved"开着时标了已处理）时回到这一节的按钮。 */
 function closeDetail(section: ReviewKind, name: string): void {
   selectRecord(section, null);
   const row = document.querySelector<HTMLElement>(`[data-testid="review-row"][data-name="${CSS.escape(name)}"]`);
@@ -261,11 +266,11 @@ export function ReviewDetail({ children }: { children: React.ReactNode }) {
   const item = useReview(selectedRecord);
   if (!item) return null;
   return (
-    <aside className="right-panel" data-testid="review-detail" aria-label="工作回顾的详情">
+    <aside className="right-panel" data-testid="review-detail" aria-label="Review details">
       {children}
       <div className="panel-header">
         <Icon name={section === 'feedback' ? 'feedback' : 'flag'} />{KIND_LABEL[section]}
-        <button type="button" className="icon-button" aria-label="关闭详情" title="关闭详情"
+        <button type="button" className="icon-button" aria-label="Close details" title="Close details"
           onClick={() => closeDetail(section, item.name)}><Icon name="close" /></button>
       </div>
       <div className="panel-body review-detail-body" key={`${section}/${item.name}`}>

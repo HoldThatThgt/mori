@@ -177,7 +177,7 @@ const modelSwitch = { name: 'model-switch', description: '在 DeepSeek 连接下
       `reply models ${models}`), ...need(cfg?.connections?.[0]?.models?.length === 2, 'two models in the connection')];
   } };
 
-/** @brief thinking：模型标支持思考，顶栏切到"高"有思考内容，切到"关"没有。 */
+/** @brief thinking：模型标支持思考，顶栏切到"High"有思考内容，切到"Off"没有。 */
 const thinking = { name: 'thinking', description: '把 deepseek-flash 标为支持思考（新会话默认"中"）；新会话里顶栏切到"高"，'
     + '问一道要推理的题，回复带思考内容；切到"关"再问一道，回复没有思考内容',
   phases: [{ page: async (rec, args) => {

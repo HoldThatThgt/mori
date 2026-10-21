@@ -135,7 +135,7 @@ sequenceDiagram
 | 项目的 `.pi/mcp.json` 里的服务 | 仍在那个项目文件夹里运行；同一个项目、同一份配置的会话共用；这个项目最后一个用它的会话关闭（归档、删除）后关掉（实现时定的推荐做法，见 [defaults.md](defaults.md)） | Claude 桌面版没有项目级服务（没有对应的做法），保持 pi 的语义：进程跟着这个项目的会话 |
 | HTTP 服务 | **也共用**，整个 Mori 一个连接；第一次有会话要用时才连（登录凭据本来就是共用的 `mcp-auth.json`）；最后一个用它的会话关闭后关掉（实现时定的，见 [defaults.md](defaults.md)） | 照 Claude 桌面版（远程连接器也是整个 App 一份） |
 | 进程什么时候起、什么时候关 | **Mori 启动时**就起用户级启用的 stdio 服务，**一直开到退出 Mori**；只有配置改了、删了或停用了的服务，在没有会话用它之后关掉 | 照 Claude 桌面版（启动 App 时连上、退出时关；它改配置要重启，Mori 改为新会话用新配置、旧进程没人用了就关） |
-| 工具页显示进程状态 | 每个服务显示"运行中 · N 个会话在用"、"启动中…"、"失败：<原文第一行>"（完整原文可以展开；来源是共享服务表，真实状态） | 照 Claude 桌面版（设置 → 开发者里每个本地服务显示 running / failed） |
+| 工具页显示进程状态 | 每个服务显示"Running · Used by N sessions"（1 个时"Running · Used by 1 session"，没有会话在用时"Running · Not in use"）、"Starting…"、"Failed: <原文第一行>"（完整原文可以展开；来源是共享服务表，真实状态） | 照 Claude 桌面版（设置 → 开发者里每个本地服务显示 running / failed） |
 | 怎样起真进程 | 按文件路径载入 pi 1.3.0 自己的 `createDefaultTransport` 和 `loadMcpConfig`（版本锁定；启动时找不到就报错，不退回别的做法） | 没有对应的 Claude 做法，用推荐的做法 |
 | 扩展用 `pi.registerMcpServer()` 注册的服务 | 不共用，照旧每个会话自己连 | 没有对应的 Claude 做法；它们跟着扩展、扩展跟着会话 |
 
@@ -144,8 +144,8 @@ sequenceDiagram
 - 同一个服务被所有会话共用，服务里的状态（例如开着的浏览器、记着的当前目录）跨会话、跨项目都看得到。
 - pi 的 `/mcp reconnect` 只重连这个会话，不重启用户级服务的共享进程（Claude 桌面版要重启 App）；项目的服务、配置已经不在的服务
   只有这一个会话在用时，重连会等旧进程退出、再起新进程（同 pi 原来的做法）。
-- M6 的反例"没有注册任何工具的 MCP 服务不显示'已连接'"：工具页仍不凭工具列表猜连接状态；现在有了共享服务表这个真实来源，
-  显示的是进程状态"运行中"，不是"已连接"。
+- M6 的反例"没有注册任何工具的 MCP 服务不显示'Connected'"：工具页（Customize）仍不凭工具列表猜连接状态；现在有了共享服务表这个真实来源，
+  显示的是进程状态"Running"，不是"Connected"。
 
 ## 实现约定（给实现和测试）
 
@@ -157,7 +157,7 @@ sequenceDiagram
   - `sharedServerStates()`：给工具页；`forgetStaleServers()`：`mcp.json` 写入之后关掉没人用、配置已经不在（或停用）的共享服务。
 - 共享键：`[entry.name, entry.config, 运行目录]` 的规范 JSON；运行目录 = 项目级为会话的项目文件夹，否则为用户目录。
   `entry.config` 里不算 `enabled`、`exposure`、`toolExposure`（pi 的 OVERRIDE_KEYS）：它们只决定 pi 在会话里怎样给出工具，
-  不影响起进程；否则项目的覆盖、工具页的启停和"改为直接调用"会让同一个用户级服务多起一个进程（审查时发现，已改）。
+  不影响起进程；否则项目的覆盖、工具页的启停和"Switch to direct calls"会让同一个用户级服务多起一个进程（审查时发现，已改）。
 - 每个共享服务一个 pi-mcp `McpClient`（`name: "pi"`、pi 的版本、超时同 pi：`timeout` 秒或 60 秒，`roots` 是挂着的会话的项目文件夹去重）和一个
   pi 的 `createDefaultTransport(entry, 运行目录, authProvider)`。连不上时原文照 pi 的写法：错误第一行，stdio 时接上 stderr 末尾。
 - 虚拟传输：`start()` 挂上并等共享服务连好（失败时以原文抛错）；`initialize` 按握手缓存回答；`notifications/initialized` 不转发；`ping` 自己回答；

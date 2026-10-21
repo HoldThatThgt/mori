@@ -12,7 +12,7 @@ export const PANE = '.pane-slot:not([hidden]) [data-testid="chat-pane"]';
 /** @brief 会话名取第一条消息的前几个字 */
 export const TITLE_LENGTH = 20;
 /** @brief 停止后对话流里的提示 */
-export const STOPPED = '已停止 · 已经做出的修改不会自动撤销';
+export const STOPPED = 'Stopped · Changes made so far stay as they are';
 
 // ---------- 路径与会话文件 ----------
 
@@ -111,7 +111,7 @@ export const topTitle = (page) => paneOf(page).getByTestId('session-title').inne
 /** @brief 当前会话面板里最后一条助手回复。 */
 export const lastReply = (page) => paneOf(page).getByTestId('assistant').last().innerText({ timeout: 5000 })
   .catch(() => '');
-/** @brief 当前会话面板里"已停止"提示的条数。 */
+/** @brief 当前会话面板里"Stopped · …"提示的条数。 */
 export const stoppedCount = (page) => paneOf(page).getByTestId('notice').filter({ hasText: STOPPED }).count();
 /** @brief 本机保存的草稿（localStorage 的 mori.drafts）。 */
 export const savedDrafts = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('mori.drafts') ?? '{}'));
@@ -120,7 +120,7 @@ export const hasDraft = (drafts, file) => Object.keys(drafts).some((key) => same
 /** @brief 本机记下的已归档会话文件（localStorage 的 mori.archived）。 */
 export const savedArchived = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('mori.archived') ?? '[]'));
 
-/** @brief 会话树：项目（工作目录、文件夹名、悬停提示）和其中的会话行（不含"已归档"里的）。 */
+/** @brief 会话树：项目（工作目录、文件夹名、悬停提示）和其中的会话行（不含"Archived"里的）。 */
 export function treeState(page) {
   const selector = '[data-testid="session-tree"] .project-group';
   return page.evaluate((groups) => [...document.querySelectorAll(groups)].map((group) => {
@@ -151,7 +151,7 @@ export async function rowState(page, file) {
   return (await allRows(page)).find((row) => samePath(row.file, file)) ?? null;
 }
 
-/** @brief 侧栏底部的"已归档"：开关的文字、是否展开、列表里的行（会话文件、会话名、悬停提示）。 */
+/** @brief 侧栏底部的"Archived N"：开关的文字、是否展开、列表里的行（会话文件、会话名、悬停提示）。 */
 export function archivedState(page) {
   return page.evaluate(() => {
     const toggle = document.querySelector('[data-testid="archived-toggle"]');
@@ -162,12 +162,12 @@ export function archivedState(page) {
   });
 }
 
-/** @brief 等"已归档"开关的文字变成 text（null 表示开关不在）。 */
+/** @brief 等"Archived N"开关的文字变成 text（null 表示开关不在）。 */
 export function waitArchivedToggle(page, text, timeout = 10000) {
   return until(async () => (await archivedState(page)).toggle === text, timeout);
 }
 
-/** @brief "已归档"收起时点开它，等列表出现。 */
+/** @brief "Archived N"收起时点开它，等列表出现。 */
 export async function expandArchived(page) {
   if (!(await archivedState(page)).expanded) await page.getByTestId('archived-toggle').click();
   await page.getByTestId('archived-list').waitFor({ timeout: 5000 });
@@ -194,7 +194,7 @@ export async function focusInfo(page) {
   }, PANE);
 }
 
-/** @brief 等当前会话面板就绪（没有"正在启动…"之类的说明）。 */
+/** @brief 等当前会话面板就绪（没有"Starting…"之类的说明）。 */
 export function waitReady(page, timeout = 30000) {
   return page.waitForFunction((selector) => {
     const pane = document.querySelector(selector);
@@ -265,11 +265,11 @@ export function stubFolder(app, folder) {
   }, folder);
 }
 
-/** @brief 点左栏"打开文件夹…"选 folder，等新会话面板出现（不等就绪：可能先弹信任询问）。 */
+/** @brief 点左栏"Open folder…"选 folder，等新会话面板出现（不等就绪：可能先弹信任询问）。 */
 export async function clickOpenFolder(ctx, folder) {
   const before = await paneCount(ctx.page);
   await stubFolder(ctx.app, folder);
-  await ctx.page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await ctx.page.getByRole('button', { name: 'Open folder…' }).first().click();
   await waitPanes(ctx.page, before + 1);
 }
 
@@ -341,8 +341,8 @@ export async function openMenuByMouse(page, file) {
   return { menu, at: { x: box.x + position.x, y: box.y + position.y }, rowBox: box };
 }
 
-/** M5 加进会话菜单的两项（由 M5 的测试检查）；M3 的检查只看 M3 的重命名、归档、删除（恢复） */
-export const M5_MENU_ITEMS = ['引用到当前会话', '在右侧分屏打开'];
+/** M5 加进会话菜单的两项（由 M5 的测试检查）；M3 的检查只看 M3 的 Rename、Archive、Delete…（Unarchive） */
+export const M5_MENU_ITEMS = ['Attach as context', 'Open in split view'];
 
 /** @brief 菜单项：文字（不含小字）、旁边的小字、是否不可用。不含 M5 加的两项（见 M5_MENU_ITEMS）。 */
 export async function menuItems(menu) {
@@ -371,17 +371,17 @@ export async function chooseMenuItem(page, file, label) {
   throw new Error(`menu item ${label} cannot be reached by keyboard`);
 }
 
-/** @brief 键盘打开菜单后 Enter（焦点在"重命名"），等改名框出现。 */
+/** @brief 键盘打开菜单后 Enter（焦点在"Rename"），等改名框出现。 */
 export async function startRename(page, file) {
-  await chooseMenuItem(page, file, '重命名');
+  await chooseMenuItem(page, file, 'Rename');
   const input = page.getByTestId('rename-input');
   await input.waitFor({ timeout: 5000 });
   return input;
 }
 
-/** @brief 键盘打开菜单，↓ 到"删除"再 Enter，等删除确认框出现。 */
+/** @brief 键盘打开菜单，↓ 到"Delete…"再 Enter，等删除确认框出现。 */
 export async function startDelete(page, file) {
-  await chooseMenuItem(page, file, '删除');
+  await chooseMenuItem(page, file, 'Delete…');
   const dialog = page.getByTestId('delete-dialog');
   await dialog.waitFor({ timeout: 5000 });
   return dialog;
@@ -394,11 +394,11 @@ export const renameView = (input) => input.evaluate((el) => ({ value: el.value, 
 export const renameClosed = (page) => page.getByTestId('rename-input').waitFor({ state: 'detached', timeout: 5000 })
   .then(() => true, () => false);
 
-/** @brief 等询问框，按 answer 回答（'esc' 或按钮名，remember 为真时先勾"记住"），等会话就绪，返回横幅文字。 */
+/** @brief 等询问框，按 answer 回答（'esc' 或按钮名，remember 为真时先勾"Remember my choice"），等会话就绪，返回横幅文字。 */
 export async function answerTrustDialog(page, { answer, remember = false }) {
   const dialog = page.getByTestId('trust-dialog');
   await dialog.waitFor({ timeout: 15000 });
-  if (remember) await dialog.getByRole('checkbox', { name: '记住' }).check();
+  if (remember) await dialog.getByRole('checkbox', { name: 'Remember my choice' }).check();
   if (answer === 'esc') await page.keyboard.press('Escape');
   else await dialog.getByRole('button', { name: answer, exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 5000 });

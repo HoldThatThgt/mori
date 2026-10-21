@@ -1,6 +1,6 @@
 // 引用芯片（docs/v0/screens/selection.md）：输入框上方的芯片（可移除），以及发出的消息上方的引用。
-// 照 Claude 桌面版：引用显示来源和原文摘要，点它回到原位置；点过之后查出的问题（原文已变化等）一直标在芯片上。
-// M5 的会话引用（session-refs.md）：芯片写"引用 · 会话名 · 第 3–8 轮 · 约 3,200 字"，会话名取原会话现在的名字；
+// 照 Claude 桌面版：引用显示来源和原文摘要，点它回到原位置；点过之后查出的问题（"Source changed"等）一直标在芯片上。
+// M5 的会话引用（session-refs.md）：芯片写"Context · 会话名 · turns 3–8 · ~3,200 characters"，会话名取原会话现在的名字；
 // 输入框里的芯片点开是预览对话框，发出的引用点了回到原会话；正在读取、没能加入的引用另列一行。
 
 import type { QuoteRef } from '../../../shared/protocol';
@@ -10,8 +10,8 @@ import { useApp, type PendingRef, type Tab } from '../state/store';
 import { Icon, type IconName } from '../icons';
 
 /** 芯片上的检查结果 */
-const STATUS_TEXT: Record<QuoteStatus, string> = { changed: '原文已变化', missing: '文件已被删除或移动',
-  gone: '原会话已删除' };
+const STATUS_TEXT: Record<QuoteStatus, string> = { changed: 'Source changed', missing: 'File not found',
+  gone: 'Session deleted' };
 
 /** 各种来源的图标 */
 const ICONS: Record<QuoteRef['source']['kind'], IconName> = { file: 'file', message: 'quote', session: 'chat' };
@@ -45,13 +45,13 @@ function ComposerChip({ tab, quote }: { tab: Tab; quote: QuoteRef }) {
   return (
     <div className="quote-chip" data-testid="quote-chip" data-kind={quote.source.kind}>
       <button className="quote-chip-main" title={quote.quote}
-        aria-label={session ? `${label}，打开预览` : `引用 · ${label}，回到原位置`} onClick={open}>
+        aria-label={session ? `${label}, open preview` : `Context: ${label}, jump to source`} onClick={open}>
         <Icon name={ICONS[quote.source.kind]} />
         <span className="quote-chip-label">{label}</span>
         {!session && <span className="quote-chip-text">{excerpt(quote.quote)}</span>}
         <StatusBadge quote={quote} />
       </button>
-      <button className="icon-button" aria-label={`移除引用 · ${label}`} title="移除引用"
+      <button className="icon-button" aria-label={`Remove context: ${label}`} title="Remove context"
         onClick={() => removeQuote(tab.key, quote)}><Icon name="close" /></button>
     </div>
   );
@@ -63,7 +63,7 @@ function PendingChip({ tabKey, item }: { tabKey: string; item: PendingRef }) {
     return (
       <div className="ref-problem" role="alert" data-testid="ref-problem">
         <span>{item.problem}</span>
-        <button className="icon-button" aria-label="关掉这条提示" title="关掉"
+        <button className="icon-button" aria-label="Dismiss warning" title="Dismiss"
           onClick={() => dropPending(tabKey, item.id)}><Icon name="close" /></button>
       </div>
     );
@@ -71,9 +71,9 @@ function PendingChip({ tabKey, item }: { tabKey: string; item: PendingRef }) {
   return (
     <div className="quote-chip" data-testid="quote-chip" data-kind="session" data-pending="true">
       <span className="quote-chip-main" role="status">
-        <Icon name="chat" /><span className="quote-chip-label">引用 · {item.title} · 正在读取…</span>
+        <Icon name="chat" /><span className="quote-chip-label">Context · {item.title} · Loading…</span>
       </span>
-      <button className="icon-button" aria-label={`取消引用 · ${item.title}`} title="取消"
+      <button className="icon-button" aria-label={`Cancel attaching “${item.title}”`} title="Cancel"
         onClick={() => dropPending(tabKey, item.id)}><Icon name="close" /></button>
     </div>
   );
@@ -96,7 +96,7 @@ function SentQuote({ quote, tabKey, cwd }: { quote: QuoteRef; tabKey: string; cw
   const session = quote.source.kind === 'session';
   return (
     <button className="sent-quote" data-testid="sent-quote" data-kind={quote.source.kind} title={quote.quote}
-      aria-label={session ? `${label}，回到原会话` : `引用 · ${label}，回到原位置`}
+      aria-label={session ? `${label}, jump to session` : `Context: ${label}, jump to source`}
       onClick={() => jumpToQuote(tabKey, quote)}>
       <span className="sent-quote-head">
         <Icon name={ICONS[quote.source.kind]} />

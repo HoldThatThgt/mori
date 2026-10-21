@@ -1,5 +1,5 @@
 // 会话引用的预览对话框（docs/v0/screens/session-refs.md "预览与调整范围"）。照 Claude 桌面版：点输入框里的附加内容卡片，
-// 打开一个对话框看全文。输入框里的芯片：后台进程再读一次原会话，按轮列出内容，两个下拉框调整范围，"确定"更新芯片；
+// 打开一个对话框看全文。输入框里的芯片：后台进程再读一次原会话，按轮列出内容，两个下拉框调整范围，"Done"更新芯片；
 // 发出的引用在原会话已删除或原文已变化时：只显示引用时存下的原文。内容就是发给模型的文字，不渲染 Markdown。
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
@@ -36,7 +36,8 @@ const NOT_FOUND = 'Session file not found';
 
 /** @brief 只看原文时顶部的说明。 */
 function storedNote(reason: PreviewRequest['reason']): string {
-  return reason === 'changed' ? '原文已变化 · 下面是引用时的原文' : '原会话已删除 · 下面是引用时的原文';
+  return reason === 'changed' ? 'Source changed · Showing the attached text'
+    : 'Session deleted · Showing the attached text';
 }
 
 /** @brief 输入框里的芯片：读原会话、分轮、找回范围；只看原文的直接显示存下的内容。 */
@@ -51,12 +52,15 @@ function usePreviewData(request: PreviewRequest): Phase {
       const turns = sessionTurns(content.entries, content.cwd);
       const found = locateRange(turns, source);
       if (!live) return;
-      if (turns.length === 0) setPhase({ kind: 'stored', note: '原会话现在没有已完成的轮次 · 下面是引用时的原文' });
-      else setPhase({ kind: 'ready', loaded: { content, turns, range: found ?? defaultRange(turns), moved: !found } });
+      if (turns.length === 0) {
+        setPhase({ kind: 'stored', note: 'The session no longer has finished turns · Showing the attached text' });
+      } else {
+        setPhase({ kind: 'ready', loaded: { content, turns, range: found ?? defaultRange(turns), moved: !found } });
+      }
     }, (error: unknown) => {
       const message = describe('session.read', error);
       if (live) setPhase({ kind: 'stored', note: message.includes(NOT_FOUND) ? storedNote('gone')
-        : `读取失败：${message} · 下面是引用时的原文` });
+        : `Couldn’t read the session: ${message} · Showing the attached text` });
     });
     return () => { live = false; };
   }, [request]);
@@ -68,14 +72,14 @@ function readSource(sessionFile: string): Promise<SessionContent> {
   return request<SessionContent>({ type: 'session.read', sessionFile });
 }
 
-/** @brief 一个"第几轮"下拉框。 */
+/** @brief 一个选轮次的下拉框（选项是"Turn N"）。 */
 function TurnSelect({ label, value, count, onChange }: {
   label: string; value: number; count: number; onChange: (value: number) => void;
 }) {
   return (
     <select aria-label={label} value={value} onChange={(event) => onChange(Number(event.target.value))}>
       {Array.from({ length: count }, (_, index) => index + 1).map((number) => (
-        <option key={number} value={number}>第 {number} 轮</option>
+        <option key={number} value={number}>Turn {number}</option>
       ))}
     </select>
   );
@@ -95,7 +99,7 @@ function TurnList({ turns, from, to }: { turns: RefTurn[]; from: number; to: num
         return (
           <section key={turn.entryId} className={`ref-turn${included ? '' : ' excluded'}`} data-testid="ref-turn"
             data-turn={turn.number} data-included={included}>
-            <h3>第 {turn.number} 轮 · {approxChars(charCount(turn.text))}{!included && <span> · 不引用</span>}</h3>
+            <h3>Turn {turn.number} · {approxChars(charCount(turn.text))}{!included && <span> · Not attached</span>}</h3>
             <pre>{turn.text}</pre>
           </section>
         );
@@ -104,7 +108,7 @@ function TurnList({ turns, from, to }: { turns: RefTurn[]; from: number; to: num
   );
 }
 
-/** @brief 读到原会话之后：范围、总字数、按轮列出，"确定"按新范围更新芯片。 */
+/** @brief 读到原会话之后：范围、总字数、按轮列出，"Done"按新范围更新芯片。 */
 function RangeEditor({ request: open, loaded, onClose }: { request: PreviewRequest; loaded: Loaded;
   onClose: () => void }) {
   const [range, setRange] = useState(loaded.range);
@@ -117,21 +121,25 @@ function RangeEditor({ request: open, loaded, onClose }: { request: PreviewReque
   };
   return (
     <>
-      {loaded.content.unfinished && <p className="ref-note">这个会话还在生成，只列出已完成的 {count} 轮</p>}
-      {loaded.moved && <p className="ref-note">原会话的内容变了，范围已按现在的内容重新选</p>}
+      {loaded.content.unfinished && <p className="ref-note">{count === 1
+        ? 'This session is still running. Only 1 finished turn is listed.'
+        : `This session is still running. Only the ${count} finished turns are listed.`}</p>}
+      {loaded.moved && (
+        <p className="ref-note">The session changed since you attached it, so the range was reset to the default.</p>
+      )}
       <div className="ref-range">
-        <span>从</span>
-        <TurnSelect label="从第几轮" value={range.from} count={count}
+        <span>From</span>
+        <TurnSelect label="From turn" value={range.from} count={count}
           onChange={(from) => setRange({ from, to: Math.max(from, range.to) })} />
-        <span>到</span>
-        <TurnSelect label="到第几轮" value={range.to} count={count}
+        <span>to</span>
+        <TurnSelect label="To turn" value={range.to} count={count}
           onChange={(to) => setRange({ from: Math.min(range.from, to), to })} />
         <span className="ref-total" data-testid="ref-total">{approxChars(total)}</span>
       </div>
       <TurnList turns={loaded.turns} from={range.from} to={range.to} />
       <div className="dialog-actions">
-        <button className="button primary" onClick={confirm}>确定</button>
-        <button className="button" onClick={onClose}>取消</button>
+        <button className="button primary" onClick={confirm}>Done</button>
+        <button className="button" onClick={onClose}>Cancel</button>
       </div>
     </>
   );
@@ -143,7 +151,7 @@ function StoredText({ refValue, note, onClose }: { refValue: QuoteRef; note: str
     <>
       <p className="ref-note" role="status">{note}</p>
       <div className="ref-turns"><pre className="ref-stored">{refValue.quote}</pre></div>
-      <div className="dialog-actions"><button className="button" onClick={onClose}>关闭</button></div>
+      <div className="dialog-actions"><button className="button" onClick={onClose}>Close</button></div>
     </>
   );
 }
@@ -177,12 +185,12 @@ function PreviewDialog({ open }: { open: PreviewRequest }) {
       && event.preventDefault()}>
       <div ref={box} className="dialog ref-preview" role="dialog" aria-modal="true" aria-labelledby={titleId}
         data-testid="ref-preview" onKeyDown={trapTab}>
-        <h2 id={titleId}>引用 · {name}</h2>
-        {phase.kind === 'loading' && <p className="ref-note" role="status">正在读取…</p>}
+        <h2 id={titleId}>Context · {name}</h2>
+        {phase.kind === 'loading' && <p className="ref-note" role="status">Loading…</p>}
         {phase.kind === 'ready' && <RangeEditor request={open} loaded={phase.loaded} onClose={close} />}
         {phase.kind === 'stored' && <StoredText refValue={open.ref} note={phase.note} onClose={close} />}
         {phase.kind === 'loading' && (
-          <div className="dialog-actions"><button className="button" onClick={close}>取消</button></div>
+          <div className="dialog-actions"><button className="button" onClick={close}>Cancel</button></div>
         )}
       </div>
     </div>,

@@ -1,4 +1,4 @@
-// 设置页（docs/v0/screens/settings.md）的状态与命令：当前分节、"连接与模型"里显示的列表或表单、列表上方的一行、
+// 设置页（docs/v0/screens/settings.md）的状态与命令：当前分节、"Connections and models"里显示的列表或表单、列表上方的一行、
 // 每个模型的测试；设为默认、删除、保存模型。打开设置页时重新读取配置，写入之后用 loadConfig 重新读取。
 
 import { create } from 'zustand';
@@ -21,7 +21,7 @@ export interface Notice {
 /** @brief 设置页的分节。 */
 export type SettingsSection = 'connections' | 'agents';
 
-/** @brief "连接与模型"里显示什么：列表、添加连接、编辑连接、添加或编辑模型。 */
+/** @brief "Connections and models"里显示什么：列表、添加连接、编辑连接、添加或编辑模型。 */
 export type ConnectionsView =
   | {
     kind: 'list';
@@ -31,9 +31,9 @@ export type ConnectionsView =
   | { kind: 'add' }
   | {
     kind: 'edit';
-    /** 要编辑的连接；"去设置"时是出错会话所用模型的 provider，不知道时为 null（落在默认模型的连接上） */
+    /** 要编辑的连接；"Go to settings"时是出错会话所用模型的 provider，不知道时为 null（落在默认模型的连接上） */
     providerId: string | null;
-    /** 大于 0 时把焦点放到 API key（"去设置"的序号） */
+    /** 大于 0 时把焦点放到 API key（"Go to settings"的序号） */
     focusKey: number;
   }
   | {
@@ -44,11 +44,11 @@ export type ConnectionsView =
     modelId: string | null;
   };
 
-/** @brief 设置页的状态；每次打开设置页时回到"连接与模型"的列表。 */
+/** @brief 设置页的状态；每次打开设置页时回到"Connections and models"的列表。 */
 interface SettingsState {
   /** 当前分节 */
   section: SettingsSection;
-  /** "连接与模型"里显示的内容 */
+  /** "Connections and models"里显示的内容 */
   view: ConnectionsView;
   /** 打开设置页时重新读取配置失败的原文；没有时为 null */
   readError: string | null;
@@ -66,15 +66,16 @@ export const useSettings = create<SettingsState>(() => ({
 }));
 
 /** 保存连接或模型之后列表上方的一行 */
-export const SAVED_NOTICE = '已保存 · 已经打开的会话下一条消息起用新的设置';
+export const SAVED_NOTICE = 'Saved · Sessions already open use the new settings from their next message';
 
 /** @brief 测试结果的文字（connection.md "测试成功 / 失败 / 已取消"）。 */
 function testMessage(result: TestResult): Notice {
-  if (result.cancelled) return { tone: 'info', text: '已取消测试' };
-  if (!result.ok) return { tone: 'error', text: `连接失败：${result.error ?? '没有收到回复'}` };
-  const thinking = result.thinking ? ' · 有思考内容' : '';
-  const reply = result.text ? ` · 回复：${result.text}` : '';
-  return { tone: 'ok', text: `连接成功 · 首字 ${result.firstTokenMs} ms · 共 ${result.totalMs} ms${thinking}${reply}` };
+  if (result.cancelled) return { tone: 'info', text: 'Test cancelled' };
+  if (!result.ok) return { tone: 'error', text: `Connection failed: ${result.error ?? 'No response'}` };
+  const thinking = result.thinking ? ' · Includes thinking' : '';
+  const reply = result.text ? ` · Response: ${result.text}` : '';
+  const times = `First token ${result.firstTokenMs}ms · Total ${result.totalMs}ms`;
+  return { tone: 'ok', text: `Connected · ${times}${thinking}${reply}` };
 }
 
 /** @brief Mori 的全部连接；M6 之前的配置里没有这一项时为空。 */
@@ -83,7 +84,7 @@ export function connectionsOf(config: ConfigInfo | null): ConnectionInfo[] {
 }
 
 /**
- * @brief 要编辑的连接：providerId 指定的；为 null（"去设置"时不知道出错会话的模型）时取默认模型的连接，再取第一个。
+ * @brief 要编辑的连接：providerId 指定的；为 null（"Go to settings"时不知道出错会话的模型）时取默认模型的连接，再取第一个。
  *        找不到时为 null。
  */
 export function connectionFor(config: ConfigInfo, providerId: string | null): ConnectionInfo | null {
@@ -105,8 +106,8 @@ async function rereadConfig(): Promise<void> {
 }
 
 /**
- * @brief 打开设置页时落在"连接与模型"的列表，并重新读取配置（修好 models.json 后重新打开设置页就能看到）；
- *        "去设置"（settingsFocus 加一）时打开出错会话所用模型的连接的"编辑连接"，焦点放到 API key。
+ * @brief 打开设置页时落在"Connections and models"的列表，并重新读取配置（修好 models.json 后重新打开设置页就能看到）；
+ *        "Go to settings"（settingsFocus 加一）时打开出错会话所用模型的连接的"Edit connection"，焦点放到 API key。
  */
 useApp.subscribe((state, previous) => {
   if (state.view === 'settings' && previous.view !== 'settings') {
@@ -125,7 +126,7 @@ export function selectSection(section: SettingsSection): void {
   guardLeave(() => useSettings.setState({ section, view: { kind: 'list' }, notice: null }));
 }
 
-/** @brief "连接与模型"里换成列表或一张表单；notice 为回到列表时上方的一行。 */
+/** @brief "Connections and models"里换成列表或一张表单；notice 为回到列表时上方的一行。 */
 export function showView(view: ConnectionsView, notice: Notice | null = null): void {
   useSettings.setState({ view, notice });
 }
@@ -140,7 +141,8 @@ export async function runTest(providerId: string | undefined, modelId: string | 
     const result = await request<TestResult>({ type: 'connection.test', providerId, modelId });
     return { ok: result.ok, notice: testMessage(result) };
   } catch (error) {
-    return { ok: false, notice: { tone: 'error', text: `测试失败：${describe('connection.test', error)}` } };
+    const text = `Couldn’t test the connection: ${describe('connection.test', error)}`;
+    return { ok: false, notice: { tone: 'error', text } };
   }
 }
 
@@ -155,25 +157,27 @@ export async function testModel(providerId: string, modelId: string): Promise<vo
   useSettings.setState((state) => ({ testing: null, tests: { ...state.tests, [ref]: notice } }));
 }
 
-/** @brief 取消正在进行的测试；测试随后以"已取消"结束。 */
+/** @brief 取消正在进行的测试；测试随后以"Test cancelled"结束。 */
 export function cancelTest(): void {
   void request({ type: 'connection.testCancel' }).catch((error) => describe('connection.testCancel', error));
 }
 
 /**
  * @brief 设为默认模型；结果写在列表上方，pi 报告写设置的错误时显示原文。
- * @return 写入了时为 true；"设为默认失败"时为 false（这一行的"设为默认"还在）
+ * @return 写入了时为 true；"Couldn’t set the default model"时为 false（这一行的"Set as default"还在）
  */
 export async function setDefaultModel(providerId: string, modelId: string): Promise<boolean> {
   try {
     const result = await request<SaveResult>({ type: 'model.setDefault', providerId, modelId });
     await loadConfig();
-    const text = `已把 ${modelId} 设为默认`;
-    showView({ kind: 'list' }, result.error ? { tone: 'error', text: `${text}，但配置有错误：${result.error}` }
-      : { tone: 'ok', text: `${text} · 新会话用默认模型；已经打开的会话不变` });
+    const text = `${modelId} set as default`;
+    const failed = `${text}, but the configuration has an error: ${result.error}`;
+    showView({ kind: 'list' }, result.error ? { tone: 'error', text: failed }
+      : { tone: 'ok', text: `${text} · New sessions use it; sessions already open keep their model` });
     return true;
   } catch (error) {
-    showView({ kind: 'list' }, { tone: 'error', text: `设为默认失败：${describe('model.setDefault', error)}` });
+    const text = `Couldn’t set the default model: ${describe('model.setDefault', error)}`;
+    showView({ kind: 'list' }, { tone: 'error', text });
     return false;
   }
 }
@@ -183,9 +187,10 @@ export async function deleteModel(connection: ConnectionInfo, modelId: string): 
   const result = await request<SaveResult | null>({ type: 'model.delete', providerId: connection.providerId, modelId });
   await loadConfig();
   const last = connection.models.length === 1;
-  const text = last ? `已删除模型 ${modelId} 和连接 ${connection.endpoint.name}` : `已删除模型 ${modelId}`;
-  showView({ kind: 'list' }, result?.error ? { tone: 'error', text: `${text}，但配置有错误：${result.error}` }
-    : { tone: 'ok', text });
+  const name = connection.endpoint.name;
+  const text = last ? `Deleted model ${modelId} and connection ${name}` : `Deleted model ${modelId}`;
+  const failed = `${text}, but the configuration has an error: ${result?.error}`;
+  showView({ kind: 'list' }, result?.error ? { tone: 'error', text: failed } : { tone: 'ok', text });
 }
 
 /** @brief 添加或修改一个模型；失败时抛错。返回 pi 报告的配置错误。 */

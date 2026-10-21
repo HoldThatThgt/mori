@@ -22,6 +22,7 @@ body:has(.first-run) { overflow: auto; }
 .first-run-card > .muted { margin: 0 0 18px; }
 
 .connection-form { display: grid; gap: 10px; margin-top: 12px; }
+/* 标签列 96px 放得下最长的标签 "Context window"（Segoe UI 13px 约 93px）；settings.css 的 .field-indent 跟着它 */
 .connection-form > label {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);

@@ -27,7 +27,7 @@ const DEFAULT_THINKING_LEVEL: ThinkingLevel = 'medium';
 const TEST_TIMEOUT_MS = 30_000;
 const TEST_MAX_TOKENS = 512;
 
-/** 正在进行的测试连接；你点"取消"时中止它 */
+/** 正在进行的测试连接；你点"Cancel"时中止它 */
 let runningTest: AbortController | null = null;
 /**
  * 改 models.json 和默认模型的命令排成的队（后台进程同时处理多条命令）：保存连接要在读和写之间等主进程存 key，
@@ -317,7 +317,7 @@ function requireReusableKey(runtime: ModelRuntime, providerId: string, previousB
   baseUrl: string): void {
   const previousOrigin = previousBaseUrl ? new URL(String(previousBaseUrl)).origin : null;
   if (!hasKey(runtime, providerId) || previousOrigin !== new URL(baseUrl).origin) {
-    throw new Error('API key is required when the service address changes');
+    throw new Error('API key is required when the base URL changes');
   }
 }
 
@@ -406,7 +406,7 @@ async function settle(runtime: ModelRuntime, settings?: SettingsManager): Promis
 }
 
 /**
- * @brief 保存连接表单（首次启动、"添加连接"）：providerId 为 null 时新建一个连接（排在最后），否则改这个连接并写入
+ * @brief 保存连接表单（首次启动、"Add connection"）：providerId 为 null 时新建一个连接（排在最后），否则改这个连接并写入
  *        （或更新）表单里的模型。没有默认模型时它成为默认；默认模型就在这个连接上时也换成它：首次启动测试失败、
  *        改了模型 ID 再保存测试，打开文件夹后的会话才用测试过的那个模型。返回保存到的连接和 pi 报告的配置错误。
  */
@@ -529,7 +529,7 @@ async function testTarget(runtime: ModelRuntime, providerId?: string, modelId?: 
 
 /**
  * @brief 用给定的模型（不给时用默认模型）发一条短消息，记录到第一个增量（正文或思考）的时间；
- *        你点"取消"或超时都会中止。
+ *        你点"Cancel"或超时都会中止。
  */
 export async function testConnection(providerId?: string, modelId?: string): Promise<TestResult> {
   const started = Date.now();

@@ -2,7 +2,7 @@
 // 直接通过 window.mori（与界面相同的进程桥）发命令，记录命令、命令结果和后台进程转发的全部事件及其时间；
 // 批准卡由页面里的录制器答复：等到 mori.approval_request，再用它的 requestId 发 approval.answer。
 // 每个场景用一个新的临时项目（README.md + src/a.ts，见 lib.mjs prepareProject），互不影响。
-// 录完先核对场景要的东西真的发生了（例如"本会话已允许"真的放行了第二条命令）；不符合时不写进 fixtures，
+// 录完先核对场景要的东西真的发生了（例如"Allowed for this session"真的放行了第二条命令）；不符合时不写进 fixtures，
 // 而是写到 test-results/m2-record/<名字>.rejected.json 供查看，并以退出码 1 结束，换个时间再录。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m2-record.mjs --source <走查数据目录> [--only name1,name2] [--exe <Mori.exe>]
@@ -218,7 +218,7 @@ const scenarios = [
       const later = eventsOfType(steps.slice(forgetAt), 'mori.approval_request');
       return [...basics(steps, COMMAND_TOOLS),
         ...need(eventsOfType(steps, 'mori.tool_gate').some((g) => g.gate === 'session' && g.toolName === first),
-          'the second command was not allowed by "本会话不再询问"'),
+          'the second command was not allowed by “Allow for this session”'),
         ...need(forgetAt >= 0 && later[0]?.toolName === first, 'no approval request for the same tool after forget')];
     } },
   { name: 'all-mode', description: '切到全部允许后修改文件不出卡（标"全部允许"）；切回每次询问后命令又出卡',

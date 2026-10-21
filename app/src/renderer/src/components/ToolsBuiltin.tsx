@@ -1,19 +1,19 @@
-// 工具页的"内置工具"一节（docs/v0/screens/tools.md）：跟随的会话注册的全部工具（pi getAllTools，不含 hidden），
+// 工具页的"Built-in tools"一节（docs/v0/screens/tools.md）：跟随的会话注册的全部工具（pi getAllTools，不含 hidden），
 // 启用的才给模型。只读：v0 不在这里启停工具。
 
 import type { ToolEntry } from '../../../shared/protocol';
 
-/** @brief 工具的来源：内置 / 扩展 <路径> / MCP · <服务> / 插件 <包>。 */
+/** @brief 工具的来源：Built-in / Extension <路径> / MCP · <服务> / Plugin <包>。 */
 function toolSource(tool: ToolEntry): string {
   switch (tool.source) {
     case 'builtin':
-      return '内置';
+      return 'Built-in';
     case 'extension':
-      return `扩展 ${tool.sourceLabel}`;
+      return `Extension ${tool.sourceLabel}`;
     case 'mcp':
       return `MCP · ${tool.sourceLabel}`;
     case 'package':
-      return `插件 ${tool.sourceLabel}`;
+      return `Plugin ${tool.sourceLabel}`;
     default:
       return tool.sourceLabel;
   }
@@ -30,7 +30,7 @@ function ToolRow({ tool }: { tool: ToolEntry }) {
         <summary className="tools-row-main">
           <span className="tools-row-name">{tool.name}</span>
           {source && <span className="tools-tag" title={source}>{source}</span>}
-          <span className={`tools-state${tool.active ? ' on' : ''}`}>{tool.active ? '启用' : '未启用'}</span>
+          <span className={`tools-state${tool.active ? ' on' : ''}`}>{tool.active ? 'Enabled' : 'Not enabled'}</span>
           <span className="tools-row-desc">{firstLine}</span>
         </summary>
         <pre className="tools-body">{tool.description}</pre>
@@ -39,12 +39,12 @@ function ToolRow({ tool }: { tool: ToolEntry }) {
   );
 }
 
-/** @brief "内置工具"一节。 */
+/** @brief "Built-in tools"一节。 */
 export function BuiltinSection({ tools }: { tools: ToolEntry[] }) {
   return (
     <>
-      <h2>内置工具</h2>
-      <p className="tools-lead">当前会话注册的全部工具。启用的才会给模型。</p>
+      <h2>Built-in tools</h2>
+      <p className="tools-lead">All tools in this session. Only enabled tools are available to the model.</p>
       <ul className="tools-list">{tools.map((tool) => <ToolRow key={tool.name} tool={tool} />)}</ul>
     </>
   );

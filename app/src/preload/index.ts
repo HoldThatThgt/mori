@@ -37,7 +37,7 @@ function onKernelExit(code: number): void {
   port?.close();
   port = null;
   queued.length = 0;
-  const error = new Error(`Mori kernel exited (code ${code})`);
+  const error = new Error(`Mori’s background process crashed (exit code ${code})`);
   for (const entry of pending.values()) entry.reject(error);
   pending.clear();
   for (const listener of exitListeners) listener(code);
@@ -59,7 +59,9 @@ ipcRenderer.on('mori:kernel-exit', (_event, code: number) => onKernelExit(code))
 contextBridge.exposeInMainWorld('mori', {
   /** @brief 发送一条命令，返回后台进程的结果。 */
   request(command: Command): Promise<unknown> {
-    if (exitCode !== null) return Promise.reject(new Error(`Mori kernel exited (code ${exitCode})`));
+    if (exitCode !== null) {
+      return Promise.reject(new Error(`Mori’s background process crashed (exit code ${exitCode})`));
+    }
     return new Promise((resolve, reject) => {
       const request: RequestEnvelope = { kind: 'request', id: nextId++, command };
       pending.set(request.id, { resolve, reject });
@@ -120,7 +122,7 @@ contextBridge.exposeInMainWorld('mori', {
   openPath(path: string, cwd: string): Promise<{ error: string | null; revealed: boolean }> {
     return ipcRenderer.invoke('mori:open-path', path, cwd);
   },
-  /** @brief 把文字写进系统剪贴板（回复下的"复制"）。 */
+  /** @brief 把文字写进系统剪贴板（回复下的"Copy"）。 */
   copyText(text: string): Promise<void> {
     return ipcRenderer.invoke('mori:copy-text', text);
   },

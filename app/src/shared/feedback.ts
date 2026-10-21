@@ -6,7 +6,7 @@ import { FileSourceSchema, MessageSourceSchema } from './protocol';
 
 /** @brief 一份反馈。 */
 export const FeedbackSchema = z.object({
-  /** 你写的"希望得到什么结果" */
+  /** 你写的"What result were you hoping for?" */
   expected: z.string().trim().min(1),
   /** 引用的原文 */
   quote: z.string().min(1),

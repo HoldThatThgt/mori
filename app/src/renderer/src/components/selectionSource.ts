@@ -20,7 +20,7 @@ function elementOf(node: Node): Element | null {
 }
 
 /**
- * @brief 起止所在的同一个引用来源元素；不在同一个里、或一端落在界面文字上（工具卡标题、"思考"、按钮，
+ * @brief 起止所在的同一个引用来源元素；不在同一个里、或一端落在界面文字上（工具卡标题、"Thought process"、按钮，
  *        标了 data-no-quote）时为 null。
  */
 function sourceOf(range: Range): HTMLElement | null {

@@ -31,8 +31,8 @@ export interface SlashGroup {
 
 /** 两组的顺序和组名 */
 const GROUPS: ReadonlyArray<Pick<SlashGroup, 'kind' | 'label'>> = [
-  { kind: 'prompt', label: '提示词模板' },
-  { kind: 'skill', label: '技能' },
+  { kind: 'prompt', label: 'Prompt templates' },
+  { kind: 'skill', label: 'Skills' },
 ];
 
 /** @brief 草稿里第一个空白的位置；没有空白时为草稿长度。 */
@@ -56,7 +56,7 @@ export function slashQuery(draft: string, caret: number): string | null {
   return caret <= end ? draft.slice(1, end) : null;
 }
 
-/** @brief 按筛选词过滤（不分大小写；名字以它开头的在前，包含它的在后），再分成"提示词模板""技能"两组；空组不列。 */
+/** @brief 按筛选词过滤（不分大小写；名字以它开头的在前，包含它的在后），再分成"Prompt templates""Skills"两组；空组不列。 */
 export function filterCommands(commands: SlashCommand[], query: string): SlashGroup[] {
   const needle = query.toLowerCase();
   const prefix = commands.filter((command) => command.name.toLowerCase().startsWith(needle));
@@ -74,7 +74,7 @@ export function insertCommand(draft: string, name: string): string {
 
 /**
  * @brief 列表打开时读取这个会话的提示词模板和技能命令，每次打开都重新读；
- *        关闭时回到"读取中"，下次打开不先闪出上一次的结果。
+ *        关闭时回到 loading（"Loading…"），下次打开不先闪出上一次的结果。
  */
 export function useSlashCommands(open: boolean, sessionId: string | null): SlashLoad {
   const [load, setLoad] = useState<SlashLoad>({ status: 'loading' });

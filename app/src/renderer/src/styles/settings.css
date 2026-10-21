@@ -1,13 +1,14 @@
 /* M6：settings（docs/v0/screens/settings.md）。照 Claude 桌面版：左边分节列表、右边这一节的内容；
-   连接卡与模型行、模型表单的思考设置、AGENTS.md 编辑器。中栏较窄时分节列表排到内容上方。 */
+   连接卡与模型行、模型表单的思考设置、AGENTS.md 编辑器。中栏较窄时分节列表排到内容上方。
+   分节列表的宽度让最长的 "Connections and models"（13px 约 142px，按钮左右内边距共 24px）排在一行。 */
 .settings-page { container-type: inline-size; }
 .settings-layout { display: flex; flex: 1; min-height: 0; }
 .settings-nav {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  width: 180px;
-  flex: 0 0 180px;
+  width: 200px;
+  flex: 0 0 200px;
   padding: 20px 12px;
   border-right: 1px solid var(--color-line);
 }
@@ -20,7 +21,7 @@
 .settings-error { margin: 8px 0; }
 .settings-error .muted { margin: 4px 0 0; }
 
-/* 表单：模型 ID 只读时的说明对齐输入框；"新会话默认的思考强度"缩进在"支持思考"下面 */
+/* 表单：模型 ID 只读时的说明对齐输入框；"Default effort for new sessions"缩进在"Supports thinking"下面 */
 .connection-form input[readonly] { background: var(--color-surface); color: var(--color-muted); }
 .field-indent { margin: -4px 0 0 106px; }
 .thinking-fields { display: grid; gap: 4px; }
@@ -113,7 +114,7 @@
 .agents-files { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .agents-files li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 
-/* 中栏较窄（最小窗口宽度 800px、侧栏展开时）：分节列表横排在内容上方，表单标签放到输入框上面 */
+/* 中栏较窄（最小窗口宽度 800px、侧栏展开时）：分节列表横排在内容上方 */
 @container (max-width: 620px) {
   .settings-layout { flex-direction: column; }
   .settings-nav {
@@ -126,6 +127,10 @@
   }
   .settings-nav .nav-item { width: auto; }
   .settings-layout .settings-body { padding: 16px; }
+}
+/* 设置页 760px 以下表单标签放到输入框上面：已保存的 key 的提示 "Saved and encrypted · Re-enter it if you change the
+   base URL"（13px 约 350px）在 96px 标签列旁放不下（800 宽窗口时输入框里只有约 348px，左栏拉宽时更少） */
+@container (max-width: 760px) {
   .settings-page .connection-form > label { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .settings-page .field-indent { margin-left: 0; }
 }

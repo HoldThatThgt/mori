@@ -1,4 +1,4 @@
-// "连接与模型"的列表（docs/v0/screens/settings.md）：每个连接一张卡，卡里每个模型一行；设为默认、测试、编辑、删除。
+// "Connections and models"的列表（docs/v0/screens/settings.md）：每个连接一张卡，卡里每个模型一行；设为默认、测试、编辑、删除。
 
 import { useEffect, useState } from 'react';
 import { THINKING_LABELS, type ConfigInfo, type ConnectionInfo, type ModelInfo } from '../../../shared/protocol';
@@ -18,7 +18,7 @@ interface DeleteTarget {
   model: ModelInfo;
 }
 
-/** @brief 正在确认删除的模型，和删除成功后焦点去的按钮（打开确认框时算好；null 时去"添加连接"）。 */
+/** @brief 正在确认删除的模型，和删除成功后焦点去的按钮（打开确认框时算好；null 时去"Add connection"）。 */
 interface Deleting {
   /** 要删除的模型 */
   target: DeleteTarget;
@@ -34,12 +34,12 @@ export function modelButton(ref: string, action: 'edit' | 'delete'): string {
   return `[data-testid="model-row"][data-model="${CSS.escape(ref)}"] [data-action="${action}"]`;
 }
 
-/** @brief 连接卡上一个按钮的选择器："编辑连接"或"添加模型"。 */
+/** @brief 连接卡上一个按钮的选择器："Edit connection"或"Add model"。 */
 export function connectionButton(providerId: string, action: 'edit-connection' | 'add-model'): string {
   return `[data-testid="connection-card"][data-provider="${CSS.escape(providerId)}"] [data-action="${action}"]`;
 }
 
-/** @brief 下一帧（列表重新渲染之后）把焦点放到 selector 指的按钮；为 null 或找不到时放到"添加连接"。 */
+/** @brief 下一帧（列表重新渲染之后）把焦点放到 selector 指的按钮；为 null 或找不到时放到"Add connection"。 */
 function focusInList(selector: string | null): void {
   requestAnimationFrame(() => {
     const target = selector ? document.querySelector<HTMLElement>(selector) : null;
@@ -48,8 +48,8 @@ function focusInList(selector: string | null): void {
 }
 
 /**
- * @brief 删除成功后焦点去哪：同一张卡里下一个（没有时上一个）模型的"编辑"；整张卡一起删掉时下一张卡的"编辑连接"，
- *        没有下一张卡时为 null（"添加连接"）。
+ * @brief 删除成功后焦点去哪：同一张卡里下一个（没有时上一个）模型的"Edit"；整张卡一起删掉时下一张卡的"Edit connection"，
+ *        没有下一张卡时为 null（"Add connection"）。
  */
 function afterDelete(connections: ConnectionInfo[], { connection, model }: DeleteTarget): string | null {
   const index = connection.models.findIndex((item) => item.id === model.id);
@@ -62,7 +62,8 @@ function afterDelete(connections: ConnectionInfo[], { connection, model }: Delet
 
 /** @brief 一行模型的思考设置。 */
 function thinkingText(model: ModelInfo): string {
-  return model.reasoning ? `支持思考 · 新会话默认 ${THINKING_LABELS[model.thinkingLevel]}` : '不支持思考';
+  return model.reasoning ? `Supports thinking · Default effort: ${THINKING_LABELS[model.thinkingLevel]}`
+    : 'Doesn’t support thinking';
 }
 
 /**
@@ -70,13 +71,13 @@ function thinkingText(model: ModelInfo): string {
  * @param total 全部连接下模型的个数
  */
 function deleteBlock(isDefault: boolean, total: number): string | null {
-  if (total <= 1) return '至少要留一个模型';
-  return isDefault ? '默认模型不能删除，先把别的模型设为默认' : null;
+  if (total <= 1) return 'Keep at least one model';
+  return isDefault ? 'Can’t delete the default model. Set another model as default first.' : null;
 }
 
 /**
  * @brief 模型行的按钮：设为默认（不是默认时）、测试（测试中可以取消）、编辑、删除。
- *        设为默认之后这个按钮消失，焦点放到这一行的"编辑"；失败时按钮还在，焦点不动（再按一次就是重试）。
+ *        设为默认之后这个按钮消失，焦点放到这一行的"Edit"；失败时按钮还在，焦点不动（再按一次就是重试）。
  */
 function ModelActions({ connection, model, isDefault, total, onDelete }: {
   connection: ConnectionInfo; model: ModelInfo; isDefault: boolean; total: number; onDelete: () => void;
@@ -90,25 +91,25 @@ function ModelActions({ connection, model, isDefault, total, onDelete }: {
   };
   return (
     <div className="model-actions">
-      {!isDefault && <button className="button compact" onClick={() => void makeDefault()}>设为默认</button>}
+      {!isDefault && <button className="button compact" onClick={() => void makeDefault()}>Set as default</button>}
       {testing === ref ? (
         <>
-          <button className="button compact" disabled>测试中…</button>
-          <button className="button compact" onClick={cancelTest}>取消</button>
+          <button className="button compact" disabled>Testing…</button>
+          <button className="button compact" onClick={cancelTest}>Cancel</button>
         </>
       ) : (
         <button className="button compact" disabled={testing !== null}
-          onClick={() => void testModel(providerId, model.id)}>测试</button>
+          onClick={() => void testModel(providerId, model.id)}>Test</button>
       )}
       <button className="button compact" data-action="edit"
-        onClick={() => showView({ kind: 'model', providerId, modelId: model.id })}>编辑</button>
+        onClick={() => showView({ kind: 'model', providerId, modelId: model.id })}>Edit</button>
       <button className="button compact danger" data-action="delete" disabled={blocked !== null}
-        title={blocked ?? undefined} onClick={onDelete}>删除</button>
+        title={blocked ?? undefined} onClick={onDelete}>Delete…</button>
     </div>
   );
 }
 
-/** @brief 一行模型：ID、"默认"、上下文长度、思考；下面是测试结果。 */
+/** @brief 一行模型：ID、"Default"、上下文长度、思考；下面是测试结果。 */
 function ModelRow({ connection, model, defaultModel, total, onDelete }: {
   connection: ConnectionInfo; model: ModelInfo; defaultModel: string | null; total: number; onDelete: () => void;
 }) {
@@ -120,8 +121,10 @@ function ModelRow({ connection, model, defaultModel, total, onDelete }: {
       <div className="model-line">
         <div className="model-info">
           <span className="model-id">{model.id}</span>
-          {isDefault && <span className="default-badge">默认</span>}
-          <span className="model-meta">上下文 {model.contextWindow.toLocaleString('en-US')} · {thinkingText(model)}</span>
+          {isDefault && <span className="default-badge">Default</span>}
+          <span className="model-meta">
+            Context window: {model.contextWindow.toLocaleString('en-US')} · {thinkingText(model)}
+          </span>
         </div>
         <ModelActions connection={connection} model={model} isDefault={isDefault} total={total} onDelete={onDelete} />
       </div>
@@ -144,13 +147,17 @@ function ConnectionCard({ connection, defaultModel, total, onDelete }: {
         <div className="connection-info">
           <span className="connection-name">{endpoint.name}</span>
           <span className="connection-meta">{endpoint.baseUrl} · {apiLabels[endpoint.api]}</span>
-          <span className={`connection-key${keySaved ? '' : ' missing'}`}>{keySaved ? 'key 已加密保存' : '没有 key'}</span>
+          <span className={`connection-key${keySaved ? '' : ' missing'}`}>
+            {keySaved ? 'Key saved (encrypted)' : 'No key'}
+          </span>
         </div>
         <div className="model-actions">
           <button className="button compact" data-action="edit-connection"
-            onClick={() => showView({ kind: 'edit', providerId, focusKey: 0 })}>编辑连接</button>
+            onClick={() => showView({ kind: 'edit', providerId, focusKey: 0 })}>Edit connection</button>
           <button className="button compact" data-action="add-model"
-            onClick={() => showView({ kind: 'model', providerId, modelId: null })}><Icon name="plus" />添加模型</button>
+            onClick={() => showView({ kind: 'model', providerId, modelId: null })}>
+            <Icon name="plus" />Add model
+          </button>
         </div>
       </header>
       <ul className="model-list">
@@ -164,7 +171,7 @@ function ConnectionCard({ connection, defaultModel, total, onDelete }: {
 }
 
 /**
- * @brief 删除确认：焦点先在"取消"；是连接的最后一个模型时说明连接和 key 一起删除。失败时显示原文。
+ * @brief 删除确认：焦点先在"Cancel"；是连接的最后一个模型时说明连接和 key 一起删除。失败时显示原文。
  *        onClose 的参数为是否删除了。
  */
 function DeleteModelDialog({ target, onClose }: { target: DeleteTarget; onClose: (deleted: boolean) => void }) {
@@ -172,8 +179,8 @@ function DeleteModelDialog({ target, onClose }: { target: DeleteTarget; onClose:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const name = connection.endpoint.name;
-  const text = connection.models.length === 1 ? `连接 ${name} 也会删除，它的 key 一起删除。`
-    : `从连接 ${name} 里删除这个模型。`;
+  const text = connection.models.length === 1 ? `This also deletes the connection ${name} and its key.`
+    : `This deletes the model from the connection ${name}.`;
   async function confirm() {
     setBusy(true);
     setError(null);
@@ -181,20 +188,20 @@ function DeleteModelDialog({ target, onClose }: { target: DeleteTarget; onClose:
       await deleteModel(connection, model.id);
       onClose(true);
     } catch (failure) {
-      setError(`删除失败：${describe('model.delete', failure)}`);
+      setError(`Couldn’t delete the model: ${describe('model.delete', failure)}`);
       setBusy(false);
     }
   }
   return (
-    <ConfirmDialog title={`删除模型 ${model.id}？`} text={text} confirmLabel="删除" tone="danger" testId="delete-dialog"
-      busyText={busy ? '正在删除…' : null} error={error} onConfirm={() => void confirm()}
+    <ConfirmDialog title={`Delete model ${model.id}?`} text={text} confirmLabel="Delete" tone="danger"
+      testId="delete-dialog" busyText={busy ? 'Deleting…' : null} error={error} onConfirm={() => void confirm()}
       onCancel={() => onClose(false)} />
   );
 }
 
 /**
- * @brief 列表：上方一行结果，连接卡，底部"添加连接"。从表单回到列表时焦点放到 view.focus 指的按钮；
- *        删除确认框关掉后焦点回到这一行的"删除"（取消时），或打开确认框时算好的按钮（删除后）。
+ * @brief 列表：上方一行结果，连接卡，底部"Add connection"。从表单回到列表时焦点放到 view.focus 指的按钮；
+ *        删除确认框关掉后焦点回到这一行的"Delete…"（取消时），或打开确认框时算好的按钮（删除后）。
  */
 export function ConnectionsList({ config }: { config: ConfigInfo }) {
   const notice = useSettings((state) => state.notice);
@@ -216,14 +223,14 @@ export function ConnectionsList({ config }: { config: ConfigInfo }) {
       {notice && (
         <p className={`form-message ${notice.tone}`} role="status" data-testid="settings-notice">{notice.text}</p>
       )}
-      {connections.length === 0 && <p className="settings-empty">还没有模型</p>}
+      {connections.length === 0 && <p className="settings-empty">No models yet</p>}
       {connections.map((connection) => (
         <ConnectionCard key={connection.providerId} connection={connection} defaultModel={config.defaultModel ?? null}
           total={total} onDelete={(target) => setDeleting({ target, next: afterDelete(connections, target) })} />
       ))}
       <div className="form-actions">
         <button className="button" data-action="add-connection" onClick={() => showView({ kind: 'add' })}>
-          <Icon name="plus" />添加连接</button>
+          <Icon name="plus" />Add connection</button>
       </div>
       {deleting && <DeleteModelDialog target={deleting.target} onClose={closeDelete} />}
     </>
