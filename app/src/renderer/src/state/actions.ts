@@ -3,8 +3,9 @@
 
 import type {
   ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, Command, ConfigInfo, EventEnvelope, ForwardedEvent,
-  LiveStatus, QuoteRef, SavedSession, SessionState,
+  GlobalEventEnvelope, LiveStatus, QuoteRef, SavedSession, SessionState,
 } from '../../../shared/protocol';
+import { STOPPED_BEFORE_SENDING } from '../../../shared/models';
 import { recordAction } from './actionLog';
 import { describe, request } from './bridge';
 import { persistDrafts } from './drafts';
@@ -13,16 +14,16 @@ import { loadSessions, reopenAll } from './projects';
 import { addQuote, composePrompt, stripQuotes } from './quotes';
 import { guardLeave } from './leaveGuard';
 import { skillCommandText } from './skillText';
-import { applyEvent, finishOpenTools } from './transcript';
-import { activeTab, isShown, sameFile, tabByFile, tabBySession, updateTab, useApp, type Tab } from './store';
+import { addPendingPrompt, applyEvent, finishOpenTools, pendingPrompt, setPendingQueued } from './transcript';
+import { isShown, modelStateOf, sameFile, tabByFile, tabBySession, updateTab, useApp, type Tab } from './store';
 
-/** @brief 读取已保存的连接；没有时进入首次启动。 */
+/** @brief 读取配置；后台进程说要首次启动（还没有模型配置、也没有迁移成，§9.4）时进入首次启动。 */
 export async function loadConfig(): Promise<void> {
   try {
     const config = await request<ConfigInfo>({ type: 'config.get' });
     // 首次启动只在第一次读取时判断；首次启动页里保存连接后仍停在首次启动，直到测试成功并打开文件夹。
     useApp.setState((state) => ({ config, configError: null,
-      firstRun: state.config === null ? config.saved === null : state.firstRun }));
+      firstRun: state.config === null ? config.firstRun : state.firstRun }));
   } catch (error) {
     useApp.setState({ configError: describe('config.get', error) });
   }
@@ -49,25 +50,53 @@ export function putBackQuoted(key: string, text: string, refs: QuoteRef[]): void
   for (const ref of refs) addQuote(key, ref);
 }
 
+/** @brief 会话是否在准备中（模型层 §11.4）：你发了消息，pi 还没开始运行。 */
+export function isPreparing(tab: Tab): boolean {
+  return tab.transcript.sending && !tab.transcript.running;
+}
+
+/**
+ * @brief 发送前对话流的变化：空闲时你的消息先显示出来、会话进入"发送中"（准备中，§11.4）；
+ *        准备中再发的显示在排队区；生成中的插话与排队等 pi 的排队区（不变）。
+ */
+function beforeSend(transcript: Transcript, text: string, refs: QuoteRef[], how: SendHow): Transcript {
+  if (how === 'pending') return setPendingQueued(transcript, text, true);
+  return how === 'idle' ? addPendingPrompt(transcript, text, refs) : transcript;
+}
+
+/** @brief 发送失败：撤掉发送前加的（先显示的消息或排队区里暂存的那条），会话不再"发送中"。 */
+function afterFailure(transcript: Transcript, text: string, how: SendHow): Transcript {
+  if (how === 'pending') return setPendingQueued(transcript, text, false);
+  if (how !== 'idle') return transcript;
+  const items = transcript.items.filter((item) => !(item.kind === 'user' && item.pending));
+  return { ...transcript, items, sending: false };
+}
+
+/** @brief 一次发送的方式：空闲时发、准备中再发（暂存）、生成中插话或排队。 */
+type SendHow = 'idle' | 'pending' | 'steer' | 'followUp';
+
 /**
  * @brief 发送输入框里的文字和引用芯片：发给模型的全文是引用块加你的文字（quotes.ts composePrompt），
- *        芯片随命令带给后台进程，pi 记下这条消息后写成 mori.ref 条目。
+ *        芯片随命令带给后台进程，pi 记下这条消息后写成 mori.ref 条目。会话被拒绝启动时不发送（草稿不丢，§4.6）。
+ *        准备中再发的按排队处理（准备中不能插话，§11.4），由后台进程暂存，pi 开始后作为排队消息交给 pi。
  * @param behavior 生成中时：steer 插话，followUp 排队；空闲时不传
  */
 export async function send(key: string, behavior?: 'steer' | 'followUp'): Promise<void> {
   const tab = useApp.getState().tabs.find((item) => item.key === key);
-  if (!tab?.sessionId) return;
+  if (!tab?.sessionId || tab.blocked) return;
   const refs = tab.draftRefs;
   const text = composePrompt(refs, tab.draft, tab.cwd);
   if (!text) return;
+  const how: SendHow = isPreparing(tab) ? 'pending' : behavior ?? 'idle';
   updateTab(key, (current) => ({ ...current, draft: '', draftRefs: [], activity: Date.now(),
-    transcript: behavior ? current.transcript : { ...current.transcript, sending: true } }));
+    transcript: beforeSend(current.transcript, text, refs, how) }));
   try {
-    await request({ type: 'session.prompt', sessionId: tab.sessionId, text, behavior,
+    await request({ type: 'session.prompt', sessionId: tab.sessionId, text,
+      behavior: how === 'idle' ? undefined : how === 'pending' ? 'followUp' : how,
       refs: refs.length > 0 ? refs : undefined });
   } catch (error) {
     const message = describe('session.prompt', error);
-    updateTranscript(key, (t) => pushItem({ ...t, sending: false },
+    updateTranscript(key, (t) => pushItem(afterFailure(t, text, how),
       { kind: 'error', text: message, restore: text, live: true, ...(refs.length ? { refs } : {}) }));
   }
 }
@@ -87,12 +116,15 @@ export async function withdraw(key: string): Promise<void> {
   }
 }
 
-/** @brief 停止：先把排队消息放回输入框，再停止生成（方案 5.8）。 */
+/**
+ * @brief 停止：先把排队消息放回输入框，再停止生成（方案 5.8）。准备中（§11.4）只停止：后台进程撤回这条消息和暂存的
+ *        消息，经 mori.prompt_error 交回文字，由 handleEvent 放回输入框。
+ */
 export async function stop(key: string): Promise<void> {
   const tab = useApp.getState().tabs.find((item) => item.key === key);
-  if (!tab?.sessionId || !tab.transcript.running) return;
+  if (!tab?.sessionId || !(tab.transcript.running || tab.transcript.sending)) return;
   updateTranscript(key, (t) => ({ ...t, stopRequested: true }));
-  await withdraw(key);
+  if (tab.transcript.running) await withdraw(key);
   try {
     await request({ type: 'session.abort', sessionId: tab.sessionId });
   } catch (error) {
@@ -181,12 +213,37 @@ export async function refreshUsage(key: string): Promise<void> {
   }
 }
 
-/** @brief 模型与思考强度的事件（docs/v0/screens/models.md）：mori.model_state 带全部四项，pi 的事件只带新的强度。 */
+/**
+ * @brief 模型状态与思考强度的事件（docs/v1/screens/model-menu.md）：mori.model_state 带 ModelState 的全部各项，
+ *        pi 的事件只带新的强度。
+ */
 function withModelEvent(tab: Tab, event: ForwardedEvent): Tab {
   if (event.type === 'thinking_level_changed') return { ...tab, thinkingLevel: event.level };
   if (event.type !== 'mori.model_state') return tab;
-  return { ...tab, model: event.model, thinkingLevel: event.thinkingLevel, thinkingLevels: event.thinkingLevels,
-    reasoning: event.reasoning };
+  return { ...tab, ...modelStateOf(event) };
+}
+
+/**
+ * @brief 准备中被撤回的消息（§11.4、§5.8）：mori.prompt_error 或段开始时就没有可用模型的 mori.model_unavailable。
+ *        这条消息（带引用芯片时去掉引用块、芯片放回）与暂存的消息按发送顺序放回输入框。没有要撤回的时不动。
+ *        pi 的 prompt() 没有开始运行就结束时，mori.prompt_done 先到、已撤回先显示的消息，随后的
+ *        “Stopped before sending”仍要放回（这时 text 是准备中又发的第一条，queued 是其余的）。
+ */
+function restoreWithdrawn(tab: Tab, event: ForwardedEvent): void {
+  const pending = pendingPrompt(tab.transcript);
+  if (event.type === 'mori.prompt_error' && (pending || event.message === STOPPED_BEFORE_SENDING)) {
+    restoreTexts(tab, event.text, event.refs ?? pending?.refs ?? [], event.queued ?? []);
+  }
+  if (event.type === 'mori.model_unavailable' && event.firstRequest) {
+    restoreTexts(tab, event.text, pending?.refs ?? [], event.queued);
+  }
+}
+
+/** @brief 把撤回的消息和暂存的消息放回输入框（在已有草稿之前），引用芯片一并放回。 */
+function restoreTexts(tab: Tab, text: string | null, refs: QuoteRef[], queued: string[]): void {
+  const own = text === null || refs.length === 0 ? text : stripQuotes(text, refs, tab.cwd) ?? text;
+  putBack(tab.key, [...(own === null ? [] : [own]), ...queued]);
+  if (text !== null) for (const ref of refs) addQuote(tab.key, ref);
 }
 
 /** @brief 一个事件对还开着的会话的状态（侧栏）的改变；不改变时为 null。 */
@@ -201,6 +258,8 @@ function liveChange(live: LiveStatus, event: ForwardedEvent): LiveStatus | null 
     // 扩展命令等没有开始运行的提示只有这一个结束事件。
     case 'mori.prompt_done':
     case 'mori.prompt_error': return { ...live, running: event.running };
+    // 段开始时就等不到模型（§5.8）：后台进程只发这一个事件，没有 prompt_error 或 agent_settled。
+    case 'mori.model_unavailable': return event.firstRequest ? { ...live, running: false } : null;
     default: return null;
   }
 }
@@ -237,14 +296,17 @@ function handleUntabbed(envelope: EventEnvelope): void {
 /**
  * @brief 归并一个后台进程事件；本轮或压缩结束后刷新上下文用量。改名事件更新会话名；
  *        不可见的会话本轮结束时标"有新结果"。界面重新加载后还没点开的会话只更新侧栏状态。
+ *        全局事件（sessionId 为 null：mori.profiles、mori.key_status）不属于任何会话，由设置页自己订阅处理。
  */
-export function handleEvent(envelope: EventEnvelope): void {
+export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void {
+  if (envelope.sessionId === null) return;
   const tab = tabBySession(envelope.sessionId);
   if (!tab) {
     handleUntabbed(envelope);
     return;
   }
   const { event } = envelope;
+  restoreWithdrawn(tab, event);
   updateTranscript(tab.key, (t) => applyEvent(t, event, Date.now()));
   if (event.type === 'session_info_changed') {
     updateTab(tab.key, (current) => ({ ...current, name: event.name ?? null }));
@@ -264,10 +326,19 @@ export function handleEvent(envelope: EventEnvelope): void {
 }
 
 /**
- * @brief 后台进程意外退出：没结束的工具标"已中断"，运行状态清空，草稿不动；正在生成的会话在侧栏标"出错"。
+ * @brief 后台进程意外退出：没结束的工具标"已中断"，运行状态清空；准备中的消息和暂存的消息放回输入框；
+ *        正在生成的会话在侧栏标"出错"。
  *        pi 会话随后台进程一起没了，会话标识清掉，之后的命令不会用到它（重新载入后换成新的）。
  */
 export function handleKernelExit(): void {
+  // 准备中的消息和暂存的消息 pi 还没收到，会话文件里没有：按发送顺序放回输入框（同 §11.4 的撤回）。
+  // 先放回再清状态，读的是清掉之前的对话流。
+  for (const tab of useApp.getState().tabs) {
+    const pending = pendingPrompt(tab.transcript);
+    if (pending || tab.transcript.pendingQueue.length > 0) {
+      restoreTexts(tab, pending?.text ?? null, pending?.refs ?? [], tab.transcript.pendingQueue);
+    }
+  }
   useApp.setState((state) => ({
     kernel: 'exited',
     // 还没点开的会话：后台进程里的状态随它一起没了，退出时正在生成的标"出错"（打开着的看它自己的对话流）。
@@ -277,9 +348,14 @@ export function handleKernelExit(): void {
       .map((item) => [item.sessionFile, 'error' as const])) },
     tabs: state.tabs.map((tab) => ({ ...tab, sessionId: null,
       interrupted: tab.interrupted || tab.transcript.running || tab.transcript.sending,
-      transcript: { ...finishOpenTools(tab.transcript, 'interrupted'), running: false, sending: false, stage: null,
-        steering: [], followUp: [], stopRequested: false } })),
+      transcript: { ...withoutPending(finishOpenTools(tab.transcript, 'interrupted')), running: false, sending: false,
+        stage: null, modelStage: null, pendingQueue: [], steering: [], followUp: [], stopRequested: false } })),
   }));
+}
+
+/** @brief 去掉准备中先显示的那条消息（文字已放回输入框）。 */
+function withoutPending(transcript: Transcript): Transcript {
+  return { ...transcript, items: transcript.items.filter((item) => !(item.kind === 'user' && item.pending)) };
 }
 
 /** @brief "重新载入"：重启后台进程；新通道连上后由 handleKernelReady 重新打开会话。 */
@@ -304,15 +380,12 @@ export function handleKernelReady(): void {
 }
 
 /**
- * @brief 打开设置页；fromError 为真时（"去设置"）设置页打开当前会话所用模型的连接的"编辑连接"、焦点放到 API key。
- *        从工具页过来时不用问（有未保存改动的编辑器只在设置页里）。
+ * @brief 打开设置页（侧栏）。从工具页过来时不用问（有未保存改动的编辑器只在设置页里）。
+ *        卡片与顶栏菜单里打开 设置 → Models 的按钮用 settings.ts 的 openModelsSettings。
  */
-export function openSettings(fromError = false): void {
-  recordAction(fromError ? '去设置' : '打开设置');
-  const provider = activeTab()?.model?.split('/')[0] ?? null;
-  useApp.setState((state) => ({ view: 'settings',
-    settingsFocus: fromError ? state.settingsFocus + 1 : state.settingsFocus,
-    settingsProvider: fromError ? provider : state.settingsProvider }));
+export function openSettings(): void {
+  recordAction('打开设置');
+  useApp.setState({ view: 'settings' });
 }
 
 /** @brief 打开工具页（docs/v0/screens/tools.md）；从有未保存改动的设置页过来时先问。 */

@@ -4,6 +4,9 @@
 
 更新日期：2026-10-14。
 
+> 2026-10-21 注：Agent 使用哪个模型，以 [统一模型提供商 Proposal](model-providers.md) 为准：Agent 写有序候选（分组、提供商或模型）和能力要求，
+> 不再“引用固定的模型资源”；角色、实例与生命周期以 [平行 Agent 与 TaskBoard Proposal](parallel-agents-taskboard.md) 为准。
+
 产品范围见 [Mori 产品与技术 Proposal](../proposal.md)。本文定义用户如何创建 Agent、
 编写 `agent.md`、选择启动方式，以及 main agent 和 subagent 的启动、通信、结束与恢复规则。
 

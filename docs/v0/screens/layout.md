@@ -43,12 +43,12 @@ M1 只列本次运行打开过的会话；M3 起换成项目 → 会话树，状
 | --- | --- | --- | --- |
 | 顶部（M3 起） | — | "新会话"主按钮（Ctrl+N）、"打开文件夹…" | 新会话、打开文件夹… |
 | 会话树（M3 起） | pi 的会话列表加本次打开的会话 | 见 [sessions.md](sessions.md) | 见 sessions.md |
-| 设置页打开 | 你点了"设置"或"去设置" | "设置"高亮 | 返回会话 |
+| 设置页打开 | 你点了"设置"或"去设置"（v1：见 docs/specs/model-providers.md §9.3："去设置"删除，改为说明卡与拒绝启动卡的"Open settings"） | "设置"高亮 | 返回会话 |
 | 底部（M2 起） | — | "报告界面问题（F8）"和"设置"；收起为图标栏时是两个图标按钮 | 报告界面问题（见 [f8.md](f8.md)）、设置 |
 
 工具（M6）在"打开文件夹…"下面，见 [tools.md](tools.md)；工作回顾（M7）在"工具"下面，见 [review.md](review.md)。
 
 ## 设置页外框
 
-- 中栏换成设置页，顶部"返回会话"；M6 起左边是分节列表（连接与模型、AGENTS.md），见 [settings.md](settings.md)。工具页（M6）外框相同，见 [tools.md](tools.md)；工作回顾（M7）顶部相同，详情放在右栏，见 [review.md](review.md)。
+- 中栏换成设置页，顶部"返回会话"；M6 起左边是分节列表（连接与模型、AGENTS.md），见 [settings.md](settings.md)（v1：见 docs/specs/model-providers.md §9.1：“连接与模型”分节改为“Models”，状态表见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)）。工具页（M6）外框相同，见 [tools.md](tools.md)；工作回顾（M7）顶部相同，详情放在右栏，见 [review.md](review.md)。
 - 会话面板保持挂载、只隐藏，所以返回后滚动位置、草稿、展开状态都在。

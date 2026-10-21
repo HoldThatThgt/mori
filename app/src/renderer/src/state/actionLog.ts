@@ -1,5 +1,6 @@
 // 最近的操作记录：只在本次运行的内存里，F8 报告界面问题时附上（方案 5.15，见 docs/v0/screens/f8.md）。
-// 只记操作的类型和不含机密的摘要：发送的消息只取前几十个字，连接表单只记"保存连接"，从不记 key。
+// 只记操作的类型和不含机密的摘要：发送的消息只取前几十个字，模型层的命令（models.*）只记类型和 id，
+// 从不记 key 的明文（secret、keySecret，docs/specs/model-providers.md §9.4）。
 
 import type { Command } from '../../../shared/protocol';
 import type { IssueAction } from '../../../shared/issues';
@@ -43,10 +44,9 @@ export function describeCommand(command: Command): string | null {
     case 'session.read':
     case 'trust.check':
       return null;
-    case 'connection.save':
-      return '保存连接';
     case 'connection.test':
-      return '测试连接';
+      return `Test connection ${command.providerId}/${command.modelId}`
+        + (command.keyRef ? ` with key ${command.keyRef}` : '');
     case 'connection.testCancel':
       return '取消测试连接';
     case 'session.create':
@@ -83,11 +83,6 @@ export function describeCommand(command: Command): string | null {
 /** @brief M6 的命令（设置页、顶栏、工具页）的摘要；只读的查询返回 null。 */
 function describeM6Command(command: Command): string | null {
   switch (command.type) {
-    case 'endpoint.save': return `保存连接 ${command.providerId}`;
-    case 'model.save': return `${command.adding ? '添加' : '保存'}模型 ${command.providerId}/${command.model.modelId}`;
-    case 'model.delete': return `删除模型 ${command.providerId}/${command.modelId}`;
-    case 'model.setDefault': return `设为默认模型 ${command.providerId}/${command.modelId}`;
-    case 'session.setModel': return `这个会话换模型 ${command.model}`;
     case 'session.setThinking': return `这个会话换思考强度 ${command.level}`;
     case 'agents.save': return '保存用户级 AGENTS.md';
     case 'resource.toggle': return `${command.enabled ? '启用' : '停用'} ${command.kind} ${command.path}`;
@@ -98,6 +93,39 @@ function describeM6Command(command: Command): string | null {
     case 'mcp.setEnabled': return `${command.enabled ? '启用' : '停用'} MCP 服务 ${command.name}`;
     case 'mcp.setDirect': return `MCP 服务改为直接调用 ${command.name}`;
     case 'mcp.remove': return `移除 MCP 服务 ${command.name}`;
+    default: return describeModelCommand(command);
+  }
+}
+
+/** @brief 删除类命令的摘要：dryRun（确认框先算连带改动）不记。 */
+function deleteText(what: string, dryRun: boolean): string | null {
+  return dryRun ? null : `Delete ${what}`;
+}
+
+/** @brief 模型层的写命令（§9.4、§9.5）的摘要：只记类型和 id，不含 secret、keySecret；只读的查询返回 null。 */
+function describeModelCommand(command: Command): string | null {
+  switch (command.type) {
+    case 'models.firstRun': return `Save first-run provider ${command.providerId ?? command.provider.name}`;
+    case 'models.saveProvider':
+      return command.id ? `Save provider ${command.id}` : `Add provider ${command.provider.name}`;
+    case 'models.deleteProvider': return deleteText(`provider ${command.id}`, command.dryRun);
+    case 'models.saveModel':
+      return `${command.adding ? 'Add' : 'Save'} model ${command.providerId}/${command.model.id}`;
+    case 'models.deleteModel': return deleteText(`model ${command.providerId}/${command.modelId}`, command.dryRun);
+    case 'models.moveModel': return `Move model ${command.providerId}/${command.modelId} ${command.delta}`;
+    case 'models.addKey': return `Add key ${command.providerId}`;
+    case 'models.removeKey': return `Remove key ${command.ref}`;
+    case 'models.moveKey': return `Move key ${command.ref} ${command.delta}`;
+    case 'models.saveGroup': return `${command.creating ? 'Create' : 'Save'} group ${command.id}`;
+    case 'models.deleteGroup': return deleteText(`group ${command.id}`, command.dryRun);
+    case 'models.setDefaults':
+      return `Set defaults ${command.normalDefault ?? 'None'} · ${command.allowedZones.join(' ')}`;
+    case 'models.setProjectZones': return `Set project zones ${command.path} · ${command.zones.join(' ')}`;
+    case 'models.confirmZone': return `Confirm zone ${command.providerId} · ${command.zone}`;
+    case 'models.dismissMigration': return 'Dismiss migration notice';
+    case 'models.reload': return 'Reload model settings';
+    case 'models.verify': return `Verify ${command.refs.join(' ')} (${command.tests})`;
+    case 'session.setPick': return `Set model range ${command.pick}`;
     default: return null;
   }
 }

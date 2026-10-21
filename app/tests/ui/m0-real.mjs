@@ -1,15 +1,19 @@
 // M0 真实端点走查（走查项 2–3）：测试连接 →"总结 README"，确认流式文字与原生工具调用。
-// 脚本不接触 key：先用 --setup 打开 Mori，由你在界面里填连接并保存（key 由 Mori 加密保存），关闭窗口；
+// 脚本不接触 key：先用 --setup 打开 Mori，由你在界面里填连接并保存（key 由 Mori 加密保存），等探针显示 Verified 后关闭窗口；
 // 之后不带 --setup 运行，脚本用同一个数据目录走查。用法：
 //   node tests/ui/m0-real.mjs --user-data <目录> --setup [--exe <Mori.exe 路径>]
 //   node tests/ui/m0-real.mjs --user-data <目录> [--exe <Mori.exe 路径>]
 // 数据目录专门用于走查，不要用日常使用的 %APPDATA%\Mori。结果写到 test-results/m0-real.json。
+// v1（docs/specs/model-providers.md §14.4）：已保存的提供商从 model-config.json 读，断言改为 model-config.json 与
+// credentials.json（key 只有 ref、密文在 credentials.json）；测试连接在 设置 → Models 的提供商卡上；临时项目在走查期间
+// 授权公网（测试准备，走查结束后删掉这一项）。
 
-import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { lookup } from 'node:dns/promises';
 import { _electron as electron } from 'playwright-core';
+import { editModelConfig, projectKey } from './lib.mjs';
 import { startNetWatch } from './net-watch.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
@@ -26,20 +30,35 @@ const launch = () => {
   return electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
 };
 
-/** @brief --setup：打开 Mori，等你填好连接、保存并关闭窗口。 */
+/**
+ * @brief --setup：打开 Mori，等你填好连接、保存并关闭窗口。数据目录里已有 v1 的 model-config.json 或 v0 的
+ *        pi/models.json（迁移）时，窗口直接打开 设置 → Models 而不是首次启动表单（§4.5）。
+ */
 async function setup() {
+  const previous = existsSync(join(userData, 'model-config.json')) || existsSync(join(userData, 'pi', 'models.json'));
   const app = await launch();
-  console.log('Mori 已打开：在"连接"里填服务地址、API key、模型 ID 和上下文长度，保存并测试后关闭窗口。');
+  console.log(previous
+    ? 'Mori 已打开：数据目录里已有模型配置，窗口打开在 设置 → Models。确认各提供商的 Network zone，需要时添加提供商并测试连接；'
+    : 'Mori 已打开：在首次启动表单里填 Name、Address、Network zone、API key、Model id，测试连接后保存；');
+  console.log('等每个模型的 Tool calling 都显示 Verified 后再关闭窗口（探针没跑完就关，下次启动会重新探测）。');
   await new Promise((done) => app.process().once('exit', done));
   console.log(`已退出。数据目录：${userData}`);
 }
 
-/** @brief 读取已保存连接的非机密信息；确认 models.json 里没有 key。 */
+/**
+ * @brief 读取已保存的第一个提供商的非机密信息（v1：model-config.json）；确认它的 key 只有 ref 与标签，密文在
+ *        credentials.json 里（只看有没有这一项，不读密文）。
+ */
 function savedConnection() {
-  const provider = JSON.parse(readFileSync(join(userData, 'pi', 'models.json'), 'utf8')).providers?.['mori-endpoint'];
-  if (!provider) throw new Error('No saved connection: run with --setup first');
-  return { baseUrl: provider.baseUrl, model: provider.models?.[0]?.id, contextWindow: provider.models?.[0]?.contextWindow,
-    keyInModelsJson: 'apiKey' in provider };
+  const configPath = join(userData, 'model-config.json');
+  const provider = JSON.parse(readFileSync(configPath, 'utf8')).providers?.[0];
+  if (!provider) throw new Error('No saved provider: run with --setup first');
+  const credentials = JSON.parse(readFileSync(join(userData, 'credentials.json'), 'utf8'));
+  return { id: provider.id, name: provider.name, baseUrl: provider.baseUrl, model: provider.models?.[0]?.id,
+    contextWindow: provider.models?.[0]?.contextWindow,
+    keyRefsOnly: provider.keys.length > 0
+      && provider.keys.every((key) => Object.keys(key).sort().join() === 'label,ref'),
+    cipherSaved: provider.keys.every((key) => typeof credentials[key.ref] === 'string') };
 }
 
 const results = { target: exePath ?? 'dev build', checks: [] };
@@ -78,12 +97,17 @@ function toolCards(page) {
   })));
 }
 
-/** @brief 走查 2：不重填 key，直接测试连接。 */
-async function connectionCheck(page) {
-  await page.getByRole('button', { name: '测试连接' }).click();
-  const result = page.locator('.panel .ok, .panel .error').first();
-  await result.waitFor({ timeout: 60000 });
-  record('走查 2：测试连接成功（用加密保存的 key）', (await result.getAttribute('class')) === 'ok', oneLine(await result.innerText()));
+/** @brief 走查 2：不重填 key，在 设置 → Models 的提供商卡上测试连接（v1）。 */
+async function connectionCheck(page, providerId) {
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.locator('[data-testid="settings-nav"] button[data-section="models"]').click();
+  const card = page.locator(`[data-testid="provider-card"][data-provider="${providerId}"]`);
+  await card.locator('[data-action="test-provider"]').click();
+  const result = card.getByTestId('test-result');
+  await result.waitFor({ timeout: 120000 });
+  const text = await result.innerText();
+  record('走查 2：测试连接成功（用加密保存的 key）', text.startsWith('Connected'), oneLine(text));
+  await page.getByRole('button', { name: '返回会话' }).click();
 }
 
 /** @brief 走查 3：总结 README，确认流式文字和一次读取（原生工具调用）；再追问一轮确认多轮可用。 */
@@ -115,16 +139,20 @@ async function readmeCheck(app, page, project) {
 async function walkthrough() {
   const saved = savedConnection();
   Object.assign(results, { baseUrl: saved.baseUrl, model: saved.model, contextWindow: saved.contextWindow });
-  record('models.json 里没有 key', !saved.keyInModelsJson);
+  record('model-config.json 里 key 只有 ref 与标签，密文在 credentials.json 里', saved.keyRefsOnly && saved.cipherSaved);
   const project = mkdtempSync(join(tmpdir(), 'mori-real-project-'));
   writeFileSync(join(project, 'README.md'),
     '# Mori smoke project\n\nThis folder is used to check Mori against a real model.\n\n' +
     '- It has one README file.\n- The model should read this file before summarizing it.\n');
+  // 测试准备（synthetic test setup，§14.1）：走查期间给临时项目授权公网，结束后删掉这一项
+  editModelConfig(userData, (config) => {
+    config.projectZones[projectKey(project)] = ['public'];
+  });
   const app = await launch();
   const net = startNetWatch(app.process().pid);
   try {
     const page = await app.firstWindow();
-    await connectionCheck(page);
+    await connectionCheck(page, saved.id);
     await readmeCheck(app, page, project);
     const endpointIps = new Set((await lookup(new URL(saved.baseUrl).hostname, { all: true })).map((a) => a.address));
     const local = [...endpointIps].every((ip) => ip === '127.0.0.1' || ip === '::1');
@@ -136,6 +164,9 @@ async function walkthrough() {
   } finally {
     net.stop();
     await app.close().catch(() => {});
+    editModelConfig(userData, (config) => {
+      delete config.projectZones[projectKey(project)];
+    });
     rmSync(project, { recursive: true, force: true });
   }
   mkdirSync(join(appRoot, 'test-results'), { recursive: true });

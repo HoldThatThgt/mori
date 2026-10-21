@@ -47,6 +47,7 @@
 4. **界面不谈自己**：界面文字不出现"演示""内核""回合""事件""SDK""compat"这类实现用语，
    也不出现"执行者""角色会话""任务版本"这类 proposal 术语。所有操作都能用键盘完成。
 5. **配置就是 pi 的配置**：界面读写 pi 自己的配置文件，不另建一套格式。
+   （2026-10-21 改：模型这一层改用 Mori 自己的模型配置，从 `models.json` 迁移一次，见 [specs/model-providers.md](specs/model-providers.md)；其余配置仍是 pi 的。）
 
 ## 3. 后端与外壳选择
 
@@ -71,11 +72,11 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | 能力 | 由谁提供 | 界面做什么 |
 | --- | --- | --- |
 | 对话、流式、工具执行、停止、排队、插话 | pi | 渲染事件；按钮对应 pi 的 `abort` / `clearQueue` / `followUp` / `steer` |
-| 自动重试、上下文压缩 | pi（`auto_retry_*`、`compaction_*` 事件） | 显示"重试 1/3"、"已压缩较早的对话" |
+| 自动重试、上下文压缩 | pi（`auto_retry_*`、`compaction_*` 事件）。2026-10-21 起重试由模型层的模型池做，pi 的自动重试关闭 | 显示"重试 1/3"、"已压缩较早的对话" |
 | 会话保存、列表、打开、命名 | pi（`SessionManager`） | 侧栏、改名 |
 | 会话归档与删除 | Mori（pi 没有归档和删除接口） | 照 Claude 桌面版：归档（可以恢复，已归档列表记在本机）；删除是永久的，先确认（2026-10-19 改） |
 | 编辑后的 diff | pi（edit 结果的 `details.patch`；write 不提供 diff） | 工具卡与右栏显示；写入显示新内容 |
-| 模型与端点 | pi（`models.json`） | 连接表单、"测试连接" |
+| 模型与端点 | v0：pi（`models.json`）。2026-10-21 起：**Mori 模型层**（分组、提供商、多个 key、模型、网络区域、选择器、模型池、档案与探针，[specs/model-providers.md](specs/model-providers.md)） | 连接表单、"测试连接"；模型层起见规格 §9 |
 | AGENTS.md | pi（每个目录取 AGENTS.override.md、AGENTS.md、CLAUDE.md 中第一个存在的） | 用户级编辑，项目级只显示加载了哪些文件 |
 | Skill | pi（`SKILL.md`，Agent Skills 规范） | 工具页列出、查看、启停 |
 | MCP | pi（`mcp.json` 加 pi 的 MCP 扩展）；**Mori 共享连接**：每个服务一个进程，所有会话共用（2026-10-20 改为照 Claude 桌面版，[v0/m6-mcp-shared.md](v0/m6-mcp-shared.md)） | 工具页添加、启停、看工具、进程状态和错误原文 |
@@ -89,8 +90,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 
 - 撤销与文件快照：v0 只看 diff，回退用 git。
 - 按命令前缀放行、复合命令识别等批准规则。
-- 端点并发排队：端点忙时由 pi 的自动重试处理，界面如实显示。
-- 完整模型体检（v0 只有"测试连接"）、原始请求轨迹、后台进程重启后的自动恢复。
+- 端点并发排队：端点忙时由 pi 的自动重试处理，界面如实显示。（2026-10-21 起由模型层的模型池做，[specs/model-providers.md](specs/model-providers.md)）
+- 完整模型体检（v0 只有"测试连接"）、原始请求轨迹、后台进程重启后的自动恢复。（模型体检 2026-10-21 起由模型层的探针做；其余仍不做）
 - MCP 每个会话的连接状态：pi 没有提供；v0 显示 pi 给出的工具列表和错误原文，加上共享连接的进程状态，不显示"已连接"。
 - MCP 的 codemode 和延迟加载方式：v0 只支持直接调用。
 
@@ -124,7 +125,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 
 - 首次启动只有连接表单：名称、服务地址、接口类型（默认 OpenAI 兼容）、API key、模型 ID、上下文长度，
   以及"兼容选项"（每项配中文说明，例如"端点不支持 developer 角色"；列表登记在 `docs/v0/defaults.md`）。
-- 保存时写入 pi 的 `models.json`，并把它设为默认模型。
+- 保存时写入 pi 的 `models.json`，并把它设为默认模型。（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §9.1：写 Mori 的模型配置，表单加网络区域，界面改英文）
   API key 由 Mori 用系统加密（Windows 上是 DPAPI，绑定当前用户）保存在本机，不写进 `models.json`，也不放进环境变量；
   启动时解密后只交给 pi 放在内存里，模型运行的命令读不到它。不再支持 `$环境变量名` 这种命令行时代的写法。
 - "测试连接"：按钮变为"测试中…"，可以取消。成功时显示首字耗时，失败时显示错误原文。
@@ -181,7 +182,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - 每次请求模型（包括工具执行之后再次请求）时，显示"等待模型响应 12s"，直到助手开始回复。
 - 思考内容流入时显示"思考中 5s"，正文流入时显示"生成中"。
 - 执行工具时显示"运行 npm test 8s"；有批准卡挂起时显示"等你批准"。
-- 自动重试时显示"重试 1/3 · 原因"；压缩时显示"正在压缩较早的对话"。
+- 自动重试时显示"重试 1/3 · 原因"；压缩时显示"正在压缩较早的对话"。（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §9.3：重试、排队、等模型由模型层的事件提供）
 
 ### 5.7 批准
 
@@ -212,7 +213,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   - 停止时先把排队消息放回输入框，再停止生成。有批准卡时按拒绝处理。
   - 停止后显示"已停止 · 已经做出的修改不会自动撤销"。
 - **错误**：都显示原文，来源有三种：发送时就失败（例如找不到模型或 key）、模型回复出错、自动重试最终失败。
-  - 原文里有 401、unauthorized 或 api key 字样时，附"去设置"（这条文字匹配登记为临时默认值）。
+  - 原文里有 401、unauthorized 或 api key 字样时，附"去设置"（这条文字匹配登记为临时默认值）。（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §9.3 删除：认证类错误由模型层换 key、换模型或给出说明卡）
   - 其他错误附"把上一条消息放回输入框"，由你决定是否再发。
 - **后台进程退出**：每个打开的会话显示"Mori 的后台进程意外退出 · 刚才没完成的回复已中断"和"重新载入"。
   重新载入时从会话文件恢复对话；排队消息、批准卡和"本会话已允许"不恢复，界面上明说。草稿不受影响。
@@ -256,7 +257,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 
 ### 5.12 设置页
 
-- **连接**：与首次启动同一张表单；可以添加多个模型，并设定默认模型。
+- **连接**：与首次启动同一张表单；可以添加多个模型，并设定默认模型。（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §9.1：由设置页 Models 分节取代）
 - **思考**：每个模型可以标"支持思考"（写入 `models.json` 的 `reasoning: true`，pi 才会发送思考参数），
   并设定新会话默认的思考强度（pi 的 thinking level）。顶栏按会话切换思考强度；模型不支持思考时这一项不可选，并说明原因。
 - **用户级 AGENTS.md**：编辑 `<agentDir>/AGENTS.md`，标出当前实际生效的是哪个文件。有未保存改动时离开，先询问。
@@ -315,7 +316,7 @@ app/
 docs/v0/                     screens/（每屏一张状态表）、defaults.md
 ```
 
-**后台进程（utilityProcess）只做五件事**（第 5 件 2026-10-20 加）：
+**后台进程（utilityProcess）只做六件事**（第 5 件 2026-10-20 加，第 6 件 2026-10-21 加）：
 
 1. 调用 pi SDK：新建或打开会话、`prompt`、`steer`、`followUp`、`clearQueue`、`abort`、改名、读写配置。
 2. 转发事件：`session.subscribe` 收到的事件原样转发，外面包一层 `{ sessionId, event }`。
@@ -326,18 +327,21 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
 5. MCP 共享连接（`mcpShare.ts`，[v0/m6-mcp-shared.md](v0/m6-mcp-shared.md)）：pi 的 MCP 扩展给每个会话要传输时，
    交给它挂在共享服务上的虚拟传输；每个服务一个真连接（pi 自己起进程、连 HTTP 的方式），各会话的请求按编号转发。
    pi 的 MCP 扩展不改。
+6. 模型层（2026-10-21 加，[specs/model-providers.md](specs/model-providers.md)）：Mori 自己的模型配置与迁移、选择器、按 key 的模型池、
+   模型档案与探针；每个会话的模型请求经 Mori 的虚拟模型、流函数包装和模型池的 fetch 发出。
 
 **会话与数据**
 
 - `host.ts` 持有 `Map<sessionId, AgentSession>`，每个会话用 `createAgentSession` 独立创建；
   打开过的会话一直保持存活，直到归档、删除或退出；界面重新加载也不停，重新加载后的界面接上它们（2026-10-19 改为照 Claude 桌面版：
-  会话不因不在屏幕上而停）。不做调度、优先级或并发限制。
+  会话不因不在屏幕上而停）。不做调度、优先级或并发限制（模型请求的排队和优先级属于第 6 件事，2026-10-21）。
 - 历史：后台进程调用 `SessionManager.open(path).getBranch()`，把当前分支的条目交给界面；不自己解析会话文件。
 - 引用来源用 pi 的自定义条目（`appendCustomEntry("mori.ref", …)`）写进会话文件，它不进入模型上下文。
 - 会话内容只存一份，就是 pi 的会话文件。Mori 自己只保存：界面状态（栏宽、分屏、各会话草稿、已归档的会话列表）、
   反馈和 F8 报告，以及加密后的 API key（`<userData>/credentials.json`）。
 - API key：主进程用 Electron safeStorage 加密保存；启动时解密，经进程通道交给后台进程，
   后台进程用 pi 的 `setRuntimeApiKey` 只放在内存里。key 不进 `models.json`，也不进任何进程的环境变量。
+  （2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §8.4：一个提供商可以有多个 key，按引用存；明文只在模型池的内存里，pi 只拿到占位 key。）
 
 **pi 装配要点**（已对照 pi 源码核查）
 
@@ -362,7 +366,7 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
 - **Shell**：不传 `shellPath`，靠 pi 自己的查找顺序（先找 Program Files 下的 Git Bash）。
   Git Bash 装在别处时，把 `shellPath` 写进 pi 的 `settings.json`；
   没有 bash 时写 `defaultTools: ["-bash", "+powershell"]`。
-- **模型**：保存 `models.json` 后调用 `modelRegistry.refresh()`，用 `getError()` 显示配置错误；
+- **模型**（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §4.4、§7、§11：Mori 的模型配置编译到 pi；探针和模型池经 pi-ai 的 fetch 选项发请求）：保存 `models.json` 后调用 `modelRegistry.refresh()`，用 `getError()` 显示配置错误；
   "测试连接"用 `modelRegistry.streamSimple` 发一条短消息，测到第一个文字增量的时间。不自己发 HTTP 请求。
 - **启停**：列表来自 `DefaultPackageManager.resolve()`（每项带启用状态和来源）。
   写入逻辑在 pi 未导出的 `config-selector.ts` 里，v0 照搬其中用户级启停的两个函数，注明出处，
@@ -421,6 +425,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 - 废止 :244、:270–272、:281 等 demo 示例条款。工具页、设置和工作回顾保留界面形态，但必须接 pi 的真实数据。
 - 多 agent、通信、协作、Chrome、模型池五份子 proposal，以及工作回顾的定时与反证流程，本轮都不实现。
 - 2026-10-19 的两份重设计草案（平行 Agent 与 TaskBoard、统一模型提供商）不在 v0 范围，v0 稳定后再对照。
+  2026-10-21：统一模型提供商 proposal 第四版的普通模式部分开始实现（[specs/model-providers.md](specs/model-providers.md)），它取代模型池子 proposal 中“不自动切换”的规则；平行 Agent 与 TaskBoard 仍不实现。
 
 **保留的规则**：
 
@@ -463,6 +468,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 - 显示语言（2026-10-21）：Mori 代码显示和写出的文字（界面、对话框、F8 报告、导出、Mori 加进消息里的引用标题等）全部改为英文；
   模型生成的内容随你的用法。文档正文仍用中文，引用的界面文字改成英文；代码注释仍用中文。工作量大（M0–M7 的全部界面文字、测试和
   含 Mori 文字的 fixture），你同意另开任务、在 M7 之后做。
+- 模型层（2026-10-21）：按统一模型提供商 proposal 第四版和构建规格（[specs/model-providers.md](specs/model-providers.md)）实现普通模式的模型层；新写的界面用英文。
 - 实现者：全部由 Claude 实现，你按界面走查签收。
 
 **待确认**（括号里是默认推荐，没有异议就按默认执行）

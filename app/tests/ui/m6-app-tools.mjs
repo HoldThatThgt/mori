@@ -40,7 +40,7 @@ import { composerAt, paneAt, sendAt, splitState, waitPaneIdle, waitPaneReady, wa
 import { openToolsSection, slashItems, startFakeEndpoint } from './m6-helpers.mjs';
 import { prepareLayout, STEPS } from './m6-pi-config.mjs';
 import { mcpRows, packageCards, skillRows, toolRows, toolsHead } from './m6-tools-helpers.mjs';
-import { pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
@@ -288,7 +288,7 @@ async function newFromSaved(ctx) {
 /** @brief 点左栏"打开文件夹…"选 folder；trust 为 '信任' / '不信任' 时回答信任询问。 */
 async function openFolder(ctx, folder, trust, remember = false) {
   await stubFolder(ctx.app, folder);
-  await ctx.page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await ctx.page.getByRole('button', { name: OPEN_FOLDER }).first().click();
   if (trust) await answerTrustDialog(ctx.page, { answer: trust, remember });
   else await waitReady(ctx.page);
   await settle(ctx.page);
@@ -473,10 +473,8 @@ async function recover(ctx) {
 async function setup(ctx) {
   await startApp(ctx);
   const { page, h } = ctx;
-  await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
-  await h.fillConnection({ name: '合成端点', baseUrl, apiKey: testKey, modelId: 'fake-coder' });
-  await page.getByRole('button', { name: '测试连接' }).click();
-  await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
+  // v1（规格 §14.4）：首次启动填英文表单、区域选 Local，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
+  await h.setupFirstRun({ baseUrl, apiKey: testKey });
   await openFolder(ctx, ctx.project, '信任', true);
   await h.send('plain hello');
   await h.idle(60000);
@@ -567,17 +565,21 @@ async function addPackage(ctx) {
   const { page } = ctx;
   await openToolsSection(page, 'plugins');
   ctx.baseline = readJson(join(ctx.agentDir, 'settings.json')) ?? {};
-  record('首次启动后用户级 settings.json 只有 Mori 写的默认模型（之后的对照把 pi config 的写入接在它后面）',
+  // v1：默认范围在 model-config.json（规格 §4.1），首次启动不再往 pi 的 settings.json 写默认模型，文件可能还不存在。
+  record('首次启动后用户级 settings.json 没有别的设置（之后的对照把 pi config 的写入接在它后面）',
     Object.keys(ctx.baseline).every((key) => ['defaultProvider', 'defaultModel'].includes(key)),
     JSON.stringify(ctx.baseline));
   const empty = await page.getByTestId('tools-page').innerText();
-  const filesBefore = readdirSync(ctx.agentDir).sort();
+  // settings.json 不算：添加包要写它，v1 首次启动之后它可能还不存在（上面的注释）
+  const listed = () => readdirSync(ctx.agentDir).filter((name) => name !== 'settings.json').sort();
+  const filesBefore = listed();
   await stubFolder(ctx.app, ctx.pkg);
   await page.getByRole('button', { name: '添加本地包…' }).click();
   await packageCard(page).waitFor({ timeout: 20000 });
   await expectSnapshot(ctx, 0, '插件 → 添加本地包…');
-  const filesAfter = readdirSync(ctx.agentDir).sort();
-  record('添加本地包不复制文件：agentDir 里的文件和文件夹与添加前相同（只改了 settings.json 的内容），包的文件夹原样',
+  const filesAfter = listed();
+  record('添加本地包不复制文件：agentDir 里除 settings.json 以外的文件和文件夹与添加前相同（只写了 settings.json），'
+    + '包的文件夹原样',
     same(filesBefore, filesAfter) && existsSync(join(ctx.pkg, 'extensions', 'package-hello.ts')),
     JSON.stringify({ filesBefore, filesAfter }));
   const [card] = await packageCards(page);

@@ -1,6 +1,6 @@
 // window.mori 的类型，与 preload 暴露的接口一致。
 
-import type { Command, EventEnvelope } from '../../shared/protocol';
+import type { Command, EventEnvelope, GlobalEventEnvelope } from '../../shared/protocol';
 import type { Feedback, SavedFeedback } from '../../shared/feedback';
 import type { FileRead } from '../../shared/files';
 import type { IssueReport, SavedIssue, WindowCapture } from '../../shared/issues';
@@ -10,7 +10,8 @@ declare global {
   interface Window {
     mori: {
       request<T = unknown>(command: Command): Promise<T>;
-      onEvent(listener: (envelope: EventEnvelope) => void): () => void;
+      /** 会话事件，以及 sessionId 为 null 的全局事件（模型层 §9.5） */
+      onEvent(listener: (envelope: EventEnvelope | GlobalEventEnvelope) => void): () => void;
       onKernelExit(listener: (code: number) => void): () => void;
       onKernelReady(listener: () => void): () => void;
       restartKernel(): Promise<void>;

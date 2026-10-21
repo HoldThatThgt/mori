@@ -75,7 +75,7 @@ function tabFields(state: AppState): IssueField[] {
     { label: '当前会话', value: sessionTitle(tab) },
     { label: '文件夹', value: tab.cwd },
     { label: '会话文件', value: tab.sessionFile ?? '还没有' },
-    { label: '模型', value: tab.model ?? '没有' },
+    { label: '模型', value: tab.current ?? '没有' },
     { label: '是否在生成', value: transcript.running ? '是' : '否' },
     { label: '阶段行', value: stageText(transcript, tab.cwd, Date.now()) ?? '不显示' },
     { label: '等你批准', value: String(transcript.approvals.length) },

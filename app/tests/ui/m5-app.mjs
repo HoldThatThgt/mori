@@ -20,7 +20,7 @@ import {
   centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, paneAt, pickRange, previewState, savedLayout, sendAt,
   sentSessionRefs, smallText, splitState, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip, waitSplit,
 } from './m5-helpers.mjs';
-import { pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -133,12 +133,10 @@ const focusedTitle = async (page) => (await splitState(page)).focusedTitle;
  */
 async function setup(ctx) {
   const { app, page, h } = ctx;
-  await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
-  await h.fillConnection({ name: '合成端点', baseUrl, apiKey: testKey, modelId: 'fake-coder' });
-  await page.getByRole('button', { name: '测试连接' }).click();
-  await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
+  // v1（规格 §14.4）：首次启动填英文表单、区域选 Local，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
+  await h.setupFirstRun({ baseUrl, apiKey: testKey });
   await stubFolder(app, ctx.project);
-  await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await page.getByRole('button', { name: OPEN_FOLDER }).first().click();
   await waitReady(page);
   for (const text of ['plain A 第一轮', 'read the README A 第二轮', 'think first A 第三轮', 'plain A 第四轮']) {
     await sendIn(page, 'focused', text);

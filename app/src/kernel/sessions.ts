@@ -2,11 +2,17 @@
 // 每个会话带一个最小批准扩展（approval.ts）和扩展的界面上下文（extensionUi.ts），批准状态和挂起的询问只在这里的内存里。
 // 照 Claude 桌面版，本次运行里打开过的会话一直保持打开，直到界面要求关闭（归档、删除前）或退出；界面重新加载也不停，
 // 重新加载后的界面经 session.list 的 live 和 session.open 交出的这一刻的样子接上它们（docs/v0/screens/sessions.md）。
-// M6：顶栏换模型、换思考强度只作用于一个会话（pi 不 persist）；设置里改了模型后把打开着的会话换成新的模型对象；
-// "/"补全取会话的提示词模板和技能命令（docs/v0/screens/models.md、slash.md）。
+// M6：换思考强度只作用于一个会话（pi 不 persist）；"/"补全取会话的提示词模板和技能命令（docs/v0/screens/slash.md）。
+// v1：模型层（docs/specs/model-providers.md §5、§6、§11）：每个会话一个 ModelSession（modelSession.ts）——虚拟模型、
+// 选择范围与静态校验、流函数包装；这里接上它：会话的新建与打开、session.prompt 的准备中（§11.4）、段的结束、停止。
 
 import { existsSync } from 'node:fs';
-import type { AgentSession, AgentSessionEvent, SessionEntry, SessionManager } from '@earendil-works/pi-coding-agent';
+import type {
+  AgentSession, AgentSessionEvent, ExtensionFactory, PromptOptions as PiPromptOptions, SessionEntry, SessionManager,
+} from '@earendil-works/pi-coding-agent';
+import {
+  BLOCKED_PROMPT_MESSAGE, STOPPED_BEFORE_SENDING, type ModelEvent, type ModelPick, type PickOptions,
+} from '../shared/models';
 import type {
   ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, EventEnvelope, ExtensionNotice, LiveSnapshot, LiveStatus,
   ModelState, OpenedSession, ProjectTrust, QuoteRef, SavedSession, SessionContent, SessionInfo, SessionState,
@@ -18,10 +24,40 @@ import { PendingRefs, supplementEntry } from './entries';
 import { ExtensionUi } from './extensionUi';
 import { slimEvent } from './events';
 import { createSharedTransport, loadMcpShare } from './mcpShare';
-import { getRuntime, loadPi } from './pi';
+import { getModelLayer } from './modelLayer';
+import { ModelSession, type PrepareResult } from './modelSession';
+import { loadPi } from './pi';
 import { decideTrust, type TrustDecision } from './trust';
 
 type Emit = (envelope: EventEnvelope) => void;
+/** @brief 等着 pi 记下的带引用的消息（PendingRefs.add 的返回值）。 */
+type Pending = ReturnType<PendingRefs['add']>;
+
+/** @brief 准备中又发的一条消息（§11.4）：pi 开始运行后作为 followUp 交给 pi。 */
+interface HeldPrompt {
+  /** 全文 */
+  text: string;
+  /** 引用芯片 */
+  refs: QuoteRef[] | undefined;
+  /** 等着写成 mori.ref 的引用；没有引用时为 null */
+  pending: Pending | null;
+}
+
+/** @brief 你发消息后、pi 开始运行前（§11.4）：选模型、等待、重建（preparing），已调 pi 的 prompt、等它开始（starting）。 */
+interface Preparing {
+  /** 这条消息 */
+  text: string;
+  /** 它的引用芯片 */
+  refs: QuoteRef[] | undefined;
+  /** 等着写成 mori.ref 的引用；没有引用时为 null */
+  pending: Pending | null;
+  /** 准备中又发的消息，按发送顺序 */
+  held: HeldPrompt[];
+  /** 你按了停止（只在 preparing 阶段用） */
+  controller: AbortController;
+  /** 阶段 */
+  phase: 'preparing' | 'starting';
+}
 
 /** @brief 一个打开的会话、它的批准状态和打开时就确定的信息。 */
 interface Entry {
@@ -41,8 +77,10 @@ interface Entry {
   toolStarts: Map<string, number>;
   /** 扩展在打开过程中发的通知 */
   notices: ExtensionNotice[];
-  /** pi 选不到默认模型时给出的说明 */
-  modelNotice: string | null;
+  /** 模型层的会话接线 */
+  model: ModelSession;
+  /** 你发消息后、pi 开始运行前（§11.4）；不在准备中时为 null */
+  preparing: Preparing | null;
   /** 文件夹的信任状态和没能记住时的原文 */
   trust: TrustDecision;
   /** 加载失败的扩展（批准扩展以外） */
@@ -63,6 +101,9 @@ const opening = new Map<string, Promise<OpenedSession>>();
 /** 批准扩展的名字；pi 用 `<inline:名字>` 标出它的加载错误 */
 const APPROVAL_EXTENSION = 'mori-approval';
 const APPROVAL_EXTENSION_PATH = `<inline:${APPROVAL_EXTENSION}>`;
+/** 模型层扩展（context 钩子、排队消息、压缩前去掉被隐藏的过程）的名字 */
+const MODEL_EXTENSION = 'mori-models';
+const MODEL_EXTENSION_PATH = `<inline:${MODEL_EXTENSION}>`;
 /** pi 的会话列表里没有你的消息时 firstMessage 的写法（session-manager.js buildSessionInfo） */
 const NO_MESSAGES = '(no messages)';
 
@@ -72,10 +113,14 @@ const NO_MESSAGES = '(no messages)';
  *        处理器后来判断不同时由批准扩展发更正。
  */
 function forward(entry: Entry, sessionId: string, event: AgentSessionEvent, emit: Emit): void {
+  // 重建对话时的压缩（§6.3 第 1 步）不转给界面：结果只经 mori.model_rebuild 或换模型提示显示。
+  if (entry.model.isSuppressed(event.type)) return;
   if (event.type === 'agent_start') {
     entry.running = true;
     // 扩展发起的一轮没有经过 prompt()：这时才记下本轮开始时的叶子（你的消息还没写入）。
     if (entry.runStart === undefined) entry.runStart = entry.session.sessionManager.getLeafId();
+    entry.model.onAgentStart();
+    releaseHeld(entry, sessionId, emit);
   }
   if (event.type === 'agent_settled') {
     entry.running = false;
@@ -91,27 +136,8 @@ function forward(entry: Entry, sessionId: string, event: AgentSessionEvent, emit
     entry.toolStarts.delete(event.toolCallId);
     entry.gate.noteToolEnd(event.toolCallId);
   }
-}
-
-/** @brief 会话的模型和思考强度（顶栏）：pi 的当前模型、思考强度、这个模型可选的强度、是否支持思考。 */
-function modelState(session: AgentSession): ModelState {
-  const { model } = session;
-  // pi 选不到模型时（例如没有 key）会话里是 pi-agent-core 的占位模型（agent.js DEFAULT_MODEL：provider 和 api 都是
-  // "unknown"），不是真的模型：按"没有可用模型"交给界面。
-  const placeholder = model?.provider === 'unknown' && model.api === 'unknown';
-  return {
-    model: model && !placeholder ? `${model.provider}/${model.id}` : null,
-    thinkingLevel: session.thinkingLevel,
-    thinkingLevels: session.getAvailableThinkingLevels(),
-    reasoning: session.supportsThinking(),
-  };
-}
-
-/** @brief 告诉界面会话的模型或思考强度变了（mori.model_state），并返回这时的状态。 */
-function emitModelState(sessionId: string, session: AgentSession, emit: Emit): ModelState {
-  const state = modelState(session);
-  emit({ kind: 'event', sessionId, event: { type: 'mori.model_state', ...state } });
-  return state;
+  // 一段结束（§5.2）：pi 每次运行结束发一次 agent_settled（K13）。
+  if (event.type === 'agent_settled') entry.model.endReply();
 }
 
 /** @brief 打开中的会话的信息。 */
@@ -128,15 +154,18 @@ function describeEntry(entry: Entry): SessionInfo {
     extensionErrors: entry.extensionErrors,
     extensionNotices: entry.notices,
     tools: session.getActiveToolNames(),
-    ...modelState(session),
-    modelNotice: entry.modelNotice,
+    ...entry.model.state(),
     contextUsage: session.getContextUsage() ?? null,
     approval: entry.gate.state(),
   };
 }
 
-/** @brief 资源加载器与 createAgentSession 默认建的相同（同一个 settingsManager），只多一个 inline extension。 */
-async function loadResources(cwd: string, gate: ApprovalGate, trust: TrustAnswer | undefined) {
+/**
+ * @brief 资源加载器与 createAgentSession 默认建的相同（同一个 settingsManager），只多两个 inline extension：
+ *        批准扩展和模型层扩展（modelSession.ts）。
+ */
+async function loadResources(cwd: string, gate: ApprovalGate, trust: TrustAnswer | undefined,
+  models: ExtensionFactory) {
   const pi = await loadPi();
   const agentDir = pi.getAgentDir();
   // 先按"不信任"创建；pi 在加载项目资源之前调用 resolveProjectTrust，由它决定（trust.ts）。
@@ -148,7 +177,8 @@ async function loadResources(cwd: string, gate: ApprovalGate, trust: TrustAnswer
   const mcp = { name: 'mcp', factory: pi.createMcpExtension({ createTransport: createSharedTransport }),
     replaceable: true, builtin: true };
   const resourceLoader = new pi.DefaultResourceLoader({ cwd, agentDir, settingsManager,
-    extensionFactories: [{ name: APPROVAL_EXTENSION, factory: gate.extension() }, mcp] });
+    extensionFactories: [{ name: APPROVAL_EXTENSION, factory: gate.extension() },
+      { name: MODEL_EXTENSION, factory: models }, mcp] });
   let decision: TrustDecision = { trusted: false, projectTrust: 'unasked', remembered: false, saveError: null };
   await resourceLoader.reload({
     resolveProjectTrust: async () => {
@@ -159,31 +189,90 @@ async function loadResources(cwd: string, gate: ApprovalGate, trust: TrustAnswer
   return { settingsManager, resourceLoader, decision };
 }
 
+/** @brief 打开一个会话要用的参数。 */
+interface StartArgs {
+  /** 工作目录 */
+  cwd: string;
+  /** 会话的 SessionManager */
+  sessionManager: SessionManager;
+  /** 发事件 */
+  emit: Emit;
+  /** 你对信任询问的回答；没问时为 undefined */
+  trust: TrustAnswer | undefined;
+  /** 打开已保存的会话 */
+  restored: boolean;
+}
+
 /**
- * @brief 用给定的 SessionManager 在 cwd 创建 pi 会话，带上批准扩展，绑定扩展并开始转发事件。模型取 pi 设置里的默认模型。
- * @param trust 你对信任询问的回答；没问时为 undefined
+ * @brief 检查扩展的加载错误：批准扩展没加载上时，pi 没有 tool_call 处理器就不经询问直接执行；模型层扩展没加载上时，
+ *        换模型后被隐藏的过程会发给新模型。这两种情况都不打开会话。
+ * @return 加载失败的扩展（路径和原文）
+ */
+function checkExtensions(session: AgentSession, errors: { path: string; error: string }[]): string[] {
+  for (const error of errors) console.error(`[kernel] extension failed to load: ${error.path}: ${error.error}`);
+  const required = errors.find((error) => error.path === APPROVAL_EXTENSION_PATH
+    || error.path === MODEL_EXTENSION_PATH);
+  if (required) {
+    session.dispose();
+    const which = required.path === APPROVAL_EXTENSION_PATH ? 'approval' : 'model layer';
+    throw new Error(`The ${which} extension failed to load: ${required.error}`);
+  }
+  return errors.map((error) => `${error.path}: ${error.error}`);
+}
+
+/**
+ * @brief 建立会话的模型层接线：读选择范围（新会话记下默认范围，v0 的旧会话按 §5.1 记下）并做静态校验。
+ * @param args 打开会话的参数
+ */
+async function createModelSession(args: StartArgs): Promise<ModelSession> {
+  const layer = await getModelLayer();
+  const sessionId = args.sessionManager.getSessionId();
+  const model = await ModelSession.create({ layer, sessionId, cwd: args.cwd,
+    emit: (event: ModelEvent) => args.emit({ kind: 'event', sessionId, event }) });
+  try {
+    await model.loadPick(args.sessionManager, !args.restored);
+  } catch (error) {
+    await model.dispose();
+    throw error;
+  }
+  return model;
+}
+
+/**
+ * @brief 用给定的 SessionManager 在 cwd 创建 pi 会话，带上批准扩展与模型层扩展，绑定扩展并开始转发事件。
+ *        会话的模型是它自己的虚拟模型（§11.1）；失败时注销虚拟模型。
  * @param restored 打开已保存的会话：绑定扩展之前补上当前注册的扩展工具（refreshTools），扩展的 session_start 仍可再改
  */
 async function startSession(cwd: string, sessionManager: SessionManager, emit: Emit,
   trust: TrustAnswer | undefined, restored: boolean): Promise<SessionInfo> {
+  const args: StartArgs = { cwd, sessionManager, emit, trust, restored };
+  const model = await createModelSession(args);
+  try {
+    return await createEntry(args, model);
+  } catch (error) {
+    await model.dispose();
+    throw error;
+  }
+}
+
+/** @brief 建 pi 会话并登记：虚拟模型、思考强度（§11.1）、流函数包装（§11.2）、扩展、事件转发。 */
+async function createEntry(args: StartArgs, model: ModelSession): Promise<SessionInfo> {
   const pi = await loadPi();
+  const { cwd, emit } = args;
   const gate = new ApprovalGate(emit);
   const ui = new ExtensionUi(emit);
-  const { settingsManager, resourceLoader, decision } = await loadResources(cwd, gate, trust);
-  const modelRuntime = await getRuntime();
-  const result = await pi.createAgentSession({ cwd, modelRuntime, settingsManager, sessionManager, resourceLoader });
+  const { settingsManager, resourceLoader, decision } = await loadResources(cwd, gate, args.trust, model.extension());
+  const virtual = await model.register();
+  // 新会话按第一个候选取思考强度；打开已有会话时不传，pi 从会话记录恢复（§11.1）。
+  const thinkingLevel = args.restored ? undefined : model.newSessionThinking(settingsManager);
+  const result = await pi.createAgentSession({ cwd, modelRuntime: model.layer.getRuntime(), settingsManager,
+    sessionManager: args.sessionManager, resourceLoader, model: virtual, thinkingLevel });
   const { session } = result;
   // 一条回复里的多个调用按顺序执行：允许一张卡就执行一张（临时默认值，见 docs/v0/defaults.md）。
   session.agent.toolExecution = 'sequential';
-  const { errors } = result.extensionsResult;
-  for (const error of errors) console.error(`[kernel] extension failed to load: ${error.path}: ${error.error}`);
-  // 批准扩展没加载上时，pi 没有 tool_call 处理器就不经询问直接执行：这时不打开会话。
-  const approvalError = errors.find((error) => error.path === APPROVAL_EXTENSION_PATH);
-  if (approvalError) {
-    session.dispose();
-    throw new Error(`The approval extension failed to load: ${approvalError.error}`);
-  }
-  if (restored) refreshTools(session);
+  const extensionErrors = checkExtensions(session, result.extensionsResult.errors);
+  model.attach(session);
+  if (args.restored) refreshTools(session);
   const sessionId = session.sessionId;
   ui.attach(sessionId);
   await session.bindExtensions({
@@ -191,8 +280,7 @@ async function startSession(cwd: string, sessionManager: SessionManager, emit: E
     onError: (error) => console.error(`[kernel] extension error ${error.extensionPath}: ${error.error}`),
   });
   const entry: Entry = { session, gate, ui, cwd, running: false, openedAt: Date.now(), toolStarts: new Map(),
-    notices: ui.ready(), modelNotice: result.modelFallbackMessage ?? null, trust: decision,
-    extensionErrors: errors.map((error) => `${error.path}: ${error.error}`), refs: new PendingRefs(),
+    notices: ui.ready(), model, preparing: null, trust: decision, extensionErrors, refs: new PendingRefs(),
     runStart: undefined };
   gate.attach(sessionId);
   sessions.set(sessionId, entry);
@@ -219,13 +307,15 @@ function liveStatus(entry: Entry): LiveStatus {
 }
 
 /** @brief 还开着的会话这一刻的样子：正在生成的回复、正在执行的工具、挂起的批准请求和扩展询问、排队区。 */
-function snapshot(entry: Entry): LiveSnapshot {
+export function snapshot(entry: Entry): LiveSnapshot {
   const { session } = entry;
   const runningTools = [...session.state.pendingToolCalls].map((toolCallId) => ({ toolCallId,
     startedAt: entry.toolStarts.get(toolCallId) ?? Date.now() }));
-  return { running: liveStatus(entry).running, streaming: session.state.streamingMessage ?? null, runningTools,
+  return { running: liveStatus(entry).running, preparing: entry.preparing !== null && !session.isStreaming,
+    streaming: session.state.streamingMessage ?? null, runningTools,
     approvals: entry.gate.requests(), questions: entry.ui.requests(), steering: [...session.getSteeringMessages()],
-    followUp: [...session.getFollowUpMessages()] };
+    // 准备中暂存的消息也在排队区（§11.4）。
+    followUp: [...session.getFollowUpMessages(), ...(entry.preparing?.held.map((item) => item.text) ?? [])] };
 }
 
 /**
@@ -407,17 +497,20 @@ async function release(entry: Entry): Promise<void> {
   session.dispose();
 }
 
-/** @brief 正在生成时拒绝（关闭、换模型、换思考强度），不替你停止。 */
+/** @brief 正在生成或准备中时拒绝（关闭、换范围、换思考强度），不替你停止。 */
 function requireIdle(entry: Entry): void {
-  if (entry.running || entry.session.isStreaming) throw new Error('The session is generating; stop it first');
+  if (entry.running || entry.preparing || entry.session.isStreaming) {
+    throw new Error('The session is generating; stop it first');
+  }
 }
 
-/** @brief 关闭并释放一个会话（归档、删除前）；正在生成时拒绝，不替你停止。 */
+/** @brief 关闭并释放一个会话（归档、删除前），注销它的虚拟模型；正在生成时拒绝，不替你停止。 */
 export async function closeSession(sessionId: string): Promise<{ closed: true }> {
   const entry = requireEntry(sessionId);
   requireIdle(entry);
   sessions.delete(sessionId);
   await release(entry);
+  await entry.model.dispose();
   return { closed: true };
 }
 
@@ -429,32 +522,193 @@ interface PromptOptions {
   refs?: QuoteRef[];
 }
 
-/** @brief 发出提示；不等本轮结束，结果和失败都通过事件回到界面。 */
+/** @brief mori.prompt_error 的字段。 */
+interface PromptErrorFields {
+  /** 错误原文 */
+  message: string;
+  /** 撤回的消息 */
+  text: string;
+  /** 它的引用芯片 */
+  refs: QuoteRef[] | null;
+  /** 这时会话是否还在运行 */
+  running: boolean;
+  /** 一起撤回的、准备中又发的消息 */
+  queued: string[];
+}
+
+/** @brief 准备中的结果，加上停止与准备时出错。 */
+type PrepareOutcome = PrepareResult | { kind: 'aborted' } | { kind: 'failed'; message: string };
+
+/** @brief 错误的原文。 */
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** @brief 发 mori.prompt_error。 */
+function promptError(sessionId: string, emit: Emit, fields: PromptErrorFields): void {
+  emit({ kind: 'event', sessionId, event: { type: 'mori.prompt_error', ...fields } });
+}
+
+/** @brief pi 的 prompt() 结束后按 pi 的状态重设运行状态；会话已不在运行时一段结束（§5.2）。 */
+function settleRun(entry: Entry): void {
+  entry.running = entry.session.isStreaming || entry.preparing !== null;
+  if (entry.running) return;
+  entry.runStart = undefined;
+  entry.model.endReply();
+}
+
+/**
+ * @brief 发出提示；不等本轮结束，结果和失败都通过事件回到界面。被拒绝启动的会话拒绝（§4.6）；准备中暂存，
+ *        pi 开始运行后作为 followUp 交给 pi（§11.4）；生成中按 behavior 交给 pi（插话或排队）；空闲时开始一段：
+ *        先准备（选模型、等待、重建），再调 pi。
+ */
 export function prompt(sessionId: string, text: string, options: PromptOptions, emit: Emit) {
   const entry = requireEntry(sessionId);
-  const queued = entry.running || entry.session.isStreaming;
+  if (entry.model.isBlocked()) {
+    promptError(sessionId, emit, { message: BLOCKED_PROMPT_MESSAGE, text, refs: options.refs ?? null,
+      running: entry.running, queued: [] });
+    return { accepted: true };
+  }
   const pending = options.refs?.length ? entry.refs.add(text, options.refs) : null;
-  // 空闲时发出的提示开始新的一轮：记下这时的叶子，会话引用只取到这里（已完成的轮次）。
-  if (!queued) entry.runStart = entry.session.sessionManager.getLeafId();
-  entry.running = true;
-  // pi 处理了提示却没有开始运行时（扩展命令、输入处理器接手）不会发 agent_settled：结束后按 pi 的状态重设。
-  const streaming = options.behavior ? { streamingBehavior: options.behavior } : undefined;
-  entry.session.prompt(text, streaming).then(() => {
-    // 空闲时发出的提示，prompt() 结束时消息早该记下了；还在等就是没有送达（例如交给了扩展命令）。
-    if (pending && !queued && entry.refs.has(pending)) entry.refs.drop(pending);
-    entry.running = entry.session.isStreaming;
-    if (!entry.running) entry.runStart = undefined;
+  const item: HeldPrompt = { text, refs: options.refs, pending };
+  if (entry.preparing) entry.preparing.held.push(item);
+  else if (entry.running || entry.session.isStreaming) sendToPi(entry, sessionId, item, options.behavior, emit);
+  else void startReply(entry, sessionId, item, emit);
+  return { accepted: true };
+}
+
+/**
+ * @brief 生成中交给 pi 的选项：插话或排队；排队时把 pi 真正排进排队区的文字记给模型层（§11.4、K13）。
+ * @param entry 会话
+ * @param behavior 插话或排队；空闲时省略
+ * @return pi 的 prompt 选项；空闲时为 undefined
+ */
+export function streamingOptions(entry: Entry, behavior: PromptOptions['behavior']): PiPromptOptions | undefined {
+  if (!behavior) return undefined;
+  return { streamingBehavior: behavior, preflightResult: (disposition) => {
+    // pi 排队的是输入处理器、技能命令与提示词模板展开后的文字；记下它，message_start 才能比上。
+    // 被扩展命令或输入处理器接手（handled）的不记，不会留下比不上的文字。
+    if (behavior !== 'followUp' || disposition !== 'queued') return;
+    const queued = entry.session.getFollowUpMessages().at(-1);
+    if (queued !== undefined) entry.model.noteFollowUp(queued);
+  } };
+}
+
+/**
+ * @brief 生成中把消息交给 pi（插话或排队）；排队的文字记给模型层，pi 送进上下文时开始新的一段（§11.4、K13）。
+ *        pi 处理了提示却没有开始运行时（扩展命令、输入处理器接手）不会发 agent_settled：结束后按 pi 的状态重设。
+ */
+function sendToPi(entry: Entry, sessionId: string, item: HeldPrompt, behavior: PromptOptions['behavior'],
+  emit: Emit): void {
+  entry.model.disableRetry();
+  entry.session.prompt(item.text, streamingOptions(entry, behavior)).then(() => {
+    settleRun(entry);
     emit({ kind: 'event', sessionId, event: { type: 'mori.prompt_done', running: entry.running } });
   }, (error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorText(error);
     console.error(`[kernel] prompt failed for ${sessionId}: ${message}`);
-    if (pending) entry.refs.drop(pending);
-    entry.running = entry.session.isStreaming;
-    if (!entry.running) entry.runStart = undefined;
-    emit({ kind: 'event', sessionId, event: { type: 'mori.prompt_error', message, text, running: entry.running,
-      refs: options.refs ?? null } });
+    if (item.pending) entry.refs.drop(item.pending);
+    settleRun(entry);
+    promptError(sessionId, emit, { message, text: item.text, refs: item.refs ?? null, running: entry.running,
+      queued: [] });
   });
-  return { accepted: true };
+}
+
+/**
+ * @brief 空闲时发消息（§11.4）：进入准备中（会话按“发送中”显示），模型层选模型、等待、重建；准备好后调 pi 的 prompt。
+ *        停止、等不到模型或准备时出错：撤回这条消息和准备中又发的消息。
+ */
+async function startReply(entry: Entry, sessionId: string, item: HeldPrompt, emit: Emit): Promise<void> {
+  const preparing: Preparing = { ...item, held: [], controller: new AbortController(), phase: 'preparing' };
+  const { signal } = preparing.controller;
+  entry.preparing = preparing;
+  entry.running = true;
+  // 空闲时发出的提示开始新的一轮：记下这时的叶子，会话引用只取到这里（已完成的轮次）。
+  entry.runStart = entry.session.sessionManager.getLeafId();
+  let outcome: PrepareOutcome;
+  try {
+    outcome = await entry.model.prepare(item.text, signal);
+  } catch (error) {
+    if (!signal.aborted) console.error(`[kernel] preparing the reply failed for ${sessionId}: ${errorText(error)}`);
+    outcome = signal.aborted ? { kind: 'aborted' } : { kind: 'failed', message: errorText(error) };
+  }
+  if (outcome.kind === 'ok' && signal.aborted) outcome = { kind: 'aborted' };
+  if (outcome.kind !== 'ok') {
+    giveBack(entry, sessionId, outcome, emit);
+    return;
+  }
+  preparing.phase = 'starting';
+  entry.model.disableRetry();
+  runPrompt(entry, sessionId, preparing, emit);
+}
+
+/**
+ * @brief 准备中没能发出（§11.4）：撤回这条消息和暂存的消息。停止或出错时发 mori.prompt_error；
+ *        等不到模型时只发 mori.model_unavailable（§5.8，firstRequest 为真）。
+ */
+function giveBack(entry: Entry, sessionId: string, outcome: Exclude<PrepareOutcome, { kind: 'ok' }>,
+  emit: Emit): void {
+  const preparing = entry.preparing;
+  if (!preparing) return;
+  entry.preparing = null;
+  for (const item of [preparing, ...preparing.held]) if (item.pending) entry.refs.drop(item.pending);
+  entry.running = false;
+  entry.runStart = undefined;
+  entry.model.endReply();
+  const queued = preparing.held.map((item) => item.text);
+  if (outcome.kind === 'unavailable') {
+    entry.model.emitUnavailable(outcome.candidates, true, preparing.text, queued);
+    return;
+  }
+  const message = outcome.kind === 'aborted' ? STOPPED_BEFORE_SENDING : outcome.message;
+  promptError(sessionId, emit, { message, text: preparing.text, refs: preparing.refs ?? null, running: false,
+    queued });
+}
+
+/**
+ * @brief 准备好之后调 pi 的 prompt（§11.4 第 4 步）。pi 开始运行（agent_start）时暂存的消息交给 pi（releaseHeld）；
+ *        prompt() 没有开始运行就结束时，抛错的撤回这条消息和暂存的消息，正常结束的（扩展命令接手）把暂存的消息放回输入框。
+ */
+function runPrompt(entry: Entry, sessionId: string, preparing: Preparing, emit: Emit): void {
+  entry.session.prompt(preparing.text).then(() => {
+    // prompt() 结束时消息早该记下了；还在等就是没有送达（例如交给了扩展命令）。
+    if (preparing.pending && entry.refs.has(preparing.pending)) entry.refs.drop(preparing.pending);
+    const unstarted = takeUnstarted(entry, preparing);
+    settleRun(entry);
+    emit({ kind: 'event', sessionId, event: { type: 'mori.prompt_done', running: entry.running } });
+    const [first, ...rest] = unstarted;
+    if (!first) return;
+    promptError(sessionId, emit, { message: STOPPED_BEFORE_SENDING, text: first.text, refs: first.refs ?? null,
+      running: entry.running, queued: rest.map((item) => item.text) });
+  }, (error: unknown) => {
+    const message = errorText(error);
+    console.error(`[kernel] prompt failed for ${sessionId}: ${message}`);
+    if (preparing.pending) entry.refs.drop(preparing.pending);
+    const unstarted = takeUnstarted(entry, preparing);
+    settleRun(entry);
+    promptError(sessionId, emit, { message, text: preparing.text, refs: preparing.refs ?? null,
+      running: entry.running, queued: unstarted.map((item) => item.text) });
+  });
+}
+
+/** @brief pi 没有开始运行就结束：结束准备中，取出暂存的消息（它们的引用不再写进会话）。 */
+function takeUnstarted(entry: Entry, preparing: Preparing): HeldPrompt[] {
+  if (entry.preparing !== preparing) return [];
+  entry.preparing = null;
+  for (const item of preparing.held) if (item.pending) entry.refs.drop(item.pending);
+  return preparing.held;
+}
+
+/** @brief pi 开始运行（agent_start）：准备中暂存的消息作为 followUp 交给 pi（§11.4），准备中结束。 */
+function releaseHeld(entry: Entry, sessionId: string, emit: Emit): void {
+  const preparing = entry.preparing;
+  if (!preparing || preparing.phase !== 'starting') return;
+  entry.preparing = null;
+  if (preparing.held.length === 0) return;
+  // 等 pi 发完 agent_start 再交：这时它已在运行，消息进它的排队区。
+  queueMicrotask(() => {
+    for (const item of preparing.held) sendToPi(entry, sessionId, item, 'followUp', emit);
+  });
 }
 
 /** @brief 撤回排队与插话的消息，返回它们的原文；它们的引用不再写进会话（芯片不恢复）。 */
@@ -471,6 +725,11 @@ export function clearQueue(sessionId: string): ClearedQueue {
  */
 export async function abort(sessionId: string): Promise<{ aborted: true }> {
   const entry = requireEntry(sessionId);
+  if (entry.preparing?.phase === 'preparing') {
+    // 准备中（§11.4）：取消等待或压缩；startReply 随后撤回消息并发 mori.prompt_error。
+    entry.preparing.controller.abort();
+    return { aborted: true };
+  }
   entry.ui.beginStop();
   try {
     await entry.gate.rejectForStop();
@@ -510,48 +769,30 @@ export function forgetApproval(sessionId: string, toolName: string): ApprovalSta
 }
 
 /**
- * @brief 这个会话换模型（pi setModel，不 persist：不改默认模型）；pi 随后按 modelThinkingLevels → defaultThinkingLevel
- *        → 原来的强度重定思考强度。设置页经另一个 SettingsManager 写设置，会话自己的还是打开时读的：先 reload，
- *        pi 才用到设置页里改过的按模型强度。正在生成时拒绝。
- * @param ref provider/id
+ * @brief 这个会话换思考强度（pi setThinkingLevel，不 persist）。会话的虚拟模型有全部七档，pi 按每次请求的实际模型收紧
+ *        （§11.1）；顶栏显示按当前模型收紧后的强度。生成中或准备中拒绝（§11.4）。
  */
-export async function setSessionModel(sessionId: string, ref: string, emit: Emit): Promise<ModelState> {
-  const entry = requireEntry(sessionId);
-  requireIdle(entry);
-  const slash = ref.indexOf('/');
-  const runtime = await getRuntime();
-  const model = slash > 0 ? runtime.getModel(ref.slice(0, slash), ref.slice(slash + 1)) : undefined;
-  if (!model) throw new Error(`Model ${ref} not found`);
-  await entry.session.settingsManager.reload();
-  await entry.session.setModel(model);
-  return emitModelState(sessionId, entry.session, emit);
-}
-
-/** @brief 这个会话换思考强度（pi setThinkingLevel，不 persist；pi 按模型收紧）。正在生成时拒绝。 */
-export function setSessionThinking(sessionId: string, level: ThinkingLevel, emit: Emit): ModelState {
+export function setSessionThinking(sessionId: string, level: ThinkingLevel): ModelState {
   const entry = requireEntry(sessionId);
   requireIdle(entry);
   entry.session.setThinkingLevel(level);
-  return emitModelState(sessionId, entry.session, emit);
+  entry.model.emitState();
+  return entry.model.state();
 }
 
 /**
- * @brief pi 重读 models.json 之后，把打开着的会话换成新的模型对象（地址、上下文长度、是否支持思考），做法与 pi 自己的
- *        _refreshCurrentModelFromRegistry 相同（agent-session.js 2702–2712：agent.state.model = runtime.getModel(...)）。
- *        当前的思考强度新模型不再支持时，再用 setThinkingLevel 交给 pi 收紧（会话里记一条 thinking_level_change）。
- *        换了的会话发 mori.model_state；模型已经不在的会话不动，下一条消息仍用打开时的设置。
+ * @brief 这个会话换选择范围（§5.10、§9.5 session.setPick）：写一条 mori.pick，重新做静态校验，下一段起生效；
+ *        不改设置里的默认范围。生成中或准备中拒绝。
  */
-export async function refreshSessionModels(emit: Emit): Promise<void> {
-  const runtime = await getRuntime();
-  for (const [sessionId, { session }] of sessions) {
-    const current = session.model;
-    const refreshed = current ? runtime.getModel(current.provider, current.id) : undefined;
-    if (!refreshed || refreshed === current) continue;
-    session.agent.state.model = refreshed;
-    const level = session.thinkingLevel;
-    if (!session.getAvailableThinkingLevels().includes(level)) session.setThinkingLevel(level);
-    emitModelState(sessionId, session, emit);
-  }
+export async function setSessionPick(sessionId: string, pick: ModelPick): Promise<ModelState & { error: null }> {
+  const entry = requireEntry(sessionId);
+  requireIdle(entry);
+  return { ...(await entry.model.setPick(pick)), error: null };
+}
+
+/** @brief 顶栏菜单的各项（§9.2、§9.5 session.pickOptions，只读）：按这个会话的项目做静态校验。 */
+export function sessionPickOptions(sessionId: string): Promise<PickOptions> {
+  return requireEntry(sessionId).model.pickOptions();
 }
 
 /**
@@ -572,6 +813,9 @@ export function sessionCommands(sessionId: string): SlashCommand[] {
 export async function shutdownSessions(): Promise<void> {
   const all = [...sessions.values()];
   sessions.clear();
-  await Promise.all(all.map((entry) => release(entry)));
+  await Promise.all(all.map(async (entry) => {
+    await release(entry);
+    await entry.model.dispose();
+  }));
 }
 

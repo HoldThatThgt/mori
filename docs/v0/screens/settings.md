@@ -9,13 +9,16 @@
 
 | 分节 | 内容 |
 | --- | --- |
-| 连接与模型 | 连接列表、每个连接下的模型、默认模型、每个模型是否支持思考和新会话默认的思考强度 |
+| 连接与模型（v1：见 docs/specs/model-providers.md §9.1：由 Models 分节取代） | 连接列表、每个连接下的模型、默认模型、每个模型是否支持思考和新会话默认的思考强度 |
 | AGENTS.md | 用户级 AGENTS.md 编辑器；当前会话的项目加载了哪些文件 |
 
 - 打开设置页时落在"连接与模型"；"去设置"（错误卡）落在出错会话所用模型的连接上，打开"编辑连接"，焦点在 API key。
+  （v1：见 docs/specs/model-providers.md §9.1、§9.3：落在 Models；"去设置"删除，说明卡的"Open settings"滚到提供商卡、焦点在 Keys。）
 - 分节列表可以用 Tab 和 ↑ ↓ 切换；当前分节高亮（`aria-current`）。
 
 ## 连接与模型
+
+> v1：见 docs/specs/model-providers.md §4.1、§9.1：整节由设置 → Models 取代（提供商、多个 key、模型、分组、默认范围、区域与项目授权），配置写 Mori 的 `model-config.json`，不再写 pi 的 `models.json` 和 `defaultProvider` / `defaultModel`；provider id 由名称生成（§4.1）；状态表见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)。
 
 pi 的 `models.json` 里一个 provider 就是一个"连接"（服务地址、接口类型、兼容选项、key），它下面可以有多个模型。
 Mori 的连接用 provider id `mori-endpoint`（`models.json` 里还没有 Mori 的连接时，M0 起沿用），之后的连接用
@@ -23,6 +26,8 @@ Mori 的连接用 provider id `mori-endpoint`（`models.json` 里还没有 Mori 
 key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。默认模型写 pi 设置的 `defaultProvider` / `defaultModel`。
 
 ### 列表
+
+> v1：见 docs/specs/model-providers.md §9.1（Providers）、§4.1（配置读不出）、§4.5（迁移后 `mori-endpoint*` 以外的 provider 也迁入）。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
@@ -37,6 +42,8 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 底部"添加连接"。
 
 ### 添加连接（与首次启动同一张表单）
+
+> v1：见 docs/specs/model-providers.md §9.1（提供商表单，命令 `models.saveProvider`）。
 
 字段：名称、服务地址、接口类型、API key、模型 ID、上下文长度、兼容选项（connection.md），M6 加两项：
 
@@ -53,6 +60,8 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 
 ### 编辑连接
 
+> v1：见 docs/specs/model-providers.md §9.1、§4.1：改地址的 origin 删除全部 key 并确认；key 在 Keys 里单独加删（§9.1）；打开着的会话不换模型对象（§4.4 第 6 步、§4.7）。
+
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 编辑 | 你点了"编辑连接" | 名称、服务地址、接口类型、API key、兼容选项（不含模型字段）；说明"这个连接下的 N 个模型都用这里的地址和 key"；key 框同 connection.md（已保存时"已加密保存（不显示）；改了服务地址就要重新填写"） | 保存、测试（测这个连接的第一个模型）、取消 |
@@ -60,6 +69,8 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 | 已经打开的会话 | 保存后后台进程把打开着的会话换成新的模型对象（m6-checks.md） | 列表上方一行"已保存 · 已经打开的会话下一条消息起用新的设置" | — |
 
 ### 添加模型 / 编辑模型
+
+> v1：见 docs/specs/model-providers.md §9.1（模型表单：加 Max output、Family、Image input；命令 `models.saveModel`）。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
@@ -69,6 +80,8 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 | 已经打开的会话 | 同"编辑连接"：用这个模型的会话换成新的模型对象；不再支持思考时思考强度按 pi 收紧为"关"（顶栏随之变化） | 同上 | — |
 
 ### 默认、测试与删除
+
+> v1：见 docs/specs/model-providers.md §9.1（Defaults 的默认范围、模型行的 Test）、§4.1（删除的连带改动）、§4.6（`pick_missing`）；`model.setDefault`、`model.delete` 删除（§9.4）。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
@@ -128,9 +141,9 @@ pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AG
 
 | 元素 | 标识 |
 | --- | --- |
-| 设置页 | `data-testid="settings-page"`；分节按钮 `data-testid="settings-nav"` 里的 `button[data-section]`（`connections` / `agents`） |
-| 连接卡 | `[data-testid="connection-card"][data-provider]`；模型行 `[data-testid="model-row"][data-model]`（`provider/id`），默认的带 `data-default="true"`；行里的"编辑""删除"带 `data-action`（`edit`、`delete`），卡上的带 `edit-connection`、`add-model`，底部"添加连接"带 `add-connection` |
-| 表单 | 添加连接、编辑连接都是 `data-testid="connection-form"`（M1 的测试沿用）；添加 / 编辑模型 `data-testid="model-form"` |
+| 设置页 | `data-testid="settings-page"`；分节按钮 `data-testid="settings-nav"` 里的 `button[data-section]`（`connections` / `agents`；v1：见 docs/specs/model-providers.md §9.1，`connections` 改为 `models`） |
+| 连接卡（v1：见 docs/specs/model-providers.md §9.1，改为 `provider-card`，见 v1/screens/models-settings.md） | `[data-testid="connection-card"][data-provider]`；模型行 `[data-testid="model-row"][data-model]`（`provider/id`），默认的带 `data-default="true"`；行里的"编辑""删除"带 `data-action`（`edit`、`delete`），卡上的带 `edit-connection`、`add-model`，底部"添加连接"带 `add-connection` |
+| 表单（v1：见 docs/specs/model-providers.md §9.1：提供商表单改为 `provider-form`，`connection-form` 只留给首次启动表单） | 添加连接、编辑连接都是 `data-testid="connection-form"`（M1 的测试沿用）；添加 / 编辑模型 `data-testid="model-form"` |
 | 结果文字 | 表单里 `data-testid="form-message"`（M1 沿用）；模型行里的测试结果 `data-testid="model-test"` |
 | AGENTS.md | 编辑框 `data-testid="agents-editor"`；生效的文件 `data-testid="agents-effective"`；项目级列表 `data-testid="agents-loaded"` |
 | 离开确认 | `data-testid="leave-dialog"` |

@@ -6,6 +6,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import koffi from 'koffi';
 import { sleep } from './lib.mjs';
+import { OPEN_FOLDER } from './page.mjs';
 
 /** @brief 当前显示的会话面板（隐藏的会话面板仍然挂载，找元素都限定在这里） */
 export const PANE = '.pane-slot:not([hidden]) [data-testid="chat-pane"]';
@@ -269,7 +270,7 @@ export function stubFolder(app, folder) {
 export async function clickOpenFolder(ctx, folder) {
   const before = await paneCount(ctx.page);
   await stubFolder(ctx.app, folder);
-  await ctx.page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await ctx.page.getByRole('button', { name: OPEN_FOLDER }).first().click();
   await waitPanes(ctx.page, before + 1);
 }
 

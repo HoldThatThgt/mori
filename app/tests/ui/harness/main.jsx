@@ -1,5 +1,5 @@
 // 回放界面测试的入口：先装好回放进程桥（window.mori），再载入真正的界面（src/renderer/src/main.tsx）。
-// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>&keepDrafts=1&part=before|after。录制文件来自 tests/fixtures/m1–m7，
+// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>&keepDrafts=1&part=before|after。录制文件来自 tests/fixtures/m1–m7 与 v1，
 // 名字不能重复。part：M7 的录制里有一次重启，取重启前或重启后的一段回放（见 replay.js 的 partOf）。
 // 每次载入先清掉上一个录制留下的草稿、已归档列表和工作回顾的已处理标记（localStorage），keepDrafts=1 时保留
 // （测"重启后草稿还在"）。
@@ -17,6 +17,8 @@ const globbed = {
   ...import.meta.glob('../../fixtures/m5/*.json', { eager: true, import: 'default' }),
   ...import.meta.glob('../../fixtures/m6/*.json', { eager: true, import: 'default' }),
   ...import.meta.glob('../../fixtures/m7/*.json', { eager: true, import: 'default' }),
+  // v1（docs/specs/model-providers.md §14.4）：模型层的录制；文件夹为空或还没有时 glob 得到空对象
+  ...import.meta.glob('../../fixtures/v1/*.json', { eager: true, import: 'default' }),
 };
 const params = new URLSearchParams(location.search);
 const name = params.get('fixture') ?? 'readme';

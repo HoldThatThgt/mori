@@ -1,5 +1,6 @@
 // 会话面板：顶栏（会话名、模型、思考强度、权限、上下文用量、右栏开关；分屏时"关闭这一栏"）、对话流、阶段行、后台进程退出提示、
-// 批准卡、排队区与输入框。分屏时每一栏是一个完整的会话面板；在面板里按下鼠标或焦点进入它，焦点就切到这一栏（split.md）。
+// 批准卡、排队区、拒绝启动卡与输入框。分屏时每一栏是一个完整的会话面板；在面板里按下鼠标或焦点进入它，焦点就切到这一栏
+// （split.md）。模型层（docs/v1/screens/model-menu.md、model-chat.md）：顶栏的选择范围，输入框上方的拒绝启动卡。
 
 import { reload } from '../state/actions';
 import type { ContextUsage } from '../../../shared/protocol';
@@ -8,6 +9,7 @@ import { closePane, focusComposer, focusPane } from '../state/split';
 import { useApp, type KernelStatus, type Tab } from '../state/store';
 import { Icon } from '../icons';
 import { ApprovalCard } from './ApprovalCard';
+import { BlockedCard } from './BlockedCard';
 import { Composer, QueueArea } from './Composer';
 import { ModelMenu } from './ModelMenu';
 import { PaneTitle } from './PaneTitle';
@@ -117,7 +119,7 @@ export interface PaneProps {
   onToggleRight: () => void;
 }
 
-/** @brief 顶栏；模型和思考强度在会话打开之后才显示（docs/v0/screens/models.md）。 */
+/** @brief 顶栏；选择范围和思考强度在会话打开之后才显示，没有当前模型时不显示思考按钮（model-menu.md）。 */
 function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab }) {
   const kernel = useApp((state) => state.kernel);
   const notReady = notReadyText(kernel, tab) !== null;
@@ -132,7 +134,7 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
         {tab.phase !== 'opening' && (
           <>
             <ModelMenu tab={tab} disabled={notReady} />
-            {tab.model && <ThinkingMenu tab={tab} disabled={notReady} />}
+            {tab.current && <ThinkingMenu tab={tab} disabled={notReady} />}
           </>
         )}
         <PermissionMenu tab={tab} disabled={notReady} />
@@ -158,7 +160,6 @@ export function ChatPane({ tab, ...pane }: PaneProps & { tab: Tab }) {
       data-running={tab.transcript.running} data-sending={tab.transcript.sending}
       onPointerDownCapture={() => focusPane(tab.key)} onFocusCapture={() => focusPane(tab.key)}>
       <TopBar tab={tab} {...pane} />
-      {tab.modelNotice && <div className="banner">{tab.modelNotice}</div>}
       <SessionBanners tab={tab} />
       <Transcript tab={tab} />
       <div className="composer-area">
@@ -167,6 +168,7 @@ export function ChatPane({ tab, ...pane }: PaneProps & { tab: Tab }) {
         <ApprovalCard tab={tab} />
         <QuestionCard tab={tab} />
         <QueueArea tab={tab} />
+        <BlockedCard tab={tab} />
         <Composer tab={tab} notReady={notReadyText(kernel, tab)} />
       </div>
     </section>

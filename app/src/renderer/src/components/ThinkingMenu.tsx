@@ -1,10 +1,12 @@
-// 顶栏的思考强度按钮和菜单（docs/v0/screens/models.md）：只作用于这个会话，新会话的默认在设置里按模型设定。
-// 模型没标"支持思考"时按钮变淡但能点开，菜单里的强度都不可用（不是藏起来），并说明原因、可以去设置。
+// 顶栏的思考强度按钮和菜单（docs/v0/screens/models.md，v1 改动见 docs/v1/screens/model-menu.md "思考强度"）：
+// 只作用于这个会话，新会话的默认在设置里按模型设定；可选的强度取当前模型（实际模型）的。
+// 模型没标"支持思考"时按钮变淡但能点开，菜单里的强度都不可用（不是藏起来），并说明原因、
+// 可以打开 设置 → Models。
 
 import { useRef } from 'react';
 import { THINKING_LABELS, type ThinkingLevel } from '../../../shared/protocol';
-import { openSettings } from '../state/actions';
 import { setThinking, usePendingSwitch } from '../state/modelActions';
+import { openModelsSettings } from '../state/settings';
 import type { Tab } from '../state/store';
 import { Icon } from '../icons';
 import { moveMenuFocus } from './menu';
@@ -13,9 +15,9 @@ import { useFocusCurrent, useSwitchMenu } from './ModelMenu';
 /** 模型没标支持思考时菜单里列出（都不可用）的强度：标了支持思考、没有强度映射的模型可选的 off–high（pi-ai models.js） */
 const PLAIN_LEVELS: ThinkingLevel[] = ['off', 'minimal', 'low', 'medium', 'high'];
 
-/** 模型没标支持思考时菜单里的说明 */
-const UNSUPPORTED_TEXT = "这个模型没有标'支持思考'：pi 不发送思考参数，由端点自己决定（DeepSeek 默认会思考，但不能控制）。"
-  + "在 设置 → 连接与模型 里编辑这个模型、勾选'支持思考'后可以选。";
+/** 模型没标支持思考时菜单里的说明（§9.2） */
+const UNSUPPORTED_TEXT = "This model isn't marked 'Supports thinking', so Mori doesn't send thinking parameters and "
+  + "the endpoint decides. Edit the model in Settings → Models and tick 'Supports thinking' to choose a level.";
 
 /** @brief 思考强度菜单的内容。 */
 interface ThinkingPanelProps {
@@ -27,7 +29,7 @@ interface ThinkingPanelProps {
   reasoning: boolean;
   /** 选了一个强度 */
   onChoose: (level: ThinkingLevel) => void;
-  /** 点了"打开设置" */
+  /** 点了"Open settings" */
   onSettings: () => void;
 }
 
@@ -50,7 +52,7 @@ function ThinkingPanel({ levels, current, reasoning, onChoose, onSettings }: Thi
       {reasoning ? <p className="menu-note">只作用于这个会话；新会话的默认在设置里按模型设定</p> : (
         <>
           <p className="menu-note">{UNSUPPORTED_TEXT}</p>
-          <button role="menuitem" onClick={onSettings}>打开设置</button>
+          <button role="menuitem" data-action="open-settings" onClick={onSettings}>Open settings</button>
         </>
       )}
     </div>
@@ -58,7 +60,7 @@ function ThinkingPanel({ levels, current, reasoning, onChoose, onSettings }: Thi
 }
 
 /**
- * @brief 顶栏的思考强度按钮和菜单。disabled 为真时（会话没打开、后台进程不可用）不能切换；生成中也不能切换。
+ * @brief 顶栏的思考强度按钮和菜单。disabled 为真时（会话没打开、后台进程不可用）不能切换；准备中与生成中也不能切换。
  *        换强度或换模型的请求还没返回时按钮显示你选的强度、不可用（仍可聚焦）。
  *        旧的会话数据没有思考强度时按"关"、不支持思考处理。面板窄于 600px 时按钮只显示强度（models.md"窄栏"）。
  */
@@ -80,7 +82,7 @@ export function ThinkingMenu({ tab, disabled }: { tab: Tab; disabled: boolean })
 
   function settings() {
     menu.setOpen(false);
-    openSettings();
+    openModelsSettings();
   }
 
   return (

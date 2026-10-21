@@ -9,7 +9,10 @@
 
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { appRoot, arg, createRecorder, launch, oneLine, prepareProject, scratchUserData, sleep } from './lib.mjs';
+import {
+  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, scratchUserData,
+  sleep,
+} from './lib.mjs';
 import { pageHelpers } from './page.mjs';
 
 const source = arg('source');
@@ -604,20 +607,21 @@ async function f8WhileWaiting(ctx) {
   await answerCards(page, allowAll(page, h), [card.request]);
 }
 
-/** @brief 走查 8 后半：在连接表单里填一个假 key 并保存，再从左栏按钮报告：key 不进报告。放在最后（之后不再请求模型）。 */
+/**
+ * @brief 走查 8 后半：在 设置 → Models 的提供商卡上 Add key 填一个假 key（v1，models.addKey，§14.4；加在最后，不影响前面的
+ *        key），再从左栏按钮报告：key 不进报告。放在最后（之后不再请求模型）。
+ */
 async function f8KeyNotInReport({ page, h }) {
-  // M6：设置页先是连接列表，填 key 在连接卡的"编辑连接"里（settings.md"编辑连接"；最近的操作记"保存连接 <provider>"）。
-  await h.editConnection();
-  await h.fillConnection({ apiKey: FAKE_KEY });
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await h.formMessage();
+  await h.openModels();
+  const provider = await page.getByTestId('provider-card').first().getAttribute('data-provider');
+  await h.addKey(FAKE_KEY, provider);
   await page.getByRole('button', { name: '报告界面问题（F8）' }).click();
   const dialog = page.getByTestId('issue-dialog');
   await dialog.getByTestId('issue-shot').waitFor({ timeout: 15000 });
   const issue = await saveIssue(dialog, '设置页的报告', '');
   const md = issue && existsSync(issue) ? readFileSync(issue, 'utf8') : '';
-  record('8 反例：连接表单里填过的 key 不出现在报告里（"最近的操作"只记"保存连接"）；左栏按钮与设置页也能报告',
-    md.length > 0 && !md.includes(FAKE_KEY) && section(md, '最近的操作').includes('保存连接')
+  record('8 反例：Add key 填过的 key 不出现在报告里（"最近的操作"只记"Add key <提供商>"）；左栏按钮与设置页也能报告',
+    md.length > 0 && !md.includes(FAKE_KEY) && section(md, '最近的操作').includes(`Add key ${provider}`)
       && /^- 页面：设置$/m.test(section(md, '当前界面')) && section(md, '你期望什么').includes('（没有填写）'), issue);
   await dialog.getByRole('button', { name: '关闭', exact: true }).click();
 }
@@ -649,15 +653,12 @@ async function step(ctx, name, fn) {
   }
 }
 
-/** @brief 走查数据目录里要有 Mori 保存的连接（只读 models.json 的非机密部分）；没有时在复制密文之前就失败。 */
-function requireConnection(dir) {
-  const models = JSON.parse(readFileSync(join(dir, 'pi', 'models.json'), 'utf8'));
-  if (!models.providers?.['mori-endpoint']) throw new Error(`No saved connection in ${dir}`);
-}
-
-requireConnection(source);
+// 走查数据目录里要有 Mori（v1）保存的提供商（只读 model-config.json 的非机密部分）；没有时在复制密文之前就失败。
+realProviders(source);
 const { project, root } = prepareProject('mori-m2-real-');
 const userData = scratchUserData(source);
+// 测试准备（synthetic test setup，§14.1）：给临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
+allowRealProject(userData, project);
 const ctx = { project, userData };
 const pageErrors = [];
 // 复制密文之后的每一步（包括启动）都在 try 里，出错也会删掉临时目录。

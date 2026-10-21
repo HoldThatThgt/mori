@@ -27,12 +27,15 @@
     "test:m6-replay": "node tests/ui/m6-replay.mjs",
     "test:m7-app": "electron-vite build && node tests/ui/m7-app.mjs",
     "test:m7-replay": "node tests/ui/m7-replay.mjs",
-    "check": "npm run typecheck && node tests/check.mjs"
+    "check": "npm run typecheck && node tests/check.mjs",
+    "test:unit": "node --test --test-reporter=./tests/unit/reporter.mjs \"tests/unit/*.test.mjs\"",
+    "test:v1-models": "npm run test:unit && electron-vite build && node tests/ui/v1-models-app-settings.mjs && node tests/ui/v1-models-app-switch.mjs && node tests/ui/v1-models-app-session.mjs && node tests/ui/v1-models-replay.mjs && node tests/ui/v1-models-existing.mjs && node tests/spec-coverage.mjs"
   },
   "engines": {
     "node": ">=22.19.0"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "1.3.0",
     "@earendil-works/pi-coding-agent": "1.3.0",
     "@earendil-works/pi-mcp": "1.3.0",
     "@pierre/diffs": "1.5.2",
@@ -53,6 +56,7 @@
     "electron": "44.9.0",
     "electron-builder": "26.17.0",
     "electron-vite": "5.0.0",
+    "esbuild": "0.25.12",
     "playwright-core": "1.64.1",
     "typescript": "5.9.3",
     "vite": "7.3.7"

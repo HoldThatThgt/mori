@@ -130,15 +130,17 @@ export async function layoutChecks(page, h, { app, record, shots }) {
   await page.getByTestId('tool-card').first().locator('summary').click();
   await page.getByRole('button', { name: '右栏：本会话的改动' }).click();
   let small = await smallText(page);
-  // M6 起设置页先是连接列表（settings.md"列表"），表单在"编辑连接"里：等列表读完再量，再量编辑连接的表单。
+  // v1（docs/specs/model-providers.md §14.4）：设置页是 Models 分节，先量提供商卡（models.get 读完之后），再量 Edit 打开的
+  // 提供商表单；回放里 models.get 由回放桥按录制的模型合成（harness/replay.js）。
   await page.getByRole('button', { name: '设置' }).click();
-  await page.getByTestId('connection-card').first().waitFor({ timeout: 10000 });
+  await page.getByTestId('provider-card').first().waitFor({ timeout: 10000 });
   small = small.concat(await smallText(page));
-  await page.getByTestId('connection-card').first().getByRole('button', { name: '编辑连接' }).click();
-  await page.getByTestId('connection-form').waitFor({ timeout: 10000 });
+  await page.getByTestId('provider-card').first().locator('[data-action="edit-provider"]').click();
+  await page.getByTestId('provider-form').waitFor({ timeout: 10000 });
   small = small.concat(await smallText(page));
+  await page.getByTestId('provider-form').getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.getByRole('button', { name: '返回会话' }).click();
-  record('fonts：会话、工具卡展开、右栏、设置页（连接列表和编辑连接）没有小于 12px 的文字', small.length === 0,
+  record('fonts：会话、工具卡展开、右栏、设置页（Models 的提供商卡和提供商表单）没有小于 12px 的文字', small.length === 0,
     small.slice(0, 5).join('; '));
   await page.getByRole('button', { name: '右栏：本会话的改动' }).click();
   await dividerChecks(page, h, record);

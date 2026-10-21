@@ -1,11 +1,12 @@
 // 后台进程入口（utilityProcess）：接收主进程转交的 MessagePort，校验并分发命令，广播事件，按要求有序退出。
 
 import type { MessagePortMain } from 'electron';
-import { CommandSchema, type EventEnvelope, type KernelMessage } from '../shared/protocol';
+import { CommandSchema, type EventEnvelope, type GlobalEventEnvelope, type KernelMessage } from '../shared/protocol';
 import { handleCommand } from './commands';
 import { onStoreKeyResult } from './credentials';
 import { closeSharedServers, startSharedServers } from './mcpShare';
-import { applyStoredKeys } from './pi';
+import { startModelLayer } from './modelLayer';
+import { loadPi } from './pi';
 import { shutdownSessions } from './sessions';
 
 const ports = new Set<MessagePortMain>();
@@ -20,9 +21,25 @@ function post(port: MessagePortMain, message: KernelMessage): void {
   }
 }
 
-/** @brief 把事件广播给所有已连接的页面。 */
-function emit(envelope: EventEnvelope): void {
+/** @brief 把事件（会话事件，或 sessionId 为 null 的全局事件）广播给所有已连接的页面。 */
+function emit(envelope: EventEnvelope | GlobalEventEnvelope): void {
   for (const port of ports) post(port, envelope);
+}
+
+/**
+ * @brief 主进程送来 userData 与全部 key 后启动模型层（读配置或迁移、编译到 pi、建模型池，§4、§8）。
+ *        启动失败时记录；之后的模型层命令都按失败回复。
+ * @param userData Electron 的 userData 目录
+ * @param keys 解密后的全部 key：ref → 明文
+ */
+async function startModels(userData: string, keys: Record<string, string>): Promise<void> {
+  try {
+    const pi = await loadPi();
+    await startModelLayer({ userData, agentDir: pi.getAgentDir(), keys,
+      emitGlobal: (event) => emit({ kind: 'event', sessionId: null, event }) });
+  } catch (error) {
+    console.error(`[kernel] model layer did not start: ${(error as Error).message}`);
+  }
 }
 
 /** @brief 处理界面发来的一条请求并回复。 */
@@ -62,15 +79,15 @@ function attachPort(port: MessagePortMain): void {
 /** @brief 主进程发给后台进程的消息。 */
 type MainToKernel =
   | { type: 'port' }
-  | { type: 'keys'; keys: Record<string, string> }
+  | { type: 'start'; userData: string; keys: Record<string, string> }
   | { type: 'store-key-result'; id: number; error: string | null }
   | { type: 'shutdown' };
 
 process.parentPort.on('message', (event) => {
   const message = event.data as MainToKernel;
   if (message?.type === 'port' && event.ports[0]) attachPort(event.ports[0]);
-  if (message?.type === 'keys') {
-    void applyStoredKeys(message.keys);
+  if (message?.type === 'start') {
+    void startModels(message.userData, message.keys);
     // 照 Claude 桌面版，启动时就起用户级启用的 stdio MCP 服务（docs/v0/m6-mcp-shared.md），在后台连接、不挡住命令。
     // 主进程把后台进程放进作业对象之后才发 key（kernel-process.ts），这之后起的服务进程都在作业里。
     void startSharedServers();

@@ -7,10 +7,13 @@
 // 也在这里走一遍：回放桥会把多发的命令记为不一致，所以"没有多发"由收尾的检查保证。
 // mcp 回放的是 synthetic-mcp-setup（harness/main.jsx 的 mcpSetup，synthetic）：录制在打开任何会话之前就保存了 MCP 服务，
 // 而界面只在有会话时才有"MCP"一节，所以前面补一个先打开的会话，在它的工具页里添加，再"新建会话"建出录制里的会话。
-// 用法（在 app/ 下）：node tests/ui/m6-replay.mjs [--only model-switch,slash]
+// v1（docs/specs/model-providers.md §14.4）：m6/model-switch.json、m6/thinking.json 与它们的检查删去（v1 不再有 model.save、
+// session.setModel；顶栏范围由 v1-models 的回放覆盖）；思考强度改由 fixtures/v1/thinking.json（m6-record.mjs 用 v1 录制）
+// 回放，这个录制还没有时那一项记 KNOWN；设置页分节导航的检查改到 Models 分节（放在 agents-md 里）。
+// 用法（在 app/ 下）：node tests/ui/m6-replay.mjs [--only thinking,slash]
 // 结果写到 test-results/m6-replay.json；截图在 test-results/m6-replay/。
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -19,7 +22,7 @@ import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, createRecorder, oneLine } from './lib.mjs';
 import { composerAt, sendAt, waitPaneIdle, waitPaneReady } from './m5-helpers.mjs';
-import { connectionCard, modelRow, openToolsSection, slashItems } from './m6-helpers.mjs';
+import { modelRow, openToolsSection, slashItems } from './m6-helpers.mjs';
 
 const only = arg('only')?.split(',');
 const harnessDir = join(appRoot, 'tests/ui/harness');
@@ -34,12 +37,18 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 const FOCUSED = '.pane-slot[data-focused="true"]:not([hidden])';
 /** 回放桥当作只读查询回答、不占回放顺序的命令（与 harness/replay.js 的 QUERIES 相同） */
 const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
-  'agents.get', 'session.commands'];
+  'agents.get', 'session.commands', 'models.get', 'session.pickOptions'];
 
 /** @brief 读取一个 M6 录制文件。 */
 const readFixture = (name) => JSON.parse(readFileSync(join(fixtureDir, `${name}.json`), 'utf8'));
-/** @brief 录制里界面发出的命令（只读查询除外），下标与回放桥的 cursor 一致。 */
-const commandsOf = (fx) => fx.steps.filter((s) => s.command && !QUERIES.includes(s.command.type)).map((s) => s.command);
+/** v1 的录制（m6-record.mjs 的思考强度场景写到这里） */
+const v1Dir = join(appRoot, 'tests/fixtures/v1');
+/**
+ * @brief 录制里界面发出的命令（只读查询与回放桥直接应答的 models.* 写命令除外，同 harness/replay.js），
+ *        下标与回放桥的 cursor 一致。
+ */
+const commandsOf = (fx) => fx.steps.filter((s) => s.command && !QUERIES.includes(s.command.type)
+  && !s.command.type.startsWith('models.')).map((s) => s.command);
 /** @brief 录制里某种命令的结果（按顺序）。 */
 const resultsOf = (fx, type) => fx.steps.filter((s) => s.result?.type === type && !s.result.error)
   .map((s) => s.result.value);
@@ -177,7 +186,7 @@ async function newSessionVia(page, button, trust) {
 const currentSection = (page) => page.locator('[data-testid="settings-nav"] button[aria-current="page"]')
   .getAttribute('data-section', { timeout: 3000 }).catch(() => null);
 
-/** @brief 打开设置页的某一节（connections / agents）；返回打开时落在哪一节。 */
+/** @brief 打开设置页的某一节（models / agents）；返回打开时落在哪一节。 */
 async function openSettings(page, section) {
   await sideButton(page, '设置').click();
   await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
@@ -284,308 +293,15 @@ function lastToolCard(page) {
     title: card.querySelector('.tool-verb')?.textContent ?? card.textContent.slice(0, 40) })).catch(() => null);
 }
 
-/** @brief 设置页里一个连接卡的模型行：标识、是否默认、文字。 */
-function modelRows(page, providerId) {
-  return connectionCard(page, providerId).locator('[data-testid="model-row"]').evaluateAll((rows) => rows
-    .map((row) => ({ ref: row.dataset.model, isDefault: row.dataset.default === 'true',
-      text: row.querySelector('.model-info')?.textContent ?? '' })));
-}
-
-/**
- * @brief 设置页里一个连接卡的样子：名称、地址与接口类型、key 状态；每个模型行有没有"设为默认"，"删除"是否可用和
- *        悬停说明。
- */
-function connectionView(page, providerId) {
-  return connectionCard(page, providerId).evaluate((card) => ({
-    name: card.querySelector('.connection-name')?.textContent ?? null,
-    meta: card.querySelector('.connection-meta')?.textContent ?? null,
-    key: card.querySelector('.connection-key')?.textContent ?? null,
-    rows: [...card.querySelectorAll('[data-testid="model-row"]')].map((row) => {
-      const buttons = [...row.querySelectorAll('.model-actions button')];
-      const remove = buttons.find((button) => button.textContent === '删除');
-      return { ref: row.dataset.model, setDefault: buttons.some((button) => button.textContent === '设为默认'),
-        removable: remove ? !remove.disabled : null, removeTitle: remove?.title ?? null };
-    }) }));
-}
-
-/** @brief 设置页列表上方的一行（没有时为空串）。 */
-const settingsNotice = (page) => page.getByTestId('settings-notice').innerText({ timeout: 3000 }).catch(() => '');
-
-/**
- * @brief 在连接卡上点"添加模型"，看表单；先填这个连接下已有的 ID 保存（界面先检查、不发命令），再换成录制的 ID 保存。
- * @return 打开时落在哪一节、保存前的连接卡、表单的样子、重名时的提示和那一次多发的命令数
- */
-async function addModel(page, h, providerId, { model, existing }) {
-  const landed = await openSettings(page, 'connections');
-  const card = await connectionView(page, providerId);
-  await connectionCard(page, providerId).getByRole('button', { name: '添加模型' }).click();
-  const form = page.getByTestId('model-form');
-  await form.waitFor({ timeout: 10000 });
-  const seen = { landed, card, title: await page.locator('.settings-form h3').innerText(),
-    hint: await page.locator('.settings-form .field-hint').first().innerText(),
-    keyFields: await form.locator('input[type="password"]').count() + await form.getByLabel('API key').count(),
-    levelField: await form.getByLabel('新会话默认的思考强度').count(),
-    reasoning: await form.getByLabel('支持思考').isChecked(),
-    reasoningHint: await form.locator('label.check-row small').innerText() };
-  const sent = await h.sent();
-  await form.getByLabel('模型 ID').fill(existing);
-  await form.getByLabel('上下文长度').fill(String(model.contextWindow));
-  await form.getByRole('button', { name: '保存', exact: true }).click();
-  seen.duplicate = await form.getByTestId('form-message').innerText({ timeout: 5000 }).catch(() => null);
-  seen.duplicateSent = await h.sent() - sent;
-  await form.getByLabel('模型 ID').fill(model.modelId);
-  await form.getByRole('button', { name: '保存', exact: true }).click();
-  await modelRow(page, `${providerId}/${model.modelId}`).waitFor({ timeout: 10000 });
-  return seen;
-}
-
-/** @brief 点不是默认的模型的"删除"：确认框；取消后这一行还在、不发命令。 */
-async function cancelDelete(page, h, ref) {
-  const sent = await h.sent();
-  await modelRow(page, ref).getByRole('button', { name: '删除', exact: true }).click();
-  const asked = await cancelDialog(page, 'delete-dialog');
-  return { ...asked, kept: await modelRow(page, ref).count(), sent: await h.sent() - sent };
-}
-
-/**
- * @brief "编辑连接"：只有连接的字段（没有模型 ID），说明这个连接下有几个模型，key 框说明已加密保存；取消回到列表、
- *        不发命令。
- */
-async function editConnectionCancel(page, h, providerId) {
-  const sent = await h.sent();
-  await connectionCard(page, providerId).getByRole('button', { name: '编辑连接' }).click();
-  const form = page.getByTestId('connection-form');
-  await form.waitFor({ timeout: 10000 });
-  const key = form.getByLabel('API key');
-  const seen = { title: await page.locator('.settings-form h3').innerText(),
-    hint: await page.locator('.settings-form > .field-hint').innerText(),
-    name: await form.getByLabel('名称', { exact: true }).inputValue(),
-    baseUrl: await form.getByLabel('服务地址').inputValue(), keyHint: await key.getAttribute('placeholder'),
-    keyValue: await key.inputValue(), modelField: await form.getByLabel('模型 ID').count() };
-  await form.getByRole('button', { name: '取消', exact: true }).click();
-  await connectionCard(page, providerId).waitFor({ timeout: 5000 });
-  return { ...seen, back: await form.count() === 0, sent: await h.sent() - sent };
-}
-
-/** @brief 设置页分节列表用 ↑ ↓ 切换：↓ 到"AGENTS.md"，↑ 回到"连接与模型"；当前分节 aria-current，焦点跟着走。 */
+/** @brief 设置页分节列表用 ↑ ↓ 切换：↓ 到"AGENTS.md"，↑ 回到"Models"；当前分节 aria-current，焦点跟着走。 */
 async function settingsNavKeys(page) {
   const focusedSection = () => page.evaluate(() => document.activeElement?.dataset.section ?? null);
-  await page.locator('[data-testid="settings-nav"] button[data-section="connections"]').focus();
+  await page.locator('[data-testid="settings-nav"] button[data-section="models"]').focus();
   await page.keyboard.press('ArrowDown');
   const down = { current: await currentSection(page), focused: await focusedSection() };
   await page.keyboard.press('ArrowUp');
   const up = { current: await currentSection(page), focused: await focusedSection() };
   return { down, up };
-}
-
-/** @brief 走查 1 的前半：设置页在连接下添加第二个模型（不填 key）；看连接卡、重名检查和删除限制。 */
-async function modelSwitchSettings(page, h, fx) {
-  const save = commandOf(fx, 'model.save');
-  const recorded = resultsOf(fx, 'config.get')[0].connections.find((item) => item.providerId === save.providerId);
-  const form = await addModel(page, h, save.providerId, { model: save.model, existing: recorded.models[0].id });
-  const { card } = form;
-  record('model-switch：连接卡显示名称、"服务地址 · 接口类型"和"key 已加密保存"；只有一个模型时它标"默认"、没有"设为默认"，'
-    + '"删除"不可用、悬停"至少要留一个模型"', card.name === recorded.endpoint.name
-    && card.meta === `${recorded.endpoint.baseUrl} · OpenAI 兼容（Chat Completions）` && card.key === 'key 已加密保存'
-    && card.rows.length === 1 && !card.rows[0].setDefault && card.rows[0].removable === false
-    && card.rows[0].removeTitle === '至少要留一个模型', JSON.stringify(card));
-  record('model-switch：设置页打开时落在"连接与模型"；在连接卡上点"添加模型"：标题"添加模型 · Deepseek"、说明不用再填 key、'
-    + '没有 key 框；"支持思考"不勾、带说明；没勾时没有"新会话默认的思考强度"', form.landed === 'connections'
-    && form.title === '添加模型 · Deepseek' && form.hint === '用这个连接的地址和 key，不用再填 key'
-    && form.keyFields === 0 && form.levelField === 0 && !form.reasoning
-    && form.reasoningHint === '勾选后 pi 才会发送思考参数；不勾时端点按自己的默认处理（DeepSeek 默认会思考，但不能控制）',
-  JSON.stringify(form));
-  record(`model-switch：添加时 ID 与已有的重名：表单里"保存失败：这个连接下已经有模型 ${recorded.models[0].id}"，`
-    + '界面先检查、不发命令', form.duplicate === `保存失败：这个连接下已经有模型 ${recorded.models[0].id}`
-    && form.duplicateSent === 0, JSON.stringify({ duplicate: form.duplicate, sent: form.duplicateSent }));
-  const rows = await modelRows(page, save.providerId);
-  const after = await connectionView(page, save.providerId);
-  const notice = await settingsNotice(page);
-  record('model-switch：保存后回到列表，"已保存 · 已经打开的会话下一条消息起用新的设置"；连接卡里两行模型，'
-    + 'deepseek-v4-pro 标"不支持思考"，默认仍是 deepseek-flash', notice === '已保存 · 已经打开的会话下一条消息起用新的设置'
-    && rows.length === 2 && rows[0].ref === 'mori-endpoint/deepseek-flash' && rows[0].isDefault
-    && rows[1].ref === 'mori-endpoint/deepseek-v4-pro' && !rows[1].isDefault && rows[1].text.includes('不支持思考')
-    && rows[1].text.includes('上下文 1,000,000'), JSON.stringify({ notice, rows }));
-  const [flash, pro] = after.rows;
-  record('model-switch：两个模型时默认的 deepseek-flash 没有"设为默认"，"删除"不可用、悬停"默认模型不能删除，先把别的模型'
-    + '设为默认"；deepseek-v4-pro 有"设为默认"、可以删除', !flash?.setDefault && flash?.removable === false
-    && flash.removeTitle === '默认模型不能删除，先把别的模型设为默认' && pro?.setDefault && pro.removable === true,
-  JSON.stringify(after.rows));
-  await shot(page, 'model-switch-settings');
-  await settingsActions(page, h, save.providerId);
-}
-
-/** @brief 列表底部"添加连接"：空表单（含模型字段），key 框提示"保存后由 Mori 加密存放在本机"；取消回到列表、不发命令。 */
-async function addConnectionCancel(page, h) {
-  const sent = await h.sent();
-  await page.getByTestId('settings-page').getByRole('button', { name: '添加连接' }).click();
-  const form = page.getByTestId('connection-form');
-  await form.waitFor({ timeout: 10000 });
-  const seen = { title: await page.locator('.settings-form h3').innerText(),
-    hint: await page.locator('.settings-form > .field-hint').innerText(),
-    name: await form.getByLabel('名称', { exact: true }).inputValue(),
-    baseUrl: await form.getByLabel('服务地址').inputValue(), modelId: await form.getByLabel('模型 ID').inputValue(),
-    keyHint: await form.getByLabel('API key').getAttribute('placeholder'),
-    reasoning: await form.getByLabel('支持思考').count() };
-  await form.getByRole('button', { name: '取消', exact: true }).click();
-  await page.getByTestId('connection-card').first().waitFor({ timeout: 5000 });
-  return { ...seen, back: await form.count() === 0, sent: await h.sent() - sent };
-}
-
-/** @brief 设置页里不发命令的操作：取消删除、打开再取消"编辑连接"和"添加连接"、用 ↑ ↓ 换分节。 */
-async function settingsActions(page, h, providerId) {
-  const added = await addConnectionCancel(page, h);
-  record('model-switch：列表底部"添加连接"：空表单（名称、服务地址、模型 ID 都空，有"支持思考"），key 框提示"保存后由 Mori'
-    + ' 加密存放在本机"；取消回到列表、不发命令', added.title === '添加连接'
-    && added.hint === '填好服务地址、API key 和模型 ID；保存后新连接排在最后。' && added.name === ''
-    && added.baseUrl === '' && added.modelId === '' && added.keyHint === '保存后由 Mori 加密存放在本机'
-    && added.reasoning === 1 && added.back && added.sent === 0, JSON.stringify(added));
-  const removed = await cancelDelete(page, h, `${providerId}/deepseek-v4-pro`);
-  record('model-switch：点 deepseek-v4-pro 的"删除"：确认框"删除模型 deepseek-v4-pro？"、"从连接 Deepseek 里删除这个模型。"，'
-    + '焦点在"取消"；取消后这一行还在、不发命令', removed.title === '删除模型 deepseek-v4-pro？'
-    && removed.text === '从连接 Deepseek 里删除这个模型。' && removed.focused === '取消' && removed.closed
-    && removed.kept === 1 && removed.sent === 0, JSON.stringify(removed));
-  const edit = await editConnectionCancel(page, h, providerId);
-  record('model-switch："编辑连接 · Deepseek"说明"这个连接下的 2 个模型都用这里的地址和 key"，只有连接的字段（没有模型 ID），'
-    + 'key 框空着、提示"已加密保存（不显示）；改了服务地址就要重新填写"；取消回到列表、不发命令',
-  edit.title === '编辑连接 · Deepseek' && edit.hint === '这个连接下的 2 个模型都用这里的地址和 key'
-    && edit.name === 'Deepseek' && edit.baseUrl === 'https://api.deepseek.com' && edit.modelField === 0
-    && edit.keyValue === '' && edit.keyHint === '已加密保存（不显示）；改了服务地址就要重新填写' && edit.back
-    && edit.sent === 0, JSON.stringify(edit));
-  const keys = await settingsNavKeys(page);
-  record('model-switch：设置页分节列表用 ↓ 换到"AGENTS.md"、↑ 回到"连接与模型"，当前分节高亮（aria-current）、焦点跟着走',
-    keys.down.current === 'agents' && keys.down.focused === 'agents' && keys.up.current === 'connections'
-    && keys.up.focused === 'connections', JSON.stringify(keys));
-}
-
-/** @brief 反例：模型没标"支持思考"时顶栏"思考：不可选"，菜单里的强度都不可用并说明原因；Esc 关闭；"打开设置"。 */
-async function thinkingUnsupported(page, name) {
-  const bar = await topBar(page);
-  const menu = await openMenu(page, 'thinking-button', 'thinking-menu');
-  await page.keyboard.press('Escape');
-  const escaped = await menuClosed(page, 'thinking-menu', 'thinking-button');
-  record(`${name}：反例：模型没标"支持思考"时顶栏"思考：不可选"；点开菜单里的强度都不可用（焦点落在"打开设置"），`
-    + '说明原因；Esc 关闭菜单、焦点回到思考按钮', bar.thinking === '思考：不可选' && bar.reasoning === 'false'
-    && menu?.items.length === 5 && menu.items.every((item) => item.disabled && !item.checked)
-    && menu.text.includes("这个模型没有标'支持思考'") && menu.focused === '打开设置' && escaped.closed
-    && escaped.focusBack, JSON.stringify({ bar, menu, escaped }));
-  await openMenu(page, 'thinking-button', 'thinking-menu');
-  await page.getByTestId('thinking-menu').getByRole('menuitem', { name: '打开设置' }).click();
-  await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
-  const section = await currentSection(page);
-  await leaveSettings(page);
-  record(`${name}：不支持思考时菜单里的"打开设置"打开设置页的"连接与模型"`, section === 'connections', section);
-}
-
-/** @brief 顶栏的模型按钮与菜单：显示默认模型；菜单按连接分组列出两个模型；Esc 关闭（焦点回到按钮）、点外面关闭。 */
-async function modelMenu(page) {
-  const opened = await topBar(page);
-  const menu = await openMenu(page, 'model-button', 'model-menu');
-  const groups = await page.getByTestId('model-menu').locator('[role="group"]').evaluateAll((items) => items
-    .map((group) => `${group.getAttribute('aria-label')}:${group.querySelector('.model-group-name')?.textContent}`));
-  record('model-switch：顶栏模型按钮显示 deepseek-flash（悬停"Deepseek · deepseek-flash"）；菜单按连接分组（组名 Deepseek）列出'
-    + '两个模型，当前的打勾、焦点在它上面，默认的标"默认"，底部"只作用于这个会话；新会话用设置里的默认模型"和"管理模型…"',
-  opened.model === 'deepseek-flash' && opened.modelTitle === 'Deepseek · deepseek-flash'
-    && groups.join() === 'Deepseek:Deepseek' && menu?.items.map((item) => item.model).join()
-      === 'mori-endpoint/deepseek-flash,mori-endpoint/deepseek-v4-pro'
-    && menu.items[0].checked && !menu.items[1].checked && menu.focused === 'mori-endpoint/deepseek-flash'
-    && menu.items[0].text.includes('默认') && !menu.items[1].text.includes('默认')
-    && menu.text.includes('只作用于这个会话；新会话用设置里的默认模型') && menu.text.includes('管理模型…'),
-  JSON.stringify({ opened, groups, menu }));
-  await page.keyboard.press('Escape');
-  const escaped = await menuClosed(page, 'model-menu', 'model-button');
-  await openMenu(page, 'model-button', 'model-menu');
-  await composerAt(page, 'focused').click();
-  const outside = await menuClosed(page, 'model-menu', 'model-button');
-  record('model-switch：模型菜单按 Esc 关闭、焦点回到模型按钮；点菜单外面（输入框）也关闭；都不发命令',
-    escaped.closed && escaped.focusBack && outside.closed && (await topBar(page)).model === 'deepseek-flash',
-    JSON.stringify({ escaped, outside }));
-}
-
-/**
- * @brief 用键盘换模型：打开菜单（焦点在当前项），↓ 移到下一项，Enter 选中；记下切换中按钮的样子，等切换的命令返回。
- * @return ↓ 之后焦点所在的项、按钮经过的样子
- */
-async function keyboardModel(page, ref) {
-  await openMenu(page, 'model-button', 'model-menu');
-  await page.keyboard.press('ArrowDown');
-  const focused = await page.evaluate(() => document.activeElement?.dataset.model ?? null);
-  await watch(page, `${FOCUSED} [data-testid="model-button"]`);
-  await page.keyboard.press('Enter');
-  await waitSwitched(page, 'model-button', ref.split('/').pop());
-  return { focused, seen: await watched(page) };
-}
-
-/** @brief 模型菜单最后一项"管理模型…"打开设置页的"连接与模型"；顶栏换了模型，设置里的默认不变。 */
-async function manageModels(page) {
-  await openMenu(page, 'model-button', 'model-menu');
-  await page.getByTestId('model-menu').getByRole('menuitem', { name: '管理模型…' }).click();
-  await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
-  const section = await currentSection(page);
-  const cards = await page.getByTestId('connection-card').count();
-  const rows = await modelRows(page, 'mori-endpoint');
-  const defaults = rows.filter((row) => row.isDefault).map((row) => row.ref);
-  record('model-switch：模型菜单的"管理模型…"打开设置页的"连接与模型"；反例：顶栏换了模型，设置里的默认仍是 deepseek-flash',
-    section === 'connections' && cards === 1 && defaults.join() === 'mori-endpoint/deepseek-flash',
-    JSON.stringify({ section, cards, defaults }));
-  await leaveSettings(page);
-}
-
-/** @brief 走查 1：加第二个模型，在顶栏切换，新回复来自新模型。 */
-async function modelSwitch(page, h) {
-  const fx = readFixture('model-switch');
-  await h.load('model-switch');
-  await modelSwitchSettings(page, h, fx);
-  await newSessionVia(page, sideButton(page, '打开文件夹…'));
-  const [first, second] = promptsOf(fx);
-  await thinkingUnsupported(page, 'model-switch');
-  await say(page, first.text);
-  await modelMenu(page);
-  const keyed = await keyboardModel(page, 'mori-endpoint/deepseek-v4-pro');
-  const switched = await topBar(page);
-  record('model-switch：键盘选模型：菜单里 ↓ 移到 deepseek-v4-pro、Enter 选中；命令返回前按钮已显示 deepseek-v4-pro 且不可用'
-    + '（切换中），返回后可用；思考按钮按返回值仍"思考：不可选"', keyed.focused === 'mori-endpoint/deepseek-v4-pro'
-    && keyed.seen.some((item) => item.text === 'deepseek-v4-pro' && item.pending) && !switched.pending
-    && switched.model === 'deepseek-v4-pro' && switched.thinking === '思考：不可选',
-  JSON.stringify({ keyed, switched }));
-  const before = (await replies(page)).length;
-  await say(page, second.text);
-  const after = await replies(page);
-  const recorded = recordedReplies(fx, resultsOf(fx, 'session.create')[0].sessionId).at(-1);
-  const order = (await h.status()).commands.map((c) => c.type);
-  record('model-switch：选 deepseek-v4-pro 后按钮显示它；之后发的消息的回复（录制里来自 deepseek-v4-pro）出现在切换之后',
-    after.length === before + 1 && recorded.model === 'deepseek-v4-pro'
-    && after.at(-1).text.includes(recorded.text.slice(0, 12)) && order.lastIndexOf('session.prompt')
-      > order.indexOf('session.setModel') && (await topBar(page)).model === 'deepseek-v4-pro',
-    JSON.stringify({ before, after: after.at(-1)?.text.slice(0, 60), order }));
-  await shot(page, 'model-switch');
-  await manageModels(page);
-  await finish(page, 'model-switch', commandsOf(fx).length);
-}
-
-/** @brief 走查 8 的前半：设置页编辑模型，勾"支持思考"，新会话默认的强度用表单给的默认值（中）。 */
-async function markReasoning(page, fx) {
-  const save = commandOf(fx, 'model.save');
-  const ref = `${save.providerId}/${save.model.modelId}`;
-  await openSettings(page, 'connections');
-  await modelRow(page, ref).getByRole('button', { name: '编辑', exact: true }).click();
-  const form = page.getByTestId('model-form');
-  await form.waitFor({ timeout: 10000 });
-  const before = { readOnly: await form.getByLabel('模型 ID').getAttribute('readonly') !== null,
-    levelField: await form.getByLabel('新会话默认的思考强度').count() };
-  await form.getByLabel('支持思考').check();
-  const select = form.getByLabel('新会话默认的思考强度');
-  const level = { value: await select.inputValue(), options: await select.locator('option').allInnerTexts() };
-  // 照录制保存的强度；表单的默认值不同时下面的检查会失败，这里仍选成录制的值，让后面的回放能接着走。
-  if (level.value !== save.model.thinkingLevel) await select.selectOption(save.model.thinkingLevel);
-  await form.getByRole('button', { name: '保存', exact: true }).click();
-  await page.waitForFunction((css) => document.querySelector(css)?.textContent.includes('支持思考 · 新会话默认'),
-    `[data-testid="model-row"][data-model="${ref}"]`, { timeout: 10000 }).catch(() => {});
-  const row = await modelRow(page, ref).locator('.model-info').innerText();
-  record('thinking：编辑模型时模型 ID 只读；勾"支持思考"后才出现"新会话默认的思考强度"，可选 关、最低、低、中、高，默认"中"；'
-    + '保存后模型行"支持思考 · 新会话默认 中"', before.readOnly && before.levelField === 0 && level.value === 'medium'
-    && level.options.join() === '关,最低,低,中,高' && row.includes('支持思考 · 新会话默认 中'),
-  JSON.stringify({ before, level, row }));
 }
 
 /** @brief 发一道要推理的题，等生成开始时记下顶栏，等这一轮结束；返回生成中的顶栏和最后一条回复。 */
@@ -607,77 +323,89 @@ async function clickThinking(page, level) {
   return watched(page);
 }
 
-/** @brief 用键盘换思考强度：打开菜单时焦点在当前项，↓ 移动（从最后一项回到第一项），Enter 选中；等切换的命令返回。 */
-async function keyboardThinking(page, level) {
-  const focusedLevel = () => page.evaluate(() => document.activeElement?.dataset.level ?? null);
-  await openMenu(page, 'thinking-button', 'thinking-menu');
-  const start = await focusedLevel();
-  await page.keyboard.press('ArrowDown');
-  const moved = await focusedLevel();
-  await page.keyboard.press('Enter');
-  await waitSwitched(page, 'thinking-button', level);
-  return { start, moved };
+/**
+ * @brief 走查 8 的前半（v1）：设置 → Models 编辑模型，勾"Supports thinking"，新会话的强度照录制保存（models.saveModel 由
+ *        回放桥直接应答，之后读到的 models.get 是录制里保存之后的结果）。
+ */
+async function markReasoning(page, fx) {
+  const save = fx.steps.find((step) => step.command?.type === 'models.saveModel')?.command;
+  const ref = `${save.providerId}/${save.model.id}`;
+  await openSettings(page, 'models');
+  await modelRow(page, ref).locator('[data-action="edit"]').click();
+  const form = page.getByTestId('model-form');
+  await form.waitFor({ timeout: 10000 });
+  const before = { readOnly: await form.getByLabel('Model id', { exact: true }).getAttribute('readonly') !== null,
+    levelField: await form.getByLabel('New-session thinking level').count() };
+  await form.getByLabel('Supports thinking').check();
+  const select = form.getByLabel('New-session thinking level');
+  const level = { value: await select.inputValue(), options: await select.locator('option').allInnerTexts() };
+  if (save.thinkingLevel && level.value !== save.thinkingLevel) await select.selectOption(save.thinkingLevel);
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  await form.waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+  const writes = (await page.evaluate(() => window.__replay.status.modelWrites))
+    .filter((write) => write.type === 'models.saveModel');
+  record('thinking：编辑模型时 Model id 只读；勾"Supports thinking"后才出现"New-session thinking level"（Off 到 Max，默认 '
+    + 'Medium）；Save 发出 models.saveModel（reasoning: true，强度照录制）', before.readOnly && before.levelField === 0
+    && level.value === 'medium' && level.options.join() === 'Off,Minimal,Low,Medium,High,Extra high,Max'
+    && writes.length === 1 && writes[0].model.reasoning === true && writes[0].thinkingLevel === save.thinkingLevel,
+  JSON.stringify({ before, level, writes }));
+  await leaveSettings(page, false);
 }
 
-/** @brief 设置页"连接与模型"里一个模型行：是否默认、文字；看完回到会话。 */
-async function settingsRow(page, ref) {
-  await openSettings(page, 'connections');
-  await modelRow(page, ref).waitFor({ timeout: 10000 });
-  const row = await modelRow(page, ref).evaluate((el) => ({ isDefault: el.dataset.default === 'true',
-    text: el.querySelector('.model-info')?.textContent ?? '' }));
-  await leaveSettings(page);
-  return row;
-}
-
-/** @brief 新会话顶栏"思考：中"；菜单列出 off–high、都可选，"中"打勾且焦点在它上面。 */
-async function thinkingOpened(page) {
+/** @brief 新会话顶栏"思考：<录制的强度>"；菜单列出这个模型可选的强度、都可选，当前的打勾且焦点在它上面。 */
+async function thinkingOpened(page, fx) {
+  const created = resultsOf(fx, 'session.create')[0];
   const opened = await topBar(page);
   const menu = await openMenu(page, 'thinking-button', 'thinking-menu');
-  record('thinking：新会话顶栏"思考：中"；菜单列出 关、最低、低、中、高，都可选，"中"打勾、焦点在它上面，底部说明只作用于'
-    + '这个会话', opened.thinking === '思考：中' && opened.level === 'medium' && opened.reasoning === 'true'
-    && menu?.items.map((item) => item.level).join() === 'off,minimal,low,medium,high'
-    && menu.items.every((item) => !item.disabled) && menu.items.find((item) => item.checked)?.level === 'medium'
-    && menu.focused === 'medium' && menu.text.includes('只作用于这个会话；新会话的默认在设置里按模型设定'),
-  JSON.stringify({ opened, menu }));
+  record('thinking：新会话顶栏的思考强度是会话新建时的强度（§11.1，录制的 session.create）；菜单列出当前模型可选的强度'
+    + '（录制的 thinkingLevels），都可选，当前的打勾、焦点在它上面，底部说明只作用于这个会话',
+  opened.level === created.thinkingLevel && opened.reasoning === 'true'
+    && menu?.items.map((item) => item.level).join() === created.thinkingLevels.join()
+    && menu.items.every((item) => !item.disabled)
+    && menu.items.find((item) => item.checked)?.level === created.thinkingLevel
+    && menu.focused === created.thinkingLevel && menu.text.includes('只作用于这个会话；新会话的默认在设置里按模型设定'),
+  JSON.stringify({ opened, menu, recorded: { level: created.thinkingLevel, levels: created.thinkingLevels } }));
   await page.keyboard.press('Escape');
   await menuClosed(page, 'thinking-menu', 'thinking-button');
 }
 
-/** @brief 走查 8：把模型标为支持思考，顶栏切到"高"：回复带思考内容；切到"关"：不再有思考内容。 */
+/**
+ * @brief 走查 8（v1，fixtures/v1/thinking.json）：把模型标为支持思考，新会话里顶栏切到"高"：回复带思考内容；切到"关"：
+ *        不再有思考内容；生成中不能切换。录制还没有时记 KNOWN（要用负责人的数据目录跑 m6-record.mjs --only thinking）。
+ */
 async function thinking(page, h) {
-  const fx = readFixture('thinking');
+  if (!existsSync(join(v1Dir, 'thinking.json'))) {
+    record('thinking：顶栏思考强度的回放（fixtures/v1/thinking.json）', false,
+      'fixtures/v1/thinking.json not recorded yet: run node tests/ui/m6-record.mjs --source <data dir> --only thinking',
+      true);
+    return;
+  }
+  const fx = JSON.parse(readFileSync(join(v1Dir, 'thinking.json'), 'utf8'));
   // 放慢一些，生成中的顶栏看得到
   await h.load('thinking', { speed: 2 });
   await markReasoning(page, fx);
   await newSessionVia(page, sideButton(page, '打开文件夹…'));
-  await thinkingOpened(page);
+  await thinkingOpened(page, fx);
   const highSeen = await clickThinking(page, 'high');
   const high = await topBar(page);
   record('thinking：点"高"：命令返回前按钮已显示"思考：高"且不可用（切换中），返回后可用',
     highSeen.some((item) => item.text === '思考：高' && item.pending) && !high.pending, JSON.stringify(highSeen));
   const [hard, easy] = promptsOf(fx);
   const { running, reply: withThinking } = await reason(page, hard.text);
-  record('thinking：生成中模型和思考按钮都不可用，悬停"生成中不能切换模型""生成中不能切换思考强度"',
-    running.modelDisabled === true && running.modelTitle === '生成中不能切换模型' && running.thinkingDisabled === true
-    && running.thinkingTitle === '生成中不能切换思考强度', JSON.stringify(running));
-  const keyed = await keyboardThinking(page, 'off');
+  record('thinking：生成中范围和思考按钮都不可用，悬停"Can\'t change the model while generating""生成中不能切换思考强度"',
+    running.modelDisabled === true && running.modelTitle === "Can't change the model while generating"
+    && running.thinkingDisabled === true && running.thinkingTitle === '生成中不能切换思考强度', JSON.stringify(running));
+  await clickThinking(page, 'off');
   const off = await topBar(page);
-  record('thinking：键盘换强度：打开菜单时焦点在"高"，↓ 从最后一项回到"关"，Enter 选中',
-    keyed.start === 'high' && keyed.moved === 'off' && off.level === 'off', JSON.stringify(keyed));
   const without = (await reason(page, easy.text)).reply;
   const recorded = recordedReplies(fx, resultsOf(fx, 'session.create')[0].sessionId);
   record('thinking：顶栏切到"高"后的回复带思考块（录制里有思考内容）', high.thinking === '思考：高' && high.level === 'high'
     && withThinking?.thinking === 1 && recorded[0]?.thinking
-    && withThinking.text.includes(recorded[0].text.slice(0, 6)),
-  JSON.stringify({ high, withThinking }));
+    && withThinking.text.includes(recorded[0].text.slice(0, 6)), JSON.stringify({ high, withThinking }));
   record('thinking：反例：切到"关"后的回复没有思考块', off.thinking === '思考：关' && off.level === 'off'
     && without?.thinking === 0 && recorded[1] && !recorded[1].thinking && without.text === recorded[1].text,
   JSON.stringify({ off, without }));
   await shot(page, 'thinking');
-  const save = commandOf(fx, 'model.save');
-  const row = await settingsRow(page, `${save.providerId}/${save.model.modelId}`);
-  record('thinking：反例：顶栏换了思考强度，设置里这个模型仍是默认、新会话默认仍是"中"', row.isDefault
-    && row.text.includes('支持思考 · 新会话默认 中'), JSON.stringify(row));
   await finish(page, 'thinking', commandsOf(fx).length);
 }
 
@@ -772,7 +500,12 @@ async function saveAgentsByKey(page, content) {
 async function writeAgents(page, fx) {
   const save = commandOf(fx, 'agents.save');
   const [empty, saved] = resultsOf(fx, 'agents.get');
-  await openSettings(page, 'connections');
+  await openSettings(page, 'models');
+  await page.getByTestId('models-section').waitFor({ timeout: 10000 });
+  const keys = await settingsNavKeys(page);
+  record('agents-md：设置页分节列表用 ↓ 换到"AGENTS.md"、↑ 回到"Models"，当前分节高亮（aria-current）、焦点跟着走',
+    keys.down.current === 'agents' && keys.down.focused === 'agents' && keys.up.current === 'models'
+    && keys.up.focused === 'models', JSON.stringify(keys));
   await watch(page, '.agents-user');
   await page.locator('[data-testid="settings-nav"] button[data-section="agents"]').click();
   await agentsReady(page);
@@ -1536,8 +1269,7 @@ async function slash(page, h) {
   await finish(page, 'slash', commandsOf(fx).length);
 }
 
-const checks = { 'model-switch': modelSwitch, thinking, 'agents-md': agentsMd, 'project-skill': projectSkill, mcp,
-  plugin, slash };
+const checks = { thinking, 'agents-md': agentsMd, 'project-skill': projectSkill, mcp, plugin, slash };
 
 await buildHarness();
 /** 回放窗口的临时数据目录：关掉窗口之后删掉 */

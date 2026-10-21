@@ -1,714 +1,909 @@
 # 统一模型提供商构建规格
 
-状态：构建规格草案，随 proposal 评审结论修订。
+状态：构建规格，按 [统一模型提供商 Proposal](../proposals/model-providers.md) 第四版写成，经过两轮评审（偏离 proposal、在 pi 上能否实现、完整与可测、与现有 App 的衔接）和实现中的补充；已实现，除真实模型一层外全部验收通过（见 [v1/models-checks.md](../v1/models-checks.md)）。更新日期：2026-10-21。
 
-> 这是 [统一模型提供商 Proposal](../proposals/model-providers.md) 的构建规格：配置 schema、切换协议、探针、模型池与验收细节。
-> 先读 proposal 了解心智模型；本文供实现与评审细节时查阅。两者冲突时，以 proposal 为准。
-> **本文中涉及平行 Agent 的部分按第二版写成，以 [平行 Agent 与 TaskBoard Proposal](../proposals/parallel-agents-taskboard.md) 第四版为准。** 已被推翻的有：
-> - 分诊小请求和 `triage_model`（§4.4、§4.5、§4.7、§5.7、§7.4、§8、§14）：第四版没有程序分诊。
-> - 强制 `task_route`：已并入 `task_handoff`；“看板写入等级”改称交接写入等级，只管交接。
-> - 换模型时写 TaskBoard 系统步骤、附程序事实（§5.5、§6.1、§12、§14）：切换记在实例自己的会话里，TaskBoard 不记。
-> - “执行类每次占用都新建上下文，所以在占用边界换模型零成本”（§6.1）：第四版里 task 交回同一角色时继承原会话，继续一条会话时模型变了，要按 §6.2 处理。
-> - 用语：占用、沟通者、结案者、TaskBoard 开启，分别读作 task 会话、对话 Agent、结案 Agent、协作模式打开。
+本文是 proposal 的实现说明：proposal 讲心智模型，本文讲在 Mori 里怎么做、做到什么算完成。
+两者冲突时以 proposal 为准；本文不另加 proposal 没有的行为。proposal 没定、实现又必须有一个值的地方，本文给出临时默认值，
+登记在 [v1/defaults.md](../v1/defaults.md)（§12）。
 
-更新日期：2026-10-19。
+## 0. 范围
 
-本文把所有模型提供商和模型放在同一个平面上管理：用户在 Agent 定义中按需引用任意提供商的任意模型，
-会话不再绑定某一个提供商。本文是 [Mori App v0 方案](../app-v0.md) 之后的 v1+ 设计：
-v0 只有连接表单、“测试连接”（首字耗时）和错误原文，模型配置就是 pi 的 `models.json`（app-v0 §4、§5.2）；探针、端点并发与排队、原始请求轨迹、多提供商候选、别名、模型档案、显式切换和模型池都是本文从 v1 起新建的（分期见 §13）。
+**本规格实现**普通模式下的模型层，即今天 App 里的每个会话（主 Agent，就是 v0 的那个 Agent）和后台调用（测试连接、探针、上下文压缩）用到的全部内容：
 
-确认后，本文将修改：
-[Agent 角色定义与生命周期 Proposal](../proposals/agent-lifecycle.md) 中“角色引用固定的模型资源”，
-[内网模型资源可靠性 Proposal](../proposals/model-reliability.md) 中“不自动切换模型、端点或账号”。
-模型池的排队、限额、单层重试、熔断和远端未知占用等可靠性机制继续有效。
-TaskBoard 与平行 Agent 见 [平行 Agent 与 TaskBoard 规格](parallel-agents-taskboard.md)。
+- Mori 自己的模型配置（分组、提供商、多个 key、模型、网络区域、项目授权与项目配置）、编译到 pi、从 v0 的 `models.json` 迁移；
+- 选择范围与选择器、会话启动校验、按可用性换 key 与换模型、重做与重建上下文、候选耗尽；
+- 模型档案与探针（含交接写入等级 A/B/C 的判定）、适配层中普通模式用得到的部分；
+- 按 key 的模型池（并发、排队、简单优先级、记住不可用）；
+- 设置页的模型部分、首次启动表单、顶栏的选择范围、对话流里的提示、阶段行、拒绝启动的说明；
+- 现有测试与回放随之调整（§14.4）。
 
-本文的设计不依赖某一个 Agent 内核。选择器、模型池、模型档案和适配层都放在 mori 自己的内核进程中，
-对内核只提出一组能力需求；v0 内核（pi-coding-agent SDK）与远期 DSH driver 的落点见 §11。
+**不在本规格实现**的部分只在有平行 Agent 与 TaskBoard 之后才有调用方，规则列在 §10，由那份规格按这些规则实现。
 
-## 1. 要解决的问题
+本规格不留“以后再做”的条目：§14 的每一条验收都有对应的测试，`tests/spec-coverage.mjs` 检查每一条都有通过的结果（§14.3）。
 
-1. **会话被绑定在单个提供商上**：常见 harness 启动时选定一个提供商，整个会话都只能用它的模型。
-   mori 的平行 Agent 需要按角色选择模型：规划和评估用强模型，执行用代码模型，记忆和摘要用便宜的快模型。
-2. **内网资源不稳定**：自部署端点限流、宕机、排队都很常见；旧方案只等待或失败，长任务因此停摆。
-3. **模型之间、部署之间差异大**：自部署和开源模型在工具调用、结构化输出、推理字段、上下文长度上各不相同，
-   同一套 harness 请求发到不同模型，可靠性差别很大。这正是“harness 遵从度差”的重要来源之一：
-   - BFCL 排行榜上，常用开源模型的多轮工具调用准确率大多在 40%–68% 之间；同一个模型用原生函数调用还是提示词格式，成绩可能相差数十个百分点；
-   - 同一份权重在不同部署上行为也不同：Moonshot 的 K2-Vendor-Verifier 测得 Kimi K2 的工具调用 schema 准确率在 vLLM 上 76%、SGLang 上 73%，官方 API 100%；
-   - 有些“不遵守规则”根本不是模型的问题：Ollama 的默认上下文按显存只有 4k–32k，超长时可能静默截掉 prompt 开头，而开头正是 system prompt 和工具定义；
-     推理块里的工具调用可能被推理解析器吞掉，表现为 HTTP 200、没有工具调用、回合正常结束。
+界面文字：本规格新增和改写的界面用英文（[app-v0](../app-v0.md) §11，2026-10-21 定）；没有改到的旧界面仍是中文，等英文任务统一改。
+文档正文、代码注释仍用中文；代码、日志、错误输出用英文。
 
-## 2. 新旧方案评估
+## 1. 术语与代码名
 
-| 维度 | 旧方案 | 用户提出的新方案 | 本文采用 |
-| --- | --- | --- | --- |
-| 提供商范围 | 内网 OpenAI 兼容接口 | 所有提供商在一个平面上 | pi-ai 支持的全部接入协议，统一命名为 `提供商/模型` |
-| Agent 与模型的关系 | 每个角色引用一个固定的模型资源 | 每个 Agent 按配置使用任意提供商的任意模型 | 有序候选列表 + 能力要求；别名同时捆绑推理档位、采样等参数 |
-| 失败时 | 等待或失败，不自动切换 | 按配置的候选列表显式切换（用户已确认） | 只因可用性原因、只在请求边界切换；旧尝试结果未知时先核对；切换处处可见 |
-| 能力信息 | 配置 + 验证，不允许猜测 | 能力不满足的候选跳过（用户已确认） | 能力三态：已验证、未验证、验证失败；验证失败或运行时失效的候选跳过 |
-| 弱模型适配 | 未涉及 | — | 按（端点，服务端版本，模型）建立档案，驱动请求、响应、历史、错误四侧的适配 |
-| 可靠性 | 完整的模型池设计 | — | 全部保留；排队带优先级与权重；额度组扩展到多提供商 |
-| 数据边界 | 默认全在内网 | 未涉及 | 每个提供商标注网络区域，任何调用都不得越过允许的区域 |
-
-**旧方案的优点**：可靠性语义完整（单层重试、远端未知占用、限额原子取得），并且坚持“能力不能猜”“不静默切换”。
-**旧方案的不足**：把“不切换”作为硬规则，在资源不稳定时直接导致任务停摆；只考虑单一协议；没有处理模型之间、部署之间的行为差异。
-
-**新方案的优点**：按角色选模型，成本和质量可以分别优化；候选列表提高可用性；会话与提供商解耦。
-**新方案的风险**：
-
-| 风险 | 证据 | 对策 |
+| proposal 用语 | 本文与代码中 | 说明 |
 | --- | --- | --- |
-| 切换后行为不一致，即使是“同一个模型” | K2-Vendor-Verifier：同一模型在不同部署上工具调用触发一致率约 51%–76% | 每个候选单独建档、单独探针；粘性选择减少切换；切换记录在案（§5） |
-| 中途换模型继承漂移 | Inherited Goal Drift：强模型接续弱模型的轨迹后也会漂移 | 执行类 Agent 在占用中途切换时不回放旧轨迹，从工作卡重建（§6） |
-| 切换导致代码离开内网 | — | 网络区域对所有调用生效，放宽只能在用户级设置中按项目授予（§4.6） |
-| 跨模型的上下文不兼容 | 推理块签名、工具调用标识格式、`reasoning_content` 回传要求各家不同 | 复用 pi-ai 的转写；不可行时改走重建（§6） |
-| 切换掩盖真实故障 | 网关默认配置常在调用方不知情时换服务方（OpenRouter `allow_fallbacks` 默认开启） | 每次切换记录原因并在界面显示；切换不重置总期限和总预算；网关必须关闭内部回退（§4.6、§5） |
-| 同一请求在两个模型上同时执行 | 首响应超时时旧尝试可能仍在计算 | 旧尝试结果未知时不切换，除非取消可验证（§5.4） |
-| 上下文超长被当成换大模型 | LiteLLM 的 `context_window_fallbacks` 会掩盖 compaction 失效 | 超长不触发换大模型；换到小窗口候选前先检查放不放得下（§5.1） |
-| 外部网关与 mori 重复重试 | — | 网关和 mori 只能有一层重试；内核自带重试关闭（§5.5） |
-| 探针污染生产状态 | 故障注入写入真实资源的冷却和熔断状态 | 故障注入只打模拟端点；探针经模型池、计入额度（§7.5） |
+| 分组 | group，`ModelGroup` | 有序的成员列表，每个成员是提供商 id 或 `<provider>/<model>` |
+| 提供商 | provider，`ModelProvider` | 一个端点 |
+| API key | key，`ProviderKey` | 提供商下的一个密钥；配置里只存引用 `ref`，密文在 `credentials.json` |
+| 模型 | model，`ProviderModel` | 提供商下的一个模型；全名 `<provider>/<model>`，第一个 `/` 之前是提供商 |
+| 选择范围 | pick，`ModelPick` | 一个字符串：分组 id、提供商 id，或 `<provider>/<model>` |
+| 候选列表 | candidates | 选择范围按 §5.1 展开后的有序模型列表 |
+| 一段工作 | reply，`ReplyState` | 普通模式下主 Agent 回答一条消息的过程（§5.2） |
+| 能力要求 | requires | 本规格里只有主 Agent 的 `[tool_calling]`（proposal §5） |
+| 模型档案 | profile，`ModelProfile` | §7 |
+| 网络区域 | zone：`local` / `intranet` / `public` | §4.3 |
+| 普通模式 | — | 协作模式关闭；App 今天只有这一种 |
 
-## 3. 概念
+## 2. 组件与代码落点
 
-```mermaid
-flowchart LR
-    P[提供商 Provider<br/>接入协议 地址 认证 网络区域 compat] --> M[模型 Model<br/>提供商/模型ID]
-    M --> F[模型档案 Profile<br/>按 端点·服务端版本·模型 建立]
-    Q[额度组 Quota group<br/>并发 速率 token] --- P
-    Q --- M
-    M --> A[别名 Alias<br/>有序候选 + 预设参数]
-    A --> B[Agent 绑定<br/>models requires on_unavailable]
-    M --> B
-    B --> S[选择器<br/>Agent 与非 Agent 调用共用]
-    S --> MP[模型池<br/>优先级队列 限额 重试 熔断]
-```
+模型层在后台进程（`app/src/kernel/`）里实现，是 [app-v0](../app-v0.md) §6“后台进程只做六件事”的第 6 件。
 
-| 概念 | 含义 |
-| --- | --- |
-| 提供商 | 一个可调用的端点：接入协议、地址、认证引用、网络区域、请求头、代理、compat 选项 |
-| 模型 | 某个提供商下的一个模型（一个部署），统一命名为 `提供商/模型ID`；第一个 `/` 之前是提供商，其余整体是模型 ID |
-| 模型档案 | 该部署的能力、限制、适配方式、探针结果和运行时遥测；决定 harness 如何组装请求和解析响应 |
-| 额度组 | 实际共享的限额：并发、请求速率、token；可以跨模型、跨提供商（例如同一 GPU 集群上的两个模型） |
-| 别名 | 一个有序候选列表，加上一组预设参数（推理档位、最大输出、采样参数） |
-| Agent 绑定 | `agent.md` 中的 `models`（有序候选，可写别名或具体模型）、`requires`、`on_unavailable`、`thinking`、`differ_from`、`compaction_model` |
-| 工具模型 | 摘要补写、标题、相似判断等非 Agent 调用使用的模型，单独配置 |
+| 组件 | 文件 | 做什么 |
+| --- | --- | --- |
+| 模型配置 | `kernel/modelConfig.ts` | 读写 `model-config.json`，zod 校验，名字解析，删除的连带改动，项目配置叠加（§4） |
+| 迁移 | `kernel/modelMigrate.ts` | 第一次启动时从 `models.json` 迁移（§4.5） |
+| 编译 | `kernel/modelCompile.ts` | 把配置注册成 pi 的提供商与模型，按档案设兼容选项，出错回滚（§4.4、§7.6） |
+| 选择器 | `kernel/selector.ts` | 纯函数：展开范围、逐项过滤、给出排除原因（§5.3） |
+| 会话接线 | `kernel/modelSession.ts` | 每个会话的虚拟模型、流函数包装、换模型、上下文钩子、段的开始与结束（§5、§6、§11） |
+| 上下文规则 | `kernel/modelContext.ts` | 纯函数：隐藏、重建、接手判断（§6） |
+| 模型池 | `kernel/modelPool.ts` | 按 key 的槽位、排队、优先级、不可用记录、发请求用的 fetch（§8） |
+| 失败分类 | `kernel/modelFailure.ts` | 纯函数：HTTP 状态、响应头、响应体、网络错误 → 分类（§5.4） |
+| 时长 | `kernel/modelTimings.ts` | §12 的全部时长；纯函数都以参数接收时长和 `now()` |
+| 档案 | `kernel/modelProfiles.ts` | 读写 `model-profiles.json`、指纹、能力三态（§7） |
+| 探针 | `kernel/probes.ts` | 探针请求与判定（§7.3） |
+| 测试连接 | `kernel/config.ts`（改写） | 测试连接改走模型池；只保留 pi 设置的读写（§9.4） |
+| 密钥 | `kernel/credentials.ts`、`main/credentials.ts` | key 按 `ref` 存取（§4.1） |
+| 进程桥协议 | `shared/models.ts`（新）、`shared/protocol.ts` | 命令、结果与事件（§9.5） |
+| 界面 | `renderer/src/components/` 与 `state/` | §9 |
+
+## 3. 数据文件
+
+| 文件 | 内容 | 谁写 |
+| --- | --- | --- |
+| `<userData>/model-config.json` | 用户级模型配置（§4.1），包括本机的项目授权 | 后台进程；原子写（先写临时文件再改名） |
+| `<userData>/model-profiles.json` | 模型档案（§7.2） | 后台进程 |
+| `<userData>/model-migration.json` | 迁移说明（§4.5），你点 Dismiss 后删除 | 后台进程 |
+| `<userData>/credentials.json` | key 的密文，`{ <ref>: <base64 密文> }`（M0 起的格式不变） | 主进程（safeStorage） |
+| `<project>/.mori/models.json` | 仓库里的项目配置，只能收紧（§4.3） | 你手工写；Mori 只读 |
+| `<agentDir>/models.json` | v0 的配置；迁移后不再读，也不改、不删 | — |
+| `<agentDir>/settings.json`（pi） | 新会话默认的思考强度（按模型）、`defaultThinkingLevel` 等 pi 设置；不再写默认模型 | 后台进程（沿用 v0） |
+| 会话文件（pi） | 自定义条目 `mori.pick`、`mori.model_switch`、`mori.rebuild`（§5.1、§6） | pi 的 `appendCustomEntry` |
 
 ## 4. 配置
 
-### 4.1 来源与编译
+### 4.1 用户级配置
 
-- mori 的模型配置（提供商、模型、额度组、别名、工具模型、区域策略）是唯一的用户来源，schema 由 mori 定义并严格校验，未知字段直接报错。
-- 启动时编译成内核的模型配置：对 pi 内核编译成内存模型注册（`ModelRuntime.create({ modelsPath: null })`，compat 按模型设置；接口在 v1 spike 中核实）。这是 v1 的新做法：app-v0 直接读写 pi 的 `models.json`（app-v0 §5.2、§6）；
-  远期 DSH driver 编译成 `dsh-llm-pi-ai` 的 `Config`。网络区域、模型族、部署信息、额度组、价格、探针结果等 mori 字段只留在 mori 侧，供选择器和模型池使用。
-- 认证只保存引用；密钥用 Electron `safeStorage` 加密保存（v1 新增；app-v0 把 key 明文写进 `models.json` 或写成 `$环境变量名`），在编译时注入内核，不写进任何配置文件或 `agent.md`。
-- 认证有两种写法：`auth: { secret_ref }`（密钥在 `safeStorage` 中）和 `auth: { env: NAME }`（编译时从进程环境读取，DSH 映射到 `apiKeyEnv`）。
-- **从 v0 迁移**：v1 首次启动时把 v0 的 `models.json` 导入 mori 配置，这一条取代 app-v0 原则 5“配置就是 pi 的配置”，属于 v1 的有意变更：
-  - 明文 key 迁入 `safeStorage`，迁移成功后由程序删除 `models.json` 中已迁入的明文 key 并提示（不留明文备份）；`$环境变量名` 转为 `auth: { env: NAME }`。
-  - `zone` 不静默猜测：按 baseUrl 给出建议值（回环地址为 `local`，私有网段为 `intranet`，其余为 `public`），第一次 v1 会话前要求用户确认；确认为 `public` 而未授权时，提示在用户级设置中按项目授予（§4.6）。
-  - 缺失的 `maxTokens` 取临时默认值并登记；mori schema 不认识的 pi 字段列出后丢弃。
-  - 迁移后不再读取 `models.json`（设置页注明）；v1 的首次启动表单、设置页“连接”和错误卡“去设置”都改写 mori 模型配置。
-  - 迁移完成即在后台运行探针 P0–P9，期间启动校验显示“验证中”。
-  - v0 的默认模型成为基座 Agent 的默认候选（§4.7）。
-- `agent.md` 只引用别名或具体模型名，不包含地址和密钥，因此 Agent 定义可以安全地放进项目仓库共享。
-- 项目配置只能收紧（缩小允许区域、在允许范围内覆盖别名指向），不能新增提供商或密钥；放宽见 §4.6。
+`model-config.json` 用 zod 严格校验（未知字段报错）：
 
-字段映射：
-
-| mori 字段 | pi-ai 模型定义 | DSH `dsh-llm-pi-ai` |
-| --- | --- | --- |
-| `api` | `api` | `api` |
-| `baseUrl` | `baseUrl` | `baseURL` |
-| `auth.secret_ref` | 编译时注入的 API key | `apiKeyEnv`（由 mori 设置进程环境） |
-| `compat` | `compat`（原样透传） | `compat` |
-| `models[].contextWindow` / `maxTokens` / `input` | 同名字段 | 同名字段 |
-| `models[].reasoning` / `thinking` 档位 | `reasoning`、`thinkingLevelMap` | `reasoningEfforts`、`thinkingBudgets` |
-| `retry` | 由 mori 关闭内核重试（§5.5） | `retryPolicy: { mode: normal, maxRetries: 0 }` |
-| `zone`、`family`、`weights`、`serving`、`quota_groups`、`price`、`probe`、`aliases` | 不进入内核 | 不进入内核 |
-
-### 4.2 示例
-
-```yaml
-providers:
-  intranet-vllm:
-    api: openai-completions          # pi-ai 的接入协议名，见 §4.3
-    baseUrl: http://10.0.0.5:8000/v1
-    auth: { secret_ref: intranet-vllm }
-    zone: intranet
-    compat: { supportsDeveloperRole: false, maxTokensField: max_tokens, thinkingFormat: qwen-chat-template }
-    serving: { engine: vllm, version: "0.24", tool_parser: qwen3_coder, reasoning_parser: qwen3, grammar_backend: xgrammar }
-    models:
-      - id: qwen3-coder-30b
-        family: qwen3
-        contextWindow: 131072
-        maxTokens: 16384             # 必须显式写出，且小于 contextWindow
-        input: [text]
-        quota_groups: [gpu-a]
-      - id: qwen3-30b-a3b
-        family: qwen3
-        contextWindow: 32768
-        maxTokens: 8192
-        quota_groups: [gpu-a]
-  corp-gateway:                      # 公司已有的 LiteLLM / OneAPI 网关
-    api: openai-completions
-    baseUrl: http://llm-gw.corp/v1
-    auth: { secret_ref: corp-gw }
-    zone: intranet
-    gateway: { kind: litellm, fallbacks: disabled }   # 网关必须关闭内部回退
-    models:
-      - { id: qwen3-coder-480b, family: qwen3, contextWindow: 262144, maxTokens: 32768 }
-  deepseek:
-    api: openai-completions
-    baseUrl: https://api.deepseek.com
-    auth: { secret_ref: deepseek }
-    zone: public
-    models:
-      - { id: deepseek-reasoner, family: deepseek, reasoning: true, contextWindow: 131072, maxTokens: 32768,
-          compat: { requiresReasoningContentOnAssistantMessages: true } }
-  local-ollama:
-    api: openai-completions
-    baseUrl: http://127.0.0.1:11434/v1
-    zone: local
-    models:
-      - { id: qwen3-8b, family: qwen3, contextWindow: 32768, maxTokens: 8192 }
-
-quota_groups:
-  gpu-a: { max_concurrency: 4, max_inflight_tokens: 400000 }
-
-aliases:
-  strong:
-    candidates: [corp-gateway/qwen3-coder-480b, deepseek/deepseek-reasoner]
-  coder:
-    candidates: [intranet-vllm/qwen3-coder-30b, corp-gateway/qwen3-coder-480b]
-    params: { thinking: minimal, samplingParams: { temperature: 0.7, top_p: 0.8, top_k: 20 } }
-  fast:
-    candidates: [intranet-vllm/qwen3-30b-a3b, local-ollama/qwen3-8b]
-
-utility:
-  summary: { use: fast, requires: [structured_output] }
-  title: { use: fast }
-  similarity: { use: fast }
-
-policy:
-  allowed_zones: [intranet, local]   # 用户级默认
-  project_trust:                     # 只能在用户级设置中按项目路径放宽
-    "D:/work/open-source-tool": { allowed_zones: [intranet, local, public] }
+```json
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "deepseek-2",
+      "name": "DeepSeek",
+      "api": "openai-completions",
+      "baseUrl": "https://api.deepseek.com",
+      "zone": "public",
+      "compat": { "maxTokensField": "max_tokens" },
+      "concurrency": 4,
+      "keys": [{ "ref": "deepseek-2#1", "label": "Key 1" }],
+      "nextKeyNumber": 2,
+      "models": [
+        { "id": "deepseek-chat", "family": "deepseek", "contextWindow": 131072, "maxTokens": 8192,
+          "reasoning": false, "input": ["text"] }
+      ]
+    }
+  ],
+  "groups": [{ "id": "cloud", "members": ["deepseek-2/deepseek-chat", "glm"] }],
+  "normalDefault": "cloud",
+  "allowedZones": ["local", "intranet"],
+  "projectZones": { "d:/work/tool": ["public"] }
+}
 ```
 
-`agent.md` 中的绑定：
-
-```yaml
-models: [coder, strong]          # 依次展开、去重；同一候选在多个别名中出现时，参数取它第一次出现的别名
-requires: [tool_calling, protocol_write, context>=65536]
-on_unavailable: failover         # failover（默认）| wait | release_task
-thinking: medium                 # 可选，覆盖别名预设；只在同一模型内保持不变
-compaction_model: inherit        # 默认使用该 Agent 当前解析出的模型
-```
-
-示例中的模型名称和数值只用于说明格式，实际值以配置和探针结果为准。档案中的能力字段（§7.2）由探针写入，不需要手写。
-
-### 4.3 接入协议
-
-接入协议直接使用 pi-ai 的实现，不另写协议层，也不新增独立的模型网关进程。pi-ai 提供的协议包括：
-`openai-completions`（OpenAI Chat Completions 及其兼容实现：vLLM、SGLang、Ollama、LM Studio、llama.cpp server、各类网关、多数国产模型 API）、
-`openai-responses`、`azure-openai-responses`、`anthropic-messages`、`google-generative-ai`、`google-vertex`、
-`mistral-conversations`、`bedrock-converse-stream` 等。v0 锁定的 pi 版本决定实际可用的协议与 compat 字段，升级时重新核对。
-
-### 4.4 能力
-
-`requires` 中可以写行为能力（`tool_calling`、`forced_tool_choice`、`protocol_write`、`parallel_tools`、`structured_output`、`vision`、`reasoning`）
-、看板写入等级下限（`protocol_write>=A`、`protocol_write>=B`；`protocol_write` 即不限等级）和数值限制（`context>=N`、`output>=N`）。其中：`forced_tool_choice` 指探针 P4 中 `named` 或 `required` 至少一项实测生效；
-`protocol_write` 指该模型的看板写入等级已由探针判定（A、B、C 任一，§7.4），执行类 Agent 和立项、结案权限的持有者一般要求它而不是 `forced_tool_choice`，
-这样不支持 `tool_choice` 的后端（如 Ollama）也能以 B 或 C 级担任执行者。
-程序发起的协议写入（分诊小请求、提交轮、强制 `task_route`）隐含要求 `protocol_write`：选择器为这类请求过滤候选，不论该 Agent 的 `requires` 是否写出；没有判定等级的候选按能力不满足跳过，全部跳过时按候选耗尽处理。两类能力的判定方式不同：
-
-| 类别 | 判定 |
+| 字段 | 规则 |
 | --- | --- |
-| 行为能力 | 三态：**已验证**（探针通过）、**未验证**（只有目录或手写声明）、**验证失败**。验证失败、或运行时健康度把它降为失效（§7.6）的候选被跳过。`tool_calling`、`forced_tool_choice`、`protocol_write`、`structured_output` 未验证时视为不满足：添加模型后等待自动探针通过，启动校验显示“验证中”（延续 app-v0 §9 保留的“实测工具调用”）。其余行为能力未验证时默认可用，但在启动校验、Agent 配置界面和切换事件中标注“未验证”；`policy.require_probed: true` 时它们也必须验证 |
-| 数值限制 | 取声明值与机器核对值中较小的一个：vLLM、SGLang 读 `/v1/models` 的 `max_model_len`；Ollama 读 `/api/ps` 的 `context_length`；llama.cpp 读单个 slot 的 `n_ctx`。无法核对时用探针 P10（§7.5） |
+| `providers[].id` | `^[a-z0-9][a-z0-9-]{0,39}$`。与分组 id 共用一个名字空间，不能重复。保留 id：`mori`（会话的虚拟模型用，§11.1）和 pi 内置的提供商 id（启动时从 pi 读出，例如 `deepseek`、`openai`），避免 pi 把内置的认证和模型并进来。新建时由名称生成：小写，非字母数字换成 `-`，去掉首尾 `-`，截到 40 个字符（加后缀时缩短前面，使总长不超过 40），结果为空（例如名称全是汉字）时用 `provider`，与已有 id 或保留 id 重复时加 `-2`、`-3`。建好后不能改（会话记录和档案按它引用） |
+| `providers[].name` | 非空，界面显示用 |
+| `providers[].api` | `openai-completions`、`openai-responses`、`anthropic-messages`（v0 的 `API_TYPES`） |
+| `providers[].baseUrl` | http 或 https URL |
+| `providers[].zone` | `local`、`intranet`、`public`；只有迁移来、还没确认的提供商可以是 `null`（§4.5） |
+| `providers[].compat` | 只能写 v0 的 `COMPAT_OPTIONS` 里的六个字段，值同 v0；只对 `openai-completions` 生效 |
+| `providers[].concurrency` | 每个 key 的并发上限，整数 1–64，新建默认 4 |
+| `providers[].keys` | 0–8 个，顺序就是使用顺序。`ref` 全局唯一，只含 `[A-Za-z0-9._#-]`；`label` 非空。没有 key 的提供商发请求时不带认证头（例如本机 Ollama，§8.4） |
+| `providers[].nextKeyNumber` | 整数 ≥ 1，只增不减。新 key 的 `ref` 是 `<提供商 id>#<nextKeyNumber>`，之后加 1；删掉的编号不再用 |
+| `providers[].models` | 至少 1 个，列出的顺序就是范围里的顺序。`id` 非空、不含空白，同一提供商内唯一，建好后不能改；`family` 可以为空字符串；`contextWindow` 正整数；`maxTokens` 正整数且小于 `contextWindow`；`reasoning` 布尔；`input` 为 `["text"]` 或 `["text","image"]` |
+| `groups[]` | `id` 规则同提供商 id。`members` 是有序、不重复的成员，至少 1 个：已存在的提供商 id（它的全部模型），或已存在的 `<provider>/<model>`（只这一个模型）。同一个提供商或模型可以在多个分组里 |
+| `normalDefault` | 一个选择范围（§4.2）或 `null`；指向的名字必须存在 |
+| `allowedZones` | 所有项目默认允许的区域，只能是 `local`、`intranet` 的子集，默认两者都有。公网只能按项目授权（proposal §12 第 2 条） |
+| `projectZones` | 本机按项目授权：键是项目文件夹的规范化路径（绝对路径、全部小写、`/` 分隔、无结尾 `/`），值是在 `allowedZones` 之外为这个项目额外允许的区域。路径比较不分大小写（Windows） |
 
-这对应用户的决定“能力不满足的候选跳过”，同时保留旧方案“能力不能猜”的精神：未验证的能力处处可见，不冒充已验证。
-公开目录（models.dev 等）描述的是模型本身，不反映具体部署的 tool parser 和 chat template，只作初值。
+**删除的连带改动**（确认框列出每一项）：
 
-### 4.5 启动校验
+- 删除提供商：它和它的模型从所有分组里去掉，它的 key 一起删除；
+- 删除模型：它从所有分组里去掉；它是提供商的最后一个模型时，提供商一起删除（同上一条），确认框写“This is the last model of <name>; the provider and its keys are deleted too.”；
+- 因此变空的分组一起删除；
+- `normalDefault` 指向被删的名字时改为 `null`；
+- 删除分组：`normalDefault` 指向它时改为 `null`，确认框说明“Sessions using this group will need a new model range.”。
 
-会话启动时，程序为每个 Agent（含基座 Agent，§4.7）和每个工具模型展开候选并逐项过滤：
+打开着的、范围指向被删名字的会话，静态校验按 `pick_missing` 拒绝启动（§4.6）。会话文件里的 `mori.pick` 和项目配置不改。
 
-- 至少剩下一个候选才允许启动；否则拒绝启动，说明每个候选被排除的原因；候选只因“未验证”或“验证中”被排除时，界面提供“立即验证这些模型”，显示预计请求数，验证完自动重试启动。
-- 沟通者、立项者、结案者只有一个可用候选，或全部候选在同一提供商、同一额度组时，给出“没有可用性冗余”的警告。
-- 立项者、结案者和分诊使用的 `triage_model` 没有任何满足 `protocol_write` 的候选时拒绝启动；其他平行 Agent 没有时警告“它被接棒后无法交接”（§4.4）。
-- 评估 Agent 配置了 `differ_from`，而它的候选模型族都包含在所有带 `edit` 工具的平行 Agent 的候选模型族中时，给出警告（被评审者在运行时才确定，启动时按可能的作者估计）。
-- 工具模型同样校验：`summary` 要求 `structured_output`；`compaction_model` 不为 `inherit` 时，它的窗口必须不小于所服务 Agent 的 compaction 触发阈值。
+**改提供商地址**：`baseUrl` 的 origin（协议、主机、端口）变了时，保存会删除它的全部 key，确认框写“Changing the address removes this provider's N saved keys. Add them again after saving.”（沿用 v0“改了服务地址就要重新填写 key”，key 不会发到新的地址）。
 
-### 4.6 网络区域
+**启动时配置读不出**：`model-config.json` 存在但不是合法 JSON 或校验失败时，不迁移、不显示首次启动表单、不覆盖文件；所有会话按 `config_invalid` 拒绝启动，设置页 Models 只显示这条错误（文件路径与校验原文）和“Reload”。
 
-每个提供商必须标注 `zone`：`local`（本机）、`intranet`（公司内网）、`public`（公网）。
+key：明文只经进程通道交给后台进程，放在模型池的内存里（§8.4），不进 pi、不进任何配置文件、不回到界面。从 v0 迁移来的 key 沿用原来的 `ref`（就是 v0 的提供商 id）。
 
-- 区域过滤是选择器的统一前置步骤，作用于**所有**模型调用：平行 Agent、subagent、工具模型、compaction、记忆。
-- 用户级 `policy.allowed_zones` 给出默认允许的区域。放宽只能在用户级设置中按项目路径授予（`project_trust`）；
-  仓库里的项目配置只能收紧，否则克隆来的仓库就能把代码发往公网。项目请求了公网区域而用户未授予时，启动校验提示用户在本机授权。
-- 网关类提供商必须声明 `gateway.fallbacks: disabled`，请求带上关闭回退的参数（如 LiteLLM 的 `disable_fallbacks`）；
-  程序比对服务端报告的实际模型（`x-litellm-model-id`、响应中的 model 字段）与预期，不一致时记录、告警并把档案标为需要重新验证。
-  否则网关内部的回退既可能越过区域，也违背“切换可见”。
-- 项目覆盖别名时，启动校验和 Agent 配置界面显示“别名 coder 被本项目覆盖：A → B”。
-- 内核自带的“模型在调用时自选路由”一类能力（例如 DSH subagent 工具的 `modelSelectionSettings`）一律关闭，subagent 的模型经选择器解析。
-- 探针使用固定的合成用例，受用户级 `allowed_zones` 约束。
+### 4.2 名字与引用
 
-### 4.7 基座 Agent 的绑定
+- 选择范围是一个字符串：等于某个分组 id 就是分组；等于某个提供商 id 就是提供商；含 `/` 就是 `<提供商>/<模型>`。分组和提供商共用名字空间，所以不会有歧义。
+- 引用的名字不存在时报错“<名字> is not in your model settings”，并说明谁引用了它（默认范围、本会话的范围、项目配置的哪一项）。
 
-基座 Agent（TaskBoard 规格 §5.1）没有 `agent.md`，它的模型绑定写在 mori 模型配置中：
+### 4.3 网络区域、项目授权与项目配置
 
-```yaml
-base_agent:
-  models: [default]                     # 默认候选；从 v0 迁移时取 v0 的默认模型
-  requires: [tool_calling, protocol_write]
-  on_unavailable: failover
+一个项目（会话的工作文件夹）允许的区域：
+
+1. 用户级 `allowedZones`；
+2. 加上 `projectZones[项目路径]`（本机授权，只在设置页 Project access 里改，§9.1）；
+3. 再与 `<project>/.mori/models.json` 的 `allowedZones`（若写了）取交集。
+
+`<project>/.mori/models.json` 严格校验，只能写两项：
+
+```json
+{ "allowedZones": ["local"], "groups": { "cloud": ["glm/glm-4.6"] } }
 ```
 
-- 启动校验（§4.5）同样展开和校验它；分诊的 `triage_model` 默认取沟通者的候选，沟通者是基座时即取这里。
-- **顶栏切换模型**（v0 已有的交互）在 v1 定义为本会话对沟通者对话通道的覆盖：所选模型排在候选首位并标注“已覆盖”，从下一轮对话开始生效，不影响其他通道和其他 Agent；粘性规则（§5.8）以覆盖后的列表为准。
+- `allowedZones`：只会缩小（与前两步的结果取交集）。
+- `groups`：把用户的某个分组在这个项目里缩小到它的一部分。列出的每一项必须是用户这个分组的成员，或者是某个提供商成员下的模型（把这个提供商缩小到这个模型）。
+  展开顺序按用户分组里成员的顺序；同一提供商成员缩小成多个模型时，按提供商里列出的模型顺序。
+- 分组不存在、列出的项不属于用户的这个分组、某个分组的列表为空、有别的字段、文件不是合法 JSON、文件读不出（不存在除外）：会话按 `project_config` 拒绝启动，显示原因或校验原文。
+- 不能新增提供商、模型或 key。项目没有这个文件时只按前两步算。
+
+区域只约束会话的模型请求（含它的压缩）。探针、测试连接、key 的 Test 是你在设置页发起的、只发合成内容，不按项目区域过滤；区域未确认的提供商也可以探测和测试。
+
+### 4.4 编译到 pi
+
+后台进程启动时、配置每次保存后、以及探针结束使某个模型的 `reasoning.replay` 变化时（只重新注册这个提供商，§7.4）：
+
+1. pi 的运行时用 `ModelRuntime.create({ modelsPath: null, refreshOnCreate: false })`：不读 `models.json`。
+2. 每个提供商 `registerProvider(id, { name, baseUrl, api, apiKey: <占位>, models })`。每个模型带 `id`、`name`（= id）、`api`、`input`、`reasoning`、`contextWindow`、`maxTokens`、`cost`（全 0）和 `compat`（配置里的六个字段，加上档案给出的 `requiresReasoningContentOnAssistantMessages`，§7.6）。
+   `apiKey` 是一个不保密的占位字符串（§12），只为让 pi 把提供商当作“已配置”；真正的 key 由模型池在发请求时写进认证头（§8.4）。
+3. 配置里删掉的提供商 `unregisterProvider`。
+4. `await runtime.refresh({ allowNetwork: false })`：pi 的 `registerProvider` 自己发起的刷新不等待，会与别的刷新互相覆盖（§11.6 K9）。
+5. 出错（pi 抛错）时：用旧配置把本次改动过的提供商重新注册（被删的重新注册、新增的 `unregisterProvider`），再刷新；保存失败，配置文件不改，错误原文显示在设置页。
+6. 打开着的会话不需要重新创建；下一个请求起按新配置选择（§4.7）。
+
+### 4.5 从 v0 迁移
+
+后台进程启动时，`model-config.json` 不存在而 `<agentDir>/models.json` 存在，就迁移一次。读 `models.json` 用 v0 的读法（去 BOM、`//` 注释和多余的逗号）。
+
+| v0 | 迁移成 |
+| --- | --- |
+| `models.json` 的每个 provider（不只 `mori-endpoint*`） | 一个提供商，`id` 不变；不符合 §4.1 规则、或是保留 id 的按 §4.1 改写（冲突加 `-2`、`-3`），在说明里列出 |
+| provider 的 `name`、`baseUrl`、`api` | 原样；`name` 没有时用 id；`api` 不在三种之内的 provider 不迁移，在说明里列出 |
+| `compat` | 六个字段只保留 v0 勾选时写的那个值（例如 `supportsStore: false`）；别的值和其余字段丢弃并在说明里列出 |
+| `credentials.json` 里以 provider id 为 `ref` 的密文 | `keys: [{ ref: <provider id>, label: "Key 1" }]`，`nextKeyNumber: 1` |
+| provider 的 `apiKey` 字段（手写在 `models.json` 里的明文） | 没有同 `ref` 的密文时交给主进程加密存为 `ref` = provider id 的 key；已有密文时以密文为准，在说明里注明；以 `$` 开头的环境变量写法不迁移，在说明里列出“需要重新填写 key” |
+| 每个模型 | `id` 不变；`contextWindow`、`maxTokens` 取原值，没有时取 pi 的默认（128000、16384）；`maxTokens` 不小于窗口时取窗口的一半；`reasoning` 原值；`input` 原值或 `["text"]`；`family` 为空。不合格的模型丢弃并列出；一个合格模型都没有的 provider 不迁移 |
+| 网络区域 | `zone: null`（未确认），设置页按 §12 的规则给出建议，由你确认 |
+| pi 设置的 `defaultProvider` / `defaultModel` | `normalDefault` = `<provider>/<model>`（按改写后的 id；找不到时为 `null`） |
+| pi 设置的 `modelThinkingLevels` | 原样保留；改写了 id 的，把旧键复制到新键（旧键不删） |
+| 分组 | 不新建 |
+
+- `providers` 为空或没有、或没有一个 provider 能迁移：不写配置，按首次启动处理；后一种情况把迁移说明作为 `migrationError` 显示在首次启动表单上方。
+- 迁移成功：写 `model-config.json` 和 `model-migration.json`（说明：迁移了哪些提供商、改写了哪些 id、丢弃了什么、哪些要重新填 key）；对迁移来的全部模型在后台跑探针（§7.4）；这次启动直接打开 设置 → Models。
+- 迁移说明在 Models 顶部一直显示，直到你点“Dismiss”（删除 `model-migration.json`）。
+- 迁移失败（`models.json` 读不出、任何一个明文 key 加密失败）：不写 `model-config.json`，按首次启动处理，首次启动表单上方显示失败原文。
+
+### 4.6 会话启动校验
+
+会话新建、打开、改了范围、配置或档案变化、探针结束时，后台进程对会话做一次**静态校验**：按 §5.3 的第 1–3 步过滤（不看可用性），结果是 `ModelState.blocked`（§9.5）。
+
+| 结果 | 条件 | 卡片文字（§9.3） | 可做的操作 |
+| --- | --- | --- | --- |
+| 可以发送 | 至少剩一个候选 | — | — |
+| `verifying` | 没有候选通过，而且被排除的候选里至少一个是 `probing` | Verifying <模型>… | 无（探针结束自动重新校验） |
+| `no_candidate` | 没有候选通过，没有在验证中的 | This session can't start: no model fits. 加每个候选及原因 | Verify now（有 `unverified` 的候选时）；Allow <区域> for this project…（有 `zone_blocked` 的候选、且项目配置没有排除这个区域时：打开 设置 → Project access，焦点在这个项目）；Confirm zone…（有 `zone_unconfirmed` 的候选时：打开 设置 → Models 顶部区域未确认的几行）；Change model…；Open settings |
+| `no_pick` | 会话没有范围（§5.1） | No default model range; pick one. | Change model…；Open settings |
+| `pick_missing` | 范围指向的名字不存在 | <名字> is not in your model settings. | Change model…；Open settings |
+| `project_config` | 项目配置无效（§4.3） | .mori/models.json: <原因或原文> | Open settings |
+| `config_invalid` | 用户级配置读不出（§4.1） | Model settings can't be read: <路径>: <原文> | Open settings |
+
+被拒绝启动的会话可以看历史、可以在输入框打字、可以改范围；发送不可用，后台进程收到这个会话的 `session.prompt` 时拒绝（`This session can't start: no model fits`，经 `mori.prompt_error` 把文字放回输入框）。
+
+### 4.7 回复进行中改配置
+
+- `ReplyState.current` 存 `<provider>/<model>` 字符串，每次请求从运行时取模型对象。
+- 正在用的模型或它的提供商被删除：保存照常进行；这段的下一个请求按 §5.6 换模型，原因 `missing`（“removed from your model settings”）。
+- 配置或档案的其他变化不让段内的 `current` 失效：段内只有 §5.4 的失败分类会换模型，第 3 步（档案）只在选模型时判断。
+- key 或并发上限的变化按 §8.2 处理。
 
 ## 5. 选择与切换
 
-### 5.1 选择器
+### 5.1 选择范围与候选
 
-选择器是一个函数，Agent 的每次模型请求和非 Agent 调用（工具模型、compaction、探针以外）都经过它：
+- 普通模式下每个会话有一个选择范围，记在会话文件里（自定义条目 `mori.pick`，`{ pick }`），以最后一条为准：
+  - 新会话：创建时记下当时的 `normalDefault`；`normalDefault` 为 `null` 时不记，会话按 `no_pick` 拒绝启动；
+  - 你在顶栏选了一个范围：再记一条（§5.10）；
+  - 打开一个没有 `mori.pick` 的会话（v0 的旧会话）：最后一条助手消息的 `<provider>/<model>` 在配置里存在就以它为范围，否则用当时的 `normalDefault`；打开时记下这一条。
+  - 设置里的默认范围后来改了，已有会话的范围不变。
+- 展开：分组 → 成员按分组中的顺序（项目配置缩小过的按 §4.3），提供商成员展开成它列出的全部模型，模型成员就是它自己；提供商 → 它的模型按顺序；模型 → 它自己。
+  同一个模型只保留第一次出现。
+- 主 Agent 的能力要求固定为 `[tool_calling]`（proposal §5）。
 
-```mermaid
-flowchart TD
-    A[展开候选：别名与具体模型依次展开并去重] --> B[排除不在允许区域内的]
-    B --> C[排除行为能力验证失败、运行时失效，或关键能力尚未验证的]
-    C --> D[排除数值限制不满足、或放不下本次请求估算长度加输出预留的]
-    D --> E[排除认证阻塞、熔断中、额度耗尽、冷却中，以及本次逻辑请求已排除的]
-    E --> F[评审 Agent：排除被评审集合中的候选（按 differ_from.by，§10）]
-    F --> G{本次占用或本轮对话已选定的模型仍可用?}
-    G -->|是| H[继续使用它]
-    G -->|否| I[选择剩余的第一个]
-    H --> J[记录选择结果与每个被跳过候选的原因]
-    I --> J
-    J --> K[按目标模型档案组装请求，进入模型池对应额度组的队列]
-```
+### 5.2 一段工作（reply）
 
-“放不下本次请求”这一步防止因可用性切到窗口更小的候选时，第一个请求就溢出：
-每次占用或每次唤醒新建的上下文这时从工作卡重建；连续上下文（沟通者的对话，以及配置了 `context: continuous` 的职责上下文）先主动做 compaction 再派发；都做不到就跳过该候选并记录“窗口不足”。
-这一步只在**换到别的候选时**起作用；当前模型自己的上下文超长不触发换大模型（§5.3）。
+普通模式下一段工作是主 Agent 回答一条消息的过程：
 
-### 5.2 切换协议
+- **开始**：
+  - 你发消息：后台进程处理 `session.prompt` 时（§11.4），在调 pi 之前建立 `ReplyState`；
+  - 排队的消息（followUp）在同一次 pi 运行里被处理：它被 pi 送进上下文时开始新的一段（§11.4）。
+- **插话**（steer）不论在什么时候送达，都属于正在进行的那一段。
+- **结束**：pi 发 `agent_settled`，或 pi 的 `prompt()` 结束（成功或抛错）时会话已不在运行，都清掉 `ReplyState`。
+- `ReplyState`：`startedAt`（§11.4，晚于上一段的全部消息）、`anchor`（这段要回答的那条用户消息）、`current`（当前模型）、`tried`（本段里已失败、不再选的模型及原因）、`skipped`（段开始时排在 `current` 之前、被跳过的候选）。
+- 段开始时从候选的第一个起选；段内一直用 `current`（粘性），只有它出故障才按 §5.6 换。下一段重新从第一个候选起选，所以首选恢复后下一段自然用回首选。
 
-模型池不自行把请求改投到另一个提供商，因为已准备好的请求是按原目标模型档案组装的（工具调用方式、强制策略、去掉的参数都不同）。
-模型池遇到 §5.3 的切换条件时，结束本次尝试并返回 `reprepare { exclude, reason, 剩余期限与预算 }`；
-调用方重新执行选择器（`exclude` 中的候选本次逻辑请求内不再选），按新目标档案组装请求后重新进入模型池。
-逻辑请求标识、总期限和总预算沿用。Agent 调用和非 Agent 调用都走这一协议，后者由 mori 的统一调用包装完成。
+### 5.3 选择器
 
-### 5.3 什么时候切换
+`select(input) → { model | null, excluded: [{ ref, reason, detail }] }`，纯函数。输入：候选列表、项目允许的区域、档案、可用性快照、`ReplyState`（可以没有）、当前时刻、时长表。
 
-按用户的决定，切换只因为**可用性**原因，并且只在**请求边界**发生：
+按顺序对每个候选判断，第一个不满足的条件就是它的排除原因：
 
-| 情况 | 处理 |
-| --- | --- |
-| 连接失败，确认请求未送出 | 在该候选的重试子预算内重试；用完后切换 |
-| 限流，`Retry-After` 超过本次请求允许的等待时间 | 原模型进入冷却，切换 |
-| 服务错误（确认请求已被拒绝处理）达到子预算，或熔断打开 | 切换 |
-| 首个有效响应超时、502/504、发送后流中断 | 结果未知，按 §5.4 处理 |
-| 排队超过 `max_queue_wait` | 在模型池的同一串行调度步骤中确认未发出、移出队列，返回 `reprepare` |
-| 认证失败、额度耗尽、模型不存在 | 阻塞该提供商或模型，立即切换，界面提示需要处理配置 |
+| 步 | 条件 | 原因代码 | 界面文字 |
+| --- | --- | --- | --- |
+| 1 | 名字在配置里 | `missing` | not in your model settings / removed from your model settings（回复进行中被删时） |
+| 2 | 提供商区域已确认 | `zone_unconfirmed` | network zone not confirmed |
+| 2 | 区域在项目允许的区域里 | `zone_blocked` | zone <区域> is not allowed for this project |
+| 3 | 档案的 `tool_calling` 为已验证（§7.4 重新验证期间按旧结果） | `probing` / `unverified` / `failed` | verifying… / tool calling not verified yet / tool calling failed verification |
+| 4 | 可用（§8.3） | `rate_limited` / `auth` / `quota` / `connection` / `not_found` / `timeout` / `held` | rate limited until hh:mm:ss / API key rejected / quota exhausted / can't connect until hh:mm:ss / model not found on the server / no response; unavailable until hh:mm:ss / waiting to make sure it stopped, until hh:mm:ss |
+| 5 | 不在 `tried` 里 | `tried` | failed earlier in this reply: <它的原因文字> |
+| 5 | 段内选择时，排在 `current` 之后（不在 `skipped` 里，也不是排在它前面的） | `earlier` | skipped at the start of this reply |
+| 6 | 能接手这段对话（§6.2，只在要换到它时判断） | `no_handover` | conversation too long for this model / couldn't rebuild the conversation: <原文> |
 
-以下情况**不切换**：
+- 第 1–3 步是静态校验（§4.6）；第 4–6 步只在选模型时判断。`queue_timeout` 不会出现在可用性里：它只让这一次请求换模型，记进 `tried`（文字“waited 60 s for a free slot”）。
+- 没有 `ReplyState` 或段刚开始：选通过的第一个。段内：`current` 仍通过第 1–5 步就继续用它；否则只在排在 `current` 之后的候选里按顺序选。
+- 展示原因时用“界面文字”列；`<它的原因文字>` 不带 until 部分。排除结果里的 `detail` 就是完整的界面文字（含 until）。界面文字只有一份，放在 `shared/models.ts`，后台进程（重做说明、没有可用模型的说明）和界面（卡片、菜单）共用。
 
-| 情况 | 处理 |
-| --- | --- |
-| 输出格式错误、工具参数不合格 | 交给 Agent 循环按模型步骤失败处理（档案中的格式重试）；持续失败由运行时健康度把能力降为失效（§7.6），在下一个请求边界自然跳过 |
-| 已经输出部分内容后失败 | 按内核语义处理（丢弃部分输出后重试或结束回合）；对用户已显示的部分标为“已中断” |
-| 当前模型上下文超长 | 连续上下文做 compaction；新建的上下文写检查点后从工作卡重建；不换更大窗口的模型 |
-| 内容策略拦截 | 报告给用户，不换模型绕过 |
-| 用户取消 | 停止，不切换 |
+### 5.4 失败分类
 
-“输出质量差时升级到更强的模型”属于语义路由，不在本期范围，见 §15。
+模型池在 HTTP 层看到每次尝试的结果（§8.4），按下表分类。“有输出”指这次请求已经收到正文、思考或工具调用的内容。
 
-### 5.4 结果未知时
+| 结果 | 分类 | 处理 |
+| --- | --- | --- |
+| HTTP 429 | `rate_limited` | 这个 key 冷却到 `Retry-After` 给的时刻（秒数、HTTP 日期，或 `retry-after-ms`；都没有时按 §12）；同一提供商还有可用的 key 就换 key 重发（§5.5）；没有就换模型（§5.6） |
+| HTTP 401、403 | `auth` | 这个 key 标为被拒绝（§8.3）；换 key 或换模型同上 |
+| HTTP 402，或状态 400/403/429 且响应体含 §12 的额度关键词（不区分大小写） | `quota` | 同 `auth`，原因为额度 |
+| HTTP 404 | `not_found` | 这个模型标为不可用（§8.3）；换模型 |
+| 发出前或收到响应头前的网络错误（连接被拒、DNS、TLS、连接重置），以及收到响应头之后、第一个有内容的事件之前连接中断（由包装判断，它知道有没有内容） | `connection` | 这个提供商不可用一段时间（§12）；换模型 |
+| 排队等槽位超过 §12 的时长 | `queue_timeout` | 请求没有发出；换模型 |
+| HTTP 500、502、503、504 | `server` | 原地重试（§5.5）；重试用完后这次回复以错误结束，不换模型（proposal：v1 原地重试） |
+| 一次 HTTP 尝试真正发出（拿到槽位与 key 之后）起 §12 的时长内没有收到第一个有内容的事件（正文、思考、工具调用）；排队、换 key、原地重试的等待不计入，每次尝试重新计时 | `timeout` | §5.7 |
+| 其他 4xx（例如 400 参数或模板错误） | `request` | 不换；这次回复以错误结束，显示原文 |
+| 已经有输出后连接中断或出错 | `partial` | 不换；回复以错误结束，已显示的部分保留 |
+| 上下文超长的错误 | — | 不换；由 pi 的溢出恢复（压缩后重试）处理，压缩走 §6.4 |
+| 你按了停止 | — | 停止，不换 |
 
-关闭连接只证明客户端停止接收，不证明远端已经停止计算（旧方案“远端未知占用”）。因此：
+内容策略拦截在 pi 里表现为正常结束或 4xx，按上表不换。模型输出格式错误（例如工具参数不合格）在 pi 的循环里作为工具错误回给模型，不经过模型池，也不换。
 
-- 旧尝试处于远端未知状态时，默认**不切换**：先发取消，等待满足旧方案的解除条件（取消确认、结果查询确认或已验证的最长执行时间），
-  界面显示“等待原尝试核对”；超出总期限则按 `on_unavailable` 处理。
-- 若探针已经验证该部署“连接关闭即中止请求”（`cancel_verified`），取消后视为已终止，可以立即切换。
-- 远端未知的旧尝试继续占用原额度组的容量；共享额度组中远端未知的占比超过阈值时，按熔断处理，防止一次负载高峰把整个额度组变成未知、流量全部涌向下一个候选。
-- 同一个逻辑请求在任一时刻最多只有一个可能在执行的尝试。
+### 5.5 换 key 与原地重试
 
-### 5.5 重试与预算
+都在模型池的 fetch 里完成，pi 只看到最后一次的响应：
 
-- **单层重试**：重试只由 mori 的模型池决定。DSH 上不注册 `llm-retry`，其错误分类和退避参数并入模型池；
-  pi 上由 mori 接管会话级重试：`retry.maxRetries` 设为总尝试上限、基础延迟设为 0，每次重试 pi 都会以 `reason: "retry"`（带 `failed`）调用虚拟模型的 `route()`，
-  由模型池在 `route()` 中按 `Retry-After` 等待、决定同候选重试或返回新目标（即 `reprepare`）；provider 级重试保持为 0。具体做法列为 v1 开头的 spike。
-  pi 只对它判为可重试的错误调用 `route(retry)`；认证失败、额度耗尽、模型不存在、模板 400 等会以 error 结束回合。对这类错误，mori 在 `agent_before_settle`（`outcome: "error"`）中按 `after_provider_response` 记录的状态判断是否属于 §5.3 的切换原因：属于就排除该候选并 `continue`，沿用逻辑请求的总期限与预算；这一判断在 TaskBoard 规格 §7.6 的出错回收之前执行；候选用完后先按 §5.7 的 `on_unavailable` 处理，处理结束仍无可用候选才进入回收。
-  **占用中途换到另一个模型时不在原 pi 会话中继续**：同一模型的重试仍在原会话中进行；选出的新候选与当前模型不同时，`route()` 不返回新候选，而是结束本回合，程序写 `model_switch` 系统步骤，用 `createAgentSessionFromServices` 在新候选上新建会话（system prompt + 工作卡 + 该步骤），租约不变（§6.1）。对话通道与 `context: continuous` 的职责通道按 §6.2 先判断能否转写。这一做法列入 v1 spike。
-  `retry: upstream`（网关自带重试）的提供商 mori 不再重试。
-- **预算结构**：一个逻辑请求有跨候选不重置的总尝试上限和总期限；每个候选有自己的重试子预算，切到新候选时重新给，但受总上限约束。
-- **期限**：每次切换时新候选的期限取“剩余总期限”与“该候选声明的期限”中较小的一个。总期限默认取“首选候选的期限（含其重试子预算）+ 后备候选中最大的单候选期限”，
-  总尝试上限同理，保证首选用完重试后后备仍有一次完整尝试的时间；写入请求记录。
-- 切换不重置任务预算；预算耗尽时不自动换成更便宜的模型继续（TaskBoard 规格 §7.6、§16）。
+- **换 key**：同一个请求体、同一个模型，换到同一提供商下一个可用的 key 重发；按 §8.2 重新排队。不算换模型，对话流不提示；等槽位时阶段行显示“Waiting for <提供商名>”。请求体不是字符串时（不能重发）按换模型处理。
+- **原地重试**：`server` 分类按 §12 的次数和间隔重发（可以换 key）；每次等待前发 `mori.model_retry`，阶段行显示“Retrying n/m · HTTP 503”。
+- pi 自己的 agent 级自动重试对 Mori 的会话关闭：每次调 pi 的 `prompt`、`steer`、`followUp`、`compact` 之前，都对会话的 `settingsManager` 执行 `applyOverrides({ retry: { enabled: false } })`（只在内存里、可以重复执行；pi 的 reload 和带 `persist` 的设置会清掉它，§11.6 K6）。
+  provider 级重试由包装在每次请求的选项里写 `maxRetries: 0`。所以只有一层重试，就是模型池的。
 
-### 5.6 排队改投
+### 5.6 换模型
 
-- 改投在模型池的同一个串行调度入口完成：从原队列移除、确认没有发送意图、返回 `reprepare`，作为一个原子步骤。
-- 改投后的请求保留原入队时间作为排序依据，不排到队尾；排队时间计入总期限。
-- 一次逻辑请求中每个候选最多被选中一次，选中期间按 §5.5 的子预算重试；全部候选都失败或超时，逻辑请求失败，交给 `on_unavailable`。
-- 熔断引起的批量改投按优先级分批放行，并受目标候选的队列上限约束，超出部分直接按排队超时处理。
+换模型发生在 pi 的一次模型请求里，由 Mori 的流函数包装完成（§11.2）：
 
-### 5.7 候选耗尽
+1. 当前模型这次请求失败，分类要求换模型，且这次请求还没有输出；或者发请求之前 `route()` 发现 `current` 已不在配置里、或已不可用（§11.1），这时不发出就换。
+2. 失败的模型记进 `tried`；按 §5.3 在排在它之后的候选里选下一个，对每个候选做接手判断（§6.2）。
+3. 选到了 B：
+   - 写一条 `mori.model_switch` 条目（§6.1）；发 `mori.model_switch` 事件，对话流显示“Switched model: A → B · <原因>”，有被隐藏的过程时加“The new model redoes this reply.”；
+   - 用 §6 处理后的上下文，把同一个请求按 B 组装后发出——这就是 proposal 7.3 的“重做这次回复”（第一个请求就失败时没有要隐藏的过程，就是把这条消息原样交给 B）；
+   - 之后段内都用 B（`ReplyState.current = B`）。
+4. 选不到：按 §5.8 等待。
 
-| `on_unavailable` | 全部候选都不可用时 |
-| --- | --- |
-| `failover`（默认） | 先按 `wait` 等待到总期限，期满按 `release_task` 处理 |
-| `wait` | 等待或失败，同旧方案 |
-| `release_task` | 由程序（不是模型）写一条系统步骤，以 `model_unavailable` 交给结案者（TaskBoard 规格 §7.7） |
+段内不会回到 `tried` 里的模型，也不会回到段开始时排在 `current` 前面的候选；首选恢复要等下一段。
 
-上表适用于工作通道中的占用者，包括三项权限的持有者（基座执行、被选为下一棒、结案者亲自执行）：`wait` 期满仍不可用时同样按 `release_task` 处理；等待期间租约与写锁保留（心跳把排队视为活跃），所以总期限同时限定了写锁被占的时间。其他回合：
+### 5.7 结果未知（发出后超时）
 
-| 回合 | 候选耗尽时 |
-| --- | --- |
-| 沟通者的对话回合；立项者、结案者的职责回合 | 不交接（没有可交接的 task）：配置的 `wait`、`release_task` 都按 `failover` 等待；期满后程序在聊天流写一条系统消息，显示受影响的 Agent 名、各候选被排除的原因和可以继续的条件，不依赖任何模型；恢复后程序重投未完成的职责（TaskBoard 规格 §7.7）和未完成的 `request_settled` |
-| Agent 消息的回复回合 | 立即以“对方模型暂时不可用”返回发送方，不做 `failover` 等待 |
-| 订阅、定时回合 | 按 `PASS` 结束并记入遥测 |
-| 工具模型调用（含分诊小请求） | 没有 `on_unavailable`，候选耗尽时直接失败；分诊因此失败时走 TaskBoard 规格 §6.3 的分诊超时路径（写入保持暂停、显示“需要你处理”），不走原话建目标的兜底 |
+一次尝试按 §5.4 的 `timeout` 超时：Mori 中止这次尝试（关闭连接）。
 
-授予 task 租约前，程序先为接收者做一次候选可用性预检；没有可用候选就不授予，task 保持“已指派、等待可用模型”，不计入租约期限。
+- 档案的 `cancel_verified` 为 `true`（探针证明断开后服务端会停止，§7.3）：这个模型不可用一段时间（`timeout`，§12），立即按 §5.6 换模型。
+- `cancel_verified` 为 `false`（探针读得到服务端指标，但断开后请求没有停）：发每次尝试之前读一次服务端正在跑的请求数作基线（§7.3 第 9 步的指标）；超时后模型进入 `held`，
+  每隔 §12 的间隔读一次，回到基线或更低即视为旧请求已停，立即按 §5.6 换模型；最长等 `held` 的时长。
+- `cancel_verified` 为 `unknown`（没有指标可读）：模型进入 `held`，等满 §12 的时长后按 §5.6 换模型，换模型提示注明“couldn't confirm it stopped”。
+- 等待时阶段行显示“Waiting to make sure <模型> stopped · until hh:mm:ss”（`mori.model_wait`，`kind: held`）；你可以按停止。同一个请求不会同时在两个模型上跑（proposal §8、§12 第 4 条）。
 
-### 5.8 粘性与回切
+### 5.8 候选耗尽
 
-- 一次 task 占用（或沟通者的一轮对话）内，优先继续使用已经选定的模型，避免中途换风格、丢前缀缓存。
-- 切换到后备模型之后，即使首选模型恢复，也要等下一次占用或下一轮对话开始时才回切，避免来回抖动。
-- 选定结果（占用或对话轮 → 模型、切换原因、回切条件）随租约记录落盘；Host 恢复时沿用落盘的选定模型，它不可用时按候选列表重选并记录原因。
-  这修改了旧方案的恢复规则“资源已失效则阻塞，不改选其他资源”。
-- 每个步骤记录本次占用中出现过的全部模型（别名、解析出的部署、服务端报告的模型、模型族、用量）。
-  部分服务不回报实际模型（例如 Bedrock、Vertex 不返回 model 字段），溯源以 harness 侧的解析结果为准。
+选不到模型时先等：
+
+- 阶段行显示“Waiting for a model · <最先恢复的那个候选的原因>”（`mori.model_wait`），在最早的恢复时刻、探针结束时、或每隔 §12 的间隔重新选，最长等 §12 的时长。
+- 剩下的候选都是不会自己恢复的原因（`missing`、`zone_*`、`unverified`、`failed`、`auth`、`quota`、`not_found`、`tried`、`earlier`、`no_handover`）时不等。会恢复的是 `probing`、`rate_limited`、`connection`、`timeout`、`held`，但本段已在 `tried` 或 `earlier` 里的候选不算（它们恢复了本段也不会再选）。
+- 等到了：继续（模型变了就按 §5.6 写换模型条目）。
+- 没等到：发 `mori.model_unavailable`，对话流显示一张说明卡“No model available”：每个候选及原因，“Open settings”；这次请求以错误结束，pi 的错误卡不另外显示（§9.3）。
+- 段开始时（§11.4）就选不到时同样先等；没等到时消息不发出：后台进程只发 `mori.model_unavailable`（`firstRequest: true`，`text` 为这条消息，`queued` 为准备中又发的消息），界面撤回这条用户消息、把文字放回输入框，显示同一张说明卡，不发 `mori.prompt_error`。
+- 压缩时（没有段、或段内的压缩请求）选不到模型：不等待，`route()` 抛出“No model available for compaction: <每个候选及原因>”，由 pi 报告压缩失败。
+
+### 5.9 不换的情况
+
+proposal §8 中“不换”的各项按 §5.4 处理：输出格式错误、上下文太长（压缩或重建）、内容策略拦截、你按了停止、已经有输出、5xx（原地重试）。
+
+### 5.10 顶栏的选择范围
+
+- 菜单列出全部分组、提供商和模型；选一个就写一条 `mori.pick`，重新做静态校验，下一段起生效。
+- 回复进行中（含 §11.4 的准备阶段）不能改，沿用 v0 的临时默认值“生成中不能换模型和思考强度”。
+- 改了范围不改设置里的 `normalDefault`。
 
 ## 6. 跨模型上下文
 
-### 6.1 执行类 Agent：从工作卡重建
+### 6.1 重做：隐藏中断的过程
 
-推荐的切换点是**占用边界**：TaskBoard 是与模型无关的纯文本共享状态，执行类 Agent 默认每次占用使用新上下文，
-所以在两次占用之间换模型不需要任何转写。
+`mori.model_switch` 条目：`{ from, to, reason, detail, unconfirmed, replyStartedAt, anchorAt, hideUntil }`。
 
-占用中途原模型不可用而需要切换时，**不把旧轨迹回放给新模型**：
+- `replyStartedAt` = `ReplyState.startedAt`；`anchorAt` = 这段 `anchor` 消息的时间戳（排队消息的时间戳是它排队的时刻，可能早于 `replyStartedAt`）。
+- `hideUntil` = 换模型时上下文里助手消息和工具结果的最大时间戳；没有这类消息时等于 `replyStartedAt`（没有要隐藏的）。
+  包装在 `Date.now()` 大于 `hideUntil` 之后才对 B 发请求，保证 B 的消息时间戳在区间之外。
 
-1. 程序写一条 `system` 步骤（原因 `model_switch`）：已完成的工具调用与结果引用（程序事实）、最后一段模型输出、切换前后的模型；
-2. 在下一个候选上为该 Agent 新建上下文：system prompt + 工作卡 + 这条步骤；
-3. 继续同一次占用（租约不变）；工作卡的“交给我的原因”一栏注明“原模型不可用，从检查点继续”。
+发给模型的上下文（pi 的 `context` 钩子，以及换模型那一次由包装算出的上下文）按会话里的全部 `mori.model_switch` 条目处理：
 
-理由：旧轨迹里有原模型专有的推理块和工具调用格式，跨模型回放有兼容问题；更重要的是，接续别的模型的轨迹会继承漂移，
-而从看板重建只继承结构化的结论。这正是 TaskBoard 给模型平面带来的能力。`model_switch` 步骤不计入 TaskBoard 的无新事实计数。
+- 时间戳在 `[replyStartedAt, hideUntil]` 之间的助手消息和工具结果不发给模型；用户消息（原消息、插话）都保留。上一段的消息都早于 `replyStartedAt`，不受影响。
+- 同一段有多条条目时，隐藏区间取并集。
+- 说明加在这段的 `anchor` 消息、或它之后时间戳 ≤ 最后一条条目的 `hideUntil` 的最后一条用户消息（插话）的内容末尾，不新增消息（以免连续两条用户消息）：
+  `[Mori] The previous model (<from>) stopped partway through this reply (<reason>). Its partial work is hidden from you. Files in the workspace may already have been changed; check before you redo anything.`
+  `<from>`、`<reason>` 取最后一条条目，`<reason>` 用 §5.3 的界面文字。没有被隐藏的消息时不加。这段文字已经在消息末尾时不再加（同一个函数处理多次结果不变）。
+- 会话文件不改：被隐藏的消息仍在文件里，界面照常显示；重新打开会话后同样隐藏。
+- 压缩也不能把被隐藏的过程带给新模型：Mori 的内联扩展处理 `session_before_compact`，按同样的规则就地从 `preparation.messagesToSummarize` 与 `turnPrefixMessages` 去掉被隐藏的助手消息与工具结果，并从 `preparation.fileOps` 的三个集合里去掉只在被隐藏的工具调用里出现过的路径，不返回结果，由 pi 照常压缩（§11.6 K12）。
 
-### 6.2 保留历史的 Agent：先判断能否转写
+### 6.2 接手判断
 
-沟通者的对话，以及配置了 `context: continuous` 的特殊权限持有者，需要保留对话历史。选择器对它们多做一次“转写可行性”判断，满足任一条件就不转写，改走重建：
+要用的模型 B 与上下文里最后一条有效助手消息（不是出错或中止的）的模型 A 不同（提供商、接口、模型 id 有一个不同）时，判断 B 能否直接接手（proposal §9 第三条路）。判断在 §6.1 与 §6.3 处理后的上下文上做：
 
-- 目标模型需要回传 `reasoning_content`，而历史中有其他模型生成的工具循环（DeepSeek 推理模式带工具时缺失会直接 400，补空字符串只能绕过报错、补不回语义）；
-- 目标模型的工具调用方式（原生或提示词格式）与当前模型不同；
-- 当前上下文估算加输出预留超过目标模型的窗口。
+| 条件 | 判断方法 | 不满足时 |
+| --- | --- | --- |
+| 推理字段 | B 的档案 `reasoning.replay` 为 `required`（§7.2），而上下文里有别的模型产生的、带工具调用的助手消息 | 重建（§6.3） |
+| 工具调用格式 | Mori 的所有模型都用原生工具调用，pi-ai 按目标接口改写工具调用标识（`transformMessages`），所以总是满足 | — |
+| 窗口 | 上下文的估算 token 数（pi 的 `estimateTokens`）加 B 的 `maxTokens` 超过 B 的有效窗口（§7.2） | 重建（§6.3）；段内不能压缩，见下 |
 
-重建的内容：system prompt + 工作卡 + 由 compaction 生成的对话摘要 + 最近几轮不含工具循环的用户与助手文本。重建也不可行时跳过该候选并记录原因。
+- **你发消息、段开始时**（§11.4）：按 §6.3 重建，重建后再判断一次窗口；仍放不下就排除 B（`no_handover`，“conversation too long for this model”），选下一个。
+- **段内**（换模型，或排队消息开始的新段）：运行中不能压缩。推理字段不满足时只做 §6.3 第 2–3 步（不做摘要），B 照常接手；窗口不满足时排除 B（`no_handover`），下一段开始时再按上一条重建。
 
-### 6.3 转写规则
+### 6.3 重建
 
-可以转写时，复用 pi-ai 的 `transformMessages`，它已经处理：
+重建 = 压缩摘要 + 最近几轮对话（proposal §9）：
 
-| 内容 | pi-ai 的处理 |
-| --- | --- |
-| 推理内容 | 提供商、协议、模型三者都相同才保留；否则丢弃推理块，删除工具调用上的推理签名 |
-| 工具调用标识 | 按目标协议的格式要求规范化，并同步改写对应工具结果的标识 |
-| 没有结果的工具调用 | 补一条合成的错误结果 |
-| 出错或中止的助手消息 | 整条跳过 |
-| 图片 | 目标模型不支持图像时替换为占位文字 |
-| 中途的 system 消息 | 目标不支持时折叠进开头的 system |
+1. 调 pi 的 `session.compact()`；压缩请求由 B 生成摘要（§6.4，`ReplyState.current` 此时已是 B）。这次压缩产生的 pi 事件（`compaction_start`、`compaction_end`）后台进程不转给界面：阶段行显示“Rebuilding the conversation for <B>…”（`mori.model_wait`），结果只经 `mori.model_rebuild` 或换模型提示显示，没有 v0 的压缩提示和错误卡。
+   - pi 报“Nothing to compact”或“Already compacted”（对话太短、或刚压缩过）：跳过这一步，继续第 2 步；
+   - 其他错误：排除 B（`no_handover`，“couldn't rebuild the conversation: <原文>”），选下一个并重新做接手判断；全部候选都因此排除时按 §5.8。
+2. 写一条 `mori.rebuild` 条目 `{ model: B, at, summary }`（`summary` 表示第 1 步做了压缩），`at` 为写条目的时刻；发 `mori.model_rebuild` 事件。重新打开会话时，pi 的压缩条目照 v0 显示“已压缩较早的对话”，其后是这条重建提示。
+3. 之后发给模型的上下文里，时间戳早于 `at` 的消息：工具结果去掉；助手消息去掉思考和工具调用块，变空就去掉；其他角色（用户消息、压缩摘要、分支摘要、自定义消息、命令执行记录）原样保留。
+   同一个函数既处理 pi 的 AgentMessage（`context` 钩子），也处理 pi-ai 的 Message（包装）。
+4. 对话流显示一行“Rebuilt the conversation for <B>: summary + recent turns”（第 1 步跳过时为“Rebuilt the conversation for <B>: recent turns without tool calls”）。
 
-mori 在其上补充：
+### 6.4 压缩走 Mori
 
-| 规则 | 原因 |
-| --- | --- |
-| Kimi 系模型的工具调用标识规范为 `functions.名称:序号`（全局计数），维护内部标识到线上标识的映射 | pi-ai 源码中未见这条；vLLM 排查 Kimi K2 精度问题时发现非标准标识会被 parser 丢弃，并诱发后续调用失败 |
-| 发给自部署模型的助手和工具消息，`content` 一律为字符串，助手的空内容改为空字符串 | 空内容被转成数组后，chat template 可能把数组字面量打进 prompt |
-| 校验模型调用的工具名是否在本次请求的工具列表中 | 不在就返回错误结果，不执行；模型有时会调用历史中出现过、但本次未声明的工具 |
-| 工作卡和看板推送以追加消息注入，不改写开头的 system prompt 和工具列表 | 前缀改动会让前缀缓存失效；在 Anthropic 等提供商上还会使之前的推理块失效 |
-| 同一模型内不改推理档位 | 改档位会让缓存失效；换模型时按目标模型的档位映射 |
-| 需要图像能力的请求用 `requires: [vision]` 在选择阶段排除不支持的候选 | 不在转写时悄悄删图 |
+pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加钩子：pi 先以 `direct` 原因调会话虚拟模型的 `route()` 取模型，Mori 返回 `ReplyState.current`（没有段时按 §5.3 选，选不到见 §5.8）；
+再用会话的流函数发请求，也就是 Mori 的包装（§11.2），所以压缩同样经模型池、带 key。包装按请求里的 `sessionId` 与会话 id 不同认出压缩请求：压缩请求经模型池和 §5.5，不换模型、出错由 pi 报告压缩失败（v0 的错误卡）。
+压缩请求属于 `conversation` 调度类别（§8.2）；每次尝试同样按 §5.4 的首个内容时限计时，超时记 `timeout`（§8.3），不换模型，pi 报告压缩失败（§6.3 第 1 步因此失败时按“其他错误”排除 B）。
 
-## 7. 模型档案、适配与探针
+## 7. 模型档案、探针与适配
 
-### 7.1 按部署建档
+### 7.1 档案键与指纹
 
-档案按（端点，服务端类型与版本，所服务的模型）建立，而不是按模型名。同一份权重在不同引擎、不同版本上行为差异很大，
-字段名也会随版本改变（例如 vLLM 在 2026 年 1 月把响应中的 `reasoning_content` 改名为 `reasoning`）。
-
-档案带一个指纹：服务端版本、模型 ID、上下文上限、chat template 摘要、服务端声明的 parser。指纹变化时自动重跑探针。
-parser 名无法从 API 读出，由用户在 `serving` 中声明，再用探针验证。
+- 档案键：`<baseUrl>|<api>|<模型 id>|<服务版本>`。服务版本取自探针第 0 步，取不到时为 `unknown`。
+- 指纹：档案键加上配置里的 `contextWindow`、`maxTokens`、`reasoning`、`input`、`compat`。指纹变了，这个模型重新探测（proposal §10）。
+- 读服务版本的时机：后台进程启动时；会话新建或打开时，对它范围内的模型（异步，不挡打开）。读失败（连接、非 2xx、没有版本字段）时档案不变；只有读到与档案不同的版本才算版本变化。配置保存时立即按新指纹判断。
 
 ### 7.2 档案字段
 
-| 分组 | 字段 | 说明与来源 |
+| 字段 | 取值 | 来源 |
 | --- | --- | --- |
-| 身份 | `server_kind`、`server_version`、`served_model`、`family`、`weights`、`quantization`、`kv_cache_dtype` | vLLM 看 `/v1/models` 的 `owned_by`；llama.cpp 看 `/props`；Ollama 看 `/api/version`；其余由配置声明。KV cache 量化到 q4 会显著损害工具调用（llama.cpp 文档） |
-| 上下文 | `context_hard`（上限）、`per_slot_ctx`、`context_effective`（预算，默认取上限的 50%–60%，可调）、`overflow_behavior`（报错 / 静默截掉开头 / context shift）、`output_reserve` | 见 §4.4 的核对方式；溢出行为用探针 P10 实测。Chroma 的 context rot 实验表明有效长度远小于标称值 |
-| 工具调用 | `tool_call_mode`（native / prompt，按实测选）、`tool_choice` 每个取值是“生效 / 被忽略 / 报错”、`strict_tools`（强制执行 / 接受但不执行 / 拒绝）、`parallel`、`tool_call_id_style`、`arg_type_fidelity`、`streaming_tool_calls`、`empty_tool_calls_repr`、`leak_markers`、`first_constrained_latency` | Ollama 不支持 `tool_choice`；LM Studio 的 `required` 只在 llama.cpp 引擎可用；vLLM 的 `required`、`named` 是否真正生效依赖版本、parser 与 strict 等级（XML 原生格式的模型在旧路径上会解析不出）；首次强制调用要编译语法，可能需要数秒 |
-| 推理 | `thinking_toggle`（`chat_template_kwargs.enable_thinking`、`chat_template_kwargs.thinking`、`thinking.type`、`reasoning_effort`）、`reasoning_out_field`（`reasoning` / `reasoning_content` / `reasoning_details` / 正文中的 `<think>`）、`reasoning_replay` | 回放策略按模型族不同：Qwen3 混合模式丢弃历史推理；DeepSeek V3.2、Kimi K2 Thinking、GLM 保留当前工具循环内的推理；MiniMax M2 原样回放（MiniMax 实测丢弃先前推理后 Tau² 从 87 降到 64）。所以不能为了省 token 一律丢弃 |
-| 结构化输出 | `json_schema`（强制执行 / 只在提示词中 / 不支持）、`structured_with_reasoning`、`schema_feature_limits` | vLLM 的 `guided_*` 旧字段已移除；Qwen3-Coder 开启推理时需要额外开关才能结构化输出 |
-| 消息形态 | `content_format`、`mid_convo_system`（允许 / 折叠到开头 / 改为 user 前缀）、`strict_role_alternation`、`notification_role` | 中途插入的消息在部分模板上会因角色交替或 system 位置限制报错或被忽略，决定工作卡和推送用什么角色注入 |
-| 采样 | 按（模型族，模式）记录推荐参数，以及 `server_ignores` | 例如 Qwen3 推理模式 T=0.6、TopP=0.95、TopK=20 并禁止贪心解码，否则会无限重复；Ollama 的 OpenAI 兼容层不映射 top_k、min_p、repetition_penalty |
-| 流式与用量 | `usage_in_stream`（单独 chunk / 附在最后一个 chunk / 无）、`cached_tokens_reported` | 模型池的限额、上下文预算和截断检测都依赖它 |
-| 取消 | `cancel_verified` | 探针验证“连接关闭即中止请求”，决定 §5.4 能否立即切换 |
-| 等级 | `capability_tier`、`taskboard_write_tier`（A / B / C，§7.4） | 由探针结果派生；能力等级供 TaskBoard 调整交接内容的详略 |
-| 验证 | 每项能力的探针结果、时间、指纹、探针套件版本 | 程序 |
-| 遥测 | 见 §7.6 | 程序 |
+| `status` | `probing`、`ready`、`error`（附原文） | `error`：至少一步因连接或 HTTP 错误没有结果 |
+| `server` | `{ kind, version }`，`kind` 为 `vllm`、`sglang`、`ollama`、`llamacpp`、`unknown` | 第 0 步 |
+| `tool_calling` | `verified`、`unverified`、`failed`，附第 3、4 步各自的结果 | 第 3、4 步 |
+| `tier` | `A`、`B`、`C` 或 `null`，附每级的结果 | 第 5–7 步（§7.5） |
+| `protocol_write` | 由 `tier` 派生：有等级为 `verified`；三级都判定为不通过为 `failed`；有一级因出错没有结果为 `unverified` | — |
+| `structured_output` | `verified`、`failed`、`unverified` | 第 6 步；`anthropic-messages` 不跑第 6 步，为 `unverified` |
+| `vision` | 配置声明了图像输入为 `unverified`，否则 `failed`（proposal 的探针表里没有图像探针） | 配置 |
+| `reasoning` | `{ field, can_disable, replay }`。`field`：`openai-completions` 为 `reasoning_content`、`reasoning`、`reasoning_text` 或 `none`；另两种接口为 `native`。`can_disable`：`true`、`false`、`unknown`。`replay`：`required`、`not_required`、`unknown`；另两种接口为 `not_required`（pi-ai 自己回放同一模型的推理） | 第 1、2、4 步 |
+| `context` | `{ declared, reported, effective, truncation }`。`effective` = `declared` 与 `reported` 中较小的一个，长输入探针跑过后按第 8 步更新；`truncation`：`unknown`、`none`、`silent` | 第 0、8 步 |
+| `cancel_verified` | `true`、`false`、`unknown` | 第 9 步 |
+| `probedAt`、`suite` | 时间、探针套件版本 | — |
 
-### 7.3 档案驱动的适配
+能力三态：已验证、未验证、验证失败（proposal §4）。本规格里关键能力 `tool_calling` 必须已验证才满足（§5.3 第 3 步）；
+`protocol_write`、`structured_output`、`vision`、`context` 在设置页显示，供 §10 的 Agent 定义使用。
 
-| 侧 | 变换 |
-| --- | --- |
-| 请求 | system 与 developer 角色互转；中途插入的 system 按档案折叠或改为 user 前缀；选择 `max_tokens` 字段名并按剩余上下文钳制；思考开关映射到该族的参数；按（模型族，模式）注入采样参数并剔除服务端不认的字段；strict 只在支持时发送；schema 净化（拍平、全部 required、`additionalProperties: false`、可空写成类型数组、去掉后端不支持的关键字）；`tool_choice` 降级（见下）；content 压平成字符串 |
-| 响应 | 推理统一：依次读取 `reasoning`、`reasoning_content`、`reasoning_details` 和正文中的 `<think>…</think>`，归一成内部推理块并从可见正文中剥离；`tool_calls` 的 `[]` 与 `null` 等价；参数先解析，再按 schema 做类型转换（XML parser 会把数字变成字符串）；工具名不在列表中时回错误结果；**空轮补救**：`tool_calls` 为空但正文或推理中出现该族的工具标记（`<tool_call>`、`<|tool_call_begin|>`、`<｜DSML｜function_calls>`、`<minimax:tool_call>`、`[TOOL_REQUEST]`）时，用客户端的族内 parser 抽取并计入遥测；剥离泄漏的特殊 token；任意 chunk 上的 usage 都接受，没有时本地估算并标为估算 |
-| 历史 | 按 `reasoning_replay` 回放推理，字段名按服务端选择（vLLM 用 `reasoning`，SGLang、llama.cpp、DeepSeek 用 `reasoning_content`，Ollama 用 `reasoning`）；跨模型不回放推理；工具调用标识按族重写；按需补工具结果的 name 字段；角色交替严格的模板合并相邻同角色消息 |
-| 错误 | 各家的上下文溢出错误统一为“上下文溢出”，触发 compaction 或重建；**静默截断检测**：`usage.prompt_tokens` 明显小于本地估算，或开头金丝雀探针失败时，记为“上下文被截断”（Ollama 上高危），在界面明确告警，而不是让它表现为“模型不遵守规则”；模板异常导致的 400 归为“模板不兼容”并触发重新探测；首次强制调用的语法编译用单独的较长期限，不计入熔断 |
+### 7.3 探针
 
-**强制调用**（例如 TaskBoard 的强制交接、强制分诊）按档案实测结果选第一个可用的策略：
+经模型池的 `background` 类别发出（§8.2），用这个提供商的 key，直接用实际模型调 `runtime.streamSimple`（§11.6 K10），选项带 Mori 的 fetch、`maxRetries: 0`、`timeoutMs: 2147483647`；
+最大输出 §12；每一步 §12 的时长内没有第一个有内容的事件就中止，这一步按出错处理。第 1 步对 `reasoning: true` 的模型用思考 `medium`、否则 `off`；第 3、5、6、7、8、9 步思考关闭（`off`）；第 2、4 步见表。
 
-| 策略 | 适用 | 说明 |
+| 步 | 请求 | 判定 |
 | --- | --- | --- |
-| 指定函数（`tool_choice` 为 `named`）+ strict | 实测生效的 vLLM、SGLang（xgrammar 后端）、多数云 API | 服务端约束解码保证格式；只保证格式，不保证内容质量 |
-| `required` + 工具子集限制 | 支持 `required` 且支持在保持工具列表不变的情况下限制可调用子集的后端 | 不临时增删工具，以保住前缀缓存 |
-| 结构化输出（`json_schema`） | 不支持 `tool_choice` 的后端，例如 Ollama | 用 `response_format` 约束输出，再由程序转成工具调用 |
-| 提示词 + 解析与修复 | 以上都不支持 | 确定性修复后按 schema 校验 |
+| 0 | GET `<baseUrl>/models`、`<origin>/version`、`<origin>/api/version`、`<origin>/props`（不计入短请求） | `server`：vLLM 的 `/version`、Ollama 的 `/api/version`、llama.cpp 的 `/props`、SGLang 的 `/models` 里 `owned_by: sglang`；`reported` 窗口：`/models` 里本模型的 `max_model_len`，或 `/props` 的 `n_ctx` |
+| 1 | “Reply with the single word: ready.” | 有正文即通过；`openai-completions` 记录推理字段名（pi-ai 记在思考块的 `thinkingSignature` 里；有 `reasoning_details` 时被覆盖成 JSON，这时按 `reasoning_content`） |
+| 2 | 只对 `reasoning: true` 的模型：同一句，分别用思考 `off` 和 `medium` | `can_disable`：`off` 时没有思考内容为 `true` |
+| 3 | 工具 `get_weather({ city: string, days: integer })`，“Use the tool to get the weather for Paris for the next 3 days.” | 调用了 `get_weather`，`city` 是字符串，`days` 是整数（不是字符串） |
+| 4 | 第 3 步的调用加工具结果“Paris: 21°C, sunny for 3 days.”，再问“What temperature did the tool report?” | 回答含 `21`。`openai-completions` 且 `reasoning: true` 的模型另做回传检查：思考 `medium` 再跑一次第 3 步，保留返回的助手消息；“带上” = 原样发出；“不带” = 去掉思考块、并在这个模型的副本上把 `requiresReasoningContentOnAssistantMessages` 设为 `false` 后发出。“不带”被拒（400 或 422）而“带上”通过：`replay: required`；都通过：`not_required` |
+| 5 | 工具 `submit_outcome({ outcome: "ok" \| "fail" })`，指定调用它（`tool_choice`）并要求严格模式；“Call submit_outcome with outcome banana.” | 调用了它且 `outcome` 在枚举内：A 级通过 |
+| 6 | 只对 `openai-completions`、`openai-responses`：严格的 JSON schema 输出，schema `{ outcome: "ok" \| "fail" }`；“Reply with JSON whose outcome is banana.” | 合法 JSON 且 `outcome` 在枚举内：B 级通过、`structured_output: verified` |
+| 7 | 只在第 5 步判定为不通过、且第 6 步判定为不通过或不适用（`anthropic-messages`）时：“Answer in exactly this format: <summary>one sentence</summary><outcome>ok or fail</outcome>. Question: is 2 + 2 equal to 4?”，连发 §12 的次数 | 每次都能解析、取值都在列表内：C 级通过 |
+| 8 | 需要你同意（§9.1）：“The passphrase is <随机词>.”，接着填充到有效窗口的 50%，最后问“What is the passphrase?”；再做一次 90% | 答对：窗口可用到这个长度。报错：`truncation` 保持 `none`、`effective` 不变。不报错但答不出暗号：`truncation: silent`，`effective` 降到通过的那个长度（50% 也没通过时为 0），设置页告警 |
+| 9 | 需要你同意：只对 `server.kind` 为 `vllm`、`sglang`、`llamacpp` 的模型。先读一次服务端正在跑的请求数（vLLM、SGLang 的 `/metrics`，llama.cpp 的 `/slots`）作基线，再发“Count from 1 to 400, one number per line.”，收到第一段输出后断开 | 5 秒内请求数回到基线或更低：`true`；仍高于基线：`false`；指标接口不响应或没有这个计数：`unknown`；其他服务：`unknown` |
 
-### 7.4 看板写入等级
+各接口的请求写法（经 `toolChoice` 选项和 `onPayload`）：
 
-TaskBoard 的交接、分诊、路由这类协议写入，按档案派生的等级执行：
-
-| 等级 | 条件 | 做法 |
-| --- | --- | --- |
-| A | 指定函数 + strict 被实测强制执行（探针 P7） | 强制调用小 schema 工具 |
-| B | `json_schema` 被实测强制执行（探针 P8） | 结构化输出 |
-| C | P7、P8 的强制性测试都未通过，但 P8 的文本标签子项通过 | 文本标签（如 `<summary>…</summary><outcome>…</outcome>`）加宽松解析；不用依赖停止词的 ReAct 模板 |
-
-规则：
-
-- 协议写入只包含小字段（摘要、结果类型、下一棒、编号引用）；长内容（代码、diff、日志、分析）不放进模型生成的 JSON，
-  而是取自模型的自由文本输出和程序事实（Aider 的实验表明，让模型把代码放进 JSON 会明显增加语法错误，strict 模式也没有改善）。
-- 只修语法问题：JSON 非法、缺字段、超长，每次把校验器的原始错误回给模型；
-  `finish_reason` 为 length 时禁止补全修复（补全会制造看似合法、实则缺内容的对象），改为缩短限额重问；
-  语义字段（task、下一棒、状态迁移、租约）一律不修不猜，不做同义词映射。枚举越界（含被分诊枚举收窄排除的取值）和程序的语义拒绝（如没有程序事实却声明 done）按语法类错误处理：把校验器原文回给模型，计入下面同一份统一预算，用完走现有兜底；唯一例外是 `next_agent` 无效，直接交结案者（TaskBoard 规格 §7.7）。
-- 三档都未通过时 `protocol_write` 判为验证失败，该模型不能担任需要它的 Agent。
-- **统一预算**：每一档最多 1 次语法重试，用完降一档（A → B → C），总尝试不超过 4 次，记录降级。语义拒绝与枚举越界在同一档重试，只计入总尝试上限，不降档，也不计入 §7.6 的协议写入健康统计；降档只降到档案中已通过、且不低于该 Agent `requires` 下限的等级，没有可降的等级时直接走兜底；用完仍失败交给 TaskBoard 的兜底（强制交接走自动回收，分诊走原话建目标），不静默丢弃。
-  TaskBoard 的强制交接、分诊小请求、强制 `task_route` 都使用这一份预算。
-- 推理档位：使用裁剪上下文的提交轮（强制交接）可以关闭思考；在原上下文中强制调用（强制 `task_route`）时保持当前档位；独立的分诊小请求可以关闭思考，以免缓存与推理块失效；
-  思考不可关闭的模型不关闭。温度不设为 0（部分模型贪心解码会无限重复）。
-- Agent 定义可以用 `requires: [protocol_write>=B]` 这类写法声明写入等级的下限（§4.4），不满足时启动即报错并给出修复建议（例如“为 vLLM 开启 `--enable-auto-tool-choice`”“设置 `OLLAMA_CONTEXT_LENGTH=65536`”）。
-
-### 7.5 探针
-
-v0 的“测试连接”（app-v0 §5.2：用一条短消息测首字耗时）只覆盖 P1 的一小部分；本节探针都是 v1 新建的：
-
-| 编号 | 内容 |
-| --- | --- |
-| P0 | 指纹：`/v1/models`、`/props`、`/api/ps`、`/api/v0/models` |
-| P1 | 基础对话：推理字段名、`finish_reason`、是否有用量 |
-| P2 | 思考开关：分别关闭和开启，看推理字段 |
-| P3 | 单个工具调用：是否调用、参数是否合法、类型是否正确、标识格式 |
-| P4 | `required` 与 `named`：生效、被忽略还是报错 |
-| P5 | 并行工具调用，以及关闭并行后是否最多一次 |
-| P6 | 多轮往返：带或不带推理回放、name 字段、空内容等变体是否被接受，答案是否引用了工具结果（很多部署在这一步出错） |
-| P7 | strict 强制性：参数枚举为 `[ok, fail]`，提示模型填 `banana`，结果落在枚举内说明强制生效 |
-| P8 | `json_schema` 强制性：同样的枚举违例测试，并在开启思考时再测一次。文本标签子项（P7、P8 的强制性测试都未通过时运行，非对抗）：给出交接式的文本标签格式（`<summary>`、取值来自列表的 `<outcome>` 与 `<next_agent>`），用一个普通的小任务连跑 k 次（临时默认 3），每次都能被宽松解析且取值都在列表内，判为 C 级 |
-| P9 | 流式：带用量重复 P3，检查增量拼接与用量位置 |
-| P10 | 上下文：开头放金丝雀、长度接近有效预算；再发一个超过上限的请求，看是报错还是静默截断 |
-| P11 | 推理中的工具调用：开启思考跑 P3，检测空轮补救是否触发 |
-| P12 | 取消：发起长请求后关闭连接，验证服务端是否中止（决定 `cancel_verified`） |
-| P13 | 协议一致性（可选、手动）：固定的小型 TaskBoard 场景（领取后完成几次工具调用、记一步、交接；遇到无效下一棒是否修正；缺信息时是否选 `blocked`；对一条用户消息做分诊小请求；对一个 `done_claim` 强制 `task_route`），连跑 k 次统计 pass^k，结果只作角色建议 |
-| P14 | 图像输入：只对声明 `input` 含图像的模型执行，验证 `vision` |
-
-运行规则：
-
-- 添加或修改提供商、模型后，程序在后台自动运行 P0–P9 和 P14（每个模型约十几个短请求），界面显示进度；P10–P12 在用户确认后运行；P13 只在用户点击时运行。
-- 探针请求经过模型池，计入额度组，走后台类别，每次验证有 token 预算并在界面显示预估，不绕过共享 GPU 的并发限制。
-- 故障注入（限流、熔断）只打内置的模拟端点，不写真实资源的冷却和熔断状态。
-- 重新验证的触发条件：配置变化；指纹变化（含服务端响应头、服务端报告的模型）；探针套件版本变化（含 TaskBoard 交接 schema 与共同提示词的摘要）；超过有效期。
-  会话启动时，对过期档案在后台跑一个轻量子集（P3、P4、P6）。
-- “需要重新验证”的效果：运行中的会话继续使用并在界面告警；新会话按“未验证”处理，并提供一键验证。
-
-探针只验证能力，不代表模型在真实任务中的效果。
-
-### 7.6 运行时健康
-
-对每个（模型，强制策略，角色）维护滑动窗口统计：
-
-- 工具调用三项检查（参照 OpenRouter Exacto）：JSON 合法率、工具名合法率、参数 schema 合法率；
-- 空轮率（`tool_calls` 为空、正常结束、正文里却有工具标记）；
-- 协议写入首次成功率与修复率、自动回收次数；
-- 首字延迟、每秒 token、4xx/5xx 比例。
-
-某项强制能力的健康度跌破阈值时，档案中这项能力降为“运行时失效，需要重新验证”，界面显示原因；
-选择器在下一个请求边界按 `requires` 过滤时自然跳过它。这属于“能力不满足的候选跳过”，不是语义路由，符合用户的决定。
-否则可能出现：部署悄悄变了，强制交接每次都失败、每次都被回收，结案者重派后选择器又选回同一个模型。
-
-## 8. 模型池
-
-旧 [内网模型资源可靠性 Proposal](../proposals/model-reliability.md) 的机制全部保留：统一入口、单层重试、退避与 `Retry-After`、
-熔断、远端未知占用、排队公平、持久记录与恢复。v0 不做端点排队（app-v0 §4：端点忙时交给 pi 的自动重试，界面如实显示），模型池从 v1 起新建。本文对旧方案做以下修改：
-
-| 修改 | 说明 |
-| --- | --- |
-| 额度组跨提供商 | 额度组可以挂在提供商或模型上；一个请求同时取得它涉及的全部额度组 |
-| 带优先级的等待队列 | 并发满时排队，不像 LiteLLM 那样立即返回 429：平行 Agent 会在同一时刻收到用户消息，请求会同时涌向同一个端点 |
-| 调度类别 | 由程序按通道推导（TaskBoard 规格 §5.3、§9.2）：交互（沟通者的对话通道、分诊小请求）、决策（立项者、结案者的职责回合）、执行（工作通道）、后台（其余）；`wait_reply` 的 Agent 消息回合继承发送方的类别；类别之间按权重分配份额，不是严格优先，后台保留正权重；类别内按用户会话轮转 |
-| 调用继承类别 | compaction、摘要补写、标题等工具模型调用继承发起它的通道的类别；只有不阻塞任何 Agent 的调用才属于后台 |
-| 候选感知的排队 | 请求按选定的候选进入对应队列；排队超时后按 §5.6 返回 `reprepare` |
-| 允许切换 | “不自动切换模型”改为“只按候选列表、在请求边界、因可用性原因切换，并且可见” |
-| 熔断粒度 | 熔断作用于单个模型或单个提供商，不连带整个别名；共享额度组中远端未知占比过高也触发熔断 |
-| 故障判定 | 以 HTTP 状态、`Retry-After` 和连接错误为准；内核按错误文本分类的结果只作参考（pi-ai 的错误会被压平成文本，自部署服务的报错格式可能被误判），需要内核提供响应回调（§11） |
-| 请求优先级下发 | 档案声明支持时，把调度类别作为请求优先级传给 vLLM（服务端需开启优先级调度）；按请求设置需要内核的请求体钩子（§11） |
-| 成本统计 | 按提供商、模型、Agent、目标 task 汇总已知用量与价格；用量缺失保持未知，不按 0 计 |
-| 计量单位 | 额度槽按“请求”计：响应结束时释放，工具执行期间不占用（v0 没有端点上限，不存在迁移）。如果按“轮次”计，上限为 1 时执行者占着端点、工具又在等分诊，分诊小请求拿不到端点，会互相等待 |
-
-## 9. 工具模型
-
-- `utility` 的每一项都可以写 `requires`，同样经过选择器、区域过滤和启动校验，同样可以有多个候选并按 §5 切换。
-- 非 Agent 调用不经过 Agent 循环的请求钩子，由 mori 的统一调用包装完成选择、组装、重试和切换。
-- `compaction_model` 默认 `inherit`，使用该 Agent 当前解析出的模型：既能保住前缀缓存，也不会把大窗口的历史交给小窗口模型。
-- TaskBoard 的摘要补写是异步的：先截取内容第一句作临时摘要落盘，再补写替换，不阻塞写入。
-
-## 10. 与 TaskBoard 的协同
-
-- **看板让异构模型可以安全协作**：Agent 之间只通过看板上的纯文本和程序事实交换信息，不依赖彼此的推理内容或工具调用格式，
-  因此每个角色可以使用不同提供商的模型，换模型的最佳时机就是占用边界。
-- **占用级溯源**：每个步骤记录本次占用中出现过的全部模型及其模型族；由工具模型补写的摘要不计入。
-- **评审避开同族**：模型会偏好自己的输出。评估 Agent 可以声明 `differ_from: author`（完整写法 `{ target: author, by: family }`，`by` 还可以是 `provider` 或 `model`，默认 `family`；不按 Agent 名指定，因为系统不内置任何角色）：
-  “被评审集合”是被评审 task（`purpose: review` 时取 `verifies` 指向的 task）上，上一次验证之后产生过工作区文件改动的占用（TaskBoard 规格 §7.8 的被评审占用）中出现过的模型，按 `by` 取族、提供商或模型，不含评审者自己的占用；选择器排除这个集合，授予租约前的预检同样应用这一排除，也作用于评审者自己中途切换时的候选。排除后没有候选时不等待，立即交给结案者，原因“缺少独立评审模型”（TaskBoard 规格 §7.7，不计入异常升级）。
-- **工具模型补位**：模型漏写摘要时由 `utility.summary` 补写；相似判断由 `utility.similarity` 提供提示。
-- **按等级调整**：协议写入等级（§7.4）决定强制交接与分诊的执行方式；能力等级供 TaskBoard 在交接时决定给接手方多少上一棒的叙述（TaskBoard 规格 §9.2）。
-- **预算耗尽不降级**：单次占用预算用完时按 TaskBoard 规格 §7.6 以 `progress` 交结案者（`budget_reached`）；目标预算达到时通知结案者，超出时由程序回收并把目标置为等待、询问用户（TaskBoard 规格 §16）；两种情况都不自动换成更便宜的模型继续。
-
-## 11. 内核能力需求与落点
-
-本文需要内核提供以下能力。v0 内核是 pi-coding-agent SDK（app-v0），DSH 是远期 driver。
-pi 一列依据对 `@earendil-works/pi-coding-agent` 与 `@earendil-works/pi-ai` 1.3.0 发布包的核查，DSH 一列依据固定提交的源码核查；
-两列都需要在实施前用 spike 实测，不能因为源码中存在某个模块就视为可交付（app-v0 §1 的教训）。
-
-| 能力 | 用途 | pi-coding-agent SDK 1.3.0（v0 内核） | DSH（进程内 composition 接入；ACP driver 拿不到这些挂载点） |
+| 接口 | 第 5 步的指定调用 | 第 5 步的严格模式 | 第 6 步 |
 | --- | --- | --- | --- |
-| 按请求选择提供商与模型 | §5.1 选择器 | 虚拟模型：`registerVirtualModel` 的 `route(request)` 在每次请求前调用，`reason` 区分 user、continuation、retry、direct，重试时带 `failed`；返回物理模型与推理档位 | `agent/request` 钩子可改写路由；输入只有回合与步骤，拿不到失败原因 |
-| 按请求传 `tool_choice`、`response_format`、优先级等请求体字段 | §7.3、§8 | `before_provider_request` 返回值替换整个请求体，按各家 API 方言写入；事件不带模型，需要用 `route` 记录的结果关联；也可用工具定义的 `constrainedSampling`（json_schema、strict）。pi-ai 的 `ToolChoice` 只有 `auto`、`none` | `GenerateOptions` 没有这些字段，`dsh-llm-pi-ai` 不透传 pi-ai 的 `onPayload`；需要改 core 或自建连接器 |
-| 获取 HTTP 状态与响应头 | §8 故障判定 | `after_provider_response { status, headers }`，在读取响应体之前触发 | 连接器把错误压平成文本；需要自建连接器并使用 pi-ai 的 `onResponse` |
-| 单层重试 | §5.5 | 由 mori 接管会话级重试：`retry.maxRetries` 设为总尝试上限、基础延迟 0，退避与候选决定在 `route()` 中完成（pi 自身的退避按错误文本匹配、不读 `Retry-After`）；provider 级 `retry.provider.maxRetries` 保持 0；pi 不重试的错误经 `agent_before_settle` 的 error 结果按 §5.5 切换 | 不注册 `llm-retry`（它的重试计数按提供商分开，与跨候选预算不兼容），由 mori 的 `agent/request-error` 监听器决定 |
-| 模型池挂载点 | §8 | pi 没有按端点的并发上限，由 mori 在内核进程中新建模型池；在 `route()` 中等待额度槽、在响应结束时释放的做法需要 spike 验证 | `llm/stream` 钩子不能改写请求，只适合准入与观测 |
-| 改投 | §5.2 | 请求尚未开始占用、或同一模型重试时，`route(reason: "retry", failed)` 返回新候选，即 `reprepare`，请求体按新目标在 `before_provider_request` 中重新组装；占用中途换到另一个模型时结束本回合并在新候选上新建会话（§5.5） | 经 `agent/request-error` 由 mori 的监听器触发重新选择 |
-| 非 Agent 调用的统一包装 | §9 | compaction 等直接请求是否经过 `route` 与 `before_provider_request` 未核实；由 mori 统一包装 | 直接调用 `ctx.llm.stream` 只尝试一次、不经过 `agent/request`；由 mori 包装 |
-| 每次占用新建上下文 | §6.1 | 新建 `SessionManager`，用 `createAgentSessionFromServices` 复用服务 | 请求消息由 Agent 自己的 Session 派生，需要每次占用新建 Session/Agent |
-| compaction 使用指定模型 | §9 | 没有 `compaction.model`；用 `session_before_compact` 返回自带摘要，内部调用导出的 `compact()` | compaction-basic 只接受一对摘要模型，空则沿用最近路由（即 `inherit`） |
+| `openai-completions` | `tool_choice: { type: "function", function: { name } }` | `tools[i].function.strict = true` | `response_format: { type: "json_schema", json_schema: { name, schema, strict: true } }` |
+| `openai-responses` | `tool_choice: { type: "function", name }` | `tools[i].strict = true` | `text: { format: { type: "json_schema", name, schema, strict: true } }` |
+| `anthropic-messages` | `tool_choice: { type: "tool", name }` | `tools[i].strict = true` | 不跑 |
 
-注意：pi 的 `AgentSession.reload()` 会清空进程级的 API provider 注册表，多个平行 Agent 运行时不能调用；
-也不要覆盖 `session.agent` 上的钩子，所有扩展通过 mori 的内联扩展注册。
+`tool_calling` = 第 3、4 步都通过为 `verified`；有一步判定不成立为 `failed`；有一步出错（连接、HTTP 错误、超时）没有结果为 `unverified`，档案 `status: error` 并附原文。
+第 5、6 步例外：服务端对指定调用或 JSON schema 回 400 或 422（拒绝这个功能，例如“Thinking mode does not support this tool_choice”“This response_format type is unavailable”）算判定为不通过，原文记在这一步的说明里；连接错误、其他 4xx（401、403、408、429 等认证或可用性问题）、5xx、超时仍是出错。第 4 步回传检查的“被拒”同样只认 400、422。
 
-无论哪个内核，选择器、模型池、档案、适配层、探针都在 mori 的内核进程中实现，内核只负责执行一次请求。
+### 7.4 什么时候跑
 
-## 12. 界面
+- 自动（第 0–7 步）：后台进程启动时，对还没有档案的模型（上次探测没跑完 App 就关了）；添加或修改模型或提供商之后（加 key、删 key 也算修改提供商：这个提供商里档案不是已验证或验证失败的模型重新探测）；迁移之后；首次启动表单保存之后；指纹或服务版本变化之后。
+- 你点“Verify”、或拒绝启动卡上的“Verify now”之后。
+- 需要你同意（第 8、9 步）：只在设置页模型行上点“Long-input test…”或“Cancel test…”并确认之后；确认框写明大约多少 token（第 8 步按有效窗口的 50% + 90% 估算）。
+- 同一个模型同时只跑一组探针；新的一组开始时取消旧的。
+- 从未验证过的模型（档案里 `tool_calling` 不是 `verified` 或 `failed`，包括上次因出错为 `unverified` 的）探测中为 `probing`；验证过的模型重新探测期间，选择仍按旧结果，设置页显示“Re-verifying…”，结果出来后替换。
+- 探针结束时重新做所有会话的静态校验，发 `mori.profiles`；档案的 `reasoning.replay` 变了时按 §4.4 重新编译这个提供商（不保存配置），下一个请求起生效。
+- 探针请求属于 `background` 类别：不受排队超时限制，一直等到有槽位（取消探针、删除模型时出队）；每一步的时限从真正发出时算起。
 
-- 设置 → 模型：按提供商分组列出模型，显示网络区域、能力标签及其三态、协议写入等级、协议一致性得分（若跑过）；提供“验证”按钮和自动验证进度。
-- 别名编辑：拖动排序候选；显示每个候选当前是否可用。
-- Agent 配置：选择候选和能力要求后，立即显示展开结果、被排除的原因、冗余警告和推荐角色提示。
-- 模型池：在 v0 的阶段行上新增“等待端点空闲”，按提供商分组；切换事件显示为“executor：A → B，原因：限流 429”；“等待原尝试核对”单独显示。
-  它们以 `model.switched`、`request.phase { waiting_reconcile }` 进入 v1 新建的界面事件层（TaskBoard 规格 §9.8；v0 只原样转发 pi 事件）；阶段行的“重试 n/m”改由模型池事件提供（pi 的 `auto_retry` 事件在 mori 接管后只作参考）。
-- 静默截断、空轮补救、运行时失效等档案事件以错误卡形式出现，附原始请求轨迹入口。
-- **原始请求轨迹**（v1 新增，v0 没有）：按逻辑请求标识记录每次尝试的请求体、响应状态与响应头、耗时与切换原因，存于 `%APPDATA%/Mori/traces/`（不进项目仓库或云同步目录）；认证类请求头和 query 参数一律脱敏；保留期为临时默认值；错误卡的入口按逻辑请求标识打开。
-- TaskBoard 中每个步骤显示一个小的模型标签。
+### 7.5 交接写入等级
 
-## 13. 分期
+`tier` = 第 5 步通过为 A，否则第 6 步通过为 B，否则第 7 步通过为 C，三级都判定为不通过为 `null`（`protocol_write: failed`）。
+不适用的级别不参与判定：`anthropic-messages` 上 A、C 都判定为不通过即 `tier: null`、`protocol_write: failed`。本规格只判定和显示等级；按等级填交接单在 §10。
 
-| 阶段 | 内容 |
+### 7.6 适配层
+
+普通模式用得到的适配在编译时（§4.4）按档案设到 pi 的模型上，由 pi-ai 执行：
+
+| 档案 | 编译成 | 作用 |
+| --- | --- | --- |
+| `reasoning.replay: required` | `compat.requiresReasoningContentOnAssistantMessages: true` | 回传推理内容，避免这类部署拒绝请求（proposal §10“下一次请求要不要把它带回给模型”） |
+| 推理字段 | 不需要设置：pi-ai 依次读 `reasoning_content`、`reasoning`、`reasoning_text` | 统一推理内容 |
+
+强制调用的改写（指定函数 → 结构化输出 → 文本标签）用在填交接单上，见 §10；本规格里只有探针第 5–7 步发这类请求，各自按 §7.3 直接组装。
+
+## 8. 模型池与多 key
+
+### 8.1 槽位
+
+- 每个 key 有 `concurrency` 个槽位；没有 key 的提供商算一个“无 key”，同样有 `concurrency` 个槽位。
+- 一个 HTTP 请求从发出到响应体结束占一个槽位；工具执行期间不占。响应体结束 = 读到结尾、被读取方取消（OpenAI SDK 读到 `[DONE]` 后会取消）、出错，或请求被中止，以先到者为准。
+- 4xx、5xx 的响应体由 fetch 先读完（§8.4），读完即释放。
+
+### 8.2 排队与优先级
+
+- 请求要用某个提供商时，按 key 的顺序取第一个可用（§8.3）且有空槽位的 key；有可用的 key 但槽位都满时排队。
+- 这个模型此刻不可用（§8.3：提供商在 `connection`，模型在 `not_found`、`timeout`、`held`，或全部 key 都在 `rate_limited`、`auth`、`quota`）：不排队、不发出，fetch 立即以记录里最先恢复的原因失败，记给包装，按 §5.6 换模型。
+- 队列按（类别，入队时刻）排序，同一个提供商的请求跨会话共用一个队列。类别：`conversation`（主 Agent 的请求、它的压缩、测试连接）先于 `background`（探针），严格优先（proposal §11：v1 只做简单的优先级）。
+- `conversation` 类别排队超过 §12 的时长：`queue_timeout`；`background` 类别没有排队超时（§7.4）。排队期间发 `mori.model_queue`，阶段行显示“Waiting for <提供商名>”。
+- 你按了停止：只让这个会话的请求出队并中止。
+- 换 key、原地重试、换模型后的请求按新的入队时刻排队。
+- 并发上限调低：进行中的请求照常完成，新请求等到占用数低于新上限。删掉的 key 上进行中的请求照常完成，排队中等它的请求重新取 key。新加的 key 立即可用。
+
+### 8.3 记住不可用
+
+| 对象 | 状态 | 恢复 |
+| --- | --- | --- |
+| key | `rate_limited`（到某时刻）、`auth`、`quota` | `rate_limited` 到时刻；`auth`、`quota` 在这个 key 被删除重加、或提供商的地址、接口、兼容选项改变时清除 |
+| 提供商 | `connection`（到某时刻） | 到时刻，或提供商的地址、接口、兼容选项改变 |
+| 模型 | `not_found`；`timeout`（到某时刻）；`held`（到某时刻，§5.7） | `not_found` 在提供商或这个模型的配置改变时清除；其余到时刻 |
+
+一个模型**可用** = 它的提供商不在 `connection`，它自己不在上述状态，并且提供商至少有一个 key 不在 `rate_limited`、`auth`、`quota`。
+没有 key 的提供商把 §8.1 的“无 key”当作它唯一的 key：429、401/403、额度错误同样记在它上面，按上表恢复；`auth`、`quota` 在加了 key、或地址、接口、兼容选项改变时清除。
+key 的“Test”（§9.1）和用它的“Test connection”不看这个 key 的记录，直接发出；成功时清除它的 `rate_limited`、`auth`、`quota` 并重新做静态校验。
+槽位满不算不可用（排队）。记录只在内存里，后台进程重启后清空。只改提供商的名称、并发上限、区域或模型列表不清除记录。
+
+### 8.4 发请求用的 fetch
+
+模型池给每次请求一个 fetch（经 pi-ai 的 `fetch` 选项传入，§11.2），它：
+
+1. 按 §8.2 取槽位和 key；
+2. 改写认证头：`openai-completions`、`openai-responses` 写 `Authorization: Bearer <key>`，`anthropic-messages` 写 `x-api-key: <key>`；没有 key 的提供商删掉这两个头；
+3. 发出（每一次真正发出，含换 key、原地重试，都回调包装的 `onSent`，§11.2）；看响应状态和响应头。4xx、5xx 先 `await res.text()`（最多 64 KB）用于分类，再用同样的状态、状态文字、响应头和这段文字构造一个新的响应交还；按 §5.4 分类，需要时换 key 或原地重试（§5.5）；
+4. 2xx：把响应体包一层再交还 pi-ai，用来知道它何时结束（释放槽位）；
+5. 把这次尝试的分类、状态码、`Retry-After`、有没有输出记给调用方（包装据此决定是否换模型）。
+
+pi 传给 SDK 的超时（默认 300 秒）会把排队和重试也算进去，所以包装和探针在选项里写 `timeoutMs: 2147483647`（pi 表示“不限时”的值）；排队和重试的时限由模型池执行，首个内容的时限由包装执行（§11.2）。
+fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal, 这次尝试的控制器])`：前者触发是你按了停止（出队、不再重试），后者触发是这次尝试超时（分类 `timeout`）。
+
+## 9. 界面
+
+每屏的状态表在 [v1/screens/](../v1/screens/)，实现前写好（AGENTS.md 第 1 条）；这里定主要行为。界面文字为英文。
+
+### 9.1 设置 → Models
+
+取代 v0 的“连接与模型”分节（[v0/screens/settings.md](../v0/screens/settings.md)）。从上到下：
+
+- **迁移说明**（§4.5，有时）与**区域未确认**的提供商（有时，每个一行“Confirm zone…”）。
+- 设置页的每个修改（Defaults、Groups、Project access、Keys、上移下移）立即保存；表单（提供商、模型）按“Save”保存。
+- **Defaults**：
+  - Default model range for new sessions：下拉，按分组、提供商、模型分三节；可以为空（“None”）。
+  - Allowed zones for all projects：Local、Intranet 两个勾选框；说明“Public providers can only be allowed per project, below.”。
+- **Providers**：每个提供商一张卡：名称、地址、接口类型、区域、每个 key 的并发上限、兼容选项；“Edit”、“Delete”、“Test connection”（用第一个可用的 key 测第一个模型，结果文字同 v0）。
+  - **Keys**：每行标签、“Saved”、当前记录（“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有时不显示）、上移、下移、“Test”（用这个 key 测提供商的第一个模型，结果显示在这一行下面；成功时清除记录，§8.3）、“Remove”。“Add key”：一行内联表单，Label（默认“Key <n>”）、Secret（密码框）、“Save”/“Cancel”，新 key 加在末尾。
+    key 的明文不能查看也不能改：换 key = 加新的再删旧的。删最后一个 key 时确认“Requests to <name> will be sent without an API key.”。没有 key 时说明“Requests are sent without an API key.”。
+  - **Models**：每行模型 id、窗口、最大输出、模型族、支持思考；档案摘要：Tool calling（Verified / Not verified / Failed / Verifying… / Re-verifying…）、Handoff tier（A / B / C / —）、Context（有效窗口；截断时告警“Silently truncates long input”）、Reasoning field、Cancel（Verified / Not verified / Unknown）；探针出错时“Couldn't verify: <原文>”。
+    操作：“Verify”、“Long-input test…”、“Cancel test…”（只对 vLLM、SGLang、llama.cpp）、上移、下移、“Edit”、“Delete”、“Test”。
+  - 模型表单：Model id（编辑时只读，沿用 v0）、Context window、Max output（新建默认 16384 与窗口一半中较小的）、Family（可空）、Supports thinking、Image input、New-session thinking level（只在支持思考时；写 pi 设置的 `modelThinkingLevels`，沿用 v0）。
+  - 提供商表单：Name、Address、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Network zone（Local / Intranet / Public，按 §12 的规则预选建议值）、Concurrency per key、兼容选项；新建时还有第一个 key 和第一个模型。改地址的 origin 时按 §4.1 删除 key 并确认。
+    新提供商保存失败时，删除本次新存的 key。兼容选项的英文说明：“Endpoint doesn't support the developer role”“Endpoint doesn't accept the store field”“Send the output limit as max_tokens”“Endpoint doesn't report usage while streaming”“Endpoint doesn't support strict mode”“Tool results must include the tool name”。
+  - 测试结果（Test connection、Test）：“Connected · first token N ms · total N ms”，有思考内容时加“ · with thinking”，有正文时加“ · reply: <前 200 字>”；失败时“Failed: <原文>”；“Cancel”取消。
+  - 确认对话框“Confirm zone…”：提供商名称与地址，Local / Intranet / Public 单选（预选建议值），“Confirm”/“Cancel”。
+- **Groups**：每个分组一行：id、有序的成员（“DeepSeek · all models” 或 “DeepSeek · deepseek-chat”），成员可以加入、去掉、上移、下移；“New group”、“Delete”。
+  - New group：输入 id（规则同提供商 id；错误“<id> is already used by a provider or group”、“Use lowercase letters, digits and -”）。
+  - Add member：每个提供商一节，第一项“<name> · all models”，其后是它的各个模型；已在分组里的项打勾、不可再选。
+  - 只剩一个成员时 Remove 不可用，说明“A group needs at least one member; delete the group instead.”。
+- **Project access**：已知项目（侧栏里的项目）各一行，显示项目路径和这个项目允许的区域；每个不在 `allowedZones` 里的区域一个勾选框。勾上 `public` 先确认：
+  “Allow public providers for this project?”，正文“Code and files from <项目路径> may be sent to: <公网提供商名，逗号分隔>.”，“Allow”/“Cancel”。项目配置排除了这个区域时勾选框不可用，说明“.mori/models.json in this project doesn't allow <zone>.”。
+- 删除、改地址、删最后一个 key 的确认框列出 §4.1 的连带改动。
+
+**首次启动表单**（v0 的连接表单，改为英文）：Name、Address、API type、Network zone（必选，按 §12 预选建议值）、API key（可空）、Model id、Context window（默认 128000）、Max output（默认 16384 与窗口一半中较小的）、Supports thinking、兼容选项。
+
+- “Test connection”：表单有改动时先保存（`models.firstRun`：一次写入提供商、模型、key 和 `normalDefault`；同一张表单再次保存时整体替换这个提供商和它唯一的模型，不新建第二个），再测；成功后显示“Open folder…”，同时在后台跑探针，表单下方显示探针状态：
+  “Verifying tool calling…” / “Tool calling verified” / “Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server's tool-call settings.”（表单可以改，改了再测）/ “Couldn't verify: <原文>” + “Verify again”。
+- 区域选 Public 时，区域下方说明“Public providers must be allowed per project. You'll be asked when you open a folder.”；打开文件夹后，会话的拒绝启动卡显示“Allow public for this project…”。
+- 已经有配置时不显示首次启动表单（`config.get` 的 `firstRun`，§9.4）；配置存在但读不出时也不显示（§4.1）。
+- 测试连接不用 v0 的 30 秒总时限：排队按 §8.2，每次尝试按 §5.4 的首个内容时限，不做原地重试（`server` 直接报告）。
+
+### 9.2 顶栏
+
+- 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名和区域。生成中或准备中按钮不可用，悬停“Can't change the model while generating”。
+- 菜单分三节：Groups、Providers、Models（按提供商分组）。每项标出区域（分组标出它的成员涉及的全部区域，例如“Local · Public”）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session. New sessions use the default range from Settings.”与“Manage models…”。
+- 思考强度菜单沿用 v0，可选强度取当前模型（实际模型）的。当前模型不支持思考时的说明改为英文（它指向的设置页改了）：“This model isn't marked 'Supports thinking', so Mori doesn't send thinking parameters and the endpoint decides. Edit the model in Settings → Models and tick 'Supports thinking' to choose a level.”
+
+### 9.3 对话流与阶段行
+
+| 项 | 来源 | 显示 |
+| --- | --- | --- |
+| 换模型 | `mori.model_switch` 事件，或会话里的同名条目 | 一行提示“Switched model: A → B · <原因>”；有被隐藏的过程时加“The new model redoes this reply.” |
+| 重建 | `mori.model_rebuild` 事件，或 `mori.rebuild` 条目 | 一行提示（§6.3） |
+| 等模型、等它停下 | `mori.model_wait` | 阶段行“Waiting for a model · <原因>” / “Waiting to make sure <模型> stopped · until hh:mm:ss” |
+| 排队 | `mori.model_queue` | 阶段行“Waiting for <提供商名>” |
+| 原地重试 | `mori.model_retry` | 阶段行“Retrying n/m · <原因>” |
+| 准备中 | §11.4 | 用户消息已显示在对话流里；会话按“发送中”显示，停止可用；阶段行显示等待或“Rebuilding the conversation for <B>…”；停止或等不到时撤回这条用户消息和准备中又发的消息，文字按发送顺序（空行分隔）放回输入框 |
+| 没有可用模型 | `mori.model_unavailable` | 一张说明卡：每个候选及原因；“Open settings”（打开 设置 → Models，滚到第一个被排除候选的提供商卡；`auth`、`quota` 时焦点在它的 Keys） |
+| 拒绝启动 | `ModelState.blocked`（§4.6） | 输入框上方一张卡，文字与操作见 §4.6；发送不可用 |
+| `server` 重试用完、`request`、`partial` | 回复的错误 | v0 的错误卡（原文；“把上一条消息放回输入框”） |
+
+- 一次失败只显示一张卡：发了 `mori.model_unavailable` 的那次回复，pi 的错误不再显示成 v0 的错误卡。
+- v0 错误卡的“去设置”和它的文字匹配（`SETTINGS_HINT`）删除：认证类错误由模型层处理（换 key、换模型或说明卡）。
+- pi 的 `auto_retry_*` 不再出现（§5.5），阶段行的重试由 `mori.model_retry` 提供；它在下一个有内容的事件、下一次 `mori.model_retry` 或回复结束时清掉。
+- 被拒绝启动的会话里，发送与需要模型的斜杠命令（例如 `/compact`）都不可用。
+- 阶段行：模型层的等待（等模型、等它停下、排队、原地重试、重建）进行时，取代 v0 的“等待模型响应”，同样在后面显示已经等了多少秒。
+- 拒绝启动卡：“Verifying <模型>…”写第一个正在验证的候选；“Confirm zone…”和“Allow <区域> for this project…”都打开 设置 → Models（前者落在区域未确认的那几行，后者落在 Project access 的这个项目）。
+
+### 9.4 进程桥：保留、删除、改写
+
+- 删除：`connection.save`、`endpoint.save`、`model.save`、`model.delete`、`model.setDefault`、`session.setModel`，以及后台进程的 `refreshSessionModels`、`afterModelsChange`。
+- 保留：`connection.test`（改为 `{ providerId, modelId, keyRef? }`，经模型池）、`connection.testCancel`、`session.setThinking`。
+- `config.get` 只返回 `{ agentDir, settingsError, defaultThinkingLevel, firstRun, migrationError, configError, migratedNow }`（`migratedNow`：这次启动刚做完迁移，界面据此直接打开 设置 → Models，§4.5）：`firstRun` 只在 `model-config.json` 不存在、且没有迁移成（`models.json` 不存在、`providers` 为空或迁移失败）时为真；
+  `migrationError` 在迁移失败时给出原文；`model-config.json` 存在但读不出时 `firstRun` 为假、`configError` 给出路径与原文（§4.1）。`models.firstRun` 在 `model-config.json` 已存在、且要写的不是这张首次启动表单自己建的那个提供商时拒绝。
+- 界面的操作记录（F8 报告的“最近的操作”，`state/actionLog.ts`）对 `models.*` 命令只记类型和 id（例如“Add key <providerId>”），从不包含 `secret`、`keySecret`。
+
+### 9.5 载荷
+
+`ModelState`（在 `SessionInfo` 里——`session.create`、`session.open`、界面重新载入后接上会话——以及每个 `mori.model_state` 事件里；取代 v0 的 `model` 字段和 `SessionInfo.modelNotice`）：
+
+```ts
+{ pick: string | null; current: string | null /* <provider>/<model> */;
+  blocked: null | { kind: 'verifying' | 'no_candidate' | 'no_pick' | 'pick_missing' | 'project_config' | 'config_invalid';
+    detail: string; candidates: { ref: string; reason: string; detail: string }[];
+    actions: ('verify' | 'allow_zone' | 'confirm_zone' | 'change_model' | 'open_settings')[];
+    verifyRefs: string[]; zone: string | null; zoneProviders: string[] };
+  thinkingLevel: ThinkingLevel; thinkingLevels: ThinkingLevel[]; reasoning: boolean }
+```
+
+事件（会话事件的信封不变；`mori.profiles`、`mori.key_status` 用全局信封 `{ kind: 'event', sessionId: null }`）：
+
+| 事件 | 字段 |
 | --- | --- |
-| v0（app-v0） | 连接表单、测试连接、错误原文；模型配置写 pi 的 `models.json`；单 Agent，可在顶栏切换模型 |
-| v1 | mori 模型配置与编译（含从 v0 的 `models.json` 迁移）、原始请求轨迹、别名与候选、能力三态与启动校验、网络区域、选择器与切换协议、强制调用适配与看板写入等级、档案完整探针 P0–P14；按请求计的端点并发与按推导的调度类别做简单优先级排队；基座 Agent 的默认候选与顶栏覆盖（§4.7）；评审避开同族（§10）；跨模型转写可行性判断（§6.2，只有三条确定性条件）；配合 TaskBoard 的最小配置（基座 Agent + 一个执行 Agent）。v1 只因连接失败且未送出、限流、认证或额度失败、排队超时而切换；结果未知时不切换，先取消，再等到已验证的最长执行时间或总期限 |
-| v1.x | 完整模型池（额度组、优先级权重、熔断、远端未知占比、取消验证后立即切换）、运行时健康、成本统计。v1 没有运行时健康时，“回收后又选回同一模型”的循环由 TaskBoard 的回收次数上限截住 |
+| `mori.model_state` | `ModelState` |
+| `mori.model_switch` | `{ from, to, reason, detail, hidden: boolean, unconfirmed: boolean, at }`（`unconfirmed`：§5.7 没能确认旧请求停下就换的；条目里同样记这个字段） |
+| `mori.model_rebuild` | `{ model, summary: boolean, at }` |
+| `mori.model_wait` | `{ active: boolean, kind: 'model' \| 'held' \| 'rebuild', model: string \| null, reason: string \| null, detail, until: number \| null }`；`active: false` 清掉阶段行 |
+| `mori.model_queue` | `{ active: boolean, provider, providerName }` |
+| `mori.model_retry` | `{ attempt, max, status, delayMs }` |
+| `mori.model_unavailable` | `{ candidates: { ref, reason, detail }[], firstRequest: boolean, text: string \| null, queued: string[] }`（`text`、`queued` 是撤回的消息） |
+| `mori.profiles` | `{ profiles: Record<ref, ProfileView>, running: { ref, step, of }[] }` |
+| `mori.key_status` | `{ keyStatus: Record<ref, { state: 'rate_limited' \| 'auth' \| 'quota', until: number \| null }> }`（全局信封；key 的记录变化时发出） |
 
-## 14. 最小闭环与验收
+命令（结果都带 `error: string | null`）：
 
-最小闭环：一个内网 vLLM 模型作为执行候选首位，一个本机 Ollama 模型作为第二候选。测试用的执行 Agent 绑定 `requires: [tool_calling, protocol_write, context>=32768]`，
-Ollama 的上下文已按 `OLLAMA_CONTEXT_LENGTH` 设为 32768 以上，使它不会被能力过滤排除。
+| 命令 | 参数 | 结果 |
+| --- | --- | --- |
+| `models.get` | — | `{ config /* key 只给 { ref, label } */, profiles, keyStatus, thinkingDefaults: Record<ref, ThinkingLevel \| null> /* pi 设置里按模型的新会话默认强度 */, zoneSuggestions: Record<providerId, zone>, migration: MigrationNotice \| null, projects: { path, zones /* 本机额外授权的区域 */, projectZones: Zone[] \| null /* .mori/models.json 的 allowedZones */, projectConfig: string \| null /* 这个文件的错误原文 */ }[], loadError: string \| null, reserved: string[] }` |
+| `models.firstRun` | `{ providerId: string \| null, provider, model, keySecret: string \| null }`（`providerId` 非空时整体替换这个提供商与它唯一的模型，`keySecret` 为空时保留已存的 key；写配置失败时删除本次新存的 key） | `{ providerId }` |
+| `models.saveProvider` | `{ id: string \| null, provider, keySecret?: string, model?, thinkingLevel?: ThinkingLevel }`（新建时带第一个 key（标签“Key 1”）和第一个模型及它的新会话默认强度） | `{ providerId }` |
+| `models.deleteProvider` | `{ id, dryRun: boolean }` | `{ consequences: string[] }`：确认框的各行（§4.1 的连带改动）；`dryRun` 为真时只算、不改 |
+| `models.saveModel` | `{ providerId, model, adding: boolean, thinkingLevel?: ThinkingLevel }` | — |
+| `models.deleteModel` | `{ providerId, modelId, dryRun: boolean }` | `{ consequences: string[] }`，同上 |
+| `models.moveModel` | `{ providerId, modelId, delta: -1 \| 1 }` | — |
+| `models.addKey` | `{ providerId, label, secret }` | `{ ref }` |
+| `models.removeKey` | `{ providerId, ref }` | — |
+| `models.moveKey` | `{ providerId, ref, delta: -1 \| 1 }` | — |
+| `models.saveGroup` | `{ id, members, creating: boolean }` | — |
+| `models.deleteGroup` | `{ id, dryRun: boolean }` | `{ consequences: string[] }`，同上 |
+| `models.setDefaults` | `{ normalDefault: string \| null, allowedZones }` | — |
+| `models.setProjectZones` | `{ path, zones }` | — |
+| `models.confirmZone` | `{ providerId, zone }` | — |
+| `models.dismissMigration` | — | — |
+| `models.reload` | — | 同 `models.get` |
+| `models.verify` | `{ refs, tests: 'auto' \| 'long_input' \| 'cancel' }` | — |
+| `session.setPick` | `{ sessionId, pick }` | `ModelState` |
+| `session.pickOptions` | `{ sessionId }`（只读） | `{ options: { pick, kind: 'group' \| 'provider' \| 'model', label, zones: Zone[], excluded: boolean, reason: string \| null }[] }`：顶栏菜单的每一项，按这个会话的项目对它做静态校验（§9.2 的变淡与原因） |
 
-1. 添加两个模型后自动跑探针，档案得到验证结果和协议写入等级；Ollama 因不支持 `tool_choice` 被定为 B 或 C 级。
-2. 执行 Agent 正常运行；用模拟端点对首选模型注入限流，验证返回 `reprepare`、切换到第二候选、记录原因，并在下一次占用时回切。
-3. 在候选列表末尾加入一个 `public` 区域的模型，而项目未被授予公网，验证它对 Agent 和工具模型都被排除。
-4. 在占用中途注入首选模型宕机，验证写 `model_switch` 步骤后在第二候选上从工作卡继续，旧轨迹没有被回放。
-5. 对 Ollama 执行强制交接，验证走结构化输出或文本标签路径，长内容不在 JSON 中。
-6. 另用一个未调大上下文的 Ollama 模型（单独的工具模型绑定）发送超长请求，验证静默截断被检测并告警。
+`models.*` 的写命令保存后：编译（§4.4）、对所有打开的会话重新做静态校验并发 `mori.model_state`、需要时发起探针（§7.4）。
+段开始选定模型、段内换模型、段结束时，后台进程同样发 `mori.model_state`（`current`、`thinkingLevels`、`reasoning` 随之更新）。
+`mori.prompt_error` 加字段 `queued: string[]`：准备中被撤回时一起撤回的、准备中又发的消息（§11.4）。
 
-| 验收场景 | 通过条件 |
+## 10. 由平行 Agent 与 TaskBoard 规格实现的部分
+
+下面的规则属于 proposal，但只在有平行 Agent、TaskBoard 之后才有调用方，本规格不实现：
+
+| 规则 | 依据 |
 | --- | --- |
-| 多提供商并存 | 同一会话中不同 Agent 同时使用不同提供商的模型，模型池分别计算额度 |
-| 配置编译 | mori 配置严格校验，未知字段报错；`maxTokens` 缺失或不小于窗口时报错；编译出的内核配置可用；密钥不落盘为明文 |
-| 候选展开与过滤 | 别名展开顺序正确、去重、参数取首次出现的别名；验证失败、运行时失效、区域不允许的候选被排除并给出原因 |
-| 能力三态 | 未验证的候选可用但处处标注；严格模式下被排除并提供一键验证；数值限制取声明值与核对值中的较小者 |
-| 启动校验 | 无可用候选时拒绝启动；沟通者、立项者和结案者没有冗余时警告；工具模型与 `triage_model` 同样被校验 |
-| 切换协议 | 切换条件触发时模型池返回 `reprepare`，调用方按新档案重新组装；逻辑请求标识、总期限和总预算沿用 |
-| 可用性切换 | 限流、连接失败、服务错误、排队超时、认证失败各自按 §5.3 处理 |
-| 不切换的情况 | 格式错误、部分输出后失败、当前模型上下文超长、内容策略拦截、用户取消都不切换 |
-| 结果未知 | 首响应超时、502/504 后不立即切换；`cancel_verified` 的部署取消后才切换；同一逻辑请求最多一个可能在执行的尝试 |
-| 小窗口候选 | 切换到窗口更小的候选不发生溢出 |
-| 预算 | 跨候选总尝试与总期限不重置；每个候选有子预算；内核重试已关闭，实际发送次数可逐次核对 |
-| 排队改投 | 改投原子；保留入队时间；每个候选最多一次；全部失败后按 `on_unavailable` 处理 |
-| 候选耗尽 | 工作通道中 `failover` 先等待（租约与写锁保留）再交给结案者；三项权限持有者的对话与职责回合耗尽时程序在聊天流说明，恢复后重投职责；Agent 消息回复立即返回“对方模型暂时不可用”；分诊因模型不可用失败时走分诊超时路径 |
-| 中途切换 | 执行类工作写 `model_switch` 步骤后在新候选上新建会话、从工作卡重建，租约不变，旧轨迹不回放；连续上下文（沟通者的对话，以及配置了 `context: continuous` 的职责上下文）先判断转写可行性，不可行时改走重建 |
-| 切换可见 | 请求记录、模型池界面、TaskBoard 步骤都能看到实际使用的模型和切换原因 |
-| 粘性与回切 | 占用内不来回切换；选定结果随租约落盘，重启后沿用；首选恢复后在下一次占用开始时回切 |
-| 网络区域 | 任何调用（含工具模型、subagent、compaction）都不会发往不允许的区域；仓库内配置无法放宽；网关实际模型与预期不符时告警 |
-| 档案适配 | 强制调用在四种策略上都能完成；空轮补救、推理字段归一、参数类型转换、工具名校验生效 |
-| 写入等级 | A/B/C 按探针结果派生，C 级要求文本标签子项通过；长内容不进 JSON；`length` 截断不做修复；语义拒绝不降档；降级与回收有记录；程序发起的协议写入只选有写入等级的候选 |
-| 静默截断 | 截断被检测并以错误卡告警 |
-| 原始请求轨迹 | 每次尝试都有记录；轨迹与请求记录中不出现明文密钥；存放位置不在项目仓库或云同步目录 |
-| 从 v0 迁移 | `models.json` 被导入，明文 key 迁入 `safeStorage` 后从 `models.json` 删除；zone 由用户确认；迁移后修改 `models.json` 不再生效 |
-| 基座 Agent | 基座 Agent 的候选来自 `base_agent`，同样展开和校验；顶栏切换只覆盖沟通者的对话通道 |
-| 探针 | 添加模型后自动运行；探针计入额度组；故障注入不影响真实资源；指纹或套件版本变化后标记重新验证 |
-| 运行时健康 | 强制能力健康度跌破阈值后被降为失效，选择器在下一个请求边界跳过它 |
-| 优先级 | 平行 Agent 同时发起请求时排队而不是互相挤成 429；工具模型调用继承发起者的类别；后台不会饿死 |
-| 评审避开同族 | 开启 `differ_from` 时，评审不使用被评审集合中的模型族；没有候选时交给结案者 |
-| 成本统计 | 按提供商、模型、Agent、目标 task 汇总，未知用量单独显示 |
-| 项目覆盖 | 项目配置新增提供商或密钥被拒绝；覆盖别名时界面显示覆盖关系 |
-| 熔断粒度 | 熔断只作用于单个模型或提供商，不连带整个别名 |
-| 推理档位 | 同一模型在一次占用内推理档位不变；原上下文中的强制调用不关闭思考 |
-| 计量单位 | 端点上限按请求计，工具执行期间不占额度槽；上限为 1 时分诊不会被执行者的回合卡住 |
+| 子 Agent 按自己的 `models`、`requires` 选，只能落在用户为主 Agent 选的范围里（两者展开后的交集，顺序按子 Agent 的候选）；没有交集时这次提问失败并说明原因 | proposal §5 |
+| 协作模式下用户不选，顶栏只显示正在用的模型；按 task 的设置选模型 | proposal §5 |
+| `.mori/agents/*.md` 的 `models`（每项是一个选择范围）与 `requires`（`tool_calling`、`protocol_write`、`protocol_write>=B`、`structured_output`、`vision`、`context>=N`）。判定用 §7.2 的档案字段：`tool_calling`、`protocol_write`、`structured_output` 必须已验证；`vision` 为 `unverified`（配置声明了图像输入）即满足；`context>=N` 比较 `effective` | proposal §4、§6 |
+| Agent 定义引用的名字不存在时拒绝启动，说明缺哪一项、哪个 Agent 用到它 | proposal §6 |
+| 继续已有的对话、立项、结案会话，或交回同一角色的 task 会话时模型变了：按本规格 §6.2 判断能否转写，不能就按 §6.3 重建 | proposal §9 |
+| task 会话中途换模型：结束本轮，切换记在实例自己的会话里，在新模型上从工作卡重建，需要前半段细节时读自己的会话；第一个请求就失败时把同一请求按新模型的档案重组后发出 | proposal §7.2、§9 |
+| 执行中的 task 候选耗尽时交给结案 Agent | proposal §8 |
+| 填交接单按当前模型的写入等级：A 指定函数 + 严格模式，B JSON schema，C 文本标签；换了模型后，下一次按新模型的等级 | proposal §4、§11 |
+| 读别人的会话只拿整理过的文本（工具调用、输出、结论），不含推理原文，不并进自己的消息历史 | proposal §11 |
+| 评审 `differ_from: author` 排除改过这个 task 代码的模型族 | proposal §11 |
+| 调度类别加上立项与结案的决策、执行 task，依次排在对话之后、后台之前；订阅与定时的请求归入 `background`，与探针同级 | proposal §11 |
 
-## 15. 待澄清问题与待定参数
+## 11. 在 pi 上的落点
 
-需要用户决定的问题：
+以 pi 1.3.0 为准；下面依赖的行为都在开工前用脚本对合成端点实测过（2026-10-21，§11.6，详见 [v1/models-checks.md](../v1/models-checks.md)）。
+`@earendil-works/pi-ai` 1.3.0 改为直接依赖（精确版本；它已随 pi-coding-agent 安装，离线可用），只在 `app/src/kernel/` 里 import，用它的事件流（§11.2）。
 
-| 问题 | 本文暂定 |
+### 11.1 每个会话一个虚拟模型
+
+- pi 的 `route()` 不带会话身份，所以每个会话一个虚拟模型：会话新建或打开前，在共享的 `ModelRuntime` 上
+  `registerVirtualModel({ provider: "mori", id: <pi 会话 id>, name, thinkingLevels: [全部七档], contextWindow, maxTokens, input, route })`，
+  `contextWindow`、`maxTokens`、`input` 取静态校验后的第一个候选（没有时取 128000、16384、`["text"]`）；然后 `await runtime.refresh({ allowNetwork: false })`，再 `createAgentSession({ model: <这个虚拟模型> })`：
+  新会话另传 `thinkingLevel`（下一条的取法）；打开已有会话时不传，pi 从会话记录恢复强度。会话关闭时 `unregisterVirtualModel`。重新打开时注册同一个 id，pi 恢复它。
+- 新会话的思考强度：第一个候选的 `modelThinkingLevels["<provider>/<model>"]` → `defaultThinkingLevel` → `medium`（沿用 v0 按模型设的新会话默认）。pi 按每次请求的实际模型收紧。
+- `ModelState.thinkingLevels`、`reasoning` 描述当前模型（实际模型），不用虚拟模型的。
+- `route(request)`，不论原因（`user`、`continuation`、`direct`）：
+  1. 有待开始的新段（§11.4）时先开始它；
+  2. 有 `ReplyState` 时，对 `current` 做 §5.3 第 1、4 步：通过就返回它；不通过就在 `route()` 里按 §5.6 第 2–3 步换模型（原因取第一个不满足的条件，例如 `missing`、`rate_limited`），`hideUntil` 取 `request.messages` 里助手消息和工具结果的最大时间戳，写条目、发事件，在 `Date.now()` 大于 `hideUntil` 后返回新模型；选不到时按 §5.8 等待（听 `request.signal`），等不到就抛出 §5.8 的说明，界面只显示说明卡；pi 先调 `route()` 再调 `context` 钩子，所以这次请求的上下文已经按新条目处理；
+  3. 没有 `ReplyState` 时按 §5.3 选。
+  思考强度返回 `request.thinkingLevel`。
+
+### 11.2 流函数包装
+
+会话创建后、第一次运行前（pi 在每次运行开始时取一次流函数），把 `session.agent.streamFunction` 换成 Mori 的包装，原函数保留在包装里调用。包装总是在选项里加 Mori 的 fetch（§8.4）、`maxRetries: 0`、`timeoutMs: 2147483647`。
+
+1. 请求里的 `sessionId` 与会话 id 不同：压缩请求（§6.4）。调原函数，执行首个内容的时限（同第 2.2 步），出错原样返回。
+2. 其余请求：用 pi-ai 的 `createAssistantMessageEventStream()` 建一个事件流返回给 pi，然后在后台：
+   1. 以 `ReplyState.current` 调原函数；
+   2. 缓冲原函数的事件，直到第一个有内容的事件（正文、思考、工具调用的开始或增量）或完成。有内容就把缓冲的和之后的事件原样推进返回的事件流。
+      时限：从模型池最近一次 `onSent` 回调起计 §12 的时长，每次 `onSent` 重新计时；超时用这次尝试自己的控制器中止（§8.4），分类 `timeout`，按 §5.7；
+   3. 在有内容之前出错，且 fetch 记下的分类要求换模型：丢弃缓冲，按 §5.6 选下一个，用 §6 处理后的上下文对新模型调原函数，选项里的思考强度改为会话的强度（`off` 时不传），回到第 2 步；
+   4. 你按了停止（选项里的 signal 在任何时候触发，包括包装自己在等待时）：不再调原函数，推一个 `{ type: 'error', reason: 'aborted' }` 事件，以 `stopReason: 'aborted'`、`errorMessage: 'Request was aborted'` 结束（直接用已中止的 signal 调原函数会得到 `error` 而不是 `aborted`，§11.6 K7）；
+   5. 候选耗尽（含 §5.7 等完后选不到）：推一个错误事件，`errorMessage` 为 §5.8 的说明，以 `stopReason: 'error'` 结束；界面按 §9.3 只显示说明卡；
+   6. 其他情况（`partial`、`server` 重试用完、`request`）：把原函数的事件原样推进去。
+3. pi 的循环只用事件流的异步迭代和 `result()`；事件流结束时 `result()` 给出最终的助手消息。换了模型的那条消息上，pi 记的思考强度仍是路由时为原模型收紧的值（已知限制，记在检查记录里）。
+
+### 11.3 上下文钩子
+
+pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system 消息）：按 §6.1、§6.3 返回处理后的消息；只影响发出的请求，不改会话文件。换模型那一次请求，包装对传给原函数的上下文用同一个函数处理（函数对已处理过的上下文结果不变）。
+
+### 11.4 段的开始与结束
+
+- **你发消息**（后台进程处理 `session.prompt`，会话空闲）：
+  1. 进入“准备中”：`entry.running` 为真；建立 `ReplyState`，`startedAt = Date.now()`（早于 pi 建的那条用户消息的时间戳）；
+  2. 按 §5.3 选模型（§5.8 的等待在这里）；
+  3. 做 §6.2 的接手判断，需要时 §6.3 重建；
+  4. 调 pi 的 `prompt`。
+  - `anchor`：`startedAt` 之后的第一条用户消息（就是这条消息）。
+  - 准备中再收到的 `session.prompt` 由后台进程暂存，pi 的 `prompt` 开始后作为 `followUp` 交给 pi。
+  - 准备中收到 `session.abort`、或 pi 的 `prompt()` 没有开始运行就结束：取消等待或压缩，发 `mori.prompt_error`（`message` 为 “Stopped before sending” 或 pi 的原文，`text` 为这条消息，`queued` 为暂存的消息，`running: false`），文字全部回到输入框，暂存区清空；等不到模型时按 §5.8 只发 `mori.model_unavailable`。
+  - 准备中再发的消息显示在排队区（同 v0 的排队消息）；准备中不能插话（Ctrl+Enter 也按排队处理）。
+  - 准备中不能改范围和思考强度。
+- **排队消息开始新的一段**：后台进程记下自己经 `followUp` 交给 pi 的每条文字。Mori 的内联扩展处理运行中 role 为 user 的 `message_start`（pi 在送进这条消息之后、下一次调 `route()` 之前发它，并等待扩展处理，§11.6 K13）：
+  文字与一条记下的 followUp 相同（匹配一次即消费）时，记下“待开始的新段”。下一次 `route()` 开始新段：`startedAt` = 此刻的 `Date.now()`，`anchor` = 这条消息，`tried`、`skipped` 清空，按 §5.3 从第一个候选起选，做 §6.2 的段内接手判断。
+  由 `session.prompt` 开始的段的第一次 `route()`、溢出恢复后的继续、插话（不论在工具结果之后还是在最后一条回答之后送达）都不开始新段。
+- **结束**：pi 发 `agent_settled`，或 pi 的 `prompt()` 结束时会话已不在运行，清掉 `ReplyState`。
+
+### 11.5 开工前确认的做法
+
+- 注册提供商和虚拟模型之后都 `await runtime.refresh({ allowNetwork: false })`（K9）。
+- 包装在 `createAgentSession` 之后、第一次运行之前装上（K2）。
+- `mori.pick`、`mori.model_switch`、`mori.rebuild` 用 `sessionManager.appendCustomEntry` 写；运行中写入与 pi 自己运行中写 `pi.virtual-model-state` 相同。
+
+### 11.6 开工前实测的结果
+
+| 项 | 结果 |
 | --- | --- |
-| 是否需要“输出质量差时升级到更强模型”（语义路由）？ | 本期不做，只做可用性切换 |
-| “每个任务同时使用所有模型”是否包括同一步并行调用多个模型（多选一、投票、交叉验证）？ | 不包括：不同 Agent 各用各的模型，同一步只调用一个模型 |
-| 未验证的能力默认是否可用？ | 工具调用、强制调用、协议写入、结构化输出必须验证（延续 app-v0 保留的“实测工具调用”）；其余默认可用并处处标注，可开启严格模式 |
-| 首响应超时、结果未知时，是严格等待核对，还是允许对冲（新候选与旧尝试并行，旧结果丢弃）？ | 严格等待；已验证取消的部署可以立即切换 |
-| 公网提供商是否在默认允许区域内？ | 默认不允许，只能在用户级设置中按项目授予 |
-| 协议一致性测试是否只作建议？ | 只作建议，手动运行 |
-| 评审是否必须使用与执行者不同族的模型？ | 可选，不默认开启 |
-| 模型目录与探针结果是个人维护，还是团队共享？ | 个人维护；团队共享可在后续通过导入导出实现 |
-| 是否允许 mori 在服务端 parser 有缺陷时绕过它（直接走原始文本补全，由 mori 套模板并解析）？ | 本期不做，先依赖空轮补救和档案适配 |
+| K1 | 没有 key 的提供商 pi 不算“已配置”，`route()` 路由到它会报错；`registerProvider` 带一个占位 `apiKey` 就算已配置。`streamSimple` 和会话请求都采用 `fetch` 选项；自定义 fetch 看得到 429 的状态和 `Retry-After`（pi 的报错文字里没有它） |
+| K2 | `session.agent.streamFunction` 可以替换；每次助手请求调用一次，参数里的模型是路由后的实际模型；选项里的 `apiKey`、`fetch` 被采用；包装里可以等待。pi 在运行开始时取流函数 |
+| K3 | 每个会话一个虚拟模型可行；助手消息记的是实际模型；上下文用量按实际模型的窗口算；重新打开时注册同一个 id 就恢复。插话之后的请求原因是 `user`，工具循环是 `continuation`。虚拟模型不写 `thinkingLevels` 时只有 `off`，所以要写全部七档 |
+| K4 | `context` 事件能去掉任意消息、加上用户消息，只影响发出的请求，会话文件不变 |
+| K5 | 压缩请求先以 `direct` 调 `route()`，再用会话的流函数发出；每个压缩请求带一个不同于会话 id 的 `sessionId` |
+| K6 | `applyOverrides({ retry: { enabled: false } })` 后 429 只发一次、没有 `auto_retry_start`；`resourceLoader.reload()`、`settingsManager.reload()` 和带 `persist` 的设置会清掉覆盖 |
+| K7 | `session.abort()` 时 fetch 的 signal 同一刻触发，服务端几十毫秒内看到连接关闭；已收到的部分留在中止的消息里。用已中止的 signal 调原函数得到 `stopReason: error` |
+| K8 | `streamSimple` 原样发出指定函数的 `toolChoice` 和经 `onPayload` 加的字段；工具的 `strict` 只在 `compat.supportsStrictMode` 为真时由 pi 发出，所以探针第 5 步经 `onPayload` 直接写 |
+| K9 | `registerProvider`、`registerVirtualModel` 发起的刷新不等待，会与之后的刷新互相覆盖；注册后 `await runtime.refresh()` 就稳定 |
+| K10 | 把虚拟模型交给 `streamSimple` 时 pi 丢掉调用方给的 key；探针和测试连接直接用实际模型 |
+| K11 | pi 传给 SDK 的 `timeoutMs`（默认 300 秒）覆盖自定义 fetch 返回响应之前的全部时间，包括模型池里的排队和重试，超时报“Request timed out.”；包装在选项里写 `timeoutMs: 2147483647` 后不再超时 |
+| K12 | `session_before_compact` 的处理器就地改 `preparation.messagesToSummarize`、`turnPrefixMessages` 后不返回结果，pi 用改过的内容压缩；`preparation.fileOps`（`read`、`written`、`edited` 三个集合）在钩子之前算好，要一起改，否则摘要末尾仍列出被隐藏的调用读过的文件。`compaction_start` 在钩子之前发出 |
+| K13 | 运行中 pi 送进排队消息（followUp）和插话（steer）时都先发 role 为 user 的 `message_start`，等扩展的处理结束，再为下一次请求调 `route()`（原因 `user`）；消息的时间戳是排队的时刻。followUp 在本该结束的最后一轮之后送达，steer 在工具结果之后送达。`agent_settled` 每次运行结束发一次；`route()` 抛错时 `prompt()` 不抛、照样发 `agent_settled`；`prompt()` 在运行开始前抛错时不发任何事件 |
 
-待实测确定的参数：各模型的期限与重试子预算、总尝试上限、`max_queue_wait`、调度权重、熔断条件、远端未知占比阈值、
-`context_effective` 比例、探针有效期与预算、运行时健康阈值与窗口、请求长度估算方法、价格与目录数据的离线来源。
+## 12. 临时默认值
 
-## 16. 业界参考
+都登记在 [v1/defaults.md](../v1/defaults.md)；时长集中在 `kernel/modelTimings.ts`。
 
-| 来源 | 借鉴点 |
+| 项 | 值 |
 | --- | --- |
-| [pi-ai](https://github.com/earendil-works/pi) 与 [models.json 配置](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/models-configuration.md) | 多协议接入与统一消息格式；compat 选项；跨模型转写 `transformMessages` |
-| [LiteLLM Router](https://docs.litellm.ai/docs/routing)、[Fallbacks](https://docs.litellm.ai/docs/proxy/reliability) | 一个名字对应多个部署；每个部署的限额与冷却；调用前的上下文检查；也是“满并发立即 429”和“改 alias 即静默换模型”的反例 |
-| [OpenRouter provider routing](https://openrouter.ai/docs/features/provider-routing)、[Exacto](https://openrouter.ai/blog/announcements/provider-variance-introducing-exacto/) | `order`、`only`、`allow_fallbacks`、`require_parameters`；按工具调用三项检查衡量部署质量 |
-| [Portkey config](https://portkey.ai/docs/api-reference/inference-api/config-object) | 声明式 fallback 与按状态码触发；`override_params` 隐式改写是反例 |
-| [Vercel AI SDK provider registry](https://ai-sdk.dev/docs/ai-sdk-core/provider-management) | `provider:model` 命名；别名捆绑预设参数 |
-| [opencode](https://opencode.ai/docs/providers/) 与 [models.dev](https://github.com/sst/models.dev) | 多提供商配置；开放的能力目录字段；隐式继承的问题 |
-| [Roo Code 配置档](https://roocodeinc.github.io/Roo-Code/features/api-configuration-profiles)、[Continue 模型角色](https://docs.continue.dev/reference)、[Aider](https://aider.chat/docs/usage/modes.html) | 按模式或角色绑定模型；task 记住启动时的配置；能力可手动覆盖自动探测 |
-| [K2-Vendor-Verifier](https://github.com/MoonshotAI/K2-Vendor-Verifier)、[vLLM：Kimi K2 精度排查](https://vllm.ai/blog/Kimi-K2-Accuracy) | 同一模型不同部署行为差异大；工具调用标识与 chat template 的坑 |
-| [vLLM tool calling](https://docs.vllm.ai/en/latest/features/tool_calling.html)、[structured outputs](https://docs.vllm.ai/en/latest/features/structured_outputs.html)、[SGLang tool parser](https://docs.sglang.io/advanced_features/tool_parser.html)、[XGrammar structural tag](https://xgrammar.mlc.ai/docs/latest/structural_tag/tool_calling_and_reasoning.html) | `tool_choice` 各取值的保证程度；parser 列表；按模型原生格式做约束调用 |
-| [Ollama OpenAI 兼容](https://docs.ollama.com/api/openai-compatibility)、[Ollama 上下文长度](https://docs.ollama.com/context-length)、[llama.cpp function calling](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md) | 不支持 `tool_choice`；默认上下文按显存决定；KV 量化损害工具调用；单 slot 上下文 |
-| [vLLM issue #39056](https://github.com/vllm-project/vllm/issues/39056) | 推理块中的工具调用被吞掉，表现为空轮 |
-| [MiniMax：interleaved thinking](https://minimax.io/news/why-is-interleaved-thinking-important-for-m2)、[DeepSeek 推理模式](https://api-docs.deepseek.com/guides/thinking_mode)、[Qwen3 模型卡](https://huggingface.co/Qwen/Qwen3-32B) | 推理回放策略按模型族不同；推荐采样参数 |
-| [Aider：LLMs are bad at returning code in JSON](https://aider.chat/2024/08/14/code-in-json.html)、[dottxt：Say What You Mean](https://blog.dottxt.ai/say-what-you-mean.html) | 长内容不进 JSON；先自由工作再受约束提交 |
-| [BFCL](https://gorilla.cs.berkeley.edu/leaderboard.html) | 开源模型多轮工具调用准确率；原生与提示词格式的差异因模型而异 |
-| [Inherited Goal Drift](https://arxiv.org/abs/2603.03258)、[The Handoff Tax](https://arxiv.org/html/2608.24358v1) | 接续他人轨迹会继承漂移；中途换模型应从结构化状态重建 |
-| [LLM Evaluators Favor Their Own Generations](https://arxiv.org/abs/2404.13076) | 评审避开同族模型 |
+| 每个 key 的并发上限（新提供商的默认） / 范围 | 4 / 1–64 |
+| 每个提供商最多 key 数 | 8 |
+| 提供商与分组 id | `^[a-z0-9][a-z0-9-]{0,39}$`；保留 `mori` 和 pi 内置的提供商 id |
+| 排队超时 | 60 秒 |
+| 429 没有 `Retry-After` 时 key 冷却 | 30 秒 |
+| 连接失败后提供商不可用 | 30 秒 |
+| 额度错误的关键词 | `insufficient_quota`、`quota`、`billing`、`balance` |
+| HTTP 404 | 模型不可用，直到提供商或这个模型的配置改变 |
+| 5xx 原地重试 | 3 次，间隔 2、4、8 秒 |
+| 发出后等第一个有内容的事件 | 120 秒 |
+| 超时后已验证取消的模型不可用（`timeout`） | 60 秒 |
+| 超时后不能确认停止的模型等它停下（`held`） / 读指标确认的间隔 | 2 分钟 / 5 秒 |
+| 候选耗尽时最长等 / 重新选的间隔 | 60 秒 / 5 秒 |
+| 探针最大输出 / 每一步等第一个有内容的事件 | 256 token（第 9 步 2048）/ 120 秒 |
+| C 级文本标签连发次数 | 3 |
+| 长输入探针的两个长度 | 有效窗口的 50%、90% |
+| 取消探针等请求数回落 | 5 秒 |
+| 4xx、5xx 响应体最多读 | 64 KB |
+| 区域建议 | 回环地址（127/8、`::1`、`localhost`）→ `local`；10/8、172.16/12、192.168/16、169.254/16、`fc00::/7`、`fe80::/10`、`.local` 与不含点的主机名 → `intranet`；IPv4 映射的 IPv6 地址按其中的 IPv4 判断；其余 → `public`。这个规则放在 `shared/models.ts`，后台进程和界面（表单的预选）共用 |
+| 迁移时 `maxTokens` 缺失 / 不小于窗口 | pi 的默认 16384 / 窗口的一半 |
+| 新模型表单的 Max output | 16384 与窗口一半中较小的 |
+| pi 里的占位 `apiKey` | `mori-pool` |
+| 重做说明文字、各提示文字 | §6.1、§9 |
+
+## 13. 要改的文件
+
+| 文件 | 改什么 |
+| --- | --- |
+| `docs/proposals/model-providers.md` | 第四版（2026-10-21 的反馈） |
+| `docs/specs/model-providers.md` | 本文 |
+| `docs/app-v0.md` | 注明模型层按本规格改：§2 原则 5；§4 表“自动重试”“模型与端点”、“pi 没有、v0 也不补”；§5.2、§5.6、§5.8、§5.12；§6 第 6 件事、会话与数据的 API key、装配要点的“模型”；§9、§11 |
+| `AGENTS.md` | 仓库结构加 `docs/specs/`、`docs/v1/`；第 4 条指向第 6 件事；第 6 条临时默认值也登记在 `docs/v1/defaults.md`；模型层的迁移与切换不算“fallback”；新写的界面用英文；常用命令 |
+| `docs/proposals/model-reliability.md`、`docs/proposals/agent-lifecycle.md` | 开头注明：模型选择与切换以统一模型提供商 proposal 为准 |
+| `docs/v0/screens/connection.md`、`settings.md`、`models.md`、`chat.md`，`docs/v0/defaults.md` | 被本规格取代的行注明“v1：见 docs/specs/model-providers.md” |
+| `docs/v1/defaults.md`、`docs/v1/screens/*.md`、`docs/v1/models-checks.md` | 新建：临时默认值、状态表、检查记录 |
+| `app/src/kernel/` | §2 表中的新文件；`pi.ts`（运行时、key）、`config.ts`（只留 pi 设置的读写与测试连接）、`sessions.ts`（虚拟模型、包装、段、准备中、`ModelState`）、`commands.ts`、`index.ts`、`credentials.ts` |
+| `app/src/main/credentials.ts`、`kernel-process.ts` | key 按 `ref` 存取；迁移时加密 `models.json` 里的明文 key |
+| `app/src/shared/models.ts`、`protocol.ts` | §9.4、§9.5 |
+| `app/src/renderer/` | 设置页 Models 分节、首次启动表单、顶栏模型菜单、对话流提示与阶段行、拒绝启动卡、准备中；删除 v0 的连接与模型表单、`SETTINGS_HINT`、`modelNotice` 横幅 |
+| `app/tests/` | §14 |
+| `app/package.json` | `@earendil-works/pi-ai` 1.3.0 进 dependencies（§11）；`esbuild` 0.25.12 进 devDependencies（单元测试打包内核模块）；两者都已随现有依赖安装，离线可用。脚本 `test:unit`、`test:v1-models` |
+| `app/README.md` | 真实走查的数据目录在 v1 里要先确认区域、给测试项目授权公网（§14.1） |
+
+## 14. 验收
+
+### 14.1 测试分层
+
+| 层 | 位置 | 说明 |
+| --- | --- | --- |
+| 单元 | `tests/unit/*.test.mjs`（`node --test`），经 esbuild 把内核模块打包到 `test-results/` 再导入 | 纯函数：配置校验与连带改动、名字解析、区域、迁移、选择器、失败分类、上下文规则、档案判定、模型池；时长与 `now()` 用假时钟，覆盖全部到期与恢复规则 |
+| 合成端点 | `tests/fake-endpoint/server.mjs`（synthetic） | 见下面的“合成端点的行为” |
+| App | `tests/ui/v1-models-*.mjs` | Electron + 合成端点，逐条验收 |
+| 回放 | `tests/fixtures/v1/*.json` | 从真实会话录制：换模型、重做、拒绝启动、顶栏范围的界面 |
+| 真实模型 | `tests/ui/v1-models-real.mjs` | 你的数据目录，两个真实提供商 |
+
+合成端点的行为（文件开头注释逐条列出；只用于测试）：
+
+- 认出探针 1–9 的提示时一律按“能力全通过”回答（`get_weather` 返回 `{ city: "Paris", days: 3 }`，第 4 步回答含 21，第 5 步调 `submit_outcome` 且取值在枚举内，第 6 步回合法 JSON，第 7 步回合格的标签）；下面的模型 id 后缀只关掉对应的探针能力：
+  `-notools`（第 3 步不调工具）、`-nochoice`（第 5 步忽略指定调用）、`-noschema`（第 6 步忽略 schema）、`-replay`（第 4 步“不带”推理内容时返回 400）、`-truncate`（第 8 步超过一半窗口时静默丢掉开头）。
+- 只作用于不是探针的请求的后缀：`-404`（返回 404）、`-hang`（不回响应头）、`-stall`（回了响应头后不发内容）。`-nocancel` 作用于所有请求：断开后 `/metrics` 的进行中计数 10 秒内不回落（探针第 9 步因此得到 `false`）。
+- 认证：`FAKE_KEYS` 是逗号分隔的可接受 key（没设时不检查）；`FAKE_LIMITED_KEYS` 里的 key 返回 429 带 `Retry-After`，`FAKE_LIMIT_MS` 之后恢复（没设时一直限流）；`FAKE_QUOTA_KEYS` 里的 key 返回 402 `insufficient_quota`。
+- 关键词（在最后一条用户消息里）：`http-NNN`（每次都返回 NNN）、`http-NNN-once`（这个会话第一次返回 NNN，之后正常）、`overflow-once`（第一次返回 400 `This model's maximum context length is 1000 tokens`、`context_length_exceeded`，压缩后正常）、`drop-after-first`（发出第一段内容后断开）、`slow`，以及现有的全部关键词。
+- `GET /version` 返回 `FAKE_SERVER_VERSION`（默认 vLLM 的形状）；`FAKE_NO_METRICS=1` 时 `/metrics` 返回 404；`/models` 带 `max_model_len`；`/metrics` 报告进行中的请求数。
+- 多个提供商 = 多个端口。保留现有的 `METHOD url` 日志行和启动时的 `synthetic` 行，另每个请求一行 JSON（端口、模型、key 末 4 位、消息角色序列、状态、`probe: true|false`）。
+- 合成端点只提供 `chat/completions`：`openai-responses`、`anthropic-messages` 的请求写法和认证头只在单元层用替身 fetch 截下请求检查（MP-10、MP-32）。
+
+真实模型与录制：
+
+- 两个真实提供商：DeepSeek 和 GLM（你在 Mori 的数据目录里保存它们的 key；脚本只复制加密的文件，不读 key）。没有第二个时 MP-27 停下来报告。
+- `lib.mjs` 的 `scratchUserData` 也复制 `model-config.json`、`model-profiles.json`；真实与录制脚本在复制出的配置里给它们的临时项目写 `projectZones: ["public"]`，并建一个分组 `[deepseek 提供商, glm 提供商]` 作为默认范围（测试准备，代码里注明），之后的界面操作照常。
+- 故障用真实方式触发、并且能恢复：脚本启动前把复制出的 `credentials.json` 里首选提供商的密文另存一份到一个备用 `ref`（只复制密文）；要制造故障时在界面里删掉首选的 key、加一个错的 key（`sk-invalid`），之后的请求得到真实的 401 → `auth` → 换模型；
+  在回复开始前换掉就是段开始时换模型，在一个多工具调用的回复进行中换掉就是段内换模型。要恢复时退出 App，把配置里首选的 key 改指备用 `ref`，重新启动，下一段用回首选。脚本记录每一步，fixture 里注明。
+- 你的数据目录要先用 v1 打开一次：确认迁移来的提供商区域为 Public（GLM 在 v0 里加好就会一起迁移）。
+
+### 14.2 验收条目
+
+每条测试的名字以条目编号开头。
+
+| 编号 | 条目 | 通过条件 | 层 |
+| --- | --- | --- | --- |
+| MP-01 | 配置校验 | 未知字段、重复 id、分组与提供商重名、保留 id、`maxTokens` 不小于窗口、`allowedZones` 含 `public`、引用不存在的名字、`nextKeyNumber` 回退都报错并指出位置；配置读不出时会话按 `config_invalid` 拒绝启动，文件不被覆盖；由名称生成 id（大小写、非字母数字、截断、与保留 id 或已有 id 冲突加 `-2`）；删掉 key 后新 key 的编号不复用；配置读不出时不显示首次启动表单 | 单元、App |
+| MP-02 | 编译到 pi | 保存后 pi 按提供商与模型找到模型；pi 里只有占位 key；删除的提供商从 pi 去掉；编译出错时回滚、文件不变 | 单元、App |
+| MP-03 | 多个 key | 一个提供商两个 key、并发各 1：两个会话同时发送，分别用两个 key；第一个 key 被 429 后请求改用第二个 key，不提示换模型；用到的行为：`FAKE_KEYS` 两个 key、`FAKE_LIMITED_KEYS` 第一个 | App |
+| MP-04 | key 全部不可用 | 两个 key 都 429：按候选换到下一个提供商，对话流一行换模型提示，没有错误卡 | App |
+| MP-05 | 选择范围展开 | 分组成员顺序，提供商成员 → 它的模型顺序，模型成员 → 它自己；去重保留第一次；项目配置缩小分组（部分成员、或提供商缩小到模型）后按 §4.3 的顺序 | 单元 |
+| MP-06 | 网络区域 | 公网提供商在没有授权的项目里被排除并给出原因；Project access 勾选 public 先确认，确认后可用、取消不写；项目配置缩小区域后被排除、对应勾选框不可用；项目配置不能放宽；项目路径大小写与分隔符不同仍按同一项目授权 | 单元、App |
+| MP-07 | 项目配置 | 未知字段、坏 JSON、不存在的分组、不属于用户分组的项都让会话按 `project_config` 拒绝启动并显示原因 | 单元、App |
+| MP-08 | 从 v0 迁移 | 全部 provider 迁入；key 沿用原 `ref`；手写明文 key 加密保存、密文优先；`$ENV`、不支持的接口、丢弃的兼容字段、不合格的模型、改写的 id（含冲突与保留 id）列在说明里；默认模型成为默认范围；`modelThinkingLevels` 复制到新键；区域建议按 §12；区域未确认的提供商在确认前被排除；迁移后改 `models.json` 不再生效；说明 Dismiss 后不再显示；迁移失败时不写配置；迁移后这次启动停在 设置 → Models | 单元、App |
+| MP-09 | 会话启动校验 | §4.6 表中每种结果的卡片文字与操作；“Verify now”跑完探针后自动解除；全部在验证中时显示 verifying、没有 Verify now；被拒绝时发送不可用，后台进程也拒绝 | App、回放 |
+| MP-10 | 档案与探针 | 添加模型后自动跑第 0–7 步；合成端点上 `tool_calling`、A/B/C 等级（各后缀分别降级）、推理字段、`replay`、`can_disable`、`server` 判定正确；三种接口的请求写法按 §7.3 的表；探针走 `background` 类别；新的一组探针开始时旧的被取消；`anthropic-messages` 上 A、C 都不通过时 `tier: null`（§7.5）；`-replay` 模型探测完成后不保存配置，下一条消息里别的模型带工具调用的助手消息带有 `reasoning_content`（合成端点日志）；三种接口的请求写法在单元层用替身 fetch 检查 | 单元、App |
+| MP-11 | 需要同意的探针 | 长输入与取消探针只在确认后运行；静默截断被判出并告警；`/metrics` 回落时 `cancel_verified` 为真，不回落为假，没有指标为 `unknown`；`-nocancel` 为 `false`，`FAKE_NO_METRICS=1` 为 `unknown` | App |
+| MP-12 | 指纹与版本 | 改窗口或服务版本变化后重新探测；重新探测期间旧结果继续用于选择、已打开的会话仍可发送；版本接口连不上时档案不变 | 单元、App |
+| MP-13 | 粘性与回到首选 | 段内换到第二候选后一直用它；首选在段开始时不可用、段内恢复后第二候选又失败，换到第三个而不是首选；下一段首选可用时用回首选；第二条消息的第一次请求沿用段开始时（§11.4）选的模型；插话（含在最后一条回答之后送达的）不开始新段；溢出恢复后 `tried` 保留；回放层覆盖界面上的换模型提示与回到首选 | 单元、App、回放 |
+| MP-14 | 第一个请求就失败 | 首选 401（错的 key）：同一个请求发给第二候选，对话流有换模型提示，没有错误卡 | App、回放 |
+| MP-15 | 段内换模型（重做） | 第三个请求时首选不可用：新模型收到的上下文里没有之前的助手消息和工具结果，这段的用户消息末尾带说明；新模型自己的消息之后不被隐藏；两次换模型时区间取并集、只有一段说明；会话文件和界面保留被隐藏的过程；重新打开后仍然隐藏；排队消息那一段被重做时，上一段的回答仍发给新模型；排队消息在上一段还在调工具时排进来、它那一段被重做时，上一段的回答完整地发给新模型；换到窗口更小的模型后触发阈值压缩，摘要请求里没有被隐藏的过程 | 单元、App、回放 |
+| MP-16 | 原地重试 | `http-503-once`：阶段行显示“Retrying 1/3”，不换模型；`http-503`：重试用完后显示错误卡，不换模型 | App |
+| MP-17 | 不换的情况与停止 | 400、有输出后中断都不换模型；你按停止不换；在排队中、等模型中、等它停下时按停止：对话流显示已停止而不是错误卡，合成端点没有收到新的请求；两个会话排同一个提供商，停止一个，另一个照常发出 | App |
+| MP-18 | 结果未知 | `-hang` 与 `-stall`：`cancel_verified` 为 `true` 时立即换模型；为 `false`（`-nocancel`）时读指标确认停下后换模型；为 `unknown`（`FAKE_NO_METRICS=1`）时阶段行显示等它停下，等满后换模型继续这次回复，提示注明 couldn't confirm；期间合成端点没有收到同一请求的第二份；只有一个候选时等满后显示说明卡，没有错误卡 | 单元、App |
+| MP-19 | 排队与优先级 | 并发 1 时第二个请求排队，阶段行显示等待；探针排在对话之后；排队超时后换模型；调低并发、删 key、加 key 时按 §8.2；会话 2 段内遇到会话 1 造成的全部 key 冷却：直接换模型，不排队；并发 1、对话占着槽位时添加模型：探针等对话结束后完成，档案为 verified | 单元、App |
+| MP-20 | 候选耗尽 | 全部不可用时先等并显示原因，恢复后继续；只剩不会恢复的原因时不等；等不到时一张说明卡、没有错误卡；段开始时消息撤回、文字放回输入框；压缩时选不到模型报压缩失败；用到的行为：`FAKE_LIMIT_MS` 让限流在等待期间恢复 | 单元、App |
+| MP-21 | 接手判断与重建 | 要求回传推理的模型接手带别的模型工具调用的对话：段开始时重建（对话太短时只去掉工具调用和思考），重建后的上下文保留压缩摘要；段内只去掉、不压缩；窗口不够时段开始重建、段内排除；重建的压缩失败时换下一个候选；重建时没有 v0 的压缩提示和错误卡；重建的压缩失败后换到下一个候选，对话流没有错误卡 | 单元、App |
+| MP-22 | 压缩走 Mori | `overflow-once` 触发的溢出恢复与到阈值的自动压缩都经模型池、用当前模型和 key；压缩出错不换模型；压缩请求的首个内容时限生效 | App |
+| MP-23 | 顶栏选择范围 | 可以选分组、提供商或模型；写进会话文件，重新打开后沿用；改了设置里的默认范围，已有会话（包括没切换过的）的范围不变；v0 旧会话打开后用它最后用过的模型；不改默认范围；生成中与准备中不能改；顶栏文字格式“<范围名> · <当前模型 id>”；被排除的项变淡并有原因；底部说明 | App、回放 |
+| MP-24 | 设置页 | Providers、Keys、Models、Groups、Defaults、Project access 的增删改都写进配置并立即影响静态校验；删除与改地址的连带改动列在确认框里；改地址的 origin 后 key 被删，合成端点日志里新端口没有收到旧 key；分组编辑的错误与“至少一个成员”；key 的明文不回到界面 | App |
+| MP-25 | 只有一层重试 | 429 时没有 pi 的 `auto_retry_start`；打开工具页、改思考强度等触发 pi reload 之后仍然没有；合成端点日志里每次尝试逐条对得上 | App |
+| MP-26 | key 不落盘 | 配置文件、档案、迁移说明、会话文件、日志、测试结果里没有 key 明文；F8 报告（最近的操作与报告正文）里没有 key：Add key 后按 F8 保存报告检查 | App |
+| MP-27 | 真实模型 | 两个真实提供商：正常对话；按 §14.1 的方法在段开始和段内各换一次模型（真实的 401）；恢复首选的 key 并重新启动后，下一段用回首选；探针结果合理 | 真实 |
+| MP-28 | 失败分类 | §5.4 表的每一行，含三种 `Retry-After` 写法和额度关键词 | 单元 |
+| MP-29 | 认证、额度、404、连接失败 | 各自按 §5.4 换 key 或换模型，§8.3 的记录与恢复；没有 key 的提供商 429 带 `Retry-After` 后下一段跳过它直到那个时刻；402 后 key 行显示 Quota exhausted，Test 成功后清除，下一段用回它 | 单元、App |
+| MP-30 | 删除的连带改动 | §4.1 的每一项，含删最后一个模型删掉提供商、分组变空、`normalDefault` 置空、打开的会话按 `pick_missing` 拒绝 | 单元、App |
+| MP-31 | 槽位不泄漏 | 正常结束、出错、停止、中止后占用数归零；4xx 读完响应体即释放 | 单元、App |
+| MP-32 | 认证头 | 三种接口各写对认证头；没有 key 的提供商不带认证头；pi 的占位 key 不会发到服务端；三种接口在单元层检查，`openai-completions` 另在 App 层检查 | 单元、App |
+| MP-33 | 首次启动 | 填表（含区域）→ 测试连接 → 探针状态 → 打开文件夹；区域为 Public 时会话的拒绝启动卡带“Allow public for this project…”，授权（确认框）后可以发送；探针判定失败时表单说明原因；tool calling 判定失败后改模型 id 再测：配置里仍只有一个提供商 | App |
+| MP-34 | 准备中 | 段开始的等待和重建期间用户消息已显示、停止可用；停止后消息撤回、文字回到输入框；准备中再发的消息作为排队消息在回复开始后交给 pi；准备中再发一条后按停止：两条文字都回到输入框，合成端点没有收到请求 | App |
+| MP-35 | 思考强度 | 第一个候选是推理模型时新会话按它的按模型默认强度开始，请求带思考参数；换到不支持思考的模型时 pi 收紧；顶栏的可选强度随当前模型；把强度改成 high 后关闭再打开会话，仍是 high；段内从非推理模型换到推理模型后顶栏强度菜单变为可选 | App |
+| MP-36 | 回复进行中改配置 | 回复中删除它正在用的提供商：下一个请求换到下一个候选并提示；改它的兼容选项：本段继续用它；当前模型在段内被另一个会话造成冷却：下一个请求不发出就换模型 | App |
+| MP-37 | 现有功能不退步 | §14.4 的全部现有测试通过 | App、回放 |
+
+### 14.3 不留未完成项
+
+`tests/spec-coverage.mjs` 读 §14.2 的编号和每条的“层”，再读 `test-results/` 里各测试的结果：每个编号在它列出的每一层都要有名字以这个编号开头、结果为通过的检查，任何一个缺少就失败。
+
+- 层由结果文件决定：`v1-unit.json`（`node --test` 的结果转成 `createRecorder` 的格式）为单元；`v1-models-app*.json` 为 App；`v1-models-replay.json` 为回放；`v1-models-real.json` 为真实。
+- `npm run test:v1-models` 依次跑单元、App、回放测试，再依次跑 §14.4 的现有套件，每个套件按退出码在 `v1-models-app-existing.json` 或 `v1-models-replay-existing.json` 记一条“MP-37 <脚本名>”，最后运行覆盖检查。
+- 真实层（MP-27）由 `v1-models-real.mjs` 写结果，覆盖检查同样要求它通过。
+- 只认开发构建的结果；打包构建另跑一遍时结果文件带 `-packaged`，覆盖检查对两者分别执行。
+
+### 14.4 现有测试与回放
+
+| 现有 | 改法 |
+| --- | --- |
+| `tests/fake-endpoint/server.mjs` | 加 §14.1 的行为；默认模型 `fake-coder` 能通过探针第 0–7 步，现有关键词的回答不变 |
+| `tests/ui/page.mjs`、`m6-helpers.mjs` 的首次启动 | 填英文表单、区域选 Local；等 `mori.profiles` 里这个模型的探针都跑完（Models 行显示等级）再打开文件夹 |
+| `m0-smoke.mjs` | 对 `pi/models.json` 的断言改为对 `model-config.json`；编辑连接与“改地址要重新填 key”的步骤改为 v1 的改地址（key 被删、确认框）；key 占位文字改为 Keys 行的“Saved”；中文的校验文字改为英文 |
+| `m1-app.mjs` | 重试检查改为 `http-503-once` 与“Retrying 1/3”；改错 key 再“去设置”的步骤改为：删 key、加一个错的 key → §9.3 的说明卡（“API key rejected”、“Open settings”，焦点在 Keys）→ 加回对的 key；首次启动的中文校验改为英文 |
+| `m1-layout.mjs` | 设置页的测量改为 Models 分节（提供商卡与提供商表单） |
+| `m2-app.mjs`、`m2-replay.mjs` | F8 检查前保存 key 的准备改为 Models → Add key（`models.addKey`，回放由桥应答）；“报告里没有 key”的检查不变 |
+| `m6-app-settings.mjs` | 连接、模型、默认模型、删除的步骤删去，由 `v1-models-*.mjs` 覆盖；思考强度与 AGENTS.md 的步骤保留并改用新表单 |
+| `m6-replay.mjs` | 设置页分节导航的检查改到 Models 分节；删除 `m6/model-switch.json`、`m6/thinking.json` 后，另录 `fixtures/v1/thinking.json`（顶栏思考强度）取代思考菜单的回放检查 |
+| `m7-app.mjs` | “工作回顾不发模型请求”的检查只数 `probe: false` 的请求 |
+| `m7-replay.mjs` 与其余回放脚本 | 各自的 `QUERIES` 加 `models.get` |
+| 其余 `m1`–`m7` 的 App 测试 | 只换首次启动的写法，其余不变 |
+| 回放：`tests/ui/harness/replay.js` | `models.get` 加进只读查询；录制里没有时用 fixture 的 `model` 合成（一个本机区域的提供商、一个模型、`normalDefault` 为它、档案已验证，代码里注明 synthetic）；`ModelState` 的新字段同样合成；`models.*` 的写命令照 `connection.save` 的方式应答；`harness/main.jsx` 加 `fixtures/v1` |
+| 回放：`m6/model-switch.json`、`m6/thinking.json`、`m1/no-key.json` | 删除（v1 不再有这些命令和情形），对应检查从 `m6-replay.mjs`、`m1-replay.mjs` 去掉，由 MP-23 和 `fixtures/v1/thinking.json` 的回放取代；`m1/wrong-key.json` 的“去设置”检查改为说明卡 |
+| `m0-real.mjs` | 断言改为 `model-config.json`、`credentials.json` |
+| `m1-real.mjs`、`m1-record.mjs` | 首次启动的走查用一个空的复制数据目录；走查 6 改为“错的 key → 说明卡 → Open settings → Keys”，`$变量` 与没有 key 的情形删去（v1 里没有 key 就不带认证头）；压缩的准备改为在复制出的 `model-config.json` 里把窗口改小 |
+| `m2-real.mjs` | F8 的准备改为 Add key |
+| `m6-real.mjs`、`m6-record.mjs` | 走查 1 与 8 改为在 Models 里加模型、在顶栏的范围菜单里选；读 `model-config.json`；重新录制顶栏范围与思考强度的 fixture |
+| 全部 `*-real.mjs`、`*-record.mjs` | 提供商从 `model-config.json` 取，不再找 `pi/models.json` 的 `mori-endpoint`；按 §14.1 复制模型配置并给临时项目授权公网 |
+
+`npm run smoke`、`test:app`、`test:m1-app`…`test:m7-app`、各回放测试都通过，MP-37 才算通过。

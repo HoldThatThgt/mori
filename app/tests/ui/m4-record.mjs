@@ -12,10 +12,12 @@
 //   node tests/ui/m4-record.mjs --source <走查数据目录> [--only name1,name2] [--exe <Mori.exe>]
 // 走查数据目录是负责人在 Mori 里填过连接的目录（key 由 Mori 加密保存）；脚本只复制密文文件，不读取 key。
 
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { appRoot, arg, launch, oneLine, prepareProject, scratchUserData } from './lib.mjs';
+import {
+  allowProjectsLive, allowRealProject, appRoot, arg, launch, oneLine, prepareProject, realProviders, scratchUserData,
+} from './lib.mjs';
 
 const source = arg('source');
 const exePath = arg('exe');
@@ -397,6 +399,8 @@ async function runScenario(scenario, context, state) {
   renameSync(made.project, cwd);
   let steps = [];
   try {
+    // 测试准备（synthetic test setup，§14.1）：这个临时项目授权公网
+    await allowProjectsLive(state.mori.page, cwd);
     steps = await runPhases(scenario, { ...prompts, cwd }, state);
   } finally {
     rmSync(made.root, { recursive: true, force: true });
@@ -421,6 +425,8 @@ async function runScenario(scenario, context, state) {
 /** @brief 每个场景一个新的临时数据目录和一次新的启动；出错也会关掉 Mori、删掉临时目录。 */
 async function recordFresh(scenario, context) {
   const userData = scratchUserData(source);
+  // 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组；项目建好后再授权公网
+  allowRealProject(userData, []);
   const state = { userData, mori: null };
   try {
     state.mori = await startMori(userData);
@@ -434,10 +440,13 @@ async function recordFresh(scenario, context) {
   }
 }
 
-/** @brief 读取走查连接的非机密信息。 */
+/**
+ * @brief 读取走查数据目录里首选提供商（DeepSeek）的非机密信息：v1 从 model-config.json 取（lib.mjs realProviders，
+ *        规格 §14.4），不再找 pi/models.json 的 mori-endpoint。
+ */
 function connectionInfo(dir) {
-  const provider = JSON.parse(readFileSync(join(dir, 'pi', 'models.json'), 'utf8')).providers['mori-endpoint'];
-  return { endpoint: provider.baseUrl, model: `mori-endpoint/${provider.models[0].id}` };
+  const [first] = realProviders(dir);
+  return { endpoint: first.baseUrl, model: first.ref };
 }
 
 const context = connectionInfo(source);

@@ -818,9 +818,12 @@ function recordRunning(state, final) {
 const TITLE_MIN = 36;
 /** 模型按钮最窄（models.css .model-switch 的 min-width；models.md"放不下"） */
 const MODEL_MIN = 40;
-/** 模型按钮的读屏名称和悬停说明（models.md"窄栏"：收起的文字都在读屏名称里） */
-const MODEL_LABEL = `模型：${MODEL_ID}`;
-const MODEL_TIP = `合成端点 · ${MODEL_ID}`;
+/**
+ * 模型按钮的读屏名称和悬停说明（v1：docs/v1/screens/model-menu.md"窄栏"与"悬停"：读屏名称"Model range: <按钮文字>"，
+ * 悬停"<提供商名> · <区域>"；首次启动的提供商名 "Mori endpoint"、区域 Local）
+ */
+const MODEL_LABEL = `Model range: ${MODEL_ID}`;
+const MODEL_TIP = 'Mori endpoint · Local';
 
 /**
  * @brief 每一栏顶栏此刻的样子（在页面里执行，不引用外面的变量）：宽度、是不是分屏、模型 / 思考 / 权限按钮、
@@ -881,7 +884,7 @@ async function layoutReport(page) {
  * @brief 一栏的顶栏是否照 models.md"窄栏"分步收紧，返回不符合的项（空数组为符合）：模型和思考按钮任何宽度都显示；
  *        > 720px 权限按钮带图标、模型按钮最宽 160px；≤ 720px 去掉图标、最宽 120px；≤ 600px 思考按钮只显示强度，
  *        不显示项目名和 ›（分屏时 ≤ 640px 就不显示，split.css）；≤ 480px 不显示上下文用量；≤ 400px 两个按钮去掉 ▾。
- *        模型按钮不窄于 40px；读屏名称是完整的"模型：<ID>""思考：<强度>"，悬停说明"<连接名> · <ID>"；
+ *        模型按钮不窄于 40px；读屏名称是完整的"Model range: <ID>""思考：<强度>"，悬停说明"<提供商名> · <区域>"；
  *        不溢出、不裁切；会话名至少 36px（名字本身更短时完整显示）。
  */
 function barProblems(pane) {

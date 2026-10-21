@@ -16,7 +16,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, prepareProject, sleep } from './lib.mjs';
-import { pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
@@ -213,7 +213,7 @@ async function openNewSession(app, page, folder) {
   await app.evaluate(({ dialog }, path) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
   }, folder);
-  await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await page.getByRole('button', { name: OPEN_FOLDER }).first().click();
   await page.waitForFunction((count) => document.querySelectorAll('.pane-slot').length > count, before,
     { timeout: 30000 });
   await page.waitForFunction((selector) => {
@@ -415,14 +415,15 @@ async function pollMain(app, fn, timeoutMs) {
 
 // ---------- 检查步骤 ----------
 
-/** @brief 首次启动：填连接、测试成功、打开文件夹（M1 已测过，这里只走流程）。 */
+/**
+ * @brief 首次启动：填表（v1，区域 Local）、测试成功、等探针跑完、打开文件夹（M1 已测过，这里只走流程）。
+ */
 async function setup({ app, page, h, project }) {
-  await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
-  await h.fillConnection({ name: '合成端点', baseUrl, apiKey: testKey, modelId: 'fake-coder' });
-  await page.getByRole('button', { name: '测试连接' }).click();
+  const run = await h.firstRun({ baseUrl, apiKey: testKey });
   await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
   await openNewSession(app, page, project);
-  record('准备：首次启动、测试连接、打开文件夹', true);
+  record('准备：首次启动、测试连接、等探针跑完、打开文件夹', run.ok && run.probe === 'verified',
+    `${oneLine(run.text)}；probe-status=${run.probe}`);
 }
 
 /** @brief 读取文件不出批准卡，工具卡没有标签。 */
@@ -1055,9 +1056,10 @@ function checkIssueText({ issue, userData }, { what, expect }) {
     /^- .+：/m.test(view) && /^- \d{2}:\d{2}:\d{2} \S/m.test(actions) && actions.includes('批准卡')
     && ['Mori', 'Electron', 'Chromium', 'Node', 'Windows'].every((name) => version.includes(name)),
     oneLine(`${view} | ${actions.split(/\r?\n/).slice(-3).join(' ')} | ${version}`, 400));
-  const saves = actions.split(/\r?\n/).filter((line) => line.includes('保存连接'));
-  record('F8：报告里没有 API key（"最近的操作"里有刚才填了 key 的"保存连接"）', md.length > 0 && saves.length > 0
-    && !md.includes(testKey), saves.join(' | ') || '最近的操作里没有"保存连接"');
+  // v1：保存 key 的是 设置 → Models 的 Add key（models.addKey），最近的操作只记"Add key <providerId>"（规格 §9.4）。
+  const saves = actions.split(/\r?\n/).filter((line) => line.includes('Add key'));
+  record('F8：报告里没有 API key（"最近的操作"里有刚才加 key 的"Add key"）', md.length > 0 && saves.length > 0
+    && !md.includes(testKey), saves.join(' | ') || '最近的操作里没有"Add key"');
   return md;
 }
 
@@ -1088,18 +1090,15 @@ async function showInFolder({ app, page, issue }) {
 }
 
 /**
- * @brief F8 之前在设置页用合成端点的 key 再保存一次连接：报告只带最近 30 条操作，setup 里那次保存早就不在里面了，
- *        这样"报告里没有 key"才真的检查到了"保存连接"这一条。
+ * @brief F8 之前在 设置 → Models 用合成端点的 key 再加一个 key（v1：Add key，models.addKey，规格 §14.4）：报告只带
+ *        最近 30 条操作，setup 里那次保存早就不在里面了，这样"报告里没有 key"才真的检查到了加 key 这一条。
  */
 async function saveKeyAgain({ page, h }) {
-  // M6：设置页先是连接列表，填 key 在连接卡的"编辑连接"里（settings.md"编辑连接"；最近的操作记"保存连接 <provider>"）。
-  await h.editConnection();
-  await h.fillConnection({ apiKey: testKey });
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  const message = await h.formMessage();
+  await h.openModels();
+  const rows = await h.addKey(testKey);
   await page.getByRole('button', { name: '返回会话' }).click();
   await paneOf(page).waitFor({ timeout: 10000 });
-  record('准备 F8：在设置页填上 key 再保存一次连接', message === '已保存', message);
+  record('准备 F8：在 设置 → Models 用 Add key 再加一个 key', rows === 2, `key 行 ${rows} 个`);
 }
 
 /** @brief F8：截图、两个输入框和说明；再按 F8 焦点回到第一个输入框；保存后文件齐全；"打开所在文件夹"。 */

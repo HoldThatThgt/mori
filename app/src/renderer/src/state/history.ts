@@ -1,8 +1,10 @@
 // 把 pi 记录的当前分支（SessionManager.getBranch 的条目）转成对话流：你的消息、助手回复、工具结果、压缩处，
-// 以及 Mori 写的引用来源（mori.ref 条目，记到它指向的你的消息上）。系统消息、用量、模型切换等记录不显示。
+// 以及 Mori 写的引用来源（mori.ref 条目，记到它指向的你的消息上）、模型层的换模型与重建（mori.model_switch、
+// mori.rebuild 条目，docs/v1/screens/model-chat.md）。系统消息、用量、选择范围（mori.pick）等记录不显示。
 
 import { z } from 'zod';
 import { QuoteRefSchema, REF_ENTRY_TYPE, type LiveSnapshot, type SessionEntry } from '../../../shared/protocol';
+import { EXCLUSION_REASONS, MODEL_ENTRY_TYPES } from '../../../shared/models';
 import {
   blocksFromContent, contentText, emptyTranscript, messageTime, parseRejection, pushItem, resultPatch, type ToolCall,
   type Transcript,
@@ -10,6 +12,15 @@ import {
 
 /** mori.ref 条目的内容（会话文件里读出来的，先校验） */
 const RefDataSchema = z.object({ messageId: z.string(), refs: z.array(QuoteRefSchema) });
+
+/** mori.model_switch 条目里界面用到的字段（会话文件里读出来的，先校验；unconfirmed 在较早的条目里可能没有） */
+const SwitchDataSchema = z.object({
+  from: z.string(), to: z.string(), reason: z.enum([...EXCLUSION_REASONS, 'queue_timeout']), detail: z.string(),
+  unconfirmed: z.boolean().optional(), replyStartedAt: z.number(), hideUntil: z.number(),
+});
+
+/** mori.rebuild 条目里界面用到的字段 */
+const RebuildDataSchema = z.object({ model: z.string(), summary: z.boolean() });
 
 type Message = Record<string, unknown>;
 
@@ -63,10 +74,35 @@ function addRefs(state: Transcript, data: unknown): Transcript {
     ? { ...item, refs } : item)) };
 }
 
+/**
+ * @brief 换模型与重建的条目：显示成同实时运行时一样的一行；hideUntil 大于 replyStartedAt 即有被隐藏的过程（§6.1）。
+ *        内容不对时记录错误、不显示。
+ */
+function addModelEntry(state: Transcript, customType: string, data: unknown): Transcript {
+  if (customType === MODEL_ENTRY_TYPES.rebuild) {
+    const parsed = RebuildDataSchema.safeParse(data);
+    if (parsed.success) return pushItem(state, { kind: 'rebuild', ...parsed.data });
+    console.error(`[renderer] ignored a malformed ${customType} entry: ${parsed.error.message}`);
+    return state;
+  }
+  const parsed = SwitchDataSchema.safeParse(data);
+  if (!parsed.success) {
+    console.error(`[renderer] ignored a malformed ${customType} entry: ${parsed.error.message}`);
+    return state;
+  }
+  const { from, to, reason, detail, unconfirmed, replyStartedAt, hideUntil } = parsed.data;
+  return pushItem(state, { kind: 'model-switch', from, to, reason, detail, unconfirmed: unconfirmed ?? false,
+    hidden: hideUntil > replyStartedAt });
+}
+
 /** @brief 一条会话记录。 */
 function addEntry(state: Transcript, entry: SessionEntry): Transcript {
   if (entry.type === 'compaction') return pushItem(state, { kind: 'compaction' });
   if (entry.type === 'custom' && entry.customType === REF_ENTRY_TYPE) return addRefs(state, entry.data);
+  if (entry.type === 'custom' && (entry.customType === MODEL_ENTRY_TYPES.modelSwitch
+    || entry.customType === MODEL_ENTRY_TYPES.rebuild)) {
+    return addModelEntry(state, entry.customType, entry.data);
+  }
   if (entry.type !== 'message') return state;
   const message = entry.message as unknown as Message;
   if (message.role === 'user') {
@@ -134,9 +170,11 @@ function resumeRun(state: Transcript, live: LiveSnapshot, now: number): Transcri
 /**
  * @brief 接上后台进程里还开着的会话（界面重新加载后）：会话记录重建的对话流，加上这一刻的样子——在生成时的回复、
  *        工具和阶段，以及（不论是否在生成）挂起的批准请求和扩展询问、排队区。之后的事件照常归并。
+ *        准备中（§11.4，pi 还没开始运行）按“发送中”接上：停止走准备中的撤回，准备中结束的事件会清掉它，
+ *        pi 开始运行时 agent_start 照常进入生成中。
  */
 export function attachLive(state: Transcript, live: LiveSnapshot, now: number): Transcript {
-  const next = live.running ? resumeRun(state, live, now) : state;
+  const next = live.preparing ? { ...state, sending: true } : live.running ? resumeRun(state, live, now) : state;
   return { ...next, approvals: [...live.approvals], questions: [...live.questions], steering: [...live.steering],
     followUp: [...live.followUp] };
 }

@@ -2,43 +2,23 @@
 
 import type { Command, EventEnvelope } from '../shared/protocol';
 import { readAgents, saveAgents } from './agents';
-import {
-  cancelTest, deleteModel, readConfig, saveConnection, saveEndpoint, saveModel, setDefaultModel, testConnection,
-} from './config';
+import { cancelTest, readConfig, testConnection } from './config';
 import { removeMcpServer, saveMcpServer, setMcpDirect, setMcpEnabled } from './mcpConfig';
+import { handleModelsCommand, isModelsCommand } from './modelCommands';
 import { loadPi } from './pi';
 import { addPackage, readTools, removePackage, setPackageEnabled, toggleResource } from './resources';
 import {
   abort, answerApproval, answerQuestion, clearQueue, closeSession, createSession, forgetApproval, listSessions,
-  openSession, prompt, readSession, refreshSessionModels, renameSession, sessionCommands, sessionState,
-  setApprovalMode, setSessionModel, setSessionThinking,
+  openSession, prompt, readSession, renameSession, sessionCommands, sessionPickOptions, sessionState,
+  setApprovalMode, setSessionPick, setSessionThinking,
 } from './sessions';
 import { checkTrust } from './trust';
 
 type Emit = (envelope: EventEnvelope) => void;
 
-/**
- * @brief 改了 models.json 或默认模型之后：pi 重读 models.json（config.ts 里已 refresh），打开着的会话换成新的模型对象。
- */
-async function afterModelsChange<T>(result: Promise<T>, emit: Emit): Promise<T> {
-  const value = await result;
-  await refreshSessionModels(emit);
-  return value;
-}
-
-/** @brief 连接、模型与 AGENTS.md 的命令（M6）；不是这几种时返回 undefined。 */
-async function handleConfigCommand(command: Command, agentDir: string, emit: Emit): Promise<unknown> {
+/** @brief AGENTS.md 的命令（M6）；不是这两种时返回 undefined。 */
+async function handleAgentsCommand(command: Command): Promise<unknown> {
   switch (command.type) {
-    case 'connection.save':
-      return afterModelsChange(saveConnection(agentDir, command.providerId, command.connection), emit);
-    case 'endpoint.save':
-      return afterModelsChange(saveEndpoint(agentDir, command.providerId, command.endpoint), emit);
-    case 'model.save':
-      return afterModelsChange(saveModel(agentDir, command.providerId, command.model, command.adding), emit);
-    case 'model.delete':
-      return afterModelsChange(deleteModel(agentDir, command.providerId, command.modelId), emit);
-    case 'model.setDefault':
-      return setDefaultModel(command.providerId, command.modelId);
     case 'agents.get':
       return readAgents(command.sessionId);
     case 'agents.save':
@@ -90,8 +70,10 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
     case 'session.clearQueue': return clearQueue(command.sessionId);
     case 'session.abort': return abort(command.sessionId);
     case 'session.state': return sessionState(command.sessionId);
-    case 'session.setModel': return setSessionModel(command.sessionId, command.model, emit);
-    case 'session.setThinking': return setSessionThinking(command.sessionId, command.level, emit);
+    case 'session.setThinking': return setSessionThinking(command.sessionId, command.level);
+    // 模型层（docs/specs/model-providers.md §9.5）：换选择范围、顶栏菜单的各项
+    case 'session.setPick': return setSessionPick(command.sessionId, command.pick);
+    case 'session.pickOptions': return sessionPickOptions(command.sessionId);
     case 'session.commands': return sessionCommands(command.sessionId);
     case 'approval.answer':
       return answerApproval(command.sessionId, command.requestId, command.decision, command.reason);
@@ -103,19 +85,17 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
 
 /** @brief 执行一条命令并返回结果；失败时抛错，由调用方回复给界面。 */
 export async function handleCommand(command: Command, emit: Emit): Promise<unknown> {
-  const pi = await loadPi();
-  const agentDir = pi.getAgentDir();
   switch (command.type) {
     case 'config.get':
-      // 重读 models.json 之后打开着的会话也换成新的模型对象（与保存之后相同）。
-      return afterModelsChange(readConfig(agentDir), emit);
+      return readConfig((await loadPi()).getAgentDir());
     case 'connection.test':
-      return testConnection(command.providerId, command.modelId);
+      return testConnection(command);
     case 'connection.testCancel':
       return { cancelled: cancelTest() };
   }
-  const config = await handleConfigCommand(command, agentDir, emit);
-  if (config !== undefined) return config;
+  if (isModelsCommand(command)) return handleModelsCommand(command);
+  const agents = await handleAgentsCommand(command);
+  if (agents !== undefined) return agents;
   const tools = await handleToolsCommand(command);
   if (tools !== undefined) return tools;
   return handleSessionCommand(command, emit);

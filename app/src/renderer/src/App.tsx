@@ -51,7 +51,8 @@ function focusInPane(tabKey: string): boolean {
 }
 
 /**
- * @brief Esc：先关闭最上层的浮层；没有浮层、显示的是会话且焦点在会话面板里时停止生成。
+ * @brief Esc：先关闭最上层的浮层；没有浮层、显示的是会话且焦点在会话面板里时停止生成或准备中
+ *        （发送中，规格 §9.3：准备中停止可用）。
  *        焦点在批准卡上时卡片自己处理（先关浮层，没有浮层才拒绝这张卡），这里看到 defaultPrevented 就跳过。
  */
 function useEscape(): void {
@@ -64,7 +65,8 @@ function useEscape(): void {
       }
       const state = useApp.getState();
       const tab = activeTab(state);
-      if (state.view !== 'chat' || !tab?.transcript.running || !focusInPane(tab.key)) return;
+      const busy = tab && (tab.transcript.running || tab.transcript.sending);
+      if (state.view !== 'chat' || !tab || !busy || !focusInPane(tab.key)) return;
       event.preventDefault();
       recordAction('按 Esc 停止');
       void stop(tab.key);
@@ -329,12 +331,14 @@ export function App() {
     return (
       <main className="first-run">
         <div className="first-run-card">
-          {kernel === 'exited' ? <KernelExitBanner /> : <p className="form-message error">读取连接失败：{configError}</p>}
+          {kernel === 'exited' ? <KernelExitBanner /> : <p className="form-message error">{configError}</p>}
         </div>
       </main>
     );
   }
-  if (!config) return <main className="first-run"><p className="muted">正在读取连接…</p></main>;
+  if (!config) {
+    return <main className="first-run"><p className="muted" data-testid="first-run-loading">Loading…</p></main>;
+  }
   if (firstRun) return <FirstRun exited={kernel === 'exited'} />;
   return <><Workspace /><RefPreview /><PaneDeleteDialog /><LeaveDialog /></>;
 }

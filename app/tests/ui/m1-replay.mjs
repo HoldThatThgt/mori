@@ -2,7 +2,7 @@
 // 用法（在 app/ 下）：node tests/ui/m1-replay.mjs [--only readme,stop]
 // 结果写到 test-results/m1-replay.json；截图在 test-results/m1-replay/。
 
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -235,51 +235,44 @@ async function stopCheck(page, h) {
 }
 
 /**
- * @brief 没有 key 时的顶栏（chat.md 顶栏"模型"、models.md"没有可用模型"，M1 起）：模型按钮"没有可用模型"，
- *        pi 给出的说明（录制里 session.create 的 modelNotice）显示在会话里；M6 起不显示思考按钮。
+ * @brief key 填错（v1，docs/specs/model-providers.md §9.3、§14.4）：v0 错误卡的"去设置"删除，认证类错误由模型层处理，
+ *        换不到模型时对话流是一张说明卡（"No model available"，候选行"API key rejected"，"Open settings"），没有错误卡；
+ *        "Open settings"打开 设置 → Models，焦点在出错提供商的 Keys。
+ *        m1/wrong-key.json 是 v0 录下的（pi 的 401 错误，没有 mori.model_unavailable）：这时只能查错误卡显示 401 原文、
+ *        不再有"去设置"；说明卡的检查标 KNOWN，等用 m1-record.mjs 以 v1 重新录制。
  */
-async function noModelTopBar(page) {
-  const top = await page.evaluate(() => {
-    const pane = document.querySelector('[data-testid="chat-pane"]');
-    return { model: pane?.querySelector('[data-testid="model-button"]')?.textContent?.trim() ?? null,
-      thinking: pane?.querySelectorAll('[data-testid="thinking-button"]').length ?? null,
-      notice: pane?.textContent?.includes('No models available') ?? false };
-  });
-  record('no-key：没有可用模型时顶栏模型按钮显示"没有可用模型"、不显示思考按钮，会话里显示 pi 给出的说明',
-    top.model?.includes('没有可用模型') && top.thinking === 0 && top.notice, JSON.stringify(top));
-}
-
-/** @brief 没有 key：顶栏"没有可用模型"；发送时就失败，原文 + "去设置"；点它进设置页的"编辑连接"且焦点在 API key。 */
-async function noKeyCheck(page, h) {
-  await h.load('no-key');
-  await noModelTopBar(page);
-  await h.send('你好');
-  const card = page.getByTestId('error-card');
-  await card.waitFor({ timeout: 10000 });
-  const text = await card.innerText();
-  record('no-key：显示找不到 key 的原文和"去设置"', text.includes('No API key found') && text.includes('去设置'), oneLine(text));
-  await card.getByRole('button', { name: '去设置' }).click();
-  await page.getByTestId('settings-page').waitFor();
-  // settings.md 外框："去设置"打开"编辑连接"，焦点在 API key。会话没有可用模型（pi 的占位模型 unknown/unknown），
-  // 回放里只有一个连接（synthetic，harness 按录制的端点拼出），应打开它。
-  const focus = await h.keyFocus();
-  record('no-key："去设置"打开设置页里那个连接的"编辑连接"，焦点在 API key 框',
-    focus.type === 'password' && focus.inForm && /^编辑连接 · /.test(focus.title ?? ''), JSON.stringify(focus));
-  await page.screenshot({ path: join(shots, 'no-key-settings.png') });
-  await page.getByRole('button', { name: '返回会话' }).click();
-  record('no-key：返回会话后错误卡还在', await page.getByTestId('error-card').isVisible());
-}
-
-/** @brief key 填错：模型回复 401，原文 + "去设置"。 */
 async function wrongKeyCheck(page, h) {
   await h.load('wrong-key');
+  const fixture = JSON.parse(readFileSync(join(appRoot, 'tests/fixtures/m1/wrong-key.json'), 'utf8'));
+  const recordedV1 = fixture.steps.some((step) => step.envelope?.event.type === 'mori.model_unavailable');
   await h.send('你好');
-  const card = page.getByTestId('error-card');
+  if (!recordedV1) {
+    const card = page.getByTestId('error-card');
+    await card.waitFor({ timeout: 10000 });
+    const text = await card.innerText();
+    record('wrong-key：v0 的录制回放时错误卡显示 401 原文，不再有"去设置"（§9.3 删除）', text.includes('401')
+      && !text.includes('去设置') && await card.getByRole('button', { name: '去设置' }).count() === 0, oneLine(text));
+    record('wrong-key：说明卡（"API key rejected"、"Open settings"，没有错误卡）', false,
+      'm1/wrong-key.json 是 v0 录下的，没有 mori.model_unavailable；用 m1-record.mjs --only wrong-key 以 v1 重新录制', true);
+    await page.screenshot({ path: join(shots, 'wrong-key.png') });
+    return;
+  }
+  const card = page.getByTestId('unavailable-card');
   await card.waitFor({ timeout: 10000 });
-  const text = await card.innerText();
-  record('wrong-key：显示 401 原文和"去设置"', text.includes('401') && text.includes('去设置') && !text.includes('放回输入框'),
-    oneLine(text));
+  const text = oneLine(await card.innerText());
+  record('wrong-key：说明卡（"API key rejected"、"Open settings"），没有错误卡', text.includes('No model available')
+    && text.includes('API key rejected') && text.includes('Open settings')
+    && await page.getByTestId('error-card').count() === 0, text);
   await page.screenshot({ path: join(shots, 'wrong-key.png') });
+  await card.locator('[data-action="open-settings"]').click();
+  await page.getByTestId('models-section').waitFor({ timeout: 10000 });
+  await page.waitForFunction(() => document.activeElement?.closest('[data-testid="key-row"]'), null,
+    { timeout: 5000 }).catch(() => {});
+  const focus = await page.evaluate(() => ({ key: Boolean(document.activeElement?.closest('[data-testid="key-row"]')),
+    provider: document.activeElement?.closest('[data-testid="provider-card"]')?.dataset.provider ?? null }));
+  record('wrong-key："Open settings"打开 设置 → Models，焦点在出错提供商的 Keys', focus.key, JSON.stringify(focus));
+  await page.getByRole('button', { name: '返回会话' }).click();
+  record('wrong-key：返回会话后说明卡还在', await page.getByTestId('unavailable-card').isVisible());
 }
 
 /** @brief 压缩：阶段行"正在压缩较早的对话"，对话流留下"已压缩较早的对话"；你不在底部时"有新内容 ↓"。 */
@@ -344,7 +337,8 @@ async function longHistoryCheck(page, h) {
 }
 
 const checks = { readme: readmeCheck, markdown: markdownCheck, 'command-fail': commandFailCheck, edit: editCheck,
-  'queue-steer': queueSteerCheck, 'two-tools-steer': twoToolsCheck, stop: stopCheck, 'no-key': noKeyCheck,
+  'queue-steer': queueSteerCheck, 'two-tools-steer': twoToolsCheck, stop: stopCheck,
+  // v1：m1/no-key.json 与它的检查删去（v1 里没有 key 的提供商请求不带认证头，没有这种情形，§14.4）
   'wrong-key': wrongKeyCheck, compaction: compactionCheck, history: longHistoryCheck, layout: layoutChecks };
 
 await buildHarness();

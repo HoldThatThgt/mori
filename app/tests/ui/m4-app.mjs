@@ -26,7 +26,7 @@ import {
   popoverButtons, popoverShown, refEntries, sessionEntries, replyActionRows, savedDraftRefs, savedFeedback, selectBetween, selectLines,
   sentQuotes, viewerState, waitViewer,
 } from './m4-helpers.mjs';
-import { pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -147,12 +147,10 @@ function stubOpenPath({ shell }, fail) {
  */
 async function setup(ctx) {
   const { app, page, h } = ctx;
-  await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
-  await h.fillConnection({ name: '合成端点', baseUrl, apiKey: testKey, modelId: 'fake-coder' });
-  await page.getByRole('button', { name: '测试连接' }).click();
-  await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
+  // v1（规格 §14.4）：首次启动填英文表单、区域选 Local，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
+  await h.setupFirstRun({ baseUrl, apiKey: testKey });
   await stubFolder(app, ctx.project);
-  await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await page.getByRole('button', { name: OPEN_FOLDER }).first().click();
   await waitReady(page);
   const closed = await page.getByTestId('right-panel').count() === 0;
   await paneOf(page).getByRole('button', { name: '右栏：本会话的改动' }).click();

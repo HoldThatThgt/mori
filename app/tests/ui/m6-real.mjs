@@ -12,13 +12,18 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m6-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,5,6,7,8,c]
 // 结果写到 test-results/m6-real(-packaged).json，截图在 test-results/m6-real(-packaged)/。
+// v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；测试准备在复制出的配置里给两个临时项目
+// 授权公网、默认范围设为 [DeepSeek, GLM] 的分组。走查 1 改为在 设置 → Models 里给首选提供商加模型（等它的探针跑完）、
+// 在顶栏的范围菜单里选它；走查 8 改用 v1 的模型表单（Supports thinking、New-session thinking level）。
 
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
-import { appRoot, arg, createRecorder, launch, oneLine, scratchUserData, sleep } from './lib.mjs';
+import {
+  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, REAL_GROUP, realProviders, scratchUserData, sleep,
+} from './lib.mjs';
 import { activeFile, PANE, samePath, stubFolder, topTitle, waitPanes, waitReady } from './m3-helpers.mjs';
-import { chooseThinking, connectionCard, modelRow, openToolsSection, slashItems } from './m6-helpers.mjs';
+import { chooseThinking, modelRow, openToolsSection, providerCard, slashItems } from './m6-helpers.mjs';
 
 const source = arg('source');
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -38,6 +43,12 @@ const PI_CONFIG = JSON.parse(readFileSync(join(appRoot, 'tests/fixtures/m6/pi-co
 /** 走查 1 添加的模型和它的上下文长度 */
 const SECOND_MODEL = 'deepseek-v4-pro';
 const CONTEXT = 1000000;
+/** 新加的模型等探针跑完最多这么久（真实端点，第 0–7 步） */
+const PROBE_WAIT_MS = 600000;
+/** 生成中范围按钮的悬停说明（规格 §9.2） */
+const MODEL_BUSY = "Can't change the model while generating";
+/** 模型没标支持思考时思考菜单里的说明开头（规格 §9.2） */
+const UNSUPPORTED_NOTE = "This model isn't marked 'Supports thinking'";
 /** 项目技能（synthetic）：信任的项目和不信任的项目各一个 */
 const PROJECT_SKILL = 'm6-proj-skill';
 const UNTRUSTED_SKILL = 'm6-untrusted-skill';
@@ -175,8 +186,8 @@ async function clickNewSession(page, button) {
 /** @brief 工具页顶部"改动何时生效"一行里的"新建会话"。 */
 const toolsNewSession = (page) => page.locator('.tools-notice').getByRole('button', { name: '新建会话' });
 
-/** @brief 从左栏打开设置页，切到 section（connections / agents）。 */
-async function openSettings(page, section = 'connections') {
+/** @brief 从左栏打开设置页，切到 section（models / agents）。 */
+async function openSettings(page, section = 'models') {
   await page.getByTestId('sidebar').getByRole('button', { name: '设置', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
   await page.locator(`[data-testid="settings-nav"] button[data-section="${section}"]`).click();
@@ -322,67 +333,79 @@ async function toolInfo(page, name) {
 
 // ---------- 走查 1：第二个模型与顶栏切换 ----------
 
-/** @brief 设置页的连接卡上点"添加模型"，填模型 ID 和上下文长度（不勾支持思考），保存；返回看到的。 */
+/** @brief model-config.json（测试数据目录的副本）。 */
+const modelConfig = (ctx) => readJson(join(ctx.userData, 'model-config.json'));
+
+/** @brief 一个模型行的档案里 Tool calling 的取值（data-value）；没有时为 null。 */
+const toolCalling = (page, ref) => modelRow(page, ref).locator('[data-testid="profile"] [data-field="tool_calling"]')
+  .getAttribute('data-value', { timeout: 2000 }).catch(() => null);
+
+/**
+ * @brief 设置 → Models 的提供商卡上点"Add model"，填 Model id 和 Context window（不勾 Supports thinking），Save；
+ *        等它的探针跑完（Tool calling 不再是验证中）。返回看到的。
+ */
 async function addModel(ctx) {
   const { page } = ctx;
   await openSettings(page);
-  await connectionCard(page, ctx.conn.provider).getByRole('button', { name: '添加模型' }).click();
+  await providerCard(page, ctx.conn.provider).locator('[data-action="add-model"]').click();
   const form = page.getByTestId('model-form');
   await form.waitFor({ timeout: 10000 });
-  const panel = page.locator('.settings-form');
-  const seen = { title: await panel.locator('h3').innerText(),
-    hint: await panel.locator('.field-hint').first().innerText(),
-    keyFields: await form.getByText('API key').count() + await form.locator('input[type="password"]').count() };
-  await form.getByLabel('模型 ID').fill(SECOND_MODEL);
-  await form.getByLabel('上下文长度').fill(String(CONTEXT));
+  const seen = { title: await form.locator('h3').innerText(),
+    keyFields: await form.locator('input[type="password"]').count() };
+  await form.getByLabel('Model id', { exact: true }).fill(SECOND_MODEL);
+  await form.getByLabel('Context window', { exact: true }).fill(String(CONTEXT));
   await shot(page, '1-add-model');
-  await form.getByRole('button', { name: '保存', exact: true }).click();
-  await page.getByTestId('settings-notice').waitFor({ timeout: 15000 });
-  seen.notice = await page.getByTestId('settings-notice').innerText();
-  seen.row = await modelRow(page, `${ctx.conn.provider}/${SECOND_MODEL}`).locator('.model-meta')
-    .innerText({ timeout: 5000 }).catch(() => null);
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  await form.waitFor({ state: 'detached', timeout: 15000 });
+  const ref = `${ctx.conn.provider}/${SECOND_MODEL}`;
+  seen.row = oneLine(await modelRow(page, ref).innerText({ timeout: 5000 }).catch(() => ''));
+  const deadline = Date.now() + PROBE_WAIT_MS;
+  const settled = ['verified', 'failed', 'unverified'];
+  while (Date.now() < deadline && !settled.includes(await toolCalling(page, ref))) await sleep(3000);
+  seen.toolCalling = await toolCalling(page, ref);
   await shot(page, '1-model-list');
   return seen;
 }
 
-/** @brief 在顶栏打开模型菜单，读出菜单的样子，选 ref，等按钮显示它、不再是切换中。 */
-async function switchModel(page, ref, name = '1-model-menu') {
+/** @brief 在顶栏打开范围菜单（v1），读出菜单的样子，选 pick，等按钮不再是切换中。 */
+async function switchModel(page, pick, name = '1-model-menu') {
   await pane(page).getByTestId('model-button').click();
   const menu = page.getByTestId('model-menu');
   await menu.waitFor({ timeout: 5000 });
   const state = await menu.evaluate((element) => ({
-    items: [...element.querySelectorAll('[role="menuitemradio"]')].map((item) => ({ ref: item.dataset.model,
-      checked: item.getAttribute('aria-checked') === 'true',
-      isDefault: Boolean(item.querySelector('.model-default')) })),
-    groups: [...element.querySelectorAll('.model-group-name')].map((group) => group.textContent),
-    note: element.querySelector('.menu-note')?.textContent ?? '',
+    items: [...element.querySelectorAll('[role="menuitemradio"]')].map((item) => ({ pick: item.dataset.pick,
+      checked: item.getAttribute('aria-checked') === 'true', excluded: item.dataset.excluded === 'true' })),
+    sections: [...element.querySelectorAll('[data-section]')].map((section) => section.dataset.section),
+    note: element.querySelector('[data-testid="model-menu-note"]')?.textContent ?? '',
     last: element.lastElementChild?.getAttribute('role') === 'menuitem'
       ? element.lastElementChild.textContent : null }));
   await shot(page, name);
-  await menu.locator(`[role="menuitemradio"][data-model="${ref}"]`).click();
-  await page.waitForFunction(({ sel, id }) => {
+  await menu.locator(`[role="menuitemradio"][data-pick="${pick}"]`).click();
+  await page.waitForFunction(({ sel, want }) => {
     const button = document.querySelector(`${sel} [data-testid="model-button"]`);
-    return button?.textContent.trim() === id && !button.hasAttribute('aria-disabled');
-  }, { sel: PANE, id: ref.split('/').pop() }, { timeout: 15000 });
+    return button?.dataset.pick === want && !button.hasAttribute('aria-disabled');
+  }, { sel: PANE, want: pick }, { timeout: 15000 });
   return state;
 }
 
-/** @brief 走查 1 的设置页部分：添加模型的表单与保存结果，不改 key。 */
+/** @brief 走查 1 的设置页部分：添加模型的表单与保存结果、探针、不改 key。 */
 function recordAddModel(ctx, form, keyBefore) {
-  const models = readJson(join(ctx.agentDir, 'models.json'))?.providers?.[ctx.conn.provider]?.models ?? [];
+  const models = modelConfig(ctx)?.providers?.find((item) => item.id === ctx.conn.provider)?.models ?? [];
   const added = models.find((model) => model.id === SECOND_MODEL);
-  record('走查 1：连接卡上点"添加模型"：标题"添加模型 · <连接名>"，说明"用这个连接的地址和 key，不用再填 key"，没有 key 框',
-    form.title === `添加模型 · ${ctx.conn.name}` && form.hint === '用这个连接的地址和 key，不用再填 key'
-    && form.keyFields === 0, JSON.stringify(form));
-  record('走查 1：保存后回到列表，上方"已保存 · 已经打开的会话下一条消息起用新的设置"；新模型一行"上下文 1,000,000 · 不支持思考"；'
-    + 'models.json 这个连接下有两个模型', form.notice === '已保存 · 已经打开的会话下一条消息起用新的设置'
-    && form.row === '上下文 1,000,000 · 不支持思考' && models.length === 2 && added?.contextWindow === CONTEXT
-    && added?.reasoning === undefined, JSON.stringify({ notice: form.notice, row: form.row, models }));
+  record('走查 1：提供商卡上点"Add model"：标题"Add model · <提供商名>"，没有 key 框',
+    form.title === `Add model · ${ctx.conn.name}` && form.keyFields === 0, JSON.stringify(form));
+  record('走查 1：保存后模型行出现（Context 1,000,000），自动跑探针，Tool calling 为 Verified；model-config.json 这个提供商下'
+    + '多了这个模型（不支持思考）', form.row.includes(SECOND_MODEL) && form.row.includes('1,000,000')
+    && form.toolCalling === 'verified' && added?.contextWindow === CONTEXT && added?.reasoning === false,
+  JSON.stringify({ row: form.row, toolCalling: form.toolCalling, added }));
   record('反例：添加模型不填 key、不改 credentials.json（修改时间和大小不变）', keyStamp(ctx.userData) === keyBefore,
     `${keyBefore} → ${keyStamp(ctx.userData)}`);
 }
 
-/** @brief 走查 1：在连接下添加 deepseek-v4-pro（不填 key），顶栏切换，新回复来自它。 */
+/**
+ * @brief 走查 1（v1）：在 设置 → Models 给首选提供商加 deepseek-v4-pro（不填 key），在顶栏的范围菜单里选它，
+ *        新回复来自它；设置里的默认范围不变。
+ */
 async function item1(ctx) {
   const { page } = ctx;
   await sendTurn(page, PROMPTS.intro);
@@ -400,21 +423,20 @@ async function item1(ctx) {
   const entries = sessionEntries(ctx.s1);
   const models = entries.filter((e) => e.type === 'message' && e.message.role === 'assistant')
     .map((e) => e.message.model);
-  const change = entries.findIndex((e) => e.type === 'model_change' && e.modelId === SECOND_MODEL);
-  const lastReply = entries.findLastIndex((e) => e.type === 'message' && e.message.role === 'assistant');
-  const defaults = readJson(join(ctx.agentDir, 'settings.json'));
-  const current = menu.items.find((i) => i.ref === `${ctx.conn.provider}/${ctx.conn.model}`);
-  record('走查 1：顶栏模型菜单按连接分组列出两个模型，当前的打勾，默认模型标"默认"，说明只作用于这个会话，最后一项"管理模型…"',
-    menu.groups.length === 1 && menu.groups[0] === ctx.conn.name && menu.items.length === 2
-    && current?.checked && current?.isDefault && menu.items.filter((i) => i.checked).length === 1
-    && menu.note === '只作用于这个会话；新会话用设置里的默认模型' && menu.last === '管理模型…', JSON.stringify(menu));
-  record('走查 1：顶栏切到 deepseek-v4-pro：按钮显示它，悬停"<连接名> · deepseek-v4-pro"；新回复来自 deepseek-v4-pro'
-    + '（会话文件里回复的 model 先是默认模型、后是 deepseek-v4-pro，中间有 model_change）', shown.text === SECOND_MODEL
-    && shown.title === `${ctx.conn.name} · ${SECOND_MODEL}` && models[0] === ctx.conn.model
-    && models.at(-1) === SECOND_MODEL && change > 0 && change < lastReply, JSON.stringify({ shown, models, change }));
-  record('反例：顶栏换模型不改设置里的默认模型（settings.json 的 defaultModel 不变）',
-    defaults?.defaultModel === ctx.conn.model && defaults?.defaultProvider === ctx.conn.provider,
-    JSON.stringify({ defaultProvider: defaults?.defaultProvider, defaultModel: defaults?.defaultModel }));
+  const picks = entries.filter((e) => e.type === 'custom' && e.customType === 'mori.pick').map((e) => e.data?.pick);
+  const config = modelConfig(ctx);
+  const current = menu.items.find((item) => item.pick === REAL_GROUP);
+  record('走查 1：顶栏范围菜单分 Groups、Providers、Models 三节，当前范围（测试分组）打勾，列出新加的模型，底部说明只作用于'
+    + '这个会话，最后一项"Manage models…"', menu.sections.join() === 'groups,providers,models' && current?.checked
+    && menu.items.filter((item) => item.checked).length === 1 && menu.items.some((item) => item.pick === ref)
+    && menu.note === 'Applies to this session. New sessions use the default range from Settings.'
+    && menu.last === 'Manage models…', JSON.stringify(menu));
+  record('走查 1：选 deepseek-v4-pro：按钮显示它，悬停"<提供商名> · <区域>"；新回复来自 deepseek-v4-pro（会话文件里回复的'
+    + ' model 先是首选的第一个模型、后是 deepseek-v4-pro，记了一条 mori.pick）', shown.text === SECOND_MODEL
+    && shown.title.startsWith(`${ctx.conn.name} · `) && models[0] === ctx.conn.model && models.at(-1) === SECOND_MODEL
+    && picks.at(-1) === ref, JSON.stringify({ shown, models, picks }));
+  record('反例：顶栏换范围不改设置里的默认范围（model-config.json 的 normalDefault 仍是测试分组）',
+    config?.normalDefault === REAL_GROUP, String(config?.normalDefault));
 }
 
 // ---------- 走查 2：用户级 AGENTS.md ----------
@@ -479,7 +501,8 @@ async function item2(ctx) {
   await backToChat(page);
   await newSession(page);
   const model = (await pane(page).getByTestId('model-button').innerText()).trim();
-  record('反例：新会话仍用设置里的默认模型（顶栏切换只作用于那个会话）', model === ctx.conn.model, model);
+  record('反例：新会话仍用设置里的默认范围（测试分组，当前模型是首选的第一个；顶栏切换只作用于那个会话）',
+    model === `${REAL_GROUP} · ${ctx.conn.model}`, model);
   await sendTurn(page, PROMPTS.intro);
   const reply = await lastAssistant(page);
   await shot(page, '2-reply');
@@ -974,22 +997,22 @@ async function thinkingMenu(page, name) {
   return { ...head, ...state };
 }
 
-/** @brief 设置页里编辑默认模型：勾"支持思考"、新会话默认选 level，保存；返回看到的。 */
+/** @brief 设置 → Models 里编辑首选的第一个模型：勾"Supports thinking"、新会话强度选 level，Save；返回看到的。 */
 async function markReasoning(ctx, level) {
   const { page } = ctx;
   await openSettings(page);
   const row = modelRow(page, `${ctx.conn.provider}/${ctx.conn.model}`);
-  await row.getByRole('button', { name: '编辑', exact: true }).click();
+  await row.locator('[data-action="edit"]').click();
   const form = page.getByTestId('model-form');
   await form.waitFor({ timeout: 10000 });
-  const before = { readOnly: await form.getByLabel('模型 ID').getAttribute('readonly'),
-    selects: await form.locator('select').count() };
-  await form.locator('input[type="checkbox"]').check();
-  await form.locator('select').selectOption(level);
+  const before = { readOnly: await form.getByLabel('Model id', { exact: true }).getAttribute('readonly'),
+    selects: await form.getByLabel('New-session thinking level').count() };
+  await form.getByLabel('Supports thinking').check();
+  await form.getByLabel('New-session thinking level').selectOption(level);
   await shot(page, '8-edit-model');
-  await form.getByRole('button', { name: '保存', exact: true }).click();
-  await page.getByTestId('settings-notice').waitFor({ timeout: 15000 });
-  const meta = await row.locator('.model-meta').innerText();
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  await form.waitFor({ state: 'detached', timeout: 15000 });
+  const meta = oneLine(await row.innerText());
   return { before, meta };
 }
 
@@ -1034,8 +1057,8 @@ function recordThinkingRun(ctx, run) {
     && run.menu.items.map((item) => item.level).join() === 'off,minimal,low,medium,high'
     && run.menu.items.every((item) => !item.disabled) && run.menu.checked === 'low'
     && run.menu.note === '只作用于这个会话；新会话的默认在设置里按模型设定', JSON.stringify(run.menu));
-  record('走查 8：生成中顶栏的模型和思考按钮不可用，悬停"生成中不能切换模型""生成中不能切换思考强度"',
-    run.start?.running === true && run.start.model?.disabled && run.start.model.title === '生成中不能切换模型'
+  record('走查 8：生成中顶栏的范围和思考按钮不可用，悬停"Can\'t change the model while generating""生成中不能切换思考强度"',
+    run.start?.running === true && run.start.model?.disabled && run.start.model.title === MODEL_BUSY
     && run.start.thinking?.disabled && run.start.thinking.title === '生成中不能切换思考强度', JSON.stringify(run.start));
   record('反例：顶栏切换思考强度不改设置里的默认（modelThinkingLevels 仍是 low，没有写 defaultThinkingLevel）',
     run.settings?.modelThinkingLevels?.[`${ctx.conn.provider}/${ctx.conn.model}`] === 'low'
@@ -1052,7 +1075,7 @@ function recordThinkingRun(ctx, run) {
 /** @brief 走查 8 最后：同一会话换到没标支持思考的模型（走查 1 加的），思考按钮按返回值变成"不可选"。 */
 async function switchToUnmarked(ctx) {
   const { page } = ctx;
-  const models = readJson(join(ctx.agentDir, 'models.json'))?.providers?.[ctx.conn.provider]?.models ?? [];
+  const models = modelConfig(ctx)?.providers?.find((item) => item.id === ctx.conn.provider)?.models ?? [];
   if (!models.some((model) => model.id === SECOND_MODEL)) return;
   await switchModel(page, `${ctx.conn.provider}/${SECOND_MODEL}`, '8-model-menu');
   await page.waitForFunction((sel) => document.querySelector(`${sel} [data-testid="thinking-button"]`)
@@ -1061,8 +1084,8 @@ async function switchToUnmarked(ctx) {
   const state = { text: (await button.innerText()).trim(), reasoning: await button.getAttribute('data-reasoning'),
     level: await button.getAttribute('data-level') };
   await shot(page, '8-unmarked-switch');
-  record('走查 8：同一会话在顶栏换到没标支持思考的 deepseek-v4-pro：思考按钮按返回值变成"思考：不可选"（pi 收紧为关）',
-    state.text === '思考：不可选' && state.reasoning === 'false' && state.level === 'off', JSON.stringify(state));
+  record('走查 8：同一会话在顶栏把范围换到没标支持思考的 deepseek-v4-pro：思考按钮按当前模型变成"思考：不可选"',
+    state.text === '思考：不可选' && state.reasoning === 'false', JSON.stringify(state));
 }
 
 /** @brief 走查 8：把模型标为支持思考；顶栏"高"有思考内容，"关"没有。之前先看反例：没标时不可选。 */
@@ -1070,17 +1093,18 @@ async function item8(ctx) {
   const { page } = ctx;
   await newSession(page);
   const unmarked = await thinkingMenu(page, '8-unmarked');
-  record('反例：模型没标支持思考时，顶栏"思考：不可选"，菜单里的强度都不可用，说明原因并有"打开设置"',
+  record('反例：模型没标支持思考时，顶栏"思考：不可选"，菜单里的强度都不可用，说明原因（英文，§9.2）并有"Open settings"',
     unmarked.text === '思考：不可选' && unmarked.reasoning === 'false' && unmarked.items.length > 0
-    && unmarked.items.every((item) => item.disabled) && unmarked.note.includes("这个模型没有标'支持思考'")
-    && unmarked.links.includes('打开设置'), JSON.stringify(unmarked));
+    && unmarked.items.every((item) => item.disabled) && unmarked.note.startsWith(UNSUPPORTED_NOTE)
+    && unmarked.links.includes('Open settings'), JSON.stringify(unmarked));
   const edited = await markReasoning(ctx, 'low');
-  const model = readJson(join(ctx.agentDir, 'models.json'))?.providers?.[ctx.conn.provider]?.models
+  const model = modelConfig(ctx)?.providers?.find((item) => item.id === ctx.conn.provider)?.models
     ?.find((item) => item.id === ctx.conn.model);
   const levels = readJson(join(ctx.agentDir, 'settings.json'))?.modelThinkingLevels;
-  record('走查 8：编辑模型（ID 只读；没勾时没有思考强度下拉），勾"支持思考"、新会话默认选"低"，保存：这一行"支持思考 · 新会话默认 低"；'
-    + 'models.json 有 reasoning: true，settings.json 的 modelThinkingLevels 是 low', edited.before.readOnly !== null
-    && edited.before.selects === 0 && edited.meta.endsWith('支持思考 · 新会话默认 低') && model?.reasoning === true
+  record('走查 8：编辑模型（Model id 只读；没勾时没有 New-session thinking level），勾"Supports thinking"、新会话强度选'
+    + ' Low，Save：模型行显示"Supports thinking"；model-config.json 有 reasoning: true，settings.json 的 modelThinkingLevels'
+    + ' 是 low', edited.before.readOnly !== null && edited.before.selects === 0
+    && edited.meta.includes('Supports thinking') && model?.reasoning === true
     && levels?.[`${ctx.conn.provider}/${ctx.conn.model}`] === 'low', JSON.stringify({ edited, model, levels }));
   await backToChat(page);
   const reopened = await pane(page).getByTestId('thinking-button').getAttribute('data-reasoning');
@@ -1152,11 +1176,13 @@ async function counterExamples(ctx) {
 
 // ---------- 执行 ----------
 
-/** @brief 走查数据目录里要有 Mori 保存的连接（只读 models.json 的非机密部分）；没有时在复制密文之前就失败。 */
+/**
+ * @brief 走查数据目录里首选提供商（DeepSeek）的非机密信息（v1：model-config.json，lib.mjs realProviders）；没有时在复制密文
+ *        之前就失败。
+ */
 function readConnection(dir) {
-  const provider = JSON.parse(readFileSync(join(dir, 'pi', 'models.json'), 'utf8')).providers?.['mori-endpoint'];
-  if (!provider?.models?.length) throw new Error(`No saved connection in ${dir}`);
-  return { provider: 'mori-endpoint', name: provider.name, model: provider.models[0].id };
+  const [first] = realProviders(dir);
+  return { provider: first.provider, name: first.name, model: first.model };
 }
 
 /** @brief 删掉临时目录；MCP 服务刚退出时文件夹可能还占着，多试几次。 */
@@ -1174,6 +1200,8 @@ const ctx = { conn, root, project: makeProject(root, 'm6-walk', PROJECT_SKILL),
   untrusted: makeProject(root, 'm6-untrusted', UNTRUSTED_SKILL), pageErrors: [], skillDisabled: false };
 ctx.agentsFiles = projectAgentsFiles(ctx.project);
 ctx.userData = scratchUserData(source);
+// 测试准备（synthetic test setup，§14.1）：给两个临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
+allowRealProject(ctx.userData, [ctx.project, ctx.untrusted]);
 ctx.agentDir = join(ctx.userData, 'pi');
 try {
   await start(ctx);

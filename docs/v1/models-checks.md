@@ -1,0 +1,113 @@
+# 模型层检查记录
+
+依据：[统一模型提供商 Proposal](../proposals/model-providers.md) 第四版、[构建规格](../specs/model-providers.md)。
+日期：2026-10-21。机器：Windows 11（10.0.28000），Node 24.19.0；Electron 44.9.0；pi 1.3.0。分支 `v1-model-providers`（基于 `app-v0` 的 `12f2326`，即 M7 合并之后）。
+
+## 状态
+
+按 AGENTS.md 的完成顺序（规格与状态表 → 真实会话录 fixture → 界面测试 → 实现 → 真实模型走一遍 → 你走查），只差你走查。改动都还没有提交。
+真实端点：DeepSeek（`deepseek-flash`，从 v0 迁移来，区域 Public）与 GLM（`GLM-5.3`，`api.z.ai` 的 Anthropic 接口，区域 Public），key 由你在 Mori 里保存；
+脚本只复制加密的文件，不读 key；录下的 fixture 和结果文件里没有 key（32 个文件已扫描）。
+
+结果一览（开发构建，2026-10-21）：
+
+| 层 | 结果 |
+| --- | --- |
+| 单元（`npm run test:unit`） | 373/373 |
+| App：`v1-models-app-settings` / `-switch` / `-session` | 140/140、78/78、113/113 |
+| 回放（`v1-models-replay.mjs`，fixture 从真实会话录制） | 35/35 |
+| 真实（MP-27，`v1-models-real.mjs`） | 10/10 |
+| 现有测试（MP-37，`v1-models-existing.mjs`） | 18 个套件单独跑都通过；整套连续跑见下面“与规格不同”第 7 条 |
+| 覆盖检查（`spec-coverage.mjs`，不带 `--allow-missing-real`） | 37 条在各自列出的每一层都有通过的检查，退出码 0 |
+
+真实模型的表现（`v1-models-record.mjs`、`v1-models-real.mjs`）：
+
+- 探针：DeepSeek 工具调用已验证；指定调用与 JSON schema 被它拒绝（400：“Thinking mode does not support this tool_choice”“This response_format type is unavailable”），文本标签通过，交接写入等级 C；推理字段 `reasoning_content`。
+  GLM 工具调用已验证；指定调用没被执行，文本标签通过，等级 C；推理为接口原生，可以关闭思考，不需要回传推理。
+- 段开始时换模型：DeepSeek 的 key 换成错的后，第一个请求得到真实的 401，对话流一行“Switched model: mori-endpoint/deepseek-flash → glm/GLM-5.3 · API key rejected”，没有错误卡。
+- 段内换模型：DeepSeek 读了第一个文件后 key 失效，GLM 重做整个回复（逐个读 5 个文件再总结），提示加“The new model redoes this reply.”；DeepSeek 已做的部分仍在对话里显示，但没有发给 GLM。
+- 回到首选：恢复 key、重新启动后，下一段回到 DeepSeek，之前的换模型提示仍在。
+
+## 你走查时看什么
+
+用你的数据目录打开（`node tests/ui/m0-real.mjs --user-data <目录> --setup`，或装好的新版）：
+
+1. 设置 → Models：两个提供商的卡片、key 行（Saved、Test）、模型行的档案摘要（Tool calling Verified、Handoff tier C、Reasoning field）。
+2. 新建一个分组（例如 GLM 在前、DeepSeek 在后），设为新会话的默认范围；新会话顶栏显示“<分组> · <当前模型>”。
+3. 在没有授权公网的新项目里发消息：输入框上方出现拒绝启动卡；“Allow public for this project…”带你到 Project access，确认后可以发送。
+4. 顶栏的范围菜单：分组、提供商、模型三节；选一个提供商或模型后下一条消息由它回答；重新打开会话后范围不变。
+5. 把首选的 key 删掉、加一个错的（例如 `sk-invalid`）：下一条消息出现“Switched model: … · API key rejected”，没有错误卡；把对的 key 加回来、删掉错的，再发一条，回到首选。
+6. 在一个要连续读好几个文件的回复进行中做第 5 条：出现“The new model redoes this reply.”，之前的工具卡还在。
+7. 生成中顶栏的范围和思考按钮都不可用；Esc 或停止按钮能停在“准备中”（消息回到输入框）。
+8. 按 F8 存一份报告：最近的操作里只有“Add key <提供商>”，没有 key。
+
+## 你决定的（2026-10-21）
+
+| 问题 | 你的回答 | 现在的做法 |
+| --- | --- | --- |
+| proposal 里依赖平行 Agent 与 TaskBoard 的部分怎么办 | 现在只做模型层；依赖 TaskBoard 的部分写进 TaskBoard 规格，随它实现 | 规格 §0 的范围、§10 列出交给那份规格的规则 |
+| 新界面的文字 | 英文 | 规格新增和改写的界面用英文；没改到的旧界面仍是中文 |
+| 真实走查用哪些端点 | `D:\code` 下三个 env 文件对应的端点都可以用（DeepSeek、GLM、OpenRouter，都是公网） | 走查用 DeepSeek 与 GLM 两个真实提供商，加合成端点制造限流和故障；key 由你在 Mori 里保存，脚本不读 key |
+| 模型管理的结构 | 分组 — 提供商 — 模型三层；分组可以有多个提供商，提供商可以在多个分组里；一个提供商可以有多个 key、多个模型；分组也可以只挑提供商下的某个模型 | proposal 第四版 §1、§4；规格 §4.1 |
+| 谁来选模型 | 普通模式下你为主 Agent 选分组、提供商或模型，子 Agent 只能在你选的范围里选；协作模式下你不选，按 task 设置选 | proposal §5；规格 §5.1，子 Agent 与协作模式在 §10 |
+| 分组与别名 | 分组取代第三版的别名 | proposal 第四版不再有别名 |
+| 范围里按什么顺序选 | 按列出的顺序：分组里各项的顺序，再按提供商里的模型顺序 | 规格 §5.1 |
+| 多个 key 怎么分 | 按顺序填：用第一个有空位的 key，被限流或被拒绝的 key 跳过，全部不可用才算提供商不可用 | 规格 §8 |
+| 普通模式一次回复中途换模型 | 重做这次回复：中断的部分留在对话里，但不交给新模型 | proposal 7.3；规格 §5.6、§6.1 |
+
+我替你定的（走查时可以改）：主 Agent 固定要求“工具调用已验证”（新加的模型要等后台探针通过才能用）；公网只能按项目授权，不能在所有项目默认允许里勾选（proposal §12 第 2 条）。
+
+## 开工前查的 pi 行为（对照 pi 1.3.0 源码，并用脚本对合成端点实测）
+
+脚本放在会话的临时目录，没有进仓库；每一条的结论写进了规格 §11.5。
+
+| 项 | 规格编号 | 怎么查的 | 结果 |
+| --- | --- | --- | --- |
+| 虚拟模型 `route()` | K3 | 每个会话注册一个虚拟模型，跑带工具调用的回复、运行中插话、关掉再按文件重新打开 | 每次请求前调用；不带会话身份；插话后的请求原因是 `user`，工具循环是 `continuation`；助手消息记实际模型；重新打开时注册同一个 id 即恢复 |
+| 流函数包装 | K2 | 替换 `session.agent.streamFunction`，每次请求轮换两个合成 key，包装里等 1 秒 | 每次助手请求调用一次，模型是路由后的实际模型；`apiKey`、`fetch` 选项被采用；等待不影响后续；pi 在运行开始时取流函数 |
+| 自定义 fetch | K1 | 合成端点回 429 + `Retry-After: 7` | fetch 看得到状态和 `Retry-After`；pi 转成的报错文字里没有 `Retry-After`；OpenAI SDK 读到 `[DONE]` 后取消响应体 |
+| 关掉 agent 级重试 | K6 | `applyOverrides({ retry: { enabled: false } })` | 429 只发一次，没有 `auto_retry_start`；`resourceLoader.reload()`、`settingsManager.reload()` 和带 `persist` 的设置会清掉覆盖 |
+| `context` 事件 | K4 | 去掉工具调用和结果、加一条用户消息 | 只影响发出的请求，会话文件不变 |
+| 压缩 | K5 | 会话模型是虚拟模型时 `session.compact()` | 先以 `direct` 调 `route()`；用会话的流函数发出（经包装），压缩请求的 `sessionId` 与会话 id 不同 |
+| 中止 | K7 | 慢速流式回复中 `session.abort()` | fetch 的 signal 同一刻触发，服务端几十毫秒内看到连接关闭；已收到的部分保留 |
+| 后台调用 | K8、K10 | `streamSimple` 带指定函数的 `tool_choice`、`onPayload` 加 `response_format` | 原样发出；工具的 `strict` 只在 `supportsStrictMode` 为真时发出；把虚拟模型交给 `streamSimple` 时调用方的 key 被丢掉 |
+| 没有 key 的提供商 | K1 | `registerProvider` 不带 `apiKey` / 带占位 `apiKey` | 不带时 pi 不算“已配置”；带占位就算，SDK 发 `Authorization: Bearer <占位>`，由 Mori 的 fetch 改写 |
+| 注册与刷新 | K9 | `registerProvider` 之后马上设 key | pi 自己发起的刷新不等待、会互相覆盖；注册后 `await runtime.refresh()` 就稳定 |
+| 推理内容回传 | — | 目标模型 `requiresReasoningContentOnAssistantMessages`，历史里有别的模型的工具调用 | 别的模型的思考被丢掉，助手消息补 `reasoning_content: ""` |
+| SDK 超时覆盖整个 fetch 调用 | K11 | 设置里 `timeoutMs` 1.5 秒，自定义 fetch 先睡 3 秒 | 报“Request timed out.”；包装传 `timeoutMs: 2147483647` 后成功 |
+| 压缩前去掉被隐藏的过程 | K12 | `session_before_compact` 里就地删掉带工具调用的助手消息和对应结果，不返回结果 | 摘要请求里没有这些调用；`fileOps` 要一起清，否则摘要末尾仍列出读过的文件 |
+| 排队消息先发 `message_start` 再路由 | K13 | 工具循环中排一条 followUp、一条 steer，扩展的 `message_start` 处理器等 300 毫秒 | 两种都先发 `message_start` 并等处理器结束，再调 `route()`；时间戳是排队的时刻；`agent_settled` 每次运行一次，`prompt()` 在运行前抛错时没有 |
+
+## 交付了什么
+
+- 文档：proposal 第四版、构建规格（经三轮评审）、`docs/v1/screens/` 四张状态表、`docs/v1/defaults.md`、本记录；app-v0、AGENTS.md、两份旧 proposal 加了注明。
+- 后台进程（`app/src/kernel/`）：`modelConfig`、`modelMigrate`、`modelCompile`、`modelLayer`、`modelCommands`、`selector`、`modelContext`、`modelSession`、`modelPool`、`modelFailure`、`modelProfiles`、`probes`、`modelTimings`、`modelTypes`；
+  改写 `pi.ts`、`config.ts`、`sessions.ts`、`commands.ts`、`credentials.ts`、`index.ts`；主进程按 `ref` 存 key。
+- 进程桥：`shared/models.ts`（配置 schema、命令、事件、原因文字、区域建议），`shared/protocol.ts` 去掉 v0 的连接与模型命令。
+- 界面：设置页 Models 分节（`components/settings/`）、英文的首次启动表单、顶栏的范围菜单、换模型与重建提示、阶段行、拒绝启动卡、没有可用模型卡、准备中；删掉 v0 的连接表单、`SETTINGS_HINT`、`modelNotice`。
+- 测试：`tests/unit/`（单元）、扩展的合成端点（`tests/fake-endpoint/`）、三个 App 测试、回放与录制与真实走查脚本、`spec-coverage.mjs`、`v1-models-existing.mjs`；现有 m0–m7 的测试、回放夹具与真实脚本按规格 §14.4 改好。
+- 依赖：`@earendil-works/pi-ai` 1.3.0（原本就随 pi 安装）、`esbuild` 0.25.12（原本就随 vite 安装），都锁精确版本、离线可用。
+
+## 与规格不同、或需要你注意的地方
+
+1. 模型 id 建好后不能改（沿用 v0）；要换 id 就删掉再加。
+2. 编辑一个没设过新会话默认强度的推理模型时，表单显示“Medium”，但只有你改了强度或“支持思考”时才写入 pi 设置（不悄悄钉死）。
+3. 换了模型的那一条助手消息上，pi 记的思考强度仍是路由时为原模型收紧的值（pi 的已知限制，规格 §11.2）。
+4. 准备中重新载入界面后，准备中又发的消息显示在排队区里，撤回时可能留在那里（只影响显示）。
+5. 首次启动表单在 v1 里不能沿用已存的 key：真实走查 m1-real 的走查 1 改为“空 key 测试失败 → 指向已存的密文 → Verify now”。
+6. 打包程序（`--exe`）上的测试还没跑：另一个会话（`english-ui` 分支）在同一台机器上用同样的固定端口跑它的打包测试，同时跑会互相占端口。
+7. 现有 18 个套件连续跑时有两处不稳定：`m5-app` 的 Shift+F10 菜单偶尔没出现、`m7-replay` 的阅读器选区偶尔少一行（`tests/ui/m4-helpers.mjs` 的 `selectLines` 在高亮重绘之前选字）；
+   单独跑都通过。当时另一个会话也在跑测试（端口 4335 被占过一次）。
+8. 实测中补进规格的三条：第 5、6 步服务端回 400 或 422 算判定为不通过（DeepSeek 拒绝指定调用和 JSON schema 时等级才能定为 C）；
+   探针没跑完就关了 App 的模型，下次启动自动重新探测；加 key、删 key 也算修改提供商，没验证过的模型重新探测。
+
+## 测试中发现并已修正的问题
+
+- 测试发现的 6 个：两次换模型时说明重复；从未验证过的模型在探测中没显示 verifying；溢出恢复后仍显示错误卡；模型按钮最宽 200px（应为 160px）；删除确认框的文字；加 key 后不重新探测（规格 §7.4 补充了这一条）。
+- 代码评审（5 个角度、每条再由独立的核实者反驳）确认的 25 个，包括：429 带 `Retry-After: 0` 时无限重发；写认证头出错时槽位泄漏；保存改地址的提供商时旧 key 可能发往新地址（另加了“key 只发往它的提供商地址”的保护）；迁移时解不开的密文被丢掉；准备中排队的消息在几种情况下丢失；设置页落点用了旧数据等。全部改好并各有单元测试。
+
+## 未验证
+
+- 打包程序上的全部测试。
+- 内网 vLLM、SGLang、llama.cpp、Ollama：只用合成端点模拟过它们的版本接口、指标、截断和取消；真实的 429 `Retry-After`、5xx、长输入截断没有在真实端点上触发过。
+- 需要你同意的两个探针（长输入、取消）只在合成端点上跑过。

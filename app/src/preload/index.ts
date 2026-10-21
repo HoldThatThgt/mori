@@ -1,7 +1,9 @@
 // 预加载脚本：持有通往后台进程的 MessagePort，向页面暴露 window.mori。
 
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Command, EventEnvelope, KernelMessage, RequestEnvelope } from '../shared/protocol';
+import type {
+  Command, EventEnvelope, GlobalEventEnvelope, KernelMessage, RequestEnvelope,
+} from '../shared/protocol';
 import type { Feedback, SavedFeedback } from '../shared/feedback';
 import type { FileRead } from '../shared/files';
 import type { IssueReport, SavedIssue, WindowCapture } from '../shared/issues';
@@ -14,11 +16,13 @@ let nextId = 1;
 let exitCode: number | null = null;
 const pending = new Map<number, Pending>();
 const queued: RequestEnvelope[] = [];
-const eventListeners = new Set<(envelope: EventEnvelope) => void>();
+/** 后台进程发来的事件：会话事件，或不属于某个会话的全局事件（sessionId 为 null，模型层 §9.5） */
+type AnyEventEnvelope = EventEnvelope | GlobalEventEnvelope;
+const eventListeners = new Set<(envelope: AnyEventEnvelope) => void>();
 const exitListeners = new Set<(code: number) => void>();
 const readyListeners = new Set<() => void>();
 
-/** @brief 分发后台进程发来的回复与事件。 */
+/** @brief 分发后台进程发来的回复与事件；会话事件与全局事件都交给事件订阅者，由订阅者按 sessionId 区分。 */
 function dispatch(message: KernelMessage): void {
   if (message.kind === 'event') {
     for (const listener of eventListeners) listener(message);
@@ -67,8 +71,8 @@ contextBridge.exposeInMainWorld('mori', {
       else queued.push(request);
     });
   },
-  /** @brief 订阅会话事件，返回取消订阅的函数。 */
-  onEvent(listener: (envelope: EventEnvelope) => void): () => void {
+  /** @brief 订阅后台进程的事件（会话事件与 sessionId 为 null 的全局事件），返回取消订阅的函数。 */
+  onEvent(listener: (envelope: AnyEventEnvelope) => void): () => void {
     eventListeners.add(listener);
     return () => eventListeners.delete(listener);
   },

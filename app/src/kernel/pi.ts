@@ -1,6 +1,7 @@
 // 加载 pi，并持有整个后台进程共用的 ModelRuntime。
 // 主进程已在环境变量里设好 PI_OFFLINE、PI_TELEMETRY 和 PI_CODING_AGENT_DIR，pi 在第一次用到时才加载。
-// API key 不经环境变量，也不写进 pi 的文件：启动时主进程解密后送来，用 pi 的 runtime API key 放在内存里。
+// 运行时不读 models.json（docs/specs/model-providers.md §4.4 第 1 步）：提供商与模型由模型层编译进来（modelCompile.ts）。
+// API key 不交给 pi：pi 里只有一个不保密的占位 key，真正的 key 在模型池的内存里，由它在发请求时写进认证头（§4.4、§8.4）。
 
 import type { ModelRuntime } from '@earendil-works/pi-coding-agent';
 
@@ -8,9 +9,9 @@ export type Pi = typeof import('@earendil-works/pi-coding-agent');
 
 let piModule: Promise<Pi> | undefined;
 let runtime: Promise<ModelRuntime> | undefined;
-let markKeysApplied: () => void = () => {};
-const keysApplied = new Promise<void>((resolve) => {
-  markKeysApplied = resolve;
+let markReady: () => void = () => {};
+const runtimeReady = new Promise<void>((resolve) => {
+  markReady = resolve;
 });
 
 /**
@@ -28,33 +29,28 @@ export function loadPi(): Promise<Pi> {
   return piModule;
 }
 
-/** @brief 创建唯一的 ModelRuntime（不等 key）。 */
-function createRuntime(): Promise<ModelRuntime> {
-  runtime ??= loadPi().then((pi) => pi.ModelRuntime.create({ refreshOnCreate: false }));
+/**
+ * @brief 创建（只创建一次）共用的 ModelRuntime，不等模型层编译：modelsPath 为 null（不读 models.json），
+ *        创建时不刷新（§4.4 第 1 步）。只给模型层（modelLayer.ts）用；别处用 getRuntime。
+ */
+export function createRuntime(): Promise<ModelRuntime> {
+  runtime ??= loadPi().then((pi) => pi.ModelRuntime.create({ modelsPath: null, refreshOnCreate: false }));
   return runtime;
 }
 
-/** @brief 整个后台进程共用一个 ModelRuntime；等启动时的 key 放好后再交出去。保存连接后用 refresh() 重读 models.json。 */
+/** @brief 模型层启动完成（配置已编译进运行时，或确定没有可编译的配置）后调用一次，放行 getRuntime。 */
+export function markRuntimeReady(): void {
+  markReady();
+}
+
+/** @brief 整个后台进程共用一个 ModelRuntime；等模型层把启动时的配置编译进去之后再交出去。 */
 export async function getRuntime(): Promise<ModelRuntime> {
   const rt = await createRuntime();
-  await keysApplied;
+  await runtimeReady;
   return rt;
 }
 
-/** @brief 把主进程送来的 key 交给 pi（只在内存里）；某一项失败时记录错误并继续。 */
-export async function applyStoredKeys(keys: Record<string, string>): Promise<void> {
-  const rt = await createRuntime();
-  for (const [providerId, key] of Object.entries(keys)) {
-    try {
-      await rt.setRuntimeApiKey(providerId, key);
-    } catch (error) {
-      console.error(`[kernel] cannot apply the stored key for ${providerId}: ${(error as Error).message}`);
-    }
-  }
-  markKeysApplied();
-}
-
-/** @brief 用户级设置（`<agentDir>/settings.json`），读写默认模型。 */
+/** @brief 用户级设置（`<agentDir>/settings.json`）：思考强度、按模型的新会话思考强度等。 */
 export async function globalSettings() {
   const pi = await loadPi();
   return pi.SettingsManager.create(pi.getAgentDir(), pi.getAgentDir());

@@ -2,7 +2,7 @@
 // 走查数据目录里的 key 是 Mori 加密保存的密文；这里只复制文件，从不读取或打印 key。
 
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
@@ -39,10 +39,11 @@ export function prepareProject(prefix = 'mori-m1-') {
 }
 
 /**
- * @brief 把走查数据目录里的连接复制到新的临时目录：credentials.json（密文）、pi/models.json、pi/settings.json，
- *        以及 Electron 的 Local State（safeStorage 的密钥由 DPAPI 保护，存在这里；没有它解不开密文）。
- * @param source 由负责人在 Mori 里填过连接的数据目录（例如 %TEMP%\mori-real-data）
- * @param options.withKey 为 false 时不复制 credentials.json，用来制造"找不到 key"
+ * @brief 把走查数据目录里的模型配置复制到新的临时目录：credentials.json（密文）、model-config.json、model-profiles.json、
+ *        pi/models.json（v0 留下的，有的话；v1 不再读写它）、pi/settings.json，以及 Electron 的 Local State（safeStorage
+ *        的密钥由 DPAPI 保护，存在这里；没有它解不开密文）。
+ * @param source 由负责人在 Mori（v1）里保存过提供商的数据目录（例如 %TEMP%\mori-real-data）
+ * @param options.withKey 为 false 时不复制 credentials.json 与 Local State（v1 里没有 key 的提供商请求不带认证头）
  */
 export function scratchUserData(source, { withKey = true } = {}) {
   const target = mkdtempSync(join(tmpdir(), 'mori-m1-data-'));
@@ -51,11 +52,85 @@ export function scratchUserData(source, { withKey = true } = {}) {
     copyFileSync(join(source, 'credentials.json'), join(target, 'credentials.json'));
     copyFileSync(join(source, 'Local State'), join(target, 'Local State'));
   }
+  for (const name of ['model-config.json', 'model-profiles.json']) {
+    if (existsSync(join(source, name))) copyFileSync(join(source, name), join(target, name));
+  }
   for (const name of ['models.json', 'settings.json']) {
     const from = join(source, 'pi', name);
     if (existsSync(from)) copyFileSync(from, join(target, 'pi', name));
   }
   return target;
+}
+
+/** 测试准备（§14.1）给真实提供商建的默认分组 id */
+export const REAL_GROUP = 'real-providers';
+
+/** @brief 项目路径的规范化写法（规格 §4.1 projectZones 的键）：全部小写、/ 分隔、无结尾 /。 */
+export function projectKey(path) {
+  return resolve(path).replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
+}
+
+/**
+ * @brief 读数据目录里 model-config.json 的提供商（只读非机密部分：id、名称、地址、模型）；按 DeepSeek、GLM、其余的
+ *        顺序排。没有提供商时报错（数据目录要先用 v1 打开一次，§14.1）。
+ */
+export function realProviders(dir) {
+  const file = join(dir, 'model-config.json');
+  if (!existsSync(file)) throw new Error(`No model-config.json in ${dir}; open it with Mori v1 first`);
+  const config = JSON.parse(readFileSync(file, 'utf8'));
+  const rank = (provider) => (/deepseek/i.test(provider.baseUrl) ? 0 : /bigmodel|glm|zhipu/i.test(provider.baseUrl)
+    ? 1 : 2);
+  const providers = [...config.providers].sort((a, b) => rank(a) - rank(b));
+  if (providers.length === 0) throw new Error(`No providers in ${join(dir, 'model-config.json')}`);
+  return providers.map((provider) => ({ provider: provider.id, name: provider.name, baseUrl: provider.baseUrl,
+    api: provider.api, zone: provider.zone, model: provider.models[0].id,
+    ref: `${provider.id}/${provider.models[0].id}`,
+    contextWindow: provider.models[0].contextWindow,
+    models: provider.models.map((model) => model.id), keys: provider.keys.map((key) => key.ref) }));
+}
+
+/**
+ * @brief 测试准备（规格 §14.1，synthetic test setup）：在复制出的 model-config.json 里给临时项目授权公网
+ *        （projectZones[项目] = ["public"]），建一个分组 [DeepSeek 提供商, GLM 提供商]（只有一个时就是它）作为默认范围。
+ *        之后的界面操作照常。返回用到的提供商（同 realProviders）。
+ * @param userData scratchUserData 复制出的数据目录
+ * @param projects 要授权的临时项目文件夹（一个或多个）
+ */
+export function allowRealProject(userData, projects) {
+  const file = join(userData, 'model-config.json');
+  const config = JSON.parse(readFileSync(file, 'utf8'));
+  const providers = realProviders(userData).slice(0, 2);
+  for (const project of [projects].flat()) config.projectZones[projectKey(project)] = ['public'];
+  config.groups = config.groups.filter((group) => group.id !== REAL_GROUP);
+  config.groups.push({ id: REAL_GROUP, members: providers.map((item) => item.provider) });
+  config.normalDefault = REAL_GROUP;
+  writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
+  return providers;
+}
+
+/**
+ * @brief 测试准备（规格 §14.1，synthetic test setup）：Mori 已经启动之后才建的临时项目，经进程桥直接发
+ *        models.setProjectZones 授权公网（与 allowRealProject 写的是同一个字段；Mori 运行时配置在后台进程里，改文件不生效）。
+ *        不经界面，也不进录制器（录制器只记 rec.cmd 发的命令）。
+ * @param page Mori 的页面
+ * @param projects 项目文件夹（一个或多个）
+ */
+export async function allowProjectsLive(page, projects) {
+  for (const path of [projects].flat()) {
+    const result = await page.evaluate((cwd) => window.mori.request({ type: 'models.setProjectZones', path: cwd,
+      zones: ['public'] }), path);
+    if (result?.error) throw new Error(`cannot allow public for ${path}: ${result.error}`);
+  }
+}
+
+/**
+ * @brief 测试准备：改复制出的 model-config.json（只用于临时数据目录）。
+ * @param edit 收到解析后的配置，就地修改或返回新的
+ */
+export function editModelConfig(userData, edit) {
+  const file = join(userData, 'model-config.json');
+  const config = JSON.parse(readFileSync(file, 'utf8'));
+  writeFileSync(file, `${JSON.stringify(edit(config) ?? config, null, 2)}\n`);
 }
 
 /** @brief 检查结果收集器；known 表示已知的上游问题，失败时标 KNOWN，不计入退出码。 */

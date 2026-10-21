@@ -1,10 +1,11 @@
 // 对话流：先显示最近 50 条消息，滚到顶部时载入更早的；你在底部时跟随新内容，不在底部时显示"有新内容 ↓"。
 // M4：你的消息上方显示引用，每轮回复末尾一行操作，点引用回到原位置时滚过去高亮（docs/v0/screens/selection.md）。
 // M6：pi 展开的技能命令缩成一行"技能 · 名字"加参数，可以展开看正文（docs/v0/screens/slash.md）。
+// v1：换模型与重建的一行、No model available 卡（docs/v1/screens/model-chat.md）；错误卡不再有"去设置"。
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { openSettings, putBack, putBackQuoted } from '../state/actions';
-import { PAGE_SIZE, startIndexFor } from '../state/model';
+import { putBack, putBackQuoted } from '../state/actions';
+import { PAGE_SIZE, rebuildText, startIndexFor, switchText } from '../state/model';
 import type { Item, ToolCall } from '../state/model';
 import { stripQuotes } from '../state/quotes';
 import { parseSkillInvocation, type SkillInvocation } from '../state/skillText';
@@ -15,22 +16,22 @@ import { AssistantMessage } from './AssistantMessage';
 import { SentQuotes } from './QuoteChips';
 import { findText, flashElements, flashRange } from './quoteHighlight';
 import { ReplyActions } from './ReplyActions';
+import { UnavailableCard } from './UnavailableCard';
 
 /** 离底部不超过这么多像素就算"在底部" */
 const BOTTOM_SLACK = 24;
 /** 离顶部不超过这么多像素就载入更早的消息 */
 const TOP_SLACK = 40;
-/** 错误原文里出现这些字样时附"去设置"，临时默认值，见 docs/v0/defaults.md */
-const SETTINGS_HINT = /401|unauthorized|api key/i;
 
-/** @brief 错误卡：显示原文，按原文附"去设置"或"把上一条消息放回输入框"。 */
+/**
+ * @brief 错误卡：显示原文，有没发出去的消息时附"把上一条消息放回输入框"。认证类错误由模型层处理（换 key、换模型或
+ *        No model available 卡），不再按原文附"去设置"（§9.3）。
+ */
 function ErrorCard({ item, tabKey }: { item: Extract<Item, { kind: 'error' }>; tabKey: string }) {
-  const settings = SETTINGS_HINT.test(item.text);
   return (
     <div className="error-card" role="alert" data-testid="error-card">
       <pre className="error-text">{item.text}</pre>
-      {item.live && settings && <button className="text-link" onClick={() => openSettings(true)}>去设置</button>}
-      {item.live && !settings && item.restore !== null && (
+      {item.live && item.restore !== null && (
         <button className="text-link" onClick={() => (item.refs ? putBackQuoted(tabKey, item.restore ?? '', item.refs)
           : putBack(tabKey, [item.restore ?? '']))}>把上一条消息放回输入框</button>
       )}
@@ -100,6 +101,17 @@ const ItemView = memo(function ItemView(
       return <div className={`notice ext-notify ${item.level}`} data-testid="ext-notify">扩展：{item.text}</div>;
     case 'error':
       return <ErrorCard item={item} tabKey={tabKey} />;
+    case 'model-switch':
+      return (
+        <div className="notice model-notice" data-testid="notice" data-kind="model-switch" data-from={item.from}
+          data-to={item.to} data-reason={item.reason} data-hidden={item.hidden ? 'true' : undefined}>
+          {switchText(item)}</div>
+      );
+    case 'rebuild':
+      return <div className="notice model-notice" data-testid="notice" data-kind="rebuild"
+        data-summary={String(item.summary)}>{rebuildText(item.model, item.summary)}</div>;
+    case 'unavailable':
+      return <UnavailableCard candidates={item.candidates} />;
   }
 });
 

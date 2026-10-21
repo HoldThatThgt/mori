@@ -1,14 +1,17 @@
 // 把后台进程转发的 pi 事件归并成对话流。纯函数：时间由调用方传入，界面测试用录制的事件回放同一条路径。
-// 每个状态的来源见 docs/v0/screens/chat.md、tool-cards.md 与 approval.md。
+// 每个状态的来源见 docs/v0/screens/chat.md、tool-cards.md 与 approval.md；模型层的提示、阶段行、准备中与说明卡见
+// docs/v1/screens/model-chat.md。
 
 import type { ApprovalEndBy, ForwardedEvent, QuoteRef, SlimMessageUpdate, ToolGate } from '../../../shared/protocol';
+import { BLOCKED_PROMPT_MESSAGE, STOPPED_BEFORE_SENDING, formatClock } from '../../../shared/models';
 import {
-  blocksFromContent, contentText, messageTime, newTool, parseRejection, pushItem, resultPatch,
-  type Block, type Item, type Stage, type ToolCall, type Transcript,
+  blocksFromContent, contentText, messageTime, newTool, parseRejection, pushItem, reasonText, resultPatch,
+  type Block, type Item, type ModelStage, type Stage, type ToolCall, type Transcript,
 } from './model';
 import { skillCommandText } from './skillText';
 
 type Assistant = Extract<Item, { kind: 'assistant' }>;
+type User = Extract<Item, { kind: 'user' }>;
 type EventOf<T extends ForwardedEvent['type']> = Extract<ForwardedEvent, { type: T }>;
 
 /** @brief 设置阶段；同种阶段保留原来的开始时间。 */
@@ -80,12 +83,12 @@ function applyToolCallUpdate(state: Transcript, update: SlimMessageUpdate['updat
   return setStage(next, 'generating', now);
 }
 
-/** @brief 处理 message_update。 */
+/** @brief 处理 message_update；有内容的事件结束模型层的等待（含原地重试的阶段行，§9.3）。 */
 function applyUpdate(state: Transcript, event: SlimMessageUpdate, now: number): Transcript {
   const { update } = event;
-  if (update.type.startsWith('toolcall_')) return applyToolCallUpdate(state, update, now);
+  if (update.type.startsWith('toolcall_')) return applyToolCallUpdate({ ...state, modelStage: null }, update, now);
   if (update.type.startsWith('text_') || update.type.startsWith('thinking_')) {
-    return applyTextUpdate(state, update, now);
+    return applyTextUpdate({ ...state, modelStage: null }, update, now);
   }
   return state;
 }
@@ -101,20 +104,36 @@ function applyAssistantEnd(state: Transcript, message: Record<string, unknown>):
     next = updateTool(next, tool.id, tool.name, (current) => ({ ...current, args: tool.args,
       argsText: tool.argsText, status: current.status === 'preparing' ? 'queued' : current.status }));
   }
-  if (message.stopReason === 'error') {
+  // 已显示 No model available 卡的那次回复，pi 的错误不再显示成错误卡（一次失败只显示一张卡，§9.3）。
+  if (message.stopReason === 'error' && !state.unavailable) {
     next = { ...next, pendingError: String(message.errorMessage ?? 'The model returned an error') };
   }
-  return { ...next, stage: null };
+  return { ...next, stage: null, modelStage: null };
 }
 
-/** @brief 处理消息开始与结束。用户消息（含插话、排队送达的）只在 pi 发出 message_start 时进入对话流。 */
+/**
+ * @brief pi 送进一条用户消息。准备中先显示的那条（pending）由它取代，文字以 pi 的为准（技能命令等已展开）；
+ *        其余（插话、排队送达的）只在 pi 发出 message_start 时进入对话流。
+ */
+function applyUserStart(state: Transcript, message: Record<string, unknown>): Transcript {
+  const text = contentText(message.content);
+  const index = state.items.findIndex((item) => item.kind === 'user' && item.pending);
+  let next: Transcript;
+  if (index >= 0) {
+    const items = [...state.items];
+    const pending = items[index] as User;
+    items[index] = { ...pending, text, pending: false, time: messageTime(message) };
+    next = { ...state, items };
+  } else {
+    next = pushItem(state, { kind: 'user', text, refs: null, entryId: null, time: messageTime(message) });
+  }
+  return { ...next, lastUserText: text, firstUserText: state.firstUserText ?? text };
+}
+
+/** @brief 处理消息开始与结束。 */
 function applyMessage(state: Transcript, event: EventOf<'message_start' | 'message_end'>): Transcript {
   const message = event.message as unknown as Record<string, unknown>;
-  if (event.type === 'message_start' && message.role === 'user') {
-    const text = contentText(message.content);
-    const next = pushItem(state, { kind: 'user', text, refs: null, entryId: null, time: messageTime(message) });
-    return { ...next, lastUserText: text, firstUserText: state.firstUserText ?? text };
-  }
+  if (event.type === 'message_start' && message.role === 'user') return applyUserStart(state, message);
   if (event.type === 'message_start' && message.role === 'assistant') {
     return pushItem(state, { kind: 'assistant', blocks: [], streaming: true, entryId: null,
       time: messageTime(message) });
@@ -254,8 +273,8 @@ function applySettled(state: Transcript, aborted: boolean): Transcript {
   if (aborted || state.stopRequested) next = pushItem(finishOpenTools(next, 'stopped'), { kind: 'stopped' });
   // 本轮正常结束时还没执行的调用（例如回复出错，pi 不执行其中的调用）：与从会话记录载入时一样显示"已中断"。
   else next = finishOpenTools(next, 'interrupted');
-  return { ...next, running: false, sending: false, stage: null, stopRequested: false, retrying: false,
-    pendingError: null, approvals: [], questions: [] };
+  return { ...next, running: false, sending: false, stage: null, stopRequested: false, modelStage: null,
+    pendingQueue: [], unavailable: false, pendingError: null, approvals: [], questions: [] };
 }
 
 /**
@@ -264,7 +283,11 @@ function applySettled(state: Transcript, aborted: boolean): Transcript {
  */
 function applyQuestion(state: Transcript,
   event: EventOf<'mori.ui_request' | 'mori.ui_end' | 'mori.notify' | 'mori.prompt_done'>): Transcript {
-  if (event.type === 'mori.prompt_done') return state.running ? state : { ...state, sending: false };
+  if (event.type === 'mori.prompt_done') {
+    // 没有开始运行就结束的提示（扩展命令等）：pi 没有记下它，准备中先显示的消息去掉（同 v0 不显示）。
+    // 以后台进程报的运行状态为准：界面重新加载时按“生成中”接上的准备中会话，这里也回到空闲。
+    return event.running ? state : { ...dropPending(state), running: false, stage: null };
+  }
   if (event.type === 'mori.notify') return pushItem(state, { kind: 'notify', text: event.message, level: event.level });
   if (event.type === 'mori.ui_end') {
     return { ...state, questions: state.questions.filter((item) => item.requestId !== event.requestId) };
@@ -283,7 +306,128 @@ function pushError(state: Transcript, text: string, restore: string | null, refs
   return pushItem(state, { kind: 'error', text, restore: back, live: true, ...(refs?.length ? { refs } : {}) });
 }
 
-/** @brief 处理一轮的开始、结束、重试和压缩。 */
+// ---- 准备中（docs/specs/model-providers.md §11.4）与模型层的提示、等待（§9.3） ----
+
+
+/** @brief 准备中先显示的那条你的消息；没有时为 undefined。 */
+export function pendingPrompt(state: Transcript): User | undefined {
+  return state.items.find((item): item is User => item.kind === 'user' && Boolean(item.pending));
+}
+
+/** @brief 你发了消息（空闲时）：消息先显示在对话流里，会话进入"发送中"（准备中，§11.4）。 */
+export function addPendingPrompt(state: Transcript, text: string, refs: QuoteRef[]): Transcript {
+  const next = pushItem(state, { kind: 'user', text, refs: refs.length > 0 ? refs : null, entryId: null, time: null,
+    pending: true });
+  return { ...next, sending: true };
+}
+
+/** @brief 准备中又发了一条（后台进程暂存）：显示在排队区；发送失败时 add 为假，把它去掉。 */
+export function setPendingQueued(state: Transcript, text: string, add: boolean): Transcript {
+  if (add) return { ...state, pendingQueue: [...state.pendingQueue, text] };
+  const index = state.pendingQueue.lastIndexOf(text);
+  return index < 0 ? state : { ...state, pendingQueue: state.pendingQueue.filter((_text, at) => at !== index) };
+}
+
+/**
+ * @brief 准备中结束、pi 没有开始运行：撤回先显示的消息和暂存的消息，会话不再"发送中"，模型层的等待随之结束；
+ *        准备中按的停止已经处理完（不会再有 agent_settled 来清掉它）。
+ */
+function dropPending(state: Transcript): Transcript {
+  const items = state.items.filter((item) => !(item.kind === 'user' && item.pending));
+  return { ...state, items, pendingQueue: [], modelStage: null, sending: false, stopRequested: false };
+}
+
+/**
+ * @brief mori.prompt_error。准备中（有先显示的消息）：消息与暂存的消息撤回（文字由 actions.ts 放回输入框）；
+ *        停止和拒绝启动不显示错误卡，pi 没开始就结束时显示原文的错误卡，不带"放回输入框"（文字已在输入框里）。
+ *        没有先显示的消息时（先到的 mori.prompt_done 已撤回它：pi 的 prompt() 没有开始运行就结束，§11.4；
+ *        或界面重新加载后按“发送中”接上的准备中会话），“Stopped before sending”只结束准备中，
+ *        文字同样由 actions.ts 放回输入框，不显示错误卡。
+ *        其余（插话、排队的提示失败等）同 v0：错误卡带"把上一条消息放回输入框"；运行状态以后台进程报的为准。
+ */
+function applyPromptError(state: Transcript, event: EventOf<'mori.prompt_error'>): Transcript {
+  if (!pendingPrompt(state)) {
+    // 没有先显示的消息时 dropPending 只清暂存区、发送中、模型层的等待与准备中按的停止（同撤回）。
+    if (event.message === STOPPED_BEFORE_SENDING) return dropPending(state);
+    return pushError({ ...state, sending: false, running: event.running, stage: event.running ? state.stage : null },
+      event.message, event.text, event.refs);
+  }
+  const next = dropPending(state);
+  if (event.message === STOPPED_BEFORE_SENDING || event.message === BLOCKED_PROMPT_MESSAGE) return next;
+  return pushError(next, event.message, null);
+}
+
+/**
+ * @brief 换模型、重建的一行与 No model available 卡。说明卡之后同一次失败的 pi 错误不再显示（unavailable）；
+ *        段开始时就选不到（firstRequest）时撤回准备中的消息（文字由 actions.ts 放回输入框）。
+ */
+function applyModelNotice(state: Transcript,
+  event: EventOf<'mori.model_switch' | 'mori.model_rebuild' | 'mori.model_unavailable'>): Transcript {
+  if (event.type === 'mori.model_switch') {
+    const { from, to, reason, detail, hidden } = event;
+    return pushItem(state, { kind: 'model-switch', from, to, reason, detail, hidden,
+      unconfirmed: event.unconfirmed ?? false });
+  }
+  if (event.type === 'mori.model_rebuild') {
+    return pushItem(state, { kind: 'rebuild', model: event.model, summary: event.summary });
+  }
+  const card = { kind: 'unavailable' as const, candidates: [...event.candidates] };
+  // 段开始时就选不到：消息没发出，pi 不会运行，也就没有要压下的 pi 错误；会话回到空闲（含重新加载后接上的准备中）。
+  if (event.firstRequest) return pushItem({ ...dropPending(state), running: false, stage: null }, card);
+  const next = pushItem(state, card);
+  return { ...next, modelStage: null, pendingError: null, unavailable: true };
+}
+
+/** @brief 等模型、等它停下、重建的阶段行文字（§9.3）。 */
+function waitText(event: EventOf<'mori.model_wait'>): string {
+  const model = event.model ?? '';
+  if (event.kind === 'rebuild') return `Rebuilding the conversation for ${model}…`;
+  if (event.kind === 'held') {
+    return `Waiting to make sure ${model} stopped${event.until === null ? '' : ` · until ${formatClock(event.until)}`}`;
+  }
+  const reason = event.reason ? reasonText(event.reason, event.detail, event.detail ? undefined : event.until) : '';
+  return reason ? `Waiting for a model · ${reason}` : 'Waiting for a model';
+}
+
+/** @brief 开始（或更新）一种模型层的等待；同一种等待保留原来的开始时刻。 */
+function startModelStage(state: Transcript, kind: ModelStage['kind'], text: string, now: number): Transcript {
+  const since = state.modelStage?.kind === kind ? state.modelStage.since : now;
+  return { ...state, modelStage: { kind, since, text } };
+}
+
+/** @brief 结束一种模型层的等待；阶段行正在显示别的等待时不动。 */
+function endModelStage(state: Transcript, kind: ModelStage['kind']): Transcript {
+  return state.modelStage?.kind === kind ? { ...state, modelStage: null } : state;
+}
+
+/** @brief mori.model_wait、mori.model_queue、mori.model_retry：阶段行（§9.3）。 */
+function applyModelWait(state: Transcript,
+  event: EventOf<'mori.model_wait' | 'mori.model_queue' | 'mori.model_retry'>, now: number): Transcript {
+  if (event.type === 'mori.model_retry') {
+    // 每次重试都是一次新的等待，从这一刻计时；下一个有内容的事件、下一次重试或回复结束时清掉。
+    const text = `Retrying ${event.attempt}/${event.max} · HTTP ${event.status}`;
+    return { ...state, modelStage: { kind: 'retry', since: now, text } };
+  }
+  if (event.type === 'mori.model_queue') {
+    return event.active ? startModelStage(state, 'queue', `Waiting for ${event.providerName}`, now)
+      : endModelStage(state, 'queue');
+  }
+  const kind = event.kind === 'model' ? 'wait-model' : event.kind;
+  return event.active ? startModelStage(state, kind, waitText(event), now) : endModelStage(state, kind);
+}
+
+/**
+ * @brief pi 开始从上下文溢出恢复（compaction_start，reason 为 overflow）：pi 在 agent_end 之后才压缩并重试，
+ *        agent_end 时显示的那张溢出错误卡（对话流最后一项）去掉，由 pi 的恢复处理（规格 §5.4 溢出一行）。
+ *        恢复失败时 pi 会再发错误（重试的回复出错，或 compaction_end 带 errorMessage），照常显示。
+ */
+function withoutOverflowError(state: Transcript): Transcript {
+  const last = state.items[state.items.length - 1];
+  if (last?.kind !== 'error') return state;
+  return { ...state, items: state.items.slice(0, -1) };
+}
+
+/** @brief 处理一轮的开始、结束和压缩。 */
 function applyRun(state: Transcript, event: ForwardedEvent, now: number): Transcript {
   switch (event.type) {
     case 'agent_start':
@@ -292,22 +436,15 @@ function applyRun(state: Transcript, event: ForwardedEvent, now: number): Transc
       return setStage(state, 'waiting', now);
     case 'agent_end': {
       // 你按了停止时，pi 会以"This operation was aborted"之类的错误结束这条回复，那不是错误。
-      const show = state.pendingError && !event.willRetry && !state.retrying && !state.stopRequested;
+      // pi 的自动重试对 Mori 的会话关闭（§5.5），重试只有模型池的一层，不再看 auto_retry_*。
+      const show = state.pendingError && !state.stopRequested && !state.unavailable;
       const next = show ? pushError(state, state.pendingError ?? '', state.lastUserText) : state;
       return { ...next, pendingError: null };
     }
     case 'agent_settled':
       return applySettled(state, event.aborted);
-    case 'auto_retry_start':
-      return { ...setStage(state, 'retry', now, `${event.attempt}/${event.maxAttempts} · ${event.errorMessage}`),
-        retrying: true };
-    case 'auto_retry_end': {
-      const next = { ...state, retrying: false };
-      if (event.success || state.stopRequested) return next;
-      return pushError(next, event.finalError ?? 'Retry failed', state.lastUserText);
-    }
     case 'compaction_start':
-      return setStage(state, 'compacting', now);
+      return setStage(event.reason === 'overflow' ? withoutOverflowError(state) : state, 'compacting', now);
     case 'compaction_end': {
       let next: Transcript = { ...state, stage: null };
       if (event.result && !event.aborted) next = pushItem(next, { kind: 'compaction' });
@@ -332,14 +469,15 @@ export function applyEvent(state: Transcript, event: ForwardedEvent, now: number
     case 'tool_execution_end':
       return applyToolExecution(state, event, now);
     case 'queue_update':
-      return { ...state, steering: [...event.steering], followUp: [...event.followUp] };
+      // 准备中暂存的消息此时已作为排队消息交给 pi，改由 pi 的排队区显示。
+      return { ...state, steering: [...event.steering], followUp: [...event.followUp], pendingQueue: [] };
     case 'mori.tool_gate':
       return applyToolGate(state, event, now);
     case 'mori.approval_request':
     case 'mori.approval_end':
       return applyApproval(state, event, now);
     case 'mori.prompt_error':
-      return pushError({ ...state, sending: false }, event.message, event.text, event.refs);
+      return applyPromptError(state, event);
     case 'mori.entry_id':
       return applyEntryId(state, event);
     case 'mori.ui_request':
@@ -347,6 +485,14 @@ export function applyEvent(state: Transcript, event: ForwardedEvent, now: number
     case 'mori.notify':
     case 'mori.prompt_done':
       return applyQuestion(state, event);
+    case 'mori.model_switch':
+    case 'mori.model_rebuild':
+    case 'mori.model_unavailable':
+      return applyModelNotice(state, event);
+    case 'mori.model_wait':
+    case 'mori.model_queue':
+    case 'mori.model_retry':
+      return applyModelWait(state, event, now);
     default:
       return applyRun(state, event, now);
   }

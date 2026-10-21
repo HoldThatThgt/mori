@@ -1,9 +1,13 @@
-// 界面测试共用的页面操作：发消息、等本轮结束、采样阶段行、读工具卡、打开并填连接表单、打开文件夹。
+// 界面测试共用的页面操作：发消息、等本轮结束、采样阶段行、读工具卡、首次启动表单（v1）、设置 → Models 的提供商卡与
+// Keys、打开文件夹。v1 的标识与文字见 docs/v1/screens/first-run.md、models-settings.md。
+
+/** "打开文件夹…"按钮的名字：首次启动表单上是英文（v1），侧栏与空状态仍是中文 */
+export const OPEN_FOLDER = /^(Open folder…|打开文件夹…)$/;
 
 /** @brief 一个页面上的常用操作。 */
 export function pageHelpers(page) {
   const textarea = page.locator('.pane-slot:not([hidden]) .composer textarea');
-  return {
+  const h = {
     textarea,
     async send(text, key = 'Enter') {
       await textarea.fill(text);
@@ -54,53 +58,86 @@ export function pageHelpers(page) {
       const match = /约 ([\d,]+) \//.exec(title ?? '');
       return match ? Number(match[1].replace(/,/g, '')) : null;
     },
-    /** @brief 填连接表单；apiKey 为 null 时不碰 key 输入框。 */
-    async fillConnection({ name, baseUrl, apiKey, modelId, contextWindow }) {
+    /**
+     * @brief 填首次启动表单（v1，英文，docs/v1/screens/first-run.md）；不给的字段不碰。apiKey 为 null 时不碰 key 输入框。
+     * @param zone 网络区域 local / intranet / public（测试一律选 Local，除非要测公网）
+     */
+    async fillConnection({ name, baseUrl, apiKey, modelId, contextWindow, zone, reasoning }) {
       const form = page.getByTestId('connection-form');
-      const inputs = form.locator('input:not([type=checkbox])');
-      if (name !== undefined) await inputs.nth(0).fill(name);
-      if (baseUrl !== undefined) await inputs.nth(1).fill(baseUrl);
-      if (apiKey !== null && apiKey !== undefined) await inputs.nth(2).fill(apiKey);
-      if (modelId !== undefined) await inputs.nth(3).fill(modelId);
-      if (contextWindow !== undefined) await inputs.nth(4).fill(String(contextWindow));
+      const field = (label) => form.getByLabel(label, { exact: true });
+      if (name !== undefined) await field('Name').fill(name);
+      if (baseUrl !== undefined) await field('Address').fill(baseUrl);
+      if (zone !== undefined) await form.locator(`input[name="zone"][value="${zone}"]`).check();
+      if (apiKey !== null && apiKey !== undefined) await field('API key').fill(apiKey);
+      if (modelId !== undefined) await field('Model id').fill(modelId);
+      if (contextWindow !== undefined) await field('Context window').fill(String(contextWindow));
+      if (reasoning !== undefined) await form.getByLabel('Supports thinking').setChecked(reasoning);
     },
     /**
-     * @brief 打开设置页，在连接卡上点"编辑连接"，等连接表单出现。M6 起设置页先是连接列表（settings.md"列表"），
-     *        编辑连接的表单只有名称、服务地址、接口类型、API key 和兼容选项（输入框 0–2 仍是名称、服务地址、key）。
-     * @param provider 连接的 provider id（第一个连接是 mori-endpoint）
+     * @brief 首次启动：填表（区域默认 Local）→ Test connection → 成功后等探针都跑完（表单下方的探针状态不再是
+     *        verifying，规格 §14.4）。返回测试结果文字、是否成功和探针状态（data-state）。
+     *        名称默认 "Mori endpoint"，生成的提供商 id 为 mori-endpoint（同 v0 的连接 id，现有测试的模型全名不变）。
      */
-    async editConnection(provider = 'mori-endpoint') {
+    async firstRun({ name = 'Mori endpoint', baseUrl, apiKey, modelId = 'fake-coder', zone = 'local', contextWindow,
+      reasoning, probeTimeout = 180000 } = {}) {
+      await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
+      await h.fillConnection({ name, baseUrl, apiKey, modelId, zone, contextWindow, reasoning });
+      const previous = await page.getByTestId('form-message').innerText().catch(() => null);
+      await page.getByTestId('connection-form').locator('[data-action="test"]').click();
+      const text = await h.formMessage(previous, { test: true, timeout: 180000 });
+      const ok = text.startsWith('Connected');
+      const probe = ok ? await h.waitProbes(probeTimeout) : null;
+      return { ok, text, probe };
+    },
+    /**
+     * @brief 只走流程的首次启动（M1 已测过表单）：同 firstRun，测试失败或探针没有验证通过时报错；之后等"Open folder…"。
+     */
+    async setupFirstRun(options) {
+      const run = await h.firstRun(options);
+      if (!run.ok || run.probe !== 'verified') throw new Error(`first run: ${run.text}; probe-status ${run.probe}`);
+      await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
+      return run;
+    },
+    /** @brief 等首次启动表单下方的探针跑完（mori.profiles 里没有这个模型在跑），返回探针状态（data-state）。 */
+    async waitProbes(timeout = 180000) {
+      await page.waitForFunction(() => {
+        const state = document.querySelector('[data-testid="probe-status"]')?.dataset.state;
+        return state !== undefined && state !== 'verifying';
+      }, null, { timeout });
+      return page.getByTestId('probe-status').getAttribute('data-state');
+    },
+    /** @brief 打开设置页的 Models 分节（规格 §9.1），等它读完。 */
+    async openModels() {
       await page.getByRole('button', { name: '设置', exact: true }).click();
       await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
-      const card = page.locator(`[data-testid="connection-card"][data-provider="${provider}"]`);
-      await card.getByRole('button', { name: '编辑连接' }).click();
-      await page.getByTestId('connection-form').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="settings-nav"] button[data-section="models"]').click();
+      await page.getByTestId('models-section').waitFor({ timeout: 15000 });
+    },
+    /** @brief 设置 → Models 的提供商卡（provider id）。 */
+    providerCard: (provider = 'mori-endpoint') => page
+      .locator(`[data-testid="provider-card"][data-provider="${provider}"]`),
+    /** @brief 在提供商卡的 Keys 里 Add key：填 Secret（Label 用默认），Save，等新行出现；返回新行数。 */
+    async addKey(secret, provider = 'mori-endpoint') {
+      const card = h.providerCard(provider);
+      const before = await card.getByTestId('key-row').count();
+      await card.locator('[data-action="add-key"]').click();
+      const form = card.getByTestId('key-form');
+      await form.getByLabel('Secret').fill(secret);
+      await form.getByRole('button', { name: 'Save', exact: true }).click();
+      await page.waitForFunction(({ id, count }) => document.querySelectorAll(
+        `[data-testid="provider-card"][data-provider="${id}"] [data-testid="key-row"]`).length > count,
+      { id: provider, count: before }, { timeout: 15000 });
+      return card.getByTestId('key-row').count();
     },
     /**
-     * @brief 点了错误卡的"去设置"之后：等焦点落到连接表单的 API key 框（最多 timeout 毫秒，等不到也照常返回），
-     *        返回焦点所在元素的类型、它在不在连接表单里，以及表单的标题（settings.md 外框："去设置"打开"编辑连接"，
-     *        焦点在 API key；标题"编辑连接 · <连接名>"）。设置页里没有连接表单时 title 为 null。
-     */
-    async keyFocus(timeout = 5000) {
-      await page.waitForFunction(() => document.activeElement
-        ?.matches('[data-testid="connection-form"] input[type="password"]'), null, { timeout }).catch(() => {});
-      return page.evaluate(() => {
-        const el = document.activeElement;
-        const form = document.querySelector('[data-testid="settings-page"] [data-testid="connection-form"]');
-        return { type: el?.getAttribute('type') ?? null, tag: el?.tagName?.toLowerCase() ?? null,
-          inForm: Boolean(el?.closest('[data-testid="connection-form"]')),
-          title: form?.closest('.settings-form')?.querySelector('h3')?.textContent ?? null };
-      });
-    },
-    /**
-     * @brief 等表单下方出现一条新的结果文字并返回它。
-     * @param previous 之前的文字（要等它变化）；test 为真时只认测试连接的结果，跳过中间的"已保存"
+     * @brief 等表单下方出现一条新的结果文字并返回它（首次启动表单的 form-message）。
+     * @param previous 之前的文字（要等它变化）；test 为真时只认测试连接的结果与保存失败，跳过中间的"Saving…"
      */
     async formMessage(previous = null, { test = false, timeout = 60000 } = {}) {
       await page.waitForFunction(({ old, onlyTest }) => {
         const text = document.querySelector('[data-testid="form-message"]')?.textContent;
-        if (!text || text === old || text.startsWith('保存中')) return false;
-        return !onlyTest || /^(连接成功|连接失败|已取消测试|测试失败|保存失败|请填写|服务地址不是)/.test(text);
+        if (!text || text === old) return false;
+        return !onlyTest || /^(Connected|Failed|Test cancelled|Couldn't save)/.test(text);
       }, { old: previous, onlyTest: test }, { timeout });
       return page.getByTestId('form-message').innerText();
     },
@@ -117,15 +154,18 @@ export function pageHelpers(page) {
         '.pane-slot:not([hidden]) [data-testid="permission-button"]')?.textContent?.includes('全部允许'),
       null, { timeout: 10000 });
     },
-    /** @brief 让系统的选文件夹对话框直接返回 folder，再点"打开文件夹…"。 */
+    /**
+     * @brief 让系统的选文件夹对话框直接返回 folder，再点"打开文件夹…"（首次启动表单上是英文的"Open folder…"）。
+     */
     async openFolder(app, folder) {
       await app.evaluate(({ dialog }, path) => {
         dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
       }, folder);
-      await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+      await page.getByRole('button', { name: OPEN_FOLDER }).first().click();
       await page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]').waitFor({ timeout: 30000 });
       await page.waitForFunction(() => !document.querySelector('.pane-slot:not([hidden]) [data-testid="not-ready"]'),
         null, { timeout: 30000 });
     },
   };
+  return h;
 }

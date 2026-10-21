@@ -8,9 +8,11 @@
 //   node tests/ui/m2-record.mjs --source <走查数据目录> [--only name1,name2] [--exe <Mori.exe>]
 // 走查数据目录是负责人在 Mori 里填过连接的目录（key 由 Mori 加密保存）；脚本只复制密文文件，不读取 key。
 
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { appRoot, arg, launch, oneLine, prepareProject, scratchUserData } from './lib.mjs';
+import {
+  allowProjectsLive, allowRealProject, appRoot, arg, launch, oneLine, prepareProject, realProviders, scratchUserData,
+} from './lib.mjs';
 
 const source = arg('source');
 const exePath = arg('exe');
@@ -331,6 +333,8 @@ async function runScenario(page, scenario, context) {
   const { project, root } = prepareProject('mori-m2-record-');
   let steps;
   try {
+    // 测试准备（synthetic test setup，§14.1）：这个临时项目授权公网
+    await allowProjectsLive(page, project);
     steps = await recordInPage(page, scenario.body, { ...context, cwd: project, ...prompts });
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -373,15 +377,20 @@ function wrap(body) {
   }`;
 }
 
-/** @brief 读取走查连接的非机密信息。 */
+/**
+ * @brief 读取走查数据目录里首选提供商（DeepSeek）的非机密信息：v1 从 model-config.json 取（lib.mjs realProviders，
+ *        规格 §14.4），不再找 pi/models.json 的 mori-endpoint。
+ */
 function connectionInfo(dir) {
-  const provider = JSON.parse(readFileSync(join(dir, 'pi', 'models.json'), 'utf8')).providers['mori-endpoint'];
-  return { endpoint: provider.baseUrl, model: `mori-endpoint/${provider.models[0].id}` };
+  const [first] = realProviders(dir);
+  return { endpoint: first.baseUrl, model: first.ref };
 }
 
 // 先读连接信息：数据目录不对时在复制密文之前就失败；复制之后的每一步都在 try 里，出错也会删掉临时目录。
 const context = connectionInfo(source);
 const userData = scratchUserData(source);
+// 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组；项目建好后再授权公网
+allowRealProject(userData, []);
 let app = null;
 try {
   app = await launch({ exePath, userData });
