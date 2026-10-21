@@ -1,12 +1,21 @@
-// 模型层的时长与次数（docs/specs/model-providers.md §12，登记在 docs/v1/defaults.md）。
+// 模型层的时长与次数（docs/specs/model-providers.md §12；docs/specs/parallel-agents-taskboard.md §15，
+// 登记在 docs/v1/defaults.md）。
 // 纯函数以参数接收 ModelTimings，测试可以传入缩短的值。
 
 import { MODEL_LIMITS } from '../shared/models';
 
 /** @brief 模型层用到的全部时长（毫秒）、次数与上限。 */
 export interface ModelTimings {
-  /** conversation 类别排队等槽位的最长时间，超过即 queue_timeout（§8.2） */
+  /**
+   * conversation、decision 类别排队等槽位的最长时间，超过即 queue_timeout；task、background 不超时
+   * （§8.2，平行 Agent 规格 §12.10）
+   */
   readonly queueTimeoutMs: number;
+  /**
+   * 每个 key 给 conversation、decision 留的槽位：task、background 在一个 key 上最多占（并发上限 − 它）个、至少 1 个，
+   * 所以并发上限为 1 时不留（平行 Agent 规格 §12.10、§15）
+   */
+  readonly reservedSlots: number;
   /** 429 没有 Retry-After 时 key 的冷却时间（§5.4） */
   readonly rateLimitCooldownMs: number;
   /** 连接失败后提供商不可用的时间（§5.4） */
@@ -54,6 +63,7 @@ export interface ModelTimings {
 /** @brief §12 的临时默认值；并发与 key 数的上限与 shared/models.ts 的配置校验共用一份。 */
 export const MODEL_TIMINGS: ModelTimings = Object.freeze({
   queueTimeoutMs: 60_000,
+  reservedSlots: 1,
   rateLimitCooldownMs: 30_000,
   connectionCooldownMs: 30_000,
   serverRetryDelaysMs: Object.freeze([2_000, 4_000, 8_000]),

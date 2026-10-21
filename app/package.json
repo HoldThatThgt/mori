@@ -29,6 +29,7 @@
     "test:m7-replay": "node tests/ui/m7-replay.mjs",
     "check": "npm run typecheck && node tests/check.mjs",
     "test:unit": "node --test --test-reporter=./tests/unit/reporter.mjs \"tests/unit/*.test.mjs\"",
+    "test:tb-unit": "node --test --test-reporter=./tests/unit/tb-reporter.mjs \"tests/unit/taskboard/*.test.mjs\"",
     "test:v1-models": "npm run test:unit && electron-vite build && node tests/ui/v1-models-app-settings.mjs && node tests/ui/v1-models-app-switch.mjs && node tests/ui/v1-models-app-session.mjs && node tests/ui/v1-models-replay.mjs && node tests/ui/v1-models-existing.mjs && node tests/spec-coverage.mjs"
   },
   "engines": {

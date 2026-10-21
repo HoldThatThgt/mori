@@ -6,6 +6,8 @@
 
 路径在会话工作目录之内时显示相对路径，否则显示原路径。命令只取第一行，超过 80 个字截断加"…"。
 阶段行用同一段文字（例如"运行 npm test 8s"）。
+（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.7、§13.8：下表新增的 11 个 TaskBoard 工具标题是英文；它们出现在用户会话自己的调用里（合并会话的立项、协作模式下对话的 `board_read` 等），
+免批准、不出批准卡（§11.2）；后台实例的调用不出工具卡，只在进展摘要里，见 ../../v1/screens/team-stream.md）
 
 | 工具名（pi） | 参数 | 标题 |
 | --- | --- | --- |
@@ -18,6 +20,17 @@
 | `find` | `pattern` | 查找 `pattern` |
 | `ls` | `path`（可省略） | 列目录 `path`（省略时为"列目录 ."） |
 | `mcp__<服务>__<工具>` | — | `<服务> · <工具>` |
+| `board_read`（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.8） | 不带参数 / `request` / `task` | `Read the board` / `Read request 1` / `Read T1` |
+| `read_session`（同上） | `task`、`role` | `Read <role>’s work on T1` |
+| `agent_message`（同上） | `to` | 发给角色、开临时提问：`Ask <role>`；发进座位会话：`Message <role>`；发到 task：`Message T1` |
+| `task_handoff`（同上） | `task` | `Hand off T1` |
+| `request_submit`（同上） | — | `Register a request` |
+| `request_update`（同上） | `request` | `Add to request 1` |
+| `request_cancel`（同上） | `request` | `Cancel request 1` |
+| `task_create`（同上） | — | `Create a task` |
+| `task_edit`（同上） | `task` | `Edit T1` |
+| `reply_via_dialog`（同上） | — | `Answer directly` |
+| `request_close`（同上） | `request` | `Close request 1` |
 | 其他 | — | 原名 |
 | 参数还没写完 | `toolcall_delta` 期间参数解析不出 | 按工具名给动词，例如"运行 …"；未知工具显示原名 |
 

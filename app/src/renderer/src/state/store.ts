@@ -173,7 +173,7 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
   return { key: `t${tabCounter}`, sessionId: null, cwd, sessionFile: null, name: null, preview: null,
     activity: Date.now(), unseen: false, interrupted: false, projectTrust: 'none', trustRemembered: false,
     trustSaveError: null, extensionErrors: [], pick: null, current: null, blocked: null,
-    thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, contextUsage: null,
+    thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, pickLocked: false, contextUsage: null,
     approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '',
     draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
     refPending: [], phase: 'opening', error: null, ...fields };
@@ -181,12 +181,12 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
 
 /**
  * @brief 从会话信息、mori.model_state 事件或 session.setPick 的结果里取出模型状态的各项（不带其他字段）。
- *        旧的录制里没有的项按"没有"处理：没有范围、没有当前模型、可以发送、思考强度关。
+ *        旧的录制里没有的项按"没有"处理：没有范围、没有当前模型、可以发送、思考强度关、范围没有锁定。
  */
 export function modelStateOf(state: Partial<ModelState>): ModelState {
   return { pick: state.pick ?? null, current: state.current ?? null, blocked: state.blocked ?? null,
     thinkingLevel: state.thinkingLevel ?? 'off', thinkingLevels: state.thinkingLevels ?? ['off'],
-    reasoning: state.reasoning ?? false };
+    reasoning: state.reasoning ?? false, pickLocked: state.pickLocked ?? false };
 }
 
 /** @brief 更新一个会话。 */

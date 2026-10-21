@@ -6,6 +6,9 @@ import {
   ModelCommandSchemas, THINKING_LEVELS, type ModelEvent, type ModelGlobalEvent, type ModelState,
   type ThinkingLevel,
 } from './models';
+import {
+  TEAM_SWITCH, type BoardView, type DecidingMessage, type TeamApprovalRequest, type TeamEvent, type TeamState,
+} from './team';
 
 // 界面只经这里引用 pi 的类型。
 export type { ContextUsage, SessionEntry };
@@ -172,7 +175,10 @@ export const CommandSchema = z.discriminatedUnion('type', [
     behavior: z.enum(['steer', 'followUp']).optional(),
     /** 输入框里的引用芯片；pi 记下这条消息后写成 mori.ref 条目 */
     refs: z.array(QuoteRefSchema).optional(),
+    /** 以 /team <文字> 发出（已去掉前缀）：模式为 off 时变为 once（平行 Agent 规格 §5.1） */
+    team: z.literal('once').optional(),
   }),
+  /** 撤回排队区：pi 的插话与排队，协作模式下还有立项还没开始判断的消息（平行 Agent 规格 §5.3） */
   z.object({ type: z.literal('session.clearQueue'), sessionId }),
   z.object({ type: z.literal('session.abort'), sessionId }),
   z.object({ type: z.literal('session.state'), sessionId }),
@@ -230,6 +236,15 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('mcp.remove'), name: z.string().min(1) }),
   // ---- v1：模型层（docs/specs/model-providers.md §9.5），含 connection.test 与 session.setPick ----
   ...ModelCommandSchemas,
+  // ---- v1：平行 Agent 与 TaskBoard（docs/specs/parallel-agents-taskboard.md §13.10） ----
+  /** 开关协作模式（顶栏开关、/team on、/team off）；关掉时还不能回到 off 的变为 once（§5.1） */
+  z.object({ type: z.literal('session.setTeam'), sessionId, mode: z.enum(TEAM_SWITCH) }),
+  /** 这个用户会话的 TaskBoard 视图（只读） */
+  z.object({ type: z.literal('board.get'), sessionId }),
+  /** 拒绝启动卡的 Check again：重新读、重新校验角色文件；只在会话空闲时可用（§4.4） */
+  z.object({ type: z.literal('session.recheckAgents'), sessionId }),
+  /** Stop team：停止这个用户会话的全部 Agent（§11.4） */
+  z.object({ type: z.literal('session.stopTeam'), sessionId }),
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 
@@ -415,6 +430,13 @@ export interface LiveStatus {
   approval: boolean;
   /** 有挂起的扩展询问 */
   question: boolean;
+  /**
+   * 对话 Agent 自己的运行之外，这个用户会话还有 Agent 在运行或排队（立项、结案、实例，投递队列里等着的运行），
+   * 或有待判断的消息（平行 Agent 规格 §13.6：侧栏的“生成中”为 running 或 teamBusy）
+   */
+  teamBusy: boolean;
+  /** 有挂起的后台实例批准卡（mori.team_approval_request，§11.3） */
+  teamApproval: boolean;
 }
 
 /** @brief pi 会话列表里的一个会话（SessionManager.listAll 的一项，去掉了全文）。 */
@@ -461,6 +483,14 @@ export interface SessionInfo extends ModelState {
   contextUsage: ContextUsage | null;
   /** 批准设置；新建和重新打开的会话都是"每次询问" */
   approval: ApprovalState;
+  /** 协作状态（平行 Agent 规格 §13.10） */
+  team: TeamState;
+  /** 这个用户会话的 TaskBoard 视图 */
+  board: BoardView;
+  /** 挂起的后台实例批准卡，按到达顺序 */
+  teamApprovals: TeamApprovalRequest[];
+  /** 待判断、还没交给对话的消息，按发送顺序（§5.3） */
+  deciding: DecidingMessage[];
 }
 
 /** @brief 一个等你回答的扩展询问（mori.ui_request）。 */
@@ -521,6 +551,14 @@ export interface LiveSnapshot {
   steering: string[];
   /** 排队区：排队（pi 的 getFollowUpMessages） */
   followUp: string[];
+  /** 协作状态（平行 Agent 规格 §13.10、§11.6） */
+  team: TeamState;
+  /** 这个用户会话的 TaskBoard 视图 */
+  board: BoardView;
+  /** 挂起的后台实例批准卡，按到达顺序 */
+  teamApprovals: TeamApprovalRequest[];
+  /** 待判断、还没交给对话的消息，按发送顺序（§5.3） */
+  deciding: DecidingMessage[];
 }
 
 /** @brief session.open 的结果：会话信息加 pi 记录的当前分支（SessionManager.getBranch）。 */
@@ -557,6 +595,10 @@ export interface ClearedQueue {
   steering: string[];
   /** 排队 */
   followUp: string[];
+  /**
+   * 撤回的全部文字，按放回输入框的顺序：插话、排队，然后是立项还没开始判断的消息（平行 Agent 规格 §5.3、§13.10）
+   */
+  texts: string[];
 }
 
 /** @brief 精简后的 message_update：只带类型、序号和增量，不带完整消息。 */
@@ -659,6 +701,8 @@ export type KernelEvent =
   | { type: 'mori.prompt_done'; running: boolean }
   /** 模型层的事件（mori.model_state、换模型、重建、等待、排队、重试、说明卡，见 models.ts） */
   | ModelEvent
+  /** 协作的事件（协作状态、TaskBoard、回执、进展摘要、程序投递、待判断、后台批准，见 team.ts） */
+  | TeamEvent
   /** 扩展在等你回答（ctx.ui.confirm / select / input） */
   | ({ type: 'mori.ui_request' } & UiRequest)
   /** 扩展的询问结束：你回答了、超时、扩展取消、停止或会话关闭 */
@@ -681,6 +725,20 @@ export type KernelEvent =
     /** 拒绝时回给模型的工具结果原文；允许时为 null */
     reason: string | null;
   };
+
+/** @brief 平行 Agent 与 TaskBoard 命令的结果都带的字段（§13.10）。 */
+export interface TeamResult {
+  /** 命令没能执行时的原文；成功时为 null */
+  error: string | null;
+}
+
+/** @brief 平行 Agent 与 TaskBoard 每个命令的结果类型（§13.10）。 */
+export interface TeamCommandResults {
+  'session.setTeam': TeamState & TeamResult;
+  'board.get': BoardView & TeamResult;
+  'session.recheckAgents': SessionInfo & TeamResult;
+  'session.stopTeam': TeamResult;
+}
 
 /** @brief 转发给界面的事件。 */
 export type ForwardedEvent = Exclude<AgentSessionEvent, { type: 'message_update' }> | SlimMessageUpdate | KernelEvent;

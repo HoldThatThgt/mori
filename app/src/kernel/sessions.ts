@@ -19,6 +19,7 @@ import type {
   SlashCommand, ThinkingLevel, TrustAnswer,
 } from '../shared/protocol';
 import { REF_ENTRY_TYPE } from '../shared/protocol';
+import { emptyBoard, soloTeamState } from '../shared/team';
 import { ApprovalGate } from './approval';
 import { PendingRefs, supplementEntry } from './entries';
 import { ExtensionUi } from './extensionUi';
@@ -157,7 +158,16 @@ function describeEntry(entry: Entry): SessionInfo {
     ...entry.model.state(),
     contextUsage: session.getContextUsage() ?? null,
     approval: entry.gate.state(),
+    ...soloTeam(entry),
   };
+}
+
+/**
+ * @brief 协作的部分（平行 Agent 规格 §13.10）：会话里只有对话 Agent——关闭模式、基座持有三项权限、TaskBoard 没有需求、
+ *        没有后台批准与待判断的消息；busy 就是对话是否在运行或准备中。
+ */
+function soloTeam(entry: Entry): Pick<SessionInfo, 'team' | 'board' | 'teamApprovals' | 'deciding'> {
+  return { team: soloTeamState(liveStatus(entry).running), board: emptyBoard(), teamApprovals: [], deciding: [] };
 }
 
 /**
@@ -300,10 +310,10 @@ function entryByFile(sessionFile: string): Entry | undefined {
   return [...sessions.values()].find((entry) => entry.session.sessionFile === sessionFile);
 }
 
-/** @brief 还开着的会话的状态（侧栏）。 */
+/** @brief 还开着的会话的状态（侧栏）；只有对话 Agent 时没有后台的运行与批准。 */
 function liveStatus(entry: Entry): LiveStatus {
   return { running: entry.running || entry.session.isStreaming, approval: entry.gate.requests().length > 0,
-    question: entry.ui.requests().length > 0 };
+    question: entry.ui.requests().length > 0, teamBusy: false, teamApproval: false };
 }
 
 /** @brief 还开着的会话这一刻的样子：正在生成的回复、正在执行的工具、挂起的批准请求和扩展询问、排队区。 */
@@ -315,7 +325,8 @@ export function snapshot(entry: Entry): LiveSnapshot {
     streaming: session.state.streamingMessage ?? null, runningTools,
     approvals: entry.gate.requests(), questions: entry.ui.requests(), steering: [...session.getSteeringMessages()],
     // 准备中暂存的消息也在排队区（§11.4）。
-    followUp: [...session.getFollowUpMessages(), ...(entry.preparing?.held.map((item) => item.text) ?? [])] };
+    followUp: [...session.getFollowUpMessages(), ...(entry.preparing?.held.map((item) => item.text) ?? [])],
+    ...soloTeam(entry) };
 }
 
 /**
@@ -711,12 +722,15 @@ function releaseHeld(entry: Entry, sessionId: string, emit: Emit): void {
   });
 }
 
-/** @brief 撤回排队与插话的消息，返回它们的原文；它们的引用不再写进会话（芯片不恢复）。 */
+/**
+ * @brief 撤回排队与插话的消息，返回它们的原文（texts 按放回输入框的顺序）；它们的引用不再写进会话（芯片不恢复）。
+ */
 export function clearQueue(sessionId: string): ClearedQueue {
   const entry = requireEntry(sessionId);
   const { steering, followUp } = entry.session.clearQueue();
-  entry.refs.dropTexts([...steering, ...followUp]);
-  return { steering, followUp };
+  const texts = [...steering, ...followUp];
+  entry.refs.dropTexts(texts);
+  return { steering, followUp, texts };
 }
 
 /**

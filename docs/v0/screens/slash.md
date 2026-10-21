@@ -6,7 +6,7 @@
 
 | 来源 | 内容 |
 | --- | --- |
-| `session.commands`（这个会话） | pi 的提示词模板（`session.promptTemplates`：名字、说明、`argument-hint`）和技能命令（`resourceLoader.getSkills()`，写成 `skill:名字`，带说明）；pi 设置 `enableSkillCommands` 为 false 时不列技能（与 pi 终端相同）。只列这个会话加载了的（启用的、信任的项目里的） |
+| `session.commands`（这个会话） | pi 的提示词模板（`session.promptTemplates`：名字、说明、`argument-hint`）和技能命令（`resourceLoader.getSkills()`，写成 `skill:名字`，带说明）；pi 设置 `enableSkillCommands` 为 false 时不列技能（与 pi 终端相同）。只列这个会话加载了的（启用的、信任的项目里的）（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.1：Mori 的 `/team` 不列在这里，优先于同名的提示词模板和技能，见 ../../v1/screens/team-switch.md） |
 | 你输入的字 | 输入框的文字以 `/` 开头、光标在第一个空白之前时，`/` 后面的字是筛选词 |
 
 ## 状态表

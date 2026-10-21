@@ -1,14 +1,17 @@
-// 选择器（docs/specs/model-providers.md §5.1、§5.3、§4.6、§5.8）：纯函数。
-// 展开选择范围、按第 1–6 步逐项过滤并给出排除原因、会话启动的静态校验、顶栏菜单各项的静态校验、候选耗尽时的等待判断。
+// 选择器（docs/specs/model-providers.md §5.1、§5.3、§4.6、§5.8；docs/specs/parallel-agents-taskboard.md §12.1、§12.2、
+// §12.9、§12.11）：纯函数。
+// 展开选择范围、按第 1–6 步逐项过滤并给出排除原因（第 3 步含角色的能力要求与要避开的模型族）、会话启动的静态校验、
+// 顶栏菜单各项的静态校验、候选耗尽时的等待判断。
 // 约定：CandidateExclusion.detail 是 §5.3“界面文字”列的完整文字（带 until 部分），界面与说明卡直接显示它。
 
 import { REASON_TEXTS, ZONES, plainReasonText } from '../shared/models';
 import type {
-  BlockedAction, CandidateExclusion, ModelBlocked, ModelConfig, ModelReason, PickOption, Zone,
+  BlockedAction, CandidateExclusion, Capability, ModelBlocked, ModelConfig, ModelReason, PickOption, Zone,
 } from '../shared/models';
 import type { ModelTimings } from './modelTimings';
 import type {
-  Availability, AvailabilityReason, ModelRef, ReplyState, SelectorInput, SelectorResult, TriedReason,
+  Availability, AvailabilityReason, ModelCapabilities, ModelRef, ReplyState, Requirement, SelectorInput,
+  SelectorResult, TriedReason,
 } from './modelTypes';
 
 /** @brief 会自己恢复的原因（§5.8）；其余原因不等待。本段已在 tried 或 earlier 里的候选另外排除（见 canRecover）。 */
@@ -71,6 +74,53 @@ export function expandPick(
   return refs;
 }
 
+/** @brief 几个选择范围依次展开的结果（平行 Agent 规格 §12.1）。 */
+export interface ExpandedPicks {
+  /** 依次展开、去重后的候选，前面的优先；missing 不为 null 时为空 */
+  refs: ModelRef[];
+  /** 第一个指向的名字不存在的范围（pick_missing 的细节）；都存在时为 null */
+  missing: string | null;
+}
+
+/**
+ * @brief 把角色的 models（有序的选择范围）依次展开、去重，前面的优先（平行 Agent 规格 §12.1，
+ *        统一模型提供商 proposal §4“候选列表”）；只有一个范围时与 expandPick 相同。
+ * @param config 用户级配置
+ * @param picks 选择范围，按顺序
+ * @param projectGroups 项目配置的 groups（已校验）；没有时省略
+ */
+export function expandPicks(
+  config: Pick<ModelConfig, 'providers' | 'groups'>, picks: readonly string[],
+  projectGroups?: Readonly<Record<string, string[]>>,
+): ExpandedPicks {
+  const refs: ModelRef[] = [];
+  for (const pick of picks) {
+    const expanded = expandPick(config, pick, projectGroups);
+    if (expanded === null) return { refs: [], missing: pick };
+    for (const ref of expanded) if (!refs.includes(ref)) refs.push(ref);
+  }
+  return { refs, missing: null };
+}
+
+/**
+ * @brief 只留在另一组候选里也有的，顺序按 refs（关闭模式下的临时提问：被问角色的候选 ∩ 对话会话的候选，§12.1）。
+ * @param refs 被问角色展开后的候选
+ * @param within 对话会话展开后的候选
+ */
+export function intersectCandidates(refs: readonly ModelRef[], within: readonly ModelRef[]): ModelRef[] {
+  const allowed = new Set(within);
+  return refs.filter((ref) => allowed.has(ref));
+}
+
+/**
+ * @brief 模型族的键（平行 Agent 规格 §12.9、§15）：配置里模型的 family；为空时用 <provider>/<model> 本身当作族。
+ * @param family 配置里的 family
+ * @param ref <provider>/<model>
+ */
+export function familyKey(family: string, ref: ModelRef): string {
+  return family === '' ? ref : family;
+}
+
 // ---- 原因文字 ----
 
 /**
@@ -97,7 +147,8 @@ export function triedText(tried: TriedReason): string {
 
 /** @brief 静态校验要用的输入：选择器输入的第 1–3 步部分（§4.6）。 */
 export type StaticSelectorInput = Pick<
-  SelectorInput, 'candidates' | 'exists' | 'removedRefs' | 'zoneOf' | 'allowedZones' | 'toolCalling'
+  SelectorInput, 'candidates' | 'exists' | 'removedRefs' | 'zoneOf' | 'allowedZones' | 'toolCalling' | 'requires'
+  | 'capabilities' | 'avoidFamilies' | 'familyOf'
 >;
 
 /**
@@ -110,7 +161,7 @@ function missingExclusion(input: Pick<SelectorInput, 'removedRefs'>, ref: ModelR
 }
 
 /**
- * @brief 第 1–3 步（静态）：名字在配置里、区域已确认且允许、tool_calling 已验证。
+ * @brief 第 1–3 步（静态）：名字在配置里、区域已确认且允许、tool_calling 已验证，再按角色的能力要求与要避开的模型族。
  * @param input 选择器输入
  * @param ref 候选
  * @return 第一个不满足的条件；都满足为 null
@@ -125,8 +176,76 @@ function staticExclusion(input: StaticSelectorInput, ref: ModelRef): CandidateEx
     return { ref, reason: 'zone_blocked', detail: REASON_TEXTS.zone_blocked(zone) };
   }
   const tools = input.toolCalling(ref);
-  if (tools === 'verified') return null;
-  return { ref, reason: tools, detail: REASON_TEXTS[tools]() };
+  if (tools !== 'verified') return { ref, reason: tools, detail: REASON_TEXTS[tools]() };
+  return roleExclusion(input, ref);
+}
+
+// ---- 第 3 步：角色的能力要求与模型族（平行 Agent 规格 §12.2、§12.9） ----
+
+/** @brief 一项能力要求不满足时的原因与细节（没有 ref）。 */
+export type RequirementExclusion = Pick<CandidateExclusion, 'reason' | 'detail'>;
+
+/** @brief requires_unmet：细节就是不满足的那一项（§12.2）。 */
+function unmet(text: string): RequirementExclusion {
+  return { reason: 'requires_unmet', detail: REASON_TEXTS.requires_unmet(text) };
+}
+
+/**
+ * @brief 必须已验证的能力（protocol_write、structured_output）：未验证且正在探测按 probing（会恢复）；
+ *        其余不满足为 requires_unmet（<名字> not verified / <名字> failed verification）。
+ * @param name 词表里的名字
+ * @param state 档案里的三态
+ * @param probing 这个模型正在探测
+ */
+function verifiedExclusion(name: string, state: Capability, probing: boolean): RequirementExclusion | null {
+  if (state === 'verified') return null;
+  if (state === 'unverified' && probing) return { reason: 'probing', detail: REASON_TEXTS.probing() };
+  return unmet(state === 'failed' ? `${name} failed verification` : `${name} not verified`);
+}
+
+/**
+ * @brief 一项能力要求的判定（平行 Agent 规格 §12.2，统一模型提供商规格 §10 第 3 行）：protocol_write、structured_output
+ *        必须已验证；protocol_write>=B 另要等级 A 或 B；vision 为 unverified（配置声明了图像输入）即满足；context>=N 比较有效窗口。
+ *        tool_calling 由选择器先按 toolCalling 判断，这里总是满足。
+ * @param requirement 要求
+ * @param caps 候选的档案能力
+ * @return 不满足时的原因；满足为 null
+ */
+export function requirementExclusion(requirement: Requirement, caps: ModelCapabilities): RequirementExclusion | null {
+  switch (requirement.kind) {
+    case 'tool_calling': return null;
+    case 'protocol_write': {
+      const base = verifiedExclusion('protocol_write', caps.protocolWrite, caps.probing);
+      if (base || requirement.min === 'C' || caps.tier !== 'C') return base;
+      return unmet('handoff tier C is below B');
+    }
+    case 'structured_output': return verifiedExclusion('structured_output', caps.structuredOutput, caps.probing);
+    case 'vision': return caps.vision === 'failed' ? unmet('vision not declared in your model settings') : null;
+    case 'context': return caps.effectiveWindow >= requirement.tokens ? null
+      : unmet(`effective window ${caps.effectiveWindow} < ${requirement.tokens}`);
+  }
+}
+
+/**
+ * @brief 第 3 步的角色部分：requires 里 tool_calling 以外的各项按顺序，然后是要避开的模型族（same_family）。
+ * @param input 选择器输入
+ * @param ref 已通过 tool_calling 的候选
+ * @return 第一个不满足的条件；都满足为 null
+ */
+function roleExclusion(input: StaticSelectorInput, ref: ModelRef): CandidateExclusion | null {
+  const extra = (input.requires ?? []).filter((item) => item.kind !== 'tool_calling');
+  if (extra.length > 0) {
+    if (!input.capabilities) throw new Error('The selector got requirements without the model capabilities');
+    const caps = input.capabilities(ref);
+    for (const requirement of extra) {
+      const exclusion = requirementExclusion(requirement, caps);
+      if (exclusion) return { ref, ...exclusion };
+    }
+  }
+  if (!input.avoidFamilies || input.avoidFamilies.size === 0 || !input.familyOf) return null;
+  const family = input.familyOf(ref);
+  return input.avoidFamilies.has(family) ? { ref, reason: 'same_family', detail: REASON_TEXTS.same_family(family) }
+    : null;
 }
 
 /**
@@ -231,6 +350,16 @@ export interface StaticCheckInput extends Omit<StaticSelectorInput, 'candidates'
   candidates: readonly ModelRef[] | null;
   /** 项目配置 .mori/models.json 写的 allowedZones；没写或没有这个文件为 null（决定能否提供 allow_zone） */
   projectZones: readonly Zone[] | null;
+  /**
+   * 卡上换模型的操作（平行 Agent 规格 §12.11）：change_model（你选范围的会话）、turn_off_team（协作模式下的对话会话）、
+   * null（角色会话，不提供）；省略时为 change_model
+   */
+  modelAction?: 'change_model' | 'turn_off_team' | null;
+  /**
+   * .mori/agents/*.md 的问题（平行 Agent 规格 §4.4，<file>: … 的写法）：不为空时按 agents_invalid 拒绝启动，
+   * 优先于其他各项；省略或为空时没有
+   */
+  agentProblems?: readonly string[];
 }
 
 /** @brief 静态校验的结果。 */
@@ -248,7 +377,17 @@ export interface StaticCheckResult {
  * @param actions 操作
  */
 function plainBlocked(kind: ModelBlocked['kind'], detail: string, actions: BlockedAction[]): ModelBlocked {
-  return { kind, detail, candidates: [], actions, verifyRefs: [], zone: null, zoneProviders: [] };
+  return { kind, detail, candidates: [], actions, verifyRefs: [], zone: null, zoneProviders: [], problems: [] };
+}
+
+/**
+ * @brief 卡上换模型的操作（§4.6 的 Change model；平行 Agent 规格 §12.11：协作模式下的对话会话改为 Turn off team mode，
+ *        角色会话不提供），后面跟 Open settings。
+ * @param input 静态校验的输入
+ */
+function modelActions(input: Pick<StaticCheckInput, 'modelAction'>): BlockedAction[] {
+  const action = input.modelAction === undefined ? 'change_model' : input.modelAction;
+  return action === null ? ['open_settings'] : [action, 'open_settings'];
 }
 
 /**
@@ -260,7 +399,7 @@ function candidateBlocked(input: StaticCheckInput, excluded: CandidateExclusion[
   const probing = excluded.find((item) => item.reason === 'probing');
   if (probing) {
     return { kind: 'verifying', detail: probing.ref, candidates: excluded, actions: [], verifyRefs: [], zone: null,
-      zoneProviders: [] };
+      zoneProviders: [], problems: [] };
   }
   const verifyRefs = excluded.filter((item) => item.reason === 'unverified').map((item) => item.ref);
   const zone = allowableZone(input, excluded);
@@ -270,8 +409,9 @@ function candidateBlocked(input: StaticCheckInput, excluded: CandidateExclusion[
   if (verifyRefs.length > 0) actions.push('verify');
   if (zone !== null) actions.push('allow_zone');
   if (zoneProviders.length > 0) actions.push('confirm_zone');
-  actions.push('change_model', 'open_settings');
-  return { kind: 'no_candidate', detail: '', candidates: excluded, actions, verifyRefs, zone, zoneProviders };
+  actions.push(...modelActions(input));
+  return { kind: 'no_candidate', detail: '', candidates: excluded, actions, verifyRefs, zone, zoneProviders,
+    problems: [] };
 }
 
 /**
@@ -299,11 +439,16 @@ export function providerOf(ref: ModelRef): string {
 }
 
 /**
- * @brief 会话启动的静态校验（§4.6）：依次检查用户级配置、项目配置、有没有范围、范围是否存在，再按第 1–3 步过滤候选。
+ * @brief 会话启动的静态校验（§4.6）：先看角色文件的问题（agents_invalid，平行 Agent 规格 §4.4），再依次检查用户级配置、
+ *        项目配置、有没有范围、范围是否存在，再按第 1–3 步过滤候选。
  * @param input 静态校验的输入
  * @return ModelState.blocked 与静态校验后的第一个候选
  */
 export function staticCheck(input: StaticCheckInput): StaticCheckResult {
+  if (input.agentProblems && input.agentProblems.length > 0) {
+    const blocked = plainBlocked('agents_invalid', '', ['check_agents']);
+    return { blocked: { ...blocked, problems: [...input.agentProblems] }, first: null };
+  }
   if (input.configError !== null) {
     return { blocked: plainBlocked('config_invalid', input.configError, ['open_settings']), first: null };
   }
@@ -311,10 +456,10 @@ export function staticCheck(input: StaticCheckInput): StaticCheckResult {
     return { blocked: plainBlocked('project_config', input.projectError, ['open_settings']), first: null };
   }
   if (input.pick === null) {
-    return { blocked: plainBlocked('no_pick', '', ['change_model', 'open_settings']), first: null };
+    return { blocked: plainBlocked('no_pick', '', modelActions(input)), first: null };
   }
   if (input.candidates === null) {
-    return { blocked: plainBlocked('pick_missing', input.pick, ['change_model', 'open_settings']), first: null };
+    return { blocked: plainBlocked('pick_missing', input.pick, modelActions(input)), first: null };
   }
   const result = selectStatic({ ...input, candidates: input.candidates });
   if (result.model !== null) return { blocked: null, first: result.model };

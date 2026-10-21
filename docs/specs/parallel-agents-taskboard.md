@@ -520,7 +520,7 @@ proposal §6.6：交接缺失或出错，程序都交给结案 Agent。
 
 - **严格版本的 schema**：全部字段都列在 `required` 里，可选字段的类型加 `null`（`null` 视为没填），`additionalProperties: false`；结案的强制填写把 `task` 换成只有这个 task 的枚举。
 3. 解析失败或校验不通过：再投递一次（新的一次运行，同样的写法），消息为 `[Mori] Your handoff could not be used: <错误>. Hand off T1 now.`（统一模型提供商 proposal §8：“模型输出格式错误：不换，按格式错误重试”）；最多 1 次（§15），仍失败按 §7.4 兜底。
-4. 强制关闭需求（§7.6）用同样的写法，schema 是 `request_close`（`request` 只有这个需求的枚举）。
+4. 强制关闭需求（§7.6）用同样的写法，schema 是 `request_close`（`request` 只有这个需求的枚举），消息为 `[Mori] All tasks of request 1 have ended and it is still open. Close it now with request_close.`（C 级附 `<outcome>done|failed</outcome><conclusion>…</conclusion>`）。
 
 ### 7.6 结案与需求的关闭
 
@@ -783,6 +783,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
   你的回答经 `approval.answer { sessionId: 用户会话, requestId }`，后台进程按 `requestId` 交给那个实例。
 - 卡片与 v0 的批准卡相同（内容、三个选项、Alt+1/2/3、焦点规则），停在用户会话那一栏的输入框上方，排在对话 Agent 自己的卡之后，按到达顺序；
   卡头多一行归属：`<role> · T1 · <task title>`（没有 task 时 `<role>`），标识 `data-agent`、`data-task`（proposal §7“批准卡写明是谁、在做哪个 task”）。对话 Agent 一轮结束不会清掉它们。
+  正在显示的卡不因新到的卡而换掉（Alt+1 总是作用于看得到的那张）；新到的对话自己的卡排在后台卡之前，当前这张处理完再显示。
 - 窗口不在前台时任务栏闪烁；侧栏这个会话显示等你批准的状态（沿用现有文字）；进展摘要里这个 task 的一行显示 `Waiting for your approval`；F8 报告里等你批准的数目计入这些卡。
 - 切到 “Allow all” 就不再出卡（§11.1）。
 
@@ -909,7 +910,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
 ### 12.11 协作模式下的模型按钮
 
 - `ModelState` 加 `pickLocked: boolean`：对话会话在协作模式下为真；顶栏模型按钮只显示正在用的模型，不能打开菜单，悬停 `Team mode picks the model for each agent`；
-  `session.setPick` 被拒绝，`session.pickOptions` 返回空；拒绝启动卡与说明卡不提供 `Change model`，改为提供 `Turn off team mode`（§5.1）。回到 `off` 后恢复，范围仍是你最后选的（协作模式不写 `mori.pick`）。
+  `session.setPick` 被拒绝，`session.pickOptions` 返回空；拒绝启动卡与说明卡不提供 `Change model`，改为提供 `Turn off team mode`：拒绝启动卡上按 §5.1 直接回到 `off`；No model available 说明卡上按普通的开关规则（可能变为 `once`）。回到 `off` 后恢复，范围仍是你最后选的（协作模式不写 `mori.pick`）。
 - 角色会话的拒绝启动与说明卡不提供 `Change model`。
 - 思考强度按钮不变：只作用于对话会话。
 
@@ -927,7 +928,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
 - 顶栏（proposal §5“对话顶栏的开关”）在模型、思考强度、权限按钮之前加一个开关按钮：`role="switch"`，`aria-checked` 在 `once`、`always` 时为 `true`，
   文字 `Team: Off` / `Team: On` / `Team: Until done`（`once`），悬停分别为 `Turn on team mode` / `Messages go to <create role> first` / `Team mode ends when open requests are done`；
   标识 `data-testid="team-switch"`、`data-mode`。
-- 点击：`off` → `always`；`always` → `off`（不能回到 `off` 时 `once`，§5.1）；`once` → `always`。不需要确认。界面没准备好时不可用；运行中可以点（影响之后的消息）。
+- 点击：`off` → `always`；`always` → `off`（不能回到 `off` 时 `once`，§5.1）；`once` → `always`。不需要确认。界面没准备好、或会话按 `agents_invalid` 拒绝启动时不可用；运行中可以点（影响之后的消息）。
 - 窄栏（< 600px，§15）只显示 `Team` 和状态点。
 
 ### 13.2 回执
@@ -961,7 +962,7 @@ Request 1 · Login page is blank · Running · 6 min
 | --- | --- | --- |
 | 需求状态（按这个顺序取第一个） | `status`、`question` 与 task 的状态 | `Done`、`Failed`、`Cancelled`（终态）；`Needs your decision`（有 `asked` 为真的 `waiting_user` task，或 `question` 已问你）；`Waiting for <create role>`（有 `question` 或 `waiting_user` 还没问你）；`Stopped`（有 `stopped` 且没有运行中的）；`With <close role>`（task 都已结束、需求还开着）；`Running` |
 | 时长 | `createdAt` 到现在或 `closedAt` | `<1 min`、`6 min`、`1 h 12 min` |
-| task 的当前在做什么（`phase` 为 `running`） | 这个实例最近一次工具调用的工具名与参数要点，按 §13.8 的标题规则（与 v0 工具卡相同） | `Run npm test`、`Read src/a.ts` |
+| task 的当前在做什么（`phase` 为 `running`） | 这个实例最近一次工具调用的工具名与参数要点，按 §13.8 的标题规则（`shared/team.ts` 的 `toolCallTitle`，用 english-ui 的英文动词；本分支的 v0 工具卡仍是中文，english-ui 合入后两者一致） | `Run npm test`、`Read src/a.ts` |
 | 还没调用工具 | 实例已开始 | `Starting` |
 | 其他 `phase` | TaskBoard 与调度 | `Queued`、`Waiting to change files (T2)`、`Waiting to change files (T2, stopped)`、`Waiting for T1`、`Waiting for your approval`、`Waiting for <create role>`（`waiting_user` 未问你）、`Needs your decision`（已问你）、`With <close role>`、`Stopped`、`Stopped (Mori restarted)`、`Done`、`Failed`、`Cancelled` |
 | 模型提示 | `modelNote`（§12.12） | 放在这一行的末尾 ` · Switched model: …` |
@@ -981,7 +982,7 @@ Request 1 · Login page is blank · Running · 6 min
 
 - 立项判断你的消息、对话还没在运行时（§5.3 第 1 步，对话在准备中），阶段行显示 `<create role> is deciding… · 4s`（就是统一模型提供商规格 §9.3 准备中的阶段行，换了文字）；
   对话在回复时显示对话自己的阶段；合并会话不显示（那就是对话自己的回复）。
-- `Stop team`（§11.4）：显示在输入框的停止按钮旁，标识 `data-testid="stop-team"`。输入框照常可以发送。
+- `Stop team`（§11.4）：`TeamState.background` 为真时显示在输入框的停止按钮旁，标识 `data-testid="stop-team"`；回到输入框的消息来自 `session.stopTeam` 的结果。输入框照常可以发送。
 - 侧栏状态点：这个用户会话有任何 Agent 在运行、或有待判断的消息时为“生成中”；有后台批准卡时为等你批准（沿用现有的状态文字）。
 
 ### 13.7 对话流里的其他变化
@@ -1023,11 +1024,11 @@ v0 的规则不变；新增：
 | `session.recheckAgents` | `{ sessionId }` | `SessionInfo` |
 | `session.prompt` | 加 `team?: 'once'` | 不变 |
 | `session.abort` | 不变；停止对话的回复（§11.4） | 不变 |
-| `session.stopTeam` | `{ sessionId }` | — |
+| `session.stopTeam` | `{ sessionId }` | `{ texts: string[] }`（回到输入框的待判断消息，按发送顺序） |
 | `session.clearQueue` | 不变；协作模式下同时撤回待判断的消息（§5.3） | 加 `texts: string[]`（撤回的文字） |
 | `approval.answer` | `requestId` 可以是后台批准的 `<实例 id>:<编号>` | 不变 |
 
-`SessionInfo` 与重新载入的快照（`LiveSnapshot`）加：`team: TeamState`、`board: BoardView`、`teamApprovals`（挂起的后台批准）、`deciding: { text, behavior }[]`（待判断的消息）；
+`SessionInfo` 与重新载入的快照（`LiveSnapshot`）加：`team: TeamState`、`board: BoardView`、`teamApprovals`（挂起的后台批准）、`deciding`（与 `mori.team_deciding` 的载荷相同）；`ModelBlocked` 加 `problems: string[]`（`agents_invalid` 的各行）；
 `LiveStatus` 加 `teamBusy`、`teamApproval`（侧栏用）。
 
 ```ts
@@ -1035,17 +1036,19 @@ interface TeamState {
   mode: TeamMode
   holders: { dialog: string; create: string; close: string }
   roles: { name: string; description: string }[]
-  busy: boolean        // 这个用户会话里有任何 Agent 在运行或排队（对话、立项、结案、实例），或有待判断的消息；停止按钮、侧栏、归档与删除用它
+  busy: boolean        // 这个用户会话里有任何 Agent 在运行或排队（对话、立项、结案、实例），或有待判断的消息；侧栏、归档与删除用它
+  background: boolean  // 除对话这次运行之外还有 Agent 在运行或排队，或有待判断的消息；`Stop team` 按它显示
 }
-interface BoardView { requests: RequestView[] }
+interface BoardView { requests: RequestView[]; teamEdited: boolean /* 有实例做过成功的 edit、write（§13.12） */ }
 interface RequestView { no: number; title: string; status: string; state: string /* §13.3 的需求状态 */; createdAt: number; closedAt: number | null;
   conclusion: string | null; ruledOut: string[]; question: string | null; tasks: TaskView[] }
 interface TaskView {
-  id: string; title: string; status: string; holder: string | null
+  id: string; title: string; status: string; assignee: string; holder: string | null
   phase: 'pending' | 'queued' | 'lock_wait' | 'starting' | 'running' | 'approval' | 'waiting_user' | 'asked' | 'with_close'
        | 'stopped' | 'stopped_restart' | 'done' | 'failed' | 'cancelled'
   waitingFor: string[]            // pending 时未完成的依赖；lock_wait 时持有锁的 task
-  current: { toolName: string; args: { path?: string; command?: string; pattern?: string } } | null  // running 时最近一次工具调用；参数只给标题要用的，command 只给第一行、≤ 200 字符
+  current: { toolName: string; args: { path?: string; command?: string; pattern?: string; task?: string; request?: number; role?: string; to?: string } } | null
+                                  // running 时最近一次工具调用；参数只给标题要用的（§13.8），command 只给第一行、≤ 200 字符
   modelNote: string | null
   chain: { role: string; outcome: string | null; line: string }[]   // 交接链
 }
@@ -1192,7 +1195,7 @@ interface TaskView {
 | `docs/v1/team-checks.md` | 新建：检查记录、负责人不在时定下的选择、实测结果、未验证项 |
 | `app/src/kernel/` | §2 的新文件；`sessions.ts`、`approval.ts`、`extensionUi.ts`、`entries.ts`、`resources.ts`（工具来源 `Mori`）、`commands.ts`、`index.ts`、`probes.ts`（改用 `forcedWrite.ts`）、模型层各文件（§12） |
 | `app/src/main/index.ts` | 删除会话时一并删除 `teams/<id>`（§11.5） |
-| `app/src/shared/` | `team.ts`（新）、`protocol.ts`、`models.ts`（新的排除原因、`BlockedKind` `agents_invalid`、`BlockedAction` `check_agents`、`pickLocked`、调度类别） |
+| `app/src/shared/` | `team.ts`（新）、`protocol.ts`、`models.ts`（新的排除原因、`BlockedKind` `agents_invalid`、`BlockedAction` `check_agents` 与 `turn_off_team`、`ModelBlocked.problems`、`pickLocked`、调度类别） |
 | `app/src/renderer/` | §13：协作开关、回执与进展摘要、批准卡归属与后台卡的队列、模型按钮锁定、阶段行与 `Stop team`、`/team` 识别、待判断的消息与排队区、`wake` 条目与回合、历史条目、工具卡标题、拒绝启动卡、侧栏状态与归档删除的判断（`sessionRows.ts`、`projects.ts`、`actions.ts`）、权限菜单说明、F8（`actionLog.ts`、`IssueDialog.tsx`） |
 | `app/tests/` | §17 |
 | `app/package.json` | 脚本 `test:tb-unit`、`test:taskboard` |
@@ -1241,7 +1244,7 @@ interface TaskView {
 | --- | --- | --- | --- |
 | TB-01 | 角色文件校验 | §4.4 表的每一行都让会话按 `agents_invalid` 拒绝启动并显示那一行文字；改好文件后 `Check again` 解除并按新角色重新打开；合格的文件读出全部字段；正文原样进 system prompt；模型层重新校验时 `agents_invalid` 仍在；`Check again` 在 F8 记 `Check agent files` | 单元、App |
 | TB-02 | 权限与基座 | proposal §6.2 的配置下 `holders` 为 `{dialog:'chat', create:'planner', close:'planner'}`；没有文件时全是 `mori`；只有 `executor.md` 时全是 `mori`；两个文件认领同一项被拒绝 | 单元、App |
-| TB-03 | 关闭模式与 v0 一致 | 没有角色文件、没用过协作模式时：发给模型的工具列表与 system prompt 与 v0 的字节相同、工具页的行相同、不建任何实例、`<userData>/teams` 下没有文件；有别的角色时只多 `agent_message`（和它的说明）；m1–m7 的 fixture 在合成的空 `TeamState`/`BoardView` 下照常回放、没有 Team 相关元素；有别的角色时工具页列出 TaskBoard 工具、来源 `Mori` | App、回放 |
+| TB-03 | 关闭模式与 v0 一致 | 没有角色文件、没用过协作模式时：发给模型的工具列表与 system prompt 与 v0 的字节相同、工具页的行相同、不建任何实例、`<userData>/teams` 下没有文件；有别的角色时只多 `agent_message`（和它的说明）；m1–m7 的 fixture 在合成的空 `TeamState`/`BoardView` 下照常回放，开关显示 `Team: Off`，没有回执、进展摘要、`Stop team`；有别的角色时工具页列出 TaskBoard 工具、来源 `Mori` | App、回放 |
 | TB-04 | 临时提问 | 关闭模式下对话 `agent_message` 给 memory：新开只读实例（请求里没有 `bash`、`edit`、`write`、`agent_message`），回答完就结束，回答成为工具结果；发给持有立项的角色同样开临时提问、没有立项会话文件；候选是交集、顺序按被问角色；没有交集时报错列出原因；发到 task 被拒绝；实例会话不在侧栏；对话每回合超过 5 条报错 | 单元、App、回放、真实 |
 | TB-05 | 协作模式的进入与结束 | `/team <文字>` 进入 `once`、发出的消息去掉前缀、带引用芯片也行、同名提示词模板不展开；`/team on` 与开关进入 `always`；回到 `off` 的条件（§5.1）三项各缺一项时都变为 `once`；`once` 在条件满足的对话回合结束时回到 `off`；只有 `/team` 不发送；模式写入 `mori.team`，重新打开后沿用；F8 记 `Team <mode>`；`/team off` 不发送、清空输入框；运行中改模式，这次运行的工具、工作卡与附加段不变 | App |
 | TB-06 | 立项的决定 | 一次判断一种决定，另一类被拒绝；没做决定按直接回答；`task_create` 在本次没登记或补充之前被拒绝；立项出错时已做的写入有效、对话的工作卡含 `couldn't decide: <原因>`；新需求没有 task 时投递一次提醒，仍没有时唤醒结案；程序唤醒的回合里 `request_submit`、`request_cancel` 被拒绝；分开时立项运行中再来的两条消息各自一次判断 | 单元、App |
@@ -1322,10 +1325,11 @@ interface TaskView {
 | `tests/ui/v1-models-existing.mjs` | 参数化：`--id`、结果文件名、套件列表；不带参数时与现在相同 |
 
 TB-46 = `npm run test:unit`（模型层的单元，记一条 “TB-46 test:unit”）+ m0–m7 的 App 与回放套件 + `v1-models-app-{settings,switch,session}` + `v1-models-replay` + `node tests/spec-coverage.mjs`（模型层，退出码 0），每项按退出码记一条。
+这次运行同时写模型层 MP-37 的结果文件（同样的套件，记 “MP-37 <脚本名>”），所以模型层的覆盖检查读得到；模型层真实一层（MP-27）的结果由 `v1-models-real.mjs` 在这个工作树里另跑一次得到。
 
 ## 附录 A：程序注入的段
 
-英文（§0）。`<…>` 由程序填写。每段的第一行固定，合成端点用它认出会话的种类（§17.1）。
+英文（§0）。`<…>` 由程序填写。每段的第一句固定，合成端点用它认出会话的种类（§17.1）。
 
 **共用段**（所有 TaskBoard 会话；用户会话里在协作模式的 `mori_team` 段里）：
 
