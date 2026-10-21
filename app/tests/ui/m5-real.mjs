@@ -14,8 +14,9 @@ import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, scratchUserData, sleep } from './lib.mjs';
 import { rowOf, stubFolder, waitReady, waitStatus } from './m3-helpers.mjs';
 import {
-  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, paneAt, pickRange, previewState, sendAt, sentSessionRefs,
-  splitState, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip, waitSplit,
+  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, headingWhole, paneAt, pickRange, previewHeading,
+  previewState, sendAt, sentSessionRefs, splitState, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip,
+  waitSplit,
 } from './m5-helpers.mjs';
 
 const source = arg('source');
@@ -250,7 +251,10 @@ async function item4(ctx) {
   await page.locator('.pane-slot[data-focused="true"] [data-kind="session"] .quote-chip-main').click();
   await waitPreview(page);
   const preview = await previewState(page);
+  const heading = await previewHeading(page);
   await shot(page, '4-preview');
+  record('走查 4：轮次列表占满预览对话框时，标题"Context · <会话名>"完整显示，只有一行、没有被压矮',
+    Boolean(heading?.listFull) && headingWhole(heading), JSON.stringify(heading));
   const words = UI_WORDS.filter((word) => preview.turns.some((turn) => turn.text.includes(word)));
   record('走查 4：把会话 C 拖进输入框：提示"松开以引用到这个会话"，芯片"引用 · C · 第 1–6 轮 · 约 X 字"',
     hint?.text === 'Drop to attach as context' && /· turns 1–6 · ~[\d,]+ characters$/.test(chip),

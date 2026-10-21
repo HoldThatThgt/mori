@@ -9,6 +9,10 @@ fixture，修两个过时的脚本）。
 以及审查后的第二轮：`app/src` 三个文件（表单不用浏览器自带的校验、Chromium 固定用英文、选文件夹对话框的英文标题）和
 `m1-app.mjs`、`m6-app-settings.mjs` 新加的 3 项检查，见"测试中发现并已修正的问题"第 7–8 条；这份记录、`docs/v0/english-ui/`
 的截图、`app/README.md`、`docs/app-v0.md` 和 `ui-strings.md` 的改动也没有提交。分支没有推送，也没有合并进 `app-v0`。
+上面这些后来都提交在 `7500596`（各条里的"没有提交"是写下时的状态）。之后的第三轮修了会话引用预览的标题被压矮，
+审查后又收紧了新加的检查（见"第三轮"），改了 `app/src/renderer/src/styles/split.css`、`app/tests/ui/` 的
+`m5-helpers.mjs`、`m5-app.mjs`、`m5-replay.mjs`、`m5-real.mjs`，状态表 [screens/session-refs.md](screens/session-refs.md)、
+这份记录和 `english-ui/m5-preview.png`，都没有提交。
 
 ## 状态
 
@@ -19,8 +23,9 @@ fixture，修两个过时的脚本）。
 M2–M7 的走查也还没签收（[m7-checks.md](m7-checks.md)"状态"）。这次没有改行为，那些走查要看的东西不变，
 只是界面上的字换成了英文；另外顶栏、侧栏、设置页按英文字宽重新定了几处宽度（"与方案不同"第 3 条）。
 真实端点仍是 DeepSeek 公网端点（`deepseek-flash`），key 用你在 Mori 里加密保存的那一份（`%TEMP%\mori-real-data`）；
-脚本只复制加密的 key 文件，不读取 key；`m0-real` 用的是这个文件夹的临时副本（照 `tests/ui/lib.mjs` 的 `scratchUserData`），
-跑完已删除。重录的 fixture 里没有 key，也没有这个文件夹的路径（已扫描）。
+脚本不读取 key：走查和录制用 `tests/ui/lib.mjs` 的 `scratchUserData` 把这个文件夹里的 `credentials.json`（加密的 key）、
+`Local State`（解密要用）、`pi/models.json` 和 `pi/settings.json` 复制到临时数据目录再用（`m1-real`、`m1-record` 的几项反例
+不复制前两个）；`m0-real` 用的是同样复制出来的临时副本，跑完已删除。重录的 fixture 里没有 key，也没有这个文件夹的路径（已扫描）。
 
 结果一览：合成端点的整机测试 840 项（另有 1 项 KNOWN，pi #9129）在开发构建和打包程序上全部通过；界面回放 367 项
 在开发构建上全部通过；M0–M7 的 DeepSeek 走查 274 项（另有 1 项标为模型行为的 KNOWN）在开发构建和打包程序上都通过，
@@ -29,6 +34,11 @@ M2–M7 的走查也还没签收（[m7-checks.md](m7-checks.md)"状态"）。这
 审查后第二轮改了 `app/src`（表单不用浏览器按系统语言弹的校验气泡、Chromium 固定用英文、选文件夹对话框的英文标题），
 之后在开发构建和打包程序上重跑了全部整机测试（843 项，比第一轮多 3 项新检查）、在开发构建上重跑了全部界面回放，都通过
 （几项要重跑：锁屏时剪贴板不能用、`m4-replay` 已知的拖选时机，见"第二轮"）；真实端点的走查和一键导出安装包没有在第二轮重跑。
+第三轮修了会话引用预览的标题被压矮（原来就有）：`.ref-preview h2` 加 `flex: none`。新加的 5 项检查里 `m5-app` 的 3 项、
+`m5-replay` 的 1 项在改之前的构建上失败（`m5-real` 那一项没有在改之前跑）。审查后收紧了检查（长名字那一项要求标题横向
+裁掉放不下的部分、对话框没有被撑宽，`m5-real` 那一项要求轮次列表占满对话框）：把标题错改成 `overflow: visible` 时长名字
+那一项失败；收紧后 `m5-app` 39 项（开发构建和打包程序）、`m5-replay` 21 项（开发构建）、`m5-real` 17 项（DeepSeek，
+开发构建）全部通过；`m5-real` 在打包程序上只跑过收紧之前的版本（也是 17 项全部通过），见"第三轮"。
 到现在为止只有测试脚本和几张截图"看过"英文界面，还没有人从头到尾用眼睛看过（见"未验证"）。
 
 ## 你决定的
@@ -45,7 +55,7 @@ M2–M7 的走查也还没签收（[m7-checks.md](m7-checks.md)"状态"）。这
 | 工作回顾 | Review | 左栏导航、页标题、"View in Review"、F8 报告的 "Page: Review" |
 | 引用这一族（选区的"问 Mori"、会话菜单的"引用到当前会话"、回复下的"引用到输入框"、把会话拖进输入框） | 用 Claude 的 "Attach as context" | 选区浮层和会话菜单 "Attach as context"，回复下 "Attach message as context"，拖放提示 "Drop to attach as context"；芯片和预览 "Context · …"、"Remove context"、"Not attached"、"the attached text"；发给模型的文字不变，仍是 "Quoting …:" 和 "[Quote] …"；工作回顾里反馈的 "Quoted text" 是反馈针对的原文，不属于这个功能，没有改 |
 | 工具页 | Customize（Claude 开关技能、插件、连接器的页面叫这个） | 左栏导航、页标题、F8 的 "Page: Customize"、操作记录 "Open Customize"；分节标题 Built-in tools / Skills / Plugins / MCP 不变；代码里的文件名（`ToolsPage.tsx` 等）和状态表 [screens/tools.md](screens/tools.md) 没有改名 |
-| 会话引用预览的标题顶部被切掉一点（原来就有） | 在这个会话里修 | **还没有做**：要在 `english-ui` 上改 `split.css`（`.ref-preview h2` 加 `flex: none`）并在 `m5-app`、`m5-replay` 加一项标题没被切的检查；到这份记录为止 `app/src` 里没有这处改动（见"与方案不同"第 4 条、"未验证"） |
+| 会话引用预览的标题被压矮、字的下面被裁掉（原来就有；先前记成"顶部被切掉一点"，量过之后是下面：回放里一行 20px 只剩 16px 看得见，超过 2 万字的会话整行看不见） | 在这个会话里修 | 第三轮已修（没有提交）：`split.css` 的 `.ref-preview h2` 加 `flex: none`；`m5-app` 加 3 项、`m5-replay` 加 1 项、`m5-real` 加 1 项检查，审查后收紧过；`m5-app`、`m5-replay` 的新检查在改之前的构建上失败、改后通过（见"第三轮"、"测试中发现并已修正的问题"第 9 条） |
 | 分屏一栏约 460px 时会话名被挤到约 2 个字符 | 把模型、Effort、权限按钮从顶栏移到输入框下面一行（像 Claude 桌面版），不选"权限按钮只留图标"；Effort 仍是单独的按钮（不像 Claude 那样放进模型菜单）；上下文用量改成模型按钮旁边的小圆环（像 Claude） | 不在这个分支做：英文界面提交之后，在从 `english-ui` 分出的 `composer-pickers` 分支上做（分支还没有建）；这个分支里顶栏的布局不变（见"与方案不同"第 3 条） |
 
 "新会话"叫 "New session" 是任务说明里给定的（术语表里标"负责人定"）。排队叫 "Queue" / "Queued" 不是你定的：它只出现在
@@ -250,6 +260,87 @@ preload 里改过的每个字串去找，旧的 fixture 里都没有（只在界
 - 新加的 3 项在改代码之前的构建（`f381eed` 的 `out/`）上都失败过（"测试中发现并已修正的问题"第 7–8 条）。
 - 另一会话的测试：这一轮没有遇到端口冲突。
 
+### 第三轮：会话引用预览的标题（2026-10-21 17:14–17:49Z；审查后收紧检查 18:14–18:40Z）
+
+**原因**：预览对话框 `.dialog.ref-preview` 是限高（`max-height: calc(100vh - 32px)`）的列方向 flex 容器，轮次列表
+`.ref-turns` 是 `flex: 1`。标题 `.ref-preview h2` 为了省略号设了 `overflow: hidden`，这让它在列方向的自动最小高度变成 0
+（其余几行没有 `overflow: hidden`，最小高度就是内容的高度，不会被压）。轮次的内容放不下时，要收缩的高度按各项的基准尺寸
+分摊，标题也分到一份，被压矮；字从盒子的顶上排起，被裁掉的是字的下面（不是先前记的"顶部"）：`m5-replay` 量到一行 20px
+只剩 16px 看得见。中文界面的 [M5 截图](m5/4-preview.png) 和第一轮打包程序 `m5-real` 的 `4-preview.png`（页面 1184×735）
+都是这样；后者在 `app/test-results/` 里的已被第三轮的走查覆盖，`english-ui/m5-preview.png` 也换掉了，现在只在 git 里：
+`7500596:docs/v0/english-ui/m5-preview.png`。内容越多压得越狠：超过 2 万字的会话，标题只剩不到 1px，整行看不见。
+
+**修正**：`app/src/renderer/src/styles/split.css` 的 `.ref-preview h2` 加 `flex: none`（不伸缩），`overflow: hidden`、
+`text-overflow: ellipsis`、`white-space: nowrap` 不变（一行、放不下时省略号），上面加了两行中文注释写明原因。
+状态表 [screens/session-refs.md](screens/session-refs.md)"预览与调整范围"加了一句：标题始终完整显示在一行，会话名太长时
+截断加省略号、不折行。
+
+**检查**：`m5-helpers.mjs` 新加 `previewHeading`（量标题：`clientHeight` 与 `scrollHeight`；盒子的高度与一行的高度，
+line-height 是 normal，取字的 Range 外框的高度；字排成几行；字是否比盒子宽（`scrollWidth` 大于 `clientWidth`）；computed 的
+`overflow-x` 和 `text-overflow`；是否超出对话框右边；标题和对话框的右边、对话框的宽、页面的宽；轮次列表是否占满对话框）、
+`headingWhole`（只有一行、`clientHeight` 不小于 `scrollHeight`、盒子不比一行矮，留 0.5px）和审查后加的 `headingTruncated`
+（字比盒子宽；`overflow-x` 是 `hidden` 或 `clip`；`text-overflow` 是 `ellipsis`；只有一行；标题不超出对话框；标题和对话框的
+右边都在页面里；对话框宽 min(720px, 页面宽 − 32px)；都留 0.5px。这个宽度来自 `.dialog.ref-preview` 的
+`width: min(720px, 100%)`、外层 `.dialog-backdrop` 左右各 16px 的 padding 和全局的 `box-sizing: border-box`）。
+
+| 测试 | 新加的检查 | 怎么做 |
+| --- | --- | --- |
+| `m5-app`（新步骤 `headingFit`，在 `longSource` 之后；要用 `longSource` 建的会话，`--only` 时两个都要选） | 预览的标题：默认窗口大小、轮次列表占满对话框时标题完整显示，只有一行、没有被压矮 | 用菜单把超过 2 万字的会话（`longSource` 建的，6 轮）引用进 B，点芯片；窗口先回到启动时的大小（页面 1184×735） |
+| 同上 | 预览的标题：内容区 800×600、轮次列表占满对话框时标题仍完整显示，只有一行 | 同一个对话框，窗口内容区改成 800×600（审查后照 `m2-app` 改叫"内容区 800×600"，原来叫"最小窗口 800×600"） |
+| 同上 | 预览的标题：会话名很长时只有一行，横向裁掉放不下的部分、截断加省略号、不折行，不超出对话框和窗口，对话框没有被撑宽，完整显示 | 把这个会话改名为 127 个字符的中英文名字，再打开预览（也占满对话框）；核对标题的文字是完整的名字、`headingTruncated` 和 `headingWhole`。审查前只看"放不下""省略号""不超出对话框"和 `headingWhole`，标题错改成 `overflow: visible` 也会通过（见下面的反例） |
+| `m5-replay` | ref-turns：轮次列表占满预览对话框时（默认窗口大小），标题"Context · <会话名>"完整显示，只有一行、没有被压矮 | `ref-turns` fixture 的会话 C（6 轮），回放窗口 1200×800（页面 1184×735），就是截图里的那个对话框；另存截图 `ref-turns-preview` |
+| `m5-real` | 走查 4：轮次列表占满预览对话框时，标题"Context · <会话名>"完整显示，只有一行、没有被压矮 | 走查 4 截图 `4-preview` 的同一时刻；审查后要求轮次列表占满对话框（原来只记在详情里，列表没占满时会白白通过） |
+
+**先失败**（改之前：`7500596` 的 `app/src`，`npx electron-vite build` 之后）：
+
+| 测试 | 结果 | 量到的值（标题的 `clientHeight` / `scrollHeight`，盒子 / 一行） |
+| --- | --- | --- |
+| `m5-replay`（17:17Z） | 20 项通过，1 项失败，就是新加的那一项 | 16 / 20，15.94px / 20px：字的下面 4px 被裁掉，与截图相同；轮次列表占满对话框 |
+| `m5-app`（17:44Z） | 36 项通过，3 项失败，就是新加的 3 项 | 默认窗口（页面 1184×735）1 / 20，0.89px / 20px；800×600 时 1 / 20，0.67px；长名字 1 / 20，0.89px（一行、放不下、省略号这几样是对的，只是被压到不到 1px）。截图里标题整行不见了 |
+
+`m5-app` 的新步骤先写成用 `setContentSize` 回到启动时 `getContentSize` 的大小；这个窗口有菜单栏，页面因此比启动时高
+26px（1184×761）。改成按窗口外框（`getSize` / `setSize`）恢复、详情里记下页面的大小后，在改之前的构建上重跑了一遍（上表），
+再在改之后的两种构建上各跑一遍。第一版的结果与最终版相同：改之前 36 项通过、同样 3 项失败（17:19Z），改之后开发构建、
+打包程序都是 39 项全部通过（17:24Z、17:27Z）。`m5-helpers.mjs`、`m5-replay.mjs`、`m5-real.mjs` 在这之后到审查前没有再改。
+
+收紧后的检查也在改之前的 CSS 上跑过（18:33–18:35Z，`split.css` 临时换回 `7500596` 的版本，`npx electron-vite build`）：
+`m5-app` 仍是 36 项通过、同样 3 项失败，量到的值与上表相同（长名字那一项横向的几样都对，只是被压到 1 / 20）；
+`m5-replay --only ref-turns` 7 项通过、1 项失败，就是新加的那一项（16 / 20）。
+
+**反例：标题错改成 `overflow: visible`**（审查后，18:14–18:16Z）：临时把 `.ref-preview h2` 改成
+`flex: none; overflow: visible; …`（不再被压矮，但放不下的字不裁掉、省略号也不起作用），`npx electron-vite build` 后跑
+`m5-app`：38 项通过，1 项失败，就是长名字那一项。详情里一行、20 / 20、字比盒子宽、`text-overflow: ellipsis`、标题的盒子在
+对话框里（右边 929 ≤ 952）、对话框宽 720px（页面 1184px）都对，只有 `overflow-x` 是 `visible`；审查前的条件这时会通过。
+截图里会话名伸出对话框，一直伸到窗口右边外面。之后把 `split.css` 从改之前存的副本复制回来（SHA-256 相同，`git diff` 只有
+这一处修正和两行注释），重新构建。
+
+**结果**（改之后）：`npm run check` 通过（改后两次，`dist:dir` 里又一次；收紧后 18:17Z 一次，`dist:dir` 里又一次）。
+17:25Z `npm run dist:dir`，`app.asar` 里是改后的 CSS；最后一次构建的 `out/` 与解开的 `app.asar` 的 327 个文件逐个比较
+SHA-256，全部相同。收紧后 18:22Z 又 `npm run dist:dir` 一次，`out/` 与 `app.asar` 的 327 个文件同样逐个相同（跑完改之前的
+CSS 之后的最后一次构建也比较过）。
+
+| 测试 | 开发构建 | 打包程序（`dist/win-unpacked/Mori.exe`） |
+| --- | --- | --- |
+| `m5-app` | 39 项全部通过（原来 36 项 + 3 项）；收紧后 39 项全部通过（18:18Z，最后一次构建上 18:36Z 又一次） | 39 项全部通过；收紧后 39 项全部通过（18:24Z） |
+| `m5-replay` | 21 项全部通过（原来 20 项 + 1 项）；收紧后 21 项全部通过（18:20Z，18:38Z 又一次） | 不适用 |
+| `m5-real`（DeepSeek，`--source %TEMP%\mori-real-data`） | 17 项全部通过（原来 16 项 + 1 项），一遍就过；收紧后 17 项全部通过，一遍就过（18:26–18:30Z） | 17 项全部通过，一遍就过（17:37Z，收紧之前的版本；那一遍的详情里轮次列表占满对话框、标题 20 / 20，收紧后的条件也满足，但没有用收紧后的脚本重跑） |
+
+`m5-real` 用的是脚本复制出来的临时数据目录（`scratchUserData`：`credentials.json`（加密的 key）、`Local State`、
+`pi/models.json` 和 `pi/settings.json`，没有读 key），每遍跑完都已删除。三遍里轮次列表都占满了对话框，标题 20 / 20、
+盒子 20px。
+
+**截图（都看过）**：改之前 `m5-replay` 的 `ref-turns-preview`（字的下沿被切）、`m5-app` 的 `4-heading-default`、
+`4-heading-800x600`、`4-heading-long-name`（标题整行不见）；改之后 `m5-replay` 的 `ref-turns-preview`，`m5-app` 两种构建的
+`4-heading-default`、`4-heading-800x600`（标题完整，"Context · plain 第 1 条 这是一条很长的你…"）、`4-heading-long-name`
+（一行，末尾 "…on a sin…"，对话框没有变宽），`m5-real` 两种构建的 `4-preview`（"Context · 用一句话介绍你自己。不要调用任何工具。"
+完整）。[english-ui/m5-preview.png](english-ui/m5-preview.png) 换成了打包程序这一遍的 `4-preview`。收紧后又看了：反例的
+`4-heading-long-name`（会话名伸出对话框和窗口）、收紧后打包程序的 `4-heading-long-name`（一行，末尾 "…on a sin…"，
+对话框没有变宽）、开发构建的 `4-heading-800x600`（标题完整）、`m5-real` 开发构建的 `4-preview`（标题完整）。截图在
+`app/test-results/m5-app(-packaged)/`、`m5-replay/`、`m5-real(-packaged)/`（不提交；现在是收紧后那几遍的，
+`m5-real-packaged/` 仍是 17:37Z 那一遍的）。
+
+只改了这一条 CSS，影响只在预览对话框，所以只重跑了 M5 的整机测试、回放和走查。另一会话的测试：这一轮没有遇到端口冲突。
+
 ### 走查 5：一键导出安装包
 
 都在 `english-ui` `f381eed` 的干净克隆里，从命令行运行 `cmd /c build-installer.cmd --no-open --no-pause`，输出重定向到文件。
@@ -317,6 +408,11 @@ npm 11.17 提示 6 个包的安装脚本不在 `allowScripts` 里（esbuild 0.25
    核对标题、按钮和 `openDirectory`；改代码之前的构建上失败（只有 `properties`），改后通过。对话框的其余部分和 Windows 给的
    错误原文（`shell.openPath` 打不开的原因）仍跟 Windows 显示语言，是有意不翻的（ui-strings.md "写法约定"已写明）；
    在中文显示的 Windows 上没有试过（这台机器的显示语言是 en-US）。
+9. **会话引用预览的标题被压矮**（原来就有，中文界面的 M5 截图里就有；你要求在这个会话里修，第三轮已修正、没有提交）：
+   标题为了省略号设了 `overflow: hidden`，在列方向的 flex 对话框里它的自动最小高度因此是 0，轮次列表占满对话框时被一起压矮，
+   字被裁掉 → `.ref-preview h2` 加 `flex: none`，一行、放不下时省略号不变。加了 5 项检查（`m5-app` 3 项、`m5-replay` 1 项、
+   `m5-real` 1 项），前两个测试的 4 项在改之前的构建上失败，改之后 5 项都通过；审查后收紧了长名字和 `m5-real` 的那两项，
+   标题错改成 `overflow: visible` 时长名字那一项失败，见"第三轮"。
 
 ## 与方案不同、或需要你注意的地方
 
@@ -338,9 +434,10 @@ npm 11.17 提示 6 个包的安装脚本不在 `allowScripts` 里（esbuild 0.25
      先占了位置，会话名被挤到最小的 36px（只剩约 2 个字符，见[截图](english-ui/m5-split.png)）。这个分支只保证不溢出，
      没有给会话名腾地方。你已经定了怎么改（"你决定的"最后一条：按钮移到输入框下面一行、Effort 仍单独、上下文用量改成圆环），
      在英文界面提交之后的 `composer-pickers` 分支上做。
-4. **会话引用预览的标题顶部被切掉一点**：中文界面和英文界面都这样，原来就有。你要求在这个会话里修（"你决定的"），
-   **还没有修**：到这份记录为止 `app/src` 里没有这处改动（第二轮只改了表单、语言和选文件夹对话框），要在 `english-ui` 上
-   改 `split.css` 并在 `m5-app`、`m5-replay` 加一项检查，之后重跑 M5 的测试。
+4. **会话引用预览的标题被压矮、字的下面被裁掉**（先前记成"顶部被切掉一点"，量过之后是下面：回放里一行 20px 只剩 16px
+   看得见，超过 2 万字的会话整行看不见）：中文界面和英文界面都这样，原来就有。你要求在这个会话里修（"你决定的"），
+   第三轮已修正（没有提交）：`split.css` 的 `.ref-preview h2` 加 `flex: none`，状态表加了一句标题的样子；
+   只重跑了 M5 的整机测试、回放和走查（见"第三轮"）。
 5. **自动生成的会话名仍截到 20 个字符**（`TITLE_LENGTH`）：中文 20 个字够一句话，英文只有 3–4 个词。没有改。
 6. **两处读屏名里有 " · "**："Context: src/a.ts · lines 3–5, jump to source"、"Remove context: …"（芯片上的字本身带 " · "）。
    约定说读屏名里不用 " · "，但术语表里这两条就是这样写的，照术语表。
@@ -360,13 +457,18 @@ npm 11.17 提示 6 个包的安装脚本不在 `allowScripts` 里（esbuild 0.25
 - **你的走查**：这次的，以及还没签收的 M2–M7。到现在为止只有测试脚本和几张截图（录制时 F8 报告的截图、走查的出错截图等）
   看过英文界面，没有人从头到尾用眼睛看过每一屏的英文是否通顺、是否被截断。几张打包程序走查时的截图（第一轮，`f381eed`；
   第二轮的改动不影响这几屏）：[M4 选区芯片](english-ui/m4-chip.png)、[M5 分屏](english-ui/m5-split.png)、
-  [M5 会话引用预览](english-ui/m5-preview.png)、[M6 设置页](english-ui/m6-settings.png)、[M7 工作回顾](english-ui/m7-issue.png)。
+  [M5 会话引用预览](english-ui/m5-preview.png)（第三轮修正后打包程序走查时的截图；第一轮那张在 `7500596` 里）、
+  [M6 设置页](english-ui/m6-settings.png)、
+  [M7 工作回顾](english-ui/m7-issue.png)。
 - **M2–M7 的走查要用英文构建新建的数据**：方案第 7 节 M4 走查 3（重启后芯片仍能点回）、M5 走查 5（点引用跳回 C）、
   M7 走查 1–2（M2 起的 F8 报告都在 "UI issues" 里）照字面要在你现有的 `%APPDATA%\Mori` 上做，但按你定的不兼容
   （[app-v0.md](../app-v0.md) 第 11 节"显示语言"），M2–M7 的构建存下的 F8 报告会列为 "Couldn’t read the record <文件名>"，
   旧消息里的中文引用块（"引用 … 第 N 行：""引用会话“…”第 N 轮："）按全文显示、没有芯片。所以这些走查要用英文构建新建的
   会话、引用和 F8 报告；反馈记录（JSON）的格式没有变，旧的反馈应该照样列出（没有试过）。
-- **会话引用预览标题的修正还没做**（"与方案不同"第 4 条）。
+- **会话引用预览标题的修正**（第三轮）只查了这个对话框。别的列方向、限高的弹层里有没有同样"`overflow: hidden` 的一行被压矮"
+  的写法没有逐个查（只看了 F8 报告框：它的标题没有 `overflow: hidden`，框自己滚动）。第三轮只重跑了 M5 的测试，
+  其他整机测试、回放、走查和一键导出安装包没有用这份代码再跑；打出的安装包也没有重新打（只打了 `dist/win-unpacked`）。
+  审查后收紧的检查没有在打包程序上跑 `m5-real`（只跑了开发构建）。
 - **`m4-real` 走查 4 第一次失败的原因不知道**（开发构建，第一轮）：拖选后 30 秒内没有出现选区浮层，重跑都通过；与 M6、M7 记下的
   M4 拖选时机问题像是同一类，没有查到确切原因，测试和代码都没有改。
 - **`m1-real` 第 3 项反例没有标为模型行为**：DeepSeek 在命令后面加 `; echo …` 时命令以 0 结束，Mori 显示 "Done" 是对的，但这一项
@@ -386,7 +488,8 @@ npm 11.17 提示 6 个包的安装脚本不在 `allowScripts` 里（esbuild 0.25
   从 437 启动的 cmd 在每次测试里都正常，包括控制台的输出代码页被改成 65001 之后。
 - **第二轮之后没有重跑的**：真实端点的走查（`m0-real` … `m7-real`）、录制、一键导出安装包（走查 5）都是在第一轮（`f381eed`
   的 `app/src`）上做的；第二轮改了 `app/src`，这些没有再跑（理由见"第二轮"）。打出的安装包也没有用第二轮的代码重新打。
-  整机测试和界面回放在第二轮整体重跑过（`m5-app.mjs` 的修正也包括在内）。
+  整机测试和界面回放在第二轮整体重跑过（`m5-app.mjs` 的修正也包括在内）。第三轮（`7500596` 之后的预览标题修正）只重跑了
+  `m5-app`、`m5-replay` 和 `m5-real`，`m5-real` 是这些真实端点走查里唯一跑在第二轮以后的代码上的。
 - **中文显示的 Windows 上没有试过**：Chromium 固定用英文是用 `--lang=zh-CN` 启动模拟的（Mori 设的开关盖过了命令行上的），
   这台机器的显示语言是 en-US；选文件夹对话框的其余部分和 Windows 的错误原文在中文 Windows 上会是中文（有意不翻）。
   `navigator.languages` 第二项仍是系统的 zh-Hans-CN（Mori 没有用到它）。

@@ -140,6 +140,60 @@ export function previewState(page) {
   });
 }
 
+/**
+ * @brief 预览对话框的标题"Context · <会话名>"量出来的样子；没有对话框时为 null。
+ *        clientHeight / scrollHeight：看得见的高度与内容的高度（被压矮时前者小于后者）；height / lineHeight：标题的盒子与
+ *        一行的高度（line-height 为 normal 时取字本身的高度，即 Range 的外框；字被裁掉时 Range 仍报完整的大小）；
+ *        lines：字排成几行；overflows：字比标题的盒子宽（scrollWidth 大于 clientWidth）；overflowX：标题横向的 overflow
+ *        （computed）；textOverflow：放不下时的截断方式；inside：标题没有超出对话框的右边；headingRight / dialogRight：
+ *        标题和对话框的右边；dialogWidth：对话框的宽；pageWidth：页面的宽（documentElement.clientWidth）；
+ *        listFull：轮次列表占满了对话框（列表自己要滚动）。
+ */
+export function previewHeading(page) {
+  return page.evaluate(() => {
+    const dialog = document.querySelector('[data-testid="ref-preview"]');
+    const heading = dialog?.querySelector('h2');
+    if (!heading) return null;
+    const style = getComputedStyle(heading);
+    const range = document.createRange();
+    range.selectNodeContents(heading);
+    const tops = [...range.getClientRects()].map((rect) => rect.top).sort((a, b) => a - b);
+    const box = heading.getBoundingClientRect();
+    const frame = dialog.getBoundingClientRect();
+    const list = dialog.querySelector('.ref-turns');
+    const round = (value) => Math.round(value * 100) / 100;
+    return { text: heading.textContent, clientHeight: heading.clientHeight, scrollHeight: heading.scrollHeight,
+      height: round(box.height), lineHeight: round(style.lineHeight === 'normal' ? range.getBoundingClientRect().height
+        : parseFloat(style.lineHeight)),
+      lines: tops.filter((top, index) => index === 0 || top - tops[index - 1] > 2).length,
+      overflows: heading.scrollWidth > heading.clientWidth, overflowX: style.overflowX,
+      textOverflow: style.textOverflow,
+      inside: box.right <= frame.right + 0.5, headingRight: round(box.right), dialogRight: round(frame.right),
+      dialogWidth: round(frame.width), pageWidth: document.documentElement.clientWidth,
+      listFull: Boolean(list && list.scrollHeight > list.clientHeight + 1) };
+  });
+}
+
+/** @brief 标题完整显示：只有一行，看得见的高度不小于内容的高度，盒子不比一行矮（留 0.5px 的取整误差）。 */
+export function headingWhole(heading) {
+  return Boolean(heading) && heading.lines === 1 && heading.clientHeight >= heading.scrollHeight
+    && heading.height + 0.5 >= heading.lineHeight;
+}
+
+/**
+ * @brief 一行放不下的标题截断加省略号（session-refs.md"预览与调整范围"）：字确实比标题的盒子宽；标题横向裁掉超出的部分
+ *        （overflow-x 为 hidden 或 clip，为 visible 时字伸到对话框外、省略号也不起作用）；text-overflow 为 ellipsis；
+ *        只有一行；标题不超出对话框，标题和对话框的右边都在页面里；对话框宽 min(720px, 页面宽 − 32px)，没有被撑宽
+ *        （.dialog.ref-preview 是 width: min(720px, 100%)，外层 .dialog-backdrop 左右各 16px 的 padding，border-box）。
+ *        各项比较留 0.5px 的取整误差。
+ */
+export function headingTruncated(heading) {
+  return Boolean(heading) && heading.overflows && ['hidden', 'clip'].includes(heading.overflowX)
+    && heading.textOverflow === 'ellipsis' && heading.lines === 1 && heading.inside
+    && heading.headingRight <= heading.pageWidth + 0.5 && heading.dialogRight <= heading.pageWidth + 0.5
+    && Math.abs(heading.dialogWidth - Math.min(720, heading.pageWidth - 32)) <= 0.5;
+}
+
 /** @brief 等预览对话框读完（不再是"Loading…"）。 */
 export function waitPreview(page, timeout = 15000) {
   return page.waitForFunction(() => {

@@ -4,7 +4,8 @@
 // Esc 只停焦点所在的一栏、F8 与右栏跟随焦点、分屏中线的拖动 / 方向键 / 双击 / 保存、放不下时右栏先收起和浮出、
 // 最小窗口、关闭一栏不停止生成、设置页来回、归档删除时这一栏关闭）；会话引用（拖进输入框、菜单"Attach as context"与不可用的情况、
 // 只用键盘、芯片与预览、改范围、内容不含思考和工具输出、模型收到引用块、mori.ref 条目、跳回原会话、改名、重启后、
-// 原会话已删除、引用正在生成的会话、没有可引用的内容、超过 2 万字默认最近 5 轮、草稿里的芯片）；没有小于 12px 的字；页面没有报错。
+// 原会话已删除、引用正在生成的会话、没有可引用的内容、超过 2 万字默认最近 5 轮、草稿里的芯片、预览的标题不被压矮、
+// 很长的会话名截断加省略号）；没有小于 12px 的字；页面没有报错。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m5-app.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m5-app(-packaged).json，截图在 test-results/m5-app(-packaged)/。
@@ -17,8 +18,9 @@ import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs'
 import { openMenuOn, rowOf, savedArchived, stubFolder, until, waitReady, waitStatus } from './m3-helpers.mjs';
 import { refEntries } from './m4-helpers.mjs';
 import {
-  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, paneAt, pickRange, previewState, savedLayout, sendAt,
-  sentSessionRefs, smallText, splitState, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip, waitSplit,
+  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, headingTruncated, headingWhole, paneAt, pickRange,
+  previewHeading, previewState, savedLayout, sendAt, sentSessionRefs, smallText, splitState, waitPaneIdle,
+  waitPaneReady, waitPreview, waitSessionChip, waitSplit,
 } from './m5-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -36,6 +38,9 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 /** README 里只出现在工具输出里的一行（合成端点的工具结果摘要只取前 80 个字，到不了这里） */
 const TOOL_ONLY = 'TOOL-OUTPUT-ONLY-MARKER';
 const MENU_ORDER = 'Rename,Attach as context,Open in split view,Archive,Delete…';
+/** 很长的会话名（中英文都有），预览的标题一行放不下 */
+const LONG_NAME = 'A very long session name that keeps going so the preview heading cannot fit it on a single line'
+  + ' · 很长的会话名，用来看预览的标题放不下时截断加省略号、不折行';
 
 // ---------- 准备 ----------
 
@@ -75,6 +80,22 @@ async function startApp(ctx) {
   ctx.page.on('pageerror', (error) => ctx.pageErrors.push(error.message));
   ctx.h = pageHelpers(ctx.page);
 }
+
+/** @brief 窗口（含边框和菜单栏）现在的大小 [宽, 高]。 */
+const windowSize = (ctx) => ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getSize());
+
+/**
+ * @brief 按 windowSize 量出的大小设窗口。回到启动时的大小要用它：这个窗口有菜单栏，用 setContentSize 设回
+ *        getContentSize 的值时，页面会比启动时高出菜单栏的高度。
+ */
+async function setWindowSize(ctx, [width, height]) {
+  await ctx.app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setSize(size.w, size.h),
+    { w: width, h: height });
+  await sleep(500);
+}
+
+/** @brief 页面的大小"宽×高"。 */
+const viewSize = (page) => page.evaluate(() => `${innerWidth}×${innerHeight}`);
 
 /** @brief 改窗口大小（主进程里改，界面随之响应）。 */
 async function resizeWindow(ctx, width, height) {
@@ -134,6 +155,7 @@ const focusedTitle = async (page) => (await splitState(page)).focusedTitle;
  */
 async function setup(ctx) {
   const { app, page, h } = ctx;
+  ctx.defaultSize = await windowSize(ctx);
   await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
   await h.fillConnection({ name: '合成端点', baseUrl, apiKey: testKey, modelId: 'fake-coder' });
   await page.getByRole('button', { name: 'Test connection' }).click();
@@ -561,6 +583,59 @@ async function longSource(ctx) {
   await page.locator('.pane-slot[data-focused="true"] [data-testid="quote-chip"] .icon-button').first().click();
 }
 
+/** @brief 在侧栏的会话行上右键"Rename"改成 name，等这一行显示新名字。 */
+async function renameRow(page, file, name) {
+  await rowOf(page, file).first().click({ button: 'right' });
+  await page.getByTestId('session-menu').getByRole('menuitem', { name: 'Rename' }).click();
+  await page.getByTestId('rename-input').fill(name);
+  await page.getByTestId('rename-input').press('Enter');
+  await until(async () => (await rowOf(page, file).first().textContent()).includes(name), 10000);
+}
+
+/** @brief 点焦点所在的一栏里的会话引用芯片，等预览读完，返回量出的标题。 */
+async function openHeading(page) {
+  await page.locator('.pane-slot[data-focused="true"] [data-kind="session"] .quote-chip-main').click();
+  await waitPreview(page);
+  return previewHeading(page);
+}
+
+/**
+ * @brief 预览的标题"Context · <会话名>"完整显示（session-refs.md"预览与调整范围"）：超过 2 万字的会话（longSource 建的）
+ *        轮次列表占满对话框，默认窗口大小和内容区 800×600 下标题都是完整的一行、没有被压矮；改成很长的名字后一行放不下，
+ *        截断加省略号、不折行，不撑宽对话框。用菜单把它引用进 B，结束时去掉芯片、窗口回到原来的大小。
+ *        要用 longSource 建的会话（ctx.long），用 --only 时要同时选 longSource 和 headingFit。
+ */
+async function headingFit(ctx) {
+  const { page } = ctx;
+  const before = await windowSize(ctx);
+  await setWindowSize(ctx, ctx.defaultSize);
+  await rowOf(page, ctx.b).first().click();
+  await waitPaneReady(page, 'focused');
+  await menuOf(page, ctx.long);
+  await chooseByKeys(page, 'Attach as context');
+  await waitSessionChip(page, 'focused');
+  const normal = { ...await openHeading(page), view: await viewSize(page) };
+  await shot(page, '4-heading-default');
+  await resizeWindow(ctx, 800, 600);
+  const small = { ...await previewHeading(page), view: await viewSize(page) };
+  await shot(page, '4-heading-800x600');
+  await page.keyboard.press('Escape');
+  record('预览的标题：默认窗口大小、轮次列表占满对话框时标题完整显示，只有一行、没有被压矮',
+    Boolean(normal.listFull) && headingWhole(normal), JSON.stringify(normal));
+  record('预览的标题：内容区 800×600、轮次列表占满对话框时标题仍完整显示，只有一行', Boolean(small.listFull)
+    && headingWhole(small), JSON.stringify(small));
+  await setWindowSize(ctx, ctx.defaultSize);
+  await renameRow(page, ctx.long, LONG_NAME);
+  const long = await openHeading(page);
+  await shot(page, '4-heading-long-name');
+  await page.keyboard.press('Escape');
+  record('预览的标题：会话名很长时只有一行，横向裁掉放不下的部分、截断加省略号、不折行，不超出对话框和窗口，'
+    + '对话框没有被撑宽，完整显示',
+    long?.text === `Context · ${LONG_NAME}` && headingTruncated(long) && headingWhole(long), JSON.stringify(long));
+  await page.locator('.pane-slot[data-focused="true"] [data-testid="quote-chip"] .icon-button').first().click();
+  await setWindowSize(ctx, before);
+}
+
 /** @brief 走查 5 与删除：删除 A 时它所在的一栏关闭；指向它的引用显示"Session deleted"，原文仍可查看。 */
 async function deleteSource(ctx) {
   const { page } = ctx;
@@ -613,7 +688,7 @@ async function fontSizes(ctx) {
 }
 
 const steps = { setup, menuSplit, dragAndPlace, twoPanes, followFocus, divider, crampedRight, closeKeeps,
-  dragReference, jumpBack, keyboardReference, restart, runningSource, longSource, deleteSource, fontSizes };
+  dragReference, jumpBack, keyboardReference, restart, runningSource, longSource, headingFit, deleteSource, fontSizes };
 
 const fake = await startFakeEndpoint();
 const { root, project } = makeProject();

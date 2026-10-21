@@ -89,7 +89,9 @@
 
 /* 预览对话框 */
 .dialog.ref-preview { display: flex; flex-direction: column; width: min(720px, 100%); max-height: calc(100vh - 32px); }
-.ref-preview h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 标题不跟着收缩：overflow: hidden 使它在列方向的自动最小高度为 0，轮次列表占满对话框时会被压矮、字被裁掉；
+   会话名一行放不下时截断加省略号，不折行 */
+.ref-preview h2 { flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ref-preview .ref-note { margin: 6px 0 0; color: var(--color-muted); font-size: var(--fs-small); }
 .ref-range { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 10px; }
 .ref-range select {

@@ -83,6 +83,8 @@ Quoting session “修复登录”, turns 3–4:
 | 原会话已删除 | `session.read` 报会话文件不在，或会话列表里已经没有它 | "Session deleted · Showing the attached text"，显示芯片里保存的内容；不能改范围 | "Close"或 Esc |
 | 读取失败 | `session.read` 报其他错误 | "Couldn’t read the session: <原文> · Showing the attached text"，下面是芯片里保存的内容 | Close |
 
+标题"Context · <会话名>"始终完整显示在一行：会话名太长时截断加省略号，不折行。
+
 焦点：打开时在"From turn"的下拉框；Tab 只在对话框里循环；关闭后焦点回到芯片。
 
 ## 发出的消息里的引用

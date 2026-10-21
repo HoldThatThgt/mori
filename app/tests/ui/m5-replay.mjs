@@ -15,8 +15,9 @@ import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
-  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, paneAt, pickRange, previewState, sendAt,
-  sentSessionRefs, splitState, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip, waitSplit,
+  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, headingWhole, paneAt, pickRange, previewHeading,
+  previewState, sendAt, sentSessionRefs, splitState, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip,
+  waitSplit,
 } from './m5-helpers.mjs';
 
 const only = arg('only')?.split(',');
@@ -250,6 +251,10 @@ async function referenceTurns(page, h, fx, c) {
   await page.locator('.pane-slot[data-focused="true"] [data-testid="quote-chip"] .quote-chip-main').click();
   await waitPreview(page);
   const before = await previewState(page);
+  const heading = await previewHeading(page);
+  await shot(page, 'ref-turns-preview');
+  record('ref-turns：轮次列表占满预览对话框时（默认窗口大小），标题"Context · <会话名>"完整显示，只有一行、没有被压矮',
+    Boolean(heading?.listFull) && headingWhole(heading), JSON.stringify(heading));
   const clean = previewClean(before);
   record('ref-turns：预览按"第 N 轮"列出 6 轮和总字数；工具调用只有一行标题、没有工具输出；没有按钮、"思考"等界面文字',
     before.turns.length === 6 && before.options === 6 && clean.ok
