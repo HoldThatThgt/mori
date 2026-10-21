@@ -42,7 +42,10 @@ function m6Empty(type) {
   return { cwd: null, projectTrust: null, tools: null, skills: [], packages: [], mcp: null, diagnostics: [] };
 }
 
-/** synthetic：M6 才加进会话信息的字段，按后台进程对没标"支持思考"的模型的取值 */
+/** @brief 后台进程退出后请求得到的错误，原文同 src/preload/index.ts。 */
+const crashed = (code) => new Error(`Mori’s background process crashed (exit code ${code})`);
+
+/** synthetic：M6 才加进会话信息的字段，按后台进程对没标"Supports thinking"的模型的取值 */
 const M6_INFO = { thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false };
 
 /**
@@ -85,7 +88,7 @@ function fileKey(path, cwd) {
 
 /**
  * @brief 按录制里的 file 步骤回答 readFile：同一个文件（按主进程解析后的路径）按录下的顺序，取完后重复最后一个。
- *        synthetic：没录过的文件按"文件已被删除或移动"回答，测试不该用到。
+ *        synthetic：没录过的文件按"File not found"（status 为 missing）回答，测试不该用到。
  * @param steps 回放的步骤（M7 是重启前或重启后的一段）
  */
 function fileReader(steps) {
@@ -179,7 +182,7 @@ function m6Normal(command) {
 
 /**
  * @brief M7：录制里主进程保存反馈或报告的结果（文件的完整路径），按顺序；kind 为 feedback 或 issue。
- *        界面保存的第 n 份返回录下的第 n 个路径，"在工作回顾中查看"就按它的文件名选中录下的记录。
+ *        界面保存的第 n 份返回录下的第 n 个路径，"View in Review"就按它的文件名选中录下的记录。
  */
 function recordedFiles(steps, kind) {
   return steps.filter((step) => step[kind]?.result?.file).map((step) => step[kind].result.file);
@@ -317,7 +320,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
   const marks = boundaries(steps);
   const listeners = { event: new Set(), exit: new Set(), ready: new Set() };
   // played：已经放完的段数（每条命令之后、下一条命令之前算一段）；played 等于 cursor 时回放桥在等界面的下一条命令。
-  const status = { cursor: 0, played: 0, clock: 0, exited: false, errors: [], commands: [], queries: [],
+  const status = { cursor: 0, played: 0, clock: 0, exited: false, exitCode: null, errors: [], commands: [], queries: [],
     playing: Promise.resolve(), idle: true, attention: 0, captures: 0, dialogAtCapture: [], issues: [], shown: [],
     deleted: [], reads: [], opened: [], copied: [], feedback: [], failed: [], reviewLists: 0, reviewShots: [],
     exports: [], exportShown: [], recordShown: [], folders: [] };
@@ -399,7 +402,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
 
   /**
    * @brief 回答 session.read：同一会话文件按录制顺序取结果，取完后重复最后一个。
-   *        synthetic：没录过的会话文件按"会话文件不在了"回答（与后台进程的原文相同），测试不该用到。
+   *        synthetic：没录过的会话文件按"Session file not found: <文件>"回答（与后台进程的原文相同），测试不该用到。
    */
   function readResult(sessionFile) {
     const recorded = steps.filter((step, index) => step.result?.type === 'session.read'
@@ -454,7 +457,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
 
   const bridge = {
     request(command) {
-      if (status.exited) return Promise.reject(new Error('Mori kernel exited (code 1)'));
+      if (status.exited) return Promise.reject(crashed(status.exitCode));
       switch (command.type) {
         case 'config.get': return Promise.resolve(latestResult('config.get', m6Config(fixture, saved)));
         case 'tools.get':
@@ -505,6 +508,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     /** @brief 模拟后台进程退出。 */
     exit(code = 1) {
       status.exited = true;
+      status.exitCode = code;
       for (const listener of listeners.exit) listener(code);
     },
   };

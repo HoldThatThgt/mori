@@ -66,7 +66,7 @@ const refCode = await loadRefCode();
 function displayTitle(name, firstMessage) {
   if (name?.trim()) return name;
   const first = firstMessage?.replace(/\s+/g, ' ').trim();
-  if (!first) return '新会话';
+  if (!first) return 'New session';
   return [...first].length > 20 ? `${[...first].slice(0, 20).join('')}…` : first;
 }
 

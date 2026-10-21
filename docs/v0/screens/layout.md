@@ -23,14 +23,14 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 宽窗口（≥1024px） | 窗口宽度 | 左栏展开、中栏、右栏（打开时） | 拖动或用键盘调整两条分隔线；收起左栏 |
-| 窄窗口（<1024px） | 窗口宽度 | 左栏自动收起为 60px 图标栏 | 点图标栏的展开按钮临时展开（浮在中栏上层） |
+| 窄窗口（<1024px） | 窗口宽度 | 左栏自动收起为 60px 图标栏 | 点图标栏的展开按钮（"Open sidebar"）临时展开（浮在中栏上层） |
 | 很窄（<800px，只在最小宽度以下出现） | 窗口宽度 | 右栏浮在中栏上层 | 关闭右栏 |
 | 最小窗口 | 主进程 `minWidth: 800, minHeight: 600` | 800 宽时：图标栏 + 中栏 + 右栏都完整，中栏至少 300px，顶栏文字省略号截断而不溢出 | — |
-| 左栏收起 | 你点了收起，或窄窗口 | 图标栏：展开、新会话（M3）、打开文件夹、报告界面问题（M2）、设置 | 展开 |
-| 右栏关闭 | 本会话没有改动时默认关闭；或你关了它 | 顶栏右栏开关按钮 | 打开 |
-| 右栏打开、没有改动 | 你手动打开 | "本会话还没有改动" | 关闭 |
-| 右栏打开、有改动 | 本会话出现了编辑或写入的工具结果（pi 的 `tool_execution_end` 或会话记录里的工具结果） | 顶部注明"只含编辑和写入，命令改动的文件不在此列。"；按文件列出，展开后按时间顺序显示每次编辑的 diff，写入显示新内容 | 展开、收起；关闭 |
-| 右栏打开、显示文件（M4） | 你点了文件路径、"打开"或文件引用芯片 | 文件阅读器，见 [changes.md](changes.md) | 返回改动；关闭 |
+| 左栏收起 | 你点了收起（"Close sidebar"），或窄窗口 | 图标栏："Open sidebar"、"New session (Ctrl+N)"（M3）、"Open folder…"、"Report a UI issue (F8)"（M2）、"Settings"，都是图标按钮，名称在读屏名和悬停说明里 | "Open sidebar" |
+| 右栏关闭 | 本会话没有改动时默认关闭；或你关了它 | 顶栏右栏开关按钮（读屏名"Toggle changes"） | 打开 |
+| 右栏打开、没有改动 | 你手动打开 | "No changes yet." | 关闭 |
+| 右栏打开、有改动 | 本会话出现了编辑或写入的工具结果（pi 的 `tool_execution_end` 或会话记录里的工具结果） | 顶部注明"Only edits and writes are listed. Files changed by commands aren’t included."；按文件列出，展开后按时间顺序显示每次编辑的 diff，写入显示新内容 | 展开、收起；关闭 |
+| 右栏打开、显示文件（M4） | 你点了文件路径、"Open"或文件引用芯片 | 文件阅读器，见 [changes.md](changes.md) | 返回改动；关闭 |
 
 M4 起右栏的改动列表、文件阅读器和打开它们的入口见 [changes.md](changes.md)。
 M5 起中栏可以左右分屏，右栏跟随焦点所在的一栏；分屏时放不下两栏各 280px 加最窄的右栏就先收起右栏，见 [split.md](split.md)。
@@ -41,14 +41,16 @@ M1 只列本次运行打开过的会话；M3 起换成项目 → 会话树，状
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 顶部（M3 起） | — | "新会话"主按钮（Ctrl+N）、"打开文件夹…" | 新会话、打开文件夹… |
+| 顶部（M3 起） | — | "New session"主按钮（旁边"Ctrl+N"；左栏窄于 220px 时藏起"Ctrl+N"，不折行）、"Open folder…" | "New session"、"Open folder…" |
 | 会话树（M3 起） | pi 的会话列表加本次打开的会话 | 见 [sessions.md](sessions.md) | 见 sessions.md |
-| 设置页打开 | 你点了"设置"或"去设置" | "设置"高亮 | 返回会话 |
-| 底部（M2 起） | — | "报告界面问题（F8）"和"设置"；收起为图标栏时是两个图标按钮 | 报告界面问题（见 [f8.md](f8.md)）、设置 |
+| 设置页打开 | 你点了"Settings"或"Go to settings" | "Settings"高亮 | 返回会话（"Back to app"） |
+| 底部（M2 起） | — | "Report a UI issue (F8)"和"Settings"；收起为图标栏时是两个图标按钮 | 报告界面问题（见 [f8.md](f8.md)）、设置 |
 
-工具（M6）在"打开文件夹…"下面，见 [tools.md](tools.md)；工作回顾（M7）在"工具"下面，见 [review.md](review.md)。
+Customize 页（工具页，M6）的入口"Customize"在"Open folder…"下面，见 [tools.md](tools.md)；
+工作回顾（Review，M7）的入口"Review"在"Customize"下面，见 [review.md](review.md)。
 
 ## 设置页外框
 
-- 中栏换成设置页，顶部"返回会话"；M6 起左边是分节列表（连接与模型、AGENTS.md），见 [settings.md](settings.md)。工具页（M6）外框相同，见 [tools.md](tools.md)；工作回顾（M7）顶部相同，详情放在右栏，见 [review.md](review.md)。
+- 中栏换成设置页，顶部"Back to app"；M6 起左边是分节列表（"Connections and models"、"AGENTS.md"），见 [settings.md](settings.md)。
+  Customize 页（工具页，M6）外框相同，见 [tools.md](tools.md)；工作回顾（Review，M7）顶部相同，详情放在右栏，见 [review.md](review.md)。
 - 会话面板保持挂载、只隐藏，所以返回后滚动位置、草稿、展开状态都在。

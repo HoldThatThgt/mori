@@ -24,6 +24,8 @@ const canary = 'mori-smoke-canary';
 const results = { target: exePath ?? 'dev build', checks: [] };
 const oneLine = (text, max = 200) => String(text).replace(/\s+/g, ' ').slice(0, max);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** 后台进程意外退出时的横幅（ChatPane.tsx KernelExitBanner） */
+const CRASH_BANNER = 'Mori’s background process crashed · Unfinished responses were interrupted';
 
 /** @brief 记录一项检查；known 表示已知的上游问题，失败时标 KNOWN，不计入退出码。 */
 function record(name, ok, detail = '', known = false) {
@@ -59,9 +61,9 @@ async function saveAndTest(page, apiKey) {
   const h = pageHelpers(page);
   await h.fillConnection({ name: '合成端点', baseUrl: `http://127.0.0.1:${port}/v1`, apiKey, modelId: 'fake-coder' });
   const previous = await page.getByTestId('form-message').innerText().catch(() => null);
-  await page.getByRole('button', { name: '测试连接' }).click();
+  await page.getByRole('button', { name: 'Test connection' }).click();
   await page.waitForFunction((old) => document.querySelector('[data-testid="test-result"]')
-    || (document.querySelector('[data-testid="form-message"]')?.textContent?.startsWith('连接失败')
+    || (document.querySelector('[data-testid="form-message"]')?.textContent?.startsWith('Connection failed')
       && document.querySelector('[data-testid="form-message"]')?.textContent !== old), previous, { timeout: 40000 });
   const success = page.getByTestId('test-result');
   if (await success.count()) return { ok: true, text: oneLine(await success.innerText()) };
@@ -71,9 +73,9 @@ async function saveAndTest(page, apiKey) {
 /** @brief 连接表单：错误的 key 显示错误原文；正确的 key 能连上；key 加密保存；改服务地址必须重填 key。 */
 async function connect(app, page, userData, project) {
   await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
-  await page.getByRole('button', { name: '测试连接' }).click();
+  await page.getByRole('button', { name: 'Test connection' }).click();
   const empty = await page.getByTestId('form-message').innerText();
-  record('没填连接时不发请求，给出说明（M1：测试连接会先保存）', empty.includes('请填写'), empty);
+  record('没填连接时不发请求，给出说明（M1：测试连接会先保存）', empty.endsWith(' is required.'), empty);
   const wrong = await saveAndTest(page, 'wrong-key');
   record('错误的 key 显示错误原文', !wrong.ok && wrong.text.includes('401'), wrong.text.slice(0, 160));
   const literal = await saveAndTest(page, testKey);
@@ -88,25 +90,25 @@ async function connect(app, page, userData, project) {
   await pageHelpers(page).openFolder(app, project);
   // M2 起命令要先批准；冒烟测的是批准之外的行为，先切到全部允许。
   await pageHelpers(page).allowAll();
-  // M6 起设置页先是连接列表，改服务地址在连接卡的"编辑连接"里（settings.md"编辑连接"）。
+  // M6 起设置页先是连接列表，改服务地址在连接卡的"Edit connection"里（settings.md"编辑连接"）。
   await pageHelpers(page).editConnection();
   await pageHelpers(page).fillConnection({ baseUrl: `http://localhost:${port}/v1`, apiKey: '' });
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  // settings.md 编辑连接"保存"：改了服务地址的 origin 又没填 key 时显示后台进程的原文，models.json 里的地址不变。
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  // settings.md 编辑连接"Save"：改了服务地址的 origin 又没填 key 时显示后台进程的原文，models.json 里的地址不变。
   const refusal = await pageHelpers(page).formMessage(null, { timeout: 10000 }).catch(() => '');
   const saved = JSON.parse(readFileSync(join(userData, 'pi', 'models.json'), 'utf8'));
   const kept = saved.providers?.['mori-endpoint']?.baseUrl;
-  record('改了服务地址而没有重填 key 时拒绝保存', refusal === '保存失败：API key is required when the service address changes'
+  record('改了服务地址而没有重填 key 时拒绝保存', refusal === 'Couldn’t save: API key is required when the base URL changes'
     && kept === `http://127.0.0.1:${port}/v1`, `表单下方：${refusal}；models.json 的服务地址：${kept}`);
   await pageHelpers(page).fillConnection({ baseUrl: `http://127.0.0.1:${port}/v1` });
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app' }).click();
 }
 
 /** @brief 模型运行的命令读不到 key：key 只在 pi 的内存里，不在环境变量里。 */
 async function commandEnvCheck(page) {
   // 对照：Mori 的进程环境里放了一个无害的标记变量，命令能读到它（1），但读不到 key（0）。
   const card = await sendAndWait(page, `run: env | grep -c ${testKey}; env | grep -c ${canary}; true`);
-  record('命令的环境里没有 key（对照变量可见）', /完成/.test(card) && /输出\s*0\s+1\s*$/.test(card),
+  record('命令的环境里没有 key（对照变量可见）', /Done/.test(card) && /Output\s*0\s+1\s*$/.test(card),
     card.slice(0, 200));
 }
 
@@ -128,7 +130,7 @@ async function chatChecks(app, page, project) {
   const readCard = await sendAndWait(page, '总结 README');
   const transcript = await page.getByTestId('transcript').innerText();
   record('流式文字', transcript.includes('我先读一下 README.md') && transcript.includes('工具已返回'));
-  record('读取工具卡完成', /读取.*完成.*Smoke project/.test(readCard), readCard.slice(0, 200));
+  record('读取工具卡完成', /Read.*Done.*Smoke project/.test(readCard), readCard.slice(0, 200));
 
   await sendAndWait(page, 'code block');
   const tokens = await page.locator('.prose pre span[style*="--sdm-c"]').count();
@@ -141,11 +143,11 @@ async function chatChecks(app, page, project) {
     return `${pre?.textContent ?? ''} [带颜色的 token ${colored} 个]`;
   }).catch(() => ''), 200);
   const edited = readFileSync(join(project, 'README.md'), 'utf8').includes('(edited)');
-  record('编辑工具显示 diff', /修改.*完成/.test(editCard) && edited && diffText.includes('edited'),
+  record('编辑工具显示 diff', /Edit.*Done/.test(editCard) && edited && diffText.includes('edited'),
     `文件已修改=${edited}；diff：${diffText}`);
 
   const shellCard = await sendAndWait(page, 'run: echo "bash=$BASH_VERSION"; uname -s; command -v bash');
-  record('pi 使用 Git Bash', /完成/.test(shellCard) && /bash=\d/.test(shellCard) && /MINGW|MSYS/.test(shellCard),
+  record('pi 使用 Git Bash', /Done/.test(shellCard) && /bash=\d/.test(shellCard) && /MINGW|MSYS/.test(shellCard),
     shellCard.slice(0, 300));
 }
 
@@ -197,7 +199,7 @@ async function concurrencyCheck(page, project) {
 async function closeWhileRunning(app, page, baseline) {
   const before = new Set(sleepProcessIds());
   await pageHelpers(page).send('run: sleep 127');
-  await page.getByTestId('tool-card').last().getByText('执行中').waitFor({ timeout: 20000 });
+  await page.getByTestId('tool-card').last().getByText('Running…').waitFor({ timeout: 20000 });
   await sleep(1000);
   const started = sleepProcessIds().filter((pid) => !before.has(pid));
   const fromRun = sleepProcessIds().filter((pid) => !baseline.has(pid));
@@ -235,23 +237,23 @@ async function crashCheck(env) {
   const app = await electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
   try {
     const page = await app.firstWindow();
-    // M6：设置页先是连接列表；"编辑连接"里的"测试连接"测这个连接的第一个模型（settings.md"编辑连接"）。
+    // M6：设置页先是连接列表；"Edit connection"里的"Test connection"测这个连接的第一个模型（settings.md"编辑连接"）。
     await pageHelpers(page).editConnection();
-    await page.getByRole('button', { name: '测试连接' }).click();
+    await page.getByRole('button', { name: 'Test connection' }).click();
     const test = await pageHelpers(page).formMessage(null, { test: true, timeout: 40000 });
     const placeholder = await page.getByTestId('connection-form').locator('input[type=password]').getAttribute('placeholder');
-    record('重启后不用重填 key 也能连接', test.startsWith('连接成功') && /已加密保存/.test(placeholder ?? ''),
+    record('重启后不用重填 key 也能连接', test.startsWith('Connected') && /Saved and encrypted/.test(placeholder ?? ''),
       `${oneLine(test, 120)}；key 输入框提示：${placeholder}`);
     const pid = kernelPid(app.process().pid);
     execFileSync('taskkill', ['/PID', String(pid), '/F']);
-    await page.getByText('后台进程意外退出').waitFor({ timeout: 10000 });
+    await page.getByText(CRASH_BANNER).waitFor({ timeout: 10000 });
     const request = () => page.evaluate(() => Promise.race([
       window.mori.request({ type: 'config.get' }).then(() => 'resolved', (error) => `rejected: ${error.message}`),
       new Promise((r) => setTimeout(() => r('hung'), 3000)),
     ]));
     const before = await request();
     await page.reload();
-    const banner = await page.getByText('后台进程意外退出').waitFor({ timeout: 10000 }).then(() => true, () => false);
+    const banner = await page.getByText(CRASH_BANNER).waitFor({ timeout: 10000 }).then(() => true, () => false);
     const after = await request();
     record('后台进程意外退出：提示出现、请求立即失败、刷新后仍提示',
       before.startsWith('rejected') && after.startsWith('rejected') && banner,

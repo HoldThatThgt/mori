@@ -1,10 +1,11 @@
 // M7 界面测试：在 Electron 里载入真正的界面，用回放进程桥（tests/ui/harness）回放真实录制的会话（tests/fixtures/m7）。
 // 录制里有一次重启（{ restart: true }），每个录制分两段回放（?part=before|after，页面重新载入就是重启）：
-// 重启前一段测试像你一样在界面里写下记录（发消息；回复下的"反馈这条回复"；回复里拖选一句点"反馈"；阅读器里选第 5–6 行
-// 点"反馈"；按 F8 保存报告并点"在工作回顾中查看"），核对界面交给主进程保存的反馈与录制时逐字相同；重启后一段打开工作回顾，
+// 重启前一段测试像你一样在界面里写下记录（发消息；回复下的"Give feedback"；回复里拖选一句点"Feedback"；阅读器里选第
+// 5–6 行点"Feedback"；按 F8 保存报告并点"View in Review"），核对界面交给主进程保存的反馈与录制时逐字相同；重启后一段打开工作回顾，
 // 读到的记录和截图是录制时主进程真的读到的，按 docs/v0/screens/review.md 检查一行摘要、详情和截图；回到原位置（整条回复、
 // 回复里的一句、文件里的两行）时回放桥核对界面发出的命令与录制一致，再检查高亮和阅读器；review-changed 里指向会话里
-// 不存在的回复的那份反馈（synthetic，见 m7-record.mjs 的 seed）点"回到原位置"后留在工作回顾、标"原文已变化"，
+// 不存在的回复的那份反馈（synthetic，见 m7-record.mjs 的 seed）点"Jump to source"后留在工作回顾、说明
+// "This response is no longer in the session."，
 // 不发 session.open。再次打开工作回顾时回放桥重复录下的最后一份记录；导出、打开文件夹、在资源管理器里选中没有录过，
 // 回放桥只记下调用（导出的结果是 synthetic 的路径），这里只核对界面交出去的记录名。M1–M6 的回放检查仍由 m1–m6-replay 负责。
 // 用法（在 app/ 下）：node tests/ui/m7-replay.mjs [--only reply-before,reply-after,changed-before,changed-after]
@@ -23,7 +24,8 @@ import {
   assistantIndexWith, dragSelect, jumpHighlight, PANE, popoverShown, selectLines, viewerState, waitViewer,
 } from './m4-helpers.mjs';
 import {
-  chooseTab, detailState, flashVisible, openReviewPage, pressedRow, reviewState, selectRow, shortOf, waitLoaded,
+  chooseTab, detailState, flashVisible, openReviewPage, pressedRow, records, reviewState, selectRow, shortOf,
+  waitLoaded,
 } from './m7-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -40,7 +42,7 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
   'agents.get', 'session.commands'];
 /** 回复不在了时详情里的说明（review.md "回到原位置"） */
-const CHANGED = '原文已变化：会话里找不到这条回复了';
+const CHANGED = 'This response is no longer in the session.';
 /** synthetic：回放桥给导出返回的第一个路径（harness/replay.js 的 reviewStubs） */
 const EXPORT_FILE = 'C:\\replay\\export\\replay-1.md';
 
@@ -90,12 +92,12 @@ function firstLine(text) {
   return [...line].length > 200 ? `${[...line].slice(0, 200).join('')}…` : line;
 }
 
-/** @brief 反馈的范围："回复里的选区" / "整条回复" / "<相对工作目录的路径> 第 a–b 行"。 */
+/** @brief 反馈的范围："Selection in response" / "Whole response" / "<相对工作目录的路径> · lines a–b"。 */
 function scopeOf({ source, session }) {
-  if (source.kind === 'message') return source.scope === 'selection' ? '回复里的选区' : '整条回复';
-  const lines = source.startLine === source.endLine ? `第 ${source.startLine} 行`
-    : `第 ${source.startLine}–${source.endLine} 行`;
-  return `${win32.relative(session.cwd, source.path).replace(/\\/g, '/')} ${lines}`;
+  if (source.kind === 'message') return source.scope === 'selection' ? 'Selection in response' : 'Whole response';
+  const lines = source.startLine === source.endLine ? `line ${source.startLine}`
+    : `lines ${source.startLine}–${source.endLine}`;
+  return `${win32.relative(session.cwd, source.path).replace(/\\/g, '/')} · ${lines}`;
 }
 
 /** @brief 一份反馈的一行摘要；name 是侧栏里这个会话现在的名字。 */
@@ -106,13 +108,13 @@ function feedbackRow(item, name) {
     tags: [] };
 }
 
-/** @brief 一份有截图的界面问题报告的一行摘要（不标"没有截图"）。 */
+/** @brief 一份有截图的界面问题报告的一行摘要（不标"No screenshot"）。 */
 const issueRow = (item) => ({ name: item.name, title: item.what, quote: null, source: null, time: shortOf(item.time),
   tags: [] });
 
 // ---------- 页面 ----------
 
-/** @brief 当前分节列表里每一行的几段文字：期望（或"哪里不对"）、原文的第一行、来源、时间、标签。 */
+/** @brief 当前分节列表里每一行的几段文字：期望（或"What went wrong"）、原文的第一行、来源、时间、标签。 */
 function rowParts(page) {
   return page.locator('[data-testid="review-row"]').evaluateAll((rows) => rows.map((row) => {
     const text = (css) => row.querySelector(css)?.textContent.trim() ?? null;
@@ -173,9 +175,9 @@ function helpers(page) {
       await page.waitForFunction(() => !document.querySelector('.sidebar-note'), null, { timeout: 20000 });
       return { fx, steps: partOf(fx, part) };
     },
-    /** @brief 点"打开文件夹…"（回放桥返回下一条 session.create 的文件夹），等会话就绪。 */
+    /** @brief 点"Open folder…"（回放桥返回下一条 session.create 的文件夹），等会话就绪。 */
     async openFolder() {
-      await page.getByTestId('sidebar').getByRole('button', { name: '打开文件夹…' }).click();
+      await page.getByTestId('sidebar').getByRole('button', { name: 'Open folder…' }).click();
       await waitReady(page);
     },
     status: () => page.evaluate(() => window.__replay.status),
@@ -184,65 +186,65 @@ function helpers(page) {
 
 // ---------- 重启前：在界面里写下记录 ----------
 
-/** @brief 反馈表单出现后写 expected 点"记录"，等"已记录"，按 Esc 关掉表单；返回"已记录"那一行的文字。 */
+/** @brief 反馈表单出现后写 expected 点"Save"，等"Saved"，按 Esc 关掉表单；返回"Saved"那一行的文字。 */
 async function submitFeedback(page, expected) {
   const form = page.getByTestId('feedback-form');
   await form.waitFor({ timeout: 5000 });
   await page.getByTestId('feedback-input').fill(expected);
-  await form.getByRole('button', { name: '记录' }).click();
+  await form.getByRole('button', { name: 'Save' }).click();
   const saved = await page.getByTestId('feedback-saved').innerText({ timeout: 5000 });
   await page.keyboard.press('Escape');
   await form.waitFor({ state: 'detached', timeout: 6000 });
   return saved.trim();
 }
 
-/** @brief 最后一轮回复下的"反馈这条回复"，写 expected 记录；返回"已记录"那一行的文字。 */
+/** @brief 最后一轮回复下的"Give feedback"，写 expected 记录；返回"Saved"那一行的文字。 */
 async function feedbackReply(page, expected) {
-  await page.locator(`${PANE} [data-testid="reply-actions"]`).last().getByRole('button', { name: '反馈这条回复' })
+  await page.locator(`${PANE} [data-testid="reply-actions"]`).last().getByRole('button', { name: 'Give feedback' })
     .click();
   return submitFeedback(page, expected);
 }
 
-/** @brief 在回复里拖选录制时选的那一句，点浮层的"反馈"并记录；返回浮层是否出现。 */
+/** @brief 在回复里拖选录制时选的那一句，点浮层的"Feedback"并记录；返回浮层是否出现。 */
 async function feedbackSelection(page, recorded) {
   const index = await assistantIndexWith(page, recorded.quote);
   await dragSelect(page, `${PANE} [data-testid="assistant"]`, recorded.quote, index);
   const shown = await popoverShown(page);
-  await page.getByTestId('selection-popover').getByRole('button', { name: '反馈' }).click();
+  await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
   await submitFeedback(page, recorded.expected);
   return shown;
 }
 
-/** @brief 点"读取"工具卡里的路径打开阅读器，选录制时的那几行，点浮层的"反馈"并记录；返回浮层是否出现。 */
+/** @brief 点"Read"工具卡里的路径打开阅读器，选录制时的那几行，点浮层的"Feedback"并记录；返回浮层是否出现。 */
 async function feedbackLines(page, recorded) {
   const card = page.locator(`${PANE} [data-testid="tool-card"]`)
-    .filter({ has: page.locator('.tool-verb', { hasText: '读取' }) }).last();
+    .filter({ has: page.locator('.tool-verb', { hasText: 'Read' }) }).last();
   await card.getByTestId('tool-path').click();
   await waitViewer(page);
   await selectLines(page, recorded.source.startLine, recorded.source.endLine);
   const shown = await popoverShown(page);
-  await page.getByTestId('selection-popover').getByRole('button', { name: '反馈' }).click();
+  await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
   await submitFeedback(page, recorded.expected);
   return shown;
 }
 
-/** @brief 按 F8，填录制时的"哪里不对""你期望什么"后保存；检查交给主进程的报告和"已保存到"的路径。 */
+/** @brief 按 F8，填录制时的"What went wrong""What you expected"后保存；检查交给主进程的报告和"Saved to"的路径。 */
 async function saveReport(page, h, issue) {
   await page.keyboard.press('F8');
   const dialog = page.getByTestId('issue-dialog');
   await dialog.getByTestId('issue-shot').waitFor({ timeout: 15000 });
   await dialog.getByTestId('issue-what').fill(issue.what);
   await dialog.getByTestId('issue-expect').fill(issue.expect);
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   const saved = (await page.getByTestId('issue-saved').innerText({ timeout: 15000 })).trim();
   const reports = (await h.status()).issues;
   record('review-reply 重启前：F8 交给主进程的报告里"哪里不对""你期望什么"是录制时填的；"已保存到"后面是录制时主进程'
     + '保存的路径', reports.length === 1 && reports[0].what === issue.what && reports[0].expect === issue.expect
-    && saved === `已保存到 ${issue.result.file}`, JSON.stringify({ saved, reports: reports.length }));
+    && saved === `Saved to ${issue.result.file}`, JSON.stringify({ saved, reports: reports.length }));
 }
 
 /**
- * @brief F8 报告框里点"在工作回顾中查看"：关闭报告框，打开"界面问题"并选中录制里的这一份；列表和详情是录制时主进程
+ * @brief F8 报告框里点"View in Review"：关闭报告框，打开"UI issues"并选中录制里的这一份；列表和详情是录制时主进程
  *        读到的记录，截图按报告里的文件名读（录制时读到的 PNG）。
  */
 async function viewReport(page, h, fx, steps) {
@@ -268,7 +270,7 @@ async function viewReport(page, h, fx, steps) {
     lists: status.reviewLists, shots: status.reviewShots }));
 }
 
-/** @brief review-reply 重启前：读 README 的一轮；三份反馈与录制时逐字相同；F8 报告与"在工作回顾中查看"。 */
+/** @brief review-reply 重启前：读 README 的一轮；三份反馈与录制时逐字相同；F8 报告与"View in Review"。 */
 async function replyBefore(page, h) {
   const { fx, steps } = await h.load('review-reply', 'before');
   const saves = savesOf(steps);
@@ -281,7 +283,7 @@ async function replyBefore(page, h) {
   const sent = (await h.status()).feedback;
   const view = (index) => JSON.stringify({ sent: sent[index], recorded: saves[index].record });
   record('review-reply 重启前："反馈这条回复"后"已记录 · 在工作回顾中查看"；交给主进程的反馈（整轮回复的原文、锚点的'
-    + '条目 id 和消息时间、会话文件、工作目录、会话名）与录制时逐字相同', saved === '已记录 · 在工作回顾中查看'
+    + '条目 id 和消息时间、会话文件、工作目录、会话名）与录制时逐字相同', saved === 'Saved · View in Review'
     && canonical(sent[0]) === canonical(saves[0].record), view(0));
   record('review-reply 重启前：在回复里拖选录制时的那一句，浮层出现；"反馈"交给主进程的原文和锚点（那条助手回复）'
     + '与录制时相同', picked && canonical(sent[1]) === canonical(saves[1].record), view(1));
@@ -294,7 +296,7 @@ async function replyBefore(page, h) {
   await finish(page, 'review-reply 重启前', commandsOf(steps).length);
 }
 
-/** @brief review-changed 重启前：问 Markdown 的一轮；"反馈这条回复"交给主进程的反馈与录制时逐字相同。 */
+/** @brief review-changed 重启前：问 Markdown 的一轮；"Give feedback"交给主进程的反馈与录制时逐字相同。 */
 async function changedBefore(page, h) {
   const { steps } = await h.load('review-changed', 'before');
   const [save] = savesOf(steps);
@@ -311,7 +313,7 @@ async function changedBefore(page, h) {
 
 // ---------- 重启后：工作回顾 ----------
 
-/** @brief "对内容的反馈"一节：分节上未处理的条数；一行摘要按录制时读到的顺序（从新到旧）。 */
+/** @brief "Feedback"一节：分节上未处理的条数；一行摘要按录制时读到的顺序（从新到旧）。 */
 async function feedbackList(page, review, name) {
   const state = await reviewState(page);
   const rows = await rowParts(page);
@@ -320,17 +322,17 @@ async function feedbackList(page, review, name) {
   await shot(page, 'reply-after-feedback');
   record('review-reply 重启后：打开工作回顾（录制时主进程读到的记录），默认是"对内容的反馈"；分节上是未处理的条数'
     + `（"对内容的反馈，${counts.feedback} 条未处理"、"界面问题，${counts.issues} 条未处理"）`, state.tabs.feedback.pressed
-    && state.tabs.feedback.label === `对内容的反馈，${counts.feedback} 条未处理`
+    && state.tabs.feedback.label === `Feedback, ${counts.feedback} unresolved`
     && state.tabs.feedback.count === String(counts.feedback) && state.tabs.issues.count === String(counts.issues)
-    && state.tabs.issues.label === `界面问题，${counts.issues} 条未处理`, JSON.stringify(state.tabs));
+    && state.tabs.issues.label === `UI issues, ${counts.issues} unresolved`, JSON.stringify(state.tabs));
   record('一行摘要：按录制时读到的顺序（从新到旧），每行是期望、原文的第一行、来源（侧栏里的会话名 · 范围，或文件的'
     + '相对路径和行）、时间（MM-DD HH:mm）；会话名与反馈时记下的相同', same(rows, review.feedback.map((item) =>
     feedbackRow(item, name))) && titles.every((title) => title === name), JSON.stringify(rows));
 }
 
 /**
- * @brief "界面问题"一节：一行摘要；详情里的时间、两段原文、截图（录制时主进程读到的 PNG，只读一次）、可以展开的三节；
- *        "打开所在文件夹"（没有录过：回放桥只记下调用）。
+ * @brief "UI issues"一节：一行摘要；详情里的时间、两段原文、截图（录制时主进程读到的 PNG，只读一次）、可以展开的三节；
+ *        "Show in Explorer"（没有录过：回放桥只记下调用）。
  */
 async function issueDetail(page, h, steps) {
   const [item] = reviewOf(steps).issues;
@@ -344,7 +346,7 @@ async function issueDetail(page, h, steps) {
   record('界面问题的一行摘要："哪里不对"、时间；有截图，不标"没有截图"', same(rows, [issueRow(item)]),
     JSON.stringify(rows));
   record('界面问题的详情：标题"界面问题"、完整时间、"哪里不对""你期望什么"全文；截图是录制时主进程读到的那张 PNG'
-    + '（按报告里的截图文件名只读一次，原尺寸）；"当前界面""最近的操作""版本"是报告里的原文', detail.heading === '界面问题'
+    + '（按报告里的截图文件名只读一次，原尺寸）；"当前界面""最近的操作""版本"是报告里的原文', detail.heading === 'UI issues'
     && detail.time === item.time && detail.what === item.what && detail.expect === item.expect
     && recorded.name === item.shot && picture?.src === recorded.result && picture.natural === pngWidth(recorded.result)
     && same((await h.status()).reviewShots, [item.shot]) && same(more, [item.view, item.actions, item.versions]),
@@ -361,9 +363,9 @@ async function jumpReply(page, h, item, name) {
   const { feedback } = item;
   const detail = await selectRow(page, item.name);
   record('整条回复的详情：完整时间；来源（会话名、"整条回复"、工作目录）；"你希望得到的结果""引用的原文"全文；'
-    + '"回到原位置"可用', detail.time === item.time && [name, '整条回复', feedback.session.cwd].every((text) =>
+    + '"回到原位置"可用', detail.time === item.time && [name, 'Whole response', feedback.session.cwd].every((text) =>
     detail.source?.includes(text)) && detail.expected === feedback.expected && detail.quote === feedback.quote
-    && detail.jump?.text === '回到原位置' && !detail.jump.disabled, JSON.stringify({ source: detail.source,
+    && detail.jump?.text === 'Jump to source' && !detail.jump.disabled, JSON.stringify({ source: detail.source,
     jump: detail.jump }));
   await page.getByTestId('detail-jump').click();
   await waitChat(page);
@@ -380,7 +382,7 @@ async function jumpReply(page, h, item, name) {
 }
 
 /**
- * @brief 在侧栏点"工作回顾"回来，选中的还是上一条；回到原位置（回复里的一句，会话已开着）：看对话流确认（不读会话文件、
+ * @brief 在侧栏点"Review"回来，选中的还是上一条；回到原位置（回复里的一句，会话已开着）：看对话流确认（不读会话文件、
  *        不发命令），中栏换回会话，高亮引用的那句话。
  */
 async function jumpSelection(page, h, item, previous) {
@@ -428,7 +430,7 @@ async function jumpFile(page, h, steps, item) {
 
 /**
  * @brief 导出（没有录过，保存结果是 synthetic 的路径）：一条标为已处理后导出这一节，界面交给主进程的记录名按列表顺序、
- *        已处理的写在 handled 里；"已导出 N 条到 <路径>"和它的"打开所在文件夹"；工具行的"打开文件夹"。
+ *        已处理的写在 handled 里；"Exported N records to <路径>"和它的"Show in Explorer"；工具行的"Open folder"。
  */
 async function exportListed(page, h, review, name) {
   const names = review.feedback.map((item) => item.name);
@@ -438,7 +440,7 @@ async function exportListed(page, h, review, name) {
   await page.getByTestId('review-export').click();
   const notice = page.getByTestId('review-notice');
   const text = await notice.innerText({ timeout: 5000 }).catch(() => '');
-  await notice.getByRole('button', { name: '打开所在文件夹' }).click();
+  await notice.getByRole('button', { name: 'Show in Explorer' }).click();
   await page.getByTestId('review-open-folder').click();
   const status = await until(async () => {
     const now = await h.status();
@@ -448,7 +450,7 @@ async function exportListed(page, h, review, name) {
   record('导出为 Markdown…（没有录过：回放桥只记下调用）：界面把这一节列出的记录名按列表顺序交给主进程，标了已处理的'
     + `那条写在 handled 里；工具行下面"已导出 ${names.length} 条到 <路径>"，"打开所在文件夹"选中它；"打开文件夹"打开`
     + '这一节的文件夹', canonical(status?.exports) === canonical([{ kind: 'feedback', names, handled: [name] }])
-    && text.startsWith(`已导出 ${names.length} 条到 ${EXPORT_FILE}`) && same(status.exportShown, [EXPORT_FILE])
+    && text.startsWith(`Exported ${records(names.length)} to ${EXPORT_FILE}`) && same(status.exportShown, [EXPORT_FILE])
     && same(status.folders, ['feedback']), JSON.stringify({ text, exports: status?.exports,
     shown: status?.exportShown, folders: status?.folders }));
 }
@@ -474,7 +476,7 @@ async function replyAfter(page, h) {
 
 /**
  * @brief review-changed 重启后：列出两份反馈（synthetic 那份的会话名用侧栏现在的名字、带年份）；synthetic 那份回到原位置：
- *        读会话文件找不到那条回复，留在工作回顾、标"原文已变化"，不发 session.open。
+ *        读会话文件找不到那条回复，留在工作回顾、标"This response is no longer in the session."，不发 session.open。
  */
 async function changedAfter(page, h) {
   const { fx, steps } = await h.load('review-changed', 'after');
@@ -486,8 +488,8 @@ async function changedAfter(page, h) {
   const seeded = rows.find((row) => row.name === item.name);
   record('review-changed 重启后：列出录制时读到的两份反馈（真的回复反馈在前，synthetic 记录在后）；synthetic 那份的'
     + '会话名用侧栏现在的名字（不是记录里的名字），不是今年的时间带年份', same(rows, review.feedback.map((entry) =>
-    feedbackRow(entry, name))) && seeded?.source === `${name} · 整条回复` && /^\d{4}-\d{2}-\d{2} /.test(seeded.time)
-    && item.feedback.session.title !== name, JSON.stringify(rows));
+    feedbackRow(entry, name))) && seeded?.source === `${name} · Whole response`
+    && /^\d{4}-\d{2}-\d{2} /.test(seeded.time) && item.feedback.session.title !== name, JSON.stringify(rows));
   await selectRow(page, item.name);
   await page.getByTestId('detail-jump').click();
   await page.getByTestId('detail-jump-status').waitFor({ timeout: 10000 }).catch(() => {});

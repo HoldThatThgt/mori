@@ -1,5 +1,12 @@
 // 界面测试共用的页面操作：发消息、等本轮结束、采样阶段行、读工具卡、打开并填连接表单、打开文件夹。
 
+/**
+ * 表单下方"测试连接"的结果（含保存失败和表单校验的提示）开头的样子，ConnectionForm.tsx、state/settings.ts；
+ * "Saved"、"Saved, but…"等保存后的提示不算
+ */
+const TEST_RESULTS = [String.raw`^(Connected|Connection failed|Test cancelled)`,
+  String.raw`^(Couldn’t test the connection|Couldn’t save)`, String.raw`^(Enter a valid URL|[\w ]* is required\.$)`];
+
 /** @brief 一个页面上的常用操作。 */
 export function pageHelpers(page) {
   const textarea = page.locator('.pane-slot:not([hidden]) .composer textarea');
@@ -51,7 +58,7 @@ export function pageHelpers(page) {
     /** @brief 上下文用量（token 数），读不到时为 null。 */
     async usageTokens() {
       const title = await page.getByTestId('usage').getAttribute('title').catch(() => null);
-      const match = /约 ([\d,]+) \//.exec(title ?? '');
+      const match = /About ([\d,]+) \//.exec(title ?? '');
       return match ? Number(match[1].replace(/,/g, '')) : null;
     },
     /** @brief 填连接表单；apiKey 为 null 时不碰 key 输入框。 */
@@ -65,21 +72,21 @@ export function pageHelpers(page) {
       if (contextWindow !== undefined) await inputs.nth(4).fill(String(contextWindow));
     },
     /**
-     * @brief 打开设置页，在连接卡上点"编辑连接"，等连接表单出现。M6 起设置页先是连接列表（settings.md"列表"），
+     * @brief 打开设置页，在连接卡上点"Edit connection"，等连接表单出现。M6 起设置页先是连接列表（settings.md"列表"），
      *        编辑连接的表单只有名称、服务地址、接口类型、API key 和兼容选项（输入框 0–2 仍是名称、服务地址、key）。
      * @param provider 连接的 provider id（第一个连接是 mori-endpoint）
      */
     async editConnection(provider = 'mori-endpoint') {
-      await page.getByRole('button', { name: '设置', exact: true }).click();
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
       await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
       const card = page.locator(`[data-testid="connection-card"][data-provider="${provider}"]`);
-      await card.getByRole('button', { name: '编辑连接' }).click();
+      await card.getByRole('button', { name: 'Edit connection' }).click();
       await page.getByTestId('connection-form').waitFor({ timeout: 10000 });
     },
     /**
-     * @brief 点了错误卡的"去设置"之后：等焦点落到连接表单的 API key 框（最多 timeout 毫秒，等不到也照常返回），
-     *        返回焦点所在元素的类型、它在不在连接表单里，以及表单的标题（settings.md 外框："去设置"打开"编辑连接"，
-     *        焦点在 API key；标题"编辑连接 · <连接名>"）。设置页里没有连接表单时 title 为 null。
+     * @brief 点了错误卡的"Go to settings"之后：等焦点落到连接表单的 API key 框（最多 timeout 毫秒，等不到也照常返回），
+     *        返回焦点所在元素的类型、它在不在连接表单里，以及表单的标题（settings.md 外框："Go to settings"打开
+     *        "Edit connection"，焦点在 API key；标题"Edit connection · <连接名>"）。设置页里没有连接表单时 title 为 null。
      */
     async keyFocus(timeout = 5000) {
       await page.waitForFunction(() => document.activeElement
@@ -94,35 +101,35 @@ export function pageHelpers(page) {
     },
     /**
      * @brief 等表单下方出现一条新的结果文字并返回它。
-     * @param previous 之前的文字（要等它变化）；test 为真时只认测试连接的结果，跳过中间的"已保存"
+     * @param previous 之前的文字（要等它变化）；test 为真时只认测试连接的结果，跳过中间的"Saved"
      */
     async formMessage(previous = null, { test = false, timeout = 60000 } = {}) {
-      await page.waitForFunction(({ old, onlyTest }) => {
+      await page.waitForFunction(({ old, onlyTest, patterns }) => {
         const text = document.querySelector('[data-testid="form-message"]')?.textContent;
-        if (!text || text === old || text.startsWith('保存中')) return false;
-        return !onlyTest || /^(连接成功|连接失败|已取消测试|测试失败|保存失败|请填写|服务地址不是)/.test(text);
-      }, { old: previous, onlyTest: test }, { timeout });
+        if (!text || text === old || text.startsWith('Saving')) return false;
+        return !onlyTest || patterns.some((pattern) => new RegExp(pattern).test(text));
+      }, { old: previous, onlyTest: test, patterns: TEST_RESULTS }, { timeout });
       return page.getByTestId('form-message').innerText();
     },
     /**
-     * @brief 把当前会话切到"全部允许"（权限菜单 → 全部允许 → 确认）。M2 起命令和编辑先要批准，
-     *        M0/M1 的测试测的是批准之外的行为，打开会话后先切到全部允许。
+     * @brief 把当前会话切到"Allow all"（权限菜单 → Allow all → 确认）。M2 起命令和编辑先要批准，
+     *        M0/M1 的测试测的是批准之外的行为，打开会话后先切到 Allow all。
      */
     async allowAll() {
       const pane = page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]');
       await pane.getByTestId('permission-button').click();
-      await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: '全部允许' }).click();
-      await page.getByTestId('confirm-dialog').getByRole('button', { name: '全部允许' }).click();
+      await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
+      await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all' }).click();
       await page.waitForFunction(() => document.querySelector(
-        '.pane-slot:not([hidden]) [data-testid="permission-button"]')?.textContent?.includes('全部允许'),
+        '.pane-slot:not([hidden]) [data-testid="permission-button"]')?.textContent?.includes('Allow all'),
       null, { timeout: 10000 });
     },
-    /** @brief 让系统的选文件夹对话框直接返回 folder，再点"打开文件夹…"。 */
+    /** @brief 让系统的选文件夹对话框直接返回 folder，再点"Open folder…"。 */
     async openFolder(app, folder) {
       await app.evaluate(({ dialog }, path) => {
         dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
       }, folder);
-      await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+      await page.getByRole('button', { name: 'Open folder…' }).first().click();
       await page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]').waitFor({ timeout: 30000 });
       await page.waitForFunction(() => !document.querySelector('.pane-slot:not([hidden]) [data-testid="not-ready"]'),
         null, { timeout: 30000 });

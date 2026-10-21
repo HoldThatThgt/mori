@@ -1,6 +1,6 @@
 // M4 界面测试：在 Electron 里载入真正的界面，用回放进程桥（tests/ui/harness）回放真实录制的会话（tests/fixtures/m4）。
-// 测试像你一样操作（打开文件夹、发消息、Alt+1、点工具卡里的路径、在阅读器里选行、浮层的"问 Mori"和"反馈"、
-// 回复下的"引用到输入框"、点发出的引用），回放桥核对界面发出的每条命令都与录制时一致——带引用的消息连全文和 refs
+// 测试像你一样操作（打开文件夹、发消息、Alt+1、点工具卡里的路径、在阅读器里选行、浮层的"Attach as context"和"Feedback"、
+// 回复下的"Attach message as context"、点发出的引用），回放桥核对界面发出的每条命令都与录制时一致——带引用的消息连全文和 refs
 // 一起比较；文件阅读器读到的内容是录制时主进程真的读到的。再按 docs/v0/screens/changes.md 与 selection.md 检查界面。
 // M1–M3 的回放检查仍由 m1-replay、m2-replay、m3-replay 负责。
 // 用法（在 app/ 下）：node tests/ui/m4-replay.mjs [--only edit-two,quote-file]
@@ -78,9 +78,9 @@ function helpers(page) {
       await page.waitForFunction(() => !document.querySelector('.sidebar-note'), null, { timeout: 20000 });
       return fx;
     },
-    /** @brief 点"打开文件夹…"（回放桥返回下一条 session.create 的文件夹），等会话就绪。 */
+    /** @brief 点"Open folder…"（回放桥返回下一条 session.create 的文件夹），等会话就绪。 */
     async openFolder() {
-      await page.getByTestId('sidebar').getByRole('button', { name: '打开文件夹…' }).click();
+      await page.getByTestId('sidebar').getByRole('button', { name: 'Open folder…' }).click();
       await page.waitForFunction((p) => document.querySelector(p)
         && !document.querySelector(`${p} [data-testid="not-ready"]`), PANE, { timeout: 30000 });
     },
@@ -131,13 +131,14 @@ async function editTwo(page, h) {
   const list = await changeList(page);
   const files = list?.files.map((file) => file.path) ?? [];
   record('edit-two：右栏自动打开，列出改过的两个文件，顶部注明"只含编辑和写入，命令改动的文件不在此列。"',
-    list?.note === '只含编辑和写入，命令改动的文件不在此列。' && files.includes('README.md') && files.includes('src/a.ts'),
+    list?.note === 'Only edits and writes are listed. Files changed by commands aren’t included.'
+    && files.includes('README.md') && files.includes('src/a.ts'),
     JSON.stringify(files));
   record('edit-two：展开后每次编辑显示 diff（第 1 次 · 修改）', list.files.every((file) => file.entries.length >= 1
-    && file.entries[0].label === '第 1 次 · 修改' && file.entries.every((entry) => entry.diff.length > 0)),
+    && file.entries[0].label === 'Change 1 · Edit' && file.entries.every((entry) => entry.diff.length > 0)),
   JSON.stringify(list.files.map((f) => [f.path, f.entries.map((e) => [e.label, e.diff.length])])));
-  const card = toolCard(page, '修改', 'README.md');
-  const viewer = await openFromCard(page, '修改', 'README.md');
+  const card = toolCard(page, 'Edit', 'README.md');
+  const viewer = await openFromCard(page, 'Edit', 'README.md');
   const recorded = readsOf(fx).find((read) => read.path === 'README.md')?.result;
   record('edit-two：点工具卡里的路径打开阅读器（录制时读到的内容），工具卡不展开', viewer?.path === 'README.md'
     && viewer.first[0] === recorded?.text.split('\n')[0] && !(await card.evaluate((el) => el.open)), JSON.stringify(viewer));
@@ -148,56 +149,61 @@ async function editTwo(page, h) {
   await finish(page, 'edit-two', fx);
 }
 
-/** @brief 走查 2 后半：写入的文件打开阅读器；文件删掉后再点，显示"文件已被删除或移动"。 */
+/** @brief 走查 2 后半：写入的文件打开阅读器；文件删掉后再点，显示"File not found"。 */
 async function writeDelete(page, h) {
   const fx = await h.load('write-delete');
   await h.openFolder();
   await h.sendApproving(promptsOf(fx)[0].text);
-  const first = await openFromCard(page, '写入', 'notes.md');
-  const second = await openFromCard(page, '写入', 'notes.md');
+  const first = await openFromCard(page, 'Write', 'notes.md');
+  const second = await openFromCard(page, 'Write', 'notes.md');
   record('write-delete：点写入卡的路径打开阅读器，显示写入的内容', first?.first[0] === '# Notes'
     && first.first.join('\n').includes('Mori M4 walkthrough.'), JSON.stringify(first?.first));
-  record('write-delete：文件删掉后再点，显示"文件已被删除或移动"', second?.state.startsWith('文件已被删除或移动')
+  record('write-delete：文件删掉后再点，显示"文件已被删除或移动"', second?.state.startsWith('File not found')
     && second.lineCount === 0 && second.externalDisabled === true, JSON.stringify(second));
   await shot(page, 'write-delete');
   await finish(page, 'write-delete', fx);
 }
 
-/** @brief 在阅读器里选第 1–3 行，点"问 Mori"，写字发出；返回芯片。 */
+/** @brief 在阅读器里选第 1–3 行，点"Attach as context"，写字发出；返回芯片。 */
 async function quoteLines(page, h, own) {
   await selectLines(page, 1, 3);
   const shown = await popoverShown(page);
-  await page.getByTestId('selection-popover').getByRole('button', { name: '问 Mori' }).click();
+  await page.getByTestId('selection-popover').getByRole('button', { name: 'Attach as context' }).click();
   const chips = await composerChips(page);
   await h.textarea.fill(own);
   return { shown, chips };
 }
 
-/** @brief 走查 3 前半：阅读器里选一段点"问 Mori"：带来源的芯片；发出的全文和 refs 与录制一致；消息上方显示引用。 */
+/**
+ * @brief 走查 3 前半：阅读器里选一段点"Attach as context"：带来源的芯片；发出的全文和 refs 与录制一致；
+ *        消息上方显示引用。
+ */
 async function quoteFile(page, h) {
   const fx = await h.load('quote-file');
   const prompts = promptsOf(fx);
   await h.openFolder();
   await h.sendApproving(prompts[0].text);
-  await openFromCard(page, '读取', 'a.ts');
+  await openFromCard(page, 'Read', 'a.ts');
   const { shown, chips } = await quoteLines(page, h, prompts[1].own);
   record('quote-file：阅读器里选三行出浮层，"问 Mori"后输入框出现芯片"src/a.ts · 第 1–3 行"', shown && chips.length === 1
-    && chips[0].label === 'src/a.ts · 第 1–3 行' && chips[0].title === prompts[1].refs[0].quote, JSON.stringify(chips));
+    && chips[0].label === 'src/a.ts · lines 1–3' && chips[0].title === prompts[1].refs[0].quote, JSON.stringify(chips));
   // synthetic：这一次发送直接失败（回放桥 failNext），放回输入框时芯片也回来；再发一次与录制一致。
   await page.evaluate(() => { window.__replay.failNext = 'Synthetic send failure'; });
   await h.textarea.press('Enter');
-  await page.locator(`${PANE} [data-testid="error-card"]`).getByRole('button', { name: '把上一条消息放回输入框' })
-    .click({ timeout: 5000 });
+  await page.locator(`${PANE} [data-testid="error-card"]`)
+    .getByRole('button', { name: 'Put your last message back in the message box' }).click({ timeout: 5000 });
   const restored = { text: await h.textarea.inputValue(), chips: await composerChips(page) };
   record('quote-file：发送时就失败，"把上一条消息放回输入框"放回你写的字和引用芯片（不是含引用块的全文）',
-    restored.text === prompts[1].own && restored.chips.length === 1 && restored.chips[0].label === 'src/a.ts · 第 1–3 行',
+    restored.text === prompts[1].own && restored.chips.length === 1
+    && restored.chips[0].label === 'src/a.ts · lines 1–3',
     JSON.stringify(restored));
   await h.textarea.press('Enter');
   await untilIdle(page);
   const quotes = await sentQuotes(page);
   const bubble = await page.locator(`${PANE} [data-testid="user-message"]`).last().innerText();
   record('quote-file：发出后你的消息上方显示引用（来源和原文），气泡里只有你写的字', quotes.length === 1
-    && quotes[0].label === 'src/a.ts · 第 1–3 行' && quotes[0].text === prompts[1].refs[0].quote && bubble === prompts[1].own,
+    && quotes[0].label === 'src/a.ts · lines 1–3' && quotes[0].text === prompts[1].refs[0].quote
+    && bubble === prompts[1].own,
   JSON.stringify({ quotes, bubble }));
   await shot(page, 'quote-file');
   await finish(page, 'quote-file', fx);
@@ -217,20 +223,20 @@ async function quoteFileReopen(page, h) {
   const viewer = await viewerState(page);
   const ref = opened.entries.find((e) => e.type === 'custom' && e.customType === 'mori.ref').data.refs[0];
   record('quote-file-reopen：重启后打开的会话里引用还在（会话记录的 mori.ref 条目）', quotes.length === 1
-    && quotes[0].label === 'src/a.ts · 第 1–3 行' && quotes[0].text === ref.quote, JSON.stringify(quotes));
+    && quotes[0].label === 'src/a.ts · lines 1–3' && quotes[0].text === ref.quote, JSON.stringify(quotes));
   record('quote-file-reopen：点引用回到原位置：右栏阅读器打开 src/a.ts，第 1–3 行高亮', viewer?.path === 'src/a.ts'
     && JSON.stringify(viewer.target) === '[1,2,3]' && !viewer.changed && quotes[0].status === null, JSON.stringify(viewer));
   await shot(page, 'quote-file-reopen');
   await finish(page, 'quote-file-reopen', fx);
 }
 
-/** @brief 反例：引用之后模型改了那几行；点引用：芯片保留当时的原文并提示"原文已变化"，阅读器给出原文。 */
+/** @brief 反例：引用之后模型改了那几行；点引用：芯片保留当时的原文并提示"Source changed"，阅读器给出原文。 */
 async function quoteChanged(page, h) {
   const fx = await h.load('quote-changed');
   const prompts = promptsOf(fx);
   await h.openFolder();
   await h.sendApproving(prompts[0].text);
-  await openFromCard(page, '读取', 'a.ts');
+  await openFromCard(page, 'Read', 'a.ts');
   await quoteLines(page, h, prompts[1].own);
   await h.textarea.press('Enter');
   await page.waitForFunction((p) => document.querySelector(p)?.dataset.running === 'true', PANE, { timeout: 20000 });
@@ -244,27 +250,31 @@ async function quoteChanged(page, h) {
   await sleep(300);
   const quote = (await sentQuotes(page))[0];
   const viewer = await viewerState(page);
-  record('反例 quote-changed：原文已变化时芯片保留当时的原文并提示"原文已变化"', quote?.status === '原文已变化'
+  record('反例 quote-changed：原文已变化时芯片保留当时的原文并提示"原文已变化"', quote?.status === 'Source changed'
     && quote.text === prompts[1].refs[0].quote, JSON.stringify(quote));
   record('quote-changed：阅读器顶部"原文已变化 · 引用时的原文："和原文，停在原来的行', viewer?.changed.startsWith(
-    '原文已变化 · 引用时的原文：') && viewer.changed.includes('export function add') && JSON.stringify(viewer.target)
-    === '[1,2,3]' && viewer.first.join('\n').includes('plus'), JSON.stringify(viewer));
+    'Source changed · Attached text:') && viewer.changed.includes('export function add')
+    && JSON.stringify(viewer.target) === '[1,2,3]' && viewer.first.join('\n').includes('plus'), JSON.stringify(viewer));
   await shot(page, 'quote-changed');
   await finish(page, 'quote-changed', fx);
 }
 
-/** @brief 走查 5：不用鼠标，用回复下的"引用到输入框"引用整轮回复；发出的全文和 refs 与录制一致；点引用高亮整轮。 */
+/**
+ * @brief 走查 5：不用鼠标，用回复下的"Attach message as context"引用整轮回复；发出的全文和 refs 与录制一致；
+ *        点引用高亮整轮。
+ */
 async function quoteReply(page, h) {
   const fx = await h.load('quote-reply');
   const prompts = promptsOf(fx);
   await h.openFolder();
   await h.sendApproving(prompts[0].text);
-  await page.locator(`${PANE} [data-testid="reply-actions"]`).last().getByRole('button', { name: '引用到输入框' }).focus();
+  await page.locator(`${PANE} [data-testid="reply-actions"]`).last()
+    .getByRole('button', { name: 'Attach message as context' }).focus();
   await page.keyboard.press('Enter');
   const chips = await composerChips(page);
   const focused = await page.evaluate(() => document.activeElement?.matches('.composer textarea'));
   record('quote-reply：Tab 到"引用到输入框"按 Enter：芯片"助手回复"（整轮正文），焦点到输入框', chips.length === 1
-    && chips[0].label === '助手回复' && chips[0].title === prompts[1].refs[0].quote && focused, JSON.stringify(chips));
+    && chips[0].label === 'Response' && chips[0].title === prompts[1].refs[0].quote && focused, JSON.stringify(chips));
   await page.keyboard.type(prompts[1].own);
   await page.keyboard.press('Enter');
   await untilIdle(page);
@@ -277,7 +287,7 @@ async function quoteReply(page, h) {
   await finish(page, 'quote-reply', fx);
 }
 
-/** @brief 走查 4：流式输出时选中一句话点"反馈"：选区不被打断；提交后"已记录"，没有发出任何命令。保存失败保留文字。 */
+/** @brief 走查 4：流式输出时选中一句话点"Feedback"：选区不被打断；提交后"Saved"，没有发出任何命令。保存失败保留文字。 */
 async function streamFeedback(page, h) {
   const fx = await h.load('stream-feedback', { speed: 1, maxGap: 300 });
   await h.openFolder();
@@ -292,20 +302,21 @@ async function streamFeedback(page, h) {
   await sleep(800);
   const kept = await page.evaluate(() => window.getSelection().toString());
   const running = await page.locator(PANE).getAttribute('data-running');
-  await page.getByTestId('selection-popover').getByRole('button', { name: '反馈' }).click();
+  await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
   await page.evaluate(() => { window.__replay.feedback.error = 'Synthetic save failure'; });
   await page.getByTestId('feedback-input').pressSequentially('希望短一点', { delay: 50 });
-  await page.getByTestId('feedback-form').getByRole('button', { name: '记录' }).click();
+  await page.getByTestId('feedback-form').getByRole('button', { name: 'Save' }).click();
   const error = await page.getByTestId('feedback-error').innerText({ timeout: 3000 }).catch(() => '');
   const typed = await page.getByTestId('feedback-input').inputValue();
   await page.evaluate(() => { window.__replay.feedback.error = null; });
-  await page.getByTestId('feedback-form').getByRole('button', { name: '记录' }).click();
+  await page.getByTestId('feedback-form').getByRole('button', { name: 'Save' }).click();
   const saved = await page.getByTestId('feedback-saved').innerText({ timeout: 3000 }).catch(() => '');
   const status = await h.status();
   record('stream-feedback：生成中选中一句话，浮层出现，新流入的文字不清掉选区', shown && running === 'true'
     && kept === sentence && [...sentence].length === 12, JSON.stringify({ shown, running, kept }));
   record('stream-feedback：保存失败保留已输入的文字并显示原文；再记录后"已记录 · 在工作回顾中查看"',
-    error === '没有记录：Synthetic save failure' && typed === '希望短一点' && saved === '已记录 · 在工作回顾中查看',
+    error === 'Couldn’t save your feedback: Synthetic save failure' && typed === '希望短一点'
+    && saved === 'Saved · View in Review',
     JSON.stringify({ error, typed, saved }));
   record('stream-feedback：反馈只交给主进程保存（原文、期望、回复的消息时间），没有发给后台进程任何命令',
     status.feedback.length === 1 && status.feedback[0].quote === sentence && status.feedback[0].expected === '希望短一点'

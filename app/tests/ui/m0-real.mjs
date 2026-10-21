@@ -29,7 +29,7 @@ const launch = () => {
 /** @brief --setup：打开 Mori，等你填好连接、保存并关闭窗口。 */
 async function setup() {
   const app = await launch();
-  console.log('Mori 已打开：在"连接"里填服务地址、API key、模型 ID 和上下文长度，保存并测试后关闭窗口。');
+  console.log('Mori 已打开：在连接表单里填 Base URL、API key、Model ID 和 Context window，保存并测试后关闭窗口。');
   await new Promise((done) => app.process().once('exit', done));
   console.log(`已退出。数据目录：${userData}`);
 }
@@ -63,8 +63,8 @@ async function sendAndWatch(page, text) {
   }, 100);
   await page.locator('.composer textarea').fill(text);
   await page.locator('.composer textarea').press('Enter');
-  await page.getByRole('button', { name: '停止' }).waitFor({ timeout: 15000 }).catch(() => {});
-  await page.getByRole('button', { name: '发送' }).waitFor({ timeout: 180000 });
+  await page.getByRole('button', { name: 'Stop' }).waitFor({ timeout: 15000 }).catch(() => {});
+  await page.getByRole('button', { name: 'Send' }).waitFor({ timeout: 180000 });
   clearInterval(timer);
   return { ms: Date.now() - started, statuses, lengths: lengths.size };
 }
@@ -80,7 +80,7 @@ function toolCards(page) {
 
 /** @brief 走查 2：不重填 key，直接测试连接。 */
 async function connectionCheck(page) {
-  await page.getByRole('button', { name: '测试连接' }).click();
+  await page.getByRole('button', { name: 'Test connection' }).click();
   const result = page.locator('.panel .ok, .panel .error').first();
   await result.waitFor({ timeout: 60000 });
   record('走查 2：测试连接成功（用加密保存的 key）', (await result.getAttribute('class')) === 'ok', oneLine(await result.innerText()));
@@ -91,14 +91,14 @@ async function readmeCheck(app, page, project) {
   await app.evaluate(({ dialog }, folder) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] });
   }, project);
-  await page.getByRole('button', { name: '打开文件夹…' }).click();
+  await page.getByRole('button', { name: 'Open folder…' }).click();
   await page.locator('.chat-head').waitFor({ timeout: 30000 });
   const first = await sendAndWatch(page, '总结 README');
   const tools = await toolCards(page);
   const answer = await page.locator('.assistant').last().innerText();
   const thinking = await page.locator('.thinking').count();
   const errors = await page.locator('.chat .error').allInnerTexts();
-  const readOk = tools.some((tool) => tool.name === 'read' && tool.status === '完成');
+  const readOk = tools.some((tool) => tool.name === 'read' && tool.status === 'Done');
   record('走查 3：一次读取（原生工具调用）', readOk && answer.trim().length > 0 && errors.length === 0,
     `耗时 ${first.ms} ms；工具：${tools.map((t) => `${t.name}/${t.status} ${t.args}`).join('；') || '无'}；` +
     `思考段 ${thinking} 个；回复：${oneLine(answer, 160)}` + (errors.length ? `；错误：${oneLine(errors.join(' | '))}` : ''));

@@ -3,7 +3,7 @@
 // 脚本不接触 key：只把走查数据目录里 Mori 加密保存的密文（credentials.json 与 Local State）复制到临时目录
 // （lib.mjs scratchUserData），之后也不打开它们（"添加模型不改 key"只比较 credentials.json 的修改时间和大小）。
 // 像负责人一样操作界面：设置页里添加模型、编辑模型、写 AGENTS.md；顶栏换模型和思考强度；工具页里启停技能、用表单添加
-// MCP 服务、添加本地包并按资源启停；输入框打 "/"；批准卡点"允许一次"。系统的选文件夹对话框经 app.evaluate 换成直接
+// MCP 服务、添加本地包并按资源启停；输入框打 "/"；批准卡点"Allow once"。系统的选文件夹对话框经 app.evaluate 换成直接
 // 返回测试文件夹。项目技能和项目的 CLAUDE.md、用户级技能和提示词模板、MCP 服务（tests/mcp-server）、pi 包
 // （tests/pi-package 的副本）都是测试用的（synthetic）。
 // 模型行为（是否照 AGENTS.md 开头、是否列出技能、是否思考、是否调用工具）DeepSeek 不保证，这类检查失败时记为 KNOWN，
@@ -44,14 +44,14 @@ const UNTRUSTED_SKILL = 'm6-untrusted-skill';
 /** 走查 7 放进 agentDir 的技能和提示词模板（synthetic） */
 const USER_SKILL = 'm6-hello';
 const USER_PROMPT = 'm6-summary';
-/** 测试项目里的 CLAUDE.md（synthetic，没有任何要求）：设置页"<项目名> 加载的文件"列出它 */
+/** 测试项目里的 CLAUDE.md（synthetic，没有任何要求）：设置页"Files loaded by <项目名>"列出它 */
 const PROJECT_NOTES = '# Notes\n\nThis folder is a Mori test fixture (synthetic). It has no special instructions.\n';
 /** pi 每个目录只读第一个存在的（m6-checks.md）；Windows 不分大小写，AGENTS.MD、CLAUDE.MD 与这里的相同 */
 const AGENTS_NAMES = ['AGENTS.override.md', 'AGENTS.md', 'CLAUDE.md'];
 /** "/"列表：会话没有任何模板和技能时 */
-const SLASH_EMPTY = '这个会话没有提示词模板或技能（在工具页添加）';
+const SLASH_EMPTY = 'This session has no prompt templates or skills. Add them in Customize.';
 /** 工具页顶部"改动何时生效"的一行 */
-const TOOLS_NOTICE = '启停和添加对新建的会话生效，已经打开的会话不变。';
+const TOOLS_NOTICE = 'Changes apply to new sessions. Sessions already open aren’t affected.';
 
 const PROMPTS = {
   intro: '用一句话介绍你自己。不要调用任何工具。',
@@ -145,11 +145,11 @@ async function start(ctx) {
   await ctx.page.getByTestId('session-tree').waitFor({ state: 'attached', timeout: 60000 });
 }
 
-/** @brief 点"打开文件夹…"打开 folder，在信任询问里点 answer（信任 / 不信任），等会话就绪。 */
+/** @brief 点"Open folder…"打开 folder，在信任询问里点 answer（Trust workspace / Don’t trust），等会话就绪。 */
 async function openFolder(ctx, folder, answer) {
   const { page } = ctx;
   await stubFolder(ctx.app, folder);
-  await page.getByTestId('sidebar').getByRole('button', { name: '打开文件夹…' }).click();
+  await page.getByTestId('sidebar').getByRole('button', { name: 'Open folder…' }).click();
   const dialog = page.getByTestId('trust-dialog');
   await dialog.waitFor({ timeout: 15000 });
   await dialog.getByRole('button', { name: answer, exact: true }).click();
@@ -172,28 +172,30 @@ async function clickNewSession(page, button) {
   await waitReady(page);
 }
 
-/** @brief 工具页顶部"改动何时生效"一行里的"新建会话"。 */
-const toolsNewSession = (page) => page.locator('.tools-notice').getByRole('button', { name: '新建会话' });
+/** @brief 工具页顶部"改动何时生效"一行里的"New session"。 */
+const toolsNewSession = (page) => page.locator('.tools-notice').getByRole('button', { name: 'New session' });
 
 /** @brief 从左栏打开设置页，切到 section（connections / agents）。 */
 async function openSettings(page, section = 'connections') {
-  await page.getByTestId('sidebar').getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByTestId('sidebar').getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
   await page.locator(`[data-testid="settings-nav"] button[data-section="${section}"]`).click();
 }
 
-/** @brief 设置页或工具页上点"返回会话"，等会话面板出现。 */
+/** @brief 设置页或工具页上点"Back to app"，等会话面板出现。 */
 async function backToChat(page) {
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app' }).click();
   await page.locator(PANE).waitFor({ timeout: 10000 });
 }
 
-/** @brief 出错后回到会话页：关掉浮层；离开确认框选"放弃改动"；在设置页或工具页上时点"返回会话"。 */
+/** @brief 出错后回到会话页：关掉浮层；离开确认框选"Discard"；在设置页或工具页上时点"Back to app"。 */
 async function recover(page) {
   await page.keyboard.press('Escape').catch(() => {});
   const leave = page.getByTestId('leave-dialog');
-  if (await leave.isVisible().catch(() => false)) await leave.getByRole('button', { name: '放弃改动' }).click();
-  const back = page.getByRole('button', { name: '返回会话' });
+  if (await leave.isVisible().catch(() => false)) {
+    await leave.getByRole('button', { name: 'Discard', exact: true }).click();
+  }
+  const back = page.getByRole('button', { name: 'Back to app' });
   if (await back.isVisible().catch(() => false)) await back.click().catch(() => {});
 }
 
@@ -242,7 +244,7 @@ async function turnStart(page, before) {
 }
 
 /**
- * @brief 按 Enter 发出输入框里的文字，等本轮结束；途中出批准卡时记下它，点"允许一次"。本轮没有开始、没有新的回复、
+ * @brief 按 Enter 发出输入框里的文字，等本轮结束；途中出批准卡时记下它，点"Allow once"。本轮没有开始、没有新的回复、
  *        或出了错误卡时抛错（这一项的流程记为 FAIL，不当成模型行为）。
  * @return { cards: 出现过的批准卡 [{ request, tool, title }], start: 本轮开始那一刻顶栏按钮的样子 }
  */
@@ -265,7 +267,7 @@ async function submitTurn(page, timeout = 300000) {
   return { cards, start: begun };
 }
 
-/** @brief 在当前会话里写一条消息并发出，等本轮结束（批准卡都点"允许一次"）。 */
+/** @brief 在当前会话里写一条消息并发出，等本轮结束（批准卡都点"Allow once"）。 */
 async function sendTurn(page, text) {
   await composer(page).click();
   await composer(page).fill(text);
@@ -310,7 +312,7 @@ async function flip(page, row, want) {
   return { settled, ...state };
 }
 
-/** @brief 工具页"内置工具"里某个工具行：来源、启用状态；不在时为 null。 */
+/** @brief 工具页"Built-in tools"里某个工具行：来源、启用状态；不在时为 null。 */
 async function toolInfo(page, name) {
   await openToolsSection(page, 'builtin');
   return page.evaluate((tool) => {
@@ -322,21 +324,21 @@ async function toolInfo(page, name) {
 
 // ---------- 走查 1：第二个模型与顶栏切换 ----------
 
-/** @brief 设置页的连接卡上点"添加模型"，填模型 ID 和上下文长度（不勾支持思考），保存；返回看到的。 */
+/** @brief 设置页的连接卡上点"Add model"，填模型 ID 和上下文长度（不勾支持思考），保存；返回看到的。 */
 async function addModel(ctx) {
   const { page } = ctx;
   await openSettings(page);
-  await connectionCard(page, ctx.conn.provider).getByRole('button', { name: '添加模型' }).click();
+  await connectionCard(page, ctx.conn.provider).getByRole('button', { name: 'Add model' }).click();
   const form = page.getByTestId('model-form');
   await form.waitFor({ timeout: 10000 });
   const panel = page.locator('.settings-form');
   const seen = { title: await panel.locator('h3').innerText(),
     hint: await panel.locator('.field-hint').first().innerText(),
     keyFields: await form.getByText('API key').count() + await form.locator('input[type="password"]').count() };
-  await form.getByLabel('模型 ID').fill(SECOND_MODEL);
-  await form.getByLabel('上下文长度').fill(String(CONTEXT));
+  await form.getByLabel('Model ID').fill(SECOND_MODEL);
+  await form.getByLabel('Context window').fill(String(CONTEXT));
   await shot(page, '1-add-model');
-  await form.getByRole('button', { name: '保存', exact: true }).click();
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
   await page.getByTestId('settings-notice').waitFor({ timeout: 15000 });
   seen.notice = await page.getByTestId('settings-notice').innerText();
   seen.row = await modelRow(page, `${ctx.conn.provider}/${SECOND_MODEL}`).locator('.model-meta')
@@ -372,11 +374,14 @@ function recordAddModel(ctx, form, keyBefore) {
   const models = readJson(join(ctx.agentDir, 'models.json'))?.providers?.[ctx.conn.provider]?.models ?? [];
   const added = models.find((model) => model.id === SECOND_MODEL);
   record('走查 1：连接卡上点"添加模型"：标题"添加模型 · <连接名>"，说明"用这个连接的地址和 key，不用再填 key"，没有 key 框',
-    form.title === `添加模型 · ${ctx.conn.name}` && form.hint === '用这个连接的地址和 key，不用再填 key'
+    form.title === `Add model · ${ctx.conn.name}`
+    && form.hint === 'Uses this connection’s base URL and key. You don’t need to enter the key again.'
     && form.keyFields === 0, JSON.stringify(form));
   record('走查 1：保存后回到列表，上方"已保存 · 已经打开的会话下一条消息起用新的设置"；新模型一行"上下文 1,000,000 · 不支持思考"；'
-    + 'models.json 这个连接下有两个模型', form.notice === '已保存 · 已经打开的会话下一条消息起用新的设置'
-    && form.row === '上下文 1,000,000 · 不支持思考' && models.length === 2 && added?.contextWindow === CONTEXT
+    + 'models.json 这个连接下有两个模型',
+  form.notice === 'Saved · Sessions already open use the new settings from their next message'
+    && form.row === 'Context window: 1,000,000 · Doesn’t support thinking' && models.length === 2
+    && added?.contextWindow === CONTEXT
     && added?.reasoning === undefined, JSON.stringify({ notice: form.notice, row: form.row, models }));
   record('反例：添加模型不填 key、不改 credentials.json（修改时间和大小不变）', keyStamp(ctx.userData) === keyBefore,
     `${keyBefore} → ${keyStamp(ctx.userData)}`);
@@ -407,7 +412,8 @@ async function item1(ctx) {
   record('走查 1：顶栏模型菜单按连接分组列出两个模型，当前的打勾，默认模型标"默认"，说明只作用于这个会话，最后一项"管理模型…"',
     menu.groups.length === 1 && menu.groups[0] === ctx.conn.name && menu.items.length === 2
     && current?.checked && current?.isDefault && menu.items.filter((i) => i.checked).length === 1
-    && menu.note === '只作用于这个会话；新会话用设置里的默认模型' && menu.last === '管理模型…', JSON.stringify(menu));
+    && menu.note === 'Applies to this session only. New sessions use the default model from Settings.'
+    && menu.last === 'Manage models', JSON.stringify(menu));
   record('走查 1：顶栏切到 deepseek-v4-pro：按钮显示它，悬停"<连接名> · deepseek-v4-pro"；新回复来自 deepseek-v4-pro'
     + '（会话文件里回复的 model 先是默认模型、后是 deepseek-v4-pro，中间有 model_change）', shown.text === SECOND_MODEL
     && shown.title === `${ctx.conn.name} · ${SECOND_MODEL}` && models[0] === ctx.conn.model
@@ -429,7 +435,7 @@ async function agentsState(page) {
     const loaded = section?.querySelector('[data-testid="agents-loaded"]');
     return { path: section?.querySelector('.agents-user .agents-path')?.textContent ?? '',
       value: section?.querySelector('[data-testid="agents-editor"]')?.value ?? null,
-      missing: Boolean(section?.textContent.includes('还没有这个文件，保存后创建')),
+      missing: Boolean(section?.textContent.includes('This file doesn’t exist yet. Saving creates it.')),
       effective: section?.querySelector('[data-testid="agents-effective"]')?.textContent ?? null,
       title: loaded?.querySelector('h3')?.textContent ?? '', note: loaded?.querySelector('.muted')?.textContent ?? '',
       files: [...(loaded?.querySelectorAll('.agents-files .agents-path') ?? [])].map((item) => item.textContent),
@@ -445,9 +451,9 @@ async function saveAgents(ctx) {
   const editor = page.getByTestId('agents-editor');
   await editor.click();
   await editor.fill(PROMPTS.agents);
-  const dirty = await section.getByText('有未保存的改动').count();
-  await section.locator('.agents-user').getByRole('button', { name: '保存', exact: true }).click();
-  await section.getByText('已保存 · 新建的会话才会读到').waitFor({ timeout: 15000 });
+  const dirty = await section.getByText('Unsaved changes').count();
+  await section.locator('.agents-user').getByRole('button', { name: 'Save', exact: true }).click();
+  await section.getByText('Saved · Applies to new sessions').waitFor({ timeout: 15000 });
   await page.getByTestId('agents-effective').waitFor({ timeout: 10000 });
   const effective = await page.getByTestId('agents-effective').innerText();
   await shot(page, '2-agents');
@@ -458,16 +464,16 @@ async function saveAgents(ctx) {
 function recordAgents(ctx, seen) {
   const file = join(ctx.agentDir, 'AGENTS.md');
   const written = existsSync(file) ? readFileSync(file, 'utf8') : null;
-  const path = seen.effective.replace(/^生效中：/, '');
+  const path = seen.effective.replace(/^In effect: /, '');
   const { before } = seen;
   record('走查 2：AGENTS.md 一节：路径 <agentDir>\\AGENTS.md，"还没有这个文件，保存后创建"，编辑框是空的；改了之后"有未保存的改动"',
     samePath(before.path, file) && before.missing && before.value === '' && seen.dirty === 1, JSON.stringify(before));
   record('走查 2：保存后"已保存 · 新建的会话才会读到"，文件写入；设置页标出生效的文件"生效中：<agentDir>\\AGENTS.md"',
-    written === PROMPTS.agents && seen.effective.startsWith('生效中：') && samePath(path, file),
+    written === PROMPTS.agents && seen.effective.startsWith('In effect: ') && samePath(path, file),
     JSON.stringify({ effective: seen.effective, written }));
   record('走查 2：项目级"m6-walk 加载的文件"：列出焦点会话按 pi 规则加载的文件（测试项目的 CLAUDE.md），说明会话打开时读取',
-    before.title === 'm6-walk 加载的文件' && samePaths(before.files, ctx.agentsFiles)
-    && before.note.startsWith('会话打开时读取；之后改了文件，新会话才会读到'),
+    before.title === 'Files loaded by m6-walk' && samePaths(before.files, ctx.agentsFiles)
+    && before.note.startsWith('Read when the session opens. If you change a file later, only new sessions pick it up'),
     JSON.stringify({ title: before.title, files: before.files, expected: ctx.agentsFiles, note: before.note }));
 }
 
@@ -517,7 +523,7 @@ async function openSlash(page, text) {
   const menu = page.getByTestId('slash-menu');
   await menu.waitFor({ timeout: 10000 });
   await page.waitForFunction(() => !document.querySelector('[data-testid="slash-menu"]')?.textContent
-    .includes('正在读取…'), null, { timeout: 15000 });
+    .includes('Loading…'), null, { timeout: 15000 });
   const box = await menu.boundingBox();
   const input = await composer(page).boundingBox();
   return { items: await slashItems(page), text: (await menu.innerText()).trim(),
@@ -534,7 +540,7 @@ async function closeSlash(page) {
   await composer(page).fill('');
 }
 
-/** @brief "/"列表里没有 name：列表读到了（是数组），且要么有别的项、要么是"这个会话没有提示词模板或技能"。 */
+/** @brief "/"列表里没有 name：列表读到了（是数组），且要么有别的项、要么是"This session has no prompt templates or skills"。 */
 const slashLacks = (slash, name) => Array.isArray(slash.items) && !slash.items.some((item) => item.name === name)
   && (slash.items.length > 0 || slash.text === SLASH_EMPTY);
 
@@ -561,7 +567,8 @@ function recordDisabledSkill(ctx, seen) {
   const file = join(ctx.project, '.pi', 'skills', PROJECT_SKILL, 'SKILL.md');
   record('走查 3：工具页"技能"列出项目 .pi/skills 里的 m6-proj-skill：标"本项目"，有用途，开关开着；展开看到文件路径和 SKILL.md '
     + '正文（去掉 frontmatter）；顶部"启停和添加对新建的会话生效"', seen.listed?.scope === 'project'
-    && seen.listed.tag === '本项目' && seen.listed.checked && seen.listed.description.startsWith('Synthetic project skill')
+    && seen.listed.tag === 'Project' && seen.listed.checked
+    && seen.listed.description.startsWith('Synthetic project skill')
     && seen.body.includes('M6-PROJ-SKILL-OK') && !seen.body.includes('description:') && samePath(seen.path, file)
     && seen.notice === TOOLS_NOTICE,
   JSON.stringify({ listed: seen.listed, body: oneLine(seen.body, 80), path: seen.path, notice: seen.notice }));
@@ -574,7 +581,7 @@ function recordDisabledSkill(ctx, seen) {
   JSON.stringify({ flipped: seen.flipped, project: seen.project, expected }));
 }
 
-/** @brief 走查 3：信任的项目里的技能：工具页标"本项目"；停用写项目设置（与 pi config -l 相同）；新会话里没有它。 */
+/** @brief 走查 3：信任的项目里的技能：工具页标"Project"；停用写项目设置（与 pi config -l 相同）；新会话里没有它。 */
 async function item3(ctx) {
   const { page } = ctx;
   await newSession(page);
@@ -607,19 +614,19 @@ async function item3(ctx) {
 
 // ---------- 走查 4、5：MCP ----------
 
-/** @brief 工具页 MCP 一节点"添加"，在表单里填写并保存；返回表单的说明和保存后的提示。 */
+/** @brief 工具页 MCP 一节点"Add"，在表单里填写并保存；返回表单的说明和保存后的提示。 */
 async function addMcp(page, { name, command, args = [], env = [] }) {
   await openToolsSection(page, 'mcp');
   const tools = page.getByTestId('tools-page');
-  await tools.getByRole('button', { name: '添加', exact: true }).click();
+  await tools.getByRole('button', { name: 'Add', exact: true }).click();
   const form = page.getByTestId('mcp-form');
   await form.waitFor({ timeout: 5000 });
-  await form.getByLabel('名称').fill(name);
-  await form.getByLabel('命令').fill(command);
-  await form.getByLabel('参数').fill(args.join('\n'));
-  await form.getByLabel('环境变量').fill(env.join('\n'));
+  await form.getByLabel('Name').fill(name);
+  await form.getByLabel('Command').fill(command);
+  await form.getByLabel('Arguments').fill(args.join('\n'));
+  await form.getByLabel('Environment variables').fill(env.join('\n'));
   const hint = await form.locator('.field-hint').innerText();
-  await form.getByRole('button', { name: '保存', exact: true }).click();
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
   const saved = tools.locator('.form-message.ok');
   await saved.waitFor({ timeout: 15000 }).catch(() => {});
   return { hint, saved: await saved.innerText().catch(() => null),
@@ -653,13 +660,13 @@ async function mcpUntil(page, name, fn, tries = 15) {
   }
 }
 
-/** @brief MCP 一节保存后，点保存提示里的"新建会话"（像人一样），等新会话就绪。 */
+/** @brief MCP 一节保存后，点保存提示里的"New session"（像人一样），等新会话就绪。 */
 function savedNewSession(page) {
   return clickNewSession(page, page.getByTestId('tools-page').locator('.form-message.ok')
-    .getByRole('button', { name: '新建会话' }));
+    .getByRole('button', { name: 'New session' }));
 }
 
-/** @brief 走查 4 后半：让模型调用 mcp__mori_test__echo，批准卡点"允许一次"，看工具卡。 */
+/** @brief 走查 4 后半：让模型调用 mcp__mori_test__echo，批准卡点"Allow once"，看工具卡。 */
 async function callMcpTool(page) {
   const { cards } = await sendTurn(page, PROMPTS.mcpCall);
   const card = await lastToolCard(page);
@@ -679,25 +686,27 @@ async function item4(ctx) {
   const added = await addMcp(page, { name: 'mori_test', command: 'node', args: [MCP_SERVER] });
   const entry = readJson(join(ctx.agentDir, 'mcp.json'))?.mcpServers?.mori_test;
   record('走查 4：MCP 表单（名称、命令、参数）保存：提示"已保存 · 新建的会话才会连接它"；mcp.json 写入这一项，调用方式 direct',
-    added.saved?.startsWith('已保存 · 新建的会话才会连接它') && entry?.command === 'node'
+    added.saved?.startsWith('Saved · Only new sessions will connect to it') && entry?.command === 'node'
     && entry?.args?.[0] === MCP_SERVER && entry?.exposure === 'direct'
-    && added.hint === 'Mori 添加的服务都用直接调用方式（exposure: direct）', JSON.stringify({ added, entry }));
+    && added.hint === 'Servers you add here always use direct calls (exposure: direct)',
+  JSON.stringify({ added, entry }));
   await savedNewSession(page);
   const info = await mcpUntil(page, 'mori_test', (row) => row?.tools?.includes('mcp__mori_test__echo'));
   await shot(page, '4-mcp-tools');
   record('走查 4：新会话的工具页 MCP 一节：mori_test 一行（用户级、直接调用、命令行、开关开着），"当前会话里注册的工具：'
-    + 'mcp__mori_test__echo、mcp__mori_test__add"', info.tools === '当前会话里注册的工具：mcp__mori_test__echo、mcp__mori_test__add'
-    && info.tags.includes('用户级') && info.tags.includes('直接调用') && info.command === `node ${MCP_SERVER}`
+    + 'mcp__mori_test__echo、mcp__mori_test__add"',
+  info.tools === 'Tools in this session: mcp__mori_test__echo, mcp__mori_test__add'
+    && info.tags.includes('User') && info.tags.includes('Direct') && info.command === `node ${MCP_SERVER}`
     && info.checked, JSON.stringify(info));
   const tool = await toolInfo(page, 'mcp__mori_test__echo');
   record('走查 4：工具页"内置工具"列出 mcp__mori_test__echo，来源"MCP · mori_test"，状态"启用"',
-    tool?.tag === 'MCP · mori_test' && tool.active === 'true' && tool.state === '启用', JSON.stringify(tool));
+    tool?.tag === 'MCP · mori_test' && tool.active === 'true' && tool.state === 'Enabled', JSON.stringify(tool));
   await backToChat(page);
   await callMcpTool(page);
 }
 
 /**
- * @brief 展开 MCP 一行下面 pi 通知的"完整通知"（不是进程状态的"完整原文"）；返回展开后看得见没有，和通知原文。
+ * @brief 展开 MCP 一行下面 pi 通知的"Full notice"（不是进程状态的"Full error"）；返回展开后看得见没有，和通知原文。
  */
 async function expandNotice(page, name) {
   const details = page.locator(`[data-testid="mcp-row"][data-server="${name}"] [data-testid="mcp-error"] .tools-full-notice`);
@@ -718,7 +727,8 @@ async function item5(ctx) {
   const kept = Object.entries(before?.mcpServers ?? {})
     .every(([name, entry]) => JSON.stringify(after?.mcpServers?.[name]) === JSON.stringify(entry));
   record('走查 5：表单保存命令写错的服务：mcp.json 加上 mori_broken（direct），已有的服务原样保留',
-    added.saved?.startsWith('已保存 · 新建的会话才会连接它') && after?.mcpServers?.mori_broken?.command === 'no-such-command-mori'
+    added.saved?.startsWith('Saved · Only new sessions will connect to it')
+    && after?.mcpServers?.mori_broken?.command === 'no-such-command-mori'
     && after.mcpServers.mori_broken.exposure === 'direct' && kept,
     JSON.stringify({ added, servers: Object.keys(after?.mcpServers ?? {}) }));
   await savedNewSession(page);
@@ -735,7 +745,8 @@ async function item5(ctx) {
     && full.texts.some((text) => text.startsWith('MCP servers need attention') && text.includes(line)),
   JSON.stringify({ line, raw, full }));
   record('走查 5：写错的服务不显示"已连接"，工具名一行写"当前会话里它没有注册工具"',
-    info?.tools === '当前会话里它没有注册工具' && !(await page.getByTestId('tools-page').innerText()).includes('已连接'),
+    info?.tools === 'This server has no tools in this session'
+    && !(await page.getByTestId('tools-page').innerText()).includes('Connected'),
     JSON.stringify(info));
   await backToChat(page);
 }
@@ -760,7 +771,7 @@ async function addPackage(ctx, pkg) {
   await openToolsSection(page, 'plugins');
   await stubFolder(ctx.app, pkg);
   const note = await page.locator('.tools-add .tools-row-note').innerText();
-  await page.getByTestId('tools-page').getByRole('button', { name: '添加本地包…' }).click();
+  await page.getByTestId('tools-page').getByRole('button', { name: 'Add plugin from folder…' }).click();
   await page.getByTestId('package-card').first().waitFor({ timeout: 15000 });
   await shot(page, '6-package');
   return { note, cards: await packageInfo(page), packages: readJson(join(ctx.agentDir, 'settings.json'))?.packages };
@@ -795,7 +806,7 @@ async function callPackageTool(ctx) {
   const card = await lastToolCard(page);
   await shot(page, '6-package-call');
   record('走查 6：新会话的工具页"内置工具"列出包的扩展注册的 package_hello，来源"插件 …"，状态"启用"',
-    tool?.tag.startsWith('插件 ') && tool.active === 'true', JSON.stringify(tool));
+    tool?.tag.startsWith('Plugin ') && tool.active === 'true', JSON.stringify(tool));
   record('反例：调用插件扩展注册的 package_hello 出批准卡；允许后输出 hello from package',
     cards.some((item) => item.tool === 'package_hello') && card?.status === 'done'
     && card.body.includes('hello from package'), JSON.stringify({ cards, card }), cards.length === 0);
@@ -808,7 +819,7 @@ function recordPackageToggle(toggled, source) {
     + 'SKILL.md"] }（与 pi config 相同）；技能一节里它标"插件 …"、开关关着', toggled.off.settled
     && toggled.off.checked === 'false' && toggled.off.off
     && JSON.stringify(toggled.written) === JSON.stringify([{ source, skills: expected }])
-    && toggled.listed?.scope === 'package' && toggled.listed.tag.startsWith('插件 ') && !toggled.listed.checked,
+    && toggled.listed?.scope === 'package' && toggled.listed.tag.startsWith('Plugin ') && !toggled.listed.checked,
   JSON.stringify({ off: toggled.off, written: toggled.written, listed: toggled.listed }));
   record('走查 6（Mori 一侧）：停用后新会话的"/"列表没有 /skill:package-review，同一个包的提示词 /package-summary 还在',
     slashLacks(toggled.slash, 'skill:package-review')
@@ -830,13 +841,13 @@ async function item6(ctx) {
   const source = relative(ctx.agentDir, pkg);
   record('走查 6：添加本地包：出现包的卡（用户级、解析后的文件夹），按扩展、技能、提示词、主题分组列出资源，开关都开着，'
     + '主题标"Mori 不使用"；说明"内网只支持本地文件夹的包"；设置的 packages 写入相对 agentDir 的路径',
-  added.cards.length === 1 && card.tag === '用户级' && samePath(card.root, pkg) && card.source === source
-    && card.groups.join() === '扩展,技能,提示词,主题' && card.resources.length === 4
+  added.cards.length === 1 && card.tag === 'User' && samePath(card.root, pkg) && card.source === source
+    && card.groups.join() === 'Extensions,Skills,Prompt templates,Themes' && card.resources.length === 4
     && names.extensions === 'package-hello.ts' && names.skills === 'package-review'
     && names.prompts === 'package-summary.md' && names.themes === 'package-theme.json'
     && card.resources.every((item) => item.checked)
-    && card.resources.find((item) => item.kind === 'themes')?.tags.includes('Mori 不使用')
-    && added.note === '内网只支持本地文件夹的包，包要自带依赖'
+    && card.resources.find((item) => item.kind === 'themes')?.tags.includes('Not used by Mori')
+    && added.note === 'Plugins must be local folders that include their dependencies. Nothing is downloaded.'
     && JSON.stringify(added.packages) === JSON.stringify([source]), JSON.stringify(added));
   recordPackageToggle(await togglePackageSkill(ctx), source);
   await callPackageTool(ctx);
@@ -864,7 +875,7 @@ async function slashKeys(page, items) {
     running: await pane(page).getAttribute('data-running') };
 }
 
-/** @brief 当前会话最后一个技能调用的气泡：名字、那一行的字；点"展开"后的路径和正文。 */
+/** @brief 当前会话最后一个技能调用的气泡：名字、那一行的字；点"Expand"后的路径和正文。 */
 async function skillBubble(page) {
   const bubble = pane(page).getByTestId('skill-invocation').last();
   if (await bubble.count() === 0) return null;
@@ -896,7 +907,7 @@ async function slashSkill(ctx) {
     && inserted.value === `/skill:${USER_SKILL} ` && inserted.open === 0 && inserted.running === 'false',
   JSON.stringify({ filtered, inserted }));
   record('走查 7：发出技能命令：你的消息显示为一行"技能 · m6-hello"，展开看到 SKILL.md 的路径和正文；会话名是"/skill:m6-hello"',
-    bubble?.skill === USER_SKILL && bubble.label === `技能 · ${USER_SKILL}`
+    bubble?.skill === USER_SKILL && bubble.label === `Skill · ${USER_SKILL}`
     && samePath(bubble.location, join(ctx.agentDir, 'skills', USER_SKILL, 'SKILL.md'))
     && bubble.body.includes('Reply with exactly one line: M6-SKILL-OK') && title === `/skill:${USER_SKILL}`,
   JSON.stringify({ bubble: bubble && { ...bubble, body: oneLine(bubble.body, 120) }, title }));
@@ -927,7 +938,8 @@ function recordSlashList(ctx, all) {
   const prompt = all.info[USER_PROMPT];
   const skill = all.info[`skill:${USER_SKILL}`];
   record('走查 7：输入 "/"：输入框上方分"提示词模板""技能"两组，列出 /m6-summary（<file>，说明）和 /skill:m6-hello（说明），'
-    + '第一项高亮', all.above && all.groups[0] === '提示词模板' && all.groups[1] === '技能' && kindOf(USER_PROMPT) === 'prompt'
+    + '第一项高亮', all.above && all.groups[0] === 'Prompt templates' && all.groups[1] === 'Skills'
+    && kindOf(USER_PROMPT) === 'prompt'
     && prompt?.hint === '<file>' && prompt?.description === '用一句话总结一个文件' && kindOf(`skill:${USER_SKILL}`) === 'skill'
     && Boolean(skill?.description?.startsWith('Synthetic skill for the Mori M6 walkthrough'))
     && all.items?.[0]?.selected && all.items.filter((item) => item.selected).length === 1,
@@ -974,20 +986,20 @@ async function thinkingMenu(page, name) {
   return { ...head, ...state };
 }
 
-/** @brief 设置页里编辑默认模型：勾"支持思考"、新会话默认选 level，保存；返回看到的。 */
+/** @brief 设置页里编辑默认模型：勾"Supports thinking"、新会话默认选 level，保存；返回看到的。 */
 async function markReasoning(ctx, level) {
   const { page } = ctx;
   await openSettings(page);
   const row = modelRow(page, `${ctx.conn.provider}/${ctx.conn.model}`);
-  await row.getByRole('button', { name: '编辑', exact: true }).click();
+  await row.getByRole('button', { name: 'Edit', exact: true }).click();
   const form = page.getByTestId('model-form');
   await form.waitFor({ timeout: 10000 });
-  const before = { readOnly: await form.getByLabel('模型 ID').getAttribute('readonly'),
+  const before = { readOnly: await form.getByLabel('Model ID').getAttribute('readonly'),
     selects: await form.locator('select').count() };
   await form.locator('input[type="checkbox"]').check();
   await form.locator('select').selectOption(level);
   await shot(page, '8-edit-model');
-  await form.getByRole('button', { name: '保存', exact: true }).click();
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
   await page.getByTestId('settings-notice').waitFor({ timeout: 15000 });
   const meta = await row.locator('.model-meta').innerText();
   return { before, meta };
@@ -1007,7 +1019,7 @@ function levelAround(entries, text) {
   return { level, thinking: null };
 }
 
-/** @brief 走查 8 后半：新会话默认"低"；切到"高"问鸡兔同笼（记下生成中顶栏按钮的样子），切到"关"再问一道。 */
+/** @brief 走查 8 后半：新会话默认"Low"；切到"High"问鸡兔同笼（记下生成中顶栏按钮的样子），切到"Off"再问一道。 */
 async function askWithThinking(ctx) {
   const { page } = ctx;
   await newSession(page);
@@ -1030,13 +1042,15 @@ async function askWithThinking(ctx) {
 /** @brief 走查 8 后半的检查：新会话的默认强度、生成中按钮不可用、高 / 关两次回复。 */
 function recordThinkingRun(ctx, run) {
   record('走查 8：新会话的思考强度是设置里的默认"低"；菜单列出关、最低、低、中、高，"低"打勾，说明只作用于这个会话',
-    run.initial === 'low' && run.menu.text === '思考：低' && run.menu.reasoning === 'true'
+    run.initial === 'low' && run.menu.text === 'Effort: Low' && run.menu.reasoning === 'true'
     && run.menu.items.map((item) => item.level).join() === 'off,minimal,low,medium,high'
     && run.menu.items.every((item) => !item.disabled) && run.menu.checked === 'low'
-    && run.menu.note === '只作用于这个会话；新会话的默认在设置里按模型设定', JSON.stringify(run.menu));
+    && run.menu.note === 'Applies to this session only. Set each model’s default for new sessions in Settings.',
+    JSON.stringify(run.menu));
   record('走查 8：生成中顶栏的模型和思考按钮不可用，悬停"生成中不能切换模型""生成中不能切换思考强度"',
-    run.start?.running === true && run.start.model?.disabled && run.start.model.title === '生成中不能切换模型'
-    && run.start.thinking?.disabled && run.start.thinking.title === '生成中不能切换思考强度', JSON.stringify(run.start));
+    run.start?.running === true && run.start.model?.disabled
+    && run.start.model.title === 'Can’t switch models until the response finishes' && run.start.thinking?.disabled
+    && run.start.thinking.title === 'Can’t change effort until the response finishes', JSON.stringify(run.start));
   record('反例：顶栏切换思考强度不改设置里的默认（modelThinkingLevels 仍是 low，没有写 defaultThinkingLevel）',
     run.settings?.modelThinkingLevels?.[`${ctx.conn.provider}/${ctx.conn.model}`] === 'low'
     && run.settings?.defaultThinkingLevel === undefined, JSON.stringify(run.settings?.modelThinkingLevels));
@@ -1049,7 +1063,7 @@ function recordThinkingRun(ctx, run) {
     && (run.off.thinking > 0) === (run.second.thinking > 0), JSON.stringify({ first: run.first, second: run.second }));
 }
 
-/** @brief 走查 8 最后：同一会话换到没标支持思考的模型（走查 1 加的），思考按钮按返回值变成"不可选"。 */
+/** @brief 走查 8 最后：同一会话换到没标支持思考的模型（走查 1 加的），思考按钮按返回值变成"Unavailable"。 */
 async function switchToUnmarked(ctx) {
   const { page } = ctx;
   const models = readJson(join(ctx.agentDir, 'models.json'))?.providers?.[ctx.conn.provider]?.models ?? [];
@@ -1062,25 +1076,28 @@ async function switchToUnmarked(ctx) {
     level: await button.getAttribute('data-level') };
   await shot(page, '8-unmarked-switch');
   record('走查 8：同一会话在顶栏换到没标支持思考的 deepseek-v4-pro：思考按钮按返回值变成"思考：不可选"（pi 收紧为关）',
-    state.text === '思考：不可选' && state.reasoning === 'false' && state.level === 'off', JSON.stringify(state));
+    state.text === 'Effort: Unavailable' && state.reasoning === 'false' && state.level === 'off',
+    JSON.stringify(state));
 }
 
-/** @brief 走查 8：把模型标为支持思考；顶栏"高"有思考内容，"关"没有。之前先看反例：没标时不可选。 */
+/** @brief 走查 8：把模型标为支持思考；顶栏"High"有思考内容，"Off"没有。之前先看反例：没标时不可选。 */
 async function item8(ctx) {
   const { page } = ctx;
   await newSession(page);
   const unmarked = await thinkingMenu(page, '8-unmarked');
   record('反例：模型没标支持思考时，顶栏"思考：不可选"，菜单里的强度都不可用，说明原因并有"打开设置"',
-    unmarked.text === '思考：不可选' && unmarked.reasoning === 'false' && unmarked.items.length > 0
-    && unmarked.items.every((item) => item.disabled) && unmarked.note.includes("这个模型没有标'支持思考'")
-    && unmarked.links.includes('打开设置'), JSON.stringify(unmarked));
+    unmarked.text === 'Effort: Unavailable' && unmarked.reasoning === 'false' && unmarked.items.length > 0
+    && unmarked.items.every((item) => item.disabled)
+    && unmarked.note.includes('This model isn’t marked “Supports thinking”')
+    && unmarked.links.includes('Open settings'), JSON.stringify(unmarked));
   const edited = await markReasoning(ctx, 'low');
   const model = readJson(join(ctx.agentDir, 'models.json'))?.providers?.[ctx.conn.provider]?.models
     ?.find((item) => item.id === ctx.conn.model);
   const levels = readJson(join(ctx.agentDir, 'settings.json'))?.modelThinkingLevels;
   record('走查 8：编辑模型（ID 只读；没勾时没有思考强度下拉），勾"支持思考"、新会话默认选"低"，保存：这一行"支持思考 · 新会话默认 低"；'
     + 'models.json 有 reasoning: true，settings.json 的 modelThinkingLevels 是 low', edited.before.readOnly !== null
-    && edited.before.selects === 0 && edited.meta.endsWith('支持思考 · 新会话默认 低') && model?.reasoning === true
+    && edited.before.selects === 0 && edited.meta.endsWith('Supports thinking · Default effort: Low')
+    && model?.reasoning === true
     && levels?.[`${ctx.conn.provider}/${ctx.conn.model}`] === 'low', JSON.stringify({ edited, model, levels }));
   await backToChat(page);
   const reopened = await pane(page).getByTestId('thinking-button').getAttribute('data-reasoning');
@@ -1092,9 +1109,9 @@ async function item8(ctx) {
 // ---------- 反例 ----------
 
 /**
- * @brief 反例：没有注册任何工具的 MCP 服务不显示"已连接"。先保证有一个会注册工具的服务（mori_test）和一个命令写错的服务
+ * @brief 反例：没有注册任何工具的 MCP 服务不显示"Connected"。先保证有一个会注册工具的服务（mori_test）和一个命令写错的服务
  *        （mori_broken）：pi 在全部启用的服务连上或失败之后才发"MCP servers need attention"，等到它就知道 mori_empty
- *        也已经连完，看到的"没有注册工具"不是还在连接。
+ *        也已经连完，看到的"This server has no tools in this session"不是还在连接。
  */
 async function emptyMcp(ctx) {
   const { page } = ctx;
@@ -1114,9 +1131,10 @@ async function emptyMcp(ctx) {
   await openToolsSection(page, 'mcp');
   await shot(page, 'c-mcp-empty');
   record('反例：没有注册任何工具的 MCP 服务：全部服务连完之后（mori_test 有工具、mori_broken 报错），这一行写"当前会话里它没有注册工具"，'
-    + '没有错误；工具页和会话页上都没有"已连接"', added.saved?.startsWith('已保存') && servers().mori_empty?.env?.MORI_MCP_TOOLS === 'none'
-    && settled && test.tools?.includes('mcp__mori_test__echo') && info?.tools === '当前会话里它没有注册工具'
-    && info.errors.length === 0 && !text.includes('已连接') && !chat.includes('已连接'),
+    + '没有错误；工具页和会话页上都没有"已连接"', added.saved?.startsWith('Saved')
+    && servers().mori_empty?.env?.MORI_MCP_TOOLS === 'none' && settled && test.tools?.includes('mcp__mori_test__echo')
+    && info?.tools === 'This server has no tools in this session'
+    && info.errors.length === 0 && !text.includes('Connected') && !chat.includes('Connected'),
   JSON.stringify({ saved: added.saved, settled, info, test: test?.tools ?? null }));
   await backToChat(page);
 }
@@ -1124,7 +1142,7 @@ async function emptyMcp(ctx) {
 /** @brief 反例：没有信任的项目里的技能不出现在工具页里，也不在"/"列表里。 */
 async function untrustedSkill(ctx) {
   const { page } = ctx;
-  await openFolder(ctx, ctx.untrusted, '不信任');
+  await openFolder(ctx, ctx.untrusted, 'Don’t trust');
   const slash = await openSlash(page, '/');
   await closeSlash(page);
   await openToolsSection(page, 'builtin');
@@ -1137,7 +1155,8 @@ async function untrustedSkill(ctx) {
   await shot(page, 'c-untrusted');
   record('反例：没有信任的项目：它 .pi/skills 里的 m6-untrusted-skill 不出现在工具页"技能"里（工具页读到了这个会话：内置工具有列出）；'
     + '顶部说明"没有信任这个文件夹，它自带的技能和配置不列出"', builtin > 0 && !names.includes(UNTRUSTED_SKILL)
-    && notice === '没有信任这个文件夹，它自带的技能和配置不列出' && follow.startsWith('m6-untrusted · '),
+    && notice === 'This workspace isn’t trusted, so its skills and settings aren’t listed'
+    && follow.startsWith('m6-untrusted · '),
   JSON.stringify({ builtin, names, notice, follow }));
   record('反例：没有信任的项目里会话的"/"列表没有 /skill:m6-untrusted-skill', slashLacks(slash, `skill:${UNTRUSTED_SKILL}`),
     oneLine(slash.text, 200));
@@ -1177,7 +1196,7 @@ ctx.userData = scratchUserData(source);
 ctx.agentDir = join(ctx.userData, 'pi');
 try {
   await start(ctx);
-  await openFolder(ctx, ctx.project, '信任');
+  await openFolder(ctx, ctx.project, 'Trust workspace');
   const items = { 1: item1, 2: item2, 3: item3, 4: item4, 5: item5, 6: item6, 7: item7, 8: item8, c: counterExamples };
   for (const [item, fn] of Object.entries(items)) {
     if (!wanted(item)) continue;

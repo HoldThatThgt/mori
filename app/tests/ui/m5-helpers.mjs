@@ -47,7 +47,7 @@ export function waitSplit(page, split = true, timeout = 10000) {
     split, { timeout });
 }
 
-/** @brief 等某一栏就绪（没有"正在启动…"）。 */
+/** @brief 等某一栏就绪（没有"Starting…"）。 */
 export function waitPaneReady(page, side, timeout = 30000) {
   return page.waitForFunction((css) => document.querySelector(`${css} [data-testid="chat-pane"]`)
     && !document.querySelector(`${css} [data-testid="not-ready"]`), slotSelector(side), { timeout });
@@ -140,19 +140,19 @@ export function previewState(page) {
   });
 }
 
-/** @brief 等预览对话框读完（不再是"正在读取…"）。 */
+/** @brief 等预览对话框读完（不再是"Loading…"）。 */
 export function waitPreview(page, timeout = 15000) {
   return page.waitForFunction(() => {
     const dialog = document.querySelector('[data-testid="ref-preview"]');
-    return dialog && !dialog.textContent.includes('正在读取…');
+    return dialog && !dialog.textContent.includes('Loading…');
   }, null, { timeout });
 }
 
 /** @brief 在预览对话框里选范围（两个下拉框）。 */
 export async function pickRange(page, from, to) {
   const dialog = page.getByTestId('ref-preview');
-  await dialog.getByRole('combobox', { name: '从第几轮' }).selectOption(String(from));
-  await dialog.getByRole('combobox', { name: '到第几轮' }).selectOption(String(to));
+  await dialog.getByRole('combobox', { name: 'From turn' }).selectOption(String(from));
+  await dialog.getByRole('combobox', { name: 'To turn' }).selectOption(String(to));
 }
 
 /** @brief 某一栏里发出的会话引用：文字、状态、内容的开头。 */
