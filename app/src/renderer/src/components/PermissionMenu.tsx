@@ -1,5 +1,7 @@
-// 顶栏的权限菜单：每次询问 / 全部允许，"本会话已允许"的列表可以逐项清除（docs/v0/screens/approval.md）。
-// 只作用于这个会话；切到"全部允许"前确认一次，切回"每次询问"不需要确认。
+// 顶栏的权限菜单：Ask each time / Allow all，"Allowed for this session:"的列表可以逐项清除（Forget）
+// （docs/v0/screens/approval.md）。只作用于这个会话；切到"Allow all"前确认一次，切回"Ask each time"不需要确认。
+// 面板 400px 以下按钮只显示盾牌图标（chat.css 的 @container 藏起 .permission-text），模式名靠读屏名
+// "Permission mode: <模式>"。
 
 import { useEffect, useRef, useState } from 'react';
 import type { ApprovalMode } from '../../../shared/protocol';
@@ -11,9 +13,9 @@ import { approvalLabel } from './approvalLabel';
 import { ConfirmDialog } from './ConfirmDialog';
 import { moveMenuFocus, useOutsideClose } from './menu';
 
-const modeText: Record<ApprovalMode, string> = { ask: '每次询问', all: '全部允许' };
+const modeText: Record<ApprovalMode, string> = { ask: 'Ask each time', all: 'Allow all' };
 
-/** @brief 菜单内容：两个权限（当前项打勾）、"本会话已允许"列表、底部说明。打开时焦点在当前项上。 */
+/** @brief 菜单内容：两个权限（当前项打勾）、"Allowed for this session:"列表、底部说明。打开时焦点在当前项上。 */
 function PermissionPanel({ tab, onChoose }: { tab: Tab; onChoose: (mode: ApprovalMode) => void }) {
   const menu = useRef<HTMLDivElement>(null);
   const { mode, allowed } = tab.approval;
@@ -21,25 +23,25 @@ function PermissionPanel({ tab, onChoose }: { tab: Tab; onChoose: (mode: Approva
     menu.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
   }, []);
   return (
-    <div ref={menu} className="menu permission-menu" role="menu" aria-label="权限" data-testid="permission-menu"
+    <div ref={menu} className="menu permission-menu" role="menu" aria-label="Permissions" data-testid="permission-menu"
       onKeyDown={moveMenuFocus}>
       {(['ask', 'all'] as const).map((item) => (
         <button key={item} role="menuitemradio" aria-checked={mode === item} onClick={() => onChoose(item)}>
           {modeText[item]}{mode === item && <Icon name="check" />}
         </button>
       ))}
-      <div className="menu-caption">本会话已允许：</div>
+      <div className="menu-caption">Allowed for this session:</div>
       <ul className="permission-allowed" data-testid="permission-allowed">
         {allowed.map((name) => (
           <li key={name}>
             <span>{approvalLabel(name)}</span>
-            <button className="text-link" title={`清除"${approvalLabel(name)}"`}
-              onClick={() => void forgetApproval(tab.key, name)}>清除</button>
+            <button className="text-link" title={`Forget “${approvalLabel(name)}”`}
+              onClick={() => void forgetApproval(tab.key, name)}>Forget</button>
           </li>
         ))}
       </ul>
-      {allowed.length === 0 && <div className="menu-empty">还没有</div>}
-      <p className="menu-note">只作用于这个会话，新会话从'每次询问'开始</p>
+      {allowed.length === 0 && <div className="menu-empty">None</div>}
+      <p className="menu-note">Applies to this session only. New sessions start with “Ask each time”.</p>
     </div>
   );
 }
@@ -77,12 +79,14 @@ export function PermissionMenu({ tab, disabled }: { tab: Tab; disabled: boolean 
     <div className="permission" ref={root}>
       <button ref={button} className={`permission-button${mode === 'all' ? ' all' : ''}`}
         data-testid="permission-button" aria-haspopup="menu" aria-expanded={open} disabled={disabled}
-        title="权限：只作用于这个会话" onClick={() => setOpen(!open)}>
-        <Icon name="shield" />{modeText[mode]}<Icon name="down" />
+        title="Set the permission mode for this session" aria-label={`Permission mode: ${modeText[mode]}`}
+        onClick={() => setOpen(!open)}>
+        <Icon name="shield" /><span className="permission-text">{modeText[mode]}</span><Icon name="down" />
       </button>
       {open && <PermissionPanel tab={tab} onChoose={choose} />}
-      {confirming && <ConfirmDialog title="切换到全部允许？" text="编辑、写入和命令都不再询问。" confirmLabel="全部允许"
-        tone="warn" testId="confirm-dialog" onConfirm={() => confirmed(true)} onCancel={() => confirmed(false)} />}
+      {confirming && <ConfirmDialog title="Switch to “Allow all”?"
+        text="Edits, writes, and commands will run without asking." confirmLabel="Allow all" tone="warn"
+        testId="confirm-dialog" onConfirm={() => confirmed(true)} onCancel={() => confirmed(false)} />}
     </div>
   );
 }

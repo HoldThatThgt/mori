@@ -50,7 +50,7 @@ function connectWindow(window: BrowserWindow): void {
 
 /**
  * @brief 禁止页面跳转、弹新窗口、嵌入 webview 和申请权限。唯一的例外：Mori 自己的页面写剪贴板
- *        （代码块上的"复制代码"用浏览器的剪贴板接口，Chromium 按 clipboard-sanitized-write 申请）。
+ *        （代码块上的"Copy code"用浏览器的剪贴板接口，Chromium 按 clipboard-sanitized-write 申请）。
  */
 function lockDown(window: BrowserWindow): void {
   const contents = window.webContents;
@@ -120,7 +120,7 @@ ipcMain.handle('mori:delete-session', async (event: IpcMainInvokeEvent, file: un
   return { deleted: true, error: null };
 });
 
-// 后台进程意外退出后，界面上的"重新载入"重启它并重连通道；页面不刷新，草稿等界面状态保留。
+// 后台进程意外退出后，界面上的"Restart"重启它并重连通道；页面不刷新，草稿等界面状态保留。
 ipcMain.handle('mori:restart-kernel', (event: IpcMainInvokeEvent) => {
   if (!event.senderFrame || !isAppPage(event.senderFrame.url)) throw new Error('Not allowed');
   if (!currentKernel()) startKernel(notifyKernelExit);

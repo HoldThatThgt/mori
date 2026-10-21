@@ -1,5 +1,5 @@
 // 项目信任询问（docs/v0/screens/sessions.md "项目信任"）：新建或打开会话之前问后台进程要不要问你，
-// 要问时显示询问框并等你回答。本次运行里回答过的文件夹不再问（勾了"记住"的由 pi 的 trust.json 记住，跨重启）。
+// 要问时显示询问框并等你回答。本次运行里回答过的文件夹不再问（勾了"Remember my choice"的由 pi 的 trust.json 记住，跨重启）。
 // 同一个文件夹同时要问两次时只问一次；不同文件夹的询问排队，一次显示一个。
 
 import type { TrustAnswer, TrustCheck } from '../../../shared/protocol';
@@ -7,7 +7,7 @@ import { recordAction } from './actionLog';
 import { request } from './bridge';
 import { useApp } from './store';
 
-/** 本次运行里你对每个文件夹的回答；只记"信任 / 不信任"，"没有要信任的内容"不记（之后可能出现） */
+/** 本次运行里你对每个文件夹的回答；只记"Trust workspace" / "Don’t trust"，"没有要信任的内容"不记（之后可能出现） */
 const answers = new Map<string, boolean>();
 /** 正在问的文件夹 */
 const pending = new Map<string, Promise<TrustAnswer>>();
@@ -27,11 +27,12 @@ function ask(cwd: string, readError: string | null): Promise<TrustAnswer> {
   return answer.finally(() => pending.delete(cwd));
 }
 
-/** @brief 你在询问框里的回答。 */
+/** @brief 你在询问框里的回答；操作记录写"Trust prompt: Trust workspace (remembered) <文件夹>"或"Trust prompt: Don’t trust <文件夹>"。 */
 export function answerTrust(id: number, answer: TrustAnswer): void {
   const prompt = useApp.getState().trustPrompts.find((item) => item.id === id);
   if (!prompt) return;
-  recordAction(`信任询问：${answer.trusted ? '信任' : '不信任'}${answer.remember ? '（记住）' : ''} ${prompt.cwd}`);
+  const choice = answer.trusted ? 'Trust workspace' : 'Don’t trust';
+  recordAction(`Trust prompt: ${choice}${answer.remember ? ' (remembered)' : ''} ${prompt.cwd}`);
   useApp.setState((state) => ({ trustPrompts: state.trustPrompts.filter((item) => item.id !== id) }));
   resolvers.get(id)?.(answer);
   resolvers.delete(id);

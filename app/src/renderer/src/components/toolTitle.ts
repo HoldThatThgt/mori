@@ -7,7 +7,7 @@ const COMMAND_MAX = 80;
 
 /** @brief 标题的两部分：动词和对象（对象用等宽字体显示）。 */
 export interface ToolTitle {
-  /** 动词，例如"读取""运行" */
+  /** 动词，例如"Read""Run" */
   verb: string;
   /** 对象，例如路径或命令；没有时为空串 */
   target: string;
@@ -16,7 +16,7 @@ export interface ToolTitle {
 }
 
 const verbs: Record<string, string> = {
-  read: '读取', bash: '运行', powershell: '运行', edit: '修改', write: '写入', grep: '搜索', find: '查找', ls: '列目录',
+  read: 'Read', bash: 'Run', powershell: 'Run', edit: 'Edit', write: 'Write', grep: 'Search', find: 'Find', ls: 'List',
 };
 
 /** @brief 在工作目录之内的路径显示为相对路径。 */
@@ -70,12 +70,12 @@ function field(tool: ToolCall, name: string): string | null {
   return partialField(tool.argsText, name);
 }
 
-/** @brief read 的行范围后缀。 */
+/** @brief read 的行范围后缀：" · lines a–b"或" · from line a"。 */
 function lineRange(tool: ToolCall): string {
   const offset = Number(tool.args?.offset);
   const limit = Number(tool.args?.limit);
   if (!Number.isFinite(offset) || offset <= 0) return '';
-  return Number.isFinite(limit) && limit > 0 ? ` · 第 ${offset}–${offset + limit - 1} 行` : ` · 从第 ${offset} 行`;
+  return Number.isFinite(limit) && limit > 0 ? ` · lines ${offset}–${offset + limit - 1}` : ` · from line ${offset}`;
 }
 
 /** @brief 生成工具卡标题。 */
@@ -95,7 +95,7 @@ export function toolTitle(tool: ToolCall, cwd: string): ToolTitle {
   return { verb, target, suffix: tool.name === 'read' ? lineRange(tool) : '' };
 }
 
-/** @brief 标题的纯文字形式（阶段行用）。 */
+/** @brief 标题的纯文字形式（阶段行、会话引用里的"[Tool] …"行用）。 */
 export function toolTitleText(tool: ToolCall, cwd: string): string {
   const title = toolTitle(tool, cwd);
   return [title.verb, title.target].filter(Boolean).join(' ') + title.suffix;

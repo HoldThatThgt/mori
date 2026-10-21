@@ -45,16 +45,16 @@ function changeCount(transcript: Transcript, cwd: string, path: string): number 
 
 /** @brief 一次改动：编辑显示 diff，写入显示新内容。 */
 function Change({ tool, index }: { tool: ToolCall; index: number }) {
-  const label = `第 ${index + 1} 次 · ${tool.name === 'edit' ? '修改' : '写入'}`;
+  const label = `Change ${index + 1} · ${tool.name === 'edit' ? 'Edit' : 'Write'}`;
   return (
     <div className="change-entry" data-testid="change-entry">
       <div className="tool-section-label">{label}</div>
       {tool.name === 'write' && <>
-        <div className="tool-section-label">写入的内容</div>
+        <div className="tool-section-label">File content</div>
         <pre className="tool-pre">{String(tool.args?.content ?? '')}</pre>
       </>}
       {tool.name === 'edit' && (tool.patch ? <div className="change-diff"><Diff patch={tool.patch} /></div>
-        : <p className="muted">这次编辑没有返回 diff</p>)}
+        : <p className="muted">This edit didn’t return a diff.</p>)}
     </div>
   );
 }
@@ -65,20 +65,21 @@ function ChangesList({ tab, onClose }: { tab: Tab; onClose: () => void }) {
   return (
     <>
       <div className="panel-header">
-        <Icon name="file" />本会话的改动
-        <button className="icon-button" onClick={onClose} aria-label="关闭右栏"><Icon name="close" /></button>
+        <Icon name="file" />This session’s changes
+        <button className="icon-button" onClick={onClose} aria-label="Close panel"><Icon name="close" /></button>
       </div>
       <div className="panel-body" data-testid="changes">
-        {files.length === 0 ? <p className="muted">本会话还没有改动</p> : (
+        {files.length === 0 ? <p className="muted">No changes yet.</p> : (
           <>
-            <p className="panel-note">只含编辑和写入，命令改动的文件不在此列。</p>
+            <p className="panel-note">Only edits and writes are listed. Files changed by commands aren’t included.</p>
             {files.map((file) => (
               <details key={file.path} className="change-file" data-testid="change-file">
                 <summary>
                   <code className="change-path">{file.path}</code>
-                  <span className="muted">{file.changes.length} 次</span>
-                  <button className="text-link change-open" aria-label={`打开 ${file.path}`}
-                    onClick={(event) => { event.preventDefault(); openFile(tab.key, file.rawPath); }}>打开</button>
+                  <span className="muted">
+                    {file.changes.length === 1 ? '1 change' : `${file.changes.length} changes`}</span>
+                  <button className="text-link change-open" aria-label={`Open ${file.path}`}
+                    onClick={(event) => { event.preventDefault(); openFile(tab.key, file.rawPath); }}>Open</button>
                 </summary>
                 {file.changes.map((tool, index) => <Change key={tool.id} tool={tool} index={index} />)}
               </details>

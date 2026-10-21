@@ -92,7 +92,7 @@ function runnable(path: string): boolean {
 
 /**
  * @brief 用系统默认程序打开文件（文件夹在资源管理器里打开）；失败时返回原文。会被运行的文件（脚本、程序、快捷方式）
- *        不打开，改为在资源管理器里选中它（revealed 为真），免得点"用系统编辑器打开"就执行了模型写的东西。
+ *        不打开，改为在资源管理器里选中它（revealed 为真），免得点"Open in default app"就执行了模型写的东西。
  */
 async function openPath(input: string, cwd: string): Promise<{ error: string | null; revealed: boolean }> {
   try {

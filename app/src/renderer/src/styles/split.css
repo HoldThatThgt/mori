@@ -120,9 +120,11 @@
 }
 .ref-turns .ref-stored { padding: 10px 14px; }
 
-/* 分屏时每一栏较窄：640px 以下先藏项目名；再往下与单栏相同分步收紧（chat.css），模型和思考强度按钮一直在，
-   会话名不被挤掉（关闭分屏或拉宽这一栏后又会显示）。这里只改分屏自己的内边距和间距 */
-@container (max-width: 640px) {
+/* 分屏时每一栏较窄：690px 以下先藏项目名；再往下与单栏相同分步收紧（chat.css），模型和思考强度按钮一直在，
+   会话名不被挤掉（关闭分屏或拉宽这一栏后又会显示）。阈值按最宽的英文估算（Segoe UI 12px）：≤ 720px 时按钮区最宽约
+   530px（模型按钮 120px、"Effort: Unavailable ▾"、"Ask each time"、"Context 100%"、右栏开关、关闭这一栏），
+   690px 时还给项目名、› 和会话名留约 125px（项目名最窄 40px，会话名至少 36px）。这里只改分屏自己的内边距和间距 */
+@container (max-width: 690px) {
   .center[data-split] .chat-project, .center[data-split] .breadcrumb > svg { display: none; }
 }
 @container (max-width: 400px) {

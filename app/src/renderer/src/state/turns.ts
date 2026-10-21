@@ -1,5 +1,5 @@
 // 一轮回复：你的一条消息之后、下一条之前的全部助手回复（方案 5.11 的"轮"）。
-// 照 Claude 桌面版，回复下的操作（复制、引用到输入框、反馈这条回复）每轮一行，放在这一轮最后一条助手回复下。
+// 照 Claude 桌面版，回复下的操作（"Copy"、"Attach message as context"、"Give feedback"）每轮一行，放在这一轮最后一条助手回复下。
 
 import type { MessageSource } from '../../../shared/protocol';
 import type { Item, MessageMark } from './model';

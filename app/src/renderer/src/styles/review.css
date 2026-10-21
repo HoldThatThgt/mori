@@ -1,4 +1,4 @@
-/* M7：工作回顾（docs/v0/screens/review.md）。外框照工具页：顶部"返回会话"和标题；分节与工具行同一行（放不下时换行）；
+/* M7：工作回顾（docs/v0/screens/review.md）。外框照工具页：顶部"Back to app"和标题；分节与工具行同一行（放不下时换行）；
    每条记录一行摘要，已处理的变淡，选中的高亮；详情在右栏（.right-panel），截图点开浮在最上层。字号不小于 12px。 */
 .review-page {
   display: flex;

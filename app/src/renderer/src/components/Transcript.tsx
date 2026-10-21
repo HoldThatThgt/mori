@@ -1,6 +1,6 @@
-// 对话流：先显示最近 50 条消息，滚到顶部时载入更早的；你在底部时跟随新内容，不在底部时显示"有新内容 ↓"。
+// 对话流：先显示最近 50 条消息，滚到顶部时载入更早的；你在底部时跟随新内容，不在底部时显示"Jump to latest ↓"。
 // M4：你的消息上方显示引用，每轮回复末尾一行操作，点引用回到原位置时滚过去高亮（docs/v0/screens/selection.md）。
-// M6：pi 展开的技能命令缩成一行"技能 · 名字"加参数，可以展开看正文（docs/v0/screens/slash.md）。
+// M6：pi 展开的技能命令缩成一行"Skill · 名字"加参数，可以展开看正文（docs/v0/screens/slash.md）。
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { openSettings, putBack, putBackQuoted } from '../state/actions';
@@ -20,36 +20,38 @@ import { ReplyActions } from './ReplyActions';
 const BOTTOM_SLACK = 24;
 /** 离顶部不超过这么多像素就载入更早的消息 */
 const TOP_SLACK = 40;
-/** 错误原文里出现这些字样时附"去设置"，临时默认值，见 docs/v0/defaults.md */
+/** 错误原文里出现这些字样时附"Go to settings"，临时默认值，见 docs/v0/defaults.md */
 const SETTINGS_HINT = /401|unauthorized|api key/i;
 
-/** @brief 错误卡：显示原文，按原文附"去设置"或"把上一条消息放回输入框"。 */
+/** @brief 错误卡：显示原文，按原文附"Go to settings"或"Put your last message back in the message box"。 */
 function ErrorCard({ item, tabKey }: { item: Extract<Item, { kind: 'error' }>; tabKey: string }) {
   const settings = SETTINGS_HINT.test(item.text);
   return (
     <div className="error-card" role="alert" data-testid="error-card">
       <pre className="error-text">{item.text}</pre>
-      {item.live && settings && <button className="text-link" onClick={() => openSettings(true)}>去设置</button>}
+      {item.live && settings && (
+        <button className="text-link" onClick={() => openSettings(true)}>Go to settings</button>
+      )}
       {item.live && !settings && item.restore !== null && (
         <button className="text-link" onClick={() => (item.refs ? putBackQuoted(tabKey, item.restore ?? '', item.refs)
-          : putBack(tabKey, [item.restore ?? '']))}>把上一条消息放回输入框</button>
+          : putBack(tabKey, [item.restore ?? '']))}>Put your last message back in the message box</button>
       )}
     </div>
   );
 }
 
 /**
- * @brief 技能调用（照 pi 终端 SkillInvocationMessageComponent）：气泡里一行"技能 · 名字"，下面是你写的参数；
- *        "展开"看 SKILL.md 的路径和技能正文。
+ * @brief 技能调用（照 pi 终端 SkillInvocationMessageComponent）：气泡里一行"Skill · 名字"，下面是你写的参数；
+ *        "Expand"看 SKILL.md 的路径和技能正文。
  */
 function SkillMessage({ skill }: { skill: SkillInvocation }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="user-message skill-invocation" data-testid="skill-invocation" data-skill={skill.name}>
       <div className="skill-head">
-        <span className="skill-label">技能 · {skill.name}</span>
+        <span className="skill-label">Skill · {skill.name}</span>
         <button className="text-link skill-toggle" aria-expanded={open} data-no-quote
-          onClick={() => setOpen(!open)}>{open ? '收起' : '展开'}</button>
+          onClick={() => setOpen(!open)}>{open ? 'Collapse' : 'Expand'}</button>
       </div>
       {skill.args && <div className="skill-args">{skill.args}</div>}
       {open && (
@@ -91,13 +93,13 @@ const ItemView = memo(function ItemView(
     case 'assistant':
       return <AssistantMessage item={item} tools={tools} cwd={cwd} tabKey={tabKey} />;
     case 'compaction':
-      return <div className="notice" data-testid="notice">已压缩较早的对话</div>;
+      return <div className="notice" data-testid="notice">Compacted session</div>;
     case 'stopped':
-      return <div className="notice stopped" data-testid="notice">已停止 · 已经做出的修改不会自动撤销</div>;
+      return <div className="notice stopped" data-testid="notice">Stopped · Changes made so far stay as they are</div>;
     case 'note':
       return <div className="notice" data-testid="notice">{item.text}</div>;
     case 'notify':
-      return <div className={`notice ext-notify ${item.level}`} data-testid="ext-notify">扩展：{item.text}</div>;
+      return <div className={`notice ext-notify ${item.level}`} data-testid="ext-notify">Extension: {item.text}</div>;
     case 'error':
       return <ErrorCard item={item} tabKey={tabKey} />;
   }
@@ -109,7 +111,7 @@ function EmptyChat({ cwd }: { cwd: string }) {
   return (
     <div className="empty-chat">
       <h1>{name}</h1>
-      <p>Enter 发送 · Shift+Enter 换行</p>
+      <p>Enter to send · Shift+Enter for new line</p>
     </div>
   );
 }
@@ -159,8 +161,8 @@ function useHolding(scroller: React.RefObject<HTMLDivElement | null>): React.Ref
 }
 
 /**
- * @brief 跟随与"有新内容"：内容变高、或对话流本身变矮（输入框上方出现批准卡、排队区、阶段行）时，
- *        在底部就跟到底部；你发消息时回到底部。对话流里按着鼠标或有选区时暂停跟随，显示"有新内容"。
+ * @brief 跟随与"Jump to latest"：内容变高、或对话流本身变矮（输入框上方出现批准卡、排队区、阶段行）时，
+ *        在底部就跟到底部；你发消息时回到底部。对话流里按着鼠标或有选区时暂停跟随，显示"Jump to latest"。
  *        只有你往上滚（比上次自动滚到底的位置更靠上）才算离开底部：流式输出很快时，
  *        自动滚动触发的 scroll 事件可能晚到、那时内容又长了一截，不能据此认为你离开了。
  */
@@ -301,7 +303,7 @@ export function Transcript({ tab }: { tab: Tab }) {
       <div className="conversation" ref={scroller} onScroll={onScroll} data-testid="transcript">
         <div className="conversation-inner" ref={inner}>
           {items.length === 0 && tab.phase === 'ready' && <EmptyChat cwd={tab.cwd} />}
-          {tab.startIndex > 0 && <div className="load-earlier">向上滚动载入更早的消息</div>}
+          {tab.startIndex > 0 && <div className="load-earlier">Scroll up to load earlier messages</div>}
           {items.slice(tab.startIndex).map((item) => {
             const turn = shown.get(item.key);
             return (
@@ -316,7 +318,7 @@ export function Transcript({ tab }: { tab: Tab }) {
       </div>
       {hasNew && (
         <button className="new-content" onClick={jump} data-testid="new-content">
-          有新内容 <Icon name="down" />
+          Jump to latest <Icon name="down" />
         </button>
       )}
     </div>

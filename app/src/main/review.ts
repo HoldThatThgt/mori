@@ -18,7 +18,9 @@ import { feedbackDir, issuesDir, localTime } from './feedback';
 const StoredFeedbackSchema = FeedbackSchema.extend({ createdAt: z.iso.datetime() });
 
 /** 报告里的各节，按报告里的顺序（main/feedback.ts issueMarkdown） */
-const ISSUE_SECTIONS = ['哪里不对', '你期望什么', '截图', '当前界面', '最近的操作', '版本'] as const;
+const ISSUE_SECTIONS = [
+  'What went wrong', 'What you expected', 'Screenshot', 'Current view', 'Recent activity', 'Versions',
+] as const;
 /** 报告里的一节 */
 type IssueSection = (typeof ISSUE_SECTIONS)[number];
 
@@ -94,9 +96,8 @@ function readFeedback(name: string): FeedbackRecord | BrokenRecord {
 }
 
 /**
- * @brief 一节在报告里的行号：第一节取第一次出现，之后的从后往前找。"截图"及之后的几节是 Mori 生成的，不会有标题行；
- *        你写的两节里像标题的行从 M7 起写报告时加了转义（main/feedback.ts written）。更早的报告里，"你期望什么"
- *        写了一行"## 你期望什么"时分不清哪一行是真的标题，那一行之前的字会被算进"哪里不对"。
+ * @brief 一节在报告里的行号：第一节取第一次出现，之后的从后往前找。"Screenshot"及之后的几节是 Mori 生成的，
+ *        不会有标题行；你写的两节里像标题的行写报告时加了转义（main/feedback.ts written）。
  */
 function sectionLines(lines: string[]): Record<IssueSection, number> {
   const found = {} as Record<IssueSection, number>;
@@ -104,7 +105,7 @@ function sectionLines(lines: string[]): Record<IssueSection, number> {
   for (const section of [...ISSUE_SECTIONS].reverse()) {
     const heading = `## ${section}`;
     const index = section === ISSUE_SECTIONS[0] ? lines.indexOf(heading) : lines.lastIndexOf(heading, end - 1);
-    if (index < 0 || index >= end) throw new Error(`The report has no "${heading}" section`);
+    if (index < 0 || index >= end) throw new Error(`The report has no “${heading}” section`);
     found[section] = index;
     end = index;
   }
@@ -114,8 +115,8 @@ function sectionLines(lines: string[]): Record<IssueSection, number> {
 /** @brief 报告各节的原文（去掉首尾空行）。 */
 function reportSections(text: string): { time: string; sections: Record<IssueSection, string> } {
   const lines = text.replace(/\r\n/g, '\n').split('\n');
-  const title = /^# 界面问题 · (.+)$/.exec(lines[0] ?? '');
-  if (!title) throw new Error('The report has no "# 界面问题 · <time>" title');
+  const title = /^# UI issue · (.+)$/.exec(lines[0] ?? '');
+  if (!title) throw new Error('The report has no “# UI issue · <time>” title');
   const at = sectionLines(lines);
   const sections = {} as Record<IssueSection, string>;
   ISSUE_SECTIONS.forEach((section, index) => {
@@ -126,26 +127,28 @@ function reportSections(text: string): { time: string; sections: Record<IssueSec
 }
 
 /**
- * @brief 报告里"截图"一节：截图的文件名，或没有截图时的原文。这里不看 PNG 还在不在：被删了的由详情读截图时显示
- *        "截图读不出来"，导出照样链接原来的 PNG。
+ * @brief 报告里"Screenshot"一节：截图的文件名，或没有截图时的原文（去掉"Couldn’t capture a screenshot:"前缀；
+ *        各节读出时去掉了首尾空白，原文为空时冒号后没有空格）。这里不看 PNG 还在不在：
+ *        被删了的由详情读截图时显示"Couldn’t load the screenshot"，导出照样链接原来的 PNG。
  */
 function reportShot(text: string): { shot: string | null; shotError: string | null } {
-  const image = /^!\[截图\]\((.+)\)$/.exec(text);
+  const image = /^!\[Screenshot\]\((.+)\)$/.exec(text);
   if (image) {
     const shot = image[1]!;
     if (isShotName(shot)) return { shot, shotError: null };
     return { shot: null, shotError: `Not a report screenshot: ${shot}` };
   }
-  return { shot: null, shotError: text.replace(/^截图失败：/, '') || 'No screenshot section' };
+  const error = text.replace(/^Couldn’t capture a screenshot:\s*/, '');
+  return { shot: null, shotError: error || 'No screenshot section' };
 }
 
 /** @brief 读一份界面问题报告。 */
 function readIssue(name: string): IssueRecord | BrokenRecord {
   try {
     const { time, sections } = reportSections(readText(join(issuesDir(), name)));
-    return { status: 'ok', name, time, what: sections['哪里不对'], expect: sections['你期望什么'],
-      ...reportShot(sections['截图']), view: sections['当前界面'], actions: sections['最近的操作'],
-      versions: sections['版本'] };
+    return { status: 'ok', name, time, what: sections['What went wrong'], expect: sections['What you expected'],
+      ...reportShot(sections['Screenshot']), view: sections['Current view'], actions: sections['Recent activity'],
+      versions: sections['Versions'] };
   } catch (error) {
     return broken('issues', name, error);
   }
@@ -185,28 +188,28 @@ function quoted(text: string): string {
   return text.replace(/\r\n/g, '\n').split('\n').map((line) => `> ${line}`).join('\n');
 }
 
-/** @brief 反馈的范围：回复里的选区 / 整条回复 / 文件和行范围。 */
+/** @brief 反馈的范围："Selection in response" / "Whole response" / "File <完整路径>, lines a–b"。 */
 function feedbackScope(record: FeedbackRecord): string {
   const source = record.feedback.source;
   if (source.kind === 'file') {
-    const lines = source.startLine === source.endLine ? `第 ${source.startLine} 行`
-      : `第 ${source.startLine}–${source.endLine} 行`;
-    return `文件 ${source.path} ${lines}`;
+    const lines = source.startLine === source.endLine ? `line ${source.startLine}`
+      : `lines ${source.startLine}–${source.endLine}`;
+    return `File ${source.path}, ${lines}`;
   }
-  return source.scope === 'reply' ? '整条回复' : '回复里的选区';
+  return source.scope === 'reply' ? 'Whole response' : 'Selection in response';
 }
 
 /** @brief 导出文件里的一份反馈。 */
 function feedbackSection(record: FeedbackRecord): string[] {
   const { feedback } = record;
   return [
-    `- 会话：${feedback.session.title || '（没有名字）'}`,
-    `- 范围：${feedbackScope(record)}`,
-    `- 会话文件：${feedback.session.file ?? '（没有保存）'}`,
-    `- 工作目录：${feedback.session.cwd || '（不知道）'}`,
-    `- 记录文件：${join(feedbackDir(), record.name)}`, '',
-    '### 你希望得到的结果', '', feedback.expected, '',
-    '### 引用的原文', '', quoted(feedback.quote), '',
+    `- Session: ${feedback.session.title || 'Untitled session'}`,
+    `- Scope: ${feedbackScope(record)}`,
+    `- Session file: ${feedback.session.file ?? '(not saved)'}`,
+    `- Working directory: ${feedback.session.cwd || '(unknown)'}`,
+    `- Record file: ${join(feedbackDir(), record.name)}`, '',
+    '### What you hoped for', '', feedback.expected, '',
+    '### Quoted text', '', quoted(feedback.quote), '',
   ];
 }
 
@@ -222,20 +225,22 @@ function shotLink(target: string, shot: string): string {
 
 /** @brief 导出文件里的一份报告：报告原来的各节，标题降一级，截图链接改成相对导出文件的路径。 */
 function issueSection(record: IssueRecord, target: string): string[] {
-  const shot = record.shot ? `![截图](<${shotLink(target, record.shot)}>)` : `截图失败：${record.shotError ?? ''}`;
-  const body: [string, string][] = [['哪里不对', record.what], ['你期望什么', record.expect], ['截图', shot],
-    ['当前界面', record.view], ['最近的操作', record.actions], ['版本', record.versions]];
-  return [`- 报告文件：${join(issuesDir(), record.name)}`, '',
+  const shot = record.shot ? `![Screenshot](<${shotLink(target, record.shot)}>)`
+    : `Couldn’t capture a screenshot: ${record.shotError ?? ''}`;
+  const body: [IssueSection, string][] = [['What went wrong', record.what], ['What you expected', record.expect],
+    ['Screenshot', shot], ['Current view', record.view], ['Recent activity', record.actions],
+    ['Versions', record.versions]];
+  return [`- Report file: ${join(issuesDir(), record.name)}`, '',
     ...body.flatMap(([heading, text]) => [`### ${heading}`, '', text, ''])];
 }
 
 /** @brief 导出文件里的一条记录。 */
 function exportSection(kind: ReviewKind, name: string, index: number, done: boolean, target: string): string[] {
-  const state = done ? '已处理' : '未处理';
+  const state = done ? 'Resolved' : 'Unresolved';
   const record = kind === 'feedback' ? readFeedback(name) : readIssue(name);
   if (record.status === 'broken') {
-    return [`## ${index + 1}. ${name} · ${state}`, '', `- 记录文件：${join(kindDir(kind), name)}`, '',
-      `读不出这份记录：${record.error}`, ''];
+    return [`## ${index + 1}. ${name} · ${state}`, '', `- Record file: ${join(kindDir(kind), name)}`, '',
+      `Couldn’t read this record: ${record.error}`, ''];
   }
   const body = 'feedback' in record ? feedbackSection(record) : issueSection(record, target);
   return [`## ${index + 1}. ${record.time} · ${state}`, '', ...body];
@@ -245,9 +250,10 @@ function exportSection(kind: ReviewKind, name: string, index: number, done: bool
 function exportMarkdown(request: ExportRequest, target: string): string {
   const handled = new Set(request.handled);
   const done = request.names.filter((name) => handled.has(name)).length;
+  const total = request.names.length;
   const head = [`# ${KIND_LABEL[request.kind]}`, '',
-    `导出于 ${localTime(new Date())} · 共 ${request.names.length} 条：未处理 ${request.names.length - done} 条，`
-    + `已处理 ${done} 条`, ''];
+    `Exported ${localTime(new Date())} · ${total} ${total === 1 ? 'record' : 'records'}: ${total - done} unresolved, `
+    + `${done} resolved`, ''];
   const sections = request.names.flatMap((name, index) =>
     exportSection(request.kind, name, index, handled.has(name), target));
   return [...head, ...sections].join('\n');
@@ -265,9 +271,10 @@ function checkExport(value: unknown): ExportRequest {
 async function exportReview(event: IpcMainInvokeEvent, value: unknown): Promise<ExportResult> {
   try {
     const request = checkExport(value);
-    const label = KIND_LABEL[request.kind];
     const day = localTime(new Date()).slice(0, 10);
-    const options = { title: `导出${label}`, defaultPath: join(app.getPath('documents'), `${label}-${day}.md`),
+    // 默认文件名与记录文件夹同名：feedback-2026-10-21.md、ui-issues-2026-10-21.md。
+    const file = `${basename(kindDir(request.kind))}-${day}.md`;
+    const options = { title: 'Export as Markdown', defaultPath: join(app.getPath('documents'), file),
       filters: [{ name: 'Markdown', extensions: ['md'] }] };
     const window = BrowserWindow.fromWebContents(event.sender);
     const result = window ? await dialog.showSaveDialog(window, options) : await dialog.showSaveDialog(options);
@@ -290,7 +297,7 @@ function showExport(file: unknown): void {
   shell.showItemInFolder(file);
 }
 
-/** @brief 在资源管理器里选中一份记录（详情里的"打开所在文件夹"）；只接受这一类文件夹里已存在的记录文件。 */
+/** @brief 在资源管理器里选中一份记录（详情里的"Show in Explorer"）；只接受这一类文件夹里已存在的记录文件。 */
 function showRecord(kind: unknown, name: unknown): void {
   try {
     const parsed = z.enum(REVIEW_KINDS).parse(kind);

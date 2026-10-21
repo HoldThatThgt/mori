@@ -50,7 +50,7 @@
 .slash-note { padding: 6px 10px; color: var(--color-faint); font-size: var(--fs-small); }
 .slash-note.slash-error { color: #a54a3a; white-space: pre-wrap; overflow-wrap: anywhere; }
 
-/* 技能调用：一行"技能 · 名字"和"展开"，下面是你写的参数；展开后是 SKILL.md 的路径和正文 */
+/* 技能调用：一行"Skill · <名字>"和"Expand"，下面是你写的参数；展开后是 SKILL.md 的路径和正文 */
 .skill-head { display: flex; align-items: baseline; gap: 12px; }
 .skill-label { color: #4c638d; font-size: var(--fs-small); font-weight: 600; }
 .skill-args { margin-top: 4px; }

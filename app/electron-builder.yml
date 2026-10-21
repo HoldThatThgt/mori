@@ -17,4 +17,7 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   perMachine: false
+  # 安装与卸载界面只用英文：不写时打包全部 26 种语言，NSIS 按系统语言选择，中文 Windows 上会显示中文。
+  # 只列 en_US 时 app-builder-lib（nsisLang.js 的 LangConfigurator）只插入 English 一种语言，与系统语言无关。
+  installerLanguages: [en_US]
 publish: null

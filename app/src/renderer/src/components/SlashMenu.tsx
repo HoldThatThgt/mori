@@ -1,4 +1,4 @@
-// 输入框的"/"补全列表（docs/v0/screens/slash.md）：浮在输入框上方，分"提示词模板""技能"两组；↑ ↓ 移动（首尾循环），
+// 输入框的"/"补全列表（docs/v0/screens/slash.md）：浮在输入框上方，分"Prompt templates""Skills"两组；↑ ↓ 移动（首尾循环），
 // Enter / Tab / 点一项插入，不发送；Esc 关闭（浮层栈里不挡 Alt+数字和 Ctrl+N）。焦点一直留在输入框，
 // 高亮项用 aria-activedescendant 指出。照 Claude 桌面版：输入框没有焦点时不显示列表；Esc 关掉后改动第一个词才再出现。
 
@@ -159,14 +159,18 @@ function SlashOption({ menu, command, index }: { menu: SlashMenuState; command: 
 function SlashBody({ menu }: { menu: SlashMenuState }) {
   const { load } = menu;
   if (menu.quoted) {
-    return <div className="slash-note" data-testid="slash-quoted">带引用的消息不会展开提示词模板和技能命令（先移除引用）</div>;
+    return (
+      <div className="slash-note" data-testid="slash-quoted">
+        Prompt templates and skills don’t work in a message with attached context. Remove the context first.
+      </div>
+    );
   }
-  if (load.status === 'loading') return <div className="slash-note" role="status">正在读取…</div>;
+  if (load.status === 'loading') return <div className="slash-note" role="status">Loading…</div>;
   if (load.status === 'error') return <div className="slash-note slash-error" role="alert">{load.message}</div>;
   if (load.commands.length === 0) {
-    return <div className="slash-note">这个会话没有提示词模板或技能（在工具页添加）</div>;
+    return <div className="slash-note">This session has no prompt templates or skills. Add them in Customize.</div>;
   }
-  if (menu.items.length === 0) return <div className="slash-note">没有匹配的提示词模板或技能</div>;
+  if (menu.items.length === 0) return <div className="slash-note">No matching prompt templates or skills</div>;
   return menu.groups.map((group) => {
     const offset = menu.items.indexOf(group.items[0]);
     return (
@@ -199,7 +203,7 @@ export function SlashMenu({ menu }: { menu: SlashMenuState }) {
     if (list.current) keepVisible(list.current, menu.active);
   }, [menu.active, menu.items.length]);
   return (
-    <div className="slash-menu" role="listbox" id={menu.menuId} aria-label="提示词模板和技能" data-testid="slash-menu"
+    <div className="slash-menu" role="listbox" id={menu.menuId} aria-label="Slash commands" data-testid="slash-menu"
       ref={list} onMouseDown={(event) => event.preventDefault()}>
       <SlashBody menu={menu} />
     </div>

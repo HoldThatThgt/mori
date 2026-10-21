@@ -13,13 +13,13 @@ import { handleSlashKey, SlashMenu, useSlashMenu } from './SlashMenu';
 /** 输入框最高（px），超过后在框内滚动 */
 const MAX_INPUT_HEIGHT = 220;
 
-/** @brief 排队区：pi 的排队与插话列表；"撤回"把它们全部放回输入框。 */
+/** @brief 排队区：pi 的排队与插话列表；"Withdraw"把它们全部放回输入框。 */
 export function QueueArea({ tab }: { tab: Tab }) {
   const { steering, followUp } = tab.transcript;
   if (steering.length + followUp.length === 0) return null;
   // 技能命令在 pi 的队列里已经是展开后的正文，显示时写回"/skill:名字 参数"（slash.md）。
-  const rows = [...steering.map((text) => ({ kind: '插话', text })), ...followUp.map((text) => ({ kind: '排队', text }))]
-    .map((row) => ({ ...row, text: skillCommandText(row.text) }));
+  const rows = [...steering.map((text) => ({ kind: 'Steer', text })),
+    ...followUp.map((text) => ({ kind: 'Queued', text }))].map((row) => ({ ...row, text: skillCommandText(row.text) }));
   return (
     <div className="queue-area" data-testid="queue">
       <ul>
@@ -29,24 +29,25 @@ export function QueueArea({ tab }: { tab: Tab }) {
           </li>
         ))}
       </ul>
-      <button className="text-link" onClick={() => void withdraw(tab.key)}>撤回</button>
+      <button className="text-link" onClick={() => void withdraw(tab.key)}>Withdraw</button>
     </div>
   );
 }
 
-/** @brief 生成中且有字时的"排队发送 ▾"，下拉里是"插话"。 */
+/** @brief 生成中且有字时的"Queue ▾"，下拉里是"Steer"。 */
 function QueueButton({ tabKey }: { tabKey: string }) {
   const [open, setOpen] = useState(false);
   useOverlay(open, () => setOpen(false));
   return (
     <div className="split-button">
-      <button className="button" onClick={() => void send(tabKey, 'followUp')} title="本轮结束后发出（Enter）">排队发送</button>
-      <button className="button split-toggle" aria-label="更多发送方式" aria-expanded={open}
+      <button className="button" onClick={() => void send(tabKey, 'followUp')}
+        title="Send after the current turn (Enter)">Queue</button>
+      <button className="button split-toggle" aria-label="More send options" aria-expanded={open}
         onClick={() => setOpen(!open)}><Icon name="down" /></button>
       {open && (
         <div className="menu" role="menu">
           <button role="menuitem" onClick={() => { setOpen(false); void send(tabKey, 'steer'); }}>
-            插话<span className="menu-hint">Ctrl+Enter</span>
+            Steer<span className="menu-hint">Ctrl+Enter</span>
           </button>
         </div>
       )}
@@ -56,7 +57,7 @@ function QueueButton({ tabKey }: { tabKey: string }) {
 
 /**
  * @brief 输入框。
- * @param notReady 不能发送时按钮位置显示的文字（"正在启动…"等）；能发送时为 null
+ * @param notReady 不能发送时按钮位置显示的文字（"Starting…"等）；能发送时为 null
  */
 export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null }) {
   const input = useRef<HTMLTextAreaElement>(null);
@@ -88,8 +89,9 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
     <div className="composer" data-testid="composer" data-drop="composer" data-tab={tab.key}>
       {slash.open && <SlashMenu menu={slash} />}
       <ComposerQuotes tab={tab} />
-      <textarea ref={input} value={tab.draft} rows={2} aria-label="给 Mori 的消息" autoFocus {...slash.inputProps}
-        placeholder={running ? 'Enter 排队 · Ctrl+Enter 插话 · Shift+Enter 换行' : 'Enter 发送 · Shift+Enter 换行'}
+      <textarea ref={input} value={tab.draft} rows={2} aria-label="Message Mori" autoFocus {...slash.inputProps}
+        placeholder={running ? 'Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line'
+          : 'Enter to send · Shift+Enter for new line'}
         onChange={(event) => {
           const draft = event.target.value;
           updateTab(tab.key, (t) => ({ ...t, draft }));
@@ -103,7 +105,7 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
   );
 }
 
-/** @brief 输入框下方的按钮区：不能发送时的说明；生成中的"排队发送"和"停止"；空闲时的"发送"。 */
+/** @brief 输入框下方的按钮区：不能发送时的说明；生成中的"Queue"和"Stop"；空闲时的"Send"。 */
 function ComposerButtons({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
   const { running, sending } = tab.transcript;
   return (
@@ -112,14 +114,14 @@ function ComposerButtons({ tab, notReady, hasText }: { tab: Tab; notReady: strin
       {notReady && <span className="composer-wait" data-testid="not-ready">{notReady}</span>}
       {!notReady && running && hasText && <QueueButton tabKey={tab.key} />}
       {!notReady && running && (
-        <button className="button stop-button" onClick={() => void stop(tab.key)} title="停止（Esc）">
-          <Icon name="stop" />停止
+        <button className="button stop-button" onClick={() => void stop(tab.key)} title="Stop response (Esc)">
+          <Icon name="stop" />Stop
         </button>
       )}
       {!notReady && !running && (
         <button className="button primary send-button" disabled={!hasText || sending}
           onClick={() => void send(tab.key)}>
-          <Icon name="arrow" />发送
+          <Icon name="arrow" />Send
         </button>
       )}
     </div>

@@ -20,13 +20,13 @@ interface IssueState {
   phase: 'closed' | 'capturing' | 'open';
   /** 截图结果；截图完成前为 null */
   capture: WindowCapture | null;
-  /** 按 F8 那一刻的"当前界面" */
+  /** 按 F8 那一刻的"Current view" */
   view: IssueField[];
   /** 按 F8 那一刻的最近操作，从早到晚 */
   actions: IssueAction[];
   /** 每次要把焦点放回报告框第一个输入框时加一 */
   focusRequest: number;
-  /** 保存中（主进程还在写文件）：这时 Esc 和"取消"都不关闭报告框，等保存有结果 */
+  /** 保存中（主进程还在写文件）：这时 Esc 和"Cancel"都不关闭报告框，等保存有结果 */
   saving: boolean;
 }
 
@@ -38,20 +38,22 @@ const useIssue = create<IssueState>(() => ({
 let returnFocus: HTMLElement | null = null;
 
 const KERNEL_TEXT: Record<KernelStatus, string> = {
-  connecting: '启动中', ready: '正常', exited: '已退出', reloading: '正在重新载入',
+  connecting: 'Starting…', ready: 'Running', exited: 'Crashed', reloading: 'Restarting…',
 };
 
 /** 右栏：会话的右栏，或工作回顾页上的详情（docs/v0/screens/review.md，宽度与会话的右栏共用） */
 const RIGHT_PANEL = 'aside.right-panel';
 
 /** 中栏页面的名字 */
-const PAGE_NAME: Record<AppState['view'], string> = { chat: '会话', settings: '设置', tools: '工具', review: '工作回顾' };
+const PAGE_NAME: Record<AppState['view'], string> = {
+  chat: 'Session', settings: 'Settings', tools: 'Customize', review: 'Review',
+};
 
 /** @brief 当前显示的页面。 */
 function pageName(state: AppState): string {
-  if (state.configError) return '读取连接失败';
-  if (!state.config) return '正在读取连接';
-  if (state.firstRun) return '首次启动';
+  if (state.configError) return 'Couldn’t load connections';
+  if (!state.config) return 'Loading connections…';
+  if (state.firstRun) return 'First run';
   return PAGE_NAME[state.view];
 }
 
@@ -61,25 +63,25 @@ function pageName(state: AppState): string {
  */
 function columnWidth(selector: string, saved: number): string {
   const element = document.querySelector(selector);
-  if (!element) return `不显示（保存的宽度 ${saved}px）`;
+  if (!element) return `Hidden (saved width ${saved}px)`;
   const actual = Math.round(element.getBoundingClientRect().width);
-  return actual === saved ? `${actual}px` : `${actual}px（保存的宽度 ${saved}px）`;
+  return actual === saved ? `${actual}px` : `${actual}px (saved width ${saved}px)`;
 }
 
-/** @brief 当前会话的几项；没有打开的会话时只有一项"没有"。 */
+/** @brief 当前会话的几项；没有打开的会话时只有一项"Current session: None"。 */
 function tabFields(state: AppState): IssueField[] {
   const tab = activeTab(state);
-  if (!tab) return [{ label: '当前会话', value: '没有' }];
+  if (!tab) return [{ label: 'Current session', value: 'None' }];
   const transcript = tab.transcript;
   return [
-    { label: '当前会话', value: sessionTitle(tab) },
-    { label: '文件夹', value: tab.cwd },
-    { label: '会话文件', value: tab.sessionFile ?? '还没有' },
-    { label: '模型', value: tab.model ?? '没有' },
-    { label: '是否在生成', value: transcript.running ? '是' : '否' },
-    { label: '阶段行', value: stageText(transcript, tab.cwd, Date.now()) ?? '不显示' },
-    { label: '等你批准', value: String(transcript.approvals.length) },
-    { label: '权限', value: tab.approval.mode === 'all' ? '全部允许' : '每次询问' },
+    { label: 'Current session', value: sessionTitle(tab) },
+    { label: 'Folder', value: tab.cwd },
+    { label: 'Session file', value: tab.sessionFile ?? 'Not saved yet' },
+    { label: 'Model', value: tab.model ?? 'None' },
+    { label: 'Running', value: transcript.running ? 'Yes' : 'No' },
+    { label: 'Status line', value: stageText(transcript, tab.cwd, Date.now()) ?? 'Hidden' },
+    { label: 'Pending requests', value: String(transcript.approvals.length) },
+    { label: 'Permission mode', value: tab.approval.mode === 'all' ? 'Allow all' : 'Ask each time' },
   ];
 }
 
@@ -87,24 +89,24 @@ function tabFields(state: AppState): IssueField[] {
 function splitFields(state: AppState): IssueField[] {
   if (!state.split || state.view !== 'chat') return [];
   const [left, right] = state.split.map((key) => state.tabs.find((tab) => tab.key === key));
-  const focus = state.activeKey === state.split[0] ? '左' : '右';
-  const names = `左：${left ? sessionTitle(left) : '没有'} · 右：${right ? sessionTitle(right) : '没有'}`;
-  return [{ label: '分屏', value: `${names}（焦点在${focus}栏）` }];
+  const focus = state.activeKey === state.split[0] ? 'left' : 'right';
+  const names = `Left: ${left ? sessionTitle(left) : 'None'} · Right: ${right ? sessionTitle(right) : 'None'}`;
+  return [{ label: 'Split view', value: `${names} (focus in the ${focus} pane)` }];
 }
 
-/** @brief "当前界面"：界面状态与窗口、栏宽。 */
+/** @brief "Current view"：界面状态与窗口、栏宽。 */
 function currentView(): IssueField[] {
   const state = useApp.getState();
   const layout = useLayout.getState();
   return [
-    { label: '页面', value: pageName(state) },
+    { label: 'Page', value: pageName(state) },
     ...tabFields(state),
     ...splitFields(state),
-    { label: '右栏', value: document.querySelector(RIGHT_PANEL) ? '打开' : '关闭' },
-    { label: '窗口大小', value: `${window.innerWidth}×${window.innerHeight}` },
-    { label: '左栏宽度', value: columnWidth('[data-testid="sidebar"]', layout.sidebar) },
-    { label: '右栏宽度', value: columnWidth(RIGHT_PANEL, layout.workspace) },
-    { label: '后台进程', value: KERNEL_TEXT[state.kernel] },
+    { label: 'Right panel', value: document.querySelector(RIGHT_PANEL) ? 'Open' : 'Closed' },
+    { label: 'Window size', value: `${window.innerWidth}×${window.innerHeight}` },
+    { label: 'Sidebar width', value: columnWidth('[data-testid="sidebar"]', layout.sidebar) },
+    { label: 'Right panel width', value: columnWidth(RIGHT_PANEL, layout.workspace) },
+    { label: 'Background process', value: KERNEL_TEXT[state.kernel] },
   ];
 }
 
@@ -117,7 +119,7 @@ export async function openIssueReport(): Promise<void> {
   }
   if (state.phase === 'capturing') return;
   returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  recordAction('报告界面问题');
+  recordAction('Report a UI issue');
   useIssue.setState({ phase: 'capturing', capture: null, view: currentView(), actions: recentActions() });
   let capture: WindowCapture;
   try {
@@ -181,6 +183,21 @@ function trapTab(event: React.KeyboardEvent<HTMLElement>): void {
   }
 }
 
+/** 两个输入框下面的说明 */
+const ISSUE_NOTE = 'Includes a screenshot, the current view, and your recent activity. Saved on this computer and '
+  + 'never sent to the model.';
+
+/** @brief 截图缩略图；截图失败时是错误原文（仍可填写和保存）。 */
+function CapturePreview({ capture }: { capture: WindowCapture }) {
+  if (capture.dataUrl) {
+    return <img className="issue-shot" data-testid="issue-shot" src={capture.dataUrl}
+      alt="Screenshot of the window before this dialog opened" />;
+  }
+  return (
+    <p className="form-message error" data-testid="issue-error">Couldn’t capture a screenshot: {capture.error}</p>
+  );
+}
+
 /** @brief 填写中、保存中、保存失败。onSaved 收到 Markdown 文件的路径。 */
 function IssueForm({ capture, onSaved }: { capture: WindowCapture; onSaved: (file: string) => void }) {
   const [what, setWhat] = useState('');
@@ -210,37 +227,37 @@ function IssueForm({ capture, onSaved }: { capture: WindowCapture; onSaved: (fil
   }
   return (
     <>
-      {capture.dataUrl
-        ? <img className="issue-shot" data-testid="issue-shot" src={capture.dataUrl} alt="打开报告框前的窗口截图" />
-        : <p className="form-message error" data-testid="issue-error">截图失败：{capture.error}</p>}
-      <label className="issue-field">哪里不对
-        <textarea data-testid="issue-what" aria-label="哪里不对" rows={3} value={what}
+      <CapturePreview capture={capture} />
+      <label className="issue-field">What went wrong
+        <textarea data-testid="issue-what" aria-label="What went wrong" rows={3} value={what}
           onChange={(event) => setWhat(event.target.value)} />
       </label>
-      <label className="issue-field">你期望什么
-        <textarea data-testid="issue-expect" aria-label="你期望什么" rows={3} value={expect}
+      <label className="issue-field">What you expected
+        <textarea data-testid="issue-expect" aria-label="What you expected" rows={3} value={expect}
           onChange={(event) => setExpect(event.target.value)} />
       </label>
-      <p className="muted">会附上截图、当前界面和最近的操作记录，保存在本机，不会发给模型</p>
-      {error && <p className="form-message error" role="alert" data-testid="issue-error">保存失败：{error}</p>}
+      <p className="muted">{ISSUE_NOTE}</p>
+      {error && (
+        <p className="form-message error" role="alert" data-testid="issue-error">Couldn’t save the report: {error}</p>
+      )}
       <div className="issue-actions">
         <button ref={saveButton} className="button primary" disabled={saving || (!what.trim() && !expect.trim())}
-          onClick={() => void save()}>{saving ? '保存中…' : '保存'}</button>
-        <button className="button" disabled={saving} onClick={closeIssueReport}>取消</button>
+          onClick={() => void save()}>{saving ? 'Saving…' : 'Save'}</button>
+        <button className="button" disabled={saving} onClick={closeIssueReport}>Cancel</button>
       </div>
     </>
   );
 }
 
-/** @brief "在工作回顾中查看"：关闭报告框，打开工作回顾的"界面问题"，选中这一份。 */
+/** @brief "View in Review"：关闭报告框，打开工作回顾的"UI issues"，选中这一份。 */
 function viewInReview(file: string): void {
   if (!closeIssueReport()) return;
   openReview('issues', fileName(file));
 }
 
 /**
- * @brief 已保存：路径、"打开所在文件夹"、"在工作回顾中查看"（只在显示工作区时有：首次启动、读取连接中或失败的页面上
- *        没有工作回顾）、"关闭"。
+ * @brief 已保存：路径、"Show in Explorer"、"View in Review"（只在显示工作区时有：首次启动、读取连接中或失败的页面上
+ *        没有工作回顾）、"Close"。
  */
 function SavedView({ file }: { file: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -255,15 +272,15 @@ function SavedView({ file }: { file: string }) {
   }
   return (
     <>
-      <p className="form-message ok issue-path" data-testid="issue-saved">已保存到 {file}</p>
+      <p className="form-message ok issue-path" data-testid="issue-saved">Saved to {file}</p>
       {error && <p className="form-message error" role="alert" data-testid="issue-error">{error}</p>}
       <div className="issue-actions">
-        <button className="button" onClick={() => void showInFolder()}><Icon name="folder" />打开所在文件夹</button>
+        <button className="button" onClick={() => void showInFolder()}><Icon name="folder" />Show in Explorer</button>
         {workspace && (
           <button className="button" data-testid="issue-open-review" onClick={() => viewInReview(file)}>
-            在工作回顾中查看</button>
+            View in Review</button>
         )}
-        <button className="button" onClick={closeIssueReport}>关闭</button>
+        <button className="button" onClick={closeIssueReport}>Close</button>
       </div>
     </>
   );
@@ -279,9 +296,9 @@ function IssueDialog({ capture }: { capture: WindowCapture }) {
   }, [focusRequest, saved]);
   return (
     <div className="issue-backdrop" onMouseDown={keepFocus}>
-      <div ref={dialog} className="issue-dialog" role="dialog" aria-modal="true" aria-label="报告界面问题"
+      <div ref={dialog} className="issue-dialog" role="dialog" aria-modal="true" aria-label="Report a UI issue"
         data-testid="issue-dialog" tabIndex={-1} onKeyDown={trapTab}>
-        <h2>报告界面问题</h2>
+        <h2>Report a UI issue</h2>
         {saved ? <SavedView file={saved} /> : <IssueForm capture={capture} onSaved={setSaved} />}
       </div>
     </div>

@@ -35,7 +35,7 @@ export interface Row {
 /** @brief 会话行的状态，文字见 STATUS_TEXT。 */
 export type SessionStatus = 'approval' | 'question' | 'running' | 'error' | 'unseen';
 export const STATUS_TEXT: Record<SessionStatus, string> = {
-  approval: '等你批准', question: '等你回答', running: '生成中', error: '出错', unseen: '有新结果',
+  approval: 'Needs approval', question: 'Needs input', running: 'Running', error: 'Error', unseen: 'Unread',
 };
 
 /** @brief 本次打开过的会话的状态；同时满足时取前面的。 */
@@ -71,7 +71,7 @@ export function isUnsaved(row: Row): boolean {
   return !(row.tab?.transcript.firstUserText ?? row.tab?.preview ?? row.saved?.firstMessage);
 }
 
-/** @brief 正在生成（生成中、等你批准、等你回答）：不能归档、删除。 */
+/** @brief 正在生成（"Running"、"Needs approval"、"Needs input"）：不能归档、删除。 */
 export function isBusy(row: Row): boolean {
   const status = rowStatus(row);
   return status === 'running' || status === 'approval' || status === 'question';
@@ -87,7 +87,7 @@ function editNameOf(name: string | null, first: string | null): string {
 function savedRow(saved: SavedSession, archived: boolean, mark: 'unseen' | 'error' | null): Row {
   const first = saved.firstMessage && skillCommandText(saved.firstMessage);
   return { id: saved.sessionFile, cwd: saved.cwd, file: saved.sessionFile, saved,
-    title: displayTitle(saved.name, saved.firstMessage), full: saved.name ?? first ?? '新会话',
+    title: displayTitle(saved.name, saved.firstMessage), full: saved.name ?? first ?? 'New session',
     editName: editNameOf(saved.name, first), activity: saved.modified, archived, mark };
 }
 
@@ -104,7 +104,7 @@ export function buildRows(tabs: Tab[], sessions: SavedSession[], state: RowState
     const raw = tab.transcript.firstUserText ?? tab.preview;
     const first = raw && skillCommandText(raw);
     return { id: tab.key, cwd: tab.cwd, file: tab.sessionFile, tab, saved, title: sessionTitle(tab),
-      full: tab.name ?? first ?? '新会话', editName: editNameOf(tab.name, first),
+      full: tab.name ?? first ?? 'New session', editName: editNameOf(tab.name, first),
       activity: Math.max(tab.activity, saved?.modified ?? 0), archived: false, mark: null };
   });
   for (const saved of sessions) {

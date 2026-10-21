@@ -1,7 +1,7 @@
 // 最小批准扩展（方案第 6 节，后台进程第 3 件事"转达批准请求"）：用 inline extension 注册 tool_call 处理器，
 // 在闭包里等界面的答复；拒绝时返回 { block: true, reason }，pi 把 reason 原样作为工具结果回给模型。
 // 每个待批准请求都绑定 ctx.signal：pi 不会替处理器取消等待，中止时不放手 session.abort() 会一直等着。
-// "本会话不再询问"只是按工具名记录的集合，和权限一起只存在内存里，不做其他规则。状态表见 docs/v0/screens/approval.md。
+// "Allow for this session"只是按工具名记录的集合，和权限一起只存在内存里，不做其他规则。状态表见 docs/v0/screens/approval.md。
 
 import type {
   ExtensionContext, ExtensionFactory, ToolCallEvent, ToolCallEventResult,
@@ -37,13 +37,13 @@ export function rejectionText(reason: string | undefined): string {
   return text ? `${REJECTED_REASON_PREFIX}${text}` : REJECTED_TEXT;
 }
 
-/** @brief 一个会话的批准状态：权限、"本会话不再询问"的工具名、挂起的请求。 */
+/** @brief 一个会话的批准状态：权限、"Allow for this session"的工具名、挂起的请求。 */
 export class ApprovalGate {
   /** 事件要带上的 pi 会话 id；会话建好后由 attach 记下 */
   private sessionId = '';
   /** 权限：每次询问 / 全部允许 */
   private mode: ApprovalMode = DEFAULT_APPROVAL.mode;
-  /** "本会话不再询问"记下的工具名 */
+  /** "Allow for this session"记下的工具名 */
   private readonly allowed = new Set<string>(DEFAULT_APPROVAL.allowed);
   /** 等你选择的请求，按请求 id */
   private readonly pending = new Map<string, Pending>();
@@ -95,7 +95,7 @@ export class ApprovalGate {
 
   /**
    * @brief pi 在执行工具前调用：要批准时挂起，等你在界面上选择；停止中的调用直接按拒绝处理。
-   *        预告过要批准、现在已不用批准时（例如排队的嵌套调用在你选了"本会话不再询问"之后才轮到），
+   *        预告过要批准、现在已不用批准时（例如排队的嵌套调用在你选了"Allow for this session"之后才轮到），
    *        再发一次 mori.tool_gate 更正。
    */
   private onToolCall(event: ToolCallEvent, ctx: ExtensionContext): Promise<ToolCallEventResult | undefined> {
@@ -163,14 +163,14 @@ export class ApprovalGate {
     return this.state();
   }
 
-  /** @brief 切换权限；切到"全部允许"时挂起的请求按允许处理（方案 5.7）。 */
+  /** @brief 切换权限；切到"Allow all"时挂起的请求按允许处理（方案 5.7）。 */
   setMode(mode: ApprovalMode): ApprovalState {
     this.mode = mode;
     if (mode === 'all') for (const id of [...this.pending.keys()]) this.finish(id, 'allow', 'all', null);
     return this.state();
   }
 
-  /** @brief 从"本会话已允许"里清除一个工具名。 */
+  /** @brief 从"Allowed for this session"里清除一个工具名。 */
   forget(toolName: string): ApprovalState {
     this.allowed.delete(toolName);
     return this.state();

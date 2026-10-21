@@ -1,7 +1,7 @@
 // 最近的操作记录：只在本次运行的内存里，F8 报告界面问题时附上（方案 5.15，见 docs/v0/screens/f8.md）。
-// 只记操作的类型和不含机密的摘要：发送的消息只取前几十个字，连接表单只记"保存连接"，从不记 key。
+// 只记操作的类型和不含机密的摘要：发送的消息只取前几十个字，连接表单只记"Save connection"，从不记 key。
 
-import type { Command } from '../../../shared/protocol';
+import { KIND_ONE, type Command } from '../../../shared/protocol';
 import type { IssueAction } from '../../../shared/issues';
 
 /** 保留的条数，临时默认值，见 docs/v0/defaults.md */
@@ -28,10 +28,10 @@ export function recordAction(text: string): void {
   if (entries.length > ACTION_LOG_SIZE) entries.splice(0, entries.length - ACTION_LOG_SIZE);
 }
 
-/** @brief 信任回答的说明；没问时为空串。 */
+/** @brief 信任回答的说明（" (trusted, remembered)"，接在路径后面，所以带开头的空格）；没问时为空串。 */
 function trustText(trust: { trusted: boolean; remember: boolean } | undefined): string {
   if (!trust) return '';
-  return `（${trust.trusted ? '信任' : '不信任'}${trust.remember ? '，记住' : ''}）`;
+  return ` (${trust.trusted ? 'trusted' : 'not trusted'}${trust.remember ? ', remembered' : ''})`;
 }
 
 /** @brief 一条发给后台进程的命令的摘要；不需要记的（例如读取上下文用量）返回 null。 */
@@ -44,37 +44,37 @@ export function describeCommand(command: Command): string | null {
     case 'trust.check':
       return null;
     case 'connection.save':
-      return '保存连接';
+      return 'Save connection';
     case 'connection.test':
-      return '测试连接';
+      return 'Test connection';
     case 'connection.testCancel':
-      return '取消测试连接';
+      return 'Cancel connection test';
     case 'session.create':
-      return `新建会话 ${command.cwd}${trustText(command.trust)}`;
+      return `New session in ${command.cwd}${trustText(command.trust)}`;
     case 'session.open':
-      return `打开会话 ${command.sessionFile}${trustText(command.trust)}`;
+      return `Open session ${command.sessionFile}${trustText(command.trust)}`;
     case 'session.rename':
-      return `改名：${preview(command.name)}`;
+      return `Rename: ${preview(command.name)}`;
     case 'session.close':
-      return '关闭会话（归档或删除前）';
+      return 'Close session (before archiving or deleting)';
     case 'ui.answer':
-      return command.value === null ? '扩展询问：取消' : '扩展询问：作答';
+      return command.value === null ? 'Extension question: cancelled' : 'Extension question: answered';
     case 'session.prompt': {
-      const how = command.behavior === 'steer' ? '插话' : command.behavior === 'followUp' ? '排队' : '发送';
-      return `${how}：${preview(command.text)}`;
+      const how = command.behavior === 'steer' ? 'Steer' : command.behavior === 'followUp' ? 'Queue' : 'Send';
+      return `${how}: ${preview(command.text)}`;
     }
     case 'session.clearQueue':
-      return '撤回排队的消息';
+      return 'Withdraw queued messages';
     case 'session.abort':
-      return '停止';
+      return 'Stop';
     case 'approval.answer': {
-      const choice = { allow: '允许一次', allowSession: '本会话不再询问', reject: '拒绝' }[command.decision];
-      return `批准卡：${choice}${command.reason?.trim() ? `（理由：${preview(command.reason)}）` : ''}`;
+      const choice = { allow: 'Allow once', allowSession: 'Allow for this session', reject: 'Deny' }[command.decision];
+      return `Permission request: ${choice}${command.reason?.trim() ? ` (reason: ${preview(command.reason)})` : ''}`;
     }
     case 'approval.setMode':
-      return `权限切到${command.mode === 'all' ? '全部允许' : '每次询问'}`;
+      return `Permission mode: ${command.mode === 'all' ? 'Allow all' : 'Ask each time'}`;
     case 'approval.forget':
-      return `清除本会话已允许：${command.toolName}`;
+      return `Forget “Allow for this session”: ${command.toolName}`;
     default:
       return describeM6Command(command);
   }
@@ -83,21 +83,22 @@ export function describeCommand(command: Command): string | null {
 /** @brief M6 的命令（设置页、顶栏、工具页）的摘要；只读的查询返回 null。 */
 function describeM6Command(command: Command): string | null {
   switch (command.type) {
-    case 'endpoint.save': return `保存连接 ${command.providerId}`;
-    case 'model.save': return `${command.adding ? '添加' : '保存'}模型 ${command.providerId}/${command.model.modelId}`;
-    case 'model.delete': return `删除模型 ${command.providerId}/${command.modelId}`;
-    case 'model.setDefault': return `设为默认模型 ${command.providerId}/${command.modelId}`;
-    case 'session.setModel': return `这个会话换模型 ${command.model}`;
-    case 'session.setThinking': return `这个会话换思考强度 ${command.level}`;
-    case 'agents.save': return '保存用户级 AGENTS.md';
-    case 'resource.toggle': return `${command.enabled ? '启用' : '停用'} ${command.kind} ${command.path}`;
-    case 'package.add': return `添加本地包 ${command.path}`;
-    case 'package.setAll': return `${command.enabled ? '启用' : '停用'}整个包 ${command.source}`;
-    case 'package.remove': return `移除包 ${command.source}`;
-    case 'mcp.save': return `保存 MCP 服务 ${command.name}`;
-    case 'mcp.setEnabled': return `${command.enabled ? '启用' : '停用'} MCP 服务 ${command.name}`;
-    case 'mcp.setDirect': return `MCP 服务改为直接调用 ${command.name}`;
-    case 'mcp.remove': return `移除 MCP 服务 ${command.name}`;
+    case 'endpoint.save': return `Save connection ${command.providerId}`;
+    case 'model.save': return `${command.adding ? 'Add' : 'Save'} model ${command.providerId}/${command.model.modelId}`;
+    case 'model.delete': return `Delete model ${command.providerId}/${command.modelId}`;
+    case 'model.setDefault': return `Set default model: ${command.providerId}/${command.modelId}`;
+    case 'session.setModel': return `Switch model for this session: ${command.model}`;
+    case 'session.setThinking': return `Change effort for this session: ${command.level}`;
+    case 'agents.save': return 'Save user-level AGENTS.md';
+    case 'resource.toggle':
+      return `${command.enabled ? 'Enable' : 'Disable'} ${KIND_ONE[command.kind]} ${command.path}`;
+    case 'package.add': return `Add plugin from folder ${command.path}`;
+    case 'package.setAll': return `${command.enabled ? 'Enable' : 'Disable'} all in plugin ${command.source}`;
+    case 'package.remove': return `Remove plugin ${command.source}`;
+    case 'mcp.save': return `Save MCP server ${command.name}`;
+    case 'mcp.setEnabled': return `${command.enabled ? 'Enable' : 'Disable'} MCP server ${command.name}`;
+    case 'mcp.setDirect': return `Switch MCP server ${command.name} to direct calls`;
+    case 'mcp.remove': return `Remove MCP server ${command.name}`;
     default: return null;
   }
 }

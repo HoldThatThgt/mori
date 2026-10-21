@@ -8,7 +8,7 @@ import {
 } from '../../../shared/protocol';
 import { displayPath, toolTitleText } from '../components/toolTitle';
 import { blocksFromContent, contentText } from './model';
-import { charCount, stripQuotes, turnsText } from './quoteText';
+import { charCount, lineText, stripQuotes, turnsText } from './quoteText';
 import { skillCommandText } from './skillText';
 
 export { approxChars, charCount } from './quoteText';
@@ -27,24 +27,24 @@ export interface RefTurn {
   number: number;
   /** 这一轮你的消息的条目 id */
   entryId: string;
-  /** 这一轮引用的内容（不带"第 N 轮"标题） */
+  /** 这一轮引用的内容（不带"Turn N"标题） */
   text: string;
 }
 
 /** @brief 你的消息里一个引用压成的一行（不把被引用的全文再嵌一层）。 */
 function refMarker(ref: QuoteRef, cwd: string): string {
   const { source } = ref;
-  if (source.kind === 'message') return '[引用] 之前的回复';
-  if (source.kind === 'session') return `[引用] 会话“${source.name}”${turnsText(source.fromTurn, source.toTurn)}`;
-  const lines = source.startLine === source.endLine ? `第 ${source.startLine} 行`
-    : `第 ${source.startLine}–${source.endLine} 行`;
-  return `[引用] ${displayPath(source.path, cwd)} ${lines}`;
+  if (source.kind === 'message') return '[Quote] an earlier assistant reply';
+  if (source.kind === 'session') {
+    return `[Quote] session “${source.name}”, ${turnsText(source.fromTurn, source.toTurn)}`;
+  }
+  return `[Quote] ${displayPath(source.path, cwd)}, ${lineText(source.startLine, source.endLine)}`;
 }
 
 /** @brief 你的消息的几行：你写的字（带引用时去掉引用块），每个引用一行标记。 */
 function userLines(text: string, refs: QuoteRef[] | undefined, cwd: string): string[] {
   const own = skillCommandText(refs?.length ? stripQuotes(text, refs, cwd) ?? text : text);
-  return [`用户：${own.trim()}`, ...(refs ?? []).map((ref) => refMarker(ref, cwd))];
+  return [`User: ${own.trim()}`.trimEnd(), ...(refs ?? []).map((ref) => refMarker(ref, cwd))];
 }
 
 /** @brief 一条助手回复的几行：正文段，工具调用一行标题；思考不取。 */
@@ -52,9 +52,9 @@ function assistantLines(content: unknown, cwd: string): string[] {
   const { blocks, tools } = blocksFromContent(content);
   const lines: string[] = [];
   for (const block of blocks) {
-    if (block.type === 'text' && block.text.trim()) lines.push(`助手：${block.text.trim()}`);
+    if (block.type === 'text' && block.text.trim()) lines.push(`Assistant: ${block.text.trim()}`);
     const tool = block.type === 'tool' ? tools.find((item) => item.id === block.id) : undefined;
-    if (tool) lines.push(`[工具] ${toolTitleText(tool, cwd)}`);
+    if (tool) lines.push(`[Tool] ${toolTitleText(tool, cwd)}`);
   }
   return lines;
 }
@@ -90,9 +90,9 @@ export function sessionTurns(entries: SessionEntry[], cwd: string): RefTurn[] {
   return turns.map((turn, index) => ({ number: index + 1, entryId: turn.entryId, text: turn.lines.join('\n') }));
 }
 
-/** @brief 第 from 到 to 轮的内容：每轮一段，以"第 N 轮"开头，段之间空一行。 */
+/** @brief 第 from 到 to 轮的内容：每轮一段，以"Turn N"开头，段之间空一行。 */
 export function rangeText(turns: RefTurn[], from: number, to: number): string {
-  return turns.slice(from - 1, to).map((turn) => `第 ${turn.number} 轮\n${turn.text}`).join('\n\n');
+  return turns.slice(from - 1, to).map((turn) => `Turn ${turn.number}\n${turn.text}`).join('\n\n');
 }
 
 /** @brief 默认范围：全部；全部超过 REF_FULL_LIMIT 字时最近 REF_RECENT_TURNS 轮。 */

@@ -68,7 +68,7 @@ const NO_MESSAGES = '(no messages)';
 
 /**
  * @brief 转发一个 pi 事件。tool_execution_start 之前紧挨着由批准扩展发 mori.tool_gate：pi 先发
- *        tool_execution_start、再调用批准处理器，界面要在同一时刻就知道这张卡是"等你批准"还是"执行中"；
+ *        tool_execution_start、再调用批准处理器，界面要在同一时刻就知道这张卡是"Waiting for your approval"还是"Running…"；
  *        处理器后来判断不同时由批准扩展发更正。
  */
 function forward(entry: Entry, sessionId: string, event: AgentSessionEvent, emit: Emit): void {
@@ -97,7 +97,7 @@ function forward(entry: Entry, sessionId: string, event: AgentSessionEvent, emit
 function modelState(session: AgentSession): ModelState {
   const { model } = session;
   // pi 选不到模型时（例如没有 key）会话里是 pi-agent-core 的占位模型（agent.js DEFAULT_MODEL：provider 和 api 都是
-  // "unknown"），不是真的模型：按"没有可用模型"交给界面。
+  // "unknown"），不是真的模型：按"No models available"交给界面。
   const placeholder = model?.provider === 'unknown' && model.api === 'unknown';
   return {
     model: model && !placeholder ? `${model.provider}/${model.id}` : null,
@@ -139,7 +139,7 @@ function describeEntry(entry: Entry): SessionInfo {
 async function loadResources(cwd: string, gate: ApprovalGate, trust: TrustAnswer | undefined) {
   const pi = await loadPi();
   const agentDir = pi.getAgentDir();
-  // 先按"不信任"创建；pi 在加载项目资源之前调用 resolveProjectTrust，由它决定（trust.ts）。
+  // 先按"Don’t trust"创建；pi 在加载项目资源之前调用 resolveProjectTrust，由它决定（trust.ts）。
   const settingsManager = pi.SettingsManager.create(cwd, agentDir, { projectTrusted: false });
   // MCP 照 pi 命令行的注册方式作为内置扩展加入（方案第 6 节）：`pi config` 和设置里的 -builtin:mcp 对它有效；
   // bindExtensions 发 session_start 时它在后台连接服务。codemode 不进 v0，所以服务要用直接调用方式。
@@ -409,7 +409,7 @@ async function release(entry: Entry): Promise<void> {
 
 /** @brief 正在生成时拒绝（关闭、换模型、换思考强度），不替你停止。 */
 function requireIdle(entry: Entry): void {
-  if (entry.running || entry.session.isStreaming) throw new Error('The session is generating; stop it first');
+  if (entry.running || entry.session.isStreaming) throw new Error('This session is still running. Stop it first.');
 }
 
 /** @brief 关闭并释放一个会话（归档、删除前）；正在生成时拒绝，不替你停止。 */
@@ -504,7 +504,7 @@ export function setApprovalMode(sessionId: string, mode: ApprovalMode): Approval
   return requireEntry(sessionId).gate.setMode(mode);
 }
 
-/** @brief 从"本会话已允许"里清除一个工具名。 */
+/** @brief 从"Allowed for this session"里清除一个工具名。 */
 export function forgetApproval(sessionId: string, toolName: string): ApprovalState {
   return requireEntry(sessionId).gate.forget(toolName);
 }

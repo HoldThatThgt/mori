@@ -25,13 +25,13 @@ const BODY_LIMIT = 20_000;
 /** pi 的 MCP 扩展注册的工具的来源路径 */
 const MCP_PATH = 'builtin:mcp';
 /** 不能在这里启停的原因（界面文字）：项目设置停用了这个用户级资源 */
-const DISABLED_BY_PROJECT = '本项目的 .pi/settings.json 把它停用了，只能在项目里改';
+const DISABLED_BY_PROJECT = 'Turned off in this project’s .pi/settings.json. To change it, edit that file.';
 /** 项目设置启用了这个用户级资源 */
-const ENABLED_BY_PROJECT = '本项目的 .pi/settings.json 把它启用了，只能在项目里改';
+const ENABLED_BY_PROJECT = 'Turned on in this project’s .pi/settings.json. To change it, edit that file.';
 /** 本项目设置里的包和它的资源 */
-const PROJECT_SETTINGS = '本项目的设置，只能在项目里改';
+const PROJECT_SETTINGS = 'Set in this project’s .pi/settings.json. To change it, edit that file.';
 /** 不是本地文件夹的包和它的资源：PI_OFFLINE 下 pi 不安装它 */
-const NOT_LOCAL = '内网只支持本地文件夹的包；这一项不会被安装，可以移除';
+const NOT_LOCAL = 'Only plugins from local folders are supported, so this one won’t be installed. You can remove it.';
 /** pi 当作 npm / git 来源的前缀（pi utils/paths.js isLocalPath 列出的，去掉不是包来源的 builtin:） */
 const REMOTE_PREFIXES = ['npm:', 'git:', 'github:', 'http:', 'https:', 'ssh:'];
 
@@ -171,7 +171,7 @@ function sourceOf(pkg: PackageSource): string {
 }
 
 /**
- * @brief 卡上不能改的原因：本项目的包只能在项目里改；用户级的 npm / git 包内网不会安装，只留"移除"
+ * @brief 卡上不能改的原因：本项目的包只能在项目里改；用户级的 npm / git 包内网不会安装，只留"Remove…"
  *        （它留在设置里时，pi 每次 resolve 都会同步跑 npm root -g 找全局安装位置）。
  */
 function packageReadOnly(source: string, scope: 'user' | 'project'): string | null {
@@ -296,13 +296,13 @@ export async function toggleResource(sessionId: string | undefined, kind: Resour
   const views = await resolveViews(sessionId);
   const resource = views.shown.paths[kind].find((item) => item.path === path);
   if (!resource) throw new Error(`Resource not found: ${path}`);
-  if (readOnlyReason(views, kind, resource)) throw new Error(`${path} is read-only on the tools page`);
+  if (readOnlyReason(views, kind, resource)) throw new Error(`${path} is read-only in Customize`);
   const item = { path, metadata: resource.metadata, resourceType: kind };
   const context: ToggleContext = { settings: views.shown.settings, cwd: views.cwd, agentDir: views.agentDir,
     configDirName: views.pi.CONFIG_DIR_NAME };
   if (resource.metadata.origin === 'top-level') toggleTopLevelResource(item, enabled, context);
   else if (!togglePackageResource(item, enabled, context)) {
-    throw new Error(`Package ${resource.metadata.source} is not in the settings`);
+    throw new Error(`Plugin ${resource.metadata.source} isn’t in your user-level settings`);
   }
   await context.settings.flush();
   const scope = resource.metadata.scope === 'project' ? 'project' : 'global';
@@ -340,7 +340,7 @@ export async function addPackage(path: string): Promise<{ source: string; error:
   const packages = settings.getGlobalSettings().packages ?? [];
   if (!changed || packages.length === count) {
     await settings.flush();
-    throw new Error('This package is already added');
+    throw new Error('This plugin is already added');
   }
   const { error } = await savedUser(settings);
   return { source: sourceOf(packages[packages.length - 1]), error };
@@ -354,7 +354,7 @@ export async function setPackageEnabled(source: string, enabled: boolean): Promi
   const { settings } = await userPackages();
   const packages = [...(settings.getGlobalSettings().packages ?? [])];
   const index = packages.findIndex((pkg) => sourceOf(pkg) === source);
-  if (index === -1) throw new Error(`Package ${source} is not in the user settings`);
+  if (index === -1) throw new Error(`Plugin ${source} isn’t in your user-level settings`);
   packages[index] = enabled ? source : { source, extensions: [], skills: [], prompts: [], themes: [] };
   settings.setPackages(packages);
   return savedUser(settings);
@@ -363,6 +363,6 @@ export async function setPackageEnabled(source: string, enabled: boolean): Promi
 /** @brief 从用户级设置里移除一个包（pi removeSourceFromSettings），不删文件。 */
 export async function removePackage(source: string): Promise<SaveResult> {
   const { settings, manager } = await userPackages();
-  if (!manager.removeSourceFromSettings(source)) throw new Error(`Package ${source} is not in the user settings`);
+  if (!manager.removeSourceFromSettings(source)) throw new Error(`Plugin ${source} isn’t in your user-level settings`);
   return savedUser(settings);
 }

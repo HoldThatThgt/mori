@@ -1,4 +1,4 @@
-// 工具页的"技能"一节（docs/v0/screens/tools.md）：全部技能（含停用的、插件里的），开关启停，展开看 SKILL.md 正文和路径。
+// 工具页的"Skills"一节（docs/v0/screens/tools.md）：全部技能（含停用的、插件里的），开关启停，展开看 SKILL.md 正文和路径。
 
 import { useState } from 'react';
 import type { ResourceEntry } from '../../../shared/protocol';
@@ -11,10 +11,10 @@ function skillScope(skill: ResourceEntry): 'user' | 'project' | 'package' {
   return skill.origin === 'package' ? 'package' : skill.scope;
 }
 
-/** @brief 来源的文字："用户级" / "本项目" / "插件 <包>"。 */
+/** @brief 来源的文字："User" / "Project" / "Plugin <包>"。 */
 function skillSource(skill: ResourceEntry): string {
-  if (skill.origin === 'package') return `插件 ${skill.packageSource ?? ''}`;
-  return skill.scope === 'user' ? '用户级' : '本项目';
+  if (skill.origin === 'package') return `Plugin ${skill.packageSource ?? ''}`;
+  return skill.scope === 'user' ? 'User' : 'Project';
 }
 
 /** @brief 一个技能：名字、来源、用途、开关；展开后是正文（去掉 frontmatter）和文件路径。 */
@@ -33,8 +33,8 @@ function SkillRow({ skill, cwd }: { skill: ResourceEntry; cwd: string }) {
           {skill.description && (
             <span className="tools-row-desc" title={skill.description}>{skill.description}</span>)}
         </button>
-        <ToolSwitch checked={power.checked} label={`启用技能 ${skill.name}`} disabled={change.busy || !!skill.readOnly}
-          title={skill.readOnly ?? undefined} onChange={power.toggle} />
+        <ToolSwitch checked={power.checked} label={`Enable skill ${skill.name}`}
+          disabled={change.busy || !!skill.readOnly} title={skill.readOnly ?? undefined} onChange={power.toggle} />
       </div>
       <ResourceNotes readOnly={skill.readOnly} error={change.error} />
       {open && (
@@ -50,16 +50,17 @@ function SkillRow({ skill, cwd }: { skill: ResourceEntry; cwd: string }) {
   );
 }
 
-/** @brief "技能"一节；diagnostics 是 pi 报告的问题原文，列在列表下方。 */
+/** @brief "Skills"一节；diagnostics 是 pi 报告的问题原文，列在列表下方。 */
 export function SkillsSection({ skills, diagnostics, cwd, agentDir }: {
   skills: ResourceEntry[]; diagnostics: string[]; cwd: string; agentDir: string;
 }) {
   return (
     <>
-      <h2>技能</h2>
+      <h2>Skills</h2>
       {skills.length === 0 ? (
         <p className="tools-empty">
-          还没有技能。把技能文件夹（含 SKILL.md）放进 {agentDir}\skills 或项目的 .pi\skills，或添加一个插件。
+          No skills yet. Put a skill folder (with a SKILL.md) in {agentDir}\skills or in the project’s .pi\skills,
+          or add a plugin.
         </p>
       ) : (
         <ul className="tools-list">{skills.map((skill) => <SkillRow key={skill.path} skill={skill} cwd={cwd} />)}</ul>

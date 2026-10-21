@@ -42,7 +42,8 @@ export function openFeedback(request: FeedbackRequest, range: Range | null): voi
     return;
   }
   const { source } = request.ref;
-  recordAction(source.kind === 'message' && source.scope === 'reply' ? '反馈这条回复' : '反馈选区');
+  recordAction(source.kind === 'message' && source.scope === 'reply' ? 'Give feedback on response'
+    : 'Give feedback on selection');
   CSS.highlights.delete(QUOTE_HIGHLIGHT);
   if (range) CSS.highlights.set(QUOTE_HIGHLIGHT, new Highlight(range));
   useFeedbackForm.setState((state) => ({ request, seq: state.seq + 1 }));

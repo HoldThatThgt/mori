@@ -1,5 +1,5 @@
-// 左栏：品牌与收起、"新会话"（Ctrl+N）、"打开文件夹…"、"工具"（M6）、"工作回顾"（M7，后台进程退出后照常可用）、
-// 项目 → 会话树（SessionTree）、报告界面问题（F8）、设置。
+// 左栏：品牌与收起、"New session"（Ctrl+N）、"Open folder…"、"Customize"（M6）、"Review"（M7，后台进程退出后照常可用）、
+// 项目 → 会话树（SessionTree）、"Report a UI issue (F8)"、"Settings"。
 
 import { openSettings, openTools } from '../state/actions';
 import { newSession, openFolder } from '../state/projects';
@@ -7,19 +7,26 @@ import { openReview } from '../state/review';
 import { isShown, sameFile, useApp, type AppState } from '../state/store';
 import { BrandMark, Icon } from '../icons';
 import { openIssueReport } from './IssueDialog';
-import { savedStatus, sessionStatus, STATUS_TEXT, type SessionStatus } from './sessionRows';
+import { savedStatus, sessionStatus, type SessionStatus } from './sessionRows';
 import { SessionTree } from './SessionTree';
 
 /** F8 入口的文字；收起为图标栏时作为按钮的名称 */
-const REPORT_LABEL = '报告界面问题（F8）';
+const REPORT_LABEL = 'Report a UI issue (F8)';
 /** 新会话按钮的名称 */
-const NEW_SESSION_LABEL = '新会话（Ctrl+N）';
+const NEW_SESSION_LABEL = 'New session (Ctrl+N)';
 
-/** 收起为图标栏时"展开"按钮上显示的状态，按这个顺序取第一个 */
-const RAIL_ORDER: SessionStatus[] = ['approval', 'question', 'error', 'unseen'];
+/** @brief 收起为图标栏时"Open sidebar"按钮上显示的状态（生成中不显示）。 */
+type RailStatus = Exclude<SessionStatus, 'running'>;
+/** 收起为图标栏时"Open sidebar"按钮上显示的状态，按这个顺序取第一个 */
+const RAIL_ORDER: RailStatus[] = ['approval', 'question', 'error', 'unseen'];
+/** 这些状态在"Open sidebar"按钮读屏名和悬停说明里的写法："Open sidebar (a session needs approval)" */
+const RAIL_TEXT: Record<RailStatus, string> = {
+  approval: 'a session needs approval', question: 'a session needs input', error: 'a session has an error',
+  unseen: 'a session has unread results',
+};
 
 /** @brief 不在中栏显示的会话里最要紧的状态（收起为图标栏时看不到会话行）；包括界面重新加载后还没点开的会话。 */
-function hiddenStatus(state: AppState): SessionStatus | null {
+function hiddenStatus(state: AppState): RailStatus | null {
   const hidden = state.tabs.filter((tab) => !isShown(tab.key, state));
   const untabbed = state.saved.sessions
     .filter((item) => !state.tabs.some((tab) => sameFile(tab.sessionFile, item.sessionFile)));
@@ -28,28 +35,31 @@ function hiddenStatus(state: AppState): SessionStatus | null {
   return RAIL_ORDER.find((status) => statuses.includes(status)) ?? null;
 }
 
-/** @brief 左栏顶部的导航：新会话、打开文件夹、工具（后台进程退出后不可用）、工作回顾（读本机文件，照常可用）。 */
+/**
+ * @brief 左栏顶部的导航："New session"、"Open folder…"、"Customize"（后台进程退出后不可用）、
+ *        "Review"（读本机文件，照常可用）。
+ */
 function SidebarNav() {
   const view = useApp((state) => state.view);
   const exited = useApp((state) => state.kernel === 'exited');
-  const unavailable = exited ? '后台进程已退出，先重新载入' : undefined;
+  const unavailable = exited ? 'Mori’s background process crashed. Restart it to continue.' : undefined;
   return (
     <nav className="sidebar-nav">
       <button className="nav-item primary" onClick={() => void newSession()} title={unavailable ?? NEW_SESSION_LABEL}
         aria-label={NEW_SESSION_LABEL} data-testid="new-session" disabled={exited}>
-        <Icon name="plus" /><span className="nav-label">新会话</span><span className="nav-hint">Ctrl+N</span>
+        <Icon name="plus" /><span className="nav-label">New session</span><span className="nav-hint">Ctrl+N</span>
       </button>
-      <button className="nav-item" onClick={() => void openFolder()} title={unavailable ?? '打开文件夹…'}
-        aria-label="打开文件夹…" disabled={exited}>
-        <Icon name="folder" /><span className="nav-label">打开文件夹…</span>
+      <button className="nav-item" onClick={() => void openFolder()} title={unavailable ?? 'Open folder…'}
+        aria-label="Open folder…" disabled={exited}>
+        <Icon name="folder" /><span className="nav-label">Open folder…</span>
       </button>
       <button className={`nav-item${view === 'tools' ? ' active' : ''}`} onClick={openTools}
-        title={unavailable ?? '工具'} aria-label="工具" data-testid="nav-tools" disabled={exited}>
-        <Icon name="tools" /><span className="nav-label">工具</span>
+        title={unavailable ?? 'Customize'} aria-label="Customize" data-testid="nav-tools" disabled={exited}>
+        <Icon name="tools" /><span className="nav-label">Customize</span>
       </button>
       <button className={`nav-item${view === 'review' ? ' active' : ''}`} onClick={() => openReview()}
-        title="工作回顾" aria-label="工作回顾" data-testid="nav-review">
-        <Icon name="clock" /><span className="nav-label">工作回顾</span>
+        title="Review" aria-label="Review" data-testid="nav-review">
+        <Icon name="clock" /><span className="nav-label">Review</span>
       </button>
     </nav>
   );
@@ -63,9 +73,9 @@ export function Sidebar({ collapsed, floating, onToggle, onNavigate, children }:
   const railStatus = useApp(hiddenStatus);
   const className = `sidebar${collapsed ? ' collapsed' : ''}${floating ? ' floating' : ''}`;
   const toggleLabel = collapsed
-    ? `展开侧栏${railStatus ? `（有会话${STATUS_TEXT[railStatus]}）` : ''}` : '收起侧栏';
+    ? `Open sidebar${railStatus ? ` (${RAIL_TEXT[railStatus]})` : ''}` : 'Close sidebar';
   return (
-    <aside className={className} aria-label="侧栏" data-testid="sidebar">
+    <aside className={className} aria-label="Sidebar" data-testid="sidebar">
       <div className="brand-row">
         {!collapsed && <><BrandMark /><span className="brand">mori</span></>}
         <button className="icon-button rail-toggle" onClick={onToggle} aria-label={toggleLabel} title={toggleLabel}
@@ -83,8 +93,9 @@ export function Sidebar({ collapsed, floating, onToggle, onNavigate, children }:
           aria-label={REPORT_LABEL}>
           <Icon name="flag" /><span className="nav-label">{REPORT_LABEL}</span>
         </button>
-        <button className={`nav-item${view === 'settings' ? ' active' : ''}`} onClick={() => openSettings()} title="设置">
-          <Icon name="settings" /><span className="nav-label">设置</span>
+        <button className={`nav-item${view === 'settings' ? ' active' : ''}`} onClick={() => openSettings()}
+          title="Settings">
+          <Icon name="settings" /><span className="nav-label">Settings</span>
         </button>
       </div>
       {children}

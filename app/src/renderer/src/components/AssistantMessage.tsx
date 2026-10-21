@@ -8,7 +8,7 @@ import { ToolCard } from './ToolCard';
 
 const plugins = { code };
 const controls = { code: { copy: true, download: false }, table: false, mermaid: false, image: false };
-const translations = { copyCode: '复制代码', copied: '已复制' };
+const translations = { copyCode: 'Copy code', copied: 'Copied' };
 // 链接不在 App 里打开（窗口禁止跳转），也不弹外链确认框。
 const linkSafety = { enabled: false };
 
@@ -19,7 +19,7 @@ function Thinking({ block }: { block: Extract<Block, { type: 'thinking' }> }) {
   return (
     <details className="thinking" open={open} data-testid="thinking">
       <summary data-no-quote onClick={(event) => { event.preventDefault(); setChosen(!open); }}>
-        {block.streaming ? '思考中…' : '思考'}
+        {block.streaming ? 'Thinking…' : 'Thought process'}
       </summary>
       <div className="thinking-text">{block.text}</div>
     </details>
@@ -37,7 +37,7 @@ const Markdown = memo(function Markdown({ text }: { text: string }) {
 });
 
 /**
- * @brief 一条助手回复（pi 的一条助手消息）。整条是一个引用来源：选区起止都在这里时出"问 Mori / 反馈"浮层
+ * @brief 一条助手回复（pi 的一条助手消息）。整条是一个引用来源：选区起止都在这里时出"Attach as context / Feedback"浮层
  *        （docs/v0/screens/selection.md）。
  */
 export const AssistantMessage = memo(function AssistantMessage({ item, tools, cwd, tabKey }: {
