@@ -1,7 +1,9 @@
-// 左栏：品牌与收起、"新会话"（Ctrl+N）、"打开文件夹…"、"工具"（M6）、项目 → 会话树（SessionTree）、报告界面问题（F8）、设置。
+// 左栏：品牌与收起、"新会话"（Ctrl+N）、"打开文件夹…"、"工具"（M6）、"工作回顾"（M7，后台进程退出后照常可用）、
+// 项目 → 会话树（SessionTree）、报告界面问题（F8）、设置。
 
 import { openSettings, openTools } from '../state/actions';
 import { newSession, openFolder } from '../state/projects';
+import { openReview } from '../state/review';
 import { isShown, sameFile, useApp, type AppState } from '../state/store';
 import { BrandMark, Icon } from '../icons';
 import { openIssueReport } from './IssueDialog';
@@ -26,17 +28,42 @@ function hiddenStatus(state: AppState): SessionStatus | null {
   return RAIL_ORDER.find((status) => statuses.includes(status)) ?? null;
 }
 
+/** @brief 左栏顶部的导航：新会话、打开文件夹、工具（后台进程退出后不可用）、工作回顾（读本机文件，照常可用）。 */
+function SidebarNav() {
+  const view = useApp((state) => state.view);
+  const exited = useApp((state) => state.kernel === 'exited');
+  const unavailable = exited ? '后台进程已退出，先重新载入' : undefined;
+  return (
+    <nav className="sidebar-nav">
+      <button className="nav-item primary" onClick={() => void newSession()} title={unavailable ?? NEW_SESSION_LABEL}
+        aria-label={NEW_SESSION_LABEL} data-testid="new-session" disabled={exited}>
+        <Icon name="plus" /><span className="nav-label">新会话</span><span className="nav-hint">Ctrl+N</span>
+      </button>
+      <button className="nav-item" onClick={() => void openFolder()} title={unavailable ?? '打开文件夹…'}
+        aria-label="打开文件夹…" disabled={exited}>
+        <Icon name="folder" /><span className="nav-label">打开文件夹…</span>
+      </button>
+      <button className={`nav-item${view === 'tools' ? ' active' : ''}`} onClick={openTools}
+        title={unavailable ?? '工具'} aria-label="工具" data-testid="nav-tools" disabled={exited}>
+        <Icon name="tools" /><span className="nav-label">工具</span>
+      </button>
+      <button className={`nav-item${view === 'review' ? ' active' : ''}`} onClick={() => openReview()}
+        title="工作回顾" aria-label="工作回顾" data-testid="nav-review">
+        <Icon name="clock" /><span className="nav-label">工作回顾</span>
+      </button>
+    </nav>
+  );
+}
+
 /** @brief 左栏。children 是分隔线；onNavigate 在打开或切换会话后调用（浮动的左栏据此收起）。 */
 export function Sidebar({ collapsed, floating, onToggle, onNavigate, children }: {
   collapsed: boolean; floating: boolean; onToggle: () => void; onNavigate: () => void; children?: React.ReactNode;
 }) {
   const view = useApp((state) => state.view);
-  const exited = useApp((state) => state.kernel === 'exited');
   const railStatus = useApp(hiddenStatus);
   const className = `sidebar${collapsed ? ' collapsed' : ''}${floating ? ' floating' : ''}`;
   const toggleLabel = collapsed
     ? `展开侧栏${railStatus ? `（有会话${STATUS_TEXT[railStatus]}）` : ''}` : '收起侧栏';
-  const unavailable = exited ? '后台进程已退出，先重新载入' : undefined;
   return (
     <aside className={className} aria-label="侧栏" data-testid="sidebar">
       <div className="brand-row">
@@ -47,20 +74,7 @@ export function Sidebar({ collapsed, floating, onToggle, onNavigate, children }:
           {collapsed && railStatus && <span className={`rail-dot ${railStatus}`} data-testid="rail-status" />}
         </button>
       </div>
-      <nav className="sidebar-nav">
-        <button className="nav-item primary" onClick={() => void newSession()} title={unavailable ?? NEW_SESSION_LABEL}
-          aria-label={NEW_SESSION_LABEL} data-testid="new-session" disabled={exited}>
-          <Icon name="plus" /><span className="nav-label">新会话</span><span className="nav-hint">Ctrl+N</span>
-        </button>
-        <button className="nav-item" onClick={() => void openFolder()} title={unavailable ?? '打开文件夹…'}
-          aria-label="打开文件夹…" disabled={exited}>
-          <Icon name="folder" /><span className="nav-label">打开文件夹…</span>
-        </button>
-        <button className={`nav-item${view === 'tools' ? ' active' : ''}`} onClick={openTools}
-          title={unavailable ?? '工具'} aria-label="工具" data-testid="nav-tools" disabled={exited}>
-          <Icon name="tools" /><span className="nav-label">工具</span>
-        </button>
-      </nav>
+      <SidebarNav />
       <div className="sidebar-sessions">
         <SessionTree onNavigate={onNavigate} />
       </div>

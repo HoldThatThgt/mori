@@ -35,11 +35,13 @@ export function openPreview(request: Omit<PreviewRequest, 'returnFocus'>): void 
   useRefPreview.setState({ request: { ...request, returnFocus: focused instanceof HTMLElement ? focused : null } });
 }
 
-/** @brief 会话引用的原会话：会话列表读完了、里面没有它，本次也没有打开它（被删除了）。 */
-export function sourceGone(state: AppState, source: SessionSource): boolean {
+/**
+ * @brief 原会话（会话引用的、工作回顾里反馈所在的）被删除了：会话列表读完了、里面没有它，本次也没有打开它。
+ */
+export function sessionGone(state: AppState, sessionFile: string): boolean {
   return state.saved.status === 'ready'
-    && !state.saved.sessions.some((item) => sameFile(item.sessionFile, source.sessionFile))
-    && !state.tabs.some((tab) => sameFile(tab.sessionFile, source.sessionFile));
+    && !state.saved.sessions.some((item) => sameFile(item.sessionFile, sessionFile))
+    && !state.tabs.some((tab) => sameFile(tab.sessionFile, sessionFile));
 }
 
 /** @brief 原会话现在的名字（与侧栏同一规则）；找不到时用引用时的名字。 */
@@ -140,22 +142,22 @@ function whenOpened(key: string): Promise<string | null> {
 }
 
 /**
- * @brief 打开原会话，与在侧栏点它相同（已归档的先恢复，打开失败的重试，正在打开的等它打开完）；
- *        返回它在界面里的标识，打开失败时为 null（会话横幅显示原文）。
+ * @brief 打开原会话（会话引用的、工作回顾里反馈所在的），与在侧栏点它相同（已归档的先恢复，打开失败的重试，
+ *        正在打开的等它打开完）；返回它在界面里的标识，打开失败或会话列表里没有它时为 null（会话横幅显示原文）。
  */
-async function showSource(source: SessionSource): Promise<string | null> {
-  const open = tabByFile(source.sessionFile);
+export async function showSession(sessionFile: string): Promise<string | null> {
+  const open = tabByFile(sessionFile);
   if (open) {
     if (open.phase === 'failed') retryOpen(open.key);
     showChat(open.key);
     return whenOpened(open.key);
   }
   const state = useApp.getState();
-  const saved = state.saved.sessions.find((item) => sameFile(item.sessionFile, source.sessionFile));
+  const saved = state.saved.sessions.find((item) => sameFile(item.sessionFile, sessionFile));
   if (!saved) return null;
   if (state.archived.includes(saved.sessionFile)) restoreSession(saved, false);
   await openSaved(saved);
-  const tab = tabByFile(source.sessionFile);
+  const tab = tabByFile(sessionFile);
   return tab ? whenOpened(tab.key) : null;
 }
 
@@ -167,11 +169,11 @@ export async function jumpToSession(tabKey: string, ref: QuoteRef): Promise<void
   const source = ref.source;
   if (source.kind !== 'session') return;
   recordAction('点引用回到原会话');
-  if (sourceGone(useApp.getState(), source)) {
+  if (sessionGone(useApp.getState(), source.sessionFile)) {
     openPreview({ tabKey, ref, mode: 'view', reason: 'gone' });
     return;
   }
-  const key = await showSource(source);
+  const key = await showSession(source.sessionFile);
   if (!key) return;
   const found = rangeKeys(key, source);
   if (!found) {

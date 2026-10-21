@@ -4,10 +4,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import type { IssueAction, IssueField, WindowCapture } from '../../../shared/issues';
-import { describe } from '../state/bridge';
+import { mainError } from '../state/bridge';
 import { recentActions, recordAction } from '../state/actionLog';
 import { useLayout } from '../state/layout';
 import { useOverlay } from '../state/overlays';
+import { fileName, openReview, reviewChanged } from '../state/review';
 import { activeTab, useApp, type AppState, type KernelStatus } from '../state/store';
 import { Icon } from '../icons';
 import { sessionTitle } from './ChatPane';
@@ -40,23 +41,26 @@ const KERNEL_TEXT: Record<KernelStatus, string> = {
   connecting: '启动中', ready: '正常', exited: '已退出', reloading: '正在重新载入',
 };
 
-/** @brief 主进程报错的原文：去掉 Electron 加在前面的 "Error invoking remote method …"。 */
-function mainError(what: string, error: unknown): string {
-  return describe(what, error).replace(/^Error invoking remote method '[^']*': (Error: )?/, '');
-}
+/** 右栏：会话的右栏，或工作回顾页上的详情（docs/v0/screens/review.md，宽度与会话的右栏共用） */
+const RIGHT_PANEL = 'aside.right-panel';
+
+/** 中栏页面的名字 */
+const PAGE_NAME: Record<AppState['view'], string> = { chat: '会话', settings: '设置', tools: '工具', review: '工作回顾' };
 
 /** @brief 当前显示的页面。 */
 function pageName(state: AppState): string {
   if (state.configError) return '读取连接失败';
   if (!state.config) return '正在读取连接';
   if (state.firstRun) return '首次启动';
-  if (state.view === 'settings') return '设置';
-  return state.view === 'tools' ? '工具' : '会话';
+  return PAGE_NAME[state.view];
 }
 
-/** @brief 一栏的实际宽度；与保存的宽度不同（被收紧或收起）时一并写出。 */
-function columnWidth(testId: string, saved: number): string {
-  const element = document.querySelector(`[data-testid="${testId}"]`);
+/**
+ * @brief 一栏的实际宽度；与保存的宽度不同（被收紧或收起）时一并写出。
+ * @param selector 这一栏的元素（右栏是 aside.right-panel：会话的右栏或工作回顾的详情）
+ */
+function columnWidth(selector: string, saved: number): string {
+  const element = document.querySelector(selector);
   if (!element) return `不显示（保存的宽度 ${saved}px）`;
   const actual = Math.round(element.getBoundingClientRect().width);
   return actual === saved ? `${actual}px` : `${actual}px（保存的宽度 ${saved}px）`;
@@ -96,10 +100,10 @@ function currentView(): IssueField[] {
     { label: '页面', value: pageName(state) },
     ...tabFields(state),
     ...splitFields(state),
-    { label: '右栏', value: document.querySelector('[data-testid="right-panel"]') ? '打开' : '关闭' },
+    { label: '右栏', value: document.querySelector(RIGHT_PANEL) ? '打开' : '关闭' },
     { label: '窗口大小', value: `${window.innerWidth}×${window.innerHeight}` },
-    { label: '左栏宽度', value: columnWidth('sidebar', layout.sidebar) },
-    { label: '右栏宽度', value: columnWidth('right-panel', layout.workspace) },
+    { label: '左栏宽度', value: columnWidth('[data-testid="sidebar"]', layout.sidebar) },
+    { label: '右栏宽度', value: columnWidth(RIGHT_PANEL, layout.workspace) },
     { label: '后台进程', value: KERNEL_TEXT[state.kernel] },
   ];
 }
@@ -197,6 +201,7 @@ function IssueForm({ capture, onSaved }: { capture: WindowCapture; onSaved: (fil
         captureId: capture.captureId, captureError: capture.error, what, expect, view, actions,
       });
       onSaved(saved.file);
+      reviewChanged();
     } catch (failure) {
       setError(mainError('saveIssue', failure));
     } finally {
@@ -227,9 +232,19 @@ function IssueForm({ capture, onSaved }: { capture: WindowCapture; onSaved: (fil
   );
 }
 
-/** @brief 已保存：路径、"打开所在文件夹"、"关闭"。 */
+/** @brief "在工作回顾中查看"：关闭报告框，打开工作回顾的"界面问题"，选中这一份。 */
+function viewInReview(file: string): void {
+  if (!closeIssueReport()) return;
+  openReview('issues', fileName(file));
+}
+
+/**
+ * @brief 已保存：路径、"打开所在文件夹"、"在工作回顾中查看"（只在显示工作区时有：首次启动、读取连接中或失败的页面上
+ *        没有工作回顾）、"关闭"。
+ */
 function SavedView({ file }: { file: string }) {
   const [error, setError] = useState<string | null>(null);
+  const workspace = useApp((state) => Boolean(state.config) && !state.configError && !state.firstRun);
   async function showInFolder() {
     setError(null);
     try {
@@ -244,6 +259,10 @@ function SavedView({ file }: { file: string }) {
       {error && <p className="form-message error" role="alert" data-testid="issue-error">{error}</p>}
       <div className="issue-actions">
         <button className="button" onClick={() => void showInFolder()}><Icon name="folder" />打开所在文件夹</button>
+        {workspace && (
+          <button className="button" data-testid="issue-open-review" onClick={() => viewInReview(file)}>
+            在工作回顾中查看</button>
+        )}
         <button className="button" onClick={closeIssueReport}>关闭</button>
       </div>
     </>

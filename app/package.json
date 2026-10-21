@@ -25,6 +25,8 @@
     "test:m5-replay": "node tests/ui/m5-replay.mjs",
     "test:m6-app": "electron-vite build && node tests/ui/m6-app-settings.mjs && node tests/ui/m6-app-tools.mjs && node tests/ui/m6-app-slash.mjs && node tests/ui/m6-app-mcp-shared.mjs",
     "test:m6-replay": "node tests/ui/m6-replay.mjs",
+    "test:m7-app": "electron-vite build && node tests/ui/m7-app.mjs",
+    "test:m7-replay": "node tests/ui/m7-replay.mjs",
     "check": "npm run typecheck && node tests/check.mjs"
   },
   "engines": {

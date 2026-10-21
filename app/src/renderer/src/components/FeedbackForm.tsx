@@ -4,8 +4,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { closeFeedback, useFeedbackForm, type FeedbackRequest } from '../state/feedbackForm';
 import { useOverlay } from '../state/overlays';
+import { fileName, openReview, reviewChanged } from '../state/review';
 import { useApp } from '../state/store';
-import { describe } from '../state/bridge';
+import { mainError } from '../state/bridge';
 import { sessionTitle } from './ChatPane';
 
 /** "已记录"停留的毫秒数 */
@@ -23,12 +24,25 @@ function placement(anchor: FeedbackRequest['anchor'], box: HTMLElement): { left:
     top: Math.max(MARGIN, Math.min(top, window.innerHeight - height - MARGIN)) };
 }
 
-/** @brief 保存这份反馈；失败时抛错。 */
-async function save(request: FeedbackRequest, expected: string): Promise<void> {
+/** @brief 保存这份反馈，返回 JSON 文件的完整路径；失败时抛错。工作回顾开着时重新读。 */
+async function save(request: FeedbackRequest, expected: string): Promise<string> {
   const tab = useApp.getState().tabs.find((item) => item.key === request.tabKey);
   const session = { file: tab?.sessionFile ?? null, cwd: tab?.cwd ?? '', title: tab ? sessionTitle(tab) : '' };
-  await window.mori.saveFeedback({ expected: expected.trim(), quote: request.ref.quote, source: request.ref.source,
-    session });
+  const saved = await window.mori.saveFeedback({ expected: expected.trim(), quote: request.ref.quote,
+    source: request.ref.source, session });
+  reviewChanged();
+  return saved.file;
+}
+
+/** @brief "已记录 · 在工作回顾中查看"：点链接关闭表单，打开工作回顾的"对内容的反馈"，选中刚记下的这一条。 */
+function Saved({ file }: { file: string }) {
+  return (
+    <p className="feedback-saved" role="status" data-testid="feedback-saved">已记录 · <button type="button"
+      className="text-link" data-testid="feedback-open-review" onClick={() => {
+        closeFeedback();
+        openReview('feedback', fileName(file));
+      }}>在工作回顾中查看</button></p>
+  );
 }
 
 /** @brief 表单里写字的部分：引用的原文、输入框、说明、错误、按钮。 */
@@ -63,6 +77,7 @@ function Editing({ quote, saving, error, onSubmit }: {
 function Form({ request }: { request: FeedbackRequest }) {
   const [phase, setPhase] = useState<'editing' | 'saving' | 'saved'>('editing');
   const [error, setError] = useState<string | null>(null);
+  const [savedFile, setSavedFile] = useState('');
   const box = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   useOverlay(true, () => (phase === 'saving' ? false : closeFeedback()));
@@ -79,10 +94,10 @@ function Form({ request }: { request: FeedbackRequest }) {
     setPhase('saving');
     setError(null);
     try {
-      await save(request, expected);
+      setSavedFile(await save(request, expected));
       setPhase('saved');
     } catch (failure) {
-      setError(describe('saveFeedback', failure));
+      setError(mainError('saveFeedback', failure));
       setPhase('editing');
     }
   }
@@ -90,7 +105,7 @@ function Form({ request }: { request: FeedbackRequest }) {
     <div ref={box} className="feedback-form" role="dialog" aria-label="反馈" data-testid="feedback-form"
       style={{ left: position?.left ?? -9999, top: position?.top ?? -9999 }}>
       {phase === 'saved'
-        ? <p className="feedback-saved" role="status" data-testid="feedback-saved">已记录 · 在工作回顾中查看</p>
+        ? <Saved file={savedFile} />
         : <Editing quote={request.ref.quote} saving={phase === 'saving'} error={error}
           onSubmit={(expected) => void submit(expected)} />}
     </div>

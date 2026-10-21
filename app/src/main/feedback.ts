@@ -20,12 +20,12 @@ const THUMBNAIL_WIDTH = 640;
 const captures = new Map<string, Buffer>();
 
 /** @brief 报告保存的文件夹（临时默认值，见 docs/v0/defaults.md）。 */
-function issuesDir(): string {
+export function issuesDir(): string {
   return join(app.getPath('userData'), 'ui-issues');
 }
 
 /** @brief 对内容的反馈保存的文件夹（临时默认值，见 docs/v0/defaults.md）。 */
-function feedbackDir(): string {
+export function feedbackDir(): string {
   return join(app.getPath('userData'), 'feedback');
 }
 
@@ -41,7 +41,7 @@ function fileStamp(date: Date): string {
 }
 
 /** @brief 标题用的本地时间 YYYY-MM-DD HH:mm:ss。 */
-function localTime(date: Date): string {
+export function localTime(date: Date): string {
   const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   return `${day} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
@@ -95,9 +95,12 @@ function oneLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-/** @brief 你写的原文；没写时为"（没有填写）"。 */
+/**
+ * @brief 你写的原文；没写时为"（没有填写）"。像 Markdown 标题的行前面加 "\"（M7 的工作回顾按报告的标题切节，
+ *        你写的一行"## 你期望什么"不能被当成标题）。
+ */
 function written(text: string): string {
-  return text.trim() || '（没有填写）';
+  return text.trim().replace(/^( {0,3})(#{1,6})(?=\s|$)/gm, '$1\\$2') || '（没有填写）';
 }
 
 /** @brief 版本：Mori、Electron、Chromium、Node、Windows。 */
