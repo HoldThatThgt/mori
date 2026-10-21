@@ -5,6 +5,7 @@ import type { Command, EventEnvelope, KernelMessage, RequestEnvelope } from '../
 import type { Feedback, SavedFeedback } from '../shared/feedback';
 import type { FileRead } from '../shared/files';
 import type { IssueReport, SavedIssue, WindowCapture } from '../shared/issues';
+import type { ExportRequest, ExportResult, ReviewKind, ReviewRecords } from '../shared/review';
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 
@@ -126,5 +127,29 @@ contextBridge.exposeInMainWorld('mori', {
   /** @brief 保存一份对内容的反馈（只记录，不发给模型），返回 JSON 文件的路径。 */
   saveFeedback(feedback: Feedback): Promise<SavedFeedback> {
     return ipcRenderer.invoke('mori:save-feedback', feedback);
+  },
+  /** @brief 工作回顾：读出对内容的反馈和界面问题报告。 */
+  listReview(): Promise<ReviewRecords> {
+    return ipcRenderer.invoke('mori:review-list');
+  },
+  /** @brief 工作回顾：一份报告的截图（data URL）。 */
+  reviewShot(name: string): Promise<string> {
+    return ipcRenderer.invoke('mori:review-shot', name);
+  },
+  /** @brief 工作回顾：导出为 Markdown（弹保存对话框）；取消时 file 为 null。 */
+  exportReview(request: ExportRequest): Promise<ExportResult> {
+    return ipcRenderer.invoke('mori:review-export', request);
+  },
+  /** @brief 工作回顾：在资源管理器里选中刚导出的文件。 */
+  showExport(file: string): Promise<void> {
+    return ipcRenderer.invoke('mori:review-show-export', file);
+  },
+  /** @brief 工作回顾：在资源管理器里选中一份记录（文件名）。 */
+  showReviewRecord(kind: ReviewKind, name: string): Promise<void> {
+    return ipcRenderer.invoke('mori:review-show-record', kind, name);
+  },
+  /** @brief 工作回顾：在资源管理器里打开一类记录的文件夹；打不开时 error 为原文。 */
+  openReviewFolder(kind: ReviewKind): Promise<{ error: string | null }> {
+    return ipcRenderer.invoke('mori:review-open-folder', kind);
   },
 });

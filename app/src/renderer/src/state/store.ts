@@ -109,8 +109,8 @@ export interface PendingRef {
   problem: string | null;
 }
 
-/** @brief 中栏显示什么：会话、设置页或工具页（M6）。 */
-export type View = 'chat' | 'settings' | 'tools';
+/** @brief 中栏显示什么：会话、设置页、工具页（M6）或工作回顾（M7）。 */
+export type View = 'chat' | 'settings' | 'tools' | 'review';
 
 /** @brief 后台进程状态。 */
 export type KernelStatus = 'connecting' | 'ready' | 'exited' | 'reloading';

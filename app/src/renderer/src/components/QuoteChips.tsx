@@ -5,7 +5,7 @@
 
 import type { QuoteRef } from '../../../shared/protocol';
 import { excerpt, jumpToQuote, refKey, refLabel, removeQuote, useQuoteStatus, type QuoteStatus } from '../state/quotes';
-import { dropPending, openPreview, sourceGone, sourceName } from '../state/refActions';
+import { dropPending, openPreview, sessionGone, sourceName } from '../state/refActions';
 import { useApp, type PendingRef, type Tab } from '../state/store';
 import { Icon, type IconName } from '../icons';
 
@@ -18,7 +18,7 @@ const ICONS: Record<QuoteRef['source']['kind'], IconName> = { file: 'file', mess
 
 /** @brief 芯片上的检查结果：会话引用的原会话已删除按会话列表算；其余是点过之后查出来的。 */
 function useStatus(quote: QuoteRef): QuoteStatus | undefined {
-  const gone = useApp((state) => quote.source.kind === 'session' && sourceGone(state, quote.source));
+  const gone = useApp((state) => quote.source.kind === 'session' && sessionGone(state, quote.source.sessionFile));
   const checked = useQuoteStatus((state) => state[refKey(quote)]);
   return gone ? 'gone' : checked;
 }

@@ -1,0 +1,2979 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m7-record.mjs; do not edit by hand.",
+ "name": "review-reply",
+ "description": "让模型读 README.md 并用两句话概括；反馈这条回复、反馈回复里的一句、在阅读器里反馈 README 第 5–6 行；按 F8 保存一份报告；读一次记录。重启后打开工作回顾（两节都列出）、读 F8 报告的截图；回到原位置：整条回复（session.read 后打开会话）、回复里的一句（会话已开着）、文件里的两行（读文件）",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-21T04:21:03.273Z",
+ "steps": [
+  {
+   "t": 0,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 818,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 818,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply"
+   }
+  },
+  {
+   "t": 819,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 819,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply"
+   }
+  },
+  {
+   "t": 852,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 852,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "text": "请用 read 工具读取 README.md，然后用两句话概括它的内容。不要修改任何文件，不要运行命令。"
+   }
+  },
+  {
+   "t": 854,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 856,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 856,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 856,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m7-record-eD9uik/m7-review-reply\n</cwd>"
+      },
+      "timestamp": 1792556456626,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 856,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m7-record-eD9uik/m7-review-reply\n</cwd>"
+      },
+      "timestamp": 1792556456626,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 857,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请用 read 工具读取 README.md，然后用两句话概括它的内容。不要修改任何文件，不要运行命令。"
+       }
+      ],
+      "timestamp": 1792556456625
+     }
+    }
+   }
+  },
+  {
+   "t": 857,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请用 read 工具读取 README.md，然后用两句话概括它的内容。不要修改任何文件，不要运行命令。"
+       }
+      ],
+      "timestamp": 1792556456625
+     }
+    }
+   }
+  },
+  {
+   "t": 858,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "c82e7ff7",
+     "time": 1792556456625,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 983,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "mori.model_state",
+     "model": "mori-endpoint/deepseek-flash",
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false
+    }
+   }
+  },
+  {
+   "t": 1491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792556456722
+     }
+    }
+   }
+  },
+  {
+   "t": 1844,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 0,
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1844,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1884,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1884,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1884,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "path",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1884,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1884,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ": ",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1884,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1884,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "README",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1884,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": ".md",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1884,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "\"",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1885,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "}",
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252"
+     }
+    }
+   }
+  },
+  {
+   "t": 1914,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 0,
+      "toolName": "read",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+      "args": {
+       "path": "README.md"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 1914,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+        "name": "read",
+        "arguments": {
+         "path": "README.md"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1106,
+       "output": 38,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1656,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792556456722,
+      "responseId": "9ebe62fb-b74e-40ab-8ec9-21aa548d7962",
+      "rawStopReason": "tool_calls",
+      "durationMs": 963,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 1914,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "b83e1557",
+     "time": 1792556456722,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 1915,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+     "toolName": "read",
+     "gate": "free"
+    }
+   }
+  },
+  {
+   "t": 1915,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+     "toolName": "read",
+     "args": {
+      "path": "README.md"
+     }
+    }
+   }
+  },
+  {
+   "t": 1921,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+     "toolName": "read",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+       }
+      ],
+      "structuredContent": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+     },
+     "isError": false,
+     "durationMs": 5
+    }
+   }
+  },
+  {
+   "t": 1921,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+      "toolName": "read",
+      "content": [
+       {
+        "type": "text",
+        "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 5,
+      "timestamp": 1792556457693
+     }
+    }
+   }
+  },
+  {
+   "t": 1922,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+      "toolName": "read",
+      "content": [
+       {
+        "type": "text",
+        "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 5,
+      "timestamp": 1792556457693
+     }
+    }
+   }
+  },
+  {
+   "t": 1923,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+        "name": "read",
+        "arguments": {
+         "path": "README.md"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1106,
+       "output": 38,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1656,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1792556456722,
+      "responseId": "9ebe62fb-b74e-40ab-8ec9-21aa548d7962",
+      "rawStopReason": "tool_calls",
+      "durationMs": 963,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 5,
+       "timestamp": 1792556457693
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1923,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096"
+   }
+  },
+  {
+   "t": 1923,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 1927,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1690,
+      "contextWindow": 1000000,
+      "percent": 0.169
+     }
+    }
+   }
+  },
+  {
+   "t": 3266,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792556457695
+     }
+    }
+   }
+  },
+  {
+   "t": 3658,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3658,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "README"
+     }
+    }
+   }
+  },
+  {
+   "t": 3659,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ".md"
+     }
+    }
+   }
+  },
+  {
+   "t": 3659,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3659,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "是一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 3659,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "名为"
+     }
+    }
+   }
+  },
+  {
+   "t": 3692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " “"
+     }
+    }
+   }
+  },
+  {
+   "t": 3692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "M"
+     }
+    }
+   }
+  },
+  {
+   "t": 3692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "ori"
+     }
+    }
+   }
+  },
+  {
+   "t": 3692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " fixture"
+     }
+    }
+   }
+  },
+  {
+   "t": 3692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " project"
+     }
+    }
+   }
+  },
+  {
+   "t": 3692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "”"
+     }
+    }
+   }
+  },
+  {
+   "t": 3692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "的"
+     }
+    }
+   }
+  },
+  {
+   "t": 3692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "示例"
+     }
+    }
+   }
+  },
+  {
+   "t": 3733,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "项目"
+     }
+    }
+   }
+  },
+  {
+   "t": 3733,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "说明"
+     }
+    }
+   }
+  },
+  {
+   "t": 3740,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3740,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "指出"
+     }
+    }
+   }
+  },
+  {
+   "t": 3741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "该"
+     }
+    }
+   }
+  },
+  {
+   "t": 3741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "文件夹"
+     }
+    }
+   }
+  },
+  {
+   "t": 3741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "用于"
+     }
+    }
+   }
+  },
+  {
+   "t": 3741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "对"
+     }
+    }
+   }
+  },
+  {
+   "t": 3741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "模型"
+     }
+    }
+   }
+  },
+  {
+   "t": 3780,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "进行"
+     }
+    }
+   }
+  },
+  {
+   "t": 3780,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " Mori"
+     }
+    }
+   }
+  },
+  {
+   "t": 3780,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3780,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "检查"
+     }
+    }
+   }
+  },
+  {
+   "t": 3780,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 3780,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "它"
+     }
+    }
+   }
+  },
+  {
+   "t": 3790,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "列出了"
+     }
+    }
+   }
+  },
+  {
+   "t": 3799,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "两个"
+     }
+    }
+   }
+  },
+  {
+   "t": 3799,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "简单"
+     }
+    }
+   }
+  },
+  {
+   "t": 3799,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "事实"
+     }
+    }
+   }
+  },
+  {
+   "t": 3812,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "："
+     }
+    }
+   }
+  },
+  {
+   "t": 3812,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "项目"
+     }
+    }
+   }
+  },
+  {
+   "t": 3828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "包含"
+     }
+    }
+   }
+  },
+  {
+   "t": 3828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 3828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " READ"
+     }
+    }
+   }
+  },
+  {
+   "t": 3828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "ME"
+     }
+    }
+   }
+  },
+  {
+   "t": 3828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3828,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "文件和"
+     }
+    }
+   }
+  },
+  {
+   "t": 3837,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 3837,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "src"
+     }
+    }
+   }
+  },
+  {
+   "t": 3837,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "/"
+     }
+    }
+   }
+  },
+  {
+   "t": 3837,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 3837,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3861,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "下的"
+     }
+    }
+   }
+  },
+  {
+   "t": 3861,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 3861,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "源"
+     }
+    }
+   }
+  },
+  {
+   "t": 3861,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "文件"
+     }
+    }
+   }
+  },
+  {
+   "t": 3861,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 3861,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3861,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "README.md 是一个名为 “Mori fixture project” 的示例项目说明，指出该文件夹用于对模型进行 Mori 检查。它列出了两个简单事实：项目包含一个 README 文件和 `src/` 下的一个源文件。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 166,
+       "output": 52,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1754,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792556457695,
+      "responseId": "ed62ecfd-e826-4e92-baab-8563bbf9deff",
+      "rawStopReason": "stop",
+      "durationMs": 1937,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 3862,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "ba71a7e5",
+     "time": 1792556457695,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3862,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "README.md 是一个名为 “Mori fixture project” 的示例项目说明，指出该文件夹用于对模型进行 Mori 检查。它列出了两个简单事实：项目包含一个 README 文件和 `src/` 下的一个源文件。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 166,
+       "output": 52,
+       "cacheRead": 1536,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1754,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792556457695,
+      "responseId": "ed62ecfd-e826-4e92-baab-8563bbf9deff",
+      "rawStopReason": "stop",
+      "durationMs": 1937,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 3862,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096"
+   }
+  },
+  {
+   "t": 3862,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m7-record-eD9uik/m7-review-reply\n</cwd>"
+       },
+       "timestamp": 1792556456626,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "请用 read 工具读取 README.md，然后用两句话概括它的内容。不要修改任何文件，不要运行命令。"
+        }
+       ],
+       "timestamp": 1792556456625
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+         "name": "read",
+         "arguments": {
+          "path": "README.md"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1106,
+        "output": 38,
+        "cacheRead": 512,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1656,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1792556456722,
+       "responseId": "9ebe62fb-b74e-40ab-8ec9-21aa548d7962",
+       "rawStopReason": "tool_calls",
+       "durationMs": 963,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+       "toolName": "read",
+       "content": [
+        {
+         "type": "text",
+         "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 5,
+       "timestamp": 1792556457693
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "README.md 是一个名为 “Mori fixture project” 的示例项目说明，指出该文件夹用于对模型进行 Mori 检查。它列出了两个简单事实：项目包含一个 README 文件和 `src/` 下的一个源文件。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 166,
+        "output": 52,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1754,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792556457695,
+       "responseId": "ed62ecfd-e826-4e92-baab-8563bbf9deff",
+       "rawStopReason": "stop",
+       "durationMs": 1937,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 3863,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 3863,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 3863,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1754,
+      "contextWindow": 1000000,
+      "percent": 0.1754
+     }
+    }
+   }
+  },
+  {
+   "t": 4427,
+   "feedback": {
+    "record": {
+     "expected": "希望概括里直接说出这个项目是做什么用的",
+     "quote": "README.md 是一个名为 “Mori fixture project” 的示例项目说明，指出该文件夹用于对模型进行 Mori 检查。它列出了两个简单事实：项目包含一个 README 文件和 `src/` 下的一个源文件。",
+     "source": {
+      "kind": "message",
+      "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+      "entryId": "ba71a7e5",
+      "time": 1792556457695,
+      "scope": "reply"
+     },
+     "session": {
+      "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+      "title": "请用 read 工具读取 README.…"
+     }
+    },
+    "result": {
+     "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\feedback\\2026-10-21-002100.json"
+    }
+   }
+  },
+  {
+   "t": 4429,
+   "feedback": {
+    "record": {
+     "expected": "希望这句话说得更具体一些",
+     "quote": "README.md 是一个名为 “Mori fixture project” 的示例项目说明，指出该文件夹用于对模型进行 Mori 检查。",
+     "source": {
+      "kind": "message",
+      "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+      "entryId": "ba71a7e5",
+      "time": 1792556457695,
+      "scope": "selection"
+     },
+     "session": {
+      "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+      "title": "请用 read 工具读取 README.…"
+     }
+    },
+    "result": {
+     "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\feedback\\2026-10-21-002100-2.json"
+    }
+   }
+  },
+  {
+   "t": 4431,
+   "file": {
+    "path": "README.md",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+    "result": {
+     "status": "ok",
+     "path": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply\\README.md",
+     "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n",
+     "sha256": "07e39f3c8f75c75e176519565f124d079fed3ea03782d9e510db54d37878d64f",
+     "size": 136
+    }
+   }
+  },
+  {
+   "t": 4435,
+   "feedback": {
+    "record": {
+     "expected": "希望 README 把这两行合成一句完整的话",
+     "quote": "- It has one README file.\n- It has one source file in src/.",
+     "source": {
+      "kind": "file",
+      "path": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply\\README.md",
+      "sha256": "07e39f3c8f75c75e176519565f124d079fed3ea03782d9e510db54d37878d64f",
+      "startLine": 5,
+      "endLine": 6
+     },
+     "session": {
+      "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+      "title": "请用 read 工具读取 README.…"
+     }
+    },
+    "result": {
+     "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\feedback\\2026-10-21-002100-3.json"
+    }
+   }
+  },
+  {
+   "t": 5081,
+   "issue": {
+    "what": "（m7-record 录制）侧栏里看不到录制器建的会话",
+    "expect": "（m7-record 录制）这份报告只用来测试工作回顾",
+    "capture": {
+     "error": null
+    },
+    "result": {
+     "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\ui-issues\\2026-10-21-002100.md"
+    }
+   }
+  },
+  {
+   "t": 5114,
+   "review": {
+    "result": {
+     "feedback": [
+      {
+       "status": "ok",
+       "name": "2026-10-21-002100-3.json",
+       "createdAt": "2026-10-21T04:21:00.203Z",
+       "time": "2026-10-21 00:21:00",
+       "feedback": {
+        "expected": "希望 README 把这两行合成一句完整的话",
+        "quote": "- It has one README file.\n- It has one source file in src/.",
+        "source": {
+         "kind": "file",
+         "path": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply\\README.md",
+         "sha256": "07e39f3c8f75c75e176519565f124d079fed3ea03782d9e510db54d37878d64f",
+         "startLine": 5,
+         "endLine": 6
+        },
+        "session": {
+         "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+         "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+         "title": "请用 read 工具读取 README.…"
+        }
+       }
+      },
+      {
+       "status": "ok",
+       "name": "2026-10-21-002100-2.json",
+       "createdAt": "2026-10-21T04:21:00.199Z",
+       "time": "2026-10-21 00:21:00",
+       "feedback": {
+        "expected": "希望这句话说得更具体一些",
+        "quote": "README.md 是一个名为 “Mori fixture project” 的示例项目说明，指出该文件夹用于对模型进行 Mori 检查。",
+        "source": {
+         "kind": "message",
+         "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+         "entryId": "ba71a7e5",
+         "time": 1792556457695,
+         "scope": "selection"
+        },
+        "session": {
+         "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+         "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+         "title": "请用 read 工具读取 README.…"
+        }
+       }
+      },
+      {
+       "status": "ok",
+       "name": "2026-10-21-002100.json",
+       "createdAt": "2026-10-21T04:21:00.197Z",
+       "time": "2026-10-21 00:21:00",
+       "feedback": {
+        "expected": "希望概括里直接说出这个项目是做什么用的",
+        "quote": "README.md 是一个名为 “Mori fixture project” 的示例项目说明，指出该文件夹用于对模型进行 Mori 检查。它列出了两个简单事实：项目包含一个 README 文件和 `src/` 下的一个源文件。",
+        "source": {
+         "kind": "message",
+         "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+         "entryId": "ba71a7e5",
+         "time": 1792556457695,
+         "scope": "reply"
+        },
+        "session": {
+         "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+         "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+         "title": "请用 read 工具读取 README.…"
+        }
+       }
+      }
+     ],
+     "issues": [
+      {
+       "status": "ok",
+       "name": "2026-10-21-002100.md",
+       "time": "2026-10-21 00:21:00",
+       "what": "（m7-record 录制）侧栏里看不到录制器建的会话",
+       "expect": "（m7-record 录制）这份报告只用来测试工作回顾",
+       "shot": "2026-10-21-002100.png",
+       "shotError": null,
+       "view": "- 页面：会话\n- 当前会话：没有\n- 右栏：关闭\n- 窗口大小：1184×735\n- 左栏宽度：260px\n- 右栏宽度：不显示（保存的宽度 450px）\n- 后台进程：正常",
+       "actions": "- 00:21:00 报告界面问题",
+       "versions": "- Mori：0.0.1\n- Electron：44.9.0\n- Chromium：152.0.7977.167\n- Node：24.22.0\n- Windows：10.0.28000"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 5114,
+   "restart": true
+  },
+  {
+   "t": 5114,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 5984,
+   "result": {
+    "type": "session.list",
+    "value": [
+     {
+      "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+      "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+      "name": null,
+      "firstMessage": "请用 read 工具读取 README.md，然后用两句话概括它的内容。不要修改任何文件，不要运行命令。",
+      "modified": 1792556457695,
+      "live": null
+     }
+    ]
+   }
+  },
+  {
+   "t": 6049,
+   "review": {
+    "result": {
+     "feedback": [
+      {
+       "status": "ok",
+       "name": "2026-10-21-002100-3.json",
+       "createdAt": "2026-10-21T04:21:00.203Z",
+       "time": "2026-10-21 00:21:00",
+       "feedback": {
+        "expected": "希望 README 把这两行合成一句完整的话",
+        "quote": "- It has one README file.\n- It has one source file in src/.",
+        "source": {
+         "kind": "file",
+         "path": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply\\README.md",
+         "sha256": "07e39f3c8f75c75e176519565f124d079fed3ea03782d9e510db54d37878d64f",
+         "startLine": 5,
+         "endLine": 6
+        },
+        "session": {
+         "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+         "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+         "title": "请用 read 工具读取 README.…"
+        }
+       }
+      },
+      {
+       "status": "ok",
+       "name": "2026-10-21-002100-2.json",
+       "createdAt": "2026-10-21T04:21:00.199Z",
+       "time": "2026-10-21 00:21:00",
+       "feedback": {
+        "expected": "希望这句话说得更具体一些",
+        "quote": "README.md 是一个名为 “Mori fixture project” 的示例项目说明，指出该文件夹用于对模型进行 Mori 检查。",
+        "source": {
+         "kind": "message",
+         "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+         "entryId": "ba71a7e5",
+         "time": 1792556457695,
+         "scope": "selection"
+        },
+        "session": {
+         "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+         "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+         "title": "请用 read 工具读取 README.…"
+        }
+       }
+      },
+      {
+       "status": "ok",
+       "name": "2026-10-21-002100.json",
+       "createdAt": "2026-10-21T04:21:00.197Z",
+       "time": "2026-10-21 00:21:00",
+       "feedback": {
+        "expected": "希望概括里直接说出这个项目是做什么用的",
+        "quote": "README.md 是一个名为 “Mori fixture project” 的示例项目说明，指出该文件夹用于对模型进行 Mori 检查。它列出了两个简单事实：项目包含一个 README 文件和 `src/` 下的一个源文件。",
+        "source": {
+         "kind": "message",
+         "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+         "entryId": "ba71a7e5",
+         "time": 1792556457695,
+         "scope": "reply"
+        },
+        "session": {
+         "file": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+         "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+         "title": "请用 read 工具读取 README.…"
+        }
+       }
+      }
+     ],
+     "issues": [
+      {
+       "status": "ok",
+       "name": "2026-10-21-002100.md",
+       "time": "2026-10-21 00:21:00",
+       "what": "（m7-record 录制）侧栏里看不到录制器建的会话",
+       "expect": "（m7-record 录制）这份报告只用来测试工作回顾",
+       "shot": "2026-10-21-002100.png",
+       "shotError": null,
+       "view": "- 页面：会话\n- 当前会话：没有\n- 右栏：关闭\n- 窗口大小：1184×735\n- 左栏宽度：260px\n- 右栏宽度：不显示（保存的宽度 450px）\n- 后台进程：正常",
+       "actions": "- 00:21:00 报告界面问题",
+       "versions": "- Mori：0.0.1\n- Electron：44.9.0\n- Chromium：152.0.7977.167\n- Node：24.22.0\n- Windows：10.0.28000"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 6051,
+   "shot": {
+    "name": "2026-10-21-002100.png",
+    "result": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABKAAAALfCAIAAADZny3FAAAQAElEQVR4nOzdC3hV5YHo/RXkJlqCoomiBrENF7koIyozRalKqUVKiyk6xqEjtlq59LG2+tlOHZph2rF+2lqP3FpbsVLxKI12LNKWgg6K56BiqSDlkiolKpogShCVAMJZa+e2ExIImGB48/s9eczea6+99s5unsKf913valu+Y2cERFH7dm0jAAA4nLWJAAAACILAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAaxql82+74dvfvnPR1ggAAOBj0jbio3t15hXj7loZ3/h1Wc4rv8g7KgIAADj0BF5T6JDZJQIAAPiYZZTv2Bl9NDt27Xl104c9stu2OcD5njt27nl6Vfk/9elwZIeM6DBX9tKD02cVD5j0zUt6dIg4PLVv5987AAA4vDVB4E15YOv/WV1+2glt//+vdjn6yMam2rYP9vx/v9zyypu7/un0DpPzO0dQn3VFf3tl/d937dpV76NHHHHEKaec3LdP74yMJvg3AoEHAMDhrgkWWXl984fxf+NUu/neLXG2NeYp736w56ZU3SVPf+vDCOrz81/O+sW9v3rvvffi2088ufi1116vs0P80OwHHrzjzv+1e/fuCAAAWr0mCLw9eyqj7uU3dn37nv03XrzDjfdsWf9m5ZjMnqhRTVjh6cln9ht4Zr/8WcVRVL5+0fRvXzZk4JmnnNSj38Ched+euXB9efWe5UWVj+ae1C134JkXjb3tgZcaXOKy7KUHbx07vF/VzkMu/fb0RUXldQaNXp2VPzB59YLFUbRr68oHb8v/XHy39w0L4seK781PvbHJSyKayIbiV/+8/MXvfefGvNFfHDni4k5HdRp45oD4RvrXly/90ndu+tbLr6wv+tvLEQAAtHpNPCdtQ2nSeD++psG5mnHdxTvEu0UHpfzt0tKNUdT51adv+8INP3mhenvpxqLSX095+tc/Pe/Hvyv85+yF3x+e/4vimqdtLF258a4bFtx159ceXvTDIZnpRyx74dYrvnDnC1H6zmUbHyx45sGCrBEz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rcep/3juoKjZJefgFVTd6Tl56ZKJVXd6XLdkcfVuORMWL671vPVFK/vn5kRFFfeKpw29NXfxjMW504dOyesfDcqeOKdk44wIAACgxWniwMuIon/+8hcL/3v+z3/567PPOnPgmf1OSWVe8auv/Xn5yheWr+jV85N5X7wkOhRyC5YunlDrcudxsz2an/1ow08ZnRe/1fkPRn1mJzsn0zinJGU4vHj60MEF/WeXTr1oxqiJWUnjHfiYIQAAQDNr4sCLHXVUp6/kf3nlqjVPP/Psn5ev6NSp0+7du7eXl2dnHZ9/+ejTex/AJMeFk7rlz627sbBOoY1JuitqrNENt9mi8dmPRBVn9E3NiRasXFe5c1J3cy5bWjoxNVVz+LTS2ROzJi06kBcFAAA4FDLKd+yMms3uPXtKS99q0ybjuOO6ttnrCgrQorRv1/T/3gEAAIdS8wYeHEYEHgAAh7smXkUTAACAj4vAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAAwAACITAA+BQ2VW+vTw6GO+VlZSWlmw+uCcDQCsi8ABaklemn3tsVpdjh0x9JXW3PBU29X6VJbWzfXNpgzvU/SrbHjWV0tlfjN9kVpfcguca+YzV04f3PqVL1imjflW67yPfM2BmV4sAABAASURBVDyr+0X5dywsS9+64d5LevXu12vULzdE+7FgfOqNjV8YAUCr1DYCoMV68ju98gvrf+jyOVtm9PzFqEG3rI4aJ+/ht2cMj5rAhhlXfOPp1K3N039w/4THvpK1/+f0Oe/8KKnB56b/cu213+3V0G4b581dFpVFC9fuyoyKpw8/d/r2C756y09v6BUBAI0i8AA4EEXTx35vZfW9p755xdR/XDQpt9YuJQvv/MG84jrP29Ax9a343m9cU9rrqFoPdR/53RuHJZVYMu83yZBgh6vHDou2//eS58pLoz+si46NGrDwmmPz59b7yEP5XR6qs6nJ+hYAWjKBB9AibLh7yBnfX1d1b90tg7JuiaJe/7Fsy9szqjZW9ky88dlv5FRsmvRM6aTke/HUTydDeekPVe8/Zk7pPRdHTaNo+vBPF6yIb3TIm/3MyMc+PW5u+cpbzr0oerZW421fXTj7/nUNHKLsucIH6kzs7PXJG24cFn8vfew3y+JvHa+85Py20XPPp0YJO6ybfeMN0fLU3MxXCm/5ZlGX1FPO+eqdY/tHAEAdAg+ARtm+evqooQXP7YpvZo6Z9aMvnJZ5/qy8BfmFZVHSeFsWPHLLoMyKPTv2yRv7lXgEb8uLDz2+ojyKsgaNvTh9lmXV9ijn/K+c1z0eweuTGt1b/cupSd9F3bvH21Yu+G1qSZXylb+7v2rAMO329ovjwBt2z9uldyy7dczkjnc/ekOvDlF16KbmrybJWPaHG75wb/97Zl+dehQAwifwAFqE7lc/vvby8qj4l6OG37k26nnjgkeuyYk6HtWI09sOiZLCcedf83hJ6vaA/3j8nouTlsu8eMaCH24493txlq28Y3juUzfNn3vToMy2UfawG+5O8ip6qu0po+4tj8oGjLnjR+dX/4HzXuFl9z+eDAOO/O7DP83rWLX5qV9Or1lDZfW8uclqLB0GfPHLZ2RGW5b/5ncry6MO/b9w+YDKEbyTUt/Kn/7Bv9z5XGl07ogOz/5xQq/af6bFdXdO/gPxex71/dwXf3RexwgAwifwAFqGozKzj4qibZWDYF2Ozcpujrh7r6zkvQO42EBcmJlti2dfN+Ib/125+uU5P1yyYHzHey7rd8dfo+j0by14eP6zR+UN/+bTZVH03O0juv9q2A/umzFpcOVPcf4Xr+x4773by++9Y863zq9ai2XDvXcuSL53GJM/sia6ygqn3lvzxtb+tjCJvawJU2d9d0Ayf/X5361cF52W94OfTuie/v46nHf7s3O2nJk/d3nBuSM6vrhgWPUj2//nOxV1lzlyxlM/UHcAtBYCD6AF2f5exeUBtiy484a1m1eUDJv18NU5De28YHzWZbWXEln7/UFdvl93t7n5WZUrkfQpmP/Pc0Z8v6Gz4+rR6z+WPdx2XFXdZY29/5m7R8bxVlz+emnJxjiekisv9PpK4YrTbx0z4s5k9mbp8y9uSXv+eRNu6XPvLaujp75/64K8O4cflYTcTRVvIGfCjRfXzJtcO/3WBTVPK92wOTNOsux/zRuw37eYOeyeBQVrz5932V1Xdo/Wbdmc2tg26jjkWz8YWXjjUT9dcfclmf6sA6DV8IceQEtQNvcrudfMq75b+tQDD8Tfev1j9LHrPv7Bu//Q7xuvXzn7sTu/0K3+fTIHfXdB0WenXnPV3dk/vfvizLRHcib9+OrbR9xbVvbANTdesuLunNmXjk+FXObYO76VflpeWVlJ2r3O53/3wRe/unZD2y4lpUlbllRE467kqoCVY3FHZG7/73HDf7Ki6h1Ed4856+6ovKQiRX/zzV5Pxvt36Nj25nPOvLlilzO+NX8ftQwAYRB4AC1BZmZmrfsd+w8bM2TI8Iuz9/Gc83/00tr/qLj59I29x/8uDsIb5j/29eqGqdz4hRkv3XFBasMRmdkdr0zO9Gu0ipMAxz786pgj4lja566ZgyY9/NKkvbcP/u49lxde9lBZ2UP55zyZWRFgmZfP+MGwWsuedD/9nOjiQZM23Dk1uaxf8S9GDann+n5Fdw7vfWfl7WQ0srhkYwOXTS9PDTDWtuG9CACCJ/AAWoQzrpxxz7CsASct+UpqkZVbZs2ZdNp+ntIxM6tyOKt0e8XMzu6n98/Oqg6nzI5Vu6Wdztch+6jogHXo8BHOYcscfvfjP1g35JblUUlp6m0OLFhw97DaPRtlnz3+4WE91425s/HHPaliWZoa2xd8c9A3/lB5p/v4wgXX17pAestZsQYAmo/AA2gRsgfnjYm/vbIyOnDbn378qeR71oDTWuDVAMo3PD5jdvqP9fqSPy27stfg2onXZ9jwqLjq7MCeVdf3q1R5kcA+BS8+U3uRlbRYLSkcd0uq7gYM6r9i2coNM2644+JFt5+XGQFAa9ImAuCwsKuBqZVlC79x48LkRoeR57esa3+Xlzx97zXnnnLGuAfW7krbXLrwlhG5Jwy9Yfby0u1RUygv/t03h/S65vFkfHBgwez5M34wML5VfM8XB426e1nZrggAWg+BB9AibC8rLSktXbtw0dpam1fO/uYN30h9XTPim3P3ftrmhTddlD83NfOx179NOL9lTMvYXrpy9q355594Sq8vfmduUcW2rOH/MX/DG0UPj+9Zuc/KB75xUb8TThw06pvTf7e6LDoo24sWTh1/UXyQsfenBv+yrnz4kQnd2/ac9MicMcnQXdlT3x/RvVu/5CWWF5c5Bw+AVsAUTYAWoey/x/f65tNV9zpU/d9zdrT+gdlPp+/Y4fyzK5dR2b6s4NzhVRcHH1hw//iWskRkx1ceuOX2hdXRlj2sYPaMCed0TW4P/+GSN7/6+E3jrpu9MjUgWV781P2FwydOiA7c9sJxJ1zzeFTzKj96bPbVvSrmqGYOu2fZnOwR+VPjvNxV+tT9BU/df+c184tuHxwBQNiM4AG0CNn9B1WsmJnZrecXfvjTr1XGWtY5n0kNebXNzO6Wld2t/5gfPXpLVaV0HHTDPTcNSp77xRlr/zihV8v5J7vBP/rdDfEP0GHA5QUPL3t17cOVdVeh42mX3L341TefnXPjyJyOUYcx9z8yKTc6CB3zfjo7L+m57PMmzH42fpWquqvQddgPnn31xYcLxvRPtmZe+6C6A6A1yCjfsTMCoqh9OwPaHJbKSssysw71UiLbN5eWfZi67kLXBpZ12VW+/cMOHfe75kt5+fa0JTorDtvxqKzMOkt9vldW8l55PS9XXla2KzNzv+uCxq+y38s8AEAQBB5UEngAABzuTNEEAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIhMADAAAIRNsIgJbgzSU/f6j4tMvzh52Quv3MMdfmHbdw1vNdx40cWGe3yod+u3xrnUOcNOz62js3zsYn5zywovO+nrti3u1Pvl5348lDbsrrW/9DiU8MrPhZaimJ3/bms75++YD6X+Xnm8++9oLsmhct6pG8RAPv+emu+XWP0+CbqZRzQeql67xQ8q4WRZ/f+93u83XfXPLQ6tzLaw5SfaiK/13q/fEBoNkJPICW4YQh116/6qG75iy8PL/rM6vKXotuvyu1/a6fLUy+1QmG7GHjvhSl518qhw6i7uJQmbei88ABWxcWrhqYVlPLC3+28LXK23EX3XR9lKqXvYIzqiq9WlLJVI/4bQ9JfsaseuJnedHW0z6dnXrpOZs/nT8sOnADRt40IKo5QuVLrHpo1jvnjRvSrWqvjZtrl/GK51859aJr095PqnjfrbrXQDafMKTnMz97aMXXL8+Ky3xVWdXm5LOqN18B4JAQeAAtR9/Lr0+NiUVDbopv7BVU1dF1+11LksGocT3iWNoch1/pvNtf6HLluL4H/IJpw4ZdC3/28yePqx7XGpj39YHxo7+PRsZpFN+4q6phKoOzkaOFJfWNNEbFD/1sefWdzn2vTL3E81tzRiaVtWrd1pzz4hultZ9Tz+jcz25/suZO5ehc42R2rR55W/XQC11GjstOH8frdkH+TRdUPTrrnejJObfX9F7qdV9I3vPAvC9tLlyycUBc5kOqftjnu6o7AD5WAg+gJagMocwBX7r2gpENDQFVRlcyRbOi5fqeN+DFB5JYinOrZoSqsZK6W5V5wdcrRrqSXJn1258/+aVr6047TKnIsJp3+3zNQ68tiYNzryd8IpV/8ZDd14fVO6Oy9jzJjauLyzqfkRx/xfrira8/cNeq1ObXK45c+bFklWw8IbviPdQ64Js12/cnHiNdUpzcSOIwPuzZb7/Y9fP53Sre6udzfv77JRvjH7P6vb35TlnnYwZeMGRgZe/V+UGyh+VFC2f97IH0gq0M4DqfGAAcIgIPoCVIhVDSFbXmRiaqg6HWTMiaILzp+uxUt6R2q2e2ZP2qzrv7+sDU7XnRRXHPxO8hfvXbZzVYJvWf+daIKZrd+uSUPbMqGpA2BbRqQmbKqqfjIbKTU098YevAy1PNWc85eEXz7vptWSqcqp+YBFvnk4Z9fmS3E2qPFqYPEkZRZTHGz73+S39NjYtmxz/13xct3PpunT2fXjHk8gEjzy6cs/DNeGh0S3RsblQ9klnrB6wK8lTBVm2sbworABxCAg+gZUmG6WpSqu75Y4lkxCwesvv6Tal7lXteXxFCcWP8bO8pkbV07nt251XPV84Cre/V47K6a97BrdfSoBNyT9u6aOGbfSvPi6uZkFnxI7xYdvJJmcn2olc6n3FtQ2uTnFA9GTLaWLmp7+U1P0XlaGG073Pw3lwyr3OPeLflb0en7b2wSvyzv5DMuhyYd8ZDd8176OTXM3NHRidkjzx1zrwnS9LGNmuCHABaFIEH0BKVvP1u1DXtfjKcddzArS8m8ZYaMdtY68SwyrPRUifmfb0Ry5MM+cw+Hhww8sCWCdnXFM1qaRMg4+JKnfhXXa0lUc7IT0fznkklXF79L1J3YDNR6xy8tCmRJZv3kbilWzJzh6T26dz1hL1PEaye7Nr38gvW3/7kScNS76fbBRedNisO1PzT6ztkrUVZKoZSzc8E4GMi8ABanhXzFm7te2Xtyso8tsewvMHDknPwkrvVC4HUP22yqWxd9cBdqzJPPimKukRJdkZd++y1TyNX0Yzj7ax4bPBne19CYOAFQ+KBteRW3ZVUKs/BS/VS5YhlSjwotz46tcflF9Q7H/WtON56NjQMOKBH3GBJGcZvO4oW1noztc4tTC22+e66FdHA5LONh+zyk42r6z9q6izBqvG91JROAPhYCDyAlqJi+f5kOOjvOVXjP8d1jZakzh+LOyRt7ZO6IVQ1ltV0A0cVI2bxkOC1A2pe9IHX3o0emhPFRTRuZHTw3t1cGvdefY+kDx42eB28VQ/d9WLXirVDC6O9d9j45IvFJ59xedSQvpdfHyVn7m19Z2OnI6m3AAAQAElEQVR0XIN7pa4eMez6M9bdNW/5gH3MVn0rTtnNnaPo2HofrRwhPKAVPgHgoxB4AC1DnE8roszOv336rK9XrdEfpZ9XVktaCDXTCF7FqYDVUr13UmpRlmRBl9vTR+0aMUWzcoJl/KzrR1bcrVjEsv4VOxtW9Tbyk4OfMPKmaF7lFSPSPo1UHu9jpZlkXZbogq9fuXnOA4XRwOjd5bUWWTlpWMU+qUmkA5PRxfU/f7JkYAPvs2zFklcGfGlktOiBFb+9fUXaA51Tb2DF88s7D7np8+/8vPYCMwDQfAQeQIuwvGhraq5gskpKrVPLqp08ZFi0JM6kuIuiQyl1NYVowJduyquInGRdk+QMwOrRs31N0awZwrop7eS66oVkbr/r3UaOOlaPKKYfpyJ0K3IxfhtXHvti2uBnveL3E4/+VVwZIv+m5G7x3lM0lxcmBVi5ccDIa6s+hNSVAOO8rDxWPOJa0ZYbn2xgiuaAswe+8NvbH0redgQAh0RG+Y6dERBF7dv59w4AAA5vbSIAAACCIPAAAAACIfAAAAACIfAAAAACIfAAAAACIfAAAAACIfAAAAACIfAAAAACIfAAAAACIfAAAAACIfAAAAAC0TYCoIX564Ydjy19f1lR+ZZtu3fviWgSbTKiLke3GZTbYdTgTqd3bx8BQIgyynfsjIAoat/Ov3fQIvzooS1Pv7T9gx3Crrkc2T7jvH4dv3N5lwgAgiPwoJLAoyWYOO2t9W/u2q7umlnH9hk9Tmg7beJxEQCExTl4AC1FPHan7g6N+EOOP+r4A48AICwCD6BF+OuGHU+/tF3dHTLxRx1/4PHHHgFAQAQeQIvw2NL3nXd3iMUfePyxRwAQECcdAbQIy4rKIw45HzsAgRF4AC3Clm27Iw45HzsAgRF4AC2C6919LHzsAATGOXgAAACBEHgAAACBMEUT4LCUkRH9w6c69Du1fcXdNa/ueHbNga0Xctm12Z9/p2Tc3Ib3GHP8E4P2/cfE7uXzSr799N7PiubfvOmOep9xXtfHLop+XbD54aoNN954Yt8NbzT8NjJn3dZ+VUNHAwBqE3gAh6ULBhx505jMNa/urLh76ac73b9w28sbd1bvsO71ne+XN+oMs7j0rvvkXhM6Nr1/4R2bLpxbucO/RNtG/fy96v3T79Y1d9PMY7KvuzHzjjvK6nmtPm2jjduSuos7sPuOC+vbBwA4aAIP4LA08FPt7/n9u488U1lZnzyx3R3XHJt5VE2nle/cc+M9b6+q70Le8aDZiOMrbp4Yj7ZtWPbGhTdXPrSfeKvHUT8u6DzwyL23d3ritk419z7YMTMZtTvq3G5R0aLk4Dd2b7thw6Z6jhcP8Y1sf3Ttbd1vO3FEzb36hg0BgBSBB3BY6tAuI0646rsvv7Fz9JSS9B0mjOx8fv+O9QbeHXe8cUdjpmg2ynvfLkjVYH0jcnVfYkyngUfunp+0WWbf46Puxyd5mai6se3lraN+vnlUrXgzRRMADoBFVgDCtKF01zFHH8L/k5+7Y8PRbS+rtSker9u9qiYgj/px38p/Vbzs2o7dN71/4c3xyOEb8zdVDCEmX5Ujh/Eg3m3H37j3SzS0HQCoYgQPoDVLJljmbtxa35zMOnMvOz9xW+e0R6vuVs69jJWt2nbi58dED6eP123b8e2qe5dde/TAbbs2JAdMwm9+QcNn3z0dD+LFA3cnzlpWs/hKalrprvmG8gBgnwQeQKs05vjUwipHvz3vjVH1n89WNfey0Yus3PHsjsdGHn/j3IoGy5w1qM3yeTUVl9N59/w7dvS9rX36kRtWNu7mWgVYMa0UANg3gQfQ6iSjYdH7M19u8/l3GrtayeZ3GrHsytObf92nYv3MXT8u6BQteyP94HfcsSmpvuRmPDrXqXv6E6tPxvtgx5pt7XsfX/fAtRdZqVjh0/KbAFAPgQfQ6lQtstKxcbsnS1++vbpRuz7885Lo2uwnbmuTLJfS4PIttUbn9n0dvGSZls67ow2bPvJiMADQKgg8gMPV5UOPGlbfBQoqdO3cpvoqeR/JmE4Do10zG3lZgtTMzw2bdnX/ZOfHro0O5HIL9agYaYwH6+Ibs8bUicB4GLDj28n1EpJzBY9dlTwa73b+1q0f8UUB4LAm8AAOS4v+8sHrmz/c9z6ri3dEH9GY459ITqXb9PD+dqy8tl6yNuam6i3JQiwHNZ2y4trryeqaqaiLhxxTR7PICgDsh8ADOCw9u6Y8/ooOTpJtbVNXDK+zJUptrFlM5bpuu2bevO+6q1xsM4mx2u1VuSxKfOTbTkxbbHM/KkJx28tbL7z5vb2Oliyt+URUeQ5e1TzPmiVbLMQCABnlO5piAg8c/tq38+8dfJwuvPmNiI9D0p8AEAoXOgcAAAiEwANoEdpkRBx6PnYAAiPwAFqELkf7P+SPgY8dgMD4gw2gRRiU2yHikPOxAxAYgQfQIowa3OnI9uYLHlLxBx5/7BEABETgAbQIp3dvf16/jh013qESf9TxBx5/7BEABETgAbQU37m8S48T2mq8QyD+kOOPOv7AIwAIi8ADaEGmTTzu/H4dzdVsVvHHG3/I8UcdAUBwXOgcKrnQOS3HXzfseGzp+8uKyrds2717T0STaJORrJk5KLfDqMGdzMwEIFQCDyoJPAAADnemaAIAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAARC4AEAAASibdTU/rp63ZslpfU+1KZNm3MGDezU6cgIAACAptb0I3h/+NOTb9QXePHGRf/z9PsffBABAADQDJp+BG/Pnj2n9+458Ix+dbZP+9msgWf0P67rsdGBWTQ++5G8kmnDkhtjC+s+OnpO8lDKgolZj11aOvWi+ObCSd0KR22cMbzu3sXThg6aUtTQK/WcvHTJxJz4uflzo32r2DN5xR/2X7b4upz1M4cMnrKu/vdW+233nlzQf0pBneOPmV3xtgEAAD6KQ3QO3p//srK09K1hF54XfSRxMm0srfmanVfzUPH0Hz6aN2r/mRS3WdrTaw64bHJuxQ7Dpqa/RLI97SmVX0ndxYZPK/3eykFDZxb3uG5J7R1KS5YW9N7rbS+d3DOKRlYcf/bopOsqtu+37uKAzB46fX10AOL4zJ64MAIAAFqRph/By0ips3HN2r91735K5098IjoQ1YNphdmP9pw8uX+dh9cXrezd/7upm8XTxhasiaKx3WrGyuZ2Sx83S8bZUjfXTRmcNaXmGPGRq2/3nLz3W1h065R+BSU5ez+QRNdV0ZzF00qHR/vzaH71q/SenKTX2Iq7j2alfrq82fUMNqa/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"
+   }
+  },
+  {
+   "t": 6051,
+   "command": {
+    "type": "session.read",
+    "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl"
+   }
+  },
+  {
+   "t": 6054,
+   "result": {
+    "type": "session.read",
+    "value": {
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+     "name": null,
+     "entries": [
+      {
+       "type": "message",
+       "id": "c82e7ff7",
+       "parentId": "004956e7",
+       "timestamp": "2026-10-21T04:20:56.628Z",
+       "message": {
+        "role": "user",
+        "content": [
+         {
+          "type": "text",
+          "text": "请用 read 工具读取 README.md，然后用两句话概括它的内容。不要修改任何文件，不要运行命令。"
+         }
+        ],
+        "timestamp": 1792556456625
+       }
+      },
+      {
+       "type": "message",
+       "id": "b83e1557",
+       "parentId": "c82e7ff7",
+       "timestamp": "2026-10-21T04:20:57.685Z",
+       "message": {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "toolCall",
+          "id": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+          "name": "read",
+          "arguments": {
+           "path": "README.md"
+          }
+         }
+        ],
+        "api": "openai-completions",
+        "provider": "mori-endpoint",
+        "model": "deepseek-flash",
+        "usage": {
+         "input": 1106,
+         "output": 38,
+         "cacheRead": 512,
+         "cacheWrite": 0,
+         "reasoning": 0,
+         "totalTokens": 1656,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1792556456722,
+        "responseId": "9ebe62fb-b74e-40ab-8ec9-21aa548d7962",
+        "rawStopReason": "tool_calls",
+        "durationMs": 963,
+        "thinkingLevel": "off"
+       }
+      },
+      {
+       "type": "message",
+       "id": "ba71a7e5",
+       "parentId": "1fbae27d",
+       "timestamp": "2026-10-21T04:20:59.633Z",
+       "message": {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "text",
+          "text": "README.md 是一个名为 “Mori fixture project” 的示例项目说明，指出该文件夹用于对模型进行 Mori 检查。它列出了两个简单事实：项目包含一个 README 文件和 `src/` 下的一个源文件。"
+         }
+        ],
+        "api": "openai-completions",
+        "provider": "mori-endpoint",
+        "model": "deepseek-flash",
+        "usage": {
+         "input": 166,
+         "output": 52,
+         "cacheRead": 1536,
+         "cacheWrite": 0,
+         "reasoning": 0,
+         "totalTokens": 1754,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "stop",
+        "timestamp": 1792556457695,
+        "responseId": "ed62ecfd-e826-4e92-baab-8563bbf9deff",
+        "rawStopReason": "stop",
+        "durationMs": 1937,
+        "thinkingLevel": "off"
+       }
+      }
+     ],
+     "unfinished": false
+    }
+   }
+  },
+  {
+   "t": 6054,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply"
+   }
+  },
+  {
+   "t": 6056,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 6056,
+   "command": {
+    "type": "session.open",
+    "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl"
+   }
+  },
+  {
+   "t": 6072,
+   "result": {
+    "type": "session.open",
+    "value": {
+     "sessionId": "01a15cb0-da91-7549-9fe7-65af520c6096",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-uvXzY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m7-record-eD9uik-m7-review-reply--\\2026-10-21T04-20-56-594Z_01a15cb0-da91-7549-9fe7-65af520c6096.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "model": "mori-endpoint/deepseek-flash",
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "modelNotice": null,
+     "contextUsage": {
+      "tokens": 1754,
+      "contextWindow": 1000000,
+      "percent": 0.1754
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     },
+     "entries": [
+      {
+       "type": "model_change",
+       "id": "d2a1ad65",
+       "parentId": null,
+       "timestamp": "2026-10-21T04:20:56.619Z",
+       "provider": "mori-endpoint",
+       "modelId": "deepseek-flash"
+      },
+      {
+       "type": "thinking_level_change",
+       "id": "66ee7ee2",
+       "parentId": "d2a1ad65",
+       "timestamp": "2026-10-21T04:20:56.619Z",
+       "thinkingLevel": "off"
+      },
+      {
+       "type": "message",
+       "id": "004956e7",
+       "parentId": "66ee7ee2",
+       "timestamp": "2026-10-21T04:20:56.627Z",
+       "message": {
+        "role": "system",
+        "content": "",
+        "sections": {
+         "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+         "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+         "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+         "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+         "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m7-record-eD9uik/m7-review-reply\n</cwd>"
+        },
+        "timestamp": 1792556456626,
+        "toolsAdded": [
+         {
+          "name": "read",
+          "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to read (relative or absolute)"
+            },
+            "offset": {
+             "type": "number",
+             "description": "Line number to start reading from (1-indexed)"
+            },
+            "limit": {
+             "type": "number",
+             "description": "Maximum number of lines to read"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "bash",
+          "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "command"
+           ],
+           "properties": {
+            "command": {
+             "type": "string",
+             "description": "Shell command to execute"
+            },
+            "timeout": {
+             "type": "number",
+             "description": "Timeout in seconds (optional, no default timeout)"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "edit",
+          "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path",
+            "edits"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to edit (relative or absolute)"
+            },
+            "edits": {
+             "type": "array",
+             "items": {
+              "type": "object",
+              "required": [
+               "oldText",
+               "newText"
+              ],
+              "properties": {
+               "oldText": {
+                "type": "string",
+                "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+               },
+               "newText": {
+                "type": "string",
+                "description": "Replacement text for this targeted edit."
+               }
+              }
+             },
+             "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         },
+         {
+          "name": "write",
+          "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+          "parameters": {
+           "type": "object",
+           "required": [
+            "path",
+            "content"
+           ],
+           "properties": {
+            "path": {
+             "type": "string",
+             "description": "Path to the file to write (relative or absolute)"
+            },
+            "content": {
+             "type": "string",
+             "description": "Content to write to the file"
+            }
+           }
+          },
+          "constrainedSampling": {
+           "type": "json_schema",
+           "strict": "prefer"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "type": "message",
+       "id": "c82e7ff7",
+       "parentId": "004956e7",
+       "timestamp": "2026-10-21T04:20:56.628Z",
+       "message": {
+        "role": "user",
+        "content": [
+         {
+          "type": "text",
+          "text": "请用 read 工具读取 README.md，然后用两句话概括它的内容。不要修改任何文件，不要运行命令。"
+         }
+        ],
+        "timestamp": 1792556456625
+       }
+      },
+      {
+       "type": "message",
+       "id": "b83e1557",
+       "parentId": "c82e7ff7",
+       "timestamp": "2026-10-21T04:20:57.685Z",
+       "message": {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "toolCall",
+          "id": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+          "name": "read",
+          "arguments": {
+           "path": "README.md"
+          }
+         }
+        ],
+        "api": "openai-completions",
+        "provider": "mori-endpoint",
+        "model": "deepseek-flash",
+        "usage": {
+         "input": 1106,
+         "output": 38,
+         "cacheRead": 512,
+         "cacheWrite": 0,
+         "reasoning": 0,
+         "totalTokens": 1656,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1792556456722,
+        "responseId": "9ebe62fb-b74e-40ab-8ec9-21aa548d7962",
+        "rawStopReason": "tool_calls",
+        "durationMs": 963,
+        "thinkingLevel": "off"
+       }
+      },
+      {
+       "type": "message",
+       "id": "1fbae27d",
+       "parentId": "b83e1557",
+       "timestamp": "2026-10-21T04:20:57.693Z",
+       "message": {
+        "role": "toolResult",
+        "toolCallId": "call_00_ET_HneujJw8Gx04stm7uy0D2252",
+        "toolName": "read",
+        "content": [
+         {
+          "type": "text",
+          "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n"
+         }
+        ],
+        "isError": false,
+        "durationMs": 5,
+        "timestamp": 1792556457693
+       }
+      },
+      {
+       "type": "message",
+       "id": "ba71a7e5",
+       "parentId": "1fbae27d",
+       "timestamp": "2026-10-21T04:20:59.633Z",
+       "message": {
+        "role": "assistant",
+        "content": [
+         {
+          "type": "text",
+          "text": "README.md 是一个名为 “Mori fixture project” 的示例项目说明，指出该文件夹用于对模型进行 Mori 检查。它列出了两个简单事实：项目包含一个 README 文件和 `src/` 下的一个源文件。"
+         }
+        ],
+        "api": "openai-completions",
+        "provider": "mori-endpoint",
+        "model": "deepseek-flash",
+        "usage": {
+         "input": 166,
+         "output": 52,
+         "cacheRead": 1536,
+         "cacheWrite": 0,
+         "reasoning": 0,
+         "totalTokens": 1754,
+         "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+         }
+        },
+        "stopReason": "stop",
+        "timestamp": 1792556457695,
+        "responseId": "ed62ecfd-e826-4e92-baab-8563bbf9deff",
+        "rawStopReason": "stop",
+        "durationMs": 1937,
+        "thinkingLevel": "off"
+       }
+      }
+     ],
+     "live": null
+    }
+   }
+  },
+  {
+   "t": 6074,
+   "file": {
+    "path": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply\\README.md",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply",
+    "result": {
+     "status": "ok",
+     "path": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m7-record-eD9uik\\m7-review-reply\\README.md",
+     "text": "# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n- It has one README file.\n- It has one source file in src/.\n",
+     "sha256": "07e39f3c8f75c75e176519565f124d079fed3ea03782d9e510db54d37878d64f",
+     "size": 136
+    }
+   }
+  }
+ ]
+}
