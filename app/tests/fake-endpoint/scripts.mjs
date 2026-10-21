@@ -48,9 +48,16 @@
 // 日志：server.mjs 给每个对话请求的 JSON 日志行另加 logFields 的字段：agent（角色）、kind、task、scenario（不是脚本模式时
 //   为 null）、k、j、tools（请求里的工具名）、toolChoice（指定的函数名或 tool_choice 字符串，没有时为 null）、
 //   format（response_format.type，没有时为 null）、calls（回复里调用的工具名）。
-// App 测试要用的场景加在 SCENARIOS 里；下面 tb-selfcheck-* 三个由 selfcheck.mjs 使用。
+// App 测试要用的场景写在 scenarios/<套件>.mjs（导出 SCENARIOS，步骤用 steps.mjs 的构造函数），这里并入；
+// 下面 tb-selfcheck-* 三个由 selfcheck.mjs 使用。
 
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { contentText } from './replies.mjs';
+import { END_TEXT, call, end, fail, handoff, say, together, wait } from './steps.mjs';
+
+export { END_TEXT, call, end, fail, handoff, say, together, wait };
 
 /** 工作卡的第一行与最后一行（§8.3） */
 export const WORK_CARD_OPEN = '<mori-work-card>';
@@ -80,8 +87,6 @@ export const DEFAULT_KIND = 'dialog';
 export const BASE_ROLE = 'mori';
 /** 强制关闭的 C 级标签格式里固定的一段（§7.5）；最后一次投递里有它时 handoff 按强制关闭输出 */
 export const CLOSE_REQUEST_TAGS = '<outcome>done|failed</outcome>';
-/** end() 的回复 */
-export const END_TEXT = 'Stopping here without a handoff.';
 /** 找不到步骤时的回复 */
 export const NO_STEP_TEXT = 'The synthetic script has no step for this request.';
 
@@ -108,39 +113,6 @@ function sentencePattern(sentence) {
 
 const KIND_PATTERNS = KIND_ORDER.map((kind) => [kind, sentencePattern(SEGMENT_SENTENCES[kind])]);
 const textOf = (message) => contentText(message?.content);
-
-// ---------- 步骤的构造函数 ----------
-
-/** @brief 一个回复步骤：items 为 { say } | { call } | { handoff } 的有序列表；waitMs、fails 是修饰。 */
-const response = (items) => ({ items, waitMs: 0, fails: [] });
-/** @brief 只回文字。 */
-export const say = (text) => response([{ say: text }]);
-/** @brief 调用一个工具；args 里的字符串可以用模板。 */
-export const call = (name, args = {}) => response([{ call: { name, args } }]);
-/** @brief 回 END_TEXT 就结束，不交接。 */
-export const end = () => say(END_TEXT);
-/**
- * @brief 交接单，按请求的形状（A/B/C）输出。
- * @param fields 交接单字段（task_handoff 或 request_close 的参数名），字符串可以用模板
- * @param opts { malformed：输出程序用不了的截断 JSON 或标签 }
- */
-export const handoff = (fields, { malformed = false } = {}) => response([{ handoff: { fields, malformed } }]);
-/** @brief 修饰：第一个分块前多等 ms 毫秒。 */
-export const wait = (ms) => ({ items: [], waitMs: ms, fails: [] });
-/**
- * @brief 修饰：以 status 返回错误。
- * @param opts { model：只在请求的模型 id 等于它时失败；不写时总是失败 }
- */
-export const fail = (status, { model = null } = {}) => ({ items: [], waitMs: 0, fails: [{ status, model }] });
-
-/** @brief 几个步骤合成一个回复：文字与调用按顺序，等待相加，失败条件都保留。 */
-export function together(...steps) {
-  return {
-    items: steps.flatMap((s) => s.items),
-    waitMs: steps.reduce((sum, s) => sum + s.waitMs, 0),
-    fails: steps.flatMap((s) => s.fails),
-  };
-}
 
 // ---------- 场景 ----------
 
@@ -186,6 +158,18 @@ export const SCENARIOS = {
     },
   }],
 };
+
+/** 各套件的场景文件所在的目录：每个文件导出 SCENARIOS（名字以 "tb-<套件>-" 开头），在这里并入上面的场景表 */
+const SCENARIO_DIR = join(import.meta.dirname, 'scenarios');
+const scenarioFiles = existsSync(SCENARIO_DIR)
+  ? readdirSync(SCENARIO_DIR).filter((f) => f.endsWith('.mjs')).sort() : [];
+for (const file of scenarioFiles) {
+  const module = await import(pathToFileURL(join(SCENARIO_DIR, file)).href);
+  for (const [name, entries] of Object.entries(module.SCENARIOS ?? {})) {
+    if (SCENARIOS[name]) throw new Error(`Scenario ${name} in ${file} is already defined`);
+    SCENARIOS[name] = entries;
+  }
+}
 
 // ---------- 认会话与位置 ----------
 
