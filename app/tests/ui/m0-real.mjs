@@ -11,6 +11,7 @@ import { join, resolve } from 'node:path';
 import { lookup } from 'node:dns/promises';
 import { _electron as electron } from 'playwright-core';
 import { startNetWatch } from './net-watch.mjs';
+import { pageHelpers } from './page.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
 const arg = (name) => {
@@ -38,7 +39,8 @@ async function setup() {
 function savedConnection() {
   const provider = JSON.parse(readFileSync(join(userData, 'pi', 'models.json'), 'utf8')).providers?.['mori-endpoint'];
   if (!provider) throw new Error('No saved connection: run with --setup first');
-  return { baseUrl: provider.baseUrl, model: provider.models?.[0]?.id, contextWindow: provider.models?.[0]?.contextWindow,
+  const model = provider.models?.[0];
+  return { baseUrl: provider.baseUrl, model: model?.id, contextWindow: model?.contextWindow,
     keyInModelsJson: 'apiKey' in provider };
 }
 
@@ -50,64 +52,83 @@ function record(name, ok, detail = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-/** @brief 发一条消息并等本轮结束；期间每 100 毫秒采样阶段文字（变化才记录）和最后一条回复的长度。 */
+/** @brief 当前会话最后一条回复的正文（不含思考和工具卡）。 */
+const lastReply = (page) => page.evaluate(() => {
+  const replies = document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="assistant"]');
+  return [...(replies[replies.length - 1]?.querySelectorAll('.prose') ?? [])].map((el) => el.textContent).join('\n');
+});
+
+/**
+ * @brief 发一条消息并等本轮结束；期间每 100 毫秒采样阶段行文字（去掉秒数，变化才记录）和最后一条回复正文的长度。
+ *        M1 起阶段行是 [data-testid="stage"]，回复是 [data-testid="assistant"] 里的 .prose。
+ */
 async function sendAndWatch(page, text) {
+  const h = pageHelpers(page);
   const started = Date.now();
-  const statuses = [];
-  const lengths = new Set();
-  const timer = setInterval(() => {
-    void page.getByTestId('status').innerText().then((s) => {
-      if (s && statuses[statuses.length - 1] !== s) statuses.push(s);
-    }, () => {});
-    void page.locator('.assistant').last().innerText().then((t) => t && lengths.add(t.length), () => {});
-  }, 100);
-  await page.locator('.composer textarea').fill(text);
-  await page.locator('.composer textarea').press('Enter');
-  await page.getByRole('button', { name: 'Stop' }).waitFor({ timeout: 15000 }).catch(() => {});
-  await page.getByRole('button', { name: 'Send' }).waitFor({ timeout: 180000 });
-  clearInterval(timer);
-  return { ms: Date.now() - started, statuses, lengths: lengths.size };
+  await page.evaluate(() => {
+    window.__m0 = { statuses: [], lengths: new Set() };
+    clearInterval(window.__m0Timer);
+    window.__m0Timer = setInterval(() => {
+      const stage = document.querySelector('[data-testid="stage"]')?.textContent?.replace(/\s\d+(\.\d+)?s$/, '');
+      if (stage && window.__m0.statuses.at(-1) !== stage) window.__m0.statuses.push(stage);
+      const replies = document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="assistant"]');
+      const prose = [...(replies[replies.length - 1]?.querySelectorAll('.prose') ?? [])];
+      const length = prose.map((el) => el.textContent).join('\n').length;
+      if (length) window.__m0.lengths.add(length);
+    }, 100);
+  });
+  await h.send(text);
+  await h.idle(180000);
+  const watched = await page.evaluate(() => {
+    clearInterval(window.__m0Timer);
+    return { statuses: window.__m0.statuses, lengths: window.__m0.lengths.size };
+  });
+  return { ms: Date.now() - started, ...watched };
 }
 
-/** @brief 当前所有工具卡：名称、状态和参数。 */
+/** @brief 当前会话的所有工具卡：动词（read 是"Read"）、状态（data-status）和标题。 */
 function toolCards(page) {
-  return page.getByTestId('tool-card').evaluateAll((cards) => cards.map((card) => ({
-    name: card.querySelector('.tool-name')?.textContent ?? '',
-    status: card.querySelector('.tool-status')?.textContent ?? '',
-    args: (card.querySelector('pre')?.textContent ?? '').replace(/\s+/g, ' ').slice(0, 120),
+  const cards = page.locator('.pane-slot:not([hidden]) [data-testid="tool-card"]');
+  return cards.evaluateAll((items) => items.map((card) => ({
+    verb: card.querySelector('.tool-verb')?.textContent ?? '',
+    status: card.dataset.status ?? '',
+    title: (card.querySelector('.tool-title')?.textContent ?? '').replace(/\s+/g, ' ').slice(0, 120),
   })));
 }
 
-/** @brief 走查 2：不重填 key，直接测试连接。 */
+/** @brief 走查 2：不重填 key，直接测试连接。M6 起"Test connection"在设置页连接卡的"Edit connection"表单里。 */
 async function connectionCheck(page) {
-  await page.getByRole('button', { name: 'Test connection' }).click();
-  const result = page.locator('.panel .ok, .panel .error').first();
-  await result.waitFor({ timeout: 60000 });
-  record('走查 2：测试连接成功（用加密保存的 key）', (await result.getAttribute('class')) === 'ok', oneLine(await result.innerText()));
+  const h = pageHelpers(page);
+  await h.editConnection();
+  await page.getByTestId('connection-form').getByRole('button', { name: 'Test connection' }).click();
+  const result = await h.formMessage(null, { test: true, timeout: 60000 });
+  record('走查 2：测试连接成功（用加密保存的 key）', /^Connected · First token \d+ms/.test(result), oneLine(result));
+  await page.getByRole('button', { name: 'Back to app' }).click();
 }
 
-/** @brief 走查 3：总结 README，确认流式文字和一次读取（原生工具调用）；再追问一轮确认多轮可用。 */
+/**
+ * @brief 走查 3：总结 README，确认流式文字和一次读取（原生工具调用）；再追问一轮确认多轮可用。
+ *        M2 起命令先要批准，这里走查的是 M0 的行为，打开会话后先切到"Allow all"（同 m1-real）。
+ */
 async function readmeCheck(app, page, project) {
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] });
-  }, project);
-  await page.getByRole('button', { name: 'Open folder…' }).click();
-  await page.locator('.chat-head').waitFor({ timeout: 30000 });
+  const h = pageHelpers(page);
+  await h.openFolder(app, project);
+  await h.allowAll();
   const first = await sendAndWatch(page, '总结 README');
   const tools = await toolCards(page);
-  const answer = await page.locator('.assistant').last().innerText();
-  const thinking = await page.locator('.thinking').count();
-  const errors = await page.locator('.chat .error').allInnerTexts();
-  const readOk = tools.some((tool) => tool.name === 'read' && tool.status === 'Done');
+  const answer = await lastReply(page);
+  const thinking = await page.locator('.pane-slot:not([hidden]) details.thinking').count();
+  const errors = await page.getByTestId('error-card').allInnerTexts();
+  const readOk = tools.some((tool) => tool.verb === 'Read' && tool.status === 'done');
   record('走查 3：一次读取（原生工具调用）', readOk && answer.trim().length > 0 && errors.length === 0,
-    `耗时 ${first.ms} ms；工具：${tools.map((t) => `${t.name}/${t.status} ${t.args}`).join('；') || '无'}；` +
+    `耗时 ${first.ms} ms；工具：${tools.map((t) => `${t.title}/${t.status}`).join('；') || '无'}；` +
     `思考段 ${thinking} 个；回复：${oneLine(answer, 160)}` + (errors.length ? `；错误：${oneLine(errors.join(' | '))}` : ''));
   record('走查 3：回复是流式出现的', first.lengths > 2, `本轮采样到 ${first.lengths} 种不同的回复长度`);
   record('阶段文字（每 100 毫秒采样，变化才记录）', first.statuses.length > 0, first.statuses.join(' → '));
   const second = await sendAndWatch(page, '用一句话再概括一次。');
-  const errorsAfter = await page.locator('.chat .error').allInnerTexts();
+  const errorsAfter = await page.getByTestId('error-card').allInnerTexts();
   record('第二轮对话无错误（请求里带上一轮的思考与工具结果）', errorsAfter.length === 0,
-    `耗时 ${second.ms} ms；回复：${oneLine(await page.locator('.assistant').last().innerText(), 160)}` +
+    `耗时 ${second.ms} ms；回复：${oneLine(await lastReply(page), 160)}` +
     (errorsAfter.length ? `；错误：${oneLine(errorsAfter.join(' | '))}` : ''));
 }
 

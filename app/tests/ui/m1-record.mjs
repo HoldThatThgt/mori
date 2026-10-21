@@ -269,10 +269,13 @@ async function recordWrongKey(ctx) {
     const page = await app.firstWindow();
     await page.waitForFunction(() => Boolean(window.mori));
     const saved = JSON.parse(readFileSync(join(dir, 'pi', 'models.json'), 'utf8')).providers['mori-endpoint'];
-    // 这是故意填错的 key，不是机密。
+    // 这是故意填错的 key，不是机密。M6 起 connection.save 要带 providerId（改已有的 mori-endpoint，默认模型不变）
+    // 和模型的思考字段（不支持思考）。
     const connection = { name: 'wrong key', baseUrl: saved.baseUrl, api: 'openai-completions',
-      apiKey: 'sk-mori-fixture-wrong-key', modelId: saved.models[0].id, contextWindow: 128000, compat: [] };
-    await page.evaluate((c) => window.mori.request({ type: 'connection.save', connection: c }), connection);
+      apiKey: 'sk-mori-fixture-wrong-key', modelId: saved.models[0].id, contextWindow: 128000, compat: [],
+      reasoning: false, thinkingLevel: 'off' };
+    await page.evaluate((c) => window.mori.request({ type: 'connection.save', providerId: 'mori-endpoint',
+      connection: c }), connection);
     await page.evaluate(installRecorder);
     await runScenario(page, { ...errorScenarios.wrongKey, body: wrap(errorScenarios.wrongKey.body) }, ctx);
   } finally {
