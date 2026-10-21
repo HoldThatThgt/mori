@@ -9,7 +9,8 @@ import { z } from 'zod';
 import type { ModelPick } from '../shared/models';
 import { READ_ONLY_TOOLS } from '../shared/protocol';
 import {
-  BASE_ROLE, NUMBER_LIKE_PATTERN, ROLE_NAME_PATTERN, SEATS, TEAM_TOOLS, TEXT_LIMITS, baseHolders, isTeamTool,
+  BASE_ROLE, BASE_ROLE_DESCRIPTION, NUMBER_LIKE_PATTERN, ROLE_NAME_PATTERN, SEATS, TEAM_TOOLS, TEXT_LIMITS, baseHolders,
+  isTeamTool,
   type InstanceKind, type RequestStatus, type Seat, type TeamHolders, type TeamToolName,
 } from '../shared/team';
 import type { Requirement } from './modelTypes';
@@ -25,10 +26,7 @@ export const PI_TOOL_NAMES: readonly string[] = ['read', 'bash', 'edit', 'write'
 /** @brief 基座的白名单里代表全部 MCP 工具的写法（§4.2、§8.2：基座写 mcp__*）。 */
 export const ALL_MCP_TOOLS = 'mcp__*';
 
-/**
- * @brief 基座在 next、assignee 的说明里的一句话（§6.3）。基座没有角色文件，规格没有给它的说明，这是临时文字。
- */
-export const BASE_ROLE_DESCRIPTION = 'General-purpose agent with the default tools';
+export { BASE_ROLE_DESCRIPTION };
 
 /** @brief 订阅的时刻（§9.5）：v1 只有 request_closed。 */
 export const SUBSCRIBE_MOMENTS = ['request_closed'] as const;

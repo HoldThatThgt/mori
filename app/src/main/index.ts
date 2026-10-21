@@ -8,6 +8,7 @@ import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, type 
 import { registerFeedbackHandlers } from './feedback';
 import { registerFileHandlers } from './files';
 import { registerReviewHandlers } from './review';
+import { removeTeamDir, sessionIdOfFile, sessionIdOfName } from './teamDir';
 import { currentKernel, lastKernelExitCode, piAgentDir, shutdownKernel, startKernel } from './kernel-process';
 
 // 测试可以用 MORI_USER_DATA 把数据放到独立目录，避免碰到日常使用的配置。
@@ -105,11 +106,17 @@ function sessionFilePath(file: unknown): string {
 }
 
 // 删除会话：照 Claude 桌面版永久删除会话文件（方案第 4 节"会话归档与删除"由 Mori 负责；归档只在界面记下）。
-// 后台进程已先关闭这个会话；文件不存在（还没发过消息的新会话）时什么都不做。删不掉时把原文交回界面。
+// 后台进程已先关闭这个会话；文件不存在（还没发过消息的新会话）时不删文件。删不掉时把原文交回界面。
+// 删掉会话文件之后，按它第一行里的会话 id 一并删除 <userData>/teams/<id>/（平行 Agent 规格 §11.5，teamDir.ts）；
+// 还没写盘的会话按文件名里的 id 删。
 ipcMain.handle('mori:delete-session', async (event: IpcMainInvokeEvent, file: unknown) => {
   if (!event.senderFrame || !isAppPage(event.senderFrame.url)) throw new Error('Not allowed');
   const target = sessionFilePath(file);
-  if (!existsSync(target)) return { deleted: false, error: null };
+  if (!existsSync(target)) {
+    const unsaved = sessionIdOfName(target);
+    return { deleted: false, error: unsaved === null ? null : await removeTeamDir(app.getPath('userData'), unsaved) };
+  }
+  const sessionId = await sessionIdOfFile(target);
   try {
     await rm(target);
   } catch (error) {
@@ -117,7 +124,8 @@ ipcMain.handle('mori:delete-session', async (event: IpcMainInvokeEvent, file: un
     console.error(`[main] cannot delete ${target}: ${message}`);
     return { deleted: false, error: message };
   }
-  return { deleted: true, error: null };
+  const error = sessionId === null ? null : await removeTeamDir(app.getPath('userData'), sessionId);
+  return { deleted: true, error };
 });
 
 // 后台进程意外退出后，界面上的"重新载入"重启它并重连通道；页面不刷新，草稿等界面状态保留。

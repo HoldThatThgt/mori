@@ -115,7 +115,7 @@ test('TB-44 instance segments: role body is the caller\'s, then the shared segme
   }
   const [shared, close] = segments('close', { ...ctx, role: 'planner' });
   assert.ok(shared.startsWith("You are planner, one of several agents that work together on Mori's TaskBoard. "
-    + "Other roles: mori: Mori's base agent (the default agent with the default tools); chat: Talks to the user; "
+    + "Other roles: mori: General-purpose agent with the default tools; chat: Talks to the user; "
     + 'executor: Changes code and runs commands; reviewer: Verifies changes.\n'));
   assert.match(close, /^You close request 2\. /);
   assert.match(close, /or ask planner for more tasks with agent_message\./);

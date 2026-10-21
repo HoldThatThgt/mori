@@ -17,7 +17,7 @@ import {
 import { readMcpServers } from './mcpConfig';
 import { loadPi, type Pi } from './pi';
 import { togglePackageResource, toggleTopLevelResource, type ToggleContext } from './resourceToggles';
-import { sessionContext, type SessionContext } from './sessions';
+import { sessionContext, TEAM_EXTENSION_PATH, type SessionContext } from './sessions';
 import { decideTrust } from './trust';
 
 /** 技能正文最多交给界面的字符数 */
@@ -32,6 +32,8 @@ const ENABLED_BY_PROJECT = '本项目的 .pi/settings.json 把它启用了，只
 const PROJECT_SETTINGS = '本项目的设置，只能在项目里改';
 /** 不是本地文件夹的包和它的资源：PI_OFFLINE 下 pi 不安装它 */
 const NOT_LOCAL = '内网只支持本地文件夹的包；这一项不会被安装，可以移除';
+/** TaskBoard 工具在工具页上的来源（平行 Agent 规格 §17.2 TB-03） */
+const TEAM_TOOLS_SOURCE = 'Mori';
 /** pi 当作 npm / git 来源的前缀（pi utils/paths.js isLocalPath 列出的，去掉不是包来源的 builtin:） */
 const REMOTE_PREFIXES = ['npm:', 'git:', 'github:', 'http:', 'https:', 'ssh:'];
 
@@ -218,13 +220,17 @@ function skillDiagnostics(views: Views): string[] {
   });
 }
 
-/** @brief 工具的来源：MCP 服务、内置、包、内联扩展（Mori 的批准扩展）或扩展文件。 */
+/**
+ * @brief 工具的来源：MCP 服务、内置、包、内联扩展（Mori 的扩展；TaskBoard 的工具来自 mori-team，来源写 Mori，
+ *        平行 Agent 规格 §17.2 TB-03）或扩展文件。
+ */
 function toolSource(tool: ToolInfo): Pick<ToolEntry, 'source' | 'sourceLabel'> {
   const { path, origin, source } = tool.sourceInfo;
   const server = tool.namespace?.aliases?.[0] ?? tool.namespace?.name ?? '';
   if (path === MCP_PATH) return { source: 'mcp', sourceLabel: server };
   if (path.startsWith('builtin:')) return { source: 'builtin', sourceLabel: '' };
   if (origin === 'package') return { source: 'package', sourceLabel: source };
+  if (path === TEAM_EXTENSION_PATH) return { source: 'other', sourceLabel: TEAM_TOOLS_SOURCE };
   if (path.startsWith('<inline:')) return { source: 'other', sourceLabel: path };
   return { source: 'extension', sourceLabel: path };
 }

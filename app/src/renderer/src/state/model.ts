@@ -6,6 +6,7 @@ import {
 import {
   REASON_TEXTS, isUntilReason, plainReasonText, type CandidateExclusion, type ModelReason,
 } from '../../../shared/models';
+import type { ReceiptEntryData, TeamApprovalRequest, TeamDeciding, WakeKind } from '../../../shared/team';
 
 /** @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md。 */
 export type ToolStatus =
@@ -37,6 +38,11 @@ export interface ToolCall {
   allowedBy: 'session' | 'all' | null;
   /** 后台进程说这次调用会怎样处理（mori.tool_gate）；还没收到或从会话记录载入时为 null */
   gate: ToolGate | null;
+  /**
+   * 合并会话里这次立项工具调用写下的回执（平行 Agent 规格 §13.2），画在这张工具卡下面；没有时省略
+   * （docs/v1/screens/team-stream.md "回执"）
+   */
+  receipts?: ReceiptEntryData[];
 }
 
 /** @brief 一个等你选择的批准请求（mori.approval_request）。 */
@@ -113,7 +119,27 @@ export type Item =
     /** 每个候选及原因（No model available 卡） */
     candidates: CandidateExclusion[];
   }
-  | { kind: 'notify'; key: string; text: string; level: 'info' | 'warning' | 'error' };
+  | { kind: 'notify'; key: string; text: string; level: 'info' | 'warning' | 'error' }
+  /** 回执的一行（mori.receipt，平行 Agent 规格 §13.2） */
+  | { kind: 'receipt'; key: string; receipt: ReceiptEntryData }
+  /** 进展摘要的位置（mori.progress，§13.3）：内容取会话的 TaskBoard 视图里这个需求 */
+  | {
+    kind: 'progress'; key: string;
+    /** 需求编号 */
+    request: number;
+  }
+  /**
+   * 程序投递到用户会话的消息（mori.wake，§5.6、§13.7）：不显示，只结束上一轮回复；
+   * 条目 id 由它消费（mori.entry_id），所以不会记到你的消息上
+   */
+  | ({
+    kind: 'wake'; key: string;
+    /** 投递的种类 */
+    wakeKind: WakeKind;
+  } & MessageMark);
+
+/** @brief 立项判断你的消息（mori.team_deciding，§5.3、§13.6）：阶段行与排队区。 */
+export type DecidingState = TeamDeciding;
 
 /** @brief 阶段行。tool 阶段的文字由界面按工具标题生成。 */
 export interface Stage {
@@ -174,12 +200,27 @@ export interface Transcript {
   firstUserText: string | null;
   /** 生成 key 用的序号 */
   seq: number;
+  /**
+   * 后台实例挂起的批准请求（mori.team_approval_request，§11.3），按到达顺序；对话一轮结束不清掉，
+   * 由 mori.team_approval_end 去掉
+   */
+  teamApprovals: TeamApprovalRequest[];
+  /** 立项判断你的消息；没有待判断的消息时为 null */
+  deciding: DecidingState | null;
+  /** 收到 mori.wake、还没等到同样文字的 message_start 的程序投递，按到达顺序（§13.7） */
+  wakes: { text: string; kind: WakeKind }[];
+  /**
+   * 你正在撤回、停止或 Stop team（命令还没返回）：这期间待判断队列里少了的消息是被拿回输入框，
+   * 不是交给了对话（applyDeciding 不把它们显示成待发或暂存的消息）
+   */
+  decidingHold: boolean;
 }
 
 export const emptyTranscript: Transcript = {
   items: [], tools: {}, running: false, sending: false, stage: null, steering: [], followUp: [], approvals: [],
   questions: [], stopRequested: false, modelStage: null, pendingQueue: [], unavailable: false, pendingError: null,
-  lastUserText: null, firstUserText: null, seq: 0,
+  lastUserText: null, firstUserText: null, seq: 0, teamApprovals: [], deciding: null, wakes: [],
+  decidingHold: false,
 };
 
 /** 对话流每次载入的消息数（一条你的消息或一条助手回复算一条），见方案 5.4 */
@@ -200,6 +241,26 @@ export function startIndexFor(transcript: Transcript, count = PAGE_SIZE): number
 export function pushItem(state: Transcript, item: DistributiveOmit<Item, 'key'>): Transcript {
   const seq = state.seq + 1;
   return { ...state, seq, items: [...state.items, { ...item, key: `i${seq}` } as Item] };
+}
+
+/** @brief 准备中先显示的那条你的消息；没有时为 undefined。 */
+export function pendingPrompt(state: Transcript): Extract<Item, { kind: 'user' }> | undefined {
+  return state.items.find((item): item is Extract<Item, { kind: 'user' }> => item.kind === 'user'
+    && Boolean(item.pending));
+}
+
+/** @brief 你发了消息（空闲时）：消息先显示在对话流里，会话进入"发送中"（准备中，§11.4）。 */
+export function addPendingPrompt(state: Transcript, text: string, refs: QuoteRef[]): Transcript {
+  const next = pushItem(state, { kind: 'user', text, refs: refs.length > 0 ? refs : null, entryId: null, time: null,
+    pending: true });
+  return { ...next, sending: true };
+}
+
+/** @brief 准备中又发了一条（后台进程暂存）：显示在排队区；发送失败时 add 为假，把它去掉。 */
+export function setPendingQueued(state: Transcript, text: string, add: boolean): Transcript {
+  if (add) return { ...state, pendingQueue: [...state.pendingQueue, text] };
+  const index = state.pendingQueue.lastIndexOf(text);
+  return index < 0 ? state : { ...state, pendingQueue: state.pendingQueue.filter((_text, at) => at !== index) };
 }
 
 /** @brief 新建一次工具调用。 */

@@ -2,9 +2,12 @@
 // 出现时不抢焦点、没有默认按钮；Alt+1 / Alt+2 / Alt+3 由 App 的全局按键经 answerFrontApproval 转到这里；
 // 焦点在卡上时 Esc 先关开着的浮层，没有浮层才等于拒绝（生成继续），卡片消失时焦点如果在卡上就回到输入框。
 // 卡上的文字里不可见的控制字符都换成可见的标记，免得显示顺序与实际执行的不同。
+// 平行 Agent（docs/v1/screens/team-approvals.md）：后台实例的卡与对话的卡相同，卡头上面多一行归属；
+// 答复经 approval.answer（requestId 是 <实例 id>:<编号>），后台进程交给那个实例。
 
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ApprovalDecision } from '../../../shared/protocol';
+import { roleLabel, type TeamApprovalRequest } from '../../../shared/team';
 import { answerApproval } from '../state/actions';
 import { newTool, type PendingApproval } from '../state/model';
 import { closeTopOverlay } from '../state/overlays';
@@ -210,10 +213,25 @@ function ApprovalActions({ toolName, reason, onReason, answer }: {
   );
 }
 
+/** @brief 批准卡要显示的一个请求：对话自己的，或后台实例的（team 带归属）。 */
+interface CardRequest {
+  /** 请求（后台实例的 requestId 是 <实例 id>:<编号>） */
+  approval: PendingApproval;
+  /** 后台实例的请求；对话自己的为 null */
+  team: TeamApprovalRequest | null;
+}
+
+/** @brief 后台卡的归属行（§11.3）：<role> · T1 · <task title>，没有 task 时 <role>；基座显示 Mori。 */
+function attributionText(team: TeamApprovalRequest): string {
+  const role = roleLabel(team.role);
+  return team.task === null ? role : `${role} · ${team.task} · ${team.taskTitle ?? ''}`;
+}
+
 /** @brief 一张批准卡。more 是排在后面的张数。 */
-function Card({ tabKey, cwd, approval, more }: {
-  tabKey: string; cwd: string; approval: PendingApproval; more: number;
+function Card({ tabKey, cwd, request, more }: {
+  tabKey: string; cwd: string; request: CardRequest; more: number;
 }) {
+  const { approval, team } = request;
   const ref = useRef<HTMLDivElement>(null);
   const [reason, setReason] = useState('');
   const answer = useAnswer(tabKey, approval.requestId, reason);
@@ -234,7 +252,9 @@ function Card({ tabKey, cwd, approval, more }: {
 
   return (
     <div ref={ref} className="approval-card" role="group" aria-label={`等你批准：${titleText}`}
-      data-testid="approval-card" data-tool={approval.toolName} data-request={approval.requestId} onKeyDown={onKeyDown}>
+      data-testid="approval-card" data-tool={approval.toolName} data-request={approval.requestId}
+      data-agent={team?.role} data-task={team?.task ?? undefined} onKeyDown={onKeyDown}>
+      {team && <div className="approval-attribution" data-testid="approval-attribution">{attributionText(team)}</div>}
       <div className="approval-head">
         <span className="approval-title" data-testid="approval-title">
           {title.verb}{title.target && <>{' '}<code>{title.target}</code></>}{title.suffix}
@@ -248,10 +268,19 @@ function Card({ tabKey, cwd, approval, more }: {
   );
 }
 
-/** @brief 一个会话的批准卡：只显示最前面的那张，处理完下一张接着出现。 */
+/**
+ * @brief 一个会话的批准卡：只显示一张，处理完下一张接着出现。对话自己的卡排在后台实例的卡之前，各按到达顺序；
+ *        正在显示的卡不因新到的卡而换掉（Alt+1 总是作用于看得到的那张，team-approvals.md）。
+ */
 export function ApprovalCard({ tab }: { tab: Tab }) {
-  const { approvals } = tab.transcript;
-  const front = approvals[0];
+  const { approvals, teamApprovals } = tab.transcript;
+  const shown = useRef<string | null>(null);
+  const requests: CardRequest[] = [...approvals.map((approval) => ({ approval, team: null })),
+    ...teamApprovals.map((team) => ({ approval: { requestId: team.requestId, toolCallId: team.toolCallId,
+      toolName: team.toolName, args: team.args }, team }))];
+  const front = requests.find((item) => item.approval.requestId === shown.current) ?? requests[0];
+  shown.current = front?.approval.requestId ?? null;
   if (!front) return null;
-  return <Card key={front.requestId} tabKey={tab.key} cwd={tab.cwd} approval={front} more={approvals.length - 1} />;
+  return <Card key={front.approval.requestId} tabKey={tab.key} cwd={tab.cwd} request={front}
+    more={requests.length - 1} />;
 }

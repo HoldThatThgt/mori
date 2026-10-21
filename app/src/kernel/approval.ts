@@ -2,6 +2,9 @@
 // 在闭包里等界面的答复；拒绝时返回 { block: true, reason }，pi 把 reason 原样作为工具结果回给模型。
 // 每个待批准请求都绑定 ctx.signal：pi 不会替处理器取消等待，中止时不放手 session.abort() 会一直等着。
 // "本会话不再询问"只是按工具名记录的集合，和权限一起只存在内存里，不做其他规则。状态表见 docs/v0/screens/approval.md。
+// 平行 Agent（docs/specs/parallel-agents-taskboard.md §11）：权限与"本会话不再询问"一个用户会话一份（ApprovalPolicy），
+// 对话会话和它的每个实例会话共用；挂起的请求仍按 pi 会话各自记录（ApprovalGate）。TaskBoard 的工具与读取类工具一样免批准。
+// 实例的请求不在自己的信封上出卡，而是交给 Team（GateOutput.onRequest / onEnd），由它在用户会话的信封上发后台批准卡。
 
 import type {
   ExtensionContext, ExtensionFactory, ToolCallEvent, ToolCallEventResult,
@@ -9,13 +12,15 @@ import type {
 import {
   DEFAULT_APPROVAL, READ_ONLY_TOOLS, REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT,
   type ApprovalDecision, type ApprovalEndBy, type ApprovalMode, type ApprovalRequestInfo, type ApprovalState,
-  type EventEnvelope, type KernelEvent, type ToolGate,
+  type KernelEvent, type ToolGate,
 } from '../shared/protocol';
-
-type Emit = (envelope: EventEnvelope) => void;
+import { TEAM_TOOLS, type TeamApprovalEnd } from '../shared/team';
 
 /** 停止时等被拒绝的调用在 pi 里结束的上限：先让 pi 记下拒绝，再中止（否则 pi 只记"Operation aborted"） */
 const STOP_SETTLE_MS = 2000;
+
+/** 免批准的工具（§11.2）：v0 的四个读取类工具，加上 TaskBoard 的 11 个工具 */
+const FREE_TOOLS: ReadonlySet<string> = new Set([...READ_ONLY_TOOLS, ...TEAM_TOOLS]);
 
 /** @brief 一个等你选择的请求。 */
 interface Pending {
@@ -37,31 +42,46 @@ export function rejectionText(reason: string | undefined): string {
   return text ? `${REJECTED_REASON_PREFIX}${text}` : REJECTED_TEXT;
 }
 
-/** @brief 一个会话的批准状态：权限、"本会话不再询问"的工具名、挂起的请求。 */
-export class ApprovalGate {
-  /** 事件要带上的 pi 会话 id；会话建好后由 attach 记下 */
-  private sessionId = '';
+/** @brief 一个会话的批准扩展把事件交给谁。 */
+export interface GateOutput {
+  /** 请求 id 的前缀：对话会话为空串（approval-<n>，与 v0 相同），实例为 `<实例的 pi 会话 id>:`（§11.3） */
+  prefix: string;
+  /** @brief 发一个本会话的事件（mori.tool_gate；对话会话另有 mori.approval_request / mori.approval_end）。 */
+  send(event: KernelEvent): void;
+  /**
+   * @brief 实例会话：挂起一个请求时调用，代替在自己的信封上发 mori.approval_request（Team 补上角色与 task，
+   *        在用户会话的信封上发 mori.team_approval_request）；对话会话省略。
+   */
+  onRequest?(request: ApprovalRequestInfo): void;
+  /** @brief 实例会话：请求结束时调用，代替 mori.approval_end；对话会话省略。 */
+  onEnd?(end: TeamApprovalEnd): void;
+}
+
+/**
+ * @brief 一个用户会话的批准状态（§11.1）：权限与"本会话不再询问"的工具名，对话会话与它的全部实例会话共用；
+ *        记下共用它的每个会话的 ApprovalGate，切到"全部允许"、选"本会话不再询问"时一并处理它们挂起的请求。
+ */
+export class ApprovalPolicy {
   /** 权限：每次询问 / 全部允许 */
   private mode: ApprovalMode = DEFAULT_APPROVAL.mode;
   /** "本会话不再询问"记下的工具名 */
   private readonly allowed = new Set<string>(DEFAULT_APPROVAL.allowed);
-  /** 等你选择的请求，按请求 id */
-  private readonly pending = new Map<string, Pending>();
-  /** rejectForStop 在等它们在 pi 里结束的调用：toolCallId → 通知 */
-  private readonly endWaiters = new Map<string, () => void>();
-  /** 已预告给界面、处理器还没判断的调用：toolCallId → 预告的处理方式 */
-  private readonly announced = new Map<string, ToolGate>();
-  /** 正在停止（rejectForStop 开始到 session.abort() 结束）：除只读工具外的调用一律按拒绝处理 */
-  private stopping = false;
-  /** 下一个请求 id 的序号 */
-  private nextId = 1;
+  /** 共用这份状态的会话的批准扩展，按建立的顺序（对话会话在前） */
+  private readonly gates = new Set<ApprovalGate>();
 
-  /** @param emit 把事件发给界面 */
-  constructor(private readonly emit: Emit) {}
+  /**
+   * @brief 为一个会话建立批准扩展并登记。
+   * @param output 事件的去处与请求 id 的前缀
+   */
+  gate(output: GateOutput): ApprovalGate {
+    const gate = new ApprovalGate(this, output);
+    this.gates.add(gate);
+    return gate;
+  }
 
-  /** @brief 会话建好后记下它的 id（事件要带上）。 */
-  attach(sessionId: string): void {
-    this.sessionId = sessionId;
+  /** @brief 会话释放时注销它的批准扩展（ApprovalGate.close 调用）。 */
+  remove(gate: ApprovalGate): void {
+    this.gates.delete(gate);
   }
 
   /** @brief 当前的批准设置。 */
@@ -70,10 +90,59 @@ export class ApprovalGate {
   }
 
   /** @brief 这个工具现在会怎样处理。 */
-  private gateFor(toolName: string): ToolGate {
-    if (READ_ONLY_TOOLS.includes(toolName)) return 'free';
+  gateFor(toolName: string): ToolGate {
+    if (FREE_TOOLS.has(toolName)) return 'free';
     if (this.mode === 'all') return 'all';
     return this.allowed.has(toolName) ? 'session' : 'ask';
+  }
+
+  /** @brief 切换权限；切到"全部允许"时这个用户会话里全部 Agent 挂起的请求按允许处理（方案 5.7、§11.1）。 */
+  setMode(mode: ApprovalMode): ApprovalState {
+    this.mode = mode;
+    if (mode === 'all') for (const gate of [...this.gates]) gate.allowPending(null, 'all');
+    return this.state();
+  }
+
+  /** @brief "本会话不再询问"：记下工具名，全部 Agent 挂起的同名工具请求按允许处理（§11.1）。 */
+  allowSession(toolName: string): void {
+    this.allowed.add(toolName);
+    for (const gate of [...this.gates]) gate.allowPending(toolName, 'session');
+  }
+
+  /** @brief 从"本会话已允许"里清除一个工具名。 */
+  forget(toolName: string): ApprovalState {
+    this.allowed.delete(toolName);
+    return this.state();
+  }
+}
+
+/** @brief 一个会话的批准扩展：挂起的请求；权限与"本会话不再询问"在共用的 ApprovalPolicy 里。 */
+export class ApprovalGate {
+  /** 等你选择的请求，按请求 id */
+  private readonly pending = new Map<string, Pending>();
+  /** rejectForStop 在等它们在 pi 里结束的调用：toolCallId → 通知 */
+  private readonly endWaiters = new Map<string, () => void>();
+  /** 已预告给界面、处理器还没判断的调用：toolCallId → 预告的处理方式 */
+  private readonly announced = new Map<string, ToolGate>();
+  /** 正在停止（rejectForStop 开始到 session.abort() 结束）：除免批准的工具外的调用一律按拒绝处理 */
+  private stopping = false;
+  /** 下一个请求 id 的序号 */
+  private nextId = 1;
+
+  /**
+   * @param policy 共用的批准状态
+   * @param output 事件的去处与请求 id 的前缀
+   */
+  constructor(private readonly policy: ApprovalPolicy, private readonly output: GateOutput) {}
+
+  /** @brief 当前的批准设置（共用的那一份）。 */
+  state(): ApprovalState {
+    return this.policy.state();
+  }
+
+  /** @brief 这个请求是否还挂在这个会话上。 */
+  has(requestId: string): boolean {
+    return this.pending.has(requestId);
   }
 
   /**
@@ -81,7 +150,7 @@ export class ApprovalGate {
    *        处理器后来判断不同时据此发更正。
    */
   announce(toolCallId: string, toolName: string): void {
-    const gate = this.gateFor(toolName);
+    const gate = this.policy.gateFor(toolName);
     this.announced.set(toolCallId, gate);
     this.send({ type: 'mori.tool_gate', toolCallId, toolName, gate });
   }
@@ -102,7 +171,7 @@ export class ApprovalGate {
     const { toolCallId, toolName } = event;
     const announced = this.announced.get(toolCallId);
     this.announced.delete(toolCallId);
-    const gate = this.gateFor(toolName);
+    const gate = this.policy.gateFor(toolName);
     // 停止中：pi 拿到前一个调用的拒绝后会立刻放行排在后面的嵌套调用，它们不再出卡，也不执行。
     if (this.stopping && gate !== 'free') return Promise.resolve({ block: true, reason: REJECTED_BY_STOP });
     if (gate !== 'ask') {
@@ -116,7 +185,7 @@ export class ApprovalGate {
   /** @brief 发出批准请求并挂起，直到你选择、切换权限或停止；signal 中止时按拒绝处理。 */
   private request(event: ToolCallEvent, signal: AbortSignal | undefined): Promise<ToolCallEventResult | undefined> {
     if (signal?.aborted) return Promise.resolve({ block: true, reason: REJECTED_BY_STOP });
-    const requestId = `approval-${this.nextId++}`;
+    const requestId = `${this.output.prefix}approval-${this.nextId++}`;
     return new Promise((resolve) => {
       const onAbort = () => this.finish(requestId, 'reject', 'closed', REJECTED_BY_STOP);
       signal?.addEventListener('abort', onAbort, { once: true });
@@ -124,13 +193,14 @@ export class ApprovalGate {
       // 参数取 event.input：先加载的扩展可能改过它，执行的是改过之后的参数。
       const args = { ...(event.input as Record<string, unknown>) };
       this.pending.set(requestId, { toolCallId: event.toolCallId, toolName: event.toolName, args, resolve, release });
-      this.send({ type: 'mori.approval_request', requestId, toolCallId: event.toolCallId, toolName: event.toolName,
-        args });
+      const info: ApprovalRequestInfo = { requestId, toolCallId: event.toolCallId, toolName: event.toolName, args };
+      if (this.output.onRequest) this.output.onRequest(info);
+      else this.send({ type: 'mori.approval_request', ...info });
     });
   }
 
   /**
-   * @brief 结束一个请求：把结果交还给 pi，并告诉界面。
+   * @brief 结束一个请求：把结果交还给 pi，并告诉界面（实例会话告诉 Team）。
    * @param reason 拒绝时回给模型的原文；允许时忽略
    * @return 请求还挂着并已结束时为真
    */
@@ -141,7 +211,8 @@ export class ApprovalGate {
     item.release();
     const text = decision === 'reject' ? (reason ?? REJECTED_TEXT) : null;
     item.resolve(text === null ? undefined : { block: true, reason: text });
-    this.send({ type: 'mori.approval_end', requestId, toolCallId: item.toolCallId, decision, by, reason: text });
+    if (this.output.onEnd) this.output.onEnd({ requestId, decision, by, reason: text });
+    else this.send({ type: 'mori.approval_end', requestId, toolCallId: item.toolCallId, decision, by, reason: text });
     return true;
   }
 
@@ -153,27 +224,31 @@ export class ApprovalGate {
       this.finish(requestId, 'reject', 'user', rejectionText(reason));
       return this.state();
     }
-    if (decision === 'allowSession') this.allowed.add(item.toolName);
     this.finish(requestId, 'allow', 'user', null);
-    if (decision === 'allowSession') {
-      for (const [id, other] of [...this.pending]) {
-        if (other.toolName === item.toolName) this.finish(id, 'allow', 'session', null);
-      }
-    }
+    // 本会话不再询问：这个用户会话里全部 Agent 挂起的同名工具请求一并允许，之后也不再询问（§11.1）。
+    if (decision === 'allowSession') this.policy.allowSession(item.toolName);
     return this.state();
   }
 
-  /** @brief 切换权限；切到"全部允许"时挂起的请求按允许处理（方案 5.7）。 */
+  /** @brief 切换权限（共用的那一份，ApprovalPolicy.setMode）。 */
   setMode(mode: ApprovalMode): ApprovalState {
-    this.mode = mode;
-    if (mode === 'all') for (const id of [...this.pending.keys()]) this.finish(id, 'allow', 'all', null);
-    return this.state();
+    return this.policy.setMode(mode);
   }
 
-  /** @brief 从"本会话已允许"里清除一个工具名。 */
+  /** @brief 从"本会话已允许"里清除一个工具名（共用的那一份）。 */
   forget(toolName: string): ApprovalState {
-    this.allowed.delete(toolName);
-    return this.state();
+    return this.policy.forget(toolName);
+  }
+
+  /**
+   * @brief 按允许结束挂起的请求（ApprovalPolicy 调用）。
+   * @param toolName 只结束这个工具的请求；为 null 时结束全部
+   * @param by 由"本会话不再询问"或"全部允许"结束
+   */
+  allowPending(toolName: string | null, by: 'session' | 'all'): void {
+    for (const [id, item] of [...this.pending]) {
+      if (toolName === null || item.toolName === toolName) this.finish(id, 'allow', by, null);
+    }
   }
 
   /**
@@ -212,13 +287,14 @@ export class ApprovalGate {
       toolName: item.toolName, args: item.args }));
   }
 
-  /** @brief 会话释放前：挂起的请求按拒绝处理，pi 不会卡在等待上。 */
+  /** @brief 会话释放前：挂起的请求按拒绝处理，pi 不会卡在等待上；之后不再共用批准状态。 */
   close(): void {
     for (const id of [...this.pending.keys()]) this.finish(id, 'reject', 'closed', REJECTED_BY_STOP);
+    this.policy.remove(this);
   }
 
   /** @brief 发一个本会话的事件。 */
   private send(event: KernelEvent): void {
-    this.emit({ kind: 'event', sessionId: this.sessionId, event });
+    this.output.send(event);
   }
 }

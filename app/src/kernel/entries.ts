@@ -3,8 +3,9 @@
 // 所以在 message_end 之后的微任务里就能按对象找到它的条目；带引用的你的消息随后写一条 mori.ref 条目（不进模型上下文）。
 // 状态见 docs/v0/screens/selection.md。
 
-import type { AgentSession, AgentSessionEvent } from '@earendil-works/pi-coding-agent';
+import type { AgentSession, AgentSessionEvent, SessionEntry } from '@earendil-works/pi-coding-agent';
 import { REF_ENTRY_TYPE, type EventEnvelope, type QuoteRef, type RefEntryData } from '../shared/protocol';
+import { TEAM_ENTRY_TYPES, WakeEntrySchema } from '../shared/team';
 
 type Emit = (envelope: EventEnvelope) => void;
 type AgentMessage = Extract<AgentSessionEvent, { type: 'message_end' }>['message'];
@@ -111,4 +112,29 @@ export function supplementEntry(session: AgentSession, sessionId: string, pendin
       console.error(`[kernel] cannot supplement the entry id in ${sessionId}: ${(error as Error).message}`);
     }
   });
+}
+
+/** @brief mori.wake 条目指向的用户消息的条目 id（平行 Agent 规格 §5.6：程序投递到用户会话的消息）。 */
+function wakeMessageIds(entries: readonly SessionEntry[]): Set<string> {
+  const ids = new Set<string>();
+  for (const item of entries) {
+    if (item.type !== 'custom' || item.customType !== TEAM_ENTRY_TYPES.wake) continue;
+    const parsed = WakeEntrySchema.safeParse(item.data);
+    if (parsed.success) ids.add(parsed.data.messageId);
+    else console.error(`[kernel] malformed ${TEAM_ENTRY_TYPES.wake} entry ${item.id} skipped`);
+  }
+  return ids;
+}
+
+/**
+ * @brief 会话引用用得到的条目：你的消息、助手回复和 mori.ref 条目。工具结果（文件内容、命令输出、图片）等引用里不取的
+ *        不交给界面，免得每次引用、每次打开预览都把整段会话搬过去。程序投递到用户会话的 [Mori] 消息（mori.wake 指向的）
+ *        不是你说的话，也不交（平行 Agent 规格 §5.6、§13.11）。
+ * @param entries 会话的条目（当前分支，或其中已完成的部分）
+ */
+export function quotableEntries(entries: readonly SessionEntry[]): SessionEntry[] {
+  const wakes = wakeMessageIds(entries);
+  return entries.filter((item) => (item.type === 'message' && !wakes.has(item.id)
+    && (item.message.role === 'user' || item.message.role === 'assistant'))
+    || (item.type === 'custom' && item.customType === REF_ENTRY_TYPE));
 }

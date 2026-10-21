@@ -45,10 +45,10 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被本规格�
 | 立项看到的对话上限 | 12000 字符 | `app/src/kernel/boardText.ts` | 足够看清最近几轮；更早的去掉并注明 | 你走查时 |
 | `read_session` 不分页的上限 / 结果摘录 / 投递摘录 | 12000 / 400 / 300 字符 | `app/src/kernel/sessionReader.ts` | 一次读完常见的 task；超过先给目录 | 你走查时 |
 | 证据不合格时列出的编号 | 最近 5 个 | `app/src/kernel/evidence.ts` | 告诉模型可以引用哪些 | — |
-| 回执里原话的显示长度 | 120 字符 | `app/src/renderer/src/` | 一行放得下 | 你走查时 |
-| 进展摘要交接链每棒 | 结论第一句，≤ 80 字符 | `app/src/renderer/src/` | 一眼看完整条链 | 你走查时 |
+| 回执里原话的显示长度 | 120 字符 | `app/src/shared/team.ts`（`TEXT_LIMITS.receiptQuote`） | 一行放得下 | 你走查时 |
+| 进展摘要交接链每棒 | 结论第一句，≤ 80 字符 | `app/src/shared/team.ts`（`TEXT_LIMITS.chainLine`） | 一眼看完整条链 | 你走查时 |
 | `mori.board` 合并发送间隔 | 250 毫秒 | `app/src/kernel/team.ts` | 工具调用很密时不刷屏 | — |
-| Agent 消息上限 | 同一需求同一对角色 10 条；不在需求里的发送方按会话 10 条；关闭模式下对话每回合 5 条 | `app/src/kernel/team.ts` | 防止两个弱模型来回发消息停不下来 | 走查中碰到上限时 |
+| Agent 消息上限 | 同一需求同一对角色 10 条；不在需求里的发送方按会话 10 条；关闭模式下对话每回合 5 条 | `app/src/kernel/boardRoute.ts` | 防止两个弱模型来回发消息停不下来 | 走查中碰到上限时 |
 | 强制填写、强制关闭的格式重试 | 1 次 | `app/src/kernel/handoffForm.ts` | 统一模型提供商 proposal §8“格式错误按格式错误重试”；再错就交结案 | 内网模型的写入等级不稳时 |
 | A 级强制填写 | 只在档案 `reasoning.can_disable` 为真时用，这次请求关闭思考 | `app/src/kernel/handoffForm.ts` | 探针第 5 步是在关闭思考时测的 | 遇到能开着思考做强制调用的部署时 |
 | `decision` 类别的排队超时 / `task` 类别 | 60 秒 / 不超时 | `app/src/kernel/modelTimings.ts` | 决定排太久不如换模型；task 排队等槽位是常态 | 你走查时 |
@@ -56,5 +56,6 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被本规格�
 | 协作开关的窄栏宽度 | 600px | `app/src/renderer/src/styles/` | 与顶栏现有的容器查询一致 | composer-pickers 合入时 |
 | 给 `conversation`、`decision` 留的槽位 | 每个 key 1 个（`task`、`background` 最多占并发上限 − 1；并发上限为 1 时不留） | `app/src/kernel/modelPool.ts` | 严格优先不打断已经发出的请求；不留的话 4 个 task 占满默认的 4 个槽位，对话和立项等到超时 | 拿到内网端点、知道它的并发时 |
 | 命令与界面名 | `/team`、`/team on`、`/team off`、`Team` | `app/src/renderer/src/` | proposal 的暂定名；`/team off` 为派生 | 你走查时 |
+| 基座的一句话说明 | `General-purpose agent with the default tools` | `app/src/shared/team.ts`（`BASE_ROLE_DESCRIPTION`） | 基座没有角色文件，`next`、`assignee` 的说明与附加段的“Other roles”要一句话；规格没给 | 你走查时 |
 | 程序注入的文字 | 英文（规格附录 A、§8.5） | `app/src/kernel/boardText.ts` | 与 pi 默认的 system prompt 同语言 | 内网模型对英文说明理解不好时 |
 | 界面文字 | 规格 §13 | `app/src/renderer/src/` | 英文，Claude 桌面版的写法 | 你走查时 |

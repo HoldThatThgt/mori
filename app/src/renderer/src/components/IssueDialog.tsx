@@ -78,7 +78,8 @@ function tabFields(state: AppState): IssueField[] {
     { label: '模型', value: tab.current ?? '没有' },
     { label: '是否在生成', value: transcript.running ? '是' : '否' },
     { label: '阶段行', value: stageText(transcript, tab.cwd, Date.now()) ?? '不显示' },
-    { label: '等你批准', value: String(transcript.approvals.length) },
+    // 后台实例的批准卡也计入（平行 Agent 规格 §11.3）。
+    { label: '等你批准', value: String(transcript.approvals.length + transcript.teamApprovals.length) },
     { label: '权限', value: tab.approval.mode === 'all' ? '全部允许' : '每次询问' },
   ];
 }

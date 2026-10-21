@@ -2,6 +2,7 @@
 // M4：你的消息上方显示引用，每轮回复末尾一行操作，点引用回到原位置时滚过去高亮（docs/v0/screens/selection.md）。
 // M6：pi 展开的技能命令缩成一行"技能 · 名字"加参数，可以展开看正文（docs/v0/screens/slash.md）。
 // v1：换模型与重建的一行、No model available 卡（docs/v1/screens/model-chat.md）；错误卡不再有"去设置"。
+// 平行 Agent（docs/v1/screens/team-stream.md）：回执、进展摘要（挂在回复下面、回复操作之上），程序投递不显示。
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { putBack, putBackQuoted } from '../state/actions';
@@ -16,6 +17,7 @@ import { AssistantMessage } from './AssistantMessage';
 import { SentQuotes } from './QuoteChips';
 import { findText, flashElements, flashRange } from './quoteHighlight';
 import { ReplyActions } from './ReplyActions';
+import { ProgressSummary, Receipt } from './TeamStream';
 import { UnavailableCard } from './UnavailableCard';
 
 /** 离底部不超过这么多像素就算"在底部" */
@@ -111,7 +113,13 @@ const ItemView = memo(function ItemView(
       return <div className="notice model-notice" data-testid="notice" data-kind="rebuild"
         data-summary={String(item.summary)}>{rebuildText(item.model, item.summary)}</div>;
     case 'unavailable':
-      return <UnavailableCard candidates={item.candidates} />;
+      return <UnavailableCard candidates={item.candidates} tabKey={tabKey} />;
+    case 'receipt':
+      return <Receipt receipt={item.receipt} />;
+    case 'progress':
+      return <ProgressSummary request={item.request} tabKey={tabKey} />;
+    case 'wake':
+      return null;
   }
 });
 
@@ -287,7 +295,9 @@ function useReplyActions(tab: Tab) {
   const { items, running } = tab.transcript;
   const turns = useMemo(() => replyTurns(items), [items]);
   const last = items.findLast((item) => item.kind === 'assistant');
-  const lastTurnEnd = items.at(-1)?.kind === 'user' ? undefined : last?.key;
+  // 最后一轮的操作行画在哪一项下（replyTurns 的键）；最后一项是你的消息或程序投递时，最后一轮已经结束。
+  const ended = items.at(-1)?.kind === 'user' || items.at(-1)?.kind === 'wake';
+  const lastTurnEnd = ended ? undefined : [...turns.keys()].at(-1);
   const live = running || (last?.kind === 'assistant' && last.streaming);
   const shown = [...turns.entries()].filter(([key, turn]) => turn.text && !(live && key === lastTurnEnd));
   return { turns, shown: new Map(shown), latest: shown.at(-1)?.[0] };
@@ -315,6 +325,8 @@ export function Transcript({ tab }: { tab: Tab }) {
           {items.length === 0 && tab.phase === 'ready' && <EmptyChat cwd={tab.cwd} />}
           {tab.startIndex > 0 && <div className="load-earlier">向上滚动载入更早的消息</div>}
           {items.slice(tab.startIndex).map((item) => {
+            // 程序投递不显示（§13.7），只结束上一轮（replyTurns）。
+            if (item.kind === 'wake') return null;
             const turn = shown.get(item.key);
             return (
               <div key={item.key} data-item={item.kind} data-item-key={item.key}>

@@ -1,9 +1,10 @@
 // 一条助手回复：正文按 Markdown 渲染（代码块离线高亮），思考流入时展开、正文开始后收起，工具卡按调用顺序排列。
 
-import { memo, useState } from 'react';
+import { Fragment, memo, useState } from 'react';
 import { Streamdown } from 'streamdown';
 import { code } from '@streamdown/code';
 import type { Block, Item, ToolCall } from '../state/model';
+import { Receipt } from './TeamStream';
 import { ToolCard } from './ToolCard';
 
 const plugins = { code };
@@ -51,7 +52,13 @@ export const AssistantMessage = memo(function AssistantMessage({ item, tools, cw
         if (block.type === 'thinking') return block.text.trim() ? <Thinking key={index} block={block} /> : null;
         if (block.type === 'text') return block.text.trim() ? <Markdown key={index} text={block.text} /> : null;
         const tool = tools[block.id];
-        return tool ? <ToolCard key={block.id} tool={tool} cwd={cwd} tabKey={tabKey} /> : null;
+        // 合并会话里立项调用写下的回执画在它的工具卡下面（docs/v1/screens/team-stream.md "回执"）。
+        return tool ? (
+          <Fragment key={block.id}>
+            <ToolCard tool={tool} cwd={cwd} tabKey={tabKey} />
+            {tool.receipts?.map((receipt, at) => <Receipt key={at} receipt={receipt} />)}
+          </Fragment>
+        ) : null;
       })}
     </div>
   );

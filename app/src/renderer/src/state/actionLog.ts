@@ -60,6 +60,8 @@ export function describeCommand(command: Command): string | null {
     case 'ui.answer':
       return command.value === null ? '扩展询问：取消' : '扩展询问：作答';
     case 'session.prompt': {
+      // 带 team: 'once'（/team <文字>）的发送记 Send (team)（平行 Agent 规格 §13.10）。
+      if (command.team === 'once') return `Send (team): ${preview(command.text)}`;
       const how = command.behavior === 'steer' ? '插话' : command.behavior === 'followUp' ? '排队' : '发送';
       return `${how}：${preview(command.text)}`;
     }
@@ -126,6 +128,16 @@ function describeModelCommand(command: Command): string | null {
     case 'models.reload': return 'Reload model settings';
     case 'models.verify': return `Verify ${command.refs.join(' ')} (${command.tests})`;
     case 'session.setPick': return `Set model range ${command.pick}`;
+    default: return describeTeamCommand(command);
+  }
+}
+
+/** @brief 平行 Agent 与 TaskBoard 的命令（§13.10）的摘要；board.get 是只读查询，不记。 */
+function describeTeamCommand(command: Command): string | null {
+  switch (command.type) {
+    case 'session.setTeam': return `Team ${command.mode}`;
+    case 'session.recheckAgents': return 'Check agent files';
+    case 'session.stopTeam': return 'Stop team';
     default: return null;
   }
 }

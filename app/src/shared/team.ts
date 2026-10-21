@@ -13,6 +13,12 @@ export const BASE_ROLE = 'mori';
 /** @brief 基座在界面上的名字（§1）。 */
 export const BASE_ROLE_LABEL = 'Mori';
 
+/**
+ * @brief 基座在“Other roles”、next 与 assignee 说明里的一句话（§6.3、附录 A）：基座没有角色文件，也就没有 description，
+ *        规格没给这句话，这是临时文字（docs/v1/defaults.md）。
+ */
+export const BASE_ROLE_DESCRIPTION = 'General-purpose agent with the default tools';
+
 /** @brief 角色名的规则（§4.1、§15）。 */
 export const ROLE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
@@ -70,14 +76,19 @@ export interface TeamState {
    * 停止按钮、侧栏、归档与删除用它
    */
   busy: boolean;
+  /**
+   * 除对话这次运行之外还有 Agent 在运行或排队（立项、结案、实例，投递队列里等着的运行），或有待判断的消息；
+   * 输入框旁的 Stop team 按它显示（§11.4、§13.6）
+   */
+  background: boolean;
 }
 
 /**
- * @brief 没有角色文件、没用过协作模式的会话的协作状态：关闭模式、基座持有三项权限、没有角色。
+ * @brief 没有角色文件、没用过协作模式的会话的协作状态：关闭模式、基座持有三项权限、没有角色、没有后台 Agent。
  * @param busy 对话 Agent 是否在运行或准备中（这时只有它一个 Agent）
  */
 export function soloTeamState(busy: boolean): TeamState {
-  return { mode: 'off', holders: baseHolders(), roles: [], busy };
+  return { mode: 'off', holders: baseHolders(), roles: [], busy, background: false };
 }
 
 /** @brief 你在发送时的选择（§5.3）：Enter 为 followUp（排队），Ctrl+Enter 为 steer（插话）。 */
@@ -89,6 +100,21 @@ export interface DecidingMessage {
   text: string;
   /** 发送时的选择；空闲时直接发送（没带 behavior）为 null */
   behavior: PromptBehavior | null;
+}
+
+/** @brief 立项判断你的消息（mori.team_deciding 的载荷，SessionInfo 与快照的 deciding，§5.3、§13.6、§13.10）。 */
+export interface TeamDeciding {
+  /** 立项持有者的角色名 */
+  role: string;
+  /** 正在判断的那条开始判断的时刻（ms）；没有在判断时为 null */
+  since: number | null;
+  /** 待判断、还没交给对话的消息，按发送顺序（含正在判断的那条） */
+  queue: DecidingMessage[];
+}
+
+/** @brief 没有待判断的消息时的 deciding（没有 Team 的会话；立项持有者为基座）。 */
+export function noDeciding(): TeamDeciding {
+  return { role: BASE_ROLE, since: null, queue: [] };
 }
 
 // ---- TaskBoard 的取值（§6.1） ----
@@ -134,8 +160,12 @@ export type RequestState = (typeof REQUEST_STATES)[number];
 export interface ToolCallBrief {
   /** 工具名 */
   toolName: string;
-  /** 标题要用的参数；command 只给第一行、≤ 200 字符 */
-  args: { path?: string; command?: string; pattern?: string };
+  /**
+   * 标题要用的参数（§13.8）：v0 工具的 path、command、pattern，TaskBoard 工具的 task、request、role、to；
+   * command 只给第一行、≤ 200 字符
+   */
+  args: { path?: string; command?: string; pattern?: string; task?: string; request?: number; role?: string;
+    to?: string };
 }
 
 /** @brief 交接链的一棒（§13.3 展开时）。 */
@@ -156,6 +186,8 @@ export interface TaskView {
   title: string;
   /** 状态 */
   status: TaskStatus;
+  /** 指派给谁（角色名） */
+  assignee: string;
   /** 谁在做：持有者的角色名，交到结案时为结案持有者；pending 与终态为 null */
   holder: string | null;
   /** 在做什么 */
@@ -198,11 +230,13 @@ export interface RequestView {
 export interface BoardView {
   /** 全部需求，按编号 */
   requests: RequestView[];
+  /** 有实例做过成功的 edit、write（右栏写明它们不在“本会话的改动”里，§13.12） */
+  teamEdited: boolean;
 }
 
 /** @brief 没有需求的 TaskBoard 视图（还没用过协作模式的会话）。 */
 export function emptyBoard(): BoardView {
-  return { requests: [] };
+  return { requests: [], teamEdited: false };
 }
 
 // ---- Agent 用的工具（§6.3） ----
@@ -401,15 +435,7 @@ export type TeamEvent =
     kind: WakeKind;
   }
   /** 立项判断你的消息：阶段行与排队区（§5.3、§13.6） */
-  | {
-    type: 'mori.team_deciding';
-    /** 立项持有者的角色名 */
-    role: string;
-    /** 正在判断的那条开始判断的时刻（ms）；没有在判断时为 null */
-    since: number | null;
-    /** 待判断、还没交给对话的消息，按发送顺序（含正在判断的那条） */
-    queue: DecidingMessage[];
-  }
+  | ({ type: 'mori.team_deciding' } & TeamDeciding)
   /** 后台实例在等你批准 */
   | ({ type: 'mori.team_approval_request' } & TeamApprovalRequest)
   /** 后台实例的批准请求结束 */

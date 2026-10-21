@@ -3,18 +3,19 @@
 
 import type {
   ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, Command, ConfigInfo, EventEnvelope, ForwardedEvent,
-  GlobalEventEnvelope, LiveStatus, QuoteRef, SavedSession, SessionState,
+  GlobalEventEnvelope, LiveStatus, QuoteRef, SavedSession, SessionState, TeamCommandResults,
 } from '../../../shared/protocol';
 import { STOPPED_BEFORE_SENDING } from '../../../shared/models';
 import { recordAction } from './actionLog';
 import { describe, request } from './bridge';
 import { persistDrafts } from './drafts';
-import { pushItem, type Transcript } from './model';
+import { addPendingPrompt, pendingPrompt, pushItem, setPendingQueued, type Transcript } from './model';
 import { loadSessions, reopenAll } from './projects';
 import { addQuote, composePrompt, stripQuotes } from './quotes';
 import { guardLeave } from './leaveGuard';
 import { skillCommandText } from './skillText';
-import { addPendingPrompt, applyEvent, finishOpenTools, pendingPrompt, setPendingQueued } from './transcript';
+import { decidesFirst, parseTeamCommand, setTeam } from './teamActions';
+import { applyEvent, finishOpenTools } from './transcript';
 import { isShown, modelStateOf, sameFile, tabByFile, tabBySession, updateTab, useApp, type Tab } from './store';
 
 /** @brief 读取配置；后台进程说要首次启动（还没有模型配置、也没有迁移成，§9.4）时进入首次启动。 */
@@ -79,21 +80,33 @@ type SendHow = 'idle' | 'pending' | 'steer' | 'followUp';
  * @brief 发送输入框里的文字和引用芯片：发给模型的全文是引用块加你的文字（quotes.ts composePrompt），
  *        芯片随命令带给后台进程，pi 记下这条消息后写成 mori.ref 条目。会话被拒绝启动时不发送（草稿不丢，§4.6）。
  *        准备中再发的按排队处理（准备中不能插话，§11.4），由后台进程暂存，pi 开始后作为排队消息交给 pi。
+ *        协作（平行 Agent 规格 §5.1）：原文是 /team on、/team off 时不发消息、改协作模式（被拒绝启动时也照样执行），
+ *        只清空文字、芯片留着；只有 /team 时不发送；/team <文字> 去掉前缀、带 team: 'once' 发出。分开时立项先判断的
+ *        消息在准备中再发时不进暂存区，由待判断队列显示在排队区（§5.3）。
  * @param behavior 生成中时：steer 插话，followUp 排队；空闲时不传
  */
 export async function send(key: string, behavior?: 'steer' | 'followUp'): Promise<void> {
   const tab = useApp.getState().tabs.find((item) => item.key === key);
-  if (!tab?.sessionId || tab.blocked) return;
+  if (!tab?.sessionId) return;
+  const command = parseTeamCommand(tab.draft);
+  if (command.kind === 'switch') {
+    updateTab(key, (current) => ({ ...current, draft: '' }));
+    await setTeam(key, command.mode);
+    return;
+  }
+  if (command.kind === 'bare' || tab.blocked) return;
+  const once = command.kind === 'once';
   const refs = tab.draftRefs;
-  const text = composePrompt(refs, tab.draft, tab.cwd);
+  const text = composePrompt(refs, once ? command.text : tab.draft, tab.cwd);
   if (!text) return;
-  const how: SendHow = isPreparing(tab) ? 'pending' : behavior ?? 'idle';
+  const preparing = isPreparing(tab);
+  const how: SendHow = preparing ? (decidesFirst(tab, once) ? 'followUp' : 'pending') : behavior ?? 'idle';
   updateTab(key, (current) => ({ ...current, draft: '', draftRefs: [], activity: Date.now(),
     transcript: beforeSend(current.transcript, text, refs, how) }));
   try {
     await request({ type: 'session.prompt', sessionId: tab.sessionId, text,
       behavior: how === 'idle' ? undefined : how === 'pending' ? 'followUp' : how,
-      refs: refs.length > 0 ? refs : undefined });
+      refs: refs.length > 0 ? refs : undefined, team: once ? 'once' : undefined });
   } catch (error) {
     const message = describe('session.prompt', error);
     updateTranscript(key, (t) => pushItem(afterFailure(t, text, how),
@@ -102,35 +115,78 @@ export async function send(key: string, behavior?: 'steer' | 'followUp'): Promis
 }
 
 /**
- * @brief 撤回排队区里的全部消息，放回输入框。pi 排队的是展开后的文字：技能命令按排队区的写法
- *        放回"/skill:名字 参数"，不放回展开后的 <skill> 块（docs/v0/screens/slash.md）。
+ * @brief 撤回、停止期间待判断队列里少了的消息是回到输入框（teamEvents.ts applyDeciding）：命令返回之前一直如此。
+ * @param run 发命令的那一段
  */
-export async function withdraw(key: string): Promise<void> {
-  const sessionId = useApp.getState().tabs.find((tab) => tab.key === key)?.sessionId;
-  if (!sessionId) return;
+async function holdingDeciding(key: string, run: () => Promise<void>): Promise<void> {
+  updateTranscript(key, (t) => ({ ...t, decidingHold: true }));
   try {
-    const cleared = await request<ClearedQueue>({ type: 'session.clearQueue', sessionId });
-    putBack(key, [...cleared.steering, ...cleared.followUp].map(skillCommandText));
-  } catch (error) {
-    describe('session.clearQueue', error);
+    await run();
+  } finally {
+    updateTranscript(key, (t) => ({ ...t, decidingHold: false }));
   }
 }
 
 /**
+ * @brief 撤回排队区里的全部消息，放回输入框。pi 排队的是展开后的文字：技能命令按排队区的写法
+ *        放回"/skill:名字 参数"，不放回展开后的 <skill> 块（docs/v0/screens/slash.md）。
+ *        协作模式下同时撤回立项还没开始判断的消息（平行 Agent 规格 §5.3），结果的 texts 按放回的顺序列出全部。
+ */
+export async function withdraw(key: string): Promise<void> {
+  const sessionId = useApp.getState().tabs.find((tab) => tab.key === key)?.sessionId;
+  if (!sessionId) return;
+  await holdingDeciding(key, async () => {
+    try {
+      const cleared = await request<ClearedQueue>({ type: 'session.clearQueue', sessionId });
+      putBack(key, cleared.texts.map(skillCommandText));
+    } catch (error) {
+      describe('session.clearQueue', error);
+    }
+  });
+}
+
+/**
  * @brief 停止：先把排队消息放回输入框，再停止生成（方案 5.8）。准备中（§11.4）只停止：后台进程撤回这条消息和暂存的
- *        消息，经 mori.prompt_error 交回文字，由 handleEvent 放回输入框。
+ *        消息，经 mori.prompt_error 交回文字，由 handleEvent 放回输入框。协作模式下立项为这次回复判断的消息与其余
+ *        待判断的消息同样经 mori.prompt_error 交回；后台的 Agent 照常运行（平行 Agent 规格 §11.4）。
  */
 export async function stop(key: string): Promise<void> {
   const tab = useApp.getState().tabs.find((item) => item.key === key);
   if (!tab?.sessionId || !(tab.transcript.running || tab.transcript.sending)) return;
+  const sessionId = tab.sessionId;
   updateTranscript(key, (t) => ({ ...t, stopRequested: true }));
   if (tab.transcript.running) await withdraw(key);
-  try {
-    await request({ type: 'session.abort', sessionId: tab.sessionId });
-  } catch (error) {
-    const message = describe('session.abort', error);
-    updateTranscript(key, (t) => pushItem(t, { kind: 'error', text: message, restore: null, live: true }));
-  }
+  await holdingDeciding(key, async () => {
+    try {
+      await request({ type: 'session.abort', sessionId });
+    } catch (error) {
+      const message = describe('session.abort', error);
+      updateTranscript(key, (t) => pushItem(t, { kind: 'error', text: message, restore: null, live: true }));
+    }
+  });
+}
+
+/**
+ * @brief Stop team（平行 Agent 规格 §11.4、§13.6）：停止这个会话的全部 Agent；结果里的待判断消息按发送顺序放回输入框。
+ *        对话在回复时“已停止”一行由它的 agent_settled 写（按停止处理）；对话没在回复时命令返回后写一行。
+ */
+export async function stopTeam(key: string): Promise<void> {
+  const tab = useApp.getState().tabs.find((item) => item.key === key);
+  if (!tab?.sessionId) return;
+  const sessionId = tab.sessionId;
+  const running = tab.transcript.running;
+  if (running) updateTranscript(key, (t) => ({ ...t, stopRequested: true }));
+  await holdingDeciding(key, async () => {
+    try {
+      const result = await request<TeamCommandResults['session.stopTeam']>({ type: 'session.stopTeam', sessionId });
+      if (result.error) throw new Error(result.error);
+      putBack(key, result.texts);
+      if (!running) updateTranscript(key, (t) => pushItem(t, { kind: 'stopped' }));
+    } catch (error) {
+      const message = describe('session.stopTeam', error);
+      updateTranscript(key, (t) => pushItem(t, { kind: 'error', text: message, restore: null, live: true }));
+    }
+  });
 }
 
 /**
@@ -260,6 +316,10 @@ function liveChange(live: LiveStatus, event: ForwardedEvent): LiveStatus | null 
     case 'mori.prompt_error': return { ...live, running: event.running };
     // 段开始时就等不到模型（§5.8）：后台进程只发这一个事件，没有 prompt_error 或 agent_settled。
     case 'mori.model_unavailable': return event.firstRequest ? { ...live, running: false } : null;
+    // 协作（平行 Agent 规格 §13.6、§13.10）：对话以外还有 Agent 在运行或排队、或有待判断的消息；后台批准卡。
+    case 'mori.team_state': return { ...live, teamBusy: event.background };
+    case 'mori.team_approval_request': return { ...live, teamApproval: true };
+    case 'mori.team_approval_end': return { ...live, teamApproval: false };
     default: return null;
   }
 }
@@ -290,7 +350,17 @@ function handleUntabbed(envelope: EventEnvelope): void {
       sessions: state.saved.sessions.map((item) => (item === saved ? { ...item, ...change } : item)) },
     rowMarks: event.type === 'agent_settled' ? { ...state.rowMarks, [saved.sessionFile]: 'unseen' } : state.rowMarks,
   }));
-  if (event.type === 'mori.approval_request') void requestAttention();
+  if (event.type === 'mori.approval_request' || event.type === 'mori.team_approval_request') void requestAttention();
+}
+
+/** @brief 协作状态与 TaskBoard 视图的事件记到会话上（平行 Agent 规格 §13.10）。 */
+function withTeamEvent(tab: Tab, event: ForwardedEvent): Tab {
+  if (event.type === 'mori.team_state') {
+    const { type: _type, ...team } = event;
+    return { ...tab, team };
+  }
+  if (event.type !== 'mori.board') return tab;
+  return { ...tab, board: { requests: event.requests, teamEdited: event.teamEdited } };
 }
 
 /**
@@ -314,6 +384,9 @@ export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void
   if (event.type === 'mori.model_state' || event.type === 'thinking_level_changed') {
     updateTab(tab.key, (current) => withModelEvent(current, event));
   }
+  if (event.type === 'mori.team_state' || event.type === 'mori.board') {
+    updateTab(tab.key, (current) => withTeamEvent(current, event));
+  }
   if (event.type === 'agent_settled' && !isShown(tab.key)) {
     updateTab(tab.key, (current) => ({ ...current, unseen: true }));
   }
@@ -322,7 +395,7 @@ export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void
     updateTab(tab.key, (current) => ({ ...current, activity: Date.now() }));
   }
   if (['turn_end', 'compaction_end', 'agent_settled'].includes(event.type)) void refreshUsage(tab.key);
-  if (event.type === 'mori.approval_request') void requestAttention();
+  if (event.type === 'mori.approval_request' || event.type === 'mori.team_approval_request') void requestAttention();
 }
 
 /**
@@ -346,10 +419,13 @@ export function handleKernelExit(): void {
     rowMarks: { ...state.rowMarks, ...Object.fromEntries(state.saved.sessions.filter((item) => item.live?.running
       && !state.tabs.some((tab) => sameFile(tab.sessionFile, item.sessionFile)))
       .map((item) => [item.sessionFile, 'error' as const])) },
+    // 协作：后台的 Agent、批准卡和待判断的消息随后台进程一起没了；开关保留最后知道的模式（team-switch.md）。
     tabs: state.tabs.map((tab) => ({ ...tab, sessionId: null,
       interrupted: tab.interrupted || tab.transcript.running || tab.transcript.sending,
+      team: { ...tab.team, busy: false, background: false },
       transcript: { ...withoutPending(finishOpenTools(tab.transcript, 'interrupted')), running: false, sending: false,
-        stage: null, modelStage: null, pendingQueue: [], steering: [], followUp: [], stopRequested: false } })),
+        stage: null, modelStage: null, pendingQueue: [], steering: [], followUp: [], stopRequested: false,
+        teamApprovals: [], deciding: null, wakes: [], decidingHold: false } })),
   }));
 }
 

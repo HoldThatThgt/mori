@@ -31,7 +31,8 @@ const CARD = `${P}[data-testid="approval-card"]`;
 const READ_ONLY_TOOLS = ['read', 'grep', 'find', 'ls'];
 const REJECTED_REASON_PREFIX = 'Rejected by the user. Reason: ';
 const COMMAND_TOOLS = ['bash', 'powershell'];
-const MENU_NOTE = /只作用于这个会话，新会话从.每次询问.开始/;
+// 平行 Agent 规格 §11.1：权限菜单的说明作用于这个用户会话的全部 Agent。
+const MENU_NOTE = /Applies to all agents in this session\. New sessions start at Ask each time\./;
 const F8_NOTE = '会附上截图、当前界面和最近的操作记录，保存在本机，不会发给模型';
 
 /** @brief 读取一个 M2 录制文件。 */

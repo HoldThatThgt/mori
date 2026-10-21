@@ -6,6 +6,7 @@ import {
   DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextUsage, type ModelState, type ProjectTrust,
   type QuoteRef, type SavedSession,
 } from '../../../shared/protocol';
+import { emptyBoard, soloTeamState, type BoardView, type TeamState } from '../../../shared/team';
 import { loadArchived } from './archive';
 import { emptyTranscript, type Transcript } from './model';
 
@@ -65,6 +66,13 @@ export interface Tab extends ModelState {
   contextUsage: ContextUsage | null;
   /** 批准设置（权限与"本会话已允许"），以后台进程返回的为准 */
   approval: ApprovalState;
+  /**
+   * 协作状态（平行 Agent 规格 §13.10）：会话信息、mori.team_state 与 session.setTeam 的结果；
+   * 后台进程退出后保留最后知道的模式（开关照它显示、不可用，team-switch.md）
+   */
+  team: TeamState;
+  /** 这个用户会话的 TaskBoard 视图：会话信息与 mori.board（进展摘要、右栏的说明） */
+  board: BoardView;
   /** 对话流 */
   transcript: Transcript;
   /** 输入框草稿 */
@@ -174,7 +182,7 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
     activity: Date.now(), unseen: false, interrupted: false, projectTrust: 'none', trustRemembered: false,
     trustSaveError: null, extensionErrors: [], pick: null, current: null, blocked: null,
     thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, pickLocked: false, contextUsage: null,
-    approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '',
+    approval: DEFAULT_APPROVAL, team: soloTeamState(false), board: emptyBoard(), transcript: emptyTranscript, draft: '',
     draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
     refPending: [], phase: 'opening', error: null, ...fields };
 }

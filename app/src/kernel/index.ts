@@ -4,6 +4,7 @@ import type { MessagePortMain } from 'electron';
 import { CommandSchema, type EventEnvelope, type GlobalEventEnvelope, type KernelMessage } from '../shared/protocol';
 import { handleCommand } from './commands';
 import { onStoreKeyResult } from './credentials';
+import { setUserData } from './instances';
 import { closeSharedServers, startSharedServers } from './mcpShare';
 import { startModelLayer } from './modelLayer';
 import { loadPi } from './pi';
@@ -87,6 +88,8 @@ process.parentPort.on('message', (event) => {
   const message = event.data as MainToKernel;
   if (message?.type === 'port' && event.ports[0]) attachPort(event.ports[0]);
   if (message?.type === 'start') {
+    // 每个用户会话的 TaskBoard 放在 <userData>/teams/<会话 id> 下（平行 Agent 规格 §3）。
+    setUserData(message.userData);
     void startModels(message.userData, message.keys);
     // 照 Claude 桌面版，启动时就起用户级启用的 stdio MCP 服务（docs/v0/m6-mcp-shared.md），在后台连接、不挡住命令。
     // 主进程把后台进程放进作业对象之后才发 key（kernel-process.ts），这之后起的服务进程都在作业里。

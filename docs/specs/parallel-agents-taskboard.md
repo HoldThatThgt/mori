@@ -77,14 +77,15 @@
 | 读会话 | `kernel/sessionReader.ts` | `read_session` 的整理文本（纯函数，§10.2） |
 | 证据 | `kernel/evidence.ts` | 编号、核对、作者判定（纯函数，§7.3） |
 | 强制填写 | `kernel/handoffForm.ts`；`kernel/forcedWrite.ts` | 按写入等级改写请求、解析回复（§7.5）；`forcedWrite.ts` 是从 `probes.ts` 移出的三种写法，探针与强制填写共用 |
-| 协作 | `kernel/team.ts` | 每个用户会话一个 `Team`：协作模式、实例表、投递队列与唤醒、调度、写入锁、事件、恢复（§5、§8、§9、§11） |
+| 协作 | `kernel/team.ts`；`teamFlow.ts`、`teamRuns.ts`、`teamTools.ts`、`teamLanes.ts`、`teamView.ts`、`teamExtension.ts` | 每个用户会话一个 `Team`：协作模式、实例表、投递队列与唤醒、调度、写入锁、事件、恢复（§5、§8、§9、§11）。按文件行数上限拆开：分开时用户消息的判断与交给对话（`teamFlow.ts`）、一次运行的开始与结束（`teamRuns.ts`）、工具的执行（`teamTools.ts`）、每个会话的投递队列（`teamLanes.ts`）、TaskBoard 视图（`teamView.ts`）、`mori-team` 扩展（`teamExtension.ts`） |
+| 接口 | `kernel/teamHost.ts` | `Team` 与会话表之间的类型（只有类型） |
 | 实例 | `kernel/instances.ts` | 新建、打开、继续、关闭实例的 pi 会话（§8.2） |
 | 批准 | `kernel/approval.ts`（改） | 一个用户会话一份批准状态，看板工具免批准（§11） |
 | 会话 | `kernel/sessions.ts`（改） | 建会话的选项（工具白名单、附加 prompt、目录、候选来源、调度类别）、不进侧栏的实例、程序发起的运行、协作模式下的发送（§5、§8.2、§14） |
 | 扩展询问 | `kernel/extensionUi.ts`（改） | 实例会话的询问不出卡（§8.2） |
 | 模型层 | `kernel/modelSession.ts`、`selector.ts`、`modelTypes.ts`、`modelPool.ts`、`modelContext.ts`、`modelLayer.ts`、`modelTimings.ts`（改） | §12 |
 | 进程桥 | `shared/team.ts`（新）、`shared/protocol.ts`、`shared/models.ts` | §13.10 |
-| 删除 | `main/index.ts`（改） | 删除用户会话时一并删除它的 TaskBoard 目录（§11.5） |
+| 删除 | `main/index.ts`（改）、`main/teamDir.ts` | 删除用户会话时一并删除它的 TaskBoard 目录（§11.5） |
 | 界面 | `renderer/src/components/`、`state/` | §13 |
 
 ## 3. 数据文件
@@ -1175,6 +1176,7 @@ interface TaskView {
 | 协作开关的窄栏宽度 | 600px |
 | 给 `conversation`、`decision` 留的槽位 | 每个 key 1 个（`task`、`background` 最多占并发上限 − 1；并发上限为 1 时不留） |
 | 命令与界面名 | `/team`、`/team on`、`/team off`、`Team`（proposal 的暂定名；`/team off` 为派生） |
+| 基座的一句话说明（`next`、`assignee`、“Other roles”） | `General-purpose agent with the default tools` |
 | 程序注入的文字 | 英文（附录 A、§8.5） |
 | 界面文字 | §13 |
 
@@ -1194,7 +1196,7 @@ interface TaskView {
 | `docs/v0/screens/approval.md`、`tool-cards.md`、`chat.md`、`tools.md`、`sessions.md`、`f8.md`，`docs/v1/screens/model-menu.md`、`model-chat.md` | 被本规格改到的行注明“协作模式：见 docs/specs/parallel-agents-taskboard.md §x” |
 | `docs/v1/team-checks.md` | 新建：检查记录、负责人不在时定下的选择、实测结果、未验证项 |
 | `app/src/kernel/` | §2 的新文件；`sessions.ts`、`approval.ts`、`extensionUi.ts`、`entries.ts`、`resources.ts`（工具来源 `Mori`）、`commands.ts`、`index.ts`、`probes.ts`（改用 `forcedWrite.ts`）、模型层各文件（§12） |
-| `app/src/main/index.ts` | 删除会话时一并删除 `teams/<id>`（§11.5） |
+| `app/src/main/index.ts`、`teamDir.ts`（新） | 删除会话时一并删除 `teams/<id>`（§11.5） |
 | `app/src/shared/` | `team.ts`（新）、`protocol.ts`、`models.ts`（新的排除原因、`BlockedKind` `agents_invalid`、`BlockedAction` `check_agents` 与 `turn_off_team`、`ModelBlocked.problems`、`pickLocked`、调度类别） |
 | `app/src/renderer/` | §13：协作开关、回执与进展摘要、批准卡归属与后台卡的队列、模型按钮锁定、阶段行与 `Stop team`、`/team` 识别、待判断的消息与排队区、`wake` 条目与回合、历史条目、工具卡标题、拒绝启动卡、侧栏状态与归档删除的判断（`sessionRows.ts`、`projects.ts`、`actions.ts`）、权限菜单说明、F8（`actionLog.ts`、`IssueDialog.tsx`） |
 | `app/tests/` | §17 |

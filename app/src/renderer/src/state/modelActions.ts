@@ -160,8 +160,8 @@ export async function checkAgents(key: string): Promise<string | null> {
 }
 
 /**
- * @brief 拒绝启动卡的"Turn off team mode"（平行 Agent 规格 §5.1、§12.11）：关掉协作模式；之后由 mori.team_state 与
- *        mori.model_state 更新开关与卡片。
+ * @brief 拒绝启动卡与说明卡的"Turn off team mode"（平行 Agent 规格 §5.1、§12.11）：关掉协作模式，返回的协作状态记到
+ *        会话上；之后由 mori.model_state 更新模型按钮与卡片。
  * @return 失败时的原文；成功时为 null
  */
 export async function turnOffTeam(key: string): Promise<string | null> {
@@ -171,6 +171,8 @@ export async function turnOffTeam(key: string): Promise<string | null> {
     const result = await request<TeamCommandResults['session.setTeam']>({ type: 'session.setTeam', sessionId,
       mode: 'off' });
     if (result.error) throw new Error(result.error);
+    const { error: _error, ...team } = result;
+    updateTab(key, (tab) => ({ ...tab, team }));
     return null;
   } catch (error) {
     return describe('session.setTeam', error);

@@ -9,6 +9,9 @@ import { openModelsSettings } from '../state/settings';
 import type { Tab } from '../state/store';
 import { CandidateList } from './UnavailableCard';
 
+/** 会话不空闲时 Check again 的悬停说明（临时，docs/v1/screens/team-blocked.md） */
+const CHECK_BUSY_TITLE = 'Available when nothing is running in this session';
+
 /** 按钮的顺序（同状态表） */
 const ACTION_ORDER: readonly BlockedAction[] = [
   'check_agents', 'verify', 'allow_zone', 'confirm_zone', 'change_model', 'turn_off_team', 'open_settings',
@@ -81,6 +84,8 @@ export function BlockedCard({ tab }: { tab: Tab }) {
 function BlockedCardBody({ tab, blocked }: { tab: Tab; blocked: ModelBlocked }) {
   const [problem, setProblem] = useState<string | null>(null);
   const { title, note } = cardText(blocked, tab.pick);
+  // Check again 只在会话空闲时可用（§4.4）：对话没在回复或准备中，后台也没有 Agent 在运行或排队。
+  const busy = tab.transcript.running || tab.transcript.sending || tab.team.background;
   const actions = ACTION_ORDER.filter((action) => blocked.actions.includes(action));
   // verifying 只写第一个正在验证的候选，不列其他候选（状态表）。
   const candidates = blocked.kind === 'verifying' ? [] : blocked.candidates;
@@ -97,12 +102,16 @@ function BlockedCardBody({ tab, blocked }: { tab: Tab; blocked: ModelBlocked }) 
       {problem && <div className="model-card-problem" role="alert">{problem}</div>}
       {actions.length > 0 && (
         <div className="model-card-actions">
-          {actions.map((action) => (
-            <button key={action} className="button compact" data-action={action.replaceAll('_', '-')}
-              onClick={() => { setProblem(null); void runAction(action, blocked, tab).then(setProblem); }}>
-              {actionLabel(action, blocked)}
-            </button>
-          ))}
+          {actions.map((action) => {
+            const unavailable = action === 'check_agents' && busy;
+            return (
+              <button key={action} className="button compact" data-action={action.replaceAll('_', '-')}
+                disabled={unavailable} title={unavailable ? CHECK_BUSY_TITLE : undefined}
+                onClick={() => { setProblem(null); void runAction(action, blocked, tab).then(setProblem); }}>
+                {actionLabel(action, blocked)}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

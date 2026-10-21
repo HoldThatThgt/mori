@@ -1,5 +1,5 @@
 // 顶栏的权限菜单：每次询问 / 全部允许，"本会话已允许"的列表可以逐项清除（docs/v0/screens/approval.md）。
-// 只作用于这个会话；切到"全部允许"前确认一次，切回"每次询问"不需要确认。
+// 只作用于这个会话（含它的全部后台 Agent，平行 Agent 规格 §11.1）；切到"全部允许"前确认一次，切回"每次询问"不需要确认。
 
 import { useEffect, useRef, useState } from 'react';
 import type { ApprovalMode } from '../../../shared/protocol';
@@ -39,7 +39,7 @@ function PermissionPanel({ tab, onChoose }: { tab: Tab; onChoose: (mode: Approva
         ))}
       </ul>
       {allowed.length === 0 && <div className="menu-empty">还没有</div>}
-      <p className="menu-note">只作用于这个会话，新会话从'每次询问'开始</p>
+      <p className="menu-note">Applies to all agents in this session. New sessions start at Ask each time.</p>
     </div>
   );
 }

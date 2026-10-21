@@ -156,7 +156,7 @@ function importUrl(url: string): Promise<Record<string, unknown>> {
  * @brief pi 的包目录：pi 按它自己的 dist 所在位置找到的（getPackageDir），开发构建和 app.asar 里都一样；
  *        核对包名和版本是对照过内部文件的版本（载入 pi 之前去掉了 PI_PACKAGE_DIR，pi.ts，所以这就是 Mori 自带的 pi）。
  */
-function piPackageDir(pi: Pi): string {
+export function piPackageDir(pi: Pi): string {
   const dir = pi.getPackageDir();
   const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name?: unknown; version?: unknown };
   if (manifest.name !== PI_PACKAGE || manifest.version !== PI_REVIEWED_VERSION || pi.VERSION !== PI_REVIEWED_VERSION) {

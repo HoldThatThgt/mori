@@ -7,7 +7,7 @@ import {
   type ThinkingLevel,
 } from './models';
 import {
-  TEAM_SWITCH, type BoardView, type DecidingMessage, type TeamApprovalRequest, type TeamEvent, type TeamState,
+  TEAM_SWITCH, type BoardView, type TeamApprovalRequest, type TeamDeciding, type TeamEvent, type TeamState,
 } from './team';
 
 // 界面只经这里引用 pi 的类型。
@@ -489,8 +489,8 @@ export interface SessionInfo extends ModelState {
   board: BoardView;
   /** 挂起的后台实例批准卡，按到达顺序 */
   teamApprovals: TeamApprovalRequest[];
-  /** 待判断、还没交给对话的消息，按发送顺序（§5.3） */
-  deciding: DecidingMessage[];
+  /** 待判断、还没交给对话的消息与正在判断的那条开始的时刻，与 mori.team_deciding 的载荷相同（§5.3、§13.10） */
+  deciding: TeamDeciding;
 }
 
 /** @brief 一个等你回答的扩展询问（mori.ui_request）。 */
@@ -557,8 +557,8 @@ export interface LiveSnapshot {
   board: BoardView;
   /** 挂起的后台实例批准卡，按到达顺序 */
   teamApprovals: TeamApprovalRequest[];
-  /** 待判断、还没交给对话的消息，按发送顺序（§5.3） */
-  deciding: DecidingMessage[];
+  /** 待判断、还没交给对话的消息与正在判断的那条开始的时刻，与 mori.team_deciding 的载荷相同（§5.3、§13.10） */
+  deciding: TeamDeciding;
 }
 
 /** @brief session.open 的结果：会话信息加 pi 记录的当前分支（SessionManager.getBranch）。 */
@@ -643,8 +643,8 @@ export type KernelEvent =
     type: 'mori.prompt_error';
     /** 错误原文 */
     message: string;
-    /** 没发出去的提示原文，界面放回输入框 */
-    text: string;
+    /** 没发出去的提示原文，界面放回输入框；程序投递到用户会话的消息不放回，为 null（平行 Agent 规格 §5.6） */
+    text: string | null;
     /** 这条提示带的引用芯片，界面连同芯片一起放回；没有时为 null（M3 之前的录制里没有这个字段） */
     refs?: QuoteRef[] | null;
     /** 这时会话是否还在运行（插话、排队的提示失败时本轮可能还在继续） */
@@ -737,7 +737,8 @@ export interface TeamCommandResults {
   'session.setTeam': TeamState & TeamResult;
   'board.get': BoardView & TeamResult;
   'session.recheckAgents': SessionInfo & TeamResult;
-  'session.stopTeam': TeamResult;
+  /** texts：回到输入框的待判断消息，按发送顺序（§11.4） */
+  'session.stopTeam': { texts: string[] } & TeamResult;
 }
 
 /** @brief 转发给界面的事件。 */

@@ -17,6 +17,8 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
+// 回放桥当作只读查询回答、不占回放顺序的命令，与回放桥用同一份列表（平行 Agent 规格 §17.4）。
+import { QUERIES } from './harness/replay.js';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { activeFile, samePath, settle, titleOf, until, waitReady } from './m3-helpers.mjs';
 import {
@@ -36,9 +38,6 @@ mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder('replay harness');
 const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) }).catch(() => {});
 
-/** 回放桥当作只读查询回答、不占回放顺序的命令（与 harness/replay.js 的 QUERIES 相同） */
-const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
-  'agents.get', 'session.commands', 'models.get', 'session.pickOptions'];
 /** 回复不在了时详情里的说明（review.md "回到原位置"） */
 const CHANGED = '原文已变化：会话里找不到这条回复了';
 /** synthetic：回放桥给导出返回的第一个路径（harness/replay.js 的 reviewStubs） */

@@ -20,6 +20,7 @@ import './styles/models.css';
 import './styles/tools.css';
 import './styles/review.css';
 import './styles/slash.css';
+import './styles/team.css';
 
 connectKernel();
 

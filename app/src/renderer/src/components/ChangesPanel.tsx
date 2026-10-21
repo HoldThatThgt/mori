@@ -1,5 +1,6 @@
 // 右栏：本会话编辑或写入过的文件，按时间顺序显示每次编辑的 diff，写入显示新内容；文件阅读器（方案 5.9，
 // docs/v0/screens/changes.md）。照 Claude 桌面版：按文件折叠的 diff 列表，文件行上有打开文件的按钮。
+// 只列对话流里的编辑与写入；后台实例改过文件时列表上方写明它们不在这里（docs/v1/screens/team-blocked.md "右栏"）。
 
 import type { ToolCall, Transcript } from '../state/model';
 import { openFile } from '../state/quotes';
@@ -62,6 +63,8 @@ function Change({ tool, index }: { tool: ToolCall; index: number }) {
 /** @brief 改动列表。 */
 function ChangesList({ tab, onClose }: { tab: Tab; onClose: () => void }) {
   const files = collectChanges(tab.transcript, tab.cwd);
+  // 后台实例改的文件不在列表里（平行 Agent 规格 §13.12）：有实例改过文件时写明，列表为空时只有这一句。
+  const teamEdited = tab.board.teamEdited;
   return (
     <>
       <div className="panel-header">
@@ -69,7 +72,9 @@ function ChangesList({ tab, onClose }: { tab: Tab; onClose: () => void }) {
         <button className="icon-button" onClick={onClose} aria-label="关闭右栏"><Icon name="close" /></button>
       </div>
       <div className="panel-body" data-testid="changes">
-        {files.length === 0 ? <p className="muted">本会话还没有改动</p> : (
+        {teamEdited && <p className="panel-note" data-testid="team-changes-note">
+          Changes made by team tasks aren't listed here.</p>}
+        {files.length === 0 ? !teamEdited && <p className="muted">本会话还没有改动</p> : (
           <>
             <p className="panel-note">只含编辑和写入，命令改动的文件不在此列。</p>
             {files.map((file) => (

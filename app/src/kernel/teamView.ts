@@ -1,0 +1,139 @@
+// TaskBoard 的视图（docs/specs/parallel-agents-taskboard.md §13.3、§13.10）：board.json 加上调度与实例的运行状态，
+// 投影成界面看的 BoardView（需求状态、task 的 phase、等待的 task、当前工具调用、模型提示、交接链），
+// 以及 mori.board 的合并发送（最多每 250 毫秒一次，§15）。投影是纯函数。
+
+import type { BoardView, RequestView, TaskPhase, TaskView, TeamHolders, ToolCallBrief } from '../shared/team';
+import { findTask, requestState, ruledOut, tasksOf } from './board';
+import { handoffLink } from './boardText';
+import type { Board, BoardTask, ScheduleWait } from './teamTypes';
+
+/** @brief mori.board 合并发送的间隔（§13.3、§15），毫秒。 */
+export const BOARD_EVENT_INTERVAL_MS = 250;
+
+/** @brief 一个 task 的实例此刻的运行状态（持有它的角色的 task 实例）。 */
+export interface TaskLive {
+  /** 实例在运行：还没调用工具（starting）、在调用工具（running）、在等你批准（approval）；没在运行时为 null */
+  phase: 'starting' | 'running' | 'approval' | null;
+  /** 最近一次工具调用 */
+  current: ToolCallBrief | null;
+  /** 最近一条换模型或等待的提示（§12.12） */
+  modelNote: string | null;
+}
+
+/** @brief 投影要用的运行状态。 */
+export interface ViewInput {
+  /** 三项权限的持有者（结案时的 holder 写结案持有者） */
+  holders: TeamHolders;
+  /** 调度的结果里交给了角色却没开始的 task（排队、等写入锁） */
+  waiting: readonly ScheduleWait[];
+  /** task 编号 → 它的实例的运行状态 */
+  live: ReadonlyMap<string, TaskLive>;
+  /** 有实例做过成功的 edit、write（§13.12） */
+  teamEdited: boolean;
+}
+
+/** @brief 还没完成的依赖。 */
+function unfinishedDeps(board: Board, task: BoardTask): string[] {
+  return task.dependsOn.filter((id) => findTask(board, id)?.status !== 'done');
+}
+
+/** @brief 交给了角色的 task 的 phase：在运行、排队、等写入锁，或刚交出去还在准备（starting）。 */
+function activePhase(task: BoardTask, input: ViewInput): Pick<TaskView, 'phase' | 'waitingFor' | 'current'> {
+  const live = input.live.get(task.id);
+  if (live?.phase) {
+    return { phase: live.phase, waitingFor: [], current: live.phase === 'running' ? live.current : null };
+  }
+  const wait = input.waiting.find((item) => item.task === task.id);
+  if (wait?.phase === 'lock_wait') return { phase: 'lock_wait', waitingFor: [wait.lockHolder ?? ''], current: null };
+  if (wait?.phase === 'queued') return { phase: 'queued', waitingFor: [], current: null };
+  return { phase: 'starting', waitingFor: [], current: null };
+}
+
+/** @brief task 的 phase、等待的 task 与当前工具调用（§13.3 的 phase 文字）。 */
+function phaseOf(board: Board, task: BoardTask, input: ViewInput): Pick<TaskView, 'phase' | 'waitingFor' | 'current'> {
+  const simple = (phase: TaskPhase): Pick<TaskView, 'phase' | 'waitingFor' | 'current'> => ({
+    phase, waitingFor: [], current: null,
+  });
+  switch (task.status) {
+    case 'pending': return { phase: 'pending', waitingFor: unfinishedDeps(board, task), current: null };
+    case 'active': return task.holder?.kind === 'close' ? simple('with_close') : activePhase(task, input);
+    case 'waiting_user': return simple(task.asked ? 'asked' : 'waiting_user');
+    case 'stopped': return simple(task.stopReason === 'restart' ? 'stopped_restart' : 'stopped');
+    default: return simple(task.status);
+  }
+}
+
+/** @brief task 的持有者：角色名，交到结案时为结案持有者；pending 与终态为 null。 */
+function holderOf(task: BoardTask, holders: TeamHolders): string | null {
+  if (task.holder === null || task.status === 'pending') return null;
+  return task.holder.kind === 'role' ? task.holder.role : holders.close;
+}
+
+/**
+ * @brief 一个 task 的视图（§13.10）。
+ * @param board TaskBoard
+ * @param task task
+ * @param input 运行状态
+ */
+export function taskView(board: Board, task: BoardTask, input: ViewInput): TaskView {
+  return {
+    id: task.id, title: task.title, status: task.status, assignee: task.assignee,
+    holder: holderOf(task, input.holders), ...phaseOf(board, task, input),
+    modelNote: input.live.get(task.id)?.modelNote ?? null,
+    chain: task.handoffs.map(handoffLink),
+  };
+}
+
+/**
+ * @brief 整块 TaskBoard 的视图（§13.10）：每个需求的状态（§13.3 的顺序）、已排除的方案与它的全部 task。
+ * @param board TaskBoard
+ * @param input 运行状态
+ */
+export function boardView(board: Board, input: ViewInput): BoardView {
+  const requests = board.requests.map((request): RequestView => ({
+    no: request.no, title: request.title, status: request.status, state: requestState(board, request),
+    createdAt: request.createdAt, closedAt: request.closedAt, conclusion: request.conclusion,
+    ruledOut: ruledOut(board, request.no), question: request.question,
+    tasks: tasksOf(board, request.no).map((task) => taskView(board, task, input)),
+  }));
+  return { requests, teamEdited: input.teamEdited };
+}
+
+/** @brief TaskBoard 上有交接记下了改过代码的模型族（重新打开后 teamEdited 的来源，§13.12）。 */
+export function boardEdited(board: Board): boolean {
+  return board.tasks.some((task) => task.handoffs.some((handoff) => handoff.authorFamilies.length > 0));
+}
+
+/** @brief 合并发送：第一次立即发，之后每个间隔内最多一次，间隔内又有变化时在间隔结束时补发一次。 */
+export class Throttle {
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private dirty = false;
+
+  /**
+   * @param intervalMs 间隔（毫秒）
+   * @param fire 发送
+   */
+  constructor(private readonly intervalMs: number, private readonly fire: () => void) {}
+
+  /** @brief 有变化：可以发时立即发，否则在间隔结束时发。 */
+  request(): void {
+    if (this.timer !== null) {
+      this.dirty = true;
+      return;
+    }
+    this.fire();
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      if (!this.dirty) return;
+      this.dirty = false;
+      this.request();
+    }, this.intervalMs);
+  }
+
+  /** @brief 不再发（会话关闭）。 */
+  cancel(): void {
+    if (this.timer !== null) clearTimeout(this.timer);
+    this.timer = null;
+    this.dirty = false;
+  }
+}

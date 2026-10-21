@@ -2,8 +2,10 @@
 // 默认折叠，展开看参数、输出和 diff。读取、修改、写入的标题里的路径是按钮，点它在右栏打开文件阅读器（M4）。
 
 import { memo, useEffect, useState } from 'react';
+import { seatRolesOf } from '../../../shared/team';
 import type { ToolCall, ToolStatus } from '../state/model';
 import { openFile } from '../state/quotes';
+import { useApp } from '../state/store';
 import { Diff } from './Diff';
 import { toolTitle } from './toolTitle';
 
@@ -109,7 +111,9 @@ function TitleTarget({ tool, target, tabKey }: { tool: ToolCall; target: string;
 export const ToolCard = memo(function ToolCard({ tool, cwd, tabKey }: { tool: ToolCall; cwd: string; tabKey: string }) {
   const now = useNow(tool.status === 'running');
   const [open, setOpen] = useState(false);
-  const title = toolTitle(tool, cwd);
+  // agent_message 的标题按协作模式分 Message / Ask（平行 Agent 规格 §13.8）。
+  const team = useApp((state) => state.tabs.find((item) => item.key === tabKey)?.team);
+  const title = toolTitle(tool, cwd, team ? seatRolesOf(team) : []);
   return (
     <details className={`tool-card status-${tool.status}`} data-testid="tool-card" data-status={tool.status}
       onToggle={(event) => setOpen(event.currentTarget.open)}>

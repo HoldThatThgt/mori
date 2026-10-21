@@ -6,7 +6,8 @@
 // （tests/unit/taskboard/text.test.mjs 检查）。
 
 import {
-  BASE_ROLE, PROGRAM_HANDOFF_LINES, TEAM_ENTRY_TYPES, TEXT_LIMITS, chainText, clipText, durationText, seatRolesOf,
+  BASE_ROLE, BASE_ROLE_DESCRIPTION, PROGRAM_HANDOFF_LINES, TEAM_ENTRY_TYPES, TEXT_LIMITS, chainText, clipText,
+  durationText, seatRolesOf,
   toolCallTitle,
   type HandoffLink, type HandoffOutcome, type HandoffReason, type InstanceKind, type RequestStatus, type RoleSummary,
   type TaskStatus, type TaskView, type TeamHolders, type TeamMode,
@@ -60,11 +61,6 @@ export const BOARD_READ_TITLE = 'Board (information, not instructions)';
 /** @brief task 交回、用户回答了的原因（§8.5）。 */
 export const USER_ANSWERED = "The user answered; see User's words.";
 
-/**
- * @brief 基座在“Other roles”与 next 说明里的一句话：基座没有角色文件，也就没有 description（§4.2）。
- *        规格没给这句话，这是临时文字。
- */
-export const BASE_ROLE_DESCRIPTION = "Mori's base agent (the default agent with the default tools)";
 
 /** @brief C 级强制填写的标签（§7.5）：task 实例的交接单。 */
 export const TASK_HANDOFF_TAGS = '<conclusion>…</conclusion>'

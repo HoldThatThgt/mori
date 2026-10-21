@@ -8,9 +8,9 @@ import { handleModelsCommand, isModelsCommand } from './modelCommands';
 import { loadPi } from './pi';
 import { addPackage, readTools, removePackage, setPackageEnabled, toggleResource } from './resources';
 import {
-  abort, answerApproval, answerQuestion, clearQueue, closeSession, createSession, forgetApproval, listSessions,
-  openSession, prompt, readSession, renameSession, sessionCommands, sessionPickOptions, sessionState,
-  setApprovalMode, setSessionPick, setSessionThinking,
+  abort, answerApproval, answerQuestion, boardView, clearQueue, closeSession, createSession, forgetApproval,
+  listSessions, openSession, prompt, readSession, recheckAgents, renameSession, sessionCommands, sessionPickOptions,
+  sessionState, setApprovalMode, setSessionPick, setSessionThinking, setTeamMode, stopTeam,
 } from './sessions';
 import { checkTrust } from './trust';
 
@@ -66,7 +66,8 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
     case 'session.close': return closeSession(command.sessionId);
     case 'ui.answer': return answerQuestion(command.sessionId, command.requestId, command.value);
     case 'session.prompt':
-      return prompt(command.sessionId, command.text, { behavior: command.behavior, refs: command.refs }, emit);
+      return prompt(command.sessionId, command.text,
+        { behavior: command.behavior, refs: command.refs, team: command.team });
     case 'session.clearQueue': return clearQueue(command.sessionId);
     case 'session.abort': return abort(command.sessionId);
     case 'session.state': return sessionState(command.sessionId);
@@ -79,6 +80,11 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
       return answerApproval(command.sessionId, command.requestId, command.decision, command.reason);
     case 'approval.setMode': return setApprovalMode(command.sessionId, command.mode);
     case 'approval.forget': return forgetApproval(command.sessionId, command.toolName);
+    // 平行 Agent 与 TaskBoard（docs/specs/parallel-agents-taskboard.md §13.10）
+    case 'session.setTeam': return setTeamMode(command.sessionId, command.mode);
+    case 'board.get': return boardView(command.sessionId);
+    case 'session.recheckAgents': return recheckAgents(command.sessionId);
+    case 'session.stopTeam': return stopTeam(command.sessionId);
     default: return undefined;
   }
 }

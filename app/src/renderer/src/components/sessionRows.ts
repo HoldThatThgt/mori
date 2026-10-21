@@ -38,13 +38,16 @@ export const STATUS_TEXT: Record<SessionStatus, string> = {
   approval: '等你批准', question: '等你回答', running: '生成中', error: '出错', unseen: '有新结果',
 };
 
-/** @brief 本次打开过的会话的状态；同时满足时取前面的。 */
+/**
+ * @brief 本次打开过的会话的状态；同时满足时取前面的。后台实例的批准卡也是等你批准；只有后台的 Agent 在运行或排队、
+ *        或有待判断的消息时也是生成中（平行 Agent 规格 §13.6）。
+ */
 export function sessionStatus(tab: Tab | undefined): SessionStatus | null {
   if (!tab) return null;
   const { transcript } = tab;
-  if (transcript.approvals.length > 0) return 'approval';
+  if (transcript.approvals.length + transcript.teamApprovals.length > 0) return 'approval';
   if (transcript.questions.length > 0) return 'question';
-  if (transcript.running || transcript.sending) return 'running';
+  if (transcript.running || transcript.sending || tab.team.background) return 'running';
   const last = transcript.items.at(-1);
   if (tab.phase === 'failed' || tab.interrupted || (last?.kind === 'error' && last.live)) return 'error';
   return tab.unseen ? 'unseen' : null;
@@ -52,12 +55,13 @@ export function sessionStatus(tab: Tab | undefined): SessionStatus | null {
 
 /**
  * @brief 还没点开的会话的状态：界面重新加载前就在后台进程里开着的看 live（随事件更新），结束后看留下的 mark。
+ *        后台实例的批准卡与后台的 Agent 同 sessionStatus（teamApproval、teamBusy）。
  */
 export function savedStatus(saved: SavedSession | undefined, mark: 'unseen' | 'error' | null): SessionStatus | null {
   const live = saved?.live;
-  if (live?.approval) return 'approval';
+  if (live?.approval || live?.teamApproval) return 'approval';
   if (live?.question) return 'question';
-  if (live?.running) return 'running';
+  if (live?.running || live?.teamBusy) return 'running';
   return mark;
 }
 
