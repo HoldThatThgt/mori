@@ -46,6 +46,7 @@
 3. **写入和命令先批准**："已停止"不等于"已撤销"，界面上明说。
 4. **界面不谈自己**：界面文字不出现"演示""内核""回合""事件""SDK""compat"这类实现用语，
    也不出现"执行者""角色会话""任务版本"这类 proposal 术语。所有操作都能用键盘完成。
+   （2026-10-21：协作模式下界面显示你自己定义的角色名和 “Request 1”“T1” 编号，按 [specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md)；“实例”“权限会话”这类实现用语仍不出现。）
 5. **配置就是 pi 的配置**：界面读写 pi 自己的配置文件，不另建一套格式。
    （2026-10-21 改：模型这一层改用 Mori 自己的模型配置，从 `models.json` 迁移一次，见 [specs/model-providers.md](specs/model-providers.md)；其余配置仍是 pi 的。）
 
@@ -74,7 +75,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | 对话、流式、工具执行、停止、排队、插话 | pi | 渲染事件；按钮对应 pi 的 `abort` / `clearQueue` / `followUp` / `steer` |
 | 自动重试、上下文压缩 | pi（`auto_retry_*`、`compaction_*` 事件）。2026-10-21 起重试由模型层的模型池做，pi 的自动重试关闭 | 显示"重试 1/3"、"已压缩较早的对话" |
 | 会话保存、列表、打开、命名 | pi（`SessionManager`） | 侧栏、改名 |
-| 会话归档与删除 | Mori（pi 没有归档和删除接口） | 照 Claude 桌面版：归档（可以恢复，已归档列表记在本机）；删除是永久的，先确认（2026-10-19 改） |
+| 会话归档与删除 | Mori（pi 没有归档和删除接口） | 照 Claude 桌面版：归档（可以恢复，已归档列表记在本机）；删除是永久的，先确认（2026-10-19 改）。2026-10-21 起：会话里有平行 Agent 在运行时也算生成中；删除同时永久删除这个会话的 TaskBoard 和实例会话文件（[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) §11.5） |
 | 编辑后的 diff | pi（edit 结果的 `details.patch`；write 不提供 diff） | 工具卡与右栏显示；写入显示新内容 |
 | 模型与端点 | v0：pi（`models.json`）。2026-10-21 起：**Mori 模型层**（分组、提供商、多个 key、模型、网络区域、选择器、模型池、档案与探针，[specs/model-providers.md](specs/model-providers.md)） | 连接表单、"测试连接"；模型层起见规格 §9 |
 | AGENTS.md | pi（每个目录取 AGENTS.override.md、AGENTS.md、CLAUDE.md 中第一个存在的） | 用户级编辑，项目级只显示加载了哪些文件 |
@@ -95,7 +96,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - MCP 每个会话的连接状态：pi 没有提供；v0 显示 pi 给出的工具列表和错误原文，加上共享连接的进程状态，不显示"已连接"。
 - MCP 的 codemode 和延迟加载方式：v0 只支持直接调用。
 
-**界面上 v0 不做的**：任务记录、多 agent、监督、模型判决式验收、定时回顾、模型池、内嵌浏览器、交互式终端、
+**界面上 v0 不做的**（2026-10-21 起多 agent 与任务记录按 [specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) 做；监督、模型判决式验收仍不做）：任务记录、多 agent、监督、模型判决式验收、定时回顾、模型池、内嵌浏览器、交互式终端、
 暗色模式（CSS 先 token 化，以后成本很低）、demo 里的项目主页和任务阶段面板。
 
 ## 5. 界面与交互
@@ -198,7 +199,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   用 Tab 或 Alt+1 / Alt+2 / Alt+3 选择；焦点在卡片上时 Esc 等于拒绝。
 - **提醒**：窗口不在前台时任务栏闪烁。
 - **权限菜单**（顶栏）：
-  - 只作用于当前会话；新会话都从"每次询问"开始。
+  - 只作用于当前会话；新会话都从"每次询问"开始。（2026-10-21：作用于这个会话的全部 Agent，后台实例的批准卡标出角色和 task，[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) §11）
   - 菜单里列出"本会话已允许：运行命令、写入文件"，可以清除。
   - 切到"全部允许"前确认一次，文案为"编辑、写入和命令都不再询问"；切换时挂起的卡按允许处理。
 
@@ -211,7 +212,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **停止**：
   - Esc 先关闭最上层的浮层、菜单或对话框；没有浮层且焦点在这个会话时才停止。
   - 停止时先把排队消息放回输入框，再停止生成。有批准卡时按拒绝处理。
-  - 停止后显示"已停止 · 已经做出的修改不会自动撤销"。
+  - 停止后显示"已停止 · 已经做出的修改不会自动撤销"。（2026-10-21：协作模式下停止只停对话这一回合，后台 Agent 由 `Stop team` 停止，[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) §11.4）
 - **错误**：都显示原文，来源有三种：发送时就失败（例如找不到模型或 key）、模型回复出错、自动重试最终失败。
   - 原文里有 401、unauthorized 或 api key 字样时，附"去设置"（这条文字匹配登记为临时默认值）。（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §9.3 删除：认证类错误由模型层换 key、换模型或给出说明卡）
   - 其他错误附"把上一条消息放回输入框"，由你决定是否再发。
@@ -316,7 +317,7 @@ app/
 docs/v0/                     screens/（每屏一张状态表）、defaults.md
 ```
 
-**后台进程（utilityProcess）只做六件事**（第 5 件 2026-10-20 加，第 6 件 2026-10-21 加）：
+**后台进程（utilityProcess）只做七件事**（第 5 件 2026-10-20 加，第 6、7 件 2026-10-21 加）：
 
 1. 调用 pi SDK：新建或打开会话、`prompt`、`steer`、`followUp`、`clearQueue`、`abort`、改名、读写配置。
 2. 转发事件：`session.subscribe` 收到的事件原样转发，外面包一层 `{ sessionId, event }`。
@@ -329,15 +330,17 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
    pi 的 MCP 扩展不改。
 6. 模型层（2026-10-21 加，[specs/model-providers.md](specs/model-providers.md)）：Mori 自己的模型配置与迁移、选择器、按 key 的模型池、
    模型档案与探针；每个会话的模型请求经 Mori 的虚拟模型、流函数包装和模型池的 fetch 发出。
+7. 平行 Agent 与 TaskBoard（2026-10-21 加，[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md)）：读 `.mori/agents/*.md`，协作模式下的立项与对话，按 task 建实例会话，TaskBoard 服务、
+   唤醒与交接、工作卡、写入排队，把后台实例的批准请求、回执和进展交给界面。
 
 **会话与数据**
 
 - `host.ts` 持有 `Map<sessionId, AgentSession>`，每个会话用 `createAgentSession` 独立创建；
   打开过的会话一直保持存活，直到归档、删除或退出；界面重新加载也不停，重新加载后的界面接上它们（2026-10-19 改为照 Claude 桌面版：
-  会话不因不在屏幕上而停）。不做调度、优先级或并发限制（模型请求的排队和优先级属于第 6 件事，2026-10-21）。
+  会话不因不在屏幕上而停）。不做调度、优先级或并发限制（模型请求的排队和优先级属于第 6 件事，2026-10-21；后台实例的同时运行上限属于第 7 件事）。
 - 历史：后台进程调用 `SessionManager.open(path).getBranch()`，把当前分支的条目交给界面；不自己解析会话文件。
 - 引用来源用 pi 的自定义条目（`appendCustomEntry("mori.ref", …)`）写进会话文件，它不进入模型上下文。
-- 会话内容只存一份，就是 pi 的会话文件。Mori 自己只保存：界面状态（栏宽、分屏、各会话草稿、已归档的会话列表）、
+- 会话内容只存一份，就是 pi 的会话文件（2026-10-21：协作模式另存 `<userData>/teams/<会话 id>/` 下的 TaskBoard 和各实例的 pi 会话文件）。Mori 自己只保存：界面状态（栏宽、分屏、各会话草稿、已归档的会话列表）、
   反馈和 F8 报告，以及加密后的 API key（`<userData>/credentials.json`）。
 - API key：主进程用 Electron safeStorage 加密保存；启动时解密，经进程通道交给后台进程，
   后台进程用 pi 的 `setRuntimeApiKey` 只放在内存里。key 不进 `models.json`，也不进任何进程的环境变量。
@@ -408,7 +411,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 2. **完成顺序**：写状态表 → 从真实会话录 fixture → 界面测试 → 实现 → 用真实模型走一遍 → 你走查。缺一步不算完成。
 3. **每一步都可以走查**：一步只做一屏的状态或一族事件，每步都有你能在 App 里看到的变化。
 4. **不造后端**：pi 有的能力直接用；pi 没有的，先回到第 4 节确认是否在 v0 范围内，不在就不写。
-   每加一段非界面代码，都要能指向第 6 节"后台进程只做五件事"或第 4 节表中标 Mori 的行。
+   每加一段非界面代码，都要能指向第 6 节"后台进程只做七件事"或第 4 节表中标 Mori 的行。
 5. **CI 把关**：`src/` 中出现"示例/演示/mock"即失败；界面测试回放的事件必须来自真实录制，手写的要标明。
 6. **诚实交付**：交付说明列出未验证的项；遇到阻塞就停下来报告并给出选项，不写假实现，不静默换路线。
    临时默认值（2 万字、兼容选项说明、401 文字匹配等）登记在 `docs/v0/defaults.md`。
@@ -423,9 +426,9 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 - 推翻 :198 和 :534 的"无差异视图"。
 - 修改 :553：允许使用默认值，但要标"临时默认值"并登记。
 - 废止 :244、:270–272、:281 等 demo 示例条款。工具页、设置和工作回顾保留界面形态，但必须接 pi 的真实数据。
-- 多 agent、通信、协作、Chrome、模型池五份子 proposal，以及工作回顾的定时与反证流程，本轮都不实现。
+- 多 agent、通信、协作、Chrome、模型池五份子 proposal，以及工作回顾的定时与反证流程，本轮都不实现。（多 agent、通信、协作三份已被平行 Agent 与 TaskBoard Proposal 第四版取代，2026-10-21 起按其规格实现）
 - 2026-10-19 的两份重设计草案（平行 Agent 与 TaskBoard、统一模型提供商）不在 v0 范围，v0 稳定后再对照。
-  2026-10-21：统一模型提供商 proposal 第四版的普通模式部分开始实现（[specs/model-providers.md](specs/model-providers.md)），它取代模型池子 proposal 中“不自动切换”的规则；平行 Agent 与 TaskBoard 仍不实现。
+  2026-10-21：统一模型提供商 proposal 第四版的普通模式部分开始实现（[specs/model-providers.md](specs/model-providers.md)），它取代模型池子 proposal 中“不自动切换”的规则。同日平行 Agent 与 TaskBoard 第四版开始按 [specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) 实现。
 
 **保留的规则**：
 
@@ -457,7 +460,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 - 思考强度：要，在 M6 的设置页和顶栏提供。
 - 批准：允许一次 / 本会话不再询问此工具 / 拒绝，不做规则引擎。
 - 使用环境：在有外网的机器上构建，在公司内网机器上离线安装。
-- 任务记录：暂不做。
+- 任务记录：暂不做。（2026-10-21：由协作模式的 TaskBoard 取代）
 - 会话的保持打开、归档与删除、界面重新加载、重新打开时的工具、扩展的询问都照 Claude 桌面版的做法（M3 时决定；扩展的询问从 M6 提前到 M3）。
 - 交互细节不清楚时照 Claude 桌面版（2026-10-20）。M4：阅读器只用鼠标选字、带语法高亮；文件引用的"原文已变化"按原文找不找得到判断，
   只在点芯片时检查；选区浮层只在助手回复和阅读器里出现；回复下的操作每轮一行。
@@ -469,6 +472,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
   模型生成的内容随你的用法。文档正文仍用中文，引用的界面文字改成英文；代码注释仍用中文。工作量大（M0–M7 的全部界面文字、测试和
   含 Mori 文字的 fixture），你同意另开任务、在 M7 之后做。
 - 模型层（2026-10-21）：按统一模型提供商 proposal 第四版和构建规格（[specs/model-providers.md](specs/model-providers.md)）实现普通模式的模型层；新写的界面用英文。
+- 平行 Agent 与 TaskBoard（2026-10-21）：按 proposal 第四版和构建规格（[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md)）实现；新写的界面用英文。负责人不在时定下的选择列在 [v1/team-checks.md](v1/team-checks.md)。
 - 实现者：全部由 Claude 实现，你按界面走查签收。
 
 **待确认**（括号里是默认推荐，没有异议就按默认执行）

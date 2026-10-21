@@ -29,3 +29,32 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被本规格�
 | 新模型表单的 Max output | 16384 与窗口一半中较小的 | `app/src/renderer/src/components/`（模型表单） | 同上一行的理由，与迁移一致 | 拿到内网端点时 |
 | pi 里的占位 `apiKey` | `mori-pool` | `app/src/kernel/modelCompile.ts` | pi 要有 key 才把提供商当作已配置（K1）；不保密，真正的 key 由模型池写进认证头，占位不会发到服务端（MP-32） | pi 升级时 |
 | 重做说明文字、各提示文字 | 规格 §6.1 的重做说明，§9 的界面文字 | `app/src/kernel/modelContext.ts`（重做说明）；`app/src/renderer/src/components/`（提示、阶段行、说明卡、拒绝启动卡） | 重做说明要让新模型知道前半段被隐藏、工作区可能已改；英文给模型读最稳 | 内网模型对英文说明的理解不好时；你走查时 |
+
+## 平行 Agent 与 TaskBoard
+
+来源：[平行 Agent 与 TaskBoard 规格](../specs/parallel-agents-taskboard.md) §15；你不在时定下的选择见 [team-checks.md](team-checks.md)。
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 同时运行的 task 与订阅实例上限（每个用户会话） | 4 | `app/src/kernel/boardRoute.ts` | 与每个 key 的默认并发 4 一致；本机与内网的小部署同时跑太多实例只会排队 | 拿到内网端点、知道它的并发时 |
+| 写入锁持有范围 | 写 task 的第一个实例开始到这个 task 结束（交给评审、交给结案、等你拿主意、被停止期间都持有） | `app/src/kernel/boardRoute.ts` | 评审不会跑在别的 task 改了一半的代码上；proposal 规则 8 | 你走查时觉得写 task 排队太久 |
+| 角色名 | `^[a-z0-9][a-z0-9-]{0,39}$`，不能是 `mori`，不能像编号 `^(t\|r)?[0-9]+$` | `app/src/kernel/roles.ts` | 与提供商 id 同一规则；不与 task、需求编号混淆 | — |
+| 文字长度上限 | 标题 80；目标、验收 600；task 说明 1200；交接结论 600；未结事项 10 × 200；Agent 消息 4000；转告 1200；需求结论 1200；角色说明 200 | `app/src/shared/team.ts` | 进工作卡和进展摘要，太长弱模型读不完、界面放不下 | 你走查时 |
+| 工作卡上限 / 最近交接 / 消息；超出时留的消息、单条截断、最初原话 | 8000 字符 / 3 棒 / 10 条；3 条、200 字符、2000 字符（用户补充从不截断） | `app/src/kernel/boardText.ts` | 约 2000 token，每次请求都带；用户的话不丢 | 内网小窗口模型上看到效果时 |
+| 工作卡的 token 估算 | 字符数 ÷ 4 | `app/src/kernel/boardText.ts` | 给模型层的窗口判断用，粗估即可 | — |
+| 立项看到的对话上限 | 12000 字符 | `app/src/kernel/boardText.ts` | 足够看清最近几轮；更早的去掉并注明 | 你走查时 |
+| `read_session` 不分页的上限 / 结果摘录 / 投递摘录 | 12000 / 400 / 300 字符 | `app/src/kernel/sessionReader.ts` | 一次读完常见的 task；超过先给目录 | 你走查时 |
+| 证据不合格时列出的编号 | 最近 5 个 | `app/src/kernel/evidence.ts` | 告诉模型可以引用哪些 | — |
+| 回执里原话的显示长度 | 120 字符 | `app/src/renderer/src/` | 一行放得下 | 你走查时 |
+| 进展摘要交接链每棒 | 结论第一句，≤ 80 字符 | `app/src/renderer/src/` | 一眼看完整条链 | 你走查时 |
+| `mori.board` 合并发送间隔 | 250 毫秒 | `app/src/kernel/team.ts` | 工具调用很密时不刷屏 | — |
+| Agent 消息上限 | 同一需求同一对角色 10 条；不在需求里的发送方按会话 10 条；关闭模式下对话每回合 5 条 | `app/src/kernel/team.ts` | 防止两个弱模型来回发消息停不下来 | 走查中碰到上限时 |
+| 强制填写、强制关闭的格式重试 | 1 次 | `app/src/kernel/handoffForm.ts` | 统一模型提供商 proposal §8“格式错误按格式错误重试”；再错就交结案 | 内网模型的写入等级不稳时 |
+| A 级强制填写 | 只在档案 `reasoning.can_disable` 为真时用，这次请求关闭思考 | `app/src/kernel/handoffForm.ts` | 探针第 5 步是在关闭思考时测的 | 遇到能开着思考做强制调用的部署时 |
+| `decision` 类别的排队超时 / `task` 类别 | 60 秒 / 不超时 | `app/src/kernel/modelTimings.ts` | 决定排太久不如换模型；task 排队等槽位是常态 | 你走查时 |
+| 模型族为空时 | 用 `<provider>/<model>` 当作族 | `app/src/kernel/selector.ts` | 至少同一个模型不给自己评审 | 你给模型都填了族之后 |
+| 协作开关的窄栏宽度 | 600px | `app/src/renderer/src/styles/` | 与顶栏现有的容器查询一致 | composer-pickers 合入时 |
+| 给 `conversation`、`decision` 留的槽位 | 每个 key 1 个（`task`、`background` 最多占并发上限 − 1；并发上限为 1 时不留） | `app/src/kernel/modelPool.ts` | 严格优先不打断已经发出的请求；不留的话 4 个 task 占满默认的 4 个槽位，对话和立项等到超时 | 拿到内网端点、知道它的并发时 |
+| 命令与界面名 | `/team`、`/team on`、`/team off`、`Team` | `app/src/renderer/src/` | proposal 的暂定名；`/team off` 为派生 | 你走查时 |
+| 程序注入的文字 | 英文（规格附录 A、§8.5） | `app/src/kernel/boardText.ts` | 与 pi 默认的 system prompt 同语言 | 内网模型对英文说明理解不好时 |
+| 界面文字 | 规格 §13 | `app/src/renderer/src/` | 英文，Claude 桌面版的写法 | 你走查时 |

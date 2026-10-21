@@ -21,6 +21,9 @@ Mori 保留一个稳定的对话入口，让不同模型分别处理范围明确
 
 ## 产品范围与术语
 
+> 2026-10-21 注：main agent、默认 agent、subagent、同族、共享区已由 [平行 Agent 与 TaskBoard Proposal](proposals/parallel-agents-taskboard.md) 第四版的
+> 角色、实例、对话·立项·结案三项权限与 TaskBoard 取代（实现见 [构建规格](specs/parallel-agents-taskboard.md)）；本节和后文按族的描述只作历史参考。
+
 | 名称 | 含义 |
 | --- | --- |
 | 用户会话 | 用户在侧栏中打开的一段对话；可以关联多个任务和多个角色会话 |

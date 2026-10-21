@@ -4,6 +4,9 @@
 
 更新日期：2026-10-13。
 
+> 2026-10-21 注：本文已被 [平行 Agent 与 TaskBoard Proposal](parallel-agents-taskboard.md) 第四版取代，实现见 [构建规格](../specs/parallel-agents-taskboard.md)：
+> 共享区的追加与更正 → 只追加的交接记录与结案 Agent 核验的结论；共同 system prompt → 构建规格附录 A 的程序注入段；“追加不唤醒任何人”推翻，改为按交接唤醒下一棒。
+
 本文细化 [Mori 产品与技术 Proposal](../proposal.md)，定义 Agent 如何向共享区发布结果，
 如何根据自身职责发现相关信息，以及何时读取原文或向作者追问。
 DSH 是唯一运行时，固定源码基线为 `d743267388641bc76f17c45ce8b4c231aed1d32c`。

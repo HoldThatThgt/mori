@@ -4,6 +4,10 @@
 
 更新日期：2026-10-13。
 
+> 2026-10-21 注：本文已被 [平行 Agent 与 TaskBoard Proposal](parallel-agents-taskboard.md) 第四版取代，实现见 [构建规格](../specs/parallel-agents-taskboard.md)：
+> 共享区 → TaskBoard 的大纲与交接；定向消息 → `agent_message`（发给角色或 task）；读取对方上下文 → `read_session`（整理过的文本，不含推理）；跨族隔离与转述删除。
+> “Agent 消息不等于用户授权”的原则仍有效。
+
 本文细化 [Mori 产品与技术 Proposal](../proposal.md)，是 Agent 消息、等待和上下文共享的详细设计。
 DSH 官方桌面工程是唯一运行时，固定基线为 `d743267388641bc76f17c45ce8b4c231aed1d32c`。
 
