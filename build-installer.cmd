@@ -1,23 +1,36 @@
 @echo off
 setlocal EnableExtensions
-set "ROOT=%~dp0"
+if defined MORI_INSTALLER_INNER goto :main
+set "OLD_CP="
 for /f "tokens=2 delims=:" %%c in ('chcp') do set "OLD_CP=%%c"
+if defined OLD_CP set "OLD_CP=%OLD_CP: =%"
+if defined OLD_CP set "OLD_CP=%OLD_CP:.=%"
 chcp 437 >nul
+set "MORI_INSTALLER_INNER=1"
+cmd /d /c ""%~f0" %*"
+set "RC=%errorlevel%"
+if defined OLD_CP chcp %OLD_CP% >nul
+exit /b %RC%
+
+:main
 REM 一键导出 Mori 安装包：检查 Node，在 app 下按锁定版本安装依赖并构建 NSIS 安装包，复制到仓库根目录的 release 文件夹。
 REM 在资源管理器里双击运行即可。自动化测试时加 --no-open（不打开资源管理器）与 --no-pause（结束时不等待按键）。
 REM 退出码：0 成功；1 到 4 为失败的步骤编号；9 为参数错误。输出只用英文。
 REM
-REM 本文件是 UTF-8，只有 REM 注释含中文。中文 Windows 的控制台默认是 936（GBK）代码页，cmd 按双字节读这些注释
-REM 会把一行拆开，把半句注释当命令执行（实测 936 下出错，65001 与 437 下正常）。所以开头先记下仓库根目录
-REM （之后 shift 会改变第 0 个参数）与原代码页，再切到单字节的 437 解析全文，结束时恢复原代码页。
-
+REM 本文件是 UTF-8，只有 REM 注释含中文。中文 Windows 的控制台默认是 936（GBK）代码页，实测从 936 启动的 cmd
+REM 读这些注释会出错：不切代码页时把一行拆开，把半句注释当命令执行；先 chcp 437 再读，goto 仍可能找不到标签
+REM （标签前的注释多几行就出现）；子进程把控制台的输出代码页改成 65001 后，又会把半句注释当命令执行
+REM （electron-builder 26.17 收集依赖时启动的 PowerShell 设 [Console]::OutputEncoding 为 UTF-8 且不改回，
+REM 见 app-builder-lib 的 node-module-collector/nodeModulesCollector.js）。从 437 或 65001 启动的 cmd 都正常。
+REM 所以开头几行只用 ASCII，外层在其中不跳转：记下原代码页，切到单字节的 437，用新的 cmd 重新运行本文件
+REM （/d 不执行 AutoRun；MORI_INSTALLER_INNER 表示已在内层），内层结束后恢复原代码页，原样返回退出码。
+REM 内层先记下仓库根目录，之后 shift 会改变第 0 个参数。
+set "ROOT=%~dp0"
 set "APP=%ROOT%app"
 set "RELEASE=%ROOT%release"
 set "NO_OPEN="
 set "NO_PAUSE="
 set "RC=0"
-if defined OLD_CP set "OLD_CP=%OLD_CP: =%"
-if defined OLD_CP set "OLD_CP=%OLD_CP:.=%"
 
 :parse_args
 if "%~1"=="" goto :check_node
@@ -122,9 +135,8 @@ echo ************************************************************
 set "RC=%STEP_NUM%"
 goto :finish
 
-REM 结束：恢复原代码页；双击运行时停下等待按键，让人看到结果；以 RC 退出。
+REM 结束：双击运行时停下等待按键，让人看到结果；以 RC 退出，由外层恢复原代码页。
 :finish
-if defined OLD_CP chcp %OLD_CP% >nul
 echo.
 if not defined NO_PAUSE pause
 exit /b %RC%

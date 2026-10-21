@@ -13,6 +13,10 @@ import { currentKernel, lastKernelExitCode, piAgentDir, shutdownKernel, startKer
 // 测试可以用 MORI_USER_DATA 把数据放到独立目录，避免碰到日常使用的配置。
 if (process.env.MORI_USER_DATA) app.setPath('userData', process.env.MORI_USER_DATA);
 
+// Chromium 自带的文字（表单校验气泡、navigator.language）固定用英文，与界面一致；不写时按 Windows 显示语言选，
+// 中文 Windows 上是中文。要在 ready 之前设（同安装包的 installerLanguages）。
+app.commandLine.appendSwitch('lang', 'en-US');
+
 // 只有开发构建才从开发服务器加载页面；打包后的程序忽略这个变量。
 const devServerUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
 const rendererFile = join(__dirname, '../renderer/index.html');
@@ -88,7 +92,9 @@ function createWindow(): BrowserWindow {
 
 ipcMain.handle('mori:pick-folder', async (event: IpcMainInvokeEvent) => {
   if (!event.senderFrame || !isAppPage(event.senderFrame.url)) throw new Error('Not allowed');
-  const options: Electron.OpenDialogOptions = { properties: ['openDirectory'] };
+  // 标题和按钮写明英文（"Open folder…"和"Add plugin from folder…"共用）；不写时是 Windows 按显示语言给的"Select Folder"。
+  const options: Electron.OpenDialogOptions = { title: 'Select a folder', buttonLabel: 'Select folder',
+    properties: ['openDirectory'] };
   const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
   return result.canceled ? null : (result.filePaths[0] ?? null);
 });

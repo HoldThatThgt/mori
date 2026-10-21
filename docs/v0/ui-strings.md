@@ -1,8 +1,8 @@
 # 界面文字（英文）
 
-Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：界面上的字、读屏名和悬停提示、发给模型的引用块和会话引用、写进文件的 F8 报告和导出、写进报告的操作记录。模型生成的内容随用法，不做翻译。有 Claude 桌面版对应的地方照 Claude 的用词（负责人 2026-10-20 要求："我最常用 Claude，想保持同样的说法"）。不做多语言、没有语言切换，也不读旧的中文记录：以前存下的中文 F8 报告和中文引用块不做兼容，按原文显示（负责人 2026-10-20 决定）。文档和代码注释仍用中文。
+Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：界面上的字、读屏名和悬停提示、发给模型的引用块和会话引用、写进文件的 F8 报告和导出、写进报告的操作记录。模型生成的内容随用法，不做翻译。有 Claude 桌面版对应的地方照 Claude 的用词（负责人 2026-10-21 要求："我最常用 Claude，想保持同样的说法"）。不做多语言、没有语言切换，也不读旧的中文记录：以前存下的中文 F8 报告和中文引用块不做兼容，按原文显示（负责人 2026-10-21 决定）。文档和代码注释仍用中文。
 
-每一处文字的逐条对照（文件、行、种类、是否被别处解析、Claude 的键和原文）在实现时用的 `translations.json` 里；这份文档记下规则、术语和读的人要核对的固定说法。
+每一处文字的逐条对照（文件、行、种类、是否被别处解析、Claude 的键和原文）在实现时用的 `translations.json` 里；这份文档记下规则、术语和读的人要核对的固定说法。测试结果、与方案不同的地方和未验证的项见检查记录 [english-ui-checks.md](english-ui-checks.md)。
 
 ## 写法约定
 
@@ -16,6 +16,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 - **错误的说法**："Couldn’t <动作>: <原文>"（Couldn’t save: …、Couldn’t load sessions: …）；Claude 原文是 "Failed to …" 的地方照 Claude（Failed to open session: …）。冒号后面只放错误原文；要带文件名时不加冒号（"Couldn’t read the record <文件名>"）。表单校验的提示是完整的句子，带句号（"Name is required."）。
 - **数量要有真正的英文复数。** 数字插进句子时两种形式都写出（"1 session" / "2 sessions"），实现按 `n === 1` 选；`translations.json` 里这样的条目标 `"plural": true`，`en` 里用 "  /  " 隔开单数和复数。只有数字、不跟名词时用 Claude 的 "{n} more"，不用分单复数。
 - **界面不讲它自己（方案第 2 节第 4 条）。** 界面文字里不出现实现用词：demo、mock、sample、example data、kernel、event、SDK、compat layer、IPC、renderer、utilityProcess，也不出现方案里的行话（executor、role session、task version）、版本代号（v0）。中文原来就写出的 pi、MCP、AGENTS.md、JSON、API key、Markdown，以及 F8 版本列表里的 Electron / Chromium / Node / Windows 照写。Mori 的 "后台进程" 是用户看得到的东西，写 "Mori’s background process"。读屏名里不用 " · " 和 "/"（读屏会念出来），改用逗号、括号或 "of"。
+- **系统给的文字不翻译，Chromium 的固定用英文。** Windows 的对话框除了 Mori 设的标题和按钮（"Select a folder"、"Export as Markdown"）之外的部分（Cancel、导航栏、文件名框），以及 Windows 和 Node 给的错误原文（例如 `shell.openPath` 打不开时的原因，放在 "Couldn’t open the folder: <原文>"、"Couldn’t open this file with the default app: <原文>" 后面），跟 Windows 的显示语言走，中文 Windows 上是中文；这是有意不翻的，走查时不算漏掉的文字。Chromium 自带的文字（表单的校验气泡、日期控件等）不跟系统走：主进程在 ready 之前设 `--lang=en-US`；Mori 的表单都加 `noValidate`，校验的说明由 Mori 自己给（"Context window must be a whole number above 0."）。
 - **给模型读的文字要让模型看得懂**：引用块开头写 "Quoting …:"（界面上同一个功能叫 context，见术语表"引用"），会话引用里写 "User:" / "Assistant:"（不写 "You"，理由见 [defaults.md](defaults.md) "会话引用的内容格式"）。界面上助手的输出叫 "response"（Claude 的词），给模型的文字里叫 "reply"（"Quoting your earlier reply:"）。
 
 ## 术语表
@@ -25,14 +26,14 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 会话 | session / Sessions | Session、Sessions | 会话列表的读屏名 "Sessions"，菜单 "Session actions" |
 | 新会话 / 新建会话 | New session | New session | 负责人定；按钮、标题的默认值、操作记录都用它 |
 | 项目 / 项目文件夹 | project / project folder | — | 作用范围标签 "Project"，正文 "this project" |
-| 打开文件夹… | Open folder… | Open folder… | 弹出选择器，所以带 "…" |
+| 打开文件夹… | Open folder… | Open folder… | 弹出选择器，所以带 "…"；选择器的标题 "Select a folder"（Claude 有这条）、按钮 "Select folder"，与 "Add plugin from folder…" 共用（`main/index.ts` 的 `mori:pick-folder`） |
 | 轮 / 本轮 / 第 N 轮 | turn / the current turn / Turn N、turns a–b | # turn、after the current turn | 负责人定；句中小写 "turns 3–4" |
 | 第 N 行 / 第 a–b 行 | line N / lines a–b | Line {line}、Lines {start}–{end} | 总跟在路径或 " · " 后面，所以小写 |
 | 约 N 字 | ~N characters（1 character） | ~{count} characters | 复数 |
 | 回复（助手的） | response | Response、Stop response | 给模型的文字里用 "reply" |
 | 输入框 | message box | message box | |
 | 插话 | Steer | — | 负责人定；按键提示 "Ctrl+Enter to steer" |
-| 排队 / 排队发送 | Queue（按钮、记录）/ Queued（排队区的标签）| Queue、Queued | 负责人定用 Claude 的 Queue；按键提示 "Enter to queue" |
+| 排队 / 排队发送 | Queue（按钮、记录）/ Queued（排队区的标签）| Queue、Queued | 会话照 Claude 的词定的（待负责人确认，见 english-ui-checks.md "需要你确认的地方"）；按键提示 "Enter to queue" |
 | 撤回 | Withdraw | Withdraw | |
 | 停止 | Stop / Stop response (Esc) | Stop、Stop response | |
 | 发送 | Send | Send | |
@@ -67,7 +68,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 原会话已删除 | Session deleted | Session deleted | |
 | 文件已被删除或移动 | File not found | File not found | 芯片和阅读器同一句 |
 | 思考（内容） | Thinking…（进行中）/ Thought process（完成后的块） | Thinking…、Thought process | |
-| 思考强度 | Effort | Effort、Effort: {value}、Default effort level | 负责人定，不用 "Thinking"；pi 叫 thinking level；"支持思考" 仍写 "Supports thinking" |
+| 思考强度 | Effort | Effort、Effort: {value}、Default effort level | 会话定的（待负责人确认），不用 "Thinking"；pi 叫 thinking level；"支持思考" 仍写 "Supports thinking" |
 | 思考强度的档位 | Off / Minimal / Low / Medium / High / Extra high / Max | Off / — / Low / Medium / High / Extra high / Max | minimal 没有 Claude 对应，用 pi 的名字 |
 | 上下文 / 上下文用量 / 上下文长度 | Context / context usage / Context window | Context、Context window | |
 | 压缩（较早的对话） | Compacting session… / Compacted session | Compacting session…、Compacted session | |
@@ -95,7 +96,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 连接成功 / 连接失败 | Connected · … / Connection failed: … | Connected · {latency}ms、Connection failed: {error} | 毫秒和秒一样不加空格（120ms、5s） |
 | 默认 / 设为默认 | Default / Set as default | Default、Set as default | |
 | 模型 | model / Model: <id> | Model、Model: {name} | |
-| 信任 | trust / Trust workspace / Don’t trust | Trust this workspace?、Trust workspace、This workspace isn’t trusted、Trust settings couldn’t be saved.、Couldn’t check whether this workspace is trusted. | 负责人定：讲信任时一律叫 "workspace"（Claude 的说法），打开时仍叫 "folder" |
+| 信任 | trust / Trust workspace / Don’t trust | Trust this workspace?、Trust workspace、This workspace isn’t trusted、Trust settings couldn’t be saved.、Couldn’t check whether this workspace is trusted. | 会话定的（待负责人确认）：讲信任时一律叫 "workspace"（Claude 的说法），打开时仍叫 "folder" |
 | 配置（文件夹自带的） | settings | — | "its own extensions or settings" |
 | 草稿 | draft | — | 界面上目前没有出现这个词 |
 | 阶段行 | Status line（F8 字段名） | — | 内容见下面"会话" |
@@ -140,12 +141,12 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 后台进程意外退出 | Mori’s background process crashed · Unfinished responses were interrupted / Restart / Restarting… |
 | 输入框不能发送时 | Mori’s background process crashed / Restarting… / Starting… / Session didn’t open |
 | 打开失败 | Failed to open session: … |
-| 输入框的读屏名 | Message Mori（负责人定，不用 Claude 式的 "Reply to Mori"） |
+| 输入框的读屏名 | Message Mori（会话定的，待负责人确认；不用 Claude 式的 "Reply to Mori"） |
 | 按键提示 | Enter to send · Shift+Enter for new line / Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line |
 | 发送 / 停止 / 排队发送 / 插话 | Send / Stop（悬停 "Stop response (Esc)"）/ Queue（悬停 "Send after the current turn (Enter)"）/ Steer |
 | 排队区 | 标签 Queued / Steer，按钮 Withdraw |
 | 阶段行：等你批准 / 等你回答 | Waiting for your approval / Waiting for your answer |
-| 阶段行：等待模型响应 / 思考中 / 生成中 | Waiting for the model… 12s / Thinking… 5s / Responding…（负责人定，不用 Claude 的 "Writing…"） |
+| 阶段行：等待模型响应 / 思考中 / 生成中 | Waiting for the model… 12s / Thinking… 5s / Responding…（会话定的，待负责人确认；不用 Claude 的 "Writing…"） |
 | 阶段行：工具 / 重试 / 压缩 | <工具卡标题> 8s（如 "Run npm test 8s"）/ Retrying (1/3) · <错误原文> / Compacting session… |
 | 对话流里 | Thought process / Thinking… / Copy code / Compacted session / Stopped · Changes made so far stay as they are / Extension: … / Skill · <name> / Expand / Collapse |
 | 滚动 | Scroll up to load earlier messages / Jump to latest |
@@ -401,10 +402,11 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 - `main/review.ts:141` 截图失败的正则改成 `/^Couldn’t capture a screenshot:\s*/`（见上 "F8 报告"）。
 - 导出的默认文件名按类别取 `feedback` / `ui-issues`，不再用分节名（见上）。
 - 已经是英文、但用词要跟着改的错误原文（没有中文，所以清单里原来没有；`translations.json` 里都有条目）：`kernel/config.ts` "API key is required when the base URL changes"（界面上前面加 "Couldn’t save: "，`tests/ui/m0-smoke.mjs:99`、`tests/ui/m6-app-settings.mjs:738` 跟着改成 "Couldn’t save: API key is required when the base URL changes"）；`kernel/sessions.ts:412` 和 `state/projects.ts:180` 同一句 "This session is still running. Stop it first."，`state/projects.ts:182` 跟着它改成 "This session is still opening."；`preload/index.ts:40`、`:62` "Mori’s background process crashed (exit code N)"（`tests/ui/harness/replay.js:457` 跟着改）；`kernel/mcpConfig.ts:388` "Mori only supports direct calls (exposure: direct)."（`tests/ui/m6-app-tools.mjs:1127-1128` 跟着改，record() 的说明也改）；`kernel/resources.ts:299` "<path> is read-only in Customize"、`:343` "This plugin is already added"、`:357` / `:366` "Plugin <source> isn’t in your user-level settings"（`:305` 原来是 "Package … is not in the settings"，`translations.json` 里没有条目，只会在用户级的包上报出，改成同一句）；`main/review.ts:107` 的引号改成 “ ”。
+- 审查后补的（2026-10-21）：`main/index.ts` 在 ready 之前 `app.commandLine.appendSwitch('lang', 'en-US')`（不写时 Chromium 按 Windows 显示语言选，中文 Windows 上上下文长度填 0 时浏览器弹出"值必须大于或等于 1。"）；`ConnectionForm.tsx`、`ModelForm.tsx` 的 `<form>` 加 `noValidate`（`min={1}` 不再先被浏览器拦下，Mori 的说明才看得到；`m6-app-settings` 两项检查）；选文件夹对话框加 `title` / `buttonLabel`（`m1-app` 一项检查）。
 - `src/renderer/index.html` 的 `<html lang="zh-CN">` 改成 `lang="en"`（读屏按它选语音，Chromium 按它回退字体）。
 - `electron-builder.yml` 的 `nsis:` 下加 `installerLanguages: [en_US]`：不写时 electron-builder 打出带全部语言的安装包，中文系统上安装界面会是中文。
 - `tests/check.mjs` 加一项：`src/` 里 .ts/.tsx 的字符串、模板字符串、正则字面量和 JSX 文本（用 TypeScript 语法树找），以及去掉注释后的 .html、.css 不能有中文（含中文标点、全角字符和假名），报 "<文件>:<行> contains Chinese text: …"；注释不查。
-- 仓库根目录 `build-installer.cmd` 的输出只用英文：去掉文件末尾的中文提示和失败时切到 65001 用 `findstr` 取出它们的代码。开头仍切到 437 解析全文：实测控制台是 936（中文 Windows 的默认）时，cmd 会把含中文的 REM 注释拆开、把半句当命令执行；65001 和 437 下不切也正常。
+- 仓库根目录 `build-installer.cmd` 的输出只用英文：去掉文件末尾的中文提示和失败时切到 65001 用 `findstr` 取出它们的代码。仍要切到 437：实测控制台是 936（中文 Windows 的默认）时，cmd 会把含中文的 REM 注释拆开、把半句当命令执行；65001 和 437 下不切也正常。只在开头 `chcp 437` 还不够（electron-builder 启动的 PowerShell 会把控制台的输出代码页改成 65001，从 936 启动的 cmd 之后又读错），所以脚本记下原代码页、切到 437 后用新的 cmd 重新运行自己，结束时恢复原代码页（见 [english-ui-checks.md](english-ui-checks.md) "测试中发现并已修正的问题"第 5 条）。
 - 顶栏宽度：`chat.css` 的 `@container` 阈值（720 / 600 / 480 / 400px）和 `models.css` 里思考按钮的档位是按中文字宽估的，要用英文重新量（"Effort: Unavailable"、"Extra high ▾"、"Ask each time"、"Allow all"、"Context 100%"；最窄是分屏每栏 280px、中栏 300px），并改那段注释。按 Segoe UI 12px 量，280px 一栏里 "Ask each time" + "High" 已经超出约 15px，所以 400px 以下权限按钮只显示盾牌图标（"Allow all" 保留警告色），模式名放进读屏名 "Permission mode: <模式>"（悬停说明不带模式名，是 "Set the permission mode for this session"）；按钮上的模式名包在 `.permission-text` 里，窄栏时由 `chat.css` 藏起。实际改成的阈值：760px 以下权限按钮去掉图标（`models.css` 里模型按钮 120px 的上限仍在 720px）；660px 以下不显示项目名和 ›（分屏 690px 起，`split.css`）；600px 以下内边距收小、菜单贴右；500px 以下不显示上下文用量；400px 以下权限按钮只显示盾牌。思考按钮的档位（`models.css` 720 / 600 / 400px）不变。工具卡的标题至少留 56px，徽标放不下时截断加省略号。
 - 侧栏宽度：侧栏最窄 180px（`state/layout.ts` LIMITS）时，"Needs approval" 只给会话名留约 4px，"New session Ctrl+N" 会折行。侧栏做成 size container，窄于 220px（`@container (max-width: 219px)`；1024–1150px 宽窗口的默认宽度 220px 时仍显示文字，会话名留约 44px）会话行只显示状态圆点（状态文字 `.session-status-text` 用 clip 藏起，仍在读屏名里；title 在状态圆点上，不在会话行上），并隐藏 `.nav-hint`。
 - 其他宽度：设置页左侧导航 180px 改成 200px（"Connections and models" 不折行）；设置页 760px 以下连接表单的标签放到输入框上面（已保存的 key 的提示 "Saved and encrypted · Re-enter it if you change the base URL" 约 350px，在 96px 标签列旁放不下；分节导航仍到 620px 才横排）；Customize 页 MCP 表单的标签列 84px 改成 132px（"Environment variables"、"Server config (JSON)" 不折行）；工具卡状态 `max-width: max(60%, 140px)`（"Waiting for your approval"、"Denied · You pressed Stop" 在分屏 280px 一栏里不截断）；会话右键菜单 `width: max-content`（"Attach as context" + "This is the current session" 约 280px，右边放不下时由 `SessionMenu` 往左挪，不被挤得折行）；会话菜单的项目名和不可用原因（`.menu-hint`）之间留 16px。
@@ -422,4 +424,4 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
   - `tests/ui/m4-record.mjs:116-129` 自己抄的 `quoteBlock` 改成英文格式（`Quoting your earlier reply:`、`` `Quoting ${displayPath(s.path, cwd)}, ${lines}:` ``，`lines` 是 `line N` / `lines a–b`），或像 `m5-record.mjs` 那样用 esbuild 引 `quoteText.ts`；`:280` 检查 `startsWith('Quoting src/a.ts, lines 1–3:')`。
   - 重新录制：`tests/fixtures/m4/quote-*.json`（4 个）、`tests/fixtures/m5/ref-*.json`（4 个），里面 Mori 写的 "引用…："、"第 N 轮"、"用户："、"助手："、"[工具] …"、"[引用] …" 要变成英文（模型自己写的中文可以留）；`tests/fixtures/m7/review-reply.json` 用 `tests/ui/m7-record.mjs` 重新录（报告里的 "- 页面：…"、"- Mori：…"）。
   - `tests/ui/harness/replay.js:457` 改成 `new Error('Mori’s background process crashed (exit code 1)')`；`tests/ui/harness/index.html` 改成 `<html lang="en">`，与 `src/renderer/index.html` 一致。
-- 不改行为（负责人定）：读一行时工具卡仍写 "lines 5–5"（`toolTitle.ts:78`）；MCP 表单在表单和 JSON 之间切换失败时，问题仍显示在 "Couldn’t save:" 后面（`ToolsMcpForm.tsx:160`）。
+- 不改行为（会话定的，待负责人确认）：读一行时工具卡仍写 "lines 5–5"（`toolTitle.ts:78`）；MCP 表单在表单和 JSON 之间切换失败时，问题仍显示在 "Couldn’t save:" 后面（`ToolsMcpForm.tsx:160`）。

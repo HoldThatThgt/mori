@@ -219,6 +219,25 @@ async function saveModelForm(page) {
   return page.getByTestId('model-form').getByTestId('form-message').innerText();
 }
 
+/**
+ * @brief 表单（connection-form / model-form）里上下文长度填 0 后点"Save"：返回表单下方的文字和输入框的浏览器校验状态。
+ *        表单带 noValidate 时 Chromium 不先弹自己的校验气泡（气泡的文字跟系统语言走，中文 Windows 上是中文），
+ *        说明来自 Mori 的检查；没有 noValidate 时浏览器拦下提交，表单下方没有文字（返回 null）。
+ */
+async function saveZeroContext(page, testId) {
+  const form = page.getByTestId(testId);
+  const input = form.getByLabel('Context window', { exact: true });
+  await input.fill('0');
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  const message = await form.getByTestId('form-message').innerText({ timeout: 5000 }).catch(() => null);
+  const native = await input.evaluate((element) => ({ valid: element.validity.valid,
+    text: element.validationMessage }));
+  return { message, native };
+}
+
+/** 上下文长度不是正整数时 Mori 的说明（ConnectionForm.tsx 的 validate） */
+const ZERO_CONTEXT = 'Context window must be a whole number above 0.';
+
 /** @brief 在连接卡上"Add model"，填 ID 保存；返回 saveModelForm 的结果。 */
 async function addModel(page, provider, modelId) {
   await connectionCard(page, provider).getByRole('button', { name: 'Add model' }).click();
@@ -382,6 +401,12 @@ async function firstRun(ctx) {
   record('勾上"支持思考"才出现"新会话默认的思考强度"：关、最低、低、中、高，默认是 pi 现在会用的"中"', checked.select === 1
     && checked.options.join() === 'Off,Minimal,Low,Medium,High' && checked.value === 'medium', JSON.stringify(checked));
   await h.fillConnection({ name: '合成端点', baseUrl, apiKey: testKey, modelId: 'fake-coder' });
+  const modelsBefore = readText(modelsFile(ctx));
+  const zero = await saveZeroContext(page, 'connection-form');
+  record(`首次启动：上下文长度填 0 点"Save"，不保存（models.json 不变），表单下方是 Mori 的说明"${ZERO_CONTEXT}"`
+    + '（不是浏览器的校验气泡）', zero.message === ZERO_CONTEXT && readText(modelsFile(ctx)) === modelsBefore,
+  JSON.stringify(zero));
+  await h.fillConnection({ contextWindow: 128000 });
   await page.getByRole('button', { name: 'Test connection' }).click();
   await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
   firstRunFiles(ctx);
@@ -491,6 +516,9 @@ async function addModelStep(ctx) {
   const duplicate = await addModel(page, MAIN, 'fake-coder');
   record('添加模型时 ID 已存在："保存失败：这个连接下已经有模型 fake-coder"，留在表单里',
     duplicate === 'Couldn’t save: this connection already has a model with ID fake-coder', duplicate ?? '(saved)');
+  const zero = await saveZeroContext(page, 'model-form');
+  record(`添加模型时上下文长度填 0 点"Save"：留在表单里，下方是 Mori 的说明"${ZERO_CONTEXT}"（不是浏览器的校验气泡）`,
+    zero.message === ZERO_CONTEXT, JSON.stringify(zero));
   await page.getByTestId('model-form').getByRole('button', { name: 'Cancel', exact: true }).click();
   const after = await listState(page);
   const main = rowIn(after, `${MAIN}/fake-coder`);

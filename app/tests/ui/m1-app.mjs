@@ -46,6 +46,24 @@ function fastRetry(userData) {
   writeFileSync(join(userData, 'pi', 'settings.json'), JSON.stringify({ retry: { baseDelayMs: 200 } }, null, 2));
 }
 
+/**
+ * @brief 选文件夹对话框（"Open folder…"和"Add plugin from folder…"共用）带英文的标题和按钮，不用 Windows 按显示语言给的
+ *        默认文字（中文 Windows 上是"选择文件夹"）。系统对话框换成记下参数、返回取消的替身，经页面的 pickFolder 走真的主进程代码。
+ */
+async function pickerOptions(app, page) {
+  await app.evaluate(({ dialog }) => {
+    dialog.showOpenDialog = async (...args) => {
+      globalThis.moriPickOptions = args.at(-1);
+      return { canceled: true, filePaths: [] };
+    };
+  });
+  const picked = await page.evaluate(() => window.mori.pickFolder());
+  const options = await app.evaluate(() => globalThis.moriPickOptions ?? null);
+  record('选文件夹对话框的标题"Select a folder"、按钮"Select folder"（不是 Windows 按显示语言给的默认文字）；取消时返回 null',
+    picked === null && options?.title === 'Select a folder' && options.buttonLabel === 'Select folder'
+    && options.properties?.join() === 'openDirectory', JSON.stringify({ picked, options }));
+}
+
 /** @brief 首次启动：只有连接表单；校验、401 原文、测试成功后进入"Open folder…"。 */
 async function firstRun({ app, page, h, project }) {
   await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
@@ -66,6 +84,7 @@ async function firstRun({ app, page, h, project }) {
   record('首次启动：测试连接成功，显示首字耗时，进入"打开文件夹…"', /Connected · First token \d+ms/.test(ok), oneLine(ok));
   await page.screenshot({ path: join(shots, '01-first-run-ok.png') });
   await h.openFolder(app, project);
+  await pickerOptions(app, page);
   const empty = await page.locator('.empty-chat').innerText();
   record('首次启动：打开文件夹后是新会话的空状态（项目名和输入提示）',
     empty.includes('project') && empty.includes('Enter to send · Shift+Enter for new line'), oneLine(empty));

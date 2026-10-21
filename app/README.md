@@ -17,6 +17,8 @@ M6：设置页（多个连接与模型、默认模型、思考强度（Effort）
 当前处于 M7：工作回顾页（Review："Feedback"和"UI issues"两个列表、右栏详情与截图、标已处理（"Resolve"）与
 "Hide resolved"、回到原位置、"Export as Markdown…"）与一键导出安装包（仓库根目录的 `build-installer.cmd`，见下）；
 只差负责人走查（[检查记录](../docs/v0/m7-checks.md)）。
+英文界面（`english-ui` 分支）：界面和 Mori 写出的文字（F8 报告、导出、操作记录、引用块）全部改为英文，有对应处照 Claude 桌面版的
+用词（[术语表](../docs/v0/ui-strings.md)）；安装包只带英文界面；只差负责人走查（[检查记录](../docs/v0/english-ui-checks.md)）。
 
 ## 准备
 

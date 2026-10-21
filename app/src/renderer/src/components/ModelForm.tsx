@@ -64,8 +64,9 @@ export function ModelForm({ connection, model }: { connection: ConnectionInfo; m
   const { fields, edit, adding, saving, everSaved, message, save } = useModelForm(connection, model);
   const focus = returnFocus(connection.providerId, adding ? null : fields.modelId.trim());
   const close = () => showView({ kind: 'list', focus }, everSaved ? { tone: 'ok', text: SAVED_NOTICE } : null);
+  // noValidate：上下文长度的 min={1} 不交给 Chromium 拦（它的校验气泡跟系统语言走），说明一律由 problemOf 给出。
   return (
-    <form className="connection-form model-form" data-testid="model-form"
+    <form className="connection-form model-form" data-testid="model-form" noValidate
       onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <label>Model ID
         <input value={fields.modelId} readOnly={!adding} onChange={(e) => edit({ modelId: e.target.value })}

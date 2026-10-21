@@ -272,8 +272,9 @@ export function ConnectionForm(props: ConnectionFormProps) {
     const saved = await save();
     if (saved && !saved.error) onSaved?.();
   }
+  // noValidate：上下文长度的 min={1} 不交给 Chromium 拦（它的校验气泡跟系统语言走），说明一律由 validate 给出。
   return (
-    <form className="connection-form" data-testid="connection-form"
+    <form className="connection-form" data-testid="connection-form" noValidate
       onSubmit={(event) => { event.preventDefault(); void submit(); }}>
       <label>Name
         <input value={form.name} onChange={(e) => edit({ name: e.target.value })} placeholder="Internal models" />

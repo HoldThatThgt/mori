@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
-import { rowOf, savedArchived, stubFolder, until, waitReady, waitStatus } from './m3-helpers.mjs';
+import { openMenuOn, rowOf, savedArchived, stubFolder, until, waitReady, waitStatus } from './m3-helpers.mjs';
 import { refEntries } from './m4-helpers.mjs';
 import {
   centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, paneAt, pickRange, previewState, savedLayout, sendAt,
@@ -92,12 +92,13 @@ async function sendIn(page, side, text) {
 /** @brief 会话文件为 file 的会话在界面里的标识。 */
 const keyOf = (page, file) => rowOf(page, file).first().getAttribute('data-row');
 
-/** @brief 焦点放在会话行上按 Shift+F10 打开菜单，返回各项的文字和不能用的原因。 */
+/**
+ * @brief 焦点放在会话行上按 Shift+F10 打开菜单，返回各项的文字和不能用的原因。
+ *        用 m3-helpers 的 openMenuOn：先等两帧再放焦点。点会话行后界面在下一帧把焦点放进输入框（split.ts focusComposer），
+ *        紧接着放到另一行的焦点会被它移走，Shift+F10 就落在输入框里（打包程序上 keyboardReference 稳定出现过）。
+ */
 async function menuOf(page, file) {
-  await rowOf(page, file).first().focus();
-  await page.keyboard.press('Shift+F10');
-  const menu = page.getByTestId('session-menu');
-  await menu.waitFor({ timeout: 5000 });
+  const menu = await openMenuOn(page, rowOf(page, file).first());
   return menu.getByRole('menuitem').evaluateAll((items) => items.map((item) => ({
     label: item.childNodes[0]?.textContent ?? '', blocked: item.querySelector('.menu-hint')?.textContent ?? null,
     disabled: item.disabled })));

@@ -408,6 +408,10 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
 | M6 设置与工具页 | 多个模型与切换；思考强度（Effort）；用户级 AGENTS.md；工具页（Customize：内置工具、Skill、MCP、Plugin）；输入框 "/" 补全 | pi 如何在 prompt 中展开 "/名称"；MCP 扩展的通知在 SDK 下能否拿到 | 1. 加第二个模型，在顶栏切换，新回复来自新模型<br>2. 在用户级 AGENTS.md 写"每次回答以'收到'开头"：新会话的第一条回复符合；设置页标出生效的文件<br>3. 在已信任项目的 `.pi/skills` 放一个技能：工具页出现并标"Project"；停用后 `settings.json` 出现与 `pi config` 相同的条目，新会话问"你能用哪些技能"时没有它<br>4. 用表单添加一个 stdio MCP 服务：保存后看到它注册的工具名；调用它的工具会出批准卡<br>5. MCP 服务的命令写错：看到 pi 给出的错误原文<br>6. 添加一个本地文件夹的 pi 包：列出包内资源，可以按资源启停<br>7. 输入 "/"：列出提示词模板和技能命令<br>8. 把模型标为"Supports thinking"，顶栏切到"High"：回复带思考内容；切到"Off"：不再有思考内容<br><br>反例：模型没标"Supports thinking"时，思考强度不可选；项目未信任时项目技能不出现；没有注册任何工具的 MCP 服务不显示"Connected" |
 | M7 工作回顾（Review） | 反馈收件箱（Feedback）、界面问题收件箱（UI issues）、"Resolved"、导出；一键导出安装包（2026-10-21 加） | — | 1. M4 起写的反馈都在，点开跳回原位置<br>2. M2 起的 F8 报告都在"UI issues"里，带截图<br>3. 点"Resolve"标为已处理后，可以用"Hide resolved"筛掉<br>4. 两类都能导出为 Markdown（"Export as Markdown…"）<br>5. 双击 `build-installer.cmd`：结束时打开 `release\`，里面是安装包；任何一步失败时停下并说明哪一步 |
 
+界面改为英文之后（第 11 节"显示语言"，不兼容旧的中文记录），M4 走查 3、M5 走查 5、M7 走查 1–2 要用英文构建新建的会话、
+引用和 F8 报告来做：M2–M7 的构建存下的 F8 报告在工作回顾里列为读不出来的记录，旧消息里的中文引用块按全文显示、没有芯片
+（[english-ui-checks.md](v0/english-ui-checks.md)"未验证"）。
+
 M1 签收后就可以用它做日常工作；M2 起用 F8 记录界面问题，每个里程碑签收时，这些问题直接进入下一步的工作单。
 
 ## 8. 工作约定
