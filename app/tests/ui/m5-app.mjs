@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
-import { rowOf, savedArchived, stubFolder, until, waitReady, waitStatus } from './m3-helpers.mjs';
+import { openMenuOn, rowOf, savedArchived, stubFolder, until, waitReady, waitStatus } from './m3-helpers.mjs';
 import { refEntries } from './m4-helpers.mjs';
 import {
   centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, paneAt, pickRange, previewState, savedLayout, sendAt,
@@ -92,12 +92,13 @@ async function sendIn(page, side, text) {
 /** @brief 会话文件为 file 的会话在界面里的标识。 */
 const keyOf = (page, file) => rowOf(page, file).first().getAttribute('data-row');
 
-/** @brief 焦点放在会话行上按 Shift+F10 打开菜单，返回各项的文字和不能用的原因。 */
+/**
+ * @brief 焦点放在会话行上按 Shift+F10 打开菜单，返回各项的文字和不能用的原因。
+ *        先等界面挪完焦点（openMenuOn 先 settle）：刚点过会话行时，界面在下一帧把焦点放进输入框（focusComposer）；
+ *        不等的话这一帧可能落在"焦点放到会话行"和按 Shift+F10 之间，按键落进输入框、菜单不出现。
+ */
 async function menuOf(page, file) {
-  await rowOf(page, file).first().focus();
-  await page.keyboard.press('Shift+F10');
-  const menu = page.getByTestId('session-menu');
-  await menu.waitFor({ timeout: 5000 });
+  const menu = await openMenuOn(page, rowOf(page, file).first());
   return menu.getByRole('menuitem').evaluateAll((items) => items.map((item) => ({
     label: item.childNodes[0]?.textContent ?? '', blocked: item.querySelector('.menu-hint')?.textContent ?? null,
     disabled: item.disabled })));
@@ -154,9 +155,8 @@ async function setup(ctx) {
 async function menuSplit(ctx) {
   const { page } = ctx;
   const onCurrent = await menuOf(page, ctx.c);
+  // 菜单关闭后下一帧焦点回到会话行；menuOf 先等它落定再打开下一个菜单。
   await page.keyboard.press('Escape');
-  // 菜单关闭后下一帧焦点回到会话行；人按键没有这么快，等它回去再打开下一个菜单。
-  await sleep(200);
   const onA = await menuOf(page, ctx.a);
   await chooseByKeys(page, '在右侧分屏打开');
   await waitSplit(page);

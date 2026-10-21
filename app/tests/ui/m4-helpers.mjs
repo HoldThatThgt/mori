@@ -90,8 +90,19 @@ export function selectBetween(page, selector, startText, endText, index = 0) {
   }, { selector, startText, endText, index });
 }
 
-/** @brief 阅读器里用程序选中第 from 行开头到第 to 行结尾，再发 mouseup。 */
-export function selectLines(page, from, to) {
+/**
+ * @brief 等阅读器的语法高亮画上（行里出现着色的词）。高亮是异步算的，算好后每一行的文字节点换成一个个词：
+ *        先用程序选中再换，选区端点所在的文字节点被移除，终点退到行首（第 5–6 行会变成第 5–5 行）。
+ *        调用方用的都是会高亮的文件（.md、.ts）。
+ */
+function waitHighlighted(page, timeout = 10000) {
+  return page.waitForFunction(() => document.querySelector('[data-testid="file-content"] .file-line span'), null,
+    { timeout });
+}
+
+/** @brief 阅读器里等语法高亮画上后，用程序选中第 from 行开头到第 to 行结尾，再发 mouseup。 */
+export async function selectLines(page, from, to) {
+  await waitHighlighted(page);
   return page.evaluate(({ from: a, to: b }) => {
     const content = document.querySelector('[data-testid="file-content"]');
     const first = content?.querySelector(`[data-line="${a}"]`);
