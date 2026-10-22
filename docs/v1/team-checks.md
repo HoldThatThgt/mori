@@ -77,17 +77,39 @@
 
 ## 交付了什么
 
-（实现完成后填写。）
+- **规格**：[docs/specs/parallel-agents-taskboard.md](../specs/parallel-agents-taskboard.md)（proposal 第四版的实现说明；实现中按 pi 1.3.0 的实际行为与 App 测试发现的缺口修订过，见上表 41–47、52、55、56），
+  状态表 `docs/v1/screens/team-*.md`，临时默认值 [defaults.md](defaults.md) 的“平行 Agent 与 TaskBoard”一节。
+- **后台进程**（`app/src/kernel/`）：角色 `roles.ts`；TaskBoard `board.ts`、`teamTypes.ts`；路由与调度 `boardRoute.ts`；工具 `boardTools.ts`、`teamTools.ts`；
+  文本 `boardText.ts`；读会话 `sessionReader.ts`；证据 `evidence.ts`；强制填写 `handoffForm.ts`、`forcedWrite.ts`（探针共用）；
+  协作 `team.ts`、`teamFlow.ts`、`teamRuns.ts`、`teamLanes.ts`、`teamView.ts`、`teamExtension.ts`、`teamHost.ts`；实例 `instances.ts`；
+  改动：`sessions.ts`、`approval.ts`（一个用户会话一份批准状态）、`extensionUi.ts`、`entries.ts`、`resources.ts`、`commands.ts`、`index.ts`、`agents.ts`（原子写在 Windows 上的重试）与模型层各文件（§12）。
+- **主进程**：删除会话时一并删除 `teams/<id>`（`main/teamDir.ts`）。
+- **界面**：协作开关、`/team`、回执与进展摘要、带归属的后台批准卡、待判断的消息与阶段行、`Stop team`、`wake` 条目、工具卡标题、拒绝启动卡、模型按钮锁定、右栏说明、侧栏状态、F8 记录。
+- **测试**：单元 `tests/unit/taskboard/`；合成端点的脚本模式（`tests/fake-endpoint/scripts.mjs`、`steps.mjs`、`scenarios/`）；
+  App 套件 `tests/ui/tb-app-{flow,roles,modes,ask,handoff,sched,models,stop,misc}.mjs`（共用 `tb-helpers.mjs`，各自的构建目录用 `tb-build.mjs`，
+  TB-03 的对照构建用 `tb-build-base.mjs`）；回放 `tb-replay.mjs` 与真实会话录的 `tests/fixtures/tb/`（`tb-record.mjs`）；真实模型 `tb-real.mjs`；
+  `npm run test:taskboard`；覆盖检查 `node tests/spec-coverage.mjs --spec taskboard`。
+- **合入**：`v1-model-providers` 的 `78df3dc`，app-v0 的 `6a57fd4`（english-ui 与模型层）、`2e67197`（v1 文字润色）、`6217bfe`（术语表）。
 
 ## 与规格不同、或需要你注意的地方
 
 - english-ui 已随 `app-v0`（`6a57fd4`）合入（2026-10-21）：v0 界面文字与 TaskBoard 新加的文字都按
   [v0/ui-strings.md](../v0/ui-strings.md) 的英文，v0 工具卡与进展摘要的标题是同一套规则（`shared/team.ts` 的 `toolCallTitle`）。
-  composer-pickers 还没有合入：界面按本分支的顶栏布局做，合入时要调整协作开关的位置。
+  composer-pickers 还没有合入：界面按本分支的顶栏布局做（协作开关在 ≤ 860px 时只显示状态点，上表 55）。composer-pickers 会话已在它的顶栏里
+  给协作开关留了位置（右边一组的第一个，`Toggle changes` 之前）；后合入的一方重算标题的宽度与阈值。
+- 真实模型一层经本机转发代理看请求体（上表 38），请确认可以这样做。
 - 严格优先意味着 task 一直在跑时，新加模型的探针要等（规格 §12.10）。
 - `anthropic-messages` 的模型永远不满足 `requires: [structured_output]`（规格 §12.2）。
 - 用命令改的文件认不出“改过代码”（规格 §7.3）。
 
 ## 未验证
 
-（实现完成后填写。）
+- **负责人走查**：没做（方案第 8 节完成顺序的最后一步）。
+- **安装包**：TaskBoard 的 App 套件与真实模型一层都只在开发构建上跑过，没有跑 `--exe`（打包后的 Mori.exe）。
+- **真实模型没有走到的路**：分开的座位配置（chat 对话、planner 立项与结案）、A/B 级的强制填写（两个真实模型都是 C 级，真实运行里也没出现强制填写）、
+  `need_user` 与 `waiting_user`、后台批准卡上带理由的拒绝和“本会话不再询问”、临时提问没有交集的报错。这些都只在合成端点上验证过。
+- **没有失败用例证明的修复**：侧栏的后台批准状态重新读取（同一会话里两张后台卡不会同时挂起，上表 52）、退出时先关闭 Team（丢写入的竞争复现不了）、
+  `pump` 里的模型锁检查、对话回复没开始运行就结束时通知 Team 的 `sessions.ts` 接线（只有 Team 一侧有单元测试）。这些是读代码确认需要的。
+- **TB-47** 只走到了“新模型的上下文里没有别的模型的工具调用”这一支；“带压缩摘要”那一支没有出现（pi 判断不需要压缩）。
+- **规格 §14.6 最后一段**：超过 6 个并发会话、带 MCP 与技能时的表现没有测量。
+- 技能命令的展开立项看不到（pi 没有导出，规格 §5.3 写明的已知限制）。
