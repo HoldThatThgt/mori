@@ -275,7 +275,7 @@ models: [strong]
 
 - 只传话（proposal §3、规则 2）：协作模式下对话会话启用的工具 = 它的读取类工具（`read`、`grep`、`find`、`ls` 中它有的）+ `board_read`、`read_session`、`agent_message`；
   合并会话再加立项的工具（§6.3）。
-- 会话之后注册的工具（例如 MCP 服务连上）在运行中可能被启用（§14.6 T-T2），所以 `mori-team` 的 `tool_call` 处理器另外拒绝这次运行开始时算出的集合之外的调用：
+- 不在启用的工具里的调用由 pi 拒绝（`Tool <name> not found`）。会话之后注册的工具（例如 MCP 服务连上）在运行中可能被启用（§14.6 T-T2），所以 `mori-team` 的 `tool_call` 处理器另外拒绝这次运行开始时算出的集合之外的调用：
   协作模式下理由 `Team mode is on: the dialog agent only relays; the work is done in tasks.`；关闭模式下拒绝写了 `tools` 的对话角色 `tools` 之外的调用（基座不受影响）。
 - 启用的工具只在每次运行开始前按这次运行的模式设置，模式改变时不立即换。进入协作模式前最后一次关闭模式的运行启用的工具名写进 `mori.team { mode, tools }`；
   回到 `off` 时恢复最后一条带 `tools` 的条目里的那一组，加上之后新注册、默认启用的工具；重新打开会话、`Check again` 之后同样。
@@ -470,7 +470,8 @@ Request 1 · Login page is blank · open · 6 min
 
 ### 7.3 证据
 
-- **编号**：task 实例会话里，每个工具结果的第一段文字前由程序加上 `[#n] `（`n` 在这个实例会话里从 1 递增，用 pi 的 `tool_result` 钩子，返回时保留 `details` 与 `structuredContent`，§14.6 T-T4；
+- **编号**：task 实例会话里，每个执行了的工具调用的结果的第一段文字前由程序加上 `[#n] `（`n` 在这个实例会话里从 1 递增，用 pi 的 `tool_result` 钩子，返回时保留 `details` 与 `structuredContent`，§14.6 T-T4；
+  被 `tool_call` 处理器拒绝、参数校验失败的调用没有执行，pi 不经这个钩子，结果没有编号，也不能作证据；
   会话重新打开时从会话里已有的最大编号继续）。编号写进会话文件，模型在之后的上下文里看得到。
 - **引用**：`evidence` 是编号列表，写作 `#3`、`3`、`[#3]` 都认。
 - **核对**（程序，proposal §6.6“程序核对它确实发生过、结果是什么”）：每个编号必须是**这个实例会话**里一次已经结束的工具调用；
@@ -528,7 +529,7 @@ proposal §6.6：交接缺失或出错，程序都交给结案 Agent。
 - 结案会话被唤醒（§9.1）：有 task 交给它；这个需求至少有一个 task 且全部已结束（全部终态）而需求还开着；需求没有 task（§5.4 最后一条）；立项给它发了消息；你按 `Stop team` 或 App 重启之后，交给它的 task 被交回（§7.7）。
 - 结案用 `task_handoff { task, … }` 逐个处理交给它的 task：关闭为完成或失败、改派、交给立项；用 `request_close` 关闭需求；需要更多 task 时用 `agent_message` 发给立项持有者（proposal §11）。
 - `request_close` 只在这个需求下全部 task 已结束时可用（否则拒绝并列出未结束的 task）；没有 task 的需求也可以关闭。写下状态和结论、`closedAt`，清掉 `question`。
-- 结案在“全部已结束”或“没有 task”而被唤醒的回合结束时，需求仍开着、没有新的未结束的 task、这个回合也没有给立项发消息（或已经按 §5.4 兜底表第 3 行再唤醒过一次）：
+- 结案在“全部已结束”或“没有 task”而被唤醒的回合结束时，需求仍开着、没有新的未结束的 task，并且结案在这个需求上发给立项的消息都已处理完（立项收到它的那次运行已结束；还没处理完时等立项，立项没建新 task 时按 §5.4 兜底表第 3 行再唤醒结案一次，那次不再看这一条）：
   程序强制关闭一次（§7.5 第 4 步）；仍没有关闭，需求的 `question` = `Request 1 has no open tasks and <close role> didn't close it`，唤醒立项（问题在投递里），立项通常请对话 Agent 问你；立项也没处理时按 §5.4 兜底表第 2 行问你。
   立项解决后用 `agent_message { to: <结案角色>, request: 1 }` 发进这个需求的结案会话，或 `task_create` 建新 task；结案会话下一次运行开始时清掉 `question`、`asked`。
 - **需求关闭**之后：唤醒对话 Agent 去向你汇报（§5.6 `request_closed`；投递文字带状态、结论、已排除的方案和各 task 的结局与最后一棒的结论）；检查订阅（§9.5）；
@@ -918,7 +919,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
 ### 12.12 后台实例的模型提示
 
 实例会话的模型层事件不转发给界面（§8.2）；后台进程把最近一条换模型、等待的提示写进 TaskBoard 视图里这个 task 的 `modelNote`（§13.10），
-例如 `Switched model: A → B · rate limited`、`Waiting for a model · rate limited until 14:05:12`；实例的下一次运行开始时清掉。
+例如 `Switched model: A → B · rate limited`、`Waiting for a model · rate limited until 14:05:12`；实例的下一次运行开始时清掉，task 交给另一方（交接、兜底、交回）时也清掉。
 
 ## 13. 界面
 
@@ -961,7 +962,7 @@ Request 1 · Login page is blank · Running · 6 min
 
 | 部分 | 来源 | 文字 |
 | --- | --- | --- |
-| 需求状态（按这个顺序取第一个） | `status`、`question` 与 task 的状态 | `Done`、`Failed`、`Cancelled`（终态）；`Needs your decision`（有 `asked` 为真的 `waiting_user` task，或 `question` 已问你）；`Waiting for <create role>`（有 `question` 或 `waiting_user` 还没问你）；`Stopped`（有 `stopped` 且没有运行中的）；`With <close role>`（task 都已结束、需求还开着）；`Running` |
+| 需求状态（按这个顺序取第一个） | `status`、`question` 与 task 的状态 | `Done`、`Failed`、`Cancelled`（终态）；`Needs your decision`（有 `asked` 为真的 `waiting_user` task，或 `question` 已问你）；`Waiting for <create role>`（有 `question` 或 `waiting_user` 还没问你）；`Stopped`（有 `stopped` 且没有运行中的）；`With <close role>`（task 都已结束、需求还开着；还没有 task 时同样）；`Running` |
 | 时长 | `createdAt` 到现在或 `closedAt` | `<1 min`、`6 min`、`1 h 12 min` |
 | task 的当前在做什么（`phase` 为 `running`） | 这个实例最近一次工具调用的工具名与参数要点，按 §13.8 的标题规则（`shared/team.ts` 的 `toolCallTitle`，用 english-ui 的英文动词；本分支的 v0 工具卡仍是中文，english-ui 合入后两者一致） | `Run npm test`、`Read src/a.ts` |
 | 还没调用工具 | 实例已开始 | `Starting` |
@@ -1048,8 +1049,9 @@ interface TaskView {
   phase: 'pending' | 'queued' | 'lock_wait' | 'starting' | 'running' | 'approval' | 'waiting_user' | 'asked' | 'with_close'
        | 'stopped' | 'stopped_restart' | 'done' | 'failed' | 'cancelled'
   waitingFor: string[]            // pending 时未完成的依赖；lock_wait 时持有锁的 task
-  current: { toolName: string; args: { path?: string; command?: string; pattern?: string; task?: string; request?: number; role?: string; to?: string } } | null
-                                  // running 时最近一次工具调用；参数只给标题要用的（§13.8），command 只给第一行、≤ 200 字符
+  current: { toolName: string; args: { path?: string; offset?: number; limit?: number; command?: string; pattern?: string; task?: string;
+    request?: number; role?: string; to?: string } } | null
+                                  // running 时最近一次工具调用；参数只给标题要用的（§13.8），command 截到前 200 字符（标题取第一行，多行时加 …）
   modelNote: string | null
   chain: { role: string; outcome: string | null; line: string }[]   // 交接链
 }
@@ -1252,7 +1254,7 @@ interface TaskView {
 | TB-06 | 立项的决定 | 一次判断一种决定，另一类被拒绝；没做决定按直接回答；`task_create` 在本次没登记或补充之前被拒绝；立项出错时已做的写入有效、对话的工作卡含 `couldn't decide: <原因>`；新需求没有 task 时投递一次提醒，仍没有时唤醒结案；程序唤醒的回合里 `request_submit`、`request_cancel` 被拒绝；分开时立项运行中再来的两条消息各自一次判断 | 单元、App |
 | TB-07 | 用户原话照记 | 默认记下这条消息全文；`quote` 必须是你说过的原文；程序唤醒的回合缺 `quote` 被拒绝 | 单元、App |
 | TB-08 | 回执 | 三种写入各有回执，文字按 §13.2（含 120 字符截断）；立项没写入就没有回执；分开时回执紧跟用户消息、在对话回复之前；合并会话时在那次工具调用之后、工具结果之前；程序唤醒回合的回执在写入时的末尾；撤回时回执在撤回时写；实时与重新打开顺序相同；对话回复中判断完的消息被“撤回”后，它的回执与 `mori.progress` 写在末尾 | App、回放、真实 |
-| TB-09 | 对话只传话 | 协作模式下对话会话的请求里没有写入和命令类工具，回到 `off` 后恢复成之前的一组；一个 MCP 服务在会话打开之后才连上时，对话调用 `bash`、`edit` 得到 §5.5 的理由、文件不变、没有批准卡；立项、结案会话的请求里只有读取类与它们的 TaskBoard 工具；对话的工作卡带立项的决定与最后一段文字；关闭模式下 `chat.md` 写 `tools: [read]` 时请求里没有 `bash`、`edit`、`write`，调用它们被拒绝；协作模式下退出 App、重新打开、关掉协作模式后，请求里又有 `bash`、`edit`、`write` | App |
+| TB-09 | 对话只传话 | 协作模式下对话会话的请求里没有写入和命令类工具，回到 `off` 后恢复成之前的一组；一个 MCP 服务在会话打开之后才连上时，对话调用这个 MCP 工具得到 §5.5 的理由，调用 `bash`、`edit` 被拒绝（不在启用的工具里，pi 回 `Tool bash not found`），文件不变、没有批准卡；立项、结案会话的请求里只有读取类与它们的 TaskBoard 工具；对话的工作卡带立项的决定与最后一段文字；关闭模式下 `chat.md` 写 `tools: [read]` 时请求里没有 `bash`、`edit`、`write`，调用它们被拒绝；协作模式下退出 App、重新打开、关掉协作模式后，请求里又有 `bash`、`edit`、`write` | App |
 | TB-10 | 合并会话 | 只有一条会话、一次回合、没有立项会话文件；回执在工具执行时出现；程序唤醒立项的投递进用户会话且不显示；`reply_via_dialog` 在程序唤醒的回合里被拒绝；同一次运行里的插话各算一次判断；立项段在协作模式下出现在 system prompt、关闭模式下没有；程序投递到用户会话不开始用户消息的判断（结案请它建 task 时 `task_create` 不要求先记原话）；默认配置下 `need_user` 只有一次不显示的投递、只问一次；项目有 `.pi/SYSTEM.md` 时协作模式的请求里仍有立项段 | App |
 | TB-11 | 立项看着整个对话 | 投递带自上次以来的对话（含关闭模式的对话）、不含工具调用和思考；超过上限时去掉最早的并注明；重新打开后从 `mori.create_cursor` 继续 | 单元、App |
 | TB-12 | TaskBoard 持久化 | `board.json` 原子写出、编号不复用、终态不能改；重新打开会话后 TaskBoard、回执、进展摘要都在 | 单元、App |
@@ -1277,7 +1279,7 @@ interface TaskView {
 | TB-31 | 结案与需求关闭 | `request_close` 在有未结束的 task 时被拒绝；已排除的方案来自失败关闭的结论；需求关闭后对话被唤醒汇报（投递不显示、汇报有自己的回复操作、`[Mori]` 文字从不出现在输入框或排队区）；结案不关闭时强制关闭，仍不关闭时立项收到需求级问题；需求级问题在立项没处理时由程序请对话问你、摘要显示 `Needs your decision`；结案请立项建 task 而立项没建时结案再被唤醒一次，那次回合结束时强制关闭；`session.read` 的内容不含 `[Mori]` 投递 | 单元、App |
 | TB-32 | 撤销需求 | 运行中的实例停止、task 变为 `cancelled`、没有程序写的交接、写入锁释放、回执 `Request 1 cancelled`、不唤醒结案 | App |
 | TB-33 | 订阅 | `ruled_out`、`outcome` 过滤命中才唤醒；订阅实例只读、只能留消息、类别 `background`；没命中不唤醒 | 单元、App |
-| TB-34 | 后台批准卡 | 实例要批准时用户会话那一栏出卡、卡头写角色与 task、编号不与对话的冲突；Alt+1 允许；拒绝理由回到那个实例；Allow all 之后实例不再出卡；在卡上选本会话不再询问后其他实例挂起和之后的同名工具都不再问；对话一轮结束不清掉卡；TaskBoard 工具从不出卡；侧栏显示等你批准；F8 计入；权限菜单说明为 `Applies to all agents in this session. New sessions start at Ask each time.` | App、回放、真实 |
+| TB-34 | 后台批准卡 | 实例要批准时用户会话那一栏出卡、卡头写角色与 task、编号不与对话的冲突；Alt+1 允许；拒绝理由回到那个实例；Allow all 之后实例不再出卡；在卡上选本会话不再询问后其他实例之后的同名工具都不再问（挂起中的同名请求一并允许由单元测试覆盖：同一时刻最多一个实例有要批准的工具，§9.2、§8.1）；对话一轮结束不清掉卡；TaskBoard 工具从不出卡；侧栏显示等你批准；F8 计入；权限菜单说明为 `Applies to all agents in this session. New sessions start at Ask each time.` | 单元、App、回放、真实 |
 | TB-35 | 停止 | 停止对话的回复只停对话和正在为它判断的立项、后台照常；`Stop team` 停止全部 Agent、批准按拒绝、待判断的消息回到输入框、等回复的 `agent_message` 以 `Stopped by the user.` 结束、task（含交给结案而结案在处理的）变为 `stopped`、没有原因为 `error` 的交接、停止之后端点没有新的请求、不自动重新开始；之后立项 `task_edit` 交回能继续原来的会话（reviewer 被停止时交回 reviewer）；Esc 停止对话回复时，排着的 `request_closed` 汇报与合并会话里排着的 `need_user` 投递在停止后照常开始；对话回复中立项在判断第二条消息时按 Esc，没有新的回复开始；`Stop team` 发生在结案运行与程序唤醒的立项运行中时没有强制填写、强制关闭、兜底投递，投递队列清空；F8 记 `Stop team` | App |
 | TB-36 | 重新载入与重启 | 界面重新载入后后台照常运行，TaskBoard、待判断的消息和后台批准卡都接上；重启后非终态的 task 为 `stopped`、显示 `Stopped (Mori restarted)`、批准作废、回执和进展摘要都在；交回交给结案的 task 时结案会话被唤醒；全部结束而没关闭的需求在下一条消息时唤醒结案；重启前删掉 `reviewer.md` 后，holder 为 reviewer 的 task 交回时交给结案；登记之后 App 退出的需求在重新打开时补写进展摘要的位置 | App |
 | TB-37 | 进展摘要 | 挂在登记它的回复下面（对话回复时你又排了一条消息也一样）；标题行、task 行、当前在做什么取最近一次工具调用（与工具卡同一标题规则）、各种 `phase` 的文字、交接链（含程序写的一棒）；需求关闭后显示 `Done`/`Failed`/`Cancelled`、时长停在 `closedAt`、没有 `Running` 的行、有结论；实时更新；重新打开后内容一致；需求状态按 §13.3 的顺序取（`Waiting for <create role>`、`With <close role>` 等） | App、回放、真实 |
