@@ -90,7 +90,7 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 | 测试中 / 成功 / 失败 / 已取消 | `connection.test`（带 `providerId`、`modelId`），同 connection.md | 测试中按钮是"Testing…"；结果写在这一行下面 | Cancel |
 | 删除确认 | 你点了"Delete…" | 确认框"Delete model <ID>?"，说明"This deletes the model from the connection <名称>."；这是连接的最后一个模型时说明"This also deletes the connection <名称> and its key." | Delete；Cancel（焦点在"Cancel"） |
 | 不能删除 | 它是默认模型而还有别的模型；或它是唯一的模型 | "Delete…"不可用，悬停说明"Can’t delete the default model. Set another model as default first." / "Keep at least one model" | — |
-| 删除后 | `model.delete` | 列表上方"Deleted model <ID>"（连接一起删掉时"Deleted model <ID> and connection <名称>"）；这一行（或整张卡）消失；正在用它的会话：输入框下的模型按钮显示"<ID> (deleted)"，换一个模型再发；连接还在时下一条消息仍用打开时的设置，连接也删了时下一条消息失败（pi 的原文），见 [models.md](models.md) | — |
+| 删除后 | `model.delete` | 列表上方"Deleted model <ID>"（连接一起删掉时"Deleted model <ID> and connection <名称>"）；这一行（或整张卡）消失；正在用它的会话：输入框下的模型按钮显示"<ID> (deleted)"，换一个模型再发；连接还在时下一条消息仍用打开时的设置，连接也删了时下一条消息失败（pi 的原文），见 [models.md](models.md)（v1：不再出现，见 [../../v1/screens/model-chat.md](../../v1/screens/model-chat.md)"拒绝启动卡"） | — |
 
 ### 反例
 

@@ -27,7 +27,7 @@
 460px 约 285px、370px（800 宽窗口）约 215px、280px 约 190px；800 宽窗口右栏打开时中栏 300px 约 245px。
 改名框（M3）在同一位置，至少 120px。
 
-M6 起的模型菜单、思考强度和上下文用量见 [models.md](models.md)；输入框的"/"补全见 [slash.md](slash.md)。
+M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用量见 [models.md](models.md)；输入框的"/"补全见 [slash.md](slash.md)。
 
 ## 对话流
 
@@ -82,23 +82,24 @@ M6 起的模型菜单、思考强度和上下文用量见 [models.md](models.md)
 | 项 | 来源 | 必须可见 |
 | --- | --- | --- |
 | 权限（M2） | 后台进程批准扩展的设置（`session.create` / `session.open` 返回值里的 `approval`，以及 `approval.*` 命令的结果） | 在左端；只有文字（照 Claude 的模式选择，没有图标）："Ask each time ▾"或"Allow all ▾"（警示色）；窄时模式名截断，全名在悬停说明和读屏名里；菜单见 [approval.md](approval.md) |
-| 模型（v1：见 docs/specs/model-providers.md §9.2：选择范围按钮"<范围名> · <当前模型 id>"，来源 `ModelState`） | 会话返回值里的 `model`（provider/id），显示 id；M6 起是可以切换的菜单 | 右边一组的第一项；没有可用模型时"No models available"，pi 给出的说明在顶栏下的横幅里；见 [models.md](models.md)（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 为真时只显示正在用的模型、不能打开菜单，悬停 `Team mode picks the model for each agent`，见 ../../v1/screens/team-blocked.md） |
-| 思考强度（M6） | 见 [models.md](models.md) | 紧挨在模型右边；"Effort: High ▾"；模型没标支持思考时"Effort: Unavailable ▾" |
+| 选择范围（v1） | `ModelState`（`pick`、`current`）、`session.pickOptions` | 右边一组的第一项；"<范围名> · <当前模型 id>"（范围是模型时只有 id，没有范围时"No model range"）；不能启动时的说明在输入框上方的拒绝启动卡里（[../../v1/screens/model-chat.md](../../v1/screens/model-chat.md)）；见 [models.md](models.md)（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 为真时只显示正在用的模型、不能打开菜单，悬停 `Team mode picks the model for each agent`，见 ../../v1/screens/team-blocked.md） |
+| 思考强度（M6） | 见 [models.md](models.md) | 紧挨在选择范围右边；"Effort: High ▾"；当前模型没标支持思考时"Effort: Unavailable ▾"；没有当前模型时不显示 |
 | 上下文用量 | `session.state` → pi `getContextUsage()`；在打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新 | Effort 右边的小圆环，点开看详情；各状态的悬停说明和读屏名见 [models.md](models.md)"上下文用量（圆环）" |
 | 发送、停止、排队 | 下表 | 在右端，同一位置；会话面板 ≤ 600px 时只显示图标（[models.md](models.md)"窄栏"） |
 
 这一行不换行，任何宽度都不超出输入框，圆环任何宽度都在；变窄时先去掉"Effort: "前缀、发送按钮的文字、▾，再收起"Queue"，
-最后依次截短不能发送时的说明、模型 ID、模式名和 Effort 的强度，见 [models.md](models.md)"窄栏"。
+最后依次截短不能发送时的说明、选择范围按钮（先截模型 id，再截范围名）、模式名和 Effort 的强度，见 [models.md](models.md)"窄栏"。
 各项都是这一行的直接子项（不包成组），高度至少 33px（不能发送、只有权限按钮和说明时也不变矮）。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 后台正在启动 | 会话第一次打开、还没打开好，或后台进程通道还没连上 | 输入框可以打字；按钮位置显示"Starting…"，不能发送；这一行只有权限按钮（不可用），没有模型、Effort 和圆环 | 输入 |
-| 打开失败 | `session.create` / `session.open` 报错（`phase` 为 failed，见 [sessions.md](sessions.md)） | 横幅"Failed to open session: …"；按钮位置"Session didn’t open"；这一行只有权限按钮（不可用），没有模型、Effort 和圆环 | 输入（草稿保留） |
-| 空闲 | 没有运行（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.6：只有后台 Agent 在运行时对话仍算空闲，输入框照常可以发送，旁边有 `Stop team`） | "Send"按钮（输入为空时不可用）；权限、模型、Effort、圆环可用 | Enter 发送；Shift+Enter 换行；输入法组字时 Enter 只选词 |
-| 刚发出 | 你发出了消息，本轮还没开始 | "Send"不可用；模型和 Effort 不可用（`aria-disabled`，仍能 Tab 到），权限和圆环可用；开着的模型、Effort 菜单关闭 | — |
-| 生成中、输入框为空（v1：见 docs/specs/model-providers.md §9.3、§11.4：准备中同样显示"Stop"） | 本轮运行中（`agent_start` 到 `agent_settled`） | 同一位置显示"Stop"（悬停"Stop response (Esc)"；协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4、§13.6：后台有 Agent 在运行或排队时旁边另有 `Stop team`）；模型和 Effort 不可用（悬停和读屏的描述说明原因），权限和圆环可用 | 点"Stop"或按 Esc |
+| 后台正在启动 | 会话第一次打开、还没打开好，或后台进程通道还没连上 | 输入框可以打字；按钮位置显示"Starting…"，不能发送；这一行只有权限按钮（不可用），没有范围按钮、Effort 和圆环 | 输入 |
+| 打开失败 | `session.create` / `session.open` 报错（`phase` 为 failed，见 [sessions.md](sessions.md)） | 横幅"Failed to open session: …"；按钮位置"Session didn’t open"；这一行只有权限按钮（不可用），没有范围按钮、Effort 和圆环 | 输入（草稿保留） |
+| 空闲 | 没有运行（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.6：只有后台 Agent 在运行时对话仍算空闲，输入框照常可以发送，旁边有 `Stop team`） | "Send"按钮（输入为空时不可用）；权限、范围按钮、Effort、圆环可用 | Enter 发送；Shift+Enter 换行；输入法组字时 Enter 只选词 |
+| 准备中（v1） | 你发了消息（`session.prompt`），pi 还没开始运行（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：分开时准备中先等立项判断这条消息，见 ../../v1/screens/team-stop.md） | 同一位置显示"Stop"（v1：准备中可以停止，消息撤回、文字回到输入框，[model-chat.md](../../v1/screens/model-chat.md)"准备中"）；输入框有字时左边是只有一个按钮的"Queue"（准备中不能插话；≤ 400px 也不收起）；占位文字"Enter to queue · Shift+Enter for new line"；范围按钮和 Effort 不可用（`aria-disabled`，仍能 Tab 到，原因见 models.md），权限和圆环可用；开着的范围、Effort 菜单关闭 | "Stop"或 Esc；Enter 排队（Ctrl+Enter 也是排队） |
+| 生成中、输入框为空 | 本轮运行中（`agent_start` 到 `agent_settled`） | 同一位置显示"Stop"（悬停"Stop response (Esc)"；协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4、§13.6：后台有 Agent 在运行或排队时旁边另有 `Stop team`）；范围按钮和 Effort 不可用（悬停和读屏的描述说明原因），权限和圆环可用 | 点"Stop"或按 Esc |
 | 生成中、输入框有字 | 同上 | "Stop"和"Queue ▾"（"Queue"悬停"Queue for later (Enter)"），下拉"More send options"里有"Steer"（快捷键提示 Ctrl+Enter）；输入框的占位文字"Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line"；会话面板 ≤ 400px 时"Queue"收起，只留 ▾，菜单里是"Queue for later"和"Steer"，"Stop"不动 | Enter 排队（Queue）；Ctrl+Enter 插话（Steer）；"Stop" |
+| 拒绝启动（v1） | `ModelState.blocked` 不为 null | 输入框上方是拒绝启动卡；可以打字，"Send"不可用（Enter 不发送，草稿不丢）；范围按钮可用（卡上的"Change model…"打开它的菜单）；没有当前模型时没有 Effort | 打字；改范围；卡上的操作 |
 | 有排队或插话的消息（v1：见 docs/specs/model-providers.md §11.4：准备中再发的消息由后台进程暂存，pi 开始后作为 followUp 交给 pi） | pi `queue_update`（`followUp` 与 `steering` 两个列表）（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：排队区还有待判断的消息，标 `Waiting for <create role>`；"Withdraw"同时撤回还没开始判断的，正在判断的那条不撤回） | 输入框上方排队区，逐条显示"Queued"或"Steer"和内容 | "Withdraw"：把排队区里的消息全部放回输入框（`clearQueue`） |
 | 插话送达 | pi 在本轮工具全部执行完、下一次请求模型之前送出（`message_start` role=user，同时 `queue_update` 去掉它） | 排队区少一条，对话流出现这条消息 | — |
 | 排队送达 | 本轮结束后 pi 依次送出 | 同上 | — |
@@ -107,7 +108,7 @@ M6 起的模型菜单、思考强度和上下文用量见 [models.md](models.md)
 （协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4：Esc 与停止只停对话这一回合和为它判断的立项，待判断的消息一起回到输入框，后台照常；`Stop team` 停这个会话的全部 Agent，见 ../../v1/screens/team-stop.md）
 M2 起，有挂起的批准卡时，后台进程在 `abort` 里先把它按拒绝处理（工具卡"Denied · You pressed Stop"），等 pi 记下拒绝后再停止。
 
-Esc 的顺序：先关闭最上层的浮层、菜单或对话框（"Queue"的下拉、输入框下面一行的权限菜单、模型菜单、Effort 菜单和
+Esc 的顺序：先关闭最上层的浮层、菜单或对话框（"Queue"的下拉、输入框下面一行的权限菜单、范围菜单、Effort 菜单和
 上下文用量的详情、切到"Allow all"的确认框、F8 报告框；
 M3 起还有会话的右键菜单、改名框、删除确认框、信任询问，见 [sessions.md](sessions.md)；M4 起还有选区浮层和反馈表单，
 见 [selection.md](selection.md)。选区浮层和上下文用量的详情不挡 Alt+数字和 Ctrl+N）；
@@ -132,9 +133,9 @@ M5 起分屏时 Esc、Alt+数字、F8 都以焦点所在的一栏为准，见 [s
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 意外退出 | 主进程收到后台进程 `exit`（非有意关闭） | 每个打开的会话：横幅"Mori’s background process crashed · Unfinished responses were interrupted"和"Restart"；执行中的工具卡变为"Interrupted"；阶段行消失；输入框可以打字但不能发送（按钮位置显示"Mori’s background process crashed"，放不下时截断、悬停看全文）；输入框下面一行的权限、模型、Effort 按钮不可用（悬停的第二行和读屏的描述也是"Mori’s background process crashed"），开着的菜单关闭（圆环详情不关），圆环保留最后一次的用量；草稿保留 | "Restart" |
+| 意外退出 | 主进程收到后台进程 `exit`（非有意关闭） | 每个打开的会话：横幅"Mori’s background process crashed · Unfinished responses were interrupted"和"Restart"；执行中的工具卡变为"Interrupted"；阶段行消失；输入框可以打字但不能发送（按钮位置显示"Mori’s background process crashed"，放不下时截断、悬停看全文）；输入框下面一行的权限、范围按钮、Effort 按钮不可用（权限、Effort 悬停的第二行，范围按钮悬停的第三行，和读屏的描述也是"Mori’s background process crashed"；范围按钮的描述前面还有提供商和区域），开着的菜单关闭（圆环详情不关），圆环保留最后一次的用量；草稿保留 | "Restart" |
 | 重新载入中 | 你点了"Restart"；主进程重启后台进程并重连通道 | "Restarting…"（横幅和按钮位置）；输入框下面一行同"意外退出" | — |
-| Restart 之后重新打开中 | 后台进程连上后每个会话重新 `session.open`（`phase` 又变成 opening） | 按钮位置"Starting…"；输入框下面一行仍显示上一次的模型、Effort（不可用）和圆环（最后一次的用量），不像第一次打开那样藏起；焦点在这一行时留在原来的按钮上 | — |
+| Restart 之后重新打开中 | 后台进程连上后每个会话重新 `session.open`（`phase` 又变成 opening） | 按钮位置"Starting…"；输入框下面一行仍显示上一次的范围按钮、Effort（不可用）和圆环（最后一次的用量），不像第一次打开那样藏起；焦点在这一行时留在原来的按钮上 | — |
 | 已重新载入 | 每个会话用 `session.open`（会话文件）重新打开，对话流按 pi 记录的当前分支重画 | 一行"Restarted · Queued messages, pending approvals, and “Allow for this session” choices weren’t restored"；草稿仍在 | 继续对话 |
 | 会话还没保存过 | 这个会话没有你的消息（本次运行里没发过，会话列表里也没有它的第一条消息），且会话文件不存在（M3 起；保存过的会话文件不在时显示"Failed to open session: …"，不换成空会话） | 在同一文件夹新建会话，一行"Restarted · This session had no messages yet and was reopened" | 继续 |
 | 重新载入失败 | 后台进程再次启动失败或 `session.open` 报错 | 错误原文和"Restart" | 再试 |

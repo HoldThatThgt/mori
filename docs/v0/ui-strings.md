@@ -78,7 +78,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 退出码 | Exit code N | Exit code {code} | |
 | 后台进程 | Mori’s background process（F8 字段名 "Background process"） | — | 意外退出一律写 "crashed"（Claude："Claude Code crashed"），不写 "stopped"；"Stopped" 只留给停止按钮的结果 |
 | 重新载入（后台进程） | Restart / Restarting… / Restarted | Restart、Restarting Claude Code on {host}… | Claude 重启本地进程用 restart；"Reload" 只留给文件阅读器的 "Reload file" |
-| 设置 | Settings / Open settings | Settings、Open settings | 卡片和思考强度菜单里打开 Settings → Models 的按钮都叫 "Open settings"，顶栏范围菜单里是 "Manage models"；v0 错误卡上的 "Go to settings" v1 已删除（规格 §9.3） |
+| 设置 | Settings / Open settings | Settings、Open settings | 卡片和思考强度菜单里打开 Settings → Models 的按钮都叫 "Open settings"，范围菜单里是 "Manage models"；v0 错误卡上的 "Go to settings" v1 已删除（规格 §9.3） |
 | 返回会话 | Back to app | Back to app | 设置、Customize、Review 三页的返回按钮，操作记录同 |
 | 工具（页） | Customize（导航、页标题、F8 的 Page、操作记录 "Open Customize"） | Customize | Claude 开关技能、插件、连接器的页面叫 Customize；Claude 单独的 "Tools" 不是页名。分节标题 Built-in tools / Skills / Plugins / MCP 不变 |
 | 内置工具 | Built-in tools | Built-in | |
@@ -93,7 +93,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 提供商 | provider / Providers / Add provider / Edit provider · <name> | — | 一个端点（Base URL、API type、Network zone，加它的 key 和模型），v1 取代 v0 的 connection（规格 §4.1）。界面上不再有 "connection" 这个名词，只留在动作 "Test connection" 和结果 "Connected · …"、"Connection failed: …" 里 |
 | key | key / Keys / Add key / API key（输入框的标签） | — | 一个提供商最多 8 个，按列出的顺序用；明文从不显示，Keys 的每行只写 "Saved" |
 | 分组 | group / Groups / New group / Group ID | — | 有序的成员：提供商成员 "<name> · all models"，模型成员 "<name> · <model id>" |
-| 选择范围 | model range / Default model range for new sessions / No model range | — | 分组、提供商或模型（规格 §1）；顶栏按钮的读屏名 "Model range: <按钮上的字>"，菜单的读屏名 "Model range" |
+| 选择范围 | model range / Default model range for new sessions / No model range | — | 分组、提供商或模型（规格 §1）；输入框下面一行的范围按钮读屏名 "Model range: <按钮上的字>"，菜单的读屏名 "Model range" |
 | 网络区域 | network zone / Network zone / Local / Intranet / Public | — | 标签、单选、勾选框和标记写 Local / Intranet / Public；句子里写区域代码（"Allow public for this project"、"zone public is not allowed for this project"） |
 | 项目授权 | Project access / Allowed: … | — | 设置 → Models 的一节：按项目在 "Allowed zones for all projects" 之外另外允许的区域 |
 | 验证（探针） | Verify / Verifying… / Re-verifying… / Verify again / Verify now | — | 结果写在档案摘要的 "Tool calling: Verified / Not verified / Failed"；首次启动表单下方 "Verifying tool calling…" / "Tool calling verified" |
@@ -101,7 +101,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 测试连接 | Test connection / Test / Testing… | Test connection、Testing… | 提供商卡和首次启动表单用 "Test connection"，Keys 的行和模型行用 "Test" |
 | 连接成功 / 连接失败 | Connected · … / Connection failed: … | Connected · {latency}ms、Connection failed: {error} | 毫秒和秒一样不加空格（120ms、5s） |
 | 默认 | Defaults（设置 → Models 的一节）/ None（没有默认范围） | Default | v1 没有 v0 模型行上的 "Default" 标记和 "Set as default"：新会话的默认范围在 Defaults 的下拉里选（规格 §9.1） |
-| 模型 | model / Models（设置页的分节、提供商卡里的一块、范围菜单和 Defaults 下拉的一节） | Model、Model: {name} | 设置页的 "Models" 取代 v0 的 "Connections and models"（规格 §9.1）；v0 顶栏的 "Model: <id>" v1 不再有，顶栏是范围按钮（见 "选择范围"） |
+| 模型 | model / Models（设置页的分节、提供商卡里的一块、范围菜单和 Defaults 下拉的一节） | Model、Model: {name} | 设置页的 "Models" 取代 v0 的 "Connections and models"（规格 §9.1）；v0 顶栏的 "Model: <id>" v1 不再有，输入框下面一行是范围按钮（见 "选择范围"；不用 "Model: {name}"：按钮显示的不一定是一个模型） |
 | 信任 | trust / Trust workspace / Don’t trust | Trust this workspace?、Trust workspace、This workspace isn’t trusted、Trust settings couldn’t be saved.、Couldn’t check whether this workspace is trusted. | 会话定的（待负责人确认）：讲信任时一律叫 "workspace"（Claude 的说法），打开时仍叫 "folder" |
 | 配置（文件夹自带的） | settings | — | "its own extensions or settings" |
 | 草稿 | draft | — | 界面上目前没有出现这个词 |
@@ -148,7 +148,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 输入框不能发送时 | Mori’s background process crashed / Restarting… / Starting… / Session didn’t open |
 | 打开失败 | Failed to open session: … |
 | 输入框的读屏名 | Message Mori（会话定的，待负责人确认；不用 Claude 式的 "Reply to Mori"） |
-| 按键提示 | Enter to send · Shift+Enter for new line / Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line |
+| 按键提示 | Enter to send · Shift+Enter for new line / Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line / Enter to queue · Shift+Enter for new line（准备中，v1） |
 | 发送 / 停止 / 排队发送 / 插话 | Send / Stop（悬停 "Stop response (Esc)"）/ Queue（悬停 "Queue for later (Enter)"，2026-10-21 起；原来是 "Send after the current turn (Enter)"）/ Steer |
 | 排队区 | 标签 Queued / Steer，按钮 Withdraw |
 | 阶段行：等你批准 / 等你回答 | Waiting for your approval / Waiting for your answer |
@@ -177,7 +177,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 警告 | This file is outside the working directory / Contains hidden characters, shown as ⟨U+XXXX⟩ |
 | 还有 N 张 / 还有 N 个 | {n} more |
 | 权限按钮 | 输入框下面一行的左端（2026-10-21 起）；照 Claude 的模式选择只有文字 "Ask each time ▾" / "Allow all ▾"，没有图标，窄时截断，只剩开头几个字母加 "…"（由 Chromium 决定，例如 "Ask …" / "Allo…"）；悬停两行：第一行全名 "Permission mode: Ask each time"，第二行照 Claude 的模式选择用当前模式的说明："Allow all" 时 "Edits, writes, and commands will run without asking."，"Ask each time" 时 "Change the permission mode"（Claude /permissions 命令的说明）；原来的 "Set the permission mode for this session" 不再用；读屏名 "Permission mode: Ask each time"（借用 Claude 定时任务卡片上的 "Permission mode: {mode}"；模式名截断时靠它读出全名） |
-| 模型、Effort 按钮的悬停 | 两行，第一行是按钮的全文（窄时按钮上的字会截断）：模型 "<连接名> · <模型 ID>"，Effort "Effort: High"；第二行是说明或不可用的原因："Set the effort level for this session"、"This model isn’t marked “Supports thinking”"、"Can’t switch models until the response finishes"、"Can’t change effort until the response finishes"；后台进程退出、重新载入、打开中时第二行用按钮位置的说明 "Mori’s background process crashed"、"Restarting…"、"Starting…"（模型按钮能用时只有第一行）。读屏的描述只有第二行（模型按钮能用时是连接名），不把整个悬停说明当描述 |
+| 选择范围、Effort 按钮的悬停 | 第一行是按钮的全文（窄时按钮上的字会截断）。Effort 两行：第一行 "Effort: High"，第二行说明或原因。选择范围按钮三行：第一行按钮文字（"fast · deepseek-chat"），第二行 "<提供商名> · <区域>"（"DeepSeek · Public"；没有当前模型时 "No model can run in this session"），不可用时第三行原因。说明和原因："Set the effort level for this session"（Effort 能用时）、"This model isn’t marked “Supports thinking”"、"Can’t switch models until the response finishes"（准备中也用）、"Can’t change effort until the response finishes"；后台进程退出、重新载入、打开中时用按钮位置的说明 "Mori’s background process crashed"、"Restarting…"、"Starting…"。读屏的描述不含第一行：Effort 是第二行；选择范围按钮是第二行（" · "换成", "）加不可用时的 ". <原因>"，不把整个悬停说明当描述 |
 | 权限按钮不可用时的原因 | 悬停的第二行和读屏的描述："Mori’s background process crashed"、"Restarting…"、"Starting…"、"Session didn’t open"（都是按钮位置原有的说明） |
 | 权限菜单 | Ask each time / Allow all / Allowed for this session: / Forget / None / Applies to this session only. New sessions start with “Ask each time”. |
 | 切到全部允许的确认 | Switch to “Allow all”? / Edits, writes, and commands will run without asking. / Allow all |
@@ -249,8 +249,8 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 | 字段错误 | Name is required. / Base URL must be an http or https URL. / Use a whole number from 1 to 64. / Choose a network zone. / Model ID must be non-empty and contain no spaces. / Model IDs must be unique within a provider. / Context window must be a whole number above 0. / Max output must be a whole number above 0. / Max output must be smaller than the context window. / Label is required. / Use lowercase letters, digits, and hyphens. / <id> is reserved. / <id> is already used by a provider or group. |
 | 测试结果 | Testing… / Cancel / Connected · First token 120ms · Total 950ms · Includes thinking · Response: …（没有首字时间时 "First token —"）/ Connection failed: …（没有原文时 "Connection failed: No response"）/ Test cancelled / Couldn’t test the connection: … |
 | 保存 | 提供商表单、模型表单、Add key、New group 按 Save（Create）保存，保存中按钮不可用，失败时表单里原文；Defaults、Groups 的成员、Project access、Keys 和模型的上移下移、Confirm zone、Dismiss 改了就保存，没有 Save 按钮，成功时不提示 |
-| 范围菜单 | 按钮 "<范围名> · <当前模型 id>"（范围是模型时只写模型 id；没有当前模型时只写范围名）/ No model range；悬停 "<provider name> · <区域>"（没有当前模型时 "No model can run in this session"，生成中 "Can’t switch models until the response finishes"）；菜单 Groups / Providers / Models（Models 按提供商分小节），每项右边标区域（"Local · Public"，未确认时 "Zone not confirmed"）/ Applies to this session only. New sessions use the default range from Settings. / Manage models；换不了时 "Couldn’t change the model range: …" |
-| 思考强度菜单 | Effort: High / Unavailable / Applies to this session only. Set each model’s default for new sessions in Settings. / Open settings |
+| 范围菜单 | 按钮 "<范围名> · <当前模型 id>"（范围是模型时只写模型 id；没有当前模型时只写范围名）/ No model range；按钮在输入框下面一行，读屏名 "Model range: <按钮文字>"；悬停三行：第一行按钮文字，第二行 "<provider name> · <区域>"（没有当前模型时 "No model can run in this session"），不可用时第三行原因（准备中、生成中 "Can’t switch models until the response finishes"）；菜单和切换失败的一行从输入框下面一行往上打开；菜单 Groups / Providers / Models（Models 按提供商分小节），每项右边标区域（"Local · Public"，未确认时 "Zone not confirmed"）/ Applies to this session only. New sessions use the default range from Settings. / Manage models；换不了时 "Couldn’t change the model range: …" |
+| 思考强度菜单 | Effort: High / Unavailable / Applies to this session only. Set each model’s default for new sessions in Settings. / Open settings；不支持思考：This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”. |
 | 发送、停止、排队（只有图标时） | 读屏名 "Send" / "Stop" / "Queue" / "More send options"（都是 Claude 原词）；悬停 "Send (Enter)"、"Stop response (Esc)"、"Queue for later (Enter)"（Claude 的 "Queue for later"；原来是 "Send after the current turn (Enter)"）；▾ 菜单里 "Steer"，≤ 400px 时加上 "Queue for later"：项的名字只有文字，快捷键是旁边的提示（"Enter"、"Ctrl+Enter"，`aria-hidden`，另放在 `aria-keyshortcuts`），不写成 "Queue · Enter" |
 | AGENTS.md | User / In effect: <path> / <path> takes precedence, so what you write here has no effect. / <path> is in effect now. After you save, this AGENTS.md is loaded instead. / Save / Discard changes / Unsaved changes / Saved · Applies to new sessions / Open in default app |
 | 离开确认 | Discard changes to AGENTS.md? / Your edits haven’t been saved. Leaving now discards them. / Discard / Keep editing |
@@ -350,7 +350,9 @@ Assistant: <回复正文>
 - Current session: Fix login
 - Folder: D:\code\app
 - Session file: <路径>（还没有时 Not saved yet）
+- Model range: <选择范围>（没有时 None）
 - Model: <id>（没有时 None）
+- Effort: High（不支持思考时 Unavailable；没有当前模型时 None）
 - Running: Yes / No
 - Status line: Thinking… 5s（不显示时 Hidden）
 - Pending requests: 0
@@ -358,6 +360,7 @@ Assistant: <回复正文>
 - Split view: Left: <名字> · Right: <名字> (focus in the left pane)
 - Right panel: Open / Closed
 - Window size: 1280×800
+- Pane width: 740px（焦点所在那一栏；不在会话页时 None）
 - Sidebar width: 260px（收起时 Hidden (saved width 260px)；被收紧时 220px (saved width 260px)）
 - Right panel width: 420px
 - Background process: Starting… / Running / Crashed / Restarting…
@@ -426,7 +429,7 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 | 设置 | Open settings（侧栏的 Settings）/ Open Settings → Models（卡片和菜单里的按钮；带落点时加 " (keys)"、" (zones)"、" (project)"）/ Save user-level AGENTS.md |
 | 首次启动、设置 → Models | Save first-run provider <name>（第一次保存，还没有 id）/ Save first-run provider <id> / Add provider <name> / Save provider <id> / Delete provider <id> / Add model <provider>/<id> / Save model <provider>/<id> / Delete model <provider>/<id> / Move model <provider>/<id> -1（上移；下移是 1）/ Add key <provider> / Remove key <ref> / Move key <ref> -1（1）/ Create group <id> / Save group <id> / Delete group <id> / Set defaults <默认范围，没有时 None> · <允许的区域，空格分隔> / Set project zones <path> · <区域，空格分隔> / Confirm zone <provider> · <zone> / Dismiss migration notice / Reload model settings / Verify <provider>/<id> (auto)（拒绝启动卡的 Verify now 可能带多个模型，空格分隔；需要你同意的探针是 (long_input)、(cancel)）；删除的确认框打开时算连带改动的那一次不记；从不记 key 的明文 |
 | 测试连接 | Test connection <provider>/<id>（Keys 的行的 Test 加 " with key <ref>"）/ Cancel connection test |
-| 顶栏 | Set model range <范围> / Change effort for this session: <level>（<level> 是 pi 的取值，如 high、xhigh） |
+| 输入框下面一行 | Set model range <范围> / Change effort for this session: <level>（<level> 是 pi 的取值，如 high、xhigh） |
 | Customize 页 | Open Customize / Enable（Disable）<单数的类别> <path>（Enable skill …、Disable extension …、Enable prompt template …）/ Enable all in plugin（Disable all in plugin）<source> / Add plugin from folder <path> / Remove plugin <source> / Save MCP server <name> / Enable（Disable）MCP server <name> / Remove MCP server <name> / Switch MCP server <name> to direct calls |
 | 工作回顾 | Open Review / View in Review / Review: Feedback / View record: UI issues / Resolve / Reopen / Hide resolved / Show resolved / Export: Feedback / Open folder: UI issues / Show record in Explorer / Jump to source from Review |
 | 其他 | Report a UI issue / Restart background process |
