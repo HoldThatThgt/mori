@@ -4,6 +4,8 @@
 状态表在 [screens/models.md](screens/models.md)（模型、Effort、圆环、菜单、窄栏）、[screens/approval.md](screens/approval.md)（权限菜单）、
 [screens/chat.md](screens/chat.md)（顶栏、输入框下面一行、各状态下这一行的样子），临时默认值在 [defaults.md](defaults.md)。
 这里记下为什么、怎样估的宽度、我自己定了什么，以及实现和测试要改的地方。
+（上面一段是设计时写的。实现、测试、真实模型走查和打包版的结果，以及全部按推荐定的选择，见检查记录
+[composer-pickers-checks.md](composer-pickers-checks.md)。）
 
 2026-10-21 合并 v1（`v1-model-providers`）之后：搬进这一行的是 v1 的选择范围按钮
 （[../v1/screens/model-menu.md](../v1/screens/model-menu.md)），不是 v0 的模型菜单；改了哪些、按推荐定了哪些见

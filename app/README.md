@@ -19,6 +19,8 @@ M6：设置页（多个连接与模型、默认模型、思考强度（Effort）
 只差负责人走查（[检查记录](../docs/v0/m7-checks.md)）。
 英文界面（`english-ui` 分支）：界面和 Mori 写出的文字（F8 报告、导出、操作记录、引用块）全部改为英文，有对应处照 Claude 桌面版的
 用词（[术语表](../docs/v0/ui-strings.md)）；安装包只带英文界面；只差负责人走查（[检查记录](../docs/v0/english-ui-checks.md)）。
+输入框下面一行（`composer-pickers` 分支）：模型（选择范围）、Effort、只有文字的权限按钮和上下文用量圆环从顶栏移到文字框下面那一行，
+顶栏只留会话名、协作开关和这一栏的按钮；只差负责人走查（[检查记录](../docs/v0/composer-pickers-checks.md)）。
 
 ## 准备
 
