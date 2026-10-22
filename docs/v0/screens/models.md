@@ -102,7 +102,7 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 | 还没有消息 | `tokens` 为 0：pi 只估算对话里的消息，不算系统提示词和工具说明，还没有消息时就是 0 | 空圆环（只有底圈，实线）；悬停"Context window"；读屏名"Context window"，描述（`aria-describedby`）"Send a message to see context usage." | 打开详情 |
 | 有用量 | `tokens`、`contextWindow`、`percent` | 圆环从正上方顺时针按百分比填充，强调色；悬停"Context ≈ 15.4k / 128k (12%)"；读屏名"Usage: Context approximately 15,360 of 128,000 tokens (12%)" | 打开详情 |
 | 快满 | 四舍五入后显示的百分比 ≥ 75（与悬停、读屏里的数一致：74.5% 显示"75%"，也用警示色） | 填充改用警示色（较深的 `--color-warn-text`）；≥ 90 用危险色（照 Claude 的分档，登记在 defaults.md）。不靠颜色也看得出：有填充时底圈是浅的 `--color-line`，三种填充和它的对比度都 ≥ 3:1，填到哪里看得出（空圆环的 `--color-faint` 底圈和填充几乎一样亮，所以有填充时换掉） | 同上 |
-| 刚压缩完 | `tokens` 为 null（pi：压缩之后还没有新的回复） | 空圆环，底圈是虚线（与"还没有消息"分得开）；悬停"Context window"；读屏名"Context window"，描述"Just compacted. Context usage shows after the next response." | 打开详情 |
+| 刚压缩完 | `tokens` 为 null（pi：压缩之后还没有算用量的回复；上下文太小被截断、pi 从上下文去掉的回复不算，这时对话流最后一项是那条回复） | 空圆环，底圈是虚线（与"还没有消息"分得开）；悬停"Context window"；读屏名"Context window"，描述"Just compacted. Context usage shows after the next response." | 打开详情 |
 | 详情 | 你点了圆环或在它上面按 Enter / Space | 照 Claude 的用量浮层，从圆环往上弹出（宽 260px，不超过这一行）：第一行左边"Context window"，右边与悬停相同的 summary"≈ 15.4k / 128k (12%)"；下面一条 4px 的进度条（颜色同圆环）。还没有消息、刚压缩完时右边空着，进度条的位置换成那句说明（"Send a message to see context usage."，或"Just compacted. Context usage shows after the next response."）。开着时用量刷新，详情跟着变 | Esc 关闭，焦点留在圆环；点外面或 Tab 移走也关闭（焦点在新的位置）；再点圆环关闭 |
 | 后台进程退出、Restart 之后重新打开中 | 同 chat.md"后台进程退出" | 圆环和详情保留最后一次读到的用量（同原来；重新打开时 `contextUsage` 不清空） | 打开详情 |
 

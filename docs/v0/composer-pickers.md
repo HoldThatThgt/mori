@@ -875,6 +875,26 @@ Effort 菜单、"Queue"的 ▾ 和圆环详情；930、460、400、300px 时从�
 | `range-menu-300.png` | 300px 范围菜单往上打开、收在这一行的宽度里 |
 | `rings-930.png` | 930px 圆环 0% / 50% / 80% / 95% / 刚压缩完（五张截图里这一段拼在一起，放大 2 倍） |
 
+## 打包版（2026-10-22）
+
+`npm run dist:dir` 之后逐个文件比了 `dist/win-unpacked/resources/app.asar` 里的 `out/` 和 `app/out/`：327 个文件
+SHA-256 都相同，两边没有多出的文件。对 `Mori.exe`（`--exe`）跑了 m0-smoke、m1–m7 的 App 套件（含 `m6-app-row`、
+`m6-mcp-cost`）、v1 模型层的三个 App 套件、TaskBoard 的九个 App 套件，以及 m0–m7、`v1-models-real`、`tb-real` 的真实走查。
+程序没有改；改的是两处测试的预期：
+
+- `tb-app-roles` TB-03：pi 的 system prompt 写着它自己文档的路径（pi 包所在的 `node_modules`），对照构建是开发构建，
+  打包版的 pi 在 `resources/app.asar/node_modules`，两边差 111 个字。打包版运行时把对照里这个路径前缀换成打包版的
+  （`baseSystem`），其余仍逐字节比较。这是 TaskBoard 的 App 套件第一次跑 `--exe`（team-checks.md 记着之前只跑过开发构建）。
+- `m1-real` 走查 8：上下文只有 8000 时最后一条回复常被截断（stopReason `length`，输出没到 maxTokens），pi 把它从上下文去掉
+  （`context_edit`，replacement 为 null）准备压缩后重试；刚压缩过、没有可压缩的就不重试，这条回复留在对话流里。压缩之后
+  只有这一条回复时 pi 的用量是空的，圆环是"刚压缩完"，原来的测试却按"最后一项是回复"要有用量（4 遍里 1 遍）。现在按会话文件
+  照 pi 的规则判断（`usageAfterCompaction`），models.md"刚压缩完"一行也写上这种情形。
+- `m1-real` 走查 3 的反例两遍没过：模型把命令写成 `ls does-not-exist-dir; echo "exit=$?"`，以 0 结束，"Done"是对的
+  （english-ui-checks.md 记过同样的事）；第三遍模型照原样运行，过了。没有改测试。
+
+看到了、没有改的：上面那条被 pi 去掉的截断回复，界面上照常显示，没有任何说明，下一条消息时模型看不到它。这是 pi 的恢复
+没做成时的行为，不是这一步改出来的，等你定要不要提示。
+
 ## 没有验证的
 
 - 所有宽度都是按字形宽度和现在的 CSS 算的，没有在 App 里量；实现后按实测调阈值，可能比上表差几 px。

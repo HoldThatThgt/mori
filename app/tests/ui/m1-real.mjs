@@ -12,7 +12,7 @@
 // 读圆环的 data-tokens（page.mjs usageTokens），圆环的读屏名、悬停和颜色按真实的数核对；拒绝启动卡在输入框上方时这一行的样子；
 // 800 宽时这一行不换行、不溢出；压缩之后圆环的样子。
 
-import { existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
   allowRealProject, appRoot, arg, createRecorder, editModelConfig, killKernel, launch, oneLine, prepareProject,
@@ -421,7 +421,7 @@ async function item8(project, connection) {
     }
     const stages = await h.stages();
     const notices = await page.getByText('Compacted session', { exact: true }).count();
-    await compactedRing(page);
+    await compactedRing(page, dir);
     record('8 一直在底部时不出现"有新内容"', await page.getByTestId('new-content').count() === 0);
     record('8 阶段行显示"正在压缩较早的对话"', stages.includes('Compacting session…'), stages.join(' → '));
     record('8 对话流留下"已压缩较早的对话"', notices >= 1, `${notices} 处`);
@@ -433,26 +433,56 @@ async function item8(project, connection) {
 }
 
 /**
- * @brief 走查 8 的圆环（models.md"上下文用量（圆环）"）：对话流最后一项是"Compacted session"（压缩之后还没有新的回复）时，
- *        圆环为空、底圈虚线、没有 data-tokens，读屏名"Context window"、描述是"Just compacted. …"；
- *        最后一项是回复时圆环有用量，数与读屏名一致。
+ * @brief 会话文件里最近一次压缩之后有没有 pi 算用量的回复（pi getContextUsage 的规则）：中止、出错、用量为 0 的不算，
+ *        被之后的 context_edit 去掉（replacement 为 null）的也不算——上下文太小把回复截断时（stopReason length），
+ *        pi 把它从上下文去掉、准备压缩后重试，没有可压缩的就不重试，这条回复仍留在对话流里。没有压缩过时为 true。
+ * @param dir 走查的临时数据目录（会话文件在 pi/sessions 下，走查 8 只有一个会话）
+ * @return { counted（有没有算数的回复）, after（压缩之后的回复：stopReason、用量、是否被去掉） }
  */
-async function compactedRing(page) {
+function usageAfterCompaction(dir) {
+  const root = join(dir, 'pi', 'sessions');
+  const files = readdirSync(root, { recursive: true }).map(String).filter((name) => name.endsWith('.jsonl'));
+  if (files.length !== 1) throw new Error(`expected one session file under ${root}, found ${files.length}`);
+  const entries = readFileSync(join(root, files[0]), 'utf8').trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  const removed = new Set(entries.filter((entry) => entry.type === 'context_edit' && entry.replacement === null)
+    .map((entry) => entry.targetId));
+  const start = entries.findLastIndex((entry) => entry.type === 'compaction');
+  const after = entries.slice(start + 1)
+    .filter((entry) => entry.type === 'message' && entry.message.role === 'assistant')
+    .map((entry) => ({ stop: entry.message.stopReason, usage: entry.message.usage?.totalTokens ?? 0,
+      removed: removed.has(entry.id) }));
+  const counted = start < 0 || after.some((item) => !item.removed && item.usage > 0
+    && !['aborted', 'error'].includes(item.stop));
+  return { counted, after };
+}
+
+/**
+ * @brief 走查 8 的圆环（models.md"上下文用量（圆环）"）：pi 的用量为空时（对话流最后一项是"Compacted session"，
+ *        或压缩之后的回复都被 pi 从上下文去掉，见 usageAfterCompaction）圆环为空、底圈虚线、没有 data-tokens，
+ *        读屏名"Context window"、描述是"Just compacted. …"；否则圆环有用量，数与读屏名一致。
+ * @param page 走查的页面
+ * @param dir 走查的临时数据目录
+ */
+async function compactedRing(page, dir) {
   const last = await page.evaluate(() => {
     const items = [...document.querySelectorAll('[data-testid="transcript"] :is([data-testid="user-message"], '
       + '[data-testid="assistant"], [data-testid="notice"])')];
     return items.at(-1)?.textContent?.trim() ?? '';
   });
   const ring = await ringState(page);
-  const compacted = last === 'Compacted session';
+  const session = usageAfterCompaction(dir);
+  const notice = last === 'Compacted session';
+  const compacted = notice || !session.counted;
   const ok = compacted ? ring?.state === 'compacted' && ring.tokens === null && ring.label === 'Context window'
     && ring.desc === COMPACTED_NOTE && ringColorProblems(ring).length === 0
     : ringTextProblems(ring).length === 0;
-  record(`8 圆环与压缩一致：对话流最后一项${compacted ? '是"Compacted session"，圆环为空、底圈虚线、读屏名"Context window"'
-    : '是回复，圆环显示用量'}`, ok, `${oneLine(last, 60)} | ${JSON.stringify(ring)}`);
-  // 压缩之后模型可能马上又回了一条，最后一项就不是"Compacted session"、上面只查了有用量的圆环：明确记下这次走查有没有
+  const which = notice ? '是"Compacted session"' : compacted ? '是回复，但压缩之后的回复都被 pi 从上下文去掉' : '是回复';
+  record(`8 圆环与压缩一致：对话流最后一项${which}，${compacted ? '圆环为空、底圈虚线、读屏名"Context window"'
+    : '圆环显示用量'}`, ok, `${oneLine(last, 60)} | ${JSON.stringify(session.after)} | ${JSON.stringify(ring)}`);
+  // 压缩之后模型可能马上又回了一条，pi 就有了用量、上面只查了有用量的圆环：明确记下这次走查有没有
   // 看到刚压缩完的圆环（没看到时标 KNOWN，不算通过；这个状态在 m1-app.mjs ringCompacted 里查）
-  record('8 走查里看到了刚压缩完的圆环（对话流最后一项是"Compacted session"）', compacted, oneLine(last, 60), true);
+  record('8 走查里看到了刚压缩完的圆环（pi 的用量为空：对话流最后一项是"Compacted session"，或压缩之后的回复都被去掉）',
+    compacted, oneLine(last, 60), true);
 }
 
 /** @brief 走查数据目录里首选提供商（DeepSeek）的非机密信息（v1：model-config.json，lib.mjs realProviders）。 */

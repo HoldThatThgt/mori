@@ -16,7 +16,7 @@
 // 抛错（synthetic fault injection，本构建与 src 不变），最后单独启动。
 
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROLES_TEXT } from '../fake-endpoint/scenarios/roles.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
@@ -272,9 +272,24 @@ const OFF_SEGMENT = `${OFF_SENTENCE}\n`
 const toolNames = (body) => (body?.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
 
 /**
+ * @brief 装在本构建位置的 v0 会发的 system prompt：pi 的 system prompt 写着它自己文档的路径（pi 包所在的
+ *        node_modules）。对照构建是开发构建（app/node_modules），打包版（--exe）的 pi 在 resources/app.asar/node_modules，
+ *        所以打包版运行时把对照里的这个路径前缀换成打包版的；只换这一处，其余逐字节比较。
+ * @param ctx 套件上下文（ctx.v0 为对照构建的结果，ctx.exePath 为打包版路径或 null）
+ * @return 对照的 system prompt
+ */
+function baseSystem(ctx) {
+  const system = ctx.v0.request.system;
+  if (!ctx.exePath) return system;
+  const dev = join(appRoot, 'node_modules') + sep;
+  const packaged = join(dirname(ctx.exePath), 'resources', 'app.asar', 'node_modules') + sep;
+  return system.split(dev).join(packaged);
+}
+
+/**
  * @brief 本构建跑同一个关闭模式的会话，与对照构建比较（TB-03）；再写一个 executor.md、新开会话，比较多出来的部分。
- *        不做任何归一：两次用同一个项目文件夹（system prompt 里的 <cwd> 相同），pi 的 system prompt 里没有日期、
- *        数据目录这类每次运行不同的内容，所以请求体逐字节比较。
+ *        两次用同一个项目文件夹（system prompt 里的 <cwd> 相同），pi 的 system prompt 里没有日期、数据目录这类
+ *        每次运行不同的内容，所以请求体逐字节比较；唯一的例外是打包版的安装位置（baseSystem）。
  */
 async function v0same(ctx) {
   if (!ctx.v0?.request) throw new Error('the base build gave no request to compare with');
@@ -303,9 +318,9 @@ async function v0Compare(ctx, who, request, tools) {
   record('TB-03 off mode without role files: the tool list sent to the model is byte-identical to v0 (the pre-'
     + 'TaskBoard build, same project and config) and so is the system prompt',
   request !== undefined && JSON.stringify(request.body.tools) === JSON.stringify(base.body.tools)
-    && request.system === base.system,
+    && request.system === baseSystem(ctx),
   brief({ tools: toolNames(request?.body), baseTools: toolNames(base.body), system: request?.system.length,
-    baseSystem: base.system.length, wholeBody: body }));
+    baseSystem: baseSystem(ctx).length, wholeBody: body }));
   record('TB-03 off mode without role files: the Tools page rows (name, source, on/off, description) are the same as '
     + 'in v0', tools.rows.length > 0 && same(tools.rows, ctx.v0.tools.rows),
   brief({ tb: tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`),
@@ -333,7 +348,8 @@ async function v0Roles(ctx, who, request, tools) {
   const names = toolNames(request?.body);
   const extraTool = toolDef(request, 'agent_message');
   const rest = (request?.body.tools ?? []).filter((tool) => tool !== extraTool);
-  const added = request?.system.startsWith(base.system) ? request.system.slice(base.system.length) : null;
+  const v0System = baseSystem(ctx);
+  const added = request?.system.startsWith(v0System) ? request.system.slice(v0System.length) : null;
   record('TB-03 off mode with another role (executor.md): the request differs from v0 only by agent_message — the '
     + 'tool list is the v0 list plus the agent_message definition (with its description), and the system prompt is '
     + 'the v0 one plus the mori_team section holding the off-mode dialog segment that explains it',
