@@ -21,12 +21,14 @@ const REASON_MAX = 40;
 const FAILURE_MAX = 80;
 
 const statusText: Record<ToolStatus, string> = {
-  preparing: '准备中', queued: '等待执行', awaiting: '等你批准', running: '执行中', done: '完成', failed: '失败',
-  rejected: '已拒绝', stopped: '已停止', interrupted: '已中断',
+  preparing: 'Preparing…', queued: 'Queued', awaiting: 'Waiting for your approval', running: 'Running…', done: 'Done',
+  failed: 'Failed', rejected: 'Denied', stopped: 'Stopped', interrupted: 'Interrupted',
 };
 
 /** 自动放行的卡上的标签 */
-const badgeText: Record<NonNullable<ToolCall['allowedBy']>, string> = { session: '本会话已允许', all: '全部允许' };
+const badgeText: Record<NonNullable<ToolCall['allowedBy']>, string> = {
+  session: 'Allowed for this session', all: 'Allow all',
+};
 
 /** @brief 每秒刷新一次的当前时间；active 为假时不计时。 */
 export function useNow(active: boolean): number {
@@ -53,11 +55,11 @@ function cut(text: string, max: number): string {
 /** @brief 失败时的简短说明：退出码，或错误原文的第一行。 */
 function failureDetail(output: string): string {
   const code = /Command exited with code (\d+)/.exec(output);
-  if (code) return `退出码 ${code[1]}`;
+  if (code) return `Exit code ${code[1]}`;
   return cut(output.split(/\r?\n/).map((item) => item.trim()).find(Boolean) ?? '', FAILURE_MAX);
 }
 
-/** @brief 状态文字（含耗时、退出码、理由）；已拒绝时为"已拒绝"、"已拒绝 · 理由"（长理由截断）或"已拒绝 · 你按了停止"。 */
+/** @brief 状态文字（含耗时、退出码、理由）；已拒绝时为"Denied"、"Denied · <理由>"（长理由截断）或"Denied · You pressed Stop"。 */
 function statusLine(tool: ToolCall, now: number): string {
   const base = statusText[tool.status];
   if (tool.status === 'running' && tool.startedAt) return `${base} ${seconds(Math.max(0, now - tool.startedAt))}`;
@@ -67,7 +69,7 @@ function statusLine(tool: ToolCall, now: number): string {
   return base;
 }
 
-/** @brief 状态行的悬停文字：已拒绝且有理由时是完整的"已拒绝 · 理由"，其余没有。 */
+/** @brief 状态行的悬停文字：已拒绝且有理由时是完整的"Denied · <理由>"，其余没有。 */
 function statusTitle(tool: ToolCall): string | undefined {
   return tool.status === 'rejected' && tool.reason ? `${statusText.rejected} · ${tool.reason}` : undefined;
 }
@@ -79,16 +81,16 @@ function ToolBody({ tool }: { tool: ToolCall }) {
   const output = tool.output.length > OUTPUT_MAX ? `…\n${tool.output.slice(-OUTPUT_MAX)}` : tool.output;
   return (
     <div className="tool-body">
-      <div className="tool-section-label">参数</div>
+      <div className="tool-section-label">Input</div>
       <pre className="tool-pre">{typeof args === 'string' ? args : JSON.stringify(args, null, 2)}</pre>
       {content !== null && (
-        <><div className="tool-section-label">写入的内容</div><pre className="tool-pre">{content}</pre></>
+        <><div className="tool-section-label">File content</div><pre className="tool-pre">{content}</pre></>
       )}
       {tool.patch && (
         // diff 画在 shadow DOM 里，页面的选区读不到里面的字：不当作引用来源（docs/v0/screens/selection.md）。
         <div className="tool-diff" data-testid="tool-diff" data-no-quote><Diff patch={tool.patch} /></div>
       )}
-      {output && <><div className="tool-section-label">输出</div><pre className="tool-pre">{output}</pre></>}
+      {output && <><div className="tool-section-label">Output</div><pre className="tool-pre">{output}</pre></>}
     </div>
   );
 }
@@ -100,7 +102,7 @@ function TitleTarget({ tool, target, tabKey }: { tool: ToolCall; target: string;
     return <code className="tool-target">{target}</code>;
   }
   return (
-    <button className="tool-path" title={`在右栏打开 ${target}`} data-testid="tool-path"
+    <button className="tool-path" title={`Open ${target} in the right panel`} data-testid="tool-path"
       onClick={(event) => { event.preventDefault(); openFile(tabKey, path); }}>
       <code className="tool-target">{target}</code>
     </button>

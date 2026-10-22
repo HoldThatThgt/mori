@@ -5,14 +5,14 @@
 import type { QuoteRef } from '../../../shared/protocol';
 import { displayPath } from '../components/toolTitle';
 
-/** @brief 行范围的文字："第 3 行"或"第 3–5 行"。 */
+/** @brief 行范围的文字："line 3"或"lines 3–5"。 */
 export function lineText(start: number, end: number): string {
-  return start === end ? `第 ${start} 行` : `第 ${start}–${end} 行`;
+  return start === end ? `line ${start}` : `lines ${start}–${end}`;
 }
 
-/** @brief 轮次范围的文字："第 3 轮"或"第 3–5 轮"。 */
+/** @brief 轮次范围的文字："turn 3"或"turns 3–5"。 */
 export function turnsText(from: number, to: number): string {
-  return from === to ? `第 ${from} 轮` : `第 ${from}–${to} 轮`;
+  return from === to ? `turn ${from}` : `turns ${from}–${to}`;
 }
 
 /** @brief 字数（按字符数）。 */
@@ -20,26 +20,26 @@ export function charCount(text: string): number {
   return [...text].length;
 }
 
-/** @brief "约 X 字"：1,000 以上取整到百，以下取整到十，100 以下照实。 */
+/** @brief "~X characters"（正好 1 时 "~1 character"）：1,000 以上取整到百，以下取整到十，100 以下照实。 */
 export function approxChars(count: number): string {
   const rounded = count >= 1000 ? Math.round(count / 100) * 100 : count >= 100 ? Math.round(count / 10) * 10 : count;
-  return `约 ${rounded.toLocaleString('en-US')} 字`;
+  return rounded === 1 ? '~1 character' : `~${rounded.toLocaleString('en-US')} characters`;
 }
 
-/** @brief 会话引用的芯片文字："引用 · 会话名 · 第 3–8 轮 · 约 3,200 字"。 */
+/** @brief 会话引用的芯片文字："Context · 会话名 · turns 3–8 · ~3,200 characters"。 */
 export function sessionRefLabel(ref: QuoteRef, name: string): string {
   const { source } = ref;
   if (source.kind !== 'session') return '';
-  return `引用 · ${name} · ${turnsText(source.fromTurn, source.toTurn)} · ${approxChars(charCount(ref.quote))}`;
+  return `Context · ${name} · ${turnsText(source.fromTurn, source.toTurn)} · ${approxChars(charCount(ref.quote))}`;
 }
 
 /**
- * @brief 芯片上的来源："src/a.ts · 第 3–5 行"、"助手回复"，或会话引用的"引用 · 会话名 · 第 3–8 轮 · 约 3,200 字"
+ * @brief 芯片上的来源："src/a.ts · lines 3–5"、"Response"，或会话引用的"Context · 会话名 · turns 3–8 · ~3,200 characters"
  *        （会话名用引用时的；界面上显示原会话现在的名字时由调用方传 name）。
  */
 export function refLabel(ref: QuoteRef, cwd: string, name?: string): string {
   const { source } = ref;
-  if (source.kind === 'message') return '助手回复';
+  if (source.kind === 'message') return 'Response';
   if (source.kind === 'session') return sessionRefLabel(ref, name ?? source.name);
   return `${displayPath(source.path, cwd)} · ${lineText(source.startLine, source.endLine)}`;
 }
@@ -47,9 +47,11 @@ export function refLabel(ref: QuoteRef, cwd: string, name?: string): string {
 /** @brief 引用块的第一行。 */
 function blockHeading(ref: QuoteRef, cwd: string): string {
   const { source } = ref;
-  if (source.kind === 'message') return '引用你之前的回复：';
-  if (source.kind === 'session') return `引用会话“${source.name}”${turnsText(source.fromTurn, source.toTurn)}：`;
-  return `引用 ${displayPath(source.path, cwd)} ${lineText(source.startLine, source.endLine)}：`;
+  if (source.kind === 'message') return 'Quoting your earlier reply:';
+  if (source.kind === 'session') {
+    return `Quoting session “${source.name}”, ${turnsText(source.fromTurn, source.toTurn)}:`;
+  }
+  return `Quoting ${displayPath(source.path, cwd)}, ${lineText(source.startLine, source.endLine)}:`;
 }
 
 /** @brief 发给模型的一段引用块（格式是临时默认值，见 docs/v0/defaults.md）。 */

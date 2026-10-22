@@ -83,7 +83,7 @@ function composerTarget(element: Element, source: DragSource, state: AppState): 
   const tab = composer && state.tabs.find((item) => item.key === composer.dataset.tab);
   if (!composer || !tab || !source.hasMessages || !source.file) return null;
   if (sourceKey(source) === tab.key || sameFile(tab.sessionFile, source.file)) return null;
-  return { kind: 'reference', tabKey: tab.key, rect: rectOf(composer), text: '松开以引用到这个会话' };
+  return { kind: 'reference', tabKey: tab.key, rect: rectOf(composer), text: 'Drop to attach as context' };
 }
 
 /** @brief 鼠标下的放下目标；不能放下时为 null。 */
@@ -97,15 +97,17 @@ function targetAt(event: DragEvent, source: DragSource): DropTarget | null {
   const shown = shownKeys(state).filter((key) => state.tabs.some((tab) => tab.key === key));
   const key = sourceKey(source);
   const slot = key && shown.includes(key) ? slotOf(key) : null;
-  if (key && slot) return { kind: 'focus', tabKey: key, rect: rectOf(slot), text: '已经打开 · 松开切换到这一栏' };
+  if (key && slot) {
+    return { kind: 'focus', tabKey: key, rect: rectOf(slot), text: 'Already open · Drop to switch to this pane' };
+  }
   // 拖到输入框上不会分屏（session-refs.md 反例）：不能引用的会话（还没有消息）在输入框上不能放下。
   if (element.closest('[data-drop="composer"]')) return null;
-  if (shown.length === 0) return { kind: 'open', rect: rectOf(center), text: '松开以打开这个会话' };
+  if (shown.length === 0) return { kind: 'open', rect: rectOf(center), text: 'Drop to open this session' };
   const box = center.getBoundingClientRect();
   const side: Side = event.clientX < box.left + box.width / 2 ? 'left' : 'right';
   const paneSlot = state.split ? slotOf(side === 'left' ? state.split[0] : state.split[1]) : null;
   return { kind: 'split', side, rect: paneSlot ? rectOf(paneSlot) : rectOf(center, side),
-    text: `松开以在${side === 'left' ? '左' : '右'}侧分屏打开` };
+    text: `Drop to open in split view on the ${side}` };
 }
 
 /** @brief 在一侧分屏打开被拖的会话（没打开过的先打开）；之后焦点进它的输入框。 */
@@ -121,7 +123,7 @@ function drop(source: DragSource, target: DropTarget): void {
   if (target.kind === 'reference' && target.tabKey && source.file) {
     void referenceSession(target.tabKey, source.file, source.title);
   } else if (target.kind === 'focus' && target.tabKey) {
-    recordAction('拖已打开的会话到中栏');
+    recordAction('Drag an open session to the center');
     focusPane(target.tabKey);
     focusComposer(target.tabKey);
   } else {

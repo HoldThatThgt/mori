@@ -16,7 +16,7 @@
   white-space: nowrap;
 }
 .model-button { max-width: 100%; }
-/* 与 chat.css 里权限按钮收窄的阈值相同 */
+/* 720px 以下最宽 120px；chat.css 里权限按钮去掉图标的 760px 阈值按这两档宽度估算 */
 @container (max-width: 720px) {
   .model-switch { max-width: 120px; }
 }
@@ -86,8 +86,10 @@
   white-space: normal;
 }
 
-/* 窄栏（models.md"窄栏"）。600px 以下：思考按钮只显示强度（"高 ▾"）；菜单改以会话面板定位，贴着面板右边，
-   不伸出面板（按钮可能贴着窗口或右栏）。400px 以下：两个按钮去掉 ▾、内边距收小 */
+/* 窄栏（models.md"窄栏"）。600px 以下：思考按钮只显示强度（"High ▾"）；菜单改以会话面板定位，贴着面板右边，
+   不伸出面板（按钮可能贴着窗口或右栏）。400px 以下：两个按钮去掉 ▾、内边距收小。
+   思考按钮最宽的是不支持思考时（按 Segoe UI 12px 量）："Effort: Unavailable ▾" 约 128px，"Unavailable ▾" 约 93px，
+   400px 以下 "Unavailable" 约 73px；顶栏其余部分的估算见 chat.css */
 @container (max-width: 600px) {
   .thinking-prefix { display: none; }
   .model-switch, .thinking-switch { position: static; }

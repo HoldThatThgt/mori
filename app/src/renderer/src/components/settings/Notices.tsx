@@ -85,7 +85,7 @@ export function UnconfirmedZones({ providers, suggestions }: {
   if (pending.length === 0) return null;
   return (
     <section className="models-notice zones-unconfirmed" data-testid="zones-unconfirmed">
-      <p>Confirm the network zone of these providers. Sessions don't use them until you do.</p>
+      <p>Confirm the network zone of these providers. Sessions don’t use them until you do.</p>
       <ul>
         {pending.map((provider) => (
           <li key={provider.id} data-testid="zone-unconfirmed" data-provider={provider.id}>

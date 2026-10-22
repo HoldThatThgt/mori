@@ -1,4 +1,4 @@
-// 会话面板：顶栏（会话名、模型、思考强度、权限、上下文用量、右栏开关；分屏时"关闭这一栏"）、对话流、阶段行、后台进程退出提示、
+// 会话面板：顶栏（会话名、模型、思考强度、权限、上下文用量、右栏开关；分屏时"Close pane"）、对话流、阶段行、后台进程退出提示、
 // 批准卡、排队区、拒绝启动卡与输入框。分屏时每一栏是一个完整的会话面板；在面板里按下鼠标或焦点进入它，焦点就切到这一栏
 // （split.md）。模型层（docs/v1/screens/model-menu.md、model-chat.md）：顶栏的选择范围，输入框上方的拒绝启动卡。
 // 平行 Agent（docs/v1/screens/team-switch.md）：顶栏在模型、思考强度、权限按钮之前有协作开关。
@@ -25,12 +25,12 @@ import { Transcript } from './Transcript';
 /** 没有名字时会话名取第一条消息的前几个字（方案 5.3） */
 export const TITLE_LENGTH = 20;
 
-/** @brief 显示的会话名：名字；没有时第一条消息的前 TITLE_LENGTH 个字；都没有时"新会话"。 */
+/** @brief 显示的会话名：名字；没有时第一条消息的前 TITLE_LENGTH 个字；都没有时"New session"。 */
 export function displayTitle(name: string | null, firstMessage: string | null): string {
   if (name?.trim()) return name;
   // 技能调用（pi 展开后的 <skill …> 块）按"/skill:名字 参数"算（docs/v0/screens/slash.md）。
   const first = (firstMessage && skillCommandText(firstMessage))?.replace(/\s+/g, ' ').trim();
-  if (!first) return '新会话';
+  if (!first) return 'New session';
   return [...first].length > TITLE_LENGTH ? `${[...first].slice(0, TITLE_LENGTH).join('')}…` : first;
 }
 
@@ -48,50 +48,59 @@ export function folderName(cwd: string): string {
 function UsageChip({ usage }: { usage: ContextUsage | null }) {
   if (!usage) return null;
   if (usage.tokens === null || usage.percent === null) {
-    return <span className="usage-chip" title="刚压缩过，要等下一次回复才知道用量" data-testid="usage">上下文 —</span>;
+    return <span className="usage-chip" title="Just compacted. Context usage shows after the next response."
+      data-testid="usage">Context —</span>;
   }
   const percent = usage.percent < 1 ? '<1%' : `${Math.round(usage.percent)}%`;
-  const detail = `约 ${usage.tokens.toLocaleString('en-US')} / ${usage.contextWindow.toLocaleString('en-US')} token`;
-  return <span className="usage-chip" title={detail} aria-label={`上下文用量 ${percent}，${detail}`} data-testid="usage">
-    上下文 {percent}</span>;
+  const tokens = usage.tokens.toLocaleString('en-US');
+  const total = usage.contextWindow.toLocaleString('en-US');
+  return <span className="usage-chip" title={`About ${tokens} / ${total} tokens`}
+    aria-label={`Context usage ${percent}, about ${tokens} of ${total} tokens`} data-testid="usage">
+    Context {percent}</span>;
 }
 
 /** @brief 输入框不能发送时的说明；能发送时为 null。 */
 function notReadyText(kernel: KernelStatus, tab: Tab): string | null {
-  if (kernel === 'exited') return '后台进程已退出';
-  if (kernel === 'reloading') return '正在重新载入…';
-  if (kernel === 'connecting' || tab.phase === 'opening') return '正在启动…';
-  if (tab.phase === 'failed') return '会话没有打开';
+  if (kernel === 'exited') return 'Mori’s background process crashed';
+  if (kernel === 'reloading') return 'Restarting…';
+  if (kernel === 'connecting' || tab.phase === 'opening') return 'Starting…';
+  if (tab.phase === 'failed') return 'Session didn’t open';
   return null;
 }
 
-/** @brief 后台进程意外退出的提示和"重新载入"；detail 是重新载入失败时的原文。 */
+/** @brief 后台进程意外退出的提示和"Restart"按钮；detail 是重新启动失败时的原文。 */
 export function KernelExitBanner({ detail }: { detail?: string | null }) {
   return (
     <div className="banner danger" role="alert" data-testid="kernel-exit">
-      <span>Mori 的后台进程意外退出 · 刚才没完成的回复已中断</span>
+      <span>Mori’s background process crashed · Unfinished responses were interrupted</span>
       {detail && <span className="banner-detail">{detail}</span>}
-      <button className="button" onClick={() => void reload()}><Icon name="refresh" />重新载入</button>
+      <button className="button" onClick={() => void reload()}><Icon name="refresh" />Restart</button>
     </div>
   );
 }
 
-/** @brief 后台进程退出、重新载入中、打开失败的横幅。 */
+/** @brief 后台进程退出、重新启动中、打开失败的横幅。 */
 function KernelBanner({ kernel, tab }: { kernel: KernelStatus; tab: Tab }) {
   if (kernel === 'exited') return <KernelExitBanner detail={tab.error} />;
-  if (kernel === 'reloading') return <div className="banner" role="status">正在重新载入…</div>;
-  if (tab.phase === 'failed') return <div className="banner danger" role="alert">打开失败：{tab.error}</div>;
+  if (kernel === 'reloading') return <div className="banner" role="status">Restarting…</div>;
+  if (tab.phase === 'failed') {
+    return <div className="banner danger" role="alert">Failed to open session: {tab.error}</div>;
+  }
   return null;
 }
 
 /** @brief 没有加载文件夹自带的扩展和配置时的说明，以及怎样改回；加载了或文件夹没有这些内容时为 null。 */
 function trustText(tab: Tab, agentDir: string): string | null {
-  if (tab.projectTrust === 'unasked') return '这个文件夹刚出现了自带的扩展或配置，这次没有加载 · 新建会话时会问你';
+  if (tab.projectTrust === 'unasked') {
+    return 'This workspace now has its own extensions or settings, which weren’t loaded this time · '
+      + 'You’ll be asked when you start a new session';
+  }
   if (tab.projectTrust !== 'untrusted') return null;
   const how = tab.trustRemembered
-    ? `你选过记住；要改回，删掉 ${agentDir}\\trust.json 里这个文件夹的记录后重新打开`
-    : '重启 Mori 后会再问';
-  return `没有信任这个文件夹，它自带的扩展和配置没有加载 · ${how}`;
+    ? `To change your remembered choice, delete this workspace’s entry from ${agentDir}\\trust.json and reopen `
+      + 'the session'
+    : 'You’ll be asked again after you restart Mori';
+  return `This workspace isn’t trusted, so its extensions and settings weren’t loaded · ${how}`;
 }
 
 /** @brief 信任与扩展的横幅（sessions.md "项目信任"）。 */
@@ -101,10 +110,12 @@ function SessionBanners({ tab }: { tab: Tab }) {
   return (
     <>
       {trust && <div className="banner" data-testid="trust-banner">{trust}</div>}
-      {tab.trustSaveError && <div className="banner danger" role="alert">没能记住你的选择：{tab.trustSaveError}</div>}
+      {tab.trustSaveError && (
+        <div className="banner danger" role="alert">Couldn’t save trust settings: {tab.trustSaveError}</div>
+      )}
       {tab.extensionErrors.length > 0 && (
         <div className="banner danger" role="alert" data-testid="extension-errors">
-          <span>有扩展没有加载：</span>
+          <span>Some extensions didn’t load:</span>
           {tab.extensionErrors.map((error) => <span key={error} className="banner-detail">{error}</span>)}
         </div>
       )}
@@ -143,11 +154,11 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
         )}
         <PermissionMenu tab={tab} disabled={notReady} />
         <UsageChip usage={tab.contextUsage} />
-        <button className="icon-button" onClick={onToggleRight} aria-pressed={rightOpen} aria-label="右栏：本会话的改动"
-          title="本会话的改动"><Icon name="right" /></button>
+        <button className="icon-button" onClick={onToggleRight} aria-pressed={rightOpen} aria-label="Toggle changes"
+          title="This session’s changes"><Icon name="right" /></button>
         {split && (
-          <button className="icon-button close-pane" data-testid="close-pane" aria-label="关闭这一栏"
-            title="关闭这一栏（不会停止生成）" onClick={() => { closePane(tab.key); focusComposer(); }}>
+          <button className="icon-button close-pane" data-testid="close-pane" aria-label="Close pane"
+            title="Close pane (doesn’t stop the response)" onClick={() => { closePane(tab.key); focusComposer(); }}>
             <Icon name="close" />
           </button>
         )}

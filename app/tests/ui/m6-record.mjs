@@ -202,8 +202,8 @@ const modelRange = { name: 'model-range', dir: v1Dir, description: '在 Models �
   } };
 
 /**
- * @brief thinking（v1）：在 Models 里把首选的模型标为支持思考（新会话默认"中"）；新会话里顶栏切到"高"有思考内容，
- *        切到"关"没有。保存之后不再录 models.get：回放时界面保存后读到的仍是保存前的配置（回放桥直接应答写命令）。
+ * @brief thinking（v1）：在 Models 里把首选的模型标为支持思考（新会话默认"Medium"）；新会话里顶栏切到"High"有思考内容，
+ *        切到"Off"没有。保存之后不再录 models.get：回放时界面保存后读到的仍是保存前的配置（回放桥直接应答写命令）。
  */
 const thinking = { name: 'thinking', dir: v1Dir, description: '在 Models 里把首选的第一个模型标为支持思考（新会话默认'
     + '"中"）；新会话里顶栏切到"高"，问一道要推理的题，回复带思考内容；切到"关"再问一道，回复没有思考内容',

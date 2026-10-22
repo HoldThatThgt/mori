@@ -39,10 +39,10 @@ const PLAIN_REPLY = '这是一段只有文字的回复，用来测试流式输�
 /** 合成端点压缩请求的回复里的一句 */
 const SUMMARY_TEXT = 'Synthetic summary of the earlier conversation.';
 /** 生成中、准备中范围按钮的悬停说明（§9.2） */
-const BUSY_TITLE = "Can't change the model while generating";
+const BUSY_TITLE = 'Can’t switch models until the response finishes';
 /** v0 的压缩提示与已停止提示 */
-const COMPACTED_NOTICE = '已压缩较早的对话';
-const STOPPED_NOTICE = '已停止 · 已经做出的修改不会自动撤销';
+const COMPACTED_NOTICE = 'Compacted session';
+const STOPPED_NOTICE = 'Stopped · Changes made so far stay as they are';
 /** 被拒绝启动的会话收到 session.prompt 时的原文（§4.6） */
 const BLOCKED_MESSAGE = "This session can't start: no model fits";
 /** 填充对话用的文字：不含合成端点的任何关键词 */
@@ -256,7 +256,7 @@ async function startApp(ctx) {
   ctx.app = await launch({ exePath, userData: ctx.userData });
   ctx.page = await ctx.app.firstWindow();
   ctx.page.on('pageerror', (error) => ctx.pageErrors.push(error.message));
-  await ctx.page.getByRole('button', { name: '打开文件夹…' }).first().waitFor({ timeout: 60000 });
+  await ctx.page.getByRole('button', { name: 'Open folder…', exact: true }).first().waitFor({ timeout: 60000 });
   await ctx.page.evaluate(() => {
     window.__events = [];
     window.mori.onEvent((envelope) => window.__events.push(JSON.parse(JSON.stringify(envelope))));
@@ -300,11 +300,13 @@ async function openProject(ctx, folder) {
   const { page } = ctx;
   const before = await page.locator('.pane-slot').count();
   await stubFolder(ctx.app, folder);
-  await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await page.getByRole('button', { name: 'Open folder…', exact: true }).first().click();
   await page.waitForFunction((count) => document.querySelectorAll('.pane-slot').length > count
     || Boolean(document.querySelector('[data-testid="trust-dialog"]')), before, { timeout: 30000 });
   const trust = page.getByTestId('trust-dialog');
-  if (await trust.isVisible().catch(() => false)) await trust.getByRole('button', { name: '信任', exact: true }).click();
+  if (await trust.isVisible().catch(() => false)) {
+    await trust.getByRole('button', { name: 'Trust workspace', exact: true }).click();
+  }
   await waitReady(page);
   await settle(page);
 }
@@ -421,7 +423,7 @@ const clickCardAction = (page, action) => paneOf(page)
 
 /** @brief 打开设置页的 Models 分节。 */
 async function openModels(page) {
-  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
   await page.locator('[data-testid="settings-nav"] button[data-section="models"]').click();
   await page.getByTestId('models-section').waitFor({ timeout: 15000 });
@@ -429,7 +431,7 @@ async function openModels(page) {
 
 /** @brief 设置页上点"返回会话"。 */
 async function backToChat(page) {
-  await page.getByRole('button', { name: '返回会话', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to app', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 10000 });
   await waitReady(page);
 }
@@ -461,7 +463,7 @@ async function addModelUi(page, providerId, spec) {
   await card.locator('[data-action="add-model"]').click();
   const form = card.getByTestId('model-form');
   await form.waitFor({ timeout: 5000 });
-  await form.getByLabel('Model id').fill(spec.id);
+  await form.getByLabel('Model ID').fill(spec.id);
   if (spec.ctx) await form.getByLabel('Context window').fill(String(spec.ctx));
   if (spec.max) await form.getByLabel('Max output').fill(String(spec.max));
   if (spec.reasoning) await form.getByLabel('Supports thinking').check();
@@ -594,15 +596,15 @@ async function noCandidateStep(ctx) {
   await choosePick(page, 'mix');
   const card = await waitBlocked(page, 'no_candidate');
   record('MP-09 no_candidate: card text "This session can\'t start: no model fits."',
-    card.title === "This session can't start: no model fits.", card.title);
+    card.title === 'This session can’t start: no model fits.', card.title);
   const lines = card.candidates.map((item) => `${item.reason}:${item.text}`);
   record('MP-09 no_candidate: one line per candidate with its reason', same(lines, [
     'unverified:dead/dead-coder — tool calling not verified yet',
     'zone_blocked:pubp/pub-coder — zone public is not allowed for this project',
     'zone_unconfirmed:unc/unc-coder — network zone not confirmed']), lines.join(' | '));
-  record('MP-09 no_candidate: actions Verify now / Allow public for this project… / Confirm zone… / Change model… / '
+  record('MP-09 no_candidate: actions Verify now / Allow public for this project / Confirm zone / Change model… / '
     + 'Open settings, in this order', same(card.actions, [['verify', 'Verify now'],
-    ['allow-zone', 'Allow public for this project…'], ['confirm-zone', 'Confirm zone…'],
+    ['allow-zone', 'Allow public for this project'], ['confirm-zone', 'Confirm zone'],
     ['change-model', 'Change model…'], ['open-settings', 'Open settings']]), JSON.stringify(card.actions));
   await clickCardAction(page, 'confirm-zone');
   const zoneFocus = await until(() => page.evaluate(() => {
@@ -610,7 +612,7 @@ async function noCandidateStep(ctx) {
     return el?.matches('[data-action="confirm-zone"]')
       ? el.closest('[data-testid="zone-unconfirmed"]')?.dataset.provider ?? '' : null;
   }), 5000, 200);
-  record('MP-09 no_candidate: "Confirm zone…" opens Settings → Models with focus on the unconfirmed provider\'s row',
+  record('MP-09 no_candidate: "Confirm zone" opens Settings → Models with focus on the unconfirmed provider\'s row',
     zoneFocus === 'unc', `focused confirm-zone of ${zoneFocus}`);
   await backToChat(page);
   await clickCardAction(page, 'allow-zone');
@@ -620,7 +622,7 @@ async function noCandidateStep(ctx) {
       ? `${el.closest('[data-testid="project-row"]')?.dataset.path}|${el.dataset.zone}` : null;
   }), 5000, 200);
   const [path, zone] = (projectFocus ?? '|').split('|');
-  record('MP-09 no_candidate: "Allow public for this project…" opens Project access with focus on this project',
+  record('MP-09 no_candidate: "Allow public for this project" opens Project access with focus on this project',
     projectKey(path || '.') === projectKey(ctx.project) && zone === 'public', `focused ${projectFocus}`);
   await backToChat(page);
   await noCandidateMenuAndSettings(ctx);
@@ -688,7 +690,7 @@ async function allowZoneStep(ctx) {
   await dialog.waitFor({ state: 'detached', timeout: 5000 });
   await backToChat(page);
   const cleared = await until(async () => (await blockedState(page)) === null, 15000, 300);
-  record('MP-09 Allow public for this project…: after allowing in Project access the card clears', Boolean(cleared),
+  record('MP-09 Allow public for this project: after allowing in Project access the card clears', Boolean(cleared),
     JSON.stringify(await blockedState(page)));
 }
 
@@ -708,7 +710,7 @@ async function pickMissingStep(ctx) {
   await backToChat(page);
   const card = await waitBlocked(page, 'pick_missing');
   record('MP-09 pick_missing: card text "tmpg is not in your model settings." / "Used by this session\'s model range."',
-    card.title === 'tmpg is not in your model settings.' && card.note === "Used by this session's model range.",
+    card.title === 'tmpg is not in your model settings.' && card.note === 'Used by this session’s model range.',
     `${card.title} / ${card.note}`);
   record('MP-09 pick_missing: actions "Change model…" and "Open settings"',
     same(card.actions, [['change-model', 'Change model…'], ['open-settings', 'Open settings']]),
@@ -772,15 +774,15 @@ async function configInvalidScenario(ctx) {
   const form = await page.getByTestId('connection-form').count();
   await openProject(ctx, project);
   const card = await waitBlocked(page, 'config_invalid');
-  record('MP-09 config_invalid: card text "Model settings can\'t be read: <path>: <message>"',
-    card.title.startsWith("Model settings can't be read: ") && card.title.includes('model-config.json')
-    && card.title.length > "Model settings can't be read: ".length + file.length, card.title);
+  record('MP-09 config_invalid: card text "Model settings can’t be read: <path>: <message>"',
+    card.title.startsWith('Model settings can’t be read: ') && card.title.includes('model-config.json')
+    && card.title.length > 'Model settings can’t be read: '.length + file.length, card.title);
   record('MP-09 config_invalid: only "Open settings"; no first-run form',
     same(card.actions, [['open-settings', 'Open settings']]) && form === 0, JSON.stringify(card.actions));
   await clickCardAction(page, 'open-settings');
   const error = await page.getByTestId('models-load-error').innerText({ timeout: 10000 }).catch(() => '');
   record('MP-09 config_invalid: "Open settings" shows only the read error and Reload in Settings → Models',
-    error.includes("Model settings can't be read:") && error.includes('Reload'), oneLine(error, 200));
+    error.includes('Couldn’t read model settings:') && error.includes('Retry'), oneLine(error, 200));
   await backToChat(page);
   await send(page, 'plain must not be sent');
   await sleep(800);
@@ -1318,7 +1320,7 @@ async function compactionScenario(ctx) {
 
 // ---------- 场景：顶栏的选择范围（MP-23） ----------
 
-/** @brief 点开范围菜单，读出各节、各项、说明与 Manage models…，再 Esc 关上。 */
+/** @brief 点开范围菜单，读出各节、各项、说明与 Manage models，再 Esc 关上。 */
 async function readMenu(page) {
   await paneOf(page).getByTestId('model-button').click();
   const menu = page.getByTestId('model-menu');
@@ -1361,10 +1363,10 @@ async function menuStep(ctx) {
   record('MP-23 menu: items whose candidates are all excluded are faded with the reason on hover, still selectable',
     faded && !byPick.g1?.excluded && !byPick.p2?.excluded, JSON.stringify(['gpub', 'pp', 'pp/pm', 'g1'].map((pick) =>
       [pick, byPick[pick]?.excluded, byPick[pick]?.title])));
-  record('MP-23 menu: zones marked, the current range ticked, bottom note and "Manage models…"',
+  record('MP-23 menu: zones marked, the current range ticked, bottom note and "Manage models"',
     byPick.g1?.checked && byPick.g1.zone === 'Local' && byPick.pp?.zone === 'Public'
-    && menu.note === 'Applies to this session. New sessions use the default range from Settings.'
-    && menu.manage === 'Manage models…', JSON.stringify({ g1: byPick.g1, note: menu.note, manage: menu.manage }));
+    && menu.note === 'Applies to this session only. New sessions use the default range from Settings.'
+    && menu.manage === 'Manage models', JSON.stringify({ g1: byPick.g1, note: menu.note, manage: menu.manage }));
 }
 
 /** @brief 选提供商：写进会话文件、不改默认范围；按钮格式；选模型；生成中不能改。 */
@@ -1504,7 +1506,7 @@ async function stopWhilePreparingStep(ctx, ep) {
     draft === 'plain second\n\nplain third' && (await userCount(page)) === 0, JSON.stringify(draft));
   const stopped = (await notices(page)).filter((item) => item.text === STOPPED_NOTICE).length;
   const queue = await paneOf(page).getByTestId('queue').count();
-  record('MP-34 Stop while preparing: no error card, no "已停止", queue cleared, nothing reached the endpoint',
+  record('MP-34 Stop while preparing: no error card, no "Stopped", queue cleared, nothing reached the endpoint',
     (await errorCount(page)) === 0 && stopped === 0 && queue === 0 && ep.log.length === mark.log
     && talk(ep).length === talk({ bodies: ep.bodies.slice(0, mark.bodies) }).length,
     `errors ${await errorCount(page)}, stopped ${stopped}, queue ${queue}, new log lines ${ep.log.length - mark.log}`);

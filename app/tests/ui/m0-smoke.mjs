@@ -26,6 +26,8 @@ const canary = 'mori-smoke-canary';
 const results = { target: exePath ?? 'dev build', checks: [] };
 const oneLine = (text, max = 200) => String(text).replace(/\s+/g, ' ').slice(0, max);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** 后台进程意外退出时的横幅（ChatPane.tsx KernelExitBanner） */
+const CRASH_BANNER = 'Mori’s background process crashed · Unfinished responses were interrupted';
 
 /** @brief 记录一项检查；known 表示已知的上游问题，失败时标 KNOWN，不计入退出码。 */
 function record(name, ok, detail = '', known = false) {
@@ -89,10 +91,10 @@ async function connect(app, page, userData, project) {
   await h.fillConnection({ name: '' });
   const nameError = await form.locator('[data-testid="field-error"][data-field="name"]').innerText().catch(() => '');
   const disabled = await form.locator('[data-action="test"]').isDisabled();
-  record('没填连接时不能测试连接，字段旁给出英文说明', disabled && nameError === 'Name is required',
+  record('没填连接时不能测试连接，字段旁给出英文说明', disabled && /^Name is required\.?$/.test(nameError),
     `Test connection 不可用=${disabled}；${nameError}`);
   const wrong = await saveAndTest(page, 'wrong-key');
-  record('错误的 key 显示错误原文', !wrong.ok && wrong.text.startsWith('Failed') && wrong.text.includes('401'),
+  record('错误的 key 显示错误原文', !wrong.ok && /^(Connection failed|Failed)/.test(wrong.text) && wrong.text.includes('401'),
     wrong.text.slice(0, 160));
   const literal = await saveAndTest(page, testKey);
   record('测试连接', literal.ok, literal.text.slice(0, 160));
@@ -110,7 +112,7 @@ async function connect(app, page, userData, project) {
   // M2 起命令要先批准；冒烟测的是批准之外的行为，先切到全部允许。
   await h.allowAll();
   await addressChange(page, userData);
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app' }).click();
 }
 
 /**
@@ -124,7 +126,7 @@ async function addressChange(page, userData) {
   const card = h.providerCard();
   await card.locator('[data-action="edit-provider"]').click();
   const form = page.getByTestId('provider-form');
-  await form.getByLabel('Address', { exact: true }).fill(`http://localhost:${port}/v1`);
+  await form.getByLabel('Base URL', { exact: true }).fill(`http://localhost:${port}/v1`);
   await form.getByRole('button', { name: 'Save', exact: true }).click();
   const dialog = page.locator('[data-testid="confirm-dialog"][data-kind="address-change"]');
   const text = oneLine(await dialog.innerText({ timeout: 10000 }).catch(() => ''));
@@ -132,12 +134,12 @@ async function addressChange(page, userData) {
   await form.waitFor({ state: 'detached', timeout: 15000 });
   const changed = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8')).providers[0];
   record('改了服务地址的 origin：确认框说明 key 会被删，确认后地址改了、key 被删',
-    text.includes("Changing the address removes this provider's 1 saved keys.")
+    /Changing the base URL removes this provider’s saved key\./.test(text)
       && changed.baseUrl === `http://localhost:${port}/v1` && changed.keys.length === 0
       && await card.getByTestId('no-keys').count() === 1,
     `确认框：${text}；model-config.json：${changed.baseUrl}，keys=${changed.keys.length}`);
   await card.locator('[data-action="edit-provider"]').click();
-  await form.getByLabel('Address', { exact: true }).fill(`http://127.0.0.1:${port}/v1`);
+  await form.getByLabel('Base URL', { exact: true }).fill(`http://127.0.0.1:${port}/v1`);
   await form.getByRole('button', { name: 'Save', exact: true }).click();
   await form.waitFor({ state: 'detached', timeout: 15000 });
   await h.addKey(testKey);
@@ -166,7 +168,7 @@ async function verifiedAgain(page) {
 async function commandEnvCheck(page) {
   // 对照：Mori 的进程环境里放了一个无害的标记变量，命令能读到它（1），但读不到 key（0）。
   const card = await sendAndWait(page, `run: env | grep -c ${testKey}; env | grep -c ${canary}; true`);
-  record('命令的环境里没有 key（对照变量可见）', /完成/.test(card) && /输出\s*0\s+1\s*$/.test(card),
+  record('命令的环境里没有 key（对照变量可见）', /Done/.test(card) && /Output\s*0\s+1\s*$/.test(card),
     card.slice(0, 200));
 }
 
@@ -188,7 +190,7 @@ async function chatChecks(app, page, project) {
   const readCard = await sendAndWait(page, '总结 README');
   const transcript = await page.getByTestId('transcript').innerText();
   record('流式文字', transcript.includes('我先读一下 README.md') && transcript.includes('工具已返回'));
-  record('读取工具卡完成', /读取.*完成.*Smoke project/.test(readCard), readCard.slice(0, 200));
+  record('读取工具卡完成', /Read.*Done.*Smoke project/.test(readCard), readCard.slice(0, 200));
 
   await sendAndWait(page, 'code block');
   const tokens = await page.locator('.prose pre span[style*="--sdm-c"]').count();
@@ -201,11 +203,11 @@ async function chatChecks(app, page, project) {
     return `${pre?.textContent ?? ''} [带颜色的 token ${colored} 个]`;
   }).catch(() => ''), 200);
   const edited = readFileSync(join(project, 'README.md'), 'utf8').includes('(edited)');
-  record('编辑工具显示 diff', /修改.*完成/.test(editCard) && edited && diffText.includes('edited'),
+  record('编辑工具显示 diff', /Edit.*Done/.test(editCard) && edited && diffText.includes('edited'),
     `文件已修改=${edited}；diff：${diffText}`);
 
   const shellCard = await sendAndWait(page, 'run: echo "bash=$BASH_VERSION"; uname -s; command -v bash');
-  record('pi 使用 Git Bash', /完成/.test(shellCard) && /bash=\d/.test(shellCard) && /MINGW|MSYS/.test(shellCard),
+  record('pi 使用 Git Bash', /Done/.test(shellCard) && /bash=\d/.test(shellCard) && /MINGW|MSYS/.test(shellCard),
     shellCard.slice(0, 300));
 }
 
@@ -257,7 +259,7 @@ async function concurrencyCheck(page, project) {
 async function closeWhileRunning(app, page, baseline) {
   const before = new Set(sleepProcessIds());
   await pageHelpers(page).send('run: sleep 127');
-  await page.getByTestId('tool-card').last().getByText('执行中').waitFor({ timeout: 20000 });
+  await page.getByTestId('tool-card').last().getByText('Running…').waitFor({ timeout: 20000 });
   await sleep(1000);
   const started = sleepProcessIds().filter((pid) => !before.has(pid));
   const fromRun = sleepProcessIds().filter((pid) => !baseline.has(pid));
@@ -308,14 +310,14 @@ async function crashCheck(env) {
       `${oneLine(test, 120)}；Keys 行：${oneLine(saved.join(' | '), 120)}`);
     const pid = kernelPid(app.process().pid);
     execFileSync('taskkill', ['/PID', String(pid), '/F']);
-    await page.getByText('后台进程意外退出').waitFor({ timeout: 10000 });
+    await page.getByText(CRASH_BANNER).waitFor({ timeout: 10000 });
     const request = () => page.evaluate(() => Promise.race([
       window.mori.request({ type: 'config.get' }).then(() => 'resolved', (error) => `rejected: ${error.message}`),
       new Promise((r) => setTimeout(() => r('hung'), 3000)),
     ]));
     const before = await request();
     await page.reload();
-    const banner = await page.getByText('后台进程意外退出').waitFor({ timeout: 10000 }).then(() => true, () => false);
+    const banner = await page.getByText(CRASH_BANNER).waitFor({ timeout: 10000 }).then(() => true, () => false);
     const after = await request();
     record('后台进程意外退出：提示出现、请求立即失败、刷新后仍提示',
       before.startsWith('rejected') && after.startsWith('rejected') && banner,

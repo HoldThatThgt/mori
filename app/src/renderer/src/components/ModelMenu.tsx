@@ -17,7 +17,7 @@ import { moveMenuFocus, useOutsideClose } from './menu';
 const NO_OPTIONS: PickOption[] = [];
 
 /** 生成中、准备中按钮的悬停说明（§9.2） */
-const BUSY_TITLE = "Can't change the model while generating";
+const BUSY_TITLE = 'Can’t switch models until the response finishes';
 
 /** 区域在标签里的写法 */
 const ZONE_LABELS: Readonly<Record<Zone, string>> = { local: 'Local', intranet: 'Intranet', public: 'Public' };
@@ -156,7 +156,7 @@ function KindSection({ kind, title, options, current, onChoose }: { kind: 'group
   );
 }
 
-/** @brief 菜单：三节、底部说明与"Manage models…"。打开时焦点在当前范围上。 */
+/** @brief 菜单：三节、底部说明与"Manage models"。打开时焦点在当前范围上。 */
 function PickPanel({ options, current, onChoose, onManage }: { options: PickOption[]; current: string | null;
   onChoose: (pick: string) => void; onManage: () => void }) {
   const menu = useRef<HTMLDivElement>(null);
@@ -169,8 +169,8 @@ function PickPanel({ options, current, onChoose, onManage }: { options: PickOpti
       <KindSection kind="provider" title="Providers" {...props} />
       <ModelSection {...props} />
       <p className="menu-note" data-testid="model-menu-note">
-        Applies to this session. New sessions use the default range from Settings.</p>
-      <button role="menuitem" data-action="manage-models" onClick={onManage}>Manage models…</button>
+        Applies to this session only. New sessions use the default range from Settings.</p>
+      <button role="menuitem" data-action="manage-models" onClick={onManage}>Manage models</button>
     </div>
   );
 }
@@ -264,7 +264,7 @@ function RangeMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
         <Icon name="down" />
       </button>
       {pickError && <div className="pick-error" role="alert" data-testid="pick-error">
-        Couldn't change the model range: {pickError}</div>}
+        Couldn’t change the model range: {pickError}</div>}
       {menu.open && <PickPanel options={options} current={tab.pick} onChoose={choose} onManage={manage} />}
     </div>
   );

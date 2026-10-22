@@ -21,7 +21,7 @@ interface DividerProps {
   onChange: (value: number, commit: boolean) => void;
   /** 双击恢复的值；不传时用这条分隔线的默认宽度 */
   fallback?: number;
-  /** 读屏念出的值；不传时为"N 像素" */
+  /** 读屏念出的值；不传时为"N pixels" */
   valueText?: string;
 }
 
@@ -83,8 +83,8 @@ export function Divider({ kind, label, value, limits, onChange, fallback, valueT
   return (
     <div data-resize={kind} role="separator" tabIndex={0} aria-label={label} aria-orientation="vertical"
       aria-valuemin={limits.min} aria-valuemax={limits.max} aria-valuenow={value}
-      aria-valuetext={valueText ?? `${value} 像素`}
-      title="拖动调整宽度，双击恢复默认"
+      aria-valuetext={valueText ?? `${value} pixels`}
+      title="Drag to resize, double-click to reset"
       onPointerDown={onPointerDown} onPointerMove={onPointerMove}
       onPointerUp={(event) => finish(event.currentTarget)} onPointerCancel={(event) => finish(event.currentTarget)}
       onLostPointerCapture={(event) => finish(event.currentTarget)} onKeyDown={onKeyDown}

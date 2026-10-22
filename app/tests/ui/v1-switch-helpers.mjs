@@ -21,7 +21,7 @@ export const FOCUSED = '.pane-slot[data-focused="true"]:not([hidden])';
 /** 某个会话面板（按界面里的标识，隐藏的也算） */
 export const paneSel = (tab) => `[data-testid="chat-pane"][data-tab="${tab}"]`;
 /** 停止后对话流里的提示（v0，仍是中文） */
-export const STOPPED_TEXT = '已停止 · 已经做出的修改不会自动撤销';
+export const STOPPED_TEXT = 'Stopped · Changes made so far stay as they are';
 
 // ---------- 合成端点与记录代理 ----------
 
@@ -253,7 +253,7 @@ export function stagesOf(page, tab, since = 0) {
 }
 
 /**
- * @brief 某个会话面板此刻的样子：是否生成中、发送中；换模型与重建提示、"已停止"、错误卡、说明卡、拒绝启动卡、
+ * @brief 某个会话面板此刻的样子：是否生成中、发送中；换模型与重建提示、"Stopped"、错误卡、说明卡、拒绝启动卡、
  *        用户消息、助手回复、工具卡数、阶段行、输入框里的文字、排队区。
  */
 export function paneState(page, tab) {

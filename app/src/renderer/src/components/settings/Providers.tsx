@@ -26,13 +26,13 @@ function compatText(compat: Compat): string {
 function ProviderFieldsView({ provider }: { provider: ModelProvider }) {
   return (
     <dl className="provider-fields">
-      <dt>Address</dt><dd>{provider.baseUrl}</dd>
+      <dt>Base URL</dt><dd>{provider.baseUrl}</dd>
       <dt>API type</dt><dd>{API_TYPE_LABELS[provider.api]}</dd>
       <dt>Network zone</dt>
       <dd data-testid="provider-zone" data-zone={provider.zone ?? 'unconfirmed'}>
         {provider.zone ? ZONE_LABELS[provider.zone] : 'Not confirmed'}</dd>
       <dt>Concurrency per key</dt><dd>{provider.concurrency}</dd>
-      <dt>Compatibility</dt><dd>{compatText(provider.compat)}</dd>
+      <dt>Compatibility options</dt><dd>{compatText(provider.compat)}</dd>
     </dl>
   );
 }
@@ -65,7 +65,7 @@ function ProviderCard({ provider, form, setForm }: CardProps) {
           <button className="button compact" data-action="edit-provider"
             onClick={() => setForm({ kind: 'provider', id: provider.id })}>Edit</button>
           <button className="button compact danger" data-action="delete-provider" onClick={() => void flow.start()}>
-            Delete</button>
+            Delete…</button>
           <TestButton at={at} label="Test connection" action="test-provider"
             onTest={() => void testAt(at, { providerId: provider.id, modelId: provider.models[0].id })} />
           <button className="button compact" data-action="add-model"

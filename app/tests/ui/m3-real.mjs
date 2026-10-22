@@ -82,9 +82,10 @@ const ASK = {
 const CALL_ASK = `请调用 ${ASK_TOOL} 工具（它会问我几个问题），然后用一句话告诉我它返回的结果，`
   + '原样写出其中 color 和 word 的值。';
 const DRAFTS = { a: '这是一段写了一半的草稿，切走再回来还要', b: '另一个会话里的草稿' };
-const PICK_HINT = '从左侧选一个会话继续，或打开一个文件夹开始新的会话。';
-const UNTRUSTED = '没有信任这个文件夹，它自带的扩展和配置没有加载 · 重启 Mori 后会再问';
-const TRUST_TEXT = '这个文件夹带有自己的扩展或配置，信任后它们会在你的电脑上运行。';
+const PICK_HINT = 'Pick a session on the left to continue, or open a folder to start a new session.';
+const UNTRUSTED = 'This workspace isn’t trusted, so its extensions and settings weren’t loaded · '
+  + 'You’ll be asked again after you restart Mori';
+const TRUST_TEXT = 'This workspace has its own extensions or settings. If you trust it, they’ll run on your computer.';
 /** pi 的内置工具名（问模型能用哪些工具时，回答里至少要有一个） */
 const BUILTIN_TOOLS = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls'];
 /** 读回收站：每项一行"名字|原位置|回收站里的路径" */
@@ -193,7 +194,7 @@ function makeDirs(root) {
 
 /** @brief CSS 属性选择器里的字符串（会话文件路径里有反斜杠）。 */
 const cssString = (value) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-/** @brief 会话文件是 file 的会话行（项目下的，或展开的"已归档"里的）。 */
+/** @brief 会话文件是 file 的会话行（项目下的，或展开的"Archived"里的）。 */
 const rowOf = (page, file) => page.locator(`.session-item[data-file="${cssString(file)}"]`);
 /** @brief 一张批准卡或询问卡（nextCard 返回的 card）。 */
 const cardOf = (page, card) => page.locator(`${card.kind === 'question' ? QUESTION : CARD}`
@@ -210,7 +211,7 @@ const topTitle = (page) => page.locator(`${P}[data-testid="session-title"]`).tex
 /** @brief 当前会话的信任横幅；没有时为 null。 */
 const bannerText = (page) => page.evaluate((p) => document.querySelector(`${p}[data-testid="trust-banner"]`)
   ?.textContent ?? null, P);
-/** @brief 当前会话输入框位置的"正在启动…"等文字；能发送时为 null。 */
+/** @brief 当前会话输入框位置的"Starting…"等文字；能发送时为 null。 */
 const notReadyText = (page) => page.evaluate((p) => document.querySelector(`${p}[data-testid="not-ready"]`)
   ?.textContent ?? null, P);
 /** @brief 焦点是否在当前会话的输入框里。 */
@@ -219,7 +220,7 @@ const composerFocused = (page) => page.evaluate((p) => document.activeElement
 /** @brief 当前会话是否在生成（'true' / 'false'；没有会话时为 null）。 */
 const running = (page) => page.evaluate((p) => document.querySelector(`${p}[data-testid="chat-pane"]`)
   ?.dataset.running ?? null, P);
-/** @brief 中栏"打开一个文件夹"的标题；中栏显示会话时为 null。 */
+/** @brief 中栏"Open a folder"的标题；中栏显示会话时为 null。 */
 const centerHeading = (page) => page.evaluate(() => document.querySelector('[data-testid="open-folder"] h2')
   ?.textContent ?? null);
 
@@ -233,7 +234,7 @@ function focusInfo(page) {
   });
 }
 
-/** @brief 会话树：每个项目的工作目录、显示的文件夹名、悬停路径和会话行（不含"已归档"里的）。 */
+/** @brief 会话树：每个项目的工作目录、显示的文件夹名、悬停路径和会话行（不含"Archived"里的）。 */
 function treeGroups(page) {
   const selector = '[data-testid="session-tree"] .project-group';
   return page.evaluate((groups) => [...document.querySelectorAll(groups)].map((group) => {
@@ -313,9 +314,12 @@ async function openMenu(page, file) {
   await page.getByTestId('session-menu').waitFor({ timeout: 5000 });
 }
 
-/** @brief 开着的右键菜单里的菜单项：文字（含旁边的小字）和是否不可用。 */
-const menuItems = (page) => page.getByTestId('session-menu').getByRole('menuitem')
-  .evaluateAll((els) => els.map((el) => ({ text: el.textContent, disabled: el.disabled })));
+/** M5 加进会话菜单的两项（由 M5 的测试检查，与 m3-replay、m3-helpers 相同）；这里的菜单检查只看 M3 的几项 */
+const M5_MENU_ITEMS = ['Attach as context', 'Open in split view'];
+/** @brief 开着的右键菜单里的菜单项：文字（含旁边的小字）和是否不可用；不含 M5 加的两项。 */
+const menuItems = async (page) => (await page.getByTestId('session-menu').getByRole('menuitem')
+  .evaluateAll((els) => els.map((el) => ({ label: el.firstChild?.textContent ?? '', text: el.textContent,
+    disabled: el.disabled })))).filter((item) => !M5_MENU_ITEMS.includes(item.label));
 /** @brief 菜单项连成一行：文字（含小字），不可用的加"（不可用）"。 */
 const menuText = (items) => items.map((item) => `${item.text}${item.disabled ? '（不可用）' : ''}`).join(' / ');
 /** @brief 点开头是 label 的菜单项。 */
@@ -331,7 +335,7 @@ const storedArchived = (page) => page.evaluate(() => {
   }
 });
 
-/** @brief 侧栏底部的"已归档"：开关上的文字、是否展开、展开时列出的会话行（会话文件、会话名、悬停文字）。 */
+/** @brief 侧栏底部的"Archived"：开关上的文字、是否展开、展开时列出的会话行（会话文件、会话名、悬停文字）。 */
 function archivedState(page) {
   return page.evaluate(() => {
     const toggle = document.querySelector('[data-testid="archived-toggle"]');
@@ -342,7 +346,7 @@ function archivedState(page) {
   });
 }
 
-/** @brief 展开"已归档"（已经展开时不动）。 */
+/** @brief 展开"Archived"（已经展开时不动）。 */
 async function expandArchived(page) {
   const toggle = page.getByTestId('archived-toggle');
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
@@ -374,7 +378,7 @@ async function rowBelow(page, file) {
 
 // ---------- 等待、批准卡与询问卡 ----------
 
-/** @brief 等当前会话可以发送（不再"正在启动…"）。 */
+/** @brief 等当前会话可以发送（不再"Starting…"）。 */
 function waitReady(page, timeout = 60000) {
   return page.waitForFunction((p) => {
     const pane = document.querySelector(`${p}[data-testid="chat-pane"]`);
@@ -436,10 +440,10 @@ async function altKey(ctx, digit) {
   await ctx.page.keyboard.press(`Alt+${digit}`);
 }
 
-/** @brief 拒绝一张卡：批准卡 Alt+3；询问卡点"否"（确认）或"取消"（选择、输入）。 */
+/** @brief 拒绝一张卡：批准卡 Alt+3；询问卡点"No"（确认）或"Cancel"（选择、输入）。 */
 async function rejectCard(ctx, card) {
   if (card.kind === 'approval') return altKey(ctx, 3);
-  const name = card.method === 'confirm' ? '否' : '取消';
+  const name = card.method === 'confirm' ? 'No' : 'Cancel';
   await cardOf(ctx.page, card).getByRole('button', { name, exact: true }).click();
 }
 
@@ -456,13 +460,13 @@ async function settle(ctx, decide = (card) => rejectCard(ctx, card)) {
 const waitNewPane = (page, before) => page.waitForFunction((n) => document.querySelectorAll('.pane-slot').length > n,
   before, { timeout: 30000 });
 
-/** @brief 让系统的选文件夹对话框直接返回 folder，再点左栏的"打开文件夹…"，等新会话加入。 */
+/** @brief 让系统的选文件夹对话框直接返回 folder，再点左栏的"Open folder…"，等新会话加入。 */
 async function openNew(ctx, folder) {
   const before = await ctx.page.locator('.pane-slot').count();
   await ctx.app.evaluate(({ dialog }, path) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
   }, folder);
-  await ctx.page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await ctx.page.getByRole('button', { name: 'Open folder…' }).first().click();
   await waitNewPane(ctx.page, before);
 }
 
@@ -489,10 +493,10 @@ async function openAndSee(ctx, folder) {
   return dialogOrReady(ctx.page);
 }
 
-/** @brief 在信任询问里选"信任"（不勾"记住"），等会话可以发送。 */
+/** @brief 在信任询问里选"Trust workspace"（不勾"Remember my choice"），等会话可以发送。 */
 async function trustOnce(page) {
   const dialog = page.getByTestId('trust-dialog');
-  await dialog.getByRole('button', { name: '信任', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Trust workspace', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 5000 });
   await waitReady(page);
 }
@@ -524,7 +528,7 @@ async function openRow(ctx, file) {
   await waitReady(ctx.page);
 }
 
-/** @brief 点会话行，等它成为当前会话；返回先看到的是信任询问还是可以发送的会话（询问时选"信任"后等它可以发送）。 */
+/** @brief 点会话行，等它成为当前会话；返回先看到的是信任询问还是可以发送的会话（询问时选"Trust workspace"后等它可以发送）。 */
 async function clickRow(ctx, file) {
   await rowOf(ctx.page, file).click();
   await waitActive(ctx.page, file);
@@ -536,7 +540,7 @@ async function clickRow(ctx, file) {
 /** @brief 等会话树出现、会话列表读完（启动和界面重新加载之后）。 */
 async function waitTreeLoaded(page) {
   await page.getByTestId('session-tree').waitFor({ state: 'attached', timeout: 60000 });
-  await page.waitForFunction(() => !document.querySelector('.sidebar-note')?.textContent?.includes('正在读取会话'),
+  await page.waitForFunction(() => !document.querySelector('.sidebar-note')?.textContent?.includes('Loading sessions'),
     null, { timeout: 30000 });
 }
 
@@ -564,12 +568,12 @@ async function restart(ctx) {
   await start(ctx);
 }
 
-/** @brief 右键会话行 → 重命名 → 填名字 → Enter。返回菜单开着时的当前会话和改名框预先填的名字。 */
+/** @brief 右键会话行 → Rename → 填名字 → Enter。返回菜单开着时的当前会话和改名框预先填的名字。 */
 async function renameByMouse(ctx, file, name) {
   const { page } = ctx;
   await openMenu(page, file);
   const activeAtMenu = await activeFile(page);
-  await pickMenu(page, '重命名');
+  await pickMenu(page, 'Rename');
   const input = page.getByTestId('rename-input');
   await input.waitFor({ timeout: 5000 });
   const prefill = await input.inputValue();
@@ -651,7 +655,8 @@ async function item2(ctx) {
   await waitReady(page);
   const row = (await allRows(page)).find((r) => r.active);
   record('2 Ctrl+N：在当前会话所在的项目里新建"新会话"并切过去，焦点在它的输入框',
-    row?.label === '新会话' && samePath(row.cwd, ctx.dirs.beta) && await composerFocused(page), JSON.stringify(row));
+    row?.label === 'New session' && samePath(row.cwd, ctx.dirs.beta) && await composerFocused(page),
+    JSON.stringify(row));
   if (!row?.file) throw new Error('the new session has no row');
   const path = await shiftTabToTree(page);
   const focused = await focusInfo(page);
@@ -664,13 +669,13 @@ async function item2(ctx) {
   await renameByKeyboard(ctx, row);
 }
 
-/** @brief 走查 2 后半：焦点在新会话行上，Shift+F10 → Enter（重命名）→ 输入 → Enter；再 Enter 进输入框发第一条消息。 */
+/** @brief 走查 2 后半：焦点在新会话行上，Shift+F10 → Enter（Rename）→ 输入 → Enter；再 Enter 进输入框发第一条消息。 */
 async function renameByKeyboard(ctx, row) {
   const { page } = ctx;
   await page.keyboard.press('Shift+F10');
   await page.getByTestId('session-menu').waitFor({ timeout: 5000 });
   const menuFocus = await focusInfo(page);
-  record('2 Shift+F10 打开右键菜单，焦点在"重命名"', menuFocus.role === 'menuitem' && menuFocus.label.startsWith('重命名'),
+  record('2 Shift+F10 打开右键菜单，焦点在"重命名"', menuFocus.role === 'menuitem' && menuFocus.label.startsWith('Rename'),
     menuFocus.label);
   await shot(page, '2-menu');
   await page.keyboard.press('Enter');
@@ -731,7 +736,7 @@ async function checkAfterRestart(ctx, before) {
     return { heading: box.querySelector('h2')?.textContent, hint: box.querySelector('.muted')?.textContent };
   });
   record('3 重启后中栏"打开一个文件夹"，说明"从左侧选一个会话继续，或打开一个文件夹开始新的会话。"',
-    center?.heading === '打开一个文件夹' && center.hint === PICK_HINT, JSON.stringify(center));
+    center?.heading === 'Open a folder' && center.hint === PICK_HINT, JSON.stringify(center));
   const rows = await allRows(page);
   const labelOf = (key) => rows.find((r) => r.file === ctx.s[key]?.file)?.label;
   record('3 重启后改过的名字还在（右键改名的，和走查 2 用键盘改名的）', labelOf('a1') === NAMES.opened
@@ -772,8 +777,8 @@ async function renameUnopened(ctx) {
 // ---------- 走查 4：归档与删除 ----------
 
 /**
- * @brief 走查 4：正在生成不能归档、删除；归档当前会话、"恢复"、点已归档的会话恢复并打开；永久删除当前会话和还没有消息的
- *        会话；用键盘归档另一个会话，重启后它还在"已归档"里，再用键盘永久删除它；删除的文件没有进回收站；重启后不再出现。
+ * @brief 走查 4：正在生成不能归档、删除；归档当前会话、"Unarchive"、点已归档的会话恢复并打开；永久删除当前会话和还没有消息的
+ *        会话；用键盘归档另一个会话，重启后它还在"Archived"里，再用键盘永久删除它；删除的文件没有进回收站；重启后不再出现。
  */
 async function item4(ctx) {
   await makeSessions(ctx);
@@ -792,7 +797,7 @@ async function item4(ctx) {
   await deletedAfterRestart(ctx);
 }
 
-/** @brief 正在生成的会话：右键菜单里"归档""删除"不可用（小字"正在生成"）；Esc 只关菜单、不停止生成。 */
+/** @brief 正在生成的会话：右键菜单里"Archive""Delete…"不可用（小字"Still running"）；Esc 只关菜单、不停止生成。 */
 async function busyBlocked(ctx) {
   const { page } = ctx;
   const { b2 } = ctx.s;
@@ -804,8 +809,8 @@ async function busyBlocked(ctx) {
   const status = (await rowByFile(page, b2.file))?.status;
   await shot(page, '4-generating-menu');
   record('4 正在生成的会话：右键菜单里"归档""删除"不可用，旁边小字"正在生成"；"重命名"可用',
-    ['running', 'approval'].includes(status) && texts === '重命名 / 归档正在生成（不可用） / 删除正在生成（不可用）',
-    `${status}；${texts}`);
+    ['running', 'approval'].includes(status)
+      && texts === 'Rename / ArchiveStill running（不可用） / Delete…Still running（不可用）', `${status}；${texts}`);
   await page.keyboard.press('Escape');
   await page.getByTestId('session-menu').waitFor({ state: 'detached', timeout: 5000 });
   await settle(ctx);
@@ -815,8 +820,8 @@ async function busyBlocked(ctx) {
 }
 
 /**
- * @brief 右键归档当前会话（打开着、刚生成完、有草稿）：不确认；会话行移到"已归档 1"（默认收起）；中栏回到
- *        "打开一个文件夹"；焦点移到原来排在它下面的会话行；会话文件和草稿都在。
+ * @brief 右键归档当前会话（打开着、刚生成完、有草稿）：不确认；会话行移到"Archived 1"（默认收起）；中栏回到
+ *        "Open a folder"；焦点移到原来排在它下面的会话行；会话文件和草稿都在。
  */
 async function archiveCurrent(ctx) {
   const { page } = ctx;
@@ -825,7 +830,7 @@ async function archiveCurrent(ctx) {
   await sleep(200);
   const next = await rowBelow(page, b2.file);
   await openMenu(page, b2.file);
-  await pickMenu(page, '归档');
+  await pickMenu(page, 'Archive');
   const moved = await waitArchived(page, b2.file, true);
   await sleep(400);
   const dialogs = await page.locator('[data-testid="delete-dialog"], [data-testid="confirm-dialog"]').count();
@@ -834,15 +839,15 @@ async function archiveCurrent(ctx) {
   const shelf = await archivedState(page);
   await shot(page, '4-archived');
   record('4 右键归档当前会话：不确认；会话行从项目下移到侧栏底部"已归档 1"（默认收起），本机的已归档列表记下它',
-    moved && dialogs === 0 && shelf.toggle === '已归档 1' && shelf.expanded === 'false' && shelf.rows === null,
+    moved && dialogs === 0 && shelf.toggle === 'Archived 1' && shelf.expanded === 'false' && shelf.rows === null,
     `移过去：${moved}；对话框 ${dialogs} 个；${JSON.stringify(shelf)}`);
-  record('4 归档当前会话后：中栏回到"打开一个文件夹"，焦点移到原来排在它下面的会话行', center === '打开一个文件夹'
+  record('4 归档当前会话后：中栏回到"打开一个文件夹"，焦点移到原来排在它下面的会话行', center === 'Open a folder'
     && focused.row === next, `中栏：${center}；焦点：${focused.label}（${focused.row}，应为 ${next}）`);
   record('4 归档不删东西：会话文件还在，草稿保留', existsSync(b2.file) && await hasDraft(page, b2.file) === true,
     `文件还在：${existsSync(b2.file)}`);
 }
 
-/** @brief 展开"已归档"：列出归档的会话；它的右键菜单是"恢复""删除"；选"恢复"：回到项目下，不打开（中栏不变）。 */
+/** @brief 展开"Archived"：列出归档的会话；它的右键菜单是"Unarchive""Delete…"；选"Unarchive"：回到项目下，不打开。 */
 async function restoreByMenu(ctx) {
   const { page } = ctx;
   const { b2 } = ctx.s;
@@ -854,22 +859,22 @@ async function restoreByMenu(ctx) {
     JSON.stringify(listed ?? null));
   await openMenu(page, b2.file);
   const texts = menuText(await menuItems(page));
-  await pickMenu(page, '恢复');
+  await pickMenu(page, 'Unarchive');
   const restored = await waitArchived(page, b2.file, false);
   const row = await rowByFile(page, b2.file);
   const center = await centerHeading(page);
   const shelf = await archivedState(page);
   record('4 已归档的会话右键菜单是"恢复""删除"；选"恢复"：回到它的项目下，不打开（中栏不变），"已归档"没有了',
-    texts === '恢复 / 删除' && restored && samePath(row?.cwd, ctx.dirs.beta) && center === '打开一个文件夹'
+    texts === 'Unarchive / Delete…' && restored && samePath(row?.cwd, ctx.dirs.beta) && center === 'Open a folder'
       && shelf.toggle === null, `菜单：${texts}；项目：${row?.cwd}；中栏：${center}；已归档：${shelf.toggle}`);
 }
 
-/** @brief 再归档一次（这次它没打开），点"已归档"里的它：恢复并打开，对话和归档前的草稿都在。 */
+/** @brief 再归档一次（这次它没打开），点"Archived"里的它：恢复并打开，对话和归档前的草稿都在。 */
 async function restoreByClick(ctx) {
   const { page } = ctx;
   const { b2 } = ctx.s;
   await openMenu(page, b2.file);
-  await pickMenu(page, '归档');
+  await pickMenu(page, 'Archive');
   const archived = await waitArchived(page, b2.file, true);
   await expandArchived(page);
   await rowOf(page, b2.file).click();
@@ -887,7 +892,7 @@ async function restoreByClick(ctx) {
       + `草稿：${draft}`);
 }
 
-/** @brief 删除对话框：文字、焦点在"取消"、Tab 只在两个按钮之间切换。 */
+/** @brief 删除对话框：文字、焦点在"Cancel"、Tab 只在两个按钮之间切换。 */
 async function checkConfirm(page, dialog, title) {
   const text = await dialog.innerText();
   const first = (await focusInfo(page)).label;
@@ -896,14 +901,15 @@ async function checkConfirm(page, dialog, title) {
   await page.keyboard.press('Tab');
   const third = (await focusInfo(page)).label;
   record('4 删除先确认："永久删除会话\'会话名\'？"、"对话记录会被删除，无法恢复。"，焦点在"取消"，'
-    + 'Tab 只在"删除"和"取消"之间切换', text.includes(`永久删除会话'${title}'？`)
-    && text.includes('对话记录会被删除，无法恢复。') && first === '取消' && second === '删除' && third === '取消',
+    + 'Tab 只在"删除"和"取消"之间切换', text.includes(`Delete “${title}”?`)
+    && text.includes('This session will be permanently deleted. This can’t be undone.') && first === 'Cancel'
+    && second === 'Delete' && third === 'Cancel',
   `${oneLine(text)}；焦点：${first} → ${second} → ${third}`);
   await shot(page, '4-confirm');
 }
 
 /**
- * @brief 右键永久删除当前会话（恢复后打开着、有草稿）：先确认；确认后会话行消失、中栏回到"打开一个文件夹"、
+ * @brief 右键永久删除当前会话（恢复后打开着、有草稿）：先确认；确认后会话行消失、中栏回到"Open a folder"、
  *        焦点移到下一行；会话文件和草稿都删了。
  */
 async function deleteCurrent(ctx) {
@@ -913,27 +919,27 @@ async function deleteCurrent(ctx) {
   const next = await rowBelow(page, b2.file);
   const title = (await rowByFile(page, b2.file))?.label;
   await openMenu(page, b2.file);
-  await pickMenu(page, '删除');
+  await pickMenu(page, 'Delete');
   const dialog = page.getByTestId('delete-dialog');
   await dialog.waitFor({ timeout: 5000 });
   await checkConfirm(page, dialog, title);
-  await dialog.getByRole('button', { name: '删除', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 20000 });
   await sleep(400);
   const focused = await focusInfo(page);
   const center = await centerHeading(page);
   record('4 确认删除当前会话：会话行消失，中栏回到"打开一个文件夹"，焦点移到删除前排在它下面的会话行',
-    !(await rowByFile(page, b2.file)) && center === '打开一个文件夹' && focused.row === next,
+    !(await rowByFile(page, b2.file)) && center === 'Open a folder' && focused.row === next,
     `焦点：${focused.label}（${focused.row}，应为 ${next}）；中栏：${center}`);
   record('4 永久删除：会话文件不在了，草稿一起删除', !existsSync(b2.file) && draftBefore === true
     && await hasDraft(page, b2.file) === false, `删除前有草稿：${draftBefore}；文件还在：${existsSync(b2.file)}`);
   await shot(page, '4-deleted');
 }
 
-/** @brief 还没有消息的新会话：菜单里"归档"不可用（小字"还没有消息"）；删除的说明是"这个会话还没有消息。"。 */
+/** @brief 还没有消息的新会话：菜单里"Archive"不可用（小字"No messages yet"）；删除的说明是"This session has no messages yet."。 */
 async function deleteUnsaved(ctx) {
   const { page } = ctx;
-  // Ctrl+N 要有当前会话（没有时等于"打开文件夹…"）：先打开 a1。
+  // Ctrl+N 要有当前会话（没有时等于"Open folder…"）：先打开 a1。
   await openRow(ctx, ctx.s.a1.file);
   await ctx.h.textarea.focus();
   await pressCtrlN(ctx);
@@ -942,39 +948,60 @@ async function deleteUnsaved(ctx) {
   if (!row?.file) throw new Error('the new session has no row');
   await openMenu(page, row.file);
   const texts = menuText(await menuItems(page));
-  await pickMenu(page, '删除');
+  await pickMenu(page, 'Delete');
   const dialog = page.getByTestId('delete-dialog');
   await dialog.waitFor({ timeout: 5000 });
   const text = await dialog.innerText();
   await shot(page, '4-unsaved-confirm');
   record('4 还没有消息的新会话：菜单里"归档"不可用、小字"还没有消息"，"删除"可用；删除确认的说明是"这个会话还没有消息。"',
-    texts === '重命名 / 归档还没有消息（不可用） / 删除' && text.includes('永久删除会话\'新会话\'？')
-      && text.includes('这个会话还没有消息。'), `${texts}；${oneLine(text)}`);
-  await dialog.getByRole('button', { name: '删除', exact: true }).click();
+    texts === 'Rename / ArchiveNo messages yet（不可用） / Delete…' && text.includes('Delete “New session”?')
+      && text.includes('This session has no messages yet.'), `${texts}；${oneLine(text)}`);
+  await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 20000 });
   await sleep(300);
   const center = await centerHeading(page);
   record('4 确认删除还没有消息的新会话：会话行消失，中栏回到"打开一个文件夹"', !(await rowByFile(page, row.file))
-    && center === '打开一个文件夹', `中栏：${center}`);
+    && center === 'Open a folder', `中栏：${center}`);
 }
 
-/** @brief 只用键盘归档另一个会话：焦点在会话行上，Shift+F10 → ↓ → Enter。 */
+/**
+ * @brief 开着的菜单里从"Rename"按 ↓ 直到焦点在开头是 label 的菜单项上（最多 max 次）；返回按的次数和焦点所在菜单项的
+ *        文字。走不到时抛错（不在别的菜单项上按 Enter）。
+ */
+async function arrowDownTo(page, label, max = 5) {
+  for (let presses = 1; presses <= max; presses += 1) {
+    await page.keyboard.press('ArrowDown');
+    const item = (await focusInfo(page)).label;
+    if (item.startsWith(label)) return { presses, item };
+  }
+  throw new Error(`menu item ${label} cannot be reached with ArrowDown`);
+}
+
+/**
+ * @brief 只用键盘归档另一个会话：焦点在会话行上，Shift+F10 → ↓ 到"Archive" → Enter。M5 起"Rename"和"Archive"之间多了
+ *        "Attach as context""Open in split view"（没有当前会话时前者不可用、↓ 跳过，后者可用），所以 ↓ 到"Archive"为止。
+ */
 async function archiveByKeyboard(ctx) {
   const { page } = ctx;
   const { a2 } = ctx.s;
   await rowOf(page, a2.file).focus();
   await page.keyboard.press('Shift+F10');
-  await page.getByTestId('session-menu').waitFor({ timeout: 5000 });
-  await page.keyboard.press('ArrowDown');
-  const item = (await focusInfo(page)).label;
+  const menu = page.getByTestId('session-menu');
+  await menu.waitFor({ timeout: 5000 });
+  const enabled = await menu.getByRole('menuitem').evaluateAll((items) => items.filter((item) => !item.disabled)
+    .map((item) => item.childNodes[0]?.textContent ?? ''));
+  const expected = enabled.indexOf('Archive');
+  const { presses, item } = await arrowDownTo(page, 'Archive');
   await page.keyboard.press('Enter');
   const moved = await waitArchived(page, a2.file, true);
   const shelf = await archivedState(page);
-  record('4 只用键盘归档（Shift+F10 → ↓ → Enter）：会话行移到"已归档 1"，会话文件还在', item.startsWith('归档')
-    && moved && shelf.toggle === '已归档 1' && existsSync(a2.file), `菜单焦点：${item}；已归档：${shelf.toggle}`);
+  record('4 只用键盘归档（Shift+F10 → ↓ 到"Archive"→ Enter）：↓ 跳过不可用的菜单项，次数等于"Archive"前面可用的项数；'
+    + '会话行移到"Archived 1"，会话文件还在', item.startsWith('Archive') && presses === expected
+    && moved && shelf.toggle === 'Archived 1' && existsSync(a2.file),
+  `↓ ${presses} 次（应为 ${expected}，可用的项：${enabled.join(' / ')}）；菜单焦点：${item}；已归档：${shelf.toggle}`);
 }
 
-/** @brief 重启后：删除的会话不在；归档的会话还在"已归档 1"里（默认收起、不在项目下）；其他会话还在。 */
+/** @brief 重启后：删除的会话不在；归档的会话还在"Archived 1"里（默认收起、不在项目下）；其他会话还在。 */
 async function archivedAfterRestart(ctx) {
   const { page } = ctx;
   const { a1, a2, b2 } = ctx.s;
@@ -985,11 +1012,11 @@ async function archivedAfterRestart(ctx) {
   await shot(page, '4-after-restart');
   record('4 重启后：删除的会话不再出现；归档的会话还在"已归档 1"里（默认收起、不在项目下）；其他会话还在',
     !rows.some((r) => r.file === b2.file || r.file === a2.file) && rows.some((r) => r.file === a1.file)
-      && shelf.toggle === '已归档 1' && shelf.expanded === 'false' && listed.some((r) => r.file === a2.file),
+      && shelf.toggle === 'Archived 1' && shelf.expanded === 'false' && listed.some((r) => r.file === a2.file),
     `${rows.map((r) => r.label).join(' / ')}；已归档：${listed.map((r) => r.label).join(' / ')}`);
 }
 
-/** @brief 只用键盘永久删除已归档的会话：焦点在已归档的会话行上，Shift+F10（恢复、删除）→ ↓ → Enter → Tab → Enter。 */
+/** @brief 只用键盘永久删除已归档的会话：焦点在已归档的会话行上，Shift+F10（Unarchive、Delete…）→ ↓ → Enter → Tab → Enter。 */
 async function deleteArchivedByKeyboard(ctx) {
   const { page } = ctx;
   const { a2 } = ctx.s;
@@ -1013,8 +1040,8 @@ async function deleteArchivedByKeyboard(ctx) {
   const shelf = await archivedState(page);
   const stored = await storedArchived(page);
   record('4 只用键盘删除已归档的会话（Shift+F10 → ↓ → Enter → Tab → Enter）：菜单是"恢复""删除"，'
-    + '确认后会话行和"已归档"一起消失，会话文件不在了', texts === '恢复 / 删除' && item.startsWith('删除')
-    && text.includes(`永久删除会话'${title}'？`) && left === 0 && shelf.toggle === null && Array.isArray(stored)
+    + '确认后会话行和"已归档"一起消失，会话文件不在了', texts === 'Unarchive / Delete…' && item.startsWith('Delete')
+    && text.includes(`Delete “${title}”?`) && left === 0 && shelf.toggle === null && Array.isArray(stored)
     && !stored.includes(a2.file) && !existsSync(a2.file),
   `菜单：${texts}；菜单焦点：${item}；${oneLine(text)}；剩 ${left} 行；已归档：${shelf.toggle}`);
 }
@@ -1048,7 +1075,7 @@ function checkNotRecycled(files) {
       + `${found.map((file) => basename(file)).join(', ') || '无'}`);
 }
 
-/** @brief 再重启：删除的会话都不再出现（项目下没有，也没有"已归档"），其他会话还在。 */
+/** @brief 再重启：删除的会话都不再出现（项目下没有，也没有"Archived"），其他会话还在。 */
 async function deletedAfterRestart(ctx) {
   const { page } = ctx;
   const { a1, a2, b2 } = ctx.s;
@@ -1083,7 +1110,7 @@ async function item5(ctx) {
   await reopenUntrusted(ctx);
 }
 
-/** @brief 打开带扩展的文件夹：先弹询问（回答之前扩展不运行）；选"不信任"：横幅，扩展不运行。记下这个会话。 */
+/** @brief 打开带扩展的文件夹：先弹询问（回答之前扩展不运行）；选"Don’t trust"：横幅，扩展不运行。记下这个会话。 */
 async function trustDeny(ctx) {
   const { page } = ctx;
   const marker = ctx.dirs.markers.ext;
@@ -1091,18 +1118,18 @@ async function trustDeny(ctx) {
   if (seen !== 'dialog') throw new Error('no trust dialog for a folder with .pi/extensions');
   const state = await trustDialogState(page);
   record('5 打开带 .pi/extensions 的文件夹：先弹"信任这个文件夹？"（说明、完整路径、"记住"默认不勾），焦点在"不信任"',
-    state.title === '信任这个文件夹？' && state.text.includes(TRUST_TEXT) && samePath(state.path, ctx.dirs.ext)
-      && state.remember === false && state.focused === '不信任', JSON.stringify(state));
+    state.title === 'Trust this workspace?' && state.text.includes(TRUST_TEXT) && samePath(state.path, ctx.dirs.ext)
+      && state.remember === false && state.focused === 'Don’t trust', JSON.stringify(state));
   const waiting = await notReadyText(page);
   const slots = await page.locator('.pane-slot').count();
   await page.keyboard.press('Control+N');
   await sleep(1500);
-  record('5 询问时中栏已切到这个会话（"正在启动…"）；询问开着时 Ctrl+N 不起作用', waiting === '正在启动…'
+  record('5 询问时中栏已切到这个会话（"正在启动…"）；询问开着时 Ctrl+N 不起作用', waiting === 'Starting…'
     && await page.locator('.pane-slot').count() === slots && await page.getByTestId('trust-dialog').isVisible(),
   `输入框位置：${waiting}`);
   record('反例：回答之前项目扩展没有运行（标记文件不存在）', !existsSync(marker));
   await shot(page, '5-trust-dialog');
-  await page.getByTestId('trust-dialog').getByRole('button', { name: '不信任', exact: true }).click();
+  await page.getByTestId('trust-dialog').getByRole('button', { name: 'Don’t trust', exact: true }).click();
   await page.getByTestId('trust-dialog').waitFor({ state: 'detached', timeout: 5000 });
   await waitReady(page);
   await sleep(300);
@@ -1131,7 +1158,7 @@ async function untrustedTools(ctx) {
   await shot(page, '5-untrusted');
 }
 
-/** @brief 重启后再打开：又问；勾"记住"、选"信任"：扩展加载；让模型调用 project_hello，Alt+1 允许。 */
+/** @brief 重启后再打开：又问；勾"Remember my choice"、选"Trust workspace"：扩展加载；让模型调用 project_hello，Alt+1 允许。 */
 async function trustAllow(ctx) {
   const { page } = ctx;
   const marker = ctx.dirs.markers.ext;
@@ -1140,8 +1167,8 @@ async function trustAllow(ctx) {
   if (seen !== 'dialog') return;
   record('反例：重启后再次询问、回答之前项目扩展仍没有运行', !existsSync(marker));
   const dialog = page.getByTestId('trust-dialog');
-  await dialog.getByRole('checkbox', { name: '记住' }).check();
-  await dialog.getByRole('button', { name: '信任', exact: true }).click();
+  await dialog.getByRole('checkbox', { name: 'Remember my choice' }).check();
+  await dialog.getByRole('button', { name: 'Trust workspace', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 5000 });
   await waitReady(page);
   const banner = await bannerText(page);
@@ -1189,7 +1216,7 @@ async function callHello(ctx, label, message, name, known = false) {
   await shot(page, `${name}-done`);
 }
 
-/** @brief 勾"记住"后重启：再打开这个文件夹不再问，直接信任（扩展照常加载）。 */
+/** @brief 勾"Remember my choice"后重启：再打开这个文件夹不再问，直接信任（扩展照常加载）。 */
 async function trustRemembered(ctx) {
   const { page } = ctx;
   const marker = ctx.dirs.markers.ext;
@@ -1198,7 +1225,7 @@ async function trustRemembered(ctx) {
   const seen = await openAndSee(ctx, ctx.dirs.ext);
   const flashed = await trustDialogSeen(page);
   if (seen === 'dialog') {
-    await page.getByTestId('trust-dialog').getByRole('button', { name: '不信任', exact: true }).click();
+    await page.getByTestId('trust-dialog').getByRole('button', { name: 'Don’t trust', exact: true }).click();
     await waitReady(page);
   }
   const banner = await bannerText(page);
@@ -1262,9 +1289,9 @@ async function item6(ctx) {
   const aBack = await ctx.h.textarea.inputValue();
   record('6 在 A 写半句话，切到 B 再回 A：A 的草稿还在，B 的输入框里没有 A 的字', aBack === DRAFTS.a
     && !bBefore.includes(DRAFTS.a), `A：${aBack}；切到 B 时 B 的输入框：${bBefore}`);
-  await ctx.page.getByRole('button', { name: '设置', exact: true }).click();
+  await ctx.page.getByRole('button', { name: 'Settings', exact: true }).click();
   await ctx.page.getByTestId('settings-page').waitFor({ timeout: 5000 });
-  await ctx.page.getByRole('button', { name: '返回会话' }).click();
+  await ctx.page.getByRole('button', { name: 'Back to app' }).click();
   await waitReady(ctx.page);
   const aSettings = await ctx.h.textarea.inputValue();
   record('6 去设置页再回来：草稿还在', aSettings === DRAFTS.a, aSettings);
@@ -1285,7 +1312,7 @@ async function item6(ctx) {
 
 // ---------- 走查 7：有新结果 ----------
 
-/** @brief 走查 7：在一个会话开始较长的回答，切到另一个：侧栏"生成中"→"有新结果"；点开后消失。 */
+/** @brief 走查 7：在一个会话开始较长的回答，切到另一个：侧栏"Running"→"Unread"；点开后消失。 */
 async function item7(ctx) {
   await makeSessions(ctx);
   const { page } = ctx;
@@ -1296,14 +1323,14 @@ async function item7(ctx) {
   await openRow(ctx, a1.file);
   const during = await rowByFile(page, b1.file);
   await shot(page, '7-running');
-  record('7 切到别的会话：还在生成的会话行显示"生成中"', during?.status === 'running' && during.statusText === '生成中',
+  record('7 切到别的会话：还在生成的会话行显示"生成中"', during?.status === 'running' && during.statusText === 'Running',
     JSON.stringify({ status: during?.status, text: during?.statusText }));
   await waitRowStatus(page, b1.file, ['unseen', 'error', 'approval'], 240000);
   const done = await rowByFile(page, b1.file);
   const other = await rowByFile(page, a1.file);
   await shot(page, '7-unseen');
   record('7 不可见的会话生成完成：侧栏显示"有新结果"（当前会话没有状态）', done?.status === 'unseen'
-    && done.statusText === '有新结果' && other?.status === null,
+    && done.statusText === 'Unread' && other?.status === null,
   JSON.stringify({ hidden: done?.statusText, current: other?.statusText }));
   await rowOf(page, b1.file).click();
   await waitActive(page, b1.file);
@@ -1347,12 +1374,12 @@ function questionState(page, card, file) {
   }, { p: P, id: card.request, f: file });
 }
 
-/** @brief 回答一张询问卡：确认点"是"，选择点 green，输入框里写 pinecone 后按 Enter；别的种类点"取消"。 */
+/** @brief 回答一张询问卡：确认点"Yes"，选择点 green，输入框里写 pinecone 后按 Enter；别的种类点"Cancel"。 */
 async function answerAsk(page, card) {
   const box = cardOf(page, card);
-  if (card.method === 'confirm') return box.getByRole('button', { name: '是', exact: true }).click();
+  if (card.method === 'confirm') return box.getByRole('button', { name: 'Yes', exact: true }).click();
   if (card.method === 'select') return box.getByRole('button', { name: ASK.select.answer, exact: true }).click();
-  if (card.method !== 'input') return box.getByRole('button', { name: '取消', exact: true }).click();
+  if (card.method !== 'input') return box.getByRole('button', { name: 'Cancel', exact: true }).click();
   await box.locator('input').fill(ASK.input.answer);
   await box.locator('input').press('Enter');
 }
@@ -1384,29 +1411,30 @@ async function askRun(ctx, file) {
 
 /** @brief 三张询问卡的样子（extension-ui.md"询问卡"），以及有询问时的阶段行、会话行状态和焦点。 */
 function checkQuestions({ confirm, select, input }) {
-  const head = (state) => Boolean(state) && state.text.includes('扩展的询问');
+  const head = (state) => Boolean(state) && state.text.includes('An extension needs your input');
   record('e 确认：询问卡头"扩展的询问"，标题、说明原文，按钮"是""否"', head(confirm)
     && confirm.text.includes(ASK.confirm.title) && confirm.text.includes(ASK.confirm.message)
-    && confirm.buttons.join(',') === '是,否', JSON.stringify(confirm ?? null));
+    && confirm.buttons.join(',') === 'Yes,No', JSON.stringify(confirm ?? null));
   record('e 有挂起的询问时：阶段行"等你回答"，会话行状态"等你回答"；询问卡不抢输入框的焦点',
-    confirm?.stage === '等你回答' && confirm.status === 'question' && confirm.statusText === '等你回答'
-      && confirm.composer === true, JSON.stringify(confirm ? { stage: confirm.stage, status: confirm.statusText,
-      composer: confirm.composer } : null));
+    confirm?.stage === 'Waiting for your answer' && confirm.status === 'question'
+      && confirm.statusText === 'Needs input' && confirm.composer === true,
+    JSON.stringify(confirm ? { stage: confirm.stage, status: confirm.statusText, composer: confirm.composer } : null));
   record('e 选择：询问卡头"扩展的询问"、标题，每个选项一个按钮，加"取消"', head(select)
-    && select.text.includes(ASK.select.title) && select.buttons.join(',') === [...ASK.select.options, '取消'].join(','),
-  JSON.stringify(select ?? null));
+    && select.text.includes(ASK.select.title)
+    && select.buttons.join(',') === [...ASK.select.options, 'Cancel'].join(','), JSON.stringify(select ?? null));
   record('e 输入：询问卡头"扩展的询问"、标题，输入框显示提示文字，"确定""取消"；带超时时一行"N 秒后自动取消"',
     head(input) && input.text.includes(ASK.input.title) && input.placeholder === ASK.input.placeholder
-      && input.buttons.join(',') === '确定,取消' && /\d+ 秒后自动取消/.test(input.text), JSON.stringify(input ?? null));
+      && input.buttons.join(',') === 'Submit,Cancel' && /This request expires in \d+ seconds?/.test(input.text),
+    JSON.stringify(input ?? null));
 }
 
-/** @brief 通知是对话流里一行"扩展：原文"（warning）；project_ask 的工具卡完成；模型的回复提到选的颜色和写的词。 */
+/** @brief 通知是对话流里一行"Extension: <原文>"（warning）；project_ask 的工具卡完成；模型的回复提到选的颜色和写的词。 */
 async function checkAskResult(ctx, run) {
   const { page } = ctx;
   const notes = await page.locator(`${P}[data-testid="ext-notify"]`).evaluateAll((els) => els.map((el) => ({
     text: el.textContent, className: el.className })));
   record('e 扩展的通知：对话流里一行"扩展：原文"，warning 级别用警示样式（class warning）',
-    notes.some((note) => note.text === `扩展：${ASK.note}` && note.className.split(/\s+/).includes('warning')),
+    notes.some((note) => note.text === `Extension: ${ASK.note}` && note.className.split(/\s+/).includes('warning')),
     JSON.stringify(notes));
   const tools = await toolCards(page);
   const reply = await lastReply(page);
@@ -1423,7 +1451,7 @@ async function checkAskResult(ctx, run) {
 // ---------- 走查 r：界面重新加载 ----------
 
 /**
- * @brief 走查 r：在要问信任的文件夹里（信任、不记住）开始较长的回答，界面重新加载：侧栏"生成中"；点它不问信任、
+ * @brief 走查 r：在要问信任的文件夹里（信任、不记住）开始较长的回答，界面重新加载：侧栏"Running"；点它不问信任、
  *        接上后接着流完，草稿还在；再重新加载一次点开，对话相同；新建会话时信任询问又出现（本次的回答已清空）。
  */
 async function itemR(ctx) {
@@ -1456,7 +1484,7 @@ async function startLongReply(ctx) {
   return file;
 }
 
-/** @brief 重新加载后：中栏回到"打开一个文件夹"；还在后台进程里生成的会话行显示"生成中"。 */
+/** @brief 重新加载后：中栏回到"Open a folder"；还在后台进程里生成的会话行显示"Running"。 */
 async function checkReloaded(ctx, file) {
   const { page } = ctx;
   await waitRowStatus(page, file, ['running'], 10000).catch(() => {});
@@ -1464,8 +1492,8 @@ async function checkReloaded(ctx, file) {
   const center = await centerHeading(page);
   await shot(page, 'r-reloaded');
   record('r 界面重新加载（page.reload，与 Ctrl+R 相同）后：中栏回到"打开一个文件夹"，'
-    + '还在后台进程里生成的会话行显示"生成中"', row?.status === 'running' && row.statusText === '生成中'
-    && center === '打开一个文件夹', `状态：${row ? row.statusText || '(没有)' : '(没有这一行)'}；中栏：${center}`);
+    + '还在后台进程里生成的会话行显示"生成中"', row?.status === 'running' && row.statusText === 'Running'
+    && center === 'Open a folder', `状态：${row ? row.statusText || '(没有)' : '(没有这一行)'}；中栏：${center}`);
 }
 
 /** @brief 点还在生成的会话：不问信任，直接接上；重新加载前流出的开头还在，之后的字接着流入。返回接上时的回复。 */
@@ -1534,14 +1562,14 @@ async function asksAgainAfterReload(ctx) {
 
 // ---------- 反例 ----------
 
-/** @brief 反例：询问开着时扩展不运行，Esc 等于"不信任"；本次运行里同一文件夹不再问；问过之后才出现 .pi/。 */
+/** @brief 反例：询问开着时扩展不运行，Esc 等于"Don’t trust"；本次运行里同一文件夹不再问；问过之后才出现 .pi/。 */
 async function counterExample(ctx) {
   await escDeny(ctx);
   await sameFolderAgain(ctx);
   await lateExtension(ctx);
 }
 
-/** @brief 询问开着 3 秒，扩展不运行；按 Esc：按不信任打开，扩展仍不运行。 */
+/** @brief 询问开着 3 秒，扩展不运行；按 Esc：按"Don’t trust"打开，扩展仍不运行。 */
 async function escDeny(ctx) {
   const { page } = ctx;
   const marker = ctx.dirs.markers.ext2;
@@ -1558,7 +1586,7 @@ async function escDeny(ctx) {
   await shot(page, 'c-esc');
 }
 
-/** @brief 本次运行里在同一文件夹再新建会话（Ctrl+N）：不再问，沿用"不信任"。 */
+/** @brief 本次运行里在同一文件夹再新建会话（Ctrl+N）：不再问，沿用"Don’t trust"。 */
 async function sameFolderAgain(ctx) {
   const { page } = ctx;
   await watchTrustDialog(page);
@@ -1591,7 +1619,7 @@ async function lateExtension(ctx) {
   const during = existsSync(marker);
   if (seen === 'dialog') {
     await shot(page, 'c-late-dialog');
-    await page.getByTestId('trust-dialog').getByRole('button', { name: '不信任', exact: true }).click();
+    await page.getByTestId('trust-dialog').getByRole('button', { name: 'Don’t trust', exact: true }).click();
   }
   await waitReady(page);
   const banner = await bannerText(page);

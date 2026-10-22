@@ -102,12 +102,12 @@ export function providerPatch(draft: ProviderDraft, patch: Partial<ProviderDraft
 export function providerErrors(draft: ProviderDraft): FieldErrors {
   const concurrency = positiveInt(draft.concurrency);
   return {
-    name: draft.name.trim() ? undefined : 'Name is required',
+    name: draft.name.trim() ? undefined : 'Name is required.',
     baseUrl: ProviderFormSchema.shape.baseUrl.safeParse(draft.baseUrl.trim()).success ? undefined
-      : 'Address must be an http or https URL',
+      : 'Base URL must be an http or https URL.',
     concurrency: concurrency !== null && ConcurrencySchema.safeParse(concurrency).success ? undefined
-      : 'Use a whole number from 1 to 64',
-    zone: draft.zone === null ? 'Choose a network zone' : undefined,
+      : 'Use a whole number from 1 to 64.',
+    zone: draft.zone === null ? 'Choose a network zone.' : undefined,
   };
 }
 
@@ -172,12 +172,12 @@ export function modelPatch(draft: ModelDraft, patch: Partial<ModelDraft>): Parti
 export function modelErrors(draft: ModelDraft, otherIds: readonly string[]): FieldErrors {
   const window = positiveInt(draft.contextWindow);
   const max = positiveInt(draft.maxTokens);
-  const idError = !/^\S+$/.test(draft.id) ? 'Model id must be non-empty and contain no spaces'
-    : otherIds.includes(draft.id) ? 'Model ids must be unique within a provider' : undefined;
-  const maxError = max === null ? 'Use a whole number greater than 0'
-    : window !== null && max >= window ? 'Max output must be smaller than the context window' : undefined;
-  return { id: idError, contextWindow: window === null ? 'Use a whole number greater than 0' : undefined,
-    maxTokens: maxError };
+  const idError = !/^\S+$/.test(draft.id) ? 'Model ID must be non-empty and contain no spaces.'
+    : otherIds.includes(draft.id) ? 'Model IDs must be unique within a provider.' : undefined;
+  const maxError = max === null ? 'Max output must be a whole number above 0.'
+    : window !== null && max >= window ? 'Max output must be smaller than the context window.' : undefined;
+  const windowError = window === null ? 'Context window must be a whole number above 0.' : undefined;
+  return { id: idError, contextWindow: windowError, maxTokens: maxError };
 }
 
 /** @brief 草稿转成配置里的模型。 */
@@ -231,7 +231,7 @@ export function ApiRow({ value, onChange }: { value: ApiType; onChange: (value: 
 export function ZoneRadios({ value, onChange, note }: {
   value: Zone | null; onChange: (zone: Zone) => void; note?: ReactNode;
 }) {
-  const error = value === null ? 'Choose a network zone' : null;
+  const error = value === null ? 'Choose a network zone.' : null;
   return (
     <fieldset className="mf-row zone-radios">
       <legend>Network zone</legend>
@@ -262,7 +262,7 @@ export function CompatChecks({ api, value, onChange }: {
   }
   return (
     <fieldset className="mf-row compat-checks">
-      <legend>Compatibility</legend>
+      <legend>Compatibility options</legend>
       <div className="mf-control">
         {COMPAT_OPTIONS.map((option) => (
           <label key={option.id} className="check-row">
@@ -299,20 +299,23 @@ export interface ModelFieldsProps {
   edit: (patch: Partial<ModelDraft>) => void;
   /** 显示的字段错误 */
   errors: FieldErrors;
-  /** Edit：Model id 只读 */
+  /** Edit：Model ID 只读 */
   editing: boolean;
   /** 设置页的模型表单另有 Family、Image input；首次启动表单没有 */
   full: boolean;
-  /** 显示 New-session thinking level（勾了 Supports thinking 时）：设置页的模型表单与新建提供商的第一个模型有，首次启动表单没有 */
+  /**
+   * 显示 Default effort for new sessions（勾了 Supports thinking 时）：设置页的模型表单与新建提供商的第一个模型有，
+   * 首次启动表单没有
+   */
   thinking: boolean;
 }
 
-/** @brief 模型字段：Model id、Context window、Max output、（Family）、Supports thinking、（Image input、思考强度）。 */
+/** @brief 模型字段：Model ID、Context window、Max output、（Family）、Supports thinking、（Image input、思考强度）。 */
 export function ModelFields({ draft, edit, errors, editing, full, thinking }: ModelFieldsProps) {
   const set = (patch: Partial<ModelDraft>) => edit(modelPatch(draft, patch));
   return (
     <>
-      <TextRow label="Model id" field="id" error={errors.id} value={draft.id} readOnly={editing}
+      <TextRow label="Model ID" field="id" error={errors.id} value={draft.id} readOnly={editing}
         onChange={(id) => set({ id })} spellCheck={false} />
       <TextRow label="Context window" field="contextWindow" error={errors.contextWindow} inputMode="numeric"
         value={draft.contextWindow} onChange={(contextWindow) => set({ contextWindow })} />
@@ -323,7 +326,7 @@ export function ModelFields({ draft, edit, errors, editing, full, thinking }: Mo
       <CheckRow label="Supports thinking" checked={draft.reasoning} onChange={(reasoning) => set({ reasoning })} />
       {full && <CheckRow label="Image input" checked={draft.image} onChange={(image) => set({ image })} />}
       {thinking && draft.reasoning && (
-        <Row label="New-session thinking level">
+        <Row label="Default effort for new sessions">
           {(id) => (
             <select id={id} value={draft.thinkingLevel}
               onChange={(event) => set({ thinkingLevel: event.target.value as ThinkingLevel })}>

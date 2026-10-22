@@ -1,8 +1,15 @@
 // 界面测试共用的页面操作：发消息、等本轮结束、采样阶段行、读工具卡、首次启动表单（v1）、设置 → Models 的提供商卡与
-// Keys、打开文件夹。v1 的标识与文字见 docs/v1/screens/first-run.md、models-settings.md。
+// Keys、打开文件夹。v1 的标识见 docs/v1/screens/first-run.md、models-settings.md，界面文字见 docs/v0/ui-strings.md。
 
-/** "打开文件夹…"按钮的名字：首次启动表单上是英文（v1），侧栏与空状态仍是中文 */
-export const OPEN_FOLDER = /^(Open folder…|打开文件夹…)$/;
+/** "Open folder…"按钮的名字（侧栏、空状态与首次启动表单同一个词） */
+export const OPEN_FOLDER = 'Open folder…';
+
+/**
+ * 首次启动表单下方"Test connection"的结果（含保存失败）开头的样子，FirstRunForm.tsx、state/settings.ts；
+ * 跳过中间的"Saving…"
+ */
+const TEST_RESULTS = [String.raw`^(Connected|Connection failed|Failed|Test cancelled)`,
+  String.raw`^Couldn[’']t (test the connection|save)`];
 
 /** @brief 一个页面上的常用操作。 */
 export function pageHelpers(page) {
@@ -55,7 +62,7 @@ export function pageHelpers(page) {
     /** @brief 上下文用量（token 数），读不到时为 null。 */
     async usageTokens() {
       const title = await page.getByTestId('usage').getAttribute('title').catch(() => null);
-      const match = /约 ([\d,]+) \//.exec(title ?? '');
+      const match = /About ([\d,]+) \//.exec(title ?? '');
       return match ? Number(match[1].replace(/,/g, '')) : null;
     },
     /**
@@ -66,10 +73,10 @@ export function pageHelpers(page) {
       const form = page.getByTestId('connection-form');
       const field = (label) => form.getByLabel(label, { exact: true });
       if (name !== undefined) await field('Name').fill(name);
-      if (baseUrl !== undefined) await field('Address').fill(baseUrl);
+      if (baseUrl !== undefined) await field('Base URL').fill(baseUrl);
       if (zone !== undefined) await form.locator(`input[name="zone"][value="${zone}"]`).check();
       if (apiKey !== null && apiKey !== undefined) await field('API key').fill(apiKey);
-      if (modelId !== undefined) await field('Model id').fill(modelId);
+      if (modelId !== undefined) await field('Model ID').fill(modelId);
       if (contextWindow !== undefined) await field('Context window').fill(String(contextWindow));
       if (reasoning !== undefined) await form.getByLabel('Supports thinking').setChecked(reasoning);
     },
@@ -108,7 +115,7 @@ export function pageHelpers(page) {
     },
     /** @brief 打开设置页的 Models 分节（规格 §9.1），等它读完。 */
     async openModels() {
-      await page.getByRole('button', { name: '设置', exact: true }).click();
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
       await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
       await page.locator('[data-testid="settings-nav"] button[data-section="models"]').click();
       await page.getByTestId('models-section').waitFor({ timeout: 15000 });
@@ -134,29 +141,27 @@ export function pageHelpers(page) {
      * @param previous 之前的文字（要等它变化）；test 为真时只认测试连接的结果与保存失败，跳过中间的"Saving…"
      */
     async formMessage(previous = null, { test = false, timeout = 60000 } = {}) {
-      await page.waitForFunction(({ old, onlyTest }) => {
+      await page.waitForFunction(({ old, onlyTest, patterns }) => {
         const text = document.querySelector('[data-testid="form-message"]')?.textContent;
-        if (!text || text === old) return false;
-        return !onlyTest || /^(Connected|Failed|Test cancelled|Couldn't save)/.test(text);
-      }, { old: previous, onlyTest: test }, { timeout });
+        if (!text || text === old || text.startsWith('Saving')) return false;
+        return !onlyTest || patterns.some((pattern) => new RegExp(pattern).test(text));
+      }, { old: previous, onlyTest: test, patterns: TEST_RESULTS }, { timeout });
       return page.getByTestId('form-message').innerText();
     },
     /**
-     * @brief 把当前会话切到"全部允许"（权限菜单 → 全部允许 → 确认）。M2 起命令和编辑先要批准，
-     *        M0/M1 的测试测的是批准之外的行为，打开会话后先切到全部允许。
+     * @brief 把当前会话切到"Allow all"（权限菜单 → Allow all → 确认）。M2 起命令和编辑先要批准，
+     *        M0/M1 的测试测的是批准之外的行为，打开会话后先切到 Allow all。
      */
     async allowAll() {
       const pane = page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]');
       await pane.getByTestId('permission-button').click();
-      await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: '全部允许' }).click();
-      await page.getByTestId('confirm-dialog').getByRole('button', { name: '全部允许' }).click();
+      await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
+      await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all' }).click();
       await page.waitForFunction(() => document.querySelector(
-        '.pane-slot:not([hidden]) [data-testid="permission-button"]')?.textContent?.includes('全部允许'),
+        '.pane-slot:not([hidden]) [data-testid="permission-button"]')?.textContent?.includes('Allow all'),
       null, { timeout: 10000 });
     },
-    /**
-     * @brief 让系统的选文件夹对话框直接返回 folder，再点"打开文件夹…"（首次启动表单上是英文的"Open folder…"）。
-     */
+    /** @brief 让系统的选文件夹对话框直接返回 folder，再点"Open folder…"。 */
     async openFolder(app, folder) {
       await app.evaluate(({ dialog }, path) => {
         dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });

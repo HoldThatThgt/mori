@@ -29,7 +29,7 @@ function probeText(profile: ProfileView | null, running: boolean): { state: stri
   const { call, result } = profile.tool_calling;
   const detail = [call, result].find((step) => step.outcome === 'fail')?.detail ?? '';
   return { state: 'failed', text: `Tool calling failed verification: ${detail}. Mori needs tool calling for the main`
-    + " agent; pick another model or check the server's tool-call settings." };
+    + ' agent; pick another model or check the server’s tool-call settings.' };
 }
 
 /** @brief 表单下方的探针状态（first-run.md "探针状态"）；探针出错时"Couldn't verify"与"Verify again"。 */
@@ -47,7 +47,7 @@ function ProbeStatus({ modelRef }: { modelRef: string }) {
   if (!running && profile?.status === 'error') {
     return (
       <div className="probe-status" data-testid="probe-status" data-state="error">
-        <p className="form-message error">Couldn't verify: {profile.error}</p>
+        <p className="form-message error">Couldn’t verify: {profile.error}</p>
         <button className="button compact" data-action="verify" onClick={() => void verify()}>Verify again</button>
         {error && <p className="form-message error" role="alert">{error}</p>}
       </div>
@@ -69,7 +69,7 @@ function OpenFolder() {
         <Icon name="folder" />Open folder…
       </button>
       {opening && <p className="muted">Opening {folderName(last.cwd)}…</p>}
-      {last?.phase === 'failed' && <p className="form-message error">Couldn't open: {last.error}</p>}
+      {last?.phase === 'failed' && <p className="form-message error">Failed to open session: {last.error}</p>}
     </div>
   );
 }
@@ -101,7 +101,7 @@ function useFirstRun() {
       setSecret('');
       return next;
     } catch (error) {
-      setMessage({ tone: 'error', text: `Couldn't save: ${describe('models.firstRun', error)}` });
+      setMessage({ tone: 'error', text: `Couldn’t save: ${describe('models.firstRun', error)}` });
       return null;
     } finally {
       setPhase('idle');
@@ -133,19 +133,19 @@ export function FirstRunForm() {
   };
   const setModel = (patch: Parameters<typeof model.edit>[0]) => { model.edit(patch); form.mark(); };
   const publicNote = provider.draft.zone === 'public' && <p className="field-hint" data-testid="zone-public-note">
-    Public providers must be allowed per project. You'll be asked when you open a folder.</p>;
+    Public providers must be allowed per project. You’ll be asked when you open a folder.</p>;
   return (
     <>
       <h2>Connect a model</h2>
-      <p className="muted">Fill in your model endpoint, then test the connection.</p>
+      <p className="muted">Enter the base URL, API key, and model ID, then test the connection.</p>
       {migrationError && <p className="form-message error" data-testid="migration-error">
-        Couldn't import your previous model settings: {migrationError}</p>}
-      <form className="mf-grid first-run-form" data-testid="connection-form"
+        Couldn’t import your previous model settings: {migrationError}</p>}
+      <form className="mf-grid first-run-form" data-testid="connection-form" noValidate
         onSubmit={(event) => { event.preventDefault(); void form.test(); }}>
         <TextRow label="Name" field="name" error={shown.name} value={provider.draft.name}
           onChange={(name) => setProvider({ name })} />
-        <TextRow label="Address" field="baseUrl" error={shown.baseUrl} value={provider.draft.baseUrl} spellCheck={false}
-          placeholder="http://host:8000/v1" onChange={(baseUrl) => setProvider({ baseUrl })} />
+        <TextRow label="Base URL" field="baseUrl" error={shown.baseUrl} value={provider.draft.baseUrl}
+          spellCheck={false} placeholder="http://host:8000/v1" onChange={(baseUrl) => setProvider({ baseUrl })} />
         <ApiRow value={provider.draft.api} onChange={(api) => setProvider({ api })} />
         <ZoneRadios value={provider.draft.zone} onChange={(zone) => setProvider({ zone })} note={publicNote} />
         <TextRow label="API key" field="secret" type="password" autoComplete="off" value={form.secret}

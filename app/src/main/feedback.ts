@@ -96,34 +96,35 @@ function oneLine(text: string): string {
 }
 
 /**
- * @brief 你写的原文；没写时为"（没有填写）"。像 Markdown 标题的行前面加 "\"（M7 的工作回顾按报告的标题切节，
- *        你写的一行"## 你期望什么"不能被当成标题）。
+ * @brief 你写的原文；没写时为"(left blank)"。像 Markdown 标题的行前面加 "\"（M7 的工作回顾按报告的标题切节，
+ *        你写的一行"## What you expected"不能被当成标题）。
  */
 function written(text: string): string {
-  return text.trim().replace(/^( {0,3})(#{1,6})(?=\s|$)/gm, '$1\\$2') || '（没有填写）';
+  return text.trim().replace(/^( {0,3})(#{1,6})(?=\s|$)/gm, '$1\\$2') || '(left blank)';
 }
 
 /** @brief 版本：Mori、Electron、Chromium、Node、Windows。 */
 function versions(): string[] {
   return [
-    `- Mori：${app.getVersion()}`,
-    `- Electron：${process.versions.electron}`,
-    `- Chromium：${process.versions.chrome}`,
-    `- Node：${process.versions.node}`,
-    `- Windows：${release()}`,
+    `- Mori: ${app.getVersion()}`,
+    `- Electron: ${process.versions.electron}`,
+    `- Chromium: ${process.versions.chrome}`,
+    `- Node: ${process.versions.node}`,
+    `- Windows: ${release()}`,
   ];
 }
 
-/** @brief 报告的 Markdown；标题用中文，M7 的收件箱按这些标题读取。shot 是"截图"一节的内容。 */
+/** @brief 报告的 Markdown；M7 的工作回顾按这些标题读取（main/review.ts ISSUE_SECTIONS）。shot 是"Screenshot"一节的内容。 */
 function issueMarkdown(report: IssueReport, when: Date, shot: string): string {
   return [
-    `# 界面问题 · ${localTime(when)}`, '',
-    '## 哪里不对', '', written(report.what), '',
-    '## 你期望什么', '', written(report.expect), '',
-    '## 截图', '', shot, '',
-    '## 当前界面', '', ...report.view.map((field) => `- ${oneLine(field.label)}：${oneLine(field.value)}`), '',
-    '## 最近的操作', '', ...report.actions.map((action) => `- ${oneLine(action.time)} ${oneLine(action.text)}`), '',
-    '## 版本', '', ...versions(), '',
+    `# UI issue · ${localTime(when)}`, '',
+    '## What went wrong', '', written(report.what), '',
+    '## What you expected', '', written(report.expect), '',
+    '## Screenshot', '', shot, '',
+    '## Current view', '', ...report.view.map((field) => `- ${oneLine(field.label)}: ${oneLine(field.value)}`), '',
+    '## Recent activity', '',
+    ...report.actions.map((action) => `- ${oneLine(action.time)} ${oneLine(action.text)}`), '',
+    '## Versions', '', ...versions(), '',
   ].join('\n');
 }
 
@@ -172,7 +173,7 @@ function saveIssue(value: unknown): SavedIssue {
     // 全程同步读写，查找文件名与写入之间不会插进别的保存。
     const name = freeName(dir, fileStamp(now));
     if (png) writeFileSync(join(dir, `${name}.png`), png);
-    const shot = png ? `![截图](${name}.png)` : `截图失败：${oneLine(error)}`;
+    const shot = png ? `![Screenshot](${name}.png)` : `Couldn’t capture a screenshot: ${oneLine(error)}`;
     const file = join(dir, `${name}.md`);
     writeFileSync(file, issueMarkdown(report, now, shot), { encoding: 'utf8', flag: 'wx' });
     if (report.captureId) captures.delete(report.captureId);

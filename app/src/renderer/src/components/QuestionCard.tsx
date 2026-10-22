@@ -1,6 +1,6 @@
 // 扩展的询问卡（docs/v0/screens/extension-ui.md）：确认、选择、输入。停靠在输入框上方，排在批准卡之后；
 // 不抢输入框的焦点，没有默认按钮，Enter 不会作答（输入框里的 Enter 除外）。焦点在卡上时 Esc：先关开着的浮层，
-// 没有浮层时确认等于"否"、选择和输入等于取消。
+// 没有浮层时确认等于"No"、选择和输入等于"Cancel"。
 
 import { useRef, useState } from 'react';
 import { answerQuestion } from '../state/actions';
@@ -29,8 +29,8 @@ function QuestionActions({ question, send }: {
   if (question.method === 'confirm') {
     return (
       <div className="approval-actions">
-        <button className="button" onClick={() => send(true)}>是</button>
-        <button className="button" onClick={() => send(false)}>否</button>
+        <button className="button" onClick={() => send(true)}>Yes</button>
+        <button className="button" onClick={() => send(false)}>No</button>
       </div>
     );
   }
@@ -42,9 +42,9 @@ function QuestionActions({ question, send }: {
       {question.method === 'input' && <>
         <input className="approval-reason" aria-label={question.title} placeholder={question.placeholder ?? ''}
           value={text} onChange={(event) => setText(event.target.value)} onKeyDown={onInputKeyDown} />
-        <button className="button" onClick={() => send(text)}>确定</button>
+        <button className="button" onClick={() => send(text)}>Submit</button>
       </>}
-      <button className="button" onClick={() => send(null)}>取消</button>
+      <button className="button" onClick={() => send(null)}>Cancel</button>
     </div>
   );
 }
@@ -66,16 +66,21 @@ function Question({ tabKey, question, more }: { tabKey: string; question: Pendin
   }
 
   return (
-    <div ref={ref} className="approval-card question-card" role="group" aria-label={`扩展的询问：${question.title}`}
-      data-testid="ext-ui-card" data-request={question.requestId} data-method={question.method} onKeyDown={onKeyDown}>
+    <div ref={ref} className="approval-card question-card" role="group"
+      aria-label={`An extension needs your input: ${question.title}`} data-testid="ext-ui-card"
+      data-request={question.requestId} data-method={question.method} onKeyDown={onKeyDown}>
       <div className="approval-head">
-        <span className="approval-title">扩展的询问</span>
-        {more > 0 && <span className="approval-more">还有 {more} 个</span>}
+        <span className="approval-title">An extension needs your input</span>
+        {more > 0 && <span className="approval-more">{more} more</span>}
       </div>
       <div className="question-body">
         <p className="question-title">{question.title}</p>
         {question.message && <p className="question-message">{question.message}</p>}
-        {left !== null && <p className="question-timeout">{left} 秒后自动取消</p>}
+        {left !== null && (
+          <p className="question-timeout">
+            {left === 1 ? 'This request expires in 1 second' : `This request expires in ${left} seconds`}
+          </p>
+        )}
       </div>
       <QuestionActions question={question} send={send} />
     </div>

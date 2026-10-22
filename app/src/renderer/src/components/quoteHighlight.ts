@@ -1,4 +1,4 @@
-// 回到原位置时在对话流里标出引用（docs/v0/screens/selection.md "回到原位置"）：选区高亮引用的文字，
+// 回到原位置时在对话流里标出引用（docs/v0/screens/selection.md "Jump to source"）：选区高亮引用的文字，
 // 整条回复或找不到对应文字时高亮整轮回复，约 4 秒后消失。高亮用 CSS Custom Highlight，不改对话流的 DOM。
 
 /** 回到原位置的高亮名 */

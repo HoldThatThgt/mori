@@ -68,7 +68,7 @@ function useEscape(): void {
       const busy = tab && (tab.transcript.running || tab.transcript.sending);
       if (state.view !== 'chat' || !tab || !busy || !focusInPane(tab.key)) return;
       event.preventDefault();
-      recordAction('按 Esc 停止');
+      recordAction('Stop response (Esc)');
       void stop(tab.key);
     }
     window.addEventListener('keydown', onKeyDown);
@@ -166,7 +166,7 @@ function useElementWidth(element: React.RefObject<HTMLElement | null>): number {
 }
 
 /** 中栏没有会话、侧栏有会话时的说明 */
-const PICK_HINT = '从左侧选一个会话继续，或打开一个文件夹开始新的会话。';
+const PICK_HINT = 'Pick a session on the left to continue, or open a folder to start a new session.';
 
 /** @brief 一栏在中栏里的位置：不显示时为 undefined。 */
 function sideOf(key: string, shown: string[], split: boolean): 'left' | 'right' | 'single' | undefined {
@@ -189,8 +189,8 @@ function SplitDivider({ width, left }: { width: number; left: number }) {
   const limits = splitLimits(width);
   if (!width || !limits) return null;
   return (
-    <Divider kind="split" label="调整两栏的宽度" value={left} limits={limits} fallback={width / 2}
-      valueText={`左栏 ${left} 像素`} onChange={(value, commit) => resize('split', value / width, commit)} />
+    <Divider kind="split" label="Resize panes" value={left} limits={limits} fallback={width / 2}
+      valueText={`Left pane: ${left} pixels`} onChange={(value, commit) => resize('split', value / width, commit)} />
   );
 }
 
@@ -224,7 +224,7 @@ function Center({ tabs, view, right }: { tabs: Tab[]; view: View; right: RightTo
       })}
       {split && <SplitDivider width={width} left={left} />}
       {view === 'chat' && !tabs.some((tab) => tab.key === activeKey) && (
-        <OpenFolderPrompt heading="打开一个文件夹" hint={hasSaved || tabs.length > 0 ? PICK_HINT : undefined} />
+        <OpenFolderPrompt heading="Open a folder" hint={hasSaved || tabs.length > 0 ? PICK_HINT : undefined} />
       )}
       {view === 'settings' && <SettingsPage />}
       {view === 'tools' && <ToolsPage />}
@@ -241,7 +241,7 @@ function hasChanges(tab: Tab): boolean {
 /**
  * @brief 右栏怎么显示：贴在右边、浮在上层（窄窗口，或分屏放不下时你点开的）、不显示。右栏跟随焦点所在的一栏；
  *        分屏放不下时先收起，你点右栏开关才浮出来，回到放得下时恢复原来的开关状态。分屏放不下时在这一栏打开了文件
- *        （点文件芯片、工具卡里的路径、工作回顾的"回到原位置"）也浮出来，阅读器才看得见。
+ *        （点文件芯片、工具卡里的路径、工作回顾的"Jump to source"）也浮出来，阅读器才看得见。
  */
 function useRightPanel(tab: Tab | undefined, view: View, cramped: boolean) {
   const split = useApp((state) => state.split);
@@ -288,7 +288,7 @@ function Workspace() {
   const columns = useColumns(width, collapsed || (narrow && floating), wantRight, Boolean(split) && view === 'chat');
   const { right, shown: rightShown, floating: rightFloating } = useRightPanel(tab, view, columns.cramped);
   const style = { '--sidebar-width': `${columns.sidebar}px`, '--workspace-width': `${columns.workspace}px` };
-  const divider = <Divider kind="workspace" label="调整右栏宽度" value={columns.workspace}
+  const divider = <Divider kind="workspace" label="Resize right panel" value={columns.workspace}
     limits={columns.workspaceLimits} onChange={(value, commit) => resize('workspace', value, commit)} />;
   return (
     <div className="app" style={style as React.CSSProperties}>
@@ -296,7 +296,7 @@ function Workspace() {
       <Sidebar collapsed={collapsed && !(narrow && floating)} floating={narrow && floating}
         onToggle={() => (narrow ? setFloating(!floating) : setLayout({ sidebarCollapsed: !sidebarCollapsed }))}
         onNavigate={() => setFloating(false)}>
-        {!collapsed && !floating && <Divider kind="sidebar" label="调整左栏宽度" value={columns.sidebar}
+        {!collapsed && !floating && <Divider kind="sidebar" label="Resize sidebar" value={columns.sidebar}
           limits={columns.sidebarLimits} onChange={(value, commit) => resize('sidebar', value, commit)} />}
       </Sidebar>
       <main className="main">
@@ -304,8 +304,8 @@ function Workspace() {
         <div className="body">
           <Center tabs={tabs} view={view} right={right} />
           {rightShown && tab && (
-            <aside className={`right-panel${rightFloating ? ' floating' : ''}`} aria-label="本会话的改动与文件"
-              data-testid="right-panel">
+            <aside className={`right-panel${rightFloating ? ' floating' : ''}`}
+              aria-label="Changes and files in this session" data-testid="right-panel">
               {divider}
               <RightPanel tab={tab} onClose={() => right.toggle(tab)} />
             </aside>
@@ -331,13 +331,16 @@ export function App() {
     return (
       <main className="first-run">
         <div className="first-run-card">
-          {kernel === 'exited' ? <KernelExitBanner /> : <p className="form-message error">{configError}</p>}
+          {kernel === 'exited' ? <KernelExitBanner />
+            : <p className="form-message error">Couldn’t load connections: {configError}</p>}
         </div>
       </main>
     );
   }
   if (!config) {
-    return <main className="first-run"><p className="muted" data-testid="first-run-loading">Loading…</p></main>;
+    return (
+      <main className="first-run"><p className="muted" data-testid="first-run-loading">Loading connections…</p></main>
+    );
   }
   if (firstRun) return <FirstRun exited={kernel === 'exited'} />;
   return <><Workspace /><RefPreview /><PaneDeleteDialog /><LeaveDialog /></>;

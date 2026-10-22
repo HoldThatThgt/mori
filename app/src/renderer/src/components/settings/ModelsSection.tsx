@@ -64,8 +64,8 @@ function useTarget(root: React.RefObject<HTMLDivElement | null>, info: ModelsInf
 function LoadError({ error }: { error: string }) {
   return (
     <div className="settings-error" data-testid="models-load-error">
-      <p className="form-message error" role="alert">Model settings can't be read: {error}</p>
-      <button className="button" data-action="reload" onClick={() => void loadModels('models.reload')}>Reload</button>
+      <p className="form-message error" role="alert">Couldn’t read model settings: {error}</p>
+      <button className="button" data-action="reload" onClick={() => void loadModels('models.reload')}>Retry</button>
     </div>
   );
 }

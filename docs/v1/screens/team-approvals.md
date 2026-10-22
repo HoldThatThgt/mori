@@ -3,7 +3,9 @@
 依据：TaskBoard 规格（[parallel-agents-taskboard.md](../../specs/parallel-agents-taskboard.md)，下称“规格”）§11.1（一个用户会话一份批准状态）、§11.2（免批准的工具）、
 §11.3（后台实例的批准卡）、§11.4（停止）、§11.6（重新载入与重启）、§13.4、§13.6（侧栏状态）、§13.10。
 补充 [v0 approval.md](../../v0/screens/approval.md)：卡片内容、三个选项、Alt+1/2/3、焦点规则、权限菜单与任务栏闪烁都沿用它，下面只写不同的地方。
-v0 的中文文字（“允许一次”“本会话不再询问”“拒绝”“还有 N 张”“等你批准”“本会话已允许”）仍是中文，等英文任务统一改。
+与 english-ui 合并后（2026-10-21）v0 的文字按 [v0/ui-strings.md](../../v0/ui-strings.md) 的英文；下文引号里的中文是原来的叫法，界面上显示：
+允许一次 = Allow once，本会话不再询问 = Allow “…” for this session，拒绝 = Deny，还有 N 张 = {n} more，等你批准 = Waiting for your approval /
+Needs approval，本会话已允许 = Allowed for this session，每次询问 = Ask each time，全部允许 = Allow all，生成中 = Running。
 标了“（临时，走查时可以改）”的是规格没给、本表定的。
 
 ## 来源

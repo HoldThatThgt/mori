@@ -18,7 +18,7 @@ export function shortOf(full) {
 /** @brief 列表里文件名为 name 的一行。 */
 export const rowAt = (page, name) => page.locator(`[data-testid="review-row"][data-name="${name}"]`);
 
-/** @brief 等工作回顾读完（不再"正在读取…"）。 */
+/** @brief 等工作回顾读完（不再"Loading…"）。 */
 export async function waitLoaded(page) {
   await sleep(300);
   await page.waitForFunction(() => {
@@ -36,7 +36,7 @@ export async function chooseTab(page, kind) {
   await settle(page);
 }
 
-/** @brief 点左栏"工作回顾"，等读完；section 不为空时切到那一节。 */
+/** @brief 点左栏"Review"，等读完；section 不为空时切到那一节。 */
 export async function openReviewPage(page, section) {
   await page.getByTestId('nav-review').click();
   await page.getByTestId('review-page').waitFor({ timeout: 10000 });
@@ -44,9 +44,9 @@ export async function openReviewPage(page, section) {
   if (section) await chooseTab(page, section);
 }
 
-/** @brief 点"返回会话"，等工作回顾页消失。 */
+/** @brief 点"Back to app"，等工作回顾页消失。 */
 export async function backToChat(page) {
-  await page.getByTestId('review-page').getByRole('button', { name: '返回会话' }).click();
+  await page.getByTestId('review-page').getByRole('button', { name: 'Back to app' }).click();
   await page.getByTestId('review-page').waitFor({ state: 'detached', timeout: 10000 });
   await settle(page);
 }
@@ -78,7 +78,7 @@ export function reviewState(page) {
     const hide = find('review-hide-handled');
     return {
       title: root.querySelector('.topbar .chat-title')?.textContent.trim() ?? '',
-      back: [...root.querySelectorAll('.topbar button')].some((item) => item.textContent.includes('返回会话')),
+      back: [...root.querySelectorAll('.topbar button')].some((item) => item.textContent.includes('Back to app')),
       tabs: { feedback: tab('feedback'), issues: tab('issues') },
       hide: { role: hide?.getAttribute('role') ?? null, checked: hide?.getAttribute('aria-checked') ?? null },
       exportText: text('review-export'), exportDisabled: find('review-export')?.disabled ?? null,
@@ -115,7 +115,7 @@ export function detailState(page) {
       tag: aside.tagName.toLowerCase(), panel: aside.classList.contains('right-panel'),
       label: aside.getAttribute('aria-label'), divider: Boolean(aside.querySelector('[data-resize="workspace"]')),
       heading: aside.querySelector('.panel-header')?.textContent.trim() ?? '',
-      close: Boolean(aside.querySelector('.panel-header button[aria-label="关闭详情"]')),
+      close: Boolean(aside.querySelector('.panel-header button[aria-label="Close details"]')),
       time: text('detail-time'), source: text('detail-source'), expected: text('detail-expected'),
       quote: text('detail-quote'), quoteScroll: quote ? getComputedStyle(quote).overflowY : null,
       quoteBox: quote && { scroll: quote.scrollHeight, client: quote.clientHeight },
@@ -197,21 +197,30 @@ function stubSave({ dialog }, target) {
 export const mainCalls = (app) => app.evaluate(() => ({ opened: globalThis.__m7Opened ?? [],
   revealed: globalThis.__m7Revealed ?? [], saves: globalThis.__m7Save ?? [] }));
 
-/** @brief 导出文件的开头：标题行和下一行（导出时间、条数）。 */
+/** @brief "N record" / "N records"（导出的条数、隐藏的条数里的写法）。 */
+export const records = (count) => `${count} ${count === 1 ? 'record' : 'records'}`;
+
+/**
+ * @brief 导出文件的开头：标题行和下一行（导出时间、条数）。条数的单复数不对（"1 records"、"3 record"）时
+ *        total 为 NaN，和任何期望的条数都不相等。
+ */
 export function mdHead(md) {
   const lines = md.replace(/\r\n/g, '\n').split('\n');
   const line = lines.slice(1).find((item) => item.trim()) ?? '';
-  const match = /^导出于 \d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})? · 共 (\d+) 条：未处理 (\d+) 条，已处理 (\d+) 条$/.exec(line);
-  return { title: lines[0], line, total: Number(match?.[2]), open: Number(match?.[3]), done: Number(match?.[4]) };
+  const head = /^Exported \d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})? · (\d+ records?): (\d+) unresolved, (\d+) resolved$/;
+  const match = head.exec(line);
+  const count = Number.parseInt(match?.[2] ?? '', 10);
+  const total = match && match[2] === records(count) ? count : Number.NaN;
+  return { title: lines[0], line, total, open: Number(match?.[3]), done: Number(match?.[4]) };
 }
 
-/** @brief 导出文件的各节（"## <序号>. "开头）：标题行、记录的文件名（"- 记录文件："或"- 报告文件："那一行）、全文。 */
+/** @brief 导出文件的各节（"## <序号>. "开头）：标题行、记录的文件名（"- Record file: "或"- Report file: "那一行）、全文。 */
 export function mdSections(md) {
   const lines = md.replace(/\r\n/g, '\n').split('\n');
   const starts = lines.flatMap((line, index) => (/^## \d+\. /.test(line) ? [index] : []));
   return starts.map((start, index) => {
     const body = lines.slice(start, starts[index + 1] ?? lines.length);
-    const file = body.map((line) => /^- (?:记录文件|报告文件)：(.+)$/.exec(line)?.[1]).find(Boolean);
+    const file = body.map((line) => /^- (?:Record file|Report file): (.+)$/.exec(line)?.[1]).find(Boolean);
     return { heading: body[0], name: file ? basename(file.trim()) : null, text: body.join('\n') };
   });
 }
@@ -223,11 +232,11 @@ export async function noticeText(page, prefix) {
   return page.getByTestId('review-notice').innerText({ timeout: 1000 }).catch(() => '');
 }
 
-/** @brief 一节里截图的链接（"![截图](<路径>)"）；没有时为 null。 */
-export const shotLink = (text) => /!\[截图\]\(<?([^<>)]+)>?\)/.exec(text)?.[1] ?? null;
+/** @brief 一节里截图的链接（"![Screenshot](<路径>)"）；没有时为 null。 */
+export const shotLink = (text) => /!\[Screenshot\]\(<?([^<>)]+)>?\)/.exec(text)?.[1] ?? null;
 
 /**
- * @brief 换掉保存对话框（返回 target，null 为取消），点"导出为 Markdown…"；返回对话框收到的标题和默认路径，
+ * @brief 换掉保存对话框（返回 target，null 为取消），点"Export as Markdown…"；返回对话框收到的标题和默认路径，
  *        以及导出文件的全文（wait 为真时等文件写好）。
  * @param ctx 带 app（Electron 应用）和 page（窗口）
  */

@@ -1,6 +1,6 @@
 // 文件阅读器（docs/v0/screens/changes.md "文件阅读器"）：只读，行号加语法高亮，用鼠标选字引用或反馈。
-// 文件由主进程读（不监视文件）；本会话对同一个文件的编辑或写入完成后自动重新读一次，其余点"重新读取"。
-// 照 Claude 桌面版：顶部有"用系统编辑器打开"；"← 改动"回到改动列表，× 关闭右栏。
+// 文件由主进程读（不监视文件）；本会话对同一个文件的编辑或写入完成后自动重新读一次，其余点"Reload file"。
+// 照 Claude 桌面版：顶部有"Open in default app"；"← Changes"回到改动列表，× 关闭右栏。
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { BundledLanguage, ThemedToken } from 'shiki';
@@ -125,7 +125,7 @@ function FileText({ tab, read, target }: {
     <>
       {target?.changed && (
         <div className="banner file-changed" data-testid="quote-changed">
-          <span>原文已变化 · 引用时的原文：</span>
+          <span>Source changed · Attached text:</span>
           <pre className="file-changed-quote">{target.changed}</pre>
         </div>
       )}
@@ -139,26 +139,27 @@ function FileText({ tab, read, target }: {
 
 /** @brief 读不出内容时的说明（docs/v0/screens/changes.md 的各个状态）。 */
 function FileState({ read }: { read: FileRead | null }) {
-  if (!read) return <p className="muted file-state">正在读取…</p>;
+  if (!read) return <p className="muted file-state">Loading…</p>;
   switch (read.status) {
     case 'missing':
-      return <div className="file-state" data-testid="file-state"><p>文件已被删除或移动</p>
+      return <div className="file-state" data-testid="file-state"><p>File not found</p>
         <p className="muted file-path-full">{read.path}</p></div>;
     case 'binary':
-      return <p className="file-state" data-testid="file-state">无法预览 · 这是二进制文件</p>;
+      return <p className="file-state" data-testid="file-state">Preview unavailable · Binary file</p>;
     case 'large':
       return <p className="file-state" data-testid="file-state">
-        无法预览 · 文件超过 1MB（实际 {(read.size / 1024 / 1024).toFixed(1)} MB）</p>;
+        Preview unavailable · File is larger than 1 MB ({(read.size / 1024 / 1024).toFixed(1)} MB)</p>;
     case 'directory':
-      return <p className="file-state" data-testid="file-state">无法预览 · 这是一个文件夹</p>;
+      return <p className="file-state" data-testid="file-state">Preview unavailable · This is a folder</p>;
     case 'error':
-      return <p className="file-state form-message error" data-testid="file-state">读取失败：{read.message}</p>;
+      return <p className="file-state form-message error" data-testid="file-state">
+        Couldn’t read this file: {read.message}</p>;
     default:
       return null;
   }
 }
 
-/** @brief 阅读器顶部："← 改动"、路径、重新读取、用系统编辑器打开、关闭。 */
+/** @brief 阅读器顶部："← Changes"、路径、"Reload file"、"Open in default app"、关闭。 */
 function ViewerHeader({ tab, path, missing, onReload, onClose }: {
   tab: Tab; path: string; missing: boolean; onReload: () => void; onClose: () => void;
 }) {
@@ -175,20 +176,21 @@ function ViewerHeader({ tab, path, missing, onReload, onClose }: {
     <>
       <div className="panel-header file-header">
         <button className="text-link back-link" onClick={() => showChanges(tab.key)}>
-          <Icon name="back" />改动</button>
+          <Icon name="back" />Changes</button>
         <span className="file-path" title={path} data-testid="file-path">{displayPath(path, tab.cwd)}</span>
-        <button className="icon-button" onClick={onReload} aria-label="重新读取" title="重新读取">
+        <button className="icon-button" onClick={onReload} aria-label="Reload file" title="Reload file">
           <Icon name="refresh" /></button>
         <button className="icon-button" onClick={() => void openExternal()} disabled={missing}
-          aria-label="用系统编辑器打开" title="用系统编辑器打开"><Icon name="external" /></button>
-        <button className="icon-button" onClick={onClose} aria-label="关闭右栏"><Icon name="close" /></button>
+          aria-label="Open in default app" title="Open in default app"><Icon name="external" /></button>
+        <button className="icon-button" onClick={onClose} aria-label="Close panel"><Icon name="close" /></button>
       </div>
       {opened?.error && (
-        <p className="form-message error panel-error" role="alert">没能用系统编辑器打开：{opened.error}</p>
+        <p className="form-message error panel-error" role="alert">
+          Couldn’t open this file with the default app: {opened.error}</p>
       )}
       {opened?.revealed && (
         <p className="panel-note panel-error" role="status" data-testid="open-revealed">
-          这类文件直接打开会运行它，已在资源管理器里选中，请用编辑器打开</p>
+          Opening this kind of file would run it, so it’s selected in File Explorer instead. Open it in an editor.</p>
       )}
     </>
   );

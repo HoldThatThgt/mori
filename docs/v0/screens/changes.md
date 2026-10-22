@@ -18,22 +18,22 @@
 
 | 视图 | 顶部 | 内容 |
 | --- | --- | --- |
-| 改动 | "本会话的改动"、关闭（×） | 改动列表 |
-| 文件 | "← 改动"（回到改动列表）、文件路径（工作目录之内显示相对路径，省略号截断，悬停显示完整路径）、"重新读取"、"用系统编辑器打开"、关闭（×） | 文件阅读器 |
+| 改动 | "This session’s changes"、关闭（×，读屏名"Close panel"） | 改动列表 |
+| 文件 | "← Changes"（回到改动列表）、文件路径（工作目录之内显示相对路径，省略号截断，悬停显示完整路径）、"Reload file"、"Open in default app"、关闭（×，"Close panel"） | 文件阅读器 |
 
-照 Claude 桌面版：点工具调用里的文件路径，右侧打开这个文件的只读预览，带"在编辑器中打开"；预览和改动列表在同一个右栏里切换，× 关闭右栏。
+照 Claude 桌面版：点工具调用里的文件路径，右侧打开这个文件的只读预览，带"Open in {editor}"；预览和改动列表在同一个右栏里切换，× 关闭右栏。
 
 ## 改动列表
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 没有改动、右栏关闭 | 本会话没有完成的编辑或写入 | 顶栏的右栏开关 | 打开右栏 |
-| 没有改动、手动打开 | 你打开了右栏 | "本会话还没有改动"（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.12：这个会话的 TaskBoard 上有实例做过成功的编辑或写入时只显示 `Changes made by team tasks aren't listed here.`，不显示这一句，见 ../../v1/screens/team-blocked.md） | 关闭 |
-| 有改动（协作模式：见 docs/specs/parallel-agents-taskboard.md §0、§13.12：只列对话流里的编辑与写入，后台实例改的文件不列；有实例改过文件时列表上方另有 `Changes made by team tasks aren't listed here.`） | 编辑或写入的工具结果：pi 的 `tool_execution_end`（`isError` 为假），或会话记录里成功的工具结果 | 顶部注明"只含编辑和写入，命令改动的文件不在此列。"；每个文件一行：路径、"N 次"、"打开"按钮；按文件第一次改动的先后排列 | 展开 / 收起一个文件（Enter、空格）；"打开"打开阅读器 |
-| 展开的文件 | 同上 | 按时间顺序列出这个文件的每次改动，每次标"第 N 次 · 修改"或"第 N 次 · 写入" | — |
+| 没有改动、手动打开 | 你打开了右栏 | "No changes yet."（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.12：这个会话的 TaskBoard 上有实例做过成功的编辑或写入时只显示 `Changes made by team tasks aren't listed here.`，不显示这一句，见 ../../v1/screens/team-blocked.md） | 关闭 |
+| 有改动（协作模式：见 docs/specs/parallel-agents-taskboard.md §0、§13.12：只列对话流里的编辑与写入，后台实例改的文件不列；有实例改过文件时列表上方另有 `Changes made by team tasks aren't listed here.`） | 编辑或写入的工具结果：pi 的 `tool_execution_end`（`isError` 为假），或会话记录里成功的工具结果 | 顶部注明"Only edits and writes are listed. Files changed by commands aren’t included."；每个文件一行：路径、"N changes"（1 次时"1 change"）、"Open"按钮；按文件第一次改动的先后排列 | 展开 / 收起一个文件（Enter、空格）；"Open"打开阅读器 |
+| 展开的文件 | 同上 | 按时间顺序列出这个文件的每次改动，每次标"Change N · Edit"或"Change N · Write" | — |
 | 一次编辑 | edit 结果的 `details.patch` | diff（上下合并，长行折行） | — |
-| 编辑没有 diff | edit 成功了但结果里没有 patch | "这次编辑没有返回 diff" | 打开文件看现在的内容 |
-| 一次写入 | write 调用参数里的 `content` | "第 N 次 · 写入"、"写入的内容"和内容原文 | — |
+| 编辑没有 diff | edit 成功了但结果里没有 patch | "This edit didn’t return a diff." | 打开文件看现在的内容 |
+| 一次写入 | write 调用参数里的 `content` | "Change N · Write"、"File content"和内容原文 | — |
 | 有改动时自动打开 | 本会话第一次出现编辑或写入结果 | 右栏自动打开到改动列表；你手动开关过之后以你为准（M1 起，临时默认值） | — |
 | 失败、被拒绝、已停止、已中断的编辑或写入 | 文件没有被它改动 | 不列出 | — |
 
@@ -42,29 +42,29 @@
 ## 文件阅读器
 
 由谁读文件：主进程（`mori:read-file`）按上面的规则解析路径，只读，不监视文件（不占后台 CPU）；
-阅读器打开时，本会话对同一个文件的编辑或写入完成后自动重新读一次，其他情况（命令改的、外部改的）点"重新读取"。
+阅读器打开时，本会话对同一个文件的编辑或写入完成后自动重新读一次，其他情况（命令改的、外部改的）点"Reload file"。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 读取中 | 你点了文件路径、"打开"、"重新读取"或引用芯片 | "正在读取…" | 返回改动、关闭 |
-| 显示 | 文件存在、是文本（前 8KB 没有 0 字节）、不超过 1MB | 行号和内容，只读；按扩展名语法高亮（超过 200KB 的不高亮，临时默认值）；长行不折行，横向滚动 | 用鼠标选中文字（浮层见 selection.md）；滚动；重新读取；用系统编辑器打开；返回改动；关闭 |
+| 读取中 | 你点了文件路径、"Open"、"Reload file"或引用芯片 | "Loading…" | 返回改动（"← Changes"）、关闭 |
+| 显示 | 文件存在、是文本（前 8KB 没有 0 字节）、不超过 1MB | 行号和内容，只读；按扩展名语法高亮（超过 200KB 的不高亮，临时默认值）；长行不折行，横向滚动 | 用鼠标选中文字（浮层见 selection.md）；滚动；"Reload file"；"Open in default app"；返回改动；关闭 |
 | 跳到引用 | 你点了一个文件引用芯片（selection.md） | 滚到引用的行，这几行高亮，直到下一次跳转或重新读取 | 同上 |
-| 原文已变化 | 引用的原文在文件里找不到了（selection.md） | 顶部提示"原文已变化 · 引用时的原文："和原文；滚到原来的行 | 同上 |
-| 文件已被删除或移动 | 路径不存在 | "文件已被删除或移动"和完整路径 | 重新读取；返回改动；关闭 |
-| 无法预览：二进制 | 前 8KB 里有 0 字节 | "无法预览 · 这是二进制文件" | 用系统编辑器打开 |
-| 无法预览：太大 | 文件超过 1MB（方案 5.9） | "无法预览 · 文件超过 1MB（实际 X MB）" | 用系统编辑器打开 |
-| 无法预览：文件夹 | 路径是文件夹 | "无法预览 · 这是一个文件夹" | 用系统编辑器打开（在资源管理器里打开） |
-| 读取失败 | 其他错误（例如没有权限） | "读取失败："加原文 | 重新读取 |
-| 系统编辑器打开失败 | `shell.openPath` 返回的错误 | 顶部下方一行"没能用系统编辑器打开："加原文 | 再试 |
-| 会被运行的文件 | 扩展名在 `PATHEXT` 里，或是常见的脚本、快捷方式、安装包（.bat、.ps1、.py、.lnk、.msi 等） | 不打开（Windows 会运行它），改为在资源管理器里选中它，顶部下方一行"这类文件直接打开会运行它，已在资源管理器里选中，请用编辑器打开" | — |
-| 网络路径 | 解析出的路径是 `\\主机\共享\…` | 不读也不打开（访问它会让 Windows 向那台主机认证）："读取失败："加原文 | — |
+| 原文已变化 | 引用的原文在文件里找不到了（selection.md） | 顶部提示"Source changed · Attached text:"和原文；滚到原来的行 | 同上 |
+| 文件已被删除或移动 | 路径不存在 | "File not found"和完整路径 | "Reload file"；返回改动；关闭 |
+| 无法预览：二进制 | 前 8KB 里有 0 字节 | "Preview unavailable · Binary file" | "Open in default app" |
+| 无法预览：太大 | 文件超过 1MB（方案 5.9） | "Preview unavailable · File is larger than 1 MB (X MB)" | "Open in default app" |
+| 无法预览：文件夹 | 路径是文件夹 | "Preview unavailable · This is a folder" | "Open in default app"（在资源管理器里打开） |
+| 读取失败 | 其他错误（例如没有权限） | "Couldn’t read this file: "加原文 | "Reload file" |
+| 系统编辑器打开失败 | `shell.openPath` 返回的错误 | 顶部下方一行"Couldn’t open this file with the default app: "加原文 | 再试 |
+| 会被运行的文件 | 扩展名在 `PATHEXT` 里，或是常见的脚本、快捷方式、安装包（.bat、.ps1、.py、.lnk、.msi 等） | 不打开（Windows 会运行它），改为在资源管理器里选中它，顶部下方一行"Opening this kind of file would run it, so it’s selected in File Explorer instead. Open it in an editor." | — |
+| 网络路径 | 解析出的路径是 `\\主机\共享\…` | 不读也不打开（访问它会让 Windows 向那台主机认证）："Couldn’t read this file: "加原文 | — |
 
 ## 打开阅读器的入口
 
 | 入口 | 范围 | 键盘 |
 | --- | --- | --- |
 | 工具卡标题里的路径 | 读取、修改、写入三种工具（参数里有 `path`）；列目录、搜索、查找不算 | 路径是标题里的按钮，Tab 到它按 Enter；点路径不展开工具卡 |
-| 改动列表每个文件行的"打开" | 列表里的全部文件 | Tab、Enter |
+| 改动列表每个文件行的"Open" | 列表里的全部文件 | Tab、Enter |
 | 文件引用芯片 | 输入框里和发出的消息里的文件引用 | Tab、Enter |
 
 改动列表按文件分组、阅读器判断"本会话改了这个文件"时，按 pi 的规则比较路径：`./a.ts`、`@a.ts`、Git Bash 的 `/c/...`、
@@ -76,4 +76,4 @@
 - 被拒绝或失败的编辑不出现在改动列表里。
 - 阅读器里不能改文件，也没有保存按钮。
 - 删掉的文件不显示上次读到的旧内容；换一个文件打开时不先显示上一个文件。
-- 点"用系统编辑器打开"不会运行模型写的脚本或程序。
+- 点"Open in default app"不会运行模型写的脚本或程序。

@@ -26,16 +26,16 @@ function cardText(blocked: ModelBlocked, pick: string | null): { title: string; 
       return { title: `Verifying ${probing}…`, note: null };
     }
     case 'no_candidate':
-      return { title: "This session can't start: no model fits.", note: null };
+      return { title: 'This session can’t start: no model fits.', note: null };
     case 'no_pick':
       return { title: 'No default model range; pick one.', note: null };
     case 'pick_missing':
       return { title: `${blocked.detail || pick || ''} is not in your model settings.`,
-        note: "Used by this session's model range." };
+        note: 'Used by this session’s model range.' };
     case 'project_config':
       return { title: `.mori/models.json: ${blocked.detail}`, note: null };
     case 'config_invalid':
-      return { title: `Model settings can't be read: ${blocked.detail}`, note: null };
+      return { title: `Model settings can’t be read: ${blocked.detail}`, note: null };
     case 'agents_invalid':
       return { title: 'Fix the agent files', note: null };
   }
@@ -45,8 +45,8 @@ function cardText(blocked: ModelBlocked, pick: string | null): { title: string; 
 function actionLabel(action: BlockedAction, blocked: ModelBlocked): string {
   switch (action) {
     case 'verify': return 'Verify now';
-    case 'allow_zone': return `Allow ${blocked.zone ?? ''} for this project…`;
-    case 'confirm_zone': return 'Confirm zone…';
+    case 'allow_zone': return `Allow ${blocked.zone ?? ''} for this project`;
+    case 'confirm_zone': return 'Confirm zone';
     case 'change_model': return 'Change model…';
     case 'open_settings': return 'Open settings';
     case 'check_agents': return 'Check again';

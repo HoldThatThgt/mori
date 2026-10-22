@@ -174,11 +174,11 @@ export function useKeyStatus(ref: string): KeyStatus | null {
 /** @brief 测试结果的文字（models-settings.md "测试结果的文字"）。 */
 export function testMessage(result: TestResult): Notice {
   if (result.cancelled) return { tone: 'info', text: 'Test cancelled' };
-  if (!result.ok) return { tone: 'error', text: `Failed: ${result.error ?? 'no reply'}` };
-  const thinking = result.thinking ? ' · with thinking' : '';
-  const reply = result.text ? ` · reply: ${result.text.slice(0, 200)}` : '';
-  const first = result.firstTokenMs ?? '—';
-  return { tone: 'ok', text: `Connected · first token ${first} ms · total ${result.totalMs} ms${thinking}${reply}` };
+  if (!result.ok) return { tone: 'error', text: `Connection failed: ${result.error ?? 'No response'}` };
+  const thinking = result.thinking ? ' · Includes thinking' : '';
+  const reply = result.text ? ` · Response: ${result.text.slice(0, 200)}` : '';
+  const first = result.firstTokenMs === null ? '—' : `${result.firstTokenMs}ms`;
+  return { tone: 'ok', text: `Connected · First token ${first} · Total ${result.totalMs}ms${thinking}${reply}` };
 }
 
 /** @brief 一次测试连接的目标：模型，和 Keys 行的 Test 用的 key。 */
@@ -197,7 +197,8 @@ export async function runTest(target: TestTarget): Promise<{ ok: boolean; notice
     const result = await request<TestResult>({ type: 'connection.test', ...target });
     return { ok: result.ok, notice: testMessage(result) };
   } catch (error) {
-    return { ok: false, notice: { tone: 'error', text: `Failed: ${describe('connection.test', error)}` } };
+    const text = `Couldn’t test the connection: ${describe('connection.test', error)}`;
+    return { ok: false, notice: { tone: 'error', text } };
   }
 }
 

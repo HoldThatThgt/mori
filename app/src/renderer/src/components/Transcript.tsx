@@ -1,7 +1,7 @@
-// 对话流：先显示最近 50 条消息，滚到顶部时载入更早的；你在底部时跟随新内容，不在底部时显示"有新内容 ↓"。
+// 对话流：先显示最近 50 条消息，滚到顶部时载入更早的；你在底部时跟随新内容，不在底部时显示"Jump to latest ↓"。
 // M4：你的消息上方显示引用，每轮回复末尾一行操作，点引用回到原位置时滚过去高亮（docs/v0/screens/selection.md）。
-// M6：pi 展开的技能命令缩成一行"技能 · 名字"加参数，可以展开看正文（docs/v0/screens/slash.md）。
-// v1：换模型与重建的一行、No model available 卡（docs/v1/screens/model-chat.md）；错误卡不再有"去设置"。
+// M6：pi 展开的技能命令缩成一行"Skill · 名字"加参数，可以展开看正文（docs/v0/screens/slash.md）。
+// v1：换模型与重建的一行、No model available 卡（docs/v1/screens/model-chat.md）；错误卡不再有"Go to settings"。
 // 平行 Agent（docs/v1/screens/team-stream.md）：回执、进展摘要（挂在回复下面、回复操作之上），程序投递不显示。
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -26,8 +26,8 @@ const BOTTOM_SLACK = 24;
 const TOP_SLACK = 40;
 
 /**
- * @brief 错误卡：显示原文，有没发出去的消息时附"把上一条消息放回输入框"。认证类错误由模型层处理（换 key、换模型或
- *        No model available 卡），不再按原文附"去设置"（§9.3）。
+ * @brief 错误卡：显示原文，有没发出去的消息时附"Put your last message back in the message box"。认证类错误由模型层
+ *        处理（换 key、换模型或 No model available 卡），不再按原文附"Go to settings"（§9.3）。
  */
 function ErrorCard({ item, tabKey }: { item: Extract<Item, { kind: 'error' }>; tabKey: string }) {
   return (
@@ -35,24 +35,24 @@ function ErrorCard({ item, tabKey }: { item: Extract<Item, { kind: 'error' }>; t
       <pre className="error-text">{item.text}</pre>
       {item.live && item.restore !== null && (
         <button className="text-link" onClick={() => (item.refs ? putBackQuoted(tabKey, item.restore ?? '', item.refs)
-          : putBack(tabKey, [item.restore ?? '']))}>把上一条消息放回输入框</button>
+          : putBack(tabKey, [item.restore ?? '']))}>Put your last message back in the message box</button>
       )}
     </div>
   );
 }
 
 /**
- * @brief 技能调用（照 pi 终端 SkillInvocationMessageComponent）：气泡里一行"技能 · 名字"，下面是你写的参数；
- *        "展开"看 SKILL.md 的路径和技能正文。
+ * @brief 技能调用（照 pi 终端 SkillInvocationMessageComponent）：气泡里一行"Skill · 名字"，下面是你写的参数；
+ *        "Expand"看 SKILL.md 的路径和技能正文。
  */
 function SkillMessage({ skill }: { skill: SkillInvocation }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="user-message skill-invocation" data-testid="skill-invocation" data-skill={skill.name}>
       <div className="skill-head">
-        <span className="skill-label">技能 · {skill.name}</span>
+        <span className="skill-label">Skill · {skill.name}</span>
         <button className="text-link skill-toggle" aria-expanded={open} data-no-quote
-          onClick={() => setOpen(!open)}>{open ? '收起' : '展开'}</button>
+          onClick={() => setOpen(!open)}>{open ? 'Collapse' : 'Expand'}</button>
       </div>
       {skill.args && <div className="skill-args">{skill.args}</div>}
       {open && (
@@ -94,13 +94,13 @@ const ItemView = memo(function ItemView(
     case 'assistant':
       return <AssistantMessage item={item} tools={tools} cwd={cwd} tabKey={tabKey} />;
     case 'compaction':
-      return <div className="notice" data-testid="notice">已压缩较早的对话</div>;
+      return <div className="notice" data-testid="notice">Compacted session</div>;
     case 'stopped':
-      return <div className="notice stopped" data-testid="notice">已停止 · 已经做出的修改不会自动撤销</div>;
+      return <div className="notice stopped" data-testid="notice">Stopped · Changes made so far stay as they are</div>;
     case 'note':
       return <div className="notice" data-testid="notice">{item.text}</div>;
     case 'notify':
-      return <div className={`notice ext-notify ${item.level}`} data-testid="ext-notify">扩展：{item.text}</div>;
+      return <div className={`notice ext-notify ${item.level}`} data-testid="ext-notify">Extension: {item.text}</div>;
     case 'error':
       return <ErrorCard item={item} tabKey={tabKey} />;
     case 'model-switch':
@@ -129,7 +129,7 @@ function EmptyChat({ cwd }: { cwd: string }) {
   return (
     <div className="empty-chat">
       <h1>{name}</h1>
-      <p>Enter 发送 · Shift+Enter 换行</p>
+      <p>Enter to send · Shift+Enter for new line</p>
     </div>
   );
 }
@@ -179,8 +179,8 @@ function useHolding(scroller: React.RefObject<HTMLDivElement | null>): React.Ref
 }
 
 /**
- * @brief 跟随与"有新内容"：内容变高、或对话流本身变矮（输入框上方出现批准卡、排队区、阶段行）时，
- *        在底部就跟到底部；你发消息时回到底部。对话流里按着鼠标或有选区时暂停跟随，显示"有新内容"。
+ * @brief 跟随与"Jump to latest"：内容变高、或对话流本身变矮（输入框上方出现批准卡、排队区、阶段行）时，
+ *        在底部就跟到底部；你发消息时回到底部。对话流里按着鼠标或有选区时暂停跟随，显示"Jump to latest"。
  *        只有你往上滚（比上次自动滚到底的位置更靠上）才算离开底部：流式输出很快时，
  *        自动滚动触发的 scroll 事件可能晚到、那时内容又长了一截，不能据此认为你离开了。
  */
@@ -323,7 +323,7 @@ export function Transcript({ tab }: { tab: Tab }) {
       <div className="conversation" ref={scroller} onScroll={onScroll} data-testid="transcript">
         <div className="conversation-inner" ref={inner}>
           {items.length === 0 && tab.phase === 'ready' && <EmptyChat cwd={tab.cwd} />}
-          {tab.startIndex > 0 && <div className="load-earlier">向上滚动载入更早的消息</div>}
+          {tab.startIndex > 0 && <div className="load-earlier">Scroll up to load earlier messages</div>}
           {items.slice(tab.startIndex).map((item) => {
             // 程序投递不显示（§13.7），只结束上一轮（replyTurns）。
             if (item.kind === 'wake') return null;
@@ -340,7 +340,7 @@ export function Transcript({ tab }: { tab: Tab }) {
       </div>
       {hasNew && (
         <button className="new-content" onClick={jump} data-testid="new-content">
-          有新内容 <Icon name="down" />
+          Jump to latest <Icon name="down" />
         </button>
       )}
     </div>

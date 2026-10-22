@@ -3,7 +3,9 @@
 依据：TaskBoard 规格（[parallel-agents-taskboard.md](../../specs/parallel-agents-taskboard.md)，下称“规格”）§5.3（协作模式下一条消息怎么走、待判断队列、撤回）、
 §5.6（程序投递在停止时）、§9.4（停止原因）、§11.4（停止对话的回复与 `Stop team`）、§11.5（归档、删除与关闭）、§11.6、§13.6（阶段行与停止）、§13.10。
 补充 [v0 chat.md](../../v0/screens/chat.md) 的排队区、输入框与停止，[model-chat.md](model-chat.md) 的准备中，[v0 sessions.md](../../v0/screens/sessions.md) 的状态与归档删除。
-v0 的中文文字（“停止”“排队”“插话”“撤回”“已停止 · 已经做出的修改不会自动撤销”“生成中”“正在生成”）仍是中文，等英文任务统一改。
+与 english-ui 合并后（2026-10-21）v0 的文字按 [v0/ui-strings.md](../../v0/ui-strings.md) 的英文；下文引号里的中文是原来的叫法，界面上显示：
+停止 = Stop，发送 = Send，排队 = Queue / Queued，插话 = Steer，撤回 = Withdraw，已停止 = Stopped，
+已停止 · 已经做出的修改不会自动撤销 = Stopped · Changes made so far stay as they are，生成中 = Running，正在生成 = Responding…。
 标了“（临时，走查时可以改）”的是规格没给、本表定的。
 
 本表的“分开时”指对话与立项由不同角色持有（例如 `chat` 与 `planner`）；“合并会话”指同一个角色持有两者（没有角色文件、只有 `executor.md` 时都是，§1）。

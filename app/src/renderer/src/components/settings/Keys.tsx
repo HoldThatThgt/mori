@@ -59,7 +59,8 @@ function KeyRow({ provider, item, index }: KeyRowProps) {
           <TestButton at={at} label="Test" action="key-test" onTest={() => void testAt(at,
             { providerId: provider.id, modelId: provider.models[0].id, keyRef: item.ref })} />
           <button className="button compact" data-action="key-remove" disabled={busy}
-            onClick={() => (count === 1 ? setConfirming(true) : void remove())}>Remove</button>
+            onClick={() => (count === 1 ? setConfirming(true) : void remove())}>
+            {count === 1 ? 'Remove…' : 'Remove'}</button>
         </span>
       </div>
       <TestNotice at={at} testId="key-test" />
@@ -81,7 +82,7 @@ function KeyForm({ provider, onClose }: { provider: ModelProvider; onClose: () =
   const [secret, setSecret] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const labelError = label.trim() ? null : 'Label is required';
+  const labelError = label.trim() ? null : 'Label is required.';
   async function save() {
     setBusy(true);
     const result = await writeModels<KeyAdded>({ type: 'models.addKey', providerId: provider.id, label, secret });
@@ -90,7 +91,8 @@ function KeyForm({ provider, onClose }: { provider: ModelProvider; onClose: () =
     else setError(result.error);
   }
   return (
-    <form className="key-form" data-testid="key-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+    <form className="key-form" data-testid="key-form" noValidate
+      onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <label>Label
         <input value={label} onChange={(event) => setLabel(event.target.value)} aria-invalid={Boolean(labelError)} />
       </label>

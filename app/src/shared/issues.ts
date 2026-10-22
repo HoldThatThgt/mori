@@ -11,7 +11,7 @@ export interface WindowCapture {
   error: string | null;
 }
 
-/** @brief "当前界面"里的一项：名称和取值，例如 { label: '页面', value: '会话' }。 */
+/** @brief "Current view"里的一项：名称和取值，例如 { label: 'Page', value: 'Session' }。 */
 export interface IssueField {
   /** 这一项的名称 */
   label: string;

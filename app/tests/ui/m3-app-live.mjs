@@ -1,15 +1,16 @@
 // M3 整机测试的后半段，由 m3-app.mjs 在同一次运行里接着调用（同一个 Mori、同一个合成端点，synthetic）：
 // 扩展的询问（docs/v0/screens/extension-ui.md）：确认、选择、输入的询问卡（卡头、标题、说明、按钮、提示文字）、
-// 不抢输入框的焦点、输入框里 Enter 不作答、按钮作答、输入框里 Enter 确定、焦点在卡上时 Esc、阶段行"等你回答"、
-// 不可见的会话显示"等你回答"、通知一行"扩展：…"（warning）、超时倒数与自动取消、停止时取消挂着的询问；
+// 不抢输入框的焦点、输入框里 Enter 不作答、按钮作答、输入框里 Enter 确定、焦点在卡上时 Esc、
+// 阶段行"Waiting for your answer"、不可见的会话显示"Needs input"、通知一行"Extension: …"（warning）、
+// 超时倒数与自动取消、停止时取消挂着的询问；
 // 会话打开过程中的通知（打开后显示）与询问（不出卡，按取消回答）；扩展命令里的询问（不经过一轮运行）；
-// 正在打开的会话的菜单（三项都不可用，小字"正在打开"）。
+// 正在打开的会话的菜单（三项都不可用，小字"Opening…"）。
 // 界面重新加载（sessions.md "后台进程退出与重新载入"）：后台进程里的会话照常运行，session.list 带回 live，
-// 侧栏显示生成中、等你批准、等你回答，还没接上时随事件更新（之后才来的批准请求、本轮结束时"有新结果"、
-// 后台进程退出时"出错"）；还没发消息的新会话也在；点开接上（不问信任）：生成中的回复接着流入、执行中的工具卡、
-// 挂着的批准卡和扩展询问照常出现并能作答；草稿和"本会话已允许"还在；本次运行里信任询问的回答清空；
+// 侧栏显示 Running、Needs approval、Needs input，还没接上时随事件更新（之后才来的批准请求、本轮结束时"Unread"、
+// 后台进程退出时"Error"）；还没发消息的新会话也在；点开接上（不问信任）：生成中的回复接着流入、执行中的工具卡、
+// 挂着的批准卡和扩展询问照常出现并能作答；草稿和"Allowed for this session"还在；本次运行里信任询问的回答清空；
 // 归档开着、还没接上的会话。
-// 项目扩展（eta/.pi/extensions/project-ask.ts）是测试写的 synthetic 扩展：加载时先等 2.5 秒（看得到"正在打开"），
+// 项目扩展（eta/.pi/extensions/project-ask.ts）是测试写的 synthetic 扩展：加载时先等 2.5 秒（看得到"Starting…"），
 // 再注册 project_ask（依次确认、选择、输入，再通知）、project_wait（带 3 秒超时的确认）、project_once（只问一次）、
 // 命令 /mori-ask（确认一次再通知）、/mori-wait（带 15 秒超时的确认）；session_start 时确认一次并通知结果。
 
@@ -24,7 +25,7 @@ import {
   waitIdle, waitPanes, waitReady, waitRunning, waitStatus,
 } from './m3-helpers.mjs';
 
-/** 项目扩展加载时先等这么久，打开会话时有时间看到"正在打开" */
+/** 项目扩展加载时先等这么久，打开会话时有时间看到"Starting…"和菜单的"Opening…" */
 const SLOW_LOAD_MS = 2500;
 /** 询问卡输入框里写的字 */
 const ANSWER_TEXT = 'Mori 的回答';
@@ -34,6 +35,13 @@ const RELOAD_DRAFT = '重新加载之前写的草稿';
 const SLEEP_SECONDS = 29;
 /** 扩展的工具 */
 const ASK_TOOLS = ['project_ask', 'project_wait', 'project_once'];
+/** 询问卡的卡头 */
+const QUESTION_HEAD = 'An extension needs your input';
+/** 有挂起的扩展询问时的阶段行 */
+const WAITING_ANSWER = 'Waiting for your answer';
+/** "/"列表里没有可选的项时的说明（slash.md）：没有匹配，或这个会话没有提示词模板和技能 */
+const SLASH_NOTES = ['No matching prompt templates or skills',
+  'This session has no prompt templates or skills. Add them in Customize.'];
 
 /** @brief synthetic 项目扩展的源码：工厂函数先等 SLOW_LOAD_MS，再注册三个经 ctx.ui 询问的工具。 */
 function askExtensionSource() {
@@ -95,10 +103,12 @@ export function writeAskExtension(project) {
 const questionCard = (page) => paneOf(page).getByTestId('ext-ui-card');
 /** @brief 两个列表是否相同。 */
 const sameList = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-/** @brief "N 秒后自动取消"里的 N；不是这个写法时为 null。 */
+/** @brief 剩 n 秒时卡上的说明（1 秒时用单数）。 */
+const expiresText = (n) => (n === 1 ? 'This request expires in 1 second' : `This request expires in ${n} seconds`);
+/** @brief "This request expires in N seconds"里的 N；不是这个写法（含单复数）时为 null。 */
 const secondsOf = (text) => {
-  const match = /^(\d+) 秒后自动取消$/.exec(text ?? '');
-  return match ? Number(match[1]) : null;
+  const match = /^This request expires in (\d+) seconds?$/.exec(text ?? '');
+  return match && text === expiresText(Number(match[1])) ? Number(match[1]) : null;
 };
 /** @brief 当前会话面板的阶段行文字；没有时为空串。 */
 const stageOf = (page) => paneOf(page).getByTestId('stage').innerText({ timeout: 2000 }).catch(() => '');
@@ -130,7 +140,7 @@ async function waitCard(page, method, timeout = 15000) {
 
 /**
  * @brief 发出扩展命令（"/mori-ask" 之类）。M6 起输入框以 "/" 开头时出"/"补全列表，列表只列提示词模板和技能，
- *        扩展命令不在里面（"没有匹配"）；列表开着时 Enter 不发送，Esc 先关闭列表（slash.md 状态表与表下说明）。
+ *        扩展命令不在里面（"No matching prompt templates or skills"）；列表开着时 Enter 不发送，Esc 先关闭列表（slash.md 状态表与表下说明）。
  *        所以先等列表读完，记下它的样子，按一次 Enter（应不发送），再按 Esc 关掉、按 Enter 发送。
  * @return 列表读完时的项数和文字，以及列表开着时按 Enter 之后列表还在不在、输入框里的字
  */
@@ -140,7 +150,7 @@ async function sendExtCommand(ctx, text) {
   const menu = paneOf(page).getByTestId('slash-menu');
   await menu.waitFor({ timeout: 10000 });
   await page.waitForFunction((selector) => !document.querySelector(`${selector} [data-testid="slash-menu"]`)
-    ?.textContent?.includes('正在读取…'), PANE, { timeout: 10000 });
+    ?.textContent?.includes('Loading…'), PANE, { timeout: 10000 });
   const view = await menu.evaluate((el) => ({ options: el.querySelectorAll('[role="option"]').length,
     text: el.textContent?.trim() ?? '' }));
   // 列表里没有可选的项时 Enter 照常发送（slash.md，照 Claude 桌面版）：扩展命令直接发出，输入框清空、列表关闭。
@@ -163,11 +173,11 @@ async function askTool(ctx, tool) {
 /** @brief 点询问卡上文字为 name 的按钮。 */
 const clickCard = (page, name) => questionCard(page).getByRole('button', { name, exact: true }).click();
 
-/** @brief 把还挂着的询问卡逐个答掉（确认点"否"，其余点"取消"），最多 count 张；返回答掉了几张。 */
+/** @brief 把还挂着的询问卡逐个答掉（确认点"No"，其余点"Cancel"），最多 count 张；返回答掉了几张。 */
 async function cancelCards(page, count = 5) {
   let done = 0;
   while (done < count && await questionCard(page).count() > 0) {
-    await questionCard(page).getByRole('button', { name: /^(否|取消)$/ }).first().click({ timeout: 3000 });
+    await questionCard(page).getByRole('button', { name: /^(No|Cancel)$/ }).first().click({ timeout: 3000 });
     done += 1;
     await sleep(400);
   }
@@ -177,21 +187,21 @@ async function cancelCards(page, count = 5) {
 // ---------- 扩展的询问 ----------
 
 /**
- * @brief 打开 eta（带询问用的项目扩展）并选"信任"（不记住）：扩展加载要 2.5 秒，这时会话行的菜单三项都不可用，
- *        小字"正在打开"；打开后扩展的三个工具都可用。
+ * @brief 打开 eta（带询问用的项目扩展）并选"Trust workspace"（不记住）：扩展加载要 2.5 秒，这时会话行的菜单
+ *        三项都不可用，小字"Opening…"；打开后扩展的三个工具都可用。
  */
 async function extOpen(ctx) {
   const { page, record } = ctx;
   await clickOpenFolder(ctx, ctx.folders.eta);
   const dialog = page.getByTestId('trust-dialog');
   await dialog.waitFor({ timeout: 15000 });
-  await dialog.getByRole('button', { name: '信任', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Trust workspace', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 5000 });
   const opening = await paneOf(page).getByTestId('not-ready').innerText({ timeout: 1000 }).catch(() => '');
   const menu = await openMenuOn(page, page.locator('.session-item.active'));
   const items = await menuItems(menu);
-  record('正在打开的会话（"正在启动…"）：菜单里重命名、归档、删除都不可用，旁边小字"正在打开"', opening === '正在启动…'
-    && items.length === 3 && items.every((item) => item.disabled && item.hint === '正在打开'),
+  record('正在打开的会话（"正在启动…"）：菜单里重命名、归档、删除都不可用，旁边小字"正在打开"', opening === 'Starting…'
+    && items.length === 3 && items.every((item) => item.disabled && item.hint === 'Opening…'),
   `按钮位置 ${opening}；菜单 ${menuText(items)}`);
   await noteSmallText(ctx, 'menu while opening');
   await page.keyboard.press('Escape');
@@ -204,24 +214,24 @@ async function extOpen(ctx) {
   const notices = await paneOf(page).getByTestId('ext-notify').allInnerTexts();
   const cards = await questionCard(page).count();
   record('会话打开过程中（session_start）：扩展的询问不出卡、按取消回给扩展，扩展的通知在打开后接在对话流里'
-    + '（"扩展：startup confirm=false"）', sameList(notices, ['扩展：startup confirm=false']) && cards === 0,
+    + '（"扩展：startup confirm=false"）', sameList(notices, ['Extension: startup confirm=false']) && cards === 0,
   `通知 ${JSON.stringify(notices)}；询问卡 ${cards}`);
 }
 
-/** @brief 确认卡挂着时切到 A1：E1 的会话行显示"等你回答"；再切回来，卡还在。 */
+/** @brief 确认卡挂着时切到 A1：E1 的会话行显示"Needs input"；再切回来，卡还在。 */
 async function hiddenQuestion(ctx) {
   const { page, record } = ctx;
   await openRow(page, ctx.files.A1);
   const shown = await waitStatus(page, ctx.files.E1, 'question', 5000);
   const row = await rowState(page, ctx.files.E1);
-  record('状态：不可见的会话有挂起的扩展询问时显示"等你回答"（圆点加文字）', shown && row?.statusText === '等你回答',
+  record('状态：不可见的会话有挂起的扩展询问时显示"等你回答"（圆点加文字）', shown && row?.statusText === 'Needs input',
     JSON.stringify(row));
   await noteSmallText(ctx, 'status question');
   await openRow(page, ctx.files.E1);
   await questionCard(page).waitFor({ timeout: 5000 });
 }
 
-/** @brief project_ask：确认卡的内容、焦点、阶段行、Enter 不作答、不可见时的状态；点"是"、选"乙"、输入后 Enter。 */
+/** @brief project_ask：确认卡的内容、焦点、阶段行、Enter 不作答、不可见时的状态；点"Yes"、选"乙"、输入后 Enter。 */
 async function extAnswer(ctx) {
   const { page, record } = ctx;
   const first = await askTool(ctx, 'project_ask');
@@ -229,9 +239,9 @@ async function extAnswer(ctx) {
   const focus = await focusInfo(page);
   const stage = await stageOf(page);
   record('询问卡（确认，data-method=confirm）：卡头"扩展的询问"、标题、说明原文、按钮"是""否"；出现时不抢输入框的焦点；'
-    + '阶段行"等你回答"', first.method === 'confirm' && Boolean(first.request) && first.head === '扩展的询问'
-    && first.title === '继续吗？' && first.message === '说明' && sameList(first.buttons, ['是', '否']) && focus.composer
-    && stage === '等你回答', `${JSON.stringify(first)}；焦点 ${JSON.stringify(focus)}；阶段 ${stage}`);
+    + '阶段行"等你回答"', first.method === 'confirm' && Boolean(first.request) && first.head === QUESTION_HEAD
+    && first.title === '继续吗？' && first.message === '说明' && sameList(first.buttons, ['Yes', 'No'])
+    && focus.composer && stage === WAITING_ANSWER, `${JSON.stringify(first)}；焦点 ${JSON.stringify(focus)}；阶段 ${stage}`);
   await ctx.shot(page, '15-ext-confirm');
   await ctx.h.textarea.press('Enter');
   await sleep(600);
@@ -239,15 +249,15 @@ async function extAnswer(ctx) {
   record('询问卡：没有默认按钮，输入框里按 Enter 不会作答（卡还在，同一个询问）', still?.request === first.request,
     JSON.stringify(still));
   await hiddenQuestion(ctx);
-  await clickCard(page, '是');
+  await clickCard(page, 'Yes');
   const select = await waitCard(page, 'select');
   record('询问卡（选择）：点"是"作答后下一个询问接着出现；卡头、标题、每个选项一个按钮和"取消"',
-    select.head === '扩展的询问' && select.title === '选一个' && sameList(select.buttons, ['甲', '乙', '取消']),
+    select.head === QUESTION_HEAD && select.title === '选一个' && sameList(select.buttons, ['甲', '乙', 'Cancel']),
     JSON.stringify(select));
   await clickCard(page, '乙');
   const input = await waitCard(page, 'input');
-  record('询问卡（输入）：卡头、标题、显示提示文字的输入框、"确定"和"取消"', input.head === '扩展的询问'
-    && input.title === '写点什么' && input.placeholder === '提示' && sameList(input.buttons, ['确定', '取消']),
+  record('询问卡（输入）：卡头、标题、显示提示文字的输入框、"确定"和"取消"', input.head === QUESTION_HEAD
+    && input.title === '写点什么' && input.placeholder === '提示' && sameList(input.buttons, ['Submit', 'Cancel']),
   JSON.stringify(input));
   await ctx.shot(page, '16-ext-input');
   const box = questionCard(page).locator('input');
@@ -264,7 +274,7 @@ async function extResult(ctx) {
   const notify = paneOf(page).getByTestId('ext-notify').last();
   const text = await notify.innerText({ timeout: 3000 }).catch(() => '');
   const classes = (await notify.getAttribute('class', { timeout: 3000 }).catch(() => '')) ?? '';
-  record('通知：对话流里一行"扩展：ask done"，warning 用警示色（class 有 warning）', text === '扩展：ask done'
+  record('通知：对话流里一行"扩展：ask done"，warning 用警示色（class 有 warning）', text === 'Extension: ask done'
     && classes.split(/\s+/).includes('warning'), `${text}；class ${classes}`);
   const tool = await lastToolCard(page);
   record('按钮作答、输入框里 Enter 确定：扩展收到全部回答（工具结果 confirm=true; select=乙; input=写的字）',
@@ -272,12 +282,12 @@ async function extResult(ctx) {
     `状态 ${tool.status}；${oneLine(tool.body)}`);
 }
 
-/** @brief 焦点在卡上时 Esc：确认等于"否"、选择和输入等于取消；不停止生成。 */
+/** @brief 焦点在卡上时 Esc：确认等于"No"、选择和输入等于"Cancel"；不停止生成。 */
 async function extEsc(ctx) {
   const { page, record } = ctx;
   const stopped = await stoppedCount(page);
   await askTool(ctx, 'project_ask');
-  await questionCard(page).getByRole('button', { name: '是', exact: true }).focus();
+  await questionCard(page).getByRole('button', { name: 'Yes', exact: true }).focus();
   await page.keyboard.press('Escape');
   await waitCard(page, 'select');
   await questionCard(page).getByRole('button', { name: '甲', exact: true }).focus();
@@ -295,7 +305,7 @@ async function extEsc(ctx) {
   `状态 ${tool.status}；${oneLine(tool.body)}；"已停止" ${stopped} → ${after}`);
 }
 
-/** @brief project_wait：卡上"N 秒后自动取消"每秒刷新；到时卡消失，扩展收到"否"。 */
+/** @brief project_wait：卡上"This request expires in N seconds"每秒刷新；到时卡消失，扩展收到"No"（false）。 */
 async function extTimeout(ctx) {
   const { page, record } = ctx;
   const card = await askTool(ctx, 'project_wait');
@@ -314,7 +324,7 @@ async function extTimeout(ctx) {
     && tool.body.includes('wait=false'), `${elapsed} ms 后消失 ${gone}；${oneLine(tool.body)}`);
 }
 
-/** @brief project_once（只问一次）挂着时按"停止"：询问按取消回给扩展，卡消失，本轮停止，后台进程里没有挂着的询问。 */
+/** @brief project_once（只问一次）挂着时按"Stop"：询问按取消回给扩展，卡消失，本轮停止，后台进程里没有挂着的询问。 */
 async function extStopOnce(ctx) {
   const { page, record } = ctx;
   const stopped = await stoppedCount(page);
@@ -330,7 +340,7 @@ async function extStopOnce(ctx) {
 }
 
 /**
- * @brief project_ask（确认之后还会接着问选择和输入，扩展没有把 signal 交给询问）的确认卡挂着时按"停止"：
+ * @brief project_ask（确认之后还会接着问选择和输入，扩展没有把 signal 交给询问）的确认卡挂着时按"Stop"：
  *        卡消失、本轮停止，扩展接着问的不该再出卡把停止卡住。之后把剩下的卡答掉，让本轮结束。
  */
 async function extStopChain(ctx) {
@@ -358,7 +368,7 @@ async function extStopChain(ctx) {
 }
 
 /**
- * @brief 扩展命令 /mori-ask（pi 交给扩展处理，不开始一轮运行）里的询问：卡照常出现，阶段行"等你回答"；
+ * @brief 扩展命令 /mori-ask（pi 交给扩展处理，不开始一轮运行）里的询问：卡照常出现，阶段行"Waiting for your answer"；
  *        答完后不停在"刚发出"。
  */
 async function extCommand(ctx) {
@@ -366,21 +376,21 @@ async function extCommand(ctx) {
   const slash = await sendExtCommand(ctx, '/mori-ask');
   record('扩展命令（M6 起有"/"补全）：打出 "/mori-ask" 时列表里没有它（扩展命令不在列表里，只有一行说明）；'
     + '没有可选的项，Enter 照常发出，输入框清空（slash.md）', slash.options === 0
-    && /^(没有匹配的提示词模板或技能|这个会话没有提示词模板或技能（在工具页添加）)$/.test(slash.text)
+    && SLASH_NOTES.includes(slash.text)
     && slash.sent.closed && slash.sent.draft === '', JSON.stringify(slash));
   const card = await waitCard(page, 'confirm');
   const stage = await stageOf(page);
   const running = await paneOf(page).getAttribute('data-running');
   record('扩展命令里的询问（不经过一轮运行）：询问卡照常出现（"命令里问"），阶段行"等你回答"',
-    card.title === '命令里问' && stage === '等你回答' && running === 'false',
+    card.title === '命令里问' && stage === WAITING_ANSWER && running === 'false',
     `${JSON.stringify(card)}；阶段 ${stage}；生成中 ${running}`);
-  await clickCard(page, '是');
+  await clickCard(page, 'Yes');
   await questionCard(page).waitFor({ state: 'detached', timeout: 5000 });
   const ended = await until(async () => await paneOf(page).getAttribute('data-sending') === 'false', 5000);
   const notices = await paneOf(page).getByTestId('ext-notify').allInnerTexts();
   const row = await rowState(page, ctx.files.E1);
   record('扩展命令结束后不停在"刚发出"（会话行没有"生成中"）；扩展收到回答（"扩展：command confirm=true"）', ended
-    && notices.at(-1) === '扩展：command confirm=true' && row?.status === null,
+    && notices.at(-1) === 'Extension: command confirm=true' && row?.status === null,
   `刚发出已结束 ${ended}；最后的通知 ${notices.at(-1)}；行 ${JSON.stringify(row)}`);
 }
 
@@ -391,7 +401,7 @@ async function reloadPage(page) {
   await page.reload();
   await page.getByTestId('session-tree').waitFor({ timeout: 30000 });
   await page.waitForFunction(() => document.querySelectorAll('.session-item').length > 0
-    && !document.querySelector('[data-testid="session-tree"]')?.textContent?.includes('正在读取会话…'), null,
+    && !document.querySelector('[data-testid="session-tree"]')?.textContent?.includes('Loading sessions…'), null,
   { timeout: 20000 });
 }
 
@@ -411,7 +421,8 @@ async function attachRow(page, file) {
 }
 
 /**
- * @brief 界面重新加载前布好各会话：G1 开着、空闲；K 挂着批准卡；E1 挂着扩展询问；B2 命令执行中（"本会话不再询问"）；
+ * @brief 界面重新加载前布好各会话：G1 开着、空闲；K 挂着批准卡；E1 挂着扩展询问；
+ *        B2 命令执行中（"Allow “Run commands” for this session"）；
  *        C（在 B2 所在的 beta 里新建）9 秒后才要批准；G3 等 6 秒的回复并写了草稿；W（eta 里新建）的扩展命令 /mori-wait
  *        挂着带 15 秒超时的询问；A1 等 8 秒的回复（接上时还没开始回复）；N（alpha 里新建）还没发消息。
  *        然后重新加载页面（与 Ctrl+R 相同）。
@@ -478,7 +489,8 @@ async function reloadSidebar(ctx) {
   const panes = await paneCount(page);
   record('界面重新加载：侧栏为后台进程里开着的会话显示状态（A1、B2 生成中，K 等你批准，E1 等你回答，空闲的 G1 没有），'
     + '中栏还没有会话', sameList(shown, { A1: 'running', B2: 'running', K: 'approval', E1: 'question', G1: null })
-    && row(A1)?.statusText === '生成中' && row(K)?.statusText === '等你批准' && row(E1)?.statusText === '等你回答'
+    && row(A1)?.statusText === 'Running' && row(K)?.statusText === 'Needs approval'
+    && row(E1)?.statusText === 'Needs input'
     && panes === 0, `${JSON.stringify(shown)}；会话面板 ${panes}`);
   record('界面重新加载不停止会话：原来的会话标识在后台进程里还在', !(await sessionGone(page, ctx.live.A1)), ctx.live.A1);
   await ctx.shot(page, '20-reload-sidebar');
@@ -487,11 +499,11 @@ async function reloadSidebar(ctx) {
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'detached', timeout: 3000 });
   record('界面重新加载后还在后台进程里生成的会话：菜单里"归档""删除"不可用，旁边小字"正在生成"', items.length === 3
-    && items[1].disabled && items[1].hint === '正在生成' && items[2].disabled && items[2].hint === '正在生成',
+    && items[1].disabled && items[1].hint === 'Still running' && items[2].disabled && items[2].hint === 'Still running',
   menuText(items));
 }
 
-/** @brief 接上 A1（等回复中）：不问信任，阶段行"生成中"；回复接着流入并结束，没有被停止。 */
+/** @brief 接上 A1（等回复中）：不问信任，阶段行"Waiting for the model…"；回复接着流入并结束，没有被停止。 */
 async function reloadReply(ctx) {
   const { page, record } = ctx;
   const trust = await attachRow(page, ctx.files.A1);
@@ -499,7 +511,7 @@ async function reloadReply(ctx) {
   const stage = await stageOf(page);
   const stopped = await stoppedCount(page);
   record('接上后台进程里的会话（生成中、模型还没开始回复）：不问信任，阶段行"等待模型响应"', trust === 0
-    && running === 'true' && stage.startsWith('等待模型响应'), `询问框 ${trust}；生成中 ${running}；阶段 ${stage}`);
+    && running === 'true' && stage.startsWith('Waiting for the model…'), `询问框 ${trust}；生成中 ${running}；阶段 ${stage}`);
   await ctx.shot(page, '21-reload-attached');
   await waitIdle(page, 30000);
   const reply = await lastReply(page);
@@ -511,7 +523,7 @@ async function reloadReply(ctx) {
     `回复 ${oneLine(reply, 60)}；"已停止" ${stopped} → ${after}；"wait 8s" ${sent} 条`);
 }
 
-/** @brief 接上 B2（命令执行中）：不问信任，正在执行的工具卡是"执行中"；"本会话已允许"还在。 */
+/** @brief 接上 B2（命令执行中）：不问信任，正在执行的工具卡是"Running…"；"Allowed for this session"还在。 */
 async function reloadCommand(ctx) {
   const { page, record } = ctx;
   const trust = await attachRow(page, ctx.files.B2);
@@ -526,7 +538,7 @@ async function reloadCommand(ctx) {
 }
 
 /**
- * @brief C 在界面重新加载后、还没接上时才要批准：会话行随事件显示"等你批准"；接上后批准卡照常出现，
+ * @brief C 在界面重新加载后、还没接上时才要批准：会话行随事件显示"Needs approval"；接上后批准卡照常出现，
  *        允许后命令执行完成。
  */
 async function reloadLate(ctx) {
@@ -535,7 +547,7 @@ async function reloadLate(ctx) {
   const shown = await waitStatus(page, C, 'approval', 20000);
   const row = await rowState(page, C);
   record('界面重新加载后还没接上的会话之后才要批准：会话行随事件显示"等你批准"', shown
-    && row?.statusText === '等你批准', JSON.stringify(row));
+    && row?.statusText === 'Needs approval', JSON.stringify(row));
   const trust = await attachRow(page, C);
   const card = paneOf(page).getByTestId('approval-card');
   const ok = await card.waitFor({ timeout: 5000 }).then(() => true, () => false);
@@ -549,8 +561,8 @@ async function reloadLate(ctx) {
 }
 
 /**
- * @brief N（重新加载前新建、还没发消息）：侧栏里还在（"新会话"），菜单里"归档"不可用；点开接上后台进程里原来那个，
- *        不问信任、不多出会话。
+ * @brief N（重新加载前新建、还没发消息）：侧栏里还在（"New session"），菜单里"Archive"不可用；点开接上后台进程里
+ *        原来那个，不问信任、不多出会话。
  */
 async function reloadUnsaved(ctx) {
   const { page, record } = ctx;
@@ -561,7 +573,7 @@ async function reloadUnsaved(ctx) {
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'detached', timeout: 3000 });
   record('界面重新加载：本次新建、还没发消息的会话（后台进程里还开着）也在侧栏（"新会话"），菜单里"归档"不可用，'
-    + '小字"还没有消息"', row?.title === '新会话' && items[1]?.disabled && items[1]?.hint === '还没有消息',
+    + '小字"还没有消息"', row?.title === 'New session' && items[1]?.disabled && items[1]?.hint === 'No messages yet',
   `行 ${JSON.stringify(row)}；菜单 ${menuText(items)}`);
   const before = (await allRows(page)).length;
   const trust = await attachRow(page, N);
@@ -572,8 +584,8 @@ async function reloadUnsaved(ctx) {
 }
 
 /**
- * @brief W 的扩展命令在没接上时结束（询问超时，pi 没有开始一轮运行，只有 prompt 结束）：会话行的"等你回答"消失，
- *        不停在"生成中"，可以删除（命令不写消息，它还是没有消息的会话，"归档"不可用）。
+ * @brief W 的扩展命令在没接上时结束（询问超时，pi 没有开始一轮运行，只有 prompt 结束）：会话行的"Needs input"
+ *        消失，不停在"Running"，可以删除（命令不写消息，它还是没有消息的会话，"Archive"不可用）。
  */
 async function reloadCommandEnd(ctx) {
   const { page, record } = ctx;
@@ -585,7 +597,7 @@ async function reloadCommandEnd(ctx) {
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'detached', timeout: 3000 });
   record('界面重新加载后还没接上的会话里扩展命令结束（没有开始运行）：会话行的"等你回答"消失、不停在"生成中"，'
-    + '可以删除（还没有消息，"归档"不可用）', ended && row?.status === null && items[1]?.hint === '还没有消息'
+    + '可以删除（还没有消息，"归档"不可用）', ended && row?.status === null && items[1]?.hint === 'No messages yet'
     && !items[2]?.disabled,
   `行 ${JSON.stringify(row)}；菜单 ${menuText(items)}`);
 }
@@ -596,7 +608,7 @@ const archivedStatuses = (page) => page.evaluate(() => [...document.querySelecto
   ?.dataset.status ?? null));
 
 /**
- * @brief G3 的回复在没接上时结束：侧栏的"生成中"换成"有新结果"，可以归档删除；归档、恢复后"有新结果"不跟着走；
+ * @brief G3 的回复在没接上时结束：侧栏的"Running"换成"Unread"，可以归档删除；归档、恢复后"Unread"不跟着走；
  *        点开后草稿和回复都在。
  */
 async function reloadStale(ctx) {
@@ -610,15 +622,15 @@ async function reloadStale(ctx) {
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'detached', timeout: 3000 });
   record('界面重新加载后，后台进程里还没接上的会话本轮结束时，侧栏的"生成中"换成"有新结果"，可以归档和删除',
-    ended && row?.status === 'unseen' && row.statusText === '有新结果' && items.length === 3 && !items[1].disabled
+    ended && row?.status === 'unseen' && row.statusText === 'Unread' && items.length === 3 && !items[1].disabled
     && !items[2].disabled, `后台进程里本轮已结束 ${ended}；行状态 ${row?.status} ${row?.statusText}；`
     + `菜单 ${menuText(items)}`);
-  await chooseMenuItem(page, G3, '归档');
-  await waitArchivedToggle(page, '已归档 1');
+  await chooseMenuItem(page, G3, 'Archive');
+  await waitArchivedToggle(page, 'Archived 1');
   await expandArchived(page);
   const shelved = await archivedStatuses(page);
   const { menu: shelf } = await openMenuByMouse(page, G3);
-  await shelf.getByRole('menuitem', { name: '恢复' }).click();
+  await shelf.getByRole('menuitem', { name: 'Unarchive' }).click();
   const back = await until(() => rowState(page, G3), 5000);
   record('归档还没点开、"有新结果"的会话：已归档列表里它没有状态；恢复后回到项目下也没有（会话已关闭，状态不跟着走）',
     sameList(shelved, [null]) && back?.status === null, `已归档 ${JSON.stringify(shelved)}；恢复后 ${JSON.stringify(back)}`);
@@ -640,7 +652,7 @@ async function reloadApproval(ctx) {
   const tool = await card.getAttribute('data-tool', { timeout: 2000 }).catch(() => null);
   const stage = await stageOf(page);
   record('接上挂着批准卡的会话：不问信任，批准卡照常出现（bash），阶段行"等你批准"', trust === 0 && shown
-    && tool === 'bash' && stage === '等你批准', `询问框 ${trust}；卡 ${shown} ${tool}；阶段 ${stage}`);
+    && tool === 'bash' && stage === 'Waiting for your approval', `询问框 ${trust}；卡 ${shown} ${tool}；阶段 ${stage}`);
   await ctx.h.textarea.press('Alt+1');
   await card.waitFor({ state: 'detached', timeout: 10000 });
   await waitIdle(page, 30000);
@@ -661,9 +673,9 @@ async function reloadQuestion(ctx) {
   const stage = await stageOf(page);
   const notices = await paneOf(page).getByTestId('ext-notify').allInnerTexts();
   record('接上挂着扩展询问的会话：不问信任，询问卡照常出现（确认"继续吗？"），阶段行"等你回答"；打开时的通知不再接到'
-    + '对话流末尾', trust === 0 && view?.method === 'confirm' && view.title === '继续吗？' && stage === '等你回答'
+    + '对话流末尾', trust === 0 && view?.method === 'confirm' && view.title === '继续吗？' && stage === WAITING_ANSWER
     && notices.length === 0, `询问框 ${trust}；${JSON.stringify(view)}；阶段 ${stage}；通知 ${JSON.stringify(notices)}`);
-  await clickCard(page, '是');
+  await clickCard(page, 'Yes');
   await waitCard(page, 'select');
   await clickCard(page, '甲');
   await waitCard(page, 'input');
@@ -694,20 +706,20 @@ async function reloadTool(ctx) {
     `状态 ${result.status}；${oneLine(result.body)}`);
 }
 
-/** @brief 归档界面重新加载前开着、还没接上的空闲会话 G1：后台进程关闭它，行移到"已归档"；再恢复回来。 */
+/** @brief 归档界面重新加载前开着、还没接上的空闲会话 G1：后台进程关闭它，行移到"Archived 1"；再恢复回来。 */
 async function reloadArchive(ctx) {
   const { page, record } = ctx;
   const { G1 } = ctx.files;
   const row = await rowState(page, G1);
-  await chooseMenuItem(page, G1, '归档');
-  const moved = await waitArchivedToggle(page, '已归档 1');
+  await chooseMenuItem(page, G1, 'Archive');
+  const moved = await waitArchivedToggle(page, 'Archived 1');
   const gone = await until(() => sessionGone(page, ctx.live.G1), 5000);
   record('界面重新加载后归档后台进程里开着、还没接上的空闲会话：按会话列表带回的会话标识在后台进程里关闭它'
     + '（原来的标识报 Unknown session），行移到"已归档"', row?.status === null && moved && gone
     && !(await rowState(page, G1)), `行 ${JSON.stringify(row)}；${JSON.stringify(await archivedState(page))}；关闭 ${gone}`);
   await expandArchived(page);
   const { menu } = await openMenuByMouse(page, G1);
-  await menu.getByRole('menuitem', { name: '恢复' }).click();
+  await menu.getByRole('menuitem', { name: 'Unarchive' }).click();
   await until(() => rowState(page, G1), 5000);
 }
 
@@ -725,19 +737,19 @@ async function kernelDoubleOpen(ctx) {
 }
 
 /**
- * @brief 删除排在最下面的会话行，这时"已归档"收起、里面有会话（G1）：焦点移到屏幕上它上面的那一行，
+ * @brief 删除排在最下面的会话行，这时"Archived 1"收起、里面有会话（G1）：焦点移到屏幕上它上面的那一行，
  *        不落到收起的已归档会话上。
  */
 async function focusAfterRemoval(ctx) {
   const { page, record } = ctx;
-  await chooseMenuItem(page, ctx.files.G1, '归档');
-  await waitArchivedToggle(page, '已归档 1');
+  await chooseMenuItem(page, ctx.files.G1, 'Archive');
+  await waitArchivedToggle(page, 'Archived 1');
   if ((await archivedState(page)).expanded) await page.getByTestId('archived-toggle').click();
   const rows = await allRows(page);
   const last = rows.at(-1);
   const want = rows.at(-2)?.id ?? null;
   const dialog = await startDelete(page, last.file);
-  await dialog.getByRole('button', { name: '删除', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 15000 });
   const focus = await until(async () => {
     const info = await focusInfo(page);
@@ -747,13 +759,13 @@ async function focusAfterRemoval(ctx) {
     `应为 ${want}；焦点 ${JSON.stringify(focus)}；已归档 ${JSON.stringify(await archivedState(page))}`);
   await expandArchived(page);
   const { menu } = await openMenuByMouse(page, ctx.files.G1);
-  await menu.getByRole('menuitem', { name: '恢复' }).click();
+  await menu.getByRole('menuitem', { name: 'Unarchive' }).click();
   await until(() => rowState(page, ctx.files.G1), 5000);
 }
 
 /**
- * @brief A1 生成中时重新加载页面，还没接上时后台进程意外退出：会话行从"生成中"变为"出错"；点开、重新载入后
- *        重新打开成功，"出错"消失。
+ * @brief A1 生成中时重新加载页面，还没接上时后台进程意外退出：会话行从"Running"变为"Error"；点开、"Restart"后
+ *        重新打开成功，"Error"消失。
  */
 async function reloadKernelExit(ctx) {
   const { page, record } = ctx;
@@ -769,7 +781,7 @@ async function reloadKernelExit(ctx) {
     JSON.stringify(await rowState(page, A1)));
   await rowOf(page, A1).click();
   await paneOf(page).getByTestId('kernel-exit').waitFor({ timeout: 10000 });
-  await paneOf(page).getByRole('button', { name: '重新载入' }).click();
+  await paneOf(page).getByRole('button', { name: 'Restart' }).click();
   const cleared = await waitStatus(page, A1, null, 30000);
   await waitReady(page);
   record('点开、重新载入后这个会话重新打开成功，"出错"消失', cleared, JSON.stringify(await rowState(page, A1)));

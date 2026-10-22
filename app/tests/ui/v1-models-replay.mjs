@@ -3,10 +3,10 @@
 // 测试像你一样操作（打开文件夹、发录制里的消息、顶栏选范围与思考强度、拒绝启动卡上的操作），回放桥核对界面发出的每条
 // 命令都与录制一致；再按 docs/v1/screens/model-chat.md、model-menu.md、models-settings.md 检查界面：
 //   switch-start（MP-14）：第一个请求就 401，一行换模型提示、没有错误卡。
-//   switch-mid（MP-15、MP-13）：段内换模型，提示带"The new model redoes this reply."，被隐藏的过程仍显示；之后一直用第二个；
+//   switch-mid（MP-15、MP-13）：段内换模型，提示带"The new model redoes this response."，被隐藏的过程仍显示；之后一直用第二个；
 //     重启（恢复 key）后重新打开，提示仍在，下一段用回首选。
 //   blocked（MP-09、MP-23）：拒绝启动卡的文字、候选与按钮，发送不可用；"Change model…"打开的菜单里全部变淡、悬停写原因；
-//     "Allow public for this project…"打开 Project access 并聚焦这个项目，勾选 Public 先确认；解除后卡消失、可以发送。
+//     "Allow public for this project"打开 Project access 并聚焦这个项目，勾选 Public 先确认；解除后卡消失、可以发送。
 //   range（MP-23）："<范围名> · <当前模型 id>"、菜单的三节与底部说明、选提供商与模型、生成中不能改、重新打开后沿用。
 //   thinking（MP-37，§14.4 取代 m6/thinking.json 的回放检查）：顶栏思考强度随当前模型，high 有思考、off 没有。
 // 录制文件还不存在时，每个对应编号记一条失败"<编号> replay fixture missing"（不造假录制）。
@@ -41,13 +41,13 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 
 /** 不支持思考的说明以外，§5.3 的原因文字（shared/models.ts REASON_TEXTS）里本测试用到的 */
 const AUTH_TEXT = 'API key rejected';
-const REDO = ' The new model redoes this reply.';
-const BUSY_TITLE = "Can't change the model while generating";
-const MENU_NOTE = 'Applies to this session. New sessions use the default range from Settings.';
+const REDO = ' The new model redoes this response.';
+const BUSY_TITLE = 'Can’t switch models until the response finishes';
+const MENU_NOTE = 'Applies to this session only. New sessions use the default range from Settings.';
 /** 拒绝启动卡按钮的顺序与文字（model-chat.md "拒绝启动卡"） */
 const ACTION_ORDER = ['verify', 'allow_zone', 'confirm_zone', 'change_model', 'open_settings'];
-const actionLabel = (action, blocked) => ({ verify: 'Verify now', allow_zone: `Allow ${blocked.zone} for this project…`,
-  confirm_zone: 'Confirm zone…', change_model: 'Change model…', open_settings: 'Open settings' })[action];
+const actionLabel = (action, blocked) => ({ verify: 'Verify now', allow_zone: `Allow ${blocked.zone} for this project`,
+  confirm_zone: 'Confirm zone', change_model: 'Change model…', open_settings: 'Open settings' })[action];
 
 // ---------- 录制 ----------
 
@@ -145,7 +145,7 @@ function helpers(page) {
     },
     /** @brief 点侧栏"打开文件夹…"（回放桥返回下一条 session.create 的文件夹），等会话面板出现。 */
     async openFolder() {
-      await page.getByTestId('sidebar').getByRole('button', { name: '打开文件夹…' }).click();
+      await page.getByTestId('sidebar').getByRole('button', { name: 'Open folder…', exact: true }).click();
       await page.locator(PANE).waitFor({ timeout: 20000 });
     },
     status: () => page.evaluate(() => window.__replay.status),
@@ -349,7 +349,7 @@ async function blockedCheck(page, h) {
   const wantRows = blocked.candidates.map((c) => `${c.ref} — zone ${blocked.zone} is not allowed for this project`);
   record('MP-09 replay blocked: the card reads "This session can\'t start: no model fits." and lists each candidate as '
     + `"<provider>/<model> — zone ${blocked.zone} is not allowed for this project"`, card?.kind === 'no_candidate'
-    && card.title === "This session can't start: no model fits."
+    && card.title === 'This session can’t start: no model fits.'
     && JSON.stringify(card.candidates.map((c) => c.text)) === JSON.stringify(wantRows)
     && card.candidates.every((c) => c.reason === 'zone_blocked'), JSON.stringify(card));
   const names = wantActions.map((a) => `"${a.text}"`).join(', ');
@@ -377,7 +377,7 @@ async function blockedCheck(page, h) {
   await finish(page, 'MP-09', 'blocked', steps);
 }
 
-/** @brief Change model…：打开这一栏的范围菜单，全部变淡、悬停写每个候选的原因，底部说明与 Manage models…。 */
+/** @brief Change model…：打开这一栏的范围菜单，全部变淡、悬停写每个候选的原因，底部说明与 Manage models。 */
 async function blockedMenu(page, options) {
   await page.locator(`${PANE} [data-testid="blocked-card"] [data-action="change-model"]`).click();
   const opened = await page.getByTestId('model-menu').waitFor({ timeout: 5000 }).then(() => true, () => false);
@@ -387,15 +387,15 @@ async function blockedMenu(page, options) {
     : null;
   await shot(page, 'blocked-menu');
   record('MP-23 replay blocked: "Change model…" opens the range menu; every item is faded (data-excluded) and its '
-    + 'hover lists each candidate as "<provider>/<model> — <reason>"; the note and "Manage models…" are at the bottom',
+    + 'hover lists each candidate as "<provider>/<model> — <reason>"; the note and "Manage models" are at the bottom',
   opened && items.length === options.length && items.every((item, i) => item.excluded && item.pick === options[i].pick
     && item.title === options[i].reason && /— zone \w+ is not allowed for this project/.test(item.title ?? ''))
-    && note?.trim() === MENU_NOTE && manage?.trim() === 'Manage models…', JSON.stringify({ items, note }));
+    && note?.trim() === MENU_NOTE && manage?.trim() === 'Manage models', JSON.stringify({ items, note }));
   await page.keyboard.press('Escape');
   await page.getByTestId('model-menu').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
 }
 
-/** @brief Allow public for this project…：打开 Project access、焦点在这个项目；勾选 Public 先确认，确认后发出授权。 */
+/** @brief Allow public for this project：打开 Project access、焦点在这个项目；勾选 Public 先确认，确认后发出授权。 */
 async function allowPublic(page, h, cwd) {
   const key = cwd.replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
   await page.locator(`${PANE} [data-testid="blocked-card"] [data-action="allow-zone"]`).click();
@@ -404,7 +404,7 @@ async function allowPublic(page, h, cwd) {
     { timeout: 5000 }).catch(() => {});
   const focus = await page.evaluate(() => document.activeElement?.closest('[data-testid="project-row"]')?.dataset.path
     ?? null);
-  record('MP-09 replay blocked: "Allow public for this project…" opens Settings → Models → Project access with the '
+  record('MP-09 replay blocked: "Allow public for this project" opens Settings → Models → Project access with the '
     + 'focus on this session\'s project row', focus === key, `focus ${focus}, want ${key}`);
   const row = page.locator(`[data-testid="project-row"][data-path="${key}"]`);
   await row.locator('[data-testid="project-zone"][data-zone="public"]').click();
@@ -418,7 +418,7 @@ async function allowPublic(page, h, cwd) {
     + 'models.setProjectZones with public for this project', asked && writes.length === 1
     && writes[0].type === 'models.setProjectZones' && writes[0].path === key && writes[0].zones.includes('public'),
   JSON.stringify(writes));
-  await page.getByTestId('settings-page').getByRole('button', { name: '返回会话' }).click();
+  await page.getByTestId('settings-page').getByRole('button', { name: 'Back to app' }).click();
   await page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 10000 });
 }
 

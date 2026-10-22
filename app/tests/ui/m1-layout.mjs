@@ -53,7 +53,7 @@ async function dividerChecks(page, h, record) {
   const reset = await separatorValue(page, 'sidebar');
   record('divider：左分隔线 → 每次 20px、拖动、双击恢复 260', keyed === start + 40 && dragged === keyed - 50 && reset === 260,
     `${start} → ${keyed} → ${dragged} → ${reset}`);
-  await page.getByRole('button', { name: '右栏：本会话的改动' }).click();
+  await page.getByRole('button', { name: 'Toggle changes' }).click();
   const right = page.locator('[data-resize="workspace"]');
   const rightStart = await separatorValue(page, 'workspace');
   await right.focus();
@@ -67,7 +67,7 @@ async function dividerChecks(page, h, record) {
   await page.keyboard.press('ArrowLeft');
   const saved = { sidebar: await separatorValue(page, 'sidebar'), workspace: rightDragged };
   await h.load('readme');
-  await page.getByRole('button', { name: '右栏：本会话的改动' }).click();
+  await page.getByRole('button', { name: 'Toggle changes' }).click();
   const after = { sidebar: await separatorValue(page, 'sidebar'), workspace: await separatorValue(page, 'workspace') };
   record('divider：刷新页面后宽度还在', after.sidebar === saved.sidebar && after.workspace === saved.workspace,
     `${JSON.stringify(saved)} → ${JSON.stringify(after)}`);
@@ -128,21 +128,21 @@ export async function layoutChecks(page, h, { app, record, shots }) {
   await h.send('总结一下 README.md');
   await h.idle();
   await page.getByTestId('tool-card').first().locator('summary').click();
-  await page.getByRole('button', { name: '右栏：本会话的改动' }).click();
+  await page.getByRole('button', { name: 'Toggle changes' }).click();
   let small = await smallText(page);
   // v1（docs/specs/model-providers.md §14.4）：设置页是 Models 分节，先量提供商卡（models.get 读完之后），再量 Edit 打开的
   // 提供商表单；回放里 models.get 由回放桥按录制的模型合成（harness/replay.js）。
-  await page.getByRole('button', { name: '设置' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByTestId('provider-card').first().waitFor({ timeout: 10000 });
   small = small.concat(await smallText(page));
   await page.getByTestId('provider-card').first().locator('[data-action="edit-provider"]').click();
   await page.getByTestId('provider-form').waitFor({ timeout: 10000 });
   small = small.concat(await smallText(page));
   await page.getByTestId('provider-form').getByRole('button', { name: 'Cancel', exact: true }).click();
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app' }).click();
   record('fonts：会话、工具卡展开、右栏、设置页（Models 的提供商卡和提供商表单）没有小于 12px 的文字', small.length === 0,
     small.slice(0, 5).join('; '));
-  await page.getByRole('button', { name: '右栏：本会话的改动' }).click();
+  await page.getByRole('button', { name: 'Toggle changes' }).click();
   await dividerChecks(page, h, record);
   await narrowChecks(page, app, record, shots);
   await imeCheck(page, h, record);

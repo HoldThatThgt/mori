@@ -45,10 +45,10 @@ function MemberPicker({ config, chosen, lockChosen, onPick, onClose }: {
 
 /** @brief 新分组 id 的错误（§4.1：与提供商、分组 id 共用名字空间，含保留 id）；没有时为 null。 */
 function idError(id: string, config: ModelConfig, reserved: readonly string[]): string | null {
-  if (!ID_PATTERN.test(id)) return 'Use lowercase letters, digits and -';
-  if (reserved.includes(id)) return `${id} is reserved`;
+  if (!ID_PATTERN.test(id)) return 'Use lowercase letters, digits, and hyphens.';
+  if (reserved.includes(id)) return `${id} is reserved.`;
   const taken = config.providers.some((item) => item.id === id) || config.groups.some((item) => item.id === id);
-  return taken ? `${id} is already used by a provider or group` : null;
+  return taken ? `${id} is already used by a provider or group.` : null;
 }
 
 /** @brief 一个分组的成员行。 */
@@ -90,7 +90,7 @@ function GroupRow({ config, group }: { config: ModelConfig; group: ModelGroup })
           <button className="button compact" data-action="add-member" disabled={busy}
             onClick={() => setPicking(!picking)} aria-expanded={picking}>Add member</button>
           <button className="button compact danger" data-action="delete-group" onClick={() => void flow.start()}>
-            Delete</button>
+            Delete…</button>
         </span>
       </div>
       <ol className="member-list">
@@ -127,9 +127,9 @@ function GroupForm({ config, reserved, onClose }: {
   const toggle = (member: string) => setMembers(members.includes(member)
     ? members.filter((item) => item !== member) : [...members, member]);
   return (
-    <form className="group-form" data-testid="group-form"
+    <form className="group-form" data-testid="group-form" noValidate
       onSubmit={(event) => { event.preventDefault(); void create(); }}>
-      <label>Group id
+      <label>Group ID
         <input value={id} spellCheck={false} onChange={(event) => setId(event.target.value)}
           aria-invalid={Boolean(id && problem)} />
       </label>

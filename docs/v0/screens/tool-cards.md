@@ -5,20 +5,20 @@
 ## 标题对照表
 
 路径在会话工作目录之内时显示相对路径，否则显示原路径。命令只取第一行，超过 80 个字截断加"…"。
-阶段行用同一段文字（例如"运行 npm test 8s"）。
+阶段行用同一段文字（例如"Run npm test 8s"）。
 （协作模式：见 docs/specs/parallel-agents-taskboard.md §13.7、§13.8：下表新增的 11 个 TaskBoard 工具标题是英文；它们出现在用户会话自己的调用里（合并会话的立项、协作模式下对话的 `board_read` 等），
 免批准、不出批准卡（§11.2）；后台实例的调用不出工具卡，只在进展摘要里，见 ../../v1/screens/team-stream.md）
 
 | 工具名（pi） | 参数 | 标题 |
 | --- | --- | --- |
-| `read` | `path`，可选 `offset`、`limit` | 读取 `path`；有行范围时加" · 第 a–b 行" |
-| `bash` | `command` | 运行 `command` |
-| `powershell` | `command` | 运行 `command` |
-| `edit` | `path` | 修改 `path` |
-| `write` | `path` | 写入 `path` |
-| `grep` | `pattern` | 搜索 `pattern` |
-| `find` | `pattern` | 查找 `pattern` |
-| `ls` | `path`（可省略） | 列目录 `path`（省略时为"列目录 ."） |
+| `read` | `path`，可选 `offset`、`limit` | Read `path`；有行范围时加" · lines a–b"（只有 `offset` 时" · from line a"） |
+| `bash` | `command` | Run `command` |
+| `powershell` | `command` | Run `command` |
+| `edit` | `path` | Edit `path` |
+| `write` | `path` | Write `path` |
+| `grep` | `pattern` | Search `pattern` |
+| `find` | `pattern` | Find `pattern` |
+| `ls` | `path`（可省略） | List `path`（省略时为"List ."） |
 | `mcp__<服务>__<工具>` | — | `<服务> · <工具>` |
 | `board_read`（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.8） | 不带参数 / `request` / `task` | `Read the board` / `Read request 1` / `Read T1` |
 | `read_session`（同上） | `task`、`role` | `Read <role>’s work on T1` |
@@ -32,26 +32,27 @@
 | `reply_via_dialog`（同上） | — | `Answer directly` |
 | `request_close`（同上） | `request` | `Close request 1` |
 | 其他 | — | 原名 |
-| 参数还没写完 | `toolcall_delta` 期间参数解析不出 | 按工具名给动词，例如"运行 …"；未知工具显示原名 |
+| 参数还没写完 | `toolcall_delta` 期间参数解析不出 | 按工具名给动词，例如"Run …"；未知工具显示原名 |
 
 ## 状态表
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 准备中 | `toolcall_start`、`toolcall_delta`：模型正在生成这次调用的参数 | 标题（参数够用时）+"准备中" | 展开看已收到的参数 |
-| 等待执行 | 这条回复已结束（`message_end`，参数完整），pi 还没发这次调用的 `tool_execution_start`：一条回复里的调用按顺序执行，前面的调用还在等批准或执行中（M2） | "等待执行" | 展开看参数 |
-| 等你批准 | `mori.tool_gate` 为 `ask` 时的 `tool_execution_start`，或批准扩展的 `mori.approval_request`（M2） | "等你批准" | 输入框上方的批准卡（approval.md） |
-| 执行中 | 自动放行（`mori.tool_gate` 为 `free` / `session` / `all`）时的 `tool_execution_start`；要批准的调用在 `mori.approval_end` 为允许时（M2） | "执行中"和实时耗时"8s"，从开始执行（或你允许）的那一刻计时；命令有输出时展开能看到实时输出（`tool_execution_update`） | 展开 |
-| 完成 | `tool_execution_end`，`isError` 为假 | "完成"，实时运行时显示耗时（`durationMs`） | 展开看参数和输出；编辑类显示 diff，写入显示新内容 |
-| 失败 | `tool_execution_end`，`isError` 为真，且你没按停止 | "失败 · 退出码 N"（输出里有 `Command exited with code N` 时）或错误原文第一行 | 展开看完整输出 |
-| 已拒绝 | `mori.approval_end` 为拒绝；从会话记录载入时，工具结果是 Mori 拒绝的固定写法（M2） | "已拒绝"、"已拒绝 · 你写的理由"（理由超过 40 字时截断加"…"，悬停看全文），或卡挂着时你按了停止："已拒绝 · 你按了停止"；之后的 `tool_execution_end` 不改变它 | 展开（输出里有完整理由） |
-| 已停止 | 你按了停止：之后结束的工具（`isError`）、还在准备中、等待执行或没开始执行的调用 | "已停止" | 展开看已有输出 |
-| 已中断 | Mori 后台进程退出时还没结束；或会话记录里这次调用没有结果；或本轮结束（`agent_settled`）时它还没执行（例如回复出错，pi 不执行其中的调用） | "已中断" | 展开 |
-| 本会话已允许 / 全部允许 | `mori.tool_gate` 为 `session` / `all`，或挂着的卡被"本会话不再询问"（同名的其余请求）或切到"全部允许"放行（M2）；只在实时运行时 | 卡上小字标签；你亲手允许的那张卡不标 | — |
+| 准备中 | `toolcall_start`、`toolcall_delta`：模型正在生成这次调用的参数 | 标题（参数够用时）+"Preparing…" | 展开看已收到的参数 |
+| 等待执行 | 这条回复已结束（`message_end`，参数完整），pi 还没发这次调用的 `tool_execution_start`：一条回复里的调用按顺序执行，前面的调用还在等批准或执行中（M2） | "Queued" | 展开看参数 |
+| 等你批准 | `mori.tool_gate` 为 `ask` 时的 `tool_execution_start`，或批准扩展的 `mori.approval_request`（M2） | "Waiting for your approval" | 输入框上方的批准卡（approval.md） |
+| 执行中 | 自动放行（`mori.tool_gate` 为 `free` / `session` / `all`）时的 `tool_execution_start`；要批准的调用在 `mori.approval_end` 为允许时（M2） | "Running…"和实时耗时（"Running… 8s"），从开始执行（或你允许）的那一刻计时；命令有输出时展开能看到实时输出（`tool_execution_update`） | 展开 |
+| 完成 | `tool_execution_end`，`isError` 为假 | "Done"，实时运行时加耗时（`durationMs`，如"Done · 1.2s"） | 展开看参数和输出；编辑类显示 diff，写入显示新内容 |
+| 失败 | `tool_execution_end`，`isError` 为真，且你没按停止 | "Failed · Exit code N"（输出里有 `Command exited with code N` 时）或"Failed · <错误原文第一行>" | 展开看完整输出 |
+| 已拒绝 | `mori.approval_end` 为拒绝；从会话记录载入时，工具结果是 Mori 拒绝的固定写法（M2） | "Denied"、"Denied · <你写的理由>"（理由超过 40 字时截断加"…"，悬停看全文），或卡挂着时你按了停止："Denied · You pressed Stop"；之后的 `tool_execution_end` 不改变它 | 展开（输出里有完整理由） |
+| 已停止 | 你按了停止：之后结束的工具（`isError`）、还在准备中、等待执行或没开始执行的调用 | "Stopped" | 展开看已有输出 |
+| 已中断 | Mori 后台进程退出时还没结束；或会话记录里这次调用没有结果；或本轮结束（`agent_settled`）时它还没执行（例如回复出错，pi 不执行其中的调用） | "Interrupted" | 展开 |
+| 本会话已允许 / 全部允许 | `mori.tool_gate` 为 `session` / `all`，或挂着的卡被"Allow “…” for this session"（同名的其余请求）或切到"Allow all"放行（M2）；只在实时运行时 | 卡上小字标签"Allowed for this session" / "Allow all"；你亲手允许的那张卡不标 | — |
 
-- 默认折叠。展开看参数（格式化 JSON）和输出（最多显示最后 20,000 字，临时默认值）。
-- 编辑工具展开后显示 pi 结果里的 `details.patch`（@pierre/diffs 渲染）；写入显示参数里的 `content`。
+- 默认折叠。展开看"Input"（参数，格式化 JSON）和"Output"（输出，最多显示最后 20,000 字，临时默认值）。
+- 编辑工具展开后显示 pi 结果里的 `details.patch`（@pierre/diffs 渲染）；写入显示参数里的 `content`（"File content"）。
 - 耗时只在实时运行时显示；从会话记录载入的工具卡不显示耗时。
-- M4 起，读取、修改、写入的标题里的路径是按钮：点它（或 Tab 到它按 Enter）在右栏打开文件阅读器，不展开工具卡（见 [changes.md](changes.md)）。
+- M4 起，读取、修改、写入的标题里的路径是按钮：点它（或 Tab 到它按 Enter）在右栏打开文件阅读器
+  （悬停"Open <路径> in the right panel"），不展开工具卡（见 [changes.md](changes.md)）。
 
-反例：失败的命令不显示"完成"；读取、搜索、查找、列目录不出批准卡；等你批准时不显示"执行中"。
+反例：失败的命令不显示"Done"；读取、搜索、查找、列目录不出批准卡；等你批准时不显示"Running…"。

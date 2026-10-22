@@ -62,7 +62,9 @@
 
 ## 与规格不同、或需要你注意的地方
 
-- 本分支没有 english-ui 与 composer-pickers：界面按本分支的顶栏布局做，v0 的中文界面文字照旧；两者合入时要调整协作开关的位置和新旧文字。
+- english-ui 已随 `app-v0`（`6a57fd4`）合入（2026-10-21）：v0 界面文字与 TaskBoard 新加的文字都按
+  [v0/ui-strings.md](../v0/ui-strings.md) 的英文，v0 工具卡与进展摘要的标题是同一套规则（`shared/team.ts` 的 `toolCallTitle`）。
+  composer-pickers 还没有合入：界面按本分支的顶栏布局做，合入时要调整协作开关的位置。
 - 严格优先意味着 task 一直在跑时，新加模型的探针要等（规格 §12.10）。
 - `anthropic-messages` 的模型永远不满足 `requires: [structured_output]`（规格 §12.2）。
 - 用命令改的文件认不出“改过代码”（规格 §7.3）。

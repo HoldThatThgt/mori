@@ -1,5 +1,5 @@
 // M2 界面测试：在 Electron 里载入真正的界面，用回放进程桥（tests/ui/harness）回放真实录制的批准会话（tests/fixtures/m2）。
-// 测试像你一样操作（Alt+1 / Alt+2、写理由后点"拒绝"、理由框里 Enter 或 Esc、权限菜单与确认框、在输入框按 Esc、F8），
+// 测试像你一样操作（Alt+1 / Alt+2、写理由后点"Deny"、理由框里 Enter 或 Esc、权限菜单与确认框、在输入框按 Esc、F8），
 // 回放桥核对界面发出的每条命令都与录制时一致；再按 docs/v0/screens/approval.md 与 f8.md 的状态表检查界面。
 // 用法（在 app/ 下）：node tests/ui/m2-replay.mjs [--only edit-allow,f8]
 // 结果写到 test-results/m2-replay.json；截图在 test-results/m2-replay/。M1 的回放检查仍由 m1-replay.mjs 负责。
@@ -32,8 +32,10 @@ const READ_ONLY_TOOLS = ['read', 'grep', 'find', 'ls'];
 const REJECTED_REASON_PREFIX = 'Rejected by the user. Reason: ';
 const COMMAND_TOOLS = ['bash', 'powershell'];
 // 平行 Agent 规格 §11.1：权限菜单的说明作用于这个用户会话的全部 Agent。
-const MENU_NOTE = /Applies to all agents in this session\. New sessions start at Ask each time\./;
-const F8_NOTE = '会附上截图、当前界面和最近的操作记录，保存在本机，不会发给模型';
+const MENU_NOTE = 'Applies to all agents in this session. New sessions start at Ask each time.';
+const F8_NOTE = 'Includes a screenshot, the current view, and your recent activity. Saved on this computer and never '
+  + 'sent to the model.';
+const STOPPED_TEXT = 'Stopped · Changes made so far stay as they are';
 
 /** @brief 读取一个 M2 录制文件。 */
 const readFixture = (name) => JSON.parse(readFileSync(join(fixtureDir, `${name}.json`), 'utf8'));
@@ -55,16 +57,14 @@ const composerFocused = (page) => page.evaluate((p) => document.activeElement
 const baseName = (path) => String(path ?? '').split(/[\\/]/).pop();
 /** @brief 压掉空白，便于比较界面上的文字。 */
 const norm = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
-/** @brief 正则里的字面文字。 */
-const literal = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** @brief 带引号的标签：直引号或中文引号都算。 */
-const quoted = (label) => `["“]${literal(label)}["”]`;
+/** @brief 界面上带引号的标签：用排版引号 “ ”。 */
+const quoted = (label) => `“${label}”`;
 
-/** @brief 工具名在"本会话不再询问"和权限菜单里的叫法（approval.md 选项表）。 */
+/** @brief 工具名在"Allow “…” for this session"和权限菜单里的叫法（approval.md 选项表）。 */
 function toolLabel(name) {
-  if (COMMAND_TOOLS.includes(name)) return '运行命令';
-  if (name === 'edit') return '修改文件';
-  if (name === 'write') return '写入文件';
+  if (COMMAND_TOOLS.includes(name)) return 'Run commands';
+  if (name === 'edit') return 'Edit files';
+  if (name === 'write') return 'Write files';
   const mcp = /^mcp__(.+?)__(.+)$/.exec(name);
   return mcp ? `${mcp[1]} · ${mcp[2]}` : name;
 }
@@ -109,7 +109,7 @@ function helpers(page) {
       const url = `${pathToFileURL(join(outDir, 'index.html')).href}?fixture=${name}&speed=${speed}&maxGap=${maxGap}`;
       await page.goto(url);
       await page.getByTestId('open-folder').waitFor({ timeout: 20000 });
-      await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+      await page.getByRole('button', { name: 'Open folder…' }).first().click();
       await page.getByTestId('chat-pane').waitFor({ timeout: 20000 });
       await page.waitForFunction(() => !document.querySelector('[data-testid="not-ready"]'));
       await watchApproval(page);
@@ -166,36 +166,37 @@ async function openMenu(page) {
   return menu;
 }
 
-/** @brief 在权限菜单里切换；切到全部允许时在确认框里先调用 confirm(dialog)，再点"全部允许"。 */
+/** @brief 在权限菜单里切换；切到全部允许时在确认框里先调用 confirm(dialog)，再点"Allow all"。 */
 async function chooseMode(page, mode, confirm) {
   const menu = await openMenu(page);
-  await menu.getByRole('menuitemradio', { name: mode === 'all' ? '全部允许' : '每次询问' }).click();
+  await menu.getByRole('menuitemradio', { name: mode === 'all' ? 'Allow all' : 'Ask each time' }).click();
   if (mode !== 'all') return;
   const dialog = page.getByTestId('confirm-dialog');
   await dialog.waitFor({ timeout: 5000 });
   await confirm?.(dialog);
-  await dialog.getByRole('button', { name: '全部允许', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Allow all', exact: true }).click();
 }
 
-/** @brief 在权限菜单里清除一项"本会话已允许"；菜单还开着时用 Esc 关上。 */
+/** @brief 在权限菜单里 Forget 一项"Allowed for this session"；菜单还开着时用 Esc 关上。 */
 async function forgetTool(page, toolName) {
   const menu = await openMenu(page);
   const row = page.getByTestId('permission-allowed').locator('*').filter({ hasText: toolLabel(toolName) })
-    .filter({ has: page.getByRole('button', { name: '清除' }) }).last();
-  await row.getByRole('button', { name: '清除' }).click();
+    .filter({ has: page.getByRole('button', { name: 'Forget' }) }).last();
+  await row.getByRole('button', { name: 'Forget' }).click();
   if (await menu.isVisible().catch(() => false)) await page.keyboard.press('Escape');
 }
 
-/** @brief 权限菜单的内容：选项与勾选、"本会话已允许"的各行、全文。 */
+/** @brief 权限菜单的内容：选项与勾选、"Allowed for this session:"的各行、全文。 */
 function menuInfo(page) {
   return page.evaluate(() => {
     const menu = document.querySelector('[data-testid="permission-menu"]');
     const allowed = document.querySelector('[data-testid="permission-allowed"]');
-    const rows = [...(allowed?.querySelectorAll('button') ?? [])].filter((b) => b.textContent.includes('清除'))
-      .map((b) => b.parentElement.textContent.replace('清除', '').trim());
+    const rows = [...(allowed?.querySelectorAll('button') ?? [])].filter((b) => b.textContent.includes('Forget'))
+      .map((b) => b.parentElement.textContent.replace('Forget', '').trim());
     const checked = (label) => [...(menu?.querySelectorAll('[role="menuitemradio"]') ?? [])]
       .find((item) => item.textContent.includes(label))?.getAttribute('aria-checked') ?? null;
-    return { open: Boolean(menu), text: menu?.innerText ?? '', rows, ask: checked('每次询问'), all: checked('全部允许') };
+    return { open: Boolean(menu), text: menu?.innerText ?? '', rows, ask: checked('Ask each time'),
+      all: checked('Allow all') };
   });
 }
 
@@ -241,8 +242,8 @@ async function act(page, h, command, next, hooks) {
       return 2;
     case 'session.open':
       await page.evaluate(() => window.__replay.exit(1));
-      await page.getByRole('button', { name: '重新载入' }).click();
-      await page.getByText('已重新载入', { exact: false }).first().waitFor({ timeout: 10000 });
+      await page.getByRole('button', { name: 'Restart', exact: true }).click();
+      await page.getByText('Restarted · ', { exact: false }).first().waitFor({ timeout: 10000 });
       return 1;
     default:
       throw new Error(`No user action produces ${command.type}`);
@@ -298,18 +299,18 @@ function bodyProblems(info, request) {
     if (!parts.every((part) => info.title.includes(part))) problems.push(`title "${info.title}"`);
   };
   if (toolName === 'edit') {
-    title('修改', baseName(args.path));
+    title('Edit', baseName(args.path));
     const edits = args.edits ?? [];
     const same = info.edits.length === edits.length && edits.every((e, i) => norm(info.edits[i].old)
       .includes(norm(e.oldText)) && norm(info.edits[i].new).includes(norm(e.newText)));
     if (!same) problems.push(`edits ${JSON.stringify(info.edits)}`);
   } else if (toolName === 'write') {
-    title('写入', baseName(args.path));
+    title('Write', baseName(args.path));
     if (!norm(info.content).includes(norm(args.content))) problems.push(`content "${info.content}"`);
   } else if (COMMAND_TOOLS.includes(toolName)) {
-    title('运行命令');
+    title('Run a command');
     if (!info.command?.includes(String(args.command).trim())) problems.push(`command "${info.command}"`);
-    if (args.timeout && !info.text.includes(`超时 ${args.timeout} 秒`)) problems.push('no timeout');
+    if (args.timeout && !info.text.includes(`Timeout: ${args.timeout}s`)) problems.push('no timeout');
   } else {
     title(toolLabel(toolName));
     if (info.args === null) problems.push('no formatted args');
@@ -317,18 +318,18 @@ function bodyProblems(info, request) {
   return problems;
 }
 
-/** @brief 三个选项、快捷键、"本会话不再询问"的说明与理由框（approval.md "选项"表）；返回不符合的地方。 */
+/** @brief 三个选项、快捷键、"Allow “…” for this session"的说明与理由框（approval.md "选项"表）；返回不符合的地方。 */
 function optionProblems(info, request) {
   const label = toolLabel(request.toolName);
-  const hint = COMMAND_TOOLS.includes(request.toolName) ? '之后本会话的所有命令都会直接执行'
-    : `之后本会话的所有${quoted(label)}都会直接执行`;
+  const hint = COMMAND_TOOLS.includes(request.toolName) ? 'You won’t be asked again for any command in this session.'
+    : `You won’t be asked again for ${quoted(label)} in this session.`;
   const checks = [
-    [/允许一次/.test(info.allow) && /Alt\+1/.test(info.allow), `allow "${info.allow}"`],
-    [new RegExp(`本会话不再询问${quoted(label)}`).test(info.allowSession) && /Alt\+2/.test(info.allowSession),
+    [/Allow once/.test(info.allow) && /Alt\+1/.test(info.allow), `allow "${info.allow}"`],
+    [info.allowSession.includes(`Allow ${quoted(label)} for this session`) && /Alt\+2/.test(info.allowSession),
       `allow-session "${info.allowSession}"`],
-    [new RegExp(hint).test(info.text), `hint "${hint}"`],
-    [/拒绝/.test(info.reject) && /Alt\+3/.test(info.reject), `reject "${info.reject}"`],
-    [info.reason?.label === '拒绝理由' && info.reason?.placeholder === '拒绝理由（可选，会告诉模型）',
+    [info.text.includes(hint), `hint "${hint}"`],
+    [/Deny/.test(info.reject) && /Alt\+3/.test(info.reject), `reject "${info.reject}"`],
+    [info.reason?.label === 'Reason for denying' && info.reason?.placeholder === 'Tell the model why (optional)',
       `reason ${JSON.stringify(info.reason)}`],
   ];
   return checks.filter(([ok]) => !ok).map(([, problem]) => problem);
@@ -345,16 +346,16 @@ async function checkCard(page, label, request, name) {
 
 /** @brief 拒绝时工具卡应显示的文字（tool-cards.md "已拒绝"）。 */
 function rejectedText(end) {
-  if (end.by === 'stop') return '已拒绝 · 你按了停止';
+  if (end.by === 'stop') return 'Denied · You pressed Stop';
   const reason = end.reason?.startsWith(REJECTED_REASON_PREFIX) ? end.reason.slice(REJECTED_REASON_PREFIX.length) : '';
   // 工具卡上的理由超过 40 字时截断加"…"（docs/v0/defaults.md）。
   const shown = [...reason].length > 40 ? `${[...reason].slice(0, 40).join('')}…` : reason;
-  return reason ? `已拒绝 · ${shown}` : '已拒绝';
+  return reason ? `Denied · ${shown}` : 'Denied';
 }
 
 /**
  * @brief 按录制推出每次调用的工具卡最终状态与标签，按开始执行的顺序（一条回复的调用按顺序执行，与卡片顺序相同）。
- * @param live 实时运行时为真；从会话记录载入的卡没有"本会话已允许 / 全部允许"标签
+ * @param live 实时运行时为真；从会话记录载入的卡没有"Allowed for this session / Allow all"标签
  */
 function expectedCards(fx, live) {
   const ends = eventsOfType(fx, 'mori.approval_end');
@@ -362,12 +363,12 @@ function expectedCards(fx, live) {
   return eventsOfType(fx, 'mori.tool_gate').map((gate) => {
     const end = ends.find((e) => e.toolCallId === gate.toolCallId);
     const by = gate.gate === 'ask' ? end?.by : gate.gate;
-    const badge = !live ? '' : by === 'session' ? '本会话已允许' : by === 'all' ? '全部允许' : '';
+    const badge = !live ? '' : by === 'session' ? 'Allowed for this session' : by === 'all' ? 'Allow all' : '';
     if (end?.decision === 'reject') return { status: 'rejected', text: rejectedText(end), badge };
     const at = fx.steps.findIndex((s) => s.envelope?.event.type === 'tool_execution_end'
       && s.envelope.event.toolCallId === gate.toolCallId);
     if (!fx.steps[at]?.envelope.event.isError) return { status: 'done', text: null, badge };
-    // 你按了停止之后才结束的工具是"已停止"，否则是"失败"（tool-cards.md）。
+    // 你按了停止之后才结束的工具是"Stopped"，否则是"Failed"（tool-cards.md）。
     return { status: stopAt >= 0 && stopAt < at ? 'stopped' : 'failed', text: null, badge };
   });
 }
@@ -387,7 +388,7 @@ async function commonChecks(page, h, fx) {
   await checkToolCards(h, fx, `${name}：工具卡的状态与"本会话已允许 / 全部允许"标签和录制一致`);
   const requested = eventsOfType(fx, 'mori.approval_request').map((r) => r.requestId);
   const shown = (await h.samples()).filter((s) => s.request);
-  const wrong = shown.filter((s) => s.stage !== '等你批准' || s.running > 0 || s.awaiting === 0);
+  const wrong = shown.filter((s) => s.stage !== 'Waiting for your approval' || s.running > 0 || s.awaiting === 0);
   record(`${name}：等批准时阶段行显示"等你批准"（不显示"生成中"或"执行中"），工具卡"等你批准"`,
     (shown.length > 0 || requested.length === 0) && wrong.length === 0, JSON.stringify(wrong.slice(0, 3)));
   const seen = new Set(shown.map((s) => s.request));
@@ -420,7 +421,7 @@ async function editAllowCheck(page, h) {
     },
   });
   const cards = await h.toolCards();
-  const index = cards.findIndex((card) => card.title.startsWith('修改'));
+  const index = cards.findIndex((card) => card.title.startsWith('Edit'));
   const editCard = page.locator(`${P}[data-testid="tool-card"]`).nth(Math.max(0, index));
   await editCard.locator('summary').click();
   const diff = await editCard.getByTestId('tool-diff').waitFor({ timeout: 5000 }).then(() => true, () => false);
@@ -430,13 +431,13 @@ async function editAllowCheck(page, h) {
   await shot(page, 'edit-allow');
 }
 
-/** @brief 拒绝后的阶段：卡片消失后第一个阶段（"等你批准"之外）。 */
+/** @brief 拒绝后的阶段：卡片消失后第一个阶段（"Waiting for your approval"之外）。 */
 function stageAfterCard(samples, requestId) {
   const last = samples.map((s) => s.request).lastIndexOf(requestId);
-  return samples.slice(last + 1).map((s) => s.stage).filter((stage) => stage && stage !== '等你批准');
+  return samples.slice(last + 1).map((s) => s.stage).filter((stage) => stage && stage !== 'Waiting for your approval');
 }
 
-/** @brief edit-reject：三种拒绝方式（点"拒绝"、理由框 Enter、输入框 Alt+3）都带理由；模型的下一条回复在卡之后。 */
+/** @brief edit-reject：三种拒绝方式（点"Deny"、理由框 Enter、输入框 Alt+3）都带理由；模型的下一条回复在卡之后。 */
 async function editRejectCheck(page, h) {
   const ways = { click: '写理由后点"拒绝"', enter: '在理由框里按 Enter', alt3: '写理由后在输入框按 Alt+3' };
   for (const [way, label] of Object.entries(ways)) {
@@ -459,25 +460,28 @@ async function editRejectCheck(page, h) {
     }, P);
     record('edit-reject：模型的下一条回复出现在已拒绝的卡之后', replied);
     const next = stageAfterCard(await h.samples(), end.requestId);
-    record('edit-reject：拒绝后阶段行回到"等待模型响应"（不显示"运行"或"执行中"）', next[0] === '等待模型响应',
+    record('edit-reject：拒绝后阶段行回到"等待模型响应"（不显示"运行"或"执行中"）', next[0] === 'Waiting for the model…',
       next.slice(0, 4).join(' → '));
     await commonChecks(page, h, fx);
     await shot(page, 'edit-reject');
   }
 }
 
-/** @brief 权限菜单：两个选项与勾选、"本会话已允许"列表与"清除"、底部说明。 */
+/** @brief 权限菜单：两个选项与勾选、"Allowed for this session:"列表与"Forget"、底部说明。 */
 async function checkMenu(page, label, { mode, allowed }) {
   await openMenu(page);
   const view = await menuInfo(page);
   const rowsOk = allowed.every((item) => view.rows.some((row) => row.includes(item)))
     && view.rows.length === allowed.length;
   record(label, view.ask === String(mode === 'ask') && view.all === String(mode === 'all') && rowsOk
-    && MENU_NOTE.test(view.text), JSON.stringify(view));
+    && view.text.includes(MENU_NOTE), JSON.stringify(view));
   return view;
 }
 
-/** @brief command-session：Alt+2 本会话不再询问"运行命令"，之后的命令不出卡、标"本会话已允许"；菜单里清除后又出卡。 */
+/**
+ * @brief command-session：Alt+2"Allow “Run commands” for this session"，之后的命令不出卡、
+ *        标"Allowed for this session"；菜单里 Forget 后又出卡。
+ */
 async function commandSessionCheck(page, h) {
   const fx = await h.load('command-session');
   const [first] = eventsOfType(fx, 'mori.approval_request');
@@ -519,14 +523,15 @@ function permissionButton(page) {
   });
 }
 
-/** @brief 切到全部允许的确认框：文字、角色、初始焦点在"取消"。 */
+/** @brief 切到全部允许的确认框：文字、角色、初始焦点在"Cancel"。 */
 async function checkConfirm(page, dialog) {
   const text = await dialog.innerText();
   const role = await dialog.getAttribute('role');
   const focused = await page.evaluate(() => document.activeElement?.textContent?.trim());
   record('all-mode：切到全部允许前先确认："切换到全部允许？编辑、写入和命令都不再询问。"，焦点在"取消"',
-    role === 'alertdialog' && text.includes('切换到全部允许？') && text.includes('编辑、写入和命令都不再询问。')
-      && text.includes('取消') && focused === '取消', `${oneLine(text)} | 焦点：${focused}`);
+    role === 'alertdialog' && text.includes('Switch to “Allow all”?')
+      && text.includes('Edits, writes, and commands will run without asking.') && text.includes('Cancel')
+      && focused === 'Cancel', `${oneLine(text)} | 焦点：${focused}`);
   await shot(page, 'confirm-all');
 }
 
@@ -535,7 +540,7 @@ async function cancelAllOnce(page) {
   const before = await permissionButton(page);
   const count = await commandCount(page);
   await checkMenu(page, 'all-mode：权限菜单两个选项，当前"每次询问"打勾，底部说明', { mode: 'ask', allowed: [] });
-  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: '全部允许' }).click();
+  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
   const dialog = page.getByTestId('confirm-dialog');
   await dialog.waitFor({ timeout: 5000 });
   await checkConfirm(page, dialog);
@@ -543,11 +548,11 @@ async function cancelAllOnce(page) {
   await sleep(200);
   const after = await permissionButton(page);
   record('all-mode：确认框里按 Esc 等于取消，权限不变', await dialog.count() === 0 && await commandCount(page) === count
-    && after.text === '每次询问' && before.popup === 'menu', JSON.stringify(after));
+    && after.text === 'Ask each time' && before.popup === 'menu', JSON.stringify(after));
   return before;
 }
 
-/** @brief all-mode：确认后全部允许（警示色），改文件不出卡、标"全部允许"；切回每次询问不需要确认，之后又出卡。 */
+/** @brief all-mode：确认后全部允许（警示色），改文件不出卡、标"Allow all"；切回每次询问不需要确认，之后又出卡。 */
 async function allModeCheck(page, h) {
   const fx = await h.load('all-mode');
   let askLook = null;
@@ -560,22 +565,22 @@ async function allModeCheck(page, h) {
       if (command.type !== 'approval.setMode') return;
       const button = await permissionButton(page);
       if (command.mode === 'all') {
-        record('all-mode：确认后顶栏按钮显示"全部允许"，用警示色', button.text === '全部允许'
+        record('all-mode：确认后顶栏按钮显示"全部允许"，用警示色', button.text === 'Allow all'
           && button.look !== askLook?.look, JSON.stringify([askLook, button]));
       } else {
-        record('all-mode：切回"每次询问"不需要确认', button.text === '每次询问'
+        record('all-mode：切回"每次询问"不需要确认', button.text === 'Ask each time'
           && await page.getByTestId('confirm-dialog').count() === 0, JSON.stringify(button));
       }
     },
   });
   const cards = await h.toolCards();
-  record('all-mode：全部允许时改文件不出卡，修改卡标"全部允许"', cards.some((c) => c.title.startsWith('修改')
-    && c.badge === '全部允许'), JSON.stringify(cards));
+  record('all-mode：全部允许时改文件不出卡，修改卡标"全部允许"', cards.some((c) => c.title.startsWith('Edit')
+    && c.badge === 'Allow all'), JSON.stringify(cards));
   await commonChecks(page, h, fx);
   await shot(page, 'all-mode');
 }
 
-/** @brief pending-to-all：卡挂着时切到全部允许，挂起的卡按允许处理，工具卡标"全部允许"。 */
+/** @brief pending-to-all：卡挂着时切到全部允许，挂起的卡按允许处理，工具卡标"Allow all"。 */
 async function pendingToAllCheck(page, h) {
   const fx = await h.load('pending-to-all');
   await drive(page, h, fx, {
@@ -590,11 +595,11 @@ async function pendingToAllCheck(page, h) {
     },
   });
   const cards = await h.toolCards();
-  record('pending-to-all：被放行的命令卡标"全部允许"', cards[0]?.badge === '全部允许', JSON.stringify(cards));
+  record('pending-to-all：被放行的命令卡标"全部允许"', cards[0]?.badge === 'Allow all', JSON.stringify(cards));
   await commonChecks(page, h, fx);
 }
 
-/** @brief stop-pending：卡挂着时在输入框按 Esc：撤回排队、停止，卡按拒绝处理；重新打开后仍是"已拒绝 · 你按了停止"。 */
+/** @brief stop-pending：卡挂着时在输入框按 Esc：撤回排队、停止，卡按拒绝处理；重新打开后仍是"Denied · You pressed Stop"。 */
 async function stopPendingCheck(page, h) {
   const fx = await h.load('stop-pending');
   await drive(page, h, fx, {
@@ -602,16 +607,16 @@ async function stopPendingCheck(page, h) {
       if (command.type !== 'session.clearQueue') return;
       const cards = await h.toolCards();
       record('stop-pending：停止前批准卡挂着，工具卡"等你批准"', await page.locator(CARD).count() === 1
-        && cards[0]?.status === 'awaiting' && cards[0]?.text === '等你批准', JSON.stringify(cards));
+        && cards[0]?.status === 'awaiting' && cards[0]?.text === 'Waiting for your approval', JSON.stringify(cards));
     },
     async after(command) {
       if (command.type === 'session.clearQueue') {
         await untilIdle(page);
         const cards = await h.toolCards();
         record('stop-pending：在输入框按 Esc：卡按拒绝处理，工具卡"已拒绝 · 你按了停止"', await page.locator(CARD).count() === 0
-          && cards[0]?.status === 'rejected' && cards[0]?.text === '已拒绝 · 你按了停止', JSON.stringify(cards));
+          && cards[0]?.status === 'rejected' && cards[0]?.text === 'Denied · You pressed Stop', JSON.stringify(cards));
         record('stop-pending：提示"已停止 · 已经做出的修改不会自动撤销"，不显示错误',
-          await page.getByText('已停止 · 已经做出的修改不会自动撤销').count() === 1
+          await page.getByText(STOPPED_TEXT).count() === 1
             && await page.getByTestId('error-card').count() === 0);
         await commonChecks(page, h, fx);
         await shot(page, 'stop-pending');
@@ -641,7 +646,7 @@ async function cardEscCheck(page, h) {
   const [end] = eventsOfType(fx, 'mori.approval_end');
   const cards = await h.toolCards();
   record(`card-esc：工具卡显示"${rejectedText(end)}"，没有停止`, cards.some((c) => c.text === rejectedText(end))
-    && await page.getByText('已停止 · 已经做出的修改不会自动撤销').count() === 0, JSON.stringify(cards));
+    && await page.getByText(STOPPED_TEXT).count() === 0, JSON.stringify(cards));
   await commonChecks(page, h, fx);
 }
 
@@ -667,13 +672,13 @@ async function writeAllowCheck(page, h) {
   });
   const users = await page.getByTestId('user-message').allInnerTexts();
   const cards = await h.toolCards();
-  const written = cards.some((c) => c.title.startsWith('写入') && c.status === 'done');
+  const written = cards.some((c) => c.title.startsWith('Write') && c.status === 'done');
   record('write-allow：Alt+1 允许后写入完成，排队的消息在本轮结束前送达', written && users.length === 2
     && users[1].startsWith('排队：'), `${JSON.stringify(cards)} | ${users.join(' | ')}`);
   await commonChecks(page, h, fx);
 }
 
-/** @brief two-tools：逐张出卡（没有"还有 N 张"，上一个调用执行完才出下一张）；焦点不在任何元素上时 Alt+1 也有效。 */
+/** @brief two-tools：逐张出卡（没有"{n} more"，上一个调用执行完才出下一张）；焦点不在任何元素上时 Alt+1 也有效。 */
 async function twoToolsCheck(page, h) {
   const fx = await h.load('two-tools');
   const requests = eventsOfType(fx, 'mori.approval_request');
@@ -709,7 +714,7 @@ async function saveFakeKey(page, h, key) {
   const rows = '[data-testid="provider-card"] [data-testid="key-row"]';
   await page.waitForFunction(({ css, count }) => document.querySelectorAll(css).length > count, { css: rows, count: before },
     { timeout: 10000 });
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app' }).click();
 }
 
 /**
@@ -730,10 +735,11 @@ async function f8Open(page) {
     src: el.querySelector('[data-testid="issue-shot"]')?.getAttribute('src') ?? '', text: el.innerText,
     what: el.querySelector('[data-testid="issue-what"]')?.getAttribute('aria-label'),
     expect: el.querySelector('[data-testid="issue-expect"]')?.getAttribute('aria-label') }));
-  record('f8：报告框有截图缩略图、"哪里不对""你期望什么"和说明', view.role === 'dialog' && view.label === '报告界面问题'
-    && view.src.startsWith('data:image/png') && view.what === '哪里不对' && view.expect === '你期望什么'
+  record('f8：报告框有截图缩略图、"哪里不对""你期望什么"和说明', view.role === 'dialog'
+    && view.label === 'Report a UI issue' && view.src.startsWith('data:image/png') && view.what === 'What went wrong'
+    && view.expect === 'What you expected'
     && view.text.includes(F8_NOTE), JSON.stringify({ ...view, src: view.src.slice(0, 30) }));
-  record('f8：两个框都空时"保存"不可用', await dialog.getByRole('button', { name: '保存', exact: true }).isDisabled());
+  record('f8：两个框都空时"保存"不可用', await dialog.getByRole('button', { name: 'Save', exact: true }).isDisabled());
   await dialog.getByTestId('issue-expect').fill('按钮之间留出空隙');
   await page.keyboard.press('F8');
   const focused = await page.evaluate(() => document.activeElement?.dataset.testid);
@@ -742,51 +748,53 @@ async function f8Open(page) {
   return dialog;
 }
 
-/** @brief 交给主进程的报告：截图 id、两段文字、"当前界面"的几项、带时间的最近操作；不含连接表单里填过的 key。 */
+/** @brief 交给主进程的报告：截图 id、两段文字、"Current view"的几项、带时间的最近操作；不含连接表单里填过的 key。 */
 function checkReport(report, key) {
   const field = (part) => report.view.find((item) => item.label.includes(part))?.value;
   const actions = report.actions.map((item) => item.text);
   const timed = report.actions.every((item) => /^\d\d:\d\d:\d\d$/.test(item.time));
   record('f8：报告带截图、两段文字、当前界面（会话、每次询问、等你批准 1 张）和带时间的最近操作',
     report.captureId === 'replay-capture-1' && report.what === '批准卡的按钮太挤' && report.expect === '按钮之间留出空隙'
-      && field('页面') === '会话' && field('权限') === '每次询问' && field('等你批准') === '1'
-      && actions.some((text) => text.startsWith('发送：')) && timed, JSON.stringify({ view: report.view, actions }));
+      && field('Page') === 'Session' && field('Permission mode') === 'Ask each time'
+      && field('Pending requests') === '1'
+      && actions.some((text) => text.startsWith('Send: ')) && timed, JSON.stringify({ view: report.view, actions }));
   const added = actions.filter((text) => /^Add key \S+$/.test(text));
-  record('f8：Add key 填过的 key 不出现在报告里，"最近的操作"只记"Add key <提供商>"', !JSON.stringify(report).includes(key)
+  record('f8：Add key 填过的 key 不出现在报告里，"Recent activity"只记"Add key <提供商>"', !JSON.stringify(report).includes(key)
     && added.length === 1, actions.join(' | '));
 }
 
-/** @brief F8 保存：保存中 → 已保存；报告内容（截图、文字、当前界面、最近的操作）不含 key；打开所在文件夹；关闭。 */
+/** @brief F8 保存：Saving… → Saved to；报告内容（截图、文字、当前界面、最近的操作）不含 key；Show in Explorer；Close。 */
 async function f8Save(page, dialog, key) {
   await dialog.getByTestId('issue-what').fill('批准卡的按钮太挤');
   await shot(page, 'f8-dialog');
   await page.evaluate(() => { window.__replay.f8.saveDelayMs = 1500; });
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   record('f8：保存中按钮显示"保存中…"，不可再点',
-    await dialog.getByRole('button', { name: '保存中…' }).isDisabled().catch(() => false));
-  // 保存中按 Esc 不关闭报告框，"取消"也不可用：要等保存结束、显示路径
+    await dialog.getByRole('button', { name: 'Saving…' }).isDisabled().catch(() => false));
+  // 保存中按 Esc 不关闭报告框，"Cancel"也不可用：要等保存结束、显示路径
   await page.keyboard.press('Escape');
   await sleep(200);
-  const savingStill = await dialog.getByRole('button', { name: '保存中…' }).count() === 1;
-  const cancelOff = await dialog.getByRole('button', { name: '取消', exact: true }).isDisabled().catch(() => false);
+  const savingStill = await dialog.getByRole('button', { name: 'Saving…' }).count() === 1;
+  const cancelOff = await dialog.getByRole('button', { name: 'Cancel', exact: true }).isDisabled().catch(() => false);
   record('f8：保存中按 Esc 不关闭报告框，"取消"不可用', savingStill && cancelOff,
     `报告框 ${await page.getByTestId('issue-dialog').count()} 个，保存中 ${savingStill}，取消不可用 ${cancelOff}`);
   await dialog.getByTestId('issue-saved').waitFor({ timeout: 5000 });
   const saved = await dialog.getByTestId('issue-saved').innerText();
   const report = await page.evaluate(() => window.__replay.status.issues.at(-1));
-  record('f8：已保存：显示"已保存到 <路径>"、"打开所在文件夹"和"关闭"', saved.includes('已保存到 C:\\replay\\ui-issues\\replay-1.md')
-    && await dialog.getByRole('button', { name: '打开所在文件夹' }).count() === 1
-    && await dialog.getByRole('button', { name: '关闭' }).count() === 1, oneLine(saved));
+  record('f8：已保存：显示"已保存到 <路径>"、"打开所在文件夹"和"关闭"',
+    saved.includes('Saved to C:\\replay\\ui-issues\\replay-1.md')
+    && await dialog.getByRole('button', { name: 'Show in Explorer' }).count() === 1
+    && await dialog.getByRole('button', { name: 'Close' }).count() === 1, oneLine(saved));
   checkReport(report, key);
-  await dialog.getByRole('button', { name: '打开所在文件夹' }).click();
+  await dialog.getByRole('button', { name: 'Show in Explorer' }).click();
   const shown = await page.evaluate(() => window.__replay.status.shown.at(-1));
   record('f8：点"打开所在文件夹"在资源管理器里选中这个文件', shown === 'C:\\replay\\ui-issues\\replay-1.md', shown);
-  await dialog.getByRole('button', { name: '关闭' }).click();
+  await dialog.getByRole('button', { name: 'Close' }).click();
   record('f8：关闭后焦点回到打开前的位置（输入框）', await page.getByTestId('issue-dialog').count() === 0
     && await composerFocused(page));
 }
 
-/** @brief F8 的失败状态：截图失败仍可保存（报告注明）；保存失败显示原文且文字还在；左栏按钮也能打开；"取消"关闭。 */
+/** @brief F8 的失败状态：截图失败仍可保存（报告注明）；保存失败显示原文且文字还在；左栏按钮也能打开；"Cancel"关闭。 */
 async function f8Failures(page) {
   const dialog = page.getByTestId('issue-dialog');
   await page.evaluate(() => Object.assign(window.__replay.f8, { captureDelayMs: 0, saveDelayMs: 0,
@@ -794,22 +802,22 @@ async function f8Failures(page) {
   await page.keyboard.press('F8');
   const captureError = await dialog.getByTestId('issue-error').innerText({ timeout: 5000 }).catch(() => '');
   await dialog.getByTestId('issue-what').fill('截图失败时也能保存');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await dialog.getByTestId('issue-saved').waitFor({ timeout: 5000 });
   const report = await page.evaluate(() => window.__replay.status.issues.at(-1));
   record('f8：截图失败时显示原文，仍可填写和保存（报告注明截图失败）', captureError.includes('capture failed in replay')
     && report.captureId === null && report.captureError?.includes('capture failed in replay'), oneLine(captureError));
-  await dialog.getByRole('button', { name: '关闭' }).click();
+  await dialog.getByRole('button', { name: 'Close' }).click();
   await page.evaluate(() => Object.assign(window.__replay.f8, { captureError: null,
     saveError: 'disk full in replay' }));
-  await page.getByRole('button', { name: '报告界面问题（F8）' }).click();
+  await page.getByRole('button', { name: 'Report a UI issue (F8)' }).click();
   await dialog.getByTestId('issue-shot').waitFor({ timeout: 5000 });
   await dialog.getByTestId('issue-what').fill('保存失败时文字还在');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   const saveError = await dialog.getByTestId('issue-error').innerText({ timeout: 5000 }).catch(() => '');
   record('f8：左栏按钮打开报告框；保存失败时显示原文，已输入的文字还在', saveError.includes('disk full in replay')
     && await dialog.getByTestId('issue-what').inputValue() === '保存失败时文字还在', oneLine(saveError));
-  await dialog.getByRole('button', { name: '取消' }).click();
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
   record('f8：点"取消"关闭报告框', await dialog.count() === 0);
 }
 

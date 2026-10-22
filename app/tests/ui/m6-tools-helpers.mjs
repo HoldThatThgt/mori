@@ -13,16 +13,16 @@ export function toolsHead(page) {
       current: root.querySelector('[data-testid="tools-nav"] [aria-current="page"]')?.dataset.section ?? null,
       follow: text(root.querySelector('[data-testid="tools-follow"]')),
       notice: text(root.querySelector('.tools-notice span')),
-      newSession: [...root.querySelectorAll('.tools-notice button')].some((b) => b.textContent.includes('新建会话')),
+      newSession: [...root.querySelectorAll('.tools-notice button')].some((b) => b.textContent.includes('New session')),
       trust: text(root.querySelector('[data-testid="tools-trust"]')) || null,
       title: text(root.querySelector('.topbar .chat-title')),
-      back: [...root.querySelectorAll('.topbar button')].some((b) => b.textContent.includes('返回会话')),
+      back: [...root.querySelectorAll('.topbar button')].some((b) => b.textContent.includes('Back to app')),
       text: root.innerText,
     };
   });
 }
 
-/** @brief "技能"一节的行（开关：aria-checked、是否不可用）。 */
+/** @brief "Skills"一节的行（开关：aria-checked、是否不可用）。 */
 export function skillRows(page) {
   return page.evaluate(() => {
     const text = (element) => element?.textContent?.trim() ?? '';
@@ -37,7 +37,7 @@ export function skillRows(page) {
   });
 }
 
-/** @brief "内置工具"一节的行。 */
+/** @brief "Built-in tools"一节的行。 */
 export function toolRows(page) {
   return page.evaluate(() => {
     const text = (element) => element?.textContent?.trim() ?? '';
@@ -50,8 +50,8 @@ export function toolRows(page) {
 /**
  * @brief "MCP"一节的行。process 是进程状态那一行（tools.md"进程状态"）：data-state、状态文字（里面的 p）、
  *        是不是警示色（tools-warn 类，和 p 实际显示的颜色 color）、是不是紧接在命令行（.tools-mono）下面、
- *        "完整原文"（details.tools-full-notice 的 summary、是否展开和 pre 的原文；没有时为 null）、这一行里任何地方
- *        有没有"完整原文"几个字（fullWord）；没有这一行时为 null。
+ *        "Full error"（details.tools-full-notice 的 summary、是否展开和 pre 的原文；没有时为 null）、这一行里任何地方
+ *        有没有"Full error"几个字（fullWord）；没有这一行时为 null。
  *        errorColor 是行下面 pi 通知原文（mcp-error 的第一行）实际显示的颜色（警示色的参照；没有时为 null）。
  *        warn 是行里全部警示色的文字（进程状态失败时也算在里面）。
  */
@@ -66,7 +66,7 @@ export function mcpRows(page) {
       warn: line.classList.contains('tools-warn'), color: color(line.querySelector(':scope > p')),
       afterCommand: line.previousElementSibling?.classList.contains('tools-mono') ?? false,
       full: fullText(line.querySelector(':scope > details.tools-full-notice')),
-      fullWord: line.textContent.includes('完整原文') } : null);
+      fullWord: line.textContent.includes('Full error') } : null);
     return [...document.querySelectorAll('[data-testid="mcp-row"]')].map((row) => ({
       process: processLine(row.querySelector('[data-testid="mcp-process"]')),
       errorColor: color(row.querySelector('[data-testid="mcp-error"] > p')),
@@ -86,7 +86,7 @@ export function mcpRows(page) {
   });
 }
 
-/** @brief "插件"一节的卡。 */
+/** @brief "Plugins"一节的卡。 */
 export function packageCards(page) {
   return page.evaluate(() => {
     const text = (element) => element?.textContent?.trim() ?? '';

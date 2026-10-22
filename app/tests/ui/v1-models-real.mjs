@@ -8,7 +8,7 @@
 //      发给第二个，对话流一行"Switched model: A → B · API key rejected"，没有错误卡。
 //   4. 退出，把首选的 key 改指备用 ref，重新启动，打开同一个会话：下一段用回首选。
 //   5. 段内换模型：让模型一个一个读五个文件，回复开始后照 3 换 key：段内换到第二个并重做（提示带
-//      "The new model redoes this reply."），之前的工具卡仍显示，没有错误卡。
+//      "The new model redoes this response."），之前的工具卡仍显示，没有错误卡。
 //   6. 再照 4 恢复并重新启动：重新打开后换模型提示仍在，下一段用回首选。
 // 每一步的实际模型从会话文件里助手消息的 provider / model 读（包装后的流函数原样转发实际模型的消息，§11.2）。
 // 用法（在 app/ 下，先 npm run build）：
@@ -95,7 +95,7 @@ async function probes(ctx) {
       tier: p?.tier?.level, context: p?.context, reasoning: p?.reasoning, cancel: p?.cancel_verified }));
   }
   await shot(ctx.page, '01-profiles');
-  await ctx.page.getByTestId('settings-page').getByRole('button', { name: '返回会话' }).click();
+  await ctx.page.getByTestId('settings-page').getByRole('button', { name: 'Back to app' }).click();
   await ctx.page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 10000 });
 }
 
@@ -165,7 +165,8 @@ async function switchMidReply(ctx) {
   const entry = customEntries(ctx.sessionFile, 'mori.model_switch').at(-1);
   const firstTools = messages.filter((m) => m.ref === ctx.firstRef).reduce((sum, m) => sum + m.tools, 0);
   await shot(ctx.page, '05-switch-mid');
-  const want = `Switched model: ${ctx.firstRef} → ${ctx.secondRef} · API key rejected The new model redoes this reply.`;
+  const want = `Switched model: ${ctx.firstRef} → ${ctx.secondRef} · API key rejected`
+    + ' The new model redoes this response.';
   record('MP-27 switch mid-reply (wrong key entered while the reply was reading files → real HTTP 401): one line '
     + `"${want}"; ${ctx.secondRef} finishes the reply; no error card`,
   running === 'true' && stillRunning === 'true' && notices.length === 1 && notices[0].text === want && notices[0].hidden

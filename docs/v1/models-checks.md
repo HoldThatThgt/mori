@@ -111,6 +111,15 @@
    改为等高亮完成再选。改后 `m5-app` 负载下连跑 5 次、`m7-replay` 连跑 8 次都通过。
 8. 实测中补进规格的三条：第 5、6 步服务端回 400 或 422 算判定为不通过（DeepSeek 拒绝指定调用和 JSON schema 时等级才能定为 C）；
    探针没跑完就关了 App 的模型，下次启动自动重新探测；加 key、删 key 也算修改提供商，没验证过的模型重新探测。
+9. 界面文字（2026-10-21，与 english-ui 合并）：v1 的界面文字改按英文界面的术语表 [v0/ui-strings.md](../v0/ui-strings.md)，
+   不再逐字照规格 §9 原来给的英文；规格 §9 与 [screens/](screens/) 已同步成代码里的文字，行为不变。主要改动：Address → Base URL、
+   Model id → Model ID、New-session thinking level → Default effort for new sessions、Compatibility → Compatibility options；
+   测试结果“Connected · First token Nms · Total Nms · Includes thinking · Response: …”、失败“Connection failed: …”；
+   顶栏悬停“Can’t switch models until the response finishes”、菜单“Applies to this session only. …”与“Manage models”；
+   不支持思考的说明用 english-ui 的句子（Settings → Models）；阶段行“Retrying (n/m) · …”；换模型提示“… redoes this response.”；
+   只跳页的按钮去掉“…”（拒绝启动卡的“Allow <zone> for this project”“Confirm zone”），会弹确认的加“…”（Delete…、最后一个 key 的 Remove…）；
+   字段错误改为带句号的整句；撇号一律用 ’。`shared/models.ts` 的兼容选项说明（`COMPAT_LABELS`）和后台进程写出的原文
+   （原因文字、“This session can't start: no model fits”等）仍是规格原来的写法。
 
 ## 测试中发现并已修正的问题
 

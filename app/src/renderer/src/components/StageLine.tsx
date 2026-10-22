@@ -1,5 +1,5 @@
 // 阶段行：由 pi 事件推出（见 docs/v0/screens/chat.md），本轮结束后隐藏。模型层的等待（等模型、等它停下、重建、排队、
-// 原地重试，docs/v1/screens/model-chat.md "阶段行"）进行时取代"等待模型响应"，准备中也显示。
+// 原地重试，docs/v1/screens/model-chat.md "阶段行"）进行时取代"Waiting for the model…"，准备中也显示。
 // 协作（docs/v1/screens/team-stop.md "阶段行"）：分开时立项判断你刚发的消息、对话还没在运行时显示
 // "<create role> is deciding… · 4s"；后台实例的批准卡不改变阶段行。
 
@@ -34,16 +34,17 @@ function decidingText(transcript: Transcript, now: number): string | null {
 }
 
 /**
- * @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"等你批准"，其次有挂起的扩展询问时"等你回答"，
- *        都不显示"生成中"或"执行中"。模型层的等待写作"<文字> · 12s"，从这次等待开始计时。
+ * @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"Waiting for your approval"，其次有挂起的扩展询问时
+ *        "Waiting for your answer"，都不显示"Responding…"或工具的"<标题> Ns"。模型层的等待写作"<文字> · 12s"，
+ *        从这次等待开始计时。
  * @param seatRoles 工具标题里 agent_message 的 Message / Ask（toolTitle）
  */
 export function stageText(transcript: Transcript, cwd: string, now: number,
   seatRoles: readonly string[] = []): string | null {
   const stage = transcript.stage;
-  if (transcript.running && transcript.approvals.length > 0) return '等你批准';
+  if (transcript.running && transcript.approvals.length > 0) return 'Waiting for your approval';
   // 扩展命令等不经过一轮运行的询问也要看得到。
-  if (transcript.questions.length > 0) return '等你回答';
+  if (transcript.questions.length > 0) return 'Waiting for your answer';
   const model = transcript.modelStage;
   if (model && modelStageShown(transcript)) return `${model.text} · ${elapsedText(model.since, now)}`;
   const deciding = decidingText(transcript, now);
@@ -53,19 +54,19 @@ export function stageText(transcript: Transcript, cwd: string, now: number,
   const elapsed = elapsedText(stage.since, now);
   switch (stage.kind) {
     case 'waiting':
-      return `等待模型响应 ${elapsed}`;
+      return `Waiting for the model… ${elapsed}`;
     case 'thinking':
-      return `思考中 ${elapsed}`;
+      return `Thinking… ${elapsed}`;
     case 'generating':
-      return '生成中';
+      return 'Responding…';
     case 'tool': {
       const tool = transcript.tools[stage.detail];
       return tool ? `${toolTitleText(tool, cwd, seatRoles)} ${elapsed}` : null;
     }
     case 'approval':
-      return '等你批准';
+      return 'Waiting for your approval';
     case 'compacting':
-      return '正在压缩较早的对话';
+      return 'Compacting session…';
   }
 }
 

@@ -236,13 +236,13 @@ export async function answerQuestion(key: string, requestId: string, value: bool
   }
 }
 
-/** @brief 切换会话的权限（每次询问 / 全部允许）。 */
+/** @brief 切换会话的权限（Ask each time / Allow all）。 */
 export async function setApprovalMode(key: string, mode: ApprovalMode): Promise<void> {
   const sessionId = sessionIdOf(key);
   if (sessionId) await sendApproval(key, { type: 'approval.setMode', sessionId, mode });
 }
 
-/** @brief 从"本会话已允许"里清除一个工具名。 */
+/** @brief 从"Allowed for this session"里清除一个工具名（Forget）。 */
 export async function forgetApproval(key: string, toolName: string): Promise<void> {
   const sessionId = sessionIdOf(key);
   if (sessionId) await sendApproval(key, { type: 'approval.forget', sessionId, toolName });
@@ -336,7 +336,7 @@ function untabbedChange(saved: SavedSession, event: ForwardedEvent): Partial<Sav
 
 /**
  * @brief 界面重新加载后还没点开、但还在后台进程里的会话的事件：更新侧栏的行（列表带回的 live、名字、排序）；
- *        本轮结束时标"有新结果"，要批准时让任务栏闪烁。正在打开（还没拿到会话标识）的由打开结果接上，这里不记。
+ *        本轮结束时标"Unread"，要批准时让任务栏闪烁。正在打开（还没拿到会话标识）的由打开结果接上，这里不记。
  *        一个会话可能同时有几个询问，结束一个时这里按"没有了"处理，下一个询问到来时再标上。
  */
 function handleUntabbed(envelope: EventEnvelope): void {
@@ -394,7 +394,7 @@ function withTeamEvent(tab: Tab, event: ForwardedEvent): Tab {
 
 /**
  * @brief 归并一个后台进程事件；本轮或压缩结束后刷新上下文用量。改名事件更新会话名；
- *        不可见的会话本轮结束时标"有新结果"。界面重新加载后还没点开的会话只更新侧栏状态。
+ *        不可见的会话本轮结束时标"Unread"。界面重新加载后还没点开的会话只更新侧栏状态。
  *        全局事件（sessionId 为 null：mori.profiles、mori.key_status）不属于任何会话，由设置页自己订阅处理。
  */
 export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void {
@@ -430,8 +430,8 @@ export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void
 }
 
 /**
- * @brief 后台进程意外退出：没结束的工具标"已中断"，运行状态清空；准备中的消息和暂存的消息放回输入框；
- *        正在生成的会话在侧栏标"出错"。
+ * @brief 后台进程意外退出：没结束的工具标"Interrupted"，运行状态清空；准备中的消息和暂存的消息放回输入框；
+ *        正在生成的会话在侧栏标"Error"。
  *        pi 会话随后台进程一起没了，会话标识清掉，之后的命令不会用到它（重新载入后换成新的）。
  */
 export function handleKernelExit(): void {
@@ -445,7 +445,7 @@ export function handleKernelExit(): void {
   }
   useApp.setState((state) => ({
     kernel: 'exited',
-    // 还没点开的会话：后台进程里的状态随它一起没了，退出时正在生成的标"出错"（打开着的看它自己的对话流）。
+    // 还没点开的会话：后台进程里的状态随它一起没了，退出时正在生成的标"Error"（打开着的看它自己的对话流）。
     saved: { ...state.saved, sessions: state.saved.sessions.map((item) => ({ ...item, live: null })) },
     rowMarks: { ...state.rowMarks, ...Object.fromEntries(state.saved.sessions.filter((item) => item.live?.running
       && !state.tabs.some((tab) => sameFile(tab.sessionFile, item.sessionFile)))
@@ -465,9 +465,9 @@ function withoutPending(transcript: Transcript): Transcript {
   return { ...transcript, items: transcript.items.filter((item) => !(item.kind === 'user' && item.pending)) };
 }
 
-/** @brief "重新载入"：重启后台进程；新通道连上后由 handleKernelReady 重新打开会话。 */
+/** @brief "Restart"：重启后台进程；新通道连上后由 handleKernelReady 重新打开会话。 */
 export async function reload(): Promise<void> {
-  recordAction('重新载入后台进程');
+  recordAction('Restart background process');
   useApp.setState({ kernel: 'reloading' });
   try {
     await window.mori.restartKernel();
@@ -487,18 +487,18 @@ export function handleKernelReady(): void {
 }
 
 /**
- * @brief 打开设置页（侧栏）。从工具页过来时不用问（有未保存改动的编辑器只在设置页里）。
- *        卡片与顶栏菜单里打开 设置 → Models 的按钮用 settings.ts 的 openModelsSettings。
+ * @brief 打开设置页（侧栏）。从工具页（Customize）过来时不用问（有未保存改动的编辑器只在设置页里）。
+ *        卡片与顶栏菜单里打开 Settings → Models 的按钮用 settings.ts 的 openModelsSettings。
  */
 export function openSettings(): void {
-  recordAction('打开设置');
+  recordAction('Open settings');
   useApp.setState({ view: 'settings' });
 }
 
-/** @brief 打开工具页（docs/v0/screens/tools.md）；从有未保存改动的设置页过来时先问。 */
+/** @brief 打开工具页（Customize，docs/v0/screens/tools.md）；从有未保存改动的设置页过来时先问。 */
 export function openTools(): void {
   guardLeave(() => {
-    recordAction('打开工具页');
+    recordAction('Open Customize');
     useApp.setState({ view: 'tools' });
   });
 }

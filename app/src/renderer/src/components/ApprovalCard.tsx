@@ -81,9 +81,9 @@ function replacements(args: Record<string, unknown>): Replacement[] {
     && typeof (item as Replacement).newText === 'string');
 }
 
-/** @brief 卡片标题：命令是"运行命令"，其余与工具卡标题相同（修改 / 写入 路径、服务 · 工具、原名）。 */
+/** @brief 卡片标题：命令是"Run a command"，其余与工具卡标题相同（Edit / Write <路径>、服务 · 工具、原名）。 */
 function cardTitle(approval: PendingApproval, cwd: string): ToolTitle {
-  if (isCommandTool(approval.toolName)) return { verb: '运行命令', target: '', suffix: '' };
+  if (isCommandTool(approval.toolName)) return { verb: 'Run a command', target: '', suffix: '' };
   return toolTitle({ ...newTool(approval.toolCallId, approval.toolName), args: approval.args }, cwd);
 }
 
@@ -116,8 +116,12 @@ function ApprovalWarnings({ view }: { view: CardView }) {
   if (!view.outside && !view.hidden) return null;
   return (
     <div className="approval-warnings">
-      {view.outside && <p className="approval-warn" data-testid="approval-outside">这个路径在项目文件夹之外</p>}
-      {view.hidden && <p className="approval-warn" data-testid="approval-hidden">内容里有不可见的控制字符，已标出</p>}
+      {view.outside && (
+        <p className="approval-warn" data-testid="approval-outside">This file is outside the working directory</p>
+      )}
+      {view.hidden && (
+        <p className="approval-warn" data-testid="approval-hidden">Contains hidden characters, shown as ⟨U+XXXX⟩</p>
+      )}
     </div>
   );
 }
@@ -129,19 +133,19 @@ function ApprovalBody({ view }: { view: CardView }) {
     <div className="approval-body">
       {view.path !== null && (
         <div className="approval-path" data-testid="approval-path">
-          <span className="approval-meta">路径</span><code>{view.path}</code>
+          <span className="approval-meta">Path</span><code>{view.path}</code>
         </div>
       )}
       {edits.map((edit, index) => (
         <div key={index} className="approval-edit" data-testid="approval-edit">
-          {edits.length > 1 && <div className="approval-meta">第 {index + 1} 处</div>}
+          {edits.length > 1 && <div className="approval-meta">Change {index + 1}</div>}
           <pre className="approval-pre approval-old">{edit.oldText}</pre>
           <pre className="approval-pre approval-new">{edit.newText}</pre>
         </div>
       ))}
       {view.content !== null && <pre className="approval-pre" data-testid="approval-content">{view.content}</pre>}
       {view.command !== null && <pre className="approval-pre" data-testid="approval-command">{view.command}</pre>}
-      {view.timeout !== null && <div className="approval-meta">超时 {view.timeout} 秒</div>}
+      {view.timeout !== null && <div className="approval-meta">Timeout: {view.timeout}s</div>}
       {view.args !== null && <pre className="approval-pre" data-testid="approval-args">{view.args}</pre>}
     </div>
   );
@@ -183,7 +187,7 @@ function KeyHint({ keys }: { keys: string }) {
   return <span className="approval-key" aria-hidden="true">{keys}</span>;
 }
 
-/** @brief 三个选项和理由框；"本会话不再询问"下方是小字说明。在理由框里按 Enter 等于拒绝。 */
+/** @brief 三个选项和理由框；"Allow “…” for this session"下方是小字说明。在理由框里按 Enter 等于拒绝。 */
 function ApprovalActions({ toolName, reason, onReason, answer }: {
   toolName: string; reason: string; onReason: (text: string) => void; answer: (decision: ApprovalDecision) => void;
 }) {
@@ -197,16 +201,16 @@ function ApprovalActions({ toolName, reason, onReason, answer }: {
     <>
       <div className="approval-actions">
         <button className="button" data-testid="approval-allow" aria-keyshortcuts="Alt+1"
-          onClick={() => answer('allow')}>允许一次<KeyHint keys="Alt+1" /></button>
+          onClick={() => answer('allow')}>Allow once<KeyHint keys="Alt+1" /></button>
         <button className="button approval-session" data-testid="approval-allow-session" aria-keyshortcuts="Alt+2"
           aria-describedby={hintId} onClick={() => answer('allowSession')}>
-          本会话不再询问"{approvalLabel(toolName)}"<KeyHint keys="Alt+2" />
+          Allow “{approvalLabel(toolName)}” for this session<KeyHint keys="Alt+2" />
         </button>
-        <input className="approval-reason" data-testid="approval-reason" aria-label="拒绝理由"
-          placeholder="拒绝理由（可选，会告诉模型）" value={reason} onChange={(event) => onReason(event.target.value)}
+        <input className="approval-reason" data-testid="approval-reason" aria-label="Reason for denying"
+          placeholder="Tell the model why (optional)" value={reason} onChange={(event) => onReason(event.target.value)}
           onKeyDown={onReasonKeyDown} />
         <button className="button danger" data-testid="approval-reject" aria-keyshortcuts="Alt+3"
-          onClick={() => answer('reject')}>拒绝<KeyHint keys="Alt+3" /></button>
+          onClick={() => answer('reject')}>Deny<KeyHint keys="Alt+3" /></button>
       </div>
       <p id={hintId} className="approval-hint">{allowSessionHint(toolName)}</p>
     </>
@@ -242,7 +246,7 @@ function Card({ tabKey, cwd, request, more }: {
 
   function onKeyDown(event: React.KeyboardEvent) {
     if (event.key !== 'Escape' || event.nativeEvent.isComposing) return;
-    // 焦点在卡上时 Esc：有开着的浮层（"排队发送"的下拉、权限菜单、报告框……）先关它，卡不变；
+    // 焦点在卡上时 Esc：有开着的浮层（"Queue"的下拉、权限菜单、报告框……）先关它，卡不变；
     // 没有浮层才只拒绝这张卡、生成继续。两种情况全局 Esc 都看到 defaultPrevented 就跳过。
     event.preventDefault();
     event.stopPropagation();
@@ -251,7 +255,7 @@ function Card({ tabKey, cwd, request, more }: {
   }
 
   return (
-    <div ref={ref} className="approval-card" role="group" aria-label={`等你批准：${titleText}`}
+    <div ref={ref} className="approval-card" role="group" aria-label={`Waiting for your approval: ${titleText}`}
       data-testid="approval-card" data-tool={approval.toolName} data-request={approval.requestId}
       data-agent={team?.role} data-task={team?.task ?? undefined} onKeyDown={onKeyDown}>
       {team && <div className="approval-attribution" data-testid="approval-attribution">{attributionText(team)}</div>}
@@ -259,7 +263,7 @@ function Card({ tabKey, cwd, request, more }: {
         <span className="approval-title" data-testid="approval-title">
           {title.verb}{title.target && <>{' '}<code>{title.target}</code></>}{title.suffix}
         </span>
-        {more > 0 && <span className="approval-more" data-testid="approval-more">还有 {more} 张</span>}
+        {more > 0 && <span className="approval-more" data-testid="approval-more">{more} more</span>}
       </div>
       <ApprovalWarnings view={view} />
       <ApprovalBody view={view} />

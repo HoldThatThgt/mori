@@ -1,8 +1,8 @@
 // 最小批准扩展（方案第 6 节，后台进程第 3 件事"转达批准请求"）：用 inline extension 注册 tool_call 处理器，
 // 在闭包里等界面的答复；拒绝时返回 { block: true, reason }，pi 把 reason 原样作为工具结果回给模型。
 // 每个待批准请求都绑定 ctx.signal：pi 不会替处理器取消等待，中止时不放手 session.abort() 会一直等着。
-// "本会话不再询问"只是按工具名记录的集合，和权限一起只存在内存里，不做其他规则。状态表见 docs/v0/screens/approval.md。
-// 平行 Agent（docs/specs/parallel-agents-taskboard.md §11）：权限与"本会话不再询问"一个用户会话一份（ApprovalPolicy），
+// "Allow for this session"只是按工具名记录的集合，和权限一起只存在内存里，不做其他规则。状态表见 docs/v0/screens/approval.md。
+// 平行 Agent（docs/specs/parallel-agents-taskboard.md §11）：权限与"Allow for this session"一个用户会话一份（ApprovalPolicy），
 // 对话会话和它的每个实例会话共用；挂起的请求仍按 pi 会话各自记录（ApprovalGate）。TaskBoard 的工具与读取类工具一样免批准。
 // 实例的请求不在自己的信封上出卡，而是交给 Team（GateOutput.onRequest / onEnd），由它在用户会话的信封上发后台批准卡。
 
@@ -58,13 +58,13 @@ export interface GateOutput {
 }
 
 /**
- * @brief 一个用户会话的批准状态（§11.1）：权限与"本会话不再询问"的工具名，对话会话与它的全部实例会话共用；
- *        记下共用它的每个会话的 ApprovalGate，切到"全部允许"、选"本会话不再询问"时一并处理它们挂起的请求。
+ * @brief 一个用户会话的批准状态（§11.1）：权限与"Allow for this session"的工具名，对话会话与它的全部实例会话共用；
+ *        记下共用它的每个会话的 ApprovalGate，切到"Allow all"、选"Allow for this session"时一并处理它们挂起的请求。
  */
 export class ApprovalPolicy {
   /** 权限：每次询问 / 全部允许 */
   private mode: ApprovalMode = DEFAULT_APPROVAL.mode;
-  /** "本会话不再询问"记下的工具名 */
+  /** "Allow for this session"记下的工具名 */
   private readonly allowed = new Set<string>(DEFAULT_APPROVAL.allowed);
   /** 共用这份状态的会话的批准扩展，按建立的顺序（对话会话在前） */
   private readonly gates = new Set<ApprovalGate>();
@@ -96,27 +96,27 @@ export class ApprovalPolicy {
     return this.allowed.has(toolName) ? 'session' : 'ask';
   }
 
-  /** @brief 切换权限；切到"全部允许"时这个用户会话里全部 Agent 挂起的请求按允许处理（方案 5.7、§11.1）。 */
+  /** @brief 切换权限；切到"Allow all"时这个用户会话里全部 Agent 挂起的请求按允许处理（方案 5.7、§11.1）。 */
   setMode(mode: ApprovalMode): ApprovalState {
     this.mode = mode;
     if (mode === 'all') for (const gate of [...this.gates]) gate.allowPending(null, 'all');
     return this.state();
   }
 
-  /** @brief "本会话不再询问"：记下工具名，全部 Agent 挂起的同名工具请求按允许处理（§11.1）。 */
+  /** @brief "Allow for this session"：记下工具名，全部 Agent 挂起的同名工具请求按允许处理（§11.1）。 */
   allowSession(toolName: string): void {
     this.allowed.add(toolName);
     for (const gate of [...this.gates]) gate.allowPending(toolName, 'session');
   }
 
-  /** @brief 从"本会话已允许"里清除一个工具名。 */
+  /** @brief 从"Allowed for this session"里清除一个工具名。 */
   forget(toolName: string): ApprovalState {
     this.allowed.delete(toolName);
     return this.state();
   }
 }
 
-/** @brief 一个会话的批准扩展：挂起的请求；权限与"本会话不再询问"在共用的 ApprovalPolicy 里。 */
+/** @brief 一个会话的批准扩展：挂起的请求；权限与"Allow for this session"在共用的 ApprovalPolicy 里。 */
 export class ApprovalGate {
   /** 等你选择的请求，按请求 id */
   private readonly pending = new Map<string, Pending>();
@@ -164,7 +164,7 @@ export class ApprovalGate {
 
   /**
    * @brief pi 在执行工具前调用：要批准时挂起，等你在界面上选择；停止中的调用直接按拒绝处理。
-   *        预告过要批准、现在已不用批准时（例如排队的嵌套调用在你选了"本会话不再询问"之后才轮到），
+   *        预告过要批准、现在已不用批准时（例如排队的嵌套调用在你选了"Allow for this session"之后才轮到），
    *        再发一次 mori.tool_gate 更正。
    */
   private onToolCall(event: ToolCallEvent, ctx: ExtensionContext): Promise<ToolCallEventResult | undefined> {
@@ -225,7 +225,7 @@ export class ApprovalGate {
       return this.state();
     }
     this.finish(requestId, 'allow', 'user', null);
-    // 本会话不再询问：这个用户会话里全部 Agent 挂起的同名工具请求一并允许，之后也不再询问（§11.1）。
+    // Allow for this session：这个用户会话里全部 Agent 挂起的同名工具请求一并允许，之后也不再询问（§11.1）。
     if (decision === 'allowSession') this.policy.allowSession(item.toolName);
     return this.state();
   }
@@ -235,7 +235,7 @@ export class ApprovalGate {
     return this.policy.setMode(mode);
   }
 
-  /** @brief 从"本会话已允许"里清除一个工具名（共用的那一份）。 */
+  /** @brief 从"Allowed for this session"里清除一个工具名（共用的那一份）。 */
   forget(toolName: string): ApprovalState {
     return this.policy.forget(toolName);
   }
@@ -243,7 +243,7 @@ export class ApprovalGate {
   /**
    * @brief 按允许结束挂起的请求（ApprovalPolicy 调用）。
    * @param toolName 只结束这个工具的请求；为 null 时结束全部
-   * @param by 由"本会话不再询问"或"全部允许"结束
+   * @param by 由"Allow for this session"或"Allow all"结束
    */
   allowPending(toolName: string | null, by: 'session' | 'all'): void {
     for (const [id, item] of [...this.pending]) {

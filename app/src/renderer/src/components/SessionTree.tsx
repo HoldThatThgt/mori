@@ -1,5 +1,5 @@
 // 左栏的项目 → 会话树（docs/v0/screens/sessions.md）：会话行的状态、键盘（整棵树一个 Tab 停靠点，↑ ↓ Home End 移动，
-// Enter 打开）、右键菜单（右键、菜单键、Shift+F10）、改名框、删除确认框，以及底部的"已归档"。行的数据在 sessionRows.ts。
+// Enter 打开）、右键菜单（右键、菜单键、Shift+F10）、改名框、删除确认框，以及底部的"Archived"。行的数据在 sessionRows.ts。
 
 import { useState } from 'react';
 import { describe } from '../state/bridge';
@@ -15,7 +15,7 @@ import { dragProps, useDragging } from './SessionDrag';
 import { SessionMenu, type MenuAction } from './SessionMenu';
 import { buildRows, groupRows, isUnsaved, rowStatus, STATUS_TEXT, type Row } from './sessionRows';
 
-/** @brief 把焦点放到某个会话行；找不到时放到"新会话"。 */
+/** @brief 把焦点放到某个会话行；找不到时放到"New session"。 */
 function focusRow(id: string | null): void {
   requestAnimationFrame(() => {
     const row = id ? document.querySelector<HTMLElement>(`.session-item[data-row="${CSS.escape(id)}"]`) : null;
@@ -23,7 +23,7 @@ function focusRow(id: string | null): void {
   });
 }
 
-/** @brief 屏幕上排在这一行下面的会话行（没有时上面的）；收起的"已归档"里的行不算。 */
+/** @brief 屏幕上排在这一行下面的会话行（没有时上面的）；收起的"Archived"里的行不算。 */
 function neighbourRow(id: string): string | null {
   const items = [...document.querySelectorAll<HTMLElement>('[data-testid="session-tree"] .session-item')];
   const index = items.findIndex((item) => item.dataset.row === id);
@@ -85,9 +85,11 @@ function SessionRow({ row, active, inSplit, tabStop, onMenu, onOpen, onFocus }: 
       aria-selected={active} data-row={row.id} data-file={row.file ?? ''} title={title} tabIndex={tabStop ? 0 : -1}
       onClick={() => onOpen(row)} onKeyDown={onKeyDown} onContextMenu={onContextMenu} onFocus={() => onFocus(row)}>
       <Icon name="chat" /><span className="session-label">{row.title}</span>
+      {/* 文字单独一个 span：侧栏很窄时只藏文字、留下圆点（文字仍在读屏名里），悬停圆点看 title */}
       {status && (
-        <span className={`session-status ${status}`} data-testid="session-status" data-status={status}>
-          {STATUS_TEXT[status]}
+        <span className={`session-status ${status}`} data-testid="session-status" data-status={status}
+          title={STATUS_TEXT[status]}>
+          <span className="session-status-text">{STATUS_TEXT[status]}</span>
         </span>
       )}
     </button>
@@ -98,12 +100,12 @@ function SessionRow({ row, active, inSplit, tabStop, onMenu, onOpen, onFocus }: 
 function ListNote({ problem }: { problem: string | null }) {
   const saved = useApp((state) => state.saved);
   if (problem) return <p className="sidebar-note error" role="alert">{problem}</p>;
-  if (saved.status === 'loading') return <p className="sidebar-note">正在读取会话…</p>;
+  if (saved.status === 'loading') return <p className="sidebar-note">Loading sessions…</p>;
   if (saved.status !== 'failed') return null;
   return (
     <div className="sidebar-note error" role="alert">
-      <span>读取会话列表失败：{saved.error}</span>
-      <button className="text-link" onClick={() => void loadSessions()}>重试</button>
+      <span>Couldn’t load sessions: {saved.error}</span>
+      <button className="text-link" onClick={() => void loadSessions()}>Retry</button>
     </div>
   );
 }
@@ -144,15 +146,15 @@ function ProjectGroup({ cwd, rows, activeRow, others, tabStop, renaming, onRenam
   );
 }
 
-/** @brief 侧栏底部的"已归档 N"：默认收起，展开后列出已归档的会话。 */
+/** @brief 侧栏底部的"Archived N"：默认收起，展开后列出已归档的会话。 */
 function ArchivedList({ rows, tabStop, ...handlers }: RowHandlers & { rows: Row[]; tabStop: string | undefined }) {
   const [open, setOpen] = useState(false);
   if (rows.length === 0) return null;
   return (
-    <div className="archived" role="group" aria-label="已归档">
+    <div className="archived" role="group" aria-label="Archived">
       <button className="archived-toggle" data-testid="archived-toggle" aria-expanded={open}
         onClick={() => setOpen(!open)}>
-        <Icon name={open ? 'down' : 'chevron'} /><span>已归档 {rows.length}</span>
+        <Icon name={open ? 'down' : 'chevron'} /><span>Archived {rows.length}</span>
       </button>
       {open && (
         <div data-testid="archived-list">
@@ -165,7 +167,7 @@ function ArchivedList({ rows, tabStop, ...handlers }: RowHandlers & { rows: Row[
 }
 
 /**
- * @brief 菜单里的"引用到当前会话"和"在右侧分屏打开"：与把会话拖进输入框、拖到中栏右半边相同（M5）。
+ * @brief 菜单里的"Attach as context"和"Open in split view"：与把会话拖进输入框、拖到中栏右半边相同（M5）。
  *        会话行和分屏标题行上的菜单共用。
  */
 export function sessionAction(row: Row, action: 'reference' | 'split'): void {
@@ -196,7 +198,7 @@ function useTreeActions(onNavigate: () => void) {
   const handlers: RowHandlers = {
     onOpen: (row) => {
       setProblem(null);
-      // 先过离开确认（AGENTS.md 有未保存的改动时）：你选"继续编辑"时什么都不变，已归档的不恢复、失败的不重试。
+      // 先过离开确认（AGENTS.md 有未保存的改动时）：你选"Keep editing"时什么都不变，已归档的不恢复、失败的不重试。
       guardLeave(() => {
         if (row.archived && row.saved) restoreSession(row.saved, true);
         else if (row.tab?.phase === 'failed') retryOpen(row.tab.key);
@@ -223,7 +225,7 @@ function useTreeActions(onNavigate: () => void) {
     if (action !== 'archive') return;
     const next = nextOf(row);
     archiveSession({ tabKey: row.tab?.key, sessionFile: row.file }).then(() => focusRow(next),
-      (cause: unknown) => setProblem(`归档失败：${describe('archive session', cause)}`));
+      (cause: unknown) => setProblem(`Couldn’t archive this session: ${describe('archive session', cause)}`));
   }
   return { menu, setMenu, renaming, setRenaming, deleting, setDeleting, focused, setFocused, problem, handlers, act };
 }
@@ -236,7 +238,7 @@ export function SessionTree({ onNavigate }: { onNavigate: () => void }) {
   const menuRow = menu ? rows.find((row) => row.id === menu.id) : undefined;
   const tabStop = rows.find((row) => row.id === focused)?.id ?? activeRow?.id ?? rows[0]?.id;
   return (
-    <div className="session-tree" role="tree" aria-label="会话" data-testid="session-tree"
+    <div className="session-tree" role="tree" aria-label="Sessions" data-testid="session-tree"
       onBlur={(event) => !event.currentTarget.contains(event.relatedTarget) && setFocused(null)}>
       <ListNote problem={problem} />
       {groups.map((group) => (

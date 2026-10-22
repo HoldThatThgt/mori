@@ -30,7 +30,7 @@ declare global {
       readFile(path: string, cwd: string): Promise<FileRead>;
       /** 用系统默认程序打开文件；失败时 error 为原文；会被运行的文件改为在资源管理器里选中（revealed） */
       openPath(path: string, cwd: string): Promise<{ error: string | null; revealed: boolean }>;
-      /** 把文字写进系统剪贴板（回复下的"复制"） */
+      /** 把文字写进系统剪贴板（回复下的"Copy"） */
       copyText(text: string): Promise<void>;
       /** 保存一份对内容的反馈（只记录，不发给模型） */
       saveFeedback(feedback: Feedback): Promise<SavedFeedback>;

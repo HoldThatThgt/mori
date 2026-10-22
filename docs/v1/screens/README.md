@@ -17,14 +17,14 @@
 
 | 文件 | 内容 | 取代 v0 的 |
 | --- | --- | --- |
-| [models-settings.md](models-settings.md) | 设置 → Models：迁移说明、区域未确认与 Confirm zone、Defaults、Providers（提供商卡、提供商表单、Keys、Models 行、模型表单、档案摘要、需要同意的探针）、Groups、Project access、删除与改地址的确认、配置读不出 | [v0 settings.md](../../v0/screens/settings.md)“连接与模型” |
+| [models-settings.md](models-settings.md) | 设置 → Models：迁移说明、区域未确认与 Confirm zone、Defaults、Providers（提供商卡、提供商表单、Keys、Models 行、模型表单、档案摘要、需要同意的探针）、Groups、Project access、删除与改地址的确认、配置读不出 | [v0 settings.md](../../v0/screens/settings.md)“Connections and models” |
 | [first-run.md](first-run.md) | 首次启动表单（含网络区域）、Test connection、探针状态、Public 的说明、迁移失败 | [v0 connection.md](../../v0/screens/connection.md) 的表单与首次启动 |
 | [model-menu.md](model-menu.md) | 顶栏的选择范围按钮与菜单、按当前模型的思考强度菜单、准备中与生成中不可用 | [v0 models.md](../../v0/screens/models.md) |
-| [model-chat.md](model-chat.md) | 换模型与重建的提示、阶段行（等模型、等它停下、排队、重试、重建）、准备中、No model available 卡、拒绝启动卡、v0 错误卡的规则 | [v0 chat.md](../../v0/screens/chat.md) 的阶段行重试、错误卡“去设置”、顶栏模型 |
+| [model-chat.md](model-chat.md) | 换模型与重建的提示、阶段行（等模型、等它停下、排队、重试、重建）、准备中、No model available 卡、拒绝启动卡、v0 错误卡的规则 | [v0 chat.md](../../v0/screens/chat.md) 的阶段行重试、错误卡“Go to settings”、顶栏模型 |
 | [team-switch.md](team-switch.md) | 顶栏的协作开关（Off / On / Until done、窄栏、不可用）、`/team on`、`/team off`、`/team <文字>`、只有 `/team`，模式怎样变 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的顶栏与输入框 |
 | [team-stream.md](team-stream.md) | 回执、进展摘要（位置、折叠与展开、需求状态、task 的 phase 文字、交接链）、不显示的程序投递与回合、合并会话里立项工具的卡、重新打开 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的对话流 |
 | [team-approvals.md](team-approvals.md) | 后台实例的批准卡与归属、和对话自己的卡怎样排、全部允许与本会话不再询问作用于全部 Agent、权限菜单说明、侧栏状态、F8 计数 | 补充 [v0 approval.md](../../v0/screens/approval.md) |
-| [team-stop.md](team-stop.md) | 待判断的消息（`<create role> is deciding…`、排队区的 `Waiting for <create role>`、撤回）、Esc 与 `Stop team`、回到输入框的文字、侧栏“生成中”、正在生成时不能归档删除 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的排队区与停止、[model-chat.md](model-chat.md) 的准备中、[v0 sessions.md](../../v0/screens/sessions.md) 的状态与归档删除 |
+| [team-stop.md](team-stop.md) | 待判断的消息（`<create role> is deciding…`、排队区的 `Waiting for <create role>`、撤回）、Esc 与 `Stop team`、回到输入框的文字、侧栏“Running”、正在生成时不能归档删除 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的排队区与停止、[model-chat.md](model-chat.md) 的准备中、[v0 sessions.md](../../v0/screens/sessions.md) 的状态与归档删除 |
 | [team-blocked.md](team-blocked.md) | `agents_invalid` 的拒绝启动卡（§4.4 的每一行、Check again）、`Turn off team mode`、协作模式下锁定的模型按钮、右栏的后台改动说明 | 补充 [model-chat.md](model-chat.md) 的拒绝启动卡、[model-menu.md](model-menu.md) 的按钮、[v0 changes.md](../../v0/screens/changes.md) |
 
 时刻 `hh:mm:ss` 一律是本地时间（24 小时制，`shared/models.ts` 的 `formatClock`），由事件里的毫秒时刻（`until`）换算。
@@ -32,18 +32,19 @@
 
 ## 界面文字
 
-- 本目录写到的新界面和改写的界面用英文，按规格原文（规格 §0、§9）。规格没给文字的地方，各文件写了一个短的英文文字并标
+- 本目录写到的新界面和改写的界面用英文，按规格原文（规格 §0、§9）；与 english-ui 合并后（2026-10-21）按 [v0/ui-strings.md](../../v0/ui-strings.md) 的术语和写法统一（例如 Base URL、Model ID、Effort、弯撇号 ’）。规格没给文字的地方，各文件写了一个短的英文文字并标
   “（临时，走查时可以改）”，每个文件末尾的“本表定下的界面细节”列出这些决定。
-- 规格让界面“沿用 v0”的几处：Test connection 的结果规格 §9.1 已给英文（“Connected · first token N ms · total N ms”等）；
-  模型按钮生成中的悬停规格 §9.2 已给英文（“Can't change the model while generating”）；思考强度菜单除“不支持思考”的说明
-  （§9.2 已给英文）外仍是 v0 的中文（强度名、“思考：高”、生成中的悬停）；v0 错误卡的“把上一条消息放回输入框”、
-  “已停止”“已压缩较早的对话”、排队区的“排队”仍是中文。这些等英文任务统一改（规格 §0）。
-- 设置页左侧的分节按钮写“Models”（规格 §9.1 的叫法），“AGENTS.md”分节与“返回会话”不变。
+- 规格让界面“沿用 v0”的几处：Test connection 的结果规格 §9.1 已给英文（“Connected · First token Nms · Total Nms”等）；
+  模型按钮生成中的悬停规格 §9.2 已给英文（“Can’t switch models until the response finishes”）；思考强度菜单（强度名、
+  “Effort: High”、生成中的悬停）、v0 错误卡的“Put your last message back in the message box”、“Stopped · …”
+  “Compacted session”、排队区的“Queued”都是 english-ui 定的英文（v0/ui-strings.md）。
+- 设置页左侧的分节按钮写“Models”（规格 §9.1 的叫法），“AGENTS.md”分节与“Back to app”不变。
 - 区域在标签、单选、勾选框、标记里写作 Local / Intranet / Public；在句子里写区域代码（`local`、`intranet`、`public`），
-  例如“Allow public for this project…”“zone public is not allowed for this project”（规格 §4.6、§5.3、§9.1）。
+  例如“Allow public for this project”“zone public is not allowed for this project”（规格 §4.6、§5.3、§9.1）。
 - `team-*.md` 的新界面文字按 TaskBoard 规格 §13 原文（`Team: Off`、`Request 1 registered · <title>`、`Stop team`、`Fix the agent files` 等）；
-  它们改到的 v0 界面里没有改写的部分（“停止”“排队”“插话”“撤回”“已停止”、批准卡的三个选项、“还有 N 张”、侧栏状态“生成中”“等你批准”）仍是中文，
-  等英文任务统一改（TaskBoard 规格 §0、§1 基线一段）。角色名、需求和 task 的标题原样显示；基座的角色名 `mori` 显示为 `Mori`。
+  它们改到的 v0 界面（“Stop”“Queue”“Steer”“Withdraw”“Stopped · Changes made so far stay as they are”、批准卡的三个选项
+  “Allow once”“Allow “…” for this session”“Deny”、“N more”、侧栏状态“Running”“Needs approval”）用 [v0 ui-strings.md](../../v0/ui-strings.md) 的英文
+  （与 `english-ui` 合并后，2026-10-21）。角色名、需求和 task 的标题原样显示；基座的角色名 `mori` 显示为 `Mori`。
 - `<create role>`、`<close role>` 取 `TeamState.holders` 的 `create`、`close`；进展摘要“当前在做什么”的英文动词见 team-stream.md。
 
 ## 需要规格回答
@@ -52,10 +53,10 @@
 
 1. 新地址的建议区域从哪里来（models-settings.md、first-run.md）。
 2. 菜单里当前范围以外的项是否被本会话静态校验排除，数据从哪里来（model-menu.md）。
-3. 换模型提示的“couldn't confirm it stopped”由哪个字段标出（model-chat.md）。
+3. 换模型提示的“Couldn’t confirm it stopped”由哪个字段标出（model-chat.md）。
 4. `agents_invalid` 时协作开关能不能用；TB-03“没有 Team 相关元素”与总在顶栏的开关（team-switch.md）。
 5. `TaskView` 没有 `assignee`；交接链截断的位置（defaults.md 与 `shared/team.ts` 不一致）；`current.args` 不够写 TaskBoard 工具的标题；
-   进展摘要的英文动词与本分支中文的 v0 工具卡（team-stream.md）。`RequestView.state`、`holder`、`chain` 的写法已由 `shared/team.ts` 定下，规格应补上。
+   进展摘要的英文动词与 v0 工具卡的标题（与 `english-ui` 合并后 v0 工具卡也是英文，team-stream.md）。`RequestView.state`、`holder`、`chain` 的写法已由 `shared/team.ts` 定下，规格应补上。
 6. 对话卡与后台卡同时挂着时，正在显示的卡是否被换掉（team-approvals.md）。
 7. `Stop team` 的显示条件（`TeamState.busy` 含对话自己的运行）；`Stop team` 时待判断的消息经哪里回到输入框；重新载入的快照没有 `since`（team-stop.md）。
 8. 说明卡上的 `Turn off team mode` 是否直接回到 `off`；右栏说明在 `BoardView` 里没有依据；`agents_invalid` 而模式不是 `off`（team-blocked.md）。

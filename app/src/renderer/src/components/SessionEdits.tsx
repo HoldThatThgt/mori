@@ -72,14 +72,16 @@ export function RenameInput({ row, onDone }: { row: Row; onDone: (keepFocus: boo
 
   return (
     <div ref={box} className="session-rename">
-      <input ref={input} value={value} readOnly={saving} aria-label="会话名" data-testid="rename-input"
+      <input ref={input} value={value} readOnly={saving} aria-label="Session name" data-testid="rename-input"
         onChange={(event) => setValue(event.target.value)} onKeyDown={onKeyDown} />
-      {error && <p className="rename-error" role="alert" data-testid="rename-error">改名失败：{error}</p>}
+      {error && (
+        <p className="rename-error" role="alert" data-testid="rename-error">Couldn’t rename this session: {error}</p>
+      )}
     </div>
   );
 }
 
-/** @brief 删除确认框（照 Claude 桌面版，永久删除）；删除中 Esc 和"取消"都不起作用。 */
+/** @brief 删除确认框（照 Claude 桌面版，永久删除）；删除中 Esc 和"Cancel"都不起作用。 */
 export function DeleteDialog({ row, onClose }: { row: Row; onClose: (deleted: boolean) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,14 +93,15 @@ export function DeleteDialog({ row, onClose }: { row: Row; onClose: (deleted: bo
       await deleteSession({ tabKey: row.tab?.key, sessionFile: row.file });
       onClose(true);
     } catch (cause) {
-      setError(`删除失败：${describe('delete session', cause)}`);
+      setError(`Couldn’t delete this session: ${describe('delete session', cause)}`);
       setBusy(false);
     }
   }
+  const text = unsaved ? 'This session has no messages yet.'
+    : 'This session will be permanently deleted. This can’t be undone.';
   return (
-    <ConfirmDialog title={`永久删除会话'${row.title}'？`}
-      text={unsaved ? '这个会话还没有消息。' : '对话记录会被删除，无法恢复。'} confirmLabel="删除" tone="danger"
-      testId="delete-dialog" busyText={busy ? '正在删除…' : null} error={error}
+    <ConfirmDialog title={`Delete “${row.title}”?`} text={text} confirmLabel="Delete" tone="danger"
+      testId="delete-dialog" busyText={busy ? 'Deleting…' : null} error={error}
       onConfirm={() => void confirm()} onCancel={() => onClose(false)} />
   );
 }

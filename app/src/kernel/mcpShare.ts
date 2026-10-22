@@ -38,7 +38,7 @@ const PI_CONFIG_FILE = 'dist/extensions/mcp/config.js';
 const DEFAULT_TIMEOUT_SECONDS = 60;
 /**
  * 共享键里不算的配置项（pi 的 OVERRIDE_KEYS）：只决定 pi 在会话里用不用、怎样给出这个服务的工具，不影响起进程、
- * 连 HTTP。项目的覆盖、工具页的启停和"改为直接调用"只改这些，同一个用户级服务仍只有一个进程。
+ * 连 HTTP。项目的覆盖、工具页的启停和"Switch to direct calls"只改这些，同一个用户级服务仍只有一个进程。
  */
 const SESSION_ONLY_KEYS = ['enabled', 'exposure', 'toolExposure'];
 /** 失败原文里 stderr 末尾的长度，同 pi 的 STDERR_TAIL_CHARS */

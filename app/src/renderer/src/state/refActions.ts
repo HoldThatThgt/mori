@@ -1,4 +1,4 @@
-// 会话引用的操作（docs/v0/screens/session-refs.md）：加进输入框（拖进输入框或菜单"引用到当前会话"）、
+// 会话引用的操作（docs/v0/screens/session-refs.md）：加进输入框（拖进输入框或菜单"Attach as context"）、
 // 原会话现在的名字和是否已删除、点引用回到原会话、预览对话框的请求。内容的整理在 sessionRefs.ts。
 
 import { create } from 'zustand';
@@ -73,7 +73,7 @@ function stillPending(tabKey: string, id: number): boolean {
 function settleRead(tabKey: string, pending: PendingRef, content: SessionContent): void {
   const turns = sessionTurns(content.entries, content.cwd);
   if (turns.length === 0) {
-    const problem = `'${pending.title}'还没有完成的一轮，没有可引用的内容`;
+    const problem = `“${pending.title}” has no finished turns yet, so there’s nothing to attach.`;
     setPending(tabKey, (items) => items.map((item) => (item.id === pending.id ? { ...item, problem } : item)));
     return;
   }
@@ -82,7 +82,7 @@ function settleRead(tabKey: string, pending: PendingRef, content: SessionContent
 }
 
 /**
- * @brief 把一个会话引用进某一栏的输入框（拖进输入框、菜单"引用到当前会话"，两条路径相同）：后台进程读出它已完成的轮次，
+ * @brief 把一个会话引用进某一栏的输入框（拖进输入框、菜单"Attach as context"，两条路径相同）：后台进程读出它已完成的轮次，
  *        按默认范围加一个芯片；焦点到这一栏的输入框。同一个会话已经引用过时不再加。
  */
 export async function referenceSession(tabKey: string, sessionFile: string, title: string): Promise<void> {
@@ -93,7 +93,7 @@ export async function referenceSession(tabKey: string, sessionFile: string, titl
   const taken = tab.draftRefs.some((ref) => ref.source.kind === 'session'
     && sameFile(ref.source.sessionFile, sessionFile));
   if (taken || tab.refPending.some((item) => sameFile(item.sessionFile, sessionFile) && !item.problem)) return;
-  recordAction('引用会话');
+  recordAction('Attach session as context');
   pendingSeq += 1;
   const pending: PendingRef = { id: pendingSeq, sessionFile, title, problem: null };
   setPending(tabKey, (items) => [...items.filter((item) => !sameFile(item.sessionFile, sessionFile)), pending]);
@@ -101,7 +101,7 @@ export async function referenceSession(tabKey: string, sessionFile: string, titl
     const content = await request<SessionContent>({ type: 'session.read', sessionFile });
     if (stillPending(tabKey, pending.id)) settleRead(tabKey, pending, content);
   } catch (error) {
-    const problem = `读取会话'${title}'失败：${describe('session.read', error)}`;
+    const problem = `Couldn’t attach “${title}” as context: ${describe('session.read', error)}`;
     if (stillPending(tabKey, pending.id)) {
       setPending(tabKey, (items) => items.map((item) => (item.id === pending.id ? { ...item, problem } : item)));
     }
@@ -163,12 +163,12 @@ export async function showSession(sessionFile: string): Promise<string | null> {
 
 /**
  * @brief 点发出的会话引用回到原会话：原会话已删除时只看引用时的原文；否则打开它（与在侧栏点它相同），
- *        滚到第一轮、高亮引用的几轮；找不到那几轮时标"原文已变化"并显示引用时的原文。
+ *        滚到第一轮、高亮引用的几轮；找不到那几轮时标"Source changed"并显示引用时的原文。
  */
 export async function jumpToSession(tabKey: string, ref: QuoteRef): Promise<void> {
   const source = ref.source;
   if (source.kind !== 'session') return;
-  recordAction('点引用回到原会话');
+  recordAction('Jump to session from attached context');
   if (sessionGone(useApp.getState(), source.sessionFile)) {
     openPreview({ tabKey, ref, mode: 'view', reason: 'gone' });
     return;

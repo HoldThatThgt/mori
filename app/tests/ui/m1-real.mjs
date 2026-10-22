@@ -82,13 +82,13 @@ async function item1(ctx) {
   await page.getByTestId('connection-form').locator('[data-action="test"]').click();
   const result = await h.formMessage(null, { test: true, timeout: 180000 });
   record('1 区域 Public 时说明"Public providers must be allowed per project…"；key 栏留空时测试连接失败（请求不带认证头，'
-    + '真实端点的原文）', note.startsWith('Public providers must be allowed per project') && result.startsWith('Failed'),
-  `${oneLine(note)}；${oneLine(result)}`);
+    + '真实端点的原文）', note.startsWith('Public providers must be allowed per project')
+    && /^(Connection failed|Failed)/.test(result), `${oneLine(note)}；${oneLine(result)}`);
   await shot(page, '1-test-no-key');
   await ctx.app.close();
   pointKeyToCopiedCipher(ctx.userData, connection, ctx.project);
   await relaunch(ctx);
-  await ctx.page.getByRole('button', { name: '打开文件夹…' }).first().waitFor({ timeout: 60000 });
+  await ctx.page.getByRole('button', { name: 'Open folder…' }).first().waitFor({ timeout: 60000 });
   await ctx.h.openFolder(ctx.app, ctx.project);
   await verifyNow(ctx);
   await sendFirst(ctx);
@@ -132,25 +132,25 @@ async function sendFirst({ page, h }) {
   record('1 发出第一条消息（出现在对话流里）', sent && await page.getByTestId('user-message').count() === 1);
 }
 
-/** @brief 走查 2：先"等待模型响应 Ns"，再流式 Markdown；有思考时"思考中"，正文开始后思考收起。 */
+/** @brief 走查 2：先"Waiting for the model… Ns"，再流式 Markdown；有思考时"Thinking…"，正文开始后思考收起。 */
 async function item2({ page, h }) {
   await h.idle();
   const stages = await h.stages();
   const lengths = await page.evaluate(() => window.__lengths.size);
-  record('2 先看到"等待模型响应 Ns"', stages[0] === '等待模型响应', stages.join(' → '));
+  record('2 先看到"等待模型响应 Ns"', stages[0] === 'Waiting for the model…', stages.join(' → '));
   record('2 Markdown 流式出现', lengths > 3 && await page.locator('.prose li, .prose [data-streamdown^="heading"]').count() > 0,
     `采样到 ${lengths} 种长度`);
   const thinking = await page.locator('details.thinking').count();
   const collapsed = await page.locator('details.thinking').evaluateAll((items) => items.every((d) => !d.open));
   const opened = await h.thinkingOpened();
   record('2 有思考内容时阶段行显示"思考中"、思考流入时展开，正文开始后折叠', thinking === 0
-    || (stages.includes('思考中') && opened && collapsed), `思考块 ${thinking} 个；流入时展开=${opened}`);
-  const afterTool = stages.findIndex((s, i) => i > 0 && s === '生成中' && stages[i - 1].startsWith('运行 '));
+    || (stages.includes('Thinking…') && opened && collapsed), `思考块 ${thinking} 个；流入时展开=${opened}`);
+  const afterTool = stages.findIndex((s, i) => i > 0 && s === 'Responding…' && stages[i - 1].startsWith('Run '));
   record('2 反例：工具执行完后不直接显示"生成中"（应先等待模型响应）', afterTool < 0, stages.join(' → '));
   await shot(page, '2-markdown');
 }
 
-/** @brief 走查 3：工具卡从执行中到完成，可以展开；上下文用量随对话增长；反例：失败的命令不显示"完成"。 */
+/** @brief 走查 3：工具卡从执行中到完成，可以展开；上下文用量随对话增长；反例：失败的命令不显示"Done"。 */
 async function item3({ page, h }) {
   const before = await h.usageTokens();
   await page.evaluate(() => {
@@ -170,13 +170,13 @@ async function item3({ page, h }) {
   const sleepCard = cards.find((card) => card.title.includes('sleep 3'));
   const failCard = cards.find((card) => card.title.includes('does-not-exist-dir'));
   record('3 工具卡从"执行中"变为"完成"', statuses.includes('running') && sleepCard?.status === 'done', statuses.join(' → '));
-  record('3 反例：失败的命令显示"失败 · 退出码"，不显示"完成"', failCard?.status === 'failed' && /^失败/.test(failCard.text),
+  record('3 反例：失败的命令显示"失败 · 退出码"，不显示"完成"', failCard?.status === 'failed' && /^Failed/.test(failCard.text),
     JSON.stringify(failCard));
   const index = cards.indexOf(sleepCard);
   await page.getByTestId('tool-card').nth(index).locator('summary').click();
   await page.getByTestId('tool-card').nth(index).locator('.tool-body').waitFor();
   const body = await page.getByTestId('tool-card').nth(index).innerText();
-  record('3 展开工具卡能看到参数和输出', body.includes('参数') && body.includes('sleep 3') && body.includes('ok'), oneLine(body));
+  record('3 展开工具卡能看到参数和输出', body.includes('Input') && body.includes('sleep 3') && body.includes('ok'), oneLine(body));
   const after = await h.usageTokens();
   record('3 上下文用量随对话增长', before !== null && after > before, `${before} → ${after}`);
   await shot(page, '3-tool-cards');
@@ -204,7 +204,7 @@ async function item4({ page, h }) {
   await shot(page, '4-delivered');
 }
 
-/** @brief 走查 5：运行耗时命令时按 Esc：命令卡"已停止"，提示，排队消息回到输入框。 */
+/** @brief 走查 5：运行耗时命令时按 Esc：命令卡"Stopped"，提示，排队消息回到输入框。 */
 async function item5({ page, h }) {
   await h.send('运行命令 `sleep 30; echo late`，然后告诉我输出。');
   await page.locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 60000 });
@@ -215,7 +215,7 @@ async function item5({ page, h }) {
   await page.keyboard.press('Escape');
   await h.idle(60000);
   const card = (await h.cards()).find((item) => item.title.includes('sleep 30'));
-  const notice = await page.getByText('已停止 · 已经做出的修改不会自动撤销').count();
+  const notice = await page.getByText('Stopped · Changes made so far stay as they are').count();
   record('5 Esc：命令卡显示"已停止"', card?.status === 'stopped', JSON.stringify(card));
   record('5 提示"已停止 · 已经做出的修改不会自动撤销"', notice >= 1);
   record('5 排队消息回到输入框', (await h.textarea.inputValue()).includes('排队：这条会回到输入框'));
@@ -224,7 +224,7 @@ async function item5({ page, h }) {
   await h.textarea.fill('');
 }
 
-/** @brief 走查 7：结束后台进程：退出提示和"重新载入"，草稿还在；重新载入后接着用。 */
+/** @brief 走查 7：结束后台进程：退出提示和"Restart"，草稿还在；重新载入后接着用。 */
 async function item7({ app, page, h }) {
   await h.send('运行命令 `sleep 20; echo late`，然后告诉我输出。');
   await page.locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 60000 });
@@ -232,14 +232,16 @@ async function item7({ app, page, h }) {
   const pid = killKernel(app);
   await page.getByTestId('kernel-exit').waitFor({ timeout: 10000 });
   const banner = await page.getByTestId('kernel-exit').innerText();
-  record('7 看到退出提示和"重新载入"', banner.includes('Mori 的后台进程意外退出 · 刚才没完成的回复已中断')
-    && banner.includes('重新载入'), `PID ${pid}`);
+  record('7 看到退出提示和"重新载入"',
+    banner.includes('Mori’s background process crashed · Unfinished responses were interrupted')
+    && banner.includes('Restart'), `PID ${pid}`);
   record('7 输入框里的草稿还在', (await h.textarea.inputValue()) === '后台进程退出前写的草稿');
   const card = (await h.cards()).find((item) => item.title.includes('sleep 20'));
   record('7 没结束的命令卡显示"已中断"', card?.status === 'interrupted', JSON.stringify(card));
   await shot(page, '7-kernel-exit');
-  await page.getByRole('button', { name: '重新载入' }).click();
-  await page.getByText('已重新载入 · 排队消息、批准卡和"本会话已允许"不会恢复').waitFor({ timeout: 60000 });
+  await page.getByRole('button', { name: 'Restart' }).click();
+  await page.getByText('Restarted · Queued messages, pending approvals, and “Allow for this session” choices '
+    + 'weren’t restored').waitFor({ timeout: 60000 });
   record('7 重新载入后草稿仍在', (await h.textarea.inputValue()) === '后台进程退出前写的草稿');
   await h.send('重新载入之后，用一句话回答：1+1 等于几？');
   await h.idle();
@@ -266,7 +268,7 @@ async function item9(ctx) {
   await page.mouse.move(box.x - 36, box.y + 300, { steps: 6 });
   await page.mouse.up();
   if (await page.locator('[data-resize="workspace"]').count() === 0) {
-    await page.getByRole('button', { name: '右栏：本会话的改动' }).click();
+    await page.getByRole('button', { name: 'Toggle changes' }).click();
   }
   const right = page.locator('[data-resize="workspace"]');
   const rightBox = await right.boundingBox();
@@ -281,9 +283,9 @@ async function item9(ctx) {
   ctx.app = await launch({ exePath, userData: ctx.userData });
   ctx.page = await ctx.app.firstWindow();
   ctx.h = pageHelpers(ctx.page);
-  await ctx.page.getByRole('button', { name: '打开文件夹…' }).first().waitFor({ timeout: 60000 });
+  await ctx.page.getByRole('button', { name: 'Open folder…' }).first().waitFor({ timeout: 60000 });
   await ctx.h.openFolder(ctx.app, ctx.project);
-  await ctx.page.getByRole('button', { name: '右栏：本会话的改动' }).click();
+  await ctx.page.getByRole('button', { name: 'Toggle changes' }).click();
   const after = { sidebar: await ctx.page.locator('[data-resize="sidebar"]').getAttribute('aria-valuenow'),
     workspace: await ctx.page.locator('[data-resize="workspace"]').getAttribute('aria-valuenow') };
   record('9 重启后宽度还在', saved.sidebar === after.sidebar && saved.workspace === after.workspace,
@@ -331,7 +333,7 @@ async function item6({ page, h }) {
     await card.getByTestId('key-row').first().locator('[data-action="key-remove"]').click();
     await sleep(500);
   }
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app' }).click();
   const errors = await page.getByTestId('error-card').count();
   await h.send('你好');
   await h.idle();
@@ -346,11 +348,11 @@ async function item6({ page, h }) {
   const focus = await page.evaluate(() => document.activeElement?.closest('[data-testid="provider-card"]')
     ?.dataset.provider ?? null);
   record('6 "Open settings"打开 设置 → Models，焦点在这个提供商的 Keys', focus === provider, String(focus));
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app' }).click();
 }
 
 /**
- * @brief 走查 8：上下文长度 8k（加 pi 的压缩参数）长聊：阶段行"正在压缩较早的对话"，对话流留下"已压缩较早的对话"。
+ * @brief 走查 8：上下文长度 8k（加 pi 的压缩参数）长聊：阶段行"Compacting session…"，对话流留下"Compacted session"。
  *        准备（§14.4）：在复制出的 model-config.json 里把首选第一个模型的窗口改为 8000（最大输出不超过 4000），并给项目
  *        授权公网、默认范围设为测试分组（测试准备）。
  */
@@ -367,7 +369,7 @@ async function item8(project, connection) {
   try {
     const page = await app.firstWindow();
     const h = pageHelpers(page);
-    await page.getByRole('button', { name: '打开文件夹…' }).first().waitFor({ timeout: 60000 });
+    await page.getByRole('button', { name: 'Open folder…' }).first().waitFor({ timeout: 60000 });
     await h.openFolder(app, project);
     await h.allowAll();
     await h.sampleStages();
@@ -376,9 +378,9 @@ async function item8(project, connection) {
       await h.idle(240000);
     }
     const stages = await h.stages();
-    const notices = await page.getByText('已压缩较早的对话', { exact: true }).count();
+    const notices = await page.getByText('Compacted session', { exact: true }).count();
     record('8 一直在底部时不出现"有新内容"', await page.getByTestId('new-content').count() === 0);
-    record('8 阶段行显示"正在压缩较早的对话"', stages.includes('正在压缩较早的对话'), stages.join(' → '));
+    record('8 阶段行显示"正在压缩较早的对话"', stages.includes('Compacting session…'), stages.join(' → '));
     record('8 对话流留下"已压缩较早的对话"', notices >= 1, `${notices} 处`);
     await shot(page, '8-compaction');
   } finally {

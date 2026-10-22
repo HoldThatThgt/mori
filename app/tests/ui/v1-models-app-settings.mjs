@@ -216,14 +216,14 @@ const shot = (ctx, name) => ctx?.page.screenshot({ path: join(shots, `${name}.pn
 /** @brief 打开设置页（左栏"设置"），等 Models 分节读好（或配置读不出的错误）。 */
 async function openSettings(page) {
   if (!(await page.getByTestId('settings-page').isVisible().catch(() => false))) {
-    await page.getByRole('button', { name: '设置', exact: true }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
   }
   await page.waitForSelector('[data-testid="models-section"], [data-testid="models-load-error"]', { timeout: 20000 });
 }
 
 /** @brief 设置页"返回会话"。 */
 async function backToChat(page) {
-  await page.getByRole('button', { name: '返回会话', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to app', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 5000 });
 }
 
@@ -232,11 +232,11 @@ async function openFolder(ctx, folder) {
   const { page } = ctx;
   const before = await paneCount(page);
   await stubFolder(ctx.app, folder);
-  await page.getByRole('button', { name: /^(Open folder…|打开文件夹…)$/ }).first().click();
+  await page.getByRole('button', { name: 'Open folder…', exact: true }).first().click();
   await waitPanes(page, before + 1);
   const trust = page.getByTestId('trust-dialog');
   if (await trust.waitFor({ timeout: 1500 }).then(() => true, () => false)) {
-    await trust.getByRole('button', { name: '信任', exact: true }).click();
+    await trust.getByRole('button', { name: 'Trust workspace', exact: true }).click();
   }
   await waitReady(page);
   return activeFile(page);
@@ -329,10 +329,10 @@ async function addProvider(page, { name, baseUrl, modelId = 'fake-coder', secret
   await page.locator('[data-action="add-provider"]').click();
   const form = page.getByTestId('provider-form');
   await form.getByLabel('Name', { exact: true }).fill(name);
-  await form.getByLabel('Address', { exact: true }).fill(baseUrl);
+  await form.getByLabel('Base URL', { exact: true }).fill(baseUrl);
   if (zone) await form.locator(`input[name="zone"][value="${zone}"]`).check();
   if (secret) await form.getByLabel('API key', { exact: true }).fill(secret);
-  await form.getByLabel('Model id', { exact: true }).fill(modelId);
+  await form.getByLabel('Model ID', { exact: true }).fill(modelId);
   await form.getByRole('button', { name: 'Save', exact: true }).click();
   await form.waitFor({ state: 'detached', timeout: 20000 });
 }
@@ -357,18 +357,19 @@ const keyRefs = (cfg, id) => providerOf(cfg, id)?.keys.map((key) => key.ref) ?? 
 async function fillFirstRun(page, { name, baseUrl, secret, modelId }) {
   const form = page.getByTestId('connection-form');
   await form.getByLabel('Name', { exact: true }).fill(name);
-  await form.getByLabel('Address', { exact: true }).fill(baseUrl);
+  await form.getByLabel('Base URL', { exact: true }).fill(baseUrl);
   if (secret) await form.getByLabel('API key', { exact: true }).fill(secret);
-  await form.getByLabel('Model id', { exact: true }).fill(modelId);
+  await form.getByLabel('Model ID', { exact: true }).fill(modelId);
   return form.locator('input[name="zone"]:checked').getAttribute('value');
 }
 
-/** @brief 点 Test connection，等结果文字（Connected / Failed / Couldn't save）。 */
+/** @brief 点 Test connection，等结果文字（Connected / Connection failed / Couldn’t save）。 */
 async function testConnection(page) {
   const before = await page.getByTestId('form-message').textContent().catch(() => null);
   await page.locator('[data-testid="connection-form"] [data-action="test"]').click();
   const result = await poll(() => page.getByTestId('form-message').textContent().catch(() => null),
-    (text) => text && text !== before && /^(Connected|Failed|Couldn't save|Test cancelled)/.test(text), 90000);
+    (text) => text && text !== before
+      && /^(Connected|Connection failed|Couldn’t test|Couldn’t save|Test cancelled)/.test(text), 90000);
   return result.value ?? '';
 }
 
@@ -492,16 +493,16 @@ async function invalidStart(ctx, file, project) {
     reload: Boolean(document.querySelector('[data-testid="models-load-error"] [data-action="reload"]')),
     sections: ['defaults', 'providers', 'groups', 'project-access', 'migration-notice']
       .filter((id) => document.querySelector(`[data-testid="${id}"]`)) }));
-  record('MP-01 config can\'t be read: Settings → Models shows only "Model settings can\'t be read: <path>: <raw>" '
-    + 'and Reload', Boolean(view.error?.startsWith(`Model settings can't be read: ${file}: `)) && view.reload
+  record('MP-01 config can\'t be read: Settings → Models shows only "Couldn’t read model settings: <path>: <raw>" '
+    + 'and Retry', Boolean(view.error?.startsWith(`Couldn’t read model settings: ${file}: `)) && view.reload
     && view.sections.length === 0, oneLine(JSON.stringify(view)));
   await shot(ctx, 'mp01-load-error');
   await backToChat(page);
   await openFolder(ctx, project);
   const card = (await waitCard(page, (s) => s?.kind === 'config_invalid', 20000)).value;
-  record('MP-01 config can\'t be read: the session is blocked config_invalid ("Model settings can\'t be read: '
+  record('MP-01 config can\'t be read: the session is blocked config_invalid ("Model settings can’t be read: '
     + '<path>: <raw>"), with only Open settings', card?.kind === 'config_invalid'
-    && card.title.startsWith(`Model settings can't be read: ${file}: `)
+    && card.title.startsWith(`Model settings can’t be read: ${file}: `)
     && card.actions.map((a) => a.action).join() === 'open-settings', cardText(card));
   const attempt = await trySend(ctx, fakes.invalid, 'plain while blocked');
   record('MP-01 config can\'t be read: Send is unavailable, Enter keeps the draft, nothing is sent',
@@ -629,8 +630,8 @@ async function localForm(ctx) {
   record('MP-33 first run (Local): the form "Connect a model" preselects Network zone Local for 127.0.0.1',
     title === 'Connect a model' && zone === 'local', `${title} · ${zone}`);
   const message = await testConnection(page);
-  record('MP-33 first run (Local): Test connection saves and reports "Connected · first token N ms · total N ms"',
-    /^Connected · first token \d+ ms · total \d+ ms/.test(message), message);
+  record('MP-33 first run (Local): Test connection saves and reports "Connected · First token Nms · Total Nms"',
+    /^Connected · First token \d+ms · Total \d+ms/.test(message), message);
   const seen = await probeStates(page, ['verified', 'failed', 'error']);
   record('MP-33 first run (Local): the probe status under the form ends at "Tool calling verified"',
     seen.at(-1)?.state === 'verified' && seen.at(-1)?.text === 'Tool calling verified',
@@ -710,10 +711,10 @@ async function f8AfterAddKey(ctx) {
   await dialog.waitFor({ timeout: 15000 });
   await dialog.getByTestId('issue-what').fill('Model settings check');
   await dialog.getByTestId('issue-expect').fill('No API key in this report');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   const saved = page.getByTestId('issue-saved');
   await saved.waitFor({ timeout: 15000 });
-  const path = /已保存到\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
+  const path = /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
   const md = path && existsSync(path) ? readFileSync(path, 'utf8') : '';
   await page.keyboard.press('Escape');
   const actions = md.split(/\r?\n/).filter((line) => /Add key|Save first-run/.test(line));
@@ -755,18 +756,18 @@ async function publicForm(ctx) {
   const note = await page.getByTestId('zone-public-note').textContent().catch(() => null);
   record('MP-33 first run (Public): choosing Public shows "Public providers must be allowed per project. You\'ll be '
     + 'asked when you open a folder."', note?.trim() === 'Public providers must be allowed per project. '
-    + 'You\'ll be asked when you open a folder.', note ?? 'no note');
+    + 'You’ll be asked when you open a folder.', note ?? 'no note');
   const first = await testConnection(page);
   const seen = await probeStates(page, ['verified', 'failed', 'error']);
   const text = seen.at(-1)?.text ?? '';
-  const advice = '. Mori needs tool calling for the main agent; pick another model or check the server\'s tool-call '
+  const advice = '. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call '
     + 'settings.';
   record('MP-33 tool calling failed (-notools): the probe status says "Tool calling failed verification: <detail>. '
     + 'Mori needs tool calling for the main agent; …"', first.startsWith('Connected') && seen.at(-1)?.state === 'failed'
     && text.startsWith('Tool calling failed verification: ') && text.endsWith(advice)
     && text.length > 'Tool calling failed verification: '.length + advice.length, `${first} | ${text}`);
   const before = readConfig(userData);
-  await page.getByTestId('connection-form').getByLabel('Model id', { exact: true }).fill('fake-coder');
+  await page.getByTestId('connection-form').getByLabel('Model ID', { exact: true }).fill('fake-coder');
   const second = await testConnection(page);
   const again = await probeStates(page, ['verified', 'failed', 'error']);
   const after = readConfig(userData);
@@ -786,8 +787,8 @@ async function publicAllow(ctx, project) {
   await openFolder(ctx, project);
   const card = (await waitCard(page, (s) => s?.kind === 'no_candidate', 30000)).value;
   const allow = card?.actions.find((a) => a.action === 'allow-zone');
-  record('MP-33 first run (Public): the new session is blocked with "Allow public for this project…"',
-    allow?.label === 'Allow public for this project…', cardText(card));
+  record('MP-33 first run (Public): the new session is blocked with "Allow public for this project"',
+    allow?.label === 'Allow public for this project', cardText(card));
   const candidate = card?.candidates.find((c) => c.ref === 'fake-public/fake-coder');
   record('MP-06 a public provider in a project without a grant is excluded: "zone public is not allowed for this '
     + 'project"', candidate?.reason === 'zone_blocked'
@@ -797,7 +798,7 @@ async function publicAllow(ctx, project) {
     const el = document.activeElement;
     return { zone: el?.dataset?.zone ?? null, row: el?.closest('[data-testid="project-row"]')?.dataset.path ?? null };
   }), (f) => f.zone === 'public', 8000);
-  record('MP-33 "Allow public for this project…" opens Settings → Project access with focus on this project\'s Public '
+  record('MP-33 "Allow public for this project" opens Settings → Project access with focus on this project\'s Public '
     + 'box', focus.ok && focus.value.row === norm(project), JSON.stringify(focus.value));
   await grantPublic(ctx, project, 'Fake Public');
   await backToChat(page);
@@ -927,7 +928,7 @@ async function narrowZones(ctx, project) {
   const box = row.locator('[data-testid="project-zone"][data-zone="public"]');
   const text = await row.textContent();
   record('MP-06 Project access: the Public box is unavailable with ".mori/models.json in this project doesn\'t allow '
-    + 'public."', await box.isDisabled() && text.includes('.mori/models.json in this project doesn\'t allow public.')
+    + 'public."', await box.isDisabled() && text.includes('.mori/models.json in this project doesn’t allow public.')
     && text.includes('Allowed: Intranet'), oneLine(text));
   await backToChat(page);
 }
@@ -1148,7 +1149,7 @@ async function editAddress(ctx) {
   const card = providerCard(page, 'intra');
   await card.locator('[data-action="edit-provider"]').click();
   const form = page.getByTestId('provider-form');
-  await form.getByLabel('Address', { exact: true }).fill(url(PORT.moved));
+  await form.getByLabel('Base URL', { exact: true }).fill(url(PORT.moved));
   await form.getByRole('button', { name: 'Save', exact: true }).click();
   const dialog = dialogOf(page, 'address-change');
   await dialog.waitFor({ timeout: 5000 });
@@ -1156,10 +1157,10 @@ async function editAddress(ctx) {
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await sleep(500);
   const unchanged = providerOf(readConfig(userData), 'intra');
-  record('MP-24 changing the address origin asks "Change the address?" with "Changing the address removes this '
-    + 'provider\'s 1 saved keys. Add them again after saving."; Cancel saves nothing',
-  info.title === 'Change the address?'
-    && info.text.includes('Changing the address removes this provider\'s 1 saved keys. Add them again after saving.')
+  record('MP-24 changing the address origin asks "Change the base URL?" with "Changing the base URL removes '
+    + 'this provider’s saved key. Add it again after saving."; Cancel saves nothing',
+  info.title === 'Change the base URL?'
+    && info.text.includes('Changing the base URL removes this provider’s saved key. Add it again after saving.')
     && unchanged.baseUrl === url(PORT.edits) && unchanged.keys.length === 1, oneLine(info.text));
   await form.getByRole('button', { name: 'Save', exact: true }).click();
   await dialog.getByRole('button', { name: 'Save and remove keys', exact: true }).click();
@@ -1167,7 +1168,7 @@ async function editAddress(ctx) {
   const since = Date.now();
   await providerCard(page, 'intra').locator('[data-action="test-provider"]').click();
   const result = await poll(() => providerCard(page, 'intra').getByTestId('test-result').textContent().catch(() => ''),
-    (text) => /^(Connected|Failed)/.test(text), 60000);
+    (text) => /^(Connected|Connection failed|Couldn’t test)/.test(text), 60000);
   const newPort = fakes.moved.chats.filter((chat) => chat.at >= since);
   const creds = await credsWithout(userData, 'intra#1');
   record('MP-24 after the address change the keys are deleted and the new port never receives the old key',
@@ -1183,7 +1184,7 @@ async function editModels(ctx) {
   await openSettings(page);
   await providerCard(page, 'loc').locator('[data-action="add-model"]').click();
   let form = page.getByTestId('model-form');
-  await form.getByLabel('Model id', { exact: true }).fill('fake-coder-b');
+  await form.getByLabel('Model ID', { exact: true }).fill('fake-coder-b');
   await form.getByRole('button', { name: 'Save', exact: true }).click();
   await form.waitFor({ state: 'detached', timeout: 15000 });
   const added = await waitConfig(userData, (cfg) => providerOf(cfg, 'loc').models.length === 2);
@@ -1217,15 +1218,16 @@ async function editGroups(ctx) {
   const form = page.getByTestId('group-form');
   const errors = {};
   for (const id of ['loc', 'Bad_ID', 'mori']) {
-    await form.getByLabel('Group id').fill(id);
+    await form.getByLabel('Group ID').fill(id);
     errors[id] = { text: await form.getByTestId('group-error').textContent().catch(() => null),
       create: await form.getByRole('button', { name: 'Create', exact: true }).isDisabled() };
   }
-  record('MP-24 Groups: new group id errors ("loc is already used by a provider or group", "Use lowercase letters, '
-    + 'digits and -", "mori is reserved") and Create unavailable', errors.loc.text === 'loc is already used by a '
-    + 'provider or group' && errors.Bad_ID.text === 'Use lowercase letters, digits and -'
-    && errors.mori.text === 'mori is reserved' && Object.values(errors).every((e) => e.create), JSON.stringify(errors));
-  await form.getByLabel('Group id').fill('duo');
+  record('MP-24 Groups: new group id errors ("loc is already used by a provider or group.", "Use lowercase letters, '
+    + 'digits, and hyphens.", "mori is reserved.") and Create unavailable', errors.loc.text === 'loc is already used '
+    + 'by a provider or group.' && errors.Bad_ID.text === 'Use lowercase letters, digits, and hyphens.'
+    && errors.mori.text === 'mori is reserved.' && Object.values(errors).every((e) => e.create),
+  JSON.stringify(errors));
+  await form.getByLabel('Group ID').fill('duo');
   await form.locator('[data-testid="member-picker"] [data-member="intra/fake-coder"]').click();
   await form.getByRole('button', { name: 'Create', exact: true }).click();
   const created = await waitConfig(userData, (cfg) => cfg.groups.some((g) => g.id === 'duo'));
@@ -1659,7 +1661,7 @@ async function zoneRules(ctx) {
   const form = page.getByTestId('provider-form');
   const wrong = [];
   for (const [address, zone] of Object.entries(ZONE_RULES)) {
-    await form.getByLabel('Address', { exact: true }).fill(address);
+    await form.getByLabel('Base URL', { exact: true }).fill(address);
     const chosen = await form.locator('input[name="zone"]:checked').getAttribute('value');
     if (chosen !== zone) wrong.push(`${address} → ${chosen} (want ${zone})`);
   }
@@ -1669,7 +1671,7 @@ async function zoneRules(ctx) {
     + 'fe80::/10, IPv4-mapped IPv6, .local, dotless host, others public)', wrong.length === 0, wrong.join('; '));
 }
 
-/** @brief 区域未确认时会话被拒绝；Confirm zone… 带到区域未确认的那一行；确认后可以发送，用迁移来的 key。 */
+/** @brief 区域未确认时会话被拒绝；Confirm zone 带到区域未确认的那一行；确认后可以发送，用迁移来的 key。 */
 async function unconfirmedBlocked(ctx, project) {
   const { page, userData } = ctx;
   await backToChat(page);
@@ -1678,13 +1680,13 @@ async function unconfirmedBlocked(ctx, project) {
   const candidate = card?.candidates.find((c) => c.ref === 'mori-endpoint/fake-coder');
   const attempt = await trySend(ctx, fakes.migrate, 'plain before confirming');
   record('MP-08 a provider whose zone is unconfirmed is excluded until confirmed ("network zone not confirmed"); the '
-    + 'session is blocked and offers Confirm zone…', candidate?.reason === 'zone_unconfirmed'
+    + 'session is blocked and offers Confirm zone', candidate?.reason === 'zone_unconfirmed'
     && candidate.text.includes('network zone not confirmed') && card.actions.some((a) => a.action === 'confirm-zone')
     && attempt.disabled && attempt.requests === 0, cardText(card));
   await page.locator(`${CARD} [data-action="confirm-zone"]`).click();
   const focus = await poll(() => page.evaluate(() => document.activeElement?.closest('[data-testid="zone-unconfirmed"]')
     ?.dataset.provider ?? null), (v) => v === 'mori-endpoint', 8000);
-  record('MP-08 Confirm zone… on the card opens Settings → Models with focus on that provider\'s unconfirmed row',
+  record('MP-08 Confirm zone on the card opens Settings → Models with focus on that provider\'s unconfirmed row',
     focus.ok, String(focus.value));
   await confirmZone(page, 'mori-endpoint');
   const saved = await waitConfig(userData, (cfg) => providerOf(cfg, 'mori-endpoint')?.zone === 'local');
@@ -1775,7 +1777,7 @@ async function migrationFailure() {
       ctx = await startApp(userData);
       const form = await ctx.page.getByTestId('connection-form').isVisible();
       const error = await ctx.page.getByTestId('migration-error').textContent().catch(() => '');
-      const prefix = 'Couldn\'t import your previous model settings: ';
+      const prefix = 'Couldn’t import your previous model settings: ';
       record(`MP-08 migration failure (${label}): no model-config.json is written and the first-run form shows `
         + `"${prefix}<raw>"`, form && error.startsWith(prefix) && test(error)
         && !existsSync(configFile(userData)) && !existsSync(join(userData, 'model-migration.json')), oneLine(error));

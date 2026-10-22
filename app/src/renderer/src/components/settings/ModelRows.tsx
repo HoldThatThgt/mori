@@ -55,7 +55,7 @@ function ProfileSummary({ modelRef }: { modelRef: string }) {
         <span className="profile-warn" data-testid="truncation-warning">Silently truncates long input</span>
       )}
       {profile?.status === 'error' && !running && (
-        <p className="form-message error" data-testid="probe-error">Couldn't verify: {profile.error}</p>
+        <p className="form-message error" data-testid="probe-error">Couldn’t verify: {profile.error}</p>
       )}
     </div>
   );
@@ -81,7 +81,7 @@ function ConsentDialog({ kind, model, effective, onClose }: {
   const text = kind === 'long-input'
     ? `Sends two requests of about ${thousands(half)} and ${thousands(most)} tokens (about ${thousands(half + most)}`
       + ' tokens in all) to check whether long input is silently truncated.'
-    : 'Sends one request for a long reply, disconnects after the first output, and reads the server\'s metrics'
+    : 'Sends one request for a long reply, disconnects after the first output, and reads the server’s metrics'
       + ' to see whether the request stopped.';
   const title = kind === 'long-input' ? `Run the long-input test on ${id}?` : `Run the cancel test on ${id}?`;
   return (
@@ -108,8 +108,8 @@ export interface ModelRowProps {
 function ModelMeta({ model }: { model: ProviderModel }) {
   return (
     <span className="model-meta">
-      Context {thousands(model.contextWindow)} · Max output {thousands(model.maxTokens)}
-      {model.family && ` · Family ${model.family}`}{model.reasoning && ' · Supports thinking'}
+      Context window: {thousands(model.contextWindow)} · Max output: {thousands(model.maxTokens)}
+      {model.family && ` · Family: ${model.family}`}{model.reasoning && ' · Supports thinking'}
     </span>
   );
 }
@@ -145,7 +145,7 @@ export function ModelRow({ provider, model, index, onEdit }: ModelRowProps) {
               delta })} />
           <button className="button compact" data-action="edit" onClick={onEdit}>Edit</button>
           <button className="button compact danger" data-action="delete" onClick={() => void flow.start()}>
-            Delete</button>
+            Delete…</button>
           <TestButton at={at} label="Test" action="test"
             onTest={() => void testAt(at, { providerId: provider.id, modelId: model.id })} />
         </span>

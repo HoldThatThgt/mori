@@ -1,6 +1,7 @@
-// 工具页（docs/v0/screens/tools.md）：中栏换成工具页，顶部"返回会话"、标题和跟随的会话，下面一行说明改动对新建的会话生效；
-// 左边分节（内置工具、技能、MCP、插件），右边这一节的内容。跟随的是当前会话（分屏时焦点所在的那一栏）；工具页开着时
-// 在侧栏归档或删除了它，跟到剩下的那一栏。还在打开中时等它打开；没有会话时只列出技能和插件（用户级）。
+// 工具页（标题"Customize"，docs/v0/screens/tools.md）：中栏换成工具页，顶部"Back to app"、标题和跟随的会话，
+// 下面一行说明改动对新建的会话生效；左边分节（Built-in tools、Skills、MCP、Plugins），右边这一节的内容。
+// 跟随的是当前会话（分屏时焦点所在的那一栏）；工具页开着时在侧栏归档或删除了它，跟到剩下的那一栏。
+// 还在打开中时等它打开；没有会话时只列出技能和插件（用户级）。
 
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -19,10 +20,12 @@ import { SkillsSection } from './ToolsSkills';
 type Section = 'builtin' | 'skills' | 'mcp' | 'plugins';
 
 /** 分节的文字 */
-const SECTION_TEXT: Record<Section, string> = { builtin: '内置工具', skills: '技能', mcp: 'MCP', plugins: '插件' };
+const SECTION_TEXT: Record<Section, string> = {
+  builtin: 'Built-in tools', skills: 'Skills', mcp: 'MCP', plugins: 'Plugins',
+};
 
 /** 没有跟随的会话时顶部的说明 */
-const NO_SESSION = '没有打开的会话：只列出技能和插件（用户级）';
+const NO_SESSION = 'No open session. Only user-level skills and plugins are listed.';
 
 /** @brief 跟随的会话。 */
 interface Followed {
@@ -73,7 +76,7 @@ function SectionNav({ sections, current, onSelect }: {
     event.currentTarget.querySelector<HTMLButtonElement>(`[data-section="${next}"]`)?.focus();
   }
   return (
-    <nav className="tools-nav" aria-label="工具分节" data-testid="tools-nav" onKeyDown={onKeyDown}>
+    <nav className="tools-nav" aria-label="Customize page sections" data-testid="tools-nav" onKeyDown={onKeyDown}>
       {sections.map((section) => (
         <button key={section} type="button" data-section={section} onClick={() => onSelect(section)}
           aria-current={section === current ? 'page' : undefined}>{SECTION_TEXT[section]}</button>
@@ -82,7 +85,7 @@ function SectionNav({ sections, current, onSelect }: {
   );
 }
 
-/** @brief 一节的内容；cwd 是跟随的会话的工作目录（没有会话时为 agentDir），只用于"用系统编辑器打开"。 */
+/** @brief 一节的内容；cwd 是跟随的会话的工作目录（没有会话时为 agentDir），只用于"Open in default app"。 */
 function SectionContent({ section, info, tabKey, agentDir }: {
   section: Section; info: ToolsInfo; tabKey: string | null; agentDir: string;
 }) {
@@ -99,7 +102,7 @@ function SectionContent({ section, info, tabKey, agentDir }: {
   }
 }
 
-/** @brief 右边：读取中、读取失败（原文和"重新读取"）、这一节的内容。 */
+/** @brief 右边：读取中、读取失败（原文和"Retry"）、这一节的内容。 */
 function ToolsContent({ section, tabKey }: { section: Section; tabKey: string | null }) {
   const { info, error, sessionId } = useTools();
   const agentDir = useApp((state) => state.config?.agentDir ?? '');
@@ -109,9 +112,9 @@ function ToolsContent({ section, tabKey }: { section: Section; tabKey: string | 
       <div className="tools-inner">
         {error && (
           <p className="form-message error" role="alert" data-testid="tools-error">{error}
-            <button type="button" className="text-link" onClick={() => void loadTools(sessionId)}>重新读取</button></p>
+            <button type="button" className="text-link" onClick={() => void loadTools(sessionId)}>Retry</button></p>
         )}
-        {!info && !error && <p className="tools-empty" role="status">正在读取…</p>}
+        {!info && !error && <p className="tools-empty" role="status">Loading…</p>}
         {info && <SectionContent section={section} info={info} tabKey={tabKey} agentDir={agentDir} />}
       </div>
     </div>
@@ -130,19 +133,20 @@ export function ToolsPage() {
   return (
     <section className="tools-page" data-testid="tools-page">
       <header className="topbar">
-        <button type="button" className="button" onClick={() => showChat()}><Icon name="back" />返回会话</button>
-        <span className="chat-title">工具</span>
+        <button type="button" className="button" onClick={() => showChat()}><Icon name="back" />Back to app</button>
+        <span className="chat-title">Customize</span>
         <span className="tools-follow" title={followed?.title ?? NO_SESSION} data-testid="tools-follow">
           {followed?.title ?? NO_SESSION}</span>
       </header>
       <div className="tools-notice">
-        <span>启停和添加对新建的会话生效，已经打开的会话不变。</span>
+        <span>Changes apply to new sessions. Sessions already open aren’t affected.</span>
         <button type="button" className="button" disabled={exited || followed?.opening}
           onClick={() => void newSession()}>
-          <Icon name="plus" />新建会话</button>
+          <Icon name="plus" />New session</button>
       </div>
       {(trust === 'untrusted' || trust === 'unasked') && (
-        <div className="tools-notice warn" data-testid="tools-trust">没有信任这个文件夹，它自带的技能和配置不列出</div>
+        <div className="tools-notice warn" data-testid="tools-trust">
+          This workspace isn’t trusted, so its skills and settings aren’t listed</div>
       )}
       <div className="tools-layout">
         <SectionNav sections={sections} current={section} onSelect={setChosen} />

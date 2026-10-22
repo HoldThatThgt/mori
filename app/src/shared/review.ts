@@ -8,8 +8,8 @@ import type { Feedback } from './feedback';
 export const REVIEW_KINDS = ['feedback', 'issues'] as const;
 export type ReviewKind = (typeof REVIEW_KINDS)[number];
 
-/** @brief 两类记录的显示名（分节按钮、详情标题、导出文件的标题和默认文件名）。 */
-export const KIND_LABEL: Record<ReviewKind, string> = { feedback: '对内容的反馈', issues: '界面问题' };
+/** @brief 两类记录的显示名（分节按钮、详情标题、导出文件的标题、操作记录）。 */
+export const KIND_LABEL: Record<ReviewKind, string> = { feedback: 'Feedback', issues: 'UI issues' };
 
 /** @brief 界面问题报告的文件名（不含扩展名）：保存时刻的本地时间，同一秒内再保存时加 -2、-3（main/feedback.ts）。 */
 export const ISSUE_NAME = /^\d{4}-\d{2}-\d{2}-\d{6}(-\d+)?$/;
@@ -34,19 +34,19 @@ export interface IssueRecord {
   name: string;
   /** 报告标题里的本地时间 YYYY-MM-DD HH:mm:ss */
   time: string;
-  /** 哪里不对 */
+  /** "What went wrong"一节 */
   what: string;
-  /** 你期望什么 */
+  /** "What you expected"一节 */
   expect: string;
   /** 截图的文件名（含 .png）；没有截图时为 null */
   shot: string | null;
-  /** 没有截图时的原文（报告里的"截图失败：…"，或截图链接不是报告的截图） */
+  /** 没有截图时的原文（报告里"Couldn’t capture a screenshot: …"去掉前缀后的原文，或截图链接不是报告的截图） */
   shotError: string | null;
-  /** 当前界面 */
+  /** "Current view"一节 */
   view: string;
-  /** 最近的操作 */
+  /** "Recent activity"一节 */
   actions: string;
-  /** 版本 */
+  /** "Versions"一节 */
   versions: string;
 }
 

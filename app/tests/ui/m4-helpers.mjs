@@ -196,7 +196,7 @@ export async function expandChange(page, path) {
   await sleep(300);
 }
 
-/** @brief 文件阅读器：路径、状态说明、前几行、高亮的行、"原文已变化"的提示。 */
+/** @brief 文件阅读器：路径、状态说明、前几行、高亮的行、"Source changed"的提示。 */
 export async function viewerState(page) {
   const viewer = page.getByTestId('file-viewer');
   if (await viewer.count() === 0) return null;
@@ -206,22 +206,22 @@ export async function viewerState(page) {
       path: panel.querySelector('[data-testid="file-path"]')?.textContent ?? '',
       fullPath: panel.querySelector('[data-testid="file-path"]')?.getAttribute('title') ?? '',
       state: panel.querySelector('[data-testid="file-state"]')?.textContent ?? '',
-      loading: panel.textContent.includes('正在读取…'),
+      loading: panel.textContent.includes('Loading…'),
       lineCount: lines.length,
       first: lines.slice(0, 6).map((line) => line.textContent),
       gutter: lines[0] ? getComputedStyle(lines[0], '::before').content : '',
       target: lines.filter((line) => line.classList.contains('target')).map((line) => Number(line.dataset.line)),
       changed: panel.querySelector('[data-testid="quote-changed"]')?.textContent ?? '',
-      externalDisabled: panel.querySelector('[aria-label="用系统编辑器打开"]')?.disabled ?? null,
+      externalDisabled: panel.querySelector('[aria-label="Open in default app"]')?.disabled ?? null,
       error: panel.querySelector('.panel-error')?.textContent ?? '' };
   });
 }
 
-/** @brief 等阅读器读完（不再"正在读取…"）。 */
+/** @brief 等阅读器读完（不再"Loading…"）。 */
 export function waitViewer(page, timeout = 10000) {
   return page.waitForFunction(() => {
     const viewer = document.querySelector('[data-testid="file-viewer"]');
-    return viewer && !viewer.textContent.includes('正在读取…');
+    return viewer && !viewer.textContent.includes('Loading…');
   }, null, { timeout });
 }
 

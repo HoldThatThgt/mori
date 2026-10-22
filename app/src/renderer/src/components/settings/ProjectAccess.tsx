@@ -48,7 +48,7 @@ function ProjectRow({ config, project }: { config: ModelConfig; project: Project
                   checked={zones.includes(zone)} onChange={(event) => toggle(zone, event.target.checked)} />
                 <span>{ZONE_LABELS[zone]}</span>
               </label>
-              {excluded && <span className="field-hint">.mori/models.json in this project doesn't allow {zone}.</span>}
+              {excluded && <span className="field-hint">.mori/models.json in this project doesn’t allow {zone}.</span>}
             </span>
           );
         })}

@@ -216,7 +216,7 @@ async function openFolder(ctx, folder) {
   const { page } = ctx;
   const before = await page.locator('.pane-slot').count();
   await stubFolder(ctx.app, folder);
-  await page.getByRole('button', { name: /^(Open folder…|打开文件夹…)$/ }).first().click();
+  await page.getByRole('button', { name: 'Open folder…', exact: true }).first().click();
   await page.waitForFunction((n) => document.querySelectorAll('.pane-slot').length === n, before + 1,
     { timeout: 30000 });
   return visibleReady(ctx);
@@ -313,7 +313,7 @@ async function switchesOf(ctx, tab) {
 async function keyRows(ctx, providerId) {
   const { page } = ctx;
   if (!(await page.getByTestId('settings-page').isVisible().catch(() => false))) {
-    await page.getByRole('button', { name: '设置', exact: true }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
   }
   await page.locator('[data-testid="settings-nav"] button[data-section="models"]').click();
@@ -330,7 +330,7 @@ async function keyRows(ctx, providerId) {
 async function backToChat(ctx) {
   const { page } = ctx;
   if (!(await page.getByTestId('settings-page').isVisible().catch(() => false))) return;
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 10000 });
 }
 
@@ -352,7 +352,7 @@ async function multiKey(ctx) {
   await sendWait(ctx, first, 'plain MP03 warm-up');
   const file = await fileOf(ctx, first);
   const second = await sessionWith(ctx, 'm03');
-  await chooseMenuItem(page, file, '在右侧分屏打开');
+  await chooseMenuItem(page, file, 'Open in split view');
   await waitSplit(page, true);
   const tabAt = (side) => page.locator(`${slotSelector(side)} [data-testid="chat-pane"]`).getAttribute('data-tab');
   const [left, right] = [await tabAt('left'), await tabAt('right')];
@@ -470,9 +470,9 @@ async function serverRetry(ctx) {
   const once = await sendWait(ctx, tab, 'http-503-once plain MP16 first');
   const onceStages = (await stagesOf(ctx.page, tab, since)).map((item) => item.v);
   const onceLines = chatLogs(ctx, M('m16'), since);
-  record('MP-16 http-503-once: the stage line shows "Retrying 1/3 · HTTP 503", the retry succeeds on the same '
+  record('MP-16 http-503-once: the stage line shows "Retrying (1/3) · HTTP 503", the retry succeeds on the same '
     + 'model, no model switch and no error card',
-  onceStages.includes('retry|Retrying 1/3 · HTTP 503') && same(onceLines.map((line) => line.status), [503, 200])
+  onceStages.includes('retry|Retrying (1/3) · HTTP 503') && same(onceLines.map((line) => line.status), [503, 200])
     && chatLogs(ctx, M('m16bk'), since).length === 0 && once.switches.length === 0 && once.errors.length === 0
     && once.assistants.at(-1)?.includes(PLAIN), brief({ stages: onceStages, lines: lineBrief(onceLines, since) }));
   const later = Date.now();
@@ -481,7 +481,7 @@ async function serverRetry(ctx) {
   const lines = chatLogs(ctx, M('m16'), later);
   record('MP-16 http-503: Retrying 1/3, 2/3, 3/3 on the stage line, four attempts on the same model, then the v0 '
     + 'error card; no model switch (the second candidate gets nothing)',
-  ['1/3', '2/3', '3/3'].every((n) => stages.includes(`retry|Retrying ${n} · HTTP 503`)) && lines.length === 4
+  ['1/3', '2/3', '3/3'].every((n) => stages.includes(`retry|Retrying (${n}) · HTTP 503`)) && lines.length === 4
     && lines.every((line) => line.status === 503) && chatLogs(ctx, M('m16bk'), since).length === 0
     && always.switches.length === 0 && always.errors.length === 1 && always.errors[0].includes('503')
     && always.unavailable.length === 0, brief({ stages, lines: lineBrief(lines, later), errors: always.errors }));
@@ -512,7 +512,7 @@ async function noSwitchCases(ctx) {
   await stop(ctx, tab);
   await waitTabIdle(ctx.page, tab, 30000);
   const stopped = await paneState(ctx.page, tab);
-  record('MP-17 Stop while waiting for the first output and Stop while streaming: "已停止" each time, no new error '
+  record('MP-17 Stop while waiting for the first output and Stop while streaming: "Stopped" each time, no new error '
     + 'card, no model switch, the second candidate gets nothing',
   stopped.stopped === 2 && stopped.errors.length === 2 && stopped.switches.length === 0
     && chatLogs(ctx, M('m17bk'), since).length === 0, brief({ stopped: stopped.stopped, errors: stopped.errors }));
@@ -539,7 +539,7 @@ async function stopQueued(ctx) {
   await waitTabIdle(page, holder, 60000);
   const lines = chatLogs(ctx, M('q17'), since);
   const otherState = await paneState(page, other);
-  record('MP-17 Stop while queued for a slot ("Waiting for Q17" on the stage line): "已停止", no error card, no '
+  record('MP-17 Stop while queued for a slot ("Waiting for Q17" on the stage line): "Stopped", no error card, no '
     + 'model switch, and the fake endpoint never receives that request',
   queuedStage && /^Waiting for Q17/.test(stageText ?? '') && state.stopped === 1 && state.errors.length === 0
     && state.unavailable.length === 0 && state.switches.length === 0 && lines.length === 2,
@@ -566,7 +566,7 @@ async function stopWaitingModel(ctx) {
   await sleep(1000);
   const state = await paneState(page, tab);
   const after = [...chatLogs(ctx, M('w17a'), stoppedAt), ...chatLogs(ctx, M('w17b'), stoppedAt)];
-  record('MP-17 Stop while "Waiting for a model · rate limited until hh:mm:ss" in a reply: "已停止" instead of '
+  record('MP-17 Stop while "Waiting for a model · rate limited until hh:mm:ss" in a reply: "Stopped" instead of '
     + 'an error card or a "No model available" card, and no new request reaches the fake endpoint',
   waiting && new RegExp(`^Waiting for a model · rate limited until ${CLOCK}`).test(stageText ?? '')
     && state.stopped === 1 && state.errors.length === 0 && state.unavailable.length === 0 && after.length === 0
@@ -856,7 +856,7 @@ async function quotaKey(ctx) {
   await sendWait(ctx, tab, 'plain MP29 quota third');
   const thirdLines = chatLogs(ctx, M('qu29'), third);
   record('MP-29 after the quota is restored, the key\'s Test succeeds and clears "Quota exhausted"; the next reply '
-    + 'uses key 1 again', /^Connected · first token \d+ ms · total \d+ ms/.test(result ?? '')
+    + 'uses key 1 again', /^Connected · First token \d+ms · Total \d+ms/.test(result ?? '')
     && cleared[0]?.state === null && same(thirdLines.map((line) => `${line.status}:${line.key}`),
     [`200:${tail(K.q1)}`]), brief({ result, cleared, lines: lineBrief(thirdLines) }));
 }
@@ -1125,10 +1125,10 @@ async function redo15(ctx) {
   const file = await fileOf(ctx, tab);
   const text = file && existsSync(file) ? readFileSync(file, 'utf8') : '';
   record('MP-15 the session file and the transcript keep the hidden work: the file still has the first model\'s '
-    + 'tool calls, the transcript shows all three tool cards and "The new model redoes this reply."',
+    + 'tool calls, the transcript shows all three tool cards and "The new model redoes this response."',
   callIds.length === 2 && callIds.every((id) => text.includes(id)) && state.tools === 3
     && state.switches.length === 1 && state.switches[0].hidden
-    && state.switches[0].text.includes('The new model redoes this reply.') && state.errors.length === 0,
+    && state.switches[0].text.includes('The new model redoes this response.') && state.errors.length === 0,
   brief({ tools: state.tools, switches: state.switches, inFile: callIds.map((id) => text.includes(id)) }));
   ctx.redo15 = { tab, file, callIds };
   await shot(page, 'mp15-redo');
@@ -1368,7 +1368,7 @@ async function checkUnknown(ctx, runs) {
     record(`MP-18 ${kind} with cancel_verified true: after the 120 s first-content limit the reply switches model at `
       + 'once (no waiting to make sure it stopped), the fake endpoint gets no second copy of the request',
     common(r) && r.after >= 115 && r.after <= 135 && r.held.length === 0 && !r.event.unconfirmed
-      && !r.state.switches[0].text.includes("couldn't confirm"), brief(r));
+      && !r.state.switches[0].text.includes('Couldn’t confirm'), brief(r));
   }
   for (const [id, kind] of [['f18h', '-hang-nocancel'], ['f18s', '-stall-nocancel']]) {
     const r = await unknownOutcome(ctx, runs[id], id);
@@ -1376,7 +1376,7 @@ async function checkUnknown(ctx, runs) {
       + '<model> stopped · until hh:mm:ss", Mori reads the server metrics and switches once they are back to the '
       + 'baseline (well before 2 min), without "couldn\'t confirm"',
     common(r) && r.held.length >= 1 && heldText(id).test(r.held[0]) && r.after >= 120 && r.after <= 160
-      && !r.event.unconfirmed && !r.state.switches[0].text.includes("couldn't confirm"), brief(r));
+      && !r.event.unconfirmed && !r.state.switches[0].text.includes('Couldn’t confirm'), brief(r));
   }
   for (const [id, kind] of [['u18h', '-hang'], ['u18s', '-stall']]) {
     const r = await unknownOutcome(ctx, runs[id], id);
@@ -1384,7 +1384,7 @@ async function checkUnknown(ctx, runs) {
       + 'it stopped, after the full 2 min the reply switches model and continues; the notice says "couldn\'t confirm '
       + 'it stopped"; no second copy of the request reaches the fake endpoint',
     common(r) && r.held.length >= 1 && heldText(id).test(r.held[0]) && r.after >= 235 && r.event.unconfirmed
-      && r.state.switches[0].text.includes("couldn't confirm it stopped"), brief(r));
+      && r.state.switches[0].text.includes('Couldn’t confirm it stopped'), brief(r));
   }
   const single = await unknownOutcome(ctx, runs.s18, 's18');
   record('MP-18 only one candidate (cancel_verified unknown): after the timeout and the full 2 min wait, one "No '
@@ -1402,7 +1402,7 @@ async function stopHeld(ctx, run) {
   await waitTabIdle(page, run.tab, 30000);
   await sleep(1500);
   const state = await paneState(page, run.tab);
-  record('MP-17 Stop while "Waiting to make sure <model> stopped": "已停止", no error card, no model switch, and the '
+  record('MP-17 Stop while "Waiting to make sure <model> stopped": "Stopped", no error card, no model switch, and the '
     + 'fake endpoint receives no new request',
   shown && /^Waiting to make sure \S+ stopped · until/.test(stage ?? '') && state.stopped === 1
     && state.errors.length === 0 && state.switches.length === 0 && state.unavailable.length === 0

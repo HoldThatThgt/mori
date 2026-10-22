@@ -1,5 +1,6 @@
-// 选区浮层（docs/v0/screens/selection.md）：用鼠标在助手回复或文件阅读器里选中文字后，选区上方出现"问 Mori"和"反馈"。
-// 照 Claude 桌面版：点了之后选区清除；问 Mori 把引用芯片放进输入框、焦点到输入框末尾。在根组件旁挂一次。
+// 选区浮层（docs/v0/screens/selection.md）：用鼠标在助手回复或文件阅读器里选中文字后，选区上方出现
+// "Attach as context"和"Feedback"。照 Claude 桌面版：点了之后选区清除；"Attach as context"把引用芯片放进输入框、
+// 焦点到输入框末尾。在根组件旁挂一次。
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { openFeedback, useFeedbackForm } from '../state/feedbackForm';
@@ -98,12 +99,13 @@ export function SelectionPopover() {
     dismiss();
   };
   return (
-    <div ref={box} className="selection-popover" role="toolbar" aria-label="选中的文字" data-testid="selection-popover"
+    <div ref={box} className="selection-popover" role="toolbar" aria-label="Selected text"
+      data-testid="selection-popover"
       style={{ left: position?.left ?? -9999, top: position?.top ?? -9999,
         visibility: position ? 'visible' : 'hidden' }}
       onMouseDown={(event) => event.preventDefault()}>
-      <button onClick={ask}>问 Mori</button>
-      <button onClick={feedback}>反馈</button>
+      <button onClick={ask}>Attach as context</button>
+      <button onClick={feedback}>Feedback</button>
     </div>
   );
 }

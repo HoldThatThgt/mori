@@ -11,13 +11,13 @@ import type { Item } from './model';
 export interface ToolsState {
   /** 读取用的会话 id（跟随的会话）；没有会话时为 null */
   sessionId: string | null;
-  /** 最近一次读到的内容；还没读到时为 null（界面显示"正在读取…"） */
+  /** 最近一次读到的内容；还没读到时为 null（界面显示"Loading…"） */
   info: ToolsInfo | null;
   /** 最近一次读取失败的原文；重新读取时清除 */
   error: string | null;
 }
 
-/** 离开工具页后的状态：下次进入时先显示"正在读取…" */
+/** 离开工具页后的状态：下次进入时先显示"Loading…" */
 const EMPTY: ToolsState = { sessionId: null, info: null, error: null };
 
 /** @brief 工具页读到的内容（跟随的会话的 tools.get 结果）；离开工具页时由 resetTools 清空。 */

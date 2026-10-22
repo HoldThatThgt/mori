@@ -35,7 +35,7 @@ function ProviderFields({ form, follow }: { form: ReturnType<typeof useDraft<Pro
   return (
     <>
       <TextRow label="Name" field="name" error={errors.name} value={draft.name} onChange={(name) => set({ name })} />
-      <TextRow label="Address" field="baseUrl" error={errors.baseUrl} value={draft.baseUrl} spellCheck={false}
+      <TextRow label="Base URL" field="baseUrl" error={errors.baseUrl} value={draft.baseUrl} spellCheck={false}
         placeholder="http://host:8000/v1" onChange={(baseUrl) => set({ baseUrl })} />
       <ApiRow value={draft.api} onChange={(api) => set({ api })} />
       <ZoneRadios value={draft.zone} onChange={(zone) => set({ zone })} />
@@ -65,7 +65,7 @@ function AddProvider({ onClose }: { onClose: () => void }) {
     else setError(result.error);
   }
   return (
-    <form className="settings-form mf-grid" data-testid="provider-form"
+    <form className="settings-form mf-grid" data-testid="provider-form" noValidate
       onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <h3>Add provider</h3>
       <ProviderFields form={form} follow />
@@ -110,17 +110,18 @@ function EditProvider({ provider, onClose }: { provider: ModelProvider; onClose:
   }
   const submit = () => (originChanged && count > 0 ? setConfirming(true) : void save());
   return (
-    <form className="settings-form mf-grid" data-testid="provider-form"
+    <form className="settings-form mf-grid" data-testid="provider-form" noValidate
       onSubmit={(event) => { event.preventDefault(); submit(); }}>
       <h3>Edit provider · {provider.name}</h3>
       <ProviderFields form={form} follow={false} />
       <FormButtons busy={busy} invalid={hasErrors(providerErrors(form.draft))} onClose={onClose} />
       {error && <p className="form-message error" role="alert" data-testid="form-message">{error}</p>}
       {confirming && (
-        <ModelDialog testId="confirm-dialog" kind="address-change" title="Change the address?"
+        <ModelDialog testId="confirm-dialog" kind="address-change" title="Change the base URL?"
           confirmLabel="Save and remove keys" tone="danger" busy={busy} error={null}
           onConfirm={() => void save()} onCancel={() => setConfirming(false)}>
-          <p>{`Changing the address removes this provider's ${count} saved keys. Add them again after saving.`}</p>
+          <p>{count === 1 ? 'Changing the base URL removes this provider’s saved key. Add it again after saving.'
+            : `Changing the base URL removes this provider’s ${count} saved keys. Add them again after saving.`}</p>
         </ModelDialog>
       )}
     </form>

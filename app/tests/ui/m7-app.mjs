@@ -1,23 +1,23 @@
 // M7 整机测试：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint，synthetic），
 // 覆盖工作回顾（docs/v0/screens/review.md 的各张表；方案第 7 节 M7 走查 1–4 与反例）：
-// 入口（左栏"工具"下面的"工作回顾"、高亮、收起为图标栏）、读取中 / 读取失败与重新读取、空、"打开文件夹"（还没有时先建好、
-// 打不开）；在界面里真的写下的记录（回复下的"反馈这条回复"、回复里的选区、文件阅读器里的选区、第二个会话、F8 报告带截图）
-// 与"在工作回顾中查看"（反馈表单、F8 报告框）；手写进数据目录的 synthetic 记录（没有截图的报告、读不出的 JSON 和报告、
+// 入口（左栏"Customize"下面的"Review"、高亮、收起为图标栏）、读取中 / 读取失败与重新读取、空、"Open folder"（还没有时
+// 先建好、打不开）；在界面里真的写下的记录（回复下的"Give feedback"、回复里的选区、文件阅读器里的选区、第二个会话、F8 报告
+// 带截图）与"View in Review"（反馈表单、F8 报告框）；手写进数据目录的 synthetic 记录（没有截图的报告、读不出的 JSON 和报告、
 // 文件开头带 BOM 的记录、createdAt 不是时间的反馈、
 // 不是报告的 .md、zip 和别的文件不列出、回复不在会话里的反馈、原会话已删除、原会话没有保存、工作目录外的文件）；
 // 一行摘要（期望最多两行、原文第一行、来源、MM-DD HH:mm 与带年份）、几种窗口宽度下列表和详情都没有横向滚动条、
 // 从新到旧、会话改名后显示新名字、不监视文件夹、
-// 记录不在了关闭详情、重新读取时的"正在读取…"；右栏的详情（反馈、界面问题、读不出来的记录与打开所在文件夹、截图读取中 /
-// 读不出（列表读完后、打开之前 PNG 被删了）、放大截图与 Esc / 点外面 / "关闭"、焦点回到截图、可以展开的三节、
+// 记录不在了关闭详情、重新读取时的"Loading…"；右栏的详情（反馈、界面问题、读不出来的记录与打开所在文件夹、截图读取中 /
+// 读不出（列表读完后、打开之前 PNG 被删了）、放大截图与 Esc / 点外面 / "Close"、焦点回到截图、可以展开的三节、
 // 打开所在文件夹、与会话右栏共用宽度、窄窗口浮在上层）；↑ ↓ 与 Enter；分节各自记住的选中和滚动位置（选中的一行滚出视野时
-// 也不被拉回去）、"在工作回顾中查看"把刚记下的一行滚进视野；已处理与"隐藏已处理"（变淡、标"已处理"、条数、
+// 也不被拉回去）、"View in Review"把刚记下的一行滚进视野；已处理与"Hide resolved"（变淡、标"Resolved"、条数、
 // 开关开着时详情还在、关闭详情时焦点、都已隐藏、重启后还在、文件不变）；
 // 导出为 Markdown（对话框标题与默认文件名、取消、内容与顺序、引用块、报告各节降一级、截图的相对链接、导出到 ui-issues
-// 里时是文件名且不列出、不复制截图、"打开所在文件夹"、导出失败）；回到原位置（重启后没开着的会话里的整条回复、选区高亮、
+// 里时是文件名且不列出、不复制截图、"Show in Explorer"、导出失败）；回到原位置（重启后没开着的会话里的整条回复、选区高亮、
 // 文件里的行、已归档的先恢复、回复不在了留在工作回顾、原会话已删除（列表里没有的、列表里有但文件被删了的）不新建会话、
-// 没有保存不可用、"正在打开…"、分屏放不下右栏时右栏浮出来）；返回会话（分屏、焦点、草稿、右栏的文件）；
-// 工作回顾页上按 F8（"页面：工作回顾"，新报告马上出现在最上面，你写的标题行不切错）；
-// 后台进程退出后照常能看、能标、能导出，只有"回到原位置"不可用；打开、标记、导出都不发请求给模型；
+// 没有保存不可用、"Opening…"、分屏放不下右栏时右栏浮出来）；返回会话（分屏、焦点、草稿、右栏的文件）；
+// 工作回顾页上按 F8（"Page: Review"，新报告马上出现在最上面，你写的标题行不切错）；
+// 后台进程退出后照常能看、能标、能导出，只有"Jump to source"不可用；打开、标记、导出都不发请求给模型；
 // 没有小于 12px 的字；页面没有报错。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m7-app.mjs [--exe <Mori.exe 路径>]
@@ -43,7 +43,7 @@ import { composerAt, savedLayout, splitState, waitPaneReady, waitSplit } from '.
 import { firstRunAndOpen, resizeWindow, startFakeEndpoint } from './m6-helpers.mjs';
 import {
   backToChat, chooseTab, detailState, exportTo, flashVisible, mainCalls, mdHead, mdSections, noticeText, openReviewPage,
-  pressedRow, reviewState, rowAt, selectRow, shortOf, shotLink, sideOverflow, waitLoaded,
+  pressedRow, records, reviewState, rowAt, selectRow, shortOf, shotLink, sideOverflow, waitLoaded,
 } from './m7-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -60,11 +60,12 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 
 /** 两节没有记录时的说明（review.md "空"） */
 const EMPTY = {
-  feedback: "还没有反馈。在助手回复或文件阅读器里选中文字点'反馈'，或用回复下的'反馈这条回复'。",
-  issues: '还没有界面问题。按 F8 报告界面问题。',
+  feedback: 'No feedback yet. Select text in a response or the file viewer and click “Feedback”, '
+    + 'or use “Give feedback” under a response.',
+  issues: 'No UI issues yet. Press F8 to report one.',
 };
 /** 两节的名字 */
-const LABEL = { feedback: '对内容的反馈', issues: '界面问题' };
+const LABEL = { feedback: 'Feedback', issues: 'UI issues' };
 /** 合成端点 "plain" 的回复 */
 const REPLY = '这是一段只有文字的回复，用来测试流式输出。';
 /** README 的第一行（文件里的反馈引用第 1–2 行） */
@@ -73,8 +74,9 @@ const TITLE = '# Mori fixture project';
 const ISSUE_NAME = /^\d{4}-\d{2}-\d{2}-\d{6}(-\d+)?$/;
 /** 回到原位置不可用或没有成功时详情里的说明（review.md "回到原位置"） */
 const JUMP_TEXT = {
-  changed: '原文已变化：会话里找不到这条回复了', gone: '原会话已删除', unsaved: '原会话没有保存，无法回到原位置',
-  exited: '后台进程已退出，先重新载入',
+  changed: 'This response is no longer in the session.', gone: 'Session deleted',
+  unsaved: 'The session wasn’t saved, so there’s no source to jump to.',
+  exited: 'Mori’s background process crashed. Restart it to continue.',
 };
 /** 第一个会话改名后的名字（摘要里的会话名用侧栏现在的名字） */
 const RENAMED = '回顾测试会话';
@@ -86,7 +88,7 @@ const SEED = {
   sameSecond: '2024-06-15-120000-2.json', listedGone: '2024-06-14-130000.json', bom: '2024-05-04-120000.json',
   badTime: '2024-05-05-120000.json',
   noShot: '2024-06-15-120000.md', brokenMd: '2024-06-14-120000.md', onlyExpect: '2024-06-13-120000.md',
-  notReport: '界面问题-2000-01-01.md', zip: 'synthetic-share.zip',
+  notReport: 'ui-issues-2000-01-01.md', zip: 'synthetic-share.zip',
 };
 /** synthetic 的长期望：摘要里最多两行，详情里是全文 */
 const LONG_EXPECTED = `synthetic：${'这条期望很长，摘要里最多显示两行，详情里显示全文。'.repeat(8)}`;
@@ -157,7 +159,7 @@ function localTime(date) {
 /** @brief 反馈的完整本地时间（记录里的 createdAt 是 UTC）。 */
 const feedbackTime = (createdAt) => localTime(new Date(createdAt));
 /** @brief 报告标题里的时间。 */
-const reportTime = (file) => /^# 界面问题 · (.+)$/m.exec(readFileSync(file, 'utf8'))?.[1].trim() ?? '';
+const reportTime = (file) => /^# UI issue · (.+)$/m.exec(readFileSync(file, 'utf8'))?.[1].trim() ?? '';
 /** @brief 今天（本地）YYYY-MM-DD。 */
 const today = () => localTime(new Date()).slice(0, 10);
 
@@ -170,9 +172,9 @@ function feedbackJson(createdAt, expected, quote, source, session) {
 
 /** @brief synthetic 报告的 Markdown（与 main/feedback.ts 写的格式相同）。 */
 function reportMarkdown(time, what, expect, shotText) {
-  return [`# 界面问题 · ${time}`, '', '## 哪里不对', '', what, '', '## 你期望什么', '', expect, '', '## 截图', '',
-    shotText, '', '## 当前界面', '', '- 页面：synthetic', '', '## 最近的操作', '', '- 12:00:00 synthetic 操作', '',
-    '## 版本', '', '- Mori：synthetic', ''].join('\n');
+  return [`# UI issue · ${time}`, '', '## What went wrong', '', what, '', '## What you expected', '', expect, '',
+    '## Screenshot', '', shotText, '', '## Current view', '', '- Page: synthetic', '', '## Recent activity', '',
+    '- 12:00:00 synthetic 操作', '', '## Versions', '', '- Mori: synthetic', ''].join('\n');
 }
 
 /** @brief 回复里的锚点（synthetic：条目 id 和消息时间都不在任何会话里）。 */
@@ -229,17 +231,17 @@ function seedFeedback(ctx) {
 }
 
 /**
- * @brief 写进 synthetic 报告：没有截图的（文件开头带 BOM）、读不出的、"哪里不对"没有填写的（带截图）、不是报告的 .md、zip。
+ * @brief 写进 synthetic 报告：没有截图的（文件开头带 BOM）、读不出的、"What went wrong"没有填写的（带截图）、不是报告的 .md、zip。
  */
 function seedIssues(ctx) {
   const dir = dirOf(ctx, 'issues');
   const png = SEED.onlyExpect.replace(/\.md$/, '.png');
   writeFileSync(join(dir, SEED.noShot), `\uFEFF${reportMarkdown('2024-06-15 12:00:00', 'synthetic：没有截图的报告',
-    'synthetic：照样列出', '截图失败：Synthetic capture failure')}`);
-  writeFileSync(join(dir, SEED.brokenMd), '# 界面问题 · 2024-06-14 12:00:00\n\nsynthetic: a report without sections\n');
+    'synthetic：照样列出', 'Couldn’t capture a screenshot: Synthetic capture failure')}`);
+  writeFileSync(join(dir, SEED.brokenMd), '# UI issue · 2024-06-14 12:00:00\n\nsynthetic: a report without sections\n');
   copyFileSync(ctx.issue1.replace(/\.md$/, '.png'), join(dir, png));
-  writeFileSync(join(dir, SEED.onlyExpect), reportMarkdown('2024-06-13 12:00:00', '（没有填写）',
-    'synthetic：只写了你期望什么', `![截图](${png})`));
+  writeFileSync(join(dir, SEED.onlyExpect), reportMarkdown('2024-06-13 12:00:00', '(left blank)',
+    'synthetic：只写了你期望什么', `![Screenshot](${png})`));
   writeFileSync(join(dir, SEED.notReport), '# synthetic: an exported file, not a report\n');
   writeFileSync(join(dir, SEED.zip), Buffer.from('PK\u0003\u0004synthetic'));
 }
@@ -400,7 +402,7 @@ function viewerOverlay(page) {
       outsideApp: !dialog.closest('.app') && !dialog.closest('[data-testid="review-detail"]'),
       loaded: Boolean(img && img.naturalWidth > 0), fits: Boolean(rect && rect.left >= -1 && rect.top >= -1
         && rect.right <= innerWidth + 1 && rect.bottom <= innerHeight + 1),
-      close: [...dialog.querySelectorAll('button')].some((button) => button.textContent.trim() === '关闭') };
+      close: [...dialog.querySelectorAll('button')].some((button) => button.textContent.trim() === 'Close') };
   });
 }
 
@@ -452,14 +454,14 @@ const seenNow = (page) => page.evaluate(() => {
   return window.__m7Seen ?? {};
 });
 
-/** @brief 开始记下"回到原位置"有没有显示过"正在打开…"并且不可点。 */
+/** @brief 开始记下"Jump to source"有没有显示过"Opening…"并且不可点。 */
 function watchJump(page) {
   return page.evaluate(() => {
     window.__m7Jump = { checking: false };
     window.__m7JumpObserver?.disconnect();
     const look = () => {
       const button = document.querySelector('[data-testid="detail-jump"]');
-      if (button?.textContent.includes('正在打开…') && button.disabled) window.__m7Jump.checking = true;
+      if (button?.textContent.includes('Opening…') && button.disabled) window.__m7Jump.checking = true;
     };
     window.__m7JumpObserver = new MutationObserver(look);
     window.__m7JumpObserver.observe(document.body, { subtree: true, childList: true, characterData: true,
@@ -498,7 +500,7 @@ async function setup(ctx) {
   record('准备：首次启动填连接，打开项目并收到一条回复', Boolean(ctx.file), ctx.file ?? '');
 }
 
-/** @brief 左栏"工作回顾"：nav 里按钮的读屏名称顺序、文字、悬停提示、图标、是否在"工具"下面。 */
+/** @brief 左栏"Review"：nav 里按钮的读屏名称顺序、文字、悬停提示、图标、是否在"Customize"下面。 */
 function navPlace(page) {
   return page.evaluate(() => {
     const nav = document.querySelector('[data-testid="sidebar"] .sidebar-nav');
@@ -512,28 +514,28 @@ function navPlace(page) {
 }
 
 /**
- * @brief 入口与读取失败：左栏"工具"下面的"工作回顾"；feedback 的位置是个文件时读取失败（先"正在读取…"，
- *        再原文和"重新读取"），删掉它再"重新读取"变成空（文件夹不存在不算错）。
+ * @brief 入口与读取失败：左栏"Customize"下面的"Review"；feedback 的位置是个文件时读取失败（先"Loading…"，
+ *        再原文和"Retry"），删掉它再"Retry"变成空（文件夹不存在不算错）。
  */
 async function entry(ctx) {
   const { page } = ctx;
   const place = await navPlace(page);
   record('左栏："工具"下面一项"工作回顾"（nav-item、图标、悬停提示"工作回顾"）', place.below && place.nav && place.icon
-    && place.labels.indexOf('工作回顾') === place.labels.indexOf('工具') + 1 && place.text === '工作回顾'
-    && place.title === '工作回顾', JSON.stringify(place));
+    && place.labels.indexOf('Review') === place.labels.indexOf('Customize') + 1 && place.text === 'Review'
+    && place.title === 'Review', JSON.stringify(place));
   writeFileSync(dirOf(ctx, 'feedback'), 'synthetic: a file where the feedback folder should be');
   await watchSeen(page, ['review-loading']);
   await page.getByTestId('nav-review').click();
   const error = page.getByTestId('review-error');
   await error.waitFor({ timeout: 10000 }).catch(() => {});
   const failed = await error.innerText().catch(() => '');
-  const retry = await error.getByRole('button', { name: '重新读取' }).count();
+  const retry = await error.getByRole('button', { name: 'Retry' }).count();
   const seen = await seenNow(page);
   await shot(page, '1-read-failure');
   record('读取失败（主进程读文件夹报错）：先显示"正在读取…"，再显示原文和"重新读取"', seen['review-loading']
     && /ENOTDIR|not a directory/i.test(failed) && retry === 1, JSON.stringify({ seen, failed }));
   rmSync(dirOf(ctx, 'feedback'));
-  await error.getByRole('button', { name: '重新读取' }).click();
+  await error.getByRole('button', { name: 'Retry' }).click();
   const empty = await page.getByTestId('review-empty').waitFor({ timeout: 10000 }).then(() => true, () => false);
   record('重新读取：文件夹不存在不算错，算空', empty && await page.getByTestId('review-error').count() === 0);
 }
@@ -545,17 +547,17 @@ async function emptyStates(ctx) {
   const feedback = await reviewState(page);
   const lit = await page.getByTestId('nav-review').evaluate((el) => el.classList.contains('active'));
   record('工作回顾页：左栏"工作回顾"高亮；顶部"返回会话"、标题"工作回顾"', lit && feedback.back
-    && feedback.title === '工作回顾', JSON.stringify({ lit, back: feedback.back, title: feedback.title }));
+    && feedback.title === 'Review', JSON.stringify({ lit, back: feedback.back, title: feedback.title }));
   const { tabs } = feedback;
   record('分节："对内容的反馈""界面问题"两个切换按钮，当前分节按下；读屏名称带未处理的条数（"对内容的反馈，0 条未处理"），'
     + '没有记录时不显示数字', tabs.feedback.pressed && !tabs.issues.pressed && tabs.feedback.text === LABEL.feedback
-    && tabs.issues.text === LABEL.issues && tabs.feedback.label === '对内容的反馈，0 条未处理'
-    && tabs.issues.label === '界面问题，0 条未处理' && tabs.feedback.count === null && tabs.issues.count === null,
+    && tabs.issues.text === LABEL.issues && tabs.feedback.label === 'Feedback, 0 unresolved'
+    && tabs.issues.label === 'UI issues, 0 unresolved' && tabs.feedback.count === null && tabs.issues.count === null,
   JSON.stringify(tabs));
-  const toggle = await page.getByRole('switch', { name: '隐藏已处理' }).count();
+  const toggle = await page.getByRole('switch', { name: 'Hide resolved' }).count();
   record('工具行："隐藏已处理"开关（默认关）、"导出为 Markdown…"（没有记录时不可用）、"打开文件夹"', toggle === 1
-    && feedback.hide.checked === 'false' && feedback.exportText === '导出为 Markdown…'
-    && feedback.exportDisabled === true && feedback.folderText === '打开文件夹', JSON.stringify({ toggle,
+    && feedback.hide.checked === 'false' && feedback.exportText === 'Export as Markdown…'
+    && feedback.exportDisabled === true && feedback.folderText === 'Open folder', JSON.stringify({ toggle,
     hide: feedback.hide, exportText: feedback.exportText, disabled: feedback.exportDisabled }));
   await noteSmall(ctx, '空的对内容的反馈');
   await chooseTab(page, 'issues');
@@ -571,7 +573,7 @@ async function emptyStates(ctx) {
   await shot(page, '1-empty');
 }
 
-/** @brief "打开文件夹"：还没有文件夹时先建好再打开，两节各开自己的文件夹；打不开时工具行下面显示原文。 */
+/** @brief "Open folder"：还没有文件夹时先建好再打开，两节各开自己的文件夹；打不开时工具行下面显示原文。 */
 async function folderEmpty(ctx) {
   const { app, page } = ctx;
   const before = { feedback: existsSync(dirOf(ctx, 'feedback')), issues: existsSync(dirOf(ctx, 'issues')) };
@@ -601,11 +603,11 @@ async function folderEmpty(ctx) {
   record('打不开之后再试，这次打开了：工具行下面的原文消失', cleared);
 }
 
-/** @brief 收起为图标栏时"工作回顾"是图标按钮（悬停"工作回顾"），点它打开并高亮；返回会话回到原来的会话。 */
+/** @brief 收起为图标栏时"Review"是图标按钮（悬停"Review"），点它打开并高亮；返回会话回到原来的会话。 */
 async function railEntry(ctx) {
   const { page } = ctx;
   await backToChat(page);
-  await page.getByRole('button', { name: '收起侧栏' }).click();
+  await page.getByRole('button', { name: 'Close sidebar' }).click();
   await page.waitForFunction(() => document.querySelector('[data-testid="sidebar"]')?.classList.contains('collapsed'),
     null, { timeout: 5000 });
   const rail = await page.getByTestId('nav-review').evaluate((el) => ({ shown: el.getClientRects().length > 0,
@@ -616,10 +618,10 @@ async function railEntry(ctx) {
   const lit = await page.getByTestId('nav-review').evaluate((el) => el.classList.contains('active'));
   await shot(page, '1-rail');
   record('收起为图标栏时"工作回顾"是图标按钮（名称、悬停提示"工作回顾"），点它打开工作回顾并高亮', rail.shown
-    && rail.name === '工作回顾' && rail.title === '工作回顾' && rail.icon && rail.labelHidden && lit,
+    && rail.name === 'Review' && rail.title === 'Review' && rail.icon && rail.labelHidden && lit,
   JSON.stringify({ ...rail, lit }));
   await backToChat(page);
-  await page.getByRole('button', { name: /^展开侧栏/ }).click();
+  await page.getByRole('button', { name: /^Open sidebar/ }).click();
   await page.waitForFunction(() => !document.querySelector('[data-testid="sidebar"]')?.classList.contains('collapsed'),
     null, { timeout: 5000 });
   const back = { file: await activeFile(page),
@@ -629,14 +631,14 @@ async function railEntry(ctx) {
 
 // ---------- 步骤：在界面里写下的记录 ----------
 
-/** @brief 表单出现后写 expected 点"记录"，等"已记录"；返回那一行的文字、链接、新的记录文件名和"已记录"出现的时刻。 */
+/** @brief 表单出现后写 expected 点"Save"，等"Saved"；返回那一行的文字、链接、新的记录文件名和"Saved"出现的时刻。 */
 async function submitFeedback(ctx, expected) {
   const { page } = ctx;
   const before = new Set(expectedNames(ctx, 'feedback'));
   const form = page.getByTestId('feedback-form');
   await form.waitFor({ timeout: 5000 });
   await page.getByTestId('feedback-input').fill(expected);
-  await form.getByRole('button', { name: '记录' }).click();
+  await form.getByRole('button', { name: 'Save' }).click();
   await page.getByTestId('feedback-saved').waitFor({ timeout: 5000 });
   const savedAt = Date.now();
   const text = await page.getByTestId('feedback-saved').innerText();
@@ -646,33 +648,33 @@ async function submitFeedback(ctx, expected) {
   return { text, link, name, savedAt };
 }
 
-/** @brief 等反馈表单关闭（"已记录"约 3 秒后）。 */
+/** @brief 等反馈表单关闭（"Saved"约 3 秒后）。 */
 const formClosed = (page) => page.getByTestId('feedback-form').waitFor({ state: 'detached', timeout: 6000 })
   .then(() => true, () => false);
 
-/** @brief 回复下的"反馈这条回复"：已记录一行带"在工作回顾中查看"链接；不点时约 3 秒后关闭。 */
+/** @brief 回复下的"Give feedback"：已记录一行带"View in Review"链接；不点时约 3 秒后关闭。 */
 async function replyFeedback(ctx) {
   const { page } = ctx;
-  await paneOf(page).getByTestId('reply-actions').last().getByRole('button', { name: '反馈这条回复' }).click();
+  await paneOf(page).getByTestId('reply-actions').last().getByRole('button', { name: 'Give feedback' }).click();
   const saved = await submitFeedback(ctx, '希望整条回复更短');
   ctx.fb.reply = saved.name;
   await noteSmall(ctx, '反馈已记录');
   record('反馈已记录："已记录 · 在工作回顾中查看"，"在工作回顾中查看"是链接（button.text-link）',
-    saved.text === '已记录 · 在工作回顾中查看' && saved.link?.tag === 'button' && saved.link.textLink
-    && saved.link.text === '在工作回顾中查看' && Boolean(saved.name), JSON.stringify(saved));
+    saved.text === 'Saved · View in Review' && saved.link?.tag === 'button' && saved.link.textLink
+    && saved.link.text === 'View in Review' && Boolean(saved.name), JSON.stringify(saved));
   await sleep(Math.max(0, saved.savedAt + 2000 - Date.now()));
   const still = await page.getByTestId('feedback-form').count();
   record('不点链接时表单仍约 3 秒后关闭（约 2 秒时还在，6 秒内关闭）', still === 1 && await formClosed(page),
     `2 秒时 ${still}`);
 }
 
-/** @brief 回复里选字点"反馈"，记录后点"在工作回顾中查看"：表单关闭，打开"对内容的反馈"并选中这一条。 */
+/** @brief 回复里选字点"Feedback"，记录后点"View in Review"：表单关闭，打开"Feedback"一节并选中这一条。 */
 async function selectionFeedback(ctx) {
   const { page } = ctx;
   const index = await paneOf(page).getByTestId('assistant').count() - 1;
   await dragSelect(page, `${PANE} [data-testid="assistant"]`, '只有文字的回复', index);
   await popoverShown(page);
-  await page.getByTestId('selection-popover').getByRole('button', { name: '反馈' }).click();
+  await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
   const saved = await submitFeedback(ctx, '希望先给结论');
   ctx.fb.selection = saved.name;
   await page.getByTestId('feedback-open-review').click();
@@ -690,17 +692,17 @@ async function selectionFeedback(ctx) {
   await backToChat(page);
 }
 
-/** @brief 文件阅读器里选两行点"反馈"：记下的锚点是文件和行。 */
+/** @brief 文件阅读器里选两行点"Feedback"：记下的锚点是文件和行。 */
 async function fileFeedback(ctx) {
   const { page, h } = ctx;
   await h.send('看看 README');
   await h.idle(60000);
-  const card = paneOf(page).getByTestId('tool-card').filter({ has: page.locator('.tool-verb', { hasText: '读取' }) });
+  const card = paneOf(page).getByTestId('tool-card').filter({ has: page.locator('.tool-verb', { hasText: 'Read' }) });
   await card.last().getByTestId('tool-path').click();
   await waitViewer(page);
   await selectLines(page, 1, 2);
   await popoverShown(page);
-  await page.getByTestId('selection-popover').getByRole('button', { name: '反馈' }).click();
+  await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
   const saved = await submitFeedback(ctx, '希望标题更具体');
   ctx.fb.file = saved.name;
   const source = readFeedback(ctx, saved.name)?.source;
@@ -710,14 +712,14 @@ async function fileFeedback(ctx) {
   await formClosed(page);
 }
 
-/** @brief 第二个会话（之后归档它，测回到原位置先恢复）：收到回复后"反馈这条回复"。 */
+/** @brief 第二个会话（之后归档它，测回到原位置先恢复）：收到回复后"Give feedback"。 */
 async function secondSession(ctx) {
   const { page, h } = ctx;
   await ctrlN(page);
   await h.send('plain 第二个会话');
   await h.idle(60000);
   ctx.file2 = await activeFile(page);
-  await paneOf(page).getByTestId('reply-actions').last().getByRole('button', { name: '反馈这条回复' }).click();
+  await paneOf(page).getByTestId('reply-actions').last().getByRole('button', { name: 'Give feedback' }).click();
   const saved = await submitFeedback(ctx, '第二个会话里的反馈');
   ctx.fb.second = saved.name;
   const source = readFeedback(ctx, saved.name)?.source;
@@ -726,11 +728,11 @@ async function secondSession(ctx) {
   await formClosed(page);
 }
 
-/** @brief 等"已保存到 <路径>"，返回 Markdown 文件路径（同 m2-app.mjs）。 */
+/** @brief 等"Saved to <路径>"，返回 Markdown 文件路径（同 m2-app.mjs）。 */
 async function savedIssuePath(page) {
   const saved = page.getByTestId('issue-saved');
   await saved.waitFor({ timeout: 15000 });
-  return /已保存到\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
+  return /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
 }
 
 /** @brief 按 F8 写一份报告并保存；返回报告框和 Markdown 路径。 */
@@ -740,20 +742,20 @@ async function saveReport(page, what, expect) {
   await dialog.getByTestId('issue-shot').waitFor({ timeout: 15000 });
   await dialog.getByTestId('issue-what').fill(what);
   await dialog.getByTestId('issue-expect').fill(expect);
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   return { dialog, file: await savedIssuePath(page) };
 }
 
-/** @brief F8 报告（带截图）：保存后"打开所在文件夹"旁边有"在工作回顾中查看"，点它打开"界面问题"并选中这一份。 */
+/** @brief F8 报告（带截图）：保存后"Show in Explorer"旁边有"View in Review"，点它打开"UI issues"并选中这一份。 */
 async function f8Report(ctx) {
   const { page } = ctx;
   const { dialog, file } = await saveReport(page, '列表的字太挤', '行距大一点');
   ctx.issue1 = file;
   const buttons = (await dialog.locator('button').allInnerTexts()).map((text) => text.trim());
-  const at = buttons.indexOf('打开所在文件夹');
+  const at = buttons.indexOf('Show in Explorer');
   await noteSmall(ctx, 'F8 已保存');
   record('界面问题已保存：报告框里"打开所在文件夹"旁边多一个"在工作回顾中查看"', Boolean(file) && at >= 0
-    && buttons[at + 1] === '在工作回顾中查看', JSON.stringify(buttons));
+    && buttons[at + 1] === 'View in Review', JSON.stringify(buttons));
   await dialog.getByTestId('issue-open-review').click();
   await page.getByTestId('review-page').waitFor({ timeout: 10000 });
   await waitLoaded(page);
@@ -795,15 +797,16 @@ async function seeded(ctx) {
   JSON.stringify(names.issues));
   record('分节上是未处理的条数（读屏名称"对内容的反馈，N 条未处理"）；每条记录是一个行按钮',
     feedback.tabs.feedback.count === String(want.feedback.length)
-    && feedback.tabs.feedback.label === `对内容的反馈，${want.feedback.length} 条未处理`
+    && feedback.tabs.feedback.label === `Feedback, ${want.feedback.length} unresolved`
     && issues.tabs.issues.count === String(want.issues.length)
     && feedback.rows.every((row) => row.tagName === 'button'),
   JSON.stringify({ feedback: feedback.tabs.feedback, issues: issues.tabs.issues }));
   const json = feedback.rows.find((row) => row.name === SEED.brokenJson)?.text ?? '';
   const md = issues.rows.find((row) => row.name === SEED.brokenMd)?.text ?? '';
   record('读不出来的记录：一行"读不出这份记录：<文件名>"和原文（坏的 JSON；缺"哪里不对"等标题的报告）',
-    json.includes(`读不出这份记录：${SEED.brokenJson}`) && /JSON/.test(json)
-    && md.includes(`读不出这份记录：${SEED.brokenMd}`) && md.includes('The report has no'), oneLine(`${json} | ${md}`));
+    json.includes(`Couldn’t read the record ${SEED.brokenJson}`) && /JSON/.test(json)
+    && md.includes(`Couldn’t read the record ${SEED.brokenMd}`) && md.includes('The report has no'),
+  oneLine(`${json} | ${md}`));
   await shot(page, '3-seeded');
 }
 
@@ -818,7 +821,8 @@ async function seededReads(ctx) {
   const badTime = await text('feedback', SEED.badTime);
   record('文件开头带 BOM 的反馈和报告（在"UTF-8 带 BOM"的编辑器里另存过）照样读出；createdAt 不是时间的反馈列为读不出来',
     bom.feedback.includes('synthetic：带 BOM 的反馈') && bom.issue.includes('synthetic：没有截图的报告')
-    && !`${bom.feedback}${bom.issue}`.includes('读不出这份记录') && badTime.includes(`读不出这份记录：${SEED.badTime}`)
+    && !`${bom.feedback}${bom.issue}`.includes('Couldn’t read the record')
+    && badTime.includes(`Couldn’t read the record ${SEED.badTime}`)
     && badTime.includes('createdAt'), oneLine(`${bom.feedback} | ${bom.issue} | ${badTime}`));
 }
 
@@ -873,12 +877,12 @@ async function feedbackRows(ctx) {
   const year = `${new Date().getFullYear()}-`;
   record('反馈一行（整条回复）：你的期望、原文第一行、"<会话名> · 整条回复"、时间 MM-DD HH:mm（今年的不带年份）；'
     + '会话名是侧栏现在的名字（改名后）', renamed && has(ctx.fb.reply, ['希望整条回复更短', REPLY,
-    `${RENAMED} · 整条回复`, time(ctx.fb.reply)]) && !(rows[ctx.fb.reply] ?? '').includes(year),
+    `${RENAMED} · Whole response`, time(ctx.fb.reply)]) && !(rows[ctx.fb.reply] ?? '').includes(year),
   oneLine(rows[ctx.fb.reply] ?? ''));
   record('反馈一行（回复里的选区）："<会话名> · 回复里的选区"，原文是选中的字', has(ctx.fb.selection, ['希望先给结论',
-    '只有文字的回复', `${RENAMED} · 回复里的选区`, time(ctx.fb.selection)]), oneLine(rows[ctx.fb.selection] ?? ''));
+    '只有文字的回复', `${RENAMED} · Selection in response`, time(ctx.fb.selection)]), oneLine(rows[ctx.fb.selection] ?? ''));
   record('反馈一行（文件里的）："README.md 第 1–2 行"（按工作目录的相对路径），原文第一行', has(ctx.fb.file,
-    ['希望标题更具体', TITLE, 'README.md 第 1–2 行', time(ctx.fb.file)]), oneLine(rows[ctx.fb.file] ?? ''));
+    ['希望标题更具体', TITLE, 'README.md · lines 1–2', time(ctx.fb.file)]), oneLine(rows[ctx.fb.file] ?? ''));
   await noteSmall(ctx, '对内容的反馈列表');
 }
 
@@ -893,19 +897,20 @@ async function seededRows(ctx) {
   const changed = rows[SEED.changed] ?? '';
   record('不是今年的记录时间带年份；原文只显示第一行；找得到会话时用侧栏现在的名字（不是记录里的名字）',
     time.startsWith('2024-') && changed.includes(time) && changed.includes('synthetic 第一行')
-    && !changed.includes('synthetic 第二行') && changed.includes(`${RENAMED} · 回复里的选区`)
+    && !changed.includes('synthetic 第二行') && changed.includes(`${RENAMED} · Selection in response`)
     && !changed.includes('synthetic 记录里的名字'), oneLine(changed));
   record('找不到会话时用记录里的名字（已删除的、没有保存的）', (rows[SEED.gone] ?? '').includes(
-    'synthetic 已删除的会话 · 整条回复') && (rows[SEED.unsaved] ?? '').includes('synthetic 没有保存的会话 · 回复里的选区'),
+    'synthetic 已删除的会话 · Whole response')
+    && (rows[SEED.unsaved] ?? '').includes('synthetic 没有保存的会话 · Selection in response'),
   oneLine(`${rows[SEED.gone]} | ${rows[SEED.unsaved]}`));
   record('不在工作目录里的文件显示完整路径（"<路径> 第 3–4 行"）', (rows[SEED.outside] ?? '').includes(
-    `${ctx.outsideFile} 第 3–4 行`), oneLine(rows[SEED.outside] ?? ''));
+    `${ctx.outsideFile} · lines 3–4`), oneLine(rows[SEED.outside] ?? ''));
   const clamp = await linesOf(page, SEED.changed, 'synthetic：这条期望很长');
   record('你的期望最多显示 2 行（长期望在行里截断）', Boolean(clamp) && clamp.lines >= 1 && clamp.lines <= 2,
     JSON.stringify(clamp));
 }
 
-/** @brief 界面问题的一行摘要："哪里不对"（没有填写时用"你期望什么"）、时间、没有截图时标"没有截图"。 */
+/** @brief 界面问题的一行摘要："What went wrong"（没有填写时用"What you expected"）、时间、没有截图时标"No screenshot"。 */
 async function issueRows(ctx) {
   const { page } = ctx;
   await chooseTab(page, 'issues');
@@ -913,13 +918,13 @@ async function issueRows(ctx) {
   const first = basename(ctx.issue1);
   const time = shortOf(reportTime(ctx.issue1));
   record('界面问题一行："哪里不对"和时间（MM-DD HH:mm）；有截图时没有"没有截图"', (rows[first] ?? '').includes('列表的字太挤')
-    && rows[first].includes(time) && !rows[first].includes('没有截图'), oneLine(rows[first] ?? ''));
+    && rows[first].includes(time) && !rows[first].includes('No screenshot'), oneLine(rows[first] ?? ''));
   const noShot = rows[SEED.noShot] ?? '';
   record('界面问题一行：没有截图时标"没有截图"；不是今年的带年份', noShot.includes('synthetic：没有截图的报告')
-    && noShot.includes('没有截图') && noShot.includes('2024-06-15 12:00'), oneLine(noShot));
+    && noShot.includes('No screenshot') && noShot.includes('2024-06-15 12:00'), oneLine(noShot));
   const only = rows[SEED.onlyExpect] ?? '';
   record('界面问题一行："哪里不对"没有填写时用"你期望什么"', only.includes('synthetic：只写了你期望什么')
-    && !only.includes('（没有填写）'), oneLine(only));
+    && !only.includes('(left blank)'), oneLine(only));
   await noteSmall(ctx, '界面问题列表');
 }
 
@@ -933,21 +938,21 @@ async function feedbackDetail(ctx) {
   const center = await page.getByTestId('review-page').boundingBox();
   const frame = { right: Math.round(center.x + center.width), session: await page.getByTestId('right-panel').count() };
   record('点一条：右栏打开详情（aside.right-panel，读屏名称"工作回顾的详情"，有分隔线），中栏让出位置，没有会话的右栏',
-    detail.tag === 'aside' && detail.panel && detail.label === '工作回顾的详情' && detail.divider
+    detail.tag === 'aside' && detail.panel && detail.label === 'Review details' && detail.divider
     && frame.right <= detail.left + 1 && frame.session === 0, JSON.stringify({ ...frame, left: detail.left }));
   const stored = readFeedback(ctx, ctx.fb.reply);
   record('反馈的详情：标题"对内容的反馈"和"关闭详情"；完整时间；来源（会话名、整条回复、工作目录）；期望和原文全文；'
     + '"回到原位置"；"标为已处理"', detail.heading.includes(LABEL.feedback) && detail.close
     && (detail.time ?? '').startsWith(feedbackTime(stored.createdAt).slice(0, 16))
-    && (detail.source ?? '').includes(RENAMED) && detail.source.includes('整条回复')
+    && (detail.source ?? '').includes(RENAMED) && detail.source.includes('Whole response')
     && detail.source.includes(ctx.project) && detail.expected === '希望整条回复更短' && detail.quote === REPLY
-    && detail.jump?.text === '回到原位置' && !detail.jump.disabled && !detail.jumpStatus
-    && detail.handled === '标为已处理', JSON.stringify({ ...detail, text: undefined }));
+    && detail.jump?.text === 'Jump to source' && !detail.jump.disabled && !detail.jumpStatus
+    && detail.handled === 'Resolve', JSON.stringify({ ...detail, text: undefined }));
   await noteSmall(ctx, '反馈的详情');
   await shot(page, '4-feedback-detail');
   const file = await selectRow(page, ctx.fb.file);
   record('文件里的反馈：来源是文件和行范围（README.md 第 1–2 行）和工作目录', (file.source ?? '').includes(
-    'README.md 第 1–2 行') && file.source.includes(ctx.project), file.source ?? '');
+    'README.md · lines 1–2') && file.source.includes(ctx.project), file.source ?? '');
   const long = await selectRow(page, SEED.changed);
   record('详情里"你希望得到的结果"是全文（摘要里最多两行）；"引用的原文"每一行都在，太长时在框里滚动（框不超过 300px）',
     long.expected === LONG_EXPECTED && (long.quote ?? '').includes('synthetic 第二行')
@@ -955,7 +960,7 @@ async function feedbackDetail(ctx) {
     && long.quoteBox.scroll > long.quoteBox.client + 20 && long.quoteBox.client <= 300,
   JSON.stringify({ length: long.expected?.length, quote: long.quote?.length, scroll: long.quoteScroll,
     box: long.quoteBox }));
-  await page.getByTestId('review-detail').getByRole('button', { name: '关闭详情' }).click();
+  await page.getByTestId('review-detail').getByRole('button', { name: 'Close details' }).click();
   const closed = { detail: await page.getByTestId('review-detail').count(), pressed: await pressedRow(page) };
   record('关闭（×）：详情关闭，中栏占满，没有行高亮', closed.detail === 0 && closed.pressed === null, JSON.stringify(closed));
 }
@@ -992,10 +997,10 @@ async function noSideScroll(ctx) {
   const detail = (item) => item && [item.width, item.detail, item.detailParts];
   record('详情没有横向溢出（同上四个宽度）', all((item) => Boolean(item.detail) && item.detail[0] <= item.detail[1]
     && item.detailParts === 0), JSON.stringify(seen.map(detail)));
-  await page.getByTestId('review-detail').getByRole('button', { name: '关闭详情' }).click();
+  await page.getByTestId('review-detail').getByRole('button', { name: 'Close details' }).click();
 }
 
-/** @brief 依次展开"当前界面""最近的操作""版本"，返回每节展开前是否打开和展开后的样子。 */
+/** @brief 依次展开"Current view""Recent activity""Versions"，返回每节展开前是否打开和展开后的样子。 */
 async function expandMore(page) {
   const keys = { 'detail-view': 'view', 'detail-actions': 'actions', 'detail-versions': 'versions' };
   const result = [];
@@ -1026,9 +1031,10 @@ async function issueDetail(ctx) {
   const more = await expandMore(page);
   const [view, actions, versions] = more.map((item) => item.after);
   record('"当前界面""最近的操作""版本"默认收起、可以展开，展开后是报告里的原文（保留换行）', more.every((item) => item.before
-    === false && item.after?.open && item.after.wrap === 'pre-wrap') && view.summary === '当前界面'
-    && view.text.includes('页面：会话') && actions.summary === '最近的操作' && actions.text.includes('报告界面问题')
-    && versions.summary === '版本' && versions.text.includes('Electron'), JSON.stringify(more));
+    === false && item.after?.open && item.after.wrap === 'pre-wrap') && view.summary === 'Current view'
+    && view.text.includes('Page: Session') && actions.summary === 'Recent activity'
+    && actions.text.includes('Report a UI issue') && versions.summary === 'Versions'
+    && versions.text.includes('Electron'), JSON.stringify(more));
   await noteSmall(ctx, '界面问题的详情（展开）');
   await shot(page, '4-issue-detail');
   await app.evaluate(clearShell);
@@ -1037,10 +1043,10 @@ async function issueDetail(ctx) {
   record('"打开所在文件夹"：资源管理器里选中这份报告', samePath(revealed, ctx.issue1), String(revealed));
 }
 
-/** @brief 放大截图：浮层显示截图、缩到窗口内、有"关闭"；Esc、点外面、"关闭"都关闭，焦点回到截图。 */
+/** @brief 放大截图：浮层显示截图、缩到窗口内、有"Close"；Esc、点外面、"Close"都关闭，焦点回到截图。 */
 async function shotViewer(ctx) {
   const { page } = ctx;
-  const zoom = page.getByTestId('review-detail').getByRole('button', { name: '放大截图' });
+  const zoom = page.getByTestId('review-detail').getByRole('button', { name: 'View full screenshot' });
   const viewer = page.getByTestId('shot-viewer');
   const gone = () => viewer.waitFor({ state: 'detached', timeout: 3000 }).then(() => true, () => false);
   await zoom.click();
@@ -1052,8 +1058,9 @@ async function shotViewer(ctx) {
   const esc = { closed: await gone(), focus: await focusedLabel(page),
     detail: await page.getByTestId('review-detail').count() };
   record('放大截图：浮层（role=dialog，读屏名称"截图"，挂在 body 下）显示截图、缩到窗口内，有"关闭"；'
-    + 'Esc 关闭（详情还在），焦点回到截图', opened?.role === 'dialog' && opened.label === '截图' && opened.outsideApp
-    && opened.loaded && opened.fits && opened.close && esc.closed && esc.focus === '放大截图' && esc.detail === 1,
+    + 'Esc 关闭（详情还在），焦点回到截图', opened?.role === 'dialog' && opened.label === 'Screenshot'
+    && opened.outsideApp && opened.loaded && opened.fits && opened.close && esc.closed
+    && esc.focus === 'View full screenshot' && esc.detail === 1,
   JSON.stringify({ opened, esc }));
   await zoom.focus();
   await page.keyboard.press('Enter');
@@ -1063,10 +1070,11 @@ async function shotViewer(ctx) {
   const outside = { point, closed: await gone(), focus: await focusedLabel(page) };
   await zoom.click();
   await viewer.waitFor({ timeout: 5000 });
-  await viewer.getByRole('button', { name: '关闭' }).click();
+  await viewer.getByRole('button', { name: 'Close' }).click();
   const button = { closed: await gone(), focus: await focusedLabel(page) };
   record('焦点在截图上按 Enter 也放大；点截图外面、点"关闭"都关闭，焦点回到截图', Boolean(point) && outside.closed
-    && outside.focus === '放大截图' && button.closed && button.focus === '放大截图', JSON.stringify({ outside, button }));
+    && outside.focus === 'View full screenshot' && button.closed && button.focus === 'View full screenshot',
+  JSON.stringify({ outside, button }));
 }
 
 /** @brief 读不出来的记录的详情；没有截图的报告；列表读完后、打开工作回顾之前 PNG 被删了（截图读不出来）。 */
@@ -1078,32 +1086,33 @@ async function brokenDetail(ctx) {
   await page.getByTestId('detail-show-file').click();
   const shown = await firstRevealed(app);
   record('读不出来的反馈：详情里文件名和原文、"打开所在文件夹"（资源管理器里选中它）、"标为已处理"，没有"回到原位置"',
-    (json.broken ?? '').includes(SEED.brokenJson) && /JSON/.test(json.broken) && json.handled === '标为已处理'
+    (json.broken ?? '').includes(SEED.brokenJson) && /JSON/.test(json.broken) && json.handled === 'Resolve'
     && !json.jump && samePath(shown, join(dirOf(ctx, 'feedback'), SEED.brokenJson)),
   JSON.stringify({ broken: json.broken, handled: json.handled, shown }));
   await chooseTab(page, 'issues');
   const md = await selectRow(page, SEED.brokenMd);
   await app.evaluate(clearShell);
-  await page.getByTestId('review-detail').getByRole('button', { name: '打开所在文件夹' }).click();
+  await page.getByTestId('review-detail').getByRole('button', { name: 'Show in Explorer' }).click();
   const revealed = await firstRevealed(app);
   record('读不出来的报告：详情里文件名和原文、"打开所在文件夹"（资源管理器里选中它）、"标为已处理"',
-    (md.broken ?? '').includes(SEED.brokenMd) && md.broken.includes('The report has no') && md.handled === '标为已处理'
+    (md.broken ?? '').includes(SEED.brokenMd) && md.broken.includes('The report has no') && md.handled === 'Resolve'
     && samePath(revealed, join(dirOf(ctx, 'issues'), SEED.brokenMd)), JSON.stringify({ broken: md.broken, revealed }));
   const noShot = await selectRow(page, SEED.noShot);
   record('没有截图的报告：详情里"截图失败：Synthetic capture failure"，没有截图', noShot.text.includes(
-    '截图失败：Synthetic capture failure') && !noShot.shot, noShot.shotError ?? '');
+    'Couldn’t capture a screenshot: Synthetic capture failure') && !noShot.shot, noShot.shotError ?? '');
   rmSync(join(dirOf(ctx, 'issues'), SEED.onlyExpect.replace(/\.md$/, '.png')));
   await selectRow(page, SEED.onlyExpect);
   const failed = await page.getByTestId('detail-shot-error').innerText({ timeout: 5000 }).catch(() => '');
-  record('截图读不出来（列表读完后 PNG 被删了）：详情里"截图读不出来："和原文', failed.startsWith('截图读不出来：')
-    && failed.length > '截图读不出来：'.length, failed);
+  record('截图读不出来（列表读完后 PNG 被删了）：详情里"截图读不出来："和原文', failed.startsWith('Couldn’t load the screenshot: ')
+    && failed.length > 'Couldn’t load the screenshot: '.length, failed);
   await backToChat(page);
   await openReviewPage(page, 'issues');
   const row = (await reviewState(page)).rows.find((item) => item.name === SEED.onlyExpect)?.text ?? '';
   await selectRow(page, SEED.onlyExpect);
   const reread = await page.getByTestId('detail-shot-error').innerText({ timeout: 5000 }).catch(() => '');
   record('截图读不出来（打开工作回顾之前 PNG 就被删了）：这一行不标"没有截图"，详情里"截图读不出来："和原文，'
-    + '不说"截图失败"', Boolean(row) && !row.includes('没有截图') && reread.startsWith('截图读不出来：'),
+    + '不说"截图失败"', Boolean(row) && !row.includes('No screenshot')
+    && reread.startsWith('Couldn’t load the screenshot: '),
   oneLine(`${row} | ${reread}`));
 }
 
@@ -1165,7 +1174,7 @@ async function sectionMemory(ctx) {
 }
 
 /**
- * @brief "在工作回顾中查看"把刚记下的一行滚到看得见的地方：列表记住的滚动位置在最下面（最上面的新记录在视野外）时
+ * @brief "View in Review"把刚记下的一行滚到看得见的地方：列表记住的滚动位置在最下面（最上面的新记录在视野外）时
  *        也一样（窗口调矮，列表才滚得动）。
  */
 async function revealSaved(ctx) {
@@ -1181,7 +1190,7 @@ async function revealSaved(ctx) {
     await backToChat(page);
     await openRow(page, ctx.file);
     await waitReady(page);
-    await paneOf(page).getByTestId('reply-actions').last().getByRole('button', { name: '反馈这条回复' }).click();
+    await paneOf(page).getByTestId('reply-actions').last().getByRole('button', { name: 'Give feedback' }).click();
     const saved = await submitFeedback(ctx, '希望回到列表时看得见这一条');
     await page.getByTestId('feedback-open-review').click();
     await page.getByTestId('review-page').waitFor({ timeout: 10000 });
@@ -1196,9 +1205,9 @@ async function revealSaved(ctx) {
   }
 }
 
-// ---------- 步骤：已处理与"隐藏已处理" ----------
+// ---------- 步骤：已处理与"Hide resolved" ----------
 
-/** @brief 标为已处理：变淡、标"已处理"、数字少一、按钮变"标为未处理"、本机存了。 */
+/** @brief 标为已处理：变淡、标"Resolved"、数字少一、按钮变"Reopen"、本机存了。 */
 async function handled(ctx) {
   const { page } = ctx;
   ctx.snap = snapshots(ctx);
@@ -1212,8 +1221,8 @@ async function handled(ctx) {
   const dim = await rowDim(page, [ctx.fb.reply, '希望整条回复更短'], [ctx.fb.selection, '希望先给结论']);
   const detail = await detailState(page);
   record('标为已处理：这一行变淡并标"已处理"，分节上的数字少一（读屏名称跟着变），按钮变成"标为未处理"', row?.handled
-    && row.tag === '已处理' && dim.dim && state.tabs.feedback.count === String(total - 1)
-    && state.tabs.feedback.label === `对内容的反馈，${total - 1} 条未处理` && detail.handled === '标为未处理',
+    && row.tag === 'Resolved' && dim.dim && state.tabs.feedback.count === String(total - 1)
+    && state.tabs.feedback.label === `Feedback, ${total - 1} unresolved` && detail.handled === 'Reopen',
   JSON.stringify({ row: row && { ...row, text: undefined }, dim, tab: state.tabs.feedback, button: detail.handled }));
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('mori.review') ?? 'null'));
   record('已处理记在本机界面状态（localStorage 的 mori.review，按"文件夹/文件名"），开关默认关',
@@ -1222,7 +1231,7 @@ async function handled(ctx) {
   await shot(page, '5-handled');
 }
 
-/** @brief 打开"隐藏已处理"：已处理的不列出、数字不变、详情还在；马上"标为未处理"又列出；再标回已处理详情不消失。 */
+/** @brief 打开"Hide resolved"：已处理的不列出、数字不变、详情还在；马上"Reopen"又列出；再标回已处理详情不消失。 */
 async function hideHandled(ctx) {
   const { page } = ctx;
   const total = expectedNames(ctx, 'feedback').length;
@@ -1232,7 +1241,7 @@ async function hideHandled(ctx) {
   record('打开"隐藏已处理"：已处理的不列出，分节上的数字不变（未处理的条数），右栏的详情还在、按钮是"标为未处理"',
     hidden.hide.checked === 'true' && !hidden.rows.some((row) => row.name === ctx.fb.reply)
     && hidden.rows.length === total - 1 && hidden.tabs.feedback.count === String(total - 1)
-    && kept?.expected === '希望整条回复更短' && kept.handled === '标为未处理', JSON.stringify({ hide: hidden.hide,
+    && kept?.expected === '希望整条回复更短' && kept.handled === 'Reopen', JSON.stringify({ hide: hidden.hide,
     rows: hidden.rows.length, count: hidden.tabs.feedback.count, kept: kept?.handled }));
   await page.getByTestId('detail-handled').click();
   const back = await reviewState(page);
@@ -1244,9 +1253,9 @@ async function hideHandled(ctx) {
   const again = await reviewState(page);
   const still = await detailState(page);
   record('反例：开关开着时标了已处理，这一行马上不列出，详情不会跟着消失（还能"标为未处理"）',
-    !again.rows.some((item) => item.name === ctx.fb.reply) && still?.handled === '标为未处理',
+    !again.rows.some((item) => item.name === ctx.fb.reply) && still?.handled === 'Reopen',
     JSON.stringify({ rows: again.rows.length, still: still?.handled }));
-  await page.getByTestId('review-detail').getByRole('button', { name: '关闭详情' }).click();
+  await page.getByTestId('review-detail').getByRole('button', { name: 'Close details' }).click();
   await settle(page);
   const focus = await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? null);
   record('这时关闭详情（这一行没有列出）：焦点回到"对内容的反馈"分节按钮，不掉到页面外', focus === 'review-tab-feedback',
@@ -1264,15 +1273,16 @@ async function allHidden(ctx) {
     await until(async () => !(await reviewState(page)).rows.some((row) => row.name === name), 3000);
   }
   const state = await reviewState(page);
+  const hidden = `No unresolved records · ${names.length} resolved ${names.length === 1 ? 'record' : 'records'} hidden`;
   record(`都已隐藏："没有未处理的记录 · 已处理的 ${names.length} 条已隐藏"，导出不可用，分节上没有数字`,
-    state.allHidden === `没有未处理的记录 · 已处理的 ${names.length} 条已隐藏` && state.rows.length === 0
+    state.allHidden === hidden && state.rows.length === 0
     && state.exportDisabled === true && state.tabs.issues.count === null
-    && state.tabs.issues.label === '界面问题，0 条未处理', JSON.stringify({ ...state, rows: state.rows.length }));
+    && state.tabs.issues.label === 'UI issues, 0 unresolved', JSON.stringify({ ...state, rows: state.rows.length }));
   await shot(page, '5-all-hidden');
   await page.getByTestId('review-hide-handled').click();
   const shown = await reviewState(page);
   record('关掉"隐藏已处理"：全部列出，已处理的都标"已处理"', shown.hide.checked === 'false'
-    && shown.rows.length === names.length && shown.rows.every((row) => row.handled && row.tag === '已处理'),
+    && shown.rows.length === names.length && shown.rows.every((row) => row.handled && row.tag === 'Resolved'),
   JSON.stringify(shown.rows.map((row) => [row.name, row.handled])));
   for (const name of [basename(ctx.issue1), SEED.onlyExpect]) {
     await selectRow(page, name);
@@ -1311,14 +1321,14 @@ async function exportCancel(ctx) {
   const documents = await app.evaluate(({ app: main }) => main.getPath('documents'));
   const notice = await page.getByTestId('review-notice').count();
   record('导出：保存对话框标题"导出对内容的反馈"，默认文件名"对内容的反馈-<今天>.md"，默认放在"文档"里',
-    dialog?.title === '导出对内容的反馈' && basename(dialog.defaultPath ?? '') === `对内容的反馈-${today()}.md`
+    dialog?.title === 'Export as Markdown' && basename(dialog.defaultPath ?? '') === `feedback-${today()}.md`
     && samePath(dirname(dialog.defaultPath), documents), JSON.stringify({ dialog, documents }));
   record('取消保存对话框：什么都不变（没有写文件，没有提示）', notice === 0 && readdirSync(ctx.exportDir).length === 0,
     JSON.stringify({ notice, files: readdirSync(ctx.exportDir) }));
 }
 
 /**
- * @brief 导出对内容的反馈：开关开着时只导出列出的、顺序与列表相同；"已导出 N 条到 <路径>"和打开所在文件夹；
+ * @brief 导出对内容的反馈：开关开着时只导出列出的、顺序与列表相同；"Exported N records to <路径>"和打开所在文件夹；
  *        关掉开关后全部导出（checkFeedbackSections）。
  */
 async function exportFeedback(ctx) {
@@ -1329,41 +1339,43 @@ async function exportFeedback(ctx) {
   const head = mdHead(md);
   const sections = mdSections(md);
   record('导出（"隐藏已处理"开着）：只含列出的记录，顺序与列表相同、按序号；开头"# 对内容的反馈"和'
-    + '"导出于 … · 共 N 条：未处理 N 条，已处理 0 条"', head.title === '# 对内容的反馈' && head.total === listed.length
+    + '"导出于 … · 共 N 条：未处理 N 条，已处理 0 条"', head.title === '# Feedback' && head.total === listed.length
     && head.open === listed.length && head.done === 0 && same(sections.map((item) => item.name), listed)
     && !listed.includes(ctx.fb.reply) && sections.every((item, index) => item.heading.startsWith(`## ${index + 1}. `)),
   JSON.stringify({ head, names: sections.map((item) => item.name) }));
-  const notice = await noticeText(page, '已导出');
+  const notice = await noticeText(page, 'Exported ');
   await app.evaluate(clearShell);
-  await page.getByTestId('review-notice').getByRole('button', { name: '打开所在文件夹' }).click();
+  await page.getByTestId('review-notice').getByRole('button', { name: 'Show in Explorer' }).click();
   const revealed = await firstRevealed(app);
   record('已导出：工具行下面"已导出 N 条到 <路径>"和"打开所在文件夹"（资源管理器里选中导出的文件）', notice.startsWith(
-    `已导出 ${listed.length} 条到 ${hiddenFile}`) && samePath(revealed, hiddenFile), JSON.stringify({ notice, revealed }));
+    `Exported ${records(listed.length)} to ${hiddenFile}`) && samePath(revealed, hiddenFile),
+  JSON.stringify({ notice, revealed }));
   await noteSmall(ctx, '已导出');
   await page.getByTestId('review-hide-handled').click();
   const all = await exportTo(ctx, join(ctx.exportDir, 'feedback-all.md'));
   checkFeedbackSections(ctx, all.md);
 }
 
-/** @brief 全部导出的反馈：已处理的注明"已处理"，每条的来源、期望和引用块，读不出来的写文件名和原文。 */
+/** @brief 全部导出的反馈：已处理的注明"Resolved"，每条的来源、期望和引用块，读不出来的写文件名和原文。 */
 function checkFeedbackSections(ctx, md) {
   const head = mdHead(md);
   const sections = Object.fromEntries(mdSections(md).map((item) => [item.name, item]));
   const total = expectedNames(ctx, 'feedback').length;
   record('关掉开关再导出：全部记录，已处理的标"已处理"、其余"未处理"（"共 N 条：未处理 N-1 条，已处理 1 条"）',
     head.total === total && head.done === 1 && head.open === total - 1
-    && Boolean(sections[ctx.fb.reply]?.heading.endsWith(' · 已处理'))
-    && Boolean(sections[ctx.fb.selection]?.heading.endsWith(' · 未处理')), JSON.stringify(head));
+    && Boolean(sections[ctx.fb.reply]?.heading.endsWith(' · Resolved'))
+    && Boolean(sections[ctx.fb.selection]?.heading.endsWith(' · Unresolved')), JSON.stringify(head));
   const reply = sections[ctx.fb.reply]?.text ?? '';
   const time = feedbackTime(readFeedback(ctx, ctx.fb.reply).createdAt);
   record('导出的反馈一节："## <序号>. <时间> · <状态>"，来源（范围、会话文件、工作目录）、"### 你希望得到的结果"、'
-    + '"### 引用的原文"（每行前加 "> "）', reply.split('\n')[0].endsWith(`${time} · 已处理`) && reply.includes('整条回复')
+    + '"### 引用的原文"（每行前加 "> "）', reply.split('\n')[0].endsWith(`${time} · Resolved`) && reply.includes('Whole response')
     && reply.toLowerCase().includes(ctx.file.toLowerCase()) && reply.includes(ctx.project)
-    && reply.includes('### 你希望得到的结果\n\n希望整条回复更短') && reply.includes(`### 引用的原文\n\n> ${REPLY}`)
+    && reply.includes('### What you hoped for\n\n希望整条回复更短') && reply.includes(`### Quoted text\n\n> ${REPLY}`)
     && Boolean(sections[SEED.changed]?.text.includes('> synthetic 第一行：这段原文不在会话里\n> synthetic 第二行')),
   oneLine(reply, 400));
   record('导出里读不出来的记录：一节，写文件名和原文', Boolean(sections[SEED.brokenJson]?.heading.includes(SEED.brokenJson))
-    && sections[SEED.brokenJson].text.includes('读不出这份记录：'), oneLine(sections[SEED.brokenJson]?.text ?? '', 300));
+    && sections[SEED.brokenJson].text.includes('Couldn’t read this record: '),
+  oneLine(sections[SEED.brokenJson]?.text ?? '', 300));
 }
 
 /** @brief 导出界面问题到别的文件夹：报告各节降一级，截图链接是到原来 PNG 的相对路径，不复制截图。 */
@@ -1375,15 +1387,16 @@ async function exportIssues(ctx) {
   const head = mdHead(md);
   const sections = mdSections(md);
   record('导出界面问题：对话框标题"导出界面问题"、默认文件名"界面问题-<今天>.md"；开头"# 界面问题"和条数；顺序与列表相同',
-    dialog?.title === '导出界面问题' && basename(dialog.defaultPath ?? '') === `界面问题-${today()}.md`
-    && head.title === '# 界面问题' && head.total === listed.length && head.done === 2
+    dialog?.title === 'Export as Markdown' && basename(dialog.defaultPath ?? '') === `ui-issues-${today()}.md`
+    && head.title === '# UI issues' && head.total === listed.length && head.done === 2
     && same(sections.map((item) => item.name), listed), JSON.stringify({ dialog, head,
     names: sections.map((item) => item.name) }));
   const first = sections.find((item) => item.name === basename(ctx.issue1))?.text ?? '';
-  const headings = ['哪里不对', '你期望什么', '截图', '当前界面', '最近的操作', '版本'];
+  const headings = ['What went wrong', 'What you expected', 'Screenshot', 'Current view', 'Recent activity',
+    'Versions'];
   record('导出的报告一节：报告文件的完整路径，原来的各节标题降一级（### 哪里不对 … ### 版本），没有 "## 哪里不对"',
     headings.every((title) => first.includes(`\n### ${title}\n`)) && first.includes(ctx.issue1)
-    && !/^## (哪里不对|你期望什么|截图|当前界面|最近的操作|版本)$/m.test(md), oneLine(first, 300));
+    && !new RegExp(`^## (${headings.join('|')})$`, 'm').test(md), oneLine(first, 300));
   const link = shotLink(first);
   const png = ctx.issue1.replace(/\.md$/, '.png');
   const target = (href) => href && resolve(ctx.exportDir, ...href.split('/').map(decodeURIComponent));
@@ -1392,7 +1405,8 @@ async function exportIssues(ctx) {
     + ' PNG；没有截图的写"截图失败："', Boolean(link) && !isAbsolute(link) && !link.includes('\\')
     && samePath(target(link), png)
     && samePath(target(deleted), join(dirOf(ctx, 'issues'), SEED.onlyExpect.replace(/\.md$/, '.png')))
-    && Boolean(sections.find((item) => item.name === SEED.noShot)?.text.includes('截图失败：Synthetic capture failure')),
+    && Boolean(sections.find((item) => item.name === SEED.noShot)?.text
+      .includes('Couldn’t capture a screenshot: Synthetic capture failure')),
   `${link} | ${deleted}`);
   record('反例：导出不复制截图（导出的文件夹里只有导出的 .md）', readdirSync(ctx.exportDir).every((name) => name
     .endsWith('.md')), JSON.stringify(readdirSync(ctx.exportDir)));
@@ -1401,7 +1415,7 @@ async function exportIssues(ctx) {
 /** @brief 导出到 ui-issues 文件夹里：截图链接就是文件名；只多这一个 .md，不复制截图，它也不出现在列表里。 */
 async function exportIntoIssues(ctx) {
   const { page } = ctx;
-  const target = join(dirOf(ctx, 'issues'), `界面问题-${today()}.md`);
+  const target = join(dirOf(ctx, 'issues'), `ui-issues-${today()}.md`);
   const fresh = !existsSync(target);
   const before = snapshot(dirOf(ctx, 'issues'));
   const { md } = await exportTo(ctx, target);
@@ -1416,11 +1430,11 @@ async function exportIntoIssues(ctx) {
     && !names.includes(ctx.exported), JSON.stringify({ fresh, link: shotLink(first), added, names }));
 }
 
-/** @brief 导出失败（主进程写文件报错）："没有导出："和原文。 */
+/** @brief 导出失败（主进程写文件报错）："Couldn’t export: "和原文。 */
 async function exportFailure(ctx) {
   await exportTo(ctx, join(ctx.root, 'synthetic-missing-folder', 'x.md'), false);
-  const notice = await noticeText(ctx.page, '没有导出：');
-  record('导出失败：工具行下面"没有导出："和原文', notice.startsWith('没有导出：') && /ENOENT/.test(notice), notice);
+  const notice = await noticeText(ctx.page, 'Couldn’t export: ');
+  record('导出失败：工具行下面"没有导出："和原文', notice.startsWith('Couldn’t export: ') && /ENOENT/.test(notice), notice);
 }
 
 /** @brief 反例：工作回顾里的操作都没有发请求给模型；反馈文件没变，报告文件夹里只多了选的那一个导出文件。 */
@@ -1434,7 +1448,7 @@ async function untouched(ctx) {
     changed.join(', '));
 }
 
-/** @brief 有记录时"打开文件夹"：两节各打开自己的文件夹。 */
+/** @brief 有记录时"Open folder"：两节各打开自己的文件夹。 */
 async function openFolders(ctx) {
   const { app, page } = ctx;
   await app.evaluate(clearShell);
@@ -1453,7 +1467,7 @@ async function openFolders(ctx) {
 
 // ---------- 步骤：回到原位置 ----------
 
-/** @brief 点详情里的"回到原位置"。 */
+/** @brief 点详情里的"Jump to source"。 */
 const clickJump = (page) => page.getByTestId('detail-jump').click();
 
 /** @brief 会话面板的个数和工作回顾页在不在（检查没有打开、新建会话，也没有离开工作回顾）。 */
@@ -1467,7 +1481,10 @@ async function waitChat(page) {
   await settle(page);
 }
 
-/** @brief 回复不在了（会话没开着，读会话文件）："正在打开…"，留在工作回顾，"原文已变化：…"，引用的原文仍在。 */
+/**
+ * @brief 回复不在了（会话没开着，读会话文件）："Opening…"，留在工作回顾，"This response is no longer in the session."，
+ *        引用的原文仍在。
+ */
 async function jumpChanged(ctx) {
   const { page } = ctx;
   await openReviewPage(page, 'feedback');
@@ -1488,8 +1505,8 @@ async function jumpChanged(ctx) {
 }
 
 /**
- * @brief 原会话已删除：会话列表里没有的，详情里一开始就"原会话已删除"、按钮不可用；列表里还有、会话文件被删了的，
- *        点了之后读会话文件时发现，变成"原会话已删除"；都不新建会话。没有保存的：按钮不可用并说明。
+ * @brief 原会话已删除：会话列表里没有的，详情里一开始就"Session deleted"、按钮不可用；列表里还有、会话文件被删了的，
+ *        点了之后读会话文件时发现，变成"Session deleted"；都不新建会话。没有保存的：按钮不可用并说明。
  */
 async function jumpBlocked(ctx) {
   const { page } = ctx;
@@ -1573,7 +1590,7 @@ async function jumpFile(ctx) {
 async function jumpArchived(ctx) {
   const { page } = ctx;
   const isArchived = async () => (await savedArchived(page)).some((file) => samePath(file, ctx.file2));
-  await chooseMenuItem(page, ctx.file2, '归档');
+  await chooseMenuItem(page, ctx.file2, 'Archive');
   const archived = await until(isArchived, 5000);
   await openReviewPage(page, 'feedback');
   await selectRow(page, ctx.fb.second);
@@ -1593,7 +1610,7 @@ async function detailWidth(ctx) {
   const { page } = ctx;
   await openRow(page, ctx.file);
   if (await page.getByTestId('right-panel').count() === 0) {
-    await paneOf(page).getByRole('button', { name: '右栏：本会话的改动' }).click();
+    await paneOf(page).getByRole('button', { name: 'Toggle changes' }).click();
   }
   const panel = await panelWidth(page, 'right-panel');
   await openReviewPage(page, 'feedback');
@@ -1641,7 +1658,7 @@ async function narrowDetail(ctx) {
 /** @brief 返回会话恢复分屏、焦点、草稿和右栏的文件（与设置页、工具页相同）。 */
 async function backRestores(ctx) {
   const { page } = ctx;
-  await chooseMenuItem(page, ctx.file2, '在右侧分屏打开');
+  await chooseMenuItem(page, ctx.file2, 'Open in split view');
   await waitSplit(page);
   await waitPaneReady(page, 'right');
   await composerAt(page, 'left').click();
@@ -1689,32 +1706,34 @@ async function jumpCramped(ctx) {
 }
 
 /**
- * @brief 工作回顾页上按 F8（右栏开着详情）：报告的"当前界面"是"页面：工作回顾"、右栏打开和它的宽度；
- *        保存后新报告马上出现在"界面问题"最上面。"你期望什么"里写了一行"## 你期望什么"：文件里加了转义，两节照样分清。
+ * @brief 工作回顾页上按 F8（右栏开着详情）：报告的"Current view"是"Page: Review"、右栏打开和它的宽度；
+ *        保存后新报告马上出现在"UI issues"最上面。"What you expected"里写了一行"## What you expected"：文件里加了转义，
+ *        两节照样分清。
  */
 async function f8OnReview(ctx) {
   const { page } = ctx;
   await openReviewPage(page, 'issues');
   await selectRow(page, basename(ctx.issue1));
-  await page.getByTestId('review-page').getByRole('button', { name: '返回会话' }).focus();
-  const { dialog, file } = await saveReport(page, 'F8 来自工作回顾页', '新报告出现在列表最上面\n## 你期望什么\n第二段');
+  await page.getByTestId('review-page').getByRole('button', { name: 'Back to app' }).focus();
+  const { dialog, file } = await saveReport(page, 'F8 来自工作回顾页', '新报告出现在列表最上面\n## What you expected\n第二段');
   const md = file && existsSync(file) ? readFileSync(file, 'utf8') : '';
   const name = basename(file ?? '');
   const top = await until(async () => (await reviewState(page))?.rows[0]?.name === name, 5000);
-  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
-  const fields = md.split(/\r?\n/).filter((line) => /^- (页面|右栏|右栏宽度)：/.test(line));
+  const fields = md.split(/\r?\n/).filter((line) => /^- (Page|Right panel|Right panel width): /.test(line));
   record('工作回顾页上按 F8：报告的"当前界面"写"页面：工作回顾"，开着详情时"右栏：打开"和右栏宽度；保存后不用重新打开，'
-    + '新报告就在"界面问题"最上面', fields.includes('- 页面：工作回顾') && fields.includes('- 右栏：打开')
-    && fields.some((line) => /^- 右栏宽度：\d+px/.test(line)) && Boolean(top), JSON.stringify({ file, fields, top }));
+    + '新报告就在"界面问题"最上面', fields.includes('- Page: Review') && fields.includes('- Right panel: Open')
+    && fields.some((line) => /^- Right panel width: \d+px/.test(line)) && Boolean(top),
+  JSON.stringify({ file, fields, top }));
   const detail = await selectRow(page, name);
   record('"你期望什么"里写了一行"## 你期望什么"：报告文件里这一行前面加了 "\\"，工作回顾照样分清两节',
-    /\n\\## 你期望什么\n/.test(md) && detail?.what === 'F8 来自工作回顾页'
-    && (detail?.expect ?? '').startsWith('新报告出现在列表最上面') && detail.expect.includes('\\## 你期望什么')
+    /\n\\## What you expected\n/.test(md) && detail?.what === 'F8 来自工作回顾页'
+    && (detail?.expect ?? '').startsWith('新报告出现在列表最上面') && detail.expect.includes('\\## What you expected')
     && detail.expect.includes('第二段'), JSON.stringify({ what: detail?.what, expect: detail?.expect }));
 }
 
-/** @brief 后台进程退出：横幅、"工作回顾"照常可用（能看、能标、能导出），只有"回到原位置"不可用并说明。 */
+/** @brief 后台进程退出：横幅、"Review"照常可用（能看、能标、能导出），只有"Jump to source"不可用并说明。 */
 async function kernelExit(ctx) {
   const { app, page } = ctx;
   await openReviewPage(page, 'feedback');
@@ -1736,7 +1755,7 @@ async function kernelExit(ctx) {
   const marked = (await reviewState(page)).rows.find((row) => row.name === ctx.fb.selection)?.handled;
   await page.getByTestId('detail-handled').click();
   const { md } = await exportTo(ctx, join(ctx.exportDir, 'after-exit.md'));
-  record('后台进程退出后照常能标已处理、能导出', Boolean(marked) && md.startsWith('# 对内容的反馈'),
+  record('后台进程退出后照常能标已处理、能导出', Boolean(marked) && md.startsWith('# Feedback'),
     JSON.stringify({ marked, length: md.length }));
 }
 

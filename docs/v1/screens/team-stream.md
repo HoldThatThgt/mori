@@ -184,8 +184,9 @@ task 行里的 `<role>` 是 `TaskView.holder`（持有者的角色名，交到�
 - **`current.args` 不够写 TaskBoard 工具的标题**：§13.10 的 `current.args` 只有 `path`、`command`、`pattern`，而 §13.8 的 `Read T1`、`Read <role>’s work on T1`、
   `Ask <role>` / `Message <role>` / `Message T1` 需要 `request`、`task`、`role`、`to`；read 的行范围也需要 `offset`、`limit`。需要 `current.args` 加这些字段，或由后台进程直接给出标题。
   TB-45 要求 task 行“等于那个实例会话最近一次工具调用的 §13.8 标题”，按现在的字段这几个工具做不到。
-- **进展摘要的标题与 v0 工具卡的语言**：§13.3 说“与 v0 工具卡相同”，例子却是英文（`Run npm test`、`Read src/a.ts`），本分支的 v0 工具卡仍是中文（“运行 npm test”）。
-  本表让进展摘要用英文动词、其余规则同 v0；TB-45 的“等于 §13.8 标题”按这个英文规则比较。
+- **进展摘要的标题与 v0 工具卡的语言**：§13.3 说“与 v0 工具卡相同”，例子却是英文（`Run npm test`、`Read src/a.ts`），与 english-ui 合并前本分支的 v0 工具卡是中文（“运行 npm test”）。
+  本表让进展摘要用英文动词、其余规则同 v0；合并后（2026-10-21）v0 工具卡也是英文，两者一致；
+  TB-45 的“等于 §13.8 标题”按这个英文规则比较。
 
 ## 界面测试用的标识
 

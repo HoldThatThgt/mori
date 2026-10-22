@@ -7,7 +7,7 @@
 // 覆盖：首次启动的"Supports thinking"（首次启动表单没有思考强度）、model-config.json 只有 key 的 ref、credentials.json 只有密文；
 // 设置页的分节（Models、AGENTS.md，↑ ↓ 与 Tab）；模型没标支持思考时思考强度不可选（英文说明、"Open settings"）；
 // 编辑模型标"Supports thinking"和新会话默认强度（model-config.json、settings.json 的 modelThinkingLevels）、打开着的会话
-// 随之可选、"高"有思考内容、"关"没有、新会话用按模型的默认强度、去掉支持思考时会话收紧、重启后恢复会话的强度；
+// 随之可选、"High"有思考内容、"Off"没有、新会话用按模型的默认强度、去掉支持思考时会话收紧、重启后恢复会话的强度；
 // 用户级 AGENTS.md（空状态、保存与 Ctrl+S、撤销改动、生效的文件、AGENTS.override.md 与 CLAUDE.md 的警示、新会话的系统提示里有、
 // 之前打开的会话没有、离开时有未保存改动的确认框、拖到设置页、取消选文件夹、已归档的会话、关闭窗口时不问）、项目级列表与
 // 用系统编辑器打开；settings.json 读不出；顶栏窄栏；新页面没有小于 12px 的字；页面没有报错。
@@ -44,12 +44,15 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 
 /** Mori 的提供商（provider id）：首次启动表单的名称 "Mori endpoint" 生成的 id（规格 §4.1） */
 const MAIN = 'mori-endpoint';
+/** 模型表单里模型 ID 和新会话思考强度两个字段的标签（docs/v0/ui-strings.md：Model ID、Default effort for new sessions） */
+const ID_FIELD = 'Model ID';
+const LEVEL_FIELD = 'Default effort for new sessions';
 
 /** 写进用户级 AGENTS.md 的标记：合成端点的 "agents check" 在系统提示里找它 */
 const MARKER = `MORI-AGENTS-${Date.now().toString(36).toUpperCase()}`;
 /** 离开有未保存改动的 AGENTS.md 时确认框的标题和说明 */
-const LEAVE_TITLE = '放弃对 AGENTS.md 的改动？';
-const LEAVE_TEXT = '你改的内容还没有保存。';
+const LEAVE_TITLE = 'Discard changes to AGENTS.md?';
+const LEAVE_TEXT = 'Your edits haven’t been saved. Leaving now discards them.';
 // ---------- 准备与磁盘 ----------
 
 /** @brief 测试用的项目：README 和项目级 AGENTS.md（不含标记）。 */
@@ -124,22 +127,22 @@ async function openSection(page, section) {
   }
 }
 
-/** @brief 只点左栏"设置"、不点分节，返回设置页出现时落在哪一节（currentSection）。 */
+/** @brief 只点左栏"Settings"、不点分节，返回设置页出现时落在哪一节（currentSection）。 */
 async function landSettings(page) {
-  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
   return currentSection(page);
 }
 
-/** @brief 打开设置页（左栏"设置"），切到 section，等这一节读好。 */
+/** @brief 打开设置页（左栏"Settings"），切到 section，等这一节读好。 */
 async function openSettings(page, section = 'models') {
   await landSettings(page);
   await openSection(page, section);
 }
 
-/** @brief 设置页"返回会话"，等会话面板就绪。 */
+/** @brief 设置页"Back to app"，等会话面板就绪。 */
 async function back(page) {
-  await page.getByRole('button', { name: '返回会话', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to app', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 5000 });
   await waitReady(page);
 }
@@ -159,25 +162,25 @@ const currentSection = (page) => page.evaluate(() => {
 async function fillModelForm(page, { reasoning, level }) {
   const form = page.getByTestId('model-form');
   if (reasoning !== undefined) await form.getByLabel('Supports thinking').setChecked(reasoning);
-  if (level !== undefined) await form.getByLabel('New-session thinking level').selectOption(level);
+  if (level !== undefined) await form.getByLabel(LEVEL_FIELD).selectOption(level);
 }
 
-/** @brief 模型表单此刻的样子：标题、Model id 是否只读、密码框个数、Supports thinking、新会话思考强度的选项。 */
+/** @brief 模型表单此刻的样子：标题、Model ID 是否只读、密码框个数、Supports thinking、新会话思考强度的选项。 */
 function modelFormState(page) {
-  return page.evaluate(() => {
+  return page.evaluate(({ idLabel, levelLabel }) => {
     const form = document.querySelector('[data-testid="model-form"]');
     if (!form) return null;
     const row = (label) => [...form.querySelectorAll('.mf-row')]
       .find((item) => item.querySelector('label')?.textContent === label);
-    const select = row('New-session thinking level')?.querySelector('select');
+    const select = row(levelLabel)?.querySelector('select');
     const box = [...form.querySelectorAll('label.check-row')].find((item) => item.textContent === 'Supports thinking');
     return { title: form.querySelector('h3')?.textContent ?? null,
-      idReadOnly: row('Model id')?.querySelector('input')?.readOnly ?? null,
+      idReadOnly: row(idLabel)?.querySelector('input')?.readOnly ?? null,
       passwords: form.querySelectorAll('input[type="password"]').length,
       reasoning: box?.querySelector('input')?.checked ?? null,
       level: select ? { value: select.value, options: [...select.options].map((option) => option.textContent) }
         : null };
-  });
+  }, { idLabel: ID_FIELD, levelLabel: LEVEL_FIELD });
 }
 
 /** @brief 保存模型表单：成功时表单关闭，返回 null；失败时留在表单里，返回表单里的原文。 */
@@ -302,12 +305,12 @@ async function firstRun(ctx) {
   const form = page.getByTestId('connection-form');
   await form.waitFor({ timeout: 60000 });
   const box = form.getByLabel('Supports thinking');
-  const level = () => form.getByLabel('New-session thinking level').count();
+  const level = () => form.getByLabel(LEVEL_FIELD).count();
   const before = { checked: await box.isChecked(), select: await level() };
   await box.check();
   const checked = await level();
   await box.uncheck();
-  record('首次启动：表单里有"Supports thinking"（不勾）；首次启动表单没有"New-session thinking level"（勾上也没有）',
+  record('首次启动：表单里有"Supports thinking"（不勾）；首次启动表单没有"Default effort for new sessions"（勾上也没有）',
     before.checked === false && before.select === 0 && checked === 0, JSON.stringify({ before, checked }));
   await h.setupFirstRun({ baseUrl, apiKey: testKey });
   firstRunFiles(ctx);
@@ -339,8 +342,8 @@ async function settingsList(ctx) {
   await page.getByTestId('models-section').waitFor({ timeout: 15000 });
   const nav = await page.locator('[data-testid="settings-nav"] button').evaluateAll((items) => items.map((item) => ({
     section: item.dataset.section, text: item.textContent, current: item.getAttribute('aria-current') })));
-  const backButton = await page.getByRole('button', { name: '返回会话', exact: true }).count();
-  record('设置页：左边分节"Models""AGENTS.md"，打开时落在 Models（aria-current）；顶部"返回会话"',
+  const backButton = await page.getByRole('button', { name: 'Back to app', exact: true }).count();
+  record('设置页：左边分节"Models""AGENTS.md"，打开时落在 Models（aria-current）；顶部"Back to app"',
     nav.map((item) => `${item.section}:${item.text}`).join() === 'models:Models,agents:AGENTS.md'
     && nav[0].current === 'page' && nav[1].current === null && backButton === 1 && landed.body === 'models',
   JSON.stringify({ landed, nav }));
@@ -383,8 +386,9 @@ async function navByTab(page) {
 // ---------- 步骤：思考强度 ----------
 
 /** 模型没标支持思考时思考菜单里的说明（规格 §9.2） */
-const UNSUPPORTED_NOTE = "This model isn't marked 'Supports thinking', so Mori doesn't send thinking parameters and "
-  + "the endpoint decides. Edit the model in Settings → Models and tick 'Supports thinking' to choose a level.";
+const UNSUPPORTED_NOTE = 'This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and '
+  + 'the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit '
+  + 'this model in Settings → Models and check “Supports thinking”.';
 
 /** @brief 反例：模型没标支持思考时思考强度不可选，并说明原因（英文）；"Open settings"进入 设置 → Models。 */
 async function thinkingUnsupported(ctx) {
@@ -394,10 +398,10 @@ async function thinkingUnsupported(ctx) {
   const reply = await sendIn(page, 'thinking check');
   const menu = await openThinkingMenu(page);
   await noteSmall(ctx, '思考菜单（不支持思考）', '[data-testid="thinking-menu"]');
-  record('反例：模型没标"Supports thinking"时按钮"思考：不可选"（data-reasoning=false，样式变淡但可以点开）；菜单里关、最低、'
-    + '低、中、高都不可用（不是藏起来），说明原因（§9.2 的英文），有"Open settings"', plain.text === '思考：不可选'
+  record('反例：模型没标"Supports thinking"时按钮"Effort: Unavailable"（data-reasoning=false，样式变淡但可以点开）；菜单里 Off、Minimal、'
+    + 'Low、Medium、High 都不可用（不是藏起来），说明原因（§9.2 的英文），有"Open settings"', plain.text === 'Effort: Unavailable'
     && plain.reasoning === 'false' && !plain.disabled && plain.icon && plain.color !== ctx.modelColor
-    && menu.items.map((item) => item.text).join() === '关,最低,低,中,高'
+    && menu.items.map((item) => item.text).join() === 'Off,Minimal,Low,Medium,High'
     && menu.items.every((item) => item.disabled && !item.checked) && menu.note === UNSUPPORTED_NOTE
     && menu.actions.join() === 'Open settings', JSON.stringify({ plain, modelColor: ctx.modelColor, menu }));
   record('没标支持思考时不发送思考参数（"thinking check" → "没有思考参数"）', reply.fresh && reply.text === '没有思考参数'
@@ -429,8 +433,8 @@ async function markReasoning(ctx) {
   const row = oneLine(await modelRow(page, ref).innerText().catch(() => ''));
   const model = configJson(ctx).providers?.find((item) => item.id === MAIN)?.models.find((m) => m.id === 'fake-coder');
   const levels = settingsJson(ctx).modelThinkingLevels ?? {};
-  record('编辑模型：标题"Edit model · Mori endpoint"，Model id 只读，没有 key 框；不勾"Supports thinking"时没有'
-    + '"New-session thinking level"，勾上才出现（Off 到 Max，默认 Medium）', form?.title === 'Edit model · Mori endpoint'
+  record('编辑模型：标题"Edit model · Mori endpoint"，Model ID 只读，没有 key 框；不勾"Supports thinking"时没有'
+    + '"Default effort for new sessions"，勾上才出现（Off 到 Max，默认 Medium）', form?.title === 'Edit model · Mori endpoint'
     && form.idReadOnly === true && form.passwords === 0 && form.reasoning === false && form.level === null
     && checked?.level?.options.join() === 'Off,Minimal,Low,Medium,High,Extra high,Max'
     && checked.level.value === 'medium', JSON.stringify({ form, checked: checked?.level }));
@@ -441,9 +445,9 @@ async function markReasoning(ctx) {
 }
 
 /**
- * @brief 打开着的会话随之可选；"高"有思考内容，"关"没有；不改设置；新会话用按模型的默认强度。
+ * @brief 打开着的会话随之可选；"High"有思考内容，"Off"没有；不改设置；新会话用按模型的默认强度。
  *        v1：会话新建时的强度是第一个候选的 modelThinkingLevels → defaultThinkingLevel → medium（规格 §11.1），
- *        S1 建的时候 fake-coder 还没有按模型的强度，所以是"中"（不支持思考时显示"不可选"），标了之后显示"中"。
+ *        S1 建的时候 fake-coder 还没有按模型的强度，所以是"Medium"（不支持思考时显示"Unavailable"），标了之后显示"Medium"。
  */
 async function thinkingLevels(ctx) {
   const { page } = ctx;
@@ -457,10 +461,11 @@ async function thinkingLevels(ctx) {
   const closed = await menuGone(page, 'thinking-menu');
   record('已经打开的会话（打开时模型没标支持思考）：设置里标了之后顶栏的思考强度变得可选（关–高都可用，按钮不再变淡），'
     + '当前"中"（会话新建时的 medium，§11.1）打勾；底部"只作用于这个会话；新会话的默认在设置里按模型设定"；Esc 关闭菜单',
-  open.reasoning === 'true' && open.text === '思考：中' && open.color === ctx.modelColor && closed
+  open.reasoning === 'true' && open.text === 'Effort: Medium' && open.color === ctx.modelColor && closed
     && menu.items.map((item) => item.level).join() === 'off,minimal,low,medium,high'
     && menu.items.every((item) => !item.disabled) && menu.items.find((item) => item.checked)?.level === 'medium'
-    && menu.note === '只作用于这个会话；新会话的默认在设置里按模型设定', JSON.stringify({ open, closed, menu }));
+    && menu.note === 'Applies to this session only. Set each model’s default for new sessions in Settings.',
+  JSON.stringify({ open, closed, menu }));
   await paneOf(page).getByTestId('thinking-button').click();
   await watchStates(page, 'thinking');
   const focusBack = await chooseByKeys(page, 'thinking-menu', 'thinking-button', 1);
@@ -472,7 +477,7 @@ async function thinkingLevels(ctx) {
   const high = await sendIn(page, 'thinking check');
   const highButton = await buttonState(page, 'thinking-button');
   record('走查 8：只用键盘（菜单里从"中"按 1 次 ↓ 到"高"、Enter）切到"高"：焦点回到按钮，按钮"思考：高"；回复带思考内容，'
-    + '端点收到 high（"收到思考参数：high"）', focusBack && highButton.text === '思考：高' && high.fresh
+    + '端点收到 high（"收到思考参数：high"）', focusBack && highButton.text === 'Effort: High' && high.fresh
     && high.text === '收到思考参数：high' && high.thinking === 1,
   JSON.stringify({ focusBack, button: highButton.text, text: high.text, thinking: high.thinking }));
   record('思考强度切换中：session.setThinking 返回之前按钮已显示"高"、不可用，返回后恢复可用',
@@ -495,7 +500,7 @@ async function thinkingNewSession(ctx) {
   const fresh = await buttonState(page, 'thinking-button');
   const freshReply = await sendIn(page, 'thinking check');
   record('新会话用默认范围的第一个候选和它在设置里的默认强度：fake-coder 的新会话是"思考：高"，回复带思考内容'
-    + '（"收到思考参数：high"）', fresh.level === 'high' && fresh.text === '思考：高'
+    + '（"收到思考参数：high"）', fresh.level === 'high' && fresh.text === 'Effort: High'
     && freshReply.text === '收到思考参数：high' && freshReply.thinking === 1,
   JSON.stringify({ fresh, reply: freshReply.text }));
   await shot(page, '5-thinking');
@@ -515,8 +520,8 @@ const waitReasoning = (page, want) => page.waitForFunction(({ selector, value })
 { timeout: 10000 }).catch(() => {});
 
 /**
- * @brief 编辑模型去掉"Supports thinking"：用它的打开着的会话思考强度按 pi 收紧为"关"，顶栏随之变成"不可选"；再标回来。
- *        最后在 S1 切到"低"（重启后检查恢复）。
+ * @brief 编辑模型去掉"Supports thinking"：用它的打开着的会话思考强度按 pi 收紧为"Off"，顶栏随之变成"Unavailable"；
+ *        再标回来。最后在 S1 切到"Low"（重启后检查恢复）。
  */
 async function unmarkReasoning(ctx) {
   const { page } = ctx;
@@ -532,7 +537,7 @@ async function unmarkReasoning(ctx) {
   record('编辑模型去掉"Supports thinking"：模型行不再显示它，model-config.json 的 reasoning 为 false，settings.json 删掉它的'
     + ' modelThinkingLevels；正在用它的会话（"思考：高"）按 pi 收紧为"关"，顶栏随之变成"思考：不可选"', message === null
     && !row.includes('Supports thinking') && model?.reasoning === false && !(ref in levels)
-    && s4.reasoning === 'false' && s4.level === 'off' && s4.text === '思考：不可选',
+    && s4.reasoning === 'false' && s4.level === 'off' && s4.text === 'Effort: Unavailable',
   JSON.stringify({ message, row, model, levels, s4 }));
   await openSettings(page);
   await editModel(page, 'fake-coder', { reasoning: true, level: 'high' });
@@ -555,7 +560,7 @@ function agentsState(page) {
     const button = (name) => [...(section?.querySelectorAll('.agents-user .form-actions button') ?? [])]
       .find((item) => item.textContent === name);
     return { shown: Boolean(section), text: section?.innerText ?? '',
-      saveDisabled: button('保存')?.disabled ?? null, revertDisabled: button('撤销改动')?.disabled ?? null,
+      saveDisabled: button('Save')?.disabled ?? null, revertDisabled: button('Discard changes')?.disabled ?? null,
       path: section?.querySelector('.agents-user .agents-path')?.textContent ?? null, editor: editor?.value ?? null,
       effective: effective?.textContent ?? null, warn: effective?.classList.contains('warn') ?? null,
       status: section?.querySelector('.agents-status')?.textContent ?? null,
@@ -582,21 +587,23 @@ async function agentsUser(ctx) {
   const empty = await agentsState(page);
   await noteSmall(ctx, 'AGENTS.md 一节', '.settings-page');
   record('AGENTS.md 读取中：agents.get 返回之前"正在读取…"，编辑框不可用', loading.some((item) => item.startsWith(
-    '正在读取…|true|')) && loading.at(-1)?.startsWith('|false|'), JSON.stringify(loading));
+    'Loading…|true|')) && loading.at(-1)?.startsWith('|false|'), JSON.stringify(loading));
   record('AGENTS.md：路径 <agentDir>\\AGENTS.md，"还没有这个文件，保存后创建"，编辑框是空的，还没有生效的文件；'
     + '没有改动时"保存""撤销改动"不可用', samePath(empty.path, userAgents(ctx))
-    && empty.text.includes('还没有这个文件，保存后创建') && empty.editor === '' && empty.effective === null
-    && empty.saveDisabled === true && empty.revertDisabled === true,
+    && empty.text.includes('This file doesn’t exist yet. Saving creates it.') && empty.editor === ''
+    && empty.effective === null && empty.saveDisabled === true && empty.revertDisabled === true,
   JSON.stringify({ path: empty.path, effective: empty.effective, save: empty.saveDisabled }));
   const projectFile = join(ctx.project, 'AGENTS.md');
   record('项目级（只列出）：标题"m6proj 加载的文件"，列出项目 AGENTS.md 的完整路径，说明"会话打开时读取；之后改了文件，新会话才会读到"；'
-    + '没有编辑框', empty.loadedTitle === `${basename(ctx.project)} 加载的文件`
+    + '没有编辑框', empty.loadedTitle === `Files loaded by ${basename(ctx.project)}`
     && empty.loadedFiles.some((path) => samePath(path, projectFile))
-    && empty.loadedText.includes('会话打开时读取；之后改了文件，新会话才会读到') && empty.loadedInputs === 0,
+    && empty.loadedText
+      .includes('Read when the session opens. If you change a file later, only new sessions pick it up.')
+    && empty.loadedInputs === 0,
   JSON.stringify({ title: empty.loadedTitle, files: empty.loadedFiles }));
   await app.evaluate(stubOpenPath);
   const row = page.getByTestId('agents-loaded').locator('li').filter({ hasText: 'm6proj' }).last();
-  await row.getByRole('button', { name: '用系统编辑器打开' }).click();
+  await row.getByRole('button', { name: 'Open in default app' }).click();
   const opened = await until(() => app.evaluate(() => globalThis.__opened?.at(-1) ?? null), 3000);
   record('项目级"用系统编辑器打开"：交给主进程（shell.openPath）的是项目 AGENTS.md 的路径', samePath(opened, projectFile),
     String(opened));
@@ -605,8 +612,9 @@ async function agentsUser(ctx) {
 }
 
 /**
- * @brief agentDir 里还没有 AGENTS.md、有 CLAUDE.md（synthetic）时：警示色"现在生效的是 <CLAUDE.md>；保存后改读这里的
- *        AGENTS.md，它不再加载"，可以用系统编辑器打开它。保存 AGENTS.md 之后（agentsSave）变成"生效中"，再删掉 CLAUDE.md。
+ * @brief agentDir 里还没有 AGENTS.md、有 CLAUDE.md（synthetic）时：警示色"<CLAUDE.md> is in effect now. After you save,
+ *        this AGENTS.md is loaded instead."，可以用系统编辑器打开它。保存 AGENTS.md 之后（agentsSave）变成
+ *        "In effect: …"，再删掉 CLAUDE.md。
  */
 async function claudeEffective(ctx) {
   const { page, app } = ctx;
@@ -617,54 +625,56 @@ async function claudeEffective(ctx) {
   await page.waitForFunction(() => document.querySelector('[data-testid="agents-effective"]'), null, { timeout: 5000 })
     .catch(() => {});
   const state = await agentsState(page);
-  await page.locator('.agents-line').getByRole('button', { name: '用系统编辑器打开' }).click().catch(() => {});
+  await page.locator('.agents-line').getByRole('button', { name: 'Open in default app' }).click().catch(() => {});
   const opened = await until(async () => {
     const path = await app.evaluate(() => globalThis.__opened?.at(-1) ?? null);
     return samePath(path, ctx.claude) ? path : null;
   }, 3000);
-  const expected = `现在生效的是 ${ctx.claude}；保存后改读这里的 AGENTS.md，它不再加载`;
+  const expected = `${ctx.claude} is in effect now. After you save, this AGENTS.md is loaded instead.`;
   record('还没有 AGENTS.md、agentDir 里有 CLAUDE.md 时：警示色"现在生效的是 <CLAUDE.md>；保存后改读这里的 AGENTS.md，'
     + '它不再加载"，"用系统编辑器打开"打开 CLAUDE.md', state.warn === true
     && state.effective?.toLowerCase() === expected.toLowerCase() && samePath(opened, ctx.claude),
   JSON.stringify({ effective: state.effective, opened }));
 }
 
-/** @brief 保存（按钮和 Ctrl+S）、生效的文件与它的"用系统编辑器打开"、撤销改动。 */
+/** @brief 保存（按钮和 Ctrl+S）、生效的文件与它的"Open in default app"、"Discard changes"。 */
 async function agentsSave(ctx) {
   const { page, app } = ctx;
   const editor = page.getByTestId('agents-editor');
   const first = `每次回答以“收到”开头。${MARKER}\n`;
   await editor.fill(first);
   const dirty = await agentsState(page);
-  const saveButton = page.locator('.agents-user').getByRole('button', { name: '保存', exact: true });
+  const saveButton = page.locator('.agents-user').getByRole('button', { name: 'Save', exact: true });
   const enabled = await saveButton.isEnabled();
   await watchStates(page, 'agents');
   await saveButton.click();
-  await waitAgentsStatus(page, '已保存 · 新建的会话才会读到');
+  await waitAgentsStatus(page, 'Saved · Applies to new sessions');
   await page.waitForFunction(() => document.querySelector('[data-testid="agents-effective"]')?.textContent
-    ?.startsWith('生效中：'), null, { timeout: 5000 }).catch(() => {});
+    ?.startsWith('In effect: '), null, { timeout: 5000 }).catch(() => {});
   const saving = await seenStates(page);
   const saved = await agentsState(page);
   rmSync(ctx.claude ?? join(ctx.userData, 'pi', 'CLAUDE.md'), { force: true });
   record('有未保存的改动时"保存"可用、旁边"有未保存的改动"；保存时"保存中…"，保存后"已保存 · 新建的会话才会读到"，'
-    + '"保存""撤销改动"又不可用，<agentDir>\\AGENTS.md 就是写的字', dirty.status === '有未保存的改动' && enabled
-    && dirty.revertDisabled === false && saving.some((item) => item.endsWith('|保存中…'))
-    && saved.status === '已保存 · 新建的会话才会读到' && saved.saveDisabled === true && saved.revertDisabled === true
+    + '"保存""撤销改动"又不可用，<agentDir>\\AGENTS.md 就是写的字', dirty.status === 'Unsaved changes' && enabled
+    && dirty.revertDisabled === false && saving.some((item) => item.endsWith('|Saving…'))
+    && saved.status === 'Saved · Applies to new sessions' && saved.saveDisabled === true
+    && saved.revertDisabled === true
     && readText(userAgents(ctx)) === first, JSON.stringify({ dirty: dirty.status, saving, saved: saved.status }));
   record('走查 2：设置页标出生效的文件："生效中：<agentDir>\\AGENTS.md"（agentDir 里还有 CLAUDE.md 时也改读 AGENTS.md）',
-    saved.warn === false && saved.effective?.startsWith('生效中：') && samePath(saved.effective.slice(4), userAgents(ctx)),
+    saved.warn === false && saved.effective?.startsWith('In effect: ')
+    && samePath(saved.effective.slice('In effect: '.length), userAgents(ctx)),
   saved.effective ?? '');
   ctx.agentsSaved = `${first}第二行：用 Ctrl+S 保存。\n`;
   await editor.fill(ctx.agentsSaved);
   await editor.press('Control+s');
-  await waitAgentsStatus(page, '已保存 · 新建的会话才会读到');
+  await waitAgentsStatus(page, 'Saved · Applies to new sessions');
   record('Ctrl+S 也能保存', readText(userAgents(ctx)) === ctx.agentsSaved, oneLine(readText(userAgents(ctx)) ?? ''));
   await editor.fill(`${ctx.agentsSaved}还没保存的一行`);
-  await page.locator('.agents-user').getByRole('button', { name: '撤销改动' }).click();
+  await page.locator('.agents-user').getByRole('button', { name: 'Discard changes' }).click();
   const reverted = await agentsState(page);
   record('撤销改动：编辑框回到读到的内容，"有未保存的改动"消失', reverted.editor === ctx.agentsSaved
-    && reverted.status !== '有未保存的改动', JSON.stringify({ status: reverted.status }));
-  await page.locator('.agents-line').getByRole('button', { name: '用系统编辑器打开' }).click();
+    && reverted.status !== 'Unsaved changes', JSON.stringify({ status: reverted.status }));
+  await page.locator('.agents-line').getByRole('button', { name: 'Open in default app' }).click();
   const lastOpened = () => app.evaluate(() => globalThis.__opened?.at(-1) ?? null);
   const opened = await until(async () => {
     const path = await lastOpened();
@@ -691,12 +701,12 @@ async function agentsPrompt(ctx) {
 
 /** 离开 AGENTS.md 一节的入口 */
 const LEAVE_TRIGGERS = {
-  返回会话: (ctx) => ctx.page.getByRole('button', { name: '返回会话', exact: true }).click(),
+  返回会话: (ctx) => ctx.page.getByRole('button', { name: 'Back to app', exact: true }).click(),
   点侧栏的会话: (ctx) => rowOf(ctx.page, ctx.s1).first().click(),
   工具: (ctx) => ctx.page.getByTestId('nav-tools').click(),
   'Ctrl+N': (ctx) => ctx.page.keyboard.press('Control+n'),
   新会话: (ctx) => ctx.page.getByTestId('new-session').click(),
-  打开文件夹: (ctx) => ctx.page.getByRole('button', { name: '打开文件夹…' }).first().click(),
+  打开文件夹: (ctx) => ctx.page.getByRole('button', { name: 'Open folder…' }).first().click(),
   换到另一节: (ctx) => ctx.page.locator('[data-testid="settings-nav"] button[data-section="models"]').click(),
 };
 
@@ -711,7 +721,7 @@ const whereNow = (page) => page.evaluate(() => ({
   panes: document.querySelectorAll('.pane-slot').length,
   active: document.querySelector('.session-item.active')?.dataset.file ?? null }));
 
-/** @brief 选"放弃改动"之后应当到的地方。 */
+/** @brief 选"Discard"之后应当到的地方。 */
 function leftAsExpected(trigger, now, before, ctx) {
   switch (trigger) {
     case '返回会话': return !now.settings && !now.tools && now.panes === before.panes;
@@ -723,7 +733,7 @@ function leftAsExpected(trigger, now, before, ctx) {
 }
 
 /**
- * @brief 让 AGENTS.md 一节有未保存的改动（不在这一节时先打开）。之前选过"放弃改动"时，先记下重新打开后编辑框是不是
+ * @brief 让 AGENTS.md 一节有未保存的改动（不在这一节时先打开）。之前选过"Discard"时，先记下重新打开后编辑框是不是
  *        保存过的内容（草稿已丢弃）。
  */
 async function makeDirty(ctx) {
@@ -733,7 +743,7 @@ async function makeDirty(ctx) {
     ctx.reopened.push((await agentsState(page)).editor === ctx.agentsSaved);
   }
   const state = await agentsState(page);
-  if (state.status !== '有未保存的改动') await page.getByTestId('agents-editor').fill(`${ctx.agentsSaved}未保存的草稿\n`);
+  if (state.status !== 'Unsaved changes') await page.getByTestId('agents-editor').fill(`${ctx.agentsSaved}未保存的草稿\n`);
   await page.getByTestId('agents-editor').focus();
 }
 
@@ -748,12 +758,12 @@ async function leaveCase(ctx, trigger, answer) {
     await noteSmall(ctx, '离开确认框', '[data-testid="leave-dialog"]');
     await shot(page, '7-leave-dialog');
   }
-  const shape = dialog?.title === LEAVE_TITLE && dialog.text === LEAVE_TEXT && dialog.buttons.join() === '放弃改动,继续编辑'
-    && dialog.focused === '继续编辑';
+  const shape = dialog?.title === LEAVE_TITLE && dialog.text === LEAVE_TEXT
+    && dialog.buttons.join() === 'Discard,Keep editing' && dialog.focused === 'Keep editing';
   if (answer === 'Escape') await page.keyboard.press('Escape');
   else await page.getByTestId('leave-dialog').getByRole('button', { name: answer, exact: true }).click();
   await page.getByTestId('leave-dialog').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
-  if (answer === '放弃改动') {
+  if (answer === 'Discard') {
     const now = await until(async () => {
       const state = await whereNow(page);
       return leftAsExpected(trigger, state, before, ctx) ? state : null;
@@ -769,14 +779,14 @@ async function leaveCase(ctx, trigger, answer) {
   return { trigger, answer, shape, ok, dialog, focused: state.focused };
 }
 
-/** @brief 离开时有未保存的改动：每个入口都先问；"继续编辑"（和 Esc）留下、焦点回到编辑框；"放弃改动"照常离开。 */
+/** @brief 离开时有未保存的改动：每个入口都先问；"Keep editing"（和 Esc）留下、焦点回到编辑框；"Discard"照常离开。 */
 async function agentsLeave(ctx) {
   const { page } = ctx;
   ctx.reopened = [];
-  // "打开文件夹…"的系统对话框已经换成直接返回测试项目（firstRun 里），放弃改动后在测试项目里新建会话。
-  const stays = [['返回会话', 'Escape'], ['点侧栏的会话', '继续编辑'], ['工具', 'Escape'], ['Ctrl+N', '继续编辑'],
-    ['新会话', '继续编辑'], ['打开文件夹', 'Escape'], ['换到另一节', 'Escape']];
-  const leaves = Object.keys(LEAVE_TRIGGERS).map((trigger) => [trigger, '放弃改动']);
+  // "Open folder…"的系统对话框已经换成直接返回测试项目（firstRun 里），放弃改动后在测试项目里新建会话。
+  const stays = [['返回会话', 'Escape'], ['点侧栏的会话', 'Keep editing'], ['工具', 'Escape'], ['Ctrl+N', 'Keep editing'],
+    ['新会话', 'Keep editing'], ['打开文件夹', 'Escape'], ['换到另一节', 'Escape']];
+  const leaves = Object.keys(LEAVE_TRIGGERS).map((trigger) => [trigger, 'Discard']);
   const results = [];
   for (const [trigger, answer] of [...stays, ...leaves]) {
     try {
@@ -788,8 +798,8 @@ async function agentsLeave(ctx) {
   }
   const brief = (list) => JSON.stringify(list.filter((item) => !item.shape || !item.ok)
     .map(({ trigger, answer, shape, ok, dialog, error }) => ({ trigger, answer, shape, ok, dialog, error })));
-  const stayed = results.filter((item) => item.answer !== '放弃改动');
-  const left = results.filter((item) => item.answer === '放弃改动');
+  const stayed = results.filter((item) => item.answer !== 'Discard');
+  const left = results.filter((item) => item.answer === 'Discard');
   record('离开时有未保存的改动（返回会话、点侧栏的会话、工具、Ctrl+N、新会话、打开文件夹、换到另一节）：都先弹确认框'
     + '"放弃对 AGENTS.md 的改动？""你改的内容还没有保存。"，按钮"放弃改动""继续编辑"，焦点在"继续编辑"', results.length === 14
     && results.every((item) => item.shape), brief(results));
@@ -806,14 +816,14 @@ async function agentsLeave(ctx) {
 
 /** @brief 草稿还在时（旧的做法）撤销改动，免得后面的步骤一离开就弹确认框。 */
 async function dropDraft(page) {
-  if ((await agentsState(page)).status === '有未保存的改动') {
-    await page.locator('.agents-user').getByRole('button', { name: '撤销改动' }).click();
+  if ((await agentsState(page)).status === 'Unsaved changes') {
+    await page.locator('.agents-user').getByRole('button', { name: 'Discard changes' }).click();
   }
 }
 
 /**
- * @brief 选了"放弃改动"、离开却没有发生（"打开文件夹…"里取消了选择；系统对话框换成直接返回取消，synthetic）：
- *        留在 AGENTS.md，编辑框回到读到的内容，没有"有未保存的改动"，没有新会话。
+ * @brief 选了"Discard"、离开却没有发生（"Open folder…"里取消了选择；系统对话框换成直接返回取消，synthetic）：
+ *        留在 AGENTS.md，编辑框回到读到的内容，没有"Unsaved changes"，没有新会话。
  */
 async function cancelledLeave(ctx) {
   const { page, app } = ctx;
@@ -822,9 +832,9 @@ async function cancelledLeave(ctx) {
   await app.evaluate(({ dialog }) => {
     dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] });
   });
-  await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await page.getByRole('button', { name: 'Open folder…' }).first().click();
   const dialog = await dialogState(page, 'leave-dialog').catch(() => null);
-  await page.getByTestId('leave-dialog').getByRole('button', { name: '放弃改动', exact: true }).click().catch(() => {});
+  await page.getByTestId('leave-dialog').getByRole('button', { name: 'Discard', exact: true }).click().catch(() => {});
   await page.getByTestId('leave-dialog').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   await page.waitForFunction((want) => document.querySelector('[data-testid="agents-editor"]')?.value === want,
     ctx.agentsSaved, { timeout: 5000 }).catch(() => {});
@@ -834,21 +844,21 @@ async function cancelledLeave(ctx) {
   await stubFolder(app, ctx.project);
   record('放弃改动、离开却没有发生（"打开文件夹…"里取消了选择）：留在 AGENTS.md，编辑框回到读到的内容，'
     + '没有"有未保存的改动"，没有新会话', dialog?.title === LEAVE_TITLE && now.settings && now.section === 'agents'
-    && now.panes === before.panes && state.editor === ctx.agentsSaved && state.status !== '有未保存的改动',
+    && now.panes === before.panes && state.editor === ctx.agentsSaved && state.status !== 'Unsaved changes',
   JSON.stringify({ dialog: dialog?.title ?? null, now, editor: oneLine(state.editor ?? '', 80),
     status: state.status }));
   await dropDraft(page);
 }
 
 /**
- * @brief 有未保存的改动时点"已归档"里的会话（M3：点它会恢复并打开）：先问；"继续编辑"什么都不变（不恢复，留在
- *        AGENTS.md，改动还在）；"放弃改动"才恢复并打开它。用 agentsPrompt 里新建的会话（ctx.after）。
+ * @brief 有未保存的改动时点"Archived"里的会话（M3：点它会恢复并打开）：先问；"Keep editing"什么都不变（不恢复，
+ *        留在 AGENTS.md，改动还在）；"Discard"才恢复并打开它。用 agentsPrompt 里新建的会话（ctx.after）。
  */
 async function archivedLeave(ctx) {
   const { page } = ctx;
   const archived = async () => (await archivedState(page)).rows.some((row) => samePath(row.file, ctx.after));
   const row = page.locator(`[data-testid="archived-list"] .session-item[data-file=${JSON.stringify(ctx.after)}]`);
-  await chooseMenuItem(page, ctx.after, '归档');
+  await chooseMenuItem(page, ctx.after, 'Archive');
   await expandArchived(page);
   await row.waitFor({ timeout: 10000 });
   await makeDirty(ctx);
@@ -860,7 +870,7 @@ async function archivedLeave(ctx) {
     await settle(page);
     return dialog;
   };
-  const asked = await answer('继续编辑');
+  const asked = await answer('Keep editing');
   const stay = { archived: await archived(), ...(await whereNow(page)), state: await agentsState(page) };
   record('有未保存的改动时点"已归档"里的会话：先问；选"继续编辑"什么都不变（会话仍在"已归档"里、没有恢复，'
     + '留在 AGENTS.md，改动还在，焦点回到编辑框）', asked?.title === LEAVE_TITLE && stay.archived && stay.settings
@@ -868,7 +878,7 @@ async function archivedLeave(ctx) {
   JSON.stringify({ asked: asked?.title ?? null, archived: stay.archived, settings: stay.settings,
     focused: stay.state.focused }));
   if (!stay.archived || !stay.settings) return dropDraft(page);
-  await answer('放弃改动');
+  await answer('Discard');
   const now = await until(async () => {
     const state = await whereNow(page);
     return !state.settings && samePath(state.active, ctx.after) ? state : null;
@@ -916,10 +926,10 @@ async function dragOntoSettings(ctx) {
     + '不弹确认框，改动还在', during.dragging && during.hint === null && dialog === 0 && state.shown
     && state.editor === `${ctx.agentsSaved}未保存的草稿\n` && now.settings && now.panes === before.panes,
   JSON.stringify({ during, dialog, now }));
-  await page.locator('.agents-user').getByRole('button', { name: '撤销改动' }).click();
+  await page.locator('.agents-user').getByRole('button', { name: 'Discard changes' }).click();
 }
 
-/** @brief agentDir 里有 AGENTS.override.md 时警示"这里写的不会生效"；之后删掉它。 */
+/** @brief agentDir 里有 AGENTS.override.md 时警示"… takes precedence, so what you write here has no effect."；之后删掉它。 */
 async function agentsOverride(ctx) {
   const { page } = ctx;
   const override = join(ctx.userData, 'pi', 'AGENTS.override.md');
@@ -931,13 +941,13 @@ async function agentsOverride(ctx) {
     ?.classList.contains('warn'), null, { timeout: 5000 }).catch(() => {});
   const state = await agentsState(page);
   await shot(page, '8-agents-override');
-  await page.locator('.agents-line').getByRole('button', { name: '用系统编辑器打开' }).click().catch(() => {});
+  await page.locator('.agents-line').getByRole('button', { name: 'Open in default app' }).click().catch(() => {});
   const opened = await until(async () => {
     const path = await ctx.app.evaluate(() => globalThis.__opened?.at(-1) ?? null);
     return samePath(path, override) ? path : null;
   }, 3000);
   rmSync(override, { force: true });
-  const expected = `生效的是 ${override}，这里写的不会生效`;
+  const expected = `${override} takes precedence, so what you write here has no effect.`;
   record('agentDir 里有 AGENTS.override.md 时：警示色"生效的是 <它的路径>，这里写的不会生效"；"用系统编辑器打开"打开的是它',
     state.warn === true && state.effective?.toLowerCase() === expected.toLowerCase() && samePath(opened, override),
     JSON.stringify({ effective: state.effective, opened }));
@@ -948,7 +958,7 @@ async function agentsOverride(ctx) {
 async function agentsFailures(ctx) {
   const { page } = ctx;
   const path = userAgents(ctx);
-  // 上一步从 AGENTS.md 一节"返回会话"：再打开设置页时仍落在 Models。
+  // 上一步从 AGENTS.md 一节"Back to app"：再打开设置页时仍落在 Models。
   const landed = await landSettings(page);
   record('打开设置页时落在 Models（上次离开设置页时在 AGENTS.md 一节）', landed.nav === 'models'
     && landed.body === 'models', JSON.stringify(landed));
@@ -956,15 +966,16 @@ async function agentsFailures(ctx) {
   mkdirSync(`${path}.tmp`);
   const draft = `${ctx.agentsSaved}保存会失败的一行\n`;
   await page.getByTestId('agents-editor').fill(draft);
-  await page.locator('.agents-user').getByRole('button', { name: '保存', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('.agents-status')?.textContent?.startsWith('保存失败：'), null,
-    { timeout: 10000 }).catch(() => {});
+  await page.locator('.agents-user').getByRole('button', { name: 'Save', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('.agents-status')?.textContent
+    ?.startsWith('Couldn’t save: '), null, { timeout: 10000 }).catch(() => {});
   const failed = await agentsState(page);
   rmSync(`${path}.tmp`, { recursive: true, force: true });
   record('保存失败（<agentDir>\\AGENTS.md.tmp 被一个文件夹占着）："保存失败："加原文，写的字留在编辑框里，文件不变',
-    failed.status?.startsWith('保存失败：') && failed.status.length > 5 && failed.editor === draft
+    failed.status?.startsWith('Couldn’t save: ')
+    && failed.status.length > 'Couldn’t save: '.length && failed.editor === draft
     && readText(path) === ctx.agentsSaved, failed.status ?? '');
-  await page.locator('.agents-user').getByRole('button', { name: '撤销改动' }).click();
+  await page.locator('.agents-user').getByRole('button', { name: 'Discard changes' }).click();
   renameSync(path, `${path}.bak`);
   mkdirSync(path);
   await page.locator('[data-testid="settings-nav"] button[data-section="models"]').click();
@@ -974,8 +985,8 @@ async function agentsFailures(ctx) {
   const editors = await page.getByTestId('agents-editor').count();
   rmSync(path, { recursive: true, force: true });
   renameSync(`${path}.bak`, path);
-  record('读取失败（<agentDir>\\AGENTS.md 是一个文件夹）：显示"读取失败："加原文，没有编辑框', text?.startsWith('读取失败：')
-    && text.length > 5 && editors === 0, text ?? '');
+  record('读取失败（<agentDir>\\AGENTS.md 是一个文件夹）：显示"读取失败："加原文，没有编辑框', text?.startsWith('Couldn’t load AGENTS.md: ')
+    && text.length > 'Couldn’t load AGENTS.md: '.length && editors === 0, text ?? '');
   await page.locator('[data-testid="settings-nav"] button[data-section="models"]').click();
   await openSettings(page, 'agents');
   const fixed = await agentsState(page);
@@ -994,7 +1005,8 @@ async function agentsNoProjectFile(ctx) {
   await openSettings(page, 'agents');
   const state = await agentsState(page);
   record('项目没有加载 AGENTS.md 或 CLAUDE.md 时：标题"m6empty 加载的文件"，说明"这个项目没有加载 AGENTS.md 或 CLAUDE.md"',
-    state.loadedTitle === 'm6empty 加载的文件' && state.loadedText.includes('这个项目没有加载 AGENTS.md 或 CLAUDE.md')
+    state.loadedTitle === 'Files loaded by m6empty'
+    && state.loadedText.includes('This project doesn’t load an AGENTS.md or CLAUDE.md')
     && state.loadedFiles.length === 0, JSON.stringify({ title: state.loadedTitle, files: state.loadedFiles }));
   await back(page);
   await stubFolder(app, ctx.project);
@@ -1018,7 +1030,7 @@ async function brokenSettings(ctx) {
     await noteSmall(ctx, '设置页 settings.json 读不出', '.settings-page');
     broken = { error, cards: await page.getByTestId('provider-card').count(),
       rows: await modelRow(page, `${MAIN}/fake-coder`).count() };
-    await page.getByRole('button', { name: '返回会话', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to app', exact: true }).click();
   } finally {
     writeFileSync(path, original);
   }
@@ -1039,7 +1051,8 @@ async function brokenSettings(ctx) {
 // ---------- 步骤：窄栏 ----------
 
 /** 思考强度的界面文字（models.md） */
-const LEVEL_TEXT = { off: '关', minimal: '最低', low: '低', medium: '中', high: '高', xhigh: '很高', max: '最高' };
+const LEVEL_TEXT = { off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high',
+  max: 'Max' };
 /** @brief 会话面板宽度落在 models.md"窄栏"的哪一档。 */
 const bucketOf = (width) => (width > 720 ? '宽' : width > 600 ? '较窄' : width > 400 ? '窄' : '很窄');
 
@@ -1048,7 +1061,7 @@ async function narrowSample(ctx, width, right) {
   const { page, app } = ctx;
   await app.evaluate(({ BrowserWindow }, w) => BrowserWindow.getAllWindows()[0].setContentSize(w, 800), width);
   await page.waitForFunction((w) => window.innerWidth === w, width, { timeout: 5000 }).catch(() => {});
-  const toggle = paneOf(page).getByRole('button', { name: '右栏：本会话的改动' });
+  const toggle = paneOf(page).getByRole('button', { name: 'Toggle changes' });
   if ((await toggle.getAttribute('aria-pressed')) !== String(right)) await toggle.click();
   await settle(page);
   await settle(page);
@@ -1058,8 +1071,8 @@ async function narrowSample(ctx, width, right) {
   return { window: width, right, bucket: bucketOf(state.pane), ...state, inside };
 }
 
-/** @brief 样本里思考按钮应有的强度文字（不支持思考时"不可选"）。 */
-const labelOf = (sample) => (sample.reasoning === 'true' ? LEVEL_TEXT[sample.level] : '不可选');
+/** @brief 样本里思考按钮应有的强度文字（不支持思考时"Unavailable"）。 */
+const labelOf = (sample) => (sample.reasoning === 'true' ? LEVEL_TEXT[sample.level] : 'Unavailable');
 
 /** @brief 一个样本不符合它那一档（models.md"窄栏"）的地方（读屏名称另查）；都符合时为空。 */
 function narrowProblems(sample) {
@@ -1067,7 +1080,7 @@ function narrowProblems(sample) {
   const problems = [];
   if (!sample.model || !sample.thinking) problems.push('按钮没有显示');
   const wide = sample.bucket === '宽' || sample.bucket === '较窄';
-  if (sample.thinkingText !== (wide ? `思考：${label}` : label)) problems.push(`思考按钮文字 ${sample.thinkingText}`);
+  if (sample.thinkingText !== (wide ? `Effort: ${label}` : label)) problems.push(`思考按钮文字 ${sample.thinkingText}`);
   if (sample.modelWidth > (sample.bucket === '宽' ? 160 : 120) || sample.modelWidth < 40) problems.push('模型按钮宽度');
   if (sample.bucket === '很窄' ? sample.modelIcon || sample.thinkingIcon : !sample.modelIcon || !sample.thinkingIcon) {
     problems.push('▾');
@@ -1100,14 +1113,14 @@ async function narrowTopbar(ctx) {
       right: sample.right, pane: sample.pane, text: sample.thinkingText, model: sample.modelWidth }))));
   }
   const names = samples.map((sample) => ({ pane: sample.pane, name: sample.thinkingName,
-    want: `思考：${labelOf(sample)}` }));
+    want: `Effort: ${labelOf(sample)}` }));
   record('窄栏各档思考按钮的读屏名称都是完整的"思考：<强度>"（收起的文字在读屏名称里）',
     names.every((item) => item.name === item.want), JSON.stringify(names));
 }
 
 // ---------- 步骤：重启与收尾 ----------
 
-/** @brief 重新打开的会话：pi 按会话记录恢复思考强度（关掉前在 S1 切到了"低"，它的默认是"高"）。 */
+/** @brief 重新打开的会话：pi 按会话记录恢复思考强度（关掉前在 S1 切到了"Low"，它的默认是"High"）。 */
 async function reopen(ctx) {
   await closeWithDraft(ctx);
   await startApp(ctx);
@@ -1121,7 +1134,7 @@ async function reopen(ctx) {
   const thinking = await buttonState(page, 'thinking-button');
   const model = await buttonState(page, 'model-button');
   record('重启后重新打开会话：按会话记录恢复思考强度（关掉 Mori 前切到"低"，不是这个模型的默认"高"），模型仍是 fake-coder',
-    thinking.level === 'low' && thinking.text === '思考：低' && model.text === 'fake-coder',
+    thinking.level === 'low' && thinking.text === 'Effort: Low' && model.text === 'fake-coder',
     JSON.stringify({ thinking, model: model.text }));
   const reply = await sendIn(page, 'which model');
   record('重启后会话照常能用（key 从 credentials.json 读入），回复来自 fake-coder', reply.fresh
@@ -1142,11 +1155,11 @@ async function closeWithDraft(ctx) {
   await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {});
   const ok = await closed;
   if (!ok) await ctx.app.close().catch(() => {});
-  record('AGENTS.md 有未保存的改动时关闭 Mori 窗口：不问，直接关闭；AGENTS.md 不变', status === '有未保存的改动' && ok
+  record('AGENTS.md 有未保存的改动时关闭 Mori 窗口：不问，直接关闭；AGENTS.md 不变', status === 'Unsaved changes' && ok
     && readText(userAgents(ctx)) === ctx.agentsSaved, JSON.stringify({ status, closed: ok }));
 }
 
-/** @brief 重启后还没有打开会话时：AGENTS.md 一节的项目级说明"打开一个会话后…"。重启后自动打开了会话时记为失败（没有覆盖）。 */
+/** @brief 重启后还没有打开会话时：AGENTS.md 一节的项目级说明"Open a session to see…"。重启后自动打开了会话时记为失败（没有覆盖）。 */
 async function noSession(ctx) {
   const { page } = ctx;
   const panes = await page.locator('.pane-slot').count();
@@ -1158,9 +1171,9 @@ async function noSession(ctx) {
   await openSettings(page, 'agents');
   const state = await agentsState(page);
   record('没有打开的会话时（重启后还没点开会话）：项目级一栏"打开一个会话后，这里列出它的项目加载了哪些文件。"',
-    state.loadedText.includes('打开一个会话后，这里列出它的项目加载了哪些文件。') && state.loadedFiles.length === 0,
+    state.loadedText.includes('Open a session to see which files its project loads.') && state.loadedFiles.length === 0,
     oneLine(state.loadedText, 200));
-  await page.getByRole('button', { name: '返回会话', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to app', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 5000 });
 }
 

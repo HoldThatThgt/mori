@@ -6,8 +6,9 @@
 //     v1-models-app-settings、-switch、-session 与 v1-models-replay），App 套件记进 tb-app-existing.json；
 //     回放层的 tb-replay-existing.json 依次记 "TB-46 test:unit"（npm run test:unit，模型层的单元）、回放套件、
 //     "TB-46 spec-coverage"（node tests/spec-coverage.mjs，模型层的覆盖检查，按退出码 0 记通过，最后跑）。
-//     覆盖检查读前面刚写的 v1-unit.json、v1-models-app-*.json、v1-models-replay.json；MP-37 的两个结果文件与
-//     v1-models-real.json 不由 TB-46 写，要已经存在（npm run test:v1-models 与真实走查留下的），否则这一条失败。
+//     这次运行同时写模型层 MP-37 的两个结果文件（同样的套件，记 "MP-37 <脚本名>"，规格 §17.4），在覆盖检查之前写；
+//     覆盖检查读前面刚写的 v1-unit.json、v1-models-app-*.json、v1-models-replay.json 与这两个文件；v1-models-real.json
+//     不由 TB-46 写，要已经存在（v1-models-real.mjs 在这个工作树里跑过），否则这一条失败。
 // 各套件自己的结果文件照旧写（m1-app.json 等）；这里另把每个套件的输出存到 test-results/<日志目录>/<脚本名>.log
 // （MP-37 为 v1-models-existing，TB-46 为 tb-existing；脚本名里的 ":" 换成 "-"），失败时检查的细节里带它打印的 FAIL 行。
 // 套件要求 out/ 里已是最新构建（npm run test:v1-models 先 electron-vite build，这里不构建）。现有套件用固定端口
@@ -83,7 +84,8 @@ const PRESETS = {
     partial: 'v1-models-existing-partial-', logDir: 'v1-models-existing', suites: 'models',
     withUnit: false, withCoverage: false },
   'TB-46': { appFile: 'tb-app-existing.json', replayFile: 'tb-replay-existing.json',
-    partial: 'tb-partial-existing-', logDir: 'tb-existing', suites: 'taskboard', withUnit: true, withCoverage: true },
+    partial: 'tb-partial-existing-', logDir: 'tb-existing', suites: 'taskboard', withUnit: true, withCoverage: true,
+    alsoWrites: 'MP-37' },
 };
 
 /** @brief 参数不认识时打印原因并以退出码 2 结束。 */
@@ -172,27 +174,60 @@ function detailOf(entry, { code, output, ms }, note) {
   return code === 0 ? head : `${head}; ${fails.slice(0, 6).map((line) => oneLine(line, 160)).join(' | ')}`;
 }
 
-/** @brief 跑一组套件，每个记一条 "<编号> <脚本名>"，写结果文件；返回是否全部通过。 */
-async function runGroup(entries, resultFile) {
+/** 每个跑过的套件的结果（按脚本名）：TB-46 据此另写 MP-37 的结果文件 */
+const outcomes = new Map();
+
+/**
+ * @brief 跑一组套件，每个记一条 "<编号> <脚本名>"，写结果文件；返回是否全部通过。
+ * @param before 跑每一项之前调用（TB-46 在覆盖检查之前写 MP-37 的结果文件）；省略时不调
+ */
+async function runGroup(entries, resultFile, before = () => {}) {
   const { exePath, only, id } = options;
   const recorder = createRecorder(exePath ?? 'dev build');
   const chosen = entries.filter((entry) => !only || only.includes(entry.name));
   if (chosen.length === 0) return true;
   for (const entry of chosen) {
+    before(entry);
     console.log(`\n[v1-models-existing] ==== ${entry.name} ====`);
     const args = exePath && entry.takesExe ? ['--exe', exePath] : [];
     const note = exePath && !entry.takesExe ? 'no --exe support, ran against the dev build' : '';
     const run = await runSuite(entry, args);
     writeFileSync(join(options.logDir, logFileOf(entry)), run.output);
     const ran = !entry.needsPass || /^PASS /m.test(run.output.replace(/\x1b\[[0-9;]*m/g, ''));
-    recorder.record(`${id} ${entry.name}: ${entry.what}`, run.code === 0 && ran,
-      `${ran ? '' : 'no PASS line, the suite ran no checks; '}${detailOf(entry, run, note)}`);
+    const outcome = { ok: run.code === 0 && ran,
+      detail: `${ran ? '' : 'no PASS line, the suite ran no checks; '}${detailOf(entry, run, note)}` };
+    outcomes.set(entry.name, outcome);
+    recorder.record(`${id} ${entry.name}: ${entry.what}`, outcome.ok, outcome.detail);
   }
   return recorder.write(resultFile);
+}
+
+/**
+ * @brief TB-46 跑全时另写 MP-37 的两个结果文件（规格 §17.4）：模型层 §14.4 的套件，用这次运行的结果，
+ *        记 "MP-37 <脚本名>"；--only 时不写（部分结果不能算 MP-37 通过）。--exe 时只写 App 层（加 -packaged）。
+ */
+function writeAlso() {
+  const also = PRESETS[options.id].alsoWrites;
+  if (!also || options.only) return;
+  const preset = PRESETS[also];
+  const suffix = options.exePath ? '-packaged' : '';
+  const groups = [[SUITE_LISTS[preset.suites].app, preset.appFile.replace(/\.json$/, `${suffix}.json`)]];
+  if (!options.exePath) groups.push([SUITE_LISTS[preset.suites].replay, preset.replayFile]);
+  for (const [entries, file] of groups) {
+    const recorder = createRecorder(options.exePath ?? 'dev build');
+    for (const entry of entries) {
+      const outcome = outcomes.get(entry.name) ?? { ok: false, detail: `${entry.name} did not run` };
+      recorder.record(`${also} ${entry.name}: ${entry.what}`, outcome.ok, outcome.detail);
+    }
+    recorder.write(file);
+  }
 }
 
 const { lists, exePath, withUnit, withCoverage } = options;
 const replayEntries = [...(withUnit ? [UNIT_CHECK] : []), ...lists.replay, ...(withCoverage ? [COVERAGE_CHECK] : [])];
 const appOk = await runGroup(lists.app, options.appFile);
-const replayOk = exePath ? true : await runGroup(replayEntries, options.replayFile);
+if (exePath) writeAlso();
+const replayOk = exePath ? true
+  : await runGroup(replayEntries, options.replayFile, (entry) => { if (entry === COVERAGE_CHECK) writeAlso(); });
+if (!exePath && !withCoverage) writeAlso();
 process.exitCode = appOk && replayOk ? 0 : 1;

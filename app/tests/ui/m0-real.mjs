@@ -15,6 +15,7 @@ import { lookup } from 'node:dns/promises';
 import { _electron as electron } from 'playwright-core';
 import { editModelConfig, projectKey } from './lib.mjs';
 import { startNetWatch } from './net-watch.mjs';
+import { pageHelpers } from './page.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
 const arg = (name) => {
@@ -38,8 +39,8 @@ async function setup() {
   const previous = existsSync(join(userData, 'model-config.json')) || existsSync(join(userData, 'pi', 'models.json'));
   const app = await launch();
   console.log(previous
-    ? 'Mori 已打开：数据目录里已有模型配置，窗口打开在 设置 → Models。确认各提供商的 Network zone，需要时添加提供商并测试连接；'
-    : 'Mori 已打开：在首次启动表单里填 Name、Address、Network zone、API key、Model id，测试连接后保存；');
+    ? 'Mori 已打开：数据目录里已有模型配置，窗口打开在 Settings → Models。确认各提供商的 Network zone，需要时添加提供商并测试连接；'
+    : 'Mori 已打开：在首次启动表单里填 Name、Base URL、Network zone、API key、Model ID，测试连接后保存；');
   console.log('等每个模型的 Tool calling 都显示 Verified 后再关闭窗口（探针没跑完就关，下次启动会重新探测）。');
   await new Promise((done) => app.process().once('exit', done));
   console.log(`已退出。数据目录：${userData}`);
@@ -69,37 +70,53 @@ function record(name, ok, detail = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-/** @brief 发一条消息并等本轮结束；期间每 100 毫秒采样阶段文字（变化才记录）和最后一条回复的长度。 */
+/** @brief 当前会话最后一条回复的正文（不含思考和工具卡）。 */
+const lastReply = (page) => page.evaluate(() => {
+  const replies = document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="assistant"]');
+  return [...(replies[replies.length - 1]?.querySelectorAll('.prose') ?? [])].map((el) => el.textContent).join('\n');
+});
+
+/**
+ * @brief 发一条消息并等本轮结束；期间每 100 毫秒采样阶段行文字（去掉秒数，变化才记录）和最后一条回复正文的长度。
+ *        M1 起阶段行是 [data-testid="stage"]，回复是 [data-testid="assistant"] 里的 .prose。
+ */
 async function sendAndWatch(page, text) {
+  const h = pageHelpers(page);
   const started = Date.now();
-  const statuses = [];
-  const lengths = new Set();
-  const timer = setInterval(() => {
-    void page.getByTestId('status').innerText().then((s) => {
-      if (s && statuses[statuses.length - 1] !== s) statuses.push(s);
-    }, () => {});
-    void page.locator('.assistant').last().innerText().then((t) => t && lengths.add(t.length), () => {});
-  }, 100);
-  await page.locator('.composer textarea').fill(text);
-  await page.locator('.composer textarea').press('Enter');
-  await page.getByRole('button', { name: '停止' }).waitFor({ timeout: 15000 }).catch(() => {});
-  await page.getByRole('button', { name: '发送' }).waitFor({ timeout: 180000 });
-  clearInterval(timer);
-  return { ms: Date.now() - started, statuses, lengths: lengths.size };
+  await page.evaluate(() => {
+    window.__m0 = { statuses: [], lengths: new Set() };
+    clearInterval(window.__m0Timer);
+    window.__m0Timer = setInterval(() => {
+      const stage = document.querySelector('[data-testid="stage"]')?.textContent?.replace(/\s\d+(\.\d+)?s$/, '');
+      if (stage && window.__m0.statuses.at(-1) !== stage) window.__m0.statuses.push(stage);
+      const replies = document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="assistant"]');
+      const prose = [...(replies[replies.length - 1]?.querySelectorAll('.prose') ?? [])];
+      const length = prose.map((el) => el.textContent).join('\n').length;
+      if (length) window.__m0.lengths.add(length);
+    }, 100);
+  });
+  await h.send(text);
+  await h.idle(180000);
+  const watched = await page.evaluate(() => {
+    clearInterval(window.__m0Timer);
+    return { statuses: window.__m0.statuses, lengths: window.__m0.lengths.size };
+  });
+  return { ms: Date.now() - started, ...watched };
 }
 
-/** @brief 当前所有工具卡：名称、状态和参数。 */
+/** @brief 当前会话的所有工具卡：动词（read 是"Read"）、状态（data-status）和标题。 */
 function toolCards(page) {
-  return page.getByTestId('tool-card').evaluateAll((cards) => cards.map((card) => ({
-    name: card.querySelector('.tool-name')?.textContent ?? '',
-    status: card.querySelector('.tool-status')?.textContent ?? '',
-    args: (card.querySelector('pre')?.textContent ?? '').replace(/\s+/g, ' ').slice(0, 120),
+  const cards = page.locator('.pane-slot:not([hidden]) [data-testid="tool-card"]');
+  return cards.evaluateAll((items) => items.map((card) => ({
+    verb: card.querySelector('.tool-verb')?.textContent ?? '',
+    status: card.dataset.status ?? '',
+    title: (card.querySelector('.tool-title')?.textContent ?? '').replace(/\s+/g, ' ').slice(0, 120),
   })));
 }
 
 /** @brief 走查 2：不重填 key，在 设置 → Models 的提供商卡上测试连接（v1）。 */
 async function connectionCheck(page, providerId) {
-  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.locator('[data-testid="settings-nav"] button[data-section="models"]').click();
   const card = page.locator(`[data-testid="provider-card"][data-provider="${providerId}"]`);
   await card.locator('[data-action="test-provider"]').click();
@@ -107,31 +124,32 @@ async function connectionCheck(page, providerId) {
   await result.waitFor({ timeout: 120000 });
   const text = await result.innerText();
   record('走查 2：测试连接成功（用加密保存的 key）', text.startsWith('Connected'), oneLine(text));
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app' }).click();
 }
 
-/** @brief 走查 3：总结 README，确认流式文字和一次读取（原生工具调用）；再追问一轮确认多轮可用。 */
+/**
+ * @brief 走查 3：总结 README，确认流式文字和一次读取（原生工具调用）；再追问一轮确认多轮可用。
+ *        M2 起命令先要批准，这里走查的是 M0 的行为，打开会话后先切到"Allow all"（同 m1-real）。
+ */
 async function readmeCheck(app, page, project) {
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] });
-  }, project);
-  await page.getByRole('button', { name: '打开文件夹…' }).click();
-  await page.locator('.chat-head').waitFor({ timeout: 30000 });
+  const h = pageHelpers(page);
+  await h.openFolder(app, project);
+  await h.allowAll();
   const first = await sendAndWatch(page, '总结 README');
   const tools = await toolCards(page);
-  const answer = await page.locator('.assistant').last().innerText();
-  const thinking = await page.locator('.thinking').count();
-  const errors = await page.locator('.chat .error').allInnerTexts();
-  const readOk = tools.some((tool) => tool.name === 'read' && tool.status === '完成');
+  const answer = await lastReply(page);
+  const thinking = await page.locator('.pane-slot:not([hidden]) details.thinking').count();
+  const errors = await page.getByTestId('error-card').allInnerTexts();
+  const readOk = tools.some((tool) => tool.verb === 'Read' && tool.status === 'done');
   record('走查 3：一次读取（原生工具调用）', readOk && answer.trim().length > 0 && errors.length === 0,
-    `耗时 ${first.ms} ms；工具：${tools.map((t) => `${t.name}/${t.status} ${t.args}`).join('；') || '无'}；` +
+    `耗时 ${first.ms} ms；工具：${tools.map((t) => `${t.title}/${t.status}`).join('；') || '无'}；` +
     `思考段 ${thinking} 个；回复：${oneLine(answer, 160)}` + (errors.length ? `；错误：${oneLine(errors.join(' | '))}` : ''));
   record('走查 3：回复是流式出现的', first.lengths > 2, `本轮采样到 ${first.lengths} 种不同的回复长度`);
   record('阶段文字（每 100 毫秒采样，变化才记录）', first.statuses.length > 0, first.statuses.join(' → '));
   const second = await sendAndWatch(page, '用一句话再概括一次。');
-  const errorsAfter = await page.locator('.chat .error').allInnerTexts();
+  const errorsAfter = await page.getByTestId('error-card').allInnerTexts();
   record('第二轮对话无错误（请求里带上一轮的思考与工具结果）', errorsAfter.length === 0,
-    `耗时 ${second.ms} ms；回复：${oneLine(await page.locator('.assistant').last().innerText(), 160)}` +
+    `耗时 ${second.ms} ms；回复：${oneLine(await lastReply(page), 160)}` +
     (errorsAfter.length ? `；错误：${oneLine(errorsAfter.join(' | '))}` : ''));
 }
 

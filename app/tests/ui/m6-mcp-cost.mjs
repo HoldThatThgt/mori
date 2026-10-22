@@ -2,7 +2,7 @@
 // （docs/v0/m6-mcp-shared.md"怎样验收"第一行，照 Claude 桌面版每个服务一个进程、所有会话共用）：
 // 用户级 mcp.json 里放 servers 个合成 MCP 服务（tests/mcp-server/server.mjs，synthetic）。
 // Mori 启动时就起用户级启用的 stdio 服务，所以先等到还没有会话时就有 servers 个服务进程（有上限地轮询），记为基线；
-// 再依次打开 1、5、10 个会话，每次等每个服务的共享连接显示"运行中"且在用的会话数等于打开的会话数（tools.get 的
+// 再依次打开 1、5、10 个会话，每次等每个服务的共享连接显示"Running"且在用的会话数等于打开的会话数（tools.get 的
 // mcp.servers[].shared，共享服务表里的真实状态；会话真的挂上了，进程数才有意义），然后数 Mori 后台进程的子孙进程：
 // 服务进程（命令行是合成 MCP 服务的 node.exe）的个数等于 servers 才记 PASS；同时照旧打印后台进程和子进程的内存（工作集）。
 // 会话不发消息（不用模型），连接只靠 pi 的 MCP 扩展在 session_start 时自己连。
@@ -105,11 +105,11 @@ async function sharedStates(page, sessionId) {
   return Object.fromEntries(NAMES.map((name) => [name, list.find((item) => item.name === name)?.shared ?? null]));
 }
 
-/** @brief 每个服务都是"运行中"且在用的会话数为 count。 */
+/** @brief 每个服务都是"Running"且在用的会话数为 count。 */
 const allShared = (states, count) => NAMES.every((name) => states[name]?.state === 'running'
   && states[name].sessions === count);
 
-/** @brief 等每个服务的共享连接都是"运行中 · count 个会话在用"（最多 WAIT_MS）；返回最后读到的状态和是否等到了。 */
+/** @brief 等每个服务的共享连接都是"Running · Used by count sessions"（最多 WAIT_MS）；返回最后读到的状态和是否等到了。 */
 async function waitSessions(page, sessionId, count) {
   const started = Date.now();
   let states = await sharedStates(page, sessionId);

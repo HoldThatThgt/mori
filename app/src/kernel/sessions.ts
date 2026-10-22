@@ -143,11 +143,11 @@ const NO_MESSAGES = '(no messages)';
 /** pi 设置没有 defaultTools 时默认启用的工具（pi core/settings-manager.js DEFAULT_TOOL_NAMES） */
 const PI_DEFAULT_TOOLS: readonly string[] = ['read', 'bash', 'edit', 'write'];
 /** 会话在生成（含协作模式下有 Agent 在运行、排队或有待判断的消息）时拒绝的原文 */
-const GENERATING = 'The session is generating; stop it first';
+const GENERATING = 'This session is still running. Stop it first.';
 
 /**
  * @brief 转发一个 pi 事件。tool_execution_start 之前紧挨着由批准扩展发 mori.tool_gate：pi 先发
- *        tool_execution_start、再调用批准处理器，界面要在同一时刻就知道这张卡是"等你批准"还是"执行中"；
+ *        tool_execution_start、再调用批准处理器，界面要在同一时刻就知道这张卡是"Waiting for your approval"还是"Running…"；
  *        处理器后来判断不同时由批准扩展发更正。实例会话的事件不发给界面，交给 Team；用户会话的事件发给界面后也交给它的 Team。
  *        交给 Team 放在最后：这时这次运行的记账（段的结束）已经做完，Team 在里面开始下一次投递不会被它清掉。
  */
@@ -291,8 +291,8 @@ async function loadResources(cwd: string, setup: SessionSetup, gate: ApprovalGat
 }
 
 /**
- * @brief 这个会话自己的 SettingsManager。按信任结果读项目设置：pi 在 reload 里先按"不信任"加载一遍、再按信任结果设回，
- *        结果与 v0 的先按"不信任"创建相同；先按结果创建，是为了在建 Team 之前读到默认工具（§4.2）。
+ * @brief 这个会话自己的 SettingsManager。按信任结果读项目设置：pi 在 reload 里先按"Don’t trust"加载一遍、再按信任结果设回，
+ *        结果与 v0 的先按"Don’t trust"创建相同；先按结果创建，是为了在建 Team 之前读到默认工具（§4.2）。
  */
 async function createSettings(cwd: string, trust: TrustDecision): Promise<SettingsManager> {
   const pi = await loadPi();
@@ -1029,7 +1029,7 @@ export function setApprovalMode(sessionId: string, mode: ApprovalMode): Approval
   return requireEntry(sessionId).gate.setMode(mode);
 }
 
-/** @brief 从"本会话已允许"里清除一个工具名。 */
+/** @brief 从"Allowed for this session"里清除一个工具名。 */
 export function forgetApproval(sessionId: string, toolName: string): ApprovalState {
   return requireEntry(sessionId).gate.forget(toolName);
 }

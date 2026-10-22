@@ -1,8 +1,8 @@
 // 从真实会话录制界面测试用的 fixture（tests/fixtures/m1/*.json）。
 // 直接通过 window.mori（与界面相同的进程桥）发命令，记录命令、命令结果和后台进程转发的全部事件及其时间。
 // 每次 turn_end 后像界面一样读取一次 session.state，供回放时回答上下文用量。
-// M2 起新会话默认"每次询问"，命令和编辑要等批准：每个场景 session.create 之后直接用 window.mori 把会话切到
-// "全部允许"（不经录制器，所以录下的命令序列仍是 M1 的）；录下的事件里会多出 gate 为 all 的 mori.tool_gate。
+// M2 起新会话默认"Ask each time"，命令和编辑要等批准：每个场景 session.create 之后直接用 window.mori 把会话切到
+// "Allow all"（不经录制器，所以录下的命令序列仍是 M1 的）；录下的事件里会多出 gate 为 all 的 mori.tool_gate。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m1-record.mjs --source <走查数据目录> [--only name1,name2] [--exe <Mori.exe>]
 // 走查数据目录是负责人在 Mori 里填过连接的目录（key 由 Mori 加密保存）；脚本只复制密文文件，不读取 key。
@@ -95,7 +95,7 @@ async function runScenario(page, scenario, context) {
   console.log(`RECORDED ${scenario.name}: ${steps.length} steps, ${types.length} events, tools: ${tools.join(', ')}`);
 }
 
-/** @brief 新建会话并切到"全部允许"；切换不经录制器，fixture 里没有这条命令。 */
+/** @brief 新建会话并切到"Allow all"；切换不经录制器，fixture 里没有这条命令。 */
 const create = async (rec, args) => {
   const s = await rec.cmd({ type: 'session.create', cwd: args.cwd });
   await window.mori.request({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'all' });

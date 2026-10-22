@@ -32,9 +32,9 @@ export interface ToolCall {
   startedAt: number | null;
   /** 实时运行时的耗时（ms）；从会话记录载入时为 null */
   durationMs: number | null;
-  /** 已拒绝时工具卡上显示的理由：你写的理由，或"你按了停止"；没写理由时为 null */
+  /** 已拒绝时工具卡上显示的理由：你写的理由，或"You pressed Stop"；没写理由时为 null */
   reason: string | null;
-  /** 自动放行的原因：本会话已允许 / 全部允许；你在卡上允许的、只读工具和会话记录里的为 null */
+  /** 自动放行的原因：本会话已允许（"Allowed for this session"）/ 全部允许（"Allow all"）；你在卡上允许的、只读工具和会话记录里的为 null */
   allowedBy: 'session' | 'all' | null;
   /** 后台进程说这次调用会怎样处理（mori.tool_gate）；还没收到或从会话记录载入时为 null */
   gate: ToolGate | null;
@@ -89,9 +89,9 @@ export interface ModelSwitchNotice {
   reason: ModelReason;
   /** 原因的完整界面文字（带 until 部分） */
   detail: string;
-  /** 有被隐藏的过程：加 "The new model redoes this reply." */
+  /** 有被隐藏的过程：加 "The new model redoes this response." */
   hidden: boolean;
-  /** 没能确认旧请求停下就换的：原因后加 " · couldn't confirm it stopped" */
+  /** 没能确认旧请求停下就换的：原因后加 " · Couldn’t confirm it stopped" */
   unconfirmed: boolean;
 }
 
@@ -107,7 +107,7 @@ export type Item =
   | { kind: 'stopped'; key: string }
   | {
     kind: 'error'; key: string; text: string; restore: string | null; live: boolean;
-    /** 没发出去的消息带的引用芯片："放回输入框"时连芯片一起放回（restore 是含引用块的全文） */
+    /** 没发出去的消息带的引用芯片："Put your last message back in the message box"时连芯片一起放回（restore 是含引用块的全文） */
     refs?: QuoteRef[];
   }
   | { kind: 'note'; key: string; text: string }
@@ -199,7 +199,7 @@ export interface Transcript {
   unavailable: boolean;
   /** 模型回复出错，等 agent_end 决定是否显示 */
   pendingError: string | null;
-  /** 最后一条你的消息（"把上一条消息放回输入框"） */
+  /** 最后一条你的消息（"Put your last message back in the message box"） */
   lastUserText: string | null;
   /** 第一条你的消息（会话名） */
   firstUserText: string | null;
@@ -277,7 +277,7 @@ export function newTool(id: string, name: string): ToolCall {
 }
 
 /** 卡还挂着时你按了停止：工具卡上显示的理由 */
-const STOPPED_REASON = '你按了停止';
+const STOPPED_REASON = 'You pressed Stop';
 
 /**
  * @brief 认出 Mori 拒绝时回给模型的工具结果（固定写法见 protocol.ts 的 REJECTED_*）。
@@ -342,8 +342,8 @@ export function reasonText(reason: ModelReason, detail: string, until?: number |
 
 /** @brief 换模型提示的文字："Switched model: A → B · <原因>"，原因不带 until 部分。 */
 export function switchText(notice: ModelSwitchNotice): string {
-  const confirm = notice.unconfirmed ? " · couldn't confirm it stopped" : '';
-  const redo = notice.hidden ? ' The new model redoes this reply.' : '';
+  const confirm = notice.unconfirmed ? ' · Couldn’t confirm it stopped' : '';
+  const redo = notice.hidden ? ' The new model redoes this response.' : '';
   return `Switched model: ${notice.from} → ${notice.to} · ${reasonText(notice.reason, notice.detail, null)}${confirm}`
     + redo;
 }

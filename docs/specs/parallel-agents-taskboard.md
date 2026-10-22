@@ -37,8 +37,9 @@
 语言：本规格新增和改写的界面用英文（[app-v0](../app-v0.md) §11）；程序注入给模型的文字用英文（与 pi 默认的 system prompt 同语言，附录 A）；
 角色名、需求和 task 的标题是你和模型写的内容，原样显示。文档正文、代码注释用中文；代码、日志、错误输出用英文。
 
-界面的基线：本分支从 `v1-model-providers` 开出，还没有 english-ui 与 composer-pickers（模型、Effort、权限按钮移到输入框那一行）；
-本规格的界面按本分支现有的布局写（§13.1），这两个分支合入时一并调整（记在检查记录里）。
+界面的基线：本分支从 `v1-model-providers` 开出；2026-10-21 合入了 `app-v0`（english-ui 与 v1 模型层），v0 界面文字按
+[v0/ui-strings.md](../v0/ui-strings.md) 的英文。还没有 composer-pickers（模型、Effort、权限按钮移到输入框那一行）；
+本规格的界面按本分支现有的顶栏布局写（§13.1），composer-pickers 合入时一并调整（记在检查记录里）。
 
 ## 1. 术语与代码名
 
@@ -964,7 +965,7 @@ Request 1 · Login page is blank · Running · 6 min
 | --- | --- | --- |
 | 需求状态（按这个顺序取第一个） | `status`、`question` 与 task 的状态 | `Done`、`Failed`、`Cancelled`（终态）；`Needs your decision`（有 `asked` 为真的 `waiting_user` task，或 `question` 已问你）；`Waiting for <create role>`（有 `question` 或 `waiting_user` 还没问你）；`Stopped`（有 `stopped` 且没有运行中的）；`With <close role>`（task 都已结束、需求还开着；还没有 task 时同样）；`Running` |
 | 时长 | `createdAt` 到现在或 `closedAt` | `<1 min`、`6 min`、`1 h 12 min` |
-| task 的当前在做什么（`phase` 为 `running`） | 这个实例最近一次工具调用的工具名与参数要点，按 §13.8 的标题规则（`shared/team.ts` 的 `toolCallTitle`，用 english-ui 的英文动词；本分支的 v0 工具卡仍是中文，english-ui 合入后两者一致） | `Run npm test`、`Read src/a.ts` |
+| task 的当前在做什么（`phase` 为 `running`） | 这个实例最近一次工具调用的工具名与参数要点，按 §13.8 的标题规则（`shared/team.ts` 的 `toolCallTitle`，用 english-ui 的英文动词，与 v0 工具卡的标题一致） | `Run npm test`、`Read src/a.ts` |
 | 还没调用工具 | 实例已开始 | `Starting` |
 | 其他 `phase` | TaskBoard 与调度 | `Queued`、`Waiting to change files (T2)`、`Waiting to change files (T2, stopped)`、`Waiting for T1`、`Waiting for your approval`、`Waiting for <create role>`（`waiting_user` 未问你）、`Needs your decision`（已问你）、`With <close role>`、`Stopped`、`Stopped (Mori restarted)`、`Done`、`Failed`、`Cancelled` |
 | 模型提示 | `modelNote`（§12.12） | 放在这一行的末尾 ` · Switched model: …` |

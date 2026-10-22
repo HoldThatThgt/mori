@@ -10,7 +10,7 @@ import { emptyBoard, soloTeamState, type BoardView, type TeamState } from '../..
 import { loadArchived } from './archive';
 import { emptyTranscript, type Transcript } from './model';
 
-/** @brief 一次"回到原位置"的请求：引用和请求序号（同一个引用再点一次也要再跳）。 */
+/** @brief 一次"Jump to source"的请求：引用和请求序号（同一个引用再点一次也要再跳）。 */
 export interface QuoteJump {
   /** 引用 */
   ref: QuoteRef;
@@ -50,9 +50,9 @@ export interface Tab extends ModelState {
   preview: string | null;
   /** 最后活动时间（ms）：新建、打开时列表里的时间、你发消息的时间；侧栏按它排序 */
   activity: number;
-  /** 不可见时完成了一轮（"有新结果"），点开后清除 */
+  /** 不可见时完成了一轮（"Unread"），点开后清除 */
   unseen: boolean;
-  /** 后台进程意外退出时它正在生成（侧栏状态"出错"），重新打开后清除 */
+  /** 后台进程意外退出时它正在生成（侧栏状态"Error"），重新打开后清除 */
   interrupted: boolean;
   /** 文件夹的信任状态 */
   projectTrust: ProjectTrust;
@@ -64,7 +64,7 @@ export interface Tab extends ModelState {
   extensionErrors: string[];
   /** 上下文用量 */
   contextUsage: ContextUsage | null;
-  /** 批准设置（权限与"本会话已允许"），以后台进程返回的为准 */
+  /** 批准设置（权限与"Allowed for this session"），以后台进程返回的为准 */
   approval: ApprovalState;
   /**
    * 协作状态（平行 Agent 规格 §13.10）：会话信息、mori.team_state 与 session.setTeam 的结果；
@@ -86,7 +86,7 @@ export interface Tab extends ModelState {
   /** 右栏的视图 */
   rightView: RightView;
   /**
-   * 等对话流处理的"回到原位置"（回复里的引用、会话引用的原会话）；itemKey 是要跳到的那一项，
+   * 等对话流处理的"Jump to source"（回复里的引用、会话引用的原会话）；itemKey 是要跳到的那一项，
    * keys 为要高亮的各项（会话引用的几轮）；没有时按引用的范围高亮
    */
   transcriptJump: (QuoteJump & { itemKey: string; keys?: string[] }) | null;
@@ -161,8 +161,8 @@ export interface AppState {
   /** 已归档的会话文件（本机记下的，见 archive.ts） */
   archived: string[];
   /**
-   * 界面重新加载后还没点开的、后台进程里的会话结束时留下的状态（按会话文件）：不可见时本轮结束为"有新结果"，
-   * 后台进程退出时它正在生成为"出错"；点开后清除，不跨重启保存
+   * 界面重新加载后还没点开的、后台进程里的会话结束时留下的状态（按会话文件）：不可见时本轮结束为"Unread"，
+   * 后台进程退出时它正在生成为"Error"；点开后清除，不跨重启保存
    */
   rowMarks: Record<string, 'unseen' | 'error'>;
 }

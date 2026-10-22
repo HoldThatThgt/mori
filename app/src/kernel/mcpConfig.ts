@@ -19,7 +19,7 @@ const OVERRIDE_KEYS = ['enabled', 'exposure', 'toolExposure'];
 /** 服务名只能有字母、数字、_、-（pi SERVER_NAME） */
 const SERVER_NAME = /^[A-Za-z0-9_-]+$/;
 /** 本项目的服务不能在这里改的原因（界面文字） */
-const PROJECT_READ_ONLY = '本项目的 .pi/mcp.json，只能在项目里改';
+const PROJECT_READ_ONLY = 'Set in this project’s .pi/mcp.json. To change it, edit that file.';
 /** pi 认的调用方式（pi MCP_EXPOSURES；旧名字 codemode-deferred 当作 codemode） */
 const MCP_EXPOSURES = ['codemode', 'deferred', 'direct', 'hidden'];
 /** pi 当作本机的主机名（pi LOOPBACK_HOSTS） */
@@ -275,7 +275,7 @@ function reject(source: Source, name: string, value: unknown, problem: string, s
 
 /**
  * @brief 项目里对同名服务的覆盖：合并后显示，列出改了的字段；条目原样仍是被覆盖的那一项。服务仍是用户级、readOnly
- *        为 null：界面按 overrides 让开关和按钮不可用，说明"本项目改了它的 <字段>"（状态表"本项目的"一行）。
+ *        为 null：界面按 overrides 让开关和按钮不可用，说明"Overridden by this project: <字段>"（状态表"本项目的"一行）。
  *        pi 不认的覆盖（没有被覆盖的服务、写了别的字段、合并后 pi 不接受）照 pi 的原文记为不加载，用户级服务不变。
  */
 function addOverride(source: Source, name: string, value: JsonObject, state: ReadState): void {
@@ -385,7 +385,7 @@ function checkedEntry(name: string, entry: JsonObject): JsonObject {
   const server = entry.exposure === undefined ? { ...entry, exposure: 'direct' } : entry;
   const problem = entryProblem(name, server);
   if (problem !== null) throw new Error(problem);
-  if (server.exposure !== 'direct') throw new Error('v0 only supports direct exposure');
+  if (server.exposure !== 'direct') throw new Error('Mori only supports direct calls (exposure: direct).');
   return server;
 }
 

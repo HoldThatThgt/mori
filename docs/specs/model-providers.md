@@ -135,9 +135,9 @@
 
 打开着的、范围指向被删名字的会话，静态校验按 `pick_missing` 拒绝启动（§4.6）。会话文件里的 `mori.pick` 和项目配置不改。
 
-**改提供商地址**：`baseUrl` 的 origin（协议、主机、端口）变了时，保存会删除它的全部 key，确认框写“Changing the address removes this provider's N saved keys. Add them again after saving.”（沿用 v0“改了服务地址就要重新填写 key”，key 不会发到新的地址）。
+**改提供商地址**：`baseUrl` 的 origin（协议、主机、端口）变了时，保存会删除它的全部 key，确认框写“Changing the base URL removes this provider’s N saved keys. Add them again after saving.”（沿用 v0“改了服务地址就要重新填写 key”，key 不会发到新的地址）。
 
-**启动时配置读不出**：`model-config.json` 存在但不是合法 JSON 或校验失败时，不迁移、不显示首次启动表单、不覆盖文件；所有会话按 `config_invalid` 拒绝启动，设置页 Models 只显示这条错误（文件路径与校验原文）和“Reload”。
+**启动时配置读不出**：`model-config.json` 存在但不是合法 JSON 或校验失败时，不迁移、不显示首次启动表单、不覆盖文件；所有会话按 `config_invalid` 拒绝启动，设置页 Models 只显示这条错误（“Couldn’t read model settings: <文件路径>: <校验原文>”）和“Retry”。
 
 key：明文只经进程通道交给后台进程，放在模型池的内存里（§8.4），不进 pi、不进任何配置文件、不回到界面。从 v0 迁移来的 key 沿用原来的 `ref`（就是 v0 的提供商 id）。
 
@@ -210,11 +210,11 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 | --- | --- | --- | --- |
 | 可以发送 | 至少剩一个候选 | — | — |
 | `verifying` | 没有候选通过，而且被排除的候选里至少一个是 `probing` | Verifying <模型>… | 无（探针结束自动重新校验） |
-| `no_candidate` | 没有候选通过，没有在验证中的 | This session can't start: no model fits. 加每个候选及原因 | Verify now（有 `unverified` 的候选时）；Allow <区域> for this project…（有 `zone_blocked` 的候选、且项目配置没有排除这个区域时：打开 设置 → Project access，焦点在这个项目）；Confirm zone…（有 `zone_unconfirmed` 的候选时：打开 设置 → Models 顶部区域未确认的几行）；Change model…；Open settings |
+| `no_candidate` | 没有候选通过，没有在验证中的 | This session can’t start: no model fits. 加每个候选及原因 | Verify now（有 `unverified` 的候选时）；Allow <区域> for this project（有 `zone_blocked` 的候选、且项目配置没有排除这个区域时：打开 设置 → Project access，焦点在这个项目）；Confirm zone（有 `zone_unconfirmed` 的候选时：打开 设置 → Models 顶部区域未确认的几行）；Change model…；Open settings |
 | `no_pick` | 会话没有范围（§5.1） | No default model range; pick one. | Change model…；Open settings |
 | `pick_missing` | 范围指向的名字不存在 | <名字> is not in your model settings. | Change model…；Open settings |
 | `project_config` | 项目配置无效（§4.3） | .mori/models.json: <原因或原文> | Open settings |
-| `config_invalid` | 用户级配置读不出（§4.1） | Model settings can't be read: <路径>: <原文> | Open settings |
+| `config_invalid` | 用户级配置读不出（§4.1） | Model settings can’t be read: <路径>: <原文> | Open settings |
 | `agents_invalid` | `.mori/agents/*.md` 有错（平行 Agent 规格 §4.4，2026-10-21 加；优先于以上各项） | Fix the agent files 加每个问题 | Check again |
 
 被拒绝启动的会话可以看历史、可以在输入框打字、可以改范围；发送不可用，后台进程收到这个会话的 `session.prompt` 时拒绝（`This session can't start: no model fits`，经 `mori.prompt_error` 把文字放回输入框）。
@@ -299,7 +299,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 都在模型池的 fetch 里完成，pi 只看到最后一次的响应：
 
 - **换 key**：同一个请求体、同一个模型，换到同一提供商下一个可用的 key 重发；按 §8.2 重新排队。不算换模型，对话流不提示；等槽位时阶段行显示“Waiting for <提供商名>”。请求体不是字符串时（不能重发）按换模型处理。
-- **原地重试**：`server` 分类按 §12 的次数和间隔重发（可以换 key）；每次等待前发 `mori.model_retry`，阶段行显示“Retrying n/m · HTTP 503”。
+- **原地重试**：`server` 分类按 §12 的次数和间隔重发（可以换 key）；每次等待前发 `mori.model_retry`，阶段行显示“Retrying (n/m) · HTTP 503”。
 - pi 自己的 agent 级自动重试对 Mori 的会话关闭：每次调 pi 的 `prompt`、`steer`、`followUp`、`compact` 之前，都对会话的 `settingsManager` 执行 `applyOverrides({ retry: { enabled: false } })`（只在内存里、可以重复执行；pi 的 reload 和带 `persist` 的设置会清掉它，§11.6 K6）。
   provider 级重试由包装在每次请求的选项里写 `maxRetries: 0`。所以只有一层重试，就是模型池的。
 
@@ -310,7 +310,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 1. 当前模型这次请求失败，分类要求换模型，且这次请求还没有输出；或者发请求之前 `route()` 发现 `current` 已不在配置里、或已不可用（§11.1），这时不发出就换。
 2. 失败的模型记进 `tried`；按 §5.3 在排在它之后的候选里选下一个，对每个候选做接手判断（§6.2）。
 3. 选到了 B：
-   - 写一条 `mori.model_switch` 条目（§6.1）；发 `mori.model_switch` 事件，对话流显示“Switched model: A → B · <原因>”，有被隐藏的过程时加“The new model redoes this reply.”；
+   - 写一条 `mori.model_switch` 条目（§6.1）；发 `mori.model_switch` 事件，对话流显示“Switched model: A → B · <原因>”，有被隐藏的过程时加“The new model redoes this response.”；
    - 用 §6 处理后的上下文，把同一个请求按 B 组装后发出——这就是 proposal 7.3 的“重做这次回复”（第一个请求就失败时没有要隐藏的过程，就是把这条消息原样交给 B）；
    - 之后段内都用 B（`ReplyState.current = B`）。
 4. 选不到：按 §5.8 等待。
@@ -527,70 +527,70 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 
 ## 9. 界面
 
-每屏的状态表在 [v1/screens/](../v1/screens/)，实现前写好（AGENTS.md 第 1 条）；这里定主要行为。界面文字为英文。
+每屏的状态表在 [v1/screens/](../v1/screens/)，实现前写好（AGENTS.md 第 1 条）；这里定主要行为。界面文字为英文，术语与写法按 [v0/ui-strings.md](../v0/ui-strings.md)（2026-10-21 与 english-ui 合并后统一，见 v1/models-checks.md）。
 
 ### 9.1 设置 → Models
 
-取代 v0 的“连接与模型”分节（[v0/screens/settings.md](../v0/screens/settings.md)）。从上到下：
+取代 v0 的“Connections and models”分节（[v0/screens/settings.md](../v0/screens/settings.md)）。从上到下：
 
 - **迁移说明**（§4.5，有时）与**区域未确认**的提供商（有时，每个一行“Confirm zone…”）。
 - 设置页的每个修改（Defaults、Groups、Project access、Keys、上移下移）立即保存；表单（提供商、模型）按“Save”保存。
 - **Defaults**：
   - Default model range for new sessions：下拉，按分组、提供商、模型分三节；可以为空（“None”）。
   - Allowed zones for all projects：Local、Intranet 两个勾选框；说明“Public providers can only be allowed per project, below.”。
-- **Providers**：每个提供商一张卡：名称、地址、接口类型、区域、每个 key 的并发上限、兼容选项；“Edit”、“Delete”、“Test connection”（用第一个可用的 key 测第一个模型，结果文字同 v0）。
-  - **Keys**：每行标签、“Saved”、当前记录（“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有时不显示）、上移、下移、“Test”（用这个 key 测提供商的第一个模型，结果显示在这一行下面；成功时清除记录，§8.3）、“Remove”。“Add key”：一行内联表单，Label（默认“Key <n>”）、Secret（密码框）、“Save”/“Cancel”，新 key 加在末尾。
+- **Providers**：每个提供商一张卡：名称、地址、接口类型、区域、每个 key 的并发上限、兼容选项；“Edit”、“Delete…”、“Test connection”（用第一个可用的 key 测第一个模型，结果文字同 v0）。
+  - **Keys**：每行标签、“Saved”、当前记录（“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有时不显示）、上移、下移、“Test”（用这个 key 测提供商的第一个模型，结果显示在这一行下面；成功时清除记录，§8.3）、“Remove”（只剩一个 key 时“Remove…”）。“Add key”：一行内联表单，Label（默认“Key <n>”）、Secret（密码框）、“Save”/“Cancel”，新 key 加在末尾。
     key 的明文不能查看也不能改：换 key = 加新的再删旧的。删最后一个 key 时确认“Requests to <name> will be sent without an API key.”。没有 key 时说明“Requests are sent without an API key.”。
-  - **Models**：每行模型 id、窗口、最大输出、模型族、支持思考；档案摘要：Tool calling（Verified / Not verified / Failed / Verifying… / Re-verifying…）、Handoff tier（A / B / C / —）、Context（有效窗口；截断时告警“Silently truncates long input”）、Reasoning field、Cancel（Verified / Not verified / Unknown）；探针出错时“Couldn't verify: <原文>”。
-    操作：“Verify”、“Long-input test…”、“Cancel test…”（只对 vLLM、SGLang、llama.cpp）、上移、下移、“Edit”、“Delete”、“Test”。
-  - 模型表单：Model id（编辑时只读，沿用 v0）、Context window、Max output（新建默认 16384 与窗口一半中较小的）、Family（可空）、Supports thinking、Image input、New-session thinking level（只在支持思考时；写 pi 设置的 `modelThinkingLevels`，沿用 v0）。
-  - 提供商表单：Name、Address、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Network zone（Local / Intranet / Public，按 §12 的规则预选建议值）、Concurrency per key、兼容选项；新建时还有第一个 key 和第一个模型。改地址的 origin 时按 §4.1 删除 key 并确认。
+  - **Models**：每行模型 id、窗口、最大输出、模型族、支持思考；档案摘要：Tool calling（Verified / Not verified / Failed / Verifying… / Re-verifying…）、Handoff tier（A / B / C / —）、Context（有效窗口；截断时告警“Silently truncates long input”）、Reasoning field、Cancel（Verified / Not verified / Unknown）；探针出错时“Couldn’t verify: <原文>”。
+    操作：“Verify”、“Long-input test…”、“Cancel test…”（只对 vLLM、SGLang、llama.cpp）、上移、下移、“Edit”、“Delete…”、“Test”。
+  - 模型表单：Model ID（编辑时只读，沿用 v0）、Context window、Max output（新建默认 16384 与窗口一半中较小的）、Family（可空）、Supports thinking、Image input、Default effort for new sessions（只在支持思考时；写 pi 设置的 `modelThinkingLevels`，沿用 v0）。
+  - 提供商表单：Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Network zone（Local / Intranet / Public，按 §12 的规则预选建议值）、Concurrency per key、兼容选项；新建时还有第一个 key 和第一个模型。改地址的 origin 时按 §4.1 删除 key 并确认。
     新提供商保存失败时，删除本次新存的 key。兼容选项的英文说明：“Endpoint doesn't support the developer role”“Endpoint doesn't accept the store field”“Send the output limit as max_tokens”“Endpoint doesn't report usage while streaming”“Endpoint doesn't support strict mode”“Tool results must include the tool name”。
-  - 测试结果（Test connection、Test）：“Connected · first token N ms · total N ms”，有思考内容时加“ · with thinking”，有正文时加“ · reply: <前 200 字>”；失败时“Failed: <原文>”；“Cancel”取消。
+  - 测试结果（Test connection、Test）：“Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>”；失败时“Connection failed: <原文>”；“Cancel”取消。
   - 确认对话框“Confirm zone…”：提供商名称与地址，Local / Intranet / Public 单选（预选建议值），“Confirm”/“Cancel”。
-- **Groups**：每个分组一行：id、有序的成员（“DeepSeek · all models” 或 “DeepSeek · deepseek-chat”），成员可以加入、去掉、上移、下移；“New group”、“Delete”。
-  - New group：输入 id（规则同提供商 id；错误“<id> is already used by a provider or group”、“Use lowercase letters, digits and -”）。
+- **Groups**：每个分组一行：id、有序的成员（“DeepSeek · all models” 或 “DeepSeek · deepseek-chat”），成员可以加入、去掉、上移、下移；“New group”、“Delete…”。
+  - New group：输入 id（规则同提供商 id；错误“<id> is already used by a provider or group.”、“Use lowercase letters, digits, and hyphens.”）。
   - Add member：每个提供商一节，第一项“<name> · all models”，其后是它的各个模型；已在分组里的项打勾、不可再选。
   - 只剩一个成员时 Remove 不可用，说明“A group needs at least one member; delete the group instead.”。
 - **Project access**：已知项目（侧栏里的项目）各一行，显示项目路径和这个项目允许的区域；每个不在 `allowedZones` 里的区域一个勾选框。勾上 `public` 先确认：
-  “Allow public providers for this project?”，正文“Code and files from <项目路径> may be sent to: <公网提供商名，逗号分隔>.”，“Allow”/“Cancel”。项目配置排除了这个区域时勾选框不可用，说明“.mori/models.json in this project doesn't allow <zone>.”。
+  “Allow public providers for this project?”，正文“Code and files from <项目路径> may be sent to: <公网提供商名，逗号分隔>.”，“Allow”/“Cancel”。项目配置排除了这个区域时勾选框不可用，说明“.mori/models.json in this project doesn’t allow <zone>.”。
 - 删除、改地址、删最后一个 key 的确认框列出 §4.1 的连带改动。
 
-**首次启动表单**（v0 的连接表单，改为英文）：Name、Address、API type、Network zone（必选，按 §12 预选建议值）、API key（可空）、Model id、Context window（默认 128000）、Max output（默认 16384 与窗口一半中较小的）、Supports thinking、兼容选项。
+**首次启动表单**（v0 的连接表单，改为英文）：Name、Base URL、API type、Network zone（必选，按 §12 预选建议值）、API key（可空）、Model ID、Context window（默认 128000）、Max output（默认 16384 与窗口一半中较小的）、Supports thinking、兼容选项。
 
 - “Test connection”：表单有改动时先保存（`models.firstRun`：一次写入提供商、模型、key 和 `normalDefault`；同一张表单再次保存时整体替换这个提供商和它唯一的模型，不新建第二个），再测；成功后显示“Open folder…”，同时在后台跑探针，表单下方显示探针状态：
-  “Verifying tool calling…” / “Tool calling verified” / “Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server's tool-call settings.”（表单可以改，改了再测）/ “Couldn't verify: <原文>” + “Verify again”。
-- 区域选 Public 时，区域下方说明“Public providers must be allowed per project. You'll be asked when you open a folder.”；打开文件夹后，会话的拒绝启动卡显示“Allow public for this project…”。
+  “Verifying tool calling…” / “Tool calling verified” / “Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings.”（表单可以改，改了再测）/ “Couldn’t verify: <原文>” + “Verify again”。
+- 区域选 Public 时，区域下方说明“Public providers must be allowed per project. You’ll be asked when you open a folder.”；打开文件夹后，会话的拒绝启动卡显示“Allow public for this project”。
 - 已经有配置时不显示首次启动表单（`config.get` 的 `firstRun`，§9.4）；配置存在但读不出时也不显示（§4.1）。
 - 测试连接不用 v0 的 30 秒总时限：排队按 §8.2，每次尝试按 §5.4 的首个内容时限，不做原地重试（`server` 直接报告）。
 
 ### 9.2 顶栏
 
 - 协作模式下（`ModelState.pickLocked`，平行 Agent 规格 §12.11）模型按钮只显示正在用的模型，不能打开菜单。
-- 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名和区域。生成中或准备中按钮不可用，悬停“Can't change the model while generating”。
-- 菜单分三节：Groups、Providers、Models（按提供商分组）。每项标出区域（分组标出它的成员涉及的全部区域，例如“Local · Public”）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session. New sessions use the default range from Settings.”与“Manage models…”。
-- 思考强度菜单沿用 v0，可选强度取当前模型（实际模型）的。当前模型不支持思考时的说明改为英文（它指向的设置页改了）：“This model isn't marked 'Supports thinking', so Mori doesn't send thinking parameters and the endpoint decides. Edit the model in Settings → Models and tick 'Supports thinking' to choose a level.”
+- 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名和区域。生成中或准备中按钮不可用，悬停“Can’t switch models until the response finishes”。
+- 菜单分三节：Groups、Providers、Models（按提供商分组）。每项标出区域（分组标出它的成员涉及的全部区域，例如“Local · Public”）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session only. New sessions use the default range from Settings.”与“Manage models”。
+- 思考强度菜单沿用 v0，可选强度取当前模型（实际模型）的。当前模型不支持思考时的说明（它指向的设置页改了）：“This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”.”
 
 ### 9.3 对话流与阶段行
 
 | 项 | 来源 | 显示 |
 | --- | --- | --- |
-| 换模型 | `mori.model_switch` 事件，或会话里的同名条目 | 一行提示“Switched model: A → B · <原因>”；有被隐藏的过程时加“The new model redoes this reply.” |
+| 换模型 | `mori.model_switch` 事件，或会话里的同名条目 | 一行提示“Switched model: A → B · <原因>”；有被隐藏的过程时加“The new model redoes this response.” |
 | 重建 | `mori.model_rebuild` 事件，或 `mori.rebuild` 条目 | 一行提示（§6.3） |
 | 等模型、等它停下 | `mori.model_wait` | 阶段行“Waiting for a model · <原因>” / “Waiting to make sure <模型> stopped · until hh:mm:ss” |
 | 排队 | `mori.model_queue` | 阶段行“Waiting for <提供商名>” |
-| 原地重试 | `mori.model_retry` | 阶段行“Retrying n/m · <原因>” |
+| 原地重试 | `mori.model_retry` | 阶段行“Retrying (n/m) · <原因>” |
 | 准备中 | §11.4 | 用户消息已显示在对话流里；会话按“发送中”显示，停止可用；阶段行显示等待或“Rebuilding the conversation for <B>…”；停止或等不到时撤回这条用户消息和准备中又发的消息，文字按发送顺序（空行分隔）放回输入框 |
 | 没有可用模型 | `mori.model_unavailable` | 一张说明卡：每个候选及原因；“Open settings”（打开 设置 → Models，滚到第一个被排除候选的提供商卡；`auth`、`quota` 时焦点在它的 Keys） |
 | 拒绝启动 | `ModelState.blocked`（§4.6） | 输入框上方一张卡，文字与操作见 §4.6；发送不可用 |
-| `server` 重试用完、`request`、`partial` | 回复的错误 | v0 的错误卡（原文；“把上一条消息放回输入框”） |
+| `server` 重试用完、`request`、`partial` | 回复的错误 | v0 的错误卡（原文；“Put your last message back in the message box”） |
 
 - 一次失败只显示一张卡：发了 `mori.model_unavailable` 的那次回复，pi 的错误不再显示成 v0 的错误卡。
-- v0 错误卡的“去设置”和它的文字匹配（`SETTINGS_HINT`）删除：认证类错误由模型层处理（换 key、换模型或说明卡）。
+- v0 错误卡的“Go to settings”和它的文字匹配（`SETTINGS_HINT`）删除：认证类错误由模型层处理（换 key、换模型或说明卡）。
 - pi 的 `auto_retry_*` 不再出现（§5.5），阶段行的重试由 `mori.model_retry` 提供；它在下一个有内容的事件、下一次 `mori.model_retry` 或回复结束时清掉。
 - 被拒绝启动的会话里，发送与需要模型的斜杠命令（例如 `/compact`）都不可用。
-- 阶段行：模型层的等待（等模型、等它停下、排队、原地重试、重建）进行时，取代 v0 的“等待模型响应”，同样在后面显示已经等了多少秒。
-- 拒绝启动卡：“Verifying <模型>…”写第一个正在验证的候选；“Confirm zone…”和“Allow <区域> for this project…”都打开 设置 → Models（前者落在区域未确认的那几行，后者落在 Project access 的这个项目）。
+- 阶段行：模型层的等待（等模型、等它停下、排队、原地重试、重建）进行时，取代 v0 的“Waiting for the model…”，同样在后面显示已经等了多少秒。
+- 拒绝启动卡：“Verifying <模型>…”写第一个正在验证的候选；“Confirm zone”和“Allow <区域> for this project”都打开 设置 → Models（前者落在区域未确认的那几行，后者落在 Project access 的这个项目）。
 
 ### 9.4 进程桥：保留、删除、改写
 
@@ -598,7 +598,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 - 保留：`connection.test`（改为 `{ providerId, modelId, keyRef? }`，经模型池）、`connection.testCancel`、`session.setThinking`。
 - `config.get` 只返回 `{ agentDir, settingsError, defaultThinkingLevel, firstRun, migrationError, configError, migratedNow }`（`migratedNow`：这次启动刚做完迁移，界面据此直接打开 设置 → Models，§4.5）：`firstRun` 只在 `model-config.json` 不存在、且没有迁移成（`models.json` 不存在、`providers` 为空或迁移失败）时为真；
   `migrationError` 在迁移失败时给出原文；`model-config.json` 存在但读不出时 `firstRun` 为假、`configError` 给出路径与原文（§4.1）。`models.firstRun` 在 `model-config.json` 已存在、且要写的不是这张首次启动表单自己建的那个提供商时拒绝。
-- 界面的操作记录（F8 报告的“最近的操作”，`state/actionLog.ts`）对 `models.*` 命令只记类型和 id（例如“Add key <providerId>”），从不包含 `secret`、`keySecret`。
+- 界面的操作记录（F8 报告的“Recent activity”，`state/actionLog.ts`）对 `models.*` 命令只记类型和 id（例如“Add key <providerId>”），从不包含 `secret`、`keySecret`。
 
 ### 9.5 载荷
 
@@ -854,7 +854,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-13 | 粘性与回到首选 | 段内换到第二候选后一直用它；首选在段开始时不可用、段内恢复后第二候选又失败，换到第三个而不是首选；下一段首选可用时用回首选；第二条消息的第一次请求沿用段开始时（§11.4）选的模型；插话（含在最后一条回答之后送达的）不开始新段；溢出恢复后 `tried` 保留；回放层覆盖界面上的换模型提示与回到首选 | 单元、App、回放 |
 | MP-14 | 第一个请求就失败 | 首选 401（错的 key）：同一个请求发给第二候选，对话流有换模型提示，没有错误卡 | App、回放 |
 | MP-15 | 段内换模型（重做） | 第三个请求时首选不可用：新模型收到的上下文里没有之前的助手消息和工具结果，这段的用户消息末尾带说明；新模型自己的消息之后不被隐藏；两次换模型时区间取并集、只有一段说明；会话文件和界面保留被隐藏的过程；重新打开后仍然隐藏；排队消息那一段被重做时，上一段的回答仍发给新模型；排队消息在上一段还在调工具时排进来、它那一段被重做时，上一段的回答完整地发给新模型；换到窗口更小的模型后触发阈值压缩，摘要请求里没有被隐藏的过程 | 单元、App、回放 |
-| MP-16 | 原地重试 | `http-503-once`：阶段行显示“Retrying 1/3”，不换模型；`http-503`：重试用完后显示错误卡，不换模型 | App |
+| MP-16 | 原地重试 | `http-503-once`：阶段行显示“Retrying (1/3)”，不换模型；`http-503`：重试用完后显示错误卡，不换模型 | App |
 | MP-17 | 不换的情况与停止 | 400、有输出后中断都不换模型；你按停止不换；在排队中、等模型中、等它停下时按停止：对话流显示已停止而不是错误卡，合成端点没有收到新的请求；两个会话排同一个提供商，停止一个，另一个照常发出 | App |
 | MP-18 | 结果未知 | `-hang` 与 `-stall`：`cancel_verified` 为 `true` 时立即换模型；为 `false`（`-nocancel`）时读指标确认停下后换模型；为 `unknown`（`FAKE_NO_METRICS=1`）时阶段行显示等它停下，等满后换模型继续这次回复，提示注明 couldn't confirm；期间合成端点没有收到同一请求的第二份；只有一个候选时等满后显示说明卡，没有错误卡 | 单元、App |
 | MP-19 | 排队与优先级 | 并发 1 时第二个请求排队，阶段行显示等待；探针排在对话之后；排队超时后换模型；调低并发、删 key、加 key 时按 §8.2；会话 2 段内遇到会话 1 造成的全部 key 冷却：直接换模型，不排队；并发 1、对话占着槽位时添加模型：探针等对话结束后完成，档案为 verified | 单元、App |
@@ -871,7 +871,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-30 | 删除的连带改动 | §4.1 的每一项，含删最后一个模型删掉提供商、分组变空、`normalDefault` 置空、打开的会话按 `pick_missing` 拒绝 | 单元、App |
 | MP-31 | 槽位不泄漏 | 正常结束、出错、停止、中止后占用数归零；4xx 读完响应体即释放 | 单元、App |
 | MP-32 | 认证头 | 三种接口各写对认证头；没有 key 的提供商不带认证头；pi 的占位 key 不会发到服务端；三种接口在单元层检查，`openai-completions` 另在 App 层检查 | 单元、App |
-| MP-33 | 首次启动 | 填表（含区域）→ 测试连接 → 探针状态 → 打开文件夹；区域为 Public 时会话的拒绝启动卡带“Allow public for this project…”，授权（确认框）后可以发送；探针判定失败时表单说明原因；tool calling 判定失败后改模型 id 再测：配置里仍只有一个提供商 | App |
+| MP-33 | 首次启动 | 填表（含区域）→ 测试连接 → 探针状态 → 打开文件夹；区域为 Public 时会话的拒绝启动卡带“Allow public for this project”，授权（确认框）后可以发送；探针判定失败时表单说明原因；tool calling 判定失败后改模型 id 再测：配置里仍只有一个提供商 | App |
 | MP-34 | 准备中 | 段开始的等待和重建期间用户消息已显示、停止可用；停止后消息撤回、文字回到输入框；准备中再发的消息作为排队消息在回复开始后交给 pi；准备中再发一条后按停止：两条文字都回到输入框，合成端点没有收到请求 | App |
 | MP-35 | 思考强度 | 第一个候选是推理模型时新会话按它的按模型默认强度开始，请求带思考参数；换到不支持思考的模型时 pi 收紧；顶栏的可选强度随当前模型；把强度改成 high 后关闭再打开会话，仍是 high；段内从非推理模型换到推理模型后顶栏强度菜单变为可选 | App |
 | MP-36 | 回复进行中改配置 | 回复中删除它正在用的提供商：下一个请求换到下一个候选并提示；改它的兼容选项：本段继续用它；当前模型在段内被另一个会话造成冷却：下一个请求不发出就换模型 | App |
@@ -893,7 +893,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | `tests/fake-endpoint/server.mjs` | 加 §14.1 的行为；默认模型 `fake-coder` 能通过探针第 0–7 步，现有关键词的回答不变 |
 | `tests/ui/page.mjs`、`m6-helpers.mjs` 的首次启动 | 填英文表单、区域选 Local；等 `mori.profiles` 里这个模型的探针都跑完（Models 行显示等级）再打开文件夹 |
 | `m0-smoke.mjs` | 对 `pi/models.json` 的断言改为对 `model-config.json`；编辑连接与“改地址要重新填 key”的步骤改为 v1 的改地址（key 被删、确认框）；key 占位文字改为 Keys 行的“Saved”；中文的校验文字改为英文 |
-| `m1-app.mjs` | 重试检查改为 `http-503-once` 与“Retrying 1/3”；改错 key 再“去设置”的步骤改为：删 key、加一个错的 key → §9.3 的说明卡（“API key rejected”、“Open settings”，焦点在 Keys）→ 加回对的 key；首次启动的中文校验改为英文 |
+| `m1-app.mjs` | 重试检查改为 `http-503-once` 与“Retrying (1/3)”；改错 key 再“Go to settings”的步骤改为：删 key、加一个错的 key → §9.3 的说明卡（“API key rejected”、“Open settings”，焦点在 Keys）→ 加回对的 key；首次启动的中文校验改为英文 |
 | `m1-layout.mjs` | 设置页的测量改为 Models 分节（提供商卡与提供商表单） |
 | `m2-app.mjs`、`m2-replay.mjs` | F8 检查前保存 key 的准备改为 Models → Add key（`models.addKey`，回放由桥应答）；“报告里没有 key”的检查不变 |
 | `m6-app-settings.mjs` | 连接、模型、默认模型、删除的步骤删去，由 `v1-models-*.mjs` 覆盖；思考强度与 AGENTS.md 的步骤保留并改用新表单 |

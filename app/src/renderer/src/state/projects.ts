@@ -17,7 +17,8 @@ import {
 import { trustFor } from './trust';
 
 /** 重新载入后在对话流里说明哪些没有恢复（方案 5.8） */
-const RELOADED_NOTE = '已重新载入 · 排队消息、批准卡和"本会话已允许"不会恢复';
+const RELOADED_NOTE = 'Restarted · Queued messages, pending approvals, and “Allow for this session” choices '
+  + 'weren’t restored';
 
 /** @brief 读取 pi 的会话列表；已有列表时读取中仍显示旧的，失败时保留旧的并显示原文。 */
 export async function loadSessions(): Promise<void> {
@@ -33,7 +34,7 @@ export async function loadSessions(): Promise<void> {
 }
 
 /**
- * @brief 把会话信息写进会话。批准设置以后台进程返回的为准（新建和重新打开的会话都是"每次询问"）；
+ * @brief 把会话信息写进会话。批准设置以后台进程返回的为准（新建和重新打开的会话都是"Ask each time"）；
  *        协作状态与 TaskBoard 视图同样（平行 Agent 规格 §13.10），挂起的后台批准卡与待判断的消息接到对话流上。
  */
 export function withInfo(tab: Tab, info: SessionInfo): Tab {
@@ -66,7 +67,7 @@ function addTab(tab: Tab, side?: Side): void {
   });
 }
 
-/** @brief 打开失败：会话留在侧栏，状态"出错"，中栏显示原文；没有打开的 pi 会话（后台进程里没有它）。 */
+/** @brief 打开失败：会话留在侧栏，状态"Error"，中栏显示原文；没有打开的 pi 会话（后台进程里没有它）。 */
 function markFailed(key: string, what: string, error: unknown): void {
   const message = describe(what, error);
   updateTab(key, (current) => ({ ...current, sessionId: null, phase: 'failed', error: message }));
@@ -94,10 +95,10 @@ export async function openFolder(): Promise<void> {
   if (cwd) await createSessionIn(cwd);
 }
 
-/** @brief 新会话（Ctrl+N）：在当前会话所在的项目里新建；没有当前会话时等于"打开文件夹…"。 */
+/** @brief "New session"（Ctrl+N）：在当前会话所在的项目里新建；没有当前会话时等于"Open folder…"。 */
 export async function newSession(): Promise<void> {
   if (!(await leaveAllowed())) return;
-  recordAction('新会话');
+  recordAction('New session');
   const current = activeTab();
   if (current) await createSessionIn(current.cwd);
   else await openFolder();
@@ -105,7 +106,7 @@ export async function newSession(): Promise<void> {
 
 /**
  * @brief 回到会话页：key 为左栏点的会话（已在某一栏的只切焦点，否则放进焦点所在的那一栏）；不传时回到原来的样子
- *        （设置页的"返回会话"，分屏也恢复）。显示出来的会话清掉"有新结果"。
+ *        （设置页的"Back to app"，分屏也恢复）。显示出来的会话清掉"Unread"。
  */
 export function showChat(key?: string): void {
   guardLeave(() => placeChat(key));
@@ -113,7 +114,7 @@ export function showChat(key?: string): void {
 
 /** @brief showChat 的实际切换（已经确认可以离开）。 */
 function placeChat(key?: string): void {
-  recordAction(key ? '切换会话' : '返回会话');
+  recordAction(key ? 'Switch session' : 'Back to app');
   useApp.setState((state) => {
     const placed = key ? showInFocused(state, key) : { activeKey: state.activeKey, split: state.split };
     const shown: string[] = placed.split ?? (placed.activeKey ? [placed.activeKey] : []);
@@ -134,7 +135,7 @@ export async function openSaved(saved: SavedSession, side?: Side): Promise<void>
     else showChat(existing.key);
     return;
   }
-  recordAction('打开会话');
+  recordAction('Open session');
   useApp.setState((state) => ({ rowMarks: withoutMark(state.rowMarks, saved.sessionFile) }));
   const tab = newTab(saved.cwd, { sessionFile: saved.sessionFile, name: saved.name, preview: saved.firstMessage,
     activity: saved.modified, draft: savedDraft(saved.sessionFile), draftRefs: savedDraftRefs(saved.sessionFile) });
@@ -181,9 +182,9 @@ async function closeForRemoval(ref: SessionRef): Promise<string | null> {
   const saved = state.saved.sessions.find((item) => sameFile(item.sessionFile, ref.sessionFile));
   // 后台还有 Agent 在运行或排队、或有待判断的消息时也算正在生成（平行 Agent 规格 §11.5）。
   if (tab && (tab.transcript.running || tab.transcript.sending || tab.team.background)) {
-    throw new Error('The session is generating; stop it first');
+    throw new Error('This session is still running. Stop it first.');
   }
-  if (tab?.phase === 'opening') throw new Error('The session is still opening');
+  if (tab?.phase === 'opening') throw new Error('This session is still opening.');
   const sessionId = tab ? tab.sessionId : saved?.live ? saved.sessionId : null;
   if (sessionId && state.kernel === 'ready') await request({ type: 'session.close', sessionId });
   const file = tab?.sessionFile ?? ref.sessionFile;
@@ -206,7 +207,7 @@ function setArchived(fn: (files: string[]) => string[]): void {
 
 /** @brief 归档（照 Claude 桌面版，不确认、可以恢复）：关闭会话，记进已归档列表；失败时抛错。 */
 export async function archiveSession(ref: SessionRef): Promise<void> {
-  recordAction('归档会话');
+  recordAction('Archive session');
   const sessionFile = await closeForRemoval(ref);
   if (sessionFile) setArchived((files) => [...files.filter((file) => file !== sessionFile), sessionFile]);
   void loadSessions();
@@ -214,7 +215,7 @@ export async function archiveSession(ref: SessionRef): Promise<void> {
 
 /** @brief 从已归档列表恢复；open 为真时同时打开它。 */
 export function restoreSession(saved: SavedSession, open: boolean): void {
-  recordAction('恢复归档的会话');
+  recordAction('Unarchive session');
   setArchived((files) => files.filter((file) => file !== saved.sessionFile));
   if (open) void openSaved(saved);
 }
@@ -224,7 +225,7 @@ export function restoreSession(saved: SavedSession, open: boolean): void {
  *        关闭成功、删除文件失败时会话变回没打开的会话（再点会重新打开），文件还在。
  */
 export async function deleteSession(ref: SessionRef): Promise<void> {
-  recordAction('删除会话');
+  recordAction('Delete session');
   const sessionFile = await closeForRemoval(ref);
   try {
     const result = sessionFile ? await window.mori.deleteSessionFile(sessionFile) : null;
@@ -279,7 +280,7 @@ async function reopen(tab: Tab, note: { saved: string; unsaved: string } | null)
 /** @brief 后台进程重新载入后：重新读取会话列表，重新打开全部会话（信任沿用本次运行里的回答）。 */
 export function reopenAll(): void {
   void loadSessions();
-  const note = { saved: RELOADED_NOTE, unsaved: '已重新载入 · 这个会话还没有消息，已重新打开' };
+  const note = { saved: RELOADED_NOTE, unsaved: 'Restarted · This session had no messages yet and was reopened' };
   for (const tab of useApp.getState().tabs) void reopen(tab, note);
 }
 
@@ -287,6 +288,6 @@ export function reopenAll(): void {
 export function retryOpen(key: string): void {
   const tab = useApp.getState().tabs.find((item) => item.key === key);
   if (tab?.phase !== 'failed') return;
-  recordAction('重试打开会话');
+  recordAction('Retry opening session');
   void reopen(tab, null);
 }

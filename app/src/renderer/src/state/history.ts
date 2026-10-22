@@ -56,8 +56,8 @@ function addAssistant(state: Transcript, message: Message, entryId: string): Tra
 }
 
 /**
- * @brief 把工具结果合并到对应的工具调用。Mori 拒绝的固定写法（parseRejection）显示"已拒绝"，
- *        先于"已停止"的原文判断：你按停止时挂着的卡回给模型的也是拒绝。
+ * @brief 把工具结果合并到对应的工具调用。Mori 拒绝的固定写法（parseRejection）显示"Denied"，
+ *        先于"Stopped"的原文判断：你按停止时挂着的卡回给模型的也是拒绝。
  */
 function addToolResult(state: Transcript, message: Message): Transcript {
   const id = String(message.toolCallId);
@@ -195,7 +195,7 @@ function teamModeOf(entry: SessionEntry): TeamMode | null {
 }
 
 /**
- * @brief 由会话记录重建对话流。没有结果的工具调用保持"已中断"。
+ * @brief 由会话记录重建对话流。没有结果的工具调用保持"Interrupted"。
  *        每次运行从一条用户消息开始，按那时最后一条 mori.team 的模式记下运行的模式（工具卡的 Message / Ask，§13.8）。
  */
 export function transcriptFromEntries(entries: SessionEntry[]): Transcript {
@@ -216,7 +216,7 @@ export function withTeamInfo(state: Transcript, info: SessionInfo): Transcript {
   return { ...state, teamApprovals: [...info.teamApprovals], deciding };
 }
 
-/** @brief 最后一条助手回复里还没有结果的调用：正在执行的标"执行中"（从开始执行的时刻计时），其余"等待执行"。 */
+/** @brief 最后一条助手回复里还没有结果的调用：正在执行的标"Running…"（从开始执行的时刻计时），其余"Queued"。 */
 function resumeTools(state: Transcript, running: LiveSnapshot['runningTools']): Transcript {
   const last = state.items.findLast((item) => item.kind === 'assistant');
   if (last?.kind !== 'assistant') return state;

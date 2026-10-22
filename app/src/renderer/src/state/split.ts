@@ -9,7 +9,7 @@ import { shownKeys, useApp, type AppState } from './store';
 /** @brief 分屏的哪一侧。 */
 export type Side = 'left' | 'right';
 
-/** @brief 让一个会话显示出来时的状态改动：清掉它的"有新结果"。 */
+/** @brief 让一个会话显示出来时的状态改动：清掉它的"Unread"。 */
 function seen(state: AppState, key: string): Pick<AppState, 'tabs'> {
   return { tabs: state.tabs.map((tab) => (tab.key === key && tab.unseen ? { ...tab, unseen: false } : tab)) };
 }
@@ -27,7 +27,7 @@ export function showInFocused(state: AppState, key: string): Pick<AppState, 'act
 }
 
 /**
- * @brief 在某一侧分屏打开一个会话（拖到中栏、菜单"在右侧分屏打开"）：已在某一栏的只切焦点；中栏没有会话时单栏打开；
+ * @brief 在某一侧分屏打开一个会话（拖到中栏、菜单"Open in split view"）：已在某一栏的只切焦点；中栏没有会话时单栏打开；
  *        单栏时与原来的会话并排；分屏时换掉这一侧那一栏。打开的那一栏得到焦点。
  */
 export function placeInSplit(state: AppState, key: string, side: Side): Pick<AppState, 'activeKey' | 'split'> {
@@ -42,7 +42,7 @@ export function placeInSplit(state: AppState, key: string, side: Side): Pick<App
 /** @brief 在某一侧分屏打开一个已在界面里的会话。 */
 export function openInSplit(key: string, side: Side): void {
   guardLeave(() => {
-    recordAction(side === 'left' ? '在左侧分屏打开' : '在右侧分屏打开');
+    recordAction(`Open in split view on the ${side}`);
     useApp.setState((state) => ({ ...placeInSplit(state, key, side), ...seen(state, key), view: 'chat' }));
   });
 }
@@ -58,7 +58,7 @@ export function focusPane(key: string): void {
 export function closePane(key: string): void {
   const { split } = useApp.getState();
   if (!split?.includes(key)) return;
-  recordAction('关闭分屏的一栏');
+  recordAction('Close pane');
   const other = split[0] === key ? split[1] : split[0];
   useApp.setState({ split: null, activeKey: other });
 }

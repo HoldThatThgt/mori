@@ -3,14 +3,14 @@
 // 时有 pid、cwd、roots、slow 四个工具，MORI_MCP_LOG 记下它收到的每条消息）。覆盖：
 //   1. 启动：还没有会话时，用户级 mcp.json 里启用的 stdio 服务已经在后台进程下面起了一个进程，只握手一次；
 //   2. 两个项目的会话共用这一个进程（pid 工具的输出、进程树、日志里只有一次 initialize），调用仍出批准卡
-//      "shared · pid"；工具页这一行"运行中 · N 个会话在用"；
+//      "shared · pid"；工具页这一行"Running · Used by N sessions"；
 //   3. 运行目录：用户级服务在用户目录里运行；项目 .pi/mcp.json 的服务在项目文件夹里运行，同一个项目的会话共用、
 //      另一个项目另起一个；
 //   4. roots：共享服务回答挂着的会话的项目文件夹（去重）；
 //   5. 两个会话同时调用 slow：各自出批准卡；停止 A 只取消 A 的请求（服务日志里的 notifications/cancelled），B 照常做完，
 //      进度只到发起的会话；几个会话经同一个连接发的请求在服务日志里编号不重复（共享连接换了编号）；
-//   6. 杀掉服务进程：工具页"失败：Connection closed"（原文只有一行，没有"完整原文"），下一次调用起新进程，
-//      工具页又是"运行中"；
+//   6. 杀掉服务进程：工具页"Failed: Connection closed"（原文只有一行，没有"Full error"），下一次调用起新进程，
+//      工具页又是"Running"；
 //   7. 改了配置：旧进程在旧会话关掉之前一直在，新会话用新进程，旧会话都归档之后旧进程退出；工具页这一行只显示
 //      现在的配置的进程（改了之后、还没有会话用新配置时没有进程状态，C 用了之后是 C 的新进程）；项目的服务在这个项目最后一个用它的会话归档之后退出（p1：A、A2 都归档；p2：归档唯一的 B），之后这个项目新建的
 //      会话起新进程；移除一个没有会话在用的服务，它的进程马上退出；停用一个有会话在用的用户级服务，进程留到那个会话
@@ -225,14 +225,14 @@ const folders = (...dirs) => dirs.map((dir) => resolve(dir).toLowerCase()).sort(
 
 // ---------- 页面 ----------
 
-/** @brief 当前一栏（或 slot 里那一栏）最后一张工具卡：状态和展开后"输出"下面的文字。 */
+/** @brief 当前一栏（或 slot 里那一栏）最后一张工具卡：状态和展开后"Output"下面的文字。 */
 async function cardOutput(page, slot = '.pane-slot:not([hidden])') {
   const card = page.locator(`${slot} [data-testid="chat-pane"] [data-testid="tool-card"]`).last();
   const status = await card.getAttribute('data-status', { timeout: 5000 });
   if (!(await card.evaluate((element) => element.open))) await card.locator('summary').click();
   await card.locator('.tool-body').waitFor({ timeout: 5000 });
   const output = await card.evaluate((element) => {
-    const label = [...element.querySelectorAll('.tool-section-label')].find((item) => item.textContent === '输出');
+    const label = [...element.querySelectorAll('.tool-section-label')].find((item) => item.textContent === 'Output');
     return label?.nextElementSibling?.textContent ?? '';
   });
   return { status, output };
@@ -255,17 +255,17 @@ async function callTool(ctx, label, tool, args = null) {
   return { tool: name, title, ...(await cardOutput(page)) };
 }
 
-/** @brief 点"返回会话"，等工具页关上。 */
+/** @brief 点"Back to app"，等工具页关上。 */
 async function backToChat(page) {
-  await page.getByTestId('tools-page').getByRole('button', { name: '返回会话' }).click();
+  await page.getByTestId('tools-page').getByRole('button', { name: 'Back to app' }).click();
   await page.getByTestId('tools-page').waitFor({ state: 'detached', timeout: 10000 });
   await settle(page);
 }
 
 /**
  * @brief 工具页 MCP 一节里一行（名字、来源）的进程状态：有没有这一行、有没有进程状态（mcp-process）、data-state、
- *        状态一行（p）的文字、"完整原文"（details.tools-full-notice 的 summary 和 pre；没有时为 null）、
- *        进程状态里有没有"完整原文"几个字、这一行的工具名（mcp-tools）、跟随的会话。
+ *        状态一行（p）的文字、"Full error"（details.tools-full-notice 的 summary 和 pre；没有时为 null）、
+ *        进程状态里有没有"Full error"几个字、这一行的工具名（mcp-tools）、跟随的会话。
  */
 function processOf(page, server, scope) {
   return page.evaluate(({ name, where }) => {
@@ -276,7 +276,7 @@ function processOf(page, server, scope) {
       text: line?.querySelector(':scope > p')?.textContent?.trim() ?? null,
       full: full ? { summary: full.querySelector('summary')?.textContent?.trim() ?? '',
         text: full.querySelector('pre')?.textContent ?? '' } : null,
-      fullWord: Boolean(line?.textContent?.includes('完整原文')),
+      fullWord: Boolean(line?.textContent?.includes('Full error')),
       tools: row?.querySelector('[data-testid="mcp-tools"]')?.textContent?.trim() ?? null,
       follow: document.querySelector('[data-testid="tools-follow"]')?.textContent?.trim() ?? '' };
   }, { name: server, where: scope });
@@ -301,23 +301,24 @@ async function readProcess(ctx, server, scope, want, timeoutMs = 15000) {
   }
 }
 
-/** @brief 工具页里一行的"运行中 · N 个会话在用"（N 为 0 时"运行中 · 没有会话在用"）。 */
-const runningText = (count) => (count > 0 ? `运行中 · ${count} 个会话在用` : '运行中 · 没有会话在用');
-/** @brief 读到的进程状态是不是"运行中"、在用的会话数是 count。 */
+/** @brief 工具页里一行的"Running · Used by N sessions"（N 为 0 时"Running · Not in use"）。 */
+const runningText = (count) => (count > 0 ? `Running · Used by ${count} ${count === 1 ? 'session' : 'sessions'}`
+  : 'Running · Not in use');
+/** @brief 读到的进程状态是不是"Running"、在用的会话数是 count。 */
 const runningWith = (count) => (seen) => seen.state === 'running' && seen.text === runningText(count);
 /** @brief 读到的这一行在，但没有进程状态（共享服务表里没有现在的配置的进程）。 */
 const noProcess = (seen) => seen.row && !seen.line && seen.state === null && seen.text === null;
 
-/** @brief 点左栏"打开文件夹…"选 folder，在信任询问里选"信任"并勾"记住"，等会话就绪。 */
+/** @brief 点左栏"Open folder…"选 folder，在信任询问里选"Trust workspace"并勾"Remember my choice"，等会话就绪。 */
 async function openTrusted(ctx, folder) {
   await stubFolder(ctx.app, folder);
   await ctx.page.getByRole('button', { name: OPEN_FOLDER }).first().click();
-  await answerTrustDialog(ctx.page, { answer: '信任', remember: true });
+  await answerTrustDialog(ctx.page, { answer: 'Trust workspace', remember: true });
   await settle(ctx.page);
 }
 
 /**
- * @brief 点左栏"打开文件夹…"选一个第 2 步已经信任并记住的文件夹（不再问信任），等新会话就绪
+ * @brief 点左栏"Open folder…"选一个第 2 步已经信任并记住的文件夹（不再问信任），等新会话就绪
  *        （还没有会话文件：第一条回复之后才有）。
  */
 async function openKnown(ctx, folder) {
@@ -341,19 +342,19 @@ async function newByCtrlN(page) {
   await settle(page);
 }
 
-/** @brief 工具页顶部的"新建会话"（在跟随的项目里新建），等新的一栏就绪。 */
+/** @brief 工具页顶部的"New session"（在跟随的项目里新建），等新的一栏就绪。 */
 async function newFromTools(page) {
   const before = await page.locator('.pane-slot').count();
-  await page.getByTestId('tools-page').locator('.tools-notice').getByRole('button', { name: '新建会话' }).click();
+  await page.getByTestId('tools-page').locator('.tools-notice').getByRole('button', { name: 'New session' }).click();
   await waitPanes(page, before + 1);
   await waitReady(page);
   await settle(page);
 }
 
-/** @brief 在侧栏归档一个会话（右键菜单"归档"：关闭后台进程里的这个会话），等它的行从会话树里消失；10 秒内没消失时报错。 */
+/** @brief 在侧栏归档一个会话（右键菜单"Archive"：关闭后台进程里的这个会话），等它的行从会话树里消失；10 秒内没消失时报错。 */
 async function archive(ctx, file) {
   if (!file) throw new Error('no session file to archive');
-  await chooseMenuItem(ctx.page, file, '归档');
+  await chooseMenuItem(ctx.page, file, 'Archive');
   if (!(await until(async () => (await rowState(ctx.page, file)) === null, 10000, 200))) {
     throw new Error(`${file} is still in the session tree 10 s after archiving`);
   }
@@ -365,13 +366,13 @@ async function archive(ctx, file) {
  */
 const field = (form, label) => form.locator(`label:has(> span:text-is("${label}"))`).locator('input, textarea');
 
-/** @brief 在工具页 MCP 一节打开表单（opener 是"编辑"或"添加"按钮），填 values（标签 → 内容），保存，等表单关上。 */
+/** @brief 在工具页 MCP 一节打开表单（opener 是"Edit"或"Add"按钮），填 values（标签 → 内容），保存，等表单关上。 */
 async function saveForm(page, opener, values) {
   await opener.click();
   const form = page.getByTestId('mcp-form');
   await form.waitFor({ timeout: 5000 });
   for (const [label, value] of Object.entries(values)) await field(form, label).fill(value);
-  await form.getByRole('button', { name: '保存', exact: true }).click();
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
   await form.waitFor({ state: 'detached', timeout: 15000 });
 }
 
@@ -476,7 +477,7 @@ async function roots(ctx) {
 }
 
 /**
- * @brief 开始记录左右两栏最后一张工具卡"输出"下面出现过的文字（MutationObserver：进度一条接一条地换，轮询会漏）。
+ * @brief 开始记录左右两栏最后一张工具卡"Output"下面出现过的文字（MutationObserver：进度一条接一条地换，轮询会漏）。
  */
 function watchOutputs(page) {
   return page.evaluate(() => {
@@ -486,7 +487,7 @@ function watchOutputs(page) {
       for (const side of ['left', 'right']) {
         const cards = document.querySelectorAll(`.pane-slot[data-side="${side}"] [data-testid="tool-card"]`);
         const label = [...(cards[cards.length - 1]?.querySelectorAll('.tool-section-label') ?? [])]
-          .find((item) => item.textContent === '输出');
+          .find((item) => item.textContent === 'Output');
         const text = label?.nextElementSibling?.textContent ?? '';
         if (text && window.__outputs[side].at(-1) !== text) window.__outputs[side].push(text);
       }
@@ -503,11 +504,11 @@ const seenOutputs = (page) => page.evaluate(() => {
   return window.__outputs;
 });
 
-/** @brief 5 的前半：左右分屏放 A、B，各发一个 slow，两张批准卡都出现后依次点"允许一次"，展开两张工具卡。 */
+/** @brief 5 的前半：左右分屏放 A、B，各发一个 slow，两张批准卡都出现后依次点"Allow once"，展开两张工具卡。 */
 async function startTwoSlow(ctx) {
   const { page } = ctx;
   await openRow(page, ctx.files.A);
-  await chooseMenuItem(page, ctx.files.B, '在右侧分屏打开');
+  await chooseMenuItem(page, ctx.files.B, 'Open in split view');
   await waitSplit(page);
   await waitPaneReady(page, 'right');
   const panes = (await splitState(page)).slots.map((slot) => slot.title);
@@ -620,7 +621,7 @@ function progressChecks(outputs) {
   JSON.stringify(outputs));
 }
 
-/** @brief 6. 杀掉共享的 shared 进程：工具页"失败：Connection closed"；B 的下一次调用起新进程，工具页又是"运行中"。 */
+/** @brief 6. 杀掉共享的 shared 进程：工具页"Failed: Connection closed"；B 的下一次调用起新进程，工具页又是"Running"。 */
 async function crash(ctx) {
   const { page } = ctx;
   await page.locator(`${slotSelector('left')} [data-testid="close-pane"]`).click();
@@ -633,7 +634,7 @@ async function crash(ctx) {
   await shot(page, '6-failed');
   record('6 杀掉共享的 shared 进程（taskkill /F）后重新进入工具页：这一行 data-state="failed"，状态一行是'
     + '"失败：Connection closed"（pi 的原文；合成服务不写 stderr，原文只有一行），下面没有"完整原文"',
-  left.length === 0 && failed.state === 'failed' && failed.text === '失败：Connection closed'
+  left.length === 0 && failed.state === 'failed' && failed.text === 'Failed: Connection closed'
     && failed.full === null && !failed.fullWord, JSON.stringify({ left, failed }));
   await backToChat(page);
   await openRow(page, ctx.files.B);
@@ -650,7 +651,7 @@ async function crash(ctx) {
   await reconnectOthers(ctx);
 }
 
-/** @brief 6 的后半：A、A2 再调用 pid 也连到这个新进程（不再起别的）；工具页"运行中 · 3 个会话在用"。 */
+/** @brief 6 的后半：A、A2 再调用 pid 也连到这个新进程（不再起别的）；工具页"Running · Used by 3 sessions"。 */
 async function reconnectOthers(ctx) {
   const { page } = ctx;
   const pids = {};
@@ -675,8 +676,9 @@ async function editShared(ctx) {
   const { page } = ctx;
   await openToolsSection(page, 'mcp');
   const row = page.locator('[data-testid="mcp-row"][data-server="shared"][data-scope="user"]');
-  await saveForm(page, row.getByRole('button', { name: '编辑', exact: true }),
-    { 参数: `${MCP_SERVER}\n${MARK.v2}`, 环境变量: `MORI_MCP_EXTRA=1\nMORI_MCP_LOG=${ctx.logs.v2}` });
+  await saveForm(page, row.getByRole('button', { name: 'Edit', exact: true }),
+    { Arguments: `${MCP_SERVER}\n${MARK.v2}`,
+      'Environment variables': `MORI_MCP_EXTRA=1\nMORI_MCP_LOG=${ctx.logs.v2}` });
   const entry = readJson(join(ctx.agentDir, 'mcp.json'))?.mcpServers?.shared;
   record('7 在工具页编辑 shared（参数加上新的标记、日志换成另一个文件）并保存：mcp.json 里 shared 的 args 和 env 是新的',
     JSON.stringify(entry?.args) === JSON.stringify([MCP_SERVER, MARK.v2]) && entry?.env?.MORI_MCP_LOG === ctx.logs.v2,
@@ -703,7 +705,7 @@ async function staleConfig(ctx) {
 }
 
 /**
- * @brief 7（p1 的项目服务）：归档 A 之后 p1 的 proj 还在（A2 还在用），工具页 proj"运行中 · 1 个会话在用"；
+ * @brief 7（p1 的项目服务）：归档 A 之后 p1 的 proj 还在（A2 还在用），工具页 proj"Running · Used by 1 session"；
  *        再归档 A2（p1 最后一个会话）之后它退出。旧配置的 shared 一直在（B 还在用）。
  */
 async function releaseP1(ctx) {
@@ -730,7 +732,7 @@ async function releaseP1(ctx) {
 }
 
 /**
- * @brief 7：p1 的会话都归档之后，在 p1 新建会话 C（"打开文件夹…"）：shared 用新配置起新进程（旧进程还在，B 在用）；
+ * @brief 7：p1 的会话都归档之后，在 p1 新建会话 C（"Open folder…"）：shared 用新配置起新进程（旧进程还在，B 在用）；
  *        C 调用 proj 拿到 p1 新起的进程（与归档前的不同）。
  */
 async function newInP1(ctx) {
@@ -763,7 +765,7 @@ async function newInP1(ctx) {
 
 /**
  * @brief 7：归档 B（最后一个用旧配置的会话，也是 p2 唯一的会话）：旧的 shared 和 p2 的 proj 都退出；
- *        工具页（跟随 C）shared、proj 都是"运行中 · 1 个会话在用"。
+ *        工具页（跟随 C）shared、proj 都是"Running · Used by 1 session"。
  */
 async function releaseB(ctx) {
   const { page } = ctx;
@@ -785,8 +787,9 @@ async function releaseB(ctx) {
 async function removeUnused(ctx) {
   const { page } = ctx;
   await openToolsSection(page, 'mcp');
-  await saveForm(page, page.getByTestId('tools-page').getByRole('button', { name: '添加', exact: true }),
-    { 名称: 'spare', 命令: 'node', 参数: `${MCP_SERVER}\n${MARK.spare}`, 环境变量: 'MORI_MCP_EXTRA=1' });
+  await saveForm(page, page.getByTestId('tools-page').getByRole('button', { name: 'Add', exact: true }),
+    { Name: 'spare', Command: 'node', Arguments: `${MCP_SERVER}\n${MARK.spare}`,
+      'Environment variables': 'MORI_MCP_EXTRA=1' });
   await newFromTools(page);
   const d = await callTool(ctx, 'D', 'mcp__spare__pid');
   ctx.files.D = await activeFile(page);
@@ -797,15 +800,15 @@ async function removeUnused(ctx) {
   const kept = alive(ctx, [ctx.pids.spare]);
   await openRow(page, ctx.files.C);
   const seen = await readProcess(ctx, 'spare', 'user', runningWith(0));
-  // 工具页读到"没有会话在用"时后台进程确实已经放开了 D 的连接：这之后进程还在，才算归档之后照旧开着
+  // 工具页读到"Not in use"时后台进程确实已经放开了 D 的连接：这之后进程还在，才算归档之后照旧开着
   const later = alive(ctx, [ctx.pids.spare]);
   record('7 新添加的 spare：新会话 D 调用它起了一个进程；归档 D（没有会话在用了）之后进程照旧开着（配置还在）',
     ctx.pids.spare !== null && JSON.stringify(procs) === `[${ctx.pids.spare}]` && kept.length === 1
     && later.length === 1, JSON.stringify({ spare: d.output, procs, kept, afterToolsPage: later }));
   record('7 工具页（跟随 C）spare 一行："运行中 · 没有会话在用"', runningWith(0)(seen), JSON.stringify(seen));
   const row = page.locator('[data-testid="mcp-row"][data-server="spare"][data-scope="user"]');
-  await row.getByRole('button', { name: '移除' }).click();
-  await page.getByTestId('remove-dialog').getByRole('button', { name: '移除' }).click();
+  await row.getByRole('button', { name: 'Remove…', exact: true }).click();
+  await page.getByTestId('remove-dialog').getByRole('button', { name: 'Remove', exact: true }).click();
   await row.waitFor({ state: 'detached', timeout: 15000 });
   const left = await serversGone([ctx.pids.spare], 5000);
   record('7 在工具页移除没有会话在用的 spare：它的进程马上退出（5 秒内）', left.length === 0,
@@ -815,11 +818,11 @@ async function removeUnused(ctx) {
 
 /** @brief 工具页里用户级 shared 一行的开关。 */
 const sharedSwitch = (page) => page.locator('[data-testid="mcp-row"][data-server="shared"][data-scope="user"]')
-  .getByRole('switch', { name: '启用 MCP 服务 shared' });
+  .getByRole('switch', { name: 'Enable MCP server shared' });
 
 /**
  * @brief 7（停用）：C 还在用 shared 时在工具页关掉它的开关：mcp.json 写 enabled: false，进程还在，工具页仍是
- *        "运行中 · 1 个会话在用"。读完留在工具页。
+ *        "Running · Used by 1 session"。读完留在工具页。
  */
 async function disableShared(ctx) {
   const { page } = ctx;
@@ -862,7 +865,8 @@ async function newAfterDisable(ctx) {
     + 'shared 的新日志里没有多出 tools/list，仍只有原来那个进程、一次 initialize；工具页（跟随 E）shared 一行仍是'
     + '"运行中 · 1 个会话在用"（只有 C），"当前会话里它没有注册工具"', Boolean(connected) && lists === 0
     && JSON.stringify(procs) === `[${ctx.pids.s2}]` && initializes(ctx.logs.v2) === 1 && runningWith(1)(after)
-    && after.tools === '当前会话里它没有注册工具' && after.follow.startsWith('p1 · ') && !after.follow.includes('[C]'),
+    && after.tools === 'This server has no tools in this session' && after.follow.startsWith('p1 · ')
+    && !after.follow.includes('[C]'),
   JSON.stringify({ projToolLists: toolLists(projLog) - before.proj, sharedToolLists: lists, procs,
     initialize: initializes(ctx.logs.v2), after }));
   await backToChat(page);
@@ -908,7 +912,7 @@ function configStamp(ctx) {
 }
 
 /**
- * @brief 7 的最后（项目的服务，最后一次写 mcp.json 之后）：在 p2 新建会话 G（"打开文件夹…"，信任已记住），调用 proj
+ * @brief 7 的最后（项目的服务，最后一次写 mcp.json 之后）：在 p2 新建会话 G（"Open folder…"，信任已记住），调用 proj
  *        起 p2 新的进程；归档 G（p2 唯一的会话）之后它退出。前面看到的项目服务退出都在改过 mcp.json 之后，分不出是
  *        "项目最后一个会话关闭"还是"写入之后的过时检查"关掉的；这里从新建 G 到它退出 mcp.json 没变（修改时间、内容），
  *        只能是前者。E 在用的 p1 的 proj 不受影响。

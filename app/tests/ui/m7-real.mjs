@@ -2,15 +2,15 @@
 // 状态表见 docs/v0/screens/review.md（写反馈见 selection.md "反馈"，F8 报告见 f8.md）。脚本不接触 key：只把走查数据目录里
 // Mori 加密保存的密文（credentials.json 与 Local State）复制到临时目录（lib.mjs scratchUserData），整个走查（包括重启）都用
 // 这一个复制出来的数据目录。
-// 像负责人一样操作界面：发消息（批准卡点"允许一次"）、回复下的"反馈这条回复"、在回复里拖选一段点"反馈"、点工具卡里的路径
-// 在阅读器里选两行点"反馈"、按 F8 写报告、Ctrl+N 开第二个会话并在侧栏里永久删除它（只删临时数据目录里的这个测试会话）；
-// 左栏"工作回顾"、选中一行、"回到原位置"、"标为已处理"、"隐藏已处理"、"导出为 Markdown…"。"重启"是关掉窗口（Mori 有序
+// 像负责人一样操作界面：发消息（批准卡点"Allow once"）、回复下的"Give feedback"、在回复里拖选一段点"Feedback"、点工具卡里
+// 的路径在阅读器里选两行点"Feedback"、按 F8 写报告、Ctrl+N 开第二个会话并在侧栏里永久删除它（只删临时数据目录里的这个测试
+// 会话）；左栏"Review"、选中一行、"Jump to source"、"Resolve"、"Hide resolved"、"Export as Markdown…"。"重启"是关掉窗口（Mori 有序
 // 退出）再用同一个数据目录启动。系统的选文件夹对话框和保存对话框经 app.evaluate 换成直接返回测试文件夹、临时目录里的导出
 // 文件（不弹对话框）。
 // "回复不在了"：pi 和 Mori 都没有让一条回复离开当前分支的操作（不手改会话文件），所以写进一份 synthetic 反馈（指向真的会话
 // 文件里不存在的条目 id 和消息时间，内容写明 synthetic）；会话和 session.read 是真的（同 m7-record.mjs 的 review-changed）。
 // "不发给模型"：脚本看不到后台进程发给端点的请求，用三样看得到的代替：会话文件里的消息条数不变（pi 发请求前先把你的消息写进
-// 会话文件）、工作回顾这段时间里没有会话进入生成中、最后一份 F8 报告的"最近的操作"里没有"发送 / 插话 / 排队"。
+// 会话文件）、工作回顾这段时间里没有会话进入生成中、最后一份 F8 报告的"Recent activity"里没有"Send / Steer / Queue"。
 // 模型行为（是否用 read 读了 README.md）DeepSeek 不保证，这类检查失败时记为 KNOWN，标"（模型行为）"。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m7-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,c]
@@ -34,7 +34,7 @@ import {
 } from './m4-helpers.mjs';
 import {
   backToChat, chooseTab, detailState, exportTo, flashVisible, mdHead, mdSections, noticeText, openReviewPage,
-  pressedRow, reviewState, selectRow, shotLink,
+  pressedRow, records, reviewState, selectRow, shotLink,
 } from './m7-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -69,9 +69,10 @@ const FILE_LINES = [5, 6];
 /** synthetic 反馈的文件名（日期早于真的记录，排在列表最后） */
 const SEED_NAME = '2024-06-15-120000.json';
 /** 回到原位置不成功时详情里的说明（review.md "回到原位置"） */
-const JUMP_TEXT = { changed: '原文已变化：会话里找不到这条回复了', gone: '原会话已删除' };
+const JUMP_TEXT = { changed: 'This response is no longer in the session.', gone: 'Session deleted' };
 /** 导出的报告一节里降一级的标题（review.md "导出的内容"） */
-const ISSUE_HEADINGS = ['哪里不对', '你期望什么', '截图', '当前界面', '最近的操作', '版本'];
+const ISSUE_HEADINGS = ['What went wrong', 'What you expected', 'Screenshot', 'Current view', 'Recent activity',
+  'Versions'];
 
 // ---------- 磁盘 ----------
 
@@ -194,7 +195,7 @@ const turnIdle = (page) => page.evaluate((sel) => {
     && !root.querySelector('[data-testid="stage"]');
 }, PANE);
 
-/** @brief 发一条消息，等本轮结束（批准卡都点"允许一次"）；没有新回复或出了错误卡时抛错（流程失败，不算模型行为）。 */
+/** @brief 发一条消息，等本轮结束（批准卡都点"Allow once"）；没有新回复或出了错误卡时抛错（流程失败，不算模型行为）。 */
 async function sendTurn(ctx, text) {
   const { page, h } = ctx;
   const before = await turnCounts(page);
@@ -215,9 +216,9 @@ async function sendTurn(ctx, text) {
   }
 }
 
-/** @brief 当前会话里"读取 README.md"的工具卡。 */
+/** @brief 当前会话里"Read README.md"的工具卡。 */
 const readCards = (page) => paneOf(page).getByTestId('tool-card')
-  .filter({ has: page.locator('.tool-verb', { hasText: '读取' }) })
+  .filter({ has: page.locator('.tool-verb', { hasText: 'Read' }) })
   .filter({ has: page.locator('.tool-target', { hasText: 'README.md' }) });
 
 /**
@@ -245,35 +246,35 @@ function plainPick(page) {
 
 // ---------- 反馈与 F8 ----------
 
-/** @brief 反馈表单出现后写 expected 点"记录"，等"已记录"；返回那一行的文字和新的记录文件名。 */
+/** @brief 反馈表单出现后写 expected 点"Save"，等"Saved"；返回那一行的文字和新的记录文件名。 */
 async function submitFeedback(ctx, expected) {
   const { page } = ctx;
   const before = new Set(filesIn(dirOf(ctx, 'feedback')));
   const form = page.getByTestId('feedback-form');
   await form.waitFor({ timeout: 5000 });
   await page.getByTestId('feedback-input').fill(expected);
-  await form.getByRole('button', { name: '记录' }).click();
+  await form.getByRole('button', { name: 'Save' }).click();
   await page.getByTestId('feedback-saved').waitFor({ timeout: 10000 });
   const text = await page.getByTestId('feedback-saved').innerText();
   const name = await until(() => filesIn(dirOf(ctx, 'feedback')).find((item) => !before.has(item)), 5000);
   return { text, name };
 }
 
-/** @brief 等反馈表单关闭（"已记录"约 3 秒后）。 */
+/** @brief 等反馈表单关闭（"Saved"约 3 秒后）。 */
 const formClosed = (page) => page.getByTestId('feedback-form').waitFor({ state: 'detached', timeout: 8000 })
   .catch(() => {});
 
-/** @brief 按 F8 写一份报告并保存；返回报告框和"已保存到"里的 Markdown 路径。 */
+/** @brief 按 F8 写一份报告并保存；返回报告框和"Saved to"里的 Markdown 路径。 */
 async function saveReport(page, { what, expect }) {
   await page.keyboard.press('F8');
   const dialog = page.getByTestId('issue-dialog');
   await dialog.getByTestId('issue-shot').waitFor({ timeout: 15000 });
   await dialog.getByTestId('issue-what').fill(what);
   await dialog.getByTestId('issue-expect').fill(expect);
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   const saved = page.getByTestId('issue-saved');
   await saved.waitFor({ timeout: 15000 });
-  return { dialog, file: /已保存到\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null };
+  return { dialog, file: /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null };
 }
 
 /** @brief 工作回顾里选中的一份报告的截图读完（img 有了宽度），最多 10 秒。 */
@@ -285,7 +286,7 @@ const shotLoaded = (page) => page.waitForFunction(() => document.querySelector('
 /** @brief 打开测试项目，让模型用 read 读 README 并概括；没有读时再明确要它读一次（模型行为）。 */
 async function firstSession(ctx) {
   const { page } = ctx;
-  await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await page.getByRole('button', { name: 'Open folder…' }).first().click();
   await waitReady(page);
   await sendTurn(ctx, PROMPTS.summary);
   if (await readCards(page).count() === 0) await sendTurn(ctx, PROMPTS.readAgain);
@@ -295,10 +296,10 @@ async function firstSession(ctx) {
   return cards > 0;
 }
 
-/** @brief 回复下的"反馈这条回复"和回复里拖选一段点"反馈"：都显示"已记录"，记下整条回复 / 选区的锚点。 */
+/** @brief 回复下的"Give feedback"和回复里拖选一段点"Feedback"：都显示"Saved"，记下整条回复 / 选区的锚点。 */
 async function replyFeedbacks(ctx) {
   const { page } = ctx;
-  await paneOf(page).getByTestId('reply-actions').last().getByRole('button', { name: '反馈这条回复' }).click();
+  await paneOf(page).getByTestId('reply-actions').last().getByRole('button', { name: 'Give feedback' }).click();
   const reply = await submitFeedback(ctx, EXPECT.reply);
   ctx.fb.reply = reply.name;
   await formClosed(page);
@@ -307,27 +308,27 @@ async function replyFeedbacks(ctx) {
   ctx.picked = picked.pick;
   await dragSelect(page, `${PANE} [data-testid="assistant"]`, picked.pick, picked.index);
   await popoverShown(page);
-  await page.getByTestId('selection-popover').getByRole('button', { name: '反馈' }).click();
+  await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
   const selection = await submitFeedback(ctx, EXPECT.selection);
   ctx.fb.selection = selection.name;
   await formClosed(page);
   const [whole, part] = [readFeedback(ctx, reply.name), readFeedback(ctx, selection.name)];
   record('走查 1：回复下的"反馈这条回复"和回复里拖选一段点"反馈"：都显示"已记录 · 在工作回顾中查看"，记下整条回复 / '
     + '回复里的选区（锚点是这个会话的会话文件）', [reply.text, selection.text].every((text) => text
-    === '已记录 · 在工作回顾中查看') && whole?.source.scope === 'reply' && part?.source.scope === 'selection'
+    === 'Saved · View in Review') && whole?.source.scope === 'reply' && part?.source.scope === 'selection'
     && part.quote === picked.pick && samePath(whole.source.sessionFile, ctx.s1)
     && samePath(part.source.sessionFile, ctx.s1), JSON.stringify({ reply, selection, picked: picked.pick,
     scopes: [whole?.source.scope, part?.source.scope] }));
 }
 
-/** @brief 点工具卡里的 README.md，阅读器里选第 5–6 行点"反馈"；记录后点"在工作回顾中查看"。 */
+/** @brief 点工具卡里的 README.md，阅读器里选第 5–6 行点"Feedback"；记录后点"View in Review"。 */
 async function fileFeedback(ctx) {
   const { page } = ctx;
   await readCards(page).last().getByTestId('tool-path').click();
   await waitViewer(page);
   await selectLines(page, ...FILE_LINES);
   await popoverShown(page);
-  await page.getByTestId('selection-popover').getByRole('button', { name: '反馈' }).click();
+  await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
   const saved = await submitFeedback(ctx, EXPECT.file);
   ctx.fb.file = saved.name;
   const anchor = readFeedback(ctx, saved.name)?.source;
@@ -343,7 +344,7 @@ async function fileFeedback(ctx) {
   await backToChat(page);
 }
 
-/** @brief 两份 F8 报告：第一份保存后点"在工作回顾中查看"（打开"界面问题"、选中它、右栏有截图），第二份点"关闭"。 */
+/** @brief 两份 F8 报告：第一份保存后点"View in Review"（打开"UI issues"、选中它、右栏有截图），第二份点"Close"。 */
 async function issueReports(ctx) {
   const { page } = ctx;
   const first = await saveReport(page, ISSUES[0]);
@@ -360,25 +361,25 @@ async function issueReports(ctx) {
     && Boolean(view.shot?.loaded), JSON.stringify({ file: first.file, view }));
   await backToChat(page);
   const second = await saveReport(page, ISSUES[1]);
-  await second.dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await second.dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await second.dialog.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   ctx.issues = { [name]: ISSUES[0], [basename(second.file ?? '')]: ISSUES[1] };
   ctx.issueFirst = name;
 }
 
-/** @brief 第二个会话：收到回复后"反馈这条回复"，再在侧栏里永久删除这个会话。 */
+/** @brief 第二个会话：收到回复后"Give feedback"，再在侧栏里永久删除这个会话。 */
 async function goneSession(ctx) {
   const { page } = ctx;
   await ctrlN(page);
   await sendTurn(ctx, PROMPTS.ask);
   ctx.s2 = await activeFile(page);
-  await paneOf(page).getByTestId('reply-actions').last().getByRole('button', { name: '反馈这条回复' }).click();
+  await paneOf(page).getByTestId('reply-actions').last().getByRole('button', { name: 'Give feedback' }).click();
   ctx.fb.gone = (await submitFeedback(ctx, EXPECT.gone)).name;
   await formClosed(page);
-  await chooseMenuItem(page, ctx.s2, '删除');
+  await chooseMenuItem(page, ctx.s2, 'Delete…');
   const dialog = page.getByTestId('delete-dialog');
   await dialog.waitFor({ timeout: 5000 });
-  await dialog.getByRole('button', { name: '删除', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 20000 });
   await sleep(500);
   const deleted = { file: existsSync(ctx.s2), row: await rowOf(page, ctx.s2).count() };
@@ -423,12 +424,15 @@ const rowTexts = (page) => page.evaluate(() => [...document.querySelectorAll('[d
   .map((row) => ({ name: row.dataset.name, title: row.querySelector('.review-row-title')?.textContent ?? '',
     source: row.querySelector('.review-row-source')?.textContent ?? '' })));
 
-/** @brief 一条反馈在列表里应有的来源："<会话名> · 整条回复 / 回复里的选区"，文件的是"README.md 第 a–b 行"。 */
+/**
+ * @brief 一条反馈在列表里应有的来源："<会话名> · Whole response / Selection in response"，文件的是
+ *        "README.md · lines a–b"。
+ */
 function sourceLabel(ctx, record, s1Name) {
   const { source, session } = record;
-  if (source.kind === 'file') return `README.md 第 ${source.startLine}–${source.endLine} 行`;
+  if (source.kind === 'file') return `README.md · lines ${source.startLine}–${source.endLine}`;
   const name = samePath(source.sessionFile, ctx.s1) ? s1Name : session.title;
-  return `${name} · ${source.scope === 'reply' ? '整条回复' : '回复里的选区'}`;
+  return `${name} · ${source.scope === 'reply' ? 'Whole response' : 'Selection in response'}`;
 }
 
 /** @brief 重启后打开工作回顾：写下的反馈都在（从新到旧），每行是自己的期望和来源。 */
@@ -458,7 +462,7 @@ async function waitChat(page) {
   await settle(page);
 }
 
-/** @brief 选中一行点"回到原位置"，等中栏换回会话。 */
+/** @brief 选中一行点"Jump to source"，等中栏换回会话。 */
 async function jumpFrom(page, name) {
   await openReviewPage(page, 'feedback');
   await selectRow(page, name);
@@ -513,9 +517,9 @@ async function jumpFile(ctx) {
     JSON.stringify(state));
 }
 
-// ---------- 走查 2：F8 报告在"界面问题"里，带截图 ----------
+// ---------- 走查 2：F8 报告在"UI issues"里，带截图 ----------
 
-/** @brief 重启后"界面问题"列出两份报告（从新到旧），每份的两段和截图（与 PNG 文件同宽）。 */
+/** @brief 重启后"UI issues"列出两份报告（从新到旧），每份的两段和截图（与 PNG 文件同宽）。 */
 async function issueList(ctx) {
   const { page } = ctx;
   await openReviewPage(page, 'issues');
@@ -537,9 +541,9 @@ async function issueList(ctx) {
   JSON.stringify(seen));
 }
 
-// ---------- 走查 3：标已处理，"隐藏已处理"筛掉，重启后还在 ----------
+// ---------- 走查 3：标已处理，"Hide resolved"筛掉，重启后还在 ----------
 
-/** @brief 选中 name 点"标为已处理"，等这一行标上"已处理"。 */
+/** @brief 选中 name 点"Resolve"，等这一行标上"Resolved"。 */
 async function markHandled(page, name) {
   await selectRow(page, name);
   await page.getByTestId('detail-handled').click();
@@ -554,7 +558,7 @@ async function sectionView(page, kind) {
     hide: state.hide.checked };
 }
 
-/** @brief 标已处理（一条反馈、一份报告）：变淡标"已处理"；打开"隐藏已处理"：两节都不列出它们，数字不变，详情还在。 */
+/** @brief 标已处理（一条反馈、一份报告）：变淡标"Resolved"；打开"Hide resolved"：两节都不列出它们，数字不变，详情还在。 */
 async function handledHide(ctx) {
   const { page } = ctx;
   const total = { feedback: feedbackOrder(ctx).length, issues: issueOrder(ctx).length };
@@ -563,7 +567,7 @@ async function handledHide(ctx) {
   await chooseTab(page, 'issues');
   await markHandled(page, ctx.issueFirst);
   const marked = { feedback: await sectionView(page, 'feedback'), issues: await sectionView(page, 'issues') };
-  const tagged = (view, name) => view.rows.some(([row, tag]) => row === name && tag === '已处理');
+  const tagged = (view, name) => view.rows.some(([row, tag]) => row === name && tag === 'Resolved');
   record('走查 3：标为已处理（一条反馈、一份报告）：那一行标"已处理"，分节上的数字各少一', tagged(marked.feedback,
     ctx.fb.reply) && tagged(marked.issues, ctx.issueFirst) && marked.feedback.count === String(total.feedback - 1)
     && marked.issues.count === String(total.issues - 1), JSON.stringify(marked));
@@ -577,13 +581,13 @@ async function handledHide(ctx) {
     hidden.feedback.hide === 'true' && absent(hidden.feedback, ctx.fb.reply) && absent(hidden.issues, ctx.issueFirst)
     && hidden.feedback.rows.length === total.feedback - 1 && hidden.issues.rows.length === total.issues - 1
     && hidden.feedback.count === marked.feedback.count && hidden.issues.count === marked.issues.count
-    && detail?.handled === '标为未处理', JSON.stringify({ hidden, detail: detail?.handled }));
+    && detail?.handled === 'Reopen', JSON.stringify({ hidden, detail: detail?.handled }));
   record('走查 3：已处理和开关记在本机界面状态（localStorage 的 mori.review）', same([...(stored?.handled ?? [])].sort(),
     [`feedback/${ctx.fb.reply}`, `ui-issues/${ctx.issueFirst}`].sort()) && stored.hideHandled === true,
   JSON.stringify(stored));
 }
 
-/** @brief 重启后"隐藏已处理"还开着，已处理的两条仍不列出。 */
+/** @brief 重启后"Hide resolved"还开着，已处理的两条仍不列出。 */
 async function handledRestart(ctx) {
   await restart(ctx);
   const { page } = ctx;
@@ -602,10 +606,10 @@ async function handledRestart(ctx) {
 function badFeedbackSections(ctx, sections, handled) {
   return sections.filter((section) => {
     const fb = readFeedback(ctx, section.name);
-    const state = handled.includes(section.name) ? '已处理' : '未处理';
+    const state = handled.includes(section.name) ? 'Resolved' : 'Unresolved';
     return !fb || !section.heading.endsWith(` · ${state}`)
-      || !section.text.includes(`### 你希望得到的结果\n\n${fb.expected}\n`)
-      || !section.text.includes(`### 引用的原文\n\n${quoted(fb.quote)}`);
+      || !section.text.includes(`### What you hoped for\n\n${fb.expected}\n`)
+      || !section.text.includes(`### Quoted text\n\n${quoted(fb.quote)}`);
   }).map((section) => section.name);
 }
 
@@ -620,13 +624,13 @@ async function exportFeedback(ctx) {
   if (existsSync(target)) copyFileSync(target, join(shots, `4-${basename(target)}`));
   const head = mdHead(md);
   const sections = mdSections(md);
-  const notice = await noticeText(page, '已导出');
+  const notice = await noticeText(page, 'Exported ');
   const bad = badFeedbackSections(ctx, sections, handled);
   record('走查 4：导出对内容的反馈：对话框标题"导出对内容的反馈"；导出文件开头"# 对内容的反馈"和条数，只含列出的记录，'
     + '顺序与列表相同；每条有"### 你希望得到的结果"和"### 引用的原文"（每行前加 "> "）；工具行下面"已导出 N 条到 <路径>"',
-  dialog?.title === '导出对内容的反馈' && head.title === '# 对内容的反馈' && head.total === rows.length
+  dialog?.title === 'Export as Markdown' && head.title === '# Feedback' && head.total === rows.length
     && head.done === handled.length && same(sections.map((item) => item.name), rows.map((row) => row.name))
-    && bad.length === 0 && notice.startsWith(`已导出 ${rows.length} 条到 ${target}`),
+    && bad.length === 0 && notice.startsWith(`Exported ${records(rows.length)} to ${target}`),
   JSON.stringify({ dialog, head, bad, notice: oneLine(notice, 160) }));
 }
 
@@ -639,7 +643,7 @@ function shotLinkOk(ctx, section) {
     && existsSync(png) };
 }
 
-/** @brief 导出界面问题（关掉"隐藏已处理"，含已处理的）：各节降一级，截图链接到原来的 PNG。 */
+/** @brief 导出界面问题（关掉"Hide resolved"，含已处理的）：各节降一级，截图链接到原来的 PNG。 */
 async function exportIssues(ctx) {
   const { page } = ctx;
   await chooseTab(page, 'issues');
@@ -653,14 +657,14 @@ async function exportIssues(ctx) {
   const sections = mdSections(md);
   const links = sections.map((section) => ({ name: section.name, ...shotLinkOk(ctx, section) }));
   const bad = sections.filter((section) => !ISSUE_HEADINGS.every((title) => section.text.includes(`\n### ${title}\n`))
-    || !section.text.includes(`### 哪里不对\n\n${ctx.issues[section.name]?.what}\n`)
-    || !section.heading.endsWith(handled.includes(section.name) ? ' · 已处理' : ' · 未处理')).map((s) => s.name);
-  const notice = await noticeText(page, '已导出');
+    || !section.text.includes(`### What went wrong\n\n${ctx.issues[section.name]?.what}\n`)
+    || !section.heading.endsWith(handled.includes(section.name) ? ' · Resolved' : ' · Unresolved')).map((s) => s.name);
+  const notice = await noticeText(page, 'Exported ');
   await shot(page, '4-export');
   record('走查 4：导出界面问题（关掉"隐藏已处理"，含已处理的一份并注明"已处理"）：开头"# 界面问题"和条数，顺序与列表相同，'
-    + '报告各节降一级（### 哪里不对 … ### 版本）', dialog?.title === '导出界面问题' && head.title === '# 界面问题'
+    + '报告各节降一级（### 哪里不对 … ### 版本）', dialog?.title === 'Export as Markdown' && head.title === '# UI issues'
     && head.total === rows.length && head.done === handled.length && same(sections.map((s) => s.name), rows
-    .map((row) => row.name)) && bad.length === 0 && notice.startsWith(`已导出 ${rows.length} 条到 ${target}`),
+    .map((row) => row.name)) && bad.length === 0 && notice.startsWith(`Exported ${records(rows.length)} to ${target}`),
   JSON.stringify({ dialog, head, bad, notice: oneLine(notice, 160) }));
   record('走查 4：导出的截图链接是从导出文件所在的文件夹到 ui-issues 里原来那张 PNG 的相对路径（用 /，PNG 在）',
     links.length === rows.length && links.every((item) => item.ok), JSON.stringify(links));
@@ -674,7 +678,10 @@ async function exportIssues(ctx) {
 const sessionCounts = async (page) => ({ panes: await page.locator('.pane-slot').count(),
   rows: await page.locator('.session-item').count(), review: await page.getByTestId('review-page').count() });
 
-/** @brief 回复不在了（synthetic 反馈，会话文件是真的；会话没开着时读会话文件）：留在工作回顾，"原文已变化"。 */
+/**
+ * @brief 回复不在了（synthetic 反馈，会话文件是真的；会话没开着时读会话文件）：留在工作回顾，
+ *        "This response is no longer in the session."。
+ */
 async function jumpChanged(ctx) {
   const { page } = ctx;
   await openReviewPage(page, 'feedback');
@@ -691,7 +698,7 @@ async function jumpChanged(ctx) {
     && after.panes === before.panes, JSON.stringify({ status: detail?.jumpStatus, before, after }));
 }
 
-/** @brief 原会话已删除（重启后会话列表里没有它）：详情里"原会话已删除"，按钮不可用，引用的原文仍在；不新建会话。 */
+/** @brief 原会话已删除（重启后会话列表里没有它）：详情里"Session deleted"，按钮不可用，引用的原文仍在；不新建会话。 */
 async function goneDetail(ctx) {
   const { page } = ctx;
   await openReviewPage(page, 'feedback');
@@ -721,15 +728,15 @@ async function untouched(ctx) {
     === 0), JSON.stringify({ before: ctx.messages, after: messages, ranBefore: ctx.ranBefore, ran }));
 }
 
-/** @brief 一份报告的"最近的操作"里的行，和其中发消息给模型的（"发送 / 插话 / 排队"）。 */
+/** @brief 一份报告的"Recent activity"里的行，和其中发消息给模型的（"Send / Steer / Queue"）。 */
 function reportActionLines(file) {
   const md = file && existsSync(file) ? readFileSync(file, 'utf8').replace(/\r\n/g, '\n') : '';
-  const actions = (/\n## 最近的操作\n\n([\s\S]*?)\n\n## /.exec(md)?.[1] ?? '').split('\n').filter(Boolean);
-  return { md, actions, sent: actions.filter((line) => /^- \S+ (发送|插话|排队)：/.test(line)) };
+  const actions = (/\n## Recent activity\n\n([\s\S]*?)\n\n## /.exec(md)?.[1] ?? '').split('\n').filter(Boolean);
+  return { md, actions, sent: actions.filter((line) => /^- \S+ (Send|Steer|Queue): /.test(line)) };
 }
 
 /**
- * @brief 最后在工作回顾页上按 F8：报告的"最近的操作"里没有"发送 / 插话 / 排队"（这次运行没有发过消息）；
+ * @brief 最后在工作回顾页上按 F8：报告的"Recent activity"里没有"Send / Steer / Queue"（这次运行没有发过消息）；
  *        重启前的第一份报告里有（同一个认法认得出发消息）。
  */
 async function reportActions(ctx) {
@@ -737,13 +744,13 @@ async function reportActions(ctx) {
   await openReviewPage(page, 'issues');
   const { dialog, file } = await saveReport(page, { what: '（m7-real 走查）最后一份报告，看最近的操作',
     expect: '最近的操作里没有发送消息' });
-  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   const { md, actions, sent } = reportActionLines(file);
   const earlier = reportActionLines(join(dirOf(ctx, 'issues'), ctx.issueFirst ?? '')).sent;
   const top = await until(async () => (await reviewState(page))?.rows[0]?.name === basename(file ?? ''), 5000);
   record('反例：最后在工作回顾页上按 F8，报告的"最近的操作"里有工作回顾里的操作、没有"发送 / 插话 / 排队"（这次运行'
     + '没有发消息给模型；重启前的第一份报告里有"发送"）；新报告在"界面问题"最上面', earlier.length > 0
-    && actions.length > 0 && sent.length === 0 && Boolean(top) && md.includes('- 页面：工作回顾'),
+    && actions.length > 0 && sent.length === 0 && Boolean(top) && md.includes('- Page: Review'),
   JSON.stringify({ file, actions, sent, earlier }));
 }
 

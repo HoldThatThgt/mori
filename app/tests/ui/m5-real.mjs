@@ -16,8 +16,9 @@ import {
 } from './lib.mjs';
 import { rowOf, stubFolder, waitReady, waitStatus } from './m3-helpers.mjs';
 import {
-  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, paneAt, pickRange, previewState, sendAt, sentSessionRefs,
-  splitState, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip, waitSplit,
+  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, headingWhole, paneAt, pickRange, previewHeading,
+  previewState, sendAt, sentSessionRefs, splitState, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip,
+  waitSplit,
 } from './m5-helpers.mjs';
 
 const source = arg('source');
@@ -30,7 +31,8 @@ mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder(exePath ?? 'dev build');
 const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) }).catch(() => {});
 const wanted = (item) => !only || only.includes(String(item));
-const UI_WORDS = ['复制', '引用到输入框', '反馈这条回复', '思考', '执行中', '等你批准', '已停止', '打开预览'];
+const UI_WORDS = ['Copy', 'Attach message as context', 'Give feedback', 'Thought process', 'Thinking…', 'Running…',
+  'Waiting for your approval', 'Stopped', 'open preview'];
 
 const PROMPTS = {
   introA: '用一句话介绍你自己。不要调用任何工具。',
@@ -125,7 +127,7 @@ const cardStatus = (page, side, verb, target) => paneAt(page, side).locator('[da
 async function prepare(ctx) {
   const { page } = ctx;
   await stubFolder(ctx.app, ctx.project);
-  await page.getByRole('button', { name: '打开文件夹…' }).first().click();
+  await page.getByRole('button', { name: 'Open folder…' }).first().click();
   await waitReady(page);
   await sendIn(page, 'single', PROMPTS.introA);
   ctx.a = await activeFile(page);
@@ -147,11 +149,12 @@ async function item1(ctx) {
   await sendAt(page, 'left', PROMPTS.editLeft);
   await sendAt(page, 'right', PROMPTS.writeRight);
   await approveUntilIdle(page, ['left', 'right']);
-  const cards = { left: await cardStatus(page, 'left', '修改', 'README.md'),
-    right: await cardStatus(page, 'right', '写入', 'notes.md') };
+  const cards = { left: await cardStatus(page, 'left', 'Edit', 'README.md'),
+    right: await cardStatus(page, 'right', 'Write', 'notes.md') };
   const readme = readFileSync(join(ctx.project, 'README.md'), 'utf8');
   record('走查 1：把会话 B 拖到 A 的右侧：放下前提示"松开以在右侧分屏打开"；松开后左 A、右 B 分屏，B 有焦点',
-    hint?.text === '松开以在右侧分屏打开' && state.split && state.slots[1].focused && state.slots.length === 2,
+    hint?.text === 'Drop to open in split view on the right' && state.split && state.slots[1].focused
+    && state.slots.length === 2,
     JSON.stringify({ hint, slots: state.slots.map((s) => [s.side, s.title, s.focused]) }));
   record('走查 1：两边各自发消息、各自出批准卡并在自己那一栏按 Alt+1 允许：左栏改了 README.md，右栏写了 notes.md',
     cards.left === 'done' && cards.right === 'done' && readme.startsWith('# Mori M5 左栏')
@@ -177,8 +180,8 @@ async function item2(ctx) {
   const left = await notices('left');
   const right = await notices('right');
   record('走查 2：在左栏按 Esc 只停止左栏（命令卡和"已停止"）；右栏这时还在生成、之后照常写完', left.some((t) =>
-    t.startsWith('已停止')) && rightRunning && !right.some((t) => t.startsWith('已停止')), JSON.stringify({ left, right,
-    rightRunning }));
+    t.startsWith('Stopped')) && rightRunning && !right.some((t) => t.startsWith('Stopped')),
+  JSON.stringify({ left, right, rightRunning }));
   await followFocus(ctx);
 }
 
@@ -195,7 +198,7 @@ async function followFocus(ctx) {
   await page.keyboard.press('F8');
   await page.getByTestId('issue-dialog').waitFor({ timeout: 10000 });
   await page.getByTestId('issue-what').fill('M5 走查：分屏时 F8');
-  await page.getByTestId('issue-dialog').getByRole('button', { name: '保存' }).click();
+  await page.getByTestId('issue-dialog').getByRole('button', { name: 'Save' }).click();
   await page.getByTestId('issue-saved').waitFor({ timeout: 10000 });
   await shot(page, '2-f8');
   await page.keyboard.press('Escape');
@@ -206,15 +209,16 @@ async function followFocus(ctx) {
   record('走查 2：右栏跟随焦点所在的一栏（左栏 README.md，右栏 notes.md）', onLeft.includes('README.md')
     && !onLeft.includes('notes.md') && onRight.includes('notes.md') && !onRight.includes('README.md'),
   JSON.stringify({ onLeft: oneLine(onLeft, 80), onRight: oneLine(onRight, 80) }));
-  record('走查 2：F8 跟随焦点：报告的"当前会话"是右栏，"分屏"一行写明焦点在右栏', report.includes(`当前会话：${right}`)
-    && report.includes('（焦点在右栏）'), oneLine(report.split('\n').filter((l) => /当前会话|分屏/.test(l)).join(' | ')));
+  record('走查 2：F8 跟随焦点：报告的"当前会话"是右栏，"分屏"一行写明焦点在右栏', report.includes(`Current session: ${right}`)
+    && report.includes('(focus in the right pane)'),
+  oneLine(report.split('\n').filter((l) => /Current session|Split view/.test(l)).join(' | ')));
 }
 
 /** @brief 走查 3：拖动分屏中线调整比例（先关掉右栏给两栏腾出地方），双击恢复各一半。 */
 async function item3(ctx) {
   const { page } = ctx;
   if (await page.getByTestId('right-panel').count()) {
-    await page.getByTestId('right-panel').getByRole('button', { name: '关闭右栏' }).first().click();
+    await page.getByTestId('right-panel').getByRole('button', { name: 'Close panel' }).first().click();
   }
   await sleep(300);
   const handle = page.locator('[data-resize="split"]');
@@ -249,20 +253,24 @@ async function item4(ctx) {
   await page.locator('.pane-slot[data-focused="true"] [data-kind="session"] .quote-chip-main').click();
   await waitPreview(page);
   const preview = await previewState(page);
+  const heading = await previewHeading(page);
   await shot(page, '4-preview');
+  record('走查 4：轮次列表占满预览对话框时，标题"Context · <会话名>"完整显示，只有一行、没有被压矮',
+    Boolean(heading?.listFull) && headingWhole(heading), JSON.stringify(heading));
   const words = UI_WORDS.filter((word) => preview.turns.some((turn) => turn.text.includes(word)));
   record('走查 4：把会话 C 拖进输入框：提示"松开以引用到这个会话"，芯片"引用 · C · 第 1–6 轮 · 约 X 字"',
-    hint?.text === '松开以引用到这个会话' && /· 第 1–6 轮 · 约 [\d,]+ 字$/.test(chip), JSON.stringify({ hint, chip }));
+    hint?.text === 'Drop to attach as context' && /· turns 1–6 · ~[\d,]+ characters$/.test(chip),
+    JSON.stringify({ hint, chip }));
   record('走查 4：预览按"第 N 轮"标出内容和总字数；工具调用只有一行标题；反例：没有按钮文字等界面文字',
-    preview.turns.length === 6 && preview.turns.every((t) => t.heading.startsWith(`第 ${t.number} 轮 · 约`))
-    && /^约 [\d,]+ 字$/.test(preview.total ?? '') && words.length === 0
-    && /\n\[工具\] [^\n]+/.test(preview.turns[1].text), JSON.stringify({ words, turn2: preview.turns[1]?.text }));
+    preview.turns.length === 6 && preview.turns.every((t) => t.heading.startsWith(`Turn ${t.number} · ~`))
+    && /^~[\d,]+ characters$/.test(preview.total ?? '') && words.length === 0
+    && /\n\[Tool\] [^\n]+/.test(preview.turns[1].text), JSON.stringify({ words, turn2: preview.turns[1]?.text }));
   await pickRange(page, 3, 5);
-  await page.getByTestId('ref-preview').getByRole('button', { name: '确定' }).click();
+  await page.getByTestId('ref-preview').getByRole('button', { name: 'Done' }).click();
   const after = await waitSessionChip(page, 'focused');
   await sendIn(page, 'single', PROMPTS.askRef);
   const reply = await paneAt(page, 'single').getByTestId('assistant').last().innerText();
-  record('走查 4：改成第 3–5 轮后发出：芯片"第 3–5 轮"；模型按引用的讨论回答了函数名', after.includes('· 第 3–5 轮 ·')
+  record('走查 4：改成第 3–5 轮后发出：芯片"第 3–5 轮"；模型按引用的讨论回答了函数名', after.includes('· turns 3–5 ·')
     && /sub/i.test(reply), JSON.stringify({ after, reply: oneLine(reply, 120) }));
   await shot(page, '4-sent');
 }
@@ -275,7 +283,7 @@ async function clickSentRef(page) {
   return { flashed: await flashedAt(page, 'focused'), title: (await splitState(page)).focusedTitle };
 }
 
-/** @brief 走查 5：点引用跳回 C；C 改名后（含重启后）仍有效；C 删除后显示"原会话已删除"，原文仍可查看。 */
+/** @brief 走查 5：点引用跳回 C；C 改名后（含重启后）仍有效；C 删除后显示"Session deleted"，原文仍可查看。 */
 async function item5(ctx) {
   let { page } = ctx;
   const first = await clickSentRef(page);
@@ -283,7 +291,7 @@ async function item5(ctx) {
   record('走查 5：点消息里的引用跳回 C，第 3–5 轮高亮（3 条你的消息）', first.flashed.users.length === 3
     && first.flashed.users[0].startsWith('我们来讨论'), JSON.stringify(first));
   await rowOf(page, ctx.c).first().click({ button: 'right' });
-  await page.getByTestId('session-menu').getByRole('menuitem', { name: '重命名' }).click();
+  await page.getByTestId('session-menu').getByRole('menuitem', { name: 'Rename' }).click();
   await page.getByTestId('rename-input').fill('减法函数的讨论');
   await page.getByTestId('rename-input').press('Enter');
   await restart(ctx);
@@ -293,11 +301,11 @@ async function item5(ctx) {
   const sent = await sentSessionRefs(page, 'single');
   const second = await clickSentRef(page);
   record('走查 5：C 改名、重启 Mori 后，引用显示新名字，点它仍跳回 C 并高亮第 3–5 轮', sent.at(-1)?.label
-    .startsWith('引用 · 减法函数的讨论 · 第 3–5 轮') && second.title === '减法函数的讨论'
+    .startsWith('Context · 减法函数的讨论 · turns 3–5') && second.title === '减法函数的讨论'
     && second.flashed.users.length === 3, JSON.stringify({ sent: sent.at(-1)?.label, second }));
   await rowOf(page, ctx.c).first().click({ button: 'right' });
-  await page.getByTestId('session-menu').getByRole('menuitem', { name: '删除' }).click();
-  await page.getByTestId('delete-dialog').getByRole('button', { name: '删除' }).click();
+  await page.getByTestId('session-menu').getByRole('menuitem', { name: 'Delete…' }).click();
+  await page.getByTestId('delete-dialog').getByRole('button', { name: 'Delete' }).click();
   await page.getByTestId('delete-dialog').waitFor({ state: 'detached', timeout: 15000 });
   await rowOf(page, ctx.a).first().click();
   await waitPaneReady(page, 'single');
@@ -307,8 +315,8 @@ async function item5(ctx) {
   const stored = await previewState(page);
   await shot(page, '5-deleted');
   await page.keyboard.press('Escape');
-  record('走查 5：C 删除后引用标"原会话已删除"，点它仍能看到引用时的原文（第 3–5 轮）', gone?.status === '原会话已删除'
-    && stored.notes.includes('原会话已删除 · 下面是引用时的原文') && stored.stored?.startsWith('第 3 轮')
+  record('走查 5：C 删除后引用标"原会话已删除"，点它仍能看到引用时的原文（第 3–5 轮）', gone?.status === 'Session deleted'
+    && stored.notes.includes('Session deleted · Showing the attached text') && stored.stored?.startsWith('Turn 3')
     && !existsSync(ctx.c), JSON.stringify({ gone, notes: stored.notes }));
 }
 
@@ -316,12 +324,12 @@ async function item5(ctx) {
 async function item6(ctx) {
   const { page } = ctx;
   await rowOf(page, ctx.b).first().click({ button: 'right' });
-  await page.getByTestId('session-menu').getByRole('menuitem', { name: '在右侧分屏打开' }).click();
+  await page.getByTestId('session-menu').getByRole('menuitem', { name: 'Open in split view' }).click();
   await waitSplit(page);
   const state = await splitState(page);
   await composerAt(page, 'left').click();
   await rowOf(page, ctx.b).first().click({ button: 'right' });
-  await page.getByTestId('session-menu').getByRole('menuitem', { name: '引用到当前会话' }).click();
+  await page.getByTestId('session-menu').getByRole('menuitem', { name: 'Attach as context' }).click();
   const chip = await waitSessionChip(page, 'left');
   await sendIn(page, 'left', PROMPTS.askMenu);
   const sent = await sentSessionRefs(page, 'left');
@@ -329,7 +337,8 @@ async function item6(ctx) {
     && state.slots[1].title === await rowOf(page, ctx.b).first().locator('.session-label').innerText(),
   JSON.stringify(state.slots));
   record('走查 6：右键菜单"引用到当前会话"：焦点所在的左栏输入框出现 B 的引用芯片，发出后消息上方显示引用',
-    /^引用 · .+ · 第 1–\d 轮 · 约 [\d,]+ 字$/.test(chip) && sent.at(-1)?.label === chip, JSON.stringify({ chip, sent }));
+    /^Context · .+ · turns 1–\d · ~[\d,]+ characters$/.test(chip) && sent.at(-1)?.label === chip,
+  JSON.stringify({ chip, sent }));
   await shot(page, '6-menu');
 }
 
@@ -347,7 +356,7 @@ async function counterExample(ctx) {
   const notices = await paneAt(page, 'single').getByTestId('notice').allInnerTexts();
   const reply = await paneAt(page, 'single').getByTestId('assistant').last().innerText();
   record('反例：关闭分屏中正在生成的一栏不停止它：侧栏"生成中"，之后"有新结果"，回复写完、没有"已停止"', running && unseen
-    && reply.length > 200 && !notices.some((t) => t.startsWith('已停止')), JSON.stringify({ running, unseen,
+    && reply.length > 200 && !notices.some((t) => t.startsWith('Stopped')), JSON.stringify({ running, unseen,
     reply: reply.length, notices }));
 }
 

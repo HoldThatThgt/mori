@@ -129,7 +129,7 @@ button.tools-row-main, summary.tools-row-main { cursor: pointer; }
 .tools-tool[open] summary::before { content: '▾'; }
 .tools-tool .tools-body { margin: 6px 6px 0; }
 
-/* 技能展开：路径、用系统编辑器打开、正文 */
+/* 技能展开：路径、"Open in default app"、正文 */
 .tools-detail { margin: 6px 6px 0; }
 .tools-path {
   display: flex;
@@ -206,9 +206,10 @@ button.tools-row-main, summary.tools-row-main { cursor: pointer; }
   border: 1px solid var(--color-line);
   border-radius: var(--radius-m);
 }
+/* 标签列 132px 放得下最长的标签 "Environment variables"（Segoe UI 13px 约 126px），不折行 */
 .tools-form > label {
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
+  grid-template-columns: 132px minmax(0, 1fr);
   align-items: start;
   gap: 10px;
   color: var(--color-muted);
@@ -249,7 +250,8 @@ button.tools-row-main, summary.tools-row-main { cursor: pointer; }
 .tools-group .tools-list { margin: 0; }
 .tools-group .tools-row:last-child { border-bottom: 0; }
 
-/* 中栏较窄（最小窗口 800 宽时中栏约 740px） */
+/* 中栏较窄（最小窗口 800 宽时中栏约 740px）：分节列表收窄（最宽的 "Built-in tools" 约 76px，124px 宽时仍是一行），
+   表单标签放到输入框上面 */
 @container (max-width: 640px) {
   .tools-nav { width: 124px; padding: 12px 8px; }
   .tools-content { padding: 16px 16px 24px; }

@@ -69,7 +69,7 @@ function applyTextUpdate(state: Transcript, update: SlimMessageUpdate['update'],
   return setStage(next, thinking ? 'thinking' : 'generating', now);
 }
 
-/** @brief 处理工具调用参数的增量：卡片进入"准备中"。 */
+/** @brief 处理工具调用参数的增量：卡片进入"Preparing…"。 */
 function applyToolCallUpdate(state: Transcript, update: SlimMessageUpdate['update'], now: number): Transcript {
   const id = update.toolCallId;
   if (!id) return state;
@@ -96,7 +96,7 @@ function applyUpdate(state: Transcript, event: SlimMessageUpdate, now: number): 
 
 /**
  * @brief 助手回复结束：以 pi 给出的完整内容为准，思考收起，记下错误等 agent_end 决定是否显示。
- *        参数已经完整、pi 还没开始执行的调用从"准备中"变成"等待执行"（一条回复里的调用按顺序执行）。
+ *        参数已经完整、pi 还没开始执行的调用从"Preparing…"变成"Queued"（一条回复里的调用按顺序执行）。
  */
 function applyAssistantEnd(state: Transcript, message: Record<string, unknown>): Transcript {
   const { blocks, tools } = blocksFromContent(message.content);
@@ -170,13 +170,13 @@ function runningToolStage(state: Transcript): Stage | null {
   return running ? { kind: 'tool', since: running.startedAt ?? 0, detail: running.id } : null;
 }
 
-/** @brief 一件事结束后的阶段：有挂起的批准时总是"等你批准"，否则是还在执行的工具，都没有时不显示。 */
+/** @brief 一件事结束后的阶段：有挂起的批准时总是"Waiting for your approval"，否则是还在执行的工具，都没有时不显示。 */
 function nextStage(state: Transcript, now: number): Stage | null {
   if (state.approvals.length === 0) return runningToolStage(state);
   return state.stage?.kind === 'approval' ? state.stage : { kind: 'approval', since: now, detail: '' };
 }
 
-/** @brief 自动放行的原因：本会话已允许 / 全部允许；只读工具和要批准的调用没有。 */
+/** @brief 自动放行的原因：Allowed for this session / Allow all；只读工具和要批准的调用没有。 */
 function autoAllowed(gate: ToolGate | ApprovalEndBy | null): ToolCall['allowedBy'] {
   return gate === 'session' || gate === 'all' ? gate : null;
 }
@@ -188,8 +188,8 @@ function hasToolBlock(state: Transcript, id: string): boolean {
 }
 
 /**
- * @brief 工具开始执行。mori.tool_gate 为 ask 的调用先"等你批准"（pi 先发这个事件、再调用批准处理器），
- *        其余的直接"执行中"，本会话已允许 / 全部允许的标出原因。
+ * @brief 工具开始执行。mori.tool_gate 为 ask 的调用先"Waiting for your approval"（pi 先发这个事件、再调用批准处理器），
+ *        其余的直接"Running…"，Allowed for this session / Allow all 的标出原因。
  */
 function applyToolStart(state: Transcript, event: EventOf<'tool_execution_start'>, now: number): Transcript {
   const id = event.toolCallId;
@@ -208,8 +208,8 @@ function applyToolStart(state: Transcript, event: EventOf<'tool_execution_start'
 
 /**
  * @brief mori.tool_gate。tool_execution_start 之前收到的只记下来；之后再收到的是后台进程的更正：
- *        预告要批准、实际已不用批准（例如排队的嵌套调用轮到时，你已选了"本会话不再询问"），
- *        还在"等你批准"且没有挂起请求的卡直接变"执行中"，标出放行原因。
+ *        预告要批准、实际已不用批准（例如排队的嵌套调用轮到时，你已选了"Allow for this session"），
+ *        还在"Waiting for your approval"且没有挂起请求的卡直接变"Running…"，标出放行原因。
  */
 function applyToolGate(state: Transcript, event: EventOf<'mori.tool_gate'>, now: number): Transcript {
   const id = event.toolCallId;
@@ -243,7 +243,7 @@ function applyToolExecution(state: Transcript, event: EventOf<'tool_execution_st
 
 /**
  * @brief 批准请求开始与结束。允许后从这一刻开始计时；你在卡上允许的不标原因，
- *        "本会话不再询问"或切到"全部允许"顺带放行的标出原因。拒绝后等模型收到拒绝再回复。
+ *        "Allow for this session"或切到"Allow all"顺带放行的标出原因。拒绝后等模型收到拒绝再回复。
  */
 function applyApproval(state: Transcript, event: EventOf<'mori.approval_request' | 'mori.approval_end'>,
   now: number): Transcript {
@@ -261,7 +261,10 @@ function applyApproval(state: Transcript, event: EventOf<'mori.approval_request'
   return { ...next, stage: nextStage(next, now) };
 }
 
-/** @brief 把还没结束的工具调用（准备中、等待执行、等你批准、执行中）标成 status（停止或中断时）；挂起的批准一并清掉。 */
+/**
+ * @brief 把还没结束的工具调用（Preparing…、Queued、Waiting for your approval、Running…）标成 status（停止或中断时）；
+ *        挂起的批准一并清掉。
+ */
 export function finishOpenTools(state: Transcript, status: 'stopped' | 'interrupted'): Transcript {
   const tools = { ...state.tools };
   for (const tool of Object.values(tools)) {
@@ -272,11 +275,13 @@ export function finishOpenTools(state: Transcript, status: 'stopped' | 'interrup
   return { ...state, tools, items, approvals: [], questions: [] };
 }
 
-/** @brief 本轮结束：清掉运行状态和挂起的批准；停止过就留一行"已停止"，没执行的调用标"已停止"或"已中断"。 */
+/**
+ * @brief 本轮结束：清掉运行状态和挂起的批准；停止过就留一行"Stopped · …"，没执行的调用标"Stopped"或"Interrupted"。
+ */
 function applySettled(state: Transcript, aborted: boolean): Transcript {
   let next = state;
   if (aborted || state.stopRequested) next = pushItem(finishOpenTools(next, 'stopped'), { kind: 'stopped' });
-  // 本轮正常结束时还没执行的调用（例如回复出错，pi 不执行其中的调用）：与从会话记录载入时一样显示"已中断"。
+  // 本轮正常结束时还没执行的调用（例如回复出错，pi 不执行其中的调用）：与从会话记录载入时一样显示"Interrupted"。
   else next = finishOpenTools(next, 'interrupted');
   return { ...next, running: false, sending: false, stage: null, stopRequested: false, modelStage: null,
     pendingQueue: [], unavailable: false, pendingError: null, approvals: [], questions: [] };
@@ -303,8 +308,8 @@ function applyQuestion(state: Transcript,
 }
 
 /**
- * @brief 追加一张错误卡；restore 是"放回输入框"的内容。pi 记下的是展开后的文字：技能调用放回
- *        "/skill:名字 参数"，与气泡里显示的一致（docs/v0/screens/slash.md）。
+ * @brief 追加一张错误卡；restore 是"Put your last message back in the message box"放回的内容。
+ *        pi 记下的是展开后的文字：技能调用放回"/skill:名字 参数"，与气泡里显示的一致（docs/v0/screens/slash.md）。
  */
 function pushError(state: Transcript, text: string, restore: string | null, refs?: QuoteRef[] | null): Transcript {
   const back = restore === null ? null : skillCommandText(restore);
@@ -390,7 +395,7 @@ function applyModelWait(state: Transcript,
   event: EventOf<'mori.model_wait' | 'mori.model_queue' | 'mori.model_retry'>, now: number): Transcript {
   if (event.type === 'mori.model_retry') {
     // 每次重试都是一次新的等待，从这一刻计时；下一个有内容的事件、下一次重试或回复结束时清掉。
-    const text = `Retrying ${event.attempt}/${event.max} · HTTP ${event.status}`;
+    const text = `Retrying (${event.attempt}/${event.max}) · HTTP ${event.status}`;
     return { ...state, modelStage: { kind: 'retry', since: now, text } };
   }
   if (event.type === 'mori.model_queue') {

@@ -1,5 +1,5 @@
 // M1 整机测试：真正的 Mori（界面 + 后台进程 + pi）对合成端点（tests/fake-endpoint，synthetic），
-// 覆盖首次启动、测试连接与取消、代码块的"复制代码"、停止、排队与插话、三种错误来源、后台进程退出与重新载入、
+// 覆盖首次启动、测试连接与取消、代码块的"Copy code"、停止、排队与插话、三种错误来源、后台进程退出与重新载入、
 // 重启后布局还在。v1（docs/specs/model-providers.md §14.4）：首次启动是英文表单；重试改为 http-503-once 与
 // "Retrying 1/3"；key 被拒改为删 key、加错的 key → 说明卡 → Open settings（焦点在 Keys）→ 加回对的 key。
 // 用法（在 app/ 下，先 npm run build）：
@@ -27,8 +27,11 @@ const testKey = 'synthetic-test-key';
 const shots = join(appRoot, `test-results/m1-app${suffix}`);
 mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder(exePath ?? 'dev build');
+/** 重新载入后对话流里的说明（state/projects.ts RELOADED_NOTE） */
+const RESTARTED_NOTE = 'Restarted · Queued messages, pending approvals, and “Allow for this session” choices '
+  + 'weren’t restored';
 
-/** @brief 启动合成端点（第一个分块前等 1.2 秒，便于看到"等待模型响应"）。 */
+/** @brief 启动合成端点（第一个分块前等 1.2 秒，便于看到"Waiting for the model…"）。 */
 function startFakeEndpoint() {
   const child = spawn(process.execPath, [join(appRoot, 'tests/fake-endpoint/server.mjs')], {
     env: { ...process.env, FAKE_PORT: String(port), FAKE_CHUNK_DELAY_MS: '25', FAKE_FIRST_DELAY_MS: '1200',
@@ -48,6 +51,24 @@ function fastRetry(userData) {
 }
 
 /**
+ * @brief 选文件夹对话框（"Open folder…"和"Add plugin from folder…"共用）带英文的标题和按钮，不用 Windows 按显示语言给的
+ *        默认文字（中文 Windows 上是"选择文件夹"）。系统对话框换成记下参数、返回取消的替身，经页面的 pickFolder 走真的主进程代码。
+ */
+async function pickerOptions(app, page) {
+  await app.evaluate(({ dialog }) => {
+    dialog.showOpenDialog = async (...args) => {
+      globalThis.moriPickOptions = args.at(-1);
+      return { canceled: true, filePaths: [] };
+    };
+  });
+  const picked = await page.evaluate(() => window.mori.pickFolder());
+  const options = await app.evaluate(() => globalThis.moriPickOptions ?? null);
+  record('选文件夹对话框的标题"Select a folder"、按钮"Select folder"（不是 Windows 按显示语言给的默认文字）；取消时返回 null',
+    picked === null && options?.title === 'Select a folder' && options.buttonLabel === 'Select folder'
+    && options.properties?.join() === 'openDirectory', JSON.stringify({ picked, options }));
+}
+
+/**
  * @brief 首次启动（v1，英文表单，docs/v1/screens/first-run.md）：只有首次启动表单；字段错误是英文；测试中可以取消
  *        （"Testing…"、"Cancel" → "Test cancelled"）；401 原文；测试成功后等探针跑完，再"Open folder…"。
  *        测试取消用 fake-slow（合成端点对它第一个分块前等 8 秒），之后同一张表单改回 fake-coder 再测（整体替换，
@@ -62,18 +83,18 @@ async function firstRun({ app, page, h, project, userData }) {
   await h.fillConnection({ name: 'x' });
   await h.fillConnection({ name: '' });
   const nameError = await form.locator('[data-testid="field-error"][data-field="name"]').innerText().catch(() => '');
-  record('首次启动：没填的字段给出英文说明，Test connection 不可用', nameError === 'Name is required'
+  record('首次启动：没填的字段给出英文说明，Test connection 不可用', /^Name is required\.?$/.test(nameError)
     && await form.locator('[data-action="test"]').isDisabled(), nameError);
   await cancelFormTest({ page, h });
   await h.fillConnection({ apiKey: 'wrong-key', modelId: 'fake-coder' });
   await form.locator('[data-action="test"]').click();
   const wrong = await h.formMessage('Test cancelled', { test: true });
-  record('首次启动：key 错误时显示错误原文', wrong.startsWith('Failed') && wrong.includes('401'), oneLine(wrong));
+  record('首次启动：key 错误时显示错误原文', /^(Connection failed|Failed)/.test(wrong) && wrong.includes('401'), oneLine(wrong));
   await h.fillConnection({ apiKey: testKey });
   await form.locator('[data-action="test"]').click();
   const ok = await h.formMessage(wrong, { test: true });
   await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
-  record('首次启动：测试连接成功，显示首字耗时，进入"Open folder…"', /^Connected · first token \d+ ms/.test(ok),
+  record('首次启动：测试连接成功，显示首字耗时，进入"Open folder…"', /^Connected · [Ff]irst token \d+ ?ms/.test(ok),
     oneLine(ok));
   const probe = await h.waitProbes();
   const providers = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8')).providers;
@@ -82,20 +103,22 @@ async function firstRun({ app, page, h, project, userData }) {
     `probe-status=${probe}；providers=${providers.map((p) => `${p.id}:${p.models.map((m) => m.id)}`).join(' ')}`);
   await page.screenshot({ path: join(shots, '01-first-run-ok.png') });
   await h.openFolder(app, project);
+  await pickerOptions(app, page);
   const empty = await page.locator('.empty-chat').innerText();
   record('首次启动：打开文件夹后是新会话的空状态（项目名和输入提示）',
-    empty.includes('project') && empty.includes('Enter 发送 · Shift+Enter 换行'), oneLine(empty));
+    empty.includes('project') && empty.includes('Enter to send · Shift+Enter for new line'), oneLine(empty));
   // M2 起命令和编辑要先批准；这里测的是 M1 的行为，先切到全部允许。
   await h.allowAll();
 }
 
-/** @brief 发第一条消息：先"等待模型响应"，再流式文字；读取卡完成；上下文用量随对话增长。 */
+/** @brief 发第一条消息：先"Waiting for the model…"，再流式文字；读取卡完成；上下文用量随对话增长。 */
 async function firstMessage({ page, h }) {
   await h.sampleStages();
   await h.send('总结 README');
   await h.idle();
   const stages = await h.stages();
-  record('对话：先显示"等待模型响应"，再"生成中"', stages[0] === '等待模型响应' && stages.includes('生成中'), stages.join(' → '));
+  record('对话：先显示"等待模型响应"，再"生成中"', stages[0] === 'Waiting for the model…'
+    && stages.includes('Responding…'), stages.join(' → '));
   const cards = await h.cards();
   record('对话：读取卡完成', cards[0]?.title.includes('README.md') && cards[0].status === 'done', JSON.stringify(cards));
   record('对话：会话名取第一条消息', (await page.getByTestId('session-title').innerText()) === '总结 README');
@@ -106,12 +129,12 @@ async function firstMessage({ page, h }) {
   record('对话：顶栏上下文用量随对话增长', before !== null && after !== null && after > before, `${before} → ${after}`);
 }
 
-/** @brief 代码块上的"复制代码"：代码进系统剪贴板（Mori 只放行自己页面写剪贴板这一项权限）。 */
+/** @brief 代码块上的"Copy code"：代码进系统剪贴板（Mori 只放行自己页面写剪贴板这一项权限）。 */
 async function copyCode({ app, page, h }) {
   await h.send('code block 给我一段代码');
   await h.idle();
   await app.evaluate(({ clipboard }) => clipboard.writeText('剪贴板原来的内容'));
-  await page.getByRole('button', { name: '复制代码' }).last().click();
+  await page.getByRole('button', { name: 'Copy code' }).last().click();
   let copied = '';
   for (let tries = 0; tries < 10 && !copied.includes('export function add'); tries += 1) {
     await sleep(200);
@@ -130,7 +153,7 @@ async function cancelTest({ page, h, userData }) {
   await h.openModels();
   await h.providerCard().locator('[data-action="add-model"]').click();
   const form = page.getByTestId('model-form');
-  await form.getByLabel('Model id', { exact: true }).fill('fake-slow');
+  await form.getByLabel('Model ID', { exact: true }).fill('fake-slow');
   await form.getByRole('button', { name: 'Save', exact: true }).click();
   const row = page.locator('[data-testid="model-row"][data-model="mori-endpoint/fake-slow"]');
   await row.waitFor({ timeout: 15000 });
@@ -144,11 +167,11 @@ async function cancelTest({ page, h, userData }) {
   const config = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8'));
   record('设置："Add model"不改默认范围：normalDefault 仍是 mori-endpoint/fake-coder',
     config.normalDefault === 'mori-endpoint/fake-coder', String(config.normalDefault));
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app' }).click();
 }
 
 /**
- * @brief 首次启动表单的"测试连接 → 取消"（first-run.md "测试中"）：模型 fake-slow（合成端点对它第一个分块前等 8 秒），
+ * @brief 首次启动表单的"Test connection → Cancel"（first-run.md "测试中"）：模型 fake-slow（合成端点对它第一个分块前等 8 秒），
  *        测试中按钮变为"Testing…"，旁边"Cancel"；取消后表单下方"Test cancelled"。
  */
 async function cancelFormTest({ page, h }) {
@@ -163,7 +186,7 @@ async function cancelFormTest({ page, h }) {
     testing && text === 'Test cancelled', `Testing… 出现 ${testing}；${text}`);
 }
 
-/** @brief 运行耗时命令时排队一条，然后按 Esc：命令卡"已停止"，提示，排队消息回到输入框。 */
+/** @brief 运行耗时命令时排队一条，然后按 Esc：命令卡"Stopped"，提示，排队消息回到输入框。 */
 async function escStop({ page, h }) {
   await h.send('run: sleep 30');
   await page.locator('[data-testid="tool-card"][data-status="running"]').waitFor({ timeout: 30000 });
@@ -173,7 +196,7 @@ async function escStop({ page, h }) {
   await page.keyboard.press('Escape');
   await h.idle(30000);
   const last = (await h.cards()).at(-1);
-  const notice = await page.getByText('已停止 · 已经做出的修改不会自动撤销').count();
+  const notice = await page.getByText('Stopped · Changes made so far stay as they are').count();
   record('停止：命令卡显示"已停止"并提示修改不会自动撤销', last?.status === 'stopped' && notice >= 1, JSON.stringify(last));
   record('停止：排队消息回到输入框', (await h.textarea.inputValue()).includes('plain 排队的消息'));
   record('停止：没有错误卡', await page.getByTestId('error-card').count() === 0);
@@ -211,9 +234,9 @@ async function errors({ page, h }) {
   await h.idle();
   const card = page.getByTestId('error-card').last();
   const text = await card.innerText();
-  record('错误：模型回复出错显示原文和"把上一条消息放回输入框"', text.includes('400') && text.includes('把上一条消息放回输入框'),
-    oneLine(text));
-  await card.getByRole('button', { name: '把上一条消息放回输入框' }).click();
+  record('错误：模型回复出错显示原文和"Put your last message back in the message box"', text.includes('400')
+    && text.includes('Put your last message back in the message box'), oneLine(text));
+  await card.getByRole('button', { name: 'Put your last message back in the message box' }).click();
   record('错误：点它把上一条消息放回输入框', (await h.textarea.inputValue()) === 'http-400 坏请求');
   await h.textarea.fill('');
   const cardsBefore = await page.getByTestId('error-card').count();
@@ -222,7 +245,7 @@ async function errors({ page, h }) {
   await h.idle(120000);
   const stages = await h.stages();
   record('错误：原地重试时阶段行显示"Retrying 1/3"，之后正常回复，没有错误卡、没有换模型',
-    stages.some((stage) => stage.startsWith('Retrying 1/3'))
+    stages.some((stage) => /^Retrying \(?1\/3\)?/.test(stage))
       && await page.getByTestId('error-card').count() === cardsBefore
       && await page.locator('[data-testid="notice"][data-kind="model-switch"]').count() === 0,
     stages.join(' → '));
@@ -243,7 +266,7 @@ async function wrongKey({ page, h }) {
   const card = h.providerCard();
   await card.getByTestId('key-row').first().locator('[data-action="key-remove"]').click();
   await keyRows(page, 1);
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app' }).click();
   const errorsBefore = await page.getByTestId('error-card').count();
   await h.send('plain 你好');
   await h.idle();
@@ -267,7 +290,7 @@ async function wrongKey({ page, h }) {
   await h.addKey(testKey);
   await card.getByTestId('key-row').first().locator('[data-action="key-remove"]').click();
   await keyRows(page, 1);
-  await page.getByRole('button', { name: '返回会话' }).click();
+  await page.getByRole('button', { name: 'Back to app' }).click();
   await h.send('plain 换回对的 key');
   await h.idle();
   const last = await page.getByTestId('assistant').last().innerText();
@@ -275,7 +298,7 @@ async function wrongKey({ page, h }) {
     && await page.getByTestId('unavailable-card').count() === 1, oneLine(last));
 }
 
-/** @brief 结束后台进程：退出提示和"重新载入"，执行中的卡"已中断"，草稿还在；重新载入后从会话文件恢复。 */
+/** @brief 结束后台进程：退出提示和"Restart"，执行中的卡"Interrupted"，草稿还在；重新载入后从会话文件恢复。 */
 async function kernelExit({ app, page, h }) {
   const before = new Set(sleepProcessIds(['33']));
   await h.send('run: sleep 33');
@@ -289,13 +312,14 @@ async function kernelExit({ app, page, h }) {
     `运行中的 sleep.exe ${running.length} 个，3 秒内剩 ${left.length} 个`);
   const last = (await h.cards()).at(-1);
   record('退出：显示"Mori 的后台进程意外退出 · 刚才没完成的回复已中断"和"重新载入"',
-    (await page.getByTestId('kernel-exit').innerText()).includes('刚才没完成的回复已中断'), `后台进程 PID ${pid}`);
+    (await page.getByTestId('kernel-exit').innerText()).includes('Unfinished responses were interrupted'),
+    `后台进程 PID ${pid}`);
   record('退出：执行中的命令卡变为"已中断"', last?.status === 'interrupted', JSON.stringify(last));
   record('退出：输入框里的草稿还在', (await h.textarea.inputValue()) === '还没发出的草稿');
   await page.screenshot({ path: join(shots, '03-kernel-exit.png') });
   const usersBefore = await page.getByTestId('user-message').count();
-  await page.getByRole('button', { name: '重新载入' }).click();
-  await page.getByText('已重新载入 · 排队消息、批准卡和"本会话已允许"不会恢复').waitFor({ timeout: 30000 });
+  await page.getByRole('button', { name: 'Restart' }).click();
+  await page.getByText(RESTARTED_NOTE).waitFor({ timeout: 30000 });
   const usersAfter = await page.getByTestId('user-message').count();
   record('退出：重新载入后从会话文件恢复对话，草稿不受影响', usersAfter === usersBefore
     && (await h.textarea.inputValue()) === '还没发出的草稿', `${usersBefore} → ${usersAfter}`);
@@ -310,7 +334,7 @@ async function layoutRestart({ page, h, app, project, userData }) {
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('ArrowLeft');
   if (await page.locator('[data-resize="workspace"]').count() === 0) {
-    await page.getByRole('button', { name: '右栏：本会话的改动' }).click();
+    await page.getByRole('button', { name: 'Toggle changes' }).click();
   }
   await page.locator('[data-resize="workspace"]').focus();
   await page.keyboard.press('ArrowLeft');
@@ -320,9 +344,9 @@ async function layoutRestart({ page, h, app, project, userData }) {
   const next = await launch({ exePath, userData });
   const nextPage = await next.firstWindow();
   const helpers = pageHelpers(nextPage);
-  await nextPage.getByRole('button', { name: '打开文件夹…' }).first().waitFor({ timeout: 60000 });
+  await nextPage.getByRole('button', { name: 'Open folder…' }).first().waitFor({ timeout: 60000 });
   await helpers.openFolder(next, project);
-  await nextPage.getByRole('button', { name: '右栏：本会话的改动' }).click();
+  await nextPage.getByRole('button', { name: 'Toggle changes' }).click();
   const after = { sidebar: await nextPage.locator('[data-resize="sidebar"]').getAttribute('aria-valuenow'),
     workspace: await nextPage.locator('[data-resize="workspace"]').getAttribute('aria-valuenow') };
   record('布局：重启后两条分隔线的宽度还在', saved.sidebar === after.sidebar && saved.workspace === after.workspace,

@@ -21,7 +21,7 @@ const NO_TIMEOUT_MS = 2147483647;
 /** @brief connection.test 的参数。 */
 export type TestRequest = Extract<Command, { type: 'connection.test' }>;
 
-/** 正在进行的测试连接；你点"取消"时中止它 */
+/** 正在进行的测试连接；你点"Cancel"时中止它 */
 let runningTest: AbortController | null = null;
 
 /** @brief pi 读设置文件时报告的错误（带文件路径），有时记录；没有时为 null。 */
@@ -92,7 +92,7 @@ function firstContentWatch(ms: number, attempt: AbortController) {
 interface TestRun {
   /** 测试开始的时刻 */
   started: number;
-  /** 你点"取消"的控制器 */
+  /** 你点"Cancel"的控制器 */
   controller: AbortController;
   /** 首个内容的时限 */
   watch: ReturnType<typeof firstContentWatch>;
@@ -135,7 +135,7 @@ async function finishTest(request: TestRequest, run: TestRun, result: TestResult
 /**
  * @brief 测试连接（§9.1、§9.4）：经模型池的 conversation 类别发一条短消息；不带 keyRef 时用第一个可用的 key，
  *        带 keyRef 时只用这个 key、不看它的记录。没有 v0 的 30 秒总时限：排队按 §8.2，每次尝试按首个内容的时限，
- *        不做原地重试（server 直接报告）。你点"取消"即中止。
+ *        不做原地重试（server 直接报告）。你点"Cancel"即中止。
  * @param request 提供商、模型与可选的 key
  */
 export async function testConnection(request: TestRequest): Promise<TestResult> {

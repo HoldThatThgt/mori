@@ -139,7 +139,7 @@ export function restoreFirstKey(userData, providerId, cipher) {
 
 /** @brief 侧栏"设置" → Models 分节，等提供商卡出现。 */
 export async function openModelsSettings(page) {
-  await page.getByTestId('sidebar').getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByTestId('sidebar').getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
   await page.locator('[data-testid="settings-nav"] button[data-section="models"]').click();
   await page.getByTestId('provider-card').first().waitFor({ timeout: 30000 });
@@ -147,7 +147,7 @@ export async function openModelsSettings(page) {
 
 /** @brief 设置页顶部"返回会话"，等会话就绪。 */
 export async function backToSession(page) {
-  await page.getByTestId('settings-page').getByRole('button', { name: '返回会话' }).click();
+  await page.getByTestId('settings-page').getByRole('button', { name: 'Back to app' }).click();
   await page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 10000 });
   await waitReady(page);
 }
@@ -185,7 +185,7 @@ export async function injectWrongKey(page, providerId, { back = true } = {}) {
 /** @brief 打开一个项目文件夹（系统对话框换成直接返回它），等会话就绪。 */
 export async function openProjectFolder(app, page, project) {
   await stubFolder(app, project);
-  await page.getByTestId('sidebar').getByRole('button', { name: '打开文件夹…' }).click();
+  await page.getByTestId('sidebar').getByRole('button', { name: 'Open folder…', exact: true }).click();
   await waitReady(page);
 }
 

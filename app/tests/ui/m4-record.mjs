@@ -4,8 +4,9 @@
 // M4 多录两样东西：
 // 1. 文件阅读器读到的内容：rec.read(path, cwd) 经主进程真的读一次，记成 { file: { path, cwd, result } }，
 //    回放桥（tests/ui/harness/replay.js）按顺序用它们回答界面的 readFile。
-// 2. 带引用的消息：发出的全文和 refs 与界面拼出的完全一样（quoteBlock 照搬 src/renderer/src/state/quotes.ts），
-//    回放时界面发出的 session.prompt 要与录制一致（含 refs）。
+// 2. 带引用的消息：发出的全文用界面的代码算——把 src/renderer/src/state/quoteText.ts 用 esbuild 打包后在 node 里
+//    直接调用（不照搬，做法与 m5-record.mjs 相同），回放时界面发出的 session.prompt 要与录制一致（含 refs）。
+//    所以带引用的场景分三段：页面里先读文件或等回复，node 里按录下的结果拼出引用和全文，页面里再发出。
 // 反馈只经主进程保存，不经过后台进程，不录。
 // 录完先核对场景要的东西真的发生了；不符合时不写进 fixtures，写到 test-results/m4-record/<名字>.rejected.json。
 // 用法（在 app/ 下，先 npm run build）：
@@ -15,6 +16,7 @@
 import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { build } from 'esbuild';
 import {
   allowProjectsLive, allowRealProject, appRoot, arg, launch, oneLine, prepareProject, realProviders, scratchUserData,
 } from './lib.mjs';
@@ -41,6 +43,15 @@ const prompts = {
   LONGER: '不要调用任何工具。请写五段文字，每段四到五句话：第一段讲春天，第二段讲夏天，第三段讲秋天，'
     + '第四段讲冬天，第五段讲四季轮回给人的启发。',
 };
+
+/** @brief 把界面拼引用全文的代码（quoteText.ts）打包后载入 node，录制时与界面拼出同样的全文。 */
+async function loadQuoteCode() {
+  const contents = "export { composePrompt } from './src/renderer/src/state/quoteText.ts';\n";
+  const out = await build({ stdin: { contents, resolveDir: appRoot, loader: 'ts', sourcefile: 'm4-quotes.ts' },
+    bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'silent' });
+  return import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
+}
+const quoteCode = await loadQuoteCode();
 
 /** @brief 页面里的录制器（与 m3-record.mjs 相同），加上读文件、等会话结束并答复批准请求。 */
 function installRecorder() {
@@ -114,51 +125,18 @@ const reopen = async (rec, sessionFile, cwd) => {
   return rec.cmd({ type: 'session.open', sessionFile });
 };
 const list = (rec) => rec.cmd({ type: 'session.list' });
-
-/** @brief 工作目录之内的路径显示为相对路径（照搬 src/renderer/src/components/toolTitle.ts 的 displayPath）。 */
-const displayPath = (path, cwd) => {
-  const normalized = path.replace(/\\/g, '/');
-  const base = cwd.replace(/\\/g, '/').replace(/\/+$/, '');
-  if (base && normalized.toLowerCase().startsWith(`${base.toLowerCase()}/`)) return normalized.slice(base.length + 1);
-  return path;
+/** @brief 像界面一样在阅读器里读一次模型用 read 读过的文件（点工具卡里的路径）。 */
+const readTool = (rec, s) => {
+  const start = rec.events().find((e) => e.event.type === 'tool_execution_start' && e.event.toolName === 'read');
+  return rec.read(start.event.args.path, s.cwd);
 };
-/** @brief 发给模型的引用块（照搬 src/renderer/src/state/quotes.ts 的 quoteBlock）。 */
-const quoteBlock = (ref, cwd) => {
-  const { source: s } = ref;
-  const lines = s.kind === 'file' ? (s.startLine === s.endLine ? `第 ${s.startLine} 行` : `第 ${s.startLine}–${s.endLine} 行`)
-    : '';
-  const heading = s.kind === 'message' ? '引用你之前的回复：' : `引用 ${displayPath(s.path, cwd)} ${lines}：`;
-  return [heading, ...ref.quote.split(/\r?\n/).map((line) => (line ? `> ${line}` : '>'))].join('\n');
-};
-/** @brief 文件内容按行拆开（照搬 quotes.ts 的 splitLines）。 */
-const splitLines = (text) => {
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
-  if (lines.length > 1 && lines.at(-1) === '') lines.pop();
-  return lines;
-};
-/** @brief 发一条带引用的消息（全文 = 引用块 + 空行 + 文字，与界面 composePrompt 相同）。 */
-const sayQuoted = (rec, s, refs, text) => rec.cmd({ type: 'session.prompt', sessionId: s.sessionId, refs,
-  text: [...refs.map((ref) => args_quoteBlock(ref, s.cwd)), text].join('\n\n') });
-/** @brief 读文件并取第 from–to 行作为文件引用（与界面在阅读器里选这几行得到的一样）。 */
-const fileRef = async (rec, path, cwd, from, to) => {
-  const read = await rec.read(path, cwd);
-  if (read.status !== 'ok') throw new Error(`cannot read ${path}: ${read.status}`);
-  const quote = splitLines(read.text).slice(from - 1, to).join('\n');
-  return { quote, source: { kind: 'file', path: read.path, sha256: read.sha256, startLine: from, endLine: to } };
-};
-/** @brief 某个会话最近一轮回复的整轮引用（与界面"引用到输入框"相同：正文段去掉首尾空白，段之间空一行）。 */
-const replyRef = (rec, s) => {
-  const events = rec.events().filter((e) => e.sessionId === s.sessionId).map((e) => e.event);
-  const userAt = events.findLastIndex((e) => e.type === 'message_start' && e.message.role === 'user');
-  const ends = events.slice(userAt).filter((e) => e.type === 'message_end' && e.message.role === 'assistant');
-  const texts = (message) => message.content.filter((p) => p.type === 'text' && p.text.trim()).map((p) => p.text.trim());
-  const first = ends.find((e) => texts(e.message).length > 0)?.message;
-  const id = events.find((e) => e.type === 'mori.entry_id' && e.role === 'assistant' && e.time === first?.timestamp);
-  return { quote: ends.flatMap((e) => texts(e.message)).join('\n\n'), source: { kind: 'message',
-    sessionFile: s.sessionFile, entryId: id?.entryId ?? null, time: first?.timestamp ?? null, scope: 'reply' } };
+/** @brief 发出上一段在 node 里拼好的带引用的消息（args.refPrompt）。 */
+const sendQuoted = (rec, args) => {
+  const { sessionId, refs, text } = args.refPrompt;
+  return rec.cmd({ type: 'session.prompt', sessionId, refs, text });
 };
 
-// ---------- 录完后的核对（在 node 里） ----------
+// ---------- 录完后的核对、带引用的消息（在 node 里） ----------
 
 const need = (ok, problem) => (ok ? [] : [problem]);
 const values = (steps, type) => steps.filter((s) => s.result?.type === type && !s.result.error)
@@ -168,6 +146,47 @@ const eventsOf = (steps, type) => steps.filter((s) => s.envelope?.event.type ===
 const reads = (steps) => steps.filter((s) => s.file).map((s) => s.file);
 const textOf = (message) => (typeof message?.content === 'string' ? message.content
   : (message?.content ?? []).map((part) => part.text ?? '').join(''));
+
+/** @brief 文件内容按行拆开（照搬 src/renderer/src/state/quotes.ts 的 splitLines）。 */
+function splitLines(text) {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  if (lines.length > 1 && lines.at(-1) === '') lines.pop();
+  return lines;
+}
+
+/** @brief 最后一次读文件的第 from–to 行作为文件引用（与界面在阅读器里选这几行得到的一样）。 */
+function fileRef(steps, from, to) {
+  const read = reads(steps).at(-1);
+  if (read?.result.status !== 'ok') throw new Error(`cannot read ${read?.path}: ${read?.result.status}`);
+  const quote = splitLines(read.result.text).slice(from - 1, to).join('\n');
+  return { quote, source: { kind: 'file', path: read.result.path, sha256: read.result.sha256, startLine: from,
+    endLine: to } };
+}
+
+/** @brief 会话 s 最近一轮回复的整轮引用（与界面"Attach message as context"相同：正文段去掉首尾空白，段之间空一行）。 */
+function replyRef(steps, s) {
+  const events = steps.filter((step) => step.envelope?.sessionId === s.sessionId).map((step) => step.envelope.event);
+  const userAt = events.findLastIndex((e) => e.type === 'message_start' && e.message.role === 'user');
+  const ends = events.slice(userAt).filter((e) => e.type === 'message_end' && e.message.role === 'assistant');
+  const texts = (message) => message.content.filter((p) => p.type === 'text' && p.text.trim()).map((p) => p.text.trim());
+  const first = ends.find((e) => texts(e.message).length > 0)?.message;
+  const id = events.find((e) => e.type === 'mori.entry_id' && e.role === 'assistant' && e.time === first?.timestamp);
+  return { quote: ends.flatMap((e) => texts(e.message)).join('\n\n'), source: { kind: 'message',
+    sessionFile: s.sessionFile, entryId: id?.entryId ?? null, time: first?.timestamp ?? null, scope: 'reply' } };
+}
+
+/**
+ * @brief 按界面的做法拼出带引用的消息（quoteText.ts 的 composePrompt：每个引用一段引用块，接你的文字），
+ *        放进 args.refPrompt 给下一段发出。refsOf 拿到录下的步骤和第一个新建的会话，返回引用。
+ */
+function prepareQuoted(steps, args, refsOf, text) {
+  const s = values(steps, 'session.create')[0];
+  const refs = refsOf(steps, s);
+  args.refPrompt = { sessionId: s.sessionId, cwd: s.cwd, refs, text: quoteCode.composePrompt(refs, text, s.cwd) };
+}
+
+/** @brief 引用最后一次读到的文件的第 1–3 行。 */
+const firstLines = (steps) => [fileRef(steps, 1, 3)];
 
 /** @brief 共同的要求：开头是会话列表；没有失败的命令；每条你的消息和助手回复都补发了条目 id。 */
 function common(steps, afterRestart = false) {
@@ -204,8 +223,8 @@ function toolsOnly(steps, allowed) {
 }
 
 /**
- * @brief 录制的场景：phases 依次执行（page 在页面里录，node 在 node 里做，restart 关掉 Mori 再启动、之前的作为准备不进
- *        fixture）。check 在录完后核对。
+ * @brief 录制的场景：phases 依次执行（page 在页面里录；node 在 node 里做，拿到目前的步骤和 args，可以往 args 里放东西
+ *        给下一段；restart 关掉 Mori 再启动、之前的作为准备不进 fixture）。check 在录完后核对。
  */
 const scenarios = [
   { name: 'edit-two', description: '让模型用 edit 改两个文件（README.md、src/a.ts），允许编辑；改完读一次两个文件',
@@ -230,7 +249,7 @@ const scenarios = [
       await rec.settle(s.sessionId, 1, ['write']);
       const start = rec.events().find((e) => e.event.type === 'tool_execution_start' && e.event.toolName === 'write');
       await rec.read(start.event.args.path, s.cwd);
-    } }, { node: (steps, state) => {
+    } }, { node: (steps) => {
       const ok = reads(steps)[0]?.result;
       if (ok?.status !== 'ok') throw new Error(`the written file was not read: ${JSON.stringify(ok)}`);
       rmSync(ok.path);
@@ -250,10 +269,11 @@ const scenarios = [
       const s = await args.create(rec, args.cwd);
       await rec.cmd({ type: 'session.prompt', sessionId: s.sessionId, text: args.READ });
       await rec.settle(s.sessionId, 1);
-      const start = rec.events().find((e) => e.event.type === 'tool_execution_start' && e.event.toolName === 'read');
-      const ref = await args.fileRef(rec, start.event.args.path, s.cwd, 1, 3);
-      await args.sayQuoted(rec, s, [ref], args.ASK_FILE);
-      await rec.settle(s.sessionId, 2);
+      await args.readTool(rec, s);
+    } }, { node: (steps, args) => prepareQuoted(steps, args, firstLines, args.ASK_FILE) },
+    { page: async (rec, args) => {
+      await args.sendQuoted(rec, args);
+      await rec.settle(args.refPrompt.sessionId, 2);
     } }],
     check: (steps) => [...common(steps), ...toolsOnly(steps, ['read']), ...refsSaved(steps),
       ...need(eventsOf(steps, 'agent_settled').length === 2, 'expected two settled turns')] },
@@ -263,10 +283,11 @@ const scenarios = [
       const s = await args.create(rec, args.cwd);
       await rec.cmd({ type: 'session.prompt', sessionId: s.sessionId, text: args.READ });
       await rec.settle(s.sessionId, 1);
-      const start = rec.events().find((e) => e.event.type === 'tool_execution_start' && e.event.toolName === 'read');
-      const ref = await args.fileRef(rec, start.event.args.path, s.cwd, 1, 3);
-      await args.sayQuoted(rec, s, [ref], args.ASK_FILE);
-      await rec.settle(s.sessionId, 2);
+      await args.readTool(rec, s);
+    } }, { node: (steps, args) => prepareQuoted(steps, args, firstLines, args.ASK_FILE) },
+    { page: async (rec, args) => {
+      await args.sendQuoted(rec, args);
+      await rec.settle(args.refPrompt.sessionId, 2);
     } }, { restart: true }, { page: async (rec, args) => {
       await args.list(rec);
       const s = args.setup[0];
@@ -279,7 +300,7 @@ const scenarios = [
       const refs = (opened?.entries ?? []).filter((e) => e.type === 'custom' && e.customType === 'mori.ref');
       const target = opened?.entries.find((e) => e.id === refs[0]?.data.messageId);
       return [...common(steps, true), ...need(refs.length === 1 && target?.message?.role === 'user'
-        && textOf(target.message).startsWith('引用 src/a.ts 第 1–3 行：') && reads(steps)[0]?.result.status === 'ok',
+        && textOf(target.message).startsWith('Quoting src/a.ts, lines 1–3:') && reads(steps)[0]?.result.status === 'ok',
       `refs entries: ${JSON.stringify(refs).slice(0, 300)}`)];
     } },
   { name: 'quote-changed', description: '引用 src/a.ts 第 1–3 行，让模型把 add 改成 plus（允许编辑）；改完再读一次文件，'
@@ -289,11 +310,13 @@ const scenarios = [
       const s = await args.create(rec, args.cwd);
       await rec.cmd({ type: 'session.prompt', sessionId: s.sessionId, text: args.READ });
       await rec.settle(s.sessionId, 1);
-      const start = rec.events().find((e) => e.event.type === 'tool_execution_start' && e.event.toolName === 'read');
-      const ref = await args.fileRef(rec, start.event.args.path, s.cwd, 1, 3);
-      await args.sayQuoted(rec, s, [ref], args.RENAME);
-      await rec.settle(s.sessionId, 2, ['edit']);
-      await rec.read(ref.source.path, s.cwd);
+      await args.readTool(rec, s);
+    } }, { node: (steps, args) => prepareQuoted(steps, args, firstLines, args.RENAME) },
+    { page: async (rec, args) => {
+      const { sessionId, cwd, refs } = args.refPrompt;
+      await args.sendQuoted(rec, args);
+      await rec.settle(sessionId, 2, ['edit']);
+      await rec.read(refs[0].source.path, cwd);
     } }],
     check: (steps) => {
       const [before, after] = reads(steps);
@@ -309,8 +332,10 @@ const scenarios = [
       await rec.cmd({ type: 'session.prompt', sessionId: s.sessionId, text: args.ASK_REPLY_FIRST });
       await rec.settle(s.sessionId, 1);
       await rec.sleep(300);
-      await args.sayQuoted(rec, s, [args.replyRef(rec, s)], args.ASK_REPLY);
-      await rec.settle(s.sessionId, 2);
+    } }, { node: (steps, args) => prepareQuoted(steps, args, (all, s) => [replyRef(all, s)], args.ASK_REPLY) },
+    { page: async (rec, args) => {
+      await args.sendQuoted(rec, args);
+      await rec.settle(args.refPrompt.sessionId, 2);
     } }],
     check: (steps) => {
       const sent = steps.find((s) => s.command?.refs)?.command;
@@ -333,15 +358,11 @@ const scenarios = [
 /** @brief 把共用的操作注入页面里的场景函数（页面里没有模块作用域）。 */
 function wrap(body) {
   return `async (rec, args) => {
-    const args_quoteBlock = ${quoteBlock.toString()};
-    const displayPath = ${displayPath.toString()};
-    const splitLines = ${splitLines.toString()};
     args.create = ${create.toString()};
     args.reopen = ${reopen.toString()};
     args.list = ${list.toString()};
-    args.sayQuoted = ${sayQuoted.toString()};
-    args.fileRef = ${fileRef.toString()};
-    args.replyRef = ${replyRef.toString()};
+    args.readTool = ${readTool.toString()};
+    args.sendQuoted = ${sendQuoted.toString()};
     return (${body.toString()})(rec, args);
   }`;
 }
@@ -377,7 +398,7 @@ async function runPhases(scenario, args, state) {
   let fresh = true;
   for (const phase of scenario.phases) {
     if (phase.node) {
-      phase.node(steps, state);
+      phase.node(steps, args, state);
     } else if (phase.restart) {
       args.setup = values(steps, 'session.create');
       await state.mori.app.close();

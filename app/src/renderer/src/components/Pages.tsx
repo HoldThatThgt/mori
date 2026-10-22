@@ -6,7 +6,7 @@ import { BrandMark, Icon } from '../icons';
 import { folderName, KernelExitBanner } from './ChatPane';
 import { FirstRunForm } from './FirstRunForm';
 
-/** @brief "打开文件夹…"：正在打开时显示文件夹名，失败时显示原文；hint 替换默认的说明。 */
+/** @brief "Open folder…"：正在打开时显示文件夹名，失败时显示原文；hint 替换默认的说明。 */
 export function OpenFolderPrompt({ heading, hint }: { heading: string; hint?: string }) {
   const tabs = useApp((state) => state.tabs);
   const last = tabs[tabs.length - 1];
@@ -14,12 +14,12 @@ export function OpenFolderPrompt({ heading, hint }: { heading: string; hint?: st
   return (
     <div className="open-folder" data-testid="open-folder">
       <h2>{heading}</h2>
-      <p className="muted">{hint ?? '选择一个项目文件夹开始对话。'}</p>
+      <p className="muted">{hint ?? 'Choose a project folder to start a session.'}</p>
       <button className="button primary" disabled={opening} onClick={() => void openFolder()}>
-        <Icon name="folder" />打开文件夹…
+        <Icon name="folder" />Open folder…
       </button>
-      {opening && <p className="muted">正在打开 {folderName(last.cwd)}…</p>}
-      {last?.phase === 'failed' && <p className="form-message error">打开失败：{last.error}</p>}
+      {opening && <p className="muted">Opening {folderName(last.cwd)}…</p>}
+      {last?.phase === 'failed' && <p className="form-message error">Failed to open session: {last.error}</p>}
     </div>
   );
 }

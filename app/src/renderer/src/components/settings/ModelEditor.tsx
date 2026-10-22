@@ -39,7 +39,7 @@ export function ModelEditor({ provider, model, onClose }: ModelEditorProps) {
     else setError(result.error);
   }
   return (
-    <form className="settings-form mf-grid" data-testid="model-form"
+    <form className="settings-form mf-grid" data-testid="model-form" noValidate
       onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <h3>{adding ? 'Add model' : 'Edit model'} · {provider.name}</h3>
       <ModelFields draft={draft} edit={edit} errors={shownErrors(errors, touched)} editing={!adding} full thinking />
