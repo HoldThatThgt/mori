@@ -430,7 +430,7 @@ async function item1(ctx) {
   const ref = `${ctx.conn.provider}/${SECOND_MODEL}`;
   const menu = await switchModel(page, ref);
   const button = pane(page).getByTestId('model-button');
-  const shown = { text: (await button.innerText()).trim(),
+  const shown = { text: (await button.textContent()).trim(),
     tip: ((await button.getAttribute('title')) ?? '').split('\n'),
     inRow: await button.evaluate((el) => Boolean(el.closest('[data-testid="composer"] .composer-bottom'))) };
   await sendTurn(page, PROMPTS.today);
@@ -517,7 +517,7 @@ async function item2(ctx) {
   recordAgents(ctx, seen);
   await backToChat(page);
   await newSession(page);
-  const model = (await pane(page).getByTestId('model-button').innerText()).trim();
+  const model = (await pane(page).getByTestId('model-button').textContent()).trim();
   record('反例：新会话仍用设置里的默认范围（测试分组，当前模型是首选的第一个；在那一栏换的范围只作用于那个会话）',
     model === `${REAL_GROUP} · ${ctx.conn.model}`, model);
   await sendTurn(page, PROMPTS.intro);
