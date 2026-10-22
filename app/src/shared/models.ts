@@ -85,7 +85,7 @@ export const CompatSchema = z.strictObject({
 });
 export type Compat = z.infer<typeof CompatSchema>;
 
-/** @brief 一个兼容选项：勾选时把 compat[field] 写成 value，取消勾选时删除该字段；界面文字见 COMPAT_LABELS。 */
+/** @brief 一个兼容选项：勾选时把 compat[field] 写成 value，取消勾选时删除该字段；界面文字见 COMPAT_LABELS、COMPAT_HINTS。 */
 export interface CompatOption {
   /** 表单里的标识 */
   id: string;
@@ -105,14 +105,24 @@ export const COMPAT_OPTIONS: readonly CompatOption[] = [
   { id: 'toolResultName', field: 'requiresToolResultName', value: true },
 ];
 
-/** @brief 兼容选项的界面文字（§9.1），按 compat 字段名索引。 */
+/** @brief 兼容选项的界面文字（§9.1，沿用 english-ui 的标签），按 compat 字段名索引。 */
 export const COMPAT_LABELS: Readonly<Record<keyof Compat, string>> = Object.freeze({
-  supportsDeveloperRole: "Endpoint doesn't support the developer role",
-  supportsStore: "Endpoint doesn't accept the store field",
-  maxTokensField: 'Send the output limit as max_tokens',
-  supportsUsageInStreaming: "Endpoint doesn't report usage while streaming",
-  supportsStrictMode: "Endpoint doesn't support strict mode",
+  supportsDeveloperRole: 'Endpoint doesn’t support the developer role',
+  supportsStore: 'Endpoint doesn’t accept the store field',
+  maxTokensField: 'Endpoint needs max_tokens instead of max_completion_tokens',
+  supportsUsageInStreaming: 'Endpoint doesn’t report usage while streaming',
+  supportsStrictMode: 'Endpoint doesn’t support strict mode for tool parameters',
   requiresToolResultName: 'Tool results must include the tool name',
+});
+
+/** @brief 兼容选项勾选框下的说明（§9.1，沿用 english-ui），按 compat 字段名索引。 */
+export const COMPAT_HINTS: Readonly<Record<keyof Compat, string>> = Object.freeze({
+  supportsDeveloperRole: 'Sends the system prompt with the system role instead',
+  supportsStore: 'Leaves store out of requests',
+  maxTokensField: 'Older endpoints don’t recognize max_completion_tokens',
+  supportsUsageInStreaming: 'Doesn’t send stream_options, so the context usage shown will be inaccurate',
+  supportsStrictMode: 'Leaves strict out of tool definitions',
+  requiresToolResultName: 'Some endpoints require a name field on tool result messages',
 });
 
 /** @brief 提供商下的一个 key：配置里只存引用，密文在 credentials.json。 */
@@ -152,7 +162,7 @@ const providerFields = {
   /** 接口类型 */
   api: z.enum(API_TYPES),
   /** 服务地址，http 或 https */
-  baseUrl: z.url({ protocol: /^https?$/, message: 'Address must be an http or https URL' }),
+  baseUrl: z.url({ protocol: /^https?$/, message: 'Base URL must be an http or https URL' }),
   /** 兼容选项 */
   compat: CompatSchema,
   /** 每个 key 的并发上限 */
@@ -216,6 +226,15 @@ export const ModelConfigSchema = z.strictObject({
   projectZones: z.record(ProjectPathSchema, ZoneListSchema),
 });
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
+
+/**
+ * @brief 改 Base URL 的 origin 要删除 key 时确认框的文字（§4.1），后台进程（applyAddressChange）与界面（提供商表单）共用。
+ * @param count 要删除的 key 数（≥ 1）
+ */
+export function addressChangeText(count: number): string {
+  return count === 1 ? 'Changing the base URL removes this provider’s saved key. Add it again after saving.'
+    : `Changing the base URL removes this provider’s ${count} saved keys. Add them again after saving.`;
+}
 
 // ---- 区域建议（§12）：后台进程（models.get 的 zoneSuggestions）与界面（表单的预选）共用 ----
 
@@ -324,7 +343,7 @@ export const REASON_TEXTS = Object.freeze({
   rate_limited: (until: number | null): string => withUntil('rate limited', ' ', until),
   auth: (): string => 'API key rejected',
   quota: (): string => 'quota exhausted',
-  connection: (until: number | null): string => withUntil("can't connect", ' ', until),
+  connection: (until: number | null): string => withUntil('can’t connect', ' ', until),
   not_found: (): string => 'model not found on the server',
   timeout: (until: number | null): string => withUntil('no response', '; unavailable ', until),
   held: (until: number | null): string => withUntil('waiting to make sure it stopped', ', ', until),
@@ -333,7 +352,7 @@ export const REASON_TEXTS = Object.freeze({
   earlier: (): string => 'skipped at the start of this reply',
   /** rebuildError：重建的压缩失败时的原文；null 表示窗口放不下 */
   no_handover: (rebuildError: string | null): string => (rebuildError === null
-    ? 'conversation too long for this model' : `couldn't rebuild the conversation: ${rebuildError}`),
+    ? 'conversation too long for this model' : `couldn’t rebuild the conversation: ${rebuildError}`),
   /** waitedMs：排队等过的时长（§12 的排队超时） */
   queue_timeout: (waitedMs: number): string => `waited ${Math.round(waitedMs / 1000)} s for a free slot`,
 }) satisfies Readonly<Record<ModelReason, (...args: never[]) => string>>;
@@ -359,7 +378,7 @@ export function plainReasonText(reason: ModelReason, detail: string): string {
 /** @brief 准备中按了停止时 session.prompt 的错误原文（§11.4）：界面撤回消息，不显示错误卡。 */
 export const STOPPED_BEFORE_SENDING = 'Stopped before sending';
 /** @brief 被拒绝启动的会话收到 session.prompt 时的错误原文（§4.6）：原因由拒绝启动卡说明，界面不另显示错误卡。 */
-export const BLOCKED_PROMPT_MESSAGE = "This session can't start: no model fits";
+export const BLOCKED_PROMPT_MESSAGE = 'This session can’t start: no model fits';
 
 /** @brief 一个候选和它被排除的原因。 */
 export interface CandidateExclusion {
@@ -706,7 +725,7 @@ export type ModelEvent =
     detail: string;
     /** 有被隐藏的过程（显示 "The new model redoes this reply."） */
     hidden: boolean;
-    /** 没能确认旧请求已停下就换的（§5.7 cancel_verified 为 unknown，提示注明 couldn't confirm it stopped） */
+    /** 没能确认旧请求已停下就换的（§5.7 cancel_verified 为 unknown，提示注明 Couldn’t confirm it stopped） */
     unconfirmed: boolean;
     /** 换模型的时刻（ms） */
     at: number;

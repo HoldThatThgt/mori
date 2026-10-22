@@ -332,14 +332,14 @@ export function App() {
       <main className="first-run">
         <div className="first-run-card">
           {kernel === 'exited' ? <KernelExitBanner />
-            : <p className="form-message error">Couldn’t load connections: {configError}</p>}
+            : <p className="form-message error">Couldn’t load model settings: {configError}</p>}
         </div>
       </main>
     );
   }
   if (!config) {
     return (
-      <main className="first-run"><p className="muted" data-testid="first-run-loading">Loading connections…</p></main>
+      <main className="first-run"><p className="muted" data-testid="first-run-loading">Loading…</p></main>
     );
   }
   if (firstRun) return <FirstRun exited={kernel === 'exited'} />;

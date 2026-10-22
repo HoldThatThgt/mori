@@ -127,7 +127,7 @@ test('MP-08 a provider with a bad address is listed as dropped', () => {
   const result = migrateFile({ providers: { bad: endpoint({ baseUrl: 'ftp://x' }), ok: endpoint() } });
   assert.deepEqual(result.config.providers.map((p) => p.id), ['ok']);
   assert.equal(result.notice.dropped[0].subject, 'bad');
-  assert.match(result.notice.dropped[0].reason, /baseUrl: Address must be an http or https URL/);
+  assert.match(result.notice.dropped[0].reason, /baseUrl: Base URL must be an http or https URL/);
 });
 
 test('MP-08 compat keeps only the values v0 wrote when ticked; the rest is listed', () => {

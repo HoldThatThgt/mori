@@ -64,7 +64,7 @@ function emptyConfig(): ModelConfig {
 function requireConfig(layer: ModelLayer, config: ModelConfig | null): ModelConfig {
   if (config) return config;
   const error = layer.configError();
-  throw new Error(error ? `Model settings can't be read: ${error}` : 'No model settings yet');
+  throw new Error(error ? `Model settings can’t be read: ${error}` : 'No model settings yet');
 }
 
 /** @brief 按 id 找提供商，找不到时报错。 */
@@ -185,7 +185,7 @@ function firstRunReplace(config: ModelConfig, command: Cmd<'models.firstRun'>, p
  */
 function firstRun(layer: ModelLayer, command: Cmd<'models.firstRun'>): Promise<ProviderSaved> {
   return write(layer, command.type, async (config) => {
-    if (layer.configError() !== null) throw new Error(`Model settings can't be read: ${layer.configError()}`);
+    if (layer.configError() !== null) throw new Error(`Model settings can’t be read: ${layer.configError()}`);
     const own = command.providerId !== null && command.providerId === layer.firstRunProvider();
     if (config !== null && !own) throw new Error('Model settings already exist; change them in Settings → Models');
     const draft = config === null ? firstRunCreate(layer, command)

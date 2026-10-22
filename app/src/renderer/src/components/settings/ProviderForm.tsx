@@ -4,7 +4,7 @@
 // 状态表见 docs/v1/screens/models-settings.md "提供商表单"。
 
 import { useState } from 'react';
-import type { ModelProvider, ProviderSaved } from '../../../../shared/models';
+import { addressChangeText, type ModelProvider, type ProviderSaved } from '../../../../shared/models';
 import { writeModels } from '../../state/settings';
 import { ModelDialog } from './common';
 import {
@@ -27,7 +27,7 @@ function originOf(url: string): string | null {
   }
 }
 
-/** @brief 提供商字段：Name、Address、API type、Network zone、Concurrency per key、兼容选项。 */
+/** @brief 提供商字段：Name、Base URL、API type、Network zone、Concurrency per key、兼容选项。 */
 function ProviderFields({ form, follow }: { form: ReturnType<typeof useDraft<ProviderDraft>>; follow: boolean }) {
   const { draft, touched, edit } = form;
   const set = (patch: Partial<ProviderDraft>) => edit(providerPatch(draft, patch, follow));
@@ -120,8 +120,7 @@ function EditProvider({ provider, onClose }: { provider: ModelProvider; onClose:
         <ModelDialog testId="confirm-dialog" kind="address-change" title="Change the base URL?"
           confirmLabel="Save and remove keys" tone="danger" busy={busy} error={null}
           onConfirm={() => void save()} onCancel={() => setConfirming(false)}>
-          <p>{count === 1 ? 'Changing the base URL removes this provider’s saved key. Add it again after saving.'
-            : `Changing the base URL removes this provider’s ${count} saved keys. Add them again after saving.`}</p>
+          <p>{addressChangeText(count)}</p>
         </ModelDialog>
       )}
     </form>

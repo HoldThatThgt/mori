@@ -20,13 +20,13 @@ const hhmmss = (ms) => {
 /** §5.3 界面文字列（按规格原文写出，不从实现取，免得与别的测试进程争用同一个打包文件）。 */
 const REASON_TEXTS = {
   rate_limited: (until) => (until === null ? 'rate limited' : `rate limited until ${hhmmss(until)}`),
-  connection: (until) => (until === null ? "can't connect" : `can't connect until ${hhmmss(until)}`),
+  connection: (until) => (until === null ? 'can’t connect' : `can’t connect until ${hhmmss(until)}`),
   timeout: (until) => (until === null ? 'no response' : `no response; unavailable until ${hhmmss(until)}`),
   held: (until) => (until === null ? 'waiting to make sure it stopped'
     : `waiting to make sure it stopped, until ${hhmmss(until)}`),
   queue_timeout: (ms) => `waited ${Math.round(ms / 1000)} s for a free slot`,
   no_handover: (error) => (error === null ? 'conversation too long for this model'
-    : `couldn't rebuild the conversation: ${error}`),
+    : `couldn’t rebuild the conversation: ${error}`),
 };
 
 const A = { provider: 'ds', api: 'openai-completions', model: 'chat' };

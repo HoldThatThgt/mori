@@ -91,7 +91,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 列表 | `config.providers`（按配置顺序） | 每个提供商一张卡：名称；“Base URL”、“API type”（三种显示名同表单）、“Network zone”（Local / Intranet / Public；未确认时“Not confirmed”）、“Concurrency per key”、“Compatibility options”（勾了的兼容选项的英文说明，逗号分隔；没有时“None”）；下面是 Keys 和 Models 两块。字段名都是临时，走查时可以改 | Edit；Delete…；Test connection；Add model；节底部“Add provider”（临时，走查时可以改） |
+| 列表 | `config.providers`（按配置顺序） | 每个提供商一张卡：名称；“Base URL”、“API type”（三种显示名同表单）、“Network zone”（Local / Intranet / Public；未确认时“Not confirmed”）、“Concurrency per key”、“Compatibility options”（勾了的兼容选项的标签，逗号分隔，不带说明；没有时“None”）；下面是 Keys 和 Models 两块。字段名都是临时，走查时可以改 | Edit；Delete…；Test connection；Add model；节底部“Add provider”（临时，走查时可以改） |
 | 没有提供商 | `config.providers` 为空（例如删掉了最后一个提供商） | “No providers yet. Add one to start a session.”（临时，走查时可以改） | Add provider |
 | 测试中 | 你点了“Test connection”，`connection.test`（`{ providerId, modelId: 第一个模型 }`，不带 `keyRef`，用第一个可用的 key）还没返回 | 按钮变为“Testing…”（临时，走查时可以改），旁边“Cancel” | Cancel（`connection.testCancel`） |
 | 测试结果 | `connection.test` 返回 | 卡内显示结果，文字见下“测试结果的文字”。没有 30 秒总时限：排队按 §8.2，每次尝试按首个内容的时限，`server` 不重试直接报告（§9.1） | 再次测试 |
@@ -103,7 +103,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 新建 | 你点了“Add provider” | 标题“Add provider”（临时，走查时可以改）；字段 Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”，默认第一项）、Network zone（Local / Intranet / Public，预选建议值，见下）、Concurrency per key（默认 4，1–64）、兼容选项（只在 API type 为 `openai-completions` 时，六个勾选框，文字用 §9.1 的英文说明）；另有第一个 key（Label 默认“Key 1”、Secret 密码框，可空）和第一个模型（同模型表单的字段） | Save；Cancel |
+| 新建 | 你点了“Add provider” | 标题“Add provider”（临时，走查时可以改）；字段 Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”，默认第一项）、Network zone（Local / Intranet / Public，预选建议值，见下）、Concurrency per key（默认 4，1–64）、兼容选项（只在 API type 为 `openai-completions` 时，六个勾选框，每个是 §9.1 的标签加下面一行说明，沿用 english-ui）；另有第一个 key（Label 默认“Key 1”、Secret 密码框，可空）和第一个模型（同模型表单的字段） | Save；Cancel |
 | Edit | 你点了卡上的“Edit” | 标题“Edit provider · <name>”（临时，走查时可以改）；同上，不含 key 和模型字段；Network zone 是当前值，不自动改 | Save；Cancel |
 | 区域的建议值 | §12 的规则，按 Base URL 算 | 新建时：你还没手动选过区域，Base URL 一改预选就跟着改；你选过之后不再自动改（临时，走查时可以改） | 改选 |
 | 字段错误 | 界面先按 §4.1 检查 | 字段旁英文错误，文字见下“字段错误的文字”；有错误时 Save 不可用 | 修改 |

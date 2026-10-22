@@ -216,7 +216,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 | `project_config` | 项目配置无效（§4.3） | .mori/models.json: <原因或原文> | Open settings |
 | `config_invalid` | 用户级配置读不出（§4.1） | Model settings can’t be read: <路径>: <原文> | Open settings |
 
-被拒绝启动的会话可以看历史、可以在输入框打字、可以改范围；发送不可用，后台进程收到这个会话的 `session.prompt` 时拒绝（`This session can't start: no model fits`，经 `mori.prompt_error` 把文字放回输入框）。
+被拒绝启动的会话可以看历史、可以在输入框打字、可以改范围；发送不可用，后台进程收到这个会话的 `session.prompt` 时拒绝（`This session can’t start: no model fits`，经 `mori.prompt_error` 把文字放回输入框）。
 
 ### 4.7 回复进行中改配置
 
@@ -262,10 +262,10 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 | 2 | 提供商区域已确认 | `zone_unconfirmed` | network zone not confirmed |
 | 2 | 区域在项目允许的区域里 | `zone_blocked` | zone <区域> is not allowed for this project |
 | 3 | 档案的 `tool_calling` 为已验证（§7.4 重新验证期间按旧结果） | `probing` / `unverified` / `failed` | verifying… / tool calling not verified yet / tool calling failed verification |
-| 4 | 可用（§8.3） | `rate_limited` / `auth` / `quota` / `connection` / `not_found` / `timeout` / `held` | rate limited until hh:mm:ss / API key rejected / quota exhausted / can't connect until hh:mm:ss / model not found on the server / no response; unavailable until hh:mm:ss / waiting to make sure it stopped, until hh:mm:ss |
+| 4 | 可用（§8.3） | `rate_limited` / `auth` / `quota` / `connection` / `not_found` / `timeout` / `held` | rate limited until hh:mm:ss / API key rejected / quota exhausted / can’t connect until hh:mm:ss / model not found on the server / no response; unavailable until hh:mm:ss / waiting to make sure it stopped, until hh:mm:ss |
 | 5 | 不在 `tried` 里 | `tried` | failed earlier in this reply: <它的原因文字> |
 | 5 | 段内选择时，排在 `current` 之后（不在 `skipped` 里，也不是排在它前面的） | `earlier` | skipped at the start of this reply |
-| 6 | 能接手这段对话（§6.2，只在要换到它时判断） | `no_handover` | conversation too long for this model / couldn't rebuild the conversation: <原文> |
+| 6 | 能接手这段对话（§6.2，只在要换到它时判断） | `no_handover` | conversation too long for this model / couldn’t rebuild the conversation: <原文> |
 
 - 第 1–3 步是静态校验（§4.6）；第 4–6 步只在选模型时判断。`queue_timeout` 不会出现在可用性里：它只让这一次请求换模型，记进 `tried`（文字“waited 60 s for a free slot”）。
 - 没有 `ReplyState` 或段刚开始：选通过的第一个。段内：`current` 仍通过第 1–5 步就继续用它；否则只在排在 `current` 之后的候选里按顺序选。
@@ -322,7 +322,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 - 档案的 `cancel_verified` 为 `true`（探针证明断开后服务端会停止，§7.3）：这个模型不可用一段时间（`timeout`，§12），立即按 §5.6 换模型。
 - `cancel_verified` 为 `false`（探针读得到服务端指标，但断开后请求没有停）：发每次尝试之前读一次服务端正在跑的请求数作基线（§7.3 第 9 步的指标）；超时后模型进入 `held`，
   每隔 §12 的间隔读一次，回到基线或更低即视为旧请求已停，立即按 §5.6 换模型；最长等 `held` 的时长。
-- `cancel_verified` 为 `unknown`（没有指标可读）：模型进入 `held`，等满 §12 的时长后按 §5.6 换模型，换模型提示注明“couldn't confirm it stopped”。
+- `cancel_verified` 为 `unknown`（没有指标可读）：模型进入 `held`，等满 §12 的时长后按 §5.6 换模型，换模型提示注明“Couldn’t confirm it stopped”。
 - 等待时阶段行显示“Waiting to make sure <模型> stopped · until hh:mm:ss”（`mori.model_wait`，`kind: held`）；你可以按停止。同一个请求不会同时在两个模型上跑（proposal §8、§12 第 4 条）。
 
 ### 5.8 候选耗尽
@@ -385,7 +385,7 @@ proposal §8 中“不换”的各项按 §5.4 处理：输出格式错误、上
 
 1. 调 pi 的 `session.compact()`；压缩请求由 B 生成摘要（§6.4，`ReplyState.current` 此时已是 B）。这次压缩产生的 pi 事件（`compaction_start`、`compaction_end`）后台进程不转给界面：阶段行显示“Rebuilding the conversation for <B>…”（`mori.model_wait`），结果只经 `mori.model_rebuild` 或换模型提示显示，没有 v0 的压缩提示和错误卡。
    - pi 报“Nothing to compact”或“Already compacted”（对话太短、或刚压缩过）：跳过这一步，继续第 2 步；
-   - 其他错误：排除 B（`no_handover`，“couldn't rebuild the conversation: <原文>”），选下一个并重新做接手判断；全部候选都因此排除时按 §5.8。
+   - 其他错误：排除 B（`no_handover`，“couldn’t rebuild the conversation: <原文>”），选下一个并重新做接手判断；全部候选都因此排除时按 §5.8。
 2. 写一条 `mori.rebuild` 条目 `{ model: B, at, summary }`（`summary` 表示第 1 步做了压缩），`at` 为写条目的时刻；发 `mori.model_rebuild` 事件。重新打开会话时，pi 的压缩条目照 v0 显示“已压缩较早的对话”，其后是这条重建提示。
 3. 之后发给模型的上下文里，时间戳早于 `at` 的消息：工具结果去掉；助手消息去掉思考和工具调用块，变空就去掉；其他角色（用户消息、压缩摘要、分支摘要、自定义消息、命令执行记录）原样保留。
    同一个函数既处理 pi 的 AgentMessage（`context` 钩子），也处理 pi-ai 的 Message（包装）。
@@ -543,7 +543,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
     操作：“Verify”、“Long-input test…”、“Cancel test…”（只对 vLLM、SGLang、llama.cpp）、上移、下移、“Edit”、“Delete…”、“Test”。
   - 模型表单：Model ID（编辑时只读，沿用 v0）、Context window、Max output（新建默认 16384 与窗口一半中较小的）、Family（可空）、Supports thinking、Image input、Default effort for new sessions（只在支持思考时；写 pi 设置的 `modelThinkingLevels`，沿用 v0）。
   - 提供商表单：Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Network zone（Local / Intranet / Public，按 §12 的规则预选建议值）、Concurrency per key、兼容选项；新建时还有第一个 key 和第一个模型。改地址的 origin 时按 §4.1 删除 key 并确认。
-    新提供商保存失败时，删除本次新存的 key。兼容选项的英文说明：“Endpoint doesn't support the developer role”“Endpoint doesn't accept the store field”“Send the output limit as max_tokens”“Endpoint doesn't report usage while streaming”“Endpoint doesn't support strict mode”“Tool results must include the tool name”。
+    新提供商保存失败时，删除本次新存的 key。兼容选项沿用 english-ui 的标签与说明，每个勾选框是标签加下面一行说明：“Endpoint doesn’t support the developer role”（“Sends the system prompt with the system role instead”）、“Endpoint doesn’t accept the store field”（“Leaves store out of requests”）、“Endpoint needs max_tokens instead of max_completion_tokens”（“Older endpoints don’t recognize max_completion_tokens”）、“Endpoint doesn’t report usage while streaming”（“Doesn’t send stream_options, so the context usage shown will be inaccurate”）、“Endpoint doesn’t support strict mode for tool parameters”（“Leaves strict out of tool definitions”）、“Tool results must include the tool name”（“Some endpoints require a name field on tool result messages”）；提供商卡上的“Compatibility options”只列标签。
   - 测试结果（Test connection、Test）：“Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>”；失败时“Connection failed: <原文>”；“Cancel”取消。
   - 确认对话框“Confirm zone…”：提供商名称与地址，Local / Intranet / Public 单选（预选建议值），“Confirm”/“Cancel”。
 - **Groups**：每个分组一行：id、有序的成员（“DeepSeek · all models” 或 “DeepSeek · deepseek-chat”），成员可以加入、去掉、上移、下移；“New group”、“Delete…”。
@@ -853,7 +853,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-15 | 段内换模型（重做） | 第三个请求时首选不可用：新模型收到的上下文里没有之前的助手消息和工具结果，这段的用户消息末尾带说明；新模型自己的消息之后不被隐藏；两次换模型时区间取并集、只有一段说明；会话文件和界面保留被隐藏的过程；重新打开后仍然隐藏；排队消息那一段被重做时，上一段的回答仍发给新模型；排队消息在上一段还在调工具时排进来、它那一段被重做时，上一段的回答完整地发给新模型；换到窗口更小的模型后触发阈值压缩，摘要请求里没有被隐藏的过程 | 单元、App、回放 |
 | MP-16 | 原地重试 | `http-503-once`：阶段行显示“Retrying (1/3)”，不换模型；`http-503`：重试用完后显示错误卡，不换模型 | App |
 | MP-17 | 不换的情况与停止 | 400、有输出后中断都不换模型；你按停止不换；在排队中、等模型中、等它停下时按停止：对话流显示已停止而不是错误卡，合成端点没有收到新的请求；两个会话排同一个提供商，停止一个，另一个照常发出 | App |
-| MP-18 | 结果未知 | `-hang` 与 `-stall`：`cancel_verified` 为 `true` 时立即换模型；为 `false`（`-nocancel`）时读指标确认停下后换模型；为 `unknown`（`FAKE_NO_METRICS=1`）时阶段行显示等它停下，等满后换模型继续这次回复，提示注明 couldn't confirm；期间合成端点没有收到同一请求的第二份；只有一个候选时等满后显示说明卡，没有错误卡 | 单元、App |
+| MP-18 | 结果未知 | `-hang` 与 `-stall`：`cancel_verified` 为 `true` 时立即换模型；为 `false`（`-nocancel`）时读指标确认停下后换模型；为 `unknown`（`FAKE_NO_METRICS=1`）时阶段行显示等它停下，等满后换模型继续这次回复，提示注明 Couldn’t confirm it stopped；期间合成端点没有收到同一请求的第二份；只有一个候选时等满后显示说明卡，没有错误卡 | 单元、App |
 | MP-19 | 排队与优先级 | 并发 1 时第二个请求排队，阶段行显示等待；探针排在对话之后；排队超时后换模型；调低并发、删 key、加 key 时按 §8.2；会话 2 段内遇到会话 1 造成的全部 key 冷却：直接换模型，不排队；并发 1、对话占着槽位时添加模型：探针等对话结束后完成，档案为 verified | 单元、App |
 | MP-20 | 候选耗尽 | 全部不可用时先等并显示原因，恢复后继续；只剩不会恢复的原因时不等；等不到时一张说明卡、没有错误卡；段开始时消息撤回、文字放回输入框；压缩时选不到模型报压缩失败；用到的行为：`FAKE_LIMIT_MS` 让限流在等待期间恢复 | 单元、App |
 | MP-21 | 接手判断与重建 | 要求回传推理的模型接手带别的模型工具调用的对话：段开始时重建（对话太短时只去掉工具调用和思考），重建后的上下文保留压缩摘要；段内只去掉、不压缩；窗口不够时段开始重建、段内排除；重建的压缩失败时换下一个候选；重建时没有 v0 的压缩提示和错误卡；重建的压缩失败后换到下一个候选，对话流没有错误卡 | 单元、App |

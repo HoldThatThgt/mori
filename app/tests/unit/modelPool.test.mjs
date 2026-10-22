@@ -977,7 +977,7 @@ test('MP-19 a request queued on a provider that is then deleted fails at once an
 test('MP-24 a key is never sent to an origin other than its provider\'s saved address', async () => {
   const { pool, stub, logs } = setup({ keys: ['p#1'] });
   const { fetch, seen } = poolFetch(pool);
-  await assert.rejects(fetch('http://127.0.0.1:9100/p/chat/completions', PI_INIT), /address of p changed/);
+  await assert.rejects(fetch('http://127.0.0.1:9100/p/chat/completions', PI_INIT), /base URL of p changed/);
   assert.equal(stub.calls.length, 0);
   assert.equal(pool.inFlight('p'), 0);
   assert.deepEqual(seen.records.map((r) => [r.cls, r.keyRef, r.sentAt]), [['request', 'p#1', null]]);
@@ -992,7 +992,7 @@ test('MP-24 a request built for the old address does not get a key added for the
   await flush();
   pool.setProviders([{ ...config, baseUrl: 'http://127.0.0.1:9100/p', keys: [{ ref: 'p#2', label: 'Key 2' }] }]);
   pool.setKeys('p', [{ ref: 'p#2', secret: 'secret-p#2' }]);
-  await assert.rejects(pending, /address of p changed/);
+  await assert.rejects(pending, /base URL of p changed/);
   assert.equal(stub.calls.length, 1);
   assert.ok(stub.calls.every((c) => c.headers.get('authorization') === null));
 });
