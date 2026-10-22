@@ -7,7 +7,7 @@ import { recordAction } from './actionLog';
 import { describe, request } from './bridge';
 import { saveArchived } from './archive';
 import { dropDraft, savedDraft, savedDraftRefs } from './drafts';
-import { attachLive, transcriptFromEntries } from './history';
+import { attachLive, transcriptFromEntries, withTeamInfo } from './history';
 import { guardLeave, leaveAllowed } from './leaveGuard';
 import { emptyTranscript, pushItem, startIndexFor, type Transcript } from './model';
 import { openInSplit, placeInSplit, showInFocused, withoutPane, type Side } from './split';
@@ -33,12 +33,16 @@ export async function loadSessions(): Promise<void> {
   }
 }
 
-/** @brief 把会话信息写进会话。批准设置以后台进程返回的为准（新建和重新打开的会话都是"Ask each time"）。 */
+/**
+ * @brief 把会话信息写进会话。批准设置以后台进程返回的为准（新建和重新打开的会话都是"Ask each time"）；
+ *        协作状态与 TaskBoard 视图同样（平行 Agent 规格 §13.10），挂起的后台批准卡与待判断的消息接到对话流上。
+ */
 export function withInfo(tab: Tab, info: SessionInfo): Tab {
   return { ...tab, sessionId: info.sessionId, cwd: info.cwd, sessionFile: info.sessionFile, name: info.name,
     projectTrust: info.projectTrust, trustRemembered: info.trustRemembered, trustSaveError: info.trustSaveError,
     extensionErrors: info.extensionErrors, ...modelStateOf(info),
-    contextUsage: info.contextUsage, approval: info.approval, phase: 'ready', error: null, interrupted: false };
+    contextUsage: info.contextUsage, approval: info.approval, team: info.team, board: info.board,
+    transcript: withTeamInfo(tab.transcript, info), phase: 'ready', error: null, interrupted: false };
 }
 
 /** @brief 扩展在会话打开过程中发的通知：接在对话流后面（extension-ui.md）。 */
@@ -76,8 +80,8 @@ export async function createSessionIn(cwd: string): Promise<void> {
   try {
     const trust = await trustFor(cwd);
     const info = await request<SessionInfo>({ type: 'session.create', cwd, trust });
-    updateTab(tab.key, (current) => ({ ...withInfo(current, info),
-      transcript: withNotices(current.transcript, info.extensionNotices) }));
+    updateTab(tab.key, (current) => withInfo({ ...current,
+      transcript: withNotices(current.transcript, info.extensionNotices) }, info));
     useApp.setState({ firstRun: false });
   } catch (error) {
     markFailed(tab.key, 'session.create', error);
@@ -176,7 +180,8 @@ async function closeForRemoval(ref: SessionRef): Promise<string | null> {
   const state = useApp.getState();
   const tab = state.tabs.find((item) => item.key === ref.tabKey);
   const saved = state.saved.sessions.find((item) => sameFile(item.sessionFile, ref.sessionFile));
-  if (tab && (tab.transcript.running || tab.transcript.sending)) {
+  // 后台还有 Agent 在运行或排队、或有待判断的消息时也算正在生成（平行 Agent 规格 §11.5）。
+  if (tab && (tab.transcript.running || tab.transcript.sending || tab.team.background)) {
     throw new Error('This session is still running. Stop it first.');
   }
   if (tab?.phase === 'opening') throw new Error('This session is still opening.');
@@ -243,7 +248,7 @@ async function reopenFromFile(tab: Tab, sessionFile: string, trust: TrustAnswer 
     opened.extensionNotices);
   const transcript = note ? pushItem(history, { kind: 'note', text: note }) : history;
   const startIndex = startIndexFor(transcript);
-  updateTab(tab.key, (current) => ({ ...withInfo(current, opened), transcript, startIndex }));
+  updateTab(tab.key, (current) => withInfo({ ...current, transcript, startIndex }, opened));
 }
 
 /**
@@ -266,7 +271,7 @@ async function reopen(tab: Tab, note: { saved: string; unsaved: string } | null)
     const info = await request<SessionInfo>({ type: 'session.create', cwd: tab.cwd, trust });
     const fresh = withNotices(emptyTranscript, info.extensionNotices);
     const transcript = note ? pushItem(fresh, { kind: 'note', text: note.unsaved }) : fresh;
-    updateTab(tab.key, (current) => ({ ...withInfo(current, info), transcript, startIndex: 0 }));
+    updateTab(tab.key, (current) => withInfo({ ...current, transcript, startIndex: 0 }, info));
   } catch (error) {
     markFailed(tab.key, 'reopen', error);
   }

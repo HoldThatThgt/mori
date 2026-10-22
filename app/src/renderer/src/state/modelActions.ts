@@ -1,12 +1,14 @@
 // 顶栏换选择范围、换思考强度（docs/v1/screens/model-menu.md）：只作用于这个会话，不改设置里的默认范围。
 // 请求期间按钮显示你选的值、不可用；返回后以后台进程给出的模型状态为准。换范围失败时按钮下方一行原文，
-// 换思考强度失败时对话流里一张错误卡（同 v0）；按钮都回到原来的值。拒绝启动卡上的 Verify now 也在这里。
+// 换思考强度失败时对话流里一张错误卡（同 v0）；按钮都回到原来的值。拒绝启动卡上的 Verify now、Check again、
+// Turn off team mode（docs/specs/parallel-agents-taskboard.md §4.4、§5.1）也在这里。
 
 import { create, type StoreApi } from 'zustand';
-import type { Command, ModelState, ThinkingLevel } from '../../../shared/protocol';
+import type { Command, ModelState, TeamCommandResults, ThinkingLevel } from '../../../shared/protocol';
 import type { ModelsResult, PickOption, PickOptions } from '../../../shared/models';
 import { describe, request } from './bridge';
 import { pushItem } from './model';
+import { withInfo } from './projects';
 import { modelStateOf, updateTab, useApp } from './store';
 
 /** 换范围失败的一行显示多久（ms），临时默认值（model-menu.md "切换失败"） */
@@ -135,5 +137,44 @@ export async function verifyNow(refs: string[]): Promise<string | null> {
     return null;
   } catch (error) {
     return describe('models.verify', error);
+  }
+}
+
+/**
+ * @brief 拒绝启动卡的"Check again"（平行 Agent 规格 §4.4）：重新读、重新校验角色文件；通过时后台进程重新打开这条会话。
+ *        返回的会话信息记到会话上，卡片随之消失或换成新的问题。
+ * @return 失败时的原文；成功时为 null
+ */
+export async function checkAgents(key: string): Promise<string | null> {
+  const sessionId = sessionIdOf(key);
+  if (!sessionId) return null;
+  try {
+    const info = await request<TeamCommandResults['session.recheckAgents']>({ type: 'session.recheckAgents',
+      sessionId });
+    if (info.error) throw new Error(info.error);
+    updateTab(key, (tab) => withInfo(tab, info));
+    return null;
+  } catch (error) {
+    return describe('session.recheckAgents', error);
+  }
+}
+
+/**
+ * @brief 拒绝启动卡与说明卡的"Turn off team mode"（平行 Agent 规格 §5.1、§12.11）：关掉协作模式，返回的协作状态记到
+ *        会话上；之后由 mori.model_state 更新模型按钮与卡片。
+ * @return 失败时的原文；成功时为 null
+ */
+export async function turnOffTeam(key: string): Promise<string | null> {
+  const sessionId = sessionIdOf(key);
+  if (!sessionId) return null;
+  try {
+    const result = await request<TeamCommandResults['session.setTeam']>({ type: 'session.setTeam', sessionId,
+      mode: 'off' });
+    if (result.error) throw new Error(result.error);
+    const { error: _error, ...team } = result;
+    updateTab(key, (tab) => ({ ...tab, team }));
+    return null;
+  } catch (error) {
+    return describe('session.setTeam', error);
   }
 }

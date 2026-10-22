@@ -2,11 +2,16 @@
 // M6：以 / 开头时输入框上方出"/"补全列表（SlashMenu.tsx），列表开着时 Enter 不发送。
 // v1（docs/v1/screens/model-chat.md）：准备中（发了消息、pi 还没开始）可以停止，再发的按排队处理（不能插话），
 // 显示在排队区；会话被拒绝启动时可以打字，但发送不可用（Enter 不发送，草稿不丢）。
+// 平行 Agent（docs/v1/screens/team-switch.md、team-stop.md）：/team on、/team off 在生成中、被拒绝启动时也按命令处理；
+// 排队区里有立项还没判断完的消息；后台有 Agent 在运行或排队时停止按钮旁有 Stop team。
 
 import { useLayoutEffect, useRef, useState } from 'react';
-import { send, stop, withdraw } from '../state/actions';
+import { roleLabel } from '../../../shared/team';
+import { send, stop, stopTeam, withdraw } from '../state/actions';
+import { pendingPrompt } from '../state/model';
 import { useOverlay } from '../state/overlays';
 import { updateTab, type Tab } from '../state/store';
+import { parseTeamCommand } from '../state/teamActions';
 import { Icon } from '../icons';
 import { skillCommandText } from '../state/skillText';
 import { ComposerQuotes } from './QuoteChips';
@@ -16,27 +21,48 @@ import { handleSlashKey, SlashMenu, useSlashMenu } from './SlashMenu';
 const MAX_INPUT_HEIGHT = 220;
 
 /**
+ * @brief 待判断、还没交给对话的消息（平行 Agent 规格 §5.3）：已作为准备中先显示在对话流里的那一条除外；
+ *        withdrawable 为"Withdraw"能带回的条数（立项正在判断的那条不撤回）。
+ */
+function decidingRows(transcript: Tab['transcript']): { texts: string[]; withdrawable: number } {
+  const { deciding } = transcript;
+  if (!deciding) return { texts: [], withdrawable: 0 };
+  const pending = pendingPrompt(transcript)?.text;
+  const shownAt = pending === undefined ? -1 : deciding.queue.findIndex((message) => message.text === pending);
+  const texts = deciding.queue.flatMap((message, at) => (at === shownAt ? [] : [message.text]));
+  // 正在判断的是队首（立项空闲时取队首，§5.3 第 2 步）；它显示在排队区时不算可以撤回的。
+  const judgedShown = deciding.since !== null && shownAt !== 0;
+  return { texts, withdrawable: texts.length - (judgedShown ? 1 : 0) };
+}
+
+/**
  * @brief 排队区：pi 的排队与插话列表；"Withdraw"把它们全部放回输入框。准备中暂存的消息（后台进程还没交给 pi）也显示在
- *        这里，标 data-pending；暂存期间"Withdraw"不可用（停止会把它们一起放回输入框）。
+ *        这里，标 data-pending；暂存期间"Withdraw"不可用（停止会把它们一起放回输入框）。协作模式下另有立项还没判断完的
+ *        消息，标 Waiting for <create role>（data-deciding）；只剩正在判断的那一条时"Withdraw"不可用（team-stop.md）。
  */
 export function QueueArea({ tab }: { tab: Tab }) {
-  const { steering, followUp, pendingQueue } = tab.transcript;
-  if (steering.length + followUp.length + pendingQueue.length === 0) return null;
+  const { steering, followUp, pendingQueue, deciding } = tab.transcript;
+  const waiting = decidingRows(tab.transcript);
+  if (steering.length + followUp.length + pendingQueue.length + waiting.texts.length === 0) return null;
+  const waitKind = `Waiting for ${roleLabel(deciding?.role ?? tab.team.holders.create)}`;
   // 技能命令在 pi 的队列里已经是展开后的正文，显示时写回"/skill:名字 参数"（slash.md）。
-  const rows = [...steering.map((text) => ({ kind: 'Steer', text, pending: false })),
-    ...followUp.map((text) => ({ kind: 'Queued', text, pending: false })),
-    ...pendingQueue.map((text) => ({ kind: 'Queued', text, pending: true }))]
+  const rows = [...steering.map((text) => ({ kind: 'Steer', text, pending: false, deciding: false })),
+    ...followUp.map((text) => ({ kind: 'Queued', text, pending: false, deciding: false })),
+    ...pendingQueue.map((text) => ({ kind: 'Queued', text, pending: true, deciding: false })),
+    ...waiting.texts.map((text) => ({ kind: waitKind, text, pending: false, deciding: true }))]
     .map((row) => ({ ...row, text: skillCommandText(row.text) }));
+  const withdrawable = steering.length + followUp.length + waiting.withdrawable > 0;
   return (
     <div className="queue-area" data-testid="queue">
       <ul>
         {rows.map((row, index) => (
-          <li key={index} data-pending={row.pending ? 'true' : undefined}>
+          <li key={index} data-pending={row.pending ? 'true' : undefined}
+            data-deciding={row.deciding ? 'true' : undefined}>
             <span className="queue-kind">{row.kind}</span><span className="queue-text">{row.text}</span>
           </li>
         ))}
       </ul>
-      {pendingQueue.length === 0 && (
+      {pendingQueue.length === 0 && withdrawable && (
         <button className="text-link" onClick={() => void withdraw(tab.key)}>Withdraw</button>
       )}
     </div>
@@ -66,6 +92,11 @@ function QueueButton({ tabKey, steer, disabled }: { tabKey: string; steer: boole
   );
 }
 
+/** @brief 原文是 /team on 或 /team off：生成中、被拒绝启动时也照样执行（team-switch.md "输入框里的 /team"）。 */
+function isTeamSwitch(draft: string): boolean {
+  return parseTeamCommand(draft).kind === 'switch';
+}
+
 /**
  * @brief 输入框。
  * @param notReady 不能发送时按钮位置显示的文字（"Starting…"等）；能发送时为 null
@@ -92,8 +123,9 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
     if (handleSlashKey(slash, event, imeActive)) return;
     if (event.key !== 'Enter' || event.shiftKey || imeActive) return;
     event.preventDefault();
-    if (notReady || !hasText || tab.blocked) return;
-    // 准备中（sending、还没 running）再发的由 send 按排队处理，Ctrl+Enter 也是（§11.4）。
+    if (notReady || !hasText) return;
+    if (tab.blocked && !isTeamSwitch(tab.draft)) return;
+    // 准备中（sending、还没 running）再发的由 send 按排队处理，Ctrl+Enter 也是（§11.4）；/team on、off 由 send 先认出。
     if (busy) void send(tab.key, event.ctrlKey && running ? 'steer' : 'followUp');
     else void send(tab.key);
   }
@@ -123,19 +155,31 @@ function placeholderText(running: boolean, sending: boolean): string {
   return sending ? 'Enter to queue · Shift+Enter for new line' : 'Enter to send · Shift+Enter for new line';
 }
 
+/** @brief Stop team（平行 Agent 规格 §11.4、§13.6）：停止这个会话的全部 Agent，不确认。 */
+function StopTeamButton({ tabKey }: { tabKey: string }) {
+  return (
+    <button className="button stop-team-button" data-testid="stop-team" title="Stop all agents in this session"
+      onClick={() => void stopTeam(tabKey)}>
+      <Icon name="stop" />Stop team
+    </button>
+  );
+}
+
 /**
- * @brief 输入框下方的按钮区：不能发送时的说明；生成中与准备中的"Queue"和"Stop"；空闲时的"Send"。
- *        会话被拒绝启动时发送不可用（原因由输入框上方的拒绝启动卡说明）。
+ * @brief 输入框下方的按钮区：不能发送时的说明；生成中与准备中的"Queue"和"Stop"；空闲时的"Send"；
+ *        后台有 Agent 在运行或排队时，"Stop"或"Send"旁的 Stop team。
+ *        会话被拒绝启动时发送不可用（原因由输入框上方的拒绝启动卡说明），/team on、/team off 除外。
  */
 function ComposerButtons({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
   const { running, sending } = tab.transcript;
   const busy = running || sending;
-  const blocked = tab.blocked !== null;
+  const blocked = tab.blocked !== null && !isTeamSwitch(tab.draft);
   return (
     <div className="composer-bottom">
       <span className="composer-spacer" />
       {notReady && <span className="composer-wait" data-testid="not-ready">{notReady}</span>}
       {!notReady && busy && hasText && <QueueButton tabKey={tab.key} steer={running} disabled={blocked} />}
+      {!notReady && tab.team.background && <StopTeamButton tabKey={tab.key} />}
       {!notReady && busy && (
         <button className="button stop-button" onClick={() => void stop(tab.key)} title="Stop response (Esc)">
           <Icon name="stop" />Stop

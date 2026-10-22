@@ -1,6 +1,11 @@
 // 合成测试端点（synthetic）：只用于本地验证管线，不是真实模型。
 // 实现 OpenAI 兼容的 /v1/models 与流式 /v1/chat/completions，另有 /version、/metrics（docs/specs/model-providers.md §14.1）。
-// 多个提供商 = 多个端口（各起一个进程）。关键词回复在 replies.mjs，探针在 probes.mjs。
+// 多个提供商 = 多个端口（各起一个进程）。关键词回复在 replies.mjs，探针在 probes.mjs，脚本模式在 scripts.mjs。
+//
+// 判断顺序：认证与 -replay 的拒绝 → 探针 → -404、-hang、-stall → pi 的压缩请求 → 脚本模式 → 关键词。
+// 脚本模式（docs/specs/parallel-agents-taskboard.md §17.1，规则逐条列在 scripts.mjs 开头）：请求里出现 "tb-scenario:<名字>"
+// 时按那个场景的脚本回复，不用下面的关键词规则，也不用 http-NNN、overflow-once、slow、drop-after-first 这些故障关键词。
+// "最后一条用户消息"不算只有工作卡（<mori-work-card>…</mori-work-card>）的那条。
 //
 // 回复内容由下列规则决定（关键词都在最后一条用户消息里）：
 //   - 最后一条是工具结果，且以 "Rejected" 开头（Mori 拒绝时回给模型的固定写法）：回复"收到拒绝："加结果的前 60 个字。
@@ -73,13 +78,19 @@
 //     （默认 131072）。
 //   - GET /metrics：Prometheus 文本，vllm:num_requests_running 为进行中的对话请求数；FAKE_NO_METRICS=1 时 404。
 // 日志：每个请求一行 "[fake-endpoint] METHOD url"；每个对话请求另打一行 JSON
-//   {"port","model","key"(key 末 4 位，没有为 null),"roles"(消息角色序列),"status"(-hang 为 null),"probe"}。
+//   {"port","model","key"(key 末 4 位，没有为 null),"roles"(消息角色序列),"status"(-hang 为 null),"probe"}，
+//   后面接着 scripts.mjs 的 logFields（agent、kind、task、scenario、k、j、tools、toolChoice、format、calls；
+//   不是脚本模式时 scenario 为 null，其余照样算），最后是 "strictTools"（function.strict 为 true 的工具名）与
+//   "reasoning"（请求是否带思考参数：reasoning_effort、reasoning、thinking、enable_thinking 之一），
+//   平行 Agent 规格 §7.5 的 A 级只给交接的工具加 strict、关闭思考由它们检查。
+// 工具调用 id："call_fake_<端口>_<进程启动时刻>_<进程内计数>"，并行的请求之间、端点重启前后都不重复。
 // 其他环境变量：FAKE_PORT（默认 4319）、FAKE_CHUNK_DELAY_MS（默认 20）、FAKE_FIRST_DELAY_MS（默认 0）。
 
 import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { contentText, isSummaryRequest, planReply, summaryReply } from './replies.mjs';
 import { probeReply, probeStep, replayRejected, thinkingOn } from './probes.mjs';
+import { logFields, scriptReply, sessionOf, withoutWorkCards } from './scripts.mjs';
 
 const env = process.env;
 const port = Number(env.FAKE_PORT ?? 4319);
@@ -115,7 +126,11 @@ const state = {
   firedTexts: new Set(),
   /** -replay 模型开着思考时发出的工具调用 id */
   reasonedCalls: new Set(),
+  /** 下一个工具调用 id 的进程内计数 */
+  nextCallId: 1,
 };
+/** 工具调用 id 的前缀：端口与进程启动时刻，端点重启或多个端点之间也不重复 */
+const callIdPrefix = `call_fake_${port}_${Date.now().toString(36)}`;
 
 const SUFFIXES = new Set(['notools', 'nochoice', 'noschema', 'replay', 'truncate', '404', 'hang', 'stall', 'nocancel']);
 const NO_KEY = 'none';
@@ -223,12 +238,25 @@ function trackRunning(res, flags) {
   });
 }
 
-/** @brief 每个对话请求一行 JSON 日志。 */
-function logRequest(req, body, probe, status) {
+/** 请求里表示思考的参数（pi 的 openai-completions 各种 thinkingFormat 写的顶层字段） */
+const REASONING_FIELDS = ['reasoning_effort', 'reasoning', 'thinking', 'enable_thinking'];
+
+/** @brief 请求里 function.strict 为 true 的工具名（平行 Agent 规格 §7.5 A 级只给交接的工具加 strict）。 */
+function strictToolNames(body) {
+  return (body.tools ?? []).filter((tool) => (tool.function ?? tool).strict === true)
+    .map((tool) => (tool.function ?? tool).name);
+}
+
+/**
+ * @brief 每个对话请求一行 JSON 日志；extra 是 scripts.mjs 的 logFields，接在原有字段后面；
+ *        最后是 strictTools 与 reasoning（请求是否带思考参数）。
+ */
+function logRequest(req, body, probe, status, extra) {
   const key = bearer(req);
   const roles = (body.messages ?? []).map((m) => m.role);
   const line = { port: req.socket.localPort, model: body.model ?? null, key: key ? key.slice(-4) : null, roles, status,
-    probe };
+    probe, ...extra, strictTools: strictToolNames(body),
+    reasoning: REASONING_FIELDS.some((field) => body[field] !== undefined && body[field] !== null) };
   console.log(JSON.stringify(line));
 }
 
@@ -248,7 +276,8 @@ function deltas(reply) {
   for (const [index, call] of reply.toolCalls.entries()) {
     const head = { index, id: call.id, type: 'function', function: { name: call.name, arguments: '' } };
     out.push([{ tool_calls: [head] }, false]);
-    for (const piece of pieces(JSON.stringify(call.args), 8)) {
+    // argsText：脚本模式 malformed 的交接单，原样发出（不是合法 JSON）
+    for (const piece of pieces(call.argsText ?? JSON.stringify(call.args), 8)) {
       out.push([{ tool_calls: [{ index, function: { arguments: piece } }] }, true]);
     }
   }
@@ -320,22 +349,36 @@ function nonProbeSuffix(res, body, flags, log) {
   return false;
 }
 
-/** @brief 不是探针的回复：压缩请求回摘要，其他按关键词；-replay 开着思考时附思考。 */
-function conversationReply(body, flags) {
-  const messages = body.messages ?? [];
-  if (isSummaryRequest(messages)) return summaryReply();
-  const reply = planReply(messages, body.tools, body);
-  if (flags.has('replay') && thinkingOn(body) && !reply.thinking) reply.thinking = REPLAY_THINKING;
-  return reply;
+/** @brief 按关键词的计划：先看关键词造成的错误，再按关键词回复；messages 不含只有工作卡的消息。 */
+function keywordPlan(body, messages) {
+  const failure = keywordFailure(messages);
+  if (failure) return { failure };
+  const last = messages[messages.length - 1];
+  const lastText = last?.role === 'user' ? contentText(last.content) : '';
+  return { reply: planReply(messages, body.tools, body), lastText };
 }
 
-/** @brief 给回复里的工具调用编 id；-replay 模型带思考发出的调用记下来。 */
+/**
+ * @brief 不是探针的请求的计划：压缩请求回摘要；有 tb-scenario 时按脚本；其他按关键词。-replay 开着思考时附思考。
+ * @return { failure } 或 { reply, lastText（关键词模式下最后一条用户消息的文字，slow、drop-after-first 用） }
+ */
+function conversationPlan(body, flags, info) {
+  const messages = body.messages ?? [];
+  if (isSummaryRequest(messages)) return { reply: summaryReply() };
+  const plan = info.scenario !== null ? scriptReply(body, flags, info) : keywordPlan(body, withoutWorkCards(messages));
+  if (plan.reply && flags.has('replay') && thinkingOn(body) && !plan.reply.thinking) {
+    plan.reply.thinking = REPLAY_THINKING;
+  }
+  return plan;
+}
+
+/** @brief 给回复里的工具调用编 id（进程内计数）；-replay 模型带思考发出的调用记下来。 */
 function assignCallIds(reply, flags) {
-  const stamp = Date.now();
-  reply.toolCalls.forEach((call, index) => {
-    call.id = `call_fake_${stamp}_${index}`;
+  for (const call of reply.toolCalls) {
+    call.id = `${callIdPrefix}_${state.nextCallId}`;
+    state.nextCallId += 1;
     if (reply.thinking && flags.has('replay')) state.reasonedCalls.add(call.id);
-  });
+  }
 }
 
 /** @brief 处理一个对话请求。 */
@@ -344,7 +387,8 @@ async function handleChat(req, res) {
   const messages = body.messages ?? [];
   const flags = flagsOf(body.model);
   const step = probeStep(messages);
-  const log = (status) => logRequest(req, body, step > 0, status);
+  const info = sessionOf(messages);
+  const log = (status, calls = []) => logRequest(req, body, step > 0, status, logFields(body, info, calls));
   trackRunning(res, flags);
   const replay = replayRejected(body, flags, state.reasonedCalls)
     ? { status: 400, body: errorBody(REPLAY_MESSAGE, 'invalid_request_error') } : null;
@@ -355,20 +399,19 @@ async function handleChat(req, res) {
   const early = keyFailure(bearer(req), true) ?? replay;
   if (early) return fail(early);
   if (step === 0 && nonProbeSuffix(res, body, flags, log)) return;
-  const summary = step === 0 && isSummaryRequest(messages);
-  const keyword = step > 0 || summary ? null : keywordFailure(messages);
-  if (keyword) return fail(keyword);
-  const reply = step > 0 ? probeReply(step, body, flags, config.maxModelLen) : conversationReply(body, flags);
+  const plan = step > 0 ? { reply: probeReply(step, body, flags, config.maxModelLen) }
+    : conversationPlan(body, flags, info);
+  if (plan.failure) return fail(plan.failure);
+  const { reply } = plan;
+  const lastText = plan.lastText ?? '';
   assignCallIds(reply, flags);
-  const lastText = messages[messages.length - 1]?.role === 'user' ? contentText(messages.at(-1).content) : '';
-  const keywords = step === 0 && !summary;
-  const slow = body.model === 'fake-slow' || (keywords && /\bslow\b/.test(lastText));
-  log(200);
+  const slow = body.model === 'fake-slow' || /\bslow\b/.test(lastText);
+  log(200, reply.toolCalls.map((call) => call.name));
   await streamReply(res, reply, {
     includeUsage: Boolean(body.stream_options?.include_usage),
     promptTokens: Math.ceil(JSON.stringify(messages).length / 4),
     delayMs: slow ? SLOW_MS : firstDelayMs + (reply.delayMs ?? 0),
-    dropAfterFirst: keywords && lastText.includes('drop-after-first'),
+    dropAfterFirst: lastText.includes('drop-after-first'),
   });
 }
 

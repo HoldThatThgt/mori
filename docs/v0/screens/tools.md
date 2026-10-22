@@ -25,7 +25,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 列表 | `tools.get` 的 `tools`：pi `session.getAllTools()`，不含 `hidden`；`active` 来自 `getActiveToolNames()` | 每个工具一行：名字、来源（"Built-in" / "Extension <路径>" / "MCP · <服务>" / "Plugin <包>"；Mori 批准扩展不注册工具）、状态（"Enabled"，或"Not enabled"：注册了但没有给模型）、说明的第一行 | 展开看完整说明 |
+| 列表 | `tools.get` 的 `tools`：pi `session.getAllTools()`，不含 `hidden`；`active` 来自 `getActiveToolNames()` | 每个工具一行：名字、来源（"Built-in" / "Extension <路径>" / "MCP · <服务>" / "Plugin <包>"；Mori 批准扩展不注册工具）、状态（"Enabled"，或"Not enabled"：注册了但没有给模型）、说明的第一行（协作模式：见 docs/specs/parallel-agents-taskboard.md §6.3：项目有别的角色、或用过协作模式的会话另列出 `mori-team` 注册的 11 个 TaskBoard 工具 `board_read`、`read_session`、`agent_message`、`task_handoff`、`request_submit`、`request_update`、`request_cancel`、`task_create`、`task_edit`、`reply_via_dialog`、`request_close`，来源显示 `Mori`；它们默认不启用，按协作模式启用（§5.2、§5.5）；没有角色、没用过协作模式的会话不列出，与 v0 相同） | 展开看完整说明 |
 | 说明 | — | 标题下一行"All tools in this session. Only enabled tools are available to the model." | — |
 
 ## 技能

@@ -10,35 +10,39 @@
 | --- | --- | --- |
 | 会话名 | 会话名（pi 的 `session_info`：`session.create` / `session.open` 返回的 `name`、`session_info_changed`，M3 起）；没有名字时第一条用户消息（pi 的 `message_start`，role=user）前 20 个字；都没有时"New session"。规则与侧栏会话行相同（[sessions.md](sessions.md)），会话面板的读屏名称和 F8 报告里的"Current session"也用它 | 省略号截断，不换行 |
 | 项目名 | 会话的工作目录（`session.create` / `session.open` 的返回值）末级文件夹名 | 同上 |
-| 模型（v1：见 docs/specs/model-providers.md §9.2：选择范围按钮"<范围名> · <当前模型 id>"，来源 `ModelState`） | 会话返回值里的 `model`（provider/id），显示 id；M6 起是可以切换的菜单，见 [models.md](models.md) | 没有可用模型时"No models available"，并显示 pi 给出的说明 |
+| 模型（v1：见 docs/specs/model-providers.md §9.2：选择范围按钮"<范围名> · <当前模型 id>"，来源 `ModelState`） | 会话返回值里的 `model`（provider/id），显示 id；M6 起是可以切换的菜单，见 [models.md](models.md) | 没有可用模型时"No models available"，并显示 pi 给出的说明（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 为真时只显示正在用的模型、不能打开菜单，悬停 `Team mode picks the model for each agent`，见 ../../v1/screens/team-blocked.md） |
 | 思考强度（M6） | 见 [models.md](models.md) | "Effort: High ▾"；模型没标支持思考时"Effort: Unavailable ▾" |
 | 上下文用量 | `session.state` → pi `getContextUsage()`；在打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新 | "Context 12%"，悬停显示"About 15,360 / 128,000 tokens"，读屏名"Context usage 12%, about 15,360 of 128,000 tokens"；pi 返回未知（刚压缩完）时"Context —"，悬停说明"Just compacted. Context usage shows after the next response."。M6 起会话面板 ≤ 500px 时藏起（见 [models.md](models.md)"窄栏"） |
 | 权限（M2） | 后台进程批准扩展的设置（`session.create` / `session.open` 返回值里的 `approval`，以及 `approval.*` 命令的结果） | "Ask each time"或"Allow all"（警示色）；会话面板 400px 以下只显示盾牌图标；菜单见 [approval.md](approval.md) |
 | 右栏开关 | 你的操作 | 按钮，显示右栏是否打开；读屏名"Toggle changes"，悬停"This session’s changes" |
 
 M6 起的模型菜单和思考强度见 [models.md](models.md)；输入框的"/"补全见 [slash.md](slash.md)。
+（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.1：顶栏在模型、思考强度、权限按钮之前加协作开关 `Team: Off` / `Team: On` / `Team: Until done`，见 ../../v1/screens/team-switch.md）
 
 ## 对话流
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 空会话 | 新建的会话，还没有消息 | 项目名，以及"Enter to send · Shift+Enter for new line" | 输入 |
-| 你的消息 | pi `message_start`（role=user），含插话和排队消息被送达时 | 右侧气泡，保留换行；带引用时引用显示在气泡上方（M4，见 [selection.md](selection.md)） | 点引用回到原位置 |
+| 你的消息（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.7：程序投递的 `[Mori]` 消息不显示为你的消息；§5.3：分开时先显示为待发、立项判断后才交给对话，见 ../../v1/screens/team-stop.md） | pi `message_start`（role=user），含插话和排队消息被送达时 | 右侧气泡，保留换行；带引用时引用显示在气泡上方（M4，见 [selection.md](selection.md)） | 点引用回到原位置 |
 | 等待回复 | pi `message_start`（role=assistant）之后还没有任何增量 | 只有阶段行变化，对话流不出现空气泡 | — |
 | 思考流入 | `thinking_start` / `thinking_delta` | 思考折叠块，流入时标题"Thinking…"、展开，文字逐段出现；完成后标题"Thought process" | 收起 |
 | 正文开始 | 同一条回复出现 `text_start` / `toolcall_start`，或回复结束（`message_end`） | 之前的思考块自动折叠；正文按 Markdown 渲染（代码块高亮、表格、列表） | 再次展开思考 |
 | 正文流入 | `text_delta` | 文字逐段出现，不打断你的输入、选区和滚动位置 | 选中文字（M4 起出"Attach as context / Feedback"浮层，见 selection.md） |
-| 一轮结束（M4） | 本轮不在生成、这一轮有正文 | 这一轮最后一条助手回复下三个图标按钮："Copy"、"Attach message as context"、"Give feedback"（见 selection.md） | Tab、Enter |
+| 一轮结束（M4）（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.7：不显示的 `wake` 条目也结束上一轮；§13.3：进展摘要挂在这一轮的回复操作之上） | 本轮不在生成、这一轮有正文 | 这一轮最后一条助手回复下三个图标按钮："Copy"、"Attach message as context"、"Give feedback"（见 selection.md） | Tab、Enter |
 | 工具调用 | `toolcall_*`、`tool_execution_*` | 工具卡，按调用顺序排在这条回复里（见 tool-cards.md） | 展开、收起 |
 | 已压缩（v1：见 docs/specs/model-providers.md §6.3 第 1 步：重建时的压缩不转给界面，不显示这一行） | `compaction_end`（有 result 且没有中止）；会话记录里的 compaction 条目 | 一行"Compacted session" | — |
-| 已停止（v1：见 docs/specs/model-providers.md §9.3、MP-17：在排队、等模型、等它停下时按停止也显示这一行；准备中按停止撤回消息，§11.4） | `agent_settled` 且 `aborted` 为真，或你按了停止之后本轮结束 | 一行"Stopped · Changes made so far stay as they are" | — |
+| 已停止（v1：见 docs/specs/model-providers.md §9.3、MP-17：在排队、等模型、等它停下时按停止也显示这一行；准备中按停止撤回消息，§11.4） | `agent_settled` 且 `aborted` 为真，或你按了停止之后本轮结束（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4：按 `Stop team` 也显示这一行） | 一行"Stopped · Changes made so far stay as they are" | — |
 | 你在底部 | 滚动位置离底部不超过 24px | 新内容出现时自动跟到底部 | — |
 | 你不在底部、有新内容 | 你上滚后又有内容变化 | 右下方"Jump to latest ↓"，不自动滚动 | 点它回到底部；自己滚到底部它也消失 |
 | 更早的消息 | 打开（或重新载入）会话时超过 50 条（一条你的消息或一条助手回复算一条） | 先显示最近 50 条，顶部一行"Scroll up to load earlier messages"；滚到顶部时载入更早的 50 条，当前看到的内容不跳动 | 继续上滚 |
 
+（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.2、§13.3：对话流里另有回执行与进展摘要，见 ../../v1/screens/team-stream.md）
+
 ## 阶段行
 
 只在本轮运行中显示，全部由 pi 事件推出；本轮结束（`agent_settled`）后隐藏。秒数每秒刷新，从该阶段开始计时。
+（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.6：分开时立项判断你的消息、对话还没在运行时显示 `<create role> is deciding… · 4s`，见 ../../v1/screens/team-stop.md）
 （v1：见 docs/specs/model-providers.md §9.3：另有模型层的阶段行——等模型、等它停下、排队、重试、重建，由 `mori.model_*` 事件推出，准备中也显示。）
 
 | 文字 | 开始于 | 结束于 |
@@ -59,14 +63,15 @@ M6 起的模型菜单和思考强度见 [models.md](models.md)；输入框的"/"
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 后台正在启动 | 会话还没打开、后台进程通道还没连上 | 输入框可以打字；按钮位置显示"Starting…"，不能发送 | 输入 |
-| 空闲 | 没有运行 | "Send"按钮（输入为空时不可用） | Enter 发送；Shift+Enter 换行；输入法组字时 Enter 只选词 |
-| 生成中、输入框为空（v1：见 docs/specs/model-providers.md §9.3、§11.4：准备中同样显示"Stop"） | 本轮运行中（`agent_start` 到 `agent_settled`） | 同一位置显示"Stop"（悬停"Stop response (Esc)"） | 点"Stop"或按 Esc |
+| 空闲 | 没有运行（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.6：只有后台 Agent 在运行时对话仍算空闲，输入框照常可以发送，旁边有 `Stop team`） | "Send"按钮（输入为空时不可用） | Enter 发送；Shift+Enter 换行；输入法组字时 Enter 只选词 |
+| 生成中、输入框为空（v1：见 docs/specs/model-providers.md §9.3、§11.4：准备中同样显示"Stop"） | 本轮运行中（`agent_start` 到 `agent_settled`） | 同一位置显示"Stop"（悬停"Stop response (Esc)"；协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4、§13.6：后台有 Agent 在运行或排队时旁边另有 `Stop team`） | 点"Stop"或按 Esc |
 | 生成中、输入框有字 | 同上 | "Stop"和"Queue ▾"（悬停"Send after the current turn (Enter)"），下拉里有"Steer"（Ctrl+Enter）；输入框的占位文字"Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line" | Enter 排队（Queue）；Ctrl+Enter 插话（Steer）；"Stop" |
-| 有排队或插话的消息（v1：见 docs/specs/model-providers.md §11.4：准备中再发的消息由后台进程暂存，pi 开始后作为 followUp 交给 pi） | pi `queue_update`（`followUp` 与 `steering` 两个列表） | 输入框上方排队区，逐条显示"Queued"或"Steer"和内容 | "Withdraw"：把排队区里的消息全部放回输入框（`clearQueue`） |
+| 有排队或插话的消息（v1：见 docs/specs/model-providers.md §11.4：准备中再发的消息由后台进程暂存，pi 开始后作为 followUp 交给 pi） | pi `queue_update`（`followUp` 与 `steering` 两个列表）（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：排队区还有待判断的消息，标 `Waiting for <create role>`；"Withdraw"同时撤回还没开始判断的，正在判断的那条不撤回） | 输入框上方排队区，逐条显示"Queued"或"Steer"和内容 | "Withdraw"：把排队区里的消息全部放回输入框（`clearQueue`） |
 | 插话送达 | pi 在本轮工具全部执行完、下一次请求模型之前送出（`message_start` role=user，同时 `queue_update` 去掉它） | 排队区少一条，对话流出现这条消息 | — |
 | 排队送达 | 本轮结束后 pi 依次送出 | 同上 | — |
 
 停止（按钮或 Esc）的顺序：先 `clearQueue`，把排队消息放回输入框（放在已有草稿之前），再 `abort`。
+（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4：Esc 与停止只停对话这一回合和为它判断的立项，待判断的消息一起回到输入框，后台照常；`Stop team` 停这个会话的全部 Agent，见 ../../v1/screens/team-stop.md）
 M2 起，有挂起的批准卡时，后台进程在 `abort` 里先把它按拒绝处理（工具卡"Denied · You pressed Stop"），等 pi 记下拒绝后再停止。
 
 Esc 的顺序：先关闭最上层的浮层、菜单或对话框（"Queue"的下拉、权限菜单、切到"Allow all"的确认框、F8 报告框；

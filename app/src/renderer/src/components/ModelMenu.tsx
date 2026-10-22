@@ -204,8 +204,35 @@ function useRangeMenu(tab: Tab, disabled: boolean) {
  * @brief 顶栏的选择范围按钮和菜单。disabled 为真时（会话没打开、后台进程不可用）不能切换；准备中与生成中也不能切换。
  *        换范围的请求还没返回时按钮显示你选的范围、不可用（仍可聚焦，焦点留在按钮上）。
  *        面板窄时按钮收短：先截当前模型 id，再截范围名，完整的文字在悬停说明和读屏名称里（model-menu.md "窄栏"）。
+ *        协作模式下（pickLocked）范围由角色的候选决定，按钮只显示正在用的模型、不能打开菜单。
  */
 export function ModelMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
+  if (tab.pickLocked) return <LockedModelButton tab={tab} />;
+  return <RangeMenu tab={tab} disabled={disabled} />;
+}
+
+/** 协作模式下模型按钮的悬停说明（平行 Agent 规格 §12.11） */
+const LOCKED_TITLE = 'Team mode picks the model for each agent';
+
+/**
+ * @brief 协作模式下的模型按钮（平行 Agent 规格 §12.11，docs/v1/screens/team-blocked.md）：只显示正在用的模型 id，
+ *        没有 ▾，点击、Enter 都不打开菜单；没有当前模型时 No model。生成中悬停说明也不变。
+ */
+function LockedModelButton({ tab }: { tab: Tab }) {
+  const text = tab.current ? modelIdOf(tab.current) : 'No model';
+  return (
+    <div className="model-switch">
+      <button className="model-button" data-testid="model-button" data-locked="true" aria-disabled="true"
+        data-pick={tab.pick ?? undefined} data-current={tab.current ?? undefined} aria-label={`Model: ${text}`}
+        title={LOCKED_TITLE}>
+        <span className="switch-text range-scope">{text}</span>
+      </button>
+    </div>
+  );
+}
+
+/** @brief 顶栏的选择范围按钮和菜单（关闭模式；见 ModelMenu）。 */
+function RangeMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
   const options = usePickOptions((state) => state[tab.key]) ?? NO_OPTIONS;
   const pickError = usePickError((state) => state[tab.key]);
   const pending = usePendingSwitch((state) => state[tab.key]);

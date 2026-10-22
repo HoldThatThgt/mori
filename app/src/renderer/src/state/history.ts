@@ -1,14 +1,23 @@
 // 把 pi 记录的当前分支（SessionManager.getBranch 的条目）转成对话流：你的消息、助手回复、工具结果、压缩处，
 // 以及 Mori 写的引用来源（mori.ref 条目，记到它指向的你的消息上）、模型层的换模型与重建（mori.model_switch、
 // mori.rebuild 条目，docs/v1/screens/model-chat.md）。系统消息、用量、选择范围（mori.pick）等记录不显示。
+// 平行 Agent（docs/specs/parallel-agents-taskboard.md §13.11）：mori.receipt 是回执行，mori.progress 是进展摘要的位置
+// （内容用会话信息里的 TaskBoard 视图），mori.wake 把它指向的用户消息变成不显示的 wake 条目，mori.team 不显示。
 
 import { z } from 'zod';
-import { QuoteRefSchema, REF_ENTRY_TYPE, type LiveSnapshot, type SessionEntry } from '../../../shared/protocol';
+import {
+  QuoteRefSchema, REF_ENTRY_TYPE, type LiveSnapshot, type SessionEntry, type SessionInfo,
+} from '../../../shared/protocol';
 import { EXCLUSION_REASONS, MODEL_ENTRY_TYPES } from '../../../shared/models';
+import {
+  ProgressEntrySchema, ReceiptEntrySchema, TEAM_ENTRY_TYPES, TeamEntrySchema, WakeEntrySchema, type ReceiptKind,
+  type TeamMode, type WakeKind,
+} from '../../../shared/team';
 import {
   blocksFromContent, contentText, emptyTranscript, messageTime, parseRejection, pushItem, resultPatch, type ToolCall,
   type Transcript,
 } from './model';
+import { attachReceipt, RECEIPT_TOOLS } from './teamEvents';
 
 /** mori.ref 条目的内容（会话文件里读出来的，先校验） */
 const RefDataSchema = z.object({ messageId: z.string(), refs: z.array(QuoteRefSchema) });
@@ -37,7 +46,7 @@ function addAssistant(state: Transcript, message: Message, entryId: string): Tra
   const { blocks, tools } = blocksFromContent(message.content);
   let next = pushItem(state, { kind: 'assistant', blocks, streaming: false, entryId, time: messageTime(message) });
   const all = { ...next.tools };
-  for (const tool of tools) all[tool.id] = { ...tool, status: 'interrupted' };
+  for (const tool of tools) all[tool.id] = { ...tool, status: 'interrupted', teamMode: state.runTeamMode };
   next = { ...next, tools: all };
   const error = String(message.errorMessage ?? '');
   const stopped = message.stopReason === 'aborted' || (message.stopReason === 'error' && ABORTED_REPLY.test(error));
@@ -95,14 +104,78 @@ function addModelEntry(state: Transcript, customType: string, data: unknown): Tr
     hidden: hideUntil > replyStartedAt });
 }
 
-/** @brief 一条会话记录。 */
-function addEntry(state: Transcript, entry: SessionEntry): Transcript {
+/**
+ * @brief 合并会话里回执记到哪次调用上：回执条目之后的第一条消息是这种立项工具的结果时，是它所属的调用
+ *        （工具按顺序执行，回执在执行时写，§13.2）；否则为 null（回执是单独的一行）。
+ * @param index 回执条目的下标
+ */
+function receiptTool(entries: SessionEntry[], index: number, kind: ReceiptKind): string | null {
+  let next: SessionEntry | undefined;
+  for (let at = index + 1; at < entries.length && !next; at += 1) {
+    if (entries[at]?.type === 'message') next = entries[at];
+  }
+  const message = next?.type === 'message' ? next.message as unknown as Message : null;
+  if (message?.role !== 'toolResult' || message.toolName !== RECEIPT_TOOLS[kind]) return null;
+  return String(message.toolCallId);
+}
+
+/** @brief 校验一个协作条目的内容；不对时记录错误，返回 null。 */
+function teamData<T>(schema: z.ZodType<T>, entry: Extract<SessionEntry, { type: 'custom' }>): T | null {
+  const parsed = schema.safeParse(entry.data);
+  if (parsed.success) return parsed.data;
+  console.error(`[renderer] ignored a malformed ${entry.customType} entry: ${parsed.error.message}`);
+  return null;
+}
+
+/** @brief mori.wake 条目：把它指向的用户消息变成不显示的 wake 条目（§13.7），“放回输入框”不会带回它。 */
+function addWake(state: Transcript, messageId: string, kind: WakeKind): Transcript {
+  const index = state.items.findIndex((item) => item.kind === 'user' && item.entryId === messageId);
+  const item = state.items[index];
+  if (item?.kind !== 'user') return state;
+  const items = [...state.items];
+  items[index] = { kind: 'wake', key: item.key, wakeKind: kind, entryId: item.entryId, time: item.time };
+  return { ...state, items, lastUserText: state.lastUserText === item.text ? null : state.lastUserText };
+}
+
+/**
+ * @brief 协作写的条目（§13.11）；内容不对时记录错误、不显示。mori.team 不显示（不经这里）。
+ * @param index 这条在 entries 里的下标（回执找它之后的工具结果）
+ */
+function addTeamEntry(state: Transcript, entry: Extract<SessionEntry, { type: 'custom' }>, entries: SessionEntry[],
+  index: number): Transcript {
+  if (entry.customType === TEAM_ENTRY_TYPES.wake) {
+    const wake = teamData(WakeEntrySchema, entry);
+    return wake ? addWake(state, wake.messageId, wake.kind) : state;
+  }
+  if (entry.customType === TEAM_ENTRY_TYPES.progress) {
+    const progress = teamData(ProgressEntrySchema, entry);
+    return progress ? pushItem(state, { kind: 'progress', request: progress.request }) : state;
+  }
+  const receipt = teamData(ReceiptEntrySchema, entry);
+  if (!receipt) return state;
+  const tool = receiptTool(entries, index, receipt.kind);
+  if (tool && state.tools[tool]) return attachReceipt(state, tool, receipt);
+  return pushItem(state, { kind: 'receipt', receipt });
+}
+
+/** @brief 是不是界面要显示的协作条目（mori.receipt、mori.progress、mori.wake）。 */
+function isTeamEntry(entry: SessionEntry): entry is Extract<SessionEntry, { type: 'custom' }> {
+  return entry.type === 'custom' && (entry.customType === TEAM_ENTRY_TYPES.receipt
+    || entry.customType === TEAM_ENTRY_TYPES.progress || entry.customType === TEAM_ENTRY_TYPES.wake);
+}
+
+/**
+ * @brief 一条会话记录。
+ * @param index 这条在 entries 里的下标（回执找它所属的调用）
+ */
+function addEntry(state: Transcript, entry: SessionEntry, entries: SessionEntry[], index: number): Transcript {
   if (entry.type === 'compaction') return pushItem(state, { kind: 'compaction' });
   if (entry.type === 'custom' && entry.customType === REF_ENTRY_TYPE) return addRefs(state, entry.data);
   if (entry.type === 'custom' && (entry.customType === MODEL_ENTRY_TYPES.modelSwitch
     || entry.customType === MODEL_ENTRY_TYPES.rebuild)) {
     return addModelEntry(state, entry.customType, entry.data);
   }
+  if (isTeamEntry(entry)) return addTeamEntry(state, entry, entries, index);
   if (entry.type !== 'message') return state;
   const message = entry.message as unknown as Message;
   if (message.role === 'user') {
@@ -115,9 +188,32 @@ function addEntry(state: Transcript, entry: SessionEntry): Transcript {
   return state;
 }
 
-/** @brief 由会话记录重建对话流。没有结果的工具调用保持"Interrupted"。 */
+/** @brief mori.team 条目里的模式；不是这种条目或内容不对时为 null（内容不对时记录错误）。 */
+function teamModeOf(entry: SessionEntry): TeamMode | null {
+  if (entry.type !== 'custom' || entry.customType !== TEAM_ENTRY_TYPES.team) return null;
+  return teamData(TeamEntrySchema, entry)?.mode ?? null;
+}
+
+/**
+ * @brief 由会话记录重建对话流。没有结果的工具调用保持"Interrupted"。
+ *        每次运行从一条用户消息开始，按那时最后一条 mori.team 的模式记下运行的模式（工具卡的 Message / Ask，§13.8）。
+ */
 export function transcriptFromEntries(entries: SessionEntry[]): Transcript {
-  return entries.reduce(addEntry, emptyTranscript);
+  let latest: TeamMode = 'off';
+  return entries.reduce((state, entry, index) => {
+    latest = teamModeOf(entry) ?? latest;
+    const user = entry.type === 'message' && (entry.message as unknown as Message).role === 'user';
+    return addEntry(user ? { ...state, runTeamMode: latest } : state, entry, entries, index);
+  }, emptyTranscript);
+}
+
+/**
+ * @brief 会话信息里协作的部分接到对话流上（§11.6、§13.10）：挂起的后台批准卡（按到达顺序）、待判断的消息与正在判断的
+ *        那条开始的时刻（与 mori.team_deciding 相同）。
+ */
+export function withTeamInfo(state: Transcript, info: SessionInfo): Transcript {
+  const deciding = info.deciding.queue.length > 0 ? { ...info.deciding, queue: [...info.deciding.queue] } : null;
+  return { ...state, teamApprovals: [...info.teamApprovals], deciding };
 }
 
 /** @brief 最后一条助手回复里还没有结果的调用：正在执行的标"Running…"（从开始执行的时刻计时），其余"Queued"。 */
@@ -140,7 +236,7 @@ function resumeStreaming(state: Transcript, message: unknown): Transcript {
   const next = pushItem(state, { kind: 'assistant', blocks, streaming: true, entryId: null,
     time: messageTime(message) });
   const all: Record<string, ToolCall> = { ...next.tools };
-  for (const tool of tools) all[tool.id] = { ...tool, status: 'preparing' };
+  for (const tool of tools) all[tool.id] = { ...tool, status: 'preparing', teamMode: state.runTeamMode };
   return { ...next, tools: all };
 }
 

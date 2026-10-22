@@ -1,5 +1,6 @@
-// 工具卡标题：用人话写出这次调用在做什么。对照表见 docs/v0/screens/tool-cards.md。
+// 工具卡标题：用人话写出这次调用在做什么。对照表见 docs/v0/screens/tool-cards.md；TaskBoard 的工具见平行 Agent 规格 §13.8。
 
+import { isTeamTool, toolCallTitle } from '../../../shared/team';
 import type { ToolCall } from '../state/model';
 
 /** 命令标题最多显示的字数 */
@@ -78,8 +79,15 @@ function lineRange(tool: ToolCall): string {
   return Number.isFinite(limit) && limit > 0 ? ` · lines ${offset}–${offset + limit - 1}` : ` · from line ${offset}`;
 }
 
-/** @brief 生成工具卡标题。 */
-export function toolTitle(tool: ToolCall, cwd: string): ToolTitle {
+/**
+ * @brief 生成工具卡标题。TaskBoard 的工具（合并会话里立项的调用、对话的 board_read 等）用平行 Agent 规格 §13.8 的
+ *        英文标题（shared/team.ts toolCallTitle），参数还没写完时缺的部分写作 …。
+ * @param seatRoles agent_message 发给这些角色时是 Message <role>（进座位会话），其余是 Ask <role>（seatRolesOf）
+ */
+export function toolTitle(tool: ToolCall, cwd: string, seatRoles: readonly string[] = []): ToolTitle {
+  if (isTeamTool(tool.name)) {
+    return { verb: toolCallTitle(tool.name, tool.args ?? {}, { cwd, seatRoles, task: null }), target: '', suffix: '' };
+  }
   const mcp = /^mcp__(.+?)__(.+)$/.exec(tool.name);
   if (mcp) return { verb: `${mcp[1]} · ${mcp[2]}`, target: '', suffix: '' };
   const verb = verbs[tool.name];
@@ -95,8 +103,8 @@ export function toolTitle(tool: ToolCall, cwd: string): ToolTitle {
   return { verb, target, suffix: tool.name === 'read' ? lineRange(tool) : '' };
 }
 
-/** @brief 标题的纯文字形式（阶段行、会话引用里的"[Tool] …"行用）。 */
-export function toolTitleText(tool: ToolCall, cwd: string): string {
-  const title = toolTitle(tool, cwd);
+/** @brief 标题的纯文字形式（阶段行、会话引用里的"[Tool] …"行用）；seatRoles 同 toolTitle。 */
+export function toolTitleText(tool: ToolCall, cwd: string, seatRoles: readonly string[] = []): string {
+  const title = toolTitle(tool, cwd, seatRoles);
   return [title.verb, title.target].filter(Boolean).join(' ') + title.suffix;
 }

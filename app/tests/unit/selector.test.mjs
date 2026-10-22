@@ -368,7 +368,7 @@ test('MP-09 no_pick when the session has no model range', () => {
   const { blocked, first } = check(null, { pick: null });
   assert.equal(first, null);
   assert.deepEqual(blocked, { kind: 'no_pick', detail: '', candidates: [], actions: ['change_model', 'open_settings'],
-    verifyRefs: [], zone: null, zoneProviders: [] });
+    verifyRefs: [], zone: null, zoneProviders: [], problems: [] });
 });
 
 test('MP-30 pick_missing names the missing range', () => {

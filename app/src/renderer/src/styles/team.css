@@ -1,0 +1,114 @@
+/* 平行 Agent 与 TaskBoard 的界面（docs/specs/parallel-agents-taskboard.md §13；docs/v1/screens/team-*.md）：
+   顶栏的协作开关（这一栏不宽于 860px 时只有状态点）、回执、进展摘要、后台批准卡的归属行、待判断的消息、Stop team。 */
+
+/* 协作开关：与权限按钮同一外观；打开（always、once）时用强调色 */
+.team-switch-wrap { position: relative; flex-shrink: 0; }
+.team-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.team-switch[aria-checked='true'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-weight: 500;
+}
+.team-switch:disabled { cursor: default; opacity: .6; }
+/* 状态点：只在窄栏显示；off 为空心，always 与 once 为实心（临时，team-switch.md "窄栏"） */
+.team-dot { display: none; width: 7px; height: 7px; border: 1.5px solid currentColor; border-radius: 50%; }
+.team-switch[aria-checked='true'] .team-dot { background: currentColor; }
+.team-error {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  width: max-content;
+  /* 不超出这一栏（顶栏是容器，cqw 按这一栏的宽度算） */
+  max-width: min(320px, 90cqw);
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+}
+/* 窄栏（team-switch.md "窄栏"）。顶栏原有各档（chat.css、models.css、split.css）是按没有开关定的，按最宽的英文量
+   （"Effort: Unavailable"、截在 160px / 120px 的长模型 ID），每档刚过阈值时只剩约 8–25px："Team: Until done"
+   （约 108px）单栏要宽于约 835px、分屏要宽于约 856px 才放得下；"Team" 加状态点（约 55px）在 1400 宽右栏打开
+   （一栏 690px，模型按钮停在 120px）时也放不下。所以这一栏不宽于 860px 时开关只显示状态点（约 19px 宽），并且：
+   - 显示项目名时（单栏宽于 660px、分屏宽于 690px，阈值同 chat.css、split.css）面包屑至少留 105px（项目名最窄 40px、
+     ›、两个间距和会话名 36px），放不下时收短模型按钮（最窄 40px，models.css），不挤会话名；
+   - 分屏不宽于 600px 时按钮间距 6px、图标按钮 28px，不宽于 400px 时间距 2px、图标按钮 24px（每栏 280px 时没有开关
+     也只剩约 8px）。
+   composer-pickers 合入后顶栏只剩开关和两个图标按钮，这些阈值随之重定（docs/v1/defaults.md）。 */
+@container (max-width: 860px) {
+  .team-switch { min-height: 22px; padding: 3px 6px; }
+  .team-text { display: none; }
+  .team-dot { display: block; }
+}
+.topbar .breadcrumb { min-width: 105px; }
+@container (max-width: 660px) {
+  .topbar .breadcrumb { min-width: 36px; }
+}
+@container (max-width: 690px) {
+  .center[data-split] .topbar .breadcrumb { min-width: 36px; }
+}
+@container (max-width: 600px) {
+  .center[data-split] .topbar-actions { gap: 6px; }
+  .center[data-split] .topbar-actions .icon-button { width: 28px; }
+}
+@container (max-width: 400px) {
+  .center[data-split] .topbar-actions { gap: 2px; }
+  .center[data-split] .topbar-actions .icon-button { width: 24px; }
+}
+
+/* 回执：对话流里的一行；合并会话里在工具卡下面 */
+.receipt {
+  margin: 0 0 16px;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+.assistant-message .receipt { margin: 4px 0 8px 12px; }
+
+/* 进展摘要：挂在回复下面、回复操作之上 */
+.progress-summary {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  font-size: var(--fs-small);
+}
+.progress-title {
+  display: block;
+  width: 100%;
+  padding: 0;
+  color: var(--color-text);
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.progress-title:not(:disabled):hover { background: transparent; text-decoration: underline; }
+.progress-task { margin-top: 4px; padding-left: 12px; color: var(--color-prose); overflow-wrap: anywhere; }
+.progress-chain { padding-left: 24px; color: var(--color-muted); overflow-wrap: anywhere; }
+.progress-ruled-out, .progress-conclusion { margin-top: 6px; padding-left: 12px; color: var(--color-prose); }
+.progress-label { color: var(--color-muted); font-weight: 500; }
+.progress-line { padding-left: 12px; overflow-wrap: anywhere; }
+
+/* 后台批准卡的归属行：卡头标题的上面一行，次要文字色（临时，team-approvals.md） */
+.approval-attribution {
+  padding: 8px 12px 0;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+
+/* 待判断的消息与 Stop team */
+.queue-area li[data-deciding='true'] .queue-kind { white-space: nowrap; }
+.stop-team-button { border-radius: 999px; color: var(--color-danger); }

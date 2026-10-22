@@ -191,7 +191,8 @@ test('MP-07 project config schema accepts the §4.3 example and rejects bad shap
 
 test('MP-15 session custom entry types', () => {
   assert.deepEqual({ ...models.MODEL_ENTRY_TYPES },
-    { pick: 'mori.pick', modelSwitch: 'mori.model_switch', rebuild: 'mori.rebuild' });
+    { pick: 'mori.pick', modelSwitch: 'mori.model_switch', rebuild: 'mori.rebuild',
+      taskRestart: 'mori.task_restart' });
 });
 
 test('MP-08 zone suggestion: loopback is local', () => {

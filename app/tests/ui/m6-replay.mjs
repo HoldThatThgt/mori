@@ -20,6 +20,8 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
+// 回放桥当作只读查询回答、不占回放顺序的命令，与回放桥用同一份列表（平行 Agent 规格 §17.4）。
+import { QUERIES } from './harness/replay.js';
 import { appRoot, arg, createRecorder, oneLine } from './lib.mjs';
 import { composerAt, sendAt, waitPaneIdle, waitPaneReady } from './m5-helpers.mjs';
 import { modelRow, openToolsSection, slashItems } from './m6-helpers.mjs';
@@ -35,9 +37,6 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 
 /** 焦点所在的一栏（不分屏时就是显示的那一栏） */
 const FOCUSED = '.pane-slot[data-focused="true"]:not([hidden])';
-/** 回放桥当作只读查询回答、不占回放顺序的命令（与 harness/replay.js 的 QUERIES 相同） */
-const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
-  'agents.get', 'session.commands', 'models.get', 'session.pickOptions'];
 
 /** @brief 读取一个 M6 录制文件。 */
 const readFixture = (name) => JSON.parse(readFileSync(join(fixtureDir, `${name}.json`), 'utf8'));

@@ -1,5 +1,6 @@
 // 顶栏的权限菜单：Ask each time / Allow all，"Allowed for this session:"的列表可以逐项清除（Forget）
-// （docs/v0/screens/approval.md）。只作用于这个会话；切到"Allow all"前确认一次，切回"Ask each time"不需要确认。
+// （docs/v0/screens/approval.md）。只作用于这个会话（含它的全部后台 Agent，平行 Agent 规格 §11.1）；
+// 切到"Allow all"前确认一次，切回"Ask each time"不需要确认。
 // 面板 400px 以下按钮只显示盾牌图标（chat.css 的 @container 藏起 .permission-text），模式名靠读屏名
 // "Permission mode: <模式>"。
 
@@ -41,7 +42,7 @@ function PermissionPanel({ tab, onChoose }: { tab: Tab; onChoose: (mode: Approva
         ))}
       </ul>
       {allowed.length === 0 && <div className="menu-empty">None</div>}
-      <p className="menu-note">Applies to this session only. New sessions start with “Ask each time”.</p>
+      <p className="menu-note">Applies to all agents in this session. New sessions start at Ask each time.</p>
     </div>
   );
 }

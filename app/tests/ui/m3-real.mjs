@@ -662,9 +662,10 @@ async function item2(ctx) {
   const focused = await focusInfo(page);
   record('2 Shift+Tab 回到会话树时落在新会话行（整棵树一个 Tab 停靠点）', focused.row === row.id,
     `按了 ${path.length} 次 Shift+Tab：${path.join(' → ')}`);
-  // M6 顶栏加了模型和思考强度两个按钮（models.md），多两个 Tab 停靠点：6 次改为 8 次。
-  record('2 从新会话的输入框 Shift+Tab 几次（不超过 8 次，经过顶栏和左栏底部的按钮）回到会话树（sessions.md 走查 2 的路径）',
-    path.length <= 8 && focused.row === row.id, `按了 ${path.length} 次：${path.join(' → ')}`);
+  // M6 顶栏加了模型和思考强度两个按钮（models.md），多两个 Tab 停靠点：6 次改为 8 次；TaskBoard 在模型按钮之前加了
+  // 协作开关（parallel-agents-taskboard.md §13.1，一个真正可以聚焦的按钮），再多一个：8 次改为 9 次。
+  record('2 从新会话的输入框 Shift+Tab 几次（不超过 9 次，经过顶栏和左栏底部的按钮）回到会话树（sessions.md 走查 2 的路径）',
+    path.length <= 9 && focused.row === row.id, `按了 ${path.length} 次：${path.join(' → ')}`);
   if (focused.row !== row.id) await rowOf(page, row.file).focus();
   await renameByKeyboard(ctx, row);
 }

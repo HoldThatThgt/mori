@@ -1,7 +1,10 @@
 // 阶段行：由 pi 事件推出（见 docs/v0/screens/chat.md），本轮结束后隐藏。模型层的等待（等模型、等它停下、重建、排队、
 // 原地重试，docs/v1/screens/model-chat.md "阶段行"）进行时取代"Waiting for the model…"，准备中也显示。
+// 协作（docs/v1/screens/team-stop.md "阶段行"）：分开时立项判断你刚发的消息、对话还没在运行时显示
+// "<create role> is deciding… · 4s"；后台实例的批准卡不改变阶段行。
 
-import type { Transcript } from '../state/model';
+import { roleLabel } from '../../../shared/team';
+import { pendingPrompt, type Transcript } from '../state/model';
 import { seconds, useNow } from './ToolCard';
 import { toolTitleText } from './toolTitle';
 
@@ -18,17 +21,34 @@ function modelStageShown(transcript: Transcript): boolean {
 }
 
 /**
+ * @brief 立项判断你刚发的消息时的阶段行（平行 Agent 规格 §13.6）：对话还没在运行、准备中先显示的那条在待判断队列里；
+ *        秒数从开始判断起算，立项在忙别的回合（since 为 null）时不带秒数。不显示时为 null。
+ */
+function decidingText(transcript: Transcript, now: number): string | null {
+  const { deciding } = transcript;
+  const pending = pendingPrompt(transcript);
+  if (transcript.running || !deciding || !pending) return null;
+  if (!deciding.queue.some((message) => message.text === pending.text)) return null;
+  const head = `${roleLabel(deciding.role)} is deciding…`;
+  return deciding.since === null ? head : `${head} · ${elapsedText(deciding.since, now)}`;
+}
+
+/**
  * @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"Waiting for your approval"，其次有挂起的扩展询问时
  *        "Waiting for your answer"，都不显示"Responding…"或工具的"<标题> Ns"。模型层的等待写作"<文字> · 12s"，
  *        从这次等待开始计时。
+ * @param seatRoles 工具标题里 agent_message 的 Message / Ask（toolTitle）
  */
-export function stageText(transcript: Transcript, cwd: string, now: number): string | null {
+export function stageText(transcript: Transcript, cwd: string, now: number,
+  seatRoles: readonly string[] = []): string | null {
   const stage = transcript.stage;
   if (transcript.running && transcript.approvals.length > 0) return 'Waiting for your approval';
   // 扩展命令等不经过一轮运行的询问也要看得到。
   if (transcript.questions.length > 0) return 'Waiting for your answer';
   const model = transcript.modelStage;
   if (model && modelStageShown(transcript)) return `${model.text} · ${elapsedText(model.since, now)}`;
+  const deciding = decidingText(transcript, now);
+  if (deciding) return deciding;
   if (!transcript.running) return null;
   if (!stage) return null;
   const elapsed = elapsedText(stage.since, now);
@@ -41,7 +61,7 @@ export function stageText(transcript: Transcript, cwd: string, now: number): str
       return 'Responding…';
     case 'tool': {
       const tool = transcript.tools[stage.detail];
-      return tool ? `${toolTitleText(tool, cwd)} ${elapsed}` : null;
+      return tool ? `${toolTitleText(tool, cwd, seatRoles)} ${elapsed}` : null;
     }
     case 'approval':
       return 'Waiting for your approval';
@@ -50,13 +70,16 @@ export function stageText(transcript: Transcript, cwd: string, now: number): str
   }
 }
 
-/** @brief 阶段行；模型层的等待带 data-kind（wait-model、held、rebuild、queue、retry）。 */
-export function StageLine({ transcript, cwd }: { transcript: Transcript; cwd: string }) {
+/** @brief 阶段行；模型层的等待带 data-kind（wait-model、held、rebuild、queue、retry），立项判断时为 deciding。 */
+export function StageLine({ transcript, cwd, seatRoles }: { transcript: Transcript; cwd: string;
+  seatRoles: readonly string[] }) {
   const busy = transcript.running || transcript.sending;
-  const now = useNow(busy && (transcript.stage !== null || transcript.modelStage !== null));
-  const text = stageText(transcript, cwd, now);
+  const now = useNow(busy && (transcript.stage !== null || transcript.modelStage !== null
+    || transcript.deciding !== null));
+  const text = stageText(transcript, cwd, now, seatRoles);
   if (!text) return null;
-  const kind = modelStageShown(transcript) ? transcript.modelStage?.kind : undefined;
+  const deciding = text === decidingText(transcript, now);
+  const kind = modelStageShown(transcript) ? transcript.modelStage?.kind : deciding ? 'deciding' : undefined;
   return (
     <div className="stage-line" data-testid="stage" data-kind={kind} aria-live="polite">
       <span className="spinner" aria-hidden="true" />

@@ -16,7 +16,7 @@
 | `mori.model_queue` | `{ active, provider, providerName }` |
 | `mori.model_retry` | `{ attempt, max, status, delayMs }` |
 | `mori.model_unavailable` | `{ candidates: { ref, reason, detail }[], firstRequest, text, queued }` |
-| `mori.model_state` 与 `SessionInfo` 里的 `ModelState` | `blocked`：`{ kind, detail, candidates, actions, verifyRefs, zone, zoneProviders }` |
+| `mori.model_state` 与 `SessionInfo` 里的 `ModelState` | `blocked`：`{ kind, detail, candidates, actions, verifyRefs, zone, zoneProviders }`（协作模式：见 docs/specs/parallel-agents-taskboard.md §4.4、§13.9：`kind` 加 `agents_invalid`，另有 `problems`；`actions` 加 `check_agents`、`turn_off_team`；`ModelState` 加 `pickLocked`，§12.11） |
 | `mori.prompt_error` | v0 的字段加 `queued: string[]`（准备中被撤回的、准备中又发的消息） |
 | pi 的事件 | 同 v0（`message_end` 的 `stopReason`、`errorMessage`，`compaction_end`，`agent_settled`） |
 | 你的操作 | 发送、停止、点卡上的操作 |
@@ -41,7 +41,7 @@
 
 ## 阶段行
 
-模型层的阶段行与 v0 的阶段行在同一位置，本轮运行中与准备中显示。模型层的等待进行时，取代 v0 的“Waiting for the model…”，
+模型层的阶段行与 v0 的阶段行在同一位置，本轮运行中与准备中显示（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.6：分开时立项判断你的消息、对话在准备中时阶段行是 `<create role> is deciding… · 4s`，见 [team-stop.md](team-stop.md)）。模型层的等待进行时，取代 v0 的“Waiting for the model…”，
 同样在后面显示已经等了多少秒（§9.3），写作“<文字> · 12s”（临时，走查时可以改），从这次等待开始计时、每秒刷新。
 v0 的“Waiting for your approval”仍优先（它在工具执行时出现，与模型请求的等待不会同时发生）。
 
@@ -63,8 +63,8 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 准备中 | 你发了消息（`session.prompt`），pi 还没开始运行 | 你的消息已显示在对话流里；会话按“发送中”显示（侧栏同 v0“生成中”含“刚发出”），停止可用；顶栏范围与思考按钮不可用；阶段行显示等待（上表）或“Rebuilding the conversation for <B>…”；没有模型层的等待时阶段行不显示（选到模型、不用等时可能一闪而过） | 停止；继续发消息 |
-| 准备中又发了消息 | 你在准备中按了发送（Ctrl+Enter 也按排队处理，准备中不能插话，§11.4） | 显示在排队区，标“Queued”（同 v0 的排队消息）；后台进程暂存，pi 开始后作为 followUp 交给 pi，之后同 v0。暂存期间排队区的“Withdraw”不可用（临时，走查时可以改；停止会把它们一起放回输入框） | — |
+| 准备中（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：分开时准备中先等立项判断这条消息，见 [team-stop.md](team-stop.md)） | 你发了消息（`session.prompt`），pi 还没开始运行 | 你的消息已显示在对话流里；会话按“发送中”显示（侧栏同 v0“生成中”含“刚发出”），停止可用；顶栏范围与思考按钮不可用；阶段行显示等待（上表）或“Rebuilding the conversation for <B>…”；没有模型层的等待时阶段行不显示（选到模型、不用等时可能一闪而过） | 停止；继续发消息 |
+| 准备中又发了消息（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：分开时先进待判断队列，排队区标 `Waiting for <create role>`，判断完才进暂存） | 你在准备中按了发送（Ctrl+Enter 也按排队处理，准备中不能插话，§11.4） | 显示在排队区，标“Queued”（同 v0 的排队消息）；后台进程暂存，pi 开始后作为 followUp 交给 pi，之后同 v0。暂存期间排队区的“Withdraw”不可用（临时，走查时可以改；停止会把它们一起放回输入框） | — |
 | 准备中按了停止 | `mori.prompt_error`：`message` 为“Stopped before sending”，`text` 为这条消息，`queued` 为暂存的，`running: false` | 你的消息从对话流撤回，排队区清空；这条与暂存的文字按发送顺序（空行分隔）放回输入框；没有错误卡，对话流也不加“Stopped · …”（消息已撤回，临时，走查时可以改）；合成端点不会收到请求（MP-34） | 编辑后再发 |
 | 准备中 pi 没开始就结束 | `mori.prompt_error`，`message` 为 pi 的原文 | 消息撤回、文字放回输入框（同上）；v0 的错误卡，原文；卡上没有“Put your last message back in the message box”（文字已在输入框里，临时，走查时可以改） | 编辑后再发 |
 | 等不到模型 | 段开始时选不到、等满 §12 的时长（§5.8）：只有 `mori.model_unavailable`（`firstRequest: true`，`text` 为撤回的消息，`queued` 为准备中又发的），没有 `mori.prompt_error` | 消息和暂存的消息撤回，文字按发送顺序（空行分隔）放回输入框；一张 No model available 卡（下节），没有错误卡 | Open settings |
@@ -74,7 +74,7 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 回复中候选耗尽 | `mori.model_unavailable`（`firstRequest: false`）；包括 `held` 等满后选不到（MP-18） | 一张说明卡，标题“No model available”；每个候选一行“<provider>/<model> — <原因>”；“Open settings” | Open settings |
+| 回复中候选耗尽 | `mori.model_unavailable`（`firstRequest: false`）；包括 `held` 等满后选不到（MP-18） | 一张说明卡，标题“No model available”；每个候选一行“<provider>/<model> — <原因>”；“Open settings”（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时另有 `Turn off team mode`，见 [team-blocked.md](team-blocked.md)） | Open settings |
 | 段开始时候选耗尽 | `mori.model_unavailable`（`firstRequest: true`） | 同上；消息已撤回（上节） | Open settings |
 | 同一次回复的 pi 错误 | 随后 pi 的 `message_end`（`stopReason: 'error'`，`errorMessage` 为 §5.8 的说明） | 不再显示 v0 的错误卡（一次失败只显示一张卡） | — |
 | Open settings | 你点了它 | 设置 → Models，滚到第一个被排除候选的提供商卡；原因是 `auth`、`quota` 时焦点在它的 Keys | — |
@@ -93,6 +93,7 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 | `pick_missing` | “<名字> is not in your model settings.”，第二行“Used by this session’s model range.”（§4.2 要说明谁引用了它；第二行临时，走查时可以改） | “Change model…”；“Open settings” |
 | `project_config` | “.mori/models.json: <原因或原文>” | “Open settings” |
 | `config_invalid` | “Model settings can’t be read: <路径>: <原文>” | “Open settings” |
+| `agents_invalid`（协作模式：见 docs/specs/parallel-agents-taskboard.md §4.4、§13.9；优先于以上各项） | “Fix the agent files”，下面 `blocked.problems` 每项一行 | “Check again”（`check_agents`）；见 [team-blocked.md](team-blocked.md) |
 
 按钮只按 `blocked.actions` 出现，顺序同上表。各操作：
 
@@ -101,7 +102,7 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 | Verify now（`verify`） | 你点了它：`models.verify`（`{ refs: blocked.verifyRefs, tests: 'auto' }`） | `mori.model_state` 变为 `verifying`（没有 Verify now）；探针结束后自动重新校验，通过时卡消失 |
 | Allow <zone> for this project（`allow_zone`） | 你点了它 | 打开 设置 → Models 的 Project access，焦点在这个会话的项目（§9.3）；勾选并确认后卡消失（models-settings.md） |
 | Confirm zone（`confirm_zone`） | 你点了它；`blocked.zoneProviders` 是要确认的提供商 | 打开 设置 → Models，落在顶部区域未确认的那几行，焦点在 `zoneProviders` 第一个提供商那一行（§9.3）；在那里逐个确认（models-settings.md） |
-| Change model…（`change_model`） | 你点了它 | 打开这一栏顶栏的范围菜单（model-menu.md） |
+| Change model…（`change_model`）（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时不提供，换成 `Turn off team mode`（`turn_off_team`）：`session.setTeam { mode: 'off' }`，直接回到 `off`，§5.1） | 你点了它 | 打开这一栏顶栏的范围菜单（model-menu.md） |
 | Open settings（`open_settings`） | 你点了它 | 设置 → Models，停在顶部 |
 
 被拒绝启动时：
@@ -156,6 +157,6 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 | 重建提示 | `[data-testid="notice"][data-kind="rebuild"]`，`data-summary`（`true` / `false`） |
 | 阶段行 | `data-testid="stage"`（沿用 v0），模型层的带 `data-kind`：`wait-model`、`held`、`rebuild`、`queue`、`retry` |
 | No model available | `data-testid="unavailable-card"`；候选 `[data-testid="candidate"][data-ref][data-reason]`；“Open settings” `data-action="open-settings"` |
-| 拒绝启动卡 | `[data-testid="blocked-card"][data-kind]`（`blocked.kind`）；候选同上；操作按钮 `data-action`：`verify`、`allow-zone`、`confirm-zone`、`change-model`、`open-settings` |
+| 拒绝启动卡 | `[data-testid="blocked-card"][data-kind]`（`blocked.kind`）；候选同上；操作按钮 `data-action`：`verify`、`allow-zone`、`confirm-zone`、`change-model`、`open-settings`（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.9、§12.11：另有 `check-agents`、`turn-off-team`，问题行 `agent-problem`） |
 | 排队区 | `data-testid="queue"`（沿用 v0）；准备中暂存的项带 `data-pending="true"` |
 | 错误卡 | `data-testid="error-card"`（沿用 v0），不再有“Go to settings” |

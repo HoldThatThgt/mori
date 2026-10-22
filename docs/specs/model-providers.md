@@ -35,10 +35,10 @@
 | 选择范围 | pick，`ModelPick` | 一个字符串：分组 id、提供商 id，或 `<provider>/<model>` |
 | 候选列表 | candidates | 选择范围按 §5.1 展开后的有序模型列表 |
 | 一段工作 | reply，`ReplyState` | 普通模式下主 Agent 回答一条消息的过程（§5.2） |
-| 能力要求 | requires | 本规格里只有主 Agent 的 `[tool_calling]`（proposal §5） |
+| 能力要求 | requires | 本规格里只有主 Agent 的 `[tool_calling]`（proposal §5）；平行 Agent 规格 §12.2 加上角色的 `requires` |
 | 模型档案 | profile，`ModelProfile` | §7 |
 | 网络区域 | zone：`local` / `intranet` / `public` | §4.3 |
-| 普通模式 | — | 协作模式关闭；App 今天只有这一种 |
+| 普通模式 | — | 协作模式关闭（协作模式见平行 Agent 规格 §5） |
 
 ## 2. 组件与代码落点
 
@@ -215,6 +215,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 | `pick_missing` | 范围指向的名字不存在 | <名字> is not in your model settings. | Change model…；Open settings |
 | `project_config` | 项目配置无效（§4.3） | .mori/models.json: <原因或原文> | Open settings |
 | `config_invalid` | 用户级配置读不出（§4.1） | Model settings can’t be read: <路径>: <原文> | Open settings |
+| `agents_invalid` | `.mori/agents/*.md` 有错（平行 Agent 规格 §4.4，2026-10-21 加；优先于以上各项） | Fix the agent files 加每个问题 | Check again |
 
 被拒绝启动的会话可以看历史、可以在输入框打字、可以改范围；发送不可用，后台进程收到这个会话的 `session.prompt` 时拒绝（`This session can’t start: no model fits`，经 `mori.prompt_error` 把文字放回输入框）。
 
@@ -236,7 +237,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
   - 设置里的默认范围后来改了，已有会话的范围不变。
 - 展开：分组 → 成员按分组中的顺序（项目配置缩小过的按 §4.3），提供商成员展开成它列出的全部模型，模型成员就是它自己；提供商 → 它的模型按顺序；模型 → 它自己。
   同一个模型只保留第一次出现。
-- 主 Agent 的能力要求固定为 `[tool_calling]`（proposal §5）。
+- 主 Agent 的能力要求固定为 `[tool_calling]`（proposal §5）；对话由用户定义的角色持有时再加上它的 `requires`（平行 Agent 规格 §12.1）。
 
 ### 5.2 一段工作（reply）
 
@@ -262,6 +263,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 | 2 | 提供商区域已确认 | `zone_unconfirmed` | network zone not confirmed |
 | 2 | 区域在项目允许的区域里 | `zone_blocked` | zone <区域> is not allowed for this project |
 | 3 | 档案的 `tool_calling` 为已验证（§7.4 重新验证期间按旧结果） | `probing` / `unverified` / `failed` | verifying… / tool calling not verified yet / tool calling failed verification |
+| 3 | 角色会话：满足角色的 `requires`、不是要避开的模型族（平行 Agent 规格 §12.2、§12.9，2026-10-21 加） | `requires_unmet` / `same_family` | <不满足的那项> / same model family as the author (<族>) |
 | 4 | 可用（§8.3） | `rate_limited` / `auth` / `quota` / `connection` / `not_found` / `timeout` / `held` | rate limited until hh:mm:ss / API key rejected / quota exhausted / can’t connect until hh:mm:ss / model not found on the server / no response; unavailable until hh:mm:ss / waiting to make sure it stopped, until hh:mm:ss |
 | 5 | 不在 `tried` 里 | `tried` | failed earlier in this reply: <它的原因文字> |
 | 5 | 段内选择时，排在 `current` 之后（不在 `skipped` 里，也不是排在它前面的） | `earlier` | skipped at the start of this reply |
@@ -466,7 +468,7 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 ### 7.5 交接写入等级
 
 `tier` = 第 5 步通过为 A，否则第 6 步通过为 B，否则第 7 步通过为 C，三级都判定为不通过为 `null`（`protocol_write: failed`）。
-不适用的级别不参与判定：`anthropic-messages` 上 A、C 都判定为不通过即 `tier: null`、`protocol_write: failed`。本规格只判定和显示等级；按等级填交接单在 §10。
+不适用的级别不参与判定：`anthropic-messages` 上 A、C 都判定为不通过即 `tier: null`、`protocol_write: failed`。本规格只判定和显示等级；按等级填交接单在平行 Agent 规格 §7.5。
 
 ### 7.6 适配层
 
@@ -477,7 +479,7 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 | `reasoning.replay: required` | `compat.requiresReasoningContentOnAssistantMessages: true` | 回传推理内容，避免这类部署拒绝请求（proposal §10“下一次请求要不要把它带回给模型”） |
 | 推理字段 | 不需要设置：pi-ai 依次读 `reasoning_content`、`reasoning`、`reasoning_text` | 统一推理内容 |
 
-强制调用的改写（指定函数 → 结构化输出 → 文本标签）用在填交接单上，见 §10；本规格里只有探针第 5–7 步发这类请求，各自按 §7.3 直接组装。
+强制调用的改写（指定函数 → 结构化输出 → 文本标签）用在填交接单上，见平行 Agent 规格 §7.5、§12.7（三种写法移到 `kernel/forcedWrite.ts`）；本规格里只有探针第 5–7 步发这类请求，各自按 §7.3 直接组装。
 
 ## 8. 模型池与多 key
 
@@ -491,7 +493,7 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 
 - 请求要用某个提供商时，按 key 的顺序取第一个可用（§8.3）且有空槽位的 key；有可用的 key 但槽位都满时排队。
 - 这个模型此刻不可用（§8.3：提供商在 `connection`，模型在 `not_found`、`timeout`、`held`，或全部 key 都在 `rate_limited`、`auth`、`quota`）：不排队、不发出，fetch 立即以记录里最先恢复的原因失败，记给包装，按 §5.6 换模型。
-- 队列按（类别，入队时刻）排序，同一个提供商的请求跨会话共用一个队列。类别：`conversation`（主 Agent 的请求、它的压缩、测试连接）先于 `background`（探针），严格优先（proposal §11：v1 只做简单的优先级）。
+- 队列按（类别，入队时刻）排序，同一个提供商的请求跨会话共用一个队列。类别：`conversation`（主 Agent 的请求、它的压缩、测试连接）先于 `background`（探针），严格优先（proposal §11：v1 只做简单的优先级）；平行 Agent 规格 §12.10 在两者之间加 `decision`、`task`。
 - `conversation` 类别排队超过 §12 的时长：`queue_timeout`；`background` 类别没有排队超时（§7.4）。排队期间发 `mori.model_queue`，阶段行显示“Waiting for <提供商名>”。
 - 你按了停止：只让这个会话的请求出队并中止。
 - 换 key、原地重试、换模型后的请求按新的入队时刻排队。
@@ -564,6 +566,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 
 ### 9.2 顶栏
 
+- 协作模式下（`ModelState.pickLocked`，平行 Agent 规格 §12.11）模型按钮只显示正在用的模型，不能打开菜单。
 - 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名和区域。生成中或准备中按钮不可用，悬停“Can’t switch models until the response finishes”。
 - 菜单分三节：Groups、Providers、Models（按提供商分组）。每项标出区域（分组标出它的成员涉及的全部区域，例如“Local · Public”）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session only. New sessions use the default range from Settings.”与“Manage models”。
 - 思考强度菜单沿用 v0，可选强度取当前模型（实际模型）的。当前模型不支持思考时的说明（它指向的设置页改了）：“This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”.”
@@ -655,21 +658,21 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 
 ## 10. 由平行 Agent 与 TaskBoard 规格实现的部分
 
-下面的规则属于 proposal，但只在有平行 Agent、TaskBoard 之后才有调用方，本规格不实现：
+下面的规则属于 proposal，但只在有平行 Agent、TaskBoard 之后才有调用方，本规格不实现；2026-10-21 起由 [平行 Agent 与 TaskBoard 规格](parallel-agents-taskboard.md) 实现，每行注明落点：
 
-| 规则 | 依据 |
-| --- | --- |
-| 子 Agent 按自己的 `models`、`requires` 选，只能落在用户为主 Agent 选的范围里（两者展开后的交集，顺序按子 Agent 的候选）；没有交集时这次提问失败并说明原因 | proposal §5 |
-| 协作模式下用户不选，顶栏只显示正在用的模型；按 task 的设置选模型 | proposal §5 |
-| `.mori/agents/*.md` 的 `models`（每项是一个选择范围）与 `requires`（`tool_calling`、`protocol_write`、`protocol_write>=B`、`structured_output`、`vision`、`context>=N`）。判定用 §7.2 的档案字段：`tool_calling`、`protocol_write`、`structured_output` 必须已验证；`vision` 为 `unverified`（配置声明了图像输入）即满足；`context>=N` 比较 `effective` | proposal §4、§6 |
-| Agent 定义引用的名字不存在时拒绝启动，说明缺哪一项、哪个 Agent 用到它 | proposal §6 |
-| 继续已有的对话、立项、结案会话，或交回同一角色的 task 会话时模型变了：按本规格 §6.2 判断能否转写，不能就按 §6.3 重建 | proposal §9 |
-| task 会话中途换模型：结束本轮，切换记在实例自己的会话里，在新模型上从工作卡重建，需要前半段细节时读自己的会话；第一个请求就失败时把同一请求按新模型的档案重组后发出 | proposal §7.2、§9 |
-| 执行中的 task 候选耗尽时交给结案 Agent | proposal §8 |
-| 填交接单按当前模型的写入等级：A 指定函数 + 严格模式，B JSON schema，C 文本标签；换了模型后，下一次按新模型的等级 | proposal §4、§11 |
-| 读别人的会话只拿整理过的文本（工具调用、输出、结论），不含推理原文，不并进自己的消息历史 | proposal §11 |
-| 评审 `differ_from: author` 排除改过这个 task 代码的模型族 | proposal §11 |
-| 调度类别加上立项与结案的决策、执行 task，依次排在对话之后、后台之前；订阅与定时的请求归入 `background`，与探针同级 | proposal §11 |
+| 规则 | 依据 | 落点 |
+| --- | --- | --- |
+| 子 Agent 按自己的 `models`、`requires` 选，只能落在用户为主 Agent 选的范围里（两者展开后的交集，顺序按子 Agent 的候选）；没有交集时这次提问失败并说明原因（子 Agent = 普通模式下对话 Agent 临时去问的只读实例） | proposal §5 | §12.1、§10.1 |
+| 协作模式下用户不选，顶栏只显示正在用的模型；按做这个 task 的角色的 `models`、`requires` 选，基座与没写 `models` 的角色用会话的选择范围 | proposal §5 | §12.1、§12.11 |
+| `.mori/agents/*.md` 的 `models`（每项是一个选择范围）与 `requires`（`tool_calling`、`protocol_write`、`protocol_write>=B`、`structured_output`、`vision`、`context>=N`）。判定用 §7.2 的档案字段：`tool_calling`、`protocol_write`、`structured_output` 必须已验证；`vision` 为 `unverified`（配置声明了图像输入）即满足；`context>=N` 比较 `effective` | proposal §4、§6 | §4.1、§12.2 |
+| Agent 定义引用的名字不存在时拒绝启动，说明缺哪一项、哪个 Agent 用到它 | proposal §6 | §4.4、§12.3 |
+| 继续已有的对话、立项、结案会话，或交回同一角色的 task 会话时模型变了：按本规格 §6.2 判断能否转写，不能就按 §6.3 重建 | proposal §9 | §12.6 |
+| task 会话中途换模型：结束本轮，切换记在实例自己的会话里，在新模型上从工作卡重建，需要前半段细节时读自己的会话；第一个请求就失败时把同一请求按新模型的档案重组后发出 | proposal §7.2、§9 | §12.4 |
+| 执行中的 task 候选耗尽时交给结案 Agent | proposal §8 | §12.5、§7.4 |
+| 填交接单按当前模型的写入等级：A 指定函数 + 严格模式，B JSON schema，C 文本标签；换了模型后，下一次按新模型的等级 | proposal §4、§11 | §7.5、§12.7 |
+| 读别人的会话只拿整理过的文本（工具调用、输出、结论），不含推理原文，不并进自己的消息历史 | proposal §11 | §10.2、§12.8 |
+| 评审 `differ_from: author` 排除改过这个 task 代码的模型族 | proposal §11 | §12.9 |
+| 调度类别加上立项与结案的决策、执行 task，依次排在对话之后、后台之前；订阅与定时的请求归入 `background`，与探针同级（v1 没有定时） | proposal §11 | §12.10：`decision`、`task` 两类 |
 
 ## 11. 在 pi 上的落点
 

@@ -6,8 +6,10 @@
 // 给会话层（sessions.ts / modelSession.ts）用的接口，都在 ModelLayer 上：
 // - 状态：getConfig()、configError()、getRuntime()、getPool()、getProfiles()、timings、reserved；
 // - 静态校验的输入：projectContext(cwd) → ProjectContext；staticBase(context) 给出 selector.staticCheck 除
-//   pick、candidates 之外的全部输入；expandPickIn(context, pick) / expandPickFor(cwd, pick) 展开范围（§5.1、§4.3）；
-// - 选择器第 1–4 步：exists(ref)、zoneOf(ref)、toolCallingOf(ref)、availabilityOf(ref)；档案 profileOf(ref)
+//   pick、candidates 之外的全部输入；expandPickIn(context, pick) / expandPickFor(cwd, pick) 展开范围（§5.1、§4.3），
+//   expandPicksIn(context, picks) 依次展开角色的 models（平行 Agent 规格 §12.1）；
+// - 选择器第 1–4 步：exists(ref)、zoneOf(ref)、toolCallingOf(ref)、availabilityOf(ref)，角色会话第 3 步的
+//   capabilitiesOf(ref)、familyOf(ref)（平行 Agent 规格 §12.2、§12.9）；档案 profileOf(ref)
 //   （§5.7 用 cancel_verified）；serverGet(ref, url, signal) 读服务端接口（§5.7 发出前读基线，配合 probes.readRunningRequests）；
 // - 原因文字：一律用 shared/models.ts 的 REASON_TEXTS、plainReasonText 与 selector.ts 的 availabilityText、triedText；
 // - 会话打开时：registerProject(cwd)（Project access 列出它）、checkVersions(refs)（§7.1，异步，不挡打开）；
@@ -31,17 +33,17 @@ import { ModelCompiler, type ReplayLookup } from './modelCompile';
 import { runMigration, type PiSettingsView, type ThinkingCopy } from './modelMigrate';
 import { authHeaders, createModelPool, type ModelPool, type PoolKeySecret } from './modelPool';
 import {
-  ProfileBook, buildProfile, needsProbe, profileFingerprint, profileView, reasoningOf, versionChanged,
+  ProfileBook, buildProfile, needsProbe, profileFingerprint, profileView, reasoningOf, versionChanged, visionOf,
   withCancel, withLongInput, type AutoResults, type CancelResult, type LongInputResult, type ProfileTarget,
   type StoredProfile,
 } from './modelProfiles';
 import { MODEL_TIMINGS, type ModelTimings } from './modelTimings';
-import type { Availability, ModelRef, ToolCallingState } from './modelTypes';
+import type { Availability, ModelCapabilities, ModelRef, ToolCallingState } from './modelTypes';
 import { createRuntime, globalSettings, loadPi, markRuntimeReady } from './pi';
 import {
   ProbeRuns, detectServer, runAutoProbes, runCancelProbe, runLongInputProbe, type ProbeDeps,
 } from './probes';
-import { expandPick, type StaticCheckInput } from './selector';
+import { expandPick, expandPicks, familyKey, type ExpandedPicks, type StaticCheckInput } from './selector';
 
 /** @brief 模型档案的文件名（在 userData 下，§3）。 */
 export const MODEL_PROFILES_FILE = 'model-profiles.json';
@@ -339,6 +341,32 @@ export class ModelLayer {
     return target ? profileView(target, this.profiles.lookup(target), this.profiles.isRunning(ref)) : null;
   }
 
+  /**
+   * @brief 选择器第 3 步判断能力要求用的档案能力（平行 Agent 规格 §12.2）：有档案时按档案（重新探测期间是旧结果）；
+   *        没有档案时能力都未验证，图像输入按配置，窗口取配置的。不在配置里时按未验证、窗口 0（第 1 步已排除它）。
+   * @param ref 模型
+   */
+  capabilitiesOf(ref: ModelRef): ModelCapabilities {
+    const found = this.lookupModel(ref);
+    const view = this.profileOf(ref);
+    const probing = this.profiles.isRunning(ref);
+    if (view) {
+      return { tier: view.tier.level, protocolWrite: view.protocol_write, structuredOutput: view.structured_output,
+        vision: view.vision, effectiveWindow: view.context.effective, probing };
+    }
+    return { tier: null, protocolWrite: 'unverified', structuredOutput: 'unverified',
+      vision: found ? visionOf(found.model) : 'failed',
+      effectiveWindow: found?.model.contextWindow ?? 0, probing };
+  }
+
+  /**
+   * @brief 模型族（平行 Agent 规格 §12.9）：配置里模型的 family，为空或不在配置里时为 <provider>/<model> 本身。
+   * @param ref 模型
+   */
+  familyOf(ref: ModelRef): string {
+    return familyKey(this.lookupModel(ref)?.model.family ?? '', ref);
+  }
+
   /** @brief 模型与它的提供商（按当前配置）；不在配置里时为 null。 */
   lookupModel(ref: ModelRef): { provider: ModelProvider; model: ProviderModel } | null {
     const split = splitRef(ref);
@@ -393,6 +421,18 @@ export class ModelLayer {
   }
 
   /**
+   * @brief 在一个项目里把几个选择范围依次展开、去重（角色的 models，平行 Agent 规格 §12.1）；只有一个范围时与 expandPickIn 相同。
+   * @param context projectContext 的结果
+   * @param picks 选择范围，按顺序
+   * @return 候选与第一个不存在的范围；没有配置时第一个范围算不存在，项目配置无效时候选为空（同 expandPickIn）
+   */
+  expandPicksIn(context: ProjectContext, picks: readonly ModelPick[]): ExpandedPicks {
+    if (!this.config) return { refs: [], missing: picks[0] ?? null };
+    if (context.projectError !== null) return { refs: [], missing: null };
+    return expandPicks(this.config, picks, context.project?.groups);
+  }
+
+  /**
    * @brief 读项目配置后展开选择范围（expandPickIn 的便捷写法）。
    * @param projectPath 会话的工作文件夹
    * @param pick 选择范围
@@ -403,14 +443,16 @@ export class ModelLayer {
 
   /**
    * @brief selector.staticCheck 除 pick、candidates 外的全部输入（§4.6）：配置与项目配置的错误、项目允许的区域、
-   *        第 1–3 步的查询。会话层补上 pick、candidates（expandPickIn）和需要时的 removedRefs。
+   *        第 1–3 步的查询（含能力要求用的档案能力与模型族，平行 Agent 规格 §12.2、§12.9）。会话层补上 pick、
+   *        candidates（expandPickIn）、需要时的 removedRefs，以及角色会话的 requires、avoidFamilies。
    * @param context projectContext 的结果
    */
   staticBase(context: ProjectContext): Omit<StaticCheckInput, 'pick' | 'candidates'> {
     return {
       configError: this.loadError, projectError: context.projectError, projectZones: context.projectZones,
       allowedZones: context.allowedZones, exists: (ref) => this.exists(ref), zoneOf: (ref) => this.zoneOf(ref),
-      toolCalling: (ref) => this.toolCallingOf(ref),
+      toolCalling: (ref) => this.toolCallingOf(ref), capabilities: (ref) => this.capabilitiesOf(ref),
+      familyOf: (ref) => this.familyOf(ref),
     };
   }
 

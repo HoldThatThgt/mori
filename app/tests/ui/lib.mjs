@@ -18,12 +18,16 @@ export function arg(name) {
   return index > 0 ? process.argv[index + 1] : undefined;
 }
 
-/** @brief 启动 Mori：exePath 为空时启动开发构建（out/）。 */
+/**
+ * @brief 启动 Mori：exePath 为空时启动开发构建——默认是 out/；环境变量 MORI_APP_DIR 给出另一个构建目录时用它
+ *        （tb-build.mjs 建的 .tb-runs/<名字>，几组 TaskBoard 套件同时开发时各用自己的构建，不互相覆盖）。
+ */
 export function launch({ exePath, userData, env = {} }) {
   const fullEnv = { ...process.env, MORI_USER_DATA: userData, ...env };
+  const appDir = process.env.MORI_APP_DIR ? resolve(process.env.MORI_APP_DIR) : appRoot;
   return electron.launch(exePath
     ? { executablePath: exePath, env: fullEnv }
-    : { args: [appRoot], cwd: appRoot, env: fullEnv });
+    : { args: [appDir], cwd: appDir, env: fullEnv });
 }
 
 /** @brief 准备一个带 README 和一个源文件的临时项目。 */

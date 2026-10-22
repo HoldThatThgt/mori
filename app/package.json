@@ -29,6 +29,8 @@
     "test:m7-replay": "node tests/ui/m7-replay.mjs",
     "check": "npm run typecheck && node tests/check.mjs",
     "test:unit": "node --test --test-reporter=./tests/unit/reporter.mjs \"tests/unit/*.test.mjs\"",
+    "test:tb-unit": "node --test --test-reporter=./tests/unit/tb-reporter.mjs \"tests/unit/taskboard/*.test.mjs\"",
+    "test:taskboard": "npm run test:tb-unit && electron-vite build && node tests/ui/tb-build-base.mjs && node tests/ui/tb-app-roles.mjs && node tests/ui/tb-app-modes.mjs && node tests/ui/tb-app-flow.mjs && node tests/ui/tb-app-ask.mjs && node tests/ui/tb-app-handoff.mjs && node tests/ui/tb-app-sched.mjs && node tests/ui/tb-app-models.mjs && node tests/ui/tb-app-stop.mjs && node tests/ui/tb-app-misc.mjs && node tests/ui/tb-replay.mjs && node tests/ui/v1-models-existing.mjs --id TB-46 && node tests/spec-coverage.mjs --spec taskboard",
     "test:v1-models": "npm run test:unit && electron-vite build && node tests/ui/v1-models-app-settings.mjs && node tests/ui/v1-models-app-switch.mjs && node tests/ui/v1-models-app-session.mjs && node tests/ui/v1-models-replay.mjs && node tests/ui/v1-models-existing.mjs && node tests/spec-coverage.mjs"
   },
   "engines": {

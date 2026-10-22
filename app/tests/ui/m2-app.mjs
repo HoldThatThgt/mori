@@ -592,11 +592,12 @@ async function permissionMenu({ page, h }) {
   const items = await menu.getByRole('menuitemradio').evaluateAll((list) => list.map((item) =>
     `${item.textContent?.trim()}:${item.getAttribute('aria-checked')}`));
   const allowed = await page.getByTestId('permission-allowed').innerText();
-  record('权限菜单：两个选项（"每次询问"打勾）、"本会话已允许：运行命令"和"只作用于这个会话"的说明', haspopup === 'menu'
+  record('权限菜单：两个选项（"每次询问"打勾）、"本会话已允许：运行命令"和"作用于这个会话的全部 Agent"的说明', haspopup === 'menu'
     && await menu.getAttribute('role') === 'menu' && items.length === 2
     && items.some((item) => item.includes('Ask each time') && item.endsWith(':true'))
     && text.includes('Allowed for this session:') && allowed.includes('Run commands')
-    && text.includes('Applies to this session only. New sessions start with “Ask each time”.'),
+    // 平行 Agent 规格 §11.1：说明改为作用于这个用户会话的全部 Agent。
+    && text.includes('Applies to all agents in this session. New sessions start at Ask each time.'),
   `${items.join(' | ')} / ${oneLine(text)}`);
   await page.screenshot({ path: join(shots, '04-permission-menu.png') });
   await (await clearButton(page, 'Run commands')).click();

@@ -1,16 +1,20 @@
 // 拒绝启动卡（docs/v1/screens/model-chat.md "拒绝启动卡"，规格 §4.6）：会话的静态校验没通过时显示在输入框上方，
 // 文字按 blocked.kind，按钮只按 blocked.actions 出现（顺序同状态表）；blocked 变为 null 时卡消失、发送恢复。
+// 角色文件有错（agents_invalid，docs/specs/parallel-agents-taskboard.md §4.4、§13.9）时逐条列出问题，操作 Check again。
 
 import { useState } from 'react';
 import type { BlockedAction, ModelBlocked } from '../../../shared/models';
-import { openRangeMenu, verifyNow } from '../state/modelActions';
+import { checkAgents, openRangeMenu, turnOffTeam, verifyNow } from '../state/modelActions';
 import { openModelsSettings } from '../state/settings';
 import type { Tab } from '../state/store';
 import { CandidateList } from './UnavailableCard';
 
+/** 会话不空闲时 Check again 的悬停说明（临时，docs/v1/screens/team-blocked.md） */
+const CHECK_BUSY_TITLE = 'Available when nothing is running in this session';
+
 /** 按钮的顺序（同状态表） */
 const ACTION_ORDER: readonly BlockedAction[] = [
-  'verify', 'allow_zone', 'confirm_zone', 'change_model', 'open_settings',
+  'check_agents', 'verify', 'allow_zone', 'confirm_zone', 'change_model', 'turn_off_team', 'open_settings',
 ];
 
 /** @brief 卡片的主文字与第二行（没有时为 null）。 */
@@ -32,6 +36,8 @@ function cardText(blocked: ModelBlocked, pick: string | null): { title: string; 
       return { title: `.mori/models.json: ${blocked.detail}`, note: null };
     case 'config_invalid':
       return { title: `Model settings can’t be read: ${blocked.detail}`, note: null };
+    case 'agents_invalid':
+      return { title: 'Fix the agent files', note: null };
   }
 }
 
@@ -43,14 +49,16 @@ function actionLabel(action: BlockedAction, blocked: ModelBlocked): string {
     case 'confirm_zone': return 'Confirm zone';
     case 'change_model': return 'Change model…';
     case 'open_settings': return 'Open settings';
+    case 'check_agents': return 'Check again';
+    case 'turn_off_team': return 'Turn off team mode';
   }
 }
 
 /**
  * @brief 点了一个操作：Verify now 探测还没验证的候选；Allow <zone> 打开 Project access 里这个会话的项目；
  *        Confirm zone 打开区域未确认的那几行，焦点在第一个要确认的提供商；Change model 打开这一栏的范围菜单；
- *        Open settings 打开 设置 → Models 的顶部。
- * @return Verify now 失败时的原文；其余为 null
+ *        Open settings 打开 设置 → Models 的顶部；Check again 重新读角色文件；Turn off team mode 关掉协作模式。
+ * @return Verify now、Check again、Turn off team mode 失败时的原文；其余为 null
  */
 async function runAction(action: BlockedAction, blocked: ModelBlocked, tab: Tab): Promise<string | null> {
   switch (action) {
@@ -59,6 +67,8 @@ async function runAction(action: BlockedAction, blocked: ModelBlocked, tab: Tab)
     case 'confirm_zone': openModelsSettings({ focus: 'zones', providerId: blocked.zoneProviders[0] }); return null;
     case 'change_model': openRangeMenu(tab.key); return null;
     case 'open_settings': openModelsSettings(); return null;
+    case 'check_agents': return checkAgents(tab.key);
+    case 'turn_off_team': return turnOffTeam(tab.key);
   }
 }
 
@@ -74,6 +84,8 @@ export function BlockedCard({ tab }: { tab: Tab }) {
 function BlockedCardBody({ tab, blocked }: { tab: Tab; blocked: ModelBlocked }) {
   const [problem, setProblem] = useState<string | null>(null);
   const { title, note } = cardText(blocked, tab.pick);
+  // Check again 只在会话空闲时可用（§4.4）：对话没在回复或准备中，后台也没有 Agent 在运行或排队。
+  const busy = tab.transcript.running || tab.transcript.sending || tab.team.background;
   const actions = ACTION_ORDER.filter((action) => blocked.actions.includes(action));
   // verifying 只写第一个正在验证的候选，不列其他候选（状态表）。
   const candidates = blocked.kind === 'verifying' ? [] : blocked.candidates;
@@ -82,15 +94,24 @@ function BlockedCardBody({ tab, blocked }: { tab: Tab; blocked: ModelBlocked }) 
       <div className="model-card-title">{title}</div>
       {note && <div className="model-card-note">{note}</div>}
       <CandidateList candidates={candidates} />
+      {blocked.kind === 'agents_invalid' && (
+        <ul className="candidate-list">
+          {blocked.problems.map((line, index) => <li key={index} data-testid="agent-problem">{line}</li>)}
+        </ul>
+      )}
       {problem && <div className="model-card-problem" role="alert">{problem}</div>}
       {actions.length > 0 && (
         <div className="model-card-actions">
-          {actions.map((action) => (
-            <button key={action} className="button compact" data-action={action.replace('_', '-')}
-              onClick={() => { setProblem(null); void runAction(action, blocked, tab).then(setProblem); }}>
-              {actionLabel(action, blocked)}
-            </button>
-          ))}
+          {actions.map((action) => {
+            const unavailable = action === 'check_agents' && busy;
+            return (
+              <button key={action} className="button compact" data-action={action.replaceAll('_', '-')}
+                disabled={unavailable} title={unavailable ? CHECK_BUSY_TITLE : undefined}
+                onClick={() => { setProblem(null); void runAction(action, blocked, tab).then(setProblem); }}>
+                {actionLabel(action, blocked)}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

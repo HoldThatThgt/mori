@@ -45,7 +45,7 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 | 正在读取 | 启动后 `session.list` 还没返回 | "Loading sessions…" | New session、Open folder… |
 | 读取失败 | `session.list` 命令失败（后台进程没有回应；pi 自己不会报错） | "Couldn’t load sessions: "加原文；已有的列表保持显示 | "Retry" |
 | 没有会话 | 列表为空，本次也没打开过文件夹（也可能是 pi 读不了会话目录，pi 不区分） | 不显示树；中栏只说"Choose a project folder to start a session." | New session、Open folder… |
-| 有会话 | pi 的会话列表（`session.list` → `listAll()`），加上本次打开、还没保存的会话 | 按项目（会话的工作目录）分组：项目行显示文件夹名，悬停显示完整路径；项目下列出会话；当前会话高亮 | 点会话打开或切换；右键菜单；键盘见下 |
+| 有会话 | pi 的会话列表（`session.list` → `listAll()`），加上本次打开、还没保存的会话（协作模式：见 docs/specs/parallel-agents-taskboard.md §3、§14.5：实例会话存在 `<userData>/teams/<id>/sessions`，不进侧栏，也不算未保存的会话） | 按项目（会话的工作目录）分组：项目行显示文件夹名，悬停显示完整路径；项目下列出会话；当前会话高亮 | 点会话打开或切换；右键菜单；键盘见下 |
 | 重新读取 | 改名没打开的会话、归档、删除、后台进程重新载入之后（界面重新加载后还没点开的会话的名字、排序、状态另随事件更新） | 旧的树保持显示，结果回来后整体替换，不回到"Loading sessions…"；正在改名的行不被打断 | — |
 | 排序 | 会话的最后活动时间：pi 列表的 `modified`；本次运行里你发消息、以及你的消息或助手回复结束（`message_end`）的时间；新建会话的时间；取最新 | 项目按其中最新的会话排，会话在项目内从新到旧 | — |
 | 项目里没有会话了 | 归档或删除了项目里最后一个会话 | 项目行一起消失（方案"本次打开的文件夹"也算项目；空项目行没有可做的操作，交付说明列出） | — |
@@ -63,9 +63,9 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 
 | 文字 | 来源 | 消失于 |
 | --- | --- | --- |
-| Needs approval | 这个会话有挂起的批准请求（`mori.approval_request`） | 请求结束（`mori.approval_end`）；后台进程退出 |
+| Needs approval | 这个会话有挂起的批准请求（`mori.approval_request`）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.3、§13.6：后台实例的批准卡也算，没点开的会话用 `LiveStatus.teamApproval`） | 请求结束（`mori.approval_end`）；后台进程退出 |
 | Needs input | 这个会话有挂起的扩展询问（`mori.ui_request`，见 extension-ui.md） | 询问结束（`mori.ui_end`）；后台进程退出 |
-| Running | 本轮运行中（`agent_start` 到 `agent_settled`），或刚发出、还没开始 | 本轮结束；后台进程退出 |
+| Running | 本轮运行中（`agent_start` 到 `agent_settled`），或刚发出、还没开始（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.6：这个会话有任何 Agent 在运行、或有待判断的消息时也是，`TeamState.busy`，没点开的会话用 `LiveStatus.teamBusy`） | 本轮结束；后台进程退出 |
 | Error | 新建或打开失败；本次运行里最近的一轮以错误结束（对话流最后一项是本次的错误卡）；后台进程意外退出时它正在生成 | 再发一条消息；重新打开成功 |
 | Unread | 这个会话不在中栏显示（不在任一栏里，或中栏显示的是设置页；M5 起分屏的两栏都算显示）时本轮结束（`agent_settled`） | 它重新显示在中栏（点它、Enter，或设置页"Back to app"）；不跨重启保存 |
 
@@ -107,7 +107,7 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 打开 | 在会话行上右键（贴着鼠标位置）；焦点在会话行上按菜单键或 Shift+F10（贴着会话行下方）。右键不切换当前会话 | 菜单（读屏名称"Session actions"）：Rename、Attach as context、Open in split view（M5）、Archive、Delete…；焦点在第一个可用的菜单项 | ↑ ↓ 选择、Enter 执行；Esc、Tab 或点别处关闭，焦点回到会话行 |
-| 正在生成的会话 | 会话行状态为"Running""Needs approval"或"Needs input"（包括界面重新加载后还在后台进程里生成的会话） | "Archive""Delete…"不可用，旁边小字"Still running" | Rename |
+| 正在生成的会话 | 会话行状态为"Running""Needs approval"或"Needs input"（包括界面重新加载后还在后台进程里生成的会话）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.5：只有后台 Agent 在运行、或有待判断的消息时同样，后台进程的 `session.close` 也拒绝） | "Archive""Delete…"不可用，旁边小字"Still running" | Rename |
 | 正在打开的会话 | 会话还在打开（按钮位置"Starting…"） | "Rename""Archive""Delete…"三项都不可用，旁边小字"Opening…" | — |
 | 还没保存的新会话 | 会话还没有消息 | "Archive"不可用，旁边小字"No messages yet" | Rename、Delete… |
 | 已归档的会话 | 在"Archived"列表里的会话行上打开菜单 | 菜单：Unarchive、Delete… | 同上 |
@@ -144,7 +144,7 @@ M5 起菜单是：Rename、Attach as context、Open in split view、Archive、De
 | 恢复 | 你选了"Unarchive"，或点了已归档的会话 | 回到它的项目下，按最后活动排序；点的是会话行时同时打开它 | — |
 | 删除确认 | 你在右键菜单选了"Delete…" | 对话框"Delete “<会话名>”?"，说明"This session will be permanently deleted. This can’t be undone."；按钮"Delete"（危险色）和"Cancel"，焦点在"Cancel"，Tab 只在两个按钮之间切换 | Delete；Cancel 或 Esc |
 | 还没保存的新会话 | 会话还没有消息 | 说明改为"This session has no messages yet." | 同上 |
-| 删除中 | 你点了"Delete"：后台进程里开着的会话先关闭（同上）；没开着或打开失败的跳过这一步；再由主进程删除会话文件（只接受 `<agentDir>\sessions` 里的 `.jsonl`；还没保存的新会话没有文件可删） | "Deleting…"，两个按钮不可用；Esc 不起作用 | — |
+| 删除中 | 你点了"Delete"：后台进程里开着的会话先关闭（同上）；没开着或打开失败的跳过这一步；再由主进程删除会话文件（只接受 `<agentDir>\sessions` 里的 `.jsonl`；还没保存的新会话没有文件可删）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.5：删除会话文件之后，按它第一行里的 id 一并永久删除 `<userData>/teams/<id>/`；归档不动它；`session.close` 同时关闭全部实例会话） | "Deleting…"，两个按钮不可用；Esc 不起作用 | — |
 | 已删除 | 各自需要的步骤都成功；然后重新读取列表 | 对话框关闭，会话行消失（也从已归档列表去掉）；如果它是当前会话，中栏回到"Open a folder"；焦点移到屏幕上排在它下面的会话行（没有时上一行，收起的"Archived"里的不算；再没有时"New session"）；草稿一起删除；重启后不再出现 | — |
 | 关闭失败 | `session.close` 报错 | 对话框里"Couldn’t delete this session: "加原文；什么都没变 | 再点"Delete"重试；Cancel（焦点回到会话行） |
 | 已关闭、删除文件失败 | 主进程删除文件报错；主进程把原文交回界面 | 对话框里"Couldn’t delete this session: "加原文；文件还在；会话已经关闭，变回没打开的会话（再点它会重新打开，"Allow for this session"的选择和权限回到"Ask each time"） | 再点"Delete"重试；Cancel |
@@ -200,7 +200,7 @@ M4 起输入框里的引用芯片也按会话文件存在本机（`localStorage`
 | 意外退出 | 主进程的退出通知 | 会话行的"Running""Needs approval""Needs input"消失；退出时正在生成的会话（包括界面重新加载后还没点开的）显示"Error"；会话树保持原样；"New session""Open folder…"不可用 | 切换已打开的会话；点没打开的会话（中栏显示退出横幅，重新载入后自动打开它）；Restart |
 | 重新载入 | 你点了"Restart" | 重新读取会话列表（旧的树保持显示）；打开过的会话照 chat.md 的做法重新打开，信任沿用本次的回答；会话名从会话文件恢复；"Error"在重新打开成功后消失 | — |
 | 界面重新加载 | 页面重新加载（例如 Electron 默认菜单的 Ctrl+R）：界面状态清空；后台进程里的会话照常运行（照 Claude 桌面版：会话不因窗口而停，只有停止、归档、删除或退出才停） | 重新读取会话列表；后台进程里打开着的会话在侧栏显示状态（`session.list` 带回的 `live`：Running、Needs approval、Needs input），之后随事件更新（见"状态"）；本次新建、还没发消息的会话也列出（后台进程把它补进列表，名为"New session"）；草稿还在（存在本机）；"Allow for this session"的选择和权限还在（会话没停）；本次运行里信任询问的回答清空，新打开的文件夹会再问 | 点会话接上 |
-| 接上后台进程里的会话 | 你点了一个还在后台进程里的会话：`session.open` 返回它这一刻的样子（已经写进会话文件的对话、`live`：是否在生成、正在生成的回复、正在执行的工具、挂着的批准请求和扩展询问、排队区） | 不问信任；对话流显示到这一刻，正在生成的回复接着流入，正在执行的工具卡是"Running…"，挂着的批准卡和扩展询问照常出现；阶段行按这一刻定（模型还没开始回复时"Waiting for the model…"，只有思考时"Thinking…"）；之后的事件照常接着显示。扩展的通知不在会话记录里，界面重新加载前显示过的不再显示 | 照常操作 |
+| 接上后台进程里的会话 | 你点了一个还在后台进程里的会话：`session.open` 返回它这一刻的样子（已经写进会话文件的对话、`live`：是否在生成、正在生成的回复、正在执行的工具、挂着的批准请求和扩展询问、排队区）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.6、§13.10：另带协作模式、TaskBoard 视图、待判断的消息和挂起的后台批准卡，后台实例照常运行） | 不问信任；对话流显示到这一刻，正在生成的回复接着流入，正在执行的工具卡是"Running…"，挂着的批准卡和扩展询问照常出现；阶段行按这一刻定（模型还没开始回复时"Waiting for the model…"，只有思考时"Thinking…"）；之后的事件照常接着显示。扩展的通知不在会话记录里，界面重新加载前显示过的不再显示 | 照常操作 |
 
 chat.md"会话还没保存过"的判断改为：这个会话没有你的消息（本次运行里没发过，会话列表里也没有它的第一条消息），且会话文件不存在。
 保存过的会话文件不在时（例如被外部删掉）显示"Failed to open session: "加原文，不再换成一个空会话。

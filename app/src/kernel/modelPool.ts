@@ -116,8 +116,15 @@ export class ModelUnavailableError extends Error {
 
 /** 无 key 的提供商在占用表里的键（§8.1）。 */
 const PSEUDO_SLOT = '';
-/** 队列排序：conversation 严格先于 background（§8.2）。 */
-const CLASS_RANK: Readonly<Record<SchedClass, number>> = { conversation: 0, background: 1 };
+/** 队列排序：conversation > decision > task > background，严格优先（§8.2，平行 Agent 规格 §12.10）。 */
+const CLASS_RANK: Readonly<Record<SchedClass, number>> = { conversation: 0, decision: 1, task: 2, background: 3 };
+/** 排队超时（换模型）只对这两类生效；task、background 排队等槽位是常态，不超时（平行 Agent 规格 §12.10）。 */
+const QUEUE_TIMEOUT_CLASSES: ReadonlySet<SchedClass> = new Set<SchedClass>(['conversation', 'decision']);
+/**
+ * 在一个 key 上最多占（并发上限 − reservedSlots）个槽位的类别，留出的给 conversation、decision：严格优先只排等待的顺序，
+ * 不打断已经发出的请求（平行 Agent 规格 §12.10、§15）。
+ */
+const CAPPED_CLASSES: ReadonlySet<SchedClass> = new Set<SchedClass>(['task', 'background']);
 /** 换 key 的分类（§5.5）。 */
 const KEY_CLASSES: readonly FailureClass[] = ['rate_limited', 'auth', 'quota'];
 
@@ -131,6 +138,8 @@ interface Lease {
   secret: string | null;
   /** 槽位是否已交还；release 只在为 false 时减占用，防止重复释放 */
   released: boolean;
+  /** 这个槽位由 task、background 类别占用（另计在 cappedInFlight 里） */
+  capped: boolean;
   /** 取槽位时提供商的配置代数；结果回来时代数变了，说明配置改过、记录清过，这次的结果不再写记录 */
   generation: number;
 }
@@ -173,6 +182,8 @@ interface ProviderState {
   connection: UnavailableRecord | null;
   /** 各槽位正在进行的请求数：键为 key 引用，无 key 时为 PSEUDO_SLOT（''）；为 0 时删除 */
   inFlight: Map<string, number>;
+  /** 其中 task、background 类别的请求数，键同 inFlight；为 0 时删除 */
+  cappedInFlight: Map<string, number>;
   /** 等槽位的请求，按 compareWaiters 的顺序出队 */
   queue: Waiter[];
   /** 配置代数：配置改变清除记录（改地址、接口、兼容选项、模型配置，删除提供商）时加 1 */
@@ -284,6 +295,13 @@ async function readLimited(response: Response, max: number): Promise<string> {
     offset += part.byteLength;
   }
   return new TextDecoder().decode(bytes);
+}
+
+/** @brief 占用表里一个槽位减 1，为 0 时删除。 */
+function decrement(counts: Map<string, number>, slot: string): void {
+  const used = (counts.get(slot) ?? 1) - 1;
+  if (used > 0) counts.set(slot, used);
+  else counts.delete(slot);
 }
 
 /** @brief 队列顺序：（类别，入队时刻），同时入队的按先后。 */
@@ -699,11 +717,13 @@ export class ModelPool {
       this.log(`${ref} (${ctx.options.sessionKey}) key ${keyRef} is not saved`);
       return Promise.reject(new Error(`Key ${keyRef} is not saved for ${ctx.providerId}`));
     }
-    const lease = this.tryTake(ctx.providerId, keyRef, ctx.rotated);
+    const lease = this.tryTake(ctx.providerId, { forced: keyRef, exclude: ctx.rotated, cls: ctx.options.cls });
     return lease ? Promise.resolve(lease) : this.enqueue(ctx);
   }
 
-  /** @brief 排队（§8.2）：conversation 到时限即 queue_timeout，background 不限；按停止只让这个请求出队。 */
+  /**
+   * @brief 排队（§8.2）：conversation、decision 到时限即 queue_timeout，task、background 不限；按停止只让这个请求出队。
+   */
   private enqueue(ctx: CallContext): Promise<Lease> {
     const state = this.state(ctx.providerId);
     const notice = (active: boolean): void => ctx.options.onQueue?.({ active, provider: ctx.providerId,
@@ -724,7 +744,7 @@ export class ModelPool {
       };
       const onAbort = (): void => waiter.reject(this.abortFailure(ctx));
       signals.forEach((signal) => signal.addEventListener('abort', onAbort, { once: true }));
-      if (ctx.options.cls === 'conversation') {
+      if (QUEUE_TIMEOUT_CLASSES.has(ctx.options.cls)) {
         timer = this.clock.setTimeout(() => waiter.reject(this.queueTimeoutFailure(ctx, waiter.enqueuedAt)),
           this.timings.queueTimeoutMs);
       }
@@ -735,7 +755,8 @@ export class ModelPool {
 
   /**
    * @brief 按（类别，入队时刻）给排队的请求分配槽位；排队中模型变得不可用的请求立即失败（§8.2）。
-   * 没有指定 key 的请求用的是同一组 key，前面的拿不到时后面的也拿不到，所以严格优先自然成立。
+   * 没有指定 key 的请求用的是同一组 key，前面的拿不到时后面的也拿不到，所以严格优先自然成立；留出的槽位只有
+   * conversation、decision 能用，它们本来就排在 task、background 前面。
    */
   private pump(providerId: string): void {
     const state = this.providers.get(providerId);
@@ -749,34 +770,51 @@ export class ModelPool {
           continue;
         }
       }
-      const lease = this.tryTake(providerId, keyRef, waiter.ctx.rotated);
+      const lease = this.tryTake(providerId, { forced: keyRef, exclude: waiter.ctx.rotated,
+        cls: waiter.ctx.options.cls });
       if (lease) waiter.resolve(lease);
     }
   }
 
   /**
    * @brief 按 key 的顺序取第一个可用且有空槽位的 key（§8.2）；指定了 key 时只看它、不看它的记录。
+   *        task、background 类别在一个 key 上最多占（并发上限 − reservedSlots）个、至少 1 个（平行 Agent 规格 §12.10）。
    * @param providerId 提供商 id
-   * @param forced 指定的 key（key 的 Test）；没有时为 undefined
-   * @param exclude 这次调用里已经换掉的 key，不再选（§5.5）
+   * @param want forced：指定的 key（key 的 Test），没有时为 undefined；exclude：这次调用里已经换掉的 key，不再选（§5.5）；
+   *        cls：调度类别
    */
-  private tryTake(providerId: string, forced: string | undefined, exclude: ReadonlySet<string>): Lease | null {
+  private tryTake(providerId: string,
+    want: { forced: string | undefined; exclude: ReadonlySet<string>; cls: SchedClass }): Lease | null {
     const state = this.providers.get(providerId);
     if (!state?.config) return null;
     const now = this.clock.now();
-    const candidates: (string | null)[] = forced !== undefined ? [forced]
-      : this.slotKeys(state).filter((keyRef) => !(keyRef !== null && exclude.has(keyRef))
+    const candidates: (string | null)[] = want.forced !== undefined ? [want.forced]
+      : this.slotKeys(state).filter((keyRef) => !(keyRef !== null && want.exclude.has(keyRef))
         && !isRecordActive(this.keyRecordOf(state, keyRef), now));
+    const capped = CAPPED_CLASSES.has(want.cls);
     for (const keyRef of candidates) {
       const slot = keyRef ?? PSEUDO_SLOT;
-      const used = state.inFlight.get(slot) ?? 0;
-      if (used >= state.config.concurrency) continue;
+      if (!this.slotFree(state, slot, capped)) continue;
       const secret = keyRef === null ? null : state.keys.find((key) => key.ref === keyRef)?.secret;
       if (secret === undefined) continue;
-      state.inFlight.set(slot, used + 1);
-      return { providerId, keyRef, secret, released: false, generation: state.generation };
+      state.inFlight.set(slot, (state.inFlight.get(slot) ?? 0) + 1);
+      if (capped) state.cappedInFlight.set(slot, (state.cappedInFlight.get(slot) ?? 0) + 1);
+      return { providerId, keyRef, secret, released: false, capped, generation: state.generation };
     }
     return null;
+  }
+
+  /**
+   * @brief 一个槽位此刻能否再接一个请求：没到并发上限；task、background 另外不超过（并发上限 − reservedSlots）、至少 1 个。
+   * @param state 提供商的状态（config 不为 null）
+   * @param slot key 引用或 PSEUDO_SLOT
+   * @param capped 请求是 task、background 类别
+   */
+  private slotFree(state: ProviderState, slot: string, capped: boolean): boolean {
+    const limit = state.config?.concurrency ?? 0;
+    if ((state.inFlight.get(slot) ?? 0) >= limit) return false;
+    if (!capped) return true;
+    return (state.cappedInFlight.get(slot) ?? 0) < Math.max(1, limit - this.timings.reservedSlots);
   }
 
   /**
@@ -801,9 +839,8 @@ export class ModelPool {
     const state = this.providers.get(lease.providerId);
     if (!state) return;
     const slot = lease.keyRef ?? PSEUDO_SLOT;
-    const used = (state.inFlight.get(slot) ?? 1) - 1;
-    if (used > 0) state.inFlight.set(slot, used);
-    else state.inFlight.delete(slot);
+    decrement(state.inFlight, slot);
+    if (lease.capped) decrement(state.cappedInFlight, slot);
     this.pump(lease.providerId);
   }
 
@@ -948,7 +985,8 @@ export class ModelPool {
   private state(providerId: string): ProviderState {
     let state = this.providers.get(providerId);
     if (!state) {
-      state = { config: null, keys: [], pseudo: null, connection: null, inFlight: new Map(), queue: [], generation: 0 };
+      state = { config: null, keys: [], pseudo: null, connection: null, inFlight: new Map(), cappedInFlight: new Map(),
+        queue: [], generation: 0 };
       this.providers.set(providerId, state);
     }
     return state;
@@ -985,7 +1023,7 @@ export class ModelPool {
     return new ModelUnavailableError(ctx.options.ref, availability.reason, availability.until);
   }
 
-  /** @brief conversation 排队超时（§8.2）：记 queue_timeout，请求没有发出。 */
+  /** @brief conversation、decision 排队超时（§8.2）：记 queue_timeout，请求没有发出。 */
   private queueTimeoutFailure(ctx: CallContext, enqueuedAt: number): Error {
     const waited = this.clock.now() - enqueuedAt;
     this.record(ctx, { keyRef: null, cls: 'queue_timeout', status: null, retryAfterMs: null, sentAt: null });

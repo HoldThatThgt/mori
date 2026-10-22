@@ -300,10 +300,13 @@ export type ProjectModelsFile = z.infer<typeof ProjectModelsFileSchema>;
 
 // ---- 选择器的原因与会话的模型状态（§5.3、§4.6、§9.5） ----
 
-/** @brief 选择器的排除原因代码（§5.3 原因代码列）。 */
+/**
+ * @brief 选择器的排除原因代码（§5.3 原因代码列）；requires_unmet、same_family 是角色会话第 3 步的原因
+ *        （平行 Agent 规格 §12.2、§12.9），不会恢复。
+ */
 export const EXCLUSION_REASONS = [
-  'missing', 'zone_unconfirmed', 'zone_blocked', 'probing', 'unverified', 'failed', 'rate_limited', 'auth', 'quota',
-  'connection', 'not_found', 'timeout', 'held', 'tried', 'earlier', 'no_handover',
+  'missing', 'zone_unconfirmed', 'zone_blocked', 'probing', 'unverified', 'failed', 'requires_unmet', 'same_family',
+  'rate_limited', 'auth', 'quota', 'connection', 'not_found', 'timeout', 'held', 'tried', 'earlier', 'no_handover',
 ] as const;
 export type ExclusionReason = (typeof EXCLUSION_REASONS)[number];
 
@@ -340,6 +343,13 @@ export const REASON_TEXTS = Object.freeze({
   probing: (): string => 'verifying…',
   unverified: (): string => 'tool calling not verified yet',
   failed: (): string => 'tool calling failed verification',
+  /**
+   * unmet：不满足的那一项，由选择器在判断时写出（平行 Agent 规格 §12.2），例如 handoff tier C is below B、
+   * effective window 32768 < 65536、structured_output not verified
+   */
+  requires_unmet: (unmet: string): string => unmet,
+  /** family：要避开的作者模型族（平行 Agent 规格 §12.9；族为空的模型用 <provider>/<model>） */
+  same_family: (family: string): string => `same model family as the author (${family})`,
   rate_limited: (until: number | null): string => withUntil('rate limited', ' ', until),
   auth: (): string => 'API key rejected',
   quota: (): string => 'quota exhausted',
@@ -379,6 +389,11 @@ export function plainReasonText(reason: ModelReason, detail: string): string {
 export const STOPPED_BEFORE_SENDING = 'Stopped before sending';
 /** @brief 被拒绝启动的会话收到 session.prompt 时的错误原文（§4.6）：原因由拒绝启动卡说明，界面不另显示错误卡。 */
 export const BLOCKED_PROMPT_MESSAGE = 'This session can’t start: no model fits';
+/**
+ * @brief task 会话中途换模型时结束这次运行的错误文字（平行 Agent 规格 §12.4）：运行以 stopReason error 和这段文字结束，
+ *        后台进程读 ModelSession.takeRestart()，不解析这段文字。
+ */
+export const MODEL_RESTART = 'MODEL_RESTART';
 
 /** @brief 一个候选和它被排除的原因。 */
 export interface CandidateExclusion {
@@ -390,14 +405,21 @@ export interface CandidateExclusion {
   detail: string;
 }
 
-/** @brief 拒绝启动的种类（§4.6）。 */
+/**
+ * @brief 拒绝启动的种类（§4.6）；agents_invalid 是 .mori/agents/*.md 有错（平行 Agent 规格 §4.4），优先于其他各项。
+ */
 export const BLOCKED_KINDS = [
-  'verifying', 'no_candidate', 'no_pick', 'pick_missing', 'project_config', 'config_invalid',
+  'verifying', 'no_candidate', 'no_pick', 'pick_missing', 'project_config', 'config_invalid', 'agents_invalid',
 ] as const;
 export type BlockedKind = (typeof BLOCKED_KINDS)[number];
 
-/** @brief 拒绝启动卡上的操作（§4.6）。 */
-export const BLOCKED_ACTIONS = ['verify', 'allow_zone', 'confirm_zone', 'change_model', 'open_settings'] as const;
+/**
+ * @brief 拒绝启动卡上的操作（§4.6）；check_agents 是 Check again（平行 Agent 规格 §4.4），
+ *        turn_off_team 是协作模式下代替 change_model 的 Turn off team mode（平行 Agent 规格 §5.1、§12.11）。
+ */
+export const BLOCKED_ACTIONS = [
+  'verify', 'allow_zone', 'confirm_zone', 'change_model', 'open_settings', 'check_agents', 'turn_off_team',
+] as const;
 export type BlockedAction = (typeof BLOCKED_ACTIONS)[number];
 
 /** @brief 会话被拒绝启动的说明（§4.6、§9.5）。 */
@@ -416,6 +438,8 @@ export interface ModelBlocked {
   zone: Zone | null;
   /** Confirm zone 要确认区域的提供商 id */
   zoneProviders: string[];
+  /** agents_invalid 时卡上逐条列出的问题（平行 Agent 规格 §4.4 表的写法，<file>: …）；其他种类为空 */
+  problems: string[];
 }
 
 /** @brief 会话的模型状态（顶栏与拒绝启动卡，§9.5）。 */
@@ -432,6 +456,11 @@ export interface ModelState {
   thinkingLevels: ThinkingLevel[];
   /** 当前模型标了支持思考 */
   reasoning: boolean;
+  /**
+   * 对话会话在协作模式下为真（平行 Agent 规格 §12.11）：顶栏模型按钮只显示正在用的模型、不能打开菜单，
+   * session.setPick 被拒绝，session.pickOptions 返回空
+   */
+  pickLocked: boolean;
 }
 
 // ---- 模型档案（§7.2），界面看到的样子 ----
@@ -815,7 +844,7 @@ export type ModelGlobalEvent = ProfilesEvent | KeyStatusEvent;
 
 // ---- 会话文件里的自定义条目（§3、§5.1、§6.1、§6.3），经 pi 的 appendCustomEntry 写 ----
 
-/** @brief 三种自定义条目的 customType。 */
+/** @brief 模型层自定义条目的 customType。 */
 export const MODEL_ENTRY_TYPES = Object.freeze({
   /** 会话的选择范围（§5.1） */
   pick: 'mori.pick',
@@ -823,6 +852,8 @@ export const MODEL_ENTRY_TYPES = Object.freeze({
   modelSwitch: 'mori.model_switch',
   /** 为新模型重建了对话（§6.3） */
   rebuild: 'mori.rebuild',
+  /** task 会话中途换模型、从工作卡重来（平行 Agent 规格 §12.4） */
+  taskRestart: 'mori.task_restart',
 } as const);
 
 /** @brief mori.pick 条目：会话的选择范围，以最后一条为准（§5.1）。 */
@@ -859,4 +890,21 @@ export interface RebuildEntryData {
   at: number;
   /** 第 1 步做了压缩（有摘要）；false 表示压缩被跳过 */
   summary: boolean;
+}
+
+/**
+ * @brief mori.task_restart 条目：task 会话中途换模型，在新模型上从工作卡重来（平行 Agent 规格 §12.4）；
+ *        时间戳早于 at 的消息都不再发给模型，会话文件不变。
+ */
+export interface TaskRestartEntryData {
+  /** 写条目的时刻（ms） */
+  at: number;
+  /** 原模型 <provider>/<model> */
+  from: string;
+  /** 新模型 <provider>/<model> */
+  to: string;
+  /** 换模型的原因代码（§5.3） */
+  reason: ModelReason;
+  /** 原因的细节 */
+  detail: string;
 }

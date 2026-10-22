@@ -1,43 +1,77 @@
-// 覆盖检查（docs/specs/model-providers.md §14.3）：读规格 §14.2 验收条目表的编号和每条的"层"，再读 test-results/ 里
-// 各层的结果文件；每个编号在它列出的每一层都要有名字以这个编号开头、结果为通过的检查，任何一个缺少就失败。
+// 覆盖检查：读一份构建规格验收条目表的编号和每条的"层"，再读 test-results/ 里各层的结果文件；每个编号在它列出的
+// 每一层都要有名字以这个编号开头、结果为通过的检查，任何一个缺少就失败。
 // 同一编号同一层里有失败的检查（含标 known 的）也算没完成：通过的检查不能掩盖失败的那一条。
-// 层由结果文件决定（§14.3）：
-//   单元  test-results/v1-unit.json（node --test 的结果，tests/unit/reporter.mjs 写的）
-//   App   test-results/v1-models-app*.json（含 v1-models-app-existing.json）
-//   回放  test-results/v1-models-replay*.json（含 v1-models-replay-existing.json）
-//   真实  test-results/v1-models-real.json
+// --spec 选规格（默认 model）：
+//   model      docs/specs/model-providers.md §14.2（§14.3），编号 MP-n
+//   taskboard  docs/specs/parallel-agents-taskboard.md §17.2（§17.3），编号 TB-n
+// 层由结果文件决定（模型层 §14.3，TaskBoard §17.3）：
+//   层    model                                          taskboard
+//   单元  v1-unit.json（tests/unit/reporter.mjs 写的）    tb-unit.json（tests/unit/tb-reporter.mjs 写的）
+//   App   v1-models-app*.json（含 -existing）            tb-app*.json（含 tb-app-existing.json）
+//   回放  v1-models-replay*.json（含 -existing）         tb-replay*.json（含 tb-replay-existing.json）
+//   真实  v1-models-real.json                            tb-real.json
+// TaskBoard 的 tb-partial-*.json（--only 只跑一部分时写的）不计入任何层。
 // 只认开发构建的结果；--packaged 时 App 与真实层改读带 -packaged 的结果文件（v1-models-app*-packaged.json、
-// v1-models-real-packaged.json）。单元与回放不经过 Mori 的构建（单元直接导入打包后的内核模块，回放在 harness 里载入界面），
-// 两种模式读同一份。
+// v1-models-real-packaged.json；tb-app*-packaged.json、tb-real-packaged.json）。单元与回放不经过 Mori 的构建
+// （单元直接导入打包后的内核模块，回放在 harness 里载入界面），两种模式读同一份；带 -packaged 的回放结果不计入。
+// 不属于任何编号的检查只列出、不计入；它们只在这份规格的结果文件里找。
 // --allow-missing-real：真实层的结果文件还不存在时把真实层记为 pending、不算失败（负责人走查之前用）；最终一遍不能带它。
-// 用法（在 app/ 下）：node tests/spec-coverage.mjs [--packaged] [--allow-missing-real]
-// 退出码：全部覆盖为 0，有缺口为 1，规格表或结果文件读不出为 2。
+// 用法（在 app/ 下）：node tests/spec-coverage.mjs [--spec model|taskboard] [--packaged] [--allow-missing-real]
+// 退出码：全部覆盖为 0，有缺口为 1，规格名不认识、规格表或结果文件读不出为 2。
+// 下面的函数导出给 tests/unit/taskboard/spec-coverage.test.mjs 检查；直接运行时才做检查。
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const appRoot = resolve(import.meta.dirname, '..');
-const specPath = resolve(appRoot, '../docs/specs/model-providers.md');
 const resultsDir = join(appRoot, 'test-results');
-const packaged = process.argv.includes('--packaged');
-const allowMissingReal = process.argv.includes('--allow-missing-real');
+
+/**
+ * @brief 各规格的覆盖检查参数。
+ *        path 相对仓库根目录；section 为验收条目表所在小节的编号；row 认出条目行；prefix 为编号前缀（用于提示）；
+ *        strayLabel 为不计入的检查的说明；files 为各层结果文件的名字（unit、real 为全名与不带 .json 的名字，
+ *        app、replay 为前缀，partial 为不计入任何层的前缀，没有时为 null）。
+ */
+export const SPECS = {
+  model: {
+    path: 'docs/specs/model-providers.md',
+    section: '14.2',
+    row: /^\|\s*MP-\d+\s*\|/,
+    prefix: 'MP',
+    strayLabel: 'an MP id',
+    files: { unit: 'v1-unit.json', app: 'v1-models-app', replay: 'v1-models-replay', real: 'v1-models-real',
+      partial: null },
+  },
+  taskboard: {
+    path: 'docs/specs/parallel-agents-taskboard.md',
+    section: '17.2',
+    row: /^\|\s*TB-\d+\s*\|/,
+    prefix: 'TB',
+    strayLabel: 'a TB id',
+    files: { unit: 'tb-unit.json', app: 'tb-app', replay: 'tb-replay', real: 'tb-real', partial: 'tb-partial-' },
+  },
+};
 
 /** 规格里的层名 → 内部名 */
 const LAYER_NAMES = { 单元: 'unit', App: 'app', 回放: 'replay', 真实: 'real' };
 /** 打印时各层的顺序与表头 */
 const LAYERS = [['unit', 'Unit'], ['app', 'App'], ['replay', 'Replay'], ['real', 'Real']];
 
+/** @brief 规格文件的绝对路径。 */
+export const specPathOf = (spec) => resolve(appRoot, '..', spec.path);
+
 /**
- * @brief 读规格 §14.2 的验收条目表。
+ * @brief 读一份规格的验收条目表（只认表格行，单元格按 "|" 分开，层在最后一列）。
+ * @param spec SPECS 中的一项
+ * @param text 规格全文
  * @return [{ id, title, layers: Set<'unit'|'app'|'replay'|'real'> }]，按表里的顺序
  */
-function readSpecTable() {
-  const text = readFileSync(specPath, 'utf8');
-  const start = text.indexOf('### 14.2');
-  if (start < 0) throw new Error(`${specPath}: section 14.2 not found`);
+export function parseSpecTable(spec, text) {
+  const specPath = specPathOf(spec);
+  const start = text.indexOf(`### ${spec.section}`);
+  if (start < 0) throw new Error(`${specPath}: section ${spec.section} not found`);
   const end = text.indexOf('\n### ', start + 1);
-  const rows = text.slice(start, end < 0 ? undefined : end).split(/\r?\n/)
-    .filter((line) => /^\|\s*MP-\d+\s*\|/.test(line));
+  const rows = text.slice(start, end < 0 ? undefined : end).split(/\r?\n/).filter((line) => spec.row.test(line));
   const items = rows.map((line) => {
     const cells = line.split('|').map((cell) => cell.trim()).filter((cell, i, all) => i > 0 && i < all.length - 1);
     const id = cells[0];
@@ -47,21 +81,29 @@ function readSpecTable() {
     if (unknown.length) throw new Error(`${id}: unknown layer ${unknown.join(', ')} in "${layerCell}"`);
     return { id, title: cells[1], layers: new Set(names.map((name) => LAYER_NAMES[name])) };
   });
-  if (items.length === 0) throw new Error(`${specPath}: no MP rows in section 14.2`);
+  if (items.length === 0) throw new Error(`${specPath}: no ${spec.prefix} rows in section ${spec.section}`);
   const ids = items.map((item) => item.id);
   const repeated = ids.filter((id, i) => ids.indexOf(id) !== i);
   if (repeated.length) throw new Error(`${specPath}: repeated ids ${repeated.join(', ')}`);
   return items;
 }
 
-/** @brief 结果文件名属于哪一层；不属于任何一层（或不是这次模式的文件）时为 null。 */
-function layerOfFile(name) {
+/**
+ * @brief 结果文件名属于哪一层。
+ * @param spec SPECS 中的一项
+ * @param name test-results/ 下的文件名
+ * @param packaged 是否在检查打包构建（--packaged）
+ * @return 'unit'|'app'|'replay'|'real'；不属于任何一层（或不是这次模式的文件）时为 null
+ */
+export function layerOfFile(spec, name, packaged) {
+  const files = spec.files;
   if (!name.endsWith('.json')) return null;
+  if (files.partial && name.startsWith(files.partial)) return null;
   const isPackaged = name.endsWith('-packaged.json');
-  if (name === 'v1-unit.json') return 'unit';
-  if (/^v1-models-replay.*\.json$/.test(name) && !isPackaged) return 'replay';
-  if (/^v1-models-app.*\.json$/.test(name)) return isPackaged === packaged ? 'app' : null;
-  if (name === (packaged ? 'v1-models-real-packaged.json' : 'v1-models-real.json')) return 'real';
+  if (name === files.unit) return 'unit';
+  if (name.startsWith(files.replay) && !isPackaged) return 'replay';
+  if (name.startsWith(files.app)) return isPackaged === packaged ? 'app' : null;
+  if (name === `${files.real}${packaged ? '-packaged' : ''}.json`) return 'real';
   return null;
 }
 
@@ -69,12 +111,12 @@ function layerOfFile(name) {
  * @brief 读各层的结果文件。
  * @return { files: [{ name, layer, checks, mtime }], problems: string[] }
  */
-function readResults() {
+function readResults(spec, packaged) {
   const files = [];
   const problems = [];
   const names = existsSync(resultsDir) ? readdirSync(resultsDir) : [];
   for (const name of names.sort()) {
-    const layer = layerOfFile(name);
+    const layer = layerOfFile(spec, name, packaged);
     if (!layer) continue;
     const path = join(resultsDir, name);
     try {
@@ -89,13 +131,14 @@ function readResults() {
 }
 
 /** @brief 检查名是否以 id 开头（MP-1 不匹配 MP-10）。 */
-const startsWithId = (name, id) => new RegExp(`^${id}(?!\\d)`).test(String(name));
+export const startsWithId = (name, id) => new RegExp(`^${id}(?!\\d)`).test(String(name));
 
 /**
  * @brief 一个编号在一层的结论。
+ * @param pending 真实层没有结果文件且带了 --allow-missing-real
  * @return { state: 'ok'|'fail'|'missing'|'pending'|'n/a', passed, failed: [{ name, file }] }
  */
-function cellOf(item, layer, files, realMissing) {
+function cellOf(item, layer, files, pending) {
   if (!item.layers.has(layer)) return { state: 'n/a', passed: 0, failed: [] };
   const checks = files.filter((file) => file.layer === layer)
     .flatMap((file) => file.checks.map((check) => ({ ...check, file: file.name })))
@@ -103,7 +146,7 @@ function cellOf(item, layer, files, realMissing) {
   const passed = checks.filter((check) => check.ok === true).length;
   const failed = checks.filter((check) => check.ok !== true).map((check) => ({ name: check.name, file: check.file,
     known: Boolean(check.known), detail: String(check.detail ?? '') }));
-  if (layer === 'real' && realMissing && allowMissingReal) return { state: 'pending', passed, failed };
+  if (layer === 'real' && pending) return { state: 'pending', passed, failed };
   if (failed.length) return { state: 'fail', passed, failed };
   return { state: passed > 0 ? 'ok' : 'missing', passed, failed };
 }
@@ -119,16 +162,25 @@ function cellText(cell) {
   }
 }
 
+/**
+ * @brief 这份规格的结果文件里不属于任何编号的检查。
+ * @return 每条一行文字：文件名、检查名（截到 100 字符），失败的带 (FAIL)
+ */
+export function strayChecks(items, files) {
+  return files.flatMap((file) => file.checks.filter((check) => !items.some((item) => startsWithId(check.name,
+    item.id))).map((check) => `${file.name}: "${String(check.name).slice(0, 100)}"${check.ok ? '' : ' (FAIL)'}`));
+}
+
 /** @brief 打印表格与缺口，返回有没有缺口。 */
-function report(items, files, realMissing) {
+function report(spec, items, files, pending) {
   const width = [8, ...LAYERS.map(() => 12)];
   const line = (cells) => cells.map((cell, i) => String(cell).padEnd(width[i])).join(' ');
   console.log(line(['Id', ...LAYERS.map(([, title]) => title)]));
   const gaps = [];
   for (const item of items) {
-    const cells = LAYERS.map(([layer]) => cellOf(item, layer, files, realMissing));
+    const cells = LAYERS.map(([layer]) => cellOf(item, layer, files, pending));
     console.log(line([item.id, ...cells.map(cellText)]));
-    LAYERS.forEach(([layer, title], i) => {
+    LAYERS.forEach(([, title], i) => {
       const cell = cells[i];
       if (cell.state === 'missing') gaps.push(`${item.id} ${title}: no passing check (${item.title})`);
       for (const failed of cell.state === 'fail' ? cell.failed : []) {
@@ -137,10 +189,9 @@ function report(items, files, realMissing) {
       }
     });
   }
-  const strays = files.flatMap((file) => file.checks.filter((check) => !items.some((item) => startsWithId(check.name,
-    item.id))).map((check) => `${file.name}: "${String(check.name).slice(0, 100)}"${check.ok ? '' : ' (FAIL)'}`));
+  const strays = strayChecks(items, files);
   if (strays.length) {
-    console.log(`\nChecks without an MP id (not counted, ${strays.length}):`);
+    console.log(`\nChecks without ${spec.strayLabel} (not counted, ${strays.length}):`);
     for (const stray of strays.slice(0, 20)) console.log(`  ${stray}`);
     if (strays.length > 20) console.log(`  … ${strays.length - 20} more`);
   }
@@ -151,32 +202,48 @@ function report(items, files, realMissing) {
   return gaps.length > 0;
 }
 
-let items;
-let results;
-try {
-  items = readSpecTable();
-  results = readResults();
-} catch (error) {
-  console.error(`spec-coverage: ${error.message}`);
-  process.exit(2);
+/** @brief 打印读到的结果文件与真实层的说明；返回真实层是否记为 pending。 */
+function printSources(spec, items, files, options) {
+  const mode = options.packaged ? 'packaged build' : 'dev build';
+  console.log(`spec-coverage (${mode}): ${items.length} items from ${spec.path} §${spec.section}`);
+  for (const file of files) {
+    console.log(`  ${file.layer.padEnd(6)} ${file.name} (${file.checks.length} checks, ${file.mtime.toISOString()})`);
+  }
+  for (const [layer, title] of LAYERS) {
+    if (!files.some((file) => file.layer === layer)) console.log(`  ${layer.padEnd(6)} (no result file for ${title})`);
+  }
+  const realMissing = !files.some((file) => file.layer === 'real');
+  if (options.allowMissingReal) {
+    console.log(realMissing ? '  --allow-missing-real: the real layer is pending (owner walkthrough not run yet)'
+      : '  --allow-missing-real given, but the real result file exists: it is checked as usual');
+  }
+  console.log('');
+  return realMissing && options.allowMissingReal;
 }
-const { files, problems } = results;
-const mode = packaged ? 'packaged build' : 'dev build';
-console.log(`spec-coverage (${mode}): ${items.length} items from docs/specs/model-providers.md §14.2`);
-for (const file of files) {
-  console.log(`  ${file.layer.padEnd(6)} ${file.name} (${file.checks.length} checks, ${file.mtime.toISOString()})`);
+
+/** @brief 解析命令行、读规格与结果、打印并设置退出码。 */
+function main(argv) {
+  const specIndex = argv.indexOf('--spec');
+  const specName = specIndex > 0 ? argv[specIndex + 1] : 'model';
+  const options = { packaged: argv.includes('--packaged'), allowMissingReal: argv.includes('--allow-missing-real') };
+  const spec = Object.hasOwn(SPECS, specName) ? SPECS[specName] : null;
+  let items;
+  let results;
+  try {
+    if (!spec) throw new Error(`unknown --spec "${specName}" (expected ${Object.keys(SPECS).join(' or ')})`);
+    items = parseSpecTable(spec, readFileSync(specPathOf(spec), 'utf8'));
+    results = readResults(spec, options.packaged);
+  } catch (error) {
+    console.error(`spec-coverage: ${error.message}`);
+    process.exit(2);
+  }
+  const { files, problems } = results;
+  const pending = printSources(spec, items, files, options);
+  const gaps = report(spec, items, files, pending);
+  for (const problem of problems) console.error(`spec-coverage: ${problem}`);
+  if (problems.length) process.exit(2);
+  console.log(gaps ? '\nspec-coverage: FAILED' : '\nspec-coverage: every item is covered on every listed layer');
+  process.exitCode = gaps ? 1 : 0;
 }
-for (const [layer, title] of LAYERS) {
-  if (!files.some((file) => file.layer === layer)) console.log(`  ${layer.padEnd(6)} (no result file for ${title})`);
-}
-const realMissing = !files.some((file) => file.layer === 'real');
-if (allowMissingReal) {
-  console.log(realMissing ? '  --allow-missing-real: the real layer is pending (owner walkthrough not run yet)'
-    : '  --allow-missing-real given, but the real result file exists: it is checked as usual');
-}
-console.log('');
-const gaps = report(items, files, realMissing);
-for (const problem of problems) console.error(`spec-coverage: ${problem}`);
-if (problems.length) process.exit(2);
-console.log(gaps ? '\nspec-coverage: FAILED' : '\nspec-coverage: every item is covered on every listed layer');
-process.exitCode = gaps ? 1 : 0;
+
+if (import.meta.main) main(process.argv);

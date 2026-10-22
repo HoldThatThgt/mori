@@ -5,6 +5,8 @@
 // （确认为 false，选择和输入为空）。会话打开过程中（扩展的 session_start，界面还不认识这个会话）、停止过程中和会话关闭后
 // 提出的询问不出卡，直接按这个默认值回答（否则打开、停止、关闭会一直等下去）；打开过程中的通知先存着，打开后交给界面。
 // 每个会话一个，挂起的询问只在这里的内存里。
+// 平行 Agent 的实例会话（docs/specs/parallel-agents-taskboard.md §8.2）不在界面上：它的询问一律不出卡，按上面的默认值回答
+// 并记错误日志，通知只记日志。
 
 import type { ExtensionUIContext, ExtensionUIDialogOptions } from '@earendil-works/pi-coding-agent';
 import type { EventEnvelope, ExtensionNotice, KernelEvent, UiRequest } from '../shared/protocol';
@@ -28,12 +30,18 @@ export class ExtensionUi {
   private readonly pending = new Map<string, Pending>();
   /** 生成询问 id 的序号 */
   private nextId = 1;
-  /** 现在不能出卡的原因：打开中、停止中、已关闭；可以出卡时为 null */
-  private blocked: 'starting' | 'stopping' | 'closed' | null = 'starting';
+  /** 现在不能出卡的原因：打开中、停止中、已关闭、实例会话（一直不能询问）；可以出卡时为 null */
+  private blocked: 'starting' | 'stopping' | 'closed' | 'instance' | null = 'starting';
   /** 打开过程中扩展发的通知 */
   private readonly early: ExtensionNotice[] = [];
 
-  constructor(private readonly emit: Emit) {}
+  /**
+   * @param emit 把事件发给界面
+   * @param instance 实例会话（§8.2）：以"不能询问"的状态建立，打开之后也不出卡
+   */
+  constructor(private readonly emit: Emit, private readonly instance = false) {
+    if (instance) this.blocked = 'instance';
+  }
 
   /** @brief 会话创建好后记下它的 id（之后的事件都带上它）。 */
   attach(sessionId: string): void {
@@ -53,7 +61,7 @@ export class ExtensionUi {
 
   /** @brief 会话打开好了（界面马上会认识它）：之后的询问出卡；返回打开过程中扩展发的通知。 */
   ready(): ExtensionNotice[] {
-    this.blocked = null;
+    if (!this.instance) this.blocked = null;
     return this.early.splice(0);
   }
 
@@ -70,7 +78,7 @@ export class ExtensionUi {
 
   /** @brief 会话关闭（归档、删除、退出）：取消挂起的询问；之后的询问直接按取消回答，通知不再转发。 */
   close(): void {
-    this.blocked = 'closed';
+    if (!this.instance) this.blocked = 'closed';
     this.cancelAll();
   }
 
@@ -131,9 +139,10 @@ export class ExtensionUi {
     return { ...TERMINAL_ONLY, ...relay } as unknown as ExtensionUIContext;
   }
 
-  /** @brief 扩展的通知：打开过程中先存着，关闭后只记日志，其余转给界面。 */
+  /** @brief 扩展的通知：实例会话只记日志；打开过程中先存着，关闭后只记日志，其余转给界面。 */
   private notify(notice: ExtensionNotice): void {
-    if (this.blocked === 'starting') this.early.push(notice);
+    if (this.instance) console.log(`[kernel] extension notice in ${this.sessionId}: ${notice.message}`);
+    else if (this.blocked === 'starting') this.early.push(notice);
     else if (this.blocked === 'closed') console.error(`[kernel] extension notice after close: ${notice.message}`);
     else this.send({ type: 'mori.notify', ...notice });
   }

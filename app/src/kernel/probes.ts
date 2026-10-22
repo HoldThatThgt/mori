@@ -1,6 +1,6 @@
 // 探针（docs/specs/model-providers.md §7.3、§7.4）：第 0–9 步的请求与判定。
 // 依赖全部注入（pi 的 streamSimple、模型池给的 fetch、读服务端接口的 GET、时长与 signal），所以可以用替身做单元测试；
-// 档案的派生（能力三态、等级）在 modelProfiles.ts。
+// 档案的派生（能力三态、等级）在 modelProfiles.ts；第 5–7 步三种写法的请求改写与标签解析在 forcedWrite.ts（与强制填写共用）。
 
 import { randomInt } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -9,6 +9,7 @@ import type {
   ToolCall,
 } from '@earendil-works/pi-ai';
 import type { ApiType, ProbeStepResult, ReasoningField, ServerKind, ThinkingLevel } from '../shared/models';
+import { forcedToolChoice, parseTagged, withJsonSchema, withStrictTools } from './forcedWrite';
 import type { AutoResults, AutoSteps, CancelResult, LongInputResult } from './modelProfiles';
 import type { ModelTimings } from './modelTimings';
 import type { ModelRef, SchedClass } from './modelTypes';
@@ -38,7 +39,7 @@ export const PROBE_PROMPTS = Object.freeze({
   count: 'Count from 1 to 400, one number per line.',
 });
 
-/** @brief 第 5、6 步的取值列表。 */
+/** @brief 第 5、6、7 步的取值列表。 */
 const OUTCOMES = ['ok', 'fail'];
 
 /** @brief 第 5 步工具与第 6 步 schema 共用的 { outcome: "ok" | "fail" }（严格模式要求列全 required、不许多余字段）。 */
@@ -397,17 +398,11 @@ export function judgeJsonOutcome(reply: ProbeReply): ProbeStepResult {
   });
 }
 
-/** @brief 第 7 步的一次回答：能解析出 <summary>…</summary><outcome>…</outcome>，取值在列表内。 */
-export function parseTagged(text: string): boolean {
-  const match = /<summary>([\s\S]+?)<\/summary>\s*<outcome>\s*([^<]*?)\s*<\/outcome>/.exec(text);
-  return !!match && match[1].trim() !== '' && OUTCOMES.includes(match[2]);
-}
-
 /** @brief 第 7 步：每次都能解析、取值都在列表内为通过。 */
 export function judgeTagged(replies: readonly ProbeReply[]): ProbeStepResult {
   const failed = replies.find((reply) => reply.error !== null);
   if (failed) return step('error', failed.error);
-  return replies.every((reply) => parseTagged(replyText(reply.message))) ? step('pass')
+  return replies.every((reply) => parseTagged(replyText(reply.message), OUTCOMES)) ? step('pass')
     : step('fail', 'A reply did not follow the <summary>/<outcome> format');
 }
 
@@ -450,37 +445,6 @@ export function reasoningFieldOf(messages: readonly (AssistantMessage | null)[])
     }
   }
   return 'none';
-}
-
-// ---- 各接口的请求写法（§7.3 的表） ----
-
-/** @brief 第 5 步指定调用的 tool_choice（经 toolChoice 选项）。 */
-export function forcedToolChoice(api: ApiType, name: string): unknown {
-  if (api === 'openai-completions') return { type: 'function', function: { name } };
-  if (api === 'openai-responses') return { type: 'function', name };
-  return { type: 'tool', name };
-}
-
-/** @brief 第 5 步的严格模式（经 onPayload）：openai-completions 写 tools[i].function.strict，另两种写 tools[i].strict。 */
-export function withStrictTools(api: ApiType, payload: unknown): unknown {
-  const body = payload as { tools?: Record<string, unknown>[] };
-  if (!Array.isArray(body.tools)) return payload;
-  const tools = body.tools.map((tool) => (api === 'openai-completions'
-    ? { ...tool, function: { ...(tool.function as object), strict: true } } : { ...tool, strict: true }));
-  return { ...body, tools };
-}
-
-/** @brief 第 6 步的严格 JSON schema 输出（经 onPayload）；anthropic-messages 不跑第 6 步。 */
-export function withJsonSchema(api: ApiType, payload: unknown): unknown {
-  const body = payload as Record<string, unknown>;
-  const schema = { ...OUTCOME_SCHEMA };
-  if (api === 'openai-completions') {
-    return { ...body, response_format: { type: 'json_schema',
-      json_schema: { name: OUTCOME_SCHEMA_NAME, schema, strict: true } } };
-  }
-  const text = (body.text ?? {}) as Record<string, unknown>;
-  const format = { type: 'json_schema', name: OUTCOME_SCHEMA_NAME, schema, strict: true };
-  return { ...body, text: { ...text, format } };
 }
 
 // ---- 第 0 步：服务种类、版本与报告的窗口 ----
@@ -712,11 +676,12 @@ async function tierSteps(run: Run): Promise<TierResults> {
   run.deps.onStep?.(5, AUTO_STEPS);
   const a = judgeOutcomeCall(await send(run, { model, thinking: 'off',
     context: { messages: [user(run, PROBE_PROMPTS.outcome)], tools: [OUTCOME_TOOL] },
-    toolChoice: forcedToolChoice(api, OUTCOME_TOOL.name), onPayload: (payload) => withStrictTools(api, payload) }));
+    toolChoice: forcedToolChoice(api, OUTCOME_TOOL.name),
+    onPayload: (payload) => withStrictTools(api, payload, OUTCOME_TOOL.name) }));
   run.deps.onStep?.(6, AUTO_STEPS);
   const b = api === 'anthropic-messages' ? step('not_applicable') : judgeJsonOutcome(await send(run, {
     model, thinking: 'off', context: { messages: [user(run, PROBE_PROMPTS.json)] },
-    onPayload: (payload) => withJsonSchema(api, payload) }));
+    onPayload: (payload) => withJsonSchema(api, payload, OUTCOME_SCHEMA_NAME, OUTCOME_SCHEMA) }));
   run.deps.onStep?.(7, AUTO_STEPS);
   if (a.outcome !== 'fail' || (b.outcome !== 'fail' && b.outcome !== 'not_applicable')) {
     return { a, b, c: step('not_run') };
@@ -725,7 +690,7 @@ async function tierSteps(run: Run): Promise<TierResults> {
   for (let i = 0; i < run.deps.timings.tierCRepetitions; i += 1) {
     const reply = await send(run, { model, thinking: 'off', context: { messages: [user(run, PROBE_PROMPTS.tagged)] } });
     replies.push(reply);
-    if (reply.error !== null || !parseTagged(replyText(reply.message))) break;
+    if (reply.error !== null || !parseTagged(replyText(reply.message), OUTCOMES)) break;
   }
   return { a, b, c: judgeTagged(replies) };
 }

@@ -1,8 +1,11 @@
-// 跨模型上下文的规则（docs/specs/model-providers.md §6）：纯函数。
-// 同一组函数既处理 pi 的 AgentMessage（context 钩子、压缩钩子），也处理 pi-ai 的 Message（流函数包装）：
-// 只认 user、assistant、toolResult 三种角色；compactionSummary、branchSummary、custom、bashExecution、system 原样保留。
+// 跨模型上下文的规则（docs/specs/model-providers.md §6；docs/specs/parallel-agents-taskboard.md §8.3、§12.4、§12.6）：
+// 纯函数。同一组函数既处理 pi 的 AgentMessage（context 钩子、压缩钩子），也处理 pi-ai 的 Message（流函数包装）：
+// 重做与重建只认 user、assistant、toolResult 三种角色，compactionSummary、branchSummary、custom、bashExecution、system
+// 原样保留；task 会话中途换模型的重来（mori.task_restart）去掉它之前除 system 以外的全部消息。
 
-import { plainReasonText, type ModelSwitchEntryData, type RebuildEntryData } from '../shared/models';
+import {
+  plainReasonText, type ModelSwitchEntryData, type RebuildEntryData, type TaskRestartEntryData,
+} from '../shared/models';
 
 /** @brief 两种消息形状共有的部分：角色与时间戳（ms）。 */
 export interface MessageLike {
@@ -245,6 +248,90 @@ export function applyRebuildEntries<T extends MessageLike>(
   return result;
 }
 
+// ---- task 会话中途换模型的重来（平行 Agent 规格 §12.4） ----
+
+/**
+ * @brief 消息是否在最后一条 mori.task_restart 之前：时间戳早于它的 at、且不是 system 消息
+ *        （system 消息是 pi 的 system prompt 与工具清单，不是对话，照常发出）。
+ * @param entries 会话里的全部 mori.task_restart 条目
+ * @return 消息不再发给模型时为真的谓词；没有条目时总是假
+ */
+export function restartHiddenBy(entries: readonly TaskRestartEntryData[]): (message: MessageLike) => boolean {
+  if (entries.length === 0) return () => false;
+  const at = Math.max(...entries.map((entry) => entry.at));
+  return (message) => message.role !== 'system' && timeOf(message) < at;
+}
+
+/**
+ * @brief 重来（平行 Agent 规格 §12.4，与重做、重建并列）：有 mori.task_restart 时，时间戳早于最后一条的 at 的消息都不发给
+ *   模型（工作卡与继续的消息是新的起点）；system 消息照常保留。会话文件不变，read_session 照常读得到前半段。
+ *   对已处理过的上下文结果不变。
+ * @param messages 发给模型的上下文（AgentMessage 或 pi-ai Message）
+ * @param entries 会话里的全部 mori.task_restart 条目
+ * @return 处理后的新数组；输入不改
+ */
+export function applyRestartEntries<T extends MessageLike>(
+  messages: readonly T[], entries: readonly TaskRestartEntryData[],
+): T[] {
+  const hidden = restartHiddenBy(entries);
+  return messages.filter((message) => !hidden(message));
+}
+
+// ---- 工作卡（平行 Agent 规格 §8.3） ----
+
+/** @brief 工作卡 custom 消息的 customType（mori-team 的 context 钩子追加，不写进会话文件）。 */
+export const WORK_CARD_TYPE = 'mori.work_card';
+/** @brief 工作卡的第一行与最后一行。 */
+export const WORK_CARD_OPEN = '<mori-work-card>';
+export const WORK_CARD_CLOSE = '</mori-work-card>';
+
+/** @brief 内容的纯文字：字符串，或各 text 块相接。 */
+function contentText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content.map((block: ContentBlock) => (block.type === 'text' ? block.text ?? '' : '')).join('');
+}
+
+/**
+ * @brief 是否是工作卡消息：AgentMessage 里 customType 为 mori.work_card 的 custom 消息；pi-ai Message 里（pi 把 custom
+ *        转成 user）全部文字就是一张卡（去掉首尾空白后以 WORK_CARD_OPEN 开始、以 WORK_CARD_CLOSE 结束）的 user 消息。
+ * @param message 消息
+ */
+export function isWorkCard(message: MessageLike): boolean {
+  const custom = message as MessageLike & { customType?: unknown; content?: unknown };
+  if (message.role === 'custom') return custom.customType === WORK_CARD_TYPE;
+  if (message.role !== 'user') return false;
+  const text = contentText(custom.content).trim();
+  return text.startsWith(WORK_CARD_OPEN) && text.endsWith(WORK_CARD_CLOSE);
+}
+
+/** @brief 从上下文末尾拿下的工作卡（流函数包装换模型重发时，§8.3）。 */
+export interface DetachedWorkCard<T> {
+  /** 去掉末尾工作卡之后的上下文 */
+  messages: T[];
+  /** 拿下的那张卡；末尾没有卡时为 null */
+  card: T | null;
+}
+
+/**
+ * @brief 去掉上下文末尾的工作卡（§8.3：先去掉卡片再做模型层的处理，然后重新追加，卡片总在最后）。
+ * @param messages 这次请求的上下文
+ */
+export function detachWorkCard<T extends MessageLike>(messages: readonly T[]): DetachedWorkCard<T> {
+  const last = messages[messages.length - 1];
+  if (!last || !isWorkCard(last)) return { messages: [...messages], card: null };
+  return { messages: messages.slice(0, -1), card: last };
+}
+
+/**
+ * @brief 把 detachWorkCard 拿下的卡接回处理后的上下文末尾。
+ * @param processed 模型层处理后的上下文
+ * @param card 拿下的卡；没有时原样返回
+ */
+export function reattachWorkCard<T extends MessageLike>(processed: readonly T[], card: T | null): T[] {
+  return card === null ? [...processed] : [...processed, card];
+}
+
 // ---- 接手判断（§6.2） ----
 
 /** @brief 一条助手消息记的模型身份（两种消息形状都有）。 */
@@ -278,6 +365,8 @@ export interface HandoverInput<T extends MessageLike> {
    * @param message 消息
    */
   estimateTokens(message: T): number;
+  /** 不在 messages 里、每次请求都会加上的 token 数：工作卡的估算（平行 Agent 规格 §8.3、§12.6）；省略时为 0 */
+  extraTokens?: number;
 }
 
 /** @brief 接手判断的结果（§6.2）。 */
@@ -327,18 +416,27 @@ function hasForeignToolCalls(messages: readonly MessageLike[], target: ModelIden
 }
 
 /**
+ * @brief 窗口条件（§6.2）：估算的上下文 token 数加 B 的最大输出不超过 B 的有效窗口。
+ * @param tokens 估算的上下文 token 数
+ * @param target 要用的模型 B
+ */
+export function fitsWindow(tokens: number, target: Pick<HandoverTarget, 'maxTokens' | 'effectiveWindow'>): boolean {
+  return tokens + target.maxTokens <= target.effectiveWindow;
+}
+
+/**
  * @brief 接手判断（§6.2）：B 与最后一条有效助手消息的模型不同时，检查推理字段与窗口两个条件；工具调用格式总是满足。
- * @param input 上下文、目标模型与 token 估算函数
+ *        估算的 token 数含 extraTokens（工作卡，平行 Agent 规格 §12.6）。
+ * @param input 上下文、目标模型、token 估算函数与额外的 token 数
  */
 export function handoverCheck<T extends MessageLike>(input: HandoverInput<T>): HandoverCheck {
-  const tokens = input.messages.reduce((sum, message) => sum + input.estimateTokens(message), 0);
+  const tokens = input.messages.reduce((sum, message) => sum + input.estimateTokens(message), input.extraTokens ?? 0);
   const last = lastValidModel(input.messages);
   if (last === null || sameModel(last, input.target)) {
     return { differs: false, reasoningOk: true, fitsWindow: true, tokens };
   }
   const reasoningOk = input.target.replay !== 'required' || !hasForeignToolCalls(input.messages, input.target);
-  const fitsWindow = tokens + input.target.maxTokens <= input.target.effectiveWindow;
-  return { differs: true, reasoningOk, fitsWindow, tokens };
+  return { differs: true, reasoningOk, fitsWindow: fitsWindow(tokens, input.target), tokens };
 }
 
 /** @brief 接手判断发生的时机（§6.2）：段开始、段开始重建之后、段内。 */
@@ -380,6 +478,8 @@ export interface CompactionPreparationLike<T extends MessageLike> {
   turnPrefixMessages: T[];
   /** 从 messagesToSummarize 算出的文件操作 */
   fileOps: FileOpsLike;
+  /** 上一次压缩的摘要，pi 把它并进这次的摘要；没有时省略 */
+  previousSummary?: string;
 }
 
 /** @brief 一次工具调用：名字与参数（助手消息的 toolCall 块，或工具结果记下的嵌套调用）。 */
@@ -460,17 +560,21 @@ function removeInPlace<T extends MessageLike>(messages: T[], hidden: (message: M
 
 /**
  * @brief 压缩也不能把被隐藏的过程带给新模型（§6.1、§11.6 K12）：就地从 messagesToSummarize 与 turnPrefixMessages
- *   去掉被隐藏的助手消息与工具结果，并从 fileOps 的三个集合里去掉只在被隐藏的工具调用里出现过的路径：
+ *   去掉被隐藏的助手消息与工具结果，以及重来之前的消息（平行 Agent 规格 §12.4，与 applyRestartEntries 同一条规则），
+ *   并从 fileOps 的三个集合里去掉只在去掉的工具调用里出现过的路径：
  *   每个集合分别看，留下的消息或上一次压缩的文件列表也给这个集合带来这个路径时保留。
  * @param preparation session_before_compact 的 preparation（就地修改）
  * @param entries 会话里的全部 mori.model_switch 条目
  * @param previous 上一次压缩（pi 生成的）记下的文件列表；没有时为 null
+ * @param restarts 会话里的全部 mori.task_restart 条目；省略时没有
  */
 export function stripForCompaction<T extends MessageLike>(
   preparation: CompactionPreparationLike<T>, entries: readonly ModelSwitchEntryData[],
-  previous: PreviousFileLists | null = null,
+  previous: PreviousFileLists | null = null, restarts: readonly TaskRestartEntryData[] = [],
 ): void {
-  const hidden = hiddenBy(entries);
+  const switched = hiddenBy(entries);
+  const restarted = restartHiddenBy(restarts);
+  const hidden = (message: MessageLike): boolean => switched(message) || restarted(message);
   const removed = [
     ...removeInPlace(preparation.messagesToSummarize, hidden),
     ...removeInPlace(preparation.turnPrefixMessages, hidden),
@@ -481,5 +585,45 @@ export function stripForCompaction<T extends MessageLike>(
   addPrevious(keptOps, previous);
   for (const kind of ['read', 'written', 'edited'] as const) {
     for (const path of hiddenOps[kind]) if (!keptOps[kind].has(path)) preparation.fileOps[kind].delete(path);
+  }
+}
+
+/** @brief 分支上的一个条目：压缩条目带写入时刻（ISO 字符串）、是否由扩展生成与 details。 */
+export interface BranchEntryLike {
+  /** 条目类型 */
+  type: string;
+  /** 写入时刻（pi 的 ISO 字符串） */
+  timestamp?: string;
+  /** 扩展生成的压缩 */
+  fromHook?: boolean;
+  /** 压缩条目的 details（pi 生成的记着文件列表） */
+  details?: unknown;
+}
+
+/**
+ * @brief 上一次压缩早于最后一次重来时（平行 Agent 规格 §12.4）：它的摘要与文件列表是重来之前的过程，这次压缩不再并入。
+ *   就地清掉 previousSummary，并从 fileOps 去掉只由它的文件列表带来的路径（留下的消息也带来这个路径时保留）。
+ *   在 stripForCompaction 之后调用。
+ * @param preparation session_before_compact 的 preparation（就地修改）
+ * @param entries 会话当前分支上的条目（session_before_compact 的 branchEntries）
+ * @param restarts 会话里的全部 mori.task_restart 条目
+ */
+export function forgetCompactionBeforeRestart<T extends MessageLike>(
+  preparation: CompactionPreparationLike<T>, entries: readonly BranchEntryLike[],
+  restarts: readonly TaskRestartEntryData[],
+): void {
+  const last = entries.findLast((entry) => entry.type === 'compaction');
+  if (!last || restarts.length === 0) return;
+  const at = Math.max(...restarts.map((entry) => entry.at));
+  const compactedAt = typeof last.timestamp === 'string' ? Date.parse(last.timestamp) : Number.NaN;
+  if (!(compactedAt < at)) return;
+  preparation.previousSummary = undefined;
+  const previous = previousFileLists(entries);
+  if (!previous) return;
+  const kept = fileOpsOf([...preparation.messagesToSummarize, ...preparation.turnPrefixMessages]);
+  const stale: FileOpsLike = { read: new Set(), written: new Set(), edited: new Set() };
+  addPrevious(stale, previous);
+  for (const kind of ['read', 'edited'] as const) {
+    for (const path of stale[kind]) if (!kept[kind].has(path)) preparation.fileOps[kind].delete(path);
   }
 }

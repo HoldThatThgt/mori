@@ -116,7 +116,7 @@ Quoting session “修复登录”, turns 3–4:
 
 | 命令 | 做什么 | 对应 |
 | --- | --- | --- |
-| `session.read`（会话文件） | 后台进程里开着的会话：它的 `getBranch()`，在生成时只交出已完成的轮次；没开着的：`SessionManager.open(文件).getBranch()`（不创建会话、不加载扩展）；文件不在时报 `Session file not found`。只交出你的消息、助手回复和 `mori.ref` 条目（工具结果里的文件内容、命令输出、图片引用里不取，不搬给界面）。返回条目、会话名、工作目录、是否有一轮还没完成 | 方案第 6 节第 1 件（调用 pi SDK 打开会话）与"历史"（`SessionManager.open(path).getBranch()` 交给界面） |
+| `session.read`（会话文件） | 后台进程里开着的会话：它的 `getBranch()`，在生成时只交出已完成的轮次；没开着的：`SessionManager.open(文件).getBranch()`（不创建会话、不加载扩展）；文件不在时报 `Session file not found`。只交出你的消息、助手回复和 `mori.ref` 条目（工具结果里的文件内容、命令输出、图片引用里不取，不搬给界面）（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.6、§13.11：去掉 `mori.wake` 指向的程序投递消息）。返回条目、会话名、工作目录、是否有一轮还没完成 | 方案第 6 节第 1 件（调用 pi SDK 打开会话）与"历史"（`SessionManager.open(path).getBranch()` 交给界面） |
 
 ## 界面测试用的标识
 

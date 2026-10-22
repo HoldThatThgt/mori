@@ -80,7 +80,8 @@ function tabFields(state: AppState): IssueField[] {
     { label: 'Model', value: tab.current ?? 'None' },
     { label: 'Running', value: transcript.running ? 'Yes' : 'No' },
     { label: 'Status line', value: stageText(transcript, tab.cwd, Date.now()) ?? 'Hidden' },
-    { label: 'Pending requests', value: String(transcript.approvals.length) },
+    // 后台实例的批准卡也计入（平行 Agent 规格 §11.3）。
+    { label: 'Pending requests', value: String(transcript.approvals.length + transcript.teamApprovals.length) },
     { label: 'Permission mode', value: tab.approval.mode === 'all' ? 'Allow all' : 'Ask each time' },
   ];
 }

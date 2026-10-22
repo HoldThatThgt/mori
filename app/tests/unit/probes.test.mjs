@@ -8,8 +8,12 @@ import { loadKernelModule } from './load.mjs';
 import { probeReply, probeStep, replayRejected } from '../fake-endpoint/probes.mjs';
 
 const probes = await loadKernelModule('src/kernel/probes.ts');
+const forced = await loadKernelModule('src/kernel/forcedWrite.ts');
 const profiles = await loadKernelModule('src/kernel/modelProfiles.ts');
 const { MODEL_TIMINGS } = await loadKernelModule('src/kernel/modelTimings.ts');
+
+/** 第 5–7 步的取值列表（与 probes.ts 的 OUTCOMES 相同）。 */
+const OK_FAIL = ['ok', 'fail'];
 
 /** 缩短的时长：首个内容的时限 40 ms，取消探针的窗口 5 ms。 */
 const TIMINGS = { ...MODEL_TIMINGS, probeStepTimeoutMs: 40, cancelProbeWindowMs: 5 };
@@ -536,11 +540,11 @@ test('MP-10 judging functions: ready, JSON outcome, tagged format', () => {
   assert.equal(probes.judgeJsonOutcome(reply({ text: 'outcome: ok' })).outcome, 'fail');
   assert.equal(probes.judgeOutcomeCall(reply({ toolCalls: [{ type: 'toolCall', id: 'x', name: 'submit_outcome',
     arguments: { outcome: 'banana' } }] })).outcome, 'fail');
-  assert.equal(probes.parseTagged('<summary>Yes.</summary><outcome>ok</outcome>'), true);
-  assert.equal(probes.parseTagged('<summary>Yes.</summary>\n<outcome> fail </outcome>'), true);
-  assert.equal(probes.parseTagged('<summary>Yes.</summary><outcome>maybe</outcome>'), false);
-  assert.equal(probes.parseTagged('<summary></summary><outcome>ok</outcome>'), false);
-  assert.equal(probes.parseTagged('ok'), false);
+  assert.equal(forced.parseTagged('<summary>Yes.</summary><outcome>ok</outcome>', OK_FAIL), true);
+  assert.equal(forced.parseTagged('<summary>Yes.</summary>\n<outcome> fail </outcome>', OK_FAIL), true);
+  assert.equal(forced.parseTagged('<summary>Yes.</summary><outcome>maybe</outcome>', OK_FAIL), false);
+  assert.equal(forced.parseTagged('<summary></summary><outcome>ok</outcome>', OK_FAIL), false);
+  assert.equal(forced.parseTagged('ok', OK_FAIL), false);
   const failed = { message: null, error: '502 Bad Gateway', status: 502, content: false };
   assert.deepEqual(probes.judgeTagged([failed]), { outcome: 'error', detail: '502 Bad Gateway' });
 });
@@ -610,10 +614,24 @@ test('MP-10 anthropic-messages payload: tool_choice {type: tool, name}, tools[i]
 
 test('MP-10 payload helpers leave other fields alone and keep existing text options', () => {
   const body = { model: 'm', text: { verbosity: 'low' } };
-  assert.deepEqual(probes.withJsonSchema('openai-responses', body).text.verbosity, 'low');
+  assert.deepEqual(forced.withJsonSchema('openai-responses', body, 'outcome', probes.OUTCOME_SCHEMA).text.verbosity,
+    'low');
   assert.deepEqual(body, { model: 'm', text: { verbosity: 'low' } }, 'input is not changed');
-  assert.deepEqual(probes.withStrictTools('openai-completions', { model: 'm' }), { model: 'm' });
-  assert.deepEqual(probes.forcedToolChoice('anthropic-messages', 'x'), { type: 'tool', name: 'x' });
+  assert.deepEqual(forced.withStrictTools('openai-completions', { model: 'm' }, 'x'), { model: 'm' });
+  assert.deepEqual(forced.forcedToolChoice('anthropic-messages', 'x'), { type: 'tool', name: 'x' });
+  // withStrictTools 只给指定名字的工具加 strict（平行 Agent 规格 §12.7）
+  const fn = (name) => ({ type: 'function', function: { name, parameters: { type: 'object' } } });
+  const completions = forced.withStrictTools('openai-completions', { tools: [fn('read'), fn('submit_outcome')] },
+    'submit_outcome');
+  assert.equal(completions.tools[0].function.strict, undefined);
+  assert.equal(completions.tools[1].function.strict, true);
+  const flat = (name) => ({ type: 'function', name, parameters: { type: 'object' } });
+  const responses = forced.withStrictTools('openai-responses', { tools: [flat('submit_outcome'), flat('read')] },
+    'submit_outcome');
+  assert.deepEqual(responses.tools.map((tool) => tool.strict), [true, undefined]);
+  const anthropic = forced.withStrictTools('anthropic-messages', { tools: [{ name: 'read' },
+    { name: 'submit_outcome' }] }, 'submit_outcome');
+  assert.deepEqual(anthropic.tools.map((tool) => tool.strict), [undefined, true]);
 });
 
 // ---- 第 0 步 ----

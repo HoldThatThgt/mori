@@ -7,7 +7,7 @@
 
 | 权限 | 工具 | 结果 |
 | --- | --- | --- |
-| 每次询问（新会话的默认值） | `read`、`grep`、`find`、`ls`（只读，放行名单是常量） | 直接执行，不出卡，没有标签 |
+| 每次询问（新会话的默认值） | `read`、`grep`、`find`、`ls`（只读，放行名单是常量）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.2：TaskBoard 的 11 个工具同样免批准，从不出卡） | 直接执行，不出卡，没有标签 |
 | 每次询问 | 本会话已允许的工具名 | 直接执行，卡上标"Allowed for this session" |
 | 每次询问 | 其余所有工具：命令（`bash`、`powershell`）、`edit`、`write`、MCP 工具、插件和项目扩展注册的工具 | 出批准卡，等你选择 |
 | 全部允许 | 只读工具 | 直接执行，不出卡，没有标签 |
@@ -21,9 +21,9 @@
 | 事件 / 命令 | 何时 | 内容 |
 | --- | --- | --- |
 | `mori.tool_gate`（事件） | pi 的 `tool_execution_start` 转发给界面之前，紧挨着它；批准处理器后来的决定与它不同（预告要批准，实际已不用批准，例如扩展里排队的嵌套调用在你选了"Allow “…” for this session"之后才轮到）时再发一次更正 | 这次调用会怎样处理：`ask` 要批准、`session` 本会话已允许、`all` 全部允许、`free` 只读工具 |
-| `mori.approval_request`（事件） | pi 调用扩展的 `tool_call` 处理器，且需要批准 | 请求 id、调用 id、工具名、完整参数 |
+| `mori.approval_request`（事件） | pi 调用扩展的 `tool_call` 处理器，且需要批准（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.3：后台实例的请求在用户会话的信封上发 `mori.team_approval_request` / `mori.team_approval_end`，见 ../../v1/screens/team-approvals.md） | 请求 id、调用 id、工具名、完整参数 |
 | `mori.approval_end`（事件） | 请求得到答复 | 允许或拒绝；由谁决定：你、"Allow “…” for this session"、切到"Allow all"、你按了停止、会话结束；拒绝理由 |
-| `approval.answer`（命令） | 你在卡上选择 | 允许一次 / 本会话不再询问此工具 / 拒绝（可带理由） |
+| `approval.answer`（命令） | 你在卡上选择（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.10：`requestId` 可以是后台批准的 `<实例 id>:<编号>`，`sessionId` 是用户会话） | 允许一次 / 本会话不再询问此工具 / 拒绝（可带理由） |
 | `approval.setMode`（命令） | 你在权限菜单里切换 | 每次询问 / 全部允许 |
 | `approval.forget`（命令） | 你在权限菜单里清除（"Forget"）一项"Allowed for this session" | 工具名 |
 
@@ -41,6 +41,7 @@
 ## 批准卡
 
 批准卡停靠在输入框上方（排队区之上），不在对话流里滚走；对话流里的工具卡同时显示"Waiting for your approval"。
+（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.3：后台实例的卡停在用户会话那一栏，卡头多一行归属 `<role> · T1 · <task title>`，排在对话自己的卡之后，对话一轮结束不清掉；它们没有工具卡，见 ../../v1/screens/team-approvals.md）
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
@@ -51,14 +52,14 @@
 | 命令（`bash` / `powershell`） | 同上 | 标题"Run a command"；完整命令行（多行原样显示）；有超时参数时显示"Timeout: Ns" | 同上 |
 | MCP 工具 | 同上，工具名 `mcp__<服务>__<工具>` | 标题"<服务> · <工具>"；格式化后的参数 | 同上 |
 | 其他工具 | 同上 | 标题为工具原名；格式化后的参数 | 同上 |
-| 还有别的卡排在后面 | 同一会话同时有多个请求（例如扩展里嵌套调用） | 卡头"N more" | 处理完当前这张，下一张接着出现 |
+| 还有别的卡排在后面 | 同一会话同时有多个请求（例如扩展里嵌套调用）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.3：后台实例的请求也算） | 卡头"N more" | 处理完当前这张，下一张接着出现 |
 
 ### 选项
 
 | 选项 | 键盘 | 结果 |
 | --- | --- | --- |
 | 允许一次（Allow once） | Alt+1 | 只放行这一次；工具卡变"Running…" |
-| 本会话不再询问（"Allow “Run commands” for this session"，按工具名：Run commands / Edit files / Write files / `<服务> · <工具>` / 原名） | Alt+2 | 放行这一次，并记住工具名；命令类下方小字"You won’t be asked again for any command in this session."，其他类"You won’t be asked again for “Edit files” in this session."；排在后面的同名请求一起放行 |
+| 本会话不再询问（"Allow “Run commands” for this session"，按工具名：Run commands / Edit files / Write files / `<服务> · <工具>` / 原名） | Alt+2 | 放行这一次，并记住工具名；命令类下方小字"You won’t be asked again for any command in this session."，其他类"You won’t be asked again for “Edit files” in this session."；排在后面的同名请求一起放行（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.1：这个用户会话里所有 Agent 挂起的同名请求一并放行，之后都不再询问） |
 | 拒绝（Deny） | Alt+3；或在理由框里按 Enter | 不执行；理由框（占位文字"Tell the model why (optional)"）里的文字作为理由；工具卡变"Denied · <理由>" |
 
 - 卡片出现时不抢焦点：焦点留在输入框，继续打字不受影响；没有默认按钮，在输入框里按 Enter 仍是发送 / 排队，不会批准。
@@ -68,6 +69,7 @@
   没有浮层时等于拒绝这张卡（带上理由框里的文字），生成继续，模型会收到拒绝。
 - 焦点不在卡片上（例如在输入框）时按 Esc：停止生成（方案 5.8 的顺序：先把排队消息放回输入框，再停止），
   挂起的卡按拒绝处理，工具卡显示"Denied · You pressed Stop"。点"Stop"按钮同样处理。
+  （协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4：Esc 只停对话这一回合，后台实例的卡不变；`Stop team` 时全部卡按拒绝处理）
 - 卡片处理完后（允许或拒绝）卡片消失；焦点如果在卡上，回到输入框。
 
 ## 工具卡与阶段行（M2 起）
@@ -94,9 +96,9 @@ M6 起会话面板窄于 600px 时，权限菜单与模型、思考菜单一样�
 | --- | --- | --- | --- |
 | 每次询问 | 新会话、重新载入后；或你切回来 | 顶栏按钮"Ask each time" | 打开菜单 |
 | 全部允许 | 你确认切换后 | 顶栏按钮"Allow all"，用警示色 | 打开菜单 |
-| 菜单打开 | 你点了按钮 | 两个选项"Ask each time""Allow all"，当前项打勾；"Allowed for this session:"及其列表（Run commands、Write files……，没有时"None"），每项一个"Forget"；底部说明"Applies to this session only. New sessions start with “Ask each time”." | 选择；清除一项（Forget）；Esc 关闭菜单 |
+| 菜单打开 | 你点了按钮 | 两个选项"Ask each time""Allow all"，当前项打勾；"Allowed for this session:"及其列表（Run commands、Write files……，没有时"None"），每项一个"Forget"；底部说明"Applies to this session only. New sessions start with “Ask each time”."（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.1：说明改为 `Applies to all agents in this session. New sessions start at Ask each time.`，模式与列表作用于这个用户会话的全部 Agent） | 选择；清除一项（Forget）；Esc 关闭菜单 |
 | 确认切到全部允许 | 你在菜单里选了"Allow all" | 对话框："Switch to “Allow all”?"和"Edits, writes, and commands will run without asking."，按钮"Allow all"和"Cancel"，焦点在"Cancel" | Allow all；Cancel（Esc） |
-| 切换时有挂起的卡 | 同上，确认后 | 挂起的卡按允许处理（`mori.approval_end`，由"Allow all"决定），工具卡标"Allow all" | — |
+| 切换时有挂起的卡 | 同上，确认后（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.1：所有 Agent 挂起的请求一并允许，之后后台实例也不再出卡） | 挂起的卡按允许处理（`mori.approval_end`，由"Allow all"决定），工具卡标"Allow all" | — |
 
 切回"Ask each time"不需要确认；之后需要批准的调用又出卡。"Allowed for this session:"的列表在切到"Allow all"时保留，切回后仍然有效。
 
@@ -104,7 +106,7 @@ M6 起会话面板窄于 600px 时，权限菜单与模型、思考菜单一样�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 窗口不在前台时出现批准卡 | `mori.approval_request`，且 Mori 窗口没有焦点 | 任务栏上的 Mori 按钮闪烁（`BrowserWindow.flashFrame(true)`） | 切回 Mori |
+| 窗口不在前台时出现批准卡 | `mori.approval_request`，且 Mori 窗口没有焦点（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.3：`mori.team_approval_request` 同样闪烁） | 任务栏上的 Mori 按钮闪烁（`BrowserWindow.flashFrame(true)`） | 切回 Mori |
 | 切回 Mori | 窗口获得焦点 | 停止闪烁 | — |
 
 反例：读取文件不出卡；等批准时阶段行显示"Waiting for your approval"，不显示"Responding…"或"<标题> Ns"；在输入框里按 Enter 不会批准；

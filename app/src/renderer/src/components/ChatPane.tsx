@@ -1,9 +1,11 @@
 // 会话面板：顶栏（会话名、模型、思考强度、权限、上下文用量、右栏开关；分屏时"Close pane"）、对话流、阶段行、后台进程退出提示、
 // 批准卡、排队区、拒绝启动卡与输入框。分屏时每一栏是一个完整的会话面板；在面板里按下鼠标或焦点进入它，焦点就切到这一栏
 // （split.md）。模型层（docs/v1/screens/model-menu.md、model-chat.md）：顶栏的选择范围，输入框上方的拒绝启动卡。
+// 平行 Agent（docs/v1/screens/team-switch.md）：顶栏在模型、思考强度、权限按钮之前有协作开关。
 
 import { reload } from '../state/actions';
 import type { ContextUsage } from '../../../shared/protocol';
+import { seatRolesOf } from '../../../shared/team';
 import { skillCommandText } from '../state/skillText';
 import { closePane, focusComposer, focusPane } from '../state/split';
 import { useApp, type KernelStatus, type Tab } from '../state/store';
@@ -16,6 +18,7 @@ import { PaneTitle } from './PaneTitle';
 import { PermissionMenu } from './PermissionMenu';
 import { QuestionCard } from './QuestionCard';
 import { StageLine } from './StageLine';
+import { TeamSwitch } from './TeamSwitch';
 import { ThinkingMenu } from './ThinkingMenu';
 import { Transcript } from './Transcript';
 
@@ -142,6 +145,7 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
         <PaneTitle tab={tab} />
       </div>
       <div className="topbar-actions">
+        <TeamSwitch tab={tab} disabled={notReady} />
         {tab.phase !== 'opening' && (
           <>
             <ModelMenu tab={tab} disabled={notReady} />
@@ -175,7 +179,7 @@ export function ChatPane({ tab, ...pane }: PaneProps & { tab: Tab }) {
       <Transcript tab={tab} />
       <div className="composer-area">
         <KernelBanner kernel={kernel} tab={tab} />
-        <StageLine transcript={tab.transcript} cwd={tab.cwd} />
+        <StageLine transcript={tab.transcript} cwd={tab.cwd} seatRoles={seatRolesOf(tab.team)} />
         <ApprovalCard tab={tab} />
         <QuestionCard tab={tab} />
         <QueueArea tab={tab} />

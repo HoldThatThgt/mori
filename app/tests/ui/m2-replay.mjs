@@ -31,7 +31,8 @@ const CARD = `${P}[data-testid="approval-card"]`;
 const READ_ONLY_TOOLS = ['read', 'grep', 'find', 'ls'];
 const REJECTED_REASON_PREFIX = 'Rejected by the user. Reason: ';
 const COMMAND_TOOLS = ['bash', 'powershell'];
-const MENU_NOTE = 'Applies to this session only. New sessions start with “Ask each time”.';
+// 平行 Agent 规格 §11.1：权限菜单的说明作用于这个用户会话的全部 Agent。
+const MENU_NOTE = 'Applies to all agents in this session. New sessions start at Ask each time.';
 const F8_NOTE = 'Includes a screenshot, the current view, and your recent activity. Saved on this computer and never '
   + 'sent to the model.';
 const STOPPED_TEXT = 'Stopped · Changes made so far stay as they are';

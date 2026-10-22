@@ -21,6 +21,10 @@
 // （一个本机区域的提供商、一个模型、normalDefault 为它、档案已验证，synthetic）；会话信息与 mori.model_state 缺的 ModelState
 // 字段（pick、current、blocked）同样合成；models.* 的写命令照 connection.save 的方式应答（status.modelWrites 记下）；
 // config.get 补上 v1 的 firstRun 等字段。
+// 平行 Agent（docs/specs/parallel-agents-taskboard.md §17.4）：board.get 也是只读查询，录制里没有时合成一个空的 TaskBoard；
+// 会话信息与接上时的快照缺的协作字段（team、board、teamApprovals、deciding）按没有角色文件、没用过协作模式的会话合成，
+// session.clearQueue 的结果缺的 texts 按插话、排队合成（都是 synthetic）；session.prompt 还比较 team。
+// m6-replay.mjs、m7-replay.mjs 从这里读只读查询的列表（QUERIES）。
 
 /** 截图返回的 1×1 PNG */
 const PIXEL = 'data:image/png;base64,'
@@ -32,11 +36,34 @@ const M3_INFO = { name: null, projectTrust: 'none', trustRemembered: false, trus
 
 /**
  * @brief synthetic：M1 录下的 session.create / session.open 结果里还没有批准设置（M2 才加），按后台进程对新会话的
- *        默认值（每次询问、没有已允许的工具）补上；M3 的字段同样按 M3_INFO 补上。新录的原样返回。
+ *        默认值（每次询问、没有已允许的工具）补上；M3 的字段同样按 M3_INFO 补上；平行 Agent 的协作字段按 TEAM_INFO
+ *        补上（会话信息和接上时的快照 live 都补）。session.clearQueue 的结果没有 texts 时按插话、排队拼出。新录的原样返回。
  */
 function withDefaults(type, value, fixture) {
-  if ((type !== 'session.create' && type !== 'session.open') || !value) return value;
-  return { ...M3_INFO, approval: { mode: 'ask', allowed: [] }, ...M6_INFO, ...v1ModelState(fixture, value), ...value };
+  if (type === 'session.clearQueue' && value && !('texts' in value)) {
+    return { ...value, texts: [...value.steering, ...value.followUp] };
+  }
+  if ((type !== 'session.create' && type !== 'session.open' && type !== 'session.recheckAgents') || !value) {
+    return value;
+  }
+  const live = value.live ? { ...teamInfo(), ...value.live } : value.live;
+  return { ...M3_INFO, approval: { mode: 'ask', allowed: [] }, ...M6_INFO, ...v1ModelState(fixture, value),
+    ...teamInfo(), ...value, ...(live === undefined ? {} : { live }) };
+}
+
+/**
+ * @brief synthetic：平行 Agent 规格 §13.10 加进会话信息与快照的字段，v0、v1 模型层的录制里没有：按后台进程对没有角色文件、
+ *        没用过协作模式的会话的取值（关闭模式、基座持有三项权限、没有角色、没有后台 Agent、空的 TaskBoard）。
+ */
+function teamInfo() {
+  return { team: { mode: 'off', holders: { dialog: 'mori', create: 'mori', close: 'mori' }, roles: [], busy: false,
+    background: false }, board: emptyBoard(), teamApprovals: [],
+    deciding: { role: 'mori', since: null, queue: [] } };
+}
+
+/** @brief synthetic：没有需求的 TaskBoard 视图（board.get 没录过时的结果，与 shared/team.ts emptyBoard 相同）。 */
+function emptyBoard() {
+  return { requests: [], teamEdited: false };
 }
 
 /** @brief synthetic：没录过的 M6 只读查询的空结果。 */
@@ -191,9 +218,9 @@ function fileReader(steps) {
   };
 }
 
-/** 不占回放顺序的只读查询 */
-const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
-  'agents.get', 'session.commands', 'models.get', 'session.pickOptions'];
+/** 不占回放顺序的只读查询（m6-replay.mjs、m7-replay.mjs 也从这里读） */
+export const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
+  'agents.get', 'session.commands', 'models.get', 'session.pickOptions', 'board.get'];
 
 /** @brief models.* 的写命令：回放桥直接应答（v1ModelWrite），不占回放顺序。 */
 const answeredWrite = (type) => type.startsWith('models.') && !QUERIES.includes(type);
@@ -224,7 +251,7 @@ function sameCommand(expected, actual) {
   switch (expected.type) {
     case 'session.prompt':
       return expected.text === actual.text && (expected.behavior ?? null) === (actual.behavior ?? null)
-        && canonical(expected.refs) === canonical(actual.refs);
+        && canonical(expected.refs) === canonical(actual.refs) && (expected.team ?? null) === (actual.team ?? null);
     case 'approval.answer':
       return expected.requestId === actual.requestId && expected.decision === actual.decision
         && reasonText(expected.reason) === reasonText(actual.reason);
@@ -563,6 +590,10 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
         case 'session.pickOptions':
           status.queries.push(command);
           return Promise.resolve(latestResult(command.type, v1PickOptions(fixture)));
+        case 'board.get':
+          // synthetic：录制里没有 board.get 时是空的 TaskBoard（没用过协作模式的会话）
+          status.queries.push(command);
+          return Promise.resolve(latestResult(command.type, { ...emptyBoard(), error: null }));
         case 'tools.get':
         case 'agents.get':
         case 'session.commands':

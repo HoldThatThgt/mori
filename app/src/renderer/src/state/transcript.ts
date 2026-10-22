@@ -1,14 +1,15 @@
 // 把后台进程转发的 pi 事件归并成对话流。纯函数：时间由调用方传入，界面测试用录制的事件回放同一条路径。
 // 每个状态的来源见 docs/v0/screens/chat.md、tool-cards.md 与 approval.md；模型层的提示、阶段行、准备中与说明卡见
-// docs/v1/screens/model-chat.md。
+// docs/v1/screens/model-chat.md；协作的回执、进展摘要、不显示的投递、待判断的消息与后台批准卡在 teamEvents.ts。
 
 import type { ApprovalEndBy, ForwardedEvent, QuoteRef, SlimMessageUpdate, ToolGate } from '../../../shared/protocol';
 import { BLOCKED_PROMPT_MESSAGE, STOPPED_BEFORE_SENDING, formatClock } from '../../../shared/models';
 import {
-  blocksFromContent, contentText, messageTime, newTool, parseRejection, pushItem, reasonText, resultPatch,
-  type Block, type Item, type ModelStage, type Stage, type ToolCall, type Transcript,
+  blocksFromContent, contentText, messageTime, newTool, parseRejection, pendingPrompt, pushItem, reasonText,
+  resultPatch, type Block, type Item, type ModelStage, type Stage, type ToolCall, type Transcript,
 } from './model';
 import { skillCommandText } from './skillText';
+import { applyTeamEvent, dropFailedWake, takeWake } from './teamEvents';
 
 type Assistant = Extract<Item, { kind: 'assistant' }>;
 type User = Extract<Item, { kind: 'user' }>;
@@ -31,7 +32,7 @@ function updateLastAssistant(state: Transcript, fn: (item: Assistant) => Assista
 
 /** @brief 更新一次工具调用；还没有时先创建。 */
 function updateTool(state: Transcript, id: string, name: string, fn: (tool: ToolCall) => ToolCall): Transcript {
-  const tool = state.tools[id] ?? newTool(id, name);
+  const tool = state.tools[id] ?? { ...newTool(id, name), teamMode: state.runTeamMode };
   return { ...state, tools: { ...state.tools, [id]: fn(tool) } };
 }
 
@@ -114,9 +115,12 @@ function applyAssistantEnd(state: Transcript, message: Record<string, unknown>):
 /**
  * @brief pi 送进一条用户消息。准备中先显示的那条（pending）由它取代，文字以 pi 的为准（技能命令等已展开）；
  *        其余（插话、排队送达的）只在 pi 发出 message_start 时进入对话流。
+ *        文字与收到过的 mori.wake 相同的是程序投递：变成不显示的 wake 条目，从不取代先显示的那条（§13.7）。
  */
 function applyUserStart(state: Transcript, message: Record<string, unknown>): Transcript {
   const text = contentText(message.content);
+  const wake = takeWake(state, text, messageTime(message));
+  if (wake) return wake;
   const index = state.items.findIndex((item) => item.kind === 'user' && item.pending);
   let next: Transcript;
   if (index >= 0) {
@@ -144,15 +148,16 @@ function applyMessage(state: Transcript, event: EventOf<'message_start' | 'messa
 
 /**
  * @brief 补发的条目 id（mori.entry_id）：记到同一角色、同一时间的那一项上（找不到时取这个角色最后一条还没有 id 的）；
- *        你的消息带着已写进会话的引用时一并记下。
+ *        你的消息带着已写进会话的引用时一并记下。程序投递的 wake 条目按用户消息对待，它的条目 id 由它消费（§13.7）。
  */
 function applyEntryId(state: Transcript, event: EventOf<'mori.entry_id'>): Transcript {
-  const matches = (item: Item) => (item.kind === 'user' || item.kind === 'assistant') && item.kind === event.role
-    && item.entryId === null;
+  const roleOf = (item: Item) => (item.kind === 'wake' ? 'user' : item.kind);
+  const matches = (item: Item) => (item.kind === 'user' || item.kind === 'assistant' || item.kind === 'wake')
+    && roleOf(item) === event.role && item.entryId === null;
   let index = state.items.findLastIndex((item) => matches(item) && 'time' in item && item.time === event.time);
   if (index < 0) index = state.items.findLastIndex(matches);
   const item = state.items[index];
-  if (!item || (item.kind !== 'user' && item.kind !== 'assistant')) return state;
+  if (!item || (item.kind !== 'user' && item.kind !== 'assistant' && item.kind !== 'wake')) return state;
   const items = [...state.items];
   items[index] = item.kind === 'user' ? { ...item, entryId: event.entryId, refs: event.refs ?? item.refs }
     : { ...item, entryId: event.entryId };
@@ -311,27 +316,7 @@ function pushError(state: Transcript, text: string, restore: string | null, refs
   return pushItem(state, { kind: 'error', text, restore: back, live: true, ...(refs?.length ? { refs } : {}) });
 }
 
-// ---- 准备中（docs/specs/model-providers.md §11.4）与模型层的提示、等待（§9.3） ----
-
-
-/** @brief 准备中先显示的那条你的消息；没有时为 undefined。 */
-export function pendingPrompt(state: Transcript): User | undefined {
-  return state.items.find((item): item is User => item.kind === 'user' && Boolean(item.pending));
-}
-
-/** @brief 你发了消息（空闲时）：消息先显示在对话流里，会话进入"发送中"（准备中，§11.4）。 */
-export function addPendingPrompt(state: Transcript, text: string, refs: QuoteRef[]): Transcript {
-  const next = pushItem(state, { kind: 'user', text, refs: refs.length > 0 ? refs : null, entryId: null, time: null,
-    pending: true });
-  return { ...next, sending: true };
-}
-
-/** @brief 准备中又发了一条（后台进程暂存）：显示在排队区；发送失败时 add 为假，把它去掉。 */
-export function setPendingQueued(state: Transcript, text: string, add: boolean): Transcript {
-  if (add) return { ...state, pendingQueue: [...state.pendingQueue, text] };
-  const index = state.pendingQueue.lastIndexOf(text);
-  return index < 0 ? state : { ...state, pendingQueue: state.pendingQueue.filter((_text, at) => at !== index) };
-}
+// ---- 准备中（docs/specs/model-providers.md §11.4，先显示的消息见 model.ts）与模型层的提示、等待（§9.3） ----
 
 /**
  * @brief 准备中结束、pi 没有开始运行：撤回先显示的消息和暂存的消息，会话不再"发送中"，模型层的等待随之结束；
@@ -352,8 +337,9 @@ function dropPending(state: Transcript): Transcript {
  */
 function applyPromptError(state: Transcript, event: EventOf<'mori.prompt_error'>): Transcript {
   if (!pendingPrompt(state)) {
-    // 没有先显示的消息时 dropPending 只清暂存区、发送中、模型层的等待与准备中按的停止（同撤回）。
-    if (event.message === STOPPED_BEFORE_SENDING) return dropPending(state);
+    // 没有先显示的消息时 dropPending 只清暂存区、发送中、模型层的等待与准备中按的停止（同撤回）。还记着程序投递时
+    // （Esc 交回文字之前下一次投递已经开始准备，§5.6），发送中与阶段是那次投递的，不动（文字由 actions.ts 放回）。
+    if (event.message === STOPPED_BEFORE_SENDING) return state.wakes.length > 0 ? state : dropPending(state);
     return pushError({ ...state, sending: false, running: event.running, stage: event.running ? state.stage : null },
       event.message, event.text, event.refs);
   }
@@ -482,7 +468,7 @@ export function applyEvent(state: Transcript, event: ForwardedEvent, now: number
     case 'mori.approval_end':
       return applyApproval(state, event, now);
     case 'mori.prompt_error':
-      return applyPromptError(state, event);
+      return applyPromptError(dropFailedWake(state, event.text), event);
     case 'mori.entry_id':
       return applyEntryId(state, event);
     case 'mori.ui_request':
@@ -493,11 +479,21 @@ export function applyEvent(state: Transcript, event: ForwardedEvent, now: number
     case 'mori.model_switch':
     case 'mori.model_rebuild':
     case 'mori.model_unavailable':
-      return applyModelNotice(state, event);
+      return applyModelNotice(event.type === 'mori.model_unavailable' && event.firstRequest
+        ? dropFailedWake(state, event.text) : state, event);
     case 'mori.model_wait':
     case 'mori.model_queue':
     case 'mori.model_retry':
       return applyModelWait(state, event, now);
+    case 'mori.team_state':
+    case 'mori.board':
+    case 'mori.receipt':
+    case 'mori.progress':
+    case 'mori.wake':
+    case 'mori.team_deciding':
+    case 'mori.team_approval_request':
+    case 'mori.team_approval_end':
+      return applyTeamEvent(state, event);
     default:
       return applyRun(state, event, now);
   }
