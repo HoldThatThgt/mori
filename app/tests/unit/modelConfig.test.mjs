@@ -436,7 +436,7 @@ test('MP-30 an open session whose pick was deleted resolves to missing', () => {
   assert.equal(mc.resolvePick(mc.deleteGroup(baseConfig(), 'cloud').config, 'cloud').kind, 'missing');
 });
 
-test('MP-01 changing the address origin removes the keys; nextKeyNumber stays', () => {
+test('MP-01 changing the base URL origin removes the keys; nextKeyNumber stays', () => {
   const ds = baseConfig().providers[0];
   const changed = mc.applyAddressChange(ds, 'https://other.example.com/v1');
   assert.equal(changed.originChanged, true);
@@ -445,10 +445,10 @@ test('MP-01 changing the address origin removes the keys; nextKeyNumber stays', 
   assert.equal(changed.provider.baseUrl, 'https://other.example.com/v1');
   assert.deepEqual(changed.removedKeyRefs, ['ds#1', 'ds#2']);
   assert.equal(changed.consequence,
-    "Changing the address removes this provider's 2 saved keys. Add them again after saving.");
+    'Changing the base URL removes this provider’s 2 saved keys. Add them again after saving.');
   const one = mc.applyAddressChange({ ...ds, keys: [ds.keys[0]] }, 'http://ds.example.com/v1');
   assert.equal(one.consequence,
-    "Changing the address removes this provider's 1 saved key. Add them again after saving.");
+    'Changing the base URL removes this provider’s saved key. Add it again after saving.');
 });
 
 test('MP-01 port or protocol changes count as an origin change; a path change does not', () => {

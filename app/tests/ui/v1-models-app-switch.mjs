@@ -890,9 +890,9 @@ async function connectionFails(ctx) {
   const tab = await sessionWith(ctx, 'g29c');
   const since = Date.now();
   const first = await sendWait(ctx, tab, 'plain MP29 connection first');
-  record('MP-29 connection refused: switches model with the reason "can\'t connect"',
+  record('MP-29 connection refused: switches model with the reason "can’t connect"',
     first.switches.length === 1 && first.switches[0].reason === 'connection'
-      && first.switches[0].text.includes("can't connect") && first.errors.length === 0, brief(first.switches));
+      && first.switches[0].text.includes('can’t connect') && first.errors.length === 0, brief(first.switches));
   const second = await sendWait(ctx, tab, 'plain MP29 connection second');
   record('MP-29 within 30 s the provider is skipped (no new switch notice, the backup answers)',
     second.switches.length === 1 && second.assistants.at(-1)?.includes(PLAIN), brief(second.switches));
@@ -1108,7 +1108,7 @@ async function redo15(ctx) {
   const failed = captures(ctx.proxyA, M('a15'), since);
   const redo = captures(ctx.proxyB, M('b15'), since);
   const callIds = callIdsOf(failed[2]?.body);
-  const first = redoBody(redo[0]?.body, R('a15'), "can't connect");
+  const first = redoBody(redo[0]?.body, R('a15'), 'can’t connect');
   const users = (redo[0]?.body?.messages ?? []).filter((m) => m.role === 'user').map((m) => textOf(m.content));
   record('MP-15 the preferred model fails on the third request of the reply (connection refused): the new model '
     + 'gets the system prompt and this reply\'s user messages (the message and the steer) without any earlier '
@@ -1143,7 +1143,7 @@ async function union15(ctx) {
   const since = Date.now();
   const state = await sendWait(ctx, tab, 'MP15 union read the readme');
   const third = captures(ctx.proxyB, M('c15c'), since);
-  const first = redoBody(third[0]?.body, R('b15c'), "can't connect");
+  const first = redoBody(third[0]?.body, R('b15c'), 'can’t connect');
   record('MP-15 two switches in one reply: the third model gets neither model\'s work (intervals joined) and the '
     + 'user message carries exactly one note, naming the last model that failed',
   same(first.roles, ['system', 'user']) && first.noteOk && first.notes === 1 && state.switches.length === 2
@@ -1232,7 +1232,7 @@ async function reopen15(ctx) {
     + 'the new model\'s work but not the first model\'s tool calls, and the steer keeps the redo note',
   same(rolesOf(sent), ['system', 'user', 'user', 'assistant', 'tool', 'assistant', 'user'])
     && saved.callIds.every((id) => !JSON.stringify(sent).includes(id))
-    && users[1]?.endsWith(noteOf(R('a15'), "can't connect")) && !users[0]?.includes(NOTE_HEAD)
+    && users[1]?.endsWith(noteOf(R('a15'), 'can’t connect')) && !users[0]?.includes(NOTE_HEAD)
     && state.switches.length === 1 && state.switches[0].hidden && state.tools === 3,
   brief({ roles: rolesOf(sent), switches: state.switches, tools: state.tools }));
 }

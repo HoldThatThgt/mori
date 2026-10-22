@@ -336,7 +336,7 @@ Assistant: <回复正文>
 - Windows: …
 ```
 
-- 没打开会话时 "Current session: None" 一行代替会话的几项；"Page" 的取值：Session / Settings / Customize / Review / First run / Loading connections… / Couldn’t load connections。
+- 没打开会话时 "Current session: None" 一行代替会话的几项；"Page" 的取值：Session / Settings / Customize / Review / First run / Loading… / Couldn’t load model settings。
 - 解析要求：标题行 `/^# UI issue · (.+)$/`；六节的标题与 `ISSUE_SECTIONS` 一字不差（What went wrong、What you expected、Screenshot、Current view、Recent activity、Versions）；截图行 `/^!\[Screenshot\]\((.+)\)$/`；截图失败行写成 `Couldn’t capture a screenshot: <原文>`（撇号是 U+2019，冒号后一个空格），读的一方用 `/^Couldn’t capture a screenshot:\s*/` 去掉前缀（各节读出来时去掉了首尾空白，原文为空时冒号后就没有空格）；"(left blank)" 与 `reviewText.ts` 的 `EMPTY_FIELD` 相同。
 - 报告里你写的一行如果像 Markdown 标题，前面加 `\`，不会被当成一节。
 

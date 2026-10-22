@@ -109,7 +109,7 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 可以看、可以打字 | `blocked` 不为 null | 历史照常显示；输入框可以打字；发送不可用（按 Enter 不发送，草稿不丢）；斜杠命令列表照常插入文字，但提示词模板、技能命令和 `/compact` 这类要发给模型的都随发送一起不可用（§9.3）；顶栏可以改范围 | 打字；改范围；卡上的操作 |
-| 后台进程拒绝 | 仍有 `session.prompt` 送到（例如界面状态还没更新）：`mori.prompt_error`，`message` 为“This session can't start: no model fits” | 消息撤回、文字放回输入框；不另显示错误卡，原因由拒绝启动卡说明（临时，走查时可以改）；各种 `kind` 都是这一句（§4.6） | — |
+| 后台进程拒绝 | 仍有 `session.prompt` 送到（例如界面状态还没更新）：`mori.prompt_error`，`message` 为“This session can’t start: no model fits” | 消息撤回、文字放回输入框；不另显示错误卡，原因由拒绝启动卡说明（临时，走查时可以改）；各种 `kind` 都是这一句（§4.6） | — |
 
 ## v0 错误卡的规则
 

@@ -3,9 +3,9 @@
 
 import { useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import {
-  API_TYPE_LABELS, API_TYPES, COMPAT_LABELS, COMPAT_OPTIONS, ConcurrencySchema, MODEL_LIMITS, ProviderFormSchema,
-  suggestZone, THINKING_LEVELS, ZONES, type ApiType, type Compat, type ProviderForm, type ProviderModel,
-  type ThinkingLevel, type Zone,
+  API_TYPE_LABELS, API_TYPES, COMPAT_HINTS, COMPAT_LABELS, COMPAT_OPTIONS, ConcurrencySchema, MODEL_LIMITS,
+  ProviderFormSchema, suggestZone, THINKING_LEVELS, ZONES, type ApiType, type Compat, type ProviderForm,
+  type ProviderModel, type ThinkingLevel, type Zone,
 } from '../../../../shared/models';
 import { FieldError, ZONE_LABELS } from './common';
 
@@ -251,7 +251,7 @@ export function ZoneRadios({ value, onChange, note }: {
   );
 }
 
-/** @brief 兼容选项（只在 API type 为 openai-completions 时显示）：六个勾选框，文字用 §9.1 的英文说明。 */
+/** @brief 兼容选项（只在 API type 为 openai-completions 时显示）：六个勾选框，标签和下面一行说明用 §9.1 的英文。 */
 export function CompatChecks({ api, value, onChange }: {
   api: ApiType; value: Compat; onChange: (compat: Compat) => void;
 }) {
@@ -268,7 +268,7 @@ export function CompatChecks({ api, value, onChange }: {
           <label key={option.id} className="check-row">
             <input type="checkbox" checked={value[option.field] !== undefined}
               onChange={(event) => toggle(option.field, event.target.checked, option.value)} />
-            <span>{COMPAT_LABELS[option.field]}</span>
+            <span>{COMPAT_LABELS[option.field]}<small>{COMPAT_HINTS[option.field]}</small></span>
           </label>
         ))}
       </div>

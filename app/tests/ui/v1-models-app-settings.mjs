@@ -11,7 +11,7 @@
 //         不合格的模型、改写的 id、默认范围、思考强度复制、区域建议、区域未确认时被排除、迁移后改 models.json 不生效、
 //         Dismiss、迁移失败不写配置、迁移后这次启动停在 设置 → Models）；
 //   MP-24 设置页的增删改立即写进配置并影响静态校验、确认框的连带改动、改地址删 key 且新端口收不到旧 key、分组的错误、
-//         key 明文不回到界面；
+//         key 明文不回到界面、兼容选项的标签与说明；
 //   MP-26 key 不落盘（数据目录的全部文件、迁移说明、日志、本测试的结果）、Add key 后 F8 报告里没有 key；
 //   MP-30 删除的连带改动；
 //   MP-33 首次启动（Local 与 Public 两种区域、Allow public、tool calling 判定失败的说明、改模型 id 再测仍只有一个提供商）。
@@ -1010,6 +1010,7 @@ async function settingsEdits() {
     await waitCard(ctx.page, (s) => s === null, 60000);
     await editDefaults(ctx);
     await editProvider(ctx);
+    await compatOptions(ctx);
     await editKeys(ctx);
     await editAddress(ctx);
     await editModels(ctx);
@@ -1089,6 +1090,41 @@ async function editProvider(ctx) {
   record('MP-24 Providers: Add provider saves it (id from the name), shows its card and probes its model to Verified',
     Boolean(providerOf(readConfig(userData), 'extra-d')) && await providerCard(page, 'extra-d').count() === 1
     && verified.ok, String(verified.value));
+}
+
+/** 兼容选项勾选框的标签与下面一行说明（§9.1，shared/models.ts COMPAT_LABELS、COMPAT_HINTS），按表单里的顺序 */
+const COMPAT_TEXTS = [
+  ['Endpoint doesn’t support the developer role', 'Sends the system prompt with the system role instead'],
+  ['Endpoint doesn’t accept the store field', 'Leaves store out of requests'],
+  ['Endpoint needs max_tokens instead of max_completion_tokens',
+    'Older endpoints don’t recognize max_completion_tokens'],
+  ['Endpoint doesn’t report usage while streaming',
+    'Doesn’t send stream_options, so the context usage shown will be inaccurate'],
+  ['Endpoint doesn’t support strict mode for tool parameters', 'Leaves strict out of tool definitions'],
+  ['Tool results must include the tool name', 'Some endpoints require a name field on tool result messages'],
+];
+
+/** @brief Add provider 表单的兼容选项：六个勾选框各有标签和一行说明；API type 不是 OpenAI-compatible 时不显示。不保存。 */
+async function compatOptions(ctx) {
+  const { page } = ctx;
+  await openSettings(page);
+  await page.locator('[data-action="add-provider"]').click();
+  const form = page.getByTestId('provider-form');
+  const rows = form.locator('.compat-checks label.check-row');
+  const shown = await rows.evaluateAll((labels) => labels.map((label) => {
+    const span = label.querySelector('span');
+    return [span?.firstChild?.textContent ?? '', span?.querySelector('small')?.textContent ?? ''];
+  }));
+  const api = form.getByLabel('API type', { exact: true });
+  await api.selectOption('anthropic-messages');
+  const hidden = await rows.count();
+  await api.selectOption('openai-completions');
+  const back = await rows.count();
+  await form.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await form.waitFor({ state: 'detached', timeout: 5000 });
+  record('MP-24 Add provider: each compatibility option shows its label and a hint line (english-ui wording); '
+    + 'the options are hidden for other API types', JSON.stringify(shown) === JSON.stringify(COMPAT_TEXTS)
+    && hidden === 0 && back === COMPAT_TEXTS.length, JSON.stringify({ shown, hidden, back }));
 }
 
 /** @brief Keys：加、上移、删（不是最后一个时不确认）、删最后一个（确认、Cancel、Remove）；明文不回到界面。 */

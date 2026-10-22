@@ -18,8 +18,8 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 读取中 | 启动后 `config.get` 还没返回 | 整窗“Loading connections…”（临时，走查时可以改），不显示表单 | — |
-| 读取失败 | `config.get` 报错 | “Couldn’t load connections: <原文>” | 重新打开 App |
+| 读取中 | 启动后 `config.get` 还没返回 | 整窗“Loading…”（临时，走查时可以改），不显示表单 | — |
+| 读取失败 | `config.get` 报错 | “Couldn’t load model settings: <原文>” | 重新打开 App |
 | 首次启动 | `config.get` 的 `firstRun` 为真 | 整窗只有首次启动表单：标题“Connect a model”，说明“Enter the base URL, API key, and model ID, then test the connection.”（都是临时，走查时可以改） | 填写；Test connection |
 | 迁移失败 | `firstRun` 为真且 `migrationError` 不为 null（`models.json` 读不出、或明文 key 加密失败，§4.5） | 表单上方“Couldn’t import your previous model settings: <原文>”（临时，走查时可以改）；表单为空（各字段的默认值） | 同首次启动 |
 | 已有配置 | `firstRun` 为假、`configError` 为 null | 不显示表单，进入三栏布局（迁移刚成功时直接打开 设置 → Models，见 models-settings.md） | — |
@@ -38,7 +38,7 @@
 | Context window | `contextWindow` | 正整数；默认 128000（§9.1） |
 | Max output | `maxTokens` | 正整数，小于窗口；默认 16384 与窗口一半中较小的（§9.1、§12），你没改过时随窗口变 |
 | Supports thinking | `reasoning` | 勾选框 |
-| Compatibility options | `compat` 的六个字段 | 只在 API type 为 `openai-completions` 时显示；每个勾选框一行，文字用 §9.1 的英文说明，不另加说明行（临时，走查时可以改） |
+| Compatibility options | `compat` 的六个字段 | 只在 API type 为 `openai-completions` 时显示；每个勾选框是 §9.1 的标签，下面一行小字说明（沿用 english-ui，临时，走查时可以改） |
 
 表单没有 Family、Image input、Concurrency per key、Default effort for new sessions（规格 §9.1 的字段列表里没有；建好后在设置 → Models 里改）。
 字段错误的文字同 [models-settings.md](models-settings.md)“字段错误的文字”。
@@ -86,8 +86,8 @@
 
 ## 本表定下的界面细节
 
-规格没给、本表定的（都是临时，走查时可以改）：读取中“Loading connections…”；标题“Connect a model”与一句说明；
-迁移失败的前缀“Couldn’t import your previous model settings: ”；API key 的两种占位文字；兼容选项只写一行英文说明；
+规格没给、本表定的（都是临时，走查时可以改）：读取中“Loading…”、读取失败“Couldn’t load model settings: ”；标题“Connect a model”与一句说明；
+迁移失败的前缀“Couldn’t import your previous model settings: ”；API key 的两种占位文字；兼容选项的标签与说明沿用 english-ui；
 从没保存过的表单点 Test connection 先保存；“Saving…”“Testing…”“Test cancelled”；保存失败的前缀“Couldn’t save: ”；
 区域建议值随 Base URL 变、手动选过后不再变；Max output 没改过时随窗口变。
 
