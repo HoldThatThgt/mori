@@ -932,7 +932,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
   文字 `Team: Off` / `Team: On` / `Team: Until done`（`once`），悬停分别为 `Turn on team mode` / `Messages go to <create role> first` / `Team mode ends when open requests are done`；
   标识 `data-testid="team-switch"`、`data-mode`。
 - 点击：`off` → `always`；`always` → `off`（不能回到 `off` 时 `once`，§5.1）；`once` → `always`。不需要确认。界面没准备好、或会话按 `agents_invalid` 拒绝启动时不可用；运行中可以点（影响之后的消息）。
-- 窄栏（< 600px，§15）只显示 `Team` 和状态点。
+- 窄栏（这一栏不宽于 860px，§15）只显示状态点（`off` 空心，`always`、`once` 实心），读屏名称和悬停仍是完整文字。顶栏现有各档是按没有开关定的，每档刚过阈值时只剩约 8–25px，`Team: Until done`（约 108px）要宽于约 856px 才放得下，`Team` 加状态点（约 55px）在 1400 宽右栏打开（690px，模型按钮停在 120px）时也放不下；为放下状态点，顶栏另有两处收紧（显示项目名时由模型按钮让位、分屏窄栏里按钮间距和图标按钮收小），见 `docs/v1/screens/team-switch.md`“窄栏”。
 
 ### 13.2 回执
 
@@ -957,7 +957,7 @@ Request 1 · Login page is blank · Running · 6 min
   T1 Find and fix · reviewer · Run npm test
 ```
 
-- 展开时：全部 task，每个 task 下一行交接链 `executor: Fixed → reviewer: Failed, logout test fails → executor: Logout fixed too`（每棒取结论的第一句，≤ 80 字符；程序写的一棒写作 `Mori: no handoff`、`Mori: error`、`Mori: no model`、`Mori: dependency failed`、`Mori: close didn't decide`），
+- 展开时：全部 task，每个 task 下一行交接链 `executor: Fixed → reviewer: Failed, logout test fails → executor: Logout fixed too`（每棒取结论的第一句，≤ 80 字符；程序写的一棒写作 `Mori: no handoff`、`Mori: error`、`Mori: no model`、`Mori: dependency failed`、`Mori: close didn’t decide`），
   已排除的方案，需求的结论。
 - 这些字由程序用现成的东西拼出来（proposal §7）：需求和 task 的标题（立项写的）、当前在做什么、每一棒的结论。
 
@@ -1080,7 +1080,7 @@ interface TaskView {
 ### 13.12 右栏
 
 “本会话的改动”只列对话流里的编辑与写入（v0 不变）；后台实例改的文件不在其中（§0 不做）。这个用户会话的 TaskBoard 上有实例做过成功的 `edit`、`write` 时，
-右栏在列表上方显示 `Changes made by team tasks aren't listed here.`（标识 `data-testid="team-changes-note"`）；列表为空时只显示这一句，不显示“本会话还没有改动”。没有 TaskBoard 时与 v0 相同。
+右栏在列表上方显示 `Changes made by team tasks aren’t listed here.`（标识 `data-testid="team-changes-note"`）；列表为空时只显示这一句，不显示“本会话还没有改动”。没有 TaskBoard 时与 v0 相同。
 
 ## 14. 在 pi 上的落点
 
@@ -1176,7 +1176,7 @@ interface TaskView {
 | A 级强制填写 | 只在档案 `reasoning.can_disable` 为真时用，这次请求关闭思考 |
 | `decision` 类别的排队超时 / `task` 类别 | 60 秒（与 `conversation` 相同）/ 不超时 |
 | 模型族为空时 | 用 `<provider>/<model>` 当作族 |
-| 协作开关的窄栏宽度 | 600px |
+| 协作开关的窄栏宽度 | 860px（不宽于时只显示状态点） |
 | 给 `conversation`、`decision` 留的槽位 | 每个 key 1 个（`task`、`background` 最多占并发上限 − 1；并发上限为 1 时不留） |
 | 命令与界面名 | `/team`、`/team on`、`/team off`、`Team`（proposal 的暂定名；`/team off` 为派生） |
 | 基座的一句话说明（`next`、`assignee`、“Other roles”） | `General-purpose agent with the default tools` |
@@ -1299,11 +1299,11 @@ interface TaskView {
 | TB-50 | `next` 与 `assignee` 的枚举 | 去掉自己、含 `mori`、说明写法与权限加注；只有基座时 task 实例没有 `next` | 单元 |
 | TB-51 | 投递队列 | 运行中到来的两次程序投递合并成一次、按到达顺序分段；用户消息的投递不与程序投递合并且排在前面；过期的投递不发出；排在一条段开始时选不到模型的消息之后的 `request_closed` 投递仍然发出 | 单元、App |
 | TB-52 | 后台实例的模型提示 | 实例换模型后进展摘要这一行末尾显示 `Switched model: A → B · <原因>`，下一次运行开始时清掉 | App |
-| TB-53 | 协作开关 | 三种文字与悬停、`aria-checked`、三种点击、界面没准备好时不可用、窄栏只显示 `Team` 与状态点 | App、回放 |
+| TB-53 | 协作开关 | 三种文字与悬停、`aria-checked`、三种点击、界面没准备好时不可用、窄栏（不宽于 860px）只显示状态点 | App、回放 |
 | TB-54 | 阶段行与 Stop team | 分开时立项判断、对话没在运行时阶段行 `<create role> is deciding… · Ns`；对话在回复时显示对话自己的阶段；合并会话不显示；后台在运行时有 `Stop team`；侧栏状态在只有后台运行时为生成中 | App |
 | TB-55 | 工具卡标题 | §13.8 每个工具的标题（三种 `agent_message`） | 单元、App |
 | TB-56 | 待判断的消息 | 对话回复中发的三条消息按顺序判断，排队区标 `Waiting for <create role>`；判断后 Enter 为排队、Ctrl+Enter 为插话；判断结束时对话已空闲则开始新的回复；“撤回”带回还没开始判断的消息；以 `/` 开头的扩展命令不经立项；对话在为别的消息准备中时判断完的消息排在它之后；提示词模板的展开文字出现在立项的投递里、需求记原文；扩展命令用 `sendUserMessage` 开始的运行的工作卡有 `No decision` 行 | App |
-| TB-57 | 右栏与后台改动 | task 改过文件后右栏显示 `Changes made by team tasks aren't listed here.`、列表为空时不显示“本会话还没有改动”；没有 TaskBoard 时与 v0 相同 | App |
+| TB-57 | 右栏与后台改动 | task 改过文件后右栏显示 `Changes made by team tasks aren’t listed here.`、列表为空时不显示“本会话还没有改动”；没有 TaskBoard 时与 v0 相同 | App |
 
 ### 17.3 不留未完成项
 
@@ -1320,8 +1320,9 @@ interface TaskView {
 | --- | --- |
 | `tests/fake-endpoint/server.mjs`、`selfcheck.mjs` | 加脚本模式（§17.1）与工具调用 id 的计数；现有关键词的回答不变；自检加脚本模式的几项 |
 | `tests/ui/harness/replay.js`、`main.jsx` | `board.get` 加进只读查询，录制里没有时合成一个空的 TaskBoard（代码里注明 synthetic）；`SessionInfo` 的 `team`、`board` 等新字段同样合成默认值；`session.prompt` 的比较加 `team`；`main.jsx` 加 `fixtures/tb`；`m6-replay.mjs`、`m7-replay.mjs` 改为从 `replay.js` 读只读查询列表 |
-| `m6-app-slash.mjs` | 不变（`/team` 不进 “/” 列表） |
-| `m6-app-tools.mjs`、`m3-app.mjs` | 不变（没有角色文件、没用过协作模式时工具与 v0 相同） |
+| `m6-app-slash.mjs` | Shift+Tab 回到会话树的次数 8 → 9：协作开关是顶栏上一个真正可以聚焦的按钮，多一个停靠点；顶栏各档的布局检查不变（§13.1 的窄栏让它们照旧通过）；其余不变（`/team` 不进 “/” 列表） |
+| `m3-app.mjs` | 走查 2 的 Shift+Tab 上限 8 → 9（同上，多了协作开关）；其余不变（没有角色文件、没用过协作模式时工具与 v0 相同） |
+| `m6-app-tools.mjs` | 不变（没有角色文件、没用过协作模式时工具与 v0 相同） |
 | `tests/unit/reporter.mjs` | 改为工厂，默认仍写 `v1-unit.json`；新增 `tests/unit/tb-reporter.mjs` 写 `tb-unit.json` |
 | `tests/unit/probes.test.mjs` | 三种写法改为从 `forcedWrite.ts` 导入；`withStrictTools` 改为只给指定名字的工具加 `strict` 的检查；MP 编号与条目不变 |
 | `tests/unit/selector.test.mjs` | 第 3 步的输入改为 `requires` |

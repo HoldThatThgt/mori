@@ -426,8 +426,7 @@ function cancelTool(team: Team, lane: Lane, args: Record<string, unknown>): Boar
   if (result.error) return refused(result.error);
   for (const other of team.lanes.values()) {
     if (other.request !== request || (other.kind !== 'task' && other.kind !== 'close')) continue;
-    other.queue = [];
-    other.solo = [];
+    dropCancelled(other, request);
     void team.stopLane(other, 'cancel');
     team.releaseIfDone(other);
   }
@@ -435,6 +434,24 @@ function cancelTool(team: Team, lane: Lane, args: Record<string, unknown>): Boar
   team.receipt(lane, { kind: 'cancelled', request, title, quote: null, at: now });
   const tasks = result.cancelled.length ? `; cancelled ${result.cancelled.join(', ')}` : '';
   return ok(`Request ${request} cancelled${tasks}.`);
+}
+
+/**
+ * @brief 撤销需求时丢弃这个需求的结案会话、task 实例的投递队列（§7.6、§8.2）：每条记日志；等这条投递回复的
+ *        agent_message（发送方在别处，不会随撤销停止）以 Request N was cancelled. 失败结束（§10.1）。
+ * @param lane 这个需求的会话
+ * @param request 撤销的需求
+ */
+function dropCancelled(lane: Lane, request: number): void {
+  const dropped = [...lane.solo, ...lane.queue];
+  lane.solo = [];
+  lane.queue = [];
+  for (const item of dropped) {
+    console.log(`[kernel] ${lane.id}: request_cancel dropped a delivery (${item.cause.kind})`);
+    const waiter = item.meta.waiter;
+    item.meta.waiter = undefined;
+    waiter?.settle(`Request ${request} was cancelled.`, true);
+  }
 }
 
 /** @brief task_create（§6.2、§9.3）：依赖都完成时直接交给 assignee，已经有一个失败时交给结案。 */

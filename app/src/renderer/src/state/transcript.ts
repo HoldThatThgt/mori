@@ -337,8 +337,9 @@ function dropPending(state: Transcript): Transcript {
  */
 function applyPromptError(state: Transcript, event: EventOf<'mori.prompt_error'>): Transcript {
   if (!pendingPrompt(state)) {
-    // 没有先显示的消息时 dropPending 只清暂存区、发送中、模型层的等待与准备中按的停止（同撤回）。
-    if (event.message === STOPPED_BEFORE_SENDING) return dropPending(state);
+    // 没有先显示的消息时 dropPending 只清暂存区、发送中、模型层的等待与准备中按的停止（同撤回）。还记着程序投递时
+    // （Esc 交回文字之前下一次投递已经开始准备，§5.6），发送中与阶段是那次投递的，不动（文字由 actions.ts 放回）。
+    if (event.message === STOPPED_BEFORE_SENDING) return state.wakes.length > 0 ? state : dropPending(state);
     return pushError({ ...state, sending: false, running: event.running, stage: event.running ? state.stage : null },
       event.message, event.text, event.refs);
   }

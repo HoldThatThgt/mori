@@ -715,7 +715,7 @@ export const PROGRAM_HANDOFF_LINES: Readonly<Record<HandoffReason, string>> = Ob
   error: 'error',
   no_model: 'no model',
   dependency_failed: 'dependency failed',
-  close_undecided: "close didn't decide",
+  close_undecided: "close didn’t decide",
 });
 
 /**

@@ -11,7 +11,7 @@ import type { Item, ToolCall } from '../state/model';
 import { stripQuotes } from '../state/quotes';
 import { parseSkillInvocation, type SkillInvocation } from '../state/skillText';
 import { updateTab, type Tab } from '../state/store';
-import { replyTurns, type ReplyTurn } from '../state/turns';
+import { lastTurnEnded, replyTurns, type ReplyTurn } from '../state/turns';
 import { Icon } from '../icons';
 import { AssistantMessage } from './AssistantMessage';
 import { SentQuotes } from './QuoteChips';
@@ -295,8 +295,8 @@ function useReplyActions(tab: Tab) {
   const { items, running } = tab.transcript;
   const turns = useMemo(() => replyTurns(items), [items]);
   const last = items.findLast((item) => item.kind === 'assistant');
-  // 最后一轮的操作行画在哪一项下（replyTurns 的键）；最后一项是你的消息或程序投递时，最后一轮已经结束。
-  const ended = items.at(-1)?.kind === 'user' || items.at(-1)?.kind === 'wake';
+  // 最后一轮的操作行画在哪一项下（replyTurns 的键）；最后一项是你的消息或程序投递时（不算回执与进展摘要），最后一轮已经结束。
+  const ended = lastTurnEnded(items);
   const lastTurnEnd = ended ? undefined : [...turns.keys()].at(-1);
   const live = running || (last?.kind === 'assistant' && last.streaming);
   const shown = [...turns.entries()].filter(([key, turn]) => turn.text && !(live && key === lastTurnEnd));

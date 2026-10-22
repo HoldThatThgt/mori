@@ -72,7 +72,10 @@ interface Preparing {
   phase: 'preparing' | 'starting';
   /** 程序的投递（平行 Agent 规格 §5.6、§8.2）：不展开模板与命令；没能发出时不回到输入框（mori.prompt_error 的 text 为 null） */
   program: boolean;
-  /** 你停止对话的回复时 Team 撤回的待判断消息（§11.4），随这条消息一起回到输入框；没有时为 null */
+  /**
+   * 你停止对话的回复或按 Stop team 时 Team 撤回的待判断消息（§11.4），排在这条消息和暂存的消息之后、一起回到输入框
+   * （一个 mori.prompt_error，按发送顺序）；没有时为 null
+   */
   withdrawn: Promise<string[]> | null;
 }
 
@@ -715,7 +718,10 @@ interface PromptOptions {
 interface PromptErrorFields {
   /** 错误原文 */
   message: string;
-  /** 撤回的消息；程序的投递、只撤回 queued 时为 null */
+  /**
+   * 撤回的消息（停止对话的回复时是交回的第一条）；只在程序的投递没能发出时为 null（平行 Agent 规格 §5.6：界面据此
+   * 去掉记下的那次投递）
+   */
   text: string | null;
   /** 它的引用芯片 */
   refs: QuoteRef[] | null;
@@ -754,30 +760,50 @@ function settleRun(entry: Entry): void {
 /**
  * @brief 发出提示；不等本轮结束，结果和失败都通过事件回到界面。被拒绝启动的会话拒绝（§4.6）；协作模式下（或带
  *        team: 'once'）交给 Team（平行 Agent 规格 §5.3）；其余与关闭模式相同（dispatch）。
+ * @return held 为真时这条消息暂存在准备中（协作模式下照 v0 交给对话的扩展命令也是），界面把它显示在排队区
  */
-export function prompt(sessionId: string, text: string, options: PromptOptions) {
+export function prompt(sessionId: string, text: string,
+  options: PromptOptions): PromptAccepted | Promise<PromptAccepted> {
   const entry = requireEntry(sessionId);
   if (entry.model.isBlocked()) {
     promptError(entry, { message: BLOCKED_PROMPT_MESSAGE, text, refs: options.refs ?? null, running: entry.running,
       queued: [] });
-    return { accepted: true };
+    return { accepted: true, held: false };
   }
   const item: HeldItem = { text, refs: options.refs };
-  if (entry.team?.takesPrompt(text, options.team)) entry.team.onUserPrompt(item, options.behavior, options.team);
-  else dispatch(entry, item, options.behavior);
-  return { accepted: true };
+  const team = entry.team;
+  if (team?.takesPrompt(text, options.team)) {
+    team.onUserPrompt(item, options.behavior, options.team);
+    return { accepted: true, held: false };
+  }
+  // /team /<扩展命令>：关闭模式下先进入 once，命令开始的运行才用协作模式的工具（平行 Agent 规格 §5.1、§5.3）
+  if (team && options.team === 'once') {
+    return team.enterOnce().then(() => ({ accepted: true, held: dispatch(entry, item, options.behavior) }));
+  }
+  return { accepted: true, held: dispatch(entry, item, options.behavior) };
+}
+
+/** @brief session.prompt 的结果。 */
+interface PromptAccepted {
+  /** 收下了（结果与失败都通过事件回到界面） */
+  accepted: true;
+  /** 暂存在准备中（§11.4）：pi 开始运行后作为 followUp 交给 pi */
+  held: boolean;
 }
 
 /**
  * @brief 交给对话：准备中暂存，pi 开始运行后作为 followUp 交给 pi（§11.4）；生成中按 behavior 交给 pi（插话或排队）；
- *        空闲时开始一段：先准备（选模型、等待、重建），再调 pi。
+ *        空闲时开始一段：先准备（选模型、等待、重建），再调 pi；这一段结束时告诉 Team（它不跟踪这次回复，
+ *        准备中就结束时也要开始投递队列里给用户会话的程序投递，平行 Agent 规格 §5.6）。
+ * @return 暂存在准备中时为真
  */
-function dispatch(entry: Entry, item: HeldItem, behavior: PromptBehavior | undefined): void {
+function dispatch(entry: Entry, item: HeldItem, behavior: PromptBehavior | undefined): boolean {
   const pending = item.refs?.length ? entry.refs.add(item.text, item.refs) : null;
   const held: HeldPrompt = { text: item.text, refs: item.refs, pending };
   if (entry.preparing) entry.preparing.held.push(held);
   else if (entry.running || entry.session.isStreaming) sendToPi(entry, held, behavior);
-  else void startReply(entry, held, {});
+  else void startReply(entry, held, {}).then(() => entry.team?.replyEnded());
+  return entry.preparing?.held.includes(held) ?? false;
 }
 
 /**
@@ -983,9 +1009,19 @@ async function dialogStopTexts(team: TeamLike): Promise<string[]> {
   }
 }
 
+/** @brief 拿回 pi 排队区的消息（插话在前），它们的引用不再写进会话（同 clearQueue）。 */
+function takePiQueue(entry: Entry): string[] {
+  const { steering, followUp } = entry.session.clearQueue();
+  const fromPi = [...steering, ...followUp];
+  entry.refs.dropTexts(fromPi);
+  return fromPi;
+}
+
 /**
  * @brief 停止对话的回复（Esc、停止按钮；平行 Agent 规格 §11.4）：记下原因 dialog，停为它判断的立项；撤回的待判断消息
- *        跟准备中撤回的消息一起回到输入框（mori.prompt_error 的 queued）；没有准备中的消息时单独交回（text 为 null）。
+ *        跟准备中撤回的消息一起回到输入框（mori.prompt_error 的 queued）。没有准备中的消息时，有 Team 的会话里
+ *        pi 排队区的消息也由这里拿回（界面不先撤回），与待判断的消息按发送顺序一起交回：一个 mori.prompt_error，
+ *        text 是第一条、queued 是其余的（text 为 null 只表示程序的投递没能发出，§5.6）。
  */
 export async function abort(sessionId: string): Promise<{ aborted: true }> {
   const entry = requireEntry(sessionId);
@@ -996,11 +1032,13 @@ export async function abort(sessionId: string): Promise<{ aborted: true }> {
     entry.preparing.controller.abort();
     return { aborted: true };
   }
+  // 协作模式下消息都先经立项，交给 pi 排队的比还在待判断的发得早
+  const fromPi = entry.team ? takePiQueue(entry) : [];
   await stopRun(entry);
-  const texts = withdrawn ? await withdrawn : [];
-  if (texts.length > 0) {
-    promptError(entry, { message: STOPPED_BEFORE_SENDING, text: null, refs: null, running: entry.running,
-      queued: texts });
+  const [first, ...rest] = [...fromPi, ...(withdrawn ? await withdrawn : [])];
+  if (first !== undefined) {
+    promptError(entry, { message: STOPPED_BEFORE_SENDING, text: first, refs: [], running: entry.running,
+      queued: rest });
   }
   return { aborted: true };
 }
@@ -1094,11 +1132,28 @@ export function boardView(sessionId: string): BoardView & { error: null } {
   return { ...(entry.team?.info().board ?? emptyBoard()), error: null };
 }
 
-/** @brief session.stopTeam（§11.4）：停止这个用户会话的全部 Agent，返回回到输入框的待判断消息；没有 Team 时什么都不做。 */
+/**
+ * @brief session.stopTeam（§11.4）：先拿回 pi 排队区的消息（同 clearQueue，它们的引用不再写进会话），再停止这个用户会话的
+ *        全部 Agent；回到输入框的是 pi 排队区的消息和待判断的消息，按发送顺序（协作模式下消息都先经立项，交给 pi 的在前）。
+ *        没有 Team 时什么都不做。
+ */
 export async function stopTeam(sessionId: string): Promise<{ texts: string[]; error: null }> {
   const entry = requireEntry(sessionId);
-  const { texts } = entry.team ? await entry.team.stopTeam() : { texts: [] };
-  return { texts, error: null };
+  if (!entry.team) return { texts: [], error: null };
+  const fromPi = takePiQueue(entry);
+  // 对话在准备中（pi 的排队区这时是空的）：待判断的消息随准备中撤回的消息一起交回（startReply 的 giveBack），
+  // 在那条之后、按发送顺序，而不是另由命令结果交回
+  const preparing = entry.preparing?.phase === 'preparing' && entry.preparing.withdrawn === null
+    ? entry.preparing : null;
+  let handBack: (texts: string[]) => void = () => undefined;
+  if (preparing) preparing.withdrawn = new Promise((resolve) => { handBack = resolve; });
+  try {
+    const { texts } = await entry.team.stopTeam();
+    handBack(texts);
+    return { texts: preparing ? fromPi : [...fromPi, ...texts], error: null };
+  } finally {
+    handBack([]);
+  }
 }
 
 /**

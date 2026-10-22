@@ -30,10 +30,13 @@ export function profile(level) {
     reasoning: { can_disable: false } };
 }
 
-/** 一条会话的模型层（只有 Team 用到的部分，synthetic）；state.blocked 为真时会话被拒绝启动。 */
-function fakeModel(state) {
+/**
+ * 一条会话的模型层（只有 Team 用到的部分，synthetic）；state.blocked 为真时会话被拒绝启动；state.pick 是你选的范围
+ * （默认 strong）；state.lockFails 为真时 setTeamLock 失败。setTeamLock 记进 state.sources（会话、锁定、候选来源）。
+ */
+function fakeModel(state, id) {
   return {
-    state: () => ({ current: 'fake/model', pick: 'strong' }),
+    state: () => ({ current: 'fake/model', pick: state.pick ?? 'strong' }),
     layer: { profileOf: () => state.profile, familyOf: (ref) => ref },
     takeRestart: () => {
       const restart = state.restart ?? null;
@@ -42,8 +45,10 @@ function fakeModel(state) {
     },
     candidateRefs: () => ['fake/model'],
     outsideRefs: () => state.outside ?? [],
-    setTeamLock: async (locked) => {
-      state.locks = [...(state.locks ?? []), locked];
+    setTeamLock: async (locked, source) => {
+      state.sources = [...(state.sources ?? []), { id, locked, source }];
+      if (state.lockFails) throw new Error('synthetic: the project settings cannot be read');
+      if (id === 'U') state.locks = [...(state.locks ?? []), locked];
       return {};
     },
     isBlocked: () => state.blocked === true,
@@ -96,12 +101,16 @@ export function fakeHost(state) {
       const entry = { id, spec, api, running: false, preparing: false, cwd, sessionFile: join(cwd, `${id}.jsonl`),
         session: { sessionManager: SessionManager.inMemory(cwd), extensionRunner: { getCommand: (name) =>
           (state.commands ?? []).includes(name) ? { name } : undefined }, promptTemplates: state.templates ?? [] },
-        model: fakeModel(state) };
+        model: fakeModel(state, id) };
       if (spec) spec.teamExtension(api);
       entries.set(id, entry);
       return entry;
     },
-    async createInstance(spec) { host.newEntry(spec.id, spec.cwd, spec); return spec.id; },
+    async createInstance(spec) {
+      await state.createGate?.(spec);
+      host.newEntry(spec.id, spec.cwd, spec);
+      return spec.id;
+    },
     async openInstance(file, spec) { host.newEntry(spec.id, spec.cwd, spec); return spec.id; },
     async closeInstance(id) { entries.delete(id); },
     deliver(id, text, choice) {
@@ -146,15 +155,16 @@ export async function until(check, what) {
  * 建一个用户会话的 Team（分开时的角色；用户会话 U）。
  * @param load 角色
  * @param level 写入等级
- * @param extra state 的其他项（commands、templates、blocked）与 restored、prepareUser（打开前往用户会话里写条目）
+ * @param extra state 的其他项（commands、templates、blocked、pick、createGate：建实例前等它）与 restored、
+ *   prepareUser（打开前往用户会话里写条目）、userFile（用户会话的文件，相对 cwd，读 mori.team）
  */
 export async function setup(load = SPLIT, level = null, extra = {}) {
   const state = { profile: level === undefined ? null : profile(level), ...extra };
   const host = fakeHost(state);
   const cwd = mkdtempSync(join(tmpdir(), 'mori-team-'));
-  const team = TeamModule.createTeam(host, { userSessionId: 'U', userSessionFile: null, cwd, roles: load,
+  const team = TeamModule.createTeam(host, { userSessionId: 'U', cwd, roles: load,
     teamDir: join(cwd, 'teams', 'U'), baseTools: ['read', 'bash', 'edit', 'write'], trust: {}, approval: {},
-    restored: extra.restored === true });
+    restored: extra.restored === true, userSessionFile: extra.userFile ? join(cwd, extra.userFile) : null });
   const user = host.newEntry('U', cwd, null);
   user.spec = { onEvent: (event) => team.onUserEvent(event), model: {} };
   await extra.prepareUser?.(user, cwd);

@@ -373,7 +373,8 @@ test('TB-14 the close session closes, reassigns or asks the user', () => {
   assert.deepEqual([T(done.board, 'T1').status, T(done.board, 'T1').closedAt, T(done.board, 'T1').holder],
     ['done', 4000, null]);
   const failed = ok(closeHandoff(withClose, 'T1', 'close_failed', { next: 'executor' }));
-  assert.deepEqual([failed.handoff.routedTo, failed.handoff.suggestedNext], [{ kind: 'end', status: 'failed' }, 'executor']);
+  assert.deepEqual([failed.handoff.routedTo, failed.handoff.suggestedNext],
+    [{ kind: 'end', status: 'failed' }, 'executor']);
   const moved = ok(closeHandoff(withClose, 'T1', 'continue', { next: 'writer' }, 4500));
   assert.deepEqual(moved.handoff.routedTo, { kind: 'role', role: 'writer' });
   assert.deepEqual([T(moved.board, 'T1').holder, T(moved.board, 'T1').assignee, T(moved.board, 'T1').readyAt],
@@ -475,7 +476,8 @@ test('TB-25 a failed dependency hands the waiting task to close', () => {
   const before = board;
   board = ok(closeHandoff(board, 'T1', 'close_failed', { conclusion: 'The CSS fix does not work' }, 6000)).board;
   const task = T(board, 'T2');
-  assert.deepEqual([task.status, task.holder, task.holderReason], ['active', { kind: 'close' }, 'dependency T1 failed']);
+  assert.deepEqual([task.status, task.holder, task.holderReason],
+    ['active', { kind: 'close' }, 'dependency T1 failed']);
   assert.deepEqual(task.handoffs.map((item) => [item.from, item.outcome, item.reason, item.conclusion, item.routedTo]),
     [['mori', null, 'dependency_failed', 'T1 failed: The CSS fix does not work', { kind: 'close' }]]);
   assert.deepEqual(route.wakesAfter(before, board), [{ kind: 'close_task', request: 1, task: 'T2' }]);
@@ -504,7 +506,8 @@ test('TB-25 depends_on: unknown tasks, other requests, the task itself and cycle
   const two = submit(board, 'Other', 'other', 5000);
   refused(two, B.createTask(two, input({ request: 2, dependsOn: ['T1'] }), 5000),
     'depends_on: T1 belongs to request 1, not request 2.');
-  refused(board, B.editTask(board, edit('T2', { dependsOn: ['T3'] }), 5000), 'depends_on: T2 → T3 → T2 would be a cycle.');
+  refused(board, B.editTask(board, edit('T2', { dependsOn: ['T3'] }), 5000),
+    'depends_on: T2 → T3 → T2 would be a cycle.');
   refused(board, B.editTask(board, edit('T2', { dependsOn: ['T2'] }), 5000), 'depends_on: T2 is the task itself.');
   const changed = ok(B.editTask(board, edit('T3', { dependsOn: ['T1'] }), 5000)).board;
   assert.deepEqual(T(changed, 'T3').dependsOn, ['T1']);
@@ -645,13 +648,15 @@ test('TB-48 Stop team stops running and queued tasks, and tasks with a busy clos
 test('TB-31 request_close is refused while tasks are open and closes the request when all have ended', () => {
   let board = create(oneTask(), { title: 'Two', readOnly: true, dependsOn: ['T1'] });
   const input = { request: 1, outcome: 'done', conclusion: 'The page renders; npm test passes', closer: 1 };
-  refused(board, B.closeRequest(board, input, 5000), 'Request 1 has tasks that have not ended: T1 (active), T2 (pending).');
+  refused(board, B.closeRequest(board, input, 5000),
+    'Request 1 has tasks that have not ended: T1 (active), T2 (pending).');
   board = ok(handoff(board, 'executor', 'T1', 'done')).board;
   board = ok(closeHandoff(board, 'T1', 'close_done')).board;
   board = ok(handoff(board, 'executor', 'T2', 'done')).board;
   board = ok(closeHandoff(board, 'T2', 'close_done')).board;
   board = B.setRequestQuestion(board, 1, 'q');
-  refused(board, B.closeRequest(board, { ...input, outcome: 'cancelled' }, 5000), 'outcome must be one of: done, failed.');
+  refused(board, B.closeRequest(board, { ...input, outcome: 'cancelled' }, 5000),
+    'outcome must be one of: done, failed.');
   refused(board, B.closeRequest(board, { ...input, conclusion: '' }, 5000), 'conclusion must be 1–1200 characters.');
   const closed = ok(B.closeRequest(board, input, 9000)).board;
   const request = B.findRequest(closed, 1);

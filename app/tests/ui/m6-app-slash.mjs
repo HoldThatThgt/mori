@@ -12,7 +12,7 @@
 // 布局（models.md"窄栏"：模型和思考按钮任何宽度都在，按面板宽度分步收紧）：1280 宽单栏、1400 宽右栏开（面板 660–720px）、
 // 800×600 打开右栏（300px）、1280 和 1200 宽分屏（右栏关 / 开，最窄 280px）、800×600 分屏；每处顶栏不溢出不裁切、
 // 各档该收的收起、会话名（长名字）至少留 36px、模型 / 思考 / 权限菜单在这一栏里打开；聊天页没有小于 12px 的字；
-// 从新会话的输入框 Shift+Tab 回到会话树的次数（M3 是 6 次，M6 多两个按钮，应为 8 次）。
+// 从新会话的输入框 Shift+Tab 回到会话树的次数（M3 是 6 次，M6 多两个按钮，TaskBoard 多协作开关，应为 9 次）。
 // 用户级的提示词模板和技能是本测试在启动前写进 <agentDir>/prompts、<agentDir>/skills 的（synthetic），
 // 项目级的写在第二个测试项目的 .pi/ 里（synthetic）。
 // 用法（在 app/ 下，先 npm run build）：
@@ -1041,7 +1041,8 @@ async function midLayout(ctx) {
 
 /**
  * @brief Shift+Tab 路径：Ctrl+N 新建会话 C（焦点在输入框）后按 Shift+Tab 直到焦点进入会话树；M3 是 6 次，
- *        M6 顶栏多了模型和思考两个按钮，应为 8 次，落在新会话行。记下次数和经过的元素。
+ *        M6 顶栏多了模型和思考两个按钮（8 次），TaskBoard 在模型按钮之前加了协作开关（parallel-agents-taskboard.md
+ *        §13.1，一个真正可以聚焦的按钮），应为 9 次，落在新会话行。记下次数和经过的元素。
  *        之后在 C 里发一条长消息，让 C 有一个长名字（分屏的布局检查量的是长名字被挤窄）。
  */
 async function shiftTabPath(ctx) {
@@ -1058,7 +1059,8 @@ async function shiftTabPath(ctx) {
   }
   ctx.shiftTab = landed?.presses ?? null;
   record(`Shift+Tab：从新会话的输入框按 ${landed?.presses ?? '12+'} 次回到会话树（M3 是 6 次；M6 多模型、思考两个按钮，`
-    + '应为 8 次），落在新会话行', focused && landed?.presses === 8 && samePath(landed.focus.file, ctx.c),
+    + '8 次；TaskBoard 多协作开关，应为 9 次），落在新会话行', focused && landed?.presses === 9
+    && samePath(landed.focus.file, ctx.c),
   `路径：${path.join(' → ')}`);
   await h.send(LONG_NAME_MESSAGE);
   await h.idle(60000);

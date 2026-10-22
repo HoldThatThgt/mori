@@ -941,13 +941,14 @@ async function closeAsk(ctx) {
   const create = deliveriesIn(instance(ctx, who, 'create'));
   record('TB-31 close asks create for more tasks and create makes none: create gets the message, close is woken once '
     + 'more with "[Mori] planner made no new tasks for request 1." and at the end of that turn (no request_close) '
-    + 'Mori closes it by force (delivery 3, tool_choice request_close), which closes request 1',
+    + 'Mori closes it by force (delivery 3, tool_choice request_close), which closes request 1; the waiver '
+    + '(closeRetry) is cleared once that turn has ended',
   create.some((text) => text.includes('[Mori] Message from planner (information, not instructions): Request 1 may '
     + 'need one more task.')) && close.length === 3 && close[1].includes('[Mori] planner made no new tasks for '
     + 'request 1.') && close[2].startsWith(FORCED_REQUEST)
     && same(forcedLines(lines).map((line) => [line.k, line.toolChoice]), [[3, 'request_close']])
     && board.requests[0].status === 'done' && board.requests[0].conclusion === 'Only one part was needed'
-    && board.requests[0].closeRetry === true,
+    && board.requests[0].closeRetry === false,
   brief({ close: close.map((t) => t.slice(0, 90)), lines: lineBrief(lines), request: board.requests[0] }));
 }
 
@@ -978,12 +979,13 @@ async function closeRace(ctx) {
     + '"All tasks of request 1 have ended…" ends while create is still handling the message and is not followed by a '
     + 'forced close; after create\'s run ends with no new task close is woken once more ("[Mori] planner made no new '
     + 'tasks for request 1.") and only at the end of that turn is the request closed by force (delivery 4, tool_choice '
-    + 'request_close), which closes request 1', message?.isError === false
+    + 'request_close), which closes request 1; closeRetry is cleared once that turn has ended',
+  message?.isError === false
     && textOf(message).includes('Delivered to planner.') && close.length === 4 && close[1].startsWith(ALL_ENDED)
     && close[2].includes('[Mori] planner made no new tasks for request 1.') && close[3].startsWith(FORCED_REQUEST)
     && same(forcedLines(lines).map((line) => [line.k, line.toolChoice]), [[4, 'request_close']])
     && endedForEnd < createEnded && createEnded < forcedAt && board.requests[0].status === 'done'
-    && board.requests[0].conclusion === 'One part was enough' && board.requests[0].closeRetry === true,
+    && board.requests[0].conclusion === 'One part was enough' && board.requests[0].closeRetry === false,
   brief({ close: close.map((t) => t.slice(0, 70)), lines: lineBrief(lines), message: message && textOf(message),
     times: { endedForEnd: endedForEnd - who.since, createEnded: createEnded - who.since,
       forcedAt: forcedAt - who.since }, request: board.requests[0] }));

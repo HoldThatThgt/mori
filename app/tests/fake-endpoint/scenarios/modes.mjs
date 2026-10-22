@@ -192,8 +192,11 @@ export const SCENARIOS = {
     } },
     quickClose(),
   ],
-  // TB-56 扩展命令不经立项，它用 sendUserMessage 开始的运行的工作卡写 No decision。
+  // TB-56 扩展命令不经立项，它用 sendUserMessage 开始的运行的工作卡写 No decision；
+  // TB-05 关闭模式下以 /team /tbcmd 发出（另一个会话，同一个脚本）：先进入 once，这次运行同样按协作模式。
   'tb-modes-cmd': [chatTeam({ 1: [say('Command reply.')] })],
+  // TB-56 对话为你的消息准备中（planner 判断它时等很久）时发的扩展命令照 v0 暂存，排队区显示它；Esc 之后都回到输入框。
+  'tb-modes-cmdheld': [planner({ 1: [together(wait(60000), say('Too late.'))] }), chatTeam()],
   // TB-56 提示词模板：立项的投递附上展开后的文字，需求记原文。
   'tb-modes-tmpl': [planner({ 1: registerOne('Template request') }), chatTeam(), quickTask(), quickClose()],
   // TB-08 合并会话：三种写入的回执（文字、120 个字符截断），在工具调用之后、工具结果之前。

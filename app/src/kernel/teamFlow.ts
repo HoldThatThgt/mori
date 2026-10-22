@@ -3,7 +3,8 @@
 // 与立项最后一段文字（对话的工作卡），再交给对话会话：对话空闲时以它开始回复，正在回复时照发送时的选择交给 pi，
 // 在为另一条消息准备中时排在那条之后。回执在对话写下这条消息之后写，进展摘要的位置在对话回复它的那一段结束时写；
 // 消息没写进对话就离开（停止、撤回、选不到模型、拒绝启动）时，两者在离开时写在对话流末尾（§13.2）。
-// 合并会话（同一个角色持有对话与立项）不经这里：消息照普通发送交给用户会话，判断在 mori-team 的 message_start 开始。
+// 合并会话（同一个角色持有对话与立项）不经待判断队列：消息照普通发送交给用户会话，判断在 mori-team 的 message_start 开始；
+// 这里只记下交出的原文（handMerged），判断按原文记原话。
 
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -195,6 +196,8 @@ export class UserFlow {
   private readonly decisions: DecisionRecord[] = [];
   /** 协作模式下照 v0 直接交给对话的扩展命令（它用 sendUserMessage 开始的运行写 No decision，§5.3）；没有时为 null */
   private command: string | null = null;
+  /** 合并会话：交给用户会话、还没写进的你的消息（原文与提示词模板展开后的文字），按交出的顺序 */
+  private merged: Pick<HandedMessage, 'text' | 'alt'>[] = [];
   /** pi 的 expandPromptTemplate（prepare 之后） */
   private expand: ExpandTemplate | null = null;
 
@@ -403,7 +406,29 @@ export class UserFlow {
   userIdle(): void {
     const left = this.handed;
     this.handed = [];
+    this.merged = [];
     this.leave(left);
+  }
+
+  /**
+   * @brief 合并会话：一条你的消息交给用户会话（§5.3），记下原文（pi 照 v0 展开提示词模板时也记下展开后的文字），
+   *        它的 message_start 据此认出这条消息、判断你输入的原文（§5.4 默认的原话）。
+   * @param text 你输入的原文
+   */
+  handMerged(text: string): void {
+    const templates = this.team.userSession?.session.promptTemplates ?? [];
+    const alt = this.expand ? templateExpansion(text, templates, this.expand)?.text ?? null : null;
+    this.merged.push({ text, alt });
+  }
+
+  /**
+   * @brief 合并会话里一条 role 为 user 的消息是交给它的哪一条（matchHanded）：取出它，返回你输入的原文。
+   * @param text 用户会话里这条消息的文字
+   * @return 原文；不是交给它的任何一条（例如扩展用 sendUserMessage 发的）时为 null
+   */
+  takeMerged(text: string): string | null {
+    const index = matchHanded(this.merged, text);
+    return index < 0 ? null : this.merged.splice(index, 1)[0]?.text ?? null;
   }
 
   /** @brief 离开的消息：回执与进展摘要的位置写在对话流末尾（对话正在输出时在当前助手消息之后，team.writeUserEntry）。 */
@@ -481,6 +506,7 @@ export class UserFlow {
   close(): void {
     this.pending = [];
     this.handed = [];
+    this.merged = [];
     this.current = null;
   }
 }

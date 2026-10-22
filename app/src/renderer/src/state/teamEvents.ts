@@ -74,11 +74,11 @@ export function takeWake(state: Transcript, text: string, time: number | null): 
 }
 
 /**
- * @brief 程序投递在准备中被停止、段开始时选不到模型（mori.prompt_error、mori.model_unavailable 的 text 为 null，§5.6）：
- *        它不会再有 message_start，记下的投递清掉。
+ * @brief 程序投递在准备中被停止、段开始时选不到模型（mori.prompt_error、mori.model_unavailable 的 text 为 null，只在这时
+ *        为 null，§5.6）：它不会再有 message_start，去掉记下的投递里最早的那条（投递一次一条，正在准备的就是它）。
  */
 export function dropFailedWake(state: Transcript, text: string | null): Transcript {
-  return text === null && state.wakes.length > 0 ? { ...state, wakes: [] } : state;
+  return text === null && state.wakes.length > 0 ? { ...state, wakes: state.wakes.slice(1) } : state;
 }
 
 /** @brief 待判断队列里少了的消息（按发送顺序，同样的文字按个数算）。 */

@@ -44,7 +44,8 @@ function gateOf(policy, instance) {
 /** @brief 等微任务跑完（批准的结果交还 pi 之后）。 */
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
-test('TB-34 dialog requests keep the v0 ids and events; instance requests go to the Team with <instance>:approval-n', async () => {
+test('TB-34 dialog requests keep the v0 ids and events; instance requests go to the Team with '
+  + '<instance>:approval-n', async () => {
   const policy = new ApprovalPolicy();
   const dialog = gateOf(policy);
   const executor = gateOf(policy, 'S.t1.executor');
@@ -137,7 +138,8 @@ test('TB-34 a released instance no longer shares the session state', async () =>
   assert.equal(executor.ends.length, 1);
 });
 
-test('TB-43 extension questions in an instance answer with pi no-UI defaults, log, and never reach the screen', async () => {
+test('TB-43 extension questions in an instance answer with pi no-UI defaults, log, and never reach the screen',
+  async () => {
   const emitted = [];
   const ui = new ExtensionUi((envelope) => emitted.push(envelope), true);
   ui.attach('S.ask.1.memory');

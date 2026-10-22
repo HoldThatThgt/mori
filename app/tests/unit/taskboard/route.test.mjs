@@ -80,7 +80,8 @@ test('TB-22 the cap counts task and subscription instances only; subscriptions q
   assert.deepEqual(R.scheduleStarts(board, [], 4, subs).subscriptions, ['memory@1', 'auditor@1']);
 });
 
-test('TB-22 a task with a running instance does not start another; tasks with close or pending are not scheduled', () => {
+test('TB-22 a task with a running instance does not start another; tasks with close or pending are not scheduled',
+  () => {
   let board = requests(1);
   board = create(board, { readOnly: true });
   board = handoff(board, 'executor', 'T1', 'continue', { next: 'reviewer' });
@@ -163,7 +164,8 @@ test('TB-27 a message to a task stays on the task and wakes nobody', () => {
   assert.deepEqual(R.routeAgentMessage(input), { route: { kind: 'task', task: 'T1' }, error: null, countKey: null });
   const after = ok(B.addTaskMessage(input.board, { task: 'T1', from: 'reviewer', text: 'Check the logout path too' },
     5000));
-  assert.deepEqual(B.findTask(after, 'T1').messages, [{ from: 'reviewer', text: 'Check the logout path too', at: 5000 }]);
+  assert.deepEqual(B.findTask(after, 'T1').messages,
+    [{ from: 'reviewer', text: 'Check the logout path too', at: 5000 }]);
   assert.deepEqual(R.wakesAfter(input.board, after), []);
 });
 
@@ -186,7 +188,8 @@ test('TB-04 team mode off: every role message opens an ad-hoc question; tasks ar
   }
   assert.equal(R.routeAgentMessage(message({ mode: 'off', sender: dialog, to: 'T1' })).error,
     'There are no tasks when team mode is off.');
-  assert.equal(R.routeAgentMessage(message({ mode: 'off', sender: dialog, to: 'memory', sentThisTurn: 4 })).error, null);
+  assert.equal(R.routeAgentMessage(message({ mode: 'off', sender: dialog, to: 'memory', sentThisTurn: 4 })).error,
+    null);
   assert.equal(R.routeAgentMessage(message({ mode: 'off', sender: dialog, to: 'memory', sentThisTurn: 5 })).error,
     'Message limit reached: at most 5 questions per turn.');
   assert.equal(R.routeAgentMessage(message({ mode: 'off', sender: dialog, to: 'ghost' })).error,
@@ -220,7 +223,8 @@ test("TB-28 a close holder without the create seat gets messages in the request'
   assert.deepEqual(R.routeAgentMessage(message({ holders, to: 'mori' })).route, { kind: 'create', session: 'create' });
 });
 
-test('TB-28 the dialog holder and roles without seats get an ad-hoc question; the dialog session is never woken', () => {
+test('TB-28 the dialog holder and roles without seats get an ad-hoc question; the dialog session is never woken',
+  () => {
   for (const to of ['chat', 'memory', 'executor']) {
     assert.deepEqual(R.routeAgentMessage(message({ to })).route, { kind: 'ask', role: to }, to);
   }
@@ -269,7 +273,8 @@ test('TB-28 a seat session that waits (directly or indirectly) for the sender is
   assert.equal(R.routeAgentMessage(message({ waits: direct, to: 'memory' })).error, null, 'ad-hoc questions are new');
 });
 
-test('TB-28 at most 10 messages per pair in a request, and per pair in the session for senders outside requests', () => {
+test('TB-28 at most 10 messages per pair in a request, and per pair in the session for senders outside requests',
+  () => {
   const first = R.routeAgentMessage(message());
   assert.equal(first.countKey, 'request:1:executor>planner');
   assert.equal(R.routeAgentMessage(message({ sent: new Map([[first.countKey, 9]]) })).error, null);
@@ -343,7 +348,8 @@ test('TB-51 program deliveries that arrive during a run merge into one, a paragr
 
 test('TB-51 a user message delivery never merges and goes before program deliveries', () => {
   const p1 = delivery('[Mori] P1');
-  const u1 = delivery('Conversation since your last turn… [Mori] New user message: one', { kind: 'user_message' }, true);
+  const u1 = delivery('Conversation since your last turn… [Mori] New user message: one', { kind: 'user_message' },
+    true);
   const p2 = delivery('[Mori] P2');
   const u2 = delivery('[Mori] New user message: two', { kind: 'user_message' }, true);
   let next = R.mergeDeliveries([p1, u1, p2, u2]);

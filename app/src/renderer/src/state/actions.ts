@@ -82,7 +82,8 @@ type SendHow = 'idle' | 'pending' | 'steer' | 'followUp';
  *        准备中再发的按排队处理（准备中不能插话，§11.4），由后台进程暂存，pi 开始后作为排队消息交给 pi。
  *        协作（平行 Agent 规格 §5.1）：原文是 /team on、/team off 时不发消息、改协作模式（被拒绝启动时也照样执行），
  *        只清空文字、芯片留着；只有 /team 时不发送；/team <文字> 去掉前缀、带 team: 'once' 发出。分开时立项先判断的
- *        消息在准备中再发时不进暂存区，由待判断队列显示在排队区（§5.3）。
+ *        消息在准备中再发时不进暂存区，由待判断队列显示在排队区（§5.3）；不经立项的扩展命令由后台进程暂存，按结果的
+ *        held 显示在排队区。
  * @param behavior 生成中时：steer 插话，followUp 排队；空闲时不传
  */
 export async function send(key: string, behavior?: 'steer' | 'followUp'): Promise<void> {
@@ -104,9 +105,13 @@ export async function send(key: string, behavior?: 'steer' | 'followUp'): Promis
   updateTab(key, (current) => ({ ...current, draft: '', draftRefs: [], activity: Date.now(),
     transcript: beforeSend(current.transcript, text, refs, how) }));
   try {
-    await request({ type: 'session.prompt', sessionId: tab.sessionId, text,
+    const result = await request<{ held: boolean }>({ type: 'session.prompt', sessionId: tab.sessionId, text,
       behavior: how === 'idle' ? undefined : how === 'pending' ? 'followUp' : how,
       refs: refs.length > 0 ? refs : undefined, team: once ? 'once' : undefined });
+    // 立项先判断的消息不进暂存区；照 v0 交给对话的扩展命令（§5.3）却暂存在准备中，同样显示在排队区
+    if (how === 'followUp' && preparing && result.held) {
+      updateTranscript(key, (t) => setPendingQueued(t, text, true));
+    }
   } catch (error) {
     const message = describe('session.prompt', error);
     updateTranscript(key, (t) => pushItem(afterFailure(t, text, how),
@@ -147,15 +152,16 @@ export async function withdraw(key: string): Promise<void> {
 
 /**
  * @brief 停止：先把排队消息放回输入框，再停止生成（方案 5.8）。准备中（§11.4）只停止：后台进程撤回这条消息和暂存的
- *        消息，经 mori.prompt_error 交回文字，由 handleEvent 放回输入框。协作模式下立项为这次回复判断的消息与其余
- *        待判断的消息同样经 mori.prompt_error 交回；后台的 Agent 照常运行（平行 Agent 规格 §11.4）。
+ *        消息，经 mori.prompt_error 交回文字，由 handleEvent 放回输入框。协作模式下不先撤回：pi 排队区的消息、立项为
+ *        这次回复判断的消息与其余待判断的消息由后台进程按发送顺序经一个 mori.prompt_error 交回；后台的 Agent 照常运行
+ *        （平行 Agent 规格 §11.4）。
  */
 export async function stop(key: string): Promise<void> {
   const tab = useApp.getState().tabs.find((item) => item.key === key);
   if (!tab?.sessionId || !(tab.transcript.running || tab.transcript.sending)) return;
   const sessionId = tab.sessionId;
   updateTranscript(key, (t) => ({ ...t, stopRequested: true }));
-  if (tab.transcript.running) await withdraw(key);
+  if (tab.transcript.running && tab.team.mode === 'off') await withdraw(key);
   await holdingDeciding(key, async () => {
     try {
       await request({ type: 'session.abort', sessionId });
@@ -295,10 +301,13 @@ function restoreWithdrawn(tab: Tab, event: ForwardedEvent): void {
   }
 }
 
-/** @brief 把撤回的消息和暂存的消息放回输入框（在已有草稿之前），引用芯片一并放回。 */
+/**
+ * @brief 把撤回的消息和暂存的消息放回输入框（在已有草稿之前），引用芯片一并放回。协作模式下停止时交回的有 pi 排队区的
+ *        文字：技能命令同撤回一样放回 "/skill:名字 参数"（skillCommandText，对没展开的原文不改）。
+ */
 function restoreTexts(tab: Tab, text: string | null, refs: QuoteRef[], queued: string[]): void {
   const own = text === null || refs.length === 0 ? text : stripQuotes(text, refs, tab.cwd) ?? text;
-  putBack(tab.key, [...(own === null ? [] : [own]), ...queued]);
+  putBack(tab.key, [...(own === null ? [] : [own]), ...queued].map(skillCommandText));
   if (text !== null) for (const ref of refs) addQuote(tab.key, ref);
 }
 

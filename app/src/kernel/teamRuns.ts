@@ -6,9 +6,9 @@
 import { plainReasonText } from '../shared/models';
 import { TEAM_ENTRY_TYPES, roleLabel } from '../shared/team';
 import {
-  closeNoModelQuestion, closeRunOutcome, closeUndecidedQuestion, findRequest, findTask, isTaskEnded, markAsked,
-  markCloseRetry, markStopped, notClosedQuestion, recordProgramHandoff, requestsWithoutTasks, setRequestQuestion,
-  startJudgment, tasksOf, unfinishedTasks, clearRequestQuestion,
+  clearCloseRetry, closeNoModelQuestion, closeRunOutcome, closeUndecidedQuestion, findRequest, findTask, isTaskEnded,
+  markAsked, markCloseRetry, markStopped, notClosedQuestion, recordProgramHandoff, requestsWithoutTasks,
+  setRequestQuestion, startJudgment, tasksOf, unfinishedTasks, clearRequestQuestion,
 } from './board';
 import { deliveryText, type FillTarget } from './boardText';
 import { nextRoles } from './boardTools';
@@ -69,11 +69,16 @@ export function runStarted(team: Team, lane: Lane): void {
 /** @brief 结案会话的运行开始：这次运行开始前就交给它的 task；需求级问题在结案下一次运行开始时清掉（§7.6）。 */
 function closeRunStart(team: Team, lane: Lane, run: LaneRun): void {
   const request = lane.request ?? 0;
-  run.heldAtStart = tasksOf(team.board, request).filter((task) => task.status === 'active'
-    && task.holder?.kind === 'close').map((task) => task.id);
+  run.heldAtStart = closeHeld(team, request);
   if (findRequest(team.board, request)?.question) {
     team.write((board) => ({ board: clearRequestQuestion(board, request), error: null }));
   }
+}
+
+/** @brief 这个需求里此刻交给结案的 task（active，持有者是结案）。 */
+function closeHeld(team: Team, request: number): string[] {
+  return tasksOf(team.board, request).filter((task) => task.status === 'active' && task.holder?.kind === 'close')
+    .map((task) => task.id);
 }
 
 /** @brief 程序唤醒的立项回合：分开时立项会话里只有程序投递的运行；合并会话里 create_wake 投递开始的运行（§5.4、§5.6）。 */
@@ -99,18 +104,21 @@ export function startUserJudgment(team: Team, lane: Lane, text: string): void {
 }
 
 /**
- * @brief 一次判断结束（§5.4 最后一条、§5.3 第 6 步）：这次登记的需求还没有 task 时在立项会话里投递一次提醒；
- *        合并会话里判断用户消息登记了需求的，写 mori.progress（进展摘要挂在这一段的回复下面，§13.3）。
+ * @brief 一次判断结束（§5.4 最后一条、§5.3 第 6 步）：这次登记的需求还没有 task 时在立项会话里投递一次提醒
+ *        （运行被停止时不投递，§9.4 第 0 行）；合并会话里判断用户消息登记了需求的，写 mori.progress
+ *        （进展摘要挂在这一段的回复下面；被停止时同样在这一段结束时写，§13.2、§13.3）。
  * @param team 协作
  * @param lane 立项会话（合并会话时为用户会话）
  * @param run 这次运行
+ * @param stopped 这次运行被停止
  */
-export function endJudgment(team: Team, lane: Lane, run: LaneRun): void {
+export function endJudgment(team: Team, lane: Lane, run: LaneRun, stopped = false): void {
   const judgment = run.judgment;
   run.judgment = null;
   if (!judgment) return;
   run.ended = judgment;
-  for (const request of requestsWithoutTasks(team.board, judgment.registered)) {
+  const remind = stopped ? [] : requestsWithoutTasks(team.board, judgment.registered);
+  for (const request of remind) {
     team.enqueueCreate(team.delivery('create_no_tasks', { request }, { kind: 'no_tasks', request }));
   }
   if (lane !== team.user || !judgment.user) return;
@@ -124,11 +132,15 @@ export function endJudgment(team: Team, lane: Lane, run: LaneRun): void {
 
 // ---- 运行结束（§9.4） ----
 
-/** @brief 投递没能开始运行时当作的一次运行：段开始时选不到模型、被停止，或没能开始（当作出错）。 */
+/**
+ * @brief 投递没能开始运行时当作的一次运行：段开始时选不到模型、被停止，或没能开始（当作出错）。
+ *        结案会话照样记下这次投递之前就交给它的 task，没处理的按 §7.4 最后一行强制填写、交给立项。
+ */
 function notStartedRun(team: Team, lane: Lane, stop: StopReason | null): LaneRun {
   const run = newRun(team.mode, lane.inflight);
   run.unavailable = lane.startUnavailable;
   if (run.unavailable === null && stop === null) run.error = NOT_STARTED;
+  if (lane.kind === 'close') run.heldAtStart = closeHeld(team, lane.request ?? 0);
   return run;
 }
 
@@ -144,7 +156,8 @@ export async function runEnded(team: Team, lane: Lane): Promise<void> {
   lane.current = null;
   lane.stop = null;
   const restart = lane.kind === 'task' ? team.host.entry(lane.id)?.model.takeRestart() ?? null : null;
-  if (!stop && run.judgment) endJudgment(team, lane, run);
+  // 被停止时分开的立项会话的判断由 teamFlow 的 judgmentStopped 处理；合并会话只写进展摘要（§13.3）
+  if (run.judgment && (!stop || lane === team.user)) endJudgment(team, lane, run, stop !== null);
   settleWaiters(run, stop);
   if (stop) stoppedRun(team, lane, run, stop);
   else await finishedRun(team, lane, run, restart);
@@ -373,23 +386,43 @@ function fillFailed(team: Team, lane: Lane, target: FillTarget, lastText: string
 /** @brief 结案会话的运行结束：没处理的 task 强制填写，全部结束却没关闭的需求强制关闭；选不到模型时交给立项。 */
 async function closeRunEnded(team: Team, lane: Lane, run: LaneRun): Promise<void> {
   const request = lane.request ?? 0;
-  if (run.unavailable) return closeNoModel(team, lane, request);
+  if (run.unavailable) {
+    closeNoModel(team, lane, run);
+    return endCloseRetry(team, run, request);
+  }
   if (run.forced) return forcedEnded(team, lane, run);
   const outcome = closeRunOutcome(team.board, { request, heldAtStart: run.heldAtStart, decided: run.decided,
     wokenForEnd: run.wokenForEnd, createPending: team.closeAskPending(request) });
+  endCloseRetry(team, run, request);
   for (const task of outcome.undecided) startForced(team, lane, { kind: 'close', task }, run.lastText);
   if (outcome.forceClose) startForced(team, lane, { kind: 'request', request }, run.lastText);
 }
 
-/** @brief 结案选不到模型（§12.5）：交给它的 task 交给立项（need_user，问题为 <close role> can't run: no model available）。 */
-function closeNoModel(team: Team, lane: Lane, request: number): void {
-  const held = tasksOf(team.board, request).filter((task) => task.status === 'active' && task.holder?.kind === 'close');
-  for (const task of held) {
-    const result = team.write((board) => recordProgramHandoff(board, { task: task.id, reason: 'no_model',
-      conclusion: closeNoModelQuestion(team.holders.close), holder: { kind: 'close' }, session: null,
-      authorFamilies: [] }, Date.now()));
-    if (result.error) console.error(`[kernel] ${lane.id}: no_model for ${task.id} refused: ${result.error}`);
+/**
+ * @brief §5.4 兜底表第 3 行的再唤醒只免一次“给立项发过消息”的检查（§7.6“那次不再看这一条”）：
+ *        为“全部已结束”或“没有 task”被唤醒的回合（不是强制填写）结束之后清掉 closeRetry。
+ */
+function endCloseRetry(team: Team, run: LaneRun, request: number): void {
+  if (run.forced || !run.wokenForEnd || !findRequest(team.board, request)?.closeRetry) return;
+  team.write((board) => ({ board: clearCloseRetry(board, request), error: null }));
+}
+
+/**
+ * @brief 结案选不到模型（§12.5）：交给它的 task 交给立项（need_user，问题为 <close role> can't run: no model available）；
+ *        为“全部已结束”或“没有 task”被唤醒、需求仍开着且没有未结束的 task 时，这句话作为需求级问题交给立项（§7.6）。
+ */
+function closeNoModel(team: Team, lane: Lane, run: LaneRun): void {
+  const request = lane.request ?? 0;
+  const question = closeNoModelQuestion(team.holders.close);
+  for (const task of closeHeld(team, request)) {
+    const result = team.write((board) => recordProgramHandoff(board, { task, reason: 'no_model',
+      conclusion: question, holder: { kind: 'close' }, session: null, authorFamilies: [] }, Date.now()));
+    if (result.error) console.error(`[kernel] ${lane.id}: no_model for ${task} refused: ${result.error}`);
   }
+  const open = findRequest(team.board, request)?.status === 'open';
+  if (!run.wokenForEnd || !open || unfinishedTasks(team.board, request).length) return;
+  console.log(`[kernel] ${lane.id}: request ${request} was not closed (no model); asking ${team.holders.create}`);
+  team.write((board) => ({ board: setRequestQuestion(board, request, question), error: null }));
 }
 
 // ---- 立项会话（§5.4 程序唤醒回合的兜底、§12.5） ----

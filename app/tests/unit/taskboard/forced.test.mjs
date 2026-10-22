@@ -403,7 +403,6 @@ test('TB-18 B JSON parses: null means not filled, the fixed task and request are
       evidence: ['#2', 3] });
     assert.deepEqual(argsOf(hf.parseForm(task, 'B', ` ${json}\n`)), { task: 'T1', conclusion: 'c', outcome: 'pass',
       evidence: ['#2', '3'] });
-    assert.equal(argsOf(hf.parseForm(task, 'B', '{"task":"t1","conclusion":"c","outcome":"fail"}')).task, 't1');
     assert.equal(hf.parseForm(task, 'B', 'not json').error, 'the reply is not valid JSON');
     assert.equal(hf.parseForm(task, 'B', '{"conclusion":"c",').error, 'the reply is not valid JSON');
     assert.equal(hf.parseForm(task, 'B', '[1]').error, 'the reply is not a JSON object');
@@ -421,6 +420,18 @@ test('TB-18 B JSON parses: null means not filled, the fixed task and request are
     assert.deepEqual(argsOf(hf.parseForm(request, 'B', '{"request":1,"outcome":"done","conclusion":"c"}')),
       { request: 1, conclusion: 'c', outcome: 'done' });
   });
+
+test('TB-18 TB-49 the task a B reply writes is normalised like task_handoff arguments (T3, t3, 3)', () => {
+  const task = hf.taskForm('T1', NEXT);
+  for (const value of ['t1', ' T1 ', '1', 1]) {
+    const json = JSON.stringify({ task: value, conclusion: 'c', outcome: 'fail' });
+    assert.equal(argsOf(hf.parseForm(task, 'B', json)).task, 'T1', JSON.stringify(value));
+  }
+  assert.equal(argsOf(hf.parseForm(task, 'B', '{"task":"X9","conclusion":"c","outcome":"fail"}')).task, 'X9',
+    'not a task id: passed on for task_handoff to refuse');
+  assert.equal(hf.parseForm(task, 'B', '{"task":0,"conclusion":"c","outcome":"fail"}').error,
+    'task must be a task id like T1');
+});
 
 // ---- 与合成端点脚本模式的交接单一致（synthetic） ----
 

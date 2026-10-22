@@ -161,6 +161,8 @@ export interface Lane {
   asker: Waiter | null;
   /** 分开时的立项会话：上一次投递带到的用户会话条目（mori.create_cursor）；还没读出时为 undefined */
   cursor: string | null | undefined;
+  /** 分开时的立项会话：这次投递带到的用户会话条目，开始运行时写成 mori.create_cursor（§8.4）；没有时为 undefined */
+  pendingCursor: string | null | undefined;
 }
 
 /**
@@ -173,7 +175,7 @@ export function newLane(fields: Pick<Lane, 'key' | 'id' | 'kind' | 'role' | 'tas
     ...fields, file: null, open: false, queue: [], solo: [], busy: false, started: false, inflight: [],
     startUnavailable: null, settling: null, run: null, stop: null,
     current: null, modelNote: null, tagNext: null, batonStart: null, sentThisTurn: 0, parent: null, asker: null,
-    cursor: undefined,
+    cursor: undefined, pendingCursor: undefined,
   };
 }
 

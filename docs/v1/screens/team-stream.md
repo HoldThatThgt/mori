@@ -122,7 +122,7 @@ task 行里的 `<role>` 是 `TaskView.holder`（持有者的角色名，交到�
 | 状态 | 来源 | 必须可见 |
 | --- | --- | --- |
 | 有交接 | `TaskView.chain` 的每一棒 `{ role, outcome, line }` | 一行 `executor: Fixed → reviewer: Failed, logout test fails → executor: Logout fixed too`：每棒 `<role>: <line>`；`line` 是结论的第一句（≤ 80 个字符，§15，后台进程截好）；结案会话那一棒的 `role` 是结案持有者的角色名；基座写 `Mori` |
-| 程序写的一棒 | `outcome` 为 null，`role` 为 `mori`（§7.4） | `Mori: no handoff` / `Mori: error` / `Mori: no model` / `Mori: dependency failed` / `Mori: close didn't decide`（`line` 按 `reason` 取 `shared/team.ts` 的 `PROGRAM_HANDOFF_LINES`：`no_handoff`、`error`、`no_model`、`dependency_failed`、`close_undecided`） |
+| 程序写的一棒 | `outcome` 为 null，`role` 为 `mori`（§7.4） | `Mori: no handoff` / `Mori: error` / `Mori: no model` / `Mori: dependency failed` / `Mori: close didn’t decide`（`line` 按 `reason` 取 `shared/team.ts` 的 `PROGRAM_HANDOFF_LINES`：`no_handoff`、`error`、`no_model`、`dependency_failed`、`close_undecided`） |
 | 还没有交接 | `chain` 为空 | 没有这一行 |
 
 ## 合并会话里立项工具的工具卡

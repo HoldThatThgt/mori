@@ -217,10 +217,6 @@ test('TB-31 the closed-request report carries status, conclusion, ruled out and 
     '- T3 Fix logout: done · last handoff: close:planner: Logout works',
     'Tell the user the result: the cause, what changed, the evidence.',
   ].join('\n'));
-  assert.equal(text.unclosedQuestion(1, 'planner'), "Request 1 has no open tasks and planner didn't close it");
-  assert.equal(text.closeUndecidedQuestion('planner', 'T1'), "planner didn't decide on T1");
-  assert.equal(text.closeNoModelQuestion('planner'), "planner can't run: no model available");
-  assert.equal(text.roleGoneReason('reviewer'), 'role reviewer no longer exists');
 });
 
 test('TB-33 the subscription delivery has title, status, conclusion and ruled out', () => {

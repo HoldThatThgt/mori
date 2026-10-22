@@ -825,6 +825,11 @@ export function markCloseRetry(board: Board, request: number): Board {
   return withOpenRequest(board, request, (item) => patch(item, { closeRetry: true }));
 }
 
+/** @brief 再唤醒的那次结案回合已经结束（§7.6“那次不再看这一条”只免那一次），清掉 closeRetry。 */
+export function clearCloseRetry(board: Board, request: number): Board {
+  return withOpenRequest(board, request, (item) => patch(item, { closeRetry: false }));
+}
+
 /**
  * @brief 标记已经问过用户（转告或程序请对话问你，§5.4），或改回没问过（丢弃的 ask_user、relay，§11.4）。
  *        只改仍在等的：waiting_user 的 task、有问题的需求。

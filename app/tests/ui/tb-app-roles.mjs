@@ -425,8 +425,8 @@ async function switches(ctx) {
 }
 
 /**
- * @brief 窄栏（会话面板 < 600px，§15）：打开右栏让中栏变窄，开关只显示 Team 和状态点（off 空心、always 实心），
- *        读屏名称与悬停仍是完整文字；关掉右栏后回到完整文字。
+ * @brief 窄栏（这一栏不宽于 860px，§15）：打开右栏让中栏变窄，开关只显示状态点（off 空心、always 实心），不显示文字，
+ *        读屏名称与悬停仍是完整文字；关掉右栏后（宽于 860px）回到完整文字、没有状态点。
  */
 async function narrow(ctx, tab) {
   const pane = ctx.page.locator(paneSel(tab));
@@ -435,34 +435,32 @@ async function narrow(ctx, tab) {
   const wideWidth = await width();
   const toggle = ctx.page.locator(`${paneSel(tab)} button[aria-label="Toggle changes"]`);
   await toggle.click();
-  await poll(async () => (await width()) < 600, 5000);
-  if ((await width()) >= 600) await resizeWindow(ctx.app, 800, 700);
+  await poll(async () => (await width()) <= 860, 5000);
+  if ((await width()) > 860) await resizeWindow(ctx.app, 800, 700);
   const narrowWidth = await width();
   const offLook = await switchLook(ctx, tab);
   await clickTo(ctx, tab, 'always');
   const onLook = await switchLook(ctx, tab);
   await clickTo(ctx, tab, 'off');
   await shot(ctx, args, 'narrow-switch');
-  record('TB-53 in a pane narrower than 600px the switch shows only "Team" and a status dot (hollow for off, filled '
-    + 'for on), the full text is hidden, and its screen-reader name and hover keep the full text; wide panes show '
-    + 'the full text and no dot', narrowWidth < 600 && wideWidth >= 600 && wide.text && !wide.short
-    && offLook.short === 'Team' && !offLook.text && offLook.dot && !offLook.filled && offLook.label === 'Team: Off'
-    && offLook.title === 'Turn on team mode' && onLook.short === 'Team' && onLook.dot && onLook.filled
+  record('TB-53 in a pane 860px wide or narrower the switch shows only a status dot (hollow for off, filled for on) '
+    + 'and no text, and its screen-reader name and hover keep the full text; wider panes show the full text and no '
+    + 'dot', narrowWidth <= 860 && wideWidth > 860 && wide.text && wide.shown === 'Team: Off' && !wide.dot
+    && !offLook.text && offLook.shown === '' && offLook.dot && !offLook.filled && offLook.label === 'Team: Off'
+    && offLook.title === 'Turn on team mode' && !onLook.text && onLook.shown === '' && onLook.dot && onLook.filled
     && onLook.label === 'Team: On', brief({ wideWidth, narrowWidth, wide, offLook, onLook }));
   await toggle.click();
   await resizeWindow(ctx.app, 1200, 800);
 }
 
-/** @brief 开关此刻显示的部分：完整文字是否可见、窄栏的 Team 文字（不可见时为 null）、状态点是否可见与是否实心。 */
+/** @brief 开关此刻显示的部分：完整文字是否可见、看得到的文字、状态点是否可见与是否实心、读屏名称与悬停。 */
 function switchLook(ctx, tab) {
   return ctx.page.locator(`${paneSel(tab)} [data-testid="team-switch"]`).evaluate((el) => {
     const shown = (node) => Boolean(node) && getComputedStyle(node).display !== 'none'
       && node.getClientRects().length > 0;
-    const text = el.querySelector('.team-text');
-    const short = el.querySelector('.team-short');
     const dot = el.querySelector('.team-dot');
     const fill = dot ? getComputedStyle(dot).backgroundColor : '';
-    return { text: shown(text), short: shown(short) ? short.textContent : null, dot: shown(dot) && shown(short),
+    return { text: shown(el.querySelector('.team-text')), shown: el.innerText.trim(), dot: shown(dot),
       filled: Boolean(fill) && fill !== 'rgba(0, 0, 0, 0)' && fill !== 'transparent',
       label: el.getAttribute('aria-label'), title: el.getAttribute('title') };
   });
@@ -1133,6 +1131,9 @@ async function notReady(ctx) {
   const records = [...(ctx.notReadyBefore ?? []), ...await ctx.page.evaluate(() => window.__tbNotReady ?? [])];
   const opening = records.filter((item) => item.text === 'Starting…');
   const tab = await ctx.page.locator(SHOWN_PANE).first().getAttribute('data-tab');
+  // 退出前不在 off：“最后知道的 mode”与默认的 Team: Off 不同，检查才分得出来
+  if ((await teamSwitch(ctx, tab)).mode === 'off') await clickTo(ctx, tab, 'always');
+  const last = await teamSwitch(ctx, tab);
   await killTbKernel(ctx);
   const exited = await poll(async () => {
     const sw = await teamSwitch(ctx, tab).catch(() => null);
@@ -1142,9 +1143,9 @@ async function notReady(ctx) {
   record('TB-53 while the UI is not ready the switch is not available: disabled every time a pane showed "Starting…" '
     + 'while its session opened, and disabled after the kernel exited ("Mori’s background process crashed"), still '
     + 'showing the last mode',
-  opening.length >= 3 && opening.every((item) => item.disabled) && Boolean(exited)
-    && exited.sw.text.startsWith('Team: '), brief({ opening: opening.length, bad: opening.filter((i) => !i.disabled),
-    exited }));
+  opening.length >= 3 && opening.every((item) => item.disabled) && Boolean(exited) && last.mode !== 'off'
+    && exited.sw.mode === last.mode && exited.sw.text === last.text && exited.sw.checked === last.checked,
+  brief({ opening: opening.length, bad: opening.filter((i) => !i.disabled), last, exited }));
 }
 
 // ---------- TB-43：mori-team 载入失败时会话不打开 ----------
@@ -1192,7 +1193,8 @@ async function teamFail(ctx) {
     record('TB-43 when mori-team fails to load the session does not open: "Failed to open session: The team '
       + 'extension failed to load: …" is shown, the pane stays "Session didn’t open" and no session file is written '
       + '(fault injected into a copy of the build)', typeof failed === 'string'
-      && failed.includes('The team extension failed to load') && failed.includes('synthetic fault injection') && sessions.length === 0
+      && failed.includes('The team extension failed to load') && failed.includes('synthetic fault injection')
+      && sessions.length === 0
       && (ready.length === 0 || ready.every((text) => text === 'Session didn’t open')),
     brief({ failed, sessions, ready }));
   } finally {

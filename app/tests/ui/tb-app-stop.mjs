@@ -4,7 +4,7 @@
 //   TB-34 后台批准卡、TB-35 停止、TB-36 重新载入与重启、TB-42 归档、删除与关闭。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs stop）：
 //   MORI_APP_DIR=.tb-runs/stop node tests/ui/tb-app-stop.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
-// 步骤：approve、team、esc、escjudge、escmerged、reload、del、restart（restart 最后跑，重启 App）。
+// 步骤：approve、team、piqueue、stopprep、esc、escjudge、escmerged、reload、del、restart（restart 最后跑，重启 App）。
 // 结果写到 test-results/tb-app-stop(-packaged).json（--only 时 tb-partial-app-stop…），截图在 test-results/tb-app-stop/。
 // 端口（§17.1 的 4600–4699 里分给本套件的 4660–4669）：合成端点 4660，记录代理 4661。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里写好一个本机提供商（写入等级 A、能关思考，跳过探针）；
@@ -519,6 +519,60 @@ async function teamStopQuiet(ctx, who, obs) {
   brief({ dropped, closeLater: lineBrief(closeLater) }));
 }
 
+/** @brief TB-35 合并会话：回复中又发、已交给 pi 排队的消息，Stop team 把它放回输入框，排队区清空，之后不再发出。 */
+async function teamStopQueued(ctx) {
+  const who = await begin(ctx, ctx.merged, `Queue then stop ${tag('piqueue')}`);
+  if (!(await waitLine(ctx, 'tb-stop-piqueue', { agent: 'mori', kind: 'task', task: 'T1' }, 40000))) {
+    throw new Error('T1 did not start');
+  }
+  const msg2 = 'A message queued in pi';
+  await sendMessage(ctx, who.tab, msg2);
+  const queued = await poll(async () => (await paneState(ctx.page, who.tab)).queue
+    .some((row) => row.includes(msg2)), 10000);
+  const stopAt = Date.now();
+  await clickStopTeam(ctx, who.tab);
+  await settle(ctx, who, 30000);
+  await sleep(6000);
+  const pane = await paneState(ctx.page, who.tab);
+  const lines = scenarioLines(ctx.ep, 'tb-stop-piqueue', { since: stopAt + 300 });
+  const sent = messagesOf(readJsonl(who.sessionFile), 'user').some((m) => textOfMessage(m).includes(msg2));
+  record('TB-35 Stop team takes back the message in pi\'s queue (merged session, sent during the reply): it is back '
+    + 'in the input box, the queue area is empty, and it is never sent (no request in 6 s, not in the session file)',
+  queued && pane.draft === msg2 && pane.queue.length === 0 && lines.length === 0 && !sent,
+  brief({ queued, draft: pane.draft, queue: pane.queue, lines: lineBrief(lines), sent }));
+}
+
+/**
+ * @brief Stop team 时对话在为第一条消息准备中（立项在判断它），第二条在等判断（脚本 tb-stop-stopprep）：
+ *        两条按发送顺序回到输入框，之后没有请求。
+ */
+async function teamStopPreparing(ctx) {
+  const first = `Prepare then stop ${tag('stopprep')}`;
+  const who = await begin(ctx, ctx.split, first);
+  if (!(await waitLine(ctx, 'tb-stop-stopprep', { agent: 'planner', kind: 'create', k: 1 }, 30000))) {
+    throw new Error('the create role did not start judging the first message');
+  }
+  const second = 'A message that waits for planner';
+  await sendMessage(ctx, who.tab, second);
+  const ready = await poll(async () => {
+    const pane = await paneState(ctx.page, who.tab);
+    const info = await liveInfo(ctx, who.sessionFile);
+    return pane.sending && !pane.running && info.deciding.queue.length === 2 ? pane : null;
+  }, 10000);
+  const stopAt = Date.now();
+  await clickStopTeam(ctx, who.tab);
+  await settle(ctx, who, 30000);
+  await sleep(6000);
+  const pane = await paneState(ctx.page, who.tab);
+  const lines = scenarioLines(ctx.ep, 'tb-stop-stopprep', { since: stopAt + 300 });
+  record('TB-35 Stop team while the dialog prepares for your first message (planner judging it) and a second one '
+    + 'waits: both are back in the input box in sending order, the pending bubble and the queue area are empty, and '
+    + 'no request follows (6 s)', ready !== null && pane.draft === `${first}\n\n${second}` && !pane.sending
+    && !pane.users.some((text) => text.includes('Prepare then stop')) && pane.queue.length === 0
+    && lines.length === 0, brief({ ready: Boolean(ready), draft: pane.draft, users: pane.users, queue: pane.queue,
+    lines: lineBrief(lines) }));
+}
+
 /** @brief TB-35：F8 的"Recent activity"记 Stop team。 */
 async function teamStopIssue(ctx, who) {
   const report = await issueReport(ctx, who.tab, 'Stop team check');
@@ -585,7 +639,10 @@ async function escBackground(ctx) {
   brief({ report: report && lineBrief([report]), last: oneLine(lastUserText(request), 200), wakes }));
 }
 
-/** @brief 对话回复中立项在判断第二条消息时按 Esc：两者都停，第二条回到输入框，没有新的回复。 */
+/**
+ * @brief 对话回复中按 Esc：A 已判断完、在 pi 的排队区，立项在判断 B，C 在等判断。三者都停，按发送顺序 A、B、C
+ *        回到输入框（一个 mori.prompt_error，text 是 A），没有新的回复或判断。
+ */
 async function escJudge(ctx) {
   const tab = await openSessionIn(ctx, ctx.split);
   await clickTeamSwitch(ctx, tab, 'always');
@@ -595,24 +652,43 @@ async function escJudge(ctx) {
   if (!(await waitLine(ctx, 'tb-stop-escjudge', { agent: 'chat', kind: 'team-dialog', k: 1 }, 30000))) {
     throw new Error('the reply did not start');
   }
-  const msg2 = 'A second message';
-  await sendMessage(ctx, tab, msg2);
-  if (!(await waitLine(ctx, 'tb-stop-escjudge', { agent: 'planner', kind: 'create', k: 2 }, 20000))) {
+  const texts = ['A queued message', 'A second message', 'A third message'];
+  await sendMessage(ctx, tab, texts[0]);
+  if (!(await poll(async () => (await liveInfo(ctx, who.sessionFile)).live?.followUp.includes(texts[0]), 20000))) {
+    throw new Error("the first message did not reach pi's queue");
+  }
+  await sendMessage(ctx, tab, texts[1]);
+  if (!(await waitLine(ctx, 'tb-stop-escjudge', { agent: 'planner', kind: 'create', k: 3 }, 20000))) {
     throw new Error('the create role did not start judging the second message');
+  }
+  await sendMessage(ctx, tab, texts[2]);
+  if (!(await poll(async () => (await liveInfo(ctx, who.sessionFile)).deciding.queue.length === 2, 10000))) {
+    throw new Error('the third message is not waiting for a judgment');
   }
   const escAt = Date.now();
   await pressInComposer(ctx, tab, 'Escape');
   await settle(ctx, who, 30000);
   await sleep(6000);
-  const pane = await paneState(ctx.page, tab);
+  await escJudgeChecks(ctx, who, texts, escAt);
+  await clickTeamSwitch(ctx, tab, 'off');
+}
+
+/** @brief escJudge 的检查。 */
+async function escJudgeChecks(ctx, who, texts, escAt) {
+  const pane = await paneState(ctx.page, who.tab);
   const info = await liveInfo(ctx, who.sessionFile);
   const after = scenarioLines(ctx.ep, 'tb-stop-escjudge', { since: escAt + 300 });
   record('TB-35 Esc while the create role judges a second message during the reply stops the reply and that '
-    + 'judgment: the second message is back in the input box, nothing is deciding, and no new reply or judgment starts '
-    + '(no request in 6 s)', pane.stopped >= 1 && pane.draft === msg2 && info.deciding.queue.length === 0
+    + 'judgment: the queued, the judged and the waiting message are back in the input box in sending order, nothing '
+    + 'is deciding or queued, and no new reply or judgment starts (no request in 6 s)', pane.stopped >= 1
+    && pane.draft === texts.join('\n\n') && info.deciding.queue.length === 0 && info.live?.followUp.length === 0
     && after.length === 0 && !pane.assistants.includes('A long reply.') && !info.team.busy,
   brief({ stopped: pane.stopped, draft: pane.draft, deciding: info.deciding, after: lineBrief(after) }));
-  await clickTeamSwitch(ctx, tab, 'off');
+  const errors = (await kernelEvents(ctx, who.sessionId, 'mori.prompt_error', escAt)).map((item) => item.data);
+  record('TB-31 the texts Esc gives back come in one mori.prompt_error whose text is the first of them (text is null '
+    + 'only for a program delivery that could not be sent, so a delivery that starts meanwhile keeps its wake)',
+  errors.length === 1 && errors[0].text === texts[0] && same(errors[0].queued, texts.slice(1)),
+  brief(errors.map((item) => ({ text: item.text, queued: item.queued }))));
 }
 
 /** @brief 合并会话里 Esc：排着的 need_user 投递（create_wake）在停止后照常开始。 */
@@ -758,7 +834,8 @@ async function deleteAndCheck(ctx, who) {
   await row.waitFor({ state: 'detached', timeout: 20000 });
   const probe = existsSync(ctx.probeLog) ? readJsonl(ctx.probeLog) : [];
   const shut = probe.filter((item) => item.t >= deleteAt).map((item) => item.id);
-  const enabled = ['Archive', 'Delete…'].every((label) => menu.find((item) => item.label === label)?.disabled === false);
+  const enabled = ['Archive', 'Delete…']
+    .every((label) => menu.find((item) => item.label === label)?.disabled === false);
   record('TB-42 closing a session closes its instance sessions: deleting it after Stop team released the open T1 '
     + 'executor and create instances (session_shutdown) together with the user session',
   enabled && open.every((id) => files.includes(id) && shut.includes(id)) && shut.includes(sid),
@@ -926,8 +1003,8 @@ async function finalChecks(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { approve, team: teamStop, esc: escBackground, escjudge: escJudge, escmerged: escMerged,
-  reload: reloadStep, del: deleteStep, restart: restartStep };
+const steps = { approve, team: teamStop, piqueue: teamStopQueued, stopprep: teamStopPreparing, esc: escBackground,
+  escjudge: escJudge, escmerged: escMerged, reload: reloadStep, del: deleteStep, restart: restartStep };
 
 const ctx = { userData: tempUserData('mori-tb-stop-data-'), exePath: args.exePath, flow: {}, pageErrors: [],
   approvalSeen: new Map() };

@@ -5,12 +5,13 @@
 // TaskBoard 的每次写入：校验 → 改内存 → 原子地写出 board.json → 发 mori.board → 唤醒（§3、§6.2）。
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type {
   AgentSessionEvent, BeforeAgentStartEvent, ExtensionAPI, ExtensionFactory, ToolCallEventResult, ToolResultEvent,
   ToolResultEventResult,
 } from '@earendil-works/pi-coding-agent';
-import { REASON_TEXTS, isUntilReason, plainReasonText, type ModelEvent } from '../shared/models';
+import { REASON_TEXTS, isUntilReason, plainReasonText, type ModelEvent, type ModelPick } from '../shared/models';
 import type { ApprovalDecision, KernelEvent, SessionInfo } from '../shared/protocol';
 import {
   BASE_ROLE, TEAM_ENTRY_TYPES, TEAM_TOOLS, TeamEntrySchema, seatRolesOf, type DecidingMessage, type PromptBehavior,
@@ -109,6 +110,23 @@ function savedTeamEntry(file: string | null): { mode: TeamMode; tools: string[] 
   return mode === null ? null : { mode, tools };
 }
 
+/** @brief 一个实例会话文件里有成功的 edit、write 工具结果（§13.12）；读不出时记日志、当作没有。 */
+async function sessionEdited(file: string): Promise<boolean> {
+  try {
+    for (const line of (await readFile(file, 'utf8')).split('\n')) {
+      if (!line.includes('"toolResult"')) continue;
+      const entry = JSON.parse(line) as { type?: string; message?: { role?: string; toolName?: string;
+        isError?: boolean } };
+      const message = entry.type === 'message' ? entry.message : undefined;
+      if (message?.role === 'toolResult' && (message.toolName === 'edit' || message.toolName === 'write')
+        && !message.isError) return true;
+    }
+  } catch (error) {
+    console.error(`[kernel] cannot read the instance session ${file}: ${(error as Error).message}`);
+  }
+  return false;
+}
+
 /** @brief 一个用户会话的协作（TeamLike 由会话表调用；其余成员是 teamRuns.ts、teamTools.ts 用的内部入口）。 */
 export class Team implements TeamLike {
   /** 用户会话 id */
@@ -157,6 +175,8 @@ export class Team implements TeamLike {
   readonly knownFiles = new Map<string, string>();
   /** 交回 task 的原因（task_back 投递，§8.5）：task → 原因 */
   readonly backReasons = new Map<string, string>();
+  /** 实例的候选来源建立时会话的范围（角色没写 models 时用它，§12.1）：实例的 pi 会话 id → 范围 */
+  private readonly sourcePicks = new Map<string, ModelPick | null>();
   /** 分开时协作模式下你的消息的走法：待判断队列、交给对话的消息与立项的决定（teamFlow.ts，§5.3） */
   readonly flow: UserFlow;
   /** 停止或重启之后，你的下一条消息交给立项时同时唤醒 task 都已结束的需求的结案（§11.4、§11.6） */
@@ -229,12 +249,13 @@ export class Team implements TeamLike {
   async attachUser(user: UserAttach): Promise<void> {
     this.userSession = user;
     this.board = await loadBoard(this.args.teamDir);
-    this.teamEdited = boardEdited(this.board);
     const saved = savedTeamEntry(user.session.sessionManager.getSessionFile() ?? this.args.userSessionFile);
     this.mode = saved?.mode ?? 'off';
-    this.offRestore = this.mode === 'off' ? null : saved?.tools ?? null;
+    // 关闭模式下重新打开也一样：pi 从会话记录恢复的可能是最后一次协作模式运行的那一组（§5.5）
+    this.offRestore = saved?.tools ?? null;
     this.scanInstanceFiles();
-    if (!this.merged) await this.flow.prepare();
+    this.teamEdited = boardEdited(this.board) || await this.instancesEdited();
+    await this.flow.prepare();
     if (this.args.restored) this.recoverAfterRestart(user);
     if (this.mode !== 'off') {
       this.registerUserTools();
@@ -279,6 +300,20 @@ export class Team implements TeamLike {
   }
 
   /**
+   * @brief /team /<扩展命令>（§5.1、§5.3）：命令照 v0 直接交给对话会话，关闭模式下先进入 once（按发送顺序，
+   *        写 mori.team、改模型层的锁定），命令开始的运行用协作模式的工具。
+   * @return 模式改好之后兑现，从不拒绝
+   */
+  enterOnce(): Promise<void> {
+    this.inbox = this.inbox.then(async () => {
+      if (this.mode === 'off' && !this.closed) await this.changeMode('once');
+    }).catch((error: unknown) => {
+      console.error(`[kernel] ${this.userId}: entering once failed: ${(error as Error).message}`);
+    });
+    return this.inbox;
+  }
+
+  /**
    * @brief 协作模式下的一条你的消息（§5.3），按发送顺序处理；/team <文字> 在关闭模式下先进入 once。
    * @param item 消息与引用芯片
    * @param behavior 回复中发送时的选择
@@ -307,6 +342,7 @@ export class Team implements TeamLike {
       this.flow.prompt(item, behavior);
       return;
     }
+    this.flow.handMerged(item.text);
     const status = this.host.status(this.userId);
     if (status && (status.running || status.preparing)) {
       this.host.dialogQueue(this.userId, item, behavior ?? 'followUp');
@@ -462,9 +498,13 @@ export class Team implements TeamLike {
     if (!this.closed) this.boardEvents.request();
   }
 
-  /** @brief 发 mori.board。 */
+  /** @brief 发 mori.board；有还没写出到 board.json 的写入时等它写出再发（§3：写出之后才发事件）。 */
   private sendBoard(): void {
     if (this.closed) return;
+    if (this.unsaved > 0) {
+      void this.saving.then(() => this.emitBoard());
+      return;
+    }
     this.host.emitUser(this.userId, { type: 'mori.board', ...this.view() });
     this.emitState();
   }
@@ -570,6 +610,18 @@ export class Team implements TeamLike {
       const id = name.slice(name.indexOf('_') + 1, -'.jsonl'.length);
       this.knownFiles.set(id, join(this.sessionsDir, name));
     }
+  }
+
+  /**
+   * @brief 打开会话时：这个 TaskBoard 的 task 实例会话里有没有成功的 edit、write（§13.10 teamEdited、§13.12）。
+   *        交接的 authorFamilies 记不下被停止、撤销、重启前没交接的那一棒，所以读实例会话文件。
+   */
+  private async instancesEdited(): Promise<boolean> {
+    const prefix = `${this.userId}.`;
+    for (const [id, file] of this.knownFiles) {
+      if (id.startsWith(prefix) && /^t\d+\./.test(id.slice(prefix.length)) && await sessionEdited(file)) return true;
+    }
+    return false;
   }
 
   // ---- TaskBoard 的写入（§3、§6.2） ----
@@ -681,13 +733,23 @@ export class Team implements TeamLike {
     const task = findTask(this.board, id);
     if (!task) return;
     const lane = this.taskLane(id, role);
-    const ran = lane.file !== null || this.knownFiles.has(lane.id);
+    const ran = this.hasRun(lane);
     const reason = this.backReasons.get(id) ?? null;
     this.backReasons.delete(id);
     const text = ran
       ? deliveryText('task_back', { task: id, latest: task.handoffs.at(-1) ?? null, reason })
       : deliveryText('task_start', { role, task: id, request: task.request });
     this.enqueue(lane, { user: false, text, cause: { kind: 'task_start', task: id, role }, at: Date.now(), meta: {} });
+  }
+
+  /**
+   * @brief 这个实例会话收到过投递（task_back 还是 task_start，§8.5）：开着的看会话里有没有回合；没开着的看会话文件是否
+   *        已写盘（pi 在第一条用户或助手消息之后才写，§14.5）。只建了会话、第一次投递没开始运行的不算。
+   */
+  private hasRun(lane: Lane): boolean {
+    if (this.host.entry(lane.id)) return turnCount(this.branchOf(lane)) > 0;
+    const file = lane.file ?? this.knownFiles.get(lane.id) ?? null;
+    return file !== null && existsSync(file);
   }
 
   /**
@@ -774,6 +836,11 @@ export class Team implements TeamLike {
       return;
     }
     if (lane === this.user && (!this.userSession || !this.userIdle())) return;
+    if (lane === this.user && this.pendingLock) {
+      // 模式在上一次回复中改过：先改锁定，这次投递按此刻的模式选模型（§12.1、§12.11）
+      void this.applyLock().catch((error: unknown) => this.lockFailed(error)).then(() => this.pump(lane));
+      return;
+    }
     for (const list of [lane.solo, lane.queue]) {
       const { kept, dropped } = dropStale(list, this.board);
       for (const item of dropped as TeamDelivery[]) {
@@ -802,6 +869,8 @@ export class Team implements TeamLike {
   private async deliverBatch(lane: Lane, batch: TeamDelivery[]): Promise<void> {
     try {
       if (lane !== this.user) await this.ensureOpen(lane);
+      // 建、开实例会话期间到来的停止（Stop team、Esc、撤销需求）：这次投递不发出，按被停止、没开始的运行处理（§9.4、§11.4）
+      if (lane.stop !== null || this.closed) return await this.deliveryDone(lane);
       let text = joinDeliveries(batch);
       if (lane.kind === 'create') text = this.withCatchUp(lane, text);
       const wake = batch.find((item) => item.meta.wake)?.meta.wake;
@@ -824,7 +893,9 @@ export class Team implements TeamLike {
    */
   private async deliveryDone(lane: Lane): Promise<void> {
     if (!lane.started && !this.closed) {
-      lane.settling = runEnded(this, lane);
+      lane.settling = runEnded(this, lane).catch((error: unknown) => {
+        console.error(`[kernel] ${lane.id}: handling the end of the run failed: ${(error as Error).message}`);
+      });
       await lane.settling;
       lane.settling = null;
     }
@@ -833,33 +904,63 @@ export class Team implements TeamLike {
     lane.started = false;
     lane.inflight = [];
     lane.stop = null;
+    lane.pendingCursor = undefined;
     setTimeout(() => this.afterRun(lane), 0);
   }
 
   /**
    * @brief 一次运行结束之后（setTimeout(0)，§14.2）：开始队列里的下一次，关闭用完的实例，重新调度。
-   *        用户会话空闲了：没写进对话就离开的消息写回执（§13.2），写挂起的条目，满足回到 off 的条件时 once 结束（§5.1）。
+   *        用户会话空闲了：没写进对话就离开的消息写回执（§13.2），写挂起的条目，运行中（或准备中）改过模式的现在改
+   *        模型层的锁定（准备中就结束、没有运行时也一样，§5.1、§12.11），满足回到 off 的条件时 once 结束（§5.1）。
    */
   private afterRun(lane: Lane): void {
     if (this.closed) return;
+    if (lane === this.user && this.pendingLock && this.userIdle()) {
+      // 先改锁定，再开始下一次（投递队列里的程序投递按此刻的模式选模型，§12.1）
+      void this.applyLock().catch((error: unknown) => this.lockFailed(error)).then(() => this.afterRun(lane));
+      return;
+    }
     this.pump(lane);
     if (lane !== this.user) this.pump(this.user);
     else if (this.userIdle()) {
       this.flow.userIdle();
       this.flushEntries();
-      if (this.mode === 'once' && this.canReturnOff()) void this.changeMode('off');
+      if (this.mode === 'once' && this.canReturnOff()) {
+        void this.changeMode('off').catch((error: unknown) => this.lockFailed(error));
+      }
     }
     this.releaseIfDone(lane);
     this.schedule();
   }
 
-  /** @brief Team 开始的对话回复结束（host.dialogStart 兑现）。 */
+  /** @brief 改模型层的锁定失败（读项目配置出错等）：记日志。 */
+  private lockFailed(error: unknown): void {
+    console.error(`[kernel] ${this.userId}: changing the model lock failed: ${(error as Error).message}`);
+  }
+
+  /** @brief Team 开始的对话回复结束（host.dialogStart 兑现）：没开始运行就结束时清掉停止原因（§9.4 第 0 行）。 */
   userReplyDone(): void {
     this.user.busy = false;
+    if (this.user.run === null && this.user.settling === null) this.user.stop = null;
     setTimeout(() => this.afterRun(this.user), 0);
   }
 
-  /** @brief 分开时给立项的投递开头带上自上次投递以来的对话，并在立项会话里记下带到了哪里（§8.4）。 */
+  /**
+   * @brief 会话表开始、Team 不跟踪的一次对话回复结束（关闭模式的发送、交给对话的扩展命令；准备中就结束或运行结束）：
+   *        没开始运行就结束时清掉停止原因，然后同一次运行结束之后一样开始投递队列里的下一次、改模型层的锁定（§5.6）。
+   */
+  replyEnded(): void {
+    if (this.closed) return;
+    setTimeout(() => {
+      if (this.userIdle() && this.user.run === null) this.user.stop = null;
+      this.afterRun(this.user);
+    }, 0);
+  }
+
+  /**
+   * @brief 分开时给立项的投递开头带上自上次投递以来的对话（§8.4）；带到了哪里在这次投递开始运行时记下（commitCursor），
+   *        没开始运行就结束的投递不算，下一次投递仍从上一个 mori.create_cursor 带起。
+   */
   private withCatchUp(lane: Lane, text: string): string {
     const createManager = this.host.entry(lane.id)?.session.sessionManager;
     const userManager = this.userSession?.session.sessionManager;
@@ -872,9 +973,18 @@ export class Team implements TeamLike {
     }
     const catchUp = createCatchUp(userManager.getBranch() as SessionEntryLike[], { after: lane.cursor,
       dialogRole: this.holders.dialog });
-    createManager.appendCustomEntry(TEAM_ENTRY_TYPES.createCursor, { entryId: catchUp.cursor });
-    lane.cursor = catchUp.cursor;
+    lane.pendingCursor = catchUp.cursor;
     return withCatchUp(catchUp.text, text);
+  }
+
+  /** @brief 立项的这次投递开始运行（agent_start）：在立项会话里写 mori.create_cursor，记下带到了哪里（§8.4）。 */
+  private commitCursor(lane: Lane): void {
+    const cursor = lane.pendingCursor;
+    if (cursor === undefined) return;
+    lane.pendingCursor = undefined;
+    lane.cursor = cursor;
+    this.host.entry(lane.id)?.session.sessionManager.appendCustomEntry(TEAM_ENTRY_TYPES.createCursor,
+      { entryId: cursor });
   }
 
   // ---- 实例会话（§8.2） ----
@@ -884,6 +994,7 @@ export class Team implements TeamLike {
     if (lane === this.user) return;
     if (this.host.entry(lane.id)) {
       lane.open = true;
+      await this.refreshSource(lane);
       return;
     }
     const spec = this.instanceSpec(lane);
@@ -954,6 +1065,7 @@ export class Team implements TeamLike {
   /** @brief 角色会话的候选来源（§12.1）：角色的 models，没写时用会话的范围；关闭模式下的临时提问取交集；评审避开同族。 */
   private roleSource(lane: Lane, role: RoleDef): CandidateSource {
     const pick = this.userSession?.model.state().pick ?? null;
+    this.sourcePicks.set(lane.id, pick);
     const source: CandidateSource = { kind: 'role', role: role.name, models: roleCandidates(role, pick),
       requires: role.requires };
     if (lane.kind === 'ask' && !lane.team) source.within = () => this.userSession?.model.candidateRefs() ?? null;
@@ -962,6 +1074,20 @@ export class Team implements TeamLike {
       source.avoidFamilies = () => new Set(findTask(this.board, task)?.handoffs.flatMap((h) => h.authorFamilies));
     }
     return source;
+  }
+
+  /**
+   * @brief 开着的实例会话的候选来源跟上会话的范围（§12.1：没写 models 的角色用你最后选的范围）：你在关闭模式下改了
+   *        范围，之后继续的实例（停下的 task、分开时的立项）按新的范围选；范围没变时不做。
+   * @param lane 开着的实例
+   */
+  private async refreshSource(lane: Lane): Promise<void> {
+    const role = findRole(this.roles, lane.role);
+    const model = this.host.entry(lane.id)?.model;
+    const pick = this.userSession?.model.state().pick ?? null;
+    if (!role || role.models || !model || this.sourcePicks.get(lane.id) === pick) return;
+    console.log(`[kernel] ${lane.id}: the session range changed; using ${pick ?? 'none'}`);
+    await model.setTeamLock(false, this.roleSource(lane, role));
   }
 
   /** @brief 调度类别（§12.10）：task、订阅、立项与结案；临时提问继承发送方的类别。 */
@@ -1004,6 +1130,7 @@ export class Team implements TeamLike {
   /** @brief 关闭一个实例会话（释放 pi 会话与虚拟模型）；临时提问与订阅的会话不再继续，去掉它的状态。 */
   async releaseLane(lane: Lane): Promise<void> {
     lane.open = false;
+    this.sourcePicks.delete(lane.id);
     if (lane.kind === 'ask' || lane.kind === 'subscription') this.lanes.delete(lane.key);
     try {
       await this.host.closeInstance(lane.id);
@@ -1025,7 +1152,9 @@ export class Team implements TeamLike {
   private laneEvent(lane: Lane, event: AgentSessionEvent): void {
     if (this.closed) return;
     switch (event.type) {
-      case 'agent_start': return runStarted(this, lane);
+      case 'agent_start':
+        if (lane.kind === 'create') this.commitCursor(lane);
+        return runStarted(this, lane);
       case 'message_start':
         if (lane === this.user && (event.message as { role?: string }).role === 'assistant') this.userOutputting = true;
         return;
@@ -1265,7 +1394,8 @@ export class Team implements TeamLike {
 
   /**
    * @brief 用户会话 role 为 user 的消息开始（程序投递的消息不算，§5.3）：分开时上一段结束、认出交给对话的那条；
-   *        合并会话里开始新的一次判断。
+   *        合并会话里开始新的一次判断，判断的是你输入的原文（pi 展开了提示词模板、技能命令时也是，§5.3、§5.4）；
+   *        扩展命令用 sendUserMessage 发的消息不是你交给对话的任何一条，没有立项的决定（§5.3）。
    */
   private userMessageStart(message: unknown): void {
     if ((message as { role?: string }).role !== 'user') return;
@@ -1278,7 +1408,9 @@ export class Team implements TeamLike {
     }
     const run = this.user.run;
     if (!run || run.mode === 'off' || wake) return;
-    startUserJudgment(this, this.user, text);
+    const typed = this.flow.takeMerged(text);
+    if (typed === null && run.command !== null) return;
+    startUserJudgment(this, this.user, typed ?? text);
   }
 
   /** @brief 这次请求的工作卡（§8.3）；没有卡片时为 null。 */
@@ -1380,8 +1512,10 @@ export class Team implements TeamLike {
     const previous = this.mode;
     this.mode = mode;
     if (mode !== 'off') this.registerUserTools();
-    const tools = previous === 'off' ? this.lastOffTools ?? this.userApi?.getActiveTools() : undefined;
-    // 写进 mori.team 的这一组就是回到 off 时要恢复的（还没有过关闭模式的运行时取此刻启用的工具，§5.5）
+    const tools = previous === 'off'
+      ? this.offRestore ?? this.lastOffTools ?? this.userApi?.getActiveTools() : undefined;
+    // 写进 mori.team 的这一组就是回到 off 时要恢复的：回到 off 之后还没有过关闭模式的运行时仍是上一条的那一组
+    // （offRestore；重新打开之后此刻启用的可能是协作模式的那一组）；从来没有时取此刻启用的工具（§5.5）
     if (tools) this.lastOffTools = [...tools];
     if (mode === 'off') this.offRestore = this.offRestore ?? this.lastOffTools;
     this.writeUserEntry(TEAM_ENTRY_TYPES.team, tools ? { mode, tools } : { mode }, null);
@@ -1395,6 +1529,8 @@ export class Team implements TeamLike {
   async applyLock(): Promise<void> {
     this.pendingLock = false;
     await this.userSession?.model.setTeamLock(this.mode !== 'off', this.dialogSource(this.mode !== 'off'));
+    const open = [...this.lanes.values()].filter((lane) => lane !== this.user && lane.open);
+    await Promise.all(open.map((lane) => this.refreshSource(lane)));
   }
 
   // ---- 停止（§9.4、§11.4） ----

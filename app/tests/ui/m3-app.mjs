@@ -290,8 +290,8 @@ async function shiftTabIntoTree(page) {
 }
 
 /**
- * @brief 走查 2：Ctrl+N（焦点在输入框）→ Shift+Tab 几次（经过顶栏的四个按钮：右栏开关、权限、M6 加的思考强度和模型，
- *        左栏分隔线、左栏底部的两个按钮）回到会话树，落在新会话行；整棵树一个 Tab 停靠点。
+ * @brief 走查 2：Ctrl+N（焦点在输入框）→ Shift+Tab 几次（经过顶栏的五个按钮：右栏开关、权限、M6 加的思考强度和模型、
+ *        TaskBoard 加的协作开关，左栏分隔线、左栏底部的两个按钮）回到会话树，落在新会话行；整棵树一个 Tab 停靠点。
  */
 async function keyboardPath(ctx) {
   const { page } = ctx;
@@ -301,9 +301,10 @@ async function keyboardPath(ctx) {
   record('走查 2：Ctrl+N 在当前会话所在的项目（beta）新建会话，名为"新会话"，焦点在新会话的输入框', k?.active
     && k.title === NEW_SESSION && samePath(k.cwd, ctx.folders.beta) && composer, JSON.stringify(k));
   const entered = await shiftTabIntoTree(page);
-  // M6 顶栏加了模型和思考强度两个按钮（models.md），多两个 Tab 停靠点：6 次改为 8 次。
-  record('走查 2：从新会话的输入框 Shift+Tab 几次回到会话树（不超过 8 次），落在新会话行（中间不在别的会话行停）',
-    samePath(entered.focus.file, ctx.files.K) && entered.presses <= 8,
+  // M6 顶栏加了模型和思考强度两个按钮（models.md），多两个 Tab 停靠点：6 次改为 8 次；TaskBoard 在模型按钮之前加了
+  // 协作开关（parallel-agents-taskboard.md §13.1，一个真正可以聚焦的按钮），再多一个：8 次改为 9 次。
+  record('走查 2：从新会话的输入框 Shift+Tab 几次回到会话树（不超过 9 次：M6 是 8 次，多了协作开关），落在新会话行'
+    + '（中间不在别的会话行停）', samePath(entered.focus.file, ctx.files.K) && entered.presses <= 9,
     `按了 ${entered.presses} 次：${entered.path.join(' → ')}；焦点：${JSON.stringify(entered.focus)}`);
   // sessions.md 走查 2 的路径：权限按钮之后依次是思考强度按钮和模型按钮（models.md 的两个新按钮都能用键盘到达）。
   const order = ['permission-button', 'thinking-button', 'model-button'].map((id) => entered.testids.indexOf(id));

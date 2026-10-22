@@ -1285,39 +1285,3 @@ export function createCatchUp(entries: readonly SessionEntryLike[], options: Cat
   const cursor = entries.at(-1)?.id ?? options.after;
   return { text: messages.length ? fitCatchUp(messages, options.cap ?? CATCH_UP_LIMIT) : null, cursor };
 }
-
-// ---- 程序写进 TaskBoard 的问题与原因（§7.4、§7.6、§11.6、§12.5） ----
-
-/**
- * @brief 需求的 task 都已结束、结案没关闭时的需求级问题（§7.6）。
- * @param request 需求编号
- * @param closeRole 结案持有者
- */
-export function unclosedQuestion(request: number, closeRole: string): string {
-  return `Request ${request} has no open tasks and ${closeRole} didn't close it`;
-}
-
-/**
- * @brief 结案没处理交给它的 task、强制填写也没填出来时交给立项的问题（§7.4 close_undecided）。
- * @param closeRole 结案持有者
- * @param task task 编号
- */
-export function closeUndecidedQuestion(closeRole: string, task: string): string {
-  return `${closeRole} didn't decide on ${task}`;
-}
-
-/**
- * @brief 结案选不到模型时交给立项的问题（§12.5）。
- * @param closeRole 结案持有者
- */
-export function closeNoModelQuestion(closeRole: string): string {
-  return `${closeRole} can't run: no model available`;
-}
-
-/**
- * @brief 打开会话时角色已经不存在的 task 的 holderReason（§11.6）。
- * @param role 不存在的角色名
- */
-export function roleGoneReason(role: string): string {
-  return `role ${role} no longer exists`;
-}

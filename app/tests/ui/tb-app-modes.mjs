@@ -1005,6 +1005,50 @@ async function command(ctx) {
     && teamShape(reply), brief({ card, tools: reply?.tools }));
 }
 
+/**
+ * @brief 对话为你的消息准备中（planner 在判断它）时发的扩展命令：照 v0 暂存在准备中，排队区显示为暂存的 Queued 一行；
+ *        Esc 之后它随那条消息按发送顺序回到输入框（tb-modes-cmdheld）。
+ */
+async function commandHeld(ctx) {
+  const scenario = 'tb-modes-cmdheld';
+  const first = `Held command tb-scenario:${scenario}`;
+  const who = await begin(ctx, ctx.split, first, { on: true });
+  await waitLine(ctx, scenario, { agent: 'planner', kind: 'create', k: 1 });
+  await sendMessage(ctx, who.tab, '/tbcmd held');
+  const held = await poll(async () => (await queueRows(ctx, who.tab)).find((row) => row.text === '/tbcmd held')
+    ?? null, 10000, 50);
+  const pane = await paneState(ctx.page, who.tab);
+  await ctx.page.locator(`${paneSel(who.tab)} .composer textarea`).press('Escape');
+  await settle(ctx, who, 30000);
+  const after = await paneState(ctx.page, who.tab);
+  const ran = scenarioLines(ctx.ep, scenario, { agent: 'chat' });
+  record('TB-56 an extension command sent while the dialog prepares for your message (planner judging it) is held '
+    + 'like in v0 and shows in the queue area as a staged Queued row (data-pending); after Esc it comes back after '
+    + 'that message, in sending order, and never ran', held?.kind === QUEUED && held.pending && !held.deciding
+    && pane.sending && !pane.running && after.draft === `${first}\n\n/tbcmd held` && ran.length === 0,
+  brief({ held, sending: [pane.sending, pane.running], draft: after.draft, ran: ran.length,
+    queue: (await queueHistory(ctx, who.tab)).map((item) => item.rows) }));
+  await teamCommand(ctx, who.tab, '/team off', 'off');
+}
+
+/** @brief /team /<扩展命令> 在关闭模式下：先进入 once，命令照 v0 交给对话，它开始的运行按协作模式（tb-modes-cmd）。 */
+async function commandOnce(ctx) {
+  const tab = await openSessionIn(ctx, ctx.split);
+  const since = Date.now();
+  await sendMessage(ctx, tab, '/tbcmd once', { team: true });
+  const who = { tab, ...(await userSession(ctx, tab)), since };
+  await settle(ctx, who, 60000);
+  const reply = requestAt(ctx, 'tb-modes-cmd', { agent: 'chat', kind: 'team-dialog', k: 1, j: 0, since });
+  const modes = customOf(userEntries(who), 'mori.team').map((item) => item.mode);
+  const create = scenarioLines(ctx.ep, 'tb-modes-cmd', { agent: 'planner', since });
+  record('TB-05 /team /<extension command> in off mode enters once before the command runs: the run it starts with '
+    + 'sendUserMessage uses the team-mode segment and tools with "No decision: started by /tbcmd", planner gets no '
+    + 'delivery, and once ends with that turn (mori.team once, then off)', teamShape(reply)
+    && reply.info.last === `${MODES_TEXT.cmdText} once` && cardOf(reply).includes('No decision: started by /tbcmd')
+    && create.length === 0 && same(modes, ['once', 'off']) && (await teamSwitch(ctx, tab)).mode === 'off',
+  brief({ kind: reply?.info.kind, last: reply?.info.last, modes, create: create.length }));
+}
+
 /** @brief 提示词模板：立项的投递附上展开后的文字，需求记原文，回执仍紧跟这条消息（tb-modes-tmpl）。 */
 async function template(ctx) {
   const scenario = 'tb-modes-tmpl';
@@ -1120,7 +1164,8 @@ function finalChecks(ctx) {
 }
 
 const steps = { once, switching, issueReport, unmetOpen, unmetQueue, unmetJudging, runOn, runOff, decide, error,
-  catchUp, stage, queueThree, withdrawStep, heldStep, command, template, mergedReceipts, restart };
+  catchUp, stage, queueThree, withdrawStep, heldStep, command, commandHeld, commandOnce,
+  template, mergedReceipts, restart };
 
 const ctx = { userData: tempUserData('mori-tb-modes-data-'), exePath: args.exePath, watched: new Map(), flow: {},
   pageErrors: [] };

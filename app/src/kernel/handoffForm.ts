@@ -404,10 +404,13 @@ export function checkForm(form: HandoffForm, data: Record<string, unknown>): For
   return collect(args, checks) ?? { args };
 }
 
-/** @brief task：task 实例写了就照用（是否持有由工具检查），没写用表单的；结案总是表单的。 */
+/**
+ * @brief task：task 实例写了就按 §6.2 归一后照用（T3、t3、3 都认；是否持有由工具检查），没写用表单的；结案总是表单的。
+ */
 function checkTask(form: HandoffForm, value: unknown): string | null | { error: string } {
   if (form.kind === 'close' || value === undefined || value === null) return form.task;
-  return typeof value === 'string' && value.trim() !== '' ? value.trim() : { error: 'task must be a task id like T1' };
+  const id = normalizeTaskId(value) ?? (typeof value === 'string' ? value.trim() : '');
+  return id !== '' ? id : { error: 'task must be a task id like T1' };
 }
 
 /** @brief 标签里每行一项的列表；空标签为 null。 */

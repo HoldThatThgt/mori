@@ -137,14 +137,20 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'close', deliveries: { 1: closeLast('The read is done') } },
   ],
 
-  // TB-35 Esc 时立项在判断第二条消息：协作模式（开关打开），第一条消息的回复等很久，回复中你又发一条，立项判断它时也
-  // 等很久；Esc 之后两者都停下，第二条回到输入框，没有新的回复。
+  // TB-35 Esc 时立项在判断第二条消息：协作模式（开关打开），第一条消息的回复等很久；回复中你又发三条：第一条判断完
+  // 交给 pi 排队，判断第二条时等很久，第三条在等判断。Esc 之后都停下，三条按发送顺序回到输入框，没有新的回复。
   'tb-stop-escjudge': [
     { role: 'planner', kind: 'create', deliveries: {
       1: [say('Nothing to register.')],
-      2: [together(wait(LONG), say('Judged the second message.'))],
+      2: [say('Nothing to register either.')],
+      3: [together(wait(LONG), say('Judged the second message.'))],
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: { 1: [together(wait(LONG), say('A long reply.'))] } },
+  ],
+
+  // TB-35 Stop team 时对话在为第一条消息准备中（等立项判断它，等很久），第二条在等判断：两条按发送顺序回到输入框。
+  'tb-stop-stopprep': [
+    { role: 'planner', kind: 'create', deliveries: { 1: [together(wait(LONG), say('unreachable'))] } },
   ],
 
   // TB-35 合并会话里 Esc：T1 交接 need_user 时用户会话在回复第二条消息（等 20 秒），create_wake 排在投递队列里；
@@ -159,6 +165,18 @@ export const SCENARIOS = {
     { role: 'mori', kind: 'task', task: 'T1', deliveries: {
       1: [together(wait(8000), call('read', { path: 'README.md' })),
         call('task_handoff', { task: '{task}', conclusion: 'Which part should I summarize?', outcome: 'need_user' })],
+    } },
+  ],
+
+  // TB-35 Stop team 拿回 pi 排队区的消息（合并会话）：第一条消息的回复等很久，T1 在后台等很久（Stop team 才显示）；
+  // 回复中你又发的一条交给 pi 排队。Stop team 之后它回到输入框，之后没有请求。
+  'tb-stop-piqueue': [
+    { role: 'mori', kind: 'merged-create', deliveries: {
+      1: [call('request_submit', { title: 'Queue then stop', goal: 'Stop team takes back the queued message' }),
+        call('task_create', readTask('Long read', 'mori')), together(wait(LONG), say('unreachable'))],
+    } },
+    { role: 'mori', kind: 'task', task: 'T1', deliveries: {
+      1: [together(wait(LONG), call('read', { path: 'README.md' })), end()],
     } },
   ],
 

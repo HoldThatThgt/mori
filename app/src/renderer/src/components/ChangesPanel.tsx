@@ -73,7 +73,7 @@ function ChangesList({ tab, onClose }: { tab: Tab; onClose: () => void }) {
       </div>
       <div className="panel-body" data-testid="changes">
         {teamEdited && <p className="panel-note" data-testid="team-changes-note">
-          Changes made by team tasks aren't listed here.</p>}
+          Changes made by team tasks aren’t listed here.</p>}
         {files.length === 0 ? !teamEdited && <p className="muted">No changes yet.</p> : (
           <>
             <p className="panel-note">Only edits and writes are listed. Files changed by commands aren’t included.</p>

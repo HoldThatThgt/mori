@@ -522,15 +522,15 @@ export async function sendMessage(ctx, tab, text, { key = 'Enter', team = false 
 
 /**
  * @brief 这个会话的协作开关此刻的样子：{ mode（data-mode）, checked（aria-checked）, text（宽栏的文字 .team-text）,
- *        label（读屏名称 aria-label）, title（悬停）, disabled, short（窄栏的文字是否显示） }。
+ *        label（读屏名称 aria-label）, title（悬停）, disabled, dot（是否是窄栏只显示状态点的样子） }。
  */
 export function teamSwitch(ctx, tab) {
   return ctx.page.locator(`${paneSel(tab)} [data-testid="team-switch"]`).evaluate((el) => {
-    const short = el.querySelector('.team-short');
+    const dot = el.querySelector('.team-dot');
     return { mode: el.dataset.mode, checked: el.getAttribute('aria-checked'),
       text: el.querySelector('.team-text')?.textContent ?? el.textContent, label: el.getAttribute('aria-label'),
       title: el.getAttribute('title'), disabled: el.disabled,
-      short: short ? getComputedStyle(short).display !== 'none' : false };
+      dot: dot ? getComputedStyle(dot).display !== 'none' : false };
   });
 }
 
