@@ -265,10 +265,20 @@ function relPath(path, cwd) {
   return normal.toLowerCase().startsWith(`${base.toLowerCase()}/`) ? normal.slice(base.length + 1) : path;
 }
 
-/** @brief 命令的标题：去掉首尾空白后的第一行，超过 80 个字符截断加 …（§13.3）。 */
+/** @brief 命令的标题：去掉首尾空白后的第一行，超过 80 个字符截断加 …；多行且没截断时加 " …"（§13.10、v0 工具卡）。 */
 function commandText(command) {
-  const first = command.trim().split(/\r?\n/)[0] ?? '';
-  return first.length > 80 ? `${first.slice(0, 80)}…` : first;
+  const lines = command.trim().split(/\r?\n/);
+  const first = lines[0] ?? '';
+  if (first.length > 80) return `${first.slice(0, 80)}…`;
+  return lines.length > 1 ? `${first} …` : first;
+}
+
+/** @brief read 的行范围（v0 工具卡）：" · lines a–b"，只有 offset 时 " · from line a"。 */
+function lineText(args) {
+  const offset = Number(args.offset);
+  const limit = Number(args.limit);
+  if (!Number.isFinite(offset) || offset <= 0) return '';
+  return Number.isFinite(limit) && limit > 0 ? ` · lines ${offset}–${offset + limit - 1}` : ` · from line ${offset}`;
 }
 
 /** @brief 参数里的 task 编号（t1、1、T1 都认，§6.2）。 */
@@ -279,8 +289,8 @@ function taskArg(args) {
 }
 
 /**
- * @brief 一次工具调用的 §13.8 标题，按进展摘要 TaskView.current 带的参数（§13.10：path、command 第一行、pattern、
- *        task、request、role、to；read 的行范围不在其中）。
+ * @brief 一次工具调用的 §13.8 标题，按进展摘要 TaskView.current 带的参数（§13.10：path、offset、limit、
+ *        command 的前 200 个字符、pattern、task、request、role、to）。
  * @param ctx { cwd, task（这一行的 task）, seatRoles }
  */
 export function expectedTitle(toolName, args, ctx) {
@@ -291,7 +301,10 @@ export function expectedTitle(toolName, args, ctx) {
   }
   if (toolName === 'grep' || toolName === 'find') return `${VERBS[toolName]} ${a.pattern ?? '…'}`;
   if (toolName === 'ls') return `List ${a.path ? relPath(a.path, ctx.cwd) : '.'}`;
-  if (VERBS[toolName]) return `${VERBS[toolName]} ${typeof a.path === 'string' ? relPath(a.path, ctx.cwd) : '…'}`;
+  if (VERBS[toolName]) {
+    const target = typeof a.path === 'string' ? relPath(a.path, ctx.cwd) : '…';
+    return `${VERBS[toolName]} ${target}${toolName === 'read' ? lineText(a) : ''}`;
+  }
   const task = taskArg(a);
   switch (toolName) {
     case 'task_handoff': return `Hand off ${task ?? ctx.task ?? '…'}`;

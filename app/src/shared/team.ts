@@ -161,11 +161,11 @@ export interface ToolCallBrief {
   /** 工具名 */
   toolName: string;
   /**
-   * 标题要用的参数（§13.8）：v0 工具的 path、command、pattern，TaskBoard 工具的 task、request、role、to；
-   * command 只给第一行、≤ 200 字符
+   * 标题要用的参数（§13.8）：v0 工具的 path、offset、limit、command、pattern，TaskBoard 工具的 task、request、role、to；
+   * command 截到前 200 字符（标题取第一行，多行时加 …）
    */
-  args: { path?: string; command?: string; pattern?: string; task?: string; request?: number; role?: string;
-    to?: string };
+  args: { path?: string; offset?: number; limit?: number; command?: string; pattern?: string; task?: string;
+    request?: number; role?: string; to?: string };
 }
 
 /** @brief 交接链的一棒（§13.3 展开时）。 */

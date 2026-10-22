@@ -11,7 +11,7 @@
 // 256000，写入等级 A，跳过探针）；临时项目各写自己的角色文件（正文带合成端点认角色用的 MORI-ROLE-<name>）、
 // .pi/mcp.json（合成 MCP 服务 tests/mcp-server/server.mjs，连上 8 秒后才列出工具）、.pi/extensions（在实例里询问的
 // 项目扩展）。
-// 同一时间只开一个 App：TB-03 先用对照构建（.tb-runs/base，提交 78df3dc，没有 TaskBoard）跑一次关闭模式，再用本构建跑；
+// 同一时间只开一个 App：TB-03 先用对照构建（.tb-runs/base，提交 6a57fd4，没有 TaskBoard）跑一次关闭模式，再用本构建跑；
 // TB-43 的 mori-team 载入失败用本构建的一份拷贝（.tb-runs/roles-teamfail），只在拷贝的内核代码里让 mori-team 的工厂函数
 // 抛错（synthetic fault injection，本构建与 src 不变），最后单独启动。
 
@@ -105,7 +105,7 @@ function filesUnder(dir) {
 }
 
 /**
- * @brief 工具页“内置工具”一节此刻的行（跟随 tab 这个会话：先让它显示出来、有焦点），读完点“返回会话”。
+ * @brief 工具页“内置工具”一节此刻的行（跟随 tab 这个会话：先让它显示出来、有焦点），读完点“Back to app”。
  * @return { rows（m6-tools-helpers toolRows：name、active、tag、state、desc）, follow（跟随的会话的文字） }
  */
 async function toolsPage(ctx, tab) {
@@ -113,7 +113,7 @@ async function toolsPage(ctx, tab) {
   await openToolsSection(ctx.page, 'builtin');
   const rows = await toolRows(ctx.page);
   const follow = await ctx.page.getByTestId('tools-follow').textContent();
-  await ctx.page.locator('[data-testid="tools-page"] .topbar button', { hasText: '返回会话' }).click();
+  await ctx.page.locator('[data-testid="tools-page"] .topbar button', { hasText: 'Back to app' }).click();
   await ctx.page.locator(`.pane-slot:not([hidden]) ${paneSel(tab)}`).waitFor({ timeout: 10000 });
   return { rows, follow };
 }
@@ -237,8 +237,8 @@ function watchNotReady(ctx) {
 // ---------- TB-03：关闭模式与 v0 一致 ----------
 
 /**
- * @brief 对照构建（.tb-runs/base，没有 TaskBoard 的 v1 模型层最终提交）：同一份合成配置、同一个项目，发 V0_TEXT，
- *        记下发给模型的第一个请求与工具页的行。打包版（--exe）运行时对照仍用这个开发构建。
+ * @brief 对照构建（.tb-runs/base，app-v0 合并模型层之后、TaskBoard 之前的提交 6a57fd4）：同一份合成配置、
+ *        同一个项目，发 V0_TEXT，记下发给模型的第一个请求与工具页的行。打包版（--exe）运行时对照仍用这个开发构建。
  */
 async function base(ctx) {
   const dir = join(appRoot, '.tb-runs', 'base');
@@ -433,7 +433,7 @@ async function narrow(ctx, tab) {
   const width = () => pane.evaluate((el) => el.getBoundingClientRect().width);
   const wide = await switchLook(ctx, tab);
   const wideWidth = await width();
-  const toggle = ctx.page.locator(`${paneSel(tab)} button[aria-label="右栏：本会话的改动"]`);
+  const toggle = ctx.page.locator(`${paneSel(tab)} button[aria-label="Toggle changes"]`);
   await toggle.click();
   await poll(async () => (await width()) < 600, 5000);
   if ((await width()) >= 600) await resizeWindow(ctx.app, 800, 700);
@@ -670,22 +670,22 @@ async function fixed(ctx, who, project) {
     actions.filter((line) => line.endsWith('Check agent files')).length >= 2, brief(actions.slice(-12)));
 }
 
-/** @brief 按 F8、写一句、保存，读保存的报告里“最近的操作”一节的各行。 */
+/** @brief 按 F8、写一句、保存，读保存的报告里“Recent activity”一节的各行。 */
 async function recentActions(ctx, tab) {
   await showTab(ctx, tab);
   await ctx.page.locator(`${paneSel(tab)} .composer textarea`).press('F8');
   const dialog = ctx.page.getByTestId('issue-dialog');
   await dialog.waitFor({ timeout: 15000 });
   await dialog.getByTestId('issue-what').fill('TB-01 check of the recent actions');
-  await dialog.getByRole('button', { name: '保存' }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   const saved = dialog.getByTestId('issue-saved');
   await saved.waitFor({ timeout: 15000 });
-  const file = /已保存到\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
+  const file = /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
   await ctx.page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   const md = file && existsSync(file) ? readFileSync(file, 'utf8') : '';
   const lines = md.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === '## 最近的操作');
+  const start = lines.findIndex((line) => line.trim() === '## Recent activity');
   const end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
   return start < 0 ? [] : lines.slice(start + 1, end < 0 ? undefined : end).filter((line) => line.startsWith('- '));
 }
@@ -947,14 +947,14 @@ function writeAskProbe(project, log) {
   ].join('\n'));
 }
 
-/** @brief 打开 folder，信任询问出现时选“信任”、不勾“记住”（这个决定只在这个会话里），等会话就绪。 */
+/** @brief 打开 folder，信任询问出现时选“Trust workspace”、不勾“Remember my choice”（这个决定只在这个会话里），等会话就绪。 */
 async function openTrustingOnce(ctx, folder) {
   const before = await ctx.page.locator('.pane-slot').count();
   await stubFolder(ctx.app, folder);
-  await ctx.page.getByRole('button', { name: /^(Open folder…|打开文件夹…)$/ }).first().click();
+  await ctx.page.getByRole('button', { name: /^Open folder…$/ }).first().click();
   const dialog = ctx.page.getByTestId('trust-dialog');
   await dialog.waitFor({ timeout: 30000 });
-  await dialog.getByRole('button', { name: '信任', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Trust workspace', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 10000 });
   await ctx.page.waitForFunction((n) => document.querySelectorAll('.pane-slot').length >= n, before + 1,
     { timeout: 30000 });
@@ -1128,19 +1128,20 @@ async function restartCheckAgain(ctx, whoC, pc) {
 
 // ---------- TB-53：界面没准备好时不可用 ----------
 
-/** @brief 打开会话时（正在启动…）开关一直不可用；后台进程退出后开关不可用。 */
+/** @brief 打开会话时（Starting…）开关一直不可用；后台进程退出后开关不可用。 */
 async function notReady(ctx) {
   const records = [...(ctx.notReadyBefore ?? []), ...await ctx.page.evaluate(() => window.__tbNotReady ?? [])];
-  const opening = records.filter((item) => item.text === '正在启动…');
+  const opening = records.filter((item) => item.text === 'Starting…');
   const tab = await ctx.page.locator(SHOWN_PANE).first().getAttribute('data-tab');
   await killTbKernel(ctx);
   const exited = await poll(async () => {
     const sw = await teamSwitch(ctx, tab).catch(() => null);
     const wait = await ctx.page.locator(`${paneSel(tab)} [data-testid="not-ready"]`).textContent().catch(() => null);
-    return sw?.disabled && wait === '后台进程已退出' ? { sw, wait } : null;
+    return sw?.disabled && wait === 'Mori’s background process crashed' ? { sw, wait } : null;
   }, 20000);
-  record('TB-53 while the UI is not ready the switch is not available: disabled every time a pane showed "正在启动…" '
-    + 'while its session opened, and disabled after the kernel exited ("后台进程已退出"), still showing the last mode',
+  record('TB-53 while the UI is not ready the switch is not available: disabled every time a pane showed "Starting…" '
+    + 'while its session opened, and disabled after the kernel exited ("Mori’s background process crashed"), still '
+    + 'showing the last mode',
   opening.length >= 3 && opening.every((item) => item.disabled) && Boolean(exited)
     && exited.sw.text.startsWith('Team: '), brief({ opening: opening.length, bad: opening.filter((i) => !i.disabled),
     exited }));
@@ -1182,16 +1183,18 @@ async function teamFail(ctx) {
     await startTbApp(fctx);
     const project = tempProject('mori-tb-roles-fail-');
     await stubFolder(fctx.app, project);
-    await fctx.page.getByRole('button', { name: /^(Open folder…|打开文件夹…)$/ }).first().click();
+    await fctx.page.getByRole('button', { name: /^Open folder…$/ }).first().click();
     const failed = await poll(() => fctx.page.evaluate(() => [...document.querySelectorAll('[role="alert"], '
-      + '.form-message.error')].map((el) => el.textContent).find((text) => text.includes('打开失败')) ?? null), 30000);
+      + '.form-message.error')].map((el) => el.textContent)
+      .find((text) => text.includes('Failed to open session: ')) ?? null), 30000);
     const sessions = filesUnder(join(fctx.userData, 'pi', 'sessions'));
     const ready = await fctx.page.locator('[data-testid="chat-pane"] [data-testid="not-ready"]').allTextContents();
-    record('TB-43 when mori-team fails to load the session does not open: "打开失败：The team extension failed to load: '
-      + '…" is shown, the pane stays "会话没有打开" and no session file is written (fault injected into a copy of '
-      + 'the build)', typeof failed === 'string' && failed.includes('The team extension failed to load')
-      && failed.includes('synthetic fault injection') && sessions.length === 0
-      && (ready.length === 0 || ready.every((text) => text === '会话没有打开')), brief({ failed, sessions, ready }));
+    record('TB-43 when mori-team fails to load the session does not open: "Failed to open session: The team '
+      + 'extension failed to load: …" is shown, the pane stays "Session didn’t open" and no session file is written '
+      + '(fault injected into a copy of the build)', typeof failed === 'string'
+      && failed.includes('The team extension failed to load') && failed.includes('synthetic fault injection') && sessions.length === 0
+      && (ready.length === 0 || ready.every((text) => text === 'Session didn’t open')),
+    brief({ failed, sessions, ready }));
   } finally {
     await closeTbApp(fctx);
     if (saved === undefined) delete process.env.MORI_APP_DIR;

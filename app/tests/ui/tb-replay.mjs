@@ -1,6 +1,6 @@
 // 平行 Agent 与 TaskBoard 的回放测试（docs/specs/parallel-agents-taskboard.md §17.1、§17.2 的回放层）：在 Electron 里载入
 // 真正的界面，用回放进程桥（tests/ui/harness）回放从真实会话录下的 tests/fixtures/tb/*.json（tb-record.mjs 录制，模型是
-// 负责人的 DeepSeek 与 GLM），以及 m1–m7 的一组录制。测试像你一样操作（打开文件夹、发录制里的消息、/team、点协作开关、
+// 负责人的 DeepSeek 与 GLM），以及 m1–m7 的一组录制。测试像你一样操作（Open folder…、发录制里的消息、/team、点协作开关、
 // 权限菜单、批准卡上的 Alt+1），回放桥核对界面发出的每条命令都与录制一致；再按 docs/v1/screens/team-*.md 检查界面：
 //   TB-03：m1–m7 的录制在合成的空 TeamState/BoardView 下照常回放：开关一直是 Team: Off，没有回执、进展摘要、Stop team。
 //   TB-04（tb-ask）：关闭模式下对话的 agent_message 是一张 "Ask reviewer" 工具卡，回答就是它的结果；没有回执、进展摘要、
@@ -243,14 +243,14 @@ async function finish(page, id, label_, steps) {
     status.errors.join('; ') || `commands ${status.commands.map((c) => c.type).join(', ')}`);
 }
 
-/** @brief 点侧栏"打开文件夹…"（回放桥返回下一条 session.create 的文件夹）；有信任询问时按 trust 回答；等会话就绪。 */
+/** @brief 点侧栏"Open folder…"（回放桥返回下一条 session.create 的文件夹）；有信任询问时按 trust 回答；等会话就绪。 */
 async function openFolder(page, trust = null) {
-  await page.getByTestId('sidebar').getByRole('button', { name: '打开文件夹…' }).click();
+  await page.getByTestId('sidebar').getByRole('button', { name: 'Open folder…' }).click();
   if (trust) {
     const dialog = page.getByTestId('trust-dialog');
     await dialog.waitFor({ timeout: 15000 });
-    if (trust.remember) await dialog.getByRole('checkbox', { name: '记住' }).check();
-    await dialog.getByRole('button', { name: trust.trusted ? '信任' : '不信任', exact: true }).click();
+    if (trust.remember) await dialog.getByRole('checkbox', { name: 'Remember my choice' }).check();
+    await dialog.getByRole('button', { name: trust.trusted ? 'Trust workspace' : 'Don’t trust', exact: true }).click();
   }
   await page.locator(PANE).waitFor({ timeout: 20000 });
   await waitReady(page);
@@ -435,7 +435,7 @@ async function askFixture(page, fx, app) {
 
 // ---------- TB-08、TB-37、TB-53：tb-team ----------
 
-/** @brief tb-team 重启前的一段：全部允许、/team、登记后点开关两次，等全部放完；返回观察到的东西。 */
+/** @brief tb-team 重启前的一段：Allow all、/team、登记后点开关两次，等全部放完；返回观察到的东西。 */
 async function teamRun(page, fx) {
   const steps = await load(page, fx, { part: 'before' });
   const prompt = commandsOf(steps).find((c) => c.type === 'session.prompt');
@@ -456,11 +456,11 @@ async function teamRun(page, fx) {
   return { steps, states };
 }
 
-/** @brief 权限菜单 → 全部允许 → 确认（界面发 approval.setMode all）。 */
+/** @brief 权限菜单 → Allow all → 确认（界面发 approval.setMode all）。 */
 async function allowAll(page) {
   await page.locator(PANE).getByTestId('permission-button').click();
-  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: '全部允许' }).click();
-  await page.getByTestId('confirm-dialog').getByRole('button', { name: '全部允许' }).click();
+  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
+  await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all', exact: true }).click();
 }
 
 /** @brief 对话流里回执、进展摘要（折叠与展开）和条目的先后，重启前后比较用。 */
@@ -633,7 +633,7 @@ async function teamFixture(page, fx) {
 
 // ---------- TB-08、TB-37：tb-receipts ----------
 
-/** @brief tb-receipts：全部允许，照录制发三条消息（/team、补充、撤销），每条之前等上一轮放完、对话空闲。 */
+/** @brief tb-receipts：Allow all，照录制发三条消息（/team、补充、撤销），每条之前等上一轮放完、对话空闲。 */
 async function receiptsRun(page, fx) {
   const steps = await load(page, fx);
   const commands = commandsOf(steps);
@@ -735,7 +735,7 @@ async function approvalFixture(page, fx) {
   await finish(page, 'TB-34', 'tb-approval', steps);
 }
 
-/** @brief 打开文件夹、/team，等第一张后台卡与它的 task 行，查卡、task 行、侧栏与权限菜单。 */
+/** @brief Open folder…、/team，等第一张后台卡与它的 task 行，查卡、task 行、侧栏与权限菜单。 */
 async function approvalFirst(page, commands, event, css) {
   await openFolder(page);
   await typeAndSend(page, `/team ${commands.find((c) => c.type === 'session.prompt').text}`);

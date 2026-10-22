@@ -10,6 +10,8 @@
 // fake-tbh-a（写入等级 A、能关思考、开思考），tbx 是各种写入等级的模型（A 不能关思考、A 不能关思考且 B 也不过、B、C、
 // 没有等级、换模型的一对、总是 404 的一个）；三个临时项目：分开配置（chat / planner 持有立项与结案 / executor / reviewer）、
 // 写入等级配置（chat / planner 立项 / closer 结案用 C 级 / 每种等级一个 exec-* 角色）、没有角色文件（合并会话）。
+// TB-16 另验只有执行了的调用有编号（§7.3：参数校验失败、被 tool_call 处理器拒绝的没有编号，也不能作证据），
+// TB-31 另验 §7.6 的竞争（结案发给立项的消息没有 wait、"全部已结束"的唤醒已排队时，等立项的运行结束才强制关闭）。
 // 步骤各用自己的会话；renum 一步最后跑：在 task 运行中重启 App，重新打开后看证据编号接着排。
 
 import { writeFileSync } from 'node:fs';
@@ -305,7 +307,19 @@ async function once(ctx) {
     + 'ends (no third request)', same(t2Lines.map((line) => line.calls), [['read', 'task_handoff'], ['read', 'read']])
     && t2.length === 4 && !t2[0].isError && !t2[1].isError && t2.slice(2).every((m) => m.isError
       && textOf(m).includes(HANDED_OFF('T2'))), brief({ lines: lineBrief(t2Lines), results: resultBrief(t2) }));
+  onceTags(t1, t2);
   onceClose(ctx, who);
+}
+
+/** @brief 工具结果开头的证据编号 "[#n]"（§7.3）；没有时为 null。 */
+const tagOf = (message) => /^\[#([1-9][0-9]*)\]/.exec(textOf(message))?.[0] ?? null;
+
+/** @brief TB-16（§7.3）：交接之后被 tool_call 处理器拒绝的调用没有执行，结果没有编号；执行了的照常编号。 */
+function onceTags(t1, t2) {
+  record('TB-16 only executed calls are numbered: the calls refused by the tool_call handler after the handoff '
+    + '(T1\'s read, T2\'s two reads) have no [#n], while the executed read and task_handoff are [#1], [#2]',
+  same(t1.map(tagOf), ['[#1]', '[#2]', null]) && same(t2.map(tagOf), ['[#1]', '[#2]', null, null]),
+  brief({ T1: t1.map(tagOf), T2: t2.map(tagOf) }));
 }
 
 /** @brief TB-15：结案会话一次运行里关闭 T1、T2 并关闭需求。 */
@@ -413,6 +427,36 @@ function authorRule(ctx, who, board) {
     + 'evidence)', t5[0]?.toolName === 'bash' && !t5[0].isError && t5[1]?.isError === false && h5?.outcome === 'pass'
     && h5.evidence[0]?.title === 'Run echo checked' && h5.evidence[0].ok === true, brief({ results: resultBrief(t5),
     h5: h5 && { outcome: h5.outcome, evidence: h5.evidence } }));
+}
+
+/** @brief 只有执行了的调用有编号，没执行的不能作证据（§7.3，脚本 tb-handoff-tags）。 */
+async function tags(ctx) {
+  const who = await begin(ctx, ctx.split, 'Number executed calls tb-scenario:tb-handoff-tags');
+  await boardWhen(ctx, who, (board) => board.requests[0]?.status === 'done', 120000);
+  await settle(ctx, who, 60000);
+  const board = readBoard(ctx, who.sessionId);
+  const t1 = toolResults(instance(ctx, who, 't1.executor')?.entries ?? []);
+  const notFound = 'evidence: #2 is not a finished tool call in your session.';
+  const onlyOne = 'recent ones: #1 Read README.md ✓.';
+  record('TB-16 a call that fails the parameter check is not executed: it gets no number and cannot be cited (T1: '
+    + 'read #1, a read without path refused by validation with no [#n], a handoff citing #2 refused with "evidence: #2 '
+    + 'is not a finished tool call in your session." listing only #1, then that refused handoff is #2 and the handoff '
+    + 'citing #1 is #3 and accepted)', same(t1.map(tagOf), ['[#1]', null, '[#2]', '[#3]'])
+    && t1[1]?.toolName === 'read' && t1[1].isError === true && t1[2]?.isError === true
+    && textOf(t1[2]).includes(notFound) && textOf(t1[2]).includes(onlyOne) && t1[3]?.isError === false
+    && same(taskOf(board, 'T1')?.handoffs[0]?.evidence.map((e) => e.tag), ['#1']),
+  brief({ tags: t1.map(tagOf), results: resultBrief(t1) }));
+  const t2 = toolResults(instance(ctx, who, 't2.executor')?.entries ?? []);
+  const forced = forcedLines(linesOf(ctx, 'tb-handoff-tags', 'executor', 'task', 'T2'));
+  const baton = programBaton(taskOf(board, 'T2'), 'no_handoff');
+  record('TB-16 a call refused by the tool_call handler is not executed either: T2\'s forced run calls read, which '
+    + 'is refused ("Only task_handoff works in this turn") with no [#n]; the retry cites #2 and is refused listing '
+    + 'only #1 (the refused handoff becomes #2), so Mori hands T2 to close (reason no_handoff)',
+  same(t2.map(tagOf), ['[#1]', null, '[#2]']) && textOf(t2[1]).includes(ONLY_FORM) && t2[2]?.isError === true
+    && textOf(t2[2]).includes(notFound) && textOf(t2[2]).includes(onlyOne)
+    && same(forced.map((line) => [line.k, line.toolChoice]), [[2, 'task_handoff'], [3, 'task_handoff']])
+    && baton?.routedTo.kind === 'close' && taskOf(board, 'T2')?.status === 'done',
+  brief({ tags: t2.map(tagOf), results: resultBrief(t2), forced: lineBrief(forced), baton }));
 }
 
 // ---------- TB-20：需要用户拿主意 ----------
@@ -907,6 +951,44 @@ async function closeAsk(ctx) {
   brief({ close: close.map((t) => t.slice(0, 90)), lines: lineBrief(lines), request: board.requests[0] }));
 }
 
+/** @brief 实例会话里回复文字含 text 的那条 assistant 条目写下的时刻（毫秒）；没有时为 NaN。 */
+function assistantAt(file, text) {
+  const entry = (file?.entries ?? []).find((item) => item.type === 'message' && item.message?.role === 'assistant'
+    && textOf(item.message).includes(text));
+  return Date.parse(entry?.timestamp ?? '');
+}
+
+/**
+ * @brief §7.6 的竞争（脚本 tb-handoff-closerace）：结案发给立项的消息没有 wait、"全部已结束"的唤醒已排队；
+ *        立项的那次运行结束之前不强制关闭，之后再唤醒结案一次、那次回合结束时强制关闭。
+ */
+async function closeRace(ctx) {
+  const who = await begin(ctx, ctx.split, 'Race the close tb-scenario:tb-handoff-closerace');
+  const board = await boardWhen(ctx, who, (item) => item.requests[0]?.status === 'done', 90000);
+  await settle(ctx, who, 60000);
+  const closeFile = instance(ctx, who, 'close.1');
+  const createFile = instance(ctx, who, 'create');
+  const close = deliveriesIn(closeFile);
+  const message = toolResults(closeFile?.entries ?? [], 'agent_message')[0];
+  const lines = linesOf(ctx, 'tb-handoff-closerace', 'planner', 'close');
+  const forcedAt = lines.find((line) => line.k === 4 && line.j === 0)?.t ?? NaN;
+  const endedForEnd = assistantAt(closeFile, 'Waiting for planner.');
+  const createEnded = assistantAt(createFile, 'No more tasks are needed.');
+  record('TB-31 §7.6 race: close messages create without wait while an "all ended" wake is queued; the turn woken by '
+    + '"All tasks of request 1 have ended…" ends while create is still handling the message and is not followed by a '
+    + 'forced close; after create\'s run ends with no new task close is woken once more ("[Mori] planner made no new '
+    + 'tasks for request 1.") and only at the end of that turn is the request closed by force (delivery 4, tool_choice '
+    + 'request_close), which closes request 1', message?.isError === false
+    && textOf(message).includes('Delivered to planner.') && close.length === 4 && close[1].startsWith(ALL_ENDED)
+    && close[2].includes('[Mori] planner made no new tasks for request 1.') && close[3].startsWith(FORCED_REQUEST)
+    && same(forcedLines(lines).map((line) => [line.k, line.toolChoice]), [[4, 'request_close']])
+    && endedForEnd < createEnded && createEnded < forcedAt && board.requests[0].status === 'done'
+    && board.requests[0].conclusion === 'One part was enough' && board.requests[0].closeRetry === true,
+  brief({ close: close.map((t) => t.slice(0, 70)), lines: lineBrief(lines), message: message && textOf(message),
+    times: { endedForEnd: endedForEnd - who.since, createEnded: createEnded - who.since,
+      forcedAt: forcedAt - who.since }, request: board.requests[0] }));
+}
+
 // ---------- TB-16：重新打开后继续编号（最后一步） ----------
 
 /** @brief T1 有两个工具结果、第三个请求在等时重启 Mori；重新打开后交回 T1，下一个结果是 #3（脚本 tb-handoff-renum）。 */
@@ -939,8 +1021,8 @@ async function renum(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { route, closeResults, once, midRun, evidence, needUser, reviewerAsks, mergedNeed, noHandoff, depFail,
-  undecided, errors, tiers, closeTags, closeReport, forceClose, closeAsk, renum };
+const steps = { route, closeResults, once, midRun, evidence, tags, needUser, reviewerAsks, mergedNeed, noHandoff,
+  depFail, undecided, errors, tiers, closeTags, closeReport, forceClose, closeAsk, closeRace, renum };
 
 const ctx = { userData: tempUserData('mori-tb-handoff-data-'), exePath: args.exePath, pageErrors: [] };
 try {

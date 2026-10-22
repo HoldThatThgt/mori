@@ -223,7 +223,6 @@ async function seatMessage(team: Team, lane: Lane, route: Extract<MessageRoute, 
   if (reply) team.waits.set(lane.key, target.key);
   if (route.kind === 'create') team.enqueueCreate(delivery);
   else team.enqueue(target, delivery);
-  if (lane.run && route.kind === 'create' && lane.kind === 'close') lane.run.messagedCreate = true;
   if (lane.run && route.kind === 'close') lane.run.messagedClose.push(route.request);
   if (!reply) return ok(`Delivered to ${roleLabel(role)}.`);
   const result = await reply;
@@ -458,17 +457,20 @@ function editTaskTool(team: Team, args: Record<string, unknown>): BoardToolReply
   return ok(`Edited ${input.task}${result.handedBack ? ' and handed it back' : ''}.`);
 }
 
+/** @brief 合并会话里 reply_via_dialog 成功的结果：对话就是它自己，请它在自己的回复里回答（§5.4、TB-10）。 */
+const MERGED_REPLY ='Noted: no collaboration needed. Answer the user in your reply.';
+
 /**
  * @brief reply_via_dialog（§5.4）：判断你的消息时表示不需要协作；程序唤醒的回合里（分开时）带 note 时唤醒对话转告你，
- *        唤醒这个回合的 waiting_user task 与需求级问题都标 asked。
+ *        唤醒这个回合的 waiting_user task 与需求级问题都标 asked。合并会话里结果请它在自己的回复里回答
+ *        （没有别的对话 Agent 替它回答）。
  */
 function replyTool(team: Team, lane: Lane, args: Record<string, unknown>): BoardToolReply {
   const note = str(args, 'note')?.trim() ?? '';
   if ([...note].length > TEXT_LIMITS.note) return refused(`note must be at most ${TEXT_LIMITS.note} characters.`);
   const run = lane.run;
-  if (!run || run.judgment?.user !== false || team.merged || !note) {
-    return ok('The dialog agent answers the user directly.');
-  }
+  if (team.merged) return ok(MERGED_REPLY);
+  if (!run || run.judgment?.user !== false || !note) return ok('The dialog agent answers the user directly.');
   const causes = run.batch.map((item) => item.cause);
   const asked = { tasks: causes.flatMap((cause) => (cause.kind === 'need_user' ? [cause.task] : [])),
     requests: causes.flatMap((cause) => (cause.kind === 'question' ? [cause.request] : [])) };

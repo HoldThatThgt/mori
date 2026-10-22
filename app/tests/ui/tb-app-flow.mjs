@@ -40,6 +40,7 @@ const SHARED_PART = "one of several agents that work together on Mori's TaskBoar
 /** 程序给的固定文字（§5.4、§6.2、§8.5） */
 const TALK_DIRECTLY = 'You talk to the user directly; say it in your reply.';
 const RECORD_FIRST = "Record the user's words first (request_submit or request_update).";
+const MERGED_REPLY = 'Noted: no collaboration needed. Answer the user in your reply.';
 const NEED_DECISION = '[Mori] T1 needs a decision from the user';
 /** TaskBoard 的工具名（§6.3） */
 const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit', 'request_update',
@@ -57,11 +58,15 @@ function durationOf(ms) {
   if (minutes < 1) return '<1 min';
   return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
-/** @brief 工具卡规则下命令的标题（只取第一行，超过 80 个字符截断加 …）。 */
+/** @brief 工具卡规则下命令的标题（只取第一行，超过 80 个字符截断加 …；没截断而有多行时加 " …"）。 */
 function commandTitle(command) {
-  const first = command.trim().split(/\r?\n/)[0];
-  return first.length > 80 ? `${first.slice(0, 80)}…` : first;
+  const lines = command.trim().split(/\r?\n/);
+  const first = lines[0];
+  if (first.length > 80) return `${first.slice(0, 80)}…`;
+  return lines.length > 1 ? `${first} …` : first;
 }
+/** @brief 工具卡规则下 read 的行范围后缀（" · lines a–b"）。 */
+const rangeTitle = ({ offset, limit }) => ` · lines ${offset}–${offset + limit - 1}`;
 /** @brief §13.3 的需求状态（独立实现：按表的顺序取第一个），用来核对界面的 data-state。 */
 function expectedState(board, request) {
   if (request.status !== 'open') return request.status;
@@ -356,7 +361,10 @@ async function steer(ctx) {
     receipts }));
 }
 
-/** @brief TB-10：项目有 .pi/SYSTEM.md 时协作模式的请求里仍有立项段（脚本 tb-flow-sysmd）。 */
+/**
+ * @brief TB-10：项目有 .pi/SYSTEM.md 时协作模式的请求里仍有立项段；判断你的消息时 reply_via_dialog 的结果请它
+ *        在自己的回复里回答（脚本 tb-flow-sysmd）。
+ */
 async function sysmd(ctx) {
   const who = await begin(ctx, ctx.sys, 'Say hello tb-scenario:tb-flow-sysmd');
   await settle(ctx, who, 60000);
@@ -368,10 +376,18 @@ async function sysmd(ctx) {
   const off = requests.filter((item) => item.t >= offSince);
   record('TB-10 with .pi/SYSTEM.md in the (trusted) project: the team-mode request has both the SYSTEM.md text and the '
     + 'merged create segment; the off-mode request after it has SYSTEM.md and no segment',
-  team.length === 1 && team[0].system.includes('MORI-SYSTEM-MD') && team[0].system.includes(MERGED_SENTENCE)
-    && off.length === 1 && off[0].system.includes('MORI-SYSTEM-MD') && !off[0].system.includes(MERGED_SENTENCE),
+  team.length === 2 && team.every((item) => item.system.includes('MORI-SYSTEM-MD')
+    && item.system.includes(MERGED_SENTENCE)) && off.length === 1 && off[0].system.includes('MORI-SYSTEM-MD')
+    && !off[0].system.includes(MERGED_SENTENCE),
   brief({ team: team.map((item) => [item.info.kind, item.system.slice(0, 80)]),
     off: off.map((item) => item.info.kind) }));
+  const reply = toolResults(userEntries(who), 'reply_via_dialog');
+  const pane = await paneState(ctx.page, who.tab);
+  record(`TB-10 merged session: reply_via_dialog while judging your message is accepted with "${MERGED_REPLY}" `
+    + '(no other dialog agent answers for it) and its reply in the same run is the answer you see',
+  reply.length === 1 && reply[0].isError === false && textOfMessage(reply[0]) === MERGED_REPLY
+    && pane.assistants.includes('No collaboration needed; answering directly.'),
+  brief({ reply: reply.map((m) => [m.isError, textOfMessage(m)]), assistants: pane.assistants }));
 }
 
 // ---------- TB-12：编号与终态（合并会话，脚本 tb-flow-renumber） ----------
@@ -590,12 +606,19 @@ async function chainPhases(ctx, who, board) {
     && item.text === text);
   const run = `T1 Fix README · executor · Run ${commandTitle(FLOW_TEXT.longCommand)}`;
   const read = 'T1 Fix README · executor · Read README.md';
-  ctx.flow.chainRows = { run, read, seen: [seen('T1', 'running', run), seen('T1', 'running', read)] };
+  const multi = `T4 Update notes · executor · Run ${commandTitle(FLOW_TEXT.multiCommand)}`;
+  const range = `T4 Update notes · executor · Read README.md${rangeTitle(FLOW_TEXT.readRange)}`;
+  ctx.flow.chainRows = { run, read, multi, range, seen: [seen('T1', 'running', run), seen('T1', 'running', read)],
+    seenMore: [seen('T4', 'running', multi), seen('T4', 'running', range)] };
   record('TB-37 title line "Request 1 · <title> · <state> · <duration>" and task rows "T<n> <title> · …" use the '
     + 'board titles at every update; the running row shows the latest tool call with the tool-card title rule: '
     + '"Run <first line cut to 80>…" while the bash call runs, then "Read README.md" for the absolute path',
   rows.length > 0 && rowFormat && heads.length > 0 && headFormat && seen('T1', 'running', run)
     && seen('T1', 'running', read), brief({ rows: rows.map((r) => `${r.phase}|${r.text}`).slice(0, 40) }, 3000));
+  record('TB-37 the running row keeps the rest of the tool-card title rule: a two-line command whose first line fits '
+    + 'reads "Run <first line> …" and a read with offset/limit reads "Read README.md · lines 3–4" (T4)',
+  ctx.flow.chainRows.seenMore.every(Boolean), brief({ multi, range, t4: rows.filter((r) => r.task === 'T4')
+    .map((r) => `${r.phase}|${r.text}`) }, 2000));
   const states = [...new Set(heads.map((item) => item.state))];
   record('TB-37 phase texts seen live: Starting, a running tool title, pending "Waiting for T1", lock_wait "Waiting to '
     + 'change files (T1)", with_close "With planner", and the request state going Running → With planner → Done',
@@ -633,21 +656,35 @@ async function chainClosed(ctx, who, board, withClose) {
     ['Notes approach did not work']), brief({ chains: open?.chains, ruledOut: open?.ruledOut }));
 }
 
-/** @brief TB-37：进展摘要与工具卡同一标题规则——关闭模式下对话自己跑同一条长命令、读同一个绝对路径（tb-flow-titles）。 */
+/**
+ * @brief TB-37、TB-55：进展摘要与工具卡同一标题规则——关闭模式下对话自己跑同样的两条命令、读同一个绝对路径
+ *        （整个文件、带行范围），与 chain 一步里 T1、T4 的行比较（tb-flow-titles）。
+ */
 async function titles(ctx) {
   const who = await begin(ctx, ctx.split, 'Run and read tb-scenario:tb-flow-titles', { team: false, allow: true });
   await settle(ctx, who, 60000);
   const cards = await toolCardsOf(ctx, who.tab);
-  const run = cards.find((card) => card.verb === '运行');
-  const read = cards.find((card) => card.verb === '读取');
+  const [run, multi] = cards.filter((card) => card.verb === 'Run');
+  const [read, range] = cards.filter((card) => card.verb === 'Read');
   const rows = ctx.flow.chainRows;
   record('TB-37 the progress row uses the same title rule as tool cards: for the same long two-line command and the '
-    + 'same absolute path, the tool cards read "运行 <cut command>" and "读取 README.md", and the progress rows of '
+    + 'same absolute path, the tool cards read "Run <cut command>" and "Read README.md", and the progress rows of '
     + 'the chain step read "Run <same>" and "Read README.md"',
   run?.target === commandTitle(FLOW_TEXT.longCommand) && read?.target === 'README.md'
     && (rows === undefined || (rows.run.endsWith(`Run ${run.target}`) && rows.read.endsWith(`Read ${read.target}`)
       && rows.seen.every(Boolean))),
   brief({ cards, rows }));
+  const alike = multi?.target === commandTitle(FLOW_TEXT.multiCommand)
+    && range?.target === `README.md${rangeTitle(FLOW_TEXT.readRange)}` && rows !== undefined
+    && rows.multi.endsWith(` · Run ${multi.target}`) && rows.range.endsWith(` · Read ${range.target}`)
+    && rows.seenMore.every(Boolean);
+  const detail = brief({ multi, range, rows: rows && { multi: rows.multi, range: rows.range, seen: rows.seenMore } });
+  record('TB-37 a two-line command whose first line fits and a read with offset/limit: the progress rows of the chain '
+    + 'step (T4) read the same titles as the tool cards — "Run echo tb-flow-multi …" and "Read README.md · lines '
+    + '3–4"', alike, detail);
+  record('TB-55 the tool card title of a multi-line command ("Run <first line> …") and of a read with offset/limit '
+    + '("Read <path> · lines a–b") is the same text as the progress row of a task instance making the same call',
+  alike, detail);
 }
 
 // ---------- 主路径 (d)、(e) ----------

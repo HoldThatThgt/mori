@@ -1,7 +1,8 @@
 // 平行 Agent 与 TaskBoard 的 App 套件：调度（docs/specs/parallel-agents-taskboard.md §17.2）。真正的 Mori（界面 + 后台进程
 // + pi + 主进程）对合成端点的脚本模式（tests/fake-endpoint/scenarios/sched.mjs，synthetic），逐条验收
 // TB-22（同时运行上限）、TB-23（写入排队）、TB-24（只读 task）、TB-25（依赖）、TB-26（补充到达正在做的实例）、
-// TB-32（撤销需求）、TB-51（投递队列）在 App 层的通过条件。
+// TB-32（撤销需求）、TB-51（投递队列）在 App 层的通过条件；另查 §3：每个实例的第一个请求到达时 board.json 已写出它是
+// 持有者（TB-12/TB-23，记录代理在转发前读 board.json）。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs sched）：
 //   MORI_APP_DIR=.tb-runs/sched node tests/ui/tb-app-sched.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/tb-app-sched(-packaged).json（--only 时 tb-partial-app-sched…），截图在
@@ -12,10 +13,10 @@
 // reviewer）、分开配置且 executor 的工具含 .pi/mcp.json 里合成 MCP 服务的工具（数据目录里预先信任它）、分开配置且
 // chat、planner、executor 各写了 models。步骤各用自己的会话。
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SCHED_TEXT } from '../fake-endpoint/scenarios/sched.mjs';
-import { WORK_CARD_OPEN, stripWorkCard } from '../fake-endpoint/scripts.mjs';
+import { WORK_CARD_OPEN, sessionOf, stripWorkCard } from '../fake-endpoint/scripts.mjs';
 import { appRoot } from './lib.mjs';
 import {
   appLogLines, brief, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents, lineBrief, messagesOf,
@@ -203,18 +204,18 @@ function capOrder(ctx, who, scenario, phases) {
 /** @brief 写 task T1（executor → reviewer → 结案）持有锁，T2 等锁；只读 T3 同时跑；T1 结束后 T2 才开始。 */
 async function lock(ctx) {
   const scenario = 'tb-sched-lock';
+  const taps = tapFirstRequests(ctx, scenario);
   const who = await begin(ctx, ctx.split, `Change the README twice tb-scenario:${scenario}`);
   const waiting = await waitTaskPhase(ctx, who.tab, { task: 'T2', phase: 'lock_wait' }, 30000);
   const atStart = readBoard(ctx, who.sessionId);
   await lineWhen(ctx, scenario, { agent: 'reviewer', kind: 'task', task: 'T1' }, 30000);
-  // 实例在内存里的写入之后就开始，board.json 稍后写出：等它写出 holder 为 reviewer（评审的第一个回复要等 4 秒）。
-  const reviewing = await boardWhen(ctx, who, (board) => taskOf(board, 'T1')?.holder?.role === 'reviewer',
-    'T1 with reviewer', 3000);
-  const review = { board: reviewing, row: await rowOf(ctx, who, 'T2'),
+  // 评审的第一个请求到达代理那一刻的 board.json（§3：写出之后才唤醒；评审的第一个回复要等 4 秒）。
+  const review = { board: taps.get('reviewer|task|T1')?.get(who.sessionId) ?? null, row: await rowOf(ctx, who, 'T2'),
     running: spanOf(ctx, scenario, { agent: 'reviewer', kind: 'task', task: 'T1' }).count === 1 };
   await waitTaskPhase(ctx, who.tab, { task: 'T1', phase: 'with_close' }, 30000);
   const close = { board: readBoard(ctx, who.sessionId), row: await rowOf(ctx, who, 'T2') };
   await settle(ctx, who, 90000);
+  ctx.ep.proxy.rule = null;
   const board = readBoard(ctx, who.sessionId);
   const phases = await phasesOf(ctx, who.tab, who.since);
   const lockText = 'T2 Second edit · executor · Waiting to change files (T1)';
@@ -223,11 +224,62 @@ async function lock(ctx) {
   waiting === lockText && atStart?.lock === 'T1', brief({ waiting, lock: atStart?.lock }));
   record('TB-23 the lock is not released while the write task is with review (or with close): while reviewer works '
     + 'on T1 and while T1 is with planner, board.json keeps lock T1 and T2 still reads Waiting to change files (T1)',
-  review.running && review.board?.lock === 'T1' && review.row === lockText
+  review.running && review.board?.lock === 'T1' && taskOf(review.board, 'T1')?.holder?.role === 'reviewer'
+    && review.row === lockText
     && close.board?.lock === 'T1' && taskOf(close.board, 'T1')?.holder?.kind === 'close' && close.row === lockText,
   brief({ review: [review.board?.lock, taskOf(review.board, 'T1')?.holder, review.row],
     close: [close.board?.lock, taskOf(close.board, 'T1')?.holder, close.row] }));
   lockOrder(ctx, scenario, board, phases);
+  firstHolders(who, taps);
+}
+
+/**
+ * @brief 在记录代理上挂钩子：脚本 scenario 里每个实例的第一个请求（k=1、j=0）到达代理、转发给端点之前，读下此刻
+ *        teams/ 下每个用户会话的 board.json。
+ * @return Map<"<agent>|<kind>|<task>", Map<用户会话 id, board.json 的内容（没有时为 null）>>
+ */
+function tapFirstRequests(ctx, scenario) {
+  const taps = new Map();
+  ctx.ep.proxy.rule = ({ body }) => {
+    const info = sessionOf(body?.messages ?? []);
+    const key = `${info.role}|${info.kind}|${info.task ?? '-'}`;
+    if (info.scenario === scenario && info.k === 1 && info.j === 0 && !taps.has(key)) taps.set(key, boardsNow(ctx));
+    return {};
+  };
+  return taps;
+}
+
+/** @brief 此刻 <userData>/teams/ 下每个用户会话的 board.json；读不了时记下错误（检查随之失败）。 */
+function boardsNow(ctx) {
+  try {
+    return new Map(readdirSync(join(ctx.userData, 'teams')).map((id) => [id, readBoard(ctx, id)]));
+  } catch (error) {
+    console.error(`[tb-app-sched] cannot read board.json: ${error instanceof Error ? error.message : error}`);
+    return new Map();
+  }
+}
+
+/** @brief board.json 把会话键 "<agent>|<kind>|<task>" 的实例记为持有者：task 实例持有它的 task，结案持有某个 task。 */
+function namesHolder(board, key) {
+  const [role, kind, id] = key.split('|');
+  const active = (board?.tasks ?? []).filter((task) => task.status === 'active');
+  if (kind === 'close') return active.some((task) => task.holder?.kind === 'close');
+  const holder = active.find((task) => task.id === id)?.holder;
+  return kind === 'task' && holder?.kind === 'role' && holder.role === role;
+}
+
+/** @brief TB-12、TB-23（§3、§6.2）：每个实例的第一个请求到达时，board.json 已经写出它是持有者。 */
+function firstHolders(who, taps) {
+  const keys = ['executor|task|T1', 'executor|task|T3', 'reviewer|task|T1', 'executor|task|T2', 'planner|close|-'];
+  const seen = keys.map((key) => {
+    const board = taps.get(key)?.get(who.sessionId) ?? null;
+    return { key, tapped: taps.has(key), holds: namesHolder(board, key),
+      holders: board?.tasks.map((task) => `${task.id}:${task.status}:${JSON.stringify(task.holder)}`) ?? null };
+  });
+  record('TB-12/TB-23 board.json is written before an instance is started: when the first request of each instance '
+    + '(T1 executor, T3 executor, T1 reviewer, T2 executor, planner\'s close) arrives, board.json already names it as '
+    + 'the holder (no wait for board.json to catch up)',
+  seen.every((item) => item.tapped && item.holds), brief(seen));
 }
 
 /** @brief 某个 task 行此刻的文字；没有时为 null。 */

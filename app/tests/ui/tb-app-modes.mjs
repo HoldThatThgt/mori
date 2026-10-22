@@ -53,8 +53,8 @@ const TEAM_DIALOG_TOOLS = ['read', 'grep', 'find', 'ls', 'board_read', 'read_ses
 /** 写入与命令类工具 */
 const WRITE_TOOLS = ['bash', 'edit', 'write'];
 /** v0 排队区的种类文字（docs/v0/screens/chat.md） */
-const QUEUED = '排队';
-const STEERED = '插话';
+const QUEUED = 'Queued';
+const STEERED = 'Steer';
 const WAITING = 'Waiting for planner';
 
 // ---------- 小工具 ----------
@@ -417,7 +417,7 @@ function section(md, title) {
   return lines.slice(start + 1, end < 0 ? undefined : end).filter((line) => line.trim());
 }
 
-/** @brief TB-05：F8 报告的“最近的操作”记 Team on、Team off 与 Send (team)。 */
+/** @brief TB-05：F8 报告的“Recent activity”记 Team on、Team off 与 Send (team)。 */
 async function issueReport(ctx) {
   const tab = ctx.flow.switching?.tab;
   if (!tab) throw new Error('switching did not run');
@@ -427,13 +427,13 @@ async function issueReport(ctx) {
   await dialog.waitFor({ timeout: 15000 });
   await dialog.getByTestId('issue-what').fill('Team mode check');
   await dialog.getByTestId('issue-expect').fill('Team actions are listed');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   const saved = ctx.page.getByTestId('issue-saved');
   await saved.waitFor({ timeout: 15000 });
-  const path = /已保存到\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
+  const path = /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
   const md = path && existsSync(path) ? readFileSync(path, 'utf8') : '';
   await ctx.page.keyboard.press('Escape');
-  const actions = section(md, '最近的操作');
+  const actions = section(md, 'Recent activity');
   const team = actions.filter((line) => /Team (on|off)|Send \(team\)/.test(line));
   record('TB-05 F8 records the mode changes as "Team on" / "Team off" (the switch and /team on, /team off) and the '
     + '/team <text> send as "Send (team): …" without the prefix', team.filter((line) => line.endsWith('Team on'))
@@ -872,7 +872,7 @@ async function queueThree(ctx) {
   const afterB = requestAt(ctx, scenario, { agent: 'chat', kind: 'team-dialog', k: 2, j: 0 });
   const afterA = requestAt(ctx, scenario, { agent: 'chat', kind: 'team-dialog', k: 3, j: 0 });
   record('TB-56 once judged, the Enter message is queued and the Ctrl+Enter one steers: the queue area shows B as '
-    + '插话 and A as 排队 while C still waits; pi takes B (steer) before A (follow-up) in the same run',
+    + 'Steer and A as Queued while C still waits; pi takes B (steer) before A (follow-up) in the same run',
   judged !== undefined && afterB?.info.last === 'Message B' && afterA?.info.last === 'Message A'
     && deliveriesOf(afterA).indexOf('Message B') < deliveriesOf(afterA).indexOf('Message A'),
   brief({ judged, history: history.map((item) => item.rows), b: afterB?.info.last, a: afterA?.info.last }));
@@ -917,7 +917,7 @@ async function withdrawStep(ctx) {
     return info.deciding.since !== null && same(info.deciding.queue.map((m) => m.text), ['Message B', 'Message C'])
       ? info.deciding : null;
   }, 10000, 50);
-  await ctx.page.locator(`${paneSel(who.tab)} [data-testid="queue"] button`, { hasText: '撤回' }).click();
+  await ctx.page.locator(`${paneSel(who.tab)} [data-testid="queue"] button`, { hasText: 'Withdraw' }).click();
   const draft = await poll(async () => (await paneState(ctx.page, who.tab)).draft || null, 5000, 50);
   await sleep(300);
   const rows = await queueRows(ctx, who.tab);
@@ -971,8 +971,8 @@ async function heldStep(ctx) {
     && item.text === 'Held message Q');
   const settledBefore = events.slice(0, qStart).filter((item) => item.type === 'agent_settled').length;
   record('TB-56 a message judged while the dialog is preparing for another one goes after it: Q is judged while the '
-    + 'dialog still waits for a model for the first message, shows as a staged 排队 row (data-pending), and pi takes '
-    + 'it as a follow-up of that reply in the same run', preparing !== null && held?.kind === QUEUED
+    + 'dialog still waits for a model for the first message, shows as a staged Queued row (data-pending), and pi '
+    + 'takes it as a follow-up of that reply in the same run', preparing !== null && held?.kind === QUEUED
     && heldPane.sending && !heldPane.running && judgedQ !== undefined && replyP !== undefined
     && judgedQ.t < replyP.t && replyQ?.info.last === 'Held message Q'
     && deliveriesOf(replyQ).indexOf('Held message Q') > 0 && qStart >= 0 && settledBefore === 0,

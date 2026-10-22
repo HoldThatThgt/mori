@@ -79,8 +79,6 @@ export interface LaneRun {
   heldAtStart: string[];
   /** 结案会话：因为“全部已结束”或“没有 task”被唤醒（§7.6） */
   wokenForEnd: boolean;
-  /** 结案会话：这次运行给立项发过消息 */
-  messagedCreate: boolean;
   /** 立项会话：这次运行给哪些需求的结案会话发过消息 */
   messagedClose: number[];
   /** 立项会话：这次运行调过 reply_via_dialog { note }（程序唤醒的回合，§5.4） */
@@ -189,7 +187,7 @@ export function newRun(mode: TeamMode, batch: TeamDelivery[]): LaneRun {
   return {
     mode, batch, forced, formMode: null, formError: null, handedOff: null, decided: [], heldAtStart: [],
     wokenForEnd: batch.some((item) => item.cause.kind === 'close_all_ended' || item.cause.kind === 'no_tasks'),
-    messagedCreate: false, messagedClose: [], relayed: false, assistants: 0, lastText: '', error: null,
+    messagedClose: [], relayed: false, assistants: 0, lastText: '', error: null,
     unavailable: null, judgment: null, judgedText: null, ended: null, command: null, allowed: null,
     startedAt: Date.now(),
   };

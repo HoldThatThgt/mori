@@ -679,15 +679,15 @@ test("TB-31 the close session's run end: undecided tasks get a forced handoff, a
     let board = create(oneTask(), { title: 'Two', readOnly: true });
     board = ok(handoff(board, 'executor', 'T1', 'done')).board;
     board = ok(handoff(board, 'executor', 'T2', 'done')).board;
-    const run = { request: 1, heldAtStart: ['T1'], decided: [], wokenForEnd: false, messagedCreate: false };
+    const run = { request: 1, heldAtStart: ['T1'], decided: [], wokenForEnd: false, createPending: false };
     assert.deepEqual(B.closeRunOutcome(board, run), { undecided: ['T1'], forceClose: false });
     assert.deepEqual(B.closeRunOutcome(board, { ...run, decided: ['T1'] }).undecided, []);
     board = ok(closeHandoff(board, 'T1', 'close_done')).board;
     board = ok(closeHandoff(board, 'T2', 'close_done')).board;
     const end = { ...run, heldAtStart: [], wokenForEnd: true };
     assert.equal(B.closeRunOutcome(board, end).forceClose, true);
-    assert.equal(B.closeRunOutcome(board, { ...end, messagedCreate: true }).forceClose, false);
-    assert.equal(B.closeRunOutcome(B.markCloseRetry(board, 1), { ...end, messagedCreate: true }).forceClose, true);
+    assert.equal(B.closeRunOutcome(board, { ...end, createPending: true }).forceClose, false);
+    assert.equal(B.closeRunOutcome(B.markCloseRetry(board, 1), { ...end, createPending: true }).forceClose, true);
     assert.equal(B.closeRunOutcome(board, { ...end, wokenForEnd: false }).forceClose, false);
     assert.equal(B.closeRunOutcome(create(board, { title: 'More', readOnly: true }), end).forceClose, false);
     const closed = ok(B.closeRequest(board, { request: 1, outcome: 'done', conclusion: 'Done', closer: 1 }, 7000));

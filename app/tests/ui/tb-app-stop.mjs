@@ -41,9 +41,9 @@ const STOPPED_BY_USER = 'Stopped by the user.';
 const REJECTED_BY_STOP = 'Rejected: the user stopped the run.';
 const PERMISSION_NOTE = 'Applies to all agents in this session. New sessions start at Ask each time.';
 const RESTARTED = 'Stopped (Mori restarted)';
-const GENERATING = 'The session is generating; stop it first';
-const BUSY_HINT = '正在生成';
-const STOPPED_NOTE = '已停止 · 已经做出的修改不会自动撤销';
+const GENERATING = 'This session is still running. Stop it first.';
+const BUSY_HINT = 'Still running';
+const STOPPED_NOTE = 'Stopped · Changes made so far stay as they are';
 
 /** @brief 这个套件的脚本标记（scenarios/stop.mjs 的 tb-stop-<name>）。 */
 const tag = (name) => `tb-scenario:tb-stop-${name}`;
@@ -160,8 +160,8 @@ async function rowMenuItems(ctx, file) {
   return items;
 }
 
-/** @brief 菜单里"归档""删除"都不可用、小字为"正在生成"。 */
-const removalBlocked = (items) => ['归档', '删除'].every((label) => {
+/** @brief 菜单里"Archive""Delete…"都不可用、小字为"Still running"。 */
+const removalBlocked = (items) => ['Archive', 'Delete…'].every((label) => {
   const item = items.find((entry) => entry.label === label);
   return item?.disabled === true && item.hint === BUSY_HINT;
 });
@@ -175,7 +175,7 @@ function section(md, title) {
   return lines.slice(start + 1, end < 0 ? undefined : end).map((line) => line.trim()).filter(Boolean);
 }
 
-/** @brief 在这个会话里按 F8、写两句、保存，读保存的 Markdown："当前界面"与"最近的操作"的各行。 */
+/** @brief 在这个会话里按 F8、写两句、保存，读保存的 Markdown："Current view"与"Recent activity"的各行。 */
 async function issueReport(ctx, tab, what) {
   await showTab(ctx, tab);
   await ctx.page.locator(`${paneSel(tab)} .composer textarea`).press('F8');
@@ -183,14 +183,14 @@ async function issueReport(ctx, tab, what) {
   await dialog.waitFor({ timeout: 15000 });
   await dialog.getByTestId('issue-what').fill(what);
   await dialog.getByTestId('issue-expect').fill('The team state is in the report');
-  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   const saved = ctx.page.getByTestId('issue-saved');
   await saved.waitFor({ timeout: 15000 });
-  const path = /已保存到\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
+  const path = /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
   const md = path && existsSync(path) ? readFileSync(path, 'utf8') : '';
   await ctx.page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
-  return { path, view: section(md, '当前界面'), actions: section(md, '最近的操作') };
+  return { path, view: section(md, 'Current view'), actions: section(md, 'Recent activity') };
 }
 
 /** @brief 打开权限菜单，读底部说明与"本会话已允许"，按 Esc 关掉。 */
@@ -270,7 +270,7 @@ async function reloadUi(ctx) {
   await ctx.page.waitForFunction(() => Boolean(window.mori), null, { timeout: 30000 });
   await ctx.page.getByTestId('session-tree').waitFor({ timeout: 30000 });
   await ctx.page.waitForFunction(() => document.querySelectorAll('.session-item').length > 0
-    && !document.querySelector('[data-testid="session-tree"]')?.textContent?.includes('正在读取会话…'), null,
+    && !document.querySelector('[data-testid="session-tree"]')?.textContent?.includes('Loading sessions…'), null,
   { timeout: 20000 });
   await captureEvents(ctx.page);
   await watchStages(ctx.page);
@@ -334,8 +334,8 @@ async function approveFirstCard(ctx, who, dialogCard, cardA) {
   record('TB-34 the sidebar row of the session shows the waiting-for-approval status (data-status approval) while '
     + 'only a background card is pending', status === 'approval', brief({ status }));
   const report = await issueReport(ctx, who.tab, 'Background approval count');
-  record('TB-34 F8 counts the background card in 等你批准 ("- 等你批准：1")',
-    report.view.includes('- 等你批准：1'), brief({ path: report.path, view: report.view }));
+  record('TB-34 F8 counts the background card in Pending requests ("- Pending requests: 1")',
+    report.view.includes('- Pending requests: 1'), brief({ path: report.path, view: report.view }));
 }
 
 /** @brief TB-34：对话这一轮在卡出现之后结束，卡还在。 */
@@ -519,7 +519,7 @@ async function teamStopQuiet(ctx, who, obs) {
   brief({ dropped, closeLater: lineBrief(closeLater) }));
 }
 
-/** @brief TB-35：F8 的"最近的操作"记 Stop team。 */
+/** @brief TB-35：F8 的"Recent activity"记 Stop team。 */
 async function teamStopIssue(ctx, who) {
   const report = await issueReport(ctx, who.tab, 'Stop team check');
   const lines = report.actions.filter((line) => line.endsWith(' Stop team'));
@@ -677,7 +677,7 @@ async function reloadStep(ctx) {
   await reloadBackground(ctx, who, reloadAt, msg2);
 }
 
-/** @brief TB-34：重新载入后没点开的会话，侧栏按后台进程的状态显示等你批准；一张卡结束、下一张到来都跟着变。 */
+/** @brief TB-34：重新载入后没点开的会话，侧栏按后台进程的状态显示 Needs approval；一张卡结束、下一张到来都跟着变。 */
 async function reloadSidebar(ctx, who, ids) {
   const untabbed = await rowStatus(ctx, who.sessionFile);
   // synthetic：这个会话没在中栏显示，界面上没有这张卡可点；经进程桥回答（与卡上的"允许一次"是同一条命令）。
@@ -733,7 +733,7 @@ async function deleteStep(ctx) {
   const menu2 = await rowMenuItems(ctx, who.sessionFile);
   const close2 = await tryBridge(ctx, { type: 'session.close', sessionId: sid });
   record('TB-42 while only the background runs (dialog idle, T1 running) the session cannot be archived or deleted '
-    + '(both menu items disabled, "正在生成"), and the kernel\'s session.close refuses it',
+    + '(both menu items disabled, "Still running"), and the kernel\'s session.close refuses it',
   background.team.background && !background.live?.running && removalBlocked(menu1)
     && close1.error?.includes(GENERATING), brief({ team: background.team, menu1, close1: close1.error }));
   record('TB-42 while a message is deciding the session cannot be archived or deleted, and session.close refuses it',
@@ -753,12 +753,12 @@ async function deleteAndCheck(ctx, who) {
   const deleteAt = Date.now();
   const row = ctx.page.locator(`.session-item[data-file=${JSON.stringify(who.sessionFile)}]`).first();
   await row.click({ button: 'right', position: { x: 40, y: 10 } });
-  await ctx.page.getByTestId('session-menu').getByRole('menuitem', { name: '删除' }).click();
-  await ctx.page.getByTestId('delete-dialog').getByRole('button', { name: '删除', exact: true }).click();
+  await ctx.page.getByTestId('session-menu').getByRole('menuitem', { name: 'Delete…' }).click();
+  await ctx.page.getByTestId('delete-dialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await row.waitFor({ state: 'detached', timeout: 20000 });
   const probe = existsSync(ctx.probeLog) ? readJsonl(ctx.probeLog) : [];
   const shut = probe.filter((item) => item.t >= deleteAt).map((item) => item.id);
-  const enabled = ['归档', '删除'].every((label) => menu.find((item) => item.label === label)?.disabled === false);
+  const enabled = ['Archive', 'Delete…'].every((label) => menu.find((item) => item.label === label)?.disabled === false);
   record('TB-42 closing a session closes its instance sessions: deleting it after Stop team released the open T1 '
     + 'executor and create instances (session_shutdown) together with the user session',
   enabled && open.every((id) => files.includes(id) && shut.includes(id)) && shut.includes(sid),

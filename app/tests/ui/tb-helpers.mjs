@@ -410,7 +410,7 @@ export async function openProject(ctx, folder, { trust } = {}) {
   const { page } = ctx;
   const before = await page.locator('.pane-slot').count();
   await stubFolder(ctx.app, folder);
-  await page.getByRole('button', { name: /^(Open folder…|打开文件夹…)$/ }).first().click();
+  await page.getByRole('button', { name: 'Open folder…', exact: true }).first().click();
   const dialog = page.getByTestId('trust-dialog');
   const outcome = await Promise.race([
     page.waitForFunction((n) => document.querySelectorAll('.pane-slot').length === n, before + 1, { timeout: 30000 })
@@ -418,8 +418,8 @@ export async function openProject(ctx, folder, { trust } = {}) {
     dialog.waitFor({ timeout: 30000 }).then(() => 'trust'),
   ]);
   if (outcome === 'trust' || await dialog.isVisible().catch(() => false)) {
-    if (trust) await dialog.getByRole('checkbox', { name: '记住' }).check();
-    await dialog.getByRole('button', { name: trust ? '信任' : '不信任', exact: true }).click();
+    if (trust) await dialog.getByRole('checkbox', { name: 'Remember my choice' }).check();
+    await dialog.getByRole('button', { name: trust ? 'Trust workspace' : 'Don’t trust', exact: true }).click();
     await dialog.waitFor({ state: 'detached', timeout: 10000 });
   }
   await page.waitForFunction((n) => document.querySelectorAll('.pane-slot').length >= n, before + 1,
@@ -849,9 +849,9 @@ export async function allowAll(ctx, tab) {
   await showTab(ctx, tab);
   const pane = ctx.page.locator(paneSel(tab));
   await pane.getByTestId('permission-button').click();
-  await ctx.page.getByTestId('permission-menu').getByRole('menuitemradio', { name: '全部允许' }).click();
-  await ctx.page.getByTestId('confirm-dialog').getByRole('button', { name: '全部允许' }).click();
-  await ctx.page.waitForFunction((css) => document.querySelector(css)?.textContent?.includes('全部允许'),
+  await ctx.page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
+  await ctx.page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all' }).click();
+  await ctx.page.waitForFunction((css) => document.querySelector(css)?.textContent?.includes('Allow all'),
     `${paneSel(tab)} [data-testid="permission-button"]`, { timeout: 10000 });
 }
 
@@ -865,7 +865,7 @@ export function toolCardsOf(ctx, tab) {
 }
 
 /**
- * @brief 把某条回复里的一段文字作为引用芯片放进输入框（真的拖鼠标选中 → 选区浮层"问 Mori"，docs/v0/screens/quotes.md），
+ * @brief 把某条回复里的一段文字作为引用芯片放进输入框（真的拖鼠标选中 → 选区浮层"Attach as context"，docs/v0/screens/quotes.md），
  *        等输入框上方多出一个芯片；/team 的识别在芯片拼进消息之前（§5.1），所以带芯片发 /team 也能用。
  * @param text 回复里的原文（在最后一条含它的回复里选）
  * @return 输入框上方的芯片数
@@ -878,7 +878,7 @@ export async function quoteReply(ctx, tab, text) {
   if (index < 0) throw new Error(`no reply contains "${text}"`);
   const before = await quoteChipsOf(ctx, tab).then((chips) => chips.length);
   if (!(await dragSelect(ctx.page, selector, text, index))) throw new Error(`cannot select "${text}"`);
-  await ctx.page.getByTestId('selection-popover').getByRole('button', { name: '问 Mori' }).click();
+  await ctx.page.getByTestId('selection-popover').getByRole('button', { name: 'Attach as context' }).click();
   await ctx.page.waitForFunction(({ css, n }) => document.querySelectorAll(css).length > n,
     { css: `${paneSel(tab)} [data-testid="quote-chip"]`, n: before }, { timeout: 5000 });
   return before + 1;

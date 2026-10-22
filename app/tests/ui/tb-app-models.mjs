@@ -2,15 +2,15 @@
 // 真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点的脚本模式（tests/fake-endpoint/scenarios/models.mjs，synthetic），
 // 逐条验收这些编号在 App 层的通过条件：
 //   TB-38 模型选择、TB-39 task 中途换模型、TB-40 候选耗尽（§12.5 表的每一行）、TB-41 调度类别、
-//   TB-47 继续会话时换了模型、TB-52 后台实例的模型提示。
+//   TB-47 继续会话时换了模型、TB-52 后台实例的模型提示（含交给结案时清掉）。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs models）：
 //   MORI_APP_DIR=.tb-runs/models node tests/ui/tb-app-models.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/tb-app-models(-packaged).json（--only 时 tb-partial-app-models…），截图在
 // test-results/tb-app-models/。
 // 端口（§17.1 的 4600–4699 里分给本套件的 4650–4659）：合成端点 4650，记录代理 4651（看完整的请求体），
 // 4652 是另一个合成端点：每个回复前等 100 秒，只给从没探测过的 tbp/fake-probing 用（它的探针一直在跑，选择器按 probing）。
-// 测试准备（synthetic test setup，逐处注明）：数据目录里写好十九个本机提供商与它们的模型档案（跳过探针；tbc/fake-c 为
-// C 级，tbk2/fake-k2 的档案要求推理回放，tbp/fake-probing 没有档案），pi 的默认思考强度 low；十五个临时项目，各自的
+// 测试准备（synthetic test setup，逐处注明）：数据目录里写好二十一个本机提供商与它们的模型档案（跳过探针；tbc/fake-c 为
+// C 级，tbk2/fake-k2 的档案要求推理回放，tbp/fake-probing 没有档案），pi 的默认思考强度 low；十六个临时项目，各自的
 // 角色文件见 PROJECTS。时长都是真实值（modelTimings.ts：排队超时 60 秒、候选耗尽最长等 60 秒）：要等的几种情形
 // （探测中的候选、立项排队超时、task 与探针排队不超时、留出的槽位）放在 longBatch 一步里同时进行，其余步骤按顺序，
 // 同一时间只开一个 App。
@@ -153,6 +153,7 @@ const PROJECTS = {
     role('pickyc', 'Needs handoff tier B but has a tier C model', { models: ['tbc/fake-c'], requires: NEED_B })],
   sw: [CHAT, PLANNER, executorOn(['tbs1/fake-sw1', 'tbs2/fake-sw2', 'tbs3/fake-sw3']),
     role('watcher', 'Watches every closed request', { models: ['tbw/fake-sub-404'], subscribe: ['request_closed'] })],
+  note: [CHAT, PLANNER, executorOn(['tbn1/fake-n1', 'tbn2/fake-n2'])],
   cdead: [CHAT, plannerOn(['tbc/fake-c'], { requires: NEED_B }), EXECUTOR],
   cwake: [CHAT, plannerOn(['tbcw/fake-cw']), EXECUTOR],
   closer: [CHAT, CREATOR, role('closer', 'Closes each request', { seats: ['close'], models: ['tbcl/fake-close-404'] }),
@@ -179,6 +180,7 @@ function providers() {
     p('tbc', [m('fake-c')]), tbProvider('tbp', SLOW, [m('fake-probing')]), { ...p('tbz', [m('fake-zone')]),
       zone: 'public' },
     p('tbs1', [m('fake-sw1')]), p('tbs2', [m('fake-sw2')]), p('tbs3', [m('fake-sw3')]),
+    p('tbn1', [m('fake-n1')]), p('tbn2', [m('fake-n2')]),
     p('tbw', [m('fake-sub-404')]), p('tbcw', [m('fake-cw')]), p('tbcl', [m('fake-close-404')]),
     p('tbk', [m('fake-chat-404')]), p('tbo4', [m('fake-ask-404')]),
     p('tbq1', [m('fake-q1'), m('fake-q1b')], { concurrency: 1 }), p('tbq2', [m('fake-qa')], { concurrency: 1 }),
@@ -774,6 +776,37 @@ async function swSubscription(ctx, who) {
     handoffs: board?.tasks[0]?.handoffs.length }));
 }
 
+// ---------- TB-52：task 交给结案时清掉模型提示（tb-models-note） ----------
+
+/**
+ * @brief executor 的第一个请求在 fake-n1 上 429，原地换到 fake-n2（这一行带提示），读完交给结案；executor 之后
+ *        没有新的运行，所以交到结案的这一行没有提示只能是交接时清掉的（§12.12）。
+ */
+async function note(ctx) {
+  const who = await begin(ctx, ctx.p.note, 'Hand it over tb-scenario:tb-models-note');
+  await settle(ctx, who, 90000);
+  const rows = (await phasesOf(ctx, who.tab, who.since)).filter((item) => item.task === 'T1');
+  const text = ' · Switched model: tbn1/fake-n1 → tbn2/fake-n2 · rate limited';
+  const shown = rows.filter((item) => item.text.endsWith(text));
+  const closeAt = rows.findIndex((item) => item.phase === 'with_close');
+  const after = closeAt >= 0 ? rows.slice(closeAt) : [];
+  const file = instanceOf(ctx, who, 'task', { task: 'T1', role: 'executor' });
+  const switches = customOf(file?.entries ?? [], 'mori.model_switch').map((s) => [s.from, s.to, s.reason]);
+  const execK = scenarioRequests(ctx.ep, 'tb-models-note', { agent: 'executor', kind: 'task' })
+    .map((item) => item.info.k);
+  const t1 = taskOf(readBoard(ctx, who.sessionId), 'T1');
+  record('TB-52 the note is cleared when the task is handed to close: executor switched model in place (tbn1/fake-n1 '
+    + '→ tbn2/fake-n2, rate limited) and its row ended with " · Switched model: tbn1/fake-n1 → tbn2/fake-n2 · rate '
+    + 'limited"; once T1 is handed to close (no new executor run) the "With …" row and every later row have no note',
+  shown.length >= 1 && shown.every((item) => item.text.startsWith('T1 Read then hand over · executor · '))
+    && same(switches, [['tbn1/fake-n1', 'tbn2/fake-n2', 'rate_limited']]) && execK.every((k) => k === 1)
+    && after.some((item) => item.phase === 'with_close' && item.text.startsWith('T1 Read then hand over · With '))
+    && after.every((item) => !item.text.includes('Switched model'))
+    && t1?.status === 'done' && t1.handoffs.length === 2,
+  brief({ shown: shown.map((item) => item.text), after: after.map((item) => `${item.phase}|${item.text}`),
+    switches, execK, t1: t1 && [t1.status, t1.handoffs.length] }));
+}
+
 // ---------- TB-40：§12.5 表的其余各行 ----------
 
 /** @brief 立项判断你的消息时选不到模型：按不需要协作，对话的工作卡写 couldn't decide: no model available。 */
@@ -909,7 +942,7 @@ function finalChecks(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { longBatch, sel, fam, zone, sw, cdead, cwake, closer, chat404, askNoModel, cont };
+const steps = { longBatch, sel, fam, zone, sw, note, cdead, cwake, closer, chat404, askNoModel, cont };
 
 const ctx = { userData: tempUserData('mori-tb-models-data-'), exePath: args.exePath, pageErrors: [] };
 try {

@@ -1,6 +1,6 @@
 // 合成端点（synthetic）的脚本：tests/ui/tb-app-models.mjs 用的场景（docs/specs/parallel-agents-taskboard.md
 // TB-38 模型选择、TB-39 task 中途换模型、TB-40 候选耗尽、TB-41 调度类别、TB-47 继续会话时换了模型、
-// TB-52 后台实例的模型提示），格式见 scripts.mjs 开头；名字都以 tb-models- 开头。
+// TB-52 后台实例的模型提示，含交给结案时清掉），格式见 scripts.mjs 开头；名字都以 tb-models- 开头。
 // 每个场景在自己的用户会话里跑（脚本按请求里第一个 tb-scenario 认），k 是这个会话里的投递序号。
 // 故障只来自步骤里的 fail（模型 id 以 -404 结尾的模型由 server.mjs 对每个不是探针的请求返回 404）。
 // 这里另外导出套件要比较的文字（MODELS_TEXT），scripts.mjs 只并入 SCENARIOS。
@@ -20,6 +20,9 @@ export const MODELS_TEXT = {
   sw2WaitMs: 6000,
   /** 重来的那一段第一次回复前等多久（进展摘要这一行没有模型提示） */
   restartWaitMs: 3000,
+  /** 交给结案时清掉提示：fake-n2 第一次回复前等多久（这一行带着提示）、结案第一次回复前等多久（交到结案的这一行） */
+  noteWaitMs: 3000,
+  noteCloseWaitMs: 3000,
 };
 
 /** @brief 1..n。 */
@@ -176,6 +179,25 @@ export const SCENARIOS = {
           evidence: ['{tag:read}'] })],
     } },
     closeAll(),
+  ],
+
+  // TB-52 task 交给结案时清掉模型提示：executor 的第一个请求在 fake-n1 上 429（原地换到 fake-n2，进展摘要这一行
+  // 带 Switched model 提示）；fake-n2 读完交给结案（这次运行里没有再换模型），结案等一会儿再关闭 T1 与需求。
+  'tb-models-note': [
+    planner({ 1: register('Note then close', [{ title: 'Read then hand over', assignee: 'executor' }]) }),
+    chatTeam(),
+    { role: 'executor', kind: 'task', deliveries: {
+      1: [fail(429, { model: 'fake-n1', retryAfter: 60 }),
+        together(wait(MODELS_TEXT.noteWaitMs), call('read', { path: 'README.md' })),
+        call('task_handoff', { task: '{task}', conclusion: 'README.md was read', outcome: 'done',
+          evidence: ['{tag:read}'] })],
+    } },
+    { role: 'planner', kind: 'close', deliveries: {
+      1: [together(wait(MODELS_TEXT.noteCloseWaitMs), call('task_handoff', { task: '{task}', conclusion: 'Checked',
+        outcome: 'close_done' })),
+      call('request_close', { request: '{request}', outcome: 'done', conclusion: 'All checked' }),
+      say('Request closed.')],
+    } },
   ],
 
   // TB-40 立项判断你的消息时选不到模型（只有 C 级、要求 B）：按不需要协作，对话的工作卡写明 couldn't decide。

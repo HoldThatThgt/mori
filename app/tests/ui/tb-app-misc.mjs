@@ -4,7 +4,7 @@
 //   TB-30 工作卡（§8.3：每次请求末尾单独一条、不写进会话文件、压缩之后仍在、换模型重发时仍在最后、超出上限时按顺序压缩且
 //         用户补充一条不少；另核对各种会话卡片的固定第一行）、
 //   TB-55 工具卡标题（§13.8：合并会话的对话流里的工具卡，含三种 agent_message；进展摘要 task 行的当前在做什么）、
-//   TB-57 右栏与后台改动（§13.12：task 改过文件后的说明、列表为空时不显示“本会话还没有改动”、没有 TaskBoard 时与 v0 相同）。
+//   TB-57 右栏与后台改动（§13.12：task 改过文件后的说明、列表为空时不显示“No changes yet.”、没有 TaskBoard 时与 v0 相同）。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs misc）：
 //   MORI_APP_DIR=.tb-runs/misc node tests/ui/tb-app-misc.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/tb-app-misc(-packaged).json（--only 时 tb-partial-app-misc…），截图在 test-results/tb-app-misc/。
@@ -46,11 +46,11 @@ const OFF_KINDS = ['dialog', 'off-dialog'];
 /** pi 压缩请求的系统提示开头（replies.mjs SUMMARY_SYSTEM）与压缩之后第一条消息的开头 */
 const SUMMARY_SYSTEM = 'You are a context summarization assistant.';
 const COMPACTED = 'The conversation history before this point was compacted';
-/** 右栏的文字（§13.12；v0 changes.md 的两句仍是中文） */
+/** 右栏的文字（§13.12；v0 changes.md 的两句，english-ui 的写法） */
 const TEAM_NOTE = "Changes made by team tasks aren't listed here.";
-const NO_CHANGES = '本会话还没有改动';
-const V0_NOTE = '只含编辑和写入，命令改动的文件不在此列。';
-const RIGHT_TOGGLE = 'button[aria-label="右栏：本会话的改动"]';
+const NO_CHANGES = 'No changes yet.';
+const V0_NOTE = 'Only edits and writes are listed. Files changed by commands aren’t included.';
+const RIGHT_TOGGLE = 'button[aria-label="Toggle changes"]';
 /** §13.8 的标题：tb-misc-titles 对话流里的工具卡、T1 那一行，tb-misc-titles2 的工具卡 */
 const TITLES_CARDS = ['Register a request', 'Create a task', 'Read the board', 'Read request 1', 'Read T1',
   'Read executor’s work on T1', 'Message T1', 'Ask executor', 'Message closer'];
@@ -212,7 +212,7 @@ async function titleRows(ctx, who) {
 async function titlesNoChanges(ctx, who) {
   await toggleRight(ctx, who);
   const panel = await rightPanel(ctx);
-  record('TB-57 a team session whose tasks changed no file: the right panel is as in v0 — "本会话还没有改动" and no '
+  record('TB-57 a team session whose tasks changed no file: the right panel is as in v0 — "No changes yet." and no '
     + 'team note', panel !== null && panel.empty && !panel.note && panel.files.length === 0, brief(panel));
   await toggleRight(ctx, who);
 }
@@ -245,8 +245,8 @@ async function toggleRight(ctx, who) {
 }
 
 /**
- * @brief 右栏此刻的样子；没有打开时为 null：{ note（team-changes-note 的文字或 null）, empty（显示“本会话还没有改动”）,
- *        v0Note（显示 v0 的“只含编辑和写入…”）, files（列表里的路径）, order（改动列表里各段的先后） }。
+ * @brief 右栏此刻的样子；没有打开时为 null：{ note（team-changes-note 的文字或 null）, empty（显示“No changes yet.”）,
+ *        v0Note（显示 v0 的“Only edits and writes are listed…”）, files（列表里的路径）, order（改动列表里各段的先后） }。
  */
 function rightPanel(ctx) {
   return ctx.page.evaluate(({ noChanges, v0 }) => {

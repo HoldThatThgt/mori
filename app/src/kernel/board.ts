@@ -775,13 +775,14 @@ export interface CloseRunInput {
   decided: readonly string[];
   /** 这次运行是因为“全部已结束”或“没有 task”被唤醒的（含 §5.4 兜底表第 3 行的再唤醒） */
   wokenForEnd: boolean;
-  /** 这次运行给立项发过消息 */
-  messagedCreate: boolean;
+  /** 结案在这个需求上发给立项的消息还有没处理完的（还在立项的投递队列里，或立项收到它的那次运行还没结束） */
+  createPending: boolean;
 }
 
 /**
  * @brief 结案会话的运行结束（不是被停止）时程序要做什么：对没处理的 task 强制填写（§7.4），
- *        需求仍开着、没有未结束的 task、也没请立项建 task（或已经再唤醒过一次）时强制关闭（§7.6）。
+ *        需求仍开着、没有未结束的 task、发给立项的消息都已处理完（或已经按 §5.4 兜底表第 3 行再唤醒过一次）时
+ *        强制关闭（§7.6）。
  * @return undecided：要强制填写的 task；forceClose：要强制关闭需求
  */
 export function closeRunOutcome(board: Board, input: CloseRunInput): { undecided: string[]; forceClose: boolean } {
@@ -792,7 +793,7 @@ export function closeRunOutcome(board: Board, input: CloseRunInput): { undecided
   });
   const request = findRequest(board, input.request);
   const forceClose = input.wokenForEnd && request?.status === 'open' && !unfinishedTasks(board, request.no).length
-    && (!input.messagedCreate || request.closeRetry);
+    && (!input.createPending || request.closeRetry);
   return { undecided, forceClose };
 }
 

@@ -8,12 +8,12 @@
 // （reviewer 的 models 是第二个提供商），基座持有对话、立项与结案（合并会话）。
 //   tb-ask（TB-04、TB-53）：关闭模式下让对话用 agent_message 问 reviewer 一个问题（开只读的临时提问实例，由 GLM 回答）；
 //     之后点开关两次：off → always → off。
-//   tb-team（TB-08、TB-37、TB-53）：切到全部允许，/team 让 executor 修好失败的测试、reviewer 复核；登记之后点开关两次：
+//   tb-team（TB-08、TB-37、TB-53）：切到 Allow all，/team 让 executor 修好失败的测试、reviewer 复核；登记之后点开关两次：
 //     once → always → once（需求还开着，回不到 off）；等需求到终态、对话汇报完、模式回到 off；退出、重新启动，
 //     打开同一个会话（{ restart: true } 之后的一段，回放用 ?part=after）。
-//   tb-receipts（TB-08、TB-37）：全部允许下 /team 让 executor 跑一个 90 秒的命令；它运行时发一条超过 120 字符的补充、
+//   tb-receipts（TB-08、TB-37）：Allow all 下 /team 让 executor 跑一个 90 秒的命令；它运行时发一条超过 120 字符的补充、
 //     再发一条撤销：三种回执都有，需求以 cancelled 结束。
-//   tb-approval（TB-34）：“每次询问”下 /team 让 executor 运行 node --version：后台实例的批准卡出现后先发一条问进展的消息，
+//   tb-approval（TB-34）：“Ask each time”下 /team 让 executor 运行 node --version：后台实例的批准卡出现后先发一条问进展的消息，
 //     等那一轮结束（卡不清掉）再允许；之后的卡一律允许。
 // 录完先核对场景要的东西真的发生了（check）；模型没照做时（例如没调 agent_message、需求没到终态）最多重录 2 次，
 // 仍不符合时不写进 fixtures，写到 test-results/tb-record/<名字>.rejected.json。
@@ -218,7 +218,7 @@ const askScenario = {
 };
 
 /**
- * @brief tb-team：全部允许下 /team 修好失败的测试；登记之后开关 once → always → once；等需求关闭、汇报完、回到 off；
+ * @brief tb-team：Allow all 下 /team 修好失败的测试；登记之后开关 once → always → once；等需求关闭、汇报完、回到 off；
  *        重启后打开同一个会话。
  */
 const teamScenario = {
@@ -261,7 +261,7 @@ const teamScenario = {
 };
 
 /**
- * @brief tb-receipts：全部允许下 /team 让 executor 跑一个 90 秒的命令；它运行时再发一条超过 120 字符的补充、一条撤销：
+ * @brief tb-receipts：Allow all 下 /team 让 executor 跑一个 90 秒的命令；它运行时再发一条超过 120 字符的补充、一条撤销：
  *        合并会话写下三种回执（registered、added、cancelled），运行中的实例被停止，需求以 cancelled 结束。
  */
 const receiptsScenario = {
@@ -297,7 +297,7 @@ const receiptsScenario = {
   },
 };
 
-/** @brief tb-approval：“每次询问”下 task 实例运行命令出后台批准卡；卡挂着时问一次进展，那一轮结束后再允许。 */
+/** @brief tb-approval：“Ask each time”下 task 实例运行命令出后台批准卡；卡挂着时问一次进展，那一轮结束后再允许。 */
 const approvalScenario = {
   name: 'tb-approval', covers: 'TB-34',
   description: 'Ask each time: "/team" asks executor to run node --version. The task instance\'s bash shows a '

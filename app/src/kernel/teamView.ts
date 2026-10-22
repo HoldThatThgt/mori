@@ -99,6 +99,24 @@ export function boardView(board: Board, input: ViewInput): BoardView {
   return { requests, teamEdited: input.teamEdited };
 }
 
+/**
+ * @brief 一次写入里交给了另一方的 task（§12.12：它们的实例的 modelNote 清掉）：交接链变长（交接、兜底）、持有者变了，
+ *        或从 waiting_user、stopped 交回。
+ * @param before 写入前
+ * @param after 写入后
+ * @return task 编号
+ */
+export function handedOver(before: Board, after: Board): string[] {
+  return after.tasks.filter((task) => {
+    const old = findTask(before, task.id);
+    if (!old || old === task) return false;
+    const back = (old.status === 'waiting_user' || old.status === 'stopped')
+      && (task.status === 'active' || task.status === 'pending');
+    return back || old.handoffs.length !== task.handoffs.length
+      || JSON.stringify(old.holder) !== JSON.stringify(task.holder);
+  }).map((task) => task.id);
+}
+
 /** @brief TaskBoard 上有交接记下了改过代码的模型族（重新打开后 teamEdited 的来源，§13.12）。 */
 export function boardEdited(board: Board): boolean {
   return board.tasks.some((task) => task.handoffs.some((handoff) => handoff.authorFamilies.length > 0));

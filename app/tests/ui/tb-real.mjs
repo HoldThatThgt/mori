@@ -5,8 +5,8 @@
 // 用来看发给模型的工具）；角色文件 executor、reviewer（reviewer 的 models 是第二个提供商），基座持有对话、立项与结案。
 // 三个驱动（§17.1），每个在自己的临时项目和会话里：
 //   ask：关闭模式下让对话用 agent_message 问 reviewer 一个问题（临时提问）。
-//   team：/team 让 executor 修好失败的测试（只改 sum.js）并跑 npm test、reviewer 复核；“每次询问”，出现的后台批准卡都允许。
-//   approval：“每次询问”下 /team 让 executor 运行 node --version（task 跑命令，出后台批准卡），允许。
+//   team：/team 让 executor 修好失败的测试（只改 sum.js）并跑 npm test、reviewer 复核；“Ask each time”，出现的后台批准卡都允许。
+//   approval：“Ask each time”下 /team 让 executor 运行 node --version（task 跑命令，出后台批准卡），允许。
 // 检查只断言程序保证的事（§17.1 的列表）：回执与 board.json 的写入一一对应；每个交接的证据编号都在那个实例会话里；
 // 对话会话的请求里没有写入类工具；后台批准卡写明角色与 task；每个实例的每次运行结束后 task 处于 §9.4 规定的状态，
 // 每个 task 到了终态、waiting_user 或交给结案；进展摘要的需求与 task 标题等于 board.json 里的，task 行的当前在做什么等于
@@ -103,7 +103,7 @@ async function askDrive(ctx, project) {
 }
 
 /**
- * @brief team / approval：发 /team <文字>，界面上出现的后台批准卡都点“允许一次”（记下卡与对应的事件），
+ * @brief team / approval：发 /team <文字>，界面上出现的后台批准卡都点“Allow once”（记下卡与对应的事件），
  *        直到需求都到终态、协作空闲（连续 3 秒）；空闲了一分钟需求还开着、或 15 分钟到了就结束。
  */
 async function teamDrive(ctx, project, prompt) {
@@ -136,7 +136,7 @@ async function idleNow(ctx, who) {
     && !pane.sending);
 }
 
-/** @brief 这个会话那一栏里新出现的批准卡：记下卡（归属行、data-*）与它的 mori.team_approval_request，点“允许一次”。 */
+/** @brief 这个会话那一栏里新出现的批准卡：记下卡（归属行、data-*）与它的 mori.team_approval_request，点“Allow once”。 */
 async function answerCards(ctx, who, cards) {
   for (const card of await approvalCardsOf(ctx, who.tab)) {
     if (cards.some((c) => c.request === card.request)) continue;

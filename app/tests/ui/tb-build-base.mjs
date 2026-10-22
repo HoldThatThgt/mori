@@ -12,8 +12,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { appRoot, arg } from './lib.mjs';
 
-/** 对照的提交：v1-model-providers 的最终提交（模型层做完、TaskBoard 之前） */
-const BASE_REF = '78df3dc';
+/** 对照的提交：app-v0 合并 v1 模型层之后的提交（英文界面与模型层都在、TaskBoard 之前） */
+const BASE_REF = '6a57fd4';
 
 /** @brief 运行一个命令；失败时打印并退出。 */
 function run(command, args, cwd) {

@@ -15,6 +15,10 @@ const SPLIT = process.env.TB_FLOW_SPLIT ?? '.';
 export const FLOW_TEXT = {
   /** 第一行超过 80 个字符的两行命令：标题只取第一行、截到 80 个字符加 … */
   longCommand: `echo tb-flow-${'x'.repeat(100)}\necho second-line`,
+  /** 第一行不到 80 个字符的两行命令：标题取第一行、加 " …"（§13.8，同 v0 工具卡） */
+  multiCommand: 'echo tb-flow-multi\necho second-line',
+  /** 带行范围的 read（offset、limit）：标题加 " · lines 3–4" */
+  readRange: { offset: 3, limit: 2 },
   /** 分开配置项目里 README.md 的绝对路径（标题写成 README.md） */
   absReadme: join(SPLIT, 'README.md'),
   /** need_user 的问题 */
@@ -97,8 +101,11 @@ export const SCENARIOS = {
   ],
 
   // TB-10 项目有 .pi/SYSTEM.md：协作模式的请求里仍有合并会话的立项段；之后关闭模式的一条没有。
+  // 判断你的消息时 reply_via_dialog（不需要协作）的结果请它在自己的回复里回答（合并会话）。
   'tb-flow-sysmd': [
-    { role: 'mori', kind: 'merged-create', deliveries: { 1: [say('No collaboration needed; answering directly.')] } },
+    { role: 'mori', kind: 'merged-create', deliveries: {
+      1: [call('reply_via_dialog', {}), say('No collaboration needed; answering directly.')],
+    } },
     { role: 'mori', kind: 'dialog', deliveries: { 2: [say('Off mode answer.')] } },
   ],
 
@@ -135,7 +142,8 @@ export const SCENARIOS = {
   ],
 
   // TB-21、TB-37（分开配置 chat / planner / executor / reviewer）：T1 executor → reviewer → executor（同一条会话），
-  // T2 只读、与 T1 同时由 executor 做（各一个实例），T3 依赖 T1（pending），T4 写 task 等写入锁，T4 没交接、
+  // T2 只读、与 T1 同时由 executor 做（各一个实例），T3 依赖 T1（pending），T4 写 task 等写入锁（之后先跑一条第一行很短的
+  // 两行命令、读 README.md 的第 3–4 行，进展摘要的标题与工具卡同一规则），T4 没交接、
   // 强制填写两次都格式错误 → 程序写的一棒（Mori: no handoff）；对话回复登记它的消息时你又发了一条。
   'tb-flow-chain': [
     { role: 'planner', kind: 'create', deliveries: {
@@ -178,7 +186,9 @@ export const SCENARIOS = {
           evidence: ['{tag:read}'] })],
     } },
     { role: 'executor', kind: 'task', task: 'T4', deliveries: {
-      1: [together(wait(3000), call('read', { path: 'README.md' })), end()],
+      1: [together(wait(3000), call('bash', { command: FLOW_TEXT.multiCommand })),
+        together(wait(1500), call('read', { path: FLOW_TEXT.absReadme, ...FLOW_TEXT.readRange })),
+        together(wait(1500), call('read', { path: 'README.md' })), end()],
       2: [handoff({ task: '{task}', conclusion: 'Notes written', outcome: 'done' }, { malformed: true }),
         say('I could not hand off.')],
       3: [handoff({ task: '{task}', conclusion: 'Notes written', outcome: 'done' }, { malformed: true }),
@@ -235,11 +245,13 @@ export const SCENARIOS = {
     { role: 'mori', kind: 'close', deliveries: { 1: closeTask('Prepared', 'T2 closed.') } },
   ],
 
-  // TB-37 与工具卡同一标题规则：关闭模式下对话自己跑同一条长命令、读同一个绝对路径，工具卡的标题对象与进展摘要的一致。
+  // TB-37 与工具卡同一标题规则：关闭模式下对话自己跑同样的两条命令（长的、第一行很短的）、读同一个绝对路径
+  // （整个文件、带行范围），工具卡的标题对象与进展摘要的一致。
   'tb-flow-titles': [
     { role: 'chat', kind: 'off-dialog', deliveries: {
       1: [call('bash', { command: FLOW_TEXT.longCommand }), call('read', { path: FLOW_TEXT.absReadme }),
-        say('Ran and read.')],
+        call('bash', { command: FLOW_TEXT.multiCommand }),
+        call('read', { path: FLOW_TEXT.absReadme, ...FLOW_TEXT.readRange }), say('Ran and read.')],
     } },
   ],
 

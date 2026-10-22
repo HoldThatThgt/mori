@@ -215,6 +215,28 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'close', deliveries: GENERIC_CLOSE },
   ],
 
+  // TB-16 只有执行了的调用有编号（§7.3）：T1 read（#1）、参数校验失败的 read（没有 path，pi 不执行，没有编号）、
+  // 引用 #2 的交接被拒绝（#2 还不存在；这个被拒绝的交接执行了，它的结果是 #2）、引用 #1 的交接被接受（#3）。
+  // T2 读一次就结束（不交接）→ 强制填写的运行里调 read 被 tool_call 处理器拒绝（没有编号）→ 重试时引用 #2 被拒绝
+  // （只有 #1）→ 程序写一棒交给结案。
+  'tb-handoff-tags': [
+    { role: 'planner', kind: 'create', deliveries: {
+      1: [submit('Number executed calls'), task('Invalid call', 'executor'), task('Blocked call', 'executor'),
+        say('Registered request 1.')],
+    } },
+    { role: 'chat', kind: 'team-dialog', deliveries: GENERIC_CHAT },
+    { role: 'executor', kind: 'task', task: 'T1', deliveries: {
+      1: [read(), call('read', {}), pass('done', 'Cite the invalid call', { evidence: ['#2'] }),
+        pass('done', 'README read', { evidence: ['#1'] })],
+    } },
+    { role: 'executor', kind: 'task', task: 'T2', deliveries: {
+      1: [together(wait(3000), read()), end()],
+      2: [read('src/a.ts')],
+      3: [handoff({ ...TASK_FORM, evidence: ['#2'] })],
+    } },
+    { role: 'planner', kind: 'close', deliveries: GENERIC_CLOSE },
+  ],
+
   // TB-16 重新打开后继续编号（合并会话）：T1 两个工具结果后第三个请求等很久，这时重启 Mori；重新打开后你说继续，
   // 立项交回 T1，同一条实例会话里下一个工具结果是 #3。
   'tb-handoff-renum': [
@@ -466,6 +488,26 @@ export const SCENARIOS = {
         say('Asked planner for more.')],
       2: [say('Still open.')],
       3: [handoff({ ...REQUEST_FORM, conclusion: 'Only one part was needed' })],
+    } },
+  ],
+
+  // TB-31 §7.6 的竞争：结案关闭最后一个 task（"全部已结束"的唤醒排进结案的队列）并给 planner 发消息但不等（没有 wait）；
+  // 结案被"全部已结束"唤醒的那次回合在立项还在处理这条消息时结束 → 不强制关闭；立项的运行结束、没建 task → 结案再被
+  // 唤醒一次（planner made no new tasks）→ 那次回合结束时强制关闭 → 需求关闭。立项处理消息的那次请求等 6 秒。
+  'tb-handoff-closerace': [
+    { role: 'planner', kind: 'create', deliveries: {
+      1: [submit('Race the close'), task('Only part', 'executor'), say('Registered request 1.')],
+      2: [together(wait(6000), say('No more tasks are needed.'))],
+    } },
+    { role: 'chat', kind: 'team-dialog', deliveries: GENERIC_CHAT },
+    { role: 'executor', kind: 'task', task: 'T1', deliveries: { 1: readThen('done', 'Only part done') } },
+    { role: 'planner', kind: 'close', deliveries: {
+      1: [decide('T1', 'close_done', 'Only part is fine'),
+        call('agent_message', { to: 'planner', request: 1, text: 'Request 1 may need one more task.' }),
+        say('Told planner.')],
+      2: [say('Waiting for planner.')],
+      3: [say('Still open.')],
+      4: [handoff({ ...REQUEST_FORM, conclusion: 'One part was enough' })],
     } },
   ],
 };

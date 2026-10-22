@@ -48,7 +48,7 @@ import {
 } from './teamLanes';
 import { STOPPED_BY_USER, runEnded, runStarted, startUserJudgment } from './teamRuns';
 import { runTool } from './teamTools';
-import { BOARD_EVENT_INTERVAL_MS, Throttle, boardEdited, boardView, type TaskLive } from './teamView';
+import { BOARD_EVENT_INTERVAL_MS, Throttle, boardEdited, boardView, handedOver, type TaskLive } from './teamView';
 import type { Board, BoardWake, BoardWrite, DeliveryCause, ScheduleWait, Subscriber } from './teamTypes';
 
 /** @brief 用户会话 system prompt 的自定义段名（§8.5，同 pi 内置 MCP 扩展的 mcp_servers 段）。 */
@@ -179,6 +179,8 @@ export class Team implements TeamLike {
   closed = false;
   /** board.json 的写出排成一条（同一个临时文件，§3） */
   private saving: Promise<void> = Promise.resolve();
+  /** 已经写进内存、还没写出到 board.json 的写入数（不为 0 时 pump 等写出之后再开始运行，§3） */
+  private unsaved = 0;
   /** 协作模式下你的消息按发送顺序处理（/team 进入 once 时先写模式、改模型层的锁定） */
   private inbox: Promise<void> = Promise.resolve();
   /** 上一次发出的 mori.team_state（没变时不重发） */
@@ -521,6 +523,19 @@ export class Team implements TeamLike {
   }
 
   /**
+   * @brief 结案在这个需求上发给立项的消息还有没处理完的（§7.6）：还在立项的投递队列里，或立项收到它的那次运行还没结束
+   *        （还没开始，或开始了还没处理完结束）。
+   * @param request 需求编号
+   */
+  closeAskPending(request: number): boolean {
+    const lane = this.merged ? this.user : this.lanes.get(LANE_IDS.create(this.userId).key);
+    if (!lane) return false;
+    const inRun = lane.busy && (!lane.started || lane.run !== null);
+    return [...lane.solo, ...lane.queue, ...(inRun ? lane.inflight : [])]
+      .some((item) => item.meta.closeAsk === request);
+  }
+
+  /**
    * @brief 一个（task，角色）的 task 实例（§8.1：交回同一角色就继续这条会话）。
    * @param task task 编号
    * @param role 角色
@@ -570,15 +585,23 @@ export class Team implements TeamLike {
     const result = change(before);
     if (result.error === null && result.board !== before) {
       this.board = result.board;
+      const over = handedOver(before, result.board);
+      for (const lane of this.lanes.values()) if (lane.task !== null && over.includes(lane.task)) lane.modelNote = null;
       this.committed(before, result.board);
     }
     return result;
   }
 
-  /** @brief 写出之后：发 mori.board，按写入前后的比较唤醒（§9.1），重新调度（§9.2）。 */
+  /**
+   * @brief 写出之后：发 mori.board，按写入前后的比较唤醒（§9.1），重新调度（§9.2）。写出之前 pump 不开始任何运行
+   *        （§3：board.json 先写出，再唤醒或开始任何人）。
+   */
   private committed(before: Board, after: Board): void {
+    this.unsaved += 1;
     const saved = this.saving.then(() => saveBoard(this.args.teamDir, after)).catch((error: unknown) => {
       console.error(`[kernel] ${this.userId}: the TaskBoard was not written: ${(error as Error).message}`);
+    }).finally(() => {
+      this.unsaved -= 1;
     });
     this.saving = saved;
     void saved.then(() => {
@@ -740,9 +763,16 @@ export class Team implements TeamLike {
     return !this.user.busy && this.user.settling === null && !status?.running && !status?.preparing;
   }
 
-  /** @brief 会话空闲时开始下一次运行（§8.2）：过期的投递丢弃并记日志，相邻的程序投递合并。 */
+  /**
+   * @brief 会话空闲时开始下一次运行（§8.2）：过期的投递丢弃并记日志，相邻的程序投递合并。
+   *        有还没写出的 TaskBoard 写入时等它写出再开始（§3、§6.2：运行结束后重新调度时也一样）。
+   */
   pump(lane: Lane): void {
     if (this.closed || lane.busy || lane.settling !== null || !hasQueued(lane)) return;
+    if (this.unsaved > 0) {
+      void this.saving.then(() => this.pump(lane));
+      return;
+    }
     if (lane === this.user && (!this.userSession || !this.userIdle())) return;
     for (const list of [lane.solo, lane.queue]) {
       const { kept, dropped } = dropStale(list, this.board);
@@ -1421,15 +1451,23 @@ export class Team implements TeamLike {
   }
 }
 
-/** @brief 一次工具调用的简要（TaskView.current）：只带标题要用的参数，command 只给第一行、≤ 200 字符（§13.10）。 */
+/** @brief TaskView.current 里 command 保留的字符数（§13.10）。 */
+const BRIEF_COMMAND_MAX = 200;
+
+/**
+ * @brief 一次工具调用的简要（TaskView.current，§13.10）：只带标题要用的参数（§13.8，含 read 的 offset、limit），
+ *        command 截到前 200 字符（不只第一行，toolCallTitle 才能给多行命令加 …）。
+ */
 export function toolBrief(toolName: string, args: unknown): ToolCallBrief {
   const raw = (typeof args === 'object' && args !== null ? args : {}) as Record<string, unknown>;
   const brief: ToolCallBrief['args'] = {};
   for (const key of ['path', 'pattern', 'task', 'role', 'to'] as const) {
     if (typeof raw[key] === 'string') brief[key] = raw[key] as string;
   }
-  if (typeof raw.command === 'string') brief.command = raw.command.split(/\r?\n/)[0]?.slice(0, 200) ?? '';
-  if (typeof raw.request === 'number') brief.request = raw.request;
+  for (const key of ['offset', 'limit', 'request'] as const) {
+    if (typeof raw[key] === 'number') brief[key] = raw[key] as number;
+  }
+  if (typeof raw.command === 'string') brief.command = raw.command.slice(0, BRIEF_COMMAND_MAX);
   return { toolName, args: brief };
 }
 

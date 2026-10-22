@@ -376,7 +376,7 @@ async function closeRunEnded(team: Team, lane: Lane, run: LaneRun): Promise<void
   if (run.unavailable) return closeNoModel(team, lane, request);
   if (run.forced) return forcedEnded(team, lane, run);
   const outcome = closeRunOutcome(team.board, { request, heldAtStart: run.heldAtStart, decided: run.decided,
-    wokenForEnd: run.wokenForEnd, messagedCreate: run.messagedCreate });
+    wokenForEnd: run.wokenForEnd, createPending: team.closeAskPending(request) });
   for (const task of outcome.undecided) startForced(team, lane, { kind: 'close', task }, run.lastText);
   if (outcome.forceClose) startForced(team, lane, { kind: 'request', request }, run.lastText);
 }
