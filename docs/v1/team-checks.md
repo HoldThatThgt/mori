@@ -6,7 +6,18 @@
 
 ## 状态
 
-（实现与测试完成后填写。）
+实现与测试完成（2026-10-22，`v1-taskboard` 本地提交，没有推送），等你走查与确认下面的选择。最后一次全部在开发构建上跑，代码为 `e5a20fa`（含 app-v0 `6217bfe`）：
+
+| 层 | 结果 |
+| --- | --- |
+| 单元 | `npm run test:tb-unit` 327/327；`npm run test:unit`（模型层）373/373；`npm run check` 通过 |
+| App（合成端点） | flow 43、roles 45、modes 58、ask 35、handoff 55、sched 24、models 32、stop 43、misc 20，全部通过 |
+| 回放 | `tb-replay` 55/55（真实会话录的 4 个 fixture，加 m1–m7 的录制在合成的空 TeamState 下） |
+| 真实模型 | `tb-real` 24/24（DeepSeek deepseek-flash 与 GLM-5.3，没有重跑）；模型层 MP-27 `v1-models-real` 通过 |
+| 现有功能（TB-46） | m0–m7 的 App 与回放套件、v1-models 的 App 与回放套件、模型层单元与覆盖检查，24/24（第一次与 TaskBoard 套件同时跑时 m2-app 的 minWindow 因负载超时，单独跑 68/68，之后完整重跑全部通过）；同时写了 MP-37 |
+| 覆盖检查 | `node tests/spec-coverage.mjs --spec taskboard` 与 `node tests/spec-coverage.mjs`（模型层）都是 every item is covered on every listed layer |
+
+另外：实现中做过一次按规格分区的代码审查（5 个审查 + 5 个对抗核实），35 条发现里核实为真的 31 条全部修好并补了测试。
 
 ## 你不在时定下的选择（2026-10-21，待你确认）
 
