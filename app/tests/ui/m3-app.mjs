@@ -12,7 +12,13 @@
 // 项目信任（询问框、不信任、Esc、记住、信任后扩展的工具与批准卡、trust.json、重启后再问或不再问、
 // 不信任时保存的会话信任后重新打开也有扩展的工具、后台进程层面的反例）；草稿（切换、设置页、重启）；
 // 状态（生成中、有新结果、等你批准、出错、后台进程退出与重新载入）；窄窗口的图标栏圆点与浮动左栏；
-// Ctrl+N 不起作用的情况（菜单、信任询问、浮动左栏、按住不放）；左栏没有小于 12px 的文字；页面没有报错。
+// Ctrl+N 不起作用的情况（菜单、信任询问、浮动左栏、按住不放、输入框下面一行的菜单；圆环详情不算）；
+// 输入框下面一行（2026-10-21 从顶栏移来，docs/v0/composer-pickers.md"测试要改的地方"）：Shift+Tab 回会话树 5 次、
+// 从文字框 Tab 的顺序、空闲时各按钮的悬停与读屏的描述、新会话的空圆环和悬停提示、有用量时圆环的读屏名和悬停、
+// 生成中不可用的原因、后台进程退出时权限菜单关闭和各按钮的不可用原因、点不可用的按钮不开菜单、
+// "Restart"之后重新载入中和重新打开中的原因（按钮和圆环保留、焦点留在按钮上）、重新打开失败时只剩权限按钮
+// （焦点回到文字框）和重试；
+// 左栏没有小于 12px 的文字；页面没有报错。
 // 扩展的询问与界面重新加载在 m3-app-live.mjs（同一次运行里接着做），共用的小工具在 m3-helpers.mjs。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m3-app.mjs                         测开发构建
@@ -24,18 +30,20 @@
 // 项目扩展（.pi/extensions/project-hello.ts）是测试写的 synthetic 扩展：加载时先写 marker 文件，再注册 project_hello。
 
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, sleep } from './lib.mjs';
 import { liveSteps, writeAskExtension } from './m3-app-live.mjs';
 import {
-  activeFile, allRows, answerTrustDialog, archivedState, chooseMenuItem, clickOpenFolder, ctrlN, expandArchived,
-  findByName, focusInfo, hasDraft, holdFile, kernelOpen, lastReply, liveInfo, menuItems, menuText, noteSmallText,
-  openMenuByKey, openMenuByMouse, openRow, PANE, paneCount, paneOf, prefillOf, recycleBinNames, renameClosed,
-  renameView, rowOf, rowState, samePath, savedArchived, savedDrafts, sendWait, sessionGone, sessionNames, startDelete,
-  startRename, stoppedCount, stubFolder, titleOf, topTitle, treeState, trustRecord, until, waitArchivedToggle,
-  waitComposerFocus, waitIdle, waitPanes, waitReady, waitRowTitle, waitRunning, waitStatus,
+  activeFile, allRows, answerTrustDialog, archivedState, blockedBy, chooseMenuItem, clickOpenFolder, composerRow,
+  ctrlN, EFFORT_BUSY, expandArchived, findByName, focusInfo, hasDraft, holdFile, kernelOpen, lastReply, liveInfo,
+  menuItems, menuText, MODEL_BUSY, noteSmallText, openMenuByKey, openMenuByMouse, openRow, PANE, paneCount, paneOf,
+  prefillOf, rangeBlockedBy, recycleBinNames, renameClosed, renameView, ROW_MENUS, ROW_REASONS, ROW_TAB_ORDER, rowLog,
+  rowOf, rowState, rowWhen, samePath, savedArchived, savedDrafts, sendWait, sessionGone, sessionNames,
+  shownWithin, spoken, startDelete, startRename, stoppedCount, stubFolder, titleOf, topTitle, treeState, trustRecord,
+  until, usable, usageOk, waitArchivedToggle, waitComposerFocus, waitIdle, waitPanes, waitReady, waitRowTitle,
+  waitRunning, waitStatus, watchRow,
 } from './m3-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
@@ -49,6 +57,8 @@ const shots = join(appRoot, `test-results/m3-app${suffix}`);
 mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder(exePath ?? 'dev build');
 const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) }).catch(() => {});
+/** @brief 两个值的 JSON 相同（顺序也算）。 */
+const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 
 /** 每个会话的第一条消息（都超过 20 个字，含 "plain" 让合成端点只回文字） */
 const MESSAGES = {
@@ -78,9 +88,18 @@ const NEW_SESSION = 'New session';
 const REMEMBERED = 'To change your remembered choice';
 /** 后台进程意外退出后左栏导航按钮的悬停说明 */
 const CRASHED_TIP = 'Mori’s background process crashed. Restart it to continue.';
-/** 开着时 Esc 先关它们的浮层 */
-const OVERLAYS = ['session-menu', 'rename-input', 'delete-dialog', 'trust-dialog', 'confirm-dialog', 'issue-dialog']
-  .map((id) => `[data-testid="${id}"]`).join(', ');
+/** 开着时 Esc 先关它们的浮层（含输入框下面一行的菜单和圆环详情） */
+const OVERLAYS = ['session-menu', 'rename-input', 'delete-dialog', 'trust-dialog', 'confirm-dialog', 'issue-dialog',
+  'permission-menu', 'model-menu', 'thinking-menu', 'usage-details'].map((id) => `[data-testid="${id}"]`).join(', ');
+/** 首次启动写下的提供商（page.mjs firstRun 的默认名称、区域 Local）和模型：选择范围按钮的字和悬停第二行 */
+const RANGE = { text: 'fake-coder', current: 'mori-endpoint/fake-coder', where: 'Mori endpoint · Local' };
+/** 能用时悬停的第二行（ui-strings.md"权限按钮""选择范围、Effort 按钮的悬停"） */
+const ROW_TIPS = { ask: 'Change the permission mode', effort: 'Set the effort level for this session',
+  unsupported: 'This model isn’t marked “Supports thinking”' };
+/** 还没有消息时圆环的读屏名和描述（models.md"上下文用量（圆环）"） */
+const RING_EMPTY = { label: 'Context window', note: 'Send a message to see context usage.' };
+/** 重新打开会失败的会话（statusKernelExit 里把它的会话文件挪走）的第一条消息 */
+const FAIL_MESSAGE = 'plain 重启后会打开失败的会话';
 
 // ---------- 准备：合成端点、项目文件夹、项目扩展 ----------
 
@@ -275,23 +294,34 @@ async function checkTree(ctx) {
 
 // ---------- 走查 2：键盘 ----------
 
-/** @brief Shift+Tab 直到焦点进入会话树（最多 12 次），返回按了几次、经过的元素（文字和 data-testid）和焦点。 */
+/**
+ * @brief Shift+Tab 直到焦点进入会话树（最多 12 次），返回按了几次、经过的元素（文字、data-testid、角色、
+ *        是否在输入框下面一行）和焦点。
+ */
 async function shiftTabIntoTree(page) {
   const path = [];
   const testids = [];
+  const roles = [];
+  const inRow = [];
   for (let presses = 1; presses <= 12; presses += 1) {
     await page.keyboard.press('Shift+Tab');
     const focus = await focusInfo(page);
     path.push(focus.label ?? focus.testid ?? focus.text);
     testids.push(focus.testid);
-    if (focus.file !== null) return { presses, path, testids, focus };
+    roles.push(focus.role);
+    inRow.push(focus.inRow);
+    if (focus.file !== null) return { presses, path, testids, roles, inRow, focus };
   }
-  return { presses: 12, path, testids, focus: await focusInfo(page) };
+  return { presses: 12, path, testids, roles, inRow, focus: await focusInfo(page) };
 }
 
 /**
- * @brief 走查 2：Ctrl+N（焦点在输入框）→ Shift+Tab 几次（经过顶栏的五个按钮：右栏开关、权限、M6 加的思考强度和模型、
- *        TaskBoard 加的协作开关，左栏分隔线、左栏底部的两个按钮）回到会话树，落在新会话行；整棵树一个 Tab 停靠点。
+ * @brief 走查 2：Ctrl+N（焦点在输入框）→ Shift+Tab 6 次（顶栏的右栏开关、协作开关，左栏分隔线、左栏底部的
+ *        两个按钮）回到会话树，落在新会话行；整棵树一个 Tab 停靠点。2026-10-21 起权限、选择范围、Effort 按钮和上下文用量在
+ *        输入框下面一行、文字框之后（composer-pickers.md），不在这条路上（原来是 8 次，路径里依次有顶栏的权限、思考强度和
+ *        模型按钮；那一项检查的行为被去掉了，改成下面"不经过输入框下面一行"）。TaskBoard 的协作开关是顶栏右边一组的第一个
+ *        （parallel-agents-taskboard.md §13.1，一个真正可以聚焦的按钮），多一个停靠点（会话还在打开时它不可用、不在 Tab
+ *        路径上；ctrlN 等到会话打开好才返回，所以次数是确定的）。
  */
 async function keyboardPath(ctx) {
   const { page } = ctx;
@@ -301,16 +331,16 @@ async function keyboardPath(ctx) {
   record('走查 2：Ctrl+N 在当前会话所在的项目（beta）新建会话，名为"新会话"，焦点在新会话的输入框', k?.active
     && k.title === NEW_SESSION && samePath(k.cwd, ctx.folders.beta) && composer, JSON.stringify(k));
   const entered = await shiftTabIntoTree(page);
-  // M6 顶栏加了模型和思考强度两个按钮（models.md），多两个 Tab 停靠点：6 次改为 8 次；TaskBoard 在模型按钮之前加了
-  // 协作开关（parallel-agents-taskboard.md §13.1，一个真正可以聚焦的按钮），再多一个：8 次改为 9 次。
-  record('走查 2：从新会话的输入框 Shift+Tab 几次回到会话树（不超过 9 次：M6 是 8 次，多了协作开关），落在新会话行'
-    + '（中间不在别的会话行停）', samePath(entered.focus.file, ctx.files.K) && entered.presses <= 9,
+  // 2026-10-21 起顶栏只有会话名、协作开关、右栏开关（分屏时"Close pane"），权限、选择范围、Effort 移到输入框下面一行：
+  // 9 次（M6 的 8 次加 TaskBoard 的协作开关）改为 6 次。
+  record('走查 2：从新会话的输入框 Shift+Tab 6 次回到会话树，落在新会话行（中间不在别的会话行停）',
+    samePath(entered.focus.file, ctx.files.K) && entered.presses === 6,
     `按了 ${entered.presses} 次：${entered.path.join(' → ')}；焦点：${JSON.stringify(entered.focus)}`);
-  // sessions.md 走查 2 的路径：权限按钮之后依次是思考强度按钮和模型按钮（models.md 的两个新按钮都能用键盘到达）。
-  const order = ['permission-button', 'thinking-button', 'model-button'].map((id) => entered.testids.indexOf(id));
-  record('走查 2（M6）：Shift+Tab 的路径依次经过顶栏的权限、思考强度、模型按钮（sessions.md 写的路径）',
-    order.every((index, i) => index >= 0 && (i === 0 || index === order[i - 1] + 1)),
-    `data-testid 顺序：${entered.testids.map((id) => id ?? '—').join(' → ')}`);
+  record('走查 2：Shift+Tab 的路径是顶栏的右栏开关 → 协作开关 → 左栏分隔线 → 左栏底部的两个按钮 → 会话行（sessions.md'
+    + ' 写的路径，加上协作开关），不经过输入框下面一行的权限、选择范围、Effort 按钮和圆环', entered.path[0] === 'Toggle changes'
+    && entered.testids[1] === 'team-switch' && entered.roles[2] === 'separator' && entered.inRow.every((inside) => !inside)
+    && !entered.testids.some((id) => ROW_TAB_ORDER.includes(id)),
+  `路径：${entered.path.join(' → ')}；data-testid：${entered.testids.map((id) => id ?? '—').join(' → ')}`);
   const stops = (await allRows(page)).filter((row) => row.tabIndex === 0);
   await page.keyboard.press('Tab');
   const out = await focusInfo(page);
@@ -319,6 +349,68 @@ async function keyboardPath(ctx) {
   record('会话树：整棵树只占一个 Tab 停靠点（只有当前会话行 tabIndex 为 0；Tab 离开树，Shift+Tab 回来落在当前会话行）',
     stops.length === 1 && samePath(stops[0].file, ctx.files.K) && out.file === null && samePath(back.file, ctx.files.K),
     `停靠点 ${stops.length} 个；Tab 后 ${JSON.stringify(out)}；Shift+Tab 后 ${JSON.stringify(back)}`);
+}
+
+/**
+ * @brief 输入框下面一行（新会话 K，空闲、还没有消息；models.md"位置""上下文用量（圆环）"）：从文字框按 Tab 依次是
+ *        权限 → 选择范围 → Effort → 圆环，输入为空时"Send"不可用、跳过（第 5 次 Tab 离开这一行）；空闲时各按钮的悬停和
+ *        读屏的描述（idleTips）；空圆环；Tab 到圆环时悬停提示也显示，Esc 藏起提示、焦点留在圆环上。
+ */
+async function rowTabOrder(ctx) {
+  const { page } = ctx;
+  await page.mouse.move(0, 0);
+  await paneOf(page).locator('.composer textarea').focus();
+  const idle = await composerRow(page);
+  const stops = [];
+  for (let presses = 0; presses < ROW_TAB_ORDER.length; presses += 1) {
+    await page.keyboard.press('Tab');
+    const focus = await focusInfo(page);
+    stops.push(focus.inRow ? focus.testid : `outside:${focus.label ?? focus.tag}`);
+  }
+  const ring = await rowWhen(page, (row) => row.tip !== null, 2000);
+  await page.keyboard.press('Escape');
+  const hidden = await rowWhen(page, (row) => row.tip === null, 2000);
+  await page.keyboard.press('Tab');
+  const after = await focusInfo(page);
+  record('输入框下面一行：从文字框按 Tab 依次是权限 → 选择范围 → Effort → 圆环；输入为空时"Send"不可用、跳过'
+    + '（再按 Tab 离开这一行）', same(stops, ROW_TAB_ORDER) && !after.inRow,
+  `停靠：${stops.join(' → ')}；再按 Tab：${JSON.stringify(after)}`);
+  idleTips(idle);
+  const usage = idle?.usage;
+  record('圆环（还没有消息的新会话）：空圆环，data-state="empty"、data-tokens 和 data-percent 为 0，读屏名"Context window"，'
+    + '描述"Send a message to see context usage."（不显示"0%"），aria-expanded 为 false、没有 aria-controls',
+  usage?.state === 'empty' && usage.tokens === '0' && usage.percent === '0' && usage.label === RING_EMPTY.label
+    && usage.described === RING_EMPTY.note && usage.expanded === 'false' && usage.controls === null,
+  JSON.stringify(usage));
+  record('圆环：Tab 到它时悬停提示也显示（"Context window"，没有"%"）；Esc 藏起提示，焦点留在圆环上，详情没有打开',
+    ring?.focus === 'usage' && ring.tip === RING_EMPTY.label && hidden?.tip === null && hidden.focus === 'usage'
+    && !hidden.details,
+  JSON.stringify({ tip: ring?.tip, focus: ring?.focus, hidden: hidden?.tip, now: hidden?.focus }));
+}
+
+/**
+ * @brief 空闲时三个按钮能用（不带 aria-disabled，composer-pickers.md C1），悬停按行（C2）、读屏的描述只有第二行
+ *        （"我自己定的"第 18 条）：权限"Permission mode: Ask each time" / "Change the permission mode"，按钮里只有模式名一段字
+ *        和 ▾（没有盾牌图标）；选择范围按钮读屏名"Model range: fake-coder"，悬停"fake-coder" / "Mori endpoint · Local"，
+ *        描述"Mori endpoint, Local"；Effort 读屏名"Effort: <强度>"，按钮的字带"Effort: "前缀，悬停第一行是全名、第二行是说明。
+ */
+function idleTips(row) {
+  const { permission, model, thinking } = row ?? {};
+  record('权限按钮（空闲）：能用（不带 aria-disabled），读屏名"Permission mode: Ask each time"，按钮的字只有模式名，'
+    + '没有图标（最多一个 ▾），悬停两行"Permission mode: Ask each time" / "Change the permission mode"，读屏的描述只有第二行',
+  usable(permission) && permission.label === 'Permission mode: Ask each time' && permission.text === 'Ask each time'
+    && permission.icons <= 1 && same(permission.tip, [permission.label, ROW_TIPS.ask])
+    && permission.described === ROW_TIPS.ask, JSON.stringify(permission));
+  record('选择范围按钮（空闲）：能用，读屏名"Model range: fake-coder"，按钮的字"fake-coder"，悬停两行"fake-coder" / '
+    + '"Mori endpoint · Local"，读屏的描述"Mori endpoint, Local"（只有第二行，" · "换成", "），data-current 是当前模型',
+  usable(model) && model.label === `Model range: ${RANGE.text}` && model.text === RANGE.text && Boolean(model.pick)
+    && model.current === RANGE.current && same(model.tip, [RANGE.text, RANGE.where])
+    && model.described === spoken(RANGE.where), JSON.stringify(model));
+  const second = thinking?.reasoning === 'false' ? ROW_TIPS.unsupported : ROW_TIPS.effort;
+  record('Effort 按钮（空闲）：能用，读屏名"Effort: <强度>"，按钮的字带"Effort: "前缀，悬停两行（第一行是全名，第二行'
+    + '"Set the effort level for this session"，不支持思考时"This model isn’t marked “Supports thinking”"），读屏的描述只有第二行',
+  usable(thinking) && /^Effort: \S/.test(thinking.label ?? '') && thinking.text.startsWith('Effort: ')
+    && same(thinking.tip, [thinking.label, second]) && thinking.described === second, JSON.stringify(thinking));
 }
 
 /** @brief ↑ ↓ Home End 在会话行之间移动焦点（跨项目，不打开会话）。 */
@@ -996,13 +1088,17 @@ async function archiveDelete(ctx) {
 
 // ---------- 走查 7：状态 ----------
 
-/** @brief 生成中切走：行显示"Running"；本轮结束后"Unread"；点开后消失。 */
+/**
+ * @brief 生成中切走：行显示"Running"；本轮结束后"Unread"；点开后消失。切走之前先看生成中 A1 的输入框下面一行
+ *        （busyRow，2026-10-21 起选择范围、Effort 在这一行）。
+ */
 async function statusRunning(ctx) {
   const { page } = ctx;
   const { A1, K } = ctx.files;
   await openRow(page, A1);
   await ctx.h.send('wait 4s');
   await waitRunning(page);
+  busyRow(await rowWhen(page, (row) => row.model?.unavailable === true && row.thinking?.unavailable === true, 2000));
   await openRow(page, K);
   const running = await rowState(page, A1);
   record('状态：切走后生成中的会话行显示"生成中"（圆点加文字，跟在会话名右边）', running?.status === 'running'
@@ -1092,6 +1188,30 @@ async function statusApproval(ctx) {
   await waitIdle(page);
 }
 
+// ---------- 输入框下面一行：生成中（composer-pickers.md 新检查第 6 条） ----------
+
+/**
+ * @brief 生成中输入框下面一行（models.md"不可用时、按钮消失时的焦点"）：权限按钮和圆环可用；选择范围按钮
+ *        不可用（aria-disabled，仍能 Tab 到），悬停三行"fake-coder" / "Mori endpoint · Local" / "Can’t switch models until the
+ *        response finishes"，描述"Mori endpoint, Local. Can’t switch models until the response finishes"；Effort 不可用，
+ *        悬停第一行仍是全名，第二行和读屏的描述"Can’t change effort until the response finishes"。
+ */
+function busyRow(row) {
+  record('生成中：权限按钮和圆环可用；选择范围按钮不可用（aria-disabled，没有 data-pending），悬停第三行和读屏描述的后半'
+    + '"Can’t switch models until the response finishes"（第一、二行不变）；Effort 不可用，悬停第二行和读屏的描述'
+    + '"Can’t change effort until the response finishes"', usable(row?.permission) && Boolean(row.usage)
+    && rangeBlockedBy(row.model, RANGE.where, MODEL_BUSY) && blockedBy(row.thinking, EFFORT_BUSY),
+  JSON.stringify(row && { permission: row.permission, model: row.model, thinking: row.thinking, usage: row.usage }));
+}
+
+/** @brief 等焦点落在当前会话的文字框里（最多 2 秒），返回那时的焦点。 */
+async function composerFocus(page) {
+  return await until(async () => {
+    const focus = await focusInfo(page);
+    return focus.composer ? focus : null;
+  }, 2000) || focusInfo(page);
+}
+
 /** @brief 不可见的会话这一轮以错误结束：行显示"Error"；再发一条消息后消失。 */
 async function statusError(ctx) {
   const { page } = ctx;
@@ -1110,15 +1230,22 @@ async function statusError(ctx) {
 
 /**
  * @brief 不可见的会话生成中时后台进程退出：行显示"Error"，"New session"不可用；"Restart"后重新打开，
- *        "Error"消失。
+ *        "Error"消失。显示的是另一个会话 F（在 K 的项目里新建，发过一条消息，空闲；退出时开着权限菜单）：退出前后它的
+ *        输入框下面一行见 idleRow、exitedRow；退出后把 F 的会话文件挪走再"Restart"，F 重新打开失败（restartRow）；
+ *        放回文件后点 F 的会话行重试（retryFailed）。
  */
 async function statusKernelExit(ctx) {
   const { app, page } = ctx;
-  const { A1, K } = ctx.files;
+  const { A1 } = ctx.files;
+  ctx.files.F = await ctrlN(page);
+  await sendWait(ctx, FAIL_MESSAGE);
   await openRow(page, A1);
   await ctx.h.send('wait 6s');
   await waitRunning(page);
-  await openRow(page, K);
+  await openRow(page, ctx.files.F);
+  const before = await idleRow(ctx);
+  await paneOf(page).getByTestId('permission-button').click();
+  await page.getByTestId('permission-menu').waitFor({ timeout: 3000 });
   killKernel(app);
   await paneOf(page).getByTestId('kernel-exit').waitFor({ timeout: 10000 });
   const error = await waitStatus(page, A1, 'error', 5000);
@@ -1128,14 +1255,117 @@ async function statusKernelExit(ctx) {
   record('后台进程意外退出：退出时正在生成的会话显示"出错"；"新会话""打开文件夹…"不可用，悬停说明"后台进程已退出，先重新载入"',
     error && await button.isDisabled() && await folder.isDisabled() && tip === CRASHED_TIP,
     `${JSON.stringify(await rowState(page, A1))}；提示 ${tip}`);
+  await exitedRow(ctx, before);
   await shot(page, '12-kernel-exit');
-  await paneOf(page).getByRole('button', { name: 'Restart' }).click();
-  await page.waitForFunction(() => !document.querySelector('[data-testid="new-session"]')?.disabled, null,
-    { timeout: 30000 });
+  const away = `${ctx.files.F}.away`;
+  renameSync(ctx.files.F, away);
+  try {
+    await restartRow(ctx, before);
+  } finally {
+    if (existsSync(away)) renameSync(away, ctx.files.F);
+  }
   const cleared = await waitStatus(page, A1, null, 30000);
   record('重新载入：打开过的会话重新打开，"出错"在重新打开成功后消失；"新会话"重新可用', cleared,
     JSON.stringify(await rowState(page, A1)));
+  await retryFailed(ctx);
   await waitReady(page);
+}
+
+/** @brief 这一行的三个按钮都在、都不可用，原因都是 reason（选择范围按钮悬停第二行仍是提供商和区域）。 */
+const rowBlocked = (row, reason) => Boolean(row) && blockedBy(row.permission, reason)
+  && rangeBlockedBy(row.model, RANGE.where, reason) && blockedBy(row.thinking, reason);
+
+/** @brief 用 element.click() 点这一栏横幅里的"Restart"：焦点不移到它上面（留在这一行的按钮上）。 */
+const clickRestart = (page) => page.evaluate((selector) => [...document.querySelector(selector)
+  .querySelectorAll('button')].find((item) => item.textContent.trim() === 'Restart').click(), PANE);
+
+/**
+ * @brief 后台进程退出前（F 空闲、有用量）输入框下面一行的样子，作为对照：三个按钮能用；圆环有用量，读屏名、data-tokens、
+ *        data-percent 对得上，悬停（鼠标移上去）的提示"Context ≈ <数> / <上下文长度> (<百分比>%)"（models.md"上下文用量（圆环）"）。
+ */
+async function idleRow(ctx) {
+  const { page } = ctx;
+  const row = await composerRow(page);
+  await paneOf(page).getByTestId('usage').hover();
+  const hovered = await rowWhen(page, (now) => now.tip !== null, 2000);
+  await page.mouse.move(0, 0);
+  record('输入框下面一行（空闲、有消息）：权限、选择范围、Effort 按钮能用（不带 aria-disabled 和 data-pending）',
+    usable(row?.permission) && usable(row.model) && usable(row.thinking), JSON.stringify(row));
+  record('圆环（有用量）：data-state="used"，读屏名"Usage: Context approximately <数> of <上下文长度> tokens (<百分比>%)"'
+    + '（写完整的数，与 data-tokens、data-percent 相同），悬停提示"Context ≈ <k> / <k> (<百分比>%)"，读屏的描述里没有"/"',
+  usageOk(row?.usage, hovered?.tip ?? null), JSON.stringify({ usage: row?.usage, tip: hovered?.tip }));
+  return row;
+}
+
+/**
+ * @brief 后台进程退出后 F 的输入框下面一行（chat.md"后台进程退出"、models.md"什么时候自动关""不可用时、按钮消失时的焦点"）：
+ *        开着的权限菜单关闭（原来不关），焦点回到权限按钮（菜单里有焦点的项消失、按钮还在）；权限、选择范围、Effort
+ *        不可用，原因"Mori’s background process crashed"；圆环保留最后一次的用量；点不可用的三个按钮都不开菜单
+ *        （"点了不开菜单"）。圆环详情在退出时不关不在这里查（M2 的整机测试查）。
+ */
+async function exitedRow(ctx, before) {
+  const { page } = ctx;
+  const crashed = ROW_REASONS.crashed;
+  const row = await rowWhen(page, (now) => now.menus.length === 0 && now.model?.unavailable === true);
+  record('后台进程退出：输入框下面一行开着的权限菜单关闭，焦点回到权限按钮；权限、选择范围、Effort 不可用（aria-disabled，'
+    + '仍能 Tab 到），原因"Mori’s background process crashed"（权限、Effort 悬停第二行，范围按钮悬停第三行，读屏的描述；'
+    + '范围按钮的描述前面仍是提供商和区域）；按钮位置也是这句；圆环保留最后一次的用量', row?.menus.length === 0
+    && row.focus === 'permission-button' && row.notReady === crashed && rowBlocked(row, crashed)
+    && Boolean(before?.usage) && row.usage?.tokens === before.usage.tokens, JSON.stringify(row));
+  const clicks = [];
+  for (const [button, menu] of Object.entries(ROW_MENUS)) {
+    await paneOf(page).getByTestId(button).click();
+    clicks.push({ button, opened: await shownWithin(page.getByTestId(menu), 800) });
+  }
+  record('后台进程退出：点不可用的权限、选择范围、Effort 按钮都不开菜单', clicks.every((item) => !item.opened),
+    JSON.stringify(clicks));
+}
+
+/**
+ * @brief F 的会话文件已挪走时"Restart"（chat.md"后台进程退出"、models.md"不可用时、按钮消失时的焦点"）：焦点先放在
+ *        选择范围按钮上，用 element.click() 点"Restart"。重新载入中三个按钮不可用、原因"Restarting…"；Restart 之后重新打开中
+ *        （"Starting…"）选择范围、Effort 和圆环仍在（不像第一次打开那样藏起）、不可用、原因"Starting…"，圆环是最后一次的
+ *        用量，焦点留在选择范围按钮上；F 重新打开失败（"Session didn’t open"）时只剩不可用的权限按钮，焦点移到文字框。
+ */
+async function restartRow(ctx, before) {
+  const { page } = ctx;
+  await paneOf(page).getByTestId('model-button').focus();
+  await watchRow(page);
+  await clickRestart(page);
+  await page.waitForFunction(() => !document.querySelector('[data-testid="new-session"]')?.disabled, null,
+    { timeout: 30000 });
+  await page.waitForFunction(({ selector, text }) => document.querySelector(`${selector} [data-testid="not-ready"]`)
+    ?.textContent === text, { selector: PANE, text: ROW_REASONS.failed }, { timeout: 30000 }).catch(() => {});
+  await composerFocus(page);
+  const log = await rowLog(page);
+  const restarting = log.find((row) => row?.notReady === ROW_REASONS.restarting);
+  const starting = log.find((row) => row?.notReady === ROW_REASONS.starting);
+  const kept = log.filter((row) => [ROW_REASONS.crashed, ROW_REASONS.restarting, ROW_REASONS.starting]
+    .includes(row?.notReady));
+  const failed = log.at(-1);
+  const banner = await paneOf(page).getByText(/^Failed to open session: /).count();
+  record('重新载入中：输入框下面一行的权限、选择范围、Effort 按钮不可用，原因"Restarting…"（按钮位置也是）',
+    rowBlocked(restarting, ROW_REASONS.restarting), JSON.stringify(restarting ?? log.map((row) => row?.notReady)));
+  record('Restart 之后重新打开中（"Starting…"）：选择范围、Effort 和圆环仍在（不像第一次打开那样藏起）、不可用，原因'
+    + '"Starting…"，圆环是最后一次的用量；焦点一直留在选择范围按钮上', rowBlocked(starting, ROW_REASONS.starting)
+    && starting.usage?.tokens === before?.usage?.tokens && kept.length > 0
+    && kept.every((row) => row.focus === 'model-button'),
+  JSON.stringify({ starting, focus: kept.map((item) => item.focus) }));
+  record('重新打开失败（会话文件不在了，"Session didn’t open"，横幅"Failed to open session: …"）：输入框下面一行只剩权限按钮'
+    + '（不可用，原因"Session didn’t open"），没有选择范围、Effort 和圆环；焦点从消失的选择范围按钮移到这一栏的文字框；'
+    + '这一行不变矮', failed?.notReady === ROW_REASONS.failed && !failed.model && !failed.thinking && !failed.usage
+    && blockedBy(failed.permission, ROW_REASONS.failed) && failed.focus === 'textarea' && banner > 0
+    && Math.abs(failed.height - before?.height) <= 1, JSON.stringify({ failed, banner, height: before?.height }));
+}
+
+/** @brief 放回 F 的会话文件后点它的会话行重试（sessions.md"新建或打开失败"）：打开后这一行的三个按钮和圆环回来、能用。 */
+async function retryFailed(ctx) {
+  const { page } = ctx;
+  await rowOf(page, ctx.files.F).click();
+  await waitReady(page);
+  const row = await rowWhen(page, (now) => usable(now.model));
+  record('重新打开失败后放回会话文件、点会话行重试：打开成功，输入框下面一行的权限、选择范围、Effort 和圆环回来、能用',
+    usable(row?.permission) && usable(row.model) && usable(row.thinking) && Boolean(row.usage), JSON.stringify(row));
 }
 
 // ---------- 窄窗口与 Ctrl+N ----------
@@ -1195,6 +1425,40 @@ async function ctrlNRepeat(ctx) {
   await page.keyboard.up('Control');
   const after = await paneCount(page);
   record('Ctrl+N 不起作用：按住不放的重复按键只新建一个会话', after === before + 1, `会话面板 ${before} → ${after}`);
+}
+
+/**
+ * @brief 输入框下面一行的菜单（sessions.md"Ctrl+N 不起作用"、models.md"算作'菜单开着'""键盘"）：权限、选择范围、
+ *        Effort 菜单开着时 Ctrl+N 什么都不发生，Esc 关闭菜单、焦点回到打开它的按钮；上下文用量的详情不算：开着时 Ctrl+N
+ *        照常新建会话。
+ */
+async function ctrlNMenus(ctx) {
+  const { page } = ctx;
+  await waitReady(page);
+  const seen = [];
+  for (const [button, menu] of Object.entries(ROW_MENUS)) {
+    await paneOf(page).getByTestId(button).click();
+    const opened = await shownWithin(page.getByTestId(menu), 3000);
+    const panes = await paneCount(page);
+    await page.keyboard.press('Control+n');
+    await sleep(800);
+    const blocked = await paneCount(page) === panes && await page.getByTestId(menu).count() === 1;
+    await page.keyboard.press('Escape');
+    const closed = await page.getByTestId(menu).waitFor({ state: 'detached', timeout: 3000 })
+      .then(() => true, () => false);
+    seen.push({ button, opened, blocked, closed, focus: (await focusInfo(page)).testid });
+  }
+  record('Ctrl+N 不起作用：输入框下面一行的权限、选择范围、Effort 菜单开着时什么都不发生；Esc 关闭菜单，焦点回到打开它的按钮',
+    seen.every((item) => item.opened && item.blocked && item.closed && item.focus === item.button),
+    JSON.stringify(seen));
+  const before = await paneCount(page);
+  await paneOf(page).getByTestId('usage').click();
+  const details = (await rowWhen(page, (row) => row.details, 3000))?.details;
+  await page.keyboard.press('Control+n');
+  const created = await waitPanes(page, before + 1, 5000).then(() => true, () => false);
+  record('Ctrl+N：上下文用量的详情开着时照常新建会话（详情只是看数，不算挡住 Ctrl+N 的浮层）', Boolean(details) && created,
+    `详情 ${details}；会话面板 ${before} → ${await paneCount(page)}`);
+  if (created) await waitReady(page);
 }
 
 // ---------- 重启之后 ----------
@@ -1343,12 +1607,12 @@ async function recover(ctx) {
 }
 
 const steps = {
-  setup, buildTree, keyboardPath, arrowKeys, keyboardRename, renameBeforeFirstMessage, menuOpeners, renamePrefill,
-  renameEsc, renameEmpty, renameEscRunning, renameBlur, drafts, restartTree, restartOpen, renameUnopened, trustAsk,
-  trustDeny, trustEsc, trustRememberDeny, trustCounterexample, deleteCancel, deleteConfirm, deleteRunning,
+  setup, buildTree, keyboardPath, rowTabOrder, arrowKeys, keyboardRename, renameBeforeFirstMessage, menuOpeners,
+  renamePrefill, renameEsc, renameEmpty, renameEscRunning, renameBlur, drafts, restartTree, restartOpen, renameUnopened,
+  trustAsk, trustDeny, trustEsc, trustRememberDeny, trustCounterexample, deleteCancel, deleteConfirm, deleteRunning,
   deleteUnsaved, deleteFail, archiveActive, statusRunning, statusApproval, statusError, statusKernelExit, narrowWindow,
-  ctrlNRepeat, restartDeleted, archiveRestore, archiveOpen, archiveDelete, trustAgain, zetaRemembered, trustRemembered,
-  ...liveSteps,
+  ctrlNRepeat, ctrlNMenus, restartDeleted, archiveRestore, archiveOpen, archiveDelete, trustAgain, zetaRemembered,
+  trustRemembered, ...liveSteps,
 };
 
 const fake = await startFakeEndpoint();

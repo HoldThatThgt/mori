@@ -23,6 +23,9 @@
    不靠颜色也读得出。
 6. 用词照 Claude 英文界面的原词；界面文字英文，文档正文和代码注释中文；先写状态表，不加后台，诚实。
 
+给 TaskBoard 留的位置（2026-10-21 与 TaskBoard 会话约定）：它的团队开关（`data-testid="team-switch"`）放在顶栏右边一组
+（`.topbar-actions`，一个容器）的第一个，在"Toggle changes"前面；后合并的一方重新算会话名能用的宽度、重调 `@container` 的档位。
+
 ## 改后的样子
 
 ```

@@ -23,6 +23,8 @@
   --color-accent-tint: #e9edf5;
   --color-ok: #28966d;
   --color-warn: #b78022;
+  /* 较深的警示色（#8d641f）：12px 的字（"Allow all"）和上下文用量圆环 75–89% 的填充要够对比度 */
+  --color-warn-text: color-mix(in srgb, var(--color-warn) 75%, var(--color-text));
   --color-danger: #cb5353;
   --color-danger-soft: #fff6f3;
   --color-selection: #d8e6ff;

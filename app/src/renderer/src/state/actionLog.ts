@@ -82,7 +82,7 @@ export function describeCommand(command: Command): string | null {
   }
 }
 
-/** @brief M6 的命令（设置页、顶栏、工具页）的摘要；只读的查询返回 null。 */
+/** @brief M6 的命令（设置页、输入框下面一行、工具页）的摘要；只读的查询返回 null。 */
 function describeM6Command(command: Command): string | null {
   switch (command.type) {
     case 'session.setThinking': return `Change effort for this session: ${command.level}`;

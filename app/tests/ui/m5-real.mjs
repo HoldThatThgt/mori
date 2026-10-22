@@ -4,6 +4,8 @@
 // 像负责人一样操作界面：用鼠标把会话行拖到中栏右半边、拖进输入框，两栏里各自发消息、Alt+1，点另一栏切焦点、Esc、F8，
 // 拖分屏中线，预览里改范围，点发出的引用，改名、重启、删除；走查 6 只用右键菜单。
 // 系统的选文件夹对话框经 app.evaluate 换成直接返回测试文件夹。只删测试数据目录里的测试会话。
+// 2026-10-21 起（docs/v0/composer-pickers.md）：分屏后两栏的输入框下面一行（真实的选择范围"<分组> · <模型 id>"）放得下；
+// F8 报告"Current view"的"Model range""Effort""Pane width"。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m5-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,5,6,c]
 // 结果写到 test-results/m5-real(-packaged).json，截图在 test-results/m5-real(-packaged)/。
@@ -14,11 +16,12 @@ import { join, resolve } from 'node:path';
 import {
   allowRealProject, appRoot, arg, createRecorder, launch, oneLine, realProviders, scratchUserData, sleep,
 } from './lib.mjs';
+import { composerRow, rowProblems, rowSummary } from './m1-layout.mjs';
 import { rowOf, stubFolder, waitReady, waitStatus } from './m3-helpers.mjs';
 import {
-  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, headingWhole, paneAt, pickRange, previewHeading,
-  previewState, sendAt, sentSessionRefs, splitState, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip,
-  waitSplit,
+  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, headingWhole, paneAt, paneView, pickRange,
+  previewHeading, previewState, reportField, reportLabels, sendAt, sentSessionRefs, slotSelector, splitState,
+  viewProblems, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip, waitSplit,
 } from './m5-helpers.mjs';
 
 const source = arg('source');
@@ -146,6 +149,7 @@ async function item1(ctx) {
   await waitSplit(page);
   const state = await splitState(page);
   await shot(page, '1-split');
+  await splitRows(page);
   await sendAt(page, 'left', PROMPTS.editLeft);
   await sendAt(page, 'right', PROMPTS.writeRight);
   await approveUntilIdle(page, ['left', 'right']);
@@ -160,6 +164,21 @@ async function item1(ctx) {
     cards.left === 'done' && cards.right === 'done' && readme.startsWith('# Mori M5 左栏')
     && existsSync(join(ctx.project, 'notes.md')), JSON.stringify({ cards, readme: oneLine(readme, 40) }));
   await shot(page, '1-both');
+}
+
+/**
+ * @brief 分屏后两栏的输入框下面一行（chat.md"输入框下面一行"、models.md"窄栏"）：权限、真实的选择范围（分组时
+ *        "<分组> · <模型 id>"，常比 200px 的上限长）、Effort、圆环、"Send"不换行、不超出输入框，按这一栏的宽度收紧、
+ *        截短的先后对（先截模型 id、再截范围名），读屏名和悬停第一行是全文，悬停第二行是"<提供商名> · <区域>"。
+ */
+async function splitRows(page) {
+  const bad = [];
+  for (const side of ['left', 'right']) {
+    const row = await composerRow(page, slotSelector(side));
+    bad.push(...rowProblems(row, 'idle').map((problem) => `${side} ${rowSummary(row)}: ${problem}`));
+  }
+  record('走查 1：分屏后两栏的输入框下面一行（权限、真实的选择范围、Effort、圆环、发送）放得下，按这一栏的宽度收紧',
+    bad.length === 0, bad.join('; '));
 }
 
 /** @brief 走查 2：左栏的长命令在右栏生成时按 Esc，只停止左栏；右栏和 F8 跟随焦点。 */
@@ -212,6 +231,10 @@ async function followFocus(ctx) {
   record('走查 2：F8 跟随焦点：报告的"当前会话"是右栏，"分屏"一行写明焦点在右栏', report.includes(`Current session: ${right}`)
     && report.includes('(focus in the right pane)'),
   oneLine(report.split('\n').filter((l) => /Current session|Split view/.test(l)).join(' | ')));
+  const view = await paneView(page, 'right');
+  const problems = viewProblems((label) => reportField(report, label), reportLabels(report), view, 'right');
+  record('走查 2：F8 的"Current view"里"Model range""Model""Effort"是右栏的，"Pane width"是右栏 .chat-pane 的宽'
+    + '（比 .pane-slot 窄 1px），三项的位置对', problems.length === 0, `${problems.join('; ')} ${JSON.stringify(view)}`);
 }
 
 /** @brief 走查 3：拖动分屏中线调整比例（先关掉右栏给两栏腾出地方），双击恢复各一半。 */

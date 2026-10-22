@@ -2,7 +2,9 @@
 .pane-slot { display: flex; flex: 1; min-width: 0; min-height: 0; }
 .chat-pane { position: relative; display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 
-/* 顶栏 */
+/* 顶栏（设置、Review、Customize 页也用 .topbar）。会话面板的顶栏只有"项目名 › 会话名"和这一栏的按钮（chat.md"顶栏"；
+   权限、选择范围、Effort 和上下文用量在输入框下面一行）：会话名放不下时项目名先收短（flex-shrink 比会话名大得多），
+   收到 40px 才截会话名；窄栏在本文件末尾的 @container */
 .topbar {
   display: flex;
   align-items: center;
@@ -13,10 +15,16 @@
   flex-shrink: 0;
   min-width: 0;
 }
-/* 会话名至少留 36px（约三个字母加省略号）：按钮区放不下时先收短模型按钮（models.css），不把会话名挤没 */
-.breadcrumb { display: flex; align-items: center; gap: 8px; min-width: 36px; flex: 1; color: var(--color-faint); }
-.breadcrumb svg { width: 13px; height: 13px; }
-.chat-project { flex-shrink: 1; min-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.breadcrumb { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; color: var(--color-faint); }
+.breadcrumb svg { width: 13px; height: 13px; flex-shrink: 0; }
+.chat-project {
+  flex-shrink: 1e6;
+  min-width: 40px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .chat-title {
   min-width: 0;
   overflow: hidden;
@@ -25,19 +33,7 @@
   color: #242a33;
   font-weight: 500;
 }
-.topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 1; min-width: 0; }
-.usage-chip {
-  flex-shrink: 0;
-  max-width: 160px;
-  overflow: hidden;
-  padding: 3px 8px;
-  border-radius: var(--radius-s);
-  background: var(--color-surface);
-  color: var(--color-muted);
-  font-size: var(--fs-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .icon-button[aria-pressed='true'] { color: var(--color-accent); background: var(--color-accent-soft); }
 
 /* 对话流 */
@@ -343,14 +339,97 @@
   line-height: 1.7;
 }
 .composer textarea::placeholder { color: #a0a6af; }
-.composer-bottom { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-.composer-spacer { flex: 1; }
-.composer-wait { color: var(--color-faint); font-size: var(--fs-small); }
-.send-button, .stop-button { border-radius: 999px; }
+/* 文字框下面一行（chat.md"输入框下面一行"、models.md"窄栏"）：左端权限；右边选择范围、Effort、上下文用量圆环，最右是
+   发送 / 停止 / 排队。各项都是这一行的直接子项（flex-shrink 只在兄弟之间分宽度）：放不下时依次截短，前一项到最窄才轮到
+   下一项——不能发送的说明（1e18）→ 选择范围（1e12，models.css）→ 权限的模式名（1e6）→ Effort 的强度（1，models.css），
+   各自有最窄宽度（min-width），其余各项不收。相邻的系数差 1e6：flex-shrink 按"系数 × 原宽"分，差得小了（例如 1000 倍），
+   前一项收短时后一项也会少几分之一像素、画出"…"。这一行是它所有菜单和圆环详情的定位参照（rowMenu.ts 量它摆位置，
+   各按钮的外层 position: static），高度不随内容变（不能发送时只有权限按钮和说明也是 33px） */
+.composer-bottom {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 33px;
+  margin-top: 6px;
+}
+:where(.composer-bottom > *) { flex-shrink: 0; }
+/* 权限后面的第一项（通常是选择范围，打开失败时是说明）推到右端 */
+.composer-bottom > .permission + * { margin-left: auto; }
+.composer-wait {
+  flex-shrink: 1e18;
+  min-width: 48px;
+  overflow: hidden;
+  color: var(--color-faint);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.send-button, .stop-button, .queue-button { border-radius: 999px; }
 .stop-button { color: var(--color-danger); }
-.split-button { position: relative; display: flex; }
+.split-button { display: flex; }
 .split-button > .button:first-child { border-radius: 999px 0 0 999px; }
 .split-toggle { padding: 7px 8px; border-left: 0; border-radius: 0 999px 999px 0; }
+/* "Queue"的图标只在只有图标时（≤ 600px）显示；"Queue for later"一项只在"Queue"收起时（≤ 400px）出现在 ▾ 的菜单里 */
+.queue-icon { display: none; }
+.send-menu .queue-later { display: none; }
+/* 这一行的菜单往上打开（.menu 默认在上方 6px），左右位置和最高由 rowMenu.ts 按这一行和按钮的位置算 */
+.composer-bottom .menu { right: auto; left: 0; overflow-y: auto; }
+
+/* 上下文用量圆环（models.md"上下文用量（圆环）"）：14px 的环、2px 的线，按钮 26×24px，任何宽度都不收。
+   空圆环的底圈用 --color-faint（刚压缩完是虚线）；有填充时底圈换成浅的 --color-line，三种填充在它上面都 ≥ 3:1 */
+.usage { display: flex; --ring-color: var(--color-accent); }
+.usage.tone-warn { --ring-color: var(--color-warn-text); }
+.usage.tone-danger { --ring-color: var(--color-danger); }
+.usage-ring {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  border-radius: var(--radius-s);
+}
+.ring { width: 14px; height: 14px; }
+.ring circle { fill: none; stroke-width: 2; }
+.ring-base { stroke: var(--color-faint); }
+.usage-ring[data-state='used'] .ring-base { stroke: var(--color-line); }
+.usage-ring[data-state='compacted'] .ring-base { stroke-dasharray: 2 2; }
+.ring-fill { stroke: var(--ring-color); }
+/* 悬停提示：自画的（不用 title），位置由 rowMenu.ts 算；下面透明的一条连着圆环，鼠标移到提示上时它不消失 */
+.usage-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  z-index: 31;
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+  background: #242a33;
+  color: #fff;
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.usage-tip::after { content: ''; position: absolute; top: 100%; right: 0; left: 0; height: 6px; }
+/* 只因键盘焦点显示时不接鼠标：提示盖在文字框上，点文字框要点到文字框 */
+.usage-tip.passive { pointer-events: none; }
+/* 详情：照 Claude 的用量浮层，260px 宽（这一行更窄时收到这一行的宽），右边对齐这一行 */
+.usage-details {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  z-index: 30;
+  width: 260px;
+  padding: 10px 12px;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--fs-small);
+}
+.usage-head { display: flex; justify-content: space-between; gap: 12px; color: var(--color-text); }
+.usage-head span:last-child { color: var(--color-muted); white-space: nowrap; }
+.usage-bar { height: 4px; margin-top: 8px; overflow: hidden; border-radius: 2px; background: var(--color-line); }
+.usage-bar span { display: block; height: 100%; background: var(--ring-color); }
+.usage-note { margin: 6px 0 0; color: var(--color-muted); line-height: 1.6; }
+
 .menu {
   position: absolute;
   right: 0;
@@ -461,12 +540,15 @@
 .approval-reason:focus { outline: 2px solid #b8c9eb; outline-offset: 0; }
 .approval-hint { margin: 0; padding: 4px 12px 8px; color: var(--color-faint); }
 
-/* 顶栏的权限菜单；"Allow all"用警示色 */
-.permission { position: relative; flex-shrink: 0; }
+/* 权限按钮（输入框下面一行的左端）：只有文字（模式名和 ▾），任何宽度都没有图标；放不下时模式名截断（最窄 44px，
+   ≤ 340px 时 40px）。"Allow all"的底色是警示色的 12%，字用较深的 --color-warn-text（12px 的字要 4.5:1） */
+.permission { display: flex; flex-shrink: 1e6; min-width: 44px; }
 .permission-button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
   padding: 3px 6px 3px 8px;
   border-radius: var(--radius-s);
   background: var(--color-surface);
@@ -474,25 +556,24 @@
   font-size: var(--fs-small);
   white-space: nowrap;
 }
-.permission-button svg { width: 14px; height: 14px; }
+.permission-button svg { width: 14px; height: 14px; flex-shrink: 0; }
+.permission-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .permission-button.all {
   background: color-mix(in srgb, var(--color-warn) 12%, var(--color-canvas));
-  color: var(--color-warn);
+  color: var(--color-warn-text);
   font-weight: 500;
 }
-.permission-button.all:not(:disabled):hover {
+.permission-button.all:not([aria-disabled='true']):hover {
   background-color: color-mix(in srgb, var(--color-warn) 20%, var(--color-canvas));
 }
-/* 菜单居中在按钮下方；面板 ≤ 600px 时改为贴着面板右边打开（本文件末尾的 @container） */
-.permission-menu {
-  top: calc(100% + 6px);
-  right: auto;
-  bottom: auto;
-  left: 50%;
-  width: 220px;
-  font-size: var(--fs-body);
-  transform: translateX(-50%);
+/* 不可用（不能发送时）：同选择范围按钮，变淡、悬停不变色，仍能 Tab 到 */
+.permission-button[aria-disabled='true'] { cursor: default; opacity: .5; }
+.permission-button[aria-disabled='true']:hover { background-color: var(--color-surface); }
+.permission-button.all[aria-disabled='true']:hover {
+  background-color: color-mix(in srgb, var(--color-warn) 12%, var(--color-canvas));
 }
+/* 菜单往上打开、左边对齐这一行的左端（rowMenu.ts） */
+.permission-menu { width: 220px; font-size: var(--fs-body); }
 .permission-menu [role='menuitemradio'] { align-items: center; }
 .permission-menu [role='menuitemradio'] svg { width: 15px; height: 15px; color: var(--color-accent); }
 .menu-caption {
@@ -566,42 +647,47 @@
   .composer-area { padding-left: 12px; padding-right: 12px; }
 }
 .chat-pane { container-type: inline-size; }
-/* 顶栏随会话面板变窄分步收紧，模型和思考强度按钮一直在（最窄：分屏每栏 280px、800 宽右栏打开时中栏 300px），
-   收起的文字都在悬停说明和读屏名称里（models.md"窄栏"）。阈值按最宽的英文估算（Segoe UI 12px）："Effort: Unavailable ▾"
-   约 128px（窄时 "Unavailable ▾" 约 93px）、"Ask each time" 约 73px、"Context 100%" 约 72px；放不下时模型按钮再收短
-   （models.css）。分屏的内边距和间距在 split.css。
-   760px 以下权限按钮去掉图标：宽于 720px 时模型按钮最宽 160px，分屏 721px 的一栏里带图标的 "Ask each time ▾"
-   （约 123px）只给项目名、› 和会话名留约 84px，去掉图标后约 118px；761px 起带图标也留约 124px */
-@container (max-width: 760px) {
-  .permission-button { padding: 3px 8px; }
-  .permission-button svg { display: none; }
-}
-/* 660px 以下不显示项目名和 ›（分屏 690px 起，split.css）：≤ 720px 时单栏按钮区最宽约 490px，660px 时还给项目名
-   （最窄 40px）、› 和会话名（至少 36px）留约 120px */
-@container (max-width: 660px) {
-  .chat-project, .breadcrumb > svg { display: none; }
-}
-/* 600px 以下内边距收小（模型和思考按钮各档的样子在 models.css）；权限菜单同模型和思考菜单，贴着面板右边打开
-   （模型和思考按钮在它左边，按钮靠右，居中会伸出面板、被右栏或窗口边挡住） */
-@container (max-width: 600px) {
-  .chat-pane > .topbar { padding-left: 16px; gap: 8px; }
-  .permission { position: static; }
-  .permission-menu { top: calc(var(--topbar-height) - 12px); right: 8px; left: auto; transform: none; }
-}
-/* 500px 以下不显示上下文用量：分屏一栏刚过 480px 时 "Unavailable ▾"、"Ask each time"、"Context 100%" 和两个图标按钮
-   会把模型按钮挤到 40px 以下 */
-@container (max-width: 500px) {
-  .usage-chip { display: none; }
-}
-/* 400px 以下：内边距和间距收小；权限按钮只显示盾牌图标（"Allow all" 仍用警示色），模式名在读屏名
-   "Permission mode: <模式>" 里（280px 一栏里 "Ask each time" 加 "High" 会超出约 15px） */
+/* 顶栏随会话面板变窄：≤ 400px 内边距和间距收小、两个图标按钮 28px；≤ 320px 不显示项目名和 ›（chat.md"顶栏"；
+   分屏的内边距在 split.css） */
 @container (max-width: 400px) {
   .chat-pane > .topbar { padding: 0 10px 0 12px; gap: 4px; }
-  .topbar-actions { gap: 4px; }
-  .topbar-actions .icon-button { width: 28px; }
-  .permission-button { padding: 4px 6px; }
-  .permission-button > svg:first-child { display: block; }
-  .permission-text { display: none; }
+  .chat-pane > .topbar .topbar-actions { gap: 4px; }
+  .chat-pane > .topbar .icon-button { width: 28px; }
+}
+@container (max-width: 320px) {
+  .chat-pane > .topbar .chat-project, .chat-pane > .topbar .breadcrumb > svg { display: none; }
+}
+/* 文字框下面一行按会话面板的宽度分档，单栏、分屏相同（models.md"窄栏"；每档按最挤的情况估的宽度见
+   docs/v0/composer-pickers.md"宽度估算"）。每一档也包含比它宽的各档的改动；再放不下时按上面的 flex-shrink 截短 */
+@container (max-width: 680px) {
+  .composer-bottom .thinking-prefix { display: none; }
+}
+/* "Send"、"Stop"、"Queue"只有图标（名字在 aria-label 和悬停说明里），各 32px，▾ 24px */
+@container (max-width: 600px) {
+  .composer-bottom .send-text { display: none; }
+  .composer-bottom .queue-icon { display: block; }
+  .composer-bottom :is(.send-button, .stop-button, .queue-button, .queue-main) {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+  .composer-bottom .split-toggle { width: 24px; padding: 7px 4px; }
+}
+@container (max-width: 460px) {
+  .composer-bottom { gap: 4px; }
+  .composer-bottom :is(.permission-button, .model-button, .thinking-button) > svg { display: none; }
+}
+/* 生成中有字时"Queue"收起，只留 ▾（菜单里多出"Queue for later"），"Stop"不动；准备中只有一个按钮的"Queue"不收 */
+@container (max-width: 400px) {
+  .composer-bottom .queue-main { display: none; }
+  .composer-bottom .split-toggle { border-left: 1px solid var(--color-line-strong); border-radius: 999px; }
+  .send-menu .queue-later { display: flex; }
+}
+@container (max-width: 340px) {
+  .composer-bottom :is(.send-button, .stop-button, .queue-button) { width: 28px; height: 28px; }
+  .composer-bottom :is(.permission-button, .model-button, .thinking-button) { padding-right: 4px; padding-left: 4px; }
+  .composer-bottom > .permission { min-width: 40px; }
+  .composer-bottom > :is(.model-switch, .thinking-switch) { min-width: 36px; }
 }
 
 /* 扩展的询问卡（extension-ui.md）：与批准卡同一位置、同一外观 */

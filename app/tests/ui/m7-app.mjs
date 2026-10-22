@@ -16,7 +16,9 @@
 // 里时是文件名且不列出、不复制截图、"Show in Explorer"、导出失败）；回到原位置（重启后没开着的会话里的整条回复、选区高亮、
 // 文件里的行、已归档的先恢复、回复不在了留在工作回顾、原会话已删除（列表里没有的、列表里有但文件被删了的）不新建会话、
 // 没有保存不可用、"Opening…"、分屏放不下右栏时右栏浮出来）；返回会话（分屏、焦点、草稿、右栏的文件）；
-// 工作回顾页上按 F8（"Page: Review"，新报告马上出现在最上面，你写的标题行不切错）；
+// 会话里按 F8 时报告"Current view"的会话几项（"Model""Permission mode"照旧，2026-10-21 加的"Model range""Effort"
+// "Pane width"，各项的先后）；
+// 工作回顾页上按 F8（"Page: Review"、"Pane width: None"，新报告马上出现在最上面，你写的标题行不切错）；
 // 后台进程退出后照常能看、能标、能导出，只有"Jump to source"不可用；打开、标记、导出都不发请求给模型；
 // 没有小于 12px 的字；页面没有报错。
 // 用法（在 app/ 下，先 npm run build）：
@@ -42,8 +44,9 @@ import { dragSelect, jumpHighlight, PANE, popoverShown, selectLines, viewerState
 import { composerAt, savedLayout, splitState, waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import { firstRunAndOpen, resizeWindow, startFakeEndpoint } from './m6-helpers.mjs';
 import {
-  backToChat, chooseTab, detailState, exportTo, flashVisible, mainCalls, mdHead, mdSections, noticeText, openReviewPage,
-  pressedRow, records, reviewState, rowAt, selectRow, shortOf, shotLink, sideOverflow, waitLoaded,
+  backToChat, chooseTab, detailState, exportTo, flashVisible, focusedPaneView, mainCalls, mdHead, mdSections,
+  noticeText, offPaneFieldProblems, openReviewPage, paneFieldProblems, pressedRow, records, reviewState, rowAt,
+  selectRow, shortOf, shotLink, sideOverflow, viewFields, waitLoaded,
 } from './m7-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -746,11 +749,21 @@ async function saveReport(page, what, expect) {
   return { dialog, file: await savedIssuePath(page) };
 }
 
-/** @brief F8 报告（带截图）：保存后"Show in Explorer"旁边有"View in Review"，点它打开"UI issues"并选中这一份。 */
+/**
+ * @brief F8 报告（带截图）：保存后"Show in Explorer"旁边有"View in Review"，点它打开"UI issues"并选中这一份。
+ *        会话里按的，报告的"Current view"里"Model""Permission mode"照旧，多了"Model range""Effort"和"Pane width"
+ *        （docs/v0/composer-pickers.md"测试要改的地方"新检查第 9 条）。
+ */
 async function f8Report(ctx) {
   const { page } = ctx;
+  const pane = await focusedPaneView(page);
   const { dialog, file } = await saveReport(page, '列表的字太挤', '行距大一点');
   ctx.issue1 = file;
+  const fields = viewFields(file && existsSync(file) ? readFileSync(file, 'utf8') : '');
+  const wrong = paneFieldProblems(fields, pane);
+  record('会话里按 F8：报告的"当前界面"里"Model""Permission mode"照旧，多了"Model range"（选择范围）、"Effort"（输入框'
+    + '下面一行 Effort 按钮的强度）和"Pane width"（焦点所在那一栏 .chat-pane 的宽度）；各项的先后照 ui-strings.md',
+  wrong.length === 0, JSON.stringify({ wrong, pane, fields }));
   const buttons = (await dialog.locator('button').allInnerTexts()).map((text) => text.trim());
   const at = buttons.indexOf('Show in Explorer');
   await noteSmall(ctx, 'F8 已保存');
@@ -1726,6 +1739,10 @@ async function f8OnReview(ctx) {
     + '新报告就在"界面问题"最上面', fields.includes('- Page: Review') && fields.includes('- Right panel: Open')
     && fields.some((line) => /^- Right panel width: \d+px/.test(line)) && Boolean(top),
   JSON.stringify({ file, fields, top }));
+  const view = viewFields(md);
+  const wrong = offPaneFieldProblems(view);
+  record('工作回顾页上按 F8：报告的"当前界面"里"Pane width: None"（不在会话页，2026-10-21 加的一项），各项的先后照 ui-strings.md',
+    wrong.length === 0, JSON.stringify({ wrong, view }));
   const detail = await selectRow(page, name);
   record('"你期望什么"里写了一行"## 你期望什么"：报告文件里这一行前面加了 "\\"，工作回顾照样分清两节',
     /\n\\## What you expected\n/.test(md) && detail?.what === 'F8 来自工作回顾页'

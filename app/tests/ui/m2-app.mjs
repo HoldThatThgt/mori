@@ -3,7 +3,12 @@
 // （小键盘数字和浮层开着时不算）、长理由的截短、Esc 的几种含义（先关浮层）、"Allowed for this session"与权限菜单、
 // 全部允许与确认、新会话重新询问（不继承"Allowed for this session"和"Allow all"）、出卡时对话停在底部、最小窗口的布局、
 // 重新载入后认出"Denied"、任务栏闪烁、F8 报告界面问题（报告里没有 key、保存中按 Esc 不关闭）。
-// 状态表见 docs/v0/screens/approval.md、tool-cards.md 与 f8.md；首次启动与打开文件夹沿用 M1 的流程，不再逐项检查。
+// 2026-10-21 起权限按钮在输入框下面一行的左端（docs/v0/composer-pickers.md）：权限菜单往上打开、左对齐这一行、不出界、
+// 列表很长时在菜单里滚动，这一行同时只开一个浮层，新卡来时关闭这一行开着的浮层，Tab 移出时关闭，第一次打开中、
+// 后台进程退出、重新载入、Restart 之后重新打开中这一行的样子、不可用的原因和焦点，最小窗口里这一行完整可见，
+// F8 报告"Current view"的"Model range""Effort"和"Pane width"。
+// 状态表见 docs/v0/screens/approval.md、models.md、chat.md、tool-cards.md 与 f8.md；首次启动与打开文件夹沿用 M1 的流程，
+// 不再逐项检查。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m2-app.mjs                         测开发构建
 //   node tests/ui/m2-app.mjs --exe <Mori.exe 路径>   测打包后的程序
@@ -16,6 +21,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, prepareProject, sleep } from './lib.mjs';
+import {
+  allowedOverflow, effortTipProblems, f8ViewProblems, modeProblems, paneFacts, PERMISSION_MENU, permissionMenuProblems,
+  permissionState, permissionTipProblems, rangeTipProblems, ROW, ROW_HEIGHT, rowLog, rowMenuState, viewFields, watchRow,
+} from './m2-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -37,8 +46,20 @@ const ISSUE_HEADINGS = ['# UI issue · ', '## What went wrong', '## What you exp
   '## Current view', '## Recent activity', '## Versions'];
 /** "Queue"旁边 ▾（"More send options"）的下拉 */
 const QUEUE_MENU = '.split-button [role="menu"]';
-const OVERLAYS = ['[data-testid="issue-dialog"]', '[data-testid="confirm-dialog"]', '[data-testid="permission-menu"]',
-  QUEUE_MENU].join(', ');
+/** recover 要关掉的浮层：报告框、确认框、这一行的三个菜单、圆环详情、"Queue"的下拉 */
+const OVERLAYS = ['[data-testid="issue-dialog"]', '[data-testid="confirm-dialog"]', PERMISSION_MENU,
+  '[data-testid="model-menu"]', '[data-testid="thinking-menu"]', '[data-testid="usage-details"]', QUEUE_MENU]
+  .join(', ');
+/** 12 行草稿：输入框长到最高 220px */
+const TALL_DRAFT = Array.from({ length: 12 }, (_, index) => `草稿第 ${index + 1} 行`).join('\n');
+/** 后台进程退出时按钮位置的说明，也是这一行按钮不可用的原因（models.md"不可用时、按钮消失时的焦点"） */
+const CRASHED = 'Mori’s background process crashed';
+/** 第一次打开中、Restart 之后重新打开中的原因 */
+const STARTING = 'Starting…';
+/** 重新载入中的原因 */
+const RESTARTING = 'Restarting…';
+/** 权限菜单很长时测试在列表里加的行数（composer-pickers.md"新加的检查"第 4 条） */
+const MANY_ALLOWED = 30;
 /** 60 个字的拒绝理由：工具卡状态行只显示前 40 个字 */
 const LONG_REASON = '这一行标题和发布说明保持一致，'.repeat(4);
 /** 项目外的提示 */
@@ -69,6 +90,18 @@ function startFakeEndpoint() {
 
 /** @brief 当前显示的会话面板。 */
 const paneOf = (page) => page.locator(PANE);
+/** @brief 当前会话面板输入框下面一行的权限按钮。 */
+const permissionButton = (page) => paneOf(page).locator(`${ROW} [data-testid="permission-button"]`);
+/** @brief 当前会话面板输入框下面一行的选择范围按钮。 */
+const modelButton = (page) => paneOf(page).locator(`${ROW} [data-testid="model-button"]`);
+/** @brief 当前会话面板输入框下面一行的 Effort 按钮。 */
+const effortButton = (page) => paneOf(page).locator(`${ROW} [data-testid="thinking-button"]`);
+/** @brief 当前会话面板输入框下面一行的上下文用量圆环。 */
+const usageButton = (page) => paneOf(page).locator(`${ROW} [data-testid="usage"]`);
+/** @brief 当前会话面板"Queue"旁边的 ▾（"More send options"）。 */
+const moreSendOptions = (page) => paneOf(page).getByRole('button', { name: 'More send options' });
+/** @brief 这一行的高度约 33px（差 1px 以内）。 */
+const rowHeightOk = (height) => Math.abs(height - ROW_HEIGHT) <= 1;
 
 /** @brief 当前会话面板里的工具卡：标题、状态、状态文字、自动放行的标签。 */
 function toolCards(page) {
@@ -225,22 +258,74 @@ async function openNewSession(app, page, folder) {
   }, PANE, { timeout: 30000 });
 }
 
-/** @brief 结束后台进程，等提示出现后点"Restart"，等会话重新打开。 */
-async function killAndReload(app, page) {
+/**
+ * @brief 开着权限菜单时结束后台进程，等提示出现后点"Restart"，点完把焦点放到权限按钮上（它不可用但还在），
+ *        等会话重新打开；返回这期间这一行的每个样子（m2-helpers.mjs watchRow）和最后焦点是否还在权限按钮上。
+ */
+async function restartWatched(app, page) {
+  await openPermissionMenu(page);
+  await watchRow(page, PANE);
   killKernel(app);
   await paneOf(page).getByTestId('kernel-exit').waitFor({ timeout: 10000 });
   await paneOf(page).getByRole('button', { name: 'Restart', exact: true }).click();
+  await permissionButton(page).focus();
   await paneOf(page).getByTestId('notice').filter({ hasText: 'Restarted · ' }).last().waitFor({ timeout: 30000 });
   await page.waitForFunction((selector) => !document.querySelector(`${selector} [data-testid="not-ready"]`), PANE,
     { timeout: 30000 });
+  const log = await rowLog(page);
+  const focused = await permissionButton(page).evaluate((el) => el === document.activeElement);
+  return { log, focused };
+}
+
+/**
+ * @brief 这一行在不能发送时（reason 是按钮位置的说明）与规定不符的地方：权限、范围、Effort 三个按钮都在、不可用
+ *        （aria-disabled，仍能 Tab 到），原因在权限、Effort 悬停的第二行和范围按钮的第三行、读屏的描述里；圆环保留；
+ *        这一行仍高 33px（chat.md"后台进程退出"、models.md"不可用时、按钮消失时的焦点"）。
+ */
+function rowOffProblems(entry, reason) {
+  if (!entry) return [`no state with "${reason}" was seen`];
+  const mode = entry.permission?.text === 'Allow all' ? 'all' : 'ask';
+  return [...permissionTipProblems(entry.permission, mode, reason), ...rangeTipProblems(entry.model, reason),
+    ...effortTipProblems(entry.effort, reason), ...(entry.usage ? [] : ['the usage ring is gone']),
+    ...(rowHeightOk(entry.rowHeight) ? [] : [`row height ${entry.rowHeight}px`])];
+}
+
+/**
+ * @brief 后台进程退出、重新载入中、Restart 之后重新打开中这一行的样子（chat.md"后台进程退出"、models.md"不可用时、
+ *        按钮消失时的焦点"、approval.md"权限菜单"）。每一段取最后一个样子（菜单在下一次提交才关）。
+ */
+function checkRestartRow({ log, focused }) {
+  const crashAt = log.findIndex((entry) => entry.wait === CRASHED);
+  const after = crashAt < 0 ? [] : log.slice(crashAt);
+  const phase = (wait) => after.filter((entry) => entry.wait === wait);
+  const crashed = phase(CRASHED).at(-1);
+  const crash = [...rowOffProblems(crashed, CRASHED), ...(log[0]?.menu && !crashed?.menu ? [] : ['menu not closed'])];
+  record(`后台进程退出：开着的权限菜单关闭；权限、范围、Effort 按钮不可用（aria-disabled，仍能 Tab 到），原因"${CRASHED}"在`
+    + '权限和 Effort 悬停的第二行、范围按钮的第三行和读屏的描述里；圆环保留；这一行仍高 33px', crash.length === 0,
+  oneLine(crash.join('; '), 600));
+  const restarting = rowOffProblems(phase(RESTARTING).at(-1), RESTARTING);
+  record(`重新载入中：权限、范围、Effort 按钮仍在、不可用，原因"${RESTARTING}"；圆环保留`, restarting.length === 0,
+    oneLine(restarting.join('; '), 600));
+  const opening = phase(STARTING);
+  const from = opening.findIndex((entry) => entry.focus === 'permission-button');
+  const reopen = [...rowOffProblems(opening.at(-1), STARTING),
+    ...(from >= 0 && opening.slice(from).every((entry) => entry.focus === 'permission-button') && focused ? []
+      : [`focus ${JSON.stringify(opening.map((entry) => entry.focus))}, at the end ${focused}`])];
+  record(`Restart 之后重新打开中：范围按钮、Effort 和圆环仍在（不像第一次打开那样藏起），三个按钮不可用，原因"${STARTING}"；`
+    + '焦点留在权限按钮上', reopen.length === 0, oneLine(reopen.join('; '), 600));
+  const last = log.at(-1);
+  const ready = [...permissionTipProblems(last?.permission, 'ask', null), ...rangeTipProblems(last?.model, null),
+    ...effortTipProblems(last?.effort, null)];
+  record('重新打开后三个按钮又可用（没有 aria-disabled），权限按钮悬停第二行和读屏的描述是"Change the permission mode"',
+    ready.length === 0, oneLine(ready.join('; '), 600));
 }
 
 // ---------- 权限菜单 ----------
 
-/** @brief 打开权限菜单（已打开时不动），返回菜单。 */
+/** @brief 打开输入框下面一行的权限菜单（已打开时不动），返回菜单。 */
 async function openPermissionMenu(page) {
   const menu = page.getByTestId('permission-menu');
-  if (await menu.count() === 0) await paneOf(page).getByTestId('permission-button').click();
+  if (await menu.count() === 0) await permissionButton(page).click();
   await menu.waitFor({ timeout: 5000 });
   return menu;
 }
@@ -252,11 +337,10 @@ async function closeMenu(page) {
   await menu.waitFor({ state: 'hidden', timeout: 5000 });
 }
 
-/** @brief 等顶栏的权限按钮显示 text。 */
+/** @brief 等输入框下面一行的权限按钮显示 text。 */
 function waitPermission(page, text) {
-  return page.waitForFunction(({ selector, want }) => document.querySelector(
-    `${selector} [data-testid="permission-button"]`)?.textContent?.includes(want), { selector: PANE, want: text },
-  { timeout: 10000 });
+  return page.waitForFunction(({ selector, want }) => document.querySelector(selector)?.textContent?.includes(want),
+    { selector: `${PANE} ${ROW} [data-testid="permission-button"]`, want: text }, { timeout: 10000 });
 }
 
 /** @brief 切到全部允许：选菜单项，在确认框里点"Allow all"。 */
@@ -584,9 +668,26 @@ async function allowSession({ page, h }) {
     && second.badge === 'Allowed for this session', `${JSON.stringify(first)} ${JSON.stringify(second)}`);
 }
 
+/**
+ * @brief 权限菜单开着时：权限按钮在输入框下面一行的左端（第一项）、只有文字、悬停两行，顶栏上没有移走的几项；
+ *        菜单往上打开、左边对齐这一行、整个在这一栏和窗口里、不盖顶栏，最高按这一行到顶栏的距离算
+ *        （models.md"菜单的位置与键盘"、approval.md"权限菜单"）。
+ */
+async function permissionPlacement(page) {
+  const button = await permissionState(page, PANE);
+  const look = modeProblems(button, 'ask');
+  record('权限按钮在输入框下面一行的左端（这一行的第一项），顶栏上没有权限、范围、Effort 和上下文用量；按钮只有文字'
+    + '"Ask each time"和 ▾（没有盾牌），悬停两行，读屏的描述只有第二行', Boolean(button?.first)
+    && button.inTopbar.length === 0 && look.length === 0,
+  [`first ${button?.first ?? null}`, `in top bar ${JSON.stringify(button?.inTopbar ?? null)}`, ...look].join('; '));
+  const problems = permissionMenuProblems(await rowMenuState(page, PANE, PERMISSION_MENU));
+  record('权限菜单：从输入框下面一行往上打开（下边在这一行上方 6px），左边对齐这一行的左端，整个在这一栏和窗口里、'
+    + '不盖顶栏，最高 min(440px, 这一行上边到顶栏下边 − 12px)', problems.length === 0, problems.join('; '));
+}
+
 /** @brief 权限菜单：两个选项、"Allowed for this session:"里的"Run commands"和说明；Forget 后命令又出卡；Esc 关闭菜单。 */
 async function permissionMenu({ page, h }) {
-  const haspopup = await paneOf(page).getByTestId('permission-button').getAttribute('aria-haspopup');
+  const haspopup = await permissionButton(page).getAttribute('aria-haspopup');
   const menu = await openPermissionMenu(page);
   const text = await menu.innerText();
   const items = await menu.getByRole('menuitemradio').evaluateAll((list) => list.map((item) =>
@@ -600,6 +701,7 @@ async function permissionMenu({ page, h }) {
     && text.includes('Applies to all agents in this session. New sessions start at Ask each time.'),
   `${items.join(' | ')} / ${oneLine(text)}`);
   await page.screenshot({ path: join(shots, '04-permission-menu.png') });
+  await permissionPlacement(page);
   await (await clearButton(page, 'Run commands')).click();
   const cleared = await page.waitForFunction(() => !document.querySelector('[data-testid="permission-allowed"]')
     ?.textContent?.includes('Run commands'), null, { timeout: 5000 }).then(() => true, () => false);
@@ -618,10 +720,60 @@ async function permissionMenu({ page, h }) {
   await waitIdle(page);
 }
 
-/** @brief 新会话不继承上一个会话的"Allowed for this session"：命令又出卡；Alt+3 拒绝，工具卡"Denied"。 */
+/** 这一行的几个浮层，按点开的顺序：打开它的按钮、浮层（models.md"同时只开一个"） */
+const ROW_OVERLAYS = [
+  { name: '权限菜单', button: permissionButton, overlay: (page) => page.getByTestId('permission-menu') },
+  { name: '范围菜单', button: modelButton, overlay: (page) => page.getByTestId('model-menu') },
+  { name: 'Effort 菜单', button: effortButton, overlay: (page) => page.getByTestId('thinking-menu') },
+  { name: '圆环详情', button: usageButton, overlay: (page) => paneOf(page).getByTestId('usage-details') },
+];
+
+/**
+ * @brief 这一行同时只开一个浮层（models.md"同时只开一个"）：空闲时依次点权限、范围、Effort 按钮和圆环，每点一个，
+ *        它的浮层打开、前一个关闭；最后 Esc 关上圆环详情，焦点留在圆环上。
+ */
+async function oneOverlay({ page }) {
+  const steps = [];
+  for (const [index, item] of ROW_OVERLAYS.entries()) {
+    await item.button(page).click();
+    const opened = await item.overlay(page).waitFor({ timeout: 3000 }).then(() => true, () => false);
+    const previous = ROW_OVERLAYS[index - 1];
+    const gone = !previous || await previous.overlay(page).count() === 0;
+    steps.push({ name: item.name, opened, previousClosed: gone });
+  }
+  await page.keyboard.press('Escape');
+  const closed = await paneOf(page).getByTestId('usage-details').waitFor({ state: 'detached', timeout: 3000 })
+    .then(() => true, () => false);
+  const focus = await usageButton(page).evaluate((el) => el === document.activeElement);
+  record('这一行同时只开一个：依次点权限、范围、Effort 按钮和圆环，每点一个它的浮层打开、前一个关闭；Esc 关上圆环详情，'
+    + '焦点留在圆环上', steps.every((step) => step.opened && step.previousClosed) && closed && focus,
+  JSON.stringify({ steps, closed, focus }));
+}
+
+/**
+ * @brief 第一次打开中这一行的样子（chat.md"后台正在启动"、models.md"选择范围按钮"第一次打开中）：只有权限按钮，
+ *        不可用（aria-disabled，仍能 Tab 到；悬停第二行和读屏的描述"Starting…"），没有范围按钮、Effort 和圆环；高 33px。
+ */
+function checkFirstOpen(log) {
+  const opening = log.filter((entry) => entry.wait === STARTING);
+  const problems = opening.flatMap((entry) => [...permissionTipProblems(entry.permission, 'ask', STARTING),
+    ...(entry.model || entry.effort || entry.usage ? [`shown: range ${Boolean(entry.model)}, Effort `
+      + `${Boolean(entry.effort)}, ring ${entry.usage}`] : []),
+    ...(rowHeightOk(entry.rowHeight) ? [] : [`row height ${entry.rowHeight}px`])]);
+  record(`第一次打开中：输入框下面一行只有权限按钮（不可用，aria-disabled，仍能 Tab 到；悬停第二行和读屏的描述"${STARTING}"），`
+    + '没有范围按钮、Effort 和圆环；这一行高 33px', opening.length > 0 && problems.length === 0,
+  `${opening.length} 个样子；${oneLine([...new Set(problems)].join('; '), 500)}`);
+}
+
+/**
+ * @brief 新会话不继承上一个会话的"Allowed for this session"：命令又出卡；Alt+3 拒绝，工具卡"Denied"。
+ *        打开新会话期间记下这一行的样子（checkFirstOpen）。
+ */
 async function newSessionAsks({ app, page, h, project }) {
+  await watchRow(page, PANE);
   await openNewSession(app, page, project);
-  const button = await paneOf(page).getByTestId('permission-button').innerText();
+  checkFirstOpen(await rowLog(page));
+  const button = await permissionButton(page).innerText();
   await h.send('run: echo m2-new-session');
   const asked = await waitCard(page).then(() => true, () => false);
   record('新会话：权限是"每次询问"，命令重新出卡（不继承上一个会话的"本会话已允许"）',
@@ -649,7 +801,7 @@ async function allowAll({ page, h }) {
   await page.screenshot({ path: join(shots, '05-confirm-all.png') });
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden', timeout: 5000 });
-  const still = await paneOf(page).getByTestId('permission-button').innerText();
+  const still = await permissionButton(page).innerText();
   record('全部允许：确认框里按 Esc 等于取消，权限仍是"每次询问"', still.includes('Ask each time'), oneLine(still));
   await closeMenu(page);
   await switchToAll(page);
@@ -689,9 +841,9 @@ async function pendingToAll(ctx) {
  *        之后的步骤都在这个新会话里做，原来的会话留在"Allow all"。
  */
 async function newSessionNotAll({ app, page, h, project }) {
-  const before = await paneOf(page).getByTestId('permission-button').innerText();
+  const before = await permissionButton(page).innerText();
   await openNewSession(app, page, project);
-  const button = await paneOf(page).getByTestId('permission-button').innerText();
+  const button = await permissionButton(page).innerText();
   await h.send('run: echo m2-not-inherited');
   const asked = await waitCard(page).then(() => true, () => false);
   record('新会话：别的会话是"全部允许"时，新会话的权限是"每次询问"，命令出卡（不继承"全部允许"）',
@@ -701,7 +853,10 @@ async function newSessionNotAll({ app, page, h, project }) {
   await idleAllowingCards(page, h);
 }
 
-/** @brief 卡挂着时在输入框按 Esc：按拒绝处理并停止，命令没有执行；重新载入后从会话记录认出"Denied · You pressed Stop"。 */
+/**
+ * @brief 卡挂着时在输入框按 Esc：按拒绝处理并停止，命令没有执行；重新载入后从会话记录认出"Denied · You pressed Stop"。
+ *        重新载入时开着权限菜单，查这期间输入框下面一行的样子（checkRestartRow）。
+ */
 async function escStop({ app, page, h, project }) {
   await h.send('run: echo blocked > m2-stop.txt');
   await waitCard(page);
@@ -715,7 +870,7 @@ async function escStop({ app, page, h, project }) {
     last?.status === 'rejected' && last.text.includes('Denied · You pressed Stop') && notice >= 1 && errors === 0
     && !existsSync(join(project, 'm2-stop.txt')), `${JSON.stringify(last)}，已停止 ${notice} 条，错误卡 ${errors} 张`);
   await page.screenshot({ path: join(shots, '06-stop-rejected.png') });
-  await killAndReload(app, page);
+  checkRestartRow(await restartWatched(app, page));
   const card = (await toolCards(page)).find((item) => item.title.includes('m2-stop.txt'));
   record('重新载入：从会话记录认出这张卡"已拒绝 · 你按了停止"（没有标签）', card?.status === 'rejected'
     && card.text.includes('Denied · You pressed Stop') && !card.badge, JSON.stringify(card));
@@ -741,23 +896,38 @@ async function escInCard({ page, h }) {
   record('Esc（焦点在卡片上）：卡片消失后焦点回到输入框', focusBack);
 }
 
-/** @brief 焦点在卡片的理由框里、"Queue"的下拉开着时按 Esc：先关下拉，卡还在；再按 Esc 才拒绝这张卡。 */
+/**
+ * @brief "Queue"的下拉开着时焦点移到理由框：下拉关闭（models.md"Tab 移出时关闭"）。焦点离开下拉时没有落到别的元素上
+ *        （像切到别的程序）下拉不关；之后焦点在理由框里、下拉开着时按 Esc：先关下拉，卡还在；再按 Esc 才拒绝这张卡。
+ */
 async function escMenuFirst({ page, h }) {
   await h.send('run: echo m2-esc-menu');
   const request = await waitCard(page);
   await h.textarea.fill('排队用的草稿');
-  await paneOf(page).getByRole('button', { name: 'More send options' }).click();
   const dropdown = paneOf(page).locator(QUEUE_MENU);
+  const reason = paneOf(page).getByTestId('approval-reason');
+  await moreSendOptions(page).click();
   await dropdown.waitFor({ timeout: 5000 });
-  // fill 只把焦点放进理由框、不产生点击，下拉不会因为"点在外面"而关闭
-  await paneOf(page).getByTestId('approval-reason').fill('先关下拉');
-  const openBefore = await dropdown.count() === 1;
+  const inMenu = await dropdown.evaluate((el) => el.contains(document.activeElement));
+  await reason.focus();
+  const tabOut = await dropdown.waitFor({ state: 'detached', timeout: 2000 }).then(() => true, () => false);
+  record('Tab 移出："排队发送"的下拉打开时焦点在菜单里；焦点移到理由框（外面一个能停焦点的元素）时下拉关闭',
+    inMenu && tabOut, JSON.stringify({ inMenu, tabOut }));
+  if (await dropdown.count() === 0) await moreSendOptions(page).click();
+  await dropdown.waitFor({ timeout: 5000 });
+  // 焦点移到外面能停焦点的元素上就关下拉：先让焦点离开下拉、不落到别的元素上（focusout 的 relatedTarget 为 null，
+  // 同切到别的程序，下拉不关），再用 fill 把焦点放进理由框（不产生点击，也没有从下拉移出的 focusout）
+  await page.evaluate(() => document.activeElement?.blur());
+  const blurKept = await dropdown.count() === 1;
+  await reason.fill('先关下拉');
+  const openBefore = blurKept && await dropdown.count() === 1;
   await page.keyboard.press('Escape');
   const closed = await dropdown.waitFor({ state: 'detached', timeout: 2000 }).then(() => true, () => false);
   await sleep(300);
   const still = await cardInfo(page);
-  record('Esc（焦点在理由框里、"排队发送"下拉开着）：先关闭下拉，卡还在', openBefore && closed
-    && still?.request === request, `下拉开着 ${openBefore}，已关闭 ${closed}，卡 ${still?.request ?? '无'}`);
+  record('Esc（焦点在理由框里、"排队发送"下拉开着；焦点离开下拉时没有落到别的元素上，下拉不关）：先关闭下拉，卡还在',
+    openBefore && closed && still?.request === request,
+    `失焦后还开着 ${blurKept}，下拉开着 ${openBefore}，已关闭 ${closed}，卡 ${still?.request ?? '无'}`);
   await page.keyboard.press('Escape');
   const gone = await waitCardGone(page, 5000).then(() => true, () => false);
   await h.textarea.fill('');
@@ -805,6 +975,74 @@ async function twoCommands({ page, h }) {
     JSON.stringify(after));
 }
 
+/**
+ * 新的批准卡来时要关闭的这一行的浮层（approval.md"选项"、models.md"新的批准卡或询问卡来了"）：打开它的按钮、浮层、
+ * 要不要先在输入框里打字（"Queue ▾"只在生成中有字时出现）。批准卡只在生成中来，范围、Effort 菜单在生成开始时已经关闭、
+ * 按钮不可用（models.md"什么时候自动关"），所以生成中能开着的是这三个。
+ */
+const CARD_OVERLAYS = [
+  { name: '权限菜单', tag: 'm2-card-menu', button: permissionButton,
+    overlay: (page) => page.getByTestId('permission-menu') },
+  { name: '"排队发送"的下拉', tag: 'm2-card-queue', draft: '排队用的草稿', button: moreSendOptions,
+    overlay: (page) => paneOf(page).locator(QUEUE_MENU) },
+  { name: '上下文用量的详情', tag: 'm2-card-usage', button: usageButton,
+    overlay: (page) => paneOf(page).getByTestId('usage-details') },
+];
+
+/**
+ * @brief 一条回复两条命令：允许第一张卡、第一条命令执行时打开 item 的浮层，等第二张卡出现；返回浮层是否打开过、
+ *        第二张卡来时是否关闭、焦点是否回到打开它的按钮、在那里按 Alt+1 是否答了这张卡。
+ */
+async function overlayOnNewCard(page, h, item) {
+  await h.send(`two commands: sleep 2 && echo ${item.tag}-one ;; echo ${item.tag}-two`);
+  const first = await waitCard(page);
+  await h.textarea.press('Alt+1');
+  await paneOf(page).locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 10000 });
+  if (item.draft) await h.textarea.fill(item.draft);
+  await item.button(page).click();
+  const opened = await item.overlay(page).waitFor({ timeout: 3000 }).then(() => true, () => false);
+  await waitCard(page, first);
+  const closed = await item.overlay(page).waitFor({ state: 'detached', timeout: 2000 }).then(() => true, () => false);
+  const focus = await item.button(page).evaluate((el) => el === document.activeElement).catch(() => false);
+  await page.keyboard.press('Alt+1');
+  const answered = await waitCardGone(page, 5000).then(() => true, () => false);
+  // 没答上时从输入框再答一次，让这一轮结束（检查里已记下没答上）
+  if (!answered) await h.textarea.press('Alt+1');
+  if (item.draft) await h.textarea.fill('');
+  await waitIdle(page);
+  return { opened, closed, focus, answered };
+}
+
+/** @brief 开着权限菜单、"Queue"的下拉或圆环详情时来了新的批准卡：都关闭，焦点回到打开它的按钮，Alt+1 答了这张卡。 */
+async function cardClosesOverlays({ page, h }) {
+  for (const item of CARD_OVERLAYS) {
+    const result = await overlayOnNewCard(page, h, item);
+    record(`新卡来了：开着${item.name}时来了批准卡 → ${item.name}关闭，焦点回到打开它的按钮，在那里按 Alt+1 答了这张卡`,
+      Object.values(result).every(Boolean), JSON.stringify(result));
+  }
+}
+
+/** @brief 开着权限菜单时排队的消息开始新的一轮：权限菜单不关（models.md"什么时候自动关"：生成开始时权限菜单不关）。 */
+async function queuedTurnKeepsMenu({ page, h }) {
+  await h.send('run: sleep 3');
+  await waitCard(page);
+  await h.textarea.press('Alt+1');
+  await paneOf(page).locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 10000 });
+  const users = await paneOf(page).getByTestId('user-message').count();
+  await h.send('plain 排队的消息开始新的一轮');
+  await paneOf(page).getByTestId('queue').waitFor({ timeout: 5000 });
+  const menu = await openPermissionMenu(page);
+  const delivered = await page.waitForFunction(({ selector, count }) => document
+    .querySelectorAll(`${selector} [data-testid="user-message"]`).length > count, { selector: PANE, count: users },
+  { timeout: 30000 }).then(() => true, () => false);
+  const open = await menu.count() === 1;
+  const running = await paneOf(page).getAttribute('data-running');
+  record('权限菜单：开着时排队的消息开始新的一轮，菜单不关（生成开始时权限菜单不关）', delivered && open,
+    `排队的消息送达 ${delivered}，菜单开着 ${open}，data-running ${running}`);
+  await closeMenu(page);
+  await waitIdle(page);
+}
+
 /** @brief 卡还在、最后一张工具卡还是"Waiting for your approval"。 */
 async function stillPending(page, request) {
   const card = await cardInfo(page);
@@ -827,6 +1065,13 @@ async function keyGuards({ page, h }) {
   await sleep(800);
   const menu = await stillPending(page, request);
   record('快捷键：权限菜单开着时 Alt+1 不批准', menu.ok, menu.detail);
+  const panes = await page.locator('.pane-slot').count();
+  await page.keyboard.press('Control+KeyN');
+  await sleep(800);
+  const after = { panes: await page.locator('.pane-slot').count(),
+    menu: await page.getByTestId('permission-menu').count() };
+  record('快捷键：权限菜单开着时 Ctrl+N 不新建会话（菜单算挡住快捷键的浮层）', after.panes === panes && after.menu === 1,
+    `会话面板 ${panes} → ${after.panes}，菜单 ${after.menu} 个`);
   await closeMenu(page);
   await h.textarea.press('Alt+1');
   const answered = await waitCardGone(page, 5000).then(() => true, () => false);
@@ -834,6 +1079,65 @@ async function keyGuards({ page, h }) {
   const last = (await toolCards(page)).at(-1);
   record('快捷键：关掉菜单后在输入框里按 Alt+1 照常允许', answered && last?.status === 'done'
     && last.title.includes('m2-keys'), JSON.stringify(last));
+}
+
+/** @brief 卡挂着时打开上下文用量的详情（焦点在圆环上）再按 Alt+1：照常允许（详情不算挡快捷键的浮层，approval.md"选项"）。 */
+async function usageNotBlocking({ page, h }) {
+  await h.send('run: echo m2-usage-keys');
+  await waitCard(page);
+  await usageButton(page).click();
+  const details = paneOf(page).getByTestId('usage-details');
+  const opened = await details.waitFor({ timeout: 3000 }).then(() => true, () => false);
+  await page.keyboard.press('Alt+1');
+  const answered = await waitCardGone(page, 5000).then(() => true, () => false);
+  if (!answered) await h.textarea.press('Alt+1');
+  await waitIdle(page);
+  const last = (await toolCards(page)).at(-1);
+  record('快捷键：上下文用量的详情开着时（焦点在圆环上）Alt+1 照常允许，详情不算挡快捷键的浮层', opened && answered
+    && last?.status === 'done' && last.title.includes('m2-usage-keys'), `详情打开 ${opened}，${JSON.stringify(last)}`);
+  // 空闲时才按 Esc 关详情（生成中没有浮层时 Esc 是停止）
+  if (await details.count() > 0) {
+    await usageButton(page).focus();
+    await page.keyboard.press('Escape');
+  }
+}
+
+/** @brief 发一条命令、Alt+1 允许，等它开始执行（之后本轮还要约 2 秒才结束）。 */
+async function runningCommand(page, h, tag) {
+  await h.send(`run: sleep 2 && echo ${tag}`);
+  await waitCard(page);
+  await h.textarea.press('Alt+1');
+  await paneOf(page).locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 10000 });
+}
+
+/**
+ * @brief 焦点所在的按钮消失时焦点移到这一栏的文字框（models.md"不可用时、按钮消失时的焦点"）："Queue"的下拉开着、
+ *        焦点在下拉里时本轮结束（"Queue ▾"消失，下拉跟着关）；焦点在"Stop"上时本轮结束；焦点在"Send"上按 Enter 发出
+ *        （"Send"换成"Stop"）。
+ */
+async function buttonGoneFocus({ page, h }) {
+  const dropdown = paneOf(page).locator(QUEUE_MENU);
+  await runningCommand(page, h, 'm2-gone-queue');
+  await h.textarea.fill('排队用的草稿');
+  await moreSendOptions(page).click();
+  const opened = await dropdown.waitFor({ timeout: 3000 }).then(() => true, () => false);
+  await waitIdle(page);
+  const queue = { opened, closed: await dropdown.count() === 0, focus: await waitComposerFocus(page) };
+  await h.textarea.fill('');
+  await runningCommand(page, h, 'm2-gone-stop');
+  await paneOf(page).locator('.stop-button').focus();
+  await waitIdle(page);
+  const stop = await waitComposerFocus(page);
+  await h.textarea.fill('plain 焦点在 Send 上按 Enter');
+  await paneOf(page).locator('.send-button').focus();
+  await page.keyboard.press('Enter');
+  await page.waitForFunction((selector) => document.querySelector(selector)?.dataset.running === 'true', PANE,
+    { timeout: 20000 }).catch(() => {});
+  const send = await waitComposerFocus(page);
+  await waitIdle(page);
+  record('按钮消失时焦点到文字框："Queue"的下拉开着时本轮结束 → 下拉关闭、焦点在文字框；"Stop"上本轮结束 → 文字框；'
+    + '"Send"上按 Enter 发出 → 文字框', queue.opened && queue.closed && queue.focus && stop && send,
+  JSON.stringify({ queue, stop, send }));
 }
 
 /** @brief 写入：卡片标题"Write notes.md"，显示将写入的内容，选项按"Write files"；允许后文件写入。 */
@@ -924,10 +1228,15 @@ async function followCard({ page, h }) {
   await waitIdle(page);
 }
 
-/** @brief 停止按钮和卡上的"Allow once""Deny"是否完整显示在窗口里（不超出窗口，中心点没有被别的元素盖住）。 */
+/**
+ * @brief 停止按钮、卡上的"Allow once""Deny"，以及输入框下面一行的权限、范围、Effort 按钮和上下文用量圆环是否完整显示
+ *        在窗口里（不超出窗口，中心点没有被别的元素盖住）；这一行是否不换行（各项都在这一行的上下边之内）、不溢出
+ *        输入框，这一行的高度。
+ */
 function composerVisible(page) {
-  return page.evaluate((selector) => {
+  return page.evaluate(({ selector, row }) => {
     const pane = document.querySelector(selector);
+    const bar = pane?.querySelector(row);
     const shown = (el) => {
       if (!el) return false;
       const r = el.getBoundingClientRect();
@@ -935,12 +1244,28 @@ function composerVisible(page) {
       return r.width > 0 && r.height > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight
         && r.right <= innerWidth && Boolean(hit && el.contains(hit));
     };
-    return { size: `${innerWidth}x${innerHeight}`, stop: shown(pane?.querySelector('.stop-button')),
+    const item = (id) => shown(bar?.querySelector(`[data-testid="${id}"]`));
+    const box = bar?.getBoundingClientRect();
+    const composer = pane?.querySelector('[data-testid="composer"]')?.getBoundingClientRect();
+    const children = bar ? [...bar.children].filter((child) => child.getClientRects().length > 0) : [];
+    const inLine = Boolean(box) && children.every((child) => child.getBoundingClientRect().top >= box.top - 1
+      && child.getBoundingClientRect().bottom <= box.bottom + 1);
+    const inside = Boolean(box && composer) && children.every((child) => child.getBoundingClientRect().right
+      <= composer.right + 0.5 && child.getBoundingClientRect().left >= composer.left - 0.5);
+    return { size: `${innerWidth}x${innerHeight}`, pane: Math.round(pane?.getBoundingClientRect().width ?? 0),
+      stop: shown(pane?.querySelector('.stop-button')),
       allow: shown(pane?.querySelector('[data-testid="approval-allow"]')),
       reject: shown(pane?.querySelector('[data-testid="approval-reject"]')),
-      input: pane?.querySelector('.composer textarea')?.offsetHeight ?? 0 };
-  }, PANE);
+      input: pane?.querySelector('.composer textarea')?.offsetHeight ?? 0,
+      permission: item('permission-button'), model: item('model-button'), effort: item('thinking-button'),
+      usage: item('usage'), row: { height: Math.round((box?.height ?? 0) * 10) / 10,
+        fits: inLine && inside && bar.scrollWidth <= bar.clientWidth + 1 } };
+  }, { selector: PANE, row: ROW });
 }
+
+/** @brief composerVisible 的结果里输入框下面一行的四项都完整显示、没被盖住，这一行不换行、不溢出、高 33px。 */
+const rowShown = (view) => view.permission && view.model && view.effort && view.usage && view.row.fits
+  && rowHeightOk(view.row.height);
 
 /** @brief 等页面量到新的窗口大小（exact 为真时是 800×600 的内容区，否则比 800×600 小），再等两帧让布局稳定。 */
 async function settleSize(page, exact) {
@@ -954,11 +1279,14 @@ async function settleSize(page, exact) {
 const SMALL_WINDOWS = [{ width: 800, height: 600, content: true, name: '内容区 800×600' },
   { width: 800, height: 600, content: false, name: '最小窗口（外框 800×600）' }];
 
-/** @brief 小窗口：修改卡挂着、输入框里有 12 行草稿时，停止按钮和卡上的按钮都完整显示在窗口里。 */
+/**
+ * @brief 小窗口：修改卡挂着、输入框里有 12 行草稿时，停止按钮、卡上的按钮和输入框下面一行的几项都完整显示在窗口里；
+ *        这一行不换行、不溢出，会话面板宽于 400px 时权限的模式名不截短（models.md"窄栏"）。
+ */
 async function minWindow({ app, page, h }) {
   await h.send(EDIT_README);
   await waitCard(page);
-  await h.textarea.fill(Array.from({ length: 12 }, (_, index) => `草稿第 ${index + 1} 行`).join('\n'));
+  await h.textarea.fill(TALL_DRAFT);
   // 窄窗口里右栏浮在中栏上层、会盖住按钮（M1 的设计），先收起，检查完再打开
   const right = paneOf(page).getByRole('button', { name: 'Toggle changes' });
   const rightOpen = await right.getAttribute('aria-pressed') === 'true';
@@ -972,11 +1300,85 @@ async function minWindow({ app, page, h }) {
       const view = await composerVisible(page);
       record(`${size.name}：修改卡挂着、输入框里有 12 行草稿时，停止按钮和卡上的"允许一次""拒绝"都完整显示在窗口里`,
         view.stop && view.allow && view.reject, JSON.stringify(view));
+      const permission = await permissionState(page, PANE);
+      record(`${size.name}：同时输入框下面一行的权限、范围、Effort 按钮和上下文用量圆环也都完整显示、没被盖住，这一行不换行、`
+        + '不溢出、高 33px；会话面板宽于 400px，权限的模式名不截短', rowShown(view) && view.pane > 400
+        && permission?.truncated === false, JSON.stringify({ ...view, truncated: permission?.truncated ?? null }));
       await page.screenshot({ path: join(shots, `07-small-window-${size.content ? 'content' : 'outer'}.png`) });
     }
   } finally {
     if (bounds) await app.evaluate(restoreMain, bounds);
     if (rightOpen) await right.click();
+  }
+  await h.textarea.fill('');
+  await h.textarea.press('Alt+3');
+  await waitCardGone(page);
+  await waitIdle(page);
+}
+
+/**
+ * @brief 这一行的样子、权限按钮、草稿高度；再打开权限菜单记下它的位置（rowMenuState），rows 不为 0 时再在列表里加
+ *        rows 行量一次（allowedOverflow，synthetic），之后 Esc 关上。
+ */
+async function smallWindowMenu(page, h, rows = 0) {
+  const view = await composerVisible(page);
+  const permission = await permissionState(page, PANE);
+  const draft = await h.textarea.evaluate((el) => el.offsetHeight);
+  await openPermissionMenu(page);
+  const menu = await rowMenuState(page, PANE, PERMISSION_MENU);
+  const crowded = rows ? await allowedOverflow(page, PANE, rows) : null;
+  await closeMenu(page);
+  return { view, permission, draft, menu, crowded };
+}
+
+/** @brief 记下 minWindowMenu 的检查：tall 是 220px 草稿时、short 是 1 行草稿时的 smallWindowMenu 结果。 */
+function recordSmallMenu(tall, short) {
+  const least = tall.view.pane <= 340 ? 40 : 44;
+  const look = modeProblems(tall.permission, 'ask');
+  record('内容区 800×600、右栏打开（会话面板最窄）、修改卡挂着、草稿 220px 高：停止按钮和输入框下面一行的权限、范围、'
+    + 'Effort 按钮、圆环都完整显示，这一行不换行、不溢出、高 33px；权限按钮只有文字（≤ 460px 没有 ▾）、不窄于最窄',
+  tall.view.stop && rowShown(tall.view) && (tall.permission?.width ?? 0) >= least - 0.5 && tall.draft >= 200
+    && look.length === 0, oneLine(`${JSON.stringify({ ...tall.view, permissionWidth: tall.permission?.width,
+    draft: tall.draft })} ${look.join('; ')}`, 600));
+  const problems = permissionMenuProblems(tall.menu);
+  record('内容区 800×600、右栏打开、草稿 220px 高：权限菜单往上打开、左边对齐这一行，不出窗口和这一栏、不盖顶栏',
+    problems.length === 0, problems.join('; '));
+  const pick = (state) => state.menu && { maxHeight: state.menu.maxHeight, rowTop: state.menu.row.top,
+    draft: state.draft };
+  record('内容区 800×600、右栏打开：草稿 1 行和 220px 高时权限菜单的最高相同（这一行贴在面板底部，位置不变）',
+    Boolean(tall.menu && short.menu) && tall.menu.maxHeight === short.menu.maxHeight
+    && tall.menu.row.top === short.menu.row.top && short.draft < tall.draft,
+  JSON.stringify({ tall: pick(tall), short: pick(short) }));
+  const crowded = permissionMenuProblems(tall.crowded);
+  record(`内容区 800×600、右栏打开、草稿 220px 高：有 ${MANY_ALLOWED} 条"Allowed for this session"时（synthetic：测试在页面里`
+    + '给列表加的行）权限菜单不超过最高、在菜单里滚动，仍往上打开、不出窗口、不盖顶栏',
+  Boolean(tall.crowded?.scrolls) && tall.crowded.items >= MANY_ALLOWED && crowded.length === 0,
+  `滚动 ${tall.crowded?.scrolls ?? null}，${tall.crowded?.items ?? 0} 行；${crowded.join('; ')}`);
+}
+
+/**
+ * @brief 内容区 800×600、右栏打开（会话面板最窄）、修改卡挂着（生成中，权限菜单仍能打开）：草稿 220px 高和 1 行时
+ *        各打开一次权限菜单（models.md"菜单的位置与键盘"、composer-pickers.md"测试要改的地方"新加的第 4 条）。
+ */
+async function minWindowMenu({ app, page, h }) {
+  await h.send(EDIT_README);
+  await waitCard(page);
+  const right = paneOf(page).getByRole('button', { name: 'Toggle changes' });
+  const rightOpen = await right.getAttribute('aria-pressed') === 'true';
+  let bounds = null;
+  try {
+    bounds = await app.evaluate(resizeMain, SMALL_WINDOWS[0]);
+    await settleSize(page, true);
+    if (!rightOpen) await right.click();
+    await sleep(300);
+    await h.textarea.fill(TALL_DRAFT);
+    const tall = await smallWindowMenu(page, h, MANY_ALLOWED);
+    await page.screenshot({ path: join(shots, '07-small-window-menu.png') });
+    await h.textarea.fill('一行草稿');
+    recordSmallMenu(tall, await smallWindowMenu(page, h));
+  } finally {
+    if (!rightOpen) await right.click();
+    if (bounds) await app.evaluate(restoreMain, bounds);
   }
   await h.textarea.fill('');
   await h.textarea.press('Alt+3');
@@ -1050,8 +1452,11 @@ async function openIssueDialog(page, h) {
   return dialog;
 }
 
-/** @brief 检查保存的 Markdown：位置、文件名、各节、你写的文字、当前界面、最近的操作、版本、没有 key。 */
-function checkIssueText({ issue, userData }, { what, expect }) {
+/**
+ * @brief 检查保存的 Markdown：位置、文件名、各节、你写的文字、当前界面（含"Model range""Effort"和"Pane width"）、
+ *        最近的操作、版本、没有 key。facts 是按 F8 之前记下的那一栏宽度、范围、Effort 和权限（m2-helpers.mjs paneFacts）。
+ */
+function checkIssueText({ issue, userData }, { what, expect, facts }) {
   const md = issue && existsSync(issue) ? readFileSync(issue, 'utf8') : '';
   const lines = md.split(/\r?\n/);
   const missing = ISSUE_HEADINGS.filter((heading) => !lines.some((line) => line.startsWith(heading)));
@@ -1068,6 +1473,10 @@ function checkIssueText({ issue, userData }, { what, expect }) {
     && actions.includes('Permission request: ')
     && ['Mori', 'Electron', 'Chromium', 'Node', 'Windows'].every((name) => version.includes(name)),
     oneLine(`${view} | ${actions.split(/\r?\n/).slice(-3).join(' ')} | ${version}`, 400));
+  const problems = f8ViewProblems(viewFields(view), facts);
+  record('F8："当前界面"里"Model""Permission mode"照旧，多了"Model range"（同范围按钮的 data-pick）、"Effort"（同输入框'
+    + '下面一行的 Effort 按钮）和"Pane width"（焦点所在那一栏的宽度），顺序同 f8.md', md.length > 0 && problems.length === 0,
+  problems.join('; '));
   // v1：保存 key 的是 设置 → Models 的 Add key（models.addKey），"Recent activity"只记"Add key <providerId>"（规格 §9.4）。
   const saves = actions.split(/\r?\n/).filter((line) => line.includes('Add key'));
   record('F8：报告里没有 API key（"Recent activity"里有刚才加 key 的"Add key"）', md.length > 0 && saves.length > 0
@@ -1116,6 +1525,7 @@ async function saveKeyAgain({ page, h }) {
 /** @brief F8：截图、两个输入框和说明；再按 F8 焦点回到第一个输入框；保存后文件齐全；"Show in Explorer"。 */
 async function f8Save(ctx) {
   const { page, h } = ctx;
+  const facts = await paneFacts(page, PANE);
   const dialog = await openIssueDialog(page, h);
   const shot = await dialog.getByTestId('issue-shot').evaluate((img) => img.naturalWidth > 0);
   const text = await dialog.innerText();
@@ -1137,7 +1547,7 @@ async function f8Save(ctx) {
   await dialog.getByTestId('issue-expect').fill(input.expect);
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   ctx.issue = await savedIssuePath(page);
-  const md = checkIssueText(ctx, input);
+  const md = checkIssueText(ctx, { ...input, facts });
   checkIssueShot(ctx.issue, md);
   await page.screenshot({ path: join(shots, '09-issue-saved.png') });
   await showInFolder(ctx);
@@ -1201,10 +1611,33 @@ async function f8EscKeepsRunning({ page, h }) {
   record('F8：关闭报告框后焦点回到打开前的位置（输入框）', focusBack);
 }
 
-/** @brief 后台进程退出后 F8 仍能截图并保存；没填"What you expected"时写"(left blank)"。 */
-async function f8AfterKernelKilled({ app, page, h }) {
+/**
+ * @brief 后台进程退出时开着的上下文用量详情不关、圆环保留最后的用量，Esc 关上后还能再打开（models.md"什么时候自动关"、
+ *        "上下文用量（圆环）"后台进程退出一行）。
+ */
+async function usageAfterKernelKilled(app, page) {
+  const tokens = await usageButton(page).getAttribute('data-tokens');
+  await usageButton(page).click();
+  const details = paneOf(page).getByTestId('usage-details');
+  const opened = await details.waitFor({ timeout: 3000 }).then(() => true, () => false);
   killKernel(app);
   await paneOf(page).getByTestId('kernel-exit').waitFor({ timeout: 10000 });
+  await sleep(300);
+  const kept = await details.count() === 1;
+  const after = await usageButton(page).getAttribute('data-tokens').catch(() => null);
+  await usageButton(page).focus();
+  await page.keyboard.press('Escape');
+  const closed = await details.waitFor({ state: 'detached', timeout: 2000 }).then(() => true, () => false);
+  await usageButton(page).click();
+  const again = await details.waitFor({ timeout: 3000 }).then(() => true, () => false);
+  record('后台进程退出：开着的上下文用量详情不关，圆环保留最后的用量（data-tokens 不变）；Esc 关上后还能再打开', opened
+    && kept && tokens !== null && after === tokens && closed && again,
+  `详情打开 ${opened}，退出后还开着 ${kept}，data-tokens ${tokens} → ${after}，Esc 关上 ${closed}，再打开 ${again}`);
+}
+
+/** @brief 后台进程退出后 F8 仍能截图并保存；没填"What you expected"时写"(left blank)"。 */
+async function f8AfterKernelKilled({ app, page, h }) {
+  await usageAfterKernelKilled(app, page);
   const dialog = await openIssueDialog(page, h);
   await dialog.getByTestId('issue-what').fill('后台进程退出后的提示');
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
@@ -1249,15 +1682,16 @@ async function recover({ page }) {
   }
   await pane.locator('.composer textarea').fill('', { timeout: 5000 });
   // 停在"Allow all"的会话里，后面的步骤就看不到卡了
-  if ((await pane.getByTestId('permission-button').innerText({ timeout: 2000 })).includes('Allow all')) {
+  if ((await permissionButton(page).innerText({ timeout: 2000 })).includes('Allow all')) {
     await switchToAsk(page);
   }
 }
 
 const steps = {
-  setup, readNoCard, editCard, editApprove, rejectReason, longReason, allowSession, permissionMenu, newSessionAsks,
-  allowAll, pendingToAll, escStop, escInCard, escMenuFirst, twoCommands, keyGuards, writeCard, writeOutside,
-  hiddenChars, followCard, minWindow, taskbarFlash, saveKeyAgain, f8Save, f8EscWhileSaving, f8EscKeepsRunning,
+  setup, readNoCard, editCard, editApprove, rejectReason, longReason, allowSession, permissionMenu, oneOverlay,
+  newSessionAsks, allowAll, pendingToAll, escStop, escInCard, escMenuFirst, twoCommands, cardClosesOverlays,
+  queuedTurnKeepsMenu, keyGuards, usageNotBlocking, buttonGoneFocus, writeCard, writeOutside, hiddenChars, followCard,
+  minWindow, minWindowMenu, taskbarFlash, saveKeyAgain, f8Save, f8EscWhileSaving, f8EscKeepsRunning,
   f8AfterKernelKilled, f8SidebarButton,
 };
 

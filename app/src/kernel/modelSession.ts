@@ -896,7 +896,7 @@ export class ModelSession implements WrapperHost {
   }
 
   /**
-   * @brief 顶栏菜单的各项（§9.2、§9.5 session.pickOptions），按这个会话的项目与能力要求做静态校验；
+   * @brief 范围菜单的各项（§9.2、§9.5 session.pickOptions），按这个会话的项目与能力要求做静态校验；
    *        协作模式下锁定时为空（平行 Agent 规格 §12.11）。
    */
   async pickOptions(): Promise<PickOptions> {

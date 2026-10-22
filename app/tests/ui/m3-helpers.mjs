@@ -1,5 +1,6 @@
 // M3 整机测试（m3-app.mjs、m3-app-live.mjs）共用的小工具：路径与会话文件、等待、会话树与焦点、菜单、信任询问、
-// 拿住文件不让删除、系统回收站。只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。
+// 拿住文件不让删除、系统回收站、输入框下面一行（权限、选择范围、Effort、圆环，2026-10-21 从顶栏移来）此刻的样子和它的变化。
+// 只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
@@ -182,7 +183,7 @@ export function settle(page) {
   return page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 }
 
-/** @brief 焦点所在的元素。 */
+/** @brief 焦点所在的元素；inRow：是否在输入框下面一行（.composer-bottom）里。 */
 export async function focusInfo(page) {
   await settle(page);
   return page.evaluate((selector) => {
@@ -191,9 +192,13 @@ export async function focusInfo(page) {
       role: el?.getAttribute?.('role') ?? null, type: el?.getAttribute?.('type') ?? null,
       label: el?.getAttribute?.('aria-label') ?? null, text: (el?.textContent ?? '').trim().slice(0, 30),
       tag: el?.tagName?.toLowerCase() ?? null,
-      composer: el === document.querySelector(`${selector} .composer textarea`) };
+      composer: el === document.querySelector(`${selector} .composer textarea`),
+      inRow: Boolean(el?.closest?.('[data-testid="composer"] .composer-bottom')) };
   }, PANE);
 }
+
+/** @brief 等 locator 出现，最多 timeout 毫秒；返回是否出现了。 */
+export const shownWithin = (locator, timeout = 3000) => locator.waitFor({ timeout }).then(() => true, () => false);
 
 /** @brief 等当前会话面板就绪（没有"Starting…"之类的说明）。 */
 export function waitReady(page, timeout = 30000) {
@@ -405,6 +410,173 @@ export async function answerTrustDialog(page, { answer, remember = false }) {
   await dialog.waitFor({ state: 'detached', timeout: 5000 });
   await waitReady(page);
   return paneOf(page).getByTestId('trust-banner').innerText({ timeout: 3000 }).catch(() => '');
+}
+
+// ---------- 输入框下面一行（docs/v0/screens/models.md"界面测试用的标识"；2026-10-21 从顶栏移来） ----------
+
+/** 这一行会用 aria-disabled 表示不可用的三个按钮 → 它们的菜单（开着时挡住 Alt+数字和 Ctrl+N） */
+export const ROW_MENUS = { 'permission-button': 'permission-menu', 'model-button': 'model-menu',
+  'thinking-button': 'thinking-menu' };
+/** 从文字框按 Tab 依次停在这一行的这几项上（输入为空时"Send"不可用、跳过；models.md"位置"） */
+export const ROW_TAB_ORDER = ['permission-button', 'model-button', 'thinking-button', 'usage'];
+/** 不能发送时按钮位置的说明，也是这一行按钮不可用的原因（models.md"不可用时、按钮消失时的焦点"） */
+export const ROW_REASONS = { crashed: 'Mori’s background process crashed', restarting: 'Restarting…',
+  starting: 'Starting…', failed: 'Session didn’t open' };
+/** 准备中、生成中选择范围按钮不可用的原因（悬停第三行） */
+export const MODEL_BUSY = 'Can’t switch models until the response finishes';
+/** 准备中、生成中 Effort 按钮不可用的原因（悬停第二行） */
+export const EFFORT_BUSY = 'Can’t change effort until the response finishes';
+
+/**
+ * @brief 在页面里装上读这一行的函数 window.__moriRow（界面重新加载后要再装）。读 selector 那一栏
+ *        [data-testid="composer"] 里的 .composer-bottom：按钮位置的说明；三个按钮的读屏名、文字、aria-disabled 的原值、
+ *        "不可用"（aria-disabled 为 true 且没有 data-pending，composer-pickers.md C1）、"切换中"（data-pending）、原生 disabled、
+ *        悬停说明（title 按行拆开，C2）、读屏的描述（aria-describedby 指向的元素的文字）、图标个数、data-pick / data-current /
+ *        data-reasoning；圆环的 data-state / data-tokens / data-percent、读屏名、描述、aria-expanded、aria-controls；
+ *        圆环详情是否显示、悬停提示显示时的文字；页面上开着的这一行的菜单；焦点在哪里；这一行的高度。
+ */
+function installRowReader(page) {
+  return page.evaluate(() => {
+    if (window.__moriRow) return;
+    const describe = (el) => (el.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
+      .map((id) => document.getElementById(id)?.textContent?.trim() ?? '').join(' ');
+    const shown = (el) => Boolean(el) && el.getClientRects().length > 0
+      && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).opacity !== '0';
+    const button = (row, id) => {
+      const el = row.querySelector(`[data-testid="${id}"]`);
+      return el && { label: el.getAttribute('aria-label'), text: el.textContent.trim(),
+        ariaDisabled: el.getAttribute('aria-disabled'), pending: el.dataset.pending === 'true',
+        unavailable: el.getAttribute('aria-disabled') === 'true' && el.dataset.pending !== 'true',
+        native: el.disabled, tip: (el.getAttribute('title') ?? '').split('\n'), described: describe(el),
+        expanded: el.getAttribute('aria-expanded'), icons: el.querySelectorAll('svg').length,
+        pick: el.dataset.pick ?? null, current: el.dataset.current ?? null, reasoning: el.dataset.reasoning ?? null };
+    };
+    const focusName = (pane) => {
+      const el = document.activeElement;
+      if (el && el === pane.querySelector('.composer textarea')) return 'textarea';
+      const menu = el?.closest?.('[role="menu"]');
+      return el?.dataset?.testid ?? (menu ? `menu:${menu.dataset.testid ?? ''}` : el?.tagName?.toLowerCase() ?? null);
+    };
+    window.__moriRow = (selector) => {
+      const pane = document.querySelector(selector);
+      const row = pane?.querySelector('[data-testid="composer"] .composer-bottom');
+      if (!row) return null;
+      const ring = row.querySelector('[data-testid="usage"]');
+      const tip = pane.querySelector('[data-testid="usage-tip"]');
+      return { notReady: pane.querySelector('[data-testid="not-ready"]')?.textContent ?? null,
+        permission: button(row, 'permission-button'), model: button(row, 'model-button'),
+        thinking: button(row, 'thinking-button'),
+        usage: ring && { state: ring.dataset.state ?? null, tokens: ring.dataset.tokens ?? null,
+          percent: ring.dataset.percent ?? null, label: ring.getAttribute('aria-label'), described: describe(ring),
+          expanded: ring.getAttribute('aria-expanded'), controls: ring.getAttribute('aria-controls') },
+        details: shown(pane.querySelector('[data-testid="usage-details"]')),
+        tip: shown(tip) ? tip.textContent.trim() : null,
+        menus: ['permission-menu', 'model-menu', 'thinking-menu']
+          .filter((id) => document.querySelector(`[data-testid="${id}"]`)),
+        focus: focusName(pane), height: row.getBoundingClientRect().height };
+    };
+  });
+}
+
+/** @brief selector 那一栏（默认当前显示的会话面板）输入框下面一行此刻的样子（见 installRowReader）；没有这一行时为 null。 */
+export async function composerRow(page, selector = PANE) {
+  await installRowReader(page);
+  return page.evaluate((target) => window.__moriRow(target), selector);
+}
+
+/**
+ * @brief 开始记下 selector 那一栏输入框下面一行的每一次变化（页面里的 DOM 变了或焦点移进某个元素时读一次，
+ *        和上一次不同才记），用来抓"Restarting…""Starting…"这类一闪而过的状态。rowLog 停止并取回。
+ */
+export async function watchRow(page, selector = PANE) {
+  await installRowReader(page);
+  await page.evaluate((target) => {
+    window.__moriRowStop?.();
+    const log = [];
+    const note = () => {
+      const snap = JSON.stringify(window.__moriRow(target));
+      if (log.at(-1) !== snap) log.push(snap);
+    };
+    const observer = new MutationObserver(note);
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+    document.addEventListener('focusin', note);
+    window.__moriRowLog = log;
+    window.__moriRowStop = () => {
+      note();
+      observer.disconnect();
+      document.removeEventListener('focusin', note);
+    };
+    note();
+  }, selector);
+}
+
+/** @brief 停止 watchRow 的记录（停之前再读一次），返回记下的样子（按时间顺序；这一行不在时那一项为 null）。 */
+export async function rowLog(page) {
+  await settle(page);
+  return page.evaluate(() => {
+    window.__moriRowStop?.();
+    window.__moriRowStop = null;
+    return (window.__moriRowLog ?? []).map((snap) => JSON.parse(snap));
+  });
+}
+
+/** @brief 等这一行满足 test（参数是 composerRow 的结果），最多 timeout 毫秒；返回满足时的样子，没等到时返回最后一次的。 */
+export async function rowWhen(page, test, timeout = 3000) {
+  return await until(async () => {
+    const row = await composerRow(page);
+    return row && test(row) ? row : null;
+  }, timeout, 100) || composerRow(page);
+}
+
+/**
+ * @brief 按钮能用（models.md"不可用时、按钮消失时的焦点"）：在；没有 aria-disabled 属性（能用时不写"false"）、
+ *        没有 data-pending，也不是原生 disabled。
+ */
+export const usable = (item) => Boolean(item) && item.ariaDisabled === null && !item.pending && !item.native;
+
+/**
+ * @brief 权限或 Effort 按钮不可用、原因是 reason：aria-disabled（不是原生 disabled，仍能 Tab 到）、没有 data-pending；
+ *        悬停两行，第一行是全名（与读屏名相同），第二行是 reason；读屏的描述只有 reason（没有第一行、没有" · "）。
+ */
+export const blockedBy = (item, reason) => Boolean(item) && item.unavailable && !item.native
+  && item.tip.length === 2 && item.tip[0] === item.label && item.tip[1] === reason && item.described === reason;
+
+/** @brief 悬停第二行"<提供商名> · <区域>"在读屏的描述里的写法：" · "换成", "。 */
+export const spoken = (where) => where.replaceAll(' · ', ', ');
+
+/**
+ * @brief 选择范围按钮不可用、原因是 reason：aria-disabled、没有 data-pending；悬停三行（按钮文字、where、reason），
+ *        读屏的描述是"<where，" · "换成", ">. <reason>"（composer-pickers.md"悬停和读屏的描述"）。
+ */
+export const rangeBlockedBy = (item, where, reason) => Boolean(item) && item.unavailable && !item.native
+  && item.tip.length === 3 && item.tip[0] === item.text && item.tip[1] === where && item.tip[2] === reason
+  && item.described === `${spoken(where)}. ${reason}`;
+
+/**
+ * @brief 照 Claude 缩短一个数（models.md"上下文用量（圆环）"）：1,000 起写成 k、1,000,000 起写成 M（一位小数，去掉".0"），
+ *        不到 1,000 照写；999,950 到 999,999 按 k 会进成"1000k"，写成"1M"。
+ */
+export function shortCount(count) {
+  const trim = (text) => text.replace(/\.0$/, '');
+  if (count < 1000) return String(count);
+  if (count < 999950) return `${trim((count / 1000).toFixed(1))}k`;
+  return `${trim((count / 1e6).toFixed(1))}M`;
+}
+
+/**
+ * @brief 有用量时圆环（composerRow 的 usage）的读屏名、data-tokens、data-percent 和悬停提示对得上：读屏名
+ *        "Usage: Context approximately 15,360 of 128,000 tokens (12%)"（写完整的数、" / "换成" of "），数与 data-tokens、
+ *        百分比与 data-percent 相同（四舍五入），读屏的描述里没有"/"；给了 tip 时它是"Context ≈ 15.4k / 128k (12%)"。
+ */
+export function usageOk(usage, tip = undefined) {
+  const match = /^Usage: Context approximately ([\d,]+) of ([\d,]+) tokens \((\d+)%\)$/.exec(usage?.label ?? '');
+  if (!match || usage.state !== 'used') return false;
+  const [used, total, percent] = match.slice(1).map((text) => Number(text.replace(/,/g, '')));
+  const full = (count) => count.toLocaleString('en-US');
+  return match[1] === full(used) && match[2] === full(total) && String(used) === usage.tokens
+    && String(percent) === usage.percent && Math.abs(Math.round((used / total) * 100) - percent) <= 1
+    && !usage.described.includes('/')
+    && (tip === undefined || tip === `Context ≈ ${shortCount(used)} / ${shortCount(total)} (${percent}%)`);
 }
 
 // ---------- 左栏的字号 ----------

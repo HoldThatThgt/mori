@@ -4,7 +4,7 @@
 // 阶段行"Waiting for your answer"、不可见的会话显示"Needs input"、通知一行"Extension: …"（warning）、
 // 超时倒数与自动取消、停止时取消挂着的询问；
 // 会话打开过程中的通知（打开后显示）与询问（不出卡，按取消回答）；扩展命令里的询问（不经过一轮运行）；
-// 正在打开的会话的菜单（三项都不可用，小字"Opening…"）。
+// 正在打开的会话的菜单（三项都不可用，小字"Opening…"）和输入框下面一行（第一次打开中只有不可用的权限按钮）。
 // 界面重新加载（sessions.md "后台进程退出与重新载入"）：后台进程里的会话照常运行，session.list 带回 live，
 // 侧栏显示 Running、Needs approval、Needs input，还没接上时随事件更新（之后才来的批准请求、本轮结束时"Unread"、
 // 后台进程退出时"Error"）；还没发消息的新会话也在；点开接上（不问信任）：生成中的回复接着流入、执行中的工具卡、
@@ -18,11 +18,10 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { killKernel, oneLine, sleep } from './lib.mjs';
 import {
-  activeFile, allRows, archivedState, chooseMenuItem, clickOpenFolder, ctrlN, expandArchived, focusInfo, kernelOpen,
-  lastReply, lastToolCard, liveInfo, menuItems, menuText, noteSmallText, openMenuByKey, openMenuByMouse, openMenuOn,
-  openRow, PANE, paneCount, paneOf, rowOf, rowState, samePath, sessionGone, startDelete, stoppedCount, until,
-  waitArchivedToggle,
-  waitIdle, waitPanes, waitReady, waitRunning, waitStatus,
+  activeFile, allRows, archivedState, blockedBy, chooseMenuItem, clickOpenFolder, composerRow, ctrlN, expandArchived,
+  focusInfo, kernelOpen, lastReply, lastToolCard, liveInfo, menuItems, menuText, noteSmallText, openMenuByKey,
+  openMenuByMouse, openMenuOn, openRow, PANE, paneCount, paneOf, ROW_REASONS, rowOf, rowState, samePath, sessionGone,
+  startDelete, stoppedCount, until, waitArchivedToggle, waitIdle, waitPanes, waitReady, waitRunning, waitStatus,
 } from './m3-helpers.mjs';
 
 /** 项目扩展加载时先等这么久，打开会话时有时间看到"Starting…"和菜单的"Opening…" */
@@ -198,6 +197,11 @@ async function extOpen(ctx) {
   await dialog.getByRole('button', { name: 'Trust workspace', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 5000 });
   const opening = await paneOf(page).getByTestId('not-ready').innerText({ timeout: 1000 }).catch(() => '');
+  const row = await composerRow(page);
+  record('第一次打开中（"Starting…"）：输入框下面一行只有权限按钮（不可用：aria-disabled，悬停第二行和读屏的描述'
+    + '"Starting…"），没有选择范围、Effort 和圆环（还没有过模型状态）；这一行高度不变（min-height 33px）',
+  row?.notReady === ROW_REASONS.starting && blockedBy(row.permission, ROW_REASONS.starting) && !row.model
+    && !row.thinking && !row.usage && Math.abs(row.height - 33) <= 1, JSON.stringify(row));
   const menu = await openMenuOn(page, page.locator('.session-item.active'));
   const items = await menuItems(menu);
   record('正在打开的会话（"正在启动…"）：菜单里重命名、归档、删除都不可用，旁边小字"正在打开"', opening === 'Starting…'

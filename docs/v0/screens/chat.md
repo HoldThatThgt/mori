@@ -27,6 +27,9 @@
 460px 约 285px、370px（800 宽窗口）约 215px、280px 约 190px；800 宽窗口右栏打开时中栏 300px 约 245px。
 改名框（M3）在同一位置，至少 120px。
 
+TaskBoard 的团队开关（另一分支，还没合并）预留在右边一组（`.topbar-actions`）的第一个、"Toggle changes"前面；
+后合并的一方重新算上面会话名的宽度、重调顶栏的档位（[../composer-pickers.md](../composer-pickers.md)）。
+
 M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用量见 [models.md](models.md)；输入框的"/"补全见 [slash.md](slash.md)。
 
 ## 对话流

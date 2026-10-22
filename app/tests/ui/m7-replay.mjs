@@ -26,8 +26,8 @@ import {
   assistantIndexWith, dragSelect, jumpHighlight, PANE, popoverShown, selectLines, viewerState, waitViewer,
 } from './m4-helpers.mjs';
 import {
-  chooseTab, detailState, flashVisible, openReviewPage, pressedRow, records, reviewState, selectRow, shortOf,
-  waitLoaded,
+  chooseTab, detailState, flashVisible, focusedPaneView, openReviewPage, paneFieldProblems, pressedRow, records,
+  reviewState, selectRow, shortOf, waitLoaded,
 } from './m7-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -229,8 +229,13 @@ async function feedbackLines(page, recorded) {
   return shown;
 }
 
-/** @brief 按 F8，填录制时的"What went wrong""What you expected"后保存；检查交给主进程的报告和"Saved to"的路径。 */
+/**
+ * @brief 按 F8，填录制时的"What went wrong""What you expected"后保存；检查交给主进程的报告和"Saved to"的路径，
+ *        以及报告的"Current view"（会话里按的：2026-10-21 加的"Model range""Effort""Pane width"和各项的先后，
+ *        docs/v0/composer-pickers.md"测试要改的地方"新检查第 9 条）。
+ */
 async function saveReport(page, h, issue) {
+  const pane = await focusedPaneView(page);
   await page.keyboard.press('F8');
   const dialog = page.getByTestId('issue-dialog');
   await dialog.getByTestId('issue-shot').waitFor({ timeout: 15000 });
@@ -242,6 +247,11 @@ async function saveReport(page, h, issue) {
   record('review-reply 重启前：F8 交给主进程的报告里"哪里不对""你期望什么"是录制时填的；"已保存到"后面是录制时主进程'
     + '保存的路径', reports.length === 1 && reports[0].what === issue.what && reports[0].expect === issue.expect
     && saved === `Saved to ${issue.result.file}`, JSON.stringify({ saved, reports: reports.length }));
+  const view = reports[0]?.view ?? [];
+  const wrong = paneFieldProblems(view, pane);
+  record('review-reply 重启前：报告的"当前界面"里"Model""Permission mode"照旧，多了"Model range"（选择范围）、"Effort"'
+    + '（输入框下面一行 Effort 按钮的强度）和"Pane width"（焦点所在那一栏 .chat-pane 的宽度）；各项的先后照 ui-strings.md',
+  wrong.length === 0, JSON.stringify({ wrong, pane, view }));
 }
 
 /**

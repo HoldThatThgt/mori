@@ -23,7 +23,7 @@ export interface Notice {
 /** @brief 设置页的分节。 */
 export type SettingsSection = 'models' | 'agents';
 
-/** @brief 打开 设置 → Models 时要落到的位置（拒绝启动卡、说明卡、顶栏菜单）。 */
+/** @brief 打开 设置 → Models 时要落到的位置（拒绝启动卡、说明卡、范围菜单）。 */
 export interface ModelsTarget {
   /** 滚到这个提供商的卡；focus 为 zones 时是要确认区域的提供商 */
   providerId?: string;
@@ -122,7 +122,7 @@ useApp.subscribe((state, previous) => {
 });
 
 /**
- * @brief 打开 设置 → Models，并落到 target 指定的位置（不带时停在顶部）。拒绝启动卡、说明卡、顶栏菜单调用。
+ * @brief 打开 设置 → Models，并落到 target 指定的位置（不带时停在顶部）。拒绝启动卡、说明卡、范围菜单调用。
  *        AGENTS.md 有未保存的改动时先问。
  */
 export function openModelsSettings(target: ModelsTarget = {}): void {

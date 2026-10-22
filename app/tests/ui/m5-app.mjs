@@ -6,6 +6,10 @@
 // 只用键盘、芯片与预览、改范围、内容不含思考和工具输出、模型收到引用块、mori.ref 条目、跳回原会话、改名、重启后、
 // 原会话已删除、引用正在生成的会话、没有可引用的内容、超过 2 万字默认最近 5 轮、草稿里的芯片、预览的标题不被压矮、
 // 很长的会话名截断加省略号）；没有小于 12px 的字；页面没有报错。
+// 2026-10-21 起（docs/v0/composer-pickers.md）：分屏时顶栏里会话名的地方（titleRoomCheck）；分屏各栏的输入框下面一行在
+// 窄栏里的样子、截短、往上打开的菜单、"Queue for later"（splitRows）；Effort 是支持思考的强度时 280px 的一栏（effortWidths，
+// 另起一次 Mori，首次启动时勾上 Supports thinking）；F8 报告的"Model range""Effort""Pane width"（左右两栏各按一次）；
+// 最小窗口时两栏的输入框下面一行。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m5-app.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m5-app(-packaged).json，截图在 test-results/m5-app(-packaged)/。
@@ -16,10 +20,14 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import { openMenuOn, rowOf, savedArchived, stubFolder, until, waitReady, waitStatus } from './m3-helpers.mjs';
+import {
+  composerRow, focusName, openRingDetails, popoverChecks, rowProblems, rowSummary, setPaneWidth, tabPath,
+} from './m1-layout.mjs';
 import { refEntries } from './m4-helpers.mjs';
 import {
-  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, headingTruncated, headingWhole, paneAt, pickRange,
-  previewHeading, previewState, savedLayout, sendAt, sentSessionRefs, smallText, splitState, waitPaneIdle,
+  centerPoint, chipsAt, closeRightPanel, composerAt, dragWithHint, flashedAt, headingTruncated, headingWhole, paneAt,
+  paneView, pickRange, previewHeading, previewState, reportField, reportLabels, savedLayout, sendAt, sentSessionRefs,
+  setSplitWidth, slotSelector, smallText, splitState, titleProblems, titleRoom, viewProblems, waitPaneIdle,
   waitPaneReady, waitPreview, waitSessionChip, waitSplit,
 } from './m5-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
@@ -38,6 +46,14 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 /** README 里只出现在工具输出里的一行（合成端点的工具结果摘要只取前 80 个字，到不了这里） */
 const TOOL_ONLY = 'TOOL-OUTPUT-ONLY-MARKER';
 const MENU_ORDER = 'Rename,Attach as context,Open in split view,Archive,Delete…';
+/** 分屏各栏量输入框下面一行时的宽度（composer-pickers.md"测试要改的地方"新加的检查第 2 条里分屏才有的窄栏和各档的边） */
+const SPLIT_WIDTHS = [280, 300, 340, 341, 370, 400, 401, 460, 461, 490];
+/** 量"有字"时输入框里的字（"Queue for later"发出的也是它） */
+const SPLIT_DRAFT = 'plain 窄栏里排队的字';
+/** 从文字框按 Tab 先后停到的这一行的四项（models.md"位置"） */
+const ROW_PATH = 'permission-button,model-button,thinking-button,usage';
+/** 选择范围按钮悬停的第二行：首次启动建的提供商名和区域 */
+const APP_OPTS = { modelTip: 'Mori endpoint · Local' };
 /** 很长的会话名（中英文都有），预览的标题一行放不下 */
 const LONG_NAME = 'A very long session name that keeps going so the preview heading cannot fit it on a single line'
   + ' · 很长的会话名，用来看预览的标题放不下时截断加省略号、不折行';
@@ -301,7 +317,37 @@ async function followFocus(ctx) {
     report.includes(`Current session: ${left}`)
     && /Split view: Left: .+ · Right: .+ \(focus in the left pane\)/.test(report),
     oneLine(report.split('\n').filter((line) => /Current session|Split view/.test(line)).join(' | ')));
+  await viewFields(page, report, 'left');
   await shot(page, '2-follow');
+  await composerAt(page, 'right').click();
+  await viewFields(page, await saveIssue(ctx, 'M5 分屏 F8 右栏'), 'right');
+}
+
+/** @brief 按 F8、写上 what、保存，返回写着 what 的那一份报告（同一秒里存两份时文件名不按先后排，所以按内容找）。 */
+async function saveIssue(ctx, what) {
+  const { page } = ctx;
+  await page.keyboard.press('F8');
+  await page.getByTestId('issue-dialog').waitFor({ timeout: 10000 });
+  await page.getByTestId('issue-what').fill(what);
+  await page.getByTestId('issue-dialog').getByRole('button', { name: 'Save' }).click();
+  await page.getByTestId('issue-saved').waitFor({ timeout: 10000 });
+  await page.keyboard.press('Escape');
+  const dir = join(ctx.userData, 'ui-issues');
+  return readdirSync(dir).filter((name) => name.endsWith('.md')).map((name) => readFileSync(join(dir, name), 'utf8'))
+    .find((text) => text.includes(what)) ?? '';
+}
+
+/**
+ * @brief F8 报告"Current view"的"Model range""Effort""Pane width"（f8.md"保存的内容"、composer-pickers.md"我自己定的"
+ *        第 16 条）：都是焦点所在那一栏的；Pane width 是那一栏 .chat-pane 的宽（右边那一栏比 .pane-slot 窄 1px）；
+ *        三项的位置；"Model""Permission mode"照旧。
+ */
+async function viewFields(page, report, side) {
+  const view = await paneView(page, side);
+  const problems = viewProblems((label) => reportField(report, label), reportLabels(report), view, side);
+  record(`F8：在${side === 'left' ? '左' : '右'}栏按，"Current view"的"Model range""Model""Effort"是这一栏的，`
+    + `"Pane width"是这一栏 .chat-pane 的宽${side === 'right' ? '（比 .pane-slot 窄 1px）' : ''}，`
+    + '三项在"Model"前后和"Window size"后面', problems.length === 0, `${problems.join('; ')} ${JSON.stringify(view)}`);
 }
 
 /**
@@ -357,17 +403,161 @@ async function crampedRight(ctx) {
   await resizeWindow(ctx, 800, 600);
   const minimum = await splitState(page);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth
-    || [...document.querySelectorAll('.topbar')].some((bar) => bar.scrollWidth > bar.clientWidth + 1));
+    || [...document.querySelectorAll('.topbar, .composer-bottom')]
+      .some((bar) => bar.scrollWidth > bar.clientWidth + 1));
+  const rows = [];
+  for (const side of ['left', 'right']) {
+    const row = await composerRow(page, slotSelector(side));
+    rows.push(...rowProblems(row, 'idle', APP_OPTS).map((problem) => `${side} ${row?.pane}px: ${problem}`));
+  }
   await resizeWindow(ctx, 1280, 800);
   const back = await page.getByTestId('right-panel').getAttribute('class').catch(() => null);
   record('分屏放不下时右栏先收起（两栏各不足 280px 之前）；点右栏开关时浮在两栏上层，两栏宽度不变；窗口变宽后回到右边',
     wide === 1 && narrow.panel === 0 && narrow.state.slots.every((slot) => slot.width >= 280)
     && floating?.includes('floating') && JSON.stringify(widths) === JSON.stringify(narrow.state.slots.map((s) => s.width))
     && back === 'right-panel', JSON.stringify({ wide, narrow: narrow.state.slots.map((s) => s.width), floating, back }));
-  record('最小窗口 800×600：左栏收起为图标栏，两栏各约 370px 完整显示，没有横向滚动、标题行不溢出',
+  record('最小窗口 800×600：左栏收起为图标栏，两栏各约 370px 完整显示，没有横向滚动、标题行和输入框下面一行都不溢出',
     minimum.slots.every((slot) => slot.width >= 360) && !overflow, JSON.stringify({ widths: minimum.slots.map((s) =>
       s.width), overflow }));
+  record('最小窗口 800×600：两栏的输入框下面一行（权限、选择范围、Effort、圆环、发送）按约 370px 一栏收紧，不换行、'
+    + '截短的先后对、读屏名和悬停对', rows.length === 0, rows.join('; '));
   await shot(page, '3-wide-again');
+}
+
+/**
+ * @brief 把 side 那一栏依次设成 widths 里的宽，每个宽度下输入框空着、有字各量一次 side 那一栏（按 state 查）和另一栏
+ *        （按 other 查，宽度是剩下的），返回问题列表。
+ */
+async function splitSweep(page, side, { widths, state, other }) {
+  const bad = [];
+  const otherSide = side === 'left' ? 'right' : 'left';
+  for (const width of widths) {
+    const got = await setSplitWidth(page, side, width);
+    for (const draft of ['', SPLIT_DRAFT]) {
+      await composerAt(page, side).fill(draft);
+      const row = await composerRow(page, slotSelector(side));
+      const problems = Math.abs(got - width) > 0.5 ? [`pane ${got}px`] : rowProblems(row, state, APP_OPTS);
+      const label = `${side} ${width}${draft ? '+字' : ''}`;
+      if (problems.length) bad.push(`${label}: ${problems.join('; ')} (${rowSummary(row)})`);
+    }
+    const rest = await composerRow(page, slotSelector(otherSide));
+    const problems = rowProblems(rest, other, APP_OPTS);
+    if (problems.length) bad.push(`${otherSide} ${rest?.pane}: ${problems.join('; ')} (${rowSummary(rest)})`);
+  }
+  return bad;
+}
+
+/** @brief 在 side 那一栏的权限菜单里选 mode（选"Allow all"时确认），等按钮显示它。 */
+async function chooseMode(page, side, mode) {
+  await page.locator(`${slotSelector(side)} [data-testid="permission-button"]`).click();
+  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: mode }).click();
+  if (mode === 'Allow all') {
+    await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all' }).click();
+  }
+  await page.waitForFunction(({ css, text }) => document.querySelector(`${css} [data-testid="permission-button"]`)
+    ?.textContent?.includes(text), { css: slotSelector(side), text: mode }, { timeout: 10000 });
+}
+
+/**
+ * @brief 280px 的一栏、生成中有字（composer-pickers.md"测试要改的地方"新加的检查第 6 条）：Tab 依次到权限、选择范围、Effort、
+ *        圆环、▾（"Queue"收起）；Enter 打开 ▾ 的菜单，焦点在"Queue for later"，↓ 到"Steer"，Esc 回到 ▾；再选
+ *        "Queue for later"真的排队（这一栏的排队区多一条"Queued"）。
+ */
+async function queueForLater(page, side) {
+  await composerAt(page, side).fill(SPLIT_DRAFT);
+  const textarea = `${slotSelector(side)} .composer textarea`;
+  const path = await tabPath(page, textarea, (name) => name === 'More send options', 8);
+  await page.keyboard.press('Enter');
+  const name = () => page.evaluate(() => document.activeElement?.closest('[role="menuitem"]')?.childNodes[0]
+    ?.textContent ?? null);
+  await page.locator(`${slotSelector(side)} .split-button [role="menu"]`).waitFor({ timeout: 3000 }).catch(() => {});
+  const first = await name();
+  await page.keyboard.press('ArrowDown');
+  const second = await name();
+  await page.keyboard.press('Escape');
+  const back = await focusName(page);
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  const queued = await paneAt(page, side).getByTestId('queue').filter({ hasText: SPLIT_DRAFT })
+    .waitFor({ timeout: 10000 }).then(() => true, () => false);
+  const queueText = await paneAt(page, side).getByTestId('queue').innerText().catch(() => '');
+  record('分屏 280px、生成中有字："Queue"收起；Tab 依次到权限、选择范围、Effort、圆环、▾；Enter 打开菜单焦点在'
+    + '"Queue for later"，↓ 到"Steer"，Esc 回到 ▾；选"Queue for later"真的排队（排队区多一条"Queued"）',
+  path.join() === `${ROW_PATH},More send options` && first === 'Queue for later' && second === 'Steer'
+    && back === 'More send options' && queued && queueText.includes('Queued'),
+  JSON.stringify({ path, first, second, back, queue: oneLine(queueText, 80) }));
+}
+
+/** @brief 两栏都停止生成（焦点在各自的输入框里按 Esc），等本轮结束。 */
+async function stopBoth(page) {
+  for (const side of ['left', 'right']) {
+    if (!(await splitState(page)).slots.find((slot) => slot.side === side)?.running) continue;
+    await composerAt(page, side).click();
+    await page.keyboard.press('Escape');
+    await waitPaneIdle(page, side, 30000);
+  }
+}
+
+/**
+ * @brief 分屏各栏的输入框下面一行（composer-pickers.md"测试要改的地方"新加的检查第 2、3、4、6 条；models.md"窄栏"、
+ *        "菜单的位置与键盘"；split.md）：左栏（C）生成中，280–490px 各档、空 / 有字都量，右栏（D，空闲）同时量剩下的宽；
+ *        280px 生成中有字时权限菜单、▾ 菜单、圆环详情往上打开、在这一栏里；"Queue for later"；"Allow all"在 280px 最挤时
+ *        看得见的字仍分得出、对比度够；接着 splitRight。结束时两栏各一半、焦点在右栏（closeKeeps 接着用）。
+ */
+async function splitRows(ctx) {
+  const { page } = ctx;
+  await sendAt(page, 'left', 'wait 90s');
+  await page.waitForFunction((css) => document.querySelector(`${css} .stop-button`), slotSelector('left'),
+    { timeout: 20000 });
+  // 右栏跟随焦点所在的一栏、按各自的会话开关：焦点到了这一栏之后再关，这个会话的右栏才是关着的
+  await closeRightPanel(page);
+  const sweep = await splitSweep(page, 'left', { widths: SPLIT_WIDTHS, state: 'running', other: 'idle' });
+  record('分屏：生成中的一栏在 280–490px 各档（空 / 有字）、另一栏空闲：输入框下面一行不换行、不超出输入框，每档该有的都在，'
+    + '截短的先后和最窄对，读屏名和悬停第一行是全文，不可用的原因对', sweep.length === 0, sweep.slice(0, 4).join(' | '));
+  await setSplitWidth(page, 'left', 280);
+  await composerAt(page, 'left').fill(SPLIT_DRAFT);
+  const menus = await popoverChecks(page, slotSelector('left'), ['permission', 'queue', 'ring']);
+  record('分屏 280px 生成中有字：权限菜单、▾ 菜单、圆环详情往上打开，在这一栏会话面板和窗口里、不盖顶栏、不比这一行宽',
+    menus.length === 0, menus.join('; '));
+  await queueForLater(page, 'left');
+  await chooseMode(page, 'left', 'Allow all');
+  await composerAt(page, 'left').fill(SPLIT_DRAFT);
+  const allow = await composerRow(page, slotSelector('left'));
+  const allowProblems = rowProblems(allow, 'running', APP_OPTS);
+  record('分屏 280px 生成中有字、"Allow all"：没有图标，截短后看得见开头的字（不只剩颜色）、字和底色的对比度 ≥ 4.5:1，'
+    + '三个按钮不窄于最窄', allow?.items.permission?.all && allowProblems.length === 0,
+  `${rowSummary(allow)} ${allowProblems.join('; ')}`);
+  await chooseMode(page, 'left', 'Ask each time');
+  await splitRight(ctx);
+}
+
+/**
+ * @brief splitRows 的后半：右栏 279px（.pane-slot 280px）生成中有字；两栏各一个圆环；两栏停下后空闲时左栏 280px、
+ *        右栏 279px 打开范围菜单（收到这一行的宽，项名截短时有省略号，区域完整）、Effort 菜单、权限菜单和圆环详情。
+ */
+async function splitRight(ctx) {
+  const { page } = ctx;
+  await sendAt(page, 'right', 'wait 60s');
+  await page.waitForFunction((css) => document.querySelector(`${css} .stop-button`), slotSelector('right'),
+    { timeout: 20000 });
+  await closeRightPanel(page);
+  const right = await splitSweep(page, 'right', { widths: [279], state: 'running', other: 'running' });
+  const rings = await page.evaluate(() => [...document.querySelectorAll('.pane-slot:not([hidden])')]
+    .map((slot) => slot.querySelectorAll('[data-testid="usage"]').length));
+  record('分屏：右边一栏 279px（.pane-slot 280px）生成中有字时输入框下面一行放得下；两栏各有一个圆环', right.length === 0
+    && rings.join() === '1,1', `${right.join(' | ')} 圆环 ${rings}`);
+  await stopBoth(page);
+  for (const side of ['left', 'right']) await composerAt(page, side).fill('');
+  const idle = [];
+  for (const [side, width] of [['left', 280], ['right', 279]]) {
+    await setSplitWidth(page, side, width);
+    idle.push(...(await popoverChecks(page, slotSelector(side), ['model', 'effort', 'permission', 'ring']))
+      .map((problem) => `${side} ${width}px ${problem}`));
+  }
+  record('分屏 280px / 279px 空闲：范围菜单收到这一行的宽（项名截短有省略号、区域完整）、Effort 菜单往上打开、右边对齐'
+    + '自己的按钮或左边贴这一行左端，权限菜单左对齐，圆环详情右对齐，都在这一栏里', idle.length === 0, idle.join('; '));
+  await page.locator('[data-resize="split"]').dblclick();
+  await composerAt(page, 'right').click();
 }
 
 /** @brief 反例：关闭分屏不停止正在生成的会话；去设置页再回来分屏还在。 */
@@ -633,6 +823,63 @@ async function headingFit(ctx) {
   await setWindowSize(ctx, before);
 }
 
+/**
+ * @brief 顶栏里会话名的地方（chat.md"顶栏"；composer-pickers.md"测试要改的地方"新加的检查第 1 条）：很长的会话名（headingFit
+ *        改过名的 ctx.long）在右栏；1280 宽窗口分屏各一半（约 500px）、460 / 401 / 400 / 321 / 320 / 280px、右边一栏最窄
+ *        279px（.pane-slot 280px）、800×600 分屏（约 370px），以及 800 宽窗口右栏打开时的单栏（300px）：会话名要么完整、
+ *        要么占满剩下的地方（项目名先收到 40px）；460px 时至少 280px、280px 时至少 185px、279px 时至少 184px；
+ *        ≤ 400px 时两个图标按钮 28px、内边距比宽时小；≤ 320px 不显示项目名和 ›。
+ *        要用 longSource、headingFit 建和改名的会话，用 --only 时要一起选。
+ */
+async function titleRoomCheck(ctx) {
+  const { page } = ctx;
+  const before = await windowSize(ctx);
+  await resizeWindow(ctx, 1280, 800);
+  await rowOf(page, ctx.b).first().click();
+  await waitPaneReady(page, 'focused');
+  await menuOf(page, ctx.long);
+  await chooseByKeys(page, 'Open in split view');
+  await waitSplit(page);
+  await waitPaneReady(page, 'right');
+  await closeRightPanel(page);
+  const rooms = [];
+  const measure = async (minimum = 0) => {
+    const room = await titleRoom(page, 'right');
+    rooms.push({ pane: room?.pane, problems: titleProblems(room, minimum), padding: room?.padding });
+  };
+  await page.locator('[data-resize="split"]').dblclick();
+  await measure();
+  for (const [width, minimum] of [[460, 280], [401, 0], [400, 0], [321, 0], [320, 0], [280, 185], [279, 184]]) {
+    await setSplitWidth(page, 'right', width);
+    await measure(minimum);
+  }
+  await resizeWindow(ctx, 800, 600);
+  await page.locator('[data-resize="split"]').dblclick();
+  await measure();
+  await titleSingle(ctx, rooms);
+  await setWindowSize(ctx, before);
+}
+
+/** @brief titleRoomCheck 的后半：关上 B 那一栏，800 宽窗口、右栏打开时的单栏 300px；记录全部结果。 */
+async function titleSingle(ctx, rooms) {
+  const { page, app } = ctx;
+  await paneAt(page, 'left').getByTestId('close-pane').click();
+  await waitSplit(page, false);
+  await resizeWindow(ctx, 1200, 800);
+  await setPaneWidth(page, app, 300);
+  const room = await titleRoom(page, 'single');
+  rooms.push({ pane: room?.pane, problems: titleProblems(room), padding: room?.padding });
+  await setPaneWidth(page, app, 930);
+  const bad = rooms.filter((item) => item.problems.length);
+  const wide = rooms.find((item) => item.pane > 400 && item.pane < 410);
+  const narrow = rooms.find((item) => item.pane <= 400 && item.pane > 390);
+  record('顶栏：分屏和窄的单栏里很长的会话名要么完整、要么占满剩下的地方（项目名先收到 40px），460px 时至少 280px、'
+    + '280px 时至少 185px、279px 时至少 184px；≤ 400px 时两个图标按钮 28px、内边距变小；≤ 320px 不显示项目名和 ›',
+  bad.length === 0 && Boolean(wide && narrow)
+    && narrow.padding[0] + narrow.padding[1] < wide.padding[0] + wide.padding[1],
+  JSON.stringify(rooms.map((item) => [item.pane, item.padding?.join('/'), item.problems.join('; ')])));
+}
+
 /** @brief 走查 5 与删除：删除 A 时它所在的一栏关闭；指向它的引用显示"Session deleted"，原文仍可查看。 */
 async function deleteSource(ctx) {
   const { page } = ctx;
@@ -677,15 +924,88 @@ async function archivedSource(ctx) {
     && !archived.some((file) => file.toLowerCase() === ctx.a.toLowerCase()), JSON.stringify(archived));
 }
 
-/** @brief 新加的界面没有小于 12px 的字。 */
+/** @brief 新加的界面没有小于 12px 的字（圆环的悬停提示、圆环详情和范围菜单开着时各量一次）。 */
 async function fontSizes(ctx) {
-  const small = await smallText(ctx.page);
-  record('新加的界面（分屏标题行、芯片、预览、发出的引用、放下提示）没有小于 12px 的文字', small.length === 0,
-    small.slice(0, 5).join('; '));
+  const { page } = ctx;
+  const focused = slotSelector('focused');
+  const small = await smallText(page);
+  await page.locator(`${focused} [data-testid="usage"]`).hover();
+  await page.locator(`${focused} [data-testid="usage-tip"]`).waitFor({ timeout: 3000 }).catch(() => {});
+  small.push(...await smallText(page));
+  await openRingDetails(page, focused);
+  small.push(...await smallText(page));
+  await page.keyboard.press('Escape');
+  await page.locator(`${focused} [data-testid="model-button"]`).click();
+  await page.getByTestId('model-menu').waitFor({ timeout: 3000 }).catch(() => {});
+  small.push(...await smallText(page));
+  await page.keyboard.press('Escape');
+  record('新加的界面（分屏标题行、芯片、预览、发出的引用、放下提示、输入框下面一行、圆环的悬停提示和详情、范围菜单）'
+    + '没有小于 12px 的文字', small.length === 0, small.slice(0, 5).join('; '));
 }
 
-const steps = { setup, menuSplit, dragAndPlace, twoPanes, followFocus, divider, crampedRight, closeKeeps,
-  dragReference, jumpBack, keyboardReference, restart, runningSource, longSource, headingFit, deleteSource, fontSizes };
+/**
+ * @brief 另起一次 Mori（新的数据目录）：首次启动时给 fake-coder 勾上"Supports thinking"（新会话的强度是 Medium，
+ *        model-menu.md"思考强度"新会话），建两个会话分屏，左栏 280px，Effort 分别是"Medium"和"Minimal"时生成中有字的这一行
+ *        （composer-pickers.md"测试要改的地方"新加的检查第 3 条；"Extra high"在 v1 里选不到，见 effortAt280）。
+ */
+async function effortWidths(ctx) {
+  const run = { userData: mkdtempSync(join(tmpdir(), 'mori-m5-app-effort-')), pageErrors: ctx.pageErrors };
+  await startApp(run);
+  try {
+    await run.h.setupFirstRun({ baseUrl, apiKey: testKey, reasoning: true });
+    await stubFolder(run.app, ctx.project);
+    await run.page.getByRole('button', { name: OPEN_FOLDER }).first().click();
+    await waitReady(run.page);
+    await sendIn(run.page, 'focused', 'plain E 第一轮');
+    const first = await run.page.locator('.session-item.active').first().getAttribute('data-file');
+    await newSession(run.page);
+    await menuOf(run.page, first);
+    await chooseByKeys(run.page, 'Open in split view');
+    await waitSplit(run.page);
+    await waitPaneReady(run.page, 'right');
+    await composerAt(run.page, 'left').click();
+    await closeRightPanel(run.page);
+    await effortAt280(run.page);
+  } finally {
+    await run.app.close().catch(() => {});
+  }
+}
+
+/**
+ * @brief 左栏 280px：Effort 依次是"Medium"（新会话的强度）和"Minimal"（在菜单里选），各发一条"wait 20s"，生成中有字时量
+ *        这一行，再按 Esc 停下。v1 里配置的模型没有"Extra high"（pi 只在模型有 xhigh 映射时才列出，后台进程按当前模型收紧强度，
+ *        modelSession.ts），这里用选得到的强度；最宽的"Unavailable"在 splitRows 里量过。
+ */
+async function effortAt280(page) {
+  const bad = [];
+  const seen = [];
+  for (const level of ['medium', 'minimal']) {
+    await setSplitWidth(page, 'left', 280);
+    await page.locator(`${slotSelector('left')} [data-testid="thinking-button"]`).click();
+    await page.getByTestId('thinking-menu').locator(`[role="menuitemradio"][data-level="${level}"]`).click();
+    await page.waitForFunction(({ css, want }) => {
+      const button = document.querySelector(`${css} [data-testid="thinking-button"]`);
+      return button?.dataset.level === want && !button.dataset.pending;
+    }, { css: slotSelector('left'), want: level }, { timeout: 10000 });
+    await sendAt(page, 'left', 'wait 20s');
+    await page.waitForFunction((css) => document.querySelector(`${css} .stop-button`), slotSelector('left'),
+      { timeout: 20000 });
+    await composerAt(page, 'left').fill(SPLIT_DRAFT);
+    const row = await composerRow(page, slotSelector('left'));
+    seen.push(row?.items.effort?.label);
+    bad.push(...rowProblems(row, 'running', APP_OPTS).map((problem) => `${level}: ${problem}`));
+    await page.keyboard.press('Escape');
+    await waitPaneIdle(page, 'left', 30000);
+    await composerAt(page, 'left').fill('');
+  }
+  record('分屏 280px 生成中有字、Effort 是"Medium"和"Minimal"：这一行放得下，截短的先后对（Effort 最后截），'
+    + '读屏名和悬停第一行是全文', seen.join() === 'Effort: Medium,Effort: Minimal' && bad.length === 0,
+  `${seen.join(' / ')} ${bad.join('; ')}`);
+}
+
+const steps = { setup, menuSplit, dragAndPlace, twoPanes, followFocus, divider, crampedRight, splitRows, closeKeeps,
+  dragReference, jumpBack, keyboardReference, restart, runningSource, longSource, headingFit, titleRoomCheck,
+  deleteSource, fontSizes, effortWidths };
 
 const fake = await startFakeEndpoint();
 const { root, project } = makeProject();

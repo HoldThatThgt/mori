@@ -253,7 +253,7 @@ async function showTab(ctx, tab) {
 /** @brief 会话行上的会话文件；还没有时为空串。 */
 const fileOf = (ctx, tab) => ctx.page.locator(`.session-item[data-row="${tab}"]`).getAttribute('data-file');
 
-/** @brief 在顶栏的范围菜单里选 pick，等按钮换过去；从 mori.model_state 认出这个会话的 pi 会话 id。 */
+/** @brief 在输入框下面一行的范围菜单里选 pick，等按钮换过去；从 mori.model_state 认出这个会话的 pi 会话 id。 */
 async function chooseRange(ctx, tab, pick) {
   const { page } = ctx;
   await showTab(ctx, tab);

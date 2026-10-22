@@ -1,14 +1,17 @@
 // v1 模型层的回放测试（docs/specs/model-providers.md §14.1、§14.2 的回放层）：在 Electron 里载入真正的界面，用回放进程桥
 // （tests/ui/harness）回放从真实会话录下的 tests/fixtures/v1/*.json（由 v1-models-record.mjs 录制，故障是真实的 401）。
-// 测试像你一样操作（打开文件夹、发录制里的消息、顶栏选范围与思考强度、拒绝启动卡上的操作），回放桥核对界面发出的每条
-// 命令都与录制一致；再按 docs/v1/screens/model-chat.md、model-menu.md、models-settings.md 检查界面：
+// 测试像你一样操作（打开文件夹、发录制里的消息、在输入框下面一行选范围与思考强度、拒绝启动卡上的操作），回放桥核对界面
+// 发出的每条命令都与录制一致；再按 docs/v1/screens/model-chat.md、model-menu.md、models-settings.md 检查界面。
+// 2026-10-21 起范围按钮和 Effort 在输入框下面一行（docs/v0/composer-pickers.md）：按钮状态按那里"测试要改的地方"的 C1、C2
+// 读（v1-models-row-helpers.mjs：不可用读 aria-disabled、切换中读 data-pending、悬停说明按行比较），菜单往上打开。各录制：
 //   switch-start（MP-14）：第一个请求就 401，一行换模型提示、没有错误卡。
 //   switch-mid（MP-15、MP-13）：段内换模型，提示带"The new model redoes this response."，被隐藏的过程仍显示；之后一直用第二个；
 //     重启（恢复 key）后重新打开，提示仍在，下一段用回首选。
 //   blocked（MP-09、MP-23）：拒绝启动卡的文字、候选与按钮，发送不可用；"Change model…"打开的菜单里全部变淡、悬停写原因；
 //     "Allow public for this project"打开 Project access 并聚焦这个项目，勾选 Public 先确认；解除后卡消失、可以发送。
-//   range（MP-23）："<范围名> · <当前模型 id>"、菜单的三节与底部说明、选提供商与模型、生成中不能改、重新打开后沿用。
-//   thinking（MP-37，§14.4 取代 m6/thinking.json 的回放检查）：顶栏思考强度随当前模型，high 有思考、off 没有。
+//   range（MP-23）："<范围名> · <当前模型 id>"、菜单的三节与底部说明、选提供商与模型、生成中不能改、重新打开后沿用；
+//     换范围失败（回放桥 failNext 让 session.setPick 失败，synthetic）那一行从输入框下面一行往上弹出、10 秒后或打开菜单时消失。
+//   thinking（MP-37，§14.4 取代 m6/thinking.json 的回放检查）：输入框下面一行的思考强度随当前模型，high 有思考、off 没有。
 // 录制文件还不存在时，每个对应编号记一条失败"<编号> replay fixture missing"（不造假录制）。
 // 写配置的 models.* 命令由回放桥直接应答、不占回放顺序（§14.4）；录制时它们经界面或 window.mori 直接发出，在 fixture 里
 // 只有 { note } 步骤，它们引起的事件（mori.model_state 等）按录制的时间回放。
@@ -25,8 +28,11 @@ import { build } from 'vite';
 import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
-import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
+import { PANE, rowOf, settle, waitReady } from './m3-helpers.mjs';
 import { pageHelpers } from './page.mjs';
+import {
+  focusKind, NOTE, pickers, placeBrief, placeProblems, popupBox, rangeDescription, rangeMenuPlace, ZONE_TEXT,
+} from './v1-models-row-helpers.mjs';
 
 const only = arg('only')?.split(',');
 const selfcheck = arg('fixtures') ? resolve(arg('fixtures')) : null;
@@ -44,6 +50,13 @@ const AUTH_TEXT = 'API key rejected';
 const REDO = ' The new model redoes this response.';
 const BUSY_TITLE = 'Can’t switch models until the response finishes';
 const MENU_NOTE = 'Applies to this session only. New sessions use the default range from Settings.';
+/** 思考强度的界面文字（models.md"思考强度"） */
+const LEVEL_TEXT = { off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high',
+  max: 'Max' };
+/** synthetic：回放桥让下一条界面命令直接以这段原文失败（failNext，不占回放顺序），制造一次换范围失败 */
+const PICK_FAILURE = 'Synthetic setPick failure (replay)';
+/** @brief 两个值的 JSON 相同。 */
+const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 /** 拒绝启动卡按钮的顺序与文字（model-chat.md "拒绝启动卡"） */
 const ACTION_ORDER = ['verify', 'allow_zone', 'confirm_zone', 'change_model', 'open_settings'];
 const actionLabel = (action, blocked) => ({ verify: 'Verify now', allow_zone: `Allow ${blocked.zone} for this project`,
@@ -107,6 +120,16 @@ function rangeText(pick, current, config) {
   return current ? `${scope} · ${modelId(current)}` : scope;
 }
 
+/**
+ * @brief 范围按钮悬停的第二行（model-menu.md）：有当前模型时"<提供商名> · <区域>"，没有时"No model can run in this session"。
+ */
+function hoverLine2(current, config) {
+  if (!current) return NOTE.noModel;
+  const id = current.slice(0, current.indexOf('/'));
+  const provider = config?.providers.find((item) => item.id === id);
+  return `${provider?.name ?? id} · ${ZONE_TEXT[provider?.zone] ?? 'Zone not confirmed'}`;
+}
+
 /** @brief 换模型提示的文字（model-chat.md）：原因是 auth 时"API key rejected"，有隐藏过程时加重做说明。 */
 const switchText = (sw) => `Switched model: ${sw.from} → ${sw.to} · ${AUTH_TEXT}${sw.hidden ? REDO : ''}`;
 
@@ -149,13 +172,14 @@ function helpers(page) {
       await page.locator(PANE).waitFor({ timeout: 20000 });
     },
     status: () => page.evaluate(() => window.__replay.status),
-    /** @brief 范围按钮：完整文字（读屏名称去掉前缀）、data-pick、data-current、是否可用、悬停说明。 */
-    button: () => page.evaluate((pane) => {
-      const el = document.querySelector(`${pane} [data-testid="model-button"]`);
-      return el && { text: (el.getAttribute('aria-label') ?? '').replace(/^Model range: /, ''),
-        pick: el.dataset.pick ?? null, current: el.dataset.current ?? null, disabled: el.disabled,
-        pending: el.getAttribute('aria-disabled') === 'true', title: el.getAttribute('title') };
-    }, PANE),
+    /**
+     * @brief 输入框下面一行的范围按钮（pickers 的各项，按 C1、C2：unavailable、pending（data-pending）、tip 按行、
+     *        described、inRow，另有 thinking），text 是完整文字（读屏名称去掉"Model range: "前缀）。
+     */
+    async button() {
+      const found = await pickers(page);
+      return found && { ...found, text: (found.name ?? '').replace(/^Model range: /, '') };
+    },
     /** @brief 换模型提示：文字与 data-*。 */
     notices: () => page.locator(`${PANE} [data-testid="notice"][data-kind="model-switch"]`).evaluateAll((items) => items
       .map((el) => ({ text: el.textContent, from: el.dataset.from, to: el.dataset.to, reason: el.dataset.reason,
@@ -168,8 +192,8 @@ function helpers(page) {
 }
 
 /**
- * @brief 开始用 MutationObserver 记下本栏的样子（范围按钮的 data-current、是否可用与悬停说明，是否在运行，换模型提示、
- *        错误卡与说明卡的数量）；只在变化时记。watched 取回并停止。
+ * @brief 开始用 MutationObserver 记下本栏的样子（范围按钮的 data-current、是否不可用（C1）与悬停说明，是否在运行，
+ *        换模型提示、错误卡与说明卡的数量）；只在变化时记。watched 取回并停止。
  */
 function watchPane(page) {
   return page.evaluate((pane) => {
@@ -177,7 +201,9 @@ function watchPane(page) {
     const take = () => {
       const root = document.querySelector(pane);
       const button = root?.querySelector('[data-testid="model-button"]');
-      const now = { current: button?.dataset.current ?? null, disabled: button?.disabled ?? null,
+      const now = { current: button?.dataset.current ?? null,
+        unavailable: button
+          ? button.getAttribute('aria-disabled') === 'true' && button.dataset.pending !== 'true' : null,
         title: button?.getAttribute('title') ?? null, running: root?.dataset.running ?? null,
         notices: root?.querySelectorAll('[data-testid="notice"][data-kind="model-switch"]').length ?? 0,
         errors: root?.querySelectorAll('[data-testid="error-card"]').length ?? 0,
@@ -271,8 +297,8 @@ async function switchMidBefore(page, h) {
     && seen.every((s) => s.errors === 0 && s.unavailable === 0), JSON.stringify({ cards, tools, last: seen.at(-1) }));
   const running = seen.filter((s) => s.running === 'true');
   const firstB = running.findIndex((s) => s.current === sw.to);
-  record(`MP-13 replay switch-mid: the top bar shows ${sw.from} first, then ${sw.to} after the switch, and stays on `
-    + `${sw.to} for the rest of the reply`, running.some((s) => s.current === sw.from) && firstB >= 0
+  record(`MP-13 replay switch-mid: the range button shows ${sw.from} first, then ${sw.to} after the switch, and `
+    + `stays on ${sw.to} for the rest of the reply`, running.some((s) => s.current === sw.from) && firstB >= 0
     && running.slice(firstB).every((s) => s.current === sw.to),
   running.map((s) => s.current).filter((c, i, all) => c !== all[i - 1]).join(' → '));
   await finish(page, 'MP-15', 'switch-mid before the restart', steps);
@@ -300,7 +326,7 @@ async function switchMidAfter(page, h) {
   const button = await h.button();
   const want = rangeText(opened.pick, sw.from, configOf(steps));
   await shot(page, 'switch-mid-after');
-  record(`MP-13 replay back to first choice: the next reply runs on ${sw.from} again (top bar "${want}" while it `
+  record(`MP-13 replay back to first choice: the next reply runs on ${sw.from} again (range button "${want}" while it `
     + 'runs and after), no new switch line, no error card', seen.filter((s) => s.running === 'true')
     .every((s) => s.current === sw.from) && seen.some((s) => s.running === 'true') && button?.text === want
     && after.length === 1 && seen.every((s) => s.errors === 0) && repliesOf(steps).at(-1)?.ref === sw.from,
@@ -362,6 +388,7 @@ async function blockedCheck(page, h) {
   record('MP-09 replay blocked: sending is unavailable: Enter sends nothing and the draft stays in the input',
     (await h.status()).commands.length === sent && await h.textarea.inputValue() === prompt.text,
     `commands ${sent} → ${(await h.status()).commands.length}`);
+  await blockedButton(page, h, created, configOf(steps));
   await blockedMenu(page, options);
   await allowPublic(page, h, created.cwd);
   await page.locator('[data-testid="blocked-card"]').waitFor({ state: 'detached', timeout: 60000 }).catch(() => {});
@@ -377,10 +404,27 @@ async function blockedCheck(page, h) {
   await finish(page, 'MP-09', 'blocked', steps);
 }
 
+/**
+ * @brief 被拒绝启动时输入框下面一行的范围按钮（chat.md"拒绝启动"、composer-pickers.md 新加的检查第 10 条）：在这一行里、
+ *        能用；文字、悬停两行与读屏的描述；输入框有字时"Send"仍不可用。
+ */
+async function blockedButton(page, h, created, config) {
+  const bar = await h.button();
+  const text = rangeText(created.pick, created.current, config);
+  const line2 = hoverLine2(created.current, config);
+  const send = await page.locator(`${PANE} .send-button`).isDisabled().catch(() => null);
+  record(`MP-23 replay blocked: the range button in the message-box row stays usable while blocked: "${text}", hover `
+    + `"${text}" / "${line2}", described as "${rangeDescription(line2)}"; Send is disabled with text typed`,
+  Boolean(bar) && bar.inRow && !bar.inTopbar && bar.ariaDisabled === null && bar.text === text
+    && same(bar.tip, [text, line2]) && bar.described === rangeDescription(line2) && send === true,
+  JSON.stringify({ bar, send }));
+}
+
 /** @brief Change model…：打开这一栏的范围菜单，全部变淡、悬停写每个候选的原因，底部说明与 Manage models。 */
 async function blockedMenu(page, options) {
   await page.locator(`${PANE} [data-testid="blocked-card"] [data-action="change-model"]`).click();
   const opened = await page.getByTestId('model-menu').waitFor({ timeout: 5000 }).then(() => true, () => false);
+  const place = opened ? await rangeMenuPlace(page) : null;
   const items = opened ? await menuItems(page) : [];
   const note = opened ? await page.getByTestId('model-menu-note').innerText() : null;
   const manage = opened ? await page.locator('[data-testid="model-menu"] [data-action="manage-models"]').innerText()
@@ -391,8 +435,15 @@ async function blockedMenu(page, options) {
   opened && items.length === options.length && items.every((item, i) => item.excluded && item.pick === options[i].pick
     && item.title === options[i].reason && /— zone \w+ is not allowed for this project/.test(item.title ?? ''))
     && note?.trim() === MENU_NOTE && manage?.trim() === 'Manage models', JSON.stringify({ items, note }));
+  record('MP-23 replay blocked: that menu is the range menu of this pane\'s message-box row: it opens upward above the '
+    + 'row, right-aligned with the range button, inside the pane and not over the top bar',
+  place?.problems.length === 0, `${place?.problems.join('; ') ?? 'no menu'} ${placeBrief(place?.geo)}`);
   await page.keyboard.press('Escape');
-  await page.getByTestId('model-menu').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+  const gone = await page.getByTestId('model-menu').waitFor({ state: 'detached', timeout: 5000 })
+    .then(() => true, () => false);
+  const focus = await focusKind(page);
+  record('MP-23 replay blocked: Esc closes the menu opened from the card and the focus is on the range button',
+    opened && gone && focus === 'model-button', `menu gone ${gone}, focus ${focus}`);
 }
 
 /** @brief Allow public for this project：打开 Project access、焦点在这个项目；勾选 Public 先确认，确认后发出授权。 */
@@ -424,14 +475,54 @@ async function allowPublic(page, h, cwd) {
 
 // ---------- range（MP-23） ----------
 
-/** @brief 打开这一栏的范围菜单，选 pick 那一项；返回选之前菜单里的各项与底部说明。 */
+/**
+ * @brief 打开这一栏的范围菜单，选 pick 那一项；返回选之前菜单里的各项与底部说明，以及菜单打开后换范围失败那一行是否
+ *        还在（errorLeft：打开菜单时它该消失）。
+ */
 async function choosePick(page, pick) {
   await page.locator(`${PANE} [data-testid="model-button"]`).click();
   await page.getByTestId('model-menu').waitFor({ timeout: 5000 });
   const items = await menuItems(page);
   items.note = await page.getByTestId('model-menu-note').innerText().catch(() => null);
+  items.errorLeft = await page.locator(`${PANE} [data-testid="pick-error"]`)
+    .waitFor({ state: 'detached', timeout: 1500 }).then(() => false, () => true);
   await page.locator(`[data-testid="model-menu"] [role="menuitemradio"][data-pick="${pick}"]`).click();
   return items;
+}
+
+/**
+ * @brief 换范围失败那一行（models.md"菜单的位置与键盘"、composer-pickers.md 新加的检查第 4 条）：回放桥让 session.setPick
+ *        失败一次（failNext，synthetic，不占回放顺序）；"Couldn’t change the model range: <原文>"（role="alert"）从这一行
+ *        往上弹出、右边对齐范围按钮（放不下时挪进这一行）、最宽 min(320px, 这一行的宽)、在面板里，按钮仍是原来的范围；
+ *        约 10 秒后自己消失。最后再让它失败一次、留着那一行（下一次打开菜单时该消失，由调用方检查）。
+ * @param kept 失败后按钮该显示的范围（原来的 data-pick）
+ */
+async function pickErrorCheck(page, h, pick, kept) {
+  const alert = page.locator(`${PANE} [data-testid="pick-error"]`);
+  await page.evaluate((message) => { window.__replay.failNext = message; }, PICK_FAILURE);
+  await choosePick(page, pick);
+  const shown = await alert.waitFor({ timeout: 5000 }).then(() => true, () => false);
+  const at = Date.now();
+  await settle(page);
+  const geo = shown ? await popupBox(page, '[data-testid="pick-error"]') : null;
+  const text = shown ? (await alert.textContent())?.trim() : null;
+  const role = shown ? await alert.getAttribute('role') : null;
+  const button = await h.button();
+  const problems = geo ? placeProblems(geo, { maxWidth: Math.min(320, geo.row?.width ?? 320) }) : ['no pick-error'];
+  await shot(page, 'range-pick-error');
+  record('MP-23 replay range: a failed session.setPick shows "Couldn’t change the model range: <message>" (role alert) '
+    + 'popping up from the message-box row, right-aligned with the range button, at most 320px wide, inside the pane; '
+    + 'the button keeps its range', text === `Couldn’t change the model range: ${PICK_FAILURE}` && role === 'alert'
+    && problems.length === 0 && button?.pick === kept && !button.pending,
+  `${text}; ${problems.join('; ')} ${placeBrief(geo)}; button ${button?.pick}`);
+  await sleep(Math.max(0, at + 8000 - Date.now()));
+  const stays = await alert.count() === 1;
+  const gone = await alert.waitFor({ state: 'detached', timeout: 4000 }).then(() => true, () => false);
+  record('MP-23 replay range: the failure line stays for about 10 s and then goes away by itself', stays && gone,
+    `still there at 8 s ${stays}, gone by 12 s ${gone}`);
+  await page.evaluate((message) => { window.__replay.failNext = message; }, PICK_FAILURE);
+  await choosePick(page, pick);
+  return alert.waitFor({ timeout: 5000 }).then(() => true, () => false);
 }
 
 /** @brief 选范围：新会话的范围、菜单、选提供商、生成中不能改、选模型。 */
@@ -449,7 +540,10 @@ async function rangeBefore(page, h) {
   record(`MP-23 replay range: a new session shows "${rangeText(created.pick, created.current, config)}" (its range is `
     + 'the default from Settings)', first?.text === rangeText(created.pick, created.current, config)
     && first.pick === created.pick && first.current === created.current, JSON.stringify(first));
+  const failed = await pickErrorCheck(page, h, picks[0].pick, created.pick);
   const items = await choosePick(page, picks[0].pick);
+  record('MP-23 replay range: after another failed session.setPick, opening the range menu clears the failure line',
+    failed && !items.errorLeft, `failure line shown ${failed}, still there with the menu open ${items.errorLeft}`);
   menuShape(items, options, created.pick, config);
   await page.waitForFunction(({ pane, pick }) => document.querySelector(`${pane} [data-testid="model-button"]`)
     ?.dataset.pick === pick, { pane: PANE, pick: picks[0].pick }, { timeout: 15000 }).catch(() => {});
@@ -461,8 +555,14 @@ async function rangeBefore(page, h) {
   await page.waitForFunction((pane) => document.querySelector(pane)?.dataset.running === 'true', PANE,
     { timeout: 20000 }).catch(() => {});
   const busy = await h.button();
-  record(`MP-23 replay range: while generating the button can't be used and its hover says "${BUSY_TITLE}"`,
-    busy?.disabled === true && busy.title === BUSY_TITLE, JSON.stringify(busy));
+  record(`MP-23 replay range: while generating the button is unavailable (aria-disabled) and hover line 3 says `
+    + `"${BUSY_TITLE}"`, busy?.unavailable === true && busy.tip[2] === BUSY_TITLE, JSON.stringify(busy));
+  record(`MP-23 replay range: while generating the range button stays focusable, hover line 1 is its text, the `
+    + `description ends with ". ${BUSY_TITLE}"; Effort is unavailable with "${NOTE.effortBusy}" as line 2 and `
+    + 'description', Boolean(busy) && !busy.disabled && busy.tip[0] === busy.text
+    && busy.described === rangeDescription(busy.tip[1] ?? '', BUSY_TITLE) && busy.thinking?.unavailable === true
+    && busy.thinking.tip[1] === NOTE.effortBusy && busy.thinking.described === NOTE.effortBusy,
+  JSON.stringify({ tip: busy?.tip, described: busy?.described, thinking: busy?.thinking }));
   await h.idle();
   await choosePick(page, picks[1].pick);
   await page.waitForFunction(({ pane, pick }) => document.querySelector(`${pane} [data-testid="model-button"]`)
@@ -505,7 +605,7 @@ async function rangeAfter(page, h) {
 
 // ---------- thinking（MP-37） ----------
 
-/** @brief 顶栏思考强度：新会话按模型的默认，菜单的强度取当前模型；high 有思考，off 没有。 */
+/** @brief 输入框下面一行的思考强度：新会话按模型的默认，菜单的强度取当前模型；high 有思考，off 没有。 */
 async function thinkingCheck(page, h) {
   const { steps } = await h.load('thinking');
   const created = resultsOf(steps, 'session.create')[0];
@@ -517,6 +617,12 @@ async function thinkingCheck(page, h) {
   const button = page.locator(`${PANE} [data-testid="thinking-button"]`);
   const start = { level: await button.getAttribute('data-level'),
     reasoning: await button.getAttribute('data-reasoning') };
+  const effort = (await h.button())?.thinking ?? null;
+  const label = `Effort: ${LEVEL_TEXT[created.thinkingLevel] ?? created.thinkingLevel}`;
+  record(`MP-37 replay thinking: the Effort button is in the message-box row: "${label}", hover "${label}" / `
+    + `"${NOTE.effort}", described by line 2, no aria-disabled while usable`, Boolean(effort) && effort.inRow
+    && !effort.inTopbar && effort.name === label && effort.text === label && same(effort.tip, [label, NOTE.effort])
+    && effort.described === NOTE.effort && effort.ariaDisabled === null, JSON.stringify(effort));
   await button.click();
   await page.getByTestId('thinking-menu').waitFor({ timeout: 5000 });
   const offered = await page.locator('[data-testid="thinking-menu"] [role="menuitemradio"]')

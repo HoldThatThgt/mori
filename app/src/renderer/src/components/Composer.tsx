@@ -1,21 +1,27 @@
-// 输入框与按钮区：空闲时发送；生成中可以停止、排队（Enter）或插话（Ctrl+Enter）。输入法组字时 Enter 只选词。
+// 输入框：文字框和它下面一行（docs/v0/screens/chat.md"输入框下面一行"：左端权限；右边选择范围、Effort、上下文用量圆环，
+// 最右是发送 / 停止 / 排队）。空闲时发送；生成中可以停止、排队（Enter）或插话（Ctrl+Enter）。输入法组字时 Enter 只选词。
 // M6：以 / 开头时输入框上方出"/"补全列表（SlashMenu.tsx），列表开着时 Enter 不发送。
 // v1（docs/v1/screens/model-chat.md）：准备中（发了消息、pi 还没开始）可以停止，再发的按排队处理（不能插话），
 // 显示在排队区；会话被拒绝启动时可以打字，但发送不可用（Enter 不发送，草稿不丢）。
 // 平行 Agent（docs/v1/screens/team-switch.md、team-stop.md）：/team on、/team off 在生成中、被拒绝启动时也按命令处理；
 // 排队区里有立项还没判断完的消息；后台有 Agent 在运行或排队时停止按钮旁有 Stop team。
 
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { roleLabel } from '../../../shared/team';
 import { send, stop, stopTeam, withdraw } from '../state/actions';
 import { pendingPrompt } from '../state/model';
-import { useOverlay } from '../state/overlays';
 import { updateTab, type Tab } from '../state/store';
 import { parseTeamCommand } from '../state/teamActions';
-import { Icon } from '../icons';
+import { Icon, type IconName } from '../icons';
 import { skillCommandText } from '../state/skillText';
+import { firstMenuItem, moveMenuFocus } from './menu';
+import { ModelMenu } from './ModelMenu';
+import { PermissionMenu } from './PermissionMenu';
 import { ComposerQuotes } from './QuoteChips';
+import { useFocusFallback, useRowMenu, useRowPlacement } from './rowMenu';
 import { handleSlashKey, SlashMenu, useSlashMenu } from './SlashMenu';
+import { ThinkingMenu } from './ThinkingMenu';
+import { UsageRing } from './UsageRing';
 
 /** 输入框最高（px），超过后在框内滚动 */
 const MAX_INPUT_HEIGHT = 220;
@@ -69,22 +75,79 @@ export function QueueArea({ tab }: { tab: Tab }) {
   );
 }
 
-/** @brief 生成中且有字时的"Queue ▾"，下拉里是"Steer"；准备中不能插话，只有"Queue"。 */
-function QueueButton({ tabKey, steer, disabled }: { tabKey: string; steer: boolean; disabled: boolean }) {
-  const [open, setOpen] = useState(false);
-  useOverlay(open, () => setOpen(false));
-  const queue = <button className="button" disabled={disabled} onClick={() => void send(tabKey, 'followUp')}
-    title="Send after the current turn (Enter)">Queue</button>;
-  if (!steer) return queue;
+/** @brief 发送组里的一个按钮。 */
+interface RowButtonProps {
+  /** 这一栏会话（界面里的标识） */
+  tabKey: string;
+  /** 类名（send-button、stop-button、queue-button） */
+  className: string;
+  /** 名字（读屏名；会话面板宽于 600px 时也是按钮上的字） */
+  label: string;
+  /** 悬停说明 */
+  title: string;
+  /** 图标（宽于 600px 时"Queue"不显示图标，chat.css） */
+  icon: IconName;
+  /** 不可用（disabled，不在 Tab 路径上） */
+  disabled?: boolean;
+  /** 界面测试用的标识（data-testid） */
+  testId?: string;
+  /** 点了它 */
+  onClick: () => void;
+}
+
+/**
+ * @brief "Send"、"Stop"和准备中只有一个按钮的"Queue"：会话面板 ≤ 600px 时只有图标（chat.css），名字在 aria-label 和
+ *        悬停说明里。按钮随状态消失（本轮结束时的"Stop"、清空草稿时的"Queue"、发出时的"Send"）而焦点在它上面时，
+ *        焦点回到文字框。
+ */
+function RowButton({ tabKey, className, label, title, icon, disabled, testId, onClick }: RowButtonProps) {
+  const button = useRef<HTMLButtonElement>(null);
+  useFocusFallback(button, tabKey);
   return (
-    <div className="split-button">
-      {queue}
-      <button className="button split-toggle" aria-label="More send options" aria-expanded={open} disabled={disabled}
-        onClick={() => setOpen(!open)}><Icon name="down" /></button>
-      {open && (
-        <div className="menu" role="menu">
-          <button role="menuitem" onClick={() => { setOpen(false); void send(tabKey, 'steer'); }}>
-            Steer<span className="menu-hint">Ctrl+Enter</span>
+    <button ref={button} className={`button ${className}`} aria-label={label} title={title} disabled={disabled}
+      data-testid={testId} onClick={onClick}>
+      <Icon name={icon} className={`${icon}-icon`} /><span className="send-text">{label}</span>
+    </button>
+  );
+}
+
+/**
+ * @brief 生成中且有字时的"Queue ▾"：主按钮排队，▾"More send options"的菜单里是"Steer"；会话面板 ≤ 400px 时主按钮收起
+ *        （chat.css），菜单里多出"Queue for later"一项。菜单往上打开、右边对齐 ▾，打开时焦点在第一项，
+ *        点外面、Tab 移出时关闭，Esc 回到 ▾。
+ */
+function QueueMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
+  const menu = useRowMenu(tab, disabled);
+  const panel = useRef<HTMLDivElement>(null);
+  useRowPlacement(menu.open, menu.button, panel, 'anchor');
+  useEffect(() => {
+    if (menu.open) firstMenuItem(panel.current)?.focus();
+  }, [menu.open]);
+
+  function choose(behavior: 'followUp' | 'steer') {
+    // 焦点先回到 ▾：发出后草稿清空、这一组消失时焦点由 useFocusFallback 放回文字框
+    menu.close();
+    void send(tab.key, behavior);
+  }
+
+  return (
+    <div className="split-button" ref={menu.root}>
+      <button className="button queue-main" aria-label="Queue" title="Queue for later (Enter)" disabled={disabled}
+        onClick={() => void send(tab.key, 'followUp')}>
+        <Icon name="queue" className="queue-icon" /><span className="send-text">Queue</span>
+      </button>
+      <button ref={menu.button} className="button split-toggle" aria-label="More send options" aria-haspopup="menu"
+        aria-expanded={menu.open} disabled={disabled} onClick={() => menu.setOpen(!menu.open)}>
+        <Icon name="down" />
+      </button>
+      {menu.open && (
+        <div ref={panel} className="menu send-menu" role="menu" aria-label="More send options"
+          onKeyDown={moveMenuFocus}>
+          <button role="menuitem" className="queue-later" aria-keyshortcuts="Enter" onClick={() => choose('followUp')}>
+            Queue for later<span className="menu-hint" aria-hidden="true">Enter</span>
+          </button>
+          <button role="menuitem" aria-keyshortcuts="Control+Enter" onClick={() => choose('steer')}>
+            Steer<span className="menu-hint" aria-hidden="true">Ctrl+Enter</span>
           </button>
         </div>
       )}
@@ -144,7 +207,7 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
         onCompositionStart={() => { composing.current = true; }}
         onCompositionEnd={() => { composing.current = false; }}
         onKeyDown={onKeyDown} />
-      <ComposerButtons tab={tab} notReady={notReady} hasText={hasText} />
+      <ComposerRow tab={tab} notReady={notReady} hasText={hasText} />
     </div>
   );
 }
@@ -155,42 +218,64 @@ function placeholderText(running: boolean, sending: boolean): string {
   return sending ? 'Enter to queue · Shift+Enter for new line' : 'Enter to send · Shift+Enter for new line';
 }
 
-/** @brief Stop team（平行 Agent 规格 §11.4、§13.6）：停止这个会话的全部 Agent，不确认。 */
+/**
+ * @brief Stop team（平行 Agent 规格 §11.4、§13.6）：停止这个会话的全部 Agent，不确认；会话面板 ≤ 600px 时同"Stop"
+ *        只有图标（chat.css）。
+ */
 function StopTeamButton({ tabKey }: { tabKey: string }) {
+  return <RowButton tabKey={tabKey} className="stop-team-button" label="Stop team" testId="stop-team"
+    title="Stop all agents in this session" icon="stop" onClick={() => void stopTeam(tabKey)} />;
+}
+
+/**
+ * @brief 发送组：不能发送时的说明（放不下时截短，悬停看全文）；生成中有字时"Queue ▾"、准备中有字时只有一个按钮的
+ *        "Queue"（准备中不能插话），加上"Stop"；空闲时的"Send"；后台有 Agent 在运行或排队时，"Stop"或"Send"前的
+ *        Stop team。会话被拒绝启动时发送不可用（原因在输入框上方的拒绝启动卡里），/team on、/team off 除外。
+ */
+function SendGroup({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
+  const { running, sending } = tab.transcript;
+  const blocked = tab.blocked !== null && !isTeamSwitch(tab.draft);
+  if (notReady) return <span className="composer-wait" data-testid="not-ready" title={notReady}>{notReady}</span>;
+  // 各按钮带 key：发送组在"Stop"和"Send"之间换时不复用同一个按钮（复用时焦点会留在变得不可用的"Send"上、掉到 body）
+  const team = tab.team.background && <StopTeamButton key="stop-team" tabKey={tab.key} />;
+  if (!running && !sending) {
+    return (
+      <>
+        {team}
+        <RowButton key="send" tabKey={tab.key} className="primary send-button" label="Send" title="Send (Enter)"
+          icon="arrow" disabled={!hasText || blocked} onClick={() => void send(tab.key)} />
+      </>
+    );
+  }
   return (
-    <button className="button stop-team-button" data-testid="stop-team" title="Stop all agents in this session"
-      onClick={() => void stopTeam(tabKey)}>
-      <Icon name="stop" />Stop team
-    </button>
+    <>
+      {hasText && running && <QueueMenu tab={tab} disabled={blocked} />}
+      {hasText && !running && <RowButton key="queue" tabKey={tab.key} className="queue-button" label="Queue"
+        title="Queue for later (Enter)" icon="queue" disabled={blocked}
+        onClick={() => void send(tab.key, 'followUp')} />}
+      {team}
+      <RowButton key="stop" tabKey={tab.key} className="stop-button" label="Stop" title="Stop response (Esc)"
+        icon="stop" onClick={() => void stop(tab.key)} />
+    </>
   );
 }
 
 /**
- * @brief 输入框下方的按钮区：不能发送时的说明；生成中与准备中的"Queue"和"Stop"；空闲时的"Send"；
- *        后台有 Agent 在运行或排队时，"Stop"或"Send"旁的 Stop team。
- *        会话被拒绝启动时发送不可用（原因由输入框上方的拒绝启动卡说明），/team on、/team off 除外。
+ * @brief 文字框下面一行（docs/v0/screens/chat.md"输入框下面一行"、models.md）：左端权限；右边选择范围、Effort、
+ *        上下文用量圆环，最右是发送组。各项都是这一行的直接子项（截短的先后靠 flex-shrink，它只在兄弟之间分宽度，
+ *        chat.css）。选择范围、Effort 和圆环在第一次打开中、打开失败时不显示；Restart 之后重新打开中仍显示上一次的值
+ *        （不可用，ModelState 没有清空）。没有当前模型时没有 Effort。
  */
-function ComposerButtons({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
-  const { running, sending } = tab.transcript;
-  const busy = running || sending;
-  const blocked = tab.blocked !== null && !isTeamSwitch(tab.draft);
+function ComposerRow({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
+  const known = tab.pick !== null || tab.current !== null || tab.blocked !== null;
+  const pickers = tab.phase !== 'failed' && (tab.phase !== 'opening' || known);
   return (
     <div className="composer-bottom">
-      <span className="composer-spacer" />
-      {notReady && <span className="composer-wait" data-testid="not-ready">{notReady}</span>}
-      {!notReady && busy && hasText && <QueueButton tabKey={tab.key} steer={running} disabled={blocked} />}
-      {!notReady && tab.team.background && <StopTeamButton tabKey={tab.key} />}
-      {!notReady && busy && (
-        <button className="button stop-button" onClick={() => void stop(tab.key)} title="Stop response (Esc)">
-          <Icon name="stop" />Stop
-        </button>
-      )}
-      {!notReady && !busy && (
-        <button className="button primary send-button" disabled={!hasText || blocked}
-          onClick={() => void send(tab.key)}>
-          <Icon name="arrow" />Send
-        </button>
-      )}
+      <PermissionMenu tab={tab} unavailable={notReady} />
+      {pickers && <ModelMenu tab={tab} unavailable={notReady} />}
+      {pickers && tab.current && <ThinkingMenu tab={tab} unavailable={notReady} />}
+      {pickers && tab.contextUsage && <UsageRing tab={tab} usage={tab.contextUsage} />}
+      <SendGroup tab={tab} notReady={notReady} hasText={hasText} />
     </div>
   );
 }

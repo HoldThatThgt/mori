@@ -59,11 +59,17 @@ export function pageHelpers(page) {
     cards: () => page.getByTestId('tool-card').evaluateAll((cards) => cards.map((card) => ({
       title: card.querySelector('.tool-title')?.textContent ?? '', status: card.dataset.status,
       text: card.querySelector('[data-testid="tool-status"]')?.textContent ?? '' }))),
-    /** @brief 上下文用量（token 数），读不到时为 null。 */
+    /**
+     * @brief 当前显示的会话面板输入框下面一行圆环的上下文用量（token 数，data-tokens；docs/v0/screens/models.md
+     *        "界面测试用的标识"）。还没有消息时是 0（data-state="empty"）；刚压缩完（没有 data-tokens）、没有圆环或
+     *        分屏时两栏都有圆环（分不出是哪一栏）时为 null。2026-10-21 前读顶栏用量的悬停说明"About X / Y tokens"，
+     *        现在悬停是"Context ≈ 15.4k / 128k (12%)"，不再读它。
+     */
     async usageTokens() {
-      const title = await page.getByTestId('usage').getAttribute('title').catch(() => null);
-      const match = /About ([\d,]+) \//.exec(title ?? '');
-      return match ? Number(match[1].replace(/,/g, '')) : null;
+      const ring = page.locator('.pane-slot:not([hidden]) [data-testid="composer"] .composer-bottom '
+        + '[data-testid="usage"]');
+      const tokens = await ring.getAttribute('data-tokens', { timeout: 5000 }).catch(() => null);
+      return tokens === null ? null : Number(tokens);
     },
     /**
      * @brief 填首次启动表单（v1，英文，docs/v1/screens/first-run.md）；不给的字段不碰。apiKey 为 null 时不碰 key 输入框。
@@ -150,15 +156,16 @@ export function pageHelpers(page) {
     },
     /**
      * @brief 把当前会话切到"Allow all"（权限菜单 → Allow all → 确认）。M2 起命令和编辑先要批准，
-     *        M0/M1 的测试测的是批准之外的行为，打开会话后先切到 Allow all。
+     *        M0/M1 的测试测的是批准之外的行为，打开会话后先切到 Allow all。2026-10-21 起权限按钮在输入框下面一行的左端
+     *        （approval.md"权限菜单"），只在这一行里找它。
      */
     async allowAll() {
-      const pane = page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]');
-      await pane.getByTestId('permission-button').click();
+      const row = page.locator('.pane-slot:not([hidden]) [data-testid="composer"] .composer-bottom');
+      await row.getByTestId('permission-button').click();
       await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
       await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all' }).click();
-      await page.waitForFunction(() => document.querySelector(
-        '.pane-slot:not([hidden]) [data-testid="permission-button"]')?.textContent?.includes('Allow all'),
+      await page.waitForFunction(() => document.querySelector('.pane-slot:not([hidden]) [data-testid="composer"] '
+        + '.composer-bottom [data-testid="permission-button"]')?.textContent?.includes('Allow all'),
       null, { timeout: 10000 });
     },
     /** @brief 让系统的选文件夹对话框直接返回 folder，再点"Open folder…"。 */
