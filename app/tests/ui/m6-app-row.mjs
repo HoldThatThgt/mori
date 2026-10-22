@@ -7,7 +7,8 @@
 // 键盘焦点时显示悬停提示，Esc 先关详情、再藏提示、第三次才停止生成；开着时用量刷新详情跟着变；生成开始时不关；
 // ≥ 75%、≥ 90% 的颜色，有填充时底圈是 --color-line、空圆环是 --color-faint；1,000,000 和 999,950 的窗口写成"1M"）；
 // 生成中（范围、Effort 仍能 Tab 到、不开菜单、悬停的行和读屏的描述是原因）；切换中两个按钮都带 data-pending；
-// 准备中（v1：被限流的提供商，"Waiting for a model"）这一行在各档的样子、单个"Queue"、原因与占位文字；
+// 准备中（v1：被限流的提供商，"Waiting for a model"）这一行在各档的样子（单栏 300–930px，分屏 279 / 280px）、单个"Queue"、
+// 原因与占位文字；
 // 提供商范围"Mori endpoint · fake-coder"的截短（> 680px 完整，600px 先截模型 id，280px 最挤时 36px）；
 // 菜单（很短的模型 id "o3" 在 930px 和 680px 时范围菜单右边对齐按钮或贴这一行左端，四个弹出层往上打开、在面板里；
 // 800×600、草稿 220px 高时菜单不出窗口、不盖顶栏、最高不变；30 条"Allowed for this session"时权限菜单在菜单里滚动；
@@ -20,7 +21,8 @@
 // 各档的边界、截短的先后、拒绝启动、后台进程退出和打开失败时这一行的样子在 m6-app-slash.mjs；Effort 菜单的内容在
 // m6-app-settings.mjs；换范围失败那一行在 m6-replay.mjs（回放桥 failNext）。
 // 与原设计不同（按最接近的做，见检查的说明）：生成中范围菜单打不开（批准卡只在生成中来），"开着范围菜单时来了批准卡"改用
-// 权限菜单；"刚压缩完"的圆环由 m1-replay 的 compaction 录制覆盖（这里关掉了 pi 的自动压缩）。
+// 权限菜单；"刚压缩完"的圆环由 m1-app.mjs 的 ringCompacted 覆盖（这里关掉了 pi 的自动压缩；m1-replay 的 compaction 录制里
+// 看不到这个状态）。
 // synthetic 的做法：生成开始、发送进入准备中的两条要在焦点和菜单都不动的情况下开始：生成开始经 window.mori 直接让后台进程
 // session.prompt，发送是在文字框上派发 Enter 的 keydown（焦点不动，走界面同一条路）；拒绝启动卡的出现、消失经 window.mori 的
 // models.setDefaults 清空、恢复所有项目默认允许的区域。测试准备：启动前在 pi 的 settings.json 里关掉自动压缩（圆环的颜色要
@@ -35,9 +37,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import {
-  activeFile, ctrlN, kernelOpen, PANE, paneOf, sendWait, settle, STOPPED, waitIdle, waitPanes, waitRunning,
+  activeFile, ctrlN, kernelOpen, openRow, PANE, paneOf, sendWait, settle, STOPPED, waitIdle, waitPanes, waitReady,
+  waitRunning,
 } from './m3-helpers.mjs';
-import { waitSplit } from './m5-helpers.mjs';
+import { composerAt, sendAt, slotSelector, waitSplit } from './m5-helpers.mjs';
 import {
   addModelUi, at1, backToApp, buttonState, choosePick, colorStack, contrastOf, firstRunAndOpen, fitLeft, fitPane,
   layoutBrief, layoutReport, menuGone, NOTE, noteSmallIn as noteSmall, openAndPlace, openSettingsSection,
@@ -82,7 +85,7 @@ const MCP_SERVERS = ['s1', 's2', 's3', 's4', 's5'];
 const MCP_CALLS = [['echo', { text: 'hi' }], ['add', { a: 1, b: 2 }], ['pid', {}], ['cwd', {}], ['roots', {}],
   ['slow', { ms: 10, steps: 1 }]];
 /** 准备中量的会话面板宽度（各档的上沿和下沿；单栏 800 宽右栏打开时最窄约 300px） */
-const PREP_WIDTHS = [930, 681, 680, 601, 600, 461, 460, 401, 400, 341, 340, 300];
+const PREP_WIDTHS = [930, 740, 681, 680, 601, 600, 490, 461, 460, 401, 400, 370, 341, 340, 321, 320, 300];
 /** 布局检查时输入框里的草稿 */
 const DRAFT = 'plain draft for the row checks';
 /** 这一行里的圆环 */
@@ -441,6 +444,8 @@ async function ringNoBlock(ctx) {
   await openPopup(page, 'usage');
   await page.keyboard.press('Control+n');
   const created = await waitPanes(page, panes + 1, 15000).then(() => true, () => false);
+  // 等新会话打开完：还在"Starting…"时下一步的 Ctrl+N 照规定不起作用（sessions.md"Ctrl+N 不起作用"）
+  if (created) await waitReady(page);
   record('开着圆环详情时 Ctrl+N 照常新建会话（详情不挡 Alt+数字和 Ctrl+N）', created, String(created));
 }
 
@@ -601,12 +606,73 @@ function recordPreparing({ probe, stage, menuClosed, seen, empty, typed }) {
     + '"Enter to queue · Shift+Enter for new line"', probe === 'verified' && /^Waiting for a model/.test(stage)
     && menuClosed && seen.model.unavailable && seen.model.lines[2] === NOTE.modelBusy && seen.model.described === reason
     && seen.thinking.unavailable && seen.thinking.described === NOTE.effortBusy && !seen.permission.hasAria
+    && !seen.model.disabled && !seen.thinking.disabled
     && seen.placeholder === 'Enter to queue · Shift+Enter for new line', JSON.stringify({ probe, stage, menuClosed,
     seen }));
   recordPrepBands('准备中、输入框为空（单栏 300–930px，各档的上沿和下沿）：这一行不换行、不超出输入框、高 33px，按钮位置是'
     + '"Stop"（≤ 600px 只有图标，≤ 340px 28px），范围、Effort 不可用、原因在悬停和读屏的描述里', empty, 'preparing');
   recordPrepBands('准备中、输入框有字：按钮位置是"Stop"和单个"Queue"（.queue-button，没有 ▾，准备中不能插话；≤ 400px 也不收起，'
     + '≤ 340px 和"Stop"一样 28px），这一行仍放得下', typed, 'prepTyped');
+}
+
+/** @brief 等 side 那一栏进入准备中（发出了、pi 还没开始，阶段行在等模型），返回阶段行的字。 */
+async function waitPrepAt(page, side) {
+  const pane = `${slotSelector(side)} [data-testid="chat-pane"]`;
+  await page.waitForFunction((selector) => {
+    const element = document.querySelector(selector);
+    return element?.dataset.sending === 'true' && element.dataset.running !== 'true'
+      && element.querySelector('[data-testid="stage"][data-kind="wait-model"]');
+  }, pane, { timeout: 20000 });
+  return page.locator(`${pane} [data-testid="stage"]`).innerText();
+}
+
+/** @brief 分屏时把中线拖到最右（右边一栏 .pane-slot 280px、.chat-pane 279px）和左栏 280px，各量一次两栏。 */
+async function prepSplitSamples(page) {
+  const samples = [];
+  for (const target of [Infinity, 280]) {
+    await fitLeft(page, target);
+    samples.push({ target, report: await layoutReport(page) });
+  }
+  return samples;
+}
+
+/**
+ * @brief 接着 preparing：分屏时准备中的一栏在最窄的宽度（composer-pickers.md"新加的检查"第 2 条的 279 / 280px；"宽度估算"
+ *        里准备中有字是 ≤ 400px 最挤的）。单栏回到会话 S1，在分屏右边打开被限流的会话 R、在 R 里发一条进入准备中；中线拖到
+ *        最右（R 279px）和左栏 280px（S1 280px、R 更宽）各量一次，输入框为空和有字（单个"Queue"）各一遍。最后停下 R、关掉分屏。
+ */
+async function prepSplit(ctx) {
+  const { page } = ctx;
+  const rate = await activeFile(page);
+  await openRow(page, ctx.s1);
+  await splitOpen(page, rate);
+  await sendAt(page, 'right', 'plain preparing in a split');
+  const stage = await waitPrepAt(page, 'right');
+  const empty = await prepSplitSamples(page);
+  await composerAt(page, 'right').fill(DRAFT);
+  const typed = await prepSplitSamples(page);
+  await shot(page, 'preparing-split-279');
+  await page.locator(`${slotSelector('right')} ${ROW} .stop-button`).click();
+  await page.waitForFunction((selector) => document.querySelector(selector)?.dataset.sending === 'false',
+    `${slotSelector('right')} [data-testid="chat-pane"]`, { timeout: 15000 });
+  await composerAt(page, 'right').fill('');
+  await page.locator(`${slotSelector('right')} [data-testid="close-pane"]`).click();
+  await waitSplit(page, false);
+  recordPrepSplit(stage, empty, typed);
+}
+
+/** @brief prepSplit 看到的：两栏（左 S1 空闲、右 R 准备中）都符合，而且真的量到了 279px 的 R 和 280px 的 S1。 */
+function recordPrepSplit(stage, empty, typed) {
+  const problems = (samples, state) => samples.flatMap(({ report }) => paneProblems(report, ['idle', state])
+    .map((list, index) => (list.length ? `${at1(report.panes[index].width)}px ${state}: ${list.join(', ')}` : null))
+    .filter(Boolean));
+  const reached = (samples) => samples.length === 2 && Math.abs(samples[0].report.panes[1]?.width - 279) < 1
+    && Math.abs(samples[1].report.panes[0]?.width - 280) < 1;
+  const bad = [...problems(empty, 'preparing'), ...problems(typed, 'prepTyped')];
+  record('准备中（分屏，右边一栏在等被限流的模型）：右栏 279px（中线拖到最右）和左栏 280px 时，输入框为空和有字（单个"Queue"）'
+    + '两栏的顶栏和这一行都符合（不换行、不超出输入框、高 33px，三个按钮不窄于最窄，截短的先后照旧；左栏空闲）',
+  /^Waiting for a model/.test(stage) && reached(empty) && reached(typed) && bad.length === 0,
+  `${bad.slice(0, 6).join(' | ')} ${typed[0] ? layoutBrief(typed[0].report) : ''}`);
 }
 
 // ---------- 步骤：提供商范围的截短（composer-pickers.md"新加的检查"第 3 条） ----------
@@ -638,7 +704,8 @@ async function providerRange(ctx) {
   const cut = (fact) => Boolean(fact) && fact.width < fact.full - 0.01;
   await fitPane(ctx, 930, { right: false });
   const wide = await rangeParts(page);
-  await fitPane(ctx, 600, { right: false });
+  // 右栏关着时窗口最窄 800px（< 1024px，左栏收成图标栏），会话面板到不了 600px；右栏打开时窗口仍宽于 1024px、左栏展开
+  await fitPane(ctx, 600, { right: true });
   const mid = await rangeParts(page);
   await fitPane(ctx, 930, { right: false });
   await splitOpen(page, ctx.s1);
@@ -651,8 +718,10 @@ async function providerRange(ctx) {
   await waitIdle(page, 30000);
   await composer(page).fill('');
   await choosePick(page, `${MAIN}/${MODEL}`);
+  // 先确认真的量到了这三个宽度（fitPane、fitLeft 到不了时会停在别的宽度，量到的就不是要查的那一档）
+  const reached = Math.abs(wide.width - 930) < 1 && Math.abs(mid.width - 600) < 1 && narrow.width < 281;
   record(`提供商范围"${PROVIDER_TEXT}"、生成中有字：930px 时范围名和模型 id 都完整；600px 时先截模型 id（.range-model），范围名`
-    + '完整；280px 最挤时范围按钮 36px、模型 id 收完、只剩截短的范围名；三处这一行都符合这一档', !cut(wide.scope)
+    + '完整；280px 最挤时范围按钮 36px、模型 id 收完、只剩截短的范围名；三处这一行都符合这一档', reached && !cut(wide.scope)
     && !cut(wide.model) && cut(mid.model) && !cut(mid.scope) && Math.abs(narrow.button - 36) <= 1
     && (narrow.model?.width ?? 0) <= 0.5 && cut(narrow.scope)
     && [wide, mid, narrow].every((sample) => sample.problems.length === 0),
@@ -1077,7 +1146,7 @@ async function fontSizes(ctx) {
 
 const steps = { setup, ringEmpty, ringUsed, ringRefresh, ringEsc, busyButtons, pendingSwitch, permissionText, menuEnter,
   menuTabOut, menuExclusive, menuBlocks, cardArrival, autoClose, focusFallback, f8View, ringNoBlock, providerRange,
-  preparing, ringColors, menuPlacement, tallDraft, allowedScroll, fontSizes };
+  preparing, prepSplit, ringColors, menuPlacement, tallDraft, allowedScroll, fontSizes };
 
 const fake = await startFakeEndpoint(port, testKey);
 const rate = await startFakeEndpoint(ratePort, '', { FAKE_LIMITED_KEYS: RATE_KEY, FAKE_LIMIT_MS: '3600000' });

@@ -4,6 +4,7 @@
 // model-chat.md）：输入框下面一行的选择范围，输入框上方的拒绝启动卡。平行 Agent（docs/v1/screens/team-switch.md）：
 // 协作开关是顶栏右边一组的第一个，在右栏开关之前。
 
+import { useRef } from 'react';
 import { reload } from '../state/actions';
 import { seatRolesOf } from '../../../shared/team';
 import { skillCommandText } from '../state/skillText';
@@ -115,6 +116,49 @@ export interface PaneProps {
   onToggleRight: () => void;
 }
 
+/** @brief 按下的地方是不是右栏开关。 */
+function isRightToggle(target: EventTarget): boolean {
+  return target instanceof Element && target.closest('.right-toggle') !== null;
+}
+
+/**
+ * @brief 在面板里按下鼠标或焦点进入面板时把焦点切到这一栏（split.md"焦点所在的一栏"）。例外：鼠标主键按在右栏开关上时，
+ *        到这一下按完才切（split.md"右栏开关"）。分屏时右栏跟随焦点所在的一栏，按下那一刻就切的话右栏先换成这一栏的
+ *        开关状态（例如关着）、两栏变宽、开关被挤到别处，松开时不在开关上，这一下就点空了。按完是 click（开关里先切焦点
+ *        再开关），或在别处松开：click 和 pointerup 在同一个任务里派发，下一个任务时还在按着就说明没点成，这时再切。
+ *        焦点照常由按下鼠标放到开关上（不用脚本 focus，免得鼠标点了也画出键盘焦点框）。右键照常在按下时切。
+ * @return 面板的两个事件和包了一层的右栏开关（点了它就不再等）
+ */
+function usePaneFocus(key: string, onToggleRight: () => void) {
+  const pressing = useRef(false);
+  const onPointerDownCapture = (event: React.PointerEvent) => {
+    if (!(event.button === 0 && isRightToggle(event.target))) {
+      focusPane(key);
+      return;
+    }
+    pressing.current = true;
+    const done = new AbortController();
+    const end = () => {
+      done.abort();
+      setTimeout(() => {
+        if (!pressing.current) return;
+        pressing.current = false;
+        focusPane(key);
+      });
+    };
+    window.addEventListener('pointerup', end, { signal: done.signal });
+    window.addEventListener('pointercancel', end, { signal: done.signal });
+  };
+  const onFocusCapture = () => {
+    if (!pressing.current) focusPane(key);
+  };
+  const toggle = () => {
+    pressing.current = false;
+    onToggleRight();
+  };
+  return { onPointerDownCapture, onFocusCapture, toggle };
+}
+
 /**
  * @brief 顶栏："项目名 › 会话名"和这一栏的按钮：协作开关（界面没准备好时不可用）、右栏开关、分屏时"Close pane"
  *        （docs/v0/screens/chat.md"顶栏"）。会话名放不下时项目名先收短，会话面板 ≤ 320px 时不显示项目名（chat.css）。
@@ -131,8 +175,8 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
       </div>
       <div className="topbar-actions">
         <TeamSwitch tab={tab} disabled={notReady} />
-        <button className="icon-button" onClick={onToggleRight} aria-pressed={rightOpen} aria-label="Toggle changes"
-          title="This session’s changes"><Icon name="right" /></button>
+        <button className="icon-button right-toggle" onClick={onToggleRight} aria-pressed={rightOpen}
+          aria-label="Toggle changes" title="This session’s changes"><Icon name="right" /></button>
         {split && (
           <button className="icon-button close-pane" data-testid="close-pane" aria-label="Close pane"
             title="Close pane (doesn’t stop the response)" onClick={() => { closePane(tab.key); focusComposer(); }}>
@@ -147,11 +191,12 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
 /** @brief 一个会话的面板。 */
 export function ChatPane({ tab, ...pane }: PaneProps & { tab: Tab }) {
   const kernel = useApp((state) => state.kernel);
+  const focus = usePaneFocus(tab.key, pane.onToggleRight);
   return (
     <section className="chat-pane" aria-label={sessionTitle(tab)} data-testid="chat-pane" data-tab={tab.key}
       data-running={tab.transcript.running} data-sending={tab.transcript.sending}
-      onPointerDownCapture={() => focusPane(tab.key)} onFocusCapture={() => focusPane(tab.key)}>
-      <TopBar tab={tab} {...pane} />
+      onPointerDownCapture={focus.onPointerDownCapture} onFocusCapture={focus.onFocusCapture}>
+      <TopBar tab={tab} {...pane} onToggleRight={focus.toggle} />
       <SessionBanners tab={tab} />
       <Transcript tab={tab} />
       <div className="composer-area">

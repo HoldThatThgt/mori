@@ -1,7 +1,7 @@
 // M5 整机测试：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint，synthetic），
 // 覆盖分屏与会话引用（docs/v0/screens/split.md、session-refs.md；方案第 7 节 M5 走查 1–6 与反例）：
 // 分屏（菜单与键盘、拖到中栏左右半边、拖已在中栏的会话只切焦点、侧栏点会话换掉焦点所在的一栏、Ctrl+N、两栏各自发消息和批准、
-// Esc 只停焦点所在的一栏、F8 与右栏跟随焦点、分屏中线的拖动 / 方向键 / 双击 / 保存、放不下时右栏先收起和浮出、
+// Esc 只停焦点所在的一栏、F8 与右栏跟随焦点、点另一栏的右栏开关不落空（toggleOther）、分屏中线的拖动 / 方向键 / 双击 / 保存、放不下时右栏先收起和浮出、
 // 最小窗口、关闭一栏不停止生成、设置页来回、归档删除时这一栏关闭）；会话引用（拖进输入框、菜单"Attach as context"与不可用的情况、
 // 只用键盘、芯片与预览、改范围、内容不含思考和工具输出、模型收到引用块、mori.ref 条目、跳回原会话、改名、重启后、
 // 原会话已删除、引用正在生成的会话、没有可引用的内容、超过 2 万字默认最近 5 轮、草稿里的芯片、预览的标题不被压矮、
@@ -321,6 +321,65 @@ async function followFocus(ctx) {
   await shot(page, '2-follow');
   await composerAt(page, 'right').click();
   await viewFields(page, await saveIssue(ctx, 'M5 分屏 F8 右栏'), 'right');
+}
+
+/** @brief side 那一栏标题行上的右栏开关。 */
+const rightToggle = (page, side) => paneAt(page, side).locator('.topbar')
+  .getByRole('button', { name: 'Toggle changes' });
+
+/** @brief 此刻 side 那一栏的右栏开关：这一栏是否焦点所在、开关是否按下、焦点是否在开关上，右栏在不在、写了什么，两栏的宽。 */
+async function toggleFacts(page, side) {
+  const facts = await page.evaluate((css) => {
+    const slot = document.querySelector(css);
+    const button = slot?.querySelector('.topbar .right-toggle');
+    return { focused: slot?.dataset.focused === 'true', pressed: button?.getAttribute('aria-pressed') ?? null,
+      onToggle: Boolean(button) && document.activeElement === button,
+      panel: Boolean(document.querySelector('[data-testid="right-panel"]')) };
+  }, slotSelector(side));
+  const text = await page.getByTestId('right-panel').innerText({ timeout: 1000 }).catch(() => '');
+  return { ...facts, readme: text.includes('README.md'), widths: (await splitState(page)).slots.map((s) => s.width) };
+}
+
+/**
+ * @brief 点另一栏的右栏开关（split.md"右栏开关"：点它焦点先切到这一栏，再开关右栏；用鼠标主键按下时到点完才切焦点）：
+ *        左栏有焦点、右栏开着（左栏 C 的改动），右边那一栏 D 自己的开关关着；用鼠标点一下右边那一栏的"Toggle changes"，
+ *        这一下不落空：焦点切到右边那一栏、它的开关按下、右栏仍开着并列出 D 的改动（README.md）、焦点在这个开关上、两栏宽度
+ *        不变。接着在开关上按 Enter：关上；再按 Enter：打开。最后右键按左栏的开关：按下时焦点就切到左栏（右键不等）。
+ */
+async function toggleOther(ctx) {
+  const { page } = ctx;
+  const setOwn = async (side, open) => {
+    await composerAt(page, side).click();
+    const toggle = rightToggle(page, side);
+    if ((await toggle.getAttribute('aria-pressed')) !== String(open)) await toggle.click();
+  };
+  await setOwn('right', false);
+  await setOwn('left', true);
+  await page.getByTestId('right-panel').waitFor({ timeout: 5000 });
+  await sleep(300);
+  const before = await toggleFacts(page, 'right');
+  await rightToggle(page, 'right').click();
+  await sleep(300);
+  const clicked = await toggleFacts(page, 'right');
+  await page.keyboard.press('Enter');
+  await sleep(300);
+  const keyOff = await toggleFacts(page, 'right');
+  await page.keyboard.press('Enter');
+  await sleep(300);
+  const keyOn = await toggleFacts(page, 'right');
+  record('分屏：左栏有焦点、右栏开着时用鼠标点右边那一栏的"Toggle changes"一下：焦点切到右边那一栏、开关按下、右栏开着'
+    + '并列出这一栏的改动、焦点在开关上，两栏宽度不变（这一下没有点空）', !before.focused && before.pressed === 'false'
+    && before.panel && clicked.focused && clicked.pressed === 'true' && clicked.panel && clicked.readme
+    && clicked.onToggle && JSON.stringify(clicked.widths) === JSON.stringify(before.widths),
+  JSON.stringify({ before, clicked }));
+  record('分屏：焦点在右栏开关上按 Enter 关上右栏、再按 Enter 打开（键盘照旧）', keyOff.pressed === 'false'
+    && !keyOff.panel && keyOn.pressed === 'true' && keyOn.panel && keyOn.focused, JSON.stringify({ keyOff, keyOn }));
+  await rightToggle(page, 'left').click({ button: 'right' });
+  await sleep(300);
+  const rightClick = await toggleFacts(page, 'left');
+  record('分屏：右键按另一栏的右栏开关时按下就切焦点（split.md"焦点所在的一栏"含右键），开关不变', rightClick.focused
+    && rightClick.pressed === 'true', JSON.stringify(rightClick));
+  await composerAt(page, 'right').click();
 }
 
 /** @brief 按 F8、写上 what、保存，返回写着 what 的那一份报告（同一秒里存两份时文件名不按先后排，所以按内容找）。 */
@@ -1003,9 +1062,9 @@ async function effortAt280(page) {
   `${seen.join(' / ')} ${bad.join('; ')}`);
 }
 
-const steps = { setup, menuSplit, dragAndPlace, twoPanes, followFocus, divider, crampedRight, splitRows, closeKeeps,
-  dragReference, jumpBack, keyboardReference, restart, runningSource, longSource, headingFit, titleRoomCheck,
-  deleteSource, fontSizes, effortWidths };
+const steps = { setup, menuSplit, dragAndPlace, twoPanes, followFocus, toggleOther, divider, crampedRight, splitRows,
+  closeKeeps, dragReference, jumpBack, keyboardReference, restart, runningSource, longSource, headingFit,
+  titleRoomCheck, deleteSource, fontSizes, effortWidths };
 
 const fake = await startFakeEndpoint();
 const { root, project } = makeProject();

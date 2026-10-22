@@ -1314,10 +1314,17 @@ async function exitedRow(ctx, before) {
     && Boolean(before?.usage) && row.usage?.tokens === before.usage.tokens, JSON.stringify(row));
   const clicks = [];
   for (const [button, menu] of Object.entries(ROW_MENUS)) {
-    await paneOf(page).getByTestId(button).click();
-    clicks.push({ button, opened: await shownWithin(page.getByTestId(menu), 800) });
+    // Playwright 把 aria-disabled="true" 的按钮当成不可用、click() 会一直等它可用；force 照样在按钮中间真的点一下鼠标。
+    // force 不查有没有东西盖着，所以先确认按钮中间那一点落在按钮上（点到别的东西上也不会开菜单，检查就白过了）
+    const target = paneOf(page).getByTestId(button);
+    const hit = await target.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+    });
+    await target.click({ force: true });
+    clicks.push({ button, hit, opened: await shownWithin(page.getByTestId(menu), 800) });
   }
-  record('后台进程退出：点不可用的权限、选择范围、Effort 按钮都不开菜单', clicks.every((item) => !item.opened),
+  record('后台进程退出：点不可用的权限、选择范围、Effort 按钮都不开菜单', clicks.every((item) => item.hit && !item.opened),
     JSON.stringify(clicks));
 }
 

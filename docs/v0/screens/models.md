@@ -46,7 +46,7 @@
 | 第一次打开中 | `phase` 为 opening，还没有过模型状态（`pick`、`current`、`blocked` 都是 null） | 不显示 | — |
 | Restart 之后重新打开中 | `phase` 又变成 opening，`ModelState` 还是上一次的 | 按钮显示上一次的文字，不可用（第三行"Starting…"） | — |
 | 打开失败 | `phase` 为 failed（按钮位置"Session didn’t open"，横幅"Failed to open session: …"） | 不显示（没有打开的会话可以改范围） | — |
-| 能用 | 会话打开、空闲 | 按钮文字和 ▾（v1 model-menu.md"选择范围按钮"：分组或提供商时"<范围名> · <当前模型 id>"，模型时只有模型 id；窄时截断，见"窄栏"）；读屏名"Model range: <按钮文字>"；悬停第一行是按钮文字，第二行"<提供商名> · <区域>"（没有当前模型时"No model can run in this session"）；读屏的描述是第二行，" · "换成", " | 打开菜单 |
+| 能用 | 会话打开、空闲 | 按钮文字和 ▾（v1 model-menu.md"选择范围按钮"：分组或提供商时"<范围名> · <当前模型 id>"，模型时只有模型 id；窄时截断，见"窄栏"）；读屏名"Model range: <按钮文字>"，按钮文字里的" · "换成", "（"Model range: fast, deepseek-chat"；读屏名里不用" · "，模型 id 里的"/"是数据、照原样）；悬停第一行是按钮文字，第二行"<提供商名> · <区域>"（没有当前模型时"No model can run in this session"）；读屏的描述是第二行，" · "换成", " | 打开菜单 |
 | 拒绝启动 | `blocked` 不为 null | 同"能用"（这时 `current` 通常为 null：只有范围名，或"No model range"）；输入框上方是拒绝启动卡（`data-testid="blocked-card"`），"Send"不可用；卡上的"Change model…"打开这个菜单 | 打开菜单改范围 |
 | 菜单 | 你点了按钮，或点了拒绝启动卡的"Change model…" | v1 model-menu.md"菜单"（Groups、Providers、Models 三节，区域，被排除的变淡，当前范围打勾，底部"Applies to this session only. New sessions use the default range from Settings."，最后一项"Manage models"打开 设置 → Models）；往上打开，宽 min(300px, 这一行的宽)（见"菜单的位置与键盘"） | ↑ ↓、Enter 选择；Esc 关闭；点外面关闭 |
 | 切换中 | 你选了一项，`session.setPick` 还没返回 | 按钮显示你选的范围、不可用（`aria-disabled`、`data-pending="true"`，变淡，焦点留在按钮上）；悬停只有第一行；Effort 这时也不可用、也带 `data-pending`（两个按钮共用一个切换中的值） | — |
@@ -92,14 +92,16 @@ v0 的"No models available"、" (deleted)"和"Default"标记不再出现：没�
 
 悬停说明不用原生 `title`：圆环的读屏名在 `aria-label` 里，再加 `title` 时 Chromium 把它当成描述，读屏会接着念出"/"。
 悬停说明是自己画的小提示（`aria-hidden`），鼠标悬停和键盘焦点落在圆环上时都显示；Esc 先关详情，详情没开时藏起提示
-（WCAG 1.4.13），焦点留在圆环，这一下不停止生成。
+（WCAG 1.4.13），焦点留在圆环，这一下不停止生成。只因鼠标停在圆环上显示、焦点不在圆环上（在文字框、批准卡上，或在另一栏）时，
+Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止生成或拒绝焦点所在的批准卡，分屏时以焦点所在的一栏为准
+（2026-10-22 审查时定：提示不算浮层，鼠标停在哪里不该改变 Esc 做什么）。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 不显示 | 第一次打开中、打开失败；或 pi 返回空（没有模型，或模型的上下文长度不是正数） | 没有圆环（同原来不显示用量） | — |
 | 还没有消息 | `tokens` 为 0：pi 只估算对话里的消息，不算系统提示词和工具说明，还没有消息时就是 0 | 空圆环（只有底圈，实线）；悬停"Context window"；读屏名"Context window"，描述（`aria-describedby`）"Send a message to see context usage." | 打开详情 |
 | 有用量 | `tokens`、`contextWindow`、`percent` | 圆环从正上方顺时针按百分比填充，强调色；悬停"Context ≈ 15.4k / 128k (12%)"；读屏名"Usage: Context approximately 15,360 of 128,000 tokens (12%)" | 打开详情 |
-| 快满 | `percent` ≥ 75 | 填充改用警示色（较深的 `--color-warn-text`）；≥ 90 用危险色（照 Claude 的分档，登记在 defaults.md）。不靠颜色也看得出：有填充时底圈是浅的 `--color-line`，三种填充和它的对比度都 ≥ 3:1，填到哪里看得出（空圆环的 `--color-faint` 底圈和填充几乎一样亮，所以有填充时换掉） | 同上 |
+| 快满 | 四舍五入后显示的百分比 ≥ 75（与悬停、读屏里的数一致：74.5% 显示"75%"，也用警示色） | 填充改用警示色（较深的 `--color-warn-text`）；≥ 90 用危险色（照 Claude 的分档，登记在 defaults.md）。不靠颜色也看得出：有填充时底圈是浅的 `--color-line`，三种填充和它的对比度都 ≥ 3:1，填到哪里看得出（空圆环的 `--color-faint` 底圈和填充几乎一样亮，所以有填充时换掉） | 同上 |
 | 刚压缩完 | `tokens` 为 null（pi：压缩之后还没有新的回复） | 空圆环，底圈是虚线（与"还没有消息"分得开）；悬停"Context window"；读屏名"Context window"，描述"Just compacted. Context usage shows after the next response." | 打开详情 |
 | 详情 | 你点了圆环或在它上面按 Enter / Space | 照 Claude 的用量浮层，从圆环往上弹出（宽 260px，不超过这一行）：第一行左边"Context window"，右边与悬停相同的 summary"≈ 15.4k / 128k (12%)"；下面一条 4px 的进度条（颜色同圆环）。还没有消息、刚压缩完时右边空着，进度条的位置换成那句说明（"Send a message to see context usage."，或"Just compacted. Context usage shows after the next response."）。开着时用量刷新，详情跟着变 | Esc 关闭，焦点留在圆环；点外面或 Tab 移走也关闭（焦点在新的位置）；再点圆环关闭 |
 | 后台进程退出、Restart 之后重新打开中 | 同 chat.md"后台进程退出" | 圆环和详情保留最后一次读到的用量（同原来；重新打开时 `contextUsage` 不清空） | 打开详情 |
@@ -189,7 +191,7 @@ v0 的"No models available"、" (deleted)"和"Default"标记不再出现：没�
 | 最窄 | ≤ 340px | "Send"、"Stop"的图标按钮 28px（原来 32px），准备中的"Queue"也收到 28px；权限、范围、Effort 按钮的左右内边距 4px（原来 6px） | 同上 |
 | 放不下 | 这一行的内容比这一行宽（任何一档） | 依次截短，前一项到最窄才轮到下一项：① 不能发送时的说明（"Mori’s background process crashed"、"Starting…"等，最窄 48px，悬停说明和横幅里有全文）；② 选择范围按钮（最窄 40px，≤ 340px 时 36px）：先截当前模型 id（连同它前面的" · "，`.range-model`），截完了才截范围名（`.range-scope`；范围是模型时只有模型 id 一段）；③ 权限的模式名（最窄 44px，≤ 340px 时 40px）；④ Effort 的强度（最窄 40px，≤ 340px 时 36px）。截短处是省略号"…"，前面留几个字母由 Chromium 决定（量到最窄的权限是"Ask …"、"Allo…"），测试不比字面。最窄的数在 ≤ 460px（没有 ▾）时字有 28–32px；宽于 460px 时有 ▾，同样的最窄里字只剩约 8–14px（范围按钮约 8px），但最挤时也截不到那里。各项都是这一行的直接子项，`flex-shrink` 相邻差 1e5 以上（composer-pickers.md"宽度估算"）。不换行、不超出输入框；圆环、"Send" / "Stop" / ▾ 不收 | 同上 |
 
-- 截短只是样式：按钮的文字（textContent）仍是全文，读屏名也是全文（"Permission mode: Ask each time"、"Model range: fast · deepseek-chat"、
+- 截短只是样式：按钮的文字（textContent）仍是全文，读屏名也是全文（"Permission mode: Ask each time"、"Model range: fast, deepseek-chat"、
   "Effort: Extra high"）；会截短的三个按钮，悬停说明的第一行是全文（权限"Permission mode: Ask each time"、范围按钮
   "<按钮文字>"、Effort"Effort: Extra high"），第二行是说明或不可用的原因（范围按钮的第二行是提供商和区域，原因在第三行）。收起的"Send"、"Stop"、"Queue"的名字在读屏名
   和悬停说明里。

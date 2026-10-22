@@ -389,6 +389,9 @@
   height: 24px;
   border-radius: var(--radius-s);
 }
+/* 悬停时的底色用 --color-surface，不用全局按钮的 --color-hover：空圆环的底圈（--color-faint）在 --color-hover 上只有
+   2.82:1，不到非文字要的 3:1，在 --color-surface 上 3.08:1 */
+.usage-ring:not(:disabled):hover { background-color: var(--color-surface); }
 .ring { width: 14px; height: 14px; }
 .ring circle { fill: none; stroke-width: 2; }
 .ring-base { stroke: var(--color-faint); }

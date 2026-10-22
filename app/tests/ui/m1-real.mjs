@@ -450,6 +450,9 @@ async function compactedRing(page) {
     : ringTextProblems(ring).length === 0;
   record(`8 圆环与压缩一致：对话流最后一项${compacted ? '是"Compacted session"，圆环为空、底圈虚线、读屏名"Context window"'
     : '是回复，圆环显示用量'}`, ok, `${oneLine(last, 60)} | ${JSON.stringify(ring)}`);
+  // 压缩之后模型可能马上又回了一条，最后一项就不是"Compacted session"、上面只查了有用量的圆环：明确记下这次走查有没有
+  // 看到刚压缩完的圆环（没看到时标 KNOWN，不算通过；这个状态在 m1-app.mjs ringCompacted 里查）
+  record('8 走查里看到了刚压缩完的圆环（对话流最后一项是"Compacted session"）', compacted, oneLine(last, 60), true);
 }
 
 /** @brief 走查数据目录里首选提供商（DeepSeek）的非机密信息（v1：model-config.json，lib.mjs realProviders）。 */

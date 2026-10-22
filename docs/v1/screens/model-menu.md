@@ -61,7 +61,7 @@
 ## 窄栏
 
 见 [v0 models.md](../../v0/screens/models.md)“窄栏”：选择范围按钮的上限、最窄和截短的先后（先截当前模型 id、再截范围名，
-比权限的模式名和 Effort 先截）都写在那里，这里不重复。读屏名“Model range: <按钮文字>”（临时，走查时可以改）。
+比权限的模式名和 Effort 先截）都写在那里，这里不重复。读屏名“Model range: <按钮文字>”，按钮文字里的“ · ”换成“, ”（“Model range: fast, deepseek-chat”；读屏名里不用“ · ”，见 ui-strings.md；临时，走查时可以改）。
 v0 的“ (deleted)”不再出现：范围指向不存在的名字时由拒绝启动卡说明（`pick_missing`）。
 
 ## 反例

@@ -106,16 +106,23 @@ function rangeTip(text: string, where: string, switching: boolean, reason: strin
   return { title: tipLines(text, where, reason), description };
 }
 
-/** @brief 菜单里的一项。 */
+/**
+ * @brief 菜单里的一项。读屏名只有名字：看得见的区域标记用" · "分隔，读屏会念出来（ui-strings.md），所以它对读屏藏起，
+ *        区域改用逗号写进读屏的描述，被排除时描述里再加原因（描述来自 aria-describedby，title 不再变成描述）。
+ */
 function OptionItem({ option, current, onChoose }: { option: PickOption; current: string | null;
   onChoose: (pick: string) => void }) {
+  const describe = useId();
+  const zones = zoneLabel(option.zones);
+  const description = zones.replaceAll(' · ', ', ') + (option.reason ? `. ${option.reason}` : '');
   return (
     <button role="menuitemradio" aria-checked={option.pick === current} data-pick={option.pick}
       data-zone={option.zones.join(' ')} data-excluded={option.excluded ? 'true' : undefined}
       className={option.excluded ? 'pick-excluded' : undefined} title={option.reason ?? option.label}
-      onClick={() => onChoose(option.pick)}>
+      aria-describedby={describe} onClick={() => onChoose(option.pick)}>
       <span className="switch-text">{option.label}</span>
-      <span className="pick-zone">{zoneLabel(option.zones)}</span>
+      <span className="pick-zone" aria-hidden="true">{zones}</span>
+      <Description id={describe} text={description} />
       {option.pick === current && <Icon name="check" />}
     </button>
   );
@@ -274,7 +281,10 @@ function RangeMenu({ tab, unavailable }: { tab: Tab; unavailable: string | null 
   const tipId = useId();
   useRowPlacement(menu.open, menu.button, panel, 'anchor');
   const shown = pending?.pick ? rangeLabel(pending.pick, null, options) : rangeLabel(tab.pick, tab.current, options);
-  const text = [shown.scope, shown.model].filter(Boolean).join(' · ');
+  const parts = [shown.scope, shown.model].filter(Boolean);
+  const text = parts.join(' · ');
+  // 读屏名里不用" · "（ui-strings.md：读屏会念出来），范围名和模型 id 之间用逗号；模型 id 里的"/"是数据，照原样
+  const name = `Model range: ${parts.join(', ')}`;
   const tip = rangeTip(text, shown.where, pending !== undefined, reason);
 
   function choose(pick: string) {
@@ -291,7 +301,7 @@ function RangeMenu({ tab, unavailable }: { tab: Tab; unavailable: string | null 
     <div className="model-switch" ref={menu.root}>
       <button ref={menu.button} className="model-button" data-testid="model-button" aria-haspopup="menu"
         data-pick={tab.pick ?? undefined} data-current={tab.current ?? undefined} aria-expanded={menu.open}
-        aria-label={`Model range: ${text}`} aria-disabled={reason !== null || pending ? true : undefined}
+        aria-label={name} aria-disabled={reason !== null || pending ? true : undefined}
         data-pending={pending ? 'true' : undefined} aria-describedby={tip.description ? tipId : undefined}
         title={tip.title} onClick={() => { if (!pending && reason === null) menu.setOpen(!menu.open); }}>
         {shown.scope && <span className="switch-text range-scope">{shown.scope}</span>}

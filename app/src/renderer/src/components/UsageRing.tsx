@@ -84,25 +84,38 @@ function RingIcon({ view }: { view: RingView }) {
 
 /**
  * @brief 悬停提示的开关：鼠标在圆环上（含提示本身）或键盘焦点在圆环上时显示，详情开着时不显示；
- *        Esc 藏起（WCAG 1.4.13，焦点留在圆环），鼠标移开且焦点离开后再出现时重新显示。
+ *        Esc 藏起（WCAG 1.4.13），鼠标移开且焦点离开后再出现时重新显示。焦点在圆环上时这一下 Esc 只藏提示（在浮层栈里，
+ *        不停止生成）；只因鼠标停在圆环上显示、焦点在别处（文字框、批准卡、另一栏）时 Esc 也藏起提示，但不占这一下，
+ *        照 chat.md 的顺序停止生成、拒绝批准卡（models.md"上下文用量（圆环）"）。
  *        hovered 为假（只因键盘焦点显示）时提示不接鼠标：它盖在文字框上，点文字框时不能点到提示上。
  */
 function useRingTip(detailsOpen: boolean) {
   const [hover, setHover] = useState(false);
-  const [focus, setFocus] = useState(false);
+  // 焦点在不在圆环上：none / 鼠标点的 / 键盘来的（:focus-visible，只有这种时显示提示）
+  const [focus, setFocus] = useState<'none' | 'mouse' | 'keyboard'>('none');
   const [dismissed, setDismissed] = useState(false);
-  const visible = (hover || focus) && !dismissed && !detailsOpen;
-  useOverlay(visible, () => setDismissed(true), false);
+  const visible = (hover || focus === 'keyboard') && !dismissed && !detailsOpen;
+  useOverlay(visible && focus !== 'none', () => setDismissed(true), false);
   useEffect(() => {
-    if (!hover && !focus) setDismissed(false);
+    if (!visible || focus !== 'none') return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDismissed(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [visible, focus]);
+  useEffect(() => {
+    if (!hover && focus === 'none') setDismissed(false);
   }, [hover, focus]);
   return {
     visible,
     hovered: hover,
     pointer: { onPointerEnter: () => setHover(true), onPointerLeave: () => setHover(false) },
     focus: {
-      onFocus: (event: React.FocusEvent<HTMLElement>) => setFocus(event.currentTarget.matches(':focus-visible')),
-      onBlur: () => setFocus(false),
+      onFocus: (event: React.FocusEvent<HTMLElement>) => {
+        setFocus(event.currentTarget.matches(':focus-visible') ? 'keyboard' : 'mouse');
+      },
+      onBlur: () => setFocus('none'),
     },
   };
 }

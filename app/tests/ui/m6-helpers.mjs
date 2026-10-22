@@ -153,24 +153,36 @@ export async function openToolsSection(page, section) {
 }
 
 /**
+ * @brief 等焦点所在一栏（没有焦点标记时第一栏）里 testId 按钮的 data-<key> 是 want、且不再切换中（没有 data-pending）：
+ *        切换中按钮已经显示你选的强度（data-level 立刻就变），只等它会在 session.setThinking / setPick 返回之前就往下走，
+ *        之后发的消息可能还用旧的设置。
+ */
+function settledTo(page, testId, key, want) {
+  return page.waitForFunction(({ id, name, value }) => {
+    const pane = document.querySelector('.pane-slot[data-focused="true"]:not([hidden]) [data-testid="chat-pane"]')
+      ?? document.querySelector('.pane-slot:not([hidden]) [data-testid="chat-pane"]');
+    const button = pane?.querySelector(`[data-testid="${id}"]`);
+    return button?.dataset[name] === value && button.dataset.pending !== 'true';
+  }, { id: testId, name: key, value: want }, { timeout: 15000 });
+}
+
+/**
  * @brief 在当前一栏输入框下面一行打开范围菜单（v1，docs/v1/screens/model-menu.md），选 ref（模型 provider/id），等按钮
- *        显示这个模型。
+ *        的 data-pick 是它、不再切换中（data-pick 是会话的范围，切换返回后才变）。
  */
 export async function chooseModel(page, ref) {
   const pane = focusedPane(page);
   await pane.getByTestId('model-button').click();
   await page.getByTestId('model-menu').locator(`[role="menuitemradio"][data-pick="${ref}"]`).click();
-  await page.waitForFunction((id) => document.querySelector('.pane-slot:not([hidden]) [data-testid="model-button"]')
-    ?.textContent?.includes(id), ref.split('/').pop(), { timeout: 15000 });
+  await settledTo(page, 'model-button', 'pick', ref);
 }
 
-/** @brief 在当前一栏输入框下面一行打开 Effort 菜单，选 level，等按钮的 data-level 变过去。 */
+/** @brief 在当前一栏输入框下面一行打开 Effort 菜单，选 level，等按钮的 data-level 变过去、不再切换中。 */
 export async function chooseThinking(page, level) {
   const pane = focusedPane(page);
   await pane.getByTestId('thinking-button').click();
   await page.getByTestId('thinking-menu').locator(`[role="menuitemradio"][data-level="${level}"]`).click();
-  await page.waitForFunction((want) => document.querySelector('.pane-slot:not([hidden]) [data-testid="thinking-button"]')
-    ?.dataset.level === want, level, { timeout: 15000 });
+  await settledTo(page, 'thinking-button', 'level', level);
 }
 
 /** @brief "/"补全列表里的项：名字、种类、是否高亮；列表不在时为 null。 */
@@ -611,6 +623,13 @@ export const paneWidth = (page) => page.evaluate((selector) => document.querySel
  */
 export async function fitPane(ctx, target, { right = false, height = 800 } = {}) {
   const { app, page } = ctx;
+  // 窗口窄于 1024px 时左栏收成 60px 的图标栏：从窄的样子往宽调会停在图标栏、窗口约 990px 的样子（会话行藏起来）。
+  // 宽于 760px 的目标先回到默认的 1200 宽窗口，调完的样子不随前面的步骤变
+  if (target > 760) {
+    await app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setContentSize(size.w, size.h),
+      { w: 1200, h: height });
+    await page.waitForFunction(() => innerWidth === 1200, null, { timeout: 5000 }).catch(() => {});
+  }
   const toggle = paneOf(page).locator('.topbar').getByRole('button', { name: 'Toggle changes' });
   if ((await toggle.getAttribute('aria-pressed')) !== String(right)) await toggle.click();
   await settle(page);
@@ -984,17 +1003,17 @@ export function permissionProblems({ width: w, frame, controls: { permission: p,
 }
 
 /**
- * @brief 选择范围按钮（models.md"选择范围按钮""窄栏"，composer-pickers.md"v1 之后的调整"）：读屏名称"Model range: <按钮文字>"；
- *        悬停三行：按钮文字 / "<提供商名> · <区域>"（没有当前模型时"No model can run in this session"）/ 不可用时的原因；
+ * @brief 选择范围按钮（models.md"选择范围按钮""窄栏"，composer-pickers.md"v1 之后的调整"）：读屏名称"Model range: <按钮文字>"
+ *        （" · "换成", "）；悬停三行：按钮文字 / "<提供商名> · <区域>"（没有当前模型时"No model can run in this session"）/ 不可用时的原因；
  *        准备中、生成中、不能发送时 aria-disabled（能用时不带这个属性，不在切换中）；读屏的描述是第二行（" · "换成", "）加
  *        ". <原因>"；宽度在最窄和 200px 之间；▾ 按档；≤ 340px 时内边距 4px。
  */
-export function modelProblems({ width: w, frame, controls: { model: m } }) {
+export function modelProblems({ width: w, frame, controls: { model: m }, texts }) {
   if (!m) return [];
   const reason = frame.wait ?? (frame.running ? NOTE.modelBusy : null);
   const second = m.current ? ZONE_LINE.test(m.tip[1] ?? '') : m.tip[1] === NOTE.noModel;
   const problems = [];
-  if (m.name !== `Model range: ${m.text}` || m.tip[0] !== m.text) {
+  if (m.name !== `Model range: ${m.text.replace(/ · /g, ', ')}` || m.tip[0] !== m.text) {
     problems.push(`range "${m.text}" / "${m.name}" / "${m.tip[0]}"`);
   }
   if (!second || (m.tip[2] ?? null) !== reason || m.tip.length > 3) problems.push(`range tip "${m.tip.join(' | ')}"`);
@@ -1002,7 +1021,13 @@ export function modelProblems({ width: w, frame, controls: { model: m } }) {
     problems.push(`range aria-disabled ${m.aria} (attribute ${m.hasAria}, pending ${m.pending})`);
   }
   if (m.described !== rangeDescription(m.tip)) problems.push(`range description "${m.described}"`);
-  if (m.width > RANGE_MAX + 0.5 || m.width < least('model', w) - 0.5) problems.push(`range ${at1(m.width)}px`);
+  // C1：不可用只靠 aria-disabled，不用原生 disabled（原生的会把按钮移出 Tab 顺序）
+  if (m.disabled) problems.push('range button is natively disabled');
+  // 最窄在这一项（.model-switch）上：模型 id 很短（"o3"）时按钮比最窄窄、字完整，那一项仍占最窄；截短的按钮要撑满它
+  const item = frame.items.find((entry) => entry.kind === 'model')?.width ?? m.width;
+  const cut = [texts?.scope, texts?.model].some((fact) => Boolean(fact) && fact.width < fact.full - 0.01);
+  if (m.width > RANGE_MAX + 0.5 || item < least('model', w) - 0.5) problems.push(`range ${at1(m.width)}px`);
+  if (cut && m.width < least('model', w) - 0.5) problems.push(`range cut at ${at1(m.width)}px`);
   if (m.svgs !== (bandOf(w).arrows ? 1 : 0)) problems.push(`range icons ${m.svgs}`);
   if (w <= 340 && m.pad.some((pad) => pad !== 4)) problems.push(`range padding ${m.pad}`);
   return problems;
@@ -1011,9 +1036,9 @@ export function modelProblems({ width: w, frame, controls: { model: m } }) {
 /**
  * @brief Effort 按钮（models.md"思考强度""窄栏"）：textContent 总是"Effort: <强度>"（窄时前缀藏起也在），> 680px 时前缀
  *        看得见；读屏名称和悬停第一行"Effort: <强度>"，第二行和读屏的描述是说明或原因；不可用时 aria-disabled（能用时不带
- *        这个属性）；宽度不窄于最窄；▾ 按档；≤ 340px 时内边距 4px。
+ *        这个属性）；这一项（.thinking-switch）不窄于最窄；▾ 按档；≤ 340px 时内边距 4px。
  */
-export function effortProblems({ width: w, frame, controls: { thinking: t, prefix } }) {
+export function effortProblems({ width: w, frame, controls: { thinking: t, prefix }, texts }) {
   if (!t) return [];
   const label = t.text.replace(/^Effort: /, '');
   const reason = frame.wait ?? (frame.running ? NOTE.effortBusy : null);
@@ -1028,8 +1053,14 @@ export function effortProblems({ width: w, frame, controls: { thinking: t, prefi
   if (t.aria !== Boolean(reason) || (!reason && t.hasAria) || t.pending) {
     problems.push(`effort aria-disabled ${t.aria} (attribute ${t.hasAria}, pending ${t.pending})`);
   }
+  if (t.disabled) problems.push('effort button is natively disabled');
   if (prefix !== bandOf(w).prefix) problems.push(`"Effort: " shown ${prefix}`);
-  if (t.width < least('thinking', w) - 0.5) problems.push(`effort ${at1(t.width)}px`);
+  // 最窄（min-width）在这一行的直接子项 .thinking-switch 上：强度很短（≤ 340px 的"High"约 33px）时按钮本身比最窄窄、
+  // 字是完整的，那一项仍占最窄；所以量这一项。按钮比最窄窄时字必须是完整的（截短的按钮要撑满这一项）
+  const item = frame.items.find((entry) => entry.kind === 'thinking')?.width ?? t.width;
+  if (item < least('thinking', w) - 0.5) problems.push(`effort ${at1(item)}px`);
+  const cut = Boolean(texts?.thinking) && texts.thinking.width < texts.thinking.full - 0.01;
+  if (cut && t.width < least('thinking', w) - 0.5) problems.push(`effort cut at ${at1(t.width)}px`);
   if (t.svgs !== (bandOf(w).arrows ? 1 : 0)) problems.push(`effort icons ${t.svgs}`);
   if (w <= 340 && t.pad.some((pad) => pad !== 4)) problems.push(`effort padding ${t.pad}`);
   return problems;
@@ -1094,8 +1125,8 @@ export function sendProblems({ width: w, controls: c }, state) {
 }
 
 /**
- * @brief 截短的先后（models.md"放不下"，composer-pickers.md"新加的检查"第 3 条）：截短的都有"…"；范围按钮截短时不能发送的
- *        说明已在最窄；范围按钮里 .range-scope 截短时 .range-model 已收完（宽 0）；模式名截短时范围按钮已在最窄（差 1px
+ * @brief 截短的先后（models.md"放不下"，composer-pickers.md"新加的检查"第 3 条）：截短的都有"…"；范围按钮被挤得截短
+ *        （比 200px 的上限窄）时不能发送的说明已在最窄；范围按钮里 .range-scope 截短时 .range-model 已收完（宽 0）；模式名截短时范围按钮已在最窄（差 1px
  *        以内）；Effort 截短时范围按钮和权限都在最窄；宽于 400px 时模式名不截；模式名至少看得见开头两个字母；说明截短时
  *        悬停是全文。
  */
@@ -1106,7 +1137,9 @@ export function truncProblems({ width: w, frame, controls: c, texts: t }) {
   for (const key of ['permission', 'scope', 'model', 'thinking', 'wait']) {
     if (cut(t[key]) && !t[key].ellipsis) problems.push(`${key} cut without "…"`);
   }
-  if ((cut(t.model) || cut(t.scope)) && !atLeast('wait', c.wait)) problems.push('range cut before the reason');
+  // 范围按钮在 200px 的上限时它的字是被上限截的（很长的模型 id 任何宽度都这样），不是挤的，不算先于说明截短
+  const squeezed = (cut(t.model) || cut(t.scope)) && (c.model?.width ?? 0) < RANGE_MAX - 0.5;
+  if (squeezed && !atLeast('wait', c.wait)) problems.push('range cut before the reason');
   if (cut(t.scope) && t.model && t.model.width > 0.5) problems.push('range name cut before the model id');
   if (cut(t.permission) && !atLeast('model', c.model)) problems.push('mode cut before the range');
   if (cut(t.thinking) && !(atLeast('model', c.model) && atLeast('permission', c.permission))) {

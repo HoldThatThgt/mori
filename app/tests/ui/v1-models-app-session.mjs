@@ -26,7 +26,7 @@ import { activeFile, ctrlN, lastReply, PANE, paneOf, rowOf, samePath, settle, st
   from './m3-helpers.mjs';
 import {
   at1, fitPane, focusKind, frameProblems, isCut, kindsOf, least, menuItemFacts, NOTE, pickers, placeBrief,
-  rangeDescription, rangeMenuPlace, resetWindow, rowFacts, seenPickers, setRightPanel, watchPickers,
+  rangeDescription, rangeMenuPlace, rangeName, resetWindow, rowFacts, seenPickers, setRightPanel, watchPickers,
 } from './v1-models-row-helpers.mjs';
 import {
   brief, customs, group, hasToolHistory, makeProject, model, projectKey, provider, readConfig, seedConfig,
@@ -211,12 +211,17 @@ async function cardMenuChecks(page, label) {
   return opened;
 }
 
-/** @brief 在当前一栏的思考菜单里选 level，等按钮的 data-level 变过去。 */
+/**
+ * @brief 在当前一栏的思考菜单里选 level，等按钮的 data-level 变过去、不再切换中（没有 data-pending）：切换中按钮已经显示
+ *        选的强度（data-level 立刻就是 level），只等 data-level 会在 session.setThinking 返回之前就往下走。
+ */
 async function chooseThinking(page, level) {
   await paneOf(page).getByTestId('thinking-button').click();
   await page.getByTestId('thinking-menu').locator(`[role="menuitemradio"][data-level="${level}"]`).click();
-  await page.waitForFunction(({ selector, want }) => document.querySelector(`${selector} [data-testid="thinking-button"]`)
-    ?.dataset.level === want, { selector: PANE, want: level }, { timeout: 15000 });
+  await page.waitForFunction(({ selector, want }) => {
+    const button = document.querySelector(`${selector} [data-testid="thinking-button"]`);
+    return button?.dataset.level === want && button.dataset.pending !== 'true';
+  }, { selector: PANE, want: level }, { timeout: 15000 });
 }
 
 /** @brief 拒绝启动卡此刻的内容；没有卡时为 null。 */
@@ -1223,9 +1228,9 @@ async function menuStep(ctx) {
   record('MP-23 label: a group range shows "<group id> · <current model id>"; hover line 1 is the button text, '
     + 'line 2 "<provider name> · <zone>"', bar.text === 'g1 · m1' && bar.pick === 'g1' && bar.current === 'p1/m1'
     && bar.tip[0] === 'g1 · m1' && bar.tip[1] === 'Provider One · Local' && bar.tip.length === 2, JSON.stringify(bar));
-  record('MP-23 the range button is in the message-box row, not the top bar: name "Model range: g1 · m1", described '
+  record('MP-23 the range button is in the message-box row, not the top bar: name "Model range: g1, m1", described '
     + 'by hover line 2 as "Provider One, Local" (a hidden model-tip outside the button), no aria-disabled while usable',
-  bar.inRow && !bar.inTopbar && bar.name === 'Model range: g1 · m1' && bar.described === 'Provider One, Local'
+  bar.inRow && !bar.inTopbar && bar.name === rangeName('g1 · m1') && bar.described === 'Provider One, Local'
     && bar.tipOutside && bar.ariaDisabled === null && !bar.disabled, JSON.stringify(bar));
   const menu = await readMenu(page);
   record('MP-23 menu: opens upward from the message-box row, right-aligned with the range button, 300px wide, inside '
@@ -1290,9 +1295,7 @@ async function pickStep(ctx, ep) {
   await until(() => page.evaluate((selector) => document.querySelector(selector)?.dataset.running === 'true', PANE),
     10000, 100);
   const busy = await pickers(page);
-  await paneOf(page).getByTestId('model-button').click({ force: true });
-  await sleep(300);
-  const opened = await page.getByTestId('model-menu').count();
+  const { hit, opened } = await forceClickRange(page);
   record(`MP-23 generating: the range and Effort buttons are unavailable (aria-disabled, still focusable); range hover `
     + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, busy.unavailable && !busy.disabled
     && same(busy.tip, ['m3', 'Provider Three · Local', BUSY_TITLE]) && busy.thinking?.unavailable === true
@@ -1300,9 +1303,24 @@ async function pickStep(ctx, ep) {
   record('MP-23 generating: the range description is "Provider Three, Local. <reason>", the Effort description is the '
     + 'reason (no line 1); clicking the unavailable range button opens no menu',
   busy.described === rangeDescription('Provider Three · Local', BUSY_TITLE) && busy.thinking?.described === EFFORT_BUSY
-    && opened === 0, `${busy.described} | ${busy.thinking?.described} | menus ${opened}`);
+    && hit && opened === 0, `${busy.described} | ${busy.thinking?.described} | hit ${hit} | menus ${opened}`);
   await waitIdle(page, 30000);
   ctx.s3 = await activeFile(page);
+}
+
+/**
+ * @brief 在不可用（aria-disabled）的范围按钮中间真的点一下鼠标（Playwright 的 click() 会一直等它可用，所以用 force），
+ *        返回点的那一点是否落在按钮上（force 不查有没有东西盖着：点到别的东西上也不会开菜单，检查就白过了）和开了几个菜单。
+ */
+async function forceClickRange(page) {
+  const range = paneOf(page).getByTestId('model-button');
+  const hit = await range.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    return el.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+  });
+  await range.click({ force: true });
+  await sleep(300);
+  return { hit, opened: await page.getByTestId('model-menu').count() };
 }
 
 /** @brief 改设置里的默认范围：已有会话不变，新会话用新的。 */
@@ -1398,10 +1416,10 @@ async function rowWideStep(ctx) {
   kindsOf(facts) === 'permission,model,thinking,usage,send' && frameProblems(facts).length === 0,
   `${kindsOf(facts)}; ${frameProblems(facts).join('; ')}`);
   record(`MP-23 row at ${at1(facts.pane.width)}px: the provider range shows "${WIDE.text}" whole with ▾, at most `
-    + `200px; hover "${WIDE.text}" / "${WIDE.hover}", name "Model range: ${WIDE.text}", description `
+    + `200px; hover "${WIDE.text}" / "${WIDE.hover}", name "${rangeName(WIDE.text)}", description `
     + `"${rangeDescription(WIDE.hover)}"`, facts.pane.width > 680 && bar.text === WIDE.text
     && !isCut(facts.texts.scope) && !isCut(facts.texts.model) && bar.width <= 200.5 && bar.arrows === 1
-    && same(bar.tip, [WIDE.text, WIDE.hover]) && bar.name === `Model range: ${WIDE.text}`
+    && same(bar.tip, [WIDE.text, WIDE.hover]) && bar.name === rangeName(WIDE.text)
     && bar.described === rangeDescription(WIDE.hover), JSON.stringify({ bar, texts: facts.texts }));
 }
 
@@ -1493,7 +1511,7 @@ async function rowCrowdedStep(ctx) {
   JSON.stringify({ width: at1(width), kinds: kindsOf(facts), texts, problems: frameProblems(facts) }));
   record('MP-23 600px pane, generating: the cut range button keeps the whole text in hover line 1 and in its name; '
     + 'line 3 and the description give the reason; it is aria-disabled but still focusable', bar.unavailable
-    && !bar.disabled && same(bar.tip, [WIDE.text, WIDE.hover, BUSY_TITLE]) && bar.name === `Model range: ${WIDE.text}`
+    && !bar.disabled && same(bar.tip, [WIDE.text, WIDE.hover, BUSY_TITLE]) && bar.name === rangeName(WIDE.text)
     && bar.described === rangeDescription(WIDE.hover, BUSY_TITLE), JSON.stringify(bar));
   await composer(page).fill('');
   await stopIfRunning(page, PANE);
@@ -1599,7 +1617,7 @@ async function narrowCrowded(page) {
   JSON.stringify({ w: at1(w), kinds: kindsOf(facts), range: at1(bar.width), mode: at1(bar.permission.width),
     effort: at1(bar.thinking.width), sizes, texts, problems: frameProblems(facts) }));
   record('MP-23 narrowest pane: the cut range button keeps the whole text in hover line 1 and in its name',
-    same(bar.tip, [WIDE.text, WIDE.hover, BUSY_TITLE]) && bar.name === `Model range: ${WIDE.text}`,
+    same(bar.tip, [WIDE.text, WIDE.hover, BUSY_TITLE]) && bar.name === rangeName(WIDE.text),
     JSON.stringify(bar.tip));
 }
 

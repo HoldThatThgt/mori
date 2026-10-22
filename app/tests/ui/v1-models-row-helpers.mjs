@@ -38,6 +38,12 @@ export const least = (kind, w) => LEAST[kind][w <= 340 ? 1 : 0];
 export const rangeDescription = (line2, reason = null) => `${line2.replace(/ · /g, ', ')}`
   + `${reason ? `. ${reason}` : ''}`;
 
+/**
+ * @brief 范围按钮的读屏名（models.md"选择范围按钮"）："Model range: <按钮文字>"，按钮文字里的" · "换成", "（读屏名里不用
+ *        " · "，ui-strings.md）。
+ */
+export const rangeName = (text) => `Model range: ${text.replace(/ · /g, ', ')}`;
+
 /** @brief 保留一位小数（记录里用）。 */
 export const at1 = (value) => Math.round(value * 10) / 10;
 

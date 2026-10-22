@@ -48,6 +48,28 @@ const ROW_PATH = 'permission-button,model-button,thinking-button,usage';
 const BAND_DRAFT = '排队：这条会被撤回';
 /** 回放桥 failNext 让 session.setPick 失败时的原文（synthetic） */
 const PICK_FAIL = 'Synthetic: session.setPick failed';
+/**
+ * 本测试用 failNext 注入的失败原文，每注入一次记一条：界面照例（异常分支记错误日志）为它写一条
+ * "[renderer] <命令> failed: <原文>"（state/bridge.ts describe），"页面没有报错"只扣掉这些，每次注入扣一条，多的照样算错
+ */
+const injected = [];
+
+/** @brief 让回放桥的下一条界面命令以 text 失败（synthetic，不占回放顺序），并记下界面因此该写的那条错误日志。 */
+async function failNext(page, text) {
+  injected.push(text);
+  await page.evaluate((message) => { window.__replay.failNext = message; }, text);
+}
+
+/** @brief 控制台的错误里去掉每次注入的那一条（"[renderer] <命令> failed: <原文>"，各扣一次），剩下的是真的报错。 */
+function unexpectedErrors(errors) {
+  const left = [...errors];
+  const ours = (line, text) => /^\[renderer\] [\w.]+ failed: /.test(line) && line.endsWith(` failed: ${text}`);
+  for (const text of injected) {
+    const index = left.findIndex((line) => ours(line, text));
+    if (index >= 0) left.splice(index, 1);
+  }
+  return left;
+}
 
 /** @brief 构建回放页面。 */
 async function buildHarness() {
@@ -79,9 +101,12 @@ function helpers(page) {
 const restartKeepingFocus = (page) => page.evaluate(() => [...document.querySelectorAll('[data-testid="kernel-exit"] '
   + 'button')].find((button) => button.textContent.includes('Restart'))?.click());
 
-/** @brief 焦点在单栏的文字框里。 */
-const focusInComposer = (page) => page.evaluate((css) => document.activeElement?.matches(`${css} .composer textarea`)
-  ?? false, SINGLE);
+/**
+ * @brief 焦点在单栏的文字框里（最多等 1 秒）：按钮消失时界面在下一帧才把焦点放回文字框（focusComposer 用
+ *        requestAnimationFrame，先等刚关掉的菜单退出浮层栈），所以不能在按钮消失的同一刻就读。
+ */
+const focusInComposer = (page) => page.waitForFunction((css) => document.activeElement
+  ?.matches(`${css} .composer textarea`) ?? false, SINGLE, { timeout: 1000 }).then(() => true, () => false);
 
 /**
  * @brief 新会话还没有消息时的圆环（models.md"上下文用量（圆环）"还没有消息）：空圆环、data-state="empty"、
@@ -634,7 +659,7 @@ async function pickErrorCheck(page, h) {
   const fail = async () => {
     await button.click();
     await page.getByTestId('model-menu').waitFor({ timeout: 3000 }).catch(() => {});
-    await page.evaluate((text) => { window.__replay.failNext = text; }, PICK_FAIL);
+    await failNext(page, PICK_FAIL);
     await page.getByTestId('model-menu').locator('[role="menuitemradio"]:not([aria-checked="true"])').first().click();
     await error.waitFor({ timeout: 5000 }).catch(() => {});
   };
@@ -757,7 +782,7 @@ async function openStates(page, h, app) {
     + '圆环，高 33px', openingProblems.length === 0, `${openingProblems.join('; ')} ${rowSummary(opening)}`);
   await page.goto(h.url('readme'));
   await page.getByTestId('open-folder').waitFor({ timeout: 20000 });
-  await page.evaluate(() => { window.__replay.failNext = 'Synthetic: session.create failed'; });
+  await failNext(page, 'Synthetic: session.create failed');
   await page.getByRole('button', { name: 'Open folder…' }).first().click();
   await page.locator('[data-testid="not-ready"]', { hasText: 'Session didn’t open' }).waitFor({ timeout: 20000 });
   const failed = [];
@@ -779,7 +804,7 @@ async function reopenFails(page, h) {
   await page.evaluate(() => window.__replay.exit(1));
   await page.getByTestId('kernel-exit').waitFor({ timeout: 5000 });
   await page.locator(`${SINGLE} [data-testid="model-button"]`).focus();
-  await page.evaluate(() => { window.__replay.failNext = 'Synthetic: session.open failed'; });
+  await failNext(page, 'Synthetic: session.open failed');
   await restartKeepingFocus(page);
   await page.locator('[data-testid="not-ready"]', { hasText: 'Session didn’t open' }).waitFor({ timeout: 20000 });
   await sleep(200);
@@ -921,9 +946,10 @@ const app = await electron.launch({ args: [join(harnessDir, 'main.cjs')], cwd: a
 const page = await app.firstWindow();
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(error.message));
-// 回放桥 failNext 造出的失败（synthetic，原文以"Synthetic: "开头）界面照例记一条错误日志，不算页面报错。
+// 控制台的错误另记：回放桥 failNext 造出的失败界面照例记一条错误日志，最后按注入的次数扣掉（unexpectedErrors）
+const consoleErrors = [];
 page.on('console', (message) => {
-  if (message.type() === 'error' && !message.text().includes('Synthetic: ')) pageErrors.push(message.text());
+  if (message.type() === 'error') consoleErrors.push(message.text());
 });
 const h = helpers(page);
 for (const [name, check] of Object.entries(checks)) {
@@ -935,6 +961,7 @@ for (const [name, check] of Object.entries(checks)) {
     await page.screenshot({ path: join(shots, `${name}-error.png`) }).catch(() => {});
   }
 }
-record('页面没有报错', pageErrors.length === 0, pageErrors.slice(0, 5).join(' | '));
+const errors = [...pageErrors, ...unexpectedErrors(consoleErrors)];
+record('页面没有报错', errors.length === 0, errors.slice(0, 5).join(' | '));
 await app.close();
 process.exitCode = write('m1-replay.json') ? 0 : 1;

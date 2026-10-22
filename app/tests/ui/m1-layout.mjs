@@ -502,7 +502,14 @@ export function truncationProblems(row) {
   const out = [];
   const atMin = (name) => !it[name] || it[name].width <= minOf(row, name) + 1;
   for (const name of ['wait', 'model', 'permission', 'effort']) {
-    if (it[name] && it[name].width < minOf(row, name) - 0.5) out.push(`${name} ${it[name].width}px < its minimum`);
+    // 最窄（min-width）在这一行的直接子项上（.permission、.model-switch、.thinking-switch，chat.css、models.css），
+    // 不在按钮上：字很短（"Off"、模型 id "o3"）时按钮比最窄窄、字是完整的，那一项仍占最窄。所以量这一项；
+    // 按钮比最窄窄时字必须是完整的（截短的按钮要撑满这一项），同 m6-helpers.mjs effortProblems
+    const item = row.kids.find((kid) => kid.kind === name)?.width ?? it[name]?.width;
+    if (it[name] && item < minOf(row, name) - 0.5) out.push(`${name} ${item}px < its minimum`);
+    if (it[name] && cutOf(it[name]) && it[name].width < minOf(row, name) - 0.5) {
+      out.push(`${name} cut at ${it[name].width}px < its minimum`);
+    }
     for (const part of [it[name]?.text, it[name]?.scope, it[name]?.tail]) {
       if (part?.truncated && !part.ellipsis) out.push(`${name} cut without an ellipsis`);
     }
@@ -521,7 +528,7 @@ export function truncationProblems(row) {
 
 /**
  * @brief 读屏名和悬停第一行是全文（截短时靠它们看全名，models.md"窄栏"）：权限"Permission mode: <模式>"、按钮里只有
- *        模式名一段字；Effort 读屏名等于按钮文字"Effort: <强度>"；选择范围"Model range: <按钮文字>"，按钮文字里没有描述元素；
+ *        模式名一段字；Effort 读屏名等于按钮文字"Effort: <强度>"；选择范围"Model range: <按钮文字>"（" · "换成", "），按钮文字里没有描述元素；
  *        不能发送的说明悬停是全文。
  */
 export function nameProblems(row) {
@@ -535,7 +542,8 @@ export function nameProblems(row) {
   if (effort && (effort.label !== effort.content || lines(effort)[0] !== effort.label)) {
     out.push(`Effort: ${effort.label} | ${effort.title} | ${effort.content}`);
   }
-  if (model && model.label !== `Model range: ${model.content}`) out.push(`model range named ${model.label}`);
+  const rangeName = model && `Model range: ${model.content?.replace(/ · /g, ', ')}`;
+  if (model && model.label !== rangeName) out.push(`model range named ${model.label}`);
   if (model && lines(model)[0] !== model.content) out.push(`model range hover line 1 "${lines(model)[0]}"`);
   if (model && model.tip !== null && !model.tipOutside) out.push('model-tip is inside the button');
   if (wait && wait.title !== wait.text?.text) out.push(`note hover "${wait.title}" for "${wait.text?.text}"`);

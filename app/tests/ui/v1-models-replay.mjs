@@ -55,6 +55,28 @@ const LEVEL_TEXT = { off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium
   max: 'Max' };
 /** synthetic：回放桥让下一条界面命令直接以这段原文失败（failNext，不占回放顺序），制造一次换范围失败 */
 const PICK_FAILURE = 'Synthetic setPick failure (replay)';
+/**
+ * 本测试故意让命令失败时界面该写的错误日志（state/bridge.ts 的 console.error，异常分支照规定记错误日志）：每注入一次记一条，
+ * "the page has no errors"只扣掉这些，多出来的照样算错
+ */
+const expectedErrors = [];
+
+/** @brief 让回放桥的下一条界面命令以 PICK_FAILURE 失败（synthetic），并记下界面因此该写的那条错误日志。 */
+async function failNextPick(page) {
+  expectedErrors.push(`[renderer] session.setPick failed: ${PICK_FAILURE}`);
+  await page.evaluate((message) => { window.__replay.failNext = message; }, PICK_FAILURE);
+}
+
+/** @brief errors 里去掉 expected 的每一条各一次（同一条出现得比预期多时，多的留下）。 */
+function unexpectedErrors(errors, expected) {
+  const left = [...errors];
+  for (const text of expected) {
+    const index = left.indexOf(text);
+    if (index >= 0) left.splice(index, 1);
+  }
+  return left;
+}
+
 /** @brief 两个值的 JSON 相同。 */
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 /** 拒绝启动卡按钮的顺序与文字（model-chat.md "拒绝启动卡"） */
@@ -174,12 +196,10 @@ function helpers(page) {
     status: () => page.evaluate(() => window.__replay.status),
     /**
      * @brief 输入框下面一行的范围按钮（pickers 的各项，按 C1、C2：unavailable、pending（data-pending）、tip 按行、
-     *        described、inRow，另有 thinking），text 是完整文字（读屏名称去掉"Model range: "前缀）。
+     *        described、inRow，另有 thinking），text 是按钮的完整文字（textContent；描述元素在按钮外面。读屏名里" · "
+     *        换成了", "，不能从读屏名还原）。
      */
-    async button() {
-      const found = await pickers(page);
-      return found && { ...found, text: (found.name ?? '').replace(/^Model range: /, '') };
-    },
+    button: () => pickers(page),
     /** @brief 换模型提示：文字与 data-*。 */
     notices: () => page.locator(`${PANE} [data-testid="notice"][data-kind="model-switch"]`).evaluateAll((items) => items
       .map((el) => ({ text: el.textContent, from: el.dataset.from, to: el.dataset.to, reason: el.dataset.reason,
@@ -201,8 +221,9 @@ function watchPane(page) {
     const take = () => {
       const root = document.querySelector(pane);
       const button = root?.querySelector('[data-testid="model-button"]');
+      // buttonUnavailable 是范围按钮不可用（C1）；unavailable 是"模型不可用"说明卡的张数（两个不能同名，后者会盖掉前者）
       const now = { current: button?.dataset.current ?? null,
-        unavailable: button
+        buttonUnavailable: button
           ? button.getAttribute('aria-disabled') === 'true' && button.dataset.pending !== 'true' : null,
         title: button?.getAttribute('title') ?? null, running: root?.dataset.running ?? null,
         notices: root?.querySelectorAll('[data-testid="notice"][data-kind="model-switch"]').length ?? 0,
@@ -499,7 +520,7 @@ async function choosePick(page, pick) {
  */
 async function pickErrorCheck(page, h, pick, kept) {
   const alert = page.locator(`${PANE} [data-testid="pick-error"]`);
-  await page.evaluate((message) => { window.__replay.failNext = message; }, PICK_FAILURE);
+  await failNextPick(page);
   await choosePick(page, pick);
   const shown = await alert.waitFor({ timeout: 5000 }).then(() => true, () => false);
   const at = Date.now();
@@ -520,7 +541,7 @@ async function pickErrorCheck(page, h, pick, kept) {
   const gone = await alert.waitFor({ state: 'detached', timeout: 4000 }).then(() => true, () => false);
   record('MP-23 replay range: the failure line stays for about 10 s and then goes away by itself', stays && gone,
     `still there at 8 s ${stays}, gone by 12 s ${gone}`);
-  await page.evaluate((message) => { window.__replay.failNext = message; }, PICK_FAILURE);
+  await failNextPick(page);
   await choosePick(page, pick);
   return alert.waitFor({ timeout: 5000 }).then(() => true, () => false);
 }
@@ -692,7 +713,7 @@ if (present.length && problems.length) {
         await shot(page, `${check.name}-error`);
       }
     }
-    const errors = pageErrors.slice(errorsBefore);
+    const errors = unexpectedErrors(pageErrors.slice(errorsBefore), expectedErrors.splice(0));
     record(`${f.ids[0]} replay ${f.name}: the page has no errors`, errors.length === 0, errors.slice(0, 5).join(' | '));
   }
   await app.close();

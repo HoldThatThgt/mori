@@ -199,14 +199,17 @@ async function bothRows(page, label) {
 }
 
 /**
- * @brief 两栏都在等批准、一直在生成时（回放桥在等界面的 approval.answer；先等两张批准卡都到了，之后不会再来新的卡关菜单）：
+ * @brief 两栏都在生成、回放桥停在等界面的 approval.answer 时（录制里先来右栏的卡，答了它左栏才继续、才来左栏的卡；
+ *        所以等到有一张批准卡、两栏都在生成，这时回放不往下走，不会再来新的卡关菜单）：
  *        左栏收到 280–461px 各档、右边一栏收到 279px（.pane-slot 280px），两栏输入框下面一行都不换行、不超出输入框，
  *        截短的先后和最窄对；280px 有字时权限菜单、▾ 菜单、圆环详情往上打开、在这一栏里；同时只开一个（oneAtATime）。
  *        量完清掉输入框、两栏各一半，不发命令（回放桥核对）。
  */
 async function narrowSplit(page) {
-  await paneAt(page, 'left').getByTestId('approval-card').waitFor({ timeout: 60000 });
-  await paneAt(page, 'right').getByTestId('approval-card').waitFor({ timeout: 60000 });
+  await page.locator(`${slotSelector('left')} [data-testid="approval-card"], ${slotSelector('right')} `
+    + '[data-testid="approval-card"]').first().waitFor({ timeout: 60000 });
+  await page.waitForFunction((slots) => slots.every((css) => document.querySelector(`${css} [data-testid="chat-pane"]`)
+    ?.dataset.running === 'true'), [slotSelector('left'), slotSelector('right')], { timeout: 60000 });
   await closeRightPanel(page);
   const bad = [];
   for (const width of NARROW_LEFT) {

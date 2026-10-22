@@ -94,6 +94,12 @@ export function PermissionMenu({ tab, unavailable }: { tab: Tab; unavailable: st
     if (ok) void setApprovalMode(tab.key, 'all');
   }
 
+  // 按钮变得不可用（后台进程退出、重新载入中、重新打开中）时确认框也关上、按取消算，焦点回到按钮（approval.md）：
+  // 不然点"Allow all"会把 approval.setMode 发给已经退出或正在重启的后台进程
+  useEffect(() => {
+    if (unavailable !== null && confirming) confirmed(false);
+  }, [unavailable]);
+
   return (
     <div className="permission" ref={menu.root}>
       <button ref={menu.button} className={`permission-button${mode === 'all' ? ' all' : ''}`}

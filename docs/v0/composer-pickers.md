@@ -246,7 +246,7 @@ Effort、圆环、权限按钮照原设计不变；位置、顺序、`flex-shrin
 ### 改了什么
 
 1. 按钮的字、读屏名、悬停用 v1 的：按钮"<范围名> · <当前模型 id>"（分组写 id、提供商写名称；范围是模型时只有模型 id；
-   没有当前模型时只有范围名；没有范围时"No model range"）；读屏名"Model range: <按钮文字>"；悬停分三行，见下表。
+   没有当前模型时只有范围名；没有范围时"No model range"）；读屏名"Model range: <按钮文字>"（" · "换成", "，2026-10-22 审查时按 ui-strings.md"读屏名里不用 · "改）；悬停分三行，见下表。
 2. v0 的" (deleted)"、"No models available"、"Default"标记不再有：范围指向不存在的名字、没有能用的模型时，由输入框上方的
    拒绝启动卡（`data-testid="blocked-card"`）说明，"Send"不可用（[../v1/screens/model-chat.md](../v1/screens/model-chat.md)）。
 3. 范围按钮的上限任何宽度都是 200px，去掉"≤ 760px 最长 120px"那一档（见下"宽度"）。
@@ -394,8 +394,9 @@ v1 按钮里面的做法（`.range-model { flex: 1 1 0; white-space: pre }`、`.
    详情 260px 宽、4px 的条。底圈：空圆环（还没有消息、刚压缩完）用 `--color-faint`（#8a9098，白底上约 3.2:1）；
    有填充时改用 `--color-line`（#e8eaed）。`--color-faint` 和三种填充几乎一样亮（警示色 1.07:1、强调色 1.32:1、
    危险色 1.33:1），填到哪里看不出来；`--color-line` 上强调色 3.51:1、危险色 3.55:1。警示色的填充改用较深的
-   `--color-warn-text`（新的颜色，`color-mix(in srgb, var(--color-warn) 75%, var(--color-text))`，#8d641f，在 `--color-line` 上
-   4.38:1、白底上 5.28:1；原来的警示色在 `--color-line` 上只有 2.84:1）。代价：填得很少（几个百分点）时圆环看起来
+   `--color-warn-text`（新的颜色，`color-mix(in srgb, var(--color-warn) 70%, var(--color-text))`，#855f1e，在 `--color-line` 上
+   4.79:1、白底上 5.78:1；原来的警示色在 `--color-line` 上只有 2.84:1。2026-10-22 审查时从 75% 改成 70%：75% 的 #8d641f
+   在"Allow all"悬停时 20% 的底色上只有 4.25:1，见第 19 条）。代价：填得很少（几个百分点）时圆环看起来
    几乎是空的，数在悬停说明和读屏名里。
 10. **圆环详情不算阻塞的浮层**（与选区浮层一样不挡 Alt+数字和 Ctrl+N）：它只是看数，又是 26px 的小目标、容易误点。
     模型、Effort、权限菜单仍算阻塞，但新的批准卡或询问卡来了时关闭，焦点回到按钮。
@@ -422,12 +423,14 @@ v1 按钮里面的做法（`.range-model { flex: 1 1 0; white-space: pre }`、`.
 18. **悬停说明两行，读屏的描述只有第二行**：三个按钮都设 `aria-describedby`，指向一个藏起来的元素，里面只有第二行。
     不这样 Chromium 会把整个 `title` 当成描述：第一行和名字重复（"Permission mode: Ask each time"念两遍）。范围按钮的描述是
     第二行（" · "换成", "："DeepSeek, Public"），不可用时加". "和原因；藏起来的元素在按钮外面（测试读按钮的 textContent）。
-19. **"Allow all"的文字改用 `--color-warn-text`**（#8d641f，在它 12% 的底色上 4.65:1）：原来的警示色 #b78022 在同一底色上
+19. **"Allow all"的文字改用 `--color-warn-text`**（#855f1e，在它 12% 的底色上 5.09:1，悬停时 20% 的底色上 4.66:1；
+    原来算的 75% 的 #8d641f 只在不悬停时够，悬停时 4.25:1，2026-10-22 审查时改成 70%）：原来的警示色 #b78022 在同一底色上
     只有 3.02:1，不到 12px 文字要的 4.5:1；现在文字是唯一的标志，窄时还会截成几个字母。底色仍是警示色的 12%，看起来仍是警示。
     不支持思考时 Effort 的字（`--color-faint` 在 `--color-surface` 上 3.08:1）也不到 4.5:1，这个按钮能点，所以改用
     `--color-muted`（与能用时同色），"Unavailable"这个字已经说明了状态（原来的问题，这次一起改）。
 20. **圆环的悬停提示**在悬停和键盘焦点时都显示；Esc 先关详情，详情没开时 Esc 藏起提示（WCAG 1.4.13），焦点留在圆环；
-    提示藏起时再按 Esc 才按 chat.md 的顺序停止生成。
+    提示藏起时再按 Esc 才按 chat.md 的顺序停止生成。只因鼠标停在圆环上显示、焦点在别处时，Esc 也藏起提示，但不占这一下
+    （照常停止生成、拒绝焦点所在的批准卡，分屏时以焦点所在的一栏为准；2026-10-22 审查时定）。
 21. **准备中**（v1）：按钮位置是"Stop"和（有字时）只有一个按钮的"Queue"；≤ 400px 不收起"Queue"（只有一项，不值得收进 ▾），
     ≤ 340px 收到 28px。
 22. **范围按钮的上限 200px、去掉 ≤ 760px 那一档**；**切换中加 `data-pending`**；**F8 加"Model range"**（都是按推荐定的，
@@ -498,7 +501,7 @@ v1 按钮里面的做法（`.range-model { flex: 1 1 0; white-space: pre }`、`.
   - ≤ 600px 只有图标的"Send"、"Stop"、"Queue"：`width: 32px`（≤ 340px 时"Send"、"Stop" 28px）；`.split-toggle` 在这一档
     `width: 24px; padding: 7px 4px`（现在是 32px）；
   - 权限按钮加 `[aria-disabled='true']` 的样式（同模型按钮：变淡、`cursor: default`、悬停不变色）；
-  - 新的颜色 `--color-warn-text`（`color-mix(in srgb, var(--color-warn) 75%, var(--color-text))`）：`.permission-button.all`
+  - 新的颜色 `--color-warn-text`（`color-mix(in srgb, var(--color-warn) 70%, var(--color-text))`，见"我自己定的"第 19 条）：`.permission-button.all`
     的文字和圆环 75–89% 的填充；有填充时圆环的底圈用 `--color-line`，空圆环用 `--color-faint`；
   - `.thinking-button.unsupported` 的字改用 `--color-muted`。
 - 代码注释里写"顶栏"的地方跟着改（行号是 `6a57fd4` 的）：`ChatPane.tsx:1,3,44,133`、`ModelMenu.tsx:1,25,40,204`、
@@ -719,6 +722,33 @@ fixture 内容不变（v1 的 `fixtures/v1/*.json` 也不重录）；这是有�
 不改：`v0/m1-checks.md` 到 `m7-checks.md`（当时的记录，例如 m3、m6 里"Shift+Tab 8 次"），这一步自己的检查记录里写明改了什么；
 `v1/models-checks.md`（当时的记录，写着"顶栏"）；它第 8 条的合并要求（把顶栏的范围菜单搬进输入框下面那一行）在这一步的
 检查记录里写明：设计和文档已按它改，代码在实现那一步搬。
+
+## 2026-10-22 静态审查后改的（没有跑界面测试）
+
+这台机器上另一个会话在跑界面测试，这一轮只做了静态修改，跑过的只有 `npm run check`、`npx electron-vite build`、
+`npm run test:unit`。每一项要用哪个测试验证，记在这一步的验证清单里（实现那一步的检查记录写好前，先看交付说明）。
+
+- 右栏开关（split.md"右栏开关"）：用鼠标主键按在开关上时，到这一下点完（或在别处松开）才把焦点切到这一栏，焦点照常由
+  按下鼠标放到开关上；右键、键盘照常。原来在按下那一刻切焦点，右栏先换成这一栏的状态、开关被挤走，这一下点空
+  （上一轮诊断时发现的）。这是 split.md"焦点所在的一栏"的例外，已写进 split.md。
+- 圆环的悬停提示：只有焦点在圆环上时才在 Esc 的浮层栈里（见"我自己定的"第 20 条）。
+- 权限按钮变得不可用时，开着的"Switch to “Allow all”?"确认框按取消关上（approval.md）。
+- 范围按钮的读屏名里" · "换成", "（"Model range: fast, deepseek-chat"，ui-strings.md"读屏名里不用 · 和 /"；
+  按钮文字和悬停第一行不变）；范围菜单每项的读屏名只有名字，区域（逗号分隔）和被排除的原因在读屏的描述里。
+- `--color-warn-text` 从 75% 改成 70%（#855f1e），"Allow all"悬停时也够 4.5:1（见第 9、19 条）；圆环悬停时的底色用
+  `--color-surface`，空圆环的底圈够 3:1（defaults.md"上下文用量圆环的样子"）。
+- 圆环的颜色分档按四舍五入后显示的百分比（与悬停、读屏里的数一致），写进 models.md 和 defaults.md。
+- 测试：`m6-app-slash.mjs` 超过 2000 行，各档的边界和拒绝启动两节搬到 `m6-app-bands.mjs`（记录的名字不变）；
+  `m6-app-row` 加分屏 279 / 280px 的准备中、单栏准备中补上 740 / 490 / 370 / 321 / 320px；`m5-app` 加"点另一栏的右栏开关"；
+  其余是把检查收严（量到的宽度、点的位置、切换中、最窄量在这一行的直接子项上、错误日志按注入的次数扣）。
+
+还没定、留给走查的（静态看不出来，或是这次没改的老问题）：
+
+- 切换中（`data-pending`）范围按钮和 Effort 没有 `aria-describedby`，Chromium 可能把 `title`（按钮文字，含" · "）当成读屏的
+  描述，与"切换中没有描述"不符；"Send""Stop""Queue"的描述可能是"Send (Enter)"之类、和名字重复。要在 DevTools 的
+  无障碍面板里看一次再定改法。
+- 一些 12px 的字对比度不到 4.5:1，都是这次之前就有的颜色：`.composer-wait`、`.menu-hint`、菜单里被排除的项（`--color-faint`，
+  3.22:1；被排除的项变淡是 v1 model-menu.md 定的）、`.pick-error`（4.02:1）、宽于 600px 时的"Stop"和"Send"（约 4.2–4.3:1）。
 
 ## 没有验证的
 
