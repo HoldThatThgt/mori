@@ -2,7 +2,11 @@
 
 依据：方案 5.2。同一个表单出现在三处：首次启动、"设置 → 连接"（Settings → Connections and models）、错误卡上的"Go to settings"。
 
-> v1：见 docs/specs/model-providers.md §9.1：首次启动表单改为英文、加网络区域，写 Mori 的 `model-config.json`（§4.1）；"Settings → Connections and models"由 Settings → Models 取代，"Go to settings"删除（§9.3）。状态表见 [../../v1/screens/first-run.md](../../v1/screens/first-run.md)。
+> v1 已取代本文（docs/specs/model-providers.md §9.1、§9.3）：v0 的连接表单（`ConnectionForm.tsx`）已删除，本文的字段和状态表只是 v0 的记录，
+> 里面的文字（"Loading connections…"、"Couldn’t load connections: …"、"Save"、"Saved" 等）界面上已经没有了。现在的状态表：
+> 首次启动表单（加了网络区域，写 Mori 的 `model-config.json`，§4.1）见 [../../v1/screens/first-run.md](../../v1/screens/first-run.md)；
+> "Settings → Connections and models"由 Settings → Models 取代，见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)；
+> "Go to settings"删除（§9.3）。只有下面"首次启动之后：打开文件夹"一节仍然有效（first-run.md 沿用它）。界面文字见 [../ui-strings.md](../ui-strings.md)"首次启动""设置"。
 
 ## 字段
 
@@ -22,8 +26,8 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 读取中 | 启动后 `config.get` 尚未返回 | 表单不可编辑，"Loading connections…" | 无 |
-| 读取失败 | `config.get` 报错 | "Couldn’t load connections: "加错误原文 | 重新打开 App |
+| 读取中（v1：见 v1/screens/first-run.md：整窗"Loading…"，不显示表单） | 启动后 `config.get` 尚未返回 | 表单不可编辑，"Loading connections…" | 无 |
+| 读取失败（v1：见 v1/screens/first-run.md："Couldn’t load model settings: "加原文） | `config.get` 报错 | "Couldn’t load connections: "加错误原文 | 重新打开 App |
 | 首次启动（v1：见 docs/specs/model-providers.md §9.1、§9.4 `firstRun`） | `config.get` 返回没有已保存的连接 | 整窗只有连接表单，标题"Connect a model"，一句说明"Enter the base URL, API key, and model ID, then test the connection." | 填写、"Save"、"Test connection" |
 | 已保存的连接（v1：见 docs/specs/model-providers.md §9.1：已有配置时不显示这张表单） | `config.get` 返回已保存连接 | 表单回填（key 不回填，只在占位文字里提示"Saved and encrypted · Re-enter it if you change the base URL"） | 修改、"Save"、"Test connection" |
 | 有未保存的修改 | 你改了任一字段 | "Save"可用 | "Save"；"Test connection"（会先保存） |

@@ -78,7 +78,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 退出码 | Exit code N | Exit code {code} | |
 | 后台进程 | Mori’s background process（F8 字段名 "Background process"） | — | 意外退出一律写 "crashed"（Claude："Claude Code crashed"），不写 "stopped"；"Stopped" 只留给停止按钮的结果 |
 | 重新载入（后台进程） | Restart / Restarting… / Restarted | Restart、Restarting Claude Code on {host}… | Claude 重启本地进程用 restart；"Reload" 只留给文件阅读器的 "Reload file" |
-| 设置 | Settings / Open settings / Go to settings | Settings、Open settings、Go to settings | |
+| 设置 | Settings / Open settings | Settings、Open settings | 卡片和思考强度菜单里打开 Settings → Models 的按钮都叫 "Open settings"，顶栏范围菜单里是 "Manage models"；v0 错误卡上的 "Go to settings" v1 已删除（规格 §9.3） |
 | 返回会话 | Back to app | Back to app | 设置、Customize、Review 三页的返回按钮，操作记录同 |
 | 工具（页） | Customize（导航、页标题、F8 的 Page、操作记录 "Open Customize"） | Customize | Claude 开关技能、插件、连接器的页面叫 Customize；Claude 单独的 "Tools" 不是页名。分节标题 Built-in tools / Skills / Plugins / MCP 不变 |
 | 内置工具 | Built-in tools | Built-in | |
@@ -90,12 +90,18 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 直接调用 / 调用方式 | direct calls / Direct、codemode、Deferred、Hidden | — | 标签照 pi 的取值；正文说 "direct calls"，不写 v0 |
 | 用户级 / 本项目 | User / Project（标签）；user-level / this project（正文） | User、Project | |
 | 启用 / 停用 | Enable / Disable（动作）；Enabled / Not enabled（状态） | Enable {name}、Enabled | |
-| 连接 / 连接与模型 | connection / Connections and models | Connection、Add connection、Edit connection | |
+| 提供商 | provider / Providers / Add provider / Edit provider · <name> | — | 一个端点（Base URL、API type、Network zone，加它的 key 和模型），v1 取代 v0 的 connection（规格 §4.1）。界面上不再有 "connection" 这个名词，只留在动作 "Test connection" 和结果 "Connected · …"、"Connection failed: …" 里 |
+| key | key / Keys / Add key / API key（输入框的标签） | — | 一个提供商最多 8 个，按列出的顺序用；明文从不显示，Keys 的每行只写 "Saved" |
+| 分组 | group / Groups / New group / Group ID | — | 有序的成员：提供商成员 "<name> · all models"，模型成员 "<name> · <model id>" |
+| 选择范围 | model range / Default model range for new sessions / No model range | — | 分组、提供商或模型（规格 §1）；顶栏按钮的读屏名 "Model range: <按钮上的字>"，菜单的读屏名 "Model range" |
+| 网络区域 | network zone / Network zone / Local / Intranet / Public | — | 标签、单选、勾选框和标记写 Local / Intranet / Public；句子里写区域代码（"Allow public for this project"、"zone public is not allowed for this project"） |
+| 项目授权 | Project access / Allowed: … | — | 设置 → Models 的一节：按项目在 "Allowed zones for all projects" 之外另外允许的区域 |
+| 验证（探针） | Verify / Verifying… / Re-verifying… / Verify again / Verify now | — | 结果写在档案摘要的 "Tool calling: Verified / Not verified / Failed"；首次启动表单下方 "Verifying tool calling…" / "Tool calling verified" |
 | 服务地址 / 接口类型 / 模型 ID | base URL / API type / model ID | Gateway base URL、Model ID | |
-| 测试连接 | Test connection / Test / Testing… | Test connection、Testing… | |
+| 测试连接 | Test connection / Test / Testing… | Test connection、Testing… | 提供商卡和首次启动表单用 "Test connection"，Keys 的行和模型行用 "Test" |
 | 连接成功 / 连接失败 | Connected · … / Connection failed: … | Connected · {latency}ms、Connection failed: {error} | 毫秒和秒一样不加空格（120ms、5s） |
-| 默认 / 设为默认 | Default / Set as default | Default、Set as default | |
-| 模型 | model / Model: <id> | Model、Model: {name} | |
+| 默认 | Defaults（设置 → Models 的一节）/ None（没有默认范围） | Default | v1 没有 v0 模型行上的 "Default" 标记和 "Set as default"：新会话的默认范围在 Defaults 的下拉里选（规格 §9.1） |
+| 模型 | model / Models（设置页的分节、提供商卡里的一块、范围菜单和 Defaults 下拉的一节） | Model、Model: {name} | 设置页的 "Models" 取代 v0 的 "Connections and models"（规格 §9.1）；v0 顶栏的 "Model: <id>" v1 不再有，顶栏是范围按钮（见 "选择范围"） |
 | 信任 | trust / Trust workspace / Don’t trust | Trust this workspace?、Trust workspace、This workspace isn’t trusted、Trust settings couldn’t be saved.、Couldn’t check whether this workspace is trusted. | 会话定的（待负责人确认）：讲信任时一律叫 "workspace"（Claude 的说法），打开时仍叫 "folder" |
 | 配置（文件夹自带的） | settings | — | "its own extensions or settings" |
 | 草稿 | draft | — | 界面上目前没有出现这个词 |
@@ -136,7 +142,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | --- | --- |
 | 新会话的标题 | New session |
 | 空白页 | Pick a session on the left to continue, or open a folder to start a new session. / Open a folder / Choose a project folder to start a session. / Opening <folder>… |
-| 首次启动 | Connect a model / Enter the base URL, API key, and model ID, then test the connection. / Connected |
+| 首次启动 | 整窗的首次启动表单 "Connect a model"，文字见下面 "首次启动" 一节（v1 没有 v0 测试成功后的标题 "Connected"） |
 | 上下文 | Context 42% / Context —（刚压缩过："Just compacted. Context usage shows after the next response."）；读屏名 "Context usage 42%, about 53,760 of 128,000 tokens"，悬停 "About 53,760 / 128,000 tokens" |
 | 后台进程意外退出 | Mori’s background process crashed · Unfinished responses were interrupted / Restart / Restarting… |
 | 输入框不能发送时 | Mori’s background process crashed / Restarting… / Starting… / Session didn’t open |
@@ -150,7 +156,9 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 阶段行：工具 / 重试 / 压缩 | <工具卡标题> 8s（如 "Run npm test 8s"）/ Retrying (1/3) · <错误原文> / Compacting session… |
 | 对话流里 | Thought process / Thinking… / Copy code / Compacted session / Stopped · Changes made so far stay as they are / Extension: … / Skill · <name> / Expand / Collapse |
 | 滚动 | Scroll up to load earlier messages / Jump to latest |
-| 错误卡 | Go to settings / Put your last message back in the message box |
+| 错误卡 | Put your last message back in the message box（v1 删掉了 v0 的 "Go to settings"，规格 §9.3：模型的问题由换模型的一行、No model available 卡或拒绝启动卡说明） |
+| 模型层的卡片 | No model available / <provider>/<model> — <原因> / Open settings；拒绝启动卡：Verifying <provider>/<model>… / This session can’t start: no model fits. / No default model range; pick one. / <name> is not in your model settings.（第二行 "Used by this session’s model range."）/ .mori/models.json: <原文> / Model settings can’t be read: <原文>，按钮 Verify now / Allow <zone> for this project / Confirm zone / Change model… / Open settings。换模型的一行、阶段行等见 [v1/screens/model-chat.md](../v1/screens/model-chat.md) |
+| 候选的原因 | not in your model settings / removed from your model settings / network zone not confirmed / zone <zone> is not allowed for this project / verifying… / tool calling not verified yet / tool calling failed verification / rate limited until hh:mm:ss / API key rejected / quota exhausted / can’t connect until hh:mm:ss / model not found on the server / no response; unavailable until hh:mm:ss / waiting to make sure it stopped, until hh:mm:ss / failed earlier in this reply: <原因> / skipped at the start of this reply / conversation too long for this model / couldn’t rebuild the conversation: <原文> / waited N s for a free slot（`shared/models.ts` 的 `REASON_TEXTS`，后台进程和界面共用；小写开头，因为跟在 " — "、": " 后面。换模型的一行 "Switched model: A → B · <原因>" 里不带 until 部分，跟在 " · " 后面也是小写，与写法约定 " · " 那一条不同，待负责人确认） |
 | 回复下的按钮 | Copy / Copied / Copy failed / Attach message as context / Give feedback |
 | 停止的原因 | You pressed Stop |
 | 信任横幅 | This workspace isn’t trusted, so its extensions and settings weren’t loaded · You’ll be asked again after you restart Mori（或 "To change your remembered choice, delete this workspace’s entry from <dir>\trust.json and reopen the session"）/ This workspace now has its own extensions or settings, which weren’t loaded this time · You’ll be asked when you start a new session / Some extensions didn’t load: / Couldn’t save trust settings: … |
@@ -198,19 +206,48 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 写入的内容 | File content |
 | 阅读器 | Loading… / File not found / Source changed · Attached text: / Preview unavailable · Binary file / Preview unavailable · This is a folder / Couldn’t read this file: … / Reload file / Open in default app / Close panel |
 
-### 设置
+### 首次启动
+
+v1 的首次启动表单（[v1/screens/first-run.md](../v1/screens/first-run.md)），取代 v0 的连接表单。
 
 | 中文 | 英文 |
 | --- | --- |
-| 页头 | Back to app / Settings / Connections and models |
-| 连接 | Add connection / Edit connection · <name> / Add model / Edit model / Test / Test connection / Testing… / Set as default / Default / Edit / Delete…（确认框 "Delete model <id>?" 里的按钮是 Delete） |
-| 表单字段 | Name / Base URL / API type / Model ID / Context window / Compatibility options / Supports thinking / Default effort for new sessions |
-| 兼容选项 | 标签都写端点的情况：Endpoint doesn’t support the developer role / Endpoint doesn’t accept the store field / Endpoint needs max_tokens instead of max_completion_tokens / Endpoint doesn’t report usage while streaming / … |
-| key | Kept encrypted on this computer after you save / Saved and encrypted · Re-enter it if you change the base URL / Key saved (encrypted) / No key |
-| 测试结果 | Connected · First token 120ms · Total 950ms · Includes thinking · Response: … / Connection failed: … / No response / Test cancelled / Couldn’t test the connection: … |
-| 保存 | Save / Saving… / Saved / Couldn’t save: … / Saved, but the configuration has an error: … |
-| 模型行 | Context window: 128,000 · Supports thinking · Default effort: High / Doesn’t support thinking |
-| 模型菜单 | Model: <id> / <id> (deleted) / No models available / Applies to this session only. New sessions use the default model from Settings. / Manage models |
+| 读取中 / 读取失败 | Loading… / Couldn’t load model settings: … |
+| 标题和说明 | Connect a model / Enter the base URL, API key, and model ID, then test the connection. |
+| 迁移失败 | Couldn’t import your previous model settings: … |
+| 字段 | Name / Base URL（占位 "http://host:8000/v1"）/ API type / Network zone（Local / Intranet / Public）/ API key（占位 "Optional"，保存过之后 "Saved. Leave empty to keep it."）/ Model ID / Context window / Max output / Supports thinking / Compatibility options（同下面 "设置"）；字段错误同下面 "设置" |
+| 选了 Public | Public providers must be allowed per project. You’ll be asked when you open a folder. |
+| 按钮 | Test connection / Saving… / Testing… / Cancel；保存失败 "Couldn’t save: …"；测试结果同下面 "设置" |
+| 探针状态 | Verifying tool calling… / Tool calling verified / Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings. / Couldn’t verify: … / Verify again |
+| 测试成功之后 | Open folder… / Opening <folder>… / Failed to open session: … |
+
+### 设置
+
+v1 的设置 → Models（[v1/screens/models-settings.md](../v1/screens/models-settings.md)）取代 v0 的 "Connections and models"，
+v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit connection · <name>"、"Set as default"、"Key saved (encrypted)" 等）都已删除。
+
+| 中文 | 英文 |
+| --- | --- |
+| 页头 | Back to app / Settings；左侧分节 Models / AGENTS.md（读屏名 "Settings sections"） |
+| Models 分节 | 标题 Models；从上到下：迁移说明、区域未确认、Defaults、Providers、Groups、Project access / Loading… / 配置读不出 "Couldn’t read model settings: <路径>: <原文>" 和 Retry |
+| 迁移说明 | Imported your model settings from models.json / Imported: <name>, … / Renamed provider <from> to <id> / Dropped <subject>: <reason> / Add the API key again for: <name>, … / Kept the saved key for: <name>, …; the key written in models.json was ignored. / Dismiss |
+| 区域未确认 | Confirm the network zone of these providers. Sessions don’t use them until you do. / <name> · <base URL> / Confirm zone…；对话框 Confirm network zone / Confirm / Cancel |
+| Defaults | Defaults / Default model range for new sessions（下拉：None，再分 Groups / Providers / Models 三节，模型写 "<provider name> · <model id>"）/ Allowed zones for all projects（Local、Intranet）/ Public providers can only be allowed per project, below. |
+| Providers | Providers / No providers yet. Add one to start a session. / Add provider；卡上 Base URL / API type / Network zone（未确认时 "Not confirmed"）/ Concurrency per key / Compatibility options（勾了的标签，逗号分隔，没有时 "None"）；按钮 Edit / Delete… / Test connection / Add model |
+| 提供商表单 | Add provider（另有 First key、First model 两小节）/ Edit provider · <name>；字段 Name / Base URL（占位 "http://host:8000/v1"）/ API type / Network zone / Concurrency per key / Compatibility options / API key（占位 "Optional"）；Save / Cancel |
+| 接口类型 | OpenAI-compatible (Chat Completions) / OpenAI Responses / Anthropic Messages |
+| 兼容选项 | 标签写端点的情况，下面一行小字说明（`shared/models.ts` 的 `COMPAT_LABELS`、`COMPAT_HINTS`）：Endpoint doesn’t support the developer role（Sends the system prompt with the system role instead）/ Endpoint doesn’t accept the store field（Leaves store out of requests）/ Endpoint needs max_tokens instead of max_completion_tokens（Older endpoints don’t recognize max_completion_tokens）/ Endpoint doesn’t report usage while streaming（Doesn’t send stream_options, so the context usage shown will be inaccurate）/ Endpoint doesn’t support strict mode for tool parameters（Leaves strict out of tool definitions）/ Tool results must include the tool name（Some endpoints require a name field on tool result messages）；只在 API type 为 OpenAI-compatible 时显示 |
+| Keys | Keys / Saved / Rate limited until hh:mm:ss / Rejected / Quota exhausted / Move up / Move down / Test / Remove（只剩一个 key 时 "Remove…"）/ Requests are sent without an API key. / Add key（内联表单 Label，默认 "Key <n>"；Secret；Save / Cancel）/ A provider can have at most 8 keys. |
+| 模型行 | Models / <model id>，下面 "Context window: 128,000 · Max output: 16,384 · Family: <family> · Supports thinking"（模型族为空、不支持思考时那一段不显示）/ Verify / Long-input test… / Cancel test… / Move up / Move down / Edit / Delete… / Test |
+| 档案摘要 | Tool calling: Verified（Not verified、Failed、Verifying…、Re-verifying…）/ Handoff tier: A（B、C、—）/ Context: <有效窗口> / Reasoning field: <字段> / Cancel: Verified（Not verified、Unknown）/ Silently truncates long input / Couldn’t verify: … |
+| 模型表单 | Add model · <provider name> / Edit model · <provider name>；字段 Model ID（Edit 时只读）/ Context window / Max output / Family（占位 "Optional"）/ Supports thinking / Image input / Default effort for new sessions（勾了 Supports thinking 时；Off / Minimal / Low / Medium / High / Extra high / Max）；Save / Cancel |
+| Groups | Groups / No groups. A group lists the models to try, in order. / New group（内联表单 Group ID、成员选择、Create / Cancel）/ Add member / Remove / Delete… / <name> · all models / <name> · <model id> / A group needs at least one member; delete the group instead. |
+| Project access | Project access / No projects yet. Open a folder to add one. / Allowed: Local · Intranet（没有时 "None"）/ Local / Intranet / Public（不在 "Allowed zones for all projects" 里的区域才有勾选框）/ .mori/models.json in this project doesn’t allow <zone>. / .mori/models.json: <原文>；勾 Public 的确认框 Allow public providers for this project? / Code and files from <path> may be sent to: <name>, <name>. / Allow / Cancel |
+| 确认框 | Delete provider <name>?（Its models and keys are deleted too.）/ Delete model <id>? / Delete group <id>? / Change the base URL?（按钮 Save and remove keys）/ Remove the last key?（Requests to <name> will be sent without an API key.；按钮 Remove）/ Run the long-input test on <id>? / Run the cancel test on <id>?（按钮 Run test）；其余的按钮 Delete / Cancel。连带改动的各行由后台进程写，见 [v1/screens/models-settings.md](../v1/screens/models-settings.md) "确认框的文字" |
+| 字段错误 | Name is required. / Base URL must be an http or https URL. / Use a whole number from 1 to 64. / Choose a network zone. / Model ID must be non-empty and contain no spaces. / Model IDs must be unique within a provider. / Context window must be a whole number above 0. / Max output must be a whole number above 0. / Max output must be smaller than the context window. / Label is required. / Use lowercase letters, digits, and hyphens. / <id> is reserved. / <id> is already used by a provider or group. |
+| 测试结果 | Testing… / Cancel / Connected · First token 120ms · Total 950ms · Includes thinking · Response: …（没有首字时间时 "First token —"）/ Connection failed: …（没有原文时 "Connection failed: No response"）/ Test cancelled / Couldn’t test the connection: … |
+| 保存 | 提供商表单、模型表单、Add key、New group 按 Save（Create）保存，保存中按钮不可用，失败时表单里原文；Defaults、Groups 的成员、Project access、Keys 和模型的上移下移、Confirm zone、Dismiss 改了就保存，没有 Save 按钮，成功时不提示 |
+| 范围菜单 | 按钮 "<范围名> · <当前模型 id>"（范围是模型时只写模型 id；没有当前模型时只写范围名）/ No model range；悬停 "<provider name> · <区域>"（没有当前模型时 "No model can run in this session"，生成中 "Can’t switch models until the response finishes"）；菜单 Groups / Providers / Models（Models 按提供商分小节），每项右边标区域（"Local · Public"，未确认时 "Zone not confirmed"）/ Applies to this session only. New sessions use the default range from Settings. / Manage models；换不了时 "Couldn’t change the model range: …" |
 | 思考强度菜单 | Effort: High / Unavailable / Applies to this session only. Set each model’s default for new sessions in Settings. / Open settings |
 | AGENTS.md | User / In effect: <path> / <path> takes precedence, so what you write here has no effect. / <path> is in effect now. After you save, this AGENTS.md is loaded instead. / Save / Discard changes / Unsaved changes / Saved · Applies to new sessions / Open in default app |
 | 离开确认 | Discard changes to AGENTS.md? / Your edits haven’t been saved. Leaving now discards them. / Discard / Keep editing |
@@ -383,10 +420,13 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 | 引用 | Attach as context (file) / Attach as context (response) / Attach session as context / Open file / Open file from attached context / Jump to response from attached context / Jump to session from attached context |
 | 反馈 | Copy response / Give feedback on response / Give feedback on selection |
 | 扩展询问 | Extension question: answered / Extension question: cancelled |
-| 设置 | Save connection（新建，还没有 id）/ Save connection <id> / Test connection / Cancel connection test / Add model <provider>/<id> / Save model <provider>/<id> / Delete model <provider>/<id> / Set default model: <provider>/<id> / Switch model for this session: <id> / Change effort for this session: <level> / Save user-level AGENTS.md |
+| 设置 | Open settings（侧栏的 Settings）/ Open Settings → Models（卡片和菜单里的按钮；带落点时加 " (keys)"、" (zones)"、" (project)"）/ Save user-level AGENTS.md |
+| 首次启动、设置 → Models | Save first-run provider <name>（第一次保存，还没有 id）/ Save first-run provider <id> / Add provider <name> / Save provider <id> / Delete provider <id> / Add model <provider>/<id> / Save model <provider>/<id> / Delete model <provider>/<id> / Move model <provider>/<id> -1（上移；下移是 1）/ Add key <provider> / Remove key <ref> / Move key <ref> -1（1）/ Create group <id> / Save group <id> / Delete group <id> / Set defaults <默认范围，没有时 None> · <允许的区域，空格分隔> / Set project zones <path> · <区域，空格分隔> / Confirm zone <provider> · <zone> / Dismiss migration notice / Reload model settings / Verify <provider>/<id> (auto)（拒绝启动卡的 Verify now 可能带多个模型，空格分隔；需要你同意的探针是 (long_input)、(cancel)）；删除的确认框打开时算连带改动的那一次不记；从不记 key 的明文 |
+| 测试连接 | Test connection <provider>/<id>（Keys 的行的 Test 加 " with key <ref>"）/ Cancel connection test |
+| 顶栏 | Set model range <范围> / Change effort for this session: <level>（<level> 是 pi 的取值，如 high、xhigh） |
 | Customize 页 | Open Customize / Enable（Disable）<单数的类别> <path>（Enable skill …、Disable extension …、Enable prompt template …）/ Enable all in plugin（Disable all in plugin）<source> / Add plugin from folder <path> / Remove plugin <source> / Save MCP server <name> / Enable（Disable）MCP server <name> / Remove MCP server <name> / Switch MCP server <name> to direct calls |
 | 工作回顾 | Open Review / View in Review / Review: Feedback / View record: UI issues / Resolve / Reopen / Hide resolved / Show resolved / Export: Feedback / Open folder: UI issues / Show record in Explorer / Jump to source from Review |
-| 其他 | Report a UI issue / Restart background process / Go to settings / Open settings |
+| 其他 | Report a UI issue / Restart background process |
 
 "Feedback"、"UI issues" 是分节名（大写开头），所以放在冒号后面，不嵌进句子中间。
 
@@ -402,14 +442,14 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 - `main/review.ts:141` 截图失败的正则改成 `/^Couldn’t capture a screenshot:\s*/`（见上 "F8 报告"）。
 - 导出的默认文件名按类别取 `feedback` / `ui-issues`，不再用分节名（见上）。
 - 已经是英文、但用词要跟着改的错误原文（没有中文，所以清单里原来没有；`translations.json` 里都有条目）：`kernel/config.ts` "API key is required when the base URL changes"（界面上前面加 "Couldn’t save: "，`tests/ui/m0-smoke.mjs:99`、`tests/ui/m6-app-settings.mjs:738` 跟着改成 "Couldn’t save: API key is required when the base URL changes"）；`kernel/sessions.ts:412` 和 `state/projects.ts:180` 同一句 "This session is still running. Stop it first."，`state/projects.ts:182` 跟着它改成 "This session is still opening."；`preload/index.ts:40`、`:62` "Mori’s background process crashed (exit code N)"（`tests/ui/harness/replay.js:457` 跟着改）；`kernel/mcpConfig.ts:388` "Mori only supports direct calls (exposure: direct)."（`tests/ui/m6-app-tools.mjs:1127-1128` 跟着改，record() 的说明也改）；`kernel/resources.ts:299` "<path> is read-only in Customize"、`:343` "This plugin is already added"、`:357` / `:366` "Plugin <source> isn’t in your user-level settings"（`:305` 原来是 "Package … is not in the settings"，`translations.json` 里没有条目，只会在用户级的包上报出，改成同一句）；`main/review.ts:107` 的引号改成 “ ”。
-- 审查后补的（2026-10-21）：`main/index.ts` 在 ready 之前 `app.commandLine.appendSwitch('lang', 'en-US')`（不写时 Chromium 按 Windows 显示语言选，中文 Windows 上上下文长度填 0 时浏览器弹出"值必须大于或等于 1。"）；`ConnectionForm.tsx`、`ModelForm.tsx` 的 `<form>` 加 `noValidate`（`min={1}` 不再先被浏览器拦下，Mori 的说明才看得到；`m6-app-settings` 两项检查）；选文件夹对话框加 `title` / `buttonLabel`（`m1-app` 一项检查）。
+- 审查后补的（2026-10-21）：`main/index.ts` 在 ready 之前 `app.commandLine.appendSwitch('lang', 'en-US')`（不写时 Chromium 按 Windows 显示语言选，中文 Windows 上上下文长度填 0 时浏览器弹出"值必须大于或等于 1。"）；`ConnectionForm.tsx`、`ModelForm.tsx` 的 `<form>` 加 `noValidate`（`min={1}` 不再先被浏览器拦下，Mori 的说明才看得到；`m6-app-settings` 两项检查；v1 已删掉这两个表单，v1 的首次启动表单、提供商表单、模型表单、Add key 和 New group 也都带 `noValidate`）；选文件夹对话框加 `title` / `buttonLabel`（`m1-app` 一项检查）。
 - `src/renderer/index.html` 的 `<html lang="zh-CN">` 改成 `lang="en"`（读屏按它选语音，Chromium 按它回退字体）。
 - `electron-builder.yml` 的 `nsis:` 下加 `installerLanguages: [en_US]`：不写时 electron-builder 打出带全部语言的安装包，中文系统上安装界面会是中文。
 - `tests/check.mjs` 加一项：`src/` 里 .ts/.tsx 的字符串、模板字符串、正则字面量和 JSX 文本（用 TypeScript 语法树找），以及去掉注释后的 .html、.css 不能有中文（含中文标点、全角字符和假名），报 "<文件>:<行> contains Chinese text: …"；注释不查。
 - 仓库根目录 `build-installer.cmd` 的输出只用英文：去掉文件末尾的中文提示和失败时切到 65001 用 `findstr` 取出它们的代码。仍要切到 437：实测控制台是 936（中文 Windows 的默认）时，cmd 会把含中文的 REM 注释拆开、把半句当命令执行；65001 和 437 下不切也正常。只在开头 `chcp 437` 还不够（electron-builder 启动的 PowerShell 会把控制台的输出代码页改成 65001，从 936 启动的 cmd 之后又读错），所以脚本记下原代码页、切到 437 后用新的 cmd 重新运行自己，结束时恢复原代码页（见 [english-ui-checks.md](english-ui-checks.md) "测试中发现并已修正的问题"第 5 条）。
 - 顶栏宽度：`chat.css` 的 `@container` 阈值（720 / 600 / 480 / 400px）和 `models.css` 里思考按钮的档位是按中文字宽估的，要用英文重新量（"Effort: Unavailable"、"Extra high ▾"、"Ask each time"、"Allow all"、"Context 100%"；最窄是分屏每栏 280px、中栏 300px），并改那段注释。按 Segoe UI 12px 量，280px 一栏里 "Ask each time" + "High" 已经超出约 15px，所以 400px 以下权限按钮只显示盾牌图标（"Allow all" 保留警告色），模式名放进读屏名 "Permission mode: <模式>"（悬停说明不带模式名，是 "Set the permission mode for this session"）；按钮上的模式名包在 `.permission-text` 里，窄栏时由 `chat.css` 藏起。实际改成的阈值：760px 以下权限按钮去掉图标（`models.css` 里模型按钮 120px 的上限仍在 720px）；660px 以下不显示项目名和 ›（分屏 690px 起，`split.css`）；600px 以下内边距收小、菜单贴右；500px 以下不显示上下文用量；400px 以下权限按钮只显示盾牌。思考按钮的档位（`models.css` 720 / 600 / 400px）不变。工具卡的标题至少留 56px，徽标放不下时截断加省略号。
 - 侧栏宽度：侧栏最窄 180px（`state/layout.ts` LIMITS）时，"Needs approval" 只给会话名留约 4px，"New session Ctrl+N" 会折行。侧栏做成 size container，窄于 220px（`@container (max-width: 219px)`；1024–1150px 宽窗口的默认宽度 220px 时仍显示文字，会话名留约 44px）会话行只显示状态圆点（状态文字 `.session-status-text` 用 clip 藏起，仍在读屏名里；title 在状态圆点上，不在会话行上），并隐藏 `.nav-hint`。
-- 其他宽度：设置页左侧导航 180px 改成 200px（"Connections and models" 不折行）；设置页 760px 以下连接表单的标签放到输入框上面（已保存的 key 的提示 "Saved and encrypted · Re-enter it if you change the base URL" 约 350px，在 96px 标签列旁放不下；分节导航仍到 620px 才横排）；Customize 页 MCP 表单的标签列 84px 改成 132px（"Environment variables"、"Server config (JSON)" 不折行）；工具卡状态 `max-width: max(60%, 140px)`（"Waiting for your approval"、"Denied · You pressed Stop" 在分屏 280px 一栏里不截断）；会话右键菜单 `width: max-content`（"Attach as context" + "This is the current session" 约 280px，右边放不下时由 `SessionMenu` 往左挪，不被挤得折行）；会话菜单的项目名和不可用原因（`.menu-hint`）之间留 16px。
+- 其他宽度：设置页左侧导航 180px 改成 200px（"Connections and models" 不折行）；设置页 760px 以下连接表单的标签放到输入框上面（已保存的 key 的提示 "Saved and encrypted · Re-enter it if you change the base URL" 约 350px，在 96px 标签列旁放不下；分节导航仍到 620px 才横排）（v1 已删掉连接表单和这句提示，分节名改为 "Models"）；Customize 页 MCP 表单的标签列 84px 改成 132px（"Environment variables"、"Server config (JSON)" 不折行）；工具卡状态 `max-width: max(60%, 140px)`（"Waiting for your approval"、"Denied · You pressed Stop" 在分屏 280px 一栏里不截断）；会话右键菜单 `width: max-content`（"Attach as context" + "This is the current session" 约 280px，右边放不下时由 `SessionMenu` 往左挪，不被挤得折行）；会话菜单的项目名和不可用原因（`.menu-hint`）之间留 16px。
 - 其他写出固定格式或界面文字的文档要跟着改（说明文字仍用中文；改成本文 "Mori 写出的文字的完整格式" 里的英文，或直接指向这一节）：
   - 引用和会话引用：`defaults.md:42`（引用块开头）、`:49`（字数含 "Turn N" 标题）、`:50`（"Turn N"、"User:"、"Assistant:"、"[Tool]"、"[Quote]"）、`:51`（"约 X 字" 改成 "~N characters"）；`screens/selection.md:61`；`screens/session-refs.md:19-51`、`:28`（"~N characters"）、`:65`（芯片 "Context · <会话名> · turns 3–8 · ~3,200 characters"）、`:80`（预览顶部的轮次范围和字数）。
   - F8 报告：`screens/f8.md:20`、`:42-48`（报告标题、各节、截图行、"Couldn’t capture a screenshot: …"、"(left blank)"）。

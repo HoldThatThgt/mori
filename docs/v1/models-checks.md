@@ -181,6 +181,63 @@ v1 合并进 `app-v0`（`6a57fd4`）后还有四处界面文字与术语表 [v0/
 没改的：v0 连接表单的状态表 [v0/screens/connection.md](../v0/screens/connection.md)（v1 已删掉那个表单）仍写“Loading connections…”；
 术语表里 v0 设置页的几行（“Connections and models”“Add connection”等）还没按 v1 的 Settings → Models 改，留作后续。
 
+### 后续：术语表的设置页与 v0 连接表单的状态表（2026-10-21，分支 `v1-glossary-settings`）
+
+上面留作后续的两项。分支 `v1-glossary-settings` 基于 `app-v0` 的 `2e67197`，只改文档，不改代码和界面文字。
+文字都照代码抄（`components/settings/*.tsx`、`SettingsPage.tsx`、`FirstRunForm.tsx`、`ModelMenu.tsx`、`ThinkingMenu.tsx`、
+`BlockedCard.tsx`、`UnavailableCard.tsx`、`App.tsx`，`state/settings.ts`、`state/actionLog.ts`、`state/actions.ts`、`state/model.ts`，
+`shared/models.ts` 的 `API_TYPE_LABELS`、`COMPAT_LABELS`、`COMPAT_HINTS`、`REASON_TEXTS`，`kernel/modelConfig.ts` 的连带改动），
+再与 [screens/](screens/) 的四张状态表对过。
+
+改了什么（[v0/ui-strings.md](../v0/ui-strings.md)）：
+
+1. 术语表：去掉“连接 / 连接与模型”一行；加 v1 的提供商、key、分组、选择范围、网络区域、项目授权、验证（探针）七行；
+   “默认”改为 Defaults 一节和下拉里的“None”（v1 没有“Set as default”和模型行上的“Default”）；“模型”改为“Models”
+   （设置页的分节、提供商卡里的一块、范围菜单和 Defaults 下拉的一节），注明 v0 顶栏的“Model: <id>”不再有；
+   “设置”去掉“Go to settings”，注明打开 Settings → Models 的按钮叫“Open settings”（范围菜单里是“Manage models”）；
+   “测试连接”注明“Test connection”和“Test”各用在哪里。
+2. 按屏的固定说法：新加“首次启动”一节（读取中与读取失败、“Connect a model”和说明、迁移失败、字段和两种占位文字、
+   选了 Public 的说明、按钮、探针状态、测试成功后的“Open folder…”）；“设置”一节按 v1 的 设置 → Models 重写：
+   页头和分节、迁移说明、区域未确认、Defaults、Providers、提供商表单、接口类型、兼容选项（六个标签和各自的说明）、
+   Keys、模型行、档案摘要、模型表单、Groups、Project access、确认框、字段错误、测试结果、保存方式、范围菜单。
+   去掉了 v0 的“Connections and models”“Add connection”“Edit connection · <name>”“Set as default”、key 的四种提示
+   （“Kept encrypted on this computer after you save”等）、“Saved, but the configuration has an error: …”、
+   模型行的“Default effort: High”“Doesn’t support thinking”、模型菜单的“Model: <id>”“<id> (deleted)”
+   “No models available”“… the default model from Settings.”。思考强度菜单一行与代码一致，没改。
+   “会话”一节：首次启动一行改为指向新的一节（v1 没有 v0 测试成功后的标题“Connected”）；错误卡去掉“Go to settings”；
+   加“模型层的卡片”（No model available 卡、拒绝启动卡的文字和按钮）与“候选的原因”（`REASON_TEXTS` 的每一种原因）两行。
+3. 操作记录：按 `actionLog.ts`（加上 `settings.ts` 的“Open Settings → Models”、`actions.ts` 的“Open settings”）现在写的重写，
+   原来的“设置”一行拆成“设置”“首次启动、设置 → Models”“测试连接”“顶栏”四行。v0 的“Save connection”
+   “Set default model: …”“Switch model for this session: …”不再有，现在是“Save first-run provider …”“Add provider …”
+   “Set defaults … · …”“Set model range …”等；“Test connection”后面带 `<provider>/<id>`；删除确认框先算连带改动的那次不记。
+   “其他”一行去掉“Go to settings”和“Open settings”（后者移到“设置”一行）。
+4. “实现时要一起改的地方”是 english-ui 当时的清单，没有重写，只在提到 `ConnectionForm.tsx`、`ModelForm.tsx` 和
+   连接表单宽度的两处注明 v1 已删掉它们。
+
+[v0/screens/connection.md](../v0/screens/connection.md)：开头原来已有一句 v1 说明（只指向 first-run.md），改为写明 v1 已取代本文、
+连接表单已删除、“Loading connections…”等文字界面上已经没有，指向 [screens/first-run.md](screens/first-run.md) 与
+[screens/models-settings.md](screens/models-settings.md)；“读取中”“读取失败”两行加了 v1 的文字。没有删掉这个文件：
+first-run.md 还沿用它的“首次启动之后：打开文件夹”一节，说明里也写了只有这一节仍然有效。
+
+只改文档，没有跑测试。
+
+我替你定的（走查时都可以改）：
+
+1. 新加的七个术语，“Claude 桌面版的用词”一栏写“—”：这些说法是规格 §9.1 定的，这次没有逐个去 Claude 里找对应。
+2. 首次启动的文字单独成一节，放在“设置”前面，不再放在“会话”一节里。
+3. 确认框里后台进程写的连带改动各行，术语表只指向 models-settings.md“确认框的文字”，不抄第二份。
+4. connection.md 加说明、不删。
+
+看到了、没改的（不在这次的范围，或要你定）：
+
+1. 换模型的一行“Switched model: A → B · rate limited”里，“ · ”后面的原因是小写，与术语表写法约定“ · 后面的片段首字母大写”
+   不同（同一份原因文字也用在“ — ”“: ”后面和重做说明里）。术语表先照代码记下，标了待你确认。
+2. 秒数前有空格：“waited 30 s for a free slot”（`REASON_TEXTS.queue_timeout`），“No response within 120 s”
+   （`kernel/config.ts:122`、`kernel/probes.ts:292`）；术语表说毫秒和秒都不加空格（120ms、5s）。
+3. 别处还写着 v0 的说法：`app/README.md:113`（设置页的“Connections and models”）、[v0/screens/f8.md](../v0/screens/f8.md)
+   第 47 行（“连接表单只写“Save connection””）、[v0/screens/README.md](../v0/screens/README.md) 里 connection.md 那一行；
+   代码注释 `renderer/src/styles/settings.css:3`、`:131` 也还提到“Connections and models”和已删掉的 key 提示。
+
 ## 未验证
 
 - 内网 vLLM、SGLang、llama.cpp、Ollama：只用合成端点模拟过它们的版本接口、指标、截断和取消；真实的 429 `Retry-After`、5xx、长输入截断没有在真实端点上触发过。
