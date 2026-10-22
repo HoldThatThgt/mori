@@ -656,6 +656,8 @@
   .chat-pane > .topbar { padding: 0 10px 0 12px; gap: 4px; }
   .chat-pane > .topbar .topbar-actions { gap: 4px; }
   .chat-pane > .topbar .icon-button { width: 28px; }
+  /* 按钮间距 4px：焦点环离按钮 1px，同输入框下面一行 */
+  .chat-pane > .topbar .topbar-actions button:focus-visible { outline-offset: 1px; }
 }
 @container (max-width: 320px) {
   .chat-pane > .topbar .chat-project, .chat-pane > .topbar .breadcrumb > svg { display: none; }
@@ -679,6 +681,10 @@
 @container (max-width: 460px) {
   .composer-bottom { gap: 4px; }
   .composer-bottom :is(.permission-button, .model-button, .thinking-button) > svg { display: none; }
+  /* 间距只有 4px：焦点环离按钮 1px（全局是 2px，环的外沿正好碰到旁边的按钮、被后面的按钮盖住一截） */
+  .composer-bottom > .button:focus-visible,
+  .composer-bottom :is(.permission-button, .model-button, .thinking-button, .usage-ring):focus-visible,
+  .composer-bottom .split-button > .button:focus-visible { outline-offset: 1px; }
 }
 /* 生成中有字时"Queue"收起，只留 ▾（菜单里多出"Queue for later"），"Stop"不动；准备中只有一个按钮的"Queue"不收 */
 @container (max-width: 400px) {
