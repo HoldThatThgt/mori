@@ -25,11 +25,12 @@
 
 给 TaskBoard 留的位置（2026-10-21 与 TaskBoard 会话约定）：它的团队开关（`data-testid="team-switch"`）放在顶栏右边一组
 （`.topbar-actions`，一个容器）的第一个，在"Toggle changes"前面；后合并的一方重新算会话名能用的宽度、重调 `@container` 的档位。
+2026-10-22 TaskBoard 先合入，这边后合并，重算的结果见"TaskBoard 合入之后"。
 
 ## 改后的样子
 
 ```
-顶栏    | composer-pickers > Give split-pane titles more room with English labels    [右栏] [x] |
+顶栏    | composer-pickers > Give split-pane titles more room with English labels  [Team: Off] [右栏] [x] |
                                                                   （x 只在分屏时）
 输入框  +--------------------------------------------------------------------------------------+
         | （引用芯片）                                                                         |
@@ -52,7 +53,7 @@
 - 权限后面的第一项用 `.composer-bottom > .permission + * { margin-left: auto }` 推到右端（通常是模型，打开失败时是说明），
   删掉 `.composer-spacer`（它是 flex 项，用 `gap` 时会多出一个间距）。
 - 页面里的顺序与看到的顺序相同，都在文字框后面：从文字框 Tab 往后依次是权限 → 模型 → Effort → 圆环 → 发送组；
-  Shift+Tab 回会话树从 8 次变成 5 次。
+  Shift+Tab 回会话树从 8 次变成 5 次（TaskBoard 合入后顶栏多了协作开关，是 6 次，见"TaskBoard 合入之后"）。
 - 顶栏下的横幅（信任横幅、扩展错误）位置不变；v1 删掉了 `modelNotice`，没有可用模型时由输入框上方的拒绝启动卡说明
   （[../v1/screens/model-chat.md](../v1/screens/model-chat.md)）。
 
@@ -203,7 +204,7 @@ Effort 28px 时"Un…"、280px 最挤时"Unava…"。测试不比这些字面，
 - 各项的最窄用 `min-width`，≤ 340px 的最窄跟着内边距改；文字用 `text-overflow: ellipsis`。
 - 这一行 `min-height: 33px`。
 
-顶栏（会话名很长、项目名收到 40px 时会话名能用的宽度）：
+顶栏（会话名很长、项目名收到 40px 时会话名能用的宽度；还没有协作开关，有开关时见"TaskBoard 合入之后"）：
 
 | 会话面板 | 原来 | 改后 |
 | --- | --- | --- |
@@ -642,7 +643,8 @@ v1 的测试要改的（v1 新加或改过、读顶栏范围按钮和思考按�
 
 1. 分屏时会话名有地方（chat.md"顶栏"）：1280 宽分屏（约 510px）、1180 宽分屏（约 460px）、401px、400px、370px（800 宽分屏）、
    321px、320px、300px（800 宽右栏打开）、分屏 280px，很长的会话名要么完整显示，要么占满顶栏剩下的地方（面板 − 内边距 −
-   项目名和 › − 两个按钮 − 间距，差 2px 以内），460px 时至少 280px、280px 时至少 185px；项目名 ≤ 160px，会话名截断时项目名
+   项目名和 › − 两个按钮 − 间距，差 2px 以内），460px 时至少 280px、280px 时至少 185px（TaskBoard 合入后顶栏有协作开关，
+   改成 253px、168px）；项目名 ≤ 160px，会话名截断时项目名
    已收到 40px；≤ 400px 时两个图标按钮 28px、内边距收小；321px 时项目名还在，≤ 320px 时没有项目名和 ›。
 2. 这一行在每一档、每种状态下（空闲、准备中、准备中有字、生成中、生成中有字、拒绝启动（`no_pick`：按钮"No model range"、
    没有 Effort）、"Starting…"、后台进程退出、Restart 之后重新打开中、打开失败"Session didn’t open"）都不换行、不超出输入框
@@ -677,7 +679,7 @@ v1 的测试要改的（v1 新加或改过、读顶栏范围按钮和思考按�
    后台进程退出 → 权限菜单关、圆环详情不关；清空草稿 → "Queue"的下拉关；拒绝启动卡出现、消失 → 范围菜单不关。
 5. Tab 移出（models.md"Tab 移出时关闭"）：Tab 到菜单外面的按钮 → 关；打开范围菜单、按 F8、按 Esc → 菜单仍开着、焦点在原来那一项；
    点范围菜单底部的说明 → 不关；打开权限菜单、点"Allowed for this session:" → 不关。
-6. 键盘（models.md"键盘"、"不可用时、按钮消失时的焦点"）：Shift+Tab 5 次回会话树；从文字框 Tab 往后是权限 → 范围 → Effort → 圆环；
+6. 键盘（models.md"键盘"、"不可用时、按钮消失时的焦点"）：Shift+Tab 5 次回会话树（TaskBoard 合入后 6 次）；从文字框 Tab 往后是权限 → 范围 → Effort → 圆环；
    准备中、生成中范围按钮、Effort 仍能 Tab 到、读屏描述里是不可用的原因（范围按钮的描述是"<提供商名>, <区域>. Can’t switch models
    until the response finishes"）；拒绝启动时范围按钮可用、"Send"跳过（`disabled`）；菜单里 ↑ ↓ Enter Esc，焦点回按钮；
    菜单开着、文字框里有字时在菜单里按 Enter 只选项、不发送也不排队；菜单开着时 Alt+1 和 Ctrl+N 不起作用；按钮消失时焦点到
@@ -706,7 +708,7 @@ v1 的测试要改的（v1 新加或改过、读顶栏范围按钮和思考按�
     "Can’t switch models until the response finishes"、Effort 的是"Can’t change effort until the response finishes"。
 
 用真实模型走一遍（AGENTS.md 第 2 条，实现之后跑，断言改成新位置）：`m1-real`（用量随回复增长，读 `data-tokens`）、
-`m2-real`（权限菜单在这一行、切到"Allow all"、按钮文字变成"Allow all"并用警示色、没有图标）、`m3-real`（Shift+Tab 5 次）、
+`m2-real`（权限菜单在这一行、切到"Allow all"、按钮文字变成"Allow all"并用警示色、没有图标）、`m3-real`（Shift+Tab 5 次；TaskBoard 合入后 6 次）、
 `m6-real`（走查 1：在这一行的范围菜单里选新模型，悬停第二行是"<提供商名> · <区域>"；走查 8：在这一行换 Effort；下一条回复来自
 新模型；含一次分屏里的一栏）、`v1-models-real`（MP-27 读 `rangeButton`）。fixture 不重录：这次不改后台进程的事件和命令，回放用的
 fixture 内容不变（v1 的 `fixtures/v1/*.json` 也不重录）；这是有意跳过录制这一步，在这一步的检查记录里写明。
@@ -750,14 +752,92 @@ fixture 内容不变（v1 的 `fixtures/v1/*.json` 也不重录）；这是有�
 - 一些 12px 的字对比度不到 4.5:1，都是这次之前就有的颜色：`.composer-wait`、`.menu-hint`、菜单里被排除的项（`--color-faint`，
   3.22:1；被排除的项变淡是 v1 model-menu.md 定的）、`.pick-error`（4.02:1）、宽于 600px 时的"Stop"和"Send"（约 4.2–4.3:1）。
 
+## TaskBoard 合入之后（2026-10-22）
+
+这一步把 composer-pickers rebase 到合并了 TaskBoard 的 `app-v0`（`046a9ca`）上。按上面"给 TaskBoard 留的位置"，协作开关
+（`TeamSwitch.tsx`，`data-testid="team-switch"`，`role="switch"`）是顶栏右边一组（`.topbar-actions`）的第一个，在
+"Toggle changes"前面；顶栏从左到右是"项目名 › 会话名"、协作开关、右栏开关、分屏时的"Close pane"。
+
+合并时按两边的意思合的（不是选一边）：
+
+- 协作模式下锁定的模型按钮（`pickLocked`，平行 Agent 规格 §12.11）跟着模型按钮到这一行：`ModelMenu` 在锁定时画只显示模型 id、
+  不能打开菜单的按钮（`LockedModelButton`），否则画范围按钮和菜单（`RangeMenu`）。
+- Stop team（§11.4、§13.6）进了发送组：在"Stop"或"Send"前面，是这一行的直接子项，用发送组的 `RowButton`
+  （≤ 600px 只有图标、读屏名"Stop team"，按钮消失时焦点回到文字框）；`data-testid="stop-team"` 不变。
+- 被拒绝启动时 `/team on`、`/team off` 仍能发（发送组的"不可用"排除它们）；排队区的待判断消息、权限菜单的协作模式说明照 TaskBoard。
+- 文档里 TaskBoard 加的"（协作模式：……）"注都留在新位置（chat.md 顶栏一行改成协作开关一项，模型一项的注挪到这一行的表里）。
+
+### 顶栏的宽度（在 App 里量的）
+
+开关的宽：`Team: Off` 66.3px、`Team: On` 65.6px、`Team: Until done` 105.1px、只有状态点 19px（12px Segoe UI）；
+和右栏开关之间 8px（≤ 400px 时 4px）。会话名很长、项目名收到 40px 时会话名能用的宽度（`m5-app` 量到的与下面的估算一致）：
+
+| 会话面板 | 没有开关（上面"宽度估算"） | 有开关 |
+| --- | --- | --- |
+| 930px 单栏 | 约 770px | 约 665px（完整文字） |
+| 601px 分屏 | 约 425px | 约 315px（完整文字） |
+| 510px 分屏（1280 宽） | 约 335px | 307px（状态点） |
+| 460px 分屏 | 约 285px | 258px |
+| 401px 分屏 | 约 225px | 199px |
+| 400px 分屏 | 约 245px | 224px（≤ 400px 内边距、间距和图标按钮收小） |
+| 370px 分屏（800 宽） | 约 215px | 193px |
+| 321px 分屏 | 约 170px | 145px |
+| 320px 分屏 | 约 235px | 213px（不显示项目名） |
+| 300px 单栏（800 宽、右栏打开） | 约 245px | 223px（不显示项目名） |
+| 280px 分屏 | 约 190px | 173px（不显示项目名） |
+
+窄栏的阈值从 860px 降到 600px（`team.css`）：宽于 600px 时最宽的"Team: Until done"也给会话名留下约 315px 以上，和 1280 宽
+分屏里只有状态点时（307px）差不多；再窄时开关先只剩状态点，不再挤会话名。600px 也是这一行发送组只剩图标的一档，两处一起变。
+TaskBoard 为挤下状态点加的两处收紧去掉了：面包屑至少 105px（顶栏不再有模型按钮可以让位）、分屏 ≤ 600px 按钮间距 6px /
+图标按钮 28px 和 ≤ 400px 间距 2px / 图标按钮 24px（与 chat.css ≤ 400px 时 28px 的图标按钮冲突，现在也放得下）。
+
+### Tab 停靠点
+
+从新会话的文字框 Shift+Tab 回会话树：M6 是 8 次，TaskBoard 加了协作开关是 9 次，这一步之后是 6 次——右栏开关 → 协作开关 →
+左栏分隔线 → 左栏底部的两个按钮 → 会话行（权限、范围、Effort、圆环在文字框后面，不在这条路上）。开关在会话打开中、后台进程
+没接上时是 `disabled`、不在 Tab 路径上；测试里的 `ctrlN` 等会话打开好才返回，所以次数是确定的。从文字框往后 Tab 不变
+（权限 → 范围 → Effort → 圆环 → 发送组；协作模式下发送组前多一个 Stop team）。
+
+### 测试改的
+
+- `m3-app`（走查 2）：`presses === 6`，路径第一步"Toggle changes"、第二步 `team-switch`、第三步分隔线。
+- `m3-real`（走查 2）：不超过 6 次，第一步"Toggle changes"、第二步"Team: …"。
+- `m6-app-slash`（`shiftTabPath`）：`presses === 6`，第一步"Toggle changes"、第二步 `team-switch`；文件头和说明跟着改。
+- `m6-helpers` `topProblems`：顶栏按钮是协作开关、"Toggle changes"（分屏时再加"Close pane"）；开关宽于 600px 时是完整文字、
+  没有状态点，≤ 600px 时只有状态点（≤ 20px）；28px 的检查只看图标按钮；460px 时会话名至少 253px、280px 时至少 168px
+  （量到 258、173px，原来是 280、185px）。
+- `m5-app`（`titleRoomCheck`）：同样的下限（460px 253px、280px 168px、279px 167px），记录里加上量到的会话名宽度。
+- `tb-app-roles` TB-53：把这一栏调到 601px 和 600px（右栏打开）比阈值两边：601px 完整文字、600px 只有状态点；`tb-replay`
+  TB-53 的阈值改成 600px。
+- 记录说明里"顶栏只有会话名和右栏开关"的地方加上协作开关（`m6-app-slash`、`m6-app-bands`）。
+
+### 按推荐定的（负责人以后看）
+
+1. 窄栏阈值 600px、窄时只有状态点（TaskBoard 的样子）。没选：规格原稿的"Team ●"（约 55px，窄栏会话名再少约 36px）；
+   不设阈值、任何宽度都是完整文字（280px 一栏会话名只剩约 90px）。
+2. Stop team 作为发送组里的一项、≤ 600px 只有图标。没选：保持带字的按钮（≤ 600px 时这一行更挤，400px 以下放不下）。
+3. 锁定的模型按钮放在这一行原来模型按钮的位置、用同样的截短规则。
+
+### 还没处理的
+
+- 分屏 280–295px 一栏、生成中、输入框有字、后台有 Agent（有 Stop team）时这一行放不下：权限、范围、Effort 已到最窄
+  （40 / 36 / 36px），Stop team 多出 28px 加一个间距，按估算超出约 16px。宽于约 296px 时放得下。没有改，等你定
+  （例如这时收起 Stop team 的位置、或放进"Stop"旁的菜单）；这种情况没有测试走到。
+- 分屏时用鼠标点另一栏的协作开关：右栏开关为了"按下时右栏跟着换、两栏变宽、松开时点空"在按完才切焦点（`ChatPane.tsx`
+  `usePaneFocus`，split.md"右栏开关"），协作开关也在同一组、会被同样挤动，但这一步没有给它加同样的处理，也没有测过；
+  两栏的右栏状态不同时可能要点两次。
+
 ## 没有验证的
 
 - 所有宽度都是按字形宽度和现在的 CSS 算的，没有在 App 里量；实现后按实测调阈值，可能比上表差几 px。
+  （顶栏有协作开关时的会话名宽度是 2026-10-22 在 App 里量的，见"TaskBoard 合入之后"。）
 - `flex-shrink` 相邻差 1e5 以上能排出截短先后、差 1000 不行，是审查时在 Edge 的草稿页里试的，不是在 App 里。
 - Claude 桌面版的样子来自它的文档、字串表和本机安装包里的代码（设计审查时读的），没有打开 Claude 对照截图。
 - "pi 在还没有消息时给 0"是读 pi 1.3.0 的 `getContextUsage()` 得出的，没有在真实会话里记一次。
 
 ## 待你决定
+
+- "TaskBoard 合入之后"的"按推荐定的"3 条和"还没处理的"一条（分屏 280–295px 时这一行放不下 Stop team）。
 
 - "v1 之后的调整"最后一节"按推荐定的"16 条（范围按钮的上限、三行悬停、准备中的"Queue"、切换失败往上浮出、文档分工、
   规格里的"顶栏"等）。

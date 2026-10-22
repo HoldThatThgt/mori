@@ -668,7 +668,8 @@ async function item2(ctx) {
   const rowStop = (label) => /^(Permission mode|Model range|Effort|Usage): /.test(label) || label === 'Context window';
   record('2 从新会话的输入框 Shift+Tab 几次（不超过 6 次，先到顶栏的右栏开关和协作开关，再经过左栏底部的按钮）回到会话树'
     + '（sessions.md 走查 2 的路径），不经过输入框下面一行的按钮', path.length <= 6 && path[0] === 'Toggle changes'
-    && /^Team: /.test(path[1]) && !path.some(rowStop) && focused.row === row.id, `按了 ${path.length} 次：${path.join(' → ')}`);
+    && /^Team: /.test(path[1]) && !path.some(rowStop) && focused.row === row.id,
+  `按了 ${path.length} 次：${path.join(' → ')}`);
   if (focused.row !== row.id) await rowOf(page, row.file).focus();
   await renameByKeyboard(ctx, row);
 }

@@ -786,7 +786,8 @@ const kindsMatch = (kinds, state) => kinds === KINDS[state]
 
 /**
  * @brief 每一栏顶栏此刻的样子（在页面里执行）：宽度、左边、是不是分屏、内边距、项目名的宽度（不显示时 0）、›、会话名（宽度、
- *        全宽、文字）、顶栏上的按钮（读屏名称、宽度）、顶栏里有没有这一行的按钮（不该有）、溢出、裁切，和会话名还能变宽多少
+ *        全宽、文字）、顶栏上的按钮（读屏名称、宽度）、协作开关（宽度、文字和状态点看不看得见）、顶栏里有没有这一行的按钮
+ *        （不该有）、溢出、裁切，和会话名还能变宽多少
  *        （slack：会话名右边到面包屑右边、面包屑到按钮组的距离减去顶栏的 gap、按钮组右边到顶栏内边距，三段相加）。
  */
 export function topFacts(panes) {
@@ -800,6 +801,7 @@ export function topFacts(panes) {
     const crumb = bar.querySelector('.breadcrumb');
     const actions = bar.querySelector('.topbar-actions');
     const title = bar.querySelector('[data-testid="session-title"]');
+    const team = bar.querySelector('[data-testid="team-switch"]');
     const slack = (right(crumb) - right(title)) + (actions.getBoundingClientRect().left - right(crumb)
       - (parseFloat(style.columnGap) || 0)) + (box.right - parseFloat(style.paddingRight) - right(actions));
     const clipped = [...bar.querySelectorAll('.breadcrumb > *, .topbar-actions > *')].filter(visible).filter((el) => {
@@ -812,7 +814,9 @@ export function topFacts(panes) {
       title: width(title), titleFull: title.scrollWidth, titleText: title.textContent, slack, clipped,
       overflow: [bar, crumb, actions].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.className),
       buttons: [...actions.querySelectorAll('button')].filter(visible)
-        .map((el) => ({ name: el.getAttribute('aria-label'), width: width(el) })),
+        .map((el) => ({ name: el.getAttribute('aria-label'), width: width(el), team: el === team })),
+      team: team && { width: width(team), text: visible(team.querySelector('.team-text')),
+        dot: visible(team.querySelector('.team-dot')) },
       pickers: ['model-button', 'thinking-button', 'permission-button', 'usage']
         .filter((id) => bar.querySelector(`[data-testid="${id}"]`)) };
   });
@@ -938,19 +942,31 @@ export const layoutBrief = (report) => JSON.stringify({ window: report.window, s
     width: at1(pane.width), items: pane.frame.items.map((item) => `${item.kind}:${at1(item.width)}`).join(' '),
     title: `${at1(pane.top.title)}/${pane.top.titleFull}`, project: at1(pane.top.project) })) });
 
+/** 协作开关的读屏名称（docs/v1/screens/team-switch.md） */
+const TEAM_NAME = /^Team: (Off|On|Until done)$/;
+
 /**
- * @brief 一栏顶栏不符合 chat.md"顶栏"的地方（空数组为符合）：只有"项目名 › 会话名"、右栏开关和分屏时的"Close pane"，
- *        没有范围、Effort、权限按钮和圆环；≤ 400px 时两个图标按钮 28px；> 320px 时有项目名（最长 160px）和 ›，≤ 320px 时
- *        没有；会话名截断时项目名已收到 40px、会话名占满剩下的地方（差 2px 以内）；460px 时会话名至少 280px、280px 时至少
- *        185px；不溢出、不裁切。
+ * @brief 一栏顶栏不符合 chat.md"顶栏"的地方（空数组为符合）：只有"项目名 › 会话名"、协作开关、右栏开关和分屏时的
+ *        "Close pane"，没有范围、Effort、权限按钮和圆环；协作开关宽于 600px 时是完整文字、没有状态点，≤ 600px 时只有
+ *        状态点（team-switch.md"窄栏"）；≤ 400px 时两个图标按钮 28px；> 320px 时有项目名（最长 160px）和 ›，≤ 320px 时
+ *        没有；会话名截断时项目名已收到 40px、会话名占满剩下的地方（差 2px 以内）；460px 时会话名至少 253px、280px 时
+ *        至少 168px（只有状态点时算出的 258px、173px 留 5px）；不溢出、不裁切。
  */
 export function topProblems({ top }) {
   const problems = [];
-  const names = top.buttons.map((button) => button.name).join();
-  if (names !== (top.split ? 'Toggle changes,Close pane' : 'Toggle changes')) problems.push(`top buttons ${names}`);
+  const [team, ...icons] = top.buttons;
+  const names = icons.map((button) => button.name).join();
+  const iconNames = top.split ? 'Toggle changes,Close pane' : 'Toggle changes';
+  if (!team?.team || !TEAM_NAME.test(team.name) || names !== iconNames) {
+    problems.push(`top buttons ${top.buttons.map((button) => button.name).join()}`);
+  }
+  const narrow = top.width <= 600;
+  if (!top.team || top.team.text === narrow || top.team.dot !== narrow || (narrow && top.team.width > 20)) {
+    problems.push(`team switch ${JSON.stringify(top.team)}`);
+  }
   if (top.pickers.length) problems.push(`top bar still has ${top.pickers.join()}`);
-  if (top.width <= 400 && top.buttons.some((button) => Math.abs(button.width - 28) > 0.5)) {
-    problems.push(`icon buttons ${top.buttons.map((button) => at1(button.width)).join('/')}px`);
+  if (top.width <= 400 && icons.some((button) => Math.abs(button.width - 28) > 0.5)) {
+    problems.push(`icon buttons ${icons.map((button) => at1(button.width)).join('/')}px`);
   }
   if (top.width > 320 ? top.project === 0 || !top.chevron : top.project > 0 || top.chevron) {
     problems.push(`project ${at1(top.project)}px, chevron ${top.chevron}`);
@@ -959,8 +975,8 @@ export function topProblems({ top }) {
   const cut = top.titleFull > top.title + 1;
   if (cut && top.project > 40.5) problems.push(`title cut while the project is ${at1(top.project)}px`);
   if (cut && Math.abs(top.slack) > 2) problems.push(`title leaves ${at1(top.slack)}px`);
-  if (cut && top.width < 281 && top.title < 185) problems.push(`title ${at1(top.title)}px at ${at1(top.width)}px`);
-  if (cut && Math.abs(top.width - 460) <= 5 && top.title < 280) problems.push(`title ${at1(top.title)}px`);
+  if (cut && top.width < 281 && top.title < 168) problems.push(`title ${at1(top.title)}px at ${at1(top.width)}px`);
+  if (cut && Math.abs(top.width - 460) <= 5 && top.title < 253) problems.push(`title ${at1(top.title)}px`);
   if (top.overflow.length || top.clipped.length) problems.push(`top overflow ${top.overflow} / ${top.clipped}`);
   return problems;
 }

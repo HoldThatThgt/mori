@@ -185,10 +185,10 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 | --- | --- | --- | --- |
 | 宽 | 会话面板宽于 680px | 权限"Ask each time ▾"；选择范围按钮（最长 200px，任何宽度都是这个上限）；"Effort: High ▾"；圆环；带文字的"Send"、"Stop"、"Queue ▾"；间距 8px | 全部 |
 | 较窄 | ≤ 680px | Effort 按钮只显示强度："High ▾"、"Unavailable ▾" | 同上 |
-| 窄 | ≤ 600px | "Send"、"Stop"、"Queue"只显示图标（"Send"是圆形的强调色按钮，"Stop"是圆形按钮，"Queue"用新图标 `queue`、连着它的 ▾），名字在读屏名里："Send"（悬停"Send (Enter)"）、"Stop"（悬停"Stop response (Esc)"）、"Queue"（悬停"Queue for later (Enter)"）、▾"More send options"。"Send"、"Stop"、"Queue"各 32px 宽，▾ 24px（原来 32px） | 同上 |
+| 窄 | ≤ 600px | "Send"、"Stop"、"Queue"（协作模式下还有 Stop team）只显示图标（"Send"是圆形的强调色按钮，"Stop"是圆形按钮，"Queue"用新图标 `queue`、连着它的 ▾），名字在读屏名里："Send"（悬停"Send (Enter)"）、"Stop"（悬停"Stop response (Esc)"）、"Queue"（悬停"Queue for later (Enter)"）、▾"More send options"。"Send"、"Stop"、"Queue"各 32px 宽，▾ 24px（原来 32px）。顶栏的协作开关在同一档只剩状态点（[chat.md](chat.md)"顶栏"） | 同上 |
 | 更窄 | ≤ 460px | 权限、范围、Effort 按钮去掉 ▾，这一行的间距收小到 4px | 同上 |
 | 很窄 | ≤ 400px | 生成中、输入框有字时，"Queue"按钮收起，只留 ▾"More send options"，它的菜单里是"Queue for later"（快捷键提示 Enter）和"Steer"（快捷键提示 Ctrl+Enter）；"Stop"留在原位。准备中有字时的"Queue"只有一个按钮（不能插话，没有 ▾），不收起（32px） | 点 ▾ 选；Enter 排队、Ctrl+Enter 插话、Esc 停止照旧 |
-| 最窄 | ≤ 340px | "Send"、"Stop"的图标按钮 28px（原来 32px），准备中的"Queue"也收到 28px；权限、范围、Effort 按钮的左右内边距 4px（原来 6px） | 同上 |
+| 最窄 | ≤ 340px | "Send"、"Stop"（和 Stop team）的图标按钮 28px（原来 32px），准备中的"Queue"也收到 28px；权限、范围、Effort 按钮的左右内边距 4px（原来 6px） | 同上 |
 | 放不下 | 这一行的内容比这一行宽（任何一档） | 依次截短，前一项到最窄才轮到下一项：① 不能发送时的说明（"Mori’s background process crashed"、"Starting…"等，最窄 48px，悬停说明和横幅里有全文）；② 选择范围按钮（最窄 40px，≤ 340px 时 36px）：先截当前模型 id（连同它前面的" · "，`.range-model`），截完了才截范围名（`.range-scope`；范围是模型时只有模型 id 一段）；③ 权限的模式名（最窄 44px，≤ 340px 时 40px）；④ Effort 的强度（最窄 40px，≤ 340px 时 36px）。截短处是省略号"…"，前面留几个字母由 Chromium 决定（量到最窄的权限是"Ask …"、"Allo…"），测试不比字面。最窄的数在 ≤ 460px（没有 ▾）时字有 28–32px；宽于 460px 时有 ▾，同样的最窄里字只剩约 8–14px（范围按钮约 8px），但最挤时也截不到那里。各项都是这一行的直接子项，`flex-shrink` 相邻差 1e5 以上（composer-pickers.md"宽度估算"）。不换行、不超出输入框；圆环、"Send" / "Stop" / ▾ 不收 | 同上 |
 
 - 截短只是样式：按钮的文字（textContent）仍是全文，读屏名也是全文（"Permission mode: Ask each time"、"Model range: fast, deepseek-chat"、
@@ -199,6 +199,9 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
   放得下常见的"<提供商名> · <模型 id>"（约 170–195px）；≤ 400px 起最挤时才截模式名；
   280px 一栏最挤时是截短的模式名（权限 40px）、范围按钮 36px、截短的强度（Effort 约 52px；准备中有字时 48px，
   旁边是 28px 的"Queue"）、圆环、▾、"Stop"，三个按钮都不窄于最窄。空闲、Effort 是"High"时，280px 也能显示完整的"Ask each time"（范围按钮约 41px）。
+- 协作模式下后台有 Agent 时这一行多一个 Stop team（宽于 600px 时约 100px，之后同"Stop"）。按上面的最窄估算，它在宽于约
+  296px 的面板里都放得下；分屏 280–295px 一栏、生成中、输入框有字、后台有 Agent 时这一行会超出约 16px（三个按钮已到最窄）。
+  这种情况还没有处理，记在 [composer-pickers.md](../composer-pickers.md)"TaskBoard 合入之后"，等负责人定。
 
 "Queue"的下拉里各项的名字只有文字（"Queue for later"、"Steer"），快捷键是旁边的 `.menu-hint`（`aria-hidden`），
 另放在 `aria-keyshortcuts`（"Enter"、"Control+Enter"）里，读屏名里没有" · "。

@@ -22,7 +22,7 @@ import { ROLES_TEXT } from '../fake-endpoint/scenarios/roles.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
 import { appRoot } from './lib.mjs';
 import { stubFolder } from './m3-helpers.mjs';
-import { openToolsSection, resizeWindow } from './m6-helpers.mjs';
+import { fitPane, openToolsSection, resizeWindow } from './m6-helpers.mjs';
 import { toolRows } from './m6-tools-helpers.mjs';
 import {
   allowAll, bridge, brief, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents,
@@ -425,31 +425,31 @@ async function switches(ctx) {
 }
 
 /**
- * @brief 窄栏（这一栏不宽于 860px，§15）：打开右栏让中栏变窄，开关只显示状态点（off 空心、always 实心），不显示文字，
- *        读屏名称与悬停仍是完整文字；关掉右栏后（宽于 860px）回到完整文字、没有状态点。
+ * @brief 窄栏（这一栏不宽于 600px，§15；composer-pickers 合入后由 860px 改为 600px）：右栏打开、把这一栏调到 601px 和
+ *        600px（阈值的两边）。601px 时完整文字、没有状态点；600px 时只显示状态点（off 空心、always 实心），不显示文字，
+ *        读屏名称与悬停仍是完整文字。之后关掉右栏、回到 1200 宽窗口。
  */
 async function narrow(ctx, tab) {
   const pane = ctx.page.locator(paneSel(tab));
   const width = () => pane.evaluate((el) => el.getBoundingClientRect().width);
+  await fitPane(ctx, 601, { right: true });
   const wide = await switchLook(ctx, tab);
   const wideWidth = await width();
-  const toggle = ctx.page.locator(`${paneSel(tab)} button[aria-label="Toggle changes"]`);
-  await toggle.click();
-  await poll(async () => (await width()) <= 860, 5000);
-  if ((await width()) > 860) await resizeWindow(ctx.app, 800, 700);
+  await fitPane(ctx, 600, { right: true });
   const narrowWidth = await width();
   const offLook = await switchLook(ctx, tab);
   await clickTo(ctx, tab, 'always');
   const onLook = await switchLook(ctx, tab);
   await clickTo(ctx, tab, 'off');
   await shot(ctx, args, 'narrow-switch');
-  record('TB-53 in a pane 860px wide or narrower the switch shows only a status dot (hollow for off, filled for on) '
-    + 'and no text, and its screen-reader name and hover keep the full text; wider panes show the full text and no '
-    + 'dot', narrowWidth <= 860 && wideWidth > 860 && wide.text && wide.shown === 'Team: Off' && !wide.dot
+  record('TB-53 in a pane 600px wide or narrower the switch shows only a status dot (hollow for off, filled for on) '
+    + 'and no text, and its screen-reader name and hover keep the full text; a 601px pane shows the full text and no '
+    + 'dot', Math.abs(narrowWidth - 600) < 0.5 && Math.abs(wideWidth - 601) < 0.5 && wide.text
+    && wide.shown === 'Team: Off' && !wide.dot
     && !offLook.text && offLook.shown === '' && offLook.dot && !offLook.filled && offLook.label === 'Team: Off'
     && offLook.title === 'Turn on team mode' && !onLook.text && onLook.shown === '' && onLook.dot && onLook.filled
     && onLook.label === 'Team: On', brief({ wideWidth, narrowWidth, wide, offLook, onLook }));
-  await toggle.click();
+  await fitPane(ctx, 930);
   await resizeWindow(ctx.app, 1200, 800);
 }
 

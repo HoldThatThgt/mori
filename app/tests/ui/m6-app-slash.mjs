@@ -831,7 +831,7 @@ function recordRunning(state, final) {
 // 布局检查共用的常量和小工具、各档的边界和拒绝启动两节在 m6-app-bands.mjs。
 
 /**
- * @brief 1280 宽单栏（右栏关，会话 A）：顶栏只有会话名和右栏开关；这一行各项都完整显示（> 680px 一档）；菜单往上打开、
+ * @brief 1280 宽单栏（右栏关，会话 A）：顶栏只有会话名、协作开关和右栏开关；这一行各项都完整显示（> 680px 一档）；菜单往上打开、
  *        在面板里；各种浮层打开时没有小于 12px 的字。
  */
 async function wideLayout(ctx) {
@@ -841,7 +841,7 @@ async function wideLayout(ctx) {
   const report = await layoutReport(page);
   const pane = report.panes[0];
   const range = await rangeLabels(page);
-  recordBars('1280 宽单栏（面板宽于 680px）：顶栏只有项目名 › 会话名和右栏开关；输入框下面一行从左到右权限（"Ask each time ▾"，'
+  recordBars('1280 宽单栏（面板宽于 680px）：顶栏只有项目名 › 会话名、协作开关和右栏开关；输入框下面一行从左到右权限（"Ask each time ▾"，'
     + '没有图标）、范围按钮（最长 200px，长模型 ID 截在 200px）、"Effort: <强度> ▾"、圆环、带文字的"Send"，间距 8px；'
     + '不溢出、不裁切，会话名完整', report, 1, pane?.width > 680 && pane.controls.model?.width >= RANGE_MAX - 1);
   record(`范围按钮在这一行里（不在顶栏）：读屏名称"${MODEL_LABEL}"；悬停第一行是按钮文字、第二行"${MODEL_TIP}"；读屏的描述`
@@ -990,7 +990,7 @@ async function splitLayout(ctx) {
   await resizeTo(ctx, 1280, 800);
   await splitOpen(page, ctx.c);
   const wide = await layoutReport(page);
-  recordBars('1280 宽分屏、右栏关（每栏约 510px，460–600px）：两栏顶栏有项目名 › 会话名、右栏开关和"Close pane"；这一行'
+  recordBars('1280 宽分屏、右栏关（每栏约 510px，460–600px）：两栏顶栏有项目名 › 会话名、协作开关（只有状态点）、右栏开关和"Close pane"；这一行'
     + '"Send"只有图标，Effort 只显示强度，三个按钮带 ▾；不溢出、不裁切', wide, 2,
   wide.panes.every((pane) => pane.width > 460 && pane.width <= 600));
   await shot(page, 'layout-1280-split');
@@ -1012,7 +1012,7 @@ async function splitLayout(ctx) {
 
 /**
  * @brief 接着 splitLayout：1200 宽分屏、右栏开（两栏的会话都打开右栏），两栏各 280px（最窄，右边那一栏 .chat-pane 279px）：
- *        顶栏不显示项目名，会话名至少 185px（名字更短时完整）；这一行三个按钮和圆环都在，菜单在栏里。
+ *        顶栏不显示项目名，会话名至少 168px（名字更短时完整）；这一行三个按钮和圆环都在，菜单在栏里。
  */
 async function splitRight(ctx) {
   const { page } = ctx;

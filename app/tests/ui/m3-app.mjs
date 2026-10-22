@@ -337,9 +337,9 @@ async function keyboardPath(ctx) {
     samePath(entered.focus.file, ctx.files.K) && entered.presses === 6,
     `按了 ${entered.presses} 次：${entered.path.join(' → ')}；焦点：${JSON.stringify(entered.focus)}`);
   record('走查 2：Shift+Tab 的路径是顶栏的右栏开关 → 协作开关 → 左栏分隔线 → 左栏底部的两个按钮 → 会话行（sessions.md'
-    + ' 写的路径，加上协作开关），不经过输入框下面一行的权限、选择范围、Effort 按钮和圆环', entered.path[0] === 'Toggle changes'
-    && entered.testids[1] === 'team-switch' && entered.roles[2] === 'separator' && entered.inRow.every((inside) => !inside)
-    && !entered.testids.some((id) => ROW_TAB_ORDER.includes(id)),
+    + ' 写的路径，加上协作开关），不经过输入框下面一行的权限、选择范围、Effort 按钮和圆环',
+  entered.path[0] === 'Toggle changes' && entered.testids[1] === 'team-switch' && entered.roles[2] === 'separator'
+    && entered.inRow.every((inside) => !inside) && !entered.testids.some((id) => ROW_TAB_ORDER.includes(id)),
   `路径：${entered.path.join(' → ')}；data-testid：${entered.testids.map((id) => id ?? '—').join(' → ')}`);
   const stops = (await allRows(page)).filter((row) => row.tabIndex === 0);
   await page.keyboard.press('Tab');

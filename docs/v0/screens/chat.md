@@ -8,27 +8,28 @@
 
 2026-10-21 起顶栏只有会话名（"项目名 › 会话名"）和这一栏的按钮；模型、思考强度（Effort）、权限和上下文用量移到
 输入框下面一行（见下"输入框下面一行"，方案第 11 节 2026-10-21 的决定），让分屏时的会话名有地方显示（原来 460px 的一栏里只剩约 2 个字母）。
+右边一组从左到右是协作开关（TaskBoard，2026-10-22 合入）、右栏开关、分屏时的"Close pane"。
 
 | 项 | 来源 | 必须可见 |
 | --- | --- | --- |
 | 会话名 | 会话名（pi 的 `session_info`：`session.create` / `session.open` 返回的 `name`、`session_info_changed`，M3 起）；没有名字时第一条用户消息（pi 的 `message_start`，role=user）前 20 个字；都没有时"New session"。规则与侧栏会话行相同（[sessions.md](sessions.md)），会话面板的读屏名称和 F8 报告里的"Current session"也用它 | 省略号截断，不换行；放不下时先收短项目名（见下表） |
 | 项目名 | 会话的工作目录（`session.create` / `session.open` 的返回值）末级文件夹名；悬停显示完整路径 | 最长 160px，省略号截断 |
-| 协作开关（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.1） | `SessionInfo.team`、`mori.team_state` | 右边一组的第一个，在右栏开关之前：`Team: Off` / `Team: On` / `Team: Until done`；窄栏只显示状态点；见 ../../v1/screens/team-switch.md |
+| 协作开关（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.1） | `SessionInfo.team`、`mori.team_state` | 右边一组的第一个，在右栏开关之前：`Team: Off` / `Team: On` / `Team: Until done`（最宽约 105px）；会话面板 ≤ 600px 时只显示状态点（约 19px），读屏名和悬停仍是完整文字；会话还在打开、后台进程没接上时不可用（不在 Tab 路径上）；见 ../../v1/screens/team-switch.md |
 | 右栏开关 | 你的操作 | 图标按钮，按下状态表示右栏是否打开；读屏名"Toggle changes"，悬停"This session’s changes" |
 | 关闭这一栏（M5） | 只在分屏时 | 图标按钮 ×，读屏名"Close pane"，悬停"Close pane (doesn’t stop the response)"（[split.md](split.md)） |
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 一般 | 会话面板宽于 400px | "项目名 › 会话名"、协作开关、右栏开关，分屏时"Close pane"；会话名放不下时项目名先收短（最窄 40px），之后才截会话名 | 点、右键、拖会话名（M3、M5）；切换协作模式；开关右栏；关闭这一栏 |
+| 一般 | 会话面板宽于 600px | "项目名 › 会话名"、完整文字的协作开关、右栏开关，分屏时"Close pane"；会话名放不下时项目名先收短（最窄 40px），之后才截会话名 | 点、右键、拖会话名（M3、M5）；切换协作模式；开关右栏；关闭这一栏 |
+| 较窄 | ≤ 600px | 协作开关只显示状态点；其余同上 | 同上 |
 | 窄 | ≤ 400px | 顶栏的内边距和间距收小，两个图标按钮 28px 宽 | 同上 |
 | 很窄 | ≤ 320px | 不显示项目名和 ›，只有会话名 | 同上 |
 
-会话名能用的宽度（会话名很长、项目名收到 40px 时估算）：单栏 930px 约 770px；分屏 510px（1280 宽窗口）约 335px、
-460px 约 285px、370px（800 宽窗口）约 215px、280px 约 190px；800 宽窗口右栏打开时中栏 300px 约 245px。
-改名框（M3）在同一位置，至少 120px。
-
-TaskBoard 的团队开关（另一分支，还没合并）预留在右边一组（`.topbar-actions`）的第一个、"Toggle changes"前面；
-后合并的一方重新算上面会话名的宽度、重调顶栏的档位（[../composer-pickers.md](../composer-pickers.md)）。
+会话名能用的宽度（会话名很长、项目名收到 40px、协作开关是最宽的"Team: Until done"时估算）：单栏 930px 约 665px；
+分屏 601px 约 315px（还是完整文字的开关）；分屏 510px（1280 宽窗口）约 310px、460px 约 260px、370px（800 宽窗口）约 195px、
+280px 约 175px；800 宽窗口右栏打开时中栏 300px 约 225px（后几种开关只有状态点）。600px 的档位就是按这个定的：
+宽于 600px 时完整文字的开关也给会话名留下约 310px 以上，和 1280 宽分屏里只有状态点时差不多
+（[../composer-pickers.md](../composer-pickers.md)"TaskBoard 合入之后"）。改名框（M3）在同一位置，至少 120px。
 
 M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用量见 [models.md](models.md)；输入框的"/"补全见 [slash.md](slash.md)。
 
@@ -88,7 +89,7 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 选择范围（v1） | `ModelState`（`pick`、`current`）、`session.pickOptions` | 右边一组的第一项；"<范围名> · <当前模型 id>"（范围是模型时只有 id，没有范围时"No model range"）；不能启动时的说明在输入框上方的拒绝启动卡里（[../../v1/screens/model-chat.md](../../v1/screens/model-chat.md)）；见 [models.md](models.md)（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 为真时只显示正在用的模型、不能打开菜单，悬停 `Team mode picks the model for each agent`，见 ../../v1/screens/team-blocked.md） |
 | 思考强度（M6） | 见 [models.md](models.md) | 紧挨在选择范围右边；"Effort: High ▾"；当前模型没标支持思考时"Effort: Unavailable ▾"；没有当前模型时不显示 |
 | 上下文用量 | `session.state` → pi `getContextUsage()`；在打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新 | Effort 右边的小圆环，点开看详情；各状态的悬停说明和读屏名见 [models.md](models.md)"上下文用量（圆环）" |
-| 发送、停止、排队 | 下表 | 在右端，同一位置；会话面板 ≤ 600px 时只显示图标（[models.md](models.md)"窄栏"） |
+| 发送、停止、排队 | 下表 | 在右端，同一位置；会话面板 ≤ 600px 时只显示图标（[models.md](models.md)"窄栏"）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4、§13.6：`Stop team` 是这一行的又一项，在"Stop"或"Send"前面，同一档也只显示图标，读屏名"Stop team"） |
 
 这一行不换行，任何宽度都不超出输入框，圆环任何宽度都在；变窄时先去掉"Effort: "前缀、发送按钮的文字、▾，再收起"Queue"，
 最后依次截短不能发送时的说明、选择范围按钮（先截模型 id，再截范围名）、模式名和 Effort 的强度，见 [models.md](models.md)"窄栏"。

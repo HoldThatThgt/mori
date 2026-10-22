@@ -886,7 +886,8 @@ async function headingFit(ctx) {
  * @brief 顶栏里会话名的地方（chat.md"顶栏"；composer-pickers.md"测试要改的地方"新加的检查第 1 条）：很长的会话名（headingFit
  *        改过名的 ctx.long）在右栏；1280 宽窗口分屏各一半（约 500px）、460 / 401 / 400 / 321 / 320 / 280px、右边一栏最窄
  *        279px（.pane-slot 280px）、800×600 分屏（约 370px），以及 800 宽窗口右栏打开时的单栏（300px）：会话名要么完整、
- *        要么占满剩下的地方（项目名先收到 40px）；460px 时至少 280px、280px 时至少 185px、279px 时至少 184px；
+ *        要么占满剩下的地方（项目名先收到 40px）；460px 时至少 253px、280px 时至少 168px、279px 时至少 167px（顶栏有
+ *        协作开关，≤ 600px 时只有状态点，算出的是 258、173、172px，留 5px）；
  *        ≤ 400px 时两个图标按钮 28px、内边距比宽时小；≤ 320px 不显示项目名和 ›。
  *        要用 longSource、headingFit 建和改名的会话，用 --only 时要一起选。
  */
@@ -904,11 +905,12 @@ async function titleRoomCheck(ctx) {
   const rooms = [];
   const measure = async (minimum = 0) => {
     const room = await titleRoom(page, 'right');
-    rooms.push({ pane: room?.pane, problems: titleProblems(room, minimum), padding: room?.padding });
+    rooms.push({ pane: room?.pane, problems: titleProblems(room, minimum), padding: room?.padding,
+      title: room?.title?.width });
   };
   await page.locator('[data-resize="split"]').dblclick();
   await measure();
-  for (const [width, minimum] of [[460, 280], [401, 0], [400, 0], [321, 0], [320, 0], [280, 185], [279, 184]]) {
+  for (const [width, minimum] of [[460, 253], [401, 0], [400, 0], [321, 0], [320, 0], [280, 168], [279, 167]]) {
     await setSplitWidth(page, 'right', width);
     await measure(minimum);
   }
@@ -927,16 +929,16 @@ async function titleSingle(ctx, rooms) {
   await resizeWindow(ctx, 1200, 800);
   await setPaneWidth(page, app, 300);
   const room = await titleRoom(page, 'single');
-  rooms.push({ pane: room?.pane, problems: titleProblems(room), padding: room?.padding });
+  rooms.push({ pane: room?.pane, problems: titleProblems(room), padding: room?.padding, title: room?.title?.width });
   await setPaneWidth(page, app, 930);
   const bad = rooms.filter((item) => item.problems.length);
   const wide = rooms.find((item) => item.pane > 400 && item.pane < 410);
   const narrow = rooms.find((item) => item.pane <= 400 && item.pane > 390);
-  record('顶栏：分屏和窄的单栏里很长的会话名要么完整、要么占满剩下的地方（项目名先收到 40px），460px 时至少 280px、'
-    + '280px 时至少 185px、279px 时至少 184px；≤ 400px 时两个图标按钮 28px、内边距变小；≤ 320px 不显示项目名和 ›',
+  record('顶栏：分屏和窄的单栏里很长的会话名要么完整、要么占满剩下的地方（项目名先收到 40px），460px 时至少 253px、'
+    + '280px 时至少 168px、279px 时至少 167px；≤ 400px 时两个图标按钮 28px、内边距变小；≤ 320px 不显示项目名和 ›',
   bad.length === 0 && Boolean(wide && narrow)
     && narrow.padding[0] + narrow.padding[1] < wide.padding[0] + wide.padding[1],
-  JSON.stringify(rooms.map((item) => [item.pane, item.padding?.join('/'), item.problems.join('; ')])));
+  JSON.stringify(rooms.map((item) => [item.pane, item.padding?.join('/'), item.title, item.problems.join('; ')])));
 }
 
 /** @brief 走查 5 与删除：删除 A 时它所在的一栏关闭；指向它的引用显示"Session deleted"，原文仍可查看。 */

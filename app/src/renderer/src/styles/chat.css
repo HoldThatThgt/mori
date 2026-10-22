@@ -665,11 +665,11 @@
 @container (max-width: 680px) {
   .composer-bottom .thinking-prefix { display: none; }
 }
-/* "Send"、"Stop"、"Queue"只有图标（名字在 aria-label 和悬停说明里），各 32px，▾ 24px */
+/* "Send"、"Stop"、"Queue"和 Stop team（team.css）只有图标（名字在 aria-label 和悬停说明里），各 32px，▾ 24px */
 @container (max-width: 600px) {
   .composer-bottom .send-text { display: none; }
   .composer-bottom .queue-icon { display: block; }
-  .composer-bottom :is(.send-button, .stop-button, .queue-button, .queue-main) {
+  .composer-bottom :is(.send-button, .stop-button, .stop-team-button, .queue-button, .queue-main) {
     width: 32px;
     height: 32px;
     padding: 0;
@@ -687,7 +687,7 @@
   .send-menu .queue-later { display: flex; }
 }
 @container (max-width: 340px) {
-  .composer-bottom :is(.send-button, .stop-button, .queue-button) { width: 28px; height: 28px; }
+  .composer-bottom :is(.send-button, .stop-button, .stop-team-button, .queue-button) { width: 28px; height: 28px; }
   .composer-bottom :is(.permission-button, .model-button, .thinking-button) { padding-right: 4px; padding-left: 4px; }
   .composer-bottom > .permission { min-width: 40px; }
   .composer-bottom > :is(.model-switch, .thinking-switch) { min-width: 36px; }
