@@ -1,6 +1,7 @@
 // 后台进程的启动与有序退出。后台进程放在一个作业对象里（见 job.ts）：它和它启动的所有进程（包括父进程已经不在的孤儿进程）
 // 在 Mori 退出、后台进程意外退出、Mori 被强行结束时都会被结束，关闭 Mori 后不留下任何进程。
-// 启动时把解密后的 key 交给后台进程；之后按它的请求加密保存或删除 key（credentials.ts）。
+// 启动时把 userData 的位置和解密后的 key（ref → 明文）交给后台进程；之后按它的请求按 ref 加密保存或删除 key
+// （credentials.ts）。迁移 v0 的 models.json 时，里面手写的明文 key 也经同一个请求加密保存（docs/specs/model-providers.md §4.5）。
 
 import { join } from 'node:path';
 import { app, utilityProcess, type UtilityProcess } from 'electron';
@@ -50,7 +51,7 @@ export function startKernel(onExit: KernelExitListener): UtilityProcess {
   child.once('spawn', () => {
     job = jobFor(child);
     kernelJob = job;
-    child.postMessage({ type: 'keys', keys: loadStoredKeys() });
+    child.postMessage({ type: 'start', userData: app.getPath('userData'), keys: loadStoredKeys() });
   });
   child.on('exit', (code) => {
     if (!quitting) console.error(`[main] kernel exited unexpectedly with code ${code}`);
@@ -76,10 +77,10 @@ function jobFor(child: UtilityProcess): ProcessJob | null {
   }
 }
 
-/** @brief 后台进程发给主进程的消息。store-key 的 key 为 null 时删除这个 provider 已保存的 key（连接删掉时）。 */
+/** @brief 后台进程发给主进程的消息。store-key 按 key 的 ref 保存明文；key 为 null 时删除这个 ref 已保存的密文。 */
 type KernelToMain =
   | { type: 'shutdown-done' }
-  | { type: 'store-key'; id: number; providerId: string; key: string | null };
+  | { type: 'store-key'; id: number; ref: string; key: string | null };
 
 /** @brief 读取并解密已保存的 key；失败时记录错误，后台进程按"没有 key"启动。 */
 function loadStoredKeys(): Record<string, string> {
@@ -91,17 +92,17 @@ function loadStoredKeys(): Record<string, string> {
   }
 }
 
-/** @brief 处理后台进程的请求：目前只有"加密保存 key"和"删除 key"。 */
+/** @brief 处理后台进程的请求：目前只有"按 ref 加密保存 key"和"按 ref 删除 key"。 */
 function handleKernelMessage(child: UtilityProcess, message: KernelToMain): void {
   if (message?.type !== 'store-key') return;
   let error: string | null = null;
   try {
-    if (message.key === null) deleteKey(message.providerId);
-    else storeKey(message.providerId, message.key);
+    if (message.key === null) deleteKey(message.ref);
+    else storeKey(message.ref, message.key);
   } catch (cause) {
     error = (cause as Error).message;
     const action = message.key === null ? 'delete' : 'store';
-    console.error(`[main] cannot ${action} the key for ${message.providerId}: ${error}`);
+    console.error(`[main] cannot ${action} the key ${message.ref}: ${error}`);
   }
   child.postMessage({ type: 'store-key-result', id: message.id, error });
 }

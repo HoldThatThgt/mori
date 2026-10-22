@@ -1781,9 +1781,13 @@ const userData = mkdtempSync(join(tmpdir(), 'mori-m7-app-data-'));
 const exportDir = join(root, 'export');
 mkdirSync(exportDir, { recursive: true });
 const ctx = { root, project, userData, exportDir, pageErrors: [], small: [], smallChecked: [], posts: 0, fb: {} };
-// 合成端点每收到一个请求打一行；数对话请求，检查工作回顾里的操作没有发请求给模型。
+// 合成端点每个对话请求另打一行 JSON（tests/fake-endpoint/server.mjs）；只数 probe: false 的（v1 的探针在后台照常发请求，
+// 规格 §14.4），检查工作回顾里的操作没有发请求给模型。
+let fakeOut = '';
 fake.stdout.on('data', (chunk) => {
-  ctx.posts += (String(chunk).match(/POST \S*\/chat\/completions/g) ?? []).length;
+  const lines = (fakeOut + String(chunk)).split(/\r?\n/);
+  fakeOut = lines.pop();
+  ctx.posts += lines.filter((line) => line.startsWith('{') && line.includes('"probe":false')).length;
 });
 try {
   for (const [name, step] of Object.entries(steps)) {

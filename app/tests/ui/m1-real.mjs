@@ -3,11 +3,17 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m1-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,…]
 // 结果写到 test-results/m1-real(-packaged).json，截图在 test-results/m1-real(-packaged)/。
+// v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；首次启动的走查用一个空的复制数据目录
+// （只有密文文件）：v1 的首次启动表单不沿用已存的 key，key 栏留空时请求不带认证头，所以测试连接按真实端点的回答失败；
+// 之后作为测试准备退出 App，把这个提供商的 key 指向复制来的密文（只复制密文，不读 key）、给项目授权公网，再启动、
+// 在拒绝启动卡上 Verify now，接着走查。走查 6 改为"错的 key → 说明卡 → Open settings → Keys"，$变量与没有 key 的情形删去；
+// 压缩的准备改为在复制出的 model-config.json 里把窗口改小。
 
-import { readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
-  appRoot, arg, createRecorder, killKernel, launch, oneLine, prepareProject, scratchUserData, sleep,
+  allowRealProject, appRoot, arg, createRecorder, editModelConfig, killKernel, launch, oneLine, prepareProject,
+  realProviders, scratchUserData, sleep,
 } from './lib.mjs';
 import { smallText } from './m1-layout.mjs';
 import { pageHelpers } from './page.mjs';
@@ -23,36 +29,93 @@ const { record, write } = createRecorder(exePath ?? 'dev build');
 const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) }).catch(() => {});
 const wanted = (item) => !only || only.includes(String(item));
 
-/** @brief 读写临时数据目录里 pi 的 JSON 配置。 */
+/** @brief 读写临时数据目录里 pi 的 JSON 配置（不存在时从空对象开始）。 */
 function editJson(dir, name, fn) {
   const path = join(dir, 'pi', name);
-  writeFileSync(path, JSON.stringify(fn(JSON.parse(readFileSync(path, 'utf8'))), null, 2));
+  const value = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
+  writeFileSync(path, JSON.stringify(fn(value), null, 2));
 }
 
-/** @brief 首次启动用的数据目录：有加密的 key，models.json 里只有端点地址、没有模型，所以 Mori 按首次启动处理。 */
+/**
+ * @brief 首次启动用的数据目录（§14.4）：空的复制数据目录，只留密文文件（credentials.json 与 Local State），没有
+ *        model-config.json 与 pi 的配置，所以 Mori 按首次启动处理。
+ */
 function firstRunDir() {
   const dir = scratchUserData(source);
-  editJson(dir, 'models.json', (file) => {
-    const provider = file.providers['mori-endpoint'];
-    return { providers: { 'mori-endpoint': { baseUrl: provider.baseUrl, api: provider.api, models: [] } } };
-  });
-  rmSync(join(dir, 'pi', 'settings.json'), { force: true });
+  const configs = ['model-config.json', 'model-profiles.json', join('pi', 'models.json'), join('pi', 'settings.json')];
+  for (const name of configs) rmSync(join(dir, name), { force: true });
   return dir;
 }
 
-/** @brief 走查 1：首次启动 → 填连接（key 栏留空，沿用加密保存的 key）→ 测试成功 → 选文件夹 → 发第一条消息。 */
-async function item1({ app, page, h, project, connection }) {
+/**
+ * @brief 测试准备（synthetic test setup，§14.1）：App 退出后，把首次启动建的提供商的 key 指向复制来的首选密文
+ *        （credentials.json 里另存一份到 <id>#1，只复制密文，不读 key），并给项目授权公网。
+ */
+function pointKeyToCopiedCipher(dir, connection, project) {
+  const credentialsPath = join(dir, 'credentials.json');
+  const credentials = JSON.parse(readFileSync(credentialsPath, 'utf8'));
+  let ref = null;
+  editModelConfig(dir, (config) => {
+    const provider = config.providers[0];
+    ref = `${provider.id}#1`;
+    provider.keys = [{ ref, label: 'Key 1' }];
+    provider.nextKeyNumber = Math.max(provider.nextKeyNumber, 2);
+  });
+  credentials[ref] = credentials[connection.keys[0]];
+  writeFileSync(credentialsPath, JSON.stringify(credentials, null, 2));
+  allowRealProject(dir, project);
+}
+
+/**
+ * @brief 走查 1（v1）：首次启动 → 填表（区域 Public，key 栏留空）→ 测试连接按真实端点的回答失败（没有 key 不带认证头）；
+ *        测试准备（退出、key 指向复制来的密文、授权公网）→ 重新启动 → 打开文件夹 → 拒绝启动卡上 Verify now → 发第一条消息。
+ */
+async function item1(ctx) {
+  const { page, h, connection } = ctx;
   await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
-  record('1 首次启动只有连接表单', await page.getByTestId('sidebar').count() === 0);
+  record('1 首次启动只有首次启动表单', await page.getByTestId('sidebar').count() === 0);
   await shot(page, '1-first-run');
-  await h.fillConnection({ name: 'DeepSeek', baseUrl: connection.baseUrl, modelId: connection.model,
+  await h.fillConnection({ name: connection.name, baseUrl: connection.baseUrl, zone: 'public',
+    modelId: connection.model,
     contextWindow: connection.contextWindow });
-  await page.getByRole('button', { name: 'Test connection' }).click();
-  await page.getByTestId('open-folder').waitFor({ timeout: 90000 });
-  const result = await page.getByTestId('test-result').innerText();
-  record('1 测试连接成功（显示首字耗时），进入"打开文件夹…"', /Connected · First token \d+ms/.test(result), oneLine(result));
-  await shot(page, '1-test-ok');
-  await h.openFolder(app, project);
+  const note = await page.getByTestId('zone-public-note').innerText().catch(() => '');
+  await page.getByTestId('connection-form').locator('[data-action="test"]').click();
+  const result = await h.formMessage(null, { test: true, timeout: 180000 });
+  record('1 区域 Public 时说明"Public providers must be allowed per project…"；key 栏留空时测试连接失败（请求不带认证头，'
+    + '真实端点的原文）', note.startsWith('Public providers must be allowed per project')
+    && /^(Connection failed|Failed)/.test(result), `${oneLine(note)}；${oneLine(result)}`);
+  await shot(page, '1-test-no-key');
+  await ctx.app.close();
+  pointKeyToCopiedCipher(ctx.userData, connection, ctx.project);
+  await relaunch(ctx);
+  await ctx.page.getByRole('button', { name: 'Open folder…' }).first().waitFor({ timeout: 60000 });
+  await ctx.h.openFolder(ctx.app, ctx.project);
+  await verifyNow(ctx);
+  await sendFirst(ctx);
+  return {};
+}
+
+/** @brief 重新启动 App（同一个数据目录）。 */
+async function relaunch(ctx) {
+  ctx.app = await launch({ exePath, userData: ctx.userData });
+  ctx.page = await ctx.app.firstWindow();
+  ctx.h = pageHelpers(ctx.page);
+  ctx.page.on('pageerror', (error) => pageErrors.push(error.message));
+}
+
+/** @brief 首次启动的那次探针因为没有 key 没有结果：拒绝启动卡上点 Verify now，等探针跑完、卡片解除。 */
+async function verifyNow({ page }) {
+  const card = page.getByTestId('blocked-card');
+  if (await card.count()) {
+    await card.locator('[data-action="verify"]').click().catch(() => {});
+    await card.waitFor({ state: 'detached', timeout: 600000 }).catch(() => {});
+  }
+  record('1 key 指向复制来的密文、授权公网后，Verify now 跑完探针，会话可以发送（没有拒绝启动卡）',
+    await page.getByTestId('blocked-card').count() === 0);
+}
+
+/** @brief 走查 1 的后半：切到全部允许，开始采样，发第一条消息。 */
+async function sendFirst({ page, h }) {
   // M2 起命令和编辑要先批准；这里走查的是 M1 的行为，先切到全部允许。
   await h.allowAll();
   await h.sampleStages();
@@ -67,7 +130,6 @@ async function item1({ app, page, h, project, connection }) {
   await h.send('先读一下 README.md，再用 Markdown 列表总结它，最后给一个小标题。');
   const sent = await page.getByTestId('user-message').first().waitFor({ timeout: 30000 }).then(() => true, () => false);
   record('1 发出第一条消息（出现在对话流里）', sent && await page.getByTestId('user-message').count() === 1);
-  return {};
 }
 
 /** @brief 走查 2：先"Waiting for the model… Ns"，再流式 Markdown；有思考时"Thinking…"，正文开始后思考收起。 */
@@ -257,55 +319,51 @@ async function item10({ page, h }) {
 }
 
 /**
- * @brief 走查 6：key 填错 → 原文和"Go to settings"；key 写成没设置的 $变量 → 同样（$ 写法已不再特殊）；
- *        没有 key → 找不到 key 的原文和"Go to settings"。
+ * @brief 走查 6（v1，§14.4）：错的 key → 说明卡 → Open settings → Keys。设置 → Models 里加一个错的 key（sk-invalid，故意填错，
+ *        不是机密）、删掉原来的 key；发消息：401 → auth，范围里没有别的候选，对话流是一张说明卡（"API key rejected"、
+ *        "Open settings"），没有错误卡；Open settings 落在这个提供商的 Keys。
  */
-async function item6({ page, h }, wrongKey) {
-  // M6：设置页先是连接列表，改 key 在连接卡的"Edit connection"里（settings.md"编辑连接"）。
-  await h.editConnection();
-  await h.fillConnection({ apiKey: wrongKey });
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await h.formMessage();
+async function item6({ page, h }) {
+  await h.openModels();
+  const card = page.getByTestId('provider-card').first();
+  const provider = await card.getAttribute('data-provider');
+  const before = await card.getByTestId('key-row').count();
+  await h.addKey('sk-invalid', provider);
+  for (let left = before; left > 0; left -= 1) {
+    await card.getByTestId('key-row').first().locator('[data-action="key-remove"]').click();
+    await sleep(500);
+  }
   await page.getByRole('button', { name: 'Back to app' }).click();
+  const errors = await page.getByTestId('error-card').count();
   await h.send('你好');
   await h.idle();
-  const card = page.getByTestId('error-card').last();
-  const text = await card.innerText();
-  record(`6 key 为"${wrongKey}"：看到错误原文和"去设置"`, text.includes('Go to settings') && /401|api key/i.test(text),
-    oneLine(text));
-  await shot(page, `6-key-${wrongKey.startsWith('$') ? 'dollar' : 'wrong'}`);
-  await card.getByRole('button', { name: 'Go to settings' }).click();
-  const focused = await page.evaluate(() => document.activeElement?.getAttribute('type'));
-  record('6 "去设置"打开连接表单，焦点在 API key', focused === 'password');
+  const unavailable = page.getByTestId('unavailable-card').last();
+  const text = oneLine(await unavailable.innerText().catch(() => ''));
+  record('6 错的 key：一张说明卡（"API key rejected"、"Open settings"），没有错误卡', text.includes('API key rejected')
+    && text.includes('Open settings') && await page.getByTestId('error-card').count() === errors, text);
+  await shot(page, '6-key-wrong');
+  await unavailable.locator('[data-action="open-settings"]').click();
+  await page.waitForFunction(() => document.activeElement?.closest('[data-testid="key-row"]'), null, { timeout: 5000 })
+    .catch(() => {});
+  const focus = await page.evaluate(() => document.activeElement?.closest('[data-testid="provider-card"]')
+    ?.dataset.provider ?? null);
+  record('6 "Open settings"打开 设置 → Models，焦点在这个提供商的 Keys', focus === provider, String(focus));
   await page.getByRole('button', { name: 'Back to app' }).click();
 }
 
-/** @brief 走查 6（没有 key）：数据目录里没有加密的 key，发送时就失败。 */
-async function item6NoKey(project) {
-  const dir = scratchUserData(source, { withKey: false });
-  const app = await launch({ exePath, userData: dir });
-  try {
-    const page = await app.firstWindow();
-    const h = pageHelpers(page);
-    await page.getByRole('button', { name: 'Open folder…' }).first().waitFor({ timeout: 60000 });
-    await h.openFolder(app, project);
-    await h.send('你好');
-    const card = page.getByTestId('error-card');
-    await card.waitFor({ timeout: 30000 });
-    const text = await card.innerText();
-    record('6 没有 key：看到找不到 key 的原文和"去设置"',
-      text.includes('No API key found') && text.includes('Go to settings'), oneLine(text));
-    await shot(page, '6-no-key');
-  } finally {
-    await app.close().catch(() => {});
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
-
-/** @brief 走查 8：上下文长度 8k（加 pi 的压缩参数）长聊：阶段行"Compacting session…"，对话流留下"Compacted session"。 */
-async function item8(project) {
+/**
+ * @brief 走查 8：上下文长度 8k（加 pi 的压缩参数）长聊：阶段行"Compacting session…"，对话流留下"Compacted session"。
+ *        准备（§14.4）：在复制出的 model-config.json 里把首选第一个模型的窗口改为 8000（最大输出不超过 4000），并给项目
+ *        授权公网、默认范围设为测试分组（测试准备）。
+ */
+async function item8(project, connection) {
   const dir = scratchUserData(source);
-  editJson(dir, 'models.json', (file) => { file.providers['mori-endpoint'].models[0].contextWindow = 8000; return file; });
+  allowRealProject(dir, project);
+  editModelConfig(dir, (config) => {
+    const model = config.providers.find((item) => item.id === connection.provider).models[0];
+    model.contextWindow = 8000;
+    model.maxTokens = Math.min(model.maxTokens, 4000);
+  });
   editJson(dir, 'settings.json', (file) => ({ ...file, compaction: { reserveTokens: 6000, keepRecentTokens: 300 } }));
   const app = await launch({ exePath, userData: dir });
   try {
@@ -331,10 +389,9 @@ async function item8(project) {
   }
 }
 
-/** @brief 走查连接的非机密信息。 */
+/** @brief 走查数据目录里首选提供商（DeepSeek）的非机密信息（v1：model-config.json，lib.mjs realProviders）。 */
 function connectionInfo() {
-  const provider = JSON.parse(readFileSync(join(source, 'pi', 'models.json'), 'utf8')).providers['mori-endpoint'];
-  return { baseUrl: provider.baseUrl, model: provider.models[0].id, contextWindow: provider.models[0].contextWindow };
+  return realProviders(source)[0];
 }
 
 /** @brief 依次执行一项走查；出错时记录并截图，继续下一项。 */
@@ -351,11 +408,8 @@ async function step(ctx, name, fn) {
 const { project, root } = prepareProject('mori-m1-real-');
 const userData = firstRunDir();
 const ctx = { project, userData, connection: connectionInfo() };
-ctx.app = await launch({ exePath, userData });
-ctx.page = await ctx.app.firstWindow();
-ctx.h = pageHelpers(ctx.page);
 const pageErrors = [];
-ctx.page.on('pageerror', (error) => pageErrors.push(error.message));
+await relaunch(ctx);
 try {
   const first = await step(ctx, '走查 1', () => item1(ctx));
   if (first) await step(ctx, '走查 2', () => item2(ctx));
@@ -365,16 +419,14 @@ try {
   if (wanted(7)) await step(ctx, '走查 7', () => item7(ctx));
   if (wanted(10)) await step(ctx, '走查 10', () => item10(ctx));
   if (wanted(9)) await step(ctx, '走查 9', () => item9(ctx));
-  if (wanted(6)) {
-    await step(ctx, '走查 6 key 填错', () => item6(ctx, 'sk-mori-walkthrough-wrong-key'));
-    await step(ctx, '走查 6 $变量', () => item6(ctx, '$MORI_UNSET_KEY'));
-  }
+  if (wanted(6)) await step(ctx, '走查 6 key 填错', () => item6(ctx));
 } finally {
   record('页面没有报错', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
   await ctx.app.close().catch(() => {});
 }
-if (wanted(6)) await item6NoKey(project).catch((error) => record('走查 6 没有 key：流程', false, oneLine(error, 300)));
-if (wanted(8)) await item8(project).catch((error) => record('走查 8：流程', false, oneLine(error, 300)));
+if (wanted(8)) {
+  await item8(project, ctx.connection).catch((error) => record('走查 8：流程', false, oneLine(error, 300)));
+}
 rmSync(userData, { recursive: true, force: true });
 rmSync(root, { recursive: true, force: true });
 process.exitCode = write(`m1-real${suffix}.json`) ? 0 : 1;

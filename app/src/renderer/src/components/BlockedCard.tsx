@@ -1,0 +1,98 @@
+// 拒绝启动卡（docs/v1/screens/model-chat.md "拒绝启动卡"，规格 §4.6）：会话的静态校验没通过时显示在输入框上方，
+// 文字按 blocked.kind，按钮只按 blocked.actions 出现（顺序同状态表）；blocked 变为 null 时卡消失、发送恢复。
+
+import { useState } from 'react';
+import type { BlockedAction, ModelBlocked } from '../../../shared/models';
+import { openRangeMenu, verifyNow } from '../state/modelActions';
+import { openModelsSettings } from '../state/settings';
+import type { Tab } from '../state/store';
+import { CandidateList } from './UnavailableCard';
+
+/** 按钮的顺序（同状态表） */
+const ACTION_ORDER: readonly BlockedAction[] = [
+  'verify', 'allow_zone', 'confirm_zone', 'change_model', 'open_settings',
+];
+
+/** @brief 卡片的主文字与第二行（没有时为 null）。 */
+function cardText(blocked: ModelBlocked, pick: string | null): { title: string; note: string | null } {
+  switch (blocked.kind) {
+    case 'verifying': {
+      // 第一个正在验证的候选；后台进程把它也写在 detail 里。
+      const probing = blocked.candidates.find((candidate) => candidate.reason === 'probing')?.ref ?? blocked.detail;
+      return { title: `Verifying ${probing}…`, note: null };
+    }
+    case 'no_candidate':
+      return { title: 'This session can’t start: no model fits.', note: null };
+    case 'no_pick':
+      return { title: 'No default model range; pick one.', note: null };
+    case 'pick_missing':
+      return { title: `${blocked.detail || pick || ''} is not in your model settings.`,
+        note: 'Used by this session’s model range.' };
+    case 'project_config':
+      return { title: `.mori/models.json: ${blocked.detail}`, note: null };
+    case 'config_invalid':
+      return { title: `Model settings can’t be read: ${blocked.detail}`, note: null };
+  }
+}
+
+/** @brief 一个操作按钮的文字。 */
+function actionLabel(action: BlockedAction, blocked: ModelBlocked): string {
+  switch (action) {
+    case 'verify': return 'Verify now';
+    case 'allow_zone': return `Allow ${blocked.zone ?? ''} for this project`;
+    case 'confirm_zone': return 'Confirm zone';
+    case 'change_model': return 'Change model…';
+    case 'open_settings': return 'Open settings';
+  }
+}
+
+/**
+ * @brief 点了一个操作：Verify now 探测还没验证的候选；Allow <zone> 打开 Project access 里这个会话的项目；
+ *        Confirm zone 打开区域未确认的那几行，焦点在第一个要确认的提供商；Change model 打开这一栏的范围菜单；
+ *        Open settings 打开 设置 → Models 的顶部。
+ * @return Verify now 失败时的原文；其余为 null
+ */
+async function runAction(action: BlockedAction, blocked: ModelBlocked, tab: Tab): Promise<string | null> {
+  switch (action) {
+    case 'verify': return verifyNow(blocked.verifyRefs);
+    case 'allow_zone': openModelsSettings({ focus: 'project', projectPath: tab.cwd }); return null;
+    case 'confirm_zone': openModelsSettings({ focus: 'zones', providerId: blocked.zoneProviders[0] }); return null;
+    case 'change_model': openRangeMenu(tab.key); return null;
+    case 'open_settings': openModelsSettings(); return null;
+  }
+}
+
+/** @brief 拒绝启动卡；会话可以发送时不显示。 */
+export function BlockedCard({ tab }: { tab: Tab }) {
+  const blocked = tab.blocked;
+  if (!blocked) return null;
+  // 卡片换了一种拒绝原因（或消失后再出现）时重新挂载，清掉上一次 Verify now 的错误。
+  return <BlockedCardBody key={`${blocked.kind}:${blocked.detail}`} tab={tab} blocked={blocked} />;
+}
+
+/** @brief 拒绝启动卡的内容；Verify now 的错误（problem）只属于当前这一种拒绝原因。 */
+function BlockedCardBody({ tab, blocked }: { tab: Tab; blocked: ModelBlocked }) {
+  const [problem, setProblem] = useState<string | null>(null);
+  const { title, note } = cardText(blocked, tab.pick);
+  const actions = ACTION_ORDER.filter((action) => blocked.actions.includes(action));
+  // verifying 只写第一个正在验证的候选，不列其他候选（状态表）。
+  const candidates = blocked.kind === 'verifying' ? [] : blocked.candidates;
+  return (
+    <div className="model-card blocked-card" role="status" data-testid="blocked-card" data-kind={blocked.kind}>
+      <div className="model-card-title">{title}</div>
+      {note && <div className="model-card-note">{note}</div>}
+      <CandidateList candidates={candidates} />
+      {problem && <div className="model-card-problem" role="alert">{problem}</div>}
+      {actions.length > 0 && (
+        <div className="model-card-actions">
+          {actions.map((action) => (
+            <button key={action} className="button compact" data-action={action.replace('_', '-')}
+              onClick={() => { setProblem(null); void runAction(action, blocked, tab).then(setProblem); }}>
+              {actionLabel(action, blocked)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,4273 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/v1-models-record.mjs; do not edit by hand. Faults are real (a wrong key entered in the UI → HTTP 401), see notes.",
+ "name": "thinking",
+ "description": "在 Models 里把首选提供商的第一个模型标为支持思考（新会话默认\"中\"，等探针重新跑完）；新会话在顶栏切到 high，问一道要推理的题，回复带思考内容；切到 off 再问一道，回复没有思考内容",
+ "covers": "MP-37",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "models": {
+  "first": "mori-endpoint/deepseek-flash",
+  "second": "glm/GLM-5.3",
+  "group": "mori-real-test"
+ },
+ "notes": [
+  "Setup (synthetic test setup, spec §14.1): copied the encrypted data files; group mori-real-test = [mori-endpoint, glm] is the default range; the project is allowed public; the ciphertext of mori-endpoint's first key was copied to mori-test-spare-mori-endpoint"
+ ],
+ "recordedAt": "2026-10-21T17:21:18.784Z",
+ "steps": [
+  {
+   "t": 3,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 3,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 6,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 8,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-v1-real-data-gqUhc0\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 10,
+   "command": {
+    "type": "models.get"
+   }
+  },
+  {
+   "t": 13,
+   "result": {
+    "type": "models.get",
+    "value": {
+     "error": null,
+     "config": {
+      "version": 1,
+      "providers": [
+       {
+        "id": "mori-endpoint",
+        "name": "deepseek",
+        "api": "openai-completions",
+        "baseUrl": "https://api.deepseek.com",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "public",
+        "keys": [
+         {
+          "ref": "mori-endpoint",
+          "label": "Key 1"
+         }
+        ],
+        "nextKeyNumber": 1,
+        "models": [
+         {
+          "id": "deepseek-flash",
+          "family": "",
+          "contextWindow": 1000000,
+          "maxTokens": 16384,
+          "reasoning": false,
+          "input": [
+           "text"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "glm",
+        "name": "GLM",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.z.ai/api/anthropic",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "public",
+        "keys": [
+         {
+          "ref": "glm#1",
+          "label": "Key 1"
+         }
+        ],
+        "nextKeyNumber": 2,
+        "models": [
+         {
+          "id": "GLM-5.3",
+          "family": "",
+          "contextWindow": 1000000,
+          "maxTokens": 16384,
+          "reasoning": true,
+          "input": [
+           "text"
+          ]
+         }
+        ]
+       }
+      ],
+      "groups": [
+       {
+        "id": "mori-real-test",
+        "members": [
+         "mori-endpoint",
+         "glm"
+        ]
+       }
+      ],
+      "normalDefault": "mori-real-test",
+      "allowedZones": [
+       "local",
+       "intranet"
+      ],
+      "projectZones": {
+       "c:/users/blue/appdata/local/temp/mori-v1-record-5xunhd/v1-thinking": [
+        "public"
+       ]
+      }
+     },
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "keyStatus": {},
+     "thinkingDefaults": {
+      "mori-endpoint/deepseek-flash": null,
+      "glm/GLM-5.3": "xhigh"
+     },
+     "zoneSuggestions": {
+      "mori-endpoint": "public",
+      "glm": "public"
+     },
+     "migration": null,
+     "projects": [],
+     "loadError": null,
+     "reserved": [
+      "mori",
+      "amazon-bedrock",
+      "ant-ling",
+      "anthropic",
+      "azure",
+      "baseten",
+      "cerebras",
+      "cloudflare-ai-gateway",
+      "cloudflare-workers-ai",
+      "deepseek",
+      "fireworks",
+      "github-copilot",
+      "google",
+      "google-vertex",
+      "groq",
+      "huggingface",
+      "kimi-coding",
+      "meta",
+      "minimax",
+      "minimax-cn",
+      "mistral",
+      "moonshotai",
+      "moonshotai-cn",
+      "nvidia",
+      "openai",
+      "openai-codex",
+      "opencode",
+      "opencode-go",
+      "openrouter",
+      "qwen-token-plan",
+      "qwen-token-plan-cn",
+      "qwen-token-plan-individual",
+      "radius",
+      "together",
+      "typesafe",
+      "vercel-ai-gateway",
+      "xai",
+      "xiaomi",
+      "xiaomi-token-plan-ams",
+      "xiaomi-token-plan-cn",
+      "xiaomi-token-plan-sgp",
+      "zai",
+      "zai-coding-cn"
+     ]
+    }
+   }
+  },
+  {
+   "t": 18,
+   "command": {
+    "type": "models.saveModel",
+    "providerId": "mori-endpoint",
+    "adding": false,
+    "model": {
+     "id": "deepseek-flash",
+     "family": "",
+     "contextWindow": 1000000,
+     "maxTokens": 16384,
+     "reasoning": true,
+     "input": [
+      "text"
+     ]
+    },
+    "thinkingLevel": "medium"
+   }
+  },
+  {
+   "t": 39,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 0,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 39,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 0,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 40,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 0,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 43,
+   "result": {
+    "type": "models.saveModel",
+    "value": {
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 170,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 1,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 930,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 2,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2249,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 3,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3125,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 4,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 6211,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 5,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 7009,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 6,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 7107,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 7,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 7109,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: ba050c4f-7a9e-49cd-bc89-51c7ee8b5de0)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792603275081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": []
+    }
+   }
+  },
+  {
+   "t": 8094,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-v1-record-5xuNhd\\v1-thinking"
+   }
+  },
+  {
+   "t": 8097,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 8099,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-v1-record-5xuNhd\\v1-thinking"
+   }
+  },
+  {
+   "t": 8173,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-v1-record-5xuNhd\\v1-thinking",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-v1-real-data-gqUhc0\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-v1-record-5xuNhd-v1-thinking--\\2026-10-21T17-21-16-077Z_01a15f7b-432c-7529-bd3d-2cad62ec1d39.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write"
+     ],
+     "pick": "mori-real-test",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "medium",
+     "thinkingLevels": [
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     }
+    }
+   }
+  },
+  {
+   "t": 8179,
+   "command": {
+    "type": "session.setThinking",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "level": "high"
+   }
+  },
+  {
+   "t": 8181,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "thinking_level_changed",
+     "level": "high"
+    }
+   }
+  },
+  {
+   "t": 8181,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "mori-real-test",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "high",
+     "thinkingLevels": [
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true
+    }
+   }
+  },
+  {
+   "t": 8181,
+   "result": {
+    "type": "session.setThinking",
+    "value": {
+     "pick": "mori-real-test",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "high",
+     "thinkingLevels": [
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true
+    }
+   }
+  },
+  {
+   "t": 8229,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "text": "笼子里有鸡和兔共 35 只，脚共 94 只。鸡兔各几只？只给出答案，不要调用任何工具。"
+   }
+  },
+  {
+   "t": 8231,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "mori-real-test",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "high",
+     "thinkingLevels": [
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true
+    }
+   }
+  },
+  {
+   "t": 8231,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 8241,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 8241,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 8242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-v1-record-5xuNhd/v1-thinking\n</cwd>"
+      },
+      "timestamp": 1792603276207,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 8242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-v1-record-5xuNhd/v1-thinking\n</cwd>"
+      },
+      "timestamp": 1792603276207,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 8242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "笼子里有鸡和兔共 35 只，脚共 94 只。鸡兔各几只？只给出答案，不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792603276206
+     }
+    }
+   }
+  },
+  {
+   "t": 8242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "笼子里有鸡和兔共 35 只，脚共 94 只。鸡兔各几只？只给出答案，不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792603276206
+     }
+    }
+   }
+  },
+  {
+   "t": 8242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "477b028b",
+     "time": 1792603276206,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 8706,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Class",
+        "thinkingSignature": "reasoning_content"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792603276213,
+      "responseId": "20a624ee-47d3-4c8f-9504-80e3d25db275"
+     }
+    }
+   }
+  },
+  {
+   "t": 8706,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 8706,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Class"
+     }
+    }
+   }
+  },
+  {
+   "t": 8749,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "ic"
+     }
+    }
+   }
+  },
+  {
+   "t": 8761,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " chicken"
+     }
+    }
+   }
+  },
+  {
+   "t": 8761,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "-ra"
+     }
+    }
+   }
+  },
+  {
+   "t": 8788,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "bb"
+     }
+    }
+   }
+  },
+  {
+   "t": 8788,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "it"
+     }
+    }
+   }
+  },
+  {
+   "t": 8788,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " problem"
+     }
+    }
+   }
+  },
+  {
+   "t": 8796,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 8796,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Let"
+     }
+    }
+   }
+  },
+  {
+   "t": 8796,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " x"
+     }
+    }
+   }
+  },
+  {
+   "t": 8796,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " ="
+     }
+    }
+   }
+  },
+  {
+   "t": 8847,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " chickens"
+     }
+    }
+   }
+  },
+  {
+   "t": 8847,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 8847,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " y"
+     }
+    }
+   }
+  },
+  {
+   "t": 8847,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " ="
+     }
+    }
+   }
+  },
+  {
+   "t": 8847,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " rabbits"
+     }
+    }
+   }
+  },
+  {
+   "t": 8847,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 8848,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " x"
+     }
+    }
+   }
+  },
+  {
+   "t": 8848,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "+y"
+     }
+    }
+   }
+  },
+  {
+   "t": 8848,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "="
+     }
+    }
+   }
+  },
+  {
+   "t": 8848,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "35"
+     }
+    }
+   }
+  },
+  {
+   "t": 8848,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 8848,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 8849,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "2"
+     }
+    }
+   }
+  },
+  {
+   "t": 8849,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "x"
+     }
+    }
+   }
+  },
+  {
+   "t": 8849,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "+"
+     }
+    }
+   }
+  },
+  {
+   "t": 8849,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "4"
+     }
+    }
+   }
+  },
+  {
+   "t": 8849,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "y"
+     }
+    }
+   }
+  },
+  {
+   "t": 8849,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "="
+     }
+    }
+   }
+  },
+  {
+   "t": 8851,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "94"
+     }
+    }
+   }
+  },
+  {
+   "t": 8851,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 8851,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Subtract"
+     }
+    }
+   }
+  },
+  {
+   "t": 8851,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 8863,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "2"
+     }
+    }
+   }
+  },
+  {
+   "t": 8863,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "(x"
+     }
+    }
+   }
+  },
+  {
+   "t": 8874,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "+y"
+     }
+    }
+   }
+  },
+  {
+   "t": 8874,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ")="
+     }
+    }
+   }
+  },
+  {
+   "t": 8874,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "70"
+     }
+    }
+   }
+  },
+  {
+   "t": 8874,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 8891,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " so"
+     }
+    }
+   }
+  },
+  {
+   "t": 8891,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 8892,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "2"
+     }
+    }
+   }
+  },
+  {
+   "t": 8892,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "y"
+     }
+    }
+   }
+  },
+  {
+   "t": 8892,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "="
+     }
+    }
+   }
+  },
+  {
+   "t": 8892,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "24"
+     }
+    }
+   }
+  },
+  {
+   "t": 8898,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 8898,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " y"
+     }
+    }
+   }
+  },
+  {
+   "t": 8898,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "="
+     }
+    }
+   }
+  },
+  {
+   "t": 8898,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "12"
+     }
+    }
+   }
+  },
+  {
+   "t": 8898,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 8912,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " x"
+     }
+    }
+   }
+  },
+  {
+   "t": 8912,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "="
+     }
+    }
+   }
+  },
+  {
+   "t": 8912,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "23"
+     }
+    }
+   }
+  },
+  {
+   "t": 8926,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 8926,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Ch"
+     }
+    }
+   }
+  },
+  {
+   "t": 8935,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "ick"
+     }
+    }
+   }
+  },
+  {
+   "t": 8935,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "ens"
+     }
+    }
+   }
+  },
+  {
+   "t": 8953,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 8953,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "23"
+     }
+    }
+   }
+  },
+  {
+   "t": 8953,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 8953,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " rabbits"
+     }
+    }
+   }
+  },
+  {
+   "t": 8953,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 8953,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "12"
+     }
+    }
+   }
+  },
+  {
+   "t": 8957,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 8978,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 8978,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "鸡"
+     }
+    }
+   }
+  },
+  {
+   "t": 8978,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 9006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "23"
+     }
+    }
+   }
+  },
+  {
+   "t": 9006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 9006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "只"
+     }
+    }
+   }
+  },
+  {
+   "t": 9006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 9006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "兔"
+     }
+    }
+   }
+  },
+  {
+   "t": 9006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 9008,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "12"
+     }
+    }
+   }
+  },
+  {
+   "t": 9008,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 9008,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "只"
+     }
+    }
+   }
+  },
+  {
+   "t": 9008,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 9008,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 9008,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 9009,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Classic chicken-rabbit problem. Let x = chickens, y = rabbits. x+y=35, 2x+4y=94. Subtract 2(x+y)=70, so 2y=24, y=12, x=23.\n\nChickens 23, rabbits 12.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "鸡 23 只，兔 12 只。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1111,
+       "output": 77,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 64,
+       "totalTokens": 1700,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792603276213,
+      "responseId": "20a624ee-47d3-4c8f-9504-80e3d25db275",
+      "rawStopReason": "stop",
+      "durationMs": 769,
+      "thinkingLevel": "high"
+     }
+    }
+   }
+  },
+  {
+   "t": 9009,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "6df0aa7a",
+     "time": 1792603276213,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 9009,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Classic chicken-rabbit problem. Let x = chickens, y = rabbits. x+y=35, 2x+4y=94. Subtract 2(x+y)=70, so 2y=24, y=12, x=23.\n\nChickens 23, rabbits 12.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "鸡 23 只，兔 12 只。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1111,
+       "output": 77,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 64,
+       "totalTokens": 1700,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792603276213,
+      "responseId": "20a624ee-47d3-4c8f-9504-80e3d25db275",
+      "rawStopReason": "stop",
+      "durationMs": 769,
+      "thinkingLevel": "high"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 9009,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39"
+   }
+  },
+  {
+   "t": 9010,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
+        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
+        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-v1-record-5xuNhd/v1-thinking\n</cwd>"
+       },
+       "timestamp": 1792603276207,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "笼子里有鸡和兔共 35 只，脚共 94 只。鸡兔各几只？只给出答案，不要调用任何工具。"
+        }
+       ],
+       "timestamp": 1792603276206
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "Classic chicken-rabbit problem. Let x = chickens, y = rabbits. x+y=35, 2x+4y=94. Subtract 2(x+y)=70, so 2y=24, y=12, x=23.\n\nChickens 23, rabbits 12.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "text",
+         "text": "鸡 23 只，兔 12 只。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1111,
+        "output": 77,
+        "cacheRead": 512,
+        "cacheWrite": 0,
+        "reasoning": 64,
+        "totalTokens": 1700,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792603276213,
+       "responseId": "20a624ee-47d3-4c8f-9504-80e3d25db275",
+       "rawStopReason": "stop",
+       "durationMs": 769,
+       "thinkingLevel": "high"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 9010,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 9010,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "mori-real-test",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "high",
+     "thinkingLevels": [
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true
+    }
+   }
+  },
+  {
+   "t": 9010,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 9011,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1700,
+      "contextWindow": 1000000,
+      "percent": 0.16999999999999998
+     }
+    }
+   }
+  },
+  {
+   "t": 9207,
+   "command": {
+    "type": "session.setThinking",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "level": "off"
+   }
+  },
+  {
+   "t": 9208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "thinking_level_changed",
+     "level": "off"
+    }
+   }
+  },
+  {
+   "t": 9208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "mori-real-test",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true
+    }
+   }
+  },
+  {
+   "t": 9208,
+   "result": {
+    "type": "session.setThinking",
+    "value": {
+     "pick": "mori-real-test",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true
+    }
+   }
+  },
+  {
+   "t": 9244,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "text": "一个数加上它的一半等于 45，这个数是多少？只给出答案，不要调用任何工具。"
+   }
+  },
+  {
+   "t": 9245,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "mori-real-test",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true
+    }
+   }
+  },
+  {
+   "t": 9245,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true
+    }
+   }
+  },
+  {
+   "t": 9246,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 9246,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 9246,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "一个数加上它的一半等于 45，这个数是多少？只给出答案，不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792603277219
+     }
+    }
+   }
+  },
+  {
+   "t": 9246,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "一个数加上它的一半等于 45，这个数是多少？只给出答案，不要调用任何工具。"
+       }
+      ],
+      "timestamp": 1792603277219
+     }
+    }
+   }
+  },
+  {
+   "t": 9260,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "520df0e8",
+     "time": 1792603277219,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 10216,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "30"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1792603277222,
+      "responseId": "7d4e4c13-7d76-49eb-af9c-e887c813fc52"
+     }
+    }
+   }
+  },
+  {
+   "t": 10216,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 10216,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "30"
+     }
+    }
+   }
+  },
+  {
+   "t": 10222,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 10222,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "30"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1124,
+       "output": 1,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1637,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792603277222,
+      "responseId": "7d4e4c13-7d76-49eb-af9c-e887c813fc52",
+      "rawStopReason": "stop",
+      "durationMs": 974,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 10223,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "a65a5c58",
+     "time": 1792603277222,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 10223,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "30"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1124,
+       "output": 1,
+       "cacheRead": 512,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 1637,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1792603277222,
+      "responseId": "7d4e4c13-7d76-49eb-af9c-e887c813fc52",
+      "rawStopReason": "stop",
+      "durationMs": 974,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 10223,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39"
+   }
+  },
+  {
+   "t": 10223,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "一个数加上它的一半等于 45，这个数是多少？只给出答案，不要调用任何工具。"
+        }
+       ],
+       "timestamp": 1792603277219
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "30"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1124,
+        "output": 1,
+        "cacheRead": 512,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 1637,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1792603277222,
+       "responseId": "7d4e4c13-7d76-49eb-af9c-e887c813fc52",
+       "rawStopReason": "stop",
+       "durationMs": 974,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 10223,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 10224,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "mori-real-test",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true
+    }
+   }
+  },
+  {
+   "t": 10224,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a15f7b-432c-7529-bd3d-2cad62ec1d39",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 10226,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 1637,
+      "contextWindow": 1000000,
+      "percent": 0.1637
+     }
+    }
+   }
+  }
+ ]
+}

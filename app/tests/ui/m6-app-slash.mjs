@@ -820,9 +820,12 @@ function recordRunning(state, final) {
 const TITLE_MIN = 36;
 /** 模型按钮最窄（models.css .model-switch 的 min-width；models.md"放不下"） */
 const MODEL_MIN = 40;
-/** 模型按钮的读屏名称和悬停说明（models.md"窄栏"：收起的文字都在读屏名称里） */
-const MODEL_LABEL = `Model: ${MODEL_ID}`;
-const MODEL_TIP = `合成端点 · ${MODEL_ID}`;
+/**
+ * 模型按钮的读屏名称和悬停说明（v1：docs/v1/screens/model-menu.md"窄栏"与"悬停"：读屏名称"Model range: <按钮文字>"，
+ * 悬停"<提供商名> · <区域>"；首次启动的提供商名 "Mori endpoint"、区域 Local）
+ */
+const MODEL_LABEL = `Model range: ${MODEL_ID}`;
+const MODEL_TIP = 'Mori endpoint · Local';
 /** 权限按钮的悬停说明（PermissionMenu.tsx；模式名只在读屏名称 "Permission mode: <模式>" 里，≤ 400px 时按钮上不显示） */
 const PERMISSION_TIP = 'Set the permission mode for this session';
 
@@ -893,8 +896,8 @@ async function layoutReport(page) {
  *        去掉图标；≤ 720px 模型按钮最宽 120px；≤ 660px 不显示项目名和 ›（分屏时 ≤ 690px 就不显示，split.css）；
  *        ≤ 600px 思考按钮只显示强度；≤ 500px 不显示上下文用量；≤ 400px 两个按钮去掉 ▾，权限按钮只显示盾牌图标
  *        （模式名藏起，在读屏名称里）。
- *        模型按钮不窄于 40px；读屏名称是完整的"Model: <ID>""Effort: <强度>""Permission mode: <模式>"，
- *        悬停说明"<连接名> · <ID>""Set the permission mode for this session"；
+ *        模型按钮不窄于 40px；读屏名称是完整的"Model range: <ID>""Effort: <强度>""Permission mode: <模式>"，
+ *        悬停说明"<提供商名> · <区域>""Set the permission mode for this session"；
  *        不溢出、不裁切；会话名至少 36px（名字本身更短时完整显示）。
  */
 function barProblems(pane) {

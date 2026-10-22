@@ -700,19 +700,19 @@ async function twoToolsCheck(page, h) {
 }
 
 /**
- * @brief F8 前：在设置页的连接表单里填一个 key 并保存（回放桥直接回答 connection.save），之后检查它不进报告。
- *        M6 起设置页先是连接列表；用"Add connection"（与首次启动同一张表单，connection.save 带 providerId null，
- *        settings.md"添加连接"），保存后回到列表，上方一行"Saved"。连接的名称、地址和模型 ID 是 synthetic。
+ * @brief F8 前：在 设置 → Models 的提供商卡上 Add key（v1，models.addKey，规格 §14.4；回放桥直接应答，之后 models.get
+ *        读到的提供商多一个 key），之后检查它不进报告。提供商是回放桥按录制的模型合成的（synthetic）。
  */
 async function saveFakeKey(page, h, key) {
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
-  await page.getByRole('button', { name: 'Add connection' }).click();
-  await page.getByTestId('connection-form').waitFor({ timeout: 10000 });
-  await h.fillConnection({ name: 'synthetic 连接', baseUrl: 'http://127.0.0.1:9/v1', apiKey: key,
-    modelId: 'synthetic-model' });
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await page.getByTestId('settings-notice').filter({ hasText: 'Saved' }).waitFor({ timeout: 10000 });
+  await h.openModels();
+  const card = page.getByTestId('provider-card').first();
+  const before = await card.getByTestId('key-row').count();
+  await card.locator('[data-action="add-key"]').click();
+  await card.getByTestId('key-form').getByLabel('Secret').fill(key);
+  await card.getByTestId('key-form').getByRole('button', { name: 'Save', exact: true }).click();
+  const rows = '[data-testid="provider-card"] [data-testid="key-row"]';
+  await page.waitForFunction(({ css, count }) => document.querySelectorAll(css).length > count, { css: rows, count: before },
+    { timeout: 10000 });
   await page.getByRole('button', { name: 'Back to app' }).click();
 }
 
@@ -757,8 +757,9 @@ function checkReport(report, key) {
       && field('Page') === 'Session' && field('Permission mode') === 'Ask each time'
       && field('Pending requests') === '1'
       && actions.some((text) => text.startsWith('Send: ')) && timed, JSON.stringify({ view: report.view, actions }));
-  record('f8：连接表单里填过的 key 不出现在报告里，"最近的操作"只记"保存连接"', !JSON.stringify(report).includes(key)
-    && actions.includes('Save connection'), actions.join(' | '));
+  const added = actions.filter((text) => /^Add key \S+$/.test(text));
+  record('f8：Add key 填过的 key 不出现在报告里，"Recent activity"只记"Add key <提供商>"', !JSON.stringify(report).includes(key)
+    && added.length === 1, actions.join(' | '));
 }
 
 /** @brief F8 保存：Saving… → Saved to；报告内容（截图、文字、当前界面、最近的操作）不含 key；Show in Explorer；Close。 */

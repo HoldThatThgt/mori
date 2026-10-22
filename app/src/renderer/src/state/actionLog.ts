@@ -1,5 +1,6 @@
 // 最近的操作记录：只在本次运行的内存里，F8 报告界面问题时附上（方案 5.15，见 docs/v0/screens/f8.md）。
-// 只记操作的类型和不含机密的摘要：发送的消息只取前几十个字，连接表单只记"Save connection"，从不记 key。
+// 只记操作的类型和不含机密的摘要：发送的消息只取前几十个字，模型层的命令（models.*）只记类型和 id，
+// 从不记 key 的明文（secret、keySecret，docs/specs/model-providers.md §9.4）。
 
 import { KIND_ONE, type Command } from '../../../shared/protocol';
 import type { IssueAction } from '../../../shared/issues';
@@ -43,10 +44,9 @@ export function describeCommand(command: Command): string | null {
     case 'session.read':
     case 'trust.check':
       return null;
-    case 'connection.save':
-      return 'Save connection';
     case 'connection.test':
-      return 'Test connection';
+      return `Test connection ${command.providerId}/${command.modelId}`
+        + (command.keyRef ? ` with key ${command.keyRef}` : '');
     case 'connection.testCancel':
       return 'Cancel connection test';
     case 'session.create':
@@ -83,11 +83,6 @@ export function describeCommand(command: Command): string | null {
 /** @brief M6 的命令（设置页、顶栏、工具页）的摘要；只读的查询返回 null。 */
 function describeM6Command(command: Command): string | null {
   switch (command.type) {
-    case 'endpoint.save': return `Save connection ${command.providerId}`;
-    case 'model.save': return `${command.adding ? 'Add' : 'Save'} model ${command.providerId}/${command.model.modelId}`;
-    case 'model.delete': return `Delete model ${command.providerId}/${command.modelId}`;
-    case 'model.setDefault': return `Set default model: ${command.providerId}/${command.modelId}`;
-    case 'session.setModel': return `Switch model for this session: ${command.model}`;
     case 'session.setThinking': return `Change effort for this session: ${command.level}`;
     case 'agents.save': return 'Save user-level AGENTS.md';
     case 'resource.toggle':
@@ -99,6 +94,39 @@ function describeM6Command(command: Command): string | null {
     case 'mcp.setEnabled': return `${command.enabled ? 'Enable' : 'Disable'} MCP server ${command.name}`;
     case 'mcp.setDirect': return `Switch MCP server ${command.name} to direct calls`;
     case 'mcp.remove': return `Remove MCP server ${command.name}`;
+    default: return describeModelCommand(command);
+  }
+}
+
+/** @brief 删除类命令的摘要：dryRun（确认框先算连带改动）不记。 */
+function deleteText(what: string, dryRun: boolean): string | null {
+  return dryRun ? null : `Delete ${what}`;
+}
+
+/** @brief 模型层的写命令（§9.4、§9.5）的摘要：只记类型和 id，不含 secret、keySecret；只读的查询返回 null。 */
+function describeModelCommand(command: Command): string | null {
+  switch (command.type) {
+    case 'models.firstRun': return `Save first-run provider ${command.providerId ?? command.provider.name}`;
+    case 'models.saveProvider':
+      return command.id ? `Save provider ${command.id}` : `Add provider ${command.provider.name}`;
+    case 'models.deleteProvider': return deleteText(`provider ${command.id}`, command.dryRun);
+    case 'models.saveModel':
+      return `${command.adding ? 'Add' : 'Save'} model ${command.providerId}/${command.model.id}`;
+    case 'models.deleteModel': return deleteText(`model ${command.providerId}/${command.modelId}`, command.dryRun);
+    case 'models.moveModel': return `Move model ${command.providerId}/${command.modelId} ${command.delta}`;
+    case 'models.addKey': return `Add key ${command.providerId}`;
+    case 'models.removeKey': return `Remove key ${command.ref}`;
+    case 'models.moveKey': return `Move key ${command.ref} ${command.delta}`;
+    case 'models.saveGroup': return `${command.creating ? 'Create' : 'Save'} group ${command.id}`;
+    case 'models.deleteGroup': return deleteText(`group ${command.id}`, command.dryRun);
+    case 'models.setDefaults':
+      return `Set defaults ${command.normalDefault ?? 'None'} · ${command.allowedZones.join(' ')}`;
+    case 'models.setProjectZones': return `Set project zones ${command.path} · ${command.zones.join(' ')}`;
+    case 'models.confirmZone': return `Confirm zone ${command.providerId} · ${command.zone}`;
+    case 'models.dismissMigration': return 'Dismiss migration notice';
+    case 'models.reload': return 'Reload model settings';
+    case 'models.verify': return `Verify ${command.refs.join(' ')} (${command.tests})`;
+    case 'session.setPick': return `Set model range ${command.pick}`;
     default: return null;
   }
 }

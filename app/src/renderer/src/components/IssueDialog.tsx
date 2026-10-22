@@ -77,7 +77,7 @@ function tabFields(state: AppState): IssueField[] {
     { label: 'Current session', value: sessionTitle(tab) },
     { label: 'Folder', value: tab.cwd },
     { label: 'Session file', value: tab.sessionFile ?? 'Not saved yet' },
-    { label: 'Model', value: tab.model ?? 'None' },
+    { label: 'Model', value: tab.current ?? 'None' },
     { label: 'Running', value: transcript.running ? 'Yes' : 'No' },
     { label: 'Status line', value: stageText(transcript, tab.cwd, Date.now()) ?? 'Hidden' },
     { label: 'Pending requests', value: String(transcript.approvals.length) },

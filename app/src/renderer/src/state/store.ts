@@ -3,8 +3,8 @@
 
 import { create } from 'zustand';
 import {
-  DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextUsage, type ProjectTrust, type QuoteRef,
-  type SavedSession, type ThinkingLevel,
+  DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextUsage, type ModelState, type ProjectTrust,
+  type QuoteRef, type SavedSession,
 } from '../../../shared/protocol';
 import { loadArchived } from './archive';
 import { emptyTranscript, type Transcript } from './model';
@@ -30,8 +30,11 @@ export type RightView =
     nonce: number;
   };
 
-/** @brief 一个打开的会话。 */
-export interface Tab {
+/**
+ * @brief 一个打开的会话。模型状态（ModelState 的各项：选择范围 pick、当前模型 current、拒绝启动 blocked、思考强度）
+ *        取自会话信息、mori.model_state 事件与 session.setPick 的结果（docs/specs/model-providers.md §9.5）。
+ */
+export interface Tab extends ModelState {
   /** 界面里的标识；重新载入后 pi 会话 id 可能变化，它不变 */
   key: string;
   /** pi 会话 id；打开中为 null */
@@ -58,16 +61,6 @@ export interface Tab {
   trustSaveError: string | null;
   /** 加载失败的扩展 */
   extensionErrors: string[];
-  /** 模型（provider/id） */
-  model: string | null;
-  /** pi 选不到默认模型时的说明 */
-  modelNotice: string | null;
-  /** 思考强度（M6） */
-  thinkingLevel: ThinkingLevel;
-  /** 这个模型可选的思考强度 */
-  thinkingLevels: ThinkingLevel[];
-  /** 模型标了支持思考 */
-  reasoning: boolean;
   /** 上下文用量 */
   contextUsage: ContextUsage | null;
   /** 批准设置（权限与"Allowed for this session"），以后台进程返回的为准 */
@@ -155,10 +148,6 @@ export interface AppState {
   split: [string, string] | null;
   /** 中栏显示会话、设置页还是工具页 */
   view: View;
-  /** 每次"Go to settings"加一，设置页据此打开这个连接的"Edit connection"、把焦点放到 API key */
-  settingsFocus: number;
-  /** "Go to settings"时出错会话所用模型的连接（provider id）；不知道时为 null */
-  settingsProvider: string | null;
   /** 等你回答的信任询问，一次显示第一个 */
   trustPrompts: TrustPrompt[];
   /** 已归档的会话文件（本机记下的，见 archive.ts） */
@@ -173,7 +162,6 @@ export interface AppState {
 export const useApp = create<AppState>(() => ({
   kernel: 'connecting', config: null, configError: null, firstRun: false,
   saved: { status: 'loading', sessions: [], error: null }, tabs: [], activeKey: null, split: null, view: 'chat',
-  settingsFocus: 0, settingsProvider: null,
   trustPrompts: [], archived: loadArchived(), rowMarks: {},
 }));
 
@@ -184,11 +172,21 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
   tabCounter += 1;
   return { key: `t${tabCounter}`, sessionId: null, cwd, sessionFile: null, name: null, preview: null,
     activity: Date.now(), unseen: false, interrupted: false, projectTrust: 'none', trustRemembered: false,
-    trustSaveError: null, extensionErrors: [], model: null,
-    modelNotice: null, thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, contextUsage: null,
+    trustSaveError: null, extensionErrors: [], pick: null, current: null, blocked: null,
+    thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, contextUsage: null,
     approval: DEFAULT_APPROVAL, transcript: emptyTranscript, draft: '',
     draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
     refPending: [], phase: 'opening', error: null, ...fields };
+}
+
+/**
+ * @brief 从会话信息、mori.model_state 事件或 session.setPick 的结果里取出模型状态的各项（不带其他字段）。
+ *        旧的录制里没有的项按"没有"处理：没有范围、没有当前模型、可以发送、思考强度关。
+ */
+export function modelStateOf(state: Partial<ModelState>): ModelState {
+  return { pick: state.pick ?? null, current: state.current ?? null, blocked: state.blocked ?? null,
+    thinkingLevel: state.thinkingLevel ?? 'off', thinkingLevels: state.thinkingLevels ?? ['off'],
+    reasoning: state.reasoning ?? false };
 }
 
 /** @brief 更新一个会话。 */

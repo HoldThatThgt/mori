@@ -22,7 +22,10 @@ import {
   copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { basename, isAbsolute, join, resolve } from 'node:path';
-import { appRoot, arg, createRecorder, launch, oneLine, prepareProject, scratchUserData, sleep } from './lib.mjs';
+import {
+  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, scratchUserData,
+  sleep,
+} from './lib.mjs';
 import {
   activeFile, chooseMenuItem, ctrlN, paneOf, rowOf, samePath, settle, stubFolder, until, waitReady,
 } from './m3-helpers.mjs';
@@ -753,10 +756,12 @@ async function reportActions(ctx) {
 
 // ---------- 执行 ----------
 
-/** @brief 走查数据目录里要有 Mori 保存的连接（只读 models.json 的非机密部分）；没有时在复制密文之前就失败。 */
+/**
+ * @brief 走查数据目录里要有 Mori（v1）保存的提供商（只读 model-config.json 的非机密部分，lib.mjs realProviders，
+ *        规格 §14.4）；没有时在复制密文之前就失败。
+ */
 function requireConnection(dir) {
-  const models = JSON.parse(readFileSync(join(dir, 'pi', 'models.json'), 'utf8'));
-  if (!models.providers?.['mori-endpoint']) throw new Error(`No saved connection in ${dir}`);
+  realProviders(dir);
 }
 
 /** @brief 删掉临时目录；刚退出时文件夹可能还占着，多试几次。 */
@@ -780,6 +785,8 @@ const { root, project } = prepareProject('mori-m7-real-');
 const ctx = { root, project, exportDir: join(root, 'export'), pageErrors: [], ran: [], fb: {} };
 mkdirSync(ctx.exportDir, { recursive: true });
 ctx.userData = scratchUserData(source);
+// 测试准备（synthetic test setup，§14.1）：给临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
+allowRealProject(ctx.userData, ctx.project);
 try {
   await start(ctx);
   await prepare(ctx);

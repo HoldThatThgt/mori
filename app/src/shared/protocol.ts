@@ -2,87 +2,23 @@
 
 import { z } from 'zod';
 import type { AgentSessionEvent, ContextUsage, SessionEntry } from '@earendil-works/pi-coding-agent';
+import {
+  ModelCommandSchemas, THINKING_LEVELS, type ModelEvent, type ModelGlobalEvent, type ModelState,
+  type ThinkingLevel,
+} from './models';
 
 // 界面只经这里引用 pi 的类型。
 export type { ContextUsage, SessionEntry };
 
-/** @brief 连接表单可选的接口类型（pi models.json 的 api 字段）。 */
-export const API_TYPES = ['openai-completions', 'openai-responses', 'anthropic-messages'] as const;
-
-/** @brief 一个兼容选项：勾选时把 compat[field] 写成 value，取消勾选时删除该字段。 */
-export interface CompatOption {
-  /** 表单里的标识 */
-  id: string;
-  /** pi compat 字段名 */
-  field: string;
-  /** 勾选时写入的值 */
-  value: boolean | string;
-  /** 选项文字 */
-  label: string;
-  /** 说明 */
-  hint: string;
-}
-
-/** @brief OpenAI 兼容端点的兼容选项，登记在 docs/v0/defaults.md。 */
-export const COMPAT_OPTIONS: readonly CompatOption[] = [
-  { id: 'noDeveloperRole', field: 'supportsDeveloperRole', value: false,
-    label: 'Endpoint doesn’t support the developer role',
-    hint: 'Sends the system prompt with the system role instead' },
-  { id: 'noStore', field: 'supportsStore', value: false, label: 'Endpoint doesn’t accept the store field',
-    hint: 'Leaves store out of requests' },
-  { id: 'maxTokens', field: 'maxTokensField', value: 'max_tokens',
-    label: 'Endpoint needs max_tokens instead of max_completion_tokens',
-    hint: 'Older endpoints don’t recognize max_completion_tokens' },
-  { id: 'noStreamUsage', field: 'supportsUsageInStreaming', value: false,
-    label: 'Endpoint doesn’t report usage while streaming',
-    hint: 'Doesn’t send stream_options, so the context usage shown will be inaccurate' },
-  { id: 'noStrict', field: 'supportsStrictMode', value: false,
-    label: 'Endpoint doesn’t support strict mode for tool parameters', hint: 'Leaves strict out of tool definitions' },
-  { id: 'toolResultName', field: 'requiresToolResultName', value: true,
-    label: 'Tool results must include the tool name',
-    hint: 'Some endpoints require a name field on tool result messages' },
-];
-
-/** @brief pi 的思考强度（pi-agent-core ThinkingLevel），从低到高。 */
-export const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
-export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+// 模型层的取值与类型在 models.ts 定义（protocol.ts 的 CommandSchema 要用到其中的 schema，反过来引用会成环）。
+export {
+  API_TYPES, COMPAT_OPTIONS, THINKING_LEVELS, type CompatOption, type ConfigInfo, type ModelState, type ThinkingLevel,
+} from './models';
 
 /** @brief 思考强度的界面文字（docs/v0/screens/models.md）。 */
 export const THINKING_LABELS: Record<ThinkingLevel, string> = {
   off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max',
 };
-
-/** @brief 连接（pi models.json 里 Mori 的一个 provider）：服务地址、接口类型、key 和兼容选项，下面的模型共用。 */
-export const EndpointSchema = z.object({
-  /** 显示名称 */
-  name: z.string().trim().min(1),
-  /** 服务地址，例如 http://host:8000/v1 */
-  baseUrl: z.string().trim().url(),
-  /** 接口类型 */
-  api: z.enum(API_TYPES),
-  /** API key；留空表示沿用已保存的 key（仅限服务地址 origin 不变）。Mori 加密保存，不写进 models.json */
-  apiKey: z.string().trim(),
-  /** 勾选的兼容选项 id（只对 openai-completions 生效） */
-  compat: z.array(z.string()),
-});
-export type Endpoint = z.infer<typeof EndpointSchema>;
-
-/** @brief 连接下的一个模型（models.json 的模型条目，加上 pi 设置里这个模型的新会话默认思考强度）。 */
-export const ModelFormSchema = z.object({
-  /** 发给端点的模型 ID */
-  modelId: z.string().trim().min(1),
-  /** 上下文长度（token） */
-  contextWindow: z.number().int().positive(),
-  /** 支持思考：写 models.json 的 reasoning: true（为假时删掉这个字段），pi 才发送思考参数 */
-  reasoning: z.boolean(),
-  /** 新会话默认的思考强度：reasoning 为真时写 pi 设置的 modelThinkingLevels["provider/模型"]，为假时删掉 */
-  thinkingLevel: z.enum(THINKING_LEVELS),
-});
-export type ModelForm = z.infer<typeof ModelFormSchema>;
-
-/** @brief 连接表单（首次启动、"Add connection"）：一个连接和它的第一个模型。 */
-export const ConnectionSchema = EndpointSchema.extend(ModelFormSchema.shape);
-export type Connection = z.infer<typeof ConnectionSchema>;
 
 /** @brief pi 资源的四类（pi 设置里的 extensions / skills / prompts / themes）。 */
 export const RESOURCE_KINDS = ['extensions', 'skills', 'prompts', 'themes'] as const;
@@ -204,12 +140,6 @@ export interface RefEntryData {
 /** @brief 界面发给后台进程的全部命令。 */
 export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('config.get') }),
-  /** 测试连接：测这个模型；不带时测默认模型 */
-  z.object({
-    type: z.literal('connection.test'),
-    providerId: z.string().min(1).optional(),
-    modelId: z.string().min(1).optional(),
-  }),
   z.object({ type: z.literal('connection.testCancel') }),
   /** 问后台进程：打开这个文件夹里的会话之前要不要先问你是否信任它 */
   z.object({ type: z.literal('trust.check'), cwd: z.string().min(1) }),
@@ -262,29 +192,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('approval.setMode'), sessionId, mode: z.enum(['ask', 'all']) }),
   /** 从"Allowed for this session"里清除一个工具名 */
   z.object({ type: z.literal('approval.forget'), sessionId, toolName: z.string().min(1) }),
-  // ---- M6：连接与模型（docs/v0/screens/settings.md） ----
-  /** 保存连接表单：providerId 为 null 时新建一个连接，否则改这个连接并写入（或更新）表单里的模型 */
-  z.object({
-    type: z.literal('connection.save'),
-    providerId: z.string().min(1).nullable(),
-    connection: ConnectionSchema,
-  }),
-  /** 只改连接（地址、接口类型、key、兼容选项），不动它下面的模型 */
-  z.object({ type: z.literal('endpoint.save'), providerId: z.string().min(1), endpoint: EndpointSchema }),
-  /** 添加（adding 为真；ID 已存在时报错）或修改连接下的一个模型 */
-  z.object({
-    type: z.literal('model.save'),
-    providerId: z.string().min(1),
-    model: ModelFormSchema,
-    adding: z.boolean(),
-  }),
-  /** 删除模型；是连接的最后一个模型时连接和它的 key 一起删除；默认模型（还有别的模型时）和唯一的模型不能删 */
-  z.object({ type: z.literal('model.delete'), providerId: z.string().min(1), modelId: z.string().min(1) }),
-  /** 设为默认模型（pi 设置的 defaultProvider / defaultModel） */
-  z.object({ type: z.literal('model.setDefault'), providerId: z.string().min(1), modelId: z.string().min(1) }),
-  // ---- M6：会话的模型、思考强度与"/"补全（docs/v0/screens/models.md、slash.md） ----
-  /** 这个会话换模型（pi setModel，不改默认）；model 为 provider/id */
-  z.object({ type: z.literal('session.setModel'), sessionId, model: z.string().min(1) }),
+  // ---- M6：会话的思考强度与"/"补全（docs/v0/screens/models.md、slash.md） ----
   /** 这个会话换思考强度（pi setThinkingLevel，不改默认） */
   z.object({ type: z.literal('session.setThinking'), sessionId, level: z.enum(THINKING_LEVELS) }),
   /** 这个会话的提示词模板和技能命令 */
@@ -324,6 +232,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('mcp.setDirect'), name: z.string().min(1) }),
   /** 从用户级 mcp.json 移除一个服务 */
   z.object({ type: z.literal('mcp.remove'), name: z.string().min(1) }),
+  // ---- v1：模型层（docs/specs/model-providers.md §9.5），含 connection.test 与 session.setPick ----
+  ...ModelCommandSchemas,
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 
@@ -331,62 +241,6 @@ export type Command = z.infer<typeof CommandSchema>;
 export interface SaveResult {
   /** pi 报告的配置错误；没有时为 null */
   error: string | null;
-}
-
-/** @brief connection.save 的结果。 */
-export interface ConnectionSaveResult extends SaveResult {
-  /** 保存到的连接（新建时是新的 provider id） */
-  providerId: string;
-}
-
-/** @brief 一个模型（设置页的列表）。 */
-export interface ModelInfo {
-  /** 模型 ID */
-  id: string;
-  /** 上下文长度 */
-  contextWindow: number;
-  /** 标了支持思考（models.json 的 reasoning） */
-  reasoning: boolean;
-  /** 新会话默认的思考强度：pi 会用的那个（modelThinkingLevels → defaultThinkingLevel → medium，按模型收紧） */
-  thinkingLevel: ThinkingLevel;
-  /** 这个模型可选的思考强度（pi getSupportedThinkingLevels）；不支持思考时只有 off */
-  thinkingLevels: ThinkingLevel[];
-}
-
-/** @brief 一个连接（models.json 里 Mori 的一个 provider）和它下面的模型。 */
-export interface ConnectionInfo {
-  /** provider id：第一个连接 mori-endpoint，之后 mori-endpoint-<数字>（删掉的不再用） */
-  providerId: string;
-  /** 连接本身；apiKey 总是空串 */
-  endpoint: Endpoint;
-  /** 是否已有保存的 key */
-  keySaved: boolean;
-  /** 模型，按 models.json 里的顺序 */
-  models: ModelInfo[];
-}
-
-/** @brief 顶栏模型菜单里的一项：pi 现在能用的模型（有 key 的）。 */
-export interface AvailableModel {
-  /** provider/id */
-  ref: string;
-  /** provider id */
-  provider: string;
-  /** 模型 ID */
-  id: string;
-  /** 连接名（provider 的 name；没有时为 provider id） */
-  providerName: string;
-}
-
-/** @brief 会话的模型和思考强度（顶栏，docs/v0/screens/models.md）。 */
-export interface ModelState {
-  /** 模型（provider/id）；没有可用模型时为 null */
-  model: string | null;
-  /** 当前的思考强度 */
-  thinkingLevel: ThinkingLevel;
-  /** 这个模型可选的思考强度（pi getAvailableThinkingLevels） */
-  thinkingLevels: ThinkingLevel[];
-  /** 模型标了支持思考（pi supportsThinking） */
-  reasoning: boolean;
 }
 
 /** @brief "/"补全里的一项（docs/v0/screens/slash.md）。 */
@@ -525,37 +379,6 @@ export interface ToolsInfo {
   diagnostics: string[];
 }
 
-/** @brief 已保存连接的公开信息；key 不回传界面。 */
-export interface SavedConnection {
-  /** 连接本身；apiKey 总是空串 */
-  connection: Connection;
-  /** 是否已有保存的 key */
-  keySaved: boolean;
-}
-
-/** @brief config.get 的结果。 */
-export interface ConfigInfo {
-  /** pi 的配置目录 */
-  agentDir: string;
-  /** 第一个连接和它的第一个模型（首次启动的表单），没有时为 null */
-  saved: SavedConnection | null;
-  /** Mori 的全部连接（M6） */
-  connections: ConnectionInfo[];
-  /** 默认模型（provider/id）；没有时为 null */
-  defaultModel: string | null;
-  /** pi 现在能用的全部模型（顶栏模型菜单） */
-  models: AvailableModel[];
-  /** pi 读 models.json 时报告的错误（modelRuntime.getError）；没有时为 null */
-  modelsError: string | null;
-  /**
-   * pi 读设置文件（`<agentDir>/settings.json`）时报告的错误，带文件路径（SettingsManager.drainErrors）；没有时为 null。
-   * 有错误时 pi 按空设置处理：默认模型读不到、思考强度是 pi 的默认值，模型照常能用
-   */
-  settingsError: string | null;
-  /** pi 设置的 defaultThinkingLevel（没有时为 medium）：新模型的"Default effort for new sessions"的初始值 */
-  defaultThinkingLevel: ThinkingLevel;
-}
-
 /** @brief connection.test 的结果。 */
 export interface TestResult {
   /** 是否收到了回复（正文或思考） */
@@ -616,8 +439,8 @@ export interface SavedSession {
   live: LiveStatus | null;
 }
 
-/** @brief session.create / session.open 的结果。 */
-export interface SessionInfo {
+/** @brief session.create / session.open 的结果；模型状态（范围、当前模型、拒绝启动、思考强度）见 ModelState。 */
+export interface SessionInfo extends ModelState {
   /** pi 会话 id */
   sessionId: string;
   /** 工作目录 */
@@ -638,20 +461,10 @@ export interface SessionInfo {
   extensionNotices: ExtensionNotice[];
   /** 当前启用的工具名 */
   tools: string[];
-  /** 会话使用的模型（provider/id），没有可用模型时为 null */
-  model: string | null;
-  /** pi 选不到默认模型时给出的说明 */
-  modelNotice: string | null;
   /** 上下文用量（pi getContextUsage） */
   contextUsage: ContextUsage | null;
   /** 批准设置；新建和重新打开的会话都是"Ask each time" */
   approval: ApprovalState;
-  /** 思考强度（M6，docs/v0/screens/models.md） */
-  thinkingLevel: ThinkingLevel;
-  /** 这个模型可选的思考强度（pi getAvailableThinkingLevels） */
-  thinkingLevels: ThinkingLevel[];
-  /** 模型标了支持思考（pi supportsThinking） */
-  reasoning: boolean;
 }
 
 /** @brief 一个等你回答的扩展询问（mori.ui_request）。 */
@@ -698,6 +511,8 @@ export interface ApprovalRequestInfo {
 export interface LiveSnapshot {
   /** 正在生成 */
   running: boolean;
+  /** 准备中：已发消息、pi 还没开始运行（选模型、等待、重建，§11.4） */
+  preparing: boolean;
   /** 正在生成、还没写进会话文件的助手回复（pi 的 state.streamingMessage）；没有时为 null */
   streaming: unknown;
   /** 正在执行的工具调用（pi 的 state.pendingToolCalls）和开始执行的时刻（ms） */
@@ -796,6 +611,8 @@ export type KernelEvent =
     refs?: QuoteRef[] | null;
     /** 这时会话是否还在运行（插话、排队的提示失败时本轮可能还在继续） */
     running: boolean;
+    /** 准备中被撤回时一起撤回的、准备中又发的消息，按发送顺序（模型层 §11.4）；v1 之前的录制里没有这个字段 */
+    queued?: string[];
   }
   /**
    * 这次调用会怎样处理，见 ToolGate。每个调用在 tool_execution_start 之前发一次；批准处理器后来的判断
@@ -844,11 +661,8 @@ export type KernelEvent =
    * 只有这一个事件（界面据此清掉"刚发出"）。running 为这时会话是否还在运行（插话、排队的提示送进队列就结束）
    */
   | { type: 'mori.prompt_done'; running: boolean }
-  /**
-   * 会话的模型或思考强度变了（M6）：你在顶栏换了，或你在设置里改了它用的模型、后台进程把会话换成新的模型对象之后。
-   * 顶栏以它为准（docs/v0/screens/models.md）
-   */
-  | ({ type: 'mori.model_state' } & ModelState)
+  /** 模型层的事件（mori.model_state、换模型、重建、等待、排队、重试、说明卡，见 models.ts） */
+  | ModelEvent
   /** 扩展在等你回答（ctx.ui.confirm / select / input） */
   | ({ type: 'mori.ui_request' } & UiRequest)
   /** 扩展的询问结束：你回答了、超时、扩展取消、停止或会话关闭 */
@@ -906,5 +720,17 @@ export interface EventEnvelope {
   event: ForwardedEvent;
 }
 
+/** @brief 不属于某个会话的全局事件（模型层 §9.5：mori.profiles、mori.key_status）。 */
+export type GlobalEvent = ModelGlobalEvent;
+
+/** @brief 后台进程广播的全局事件。 */
+export interface GlobalEventEnvelope {
+  kind: 'event';
+  /** 全局事件没有会话 */
+  sessionId: null;
+  /** 事件本身 */
+  event: GlobalEvent;
+}
+
 /** @brief 后台进程发往界面的所有消息。 */
-export type KernelMessage = ResponseEnvelope | EventEnvelope;
+export type KernelMessage = ResponseEnvelope | EventEnvelope | GlobalEventEnvelope;

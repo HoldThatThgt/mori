@@ -3,6 +3,9 @@
 import {
   REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type QuoteRef, type ToolGate, type UiRequest,
 } from '../../../shared/protocol';
+import {
+  REASON_TEXTS, isUntilReason, plainReasonText, type CandidateExclusion, type ModelReason,
+} from '../../../shared/models';
 
 /** @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md。 */
 export type ToolStatus =
@@ -65,9 +68,29 @@ export interface MessageMark {
   time: number | null;
 }
 
+/** @brief 换模型的一行（mori.model_switch 事件或会话文件里的同名条目，docs/v1/screens/model-chat.md）。 */
+export interface ModelSwitchNotice {
+  /** 原模型 <provider>/<model> */
+  from: string;
+  /** 新模型 <provider>/<model> */
+  to: string;
+  /** 原因代码 */
+  reason: ModelReason;
+  /** 原因的完整界面文字（带 until 部分） */
+  detail: string;
+  /** 有被隐藏的过程：加 "The new model redoes this response." */
+  hidden: boolean;
+  /** 没能确认旧请求停下就换的：原因后加 " · Couldn’t confirm it stopped" */
+  unconfirmed: boolean;
+}
+
 /** @brief 对话流中的一项。 */
 export type Item =
-  | ({ kind: 'user'; key: string; text: string; refs: QuoteRef[] | null } & MessageMark)
+  | ({
+    kind: 'user'; key: string; text: string; refs: QuoteRef[] | null;
+    /** 准备中（模型层 §11.4）：界面先显示的你的消息，pi 还没收到；pi 发出这条消息的 message_start 后清掉 */
+    pending?: boolean;
+  } & MessageMark)
   | ({ kind: 'assistant'; key: string; blocks: Block[]; streaming: boolean } & MessageMark)
   | { kind: 'compaction'; key: string }
   | { kind: 'stopped'; key: string }
@@ -77,16 +100,42 @@ export type Item =
     refs?: QuoteRef[];
   }
   | { kind: 'note'; key: string; text: string }
+  | ({ kind: 'model-switch'; key: string } & ModelSwitchNotice)
+  | {
+    kind: 'rebuild'; key: string;
+    /** 接手的模型 <provider>/<model> */
+    model: string;
+    /** 有压缩摘要；false 时只去掉了工具调用和思考 */
+    summary: boolean;
+  }
+  | {
+    kind: 'unavailable'; key: string;
+    /** 每个候选及原因（No model available 卡） */
+    candidates: CandidateExclusion[];
+  }
   | { kind: 'notify'; key: string; text: string; level: 'info' | 'warning' | 'error' };
 
 /** @brief 阶段行。tool 阶段的文字由界面按工具标题生成。 */
 export interface Stage {
   /** 阶段种类 */
-  kind: 'waiting' | 'thinking' | 'generating' | 'tool' | 'approval' | 'retry' | 'compacting';
+  kind: 'waiting' | 'thinking' | 'generating' | 'tool' | 'approval' | 'compacting';
   /** 阶段开始的时刻（ms），用于显示秒数 */
   since: number;
-  /** tool：正在运行的工具 id；retry：重试说明 */
+  /** tool：正在运行的工具 id */
   detail: string;
+}
+
+/**
+ * @brief 模型层的等待（docs/v1/screens/model-chat.md "阶段行"）：等模型、等它停下、重建、排队、原地重试。
+ *        进行时取代 v0 的"等待模型响应"，在准备中也显示。
+ */
+export interface ModelStage {
+  /** 种类，同阶段行的 data-kind */
+  kind: 'wait-model' | 'held' | 'rebuild' | 'queue' | 'retry';
+  /** 这次等待开始的时刻（ms），用于显示已经等了多少秒 */
+  since: number;
+  /** 阶段行文字（不含秒数） */
+  text: string;
 }
 
 /** @brief 一个会话的对话流与运行状态。 */
@@ -111,8 +160,12 @@ export interface Transcript {
   questions: PendingQuestion[];
   /** 你按了停止，本轮还没结束 */
   stopRequested: boolean;
-  /** 正在自动重试 */
-  retrying: boolean;
+  /** 模型层的等待；没有时为 null */
+  modelStage: ModelStage | null;
+  /** 准备中又发的消息（后台进程暂存，pi 开始后作为排队消息交给 pi），按发送顺序 */
+  pendingQueue: string[];
+  /** 本轮已显示 No model available 卡：同一次失败的 pi 错误不再显示错误卡 */
+  unavailable: boolean;
   /** 模型回复出错，等 agent_end 决定是否显示 */
   pendingError: string | null;
   /** 最后一条你的消息（"Put your last message back in the message box"） */
@@ -125,8 +178,8 @@ export interface Transcript {
 
 export const emptyTranscript: Transcript = {
   items: [], tools: {}, running: false, sending: false, stage: null, steering: [], followUp: [], approvals: [],
-  questions: [], stopRequested: false, retrying: false, pendingError: null, lastUserText: null, firstUserText: null,
-  seq: 0,
+  questions: [], stopRequested: false, modelStage: null, pendingQueue: [], unavailable: false, pendingError: null,
+  lastUserText: null, firstUserText: null, seq: 0,
 };
 
 /** 对话流每次载入的消息数（一条你的消息或一条助手回复算一条），见方案 5.4 */
@@ -207,4 +260,33 @@ export function blocksFromContent(content: unknown): { blocks: Block[]; tools: T
     } else blocks.push({ type: 'text', text: '' });
   }
   return { blocks, tools };
+}
+
+/**
+ * @brief 原因的界面文字（§5.3）：detail 就是完整文字；until 不为 undefined 时带 until 的四种原因按它重新写出
+ *        （null 得到不带 until 部分的文字，换模型提示用）。detail 为空时退回原因代码。
+ */
+export function reasonText(reason: ModelReason, detail: string, until?: number | null): string {
+  if (until === null) return plainReasonText(reason, detail) || reason;
+  if (until !== undefined && isUntilReason(reason)) return REASON_TEXTS[reason](until);
+  return detail || reason;
+}
+
+/** @brief 换模型提示的文字："Switched model: A → B · <原因>"，原因不带 until 部分。 */
+export function switchText(notice: ModelSwitchNotice): string {
+  const confirm = notice.unconfirmed ? ' · Couldn’t confirm it stopped' : '';
+  const redo = notice.hidden ? ' The new model redoes this response.' : '';
+  return `Switched model: ${notice.from} → ${notice.to} · ${reasonText(notice.reason, notice.detail, null)}${confirm}`
+    + redo;
+}
+
+/** @brief 重建提示的文字（§6.3 第 4 步）。 */
+export function rebuildText(model: string, summary: boolean): string {
+  const kept = summary ? 'summary + recent turns' : 'recent turns without tool calls';
+  return `Rebuilt the conversation for ${model}: ${kept}`;
+}
+
+/** @brief 说明卡、拒绝启动卡、菜单悬停里候选的一行："<provider>/<model> — <原因>"。 */
+export function candidateLine(candidate: CandidateExclusion): string {
+  return `${candidate.ref} — ${reasonText(candidate.reason, candidate.detail)}`;
 }

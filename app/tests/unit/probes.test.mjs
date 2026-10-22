@@ -1,0 +1,820 @@
+// kernel/probes.ts 的单元测试（规格 §7.3、§7.4）：各步的请求写法、思考强度、判定、首个内容的时限、取消，
+// 以及与合成端点（tests/fake-endpoint/probes.mjs）的约定一致。替身 streamSimple 只在本文件里用（synthetic）。
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { normalizeContext } from '@earendil-works/pi-ai';
+import { loadKernelModule } from './load.mjs';
+import { probeReply, probeStep, replayRejected } from '../fake-endpoint/probes.mjs';
+
+const probes = await loadKernelModule('src/kernel/probes.ts');
+const profiles = await loadKernelModule('src/kernel/modelProfiles.ts');
+const { MODEL_TIMINGS } = await loadKernelModule('src/kernel/modelTimings.ts');
+
+/** 缩短的时长：首个内容的时限 40 ms，取消探针的窗口 5 ms。 */
+const TIMINGS = { ...MODEL_TIMINGS, probeStepTimeoutMs: 40, cancelProbeWindowMs: 5 };
+
+// ---- 替身（synthetic） ----
+
+/** pi 的实际模型。 */
+function piModel(overrides = {}) {
+  return {
+    id: 'fake-coder', name: 'fake-coder', api: 'openai-completions', provider: 'local',
+    baseUrl: 'http://127.0.0.1:4319/v1', input: ['text'], reasoning: false, contextWindow: 131072, maxTokens: 16384,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, ...overrides,
+  };
+}
+
+/** 一条结束的助手消息。 */
+function assistant(model, { text = '', thinking = '', signature, toolCalls = [], stopReason, errorMessage } = {}) {
+  const content = [];
+  if (thinking) content.push({ type: 'thinking', thinking, thinkingSignature: signature });
+  if (text) content.push({ type: 'text', text });
+  content.push(...toolCalls);
+  return {
+    role: 'assistant', content, api: model.api, provider: model.provider, model: model.id,
+    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    stopReason: stopReason ?? (toolCalls.length ? 'toolUse' : 'stop'), errorMessage, timestamp: 1,
+  };
+}
+
+/** 一条成功消息对应的事件。 */
+function eventsOf(message) {
+  const events = [{ type: 'start', partial: message }];
+  message.content.forEach((block, contentIndex) => {
+    if (block.type === 'thinking') {
+      events.push({ type: 'thinking_start', contentIndex, partial: message },
+        { type: 'thinking_delta', contentIndex, delta: block.thinking, partial: message });
+    } else if (block.type === 'text') {
+      events.push({ type: 'text_start', contentIndex, partial: message },
+        { type: 'text_delta', contentIndex, delta: block.text, partial: message });
+    } else {
+      events.push({ type: 'toolcall_start', contentIndex, partial: message },
+        { type: 'toolcall_end', contentIndex, toolCall: block, partial: message });
+    }
+  });
+  events.push({ type: 'done', reason: message.stopReason, message });
+  return events;
+}
+
+/**
+ * 替身 streamSimple：plan(model, context, options) 给出这次请求的结果——
+ * { message } 成功；{ status, error } HTTP 错误；{ error } 连接错误（没有响应）；{ hang: true } 发出后不发内容。
+ * 每次请求先经 options.fetch（模型池的 fetch 替身），记下 calls。
+ */
+function stubStream(plan) {
+  const calls = [];
+  const streamSimple = (model, context, options) => {
+    const call = { model, context, options };
+    calls.push(call);
+    let final;
+    return {
+      async *[Symbol.asyncIterator]() {
+        const step = await plan(model, context, options, calls.length - 1);
+        call.plan = step;
+        if (step.error && step.status === undefined) {
+          final = assistant(model, { stopReason: 'error', errorMessage: step.error });
+          yield { type: 'error', reason: 'error', error: final };
+          return;
+        }
+        await options.fetch('http://stub.test/v1/chat/completions', { stubStatus: step.status ?? 200 });
+        if (step.hang) {
+          await new Promise((resolve) => options.signal.addEventListener('abort', resolve, { once: true }));
+          final = assistant(model, { stopReason: 'aborted', errorMessage: 'Request was aborted' });
+          yield { type: 'error', reason: 'aborted', error: final };
+          return;
+        }
+        if (step.status && step.status >= 400) {
+          final = assistant(model, { stopReason: 'error', errorMessage: step.error });
+          yield { type: 'error', reason: 'error', error: final };
+          return;
+        }
+        final = step.message;
+        for (const event of eventsOf(step.message)) {
+          if (options.signal.aborted) break;
+          yield event;
+        }
+      },
+      result: async () => final,
+    };
+  };
+  return { streamSimple, calls };
+}
+
+/** 模型池 fetch 的替身：记下请求，回调 onSent，按替身计划的状态返回；delayMs 模拟排队。 */
+function stubPool({ delayMs = 0 } = {}) {
+  const requests = [];
+  const fetchFor = (request) => {
+    requests.push(request);
+    return async (_url, init) => {
+      if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      request.onSent();
+      return new Response(null, { status: init.stubStatus });
+    };
+  };
+  return { fetchFor, requests };
+}
+
+/** 第 0 步与第 9 步 GET 的替身：url → 正文（没有的为 null）。 */
+function stubGet(bodies) {
+  const urls = [];
+  const getText = async (url) => {
+    urls.push(url);
+    const body = bodies[new URL(url).pathname];
+    return typeof body === 'function' ? body() : body ?? null;
+  };
+  return { getText, urls };
+}
+
+/** vLLM 形状的第 0 步接口。 */
+const VLLM = {
+  '/v1/models': JSON.stringify({ object: 'list',
+    data: [{ id: 'fake-coder', owned_by: 'fake', max_model_len: 65536 }] }),
+  '/version': JSON.stringify({ version: '0.10.1' }),
+};
+
+/** 探针的依赖。 */
+function depsFor({ stream, pool = stubPool(), get = stubGet(VLLM), signal = new AbortController().signal,
+  ...rest }) {
+  const steps = [];
+  const deps = { streamSimple: stream.streamSimple, fetchFor: pool.fetchFor, getText: get.getText, now: () => 1000,
+    timings: TIMINGS, signal, onStep: (step, of) => steps.push([step, of]), ...rest };
+  return { deps, steps, pool, get, stream };
+}
+
+/** 一次探针的目标。 */
+function targetFor(model) {
+  return { ref: `local/${model.id}`, model };
+}
+
+/** pi 消息 → OpenAI 兼容请求的消息（合成端点认得的形状）。 */
+function openAiMessages(model, context) {
+  return context.messages.map((message) => {
+    if (message.role === 'user') return { role: 'user', content: message.content };
+    if (message.role === 'toolResult') {
+      return { role: 'tool', tool_call_id: message.toolCallId, content: message.content };
+    }
+    const thinking = message.content.find((block) => block.type === 'thinking');
+    const calls = message.content.filter((block) => block.type === 'toolCall');
+    const out = { role: 'assistant', content: message.content.filter((b) => b.type === 'text').map((b) => b.text)
+      .join('') };
+    if (calls.length) {
+      out.tool_calls = calls.map((call) => ({ id: call.id, type: 'function',
+        function: { name: call.name, arguments: JSON.stringify(call.arguments) } }));
+    }
+    if (thinking) out.reasoning_content = thinking.thinking;
+    else if (model.compat?.requiresReasoningContentOnAssistantMessages) out.reasoning_content = '';
+    return out;
+  });
+}
+
+/**
+ * 按合成端点（tests/fake-endpoint/probes.mjs）回答的替身：请求体按 OpenAI 兼容的形状组装，经 onPayload 改写，
+ * 再交给端点自己的 probeStep / probeReply / replayRejected。
+ */
+function fakeEndpoint({ flags = [], window = 131072 } = {}) {
+  const set = new Set(flags);
+  const reasoned = new Set();
+  let next = 0;
+  return stubStream(async (model, context, options) => {
+    let body = { model: model.id, messages: openAiMessages(model, context),
+      tools: (context.tools ?? []).map((tool) => ({ type: 'function', function: { name: tool.name } })) };
+    // pi 按模型收紧：没标支持思考的模型不发思考参数
+    if (options.reasoning && model.reasoning) body.reasoning_effort = options.reasoning;
+    if (options.toolChoice) body.tool_choice = options.toolChoice;
+    body = (await options.onPayload?.(body, model)) ?? body;
+    if (replayRejected(body, set, reasoned)) return { status: 400, error: '400 reasoning_content must be passed back' };
+    const reply = probeReply(probeStep(body.messages), body, set, window);
+    const toolCalls = reply.toolCalls.map((call) => ({ type: 'toolCall', id: `call_${next += 1}`, name: call.name,
+      arguments: call.args }));
+    if (reply.thinking && set.has('replay')) toolCalls.forEach((call) => reasoned.add(call.id));
+    return { message: assistant(model, { text: reply.text, thinking: reply.thinking, signature: 'reasoning_content',
+      toolCalls }) };
+  });
+}
+
+/** 一次请求的最后一条用户消息的文字。 */
+function lastUserText(context) {
+  const last = [...context.messages].reverse().find((message) => message.role === 'user');
+  return typeof last?.content === 'string' ? last.content : '';
+}
+
+// ---- 提示原文与合成端点的约定 ----
+
+test('MP-10 probe prompts are the spec texts and the fake endpoint recognises each step', () => {
+  const P = probes.PROBE_PROMPTS;
+  assert.equal(P.ready, 'Reply with the single word: ready.');
+  assert.equal(P.weather, 'Use the tool to get the weather for Paris for the next 3 days.');
+  assert.equal(P.weatherResult, 'Paris: 21°C, sunny for 3 days.');
+  assert.equal(P.temperature, 'What temperature did the tool report?');
+  assert.equal(P.outcome, 'Call submit_outcome with outcome banana.');
+  assert.equal(P.json, 'Reply with JSON whose outcome is banana.');
+  assert.equal(P.tagged, 'Answer in exactly this format: <summary>one sentence</summary><outcome>ok or fail</outcome>.'
+    + ' Question: is 2 + 2 equal to 4?');
+  assert.equal(P.passphrase, 'What is the passphrase?');
+  assert.equal(P.count, 'Count from 1 to 400, one number per line.');
+  const ask = (text) => probeStep([{ role: 'user', content: text }]);
+  assert.deepEqual([P.ready, P.weather, P.temperature, P.outcome, P.json, P.tagged,
+    probes.longInputPrompt('amber1234', 100), P.count].map(ask), [1, 3, 4, 5, 6, 7, 8, 9]);
+});
+
+test('MP-10 tool schemas: get_weather(city string, days integer), submit_outcome(outcome ok|fail)', () => {
+  assert.equal(probes.WEATHER_TOOL.name, 'get_weather');
+  assert.deepEqual(probes.WEATHER_TOOL.parameters.properties, { city: { type: 'string' }, days: { type: 'integer' } });
+  assert.equal(probes.OUTCOME_TOOL.name, 'submit_outcome');
+  assert.deepEqual(probes.OUTCOME_TOOL.parameters.properties.outcome, { type: 'string', enum: ['ok', 'fail'] });
+});
+
+// ---- 第 0–7 步：合成端点上的判定 ----
+
+test('MP-10 all-pass model on the fake endpoint: tool calling verified, tier A, vLLM server', async () => {
+  const { deps, steps } = depsFor({ stream: fakeEndpoint() });
+  const auto = await probes.runAutoProbes(targetFor(piModel()), deps);
+  assert.deepEqual(auto.server, { kind: 'vllm', version: '0.10.1' });
+  assert.equal(auto.reported, 65536);
+  const outcomes = Object.fromEntries(Object.entries(auto.steps).map(([name, result]) => [name, result.outcome]));
+  assert.deepEqual(outcomes, { ready: 'pass', thinking: 'not_applicable', call: 'pass', result: 'pass',
+    replay: 'not_applicable', a: 'pass', b: 'pass', c: 'not_run' });
+  assert.equal(auto.field, 'none');
+  assert.equal(profiles.toolCallingOf(auto.steps.call, auto.steps.result), 'verified');
+  assert.equal(profiles.tierOf(auto.steps.a, auto.steps.b, auto.steps.c), 'A');
+  assert.deepEqual(steps.map(([step]) => step), [0, 1, 3, 4, 5, 6, 7]);
+  assert.ok(steps.every(([, of]) => of === 8));
+});
+
+test('MP-10 every probe request uses the background pool fetch, maxRetries 0, no SDK timeout, 256 tokens', async () => {
+  const { deps, pool, stream } = depsFor({ stream: fakeEndpoint() });
+  await probes.runAutoProbes(targetFor(piModel()), deps);
+  assert.equal(stream.calls.length, 5);
+  assert.equal(pool.requests.length, stream.calls.length);
+  for (const request of pool.requests) {
+    assert.equal(request.cls, 'background');
+    assert.equal(request.ref, 'local/fake-coder');
+    assert.equal(request.signal, deps.signal);
+  }
+  for (const { options } of stream.calls) {
+    assert.equal(options.maxRetries, 0);
+    assert.equal(options.timeoutMs, 2147483647);
+    assert.equal(options.maxTokens, 256);
+    assert.equal(options.apiKey, 'mori-pool');
+  }
+});
+
+test('MP-10 thinking per step: step 1 medium (reasoning) or off, 2 off+medium, 3/5/6/7 off, replay medium',
+  async () => {
+    const model = piModel({ id: 'fake-coder-nochoice-noschema', reasoning: true });
+    const { deps, stream } = depsFor({ stream: fakeEndpoint({ flags: ['nochoice', 'noschema'] }) });
+    await probes.runAutoProbes(targetFor(model), deps);
+    const seen = stream.calls.map(({ context, options }) => [lastUserText(context), options.reasoning ?? 'off']);
+    const P = probes.PROBE_PROMPTS;
+    const plain = depsFor({ stream: fakeEndpoint() });
+    await probes.runAutoProbes(targetFor(piModel()), plain.deps);
+    const first = plain.stream.calls[0];
+    assert.deepEqual([lastUserText(first.context), first.options.reasoning ?? 'off'], [P.ready, 'off']);
+    assert.deepEqual(seen, [
+      [P.ready, 'medium'], [P.ready, 'off'], [P.ready, 'medium'],
+      [P.weather, 'off'], [P.temperature, 'off'],
+      [P.weather, 'medium'], [P.temperature, 'medium'], [P.temperature, 'medium'],
+      [P.outcome, 'off'], [P.json, 'off'], [P.tagged, 'off'], [P.tagged, 'off'], [P.tagged, 'off'],
+    ]);
+  });
+
+test('MP-10 reasoning model on the fake endpoint: field reasoning_content, can disable, replay not required',
+  async () => {
+    const { deps } = depsFor({ stream: fakeEndpoint() });
+    const auto = await probes.runAutoProbes(targetFor(piModel({ reasoning: true })), deps);
+    assert.equal(auto.field, 'reasoning_content');
+    assert.equal(auto.steps.thinking.outcome, 'pass');
+    assert.equal(auto.steps.replay.outcome, 'pass');
+    assert.deepEqual(profiles.reasoningOf('openai-completions', auto),
+      { field: 'reasoning_content', can_disable: true, replay: 'not_required' });
+  });
+
+test('MP-10 -replay model: dropping reasoning_content is rejected with 4xx, so replay is required', async () => {
+  const model = piModel({ id: 'fake-coder-replay', reasoning: true });
+  const { deps, stream } = depsFor({ stream: fakeEndpoint({ flags: ['replay'] }) });
+  const auto = await probes.runAutoProbes(targetFor(model), deps);
+  assert.equal(auto.steps.replay.outcome, 'fail');
+  assert.equal(profiles.reasoningOf('openai-completions', auto).replay, 'required');
+  const followUps = stream.calls.filter(({ context, options }) => lastUserText(context) === probes.PROBE_PROMPTS
+    .temperature && options.reasoning === 'medium');
+  assert.equal(followUps.length, 2);
+  const [withThinking, without] = followUps;
+  const assistantOf = (call) => call.context.messages.find((message) => message.role === 'assistant');
+  assert.ok(assistantOf(withThinking).content.some((block) => block.type === 'thinking'));
+  assert.ok(!assistantOf(without).content.some((block) => block.type === 'thinking'));
+  assert.equal(withThinking.model, model);
+  assert.equal(without.model.compat.requiresReasoningContentOnAssistantMessages, false);
+  assert.equal(without.model.id, model.id);
+  assert.equal(model.compat, undefined, 'the registered model is not changed');
+  assert.equal(auto.steps.call.outcome, 'pass', 'the base step 3/4 is not affected by -replay');
+  assert.equal(auto.steps.result.outcome, 'pass');
+});
+
+test('MP-10 -notools: tool calling failed and step 4 not run', async () => {
+  const { deps } = depsFor({ stream: fakeEndpoint({ flags: ['notools'] }) });
+  const auto = await probes.runAutoProbes(targetFor(piModel({ id: 'fake-coder-notools' })), deps);
+  assert.equal(auto.steps.call.outcome, 'fail');
+  assert.equal(auto.steps.result.outcome, 'not_run');
+  assert.equal(profiles.toolCallingOf(auto.steps.call, auto.steps.result), 'failed');
+});
+
+test('MP-10 -nochoice: tier B; -nochoice -noschema: step 7 runs 3 times and gives tier C', async () => {
+  const b = depsFor({ stream: fakeEndpoint({ flags: ['nochoice'] }) });
+  const autoB = await probes.runAutoProbes(targetFor(piModel({ id: 'fake-coder-nochoice' })), b.deps);
+  assert.equal(profiles.tierOf(autoB.steps.a, autoB.steps.b, autoB.steps.c), 'B');
+  assert.equal(autoB.steps.c.outcome, 'not_run');
+  const c = depsFor({ stream: fakeEndpoint({ flags: ['nochoice', 'noschema'] }) });
+  const autoC = await probes.runAutoProbes(targetFor(piModel({ id: 'fake-coder-nochoice-noschema' })), c.deps);
+  assert.equal(profiles.tierOf(autoC.steps.a, autoC.steps.b, autoC.steps.c), 'C');
+  const tagged = c.stream.calls.filter(({ context }) => lastUserText(context) === probes.PROBE_PROMPTS.tagged);
+  assert.equal(tagged.length, 3);
+  assert.equal(profiles.structuredOutputOf('openai-completions', autoC.steps.b), 'failed');
+});
+
+/** 按步骤脚本回答的替身：answers[提示] = 计划或计划的函数；没写的步骤按全通过回答。 */
+function scripted(answers, api = 'openai-completions') {
+  const P = probes.PROBE_PROMPTS;
+  return stubStream((model, context, options, index) => {
+    const prompt = lastUserText(context);
+    const custom = answers[prompt];
+    if (custom) return typeof custom === 'function' ? custom(model, context, options, index) : custom;
+    const ok = (fields) => ({ message: assistant(model, fields) });
+    if (prompt === P.ready) return ok({ text: 'ready' });
+    if (prompt === P.weather) {
+      return ok({ toolCalls: [{ type: 'toolCall', id: 'c1', name: 'get_weather',
+        arguments: { city: 'Paris', days: 3 } }] });
+    }
+    if (prompt === P.temperature) return ok({ text: '21°C' });
+    if (prompt === P.outcome) {
+      return ok({ toolCalls: [{ type: 'toolCall', id: 'c2', name: 'submit_outcome', arguments: { outcome: 'ok' } }] });
+    }
+    if (prompt === P.json) return ok({ text: '{"outcome":"ok"}' });
+    if (prompt === P.tagged) return ok({ text: '<summary>Yes it is.</summary><outcome>ok</outcome>' });
+    throw new Error(`unexpected prompt ${prompt.slice(0, 40)} for ${api}`);
+  });
+}
+
+test('MP-10 step 3 fails when days is a string or the call is to another tool', async () => {
+  const P = probes.PROBE_PROMPTS;
+  for (const args of [{ city: 'Paris', days: '3' }, { city: 7, days: 3 }, { city: 'Paris', days: 2.5 }]) {
+    const stream = scripted({ [P.weather]: (model) => ({ message: assistant(model,
+      { toolCalls: [{ type: 'toolCall', id: 'c', name: 'get_weather', arguments: args }] }) }) });
+    const { deps } = depsFor({ stream });
+    const auto = await probes.runAutoProbes(targetFor(piModel()), deps);
+    assert.equal(auto.steps.call.outcome, 'fail', JSON.stringify(args));
+  }
+  const other = scripted({ [P.weather]: (model) => ({ message: assistant(model,
+    { toolCalls: [{ type: 'toolCall', id: 'c', name: 'read', arguments: {} }] }) }) });
+  const auto = await probes.runAutoProbes(targetFor(piModel()), depsFor({ stream: other }).deps);
+  assert.match(auto.steps.call.detail, /did not call get_weather/);
+});
+
+test('MP-10 step 4 sends the call, the tool result and the question; fails without 21', async () => {
+  const P = probes.PROBE_PROMPTS;
+  const stream = scripted({ [P.temperature]: (model) => ({ message: assistant(model, { text: 'It was warm.' }) }) });
+  const auto = await probes.runAutoProbes(targetFor(piModel()), depsFor({ stream }).deps);
+  assert.equal(auto.steps.call.outcome, 'pass');
+  assert.equal(auto.steps.result.outcome, 'fail');
+  assert.equal(profiles.toolCallingOf(auto.steps.call, auto.steps.result), 'failed');
+  const step4 = stream.calls.find(({ context }) => lastUserText(context) === P.temperature);
+  const roles = step4.context.messages.map((message) => message.role);
+  assert.deepEqual(roles, ['user', 'assistant', 'toolResult', 'user']);
+  const result = step4.context.messages[2];
+  assert.equal(result.toolCallId, 'c1');
+  assert.equal(result.toolName, 'get_weather');
+  assert.deepEqual(result.content, [{ type: 'text', text: 'Paris: 21°C, sunny for 3 days.' }]);
+});
+
+test('MP-10 an HTTP error or connection error leaves tool calling unverified with the error text', async () => {
+  const P = probes.PROBE_PROMPTS;
+  const http = scripted({ [P.weather]: { status: 500, error: '500 Internal Server Error' } });
+  const autoHttp = await probes.runAutoProbes(targetFor(piModel()), depsFor({ stream: http }).deps);
+  assert.deepEqual(autoHttp.steps.call, { outcome: 'error', detail: '500 Internal Server Error' });
+  assert.equal(autoHttp.steps.result.outcome, 'not_run');
+  assert.equal(profiles.toolCallingOf(autoHttp.steps.call, autoHttp.steps.result), 'unverified');
+  const connection = scripted({ [P.temperature]: { error: 'Connection error.' } });
+  const autoConn = await probes.runAutoProbes(targetFor(piModel()), depsFor({ stream: connection }).deps);
+  assert.deepEqual(autoConn.steps.result, { outcome: 'error', detail: 'Connection error.' });
+  assert.equal(profiles.toolCallingOf(autoConn.steps.call, autoConn.steps.result), 'unverified');
+});
+
+test('MP-10 first-content timeout aborts the attempt and makes the step an error', async () => {
+  const P = probes.PROBE_PROMPTS;
+  const stream = scripted({ [P.ready]: { hang: true } });
+  const { deps, pool } = depsFor({ stream });
+  const auto = await probes.runAutoProbes(targetFor(piModel()), deps);
+  assert.deepEqual(auto.steps.ready, { outcome: 'error', detail: 'No response within 0.04 s' });
+  assert.equal(pool.requests[0].attemptSignal.aborted, true);
+  assert.equal(auto.steps.call.outcome, 'pass', 'later steps still run');
+});
+
+test('MP-10 first-content timeout counts from onSent, not from queueing', async () => {
+  const { deps } = depsFor({ stream: scripted({}), pool: stubPool({ delayMs: 100 }) });
+  const auto = await probes.runAutoProbes(targetFor(piModel()), deps);
+  assert.equal(auto.steps.ready.outcome, 'pass');
+  assert.equal(auto.steps.call.outcome, 'pass');
+});
+
+test('MP-10 a 4xx on steps 5 and 6 is a judged fail with the error text; step 7 runs and tags give tier C',
+  async () => {
+    const P = probes.PROBE_PROMPTS;
+    const choice = '400 Thinking mode does not support this tool_choice';
+    const format = '400 This response_format type is unavailable';
+    const stream = scripted({ [P.outcome]: { status: 400, error: choice }, [P.json]: { status: 400, error: format } });
+    const auto = await probes.runAutoProbes(targetFor(piModel()), depsFor({ stream }).deps);
+    assert.deepEqual(auto.steps.a, { outcome: 'fail', detail: choice });
+    assert.deepEqual(auto.steps.b, { outcome: 'fail', detail: format });
+    assert.equal(stream.calls.filter(({ context }) => lastUserText(context) === P.tagged).length, 3);
+    assert.equal(auto.steps.c.outcome, 'pass');
+    assert.equal(profiles.tierOf(auto.steps.a, auto.steps.b, auto.steps.c), 'C');
+    assert.equal(profiles.protocolWriteOf(auto.steps.a, auto.steps.b, auto.steps.c), 'verified');
+    assert.equal(profiles.structuredOutputOf('openai-completions', auto.steps.b), 'failed');
+  });
+
+test('MP-10 a 4xx on step 5 of anthropic-messages is a fail, so step 7 runs and gives tier C', async () => {
+  const P = probes.PROBE_PROMPTS;
+  const stream = scripted({ [P.outcome]: { status: 400, error: '400 tool_choice is not supported' } });
+  const auto = await probes.runAutoProbes(targetFor(piModel({ api: 'anthropic-messages' })), depsFor({ stream }).deps);
+  assert.equal(auto.steps.a.outcome, 'fail');
+  assert.equal(auto.steps.b.outcome, 'not_applicable');
+  assert.equal(profiles.tierOf(auto.steps.a, auto.steps.b, auto.steps.c), 'C');
+});
+
+test('MP-10 a 5xx, 401, 429 or connection error on step 5 is an error: step 7 not run, protocol_write unverified', async () => {
+  const P = probes.PROBE_PROMPTS;
+  const bad = (model) => ({ message: assistant(model, { text: 'banana' }) });
+  for (const plan of [{ status: 500, error: '500 Internal Server Error' }, { error: 'Connection error.' },
+    { status: 429, error: '429 Too Many Requests' }, { status: 401, error: '401 Unauthorized' }]) {
+    const stream = scripted({ [P.outcome]: plan, [P.json]: bad });
+    const auto = await probes.runAutoProbes(targetFor(piModel()), depsFor({ stream }).deps);
+    assert.deepEqual(auto.steps.a, { outcome: 'error', detail: plan.error });
+    assert.equal(auto.steps.b.outcome, 'fail');
+    assert.equal(auto.steps.c.outcome, 'not_run');
+    assert.ok(!stream.calls.some(({ context }) => lastUserText(context) === P.tagged), 'step 7 is not sent');
+    assert.equal(profiles.tierOf(auto.steps.a, auto.steps.b, auto.steps.c), null);
+    assert.equal(profiles.protocolWriteOf(auto.steps.a, auto.steps.b, auto.steps.c), 'unverified');
+  }
+});
+
+test('MP-10 step 7 stops at the first reply that does not parse; all fail gives tier null and failed', async () => {
+  const P = probes.PROBE_PROMPTS;
+  const bad = (model) => ({ message: assistant(model, { text: 'banana' }) });
+  const stream = scripted({ [P.outcome]: bad, [P.json]: bad,
+    [P.tagged]: (model, _c, _o, index) => ({ message: assistant(model,
+      { text: index % 2 ? 'Yes.' : '<summary>Yes.</summary><outcome>ok</outcome>' }) }) });
+  const auto = await probes.runAutoProbes(targetFor(piModel()), depsFor({ stream }).deps);
+  assert.equal(auto.steps.c.outcome, 'fail');
+  assert.ok(stream.calls.filter(({ context }) => lastUserText(context) === P.tagged).length < 3);
+  assert.equal(profiles.tierOf(auto.steps.a, auto.steps.b, auto.steps.c), null);
+  assert.equal(profiles.protocolWriteOf(auto.steps.a, auto.steps.b, auto.steps.c), 'failed');
+});
+
+test('MP-10 anthropic-messages: step 6 not run; A fails and C passes is C; A and C fail is tier null', async () => {
+  const P = probes.PROBE_PROMPTS;
+  const model = piModel({ api: 'anthropic-messages' });
+  const bad = (m) => ({ message: assistant(m, { text: 'banana' }) });
+  const passC = scripted({ [P.outcome]: bad });
+  const autoC = await probes.runAutoProbes(targetFor(model), depsFor({ stream: passC }).deps);
+  assert.equal(autoC.steps.b.outcome, 'not_applicable');
+  assert.ok(!passC.calls.some(({ context }) => lastUserText(context) === P.json), 'step 6 is not sent');
+  assert.equal(profiles.tierOf(autoC.steps.a, autoC.steps.b, autoC.steps.c), 'C');
+  assert.equal(autoC.field, 'native');
+  const failC = scripted({ [P.outcome]: bad, [P.tagged]: bad });
+  const autoNull = await probes.runAutoProbes(targetFor(model), depsFor({ stream: failC }).deps);
+  assert.equal(profiles.tierOf(autoNull.steps.a, autoNull.steps.b, autoNull.steps.c), null);
+  assert.equal(profiles.protocolWriteOf(autoNull.steps.a, autoNull.steps.b, autoNull.steps.c), 'failed');
+  assert.equal(profiles.structuredOutputOf('anthropic-messages', autoNull.steps.b), 'unverified');
+});
+
+test('MP-10 replay check: inconclusive when the thinking rerun makes no call; error when it fails', async () => {
+  const P = probes.PROBE_PROMPTS;
+  const model = piModel({ reasoning: true });
+  const noCall = scripted({ [P.weather]: (m, _c, options) => (options.reasoning === 'medium'
+    ? { message: assistant(m, { text: 'sunny' }) }
+    : { message: assistant(m, { toolCalls: [{ type: 'toolCall', id: 'c1', name: 'get_weather',
+      arguments: { city: 'Paris', days: 3 } }] }) }) });
+  const autoA = await probes.runAutoProbes(targetFor(model), depsFor({ stream: noCall }).deps);
+  assert.equal(autoA.steps.replay.outcome, 'not_run');
+  assert.equal(profiles.reasoningOf('openai-completions', autoA).replay, 'unknown');
+  const failing = scripted({ [P.temperature]: (m, _c, options) => (options.reasoning === 'medium'
+    ? { error: 'Connection error.' } : { message: assistant(m, { text: '21' }) }) });
+  const autoB = await probes.runAutoProbes(targetFor(model), depsFor({ stream: failing }).deps);
+  assert.deepEqual(autoB.steps.replay, { outcome: 'error', detail: 'Connection error.' });
+});
+
+test('MP-10 can_disable is false when thinking off still returns thinking', async () => {
+  const P = probes.PROBE_PROMPTS;
+  const stream = scripted({ [P.ready]: (m) => ({ message: assistant(m, { text: 'ready', thinking: 'hmm',
+    signature: 'reasoning' }) }) });
+  const auto = await probes.runAutoProbes(targetFor(piModel({ reasoning: true })), depsFor({ stream }).deps);
+  assert.equal(auto.steps.thinking.outcome, 'fail');
+  assert.equal(auto.field, 'reasoning');
+  assert.equal(profiles.reasoningOf('openai-completions', auto).can_disable, false);
+});
+
+test('MP-10 reasoning field from thinkingSignature; reasoning_details JSON counts as reasoning_content', () => {
+  const m = piModel();
+  const msg = (signature, thinking = 'x') => assistant(m, { text: 'a', thinking, signature });
+  assert.equal(probes.reasoningFieldOf([msg('reasoning_content')]), 'reasoning_content');
+  assert.equal(probes.reasoningFieldOf([msg('reasoning')]), 'reasoning');
+  assert.equal(probes.reasoningFieldOf([msg('reasoning_text')]), 'reasoning_text');
+  assert.equal(probes.reasoningFieldOf([msg('[{"type":"reasoning.text"}]')]), 'reasoning_content');
+  assert.equal(probes.reasoningFieldOf([null, assistant(m, { text: 'a' }), msg('reasoning')]), 'reasoning');
+  assert.equal(probes.reasoningFieldOf([msg('reasoning', '  ')]), 'none');
+  assert.equal(probes.reasoningFieldOf([]), 'none');
+});
+
+test('MP-10 judging functions: ready, JSON outcome, tagged format', () => {
+  const m = piModel();
+  const reply = (fields) => ({ message: assistant(m, fields), error: null, status: 200, content: true });
+  assert.equal(probes.judgeReady(reply({ text: 'ready' })).outcome, 'pass');
+  assert.equal(probes.judgeReady(reply({ thinking: 'only thinking' })).outcome, 'fail');
+  assert.equal(probes.judgeJsonOutcome(reply({ text: ' {"outcome":"fail"} ' })).outcome, 'pass');
+  assert.equal(probes.judgeJsonOutcome(reply({ text: '{"outcome":"banana"}' })).outcome, 'fail');
+  assert.equal(probes.judgeJsonOutcome(reply({ text: 'outcome: ok' })).outcome, 'fail');
+  assert.equal(probes.judgeOutcomeCall(reply({ toolCalls: [{ type: 'toolCall', id: 'x', name: 'submit_outcome',
+    arguments: { outcome: 'banana' } }] })).outcome, 'fail');
+  assert.equal(probes.parseTagged('<summary>Yes.</summary><outcome>ok</outcome>'), true);
+  assert.equal(probes.parseTagged('<summary>Yes.</summary>\n<outcome> fail </outcome>'), true);
+  assert.equal(probes.parseTagged('<summary>Yes.</summary><outcome>maybe</outcome>'), false);
+  assert.equal(probes.parseTagged('<summary></summary><outcome>ok</outcome>'), false);
+  assert.equal(probes.parseTagged('ok'), false);
+  const failed = { message: null, error: '502 Bad Gateway', status: 502, content: false };
+  assert.deepEqual(probes.judgeTagged([failed]), { outcome: 'error', detail: '502 Bad Gateway' });
+});
+
+// ---- 三种接口的请求写法：用 pi-ai 真实的组装，替身 fetch 截下请求体 ----
+
+/** 用 pi-ai 的接口模块组装请求、替身 fetch 截下请求体（一律回 400）。 */
+async function capturedBodies(api) {
+  const mod = await import(`@earendil-works/pi-ai/api/${api}`);
+  const bodies = [];
+  const fetchFor = (request) => async (_url, init) => {
+    request.onSent();
+    bodies.push(JSON.parse(init.body));
+    return new Response('{"error":{"message":"captured"}}', { status: 400,
+      headers: { 'content-type': 'application/json' } });
+  };
+  const stream = { streamSimple: (model, context, options) => mod.streamSimple(model, normalizeContext(context),
+    options) };
+  const { deps } = depsFor({ stream, pool: { fetchFor } });
+  await probes.runAutoProbes(targetFor(piModel({ api })), deps);
+  return bodies;
+}
+
+/** 请求体里的全部文字（找某一步的请求）。 */
+function bodyHas(body, text) {
+  return JSON.stringify(body).includes(text);
+}
+
+test('MP-10 openai-completions payload: tool_choice function, function.strict, response_format json_schema',
+  async () => {
+    const bodies = await capturedBodies('openai-completions');
+    const step5 = bodies.find((body) => bodyHas(body, 'Call submit_outcome'));
+    assert.deepEqual(step5.tool_choice, { type: 'function', function: { name: 'submit_outcome' } });
+    assert.equal(step5.tools[0].function.name, 'submit_outcome');
+    assert.equal(step5.tools[0].function.strict, true);
+    assert.equal(step5.reasoning_effort, undefined);
+    assert.equal(step5.max_completion_tokens, 256);
+    const step6 = bodies.find((body) => bodyHas(body, 'Reply with JSON'));
+    assert.deepEqual(step6.response_format, { type: 'json_schema', json_schema: { name: 'outcome',
+      schema: { type: 'object', properties: { outcome: { type: 'string', enum: ['ok', 'fail'] } },
+        required: ['outcome'], additionalProperties: false }, strict: true } });
+  });
+
+test('MP-10 openai-responses payload: tool_choice {type, name}, tools[i].strict, text.format json_schema',
+  async () => {
+    const bodies = await capturedBodies('openai-responses');
+    const step5 = bodies.find((body) => bodyHas(body, 'Call submit_outcome'));
+    assert.deepEqual(step5.tool_choice, { type: 'function', name: 'submit_outcome' });
+    assert.equal(step5.tools[0].name, 'submit_outcome');
+    assert.equal(step5.tools[0].strict, true);
+    const step6 = bodies.find((body) => bodyHas(body, 'Reply with JSON'));
+    assert.equal(step6.text.format.type, 'json_schema');
+    assert.equal(step6.text.format.name, 'outcome');
+    assert.equal(step6.text.format.strict, true);
+    assert.deepEqual(step6.text.format.schema.properties.outcome.enum, ['ok', 'fail']);
+    assert.equal(step6.response_format, undefined);
+  });
+
+test('MP-10 anthropic-messages payload: tool_choice {type: tool, name}, tools[i].strict, no step 6', async () => {
+  const bodies = await capturedBodies('anthropic-messages');
+  const step5 = bodies.find((body) => bodyHas(body, 'Call submit_outcome'));
+  assert.deepEqual(step5.tool_choice, { type: 'tool', name: 'submit_outcome' });
+  assert.equal(step5.tools[0].name, 'submit_outcome');
+  assert.equal(step5.tools[0].strict, true);
+  assert.ok(!bodies.some((body) => bodyHas(body, 'Reply with JSON')));
+});
+
+test('MP-10 payload helpers leave other fields alone and keep existing text options', () => {
+  const body = { model: 'm', text: { verbosity: 'low' } };
+  assert.deepEqual(probes.withJsonSchema('openai-responses', body).text.verbosity, 'low');
+  assert.deepEqual(body, { model: 'm', text: { verbosity: 'low' } }, 'input is not changed');
+  assert.deepEqual(probes.withStrictTools('openai-completions', { model: 'm' }), { model: 'm' });
+  assert.deepEqual(probes.forcedToolChoice('anthropic-messages', 'x'), { type: 'tool', name: 'x' });
+});
+
+// ---- 第 0 步 ----
+
+test('MP-10 step 0 GETs <baseUrl>/models, /version, /api/version and /props', async () => {
+  const get = stubGet({});
+  const { deps } = depsFor({ stream: scripted({}), get });
+  const info = await probes.detectServer(deps, 'http://10.0.0.5:8000/v1/', 'qwen');
+  assert.deepEqual(info, { kind: 'unknown', version: null, reported: null });
+  assert.deepEqual(get.urls.sort(), ['http://10.0.0.5:8000/api/version', 'http://10.0.0.5:8000/props',
+    'http://10.0.0.5:8000/v1/models', 'http://10.0.0.5:8000/version']);
+});
+
+test('MP-10 step 0 server kinds: vLLM, SGLang, Ollama, llama.cpp, unknown; reported window', () => {
+  const models = (ownedBy, extra = {}) => ({ data: [{ id: 'q', owned_by: ownedBy, ...extra }] });
+  const judge = (bodies) => probes.judgeServer({ models: null, version: null, apiVersion: null, props: null,
+    ...bodies }, 'q');
+  assert.deepEqual(judge({ models: models('vllm', { max_model_len: 32768 }), version: { version: '0.10.1' } }),
+    { kind: 'vllm', version: '0.10.1', reported: 32768 });
+  assert.deepEqual(judge({ models: models('sglang'), version: { version: '0.4.9' } }),
+    { kind: 'sglang', version: '0.4.9', reported: null });
+  assert.deepEqual(judge({ apiVersion: { version: '0.9.0' } }), { kind: 'ollama', version: '0.9.0', reported: null });
+  assert.deepEqual(judge({ props: { default_generation_settings: { n_ctx: 8192 }, build_info: 'b5000-abc' } }),
+    { kind: 'llamacpp', version: 'b5000-abc', reported: 8192 });
+  assert.deepEqual(judge({ props: { n_ctx: 4096 } }), { kind: 'llamacpp', version: null, reported: 4096 });
+  assert.deepEqual(judge({ models: { data: [{ id: 'other', max_model_len: 1 }] } }),
+    { kind: 'unknown', version: null, reported: null });
+  assert.deepEqual(judge({ version: { version: '' } }), { kind: 'unknown', version: null, reported: null });
+});
+
+test('MP-12 a server without a version gives profile version unknown', async () => {
+  const get = stubGet({ '/v1/models': VLLM['/v1/models'] });
+  const { deps } = depsFor({ stream: scripted({}), get });
+  const auto = await probes.runAutoProbes(targetFor(piModel()), deps);
+  assert.deepEqual(auto.server, { kind: 'unknown', version: 'unknown' });
+  assert.equal(auto.reported, 65536);
+});
+
+// ---- 取消：同一个模型同时只跑一组 ----
+
+test('MP-10 a new probe set for the same model cancels the old one', async () => {
+  const runs = new probes.ProbeRuns();
+  const first = runs.begin('local/a');
+  const other = runs.begin('local/b');
+  const second = runs.begin('local/a');
+  assert.equal(first.aborted, true);
+  assert.equal(other.aborted, false);
+  assert.equal(runs.end('local/a', first), false, 'the old set must not save');
+  assert.equal(runs.end('local/a', second), true);
+  assert.equal(runs.isRunning('local/a'), false);
+  runs.cancel('local/b');
+  assert.equal(other.aborted, true);
+  assert.equal(runs.end('local/b', other), false);
+});
+
+test('MP-10 a cancelled probe set stops sending and returns null', async () => {
+  const controller = new AbortController();
+  const P = probes.PROBE_PROMPTS;
+  const stream = scripted({ [P.weather]: (model) => {
+    controller.abort();
+    return { message: assistant(model, { text: 'late' }) };
+  } });
+  const { deps } = depsFor({ stream, signal: controller.signal });
+  assert.equal(await probes.runAutoProbes(targetFor(piModel()), deps), null);
+  assert.ok(!stream.calls.some(({ context }) => lastUserText(context) === P.temperature));
+});
+
+// ---- 第 8 步：长输入（需要同意） ----
+
+test('MP-11 long-input prompt: passphrase first, padded to the token estimate, question last', () => {
+  const prompt = probes.longInputPrompt('lantern4821', 1000);
+  assert.ok(prompt.startsWith('The passphrase is lantern4821.'));
+  assert.ok(prompt.endsWith('What is the passphrase?'));
+  assert.equal(prompt.length, 4000);
+  assert.equal((prompt.match(/passphrase/g) ?? []).length, 2);
+  assert.ok(probes.longInputPrompt('x', 0).endsWith('What is the passphrase?'));
+});
+
+test('MP-11 long-input lengths are 50% and 90% of the effective window; the dialog estimate is their sum', () => {
+  assert.deepEqual(probes.longInputLengths(100000, TIMINGS), [50000, 90000]);
+  assert.equal(probes.longInputTokenEstimate(100000, TIMINGS), 140000);
+});
+
+test('MP-11 fake endpoint -truncate: 50% passes, 90% is silent, effective drops to the 50% length', async () => {
+  const window = 4000;
+  const { deps, stream } = depsFor({ stream: fakeEndpoint({ flags: ['truncate'], window }),
+    randomWord: () => 'quartz7777' });
+  const result = await probes.runLongInputProbe(targetFor(piModel({ id: 'fake-coder-truncate' })), window, deps);
+  assert.deepEqual(result, { step: { outcome: 'pass', detail: 'Silently truncates long input' },
+    truncation: 'silent', limit: 2000 });
+  assert.equal(stream.calls.length, 2);
+  assert.ok(stream.calls.every(({ options }) => options.reasoning === undefined && options.maxTokens === 256));
+  const model = { id: 'm', family: '', contextWindow: 8000, maxTokens: 1000, reasoning: false, input: ['text'] };
+  assert.equal(profiles.contextOf(model, 4000, result).effective, 2000);
+});
+
+test('MP-11 fake endpoint without -truncate: both lengths pass, truncation none', async () => {
+  const { deps } = depsFor({ stream: fakeEndpoint({ window: 4000 }) });
+  const result = await probes.runLongInputProbe(targetFor(piModel()), 4000, deps);
+  assert.deepEqual(result, { step: { outcome: 'pass', detail: null }, truncation: 'none', limit: null });
+});
+
+test('MP-11 long-input judgement: silent at 50% is 0, HTTP rejection is none, connection error keeps old', () => {
+  const t = (tokens, outcome, detail = null) => ({ tokens, outcome, detail });
+  assert.deepEqual(probes.judgeLongInput([t(50, 'silent'), t(90, 'silent')]).limit, 0);
+  assert.deepEqual(probes.judgeLongInput([t(50, 'pass'), t(90, 'rejected', '400 too long')]),
+    { step: { outcome: 'pass', detail: null }, truncation: 'none', limit: null });
+  assert.deepEqual(probes.judgeLongInput([t(50, 'pass'), t(90, 'error', 'Connection error.')]),
+    { step: { outcome: 'error', detail: 'Connection error.' }, truncation: null, limit: null });
+  const m = piModel();
+  const ok = { message: assistant(m, { text: 'It is QUARTZ7777.' }), error: null, status: 200, content: true };
+  assert.equal(probes.judgeLongInputTrial(ok, 'quartz7777', 5).outcome, 'pass');
+  const rejected = { message: null, error: '400 context too long', status: 400, content: false };
+  assert.equal(probes.judgeLongInputTrial(rejected, 'w', 5).outcome, 'rejected');
+  const dropped = { message: null, error: 'Connection error.', status: null, content: false };
+  assert.equal(probes.judgeLongInputTrial(dropped, 'w', 5).outcome, 'error');
+});
+
+// ---- 第 9 步：取消（需要同意） ----
+
+/** 进行中请求数会变化的 /metrics 替身。 */
+function metrics(values) {
+  let index = 0;
+  return () => {
+    const value = values[Math.min(index, values.length - 1)];
+    index += 1;
+    return value === null ? null : `# HELP x\nvllm:num_requests_running{model_name="m"} ${value}\n`;
+  };
+}
+
+/** 第 9 步的替身：数数的回复，收到内容即被断开。 */
+function counting() {
+  return scripted({ [probes.PROBE_PROMPTS.count]: (model) => ({ message: assistant(model,
+    { text: '1\n2\n3\n' }) }) });
+}
+
+test('MP-11 cancel probe: count back to baseline is true; still above is false; first output then disconnect',
+  async () => {
+    const back = depsFor({ stream: counting(), get: stubGet({ '/metrics': metrics([2, 2]) }) });
+    const target = targetFor(piModel());
+    assert.deepEqual(await probes.runCancelProbe(target, 'vllm', back.deps),
+      { step: { outcome: 'pass', detail: null }, verified: true });
+    const call = back.stream.calls[0];
+    assert.equal(call.options.maxTokens, 2048);
+    assert.equal(call.options.reasoning, undefined);
+    assert.equal(call.options.signal.aborted, true, 'disconnected after the first output');
+    assert.deepEqual(back.get.urls, ['http://127.0.0.1:4319/metrics', 'http://127.0.0.1:4319/metrics']);
+    const stuck = depsFor({ stream: counting(), get: stubGet({ '/metrics': metrics([0, 1]) }) });
+    assert.equal((await probes.runCancelProbe(target, 'vllm', stuck.deps)).verified, false);
+  });
+
+test('MP-11 cancel probe: no metrics endpoint or no counter is unknown; other servers are unknown', async () => {
+  const target = targetFor(piModel());
+  const none = depsFor({ stream: counting(), get: stubGet({}) });
+  const result = await probes.runCancelProbe(target, 'vllm', none.deps);
+  assert.equal(result.verified, 'unknown');
+  assert.equal(none.stream.calls.length, 0, 'no request without a baseline');
+  const noCounter = depsFor({ stream: counting(), get: stubGet({ '/metrics': '# nothing\nother_metric 3\n' }) });
+  assert.equal((await probes.runCancelProbe(target, 'vllm', noCounter.deps)).verified, 'unknown');
+  const gone = depsFor({ stream: counting(), get: stubGet({ '/metrics': metrics([1, null]) }) });
+  assert.equal((await probes.runCancelProbe(target, 'vllm', gone.deps)).verified, 'unknown');
+  for (const kind of ['ollama', 'unknown']) {
+    const other = depsFor({ stream: counting() });
+    assert.deepEqual(await probes.runCancelProbe(target, kind, other.deps),
+      { step: { outcome: 'not_applicable', detail: null }, verified: 'unknown' });
+    assert.equal(other.stream.calls.length, 0);
+  }
+});
+
+test('MP-11 cancel probe: a request error before any output is an error with unknown', async () => {
+  const stream = scripted({ [probes.PROBE_PROMPTS.count]: { status: 503, error: '503 Service Unavailable' } });
+  const { deps } = depsFor({ stream, get: stubGet({ '/metrics': metrics([0]) }) });
+  assert.deepEqual(await probes.runCancelProbe(targetFor(piModel()), 'vllm', deps),
+    { step: { outcome: 'error', detail: '503 Service Unavailable' }, verified: 'unknown' });
+});
+
+test('MP-11 running-request counters: vLLM, SGLang /metrics and llama.cpp /slots', async () => {
+  const text = 'vllm:num_requests_running{model_name="a"} 1.0\nvllm:num_requests_running{model_name="b"} 2\n'
+    + 'vllm:num_requests_waiting 5\n';
+  assert.equal(probes.prometheusValue(text, 'vllm:num_requests_running'), 3);
+  assert.equal(probes.prometheusValue(text, 'sglang:num_running_reqs'), null);
+  const signal = new AbortController().signal;
+  const sglang = stubGet({ '/metrics': 'sglang:num_running_reqs{tp_rank="0"} 4\n' });
+  assert.equal(await probes.readRunningRequests(sglang, 'http://h:30000/v1', 'sglang', signal), 4);
+  const slots = stubGet({ '/slots': JSON.stringify([{ id: 0, is_processing: true },
+    { id: 1, is_processing: false }]) });
+  assert.equal(await probes.readRunningRequests(slots, 'http://h:8080', 'llamacpp', signal), 1);
+  assert.deepEqual(slots.urls, ['http://h:8080/slots']);
+  const badSlots = stubGet({ '/slots': '{"error":"disabled"}' });
+  assert.equal(await probes.readRunningRequests(badSlots, 'http://h:8080', 'llamacpp', signal), null);
+  assert.equal(await probes.readRunningRequests(sglang, 'http://h', 'ollama', signal), null);
+  assert.equal(probes.judgeCancel(2, 2), true);
+  assert.equal(probes.judgeCancel(2, 3), false);
+  assert.equal(probes.judgeCancel(2, null), 'unknown');
+});
+
+test('MP-11 cancelling the cancel probe while it waits returns null', async () => {
+  const controller = new AbortController();
+  const { deps } = depsFor({ stream: counting(), get: stubGet({ '/metrics': metrics([0, 0]) }),
+    signal: controller.signal, timings: { ...TIMINGS, cancelProbeWindowMs: 10_000 } });
+  const pending = probes.runCancelProbe(targetFor(piModel()), 'vllm', deps);
+  setTimeout(() => controller.abort(), 20);
+  assert.equal(await pending, null);
+});

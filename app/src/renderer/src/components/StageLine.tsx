@@ -1,21 +1,37 @@
-// 阶段行：全部由 pi 事件推出（见 docs/v0/screens/chat.md），本轮结束后隐藏。
+// 阶段行：由 pi 事件推出（见 docs/v0/screens/chat.md），本轮结束后隐藏。模型层的等待（等模型、等它停下、重建、排队、
+// 原地重试，docs/v1/screens/model-chat.md "阶段行"）进行时取代"Waiting for the model…"，准备中也显示。
 
 import type { Transcript } from '../state/model';
 import { seconds, useNow } from './ToolCard';
 import { toolTitleText } from './toolTitle';
 
+/** @brief 已经过的秒数，写作 "12s"。 */
+function elapsedText(since: number, now: number): string {
+  return seconds(Math.max(0, now - since)).replace(/\.\d+s$/, 's');
+}
+
+/** @brief 模型层的等待是否显示：本轮运行中或准备中（§9.3），且没有挂起的批准与询问。 */
+function modelStageShown(transcript: Transcript): boolean {
+  const busy = transcript.running || transcript.sending;
+  return busy && transcript.modelStage !== null && transcript.approvals.length === 0
+    && transcript.questions.length === 0;
+}
+
 /**
  * @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"Waiting for your approval"，其次有挂起的扩展询问时
- *        "Waiting for your answer"，都不显示"Responding…"或工具的"<标题> Ns"。
+ *        "Waiting for your answer"，都不显示"Responding…"或工具的"<标题> Ns"。模型层的等待写作"<文字> · 12s"，
+ *        从这次等待开始计时。
  */
 export function stageText(transcript: Transcript, cwd: string, now: number): string | null {
   const stage = transcript.stage;
   if (transcript.running && transcript.approvals.length > 0) return 'Waiting for your approval';
   // 扩展命令等不经过一轮运行的询问也要看得到。
   if (transcript.questions.length > 0) return 'Waiting for your answer';
+  const model = transcript.modelStage;
+  if (model && modelStageShown(transcript)) return `${model.text} · ${elapsedText(model.since, now)}`;
   if (!transcript.running) return null;
   if (!stage) return null;
-  const elapsed = seconds(Math.max(0, now - stage.since)).replace(/\.\d+s$/, 's');
+  const elapsed = elapsedText(stage.since, now);
   switch (stage.kind) {
     case 'waiting':
       return `Waiting for the model… ${elapsed}`;
@@ -29,20 +45,20 @@ export function stageText(transcript: Transcript, cwd: string, now: number): str
     }
     case 'approval':
       return 'Waiting for your approval';
-    case 'retry':
-      return `Retrying ${stage.detail}`;
     case 'compacting':
       return 'Compacting session…';
   }
 }
 
-/** @brief 阶段行。 */
+/** @brief 阶段行；模型层的等待带 data-kind（wait-model、held、rebuild、queue、retry）。 */
 export function StageLine({ transcript, cwd }: { transcript: Transcript; cwd: string }) {
-  const now = useNow(transcript.running && transcript.stage !== null);
+  const busy = transcript.running || transcript.sending;
+  const now = useNow(busy && (transcript.stage !== null || transcript.modelStage !== null));
   const text = stageText(transcript, cwd, now);
   if (!text) return null;
+  const kind = modelStageShown(transcript) ? transcript.modelStage?.kind : undefined;
   return (
-    <div className="stage-line" data-testid="stage" aria-live="polite">
+    <div className="stage-line" data-testid="stage" data-kind={kind} aria-live="polite">
       <span className="spinner" aria-hidden="true" />
       <span className="stage-text">{text}</span>
     </div>

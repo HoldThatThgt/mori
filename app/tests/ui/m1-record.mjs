@@ -6,10 +6,16 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m1-record.mjs --source <走查数据目录> [--only name1,name2] [--exe <Mori.exe>]
 // 走查数据目录是负责人在 Mori 里填过连接的目录（key 由 Mori 加密保存）；脚本只复制密文文件，不读取 key。
+// v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；每个复制出的数据目录先给临时项目授权公网、
+// 默认范围设为 [DeepSeek, GLM] 的分组（测试准备）。no-key 场景删去（v1 里没有 key 的提供商请求不带认证头）；wrong-key 改为
+// 删掉首选的 key、加一个错的 key（sk-invalid），范围只有首选，换不到模型时对话流是说明卡（mori.model_unavailable）；
+// 压缩的准备改为在复制出的 model-config.json 里把窗口改小。
 
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { appRoot, arg, launch, oneLine, prepareProject, scratchUserData } from './lib.mjs';
+import {
+  allowRealProject, appRoot, arg, editModelConfig, launch, oneLine, prepareProject, realProviders, scratchUserData,
+} from './lib.mjs';
 
 const source = arg('source');
 const exePath = arg('exe');
@@ -184,35 +190,42 @@ function wrap(body) {
   }`;
 }
 
-/** @brief 读取走查连接的非机密信息。 */
+/** @brief 读取走查数据目录里首选提供商（DeepSeek）的非机密信息（v1：model-config.json，lib.mjs realProviders）。 */
 function connectionInfo(dir) {
-  const provider = JSON.parse(readFileSync(join(dir, 'pi', 'models.json'), 'utf8')).providers['mori-endpoint'];
-  return { endpoint: provider.baseUrl, model: `mori-endpoint/${provider.models[0].id}` };
+  const [first] = realProviders(dir);
+  return { endpoint: first.baseUrl, model: first.ref, provider: first.provider, keys: first.keys };
 }
 
 /**
- * @brief 录制压缩场景：models.json 的上下文长度改为 8000，pi settings.json 的压缩参数调小。
- *        pi 默认 keepRecentTokens 为 20000，8k 上下文下没有可压缩的旧内容，永远不会压缩（见 m1-checks.md）。
+ * @brief 复制一份走查数据目录，测试准备（synthetic test setup，§14.1）：给临时项目授权公网，默认范围设为测试分组。
+ * @param options 传给 scratchUserData
  */
-function setSmallContext(dir) {
-  const modelsPath = join(dir, 'pi', 'models.json');
-  const models = JSON.parse(readFileSync(modelsPath, 'utf8'));
-  models.providers['mori-endpoint'].models[0].contextWindow = 8000;
-  writeFileSync(modelsPath, JSON.stringify(models, null, 2));
+function scratchFor(project, options) {
+  const dir = scratchUserData(source, options);
+  allowRealProject(dir, project);
+  return dir;
+}
+
+/**
+ * @brief 录制压缩场景（测试准备）：复制出的 model-config.json 里首选的第一个模型窗口改为 8000（最大输出改为 4000，
+ *        要小于窗口），pi settings.json 的压缩参数调小。pi 默认 keepRecentTokens 为 20000，8k 上下文下没有可压缩的
+ *        旧内容，永远不会压缩（见 m1-checks.md）。
+ */
+function setSmallContext(dir, providerId) {
+  editModelConfig(dir, (config) => {
+    const model = config.providers.find((item) => item.id === providerId).models[0];
+    model.contextWindow = 8000;
+    model.maxTokens = Math.min(model.maxTokens, 4000);
+  });
   const settingsPath = join(dir, 'pi', 'settings.json');
-  const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+  const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {};
   settings.compaction = { reserveTokens: 6000, keepRecentTokens: 300 };
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 }
 
 const errorScenarios = {
-  noKey: { name: 'no-key', description: '没有保存 key：发送时就失败',
-    body: async (rec, args) => {
-      const s = await args.create(rec, args);
-      await args.say(rec, s, '你好');
-      await rec.waitFor((e) => e.event.type === 'mori.prompt_error');
-    } },
-  wrongKey: { name: 'wrong-key', description: 'key 填错：模型回复 401',
+  wrongKey: { name: 'wrong-key', description: 'key 填错（v1：删掉首选的 key、加 sk-invalid，范围只有首选）：401 → auth，'
+      + '换不到模型，对话流是说明卡（mori.model_unavailable）',
     body: async (rec, args) => {
       const s = await args.create(rec, args);
       await args.say(rec, s, '你好');
@@ -239,17 +252,13 @@ const { project, root } = prepareProject('mori-m1-record-');
 const context = { cwd: project, ...connectionInfo(source) };
 const made = [];
 try {
-  made.push(scratchUserData(source));
+  made.push(scratchFor(project));
   await recordWith(made[0], scenarios, context);
 
   if (!only || only.includes('compaction')) {
-    made.push(scratchUserData(source));
-    setSmallContext(made[made.length - 1]);
+    made.push(scratchFor(project));
+    setSmallContext(made[made.length - 1], context.provider);
     await recordWith(made[made.length - 1], [errorScenarios.compaction], context);
-  }
-  if (!only || only.includes('no-key')) {
-    made.push(scratchUserData(source, { withKey: false }));
-    await recordWith(made[made.length - 1], [errorScenarios.noKey], context);
   }
   if (!only || only.includes('wrong-key')) await recordWrongKey(context);
 } catch (error) {
@@ -260,22 +269,24 @@ try {
   rmSync(root, { recursive: true, force: true });
 }
 
-/** @brief key 填错：在全新的数据目录里用一个明显错误的 key 保存同一端点，再发消息。 */
+/**
+ * @brief key 填错（§14.1 的真实故障）：在复制出的数据目录里把默认范围设为首选提供商（测试准备，只有它一个候选，换不到
+ *        模型），经进程桥删掉它的 key、加一个错的 key（sk-invalid，故意填错，不是机密；不经录制器），再发消息。
+ */
 async function recordWrongKey(ctx) {
-  const dir = scratchUserData(source, { withKey: false });
+  const dir = scratchFor(ctx.cwd);
+  editModelConfig(dir, (config) => {
+    config.normalDefault = ctx.provider;
+  });
   made.push(dir);
   const app = await launch({ exePath, userData: dir });
   try {
     const page = await app.firstWindow();
     await page.waitForFunction(() => Boolean(window.mori));
-    const saved = JSON.parse(readFileSync(join(dir, 'pi', 'models.json'), 'utf8')).providers['mori-endpoint'];
-    // 这是故意填错的 key，不是机密。M6 起 connection.save 要带 providerId（改已有的 mori-endpoint，默认模型不变）
-    // 和模型的思考字段（不支持思考）。
-    const connection = { name: 'wrong key', baseUrl: saved.baseUrl, api: 'openai-completions',
-      apiKey: 'sk-mori-fixture-wrong-key', modelId: saved.models[0].id, contextWindow: 128000, compat: [],
-      reasoning: false, thinkingLevel: 'off' };
-    await page.evaluate((c) => window.mori.request({ type: 'connection.save', providerId: 'mori-endpoint',
-      connection: c }), connection);
+    await page.evaluate(async ({ providerId, refs }) => {
+      for (const ref of refs) await window.mori.request({ type: 'models.removeKey', providerId, ref });
+      await window.mori.request({ type: 'models.addKey', providerId, label: 'Wrong key', secret: 'sk-invalid' });
+    }, { providerId: ctx.provider, refs: ctx.keys });
     await page.evaluate(installRecorder);
     await runScenario(page, { ...errorScenarios.wrongKey, body: wrap(errorScenarios.wrongKey.body) }, ctx);
   } finally {

@@ -1,12 +1,14 @@
 // M0 冒烟测试：用合成端点（tests/fake-endpoint）驱动真实的 Mori 界面与后台进程。
 // M1 起界面换成正式界面，这里只改了找元素的方式，检查的内容与 M0 相同（"未保存时不能测试连接"改为"测试连接会先保存"）。
+// v1（docs/specs/model-providers.md §14.4）：对 pi/models.json 的断言改为 model-config.json；改地址按 v1（key 被删、确认框）；
+// key 的占位文字改为 Keys 行的"Saved"；校验文字为英文。
 // 用法：
 //   node tests/ui/m0-smoke.mjs                         测开发构建（先 npm run build）
 //   node tests/ui/m0-smoke.mjs --exe <Mori.exe 路径>   测打包后的程序
 // 结果写到 test-results/m0-smoke.json；任何一项失败时退出码为 1。
 
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
@@ -56,52 +58,110 @@ function prepareDirs() {
   return { project, userData: join(root, 'user-data') };
 }
 
-/** @brief 在首次启动的表单里用给定的 key 测试连接（会先保存），返回结果文字与是否成功。 */
+/** @brief 在首次启动的表单（v1，英文）里用给定的 key 测试连接（会先保存），返回结果文字与是否成功。 */
 async function saveAndTest(page, apiKey) {
   const h = pageHelpers(page);
-  await h.fillConnection({ name: '合成端点', baseUrl: `http://127.0.0.1:${port}/v1`, apiKey, modelId: 'fake-coder' });
+  await h.fillConnection({ name: 'Mori endpoint', baseUrl: `http://127.0.0.1:${port}/v1`, zone: 'local', apiKey,
+    modelId: 'fake-coder' });
   const previous = await page.getByTestId('form-message').innerText().catch(() => null);
-  await page.getByRole('button', { name: 'Test connection' }).click();
-  await page.waitForFunction((old) => document.querySelector('[data-testid="test-result"]')
-    || (document.querySelector('[data-testid="form-message"]')?.textContent?.startsWith('Connection failed')
-      && document.querySelector('[data-testid="form-message"]')?.textContent !== old), previous, { timeout: 40000 });
-  const success = page.getByTestId('test-result');
-  if (await success.count()) return { ok: true, text: oneLine(await success.innerText()) };
-  return { ok: false, text: oneLine(await page.getByTestId('form-message').innerText()) };
+  await page.getByTestId('connection-form').locator('[data-action="test"]').click();
+  const text = oneLine(await h.formMessage(previous, { test: true, timeout: 60000 }));
+  return { ok: text.startsWith('Connected'), text };
 }
 
-/** @brief 连接表单：错误的 key 显示错误原文；正确的 key 能连上；key 加密保存；改服务地址必须重填 key。 */
+/**
+ * @brief v1 的模型配置：model-config.json、credentials.json；pi 的 models.json 不再读写（规格 §4.4 第 1 步，
+ *        提供商在内存里注册，只带占位 key），存在时（例如 v0 留下的）也一起查。
+ */
+function readConfigFiles(userData) {
+  const text = (name) => (existsSync(join(userData, name)) ? readFileSync(join(userData, name), 'utf8') : '');
+  return { config: text('model-config.json'), credentials: text('credentials.json'), pi: text('pi/models.json') };
+}
+
+/**
+ * @brief 首次启动表单（v1）：没填时不能测试并给出英文说明；错误的 key 显示错误原文；正确的 key 能连上；key 加密保存
+ *        （model-config.json 只有 ref，pi 里只有占位 key）；改地址的 origin 时确认框说明 key 会被删，确认后 key 被删
+ *        （规格 §4.1、§14.4），之后改回地址、加回 key。
+ */
 async function connect(app, page, userData, project) {
-  await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
-  await page.getByRole('button', { name: 'Test connection' }).click();
-  const empty = await page.getByTestId('form-message').innerText();
-  record('没填连接时不发请求，给出说明（M1：测试连接会先保存）', empty.endsWith(' is required.'), empty);
+  const h = pageHelpers(page);
+  const form = page.getByTestId('connection-form');
+  await form.waitFor({ timeout: 60000 });
+  await h.fillConnection({ name: 'x' });
+  await h.fillConnection({ name: '' });
+  const nameError = await form.locator('[data-testid="field-error"][data-field="name"]').innerText().catch(() => '');
+  const disabled = await form.locator('[data-action="test"]').isDisabled();
+  record('没填连接时不能测试连接，字段旁给出英文说明', disabled && /^Name is required\.?$/.test(nameError),
+    `Test connection 不可用=${disabled}；${nameError}`);
   const wrong = await saveAndTest(page, 'wrong-key');
-  record('错误的 key 显示错误原文', !wrong.ok && wrong.text.includes('401'), wrong.text.slice(0, 160));
+  record('错误的 key 显示错误原文', !wrong.ok && /^(Connection failed|Failed)/.test(wrong.text) && wrong.text.includes('401'),
+    wrong.text.slice(0, 160));
   const literal = await saveAndTest(page, testKey);
   record('测试连接', literal.ok, literal.text.slice(0, 160));
-  const models = readFileSync(join(userData, 'pi', 'models.json'), 'utf8');
-  const credentials = readFileSync(join(userData, 'credentials.json'), 'utf8');
-  const provider = JSON.parse(models).providers?.['mori-endpoint'] ?? {};
-  record('key 加密保存：models.json 没有 key，credentials.json 只有密文',
-    !('apiKey' in provider) && !models.includes(testKey) && !credentials.includes(testKey) &&
-      Boolean(JSON.parse(credentials)['mori-endpoint']),
-    `models.json 有 apiKey 字段=${'apiKey' in provider}；credentials.json 含明文=${credentials.includes(testKey)}`);
-  await pageHelpers(page).openFolder(app, project);
+  const files = readConfigFiles(userData);
+  const provider = JSON.parse(files.config).providers?.[0] ?? {};
+  const ref = provider.keys?.[0]?.ref;
+  record('key 加密保存：model-config.json 只有 key 的 ref，没有 pi/models.json 的明文，credentials.json 只有密文',
+    !files.config.includes(testKey) && !files.pi.includes(testKey) && !files.credentials.includes(testKey)
+      && provider.keys?.length === 1 && Boolean(ref) && Boolean(JSON.parse(files.credentials)[ref]),
+    `keys=${JSON.stringify(provider.keys)}；含明文：config=${files.config.includes(testKey)}`
+      + ` pi=${files.pi.includes(testKey)} credentials=${files.credentials.includes(testKey)}`);
+  const probe = await h.waitProbes();
+  record('首次启动：测试成功后等探针跑完，tool calling 已验证', probe === 'verified', `probe-status=${probe}`);
+  await h.openFolder(app, project);
   // M2 起命令要先批准；冒烟测的是批准之外的行为，先切到全部允许。
-  await pageHelpers(page).allowAll();
-  // M6 起设置页先是连接列表，改服务地址在连接卡的"Edit connection"里（settings.md"编辑连接"）。
-  await pageHelpers(page).editConnection();
-  await pageHelpers(page).fillConnection({ baseUrl: `http://localhost:${port}/v1`, apiKey: '' });
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  // settings.md 编辑连接"Save"：改了服务地址的 origin 又没填 key 时显示后台进程的原文，models.json 里的地址不变。
-  const refusal = await pageHelpers(page).formMessage(null, { timeout: 10000 }).catch(() => '');
-  const saved = JSON.parse(readFileSync(join(userData, 'pi', 'models.json'), 'utf8'));
-  const kept = saved.providers?.['mori-endpoint']?.baseUrl;
-  record('改了服务地址而没有重填 key 时拒绝保存', refusal === 'Couldn’t save: API key is required when the base URL changes'
-    && kept === `http://127.0.0.1:${port}/v1`, `表单下方：${refusal}；models.json 的服务地址：${kept}`);
-  await pageHelpers(page).fillConnection({ baseUrl: `http://127.0.0.1:${port}/v1` });
+  await h.allowAll();
+  await addressChange(page, userData);
   await page.getByRole('button', { name: 'Back to app' }).click();
+}
+
+/**
+ * @brief v1 的改地址（规格 §4.1、§9.1）：Edit 提供商把地址改到另一个 origin，Save 时确认框说明这个提供商的 key 会被删，
+ *        确认后 model-config.json 的地址改了、keys 为空；再改回原地址（没有 key，不再确认）、Add key 加回 key，
+ *        等档案回到已验证（之后的对话要用它）。
+ */
+async function addressChange(page, userData) {
+  const h = pageHelpers(page);
+  await h.openModels();
+  const card = h.providerCard();
+  await card.locator('[data-action="edit-provider"]').click();
+  const form = page.getByTestId('provider-form');
+  await form.getByLabel('Base URL', { exact: true }).fill(`http://localhost:${port}/v1`);
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  const dialog = page.locator('[data-testid="confirm-dialog"][data-kind="address-change"]');
+  const text = oneLine(await dialog.innerText({ timeout: 10000 }).catch(() => ''));
+  await dialog.getByRole('button', { name: 'Save and remove keys' }).click();
+  await form.waitFor({ state: 'detached', timeout: 15000 });
+  const changed = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8')).providers[0];
+  record('改了服务地址的 origin：确认框说明 key 会被删，确认后地址改了、key 被删',
+    /Changing the base URL removes this provider’s saved key\./.test(text)
+      && changed.baseUrl === `http://localhost:${port}/v1` && changed.keys.length === 0
+      && await card.getByTestId('no-keys').count() === 1,
+    `确认框：${text}；model-config.json：${changed.baseUrl}，keys=${changed.keys.length}`);
+  await card.locator('[data-action="edit-provider"]').click();
+  await form.getByLabel('Base URL', { exact: true }).fill(`http://127.0.0.1:${port}/v1`);
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  await form.waitFor({ state: 'detached', timeout: 15000 });
+  await h.addKey(testKey);
+  await verifiedAgain(page);
+}
+
+/** @brief 等 mori-endpoint/fake-coder 的档案回到已验证（探针出错时点 Verify 再等）。 */
+async function verifiedAgain(page) {
+  const row = page.locator('[data-testid="model-row"][data-model="mori-endpoint/fake-coder"]');
+  const state = () => row.locator('[data-testid="profile"] [data-field="tool_calling"]').getAttribute('data-value');
+  const settle = () => page.waitForFunction(() => {
+    const value = document.querySelector('[data-testid="model-row"][data-model="mori-endpoint/fake-coder"] '
+      + '[data-field="tool_calling"]')?.dataset.value;
+    return value === 'verified' || value === 'failed' || value === 'unverified';
+  }, null, { timeout: 120000 });
+  await settle();
+  if (await state() !== 'verified') {
+    await row.locator('[data-action="verify"]').click();
+    await sleep(500);
+    await settle();
+  }
+  record('改回地址、加回 key 后档案为已验证', await state() === 'verified', `tool_calling=${await state()}`);
 }
 
 /** @brief 模型运行的命令读不到 key：key 只在 pi 的内存里，不在环境变量里。 */
@@ -237,13 +297,17 @@ async function crashCheck(env) {
   const app = await electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
   try {
     const page = await app.firstWindow();
-    // M6：设置页先是连接列表；"Edit connection"里的"Test connection"测这个连接的第一个模型（settings.md"编辑连接"）。
-    await pageHelpers(page).editConnection();
-    await page.getByRole('button', { name: 'Test connection' }).click();
-    const test = await pageHelpers(page).formMessage(null, { test: true, timeout: 40000 });
-    const placeholder = await page.getByTestId('connection-form').locator('input[type=password]').getAttribute('placeholder');
-    record('重启后不用重填 key 也能连接', test.startsWith('Connected') && /Saved and encrypted/.test(placeholder ?? ''),
-      `${oneLine(test, 120)}；key 输入框提示：${placeholder}`);
+    // v1：设置 → Models 的提供商卡上"Test connection"用第一个可用的 key 测第一个模型；Keys 行显示"Saved"，不回填明文。
+    const h = pageHelpers(page);
+    await h.openModels();
+    const card = h.providerCard();
+    await card.locator('[data-action="test-provider"]').click();
+    const result = card.getByTestId('test-result');
+    await result.waitFor({ timeout: 60000 });
+    const test = await result.innerText();
+    const saved = await card.getByTestId('key-row').allInnerTexts();
+    record('重启后不用重填 key 也能连接', test.startsWith('Connected') && saved.length === 1 && saved[0].includes('Saved'),
+      `${oneLine(test, 120)}；Keys 行：${oneLine(saved.join(' | '), 120)}`);
     const pid = kernelPid(app.process().pid);
     execFileSync('taskkill', ['/PID', String(pid), '/F']);
     await page.getByText(CRASH_BANNER).waitFor({ timeout: 10000 });

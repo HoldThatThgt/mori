@@ -1,11 +1,12 @@
-// M6 测试（m6-app-*.mjs、m6-replay.mjs、m6-real.mjs）共用的准备与页面操作：合成端点、首次启动填连接并打开项目、
-// 设置页（连接卡、模型行、AGENTS.md）、Customize 页的分节、顶栏的模型和思考菜单、"/"补全列表。
+// M6 测试（m6-app-*.mjs、m6-replay.mjs、m6-real.mjs）共用的准备与页面操作：合成端点、首次启动填表并打开项目、
+// 设置页（v1 的 Models：提供商卡、模型行；AGENTS.md）、Customize 页的分节、顶栏的模型和思考菜单、"/"补全列表。
 // 只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。标识见 docs/v0/screens/settings.md、models.md、tools.md、slash.md。
 
 import { execFileSync, spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { appRoot, sleep } from './lib.mjs';
 import { PANE, paneOf, stubFolder, waitReady } from './m3-helpers.mjs';
+import { OPEN_FOLDER } from './page.mjs';
 
 /**
  * @brief 启动合成端点（synthetic），等它打出启动行；最多等 15 秒。
@@ -35,15 +36,15 @@ export async function resizeWindow(app, width, height) {
 }
 
 /**
- * @brief 首次启动：填连接表单、测试连接，再打开 project（系统对话框换成直接返回它）。
- *        trust 为 true / false 时在信任询问里选"Trust workspace" / "Don’t trust"；undefined 表示不会问。
+ * @brief 首次启动（v1，规格 §14.4）：填英文表单、区域选 Local、Test connection，等探针都跑完（表单下方的探针状态），
+ *        再打开 project（系统对话框换成直接返回它）。trust 为 true / false 时在信任询问里选"Trust workspace" / "Don’t trust"；
+ *        undefined 表示不会问。名称默认 "Mori endpoint"（提供商 id mori-endpoint）。
  */
-export async function firstRunAndOpen(ctx, { name = '合成端点', baseUrl, apiKey, modelId = 'fake-coder', project,
-  trust }) {
-  const { app, page, h } = ctx;
-  await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
-  await h.fillConnection({ name, baseUrl, apiKey, modelId });
-  await page.getByRole('button', { name: 'Test connection' }).click();
+export async function firstRunAndOpen(ctx, { name = 'Mori endpoint', baseUrl, apiKey, modelId = 'fake-coder', project,
+  trust, reasoning }) {
+  const { page, h } = ctx;
+  const run = await h.firstRun({ name, baseUrl, apiKey, modelId, reasoning });
+  if (!run.ok || run.probe !== 'verified') throw new Error(`first run: ${run.text}; probes ${run.probe}`);
   await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
   await openProject(ctx, project, trust);
 }
@@ -52,7 +53,7 @@ export async function firstRunAndOpen(ctx, { name = '合成端点', baseUrl, api
 export async function openProject(ctx, project, trust) {
   const { app, page } = ctx;
   await stubFolder(app, project);
-  await page.getByRole('button', { name: 'Open folder…' }).first().click();
+  await page.getByRole('button', { name: OPEN_FOLDER }).first().click();
   if (trust !== undefined) {
     const dialog = page.getByTestId('trust-dialog');
     await dialog.waitFor({ timeout: 15000 });
@@ -65,16 +66,17 @@ export async function openProject(ctx, project, trust) {
 export const focusedPane = (page) => page.locator('.pane-slot[data-focused="true"]:not([hidden]) [data-testid="chat-pane"]')
   .or(page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]')).first();
 
-/** @brief 打开设置页并切到某一节（connections / agents）。 */
-export async function openSettingsSection(page, section = 'connections') {
+/** @brief 打开设置页并切到某一节（models / agents，v1 的 Models 取代 v0 的 connections）。 */
+export async function openSettingsSection(page, section = 'models') {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
   await page.locator(`[data-testid="settings-nav"] button[data-section="${section}"]`).click();
 }
 
-/** @brief 设置页的连接卡（provider id）。 */
-export const connectionCard = (page, provider) => page.locator(`[data-testid="connection-card"][data-provider="${provider}"]`);
-/** @brief 设置页的模型行（provider/id）。 */
+/** @brief 设置 → Models 的提供商卡（provider id，v1 取代 v0 的连接卡）。 */
+export const providerCard = (page, provider) => page
+  .locator(`[data-testid="provider-card"][data-provider="${provider}"]`);
+/** @brief 设置 → Models 的模型行（provider/id）。 */
 export const modelRow = (page, ref) => page.locator(`[data-testid="model-row"][data-model="${ref}"]`);
 
 /** @brief 打开 Customize 页并切到某一节（builtin / skills / mcp / plugins），等读取结束（没有"Loading…"）。 */
@@ -86,11 +88,14 @@ export async function openToolsSection(page, section) {
     ?.includes('Loading…'), null, { timeout: 30000 });
 }
 
-/** @brief 在当前一栏的顶栏打开模型菜单，选 ref（provider/id），等按钮显示新模型。 */
+/**
+ * @brief 在当前一栏的顶栏打开范围菜单（v1，docs/v1/screens/model-menu.md），选 ref（模型 provider/id），等按钮显示
+ *        这个模型。
+ */
 export async function chooseModel(page, ref) {
   const pane = focusedPane(page);
   await pane.getByTestId('model-button').click();
-  await page.getByTestId('model-menu').locator(`[role="menuitemradio"][data-model="${ref}"]`).click();
+  await page.getByTestId('model-menu').locator(`[role="menuitemradio"][data-pick="${ref}"]`).click();
   await page.waitForFunction((id) => document.querySelector('.pane-slot:not([hidden]) [data-testid="model-button"]')
     ?.textContent?.includes(id), ref.split('/').pop(), { timeout: 15000 });
 }

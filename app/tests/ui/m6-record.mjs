@@ -5,18 +5,26 @@
 // 录完先核对场景要的东西真的发生了；不符合时不写进 fixtures，写到 test-results/m6-record/<名字>.rejected.json。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m6-record.mjs --source <走查数据目录> [--only name1,name2] [--exe <Mori.exe>]
-// 走查数据目录是负责人在 Mori 里填过连接的目录（key 由 Mori 加密保存）；脚本只复制密文文件，不读取 key。
+// 走查数据目录是负责人在 Mori（v1）里保存过提供商的目录（key 由 Mori 加密保存）；脚本只复制密文文件，不读取 key。
+// v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取（lib.mjs realProviders）；每个场景的临时
+// 项目先在复制出的配置里授权公网、默认范围设为测试分组 [DeepSeek, GLM]（lib.mjs allowRealProject，测试准备）。
+// 顶栏范围（model-range：在 Models 里加模型、在顶栏的范围菜单里选）与思考强度（thinking）两个场景写到 tests/fixtures/v1/；
+// v0 的 model-switch 场景删去（v1 没有 model.save、session.setModel）。
 // MCP 场景用 tests/mcp-server/server.mjs（synthetic，本地 stdio 服务），插件场景用 tests/pi-package（synthetic 包）的副本。
 
-import { cpSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { appRoot, arg, launch, oneLine, prepareProject, scratchUserData } from './lib.mjs';
+import {
+  allowRealProject, appRoot, arg, launch, oneLine, prepareProject, REAL_GROUP, realProviders, scratchUserData,
+} from './lib.mjs';
 
 const source = arg('source');
 const exePath = arg('exe');
 const only = arg('only')?.split(',');
 if (!source) throw new Error('Missing --source <user data dir with a saved connection>');
 const outDir = join(appRoot, 'tests/fixtures/m6');
+/** v1 的场景（顶栏范围、思考强度）写到这里 */
+const v1Dir = join(appRoot, 'tests/fixtures/v1');
 const rejectedDir = join(appRoot, 'test-results/m6-record');
 const mcpServer = join(appRoot, 'tests', 'mcp-server', 'server.mjs');
 
@@ -25,6 +33,8 @@ const prompts = {
   ONE_LINE: '用一句话介绍你自己。不要调用任何工具。',
   ONE_LINE_2: '用一句话说说今天适合做什么。不要调用任何工具。',
   SECOND_MODEL: 'deepseek-v4-pro',
+  /** 等新加的模型探针跑完（models.get 的档案），最多这么久 */
+  PROBE_WAIT_MS: 300000,
   CONTEXT: 1000000,
   REASON_1: '笼子里有鸡和兔共 35 只，脚共 94 只。鸡兔各几只？只给出答案，不要调用任何工具。',
   REASON_2: '一个数加上它的一半等于 45，这个数是多少？只给出答案，不要调用任何工具。',
@@ -155,37 +165,55 @@ function common(steps, allowFail = []) {
 
 // ---------- 场景 ----------
 
-/** @brief model-switch：在连接下添加第二个模型，会话里先用默认模型、再在顶栏换成第二个模型。 */
-const modelSwitch = { name: 'model-switch', description: '在 DeepSeek 连接下添加模型 deepseek-v4-pro（不填 key）；'
-    + '新会话先用默认的 deepseek-flash 回答一句，在顶栏换成 deepseek-v4-pro 后再回答一句',
+/**
+ * @brief model-range（v1，顶栏范围）：在 Models 里给首选提供商加第二个模型（models.saveModel），等它的探针跑完；新会话
+ *        （默认范围是测试分组）先由分组的第一个候选回答，在顶栏选新加的模型（session.setPick）后再回答一句。
+ */
+const modelRange = { name: 'model-range', dir: v1Dir, description: '在 Models 里给首选提供商加模型 deepseek-v4-pro；'
+    + '新会话（范围是测试分组）先由首选的第一个模型回答一句，在顶栏的范围菜单里选 deepseek-v4-pro 后再回答一句',
   phases: [{ page: async (rec, args) => {
     await args.list(rec);
     await args.config(rec);
-    await rec.cmd({ type: 'model.save', providerId: 'mori-endpoint', adding: true,
-      model: { modelId: args.SECOND_MODEL, contextWindow: args.CONTEXT, reasoning: false, thinkingLevel: 'off' } });
-    await args.config(rec);
+    const before = await rec.cmd({ type: 'models.get' });
+    const provider = before.config.providers.find((item) => item.id === args.provider);
+    const base = provider.models[0];
+    await rec.cmd({ type: 'models.saveModel', providerId: args.provider, adding: true,
+      model: { ...base, id: args.SECOND_MODEL, family: '', reasoning: false } });
+    const ref = `${args.provider}/${args.SECOND_MODEL}`;
+    // 每 3 秒读一次档案（每次读都录下来，回放时界面读到的是最后一次）
+    await rec.until(async () => {
+      await rec.sleep(3000);
+      return (await rec.cmd({ type: 'models.get' })).profiles[ref]?.tool_calling.state === 'verified';
+    }, `probes of ${ref}`, args.PROBE_WAIT_MS);
     const s = await args.create(rec, args.cwd);
+    await rec.cmd({ type: 'session.pickOptions', sessionId: s.sessionId });
     await args.say(rec, s, args.ONE_LINE);
-    await rec.cmd({ type: 'session.setModel', sessionId: s.sessionId, model: `mori-endpoint/${args.SECOND_MODEL}` });
+    await rec.cmd({ type: 'session.setPick', sessionId: s.sessionId, pick: ref });
+    await rec.cmd({ type: 'session.pickOptions', sessionId: s.sessionId });
     await args.say(rec, s, args.ONE_LINE_2);
   } }],
-  check: (steps) => {
+  check: (steps, args) => {
     const s = values(steps, 'session.create')[0];
-    const models = replies(steps, s?.sessionId).map((m) => m.model);
-    const cfg = values(steps, 'config.get').at(-1);
-    return [...common(steps), ...need(models[0] === 'deepseek-flash' && models.at(-1) === 'deepseek-v4-pro',
-      `reply models ${models}`), ...need(cfg?.connections?.[0]?.models?.length === 2, 'two models in the connection')];
+    const models = replies(steps, s?.sessionId).filter((m) => textOf(m)).map((m) => `${m.provider}/${m.model}`);
+    const picked = values(steps, 'session.setPick')[0];
+    return [...common(steps), ...need(s?.pick === args.group, `new session range ${s?.pick}`),
+      ...need(models[0] === args.first && models.at(-1) === `${args.provider}/${args.SECOND_MODEL}`,
+        `reply models ${models}`), ...need(picked?.pick === `${args.provider}/${args.SECOND_MODEL}`, 'setPick result')];
   } };
 
-/** @brief thinking：模型标支持思考，顶栏切到"High"有思考内容，切到"Off"没有。 */
-const thinking = { name: 'thinking', description: '把 deepseek-flash 标为支持思考（新会话默认"中"）；新会话里顶栏切到"高"，'
-    + '问一道要推理的题，回复带思考内容；切到"关"再问一道，回复没有思考内容',
+/**
+ * @brief thinking（v1）：在 Models 里把首选的模型标为支持思考（新会话默认"Medium"）；新会话里顶栏切到"High"有思考内容，
+ *        切到"Off"没有。保存之后不再录 models.get：回放时界面保存后读到的仍是保存前的配置（回放桥直接应答写命令）。
+ */
+const thinking = { name: 'thinking', dir: v1Dir, description: '在 Models 里把首选的第一个模型标为支持思考（新会话默认'
+    + '"中"）；新会话里顶栏切到"高"，问一道要推理的题，回复带思考内容；切到"关"再问一道，回复没有思考内容',
   phases: [{ page: async (rec, args) => {
     await args.list(rec);
     await args.config(rec);
-    await rec.cmd({ type: 'model.save', providerId: 'mori-endpoint', adding: false,
-      model: { modelId: 'deepseek-flash', contextWindow: args.CONTEXT, reasoning: true, thinkingLevel: 'medium' } });
-    await args.config(rec);
+    const before = await rec.cmd({ type: 'models.get' });
+    const base = before.config.providers.find((item) => item.id === args.provider).models[0];
+    await rec.cmd({ type: 'models.saveModel', providerId: args.provider, adding: false,
+      model: { ...base, reasoning: true }, thinkingLevel: 'medium' });
     const s = await args.create(rec, args.cwd);
     await rec.cmd({ type: 'session.setThinking', sessionId: s.sessionId, level: 'high' });
     await args.say(rec, s, args.REASON_1);
@@ -349,9 +377,10 @@ const slash = { name: 'slash', description: '用户级技能 m6-hello 和提示�
   } };
 
 /**
- * @brief 录制的场景：phases 依次执行（page 在页面里录，node 在 node 里做）。check 在录完后核对。
+ * @brief 录制的场景：phases 依次执行（page 在页面里录，node 在 node 里做）。check 在录完后核对；dir 是写到的目录
+ *        （没有时是 tests/fixtures/m6）。
  */
-const scenarios = [modelSwitch, thinking, agentsMd, projectSkill, mcp, plugin, slash];
+const scenarios = [modelRange, thinking, agentsMd, projectSkill, mcp, plugin, slash];
 
 // ---------- 执行 ----------
 
@@ -407,20 +436,16 @@ async function runPhases(scenario, args, state) {
   return steps;
 }
 
-/** @brief 一个场景：准备项目，依次执行各段，核对后写出 fixture（不符合时写到 rejected）。 */
+/** @brief 一个场景：依次执行各段，核对后写出 fixture（不符合时写到 rejected）。 */
 async function runScenario(scenario, context, state) {
-  const made = prepareProject('mori-m6-record-');
-  // 项目文件夹在 Mori 关闭之后才删（MCP 服务以它为工作目录，开着时删不掉），见 recordFresh。
-  state.root = made.root;
-  const cwd = join(made.root, `m6-${scenario.name}`);
-  renameSync(made.project, cwd);
-  const args = { ...prompts, cwd, mcpServer, pkg: join(made.root, 'pkg'), agentDir: join(state.userData, 'pi') };
+  const args = { ...prompts, ...context.args, cwd: state.cwd, mcpServer, pkg: join(state.root, 'pkg'),
+    agentDir: join(state.userData, 'pi') };
   const steps = await runPhases(scenario, args, state);
   const fixture = { source: 'real', note: 'Recorded from a real session by tests/ui/m6-record.mjs; do not edit by hand.',
     name: scenario.name, description: scenario.description, endpoint: context.endpoint, model: context.model,
     recordedAt: new Date().toISOString(), steps };
-  const problems = scenario.check(steps);
-  const dir = problems.length ? rejectedDir : outDir;
+  const problems = scenario.check(steps, args);
+  const dir = problems.length ? rejectedDir : scenario.dir ?? outDir;
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${scenario.name}${problems.length ? '.rejected' : ''}.json`),
     `${JSON.stringify(fixture, null, 1)}\n`);
@@ -433,10 +458,19 @@ async function runScenario(scenario, context, state) {
   }
 }
 
-/** @brief 每个场景一个新的临时数据目录和一次新的启动；出错也会关掉 Mori、删掉临时目录。 */
+/**
+ * @brief 每个场景一个新的临时数据目录、一个新的临时项目和一次新的启动：启动前在复制出的配置里给项目授权公网、默认范围
+ *        设为测试分组（测试准备，§14.1）。出错也会关掉 Mori、删掉临时目录。
+ */
 async function recordFresh(scenario, context) {
   const userData = scratchUserData(source);
-  const state = { userData, mori: null, root: null };
+  const made = prepareProject('mori-m6-record-');
+  const cwd = join(made.root, `m6-${scenario.name}`);
+  renameSync(made.project, cwd);
+  // 测试准备（synthetic test setup）：项目授权公网，默认范围为 [DeepSeek, GLM] 的分组
+  allowRealProject(userData, cwd);
+  // 项目文件夹在 Mori 关闭之后才删（MCP 服务以它为工作目录，开着时删不掉）
+  const state = { userData, mori: null, root: made.root, cwd };
   try {
     state.mori = await startMori(userData);
     await runScenario(scenario, context, state);
@@ -455,10 +489,14 @@ async function recordFresh(scenario, context) {
   }
 }
 
-/** @brief 读取走查连接的非机密信息。 */
+/**
+ * @brief 走查数据目录里 v1 的提供商（只读 model-config.json 的非机密部分）：首选（DeepSeek）的地址与第一个模型、
+ *        测试分组的 id 与它的第一个候选。
+ */
 function connectionInfo(dir) {
-  const provider = JSON.parse(readFileSync(join(dir, 'pi', 'models.json'), 'utf8')).providers['mori-endpoint'];
-  return { endpoint: provider.baseUrl, model: `mori-endpoint/${provider.models[0].id}` };
+  const [first] = realProviders(dir);
+  return { endpoint: first.baseUrl, model: first.ref,
+    args: { provider: first.provider, first: first.ref, group: REAL_GROUP } };
 }
 
 const context = connectionInfo(source);

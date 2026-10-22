@@ -3,28 +3,30 @@
 依据：方案 5.1（顶栏：会话名、模型、思考强度、权限……）、5.12；pi 行为见 [../m6-checks.md](../m6-checks.md)。
 补充 [chat.md](chat.md) 的"顶栏"表：模型从只显示变成可以切换，并加上思考强度。分屏时每一栏各有一组（[split.md](split.md)）。
 
+> v1：见 docs/specs/model-providers.md §5.10、§9.2：顶栏的模型按钮改为选择范围（分组、提供商或模型），思考强度按当前的实际模型；状态表见 [../../v1/screens/model-menu.md](../../v1/screens/model-menu.md)。
+
 ## 来源
 
 | 来源 | 内容 |
 | --- | --- |
-| `session.create` / `session.open` 的结果 | `model`（provider/id）、`thinkingLevel`、`thinkingLevels`（这个模型可选的强度，pi `getAvailableThinkingLevels()`）、`reasoning`（模型标了支持思考，pi `supportsThinking()`） |
-| `session.setModel` / `session.setThinking` 的结果，和后台进程的 `mori.model_state` 事件 | 同上四项；`mori.model_state` 在你改了这个会话、或在设置里改了它用的模型（换成新的模型对象之后）时发出 |
+| `session.create` / `session.open` 的结果（v1：见 docs/specs/model-providers.md §9.5：`model` 由 `ModelState` 取代） | `model`（provider/id）、`thinkingLevel`、`thinkingLevels`（这个模型可选的强度，pi `getAvailableThinkingLevels()`）、`reasoning`（模型标了支持思考，pi `supportsThinking()`） |
+| `session.setModel` / `session.setThinking` 的结果，和后台进程的 `mori.model_state` 事件（v1：见 docs/specs/model-providers.md §9.4、§9.5：`session.setModel` 删除，改为 `session.setPick`；`mori.model_state` 带 `ModelState`） | 同上四项；`mori.model_state` 在你改了这个会话、或在设置里改了它用的模型（换成新的模型对象之后）时发出 |
 | pi 的 `thinking_level_changed` 事件 | 新的强度（例如换模型后 pi 改了强度） |
-| `config.get` 的 `models` | 模型菜单的列表：pi 现在能用的全部模型（`modelRuntime.getAvailableSnapshot()`，有 key 的），按连接分组，带连接名 |
+| `config.get` 的 `models`（v1：见 docs/specs/model-providers.md §9.4、§9.5：菜单的列表改由 `models.get` 给出，列出全部分组、提供商、模型） | 模型菜单的列表：pi 现在能用的全部模型（`modelRuntime.getAvailableSnapshot()`，有 key 的），按连接分组，带连接名 |
 
 ## 模型
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 打开中 | 会话还没打开 | 不显示（M3 起） | — |
-| 有模型 | `model` | 按钮显示模型 ID 和 ▾；悬停显示"<连接名> · <模型 ID>"，读屏名"Model: <模型 ID>" | 打开菜单 |
-| 没有可用模型 | `model` 为 null | "No models available"和 pi 的说明（M1 起） | 打开菜单选一个 |
-| 菜单 | 你点了按钮 | 照 Claude 桌面版的模型菜单：按连接分组列出模型，当前的打勾；默认模型后面标"Default"；底部说明"Applies to this session only. New sessions use the default model from Settings."；最后一项"Manage models"打开设置页的"Connections and models" | ↑ ↓、Enter 选择；Esc 关闭；点外面关闭 |
-| 切换中 | 你选了一个模型，`session.setModel` 还没返回 | 按钮显示新模型、不可用 | — |
-| 已切换 | `session.setModel` 返回 | 按钮显示新模型；思考强度按返回值更新（pi 换模型时按 `modelThinkingLevels` → `defaultThinkingLevel` → 原来的强度重新定） | 下一条消息由新模型回复 |
-| 切换失败 | `session.setModel` 报错（例如 `No API key for …`） | 对话流里一张错误卡，原文；按钮回到原来的模型 | — |
-| 生成中 | 本轮运行中 | 按钮不可用，悬停"Can’t switch models until the response finishes" | 停止后再切 |
-| 模型已删除 | `model` 不在菜单列表里（在设置里删掉了；`models.json` 读不出时不算） | 按钮显示"<ID> (deleted)"，悬停说明也标" (deleted)"。连接里还有别的模型时，会话仍用打开时的设置；连接也删除了时，pi 找不到这个连接，下一条消息失败（错误卡显示 pi 的原文，实测 `No API key found for mori-endpoint-<数字>. Use /login …`；原文里有 API key 字样，错误卡也附"Go to settings"，这个连接已经不在，设置页落在连接列表上） | 打开菜单换一个 |
+| 有模型（v1：见 docs/specs/model-providers.md §9.2） | `model` | 按钮显示模型 ID 和 ▾；悬停显示"<连接名> · <模型 ID>"，读屏名"Model: <模型 ID>" | 打开菜单 |
+| 没有可用模型（v1：见 docs/specs/model-providers.md §4.6：拒绝启动卡） | `model` 为 null | "No models available"和 pi 的说明（M1 起） | 打开菜单选一个 |
+| 菜单（v1：见 docs/specs/model-providers.md §9.2） | 你点了按钮 | 照 Claude 桌面版的模型菜单：按连接分组列出模型，当前的打勾；默认模型后面标"Default"；底部说明"Applies to this session only. New sessions use the default model from Settings."；最后一项"Manage models"打开设置页的"Connections and models" | ↑ ↓、Enter 选择；Esc 关闭；点外面关闭 |
+| 切换中（v1：见 docs/specs/model-providers.md §5.10、§9.5 `session.setPick`） | 你选了一个模型，`session.setModel` 还没返回 | 按钮显示新模型、不可用 | — |
+| 已切换（v1：见 docs/specs/model-providers.md §5.10：写 `mori.pick`，下一段起生效） | `session.setModel` 返回 | 按钮显示新模型；思考强度按返回值更新（pi 换模型时按 `modelThinkingLevels` → `defaultThinkingLevel` → 原来的强度重新定） | 下一条消息由新模型回复 |
+| 切换失败（v1：见 docs/specs/model-providers.md §9.5 `session.setPick`） | `session.setModel` 报错（例如 `No API key for …`） | 对话流里一张错误卡，原文；按钮回到原来的模型 | — |
+| 生成中（v1：见 docs/specs/model-providers.md §5.10：准备中也不能改） | 本轮运行中 | 按钮不可用，悬停"Can’t switch models until the response finishes" | 停止后再切 |
+| 模型已删除（v1：见 docs/specs/model-providers.md §4.6 `pick_missing`、§4.7） | `model` 不在菜单列表里（在设置里删掉了；`models.json` 读不出时不算） | 按钮显示"<ID> (deleted)"，悬停说明也标" (deleted)"。连接里还有别的模型时，会话仍用打开时的设置；连接也删除了时，pi 找不到这个连接，下一条消息失败（错误卡显示 pi 的原文，实测 `No API key found for mori-endpoint-<数字>. Use /login …`；原文里有 API key 字样，错误卡也附"Go to settings"，这个连接已经不在，设置页落在连接列表上） | 打开菜单换一个 |
 
 ## 思考强度
 
@@ -33,12 +35,12 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 没有可用模型 | `model` 为 null | 不显示思考按钮 | — |
+| 没有可用模型（v1：见 docs/specs/model-providers.md §9.2、§11.1：思考强度描述当前的实际模型） | `model` 为 null | 不显示思考按钮 | — |
 | 支持思考 | `reasoning` 为真 | 按钮"Effort: High ▾"，悬停"Set the effort level for this session" | 打开菜单 |
-| 不支持思考 | `reasoning` 为假 | 按钮"Effort: Unavailable ▾"，样式变淡但可以点开，悬停"This model isn’t marked “Supports thinking”"；菜单里的强度都不可用，说明"This model isn’t marked “Supports thinking”, so pi doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Connections and models and check “Supports thinking”." | 打开菜单看说明；"Open settings" |
+| 不支持思考（v1：见 docs/specs/model-providers.md §9.1：说明里的设置路径改为 Settings → Models，"pi 不发送"改为"Mori 不发送"，见 [../../v1/screens/model-menu.md](../../v1/screens/model-menu.md)） | `reasoning` 为假 | 按钮"Effort: Unavailable ▾"，样式变淡但可以点开，悬停"This model isn’t marked “Supports thinking”"；菜单里的强度都不可用，说明"This model isn’t marked “Supports thinking”, so pi doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Connections and models and check “Supports thinking”." | 打开菜单看说明；"Open settings" |
 | 菜单 | 你点了按钮 | `thinkingLevels` 里的强度，当前的打勾；底部说明"Applies to this session only. Set each model’s default for new sessions in Settings." | ↑ ↓、Enter；Esc |
 | 切换中 / 已切换 / 失败 | `session.setThinking` | 同模型 | — |
-| 生成中 | 本轮运行中 | 按钮不可用，悬停"Can’t change effort until the response finishes" | — |
+| 生成中（v1：见 docs/specs/model-providers.md §5.10、§11.4：准备中也不能改） | 本轮运行中 | 按钮不可用，悬停"Can’t change effort until the response finishes" | — |
 | 重新打开的会话 | pi 按会话记录里最后一条 `thinking_level_change` 恢复 | 显示恢复后的强度 | — |
 
 ## 窄栏
@@ -46,6 +48,7 @@
 模型和思考按钮在任何宽度都显示、可以点，按会话面板的宽度分步收紧（单栏、分屏相同；最窄的两种是分屏每栏 280px、
 800 宽窗口右栏打开时中栏 300px）。收起的文字都在按钮的读屏名称里（"Model: <ID> (deleted)"、"Effort: High"），
 模型按钮的悬停说明是"<连接名> · <ID> (deleted)"。阈值按最宽的英文量（Segoe UI 12px）："Effort: Unavailable ▾"、"Ask each time"、"Context 100%"。
+（v1：见 docs/specs/model-providers.md §9.2：按钮文字改为"<范围名> · <当前模型 id>"，读屏名"Model range: …"，悬停是提供商名和区域，不再有" (deleted)"。）
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
@@ -60,7 +63,7 @@
 ## 反例
 
 - 模型没标支持思考时，思考强度的选项都不可用（不是只藏起来），并说明原因。
-- 顶栏切换模型或思考强度不改设置里的默认（pi 不 persist）；新会话仍用默认模型和它的默认强度。
+- 顶栏切换模型或思考强度不改设置里的默认（pi 不 persist）；新会话仍用默认模型和它的默认强度。（v1：见 docs/specs/model-providers.md §5.10、§11.1：默认模型改为默认范围 `normalDefault`）
 - 顶栏切到"Off"之后，下一次回复没有思考内容（DeepSeek 实测：pi 发 `thinking: disabled`）。
 
 ## 照 Claude 桌面版
@@ -74,5 +77,5 @@
 
 | 元素 | 标识 |
 | --- | --- |
-| 模型按钮 | 每一栏里 `data-testid="model-button"`；菜单 `data-testid="model-menu"`，项 `role="menuitemradio"`，`data-model` 为 provider/id |
+| 模型按钮 | 每一栏里 `data-testid="model-button"`；菜单 `data-testid="model-menu"`，项 `role="menuitemradio"`，`data-model` 为 provider/id（v1：见 docs/specs/model-providers.md §9.2：项改为 `data-pick`，见 v1/screens/model-menu.md） |
 | 思考按钮 | `data-testid="thinking-button"`（`data-level` 为当前强度，不支持思考时 `data-reasoning="false"`）；菜单 `data-testid="thinking-menu"`，项 `role="menuitemradio"`，`data-level` |

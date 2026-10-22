@@ -1,16 +1,16 @@
 // 设置页（docs/v0/screens/settings.md），照 Claude 桌面版：左边分节列表，右边这一节的内容，顶部"Back to app"。
-// 打开时落在"Connections and models"；"Go to settings"落在出错会话所用模型的连接的"Edit connection"（state/settings.ts）。
+// 打开时落在 Models（docs/v1/screens/models-settings.md）；拒绝启动卡等入口经 openModelsSettings 落到指定位置。
 
 import { useRef } from 'react';
 import { Icon } from '../icons';
 import { showChat } from '../state/projects';
 import { selectSection, useSettings, type SettingsSection } from '../state/settings';
 import { AgentsSection } from './AgentsSection';
-import { ConnectionsSection } from './ConnectionsSection';
+import { ModelsSection } from './settings/ModelsSection';
 
 /** 分节，按列表顺序 */
 const SECTIONS: ReadonlyArray<{ id: SettingsSection; label: string }> = [
-  { id: 'connections', label: 'Connections and models' },
+  { id: 'models', label: 'Models' },
   { id: 'agents', label: 'AGENTS.md' },
 ];
 
@@ -56,7 +56,7 @@ export function SettingsPage() {
       <div className="settings-layout">
         <SettingsNav />
         <div className="settings-body">
-          {section === 'connections' ? <ConnectionsSection /> : <AgentsSection />}
+          {section === 'models' ? <ModelsSection /> : <AgentsSection />}
         </div>
       </div>
     </section>

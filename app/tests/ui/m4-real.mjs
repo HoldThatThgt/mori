@@ -11,7 +11,9 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { appRoot, arg, createRecorder, launch, oneLine, scratchUserData, sleep } from './lib.mjs';
+import {
+  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, realProviders, scratchUserData, sleep,
+} from './lib.mjs';
 import { activeFile, openRow, paneOf, stubFolder, waitIdle, waitReady } from './m3-helpers.mjs';
 import {
   changeList, composerChips, dragSelect, expandChange, jumpHighlight, messageCounts, PANE, popoverShown,
@@ -270,16 +272,20 @@ async function counterExample(ctx) {
   await shot(page, 'c-changed');
 }
 
-/** @brief 走查数据目录里要有 Mori 保存的连接（只读 models.json 的非机密部分）；没有时在复制密文之前就失败。 */
+/**
+ * @brief 走查数据目录里要有 Mori（v1）保存的提供商（只读 model-config.json 的非机密部分，lib.mjs realProviders，
+ *        规格 §14.4）；没有时在复制密文之前就失败。
+ */
 function requireConnection(dir) {
-  const models = JSON.parse(readFileSync(join(dir, 'pi', 'models.json'), 'utf8'));
-  if (!models.providers?.['mori-endpoint']) throw new Error(`No saved connection in ${dir}`);
+  realProviders(dir);
 }
 
 requireConnection(source);
 const root = mkdtempSync(join(tmpdir(), 'mori-m4-real-'));
 const ctx = { project: makeProject(root), pageErrors: [] };
 ctx.userData = scratchUserData(source);
+// 测试准备（synthetic test setup，§14.1）：给临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
+allowRealProject(ctx.userData, ctx.project);
 try {
   await start(ctx);
   const items = { 1: item1, 2: item2, 3: item3, 4: item4, 5: item5, c: counterExample };

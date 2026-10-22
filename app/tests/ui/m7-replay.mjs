@@ -40,7 +40,7 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 
 /** 回放桥当作只读查询回答、不占回放顺序的命令（与 harness/replay.js 的 QUERIES 相同） */
 const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
-  'agents.get', 'session.commands'];
+  'agents.get', 'session.commands', 'models.get', 'session.pickOptions'];
 /** 回复不在了时详情里的说明（review.md "回到原位置"） */
 const CHANGED = 'This response is no longer in the session.';
 /** synthetic：回放桥给导出返回的第一个路径（harness/replay.js 的 reviewStubs） */
@@ -59,7 +59,9 @@ function partOf(fx, part) {
 }
 
 /** @brief 一段里界面发出的命令（只读查询除外），下标与回放桥的 cursor 一致。 */
-const commandsOf = (steps) => steps.filter((s) => s.command && !QUERIES.includes(s.command.type)).map((s) => s.command);
+const commandsOf = (steps) => steps.filter((s) => s.command && !QUERIES.includes(s.command.type)
+  // 回放桥直接应答的 models.* 写命令也不占回放顺序（harness/replay.js）
+  && !s.command.type.startsWith('models.')).map((s) => s.command);
 /** @brief 一段里你发的第一条消息。 */
 const promptOf = (steps) => commandsOf(steps).find((c) => c.type === 'session.prompt').text;
 /** @brief 一段里交给主进程保存的反馈（record 和 result），按顺序。 */

@@ -47,7 +47,7 @@ import {
 } from './m3-helpers.mjs';
 import { paneAt, sendAt, slotSelector, splitState, waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import { descendantsOf, openToolsSection, processList, startFakeEndpoint } from './m6-helpers.mjs';
-import { pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
@@ -312,7 +312,7 @@ const noProcess = (seen) => seen.row && !seen.line && seen.state === null && see
 /** @brief 点左栏"Open folder…"选 folder，在信任询问里选"Trust workspace"并勾"Remember my choice"，等会话就绪。 */
 async function openTrusted(ctx, folder) {
   await stubFolder(ctx.app, folder);
-  await ctx.page.getByRole('button', { name: 'Open folder…' }).first().click();
+  await ctx.page.getByRole('button', { name: OPEN_FOLDER }).first().click();
   await answerTrustDialog(ctx.page, { answer: 'Trust workspace', remember: true });
   await settle(ctx.page);
 }
@@ -324,7 +324,7 @@ async function openTrusted(ctx, folder) {
 async function openKnown(ctx, folder) {
   const before = await ctx.page.locator('.pane-slot').count();
   await stubFolder(ctx.app, folder);
-  await ctx.page.getByRole('button', { name: 'Open folder…' }).first().click();
+  await ctx.page.getByRole('button', { name: OPEN_FOLDER }).first().click();
   await waitPanes(ctx.page, before + 1);
   await waitReady(ctx.page);
   await settle(ctx.page);
@@ -396,9 +396,8 @@ async function startup(ctx) {
     procs: procs.map((row) => ({ ...row, direct: row.parent === ctx.kernel })) }));
   record('1 启动：服务日志里只有一次 initialize（共享服务自己握手一次）', initializes(ctx.logs.shared) === 1,
     `initialize × ${initializes(ctx.logs.shared)}`);
-  await ctx.h.fillConnection({ name: '合成端点', baseUrl, apiKey: testKey, modelId: 'fake-coder' });
-  await page.getByRole('button', { name: 'Test connection' }).click();
-  await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
+  // v1（规格 §14.4）：首次启动填英文表单、区域选 Local，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
+  await ctx.h.setupFirstRun({ baseUrl, apiKey: testKey });
 }
 
 /** @brief 2. 两个项目的会话调用 shared 的 pid：出批准卡"shared · pid"，拿到启动时那个进程的 PID。 */

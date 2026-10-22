@@ -1,12 +1,13 @@
 // API key 的保存：用 Electron safeStorage 加密（Windows 上是 DPAPI，绑定当前用户）后写入 `<userData>/credentials.json`，
-// 按 provider id 一项（M6 起每个连接一项）；连接删掉时删除它那一项。
-// 不写明文，不放进环境变量；解密后的 key 只经进程通道交给后台进程，由 pi 放在内存里使用。
+// 格式 `{ <ref>: <base64 密文> }`（M0 起不变）。v1 起按 key 的 ref 一项（docs/specs/model-providers.md §4.1）：
+// 新 key 的 ref 是 <提供商 id>#<编号>，从 v0 迁移来的沿用 v0 的提供商 id。
+// 不写明文，不放进环境变量；解密后的 key 只经进程通道交给后台进程，放在模型池的内存里使用。
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { app, safeStorage } from 'electron';
 
-/** @brief 加密文件：provider id → base64 密文。 */
+/** @brief 加密文件：key 的 ref → base64 密文。 */
 type EncryptedKeys = Record<string, string>;
 
 /** @brief 加密文件的位置。 */
@@ -37,32 +38,42 @@ function writeEncrypted(keys: EncryptedKeys): void {
   renameSync(`${path}.tmp`, path);
 }
 
-/** @brief 解密全部已保存的 key；某一项解不开时记录错误并跳过。 */
+/**
+ * @brief 解密全部已保存的 key；某一项解不开时记录错误并跳过。
+ * @return ref → 明文
+ */
 export function loadKeys(): Record<string, string> {
   requireEncryption();
   const keys: Record<string, string> = {};
-  for (const [providerId, cipher] of Object.entries(readEncrypted())) {
+  for (const [ref, cipher] of Object.entries(readEncrypted())) {
     try {
-      keys[providerId] = safeStorage.decryptString(Buffer.from(cipher, 'base64'));
+      keys[ref] = safeStorage.decryptString(Buffer.from(cipher, 'base64'));
     } catch (error) {
-      console.error(`[main] cannot decrypt the key for ${providerId}: ${(error as Error).message}`);
+      console.error(`[main] cannot decrypt the key ${ref}: ${(error as Error).message}`);
     }
   }
   return keys;
 }
 
-/** @brief 加密保存一个 key。 */
-export function storeKey(providerId: string, key: string): void {
+/**
+ * @brief 加密保存一个 key（新加的 key，或迁移时 models.json 里手写的明文 key）。
+ * @param ref key 的引用
+ * @param secret 明文
+ */
+export function storeKey(ref: string, secret: string): void {
   requireEncryption();
   const keys = readEncrypted();
-  keys[providerId] = safeStorage.encryptString(key).toString('base64');
+  keys[ref] = safeStorage.encryptString(secret).toString('base64');
   writeEncrypted(keys);
 }
 
-/** @brief 删除一个 provider 已保存的 key；没有时什么都不做。 */
-export function deleteKey(providerId: string): void {
+/**
+ * @brief 删除一个 ref 已保存的密文；没有时什么都不做。
+ * @param ref key 的引用
+ */
+export function deleteKey(ref: string): void {
   const keys = readEncrypted();
-  if (!(providerId in keys)) return;
-  delete keys[providerId];
+  if (!(ref in keys)) return;
+  delete keys[ref];
   writeEncrypted(keys);
 }

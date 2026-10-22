@@ -17,6 +17,10 @@
 // M7：录制里有一次重启（{ restart: true }）时，options.part 选重启前（before）或重启后（after）的一段回放，页面重新载入
 // 就是重启。保存反馈、保存报告返回录下的文件路径；工作回顾读记录、读截图按录制里的 review、shot 步骤回答（reviewStubs）；
 // 导出、在资源管理器里选中、打开文件夹没有录过，只记下调用。
+// v1（docs/specs/model-providers.md §14.4）：models.get、session.pickOptions 也是只读查询，录制里没有时按 fixture.model 合成
+// （一个本机区域的提供商、一个模型、normalDefault 为它、档案已验证，synthetic）；会话信息与 mori.model_state 缺的 ModelState
+// 字段（pick、current、blocked）同样合成；models.* 的写命令照 connection.save 的方式应答（status.modelWrites 记下）；
+// config.get 补上 v1 的 firstRun 等字段。
 
 /** 截图返回的 1×1 PNG */
 const PIXEL = 'data:image/png;base64,'
@@ -30,9 +34,9 @@ const M3_INFO = { name: null, projectTrust: 'none', trustRemembered: false, trus
  * @brief synthetic：M1 录下的 session.create / session.open 结果里还没有批准设置（M2 才加），按后台进程对新会话的
  *        默认值（每次询问、没有已允许的工具）补上；M3 的字段同样按 M3_INFO 补上。新录的原样返回。
  */
-function withDefaults(type, value) {
+function withDefaults(type, value, fixture) {
   if ((type !== 'session.create' && type !== 'session.open') || !value) return value;
-  return { ...M3_INFO, approval: { mode: 'ask', allowed: [] }, ...M6_INFO, ...value };
+  return { ...M3_INFO, approval: { mode: 'ask', allowed: [] }, ...M6_INFO, ...v1ModelState(fixture, value), ...value };
 }
 
 /** @brief synthetic：没录过的 M6 只读查询的空结果。 */
@@ -47,6 +51,88 @@ const crashed = (code) => new Error(`Mori’s background process crashed (exit c
 
 /** synthetic：M6 才加进会话信息的字段，按后台进程对没标"Supports thinking"的模型的取值 */
 const M6_INFO = { thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false };
+
+// ---------- v1 模型层（docs/specs/model-providers.md §14.4）：v0 的录制里没有的，按 fixture.model 合成（synthetic） ----------
+
+/** synthetic：v0 录制没有 model 字段时（例如 m6/pi-config-toggles）用的模型全名 */
+const FALLBACK_MODEL = 'mori-endpoint/replay-model';
+
+/**
+ * @brief synthetic：v1 的 ModelState 字段（规格 §9.5）。v0 的会话信息与 mori.model_state 只有 model（会话用的模型）：
+ *        范围 pick 取录制的模型（新会话的范围就是首次启动写下的 normalDefault，即这个模型），当前模型 current 取 model，
+ *        可以发送（blocked 为 null）。录制里已有 pick 时（v1 的录制）原样不动。
+ */
+function v1ModelState(fixture, value) {
+  if (!value || 'pick' in value) return {};
+  const model = fixture.model ?? FALLBACK_MODEL;
+  return { pick: model, current: value.model ?? model, blocked: null };
+}
+
+/**
+ * @brief synthetic：models.get 的结果（规格 §9.5），录制里没有时按 fixture.model 合成：一个本机区域的提供商、一个模型、
+ *        normalDefault 为它、档案已验证；一个 key（只有 ref 与 label）。keys 由 models.addKey / removeKey 的应答更新
+ *        （state.keys），界面写命令之后重新读到的就是改过的样子。
+ * @param state 回放桥里合成的设置状态：keys、nextKeyNumber、projects
+ */
+function v1ModelsInfo(fixture, contextWindow, state) {
+  const ref = fixture.model ?? FALLBACK_MODEL;
+  const [provider, id] = [ref.slice(0, ref.indexOf('/')), ref.slice(ref.indexOf('/') + 1)];
+  const step = (outcome) => ({ outcome, detail: null });
+  const profile = { status: 'ready', error: null, server: { kind: 'unknown', version: 'unknown' },
+    tool_calling: { state: 'verified', call: step('pass'), result: step('pass') },
+    tier: { level: 'A', a: step('pass'), b: step('pass'), c: step('not_run') }, protocol_write: 'verified',
+    structured_output: 'verified', vision: 'failed',
+    reasoning: { field: 'none', can_disable: 'unknown', replay: 'not_required' },
+    context: { declared: contextWindow, reported: null, effective: contextWindow, truncation: 'unknown' },
+    cancel_verified: 'unknown', probedAt: 0, suite: 1 };
+  const model = { id, family: '', contextWindow, maxTokens: Math.min(16384, Math.floor(contextWindow / 2)),
+    reasoning: false, input: ['text'] };
+  const config = { version: 1, providers: [{ id: provider, name: 'replay', api: 'openai-completions',
+    baseUrl: fixture.endpoint ?? 'http://127.0.0.1:9/v1', compat: {}, concurrency: 4, zone: 'local',
+    keys: state.keys.map((key) => ({ ...key })), nextKeyNumber: state.nextKeyNumber, models: [model] }], groups: [],
+  normalDefault: ref, allowedZones: ['local', 'intranet'], projectZones: {} };
+  return { error: null, config, profiles: { [ref]: profile }, keyStatus: {}, thinkingDefaults: { [ref]: null },
+    zoneSuggestions: { [provider]: 'local' }, migration: null, projects: state.projects.map((path) => ({ path,
+      zones: [], projectZones: null, projectConfig: null })), loadError: null, reserved: ['mori'] };
+}
+
+/** @brief synthetic：session.pickOptions 的结果，录制里没有时按 fixture.model 合成：这个提供商和它的模型，都可用。 */
+function v1PickOptions(fixture) {
+  const ref = fixture.model ?? FALLBACK_MODEL;
+  const provider = ref.slice(0, ref.indexOf('/'));
+  const item = (pick, kind, label) => ({ pick, kind, label, zones: ['local'], excluded: false, reason: null });
+  return { error: null, options: [item(provider, 'provider', 'replay'),
+    item(ref, 'model', ref.slice(ref.indexOf('/') + 1))] };
+}
+
+/**
+ * @brief synthetic：v1 的 config.get 只有 { agentDir, settingsError, defaultThinkingLevel, firstRun, migrationError,
+ *        configError, migratedNow }（规格 §9.4）。v0 录下的结果补上后四项（已有配置、没有迁移）；多出的 v0 字段界面不读。
+ */
+function v1Config(value) {
+  return { settingsError: null, defaultThinkingLevel: 'medium', firstRun: false, migrationError: null,
+    configError: null, migratedNow: false, ...value };
+}
+
+/**
+ * @brief synthetic：models.* 的写命令照 connection.save 的方式应答（不占回放顺序，结果没有错误）。models.addKey 与
+ *        models.removeKey 改合成的 keys，之后的 models.get 读到改过的样子；其余写命令只记下。
+ */
+function v1ModelWrite(command, state) {
+  state.writes.push(command);
+  if (command.type === 'models.addKey') {
+    const ref = `${command.providerId}#${state.nextKeyNumber}`;
+    state.nextKeyNumber += 1;
+    state.keys.push({ ref, label: command.label });
+    return { error: null, ref };
+  }
+  if (command.type === 'models.removeKey') state.keys = state.keys.filter((key) => key.ref !== command.ref);
+  if (command.type === 'models.saveProvider' || command.type === 'models.firstRun') {
+    return { error: null, providerId: command.id ?? command.providerId ?? 'replay' };
+  }
+  if (/^models\.delete/.test(command.type)) return { error: null, consequences: [] };
+  return { error: null };
+}
 
 /**
  * @brief synthetic：M1–M5 的录制里没有 config.get 的结果，按录制的端点和模型拼出一个连接（与后台进程的写法相同：
@@ -65,8 +151,9 @@ function m6Config(fixture, saved) {
  * @brief synthetic：M1/M2 录下的 mori.prompt_error 还没有 running（M3 才加）；那时发出时就失败、没有开始运行，
  *        按 false 补上。新录的原样转发。
  */
-function withEventDefaults(envelope) {
+function withEventDefaults(envelope, fixture) {
   const { event } = envelope;
+  if (event.type === 'mori.model_state') return { ...envelope, event: { ...event, ...v1ModelState(fixture, event) } };
   if (event.type !== 'mori.prompt_error' || 'running' in event) return envelope;
   return { ...envelope, event: { ...event, running: false } };
 }
@@ -106,11 +193,15 @@ function fileReader(steps) {
 
 /** 不占回放顺序的只读查询 */
 const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
-  'agents.get', 'session.commands'];
+  'agents.get', 'session.commands', 'models.get', 'session.pickOptions'];
 
-/** @brief 录制里由界面主动发出的命令（只读查询除外）的下标。 */
+/** @brief models.* 的写命令：回放桥直接应答（v1ModelWrite），不占回放顺序。 */
+const answeredWrite = (type) => type.startsWith('models.') && !QUERIES.includes(type);
+
+/** @brief 录制里由界面主动发出的命令（只读查询与直接应答的 models.* 写命令除外）的下标。 */
 function boundaries(steps) {
-  return steps.flatMap((step, index) => (step.command && !QUERIES.includes(step.command.type) ? [index] : []));
+  return steps.flatMap((step, index) => (step.command && !QUERIES.includes(step.command.type)
+    && !answeredWrite(step.command.type) ? [index] : []));
 }
 
 /** @brief 信任回答的比较形式；没带时为空串。 */
@@ -323,9 +414,13 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
   const status = { cursor: 0, played: 0, clock: 0, exited: false, exitCode: null, errors: [], commands: [], queries: [],
     playing: Promise.resolve(), idle: true, attention: 0, captures: 0, dialogAtCapture: [], issues: [], shown: [],
     deleted: [], reads: [], opened: [], copied: [], feedback: [], failed: [], reviewLists: 0, reviewShots: [],
-    exports: [], exportShown: [], recordShown: [], folders: [] };
+    exports: [], exportShown: [], recordShown: [], folders: [], modelWrites: [] };
   const { f8, feedback, stubs } = desktopStubs(status, steps);
   const created = steps.find((step) => step.result?.type === 'session.create')?.result.value;
+  // synthetic：v1 的设置页（models.get）读到的 key 与项目；models.addKey / removeKey 的应答改它（v1ModelWrite）
+  const models = { keys: [{ ref: `${(fixture.model ?? FALLBACK_MODEL).split('/')[0]}#1`, label: 'Key 1' }],
+    nextKeyNumber: 2, projects: created?.cwd ? [created.cwd.replace(/\\/g, '/').toLowerCase()] : [],
+    writes: status.modelWrites };
   const saved = { connection: { name: 'replay', baseUrl: fixture.endpoint, api: 'openai-completions', apiKey: '',
     modelId: fixture.model.split('/').pop(), contextWindow: created?.contextUsage?.contextWindow ?? 128000,
     compat: [] }, keySaved: true };
@@ -343,7 +438,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
       if (gap > 0) await sleep(gap);
       status.clock = step.t;
       if (step.envelope) {
-        for (const listener of listeners.event) listener(withEventDefaults(structuredClone(step.envelope)));
+        for (const listener of listeners.event) listener(withEventDefaults(structuredClone(step.envelope), fixture));
       }
       if (step.result && !resolved && step.result.type === commandType) {
         resolved = true;
@@ -447,7 +542,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
       status.idle = false;
       status.playing = status.playing.then(() => play(index, end, command.type, (result) => {
         if (result.error) reject(new Error(result.error));
-        else resolve(withDefaults(command.type, result.value));
+        else resolve(withDefaults(command.type, result.value, fixture));
       })).finally(() => {
         status.played += 1;
         status.idle = status.cursor >= marks.length;
@@ -459,13 +554,26 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     request(command) {
       if (status.exited) return Promise.reject(crashed(status.exitCode));
       switch (command.type) {
-        case 'config.get': return Promise.resolve(latestResult('config.get', m6Config(fixture, saved)));
+        case 'config.get': return Promise.resolve(v1Config(latestResult('config.get', m6Config(fixture, saved))));
+        case 'models.get':
+        case 'models.reload':
+          status.queries.push(command);
+          return Promise.resolve(latestResult(command.type, v1ModelsInfo(fixture,
+            created?.contextUsage?.contextWindow ?? 128000, models)));
+        case 'session.pickOptions':
+          status.queries.push(command);
+          return Promise.resolve(latestResult(command.type, v1PickOptions(fixture)));
         case 'tools.get':
         case 'agents.get':
         case 'session.commands':
           status.queries.push(command);
           return Promise.resolve(latestResult(command.type, m6Empty(command.type)));
         case 'connection.save': return Promise.resolve({ error: null });
+        case 'models.firstRun': case 'models.saveProvider': case 'models.deleteProvider': case 'models.saveModel':
+        case 'models.deleteModel': case 'models.moveModel': case 'models.addKey': case 'models.removeKey':
+        case 'models.moveKey': case 'models.saveGroup': case 'models.deleteGroup': case 'models.setDefaults':
+        case 'models.setProjectZones': case 'models.confirmZone': case 'models.dismissMigration': case 'models.verify':
+          return Promise.resolve(v1ModelWrite(command, models));
         case 'connection.testCancel': return Promise.resolve({ cancelled: false });
         case 'connection.test':
           return Promise.resolve({ ok: true, cancelled: false, firstTokenMs: 1, totalMs: 2, text: 'ok', thinking: false,

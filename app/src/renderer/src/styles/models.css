@@ -1,6 +1,7 @@
-/* M6：models（docs/v0/screens/models.md）。顶栏的模型与思考强度按钮外观同权限按钮，菜单同权限菜单。
-   面板变窄时两个按钮分步收紧、不藏起（本文件末尾的 @container；顶栏其余部分在 chat.css）：模型按钮在顶栏放不下时
-   先收短（省略号，最窄 40px），完整的文字在悬停说明和读屏名称里。 */
+/* M6：models（docs/v0/screens/models.md）；v1 的选择范围按钮与菜单见 docs/v1/screens/model-menu.md。
+   顶栏的选择范围与思考强度按钮外观同权限按钮，菜单同权限菜单。面板变窄时两个按钮分步收紧、不藏起（本文件末尾的
+   @container；顶栏其余部分在 chat.css）：范围按钮在顶栏放不下时先收短（省略号，最窄 40px），完整的文字在悬停说明和
+   读屏名称里。 */
 .model-switch, .thinking-switch { position: relative; flex-shrink: 0; }
 .model-switch { flex-shrink: 1; min-width: 40px; max-width: 160px; }
 .model-button, .thinking-button {
@@ -21,10 +22,11 @@
 }
 .model-button svg, .thinking-button svg { width: 14px; height: 14px; }
 .switch-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 按钮收短时先截模型 ID（它从 0 宽长到放得下为止），截完了才截" (deleted)"；它开头的空格在弹性项的行首被去掉，
-   与 ID 之间靠按钮里 4px 的间距隔开（约一个空格宽） */
-.model-button > .switch-text { flex: 1 1 0; }
-.model-button > .model-deleted { flex: 0 1 auto; }
+/* 按钮收短时先截当前模型 id（它从 0 宽长到放得下为止），截完了才截范围名；前者抵消按钮里的间距，与范围名连在一起，
+   " · "写在模型 id 的开头（model-menu.md "窄栏"） */
+.model-button > .range-model { flex: 1 1 0; white-space: pre; }
+.model-button > .range-scope { flex: 0 1 auto; }
+.model-button > .range-scope + .range-model { margin-left: -4px; }
 /* 模型没标支持思考：变淡，但可以点开看说明 */
 .thinking-button.unsupported { color: var(--color-faint); }
 /* 切换中：不可用，但焦点留在按钮上 */
@@ -42,7 +44,7 @@
   font-size: var(--fs-body);
   transform: translateX(-50%);
 }
-.model-menu { width: 260px; max-height: min(440px, calc(100vh - 80px)); overflow-y: auto; }
+.model-menu { width: 300px; max-height: min(440px, calc(100vh - 80px)); overflow-y: auto; }
 .thinking-menu { width: 280px; }
 .switch-menu [role='menuitemradio'] { align-items: center; justify-content: flex-start; gap: 6px; }
 .switch-menu [role='menuitemradio'] svg { width: 15px; height: 15px; margin-left: auto; color: var(--color-accent); }
@@ -55,15 +57,34 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.model-default {
-  flex-shrink: 0;
-  padding: 0 5px;
-  border-radius: 4px;
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  font-size: var(--fs-small);
-}
 .switch-menu .menu-note { padding-top: 8px; border-top: 1px solid var(--color-line); }
+/* 范围菜单的三节（Groups、Providers、Models）；每项右侧标区域；本会话静态校验排除的项变淡，仍可以选 */
+.pick-section + .pick-section { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--color-line); }
+.pick-section-name {
+  padding: 6px 10px 2px;
+  color: var(--color-faint);
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+.pick-section .model-group + .model-group { margin-top: 0; padding-top: 0; border-top: 0; }
+.pick-zone { flex-shrink: 0; margin-left: auto; color: var(--color-faint); font-size: var(--fs-small); }
+.switch-menu [role='menuitemradio'] .pick-zone + svg { margin-left: 0; }
+.switch-menu .pick-excluded { color: var(--color-faint); }
+/* 换范围失败：按钮下方一行原文 */
+.pick-error {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: 320px;
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+  white-space: normal;
+}
 
 /* 窄栏（models.md"窄栏"）。600px 以下：思考按钮只显示强度（"High ▾"）；菜单改以会话面板定位，贴着面板右边，
    不伸出面板（按钮可能贴着窗口或右栏）。400px 以下：两个按钮去掉 ▾、内边距收小。

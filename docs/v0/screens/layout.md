@@ -43,7 +43,7 @@ M1 只列本次运行打开过的会话；M3 起换成项目 → 会话树，状
 | --- | --- | --- | --- |
 | 顶部（M3 起） | — | "New session"主按钮（旁边"Ctrl+N"；左栏窄于 220px 时藏起"Ctrl+N"，不折行）、"Open folder…" | "New session"、"Open folder…" |
 | 会话树（M3 起） | pi 的会话列表加本次打开的会话 | 见 [sessions.md](sessions.md) | 见 sessions.md |
-| 设置页打开 | 你点了"Settings"或"Go to settings" | "Settings"高亮 | 返回会话（"Back to app"） |
+| 设置页打开 | 你点了"Settings"或"Go to settings"（v1：见 docs/specs/model-providers.md §9.3："Go to settings"删除，改为说明卡与拒绝启动卡的"Open settings"） | "Settings"高亮 | 返回会话（"Back to app"） |
 | 底部（M2 起） | — | "Report a UI issue (F8)"和"Settings"；收起为图标栏时是两个图标按钮 | 报告界面问题（见 [f8.md](f8.md)）、设置 |
 
 Customize 页（工具页，M6）的入口"Customize"在"Open folder…"下面，见 [tools.md](tools.md)；
@@ -51,6 +51,7 @@ Customize 页（工具页，M6）的入口"Customize"在"Open folder…"下面�
 
 ## 设置页外框
 
-- 中栏换成设置页，顶部"Back to app"；M6 起左边是分节列表（"Connections and models"、"AGENTS.md"），见 [settings.md](settings.md)。
+- 中栏换成设置页，顶部"Back to app"；M6 起左边是分节列表（"Connections and models"、"AGENTS.md"），见 [settings.md](settings.md)
+  （v1：见 docs/specs/model-providers.md §9.1："Connections and models"分节改为"Models"，状态表见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)）。
   Customize 页（工具页，M6）外框相同，见 [tools.md](tools.md)；工作回顾（Review，M7）顶部相同，详情放在右栏，见 [review.md](review.md)。
 - 会话面板保持挂载、只隐藏，所以返回后滚动位置、草稿、展开状态都在。

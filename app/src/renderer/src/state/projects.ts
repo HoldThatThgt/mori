@@ -11,7 +11,9 @@ import { attachLive, transcriptFromEntries } from './history';
 import { guardLeave, leaveAllowed } from './leaveGuard';
 import { emptyTranscript, pushItem, startIndexFor, type Transcript } from './model';
 import { openInSplit, placeInSplit, showInFocused, withoutPane, type Side } from './split';
-import { activeTab, newTab, sameFile, tabByFile, updateTab, useApp, type AppState, type Tab } from './store';
+import {
+  activeTab, modelStateOf, newTab, sameFile, tabByFile, updateTab, useApp, type AppState, type Tab,
+} from './store';
 import { trustFor } from './trust';
 
 /** 重新载入后在对话流里说明哪些没有恢复（方案 5.8） */
@@ -35,9 +37,7 @@ export async function loadSessions(): Promise<void> {
 export function withInfo(tab: Tab, info: SessionInfo): Tab {
   return { ...tab, sessionId: info.sessionId, cwd: info.cwd, sessionFile: info.sessionFile, name: info.name,
     projectTrust: info.projectTrust, trustRemembered: info.trustRemembered, trustSaveError: info.trustSaveError,
-    extensionErrors: info.extensionErrors, model: info.model, modelNotice: info.modelNotice,
-    thinkingLevel: info.thinkingLevel ?? 'off', thinkingLevels: info.thinkingLevels ?? ['off'],
-    reasoning: info.reasoning ?? false,
+    extensionErrors: info.extensionErrors, ...modelStateOf(info),
     contextUsage: info.contextUsage, approval: info.approval, phase: 'ready', error: null, interrupted: false };
 }
 

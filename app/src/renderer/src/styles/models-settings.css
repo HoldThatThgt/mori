@@ -1,0 +1,202 @@
+/* v1：设置 → Models 与首次启动表单（docs/v1/screens/models-settings.md、first-run.md）。
+   颜色、字号、圆角取自 tokens.css；卡片、按钮、结果文字沿用 settings.css 与 forms.css 的写法。 */
+
+/* 表单：标签在左、控件在右；中栏较窄时标签放到控件上面 */
+.mf-grid { display: grid; gap: 10px; margin-top: 12px; }
+.mf-grid h3 { margin: 0; }
+.mf-grid h4, .card-block h4 { margin: 6px 0 0; font-size: var(--fs-body); font-weight: 600; }
+.mf-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--color-muted);
+}
+fieldset.mf-row { align-items: start; }
+.mf-row > legend { float: left; width: 150px; padding: 0; }
+fieldset.mf-row > legend + .mf-control { grid-column: 2; }
+.mf-control { display: grid; gap: 4px; min-width: 0; }
+.mf-grid input:not([type='checkbox'], [type='radio']), .mf-grid select, .key-form input, .group-form input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-size: var(--fs-body);
+}
+.mf-grid input[readonly] { background: var(--color-surface); color: var(--color-muted); }
+.mf-grid input:focus, .mf-grid select:focus, .key-form input:focus, .group-form input:focus {
+  outline: 2px solid #b8c9eb;
+  outline-offset: 0;
+}
+.mf-grid input[aria-invalid='true'] { border-color: var(--color-danger); }
+.radio-line { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.field-error { color: var(--color-danger); font-size: var(--fs-small); }
+.mf-grid .form-actions { margin-top: 4px; }
+.first-run-form { margin-bottom: 8px; }
+.first-run-open { display: grid; justify-items: start; gap: 8px; margin-top: 14px; }
+.first-run-open .muted { margin: 0; }
+.probe-status { display: grid; justify-items: start; gap: 6px; margin-top: 8px; }
+
+/* 各节 */
+.models-section > h2 { margin-bottom: 14px; }
+.models-block { margin: 0 0 26px; }
+.models-block > h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+.models-block > .button { margin-top: 4px; }
+.models-notice {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-accent-soft);
+}
+.models-notice h3 { margin: 0; }
+.models-notice p { margin: 0; }
+.models-notice ul { display: grid; gap: 4px; margin: 0; padding-left: 18px; }
+.zones-unconfirmed ul { padding: 0; list-style: none; width: 100%; }
+.zones-unconfirmed li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+
+/* 提供商卡 */
+.provider-card {
+  margin: 0 0 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-canvas);
+}
+.provider-card:focus { outline: 2px solid #b8c9eb; outline-offset: 1px; }
+.provider-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-line);
+  border-radius: var(--radius-m) var(--radius-m) 0 0;
+  background: var(--color-surface);
+}
+.provider-info { display: grid; gap: 6px; min-width: 0; }
+.provider-name { font-weight: 600; overflow-wrap: anywhere; }
+.provider-fields {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 12px;
+  margin: 0;
+  font-size: var(--fs-small);
+}
+.provider-fields dt { color: var(--color-faint); }
+.provider-fields dd { margin: 0; color: var(--color-prose); overflow-wrap: anywhere; }
+.provider-card > .form-message { margin: 8px 14px 0; }
+.card-block { display: grid; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--color-line); }
+.provider-head + .card-block, .provider-head + .form-message + .card-block { border-top: 0; }
+.card-block > .muted { margin: 0; }
+.card-block > .mf-grid { margin-top: 4px; }
+.row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.row-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.row-list > li { padding: 8px 0; border-top: 1px solid var(--color-line); }
+.row-list > li:first-child { border-top: 0; }
+.row-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.row-list .form-message { margin-top: 6px; }
+.move-button { width: 26px; height: 26px; }
+.move-button svg { width: 14px; height: 14px; }
+.move-button .flip { transform: rotate(180deg); }
+
+/* Keys */
+.key-label { font-weight: 500; }
+.key-saved { color: var(--color-ok); font-size: var(--fs-small); }
+.key-state { color: var(--color-warn); font-size: var(--fs-small); }
+.key-state[data-state='auth'], .key-state[data-state='quota'] { color: var(--color-danger); }
+.key-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 6px; }
+.key-form label { display: flex; align-items: center; gap: 8px; color: var(--color-muted); }
+.key-form input { width: 180px; }
+.key-form .form-message { flex-basis: 100%; }
+
+/* Models 行与档案摘要 */
+.model-info { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
+.model-id { font-family: var(--font-mono); overflow-wrap: anywhere; }
+.model-meta { color: var(--color-muted); font-size: var(--fs-small); }
+.profile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin-top: 4px;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+}
+.profile b { color: var(--color-prose); font-weight: 500; }
+.profile-item[data-field='tool_calling'][data-value='failed'] b { color: var(--color-danger); }
+.profile-item[data-field='tool_calling'][data-value='verified'] b { color: var(--color-ok); }
+.profile-warn { color: var(--color-warn); }
+.profile .form-message { flex-basis: 100%; margin: 0; }
+
+/* Groups */
+.group-id { font-family: var(--font-mono); font-weight: 500; }
+.member-list { display: grid; gap: 2px; margin: 6px 0 0; padding-left: 22px; }
+.group-member { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.group-row > .field-hint { margin: 4px 0 0; }
+.member-picker {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  margin-top: 8px;
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-canvas);
+}
+.picker-section { display: grid; gap: 1px; }
+.picker-section + .picker-section { padding-top: 6px; border-top: 1px solid var(--color-line); }
+.picker-item {
+  padding: 4px 8px 4px 26px;
+  border-radius: var(--radius-s);
+  color: var(--color-prose);
+  text-align: left;
+}
+.picker-item:first-child { font-weight: 500; }
+.picker-item { position: relative; }
+.picker-item[aria-checked='true'] { background: var(--color-accent-soft); }
+.picker-item[aria-checked='true']::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--color-accent-strong);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-65%) rotate(45deg);
+}
+.picker-item:not(:disabled):hover { background-color: var(--color-hover); }
+.group-form { display: grid; gap: 8px; margin-top: 8px; }
+.group-form > label { display: grid; gap: 4px; max-width: 280px; color: var(--color-muted); }
+.group-form .field-error { margin: 0; }
+
+/* Project access */
+.project-row { display: grid; gap: 4px; }
+.project-path { font-family: var(--font-mono); font-size: var(--fs-small); overflow-wrap: anywhere; }
+.project-row > .muted { font-size: var(--fs-small); }
+.zone-check { display: grid; }
+.zone-check .field-hint { margin: 0 0 0 24px; }
+
+/* 对话框 */
+.model-dialog { width: min(460px, 100%); }
+.model-dialog .cascade { display: grid; gap: 4px; margin: 10px 0 0; padding-left: 18px; color: var(--color-prose); }
+.model-dialog .mf-grid { margin-top: 10px; }
+
+@container (max-width: 620px) {
+  .mf-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .mf-row > legend { float: none; width: auto; }
+  fieldset.mf-row > legend + .mf-control { grid-column: 1; }
+}
+
+/* settings.css 的旧模型行留有左右内边距，卡片里的行由 .card-block 留边 */
+.settings-page .card-block .model-row { padding: 8px 0; }

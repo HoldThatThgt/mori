@@ -2,13 +2,15 @@
 
 依据：方案 5.1（中栏）、5.4、5.6、5.8。工具卡见 [tool-cards.md](tool-cards.md)。
 
+> v1：见 docs/specs/model-providers.md §9.3：模型层的提示、阶段行、说明卡与拒绝启动卡见 [../../v1/screens/model-chat.md](../../v1/screens/model-chat.md)；下面注明了被取代的行。
+
 ## 顶栏
 
 | 项 | 来源 | 必须可见 |
 | --- | --- | --- |
 | 会话名 | 会话名（pi 的 `session_info`：`session.create` / `session.open` 返回的 `name`、`session_info_changed`，M3 起）；没有名字时第一条用户消息（pi 的 `message_start`，role=user）前 20 个字；都没有时"New session"。规则与侧栏会话行相同（[sessions.md](sessions.md)），会话面板的读屏名称和 F8 报告里的"Current session"也用它 | 省略号截断，不换行 |
 | 项目名 | 会话的工作目录（`session.create` / `session.open` 的返回值）末级文件夹名 | 同上 |
-| 模型 | 会话返回值里的 `model`（provider/id），显示 id；M6 起是可以切换的菜单，见 [models.md](models.md) | 没有可用模型时"No models available"，并显示 pi 给出的说明 |
+| 模型（v1：见 docs/specs/model-providers.md §9.2：选择范围按钮"<范围名> · <当前模型 id>"，来源 `ModelState`） | 会话返回值里的 `model`（provider/id），显示 id；M6 起是可以切换的菜单，见 [models.md](models.md) | 没有可用模型时"No models available"，并显示 pi 给出的说明 |
 | 思考强度（M6） | 见 [models.md](models.md) | "Effort: High ▾"；模型没标支持思考时"Effort: Unavailable ▾" |
 | 上下文用量 | `session.state` → pi `getContextUsage()`；在打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新 | "Context 12%"，悬停显示"About 15,360 / 128,000 tokens"，读屏名"Context usage 12%, about 15,360 of 128,000 tokens"；pi 返回未知（刚压缩完）时"Context —"，悬停说明"Just compacted. Context usage shows after the next response."。M6 起会话面板 ≤ 500px 时藏起（见 [models.md](models.md)"窄栏"） |
 | 权限（M2） | 后台进程批准扩展的设置（`session.create` / `session.open` 返回值里的 `approval`，以及 `approval.*` 命令的结果） | "Ask each time"或"Allow all"（警示色）；会话面板 400px 以下只显示盾牌图标；菜单见 [approval.md](approval.md) |
@@ -28,8 +30,8 @@ M6 起的模型菜单和思考强度见 [models.md](models.md)；输入框的"/"
 | 正文流入 | `text_delta` | 文字逐段出现，不打断你的输入、选区和滚动位置 | 选中文字（M4 起出"Attach as context / Feedback"浮层，见 selection.md） |
 | 一轮结束（M4） | 本轮不在生成、这一轮有正文 | 这一轮最后一条助手回复下三个图标按钮："Copy"、"Attach message as context"、"Give feedback"（见 selection.md） | Tab、Enter |
 | 工具调用 | `toolcall_*`、`tool_execution_*` | 工具卡，按调用顺序排在这条回复里（见 tool-cards.md） | 展开、收起 |
-| 已压缩 | `compaction_end`（有 result 且没有中止）；会话记录里的 compaction 条目 | 一行"Compacted session" | — |
-| 已停止 | `agent_settled` 且 `aborted` 为真，或你按了停止之后本轮结束 | 一行"Stopped · Changes made so far stay as they are" | — |
+| 已压缩（v1：见 docs/specs/model-providers.md §6.3 第 1 步：重建时的压缩不转给界面，不显示这一行） | `compaction_end`（有 result 且没有中止）；会话记录里的 compaction 条目 | 一行"Compacted session" | — |
+| 已停止（v1：见 docs/specs/model-providers.md §9.3、MP-17：在排队、等模型、等它停下时按停止也显示这一行；准备中按停止撤回消息，§11.4） | `agent_settled` 且 `aborted` 为真，或你按了停止之后本轮结束 | 一行"Stopped · Changes made so far stay as they are" | — |
 | 你在底部 | 滚动位置离底部不超过 24px | 新内容出现时自动跟到底部 | — |
 | 你不在底部、有新内容 | 你上滚后又有内容变化 | 右下方"Jump to latest ↓"，不自动滚动 | 点它回到底部；自己滚到底部它也消失 |
 | 更早的消息 | 打开（或重新载入）会话时超过 50 条（一条你的消息或一条助手回复算一条） | 先显示最近 50 条，顶部一行"Scroll up to load earlier messages"；滚到顶部时载入更早的 50 条，当前看到的内容不跳动 | 继续上滚 |
@@ -37,6 +39,7 @@ M6 起的模型菜单和思考强度见 [models.md](models.md)；输入框的"/"
 ## 阶段行
 
 只在本轮运行中显示，全部由 pi 事件推出；本轮结束（`agent_settled`）后隐藏。秒数每秒刷新，从该阶段开始计时。
+（v1：见 docs/specs/model-providers.md §9.3：另有模型层的阶段行——等模型、等它停下、排队、重试、重建，由 `mori.model_*` 事件推出，准备中也显示。）
 
 | 文字 | 开始于 | 结束于 |
 | --- | --- | --- |
@@ -45,8 +48,8 @@ M6 起的模型菜单和思考强度见 [models.md](models.md)；输入框的"/"
 | Responding… | `text_delta`；`toolcall_start` / `toolcall_delta`（模型在写工具参数） | 回复结束（`message_end`） |
 | Run npm test 8s | `tool_execution_start`（文字与工具卡标题相同，见 tool-cards.md） | 该工具的 `tool_execution_end`；同时有别的工具在跑就显示那一个 |
 | Waiting for your approval | `mori.tool_gate` 为 `ask` 的 `tool_execution_start`，或批准扩展的 `mori.approval_request`（M2）；有挂起的卡时优先显示它 | 你作出选择（`mori.approval_end`） |
-| Retrying (1/3) · <原因> | `auto_retry_start` | 下一次 `turn_start` 或 `auto_retry_end` |
-| Compacting session… | `compaction_start` | `compaction_end` |
+| Retrying (1/3) · <原因>（v1：见 docs/specs/model-providers.md §5.5、§9.3：pi 的自动重试关闭，改为 `mori.model_retry` 的"Retrying (n/m) · HTTP 503"） | `auto_retry_start` | 下一次 `turn_start` 或 `auto_retry_end` |
+| Compacting session…（v1：见 docs/specs/model-providers.md §6.3：重建时改为"Rebuilding the conversation for <B>…"） | `compaction_start` | `compaction_end` |
 | （不显示） | `message_end` 之后、下一个事件之前；没有运行时 | — |
 
 反例：回复结束到下一个事件之间不显示"Responding…"；没有任何增量时不显示"Responding…"。
@@ -57,9 +60,9 @@ M6 起的模型菜单和思考强度见 [models.md](models.md)；输入框的"/"
 | --- | --- | --- | --- |
 | 后台正在启动 | 会话还没打开、后台进程通道还没连上 | 输入框可以打字；按钮位置显示"Starting…"，不能发送 | 输入 |
 | 空闲 | 没有运行 | "Send"按钮（输入为空时不可用） | Enter 发送；Shift+Enter 换行；输入法组字时 Enter 只选词 |
-| 生成中、输入框为空 | 本轮运行中（`agent_start` 到 `agent_settled`） | 同一位置显示"Stop"（悬停"Stop response (Esc)"） | 点"Stop"或按 Esc |
+| 生成中、输入框为空（v1：见 docs/specs/model-providers.md §9.3、§11.4：准备中同样显示"Stop"） | 本轮运行中（`agent_start` 到 `agent_settled`） | 同一位置显示"Stop"（悬停"Stop response (Esc)"） | 点"Stop"或按 Esc |
 | 生成中、输入框有字 | 同上 | "Stop"和"Queue ▾"（悬停"Send after the current turn (Enter)"），下拉里有"Steer"（Ctrl+Enter）；输入框的占位文字"Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line" | Enter 排队（Queue）；Ctrl+Enter 插话（Steer）；"Stop" |
-| 有排队或插话的消息 | pi `queue_update`（`followUp` 与 `steering` 两个列表） | 输入框上方排队区，逐条显示"Queued"或"Steer"和内容 | "Withdraw"：把排队区里的消息全部放回输入框（`clearQueue`） |
+| 有排队或插话的消息（v1：见 docs/specs/model-providers.md §11.4：准备中再发的消息由后台进程暂存，pi 开始后作为 followUp 交给 pi） | pi `queue_update`（`followUp` 与 `steering` 两个列表） | 输入框上方排队区，逐条显示"Queued"或"Steer"和内容 | "Withdraw"：把排队区里的消息全部放回输入框（`clearQueue`） |
 | 插话送达 | pi 在本轮工具全部执行完、下一次请求模型之前送出（`message_start` role=user，同时 `queue_update` 去掉它） | 排队区少一条，对话流出现这条消息 | — |
 | 排队送达 | 本轮结束后 pi 依次送出 | 同上 | — |
 
@@ -77,12 +80,14 @@ M5 起分屏时 Esc、Alt+数字、F8 都以焦点所在的一栏为准，见 [s
 都显示原文。按原文决定附带的操作：原文里有 `401`、`unauthorized` 或 `api key`（不区分大小写）时附"Go to settings"
 （这条文字匹配是临时默认值，登记在 defaults.md），其他错误附"Put your last message back in the message box"。
 
+> v1：见 docs/specs/model-providers.md §9.3："Go to settings"和 `SETTINGS_HINT` 删除，认证类错误由模型层换 key、换模型或给出"No model available"说明卡；一次失败只显示一张卡；`server` 重试用完、`request`、`partial` 仍是这里的错误卡。
+
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 发送时就失败 | `session.prompt` 里 pi 的 `prompt()` 抛错（例如 "No API key found for mori-endpoint"、"No model selected"），后台进程转成 `mori.prompt_error` | 错误卡：原文 | "Go to settings" / "Put your last message back in the message box"（放回的是刚才发出的那条） |
-| 模型回复出错 | `message_end` 的 `stopReason` 为 `error`，且 `agent_end.willRetry` 为假、没有在重试 | 错误卡：`errorMessage` 原文 | 同上（放回最后一条你的消息） |
-| 自动重试最终失败 | `auto_retry_end` 且 `success` 为假（你按停止导致的"Retry cancelled"不算） | 错误卡：`finalError` 原文 | 同上 |
-| 压缩失败 | `compaction_end` 带 `errorMessage` | 错误卡：原文 | "Put your last message back in the message box" |
+| 发送时就失败（v1：见 docs/specs/model-providers.md §4.6、§5.8、§11.4：拒绝启动与段开始时等不到模型时撤回消息、文字放回输入框） | `session.prompt` 里 pi 的 `prompt()` 抛错（例如 "No API key found for mori-endpoint"、"No model selected"），后台进程转成 `mori.prompt_error` | 错误卡：原文 | "Go to settings" / "Put your last message back in the message box"（放回的是刚才发出的那条）（v1：见 docs/specs/model-providers.md §9.3："Go to settings"删除） |
+| 模型回复出错（v1：见 docs/specs/model-providers.md §5.4、§9.3：能换 key 或换模型的失败不出错误卡；发了 `mori.model_unavailable` 的不出错误卡） | `message_end` 的 `stopReason` 为 `error`，且 `agent_end.willRetry` 为假、没有在重试 | 错误卡：`errorMessage` 原文 | 同上（放回最后一条你的消息） |
+| 自动重试最终失败（v1：见 docs/specs/model-providers.md §5.5：pi 的自动重试关闭，不再出现；5xx 重试用完走"模型回复出错"） | `auto_retry_end` 且 `success` 为假（你按停止导致的"Retry cancelled"不算） | 错误卡：`finalError` 原文 | 同上 |
+| 压缩失败（v1：见 docs/specs/model-providers.md §6.3：重建时的压缩失败不出这张卡；§5.8：压缩时没有可用模型时原文为"No model available for compaction: …"） | `compaction_end` 带 `errorMessage` | 错误卡：原文 | "Put your last message back in the message box" |
 
 ## 后台进程退出
 

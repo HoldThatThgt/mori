@@ -37,7 +37,7 @@ import {
   startRename, stoppedCount, stubFolder, titleOf, topTitle, treeState, trustRecord, until, waitArchivedToggle,
   waitComposerFocus, waitIdle, waitPanes, waitReady, waitRowTitle, waitRunning, waitStatus,
 } from './m3-helpers.mjs';
-import { pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
@@ -214,12 +214,10 @@ async function relaunch(ctx) {
 /** @brief 首次启动：填连接、测试成功、打开 alpha；新会话在侧栏和顶栏都叫"New session"。 */
 async function setup(ctx) {
   const { app, page, h } = ctx;
-  await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
-  await h.fillConnection({ name: '合成端点', baseUrl, apiKey: testKey, modelId: 'fake-coder' });
-  await page.getByRole('button', { name: 'Test connection' }).click();
-  await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
+  // v1（规格 §14.4）：首次启动填英文表单、区域选 Local，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
+  await h.setupFirstRun({ baseUrl, apiKey: testKey });
   await stubFolder(app, ctx.folders.alpha);
-  await page.getByRole('button', { name: 'Open folder…' }).first().click();
+  await page.getByRole('button', { name: OPEN_FOLDER }).first().click();
   await page.locator('.pane-slot').first().waitFor({ timeout: 30000 });
   await waitReady(page);
   ctx.files.A1 = await activeFile(page);

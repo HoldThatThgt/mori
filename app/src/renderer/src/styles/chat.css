@@ -613,3 +613,23 @@
 /* 扩展的通知 */
 .notice.ext-notify.warning { color: var(--color-warn); }
 .notice.ext-notify.error { color: var(--color-danger); }
+
+/* v1 模型层（docs/v1/screens/model-chat.md）：换模型与重建的一行同 v0 的提示；No model available 卡在对话流里，
+   拒绝启动卡在输入框上方，两者外观相同；准备中暂存的排队消息变淡。 */
+.notice.model-notice { color: var(--color-muted); }
+.model-card {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  font-size: var(--fs-small);
+}
+.composer-area > .model-card { margin: 0 0 10px; }
+.model-card-title { color: var(--color-text); font-weight: 600; overflow-wrap: anywhere; }
+.model-card-note { margin-top: 2px; color: var(--color-muted); }
+.model-card-problem { margin-top: 6px; color: var(--color-danger); overflow-wrap: anywhere; }
+.candidate-list { margin: 6px 0 0; padding: 0; color: var(--color-muted); list-style: none; line-height: 1.7; }
+.candidate-list li { font-family: var(--font-mono); overflow-wrap: anywhere; }
+.model-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.queue-area li[data-pending='true'] .queue-text { color: var(--color-muted); }
