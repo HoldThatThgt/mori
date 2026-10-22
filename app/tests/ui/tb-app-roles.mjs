@@ -501,9 +501,9 @@ async function problemRows() {
   const yaml = roleText('name: [unclosed\ndescription: x');
   return [
     { row: 'header: YAML error', files: { 'bad.md': yaml },
-      line: `${bad}: can't read the header: ${await yamlError(yaml)}` },
+      line: `${bad}: can’t read the header: ${await yamlError(yaml)}` },
     { row: 'header: no frontmatter', files: { 'bad.md': 'Just a body without a header.\n' },
-      prefix: `${bad}: can't read the header: ` },
+      prefix: `${bad}: can’t read the header: ` },
     { row: 'unknown field', files: { 'bad.md': roleText(`name: bad\n${d}\ncolor: blue`) },
       line: `${bad}: unknown field "color"` },
     { row: 'missing description', files: { 'bad.md': roleText('name: bad') }, line: `${bad}: description is required` },

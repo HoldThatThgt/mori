@@ -44,7 +44,7 @@ const BUSY_TITLE = 'Can’t switch models until the response finishes';
 const COMPACTED_NOTICE = 'Compacted session';
 const STOPPED_NOTICE = 'Stopped · Changes made so far stay as they are';
 /** 被拒绝启动的会话收到 session.prompt 时的原文（§4.6） */
-const BLOCKED_MESSAGE = "This session can't start: no model fits";
+const BLOCKED_MESSAGE = 'This session can’t start: no model fits';
 /** 填充对话用的文字：不含合成端点的任何关键词 */
 const FILLER_UNIT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore. ';
 const filler = (chars) => FILLER_UNIT.repeat(Math.ceil(chars / FILLER_UNIT.length)).slice(0, chars);

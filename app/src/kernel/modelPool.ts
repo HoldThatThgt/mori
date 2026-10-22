@@ -569,9 +569,9 @@ export class ModelPool {
   private beginSend(ctx: CallContext, request: PreparedRequest, lease: Lease): { headers: Headers;
     signal: AbortSignal | undefined; } {
     if (lease.secret !== null && this.wrongOrigin(ctx.providerId, request.url)) {
-      this.notSent(ctx, lease, `${originOf(request.url) ?? 'an invalid URL'} is not the saved address of `
+      this.notSent(ctx, lease, `${originOf(request.url) ?? 'an invalid URL'} is not the saved base URL of `
         + `${ctx.providerId}`);
-      throw new Error(`The address of ${ctx.providerId} changed; the request was not sent`);
+      throw new Error(`The base URL of ${ctx.providerId} changed; the request was not sent`);
     }
     let headers: Headers;
     try {

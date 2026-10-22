@@ -44,21 +44,21 @@ test('MP-20 every reason code has exactly one UI text function', () => {
 
 test('MP-20 availability reasons show the recovery time as hh:mm:ss', () => {
   assert.equal(REASON_TEXTS.rate_limited(NINE_OH_FIVE), 'rate limited until 09:05:07');
-  assert.equal(REASON_TEXTS.connection(NINE_OH_FIVE), "can't connect until 09:05:07");
+  assert.equal(REASON_TEXTS.connection(NINE_OH_FIVE), 'can’t connect until 09:05:07');
   assert.equal(REASON_TEXTS.timeout(NINE_OH_FIVE), 'no response; unavailable until 09:05:07');
   assert.equal(REASON_TEXTS.held(NINE_OH_FIVE), 'waiting to make sure it stopped, until 09:05:07');
 });
 
 test('MP-15 reason texts without the until part for the redo note', () => {
   assert.equal(REASON_TEXTS.rate_limited(null), 'rate limited');
-  assert.equal(REASON_TEXTS.connection(null), "can't connect");
+  assert.equal(REASON_TEXTS.connection(null), 'can’t connect');
   assert.equal(REASON_TEXTS.timeout(null), 'no response');
   assert.equal(REASON_TEXTS.held(null), 'waiting to make sure it stopped');
 });
 
 test('MP-15 plain reason text drops until for the redo note and keeps other details', () => {
   assert.equal(plainReasonText('held', REASON_TEXTS.held(2_000_000)), 'waiting to make sure it stopped');
-  assert.equal(plainReasonText('connection', REASON_TEXTS.connection(2_000_000)), "can't connect");
+  assert.equal(plainReasonText('connection', REASON_TEXTS.connection(2_000_000)), 'can’t connect');
   assert.equal(plainReasonText('auth', 'API key rejected'), 'API key rejected');
 });
 
@@ -94,7 +94,7 @@ test('MP-10 tool-calling profile reasons', () => {
 
 test('MP-21 no_handover texts: window too small, or rebuild failed with the original text', () => {
   assert.equal(REASON_TEXTS.no_handover(null), 'conversation too long for this model');
-  assert.equal(REASON_TEXTS.no_handover('HTTP 500 boom'), "couldn't rebuild the conversation: HTTP 500 boom");
+  assert.equal(REASON_TEXTS.no_handover('HTTP 500 boom'), 'couldn’t rebuild the conversation: HTTP 500 boom');
 });
 
 test('MP-19 queue_timeout text states the waited seconds', () => {
@@ -104,19 +104,30 @@ test('MP-19 queue_timeout text states the waited seconds', () => {
 
 test('MP-01 compat and API type labels cover every config value with the §9.1 English text', () => {
   assert.deepEqual(Object.keys(models.COMPAT_LABELS).sort(), Object.keys(models.CompatSchema.shape).sort());
-  assert.equal(models.COMPAT_LABELS.supportsDeveloperRole, "Endpoint doesn't support the developer role");
-  assert.equal(models.COMPAT_LABELS.supportsStore, "Endpoint doesn't accept the store field");
-  assert.equal(models.COMPAT_LABELS.maxTokensField, 'Send the output limit as max_tokens');
-  assert.equal(models.COMPAT_LABELS.supportsUsageInStreaming, "Endpoint doesn't report usage while streaming");
-  assert.equal(models.COMPAT_LABELS.supportsStrictMode, "Endpoint doesn't support strict mode");
-  assert.equal(models.COMPAT_LABELS.requiresToolResultName, 'Tool results must include the tool name');
+  assert.deepEqual(Object.keys(models.COMPAT_HINTS).sort(), Object.keys(models.CompatSchema.shape).sort());
+  assert.deepEqual(Object.entries(models.COMPAT_LABELS), [
+    ['supportsDeveloperRole', 'Endpoint doesn’t support the developer role'],
+    ['supportsStore', 'Endpoint doesn’t accept the store field'],
+    ['maxTokensField', 'Endpoint needs max_tokens instead of max_completion_tokens'],
+    ['supportsUsageInStreaming', 'Endpoint doesn’t report usage while streaming'],
+    ['supportsStrictMode', 'Endpoint doesn’t support strict mode for tool parameters'],
+    ['requiresToolResultName', 'Tool results must include the tool name'],
+  ]);
+  assert.deepEqual(Object.entries(models.COMPAT_HINTS), [
+    ['supportsDeveloperRole', 'Sends the system prompt with the system role instead'],
+    ['supportsStore', 'Leaves store out of requests'],
+    ['maxTokensField', 'Older endpoints don’t recognize max_completion_tokens'],
+    ['supportsUsageInStreaming', 'Doesn’t send stream_options, so the context usage shown will be inaccurate'],
+    ['supportsStrictMode', 'Leaves strict out of tool definitions'],
+    ['requiresToolResultName', 'Some endpoints require a name field on tool result messages'],
+  ]);
   assert.deepEqual(Object.keys(models.API_TYPE_LABELS), [...models.API_TYPES]);
   assert.equal(models.API_TYPE_LABELS['openai-completions'], 'OpenAI-compatible (Chat Completions)');
   assert.equal(models.API_TYPE_LABELS['openai-responses'], 'OpenAI Responses');
   assert.equal(models.API_TYPE_LABELS['anthropic-messages'], 'Anthropic Messages');
 });
 
-test('MP-01 compat options carry only field and value, one per compat field; text lives in COMPAT_LABELS', () => {
+test('MP-01 compat options carry only field and value, one per compat field; text lives in COMPAT_LABELS/HINTS', () => {
   assert.deepEqual(models.COMPAT_OPTIONS.map((option) => option.field).sort(),
     Object.keys(models.CompatSchema.shape).sort());
   for (const option of models.COMPAT_OPTIONS) {

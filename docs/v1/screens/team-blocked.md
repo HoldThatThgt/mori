@@ -41,7 +41,7 @@
 
 | 问题 | 卡上的一行 |
 | --- | --- |
-| frontmatter 读不出（YAML 错误、没有 frontmatter） | `<file>: can't read the header: <原文>` |
+| frontmatter 读不出（YAML 错误、没有 frontmatter） | `<file>: can’t read the header: <原文>` |
 | 未知字段 | `<file>: unknown field "<field>"` |
 | 缺 `name` 或 `description`、取值不合格 | `<file>: <field> <原因>` |
 | `name` 重复 | `<file>: name "<name>" is already used by <other file>` |

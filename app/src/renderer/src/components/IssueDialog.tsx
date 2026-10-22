@@ -51,8 +51,8 @@ const PAGE_NAME: Record<AppState['view'], string> = {
 
 /** @brief 当前显示的页面。 */
 function pageName(state: AppState): string {
-  if (state.configError) return 'Couldn’t load connections';
-  if (!state.config) return 'Loading connections…';
+  if (state.configError) return 'Couldn’t load model settings';
+  if (!state.config) return 'Loading…';
   if (state.firstRun) return 'First run';
   return PAGE_NAME[state.view];
 }

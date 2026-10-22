@@ -48,7 +48,7 @@ function single(name, ...lines) {
 /** @brief name 格式不合格时的文字。 */
 const NAME_RULE = 'name must use lowercase letters, digits and - (at most 40, not starting with -)';
 /** @brief 没有 frontmatter 时的问题行。 */
-const NO_HEADER = ".mori/agents/a.md: can't read the header: no header between --- lines";
+const NO_HEADER = ".mori/agents/a.md: can’t read the header: no header between --- lines";
 
 /** @brief proposal §6.2 的配置：chat（对话）、planner（立项 + 结案）、executor、reviewer。 */
 function teamOf62() {
@@ -121,14 +121,14 @@ test('TB-01 optional fields left out: tools, models null; tool_calling implied; 
 
 test('TB-01 §4.4 row: the header can not be read (YAML error, no frontmatter)', () => {
   const [yaml] = problemsOf('---\nname: a: b\ndescription: d\n---\n');
-  assert.match(yaml, /^\.mori\/agents\/a\.md: can't read the header: Nested mappings .*at line 1, column 7$/);
+  assert.match(yaml, /^\.mori\/agents\/a\.md: can’t read the header: Nested mappings .*at line 1, column 7$/);
   assert.deepEqual(problemsOf('Just a body, no header.'), [NO_HEADER]);
   assert.deepEqual(problemsOf('---\nname: x\ndescription: d\n'), [NO_HEADER]);
   assert.deepEqual(problemsOf('---\n- name\n---\n'),
     ['.mori/agents/a.md: can\'t read the header: it must be "field: value" lines']);
   const unreadable = roles.parseRoleFiles([{ file: '.mori/agents/b.md', readError: 'EACCES: permission denied' }],
     deps);
-  assert.deepEqual(unreadable.problems, [".mori/agents/b.md: can't read the header: EACCES: permission denied"]);
+  assert.deepEqual(unreadable.problems, [".mori/agents/b.md: can’t read the header: EACCES: permission denied"]);
 });
 
 test('TB-01 §4.4 row: unknown field', () => {

@@ -118,13 +118,68 @@
    顶栏悬停“Can’t switch models until the response finishes”、菜单“Applies to this session only. …”与“Manage models”；
    不支持思考的说明用 english-ui 的句子（Settings → Models）；阶段行“Retrying (n/m) · …”；换模型提示“… redoes this response.”；
    只跳页的按钮去掉“…”（拒绝启动卡的“Allow <zone> for this project”“Confirm zone”），会弹确认的加“…”（Delete…、最后一个 key 的 Remove…）；
-   字段错误改为带句号的整句；撇号一律用 ’。`shared/models.ts` 的兼容选项说明（`COMPAT_LABELS`）和后台进程写出的原文
-   （原因文字、“This session can't start: no model fits”等）仍是规格原来的写法。
+   字段错误改为带句号的整句；撇号一律用 ’。当时还留着规格原来写法的兼容选项说明（`COMPAT_LABELS`）和后台进程写出的原文
+   （原因文字、“This session can’t start: no model fits”等），已在下面“界面文字跟着术语表”一节改好。
 
 ## 测试中发现并已修正的问题
 
 - 测试发现的 6 个：两次换模型时说明重复；从未验证过的模型在探测中没显示 verifying；溢出恢复后仍显示错误卡；模型按钮最宽 200px（应为 160px）；删除确认框的文字；加 key 后不重新探测（规格 §7.4 补充了这一条）。
 - 代码评审（5 个角度、每条再由独立的核实者反驳）确认的 25 个，包括：429 带 `Retry-After: 0` 时无限重发；写认证头出错时槽位泄漏；保存改地址的提供商时旧 key 可能发往新地址（另加了“key 只发往它的提供商地址”的保护）；迁移时解不开的密文被丢掉；准备中排队的消息在几种情况下丢失；设置页落点用了旧数据等。全部改好并各有单元测试。
+
+## 界面文字跟着术语表（2026-10-21，分支 `v1-string-polish`）
+
+v1 合并进 `app-v0`（`6a57fd4`）后还有四处界面文字与术语表 [v0/ui-strings.md](../v0/ui-strings.md) 不一致（上面第 9 条末尾）。
+这次只改文字，不改行为；分支 `v1-string-polish` 基于 `6a57fd4`。
+
+改了什么：
+
+1. 撇号用 ’：`shared/models.ts` 的原因文字（“can’t connect”“couldn’t rebuild the conversation: …”）、
+   `BLOCKED_PROMPT_MESSAGE`（“This session can’t start: no model fits”），`kernel/modelCommands.ts` 的
+   “Model settings can’t be read: …”。重做说明里的原因文字是同一份，发给模型的说明也跟着变。`STOPPED_BEFORE_SENDING` 没有撇号，不用改。
+2. 兼容选项用 english-ui 的标签，每个勾选框下面加一行小字说明（新的 `COMPAT_HINTS`），提供商表单与首次启动表单共用
+   `CompatChecks`；提供商卡上的“Compatibility options”只列标签。标签：“Endpoint doesn’t support the developer role”
+   “Endpoint doesn’t accept the store field”“Endpoint needs max_tokens instead of max_completion_tokens”
+   “Endpoint doesn’t report usage while streaming”“Endpoint doesn’t support strict mode for tool parameters”
+   “Tool results must include the tool name”；说明见规格 §9.1。
+3. 没有“连接”这个说法了：启动时读取中“Loading connections…”改成“Loading…”，读取失败“Couldn’t load connections: …”
+   改成“Couldn’t load model settings: …”；F8 报告的 Page 跟着改（“Loading…”“Couldn’t load model settings”）。
+4. 地址统一叫 base URL：改地址的确认文字由 `shared/models.ts` 的 `addressChangeText` 给出，后台进程
+   （`applyAddressChange` 的 `consequence`）与提供商表单共用，原来后台进程写的“Changing the address …”不再有；
+   zod 的“Base URL must be an http or https URL”（迁移说明、配置错误里看得到），模型池的
+   “The base URL of <id> changed; the request was not sent”。
+
+文档：规格 §4.6、§5.3、§5.7、§6.3、§9.1、MP-18 的文字，[screens/first-run.md](screens/first-run.md)、
+[screens/models-settings.md](screens/models-settings.md)、[screens/model-chat.md](screens/model-chat.md)，
+[defaults.md](defaults.md)（新增“兼容选项的标签与说明”一行），[v0/defaults.md](../v0/defaults.md) 的兼容选项行，
+[v0/screens/f8.md](../v0/screens/f8.md) 与 [v0/ui-strings.md](../v0/ui-strings.md) 里 F8 的 Page 取值。
+
+测试（开发构建，另外两个会话错开固定端口跑的）：
+
+| 检查 | 结果 |
+| --- | --- |
+| `npm run check`（类型检查 + 静态检查） | 通过 |
+| `npm run test:unit` | 373/373 |
+| `npx electron-vite build` | 通过 |
+| `v1-models-app-settings` / `-session` / `-switch` | 141/141（新增一条：Add provider 表单的六个兼容选项各有标签和说明，换成别的 API type 时隐藏）、113/113、78/78 |
+| `v1-models-replay` | 35/35 |
+| `m0-smoke` | 18/19，退出码 0；没通过的是已知的 pi #9129（命令超时后留下 sleep 进程，标 known），`6a57fd4` 合并时同样 |
+| `m1-app` | 37/37 |
+| `spec-coverage.mjs`（不带 `--allow-missing-real`） | 退出码 0 |
+
+覆盖检查里的真实层（`v1-models-real.json` 10/10）和现有测试的两份结果（`v1-models-app-existing.json` 11/11、
+`v1-models-replay-existing.json` 7/7）没有重跑，用的是 `6a57fd4` 合并时在主检出跑出的文件：这几个脚本不检查改过的文字。
+打包程序这次没有重跑。
+
+我替你定的（走查时都可以改）：
+
+1. 读取失败写“Couldn’t load model settings: …”：`config.get` 出错多半是模型层没能启动；读取中只写“Loading…”（术语表的写法）。
+2. 只加每个选项下面的说明，没有加回 english-ui 选项上方那句
+   “Check an option only if the endpoint really needs it. Otherwise pi works it out automatically.”：v1 里没有核实 pi 都能自动判断。
+3. 提供商卡上的“Compatibility options”只列标签，不带说明（一行放得下）。
+4. 同一类的后台进程文字一起改成 base URL（上面第 4 条的 zod 与模型池两处），不只是改地址的确认文字。
+
+没改的：v0 连接表单的状态表 [v0/screens/connection.md](../v0/screens/connection.md)（v1 已删掉那个表单）仍写“Loading connections…”；
+术语表里 v0 设置页的几行（“Connections and models”“Add connection”等）还没按 v1 的 Settings → Models 改，留作后续。
 
 ## 未验证
 

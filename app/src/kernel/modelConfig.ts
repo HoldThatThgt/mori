@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, posix, win32 } from 'node:path';
 import {
-  DEFAULT_ZONES, ModelConfigSchema, ProjectModelsFileSchema, VIRTUAL_PROVIDER_ID, ZONES, suggestZone,
+  addressChangeText, DEFAULT_ZONES, ModelConfigSchema, ProjectModelsFileSchema, VIRTUAL_PROVIDER_ID, ZONES, suggestZone,
   type ModelConfig, type ModelGroup, type ModelPick, type ModelProvider, type ProjectModelsFile, type Zone,
 } from '../shared/models';
 import type { ModelRef } from './modelTypes';
@@ -494,8 +494,7 @@ export function applyAddressChange(provider: ModelProvider, baseUrl: string): Ad
     return { originChanged, provider: { ...provider, baseUrl }, removedKeyRefs: [], consequence: null };
   }
   const count = provider.keys.length;
-  const consequence = count === 0 ? null : `Changing the address removes this provider's ${count} saved `
-    + `${count === 1 ? 'key' : 'keys'}. Add them again after saving.`;
+  const consequence = count === 0 ? null : addressChangeText(count);
   return {
     originChanged,
     provider: { ...provider, baseUrl, keys: [] },

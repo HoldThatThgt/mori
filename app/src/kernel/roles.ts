@@ -334,11 +334,11 @@ function readHeader(text: string, parse: RoleDeps['parseFrontmatter']):
   try {
     parsed = parse(text);
   } catch (error) {
-    return { problem: `can't read the header: ${firstLine(error)}` };
+    return { problem: `can’t read the header: ${firstLine(error)}` };
   }
   if (!isMapping(parsed.frontmatter)) return { problem: 'can\'t read the header: it must be "field: value" lines' };
   if (Object.keys(parsed.frontmatter).length === 0) {
-    return { problem: "can't read the header: no header between --- lines" };
+    return { problem: "can’t read the header: no header between --- lines" };
   }
   return { fields: parsed.frontmatter, body: parsed.body };
 }
@@ -391,7 +391,7 @@ interface FileCheck {
 /** @brief 校验一个角色文件（§4.4 中只看这个文件就能判断的各行）。 */
 function checkFile(entry: RoleFileText, deps: RoleDeps): FileCheck {
   if ('readError' in entry) {
-    return { problems: [`can't read the header: ${entry.readError}`], fields: null, role: null };
+    return { problems: [`can’t read the header: ${entry.readError}`], fields: null, role: null };
   }
   const header = readHeader(entry.text, deps.parseFrontmatter);
   if ('problem' in header) return { problems: [header.problem], fields: null, role: null };
