@@ -4,7 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadKernelModule } from '../load.mjs';
@@ -226,6 +226,25 @@ test('TB-12 board.json is written atomically and reads back the same board', asy
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('TB-12 a board.json held open by another reader for a moment is still replaced (the rename is retried)',
+  async () => {
+    const root = mkdtempSync(join(tmpdir(), 'mori-board-'));
+    try {
+      const dir = join(root, 'teams', 'session-1');
+      const board = oneTask();
+      await B.saveBoard(dir, board);
+      // Windows 上目标文件开着时改名替换失败（EPERM）；别的程序 100 毫秒后关掉它，写出照样完成。
+      const fd = openSync(join(dir, 'board.json'), 'r');
+      setTimeout(() => closeSync(fd), 100);
+      const stopped = B.markStopped(board, ['T1'], 'user');
+      await B.saveBoard(dir, stopped);
+      assert.equal((await B.loadBoard(dir)).tasks[0].status, 'stopped');
+      assert.deepEqual(readdirSync(dir), ['board.json'], 'no temporary file is left behind');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 
 test('TB-12 an unreadable board.json is reported, not replaced with an empty board', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'mori-board-'));
