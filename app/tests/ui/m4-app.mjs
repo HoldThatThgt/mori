@@ -630,7 +630,7 @@ async function streamingFeedback(ctx) {
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.wheel(0, -200);
   await sleep(300);
-  await dragSelect(page, `${PANE} [data-testid="assistant"]`, '河边的柳树发了新芽', index);
+  await dragSelect(page, `${PANE} [data-testid="assistant"]`, '河边的柳树发了新芽', index, 'end');
   const shown = await popoverShown(page);
   const running = await paneOf(page).getAttribute('data-running');
   await sleep(600);

@@ -832,6 +832,8 @@ async function deleteAndCheck(ctx, who) {
   await ctx.page.getByTestId('session-menu').getByRole('menuitem', { name: 'Delete…' }).click();
   await ctx.page.getByTestId('delete-dialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await row.waitFor({ state: 'detached', timeout: 20000 });
+  // 行在会话文件删掉时就随会话列表消失；确认框等主进程把 teams/<id> 也删完（deleteSession 返回）才关上。
+  await ctx.page.getByTestId('delete-dialog').waitFor({ state: 'detached', timeout: 20000 });
   const probe = existsSync(ctx.probeLog) ? readJsonl(ctx.probeLog) : [];
   const shut = probe.filter((item) => item.t >= deleteAt).map((item) => item.id);
   const enabled = ['Archive', 'Delete…']

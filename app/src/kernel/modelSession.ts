@@ -119,6 +119,16 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+/**
+ * @brief 等到 Date.now() 超过 at（之后写的条目与消息的时间戳都大于 at）。计时器按事件循环缓存的时钟算，到点时
+ *        Date.now() 可能还没走过 at，所以到点后再看一次，没过就接着等。
+ * @param at 毫秒时间戳
+ * @param signal 中止时以 AbortError 拒绝
+ */
+async function waitPast(at: number, signal?: AbortSignal): Promise<void> {
+  while (Date.now() <= at) await delay(at - Date.now() + 1, signal);
+}
+
 /** @brief 消息内容的纯文字（与 pi 排队区比较全文的写法相同）。 */
 function messageText(message: { content?: unknown }): string {
   const { content } = message;
@@ -1369,7 +1379,7 @@ export class ModelSession implements WrapperHost {
     if (strips.has(result.model)) this.writeRebuild(result.model, false);
     reply.current = result.model;
     this.emitState();
-    if (Date.now() <= entry.hideUntil) await delay(entry.hideUntil - Date.now() + 1, signal);
+    await waitPast(entry.hideUntil, signal);
     return { ref: result.model, excluded: [], restart: false };
   }
 
@@ -1392,7 +1402,7 @@ export class ModelSession implements WrapperHost {
       return { ref: null, excluded: result.excluded, restart: false };
     }
     this.recordSwitch({ ...entry, to: result.model });
-    if (Date.now() <= entry.hideUntil) await delay(entry.hideUntil - Date.now() + 1, signal);
+    await waitPast(entry.hideUntil, signal);
     const restart: TaskRestart = { from, to: result.model, reason, detail };
     this.writeEntry(MODEL_ENTRY_TYPES.taskRestart, { at: Date.now(), ...restart });
     this.restart = restart;

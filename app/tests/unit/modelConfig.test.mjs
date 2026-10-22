@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdtempSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadKernelModule } from './load.mjs';
@@ -531,3 +531,18 @@ test('MP-01 saving validates first and writes atomically without leaving temp fi
   assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), baseConfig());
   assert.deepEqual(readdirSync(join(dir, 'nested')), ['model-config.json']);
 });
+
+test('MP-01 a model-config.json held open by another reader for a moment is still replaced (the rename is retried)',
+  async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mori-config-'));
+    const path = join(dir, 'model-config.json');
+    await mc.saveModelConfig(path, baseConfig(), { reserved: RESERVED });
+    // Windows 上目标文件开着时改名替换失败（EPERM）；别的程序 100 毫秒后关掉它，写出照样完成。
+    const fd = openSync(path, 'r');
+    setTimeout(() => closeSync(fd), 100);
+    const moved = baseConfig();
+    moved.providers[0].keys.reverse();
+    await mc.saveModelConfig(path, moved, { reserved: RESERVED, previous: baseConfig() });
+    assert.deepEqual(await mc.readModelConfig(path, RESERVED), { kind: 'ok', config: moved });
+    assert.deepEqual(readdirSync(dir), ['model-config.json'], 'no temporary file is left behind');
+  });

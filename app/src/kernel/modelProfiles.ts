@@ -2,7 +2,7 @@
 // 由探针结果派生能力三态与交接写入等级、给界面的 ProfileView，以及选择器第 3 步用的 tool_calling 状态。
 // 档案描述的是服务端上的模型（地址、接口、模型 id、服务版本），所以按这几项存，不按 Mori 的提供商 id 存。
 
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { z } from 'zod';
 import type {
@@ -10,6 +10,7 @@ import type {
   ServerKind,
 } from '../shared/models';
 import type { ModelRef, ToolCallingState } from './modelTypes';
+import { renameReplacing } from './renameRetry';
 
 /** @brief 探针套件版本（§7.2 suite）；探针的请求或判定改变时加 1。 */
 export const PROBE_SUITE = 1;
@@ -402,14 +403,14 @@ function parseEntries(path: string, list: unknown[]): StoredProfile[] {
 }
 
 /**
- * @brief 原子写档案文件：先写临时文件再改名；目录不存在时先创建。
+ * @brief 原子写档案文件：先写临时文件再改名（目标被别的进程短暂打开时重试）；目录不存在时先创建。
  * @param profiles 全部档案
  */
 export async function writeProfiles(path: string, profiles: readonly StoredProfile[]): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const temp = `${path}.tmp`;
   await writeFile(temp, `${JSON.stringify({ version: FILE_VERSION, profiles }, null, 2)}\n`, 'utf8');
-  await rename(temp, path);
+  await renameReplacing(temp, path);
 }
 
 /** @brief 同一个服务端模型（地址、接口、模型 id）只留一个档案，不论服务版本。 */
