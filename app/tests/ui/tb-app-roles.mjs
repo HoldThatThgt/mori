@@ -11,7 +11,7 @@
 // 256000，写入等级 A，跳过探针）；临时项目各写自己的角色文件（正文带合成端点认角色用的 MORI-ROLE-<name>）、
 // .pi/mcp.json（合成 MCP 服务 tests/mcp-server/server.mjs，连上 8 秒后才列出工具）、.pi/extensions（在实例里询问的
 // 项目扩展）。
-// 同一时间只开一个 App：TB-03 先用对照构建（.tb-runs/base，提交 6a57fd4，没有 TaskBoard）跑一次关闭模式，再用本构建跑；
+// 同一时间只开一个 App：TB-03 先用对照构建（.tb-runs/base，提交 2e67197，没有 TaskBoard）跑一次关闭模式，再用本构建跑；
 // TB-43 的 mori-team 载入失败用本构建的一份拷贝（.tb-runs/roles-teamfail），只在拷贝的内核代码里让 mori-team 的工厂函数
 // 抛错（synthetic fault injection，本构建与 src 不变），最后单独启动。
 
@@ -237,7 +237,7 @@ function watchNotReady(ctx) {
 // ---------- TB-03：关闭模式与 v0 一致 ----------
 
 /**
- * @brief 对照构建（.tb-runs/base，app-v0 合并模型层之后、TaskBoard 之前的提交 6a57fd4）：同一份合成配置、
+ * @brief 对照构建（.tb-runs/base，TaskBoard 合入前最新的 app-v0 提交 2e67197）：同一份合成配置、
  *        同一个项目，发 V0_TEXT，记下发给模型的第一个请求与工具页的行。打包版（--exe）运行时对照仍用这个开发构建。
  */
 async function base(ctx) {
