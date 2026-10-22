@@ -10,7 +10,8 @@ import {
 } from '../../../shared/protocol';
 import { EXCLUSION_REASONS, MODEL_ENTRY_TYPES } from '../../../shared/models';
 import {
-  ProgressEntrySchema, ReceiptEntrySchema, TEAM_ENTRY_TYPES, WakeEntrySchema, type ReceiptKind, type WakeKind,
+  ProgressEntrySchema, ReceiptEntrySchema, TEAM_ENTRY_TYPES, TeamEntrySchema, WakeEntrySchema, type ReceiptKind,
+  type TeamMode, type WakeKind,
 } from '../../../shared/team';
 import {
   blocksFromContent, contentText, emptyTranscript, messageTime, parseRejection, pushItem, resultPatch, type ToolCall,
@@ -45,7 +46,7 @@ function addAssistant(state: Transcript, message: Message, entryId: string): Tra
   const { blocks, tools } = blocksFromContent(message.content);
   let next = pushItem(state, { kind: 'assistant', blocks, streaming: false, entryId, time: messageTime(message) });
   const all = { ...next.tools };
-  for (const tool of tools) all[tool.id] = { ...tool, status: 'interrupted' };
+  for (const tool of tools) all[tool.id] = { ...tool, status: 'interrupted', teamMode: state.runTeamMode };
   next = { ...next, tools: all };
   const error = String(message.errorMessage ?? '');
   const stopped = message.stopReason === 'aborted' || (message.stopReason === 'error' && ABORTED_REPLY.test(error));
@@ -187,9 +188,23 @@ function addEntry(state: Transcript, entry: SessionEntry, entries: SessionEntry[
   return state;
 }
 
-/** @brief 由会话记录重建对话流。没有结果的工具调用保持"已中断"。 */
+/** @brief mori.team 条目里的模式；不是这种条目或内容不对时为 null（内容不对时记录错误）。 */
+function teamModeOf(entry: SessionEntry): TeamMode | null {
+  if (entry.type !== 'custom' || entry.customType !== TEAM_ENTRY_TYPES.team) return null;
+  return teamData(TeamEntrySchema, entry)?.mode ?? null;
+}
+
+/**
+ * @brief 由会话记录重建对话流。没有结果的工具调用保持"已中断"。
+ *        每次运行从一条用户消息开始，按那时最后一条 mori.team 的模式记下运行的模式（工具卡的 Message / Ask，§13.8）。
+ */
 export function transcriptFromEntries(entries: SessionEntry[]): Transcript {
-  return entries.reduce((state, entry, index) => addEntry(state, entry, entries, index), emptyTranscript);
+  let latest: TeamMode = 'off';
+  return entries.reduce((state, entry, index) => {
+    latest = teamModeOf(entry) ?? latest;
+    const user = entry.type === 'message' && (entry.message as unknown as Message).role === 'user';
+    return addEntry(user ? { ...state, runTeamMode: latest } : state, entry, entries, index);
+  }, emptyTranscript);
 }
 
 /**
@@ -221,7 +236,7 @@ function resumeStreaming(state: Transcript, message: unknown): Transcript {
   const next = pushItem(state, { kind: 'assistant', blocks, streaming: true, entryId: null,
     time: messageTime(message) });
   const all: Record<string, ToolCall> = { ...next.tools };
-  for (const tool of tools) all[tool.id] = { ...tool, status: 'preparing' };
+  for (const tool of tools) all[tool.id] = { ...tool, status: 'preparing', teamMode: state.runTeamMode };
   return { ...next, tools: all };
 }
 

@@ -46,13 +46,18 @@ const CREATE = { name: 'task_create', args: { request: 1, title: 'Find and fix',
 
 // ---- 纯函数 ----
 
-test('TB-56 a user message in the dialog session is the handed message with the same text, else the first /command',
-  () => {
-    const handed = [{ text: 'first' }, { text: '/fix login' }, { text: 'third' }];
-    assert.equal(Flow.matchHanded(handed, 'third'), 2);
-    assert.equal(Flow.matchHanded(handed, 'Fix login please'), 1, 'pi expanded the template');
-    assert.equal(Flow.matchHanded([{ text: 'a' }], 'b'), -1);
-  });
+test('TB-56 a user message in the dialog session is the handed message with the same text, its template expansion '
+  + 'or its skill block; other text matches none', () => {
+  const handed = [{ text: 'first', alt: null }, { text: '/fix login', alt: 'Fix login please' },
+    { text: 'third', alt: null }, { text: '/skill:fmt a.ts', alt: null }];
+  assert.equal(Flow.matchHanded(handed, 'third'), 2);
+  assert.equal(Flow.matchHanded(handed, 'Fix login please'), 1, 'pi expanded the template');
+  assert.equal(Flow.matchHanded(handed, '<skill name="fmt" location="x">\nbody\n</skill>\n\na.ts'), 3,
+    'pi expanded the skill command');
+  assert.equal(Flow.matchHanded(handed, 'Sent by an extension with sendUserMessage'), -1,
+    'text an extension sends is not taken for a handed /command');
+  assert.equal(Flow.matchHanded([{ text: 'a', alt: null }], 'b'), -1);
+});
 
 test("TB-06 the dialog card decision: couldn't decide on errors and no model, otherwise the kind or reply", () => {
   const judgment = { user: true, merged: false, kind: 'submit', recorded: true, registered: [1] };
@@ -129,6 +134,29 @@ test('TB-56 TB-08 TB-37 an idle dialog waits in preparing while create decides; 
     assert.deepEqual(shape(user).filter((kind) => kind !== 'mori.team'),
       ['user', 'mori.receipt', 'assistant', 'mori.progress']);
     assert.ok(host.events.some((event) => event.type === 'mori.receipt' && event.kind === 'registered'));
+  });
+
+test('TB-56 a message judged after the dialog settled but before its reply resolved starts a reply the Team tracks',
+  async () => {
+    const { team, host } = await setup();
+    await team.setMode('on');
+    team.onUserPrompt({ text: 'first' }, undefined, undefined);
+    const reply = await nextDialog(host);
+    const judge = await nextDelivery(host, 'U.create');
+    await runDelivery(host, judge, [{ text: 'Answer it.' }]);
+    await reply.ready;
+    await beginRun(host, reply);
+    team.onUserPrompt({ text: 'second' }, 'followUp', undefined);
+    const second = await nextDelivery(host, 'U.create', host.deliveries.indexOf(judge) + 1);
+    // synthetic：对话这次运行已经 agent_settled，它的 dialogStart 还没兑现（Team 还认为对话在回复）
+    await assistantTurn(host.entry('U'), { text: 'Answered the first.' });
+    host.entry('U').running = false;
+    host.entry('U').spec.onEvent({ type: 'agent_settled' });
+    await runDelivery(host, second, [{ text: 'Answer it too.' }]);
+    const next = await nextDialog(host, 1);
+    assert.equal(next.text, 'second', 'the Team starts the reply itself');
+    assert.equal(host.queued.length, 0, 'not handed to the session table as a queued message');
+    reply.resolve();
   });
 
 test('TB-56 messages sent while the dialog replies wait for create one by one; Enter queues, Ctrl+Enter steers',
@@ -312,6 +340,7 @@ test('TB-08 a judged message withdrawn from the pi queue leaves; its receipt fol
     team.onUserPrompt({ text: 'fix it' }, 'followUp', undefined);
     await runDelivery(host, await nextDelivery(host, 'U.create'), [{ calls: [SUBMIT] }, { calls: [CREATE] }]);
     await until(() => host.queued.length === 1, 'handed to pi');
+    host.entry('U').spec.onEvent({ type: 'message_start', message: { role: 'assistant', content: [] } });
     assert.deepEqual(team.withdrawDeciding(), [], 'nothing waits for create');
     assert.deepEqual(customs(user, 'mori.receipt'), [], 'the dialog is outputting');
     await assistantTurn(host.entry('U'), { text: 'Still answering the earlier message.' });

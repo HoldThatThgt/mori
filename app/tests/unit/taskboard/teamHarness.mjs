@@ -41,6 +41,7 @@ function fakeModel(state) {
       return restart;
     },
     candidateRefs: () => ['fake/model'],
+    outsideRefs: () => state.outside ?? [],
     setTeamLock: async (locked) => {
       state.locks = [...(state.locks ?? []), locked];
       return {};
@@ -227,6 +228,7 @@ export async function assistantTurn(entry, reply) {
   const message = { role: 'assistant', content: [...(reply.text ? [{ type: 'text', text: reply.text }] : []), ...calls],
     provider: 'fake', model: 'model', stopReason: calls.length ? 'toolUse' : 'stop', timestamp: Date.now(),
     api: 'openai-completions', usage: {} };
+  entry.spec.onEvent({ type: 'message_start', message });
   sm.appendMessage(message);
   entry.spec.onEvent({ type: 'message_end', message });
   const results = [];

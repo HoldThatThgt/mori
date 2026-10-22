@@ -15,6 +15,8 @@
 //   - MORI_MCP_FAIL_INIT=<原文>：initialize 以这段原文失败（JSON-RPC 错误），用来测服务报错时界面显示的原文。
 //   - MORI_MCP_LOG=<文件>：把收到的每条消息追加写进这个文件（测试据此核对连接了几次）。
 //   - MORI_MCP_EXTRA=1：另外注册 pid、cwd、roots、slow。
+//   - MORI_MCP_LATE_TOOLS_MS=<毫秒>：回答 initialize 之后这么久里 tools/list 返回空列表，到时发
+//     notifications/tools/list_changed，之后才列出工具（测会话打开之后才注册的 MCP 工具，TaskBoard TB-09）。
 
 import { appendFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
@@ -23,6 +25,9 @@ const noTools = process.env.MORI_MCP_TOOLS === 'none';
 const failInit = process.env.MORI_MCP_FAIL_INIT;
 const logFile = process.env.MORI_MCP_LOG;
 const extra = process.env.MORI_MCP_EXTRA === '1';
+const lateToolsMs = Number(process.env.MORI_MCP_LATE_TOOLS_MS ?? 0);
+/** 设了 MORI_MCP_LATE_TOOLS_MS 时，工具是否已经列出 */
+let toolsListed = lateToolsMs <= 0;
 
 const object = (properties, required = []) => ({ type: 'object', properties, required });
 const BASIC_TOOLS = [
@@ -102,15 +107,21 @@ async function handle(id, method, params) {
   switch (method) {
     case 'initialize':
       if (failInit) throw { code: -32000, message: failInit };
+      if (!toolsListed) {
+        setTimeout(() => {
+          toolsListed = true;
+          send({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' });
+        }, lateToolsMs);
+      }
       return {
         protocolVersion: params?.protocolVersion ?? '2025-06-18',
-        capabilities: { tools: {} },
+        capabilities: { tools: lateToolsMs > 0 ? { listChanged: true } : {} },
         serverInfo: { name: 'mori-test-mcp', version: '0.0.1' },
       };
     case 'ping':
       return {};
     case 'tools/list':
-      return { tools: noTools ? [] : [...BASIC_TOOLS, ...(extra ? EXTRA_TOOLS : [])] };
+      return { tools: noTools || !toolsListed ? [] : [...BASIC_TOOLS, ...(extra ? EXTRA_TOOLS : [])] };
     case 'tools/call':
       return callTool(id, params);
     default:

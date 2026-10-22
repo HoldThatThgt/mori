@@ -169,6 +169,8 @@ export class Team implements TeamLike {
   pendingLock = false;
   /** 要在对话的当前助手消息结束后写的用户会话条目（§5.1 mori.team、§13.2 回执） */
   pendingEntries: { customType: string; data: unknown; event: KernelEvent | null }[] = [];
+  /** 用户会话正在输出一条助手消息（它的 message_start 到 message_end）：这时要写的条目等它结束（§13.2） */
+  userOutputting = false;
   /** 用户会话下一次运行（before_agent_start 定下） */
   nextUserRun: UserRunStart = { mode: 'off', allowed: null };
   /** 程序投递到用户会话、还没写下 mori.wake 条目的消息（§5.6） */
@@ -786,9 +788,12 @@ export class Team implements TeamLike {
     await this.deliveryDone(lane);
   }
 
-  /** @brief 一次投递结束：没开始运行的按 §9.4 处理（停止、选不到模型、没能开始），然后开始下一次。 */
+  /**
+   * @brief 一次投递结束：没开始运行的按 §9.4 处理（停止、选不到模型、没能开始），然后开始下一次。
+   *        Team 已关闭（会话关闭、后台进程退出）时与 laneEvent 一样不再处理（§11.6 没有自动恢复）。
+   */
   private async deliveryDone(lane: Lane): Promise<void> {
-    if (!lane.started) {
+    if (!lane.started && !this.closed) {
       lane.settling = runEnded(this, lane);
       await lane.settling;
       lane.settling = null;
@@ -991,13 +996,19 @@ export class Team implements TeamLike {
     if (this.closed) return;
     switch (event.type) {
       case 'agent_start': return runStarted(this, lane);
+      case 'message_start':
+        if (lane === this.user && (event.message as { role?: string }).role === 'assistant') this.userOutputting = true;
+        return;
       case 'tool_execution_start':
         lane.current = toolBrief(event.toolName, event.args);
         this.emitBoard();
         return;
       case 'tool_execution_end':
-        if (lane.kind === 'task' && !event.isError && (event.toolName === 'edit' || event.toolName === 'write')) {
+        if (lane.kind === 'task' && !event.isError && (event.toolName === 'edit' || event.toolName === 'write')
+          && !this.teamEdited) {
+          // 右栏的说明随 TaskBoard 视图更新（§13.12）：第一次改过文件时就发，不等下一次别的变化
           this.teamEdited = true;
+          this.emitBoard();
         }
         return;
       case 'message_end': return this.onMessageEnd(lane, event.message);
@@ -1008,6 +1019,7 @@ export class Team implements TeamLike {
 
   /** @brief 运行结束（agent_settled）：按 §9.4 处理，处理完之前会话仍算忙。 */
   private onSettled(lane: Lane): void {
+    if (lane === this.user) this.userOutputting = false;
     const settling = runEnded(this, lane).catch((error: unknown) => {
       console.error(`[kernel] ${lane.id}: handling the end of the run failed: ${(error as Error).message}`);
     });
@@ -1041,7 +1053,9 @@ export class Team implements TeamLike {
     } else if (msg.role === 'user') {
       this.flow.messageEnd();
     }
-    if (msg.role === 'assistant' && this.pendingEntries.length) queueMicrotask(() => this.flushEntries());
+    if (msg.role !== 'assistant') return;
+    this.userOutputting = false;
+    if (this.pendingEntries.length) queueMicrotask(() => this.flushEntries());
   }
 
   /** @brief 程序投递的消息写进会话文件之后，写一条 mori.wake 指向它（§5.6）。 */
@@ -1061,8 +1075,7 @@ export class Team implements TeamLike {
    */
   writeUserEntry(customType: string, data: unknown, event: KernelEvent | null): void {
     this.pendingEntries.push({ customType, data, event });
-    const status = this.host.status(this.userId);
-    if (!status?.running) this.flushEntries();
+    if (!this.userOutputting) this.flushEntries();
   }
 
   /** @brief 写出挂起的用户会话条目并发事件。 */
@@ -1338,6 +1351,8 @@ export class Team implements TeamLike {
     this.mode = mode;
     if (mode !== 'off') this.registerUserTools();
     const tools = previous === 'off' ? this.lastOffTools ?? this.userApi?.getActiveTools() : undefined;
+    // 写进 mori.team 的这一组就是回到 off 时要恢复的（还没有过关闭模式的运行时取此刻启用的工具，§5.5）
+    if (tools) this.lastOffTools = [...tools];
     if (mode === 'off') this.offRestore = this.offRestore ?? this.lastOffTools;
     this.writeUserEntry(TEAM_ENTRY_TYPES.team, tools ? { mode, tools } : { mode }, null);
     const status = this.host.status(this.userId);

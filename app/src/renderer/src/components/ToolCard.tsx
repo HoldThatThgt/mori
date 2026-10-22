@@ -111,9 +111,9 @@ function TitleTarget({ tool, target, tabKey }: { tool: ToolCall; target: string;
 export const ToolCard = memo(function ToolCard({ tool, cwd, tabKey }: { tool: ToolCall; cwd: string; tabKey: string }) {
   const now = useNow(tool.status === 'running');
   const [open, setOpen] = useState(false);
-  // agent_message 的标题按协作模式分 Message / Ask（平行 Agent 规格 §13.8）。
-  const team = useApp((state) => state.tabs.find((item) => item.key === tabKey)?.team);
-  const title = toolTitle(tool, cwd, team ? seatRolesOf(team) : []);
+  // agent_message 的标题按这次调用所在运行的协作模式分 Message / Ask（平行 Agent 规格 §13.8），模式之后改变不影响它。
+  const holders = useApp((state) => state.tabs.find((item) => item.key === tabKey)?.team.holders);
+  const title = toolTitle(tool, cwd, holders ? seatRolesOf({ mode: tool.teamMode ?? 'off', holders }) : []);
   return (
     <details className={`tool-card status-${tool.status}`} data-testid="tool-card" data-status={tool.status}
       onToggle={(event) => setOpen(event.currentTarget.open)}>

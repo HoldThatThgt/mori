@@ -61,12 +61,16 @@ interface PendingMessage extends HeldWrites {
   since: number | null;
   /** 对话空闲时发出的那条：对话的准备中在等它的判断（dialogStart 的 before），判断完调用它；其他为 null */
   release: (() => void) | null;
+  /** 提示词模板展开后的文字（对话会话照 v0 展开，写进会话的是它）；不是模板时为 null */
+  expanded: string | null;
 }
 
 /** @brief 判断完、交给了对话、还没写进对话会话的一条消息。 */
 export interface HandedMessage extends HeldWrites {
   /** 你输入的原文 */
   text: string;
+  /** pi 展开提示词模板之后的文字（对话会话里这条消息的文字）；不是模板时为 null */
+  alt: string | null;
   /** 回执已经写下 */
   written: boolean;
   /** start：以它开始一次回复；held：排在对话准备中的那条之后；pi：交给了 pi 的排队或插话 */
@@ -102,16 +106,24 @@ export function decisionNote(run: JudgedRun): DecisionNote {
   return { kind: 'decided', decision, requests, note: run.lastText };
 }
 
+/** @brief 技能命令 /skill:<name> 的名字；不是技能命令时为 null。 */
+const skillName = (text: string): string | null => /^\/skill:(\S+)/.exec(text)?.[1] ?? null;
+
 /**
  * @brief 对话会话里一条 role 为 user 的消息是交给它的哪一条（§5.3）：原文相同的那条；pi 照 v0 展开了提示词模板和技能命令，
- *        这时消息的文字不是原文，取最早一条以 / 开头的。
+ *        这时消息的文字不是原文：提示词模板比展开后的文字（alt），技能命令比 pi 展开出的 <skill name="<name>" 开头。
+ *        别的文字（例如扩展用 sendUserMessage 发的）不算其中任何一条。
  * @param handed 交给了对话、还没写进的消息，按交出的顺序
  * @param text 对话会话里这条消息的文字
  * @return 下标；不是其中任何一条时为 -1
  */
-export function matchHanded(handed: readonly Pick<HandedMessage, 'text'>[], text: string): number {
-  const same = handed.findIndex((item) => item.text === text);
-  return same >= 0 ? same : handed.findIndex((item) => item.text.trimStart().startsWith('/'));
+export function matchHanded(handed: readonly Pick<HandedMessage, 'text' | 'alt'>[], text: string): number {
+  const same = handed.findIndex((item) => item.text === text || item.alt === text);
+  if (same >= 0) return same;
+  return handed.findIndex((item) => {
+    const name = skillName(item.text);
+    return name !== null && text.startsWith(`<skill name="${name}"`);
+  });
 }
 
 /**
@@ -218,11 +230,13 @@ export class UserFlow {
     const delivery: TeamDelivery = { user: true, text, cause: { kind: 'user_message' }, at: Date.now(),
       meta: { userText: item.text } };
     const pending: PendingMessage = { item, behavior: behavior ?? null, delivery, since: null, receipts: [],
-      registered: [], release: null };
+      registered: [], release: null, expanded: expanded?.text ?? null };
     this.pending.push(pending);
     if (team.userIdle()) this.startFor(pending);
-    team.emitDeciding();
+    // 先排进立项的投递队列：立项空闲时它立即开始判断，发出的第一个 mori.team_deciding 就带开始判断的时刻
+    // （阶段行一出现就是“is deciding… · Ns”，§13.6）；立项在忙别的回合时 since 为 null
     team.enqueue(team.createLane(), delivery);
+    team.emitDeciding();
   }
 
   /** @brief 对话空闲时为这条消息开始回复：准备中先等立项的判断（before），停止时立即结束等待。 */
@@ -287,8 +301,8 @@ export class UserFlow {
     if (note.kind === 'failed') console.log(`[kernel] ${this.team.userId}: couldn't decide (${note.reason})`);
     const decision: DecisionRecord = { text: pending.item.text, timestamp: null, note };
     this.decisions.push(decision);
-    const handed: HandedMessage = { text: pending.item.text, receipts: pending.receipts, registered: pending.registered,
-      written: false, via: 'start', decision };
+    const handed: HandedMessage = { text: pending.item.text, alt: pending.expanded, receipts: pending.receipts,
+      registered: pending.registered, written: false, via: 'start', decision };
     this.handed.push(handed);
     this.handTo(pending, handed);
     this.team.emitDeciding();
@@ -304,14 +318,16 @@ export class UserFlow {
       pending.release();
       return;
     }
-    if (team.userIdle()) {
+    const status = team.host.status(team.userId);
+    // 对话会话本身没有在运行或准备中（包括上一次运行 agent_settled 之后、Team 还没处理完它的结束或上一次回复的
+    // dialogStart 还没兑现的那一会儿）：由 Team 开始并跟踪这次回复；交给 dialogQueue 会由会话表开始一次 Team 不知道的回复。
+    if (team.userIdle() || !(status?.running || status?.preparing)) {
       team.user.busy = true;
       void team.host.dialogStart(team.userId, pending.item).finally(() => team.userReplyDone());
       return;
     }
-    const status = team.host.status(team.userId);
-    handed.via = status?.preparing ? 'held' : status?.running ? 'pi' : 'start';
-    team.host.dialogQueue(team.userId, pending.item, status?.preparing ? 'followUp' : pending.behavior ?? 'followUp');
+    handed.via = status.preparing ? 'held' : 'pi';
+    team.host.dialogQueue(team.userId, pending.item, status.preparing ? 'followUp' : pending.behavior ?? 'followUp');
   }
 
   /** @brief 立项的这次判断被停止（§9.4 第 0 行：不交给对话）：这条消息还在待判断队列里时它离开。 */

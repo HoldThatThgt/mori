@@ -714,6 +714,8 @@ export class ModelSession implements WrapperHost {
   private agentProblems: string[] = [];
   private project: ProjectContext | null = null;
   private candidates: readonly ModelRef[] = [];
+  /** 取交集时去掉的候选（不在 within 里，平行 Agent 规格 §12.1），按角色的顺序 */
+  private outside: readonly ModelRef[] = [];
   private check: StaticCheckResult = { blocked: null, first: null };
   private reply: ReplyState | null = null;
   private pendingSegment: number | null = null;
@@ -811,7 +813,10 @@ export class ModelSession implements WrapperHost {
     const expanded = this.layer.expandPicksIn(project, picks);
     if (expanded.missing !== null) return { pick: expanded.missing, candidates: null };
     const within = source.kind === 'role' ? source.within?.() ?? null : null;
-    return { pick: picks[0], candidates: within === null ? expanded.refs : intersectCandidates(expanded.refs, within) };
+    if (within === null) return { pick: picks[0], candidates: expanded.refs };
+    const kept = intersectCandidates(expanded.refs, within);
+    this.outside = expanded.refs.filter((ref) => !kept.includes(ref));
+    return { pick: picks[0], candidates: kept };
   }
 
   /** @brief 这个会话的能力要求：tool_calling ∪ 角色（或对话持有者）的 requires（平行 Agent 规格 §12.1）。 */
@@ -937,6 +942,14 @@ export class ModelSession implements WrapperHost {
   /** @brief 静态校验后展开的候选（§12.1：关闭模式下临时提问的 within 用对话会话的这一组），按顺序。 */
   candidateRefs(): readonly ModelRef[] {
     return [...this.candidates];
+  }
+
+  /**
+   * @brief 取交集时去掉的候选（§12.1：关闭模式下临时提问只留对话会话也有的），按角色的顺序；
+   *        交集为空时提问失败的工具结果逐个列出它们。没有 within 时为空。
+   */
+  outsideRefs(): readonly ModelRef[] {
+    return [...this.outside];
   }
 
   /**

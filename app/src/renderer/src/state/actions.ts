@@ -351,6 +351,35 @@ function handleUntabbed(envelope: EventEnvelope): void {
     rowMarks: event.type === 'agent_settled' ? { ...state.rowMarks, [saved.sessionFile]: 'unseen' } : state.rowMarks,
   }));
   if (event.type === 'mori.approval_request' || event.type === 'mori.team_approval_request') void requestAttention();
+  if (event.type === 'mori.team_approval_request' || event.type === 'mori.team_approval_end') {
+    const seq = (teamApprovalSeq.get(saved.sessionFile) ?? 0) + 1;
+    teamApprovalSeq.set(saved.sessionFile, seq);
+    if (event.type === 'mori.team_approval_end') void refreshTeamApproval(saved.sessionFile, seq);
+  }
+}
+
+/** 还没点开的会话收到的后台批准卡事件的序号（按会话文件），refreshTeamApproval 据此丢掉过时的结果 */
+const teamApprovalSeq = new Map<string, number>();
+
+/**
+ * @brief 还没点开的会话的一张后台批准卡结束了：几个实例可能各有卡挂着（平行 Agent 规格 §11.3），侧栏的"等你批准"
+ *        按后台进程的会话列表重新取这一行的 teamApproval；取的期间这个会话又有后台批准卡的事件时不用这次的结果。
+ * @param sessionFile 会话文件
+ * @param seq 取之前的事件序号
+ */
+async function refreshTeamApproval(sessionFile: string, seq: number): Promise<void> {
+  let listed: SavedSession[];
+  try {
+    listed = await request<SavedSession[]>({ type: 'session.list' });
+  } catch (error) {
+    console.error(`[renderer] cannot refresh the approval state of ${sessionFile}: ${describe('session.list', error)}`);
+    return;
+  }
+  const pending = listed.find((item) => sameFile(item.sessionFile, sessionFile))?.live?.teamApproval;
+  if (pending === undefined || teamApprovalSeq.get(sessionFile) !== seq) return;
+  useApp.setState((state) => ({ saved: { ...state.saved, sessions: state.saved.sessions.map((item) => (
+    sameFile(item.sessionFile, sessionFile) && item.live ? { ...item, live: { ...item.live, teamApproval: pending } }
+      : item)) } }));
 }
 
 /** @brief 协作状态与 TaskBoard 视图的事件记到会话上（平行 Agent 规格 §13.10）。 */
@@ -377,7 +406,9 @@ export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void
   }
   const { event } = envelope;
   restoreWithdrawn(tab, event);
-  updateTranscript(tab.key, (t) => applyEvent(t, event, Date.now()));
+  // 运行开始时记下协作模式：这次运行里的工具调用按它定标题（平行 Agent 规格 §5.1、§13.8）
+  const started = (t: Transcript) => (event.type === 'agent_start' ? { ...t, runTeamMode: tab.team.mode } : t);
+  updateTranscript(tab.key, (t) => applyEvent(started(t), event, Date.now()));
   if (event.type === 'session_info_changed') {
     updateTab(tab.key, (current) => ({ ...current, name: event.name ?? null }));
   }

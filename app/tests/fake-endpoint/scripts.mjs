@@ -23,6 +23,7 @@
 //   匹配的条目（条目写了 task 时 task 也要相同）；deliveries[k] 里第 j 个回复步骤回答这次请求。
 // 步骤（用下面的构造函数写）：
 //   - say(text)：只回文字（没有工具调用，这次运行就此结束）。
+//   - think(text)：一段思考（reasoning_content，先于文字与调用流出）；与 say、call 用 together 合成一个回复。
 //   - call(name, args)：调用一个工具。
 //   - end()：回 END_TEXT 就结束，不交接。
 //   - handoff(fields, { malformed })：交接单，按请求的形状输出（§7.5）：
@@ -36,8 +37,9 @@
 //       malformed 为真时输出在 outcome 的值之前截断的 JSON（A 的参数、B 的正文）或标签（C），程序用不了。
 //   - together(...steps)：几个步骤合成一个回复（文字按顺序相接，调用按顺序，例如 [read, task_handoff] 一批）。
 //   - wait(ms)：修饰，这个回复的第一个分块前多等 ms 毫秒。
-//   - fail(status, { model })：修饰，这次请求以 status 返回 OpenAI 形状的错误；写了 model 时只在请求的模型 id 等于它时
-//     失败，否则不生效。失败的请求没有 assistant 消息（pi 不把出错的回复发回给模型），下一次请求仍是同一个 j。
+//   - fail(status, { model, retryAfter })：修饰，这次请求以 status 返回 OpenAI 形状的错误；写了 model 时只在请求的模型 id
+//     等于它时失败，否则不生效；写了 retryAfter 时响应带 Retry-After（秒）。失败的请求没有 assistant 消息
+//     （pi 不把出错的回复发回给模型），下一次请求仍是同一个 j。
 //   单独一项的 wait、fail 不占步骤，修饰紧随其后的回复步骤（最后一项是修饰时，修饰一个空回复）；也可以写进 together。
 //   找不到条目或步骤（或空回复上的 fail 不生效）时回 NO_STEP_TEXT，并在 stderr 记一行错误。
 // 模板：步骤里的字符串可以引用
@@ -55,9 +57,9 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { contentText } from './replies.mjs';
-import { END_TEXT, call, end, fail, handoff, say, together, wait } from './steps.mjs';
+import { END_TEXT, call, end, fail, handoff, say, think, together, wait } from './steps.mjs';
 
-export { END_TEXT, call, end, fail, handoff, say, together, wait };
+export { END_TEXT, call, end, fail, handoff, say, think, together, wait };
 
 /** 工作卡的第一行与最后一行（§8.3） */
 export const WORK_CARD_OPEN = '<mori-work-card>';
@@ -415,9 +417,11 @@ function stepAt(steps, j) {
 /** @brief 一个回复步骤的文字与调用。 */
 function renderStep(s, body, flags, info) {
   const texts = [];
+  const thoughts = [];
   const toolCalls = [];
   for (const item of s.items) {
     if (item.say !== undefined) texts.push(fill(item.say, info.ctx));
+    else if (item.think !== undefined) thoughts.push(fill(item.think, info.ctx));
     else if (item.call) toolCalls.push({ name: item.call.name, args: fill(item.call.args, info.ctx) });
     else {
       const out = handoffOutput({ ...item.handoff, fields: fill(item.handoff.fields, info.ctx) }, body, flags, info);
@@ -425,7 +429,7 @@ function renderStep(s, body, flags, info) {
       else texts.push(out.text);
     }
   }
-  return { text: texts.join('\n'), toolCalls };
+  return { text: texts.join('\n'), toolCalls, ...(thoughts.length ? { thinking: thoughts.join('\n') } : {}) };
 }
 
 /**
@@ -441,7 +445,8 @@ export function scriptReply(body, flags, info) {
   const failure = s?.fails.find((f) => f.model === null || f.model === body.model);
   if (failure) {
     const message = `Synthetic HTTP ${failure.status} from script ${info.scenario}`;
-    return { failure: { status: failure.status, body: { error: { message, type: 'synthetic_error' } } } };
+    const headers = failure.retryAfter == null ? undefined : { 'Retry-After': String(failure.retryAfter) };
+    return { failure: { status: failure.status, body: { error: { message, type: 'synthetic_error' } }, headers } };
   }
   const reply = s ? renderStep(s, body, flags, info) : { text: '', toolCalls: [] };
   if (reply.text === '' && reply.toolCalls.length === 0) {

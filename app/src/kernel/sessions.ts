@@ -126,6 +126,8 @@ interface Entry {
 const sessions = new Map<string, Entry>();
 /** 正在从会话文件打开的会话（按会话文件）：同一个文件再打开时等它打开完，不另起一个写入者 */
 const opening = new Map<string, Promise<unknown>>();
+/** 后台进程正在退出（shutdownSessions）：Team 关闭时连同在运行的实例会话一起释放 */
+let shuttingDown = false;
 
 /** 批准扩展的名字；pi 用 `<inline:名字>` 标出它的加载错误 */
 const APPROVAL_EXTENSION = 'mori-approval';
@@ -1166,10 +1168,13 @@ async function openInstance(file: string, spec: InstanceSpec): Promise<string> {
   return whileOpening(file, startInstance(spec, pi.SessionManager.open(file, spec.dir), true));
 }
 
-/** @brief 关闭一个空闲的实例会话（§8.2）：释放 pi 会话与虚拟模型，文件保留；在运行或准备中时拒绝。 */
+/**
+ * @brief 关闭一个空闲的实例会话（§8.2）：释放 pi 会话与虚拟模型，文件保留；在运行或准备中时拒绝。
+ *        后台进程退出时（Team 已关闭）在运行的也释放（release 先停止它）。
+ */
 async function closeInstance(sessionId: string): Promise<void> {
   const entry = requireInstance(sessionId);
-  requireIdle(entry);
+  if (!shuttingDown) requireIdle(entry);
   await closeEntry(entry);
 }
 
@@ -1253,8 +1258,15 @@ const host: TeamHost = {
   emitUser,
 };
 
-/** @brief 退出前停止并释放所有会话（含实例会话）；挂起的批准先按拒绝处理，pi 才不会卡在等待上。 */
+/**
+ * @brief 退出前停止并释放所有会话（含实例会话）；挂起的批准先按拒绝处理，pi 才不会卡在等待上。
+ *        先关闭每个用户会话的 Team（平行 Agent 规格 §11.6，没有自动恢复）：它不再处理停止引起的运行结束
+ *        （不交接、不投递、不改 TaskBoard），释放它的实例会话，并等正在写的 board.json 写完。
+ */
 export async function shutdownSessions(): Promise<void> {
+  shuttingDown = true;
+  const teams = [...sessions.values()].flatMap((entry) => (entry.team ? [entry.team] : []));
+  await Promise.all(teams.map((team) => closeTeam(team)));
   const all = [...sessions.values()];
   sessions.clear();
   await Promise.all(all.map(async (entry) => {

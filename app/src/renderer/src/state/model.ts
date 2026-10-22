@@ -6,7 +6,7 @@ import {
 import {
   REASON_TEXTS, isUntilReason, plainReasonText, type CandidateExclusion, type ModelReason,
 } from '../../../shared/models';
-import type { ReceiptEntryData, TeamApprovalRequest, TeamDeciding, WakeKind } from '../../../shared/team';
+import type { ReceiptEntryData, TeamApprovalRequest, TeamDeciding, TeamMode, WakeKind } from '../../../shared/team';
 
 /** @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md。 */
 export type ToolStatus =
@@ -43,6 +43,11 @@ export interface ToolCall {
    * （docs/v1/screens/team-stream.md "回执"）
    */
   receipts?: ReceiptEntryData[];
+  /**
+   * 这次调用所在的运行开始时的协作模式（平行 Agent 规格 §5.1、§13.8：agent_message 的 Message / Ask 按它定，
+   * 模式之后改变不影响已经发生的调用）；没有记下时按 off
+   */
+  teamMode?: TeamMode;
 }
 
 /** @brief 一个等你选择的批准请求（mori.approval_request）。 */
@@ -214,6 +219,8 @@ export interface Transcript {
    * 不是交给了对话（applyDeciding 不把它们显示成待发或暂存的消息）
    */
   decidingHold: boolean;
+  /** 当前（或会话记录里这一段）运行开始时的协作模式，新的工具调用记下它（ToolCall.teamMode）；没有时按 off */
+  runTeamMode?: TeamMode;
 }
 
 export const emptyTranscript: Transcript = {

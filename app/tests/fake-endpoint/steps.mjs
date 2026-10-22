@@ -8,6 +8,8 @@ export const END_TEXT = 'Stopping here without a handoff.';
 const response = (items) => ({ items, waitMs: 0, fails: [] });
 /** @brief 只回文字。 */
 export const say = (text) => response([{ say: text }]);
+/** @brief 一段思考（reasoning_content，在文字与调用之前流出）；单独用时只有思考、没有文字，通常与 say、call 合成一个回复。 */
+export const think = (text) => response([{ think: text }]);
 /** @brief 调用一个工具；args 里的字符串可以用模板。 */
 export const call = (name, args = {}) => response([{ call: { name, args } }]);
 /** @brief 回 END_TEXT 就结束，不交接。 */
@@ -22,9 +24,10 @@ export const handoff = (fields, { malformed = false } = {}) => response([{ hando
 export const wait = (ms) => ({ items: [], waitMs: ms, fails: [] });
 /**
  * @brief 修饰：以 status 返回错误。
- * @param opts { model：只在请求的模型 id 等于它时失败；不写时总是失败 }
+ * @param opts { model：只在请求的模型 id 等于它时失败；不写时总是失败, retryAfter：响应头 Retry-After 的秒数（不写时没有） }
  */
-export const fail = (status, { model = null } = {}) => ({ items: [], waitMs: 0, fails: [{ status, model }] });
+export const fail = (status, { model = null, retryAfter = null } = {}) => ({ items: [], waitMs: 0,
+  fails: [{ status, model, retryAfter }] });
 
 /** @brief 几个步骤合成一个回复：文字与调用按顺序，等待相加，失败条件都保留。 */
 export function together(...steps) {

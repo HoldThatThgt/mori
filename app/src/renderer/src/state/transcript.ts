@@ -32,7 +32,7 @@ function updateLastAssistant(state: Transcript, fn: (item: Assistant) => Assista
 
 /** @brief 更新一次工具调用；还没有时先创建。 */
 function updateTool(state: Transcript, id: string, name: string, fn: (tool: ToolCall) => ToolCall): Transcript {
-  const tool = state.tools[id] ?? newTool(id, name);
+  const tool = state.tools[id] ?? { ...newTool(id, name), teamMode: state.runTeamMode };
   return { ...state, tools: { ...state.tools, [id]: fn(tool) } };
 }
 

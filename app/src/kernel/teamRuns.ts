@@ -196,7 +196,7 @@ async function finishedRun(team: Team, lane: Lane, run: LaneRun, restart: TaskRe
     case 'task': return taskRunEnded(team, lane, run, restart);
     case 'close': return closeRunEnded(team, lane, run);
     case 'create': return createRunEnded(team, run);
-    case 'ask': return askRunEnded(lane, run);
+    case 'ask': return askRunEnded(team, lane, run);
     case 'user':
       if (isProgramCreateTurn(team, lane, run)) programTurnFallback(team, run, true);
       return;
@@ -467,23 +467,28 @@ function askUserAbout(team: Team, run: LaneRun, merged: boolean,
 
 // ---- 临时提问（§10.1、§12.5） ----
 
+/** @brief 不在对话范围里、取交集时去掉的候选的排除原因（§12.1）。 */
+const OUTSIDE_RANGE_TEXT = 'not in the range you chose for the dialog';
+
 /**
  * @brief 临时提问的失败文字：选不到模型（§12.1、§12.5：No model in your range fits <role>: 加每个候选的排除原因）。
  * @param role 被问的角色
  * @param info 候选及原因
+ * @param outside 取交集时去掉的候选（不在对话的范围里），每个也列出原因
  */
-export function askUnavailableText(role: string, info: UnavailableInfo): string {
-  const reasons = info.candidates.map((item) => `${item.ref} — ${item.detail}`).join('; ');
-  return `No model in your range fits ${roleLabel(role)}: ${reasons || 'none of its models is in the range you '
-    + 'chose for the dialog'}`;
+export function askUnavailableText(role: string, info: UnavailableInfo, outside: readonly string[] = []): string {
+  const reasons = [...info.candidates.map((item) => `${item.ref} — ${item.detail}`),
+    ...outside.map((ref) => `${ref} — ${OUTSIDE_RANGE_TEXT}`)].join('; ');
+  return `No model in your range fits ${roleLabel(role)}: ${reasons || `none of its models is ${OUTSIDE_RANGE_TEXT}`}`;
 }
 
 /** @brief 临时提问的运行结束：最后一段文字就是回答，交给等待的发送方；出错、选不到模型时发送方的工具结果报错（§9.4）。 */
-function askRunEnded(lane: Lane, run: LaneRun): void {
+function askRunEnded(team: Team, lane: Lane, run: LaneRun): void {
   const asker = lane.asker;
   lane.asker = null;
   if (!asker) return;
-  if (run.unavailable) asker.settle(askUnavailableText(lane.role, run.unavailable), true);
+  const outside = team.host.entry(lane.id)?.model.outsideRefs() ?? [];
+  if (run.unavailable) asker.settle(askUnavailableText(lane.role, run.unavailable, outside), true);
   else if (run.error) asker.settle(run.error, true);
   else asker.settle(run.lastText || `${roleLabel(lane.role)} ended without an answer.`, false);
 }
