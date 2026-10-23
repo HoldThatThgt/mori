@@ -406,19 +406,42 @@ export function listRows(body: unknown): Row[] | null {
   return rows === null ? null : rows.map(asRow);
 }
 
-/** @brief 列表是 Anthropic 形状（§3.2、§5.2：对象有 has_more）。 */
+/**
+ * Anthropic 形状列表的“还有下一页”字段（§3.2、§3.3；规格更正 2026-10-23：z.ai 的 Anthropic 兼容列表用驼峰的
+ * hasMore，见录下的 glm-models-1.json）。两种写法都有时用前面的 has_more。
+ */
+const HAS_MORE_KEYS = ['has_more', 'hasMore'] as const;
+
+/** 下一页的游标字段（§3.2；同上的规格更正，z.ai 用 lastId）。两种写法都有时用前面的 last_id。 */
+const LAST_ID_KEYS = ['last_id', 'lastId'] as const;
+
+/**
+ * @brief 两种写法里对象上先有的那个字段的值（§3.2：两种写法都有时用 has_more、last_id）。
+ * @param body 列表的对象
+ * @param keys 按优先顺序排列的字段名
+ * @return 两种写法都没有时为 undefined
+ */
+function firstPresent(body: Row, keys: readonly string[]): unknown {
+  const key = keys.find((name) => name in body);
+  return key === undefined ? undefined : body[key];
+}
+
+/** @brief 列表是 Anthropic 形状（§3.2、§3.3、§5.2：对象有 has_more 或 hasMore）。 */
 export function isAnthropicShape(body: unknown): boolean {
-  return isRecord(body) && 'has_more' in body;
+  return isRecord(body) && HAS_MORE_KEYS.some((key) => key in body);
 }
 
-/** @brief Anthropic 形状的列表还有下一页（§3.2：has_more 为真）。 */
+/** @brief Anthropic 形状的列表还有下一页（§3.2）：有 has_more 时看它是否为真，否则看 hasMore 是否为真。 */
 export function hasMore(body: unknown): boolean {
-  return isRecord(body) && body.has_more === true;
+  return isRecord(body) && firstPresent(body, HAS_MORE_KEYS) === true;
 }
 
-/** @brief 下一页的 after_id（D8）：body 的 last_id 是字符串时用它，否则用这一页最后一行的 id。 */
+/**
+ * @brief 下一页的 after_id（§3.2、D8）：游标是 last_id，没有这个字段时是 lastId；游标是字符串时用它，
+ *        否则用这一页最后一行的 id。查询参数总是 after_id（pageUrl）。
+ */
 export function afterIdOf(body: unknown): string {
-  const lastId = isRecord(body) ? body.last_id : undefined;
+  const lastId = isRecord(body) ? firstPresent(body, LAST_ID_KEYS) : undefined;
   if (typeof lastId === 'string') return lastId;
   const rows = listRows(body) ?? [];
   return rows.length > 0 ? rowId(rows[rows.length - 1]) : '';

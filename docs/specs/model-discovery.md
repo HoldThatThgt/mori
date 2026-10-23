@@ -100,7 +100,9 @@
 - 401、403：停止，`listError.kind = 'rejected'`。
 - 连接失败、超时（§11）：停止，`listError.kind = 'unreachable'`。
 - 404、405、其他 4xx、5xx、不是 JSON、没有数组：试下一个；都不行时，最后一次是 404 或 405 为 `no_list`，否则为 `invalid`。
-- Anthropic 形状的列表（对象有 `has_more`）且 `has_more` 为真：带 `after_id=<last_id>` 再取，最多 §11 的页数。
+- Anthropic 形状的列表（对象有 `has_more` 或 `hasMore`）且这个字段为真：带 `after_id=<游标>` 再取，最多 §11 的页数；
+  游标为 `last_id` 或 `lastId`，查询参数仍是 `after_id`；两种写法都有时用 `has_more`、`last_id`。
+  （规格更正（规划会话，2026-10-23）：z.ai 的 Anthropic 兼容列表用 hasMore、lastId，见录下的 glm-models-1.json）
 - 列表超过 §11 的条数时只取前面的，结果里 `truncated: true`；翻页（Anthropic 形状、§4.2 的百炼）凑够这个条数就停。
 - 同一个 id 只保留第一次出现的。
 
@@ -126,6 +128,9 @@
 - **服务版本**沿用模型层规格 §7.1 的读法，不让已有档案的键变：`vllm`、`sglang` GET `<origin>/version` 的 `version`；`ollama` 取 `/api/version`；`llamacpp` 取 `/props` 的 `build_info`；其他种类为 `null`（档案键里写 `unknown`）。
   原来被认成 vLLM 的 LocalAI、TensorRT-LLM：下一次读版本（§7.3）认出种类变了，各重新探测一次，之后版本为 `unknown`（检查记录里写明）。
 - **界面显示的名字**（`SERVER_KIND_LABELS`）：vLLM、SGLang、llama.cpp、Ollama、LM Studio、Xinference、GPUStack、MindIE、TGI、LMDeploy、LocalAI、TensorRT-LLM、LiteLLM、New API、One API、DeepSeek、Moonshot AI、Alibaba Cloud Model Studio、Baidu Qianfan、OpenRouter、Anthropic；`unknown` 写“OpenAI-compatible server”，列表是 Anthropic 形状时写“Anthropic-compatible server”。
+  Anthropic 形状 = 列表的对象有 `has_more` 或 `hasMore`（§3.2）；它决定翻页（§3.2）、这一行的写法与 §4.1 是否再看 `max_tokens`，
+  不改种类（仍按上表）与 API type（只看地址，§3.4）。
+  （规格更正（规划会话，2026-10-23）：z.ai 的 Anthropic 兼容列表用 hasMore、lastId，见录下的 glm-models-1.json）
 
 ### 3.4 API type、名称、区域
 
@@ -143,12 +148,12 @@
 
 | 字段 | 服务报告的值（依次） | 明确报告“没有” | 没报告时 |
 | --- | --- | --- | --- |
-| `contextWindow` | 正整数：`max_model_len`、`context_window`、`context_length`、`max_context_length`、`context_size`、`max_input_tokens`、`meta.max_model_len`、`meta.n_ctx`、`meta.max_total_tokens`、`top_provider.context_length`、`metadata.context_length` | — | 128000 |
+| `contextWindow` | 正整数：`max_model_len`、`context_window`、`meta.max_model_len`、`meta.n_ctx`、`meta.max_total_tokens`、`context_length`、`max_context_length`、`context_size`、`max_input_tokens`、`top_provider.context_length`、`metadata.context_length`（规格更正（规划会话，2026-10-23）：三个 `meta.*` 放在 `context_length` 之前——它们只出现在 llama.cpp 与 GPUStack `with_meta` 的行里，总是实际在用的窗口；llama.cpp router 模式的 `context_length` 是训练窗口，proposal §7） | — | 128000 |
 | `maxTokens` | 正整数：`max_output_tokens`、`max_completion_tokens`、`top_provider.max_completion_tokens`；列表是 Anthropic 形状或种类是 `qianfan` 时再看 `max_tokens`。**不小于 `contextWindow` 的值不算报告** | — | 16384 与窗口一半中较小的 |
 | `reasoning` | 布尔真：`supports_reasoning`、`capabilities.reasoning`、`capabilities.thinking.supported`；对象存在：`effort`、`reasoning`；数组含 `reasoning` 或 `thinking`：`capabilities`、`features`、`supported_parameters`、`model_ability`、`tags`、`metadata.tags` | 上面的布尔为假；数组 `capabilities`、`model_ability`、`supported_parameters` 存在但不含这两个词 | 不勾 |
 | `image` | 数组含 `image`：`input_modalities`、`architecture.input_modalities`、`inference_metadata.request_modality`；布尔真：`supports_image_in`、`supportsImageInput`、`capabilities.vision`、`capabilities.image_input.supported`；数组含 `vision` 或 `vlm`：`capabilities`、`model_ability`、`tags`、`metadata.tags`；`type` 为 `vlm` | 上面的布尔为假；三个 modality 数组存在但不含 `image`；`capabilities`、`model_ability` 数组存在但不含 `vision` | 不勾 |
 | `family` | 字符串：`details.family`、`model_family` | — | 空字符串 |
-| `chat` | 第一个能下结论的：`type`（`chat`、`llm`、`vlm`、`language`、`code` 为真；`model` 不看；其他字符串为假）；`mode`（`chat`、`responses`、`completion` 为真，其他为假）；`model_type`（`LLM` 为真，但 `model_ability` 存在且不含 `chat` 时为假；其他为假）；`capabilities.completion_chat`（布尔）；数组 `capabilities` 含 `completion` 或 `chat` 为真、只含 `embedding` 等别的值为假；`output_modalities` 或 `architecture.output_modalities` 存在但不含 `text` 为假；`supported_endpoint_types` 含 `openai`、`openai-response` 或 `anthropic` 为真、否则为假 | — | `null` |
+| `chat` | 第一个能下结论的：`capabilities.completion_chat`（布尔；规格更正（规划会话，2026-10-23）：放在 `type` 之前，按 proposal §7 Mistral 的字段照通用规则读到——Mistral 的行同时有 `type: "base"`）；`type`（`chat`、`llm`、`vlm`、`language`、`code` 为真；`model` 不看；其他字符串为假）；`mode`（`chat`、`responses`、`completion` 为真，其他为假）；`model_type`（`LLM` 为真，但 `model_ability` 存在且不含 `chat` 时为假；其他为假）；数组 `capabilities` 含 `completion` 或 `chat` 为真、只含 `embedding` 等别的值为假；`output_modalities` 或 `architecture.output_modalities` 存在但不含 `text` 为假；`supported_endpoint_types` 含 `openai`、`openai-response` 或 `anthropic` 为真、否则为假 | — | `null` |
 | 工具提示 `no_tools` | 只记“没有”：布尔假 `capabilities.function_calling`、`supports_function_calling`、`capabilities.trained_for_tool_use`；数组 `capabilities`、`model_ability`、`supported_parameters` 存在但不含 `tools` | — | 没有提示 |
 
 - 种类是 `litellm` 时，布尔假一律按没报告（LiteLLM 把不知道的填成 false）。
@@ -168,7 +173,7 @@
 | `mindie` | 每个模型 GET `<origin>/v2/models/<id>/config` | `max_seq_len` → 窗口 |
 | `tgi` | 第 6 步已有的 `/info` | `max_total_tokens` → 窗口（列表只有一行） |
 | `localai` | GET `<base>/models/capabilities` | 按 `id` 对上，`capabilities`、`input_modalities`、`output_modalities`、`context_size` 合并进行再读 |
-| `dashscope` | GET `<origin>/api/v1/models?page_no=<n>&page_size=100`，直到取完或 §11 的页数 | 按 `output.models[].model` 对上：`model_info.context_window` → 窗口；`model_info.max_output_tokens` → 输出；`capabilities` 含 `Reasoning` → `reasoning`；`capabilities` 含 `VU` 或 `inference_metadata.request_modality` 含 `Image` → `image`；`features` 存在但不含 `function-calling` → `no_tools`；`capabilities` 含 `TG` → `chat` 真，不含为假 |
+| `dashscope` | GET `<origin>/api/v1/models?page_no=<n>&page_size=100`，直到取完或 §11 的页数 | 按 `output.models[].model` 对上：`model_info.context_window` → 窗口；`model_info.max_output_tokens` → 输出；`capabilities` 含 `Reasoning` → `reasoning`；`capabilities` 含 `VU` 或 `inference_metadata.request_modality` 含 `Image` → `image`；`features` 存在但不含 `function-calling` → `no_tools`；`capabilities` 含 `TG` → `chat` 真，不含为假；`inference_metadata.request_modality` 原样合并进行，按 §4.1 读（不含 `Image` 时明确报告没有图片）；`capabilities`、`features`、`model_info` 不原样合并，只按这里的对应（规格更正（规划会话，2026-10-23）） |
 | 其他 | 无 | 只按 §4.1 |
 
 - 详情请求失败（连接、非 2xx、不是 JSON、超时）时只用列表本身，不算发现失败；记一行日志。
@@ -202,7 +207,7 @@ interface DiscoverResult {
   api: ApiType;                    // §3.4
   baseUrl: string;                 // 建议的 Base URL（§3.2 ②成功时是 <base>/v1，否则是 base）
   name: string;                    // §3.4
-  anthropicShape: boolean;         // 列表是 Anthropic 形状（种类为 unknown 时界面写 Anthropic-compatible server）
+  anthropicShape: boolean;         // 列表是 Anthropic 形状：对象有 has_more 或 hasMore（§3.2；种类为 unknown 时界面写 Anthropic-compatible server）
   listError: { kind: 'rejected' | 'unreachable' | 'no_list' | 'invalid'; detail: string } | null;
   models: DiscoveredModel[];       // 列表顺序
   truncated: boolean;              // 超过 §11 的条数，只取了前面的
@@ -336,6 +341,9 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 - 再次保存同一张表单：带上次的 `providerId` 整体替换（§5.4）。
 - 保存后 API key 框清空、占位“Saved. Leave empty to keep it.”（同现在）。表单把这张表单里最后填过的 key 留在内存里：之后再拉取而框是空的时，用它作为 `keySecret`；
   它不显示、框空时保存不再发送（照旧保留已存的 key），表单关闭就丢掉。
+  （2026-10-23 负责人决定：内存里的 key 只在 Base URL 框的地址与上次保存的提供商是同一个 origin（协议、主机、端口）时使用，
+  这时占位写“Saved. Leave empty to keep it.”；origin 不同时拉取不带它、占位写“Optional”，因为这时保存会按模型层规格 §4.1
+  删除已存的 key；带着不同的 origin 保存之后内存里的 key 丢掉。这样拉取与保存用的 key 一致，已存的 key 也不会发往别的 origin。）
 
 ## 7. 探针第 0 步
 
@@ -370,6 +378,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 - 结果 `{ listed, kind, version, versionRead }`：拿到列表时 `listed` 为真；这个种类有版本请求并且读到了版本时 `versionRead` 为真。
   `listed` 为真且种类与档案里的不同时，这个模型重新探测；种类相同时，只有 `versionRead` 为真、读到的版本与档案里的不同才重新探测。
   版本请求失败（连接、非 2xx、没有版本字段）时只比种类，不比版本；拿不到列表时档案不变（同现在，模型层规格 §7.1、MP-12）。
+  第 6 步的请求连接失败或超时、种类因此判断为 unknown 时，按拿不到列表处理（档案不变；proposal §10 第 5 条“读失败不算变化”，2026-10-23 实现时补）。
   种类本来就没有版本请求的（版本为 null），只在种类变了时重新探测。`modelProfiles.ts` 的 `versionChanged` 照此改。
 
 ## 8. 模型行的提示
@@ -500,7 +509,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 | MD-08 | 手填一行 | 拿到列表和列表错误（`nolist`、401）时都能手填加入，列表错误时手填的行列在错误下面；id 检查与重复；Entered by you 与 Not reported | App |
 | MD-09 | 加入新提供商 | 开始只有 Base URL、API key、Fetch models；拉取中两个框只读，关闭表单会取消拉取；拉取后 Name、API type、Network zone 预填且可改；`FAKE_NO_V1_ROOT=1` 时 Base URL 换成 `/v1` 并显示说明，`nolist` 时只换框不写说明；拉取后改 Base URL 或 key 清掉清单，再拉一次时你改过的 Name、API type、区域不被覆盖、改过的 API type 作为 `target.api` 发出；Add 一次写入全部勾选的模型（一次编译，顺序同清单），全部开始探针；保存失败时本次新存的 key 被删除；More settings 里的并发与兼容选项保存进配置；Fetch cancelled | App |
 | MD-10 | 已有提供商拉取 | 卡上的 Fetch models 用已保存的 key（合成端点日志里 key 末 4 位对得上）；清单打开时卡上的按钮不可用、不显示 Detected；已加入的行标 Added、不能勾；`notListed` 一行；`models.addModels` 加在末尾并开始探针；重复 id 整次拒绝、配置不变；卡上没有旧的 Add model；`models.saveModel` 没有 `adding`，Edit 里没设过强度的模型显示 `defaultThinkingLevel` | App |
-| MD-11 | 首次启动 | 填地址和 key → Fetch → 勾一个模型 → Test connection → 探针状态 → Open folder，默认范围是这个模型；勾两个时默认范围是提供商，Test connection 测第一个；有探针代价的一句、没有关闭表单的 Cancel；保存后改地址再拉取用内存里的 key（`FAKE_REQUIRE_KEY` 下不出 `rejected`）；再次保存整体替换，配置里仍只有一个提供商；列表错误时手填仍可完成 | App |
+| MD-11 | 首次启动 | 填地址和 key → Fetch → 勾一个模型 → Test connection → 探针状态 → Open folder，默认范围是这个模型；勾两个时默认范围是提供商，Test connection 测第一个；有探针代价的一句、没有关闭表单的 Cancel；保存后改地址再拉取用内存里的 key（`FAKE_REQUIRE_KEY` 下不出 `rejected`；地址只改路径、origin 不变；改到另一个 origin 时拉取不带内存里的 key、占位回到 Optional（2026-10-23 负责人决定，§6.6））；再次保存整体替换，配置里仍只有一个提供商；列表错误时手填仍可完成 | App |
 | MD-12 | 第 0 步与档案 | 第 0 步经读取器得出种类、窗口与 `meta`（`sglang`、`ollama`、`rich` 三种形状）；Ollama 只有训练窗口时 `reported` 窗口为 null；一次加入 3 个模型时列表只读一次、每个档案都有种类与 `meta`，期间点 Fetch models 或 Cancel 不取消探针；没有 `meta` 的旧档案照样读、不重新探测；Ollama 有报告窗口后有效窗口取较小的；读版本每个提供商一次，合成端点日志里没有 §4.2 的路径（`ollama` 形状：没有 `/api/tags`、`/api/ps`、`/api/show`；`sglang`：没有 `/model_info`）；`localai`、`tensorrt` 形状认出后重新探测一次、不显示 Cancel test… | 单元、App |
 | MD-13 | 模型行提示 | 没报告的窗口与输出写 not reported；§8 表的每一行的显示条件与 Use 的改动（窗口改小时 Max output 一起改；`-alwaysthink` 给第四行）；Use 后重新探测；旧档案只显示第四行 | App、回放 |
 | MD-14 | 真实端点 | DeepSeek：列表读出窗口、输出上限、思考、图片，与官方文档一致，勾选加入后探针完成；OpenRouter：几百个模型的清单可过滤，加入一个；GLM：拿到列表或显示列表错误，手填 `GLM-5.3` 后加入并完成探针；录下 §13.1 的真实样本与回放 fixture | 真实 |

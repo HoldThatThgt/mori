@@ -970,11 +970,16 @@ function addedProblems(added, baseUrl, detected = null) {
 async function setupProviders(userData) {
   await startApp(userData);
   const glm = await addProviderUi({ baseUrl: keyEnv.urls.glm, key: keyEnv.keys.glm, choose: chooseGlm });
-  const glmProblems = addedProblems(glm, keyEnv.urls.glm);
+  // z.ai 的 Anthropic 兼容列表用 hasMore、lastId（规格更正 4，§3.2、§3.3）：拿到列表时 Detected 写 Anthropic-compatible
+  // server；列表错误时没有 Detected 一行（§6.1）
+  const glmDetected = glm.state.checklist ? 'Detected: Anthropic-compatible server' : null;
+  const glmProblems = [...addedProblems(glm, keyEnv.urls.glm, glmDetected),
+    ...(glm.state.listError && glm.state.detected ? [`Detected with a list error ${brief(glm.state.detected)}`] : [])];
   record(`MD-14 real setup: Add provider for GLM (${keyEnv.urls.glm} and its API key in the password field): Fetch `
-    + `models shows the model list or a list error; ${GLM_MANUAL_ID} is entered with Add a model ID (or ticked when `
-    + 'the server lists it) and Add saves the provider (the Base URL host, its API type, Public, one saved key) with '
-    + 'only it', glmProblems.length === 0, brief({ problems: glmProblems, detected: glm.state.detected,
+    + 'models shows the model list with "Detected: Anthropic-compatible server" (or a list error without a Detected '
+    + `line); ${GLM_MANUAL_ID} is entered with Add a model ID (or ticked when the server lists it) and Add saves the `
+    + 'provider (the Base URL host, its API type, Public, one saved key) with only it', glmProblems.length === 0,
+  brief({ problems: glmProblems, detected: glm.state.detected,
     listError: glm.state.listError, title: glm.state.title, ids: glm.rows.map((row) => row.id).slice(0, 40),
     provider: providerBrief(glm.provider) }));
   const free = await addProviderUi({ baseUrl: OPENROUTER_BASE, key: keyEnv.keys.openrouter, choose: chooseFree });

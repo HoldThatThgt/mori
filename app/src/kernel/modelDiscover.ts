@@ -425,13 +425,13 @@ async function readList(ctx: Ctx): Promise<ListRead> {
 interface Paged {
   /** 各页的行（未去重） */
   rows: Row[];
-  /** 最后读到的一页 has_more 仍为真 */
+  /** 最后读到的一页 has_more（或 hasMore）仍为真 */
   more: boolean;
 }
 
 /**
- * @brief Anthropic 形状的翻页（§3.2，D8）：has_more 为真时带 after_id 再取，最多 ANTHROPIC_PAGES 页，凑够 LIST_MAX 条就停。
- *        后面的一页失败时只用已读到的页并记一行日志。
+ * @brief Anthropic 形状的翻页（§3.2，D8）：has_more（或 hasMore）为真时带 after_id 再取，最多 ANTHROPIC_PAGES 页，
+ *        凑够 LIST_MAX 条就停。后面的一页失败时只用已读到的页并记一行日志。
  * @param first 第一页的 JSON
  */
 async function readPages(ctx: Ctx, attempt: ListAttempt, first: unknown): Promise<Paged> {

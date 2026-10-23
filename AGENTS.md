@@ -54,6 +54,7 @@
 | `npm run test:taskboard` | 平行 Agent 与 TaskBoard 的单元、App、回放测试和现有套件，最后检查规格 §17 的每一条都有通过的结果 |
 | `npm run test:mem-unit` | 记忆的单元测试（`node --test`） |
 | `npm run test:memory` | 提示词分层与记忆的单元、App、回放测试和现有套件，最后检查规格 §14 的每一条都有通过的结果 |
+| `npm run test:md-unit` | 一键拉取模型的单元测试（`node --test`，跳过的与 todo 的测试算失败） |
 | `npm run test:discovery` | 一键拉取模型的单元、App、回放测试和现有套件，最后检查规格 §13 的每一条都有通过的结果（真实层 MD-14 由你跑 `md-real.mjs`） |
 
 本机访问不了 `registry.npmjs.org`，`app/.npmrc` 使用 npmmirror；安装 Electron 前设 `ELECTRON_MIRROR`，见 `app/README.md`。

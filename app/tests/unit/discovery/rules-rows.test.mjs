@@ -511,7 +511,7 @@ function abilityOf(row, cell) {
  * 按 §4.1 独立推算一行的报告值（不调用读取器）：没报告的为 null；思考、图片明确报告没有时为 false。
  * 输出上限“不小于窗口的值不算报告”：这样的值不是有效值，接着看下一条路径（§4.1、§4.3）。
  * family 为 details.family、model_family 中第一个非空字符串（同上面 family 一条的检查）。
- * @param anthropicShape 列表是 Anthropic 形状（对象有 has_more）时再看 max_tokens
+ * @param anthropicShape 列表是 Anthropic 形状（对象有 has_more 或 hasMore，§3.2）时再看 max_tokens
  */
 function reportedOf(row, anthropicShape) {
   const contextWindow = WINDOW_PATHS.map((path) => positive(valueAt(row, path))).find((value) => value !== null)
@@ -558,7 +558,7 @@ function deepseekSample() {
     seen.add(idOf(row));
     rows.push(row);
   }
-  return { rows: rows.slice(0, 1000), anthropicShape: isPlainObject(body) && 'has_more' in body,
+  return { rows: rows.slice(0, 1000), anthropicShape: isPlainObject(body) && ('has_more' in body || 'hasMore' in body),
     base: url.replace(/\/models$/, '') };
 }
 

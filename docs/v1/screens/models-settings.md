@@ -466,6 +466,14 @@ Add provider 表单的“Fetch cancelled”显示到你再点 Fetch models 或�
 Add a model ID 加入后输入框清空；模型行的提示在模型行说明下面、档案摘要上面；Use 失败的原文在这一行里；
 表单与卡上清单底部关闭用的 Cancel 的标识 `data-action="close-form"`。
 
+实现时定的（2026-10-23，都是临时，走查时可以改；见 [discovery-checks.md](../discovery-checks.md) 的 A16–A19）：
+Add provider 里改 Base URL 或 API key 时，拉取命令出错的原文与上次保存失败的原文一起清掉；卡上的“Fetch cancelled”与拉取命令出错的原文
+留到你再点这张卡的 Fetch models；在清单的过滤框和 Add a model ID 的输入框里按 Enter 什么也不做（不会按下“Add N models”）；
+清单是一张表，表头就是 §6.2 的列名（Model ID、Context window、Max output、Supports thinking、Image input），放在最高 440px、
+表头固定的滚动框里；Can’t add this model 的行只有勾选框不可用，Added 的行全部不可用；Add provider 的 Fetch models 不是主按钮；
+拉取中 `fetch-status` 没有文字（按钮已写“Fetching models…”）；加入中（Adding…）Base URL、API key 只读，Fetch models 不可用；
+关掉卡上正在拉取的清单时，卡上的按钮旁显示“Fetch cancelled”。
+
 ## 需要规格回答
 
 已回答：

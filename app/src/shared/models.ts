@@ -828,7 +828,7 @@ export interface DiscoverResult extends ModelsResult {
   baseUrl: string;
   /** 建议的名称：主机名，非默认端口时加 :<端口> */
   name: string;
-  /** 列表是 Anthropic 形状（对象有 has_more） */
+  /** 列表是 Anthropic 形状（对象有 has_more 或 hasMore，规格 §3.2） */
   anthropicShape: boolean;
   /** 拿不到列表的原因；拿到时为 null */
   listError: DiscoverListError | null;
