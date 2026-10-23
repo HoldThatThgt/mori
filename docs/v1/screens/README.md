@@ -6,11 +6,21 @@
 它实现 [平行 Agent 与 TaskBoard Proposal](../../proposals/parallel-agents-taskboard.md) 第四版；
 `memory-*.md` 与 `settings-issues.md` 按 [提示词分层与记忆构建规格](../../specs/memory.md)（在这几个文件里称“规格”，本文件称“记忆规格”），
 它实现 [提示词分层与记忆 Proposal](../../proposals/prompt-and-memory.md) 第一版（2026-10-22）。
+[models-settings.md](models-settings.md) 与 [first-run.md](first-run.md) 里拉取模型的部分（提供商表单的 Fetch models、清单、列表错误、Add a model ID、
+More settings，卡片上的 Fetch models，模型行的“not reported”与“Server reports …”提示，首次启动表单）按
+[一键拉取模型构建规格](../../specs/model-discovery.md)（first-run.md 与本文件称“发现规格”），它扩展模型层规格，实现
+[一键拉取模型 Proposal](../../proposals/model-discovery.md) 第一版（2026-10-23）。
 
 “来源”只能是：规格 §9.5 的事件（`mori.model_state`、`mori.model_switch`、`mori.model_rebuild`、`mori.model_wait`、
 `mori.model_queue`、`mori.model_retry`、`mori.model_unavailable`、`mori.profiles`、`mori.key_status`）、命令的结果（`models.*`、
 `session.setPick`、`connection.test`、`config.get`）、`SessionInfo` 里的 `ModelState`、会话文件里的自定义条目
 （`mori.model_switch`、`mori.rebuild`）、v0 已有的 pi 事件与后台进程事件，或你刚做的操作；没有来源的状态不显示。
+拉取模型的部分另有发现规格 §5、§7.2 的来源：`models.discover` 的结果（`DiscoverResult`：`error`、`cancelled`、`server` 的 `kind` 与 `version`、
+`api`、`baseUrl`、`name`、`anthropicShape`、`listError`、`truncated`、`notListed`，以及 `models` 里每个 `DiscoveredModel` 的值、`reported`、`chat`、
+`hints`、`unusable`、`added`）、`models.discoverCancel` 与 `models.addModels` 的结果（`error`）、`ProfileView.reported`
+（`models.get` 与 `mori.profiles` 的档案里服务报告的窗口、输出上限、思考、图片；档案没有 `meta` 时为 null；Ollama 只读到训练窗口时窗口为 null，
+发现规格 §7.2），以及 `shared/models.ts` 的 `suggestZone`（按表单里的 Base URL 预选区域，发现规格 §3.4）与 `SERVER_KIND_LABELS`
+（Detected 一行的种类名，§3.3）。首次启动表单还用到你在这张表单里最后填过的 key（只在表单内存里，发现规格 §6.6），属于“你刚做的操作”。
 `team-*.md` 另有 TaskBoard 规格 §13.10–§13.11 的来源：事件（`mori.team_state`、`mori.board`、`mori.receipt`、`mori.progress`、`mori.wake`、
 `mori.team_deciding`、`mori.team_approval_request`、`mori.team_approval_end`）、命令的结果（`session.setTeam`、`board.get`、`session.recheckAgents`、
 `session.stopTeam`、`session.clearQueue` 的 `texts`；`session.prompt` 的 `team: 'once'`、`approval.answer` 的后台 `requestId`）、
@@ -24,8 +34,8 @@
 
 | 文件 | 内容 | 取代 v0 的 |
 | --- | --- | --- |
-| [models-settings.md](models-settings.md) | 设置 → Models：迁移说明、区域未确认与 Confirm zone、Defaults、Providers（提供商卡、提供商表单、Keys、Models 行、模型表单、档案摘要、需要同意的探针）、Groups、Project access、删除与改地址的确认、配置读不出 | [v0 settings.md](../../v0/screens/settings.md)“Connections and models” |
-| [first-run.md](first-run.md) | 首次启动表单（含网络区域）、Test connection、探针状态、Public 的说明、迁移失败 | [v0 connection.md](../../v0/screens/connection.md) 的表单与首次启动 |
+| [models-settings.md](models-settings.md) | 设置 → Models：迁移说明、区域未确认与 Confirm zone、Defaults、Providers（提供商卡、提供商表单的 Base URL 与 API key → Fetch models → 清单 → Add、清单、列表错误、Add a model ID、More settings、卡片上的 Fetch models 与 Not listed by the server、Keys、Models 行与 not reported、Server reports … 提示与 Use、模型表单（只剩 Edit）、档案摘要、需要同意的探针）、Groups、Project access、删除与改地址的确认、配置读不出（拉取模型的部分按发现规格） | [v0 settings.md](../../v0/screens/settings.md)“Connections and models” |
+| [first-run.md](first-run.md) | 首次启动表单（Base URL 与 API key → Fetch models → 清单、Name、API type、网络区域、Add a model ID、More settings 里的兼容选项（只在 OpenAI-compatible 时显示）、探针代价一句；拉取中两个框只读、再拉一次、保存后用内存里的 key 再拉取；没有关闭表单的 Cancel）、Test connection（先保存勾选的全部模型，再测第一个勾选的）、这个模型的探针状态、默认范围（一个模型时是它，多个时是提供商）、Public 的说明、迁移失败（按规格与发现规格 §5.4、§6.1、§6.6） | [v0 connection.md](../../v0/screens/connection.md) 的表单与首次启动 |
 | [model-menu.md](model-menu.md) | 顶栏的选择范围按钮与菜单、按当前模型的思考强度菜单、准备中与生成中不可用 | [v0 models.md](../../v0/screens/models.md) |
 | [model-chat.md](model-chat.md) | 换模型与重建的提示、阶段行（等模型、等它停下、排队、重试、重建）、准备中、No model available 卡、拒绝启动卡、v0 错误卡的规则 | [v0 chat.md](../../v0/screens/chat.md) 的阶段行重试、错误卡“Go to settings”、顶栏模型 |
 | [team-switch.md](team-switch.md) | 顶栏的协作开关（Off / On / Until done、窄栏、不可用）、`/team on`、`/team off`、`/team <文字>`、只有 `/team`，模式怎样变 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的顶栏与输入框 |
@@ -66,7 +76,7 @@
 
 不是纯界面细节、规格又没定的数据来源，各文件的“需要规格回答”一节写了详情：
 
-1. 新地址的建议区域从哪里来（models-settings.md、first-run.md）。
+1. （已答：发现规格 §3.4，界面照现在的规则用 `shared/models.ts` 的 `suggestZone` 按 Base URL 预选）新地址的建议区域从哪里来（models-settings.md、first-run.md）。
 2. 菜单里当前范围以外的项是否被本会话静态校验排除，数据从哪里来（model-menu.md）。
 3. 换模型提示的“Couldn’t confirm it stopped”由哪个字段标出（model-chat.md）。
 4. `agents_invalid` 时协作开关能不能用；TB-03“没有 Team 相关元素”与总在顶栏的开关（team-switch.md）。
@@ -79,6 +89,16 @@
 9. （9–11 问记忆规格）界面怎么认出依据里的 TaskBoard 实例会话（本表按 `<userData>\teams\…\sessions\` 路径判断）；`entry` 为 null 时那一句显示在哪里（跳转后中栏已是会话）（memory-page.md）。
 10. `Project` 的用量含用户级，但只改用户级的 `mori.memory_changed` 按“这一层”不重读 `Project`；本表让 `Project` 的前四节也重读（memory-page.md）。
 11. 修订详情每处改动的 `<abstract>`：`RevisionChange` 没有这个字段（memory-page.md）。
+12. （已回答：发现规格 §5.4、§6.1–§6.3、§6.5、§6.6）拉取模型的界面问题（models-settings.md 九条、first-run.md 九条）都已由修订后的发现规格回答，
+    两个文件里不再有待回答的：
+    - 拉取中 Base URL、API key 只读；提供商表单的 Cancel 照样可用，关闭表单（Cancel、打开别的表单、离开设置页）先发 `models.discoverCancel`（§6.1）；
+    - 拉取后 Fetch models 仍在 API key 下方，再点或改 Base URL、key 就从头来（清单与手填的行清掉）；Name、API type、Network zone、More settings 里
+      你改过的值不被下次拉取覆盖，没改过的重新预填；改过的 API type 作为 `target.api` 发出；改 API type 不清掉清单（§6.1）；
+    - 建议的 Base URL 两边去掉首尾空白和结尾 `/` 后比较，不同才换框；“Updated to <url> so the model list loads.”只在拿到列表时显示（§6.1 第 3 项）；
+    - Select all、Clear selection 只作用于显示着的、能勾的行；过滤不分大小写，藏起来的勾选行照样加入；手填的行算进 20 行；“Not reported”改值后仍在；
+      空列表为“Models (0)”和“The server didn’t list any models.”（§6.2）；列表错误时手填的行列在错误一句下面，没有标题、Select all、Clear selection 和过滤框（§6.3）；
+    - 卡上的清单不显示 Detected，清单开着时卡上的 Fetch models 不可用（§6.5）；Edit 里没设过强度的模型显示 `config.get` 的 `defaultThinkingLevel`（§5.4）；
+    - 首次启动有探针代价一句、没有关闭表单的 Cancel、More settings 只有兼容选项且非 OpenAI-compatible 时不显示、保存后框空时用内存里的 key 再拉取（§6.6）。
 
 ## 界面测试用的标识（汇总）
 
@@ -100,6 +120,16 @@
 | `form-message` | 表单的结果文字（沿用 v0） | models-settings.md、first-run.md |
 | `data-action="test-cancel"` | 三处测试与首次启动测试中的“Cancel” | models-settings.md、first-run.md |
 | `connection-form`、`first-run-loading`、`migration-error`、`zone-public-note`、`probe-status`、`open-folder` | 首次启动（`connection-form`、`open-folder` 沿用 v0） | first-run.md |
+| `data-action="fetch-models"`、`data-action="fetch-cancel"`、`fetch-status`（`data-state` 为 `fetching` / `cancelled`）；拉取中 Base URL、API key 输入框的 `readonly`；`data-action="close-form"` | 提供商表单、首次启动表单与提供商卡上的 Fetch models（卡上的取代 `data-action="add-model"`）、拉取中的 Cancel、拉取的状态、拉取中只读的两个框（发现规格 §6.1、§6.5）；提供商表单与卡上清单底部关闭用的 Cancel（拉取中照样可用；首次启动没有） | models-settings.md、first-run.md |
+| `detected-server`（`data-kind` 为 `ServerKind`）、`base-url-note` | 认出的服务（卡上的清单不显示）、Base URL 换成建议值的说明（只在拿到列表时，发现规格 §6.1 第 3 项） | models-settings.md、first-run.md |
+| `list-error`（`data-kind` 为 `rejected` / `unreachable` / `no_list` / `invalid`） | 列表错误（发现规格 §6.3） | models-settings.md、first-run.md |
+| `checklist`、`data-action="select-all"`、`data-action="clear-selection"`、`checklist-filter`、`checklist-truncated` | 清单、Select all、Clear selection、过滤框、“Showing the first 1,000 models.”（发现规格 §6.2） | models-settings.md、first-run.md |
+| `discovered-row`（`data-model`；`data-chat` 为 `true` / `false` / `unknown`；`data-added="true"`、`data-unusable="true"`）、行的勾选框 `input[name="pick"]`；行内输入框的 `data-field` 为 `contextWindow`、`maxTokens`、`reasoning`、`image`（`settings/fields.tsx` 模型字段的名字，同字段错误的 `data-field`） | 清单的行（`data-added` 只在提供商卡的清单里） | models-settings.md、first-run.md |
+| `not-reported`（`data-field`）、`row-tag`（`data-kind` 为 `not-chat` / `added` / `unusable` / `entered`）、`row-hint`（`data-kind` 为 `no_tools` / `trained_window`） | 清单行的 Not reported、标记与提示；`not-reported` 也用在 Models 行 | models-settings.md、first-run.md |
+| `manual-model`（Model ID 输入框 `data-field="id"`）、`data-action="add-to-list"` | Add a model ID 一行与 Add to list（发现规格 §6.4） | models-settings.md、first-run.md |
+| `more-settings`、`probe-cost-note` | More settings（首次启动里只有兼容选项，API type 不是 OpenAI-compatible 时不显示）、探针代价的说明（提供商表单与卡上清单的底部，首次启动在 Test connection 上方，发现规格 §6.1 第 8 项、§6.6） | models-settings.md、first-run.md |
+| `data-action="add-models"`、`not-listed` | 清单底部的 Add 按钮（Add 1 model / Add N models）、卡片清单下的 Not listed by the server（发现规格 §6.5） | models-settings.md |
+| `model-hint`（`data-kind` 为 `context` / `max-output` / `reasoning` / `thinking-seen` / `image`）、`data-action="use-reported"` | Models 行的 Server reports … 提示与 Use（发现规格 §8） | models-settings.md |
 | `model-button`、`model-menu`、`model-menu-note`、`pick-error` | 顶栏范围按钮与菜单（前两个沿用 v0） | model-menu.md |
 | `thinking-button`、`thinking-menu` | 思考强度（沿用 v0） | model-menu.md |
 | `notice`（`data-kind="model-switch"` / `"rebuild"`）、`stage`（`data-kind`）、`queue`、`error-card` | 对话流提示、阶段行、排队区、错误卡（`notice`、`stage`、`queue`、`error-card` 沿用 v0） | model-chat.md |
