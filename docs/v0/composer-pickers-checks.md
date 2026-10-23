@@ -579,6 +579,36 @@ m6-app-slash 106、m5-app 53、m3-app 156、m1-replay 94，都通过。
 - [composer-pickers.md](composer-pickers.md)"待你决定"一节：截短的顺序和最窄宽度、≤ 400px 收起"Queue"和 ≤ 340px 收小、
   悬停加全名一行、几处为了对比度改的颜色，以及上面"按推荐定的"全部。
 
+## 与 v1-memory 合并（2026-10-22，`app-v0-sync`）
+
+`app-v0`（含这一步，`1212474`）与 `origin/app-v0`（v1-memory，`54f0758`）合并，两边的功能都保留：
+
+- 冲突：`ChatPane.tsx` 的开头说明和 import（记忆的新会话提示照加，上下文用量仍在 `Composer.tsx`，不再 import
+  `ContextUsage`）、`IssueDialog.tsx` 的 import（`uiIssues` 与 Effort 用的 `THINKING_LABELS`）、`icons.tsx`（`queue` 与
+  `memory` 都留）、`state/settings.ts`（`showSettingsSection` 与"范围菜单"的说法）、文档（README、app-v0.md、
+  model-providers.md、f8.md、ui-strings.md）和测试（`m2-app`、`m4-app` / `m4-helpers`、`tb-app-roles`、
+  `v1-models-existing`、`v1-models-record`）。
+- `m4-helpers.mjs` 的 `textPoints` / `dragSelect`：两边各修了生成中拖选的同一个时序问题（这一步用 `block = 'end'`，
+  v1-memory 用 `scroll = false` 和 `m4-app.mjs` 的 `selectWhileStreaming`）。合并后第五个参数是 `block`，`false` 时不滚：
+  `m4-app.mjs` 用 v1-memory 的 `selectWhileStreaming`，`m4-real.mjs` 照旧传 `'end'`。
+- `tb-app-roles.mjs`（TB-03）：v1-memory 的 `comparable`（去掉 memory 工具、身份段和记忆分节）套在这一步的
+  `baseSystem(ctx)`（打包版的安装位置）外面。
+- m7 的套件随工作回顾删除（记忆规格 §14.4）。这一步在 `m7-app.mjs` 加的两条 F8 检查移到 `mem-app-settings.mjs`：
+  会话里按 F8 时"Current view"有"Model range""Effort""Pane width"且先后照 f8.md（用 `m2-helpers.mjs` 的 `paneFacts` /
+  `f8ViewProblems`）；设置页 UI issues、记忆页、Customize 页上按 F8 时"Pane width: None"（新的 `offPaneViewProblems`，
+  代替工作回顾页上的那条）。`m7-replay.mjs`、`m7-real.mjs` 的同类检查由 `m2-replay`、`m5-replay`、`m2-real`、`m5-real`
+  覆盖（会话里按的；`m2-real` 另有设置页上"Pane width: None"），没有另外移。
+- v1-memory 没有往会话顶栏、输入框下面一行或 F8 加按钮；文档里两处"顶栏"的选择范围、Effort 说法改成输入框下面一行
+  （memory.md §9.1、§10.4，memory-enhance.md）。`v1-models-existing.mjs` 的 App 套件：去掉 `m7-app`，保留 `m6-app-row`。
+- 合并后在开发构建上跑的（日志在会话草稿目录 `runs-sync/`）：`npm run check`、`electron-vite build` 通过；单元 374、
+  TaskBoard 单元 329、记忆单元 222 全部通过；App `mem-app-settings` 83（v1-memory 的 80 加移过来的 3 条）、
+  `mem-app-prompt` 46、`mem-app-tool` 54、`mem-app-page` 104、`mem-app-enhance-a` 75、`mem-app-enhance-b` 30、
+  `mem-app-team` 50、`m2-app` 94、`m4-app` 62、`m6-app-settings` 60、`m6-app-row` 45、`tb-app-roles` 45、`tb-app-flow` 43
+  全部通过；回放 `m2-replay` 110、`m4-replay` 27、`tb-replay` 53 全部通过；`mem-replay` 61 / 62：MEM-17"off then on
+  again … the status line uses the saved time"失败——录制的 `info.next` 是在 UTC+8 的机器上记的，这台机器是
+  America/New_York，状态行按本地时间显示成 22:44，不是保存的 10:44；在 `origin/app-v0` 自己的构建上同样失败，与合并无关，
+  没有改这条检查。其余套件（m0、m1、m3、m5、m6 的其余、v1、TaskBoard 的其余 App 套件，真实模型走查、打包版）合并后没有重跑。
+
 ## 未验证
 
 - **你的走查**（这一步的，以及还没签收的 M2–M7、英文界面）。

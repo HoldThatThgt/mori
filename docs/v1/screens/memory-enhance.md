@@ -86,7 +86,7 @@ token 数不到 1000 写 `<n> tokens`（1 时 `1 token`），1000 起写 `<n>k t
 | `Model range` | 模型设置（同设置页 Defaults 的下拉） | 标签 `Model range`；下拉（`enhance-model`）分三节 `Groups`、`Providers`、`Models`，项为分组 id、提供商名称、`<provider name> · <model id>`（同 Defaults）；不提供 `None`；当前值选中 | 选一项 |
 | 没有选过范围 | `info.pick` 为 null | 下拉没有选中项（临时，走查时可以改） | 选一项 |
 | `Effort` | `info.thinking`；`info.effortPicks[<所选范围>]`（后台进程按 §9.1 取默认强度的规则取第一个候选，§8） | 标签 `Effort`；下拉（`enhance-effort`）是 pi 的七档，文字同顶栏：`Off`、`Minimal`、`Low`、`Medium`、`High`、`Extra high`、`Max` | 选一档 |
-| `Effort` 不可用 | `effortPicks[<所选范围>]` 为假：第一个候选的模型没标 Supports thinking | 下拉不可用，悬停 `This model isn’t marked “Supports thinking”`（同顶栏）；保持原来的值（临时，走查时可以改） | — |
+| `Effort` 不可用 | `effortPicks[<所选范围>]` 为假：第一个候选的模型没标 Supports thinking | 下拉不可用，悬停 `This model isn’t marked “Supports thinking”`（同输入框下面一行的 Effort 按钮）；保持原来的值（临时，走查时可以改） | — |
 | `Effort` 没有范围 | 下拉没有选中范围，或所选范围不在 `effortPicks` 里（取不到候选） | 下拉不可用，悬停 `Choose a model first.`；保持原来的值（临时，走查时可以改） | 选一个范围 |
 | `Team mode` | `info.team` | 标签 `Team mode`；勾选框 `Run with team mode`（`enhance-team`），下面一行 `Uses this project’s agents in .mori/agents.`（临时，规格 §12） | 勾选 |
 | `Daily time` | `info.time` | 标签 `Daily time`；`<input type="time">`（`enhance-time`），下面一行 `Runs once a day at this time. Conversations before it count as the previous day.`（临时，规格 §12） | 改时间 |

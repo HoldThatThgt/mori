@@ -592,7 +592,7 @@ win32 的 `relative` 不分大小写、统一 `/` 与 `\`，所以只是大小�
 - **开关**：默认关（文件不存在 = 关）。打开时：`pick` 取设置里新会话的默认范围（`model-config.json` 的 `normalDefault`），`thinking` 取它第一个候选的默认思考强度（`newSessionThinking` 的规则），
   `team` 为 `false`，`time` 为 `04:00`（已有的 `pick`、`thinking`、`team`、`time` 保留）；`since` = 打开时属于的日子（§9.2），每个任务的 `doneThrough` 不早于 `since` 的前一天。
   第一次打开从当天读起（proposal §16）；关掉再打开同样从打开那天读起，关着期间的日子不补（§12）。水位保留不清空（片段的起点另按 `since` 截，§9.5）。
-- **设置**（proposal §16：每个项目一份，三个任务共用）：`pick`（组、提供商或 `<provider>/<model>`，与顶栏选择范围同样的写法）、`thinking`（pi 的七档）、`team`、`time`（`HH:MM`，24 小时制，本地时间；§0 第 3 条）。
+- **设置**（proposal §16：每个项目一份，三个任务共用）：`pick`（组、提供商或 `<provider>/<model>`，与输入框下面一行的选择范围同样的写法）、`thinking`（pi 的七档）、`team`、`time`（`HH:MM`，24 小时制，本地时间；§0 第 3 条）。
   `pick` 为 `null`（设置里没有默认范围）时开关可以打开，但不跑，状态行写 §10.4“没有模型”那一行。
 - **改了 `time`**：按新的 `time` 重新算今天（§9.2）；每个任务的 `doneThrough` 晚于新的今天的前一天时改为新的今天的前一天；`since` 晚于新的今天时改为新的今天。
   之前读过的部分由水位跳过（§9.5），反馈由 `feedbackSeen` 跳过，不会重复读；然后去掉这个项目排着的项、按新值把该跑的日子排进队列（§9.4），再重设定时器（§12）。
@@ -803,7 +803,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 - `Run now`：发 `enhance.run`；这个项目正在跑或排着、开关关、没有模型时不可用。失败时状态行显示 `Couldn’t run enhancement: <原因>`。
 - `Settings…` 打开对话框 `Enhancement settings`（`enhance-dialog`）：
   - `Model range`（`enhance-model`）：组、提供商、模型（同设置页 Defaults 的下拉，不提供 `None`）；
-  - `Effort`（`enhance-effort`）：pi 的七档（同顶栏的文字）。按所选范围的第一个候选（同 §9.1 取默认强度的规则）：那个模型没标 Supports thinking 时不可用，悬停 `This model isn’t marked “Supports thinking”`（同顶栏）；
+  - `Effort`（`enhance-effort`）：pi 的七档（同输入框下面一行 Effort 按钮的文字）。按所选范围的第一个候选（同 §9.1 取默认强度的规则）：那个模型没标 Supports thinking 时不可用，悬停 `This model isn’t marked “Supports thinking”`（同顶栏）；
   - `Team mode`：勾选框 `Run with team mode`（`enhance-team`），下面一行 `Uses this project’s agents in .mori/agents.`（临时）；
   - `Daily time`：`<input type="time">`（`enhance-time`），下面一行 `Runs once a day at this time. Conversations before it count as the previous day.`（临时）；清空时 `Save` 显示 `Choose a time.`、不发命令；
   - `Save`（`enhance-save`）、`Cancel`；保存失败时显示 `Couldn’t save the enhancement settings: <原因>`、不关闭。
@@ -1055,7 +1055,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 
 | 现有 | 改法 |
 | --- | --- |
-| `tests/ui/m7-app.mjs`、`m7-replay.mjs`、`m7-real.mjs`、`m7-record.mjs`、`m7-helpers.mjs`、`tests/fixtures/m7/` | 工作回顾页去掉（proposal §16 不走查），这些删除；UI issues 的检查移到 MEM-28（`mem-app-settings.mjs`），反馈的检查移到 MEM-27；`package.json` 去掉 `test:m7-app`、`test:m7-replay` |
+| `tests/ui/m7-app.mjs`、`m7-replay.mjs`、`m7-real.mjs`、`m7-record.mjs`、`m7-helpers.mjs`、`tests/fixtures/m7/` | 工作回顾页去掉（proposal §16 不走查），这些删除；UI issues 的检查移到 MEM-28（`mem-app-settings.mjs`；2026-10-22 与 composer-pickers 合并时，`m7-app.mjs` 里 F8 "Current view" 的 Model range、Effort、Pane width 两条检查也移到这里，见 [v0/composer-pickers-checks.md](../v0/composer-pickers-checks.md)"与 v1-memory 合并"），反馈的检查移到 MEM-27；`package.json` 去掉 `test:m7-app`、`test:m7-replay` |
 | `tests/ui/m4-app.mjs`、`m4-replay.mjs`、`m4-real.mjs` | `FEEDBACK_NOTE` 换成 §10.7 没开增强的整段（两句），先等 `feedback-note` 有文字再比对全文；`Saved` 按 §10.7；其余不变 |
 | `tests/ui/m2-app.mjs`、`m2-replay.mjs` | F8 的 `View in Review` 改为 `View in Settings`（§10.9） |
 | `tests/ui/tb-app-roles.mjs`（TB-03） | system prompt 的比较：去掉开头的身份段（新版到第一个 `<addendum>`、`<project_context>`、`<skills>` 或 `<cwd>` 之前，对照版 pi 的身份句、`<tools>`、`<rules>`、`<docs>`）和 `taste`、`strategy`、`review`、`facts` 段后逐字相同；请求的工具列表在全部比较（含 `agent_message` 在最后、`rest` 与对照相同）之前去掉 `memory`；工具页的行去掉 `memory` 那一行后与对照相同；来源 `Mori` 的行去掉 `memory` 后等于 TaskBoard 工具 |
