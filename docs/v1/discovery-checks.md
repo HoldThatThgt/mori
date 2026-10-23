@@ -1,11 +1,12 @@
 # 一键拉取模型 检查记录
 
 依据：[构建规格](../specs/model-discovery.md)（下称“规格”），它实现 [一键拉取模型 Proposal](../proposals/model-discovery.md) 第一版（2026-10-23）。
-在 `claude/v1-discovery-91226e` 分支上做（从 `app-v0` 的 54f0758 切出，第一个提交是规格、proposal、状态表与文档），没有推送。
+在 `claude/v1-discovery-91226e` 分支上做（从 `app-v0` 的 54f0758 切出，第一个提交是规格、proposal、状态表与文档）；
+2026-10-24 合并进 `app-v0` 并推送（见下面“合并到 app-v0”）。
 
 ## 状态
 
-实现与测试完成（2026-10-24），全部提交在 `claude/v1-discovery-91226e`，没有推送。规格 §3–§9 的行为全部实现；MD-01…MD-15 在各自列出的每一层都有通过的检查，
+实现与测试完成（2026-10-24），全部提交在 `claude/v1-discovery-91226e`，之后合并进 `app-v0`。规格 §3–§9 的行为全部实现；MD-01…MD-15 在各自列出的每一层都有通过的检查，
 包括真实层 MD-14（你给了 key，见下面负责人的要求第 3 条）：`node tests/spec-coverage.mjs --spec discovery`（不带 `--allow-missing-real`）
 输出 “every item is covered on every listed layer”。
 
@@ -31,6 +32,49 @@
 `modelTimings.ts`；进程桥 `shared/models.ts`；界面 `settings/Checklist.tsx`（新）、`ProviderForm.tsx`、`Providers.tsx`、`ModelRows.tsx`、`ModelEditor.tsx`、
 `fields.tsx`、`FirstRunForm.tsx`、`state/settings.ts`、`state/actionLog.ts`、`styles/models-settings.css`；测试见规格 §13 与 §13.4 的表；
 文档：规格的五条更正与 §6.6 的负责人决定、两张状态表、defaults.md、ui-strings.md、AGENTS.md 与这份记录。
+
+## 合并到 app-v0（2026-10-24）
+
+你说“commit. merge, push”之后：
+
+1. 先把 `origin/app-v0`（14b4c25：composer-pickers，输入框下面一行的权限、范围、Effort 按钮与用量圆环；AGENTS.md 的测试分层）
+   合进分支（dfb7b46）。两边都改过的文件 30 个，有冲突的 7 个：`m1-app.mjs`、`m1-real.mjs`、`m6-record.mjs`、`m6-real.mjs`、
+   `v1-models-app-session.mjs`（composer-pickers 把它的准备代码搬到了 `v1-models-session-setup.mjs`，探针日志的过滤跟着搬过去）、
+   `docs/v0/ui-strings.md`、`docs/v1/screens/README.md`。两边的改动都留下（按行合并），composer-pickers 新写的步骤改走 Fetch models。
+2. 合并后的修正（d1241c8）：
+   - composer-pickers 的检查按首次启动表单原来的默认窗口 128,000 写；拉取之后清单行是合成端点报告的 131072。`m1-app` 的首次启动
+     与“刚压缩完”、`m6-app-row` 的准备在清单行里把窗口改成 128000（规格 §6.2），`m6-helpers` 的 `firstRunAndOpen` 多一个 contextWindow。
+   - 卡上原来的 Add model 表单（`m1-app` 的 addVerifiedModel、`m6-helpers` 的 addModelUi）和新套件 `m6-app-row` 里旧的
+     Add provider 流程改走 Fetch models（§6.5、§13.4）。
+   - 一次只读的合并审查（冲突的测试、两边都改的文档、源码、两组测试的语义冲突五个角度，每条一个对抗核实）确认 2 条，都已修好：
+     `md-markers` 比较的起点是本地的 `app-v0`，它还停在 54f0758，合进来的 composer-pickers 的 “Queue for later” 被算成这次新加的
+     标记（42 处），改成比较 `origin/app-v0`（分支合并的是它）；`first-run.md` 这次加的一行还写“顶栏范围按钮”，改成输入框下面一行的
+     范围按钮“<提供商名称> · <当前模型 id>”。否掉 1 条（AGENTS.md 的测试分层没点名 md-* 套件：那里本来就是“等”，不是缺失）。
+3. 测试按 AGENTS.md 的测试分层：合并之后只跑与冲突文件相关的套件和覆盖检查（第 3 条），打包程序只做冒烟（第 4 条）。
+4. 在主目录把本地 `app-v0` 快进到 `origin/app-v0`，再 `--no-ff` 合并这个分支（“Merge v1-discovery: …”），推送 `app-v0`。
+   主目录里没提交的规格与文档和这个分支的第一个提交逐字相同，合并前先放进一个带标签的 stash，确认它们都在历史里之后删掉。
+
+| 层 | 结果 |
+| --- | --- |
+| 每次改动 | `npm run check`、build；`test:unit` 372、`test:tb-unit` 334、`test:mem-unit` 222、`test:md-unit` 197、合成端点自检 159，全部通过 |
+| 开发构建的套件 | `md-app-form` 82、`md-app-card` 68、`md-app-firstrun` 114、`md-replay` 69、`m0-smoke` 18（+1 KNOWN，pi #9129）、`m2-app` 94、`m6-app-settings` 60、`m6-replay` 66、`v1-models-app-session` 146、`v1-models-app-settings` 141、`v1-models-app-switch` 78，全部通过；修正后 `m1-app` 46 / 47、`m6-app-row` 45 / 45、`m6-app-slash` 104–105 / 106（失败的见下面） |
+| 检查 | `md-markers` 通过（对 14b4c25：81 个文件 19710 行）；四个 `spec-coverage`（模型层、taskboard、memory、discovery）通过 |
+| 打包程序 | `npm run dist:dir` 之后 `m0-smoke --exe` 18（+1 KNOWN，同上）、`md-app-firstrun --exe` 114 / 114 |
+| 没跑 | 完整回归（TB-46、MP-37、MEM-35、MD-15 汇总）：合并之后不要求（测试分层第 3 条）。真实模型走查（`m1-real`、`m6-real` 有冲突）：冲突只在测试的准备代码里（首次启动改走 Fetch models），合并没有改模型看到的或做的（第 5 条） |
+
+没修的失败（都不在这次的代码里，没有改 composer-pickers 的测试）：
+
+- `m1-app` 的“代码块：点"复制代码"后代码进系统剪贴板”：读回的剪贴板是空的。跑的时候这台机器锁屏（`LogonUI` 在运行），
+  PowerShell 里 `Set-Clipboard` 之后 `Get-Clipboard` 也是空的；合并后第一遍（同样的源码）通过。`docs/v0/english-ui-checks.md`
+  记过同样的情况。没验证：解锁后重跑。
+- `m6-app-slash` 的“280px、生成中有字、Effort "High"”：量的时候左栏还在发送中（只有一个“Queue”，没有 ▾“More send options”；
+  `waitRunningAt` 把发送中也算作开始生成）。在 composer-pickers 自己的提交 14b4c25 上（`git archive` 出来单独构建，同一台机器、
+  同样锁屏）完整跑两遍，两遍都同样失败，量到的一样（`queue:28 stop:28`），所以不是这次合并带来的。
+- `m6-app-slash` 的“拒绝启动：从文字框 Tab 依次是权限 → 范围 → 圆环”：合并后完整跑 5 遍失败 3 遍，14b4c25 完整跑 2 遍都通过
+  （只跑那几个步骤时两边各失败 1 遍，但那时前面的步骤也失败了）。临时加日志看到：失败时按 Tab 之后焦点仍在文字框。会话树的
+  “Open in split view”在打开之后才调 `focusComposer()`（等下一帧，浮层还开着就再等几帧），测试的 `splitOpen` 只等面板准备好、
+  不等这次聚焦，聚焦晚到时把焦点从权限按钮拉回文字框；锁屏时动画帧被节流，晚到得更多。焦点的代码与测试都是 composer-pickers 的，
+  这次没有改；两边失败次数的差别是不是只因为时序，没有查实。
 
 ## 负责人的要求（2026-10-23）
 
