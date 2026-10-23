@@ -11,6 +11,7 @@ Electron 44.9.0；pi 1.3.0；electron-builder 26.17.0；playwright-core 1.64.1�
 `composer-pickers-wip-prev1`（`d21ff35`，不合并，合并后可删）。
 设计说明在 [composer-pickers.md](composer-pickers.md)（为什么、宽度怎样估的、每处按推荐定的），这里记做了什么、测了什么、
 哪里和方案不同、还有什么没验证。分支没有推送，也没有合并进 `app-v0`（合并由发起这一步的会话在最后做）。
+合入 `app-v0` 之后又与 v1-memory 合并，经过和合并后的结果见最后一节"合入 v1-memory（origin/app-v0 54f0758）之后"。
 
 ## 状态
 
@@ -579,36 +580,6 @@ m6-app-slash 106、m5-app 53、m3-app 156、m1-replay 94，都通过。
 - [composer-pickers.md](composer-pickers.md)"待你决定"一节：截短的顺序和最窄宽度、≤ 400px 收起"Queue"和 ≤ 340px 收小、
   悬停加全名一行、几处为了对比度改的颜色，以及上面"按推荐定的"全部。
 
-## 与 v1-memory 合并（2026-10-22，`app-v0-sync`）
-
-`app-v0`（含这一步，`1212474`）与 `origin/app-v0`（v1-memory，`54f0758`）合并，两边的功能都保留：
-
-- 冲突：`ChatPane.tsx` 的开头说明和 import（记忆的新会话提示照加，上下文用量仍在 `Composer.tsx`，不再 import
-  `ContextUsage`）、`IssueDialog.tsx` 的 import（`uiIssues` 与 Effort 用的 `THINKING_LABELS`）、`icons.tsx`（`queue` 与
-  `memory` 都留）、`state/settings.ts`（`showSettingsSection` 与"范围菜单"的说法）、文档（README、app-v0.md、
-  model-providers.md、f8.md、ui-strings.md）和测试（`m2-app`、`m4-app` / `m4-helpers`、`tb-app-roles`、
-  `v1-models-existing`、`v1-models-record`）。
-- `m4-helpers.mjs` 的 `textPoints` / `dragSelect`：两边各修了生成中拖选的同一个时序问题（这一步用 `block = 'end'`，
-  v1-memory 用 `scroll = false` 和 `m4-app.mjs` 的 `selectWhileStreaming`）。合并后第五个参数是 `block`，`false` 时不滚：
-  `m4-app.mjs` 用 v1-memory 的 `selectWhileStreaming`，`m4-real.mjs` 照旧传 `'end'`。
-- `tb-app-roles.mjs`（TB-03）：v1-memory 的 `comparable`（去掉 memory 工具、身份段和记忆分节）套在这一步的
-  `baseSystem(ctx)`（打包版的安装位置）外面。
-- m7 的套件随工作回顾删除（记忆规格 §14.4）。这一步在 `m7-app.mjs` 加的两条 F8 检查移到 `mem-app-settings.mjs`：
-  会话里按 F8 时"Current view"有"Model range""Effort""Pane width"且先后照 f8.md（用 `m2-helpers.mjs` 的 `paneFacts` /
-  `f8ViewProblems`）；设置页 UI issues、记忆页、Customize 页上按 F8 时"Pane width: None"（新的 `offPaneViewProblems`，
-  代替工作回顾页上的那条）。`m7-replay.mjs`、`m7-real.mjs` 的同类检查由 `m2-replay`、`m5-replay`、`m2-real`、`m5-real`
-  覆盖（会话里按的；`m2-real` 另有设置页上"Pane width: None"），没有另外移。
-- v1-memory 没有往会话顶栏、输入框下面一行或 F8 加按钮；文档里两处"顶栏"的选择范围、Effort 说法改成输入框下面一行
-  （memory.md §9.1、§10.4，memory-enhance.md）。`v1-models-existing.mjs` 的 App 套件：去掉 `m7-app`，保留 `m6-app-row`。
-- 合并后在开发构建上跑的（日志在会话草稿目录 `runs-sync/`）：`npm run check`、`electron-vite build` 通过；单元 374、
-  TaskBoard 单元 329、记忆单元 222 全部通过；App `mem-app-settings` 83（v1-memory 的 80 加移过来的 3 条）、
-  `mem-app-prompt` 46、`mem-app-tool` 54、`mem-app-page` 104、`mem-app-enhance-a` 75、`mem-app-enhance-b` 30、
-  `mem-app-team` 50、`m2-app` 94、`m4-app` 62、`m6-app-settings` 60、`m6-app-row` 45、`tb-app-roles` 45、`tb-app-flow` 43
-  全部通过；回放 `m2-replay` 110、`m4-replay` 27、`tb-replay` 53 全部通过；`mem-replay` 61 / 62：MEM-17"off then on
-  again … the status line uses the saved time"失败——录制的 `info.next` 是在 UTC+8 的机器上记的，这台机器是
-  America/New_York，状态行按本地时间显示成 22:44，不是保存的 10:44；在 `origin/app-v0` 自己的构建上同样失败，与合并无关，
-  没有改这条检查。其余套件（m0、m1、m3、m5、m6 的其余、v1、TaskBoard 的其余 App 套件，真实模型走查、打包版）合并后没有重跑。
-
 ## 未验证
 
 - **你的走查**（这一步的，以及还没签收的 M2–M7、英文界面）。
@@ -656,3 +627,96 @@ m6-app-slash 106、m5-app 53、m3-app 156、m1-replay 94，都通过。
 - 真实走查时自动模式的分类器拦下了一条会列出 `credentials.json` 里引用名（不含值）的命令，没有换别的办法去看，脚本照常自己处理
   副本里的 key。
 - `docs/v1/team-checks.md` 第 119 行仍写着 TaskBoard 的 App 和真实套件没有跑过 `--exe`（是 TaskBoard 的记录，没有改）。
+
+## 合入 v1-memory（origin/app-v0 54f0758）之后
+
+2026-10-22 至 10-23，分支 `app-v0-sync`（worktree `nifty-fermi-f01b04`），从本机 `app-v0` 的 `1212474`（这一步合入之后）开出。
+
+**为什么**：负责人要提交、合并并推送；这时 `origin/app-v0` 已经前进到 `54f0758`（v1-memory：提示词拆分和记忆，
+同样在 `046a9ca` 上合入），与本机的 `app-v0` 分叉，两边都改了 36 个文件，不能直接推送。于是在新分支上把
+`origin/app-v0` 合进来，两边的功能都保留。提交：`ba08acf`（合并）、`fe975ea`（把 v1-memory 放进这一行的布局）、
+`8cf3860`（合并后的修正）和这份记录。`1212474` 和 `54f0758` 都是它们的祖先，`app-v0` 可以快进；快进和推送由发起
+这一步的会话做，这里没有推送，也没有碰主 checkout。
+
+**冲突和怎样解决**：
+
+- `ChatPane.tsx`：保留这一步的开头说明，加上记忆的新会话提示；保留记忆的 import，去掉 `ContextUsage`（上下文用量
+  在 `Composer.tsx`）。`IssueDialog.tsx`：import 合成 `uiIssues`（`View`、`issuesChanged`、`openIssues`）加 Effort 用的
+  `Tab`、`THINKING_LABELS`；设置页、记忆页、Customize 页上"Pane width"为"None"。`icons.tsx`：`queue` 和 `memory` 都留；
+  `state/settings.ts`：`showSettingsSection` 和"范围菜单"的说法都留。
+- 文档（`app/README.md`、`docs/app-v0.md`、model-providers.md、f8.md、ui-strings.md）逐行保留两边；f8.md 是这一步的
+  字段表加 v1 的"Review 变成 Memory"。
+- `m2-app`：留 v1-memory 的"View in Settings"检查和这一步的 `{ ...input, facts }` 字段检查。`m4-helpers` / `m4-app`：
+  两边各修了生成中拖选的同一个时序问题，合并后第五个参数是 `block`（`false` 时不滚），`m4-app` 用 v1-memory 的
+  `selectWhileStreaming`，`m4-real` 照旧传 `'end'`。`tb-app-roles`（TB-03）：v1-memory 的 `comparable`（去掉 memory
+  工具、身份段和记忆分节）套在这一步的 `baseSystem(ctx)`（打包版的安装位置）外面，改名了一个遮住同名函数的局部变量。
+  `v1-models-existing` 去掉 `m7-app`、保留 `m6-app-row`；`v1-models-record` 合并开头说明。
+- m7 的测试文件（v1-memory 随工作回顾删了，这一步改过）照删。这一步加在 `m7-app.mjs` 的 F8"Current view"检查移到
+  `mem-app-settings.mjs`：会话里存的报告一条（`m2-helpers.mjs` 的 `paneFacts` / `f8ViewProblems`），设置页 UI issues、
+  记忆页、Customize 页上"Pane width: None"（新的 `offPaneViewProblems`，代替工作回顾页上的那条）。`m7-replay`、
+  `m7-real` 的同类检查由 `m2-replay`、`m5-replay`、`m2-real`、`m5-real` 覆盖（会话里按的；`m2-real` 另有设置页上
+  "Pane width: None"），没有另外移。
+
+**另外的调整**：memory.md §9.1、§10.4 和 memory-enhance.md 里在"顶栏"的范围、Effort 改成输入框下面一行，§14.4 记下
+移过来的检查（`fe975ea`）。v1-memory 没有往顶栏、这一行或 F8 加东西，Tab / Shift+Tab 的次数不变，ui-strings.md 没有要加的
+词。`app/package-lock.json` 没有变，不用 `npm ci`。合并后第一遍 `mem-replay` 的 MEM-17（"off then on again … the status
+line uses the saved time"）失败：fixture 里下次运行的时刻是内核按录制机器的时区（UTC+8）算的，回放按这台机器的时区
+（America/New_York）显示成 22:44，不是保存的 10:44；`origin/app-v0` 自己的构建上同样失败（在临时 worktree 里查的，已删），
+与合并无关。在测试的根上改（`8cf3860`）：`mem-record.mjs` 把录制机器的 IANA 时区写进 fixture 的 `timeZone`；
+`mem-replay` 用它设页面（CDP `Emulation.setTimezoneOverride`）和自己预期的文字（`process.env.TZ`，
+`mem-replay-helpers.mjs` 新的 `useZone`），没有 `timeZone` 的 fixture 照旧用本机时区；用合并后的构建重录了
+`mem-settings.json`（38 步，顺序不变，只有临时路径、id、时刻不同）；memory.md §14.1 注明。检查没有放宽。
+
+**开发构建的结果**（合成端点；一个接一个跑，日志在会话草稿目录 `runs-sync/`）：
+
+- 合并后第一遍（`fe975ea` 的构建）：`npm run check`、`electron-vite build` 通过；单元 374、TaskBoard 单元 329、记忆单元
+  222；`mem-app-settings` 83（v1-memory 的 80 加移过来的 3 条）、`mem-app-prompt` 46、`mem-app-tool` 54、`mem-app-page` 104、
+  `mem-app-enhance-a` 75、`mem-app-enhance-b` 30、`mem-app-team` 50、`m2-app` 94、`m4-app` 62、`m6-app-settings` 60、
+  `m6-app-row` 45、`tb-app-roles` 45、`tb-app-flow` 43；回放 `m2-replay` 110、`m4-replay` 27、`tb-replay` 53 全部通过；
+  `mem-replay` 61 / 62（MEM-17，见上）。
+- `8cf3860` 上重新 `electron-vite build` 后的全部一遍（修正只改测试，没有再构建）：`npm run check` 通过；单元 374、
+  TaskBoard 单元 329、记忆单元 222；7 个 `mem-app` 套件同上（46、54、104、75、30、50、83）；`mem-replay` 62 / 62（另用
+  `TZ=Asia/Shanghai` 跑 `--only mem-settings,mem-enhance` 模拟负责人的 UTC+8 机器，18 / 18）。
+- 汇总 `v1-models-existing --id TB-46` exit 0：`m0-smoke` 18 加 1 项 KNOWN（pi #9129 留下的 sleep 进程，不计入退出码）、
+  `m1-app` 47、`m2-app` 94、`m3-app` 157、`m4-app` 62、`m5-app` 55、`m6-app-settings` 60、`m6-app-tools` 142、
+  `m6-app-slash` 106、`m6-app-row` 45、`m6-app-mcp-shared` 49、`v1-models-app-settings` 141、`v1-models-app-switch` 78、
+  `v1-models-app-session` 146、单元 374、m1–m6 回放 94 / 110 / 60 / 27 / 26 / 66、`v1-models-replay` 43、覆盖检查 exit 0。
+- 汇总 `--id MEM-35`（v1-memory 自己的汇总，含 TB-46 的全部）exit 0：同上的套件和数（`m0-smoke` 同一项 KNOWN），加
+  `tb-app-roles` 45、`tb-app-modes` 58、`tb-app-flow` 43、`tb-app-ask` 35、`tb-app-handoff` 55、`tb-app-sched` 24、
+  `tb-app-models` 32、`tb-app-stop` 46、`tb-app-misc` 20、TaskBoard 单元 329、`tb-replay` 53，两个覆盖检查 exit 0。
+  `tb-build-base` 没有重建（`.tb-runs/base` 已有，固定的 `2e67197`）。
+- 覆盖检查：模型层和 `--spec taskboard` 不带 `--allow-missing-real` exit 0；`--spec memory --allow-missing-real` exit 0
+  （package.json 的 `test:memory` 和记忆规格在这台机器上就这样跑），不带这个参数 exit 1，只缺真实层（没有
+  `mem-real.json`，例如 MEM-34）。
+
+**打包版（冒烟）**：在 `8cf3860` 的代码上 `npm run dist:dir`（其中 `npm run check` 通过；electron-builder 26.17.0）。
+逐个文件比较 `dist/win-unpacked/resources/app.asar` 里的 `out/` 和 `app/out/`：327 个文件、14,713,691 字节，SHA-256
+全部相同，两边都没有多出的文件（清单 `d6dc72f8…`）。`--exe dist/win-unpacked/Mori.exe`：`m0-smoke` 18 加 1 项 KNOWN
+（pi #9129，同开发构建）exit 0，`m1-app` 47 / 47。`git diff 1212474 HEAD` 里 v1-memory 改了主进程和 preload：
+`main/review.ts` 换成 `main/issues.ts`（设置页 UI issues 的列出、截图、导出、在资源管理器里选中、打开文件夹）、
+`main/index.ts` 注册它、`main/feedback.ts`（注释、一个类型标注、`feedbackDir` 不再导出，行为不变）、`preload/index.ts`
+（工作回顾的接口换成 UI issues 的）；`app/package.json` 只改了 scripts（去掉 `test:m7-*`，加 `test:mem-unit`、
+`test:memory`），`electron-builder.yml` 没有改。所以另用 `--exe` 跑了用到这几处的 App 套件，全部通过：
+`mem-app-settings` 83 / 83（UI issues 页走 `issues.ts` 和 preload 的新接口；设置页、记忆页、Customize 页和会话里的 F8）、
+`m2-app` 94 / 94（F8 截图、保存、在资源管理器里选中，`feedback.ts`）、`m4-app` 62 / 62（保存对内容的反馈，
+`mori:save-feedback`）、`mem-app-enhance-a` 75 / 75（主进程存的反馈由内核从 `<userData>/feedback` 读作增强的依据，
+MEM-27、MEM-19）。程序没有改。按负责人 2026-10-23 的新测试做法，打包版只做冒烟（打包和主进程没改时只跑 `m0-smoke`、
+`m1-app`；这次主进程改了，所以加了上面四个），**完整的打包版一遍跳过了**：其余 App 套件没有跑 `--exe`，打包程序上的
+真实走查也没有跑。
+
+**没有重跑的**：真实模型走查。这一步合并前跑过 m0–m7 的 `*-real`、`v1-models-real`、`tb-real`（见上面"真实模型走查"
+和"未验证"），合并后没有在开发构建或打包程序上再走。v1-memory 那边其实**没有跑过**真实模型：
+[../v1/memory-checks.md](../v1/memory-checks.md) 记着它的机器没有带 key 的数据目录，`mem-real.mjs` 写好了、没有对真实端点
+跑过（只跑过改成合成端点的副本，26 / 26），模型层和 TaskBoard 的真实层也没有重跑；所以"两边都跑过真实走查"只对这一步成立，
+记忆的真实层（MEM-05、MEM-10、MEM-22、MEM-34）至今没有人跑过。m7 的套件已删；一键导出安装包（`build-installer.cmd`，NSIS）
+没有跑。
+
+**没有验证的**：
+
+- 记忆规格的真实层：没有 `mem-real.json`（见上），覆盖检查只能带 `--allow-missing-real` 过；模型层和 TaskBoard 的
+  真实层用的是 `test-results` 里这一步合并前留下的 `v1-models-real.json`、`tb-real.json`。合并后的代码（提示词拆分、
+  记忆工具、身份段）没有对真实模型跑过。
+- 其余五个 mem fixture 还没有 `timeZone`，回放时用本机时区；在 New York 和 `Asia/Shanghai` 下都通过，要写进时区得重录。
+- 移到 `mem-app-settings` 的 3 条 F8 检查没有 MEM 编号，记忆规格的覆盖检查把它们列为不计入。
+- `tb-app-roles` 比对的基线 `.tb-runs/base` 是之前建的，没有重建。
+- 上面"未验证"一节里这一步自己的各项，合并没有改变。
