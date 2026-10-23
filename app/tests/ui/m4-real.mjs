@@ -16,8 +16,8 @@ import {
 } from './lib.mjs';
 import { activeFile, openRow, paneOf, stubFolder, waitIdle, waitReady } from './m3-helpers.mjs';
 import {
-  changeList, composerChips, dragSelect, expandChange, jumpHighlight, messageCounts, PANE, popoverShown,
-  replyActionRows, savedFeedback, selectLines, sentQuotes, sessionEntries, viewerState, waitViewer,
+  changeList, composerChips, dragSelect, expandChange, FEEDBACK_NOTE_OFF, feedbackNote, jumpHighlight, messageCounts,
+  PANE, popoverShown, replyActionRows, savedFeedback, selectLines, sentQuotes, sessionEntries, viewerState, waitViewer,
 } from './m4-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -210,6 +210,7 @@ async function item4(ctx) {
   const kept = await page.evaluate(() => window.getSelection().toString());
   const beforeUi = await messageCounts(page);
   await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
+  const note = await feedbackNote(page);
   await page.getByTestId('feedback-input').pressSequentially('希望每段再短一些', { delay: 40 });
   await page.getByTestId('feedback-form').getByRole('button', { name: 'Save' }).click();
   const saved = await page.getByTestId('feedback-saved').innerText({ timeout: 10000 }).catch(() => '');
@@ -219,7 +220,8 @@ async function item4(ctx) {
   const latest = savedFeedback(ctx.userData).at(-1);
   record('走查 4：流式输出时选中一句话，浮层出现，新流入的文字不清掉选区', shown && running === 'true'
     && kept.includes(sentence), JSON.stringify({ shown, running, kept: oneLine(kept, 60) }));
-  record('走查 4：提交后提示"已记录 · 在工作回顾中查看"，记录保存在本机', saved === 'Saved · View in Review'
+  record('走查 4：反馈表单的底部说明是这个项目没开增强时的整段（记忆规格 §10.7）', note === FEEDBACK_NOTE_OFF, note);
+  record('走查 4：提交后提示"已记录"（Saved，没有链接，记忆规格 §10.7），记录保存在本机', saved === 'Saved'
     && latest?.quote.includes(sentence) && latest.expected === '希望每段再短一些', JSON.stringify({ saved, latest }));
   record('走查 4：当前会话没有新消息（界面和会话文件里你的消息都没有多）', beforeUi.user === afterUi.user
     && userEntries(ctx.file) === afterUi.user, JSON.stringify({ beforeUi, afterUi, file: userEntries(ctx.file) }));

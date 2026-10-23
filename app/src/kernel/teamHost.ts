@@ -1,17 +1,22 @@
 // 协作（team.ts）与会话表（sessions.ts、instances.ts）之间的接口（平行 Agent 规格 §2、§8.2、§14）：
 // 会话表替 Team 建、开、关实例的 pi 会话，投递程序的消息，开始对话的回复；Team 接手协作模式下的用户消息与用户会话的事件。
-// 这里只有类型。
+// 这里是类型，加上两边共用的 memory 工具名（会话表注册它，Team 把它追加到启用的工具与白名单，docs/specs/memory.md §7.6）。
 
 import type { AgentSession, AgentSessionEvent, ExtensionFactory } from '@earendil-works/pi-coding-agent';
 import type { ModelEvent } from '../shared/models';
 import type { ApprovalDecision, KernelEvent, QuoteRef, SessionInfo } from '../shared/protocol';
 import type {
-  InstanceEntryData, InstanceKind, PromptBehavior, TeamApprovalEnd, TeamApprovalRequest, TeamState, TeamSwitch,
+  InstanceEntryData, InstanceKind, PromptBehavior, TeamApprovalEnd, TeamApprovalRequest, TeamMode, TeamState,
+  TeamSwitch,
 } from '../shared/team';
 import type { ApprovalPolicy } from './approval';
+import type { EnhanceSessionSpec, MemorySessionSpec } from './memoryExtension';
 import type { ModelSession, ModelSessionOptions } from './modelSession';
 import type { RoleLoad } from './roles';
 import type { TrustDecision } from './trust';
+
+/** @brief memory 工具的名字（记忆规格 §7.1）：mori-memory 注册它，批准扩展免批准（§7.5），Team 按 §7.6 追加它。 */
+export const MEMORY_TOOL = 'memory';
 
 /** @brief 停止一次运行的原因（§9.4 第 0 行）：你按了 Stop team、你停止了对话的回复、撤销需求。 */
 export type StopReason = 'user' | 'dialog' | 'cancel';
@@ -62,6 +67,8 @@ export interface InstanceSpec {
   trust: TrustDecision;
   /** 用户会话的批准状态（§11.1） */
   approval: ApprovalPolicy;
+  /** 记忆设置（记忆规格 §7.6、§9.6）：增强会话的 Team 把这次运行交给它的实例；普通会话的实例为 { enhance: null } */
+  memory: MemorySessionSpec;
   /** @brief 实例会话的 pi 事件（不发给界面，§8.1）。 */
   onEvent(event: AgentSessionEvent): void;
   /** @brief 实例会话的模型层事件（不发给界面，§8.2；Team 用它写 TaskView.modelNote，§12.12）。 */
@@ -168,6 +175,8 @@ export interface TeamArgs {
   approval: ApprovalPolicy;
   /** 打开已保存的用户会话（读 board.json、mori.team，做重启恢复） */
   restored: boolean;
+  /** 增强会话的 Team：这次增强运行（记忆规格 §9.6，实例经 InstanceSpec.memory 继承）；普通会话为 null */
+  enhance: EnhanceSessionSpec | null;
 }
 
 /** @brief 用户会话交给 Team 的部分（attachUser 的参数）。 */
@@ -182,6 +191,10 @@ export interface UserAttach {
 
 /** @brief 一个用户会话的协作（team.ts 实现；会话表经它路由协作模式下的消息、事件与命令）。 */
 export interface TeamLike {
+  /** 此刻的协作模式；运行开始时（before_agent_start）就是这次运行的模式（记忆规格 §5.1 用它定用户会话的身份） */
+  readonly mode: TeamMode;
+  /** 对话与立项由同一个角色持有（合并会话） */
+  readonly merged: boolean;
   /** @brief 用户会话的 `mori-team` 扩展（在建用户会话的资源加载器时取）。 */
   userExtension(): ExtensionFactory;
   /** @brief 用户会话的 pi 会话建好、扩展绑定之后：读 mori.team，恢复（§11.6），设对话的工具（§5.5）。 */

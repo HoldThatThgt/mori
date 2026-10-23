@@ -1,10 +1,10 @@
-// 反馈表单（docs/v0/screens/selection.md "反馈"）：只问"What result were you hoping for?"，只记录、不发给模型。
+// 反馈表单（docs/v0/screens/selection.md "反馈"）：只问"What result were you hoping for?"，不发给模型。
 // 主进程把它存成 <userData>/feedback/<时间>.json；保存失败时保留写好的字。在根组件旁挂一次。
+// 开了增强的项目，反馈是这个项目每天增强的依据，底部说明随之不同（docs/specs/memory.md §10.7）。
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { closeFeedback, useFeedbackForm, type FeedbackRequest } from '../state/feedbackForm';
 import { useOverlay } from '../state/overlays';
-import { fileName, openReview, reviewChanged } from '../state/review';
 import { useApp } from '../state/store';
 import { mainError } from '../state/bridge';
 import { sessionTitle } from './ChatPane';
@@ -13,6 +13,13 @@ import { sessionTitle } from './ChatPane';
 const SAVED_MS = 3000;
 const GAP = 8;
 const MARGIN = 12;
+
+/** 这个会话的项目开着增强时的底部说明（§10.7） */
+const NOTE_ENHANCED = 'Saved as evidence for this project’s daily enhancement. '
+  + 'To have Mori act on it now, use “Attach as context” instead.';
+/** 没开增强、会话没有项目、后台进程退出或读不出增强设置时的底部说明（§10.7、§10.10） */
+const NOTE_SAVED_ONLY = 'This project doesn’t have enhancement on, so feedback is only saved. '
+  + 'To have Mori act on it, use “Attach as context” instead.';
 
 /** @brief 表单的位置：锚点下方，放不下时上方，夹在窗口里。 */
 function placement(anchor: FeedbackRequest['anchor'], box: HTMLElement): { left: number; top: number } {
@@ -24,24 +31,30 @@ function placement(anchor: FeedbackRequest['anchor'], box: HTMLElement): { left:
     top: Math.max(MARGIN, Math.min(top, window.innerHeight - height - MARGIN)) };
 }
 
-/** @brief 保存这份反馈，返回 JSON 文件的完整路径；失败时抛错。工作回顾开着时重新读。 */
-async function save(request: FeedbackRequest, expected: string): Promise<string> {
+/** @brief 保存这份反馈；失败时抛错。 */
+async function save(request: FeedbackRequest, expected: string): Promise<void> {
   const tab = useApp.getState().tabs.find((item) => item.key === request.tabKey);
   const session = { file: tab?.sessionFile ?? null, cwd: tab?.cwd ?? '', title: tab ? sessionTitle(tab) : '' };
-  const saved = await window.mori.saveFeedback({ expected: expected.trim(), quote: request.ref.quote,
-    source: request.ref.source, session });
-  reviewChanged();
-  return saved.file;
+  await window.mori.saveFeedback({ expected: expected.trim(), quote: request.ref.quote, source: request.ref.source,
+    session });
 }
 
-/** @brief "Saved · View in Review"：点链接关闭表单，打开工作回顾的"Feedback"一节，选中刚记下的这一条。 */
-function Saved({ file }: { file: string }) {
+/**
+ * @brief 底部说明（data-testid="feedback-note"）：enhance.get 返回之前留空、先占好这一行的高度（下面不可见的一份
+ *        较长的说明撑开同一格），不先显示另一种说法；后台进程退出时按没开增强写（§10.10）。
+ */
+function Note() {
+  const enhanced = useFeedbackForm((state) => state.enhanced);
+  const exited = useApp((state) => state.kernel === 'exited');
+  const text = exited ? NOTE_SAVED_ONLY : enhanced === null ? null : enhanced ? NOTE_ENHANCED : NOTE_SAVED_ONLY;
   return (
-    <p className="feedback-saved" role="status" data-testid="feedback-saved">Saved · <button type="button"
-      className="text-link" data-testid="feedback-open-review" onClick={() => {
-        closeFeedback();
-        openReview('feedback', fileName(file));
-      }}>View in Review</button></p>
+    <div style={{ display: 'grid' }}>
+      <p className="feedback-note" data-testid="feedback-note" style={{ gridArea: '1 / 1' }}>{text}</p>
+      {text === null && (
+        <p className="feedback-note" aria-hidden="true" style={{ gridArea: '1 / 1', visibility: 'hidden' }}>
+          {NOTE_SAVED_ONLY}</p>
+      )}
+    </div>
   );
 }
 
@@ -62,10 +75,7 @@ function Editing({ quote, saving, error, onSubmit }: {
             if (expected.trim()) onSubmit(expected);
           }} />
       </label>
-      <p className="feedback-note">
-        This is only saved to Review and isn’t sent to the model.
-        To have Mori act on it, use “Attach as context” instead.
-      </p>
+      <Note />
       {error && <p className="form-message error" role="alert" data-testid="feedback-error">
         Couldn’t save your feedback: {error}</p>}
       <div className="feedback-actions">
@@ -81,7 +91,6 @@ function Editing({ quote, saving, error, onSubmit }: {
 function Form({ request }: { request: FeedbackRequest }) {
   const [phase, setPhase] = useState<'editing' | 'saving' | 'saved'>('editing');
   const [error, setError] = useState<string | null>(null);
-  const [savedFile, setSavedFile] = useState('');
   const box = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   useOverlay(true, () => (phase === 'saving' ? false : closeFeedback()));
@@ -98,7 +107,7 @@ function Form({ request }: { request: FeedbackRequest }) {
     setPhase('saving');
     setError(null);
     try {
-      setSavedFile(await save(request, expected));
+      await save(request, expected);
       setPhase('saved');
     } catch (failure) {
       setError(mainError('saveFeedback', failure));
@@ -109,7 +118,7 @@ function Form({ request }: { request: FeedbackRequest }) {
     <div ref={box} className="feedback-form" role="dialog" aria-label="Feedback" data-testid="feedback-form"
       style={{ left: position?.left ?? -9999, top: position?.top ?? -9999 }}>
       {phase === 'saved'
-        ? <Saved file={savedFile} />
+        ? <p className="feedback-saved" role="status" data-testid="feedback-saved">Saved</p>
         : <Editing quote={request.ref.quote} saving={phase === 'saving'} error={error}
           onSubmit={(expected) => void submit(expected)} />}
     </div>

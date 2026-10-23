@@ -1,13 +1,20 @@
 // 工具卡：标题用人话，状态来自 pi 的工具事件和批准事件（等你批准、已拒绝、自动放行的原因）。
 // 默认折叠，展开看参数、输出和 diff。读取、修改、写入的标题里的路径是按钮，点它在右栏打开文件阅读器（M4）。
+// 完成的 memory 工具卡在状态行后面有 View in Memory，打开记忆页到那一条或那次修订（docs/specs/memory.md §7.5）。
 
 import { memo, useEffect, useState } from 'react';
+import type { MemoryToolDetails } from '../../../shared/memory';
 import { seatRolesOf } from '../../../shared/team';
+import { recordAction } from '../state/actionLog';
+import { openMemoryAt } from '../state/memory';
 import type { ToolCall, ToolStatus } from '../state/model';
 import { openFile } from '../state/quotes';
 import { useApp } from '../state/store';
 import { Diff } from './Diff';
 import { toolTitle } from './toolTitle';
+
+/** 后台进程退出时 View in Memory 的悬停说明（docs/specs/memory.md §10.10，同 Customize） */
+const KERNEL_EXITED = 'Mori’s background process crashed. Restart it to continue.';
 
 /** 标题里的路径能打开阅读器的工具（参数里有 path 的文件工具） */
 const FILE_TOOLS = ['read', 'edit', 'write'];
@@ -109,6 +116,27 @@ function TitleTarget({ tool, target, tabKey }: { tool: ToolCall; target: string;
   );
 }
 
+/**
+ * @brief 完成的 memory 工具卡上的 View in Memory（同 TitleTarget 的写法，点它不展开工具卡）：打开记忆页，切到那一层那一种、
+ *        选中那条；删除时切到 Revisions 选中那一次修订。后台进程退出时不可用，悬停说明原因。
+ * @param details 工具结果里的位置
+ * @param cwd 这个会话的工作目录（本项目）
+ */
+function MemoryView({ details, cwd }: { details: MemoryToolDetails; cwd: string }) {
+  const exited = useApp((state) => state.kernel === 'exited');
+  const open = () => {
+    recordAction('View in Memory');
+    if (details.action === 'forget') openMemoryAt({ cwd, layer: details.layer, revision: details.revision });
+    else openMemoryAt({ cwd, layer: details.layer, kind: details.kind, entry: details.entry });
+  };
+  return (
+    <button type="button" className="text-link" data-testid="tool-memory-view" disabled={exited}
+      title={exited ? KERNEL_EXITED : undefined} onClick={(event) => { event.preventDefault(); open(); }}>
+      View in Memory
+    </button>
+  );
+}
+
 /** @brief 一张工具卡。 */
 export const ToolCard = memo(function ToolCard({ tool, cwd, tabKey }: { tool: ToolCall; cwd: string; tabKey: string }) {
   const now = useNow(tool.status === 'running');
@@ -129,6 +157,7 @@ export const ToolCard = memo(function ToolCard({ tool, cwd, tabKey }: { tool: To
         <span className="tool-status" data-testid="tool-status" title={statusTitle(tool)}>
           {statusLine(tool, now)}
         </span>
+        {tool.status === 'done' && tool.memory && <MemoryView details={tool.memory} cwd={cwd} />}
       </summary>
       {open && <ToolBody tool={tool} />}
     </details>

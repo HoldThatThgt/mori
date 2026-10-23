@@ -1,8 +1,9 @@
-# 临时默认值（v1 模型层）
+# 临时默认值（v1）
 
 实现时需要一个值、但还没有经过你确认的地方都登记在这里。每一项都是“临时默认值”，拿到依据后再定。
-来源：[构建规格](../specs/model-providers.md) §12；位置是规格 §2 定下的代码落点，时长都集中在 `app/src/kernel/modelTimings.ts`。
-v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被本规格取代的行在那里注明。
+第一张表是模型层，来源：[统一模型提供商构建规格](../specs/model-providers.md) §12；位置是规格 §2 定下的代码落点，时长都集中在 `app/src/kernel/modelTimings.ts`。
+后面的平行 Agent 与 TaskBoard、提示词分层与记忆各成一节，来源写在各节开头。
+v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规格取代的行在那里注明。
 
 | 默认值 | 取值 | 位置 | 理由 | 何时复查 |
 | --- | --- | --- | --- | --- |
@@ -61,3 +62,40 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被本规格�
 | board.json 改名替换被别的进程挡住时的重试 | 最多 10 次，第 n 次前等 n × 20 毫秒（合计不到 1 秒），只对 EPERM、EACCES、EBUSY | `app/src/kernel/agents.ts`（`writeFileAtomic`） | Windows 上目标文件正被别的进程打开（杀毒、索引）时改名会失败，这一次写出就丢了，要等下一次写入才补上；App 测试每 20 毫秒读一次 board.json 时碰到过 | 你走查时 |
 | 程序注入的文字 | 英文（规格附录 A、§8.5） | `app/src/kernel/boardText.ts` | 与 pi 默认的 system prompt 同语言 | 内网模型对英文说明理解不好时 |
 | 界面文字 | 规格 §13 | `app/src/renderer/src/` | 英文，Claude 桌面版的写法 | 你走查时 |
+
+## 提示词分层与记忆
+
+来源：[提示词分层与记忆规格](../specs/memory.md) §12；检查记录见 [memory-checks.md](memory-checks.md)。
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| token 估算 | 中日韩字符每个 1；其余字符数 ÷ 4 向上取整；用量按层分别估算再相加 | `app/src/shared/memory.ts` `estimateMemoryTokens`（界面的用量与后台进程的检查共用） | 不需要分词器，离线可算；中文约一字一 token，英文约四字符一 token；两层分开估，用户级的数在每个项目里相同 | 拿到内网模型的分词器、对过实际 token 数时 |
+| 每种的上限 | 500（用户级 + 本项目） | `app/src/shared/memory.ts` `MEMORY_LIMIT`；检查在 `app/src/kernel/memoryRules.ts` | proposal 定的（§5.2）：四种合计约 2000 token，每次请求都带，小窗口模型也放得下 | proposal 改时；内网小窗口模型上看到效果时 |
+| 打开增强从哪天读起 | 打开那天；关掉再打开同样从打开那天读起，关着期间的日子不补；片段从 `since` 那天开始截 | `app/src/kernel/enhance.ts`（`since`）；`app/src/kernel/enhanceDays.ts`（片段的起点） | 第一次打开按 proposal §16；关着就是不想让它读，再打开时补读那几天会一下子跑很多 | 你想让它补读关着期间的会话时 |
+| 回滚的范围 | 那次修订改过的全部条目；之后又被改过的条目让整次回滚被拒绝；移动回到原层末尾 | `app/src/kernel/memoryRules.ts`（回滚的计划与冲突判断）；`app/src/kernel/memory.ts` | 一次修订是一个整体，只回滚一部分会留下半套改动；不覆盖之后的改动 | 你走查时觉得要能只回滚一部分 |
+| 失败后怎么重试 | 下一个时刻、下次启动或现在运行时从没处理完的那天起重跑；不限次数；同一任务排在失败那天之后的日子这一轮不跑 | `app/src/kernel/enhanceDays.ts`（该跑的日子）；`app/src/kernel/enhance.ts`（队列） | 水位不动、按日子顺序跑，不会跳过哪一天；重试只在到点、启动或你点 Run now 时发生，不会连续空转 | 某个项目反复失败、token 花得多时 |
+| 子文件夹算不算同一个项目 | 不算，按工作目录精确匹配 | `app/src/kernel/memoryFiles.ts`（项目目录名） | 与 pi 的会话目录一致（proposal §7） | 你想让子文件夹共用上级项目的记忆时 |
+| 两个工作目录编码到同一个项目目录 | 以 `project.json` 记下的第一个 `cwd` 为准；另一个工作目录的记忆与增强不读不写，报 `This project’s memory folder belongs to <cwd>.` | `app/src/kernel/memoryFiles.ts`（解析项目目录的函数） | pi 的编码有损，proposal §7 的“精确匹配”与“同 pi”在这里冲突；不把别的项目的条目混进来 | 碰到真实的冲突时 |
+| 写用户级时的预算检查 | 对每个有这一种条目的项目逐一检查，任一超出就拒绝；用户级自己超过 500 也拒绝 | `app/src/kernel/memoryRules.ts`（预算检查） | 用户级的每一条都进每个项目的 prompt（proposal §5.2） | 项目多、写用户级常被拒绝时 |
+| 每天的时刻 | 04:00，本地时间，每个项目一份（也是日界） | `app/src/shared/memory.ts` `MEMORY_DEFAULTS.dailyTime`；`app/src/kernel/enhance.ts` | proposal §10.1 的例子；这时多半不在用电脑，之前的对话算前一天 | 你走查时（每个项目可在增强设置里改） |
+| 改了每天的时刻 | `doneThrough` 退到新的今天的前一天、`since` 不晚于新的今天，靠水位与 `feedbackSeen` 去重 | `app/src/kernel/enhanceDays.ts`（改时刻） | 日界移动后不漏读，也不重复读 | 你走查时 |
+| 同一天多个项目的增强顺序 | 按项目 `cwd` 字符串升序 | `app/src/kernel/enhance.ts`（队列） | 确定、可测；proposal 只要求全应用一次一个 | 你想让常用的项目先跑时 |
+| 跳过的运行 | `last.status: 'skipped'`，状态行写 `No finished sessions to read`；`doneThrough` 推进，没有修订、不建会话 | `app/src/kernel/enhanceRun.ts`；状态行 `app/src/shared/memory.ts` `enhanceStatusText` | 没有会话可读时不花 token（proposal §10.1），又看得出它跑过 | 你走查时 |
+| slug | ASCII 单词小写、`-` 连接、≤ 48 字符；没有时 `<kind>-<YYYYMMDD>-<4 位>`；同一层同名时加 `-2`、`-3` | `app/src/kernel/memoryFiles.ts`；`app/src/shared/memory.ts` `MEMORY_DEFAULTS.slugMax` | 文件名可读、在 Windows 上合法；中文 abstract 不转写 | 你手改记忆文件、觉得名字难认时 |
+| 修订 id | `<YYYYMMDD-HHmmss>-<4 位小写字母数字>`（本地时间） | `app/src/kernel/memoryFiles.ts` | 按名字排序就是时间顺序，列表只读文件名；后缀防同一秒写两次 | — |
+| 修订记录的围栏 | 至少 `~~~~`，比原文里最长的纯波浪号行多一个；`<围栏>before` / `<围栏>after` / `<围栏>` | `app/src/kernel/memoryFiles.ts` | detail 里有代码块也不冲突；原文逐字保存，回滚逐字恢复 | — |
+| 记忆页修改、移动的修订说明 | `Edited on the Memory page`、`Moved to user level`、`Moved to this project` | `app/src/kernel/memory.ts` | 在记忆页改时不另填原因；移动的说明是按钮文字的过去式 | 你走查时 |
+| memory 工具修订标题里的 abstract | 前 60 字符 | `app/src/shared/memory.ts` `MEMORY_DEFAULTS.titleAbstractMax` | 修订列表一行放得下 | 你走查时 |
+| 找不到条目时列出的候选 | 最多 10 条，每条 `<layer>/<id>: <abstract>` | `app/src/shared/memory.ts` `MEMORY_DEFAULTS.candidatesMax`；`app/src/kernel/memoryRules.ts`（条目匹配） | 让模型下一次照着写对，又不把整份列表塞进工具结果 | 内网模型常找不到条目时 |
+| 字段长度 | abstract 1–200 字符（一行）；detail ≤ 4000；note ≤ 600；quote ≤ 600；依据 1–10 项；Notes ≤ 4000 | `app/src/shared/memory.ts` `MEMORY_DEFAULTS`（后台进程、memory 工具的 schema 与记忆页的表单共用）；检查在 `app/src/kernel/memoryRules.ts` | abstract 每次请求都带，要短；detail 只给你和增强任务读，可以长一些；防异常的大输入 | 你走查时；内网模型写的条目常被拒绝时 |
+| 修订列表每次最多 | 200 条 | `app/src/shared/memory.ts` `MEMORY_DEFAULTS.revisionsMax`；`app/src/kernel/memory.ts` | 只读文件名与 frontmatter，一次 200 条读得快 | 你走查时觉得要看更早的修订 |
+| 会话名 | pi 的会话名，没有时第一条用户消息的前 60 字符 | `app/src/shared/memory.ts` `MEMORY_DEFAULTS.sessionTitleMax`；`app/src/kernel/enhanceRun.ts`、`app/src/kernel/memoryTool.ts` | 同侧栏的写法，依据行和第一条消息里认得出是哪个会话 | 你走查时 |
+| token 数 | 增强会话与它 TaskBoard 目录下全部实例会话文件，关闭后按物理行读出，按 `getSessionStats` 的算法累加 `input + output` | `app/src/kernel/enhanceRun.ts` | 实例在运行中途已关闭，不能对它们调 `getSessionStats`，只能从文件读 | pi 升级、`getSessionStats` 的算法变化时 |
+| 增强会话的调度类别 | `background` | `app/src/kernel/enhanceRun.ts` | 统一模型提供商规格 §8.2：订阅与定时归 `background`，不占给对话留的槽位 | 你走查时觉得增强跑得太慢 |
+| 新会话提示、增强状态行（关、排着、全部跳过）、设置对话框的说明、离开编辑的确认框标题 | 规格 §10 标“临时”的文字 | `app/src/shared/memory.ts`（`memoryNoticeText`、`enhanceStatusText`）；`app/src/renderer/src/components/Memory*.tsx` | 没有 Claude 桌面版对应，规格定的 | 你走查时 |
+| 程序注入的文字 | 英文（规格附录） | `app/src/kernel/memoryText.ts` | 与 pi 默认的 system prompt 同语言 | 内网模型对英文说明理解不好时 |
+| 看不见的会话遇到还没有信任决定的项目 | 按不信任，不加载项目的扩展与技能，不询问 | `app/src/kernel/sessions.ts`（startHeadless） | 没有人回答信任询问；v0 的规则是不经询问不加载项目扩展 | 你走查增强、需要增强用项目扩展时 |
+| 增强运行中关掉这个项目的增强 | 正在跑的那一次立即停止、记为失败（`Enhancement was turned off`），水位不动 | `app/src/kernel/enhance.ts` | 关掉就是不要它再跑；没读完的部分下次打开后照 `since` 的规则处理 | 你走查时 |
+| 协作模式的增强运行里有需求等你拿主意 | 会话与 Team 都空闲时算结束、修订 `done`，需求留在 TaskBoard 上 | `app/src/kernel/enhanceRun.ts` | 看不见的会话没人回答，等下去就永远不结束 | 你走查协作模式的增强时 |
+| `agent` 调用方的 `save`、`update` 要带 `quote` | 必填 | `app/src/kernel/memoryRules.ts`（toolFieldError）、`app/src/kernel/memoryText.ts`（说明与 Correct form） | proposal §8.1 的依据是你的原话，记下的条目算“你说的” | 你走查对话里记一条、真实模型常漏写原话时 |
+| 在记忆页改一条“它学的” | 改后为 `You said`，之后增强不能再改它 | `app/src/kernel/memory.ts` | proposal §4 把你手写的算“你说的”；要退回可以回滚这次修改 | 你走查记忆页时 |

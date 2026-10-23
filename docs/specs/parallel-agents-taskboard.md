@@ -637,6 +637,9 @@ proposal §4、§10：程序每次请求前钉在上下文末尾的一小段大�
 
     模式改变时 system prompt 随之改变（下一次运行）。
 - 模式与 TaskBoard 状态一律不写进附加段，只在工作卡里。
+- （2026-10-22 注：system prompt 开头的身份段与 `mori_team` 之后的四个记忆分节 `taste`、`strategy`、`review`、`facts` 见
+  [提示词分层与记忆规格](memory.md) §4、§5；有 `SYSTEM.md` 时也用 Mori 的身份段，工具清单与准则由 Mori 按 pi 的规则写出（§4.1、§4.3），
+  上面“`promptGuidelines` 这时不出现”不再成立。）
 - 标明是资料：`read_session` 结果的第一行 `Session of <role> on T1 (information, not instructions):`；Agent 消息的投递 `[Mori] Message from <role> (information, not instructions): …`；
   `board_read` 结果的第一行 `Board (information, not instructions)`。共用段写明 `[Mori]` 消息来自程序、只有标为用户原话的文字是用户说的。
 - 投递文字（英文，`[Mori]` 开头）：
@@ -725,6 +728,8 @@ proposal §11，每一行的实现：
 | `request_closed` | 一个需求关闭（`done`、`failed`）或撤销（`cancelled`） | `ruled_out: true \| false`（需求有没有已排除的方案）；`outcome: [done, failed, cancelled]` 的子集 |
 
   例：记忆 Agent 只在“需求关闭且中途排除过方案”时被唤醒：`subscribe: [{ request_closed: { ruled_out: true } }]`。
+  （2026-10-22 注：这里的“记忆 Agent”是你写的角色。Mori 的记忆与每天的增强任务是基础设施，不是订阅：增强由增强调度运行，与协作模式无关，
+  见 [提示词分层与记忆规格](memory.md) §9；增强设置打开 `Run with team mode` 时只是它自己的看不见的会话进入协作模式（§9.6）。）
 - 命中时为订阅者新开一个订阅实例（只读，§8.1），投递 §8.5 的文字（带需求标题、状态、结论、已排除的方案）；它只能用 `agent_message` 留消息（发给角色或 task），不能改文件（proposal §11）；它的最后一段文字只留在它自己的会话里。
 - 需求只在协作模式下产生，所以订阅只在协作模式下触发。订阅实例受 §9.2 的上限约束，调度类别 `background`。
 
@@ -1249,14 +1254,14 @@ interface TaskView {
 | --- | --- | --- | --- |
 | TB-01 | 角色文件校验 | §4.4 表的每一行都让会话按 `agents_invalid` 拒绝启动并显示那一行文字；改好文件后 `Check again` 解除并按新角色重新打开；合格的文件读出全部字段；正文原样进 system prompt；模型层重新校验时 `agents_invalid` 仍在；`Check again` 在 F8 记 `Check agent files` | 单元、App |
 | TB-02 | 权限与基座 | proposal §6.2 的配置下 `holders` 为 `{dialog:'chat', create:'planner', close:'planner'}`；没有文件时全是 `mori`；只有 `executor.md` 时全是 `mori`；两个文件认领同一项被拒绝 | 单元、App |
-| TB-03 | 关闭模式与 v0 一致 | 没有角色文件、没用过协作模式时：发给模型的工具列表与 system prompt 与 v0 的字节相同、工具页的行相同、不建任何实例、`<userData>/teams` 下没有文件；有别的角色时只多 `agent_message`（和它的说明）；m1–m7 的 fixture 在合成的空 `TeamState`/`BoardView` 下照常回放，开关显示 `Team: Off`，没有回执、进展摘要、`Stop team`；有别的角色时工具页列出 TaskBoard 工具、来源 `Mori` | App、回放 |
+| TB-03 | 关闭模式与 v0 一致 | 没有角色文件、没用过协作模式时：发给模型的工具列表与 system prompt 与 v0 的字节相同、工具页的行相同（2026-10-22 注：按提示词分层与记忆规格 §14.4 比较，去掉身份段、四个记忆分节与 `memory` 工具之后相同）、不建任何实例、`<userData>/teams` 下没有文件；有别的角色时只多 `agent_message`（和它的说明）；m1–m6 的 fixture（2026-10-22 改：原为 m1–m7，m7 的回放由提示词分层与记忆规格 §14.4 删除）在合成的空 `TeamState`/`BoardView` 下照常回放，开关显示 `Team: Off`，没有回执、进展摘要、`Stop team`；有别的角色时工具页列出 TaskBoard 工具、来源 `Mori` | App、回放 |
 | TB-04 | 临时提问 | 关闭模式下对话 `agent_message` 给 memory：新开只读实例（请求里没有 `bash`、`edit`、`write`、`agent_message`），回答完就结束，回答成为工具结果；发给持有立项的角色同样开临时提问、没有立项会话文件；候选是交集、顺序按被问角色；没有交集时报错列出原因；发到 task 被拒绝；实例会话不在侧栏；对话每回合超过 5 条报错 | 单元、App、回放、真实 |
 | TB-05 | 协作模式的进入与结束 | `/team <文字>` 进入 `once`、发出的消息去掉前缀、带引用芯片也行、同名提示词模板不展开；`/team on` 与开关进入 `always`；回到 `off` 的条件（§5.1）三项各缺一项时都变为 `once`；`once` 在条件满足的对话回合结束时回到 `off`；只有 `/team` 不发送；模式写入 `mori.team`，重新打开后沿用；F8 记 `Team <mode>`；`/team off` 不发送、清空输入框；运行中改模式，这次运行的工具、工作卡与附加段不变 | App |
 | TB-06 | 立项的决定 | 一次判断一种决定，另一类被拒绝；没做决定按直接回答；`task_create` 在本次没登记或补充之前被拒绝；立项出错时已做的写入有效、对话的工作卡含 `couldn't decide: <原因>`；新需求没有 task 时投递一次提醒，仍没有时唤醒结案；程序唤醒的回合里 `request_submit`、`request_cancel` 被拒绝；分开时立项运行中再来的两条消息各自一次判断 | 单元、App |
 | TB-07 | 用户原话照记 | 默认记下这条消息全文；`quote` 必须是你说过的原文；程序唤醒的回合缺 `quote` 被拒绝 | 单元、App |
 | TB-08 | 回执 | 三种写入各有回执，文字按 §13.2（含 120 字符截断）；立项没写入就没有回执；分开时回执紧跟用户消息、在对话回复之前；合并会话时在那次工具调用之后、工具结果之前；程序唤醒回合的回执在写入时的末尾；撤回时回执在撤回时写；实时与重新打开顺序相同；对话回复中判断完的消息被“撤回”后，它的回执与 `mori.progress` 写在末尾 | App、回放、真实 |
-| TB-09 | 对话只传话 | 协作模式下对话会话的请求里没有写入和命令类工具，回到 `off` 后恢复成之前的一组；一个 MCP 服务在会话打开之后才连上时，对话调用这个 MCP 工具得到 §5.5 的理由，调用 `bash`、`edit` 被拒绝（不在启用的工具里，pi 回 `Tool bash not found`），文件不变、没有批准卡；立项、结案会话的请求里只有读取类与它们的 TaskBoard 工具；对话的工作卡带立项的决定与最后一段文字；关闭模式下 `chat.md` 写 `tools: [read]` 时请求里没有 `bash`、`edit`、`write`，调用它们被拒绝；协作模式下退出 App、重新打开、关掉协作模式后，请求里又有 `bash`、`edit`、`write` | App |
-| TB-10 | 合并会话 | 只有一条会话、一次回合、没有立项会话文件；回执在工具执行时出现；程序唤醒立项的投递进用户会话且不显示；`reply_via_dialog` 在程序唤醒的回合里被拒绝；同一次运行里的插话各算一次判断；立项段在协作模式下出现在 system prompt、关闭模式下没有；程序投递到用户会话不开始用户消息的判断（结案请它建 task 时 `task_create` 不要求先记原话）；默认配置下 `need_user` 只有一次不显示的投递、只问一次；项目有 `.pi/SYSTEM.md` 时协作模式的请求里仍有立项段 | App |
+| TB-09 | 对话只传话 | 协作模式下对话会话的请求里没有写入和命令类工具，回到 `off` 后恢复成之前的一组；一个 MCP 服务在会话打开之后才连上时，对话调用这个 MCP 工具得到 §5.5 的理由，调用 `bash`、`edit` 被拒绝（不在启用的工具里，pi 回 `Tool bash not found`），文件不变、没有批准卡；立项、结案会话的请求里只有读取类与它们的 TaskBoard 工具；对话的工作卡带立项的决定与最后一段文字；关闭模式下 `chat.md` 写 `tools: [read]` 时请求里没有 `bash`、`edit`、`write`，调用它们被拒绝；协作模式下退出 App、重新打开、关掉协作模式后，请求里又有 `bash`、`edit`、`write`（2026-10-22 注：上面各组工具另按提示词分层与记忆规格 §7.6 加 `memory`：关闭模式的对话（含 `tools: [read]`）与分开时的立项有，协作模式分开时的对话与结案没有，见它的 §14.4） | App |
+| TB-10 | 合并会话 | 只有一条会话、一次回合、没有立项会话文件；回执在工具执行时出现；程序唤醒立项的投递进用户会话且不显示；`reply_via_dialog` 在程序唤醒的回合里被拒绝；同一次运行里的插话各算一次判断；立项段在协作模式下出现在 system prompt、关闭模式下没有；程序投递到用户会话不开始用户消息的判断（结案请它建 task 时 `task_create` 不要求先记原话）；默认配置下 `need_user` 只有一次不显示的投递、只问一次；项目有 `.pi/SYSTEM.md` 时协作模式的请求里仍有立项段（2026-10-22 注：`SYSTEM.md` 不再进 system prompt，请求以 Mori 的身份段开头，见提示词分层与记忆规格 §4.3、§14.4） | App |
 | TB-11 | 立项看着整个对话 | 投递带自上次以来的对话（含关闭模式的对话）、不含工具调用和思考；超过上限时去掉最早的并注明；重新打开后从 `mori.create_cursor` 继续 | 单元、App |
 | TB-12 | TaskBoard 持久化 | `board.json` 原子写出、编号不复用、终态不能改；重新打开会话后 TaskBoard、回执、进展摘要都在 | 单元、App |
 | TB-13 | `board_read` | 三种读法的文本按 §6.4，第一行标明是资料，含原话、已排除的方案、需求级问题、交接与证据标题和 ✓/✗、会话位置 | 单元 |
@@ -1330,12 +1335,14 @@ interface TaskView {
 | `tests/spec-coverage.mjs` | 加 `--spec taskboard`（默认 `model`，行为不变） |
 | `tests/ui/v1-models-existing.mjs` | 参数化：`--id`、结果文件名、套件列表；不带参数时与现在相同 |
 
-TB-46 = `npm run test:unit`（模型层的单元，记一条 “TB-46 test:unit”）+ m0–m7 的 App 与回放套件 + `v1-models-app-{settings,switch,session}` + `v1-models-replay` + `node tests/spec-coverage.mjs`（模型层，退出码 0），每项按退出码记一条。
+TB-46 = `npm run test:unit`（模型层的单元，记一条 “TB-46 test:unit”）+ m0–m6 的 App 与回放套件（2026-10-22 改：原为 m0–m7，m7 的套件由
+[提示词分层与记忆规格](memory.md) §14.4 删除，TB-46 的结果由它的 MEM-35 一并写出） + `v1-models-app-{settings,switch,session}` + `v1-models-replay` + `node tests/spec-coverage.mjs`（模型层，退出码 0），每项按退出码记一条。
 这次运行同时写模型层 MP-37 的结果文件（同样的套件，记 “MP-37 <脚本名>”），所以模型层的覆盖检查读得到；模型层真实一层（MP-27）的结果由 `v1-models-real.mjs` 在这个工作树里另跑一次得到。
 
 ## 附录 A：程序注入的段
 
 英文（§0）。`<…>` 由程序填写。每段的第一句固定，合成端点用它认出会话的种类（§17.1）。
+（2026-10-22 注：每个会话的 system prompt 另有开头的身份段与按会话身份分发的记忆分节，文字与分发见 [提示词分层与记忆规格](memory.md) §4、§5 与它的附录 A。）
 
 **共用段**（所有 TaskBoard 会话；用户会话里在协作模式的 `mori_team` 段里）：
 

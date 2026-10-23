@@ -1,6 +1,7 @@
 // 设置页（docs/v1/screens/models-settings.md）的状态与命令：当前分节、Models 分节的数据（models.get 的结果，
 // 两次读取之间由全局事件 mori.profiles、mori.key_status 更新）、正在跑的探针、测试连接的结果、进入时要落到的位置。
-// 写命令成功后重新 models.get（models-settings.md "来源"）。
+// 写命令成功后重新 models.get（models-settings.md "来源"）。进入设置页默认落在 Models；F8 的"View in Settings"
+// 落在 UI issues（docs/specs/memory.md §10.8，showSettingsSection）。
 
 import { create } from 'zustand';
 import type {
@@ -20,8 +21,8 @@ export interface Notice {
   text: string;
 }
 
-/** @brief 设置页的分节。 */
-export type SettingsSection = 'models' | 'agents';
+/** @brief 设置页的分节：Models、AGENTS.md、UI issues（docs/specs/memory.md §10.8）。 */
+export type SettingsSection = 'models' | 'agents' | 'issues';
 
 /** @brief 打开 设置 → Models 时要落到的位置（拒绝启动卡、说明卡、顶栏菜单）。 */
 export interface ModelsTarget {
@@ -112,14 +113,34 @@ async function rereadConfig(): Promise<void> {
   }
 }
 
-/** @brief 进入设置页：落在 Models，重新读取配置和 Models 的数据，清掉上次的测试结果。 */
+/** 下一次进入设置页时要落到的分节（showSettingsSection 记下，进入时用掉）；平常为 null，落在 Models */
+let landing: SettingsSection | null = null;
+
+/**
+ * @brief 进入设置页：落在 Models（或 showSettingsSection 指定的分节），重新读取配置和 Models 的数据，
+ *        清掉上次的测试结果。
+ */
 useApp.subscribe((state, previous) => {
   if (state.view === 'settings' && previous.view !== 'settings') {
-    useSettings.setState({ section: 'models', readError: null, configReadError: null, tests: {} });
+    useSettings.setState({ section: landing ?? 'models', readError: null, configReadError: null, tests: {} });
+    landing = null;
     void rereadConfig();
     void loadModels();
   }
 });
+
+/**
+ * @brief 打开设置页的某一节（F8 的"View in Settings"打开 UI issues）：已经在设置页时直接换过去，否则进入设置页并落在
+ *        这一节。不再问离开：调用方已经经过 guardLeave。
+ */
+export function showSettingsSection(section: SettingsSection): void {
+  if (useApp.getState().view === 'settings') {
+    useSettings.setState({ section });
+    return;
+  }
+  landing = section;
+  useApp.setState({ view: 'settings' });
+}
 
 /**
  * @brief 打开 设置 → Models，并落到 target 指定的位置（不带时停在顶部）。拒绝启动卡、说明卡、顶栏菜单调用。

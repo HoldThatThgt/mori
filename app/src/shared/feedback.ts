@@ -1,5 +1,5 @@
 // 对内容的反馈（方案 5.10，状态表见 docs/v0/screens/selection.md "反馈"）：界面交给主进程保存的形状。
-// 只记录，不发给模型；保存在主进程里完成，后台进程退出时也能记录。M7 的工作回顾读同一个文件夹。
+// 保存在主进程里完成，后台进程退出时也能记录；开了增强的项目，后台进程读这个文件夹作为增强的依据（docs/specs/memory.md §9.5）。
 
 import { z } from 'zod';
 import { FileSourceSchema, MessageSourceSchema } from './protocol';
@@ -29,3 +29,7 @@ export interface SavedFeedback {
   /** JSON 文件的完整路径 */
   file: string;
 }
+
+/** @brief 存下的一份反馈：保存时刻（ISO，UTC）加界面交来的内容（main/feedback.ts saveFeedback）；后台进程按它读反馈作为增强的依据（docs/specs/memory.md §9.5）。 */
+export const StoredFeedbackSchema = FeedbackSchema.extend({ createdAt: z.iso.datetime() });
+export type StoredFeedback = z.infer<typeof StoredFeedbackSchema>;

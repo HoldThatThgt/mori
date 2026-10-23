@@ -1085,6 +1085,13 @@ function checkIssueShot(issue, md) {
     shot || '没有引用截图');
 }
 
+/** @brief 报告框保存后的链接：View in Settings 的文字（没有时为 null）、名为 View in Review 的按钮个数（记忆规格 §10.9）。 */
+async function savedLinks(dialog) {
+  const settings = dialog.getByTestId('issue-open-settings');
+  return { settings: await settings.count() === 1 ? (await settings.innerText()).trim() : null,
+    review: await dialog.getByRole('button', { name: 'View in Review' }).count() };
+}
+
 /** @brief "Show in Explorer"：主进程的 shell.showItemInFolder 收到这个 Markdown 文件（已替换，不会打开资源管理器）。 */
 async function showInFolder({ app, page, issue }) {
   const dialog = page.getByTestId('issue-dialog');
@@ -1137,6 +1144,9 @@ async function f8Save(ctx) {
   await dialog.getByTestId('issue-expect').fill(input.expect);
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   ctx.issue = await savedIssuePath(page);
+  const links = await savedLinks(dialog);
+  record('F8：保存后有"View in Settings"（data-testid="issue-open-settings"，记忆规格 §10.9），没有"View in Review"',
+    links.settings === 'View in Settings' && links.review === 0, JSON.stringify(links));
   const md = checkIssueText(ctx, input);
   checkIssueShot(ctx.issue, md);
   await page.screenshot({ path: join(shots, '09-issue-saved.png') });

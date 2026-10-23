@@ -1,0 +1,957 @@
+{
+ "source": "synthetic",
+ "note": "Recorded from the real App against the synthetic endpoint by tests/ui/mem-record.mjs (docs/specs/memory.md §0 item 4: no data directory with a key on this machine); do not edit by hand.",
+ "name": "mem-settings",
+ "description": "Project mem-settings: the enhancement switch is turned on (defaults: the default range, 04:00), the settings dialog saves the fake-think model (marked Supports thinking), effort high, team mode and a daily time 12 hours from now; the switch is turned off and on again (the settings stay). Project mem-broken has an unreadable enhance.json (synthetic): the switch and the dialog Save both fail with the read error.",
+ "covers": "MEM-17",
+ "endpoint": "http://127.0.0.1:4770/v1",
+ "model": "mem/fake-coder",
+ "notes": [
+  "Setup (synthetic test setup, docs/specs/memory.md §14.1): model-config.json has one local provider MEM (fake-coder; fake-think marked Supports thinking; fake-coder-404) on the synthetic endpoint http://127.0.0.1:4770/v1, default range mem/fake-coder, profiles given as verified; enhancement replies come from the synthetic enhancement script (FAKE_ENHANCE_SCRIPT)",
+  "Setup (synthetic): C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken has an unreadable enhance.json; the dialog time is 10:44"
+ ],
+ "recordedAt": "2026-10-22T14:44:06.728Z",
+ "steps": [
+  {
+   "t": 2,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 3,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 5,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 8,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-h5BDWI\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 10,
+   "command": {
+    "type": "models.get"
+   }
+  },
+  {
+   "t": 14,
+   "result": {
+    "type": "models.get",
+    "value": {
+     "error": null,
+     "config": {
+      "version": 1,
+      "providers": [
+       {
+        "id": "mem",
+        "name": "MEM",
+        "api": "openai-completions",
+        "baseUrl": "http://127.0.0.1:4770/v1",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "local",
+        "keys": [],
+        "nextKeyNumber": 1,
+        "models": [
+         {
+          "id": "fake-coder",
+          "family": "",
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "reasoning": false,
+          "input": [
+           "text"
+          ]
+         },
+         {
+          "id": "fake-think",
+          "family": "",
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "reasoning": true,
+          "input": [
+           "text"
+          ]
+         },
+         {
+          "id": "fake-coder-404",
+          "family": "",
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "reasoning": false,
+          "input": [
+           "text"
+          ]
+         }
+        ]
+       }
+      ],
+      "groups": [],
+      "normalDefault": "mem/fake-coder",
+      "allowedZones": [
+       "local",
+       "intranet"
+      ],
+      "projectZones": {}
+     },
+     "profiles": {
+      "mem/fake-coder": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "vllm",
+        "version": "0.10.1"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": true,
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": true,
+       "probedAt": 1792680240385,
+       "suite": 1
+      },
+      "mem/fake-think": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "vllm",
+        "version": "0.10.1"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": true,
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": true,
+       "probedAt": 1792680240385,
+       "suite": 1
+      },
+      "mem/fake-coder-404": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "vllm",
+        "version": "0.10.1"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": true,
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": true,
+       "probedAt": 1792680240385,
+       "suite": 1
+      }
+     },
+     "keyStatus": {},
+     "thinkingDefaults": {
+      "mem/fake-coder": null,
+      "mem/fake-think": null,
+      "mem/fake-coder-404": null
+     },
+     "zoneSuggestions": {
+      "mem": "local"
+     },
+     "migration": null,
+     "projects": [],
+     "loadError": null,
+     "reserved": [
+      "mori",
+      "amazon-bedrock",
+      "ant-ling",
+      "anthropic",
+      "azure",
+      "baseten",
+      "cerebras",
+      "cloudflare-ai-gateway",
+      "cloudflare-workers-ai",
+      "deepseek",
+      "fireworks",
+      "github-copilot",
+      "google",
+      "google-vertex",
+      "groq",
+      "huggingface",
+      "kimi-coding",
+      "meta",
+      "minimax",
+      "minimax-cn",
+      "mistral",
+      "moonshotai",
+      "moonshotai-cn",
+      "nvidia",
+      "openai",
+      "openai-codex",
+      "opencode",
+      "opencode-go",
+      "openrouter",
+      "qwen-token-plan",
+      "qwen-token-plan-cn",
+      "qwen-token-plan-individual",
+      "radius",
+      "together",
+      "typesafe",
+      "vercel-ai-gateway",
+      "xai",
+      "xiaomi",
+      "xiaomi-token-plan-ams",
+      "xiaomi-token-plan-cn",
+      "xiaomi-token-plan-sgp",
+      "zai",
+      "zai-coding-cn"
+     ]
+    }
+   }
+  },
+  {
+   "t": 21,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings"
+   }
+  },
+  {
+   "t": 25,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 27,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings"
+   }
+  },
+  {
+   "t": 146,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a16411-b817-71c6-ad66-67113a9100c5",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 146,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a16411-b817-71c6-ad66-67113a9100c5",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 148,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a16411-b817-71c6-ad66-67113a9100c5",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-h5BDWI\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-rcfXYK-mem-settings--\\2026-10-22T14-44-05-272Z_01a16411-b817-71c6-ad66-67113a9100c5.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "memory"
+     ],
+     "pick": "mem/fake-coder",
+     "current": "mem/fake-coder",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 128000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     },
+     "team": {
+      "mode": "off",
+      "holders": {
+       "dialog": "mori",
+       "create": "mori",
+       "close": "mori"
+      },
+      "roles": [],
+      "busy": false,
+      "background": false
+     },
+     "board": {
+      "requests": [],
+      "teamEdited": false
+     },
+     "teamApprovals": [],
+     "deciding": {
+      "role": "mori",
+      "since": null,
+      "queue": []
+     },
+     "memoryNotice": null
+    }
+   }
+  },
+  {
+   "t": 153,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 156,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [],
+     "usage": {
+      "used": 0,
+      "limit": 500,
+      "user": 0,
+      "project": 0
+     },
+     "broken": [],
+     "last": null,
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 158,
+   "command": {
+    "type": "enhance.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings"
+   }
+  },
+  {
+   "t": 160,
+   "result": {
+    "type": "enhance.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+     "enabled": false,
+     "pick": null,
+     "thinking": "medium",
+     "team": false,
+     "time": "04:00",
+     "since": null,
+     "last": {
+      "taste": null,
+      "strategy": null,
+      "review": null
+     },
+     "running": null,
+     "queued": 0,
+     "next": null,
+     "notice": null,
+     "effortPicks": {
+      "mem": false,
+      "mem/fake-coder": false,
+      "mem/fake-think": true,
+      "mem/fake-coder-404": false
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 163,
+   "command": {
+    "type": "enhance.set",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+    "enabled": true
+   }
+  },
+  {
+   "t": 191,
+   "result": {
+    "type": "enhance.set",
+    "value": {
+     "error": null,
+     "info": {
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+      "enabled": true,
+      "pick": "mem/fake-coder",
+      "thinking": "medium",
+      "team": false,
+      "time": "04:00",
+      "since": "2026-10-22",
+      "last": {
+       "taste": null,
+       "strategy": null,
+       "review": null
+      },
+      "running": null,
+      "queued": 0,
+      "next": 1792699200000,
+      "notice": null,
+      "effortPicks": {
+       "mem": false,
+       "mem/fake-coder": false,
+       "mem/fake-think": true,
+       "mem/fake-coder-404": false
+      },
+      "error": null
+     }
+    }
+   }
+  },
+  {
+   "t": 194,
+   "command": {
+    "type": "enhance.set",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+    "pick": "mem/fake-think",
+    "thinking": "high",
+    "team": true,
+    "time": "10:44"
+   }
+  },
+  {
+   "t": 211,
+   "result": {
+    "type": "enhance.set",
+    "value": {
+     "error": null,
+     "info": {
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+      "enabled": true,
+      "pick": "mem/fake-think",
+      "thinking": "high",
+      "team": true,
+      "time": "10:44",
+      "since": "2026-10-22",
+      "last": {
+       "taste": null,
+       "strategy": null,
+       "review": null
+      },
+      "running": null,
+      "queued": 0,
+      "next": 1792723440000,
+      "notice": null,
+      "effortPicks": {
+       "mem": false,
+       "mem/fake-coder": false,
+       "mem/fake-think": true,
+       "mem/fake-coder-404": false
+      },
+      "error": null
+     }
+    }
+   }
+  },
+  {
+   "t": 213,
+   "command": {
+    "type": "enhance.set",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+    "enabled": false
+   }
+  },
+  {
+   "t": 229,
+   "result": {
+    "type": "enhance.set",
+    "value": {
+     "error": null,
+     "info": {
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+      "enabled": false,
+      "pick": "mem/fake-think",
+      "thinking": "high",
+      "team": true,
+      "time": "10:44",
+      "since": "2026-10-22",
+      "last": {
+       "taste": null,
+       "strategy": null,
+       "review": null
+      },
+      "running": null,
+      "queued": 0,
+      "next": null,
+      "notice": null,
+      "effortPicks": {
+       "mem": false,
+       "mem/fake-coder": false,
+       "mem/fake-think": true,
+       "mem/fake-coder-404": false
+      },
+      "error": null
+     }
+    }
+   }
+  },
+  {
+   "t": 232,
+   "command": {
+    "type": "enhance.set",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+    "enabled": true
+   }
+  },
+  {
+   "t": 240,
+   "result": {
+    "type": "enhance.set",
+    "value": {
+     "error": null,
+     "info": {
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+      "enabled": true,
+      "pick": "mem/fake-think",
+      "thinking": "high",
+      "team": true,
+      "time": "10:44",
+      "since": "2026-10-22",
+      "last": {
+       "taste": null,
+       "strategy": null,
+       "review": null
+      },
+      "running": null,
+      "queued": 0,
+      "next": 1792723440000,
+      "notice": null,
+      "effortPicks": {
+       "mem": false,
+       "mem/fake-coder": false,
+       "mem/fake-think": true,
+       "mem/fake-coder-404": false
+      },
+      "error": null
+     }
+    }
+   }
+  },
+  {
+   "t": 244,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken"
+   }
+  },
+  {
+   "t": 247,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 248,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken"
+   }
+  },
+  {
+   "t": 318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a16411-b8f2-71c6-ad66-671221a5f4d3",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a16411-b8f2-71c6-ad66-671221a5f4d3",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 330,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a16411-b8f2-71c6-ad66-671221a5f4d3",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-h5BDWI\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-rcfXYK-mem-broken--\\2026-10-22T14-44-05-491Z_01a16411-b8f2-71c6-ad66-671221a5f4d3.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "memory"
+     ],
+     "pick": "mem/fake-coder",
+     "current": "mem/fake-coder",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 128000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     },
+     "team": {
+      "mode": "off",
+      "holders": {
+       "dialog": "mori",
+       "create": "mori",
+       "close": "mori"
+      },
+      "roles": [],
+      "busy": false,
+      "background": false
+     },
+     "board": {
+      "requests": [],
+      "teamEdited": false
+     },
+     "teamApprovals": [],
+     "deciding": {
+      "role": "mori",
+      "since": null,
+      "queue": []
+     },
+     "memoryNotice": null
+    }
+   }
+  },
+  {
+   "t": 335,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 336,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [],
+     "usage": {
+      "used": 0,
+      "limit": 500,
+      "user": 0,
+      "project": 0
+     },
+     "broken": [],
+     "last": null,
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 338,
+   "command": {
+    "type": "enhance.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken"
+   }
+  },
+  {
+   "t": 339,
+   "result": {
+    "type": "enhance.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+     "enabled": false,
+     "pick": null,
+     "thinking": "medium",
+     "team": false,
+     "time": "04:00",
+     "since": null,
+     "last": {
+      "taste": null,
+      "strategy": null,
+      "review": null
+     },
+     "running": null,
+     "queued": 0,
+     "next": null,
+     "notice": null,
+     "effortPicks": {
+      "mem": false,
+      "mem/fake-coder": false,
+      "mem/fake-think": true,
+      "mem/fake-coder-404": false
+     },
+     "error": "Unexpected end of JSON input"
+    }
+   }
+  },
+  {
+   "t": 341,
+   "command": {
+    "type": "enhance.set",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+    "enabled": true
+   }
+  },
+  {
+   "t": 343,
+   "result": {
+    "type": "enhance.set",
+    "value": {
+     "error": "Unexpected end of JSON input",
+     "info": {
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+      "enabled": false,
+      "pick": null,
+      "thinking": "medium",
+      "team": false,
+      "time": "04:00",
+      "since": null,
+      "last": {
+       "taste": null,
+       "strategy": null,
+       "review": null
+      },
+      "running": null,
+      "queued": 0,
+      "next": null,
+      "notice": null,
+      "effortPicks": {
+       "mem": false,
+       "mem/fake-coder": false,
+       "mem/fake-think": true,
+       "mem/fake-coder-404": false
+      },
+      "error": "Unexpected end of JSON input"
+     }
+    }
+   }
+  },
+  {
+   "t": 345,
+   "command": {
+    "type": "enhance.set",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+    "thinking": "medium",
+    "team": false,
+    "time": "04:00"
+   }
+  },
+  {
+   "t": 348,
+   "result": {
+    "type": "enhance.set",
+    "value": {
+     "error": "Unexpected end of JSON input",
+     "info": {
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+      "enabled": false,
+      "pick": null,
+      "thinking": "medium",
+      "team": false,
+      "time": "04:00",
+      "since": null,
+      "last": {
+       "taste": null,
+       "strategy": null,
+       "review": null
+      },
+      "running": null,
+      "queued": 0,
+      "next": null,
+      "notice": null,
+      "effortPicks": {
+       "mem": false,
+       "mem/fake-coder": false,
+       "mem/fake-think": true,
+       "mem/fake-coder-404": false
+      },
+      "error": "Unexpected end of JSON input"
+     }
+    }
+   }
+  }
+ ]
+}

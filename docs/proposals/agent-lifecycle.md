@@ -8,6 +8,10 @@
 > 不再“引用固定的模型资源”；角色、实例与生命周期以 [平行 Agent 与 TaskBoard Proposal](parallel-agents-taskboard.md) 为准，
 > 实现见 [构建规格](../specs/parallel-agents-taskboard.md)：主子两层、族、共享区、监督与验收的规则由 TaskBoard 的交接、结案 Agent 与证据规则取代。
 
+> 2026-10-22 注：“程序生成的提示词修订仍须经过产品 Proposal 的资产发布流程”、学习者与反证者实例、“工作回顾到期”由
+> [提示词分层与记忆 Proposal](prompt-and-memory.md) 取代，实现见 [构建规格](../specs/memory.md)：增强任务直接改本项目的记忆条目，
+> 每次留修订记录、可以回滚，不经资产发布与反证；它不碰用户写的 `agent.md`。
+
 产品范围见 [Mori 产品与技术 Proposal](../proposal.md)。本文定义用户如何创建 Agent、
 编写 `agent.md`、选择启动方式，以及 main agent 和 subagent 的启动、通信、结束与恢复规则。
 

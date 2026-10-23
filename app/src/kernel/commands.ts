@@ -4,6 +4,7 @@ import type { Command, EventEnvelope } from '../shared/protocol';
 import { readAgents, saveAgents } from './agents';
 import { cancelTest, readConfig, testConnection } from './config';
 import { removeMcpServer, saveMcpServer, setMcpDirect, setMcpEnabled } from './mcpConfig';
+import { handleMemoryCommand } from './memoryCommands';
 import { handleModelsCommand, isModelsCommand } from './modelCommands';
 import { loadPi } from './pi';
 import { addPackage, readTools, removePackage, setPackageEnabled, toggleResource } from './resources';
@@ -61,7 +62,7 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
     case 'session.create': return createSession(command.cwd, emit, command.trust);
     case 'session.open': return openSession(command.sessionFile, emit, command.trust);
     case 'session.list': return listSessions();
-    case 'session.read': return readSession(command.sessionFile);
+    case 'session.read': return readSession(command.sessionFile, command.anchor);
     case 'session.rename': return renameSession(command.sessionId, command.sessionFile, command.name);
     case 'session.close': return closeSession(command.sessionId);
     case 'ui.answer': return answerQuestion(command.sessionId, command.requestId, command.value);
@@ -104,5 +105,8 @@ export async function handleCommand(command: Command, emit: Emit): Promise<unkno
   if (agents !== undefined) return agents;
   const tools = await handleToolsCommand(command);
   if (tools !== undefined) return tools;
+  // 记忆与增强（docs/specs/memory.md §8）：在会话命令之前
+  const memory = await handleMemoryCommand(command);
+  if (memory !== undefined) return memory;
   return handleSessionCommand(command, emit);
 }

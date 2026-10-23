@@ -42,6 +42,18 @@ const TALK_DIRECTLY = 'You talk to the user directly; say it in your reply.';
 const RECORD_FIRST = "Record the user's words first (request_submit or request_update).";
 const MERGED_REPLY = 'Noted: no collaboration needed. Answer the user in your reply.';
 const NEED_DECISION = '[Mori] T1 needs a decision from the user';
+/** 身份段的第一部分（docs/specs/memory.md 附录 A.1）：system prompt 总是以它开头，SYSTEM.md 不用（§4.3） */
+const IDENTITY_TEXT = [
+  "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code "
+    + "and write files to get the user's work done.",
+  "Tool calls other than reading and searching may wait for the user's approval. A denied call returns the user's "
+    + "reason as its result: follow it and don't repeat the call.",
+  'The sections after the project information hold what Mori has learned with this user: <taste> how to talk with '
+    + 'the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> '
+    + 'what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and '
+    + "questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they "
+    + 'need into the task description or the question.',
+].join('\n');
 /** TaskBoard 的工具名（§6.3） */
 const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit', 'request_update',
   'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close'];
@@ -374,13 +386,15 @@ async function sysmd(ctx) {
   const requests = scenarioRequests(ctx.ep, 'tb-flow-sysmd');
   const team = requests.filter((item) => item.t < offSince);
   const off = requests.filter((item) => item.t >= offSince);
-  record('TB-10 with .pi/SYSTEM.md in the (trusted) project: the team-mode request has both the SYSTEM.md text and the '
-    + 'merged create segment; the off-mode request after it has SYSTEM.md and no segment',
-  team.length === 2 && team.every((item) => item.system.includes('MORI-SYSTEM-MD')
-    && item.system.includes(MERGED_SENTENCE)) && off.length === 1 && off[0].system.includes('MORI-SYSTEM-MD')
-    && !off[0].system.includes(MERGED_SENTENCE),
+  // 记忆规格 §4.3、§14.4：身份段总是 Mori 的，项目的 SYSTEM.md 不进 system prompt
+  const identity = (item) => item.system.startsWith(IDENTITY_TEXT) && !item.system.includes('MORI-SYSTEM-MD');
+  record('TB-10 with .pi/SYSTEM.md in the (trusted) project: neither the team-mode nor the off-mode request has the '
+    + 'SYSTEM.md text and both start with Mori\'s identity (memory spec §4.3, Appendix A.1); the team-mode request '
+    + 'still has the merged create segment, the off-mode request after it has none',
+  team.length === 2 && team.every((item) => identity(item) && item.system.includes(MERGED_SENTENCE))
+    && off.length === 1 && identity(off[0]) && !off[0].system.includes(MERGED_SENTENCE),
   brief({ team: team.map((item) => [item.info.kind, item.system.slice(0, 80)]),
-    off: off.map((item) => item.info.kind) }));
+    off: off.map((item) => [item.info.kind, item.system.slice(0, 80)]) }));
   const reply = toolResults(userEntries(who), 'reply_via_dialog');
   const pane = await paneState(ctx.page, who.tab);
   record(`TB-10 merged session: reply_via_dialog while judging your message is accepted with "${MERGED_REPLY}" `

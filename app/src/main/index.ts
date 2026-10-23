@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, type IpcMainInvokeEvent } from 'electron';
 import { registerFeedbackHandlers } from './feedback';
 import { registerFileHandlers } from './files';
-import { registerReviewHandlers } from './review';
+import { registerIssuesHandlers } from './issues';
 import { removeTeamDir, sessionIdOfFile, sessionIdOfName } from './teamDir';
 import { currentKernel, lastKernelExitCode, piAgentDir, shutdownKernel, startKernel } from './kernel-process';
 
@@ -149,7 +149,7 @@ ipcMain.handle('mori:attention', (event: IpcMainInvokeEvent) => {
 
 registerFeedbackHandlers(isAppPage);
 registerFileHandlers(isAppPage);
-registerReviewHandlers(isAppPage);
+registerIssuesHandlers(isAppPage);
 
 void app.whenReady().then(() => {
   // 不用拼写检查：Chromium 默认按系统语言从 redirector.gvt1.com 下载词典，离线使用时不能有这种对外连接。

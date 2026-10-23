@@ -26,6 +26,8 @@ const paths = {
   spark: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6',
   trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   clock: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM12 7v5l3 2',
+  // 记忆页（docs/specs/memory.md §10.1）：一本书，书脊在左，封面上一行标题。
+  memory: 'M5 5.5A2.5 2.5 0 0 1 7.5 3H19v13H7.5A2.5 2.5 0 0 0 5 18.5ZM5 18.5A2.5 2.5 0 0 0 7.5 21H19v-5M9 7.5h6',
 } as const;
 
 export type IconName = keyof typeof paths;

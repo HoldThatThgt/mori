@@ -1,7 +1,12 @@
-// 工具卡标题：用人话写出这次调用在做什么。对照表见 docs/v0/screens/tool-cards.md；TaskBoard 的工具见平行 Agent 规格 §13.8。
+// 工具卡标题：用人话写出这次调用在做什么。对照表见 docs/v0/screens/tool-cards.md；TaskBoard 的工具见平行 Agent 规格 §13.8；
+// memory 工具见 docs/specs/memory.md §7.5。
 
+import { memoryToolTitle } from '../../../shared/memory';
 import { isTeamTool, toolCallTitle } from '../../../shared/team';
 import type { ToolCall } from '../state/model';
+
+/** memory 工具的名字（docs/specs/memory.md §7.1） */
+const MEMORY_TOOL = 'memory';
 
 /** 命令标题最多显示的字数 */
 const COMMAND_MAX = 80;
@@ -80,6 +85,18 @@ function lineRange(tool: ToolCall): string {
 }
 
 /**
+ * @brief memory 工具的标题（docs/specs/memory.md §7.5）：`Save to <KIND>` · abstract、`Update memory` · 条目、
+ *        `Delete from memory` · 条目（shared/memory.ts memoryToolTitle）。参数还没写完时从已收到的原文里取，
+ *        对象还没收到时写作 …。
+ */
+function memoryTitle(tool: ToolCall): ToolTitle {
+  const args = tool.args ?? { action: field(tool, 'action'), kind: field(tool, 'kind'),
+    abstract: field(tool, 'abstract'), entry: field(tool, 'entry') };
+  const title = memoryToolTitle(args);
+  return { verb: title.verb, target: title.target || (tool.args ? '' : '…'), suffix: '' };
+}
+
+/**
  * @brief 生成工具卡标题。TaskBoard 的工具（合并会话里立项的调用、对话的 board_read 等）用平行 Agent 规格 §13.8 的
  *        英文标题（shared/team.ts toolCallTitle），参数还没写完时缺的部分写作 …。
  * @param seatRoles agent_message 发给这些角色时是 Message <role>（进座位会话），其余是 Ask <role>（seatRolesOf）
@@ -88,6 +105,7 @@ export function toolTitle(tool: ToolCall, cwd: string, seatRoles: readonly strin
   if (isTeamTool(tool.name)) {
     return { verb: toolCallTitle(tool.name, tool.args ?? {}, { cwd, seatRoles, task: null }), target: '', suffix: '' };
   }
+  if (tool.name === MEMORY_TOOL) return memoryTitle(tool);
   const mcp = /^mcp__(.+?)__(.+)$/.exec(tool.name);
   if (mcp) return { verb: `${mcp[1]} · ${mcp[2]}`, target: '', suffix: '' };
   const verb = verbs[tool.name];

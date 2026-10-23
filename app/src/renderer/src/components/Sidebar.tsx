@@ -1,9 +1,10 @@
-// 左栏：品牌与收起、"New session"（Ctrl+N）、"Open folder…"、"Customize"（M6）、"Review"（M7，后台进程退出后照常可用）、
-// 项目 → 会话树（SessionTree）、"Report a UI issue (F8)"、"Settings"。
+// 左栏：品牌与收起、"New session"（Ctrl+N）、"Open folder…"、"Customize"（M6）、"Memory"（在 M7 "Review" 原来的位置，
+// docs/specs/memory.md §10.1；后台进程退出后不可用）、项目 → 会话树（SessionTree）、"Report a UI issue (F8)"、"Settings"。
 
 import { openSettings, openTools } from '../state/actions';
+import { guardLeave } from '../state/leaveGuard';
+import { openMemory } from '../state/memory';
 import { newSession, openFolder } from '../state/projects';
-import { openReview } from '../state/review';
 import { isShown, sameFile, useApp, type AppState } from '../state/store';
 import { BrandMark, Icon } from '../icons';
 import { openIssueReport } from './IssueDialog';
@@ -36,8 +37,7 @@ function hiddenStatus(state: AppState): RailStatus | null {
 }
 
 /**
- * @brief 左栏顶部的导航："New session"、"Open folder…"、"Customize"（后台进程退出后不可用）、
- *        "Review"（读本机文件，照常可用）。
+ * @brief 左栏顶部的导航："New session"、"Open folder…"、"Customize"、"Memory"（后台进程退出后都不可用，悬停说明原因）。
  */
 function SidebarNav() {
   const view = useApp((state) => state.view);
@@ -57,9 +57,9 @@ function SidebarNav() {
         title={unavailable ?? 'Customize'} aria-label="Customize" data-testid="nav-tools" disabled={exited}>
         <Icon name="tools" /><span className="nav-label">Customize</span>
       </button>
-      <button className={`nav-item${view === 'review' ? ' active' : ''}`} onClick={() => openReview()}
-        title="Review" aria-label="Review" data-testid="nav-review">
-        <Icon name="clock" /><span className="nav-label">Review</span>
+      <button className={`nav-item${view === 'memory' ? ' active' : ''}`} onClick={openMemory}
+        title={unavailable ?? 'Memory'} aria-label="Memory" data-testid="nav-memory" disabled={exited}>
+        <Icon name="memory" /><span className="nav-label">Memory</span>
       </button>
     </nav>
   );
@@ -93,8 +93,8 @@ export function Sidebar({ collapsed, floating, onToggle, onNavigate, children }:
           aria-label={REPORT_LABEL}>
           <Icon name="flag" /><span className="nav-label">{REPORT_LABEL}</span>
         </button>
-        <button className={`nav-item${view === 'settings' ? ' active' : ''}`} onClick={() => openSettings()}
-          title="Settings">
+        <button className={`nav-item${view === 'settings' ? ' active' : ''}`}
+          onClick={() => (view === 'settings' ? openSettings() : guardLeave(openSettings))} title="Settings">
           <Icon name="settings" /><span className="nav-label">Settings</span>
         </button>
       </div>

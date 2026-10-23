@@ -1,8 +1,12 @@
 // 平行 Agent 与 TaskBoard 的 App 套件：角色、权限、关闭模式、对话只传话、实例会话、协作开关
 // （docs/specs/parallel-agents-taskboard.md §17.2）。真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点的脚本模式
 // （tests/fake-endpoint/scenarios/roles.mjs，synthetic），逐条验收这些条目在 App 层的通过条件：
-//   TB-01 角色文件校验、TB-02 权限与基座、TB-03 关闭模式与 v0 一致（App 的部分；回放与 m1–m7 fixture 由回放套件做）、
+//   TB-01 角色文件校验、TB-02 权限与基座、TB-03 关闭模式与 v0 一致（App 的部分；回放与 m1–m6 fixture 由回放套件做）、
 //   TB-09 对话只传话、TB-43 实例会话的存放与事件、TB-53 协作开关（App 的部分）。
+// 记忆规格（docs/specs/memory.md §14.4）之后：TB-03 比较 system prompt 时两边都去掉开头的身份段（到第一个 <addendum>、
+// <project_context>、<skills> 或 <cwd> 段之前：新版是 Mori 的身份段，对照版是 pi 的身份句、<tools>、<rules>、<docs>），
+// 新版再去掉 taste、strategy、review、facts 四段；请求的工具列表在全部比较之前去掉 memory；工具页的行去掉 memory 那一行
+// 再比较。TB-09 的工具集合按 §7.6 加 memory（关闭模式的对话、chat.md 写 tools: [read] 的对话、分开时的立项实例）。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs roles；TB-03 的对照构建 node tests/ui/tb-build-base.mjs，没有时才建）：
 //   MORI_APP_DIR=.tb-runs/roles node tests/ui/tb-app-roles.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/tb-app-roles(-packaged).json（--only 时 tb-partial-app-roles…），截图在 test-results/tb-app-roles/。
@@ -271,6 +275,30 @@ const OFF_SEGMENT = `${OFF_SENTENCE}\n`
 /** @brief 请求体里工具的名字。 */
 const toolNames = (body) => (body?.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
 
+/** 记忆的工具名（docs/specs/memory.md §7） */
+const MEMORY_TOOL = 'memory';
+/** @brief 请求体的工具定义去掉 memory（记忆规格 §14.4：TB-03 在全部比较之前去掉它）。 */
+const withoutMemoryTool = (body) => (body?.tools ?? []).filter((tool) => (tool.function?.name ?? tool.name)
+  !== MEMORY_TOOL);
+/** @brief 工具页的行去掉 memory 那一行（记忆规格 §14.4）。 */
+const withoutMemoryRow = (rows) => rows.filter((row) => row.name !== MEMORY_TOOL);
+
+/**
+ * @brief system prompt 去掉开头的身份段（记忆规格 §14.4）：从第一个 <addendum>、<project_context>、<skills> 或 <cwd>
+ *        段开始取（新版之前是 Mori 的身份段，对照版是 pi 的身份句、<tools>、<rules>、<docs>）；找不到时为 null。
+ */
+function afterIdentity(system) {
+  const at = system?.search(/\n\n<(addendum|project_context|skills|cwd)>\n/) ?? -1;
+  return at < 0 ? null : system.slice(at);
+}
+
+/** @brief 去掉记忆的四个分节 taste、strategy、review、facts（记忆规格 §5.2、§14.4）。 */
+const withoutMemorySections = (text) => text?.replace(/\n\n<(taste|strategy|review|facts)>\n[\s\S]*?\n<\/\1>/g, '')
+  ?? null;
+
+/** @brief TB-03 比较用的 system prompt：去掉身份段与记忆的四个分节。 */
+const comparable = (system) => withoutMemorySections(afterIdentity(system));
+
 /**
  * @brief 本构建跑同一个关闭模式的会话，与对照构建比较（TB-03）；再写一个 executor.md、新开会话，比较多出来的部分。
  *        不做任何归一：两次用同一个项目文件夹（system prompt 里的 <cwd> 相同），pi 的 system prompt 里没有日期、
@@ -299,15 +327,18 @@ async function v0same(ctx) {
 /** @brief TB-03 没有角色文件：请求、工具页、没有实例与 teams 文件、对话流；TB-02 没有文件时全是 mori。 */
 async function v0Compare(ctx, who, request, tools) {
   const base = ctx.v0.request;
-  const body = JSON.stringify(request?.body) === JSON.stringify(base.body);
+  const kept = withoutMemoryTool(request?.body);
+  const system = comparable(request?.system);
   record('TB-03 off mode without role files: the tool list sent to the model is byte-identical to v0 (the pre-'
-    + 'TaskBoard build, same project and config) and so is the system prompt',
-  request !== undefined && JSON.stringify(request.body.tools) === JSON.stringify(base.body.tools)
-    && request.system === base.system,
-  brief({ tools: toolNames(request?.body), baseTools: toolNames(base.body), system: request?.system.length,
-    baseSystem: base.system.length, wholeBody: body }));
+    + 'TaskBoard build, same project and config) once memory is left out, and so is the system prompt after the '
+    + 'identity part with the taste, strategy, review and facts sections left out (memory spec §14.4)',
+  request !== undefined && JSON.stringify(kept) === JSON.stringify(base.body.tools)
+    && system !== null && system === comparable(base.system),
+  brief({ tools: toolNames(request?.body), baseTools: toolNames(base.body), system: system?.length,
+    baseSystem: comparable(base.system)?.length, head: request?.system.slice(0, 60) }));
+  const rows = withoutMemoryRow(tools.rows);
   record('TB-03 off mode without role files: the Tools page rows (name, source, on/off, description) are the same as '
-    + 'in v0', tools.rows.length > 0 && same(tools.rows, ctx.v0.tools.rows),
+    + 'in v0 once the memory row is left out (memory spec §14.4)', rows.length > 0 && same(rows, ctx.v0.tools.rows),
   brief({ tb: tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`),
     v0: ctx.v0.tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`) }));
   const files = filesUnder(join(ctx.userData, 'teams'));
@@ -330,21 +361,28 @@ async function v0Compare(ctx, who, request, tools) {
 /** @brief TB-03 有别的角色（只有 executor.md）：只多 agent_message 与它的说明段；工具页列出 TaskBoard 工具、来源 Mori。 */
 async function v0Roles(ctx, who, request, tools) {
   const base = ctx.v0.request;
-  const names = toolNames(request?.body);
+  const kept = withoutMemoryTool(request?.body);
+  const names = kept.map((tool) => tool.function?.name ?? tool.name);
   const extraTool = toolDef(request, 'agent_message');
-  const rest = (request?.body.tools ?? []).filter((tool) => tool !== extraTool);
-  const added = request?.system.startsWith(base.system) ? request.system.slice(base.system.length) : null;
-  record('TB-03 off mode with another role (executor.md): the request differs from v0 only by agent_message — the '
-    + 'tool list is the v0 list plus the agent_message definition (with its description), and the system prompt is '
+  const rest = kept.filter((tool) => tool !== extraTool);
+  const system = comparable(request?.system);
+  const baseSystem = comparable(base.system);
+  const added = system !== null && baseSystem !== null && system.startsWith(baseSystem)
+    ? system.slice(baseSystem.length) : null;
+  record('TB-03 off mode with another role (executor.md): with memory left out (memory spec §14.4) the request '
+    + 'differs from v0 only by agent_message — the tool list is the v0 list plus the agent_message definition (with '
+    + 'its description) at the end, and the system prompt after the identity part (without the memory sections) is '
     + 'the v0 one plus the mori_team section holding the off-mode dialog segment that explains it',
   JSON.stringify(rest) === JSON.stringify(base.body.tools) && names.at(-1) === 'agent_message'
     && Boolean(extraTool?.function?.description) && added === `\n\n<mori_team>\n${OFF_SEGMENT}\n</mori_team>`,
   brief({ names, added }));
-  const mori = tools.rows.filter((row) => row.tag === 'Mori');
-  const others = tools.rows.filter((row) => row.tag !== 'Mori');
+  const rows = withoutMemoryRow(tools.rows);
+  const mori = rows.filter((row) => row.tag === 'Mori');
+  const others = rows.filter((row) => row.tag !== 'Mori');
   const userTools = TEAM_TOOLS.filter((name) => !['task_handoff', 'request_close'].includes(name));
-  record('TB-03 off mode with another role: the Tools page lists the TaskBoard tools of the user session (board_read '
-    + '… reply_via_dialog) with source "Mori" — only agent_message on — and every other row is the same as in v0',
+  record('TB-03 off mode with another role: with the memory row left out, the Tools page lists the TaskBoard tools of '
+    + 'the user session (board_read … reply_via_dialog) with source "Mori" — only agent_message on — and every other '
+    + 'row is the same as in v0',
   same(mori.map((row) => row.name).sort(), [...userTools].sort())
     && mori.every((row) => (row.name === 'agent_message') === (row.active === 'true'))
     && same(others, ctx.v0.tools.rows), brief(tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`)));
@@ -817,10 +855,10 @@ function dialogTools(ctx, obs) {
   const last = offReqs.filter((request) => request.info.k === 4);
   record('TB-09 in team mode the dialog session\'s requests have no write or command tool (only read, board_read, '
     + 'read_session, agent_message); back in off mode the requests have the same set as before team mode (read, '
-    + 'bash, edit, write, agent_message)', teamReqs.length >= 2
+    + 'bash, edit, write, agent_message, and memory: memory spec §7.6)', teamReqs.length >= 2
     && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'read', 'read_session']))
     && first.length === 1 && last.length === 1
-    && same(sortedTools(first[0]), ['agent_message', 'bash', 'edit', 'read', 'write'])
+    && same(sortedTools(first[0]), ['agent_message', 'bash', 'edit', 'memory', 'read', 'write'])
     && same(sortedTools(last[0]), sortedTools(first[0])) && obs.modeAfter === 'off',
   brief({ team: teamReqs.map(sortedTools), off1: first.map(sortedTools), off4: last.map(sortedTools),
     mode: obs.modeAfter }));
@@ -837,10 +875,11 @@ function createTools(ctx) {
   const close = requestsOf(ctx, 'tb-roles-fields', 'planner', 'close');
   record('TB-09 the create and close sessions\' requests have only read-class tools and their TaskBoard tools: '
     + 'create = read, ls + board_read, read_session, agent_message, request_*, task_create, task_edit, '
-    + 'reply_via_dialog; close = read, ls + board_read, read_session, agent_message, task_handoff, request_close '
-    + '(planner\'s bash is left out)', create.length > 0 && create.every((request) => same(sortedTools(request),
-    ['agent_message', 'board_read', 'ls', 'read', 'read_session', 'reply_via_dialog', 'request_cancel',
-      'request_submit', 'request_update', 'task_create', 'task_edit'])) && close.length > 0
+    + 'reply_via_dialog + memory (memory spec §7.6); close = read, ls + board_read, read_session, agent_message, '
+    + 'task_handoff, request_close (planner\'s bash is left out)', create.length > 0
+    && create.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'ls', 'memory', 'read',
+      'read_session', 'reply_via_dialog', 'request_cancel', 'request_submit', 'request_update', 'task_create',
+      'task_edit'])) && close.length > 0
     && close.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'ls', 'read',
       'read_session', 'request_close', 'task_handoff'])),
   brief({ create: sortedTools(create[0]), close: sortedTools(close[0]) }));
@@ -873,9 +912,9 @@ async function readOnlyDialog(ctx) {
   await settle(ctx, who, 60000);
   const requests = requestsOf(ctx, 'tb-roles-tools', 'chat', 'off-dialog');
   const tried = changeAttempts(project, readme, readJsonl(who.sessionFile).slice(1));
-  record('TB-09 off mode with chat.md "tools: [read]": every dialog request has only read and agent_message (no bash, '
-    + 'edit, write)', requests.length >= 4 && requests.every((request) => same(sortedTools(request),
-    ['agent_message', 'read'])), brief(requests.map(sortedTools)));
+  record('TB-09 off mode with chat.md "tools: [read]": every dialog request has only read, agent_message and memory '
+    + '(memory spec §7.6; no bash, edit, write)', requests.length >= 4 && requests.every((request) => same(
+    sortedTools(request), ['agent_message', 'memory', 'read'])), brief(requests.map(sortedTools)));
   record('TB-09 off mode with chat.md "tools: [read]": calling bash, edit and write is refused (error results), the '
     + 'command did not run and no file changed', ['bash', 'edit', 'write'].every((tool) => tried.results[tool]?.isError
     === true) && tried.untouched, brief(tried.view));

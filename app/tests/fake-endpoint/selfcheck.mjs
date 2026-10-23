@@ -1,14 +1,19 @@
 // 合成测试端点（synthetic）的自检：在空闲端口上起几份 server.mjs（不同的环境变量），用 fetch 逐条检查
-// docs/specs/model-providers.md §14.1 的行为与原有关键词，以及 docs/specs/parallel-agents-taskboard.md §17.1 的脚本模式
-// （scripts.mjs 的 tb-selfcheck-* 场景），每条打印 PASS/FAIL；有 FAIL 时退出码为 1。
+// docs/specs/model-providers.md §14.1 的行为与原有关键词，docs/specs/parallel-agents-taskboard.md §17.1 的脚本模式
+// （scripts.mjs 的 tb-selfcheck-* 场景），以及 docs/specs/memory.md §14.1 的增强脚本（enhance.mjs，脚本文件写在临时目录）
+// 与协作模式增强的场景 mem-team（scenarios/mem.mjs，依据由环境变量给），每条打印 PASS/FAIL；有 FAIL 时退出码为 1。
 // 用法（在 app/ 下）：node tests/fake-endpoint/selfcheck.mjs
 
 import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CLOSE_REQUEST_TAGS, END_TEXT, KIND_ORDER, NO_STEP_TEXT, RESTART_PREFIX, SEGMENT_SENTENCES, SHARED_SENTENCE,
   WORK_CARD_CLOSE, WORK_CARD_OPEN } from './scripts.mjs';
+import { ENHANCE_DONE } from './enhance.mjs';
+import { MEM_TEAM_TEXT } from './scenarios/mem.mjs';
 
 const here = import.meta.dirname;
 const overflowUrl = pathToFileURL(join(here, '..', '..', 'node_modules', '@earendil-works', 'pi-ai', 'dist', 'utils',
@@ -685,11 +690,134 @@ async function checkStrictAndReasoningLog(d) {
   record('script log: a thinking object also counts as a thinking parameter', other.log.reasoning === true);
 }
 
+// ---------- 增强脚本（enhance.mjs）与协作模式增强的场景（scenarios/mem.mjs），synthetic ----------
+
+/** @brief 附录 B 第一条消息的开头（synthetic，只有前两行，KIND 为大写）。 */
+const enhanceFirst = (kind) => user(`You are running Mori's daily ${kind} enhancement for the project D:\\shop. `
+  + "Day: Oct 22, 2026 (04:00 to 04:00).\nDon't change any file. Commands and MCP tools run without approval.");
+/** 增强会话的 system（synthetic，没有 tb-scenario） */
+const ENHANCE_SYSTEM = sys('You are Mori, a coding assistant working in the user\'s project folder.');
+/** 增强脚本里的依据（synthetic） */
+const ENHANCE_ARGS = { action: 'save', abstract: 'Plan first', evidence: [{ session: 'C:\\s.jsonl', entry: 'a1b2' }] };
+
+/**
+ * @brief 增强脚本：认出第一条消息与种类、第几步按助手消息数、步骤用完回 Done.、每次请求重读脚本文件、wait、
+ *        日志的 enhance 字段；没有这种、没有脚本文件、tb-scenario、协作模式的投递都不按增强脚本。
+ */
+async function checkEnhance(e, d, scriptFile) {
+  writeFileSync(scriptFile, JSON.stringify({ strategy: [{ call: 'memory', args: ENHANCE_ARGS },
+    { say: 'Saved one entry.', wait: 600 }] }));
+  const first = await chatLogged(e, { messages: [ENHANCE_SYSTEM, enhanceFirst('STRATEGY')] });
+  record('enhance: the first message is recognised (STRATEGY → strategy) and step 0 calls the scripted tool with '
+    + 'the scripted args', first.log.enhance === 'strategy' && first.out.calls[0]?.name === 'memory'
+    && JSON.stringify(parsed(first.out.calls[0].args)) === JSON.stringify(ENHANCE_ARGS), JSON.stringify(first.log));
+  const turn = toolTurn('call_m1', 'memory', ENHANCE_ARGS, 'Saved to STRATEGY (this project): Plan first');
+  const cardOnly = user(`${WORK_CARD_OPEN}\nsynthetic card\n${WORK_CARD_CLOSE}`);
+  const second = await chatLogged(e, { messages: [ENHANCE_SYSTEM, enhanceFirst('STRATEGY'), ...turn, cardOnly] });
+  const waited = second.out.firstAt - second.out.startedAt;
+  record('enhance: step = assistant messages after that user message (a trailing work-card message is skipped); '
+    + '"wait" delays the first chunk', second.out.text === 'Saved one entry.' && second.log.enhance === 'strategy'
+    && waited >= 550, `${second.out.text} ${waited}`);
+  const later = await chat(e.port, { messages: [ENHANCE_SYSTEM, enhanceFirst('STRATEGY'), ...turn,
+    said('Saved one entry.')] });
+  const other = await chat(e.port, { messages: [ENHANCE_SYSTEM, enhanceFirst('STRATEGY'), ...turn,
+    said('Saved one entry.'), user('plain')] });
+  record('enhance: when the steps run out the reply is "Done."; a later user message that is not the first message '
+    + 'is answered in keyword mode', later.text === ENHANCE_DONE && other.text !== ENHANCE_DONE
+    && other.text.length > 0, `${later.text} | ${other.text.slice(0, 40)}`);
+  writeFileSync(scriptFile, JSON.stringify({ strategy: [{ say: 'Rewritten between runs.' }] }));
+  const reread = await chat(e.port, { messages: [ENHANCE_SYSTEM, enhanceFirst('STRATEGY')] });
+  record('enhance: the script file is read again on every request', reread.text === 'Rewritten between runs.',
+    reread.text);
+  await checkEnhanceKeys(e, scriptFile);
+  await checkEnhanceFallbacks(e, d);
+}
+
+/**
+ * @brief 增强脚本的 "<kind>@<文字>" 键（按第一行的项目与日子选步骤，段数多的优先）与 "fail" 步骤
+ *        （tests/ui/mem-app-enhance-*.mjs 用，synthetic）。
+ */
+async function checkEnhanceKeys(e, scriptFile) {
+  writeFileSync(scriptFile, JSON.stringify({ taste: [{ say: 'Plain taste.' }], 'taste@D:\\shop': [{ say: 'Shop.' }],
+    'taste@D:\\shop@Oct 22, 2026': [{ say: 'Shop on Oct 22.' }], 'taste@D:\\other': [{ say: 'Other.' }],
+    review: [{ fail: 503 }] }));
+  const keyed = await chat(e.port, { messages: [ENHANCE_SYSTEM, enhanceFirst('TASTE')] });
+  const otherDay = await chat(e.port, { messages: [ENHANCE_SYSTEM, user(enhanceFirst('TASTE').content
+    .replace('Oct 22, 2026', 'Oct 23, 2026'))] });
+  const elsewhere = await chat(e.port, { messages: [ENHANCE_SYSTEM, user(enhanceFirst('TASTE').content
+    .replace('D:\\shop', 'E:\\site'))] });
+  record('enhance: "<kind>@<text>" keys apply when the first line contains every part (most parts win); otherwise '
+    + 'the plain "<kind>" steps', keyed.text === 'Shop on Oct 22.' && otherDay.text === 'Shop.'
+    && elsewhere.text === 'Plain taste.', `${keyed.text} | ${otherDay.text} | ${elsewhere.text}`);
+  const failed = await chatLogged(e, { messages: [ENHANCE_SYSTEM, enhanceFirst('REVIEW')] });
+  record('enhance: a "fail" step answers with that status and an OpenAI-shaped error (logged with enhance)',
+    failed.out.status === 503 && failed.out.body?.error?.message === 'Synthetic HTTP 503 from the enhancement script'
+    && failed.log.enhance === 'review' && failed.log.status === 503, JSON.stringify([failed.out.body, failed.log]));
+  // 后面的检查要的是只有 strategy 的脚本（taste、review 按关键词回答）
+  writeFileSync(scriptFile, JSON.stringify({ strategy: [{ say: 'Rewritten between runs.' }] }));
+}
+
+/** @brief 增强脚本不生效的情况：脚本里没有这种、没有环境变量、tb-scenario、协作模式的投递、普通请求。 */
+async function checkEnhanceFallbacks(e, d) {
+  const taste = await chatLogged(e, { messages: [ENHANCE_SYSTEM, enhanceFirst('TASTE')] });
+  record('enhance: a kind missing from the script answers in keyword mode (reads README.md) and still logs enhance',
+    taste.log.enhance === 'taste' && taste.out.calls[0]?.name === 'read', JSON.stringify(taste.log));
+  const noScript = await chatLogged(d, { messages: [ENHANCE_SYSTEM, enhanceFirst('REVIEW')] });
+  record('enhance: without FAKE_ENHANCE_SCRIPT the endpoint answers in keyword mode and logs enhance: review',
+    noScript.log.enhance === 'review' && noScript.out.calls[0]?.name === 'read', JSON.stringify(noScript.log));
+  const delivered = await chatLogged(e, { messages: [ENHANCE_SYSTEM,
+    user("[Mori] New user message: You are running Mori's daily STRATEGY enhancement for the project D:\\shop.")] });
+  const taskDelivery = await chatLogged(e, { messages: [ENHANCE_SYSTEM,
+    user('[Mori] You are executor on T1 (request 1). Start work.')] });
+  record('enhance: team-mode deliveries ("[Mori] New user message: …", "[Mori] You are executor on T1…") are not '
+    + 'recognised (enhance null, keyword mode)', delivered.log.enhance === null && taskDelivery.log.enhance === null
+    && delivered.out.calls[0]?.name === 'read', JSON.stringify([delivered.log.enhance, taskDelivery.log.enhance]));
+  const scripted = await chatLogged(e, { messages: [sys('tb-scenario:tb-selfcheck-create'),
+    enhanceFirst('STRATEGY')] });
+  record('enhance: a request with tb-scenario stays in script mode (enhance null, scenario logged)',
+    scripted.log.enhance === null && scripted.log.scenario === 'tb-selfcheck-create', JSON.stringify(scripted.log));
+  const plain = await chatLogged(e, { messages: [SYSTEM, user('plain')] });
+  record('enhance: other requests log enhance: null', plain.log.enhance === null && 'enhance' in plain.log);
+}
+
+/** @brief mem-team：task 实例按环境变量给的依据调用 memory save，再 write，再交接；合并会话先改两条被拒绝的条目。 */
+async function checkMemTeam(e) {
+  const system = sys('You are executor. tb-scenario:mem-team MORI-ROLE-executor', sample(SHARED_SENTENCE),
+    SEGMENT_SENTENCES.task);
+  const start = user('[Mori] You are executor on T1 (request 1). Start work.');
+  const taskCard = card('You are executor on T1 (request 1).', 'Task T1: Save the lesson · changes files');
+  const save = await chatLogged(e, { messages: [system, start, taskCard] });
+  const args = parsed(save.out.calls[0]?.args);
+  record('mem-team: T1 calls memory save with the evidence from MEM_TEAM_SESSION / MEM_TEAM_ENTRY',
+    save.log.scenario === 'mem-team' && save.out.calls[0]?.name === 'memory' && args?.action === 'save'
+    && args.abstract === MEM_TEAM_TEXT.abstract && args.evidence?.[0]?.session === 'C:\\synthetic\\a.jsonl'
+    && args.evidence[0].entry === 'e1e2e3e4', JSON.stringify(args));
+  const memory = toolTurn('call_t1', 'memory', args, '[#1] Saved to STRATEGY (this project): x');
+  const write = await chat(e.port, { messages: [system, start, ...memory, taskCard] });
+  const writeTurn = toolTurn('call_t2', 'write', {}, '[#2] Enhancement runs can only change memory, with the memory '
+    + 'tool.');
+  const handoff = await chat(e.port, { messages: [system, start, ...memory, ...writeTurn, taskCard] });
+  record('mem-team: then write once, then task_handoff with the memory result as evidence',
+    write.calls[0]?.name === 'write' && parsed(write.calls[0].args)?.path === MEM_TEAM_TEXT.writePath
+    && handoff.calls[0]?.name === 'task_handoff' && parsed(handoff.calls[0].args)?.evidence?.[0] === '#1',
+  `${write.calls[0]?.name} ${handoff.calls[0]?.args}`);
+  const merged = await chat(e.port, { messages: [sys('tb-scenario:mem-team', SEGMENT_SENTENCES['merged-create']),
+    enhanceFirst('STRATEGY')] });
+  record('mem-team: the merged session first tries to update the user entry from MEM_TEAM_USER_ENTRY',
+    merged.calls[0]?.name === 'memory' && parsed(merged.calls[0].args)?.entry === 'user-rule', merged.calls[0]?.args);
+}
+
 const a = await startEndpoint({ FAKE_KEYS: 'key-aaaa1,key-bbbb2,key-cccc3', FAKE_LIMITED_KEYS: 'key-bbbb2',
   FAKE_LIMIT_MS: '1500', FAKE_QUOTA_KEYS: 'key-cccc3', FAKE_SERVER_VERSION: '0.9.9', FAKE_MAX_MODEL_LEN: '4000' });
 const b = await startEndpoint({ FAKE_NO_METRICS: '1', FAKE_REQUIRE_KEY: 'req-key-1' });
 const c = await startEndpoint({ FAKE_LIMITED_KEYS: 'none' });
 const d = await startEndpoint({});
+const scriptDir = mkdtempSync(join(tmpdir(), 'mori-enhance-script-'));
+const scriptFile = join(scriptDir, 'enhance.json');
+writeFileSync(scriptFile, '{}');
+// synthetic：增强脚本文件与 mem-team 的依据（会话文件路径、条目 id 只是字符串，端点不读它们）
+const e = await startEndpoint({ FAKE_ENHANCE_SCRIPT: scriptFile, MEM_TEAM_SESSION: 'C:\\synthetic\\a.jsonl',
+  MEM_TEAM_ENTRY: 'e1e2e3e4', MEM_TEAM_USER_ENTRY: 'user-rule', MEM_TEAM_OTHER_ENTRY: 'other-kind' });
 try {
   await checkGets(a, c);
   await checkKeys(a, b, c);
@@ -709,6 +837,8 @@ try {
   await checkFailuresAndTemplates(d);
   await checkIdsAndLog(d, a);
   await checkStrictAndReasoningLog(d);
+  await checkEnhance(e, d, scriptFile);
+  await checkMemTeam(e);
   await checkCancel(a, b);
   checkLogs(a);
 } catch (error) {
@@ -718,6 +848,8 @@ try {
   b.kill();
   c.kill();
   d.kill();
+  e.kill();
+  rmSync(scriptDir, { recursive: true, force: true });
 }
 const failed = results.filter((r) => !r.ok).length;
 console.log(`${results.length - failed}/${results.length} passed`);

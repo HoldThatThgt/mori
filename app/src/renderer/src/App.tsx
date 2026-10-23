@@ -10,24 +10,26 @@ import { newSession } from './state/projects';
 import {
   CENTER_MIN, clamp, limitsFor, NARROW_WIDTH, PANE_MIN, RAIL_WIDTH, setLayout, splitLimits, useLayout, type DividerKind,
 } from './state/layout';
+import { useMemoryDetailOpen } from './state/memory';
 import { closeTopOverlay, hasOverlay, useOverlay } from './state/overlays';
-import { selectedRecord, useReview } from './state/review';
 import { focusPane } from './state/split';
 import { activeTab, updateTab, useApp, type Tab, type View } from './state/store';
+import { useIssuesDetailOpen } from './state/uiIssues';
 import { answerFrontApproval } from './components/ApprovalCard';
 import { collectChanges, RightPanel } from './components/ChangesPanel';
 import { ChatPane, KernelExitBanner } from './components/ChatPane';
 import { Divider } from './components/Divider';
 import { LeaveDialog } from './components/LeaveDialog';
+import { MemoryDetail } from './components/MemoryDetail';
+import { MemoryPage } from './components/MemoryPage';
 import { FirstRun, OpenFolderPrompt } from './components/Pages';
 import { PaneDeleteDialog } from './components/PaneTitle';
 import { RefPreview } from './components/RefPreview';
-import { ReviewDetail } from './components/ReviewDetail';
-import { ReviewPage } from './components/ReviewPage';
 import { DropHint, useSessionDrop } from './components/SessionDrag';
 import { SettingsPage } from './components/SettingsPage';
 import { Sidebar } from './components/Sidebar';
 import { ToolsPage } from './components/ToolsPage';
+import { UiIssuesDetail } from './components/UiIssuesDetail';
 
 /** 窄于此宽度时右栏浮在中栏上层（方案 5.1） */
 const OVERLAY_RIGHT_WIDTH = 800;
@@ -228,7 +230,7 @@ function Center({ tabs, view, right }: { tabs: Tab[]; view: View; right: RightTo
       )}
       {view === 'settings' && <SettingsPage />}
       {view === 'tools' && <ToolsPage />}
-      {view === 'review' && <ReviewPage />}
+      {view === 'memory' && <MemoryPage />}
     </div>
   );
 }
@@ -241,7 +243,7 @@ function hasChanges(tab: Tab): boolean {
 /**
  * @brief 右栏怎么显示：贴在右边、浮在上层（窄窗口，或分屏放不下时你点开的）、不显示。右栏跟随焦点所在的一栏；
  *        分屏放不下时先收起，你点右栏开关才浮出来，回到放得下时恢复原来的开关状态。分屏放不下时在这一栏打开了文件
- *        （点文件芯片、工具卡里的路径、工作回顾的"Jump to source"）也浮出来，阅读器才看得见。
+ *        （点文件芯片、工具卡里的路径、记忆页依据的"Jump to source"）也浮出来，阅读器才看得见。
  */
 function useRightPanel(tab: Tab | undefined, view: View, cramped: boolean) {
   const split = useApp((state) => state.split);
@@ -251,7 +253,7 @@ function useRightPanel(tab: Tab | undefined, view: View, cramped: boolean) {
   const fileNonce = tab?.rightView.kind === 'file' ? tab.rightView.nonce : 0;
   useEffect(() => setFloatRight(false), [cramped, splitId, view]);
   // 每一栏上次看到的"打开文件"次数：同一栏里变了才是刚打开了文件（换到另一栏不算）。放在上面那个 effect 之后，
-  // 从工作回顾回到会话的同一次更新里先收起再浮出。
+  // 从记忆页回到会话的同一次更新里先收起再浮出。
   useEffect(() => {
     if (!tab) return;
     const before = opened.current.get(tab.key);
@@ -281,9 +283,11 @@ function Workspace() {
   useSessionDrop();
   const collapsed = narrow ? !floating : sidebarCollapsed;
   const tab = tabs.find((item) => item.key === activeKey);
-  // 工作回顾选中了一条记录时右栏是它的详情（docs/v0/screens/review.md），宽度与会话的右栏共用。
-  const reviewDetail = useReview((state) => view === 'review' && selectedRecord(state) !== null);
-  const wantRight = reviewDetail
+  // 记忆页右栏有内容（docs/specs/memory.md §10.1）、设置页的 UI issues 选中了一份报告（§10.8）时，右栏是它的详情，
+  // 宽度与会话的右栏共用。
+  const memoryDetail = useMemoryDetailOpen();
+  const issuesDetail = useIssuesDetailOpen();
+  const wantRight = memoryDetail || issuesDetail
     || (Boolean(tab) && view === 'chat' && (tab?.rightOpen ?? (tab ? hasChanges(tab) : false)));
   const columns = useColumns(width, collapsed || (narrow && floating), wantRight, Boolean(split) && view === 'chat');
   const { right, shown: rightShown, floating: rightFloating } = useRightPanel(tab, view, columns.cramped);
@@ -310,7 +314,8 @@ function Workspace() {
               <RightPanel tab={tab} onClose={() => right.toggle(tab)} />
             </aside>
           )}
-          {reviewDetail && <ReviewDetail>{divider}</ReviewDetail>}
+          {memoryDetail && <MemoryDetail>{divider}</MemoryDetail>}
+          {issuesDetail && <UiIssuesDetail>{divider}</UiIssuesDetail>}
         </div>
       </main>
       <DropHint />
