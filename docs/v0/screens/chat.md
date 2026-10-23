@@ -22,13 +22,13 @@
 | --- | --- | --- | --- |
 | 一般 | 会话面板宽于 600px | "项目名 › 会话名"、完整文字的协作开关、右栏开关，分屏时"Close pane"；会话名放不下时项目名先收短（最窄 40px），之后才截会话名 | 点、右键、拖会话名（M3、M5）；切换协作模式；开关右栏；关闭这一栏 |
 | 较窄 | ≤ 600px | 协作开关只显示状态点；其余同上 | 同上 |
-| 窄 | ≤ 400px | 顶栏的内边距和间距收小，两个图标按钮 28px 宽 | 同上 |
+| 窄 | ≤ 400px | 顶栏的内边距和间距收小，两个图标按钮 28px 宽；按钮间距只有 4px，键盘焦点环离按钮 1px（全局是 2px，同输入框下面一行 ≤ 460px 的一档） | 同上 |
 | 很窄 | ≤ 320px | 不显示项目名和 ›，只有会话名 | 同上 |
 
-会话名能用的宽度（会话名很长、项目名收到 40px、协作开关是最宽的"Team: Until done"时估算）：单栏 930px 约 665px；
-分屏 601px 约 315px（还是完整文字的开关）；分屏 510px（1280 宽窗口）约 310px、460px 约 260px、370px（800 宽窗口）约 195px、
-280px 约 175px；800 宽窗口右栏打开时中栏 300px 约 225px（后几种开关只有状态点）。600px 的档位就是按这个定的：
-宽于 600px 时完整文字的开关也给会话名留下约 310px 以上，和 1280 宽分屏里只有状态点时差不多
+会话名能用的宽度（会话名很长、项目名收到 40px、协作开关是最宽的"Team: Until done"；在 App 里量的）：单栏 930px 约 665px；
+分屏 601px 约 315px（还是完整文字的开关）；分屏 510px（1280 宽窗口）307px、460px 258px、370px（800 宽窗口）193px、
+280px 173px；800 宽窗口右栏打开时中栏 300px 223px（后几种开关只有状态点）。600px 的档位就是按这个定的：
+宽于 600px 时完整文字的开关也给会话名留下约 315px，和 1280 宽分屏里只有状态点时（307px）差不多
 （[../composer-pickers.md](../composer-pickers.md)"TaskBoard 合入之后"）。改名框（M3）在同一位置，至少 120px。
 
 M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用量见 [models.md](models.md)；输入框的"/"补全见 [slash.md](slash.md)。
@@ -89,7 +89,7 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 选择范围（v1） | `ModelState`（`pick`、`current`）、`session.pickOptions` | 右边一组的第一项；"<范围名> · <当前模型 id>"（范围是模型时只有 id，没有范围时"No model range"）；不能启动时的说明在输入框上方的拒绝启动卡里（[../../v1/screens/model-chat.md](../../v1/screens/model-chat.md)）；见 [models.md](models.md)（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 为真时只显示正在用的模型、不能打开菜单，悬停 `Team mode picks the model for each agent`，见 ../../v1/screens/team-blocked.md） |
 | 思考强度（M6） | 见 [models.md](models.md) | 紧挨在选择范围右边；"Effort: High ▾"；当前模型没标支持思考时"Effort: Unavailable ▾"；没有当前模型时不显示 |
 | 上下文用量 | `session.state` → pi `getContextUsage()`；在打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新 | Effort 右边的小圆环，点开看详情；各状态的悬停说明和读屏名见 [models.md](models.md)"上下文用量（圆环）" |
-| 发送、停止、排队 | 下表 | 在右端，同一位置；会话面板 ≤ 600px 时只显示图标（[models.md](models.md)"窄栏"）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4、§13.6：`Stop team` 是这一行的又一项，在"Stop"或"Send"前面，同一档也只显示图标，读屏名"Stop team"） |
+| 发送、停止、排队 | 下表 | 在右端，同一位置；会话面板 ≤ 600px 时只显示图标（[models.md](models.md)"窄栏"）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4、§13.6：`Stop team` 是这一行的又一项，在"Stop"或"Send"前面，会话面板 ≤ 760px 时就只显示图标，读屏名"Stop team"；会话面板 ≤ 340px 时有它就收起排队的按钮，见 [models.md](models.md)"窄栏""最窄"） |
 
 这一行不换行，任何宽度都不超出输入框，圆环任何宽度都在；变窄时先去掉"Effort: "前缀、发送按钮的文字、▾，再收起"Queue"，
 最后依次截短不能发送时的说明、选择范围按钮（先截模型 id，再截范围名）、模式名和 Effort 的强度，见 [models.md](models.md)"窄栏"。
@@ -102,7 +102,7 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 空闲 | 没有运行（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.6：只有后台 Agent 在运行时对话仍算空闲，输入框照常可以发送，旁边有 `Stop team`） | "Send"按钮（输入为空时不可用）；权限、范围按钮、Effort、圆环可用 | Enter 发送；Shift+Enter 换行；输入法组字时 Enter 只选词 |
 | 准备中（v1） | 你发了消息（`session.prompt`），pi 还没开始运行（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：分开时准备中先等立项判断这条消息，见 ../../v1/screens/team-stop.md） | 同一位置显示"Stop"（v1：准备中可以停止，消息撤回、文字回到输入框，[model-chat.md](../../v1/screens/model-chat.md)"准备中"）；输入框有字时左边是只有一个按钮的"Queue"（准备中不能插话；≤ 400px 也不收起）；占位文字"Enter to queue · Shift+Enter for new line"；范围按钮和 Effort 不可用（`aria-disabled`，仍能 Tab 到，原因见 models.md），权限和圆环可用；开着的范围、Effort 菜单关闭 | "Stop"或 Esc；Enter 排队（Ctrl+Enter 也是排队） |
 | 生成中、输入框为空 | 本轮运行中（`agent_start` 到 `agent_settled`） | 同一位置显示"Stop"（悬停"Stop response (Esc)"；协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4、§13.6：后台有 Agent 在运行或排队时旁边另有 `Stop team`）；范围按钮和 Effort 不可用（悬停和读屏的描述说明原因），权限和圆环可用 | 点"Stop"或按 Esc |
-| 生成中、输入框有字 | 同上 | "Stop"和"Queue ▾"（"Queue"悬停"Queue for later (Enter)"），下拉"More send options"里有"Steer"（快捷键提示 Ctrl+Enter）；输入框的占位文字"Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line"；会话面板 ≤ 400px 时"Queue"收起，只留 ▾，菜单里是"Queue for later"和"Steer"，"Stop"不动 | Enter 排队（Queue）；Ctrl+Enter 插话（Steer）；"Stop" |
+| 生成中、输入框有字 | 同上 | "Stop"和"Queue ▾"（"Queue"悬停"Queue for later (Enter)"），下拉"More send options"里有"Steer"（快捷键提示 Ctrl+Enter）；输入框的占位文字"Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line"；会话面板 ≤ 400px 时"Queue"收起，只留 ▾，菜单里是"Queue for later"和"Steer"，"Stop"不动（协作模式下有 `Stop team` 时 ≤ 520px 就收起"Queue"，≤ 340px 连 ▾ 也收起，见 models.md"窄栏"） | Enter 排队（Queue）；Ctrl+Enter 插话（Steer）；"Stop" |
 | 拒绝启动（v1） | `ModelState.blocked` 不为 null | 输入框上方是拒绝启动卡；可以打字，"Send"不可用（Enter 不发送，草稿不丢）；范围按钮可用（卡上的"Change model…"打开它的菜单）；没有当前模型时没有 Effort | 打字；改范围；卡上的操作 |
 | 有排队或插话的消息（v1：见 docs/specs/model-providers.md §11.4：准备中再发的消息由后台进程暂存，pi 开始后作为 followUp 交给 pi） | pi `queue_update`（`followUp` 与 `steering` 两个列表）（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：排队区还有待判断的消息，标 `Waiting for <create role>`；"Withdraw"同时撤回还没开始判断的，正在判断的那条不撤回） | 输入框上方排队区，逐条显示"Queued"或"Steer"和内容 | "Withdraw"：把排队区里的消息全部放回输入框（`clearQueue`） |
 | 插话送达 | pi 在本轮工具全部执行完、下一次请求模型之前送出（`message_start` role=user，同时 `queue_update` 去掉它） | 排队区少一条，对话流出现这条消息 | — |

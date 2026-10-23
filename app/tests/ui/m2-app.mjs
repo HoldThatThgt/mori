@@ -5,7 +5,8 @@
 // 重新载入后认出"Denied"、任务栏闪烁、F8 报告界面问题（报告里没有 key、保存中按 Esc 不关闭）。
 // 2026-10-21 起权限按钮在输入框下面一行的左端（docs/v0/composer-pickers.md）：权限菜单往上打开、左对齐这一行、不出界、
 // 列表很长时在菜单里滚动，这一行同时只开一个浮层，新卡来时关闭这一行开着的浮层，Tab 移出时关闭，第一次打开中、
-// 后台进程退出、重新载入、Restart 之后重新打开中这一行的样子、不可用的原因和焦点，最小窗口里这一行完整可见，
+// 后台进程退出、重新载入、Restart 之后重新打开中这一行的样子、不可用的原因和焦点（开着的"Allow all"确认框按取消关上），
+// 最小窗口里这一行完整可见，
 // F8 报告"Current view"的"Model range""Effort"和"Pane width"。
 // 状态表见 docs/v0/screens/approval.md、models.md、chat.md、tool-cards.md 与 f8.md；首次启动与打开文件夹沿用 M1 的流程，
 // 不再逐项检查。
@@ -1663,6 +1664,36 @@ async function f8SidebarButton({ page }) {
   record('F8：左栏底部"报告界面问题（F8）"打开同一个报告框；两个框都空时"保存"不可用，"取消"关闭', disabled && closed);
 }
 
+/** @brief 后台进程退出时点"Restart"，等会话重新打开好（没有退出时不动）。 */
+async function restartIfExited(page) {
+  const pane = paneOf(page);
+  if (await pane.getByTestId('kernel-exit').count() === 0) return;
+  await pane.getByRole('button', { name: 'Restart', exact: true }).click();
+  await page.waitForFunction((selector) => !document.querySelector(`${selector} [data-testid="kernel-exit"]`)
+    && !document.querySelector(`${selector} [data-testid="not-ready"]`), PANE, { timeout: 30000 });
+}
+
+/**
+ * @brief "Switch to “Allow all”?"开着时后台进程退出（approval.md"权限菜单"，composer-pickers-checks.md 第 60 条）：
+ *        确认框按取消关上、焦点回到权限按钮；Restart、会话重新打开后仍是"Ask each time"（确认框关上了，"Allow all"
+ *        点不到，不会把 approval.setMode 发给退出或正在重启的后台进程）。
+ */
+async function confirmOnKernelExit({ app, page }) {
+  await restartIfExited(page);
+  const menu = await openPermissionMenu(page);
+  await menu.getByRole('menuitemradio', { name: 'Allow all' }).click();
+  const dialog = page.getByTestId('confirm-dialog');
+  const shown = await dialog.waitFor({ timeout: 5000 }).then(() => true, () => false);
+  killKernel(app);
+  await paneOf(page).getByTestId('kernel-exit').waitFor({ timeout: 10000 });
+  const closed = await dialog.waitFor({ state: 'detached', timeout: 3000 }).then(() => true, () => false);
+  const focus = await permissionButton(page).evaluate((el) => el === document.activeElement);
+  await restartIfExited(page);
+  const mode = await permissionButton(page).innerText();
+  record('后台进程退出时开着的"Switch to “Allow all”?"按取消关上、焦点回到权限按钮；Restart 之后仍是"Ask each time"',
+    shown && closed && focus && mode.includes('Ask each time'), JSON.stringify({ shown, closed, focus, mode }));
+}
+
 /** @brief 某一步出错后尽量回到空闲：关掉浮层；后台进程退出时重新载入；还在运行就停止；清空输入框。 */
 async function recover({ page }) {
   for (let tries = 0; tries < 3 && await page.locator(OVERLAYS).count() > 0; tries += 1) {
@@ -1692,7 +1723,7 @@ const steps = {
   newSessionAsks, allowAll, pendingToAll, escStop, escInCard, escMenuFirst, twoCommands, cardClosesOverlays,
   queuedTurnKeepsMenu, keyGuards, usageNotBlocking, buttonGoneFocus, writeCard, writeOutside, hiddenChars, followCard,
   minWindow, minWindowMenu, taskbarFlash, saveKeyAgain, f8Save, f8EscWhileSaving, f8EscKeepsRunning,
-  f8AfterKernelKilled, f8SidebarButton,
+  f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit,
 };
 
 const fake = await startFakeEndpoint();

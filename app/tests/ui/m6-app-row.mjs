@@ -485,7 +485,8 @@ async function busyButtons(ctx) {
 /**
  * @brief 切换中（models.md"选择范围按钮"）：在范围菜单里换成提供商 mori-endpoint，session.setPick 返回之前范围按钮和 Effort
  *        都带 data-pending（两个按钮共用一个切换中的值）、aria-disabled，范围按钮显示你选的范围、悬停只有第一行、没有读屏的
- *        描述，焦点留在范围按钮；返回后两个属性都没有。最后换回模型 fake-coder。
+ *        描述（没有 aria-describedby，带空的 aria-description，Chromium 不再把 title 当成描述），焦点留在范围按钮；返回后
+ *        两个属性都没有，也不带 aria-description。最后换回模型 fake-coder。
  */
 async function pendingSwitch(ctx) {
   const { page } = ctx;
@@ -494,15 +495,19 @@ async function pendingSwitch(ctx) {
   const rows = (await seenRows(page)).filter((row) => row.model?.pending);
   const after = await buttonState(page, 'model-button');
   const focus = await focusName(page);
+  const idleDescription = await Promise.all(['model-button', 'thinking-button']
+    .map((id) => paneOf(page).getByTestId(id).getAttribute('aria-description')));
   await choosePick(page, `${MAIN}/${MODEL}`);
   const shown = rows.find((row) => row.thinking?.pending && row.model.aria && row.thinking.aria
-    && !row.model.title.includes('\n') && row.model.reason === null);
+    && !row.model.title.includes('\n') && row.model.reason === null && row.thinking.reason === null
+    && row.model.ariaDescription === '' && row.thinking.ariaDescription === '');
   // 切换中还不知道新范围的当前模型（v1 按 current: null 算），按钮上可能只有范围名，所以只比开头
   record('切换中：范围按钮和 Effort 都带 data-pending、aria-disabled（共用一个切换中的值），范围按钮悬停只有一行（你选的范围'
-    + '的文字，以"Mori endpoint"开头）、没有读屏的描述；返回后范围按钮显示"Mori endpoint · fake-coder"，两个按钮都不带 '
-    + 'data-pending 和 aria-disabled，焦点留在范围按钮', Boolean(shown) && shown.model.title.startsWith('Mori endpoint')
-    && after.text === PROVIDER_TEXT && !after.pending && !after.hasAria && focus === 'model-button',
-  JSON.stringify({ rows: rows.slice(0, 3), after, focus }));
+    + '的文字，以"Mori endpoint"开头）、两个按钮都没有读屏的描述（没有 aria-describedby、aria-description 为空）；返回后'
+    + '范围按钮显示"Mori endpoint · fake-coder"，两个按钮都不带 data-pending、aria-disabled 和 aria-description，焦点留在'
+    + '范围按钮', Boolean(shown) && shown.model.title.startsWith('Mori endpoint') && after.text === PROVIDER_TEXT
+    && !after.pending && !after.hasAria && focus === 'model-button' && idleDescription.every((value) => value === null),
+  JSON.stringify({ rows: rows.slice(0, 3), after, focus, idleDescription }));
 }
 
 /**

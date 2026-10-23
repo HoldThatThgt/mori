@@ -65,6 +65,26 @@ export function useFocusFallback(element: React.RefObject<HTMLElement | null>, t
 }
 
 /**
+ * @brief Stop team 出现时 chat.css 可能把 root 里的排队按钮藏起（≤ 340px，models.md"窄栏"，display: none）：这时先调
+ *        onHidden（root 自己被藏起时，例如关上"Queue"的下拉），焦点在一个藏起的元素上时放回这一栏的文字框
+ *        （不让它掉到 body 上；浮层还开着时 focusComposer 等它关上）。
+ * @param stopTeam Stop team 是否显示（tab.team.background）
+ */
+export function useHiddenFallback(root: React.RefObject<HTMLElement | null>, tabKey: string, stopTeam: boolean,
+  onHidden?: () => void): void {
+  const latest = useRef(onHidden);
+  latest.current = onHidden;
+  useLayoutEffect(() => {
+    const node = root.current;
+    if (!stopTeam || !node) return;
+    const hidden = (element: Element) => element.getClientRects().length === 0;
+    if (hidden(node)) latest.current?.();
+    const focused = document.activeElement;
+    if (focused && node.contains(focused) && hidden(focused)) focusComposer(tabKey);
+  }, [root, tabKey, stopTeam]);
+}
+
+/**
  * @brief 这一行的菜单（选择范围、Effort、权限、"Queue"的下拉）的开关：算作挡住快捷键的浮层；Esc 关闭，焦点在菜单里时
  *        还给按钮（在理由框等别处时不动）；点外面、Tab 移出时关闭；按钮变得不可用、新的卡片来了时关闭，焦点在菜单里时
  *        回到按钮；整个按钮消失时焦点回到文字框。

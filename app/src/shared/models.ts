@@ -457,7 +457,7 @@ export interface ModelState {
   /** 当前模型标了支持思考 */
   reasoning: boolean;
   /**
-   * 对话会话在协作模式下为真（平行 Agent 规格 §12.11）：顶栏模型按钮只显示正在用的模型、不能打开菜单，
+   * 对话会话在协作模式下为真（平行 Agent 规格 §12.11）：范围按钮只显示正在用的模型、不能打开菜单，
    * session.setPick 被拒绝，session.pickOptions 返回空
    */
   pickLocked: boolean;

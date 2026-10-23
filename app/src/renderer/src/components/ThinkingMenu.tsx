@@ -79,7 +79,8 @@ function effortNote(reasoning: boolean, busy: boolean, unavailable: string | nul
 /**
  * @brief 输入框下面一行的思考强度按钮和菜单。unavailable 是不能发送时的说明（"Starting…"等），这时和准备中、生成中一样
  *        不能切换：按钮 aria-disabled（仍能 Tab 到，点了不开菜单），原因在悬停的第二行和读屏的描述里。
- *        换强度或换范围的请求还没返回时按钮显示你选的强度、aria-disabled 并带 data-pending（悬停只有第一行）。
+ *        换强度或换范围的请求还没返回时按钮显示你选的强度、aria-disabled 并带 data-pending（悬停只有第一行，
+ *        没有读屏的描述：空的 aria-description 不让 Chromium 把 title 当成描述）。
  *        旧的会话数据没有思考强度时按"Off"、不支持思考处理。会话面板 ≤ 680px 时按钮只显示强度，这一行放不下时强度
  *        截短，悬停的第一行和读屏名总是"Effort: <强度>"（models.md"窄栏"）。
  */
@@ -112,7 +113,8 @@ export function ThinkingMenu({ tab, unavailable }: { tab: Tab; unavailable: stri
       <button ref={menu.button} className="thinking-button" data-testid="thinking-button" data-level={level}
         data-reasoning={String(reasoning)} data-pending={pending ? 'true' : undefined} aria-haspopup="menu"
         aria-expanded={menu.open} aria-disabled={inert || pending ? true : undefined} aria-label={`Effort: ${label}`}
-        aria-describedby={note ? tipId : undefined} title={tipLines(`Effort: ${label}`, note)}
+        aria-describedby={note ? tipId : undefined} aria-description={note ? undefined : ''}
+        title={tipLines(`Effort: ${label}`, note)}
         onClick={() => { if (!pending && !inert) menu.setOpen(!menu.open); }}>
         {/* ≤ 680px 不显示"Effort: "（chat.css），读屏名和 textContent 仍是完整的 */}
         <span className="switch-text"><span className="thinking-prefix">Effort: </span>{label}</span>

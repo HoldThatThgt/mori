@@ -187,9 +187,15 @@ async function item2(ctx) {
   await sendAt(page, 'left', PROMPTS.sleep);
   await paneAt(page, 'left').getByTestId('approval-card').waitFor({ timeout: 120000 });
   await composerAt(page, 'left').press('Alt+1');
+  const before = await paneAt(page, 'right').getByTestId('assistant').count();
   await sendAt(page, 'right', PROMPTS.longer);
-  await page.waitForFunction(() => document.querySelector('.pane-slot[data-side="right"] [data-testid="assistant"]:last-of-type')
-    ?.textContent.length > 40, null, { timeout: 120000 }).catch(() => {});
+  // 等右栏这一次的回复（发出后新出现的最后一条助手消息）有 40 字以上再按 Esc。不能用 querySelector 加
+  // :last-of-type：它取文档里第一条不带回复操作行的助手消息（走查 1 里写 notes.md 那一轮的工具消息），
+  // 那条不到 40 字时一直等到超时，左栏的 sleep 37 早已跑完，Esc 就没有可停的了
+  await page.waitForFunction((count) => {
+    const all = document.querySelectorAll('.pane-slot[data-side="right"] [data-testid="assistant"]');
+    return all.length > count && all[all.length - 1].textContent.length > 40;
+  }, before, { timeout: 120000 }).catch(() => {});
   await composerAt(page, 'left').click();
   await page.keyboard.press('Escape');
   await waitPaneIdle(page, 'left', 60000);

@@ -98,7 +98,7 @@ function thinkingButton(ctx, tab) {
     level: el.dataset.level, disabled: el.disabled }));
 }
 
-/** @brief 在这个会话的顶栏把思考强度换成 level（思考菜单），等按钮的 data-level 变过去。 */
+/** @brief 在这个会话输入框下面一行把思考强度换成 level（Effort 菜单），等按钮的 data-level 变过去。 */
 async function chooseLevel(ctx, tab, level) {
   await ctx.page.locator(`${paneSel(tab)} [data-testid="thinking-button"]`).click();
   await ctx.page.getByTestId('thinking-menu').locator(`[role="menuitemradio"][data-level="${level}"]`).click();
@@ -222,7 +222,7 @@ async function setup(ctx) {
 }
 
 /**
- * @brief 在 project 里开一个新会话；可先在顶栏换范围（session.setPick，与菜单发的命令相同）、切到全部允许。
+ * @brief 在 project 里开一个新会话；可先换范围（session.setPick，与菜单发的命令相同）、切到全部允许。
  * @return { tab, sessionId, sessionFile }
  */
 async function openIn(ctx, project, { pick = null, allow = false } = {}) {
@@ -529,11 +529,11 @@ async function sel(ctx) {
   selThinking(ctx, who, lock);
 }
 
-/** @brief TB-38：协作模式下顶栏只显示模型、setPick 被拒绝、pickOptions 为空。 */
+/** @brief TB-38：协作模式下输入框下面一行的模型按钮只显示模型、setPick 被拒绝、pickOptions 为空。 */
 function selLocked(ctx, who, lock) {
-  record('TB-38 team mode: the top-bar model button only shows the model in use (data-locked, text "fake-other" = '
-    + 'chat\'s model, no menu marker, hover "Team mode picks the model for each agent"); clicking it or pressing Enter '
-    + 'opens no menu', lock.mode === 'once' && lock.button.locked && lock.button.text === 'fake-other'
+  record('TB-38 team mode: the model button in the message-box row only shows the model in use (data-locked, text '
+    + '"fake-other" = chat\'s model, no menu marker, hover "Team mode picks the model for each agent"); clicking it or '
+    + 'pressing Enter opens no menu', lock.mode === 'once' && lock.button.locked && lock.button.text === 'fake-other'
     && lock.button.title === LOCKED_TITLE && lock.button.popup === null && lock.afterClick === 0
     && lock.afterEnter === 0 && lock.t1 === 'active', brief(lock));
   record('TB-38 team mode: session.setPick is refused with "Team mode picks the model for each agent" and '

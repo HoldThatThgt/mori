@@ -650,7 +650,8 @@ export async function fitPane(ctx, target, { right = false, height = 800 } = {})
 /**
  * @brief 用 MutationObserver 记下此后每次界面变化时每一栏输入框下面一行的样子（与这一栏上一次相同时不记）：哪一边、
  *        发送中 / 生成中、不能发送的说明、看得见的直接子项（从左到右的种类）、高度、是否横向溢出，权限 / 范围 / Effort 按钮
- *        是否不可用（aria-disabled）、是否切换中（data-pending）、读屏的描述和悬停说明，以及焦点在这一栏的什么上（这一行里的
+ *        是否不可用（aria-disabled）、是否切换中（data-pending）、读屏的描述、aria-description 的原值（没有时 null）和
+ *        悬停说明，以及焦点在这一栏的什么上（这一行里的
  *        按钮的 data-testid 或 aria-label、"textarea"，不在这一栏时为 null）。抓"Starting…""Restarting…"、切换中这类
  *        只持续一小会儿的状态；seenRows 取回。
  */
@@ -658,15 +659,15 @@ export function watchRows(page) {
   return page.evaluate((rowCss) => {
     const kinds = [['permission', '[data-testid="permission-button"]'], ['model', '[data-testid="model-button"]'],
       ['thinking', '[data-testid="thinking-button"]'], ['usage', '[data-testid="usage"]'],
-      ['wait', '[data-testid="not-ready"]'], ['queue', '.split-toggle, .queue-button'], ['stop', '.stop-button'],
-      ['send', '.send-button']];
+      ['wait', '[data-testid="not-ready"]'], ['queue', '.split-toggle, .queue-button'],
+      ['stopTeam', '.stop-team-button'], ['stop', '.stop-button'], ['send', '.send-button']];
     const kindOf = (el) => kinds.find(([, css]) => el.matches(css) || el.querySelector(css))?.[0] ?? el.className;
     const control = (row, id) => {
       const el = row.querySelector(`[data-testid="${id}"]`);
       const refs = (el?.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
       return el ? { aria: el.getAttribute('aria-disabled') === 'true', pending: el.dataset.pending === 'true',
-        title: el.title, reason: refs.map((ref) => document.getElementById(ref)?.textContent ?? '').join(' ') || null }
-        : null;
+        title: el.title, reason: refs.map((ref) => document.getElementById(ref)?.textContent ?? '').join(' ') || null,
+        ariaDescription: el.getAttribute('aria-description') } : null;
     };
     const focusIn = (pane, row) => {
       const el = document.activeElement;
@@ -774,15 +775,19 @@ export const bandKey = (w) => [680, 600, 460, 400, 340, 320].filter((edge) => w 
 /**
  * 各状态下这一行从左到右该有的几项（chat.md"输入框下面一行"的状态表）：idle 空闲、running 生成中、typed 生成中有字、
  * preparing 准备中、prepTyped 准备中有字（单个"Queue"）、exited 后台进程退出 / 重新载入中 / Restart 之后重新打开中、
- * opening 第一次打开中、failed 打开失败、blocked 拒绝启动且没有当前模型（没有 Effort；圆环按 pi 的结果，可能不在）
+ * opening 第一次打开中、failed 打开失败、blocked 拒绝启动且没有当前模型（没有 Effort；圆环按 pi 的结果，可能不在）；
+ * 协作模式下后台有 Agent（有 Stop team）时：teamRunning 生成中、teamTyped 生成中有字（≤ 340px 时"Queue ▾"收起，
+ * 同 teamRunning，models.md"窄栏"）
  */
 export const KINDS = { idle: 'permission,model,thinking,usage,send', running: 'permission,model,thinking,usage,stop',
   typed: 'permission,model,thinking,usage,queue,stop', preparing: 'permission,model,thinking,usage,stop',
   prepTyped: 'permission,model,thinking,usage,queue,stop', exited: 'permission,model,thinking,usage,wait',
-  opening: 'permission,wait', failed: 'permission,wait', blocked: 'permission,model,usage,send' };
-/** @brief 这一行从左到右的几项是不是 state 该有的（blocked 时圆环可以不在）。 */
-const kindsMatch = (kinds, state) => kinds === KINDS[state]
-  || (state === 'blocked' && kinds === 'permission,model,send');
+  opening: 'permission,wait', failed: 'permission,wait', blocked: 'permission,model,usage,send',
+  teamRunning: 'permission,model,thinking,usage,stopTeam,stop',
+  teamTyped: 'permission,model,thinking,usage,queue,stopTeam,stop' };
+/** @brief 宽度 w 的一栏这一行从左到右的几项是不是 state 该有的（blocked 时圆环可以不在）。 */
+const kindsMatch = (kinds, state, w) => kinds === (state === 'teamTyped' && w <= 340 ? KINDS.teamRunning
+  : KINDS[state]) || (state === 'blocked' && kinds === 'permission,model,send');
 
 /**
  * @brief 每一栏顶栏此刻的样子（在页面里执行）：宽度、左边、是不是分屏、内边距、项目名的宽度（不显示时 0）、›、会话名（宽度、
@@ -829,8 +834,8 @@ export function topFacts(panes) {
 export function rowFrame(panes) {
   const kinds = [['permission', '[data-testid="permission-button"]'], ['model', '[data-testid="model-button"]'],
     ['thinking', '[data-testid="thinking-button"]'], ['usage', '[data-testid="usage"]'],
-    ['wait', '[data-testid="not-ready"]'], ['queue', '.split-toggle, .queue-button'], ['stop', '.stop-button'],
-    ['send', '.send-button']];
+    ['wait', '[data-testid="not-ready"]'], ['queue', '.split-toggle, .queue-button'], ['stopTeam', '.stop-team-button'],
+    ['stop', '.stop-button'], ['send', '.send-button']];
   const kindOf = (el) => kinds.find(([, css]) => el.matches(css) || el.querySelector(css))?.[0]
     ?? (el.className || el.tagName);
   const rect = (el) => {
@@ -853,8 +858,8 @@ export function rowFrame(panes) {
 /**
  * @brief 每一栏这一行里各个按钮（在页面里执行）：宽度、读屏名称、悬停说明（按行）、textContent、innerText（看得见的字）、
  *        看得见的和全部的 svg 个数、左右内边距、是否 aria-disabled、带不带这个属性、是否切换中（data-pending）、是否 disabled、
- *        读屏的描述、data-reasoning、data-current；不显示的为 null。还有权限按钮是不是"Allow all"（.all）、"Effort: "前缀
- *        看不看得见。
+ *        读屏的描述、data-reasoning、data-current、是否协作模式下锁定的模型按钮（data-locked）；不显示的为 null。还有权限按钮
+ *        是不是"Allow all"（.all）、"Effort: "前缀看不看得见，以及 Stop team。
  */
 export function rowControls(panes) {
   const visible = (el) => Boolean(el) && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden'
@@ -867,7 +872,8 @@ export function rowControls(panes) {
     pad: [parseFloat(getComputedStyle(el).paddingLeft), parseFloat(getComputedStyle(el).paddingRight)],
     aria: el.getAttribute('aria-disabled') === 'true', hasAria: el.hasAttribute('aria-disabled'),
     pending: el.dataset.pending === 'true', disabled: Boolean(el.disabled), described: describe(el),
-    reasoning: el.dataset.reasoning ?? null, current: el.dataset.current ?? null } : null);
+    reasoning: el.dataset.reasoning ?? null, current: el.dataset.current ?? null,
+    locked: el.dataset.locked === 'true' } : null);
   return panes.map((pane) => {
     const row = pane.querySelector('[data-testid="composer"] .composer-bottom');
     const q = (css) => row.querySelector(css);
@@ -876,7 +882,7 @@ export function rowControls(panes) {
       prefix: visible(q('.thinking-prefix')), usage: info(q('[data-testid="usage"]')),
       wait: info(q('[data-testid="not-ready"]')), queue: info(q('.split-button > .button:not(.split-toggle)')),
       toggle: info(q('.split-toggle')), queueOne: info(q('.queue-button')), stop: info(q('.stop-button')),
-      send: info(q('.send-button')) };
+      send: info(q('.send-button')), stopTeam: info(q('.stop-team-button')) };
   });
 }
 
@@ -949,8 +955,8 @@ const TEAM_NAME = /^Team: (Off|On|Until done)$/;
  * @brief 一栏顶栏不符合 chat.md"顶栏"的地方（空数组为符合）：只有"项目名 › 会话名"、协作开关、右栏开关和分屏时的
  *        "Close pane"，没有范围、Effort、权限按钮和圆环；协作开关宽于 600px 时是完整文字、没有状态点，≤ 600px 时只有
  *        状态点（team-switch.md"窄栏"）；≤ 400px 时两个图标按钮 28px；> 320px 时有项目名（最长 160px）和 ›，≤ 320px 时
- *        没有；会话名截断时项目名已收到 40px、会话名占满剩下的地方（差 2px 以内）；460px 时会话名至少 253px、280px 时
- *        至少 168px（只有状态点时算出的 258px、173px 留 5px）；不溢出、不裁切。
+ *        没有；会话名截断时项目名已收到 40px、会话名占满剩下的地方（差 2px 以内）；460px 时会话名至少 253px、280px 和 279px 时
+ *        至少 168px（只有状态点时算出的 258、173、172px 留 5、5、4px）；不溢出、不裁切。
  */
 export function topProblems({ top }) {
   const problems = [];
@@ -1018,6 +1024,30 @@ export function permissionProblems({ width: w, frame, controls: { permission: p,
   return problems;
 }
 
+/** 协作模式下模型按钮的悬停（平行 Agent 规格 §12.11） */
+export const LOCKED_TITLE = 'Team mode picks the model for each agent';
+
+/**
+ * @brief 协作模式下锁定的模型按钮（规格 §12.11、team-blocked.md，composer-pickers-checks.md 第 69 条）：在范围按钮的位置，
+ *        读屏名称"Model: <模型 id>"，悬停只有"Team mode picks the model for each agent"，aria-disabled，没有 ▾；
+ *        这一项不窄于最窄、按钮不宽于 200px；放不下时字截短（带"…"），截短的按钮撑满最窄；≤ 340px 时内边距 4px。
+ */
+function lockedProblems(w, frame, m, texts) {
+  const problems = [];
+  if (m.name !== `Model: ${m.text}` || m.tip.join('|') !== LOCKED_TITLE) {
+    problems.push(`locked "${m.text}" / "${m.name}" / "${m.tip.join(' | ')}"`);
+  }
+  if (!m.aria || m.allSvgs !== 0 || m.disabled) problems.push(`locked aria ${m.aria}, icons ${m.allSvgs}`);
+  const item = frame.items.find((entry) => entry.kind === 'model')?.width ?? m.width;
+  const cut = Boolean(texts?.scope) && texts.scope.width < texts.scope.full - 0.01;
+  if (m.width > RANGE_MAX + 0.5 || item < least('model', w) - 0.5) problems.push(`locked ${at1(m.width)}px`);
+  if (cut && (m.width < least('model', w) - 0.5 || !texts.scope.ellipsis)) {
+    problems.push(`locked cut at ${at1(m.width)}px`);
+  }
+  if (w <= 340 && m.pad.some((pad) => pad !== 4)) problems.push(`locked padding ${m.pad}`);
+  return problems;
+}
+
 /**
  * @brief 选择范围按钮（models.md"选择范围按钮""窄栏"，composer-pickers.md"v1 之后的调整"）：读屏名称"Model range: <按钮文字>"
  *        （" · "换成", "）；悬停三行：按钮文字 / "<提供商名> · <区域>"（没有当前模型时"No model can run in this session"）/ 不可用时的原因；
@@ -1026,6 +1056,7 @@ export function permissionProblems({ width: w, frame, controls: { permission: p,
  */
 export function modelProblems({ width: w, frame, controls: { model: m }, texts }) {
   if (!m) return [];
+  if (m.locked) return lockedProblems(w, frame, m, texts);
   const reason = frame.wait ?? (frame.running ? NOTE.modelBusy : null);
   const second = m.current ? ZONE_LINE.test(m.tip[1] ?? '') : m.tip[1] === NOTE.noModel;
   const problems = [];
@@ -1083,12 +1114,12 @@ export function effortProblems({ width: w, frame, controls: { thinking: t, prefi
 }
 
 /**
- * @brief 一个只有图标或带文字的发送组按钮：> 600px 时看得见文字 word；≤ 600px 时只有图标（innerText 为空）、
- *        读屏名称 word、悬停 tip、宽 size。
+ * @brief 一个只有图标或带文字的发送组按钮：> textAbove（默认 600px，Stop team 760px）时看得见文字 word；更窄时只有图标
+ *        （innerText 为空）、读屏名称 word、悬停 tip、宽 size。
  */
-export function sendButtonProblems(button, w, { word, tip, size }) {
+export function sendButtonProblems(button, w, { word, tip, size, textAbove = 600 }) {
   if (!button) return [`no ${word}`];
-  if (w > 600) return button.shown === word ? [] : [`${word} shows "${button.shown}"`];
+  if (w > textAbove) return button.shown === word ? [] : [`${word} shows "${button.shown}"`];
   const problems = [];
   if (button.shown !== '' || button.name !== word || button.tip[0] !== tip) {
     problems.push(`${word} icon "${button.shown}" / "${button.name}" / "${button.tip[0]}"`);
@@ -1104,10 +1135,13 @@ function ringProblems(c, state) {
   return !c.usage || Math.abs(c.usage.width - 26) > 1 ? [`ring ${at1(c.usage?.width ?? 0)}px`] : [];
 }
 
-/** @brief 生成中有字时的"Queue ▾"（models.md"窄栏"）：≤ 400px 时"Queue"收起、只留 ▾，▾ 在 ≤ 600px 时 24px。 */
-function queueProblems(c, w) {
+/**
+ * @brief 生成中有字时的"Queue ▾"（models.md"窄栏"）：≤ foldAt（400px；有 Stop team 时 520px）时"Queue"收起、只留 ▾，
+ *        ▾ 在 ≤ 600px 时 24px。
+ */
+function queueProblems(c, w, foldAt = 400) {
   const problems = [];
-  if (w <= 400) {
+  if (w <= foldAt) {
     if (c.queue) problems.push('"Queue" not folded');
   } else {
     problems.push(...sendButtonProblems(c.queue, w, { word: 'Queue', tip: 'Queue for later (Enter)', size: 32 }));
@@ -1121,18 +1155,28 @@ function queueProblems(c, w) {
  * @brief 圆环和发送组（models.md"窄栏"、chat.md 的状态表）："Send" / "Stop" / "Queue" > 600px 带文字，≤ 600px 只有图标
  *        （各 32px，≤ 340px 时"Send"、"Stop"和准备中的"Queue" 28px），▾ 24px；生成中有字、≤ 400px 时"Queue"收起；
  *        准备中有字时是单个"Queue"（.queue-button，没有 ▾，≤ 400px 也在）；拒绝启动时"Send"是 disabled。
+ *        协作模式下后台有 Agent 时（teamRunning、teamTyped）"Stop"前有 Stop team（> 760px 带字，更窄时只有图标、同"Stop"
+ *        的大小，悬停"Stop all agents in this session"）；teamTyped ≤ 520px 时"Queue"收起、只留 ▾，≤ 340px 时整组收起；
+ *        别的状态没有 Stop team。
  */
 export function sendProblems({ width: w, controls: c }, state) {
   const problems = [...ringProblems(c, state)];
   const small = w <= 340 ? 28 : 32;
+  const team = state === 'teamRunning' || state === 'teamTyped';
   if (state === 'idle' || state === 'blocked') {
     problems.push(...sendButtonProblems(c.send, w, { word: 'Send', tip: 'Send (Enter)', size: small }));
     if (state === 'blocked' && c.send && !c.send.disabled) problems.push('"Send" is not disabled');
   }
-  if (['running', 'typed', 'preparing', 'prepTyped'].includes(state)) {
+  if (['running', 'typed', 'preparing', 'prepTyped'].includes(state) || team) {
     problems.push(...sendButtonProblems(c.stop, w, { word: 'Stop', tip: 'Stop response (Esc)', size: small }));
   }
+  if (team) {
+    problems.push(...sendButtonProblems(c.stopTeam, w, { word: 'Stop team', tip: 'Stop all agents in this session',
+      size: small, textAbove: 760 }));
+  } else if (c.stopTeam) problems.push('Stop team shown');
   if (state === 'typed') problems.push(...queueProblems(c, w));
+  if (state === 'teamTyped' && w > 340) problems.push(...queueProblems(c, w, 520));
+  if (state === 'teamTyped' && w <= 340 && (c.toggle || c.queue)) problems.push('"Queue ▾" not folded for Stop team');
   if (state === 'prepTyped') {
     problems.push(...sendButtonProblems(c.queueOne, w, { word: 'Queue', tip: 'Queue for later (Enter)', size: small }));
     if (c.toggle || c.queue) problems.push('the preparing "Queue" has a ▾');
@@ -1170,8 +1214,9 @@ export function truncProblems({ width: w, frame, controls: c, texts: t }) {
 /** @brief 一栏输入框下面一行不符合 state 状态（KINDS 的键）的地方（空数组为符合）；圆环每栏最多一个。 */
 export function rowProblems(pane, state) {
   const kinds = pane.frame.items.map((item) => item.kind).join();
-  return [...(kindsMatch(kinds, state) ? [] : [`items ${kinds}`]), ...(pane.frame.rings > 1 ? ['two rings'] : []),
-    ...fitProblems(pane), ...permissionProblems(pane), ...modelProblems(pane), ...effortProblems(pane),
+  return [...(kindsMatch(kinds, state, pane.width) ? [] : [`items ${kinds}`]),
+    ...(pane.frame.rings > 1 ? ['two rings'] : []), ...fitProblems(pane), ...permissionProblems(pane),
+    ...modelProblems(pane), ...effortProblems(pane),
     ...sendProblems(pane, state), ...truncProblems(pane)];
 }
 

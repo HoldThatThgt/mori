@@ -62,7 +62,7 @@ const VIRTUAL_MODEL_NAME = 'Mori';
 const ABORTED_MESSAGE = 'Request was aborted';
 /** @brief 协作模式下对话会话 setPick 被拒绝的原文（平行 Agent 规格 §12.11，与模型按钮的悬停文字相同）。 */
 export const PICK_LOCKED_MESSAGE = 'Team mode picks the model for each agent';
-/** @brief 普通会话的候选来源：你在顶栏选的范围，只要求 tool_calling（统一模型提供商规格 §5.3 第 3 步）。 */
+/** @brief 普通会话的候选来源：你在范围菜单里选的范围，只要求 tool_calling（统一模型提供商规格 §5.3 第 3 步）。 */
 const PICK_SOURCE: CandidateSource = { kind: 'pick' };
 /** @brief 能力要求总是隐含 tool_calling（平行 Agent 规格 §4.1）。 */
 const TOOL_CALLING: readonly Requirement[] = [{ kind: 'tool_calling' }];
@@ -260,7 +260,7 @@ export interface ModelSessionOptions {
   cwd: string;
   /** @brief 发会话事件（不带信封）。 */
   emit(event: ModelEvent): void;
-  /** 候选来源（平行 Agent 规格 §12.1）；省略时为你在顶栏选的范围、只要求 tool_calling */
+  /** 候选来源（平行 Agent 规格 §12.1）；省略时为你在范围菜单里选的范围、只要求 tool_calling */
   source?: CandidateSource;
   /** 调度类别（平行 Agent 规格 §12.10），会话的请求与压缩请求都用它；省略时为 conversation */
   schedClass?: SchedClass;

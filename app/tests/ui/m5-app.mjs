@@ -1,7 +1,8 @@
 // M5 整机测试：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint，synthetic），
 // 覆盖分屏与会话引用（docs/v0/screens/split.md、session-refs.md；方案第 7 节 M5 走查 1–6 与反例）：
 // 分屏（菜单与键盘、拖到中栏左右半边、拖已在中栏的会话只切焦点、侧栏点会话换掉焦点所在的一栏、Ctrl+N、两栏各自发消息和批准、
-// Esc 只停焦点所在的一栏、F8 与右栏跟随焦点、点另一栏的右栏开关不落空（toggleOther）、分屏中线的拖动 / 方向键 / 双击 / 保存、放不下时右栏先收起和浮出、
+// Esc 只停焦点所在的一栏、F8 与右栏跟随焦点、点另一栏的右栏开关、协作开关、"Close pane"不落空
+// （toggleOther、teamOther、closeKeeps）、分屏中线的拖动 / 方向键 / 双击 / 保存、放不下时右栏先收起和浮出、
 // 最小窗口、关闭一栏不停止生成、设置页来回、归档删除时这一栏关闭）；会话引用（拖进输入框、菜单"Attach as context"与不可用的情况、
 // 只用键盘、芯片与预览、改范围、内容不含思考和工具输出、模型收到引用块、mori.ref 条目、跳回原会话、改名、重启后、
 // 原会话已删除、引用正在生成的会话、没有可引用的内容、超过 2 万字默认最近 5 轮、草稿里的芯片、预览的标题不被压矮、
@@ -327,6 +328,57 @@ async function followFocus(ctx) {
 const rightToggle = (page, side) => paneAt(page, side).locator('.topbar')
   .getByRole('button', { name: 'Toggle changes' });
 
+/** @brief 点 side 那一栏的输入框（焦点切过去），再让它自己的右栏开关是 open（不同时点一下）。 */
+async function setOwnRight(page, side, open) {
+  await composerAt(page, side).click();
+  const toggle = rightToggle(page, side);
+  if ((await toggle.getAttribute('aria-pressed')) !== String(open)) await toggle.click();
+}
+
+/** @brief 此刻 side 那一栏：是否焦点所在、协作开关的模式（data-mode），以及两栏的宽。 */
+async function teamFacts(page, side) {
+  const facts = await page.evaluate((css) => {
+    const slot = document.querySelector(css);
+    return { focused: slot?.dataset.focused === 'true',
+      mode: slot?.querySelector('[data-testid="team-switch"]')?.dataset.mode ?? null };
+  }, slotSelector(side));
+  return { ...facts, widths: (await splitState(page)).slots.map((s) => s.width) };
+}
+
+/**
+ * @brief 点另一栏的协作开关（split.md"右栏开关"：顶栏右边一组的按钮用鼠标主键按下时都到点完才切焦点）：右边那一栏自己的
+ *        右栏开关关着，左栏有焦点、右栏开着；用鼠标点一下右边那一栏的协作开关：这一下不落空（切到"Team: On"）、焦点切到
+ *        右边那一栏、右栏随之关上（两栏变宽，说明按下就切的话开关会被挤走）；再点一下回到"Team: Off"；最后把右边那一栏
+ *        自己的右栏打开，不影响后面的步骤。
+ */
+async function teamOther(ctx) {
+  const { page } = ctx;
+  await setOwnRight(page, 'right', false);
+  await setOwnRight(page, 'left', true);
+  await page.getByTestId('right-panel').waitFor({ timeout: 5000 });
+  await sleep(300);
+  const before = await teamFacts(page, 'right');
+  const teamSwitch = paneAt(page, 'right').getByTestId('team-switch');
+  await teamSwitch.click();
+  await page.waitForFunction((css) => document.querySelector(`${css} [data-testid="team-switch"]`)
+    ?.dataset.mode !== 'off', slotSelector('right'), { timeout: 5000 }).catch(() => {});
+  await sleep(300);
+  const clicked = await teamFacts(page, 'right');
+  await teamSwitch.click();
+  await page.waitForFunction((css) => document.querySelector(`${css} [data-testid="team-switch"]`)
+    ?.dataset.mode === 'off', slotSelector('right'), { timeout: 5000 }).catch(() => {});
+  const back = await teamFacts(page, 'right');
+  record('分屏：左栏有焦点、右栏开着、右边那一栏自己的右栏关着时，用鼠标点右边那一栏的协作开关一下：切到"Team: On"（这一下'
+    + '没有点空）、焦点切到右边那一栏、两栏随右栏关上变宽；再点一下回到"Team: Off"', !before.focused
+    && before.mode === 'off' && clicked.mode === 'always' && clicked.focused
+    && clicked.widths.every((width, index) => width > before.widths[index] + 50) && back.mode === 'off',
+  JSON.stringify({ before, clicked, back }));
+  // 回到 toggleOther 结束时的样子（右边那一栏有焦点、它自己的右栏开着），后面的 divider 从这里开始
+  await setOwnRight(page, 'right', true);
+  await page.getByTestId('right-panel').waitFor({ timeout: 5000 });
+  await sleep(500);
+}
+
 /** @brief 此刻 side 那一栏的右栏开关：这一栏是否焦点所在、开关是否按下、焦点是否在开关上，右栏在不在、写了什么，两栏的宽。 */
 async function toggleFacts(page, side) {
   const facts = await page.evaluate((css) => {
@@ -348,11 +400,7 @@ async function toggleFacts(page, side) {
  */
 async function toggleOther(ctx) {
   const { page } = ctx;
-  const setOwn = async (side, open) => {
-    await composerAt(page, side).click();
-    const toggle = rightToggle(page, side);
-    if ((await toggle.getAttribute('aria-pressed')) !== String(open)) await toggle.click();
-  };
+  const setOwn = (side, open) => setOwnRight(page, side, open);
   await setOwn('right', false);
   await setOwn('left', true);
   await page.getByTestId('right-panel').waitFor({ timeout: 5000 });
@@ -619,7 +667,10 @@ async function splitRight(ctx) {
   await composerAt(page, 'right').click();
 }
 
-/** @brief 反例：关闭分屏不停止正在生成的会话；去设置页再回来分屏还在。 */
+/**
+ * @brief 反例：关闭分屏不停止正在生成的会话；去设置页再回来分屏还在。关的时候用鼠标点另一栏的"Close pane"：左栏自己的右栏
+ *        开着、焦点所在的右边那一栏的关着（按下就切焦点的话右栏打开、两栏变窄，按钮被挤走），一下就关上。
+ */
 async function closeKeeps(ctx) {
   const { page } = ctx;
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -628,9 +679,17 @@ async function closeKeeps(ctx) {
   record('去设置页再回来：分屏和焦点都还在', back.split && back.slots[0].focused === false && back.slots[1].focused,
     JSON.stringify(back.slots));
   await sendAt(page, 'left', 'wait 5s');
+  await setOwnRight(page, 'left', true);
+  await setOwnRight(page, 'right', false);
   await sleep(300);
+  const before = { slots: (await splitState(page)).slots.map((s) => ({ focused: s.focused, width: s.width })),
+    leftOwn: await rightToggle(page, 'left').getAttribute('aria-pressed'),
+    panel: await page.getByTestId('right-panel').count() };
   await paneAt(page, 'left').getByTestId('close-pane').click();
-  await waitSplit(page, false);
+  const closed = await waitSplit(page, false).then(() => true, () => false);
+  record('分屏：焦点在右边那一栏、右栏关着，左栏自己的右栏开着时，用鼠标点左栏的"Close pane"一下就关上（split.md'
+    + '"右栏开关"：顶栏右边一组的按钮到点完才切焦点）', closed && before.slots[1].focused && before.leftOwn === 'true'
+    && before.panel === 0, JSON.stringify({ before, closed }));
   const single = await splitState(page);
   const running = await waitStatus(page, ctx.c, 'running', 3000);
   const unseen = await waitStatus(page, ctx.c, 'unseen', 20000);
@@ -886,8 +945,8 @@ async function headingFit(ctx) {
  * @brief 顶栏里会话名的地方（chat.md"顶栏"；composer-pickers.md"测试要改的地方"新加的检查第 1 条）：很长的会话名（headingFit
  *        改过名的 ctx.long）在右栏；1280 宽窗口分屏各一半（约 500px）、460 / 401 / 400 / 321 / 320 / 280px、右边一栏最窄
  *        279px（.pane-slot 280px）、800×600 分屏（约 370px），以及 800 宽窗口右栏打开时的单栏（300px）：会话名要么完整、
- *        要么占满剩下的地方（项目名先收到 40px）；460px 时至少 253px、280px 时至少 168px、279px 时至少 167px（顶栏有
- *        协作开关，≤ 600px 时只有状态点，算出的是 258、173、172px，留 5px）；
+ *        要么占满剩下的地方（项目名先收到 40px）；460px 时至少 253px、280px 和 279px 时至少 168px（顶栏有
+ *        协作开关，≤ 600px 时只有状态点，算出的是 258、173、172px，留 5、5、4px）；
  *        ≤ 400px 时两个图标按钮 28px、内边距比宽时小；≤ 320px 不显示项目名和 ›。
  *        要用 longSource、headingFit 建和改名的会话，用 --only 时要一起选。
  */
@@ -910,7 +969,7 @@ async function titleRoomCheck(ctx) {
   };
   await page.locator('[data-resize="split"]').dblclick();
   await measure();
-  for (const [width, minimum] of [[460, 253], [401, 0], [400, 0], [321, 0], [320, 0], [280, 168], [279, 167]]) {
+  for (const [width, minimum] of [[460, 253], [401, 0], [400, 0], [321, 0], [320, 0], [280, 168], [279, 168]]) {
     await setSplitWidth(page, 'right', width);
     await measure(minimum);
   }
@@ -935,7 +994,7 @@ async function titleSingle(ctx, rooms) {
   const wide = rooms.find((item) => item.pane > 400 && item.pane < 410);
   const narrow = rooms.find((item) => item.pane <= 400 && item.pane > 390);
   record('顶栏：分屏和窄的单栏里很长的会话名要么完整、要么占满剩下的地方（项目名先收到 40px），460px 时至少 253px、'
-    + '280px 时至少 168px、279px 时至少 167px；≤ 400px 时两个图标按钮 28px、内边距变小；≤ 320px 不显示项目名和 ›',
+    + '280px 和 279px 时至少 168px；≤ 400px 时两个图标按钮 28px、内边距变小；≤ 320px 不显示项目名和 ›',
   bad.length === 0 && Boolean(wide && narrow)
     && narrow.padding[0] + narrow.padding[1] < wide.padding[0] + wide.padding[1],
   JSON.stringify(rooms.map((item) => [item.pane, item.padding?.join('/'), item.title, item.problems.join('; ')])));
@@ -1064,8 +1123,8 @@ async function effortAt280(page) {
   `${seen.join(' / ')} ${bad.join('; ')}`);
 }
 
-const steps = { setup, menuSplit, dragAndPlace, twoPanes, followFocus, toggleOther, divider, crampedRight, splitRows,
-  closeKeeps, dragReference, jumpBack, keyboardReference, restart, runningSource, longSource, headingFit,
+const steps = { setup, menuSplit, dragAndPlace, twoPanes, followFocus, toggleOther, teamOther, divider, crampedRight,
+  splitRows, closeKeeps, dragReference, jumpBack, keyboardReference, restart, runningSource, longSource, headingFit,
   titleRoomCheck, deleteSource, fontSizes, effortWidths };
 
 const fake = await startFakeEndpoint();

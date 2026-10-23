@@ -268,7 +268,8 @@ function LockedModelButton({ tab }: { tab: Tab }) {
 /**
  * @brief 选择范围按钮和菜单（关闭协作模式时；见 ModelMenu）。unavailable 时和准备中、生成中一样
  *        不能切换：按钮 aria-disabled（仍能 Tab 到，点了不开菜单），原因在悬停的第三行和读屏的描述里。
- *        换范围或换强度的请求还没返回时按钮显示你选的范围、aria-disabled 并带 data-pending（焦点留在按钮上）。
+ *        换范围或换强度的请求还没返回时按钮显示你选的范围、aria-disabled 并带 data-pending（焦点留在按钮上），
+ *        没有读屏的描述：空的 aria-description 不让 Chromium 把 title（带" · "）当成描述。
  *        这一行放不下时按钮收短：先截当前模型 id，再截范围名，全文在悬停的第一行和读屏名里（models.md"窄栏"）。
  */
 function RangeMenu({ tab, unavailable }: { tab: Tab; unavailable: string | null }) {
@@ -303,6 +304,7 @@ function RangeMenu({ tab, unavailable }: { tab: Tab; unavailable: string | null 
         data-pick={tab.pick ?? undefined} data-current={tab.current ?? undefined} aria-expanded={menu.open}
         aria-label={name} aria-disabled={reason !== null || pending ? true : undefined}
         data-pending={pending ? 'true' : undefined} aria-describedby={tip.description ? tipId : undefined}
+        aria-description={tip.description ? undefined : ''}
         title={tip.title} onClick={() => { if (!pending && reason === null) menu.setOpen(!menu.open); }}>
         {shown.scope && <span className="switch-text range-scope">{shown.scope}</span>}
         {shown.model && (

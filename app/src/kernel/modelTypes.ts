@@ -182,7 +182,7 @@ export interface ModelCapabilities {
 
 /**
  * @brief 会话的候选来源（平行 Agent 规格 §12.1）。
- *        pick：你在顶栏选的范围（普通会话与关闭模式下的对话会话）；
+ *        pick：你在范围菜单里选的范围（普通会话与关闭模式下的对话会话）；
  *        role：角色的 models 依次展开、去重（为 null 时用会话的范围），within 给出时只留在它里面也有的、顺序按角色。
  */
 export type CandidateSource =

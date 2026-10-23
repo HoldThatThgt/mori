@@ -1,5 +1,6 @@
 // 合成端点（synthetic）的脚本：tests/ui/tb-app-stop.mjs 用的场景（docs/specs/parallel-agents-taskboard.md
-// TB-34 后台批准卡、TB-35 停止、TB-36 重新载入与重启、TB-42 归档、删除与关闭），格式见 scripts.mjs 开头；
+// TB-34 后台批准卡、TB-35 停止、TB-36 重新载入与重启、TB-42 归档、删除与关闭；另有 TB-54 输入框下面一行的宽度），
+// 格式见 scripts.mjs 开头；
 // 名字都以 tb-stop- 开头。每个场景在自己的用户会话里跑（脚本按请求里第一个 tb-scenario 认），k 是这个会话里的投递序号。
 // 分开配置（chat / planner / executor / reviewer，tb-helpers SPLIT_ROLES）的场景里 planner 持有立项与结案；
 // 合并会话的场景（没有角色文件）里基座 mori 持有三项权限。等很久的步骤（wait）是让套件在那一刻停止、重新载入或退出。
@@ -280,5 +281,22 @@ export const SCENARIOS = {
       1: [call('request_submit', { title: 'Registered then exit', goal: 'Exit right after registering' }),
         together(wait(LONG), say('unreachable'))],
     } },
+  ],
+
+  // composer-pickers 输入框下面一行（docs/v0/screens/models.md"窄栏"）：协作模式下 T1 executor 在后台读很久、对话的回复
+  // 也等很久，这时套件在各宽度量这一行（Stop team、锁定的模型按钮、≤ 340px 收起"Queue ▾"），量完按 Stop team。
+  'tb-stop-row': [
+    { role: 'planner', kind: 'create', deliveries: {
+      1: [call('request_submit', { title: 'Row job', goal: 'Something runs in the background' }),
+        call('task_create', readTask('Read for a long time', 'executor')), say('Registered request 1.')],
+    } },
+    { role: 'chat', kind: 'team-dialog', deliveries: { 1: [together(wait(LONG), say('unreachable'))] } },
+    { role: 'executor', kind: 'task', task: 'T1', deliveries: {
+      1: [together(wait(LONG), call('read', { path: 'README.md' })), end()],
+    } },
+  ],
+  // 同一步里分屏左边那一栏的会话（关闭模式，回复一句）。
+  'tb-stop-row2': [
+    { role: 'chat', kind: 'off-dialog', deliveries: { 1: [say('Other pane reply.')] } },
   ],
 };

@@ -116,23 +116,24 @@ export interface PaneProps {
   onToggleRight: () => void;
 }
 
-/** @brief 按下的地方是不是右栏开关。 */
-function isRightToggle(target: EventTarget): boolean {
-  return target instanceof Element && target.closest('.right-toggle') !== null;
+/** @brief 按下的地方是不是顶栏右边一组的按钮（协作开关、右栏开关、"Close pane"）。 */
+function isTopBarAction(target: EventTarget): boolean {
+  return target instanceof Element && target.closest('.topbar-actions button') !== null;
 }
 
 /**
- * @brief 在面板里按下鼠标或焦点进入面板时把焦点切到这一栏（split.md"焦点所在的一栏"）。例外：鼠标主键按在右栏开关上时，
- *        到这一下按完才切（split.md"右栏开关"）。分屏时右栏跟随焦点所在的一栏，按下那一刻就切的话右栏先换成这一栏的
- *        开关状态（例如关着）、两栏变宽、开关被挤到别处，松开时不在开关上，这一下就点空了。按完是 click（开关里先切焦点
- *        再开关），或在别处松开：click 和 pointerup 在同一个任务里派发，下一个任务时还在按着就说明没点成，这时再切。
- *        焦点照常由按下鼠标放到开关上（不用脚本 focus，免得鼠标点了也画出键盘焦点框）。右键照常在按下时切。
+ * @brief 在面板里按下鼠标或焦点进入面板时把焦点切到这一栏（split.md"焦点所在的一栏"）。例外：鼠标主键按在顶栏右边一组的
+ *        按钮（协作开关、右栏开关、"Close pane"）上时，到这一下按完才切（split.md"右栏开关"）。分屏时右栏跟随焦点所在的
+ *        一栏，按下那一刻就切的话右栏先换成这一栏的开关状态（例如关着）、两栏变宽、按钮被挤到别处，松开时不在按钮上，
+ *        这一下就点空了。按完是 click（右栏开关里先切焦点再开关；另两个按钮点完由下面的计时切，关掉的那一栏已不在分屏里时
+ *        focusPane 不做事），或在别处松开：click 和 pointerup 在同一个任务里派发，下一个任务时还在按着就说明没点成，
+ *        这时再切。焦点照常由按下鼠标放到按钮上（不用脚本 focus，免得鼠标点了也画出键盘焦点框）。右键照常在按下时切。
  * @return 面板的两个事件和包了一层的右栏开关（点了它就不再等）
  */
 function usePaneFocus(key: string, onToggleRight: () => void) {
   const pressing = useRef(false);
   const onPointerDownCapture = (event: React.PointerEvent) => {
-    if (!(event.button === 0 && isRightToggle(event.target))) {
+    if (!(event.button === 0 && isTopBarAction(event.target))) {
       focusPane(key);
       return;
     }
