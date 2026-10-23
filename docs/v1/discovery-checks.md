@@ -5,7 +5,32 @@
 
 ## 状态
 
-（实现与测试进行中，完成后在这里写结果。）
+实现与测试完成（2026-10-24），全部提交在 `claude/v1-discovery-91226e`，没有推送。规格 §3–§9 的行为全部实现；MD-01…MD-15 在各自列出的每一层都有通过的检查，
+包括真实层 MD-14（你给了 key，见下面负责人的要求第 3 条）：`node tests/spec-coverage.mjs --spec discovery`（不带 `--allow-missing-real`）
+输出 “every item is covered on every listed layer”。
+
+最后一次在开发构建上依次跑完整的 `npm run test:discovery`（提交 6fdb6c7，2026-10-24 00:06–01:35），之后在同一个构建上用你的 key 跑 `md-real.mjs`：
+
+| 层 | 结果 |
+| --- | --- |
+| 单元 | `test:md-unit` 197/197（跳过、todo 按失败算，没有）；`test:unit`（模型层）371/371；`test:tb-unit` 334/334；`test:mem-unit` 222/222；`npm run check` 通过 |
+| App（合成端点） | `md-app-form` 82、`md-app-card` 68、`md-app-firstrun` 114，全部通过 |
+| 回放 | `md-replay` 69/69：OpenRouter 的清单与 GLM 不带 key 的 401 是真实录制，`md-deepseek-card`、`md-glm-card` 是用你的 key 真实录制，`md-deepseek`、`md-shapes` 为 synthetic |
+| 真实 | `md-real` 27/27：DeepSeek、OpenRouter、GLM 全部经界面操作（见下面“真实端点上看到的”）；回放检查在其中重放了这次录下的卡上拉取 |
+| 现有功能（MD-15） | App 30/30（m0-smoke、m1–m6、v1-models、`tb-build-base`、9 个 `tb-app-*`、7 个 `mem-app-*`；m0-smoke 那条 `KNOWN` 是 pi #9129，这次之前就有）；回放与单元 16/16（test:unit、test:tb-unit、test:mem-unit、m1–m6、v1-models、tb、mem 的回放，模型层、TaskBoard、记忆的覆盖检查，以及 MD-15 的标记检查）；同时写了 MP-37、TB-46、MEM-35 的结果文件 |
+| 标记检查 | `tests/md-markers.mjs`：这次新加的 19680 行（79 个文件）里没有 TODO、FIXME、not implemented、later、待实现 |
+| key | 用你的 env 文件里的 4 个 key 在 `app/tests`、`app/test-results`、`docs`（4107 个文件）里查：没有 |
+
+过程：契约（`shared/models.ts`、内核接口与文件归属、D1–D18）→ 实现 workflow（读取器、内核接线、清单与表单、模型行、首次启动五路，各接一路对抗审查）
+→ 只读审查 workflow（8 个角度含“范围”一路 + 每条 3 个对抗核实 + 完整性复查，134 个 agent：确认 14 条、否掉 25 条，14 条全部修好）
+→ 测试 workflow（三段：合成端点、覆盖与套件、样本；单元、现有测试迁移、三个 App 套件、回放与录制、真实层；补审计出的缺口与真实层运行，每路接一路审查）
+→ 最后一次只读审查（98 个 agent：确认 20 条，都是文档、换行与无用代码，没有行为问题，全部修好）→ 依次跑全部套件两遍（第二遍在最终提交上）。
+测试中只在多个套件同时跑时见过三处与本次无关的偶发失败（`tb-unit` 的 TB-39、`m6-app-mcp-shared` 第 9 步、`v1-models-app-switch` 的 Stop），依次跑的两遍里都通过。
+
+交付：内核 `discoverRead.ts`（新）、`modelDiscover.ts`（新）、`modelCommands.ts`、`modelLayer.ts`（接线与 C11 的资源修正）、`probes.ts`、`modelProfiles.ts`、
+`modelTimings.ts`；进程桥 `shared/models.ts`；界面 `settings/Checklist.tsx`（新）、`ProviderForm.tsx`、`Providers.tsx`、`ModelRows.tsx`、`ModelEditor.tsx`、
+`fields.tsx`、`FirstRunForm.tsx`、`state/settings.ts`、`state/actionLog.ts`、`styles/models-settings.css`；测试见规格 §13 与 §13.4 的表；
+文档：规格的五条更正与 §6.6 的负责人决定、两张状态表、defaults.md、ui-strings.md、AGENTS.md 与这份记录。
 
 ## 负责人的要求（2026-10-23）
 
@@ -132,8 +157,8 @@
 | `openrouter-models.json` | 真实录制（2026-10-23，`https://openrouter.ai/api/v1/models`，公开列表，不带 key，468 个模型） |
 | `deepseek-models-nokey.json` | 真实录制（2026-10-23，`https://api.deepseek.com/models`，不带 key：401） |
 | `glm-models-nokey.json` | 真实录制（2026-10-23，`https://open.bigmodel.cn/api/paas/v4/models`，不带 key：401；不能说明 GLM 有没有列表接口，proposal §14） |
-| `deepseek-models.json` | 真实录制（2026-10-23，`https://api.deepseek.com/models`，带你的 key，MD-14 的录制；2 个模型，带 `context_window`、`max_output_tokens`、`input_modalities`、`effort`，与官方文档一致），取代原来的 synthetic 样本 |
-| `glm-models-1.json` | 真实录制（2026-10-23，`https://api.z.ai/api/anthropic/v1/models?limit=1000`，带你的 key，MD-14 的录制；11 个模型）：GLM 的 Anthropic 兼容地址**有**列表（proposal §14 原来以为没有） |
+| `deepseek-models.json` | 真实录制（2026-10-23 首次、2026-10-24 在最终构建上重录，内容相同，`https://api.deepseek.com/models`，带你的 key，MD-14 的录制；2 个模型，带 `context_window`、`max_output_tokens`、`input_modalities`、`effort`，与官方文档一致），取代原来的 synthetic 样本 |
+| `glm-models-1.json` | 真实录制（2026-10-23 首次、2026-10-24 在最终构建上重录，内容相同，`https://api.z.ai/api/anthropic/v1/models?limit=1000`，带你的 key，MD-14 的录制；11 个模型）：GLM 的 Anthropic 兼容地址**有**列表（proposal §14 原来以为没有） |
 | `deepinfra-models.json` | 真实录制（2026-10-23，`https://api.deepinfra.com/v1/openai/models`，公开列表，不带 key；从 176 行里截了 5 行，行内容不改）：规格 §13.1 原列为手写，因有可用的公开接口改用真实录制。它的输出上限在 `metadata.max_tokens`，不在 §4.1 的路径里（`README.md` 已知问题 3），MD-03 的“不小于窗口的不算报告”另由 LiteLLM 样本、`openai-compatible-edge-rows.json` 和把 DeepInfra 每行的值放到 §4.1 输出上限路径上的 synthetic 用例（`rules-rows.test.mjs`）检查 |
 | 其余（`README.md` 列出） | synthetic，各自写明依据（核对过的源码或文档地址） |
 

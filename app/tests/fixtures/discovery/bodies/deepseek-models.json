@@ -1,6 +1,6 @@
 {
  "source": "real",
- "recorded": "2026-10-23",
+ "recorded": "2026-10-24",
  "url": "https://api.deepseek.com/models",
  "note": "DeepSeek /models with the saved key, recorded by tests/ui/md-real.mjs through a local proxy (status and body only)",
  "status": 200,

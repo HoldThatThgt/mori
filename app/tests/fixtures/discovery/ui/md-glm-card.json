@@ -7,7 +7,7 @@
   "MD-07",
   "MD-13"
  ],
- "recorded": "2026-10-23",
+ "recorded": "2026-10-24",
  "address": "https://api.z.ai/api/anthropic",
  "endpoint": "https://api.z.ai/api/anthropic",
  "model": "api-z-ai/md-real-moved-GLM-5.3",
@@ -15,7 +15,7 @@
   "Setup (synthetic test setup, docs/specs/model-discovery.md §13.1): a copy of the data dir this run built through the UI (first run with DeepSeek, then Add provider for GLM and OpenRouter; the keys were typed into Mori's API key fields and saved encrypted by Mori), encrypted key files only; renamed api-z-ai/GLM-5.3 (the provider's only model) to api-z-ai/md-real-moved-GLM-5.3 in the copied model-config.json",
   "The card fetch used the key saved in Mori: the commands carry no key and the fixture stores no request headers"
  ],
- "recordedAt": "2026-10-23T14:31:46.133Z",
+ "recordedAt": "2026-10-23T17:37:25.382Z",
  "steps": [
   {
    "t": 1,
@@ -24,62 +24,62 @@
    }
   },
   {
-   "t": 1,
+   "t": 2,
    "result": {
     "type": "session.list",
     "value": []
    }
   },
   {
-   "t": 2,
-   "command": {
-    "type": "config.get"
-   }
-  },
-  {
-   "t": 2,
-   "result": {
-    "type": "config.get",
-    "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-frMRdu\\pi",
-     "settingsError": null,
-     "defaultThinkingLevel": "medium",
-     "firstRun": false,
-     "migrationError": null,
-     "configError": null,
-     "migratedNow": false
-    }
-   }
-  },
-  {
    "t": 3,
    "command": {
     "type": "config.get"
-   }
-  },
-  {
-   "t": 3,
-   "result": {
-    "type": "config.get",
-    "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-frMRdu\\pi",
-     "settingsError": null,
-     "defaultThinkingLevel": "medium",
-     "firstRun": false,
-     "migrationError": null,
-     "configError": null,
-     "migratedNow": false
-    }
    }
   },
   {
    "t": 4,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-QsdSQT\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 6,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 6,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-QsdSQT\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 8,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 5,
+   "t": 9,
    "result": {
     "type": "models.get",
     "value": {
@@ -221,17 +221,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -256,7 +256,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -285,7 +285,7 @@
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7244463b-e4a3-43e5-a5b8-a3f8bb92cb40)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 2b6a499d-2072-4588-b20e-15022392698d)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
          "outcome": "pass",
@@ -313,12 +313,12 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765895923,
+       "probedAt": 1792777037804,
        "suite": 1
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223121944b1b126eb047f4]\"},\"request_id\":\"20261023223121944b1b126eb047f4\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -327,7 +327,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312100fc11e08a9c4b7d]\"},\"request_id\":\"2026102322312100fc11e08a9c4b7d\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -338,7 +338,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231216723c0390d844c6e]\"},\"request_id\":\"202610232231216723c0390d844c6e\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -346,7 +346,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231218be84ffc252946ec]\"},\"request_id\":\"202610232231218be84ffc252946ec\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -370,7 +370,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765881833,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -427,7 +427,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       },
       "openrouter-ai/xingchen-agi/xing4.0-29b-a4b:free": {
@@ -548,7 +548,7 @@
    }
   },
   {
-   "t": 1520,
+   "t": 956,
    "command": {
     "type": "models.discover",
     "target": {
@@ -558,7 +558,7 @@
    }
   },
   {
-   "t": 1782,
+   "t": 1171,
    "result": {
     "type": "models.discover",
     "value": {

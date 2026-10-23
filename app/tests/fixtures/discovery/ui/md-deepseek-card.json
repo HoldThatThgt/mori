@@ -7,7 +7,7 @@
   "MD-07",
   "MD-13"
  ],
- "recorded": "2026-10-23",
+ "recorded": "2026-10-24",
  "address": "https://api.deepseek.com",
  "endpoint": "https://api.deepseek.com",
  "model": "api-deepseek-com/deepseek-flash",
@@ -15,10 +15,10 @@
   "Setup (synthetic test setup, docs/specs/model-discovery.md §13.1): a copy of the data dir this run built through the UI (first run with DeepSeek, then Add provider for GLM and OpenRouter; the keys were typed into Mori's API key fields and saved encrypted by Mori), encrypted key files only; renamed api-z-ai/GLM-5.3 (the provider's only model) to api-z-ai/md-real-moved-GLM-5.3 in the copied model-config.json",
   "The card fetch used the key saved in Mori: the commands carry no key and the fixture stores no request headers"
  ],
- "recordedAt": "2026-10-23T14:31:36.314Z",
+ "recordedAt": "2026-10-23T17:37:18.717Z",
  "steps": [
   {
-   "t": 2,
+   "t": 1,
    "command": {
     "type": "session.list"
    }
@@ -31,55 +31,55 @@
    }
   },
   {
+   "t": 2,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 3,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-QsdSQT\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 4,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 4,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-QsdSQT\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
    "t": 5,
-   "command": {
-    "type": "config.get"
-   }
-  },
-  {
-   "t": 6,
-   "result": {
-    "type": "config.get",
-    "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-frMRdu\\pi",
-     "settingsError": null,
-     "defaultThinkingLevel": "medium",
-     "firstRun": false,
-     "migrationError": null,
-     "configError": null,
-     "migratedNow": false
-    }
-   }
-  },
-  {
-   "t": 7,
-   "command": {
-    "type": "config.get"
-   }
-  },
-  {
-   "t": 8,
-   "result": {
-    "type": "config.get",
-    "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-frMRdu\\pi",
-     "settingsError": null,
-     "defaultThinkingLevel": "medium",
-     "firstRun": false,
-     "migrationError": null,
-     "configError": null,
-     "migratedNow": false
-    }
-   }
-  },
-  {
-   "t": 9,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 10,
+   "t": 6,
    "result": {
     "type": "models.get",
     "value": {
@@ -201,17 +201,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -236,7 +236,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
@@ -345,7 +345,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
@@ -412,7 +412,7 @@
    }
   },
   {
-   "t": 121,
+   "t": 27,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -438,17 +438,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -473,7 +473,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
@@ -582,14 +582,14 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
      "running": [
       {
        "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 3,
+       "step": 6,
        "of": 8
       }
      ]
@@ -597,7 +597,7 @@
    }
   },
   {
-   "t": 251,
+   "t": 28,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -623,17 +623,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -658,7 +658,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
@@ -767,14 +767,14 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
      "running": [
       {
        "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 4,
+       "step": 7,
        "of": 8
       }
      ]
@@ -782,7 +782,7 @@
    }
   },
   {
-   "t": 253,
+   "t": 147,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -808,17 +808,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -843,12 +843,12 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "probing",
-       "error": null,
+       "status": "error",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -856,27 +856,27 @@
        "tool_calling": {
         "state": "unverified",
         "call": {
-         "outcome": "not_run",
-         "detail": null
+         "outcome": "error",
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
-         "detail": null
+         "detail": "Step 3 did not produce a valid call"
         }
        },
        "tier": {
         "level": null,
         "a": {
-         "outcome": "not_run",
-         "detail": null
+         "outcome": "fail",
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
          "detail": null
         },
         "c": {
-         "outcome": "not_run",
-         "detail": null
+         "outcome": "error",
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -894,8 +894,13 @@
         "truncation": "unknown"
        },
        "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
+       "reported": {
+        "contextWindow": null,
+        "maxTokens": null,
+        "reasoning": null,
+        "image": null
+       },
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -952,22 +957,16 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 5,
-       "of": 8
-      }
-     ]
+     "running": []
     }
    }
   },
   {
-   "t": 256,
+   "t": 244,
    "command": {
     "type": "models.discover",
     "target": {
@@ -977,7 +976,7 @@
    }
   },
   {
-   "t": 342,
+   "t": 459,
    "result": {
     "type": "models.discover",
     "value": {
@@ -1038,7 +1037,7 @@
    }
   },
   {
-   "t": 404,
+   "t": 673,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -1064,17 +1063,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -1099,861 +1098,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
-       "suite": 1
-      },
-      "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "openrouter-ai/recursive/flint-v1.0:free": {
-       "status": "error",
-       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
-       "server": {
-        "kind": "openrouter",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": 262144,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 262144,
-        "maxTokens": 235929,
-        "reasoning": true,
-        "image": false
-       },
-       "probedAt": 1792765876848,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 6,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 406,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "api-deepseek-com/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "deepseek",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "unverified",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": true,
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 1048576,
-        "reported": 1048576,
-        "effective": 1048576,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 1048576,
-        "maxTokens": 393216,
-        "reasoning": true,
-        "image": true
-       },
-       "probedAt": 1792765840713,
-       "suite": 1
-      },
-      "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "openrouter-ai/recursive/flint-v1.0:free": {
-       "status": "error",
-       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
-       "server": {
-        "kind": "openrouter",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": 262144,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 262144,
-        "maxTokens": 235929,
-        "reasoning": true,
-        "image": false
-       },
-       "probedAt": 1792765876848,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 7,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 565,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "api-deepseek-com/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "deepseek",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "unverified",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": true,
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 1048576,
-        "reported": 1048576,
-        "effective": 1048576,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 1048576,
-        "maxTokens": 393216,
-        "reasoning": true,
-        "image": true
-       },
-       "probedAt": 1792765840713,
-       "suite": 1
-      },
-      "api-deepseek-com/deepseek-v4-pro": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 65536,
-        "reported": null,
-        "effective": 65536,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "openrouter-ai/recursive/flint-v1.0:free": {
-       "status": "error",
-       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
-       "server": {
-        "kind": "openrouter",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": 262144,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 262144,
-        "maxTokens": 235929,
-        "reasoning": true,
-        "image": false
-       },
-       "probedAt": 1792765876848,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 7,
-       "of": 8
-      },
-      {
-       "ref": "api-deepseek-com/deepseek-v4-pro",
-       "step": 0,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 567,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "api-deepseek-com/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "deepseek",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "unverified",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": true,
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 1048576,
-        "reported": 1048576,
-        "effective": 1048576,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 1048576,
-        "maxTokens": 393216,
-        "reasoning": true,
-        "image": true
-       },
-       "probedAt": 1792765840713,
-       "suite": 1
-      },
-      "api-deepseek-com/deepseek-v4-pro": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 65536,
-        "reported": null,
-        "effective": 65536,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "openrouter-ai/recursive/flint-v1.0:free": {
-       "status": "error",
-       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
-       "server": {
-        "kind": "openrouter",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": 262144,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 262144,
-        "maxTokens": 235929,
-        "reasoning": true,
-        "image": false
-       },
-       "probedAt": 1792765876848,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 0,
-       "of": 8
-      },
-      {
-       "ref": "api-deepseek-com/deepseek-v4-pro",
-       "step": 0,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 570,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "api-deepseek-com/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "deepseek",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "unverified",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": true,
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 1048576,
-        "reported": 1048576,
-        "effective": 1048576,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 1048576,
-        "maxTokens": 393216,
-        "reasoning": true,
-        "image": true
-       },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -2010,7 +1155,7 @@
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120a24a39e2d5be4b86]\"},\"request_id\":\"20261023223120a24a39e2d5be4b86\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -2019,7 +1164,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312081b4c2809782419b]\"},\"request_id\":\"2026102322312081b4c2809782419b\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -2030,7 +1175,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120f4d8baf9e6ed4e76]\"},\"request_id\":\"20261023223120f4d8baf9e6ed4e76\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -2038,7 +1183,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231207039ff81cd814e41]\"},\"request_id\":\"202610232231207039ff81cd814e41\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -2062,7 +1207,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765880972,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -2119,16 +1264,11 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
      "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 0,
-       "of": 8
-      },
       {
        "ref": "api-deepseek-com/deepseek-v4-pro",
        "step": 0,
@@ -2139,7 +1279,249 @@
    }
   },
   {
-   "t": 617,
+   "t": 675,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "api-deepseek-com/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "deepseek",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "unverified",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1048576,
+        "reported": 1048576,
+        "effective": 1048576,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": {
+        "contextWindow": 1048576,
+        "maxTokens": 393216,
+        "reasoning": true,
+        "image": true
+       },
+       "probedAt": 1792776985183,
+       "suite": 1
+      },
+      "api-deepseek-com/deepseek-v4-pro": {
+       "status": "probing",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "b": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 65536,
+        "reported": null,
+        "effective": 65536,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": null,
+       "suite": 1
+      },
+      "api-z-ai/md-real-moved-GLM-5.3": {
+       "status": "error",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "error",
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": "Step 3 did not produce a valid call"
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "fail",
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "error",
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": "unknown",
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": {
+        "contextWindow": null,
+        "maxTokens": null,
+        "reasoning": null,
+        "image": null
+       },
+       "probedAt": 1792777023826,
+       "suite": 1
+      },
+      "openrouter-ai/recursive/flint-v1.0:free": {
+       "status": "error",
+       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
+       "server": {
+        "kind": "openrouter",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "error",
+         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": "Step 3 did not produce a valid call"
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
+        },
+        "c": {
+         "outcome": "error",
+         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 262144,
+        "reported": 262144,
+        "effective": 262144,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": {
+        "contextWindow": 262144,
+        "maxTokens": 235929,
+        "reasoning": true,
+        "image": false
+       },
+       "probedAt": 1792777014432,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "api-deepseek-com/deepseek-v4-pro",
+       "step": 0,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 730,
    "note": "UI: on the api-deepseek-com card checklist only deepseek-v4-pro was ticked and its Context window lowered to 65536; Add 1 model sent this command (sent by the UI: window.mori is frozen, so this recorder cannot log it; checked against the models appended to the config)",
    "command": {
     "type": "models.addModels",
@@ -2159,13 +1541,13 @@
    }
   },
   {
-   "t": 618,
+   "t": 731,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 619,
+   "t": 732,
    "result": {
     "type": "models.get",
     "value": {
@@ -2297,17 +1679,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -2332,7 +1714,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -2389,7 +1771,7 @@
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120a24a39e2d5be4b86]\"},\"request_id\":\"20261023223120a24a39e2d5be4b86\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -2398,7 +1780,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312081b4c2809782419b]\"},\"request_id\":\"2026102322312081b4c2809782419b\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -2409,7 +1791,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120f4d8baf9e6ed4e76]\"},\"request_id\":\"20261023223120f4d8baf9e6ed4e76\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -2417,7 +1799,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231207039ff81cd814e41]\"},\"request_id\":\"202610232231207039ff81cd814e41\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -2441,7 +1823,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765880972,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -2498,7 +1880,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
@@ -2566,7 +1948,7 @@
    }
   },
   {
-   "t": 690,
+   "t": 749,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -2592,17 +1974,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -2627,7 +2009,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -2684,7 +2066,7 @@
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120a24a39e2d5be4b86]\"},\"request_id\":\"20261023223120a24a39e2d5be4b86\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -2693,7 +2075,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312081b4c2809782419b]\"},\"request_id\":\"2026102322312081b4c2809782419b\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -2704,7 +2086,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120f4d8baf9e6ed4e76]\"},\"request_id\":\"20261023223120f4d8baf9e6ed4e76\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -2712,7 +2094,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231207039ff81cd814e41]\"},\"request_id\":\"202610232231207039ff81cd814e41\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -2736,7 +2118,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765880972,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -2793,1736 +2175,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 0,
-       "of": 8
-      },
-      {
-       "ref": "api-deepseek-com/deepseek-v4-pro",
-       "step": 1,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 922,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "api-deepseek-com/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "deepseek",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "unverified",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": true,
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 1048576,
-        "reported": 1048576,
-        "effective": 1048576,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 1048576,
-        "maxTokens": 393216,
-        "reasoning": true,
-        "image": true
-       },
-       "probedAt": 1792765840713,
-       "suite": 1
-      },
-      "api-deepseek-com/deepseek-v4-pro": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 65536,
-        "reported": null,
-        "effective": 65536,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120a24a39e2d5be4b86]\"},\"request_id\":\"20261023223120a24a39e2d5be4b86\"}",
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312081b4c2809782419b]\"},\"request_id\":\"2026102322312081b4c2809782419b\"}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120f4d8baf9e6ed4e76]\"},\"request_id\":\"20261023223120f4d8baf9e6ed4e76\"}"
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231207039ff81cd814e41]\"},\"request_id\":\"202610232231207039ff81cd814e41\"}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": null,
-        "maxTokens": null,
-        "reasoning": null,
-        "image": null
-       },
-       "probedAt": 1792765880972,
-       "suite": 1
-      },
-      "openrouter-ai/recursive/flint-v1.0:free": {
-       "status": "error",
-       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
-       "server": {
-        "kind": "openrouter",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": 262144,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 262144,
-        "maxTokens": 235929,
-        "reasoning": true,
-        "image": false
-       },
-       "probedAt": 1792765876848,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 1,
-       "of": 8
-      },
-      {
-       "ref": "api-deepseek-com/deepseek-v4-pro",
-       "step": 1,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 1038,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "api-deepseek-com/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "deepseek",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "unverified",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": true,
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 1048576,
-        "reported": 1048576,
-        "effective": 1048576,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 1048576,
-        "maxTokens": 393216,
-        "reasoning": true,
-        "image": true
-       },
-       "probedAt": 1792765840713,
-       "suite": 1
-      },
-      "api-deepseek-com/deepseek-v4-pro": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 65536,
-        "reported": null,
-        "effective": 65536,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120a24a39e2d5be4b86]\"},\"request_id\":\"20261023223120a24a39e2d5be4b86\"}",
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312081b4c2809782419b]\"},\"request_id\":\"2026102322312081b4c2809782419b\"}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120f4d8baf9e6ed4e76]\"},\"request_id\":\"20261023223120f4d8baf9e6ed4e76\"}"
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231207039ff81cd814e41]\"},\"request_id\":\"202610232231207039ff81cd814e41\"}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": null,
-        "maxTokens": null,
-        "reasoning": null,
-        "image": null
-       },
-       "probedAt": 1792765880972,
-       "suite": 1
-      },
-      "openrouter-ai/recursive/flint-v1.0:free": {
-       "status": "error",
-       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
-       "server": {
-        "kind": "openrouter",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": 262144,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 262144,
-        "maxTokens": 235929,
-        "reasoning": true,
-        "image": false
-       },
-       "probedAt": 1792765876848,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 3,
-       "of": 8
-      },
-      {
-       "ref": "api-deepseek-com/deepseek-v4-pro",
-       "step": 1,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 1172,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "api-deepseek-com/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "deepseek",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "unverified",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": true,
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 1048576,
-        "reported": 1048576,
-        "effective": 1048576,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 1048576,
-        "maxTokens": 393216,
-        "reasoning": true,
-        "image": true
-       },
-       "probedAt": 1792765840713,
-       "suite": 1
-      },
-      "api-deepseek-com/deepseek-v4-pro": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 65536,
-        "reported": null,
-        "effective": 65536,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120a24a39e2d5be4b86]\"},\"request_id\":\"20261023223120a24a39e2d5be4b86\"}",
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312081b4c2809782419b]\"},\"request_id\":\"2026102322312081b4c2809782419b\"}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120f4d8baf9e6ed4e76]\"},\"request_id\":\"20261023223120f4d8baf9e6ed4e76\"}"
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231207039ff81cd814e41]\"},\"request_id\":\"202610232231207039ff81cd814e41\"}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": null,
-        "maxTokens": null,
-        "reasoning": null,
-        "image": null
-       },
-       "probedAt": 1792765880972,
-       "suite": 1
-      },
-      "openrouter-ai/recursive/flint-v1.0:free": {
-       "status": "error",
-       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
-       "server": {
-        "kind": "openrouter",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": 262144,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 262144,
-        "maxTokens": 235929,
-        "reasoning": true,
-        "image": false
-       },
-       "probedAt": 1792765876848,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 4,
-       "of": 8
-      },
-      {
-       "ref": "api-deepseek-com/deepseek-v4-pro",
-       "step": 1,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 1174,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "api-deepseek-com/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "deepseek",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "unverified",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": true,
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 1048576,
-        "reported": 1048576,
-        "effective": 1048576,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 1048576,
-        "maxTokens": 393216,
-        "reasoning": true,
-        "image": true
-       },
-       "probedAt": 1792765840713,
-       "suite": 1
-      },
-      "api-deepseek-com/deepseek-v4-pro": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 65536,
-        "reported": null,
-        "effective": 65536,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120a24a39e2d5be4b86]\"},\"request_id\":\"20261023223120a24a39e2d5be4b86\"}",
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312081b4c2809782419b]\"},\"request_id\":\"2026102322312081b4c2809782419b\"}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120f4d8baf9e6ed4e76]\"},\"request_id\":\"20261023223120f4d8baf9e6ed4e76\"}"
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231207039ff81cd814e41]\"},\"request_id\":\"202610232231207039ff81cd814e41\"}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": null,
-        "maxTokens": null,
-        "reasoning": null,
-        "image": null
-       },
-       "probedAt": 1792765880972,
-       "suite": 1
-      },
-      "openrouter-ai/recursive/flint-v1.0:free": {
-       "status": "error",
-       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
-       "server": {
-        "kind": "openrouter",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": 262144,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 262144,
-        "maxTokens": 235929,
-        "reasoning": true,
-        "image": false
-       },
-       "probedAt": 1792765876848,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 5,
-       "of": 8
-      },
-      {
-       "ref": "api-deepseek-com/deepseek-v4-pro",
-       "step": 1,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 1291,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "api-deepseek-com/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "deepseek",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "unverified",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": true,
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 1048576,
-        "reported": 1048576,
-        "effective": 1048576,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 1048576,
-        "maxTokens": 393216,
-        "reasoning": true,
-        "image": true
-       },
-       "probedAt": 1792765840713,
-       "suite": 1
-      },
-      "api-deepseek-com/deepseek-v4-pro": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 65536,
-        "reported": null,
-        "effective": 65536,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120a24a39e2d5be4b86]\"},\"request_id\":\"20261023223120a24a39e2d5be4b86\"}",
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312081b4c2809782419b]\"},\"request_id\":\"2026102322312081b4c2809782419b\"}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120f4d8baf9e6ed4e76]\"},\"request_id\":\"20261023223120f4d8baf9e6ed4e76\"}"
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231207039ff81cd814e41]\"},\"request_id\":\"202610232231207039ff81cd814e41\"}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": null,
-        "maxTokens": null,
-        "reasoning": null,
-        "image": null
-       },
-       "probedAt": 1792765880972,
-       "suite": 1
-      },
-      "openrouter-ai/recursive/flint-v1.0:free": {
-       "status": "error",
-       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
-       "server": {
-        "kind": "openrouter",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": 262144,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 262144,
-        "maxTokens": 235929,
-        "reasoning": true,
-        "image": false
-       },
-       "probedAt": 1792765876848,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 6,
-       "of": 8
-      },
-      {
-       "ref": "api-deepseek-com/deepseek-v4-pro",
-       "step": 1,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 1292,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "api-deepseek-com/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "deepseek",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "unverified",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": true,
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 1048576,
-        "reported": 1048576,
-        "effective": 1048576,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 1048576,
-        "maxTokens": 393216,
-        "reasoning": true,
-        "image": true
-       },
-       "probedAt": 1792765840713,
-       "suite": 1
-      },
-      "api-deepseek-com/deepseek-v4-pro": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 65536,
-        "reported": null,
-        "effective": 65536,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120a24a39e2d5be4b86]\"},\"request_id\":\"20261023223120a24a39e2d5be4b86\"}",
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312081b4c2809782419b]\"},\"request_id\":\"2026102322312081b4c2809782419b\"}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223120f4d8baf9e6ed4e76]\"},\"request_id\":\"20261023223120f4d8baf9e6ed4e76\"}"
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231207039ff81cd814e41]\"},\"request_id\":\"202610232231207039ff81cd814e41\"}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": null,
-        "maxTokens": null,
-        "reasoning": null,
-        "image": null
-       },
-       "probedAt": 1792765880972,
-       "suite": 1
-      },
-      "openrouter-ai/recursive/flint-v1.0:free": {
-       "status": "error",
-       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
-       "server": {
-        "kind": "openrouter",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": 262144,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 262144,
-        "maxTokens": 235929,
-        "reasoning": true,
-        "image": false
-       },
-       "probedAt": 1792765876848,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "api-z-ai/md-real-moved-GLM-5.3",
-       "step": 7,
-       "of": 8
-      },
-      {
-       "ref": "api-deepseek-com/deepseek-v4-pro",
-       "step": 1,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 1425,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "api-deepseek-com/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "deepseek",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "unverified",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": true,
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 1048576,
-        "reported": 1048576,
-        "effective": 1048576,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 1048576,
-        "maxTokens": 393216,
-        "reasoning": true,
-        "image": true
-       },
-       "probedAt": 1792765840713,
-       "suite": 1
-      },
-      "api-deepseek-com/deepseek-v4-pro": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 65536,
-        "reported": null,
-        "effective": 65536,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "api-z-ai/md-real-moved-GLM-5.3": {
-       "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223121944b1b126eb047f4]\"},\"request_id\":\"20261023223121944b1b126eb047f4\"}",
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312100fc11e08a9c4b7d]\"},\"request_id\":\"2026102322312100fc11e08a9c4b7d\"}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231216723c0390d844c6e]\"},\"request_id\":\"202610232231216723c0390d844c6e\"}"
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231218be84ffc252946ec]\"},\"request_id\":\"202610232231218be84ffc252946ec\"}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": null,
-        "maxTokens": null,
-        "reasoning": null,
-        "image": null
-       },
-       "probedAt": 1792765881833,
-       "suite": 1
-      },
-      "openrouter-ai/recursive/flint-v1.0:free": {
-       "status": "error",
-       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
-       "server": {
-        "kind": "openrouter",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": "Step 3 did not produce a valid call"
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        },
-        "c": {
-         "outcome": "error",
-         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "not_required"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": 262144,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": {
-        "contextWindow": 262144,
-        "maxTokens": 235929,
-        "reasoning": true,
-        "image": false
-       },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
@@ -4537,7 +2190,7 @@
    }
   },
   {
-   "t": 2062,
+   "t": 2120,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -4563,17 +2216,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -4598,7 +2251,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -4655,7 +2308,7 @@
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223121944b1b126eb047f4]\"},\"request_id\":\"20261023223121944b1b126eb047f4\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -4664,7 +2317,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312100fc11e08a9c4b7d]\"},\"request_id\":\"2026102322312100fc11e08a9c4b7d\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -4675,7 +2328,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231216723c0390d844c6e]\"},\"request_id\":\"202610232231216723c0390d844c6e\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -4683,7 +2336,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231218be84ffc252946ec]\"},\"request_id\":\"202610232231218be84ffc252946ec\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -4707,7 +2360,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765881833,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -4764,7 +2417,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
@@ -4779,7 +2432,7 @@
    }
   },
   {
-   "t": 4203,
+   "t": 3984,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -4805,17 +2458,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -4840,7 +2493,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -4897,7 +2550,7 @@
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223121944b1b126eb047f4]\"},\"request_id\":\"20261023223121944b1b126eb047f4\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -4906,7 +2559,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312100fc11e08a9c4b7d]\"},\"request_id\":\"2026102322312100fc11e08a9c4b7d\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -4917,7 +2570,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231216723c0390d844c6e]\"},\"request_id\":\"202610232231216723c0390d844c6e\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -4925,7 +2578,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231218be84ffc252946ec]\"},\"request_id\":\"202610232231218be84ffc252946ec\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -4949,7 +2602,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765881833,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -5006,7 +2659,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
@@ -5021,7 +2674,7 @@
    }
   },
   {
-   "t": 5727,
+   "t": 4732,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -5047,17 +2700,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -5082,7 +2735,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -5139,7 +2792,7 @@
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223121944b1b126eb047f4]\"},\"request_id\":\"20261023223121944b1b126eb047f4\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -5148,7 +2801,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312100fc11e08a9c4b7d]\"},\"request_id\":\"2026102322312100fc11e08a9c4b7d\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -5159,7 +2812,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231216723c0390d844c6e]\"},\"request_id\":\"202610232231216723c0390d844c6e\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -5167,7 +2820,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231218be84ffc252946ec]\"},\"request_id\":\"202610232231218be84ffc252946ec\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -5191,7 +2844,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765881833,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -5248,7 +2901,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
@@ -5263,7 +2916,7 @@
    }
   },
   {
-   "t": 10422,
+   "t": 9080,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -5289,17 +2942,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -5324,7 +2977,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -5381,7 +3034,7 @@
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223121944b1b126eb047f4]\"},\"request_id\":\"20261023223121944b1b126eb047f4\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -5390,7 +3043,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312100fc11e08a9c4b7d]\"},\"request_id\":\"2026102322312100fc11e08a9c4b7d\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -5401,7 +3054,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231216723c0390d844c6e]\"},\"request_id\":\"202610232231216723c0390d844c6e\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -5409,7 +3062,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231218be84ffc252946ec]\"},\"request_id\":\"202610232231218be84ffc252946ec\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -5433,7 +3086,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765881833,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -5490,7 +3143,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
@@ -5505,7 +3158,7 @@
    }
   },
   {
-   "t": 11511,
+   "t": 10144,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -5531,17 +3184,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -5566,7 +3219,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -5623,7 +3276,7 @@
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223121944b1b126eb047f4]\"},\"request_id\":\"20261023223121944b1b126eb047f4\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -5632,7 +3285,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312100fc11e08a9c4b7d]\"},\"request_id\":\"2026102322312100fc11e08a9c4b7d\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -5643,7 +3296,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231216723c0390d844c6e]\"},\"request_id\":\"202610232231216723c0390d844c6e\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -5651,7 +3304,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231218be84ffc252946ec]\"},\"request_id\":\"202610232231218be84ffc252946ec\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -5675,7 +3328,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765881833,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -5732,7 +3385,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
@@ -5747,7 +3400,7 @@
    }
   },
   {
-   "t": 11649,
+   "t": 10219,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -5773,17 +3426,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -5808,7 +3461,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -5865,7 +3518,7 @@
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223121944b1b126eb047f4]\"},\"request_id\":\"20261023223121944b1b126eb047f4\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -5874,7 +3527,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312100fc11e08a9c4b7d]\"},\"request_id\":\"2026102322312100fc11e08a9c4b7d\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -5885,7 +3538,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231216723c0390d844c6e]\"},\"request_id\":\"202610232231216723c0390d844c6e\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -5893,7 +3546,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231218be84ffc252946ec]\"},\"request_id\":\"202610232231218be84ffc252946ec\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -5917,7 +3570,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765881833,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -5974,7 +3627,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
@@ -5989,7 +3642,7 @@
    }
   },
   {
-   "t": 15516,
+   "t": 14126,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -6015,17 +3668,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -6050,7 +3703,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -6079,7 +3732,7 @@
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7244463b-e4a3-43e5-a5b8-a3f8bb92cb40)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 2b6a499d-2072-4588-b20e-15022392698d)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
          "outcome": "pass",
@@ -6107,12 +3760,12 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765895923,
+       "probedAt": 1792777037804,
        "suite": 1
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223121944b1b126eb047f4]\"},\"request_id\":\"20261023223121944b1b126eb047f4\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -6121,7 +3774,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312100fc11e08a9c4b7d]\"},\"request_id\":\"2026102322312100fc11e08a9c4b7d\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -6132,7 +3785,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231216723c0390d844c6e]\"},\"request_id\":\"202610232231216723c0390d844c6e\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -6140,7 +3793,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231218be84ffc252946ec]\"},\"request_id\":\"202610232231218be84ffc252946ec\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -6164,7 +3817,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765881833,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -6221,7 +3874,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
@@ -6230,17 +3883,17 @@
    }
   },
   {
-   "t": 15807,
+   "t": 14960,
    "command": {
     "type": "config.get"
    }
   },
   {
-   "t": 15808,
+   "t": 14961,
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-frMRdu\\pi",
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-QsdSQT\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -6251,13 +3904,13 @@
    }
   },
   {
-   "t": 15809,
+   "t": 14962,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 15810,
+   "t": 14963,
    "result": {
     "type": "models.get",
     "value": {
@@ -6389,17 +4042,17 @@
         }
        },
        "tier": {
-        "level": "C",
+        "level": "A",
         "a": {
-         "outcome": "fail",
-         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+         "outcome": "pass",
+         "detail": null
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7747b079-e2e4-4520-b7d1-3e09396a7d25)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
-         "outcome": "pass",
+         "outcome": "not_run",
          "detail": null
         }
        },
@@ -6424,7 +4077,7 @@
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792765840713,
+       "probedAt": 1792776985183,
        "suite": 1
       },
       "api-deepseek-com/deepseek-v4-pro": {
@@ -6453,7 +4106,7 @@
         },
         "b": {
          "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 7244463b-e4a3-43e5-a5b8-a3f8bb92cb40)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 2b6a499d-2072-4588-b20e-15022392698d)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
         },
         "c": {
          "outcome": "pass",
@@ -6481,12 +4134,12 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765895923,
+       "probedAt": 1792777037804,
        "suite": 1
       },
       "api-z-ai/md-real-moved-GLM-5.3": {
        "status": "error",
-       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261023223121944b1b126eb047f4]\"},\"request_id\":\"20261023223121944b1b126eb047f4\"}",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
        "server": {
         "kind": "unknown",
         "version": "unknown"
@@ -6495,7 +4148,7 @@
         "state": "unverified",
         "call": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][2026102322312100fc11e08a9c4b7d]\"},\"request_id\":\"2026102322312100fc11e08a9c4b7d\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
         },
         "result": {
          "outcome": "not_run",
@@ -6506,7 +4159,7 @@
         "level": null,
         "a": {
          "outcome": "fail",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231216723c0390d844c6e]\"},\"request_id\":\"202610232231216723c0390d844c6e\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
         },
         "b": {
          "outcome": "not_applicable",
@@ -6514,7 +4167,7 @@
         },
         "c": {
          "outcome": "error",
-         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][202610232231218be84ffc252946ec]\"},\"request_id\":\"202610232231218be84ffc252946ec\"}"
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
         }
        },
        "protocol_write": "unverified",
@@ -6538,7 +4191,7 @@
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792765881833,
+       "probedAt": 1792777023826,
        "suite": 1
       },
       "openrouter-ai/recursive/flint-v1.0:free": {
@@ -6595,7 +4248,7 @@
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792765876848,
+       "probedAt": 1792777014432,
        "suite": 1
       }
      },
