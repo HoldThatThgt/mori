@@ -36,8 +36,8 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | --- | --- | --- |
 | [models-settings.md](models-settings.md) | 设置 → Models：迁移说明、区域未确认与 Confirm zone、Defaults、Providers（提供商卡、提供商表单的 Base URL 与 API key → Fetch models → 清单 → Add、清单、列表错误、Add a model ID、More settings、卡片上的 Fetch models 与 Not listed by the server、Keys、Models 行与 not reported、Server reports … 提示与 Use、模型表单（只剩 Edit）、档案摘要、需要同意的探针）、Groups、Project access、删除与改地址的确认、配置读不出（拉取模型的部分按发现规格） | [v0 settings.md](../../v0/screens/settings.md)“Connections and models” |
 | [first-run.md](first-run.md) | 首次启动表单（Base URL 与 API key → Fetch models → 清单、Name、API type、网络区域、Add a model ID、More settings 里的兼容选项（只在 OpenAI-compatible 时显示）、探针代价一句；拉取中两个框只读、再拉一次、保存后用内存里的 key 再拉取；没有关闭表单的 Cancel）、Test connection（先保存勾选的全部模型，再测第一个勾选的）、这个模型的探针状态、默认范围（一个模型时是它，多个时是提供商）、Public 的说明、迁移失败（按规格与发现规格 §5.4、§6.1、§6.6） | [v0 connection.md](../../v0/screens/connection.md) 的表单与首次启动 |
-| [model-menu.md](model-menu.md) | 顶栏的选择范围按钮与菜单、按当前模型的思考强度菜单、准备中与生成中不可用 | [v0 models.md](../../v0/screens/models.md) |
-| [model-chat.md](model-chat.md) | 换模型与重建的提示、阶段行（等模型、等它停下、排队、重试、重建）、准备中、No model available 卡、拒绝启动卡、v0 错误卡的规则 | [v0 chat.md](../../v0/screens/chat.md) 的阶段行重试、错误卡“Go to settings”、顶栏模型 |
+| [model-menu.md](model-menu.md) | 输入框下面一行的选择范围按钮与菜单、按当前模型的思考强度菜单、准备中与生成中不可用 | [v0 models.md](../../v0/screens/models.md) |
+| [model-chat.md](model-chat.md) | 换模型与重建的提示、阶段行（等模型、等它停下、排队、重试、重建）、准备中、No model available 卡、拒绝启动卡、v0 错误卡的规则 | [v0 chat.md](../../v0/screens/chat.md) 的阶段行重试、错误卡“Go to settings”、v0 的模型按钮 |
 | [team-switch.md](team-switch.md) | 顶栏的协作开关（Off / On / Until done、窄栏、不可用）、`/team on`、`/team off`、`/team <文字>`、只有 `/team`，模式怎样变 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的顶栏与输入框 |
 | [team-stream.md](team-stream.md) | 回执、进展摘要（位置、折叠与展开、需求状态、task 的 phase 文字、交接链）、不显示的程序投递与回合、合并会话里立项工具的卡、重新打开 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的对话流 |
 | [team-approvals.md](team-approvals.md) | 后台实例的批准卡与归属、和对话自己的卡怎样排、全部允许与本会话不再询问作用于全部 Agent、权限菜单说明、侧栏状态、F8 计数 | 补充 [v0 approval.md](../../v0/screens/approval.md) |
@@ -130,7 +130,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `more-settings`、`probe-cost-note` | More settings（首次启动里只有兼容选项，API type 不是 OpenAI-compatible 时不显示）、探针代价的说明（提供商表单与卡上清单的底部，首次启动在 Test connection 上方，发现规格 §6.1 第 8 项、§6.6） | models-settings.md、first-run.md |
 | `data-action="add-models"`、`not-listed` | 清单底部的 Add 按钮（Add 1 model / Add N models）、卡片清单下的 Not listed by the server（发现规格 §6.5） | models-settings.md |
 | `model-hint`（`data-kind` 为 `context` / `max-output` / `reasoning` / `thinking-seen` / `image`）、`data-action="use-reported"` | Models 行的 Server reports … 提示与 Use（发现规格 §8） | models-settings.md |
-| `model-button`、`model-menu`、`model-menu-note`、`pick-error` | 顶栏范围按钮与菜单（前两个沿用 v0） | model-menu.md |
+| `model-button`、`model-menu`、`model-menu-note`、`pick-error` | 输入框下面一行的范围按钮与菜单（前两个沿用 v0） | model-menu.md |
 | `thinking-button`、`thinking-menu` | 思考强度（沿用 v0） | model-menu.md |
 | `notice`（`data-kind="model-switch"` / `"rebuild"`）、`stage`（`data-kind`）、`queue`、`error-card` | 对话流提示、阶段行、排队区、错误卡（`notice`、`stage`、`queue`、`error-card` 沿用 v0） | model-chat.md |
 | `unavailable-card`、`blocked-card`、`candidate` | No model available 卡、拒绝启动卡、卡里的候选行 | model-chat.md |

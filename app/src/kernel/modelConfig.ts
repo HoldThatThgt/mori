@@ -4,13 +4,14 @@
 // 纯函数不读文件、不取时间；文件读写只在本文件末尾的几个函数里（原子写：先写临时文件再改名）。
 
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, posix, win32 } from 'node:path';
 import {
   addressChangeText, DEFAULT_ZONES, ModelConfigSchema, ProjectModelsFileSchema, VIRTUAL_PROVIDER_ID, ZONES, suggestZone,
   type ModelConfig, type ModelGroup, type ModelPick, type ModelProvider, type ProjectModelsFile, type Zone,
 } from '../shared/models';
 import type { ModelRef } from './modelTypes';
+import { renameReplacing } from './renameRetry';
 
 /** @brief 用户级配置的文件名（在 userData 下，§3）。 */
 export const MODEL_CONFIG_FILE = 'model-config.json';
@@ -653,7 +654,8 @@ export function lastAssistantRef(messages: readonly MessageModelFields[]): Model
 // ---- 文件读写 ----
 
 /**
- * @brief 原子写 JSON：先写同目录的临时文件再改名，写到一半不会留下损坏的文件；失败时删掉临时文件并记录。
+ * @brief 原子写 JSON：先写同目录的临时文件再改名（目标被别的进程短暂打开时重试），写到一半不会留下损坏的文件；
+ *        失败时删掉临时文件并记录。
  * @param path 目标文件
  * @param value 要写的值
  */
@@ -662,7 +664,7 @@ export async function writeJsonAtomic(path: string, value: unknown): Promise<voi
   const temp = `${path}.${randomUUID()}.tmp`;
   try {
     await writeFile(temp, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-    await rename(temp, path);
+    await renameReplacing(temp, path);
   } catch (error) {
     console.error(`[kernel] cannot write ${path}: ${(error as Error).message}`);
     await rm(temp, { force: true });

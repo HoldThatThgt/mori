@@ -1,5 +1,6 @@
 // M6 界面测试：在 Electron 里载入真正的界面，用回放进程桥（tests/ui/harness）回放真实录制的会话（tests/fixtures/m6）。
-// 测试像你一样操作（设置页添加模型、标"Supports thinking"、写用户级 AGENTS.md；顶栏换模型和思考强度；工具页启停技能、用表单添加
+// 测试像你一样操作（设置页添加模型、标"Supports thinking"、写用户级 AGENTS.md；输入框下面一行换范围和思考强度（2026-10-21
+// 起这几个按钮从顶栏移到这一行，docs/v0/composer-pickers.md）；工具页启停技能、用表单添加
 // MCP 服务、"Add plugin from folder…"、按资源和整个包启停；输入框里打"/"选技能命令和提示词模板；批准卡），回放桥核对界面发出的
 // 每条命令都与录制时一致；设置页、工具页、"/"补全读到的内容是录制时后台进程真的给出的。再按 docs/v0/screens/settings.md、
 // models.md、tools.md、slash.md 检查界面。M1–M5 的回放检查仍由 m1–m5-replay 负责。
@@ -8,8 +9,11 @@
 // mcp 回放的是 synthetic-mcp-setup（harness/main.jsx 的 mcpSetup，synthetic）：录制在打开任何会话之前就保存了 MCP 服务，
 // 而界面只在有会话时才有"MCP"一节，所以前面补一个先打开的会话，在它的工具页里添加，再"New session"建出录制里的会话。
 // v1（docs/specs/model-providers.md §14.4）：m6/model-switch.json、m6/thinking.json 与它们的检查删去（v1 不再有 model.save、
-// session.setModel；顶栏范围由 v1-models 的回放覆盖）；思考强度改由 fixtures/v1/thinking.json（m6-record.mjs 用 v1 录制）
+// session.setModel；换范围由 v1-models 的回放覆盖）；思考强度改由 fixtures/v1/thinking.json（m6-record.mjs 用 v1 录制）
 // 回放，这个录制还没有时那一项记 KNOWN；设置页分节导航的检查改到 Models 分节（放在 agents-md 里）。
+// 按钮状态的读法（composer-pickers.md"测试要改的地方"C1、C2）："不可用"读 aria-disabled（没有 data-pending），"切换中"读
+// data-pending；悬停按行分开（范围按钮三行、Effort 两行），读屏的描述读 aria-describedby 指向的元素。thinking 回放里另走一次
+// 换范围失败（回放桥 failNext 让这一条 session.setPick 失败，synthetic，不占回放顺序）和点开上下文用量圆环（不发命令）。
 // 用法（在 app/ 下）：node tests/ui/m6-replay.mjs [--only thinking,slash]
 // 结果写到 test-results/m6-replay.json；截图在 test-results/m6-replay/。
 
@@ -24,7 +28,10 @@ import { _electron as electron } from 'playwright-core';
 import { QUERIES } from './harness/replay.js';
 import { appRoot, arg, createRecorder, oneLine } from './lib.mjs';
 import { composerAt, sendAt, waitPaneIdle, waitPaneReady } from './m5-helpers.mjs';
-import { modelRow, openToolsSection, slashItems } from './m6-helpers.mjs';
+import {
+  modelRow, NOTE, openToolsSection, PICK_ERROR, placeProblems, popupBox, popupGone, POPUPS, ROW, rangeDescription,
+  ringState, slashItems,
+} from './m6-helpers.mjs';
 
 const only = arg('only')?.split(',');
 const harnessDir = join(appRoot, 'tests/ui/harness');
@@ -110,9 +117,9 @@ function helpers(page) {
 }
 
 /**
- * @brief 开始记下 css 选中的元素每次变化后的样子（文字、aria-disabled、是否不可用：元素本身，或它里面的编辑框），
- *        看只出现一瞬间的状态（读取中、切换中、保存中）。用 MutationObserver 跟着页面变化记，不靠定时取样；
- *        watched 取回并停止。
+ * @brief 开始记下 css 选中的元素每次变化后的样子（文字、aria-disabled、data-pending（输入框下面一行的按钮"切换中"，C1）、
+ *        是否不可用：元素本身，或它里面的编辑框），看只出现一瞬间的状态（读取中、切换中、保存中）。用 MutationObserver
+ *        跟着页面变化记，不靠定时取样；watched 取回并停止。
  */
 function watch(page, css) {
   return page.evaluate((sel) => {
@@ -120,9 +127,11 @@ function watch(page, css) {
     const take = () => {
       const el = document.querySelector(sel);
       const disabled = el && ('disabled' in el ? el.disabled : el.querySelector('textarea')?.disabled ?? null);
-      const now = el ? { text: el.textContent, pending: el.getAttribute('aria-disabled') === 'true', disabled } : null;
+      const now = el ? { text: el.textContent, pending: el.getAttribute('aria-disabled') === 'true',
+        switching: el.getAttribute('data-pending') === 'true', disabled } : null;
       const last = seen.at(-1);
-      if (now && (last?.text !== now.text || last?.pending !== now.pending || last?.disabled !== now.disabled)) {
+      if (now && (last?.text !== now.text || last?.pending !== now.pending || last?.switching !== now.switching
+        || last?.disabled !== now.disabled)) {
         seen.push(now);
       }
     };
@@ -202,20 +211,26 @@ async function leaveSettings(page, session = true) {
 }
 
 /**
- * @brief 当前一栏顶栏：模型按钮的文字、悬停说明、是否可用，思考按钮的文字、强度、是否支持思考、悬停说明、是否可用，
- *        是否在切换中。
+ * @brief 当前一栏输入框下面一行的范围按钮和思考按钮（composer-pickers.md"测试要改的地方"C1、C2）：范围按钮的文字、悬停
+ *        说明（按行）、读屏的描述、是否不可用（aria-disabled 且没有 data-pending）；思考按钮的文字、强度、是否支持思考、
+ *        悬停说明（按行）、读屏的描述、是否不可用；两个按钮里有没有切换中的（data-pending）；两个按钮在不在这一行里。
  */
-function topBar(page) {
-  return page.evaluate((css) => {
-    const pane = document.querySelector(css);
-    const model = pane?.querySelector('[data-testid="model-button"]');
-    const thinking = pane?.querySelector('[data-testid="thinking-button"]');
-    return { model: model?.textContent ?? null, modelTitle: model?.title ?? null,
-      modelDisabled: model?.disabled ?? null, thinking: thinking?.textContent ?? null,
+function rowPickers(page) {
+  return page.evaluate(({ css, rowCss }) => {
+    const row = document.querySelector(`${css} ${rowCss}`);
+    const model = row?.querySelector('[data-testid="model-button"]');
+    const thinking = row?.querySelector('[data-testid="thinking-button"]');
+    const lines = (el) => (el?.title ? el.title.split('\n') : []);
+    const described = (el) => (el?.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
+      .map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+    const unavailable = (el) => el?.getAttribute('aria-disabled') === 'true' && el.dataset.pending !== 'true';
+    return { model: model?.textContent ?? null, modelTip: lines(model), modelDescribed: described(model),
+      modelUnavailable: unavailable(model), thinking: thinking?.textContent ?? null,
       level: thinking?.dataset.level ?? null, reasoning: thinking?.dataset.reasoning ?? null,
-      thinkingTitle: thinking?.title ?? null, thinkingDisabled: thinking?.disabled ?? null,
-      pending: Boolean(model?.getAttribute('aria-disabled') || thinking?.getAttribute('aria-disabled')) };
-  }, FOCUSED);
+      thinkingTip: lines(thinking), thinkingDescribed: described(thinking), thinkingUnavailable: unavailable(thinking),
+      pending: model?.dataset.pending === 'true' || thinking?.dataset.pending === 'true',
+      inRow: Boolean(model && thinking) };
+  }, { css: FOCUSED, rowCss: ROW });
 }
 
 /**
@@ -235,7 +250,7 @@ function menuState(page, testId) {
   }, testId);
 }
 
-/** @brief 在当前一栏的顶栏点开模型（model-button）或思考（thinking-button）菜单，等焦点落进菜单，返回菜单的样子。 */
+/** @brief 在当前一栏输入框下面一行点开范围（model-button）或思考（thinking-button）菜单，等焦点落进菜单，返回菜单的样子。 */
 async function openMenu(page, button, menu) {
   await page.locator(`${FOCUSED} [data-testid="${button}"]`).click();
   await page.getByTestId(menu).waitFor({ timeout: 5000 });
@@ -244,7 +259,7 @@ async function openMenu(page, button, menu) {
   return menuState(page, menu);
 }
 
-/** @brief 菜单关上之后：菜单是否已经不在、焦点是否回到了顶栏的按钮。 */
+/** @brief 菜单关上之后：菜单是否已经不在、焦点是否回到了这一行的按钮。 */
 async function menuClosed(page, menu, button) {
   await page.getByTestId(menu).waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   return page.evaluate(({ m, b, css }) => ({ closed: !document.querySelector(`[data-testid="${m}"]`),
@@ -252,7 +267,7 @@ async function menuClosed(page, menu, button) {
   { m: menu, b: button, css: FOCUSED });
 }
 
-/** @brief 等当前一栏顶栏的 button 显示 want（模型按钮看文字，思考按钮看 data-level），且不在切换中。 */
+/** @brief 等当前一栏这一行的 button 显示 want（范围按钮看文字，思考按钮看 data-level），且不在切换中、不是不可用。 */
 function waitSwitched(page, button, want) {
   return page.waitForFunction(({ css, id, value }) => {
     const el = document.querySelector(`${css} [data-testid="${id}"]`);
@@ -303,12 +318,12 @@ async function settingsNavKeys(page) {
   return { down, up };
 }
 
-/** @brief 发一道要推理的题，等生成开始时记下顶栏，等这一轮结束；返回生成中的顶栏和最后一条回复。 */
+/** @brief 发一道要推理的题，等生成开始时记下输入框下面一行的按钮，等这一轮结束；返回生成中的样子和最后一条回复。 */
 async function reason(page, text) {
   await sendAt(page, 'focused', text);
   await page.waitForFunction((css) => document.querySelector(`${css} [data-testid="chat-pane"]`)?.dataset.running
     === 'true', FOCUSED, { timeout: 20000 }).catch(() => {});
-  const running = await topBar(page);
+  const running = await rowPickers(page);
   await waitPaneIdle(page, 'focused');
   return { running, reply: (await replies(page)).at(-1) ?? null };
 }
@@ -364,12 +379,12 @@ async function markReasoning(page, fx) {
   await leaveSettings(page, false);
 }
 
-/** @brief 新会话顶栏"Effort: <录制的强度>"；菜单列出这个模型可选的强度、都可选，当前的打勾且焦点在它上面。 */
+/** @brief 新会话这一行"Effort: <录制的强度>"；菜单列出这个模型可选的强度、都可选，当前的打勾且焦点在它上面。 */
 async function thinkingOpened(page, fx) {
   const created = resultsOf(fx, 'session.create')[0];
-  const opened = await topBar(page);
+  const opened = await rowPickers(page);
   const menu = await openMenu(page, 'thinking-button', 'thinking-menu');
-  record('thinking：新会话顶栏的思考强度是会话新建时的强度（§11.1，录制的 session.create）；菜单列出当前模型可选的强度'
+  record('thinking：新会话输入框下面一行的思考强度是会话新建时的强度（§11.1，录制的 session.create）；菜单列出当前模型可选的强度'
     + '（录制的 thinkingLevels），都可选，当前的打勾、焦点在它上面，底部说明只作用于这个会话',
   opened.level === created.thinkingLevel && opened.reasoning === 'true'
     && menu?.items.map((item) => item.level).join() === created.thinkingLevels.join()
@@ -383,38 +398,106 @@ async function thinkingOpened(page, fx) {
 }
 
 /**
- * @brief 走查 8（v1，fixtures/v1/thinking.json）：把模型标为支持思考，新会话里顶栏切到"High"：回复带思考内容；切到"Off"：
+ * @brief 点开上下文用量圆环（models.md"上下文用量（圆环）"）：详情打开（aria-expanded、aria-controls 指向它）、Esc 关上；
+ *        点开、关上都不发命令（只用已经刷新到的用量；回放桥没有多收到命令）。
+ */
+async function ringNoCommand(page, h) {
+  const sent = await h.sent();
+  await page.locator(`${FOCUSED} ${ROW} [data-testid="usage"]`).click();
+  await page.locator(POPUPS.usage.popup).waitFor({ timeout: 5000 });
+  const open = await ringState(page, `${FOCUSED} [data-testid="chat-pane"]`);
+  await page.keyboard.press('Escape');
+  const closed = await popupGone(page, POPUPS.usage.popup);
+  const after = await h.sent();
+  record('thinking：点开上下文用量圆环看详情（aria-expanded、aria-controls 指向详情）、Esc 关上：不发任何命令（回放桥没有'
+    + '多收到命令）', sent === after && open?.expanded === 'true' && open.controlsDetails && closed,
+  JSON.stringify({ sent, after, open }));
+}
+
+/** @brief 打开当前一栏的范围菜单，回放桥让下一条命令失败（failNext），选一个不是当前范围的项；等失败那一行出现。 */
+async function failPick(page, before) {
+  await page.locator(`${FOCUSED} ${ROW} [data-testid="model-button"]`).click();
+  const menu = page.getByTestId('model-menu');
+  await menu.waitFor({ timeout: 5000 });
+  const picks = await menu.locator('[role="menuitemradio"]')
+    .evaluateAll((items) => items.map((item) => item.dataset.pick));
+  const target = picks.find((pick) => pick !== before);
+  // synthetic：这一条 session.setPick 直接以这段原文失败（回放桥 failNext，不占回放顺序）
+  await page.evaluate(() => { window.__replay.failNext = 'Synthetic setPick failure'; });
+  await menu.locator(`[role="menuitemradio"][data-pick="${target}"]`).click();
+  await page.locator(`${FOCUSED} ${PICK_ERROR.popup}`).waitFor({ timeout: 5000 });
+  return target;
+}
+
+/**
+ * @brief 换范围失败（models.md 表下"换范围失败那一行"、model-menu.md"切换失败"）：session.setPick 失败时
+ *        "Couldn’t change the model range: <原文>"（role=alert）从这一行往上弹出（下边在这一行上方 6px）、右边对齐范围按钮
+ *        或贴这一行左端、最宽 min(320px, 这一行的宽)、在面板里、不盖顶栏；按钮回到原来的范围；打开范围菜单时它消失；
+ *        再失败一次，10 秒后自己消失。
+ */
+async function pickErrorReplay(page) {
+  const button = page.locator(`${FOCUSED} ${ROW} [data-testid="model-button"]`);
+  const before = await button.getAttribute('data-pick');
+  const target = await failPick(page, before);
+  const css = `${FOCUSED} ${PICK_ERROR.popup}`;
+  const geo = await popupBox(page, { popup: css, paneCss: `${FOCUSED} [data-testid="chat-pane"]`,
+    anchor: PICK_ERROR.opener });
+  const shown = await page.locator(css).evaluate((el) => ({ text: el.textContent, role: el.getAttribute('role') }));
+  const back = { pick: await button.getAttribute('data-pick'), pending: await button.getAttribute('data-pending') };
+  await button.click();
+  await page.getByTestId('model-menu').waitFor({ timeout: 5000 });
+  const clearedByMenu = await popupGone(page, css, 2000);
+  await page.keyboard.press('Escape');
+  await failPick(page, before);
+  const start = Date.now();
+  const gone = await popupGone(page, css, 13000);
+  const waited = Date.now() - start;
+  const problems = placeProblems(geo, PICK_ERROR);
+  record('thinking：换范围失败时"Couldn’t change the model range: <原文>"（role=alert）从输入框下面一行往上弹出、右边对齐范围'
+    + '按钮或贴这一行左端、最宽 min(320px, 这一行)、在面板里不盖顶栏；按钮回到原来的范围；打开范围菜单时它消失；再失败一次'
+    + '约 10 秒后自己消失', Boolean(target) && shown.text === 'Couldn’t change the model range: Synthetic setPick failure'
+    && shown.role === 'alert' && problems.length === 0 && back.pick === before && back.pending === null && clearedByMenu
+    && gone && waited > 8000, JSON.stringify({ target, shown, problems, back, clearedByMenu, gone, waited }));
+}
+
+/**
+ * @brief 走查 8（v1，fixtures/v1/thinking.json）：把模型标为支持思考，新会话里这一行切到"High"：回复带思考内容；切到"Off"：
  *        不再有思考内容；生成中不能切换。录制还没有时记 KNOWN（要用负责人的数据目录跑 m6-record.mjs --only thinking）。
  */
 async function thinking(page, h) {
   if (!existsSync(join(v1Dir, 'thinking.json'))) {
-    record('thinking：顶栏思考强度的回放（fixtures/v1/thinking.json）', false,
+    record('thinking：输入框下面一行思考强度的回放（fixtures/v1/thinking.json）', false,
       'fixtures/v1/thinking.json not recorded yet: run node tests/ui/m6-record.mjs --source <data dir> --only thinking',
       true);
     return;
   }
   const fx = JSON.parse(readFileSync(join(v1Dir, 'thinking.json'), 'utf8'));
-  // 放慢一些，生成中的顶栏看得到
+  // 放慢一些，生成中这一行的样子看得到
   await h.load('thinking', { speed: 2 });
   await markReasoning(page, fx);
   await newSessionVia(page, sideButton(page, 'Open folder…'));
   await thinkingOpened(page, fx);
+  await ringNoCommand(page, h);
+  await pickErrorReplay(page);
   const highSeen = await clickThinking(page, 'high');
-  const high = await topBar(page);
-  record('thinking：点"高"：命令返回前按钮已显示"思考：高"且不可用（切换中），返回后可用',
-    highSeen.some((item) => item.text === 'Effort: High' && item.pending) && !high.pending, JSON.stringify(highSeen));
+  const high = await rowPickers(page);
+  record('thinking：点"高"：命令返回前按钮已显示"思考：高"且切换中（data-pending，aria-disabled），返回后可用（两个属性都没有）',
+    highSeen.some((item) => item.text === 'Effort: High' && item.switching && item.pending) && !high.pending
+    && !high.thinkingUnavailable, JSON.stringify(highSeen));
   const [hard, easy] = promptsOf(fx);
   const { running, reply: withThinking } = await reason(page, hard.text);
-  record('thinking：生成中范围和思考按钮都不可用，悬停"Can’t switch models until the response finishes"'
-    + '"Can’t change effort until the response finishes"',
-    running.modelDisabled === true && running.modelTitle === 'Can’t switch models until the response finishes'
-    && running.thinkingDisabled === true && running.thinkingTitle === 'Can’t change effort until the response finishes',
-    JSON.stringify(running));
+  record('thinking：生成中输入框下面一行的范围和思考按钮都不可用（aria-disabled，没有 data-pending），范围按钮悬停第三行'
+    + '"Can’t switch models until the response finishes"（第一、二行不变）、Effort 悬停第二行"Can’t change effort until the '
+    + 'response finishes"；读屏的描述：范围按钮是第二行加". "加原因，Effort 只有原因', running.inRow
+    && running.modelUnavailable && running.modelTip[2] === NOTE.modelBusy && running.modelTip.length === 3
+    && running.modelDescribed === rangeDescription(running.modelTip) && running.thinkingUnavailable
+    && running.thinkingTip[1] === NOTE.effortBusy && running.thinkingDescribed === NOTE.effortBusy,
+  JSON.stringify(running));
   await clickThinking(page, 'off');
-  const off = await topBar(page);
+  const off = await rowPickers(page);
   const without = (await reason(page, easy.text)).reply;
   const recorded = recordedReplies(fx, resultsOf(fx, 'session.create')[0].sessionId);
-  record('thinking：顶栏切到"高"后的回复带思考块（录制里有思考内容）', high.thinking === 'Effort: High' && high.level === 'high'
+  record('thinking：这一行切到"高"后的回复带思考块（录制里有思考内容）', high.thinking === 'Effort: High' && high.level === 'high'
     && withThinking?.thinking === 1 && recorded[0]?.thinking
     && withThinking.text.includes(recorded[0].text.slice(0, 6)), JSON.stringify({ high, withThinking }));
   record('thinking：反例：切到"关"后的回复没有思考块', off.thinking === 'Effort: Off' && off.level === 'off'

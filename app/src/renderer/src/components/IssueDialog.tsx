@@ -9,8 +9,9 @@ import { mainError } from '../state/bridge';
 import { recentActions, recordAction } from '../state/actionLog';
 import { useLayout } from '../state/layout';
 import { useOverlay } from '../state/overlays';
-import { activeTab, useApp, type AppState, type KernelStatus, type View } from '../state/store';
+import { activeTab, useApp, type AppState, type KernelStatus, type Tab, type View } from '../state/store';
 import { fileName, issuesChanged, openIssues } from '../state/uiIssues';
+import { THINKING_LABELS } from '../../../shared/protocol';
 import { Icon } from '../icons';
 import { sessionTitle } from './ChatPane';
 import { stageText } from './StageLine';
@@ -69,6 +70,22 @@ function columnWidth(selector: string, saved: number): string {
   return actual === saved ? `${actual}px` : `${actual}px (saved width ${saved}px)`;
 }
 
+/** @brief Effort 按钮上的强度（"High"、不支持思考时"Unavailable"）；没有当前模型（没有这个按钮）时"None"。 */
+function effortText(tab: Tab): string {
+  if (!tab.current) return 'None';
+  return tab.reasoning ? THINKING_LABELS[tab.thinkingLevel ?? 'off'] : 'Unavailable';
+}
+
+/**
+ * @brief 焦点所在那一栏会话面板（.chat-pane，输入框下面一行按它的宽度分档）的宽度；不在会话页时"None"。
+ *        分屏右边那一栏有 1px 的左边框，比 .pane-slot 窄 1px。
+ */
+function paneWidth(state: AppState): string {
+  const pane = document.querySelector('.pane-slot[data-focused="true"]:not([hidden]) .chat-pane');
+  const width = state.view === 'chat' ? pane?.getBoundingClientRect().width ?? 0 : 0;
+  return width > 0 ? `${Math.round(width)}px` : 'None';
+}
+
 /** @brief 当前会话的几项；没有打开的会话时只有一项"Current session: None"。 */
 function tabFields(state: AppState): IssueField[] {
   const tab = activeTab(state);
@@ -78,7 +95,9 @@ function tabFields(state: AppState): IssueField[] {
     { label: 'Current session', value: sessionTitle(tab) },
     { label: 'Folder', value: tab.cwd },
     { label: 'Session file', value: tab.sessionFile ?? 'Not saved yet' },
+    { label: 'Model range', value: tab.pick ?? 'None' },
     { label: 'Model', value: tab.current ?? 'None' },
+    { label: 'Effort', value: effortText(tab) },
     { label: 'Running', value: transcript.running ? 'Yes' : 'No' },
     { label: 'Status line', value: stageText(transcript, tab.cwd, Date.now()) ?? 'Hidden' },
     // 后台实例的批准卡也计入（平行 Agent 规格 §11.3）。
@@ -106,6 +125,7 @@ function currentView(): IssueField[] {
     ...splitFields(state),
     { label: 'Right panel', value: document.querySelector(RIGHT_PANEL) ? 'Open' : 'Closed' },
     { label: 'Window size', value: `${window.innerWidth}×${window.innerHeight}` },
+    { label: 'Pane width', value: paneWidth(state) },
     { label: 'Sidebar width', value: columnWidth('[data-testid="sidebar"]', layout.sidebar) },
     { label: 'Right panel width', value: columnWidth(RIGHT_PANEL, layout.workspace) },
     { label: 'Background process', value: KERNEL_TEXT[state.kernel] },

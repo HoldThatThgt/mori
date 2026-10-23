@@ -1,7 +1,7 @@
 # 对话流里的模型层：提示、阶段行、说明卡与拒绝启动
 
 依据：规格 §4.6（会话启动校验）、§5.3（排除原因的界面文字）、§5.5–§5.8、§6.1、§6.3、§9.3、§9.5、§11.4（准备中）。
-补充并部分取代 [v0 chat.md](../../v0/screens/chat.md)：阶段行的“Retrying (1/3) · <原因>”、错误卡的“Go to settings”、顶栏的模型。
+补充并部分取代 [v0 chat.md](../../v0/screens/chat.md)：阶段行的“Retrying (1/3) · <原因>”、错误卡的“Go to settings”、v0 的模型按钮。
 其余（对话流、工具卡、排队区、停止、后台进程退出）沿用 v0。界面文字的写法按 [v0/ui-strings.md](../../v0/ui-strings.md)。标了“（临时，走查时可以改）”的文字规格没给，是本表定的。
 
 ## 来源
@@ -63,7 +63,7 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 准备中（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：分开时准备中先等立项判断这条消息，见 [team-stop.md](team-stop.md)） | 你发了消息（`session.prompt`），pi 还没开始运行 | 你的消息已显示在对话流里；会话按“发送中”显示（侧栏同 v0“生成中”含“刚发出”），停止可用；顶栏范围与思考按钮不可用；阶段行显示等待（上表）或“Rebuilding the conversation for <B>…”；没有模型层的等待时阶段行不显示（选到模型、不用等时可能一闪而过） | 停止；继续发消息 |
+| 准备中（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：分开时准备中先等立项判断这条消息，见 [team-stop.md](team-stop.md)） | 你发了消息（`session.prompt`），pi 还没开始运行 | 你的消息已显示在对话流里；会话按“发送中”显示（侧栏同 v0“生成中”含“刚发出”），停止可用；输入框下面一行的范围与 Effort 按钮不可用（`aria-disabled`）；阶段行显示等待（上表）或“Rebuilding the conversation for <B>…”；没有模型层的等待时阶段行不显示（选到模型、不用等时可能一闪而过） | 停止；继续发消息 |
 | 准备中又发了消息（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：分开时先进待判断队列，排队区标 `Waiting for <create role>`，判断完才进暂存） | 你在准备中按了发送（Ctrl+Enter 也按排队处理，准备中不能插话，§11.4） | 显示在排队区，标“Queued”（同 v0 的排队消息）；后台进程暂存，pi 开始后作为 followUp 交给 pi，之后同 v0。暂存期间排队区的“Withdraw”不可用（临时，走查时可以改；停止会把它们一起放回输入框） | — |
 | 准备中按了停止 | `mori.prompt_error`：`message` 为“Stopped before sending”，`text` 为这条消息，`queued` 为暂存的，`running: false` | 你的消息从对话流撤回，排队区清空；这条与暂存的文字按发送顺序（空行分隔）放回输入框；没有错误卡，对话流也不加“Stopped · …”（消息已撤回，临时，走查时可以改）；合成端点不会收到请求（MP-34） | 编辑后再发 |
 | 准备中 pi 没开始就结束 | `mori.prompt_error`，`message` 为 pi 的原文 | 消息撤回、文字放回输入框（同上）；v0 的错误卡，原文；卡上没有“Put your last message back in the message box”（文字已在输入框里，临时，走查时可以改） | 编辑后再发 |
@@ -102,14 +102,14 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 | Verify now（`verify`） | 你点了它：`models.verify`（`{ refs: blocked.verifyRefs, tests: 'auto' }`） | `mori.model_state` 变为 `verifying`（没有 Verify now）；探针结束后自动重新校验，通过时卡消失 |
 | Allow <zone> for this project（`allow_zone`） | 你点了它 | 打开 设置 → Models 的 Project access，焦点在这个会话的项目（§9.3）；勾选并确认后卡消失（models-settings.md） |
 | Confirm zone（`confirm_zone`） | 你点了它；`blocked.zoneProviders` 是要确认的提供商 | 打开 设置 → Models，落在顶部区域未确认的那几行，焦点在 `zoneProviders` 第一个提供商那一行（§9.3）；在那里逐个确认（models-settings.md） |
-| Change model…（`change_model`）（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时不提供，换成 `Turn off team mode`（`turn_off_team`）：`session.setTeam { mode: 'off' }`，直接回到 `off`，§5.1） | 你点了它 | 打开这一栏顶栏的范围菜单（model-menu.md） |
+| Change model…（`change_model`）（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时不提供，换成 `Turn off team mode`（`turn_off_team`）：`session.setTeam { mode: 'off' }`，直接回到 `off`，§5.1） | 你点了它 | 打开这一栏输入框下面一行的范围菜单（model-menu.md；往上打开，盖住这张卡；Esc 或选了以后焦点在范围按钮） |
 | Open settings（`open_settings`） | 你点了它 | 设置 → Models，停在顶部 |
 
 被拒绝启动时：
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 可以看、可以打字 | `blocked` 不为 null | 历史照常显示；输入框可以打字；发送不可用（按 Enter 不发送，草稿不丢）；斜杠命令列表照常插入文字，但提示词模板、技能命令和 `/compact` 这类要发给模型的都随发送一起不可用（§9.3）；顶栏可以改范围 | 打字；改范围；卡上的操作 |
+| 可以看、可以打字 | `blocked` 不为 null | 历史照常显示；输入框可以打字；发送不可用（按 Enter 不发送，草稿不丢）；斜杠命令列表照常插入文字，但提示词模板、技能命令和 `/compact` 这类要发给模型的都随发送一起不可用（§9.3）；输入框下面一行可以改范围 | 打字；改范围；卡上的操作 |
 | 后台进程拒绝 | 仍有 `session.prompt` 送到（例如界面状态还没更新）：`mori.prompt_error`，`message` 为“This session can’t start: no model fits” | 消息撤回、文字放回输入框；不另显示错误卡，原因由拒绝启动卡说明（临时，走查时可以改）；各种 `kind` 都是这一句（§4.6） | — |
 
 ## v0 错误卡的规则

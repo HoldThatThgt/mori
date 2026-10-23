@@ -4,7 +4,7 @@
 // 一键拉取模型（docs/specs/model-discovery.md §7.2、§7.3）：auto.meta 记第 0 步读到的报告值，ProfileView.reported
 // 给模型行的提示；server.kind 为 §3.3 的全部种类；versionChanged 按读版本的结果（种类、版本）判断要不要重新探测。
 
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { z } from 'zod';
 import {
@@ -13,6 +13,7 @@ import {
   type ProviderModel, type ReasoningField, type ReportedValues, type ServerKind,
 } from '../shared/models';
 import type { ModelRef, ToolCallingState } from './modelTypes';
+import { renameReplacing } from './renameRetry';
 
 /** @brief 探针套件版本（§7.2 suite）；探针的请求或判定改变时加 1。 */
 export const PROBE_SUITE = 1;
@@ -473,14 +474,14 @@ function parseEntries(path: string, list: unknown[]): StoredProfile[] {
 }
 
 /**
- * @brief 原子写档案文件：先写临时文件再改名；目录不存在时先创建。
+ * @brief 原子写档案文件：先写临时文件再改名（目标被别的进程短暂打开时重试）；目录不存在时先创建。
  * @param profiles 全部档案
  */
 export async function writeProfiles(path: string, profiles: readonly StoredProfile[]): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const temp = `${path}.tmp`;
   await writeFile(temp, `${JSON.stringify({ version: FILE_VERSION, profiles }, null, 2)}\n`, 'utf8');
-  await rename(temp, path);
+  await renameReplacing(temp, path);
 }
 
 /** @brief 同一个服务端模型（地址、接口、模型 id）只留一个档案，不论服务版本。 */

@@ -17,7 +17,6 @@ const paths = {
   refresh: 'M20 7v5h-5M4 17v-5h5M5 8a8 8 0 0 1 14-3l1 7M4 12l1 7a8 8 0 0 0 14-3',
   back: 'm15 5-7 7 7 7',
   flag: 'M5 21V4h12l-2.5 4.5L17 13H5',
-  shield: 'm12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Zm-4 9 3 3 5-6',
   quote: 'M5 7h5v5H7a3 3 0 0 0 0 0v1a3 3 0 0 1-2 3M14 7h5v5h-3v1a3 3 0 0 1-2 3',
   copy: 'M9 9h10v11H9ZM5 15V4h10',
   external: 'M14 4h6v6M20 4l-9 9M18 14v5H5V6h5',
@@ -26,6 +25,8 @@ const paths = {
   spark: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6',
   trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   clock: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM12 7v5l3 2',
+  // 排队：三行列表，最后一行后面一个往右的箭头（只有图标的"Queue"按钮）
+  queue: 'M4 6h16M4 11h16M4 16h8M15 14l3 3-3 3',
   // 记忆页（docs/specs/memory.md §10.1）：一本书，书脊在左，封面上一行标题。
   memory: 'M5 5.5A2.5 2.5 0 0 1 7.5 3H19v13H7.5A2.5 2.5 0 0 0 5 18.5ZM5 18.5A2.5 2.5 0 0 0 7.5 21H19v-5M9 7.5h6',
 } as const;

@@ -13,7 +13,7 @@ interface DefaultsValue {
   allowedZones: ('local' | 'intranet')[];
 }
 
-/** @brief 默认范围下拉：None 在第一项，再按 Groups、Providers、Models 三节（同顶栏菜单）。 */
+/** @brief 默认范围下拉：None 在第一项，再按 Groups、Providers、Models 三节（同范围菜单）。 */
 function PickSelect({ config, value, busy, onChange }: {
   config: ModelConfig; value: ModelPick | null; busy: boolean; onChange: (pick: ModelPick | null) => void;
 }) {

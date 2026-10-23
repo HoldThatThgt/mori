@@ -32,7 +32,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 对话空闲时发出 | `session.prompt`；`mori.team_deciding`（`since` 不为 null） | 你的消息照模型层的准备中先显示在对话流里（待发，model-chat.md）；会话按“发送中”显示，侧栏“生成中”，“停止”可用；顶栏范围与思考按钮不可用（准备中）；阶段行 `<create role> is deciding… · 4s`（下节） | 停止（Esc）；继续发消息（进排队区，下一行） |
+| 对话空闲时发出 | `session.prompt`；`mori.team_deciding`（`since` 不为 null） | 你的消息照模型层的准备中先显示在对话流里（待发，model-chat.md）；会话按“发送中”显示，侧栏“生成中”，“停止”可用；输入框下面一行的范围按钮与 Effort 按钮不可用（准备中）；阶段行 `<create role> is deciding… · 4s`（下节） | 停止（Esc）；继续发消息（进排队区，下一行） |
 | 对话在回复或准备中时发出 | `session.prompt`（Enter 记为排队，Ctrl+Enter 记为插话）；`mori.team_deciding.queue` | 排队区里一行，种类写 `Waiting for <create role>`（取代“排队”“插话”的位置），后面是消息原文；多条按发送顺序 | 撤回 |
 | 立项判断完，对话空闲 | `mori.team_deciding` 不再列它；随后模型层与 pi 的事件 | 对话以这条消息开始回复（准备中继续：阶段行换成模型层的等待，或不显示）；有回执时回执紧跟在这条消息之后（team-stream.md） | 停止 |
 | 立项判断完，对话正在回复 | pi 的 `queue_update` | 排队区这一行的种类从 `Waiting for <create role>` 变为“排队”（Enter）或“插话”（Ctrl+Enter），之后同 v0；pi 送进这条消息时它进对话流，回执紧跟在它后面 | 撤回（同 v0） |

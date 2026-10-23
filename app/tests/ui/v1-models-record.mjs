@@ -1,5 +1,5 @@
 // 从真实会话录制 v1 模型层回放用的 fixture（tests/fixtures/v1/*.json，docs/specs/model-providers.md §14.1、§14.2 的
-// 回放层：换模型、重做、回到首选、拒绝启动、顶栏范围、顶栏思考强度）。
+// 回放层：换模型、重做、回到首选、拒绝启动、输入框下面一行的选择范围与思考强度）。
 // 做法同原 m7-record.mjs（随工作回顾删除，docs/specs/memory.md §14.4）：页面里的录制器直接通过 window.mori（与界面相同的进程桥）发会话命令，记下命令、结果和后台进程
 // 转发的全部事件及其时间。不同的是故障与恢复按 §14.1 用真实方式触发：
 //   - 准备（synthetic test setup，v1-real-helpers.mjs）：复制负责人的数据目录（只复制加密的文件，不读 key），在复制出的
@@ -244,7 +244,7 @@ const switchMid = {
 const blocked = {
   name: 'blocked', layer: 'MP-09, MP-23', authorize: false,
   description: '项目没有授权公网：新会话被拒绝启动（no_candidate，候选都是 zone public is not allowed for this project），'
-    + '读一次顶栏菜单（全部变淡）；8 秒后给这个项目授权公网（models.setProjectZones），卡消失，发一句话由首选回答',
+    + '读一次范围菜单（全部变淡）；8 秒后给这个项目授权公网（models.setProjectZones），卡消失，发一句话由首选回答',
   async run(d, ctx) {
     await d.start();
     const s = await d.create(ctx.cwd);
@@ -275,10 +275,10 @@ const blocked = {
   },
 };
 
-/** @brief range：顶栏选提供商、选模型，各回答一句；重启后打开会话，范围沿用。 */
+/** @brief range：在范围菜单里选提供商、选模型，各回答一句；重启后打开会话，范围沿用。 */
 const range = {
   name: 'range', layer: 'MP-23',
-  description: '新会话（默认范围是分组）先在顶栏选第二个提供商、问一句，再选首选提供商的第一个模型、问一句；'
+  description: '新会话（默认范围是分组）先在范围菜单里选第二个提供商、问一句，再选首选提供商的第一个模型、问一句；'
     + '重启后打开这个会话，范围仍是那个模型',
   async run(d, ctx) {
     await d.start();
@@ -313,11 +313,11 @@ const range = {
 
 /**
  * @brief thinking：首选模型在 Models 里标"支持思考"（models.saveModel 录进命令序列，同 m6-record.mjs：m6-replay.mjs 照它
- *        在设置页里勾选），顶栏切到 high 有思考内容，切到 off 没有（§14.4，取代 m6/thinking.json）。
+ *        在设置页里勾选），Effort 切到 high 有思考内容，切到 off 没有（§14.4，取代 m6/thinking.json）。
  */
 const thinking = {
   name: 'thinking', layer: 'MP-37',
-  description: '在 Models 里把首选提供商的第一个模型标为支持思考（新会话默认"中"，等探针重新跑完）；新会话在顶栏切到 high，'
+  description: '在 Models 里把首选提供商的第一个模型标为支持思考（新会话默认"中"，等探针重新跑完）；新会话把 Effort 切到 high，'
     + '问一道要推理的题，回复带思考内容；切到 off 再问一道，回复没有思考内容',
   async run(d, ctx) {
     const info = await d.start();

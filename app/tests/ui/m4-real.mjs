@@ -203,7 +203,7 @@ async function item4(ctx) {
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.wheel(0, -300);
   await sleep(300);
-  await dragSelect(page, `${PANE} [data-testid="assistant"]`, sentence, index);
+  await dragSelect(page, `${PANE} [data-testid="assistant"]`, sentence, index, 'end');
   const shown = await popoverShown(page);
   const running = await paneOf(page).getAttribute('data-running');
   await sleep(800);

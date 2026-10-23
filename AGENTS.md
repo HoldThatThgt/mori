@@ -21,6 +21,8 @@
 
 1. 规格只写"必须看到"：每屏一张状态表（状态 ｜ 来源 ｜ 必须可见 ｜ 可做的操作），实现该屏前写好。
 2. 完成顺序：写状态表 → 从真实会话录 fixture → 界面测试 → 实现 → 用真实模型走一遍 → 负责人走查。缺一步不算完成。
+   录 fixture 和真实模型走查只在模型看到的或做的有变化时做（发给模型的文字、工具、批准、会话的命令和事件）；只改界面布局、
+   文字或样式时可以跳过，在检查记录里写明（2026-10-23 负责人定，见下面"测试分层"）。
 3. 每一步都可以走查：一步只做一屏的状态或一族事件，每步都有在 App 里看得到的变化。
 4. 不造后端：pi 有的能力直接用；pi 没有的，先确认是否在范围内（方案第 4 节、各构建规格的范围一节），不在就不写。
    每加一段非界面代码，都要能指向方案第 6 节"后台进程只做八件事"（第 6 件是模型层，按 `docs/specs/model-providers.md`，一键拉取模型按 `docs/specs/model-discovery.md`；第 7 件是平行 Agent 与 TaskBoard，按 `docs/specs/parallel-agents-taskboard.md`；第 8 件是记忆、拼装与增强，按 `docs/specs/memory.md`）或第 4 节表中标 Mori 的行。
@@ -29,6 +31,19 @@
    临时默认值登记在 [docs/v0/defaults.md](docs/v0/defaults.md)；模型层、一键拉取模型、平行 Agent 与记忆的登记在 [docs/v1/defaults.md](docs/v1/defaults.md)。
 7. 边界：pi 的运行时代码只在 `app/src/kernel/` 中 import；`app/src/shared/` 可以 `import type`。
    pi 和其他新依赖都锁精确版本，并确认可以离线使用。
+
+## 测试分层（2026-10-23 负责人定）
+
+测试按改动的范围分层跑，不为每个改动把全部界面测试在开发构建和打包程序上各跑一遍。跳过的层在检查记录里写明。
+
+1. 每次改动：`npm run check`、构建、单元测试（`npm run test:unit` 和改动涉及的其他单元测试脚本）。
+2. 再跑覆盖改动所在界面或模块的套件（`mN-app`、回放、`v1-models-*`、`tb-*`、`mem-*` 里相关的几个）。
+3. 推送到 `app-v0` 之前，在开发构建上跑一次完整回归：`node tests/ui/v1-models-existing.mjs --id TB-46` 等汇总、
+   各 `tb-*`、`v1-models-*`、`mem-*` 套件和各个 `spec-coverage` 检查。合并别的分支或 rebase 之后，只跑与冲突文件相关的
+   套件，再加上覆盖检查。
+4. 打包程序只做冒烟：`npm run dist:dir` 后跑 `m0-smoke --exe` 和一个 App 套件；只有改了打包配置、主进程或 preload 时，
+   才在打包程序上跑相关的套件。
+5. 真实模型走查只在模型看到的或做的有变化时跑（见上面第 2 条）。
 
 ## 工程约束（proposal 工程约束）
 

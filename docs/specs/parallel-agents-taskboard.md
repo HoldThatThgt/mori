@@ -39,7 +39,7 @@
 
 界面的基线：本分支从 `v1-model-providers` 开出；2026-10-21 合入了 `app-v0`（english-ui 与 v1 模型层），v0 界面文字按
 [v0/ui-strings.md](../v0/ui-strings.md) 的英文。还没有 composer-pickers（模型、Effort、权限按钮移到输入框那一行）；
-本规格的界面按本分支现有的顶栏布局写（§13.1），composer-pickers 合入时一并调整（记在检查记录里）。
+本规格的界面起初按本分支当时的顶栏布局写（§13.1）；2026-10-22 composer-pickers 合入后模型、思考强度、权限按钮和上下文用量在输入框下面一行，顶栏只有会话名、协作开关和这一栏的按钮，下面各处已按新布局改（docs/v0/composer-pickers.md“TaskBoard 合入之后”）。
 
 ## 1. 术语与代码名
 
@@ -200,7 +200,7 @@ models: [strong]
 
 与 v0 相同：对话 Agent 一个人工作，用它自己的工具；它能不能改文件，取决于它的工具配置（proposal §5）。唯一多出来的：
 这个项目里有对话持有者以外的角色时，对话 Agent 多一个 `agent_message`，可以临时问别的角色一个问题（§10.1）。
-没有别的角色（只有基座）时，与 v0 完全相同。模型按你在顶栏选的范围（统一模型提供商规格 §5）。
+没有别的角色（只有基座）时，与 v0 完全相同。模型按你在输入框下面一行选的范围（统一模型提供商规格 §5）。
 
 关闭模式下对话持有者是基座时，后台进程不重新设置启用的工具（pi 从会话记录恢复工具、Mori 补上后注册的扩展工具，都照 v0），只在有别的角色时启用 `agent_message`；
 对话持有者是写了 `tools` 的角色时，每次运行开始前用 `setActiveToolsByName` 设成角色的工具（有别的角色时加 `agent_message`）。
@@ -281,7 +281,7 @@ models: [strong]
 - 启用的工具只在每次运行开始前按这次运行的模式设置，模式改变时不立即换。进入协作模式前最后一次关闭模式的运行启用的工具名写进 `mori.team { mode, tools }`；
   回到 `off` 时恢复最后一条带 `tools` 的条目里的那一组，加上之后新注册、默认启用的工具；重新打开会话、`Check again` 之后同样。
 - 对话的工作卡写明当前模式、每个未关闭需求一行、这条消息上立项的决定与最后一段文字（§8.3）。
-- 模型：协作模式下按对话持有者的 `models`（基座按会话的选择范围），你不选，顶栏只显示正在用的模型（§12.11）。
+- 模型：协作模式下按对话持有者的 `models`（基座按会话的选择范围），你不选，范围按钮只显示正在用的模型（§12.11）。
 
 ### 5.6 程序投递到用户会话
 
@@ -836,7 +836,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
 
 | 会话 | 候选 | 能力要求 |
 | --- | --- | --- |
-| 对话会话，协作模式关闭 | 你在顶栏选的范围（统一模型提供商规格 §5） | `tool_calling` ∪ 对话持有者的 `requires` |
+| 对话会话，协作模式关闭 | 你在输入框下面一行选的范围（统一模型提供商规格 §5） | `tool_calling` ∪ 对话持有者的 `requires` |
 | 对话会话，协作模式下 | 对话持有者的 `models`；基座、没写 `models` 的角色用会话的范围（你最后选的，协作模式下不能改） | 同上 |
 | 关闭模式下的临时提问 | 被问角色的候选（没写 `models` 时为会话的范围）展开后，只留在对话会话展开的候选里也有的，顺序按被问角色 | `tool_calling` ∪ 被问角色的 `requires` |
 | 其余会话（立项、结案、task、协作模式下的临时提问、订阅） | 角色的 `models`；基座、没写的用会话的范围 | `tool_calling` ∪ 角色的 `requires` |
@@ -917,7 +917,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
 
 ### 12.11 协作模式下的模型按钮
 
-- `ModelState` 加 `pickLocked: boolean`：对话会话在协作模式下为真；顶栏模型按钮只显示正在用的模型，不能打开菜单，悬停 `Team mode picks the model for each agent`；
+- `ModelState` 加 `pickLocked: boolean`：对话会话在协作模式下为真；输入框下面一行的模型按钮只显示正在用的模型，不能打开菜单，悬停 `Team mode picks the model for each agent`；
   `session.setPick` 被拒绝，`session.pickOptions` 返回空；拒绝启动卡与说明卡不提供 `Change model`，改为提供 `Turn off team mode`：拒绝启动卡上按 §5.1 直接回到 `off`；No model available 说明卡上按普通的开关规则（可能变为 `once`）。回到 `off` 后恢复，范围仍是你最后选的（协作模式不写 `mori.pick`）。
 - 角色会话的拒绝启动与说明卡不提供 `Change model`。
 - 思考强度按钮不变：只作用于对话会话。
@@ -933,11 +933,11 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
 
 ### 13.1 协作开关
 
-- 顶栏（proposal §5“对话顶栏的开关”）在模型、思考强度、权限按钮之前加一个开关按钮：`role="switch"`，`aria-checked` 在 `once`、`always` 时为 `true`，
+- 顶栏（proposal §5“对话顶栏的开关”）右边一组的第一个、右栏开关之前加一个开关按钮：`role="switch"`，`aria-checked` 在 `once`、`always` 时为 `true`，
   文字 `Team: Off` / `Team: On` / `Team: Until done`（`once`），悬停分别为 `Turn on team mode` / `Messages go to <create role> first` / `Team mode ends when open requests are done`；
   标识 `data-testid="team-switch"`、`data-mode`。
 - 点击：`off` → `always`；`always` → `off`（不能回到 `off` 时 `once`，§5.1）；`once` → `always`。不需要确认。界面没准备好、或会话按 `agents_invalid` 拒绝启动时不可用；运行中可以点（影响之后的消息）。
-- 窄栏（这一栏不宽于 860px，§15）只显示状态点（`off` 空心，`always`、`once` 实心），读屏名称和悬停仍是完整文字。顶栏现有各档是按没有开关定的，每档刚过阈值时只剩约 8–25px，`Team: Until done`（约 108px）要宽于约 856px 才放得下，`Team` 加状态点（约 55px）在 1400 宽右栏打开（690px，模型按钮停在 120px）时也放不下；为放下状态点，顶栏另有两处收紧（显示项目名时由模型按钮让位、分屏窄栏里按钮间距和图标按钮收小），见 `docs/v1/screens/team-switch.md`“窄栏”。
+- 窄栏（这一栏不宽于 600px，§15）只显示状态点（`off` 空心，`always`、`once` 实心），读屏名称和悬停仍是完整文字。顶栏只有“项目名 › 会话名”、开关、右栏开关和分屏时的“Close pane”；完整的 `Team: Until done`（约 105px）宽于 600px 时会话名至少还有约 315px，和 1280 宽分屏里只有状态点时（约 310px）差不多，见 `docs/v1/screens/team-switch.md`“窄栏”。（composer-pickers 合入前是 860px，那时顶栏还有模型、思考强度、权限按钮和上下文用量，另有两处收紧；合入后都去掉了。）
 
 ### 13.2 回执
 
@@ -1181,7 +1181,7 @@ interface TaskView {
 | A 级强制填写 | 只在档案 `reasoning.can_disable` 为真时用，这次请求关闭思考 |
 | `decision` 类别的排队超时 / `task` 类别 | 60 秒（与 `conversation` 相同）/ 不超时 |
 | 模型族为空时 | 用 `<provider>/<model>` 当作族 |
-| 协作开关的窄栏宽度 | 860px（不宽于时只显示状态点） |
+| 协作开关的窄栏宽度 | 600px（不宽于时只显示状态点；composer-pickers 合入前是 860px） |
 | 给 `conversation`、`decision` 留的槽位 | 每个 key 1 个（`task`、`background` 最多占并发上限 − 1；并发上限为 1 时不留） |
 | 命令与界面名 | `/team`、`/team on`、`/team off`、`Team`（proposal 的暂定名；`/team off` 为派生） |
 | 基座的一句话说明（`next`、`assignee`、“Other roles”） | `General-purpose agent with the default tools` |
@@ -1289,7 +1289,7 @@ interface TaskView {
 | TB-35 | 停止 | 停止对话的回复只停对话和正在为它判断的立项、后台照常；`Stop team` 停止全部 Agent、批准按拒绝、待判断的消息回到输入框、等回复的 `agent_message` 以 `Stopped by the user.` 结束、task（含交给结案而结案在处理的）变为 `stopped`、没有原因为 `error` 的交接、停止之后端点没有新的请求、不自动重新开始；之后立项 `task_edit` 交回能继续原来的会话（reviewer 被停止时交回 reviewer）；Esc 停止对话回复时，排着的 `request_closed` 汇报与合并会话里排着的 `need_user` 投递在停止后照常开始；对话回复中立项在判断第二条消息时按 Esc，没有新的回复开始；`Stop team` 发生在结案运行与程序唤醒的立项运行中时没有强制填写、强制关闭、兜底投递，投递队列清空；F8 记 `Stop team` | App |
 | TB-36 | 重新载入与重启 | 界面重新载入后后台照常运行，TaskBoard、待判断的消息和后台批准卡都接上；重启后非终态的 task 为 `stopped`、显示 `Stopped (Mori restarted)`、批准作废、回执和进展摘要都在；交回交给结案的 task 时结案会话被唤醒；全部结束而没关闭的需求在下一条消息时唤醒结案；重启前删掉 `reviewer.md` 后，holder 为 reviewer 的 task 交回时交给结案；登记之后 App 退出的需求在重新打开时补写进展摘要的位置 | App |
 | TB-37 | 进展摘要 | 挂在登记它的回复下面（对话回复时你又排了一条消息也一样）；标题行、task 行、当前在做什么取最近一次工具调用（与工具卡同一标题规则）、各种 `phase` 的文字、交接链（含程序写的一棒）；需求关闭后显示 `Done`/`Failed`/`Cancelled`、时长停在 `closedAt`、没有 `Running` 的行、有结论；实时更新；重新打开后内容一致；需求状态按 §13.3 的顺序取（`Waiting for <create role>`、`With <close role>` 等） | App、回放、真实 |
-| TB-38 | 模型选择 | 角色按自己的 `models`、`requires` 选；`requires_unmet` 与 `probing` 的原因；协作模式下顶栏只显示模型、`setPick` 被拒绝、拒绝启动卡没有 `Change model`，回到 `off` 后范围不变；`differ_from: author` 排除改过代码的模型族；协作模式下对话会话被拒绝启动时卡上有 `Turn off team mode`，点后回到 `off`、未关闭需求的 task 变为 `stopped`；思考强度只作用于对话会话 | 单元、App |
+| TB-38 | 模型选择 | 角色按自己的 `models`、`requires` 选；`requires_unmet` 与 `probing` 的原因；协作模式下范围按钮只显示模型、`setPick` 被拒绝、拒绝启动卡没有 `Change model`，回到 `off` 后范围不变；`differ_from: author` 排除改过代码的模型族；协作模式下对话会话被拒绝启动时卡上有 `Turn off team mode`，点后回到 `off`、未关闭需求的 task 变为 `stopped`；思考强度只作用于对话会话 | 单元、App |
 | TB-39 | task 中途换模型 | 有过程时结束本轮、写 `mori.model_switch` 与 `mori.task_restart`、新模型上的请求里没有之前的消息、继续的消息提示读自己的会话、继续的那一段从新模型开始而不是首选；第一个请求就失败时原地换 | 单元、App |
 | TB-40 | 候选耗尽 | §12.5 表的每一行 | App |
 | TB-41 | 调度类别 | `conversation` > `decision` > `task` > `background`；`decision` 排队超时换模型，`task`、`background` 不超时；4 个 task 实例占满一个并发 4 的 key 时，对话的请求不排队超时（留出的槽位） | 单元、App |
@@ -1304,7 +1304,7 @@ interface TaskView {
 | TB-50 | `next` 与 `assignee` 的枚举 | 去掉自己、含 `mori`、说明写法与权限加注；只有基座时 task 实例没有 `next` | 单元 |
 | TB-51 | 投递队列 | 运行中到来的两次程序投递合并成一次、按到达顺序分段；用户消息的投递不与程序投递合并且排在前面；过期的投递不发出；排在一条段开始时选不到模型的消息之后的 `request_closed` 投递仍然发出 | 单元、App |
 | TB-52 | 后台实例的模型提示 | 实例换模型后进展摘要这一行末尾显示 `Switched model: A → B · <原因>`，下一次运行开始时清掉 | App |
-| TB-53 | 协作开关 | 三种文字与悬停、`aria-checked`、三种点击、界面没准备好时不可用、窄栏（不宽于 860px）只显示状态点 | App、回放 |
+| TB-53 | 协作开关 | 三种文字与悬停、`aria-checked`、三种点击、界面没准备好时不可用、窄栏（不宽于 600px）只显示状态点 | App、回放 |
 | TB-54 | 阶段行与 Stop team | 分开时立项判断、对话没在运行时阶段行 `<create role> is deciding… · Ns`；对话在回复时显示对话自己的阶段；合并会话不显示；后台在运行时有 `Stop team`；侧栏状态在只有后台运行时为生成中 | App |
 | TB-55 | 工具卡标题 | §13.8 每个工具的标题（三种 `agent_message`） | 单元、App |
 | TB-56 | 待判断的消息 | 对话回复中发的三条消息按顺序判断，排队区标 `Waiting for <create role>`；判断后 Enter 为排队、Ctrl+Enter 为插话；判断结束时对话已空闲则开始新的回复；“撤回”带回还没开始判断的消息；以 `/` 开头的扩展命令不经立项；对话在为别的消息准备中时判断完的消息排在它之后；提示词模板的展开文字出现在立项的投递里、需求记原文；扩展命令用 `sendUserMessage` 开始的运行的工作卡有 `No decision` 行 | App |
@@ -1325,8 +1325,8 @@ interface TaskView {
 | --- | --- |
 | `tests/fake-endpoint/server.mjs`、`selfcheck.mjs` | 加脚本模式（§17.1）与工具调用 id 的计数；现有关键词的回答不变；自检加脚本模式的几项 |
 | `tests/ui/harness/replay.js`、`main.jsx` | `board.get` 加进只读查询，录制里没有时合成一个空的 TaskBoard（代码里注明 synthetic）；`SessionInfo` 的 `team`、`board` 等新字段同样合成默认值；`session.prompt` 的比较加 `team`；`main.jsx` 加 `fixtures/tb`；`m6-replay.mjs`、`m7-replay.mjs` 改为从 `replay.js` 读只读查询列表 |
-| `m6-app-slash.mjs` | Shift+Tab 回到会话树的次数 8 → 9：协作开关是顶栏上一个真正可以聚焦的按钮，多一个停靠点；顶栏各档的布局检查不变（§13.1 的窄栏让它们照旧通过）；其余不变（`/team` 不进 “/” 列表） |
-| `m3-app.mjs` | 走查 2 的 Shift+Tab 上限 8 → 9（同上，多了协作开关）；其余不变（没有角色文件、没用过协作模式时工具与 v0 相同） |
+| `m6-app-slash.mjs` | Shift+Tab 回到会话树的次数 8 → 9：协作开关是顶栏上一个真正可以聚焦的按钮，多一个停靠点；顶栏各档的布局检查不变（§13.1 的窄栏让它们照旧通过）；其余不变（`/team` 不进 “/” 列表）。composer-pickers 合入后是 6 次（右栏开关 → 协作开关 → 左栏分隔线 → 底部两个按钮 → 会话行），顶栏的布局检查加上开关（宽于 600px 完整文字、不宽于时只有状态点） |
+| `m3-app.mjs` | 走查 2 的 Shift+Tab 上限 8 → 9（同上，多了协作开关；composer-pickers 合入后正好 6 次，路径第二步是开关）；其余不变（没有角色文件、没用过协作模式时工具与 v0 相同） |
 | `m6-app-tools.mjs` | 不变（没有角色文件、没用过协作模式时工具与 v0 相同） |
 | `tests/unit/reporter.mjs` | 改为工厂，默认仍写 `v1-unit.json`；新增 `tests/unit/tb-reporter.mjs` 写 `tb-unit.json` |
 | `tests/unit/probes.test.mjs` | 三种写法改为从 `forcedWrite.ts` 导入；`withStrictTools` 改为只给指定名字的工具加 `strict` 的检查；MP 编号与条目不变 |

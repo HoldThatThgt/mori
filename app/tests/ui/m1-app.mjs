@@ -4,6 +4,9 @@
 // "Retrying 1/3"；key 被拒改为删 key、加错的 key → 说明卡 → Open settings（焦点在 Keys）→ 加回对的 key。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动是 Base URL 和 API key → Fetch models → 清单里勾模型；
 // 卡上加 fake-slow 改为卡上 Fetch models → 勾 fake-slow → Add 1 model（page.mjs cardAddModels）。
+// 2026-10-21 起（docs/v0/composer-pickers.md）：输入框下面一行的上下文用量圆环（docs/v0/screens/models.md"上下文用量
+// （圆环）"）：还没有消息、颜色分档（改小上下文窗口）、999,950 写成 1M、刚压缩完（pi 的压缩参数调到每轮都压缩）；
+// 准备中、切换中（很短的范围"o3"，范围菜单往上打开、右边对齐范围按钮）、后台进程退出、Restart 之后这一行的样子和焦点。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m1-app.mjs                         测开发构建
 //   node tests/ui/m1-app.mjs --exe <Mori.exe 路径>   测打包后的程序
@@ -17,7 +20,11 @@ import {
   appRoot, arg, createRecorder, killKernel, launch, mainPid, oneLine, prepareProject, processTree, sleep, sleepProcessIds,
   stillAlive, waitGone,
 } from './lib.mjs';
-import { smallText } from './m1-layout.mjs';
+import {
+  composerRow, focusName, hoverRing, layoutProblems, openRingDetails, pendingProblems, popoverChecks,
+  ringColorProblems, ringState, ringTextProblems, rowSummary, seenRows, seenWith, setPaneWidth, SINGLE, smallText,
+  stateProblems, watchRows,
+} from './m1-layout.mjs';
 import { pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -32,6 +39,15 @@ const { record, write } = createRecorder(exePath ?? 'dev build');
 /** 重新载入后对话流里的说明（state/projects.ts RELOADED_NOTE） */
 const RESTARTED_NOTE = 'Restarted · Queued messages, pending approvals, and “Allow for this session” choices '
   + 'weren’t restored';
+/** 还没有消息、刚压缩完时圆环的描述和详情里的说明（models.md"上下文用量（圆环）"） */
+const EMPTY_NOTE = 'Send a message to see context usage.';
+const COMPACTED_NOTE = 'Just compacted. Context usage shows after the next response.';
+/** 选择范围按钮悬停的第二行：首次启动建的提供商名和区域 */
+const APP_OPTS = { modelTip: 'Mori endpoint · Local' };
+/** pi 不自动压缩（改小上下文窗口看圆环的颜色时，不让压缩把用量清掉） */
+const NO_COMPACTION = { compaction: { enabled: false } };
+/** 量圆环时新会话的第一条消息（同一个项目、同一句话，第一次回复之后的用量相同） */
+const RING_FIRST = 'plain 圆环的第一条';
 
 /** @brief 启动合成端点（第一个分块前等 1.2 秒，便于看到"Waiting for the model…"）。 */
 function startFakeEndpoint() {
@@ -45,11 +61,13 @@ function startFakeEndpoint() {
 
 /**
  * @brief pi 的重试间隔调短（pi 自己的 settings.json）。v1 里 pi 的自动重试对 Mori 的会话关闭（规格 §5.5），重试由
- *        模型池按 §12 的真实间隔做；这份设置留着，保证 pi 读到的是一个合法的 settings.json。
+ *        模型池按 §12 的真实间隔做；这份设置留着，保证 pi 读到的是一个合法的 settings.json。extra 是另外要写的设置
+ *        （例如压缩参数）。
  */
-function fastRetry(userData) {
+function fastRetry(userData, extra = {}) {
   mkdirSync(join(userData, 'pi'), { recursive: true });
-  writeFileSync(join(userData, 'pi', 'settings.json'), JSON.stringify({ retry: { baseDelayMs: 200 } }, null, 2));
+  const settings = { retry: { baseDelayMs: 200 }, ...extra };
+  writeFileSync(join(userData, 'pi', 'settings.json'), JSON.stringify(settings, null, 2));
 }
 
 /**
@@ -126,11 +144,40 @@ async function firstRun({ app, page, h, project, userData }) {
   await h.allowAll();
 }
 
-/** @brief 发第一条消息：先"Waiting for the model…"，再流式文字；读取卡完成；上下文用量随对话增长。 */
+/**
+ * @brief 准备中（v1，chat.md"输入框下面一行"准备中，models.md"不可用时、按钮消失时的焦点"）：发了第一条消息、pi 还没开始时
+ *        按钮位置是"Stop"；选择范围和 Effort 不可用（aria-disabled），原因是"Can’t switch models until the response
+ *        finishes"（范围按钮悬停第三行）、"Can’t change effort until the response finishes"；权限和圆环可用；占位文字
+ *        "Enter to queue · Shift+Enter for new line"。seen 是 watchRows 抓到的状态。
+ */
+function preparingRow(seen) {
+  const row = seenWith(seen, 'preparing');
+  const problems = [...layoutProblems(row), ...stateProblems(row, 'preparing', APP_OPTS)];
+  record('对话：准备中（发了消息、pi 还没开始）按钮位置是"Stop"，选择范围和 Effort 不可用（aria-disabled）、原因对，'
+    + '权限和圆环可用，占位文字"Enter to queue · Shift+Enter for new line"', problems.length === 0,
+  `${problems.join('; ')} ${rowSummary(row)}`);
+}
+
+/**
+ * @brief 发第一条消息：先"Waiting for the model…"，再流式文字；读取卡完成；上下文用量随对话增长。
+ *        还没有消息时圆环为空（data-state="empty"、data-tokens="0"），增长从第一次回复之后开始比（composer-pickers.md
+ *        "测试要改的地方"）；第一次回复之后圆环有用量、强调色。发出时抓一次准备中的这一行。
+ */
 async function firstMessage({ page, h }) {
+  const empty = await ringState(page);
+  record('对话：新会话还没有消息时输入框下面一行的圆环为空（data-state="empty"、data-tokens 为 0，读屏名"Context window"、'
+    + '描述"Send a message to see context usage."）', empty?.state === 'empty' && empty.tokens === '0'
+    && empty.label === 'Context window' && empty.desc === EMPTY_NOTE, JSON.stringify(empty));
   await h.sampleStages();
+  await watchRows(page);
   await h.send('总结 README');
   await h.idle();
+  preparingRow(await seenRows(page));
+  const used = await hoverRing(page);
+  const usedProblems = [...ringTextProblems(used), ...ringColorProblems(used)];
+  record('对话：第一次回复之后圆环有用量：读屏名"Usage: Context approximately … of 128,000 tokens (N%)"、悬停'
+    + '"Context ≈ …k / 128k (N%)"与 data-tokens 一致，填充是强调色、底圈 --color-line', usedProblems.length === 0
+    && / \/ 128k \(\d+%\)$/.test(used?.tip ?? ''), `${usedProblems.join('; ')} ${used?.tip} | ${used?.label}`);
   const stages = await h.stages();
   record('对话：先显示"等待模型响应"，再"生成中"', stages[0] === 'Waiting for the model…'
     && stages.includes('Responding…'), stages.join(' → '));
@@ -141,7 +188,8 @@ async function firstMessage({ page, h }) {
   await h.send('plain 再说一句');
   await h.idle();
   const after = await h.usageTokens();
-  record('对话：顶栏上下文用量随对话增长', before !== null && after !== null && after > before, `${before} → ${after}`);
+  record('对话：输入框下面一行的上下文用量（圆环）随对话增长', before !== null && after !== null && after > before,
+    `${before} → ${after}`);
 }
 
 /** @brief 代码块上的"Copy code"：代码进系统剪贴板（Mori 只放行自己页面写剪贴板这一项权限）。 */
@@ -182,6 +230,62 @@ async function cancelTest({ page, h, userData }) {
   record('设置：卡上 Fetch models 加入模型不改默认范围：normalDefault 仍是 mori-endpoint/fake-coder',
     config.normalDefault === 'mori-endpoint/fake-coder', String(config.normalDefault));
   await page.getByRole('button', { name: 'Back to app' }).click();
+}
+
+/** @brief 在这一栏的范围菜单里选 pick（模型全名或范围名），等按钮显示它、切换结束。 */
+async function chooseRange(page, pick) {
+  await page.locator(`${SINGLE} [data-testid="model-button"]`).click();
+  await page.getByTestId('model-menu').locator(`[role="menuitemradio"][data-pick="${pick}"]`).click();
+  await page.waitForFunction((want) => {
+    const button = document.querySelector('.pane-slot:not([hidden]) [data-testid="model-button"]');
+    return button?.dataset.pick === want && !button.dataset.pending;
+  }, pick, { timeout: 30000 });
+}
+
+/** @brief 设置 → Models 里给合成端点加一个模型 id，等它的 tool calling 验证过（自动探测没跑时点一次 Verify）。 */
+async function addVerifiedModel(page, h, id) {
+  await h.openModels();
+  await h.providerCard().locator('[data-action="add-model"]').click();
+  const form = page.getByTestId('model-form');
+  await form.getByLabel('Model ID', { exact: true }).fill(id);
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  const row = page.locator(`[data-testid="model-row"][data-model="mori-endpoint/${id}"]`);
+  const verified = row.locator('[data-field="tool_calling"][data-value="verified"]');
+  await row.waitFor({ timeout: 15000 });
+  if (!await verified.waitFor({ timeout: 60000 }).then(() => true, () => false)) {
+    await row.locator('[data-action="verify"]').click();
+    await verified.waitFor({ timeout: 120000 });
+  }
+  await page.getByRole('button', { name: 'Back to app' }).click();
+}
+
+/**
+ * @brief 很短的范围（models.md"菜单的位置与键盘"：模型 id"o3"时范围按钮约 46px、被 margin-left: auto 推到右边，左边到
+ *        这一行右端不到 300px；composer-pickers.md"测试要改的地方"新加的检查第 4 条）：设置 → Models 里加一个模型"o3"
+ *        （合成端点对任何模型 id 都回答），在这一行的范围菜单里选它：切换中范围按钮和 Effort 都 aria-disabled、
+ *        带 data-pending，悬停只有第一行、没有描述，焦点留在范围按钮上（models.md"选择范围按钮"切换中）；空闲时在 930px 和
+ *        680px 的单栏各打开一次范围菜单（300px）：往上打开、右边对齐范围按钮、不伸出这一行。最后换回 fake-coder。
+ */
+async function shortRange({ app, page, h }) {
+  await addVerifiedModel(page, h, 'o3');
+  await watchRows(page);
+  await chooseRange(page, 'mori-endpoint/o3');
+  const switching = seenWith(await seenRows(page), 'pending');
+  const pending = pendingProblems(switching, 'o3');
+  record('范围：在这一行的范围菜单里选"o3"：切换中范围按钮和 Effort 都 aria-disabled、带 data-pending，悬停只有第一行'
+    + '（"o3"）、没有描述，焦点留在范围按钮上', pending.length === 0, `${pending.join('; ')} ${rowSummary(switching)}`);
+  const menus = [];
+  for (const width of [930, 680]) {
+    await setPaneWidth(page, app, width);
+    menus.push(...(await popoverChecks(page, SINGLE, ['model'])).map((problem) => `${width}px ${problem}`));
+  }
+  const row = await composerRow(page);
+  const idle = stateProblems(row, 'idle', APP_OPTS);
+  record('范围：范围按钮"o3"（约 46px）时 930px、680px 空闲打开范围菜单（宽 300px）：往上打开、右边对齐范围按钮、'
+    + '不伸出这一行和会话面板；按钮可用、悬停第二行"Mori endpoint · Local"', menus.length === 0 && idle.length === 0
+    && row?.items.model?.content === 'o3', `${menus.join('; ')} ${idle.join('; ')} ${rowSummary(row)}`);
+  await chooseRange(page, 'mori-endpoint/fake-coder');
+  await setPaneWidth(page, app, 930);
 }
 
 /**
@@ -330,16 +434,53 @@ async function kernelExit({ app, page, h }) {
     `后台进程 PID ${pid}`);
   record('退出：执行中的命令卡变为"已中断"', last?.status === 'interrupted', JSON.stringify(last));
   record('退出：输入框里的草稿还在', (await h.textarea.inputValue()) === '还没发出的草稿');
+  await crashedRow(page);
   await page.screenshot({ path: join(shots, '03-kernel-exit.png') });
   const usersBefore = await page.getByTestId('user-message').count();
-  await page.getByRole('button', { name: 'Restart' }).click();
-  await page.getByText(RESTARTED_NOTE).waitFor({ timeout: 30000 });
+  await restartFromModel(page);
   const usersAfter = await page.getByTestId('user-message').count();
   record('退出：重新载入后从会话文件恢复对话，草稿不受影响', usersAfter === usersBefore
     && (await h.textarea.inputValue()) === '还没发出的草稿', `${usersBefore} → ${usersAfter}`);
   await h.send('plain 重新载入之后');
   await h.idle();
   record('退出：重新载入后可以继续对话', (await page.getByTestId('assistant').last().innerText()).length > 0);
+}
+
+/**
+ * @brief 后台进程退出时输入框下面一行（chat.md"后台进程退出"）：权限、选择范围、Effort 不可用（aria-disabled），
+ *        原因"Mori’s background process crashed"（权限、Effort 悬停第二行，范围按钮第三行，读屏的描述）；
+ *        圆环保留最后的用量，详情仍能打开。
+ */
+async function crashedRow(page) {
+  const problems = stateProblems(await composerRow(page), 'crashed', APP_OPTS);
+  const ring = await openRingDetails(page);
+  await page.keyboard.press('Escape');
+  record('退出：输入框下面一行的权限、选择范围、Effort 不可用（aria-disabled），原因"Mori’s background process crashed"；'
+    + '圆环保留最后的用量、详情仍能打开', problems.length === 0 && ring?.state === 'used'
+    && Number(ring.tokens) > 0 && ring.details !== null, `${problems.join('; ')} ${JSON.stringify(ring?.details)}`);
+}
+
+/**
+ * @brief 焦点放在范围按钮上点"Restart"（element.click()，不挪焦点），等重新载入完：重新载入中"Restarting…"和
+ *        Restart 之后重新打开中"Starting…"时这一行仍有上一次的选择范围、Effort 和圆环（不可用、原因同按钮位置的说明），
+ *        焦点一直留在范围按钮上（models.md"不可用时、按钮消失时的焦点"）。
+ */
+async function restartFromModel(page) {
+  await page.locator(`${SINGLE} [data-testid="model-button"]`).focus();
+  await watchRows(page);
+  await page.evaluate(() => [...document.querySelectorAll('[data-testid="kernel-exit"] button')]
+    .find((button) => button.textContent.includes('Restart'))?.click());
+  await page.getByText(RESTARTED_NOTE).waitFor({ timeout: 30000 });
+  const seen = await seenRows(page);
+  const restarting = seenWith(seen, 'Restarting…');
+  const reopening = seenWith(seen, 'Starting…');
+  const problems = [...stateProblems(restarting, 'restarting', APP_OPTS).map((p) => `Restarting…: ${p}`),
+    ...stateProblems(reopening, 'reopening', APP_OPTS).map((p) => `Starting…: ${p}`)];
+  const focus = await focusName(page);
+  record('退出：Restart 之后"Restarting…"和重新打开中"Starting…"时这一行仍有上一次的选择范围、Effort 和圆环（不可用，'
+    + '原因是按钮位置的说明），焦点一直留在范围按钮上', problems.length === 0 && restarting?.focus === 'model-button'
+    && reopening?.focus === 'model-button' && focus === 'model-button',
+  `${problems.join('; ')} 焦点 ${restarting?.focus}/${reopening?.focus}/${focus}；${Object.keys(seen)}`);
 }
 
 /** @brief 调整两条分隔线后重启 App，宽度还在。 */
@@ -368,16 +509,116 @@ async function layoutRestart({ page, h, app, project, userData }) {
   return { app: next, page: nextPage, h: helpers };
 }
 
+/**
+ * @brief 用新的数据目录启动 Mori（pi 的设置另加 options.settings），首次启动填好合成端点的连接（区域 Local；
+ *        options.contextWindow、options.reasoning 给出时填进表单），等探针跑完（不通过时报错），打开 project。
+ * @param prefix 临时数据目录的前缀
+ */
+async function freshApp(prefix, project, { settings = {}, contextWindow, reasoning } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  fastRetry(dir, settings);
+  const freshMori = await launch({ exePath, userData: dir });
+  const freshPage = await freshMori.firstWindow();
+  const helpers = pageHelpers(freshPage);
+  await helpers.setupFirstRun({ baseUrl, apiKey: testKey, contextWindow, reasoning });
+  await helpers.openFolder(freshMori, project);
+  return { app: freshMori, page: freshPage, h: helpers };
+}
+
+/** @brief 发一条消息、等本轮结束，返回悬停时量到的圆环。 */
+async function sendAndHover(page, h, text) {
+  await h.send(text);
+  await h.idle();
+  return hoverRing(page);
+}
+
+/**
+ * @brief 圆环的数（models.md"上下文用量（圆环）"）：上下文窗口 999,950 时悬停写成"… / 1M (N%)"（按 k 会进成"1000k"），
+ *        读屏名写完整的"999,950"；pi 不压缩。返回第一次回复之后的 token 数（ringTones 按它定窗口）；量不到时为 0。
+ */
+async function ringMillion({ project }) {
+  const fresh = await freshApp('mori-m1-app-million-', project, { settings: NO_COMPACTION, contextWindow: 999950 });
+  try {
+    const ring = await sendAndHover(fresh.page, fresh.h, RING_FIRST);
+    record('圆环：上下文窗口 999,950 时悬停写成"Context ≈ … / 1M (N%)"（不是"1000k"），读屏名写完整的"999,950"',
+      / \/ 1M \(\d+%\)$/.test(ring?.tip ?? '') && Boolean(ring?.label?.includes(' of 999,950 tokens '))
+      && ringTextProblems(ring).length === 0, `${ring?.tip} | ${ring?.label}`);
+    return Number(ring?.tokens) || 0;
+  } finally {
+    await fresh.app.close().catch(() => {});
+  }
+}
+
+/**
+ * @brief 圆环的颜色分档（models.md"上下文用量（圆环）"快满；defaults.md"上下文用量圆环的样子"）：pi 不压缩；首次启动时把
+ *        上下文窗口定成 tokens / 0.8（tokens 是 ringMillion 量到的第一次回复之后的用量：同一个项目、同一句话，用量相同），
+ *        第一次回复之后应落在 75–89%（较深的警示色 --color-warn-text），再发一条补足字数的消息让它 ≥ 90%（危险色）；
+ *        有填充时底圈 --color-line；读屏名、悬停与 data-tokens 一致。
+ */
+async function ringTones({ project }, tokens) {
+  const window = Math.ceil(tokens / 0.8);
+  const fresh = await freshApp('mori-m1-app-tones-', project, { settings: NO_COMPACTION, contextWindow: window });
+  try {
+    const { page, h } = fresh;
+    const warn = await sendAndHover(page, h, RING_FIRST);
+    // 合成端点的用量按请求里消息的字数 / 4 估算：补的字让下一次的用量约到窗口的 95%
+    const pad = 'x'.repeat(Math.max(0, Math.ceil((window * 0.95 - Number(warn?.tokens ?? 0)) * 4)));
+    const danger = await sendAndHover(page, h, `plain 圆环的第二条 ${pad}`);
+    const percents = [warn, danger].map((ring) => Number(ring?.percent));
+    const problems = [warn, danger].flatMap((ring) => [...ringColorProblems(ring), ...ringTextProblems(ring)]);
+    record('圆环：75–89% 用较深的警示色（--color-warn-text）、≥ 90% 用危险色；有填充时底圈 --color-line；读屏名、悬停与 '
+      + 'data-tokens 一致', percents[0] >= 75 && percents[0] < 90 && percents[1] >= 90 && problems.length === 0,
+    `窗口 ${window}；${percents.join(' → ')}% ${problems.join('; ')}`);
+  } finally {
+    await fresh.app.close().catch(() => {});
+  }
+}
+
+/**
+ * @brief 刚压缩完（models.md"上下文用量（圆环）"刚压缩完）：pi 的压缩参数调到每轮之后都压缩（128,000 的窗口里 reserveTokens
+ *        127500，超过 500 就压缩；keepRecentTokens 1），发消息直到对话流里出现"Compacted session"：这时圆环为空、底圈是虚线、
+ *        没有 data-tokens 和 data-percent，悬停和读屏名"Context window"，描述和详情里是"Just compacted. …"。
+ *        （回放的 m1/compaction.json 里录不到这个状态，见 m1-replay.mjs compactionCheck。）
+ */
+async function ringCompacted({ project }) {
+  const settings = { compaction: { enabled: true, reserveTokens: 127500, keepRecentTokens: 1 } };
+  const fresh = await freshApp('mori-m1-app-compact-', project, { settings });
+  try {
+    const { page, h } = fresh;
+    const compactions = () => page.getByText('Compacted session', { exact: true }).count();
+    for (let turn = 1; turn <= 3 && await compactions() === 0; turn += 1) {
+      await h.send(`plain 压缩前的第 ${turn} 条`);
+      await h.idle();
+    }
+    const ring = await hoverRing(page);
+    const opened = await openRingDetails(page);
+    await page.keyboard.press('Escape');
+    const compacted = await compactions();
+    record('圆环：刚压缩完（还没有新的回复）时为空、底圈虚线，没有 data-tokens / data-percent，悬停和读屏名"Context window"，'
+      + '描述和详情里"Just compacted. Context usage shows after the next response."', compacted > 0
+      && ring?.state === 'compacted' && ring.tokens === null && ring.percent === null
+      && ring.label === 'Context window' && ring.tip === 'Context window' && ring.desc === COMPACTED_NOTE
+      && Boolean(opened?.details?.includes(COMPACTED_NOTE)) && ringColorProblems(ring).length === 0,
+    `压缩 ${compacted} 次；${JSON.stringify(ring)}`);
+  } finally {
+    await fresh.app.close().catch(() => {});
+  }
+}
+
+/** @brief 圆环要另起 Mori 的几项：999,950 写成 1M（顺便量出第一次回复后的用量）、颜色分档、刚压缩完。 */
+async function ringRuns(ctx) {
+  const tokens = await ringMillion(ctx).catch((error) => {
+    record('圆环 1M：流程', false, oneLine(error, 400));
+    return 0;
+  });
+  if (tokens > 0) await ringTones(ctx, tokens).catch((error) => record('圆环颜色：流程', false, oneLine(error, 400)));
+  else record('圆环颜色：没有量到第一次回复之后的用量，定不了上下文窗口', false);
+  await ringCompacted(ctx).catch((error) => record('圆环刚压缩完：流程', false, oneLine(error, 400)));
+}
+
 /** @brief Mori 主进程被强行结束（模拟崩溃）时，后台进程和正在运行的命令也都结束，不留下任何 Mori 的进程。 */
 async function mainKilled({ project }) {
-  const dir = mkdtempSync(join(tmpdir(), 'mori-m1-app-crash-'));
-  fastRetry(dir);
-  const crashApp = await launch({ exePath, userData: dir });
-  const crashPage = await crashApp.firstWindow();
-  const helpers = pageHelpers(crashPage);
-  // page.mjs setupFirstRun：测试连接失败、探针没通过、Fetch models 没拿到列表或 fake-coder 是手填的时报错
-  await helpers.setupFirstRun({ baseUrl, apiKey: testKey });
-  await helpers.openFolder(crashApp, project);
+  const { app: crashApp, page: crashPage, h: helpers } = await freshApp('mori-m1-app-crash-', project);
   await helpers.allowAll();
   const before = new Set(sleepProcessIds(['63']));
   await helpers.send('run: sleep 63');
@@ -405,7 +646,8 @@ let page = await app.firstWindow();
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(error.message));
 const ctx = { app, page, h: pageHelpers(page), project, userData };
-const steps = { firstRun, firstMessage, copyCode, cancelTest, escStop, queueSteer, errors, kernelExit };
+const steps = { firstRun, firstMessage, copyCode, cancelTest, shortRange, escStop, queueSteer, errors,
+  kernelExit };
 try {
   for (const [name, step] of Object.entries(steps)) {
     try {
@@ -419,6 +661,7 @@ try {
   app = ctx.app;
   page = ctx.page;
   await app.close().catch(() => {});
+  await ringRuns(ctx);
   await mainKilled(ctx).catch((error) => record('崩溃：流程', false, oneLine(error, 400)));
 } catch (error) {
   record('布局重启：流程', false, oneLine(error, 400));

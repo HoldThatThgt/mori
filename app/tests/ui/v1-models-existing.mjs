@@ -80,7 +80,7 @@ const suite = (name, takesExe, extra = {}) => ({ name, takesExe, command: [join(
 const APP_SUITES = [
   suite('m0-smoke', true), suite('m1-app', true), suite('m2-app', true), suite('m3-app', true), suite('m4-app', true),
   suite('m5-app', true), suite('m6-app-settings', true), suite('m6-app-tools', true), suite('m6-app-slash', true),
-  suite('m6-app-mcp-shared', true),
+  suite('m6-app-row', true), suite('m6-app-mcp-shared', true),
 ];
 /** 模型层 §14.4 的回放套件（test:replay、test:m2-replay … test:m6-replay） */
 const REPLAY_SUITES = ['m1-replay', 'm2-replay', 'm3-replay', 'm4-replay', 'm5-replay', 'm6-replay']

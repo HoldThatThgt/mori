@@ -66,15 +66,15 @@
 | 协作模式下的 No model available 卡 | `mori.model_unavailable`，`pickLocked` 为真（说明卡没有 `actions`，由界面按 `pickLocked` 加） | model-chat.md 的说明卡，`Open settings` 旁多一个 `Turn off team mode`（§12.11“说明卡……改为提供 `Turn off team mode`”） | Turn off team mode；Open settings |
 | 点了 Turn off team mode（拒绝启动卡） | 你的操作：`session.setTeam { mode: 'off' }`；F8 记 `Team off` | 直接回到 `off`，不看回到 off 的条件（§5.1）：开关变为 `Team: Off`；未关闭需求的非终态 task 变为 `stopped`，进展摘要显示 `Stopped`，需求仍在 TaskBoard 上（下次进入协作模式时立项在工作卡里看到它们）；`pickLocked` 变为假，模型按钮恢复；后台进程重新做静态校验（§12.1），卡消失或换成关闭模式下的卡（这时有 `Change model…`） | — |
 | 点了 Turn off team mode（说明卡） | 同上 | 会话没有被拒绝启动，按开关的规则：满足回到 off 的条件时 `off`，否则 `once`（team-switch.md；见“需要规格回答”） | — |
-| 回到 off 之后 | `ModelState`（`pickLocked: false`） | 顶栏的范围是你最后选的（协作模式不写 `mori.pick`，§12.11） | 改范围 |
+| 回到 off 之后 | `ModelState`（`pickLocked: false`） | 范围按钮显示的范围是你最后选的（协作模式不写 `mori.pick`，§12.11） | 改范围 |
 
 ## 协作模式下的模型按钮
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 锁定 | `ModelState.pickLocked` 为真 | 按钮只显示正在用的模型：`<当前模型 id>`，不写范围名，没有 ▾（§12.11；写法临时，走查时可以改）；不能打开菜单（点击、Enter 都不打开）；悬停 `Team mode picks the model for each agent` | — |
+| 锁定 | `ModelState.pickLocked` 为真 | 输入框下面一行原来范围按钮的位置（同样的最窄宽度和截短，v0 models.md“窄栏”）只显示正在用的模型：`<当前模型 id>`，不写范围名，没有 ▾（§12.11；写法临时，走查时可以改）；不能打开菜单（点击、Enter 都不打开）；悬停 `Team mode picks the model for each agent` | — |
 | 锁定、没有当前模型 | `pickLocked` 为真，`current` 为 null（被拒绝启动） | 按钮文字 `No model`（临时，走查时可以改），悬停同上 | — |
-| 锁定、准备中或生成中 | 同上 | 悬停仍是 `Team mode picks the model for each agent`（不换成“Can't change the model while generating”，临时，走查时可以改） | — |
+| 锁定、准备中或生成中 | 同上 | 悬停仍是 `Team mode picks the model for each agent`（不换成“Can’t switch models until the response finishes”，临时，走查时可以改） | — |
 | 段内换了模型 | `mori.model_state` | 按钮换成新模型的 id | — |
 | 当前模型从哪来 | §12.1 | 协作模式下对话会话按对话持有者的 `models` 选（基座、没写 `models` 的角色按会话的范围），按钮显示的就是它选到的 | — |
 | 解锁 | `pickLocked` 变为假（回到 `off`） | 恢复 model-menu.md 的样子（“<范围名> · <当前模型 id>”和 ▾），范围是你最后选的 | 打开菜单 |
@@ -96,7 +96,7 @@
 - `agents_invalid` 的卡上没有 `Open settings`、`Change model…`，只有 `Check again`。
 - 被 `agents_invalid` 拒绝启动的会话按 Enter 不发送，草稿不丢。
 - 协作模式下点模型按钮不打开菜单；拒绝启动卡上没有 `Change model…`。
-- 协作模式不改你选的范围：回到 `off` 后顶栏仍是协作模式之前的范围。
+- 协作模式不改你选的范围：回到 `off` 后范围按钮仍是协作模式之前的范围。
 - 实例会话（立项、结案、task、临时提问、订阅）的拒绝启动与说明卡不出现在界面上（实例的事件不转给界面，§8.2）；它们的结果在进展摘要里（例如 `Mori: no model`）。
 - 后台实例改的文件不出现在“本会话的改动”里。
 

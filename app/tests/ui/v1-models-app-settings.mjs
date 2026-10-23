@@ -300,7 +300,7 @@ async function trySend(ctx, fake, text) {
   return { disabled, kept, added, requests: chatsOf(fake, since).length };
 }
 
-/** @brief 在当前一栏的顶栏范围菜单里选 pick，等按钮的 data-pick 变过去。 */
+/** @brief 在当前一栏输入框下面一行的范围菜单里选 pick，等按钮的 data-pick 变过去。 */
 async function choosePick(page, pick) {
   const button = page.locator(`${PANE} [data-testid="model-button"]`);
   await button.click();
@@ -308,7 +308,7 @@ async function choosePick(page, pick) {
   return poll(() => button.getAttribute('data-pick'), (value) => value === pick, 10000);
 }
 
-/** @brief 顶栏范围菜单的全部项（data-pick），看完按 Esc 关上。 */
+/** @brief 范围菜单的全部项（data-pick），看完按 Esc 关上。 */
 async function menuPicks(page) {
   await page.locator(`${PANE} [data-testid="model-button"]`).click();
   await page.getByTestId('model-menu').waitFor({ timeout: 5000 });

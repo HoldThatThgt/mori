@@ -14,7 +14,7 @@
 - 选择范围与选择器、会话启动校验、按可用性换 key 与换模型、重做与重建上下文、候选耗尽；
 - 模型档案与探针（含交接写入等级 A/B/C 的判定）、适配层中普通模式用得到的部分；
 - 按 key 的模型池（并发、排队、简单优先级、记住不可用）；
-- 设置页的模型部分、首次启动表单、顶栏的选择范围、对话流里的提示、阶段行、拒绝启动的说明；
+- 设置页的模型部分、首次启动表单、输入框下面一行的选择范围、对话流里的提示、阶段行、拒绝启动的说明；
 - 现有测试与回放随之调整（§14.4）。
 
 （2026-10-23 注：提供商表单、卡片上的 Add model、首次启动表单和探针第 0 步按一键拉取模型改，见 [model-discovery.md](model-discovery.md) §0。）
@@ -236,7 +236,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 
 - 普通模式下每个会话有一个选择范围，记在会话文件里（自定义条目 `mori.pick`，`{ pick }`），以最后一条为准：
   - 新会话：创建时记下当时的 `normalDefault`；`normalDefault` 为 `null` 时不记，会话按 `no_pick` 拒绝启动；
-  - 你在顶栏选了一个范围：再记一条（§5.10）；
+  - 你在范围菜单里选了一个范围：再记一条（§5.10）；
   - 打开一个没有 `mori.pick` 的会话（v0 的旧会话）：最后一条助手消息的 `<provider>/<model>` 在配置里存在就以它为范围，否则用当时的 `normalDefault`；打开时记下这一条。
   - 设置里的默认范围后来改了，已有会话的范围不变。
 - 展开：分组 → 成员按分组中的顺序（项目配置缩小过的按 §4.3），提供商成员展开成它列出的全部模型，模型成员就是它自己；提供商 → 它的模型按顺序；模型 → 它自己。
@@ -346,7 +346,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 
 proposal §8 中“不换”的各项按 §5.4 处理：输出格式错误、上下文太长（压缩或重建）、内容策略拦截、你按了停止、已经有输出、5xx（原地重试）。
 
-### 5.10 顶栏的选择范围
+### 5.10 选择范围菜单
 
 - 菜单列出全部分组、提供商和模型；选一个就写一条 `mori.pick`，重新做静态校验，下一段起生效。
 - 回复进行中（含 §11.4 的准备阶段）不能改，沿用 v0 的临时默认值“生成中不能换模型和思考强度”。
@@ -574,12 +574,13 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 - 已经有配置时不显示首次启动表单（`config.get` 的 `firstRun`，§9.4）；配置存在但读不出时也不显示（§4.1）。
 - 测试连接不用 v0 的 30 秒总时限：排队按 §8.2，每次尝试按 §5.4 的首个内容时限，不做原地重试（`server` 直接报告）。
 
-### 9.2 顶栏
+### 9.2 选择范围按钮与思考强度（输入框下面一行）
 
 - 协作模式下（`ModelState.pickLocked`，平行 Agent 规格 §12.11）模型按钮只显示正在用的模型，不能打开菜单。
 - 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名和区域。生成中或准备中按钮不可用，悬停“Can’t switch models until the response finishes”。
 - 菜单分三节：Groups、Providers、Models（按提供商分组）。每项标出区域（分组标出它的成员涉及的全部区域，例如“Local · Public”）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session only. New sessions use the default range from Settings.”与“Manage models”。
 - 思考强度菜单沿用 v0，可选强度取当前模型（实际模型）的。当前模型不支持思考时的说明（它指向的设置页改了）：“This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”.”
+- 位置、窄栏和悬停的行见 docs/v0/screens/models.md（2026-10-21 起在输入框下面一行）。
 
 ### 9.3 对话流与阶段行
 
@@ -661,7 +662,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 | `models.reload` | — | 同 `models.get` |
 | `models.verify` | `{ refs, tests: 'auto' \| 'long_input' \| 'cancel' }` | — |
 | `session.setPick` | `{ sessionId, pick }` | `ModelState` |
-| `session.pickOptions` | `{ sessionId }`（只读） | `{ options: { pick, kind: 'group' \| 'provider' \| 'model', label, zones: Zone[], excluded: boolean, reason: string \| null }[] }`：顶栏菜单的每一项，按这个会话的项目对它做静态校验（§9.2 的变淡与原因） |
+| `session.pickOptions` | `{ sessionId }`（只读） | `{ options: { pick, kind: 'group' \| 'provider' \| 'model', label, zones: Zone[], excluded: boolean, reason: string \| null }[] }`：范围菜单的每一项，按这个会话的项目对它做静态校验（§9.2 的变淡与原因） |
 
 （2026-10-23 注：新命令 `models.discover`、`models.discoverCancel`、`models.addModels` 见 [model-discovery.md](model-discovery.md) §5；`ProfileView` 加 `reported`，见那边 §7.2。）
 
@@ -676,7 +677,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 | 规则 | 依据 | 落点 |
 | --- | --- | --- |
 | 子 Agent 按自己的 `models`、`requires` 选，只能落在用户为主 Agent 选的范围里（两者展开后的交集，顺序按子 Agent 的候选）；没有交集时这次提问失败并说明原因（子 Agent = 普通模式下对话 Agent 临时去问的只读实例） | proposal §5 | §12.1、§10.1 |
-| 协作模式下用户不选，顶栏只显示正在用的模型；按做这个 task 的角色的 `models`、`requires` 选，基座与没写 `models` 的角色用会话的选择范围 | proposal §5 | §12.1、§12.11 |
+| 协作模式下用户不选，范围按钮只显示正在用的模型；按做这个 task 的角色的 `models`、`requires` 选，基座与没写 `models` 的角色用会话的选择范围 | proposal §5 | §12.1、§12.11 |
 | `.mori/agents/*.md` 的 `models`（每项是一个选择范围）与 `requires`（`tool_calling`、`protocol_write`、`protocol_write>=B`、`structured_output`、`vision`、`context>=N`）。判定用 §7.2 的档案字段：`tool_calling`、`protocol_write`、`structured_output` 必须已验证；`vision` 为 `unverified`（配置声明了图像输入）即满足；`context>=N` 比较 `effective` | proposal §4、§6 | §4.1、§12.2 |
 | Agent 定义引用的名字不存在时拒绝启动，说明缺哪一项、哪个 Agent 用到它 | proposal §6 | §4.4、§12.3 |
 | 继续已有的对话、立项、结案会话，或交回同一角色的 task 会话时模型变了：按本规格 §6.2 判断能否转写，不能就按 §6.3 重建 | proposal §9 | §12.6 |
@@ -812,7 +813,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | `app/src/kernel/` | §2 表中的新文件；`pi.ts`（运行时、key）、`config.ts`（只留 pi 设置的读写与测试连接）、`sessions.ts`（虚拟模型、包装、段、准备中、`ModelState`）、`commands.ts`、`index.ts`、`credentials.ts` |
 | `app/src/main/credentials.ts`、`kernel-process.ts` | key 按 `ref` 存取；迁移时加密 `models.json` 里的明文 key |
 | `app/src/shared/models.ts`、`protocol.ts` | §9.4、§9.5 |
-| `app/src/renderer/` | 设置页 Models 分节、首次启动表单、顶栏模型菜单、对话流提示与阶段行、拒绝启动卡、准备中；删除 v0 的连接与模型表单、`SETTINGS_HINT`、`modelNotice` 横幅 |
+| `app/src/renderer/` | 设置页 Models 分节、首次启动表单、输入框下面一行的范围菜单、对话流提示与阶段行、拒绝启动卡、准备中；删除 v0 的连接与模型表单、`SETTINGS_HINT`、`modelNotice` 横幅 |
 | `app/tests/` | §14 |
 | `app/package.json` | `@earendil-works/pi-ai` 1.3.0 进 dependencies（§11）；`esbuild` 0.25.12 进 devDependencies（单元测试打包内核模块）；两者都已随现有依赖安装，离线可用。脚本 `test:unit`、`test:v1-models` |
 | `app/README.md` | 真实走查的数据目录在 v1 里要先确认区域、给测试项目授权公网（§14.1） |
@@ -826,7 +827,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | 单元 | `tests/unit/*.test.mjs`（`node --test`），经 esbuild 把内核模块打包到 `test-results/` 再导入 | 纯函数：配置校验与连带改动、名字解析、区域、迁移、选择器、失败分类、上下文规则、档案判定、模型池；时长与 `now()` 用假时钟，覆盖全部到期与恢复规则 |
 | 合成端点 | `tests/fake-endpoint/server.mjs`（synthetic） | 见下面的“合成端点的行为” |
 | App | `tests/ui/v1-models-*.mjs` | Electron + 合成端点，逐条验收 |
-| 回放 | `tests/fixtures/v1/*.json` | 从真实会话录制：换模型、重做、拒绝启动、顶栏范围的界面 |
+| 回放 | `tests/fixtures/v1/*.json` | 从真实会话录制：换模型、重做、拒绝启动、范围菜单的界面 |
 | 真实模型 | `tests/ui/v1-models-real.mjs` | 你的数据目录，两个真实提供商 |
 
 合成端点的行为（文件开头注释逐条列出；只用于测试）：
@@ -876,7 +877,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-20 | 候选耗尽 | 全部不可用时先等并显示原因，恢复后继续；只剩不会恢复的原因时不等；等不到时一张说明卡、没有错误卡；段开始时消息撤回、文字放回输入框；压缩时选不到模型报压缩失败；用到的行为：`FAKE_LIMIT_MS` 让限流在等待期间恢复 | 单元、App |
 | MP-21 | 接手判断与重建 | 要求回传推理的模型接手带别的模型工具调用的对话：段开始时重建（对话太短时只去掉工具调用和思考），重建后的上下文保留压缩摘要；段内只去掉、不压缩；窗口不够时段开始重建、段内排除；重建的压缩失败时换下一个候选；重建时没有 v0 的压缩提示和错误卡；重建的压缩失败后换到下一个候选，对话流没有错误卡 | 单元、App |
 | MP-22 | 压缩走 Mori | `overflow-once` 触发的溢出恢复与到阈值的自动压缩都经模型池、用当前模型和 key；压缩出错不换模型；压缩请求的首个内容时限生效 | App |
-| MP-23 | 顶栏选择范围 | 可以选分组、提供商或模型；写进会话文件，重新打开后沿用；改了设置里的默认范围，已有会话（包括没切换过的）的范围不变；v0 旧会话打开后用它最后用过的模型；不改默认范围；生成中与准备中不能改；顶栏文字格式“<范围名> · <当前模型 id>”；被排除的项变淡并有原因；底部说明 | App、回放 |
+| MP-23 | 选择范围（输入框下面一行） | 可以选分组、提供商或模型；写进会话文件，重新打开后沿用；改了设置里的默认范围，已有会话（包括没切换过的）的范围不变；v0 旧会话打开后用它最后用过的模型；不改默认范围；生成中与准备中不能改；范围按钮的文字格式“<范围名> · <当前模型 id>”；被排除的项变淡并有原因；底部说明 | App、回放 |
 | MP-24 | 设置页 | Providers、Keys、Models、Groups、Defaults、Project access 的增删改都写进配置并立即影响静态校验；删除与改地址的连带改动列在确认框里；改地址的 origin 后 key 被删，合成端点日志里新端口没有收到旧 key；分组编辑的错误与“至少一个成员”；key 的明文不回到界面 | App |
 | MP-25 | 只有一层重试 | 429 时没有 pi 的 `auto_retry_start`；打开工具页、改思考强度等触发 pi reload 之后仍然没有；合成端点日志里每次尝试逐条对得上 | App |
 | MP-26 | key 不落盘 | 配置文件、档案、迁移说明、会话文件、日志、测试结果里没有 key 明文；F8 报告（最近的操作与报告正文）里没有 key：Add key 后按 F8 保存报告检查 | App |
@@ -888,7 +889,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-32 | 认证头 | 三种接口各写对认证头；没有 key 的提供商不带认证头；pi 的占位 key 不会发到服务端；三种接口在单元层检查，`openai-completions` 另在 App 层检查 | 单元、App |
 | MP-33 | 首次启动 | 填表（含区域）→ 测试连接 → 探针状态 → 打开文件夹；区域为 Public 时会话的拒绝启动卡带“Allow public for this project”，授权（确认框）后可以发送；探针判定失败时表单说明原因；tool calling 判定失败后改模型 id 再测：配置里仍只有一个提供商 | App |
 | MP-34 | 准备中 | 段开始的等待和重建期间用户消息已显示、停止可用；停止后消息撤回、文字回到输入框；准备中再发的消息作为排队消息在回复开始后交给 pi；准备中再发一条后按停止：两条文字都回到输入框，合成端点没有收到请求 | App |
-| MP-35 | 思考强度 | 第一个候选是推理模型时新会话按它的按模型默认强度开始，请求带思考参数；换到不支持思考的模型时 pi 收紧；顶栏的可选强度随当前模型；把强度改成 high 后关闭再打开会话，仍是 high；段内从非推理模型换到推理模型后顶栏强度菜单变为可选 | App |
+| MP-35 | 思考强度 | 第一个候选是推理模型时新会话按它的按模型默认强度开始，请求带思考参数；换到不支持思考的模型时 pi 收紧；Effort 菜单的可选强度随当前模型；把强度改成 high 后关闭再打开会话，仍是 high；段内从非推理模型换到推理模型后 Effort 菜单的强度变为可选 | App |
 | MP-36 | 回复进行中改配置 | 回复中删除它正在用的提供商：下一个请求换到下一个候选并提示；改它的兼容选项：本段继续用它；当前模型在段内被另一个会话造成冷却：下一个请求不发出就换模型 | App |
 | MP-37 | 现有功能不退步 | §14.4 的全部现有测试通过（2026-10-22 注：m7 的 App 与回放由提示词分层与记忆规格 §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放） | App、回放 |
 
@@ -913,7 +914,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | `m1-layout.mjs` | 设置页的测量改为 Models 分节（提供商卡与提供商表单） |
 | `m2-app.mjs`、`m2-replay.mjs` | F8 检查前保存 key 的准备改为 Models → Add key（`models.addKey`，回放由桥应答）；“报告里没有 key”的检查不变 |
 | `m6-app-settings.mjs` | 连接、模型、默认模型、删除的步骤删去，由 `v1-models-*.mjs` 覆盖；思考强度与 AGENTS.md 的步骤保留并改用新表单 |
-| `m6-replay.mjs` | 设置页分节导航的检查改到 Models 分节；删除 `m6/model-switch.json`、`m6/thinking.json` 后，另录 `fixtures/v1/thinking.json`（顶栏思考强度）取代思考菜单的回放检查 |
+| `m6-replay.mjs` | 设置页分节导航的检查改到 Models 分节；删除 `m6/model-switch.json`、`m6/thinking.json` 后，另录 `fixtures/v1/thinking.json`（输入框下面一行的思考强度）取代思考菜单的回放检查 |
 | `m7-app.mjs`（2026-10-22 注：已删除，见提示词分层与记忆规格 §14.4） | “工作回顾不发模型请求”的检查只数 `probe: false` 的请求 |
 | `m7-replay.mjs` 与其余回放脚本（2026-10-22 注：`m7-replay.mjs` 已删除，同上） | 各自的 `QUERIES` 加 `models.get` |
 | 其余 `m1`–`m7` 的 App 测试（2026-10-22 注：m7 的已删除，同上） | 只换首次启动的写法，其余不变 |
@@ -922,7 +923,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | `m0-real.mjs` | 断言改为 `model-config.json`、`credentials.json` |
 | `m1-real.mjs`、`m1-record.mjs` | 首次启动的走查用一个空的复制数据目录；走查 6 改为“错的 key → 说明卡 → Open settings → Keys”，`$变量` 与没有 key 的情形删去（v1 里没有 key 就不带认证头）；压缩的准备改为在复制出的 `model-config.json` 里把窗口改小 |
 | `m2-real.mjs` | F8 的准备改为 Add key |
-| `m6-real.mjs`、`m6-record.mjs` | 走查 1 与 8 改为在 Models 里加模型、在顶栏的范围菜单里选；读 `model-config.json`；重新录制顶栏范围与思考强度的 fixture |
+| `m6-real.mjs`、`m6-record.mjs` | 走查 1 与 8 改为在 Models 里加模型、在范围菜单里选；读 `model-config.json`；重新录制范围与思考强度的 fixture |
 | 全部 `*-real.mjs`、`*-record.mjs` | 提供商从 `model-config.json` 取，不再找 `pi/models.json` 的 `mori-endpoint`；按 §14.1 复制模型配置并给临时项目授权公网 |
 
 `npm run smoke`、`test:app`、`test:m1-app`…`test:m7-app`、各回放测试都通过，MP-37 才算通过。

@@ -9,14 +9,20 @@
 // 在拒绝启动卡上 Verify now，接着走查。走查 6 改为"错的 key → 说明卡 → Open settings → Keys"，$变量与没有 key 的情形删去；
 // 压缩的准备改为在复制出的 model-config.json 里把窗口改小。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先 Fetch models，在清单里勾模型（没列出时手填）。
+// 2026-10-21 起（docs/v0/composer-pickers.md）：权限、选择范围、Effort 和上下文用量（圆环）在输入框下面一行：用量随回复增长
+// 读圆环的 data-tokens（page.mjs usageTokens），圆环的读屏名、悬停和颜色按真实的数核对；拒绝启动卡在输入框上方时这一行的样子；
+// 800 宽时这一行不换行、不溢出；压缩之后圆环的样子。
 
-import { existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
   allowRealProject, appRoot, arg, createRecorder, editModelConfig, killKernel, launch, oneLine, prepareProject,
   realProviders, scratchUserData, sleep,
 } from './lib.mjs';
-import { smallText } from './m1-layout.mjs';
+import {
+  composerRow, hoverRing, layoutProblems, ringColorProblems, ringState, ringTextProblems, rowProblems, rowSummary,
+  smallText, stateProblems,
+} from './m1-layout.mjs';
 import { pageHelpers } from './page.mjs';
 
 const source = arg('source');
@@ -29,6 +35,8 @@ mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder(exePath ?? 'dev build');
 const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) }).catch(() => {});
 const wanted = (item) => !only || only.includes(String(item));
+/** 刚压缩完时圆环的描述（models.md"上下文用量（圆环）"） */
+const COMPACTED_NOTE = 'Just compacted. Context usage shows after the next response.';
 
 /** @brief 读写临时数据目录里 pi 的 JSON 配置（不存在时从空对象开始）。 */
 function editJson(dir, name, fn) {
@@ -106,10 +114,23 @@ async function relaunch(ctx) {
   ctx.page.on('pageerror', (error) => pageErrors.push(error.message));
 }
 
+/**
+ * @brief 拒绝启动时输入框下面一行（chat.md"输入框下面一行"拒绝启动、model-chat.md"拒绝启动卡"）：拒绝启动卡在输入框上方；
+ *        选择范围按钮可用（卡上的"Change model…"打开它的菜单），没有当前模型时悬停第二行"No model can run in this session"、
+ *        没有 Effort；"Send"不可用；这一行不换行、不溢出。圆环按它自己的规则，不查在不在。
+ */
+async function blockedRow(page) {
+  const row = await composerRow(page);
+  const problems = [...layoutProblems(row), ...stateProblems(row, 'blocked', { ring: false })];
+  record('1 拒绝启动时：卡在输入框上方，这一行的选择范围按钮可用、没有当前模型时没有 Effort，"Send"不可用，不换行不溢出',
+    problems.length === 0, `${problems.join('; ')} ${rowSummary(row)}`);
+}
+
 /** @brief 首次启动的那次探针因为没有 key 没有结果：拒绝启动卡上点 Verify now，等探针跑完、卡片解除。 */
 async function verifyNow({ page }) {
   const card = page.getByTestId('blocked-card');
   if (await card.count()) {
+    await blockedRow(page);
     await card.locator('[data-action="verify"]').click().catch(() => {});
     await card.waitFor({ state: 'detached', timeout: 600000 }).catch(() => {});
   }
@@ -153,7 +174,11 @@ async function item2({ page, h }) {
   await shot(page, '2-markdown');
 }
 
-/** @brief 走查 3：工具卡从执行中到完成，可以展开；上下文用量随对话增长；反例：失败的命令不显示"Done"。 */
+/**
+ * @brief 走查 3：工具卡从执行中到完成，可以展开；上下文用量随对话增长（输入框下面一行的圆环，读 data-tokens）；
+ *        反例：失败的命令不显示"Done"。真实的数：圆环的读屏名、悬停与 data-tokens 一致，写法照 Claude（k、四舍五入），
+ *        颜色按百分比。
+ */
 async function item3({ page, h }) {
   const before = await h.usageTokens();
   await page.evaluate(() => {
@@ -182,6 +207,10 @@ async function item3({ page, h }) {
   record('3 展开工具卡能看到参数和输出', body.includes('Input') && body.includes('sleep 3') && body.includes('ok'), oneLine(body));
   const after = await h.usageTokens();
   record('3 上下文用量随对话增长', before !== null && after > before, `${before} → ${after}`);
+  const ring = await hoverRing(page);
+  const problems = [...ringTextProblems(ring), ...ringColorProblems(ring)];
+  record('3 圆环：读屏名"Usage: Context approximately … of … tokens (N%)"、悬停"Context ≈ …k / …k (N%)"与 data-tokens 一致，'
+    + '底圈和填充的颜色按百分比', problems.length === 0, `${problems.join('; ')} ${ring?.tip} | ${ring?.label}`);
   await shot(page, '3-tool-cards');
 }
 
@@ -293,14 +322,27 @@ async function item9(ctx) {
     workspace: await ctx.page.locator('[data-resize="workspace"]').getAttribute('aria-valuenow') };
   record('9 重启后宽度还在', saved.sidebar === after.sidebar && saved.workspace === after.workspace,
     `${JSON.stringify(saved)} → ${JSON.stringify(after)}`);
+  await item9Narrow(ctx);
+}
+
+/**
+ * @brief 走查 9 后半：800 宽不裁切（输入框下面一行、圆环、发送组也在查溢出的列表里），这一行（权限、真实的选择范围、Effort、
+ *        圆环、发送）按会话面板的宽度收紧、截短的先后对；没有小于 12px 的文字。
+ */
+async function item9Narrow(ctx) {
   await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(800, 600));
   await sleep(600);
   const report = await ctx.page.evaluate(() => ({ page: document.documentElement.scrollWidth, width: window.innerWidth,
-    overflow: [...document.querySelectorAll('.topbar, .composer, .composer-bottom, .chat-pane, .right-panel, .sidebar')]
+    overflow: [...document.querySelectorAll('.topbar, .composer, .composer-bottom, .chat-pane, .right-panel, '
+      + '.sidebar, [data-testid="usage"], .send-button, .stop-button, .split-button, .queue-button')]
       .filter((e) => e.getClientRects().length && e.scrollWidth > e.clientWidth + 1).map((e) => e.className) }));
+  const row = await composerRow(ctx.page);
   await shot(ctx.page, '9-800-wide');
   record('9 窗口 800 宽时没有内容被裁掉', report.width === 800 && report.page <= 800 && report.overflow.length === 0,
     JSON.stringify(report));
+  const problems = rowProblems(row, 'idle');
+  record('9 800 宽时输入框下面一行（权限、真实的选择范围、Effort、圆环、发送）不换行、不溢出，按会话面板的宽度收紧',
+    problems.length === 0, `${rowSummary(row)} ${problems.join('; ')}`);
   const narrowSmall = await smallText(ctx.page);
   record('9 800 宽时没有小于 12px 的文字', narrowSmall.length === 0, narrowSmall.slice(0, 3).join('; '));
   await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1200, 800));
@@ -382,6 +424,7 @@ async function item8(project, connection) {
     }
     const stages = await h.stages();
     const notices = await page.getByText('Compacted session', { exact: true }).count();
+    await compactedRing(page, dir);
     record('8 一直在底部时不出现"有新内容"', await page.getByTestId('new-content').count() === 0);
     record('8 阶段行显示"正在压缩较早的对话"', stages.includes('Compacting session…'), stages.join(' → '));
     record('8 对话流留下"已压缩较早的对话"', notices >= 1, `${notices} 处`);
@@ -390,6 +433,59 @@ async function item8(project, connection) {
     await app.close().catch(() => {});
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/**
+ * @brief 会话文件里最近一次压缩之后有没有 pi 算用量的回复（pi getContextUsage 的规则）：中止、出错、用量为 0 的不算，
+ *        被之后的 context_edit 去掉（replacement 为 null）的也不算——上下文太小把回复截断时（stopReason length），
+ *        pi 把它从上下文去掉、准备压缩后重试，没有可压缩的就不重试，这条回复仍留在对话流里。没有压缩过时为 true。
+ * @param dir 走查的临时数据目录（会话文件在 pi/sessions 下，走查 8 只有一个会话）
+ * @return { counted（有没有算数的回复）, after（压缩之后的回复：stopReason、用量、是否被去掉） }
+ */
+function usageAfterCompaction(dir) {
+  const root = join(dir, 'pi', 'sessions');
+  const files = readdirSync(root, { recursive: true }).map(String).filter((name) => name.endsWith('.jsonl'));
+  if (files.length !== 1) throw new Error(`expected one session file under ${root}, found ${files.length}`);
+  const entries = readFileSync(join(root, files[0]), 'utf8').trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  const removed = new Set(entries.filter((entry) => entry.type === 'context_edit' && entry.replacement === null)
+    .map((entry) => entry.targetId));
+  const start = entries.findLastIndex((entry) => entry.type === 'compaction');
+  const after = entries.slice(start + 1)
+    .filter((entry) => entry.type === 'message' && entry.message.role === 'assistant')
+    .map((entry) => ({ stop: entry.message.stopReason, usage: entry.message.usage?.totalTokens ?? 0,
+      removed: removed.has(entry.id) }));
+  const counted = start < 0 || after.some((item) => !item.removed && item.usage > 0
+    && !['aborted', 'error'].includes(item.stop));
+  return { counted, after };
+}
+
+/**
+ * @brief 走查 8 的圆环（models.md"上下文用量（圆环）"）：pi 的用量为空时（对话流最后一项是"Compacted session"，
+ *        或压缩之后的回复都被 pi 从上下文去掉，见 usageAfterCompaction）圆环为空、底圈虚线、没有 data-tokens，
+ *        读屏名"Context window"、描述是"Just compacted. …"；否则圆环有用量，数与读屏名一致。
+ * @param page 走查的页面
+ * @param dir 走查的临时数据目录
+ */
+async function compactedRing(page, dir) {
+  const last = await page.evaluate(() => {
+    const items = [...document.querySelectorAll('[data-testid="transcript"] :is([data-testid="user-message"], '
+      + '[data-testid="assistant"], [data-testid="notice"])')];
+    return items.at(-1)?.textContent?.trim() ?? '';
+  });
+  const ring = await ringState(page);
+  const session = usageAfterCompaction(dir);
+  const notice = last === 'Compacted session';
+  const compacted = notice || !session.counted;
+  const ok = compacted ? ring?.state === 'compacted' && ring.tokens === null && ring.label === 'Context window'
+    && ring.desc === COMPACTED_NOTE && ringColorProblems(ring).length === 0
+    : ringTextProblems(ring).length === 0;
+  const which = notice ? '是"Compacted session"' : compacted ? '是回复，但压缩之后的回复都被 pi 从上下文去掉' : '是回复';
+  record(`8 圆环与压缩一致：对话流最后一项${which}，${compacted ? '圆环为空、底圈虚线、读屏名"Context window"'
+    : '圆环显示用量'}`, ok, `${oneLine(last, 60)} | ${JSON.stringify(session.after)} | ${JSON.stringify(ring)}`);
+  // 压缩之后模型可能马上又回了一条，pi 就有了用量、上面只查了有用量的圆环：明确记下这次走查有没有
+  // 看到刚压缩完的圆环（没看到时标 KNOWN，不算通过；这个状态在 m1-app.mjs ringCompacted 里查）
+  record('8 走查里看到了刚压缩完的圆环（pi 的用量为空：对话流最后一项是"Compacted session"，或压缩之后的回复都被去掉）',
+    compacted, oneLine(last, 60), true);
 }
 
 /** @brief 走查数据目录里首选提供商（DeepSeek）的非机密信息（v1：model-config.json，lib.mjs realProviders）。 */

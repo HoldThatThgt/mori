@@ -44,7 +44,7 @@ import {
   guarded, KIND, harnessDir, lastChangeText, load, memoryLines, metaText, monthDay, monthDayTime, newSession,
   noticeText, OFF_TEXT, openFolder, openMemory, outDir, readFixture, recentActivity, record, recorded, replayStatus,
   resultsOf, segmentEnd, sendRecorded, shot, snap, statusText, strayLines, toolTitle, until, untilPlayed, usageText,
-  watched, write,
+  useZone, watched, write,
 } from './mem-replay-helpers.mjs';
 
 const only = arg('only')?.split(',');
@@ -1091,6 +1091,7 @@ if (present.length) {
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   for (const f of present) {
     const fx = readFixture(f.name);
+    await useZone(page, fx);
     await guarded(page, errors, { id: f.ids[0], label: f.name, allowed: f.allowed ?? [] }, () => f.run(page, fx));
   }
   await app.close();

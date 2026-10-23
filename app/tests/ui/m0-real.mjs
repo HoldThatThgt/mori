@@ -63,6 +63,17 @@ function savedConnection() {
     cipherSaved: provider.keys.every((key) => typeof credentials[key.ref] === 'string') };
 }
 
+/**
+ * @brief 已保存的全部提供商的地址解析出的 IP。v1 的后台进程启动时读每个已配置模型的服务版本（model-providers.md §7.1），
+ *        所以"配置的端点"是全部提供商的，不只是第一个。
+ */
+async function endpointAddresses() {
+  const providers = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8')).providers ?? [];
+  const hosts = [...new Set(providers.map((provider) => new URL(provider.baseUrl).hostname))];
+  const found = await Promise.all(hosts.map((host) => lookup(host, { all: true })));
+  return new Set(found.flat().map((address) => address.address));
+}
+
 const results = { target: exePath ?? 'dev build', checks: [] };
 
 /** @brief 记录一项检查。 */
@@ -173,7 +184,7 @@ async function walkthrough() {
     const page = await app.firstWindow();
     await connectionCheck(page, saved.id);
     await readmeCheck(app, page, project);
-    const endpointIps = new Set((await lookup(new URL(saved.baseUrl).hostname, { all: true })).map((a) => a.address));
+    const endpointIps = await endpointAddresses();
     const local = [...endpointIps].every((ip) => ip === '127.0.0.1' || ip === '::1');
     const others = [...net.seen.ext].filter((remote) => !endpointIps.has(remote.replace(/^\[|\]?:\d+$/g, '')));
     record('对外连接只有配置的端点（近似检查）', (local || net.seen.ext.size > 0) && others.length === 0,

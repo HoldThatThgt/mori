@@ -136,6 +136,24 @@ export const QUERIES = harnessQueries();
 export const fixturePath = (name) => join(appRoot, 'tests/fixtures/mem', `${name}.json`);
 /** @brief 读一个录制文件。 */
 export const readFixture = (name) => JSON.parse(readFileSync(fixturePath(name), 'utf8'));
+/** 本机的时区（没有 timeZone 的录制按它回放） */
+const HOST_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+/** 页面 → 设时区用的 CDP 会话 */
+const zones = new WeakMap();
+/**
+ * @brief 按录制时的时区回放：内核按录制那台机器的时区算增强的下次运行等时刻，界面再按本地时区显示，换了时区回放，
+ *        状态行里的时刻就与录下的每日时间对不上。录制的 timeZone（mem-record.mjs 记下的 IANA 名）同时用于页面
+ *        （CDP 的 Emulation.setTimezoneOverride）与本进程算期望文字的 Date（process.env.TZ）；没有 timeZone 的录制按本机时区。
+ */
+export async function useZone(page, fx) {
+  const zone = fx.timeZone ?? HOST_ZONE;
+  process.env.TZ = zone;
+  // 覆盖随 CDP 会话存在，会话一直留着（每个页面一个）
+  if (!zones.has(page)) zones.set(page, await page.context().newCDPSession(page));
+  const cdp = zones.get(page);
+  await cdp.send('Emulation.setTimezoneOverride', { timezoneId: zone });
+  return zone;
+}
 /** @brief 录制里重启前（before）或重启后（after）的步骤；part 为空时是全部（同 harness/replay.js 的 partOf）。 */
 export function partOf(fx, part) {
   if (!part) return fx.steps;

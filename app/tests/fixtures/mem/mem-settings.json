@@ -8,9 +8,10 @@
  "model": "mem/fake-coder",
  "notes": [
   "Setup (synthetic test setup, docs/specs/memory.md §14.1): model-config.json has one local provider MEM (fake-coder; fake-think marked Supports thinking; fake-coder-404) on the synthetic endpoint http://127.0.0.1:4770/v1, default range mem/fake-coder, profiles given as verified; enhancement replies come from the synthetic enhancement script (FAKE_ENHANCE_SCRIPT)",
-  "Setup (synthetic): C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken has an unreadable enhance.json; the dialog time is 10:44"
+  "Setup (synthetic): C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-broken has an unreadable enhance.json; the dialog time is 10:35"
  ],
- "recordedAt": "2026-10-22T14:44:06.728Z",
+ "recordedAt": "2026-10-23T02:35:25.193Z",
+ "timeZone": "America/New_York",
  "steps": [
   {
    "t": 2,
@@ -19,24 +20,24 @@
    }
   },
   {
-   "t": 3,
+   "t": 2,
    "result": {
     "type": "session.list",
     "value": []
    }
   },
   {
-   "t": 5,
+   "t": 4,
    "command": {
     "type": "config.get"
    }
   },
   {
-   "t": 8,
+   "t": 6,
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-h5BDWI\\pi",
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-data-3KfbGl\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -47,13 +48,13 @@
    }
   },
   {
-   "t": 10,
+   "t": 8,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 14,
+   "t": 11,
    "result": {
     "type": "models.get",
     "value": {
@@ -162,7 +163,7 @@
         "truncation": "unknown"
        },
        "cancel_verified": true,
-       "probedAt": 1792680240385,
+       "probedAt": 1792722921790,
        "suite": 1
       },
       "mem/fake-think": {
@@ -213,7 +214,7 @@
         "truncation": "unknown"
        },
        "cancel_verified": true,
-       "probedAt": 1792680240385,
+       "probedAt": 1792722921790,
        "suite": 1
       },
       "mem/fake-coder-404": {
@@ -264,7 +265,7 @@
         "truncation": "unknown"
        },
        "cancel_verified": true,
-       "probedAt": 1792680240385,
+       "probedAt": 1792722921790,
        "suite": 1
       }
      },
@@ -329,14 +330,14 @@
    }
   },
   {
-   "t": 21,
+   "t": 16,
    "command": {
     "type": "trust.check",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings"
    }
   },
   {
-   "t": 25,
+   "t": 18,
    "result": {
     "type": "trust.check",
     "value": {
@@ -346,17 +347,17 @@
    }
   },
   {
-   "t": 27,
+   "t": 19,
    "command": {
     "type": "session.create",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings"
    }
   },
   {
-   "t": 146,
+   "t": 67,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-b817-71c6-ad66-67113a9100c5",
+    "sessionId": "01a1669c-f1e3-715c-a0b7-663eaa2b6c2a",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -372,10 +373,10 @@
    }
   },
   {
-   "t": 146,
+   "t": 67,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-b817-71c6-ad66-67113a9100c5",
+    "sessionId": "01a1669c-f1e3-715c-a0b7-663eaa2b6c2a",
     "event": {
      "type": "mori.board",
      "requests": [],
@@ -384,13 +385,13 @@
    }
   },
   {
-   "t": 148,
+   "t": 68,
    "result": {
     "type": "session.create",
     "value": {
-     "sessionId": "01a16411-b817-71c6-ad66-67113a9100c5",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
-     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-h5BDWI\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-rcfXYK-mem-settings--\\2026-10-22T14-44-05-272Z_01a16411-b817-71c6-ad66-67113a9100c5.jsonl",
+     "sessionId": "01a1669c-f1e3-715c-a0b7-663eaa2b6c2a",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-data-3KfbGl\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-mem-record-QqWbU1-mem-settings--\\2026-10-23T02-35-24-004Z_01a1669c-f1e3-715c-a0b7-663eaa2b6c2a.jsonl",
      "name": null,
      "projectTrust": "none",
      "trustRemembered": false,
@@ -448,16 +449,16 @@
    }
   },
   {
-   "t": 153,
+   "t": 73,
    "command": {
     "type": "memory.list",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings",
     "layer": "project",
     "kind": "fact"
    }
   },
   {
-   "t": 156,
+   "t": 75,
    "result": {
     "type": "memory.list",
     "value": {
@@ -475,18 +476,18 @@
    }
   },
   {
-   "t": 158,
+   "t": 77,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings"
    }
   },
   {
-   "t": 160,
+   "t": 78,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings",
      "enabled": false,
      "pick": null,
      "thinking": "medium",
@@ -513,21 +514,21 @@
    }
   },
   {
-   "t": 163,
+   "t": 80,
    "command": {
     "type": "enhance.set",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings",
     "enabled": true
    }
   },
   {
-   "t": 191,
+   "t": 101,
    "result": {
     "type": "enhance.set",
     "value": {
      "error": null,
      "info": {
-      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings",
       "enabled": true,
       "pick": "mem/fake-coder",
       "thinking": "medium",
@@ -541,7 +542,7 @@
       },
       "running": null,
       "queued": 0,
-      "next": 1792699200000,
+      "next": 1792742400000,
       "notice": null,
       "effortPicks": {
        "mem": false,
@@ -555,29 +556,29 @@
    }
   },
   {
-   "t": 194,
+   "t": 103,
    "command": {
     "type": "enhance.set",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings",
     "pick": "mem/fake-think",
     "thinking": "high",
     "team": true,
-    "time": "10:44"
+    "time": "10:35"
    }
   },
   {
-   "t": 211,
+   "t": 118,
    "result": {
     "type": "enhance.set",
     "value": {
      "error": null,
      "info": {
-      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings",
       "enabled": true,
       "pick": "mem/fake-think",
       "thinking": "high",
       "team": true,
-      "time": "10:44",
+      "time": "10:35",
       "since": "2026-10-22",
       "last": {
        "taste": null,
@@ -586,7 +587,7 @@
       },
       "running": null,
       "queued": 0,
-      "next": 1792723440000,
+      "next": 1792766100000,
       "notice": null,
       "effortPicks": {
        "mem": false,
@@ -600,26 +601,26 @@
    }
   },
   {
-   "t": 213,
+   "t": 121,
    "command": {
     "type": "enhance.set",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings",
     "enabled": false
    }
   },
   {
-   "t": 229,
+   "t": 132,
    "result": {
     "type": "enhance.set",
     "value": {
      "error": null,
      "info": {
-      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings",
       "enabled": false,
       "pick": "mem/fake-think",
       "thinking": "high",
       "team": true,
-      "time": "10:44",
+      "time": "10:35",
       "since": "2026-10-22",
       "last": {
        "taste": null,
@@ -642,26 +643,26 @@
    }
   },
   {
-   "t": 232,
+   "t": 136,
    "command": {
     "type": "enhance.set",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings",
     "enabled": true
    }
   },
   {
-   "t": 240,
+   "t": 143,
    "result": {
     "type": "enhance.set",
     "value": {
      "error": null,
      "info": {
-      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-settings",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-settings",
       "enabled": true,
       "pick": "mem/fake-think",
       "thinking": "high",
       "team": true,
-      "time": "10:44",
+      "time": "10:35",
       "since": "2026-10-22",
       "last": {
        "taste": null,
@@ -670,7 +671,7 @@
       },
       "running": null,
       "queued": 0,
-      "next": 1792723440000,
+      "next": 1792766100000,
       "notice": null,
       "effortPicks": {
        "mem": false,
@@ -684,14 +685,14 @@
    }
   },
   {
-   "t": 244,
+   "t": 147,
    "command": {
     "type": "trust.check",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-broken"
    }
   },
   {
-   "t": 247,
+   "t": 149,
    "result": {
     "type": "trust.check",
     "value": {
@@ -701,17 +702,17 @@
    }
   },
   {
-   "t": 248,
+   "t": 151,
    "command": {
     "type": "session.create",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-broken"
    }
   },
   {
-   "t": 318,
+   "t": 178,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-b8f2-71c6-ad66-671221a5f4d3",
+    "sessionId": "01a1669c-f266-715c-a0b7-6641c6fa2070",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -727,10 +728,10 @@
    }
   },
   {
-   "t": 318,
+   "t": 178,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-b8f2-71c6-ad66-671221a5f4d3",
+    "sessionId": "01a1669c-f266-715c-a0b7-6641c6fa2070",
     "event": {
      "type": "mori.board",
      "requests": [],
@@ -739,13 +740,13 @@
    }
   },
   {
-   "t": 330,
+   "t": 179,
    "result": {
     "type": "session.create",
     "value": {
-     "sessionId": "01a16411-b8f2-71c6-ad66-671221a5f4d3",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
-     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-h5BDWI\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-rcfXYK-mem-broken--\\2026-10-22T14-44-05-491Z_01a16411-b8f2-71c6-ad66-671221a5f4d3.jsonl",
+     "sessionId": "01a1669c-f266-715c-a0b7-6641c6fa2070",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-broken",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-data-3KfbGl\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-mem-record-QqWbU1-mem-broken--\\2026-10-23T02-35-24-134Z_01a1669c-f266-715c-a0b7-6641c6fa2070.jsonl",
      "name": null,
      "projectTrust": "none",
      "trustRemembered": false,
@@ -803,16 +804,16 @@
    }
   },
   {
-   "t": 335,
+   "t": 186,
    "command": {
     "type": "memory.list",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-broken",
     "layer": "project",
     "kind": "fact"
    }
   },
   {
-   "t": 336,
+   "t": 187,
    "result": {
     "type": "memory.list",
     "value": {
@@ -830,18 +831,18 @@
    }
   },
   {
-   "t": 338,
+   "t": 188,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-broken"
    }
   },
   {
-   "t": 339,
+   "t": 189,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-broken",
      "enabled": false,
      "pick": null,
      "thinking": "medium",
@@ -868,21 +869,21 @@
    }
   },
   {
-   "t": 341,
+   "t": 191,
    "command": {
     "type": "enhance.set",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-broken",
     "enabled": true
    }
   },
   {
-   "t": 343,
+   "t": 192,
    "result": {
     "type": "enhance.set",
     "value": {
      "error": "Unexpected end of JSON input",
      "info": {
-      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-broken",
       "enabled": false,
       "pick": null,
       "thinking": "medium",
@@ -910,23 +911,23 @@
    }
   },
   {
-   "t": 345,
+   "t": 195,
    "command": {
     "type": "enhance.set",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-broken",
     "thinking": "medium",
     "team": false,
     "time": "04:00"
    }
   },
   {
-   "t": 348,
+   "t": 198,
    "result": {
     "type": "enhance.set",
     "value": {
      "error": "Unexpected end of JSON input",
      "info": {
-      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-rcfXYK\\mem-broken",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-QqWbU1\\mem-broken",
       "enabled": false,
       "pick": null,
       "thinking": "medium",

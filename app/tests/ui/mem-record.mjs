@@ -795,7 +795,9 @@ function writeFixture(scenario, ctx, steps, problems) {
   const fixture = { source: 'synthetic', note: 'Recorded from the real App against the synthetic endpoint by '
     + 'tests/ui/mem-record.mjs (docs/specs/memory.md §0 item 4: no data directory with a key on this machine); '
     + 'do not edit by hand.', name: scenario.name, description: scenario.description, covers: scenario.covers,
-  endpoint: baseOf(PORT), model: MODEL, notes: ctx.notes, recordedAt: new Date().toISOString(), steps };
+  endpoint: baseOf(PORT), model: MODEL, notes: ctx.notes, recordedAt: new Date().toISOString(),
+  // 录制机器的时区：内核按它算增强的下次运行等时刻，回放按它显示（mem-replay-helpers.mjs 的 useZone）
+  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, steps };
   const dir = problems.length ? rejectedDir : outDir;
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${scenario.name}${problems.length ? '.rejected' : ''}.json`),

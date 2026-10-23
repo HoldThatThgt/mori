@@ -55,11 +55,11 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | A 级强制填写 | 只在档案 `reasoning.can_disable` 为真时用，这次请求关闭思考 | `app/src/kernel/handoffForm.ts` | 探针第 5 步是在关闭思考时测的 | 遇到能开着思考做强制调用的部署时 |
 | `decision` 类别的排队超时 / `task` 类别 | 60 秒 / 不超时 | `app/src/kernel/modelTimings.ts` | 决定排太久不如换模型；task 排队等槽位是常态 | 你走查时 |
 | 模型族为空时 | 用 `<provider>/<model>` 当作族 | `app/src/kernel/selector.ts` | 至少同一个模型不给自己评审 | 你给模型都填了族之后 |
-| 协作开关的窄栏宽度 | 860px：这一栏不宽于 860px 时开关只显示状态点（约 19px），宽于时显示完整文字；另外显示项目名时面包屑至少留 105px（放不下时收短模型按钮），分屏不宽于 600px 时按钮间距 6px、图标按钮 28px，不宽于 400px 时间距 2px、图标按钮 24px | `app/src/renderer/src/styles/team.css` | 顶栏现有各档（chat.css、models.css、split.css）按没有开关定，每档刚过阈值时只剩约 8–25px（按最宽的英文："Effort: Unavailable"、截在 160px / 120px 的长模型 ID）：`Team: Until done`（约 108px）单栏要宽于约 835px、分屏要宽于约 856px；`Team` 加状态点（约 55px）在 1400 宽右栏打开（690px，模型按钮停在 120px）和 800×600 单栏（740px，模型按钮停在 160px）时也放不下；分屏每栏 280px 时没有开关也只剩约 8px | composer-pickers 合入时（模型、思考强度、权限和上下文用量移到输入框下面，顶栏只剩开关和两个图标按钮，这些都可以去掉或放宽） |
+| 协作开关的窄栏宽度 | 600px：这一栏不宽于 600px 时开关只显示状态点（约 19px），宽于时显示完整文字（2026-10-22 composer-pickers 合入前是 860px，另有面包屑至少 105px、分屏窄栏收紧按钮间距和图标按钮两处，合入后去掉） | `app/src/renderer/src/styles/team.css` | 合入后顶栏只有“项目名 › 会话名”、开关、右栏开关和分屏时的“Close pane”。按很长的会话名、项目名收到 40px 算：完整的 `Team: Until done`（App 里量到 105px）在 601px 分屏还给会话名留约 315px，和 1280 宽分屏只有状态点时（307px）差不多；不宽于 600px 时只有状态点，460px 258px、280px 173px（App 里量到的）。与输入框下面一行发送组只剩图标的一档相同 | 你走查时觉得完整文字该更早或更晚收起，或想要“Team ●”这种带字的窄样子（规格原稿的写法） |
 | 给 `conversation`、`decision` 留的槽位 | 每个 key 1 个（`task`、`background` 最多占并发上限 − 1；并发上限为 1 时不留） | `app/src/kernel/modelPool.ts` | 严格优先不打断已经发出的请求；不留的话 4 个 task 占满默认的 4 个槽位，对话和立项等到超时 | 拿到内网端点、知道它的并发时 |
 | 命令与界面名 | `/team`、`/team on`、`/team off`、`Team` | `app/src/renderer/src/` | proposal 的暂定名；`/team off` 为派生 | 你走查时 |
 | 基座的一句话说明 | `General-purpose agent with the default tools` | `app/src/shared/team.ts`（`BASE_ROLE_DESCRIPTION`） | 基座没有角色文件，`next`、`assignee` 的说明与附加段的“Other roles”要一句话；规格没给 | 你走查时 |
-| board.json 改名替换被别的进程挡住时的重试 | 最多 10 次，第 n 次前等 n × 20 毫秒（合计不到 1 秒），只对 EPERM、EACCES、EBUSY | `app/src/kernel/agents.ts`（`writeFileAtomic`） | Windows 上目标文件正被别的进程打开（杀毒、索引）时改名会失败，这一次写出就丢了，要等下一次写入才补上；App 测试每 20 毫秒读一次 board.json 时碰到过 | 你走查时 |
+| board.json、AGENTS.md、model-config.json、模型档案改名替换被别的进程挡住时的重试 | 最多 10 次，第 n 次前等 n × 20 毫秒（合计不到 1 秒），只对 EPERM、EACCES、EBUSY | `app/src/kernel/renameRetry.ts`（`renameReplacing`） | Windows 上目标文件正被别的进程打开（杀毒、索引）时改名会失败，这一次写出就丢了，要等下一次写入才补上；App 测试每 20 毫秒读一次 board.json 时碰到过，设置页连着上移、删除 key 时 model-config.json 也碰到过（2026-10-22） | 你走查时 |
 | 程序注入的文字 | 英文（规格附录 A、§8.5） | `app/src/kernel/boardText.ts` | 与 pi 默认的 system prompt 同语言 | 内网模型对英文说明理解不好时 |
 | 界面文字 | 规格 §13 | `app/src/renderer/src/` | 英文，Claude 桌面版的写法 | 你走查时 |
 

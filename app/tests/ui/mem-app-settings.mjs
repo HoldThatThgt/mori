@@ -13,6 +13,8 @@
 //   MEM-29 F8 保存后 View in Settings（没有 View in Review）打开 UI issues 并选中、滚进视野；已经在设置页时直接换节，
 //          AGENTS.md 有未保存的改动时先问；Current view 的 Page（Session、Settings、Memory、Customize、First run，
 //          没有 Review）；后台进程退出后照常；首次启动页上没有 View in Settings。
+//   另有原 m7-app.mjs 里 composer-pickers 加的 F8 检查（docs/v0/composer-pickers.md"测试要改的地方"新检查第 9 条）：
+//          会话里按的报告有"Model range""Effort""Pane width"、各项先后；设置页、记忆页、Customize 页上"Pane width: None"。
 // 用法（在 app/ 下，out/ 是当前的构建）：node tests/ui/mem-app-settings.mjs [--exe <Mori.exe 路径>]
 // 结果写到 test-results/mem-app-settings(-packaged).json，截图在 test-results/mem-app-settings(-packaged)/。
 // 端口（§14.1 的 4700–4799 里分给本套件的 4760–4769）：合成端点 4760。
@@ -28,7 +30,9 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, prepareProject, sleep } from './lib.mjs';
+import { f8ViewProblems, offPaneViewProblems, paneFacts, viewFields } from './m2-helpers.mjs';
 import { samePath, settle, until } from './m3-helpers.mjs';
+import { PANE } from './m4-helpers.mjs';
 import { savedLayout } from './m5-helpers.mjs';
 import { resizeWindow } from './m6-helpers.mjs';
 import { openProject } from './tb-helpers.mjs';
@@ -152,7 +156,7 @@ function reportParts(file) {
     return [line.slice(2, at), line.slice(at + 2)];
   }));
   const actions = section('Recent activity').map((line) => line.replace(/^- \d{2}:\d{2}:\d{2} /, ''));
-  return { md, view, actions };
+  return { md, view, actions, fields: viewFields(section('Current view').join('\n')) };
 }
 
 // ---------- synthetic 数据 ----------
@@ -791,6 +795,7 @@ async function folderEmpty(ctx) {
 async function f8Report(ctx) {
   const { page } = ctx;
   await backToApp(page);
+  const facts = await paneFacts(page, PANE);
   const { dialog, file, buttons } = await saveReport(ctx, WHAT1, EXPECT1);
   ctx.issue1 = file;
   const at = buttons.indexOf('Show in Explorer');
@@ -811,6 +816,11 @@ async function f8Report(ctx) {
   const parts = reportParts(file);
   record('MEM-29 F8 in a session writes "Page: Session" in Current view', parts.view.Page === 'Session',
     JSON.stringify(parts.view));
+  const problems = f8ViewProblems(parts.fields, facts);
+  record('F8 in a session (from m7-app, composer-pickers new check 9): Current view keeps "Model" and "Permission '
+    + 'mode" and adds "Model range" (the range button), "Effort" (the Effort button in the message-box row) and "Pane '
+    + 'width" (the focused .chat-pane), in the order of f8.md', problems.length === 0,
+  JSON.stringify({ problems, facts, fields: parts.fields }));
 }
 
 // ---------- 步骤：synthetic 报告与列表 ----------
@@ -1464,6 +1474,10 @@ async function f8OnSettings(ctx) {
     + 'width; after saving, the new report is at the top without reopening the section', parts.view.Page === 'Settings'
     && parts.view['Right panel'] === 'Open' && /^\d+px/.test(parts.view['Right panel width'] ?? '') && Boolean(top),
   JSON.stringify({ view: parts.view, top }));
+  const offPane = offPaneViewProblems(parts.fields);
+  record('F8 on Settings → UI issues (from the F8-on-Review check of m7-app): Current view says "Pane width: None" '
+    + '(not on the session page), right after Window size and before Sidebar width', offPane.length === 0,
+  JSON.stringify({ offPane, fields: parts.fields }));
   const missing = ISSUE_ACTIONS.filter((text) => !parts.actions.includes(text));
   record('MEM-28 F8 Recent activity records the UI issues actions in M7 wording: View record: UI issues, Resolve, '
     + 'Reopen, Hide resolved, Show resolved, Export: UI issues, Open folder: UI issues, Show record in Explorer',
@@ -1525,6 +1539,9 @@ async function pageValues(ctx) {
     && pages.includes('Session') && pages.includes('Settings') && !pages.includes('Review') && !pages.includes(null), JSON.stringify(pages));
   record('MEM-29 F8 Recent activity records "View in Settings" after you used it', memoryParts.actions.includes(
     'View in Settings'), JSON.stringify(memoryParts.actions));
+  const offPane = [...offPaneViewProblems(memoryParts.fields), ...offPaneViewProblems(reportParts(tools.file).fields)];
+  record('F8 on the Memory page and on the Customize page: Current view says "Pane width: None", right after Window '
+    + 'size and before Sidebar width', offPane.length === 0, JSON.stringify(offPane));
 }
 
 // ---------- 步骤：后台进程退出、字号、首次启动 ----------

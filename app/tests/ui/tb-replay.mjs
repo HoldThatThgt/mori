@@ -15,7 +15,7 @@
 //   TB-34（tb-approval）：后台批准卡在用户会话那一栏、卡头 "<role> · T1 · <title>"、编号 <实例 id>:approval-<n>；
 //     侧栏等你批准；对话一轮结束不清掉卡；Alt+1 允许；TaskBoard 工具从不出卡；权限菜单的说明。
 //   TB-53（tb-ask、tb-team）：三种文字与悬停、aria-checked、三种点击（off → always → off、once → always → once）、
-//     打开中与后台进程退出时不可用、窄栏（不宽于 860px）只显示状态点、做完为止在汇报的那一轮结束时回到 Team: Off。
+//     打开中与后台进程退出时不可用、窄栏（不宽于 600px）只显示状态点、做完为止在汇报的那一轮结束时回到 Team: Off。
 // 录制文件还不存在时，每个对应编号记一条失败"<编号> replay fixture missing"（不造假录制）。
 // 用法（在 app/ 下）：node tests/ui/tb-replay.mjs [--only tb-team,m1/readme]
 // 结果写到 test-results/tb-replay.json（--only 时 tb-partial-replay.json，不计入覆盖检查）；截图在 test-results/tb-replay/。
@@ -390,7 +390,7 @@ const switchNow = (page) => page.locator(`${PANE} [data-testid="team-switch"]`).
 const sameSwitch = (s, want) => s.text === want.text && s.label === want.text && s.title === want.title
   && s.checked === want.checked;
 
-/** @brief TB-53：窄栏（这一栏不宽于 860px）只显示状态点，读屏名称仍是完整文字；宽栏是完整文字、没有状态点。 */
+/** @brief TB-53：窄栏（这一栏不宽于 600px）只显示状态点，读屏名称仍是完整文字；宽栏是完整文字、没有状态点。 */
 async function narrowSwitch(page, app) {
   const wide = await switchNow(page);
   await app.evaluate(({ BrowserWindow }) => {
@@ -398,15 +398,15 @@ async function narrowSwitch(page, app) {
     win.setMinimumSize(400, 400);
     win.setSize(620, 800);
   });
-  await page.waitForFunction((pane) => document.querySelector(pane)?.getBoundingClientRect().width <= 860, PANE,
+  await page.waitForFunction((pane) => document.querySelector(pane)?.getBoundingClientRect().width <= 600, PANE,
     { timeout: 10000 }).catch(() => {});
   const width = await page.locator(PANE).evaluate((el) => el.getBoundingClientRect().width);
   const narrow = await switchNow(page);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1200, 800));
   await shot(page, 'tb53-narrow');
-  record('TB-53 replay: in a pane 860px wide or narrower the switch shows only the status dot (no text; the '
+  record('TB-53 replay: in a pane 600px wide or narrower the switch shows only the status dot (no text; the '
     + 'accessible name stays the full text); in a wider pane the full text shows without the dot',
-  width <= 860 && !narrow.wide && narrow.dot && narrow.shown === ''
+  width <= 600 && !narrow.wide && narrow.dot && narrow.shown === ''
     && narrow.label === SWITCH[narrow.mode].text && wide.wide && !wide.dot,
   JSON.stringify({ width, wide, narrow }));
 }

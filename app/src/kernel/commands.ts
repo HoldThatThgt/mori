@@ -73,7 +73,7 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
     case 'session.abort': return abort(command.sessionId);
     case 'session.state': return sessionState(command.sessionId);
     case 'session.setThinking': return setSessionThinking(command.sessionId, command.level);
-    // 模型层（docs/specs/model-providers.md §9.5）：换选择范围、顶栏菜单的各项
+    // 模型层（docs/specs/model-providers.md §9.5）：换选择范围、范围菜单的各项
     case 'session.setPick': return setSessionPick(command.sessionId, command.pick);
     case 'session.pickOptions': return sessionPickOptions(command.sessionId);
     case 'session.commands': return sessionCommands(command.sessionId);

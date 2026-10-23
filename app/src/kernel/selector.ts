@@ -1,7 +1,7 @@
 // 选择器（docs/specs/model-providers.md §5.1、§5.3、§4.6、§5.8；docs/specs/parallel-agents-taskboard.md §12.1、§12.2、
 // §12.9、§12.11）：纯函数。
 // 展开选择范围、按第 1–6 步逐项过滤并给出排除原因（第 3 步含角色的能力要求与要避开的模型族）、会话启动的静态校验、
-// 顶栏菜单各项的静态校验、候选耗尽时的等待判断。
+// 范围菜单各项的静态校验、候选耗尽时的等待判断。
 // 约定：CandidateExclusion.detail 是 §5.3“界面文字”列的完整文字（带 until 部分），界面与说明卡直接显示它。
 
 import { REASON_TEXTS, ZONES, plainReasonText } from '../shared/models';
@@ -366,7 +366,7 @@ export interface StaticCheckInput extends Omit<StaticSelectorInput, 'candidates'
 export interface StaticCheckResult {
   /** 拒绝启动的说明；可以发送时为 null */
   blocked: ModelBlocked | null;
-  /** 静态校验后的第一个候选（没有段时顶栏显示的当前模型）；没有时为 null */
+  /** 静态校验后的第一个候选（没有段时范围按钮显示的当前模型）；没有时为 null */
   first: ModelRef | null;
 }
 
@@ -466,9 +466,9 @@ export function staticCheck(input: StaticCheckInput): StaticCheckResult {
   return { blocked: candidateBlocked(input, result.excluded), first: null };
 }
 
-// ---- 顶栏菜单的各项（§9.2、§9.5 session.pickOptions） ----
+// ---- 范围菜单的各项（§9.2、§9.5 session.pickOptions） ----
 
-/** @brief 顶栏菜单各项的输入：配置、项目配置的分组缩小，以及这个会话的第 1–3 步输入。 */
+/** @brief 范围菜单各项的输入：配置、项目配置的分组缩小，以及这个会话的第 1–3 步输入。 */
 export interface PickOptionsInput extends Omit<StaticSelectorInput, 'candidates'> {
   /** 用户级配置 */
   config: Pick<ModelConfig, 'providers' | 'groups'>;
@@ -492,7 +492,7 @@ function pickOption(input: PickOptionsInput, item: Pick<PickOption, 'pick' | 'ki
 }
 
 /**
- * @brief 顶栏菜单的各项（§9.2）：先全部分组（文字为 id），再全部提供商（文字为名称），再按提供商列出模型（文字为模型 id），
+ * @brief 范围菜单的各项（§9.2）：先全部分组（文字为 id），再全部提供商（文字为名称），再按提供商列出模型（文字为模型 id），
  *        各按配置里的顺序；每项标出展开后候选涉及的区域，全部候选都被本会话的静态校验排除时标为 excluded 并给出原因。
  * @param input 配置、项目配置的分组缩小与这个会话的第 1–3 步输入
  */

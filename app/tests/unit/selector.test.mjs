@@ -1,4 +1,4 @@
-// kernel/selector.ts 的单元测试：§5.1 展开、§5.3 选择器第 1–6 步与段内规则、§4.6 静态校验、§9.2 顶栏菜单各项、
+// kernel/selector.ts 的单元测试：§5.1 展开、§5.3 选择器第 1–6 步与段内规则、§4.6 静态校验、§9.2 范围菜单各项、
 // §5.8 候选耗尽。
 // 时刻一律由假时钟给出（§12）。
 
@@ -393,7 +393,7 @@ test('MP-01 config_invalid wins over everything else', () => {
   assert.deepEqual(blocked.actions, ['open_settings']);
 });
 
-// ---- §9.2 顶栏菜单各项（session.pickOptions） ----
+// ---- §9.2 范围菜单各项（session.pickOptions） ----
 
 /** 菜单各项的输入：区域取配置里提供商的区域，项目只允许 local、intranet。 */
 function menuInput(over = {}) {

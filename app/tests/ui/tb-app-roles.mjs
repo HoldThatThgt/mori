@@ -20,13 +20,13 @@
 // 抛错（synthetic fault injection，本构建与 src 不变），最后单独启动。
 
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROLES_TEXT } from '../fake-endpoint/scenarios/roles.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
 import { appRoot } from './lib.mjs';
 import { stubFolder } from './m3-helpers.mjs';
-import { openToolsSection, resizeWindow } from './m6-helpers.mjs';
+import { fitPane, openToolsSection, resizeWindow } from './m6-helpers.mjs';
 import { toolRows } from './m6-tools-helpers.mjs';
 import {
   allowAll, bridge, brief, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents,
@@ -300,9 +300,25 @@ const withoutMemorySections = (text) => text?.replace(/\n\n<(taste|strategy|revi
 const comparable = (system) => withoutMemorySections(afterIdentity(system));
 
 /**
+ * @brief 装在本构建位置的 v0 会发的 system prompt：pi 的 system prompt 写着它自己文档的路径（pi 包所在的
+ *        node_modules）。对照构建是开发构建（app/node_modules），打包版（--exe）的 pi 在 resources/app.asar/node_modules，
+ *        所以打包版运行时把对照里的这个路径前缀换成打包版的；只换这一处，其余逐字节比较。
+ * @param ctx 套件上下文（ctx.v0 为对照构建的结果，ctx.exePath 为打包版路径或 null）
+ * @return 对照的 system prompt
+ */
+function baseSystem(ctx) {
+  const system = ctx.v0.request.system;
+  if (!ctx.exePath) return system;
+  const dev = join(appRoot, 'node_modules') + sep;
+  const packaged = join(dirname(ctx.exePath), 'resources', 'app.asar', 'node_modules') + sep;
+  return system.split(dev).join(packaged);
+}
+
+/**
  * @brief 本构建跑同一个关闭模式的会话，与对照构建比较（TB-03）；再写一个 executor.md、新开会话，比较多出来的部分。
- *        不做任何归一：两次用同一个项目文件夹（system prompt 里的 <cwd> 相同），pi 的 system prompt 里没有日期、
- *        数据目录这类每次运行不同的内容，所以请求体逐字节比较。
+ *        两次用同一个项目文件夹（system prompt 里的 <cwd> 相同），pi 的 system prompt 里没有日期、数据目录这类
+ *        每次运行不同的内容，所以请求体逐字节比较；例外是打包版的安装位置（baseSystem），以及记忆规格 §14.4 去掉的
+ *        memory 工具、身份段与记忆分节（comparable）。
  */
 async function v0same(ctx) {
   if (!ctx.v0?.request) throw new Error('the base build gave no request to compare with');
@@ -333,9 +349,9 @@ async function v0Compare(ctx, who, request, tools) {
     + 'TaskBoard build, same project and config) once memory is left out, and so is the system prompt after the '
     + 'identity part with the taste, strategy, review and facts sections left out (memory spec §14.4)',
   request !== undefined && JSON.stringify(kept) === JSON.stringify(base.body.tools)
-    && system !== null && system === comparable(base.system),
+    && system !== null && system === comparable(baseSystem(ctx)),
   brief({ tools: toolNames(request?.body), baseTools: toolNames(base.body), system: system?.length,
-    baseSystem: comparable(base.system)?.length, head: request?.system.slice(0, 60) }));
+    baseSystem: comparable(baseSystem(ctx))?.length, head: request?.system.slice(0, 60) }));
   const rows = withoutMemoryRow(tools.rows);
   record('TB-03 off mode without role files: the Tools page rows (name, source, on/off, description) are the same as '
     + 'in v0 once the memory row is left out (memory spec §14.4)', rows.length > 0 && same(rows, ctx.v0.tools.rows),
@@ -366,9 +382,9 @@ async function v0Roles(ctx, who, request, tools) {
   const extraTool = toolDef(request, 'agent_message');
   const rest = kept.filter((tool) => tool !== extraTool);
   const system = comparable(request?.system);
-  const baseSystem = comparable(base.system);
-  const added = system !== null && baseSystem !== null && system.startsWith(baseSystem)
-    ? system.slice(baseSystem.length) : null;
+  const v0System = comparable(baseSystem(ctx));
+  const added = system !== null && v0System !== null && system.startsWith(v0System)
+    ? system.slice(v0System.length) : null;
   record('TB-03 off mode with another role (executor.md): with memory left out (memory spec §14.4) the request '
     + 'differs from v0 only by agent_message — the tool list is the v0 list plus the agent_message definition (with '
     + 'its description) at the end, and the system prompt after the identity part (without the memory sections) is '
@@ -463,31 +479,31 @@ async function switches(ctx) {
 }
 
 /**
- * @brief 窄栏（这一栏不宽于 860px，§15）：打开右栏让中栏变窄，开关只显示状态点（off 空心、always 实心），不显示文字，
- *        读屏名称与悬停仍是完整文字；关掉右栏后（宽于 860px）回到完整文字、没有状态点。
+ * @brief 窄栏（这一栏不宽于 600px，§15；composer-pickers 合入后由 860px 改为 600px）：右栏打开、把这一栏调到 601px 和
+ *        600px（阈值的两边）。601px 时完整文字、没有状态点；600px 时只显示状态点（off 空心、always 实心），不显示文字，
+ *        读屏名称与悬停仍是完整文字。之后关掉右栏、回到 1200 宽窗口。
  */
 async function narrow(ctx, tab) {
   const pane = ctx.page.locator(paneSel(tab));
   const width = () => pane.evaluate((el) => el.getBoundingClientRect().width);
+  await fitPane(ctx, 601, { right: true });
   const wide = await switchLook(ctx, tab);
   const wideWidth = await width();
-  const toggle = ctx.page.locator(`${paneSel(tab)} button[aria-label="Toggle changes"]`);
-  await toggle.click();
-  await poll(async () => (await width()) <= 860, 5000);
-  if ((await width()) > 860) await resizeWindow(ctx.app, 800, 700);
+  await fitPane(ctx, 600, { right: true });
   const narrowWidth = await width();
   const offLook = await switchLook(ctx, tab);
   await clickTo(ctx, tab, 'always');
   const onLook = await switchLook(ctx, tab);
   await clickTo(ctx, tab, 'off');
   await shot(ctx, args, 'narrow-switch');
-  record('TB-53 in a pane 860px wide or narrower the switch shows only a status dot (hollow for off, filled for on) '
-    + 'and no text, and its screen-reader name and hover keep the full text; wider panes show the full text and no '
-    + 'dot', narrowWidth <= 860 && wideWidth > 860 && wide.text && wide.shown === 'Team: Off' && !wide.dot
+  record('TB-53 in a pane 600px wide or narrower the switch shows only a status dot (hollow for off, filled for on) '
+    + 'and no text, and its screen-reader name and hover keep the full text; a 601px pane shows the full text and no '
+    + 'dot', Math.abs(narrowWidth - 600) < 0.5 && Math.abs(wideWidth - 601) < 0.5 && wide.text
+    && wide.shown === 'Team: Off' && !wide.dot
     && !offLook.text && offLook.shown === '' && offLook.dot && !offLook.filled && offLook.label === 'Team: Off'
     && offLook.title === 'Turn on team mode' && !onLook.text && onLook.shown === '' && onLook.dot && onLook.filled
     && onLook.label === 'Team: On', brief({ wideWidth, narrowWidth, wide, offLook, onLook }));
-  await toggle.click();
+  await fitPane(ctx, 930);
   await resizeWindow(ctx.app, 1200, 800);
 }
 
