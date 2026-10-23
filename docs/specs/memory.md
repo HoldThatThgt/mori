@@ -977,7 +977,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 | 单元 | `tests/unit/memory/*.test.mjs`（`node --test`，经 esbuild 打包内核模块，`mem-reporter.mjs` 写 `mem-unit.json`） | 纯函数与模块：文件格式、slug、预算与估算、谁能改什么、条目匹配、修订与回滚、反向链接、身份段与 pi 的逐字比较、分节、分发、日子与该跑的日子、改时刻、片段与水位（物理行）、反馈的归属、第一条消息、memory 工具（替身会话，synthetic）、`mori-memory` 的钩子、增强调度（注入的时钟）、token 的累加 |
 | 合成端点 | `tests/fake-endpoint/` 的关键词模式、脚本模式与新增的增强脚本（synthetic） | 见下 |
 | App | `tests/ui/mem-app-*.mjs` | Electron + 合成端点，逐条验收；端口 4700–4799；模型配置按 `v1-switch-helpers.seedUserData` 写好（注明 synthetic）；会话文件、反馈、记忆文件、`enhance.json` 由测试按 §3 的格式写好（注明 synthetic） |
-| 回放 | `tests/fixtures/mem/*.json` | 用 `mem-record.mjs` 从真实的 App 对合成端点录制，`source: 'synthetic'`（§0 第 4 条）；`harness/main.jsx` 加 `fixtures/mem` |
+| 回放 | `tests/fixtures/mem/*.json` | 用 `mem-record.mjs` 从真实的 App 对合成端点录制，`source: 'synthetic'`（§0 第 4 条），带录制机器的时区 `timeZone`（IANA 名），回放把页面与期望文字都设成这个时区（内核按它算增强的下次运行，换了时区回放状态行的时刻对不上）；`harness/main.jsx` 加 `fixtures/mem` |
 | 真实模型 | `tests/ui/mem-real.mjs --source <你的数据目录>` | DeepSeek 与 GLM；这台机器没有数据目录，交付时未运行 |
 
 合成端点的增强脚本（只用于测试，`tests/fake-endpoint/enhance.mjs`，文件开头注释逐条列出；判断顺序在脚本模式之后、关键词之前）：
