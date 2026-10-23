@@ -3,6 +3,9 @@
 // 模型每次的做法不完全一样（例如先读文件再改、改两次），所以每轮都"出一张卡处理一张"，直到本轮结束。
 // 任务栏闪烁与"Show in Explorer"的做法与 m2-app.mjs 相同：经 app.evaluate 在主进程里记录 flashFrame 调用，
 // 开一个小窗口把焦点抢走；shell.showItemInFolder 换成只记路径的版本，不会真的打开资源管理器。
+// 2026-10-21 起权限按钮在输入框下面一行的左端（docs/v0/composer-pickers.md"用真实模型走一遍"）：走查 5 查权限菜单从这一行
+// 往上打开、切到"Allow all"后按钮只有文字、用警示色、没有图标；走查 8 查报告"Current view"的"Model range""Effort"和
+// "Pane width"。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m2-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,…]
 // 结果写到 test-results/m2-real(-packaged).json，截图在 test-results/m2-real(-packaged)/。
@@ -13,6 +16,10 @@ import {
   allowRealProject, appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, scratchUserData,
   sleep,
 } from './lib.mjs';
+import {
+  f8ViewProblems, modeProblems, paneFacts, PERMISSION_MENU, permissionMenuProblems, permissionState, ROW, rowMenuState,
+  viewFields,
+} from './m2-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
 const source = arg('source');
@@ -28,7 +35,10 @@ const wanted = (item) => !only || only.includes(String(item));
 
 /** 当前显示的会话面板（隐藏的会话面板仍然挂载，找元素都限定在这里） */
 const P = '.pane-slot:not([hidden]) ';
+const PANE = `${P}[data-testid="chat-pane"]`;
 const CARD = `${P}[data-testid="approval-card"]`;
+/** 输入框下面一行的权限按钮 */
+const PERMISSION_BUTTON = `${P}${ROW} [data-testid="permission-button"]`;
 const STOPPED = 'Stopped · Changes made so far stay as they are';
 const ISSUE_HEADINGS = ['# UI issue · ', '## What went wrong', '## What you expected', '## Screenshot',
   '## Current view', '## Recent activity', '## Versions'];
@@ -136,10 +146,10 @@ const rejectAll = (page, reason) => async (card) => {
   await cardFor(page, card.request).getByTestId('approval-reject').click();
 };
 
-/** @brief 打开顶栏的权限菜单（已经开着时直接返回）。 */
+/** @brief 打开输入框下面一行的权限菜单（已经开着时直接返回）。 */
 async function openMenu(page) {
   const menu = page.getByTestId('permission-menu');
-  if (!(await menu.isVisible().catch(() => false))) await page.locator(`${P}[data-testid="permission-button"]`).click();
+  if (!(await menu.isVisible().catch(() => false))) await page.locator(PERMISSION_BUTTON).click();
   await menu.waitFor({ timeout: 5000 });
   return menu;
 }
@@ -190,16 +200,15 @@ async function switchSession(page, title) {
 }
 
 /** @brief 权限按钮上的文字。 */
-const permissionText = (page) => page.locator(`${P}[data-testid="permission-button"]`).innerText()
-  .then((text) => text.trim());
+const permissionText = (page) => page.locator(PERMISSION_BUTTON).innerText().then((text) => text.trim());
 
 /**
- * @brief 等顶栏权限按钮变成 want（最多 5 秒）：按钮在后台进程答复 approval.setMode 之后才变，不能点完马上读。
+ * @brief 等输入框下面一行的权限按钮变成 want（最多 5 秒）：按钮在后台进程答复 approval.setMode 之后才变，不能点完马上读。
  * @return 是否等到了
  */
 function permissionBecomes(page, want) {
   return page.waitForFunction(({ selector, text }) => document.querySelector(selector)?.textContent?.trim() === text,
-    { selector: `${P}[data-testid="permission-button"]`, text: want }, { timeout: 5000 }).then(() => true, () => false);
+    { selector: PERMISSION_BUTTON, text: want }, { timeout: 5000 }).then(() => true, () => false);
 }
 
 /** @brief 已拒绝的卡之后有没有一条带文字的助手回复。 */
@@ -335,9 +344,18 @@ async function item4(ctx) {
   record('4 清除后运行命令又出卡', again.length >= 1);
 }
 
-/** @brief 切到全部允许：先弹确认（文字、焦点在"Cancel"），确认后按钮显示"Allow all"。 */
+/**
+ * @brief 切到全部允许：权限菜单从输入框下面一行往上打开、不出界；先弹确认（文字、焦点在"Cancel"），确认后按钮显示
+ *        "Allow all"，只有文字（没有盾牌图标）、用警示色（字用 --color-warn-text，对比度 ≥ 4.5:1）。
+ */
 async function confirmAll(page) {
+  const ask = await permissionState(page, PANE);
   const menu = await openMenu(page);
+  const placement = permissionMenuProblems(await rowMenuState(page, PANE, PERMISSION_MENU));
+  record('5 权限菜单从输入框下面一行（按钮在这一行的左端，顶栏上没有权限、范围、Effort 和上下文用量）往上打开，'
+    + '左边对齐这一行，整个在这一栏和窗口里、不盖顶栏', Boolean(ask?.first) && ask.inTopbar.length === 0
+    && placement.length === 0,
+  [`first ${ask?.first}`, `in top bar ${JSON.stringify(ask?.inTopbar ?? null)}`, ...placement].join('; '));
   await menu.getByRole('menuitemradio', { name: 'Allow all' }).click();
   const dialog = page.getByTestId('confirm-dialog');
   await dialog.waitFor({ timeout: 5000 });
@@ -348,7 +366,14 @@ async function confirmAll(page) {
       && focused === 'Cancel', oneLine(text));
   await shot(page, '5-confirm');
   await dialog.getByRole('button', { name: 'Allow all', exact: true }).click();
-  record('5 确认后顶栏按钮显示"全部允许"', await permissionBecomes(page, 'Allow all'), await permissionText(page));
+  record('5 确认后输入框下面一行的按钮显示"全部允许"', await permissionBecomes(page, 'Allow all'),
+    await permissionText(page));
+  const all = await permissionState(page, PANE);
+  const problems = modeProblems(all, 'all');
+  record('5 "全部允许"的按钮只有文字和 ▾、没有盾牌图标，用警示色（颜色与"每次询问"不同，字用 --color-warn-text，'
+    + '和底色的对比度 ≥ 4.5:1），悬停两行、读屏的描述只有第二行', problems.length === 0 && Boolean(all)
+    && all.look !== ask?.look, [...problems, `look ${ask?.look} → ${all?.look}`].join('; '));
+  await shot(page, '5-allow-all-button');
 }
 
 /** @brief 走查 5：切到"Allow all"先弹确认；之后改文件不出卡；切回后又出卡。 */
@@ -555,8 +580,12 @@ async function saveIssue(dialog, what, expect) {
   return /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
 }
 
-/** @brief 检查保存的报告：位置与文件名、各节、截图文件、当前界面、最近的操作与版本。 */
-function checkIssueFile({ userData }, issue, { what, expect }) {
+/**
+ * @brief 检查保存的报告：位置与文件名、各节、截图文件、当前界面（含"Model range""Effort"和"Pane width"）、最近的操作
+ *        与版本。
+ * @param facts 按 F8 之前记下的那一栏宽度、范围、Effort 和权限（m2-helpers.mjs paneFacts）
+ */
+function checkIssueFile({ userData }, issue, { what, expect, facts }) {
   const md = issue && existsSync(issue) ? readFileSync(issue, 'utf8') : '';
   const missing = ISSUE_HEADINGS.filter((heading) => !md.split(/\r?\n/).some((line) => line.startsWith(heading)));
   const shotName = /!\[Screenshot\]\(([^)]+)\)/.exec(section(md, 'Screenshot'))?.[1] ?? '';
@@ -575,6 +604,10 @@ function checkIssueFile({ userData }, issue, { what, expect }) {
       && /^- \d{2}:\d{2}:\d{2} \S/m.test(actions) && actions.includes('Permission request: ')
       && ['Mori', 'Electron', 'Chromium', 'Node', 'Windows'].every((name) => version.includes(name)),
     oneLine(`${view} | ${actions.split(/\r?\n/).slice(-3).join(' ')} | ${version}`, 400));
+  const problems = f8ViewProblems(viewFields(view), facts);
+  record('8 报告的"当前界面"里"Model""Permission mode"照旧，多了"Model range"（同范围按钮）、"Effort"（同输入框下面一行的'
+    + ' Effort 按钮）和"Pane width"（焦点所在那一栏的宽度），顺序同 f8.md', md.length > 0 && problems.length === 0,
+  problems.join('; '));
 }
 
 /** @brief 走查 8 前半：卡挂着时按 F8 写一条并保存；点"Show in Explorer"；F8 和报告框里的 Esc 都不停止生成。 */
@@ -585,11 +618,12 @@ async function f8WhileWaiting(ctx) {
   const card = await nextCard(page);
   if (!card) throw new Error('no approval card for the command');
   await h.textarea.focus();
+  const facts = await paneFacts(page, PANE);
   await page.keyboard.press('F8');
   const dialog = page.getByTestId('issue-dialog');
   await dialog.getByTestId('issue-shot').waitFor({ timeout: 15000 });
   await shot(page, '8-f8-dialog');
-  const text = { what: '批准卡挂着时的界面', expect: '只是走查，不需要处理' };
+  const text = { what: '批准卡挂着时的界面', expect: '只是走查，不需要处理', facts };
   const issue = await saveIssue(dialog, text.what, text.expect);
   checkIssueFile(ctx, issue, text);
   if (stubbed) {
@@ -628,6 +662,9 @@ async function f8KeyNotInReport({ page, h }) {
     md.length > 0 && !md.includes(FAKE_KEY) && section(md, 'Recent activity').includes(`Add key ${provider}`)
       && /^- Page: Settings$/m.test(section(md, 'Current view'))
       && section(md, 'What you expected').includes('(left blank)'), issue);
+  const width = viewFields(section(md, 'Current view')).find((field) => field.label === 'Pane width')?.value;
+  record('8 设置页的报告里"Pane width"是"None"（不在会话页时没有会话面板，f8.md"保存的内容"）', width === 'None',
+    `Pane width: ${width}`);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
 }
 

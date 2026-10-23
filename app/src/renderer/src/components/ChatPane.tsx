@@ -1,10 +1,11 @@
-// 会话面板：顶栏（会话名、模型、思考强度、权限、上下文用量、右栏开关；分屏时"Close pane"）、对话流、阶段行、后台进程退出提示、
-// 批准卡、排队区、拒绝启动卡与输入框。分屏时每一栏是一个完整的会话面板；在面板里按下鼠标或焦点进入它，焦点就切到这一栏
-// （split.md）。模型层（docs/v1/screens/model-menu.md、model-chat.md）：顶栏的选择范围，输入框上方的拒绝启动卡。
-// 平行 Agent（docs/v1/screens/team-switch.md）：顶栏在模型、思考强度、权限按钮之前有协作开关。
+// 会话面板：顶栏（"项目名 › 会话名"、协作开关、右栏开关；分屏时"Close pane"）、对话流、阶段行、后台进程退出提示、批准卡、
+// 排队区、拒绝启动卡与输入框（文字框下面一行有权限、选择范围、Effort、上下文用量和发送，Composer.tsx）。分屏时每一栏是
+// 一个完整的会话面板；在面板里按下鼠标或焦点进入它，焦点就切到这一栏（split.md）。模型层（docs/v1/screens/model-menu.md、
+// model-chat.md）：输入框下面一行的选择范围，输入框上方的拒绝启动卡。平行 Agent（docs/v1/screens/team-switch.md）：
+// 协作开关是顶栏右边一组的第一个，在右栏开关之前。
 
+import { useRef } from 'react';
 import { reload } from '../state/actions';
-import type { ContextUsage } from '../../../shared/protocol';
 import { seatRolesOf } from '../../../shared/team';
 import { skillCommandText } from '../state/skillText';
 import { closePane, focusComposer, focusPane } from '../state/split';
@@ -13,13 +14,10 @@ import { Icon } from '../icons';
 import { ApprovalCard } from './ApprovalCard';
 import { BlockedCard } from './BlockedCard';
 import { Composer, QueueArea } from './Composer';
-import { ModelMenu } from './ModelMenu';
 import { PaneTitle } from './PaneTitle';
-import { PermissionMenu } from './PermissionMenu';
 import { QuestionCard } from './QuestionCard';
 import { StageLine } from './StageLine';
 import { TeamSwitch } from './TeamSwitch';
-import { ThinkingMenu } from './ThinkingMenu';
 import { Transcript } from './Transcript';
 
 /** 没有名字时会话名取第一条消息的前几个字（方案 5.3） */
@@ -42,21 +40,6 @@ export function sessionTitle(tab: Tab): string {
 /** @brief 文件夹名。 */
 export function folderName(cwd: string): string {
   return cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd;
-}
-
-/** @brief 顶栏的上下文用量。 */
-function UsageChip({ usage }: { usage: ContextUsage | null }) {
-  if (!usage) return null;
-  if (usage.tokens === null || usage.percent === null) {
-    return <span className="usage-chip" title="Just compacted. Context usage shows after the next response."
-      data-testid="usage">Context —</span>;
-  }
-  const percent = usage.percent < 1 ? '<1%' : `${Math.round(usage.percent)}%`;
-  const tokens = usage.tokens.toLocaleString('en-US');
-  const total = usage.contextWindow.toLocaleString('en-US');
-  return <span className="usage-chip" title={`About ${tokens} / ${total} tokens`}
-    aria-label={`Context usage ${percent}, about ${tokens} of ${total} tokens`} data-testid="usage">
-    Context {percent}</span>;
 }
 
 /** @brief 输入框不能发送时的说明；能发送时为 null。 */
@@ -133,7 +116,54 @@ export interface PaneProps {
   onToggleRight: () => void;
 }
 
-/** @brief 顶栏；选择范围和思考强度在会话打开之后才显示，没有当前模型时不显示思考按钮（model-menu.md）。 */
+/** @brief 按下的地方是不是顶栏右边一组的按钮（协作开关、右栏开关、"Close pane"）。 */
+function isTopBarAction(target: EventTarget): boolean {
+  return target instanceof Element && target.closest('.topbar-actions button') !== null;
+}
+
+/**
+ * @brief 在面板里按下鼠标或焦点进入面板时把焦点切到这一栏（split.md"焦点所在的一栏"）。例外：鼠标主键按在顶栏右边一组的
+ *        按钮（协作开关、右栏开关、"Close pane"）上时，到这一下按完才切（split.md"右栏开关"）。分屏时右栏跟随焦点所在的
+ *        一栏，按下那一刻就切的话右栏先换成这一栏的开关状态（例如关着）、两栏变宽、按钮被挤到别处，松开时不在按钮上，
+ *        这一下就点空了。按完是 click（右栏开关里先切焦点再开关；另两个按钮点完由下面的计时切，关掉的那一栏已不在分屏里时
+ *        focusPane 不做事），或在别处松开：click 和 pointerup 在同一个任务里派发，下一个任务时还在按着就说明没点成，
+ *        这时再切。焦点照常由按下鼠标放到按钮上（不用脚本 focus，免得鼠标点了也画出键盘焦点框）。右键照常在按下时切。
+ * @return 面板的两个事件和包了一层的右栏开关（点了它就不再等）
+ */
+function usePaneFocus(key: string, onToggleRight: () => void) {
+  const pressing = useRef(false);
+  const onPointerDownCapture = (event: React.PointerEvent) => {
+    if (!(event.button === 0 && isTopBarAction(event.target))) {
+      focusPane(key);
+      return;
+    }
+    pressing.current = true;
+    const done = new AbortController();
+    const end = () => {
+      done.abort();
+      setTimeout(() => {
+        if (!pressing.current) return;
+        pressing.current = false;
+        focusPane(key);
+      });
+    };
+    window.addEventListener('pointerup', end, { signal: done.signal });
+    window.addEventListener('pointercancel', end, { signal: done.signal });
+  };
+  const onFocusCapture = () => {
+    if (!pressing.current) focusPane(key);
+  };
+  const toggle = () => {
+    pressing.current = false;
+    onToggleRight();
+  };
+  return { onPointerDownCapture, onFocusCapture, toggle };
+}
+
+/**
+ * @brief 顶栏："项目名 › 会话名"和这一栏的按钮：协作开关（界面没准备好时不可用）、右栏开关、分屏时"Close pane"
+ *        （docs/v0/screens/chat.md"顶栏"）。会话名放不下时项目名先收短，会话面板 ≤ 320px 时不显示项目名（chat.css）。
+ */
 function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab }) {
   const kernel = useApp((state) => state.kernel);
   const notReady = notReadyText(kernel, tab) !== null;
@@ -146,16 +176,8 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
       </div>
       <div className="topbar-actions">
         <TeamSwitch tab={tab} disabled={notReady} />
-        {tab.phase !== 'opening' && (
-          <>
-            <ModelMenu tab={tab} disabled={notReady} />
-            {tab.current && <ThinkingMenu tab={tab} disabled={notReady} />}
-          </>
-        )}
-        <PermissionMenu tab={tab} disabled={notReady} />
-        <UsageChip usage={tab.contextUsage} />
-        <button className="icon-button" onClick={onToggleRight} aria-pressed={rightOpen} aria-label="Toggle changes"
-          title="This session’s changes"><Icon name="right" /></button>
+        <button className="icon-button right-toggle" onClick={onToggleRight} aria-pressed={rightOpen}
+          aria-label="Toggle changes" title="This session’s changes"><Icon name="right" /></button>
         {split && (
           <button className="icon-button close-pane" data-testid="close-pane" aria-label="Close pane"
             title="Close pane (doesn’t stop the response)" onClick={() => { closePane(tab.key); focusComposer(); }}>
@@ -170,11 +192,12 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
 /** @brief 一个会话的面板。 */
 export function ChatPane({ tab, ...pane }: PaneProps & { tab: Tab }) {
   const kernel = useApp((state) => state.kernel);
+  const focus = usePaneFocus(tab.key, pane.onToggleRight);
   return (
     <section className="chat-pane" aria-label={sessionTitle(tab)} data-testid="chat-pane" data-tab={tab.key}
       data-running={tab.transcript.running} data-sending={tab.transcript.sending}
-      onPointerDownCapture={() => focusPane(tab.key)} onFocusCapture={() => focusPane(tab.key)}>
-      <TopBar tab={tab} {...pane} />
+      onPointerDownCapture={focus.onPointerDownCapture} onFocusCapture={focus.onFocusCapture}>
+      <TopBar tab={tab} {...pane} onToggleRight={focus.toggle} />
       <SessionBanners tab={tab} />
       <Transcript tab={tab} />
       <div className="composer-area">

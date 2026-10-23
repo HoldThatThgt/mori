@@ -1,28 +1,44 @@
-// 顶栏的权限菜单：Ask each time / Allow all，"Allowed for this session:"的列表可以逐项清除（Forget）
-// （docs/v0/screens/approval.md）。只作用于这个会话（含它的全部后台 Agent，平行 Agent 规格 §11.1）；
-// 切到"Allow all"前确认一次，切回"Ask each time"不需要确认。
-// 面板 400px 以下按钮只显示盾牌图标（chat.css 的 @container 藏起 .permission-text），模式名靠读屏名
-// "Permission mode: <模式>"。
+// 输入框下面一行左端的权限按钮和菜单（docs/v0/screens/approval.md）：Ask each time / Allow all，
+// "Allowed for this session:"的列表可以逐项清除（Forget）。只作用于这个会话（含它的全部后台 Agent，平行 Agent 规格
+// §11.1）；切到"Allow all"前确认一次，切回"Ask each time"不需要确认。按钮照 Claude 的模式选择只有文字（模式名和 ▾），
+// 任何宽度都没有图标；这一行放不下时模式名截断加"…"，全名在悬停的第一行和读屏名"Permission mode: <模式>"里。
+// 开关、位置和焦点的行为在 rowMenu.ts。
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ApprovalMode } from '../../../shared/protocol';
 import { forgetApproval, setApprovalMode } from '../state/actions';
-import { useOverlay } from '../state/overlays';
 import type { Tab } from '../state/store';
 import { Icon } from '../icons';
 import { approvalLabel } from './approvalLabel';
 import { ConfirmDialog } from './ConfirmDialog';
-import { moveMenuFocus, useOutsideClose } from './menu';
+import { moveMenuFocus } from './menu';
+import { Description, tipLines } from './ModelMenu';
+import { useRowMenu, useRowPlacement } from './rowMenu';
 
 const modeText: Record<ApprovalMode, string> = { ask: 'Ask each time', all: 'Allow all' };
 
+/** 切到"Allow all"的说明（确认框里也是这一句） */
+const ALLOW_ALL_TEXT = 'Edits, writes, and commands will run without asking.';
+
+/** 悬停的第二行：照 Claude 的模式选择用当前模式的说明；"Ask each time"没有说明，借用 /permissions 命令的说明 */
+const modeNote: Record<ApprovalMode, string> = { ask: 'Change the permission mode', all: ALLOW_ALL_TEXT };
+
+/** @brief 菜单的内容。 */
+interface PermissionPanelProps {
+  /** 菜单元素（以这一行定位时要量它） */
+  menu: React.RefObject<HTMLDivElement | null>;
+  /** 这个会话 */
+  tab: Tab;
+  /** 选了一个权限 */
+  onChoose: (mode: ApprovalMode) => void;
+}
+
 /** @brief 菜单内容：两个权限（当前项打勾）、"Allowed for this session:"列表、底部说明。打开时焦点在当前项上。 */
-function PermissionPanel({ tab, onChoose }: { tab: Tab; onChoose: (mode: ApprovalMode) => void }) {
-  const menu = useRef<HTMLDivElement>(null);
+function PermissionPanel({ menu, tab, onChoose }: PermissionPanelProps) {
   const { mode, allowed } = tab.approval;
   useEffect(() => {
     menu.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
-  }, []);
+  }, [menu]);
   return (
     <div ref={menu} className="menu permission-menu" role="menu" aria-label="Permissions" data-testid="permission-menu"
       onKeyDown={moveMenuFocus}>
@@ -47,47 +63,55 @@ function PermissionPanel({ tab, onChoose }: { tab: Tab; onChoose: (mode: Approva
   );
 }
 
-/** @brief 顶栏的权限按钮和菜单；disabled 为真时（会话没打开、后台进程不可用）不能切换。 */
-export function PermissionMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
-  const [open, setOpen] = useState(false);
+/**
+ * @brief 权限按钮和菜单。unavailable 是不能发送时的说明（"Starting…"等）：这时按钮 aria-disabled（仍能 Tab 到，
+ *        点了不开菜单），开着的菜单关闭，原因在悬停的第二行和读屏的描述里。准备中、生成中仍可用，菜单不关。
+ *        菜单往上打开、左边对齐这一行的左端。
+ */
+export function PermissionMenu({ tab, unavailable }: { tab: Tab; unavailable: string | null }) {
   const [confirming, setConfirming] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
+  const menu = useRowMenu(tab, unavailable !== null);
+  const panel = useRef<HTMLDivElement>(null);
+  const tipId = useId();
+  useRowPlacement(menu.open, menu.button, panel, 'start');
   const { mode } = tab.approval;
-  useOverlay(open, () => {
-    setOpen(false);
-    button.current?.focus();
-  });
-  useOutsideClose(open, root, () => setOpen(false));
+  const name = `Permission mode: ${modeText[mode]}`;
+  const note = unavailable ?? modeNote[mode];
 
   function choose(next: ApprovalMode) {
-    setOpen(false);
+    menu.setOpen(false);
     if (next === 'all' && mode !== 'all') {
       setConfirming(true);
       return;
     }
-    button.current?.focus();
+    menu.button.current?.focus();
     if (next !== mode) void setApprovalMode(tab.key, next);
   }
 
   function confirmed(ok: boolean) {
     setConfirming(false);
-    button.current?.focus();
+    menu.button.current?.focus();
     if (ok) void setApprovalMode(tab.key, 'all');
   }
 
+  // 按钮变得不可用（后台进程退出、重新载入中、重新打开中）时确认框也关上、按取消算，焦点回到按钮（approval.md）：
+  // 不然点"Allow all"会把 approval.setMode 发给已经退出或正在重启的后台进程
+  useEffect(() => {
+    if (unavailable !== null && confirming) confirmed(false);
+  }, [unavailable]);
+
   return (
-    <div className="permission" ref={root}>
-      <button ref={button} className={`permission-button${mode === 'all' ? ' all' : ''}`}
-        data-testid="permission-button" aria-haspopup="menu" aria-expanded={open} disabled={disabled}
-        title="Set the permission mode for this session" aria-label={`Permission mode: ${modeText[mode]}`}
-        onClick={() => setOpen(!open)}>
-        <Icon name="shield" /><span className="permission-text">{modeText[mode]}</span><Icon name="down" />
+    <div className="permission" ref={menu.root}>
+      <button ref={menu.button} className={`permission-button${mode === 'all' ? ' all' : ''}`}
+        data-testid="permission-button" aria-haspopup="menu" aria-expanded={menu.open}
+        aria-disabled={unavailable !== null ? true : undefined} aria-label={name} aria-describedby={tipId}
+        title={tipLines(name, note)} onClick={() => { if (unavailable === null) menu.setOpen(!menu.open); }}>
+        <span className="permission-text">{modeText[mode]}</span><Icon name="down" />
       </button>
-      {open && <PermissionPanel tab={tab} onChoose={choose} />}
-      {confirming && <ConfirmDialog title="Switch to “Allow all”?"
-        text="Edits, writes, and commands will run without asking." confirmLabel="Allow all" tone="warn"
-        testId="confirm-dialog" onConfirm={() => confirmed(true)} onCancel={() => confirmed(false)} />}
+      <Description id={tipId} text={note} />
+      {menu.open && <PermissionPanel menu={panel} tab={tab} onChoose={choose} />}
+      {confirming && <ConfirmDialog title="Switch to “Allow all”?" text={ALLOW_ALL_TEXT} confirmLabel="Allow all"
+        tone="warn" testId="confirm-dialog" onConfirm={() => confirmed(true)} onCancel={() => confirmed(false)} />}
     </div>
   );
 }

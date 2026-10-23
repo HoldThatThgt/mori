@@ -4,7 +4,8 @@
 // 阶段行"Waiting for your answer"、不可见的会话显示"Needs input"、通知一行"Extension: …"（warning）、
 // 超时倒数与自动取消、停止时取消挂着的询问；
 // 会话打开过程中的通知（打开后显示）与询问（不出卡，按取消回答）；扩展命令里的询问（不经过一轮运行）；
-// 正在打开的会话的菜单（三项都不可用，小字"Opening…"）。
+// 正在打开的会话的菜单（三项都不可用，小字"Opening…"）和输入框下面一行（第一次打开中只有不可用的权限按钮）；
+// 询问卡来了时这一行的菜单和圆环详情关上。
 // 界面重新加载（sessions.md "后台进程退出与重新载入"）：后台进程里的会话照常运行，session.list 带回 live，
 // 侧栏显示 Running、Needs approval、Needs input，还没接上时随事件更新（之后才来的批准请求、本轮结束时"Unread"、
 // 后台进程退出时"Error"）；还没发消息的新会话也在；点开接上（不问信任）：生成中的回复接着流入、执行中的工具卡、
@@ -12,21 +13,23 @@
 // 归档开着、还没接上的会话。
 // 项目扩展（eta/.pi/extensions/project-ask.ts）是测试写的 synthetic 扩展：加载时先等 2.5 秒（看得到"Starting…"），
 // 再注册 project_ask（依次确认、选择、输入，再通知）、project_wait（带 3 秒超时的确认）、project_once（只问一次）、
-// 命令 /mori-ask（确认一次再通知）、/mori-wait（带 15 秒超时的确认）；session_start 时确认一次并通知结果。
+// 命令 /mori-ask（确认一次再通知）、/mori-late（等 2 秒再确认）、/mori-wait（带 15 秒超时的确认）；
+// session_start 时确认一次并通知结果。
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { killKernel, oneLine, sleep } from './lib.mjs';
 import {
-  activeFile, allRows, archivedState, chooseMenuItem, clickOpenFolder, ctrlN, expandArchived, focusInfo, kernelOpen,
-  lastReply, lastToolCard, liveInfo, menuItems, menuText, noteSmallText, openMenuByKey, openMenuByMouse, openMenuOn,
-  openRow, PANE, paneCount, paneOf, rowOf, rowState, samePath, sessionGone, startDelete, stoppedCount, until,
-  waitArchivedToggle,
-  waitIdle, waitPanes, waitReady, waitRunning, waitStatus,
+  activeFile, allRows, archivedState, blockedBy, chooseMenuItem, clickOpenFolder, composerRow, ctrlN, expandArchived,
+  focusInfo, kernelOpen, lastReply, lastToolCard, liveInfo, menuItems, menuText, noteSmallText, openMenuByKey,
+  openMenuByMouse, openMenuOn, openRow, PANE, paneCount, paneOf, ROW_REASONS, rowOf, rowState, samePath, sessionGone,
+  startDelete, stoppedCount, until, waitArchivedToggle, waitIdle, waitPanes, waitReady, waitRunning, waitStatus,
 } from './m3-helpers.mjs';
 
 /** 项目扩展加载时先等这么久，打开会话时有时间看到"Starting…"和菜单的"Opening…" */
 const SLOW_LOAD_MS = 2500;
+/** /mori-late 等这么久才询问：测试先打开这一行的菜单或圆环详情，询问卡再来 */
+const LATE_ASK_MS = 2000;
 /** 询问卡输入框里写的字 */
 const ANSWER_TEXT = 'Mori 的回答';
 /** 界面重新加载前写的草稿 */
@@ -42,6 +45,27 @@ const WAITING_ANSWER = 'Waiting for your answer';
 /** "/"列表里没有可选的项时的说明（slash.md）：没有匹配，或这个会话没有提示词模板和技能 */
 const SLASH_NOTES = ['No matching prompt templates or skills',
   'This session has no prompt templates or skills. Add them in Customize.'];
+
+/** @brief synthetic 项目扩展里三个扩展命令的源码行（/mori-ask、/mori-late、/mori-wait）。 */
+function askCommandsSource() {
+  return [
+    "  pi.registerCommand('mori-ask', { description: 'Asks once from a command.',",
+    '    async handler(_args, ctx) {',
+    "      const ok = await ctx.ui.confirm('命令里问', '不经过一轮运行');",
+    "      ctx.ui.notify('command confirm=' + ok, 'info');",
+    '    } });',
+    "  pi.registerCommand('mori-late', { description: 'Asks from a command after 2 seconds.',",
+    '    async handler(_args, ctx) {',
+    `      await new Promise((done) => setTimeout(done, ${LATE_ASK_MS}));`,
+    "      const ok = await ctx.ui.confirm('晚到的询问', '这一行的菜单开着时来');",
+    "      ctx.ui.notify('late confirm=' + ok, 'info');",
+    '    } });',
+    "  pi.registerCommand('mori-wait', { description: 'Asks with a timeout from a command.',",
+    '    async handler(_args, ctx) {',
+    "      await ctx.ui.confirm('命令里等', '15 秒后取消', { timeout: 15000 });",
+    '    } });',
+  ];
+}
 
 /** @brief synthetic 项目扩展的源码：工厂函数先等 SLOW_LOAD_MS，再注册三个经 ctx.ui 询问的工具。 */
 function askExtensionSource() {
@@ -73,15 +97,7 @@ function askExtensionSource() {
     "      const ok = await ctx.ui.confirm('只问一次', '停止时取消');",
     "      return text('once=' + ok);",
     '    } });',
-    "  pi.registerCommand('mori-ask', { description: 'Asks once from a command.',",
-    '    async handler(_args, ctx) {',
-    "      const ok = await ctx.ui.confirm('命令里问', '不经过一轮运行');",
-    "      ctx.ui.notify('command confirm=' + ok, 'info');",
-    '    } });',
-    "  pi.registerCommand('mori-wait', { description: 'Asks with a timeout from a command.',",
-    '    async handler(_args, ctx) {',
-    "      await ctx.ui.confirm('命令里等', '15 秒后取消', { timeout: 15000 });",
-    '    } });',
+    ...askCommandsSource(),
     "  pi.on('session_start', async (_event, ctx) => {",
     "    const ok = await ctx.ui.confirm('启动时问', '打开过程中');",
     "    ctx.ui.notify('startup confirm=' + ok, 'info');",
@@ -198,6 +214,11 @@ async function extOpen(ctx) {
   await dialog.getByRole('button', { name: 'Trust workspace', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 5000 });
   const opening = await paneOf(page).getByTestId('not-ready').innerText({ timeout: 1000 }).catch(() => '');
+  const row = await composerRow(page);
+  record('第一次打开中（"Starting…"）：输入框下面一行只有权限按钮（不可用：aria-disabled，悬停第二行和读屏的描述'
+    + '"Starting…"），没有选择范围、Effort 和圆环（还没有过模型状态）；这一行高度不变（min-height 33px）',
+  row?.notReady === ROW_REASONS.starting && blockedBy(row.permission, ROW_REASONS.starting) && !row.model
+    && !row.thinking && !row.usage && Math.abs(row.height - 33) <= 1, JSON.stringify(row));
   const menu = await openMenuOn(page, page.locator('.session-item.active'));
   const items = await menuItems(menu);
   record('正在打开的会话（"正在启动…"）：菜单里重命名、归档、删除都不可用，旁边小字"正在打开"', opening === 'Starting…'
@@ -392,6 +413,38 @@ async function extCommand(ctx) {
   record('扩展命令结束后不停在"刚发出"（会话行没有"生成中"）；扩展收到回答（"扩展：command confirm=true"）', ended
     && notices.at(-1) === 'Extension: command confirm=true' && row?.status === null,
   `刚发出已结束 ${ended}；最后的通知 ${notices.at(-1)}；行 ${JSON.stringify(row)}`);
+}
+
+/**
+ * @brief 开着 opener 打开的浮层（权限菜单或圆环详情）时扩展的询问卡来了：发 /mori-late（2 秒后才问），马上点开 opener，
+ *        等卡出现；返回浮层打开过没有、卡来了之后还在不在、焦点在哪个 data-testid 上，然后点"No"答掉。
+ */
+async function lateCardOver(ctx, opener, popup) {
+  const { page } = ctx;
+  await sendExtCommand(ctx, '/mori-late');
+  await paneOf(page).getByTestId(opener).click();
+  const opened = await page.getByTestId(popup).waitFor({ timeout: 1500 }).then(() => true, () => false);
+  const card = await waitCard(page, 'confirm');
+  const gone = await page.getByTestId(popup).waitFor({ state: 'detached', timeout: 3000 })
+    .then(() => true, () => false);
+  const focus = await page.evaluate(() => document.activeElement?.dataset?.testid ?? document.activeElement?.tagName);
+  await clickCard(page, 'No');
+  await questionCard(page).waitFor({ state: 'detached', timeout: 5000 });
+  return { opened, title: card?.title, gone, focus };
+}
+
+/**
+ * @brief 询问卡来了时关这一行的菜单（models.md"什么时候自动关"、composer-pickers-checks.md 第 27 条；批准卡的版本在
+ *        m6-app-row）：开着权限菜单时扩展的询问卡来了，菜单关上、焦点回到权限按钮；开着圆环详情时同样关上、焦点回到圆环。
+ */
+async function extCardClosesRow(ctx) {
+  const { record } = ctx;
+  const menu = await lateCardOver(ctx, 'permission-button', 'permission-menu');
+  const ring = await lateCardOver(ctx, 'usage', 'usage-details');
+  record('询问卡来了时这一行的浮层关上：开着权限菜单时扩展命令的询问卡（"晚到的询问"）出现，菜单关上、焦点回到权限按钮；'
+    + '开着圆环详情时同样关上、焦点回到圆环', menu.opened && menu.title === '晚到的询问' && menu.gone
+    && menu.focus === 'permission-button' && ring.opened && ring.gone && ring.focus === 'usage',
+  JSON.stringify({ menu, ring }));
 }
 
 // ---------- 界面重新加载 ----------
@@ -789,7 +842,7 @@ async function reloadKernelExit(ctx) {
 
 /** 由 m3-app.mjs 依次调用的步骤（顺序即执行顺序） */
 export const liveSteps = {
-  extOpen, extAnswer, extEsc, extTimeout, extStopOnce, extStopChain, extCommand, reloadSetup, reloadSidebar,
-  reloadReply, reloadLate, reloadUnsaved, reloadCommand, reloadCommandEnd, reloadStale, reloadApproval, reloadQuestion,
-  reloadTool, reloadArchive, kernelDoubleOpen, focusAfterRemoval, reloadKernelExit,
+  extOpen, extAnswer, extEsc, extTimeout, extStopOnce, extStopChain, extCommand, extCardClosesRow, reloadSetup,
+  reloadSidebar, reloadReply, reloadLate, reloadUnsaved, reloadCommand, reloadCommandEnd, reloadStale, reloadApproval,
+  reloadQuestion, reloadTool, reloadArchive, kernelDoubleOpen, focusAfterRemoval, reloadKernelExit,
 };

@@ -1,4 +1,4 @@
-// M6 整机测试（"/"补全与顶栏布局）：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint，synthetic），
+// M6 整机测试（"/"补全与布局）：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint，synthetic），
 // 覆盖 docs/v0/screens/slash.md（方案第 7 节 M6 走查 7）和 M6 的布局限制（models.md、split.md、layout.md、defaults.md）：
 // 打出 "/" 的读取中（只有一行"Loading…"）、列表（两组各列各的项、只有第一项高亮、/名字、argument-hint、说明、浮在输入框上方
 // 且在最上层）、筛选（先开头再包含、不分大小写）、↑ ↓ 首尾循环、Enter / Tab 插入高亮项、点一项插入且不发送、插入时保留后面的字、
@@ -9,10 +9,22 @@
 // 与提示词模板（气泡是展开后的全文）；会话没有任何模板和技能（Enter 照常发送）、只列这个会话加载了的（启用的、信任的项目里的）、
 // 关闭 enableSkillCommands 时不列技能、读取失败显示原文（synthetic 做法：在后台进程里关掉会话而界面不知道）、
 // 后台进程退出 / 重新载入中 / 会话重新打开中不出列表，就绪后照常出列表；
-// 布局（models.md"窄栏"：模型和思考按钮任何宽度都在，按面板宽度分步收紧）：1280 宽单栏、1400 宽右栏开（面板 660–720px）、
-// 800×600 打开右栏（300px）、1280 和 1200 宽分屏（右栏关 / 开，最窄 280px）、800×600 分屏；每处顶栏不溢出不裁切、
-// 各档该收的收起、会话名（长名字）至少留 36px、模型 / 思考 / 权限菜单在这一栏里打开；聊天页没有小于 12px 的字；
-// 从新会话的输入框 Shift+Tab 回到会话树的次数（M3 是 6 次，M6 多两个按钮，TaskBoard 多协作开关，应为 9 次）。
+// 布局（2026-10-21 起选择范围（v1）、Effort、权限按钮和上下文用量圆环在输入框下面一行，顶栏只剩"项目名 › 会话名"、协作开关和
+// 这一栏的按钮，docs/v0/composer-pickers.md；chat.md"顶栏""输入框下面一行"、models.md"窄栏"）：1280 宽单栏、1400 宽右栏开
+// （面板约 690px）、800×600 打开右栏（约 300px）、1280 和 1200 宽分屏（右栏关 / 开，最窄 280px）、800×600 分屏；各档的
+// 上沿和下沿（分屏时拖中线凑出 279–681px，单栏 930 / 761 / 740 / 490 / 300px），生成中有字、生成中、空闲、拒绝启动
+// （no_pick）、后台进程退出、重新载入中、Restart 之后重新打开中、第一次打开中、打开失败：顶栏不溢出不裁切、会话名有地方
+// （截断时项目名已收到 40px、占满剩下的地方）；这一行不换行、高 33px、不超出输入框，各档该收的收起，截短按"不能发送的说明
+// → 选择范围（先模型 id、再范围名）→ 模式名 → Effort 的强度"的先后（比元素宽度和全文的宽，不比字面），最挤时三个按钮不窄于
+// 最窄；悬停按行、读屏的描述（aria-describedby）、不可用读 aria-disabled（composer-pickers.md"测试要改的地方"C1、C2）；
+// 菜单、圆环详情和"Queue"的下拉往上打开、在这一栏和窗口里、按 models.md 对齐，280px 时范围菜单收到这一行的宽；
+// ≤ 400px 时用键盘走"More send options"排队；"Medium""High""Allow all"各走一次 280px（"Allow all"对比度 ≥ 4.5:1）；
+// 拒绝启动卡的"Change model…"打开这一行的范围菜单；F8 的"Pane width""Model range""Effort"；聊天页没有小于 12px 的字；
+// 从新会话的文字框 Tab 依次到权限 → 范围 → Effort → 圆环，Shift+Tab 回到会话树的次数（应为 6 次：M6 是 8 次，
+// TaskBoard 加了协作开关是 9 次，权限、思考强度、模型三个按钮移到文字框后面）。
+// 与原设计不同（v1 做不到，按最接近的做）：思考强度"Extra high"在 v1 里没有途径打开（v1 的模型配置不写 thinkingLevelMap，
+// pi 的 getSupportedThinkingLevels 只给 off–high），所以 280px 的这一项改用"High"；"Unavailable"仍是最宽的写法、各档都走。
+// 为了最挤的情况，布局检查前把会话 A、C 的范围换成提供商（按钮"Mori endpoint · <很长的模型 id>"）。
 // 用户级的提示词模板和技能是本测试在启动前写进 <agentDir>/prompts、<agentDir>/skills 的（synthetic），
 // 项目级的写在第二个测试项目的 .pi/ 里（synthetic）。
 // 用法（在 app/ 下，先 npm run build）：
@@ -28,9 +40,17 @@ import {
   activeFile, ctrlN, focusInfo, kernelOpen, lastReply, openRow, rowOf, samePath, settle, STOPPED, waitComposerFocus,
   waitIdle, waitRunning,
 } from './m3-helpers.mjs';
-import { splitState, waitPaneReady, waitSplit } from './m5-helpers.mjs';
-import { firstRunAndOpen, openProject, resizeWindow, startFakeEndpoint } from './m6-helpers.mjs';
+import { splitState, waitSplit } from './m5-helpers.mjs';
+import {
+  firstRunAndOpen, KINDS, layoutBrief, layoutReport, NOTE, openProject, popupGone, POPUPS, RANGE_MAX, resizeWindow,
+  ringState, ROW, seenRows, splitOpen, startFakeEndpoint, watchRows,
+} from './m6-helpers.mjs';
 import { pageHelpers } from './page.mjs';
+import {
+  bandBlocked, bandEffort, bandIdle, bandPrep, bandSingle, bandTyped, bindRecorder, exitBands, FOCUSED, focusLabel,
+  MODEL_DESCRIBED, MODEL_ID, MODEL_LABEL, MODEL_TIP, rangeLabels, recordBars, recordExited, recordMenus, recordReopen,
+  resizeTo, setRight, setRightBoth,
+} from './m6-app-bands.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -43,9 +63,8 @@ const shots = join(appRoot, `test-results/m6-app-slash${suffix}`);
 mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder(exePath ?? 'dev build');
 const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) }).catch(() => {});
+bindRecorder({ record, shot });
 
-/** 焦点所在的一栏（单栏时也带 data-focused） */
-const FOCUSED = '.pane-slot[data-focused="true"]:not([hidden])';
 /** 技能正文里的标记：只出现在 SKILL.md 里，模型回显时能看到它说明收到了展开后的正文 */
 const SKILL_MARKER = 'SKILL-BODY-MARKER-M6';
 /** 提示词模板展开后的全文（"/review x"） */
@@ -60,8 +79,6 @@ const SKILL_COMMAND = '/skill:fmt echo back';
 const WAIT_SECONDS = 6;
 /** 生成中排队的技能命令（参数里的 plain 让合成端点只回文字） */
 const QUEUED_SKILL = '/skill:fmt plain queued';
-/** 连接里的模型 ID：故意很长（合成端点接受任何 ID），宽栏时模型按钮停在最长 160px / 120px，窄栏时收短（models.md） */
-const MODEL_ID = 'fake-coder-synthetic-long-model-id-for-layout';
 /** 列表里没有匹配的项、按 Enter 照常发出的消息（像一个不在列表里的扩展命令；plain 让合成端点只回文字） */
 const NO_MATCH_SEND = '/zzz-plain';
 /** 布局检查用的会话 C 的第一条消息（会话名取前 20 个字，足够长，窄栏时会被挤到省略号） */
@@ -183,14 +200,6 @@ async function waitQueued(page, text, timeout = 5000) {
 const queueStays = (page, count, ms = 400) => neverWithin(page, ({ focused, most }) => document
   .querySelectorAll(`${focused} [data-testid="queue"] .queue-text`).length > most,
 { focused: FOCUSED, most: count }, ms);
-
-/** @brief 改窗口内容区的大小，等界面量到新的大小、再等两帧。 */
-async function resizeTo(ctx, width, height) {
-  await resizeWindow(ctx.app, width, height);
-  await ctx.page.waitForFunction(({ w, h }) => innerWidth === w && innerHeight === h, { w: width, h: height },
-    { timeout: 5000 });
-  await settle(ctx.page);
-}
 
 // ---------- 页面上的小工具 ----------
 
@@ -815,195 +824,30 @@ function recordRunning(state, final) {
 }
 
 // ---------- 步骤：布局 ----------
-
-/** 会话名至少留这么宽（chat.css 面包屑 min-width 36px："两个字加省略号"；models.md"放不下"） */
-const TITLE_MIN = 36;
-/** 模型按钮最窄（models.css .model-switch 的 min-width；models.md"放不下"） */
-const MODEL_MIN = 40;
-/**
- * 模型按钮的读屏名称和悬停说明（v1：docs/v1/screens/model-menu.md"窄栏"与"悬停"：读屏名称"Model range: <按钮文字>"，
- * 悬停"<提供商名> · <区域>"；首次启动的提供商名 "Mori endpoint"、区域 Local）
- */
-const MODEL_LABEL = `Model range: ${MODEL_ID}`;
-const MODEL_TIP = 'Mori endpoint · Local';
-/** 权限按钮的悬停说明（PermissionMenu.tsx；模式名只在读屏名称 "Permission mode: <模式>" 里，≤ 400px 时按钮上不显示） */
-const PERMISSION_TIP = 'Set the permission mode for this session';
+// 2026-10-21 起范围、Effort、权限按钮和上下文用量圆环从顶栏移到输入框下面一行（docs/v0/composer-pickers.md）：顶栏只剩
+// "项目名 › 会话名"和这一栏的按钮；这一行按会话面板（.chat-pane）的宽度分档（680 / 600 / 460 / 400 / 340px），放不下时
+// 依次截短不能发送的说明、选择范围按钮（先截当前模型 id、再截范围名）、模式名、Effort 的强度（models.md"窄栏"）。宽度都指
+// .chat-pane（分屏右边那一栏比 .pane-slot 窄 1px），不取整：各档的边界要比到 1px。
+// 布局检查共用的常量和小工具、各档的边界和拒绝启动两节在 m6-app-bands.mjs。
 
 /**
- * @brief 每一栏顶栏此刻的样子（在页面里执行，不引用外面的变量）：宽度、是不是分屏、模型 / 思考 / 权限按钮、
- *        各档收起的部分（权限按钮的图标和模式名、"Effort: "、两个 ▾、项目名和 ›、上下文用量）、模型按钮的宽度、
- *        读屏名称和悬停说明（含权限按钮的）、
- *        思考按钮显示的字和读屏名称、会话名的宽度和全宽（scrollWidth）、溢出、裁切、输入框底边。
- */
-function paneBars(panes) {
-  const visible = (el) => Boolean(el) && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
-  const width = (el) => (el ? Math.round(el.getBoundingClientRect().width) : 0);
-  return panes.map((pane) => {
-    const q = (css) => pane.querySelector(css);
-    const bar = q('.topbar');
-    const box = bar.getBoundingClientRect();
-    const overflow = [bar, ...bar.querySelectorAll('.breadcrumb, .topbar-actions')]
-      .filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.className);
-    const clipped = [...bar.querySelectorAll('.breadcrumb > *, .topbar-actions > *, .topbar-actions button')]
-      .filter(visible).filter((el) => {
-        const rect = el.getBoundingClientRect();
-        return rect.left < box.left - 1 || rect.right > box.right + 1 || rect.right > innerWidth + 1;
-      }).map((el) => el.getAttribute('aria-label') || el.className || el.tagName);
-    const model = q('[data-testid="model-button"]');
-    const thinking = q('[data-testid="thinking-button"]');
-    const title = q('[data-testid="session-title"]');
-    const permission = q('[data-testid="permission-button"]');
-    return { width: width(pane), split: Boolean(pane.closest('.center[data-split]')), model: visible(model),
-      thinking: visible(thinking), permission: visible(permission),
-      permissionIcon: visible(q('[data-testid="permission-button"] svg')),
-      permissionText: visible(q('[data-testid="permission-button"] .permission-text')),
-      prefix: visible(q('.thinking-prefix')),
-      modelArrow: visible(q('.model-button > svg')), thinkingArrow: visible(q('.thinking-button > svg')),
-      project: visible(q('.chat-project')), chevron: visible(q('.breadcrumb > svg')),
-      usage: visible(q('[data-testid="usage"]')), usageInDom: Boolean(q('[data-testid="usage"]')),
-      modelWidth: width(model), modelLabel: model?.getAttribute('aria-label') ?? null,
-      modelTip: model?.getAttribute('title') ?? null, thinkingText: thinking?.innerText.trim() ?? null,
-      thinkingLabel: thinking?.getAttribute('aria-label') ?? null, title: width(title),
-      permissionLabel: permission?.getAttribute('aria-label') ?? null, permissionTip: permission?.getAttribute('title')
-        ?? null, permissionAll: Boolean(permission?.classList.contains('all')),
-      titleFull: title?.scrollWidth ?? 0, titleText: title?.textContent ?? '', overflow, clipped,
-      actions: [...bar.querySelectorAll('.topbar-actions button')].filter(visible)
-        .map((el) => el.dataset.testid || el.getAttribute('aria-label') || el.className),
-      composerBottom: Math.round(q('.composer')?.getBoundingClientRect().bottom ?? 0) };
-  });
-}
-
-/** @brief 窗口、左栏、中栏、右栏的宽度，页面有没有溢出、有没有元素出窗口，和每一栏的顶栏（paneBars）。 */
-async function layoutReport(page) {
-  const panes = await page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]').evaluateAll(paneBars);
-  const frame = await page.evaluate(() => {
-    const width = (el) => (el ? Math.round(el.getBoundingClientRect().width) : 0);
-    const outside = [...document.querySelectorAll('.app *')].filter((el) => {
-      const rect = el.getBoundingClientRect();
-      return rect.width > 0 && rect.right > innerWidth + 1 && !el.closest('.conversation, .panel-body');
-    }).map((el) => el.className || el.tagName).slice(0, 5);
-    return { window: innerWidth, height: innerHeight, page: document.documentElement.scrollWidth,
-      pageHeight: document.documentElement.scrollHeight, sidebar: width(document.querySelector('.sidebar')),
-      center: width(document.querySelector('.center')),
-      right: width(document.querySelector('[data-testid="right-panel"]')), outside };
-  });
-  return { ...frame, panes };
-}
-
-/**
- * @brief 一栏的顶栏是否照 models.md"窄栏"分步收紧（阈值见 chat.css、models.css、split.css），返回不符合的项
- *        （空数组为符合）：模型和思考按钮任何宽度都显示；> 760px 权限按钮带图标、模型按钮最宽 160px；≤ 760px 权限按钮
- *        去掉图标；≤ 720px 模型按钮最宽 120px；≤ 660px 不显示项目名和 ›（分屏时 ≤ 690px 就不显示，split.css）；
- *        ≤ 600px 思考按钮只显示强度；≤ 500px 不显示上下文用量；≤ 400px 两个按钮去掉 ▾，权限按钮只显示盾牌图标
- *        （模式名藏起，在读屏名称里）。
- *        模型按钮不窄于 40px；读屏名称是完整的"Model range: <ID>""Effort: <强度>""Permission mode: <模式>"，
- *        悬停说明"<提供商名> · <区域>""Set the permission mode for this session"；
- *        不溢出、不裁切；会话名至少 36px（名字本身更短时完整显示）。
- */
-function barProblems(pane) {
-  const narrow = (limit) => pane.width <= limit;
-  const crumbLimit = pane.split ? 690 : 660;
-  const want = { model: true, thinking: true, permission: true, permissionIcon: !narrow(760) || narrow(400),
-    permissionText: !narrow(400), prefix: !narrow(600), project: !narrow(crumbLimit), chevron: !narrow(crumbLimit),
-    modelArrow: !narrow(400), thinkingArrow: !narrow(400), usage: narrow(500) ? false : pane.usageInDom };
-  const problems = Object.entries(want).filter(([key, value]) => pane[key] !== value)
-    .map(([key, value]) => `${key} should be ${value}`);
-  const widest = narrow(720) ? 120 : 160;
-  if (pane.modelWidth > widest + 1 || pane.modelWidth < MODEL_MIN - 1) problems.push(`model width ${pane.modelWidth}`);
-  const shown = pane.prefix ? pane.thinkingText : `Effort: ${pane.thinkingText}`;
-  if (pane.modelLabel !== MODEL_LABEL || pane.modelTip !== MODEL_TIP || shown !== pane.thinkingLabel) {
-    problems.push('labels');
-  }
-  const mode = pane.permissionAll ? 'Allow all' : 'Ask each time';
-  if (pane.permissionLabel !== `Permission mode: ${mode}` || pane.permissionTip !== PERMISSION_TIP) {
-    problems.push(`permission label "${pane.permissionLabel}" / title "${pane.permissionTip}"`);
-  }
-  if (pane.overflow.length || pane.clipped.length) problems.push('overflow or clipped');
-  if (pane.title < Math.min(TITLE_MIN, pane.titleFull) - 1) problems.push(`title ${pane.title}px`);
-  return problems;
-}
-
-/**
- * @brief 记一条顶栏检查：有 count 栏，每一栏 barProblems 都符合，页面不横向溢出、没有元素出窗口；
- *        extra 是这一处另外的条件（面板宽度落在哪一档等）。
- */
-function recordBars(name, report, count, extra) {
-  const problems = report.panes.map((pane) => `${pane.width}px: ${barProblems(pane).join(', ') || 'ok'}`);
-  record(name, report.panes.length === count && report.panes.every((pane) => barProblems(pane).length === 0)
-    && report.page <= report.window && report.outside.length === 0 && extra,
-  `${problems.join(' | ')} ${JSON.stringify(report)}`);
-}
-
-/** 中栏里显示着的会话面板（分屏时两个） */
-const PANES = '.pane-slot:not([hidden]) [data-testid="chat-pane"]';
-
-/**
- * @brief 点第 index 栏的输入框，焦点换到这一栏（右栏跟随焦点：换成这一栏会话自己的开关状态，split.md），再等两帧。
- */
-async function focusPane(page, index) {
-  await page.locator(PANES).nth(index).locator('.composer textarea').click();
-  await page.waitForFunction(({ css, at }) => document.querySelectorAll(css)[at]?.closest('.pane-slot')
-    ?.dataset.focused === 'true', { css: PANES, at: index }, { timeout: 5000 });
-  await settle(page);
-}
-
-/**
- * @brief 在每一栏（先把焦点换到这一栏，免得点按钮时焦点换栏、右栏跟着开关、按钮移位）依次点开模型、思考和权限菜单，
- *        量菜单是否完整在这一栏里（models.md"窄栏"：≤ 600px 时贴着面板右边打开，不伸出面板），量完按 Esc 关掉。
- *        返回不在里面的菜单（空数组为都在）。
- */
-async function menusOutside(page) {
-  const panes = page.locator(PANES);
-  const outside = [];
-  const count = await panes.count();
-  for (let index = 0; index < count; index += 1) {
-    if (count > 1) await focusPane(page, index);
-    for (const id of ['model', 'thinking', 'permission']) {
-      await panes.nth(index).getByTestId(`${id}-button`).click();
-      const menu = page.getByTestId(`${id}-menu`);
-      await menu.waitFor({ timeout: 5000 });
-      const area = await panes.nth(index).boundingBox();
-      const box = await menu.boundingBox();
-      const inside = box.x >= area.x - 1 && box.x + box.width <= area.x + area.width + 1 && box.y >= area.y - 1
-        && box.y + box.height <= area.y + area.height + 1;
-      const round = (rect) => [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height].map(Math.round);
-      if (!inside) outside.push({ pane: index, menu: id, paneBox: round(area), menuBox: round(box) });
-      await page.keyboard.press('Escape');
-      await menu.waitFor({ state: 'detached', timeout: 5000 });
-    }
-  }
-  return outside;
-}
-
-/** @brief 记一条菜单检查：每一栏的模型、思考、权限菜单都完整地在这一栏里打开。 */
-async function recordMenus(ctx, where) {
-  const outside = await menusOutside(ctx.page);
-  record(`${where}：每一栏的模型、思考和权限菜单都完整地在这一栏里打开（不伸出面板、不出窗口）`, outside.length === 0,
-    JSON.stringify(outside));
-}
-
-/** @brief 把焦点所在一栏的右栏开关切到 open，等右栏出现或消失、再等两帧。 */
-async function setRight(page, open) {
-  const toggle = page.locator(`${FOCUSED} .topbar`).getByRole('button', { name: 'Toggle changes' });
-  if ((await toggle.getAttribute('aria-pressed')) !== String(open)) await toggle.click();
-  await page.waitForFunction((want) => {
-    const panel = document.querySelector('[data-testid="right-panel"]');
-    return (Boolean(panel) && panel.getBoundingClientRect().width > 0) === want;
-  }, open, { timeout: 5000 });
-  await settle(page);
-}
-
-/**
- * @brief 1280 宽单栏（右栏关，会话 A）：顶栏各项都完整显示；菜单在面板里；各种浮层打开时没有小于 12px 的字。
+ * @brief 1280 宽单栏（右栏关，会话 A）：顶栏只有会话名、协作开关和右栏开关；这一行各项都完整显示（> 680px 一档）；菜单往上打开、
+ *        在面板里；各种浮层打开时没有小于 12px 的字。
  */
 async function wideLayout(ctx) {
   const { page } = ctx;
   await resizeTo(ctx, 1280, 800);
   await setRight(page, false);
   const report = await layoutReport(page);
-  recordBars('1280 宽单栏（面板宽于 760px）：模型按钮（最宽 160px）、"思考：<强度> ▾"、项目名和 ›、权限按钮的图标、'
-    + '上下文用量都显示；长模型 ID 截在 160px；顶栏不溢出、不裁切，会话名完整', report, 1, report.panes[0]?.width > 760
-    && report.panes[0].modelWidth >= 159);
+  const pane = report.panes[0];
+  const range = await rangeLabels(page);
+  recordBars('1280 宽单栏（面板宽于 680px）：顶栏只有项目名 › 会话名、协作开关和右栏开关；输入框下面一行从左到右权限（"Ask each time ▾"，'
+    + '没有图标）、范围按钮（最长 200px，长模型 ID 截在 200px）、"Effort: <强度> ▾"、圆环、带文字的"Send"，间距 8px；'
+    + '不溢出、不裁切，会话名完整', report, 1, pane?.width > 680 && pane.controls.model?.width >= RANGE_MAX - 1);
+  record(`范围按钮在这一行里（不在顶栏）：读屏名称"${MODEL_LABEL}"；悬停第一行是按钮文字、第二行"${MODEL_TIP}"；读屏的描述`
+    + `"${MODEL_DESCRIBED}"（第二行，" · "换成", "），描述元素（model-tip）在按钮外面`, range.inRow && !range.inTopbar
+    && range.text === MODEL_ID && range.name === MODEL_LABEL && range.lines.join('|') === `${MODEL_ID}|${MODEL_TIP}`
+    && range.described === MODEL_DESCRIBED && range.tipOutside === true, JSON.stringify(range));
   await shot(page, 'layout-1280');
   const toggle = page.locator(`${FOCUSED} [data-testid="skill-invocation"] .skill-toggle`).first();
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
@@ -1012,26 +856,42 @@ async function wideLayout(ctx) {
   await waitMenu(page);
   await noteSmall(ctx, '1280 "/"列表');
   await typeFresh(page, '');
-  for (const id of ['model', 'thinking']) {
-    await page.locator(`${FOCUSED} [data-testid="${id}-button"]`).click();
-    await page.getByTestId(`${id}-menu`).waitFor({ timeout: 5000 });
-    await noteSmall(ctx, `1280 ${id === 'model' ? '模型' : '思考'}菜单`);
-    await page.keyboard.press('Escape');
-    await page.getByTestId(`${id}-menu`).waitFor({ state: 'detached', timeout: 5000 });
-  }
+  await widePopupsSmall(ctx);
   await recordMenus(ctx, '1280 宽单栏');
 }
 
-/** @brief 1400 宽、右栏打开（面板 660–720px）：权限按钮去掉图标、模型按钮最宽 120px，其余照常（models.md"较窄"）。 */
+/** @brief 接着 wideLayout：依次打开范围、Effort、权限菜单和圆环详情，键盘焦点落到圆环（显示悬停提示），各记一次小字。 */
+async function widePopupsSmall(ctx) {
+  const { page } = ctx;
+  const names = { model: '范围菜单', thinking: 'Effort 菜单', permission: '权限菜单', usage: '圆环详情' };
+  for (const kind of ['model', 'thinking', 'permission', 'usage']) {
+    await page.locator(`${FOCUSED} ${ROW} ${POPUPS[kind].opener}`).click();
+    await page.locator(POPUPS[kind].popup).waitFor({ timeout: 5000 });
+    await noteSmall(ctx, `1280 ${names[kind]}`);
+    await page.keyboard.press('Escape');
+    await page.locator(POPUPS[kind].popup).waitFor({ state: 'detached', timeout: 5000 });
+  }
+  await page.mouse.move(0, 0);
+  await page.locator(`${FOCUSED} ${ROW} [data-testid="usage"]`).focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await noteSmall(ctx, '1280 圆环的悬停提示（键盘焦点）');
+  await page.keyboard.press('Escape');
+}
+
+/**
+ * @brief 1400 宽、右栏打开（面板约 690px，仍宽于 680px）：范围按钮仍最长 200px（不再有 ≤ 720 / 760px 的 120px 一档），
+ *        "Effort: <强度> ▾"、带文字的发送按钮和项目名都还在。
+ */
 async function midLayout(ctx) {
   const { page } = ctx;
   await resizeTo(ctx, 1400, 800);
   await setRight(page, true);
   const report = await layoutReport(page);
   const pane = report.panes[0];
-  recordBars('1400 宽、右栏打开（面板宽 660–720px）：模型和思考按钮显示，权限按钮去掉图标，模型按钮最宽 120px，'
-    + '"思考："、项目名和上下文用量还在；长模型 ID 截在 120px；顶栏不溢出、不裁切，会话名完整', report, 1,
-  pane?.width > 660 && pane.width <= 720 && pane.modelWidth >= 119);
+  recordBars('1400 宽、右栏打开（面板宽于 680px）：范围按钮最长 200px（长模型 ID 截在 200px，原来 ≤ 720px 时 120px 的一档'
+    + '去掉了），"Effort: <强度> ▾"、带文字的"Send"、项目名都还在；顶栏和这一行不溢出、不裁切', report, 1,
+  pane?.width > 680 && pane.controls.model?.width >= RANGE_MAX - 1);
   await shot(page, 'layout-1400-right');
   await noteSmall(ctx, '1400 右栏打开');
   await recordMenus(ctx, '1400 宽、右栏打开');
@@ -1040,33 +900,61 @@ async function midLayout(ctx) {
 }
 
 /**
- * @brief Shift+Tab 路径：Ctrl+N 新建会话 C（焦点在输入框）后按 Shift+Tab 直到焦点进入会话树；M3 是 6 次，
- *        M6 顶栏多了模型和思考两个按钮（8 次），TaskBoard 在模型按钮之前加了协作开关（parallel-agents-taskboard.md
- *        §13.1，一个真正可以聚焦的按钮），应为 9 次，落在新会话行。记下次数和经过的元素。
- *        之后在 C 里发一条长消息，让 C 有一个长名字（分屏的布局检查量的是长名字被挤窄）。
+ * @brief 第一次打开中的样子（watchRows 记下的、按钮位置是"Starting…"的）：这一行只有权限按钮（不可用，悬停第二行和读屏的
+ *        描述"Starting…"）和说明，没有范围按钮、Effort 和圆环；这一行仍高 33px、不溢出。返回不符合的（空数组为符合）。
+ */
+const openingProblems = (rows) => rows.filter((row) => row.kinds.join() !== KINDS.opening
+  || !row.permission?.aria || row.permission.reason !== NOTE.starting
+  || row.permission.title !== `Permission mode: Ask each time\n${NOTE.starting}` || row.height < 32 || row.overflow);
+
+/**
+ * @brief Ctrl+N 新建会话 C：第一次打开中（"Starting…"）这一行只有权限按钮和说明（chat.md"后台正在启动"）；打开后从文字框
+ *        按 Tab 依次是权限 → 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）；Shift+Tab 回到会话树是 6 次（右栏开关 →
+ *        协作开关 → 左栏分隔线 → 底部两个按钮 → 会话行）：M6 是 8 次，TaskBoard 在顶栏加了协作开关
+ *        （parallel-agents-taskboard.md §13.1，一个真正可以聚焦的按钮）是 9 次，2026-10-21 起权限、思考强度和模型三个按钮
+ *        移到了文字框后面。ctrlN 等到会话打开好才返回（打开中协作开关不可用、不在 Tab 路径上）。
+ *        之后在 C 里发一条长消息（分屏的布局检查用它）。
  */
 async function shiftTabPath(ctx) {
   const { page, h } = ctx;
+  await watchRows(page);
   ctx.c = await ctrlN(page);
+  const opening = (await seenRows(page)).filter((row) => row.wait === NOTE.starting);
   const focused = await waitComposerFocus(page);
+  const forward = [];
+  for (let n = 0; n < 5; n += 1) {
+    await page.keyboard.press('Tab');
+    forward.push(await focusLabel(page));
+  }
+  await composer(page).focus();
   const path = [];
   let landed = null;
   for (let presses = 1; presses <= 12 && !landed; presses += 1) {
     await page.keyboard.press('Shift+Tab');
     const focus = await focusInfo(page);
-    path.push(focus.file !== null ? `会话行 ${focus.text}` : focus.testid || focus.label || focus.text || focus.tag);
+    path.push(await focusLabel(page));
     if (focus.file !== null) landed = { presses, focus };
   }
   ctx.shiftTab = landed?.presses ?? null;
-  record(`Shift+Tab：从新会话的输入框按 ${landed?.presses ?? '12+'} 次回到会话树（M3 是 6 次；M6 多模型、思考两个按钮，`
-    + '8 次；TaskBoard 多协作开关，应为 9 次），落在新会话行', focused && landed?.presses === 9
+  record('新会话第一次打开中（"Starting…"）：输入框下面一行只有权限按钮（不可用，悬停第二行和读屏的描述"Starting…"）和'
+    + '按钮位置的说明，没有范围按钮、Effort 和圆环；这一行仍高 33px、不溢出', opening.length > 0
+    && openingProblems(opening).length === 0, JSON.stringify(opening.slice(0, 4)));
+  record('Tab：从新会话的文字框往后依次是权限 → 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）', focused
+    && forward.slice(0, 4).join() === 'permission-button,model-button,thinking-button,usage'
+    && forward[4] !== 'Send', `路径：${forward.join(' → ')}`);
+  record(`Shift+Tab：从新会话的输入框按 ${landed?.presses ?? '12+'} 次回到会话树（应为 6 次：右栏开关 → 协作开关 → `
+    + '左栏分隔线 → 底部两个按钮 → 会话行；权限、范围、Effort 在文字框后面，不在这条路上），落在新会话行', focused
+    && landed?.presses === 6 && path[0] === 'Toggle changes' && path[1] === 'team-switch'
     && samePath(landed.focus.file, ctx.c),
   `路径：${path.join(' → ')}`);
   await h.send(LONG_NAME_MESSAGE);
   await h.idle(60000);
 }
 
-/** @brief 最小窗口 800×600、右栏打开（中栏 300px）：图标栏 + 中栏 + 右栏都完整；顶栏收到最紧；菜单和"/"列表不被裁掉。 */
+/**
+ * @brief 最小窗口 800×600、右栏打开（中栏约 300px，≤ 340px 一档）：图标栏 + 中栏 + 右栏都完整；顶栏不显示项目名，会话名
+ *        完整或占满剩下的地方；这一行收到最紧（只有图标的"Send"、没有 ▾、内边距 4px），菜单和"/"列表不被裁掉。
+ */
 async function narrowLayout(ctx) {
   const { page } = ctx;
   await openRow(page, ctx.a);
@@ -1077,13 +965,10 @@ async function narrowLayout(ctx) {
   record('800×600、右栏打开：左栏收起为 60px 图标栏，中栏至少 300px，右栏完整，页面没有横向、纵向溢出，没有元素出窗口，'
     + '输入框完整在窗口里', report.window === 800 && report.sidebar === 60 && report.center >= 300 && report.right > 0
     && report.page <= 800 && report.pageHeight <= report.height && report.outside.length === 0
-    && pane?.composerBottom > 0 && pane.composerBottom <= report.height, JSON.stringify(report));
-  recordBars('800×600、右栏打开（面板 300px，≤ 400px）：模型和思考按钮仍显示（思考只显示强度、两个都去掉 ▾），'
-    + '项目名、上下文用量和权限按钮的模式名不显示（权限按钮只显示盾牌图标）；顶栏不溢出、不裁切', report, 1, pane?.width <= 400);
-  record(`800×600、右栏打开：会话 A 的长名字省略号截断、仍看得到，宽度至少 ${TITLE_MIN}px（layout.md 最小窗口`
-    + '"顶栏文字省略号截断而不溢出"；models.md"放不下"会话名至少留 36px）', pane?.title >= TITLE_MIN
-    && pane.titleFull > pane.title, `会话名"${pane?.titleText}"宽 ${pane?.title}px（全宽 ${pane?.titleFull}px）；`
-    + `模型按钮 ${pane?.modelWidth}px；按钮：${pane?.actions.join(', ')}`);
+    && pane?.frame.composer.bottom > 0 && pane.frame.composer.bottom <= report.height, layoutBrief(report));
+  recordBars('800×600、右栏打开（面板约 300px，≤ 340px）：顶栏不显示项目名和 ›，两个图标按钮 28px，会话名完整或占满剩下的地方；'
+    + '这一行权限、范围、Effort 按钮都在（没有 ▾、内边距 4px），圆环在，"Send"只有图标（28px）；不溢出、不裁切', report, 1,
+  pane?.width <= 340);
   await shot(page, 'layout-800-right');
   await noteSmall(ctx, '800×600 右栏打开');
   await recordMenus(ctx, '800×600、右栏打开');
@@ -1099,38 +984,22 @@ async function narrowLayout(ctx) {
   await setRight(page, false);
 }
 
-/** @brief 在会话行上按 Shift+F10，用 ↓ 走到"Open in split view"再 Enter。 */
-async function splitOpen(page, file) {
-  await rowOf(page, file).first().focus();
-  await page.keyboard.press('Shift+F10');
-  const menu = page.getByTestId('session-menu');
-  await menu.waitFor({ timeout: 5000 });
-  await page.waitForFunction(() => document.activeElement?.closest('[data-testid="session-menu"]'), null,
-    { timeout: 5000 });
-  const labels = await menu.getByRole('menuitem').evaluateAll((items) => items.filter((item) => !item.disabled)
-    .map((item) => item.childNodes[0]?.textContent ?? ''));
-  for (let index = 0; index < labels.indexOf('Open in split view'); index += 1) await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Enter');
-  await waitSplit(page);
-  await waitPaneReady(page, 'right');
-}
-
-/** @brief 分屏（A 在左、C 在右，两个都是长名字）：1280 宽（每栏约 510px）和 1200 宽（每栏约 470px），右栏关。 */
+/** @brief 分屏（A 在左、C 在右）：1280 宽（每栏约 510px）和 1200 宽（每栏约 470px），右栏关。 */
 async function splitLayout(ctx) {
   const { page } = ctx;
   await resizeTo(ctx, 1280, 800);
   await splitOpen(page, ctx.c);
   const wide = await layoutReport(page);
-  recordBars('1280 宽分屏、右栏关（每栏约 510px，500–600px）：两栏都有模型和思考按钮（思考只显示强度）和上下文用量，'
-    + '不显示项目名和 ›、权限按钮的图标；顶栏不溢出、不裁切，会话名完整或至少 36px', wide, 2,
-  wide.panes.every((pane) => pane.width > 500 && pane.width <= 600));
+  recordBars('1280 宽分屏、右栏关（每栏约 510px，460–600px）：两栏顶栏有项目名 › 会话名、协作开关（只有状态点）、右栏开关和"Close pane"；这一行'
+    + '"Send"只有图标，Effort 只显示强度，三个按钮带 ▾；不溢出、不裁切', wide, 2,
+  wide.panes.every((pane) => pane.width > 460 && pane.width <= 600));
   await shot(page, 'layout-1280-split');
   await noteSmall(ctx, '1280 分屏');
   await recordMenus(ctx, '1280 宽分屏');
   await resizeTo(ctx, 1200, 800);
   const closed = await layoutReport(page);
-  recordBars('1200 宽分屏、右栏关（每栏约 470px，400–500px）：两栏都有模型和思考按钮（带 ▾），不显示上下文用量；'
-    + '顶栏不溢出、不裁切，会话名至少 36px', closed, 2, closed.panes.every((pane) => pane.width > 400 && pane.width <= 500));
+  recordBars('1200 宽分屏、右栏关（每栏约 470px，460–600px）：两栏都有范围、Effort 按钮（带 ▾）和圆环；顶栏和这一行不溢出、'
+    + '不裁切', closed, 2, closed.panes.every((pane) => pane.width > 460 && pane.width <= 600));
   await shot(page, 'layout-1200-split');
   await noteSmall(ctx, '1200 分屏');
   await recordMenus(ctx, '1200 宽分屏');
@@ -1141,80 +1010,35 @@ async function splitLayout(ctx) {
   await resizeTo(ctx, 1280, 800);
 }
 
-/** @brief 每一栏都宽于 low、不宽于 high。 */
-const inBand = (report, low, high) => report.panes.every((pane) => pane.width > low && pane.width <= high);
-
 /**
- * @brief 新阈值和旧阈值（按中文字宽估的 720 / 600 / 640 / 480px）之间各量一次，分得清是哪一套：
- *        800×600 单栏、右栏关（约 740px）：权限按钮已去掉图标，项目名、"Effort: "和上下文用量都还在；
- *        1340 宽单栏、右栏开（约 630px）：不显示项目名和 ›，"Effort: "还在；
- *        1600 宽分屏、右栏关（每栏约 670px）：不显示项目名和 ›；1240 宽分屏（每栏约 490px）：不显示上下文用量。
- *        各项照 barProblems 查（含权限按钮的读屏名称和悬停说明）。最后关掉分屏、回到 1280 宽。
- */
-async function bandLayout(ctx) {
-  const { page } = ctx;
-  await openRow(page, ctx.a);
-  await resizeTo(ctx, 800, 600);
-  await setRight(page, false);
-  const icon = await layoutReport(page);
-  recordBars('800×600 单栏、右栏关（面板 720–760px）：权限按钮去掉图标（旧阈值 720px 时还在），项目名、"Effort: "、'
-    + '上下文用量都显示，模型按钮仍最宽 160px（长模型 ID 截在 160px）；顶栏不溢出、不裁切', icon, 1, inBand(icon, 720, 760)
-    && icon.panes[0].modelWidth >= 159);
-  await resizeTo(ctx, 1340, 800);
-  await setRight(page, true);
-  const crumb = await layoutReport(page);
-  recordBars('1340 宽单栏、右栏开（面板 600–660px）：不显示项目名和 ›（旧阈值 600px 时还在），"Effort: "和上下文用量还在；'
-    + '顶栏不溢出、不裁切', crumb, 1, inBand(crumb, 600, 660));
-  await setRight(page, false);
-  await resizeTo(ctx, 1600, 800);
-  await splitOpen(page, ctx.c);
-  const splitCrumb = await layoutReport(page);
-  recordBars('1600 宽分屏、右栏关（每栏 660–690px）：两栏都不显示项目名和 ›（split.css 690px，旧阈值 640px 时还在），'
-    + '权限按钮没有图标；顶栏不溢出、不裁切', splitCrumb, 2, inBand(splitCrumb, 660, 690));
-  await resizeTo(ctx, 1240, 800);
-  const usage = await layoutReport(page);
-  recordBars('1240 宽分屏、右栏关（每栏 480–500px）：两栏都不显示上下文用量（旧阈值 480px 时还在）；'
-    + '顶栏不溢出、不裁切', usage, 2, inBand(usage, 480, 500));
-  await shot(page, 'layout-1240-split');
-  await page.locator(`${FOCUSED} [data-testid="close-pane"]`).click();
-  await waitSplit(page, false);
-  await resizeTo(ctx, 1280, 800);
-}
-
-/** @brief 分屏时两栏的会话都把右栏开关切到 open（右栏跟随焦点，各会话各自记住开关，split.md）。 */
-async function setRightBoth(page, open) {
-  for (const index of [0, 1]) {
-    await focusPane(page, index);
-    await setRight(page, open);
-  }
-}
-
-/**
- * @brief 接着 splitLayout：1200 宽分屏、右栏开（两栏的会话都打开右栏，焦点在哪一栏右栏都开着），两栏各 280px（最窄）：
- *        模型和思考按钮仍在、可以点，菜单在栏里。
+ * @brief 接着 splitLayout：1200 宽分屏、右栏开（两栏的会话都打开右栏），两栏各 280px（最窄，右边那一栏 .chat-pane 279px）：
+ *        顶栏不显示项目名，会话名至少 168px（名字更短时完整）；这一行三个按钮和圆环都在，菜单在栏里。
  */
 async function splitRight(ctx) {
   const { page } = ctx;
   await setRightBoth(page, true);
   const open = await layoutReport(page);
   const state = await splitState(page);
-  recordBars('1200 宽分屏、右栏开：右栏贴在右边、两栏各至少 280px（最窄的一种）；两栏的模型和思考按钮仍显示（去掉 ▾），'
-    + '模型按钮收短但不窄于 40px；顶栏不溢出、不裁切，会话名至少 36px', open, 2, open.right > 0
-    && state.slots.every((slot) => slot.width >= 280) && open.panes.every((pane) => pane.width <= 400));
+  recordBars('1200 宽分屏、右栏开：右栏贴在右边、两栏各 280px（右边那一栏的会话面板 279px）；顶栏不显示项目名；这一行权限、'
+    + '范围、Effort 按钮和圆环都在（没有 ▾），不窄于最窄（40 / 36 / 36px）；不溢出、不裁切', open, 2, open.right > 0
+    && state.slots.every((slot) => slot.width >= 280) && open.panes.every((pane) => pane.width <= 340));
   await shot(page, 'layout-1200-split-right');
   await noteSmall(ctx, '1200 分屏右栏开');
   await recordMenus(ctx, '1200 宽分屏、右栏开（每栏 280px）');
   await setRightBoth(page, false);
 }
 
-/** @brief 接着 splitRight（分屏、右栏关）：最小窗口 800×600 时两栏（各约 370px）的顶栏也放得下（split.md"最小 800px"）。 */
+/**
+ * @brief 接着 splitRight（分屏、右栏关）：最小窗口 800×600 时两栏（各约 370px）的顶栏和这一行也放得下（split.md"最小 800px"）：
+ *        项目名还在（> 320px），会话名约 215px。
+ */
 async function narrowSplit(ctx) {
   const { page } = ctx;
   await resizeTo(ctx, 800, 600);
   const report = await layoutReport(page);
-  recordBars('800×600 分屏、右栏关：图标栏 60px，两栏各约 370px（≤ 400px）；两栏的模型和思考按钮仍显示（去掉 ▾）；'
-    + '顶栏不溢出、不裁切，会话名至少 36px', report, 2, report.sidebar === 60
-    && report.panes.every((pane) => pane.width >= 360 && pane.width <= 400));
+  recordBars('800×600 分屏、右栏关：图标栏 60px，两栏各约 370px（340–400px）；顶栏有项目名（> 320px）；这一行三个按钮去掉 ▾、'
+    + '"Send"只有图标（32px）；顶栏和这一行不溢出、不裁切', report, 2, report.sidebar === 60
+    && report.panes.every((pane) => pane.width > 340 && pane.width <= 400));
   await shot(page, 'layout-800-split');
   await noteSmall(ctx, '800×600 分屏');
   await recordMenus(ctx, '800×600 分屏');
@@ -1363,14 +1187,22 @@ function watchReadiness(page) {
   }, FOCUSED);
 }
 
-/** @brief 后台进程退出（会话不能发送）时打出 "/" 不出列表；接着 reloadKernel。 */
+/**
+ * @brief 后台进程退出（会话不能发送）：开着的权限菜单关闭，这一行的按钮不可用、原因读得到，圆环保留用量（recordExited）；
+ *        打出 "/" 不出列表；接着 reloadKernel。
+ */
 async function kernelExited(ctx) {
   const { page, app } = ctx;
   await openRow(page, ctx.a);
   await typeFresh(page, '');
+  const before = await ringState(page, `${FOCUSED} [data-testid="chat-pane"]`);
+  // 2026-10-21 起：开着的权限菜单在后台进程退出时关闭（composer-pickers.md"我自己定的"第 13 条）
+  await page.locator(`${FOCUSED} ${ROW} [data-testid="permission-button"]`).click();
+  await page.getByTestId('permission-menu').waitFor({ timeout: 5000 });
   killKernel(app);
   // 每个会话面板各有一条退出横幅（隐藏的面板里的也在），等显示着的那条
   await page.locator(`${FOCUSED} [data-testid="kernel-exit"]`).first().waitFor({ timeout: 15000 });
+  await recordExited(ctx, before, await popupGone(page, '[data-testid="permission-menu"]'));
   await watchReadiness(page);
   await typeFresh(page, '/');
   const quiet = await neverWithin(page, () => Boolean(document.querySelector('[data-testid="slash-menu"]')), null, 800);
@@ -1382,13 +1214,15 @@ async function kernelExited(ctx) {
 }
 
 /**
- * @brief 接着 kernelExited：输入框有焦点、草稿是 "/" 时点"Restart"；重新载入中（"Restarting…"）、
- *        会话重新打开中（"Starting…"，会话还没打开）都不出列表，也不闪出读取失败；就绪后打出 "/" 照常出列表。
- *        "Restarting…"只持续一小会儿，鼠标点按钮再点回输入框赶不上，所以用 DOM 的 click() 点按钮（不移动焦点）。
+ * @brief 接着 kernelExited：输入框有焦点、草稿是 "/" 时点"Restart"（同时用 watchRows 记下这一行，recordReopen）；
+ *        重新载入中（"Restarting…"）、会话重新打开中（"Starting…"，会话还没打开）都不出列表，也不闪出读取失败；就绪后
+ *        打出 "/" 照常出列表。"Restarting…"只持续一小会儿，鼠标点按钮再点回输入框赶不上，所以用 DOM 的 click() 点按钮
+ *        （不移动焦点）。
  */
 async function reloadKernel(ctx) {
   const { page } = ctx;
   await composer(page).focus();
+  await watchRows(page);
   await page.evaluate((css) => {
     const banner = document.querySelector(`${css} [data-testid="kernel-exit"]`);
     [...banner.querySelectorAll('button')].find((button) => button.textContent.includes('Restart')).click();
@@ -1397,6 +1231,7 @@ async function reloadKernel(ctx) {
     && [...document.querySelectorAll(`${css} [data-testid="notice"]`)].some((n) => n.textContent.includes('Restarted')),
   FOCUSED, { timeout: 60000 });
   await settle(page);
+  recordReopen(await seenRows(page));
   const log = await page.evaluate(() => {
     window.__readinessObserver.disconnect();
     return window.__readiness;
@@ -1420,15 +1255,16 @@ async function reloadKernel(ctx) {
 
 /** @brief 聊天页（各种状态下）没有小于 12px 的字。 */
 async function fontSizes(ctx) {
-  record('聊天页没有小于 12px 的文字（1280 单栏与菜单、"/"列表各状态、1400 右栏开、800 宽右栏开、1280、1200 和 800 宽分屏）',
+  record('聊天页没有小于 12px 的文字（1280 单栏与范围、Effort、权限菜单、圆环详情和悬停提示，"/"列表各状态、1400 右栏开、'
+    + '800 宽右栏开、1280、1200 和 800 宽分屏）',
     ctx.small.length === 0 && ctx.smallChecked.length > 0, ctx.small.length ? ctx.small.slice(0, 5).join('; ')
       : `checked: ${ctx.smallChecked.join(' / ')}`);
 }
 
 const steps = { setup, menuList, menuArrows, menuFilter, insertEnter, insertTabClick, insertKeepsRest, noMatch,
   noMatchSends, caretRule, imeComposition, sendSkill, sendTemplate, escWhileRunning, wideLayout, midLayout,
-  shiftTabPath, narrowLayout, splitLayout, bandLayout, emptySession, skillCommandsOff, disabledResources, projectTrust,
-  commandsError, kernelExited, fontSizes };
+  shiftTabPath, narrowLayout, splitLayout, bandPrep, bandTyped, bandIdle, bandSingle, bandEffort, bandBlocked,
+  emptySession, skillCommandsOff, disabledResources, projectTrust, commandsError, kernelExited, exitBands, fontSizes };
 
 const fake = await startFakeEndpoint(port, testKey);
 const { root, project, untrusty, trusty } = makeProject();

@@ -1,10 +1,12 @@
 // 平行 Agent 与 TaskBoard 的 App 套件：批准与停止（docs/specs/parallel-agents-taskboard.md §17.2）。真正的 Mori（界面 +
 // 后台进程 + pi + 主进程）对合成端点的脚本模式（tests/fake-endpoint/scenarios/stop.mjs，synthetic），逐条验收这些编号在
 // App 层的通过条件：
-//   TB-34 后台批准卡、TB-35 停止、TB-36 重新载入与重启、TB-42 归档、删除与关闭。
+//   TB-34 后台批准卡、TB-35 停止、TB-36 重新载入与重启、TB-42 归档、删除与关闭；另有 TB-54 后台有 Agent 时
+//   输入框下面一行在各宽度的样子
+//   （docs/v0/composer-pickers.md、models.md"窄栏"，量的函数在 m6-helpers.mjs）。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs stop）：
 //   MORI_APP_DIR=.tb-runs/stop node tests/ui/tb-app-stop.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
-// 步骤：approve、team、piqueue、stopprep、esc、escjudge、escmerged、reload、del、restart（restart 最后跑，重启 App）。
+// 步骤：approve、team、piqueue、stopprep、esc、escjudge、escmerged、reload、del、row、restart（restart 最后跑，重启 App）。
 // 结果写到 test-results/tb-app-stop(-packaged).json（--only 时 tb-partial-app-stop…），截图在 test-results/tb-app-stop/。
 // 端口（§17.1 的 4600–4699 里分给本套件的 4660–4669）：合成端点 4660，记录代理 4661。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里写好一个本机提供商（写入等级 A、能关思考，跳过探针）；
@@ -23,6 +25,9 @@ import {
   userSession, waitApprovalCard, waitTaskPhase, waitTeamIdle, watchTaskPhases, writeRoles,
 } from './tb-helpers.mjs';
 import { withoutWorkCards } from '../fake-endpoint/scripts.mjs';
+import { openMenuByMouse } from './m3-helpers.mjs';
+import { waitPaneReady, waitSplit } from './m5-helpers.mjs';
+import { at1, dragSplit, fitPane, layoutReport, paneProblems, paneWidths } from './m6-helpers.mjs';
 import { captureEvents, watchStages } from './v1-switch-helpers.mjs';
 
 const args = suiteArgs('stop');
@@ -832,6 +837,8 @@ async function deleteAndCheck(ctx, who) {
   await ctx.page.getByTestId('session-menu').getByRole('menuitem', { name: 'Delete…' }).click();
   await ctx.page.getByTestId('delete-dialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await row.waitFor({ state: 'detached', timeout: 20000 });
+  // 行在会话文件删掉时就随会话列表消失；确认框等主进程把 teams/<id> 也删完（deleteSession 返回）才关上。
+  await ctx.page.getByTestId('delete-dialog').waitFor({ state: 'detached', timeout: 20000 });
   const probe = existsSync(ctx.probeLog) ? readJsonl(ctx.probeLog) : [];
   const shut = probe.filter((item) => item.t >= deleteAt).map((item) => item.id);
   const enabled = ['Archive', 'Delete…']
@@ -983,6 +990,124 @@ async function restartR4(ctx, who, prior) {
   brief({ prior: prior.r4Progress, receiptAt, progressAt, last }));
 }
 
+// ---------- TB-54：后台有 Agent 时输入框下面一行的宽度（docs/v0/composer-pickers.md、models.md"窄栏"） ----------
+
+/** 量"生成中有字"时留在输入框里的草稿 */
+const ROW_DRAFT = 'plain draft for the layout checks';
+/** 单栏量的宽度（.chat-pane）和右栏开关（窄于 740px 时右栏打开才到得了，同 m6-helpers 的 SINGLE_WIDTHS） */
+const ROW_SINGLE = [[930, false], [761, false], [760, false], [709, true], [681, true], [680, true], [601, true],
+  [600, true], [521, true], [520, true], [461, true], [460, true], [401, true], [400, true], [341, true], [340, true],
+  [300, true]];
+/** 分屏时这个会话在右边那一栏，量的宽度（.chat-pane；279px 是右边一栏最窄） */
+const ROW_SPLIT = [296, 281, 280, 279];
+
+/** @brief 第 index 栏此刻的样子和问题（m6-helpers paneProblems；states 是从左到右每一栏的状态）。 */
+async function rowSample(ctx, index, states) {
+  const report = await layoutReport(ctx.page);
+  const pane = report.panes[index];
+  const { model, stopTeam } = pane.controls;
+  return { width: at1(pane.width), problems: paneProblems(report, states)[index],
+    items: pane.frame.items.map((item) => item.kind).join(),
+    model: model && { locked: model.locked, text: model.text, width: at1(model.width) },
+    stopTeam: stopTeam && { shown: stopTeam.shown, width: at1(stopTeam.width) } };
+}
+
+/** @brief 在会话行上右键、点"Open in split view"，等这个会话在右边那一栏打开好。 */
+async function openRight(page, file) {
+  const { menu } = await openMenuByMouse(page, file);
+  await menu.getByRole('menuitem', { name: 'Open in split view' }).click();
+  await waitSplit(page);
+  await waitPaneReady(page, 'right');
+}
+
+/** @brief 分屏时拖中线，让右边那一栏的 .chat-pane 宽 target（差不到 1px 为止，最多拖 6 次）；返回量到的宽度。 */
+async function fitRight(page, target) {
+  for (let tries = 0; tries < 6; tries += 1) {
+    const [, right] = await paneWidths(page);
+    if (Math.abs(right - target) < 1) break;
+    await dragSplit(page, Math.round(right - target) || Math.sign(right - target));
+  }
+  return (await paneWidths(page))[1];
+}
+
+/**
+ * @brief TB-54 与 composer-pickers：协作模式下 T1 executor 在后台、对话在回复、输入框里有字时，这一行在单栏 930–300px、
+ *        分屏右边一栏 296–279px 都放得下（m6-helpers paneProblems 的 teamTyped：锁定的模型按钮在范围按钮的位置、
+ *        不窄于最窄、截短带"…"；宽于 400px 时模式名不截；Stop team 在"Stop"前，> 760px 带字、≤ 760px 只有图标 32px、
+ *        ≤ 340px 28px；≤ 520px 时"Queue"收起只留 ▾；
+ *        ≤ 340px 时"Queue ▾"收起）；最后用键盘按 Stop team，它消失、焦点回到文字框。
+ */
+async function rowFit(ctx) {
+  const other = await begin(ctx, ctx.review, `Other pane ${tag('row2')}`, { team: false });
+  if (!(await waitReply(ctx, other, 'Other pane reply.'))) throw new Error('the other session did not reply');
+  const who = await begin(ctx, ctx.split, `Row layout ${tag('row')}`);
+  const ready = await waitLine(ctx, 'tb-stop-row', { agent: 'executor', kind: 'task' }, 40000)
+    && await waitLine(ctx, 'tb-stop-row', { agent: 'chat', kind: 'team-dialog' }, 40000);
+  await ctx.page.locator(`${paneSel(who.tab)} [data-testid="stop-team"]`).waitFor({ timeout: 20000 });
+  if (!ready || !(await paneState(ctx.page, who.tab)).running) throw new Error('the dialog and T1 are not running');
+  await ctx.page.locator(`${paneSel(who.tab)} .composer textarea`).fill(ROW_DRAFT);
+  const samples = await rowSweep(ctx, who, other).catch(async (error) => {
+    // 量到一半出错时也停下这个会话的 Agent（脚本里的回复要等很久），免得拖累后面的步骤
+    await ctx.page.locator(`${paneSel(who.tab)} [data-testid="stop-team"]`).click({ timeout: 5000 }).catch(() => {});
+    throw error;
+  });
+  await rowFitChecks(ctx, who, samples);
+}
+
+/** @brief rowFit 的量法：单栏各宽度，再把这个会话开在分屏右边那一栏量各宽度，最后关掉左边那一栏。 */
+async function rowSweep(ctx, who, other) {
+  const single = [];
+  for (const [width, right] of ROW_SINGLE) {
+    await fitPane(ctx, width, { right });
+    single.push({ want: width, ...(await rowSample(ctx, 0, 'teamTyped')) });
+  }
+  await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1200, 800));
+  await fitPane(ctx, 930, { right: false });
+  await showTab(ctx, other.tab);
+  await openRight(ctx.page, who.sessionFile);
+  const split = [];
+  for (const width of ROW_SPLIT) {
+    await fitRight(ctx.page, width);
+    split.push({ want: width, ...(await rowSample(ctx, 1, ['idle', 'teamTyped'])) });
+  }
+  await shot(ctx, args, 'row-split-279');
+  await ctx.page.locator(`${paneSel(other.tab)} [data-testid="close-pane"]`).click();
+  return { single, split };
+}
+
+/** @brief rowFit 的检查：各宽度没有问题且到了要的宽度；再用键盘按 Stop team，它消失、焦点回到文字框。 */
+async function rowFitChecks(ctx, who, { single, split }) {
+  const off = (samples) => samples.filter((s) => s.problems.length > 0 || Math.abs(s.width - s.want) >= 1);
+  const fine = (samples) => off(samples).length === 0;
+  // 记录里先放有问题的样子（记录的说明有长度上限），再放每个宽度这一行的几项
+  const detail = (samples) => brief({ off: off(samples), all: samples.map((s) => `${s.width}:${s.items}`) });
+  record('TB-54 composer row with an agent in the background while the dialog replies and the input box has a draft '
+    + '(single pane 930 to 300px, both sides of every band edge): one line inside the message box; the locked model '
+    + 'button sits where the range button was (at least 40px, 36px at 340px or narrower, cut with an ellipsis); the '
+    + 'mode name is not cut above 400px; Stop team comes before Stop, with its text above 760px, icon only (32px) at '
+    + '760px or narrower and 28px at 340px or narrower; "Queue" folds into its menu button at 520px or narrower and '
+    + 'both fold away at 340px or narrower',
+  fine(single), detail(single));
+  record('TB-54 the same row in split view, this session in the right pane at 296/281/280/279px: one line, nothing '
+    + 'outside the row (permission, range, Effort, ring, Stop team and Stop fit; "Queue" and its menu button folded '
+    + 'away)', fine(split), detail(split));
+  const pane = ctx.page.locator(paneSel(who.tab));
+  // 关掉一栏后 focusComposer 下一帧才把焦点放进文字框：等它落定再把焦点放到 Stop team 上
+  await sleep(500);
+  await pane.getByTestId('stop-team').focus();
+  const onButton = await pane.getByTestId('stop-team').evaluate((el) => el === document.activeElement);
+  if (!onButton) throw new Error('focus did not stay on Stop team');
+  await ctx.page.keyboard.press('Enter');
+  const gone = await pane.getByTestId('stop-team').waitFor({ state: 'detached', timeout: 15000 })
+    .then(() => true, () => false);
+  const focus = await poll(() => ctx.page.evaluate((css) => document.activeElement
+    === document.querySelector(`${css} .composer textarea`), paneSel(who.tab)), 1000, 50);
+  record('TB-54 Stop team pressed with the keyboard: it stops the team, the button disappears and focus goes back to '
+    + 'the text box (models.md)', gone && Boolean(focus), brief({ gone, focus }));
+  await pane.locator('.composer textarea').fill('');
+  await settle(ctx, who, 30000);
+}
+
 // ---------- 整个套件的检查 ----------
 
 /** @brief TB-34：TaskBoard 工具从不出卡（整个套件，权限都是"每次询问"时调用的）；端点没有多出来的请求。 */
@@ -1004,7 +1129,7 @@ async function finalChecks(ctx) {
 // ---------- 主流程 ----------
 
 const steps = { approve, team: teamStop, piqueue: teamStopQueued, stopprep: teamStopPreparing, esc: escBackground,
-  escjudge: escJudge, escmerged: escMerged, reload: reloadStep, del: deleteStep, restart: restartStep };
+  escjudge: escJudge, escmerged: escMerged, reload: reloadStep, del: deleteStep, row: rowFit, restart: restartStep };
 
 const ctx = { userData: tempUserData('mori-tb-stop-data-'), exePath: args.exePath, flow: {}, pageErrors: [],
   approvalSeen: new Map() };

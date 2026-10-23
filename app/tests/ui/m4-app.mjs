@@ -3,7 +3,7 @@
 // 右栏改动列表（自动打开、注明命令改动不在此列、按时间顺序的 diff、写入的内容、命令改的和被拒绝的不列出）；
 // 文件阅读器（工具卡路径和"Open"进入、行号、改动后自动重读、"Reload file"、"Open in default app"及失败、二进制、超过 1MB、
 // 删除、读取失败、文件夹、按 pi 的规则解析路径）；选区浮层（阅读器和回复里出现，你的消息、跨回复、工具卡标题里不出现，
-// Esc 先关浮层不停止、浮层开着时 Alt+1 照常）；"Attach as context"（芯片、焦点、判重、移除、草稿与重启、只有芯片也能发、
+// Esc 先关浮层不停止、浮层开着时 Alt+1 照常；同类的上下文用量圆环：Esc 先关详情、再藏提示，之后才停止）；"Attach as context"（芯片、焦点、判重、移除、草稿与重启、只有芯片也能发、
 // 模型收到引用块、mori.ref 条目、发出的引用、回到原位置：没变、挪了行、"Source changed"、"File not found"、回复里的高亮、重启后）；
 // 反馈（表单、Ctrl+Enter、"Saved"、JSON 记录、不发给模型、保存失败保留文字、生成中选字反馈不被打断）；
 // 回复下的操作（每轮一行、最新一轮常显、悬停与聚焦、Tab 顺序、"Copy"进剪贴板、"Attach message as context"、"Give feedback"、
@@ -21,7 +21,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import koffi from 'koffi';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
-import { activeFile, ctrlN, openRow, paneOf, stubFolder, until, waitIdle, waitReady, waitRunning } from './m3-helpers.mjs';
+import {
+  activeFile, ctrlN, openRow, paneOf, ROW_TAB_ORDER, rowWhen, stoppedCount, stubFolder, until, waitIdle, waitReady,
+  waitRunning,
+} from './m3-helpers.mjs';
 import {
   assistantIndexWith, changeList, clearSelection, lastReplyHasActions, composerChips, dragSelect, expandChange, jumpHighlight, messageCounts, PANE,
   popoverButtons, popoverShown, refEntries, sessionEntries, replyActionRows, savedDraftRefs, savedFeedback, selectBetween, selectLines,
@@ -627,7 +630,7 @@ async function streamingFeedback(ctx) {
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.wheel(0, -200);
   await sleep(300);
-  await dragSelect(page, `${PANE} [data-testid="assistant"]`, '河边的柳树发了新芽', index);
+  await dragSelect(page, `${PANE} [data-testid="assistant"]`, '河边的柳树发了新芽', index, 'end');
   const shown = await popoverShown(page);
   const running = await paneOf(page).getAttribute('data-running');
   await sleep(600);
@@ -688,6 +691,47 @@ async function keysWithPopover(ctx) {
   await waitIdle(page, 30000);
   record('选区浮层开着时 Alt+1 照常批准（浮层不挡快捷键）', shown && answered, JSON.stringify({ shown, answered }));
   await clearSelection(page);
+}
+
+/**
+ * @brief 上下文用量圆环的 Esc（与选区浮层同一类：只是看数的浮层；docs/v0/screens/models.md"上下文用量（圆环）"、
+ *        chat.md"Esc 的顺序"，2026-10-21 起圆环在输入框下面一行）：生成中从文字框 Tab 到圆环（依次经过权限、选择范围、
+ *        Effort），悬停提示显示；Enter 打开详情；Esc 先关详情（焦点留在圆环，不停止生成），再按 Esc 藏起提示（仍不停止），
+ *        提示藏起后再按 Esc 才停止生成（"Stopped · …"多一行）。
+ */
+async function ringEsc(ctx) {
+  const { page, h } = ctx;
+  await page.mouse.move(0, 0);
+  const stopped = await stoppedCount(page);
+  await h.send('wait 8s');
+  await waitRunning(page);
+  await h.textarea.focus();
+  const stops = [];
+  for (let presses = 0; presses < 6 && stops.at(-1) !== 'usage'; presses += 1) {
+    await page.keyboard.press('Tab');
+    stops.push(await page.evaluate(() => document.activeElement?.dataset?.testid ?? document.activeElement?.tagName));
+  }
+  const tipped = await rowWhen(page, (row) => row.tip !== null, 2000);
+  await page.keyboard.press('Enter');
+  const opened = await rowWhen(page, (row) => row.details, 2000);
+  await page.keyboard.press('Escape');
+  const first = await rowWhen(page, (row) => !row.details, 2000);
+  const running = [await paneOf(page).getAttribute('data-running')];
+  await page.keyboard.press('Escape');
+  const second = await rowWhen(page, (row) => row.tip === null, 2000);
+  await sleep(300);
+  running.push(await paneOf(page).getAttribute('data-running'));
+  await page.keyboard.press('Escape');
+  await waitIdle(page, 30000);
+  const after = await stoppedCount(page);
+  record('圆环：生成中从文字框 Tab 到圆环（依次经过权限、选择范围、Effort）时悬停提示显示；Enter 打开详情；Esc 先关详情'
+    + '（焦点留在圆环，提示还在，不停止生成），再按 Esc 藏起提示（仍不停止），之后再按 Esc 才停止生成',
+  JSON.stringify(stops) === JSON.stringify(ROW_TAB_ORDER) && tipped?.focus === 'usage' && tipped.tip !== null
+    && Boolean(opened?.details) && opened.usage?.expanded === 'true' && first?.details === false
+    && first.focus === 'usage' && first.tip !== null && second?.tip === null && second.focus === 'usage'
+    && running.every((value) => value === 'true') && after === stopped + 1,
+  JSON.stringify({ stops, tip: tipped?.tip, opened: opened?.details, first: first && { focus: first.focus,
+    tip: first.tip }, second: second && { focus: second.focus, tip: second.tip }, running, stopped, after }));
 }
 
 /** @brief 重启后：发出的引用仍能点回（文件、回复），输入框里的芯片还在。 */
@@ -769,7 +813,7 @@ async function longHistory(ctx) {
 const steps = {
   setup, changes, toolPath, reread, openExternal, viewerStates, viewerQuote, chipDraft, sendQuote, jumpFile,
   jumpDeleted, noPopover, transcriptQuote, replyActions, feedback, feedbackReply, streamingFeedback, keysWithPopover,
-  restart, smallText, longHistory,
+  ringEsc, restart, smallText, longHistory,
 };
 
 const fake = await startFakeEndpoint();

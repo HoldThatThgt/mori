@@ -1,5 +1,5 @@
-// 顶栏换选择范围、换思考强度（docs/v1/screens/model-menu.md）：只作用于这个会话，不改设置里的默认范围。
-// 请求期间按钮显示你选的值、不可用；返回后以后台进程给出的模型状态为准。换范围失败时按钮下方一行原文，
+// 输入框下面一行换选择范围、换思考强度（docs/v1/screens/model-menu.md）：只作用于这个会话，不改设置里的默认范围。
+// 请求期间按钮显示你选的值、不可用；返回后以后台进程给出的模型状态为准。换范围失败时从输入框下面一行往上弹出一行原文，
 // 换思考强度失败时对话流里一张错误卡（同 v0）；按钮都回到原来的值。拒绝启动卡上的 Verify now、Check again、
 // Turn off team mode（docs/specs/parallel-agents-taskboard.md §4.4、§5.1）也在这里。
 
@@ -25,7 +25,7 @@ export interface PendingSwitch {
 /** @brief 正在切换的会话（界面里的标识）和你选的值，只在这次运行的内存里。 */
 export const usePendingSwitch = create<Record<string, PendingSwitch>>(() => ({}));
 
-/** @brief 每个会话顶栏菜单的各项（session.pickOptions 的结果，按界面里的标识）。 */
+/** @brief 每个会话范围菜单的各项（session.pickOptions 的结果，按界面里的标识）。 */
 export const usePickOptions = create<Record<string, PickOption[]>>(() => ({}));
 
 /** @brief 每个会话换范围失败的原文（按界面里的标识）；下次打开菜单或 10 秒后清掉。 */
@@ -52,7 +52,7 @@ function applyState(key: string, state: Partial<ModelState>): void {
   updateTab(key, (tab) => ({ ...tab, ...modelStateOf(state) }));
 }
 
-/** @brief 读取这个会话顶栏菜单的各项（只读）；失败时只记录，按钮与菜单用已有的。 */
+/** @brief 读取这个会话范围菜单的各项（只读）；失败时只记录，按钮与菜单用已有的。 */
 export async function loadPickOptions(key: string): Promise<void> {
   const sessionId = sessionIdOf(key);
   if (!sessionId) return;
@@ -70,7 +70,7 @@ export function clearPickError(key: string): void {
   setEntry(usePickError, key, null);
 }
 
-/** @brief 换范围失败：按钮下方一行原文，10 秒后自动消失（期间又失败时以最新的为准）。 */
+/** @brief 换范围失败：从输入框下面一行往上弹出一行原文，10 秒后自动消失（期间又失败时以最新的为准）。 */
 function showPickError(key: string, message: string): void {
   setEntry(usePickError, key, message);
   setTimeout(() => {
@@ -120,7 +120,7 @@ export async function setThinking(key: string, level: ThinkingLevel): Promise<vo
   if (sessionId) await switchThinking(key, { level }, { type: 'session.setThinking', sessionId, level });
 }
 
-/** @brief 拒绝启动卡的"Change model…"：打开这一栏顶栏的范围菜单。 */
+/** @brief 拒绝启动卡的"Change model…"：打开这一栏输入框下面一行的范围菜单。 */
 export function openRangeMenu(key: string): void {
   useRangeMenuRequest.setState((state) => ({ key, nonce: state.nonce + 1 }));
 }

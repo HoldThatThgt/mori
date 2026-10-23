@@ -1,7 +1,7 @@
-// M6 整机测试（设置页、顶栏的思考强度、用户级 AGENTS.md）：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点
+// M6 整机测试（设置页、输入框下面一行的思考强度、用户级 AGENTS.md）：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点
 // （tests/fake-endpoint，synthetic），覆盖 docs/v0/screens/settings.md 的 AGENTS.md 一节、models.md 的思考强度和方案第 7 节
 // M6 走查 2、8 与反例。
-// v1（docs/specs/model-providers.md §14.4）：连接、模型、默认模型、顶栏换模型、删除的步骤删去（由 v1-models-*.mjs 覆盖）；
+// v1（docs/specs/model-providers.md §14.4）：连接、模型、默认模型、换模型、删除的步骤删去（由 v1-models-*.mjs 覆盖）；
 // 思考强度与 AGENTS.md 的步骤保留，改用 v1 的首次启动表单与 设置 → Models 的模型表单（docs/v1/screens/first-run.md、
 // models-settings.md、model-menu.md）。
 // 覆盖：首次启动的"Supports thinking"（首次启动表单没有思考强度）、model-config.json 只有 key 的 ref、credentials.json 只有密文；
@@ -10,7 +10,9 @@
 // 随之可选、"High"有思考内容、"Off"没有、新会话用按模型的默认强度、去掉支持思考时会话收紧、重启后恢复会话的强度；
 // 用户级 AGENTS.md（空状态、保存与 Ctrl+S、撤销改动、生效的文件、AGENTS.override.md 与 CLAUDE.md 的警示、新会话的系统提示里有、
 // 之前打开的会话没有、离开时有未保存改动的确认框、拖到设置页、取消选文件夹、已归档的会话、关闭窗口时不问）、项目级列表与
-// 用系统编辑器打开；settings.json 读不出；顶栏窄栏；新页面没有小于 12px 的字；页面没有报错。
+// 用系统编辑器打开；settings.json 读不出；输入框下面一行的窄栏（2026-10-21 起选择范围、Effort、权限按钮从顶栏移到这一行，
+// docs/v0/composer-pickers.md：按 680 / 600 / 460 / 400 / 340px 分档，范围按钮任何宽度最长 200px，菜单往上打开）；
+// Effort 按钮悬停两行、读屏的描述是第二行；新页面没有小于 12px 的字；页面没有报错。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m6-app-settings.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m6-app-settings(-packaged).json，截图在 test-results/m6-app-settings(-packaged)/。
@@ -25,7 +27,8 @@ import {
   stubFolder, until, waitIdle, waitReady,
 } from './m3-helpers.mjs';
 import {
-  menuGone, menuInside, modelRow, seenStates, startFakeEndpoint, topbarState, watchStates,
+  buttonState, colorStack, contrastOf, fitPane, LEVEL_TEXT, menuGone, menuInside, modelRow, NOTE, ROW, rowState,
+  seenStates, startFakeEndpoint, watchStates,
 } from './m6-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
@@ -204,16 +207,6 @@ async function dialogState(page, testId) {
     focused: element.contains(document.activeElement) ? document.activeElement.textContent : null }));
 }
 
-/**
- * @brief 当前一栏顶栏的模型或思考按钮（model-button / thinking-button）：文字、悬停说明、是否不可用、切换中、
- *        data-level、data-reasoning、有没有 ▾ 图标、文字颜色（"变淡"用）。
- */
-const buttonState = (page, testId) => paneOf(page).getByTestId(testId).evaluate((button) => ({
-  text: button.textContent, title: button.title, disabled: button.disabled,
-  pending: button.getAttribute('aria-disabled') === 'true', level: button.dataset.level ?? null,
-  reasoning: button.dataset.reasoning ?? null, icon: Boolean(button.querySelector('svg')),
-  color: getComputedStyle(button).color }), null, { timeout: 10000 });
-
 /** @brief 打开着的菜单（焦点在当前项上）里按 downs 次 ↓ 再按 Enter；返回之后焦点是不是回到了 button。 */
 async function chooseByKeys(page, menuId, buttonId, downs) {
   await page.getByTestId(menuId).waitFor({ timeout: 5000 });
@@ -238,7 +231,7 @@ async function openThinkingMenu(page) {
     actions: [...element.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent) }));
 }
 
-/** @brief 在当前一栏的顶栏换思考强度，等按钮的 data-level 变过去、不再是"切换中"。 */
+/** @brief 在当前一栏输入框下面一行换思考强度，等按钮的 data-level 变过去、不再是"切换中"。 */
 async function chooseLevel(page, level) {
   await paneOf(page).getByTestId('thinking-button').click();
   await page.getByTestId('thinking-menu').locator(`[role="menuitemradio"][data-level="${level}"]`).click();
@@ -390,20 +383,28 @@ const UNSUPPORTED_NOTE = 'This model isn’t marked “Supports thinking”, so 
   + 'the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit '
   + 'this model in Settings → Models and check “Supports thinking”.';
 
-/** @brief 反例：模型没标支持思考时思考强度不可选，并说明原因（英文）；"Open settings"进入 设置 → Models。 */
+/**
+ * @brief 反例：模型没标支持思考时思考强度不可选，并说明原因（英文）；"Open settings"进入 设置 → Models。
+ *        2026-10-21 起这时的字不再变淡（--color-muted，与能用时同色，composer-pickers.md"我自己定的"第 19 条），所以不比颜色，
+ *        比 data-reasoning、按钮文字、悬停两行和读屏的描述，另查字和底色的对比度 ≥ 4.5:1。
+ */
 async function thinkingUnsupported(ctx) {
   const { page } = ctx;
   const plain = await buttonState(page, 'thinking-button');
   ctx.modelColor = (await buttonState(page, 'model-button')).color;
+  const contrast = contrastOf(await colorStack(page, `${PANE} ${ROW} [data-testid="thinking-button"]`));
   const reply = await sendIn(page, 'thinking check');
   const menu = await openThinkingMenu(page);
   await noteSmall(ctx, '思考菜单（不支持思考）', '[data-testid="thinking-menu"]');
-  record('反例：模型没标"Supports thinking"时按钮"Effort: Unavailable"（data-reasoning=false，样式变淡但可以点开）；菜单里 Off、Minimal、'
-    + 'Low、Medium、High 都不可用（不是藏起来），说明原因（§9.2 的英文），有"Open settings"', plain.text === 'Effort: Unavailable'
-    && plain.reasoning === 'false' && !plain.disabled && plain.icon && plain.color !== ctx.modelColor
+  record('反例：模型没标"Supports thinking"时输入框下面一行的按钮"Effort: Unavailable"（data-reasoning=false，可以点开，'
+    + '不带 aria-disabled；字和底色对比度 ≥ 4.5:1）；悬停两行"Effort: Unavailable"和"This model isn’t marked “Supports '
+    + 'thinking”"，读屏的描述是第二行；菜单里 Off、Minimal、Low、Medium、High 都不可用（不是藏起来），说明原因（§9.2 的英文），'
+    + '有"Open settings"', plain.text === 'Effort: Unavailable' && plain.inRow && !plain.inTopbar
+    && plain.reasoning === 'false' && !plain.disabled && !plain.hasAria && plain.icon && contrast >= 4.5
+    && plain.lines.join('|') === `Effort: Unavailable|${NOTE.unsupported}` && plain.described === NOTE.unsupported
     && menu.items.map((item) => item.text).join() === 'Off,Minimal,Low,Medium,High'
     && menu.items.every((item) => item.disabled && !item.checked) && menu.note === UNSUPPORTED_NOTE
-    && menu.actions.join() === 'Open settings', JSON.stringify({ plain, modelColor: ctx.modelColor, menu }));
+    && menu.actions.join() === 'Open settings', JSON.stringify({ plain, contrast, menu }));
   record('没标支持思考时不发送思考参数（"thinking check" → "没有思考参数"）', reply.fresh && reply.text === '没有思考参数'
     && reply.thinking === 0, reply.text);
   await shot(page, '4-thinking-unsupported');
@@ -459,9 +460,11 @@ async function thinkingLevels(ctx) {
   await noteSmall(ctx, '思考菜单（支持思考）', '[data-testid="thinking-menu"]');
   await page.keyboard.press('Escape');
   const closed = await menuGone(page, 'thinking-menu');
-  record('已经打开的会话（打开时模型没标支持思考）：设置里标了之后顶栏的思考强度变得可选（关–高都可用，按钮不再变淡），'
-    + '当前"中"（会话新建时的 medium，§11.1）打勾；底部"只作用于这个会话；新会话的默认在设置里按模型设定"；Esc 关闭菜单',
+  record('已经打开的会话（打开时模型没标支持思考）：设置里标了之后输入框下面一行的思考强度变得可选（关–高都可用，字与范围按钮'
+    + '同色），悬停两行"Effort: Medium"和"Set the effort level for this session"，读屏的描述是第二行；当前"中"（会话新建时的'
+    + ' medium，§11.1）打勾；底部"只作用于这个会话；新会话的默认在设置里按模型设定"；Esc 关闭菜单',
   open.reasoning === 'true' && open.text === 'Effort: Medium' && open.color === ctx.modelColor && closed
+    && open.lines.join('|') === `Effort: Medium|${NOTE.effort}` && open.described === NOTE.effort && !open.hasAria
     && menu.items.map((item) => item.level).join() === 'off,minimal,low,medium,high'
     && menu.items.every((item) => !item.disabled) && menu.items.find((item) => item.checked)?.level === 'medium'
     && menu.note === 'Applies to this session only. Set each model’s default for new sessions in Settings.',
@@ -480,8 +483,9 @@ async function thinkingLevels(ctx) {
     + '端点收到 high（"收到思考参数：high"）', focusBack && highButton.text === 'Effort: High' && high.fresh
     && high.text === '收到思考参数：high' && high.thinking === 1,
   JSON.stringify({ focusBack, button: highButton.text, text: high.text, thinking: high.thinking }));
-  record('思考强度切换中：session.setThinking 返回之前按钮已显示"高"、不可用，返回后恢复可用',
-    switching.includes('high|true') && switching.at(-1) === 'high|null', JSON.stringify(switching));
+  record('思考强度切换中：session.setThinking 返回之前按钮已显示"高"、不可用且带 data-pending（切换中，不是"不可用"），'
+    + '返回后恢复可用（不带 aria-disabled、data-pending）', switching.includes('high|true|true')
+    && switching.at(-1) === 'high|null|null', JSON.stringify(switching));
   await chooseLevel(page, 'off');
   const off = await sendIn(page, 'thinking check');
   record('走查 8 / 反例：切到"关"：下一次回复没有思考内容（"没有思考参数"）', off.fresh && off.text === '没有思考参数'
@@ -489,11 +493,11 @@ async function thinkingLevels(ctx) {
   await thinkingNewSession(ctx);
 }
 
-/** @brief 顶栏切换思考强度不改设置；新会话用默认范围（fake-coder）在设置里的默认强度。 */
+/** @brief 在输入框下面一行切换思考强度不改设置；新会话用默认范围（fake-coder）在设置里的默认强度。 */
 async function thinkingNewSession(ctx) {
   const { page } = ctx;
   const settings = settingsJson(ctx);
-  record('反例：顶栏切换思考强度不改设置（modelThinkingLevels 仍是 high，没有写 defaultThinkingLevel）',
+  record('反例：在输入框下面一行切换思考强度不改设置（modelThinkingLevels 仍是 high，没有写 defaultThinkingLevel）',
     settings.modelThinkingLevels?.[`${MAIN}/fake-coder`] === 'high' && settings.defaultThinkingLevel === undefined,
     JSON.stringify({ levels: settings.modelThinkingLevels, global: settings.defaultThinkingLevel }));
   ctx.s4 = await ctrlN(page);
@@ -520,7 +524,7 @@ const waitReasoning = (page, want) => page.waitForFunction(({ selector, value })
 { timeout: 10000 }).catch(() => {});
 
 /**
- * @brief 编辑模型去掉"Supports thinking"：用它的打开着的会话思考强度按 pi 收紧为"Off"，顶栏随之变成"Unavailable"；
+ * @brief 编辑模型去掉"Supports thinking"：用它的打开着的会话思考强度按 pi 收紧为"Off"，Effort 按钮随之变成"Unavailable"；
  *        再标回来。最后在 S1 切到"Low"（重启后检查恢复）。
  */
 async function unmarkReasoning(ctx) {
@@ -535,7 +539,7 @@ async function unmarkReasoning(ctx) {
   await waitReasoning(page, 'false');
   const s4 = await buttonState(page, 'thinking-button');
   record('编辑模型去掉"Supports thinking"：模型行不再显示它，model-config.json 的 reasoning 为 false，settings.json 删掉它的'
-    + ' modelThinkingLevels；正在用它的会话（"思考：高"）按 pi 收紧为"关"，顶栏随之变成"思考：不可选"', message === null
+    + ' modelThinkingLevels；正在用它的会话（"思考：高"）按 pi 收紧为"关"，Effort 按钮随之变成"思考：不可选"', message === null
     && !row.includes('Supports thinking') && model?.reasoning === false && !(ref in levels)
     && s4.reasoning === 'false' && s4.level === 'off' && s4.text === 'Effort: Unavailable',
   JSON.stringify({ message, row, model, levels, s4 }));
@@ -1050,71 +1054,82 @@ async function brokenSettings(ctx) {
 
 // ---------- 步骤：窄栏 ----------
 
-/** 思考强度的界面文字（models.md） */
-const LEVEL_TEXT = { off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high',
-  max: 'Max' };
-/** @brief 会话面板宽度落在 models.md"窄栏"的哪一档。 */
-const bucketOf = (width) => (width > 720 ? '宽' : width > 600 ? '较窄' : width > 400 ? '窄' : '很窄');
+/**
+ * @brief 会话面板宽度落在 models.md"窄栏"的哪一档（2026-10-21 起输入框下面一行按 .chat-pane 的宽度分档：680 / 600 / 460 /
+ *        400 / 340px；原来的 760 / 720px 两档和范围按钮 160 / 120px 的上限去掉了）。
+ */
+const bucketOf = (width) => (width > 680 ? '宽' : width > 600 ? '较窄' : width > 460 ? '窄' : width > 400 ? '更窄'
+  : width > 340 ? '很窄' : '最窄');
+/** 每一档要量的会话面板宽度和右栏开关（fitPane 改窗口宽度凑出；800 宽右栏打开时最窄约 300px） */
+const NARROW_SAMPLES = [[930, false], [740, true], [640, true], [520, true], [430, true], [370, true], [300, true]];
+/** 每一档该收起的（models.md"窄栏"的状态表） */
+const BUCKET_TEXT = { 宽: '"Effort: <强度> ▾"', 较窄: 'Effort 只显示强度', 窄: '"Send"只有图标',
+  更窄: '三个按钮去掉 ▾', 很窄: '三个按钮去掉 ▾', 最窄: '三个按钮去掉 ▾、范围按钮最窄 36px' };
 
-/** @brief 把窗口内容区设成 width 宽、右栏开或关，等界面量好新宽度；返回这一刻的样子和两个菜单是否在面板里。 */
+/** @brief 把会话面板调到 width 宽（右栏开或关），返回这一刻这一行的样子和范围、Effort 菜单的位置。 */
 async function narrowSample(ctx, width, right) {
-  const { page, app } = ctx;
-  await app.evaluate(({ BrowserWindow }, w) => BrowserWindow.getAllWindows()[0].setContentSize(w, 800), width);
-  await page.waitForFunction((w) => window.innerWidth === w, width, { timeout: 5000 }).catch(() => {});
-  const toggle = paneOf(page).getByRole('button', { name: 'Toggle changes' });
-  if ((await toggle.getAttribute('aria-pressed')) !== String(right)) await toggle.click();
-  await settle(page);
-  await settle(page);
-  const state = await topbarState(page);
-  const inside = { model: await menuInside(page, 'model-button', 'model-menu'),
-    thinking: await menuInside(page, 'thinking-button', 'thinking-menu') };
-  return { window: width, right, bucket: bucketOf(state.pane), ...state, inside };
+  const { page } = ctx;
+  await fitPane(ctx, width, { right });
+  const state = await rowState(page);
+  const inside = { model: await menuInside(page, 'model-button'), thinking: await menuInside(page, 'thinking-button') };
+  return { target: width, right, bucket: bucketOf(state.pane), ...state, inside };
 }
 
-/** @brief 样本里思考按钮应有的强度文字（不支持思考时"Unavailable"）。 */
+/** @brief 样本里 Effort 按钮应有的强度文字（不支持思考时"Unavailable"）。 */
 const labelOf = (sample) => (sample.reasoning === 'true' ? LEVEL_TEXT[sample.level] : 'Unavailable');
 
 /** @brief 一个样本不符合它那一档（models.md"窄栏"）的地方（读屏名称另查）；都符合时为空。 */
 function narrowProblems(sample) {
-  const label = labelOf(sample);
+  const w = sample.pane;
   const problems = [];
-  if (!sample.model || !sample.thinking) problems.push('按钮没有显示');
-  const wide = sample.bucket === '宽' || sample.bucket === '较窄';
-  if (sample.thinkingText !== (wide ? `Effort: ${label}` : label)) problems.push(`思考按钮文字 ${sample.thinkingText}`);
-  if (sample.modelWidth > (sample.bucket === '宽' ? 160 : 120) || sample.modelWidth < 40) problems.push('模型按钮宽度');
-  if (sample.bucket === '很窄' ? sample.modelIcon || sample.thinkingIcon : !sample.modelIcon || !sample.thinkingIcon) {
-    problems.push('▾');
+  if (!sample.model || !sample.thinking || !sample.usage) problems.push('范围、Effort 按钮或圆环没有显示');
+  if (sample.inTopbar.length) problems.push(`顶栏里还有 ${sample.inTopbar.join()}`);
+  if (sample.thinkingText !== `Effort: ${labelOf(sample)}` || sample.prefix !== (w > 680)) {
+    problems.push(`Effort 按钮文字 ${sample.thinkingText}，前缀看得见 ${sample.prefix}`);
   }
-  if (!wide && !(sample.inside.model && sample.inside.thinking)) problems.push('菜单伸出面板');
+  if (sample.modelWidth > 200.5 || sample.modelWidth < (w > 340 ? 40 : 36) - 0.5) {
+    problems.push(`范围按钮宽度 ${sample.modelWidth}`);
+  }
+  // 范围是模型 fake-coder（只有 .range-model 一段）：宽于 680px 时有空余，按钮按全文算宽、不截短
+  if (w > 680 && (!sample.rangeModel || sample.rangeModel.width < sample.rangeModel.full - 0.01 || sample.scope)) {
+    problems.push(`范围按钮的字 ${JSON.stringify({ scope: sample.scope, model: sample.rangeModel })}`);
+  }
+  const arrows = w > 460 ? 1 : 0;
+  if (sample.modelIcons !== arrows || sample.thinkingIcons !== arrows) problems.push('▾');
+  if (sample.permissionText !== 'Ask each time' || sample.permissionIcons !== arrows) {
+    problems.push(`权限按钮 "${sample.permissionText}"、${sample.permissionIcons} 个图标`);
+  }
+  if (!sample.inside.model?.inside || !sample.inside.thinking?.inside) {
+    problems.push(`菜单位置 ${JSON.stringify(sample.inside)}`);
+  }
   return problems;
 }
 
 /**
- * @brief models.md"窄栏"：窗口宽度和右栏开关组合出会话面板的几档宽度（宽 > 720、较窄 ≤ 720、窄 ≤ 600、很窄 ≤ 400），
- *        每档两个按钮都在、能点开；思考按钮窄时只显示强度，很窄时去掉 ▾；窄时两个菜单不伸出面板。最后恢复窗口。
+ * @brief models.md"窄栏"：单栏时改窗口宽度和右栏开关，让会话面板落在输入框下面一行的每一档（> 680、≤ 680、≤ 600、≤ 460、
+ *        ≤ 400、≤ 340），每档范围、Effort 按钮和圆环都在、能点开，菜单往上打开、在面板里（models.md"菜单的位置与键盘"）；
+ *        Effort 按钮 ≤ 680px 时只显示强度（textContent 仍是"Effort: <强度>"）；≤ 460px 时去掉 ▾；权限按钮只有文字；范围按钮
+ *        任何宽度最长 200px。各档的边界（681 / 680px 等）和截短的先后在 m6-app-slash.mjs。最后恢复会话面板 930px、右栏关。
  */
-async function narrowTopbar(ctx) {
+async function narrowRow(ctx) {
   const { page } = ctx;
   await rowOf(page, ctx.s1).first().click();
   await waitReady(page);
   const samples = [];
-  for (const [width, right] of [[1200, false], [900, false], [800, false], [1400, true], [1200, true], [800, true]]) {
-    samples.push(await narrowSample(ctx, width, right));
-  }
-  await shot(page, '10-narrow-topbar');
-  await narrowSample(ctx, 1200, false);
-  for (const bucket of ['宽', '较窄', '窄', '很窄']) {
+  for (const [width, right] of NARROW_SAMPLES) samples.push(await narrowSample(ctx, width, right));
+  await shot(page, '10-narrow-row');
+  await fitPane(ctx, 930, { right: false });
+  for (const bucket of Object.keys(BUCKET_TEXT)) {
     const hit = samples.filter((sample) => sample.bucket === bucket);
-    const bad = hit.map((sample) => ({ window: sample.window, right: sample.right, pane: sample.pane,
+    const bad = hit.map((sample) => ({ target: sample.target, right: sample.right, pane: sample.pane,
       problems: narrowProblems(sample) })).filter((item) => item.problems.length);
-    record(`窄栏"${bucket}"：模型和思考按钮都在、能点开，思考按钮${bucket === '宽' || bucket === '较窄' ? '"思考：<强度>"'
-      : '只显示强度'}${bucket === '很窄' ? '、去掉 ▾' : ''}${bucket === '窄' || bucket === '很窄' ? '，菜单不伸出会话面板' : ''}`,
-    hit.length > 0 && bad.length === 0, JSON.stringify(bad.length ? bad : hit.map((sample) => ({ window: sample.window,
-      right: sample.right, pane: sample.pane, text: sample.thinkingText, model: sample.modelWidth }))));
+    record(`窄栏"${bucket}"：输入框下面一行的范围、Effort 按钮和圆环都在、能点开，${BUCKET_TEXT[bucket]}；权限按钮只有文字；`
+      + '范围按钮最长 200px；菜单往上打开、不伸出会话面板', hit.length > 0 && bad.length === 0, JSON.stringify(bad.length
+      ? bad : hit.map((sample) => ({ pane: sample.pane, text: sample.thinkingText, model: sample.modelWidth }))));
   }
   const names = samples.map((sample) => ({ pane: sample.pane, name: sample.thinkingName,
     want: `Effort: ${labelOf(sample)}` }));
-  record('窄栏各档思考按钮的读屏名称都是完整的"思考：<强度>"（收起的文字在读屏名称里）',
+  record('窄栏各档 Effort 按钮的读屏名称都是完整的"Effort: <强度>"（收起的文字在读屏名称里）',
     names.every((item) => item.name === item.want), JSON.stringify(names));
 }
 
@@ -1177,14 +1192,14 @@ async function noSession(ctx) {
   await page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 5000 });
 }
 
-/** @brief 新加的界面（设置页、表单、确认框、顶栏的模型与思考菜单）没有小于 12px 的字。 */
+/** @brief 新加的界面（设置页、表单、确认框、输入框下面一行的范围与 Effort 菜单）没有小于 12px 的字。 */
 async function fontSizes(ctx) {
   record(`新加的界面没有小于 12px 的文字（看过：${[...new Set(ctx.smallChecked)].join('、')}）`, ctx.small.length === 0,
     ctx.small.slice(0, 6).join('; '));
 }
 
 const steps = { firstRun, settingsList, thinkingUnsupported, markReasoning, thinkingLevels, unmarkReasoning, agentsUser,
-  agentsPrompt, agentsLeave, agentsOverride, agentsFailures, agentsNoProjectFile, brokenSettings, narrowTopbar, reopen,
+  agentsPrompt, agentsLeave, agentsOverride, agentsFailures, agentsNoProjectFile, brokenSettings, narrowRow, reopen,
   fontSizes };
 
 const fake = await startFakeEndpoint(port, testKey);

@@ -642,7 +642,7 @@ export function assigneeEnum(roles: readonly RoleDef[]): RoleEnum {
 
 /**
  * @brief 角色会话的候选来源（§12.1）：角色的 models；基座、没写 models 的角色用会话的选择范围（你最后选的）。
- *        多个范围由模型层依次展开、去重。关闭模式下的对话会话直接用顶栏的范围，不用它；
+ *        多个范围由模型层依次展开、去重。关闭模式下的对话会话直接用会话的选择范围，不用它；
  *        关闭模式下的临时提问在展开之后再与对话的候选取交集（模型层做）。
  * @param role 会话的角色
  * @param sessionPick 用户会话的选择范围；没有时为 null

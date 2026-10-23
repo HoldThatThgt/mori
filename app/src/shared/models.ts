@@ -442,7 +442,7 @@ export interface ModelBlocked {
   problems: string[];
 }
 
-/** @brief 会话的模型状态（顶栏与拒绝启动卡，§9.5）。 */
+/** @brief 会话的模型状态（范围按钮、Effort 按钮与拒绝启动卡，§9.5）。 */
 export interface ModelState {
   /** 会话的选择范围；没有时为 null */
   pick: ModelPick | null;
@@ -457,7 +457,7 @@ export interface ModelState {
   /** 当前模型标了支持思考 */
   reasoning: boolean;
   /**
-   * 对话会话在协作模式下为真（平行 Agent 规格 §12.11）：顶栏模型按钮只显示正在用的模型、不能打开菜单，
+   * 对话会话在协作模式下为真（平行 Agent 规格 §12.11）：范围按钮只显示正在用的模型、不能打开菜单，
    * session.setPick 被拒绝，session.pickOptions 返回空
    */
   pickLocked: boolean;
@@ -598,7 +598,7 @@ export const ModelCommandSchemas = [
   z.object({ type: z.literal('models.verify'), refs: z.array(z.string().min(1)).min(1), tests: z.enum(PROBE_TESTS) }),
   /** 这个会话换选择范围（写一条 mori.pick，不改 normalDefault） */
   z.object({ type: z.literal('session.setPick'), sessionId, pick: PickSchema }),
-  /** 顶栏菜单的每一项，按这个会话的项目做静态校验（只读，§9.2） */
+  /** 范围菜单的每一项，按这个会话的项目做静态校验（只读，§9.2） */
   z.object({ type: z.literal('session.pickOptions'), sessionId }),
 ] as const;
 export type ModelCommand = z.infer<(typeof ModelCommandSchemas)[number]>;
@@ -665,7 +665,7 @@ export interface DeleteResult extends ModelsResult {
   consequences: string[];
 }
 
-/** @brief 顶栏菜单的一项（§9.2、§9.5 session.pickOptions）。 */
+/** @brief 范围菜单的一项（§9.2、§9.5 session.pickOptions）。 */
 export interface PickOption {
   /** 这一项的选择范围 */
   pick: ModelPick;

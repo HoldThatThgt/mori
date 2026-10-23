@@ -497,7 +497,7 @@ export function handleKernelReady(): void {
 
 /**
  * @brief 打开设置页（侧栏）。从工具页（Customize）过来时不用问（有未保存改动的编辑器只在设置页里）。
- *        卡片与顶栏菜单里打开 Settings → Models 的按钮用 settings.ts 的 openModelsSettings。
+ *        卡片与范围菜单里打开 Settings → Models 的按钮用 settings.ts 的 openModelsSettings。
  */
 export function openSettings(): void {
   recordAction('Open settings');

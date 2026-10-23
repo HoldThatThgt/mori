@@ -12,13 +12,16 @@ M4：右栏的改动列表与只读文件阅读器、选区的"Attach as context
 （[检查记录](../docs/v0/m4-checks.md)）。
 M5：左右分屏（拖会话到中栏、右键菜单、焦点所在的一栏、分屏中线）与会话引用（拖会话进输入框、按轮预览与调整范围、
 发出后跳回原会话）（[检查记录](../docs/v0/m5-checks.md)）。
-M6：设置页（多个连接与模型、默认模型、思考强度（Effort）、用户级 AGENTS.md）、顶栏按会话换模型和思考强度、
+M6：设置页（多个连接与模型、默认模型、思考强度（Effort）、用户级 AGENTS.md）、输入框下面一行按会话换模型和思考强度（2026-10-21 前在顶栏）、
 工具页（Customize：内置工具、技能、MCP、插件）、输入框的"/"补全（[检查记录](../docs/v0/m6-checks.md)）。
 当前处于 M7：工作回顾页（Review："Feedback"和"UI issues"两个列表、右栏详情与截图、标已处理（"Resolve"）与
 "Hide resolved"、回到原位置、"Export as Markdown…"）与一键导出安装包（仓库根目录的 `build-installer.cmd`，见下）；
 只差负责人走查（[检查记录](../docs/v0/m7-checks.md)）。
 英文界面（`english-ui` 分支）：界面和 Mori 写出的文字（F8 报告、导出、操作记录、引用块）全部改为英文，有对应处照 Claude 桌面版的
 用词（[术语表](../docs/v0/ui-strings.md)）；安装包只带英文界面；只差负责人走查（[检查记录](../docs/v0/english-ui-checks.md)）。
+输入框下面一行（`composer-pickers` 分支）：模型（选择范围）、Effort、只有文字的权限按钮和上下文用量圆环从顶栏移到文字框下面那一行，
+顶栏只留会话名、协作开关和这一栏的按钮；只差负责人走查，以及认可有意跳过的 fixture 录制一步
+（[检查记录](../docs/v0/composer-pickers-checks.md)）。
 
 ## 准备
 
@@ -80,7 +83,7 @@ cmd /c build-installer.cmd --no-open --no-pause
 | `node tests/ui/m5-record.mjs --source <走查数据目录> [--only …]` | 从真实会话录制 `tests/fixtures/m5/`（两栏各自批准、只停一栏、引用第 3–5 轮、重启后的引用、引用正在生成的会话、超过 2 万字）；引用的全文用界面的代码算（esbuild 打包 `sessionRefs.ts`） |
 | `npm run test:m5-replay` | M5 界面测试：回放 `tests/fixtures/m5/`（带会话引用的消息连全文和 refs 一起核对） |
 | `node tests/ui/m5-real.mjs --source <走查数据目录> [--exe …] [--only …]` | M5 真实端点走查（走查 1–6 与反例） |
-| `npm run test:m6-app` | M6 整机测试：真正的 Mori 对合成端点，设置页（连接与多个模型、默认模型、思考强度、AGENTS.md、离开时先问）与顶栏的模型和思考菜单（`m6-app-settings`）、工具页（内置工具、技能、MCP、插件，启停与 pi config 逐字比较）（`m6-app-tools`）、"/"补全与窄栏（`m6-app-slash`）、MCP 共享连接（`m6-app-mcp-shared`：每个服务一个进程、所有会话共用，运行目录、roots、并发、取消、崩溃重连、改配置、退出）；测打包结果分别加 `--exe …` |
+| `npm run test:m6-app` | M6 整机测试：真正的 Mori 对合成端点，设置页（连接与多个模型、默认模型、思考强度、AGENTS.md、离开时先问）与输入框下面一行的模型和思考菜单（`m6-app-settings`）、工具页（内置工具、技能、MCP、插件，启停与 pi config 逐字比较）（`m6-app-tools`）、"/"补全与窄栏（`m6-app-slash`，各档的边界与拒绝启动在它启动的 `m6-app-bands`）、输入框下面一行的行为（圆环、生成中和切换中、菜单的位置和自动关、焦点，`m6-app-row`）、MCP 共享连接（`m6-app-mcp-shared`：每个服务一个进程、所有会话共用，运行目录、roots、并发、取消、崩溃重连、改配置、退出）；测打包结果分别加 `--exe …` |
 | `npm run test:m6-replay` | M6 界面测试：回放 `tests/fixtures/m6/` 里从 DeepSeek 录下的 7 个场景 |
 | `node tests/ui/m6-real.mjs --source <走查数据目录> [--exe …] [--only …]` | M6 真实端点走查（走查 1–8 与反例） |
 | `node tests/ui/m6-record.mjs --source <走查数据目录> [--only …]` | 从真实会话录制 `tests/fixtures/m6/`（换模型、思考强度、AGENTS.md、项目技能、MCP、插件、"/"命令） |

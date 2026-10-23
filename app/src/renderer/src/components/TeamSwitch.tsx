@@ -1,7 +1,7 @@
-// 顶栏的协作开关（docs/specs/parallel-agents-taskboard.md §13.1；docs/v1/screens/team-switch.md）：模型、思考强度、
-// 权限按钮之前一个 role="switch" 的按钮，点击不需要确认：off → always，always → off（还不能回到 off 时 once），
+// 顶栏的协作开关（docs/specs/parallel-agents-taskboard.md §13.1；docs/v1/screens/team-switch.md）：顶栏右边一组里
+// 右栏开关之前一个 role="switch" 的按钮，点击不需要确认：off → always，always → off（还不能回到 off 时 once），
 // once → always。界面没准备好、会话按 agents_invalid 拒绝启动、切换中不可用；运行中可以点（只影响之后的消息）。
-// 窄栏（这一栏不宽于 860px）只显示状态点（team.css），读屏名称和悬停仍是完整文字。
+// 窄栏（这一栏不宽于 600px）只显示状态点（team.css），读屏名称和悬停仍是完整文字。
 
 import { roleLabel, type TeamMode, type TeamState } from '../../../shared/team';
 import { toggleTeam, useTeamError, useTeamPending } from '../state/teamActions';

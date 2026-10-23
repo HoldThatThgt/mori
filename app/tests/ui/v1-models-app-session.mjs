@@ -3,26 +3,35 @@
 // 界面文字、状态与标识见 docs/v1/screens/model-chat.md、model-menu.md、models-settings.md。
 // 每个场景用一个新的数据目录和自己的合成端点，启动前写好 model-config.json（synthetic test setup，代码里注明）；
 // 场景之间互不依赖，可以用 --only 只跑其中几个。
-// 合成端点前面放一个本进程里的转发代理（synthetic）：记下每个请求的请求体（发给模型的上下文、思考参数、压缩请求、认证头），
-// MP-21、MP-22 另用它让压缩（摘要）请求返回 400，制造"压缩出错"。MP-11 的取消探针直连合成端点（断开要直接传到端点）。
+// 2026-10-21 起选择范围按钮、Effort 和权限按钮在输入框下面一行（docs/v0/composer-pickers.md、docs/v0/screens/models.md）：
+// 按钮状态按那里"测试要改的地方"的 C1、C2 读（不可用读 aria-disabled、切换中读 data-pending、悬停说明按行比较，
+// v1-models-row-helpers.mjs）；场景 row 另查这一行里范围按钮的位置、宽度、截短、悬停、菜单往上打开、键盘、后台进程退出与
+// 重新载入、分屏 280px 的一栏（多个提供商的范围只在 v1 的配置里有）。
+// 合成端点前面放一个本进程里的转发代理（synthetic，v1-models-session-setup.mjs）：记下每个请求的请求体（发给模型的上下文、
+// 思考参数、压缩请求、认证头），MP-21、MP-22 另用它让压缩（摘要）请求返回 400，制造"压缩出错"。MP-11 的取消探针直连合成端点
+// （断开要直接传到端点）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/v1-models-app-session.mjs [--exe <Mori.exe 路径>] [--only 场景1,场景2]
-// 场景：blocked、configInvalid、probes、consent、fingerprint、handover、compaction、range、preparing、thinking。
+// 场景：blocked、configInvalid、probes、consent、fingerprint、handover、compaction、range、row、preparing、thinking。
 // 结果写到 test-results/v1-models-app-session(-packaged).json，截图在 test-results/v1-models-app-session(-packaged)/。
 // 端口：4540–4549 是 Mori 连接的地址（代理或直连的合成端点），4550–4559 是代理后面的合成端点。
 // 测试里的 key 都是合成的测试值（synthetic），与任何真实服务无关。
 
-import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import http from 'node:http';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { probeStep } from '../fake-endpoint/probes.mjs';
-import { contentText, isSummaryRequest } from '../fake-endpoint/replies.mjs';
-import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
+import { join, resolve } from 'node:path';
+import { contentText } from '../fake-endpoint/replies.mjs';
+import { appRoot, arg, createRecorder, killKernel, launch, oneLine, sleep } from './lib.mjs';
 import { activeFile, ctrlN, lastReply, PANE, paneOf, rowOf, samePath, settle, stubFolder, until, waitIdle, waitReady }
   from './m3-helpers.mjs';
+import {
+  at1, fitPane, focusKind, frameProblems, isCut, kindsOf, least, menuItemFacts, NOTE, pickers, placeBrief,
+  rangeDescription, rangeMenuPlace, rangeName, resetWindow, rowFacts, seenPickers, setRightPanel, watchPickers,
+} from './v1-models-row-helpers.mjs';
+import {
+  brief, customs, group, hasToolHistory, makeProject, model, projectKey, provider, readConfig, seedConfig,
+  seedPiSettings, seedV0Session, startEndpoint, talk,
+} from './v1-models-session-setup.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -38,8 +47,10 @@ const PORT = 4540;
 const PLAIN_REPLY = '这是一段只有文字的回复，用来测试流式输出。';
 /** 合成端点压缩请求的回复里的一句 */
 const SUMMARY_TEXT = 'Synthetic summary of the earlier conversation.';
-/** 生成中、准备中范围按钮的悬停说明（§9.2） */
+/** 生成中、准备中范围按钮悬停的第三行（§9.2） */
 const BUSY_TITLE = 'Can’t switch models until the response finishes';
+/** 生成中、准备中 Effort 悬停的第二行与读屏的描述（models.md"思考强度"） */
+const EFFORT_BUSY = NOTE.effortBusy;
 /** v0 的压缩提示与已停止提示 */
 const COMPACTED_NOTICE = 'Compacted session';
 const STOPPED_NOTICE = 'Stopped · Changes made so far stay as they are';
@@ -48,206 +59,6 @@ const BLOCKED_MESSAGE = 'This session can’t start: no model fits';
 /** 填充对话用的文字：不含合成端点的任何关键词 */
 const FILLER_UNIT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore. ';
 const filler = (chars) => FILLER_UNIT.repeat(Math.ceil(chars / FILLER_UNIT.length)).slice(0, chars);
-
-// ---------- 合成端点与转发代理（synthetic） ----------
-
-/** @brief 启动合成端点进程，收集它每个对话请求的一行 JSON 日志（加上收到的时刻）。 */
-function spawnFake(port, env) {
-  const child = spawn(process.execPath, [join(appRoot, 'tests/fake-endpoint/server.mjs')], {
-    env: { ...process.env, FAKE_PORT: String(port), FAKE_CHUNK_DELAY_MS: '10', FAKE_FIRST_DELAY_MS: '20', ...env },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const log = [];
-  let rest = '';
-  return new Promise((done, fail) => {
-    const timer = setTimeout(() => fail(new Error(`fake endpoint on ${port} did not start within 15 s`)), 15000);
-    child.once('exit', (code) => fail(new Error(`fake endpoint on ${port} exited (${code})`)));
-    child.stderr.on('data', () => {});
-    child.stdout.on('data', (chunk) => {
-      rest += chunk;
-      const lines = rest.split('\n');
-      rest = lines.pop();
-      for (const line of lines.map((item) => item.trim())) {
-        if (line.startsWith('{')) {
-          try { log.push({ ...JSON.parse(line), at: Date.now() }); } catch { /* 不是 JSON 的行不记 */ }
-        } else if (line.includes('synthetic')) {
-          clearTimeout(timer);
-          done({ child, log });
-        }
-      }
-    });
-  });
-}
-
-/** @brief 请求体的摘要：模型、消息、最后一条用户消息、是不是探针、是不是压缩（摘要）请求、思考参数、认证头。 */
-function describeBody(body, auth) {
-  const messages = body?.messages ?? [];
-  const lastUser = [...messages].reverse().find((message) => message.role === 'user');
-  return { model: body?.model ?? null, messages, auth, probe: probeStep(messages) > 0,
-    summary: isSummaryRequest(messages), lastUser: contentText(lastUser?.content).trim(),
-    effort: body?.reasoning_effort ?? null, failed: false };
-}
-
-/** @brief 代理转发一个请求：记下请求体；failSummary 不为 null 时压缩请求直接回这个状态码（synthetic 的"压缩出错"）。 */
-function forward(ep, upstream, req, res, raw) {
-  let info = null;
-  if (req.method === 'POST' && raw.length > 0) {
-    try { info = describeBody(JSON.parse(raw.toString('utf8')), req.headers.authorization ?? null); } catch { info = null; }
-  }
-  if (info) ep.bodies.push({ ...info, at: Date.now() });
-  if (info?.summary && ep.failSummary) {
-    ep.bodies.at(-1).failed = true;
-    res.writeHead(ep.failSummary, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: { message: 'Synthetic summary failure from the test proxy', type: 'synthetic_error' } }));
-    return;
-  }
-  const out = http.request({ host: '127.0.0.1', port: upstream, method: req.method, path: req.url,
-    headers: { ...req.headers, host: `127.0.0.1:${upstream}` } }, (reply) => {
-    res.writeHead(reply.statusCode ?? 502, reply.headers);
-    reply.pipe(res);
-  });
-  out.on('error', () => res.destroy());
-  res.on('close', () => { if (!res.writableFinished) out.destroy(); });
-  out.end(raw);
-}
-
-/** @brief 在 ep.port 上起转发代理，转给 upstream 端口的合成端点。 */
-function startProxy(ep, upstream) {
-  const server = http.createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => forward(ep, upstream, req, res, Buffer.concat(chunks)));
-  });
-  return new Promise((done, fail) => {
-    server.once('error', fail);
-    server.listen(ep.port, '127.0.0.1', () => done(server));
-  });
-}
-
-/**
- * @brief 启动一个合成端点（默认带转发代理），记进 ctx.eps，场景结束时关掉。
- * @param env 合成端点的环境变量（FAKE_*）
- * @param options.proxy 为 false 时 Mori 直连合成端点（没有请求体记录）
- */
-async function startEndpoint(ctx, port, env = {}, { proxy = true } = {}) {
-  const ep = { port, url: `http://127.0.0.1:${port}/v1`, bodies: [], failSummary: null, server: null };
-  const fake = await spawnFake(proxy ? port + 10 : port, env);
-  ep.child = fake.child;
-  ep.log = fake.log;
-  if (proxy) ep.server = await startProxy(ep, port + 10);
-  ep.stop = () => stopEndpoint(ep);
-  ctx.eps.push(ep);
-  return ep;
-}
-
-/** @brief 关掉合成端点和代理，等进程真正退出（之后可以在同一端口重新启动）。 */
-async function stopEndpoint(ep) {
-  if (ep.stopped) return;
-  ep.stopped = true;
-  ep.child.removeAllListeners('exit');
-  const exited = new Promise((done) => (ep.child.exitCode !== null ? done() : ep.child.once('exit', done)));
-  ep.child.kill();
-  await Promise.race([exited, sleep(5000)]);
-  if (ep.server) {
-    ep.server.closeAllConnections();
-    await new Promise((done) => ep.server.close(() => done()));
-  }
-}
-
-/** @brief 代理记下的对话请求（不是探针、不是压缩请求）。 */
-const talk = (ep) => ep.bodies.filter((body) => !body.probe && !body.summary);
-/** @brief 消息里有没有工具调用或工具结果。 */
-const hasToolHistory = (messages) => messages.some((message) => message.role === 'tool'
-  || (message.role === 'assistant' && (message.tool_calls?.length ?? 0) > 0));
-/** @brief 请求体的简短说明（失败时的 detail）。 */
-const brief = (body) => (body ? `${body.model} roles=${body.messages.map((m) => m.role).join(',')} `
-  + `last="${oneLine(body.lastUser, 40)}"` : 'none');
-
-// ---------- 配置与数据目录（synthetic test setup） ----------
-
-/** @brief 一个模型。 */
-function model(id, { ctx = 128000, max = 16384, reasoning = false } = {}) {
-  return { id, family: '', contextWindow: ctx, maxTokens: max, reasoning, input: ['text'] };
-}
-
-/** @brief 一个提供商（openai-completions，没有 key）。 */
-function provider(id, name, baseUrl, models, { zone = 'local', concurrency = 4 } = {}) {
-  return { id, name, api: 'openai-completions', baseUrl, zone, compat: {}, concurrency, keys: [], nextKeyNumber: 1,
-    models };
-}
-
-/** @brief 一个分组。 */
-const group = (id, members) => ({ id, members });
-
-/** @brief 启动前写好 model-config.json（synthetic test setup：跳过界面上的配置步骤，测的是会话一侧）。 */
-function seedConfig(ctx, { providers, groups = [], normalDefault = null }) {
-  const config = { version: 1, providers, groups, normalDefault, allowedZones: ['local', 'intranet'], projectZones: {} };
-  writeFileSync(join(ctx.userData, 'model-config.json'), `${JSON.stringify(config, null, 2)}\n`);
-}
-
-/** @brief 启动前写好 pi 的 settings.json（synthetic test setup：压缩参数、按模型的新会话思考强度）。 */
-function seedPiSettings(ctx, settings) {
-  mkdirSync(join(ctx.userData, 'pi'), { recursive: true });
-  writeFileSync(join(ctx.userData, 'pi', 'settings.json'), `${JSON.stringify(settings, null, 2)}\n`);
-}
-
-/** @brief 建一个测试项目：README、一个源文件和 extra 里的文件。 */
-function makeProject(ctx, name, extra = {}) {
-  const project = join(ctx.root, name);
-  mkdirSync(join(project, 'src'), { recursive: true });
-  writeFileSync(join(project, 'README.md'), '# Mori fixture project\n\nThis folder is used to check the v1 model layer.\n');
-  writeFileSync(join(project, 'src', 'a.ts'), 'export const a = 1;\n');
-  for (const [file, text] of Object.entries(extra)) {
-    mkdirSync(dirname(join(project, file)), { recursive: true });
-    writeFileSync(join(project, file), text);
-  }
-  return project;
-}
-
-/** @brief 规范化的项目路径（§4.1：全部小写、/ 分隔）。 */
-const projectKey = (path) => resolve(path).replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
-
-/**
- * @brief 写一个 v0 的旧会话（synthetic test setup）：没有 mori.pick，有 model_change 和一条带 provider/model 的助手消息，
- *        放在 pi 的会话目录里，侧栏会列出它。
- */
-function seedV0Session(ctx, cwd, providerId, modelId) {
-  const id = randomUUID();
-  const when = new Date(Date.now() - 3600000);
-  const iso = when.toISOString();
-  const dir = join(ctx.userData, 'pi', 'sessions', `--${cwd.replace(/^[/\\]/, '').replace(/[/\\:]/g, '-')}--`);
-  mkdirSync(dir, { recursive: true });
-  const file = join(dir, `${iso.replace(/[:.]/g, '-')}_${id}.jsonl`);
-  const usage = { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 15,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
-  const lines = [
-    { type: 'session', version: 3, id, timestamp: iso, cwd },
-    { type: 'model_change', id: 'v0aa0001', parentId: null, timestamp: iso, provider: providerId, modelId },
-    { type: 'thinking_level_change', id: 'v0aa0002', parentId: 'v0aa0001', timestamp: iso, thinkingLevel: 'off' },
-    { type: 'message', id: 'v0aa0003', parentId: 'v0aa0002', timestamp: iso, message: { role: 'user',
-      content: [{ type: 'text', text: 'v0 question (synthetic)' }], timestamp: when.getTime() } },
-    { type: 'message', id: 'v0aa0004', parentId: 'v0aa0003', timestamp: iso, message: { role: 'assistant',
-      content: [{ type: 'text', text: 'v0 answer (synthetic)' }], api: 'openai-completions', provider: providerId,
-      model: modelId, usage, stopReason: 'stop', timestamp: when.getTime() + 1 } },
-  ];
-  writeFileSync(file, `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`);
-  return file;
-}
-
-/** @brief 会话文件里的全部条目（读不出的行跳过）。 */
-function readEntries(file) {
-  if (!file || !existsSync(file)) return [];
-  return readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => {
-    try { return JSON.parse(line); } catch { return null; }
-  }).filter(Boolean);
-}
-
-/** @brief 会话文件里某种自定义条目的数据。 */
-const customs = (file, type) => readEntries(file).filter((entry) => entry.type === 'custom'
-  && entry.customType === type).map((entry) => entry.data);
-
-/** @brief 用户级配置文件。 */
-const readConfig = (ctx) => JSON.parse(readFileSync(join(ctx.userData, 'model-config.json'), 'utf8'));
 
 // ---------- App ----------
 
@@ -364,34 +175,53 @@ function stageNow(page) {
   }, PANE);
 }
 
-/** @brief 当前一栏顶栏的范围按钮与思考按钮。 */
-function topbar(page) {
-  return page.evaluate((selector) => {
-    const button = document.querySelector(`${selector} [data-testid="model-button"]`);
-    const thinking = document.querySelector(`${selector} [data-testid="thinking-button"]`);
-    return button && { text: button.textContent.trim(), pick: button.dataset.pick ?? null,
-      current: button.dataset.current ?? null, disabled: button.disabled, title: button.title,
-      thinking: thinking ? { level: thinking.dataset.level, reasoning: thinking.dataset.reasoning,
-        disabled: thinking.disabled } : null };
-  }, PANE);
-}
-
-/** @brief 在当前一栏的范围菜单里选 pick，等按钮显示它（不再是切换中）。 */
-async function choosePick(page, pick) {
-  await paneOf(page).getByTestId('model-button').click();
-  await page.getByTestId('model-menu').locator(`[role="menuitemradio"][data-pick="${pick}"]`).click();
+/**
+ * @brief 在 paneCss 那一栏输入框下面一行的范围菜单里选 pick，等按钮显示它（不再是切换中：能用时按钮上没有 aria-disabled，
+ *        composer-pickers.md C1）。
+ */
+async function choosePick(page, pick, paneCss = PANE) {
+  await page.locator(`${paneCss} [data-testid="model-button"]`).click();
+  await page.locator(`${paneCss} [data-testid="model-menu"] [role="menuitemradio"][data-pick="${pick}"]`).click();
   await page.waitForFunction(({ selector, want }) => {
     const button = document.querySelector(`${selector} [data-testid="model-button"]`);
     return button?.dataset.pick === want && !button.getAttribute('aria-disabled');
-  }, { selector: PANE, want: pick }, { timeout: 15000 });
+  }, { selector: paneCss, want: pick }, { timeout: 15000 });
 }
 
-/** @brief 在当前一栏的思考菜单里选 level，等按钮的 data-level 变过去。 */
+/** @brief 范围菜单关上了（5 秒内从页面上消失）。 */
+const menuGone = (page) => page.getByTestId('model-menu').waitFor({ state: 'detached', timeout: 5000 })
+  .then(() => true, () => false);
+
+/**
+ * @brief 拒绝启动卡的"Change model…"打开的菜单（composer-pickers.md 新加的检查第 10 条）：是这一栏输入框下面一行的范围菜单，
+ *        往上打开、在面板里、不盖到顶栏；按 Esc 关上后焦点在范围按钮。记两条检查，label 是检查名的开头。
+ */
+async function cardMenuChecks(page, label) {
+  await clickCardAction(page, 'change-model');
+  const opened = await page.getByTestId('model-menu').waitFor({ timeout: 5000 }).then(() => true, () => false);
+  const place = opened ? await rangeMenuPlace(page) : null;
+  record(`${label}: "Change model…" opens the range menu of this pane's message-box row, upward above the row, `
+    + 'inside the pane and not over the top bar', place?.problems.length === 0,
+  `${place?.problems.join('; ') ?? 'no menu'} ${placeBrief(place?.geo)}`);
+  await page.keyboard.press('Escape');
+  const gone = await menuGone(page);
+  const focus = await focusKind(page);
+  record(`${label}: Esc closes the menu opened from the card and the focus is on the range button (not on the card)`,
+    opened && gone && focus === 'model-button', `menu gone ${gone}, focus ${focus}`);
+  return opened;
+}
+
+/**
+ * @brief 在当前一栏的思考菜单里选 level，等按钮的 data-level 变过去、不再切换中（没有 data-pending）：切换中按钮已经显示
+ *        选的强度（data-level 立刻就是 level），只等 data-level 会在 session.setThinking 返回之前就往下走。
+ */
 async function chooseThinking(page, level) {
   await paneOf(page).getByTestId('thinking-button').click();
   await page.getByTestId('thinking-menu').locator(`[role="menuitemradio"][data-level="${level}"]`).click();
-  await page.waitForFunction(({ selector, want }) => document.querySelector(`${selector} [data-testid="thinking-button"]`)
-    ?.dataset.level === want, { selector: PANE, want: level }, { timeout: 15000 });
+  await page.waitForFunction(({ selector, want }) => {
+    const button = document.querySelector(`${selector} [data-testid="thinking-button"]`);
+    return button?.dataset.level === want && button.dataset.pending !== 'true';
+  }, { selector: PANE, want: level }, { timeout: 15000 });
 }
 
 /** @brief 拒绝启动卡此刻的内容；没有卡时为 null。 */
@@ -475,7 +305,8 @@ async function addModelUi(page, providerId, spec) {
 /**
  * @brief 在页面里装一个 MutationObserver，DOM 每次变化时按 kind 记一个快照（与上一个相同时不记），抓只持续一瞬间的状态。
  * @param kind stage：阶段行的 data-kind、文字和此刻的用户消息条数；card：拒绝启动卡的 kind；
- *        tool：ref 那一行的 Tool calling；thinking：思考按钮的 data-reasoning 与是否可用
+ *        tool：ref 那一行的 Tool calling；thinking：Effort 按钮的 data-reasoning 与是否不可用（aria-disabled 为 true 且
+ *        不是切换中，composer-pickers.md C1；按钮不再真的 disabled）
  */
 async function watch(page, kind, ref = null) {
   await page.evaluate(({ which, selector, target }) => {
@@ -491,7 +322,8 @@ async function watch(page, kind, ref = null) {
         ?.dataset.value,
       thinking: () => {
         const button = pane()?.querySelector('[data-testid="thinking-button"]');
-        return button && `${button.dataset.reasoning}|${button.disabled}`;
+        return button && `${button.dataset.reasoning}|`
+          + `${button.getAttribute('aria-disabled') === 'true' && button.dataset.pending !== 'true'}`;
       },
     };
     window.__seen = [];
@@ -542,17 +374,54 @@ async function noPickStep(ctx) {
   record('MP-09 no_pick: actions "Change model…" and "Open settings", no candidate list',
     same(card.actions, [['change-model', 'Change model…'], ['open-settings', 'Open settings']])
     && card.candidates.length === 0, JSON.stringify(card));
-  const bar = await topbar(page);
+  const bar = await pickers(page);
   record('MP-09 no_pick: the range button shows "No model range"', bar?.text === 'No model range', bar?.text);
+  await noPickRow(page, bar);
   await clickCardAction(page, 'open-settings');
   const shown = await settingsShown(page);
   record('MP-09 no_pick: "Open settings" opens Settings → Models at the top',
     shown.models && shown.section === 'models' && shown.scroll === 0, JSON.stringify(shown));
   await backToChat(page);
+  await cardMenuChecks(page, 'MP-09 no_pick');
   await clickCardAction(page, 'change-model');
   const menu = await page.getByTestId('model-menu').waitFor({ timeout: 5000 }).then(() => true, () => false);
   record('MP-09 no_pick: "Change model…" opens the range menu of this pane', menu, '');
-  await page.getByTestId('model-menu').locator('[role="menuitemradio"][data-pick="slowg"]').click();
+  await page.locator(`${PANE} [data-testid="model-menu"] [role="menuitemradio"][data-pick="slowg"]`).click();
+  const gone = await menuGone(page);
+  const focus = await focusKind(page);
+  const next = await until(async () => (await blockedState(page))?.kind === 'verifying', 15000, 200);
+  record('MP-09 no_pick: choosing a range in that menu closes it, the focus returns to the range button and the card '
+    + 'follows the model state (no_pick → verifying)', gone && focus === 'model-button' && Boolean(next),
+  `menu gone ${gone}, focus ${focus}, card ${JSON.stringify(await blockedState(page))}`);
+}
+
+/**
+ * @brief no_pick 时的输入框下面一行（composer-pickers.md 新加的检查第 10 条、chat.md"拒绝启动"）：权限按钮、能用的范围按钮
+ *        "No model range"（悬停两行"No model range" / "No model can run in this session"，描述是第二行，描述元素在按钮
+ *        外面）、不可用的"Send"（输入框有字时也是），没有 Effort；这一行高 33px、不溢出。圆环按 pi 的结果可有可无。
+ */
+async function noPickRow(page, bar) {
+  await composer(page).fill('plain must not be sent');
+  const facts = await rowFacts(page);
+  const send = await paneOf(page).locator('.send-button').isDisabled();
+  await composer(page).focus();
+  const path = [];
+  for (let index = 0; index < 3; index += 1) {
+    await page.keyboard.press('Tab');
+    path.push(await focusKind(page));
+  }
+  record('MP-09 no_pick keyboard: from the message box Tab reaches the permission button and the usable range button; '
+    + 'the disabled Send is skipped', path[0] === 'permission-button' && path[1] === 'model-button'
+    && !path.includes('send'), path.join(' > '));
+  await composer(page).fill('');
+  const kinds = kindsOf(facts).replace(',usage', '');
+  record('MP-09 no_pick: the message-box row has the permission button, the usable range button "No model range" '
+    + '(hover "No model range" / "No model can run in this session", described by line 2) and a disabled Send '
+    + 'even with text typed, no Effort; the row is 33px high and nothing overflows', kinds === 'permission,model,send'
+    && !bar?.thinking && bar?.ariaDisabled === null && bar.inRow && !bar.inTopbar
+    && same(bar.tip, ['No model range', NOTE.noModel]) && bar.described === NOTE.noModel && bar.tipOutside
+    && bar.name === 'Model range: No model range' && send && frameProblems(facts).length === 0,
+  JSON.stringify({ kinds: kindsOf(facts), bar, send, problems: frameProblems(facts) }));
 }
 
 /** @brief verifying：全部候选在验证中时的卡；发送不可用、后台进程拒绝；探针结束后卡自动消失。 */
@@ -583,8 +452,18 @@ async function verifyingStep(ctx) {
   record('MP-09 blocked: the refused prompt reaches no endpoint', after === before,
     `conversation requests ${before} → ${after}`);
   await composer(page).fill('');
+  // 拒绝启动卡出现、消失不关范围菜单（models.md"什么时候自动关"）：卡还在时打开菜单，等卡自己消失。
+  const shownWhileBlocked = (await blockedState(page))?.kind === 'verifying';
+  await paneOf(page).getByTestId('model-button').click();
+  await page.getByTestId('model-menu').waitFor({ timeout: 5000 }).catch(() => {});
   const cleared = await until(async () => (await blockedState(page)) === null, 90000, 500);
-  const bar = await topbar(page);
+  const stillOpen = await page.locator(`${PANE} [data-testid="model-menu"]`).count() === 1;
+  record('MP-23 a range menu opened while the blocked card is shown stays open when the card goes away',
+    shownWhileBlocked && Boolean(cleared) && stillOpen, `opened while verifying ${shownWhileBlocked}, `
+    + `card cleared ${Boolean(cleared)}, menu still open ${stillOpen}`);
+  await page.keyboard.press('Escape');
+  await menuGone(page);
+  const bar = await pickers(page);
   record('MP-09 verifying: the card clears by itself when the probes finish', Boolean(cleared)
     && bar?.text === 'slowg · slow-coder', `card=${JSON.stringify(await blockedState(page))} button=${bar?.text}`);
 }
@@ -631,11 +510,8 @@ async function noCandidateStep(ctx) {
 /** @brief no_candidate 的 Change model… 与 Open settings。 */
 async function noCandidateMenuAndSettings(ctx) {
   const { page } = ctx;
-  await clickCardAction(page, 'change-model');
-  const menu = await page.getByTestId('model-menu').waitFor({ timeout: 5000 }).then(() => true, () => false);
+  const menu = await cardMenuChecks(page, 'MP-09 no_candidate');
   record('MP-09 no_candidate: "Change model…" opens the range menu', menu, '');
-  await page.keyboard.press('Escape');
-  await page.getByTestId('model-menu').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   await clickCardAction(page, 'open-settings');
   const shown = await settingsShown(page);
   record('MP-09 no_candidate: "Open settings" opens Settings → Models at the top', shown.models && shown.scroll === 0,
@@ -660,7 +536,7 @@ async function verifyNowStep(ctx) {
     .map((item) => item.event.blocked?.kind ?? 'none');
   record('MP-09 Verify now: while the probes run the card is verifying (no Verify now)',
     kinds.includes('verifying'), `card ${kinds.join(' > ')}; mori.model_state blocked ${states.join(' > ')}`);
-  const bar = await topbar(page);
+  const bar = await pickers(page);
   record('MP-09 Verify now: the card clears after the probes pass', Boolean(cleared) && bar?.text === 'mix · dead-coder',
     `cards ${kinds.join(' > ')}; button ${bar?.text}`);
   await sendTurn(page, 'plain after verify now');
@@ -715,7 +591,7 @@ async function pickMissingStep(ctx) {
   record('MP-09 pick_missing: actions "Change model…" and "Open settings"',
     same(card.actions, [['change-model', 'Change model…'], ['open-settings', 'Open settings']]),
     JSON.stringify(card.actions));
-  const bar = await topbar(page);
+  const bar = await pickers(page);
   record('MP-09 pick_missing: the range button shows the missing name', bar?.text === 'tmpg', bar?.text);
 }
 
@@ -1318,13 +1194,18 @@ async function compactionScenario(ctx) {
   await step(ctx, 'compaction error', () => compactionErrorStep(ctx, ep, ep2));
 }
 
-// ---------- 场景：顶栏的选择范围（MP-23） ----------
+// ---------- 场景：输入框下面一行的选择范围（MP-23） ----------
 
-/** @brief 点开范围菜单，读出各节、各项、说明与 Manage models，再 Esc 关上。 */
+/**
+ * @brief 点开范围菜单，读出各节、各项、说明与 Manage models，再 Esc 关上；另记下菜单的位置（rangeMenuPlace）、打开时和
+ *        Esc 之后焦点在哪里。
+ */
 async function readMenu(page) {
   await paneOf(page).getByTestId('model-button').click();
   const menu = page.getByTestId('model-menu');
   await menu.waitFor({ timeout: 5000 });
+  const place = await rangeMenuPlace(page);
+  const opened = await focusKind(page);
   const state = await menu.evaluate((element) => ({
     sections: [...element.querySelectorAll('[data-section]')].map((item) => item.dataset.section),
     items: [...element.querySelectorAll('[role="menuitemradio"]')].map((item) => ({ pick: item.dataset.pick,
@@ -1337,17 +1218,26 @@ async function readMenu(page) {
   }));
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'detached', timeout: 5000 });
-  return state;
+  return { ...state, place, focus: { opened, closed: await focusKind(page) } };
 }
 
-/** @brief 新会话的按钮文字、悬停与菜单。 */
+/** @brief 新会话的按钮文字、悬停、在输入框下面一行的位置与菜单。 */
 async function menuStep(ctx) {
   const { page } = ctx;
-  const bar = await topbar(page);
-  record('MP-23 label: a group range shows "<group id> · <current model id>" with hover "<provider name> · <zone>"',
-    bar.text === 'g1 · m1' && bar.pick === 'g1' && bar.current === 'p1/m1' && bar.title === 'Provider One · Local',
-    JSON.stringify(bar));
+  const bar = await pickers(page);
+  record('MP-23 label: a group range shows "<group id> · <current model id>"; hover line 1 is the button text, '
+    + 'line 2 "<provider name> · <zone>"', bar.text === 'g1 · m1' && bar.pick === 'g1' && bar.current === 'p1/m1'
+    && bar.tip[0] === 'g1 · m1' && bar.tip[1] === 'Provider One · Local' && bar.tip.length === 2, JSON.stringify(bar));
+  record('MP-23 the range button is in the message-box row, not the top bar: name "Model range: g1, m1", described '
+    + 'by hover line 2 as "Provider One, Local" (a hidden model-tip outside the button), no aria-disabled while usable',
+  bar.inRow && !bar.inTopbar && bar.name === rangeName('g1 · m1') && bar.described === 'Provider One, Local'
+    && bar.tipOutside && bar.ariaDisabled === null && !bar.disabled, JSON.stringify(bar));
   const menu = await readMenu(page);
+  record('MP-23 menu: opens upward from the message-box row, right-aligned with the range button, 300px wide, inside '
+    + 'the pane and the window, not over the top bar; the focus starts on the ticked range, Esc returns it to '
+    + 'the button',
+  menu.place?.problems.length === 0 && menu.focus.opened === 'item:g1' && menu.focus.closed === 'model-button',
+  `${menu.place?.problems.join('; ')} ${placeBrief(menu.place?.geo)} focus ${JSON.stringify(menu.focus)}`);
   const picks = (section) => menu.items.filter((item) => item.section === section).map((item) => item.label);
   record('MP-23 menu: sections Groups / Providers / Models (models under provider names)',
     same(menu.sections.filter((item) => ['groups', 'providers', 'models'].includes(item)),
@@ -1372,32 +1262,65 @@ async function menuStep(ctx) {
 /** @brief 选提供商：写进会话文件、不改默认范围；按钮格式；选模型；生成中不能改。 */
 async function pickStep(ctx, ep) {
   const { page } = ctx;
+  await watchPickers(page);
   await choosePick(page, 'p2');
-  const bar = await topbar(page);
+  const states = await seenPickers(page);
+  const bar = await pickers(page);
   record('MP-23 label: a provider range shows "<provider name> · <model id>"', bar.text === 'Provider Two · m2a',
     bar.text);
+  // 切换中（session.setPick 还没返回）：两个按钮共用一个切换中的值，都带 data-pending 和 aria-disabled；范围按钮的悬停
+  // 只有第一行、没有读屏的描述（composer-pickers.md"悬停和读屏的描述"、C1）。
+  const switching = states.find((s) => s.rp && s.ra && s.e && s.ep && s.ea);
+  record('MP-23 switching: while session.setPick runs the range button and Effort both carry data-pending="true" and '
+    + 'aria-disabled; the range hover is just the chosen range, with no description; afterwards neither is '
+    + 'aria-disabled',
+  Boolean(switching) && switching.rt.length === 1 && switching.rd === '' && !bar.ariaDisabled
+    && !bar.thinking?.ariaDisabled && !bar.pending && !bar.thinking?.pending,
+  `${JSON.stringify(switching ?? states.slice(-3))}; after ${bar.ariaDisabled}/${bar.thinking?.ariaDisabled}`);
   await sendTurn(page, 'plain range one');
   ctx.s1 = await activeFile(page);
   const picks = customs(ctx.s1, 'mori.pick').map((item) => item.pick);
   record('MP-23 choosing a provider writes mori.pick into the session file (jsonl) and the next reply uses it',
     picks.at(-1) === 'p2' && talk(ep).at(-1)?.model === 'm2a', `picks ${picks.join(',')}; ${brief(talk(ep).at(-1))}`);
-  record('MP-23 choosing in the top bar does not change the default range in model-config.json',
+  record('MP-23 choosing in the range menu does not change the default range in model-config.json',
     readConfig(ctx).normalDefault === 'g1', String(readConfig(ctx).normalDefault));
   ctx.s2 = await ctrlN(page);
   await sendTurn(page, 'plain range two');
   ctx.s2 = await activeFile(page);
   ctx.s3 = await ctrlN(page);
   await choosePick(page, 'p3/m3');
-  const modelBar = await topbar(page);
+  const modelBar = await pickers(page);
   record('MP-23 label: a model range shows just the model id', modelBar.text === 'm3', modelBar.text);
   await send(page, 'wait 3s');
   await until(() => page.evaluate((selector) => document.querySelector(selector)?.dataset.running === 'true', PANE),
     10000, 100);
-  const busy = await topbar(page);
-  record('MP-23 generating: the range and thinking buttons are disabled; hover "Can\'t change the model while generating"',
-    busy.disabled && busy.title === BUSY_TITLE && busy.thinking?.disabled === true, JSON.stringify(busy));
+  const busy = await pickers(page);
+  const { hit, opened } = await forceClickRange(page);
+  record(`MP-23 generating: the range and Effort buttons are unavailable (aria-disabled, still focusable); range hover `
+    + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, busy.unavailable && !busy.disabled
+    && same(busy.tip, ['m3', 'Provider Three · Local', BUSY_TITLE]) && busy.thinking?.unavailable === true
+    && !busy.thinking.disabled && same(busy.thinking.tip, ['Effort: Unavailable', EFFORT_BUSY]), JSON.stringify(busy));
+  record('MP-23 generating: the range description is "Provider Three, Local. <reason>", the Effort description is the '
+    + 'reason (no line 1); clicking the unavailable range button opens no menu',
+  busy.described === rangeDescription('Provider Three · Local', BUSY_TITLE) && busy.thinking?.described === EFFORT_BUSY
+    && hit && opened === 0, `${busy.described} | ${busy.thinking?.described} | hit ${hit} | menus ${opened}`);
   await waitIdle(page, 30000);
   ctx.s3 = await activeFile(page);
+}
+
+/**
+ * @brief 在不可用（aria-disabled）的范围按钮中间真的点一下鼠标（Playwright 的 click() 会一直等它可用，所以用 force），
+ *        返回点的那一点是否落在按钮上（force 不查有没有东西盖着：点到别的东西上也不会开菜单，检查就白过了）和开了几个菜单。
+ */
+async function forceClickRange(page) {
+  const range = paneOf(page).getByTestId('model-button');
+  const hit = await range.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    return el.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+  });
+  await range.click({ force: true });
+  await sleep(300);
+  return { hit, opened: await page.getByTestId('model-menu').count() };
 }
 
 /** @brief 改设置里的默认范围：已有会话不变，新会话用新的。 */
@@ -1407,15 +1330,15 @@ async function defaultStep(ctx) {
   await page.getByTestId('default-pick').selectOption('p3');
   await until(() => readConfig(ctx).normalDefault === 'p3', 10000, 200);
   await backToChat(page);
-  const s3 = await topbar(page);
+  const s3 = await pickers(page);
   await openRowFile(page, ctx.s1);
-  const s1 = await topbar(page);
+  const s1 = await pickers(page);
   await openRowFile(page, ctx.s2);
-  const s2 = await topbar(page);
+  const s2 = await pickers(page);
   record('MP-23 changing the default range leaves existing sessions alone (including one that never switched)',
     s1.pick === 'p2' && s2.pick === 'g1' && s3.pick === 'p3/m3', `s1=${s1.pick} s2=${s2.pick} s3=${s3.pick}`);
   await ctrlN(page);
-  const s4 = await topbar(page);
+  const s4 = await pickers(page);
   record('MP-23 a new session uses the new default range', s4.pick === 'p3' && s4.text === 'Provider Three · m3',
     JSON.stringify(s4));
 }
@@ -1424,7 +1347,7 @@ async function defaultStep(ctx) {
 async function v0Step(ctx) {
   const { page } = ctx;
   await openRowFile(page, ctx.v0File);
-  const bar = await topbar(page);
+  const bar = await pickers(page);
   const picks = await until(() => {
     const list = customs(ctx.v0File, 'mori.pick');
     return list.length > 0 ? list : null;
@@ -1439,9 +1362,9 @@ async function reopenStep(ctx) {
   await stopApp(ctx);
   await startApp(ctx);
   await openRowFile(ctx.page, ctx.s1);
-  const s1 = await topbar(ctx.page);
+  const s1 = await pickers(ctx.page);
   await openRowFile(ctx.page, ctx.s2);
-  const s2 = await topbar(ctx.page);
+  const s2 = await pickers(ctx.page);
   record('MP-23 after a restart, reopened sessions keep their ranges (p2 and g1)',
     s1.pick === 'p2' && s1.text === 'Provider Two · m2a' && s2.pick === 'g1', `s1=${s1.text} s2=${s2.text}`);
 }
@@ -1468,6 +1391,299 @@ async function rangeScenario(ctx) {
   await step(ctx, 'reopen', () => reopenStep(ctx));
 }
 
+// ---------- 场景：输入框下面一行里的范围按钮（MP-23；composer-pickers.md"测试要改的地方"新加的检查） ----------
+
+/** 文字约 161px（按钮约 193px，Segoe UI 12px）的提供商范围：宽于 680px 时完整显示，600px 最挤时先截模型 id */
+const WIDE = { pick: 'wide', text: 'Wide Provider · wide-coder-v2', hover: 'Wide Provider · Local' };
+/** 名字很长的提供商：280px 一栏里的范围菜单（收到这一行的宽，约 226px）放不下它的名字 */
+const LONG_NAME = 'Provider With A Really Long Display Name';
+/** 分屏时左右两栏 */
+const SIDE = { left: '.pane-slot[data-side="left"] [data-testid="chat-pane"]',
+  right: '.pane-slot[data-side="right"] [data-testid="chat-pane"]' };
+
+/** @brief 930px、空闲、提供商范围：这一行从左到右的几项、范围按钮完整显示、悬停与描述（新加的检查第 2、3 条）。 */
+async function rowWideStep(ctx) {
+  const { page } = ctx;
+  await openProject(ctx, ctx.project);
+  await waitBlocked(page, 'no_pick');
+  await choosePick(page, WIDE.pick);
+  // 先回答一轮：用量在 turn_end 之后刷新，拒绝启动时 pi 可能没有用量（圆环不显示）
+  await sendTurn(page, 'plain row one');
+  const facts = await rowFacts(page);
+  const bar = await pickers(page);
+  record('MP-23 row: left to right the permission button, the range button, Effort, the usage ring and Send, each a '
+    + 'direct child of the message-box row; the top bar has none of them; the row is 33px high and nothing overflows',
+  kindsOf(facts) === 'permission,model,thinking,usage,send' && frameProblems(facts).length === 0,
+  `${kindsOf(facts)}; ${frameProblems(facts).join('; ')}`);
+  record(`MP-23 row at ${at1(facts.pane.width)}px: the provider range shows "${WIDE.text}" whole with ▾, at most `
+    + `200px; hover "${WIDE.text}" / "${WIDE.hover}", name "${rangeName(WIDE.text)}", description `
+    + `"${rangeDescription(WIDE.hover)}"`, facts.pane.width > 680 && bar.text === WIDE.text
+    && !isCut(facts.texts.scope) && !isCut(facts.texts.model) && bar.width <= 200.5 && bar.arrows === 1
+    && same(bar.tip, [WIDE.text, WIDE.hover]) && bar.name === rangeName(WIDE.text)
+    && bar.described === rangeDescription(WIDE.hover), JSON.stringify({ bar, texts: facts.texts }));
+}
+
+/**
+ * @brief 键盘（新加的检查第 6 条）：从文字框 Tab 依次是权限 → 范围 → Effort → 圆环 → "Send"；在范围按钮上 Enter 打开菜单、
+ *        焦点在打勾的一项，↓ 移动，Enter 选择后菜单关闭、焦点回到按钮；文字框里有字也不发送、不排队。选的是"o3"。
+ */
+async function rowKeyboardStep(ctx) {
+  const { page } = ctx;
+  await composer(page).fill('plain draft stays');
+  await composer(page).focus();
+  const path = [];
+  for (let index = 0; index < 5; index += 1) {
+    await page.keyboard.press('Tab');
+    path.push(await focusKind(page));
+  }
+  record('MP-23 keyboard: from the message box Tab goes to the permission button, the range button, Effort, the usage '
+    + 'ring, then Send', same(path, ['permission-button', 'model-button', 'thinking-button', 'usage', 'send']),
+  path.join(' > '));
+  for (let index = 0; index < 3; index += 1) await page.keyboard.press('Shift+Tab');
+  const users = await userCount(page);
+  await page.keyboard.press('Enter');
+  await page.getByTestId('model-menu').waitFor({ timeout: 5000 });
+  const first = await focusKind(page);
+  let focus = first;
+  for (let index = 0; index < 12 && focus !== 'item:short/o3'; index += 1) {
+    await page.keyboard.press('ArrowDown');
+    focus = await focusKind(page);
+  }
+  await page.keyboard.press('Enter');
+  const gone = await menuGone(page);
+  await page.waitForFunction((selector) => {
+    const button = document.querySelector(`${selector} [data-testid="model-button"]`);
+    return button?.dataset.pick === 'short/o3' && !button.getAttribute('aria-disabled');
+  }, PANE, { timeout: 15000 });
+  const back = await focusKind(page);
+  const draft = await composer(page).inputValue();
+  const queued = await paneOf(page).getByTestId('queue').count();
+  record('MP-23 keyboard: Enter on the range button opens the menu on the ticked range, ↓ moves, Enter chooses "o3": '
+    + 'the menu closes, the focus is back on the button, the draft stays and nothing is sent or queued',
+  first === `item:${WIDE.pick}` && focus === 'item:short/o3' && gone && back === 'model-button'
+    && draft === 'plain draft stays' && (await userCount(page)) === users && queued === 0,
+  `first ${first}, reached ${focus}, gone ${gone}, focus ${back}, draft "${draft}", queue ${queued}`);
+  await composer(page).fill('');
+}
+
+/** @brief 很短的范围（"o3"）、空闲：930px 和 680px 的会话面板里各开一次 300px 的范围菜单（新加的检查第 4 条）。 */
+async function rowShortMenuStep(ctx) {
+  const { app, page } = ctx;
+  const seenAt = [];
+  for (const target of [930, 680]) {
+    const width = await fitPane(app, page, target);
+    await paneOf(page).getByTestId('model-button').click();
+    await page.getByTestId('model-menu').waitFor({ timeout: 5000 });
+    const place = await rangeMenuPlace(page);
+    await page.keyboard.press('Escape');
+    await menuGone(page);
+    seenAt.push({ target, width, place });
+  }
+  await resetWindow(app, page);
+  record('MP-23 a short range ("o3"), idle, 930px and 680px panes: the 300px range menu opens upward, right-aligned '
+    + 'with the range button (or moved in to the row start), never out of the row, the pane or the window, not over '
+    + 'the top bar', seenAt.every((item) => Math.abs(item.width - item.target) < 1.5
+    && item.place?.problems.length === 0), seenAt.map((item) => `${at1(item.width)}px: `
+    + `${item.place?.problems.join('; ') || 'ok'} ${placeBrief(item.place?.geo)}`).join(' | '));
+  await choosePick(page, WIDE.pick);
+}
+
+/**
+ * @brief 600px 的会话面板、生成中、输入框有字（"Queue ▾"和"Stop"）、"Ask each time"、"Effort: Unavailable"（新加的检查第 3 条）：
+ *        范围按钮先截模型 id、范围名完整，模式名和强度不截；悬停第一行和读屏名是全文，第三行和描述是原因。
+ */
+async function rowCrowdedStep(ctx) {
+  const { app, page } = ctx;
+  const width = await fitPane(app, page, 600);
+  await send(page, 'wait 12s');
+  await page.waitForFunction((selector) => document.querySelector(selector)?.dataset.running === 'true', PANE,
+    { timeout: 20000 });
+  await composer(page).fill('plain queued draft');
+  await settle(page);
+  const facts = await rowFacts(page);
+  const bar = await pickers(page);
+  const { texts } = facts;
+  record('MP-23 600px pane, generating with text typed, "Ask each time", "Effort: Unavailable": the range button cuts '
+    + 'the model id first (.range-model, with "…") and keeps "Wide Provider" (.range-scope) whole; the mode name and '
+    + 'the effort are not cut; nothing overflows', width <= 600.5 && width > 460
+    && kindsOf(facts) === 'permission,model,thinking,usage,queue,stop' && isCut(texts.model) && texts.model.ellipsis
+    && !isCut(texts.scope) && !isCut(texts.permission) && !isCut(texts.effort) && frameProblems(facts).length === 0,
+  JSON.stringify({ width: at1(width), kinds: kindsOf(facts), texts, problems: frameProblems(facts) }));
+  record('MP-23 600px pane, generating: the cut range button keeps the whole text in hover line 1 and in its name; '
+    + 'line 3 and the description give the reason; it is aria-disabled but still focusable', bar.unavailable
+    && !bar.disabled && same(bar.tip, [WIDE.text, WIDE.hover, BUSY_TITLE]) && bar.name === rangeName(WIDE.text)
+    && bar.described === rangeDescription(WIDE.hover, BUSY_TITLE), JSON.stringify(bar));
+  await composer(page).fill('');
+  await stopIfRunning(page, PANE);
+  await waitIdle(page, 30000);
+  await resetWindow(app, page);
+}
+
+/** @brief 这一栏还在生成时点"Stop"（已经结束时什么也不做），等它停下。 */
+async function stopIfRunning(page, paneCss) {
+  const stop = page.locator(`${paneCss} .stop-button`);
+  if (await stop.isVisible().catch(() => false)) await stop.click().catch(() => {});
+  await page.waitForFunction((css) => document.querySelector(css)?.dataset.running === 'false', paneCss,
+    { timeout: 30000 });
+}
+
+/**
+ * @brief 后台进程退出与 Restart（新加的检查第 4、6 条）：开着的范围菜单关闭；范围按钮、Effort 和圆环留着、不可用，原因是
+ *        "Mori’s background process crashed"，重新载入中"Restarting…"、重新打开中"Starting…"；之后又能用。
+ */
+async function rowCrashStep(ctx) {
+  const { app, page } = ctx;
+  await paneOf(page).getByTestId('model-button').click();
+  await page.getByTestId('model-menu').waitFor({ timeout: 5000 });
+  killKernel(app);
+  await paneOf(page).getByTestId('kernel-exit').waitFor({ timeout: 10000 });
+  const closed = await menuGone(page);
+  const bar = await pickers(page);
+  const ring = await paneOf(page).getByTestId('usage').count();
+  record('MP-23 background process crashed: the open range menu closes; the range button and Effort stay, '
+    + `aria-disabled, with "${NOTE.crashed}" as range hover line 3 / Effort line 2 and in their descriptions; `
+    + 'the usage ring stays', closed && bar?.unavailable && same(bar.tip, [WIDE.text, WIDE.hover, NOTE.crashed])
+    && bar.described === rangeDescription(WIDE.hover, NOTE.crashed) && bar.thinking?.unavailable === true
+    && same(bar.thinking.tip, ['Effort: Unavailable', NOTE.crashed]) && bar.thinking.described === NOTE.crashed
+    && ring === 1, `menu closed ${closed}, ring ${ring}, ${JSON.stringify(bar)}`);
+  await watchPickers(page);
+  await paneOf(page).getByRole('button', { name: 'Restart', exact: true }).click();
+  await paneOf(page).getByTestId('notice').filter({ hasText: 'Restarted · ' }).last().waitFor({ timeout: 30000 });
+  await waitReady(page);
+  await settle(page);
+  const states = await seenPickers(page);
+  const after = await pickers(page);
+  const both = (reason) => states.some((s) => s.rt[2] === reason && s.et[1] === reason && s.ra && s.ea);
+  record(`MP-23 Restart: while restarting and reopening the range button, Effort and the ring stay (aria-disabled) `
+    + `with "${NOTE.restarting}" and then "${NOTE.starting}" as the reason; afterwards they are usable again`,
+  both(NOTE.restarting) && both(NOTE.starting) && states.every((s) => s.r && s.e && s.u)
+    && after?.ariaDisabled === null && after.tip.length === 2,
+  states.map((s) => `${s.r ? s.rt[2] ?? 'ok' : 'gone'}|${s.e ? s.et[1] ?? '' : 'gone'}|ring ${s.u}`).join(' > '));
+}
+
+/** @brief 在会话行的右键菜单（Shift+F10）里点"Open in split view"，等分屏、右边那一栏就绪。 */
+async function openInSplit(page, file) {
+  await rowOf(page, file).first().focus();
+  await page.keyboard.press('Shift+F10');
+  const menu = page.getByTestId('session-menu');
+  await menu.waitFor({ timeout: 5000 });
+  await menu.getByRole('menuitem').filter({ hasText: 'Open in split view' }).click();
+  await page.waitForFunction(() => document.querySelector('.center')?.dataset.split === 'true', null,
+    { timeout: 10000 });
+  await page.waitForFunction((css) => document.querySelector(css) && !document.querySelector(`${css} [data-testid=`
+    + '"not-ready"]'), SIDE.right, { timeout: 30000 });
+}
+
+/**
+ * @brief 1200 宽分屏、右栏开（两栏各 280px，右边一栏的会话面板 279px）。右栏（提供商范围）生成中有字：范围按钮在最窄、
+ *        模型 id 和范围名都截了，其余各项不窄于最窄（新加的检查第 3 条）。左栏 no_pick：没有 Effort、"No model range"、
+ *        "Send"不可用、不溢出（第 10 条）；选分组后先截模型 id；范围菜单收到这一行的宽，项名截断、区域完整（第 4 条）。
+ */
+async function rowSplitStep(ctx) {
+  const { page } = ctx;
+  const s1 = await activeFile(page);
+  await ctrlN(page);
+  await waitBlocked(page, 'no_pick');
+  await openInSplit(page, s1);
+  for (const side of ['left', 'right']) await setRightPanel(page, true, SIDE[side]);
+  const box = page.locator(`${SIDE.right} .composer textarea`);
+  await box.click();
+  await box.fill('wait 30s');
+  await box.press('Enter');
+  await page.waitForFunction((css) => document.querySelector(css)?.dataset.running === 'true', SIDE.right,
+    { timeout: 20000 });
+  await box.fill('plain queued draft');
+  await settle(page);
+  await narrowCrowded(page);
+  await narrowNoPick(page);
+  await narrowGroup(page);
+  await stopIfRunning(page, SIDE.right);
+}
+
+/** @brief rowSplitStep 的右栏：最窄、生成中有字。 */
+async function narrowCrowded(page) {
+  const facts = await rowFacts(page, SIDE.right);
+  const bar = await pickers(page, SIDE.right);
+  const w = facts.pane.width;
+  const { sizes, texts } = facts;
+  record(`MP-23 ${at1(w)}px pane (the right one of a 1200px split, changes panel open), generating with text typed: `
+    + 'the range button is at its narrowest (36px) with the model id and the provider name cut ("…"); the mode, '
+    + 'the effort, the 26px ring, the 24px ▾ and the 28px Stop still fit; nothing overflows', w <= 340
+    && kindsOf(facts) === 'permission,model,thinking,usage,queue,stop' && Math.abs(bar.width - least('model', w)) <= 1
+    && isCut(texts.model) && isCut(texts.scope) && texts.scope.ellipsis
+    && bar.permission.width >= least('permission', w) - 0.5 && bar.thinking.width >= least('thinking', w) - 0.5
+    && Math.abs(sizes.usage - 26) <= 1 && Math.abs(sizes.toggle - 24) <= 0.5 && Math.abs(sizes.stop - 28) <= 0.5
+    && sizes.queueMain === null && frameProblems(facts).length === 0,
+  JSON.stringify({ w: at1(w), kinds: kindsOf(facts), range: at1(bar.width), mode: at1(bar.permission.width),
+    effort: at1(bar.thinking.width), sizes, texts, problems: frameProblems(facts) }));
+  record('MP-23 narrowest pane: the cut range button keeps the whole text in hover line 1 and in its name',
+    same(bar.tip, [WIDE.text, WIDE.hover, BUSY_TITLE]) && bar.name === rangeName(WIDE.text),
+    JSON.stringify(bar.tip));
+}
+
+/** @brief rowSplitStep 的左栏：no_pick（输入框有字）。 */
+async function narrowNoPick(page) {
+  const box = page.locator(`${SIDE.left} .composer textarea`);
+  await box.click();
+  await box.fill('plain must not be sent');
+  const facts = await rowFacts(page, SIDE.left);
+  const bar = await pickers(page, SIDE.left);
+  const send = await page.locator(`${SIDE.left} .send-button`).isDisabled();
+  await box.fill('');
+  record(`MP-09 no_pick in a ${at1(facts.pane.width)}px pane: no Effort, the range button "No model range", Send `
+    + 'disabled with text typed; the row is 33px high and nothing overflows', facts.pane.width <= 340
+    && kindsOf(facts).replace(',usage', '') === 'permission,model,send' && !bar?.thinking
+    && bar?.text === 'No model range' && send && frameProblems(facts).length === 0,
+  JSON.stringify({ kinds: kindsOf(facts), text: bar?.text, send, problems: frameProblems(facts) }));
+}
+
+/** @brief rowSplitStep 的左栏：选分组范围（空闲），再开一次范围菜单。 */
+async function narrowGroup(page) {
+  await choosePick(page, 'grp', SIDE.left);
+  await settle(page);
+  const facts = await rowFacts(page, SIDE.left);
+  const bar = await pickers(page, SIDE.left);
+  const w = facts.pane.width;
+  record(`MP-23 ${at1(w)}px pane, group range "grp · wide-coder-v2", idle: the model id is cut first while the group `
+    + 'name stays whole; the range button is not narrower than 36px; nothing overflows',
+  bar.text === 'grp · wide-coder-v2' && isCut(facts.texts.model) && !isCut(facts.texts.scope)
+    && bar.width >= least('model', w) - 0.5 && frameProblems(facts).length === 0,
+  JSON.stringify({ range: at1(bar.width), texts: facts.texts }));
+  await page.locator(`${SIDE.left} [data-testid="model-button"]`).click();
+  await page.locator(`${SIDE.left} [data-testid="model-menu"]`).waitFor({ timeout: 5000 });
+  const place = await rangeMenuPlace(page, SIDE.left);
+  const items = await menuItemFacts(page, SIDE.left);
+  await page.keyboard.press('Escape');
+  await menuGone(page);
+  const long = items?.find((item) => item.pick === 'longp');
+  record(`MP-23 range menu in a ${at1(w)}px pane: as wide as the row (not 300px), upward, inside the pane; a long name `
+    + 'is cut with "…" and whole in its hover, every zone label stays whole', place?.problems.length === 0
+    && isCut(long?.label) && long.label.ellipsis && long.title === LONG_NAME
+    && items.every((item) => !isCut(item.zone)), `${place?.problems.join('; ')} ${placeBrief(place?.geo)}; `
+    + `${JSON.stringify(long)}`);
+}
+
+/** @brief 场景 row（MP-23）：多个提供商的范围在输入框下面一行里的样子。 */
+async function rowScenario(ctx) {
+  const ep = await startEndpoint(ctx, PORT);
+  ctx.project = makeProject(ctx, 'proj');
+  // synthetic test setup：一个名字约 75px 的提供商（范围按钮约 193px）、一个模型 id 很短的提供商、一个名字很长的提供商
+  // 和一个分组；没有默认范围，新会话是 no_pick。
+  seedConfig(ctx, { providers: [
+    provider('wide', 'Wide Provider', ep.url, [model('wide-coder-v2')]),
+    provider('short', 'Short P', ep.url, [model('o3')]),
+    provider('longp', LONG_NAME, ep.url, [model('long-coder')]),
+  ], groups: [group('grp', ['wide'])] });
+  await startApp(ctx);
+  await waitProfiles(ctx.page, ['wide/wide-coder-v2', 'short/o3', 'longp/long-coder']);
+  await step(ctx, 'wide', () => rowWideStep(ctx));
+  await step(ctx, 'keyboard', () => rowKeyboardStep(ctx));
+  await step(ctx, 'short menu', () => rowShortMenuStep(ctx));
+  await step(ctx, 'crowded', () => rowCrowdedStep(ctx));
+  await step(ctx, 'crash', () => rowCrashStep(ctx));
+  await step(ctx, 'split', () => rowSplitStep(ctx));
+}
+
 // ---------- 场景：准备中（MP-34，含 MP-23 的准备中不能改范围） ----------
 
 /** 被限流的 key（synthetic）：合成端点对它回 429，FAKE_LIMIT_MS 之后恢复 */
@@ -1479,7 +1695,34 @@ const waitStage = (page, kind, timeout = 15000) => until(async () => {
   return stage?.kind === kind ? stage : null;
 }, timeout, 100);
 
-/** @brief 准备中等模型：消息已显示、阶段行、停止可用、顶栏不可用；再发一条进排队区；停止后两条文字回到输入框。 */
+/**
+ * @brief 准备中的输入框下面一行（composer-pickers.md 新加的检查第 11 条、chat.md"准备中"）：按钮位置是"Stop"；有字时左边是
+ *        只有一个按钮的"Queue"（没有 ▾），占位文字"Enter to queue · Shift+Enter for new line"；会话面板 400px 时"Queue"
+ *        仍在（只有图标，32px）；范围按钮的描述"<提供商名>, <区域>. <原因>"，Effort 的描述是原因。留下输入框里的字。
+ */
+async function preparingRow(ctx, bar) {
+  const { app, page } = ctx;
+  await composer(page).fill('plain third');
+  const wide = await rowFacts(page);
+  const placeholder = await composer(page).getAttribute('placeholder');
+  record('MP-34 preparing: the button position shows Stop; with text typed a single "Queue" button (no ▾) sits left of '
+    + 'it; placeholder "Enter to queue · Shift+Enter for new line"', kindsOf(wide).endsWith('queue-one,stop')
+    && wide.sizes.toggle === null && placeholder === 'Enter to queue · Shift+Enter for new line',
+  `${kindsOf(wide)}; ▾ ${wide.sizes.toggle}; "${placeholder}"`);
+  record(`MP-23 preparing: the range description is "Rate Provider, Local. ${BUSY_TITLE}", the Effort description is `
+    + `"${EFFORT_BUSY}"`, bar.described === rangeDescription('Rate Provider · Local', BUSY_TITLE)
+    && bar.thinking?.described === EFFORT_BUSY, `${bar.described} | ${bar.thinking?.described}`);
+  const width = await fitPane(app, page, 400);
+  const narrow = await rowFacts(page);
+  const name = await paneOf(page).locator('.queue-button').getAttribute('aria-label').catch(() => null);
+  record('MP-34 preparing in a 400px pane: the single "Queue" stays (icon only, 32px, name "Queue") next to Stop and '
+    + 'the row does not overflow', width <= 400.5 && width > 340 && kindsOf(narrow).endsWith('queue-one,stop')
+    && Math.abs((narrow.sizes.queueOne ?? 0) - 32) <= 0.5 && name === 'Queue' && frameProblems(narrow).length === 0,
+  `pane ${at1(width)}px; ${kindsOf(narrow)}; Queue ${narrow.sizes.queueOne} "${name}"; ${frameProblems(narrow)}`);
+  await resetWindow(app, page);
+}
+
+/** @brief 准备中等模型：消息已显示、阶段行、停止可用、范围与 Effort 不可用；再发一条进排队区；停止后两条文字回到输入框。 */
 async function stopWhilePreparingStep(ctx, ep) {
   const { page } = ctx;
   await ctrlN(page);
@@ -1491,9 +1734,12 @@ async function stopWhilePreparingStep(ctx, ep) {
   record('MP-34 preparing: the message is shown, the stage line says "Waiting for a model · rate limited until '
     + 'hh:mm:ss", Stop is available', /^Waiting for a model · rate limited until \d\d:\d\d:\d\d$/.test(stage?.text ?? '')
     && same(users, ['plain second']) && stop, `${stage?.text}; users ${JSON.stringify(users)}; stop ${stop}`);
-  const bar = await topbar(page);
-  record('MP-23 preparing: the range and thinking buttons are disabled with "Can\'t change the model while generating"',
-    bar.disabled && bar.title === BUSY_TITLE && bar.thinking?.disabled === true, JSON.stringify(bar));
+  const bar = await pickers(page);
+  record(`MP-23 preparing: the range and Effort buttons are unavailable (aria-disabled, still focusable); range hover `
+    + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, bar.unavailable && !bar.disabled
+    && bar.tip[2] === BUSY_TITLE && bar.thinking?.unavailable === true && !bar.thinking.disabled
+    && bar.thinking.tip[1] === EFFORT_BUSY, JSON.stringify(bar));
+  await preparingRow(ctx, bar);
   await send(page, 'plain third');
   const pending = await paneOf(page).locator('[data-testid="queue"] li[data-pending="true"]').allInnerTexts()
     .catch(() => []);
@@ -1539,16 +1785,16 @@ async function followUpStep(ctx, ep) {
 
 /** @brief 场景 preparing（MP-34）。 */
 async function preparingScenario(ctx) {
-  const ep = await startEndpoint(ctx, PORT, { FAKE_LIMITED_KEYS: LIMITED_KEY, FAKE_LIMIT_MS: '35000' });
+  const ep = await startEndpoint(ctx, PORT, { FAKE_LIMITED_KEYS: LIMITED_KEY, FAKE_LIMIT_MS: '45000' });
   seedConfig(ctx, { providers: [provider('rp', 'Rate Provider', ep.url, [model('rl-coder')])], normalDefault: 'rp' });
   await startApp(ctx);
   await waitProfiles(ctx.page, ['rp/rl-coder']);
-  // synthetic test setup：探针跑完后才加 key，之后的对话请求都被限流（35 秒后恢复）。
+  // synthetic test setup：探针跑完后才加 key，之后的对话请求都被限流（45 秒后恢复：准备中那一步还要改一次窗口宽度）。
   const added = await bridge(ctx.page, { type: 'models.addKey', providerId: 'rp', label: 'Key 1', secret: LIMITED_KEY });
   if (added?.error) throw new Error(`models.addKey failed: ${added.error}`);
   await openProject(ctx, makeProject(ctx, 'proj'));
   // 第一条消息让 key 进入限流：它是唯一的候选、本段已失败过（tried），不等待，直接一张说明卡（§5.8）。
-  // 之后的新一段从头选，rl-coder 限流到 35 秒后恢复，这期间就是"准备中等模型"。
+  // 之后的新一段从头选，rl-coder 限流到 45 秒后恢复，这期间就是"准备中等模型"。
   await send(ctx.page, 'plain first');
   const limited = await until(async () => (await paneOf(ctx.page).getByTestId('unavailable-card').count()) > 0
     && ep.log.some((line) => line.status === 429), 20000, 200);
@@ -1566,14 +1812,29 @@ async function preparingScenario(ctx) {
 /** @brief 新会话按第一个候选的按模型默认强度开始，请求带思考参数；改成 high 后重新打开仍是 high。 */
 async function thinkingLevelStep(ctx, ep) {
   const { page } = ctx;
-  const bar = await topbar(page);
+  const bar = await pickers(page);
   await sendTurn(page, 'thinking check');
   const first = talk(ep).at(-1);
   const reply = await lastReply(page);
   record('MP-35 a new session starts at the first candidate\'s per-model default (low); the request carries it',
     bar.thinking?.level === 'low' && bar.thinking.reasoning === 'true' && first?.effort === 'low'
     && reply.includes('收到思考参数：low'), `${JSON.stringify(bar.thinking)}; effort ${first?.effort}`);
+  const effort = bar.thinking;
+  const kinds = kindsOf(await rowFacts(page));
+  record('MP-35 the Effort button is in the message-box row right after the range button: text and name '
+    + '"Effort: Low", hover "Effort: Low" / "Set the effort level for this session", described by line 2, '
+    + 'no aria-disabled while usable', Boolean(effort) && effort.inRow && !effort.inTopbar
+    && kinds.includes('model,thinking') && effort.text === 'Effort: Low' && effort.name === 'Effort: Low'
+    && same(effort.tip, ['Effort: Low', NOTE.effort]) && effort.described === NOTE.effort
+    && effort.ariaDisabled === null, `${kinds}; ${JSON.stringify(effort)}`);
+  await watchPickers(page);
   await chooseThinking(page, 'high');
+  const states = await seenPickers(page);
+  const after = await pickers(page);
+  record('MP-35 switching effort: while session.setThinking runs Effort and the range button both carry '
+    + 'data-pending="true" and aria-disabled; afterwards neither is aria-disabled',
+  states.some((s) => s.ep && s.ea && s.rp && s.ra) && !after.ariaDisabled && !after.thinking?.ariaDisabled,
+  `${JSON.stringify(states.map((s) => `${s.rp}/${s.ra}|${s.ep}/${s.ea}`))}`);
   await sendTurn(page, 'thinking check again');
   record('MP-35 after choosing high the next request carries high', talk(ep).at(-1)?.effort === 'high',
     String(talk(ep).at(-1)?.effort));
@@ -1581,7 +1842,7 @@ async function thinkingLevelStep(ctx, ep) {
   await stopApp(ctx);
   await startApp(ctx);
   await openRowFile(ctx.page, file);
-  const reopened = await topbar(ctx.page);
+  const reopened = await pickers(ctx.page);
   record('MP-35 close and reopen: the session is still at high', reopened.thinking?.level === 'high',
     JSON.stringify(reopened.thinking));
 }
@@ -1591,7 +1852,13 @@ async function inReplyThinkingStep(ctx) {
   const { page } = ctx;
   await ctrlN(page);
   await choosePick(page, 'gswitch');
-  const before = await topbar(page);
+  const before = await pickers(page);
+  record('MP-35 a current model without "Supports thinking": Effort reads "Effort: Unavailable" and stays usable, '
+    + 'hover "Effort: Unavailable" / "This model isn’t marked “Supports thinking”", described by line 2',
+  before.thinking?.text === 'Effort: Unavailable' && before.thinking.ariaDisabled === null
+    && same(before.thinking.tip, ['Effort: Unavailable', NOTE.unsupported])
+    && before.thinking.described === NOTE.unsupported,
+  JSON.stringify(before.thinking));
   await watch(page, 'thinking');
   await sendTurn(page, 'http-404-once wait 3s');
   const states = await seen(page);
@@ -1628,7 +1895,7 @@ const SCENARIOS = {
   blocked: [blockedScenario, 'MP-09'], configInvalid: [configInvalidScenario, 'MP-09'],
   probes: [probesScenario, 'MP-10'], consent: [consentScenario, 'MP-11'], fingerprint: [fingerprintScenario, 'MP-12'],
   handover: [handoverScenario, 'MP-21'], compaction: [compactionScenario, 'MP-22'], range: [rangeScenario, 'MP-23'],
-  preparing: [preparingScenario, 'MP-34'], thinking: [thinkingScenario, 'MP-35'],
+  row: [rowScenario, 'MP-23'], preparing: [preparingScenario, 'MP-34'], thinking: [thinkingScenario, 'MP-35'],
 };
 
 for (const [name, [scenario, mp]] of Object.entries(SCENARIOS)) {

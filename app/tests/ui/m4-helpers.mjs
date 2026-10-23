@@ -13,11 +13,11 @@ export const PANE = '.pane-slot:not([hidden]) [data-testid="chat-pane"]';
 
 /**
  * @brief 在页面里找到 selector 匹配的第 index 个元素里的文字 text（可以跨几个文字节点，例如语法高亮的代码），
- *        先把它滚到视野中间，返回它在视口里的起止坐标（第一个字的左边、最后一个字的右边，取各自那一行的竖直中点）；
- *        找不到时为 null。
+ *        先把它所在的元素滚进视野（block 为 scrollIntoView 的 block，默认滚到中间），返回它在视口里的起止坐标
+ *        （第一个字的左边、最后一个字的右边，取各自那一行的竖直中点）；找不到时为 null。
  */
-export function textPoints(page, selector, text, index = 0) {
-  return page.evaluate(({ selector: css, text: wanted, index: nth }) => {
+export function textPoints(page, selector, text, index = 0, block = 'center') {
+  return page.evaluate(({ selector: css, text: wanted, index: nth, block: align }) => {
     const root = document.querySelectorAll(css)[nth];
     if (!root) return null;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -40,19 +40,23 @@ export function textPoints(page, selector, text, index = 0) {
       range.setEnd(node, inner + 1);
       return range;
     };
-    charRect(at).startContainer.parentElement?.scrollIntoView({ block: 'center' });
+    charRect(at).startContainer.parentElement?.scrollIntoView({ block: align });
     const a = charRect(at).getBoundingClientRect();
     const b = charRect(at + wanted.length - 1).getBoundingClientRect();
     return { x1: a.left + 1, y1: a.top + a.height / 2, x2: b.right - 1, y2: b.top + b.height / 2 };
-  }, { selector, text, index });
+  }, { selector, text, index, block });
 }
 
-/** @brief 真的拖鼠标选中 selector 里的 text；找不到时返回 false。 */
-export async function dragSelect(page, selector, text, index = 0) {
-  const points = await textPoints(page, selector, text, index);
+/**
+ * @brief 真的拖鼠标选中 selector 里的 text；找不到时返回 false。
+ * @param block 先把文字所在的元素滚到哪里（textPoints）。生成中选字用 'end'：滚到中间时这一段下面可能只剩不到
+ *        BOTTOM_SLACK 的内容，对话流按"在底部"恢复跟随，量好坐标到按下鼠标之间流入一行就把字往上推一行。
+ */
+export async function dragSelect(page, selector, text, index = 0, block = 'center') {
+  const points = await textPoints(page, selector, text, index, block);
   if (!points) return false;
   await sleep(100);
-  const again = await textPoints(page, selector, text, index);
+  const again = await textPoints(page, selector, text, index, block);
   const { x1, y1, x2, y2 } = again ?? points;
   await page.mouse.move(x1, y1);
   await page.mouse.down();

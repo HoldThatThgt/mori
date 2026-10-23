@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdtempSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadKernelModule } from './load.mjs';
@@ -285,9 +285,10 @@ test('MP-07 project file items may be group members or models under a provider m
   assert.equal(mc.parseProjectModels(text, config).ok, true);
 });
 
-test('MP-07 readProjectModels reads .mori/models.json, treats a missing file as none', async () => {
+test('MP-07 readProjectModels reads .mori/models.json, treats a missing file as none', async (t) => {
   const config = baseConfig();
   const dir = mkdtempSync(join(tmpdir(), 'mori-project-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
   assert.deepEqual(await mc.readProjectModels(dir, config), { ok: true, file: null });
   mkdirSync(join(dir, '.mori'));
   writeFileSync(join(dir, '.mori', 'models.json'), '{"allowedZones": ["local"], "extra": 1}');
@@ -501,8 +502,9 @@ test('MP-23 the last assistant message gives the provider/model ref', () => {
   assert.equal(mc.lastAssistantRef([{ role: 'user' }]), null);
 });
 
-test('MP-01 an unreadable config is reported with its path and is not overwritten', async () => {
+test('MP-01 an unreadable config is reported with its path and is not overwritten', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'mori-config-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, 'model-config.json');
   assert.deepEqual(await mc.readModelConfig(path, RESERVED), { kind: 'missing' });
   writeFileSync(path, '{ not json');
@@ -518,8 +520,9 @@ test('MP-01 an unreadable config is reported with its path and is not overwritte
   assert.match(invalid.error, /groups\.2\.id: glm is already used by a provider or group/);
 });
 
-test('MP-01 saving validates first and writes atomically without leaving temp files', async () => {
+test('MP-01 saving validates first and writes atomically without leaving temp files', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'mori-config-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, 'nested', 'model-config.json');
   await mc.saveModelConfig(path, baseConfig(), { reserved: RESERVED });
   assert.deepEqual(await mc.readModelConfig(path, RESERVED), { kind: 'ok', config: baseConfig() });
@@ -531,3 +534,19 @@ test('MP-01 saving validates first and writes atomically without leaving temp fi
   assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), baseConfig());
   assert.deepEqual(readdirSync(join(dir, 'nested')), ['model-config.json']);
 });
+
+test('MP-01 a model-config.json held open by another reader for a moment is still replaced (the rename is retried)',
+  async (t) => {
+    const dir = mkdtempSync(join(tmpdir(), 'mori-config-'));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    const path = join(dir, 'model-config.json');
+    await mc.saveModelConfig(path, baseConfig(), { reserved: RESERVED });
+    // Windows 上目标文件开着时改名替换失败（EPERM）；别的程序 100 毫秒后关掉它，写出照样完成。
+    const fd = openSync(path, 'r');
+    setTimeout(() => closeSync(fd), 100);
+    const moved = baseConfig();
+    moved.providers[0].keys.reverse();
+    await mc.saveModelConfig(path, moved, { reserved: RESERVED, previous: baseConfig() });
+    assert.deepEqual(await mc.readModelConfig(path, RESERVED), { kind: 'ok', config: moved });
+    assert.deepEqual(readdirSync(dir), ['model-config.json'], 'no temporary file is left behind');
+  });

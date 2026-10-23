@@ -1,7 +1,10 @@
 // M5 测试（m5-app.mjs、m5-replay.mjs、m5-real.mjs）共用的页面操作：分屏的两栏、焦点、分屏中线、拖会话与放下提示、
-// 会话引用的芯片、预览对话框、发出的引用、回到原会话的高亮。只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。
+// 会话引用的芯片、预览对话框、发出的引用、回到原会话的高亮；2026-10-21 起（docs/v0/composer-pickers.md）还有：把分屏的
+// 一栏设成指定宽度、顶栏里会话名的地方（docs/v0/screens/chat.md"顶栏"）、F8 报告"Current view"的字段。
+// 只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。
 
 import { sleep } from './lib.mjs';
+import { installKit } from './m1-layout.mjs';
 
 /** @brief 中栏里显示的一栏：side 为 left / right / single，或 'focused' 表示焦点所在的那一栏。 */
 export function slotSelector(side) {
@@ -236,12 +239,164 @@ export function rowClasses(page, file) {
 /** @brief 本机保存的布局（localStorage 的 mori.layout）。 */
 export const savedLayout = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('mori.layout') ?? '{}'));
 
-/** @brief 新加的界面里小于 12px 的字（分屏标题行、芯片、预览、放下提示、关闭按钮）。 */
+/**
+ * @brief 新加的界面里小于 12px 的字（分屏标题行、芯片、预览、放下提示、关闭按钮；2026-10-21 起还有输入框下面一行、
+ *        圆环的悬停提示和详情、选择范围菜单和换范围失败那一行——后几个要开着才量得到）。
+ */
 export function smallText(page) {
   return page.evaluate(() => [...document.querySelectorAll(
-    '.topbar *, .quote-chip *, .ref-problem *, [data-testid="ref-preview"] *, [data-testid="drop-hint"], .sent-quote *')]
+    '.topbar *, .quote-chip *, .ref-problem *, [data-testid="ref-preview"] *, [data-testid="drop-hint"], '
+    + '.sent-quote *, .composer-bottom *, [data-testid="usage-tip"], [data-testid="usage-tip"] *, '
+    + '[data-testid="usage-details"] *, [data-testid="model-menu"] *, [data-testid="pick-error"], '
+    + '[data-testid="pick-error"] *')]
     .filter((element) => element.childNodes.length && [...element.childNodes].some((node) => node.nodeType === 3
       && node.textContent.trim()))
     .filter((element) => parseFloat(getComputedStyle(element).fontSize) < 12)
     .map((element) => `${element.className}: ${getComputedStyle(element).fontSize}`));
+}
+
+/** @brief 某一栏会话面板（.chat-pane）的宽；这一栏不在时为 0。 */
+export const paneWidth = (page, side) => page.evaluate((css) => document
+  .querySelector(`${css} [data-testid="chat-pane"]`)?.getBoundingClientRect().width ?? 0, slotSelector(side));
+
+/**
+ * @brief 拖分屏中线，把 side（left / right）那一栏的会话面板设成 width 宽（右边那一栏的 .chat-pane 比 .pane-slot 窄 1px；
+ *        两栏各至少 280px，所以右边一栏最窄 279px）。设不到时（中栏太窄、到了中线的范围）返回量到的宽。
+ */
+export async function setSplitWidth(page, side, width) {
+  for (let tries = 0; tries < 6; tries += 1) {
+    const now = await paneWidth(page, side);
+    if (Math.abs(now - width) <= 0.5) return now;
+    const handle = await page.locator('[data-resize="split"]').boundingBox();
+    if (!handle) return now;
+    const dx = side === 'left' ? width - now : now - width;
+    const x = handle.x + handle.width / 2;
+    const y = handle.y + Math.min(200, handle.height / 2);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + dx, y, { steps: 5 });
+    await page.mouse.up();
+    await sleep(150);
+  }
+  return paneWidth(page, side);
+}
+
+/**
+ * @brief 某一栏顶栏里会话名的地方（chat.md"顶栏"）：会话面板的宽、会话名（字、宽、是否截短）、项目名的宽（不显示时 0）、
+ *        › 是否显示、两个图标按钮的宽、顶栏的左右内边距、顶栏和面包屑里剩下没用的宽、顶栏是否溢出。
+ */
+export async function titleRoom(page, side) {
+  await installKit(page);
+  return page.evaluate((css) => {
+    const kit = window.__rowKit;
+    const pane = document.querySelector(`${css} [data-testid="chat-pane"]`);
+    const bar = pane?.querySelector(':scope > .topbar');
+    if (!bar) return null;
+    const crumb = bar.querySelector('.breadcrumb');
+    const project = bar.querySelector('.chat-project');
+    const chevron = crumb?.querySelector(':scope > svg');
+    // 一个盒子里没被直接子项和间距占掉的宽
+    const free = (box) => {
+      const style = getComputedStyle(box);
+      const kids = [...box.children].filter(kit.pkVisible);
+      const used = kids.reduce((sum, el) => sum + el.getBoundingClientRect().width, 0);
+      const gaps = (parseFloat(style.columnGap) || 0) * Math.max(0, kids.length - 1);
+      return box.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - used - gaps;
+    };
+    const buttons = [...bar.querySelectorAll('.icon-button')].filter(kit.pkVisible).map((el) => kit.pkRect(el).width);
+    const padding = getComputedStyle(bar);
+    return { pane: kit.pkRect(pane).width, title: kit.pkText(bar.querySelector('[data-testid="session-title"]')),
+      project: kit.pkVisible(project) ? kit.pkRect(project).width : 0, chevron: kit.pkVisible(chevron), buttons,
+      padding: [parseFloat(padding.paddingLeft), parseFloat(padding.paddingRight)], slack: free(bar) + free(crumb),
+      overflows: bar.scrollWidth > bar.clientWidth + 1 };
+  }, slotSelector(side));
+}
+
+/**
+ * @brief 顶栏里会话名的地方的问题（chat.md"顶栏"，composer-pickers.md"测试要改的地方"新加的检查第 1 条）：会话名要么完整，
+ *        要么占满剩下的地方（差 2px 以内）、这时项目名已收到 40px；项目名最长 160px；≤ 400px 时两个图标按钮 28px；
+ *        ≤ 320px 不显示项目名和 ›，宽于 320px 时都显示；截短的会话名有省略号；顶栏不溢出；minimum 是会话名至少要有的宽。
+ */
+export function titleProblems(room, minimum = 0) {
+  if (!room?.title) return ['no session title'];
+  const out = [];
+  const tiny = room.pane <= 320;
+  if (room.title.truncated && room.slack > 2) out.push(`title cut with ${room.slack.toFixed(1)}px left`);
+  if (room.title.truncated && !tiny && room.project > 40.5) out.push(`title cut, project still ${room.project}px`);
+  if (room.project > 160.5) out.push(`project ${room.project}px`);
+  if (tiny === (room.project > 0) || tiny === room.chevron) {
+    out.push(`project shown=${room.project > 0} at ${room.pane}`);
+  }
+  if (room.pane <= 400 && room.buttons.some((width) => Math.abs(width - 28) > 0.5)) {
+    out.push(`buttons ${room.buttons}`);
+  }
+  if (room.title.truncated && !room.title.ellipsis) out.push('title cut without an ellipsis');
+  if (room.title.width < minimum - 0.5) out.push(`title ${room.title.width}px < ${minimum}px`);
+  if (room.overflows) out.push('top bar overflows');
+  return out;
+}
+
+/** @brief F8 报告（Markdown）里"- <字段>: <值>"一行的值；没有这一行时为 null。 */
+export function reportField(report, label) {
+  const line = report.split(/\r?\n/).find((item) => item.startsWith(`- ${label}: `));
+  return line ? line.slice(label.length + 4) : null;
+}
+
+/** @brief F8 报告（Markdown）"Current view"里各行的字段名，按出现的先后。 */
+export function reportLabels(report) {
+  return report.split(/\r?\n/).map((line) => /^- ([^:]+): /.exec(line)?.[1]).filter(Boolean);
+}
+
+/**
+ * @brief 某一栏输入框下面一行里 F8 报告要写的三项（docs/v0/screens/f8.md"保存的内容"）：Effort（按钮读屏名去掉
+ *        "Effort: "；没有按钮时"None"）、Model range（范围按钮的 data-pick；没有时"None"）、Model（data-current；没有时
+ *        "None"），以及这一栏 .chat-pane 和 .pane-slot 的宽。
+ */
+export function paneView(page, side) {
+  return page.evaluate((css) => {
+    const slot = document.querySelector(css);
+    const model = slot?.querySelector('.composer-bottom [data-testid="model-button"]');
+    const effort = slot?.querySelector('.composer-bottom [data-testid="thinking-button"]');
+    return { effort: effort?.getAttribute('aria-label')?.replace(/^Effort: /, '') ?? 'None',
+      range: model?.dataset.pick ?? 'None', model: model?.dataset.current ?? 'None',
+      pane: slot?.querySelector('[data-testid="chat-pane"]')?.getBoundingClientRect().width ?? 0,
+      slot: slot?.getBoundingClientRect().width ?? 0 };
+  }, slotSelector(side));
+}
+
+/**
+ * @brief F8 报告的"Current view"（字段名 → 值）与焦点所在那一栏比（f8.md"保存的内容"、composer-pickers.md"我自己定的"
+ *        第 16 条）：Model range、Model、Effort 是这一栏的；Pane width 是这一栏 .chat-pane 的宽（整数 px，右边一栏比
+ *        .pane-slot 窄 1px）；"Model range"在"Model"前、"Effort"紧跟"Model"，"Pane width"紧跟"Window size"；
+ *        "Model""Permission mode"照旧。返回问题列表。
+ * @param side 焦点所在的一栏（left / right / single）
+ */
+export function viewProblems(field, labels, view, side) {
+  const out = [];
+  const width = /^(\d+)px$/.exec(field('Pane width') ?? '');
+  if (!width || Math.abs(Number(width[1]) - view.pane) > 0.51) {
+    out.push(`Pane width ${field('Pane width')} ≠ ${view.pane}`);
+  }
+  if (side === 'right' && Math.abs(view.slot - view.pane - 1) > 0.51) {
+    out.push(`right pane ${view.pane} / slot ${view.slot}`);
+  }
+  for (const [label, want] of [['Model range', view.range], ['Model', view.model], ['Effort', view.effort]]) {
+    if (field(label) !== want) out.push(`${label} ${field(label)} ≠ ${want}`);
+  }
+  if (field('Permission mode') === null) out.push('no Permission mode');
+  const at = (label) => labels.indexOf(label);
+  if (!(at('Model range') >= 0 && at('Model range') + 1 === at('Model') && at('Model') + 1 === at('Effort'))) {
+    out.push(`order ${labels.join(', ')}`);
+  }
+  if (at('Window size') < 0 || at('Window size') + 1 !== at('Pane width')) {
+    out.push('Pane width not after Window size');
+  }
+  return out;
+}
+
+/** @brief 关上贴在右边的右栏（开着时）。 */
+export async function closeRightPanel(page) {
+  if (await page.getByTestId('right-panel').count() === 0) return;
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Close panel' }).first().click();
+  await sleep(300);
 }

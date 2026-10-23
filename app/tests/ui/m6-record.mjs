@@ -1,14 +1,15 @@
 // 从真实会话录制 M6（设置与工具页）界面测试用的 fixture（tests/fixtures/m6/*.json）。做法与 m5-record.mjs 相同：
 // 直接通过 window.mori（与界面相同的进程桥）发命令，记录命令、结果和后台进程转发的全部事件及其时间；批准请求由页面里的
 // 录制器答复。每个场景用新的临时数据目录和一次新的启动。M6 多录的：config.get、tools.get、agents.get、session.commands
-// （回放桥把它们当只读查询，按录制回答界面），以及设置页、顶栏、工具页发出的写入命令（回放时界面发出的要与录制一致）。
+// （回放桥把它们当只读查询，按录制回答界面），以及设置页、输入框下面一行（2026-10-21 起范围、Effort、权限按钮在这里，
+// 原来在顶栏）、工具页发出的写入命令（回放时界面发出的要与录制一致）。
 // 录完先核对场景要的东西真的发生了；不符合时不写进 fixtures，写到 test-results/m6-record/<名字>.rejected.json。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m6-record.mjs --source <走查数据目录> [--only name1,name2] [--exe <Mori.exe>]
 // 走查数据目录是负责人在 Mori（v1）里保存过提供商的目录（key 由 Mori 加密保存）；脚本只复制密文文件，不读取 key。
 // v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取（lib.mjs realProviders）；每个场景的临时
 // 项目先在复制出的配置里授权公网、默认范围设为测试分组 [DeepSeek, GLM]（lib.mjs allowRealProject，测试准备）。
-// 顶栏范围（model-range：在 Models 里加模型、在顶栏的范围菜单里选）与思考强度（thinking）两个场景写到 tests/fixtures/v1/；
+// 范围（model-range：在 Models 里加模型、在输入框下面一行的范围菜单里选）与思考强度（thinking）两个场景写到 tests/fixtures/v1/；
 // v0 的 model-switch 场景删去（v1 没有 model.save、session.setModel）。
 // MCP 场景用 tests/mcp-server/server.mjs（synthetic，本地 stdio 服务），插件场景用 tests/pi-package（synthetic 包）的副本。
 
@@ -23,7 +24,7 @@ const exePath = arg('exe');
 const only = arg('only')?.split(',');
 if (!source) throw new Error('Missing --source <user data dir with a saved connection>');
 const outDir = join(appRoot, 'tests/fixtures/m6');
-/** v1 的场景（顶栏范围、思考强度）写到这里 */
+/** v1 的场景（范围、思考强度）写到这里 */
 const v1Dir = join(appRoot, 'tests/fixtures/v1');
 const rejectedDir = join(appRoot, 'test-results/m6-record');
 const mcpServer = join(appRoot, 'tests', 'mcp-server', 'server.mjs');
@@ -166,11 +167,11 @@ function common(steps, allowFail = []) {
 // ---------- 场景 ----------
 
 /**
- * @brief model-range（v1，顶栏范围）：在 Models 里给首选提供商加第二个模型（models.saveModel），等它的探针跑完；新会话
- *        （默认范围是测试分组）先由分组的第一个候选回答，在顶栏选新加的模型（session.setPick）后再回答一句。
+ * @brief model-range（v1，范围）：在 Models 里给首选提供商加第二个模型（models.saveModel），等它的探针跑完；新会话
+ *        （默认范围是测试分组）先由分组的第一个候选回答，在输入框下面一行选新加的模型（session.setPick）后再回答一句。
  */
 const modelRange = { name: 'model-range', dir: v1Dir, description: '在 Models 里给首选提供商加模型 deepseek-v4-pro；'
-    + '新会话（范围是测试分组）先由首选的第一个模型回答一句，在顶栏的范围菜单里选 deepseek-v4-pro 后再回答一句',
+    + '新会话（范围是测试分组）先由首选的第一个模型回答一句，在输入框下面一行的范围菜单里选 deepseek-v4-pro 后再回答一句',
   phases: [{ page: async (rec, args) => {
     await args.list(rec);
     await args.config(rec);
@@ -202,11 +203,11 @@ const modelRange = { name: 'model-range', dir: v1Dir, description: '在 Models �
   } };
 
 /**
- * @brief thinking（v1）：在 Models 里把首选的模型标为支持思考（新会话默认"Medium"）；新会话里顶栏切到"High"有思考内容，
+ * @brief thinking（v1）：在 Models 里把首选的模型标为支持思考（新会话默认"Medium"）；新会话里输入框下面一行切到"High"有思考内容，
  *        切到"Off"没有。保存之后不再录 models.get：回放时界面保存后读到的仍是保存前的配置（回放桥直接应答写命令）。
  */
 const thinking = { name: 'thinking', dir: v1Dir, description: '在 Models 里把首选的第一个模型标为支持思考（新会话默认'
-    + '"中"）；新会话里顶栏切到"高"，问一道要推理的题，回复带思考内容；切到"关"再问一道，回复没有思考内容',
+    + '"中"）；新会话里输入框下面一行切到"高"，问一道要推理的题，回复带思考内容；切到"关"再问一道，回复没有思考内容',
   phases: [{ page: async (rec, args) => {
     await args.list(rec);
     await args.config(rec);

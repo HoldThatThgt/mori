@@ -1074,7 +1074,7 @@ export function forgetApproval(sessionId: string, toolName: string): ApprovalSta
 
 /**
  * @brief 这个会话换思考强度（pi setThinkingLevel，不 persist）。会话的虚拟模型有全部七档，pi 按每次请求的实际模型收紧
- *        （§11.1）；顶栏显示按当前模型收紧后的强度。生成中或准备中拒绝（§11.4）。
+ *        （§11.1）；Effort 按钮显示按当前模型收紧后的强度。生成中或准备中拒绝（§11.4）。
  */
 export function setSessionThinking(sessionId: string, level: ThinkingLevel): ModelState {
   const entry = requireEntry(sessionId);
@@ -1094,7 +1094,7 @@ export async function setSessionPick(sessionId: string, pick: ModelPick): Promis
   return { ...(await entry.model.setPick(pick)), error: null };
 }
 
-/** @brief 顶栏菜单的各项（§9.2、§9.5 session.pickOptions，只读）：按这个会话的项目做静态校验。 */
+/** @brief 范围菜单的各项（§9.2、§9.5 session.pickOptions，只读）：按这个会话的项目做静态校验。 */
 export function sessionPickOptions(sessionId: string): Promise<PickOptions> {
   return requireEntry(sessionId).model.pickOptions();
 }

@@ -64,8 +64,11 @@
 
 - 卡片出现时不抢焦点：焦点留在输入框，继续打字不受影响；没有默认按钮，在输入框里按 Enter 仍是发送 / 排队，不会批准。
 - Tab 可以走到卡上的按钮和理由框；Alt+1 / Alt+2 / Alt+3（数字键区的数字不算）在焦点位于这个会话面板内任何位置（包括输入框）时都有效；
-  有菜单、对话框或 F8 报告框开着时不起作用（M3 起还有会话的右键菜单、改名框、删除确认框、信任询问）。
-- 焦点在卡片上（按钮或理由框）时按 Esc：有开着的浮层（"Queue"的下拉、权限菜单等）时先关闭它，卡不变；
+  有菜单、对话框或 F8 报告框开着时不起作用（M3 起还有会话的右键菜单、改名框、删除确认框、信任询问；
+  输入框下面一行的权限、范围、Effort 菜单和"Queue"的下拉也算；上下文用量的详情不算，与选区浮层一样）。
+  新的卡出现时，这一行开着的菜单和上下文用量的详情关闭，焦点回到打开它的按钮，所以卡一来就能用 Alt+1 / 2 / 3（[models.md](models.md)）。
+- 焦点在卡片上（按钮或理由框）时按 Esc：有开着的浮层（"Queue"的下拉，输入框下面一行的权限、范围、Effort 菜单等）时先关闭它，卡不变
+  （上下文用量的详情在焦点移到卡上时已经关了，见 [models.md](models.md)"Tab 移出时关闭"）；
   没有浮层时等于拒绝这张卡（带上理由框里的文字），生成继续，模型会收到拒绝。
 - 焦点不在卡片上（例如在输入框）时按 Esc：停止生成（方案 5.8 的顺序：先把排队消息放回输入框，再停止），
   挂起的卡按拒绝处理，工具卡显示"Denied · You pressed Stop"。点"Stop"按钮同样处理。
@@ -86,16 +89,34 @@
 
 "Allowed for this session"和"Allow all"标签只在实时运行时显示；从会话记录载入的工具卡不显示（pi 的记录里没有这个信息）。
 
-## 权限菜单（顶栏）
+## 权限菜单（输入框下面一行的左端）
 
-M6 起会话面板窄于 600px 时，权限菜单与模型、思考菜单一样从面板右边缘弹出、不超出这一栏（见 [models.md](models.md)"窄栏"）。
-顶栏按钮在会话面板 760px 以下去掉盾牌图标；400px 以下只显示盾牌图标（"Allow all" 仍用警示色），模式名放进读屏名
-"Permission mode: Ask each time"；悬停说明总是"Set the permission mode for this session"。
+2026-10-21 起权限按钮从顶栏移到输入框下面一行的左端，位置照 Claude 桌面版的模式选择（mode selector）；菜单的内容不变
+（方案第 11 节 2026-10-21 的决定）。这一行的整体见 [chat.md](chat.md)"输入框下面一行"。
+
+- 按钮照 Claude 的模式选择只有文字："Ask each time ▾"或"Allow all ▾"，任何宽度都没有图标（原来的盾牌去掉），
+  不会只剩图标（负责人 2026-10-21 定）。"Allow all"用警示色，也写着"Allow all"，不靠颜色也读得出：底色是警示色的 12%，
+  字用较深的 `--color-warn-text`（#855f1e，5.09:1，悬停时 4.66:1；原来的警示色 #b78022 在这个底色上只有 3.02:1，不到 4.5:1）。
+- 菜单从按钮往上打开，任何宽度都左边对齐这一行的左端（就是按钮的左边），不超出这一栏和窗口；
+  最高 min(440px, 这一行的上边到顶栏下边 − 12px)，"Allowed for this session:"的列表长了在菜单里滚动（见 [models.md](models.md)"菜单的位置与键盘"）。
+- 会话面板 ≤ 460px 时去掉 ▾；这一行放不下时模式名截断加"…"（模型 ID 先截，模式名其次，最窄 44px，≤ 340px 时 40px，
+  只剩开头几个字母，量到的是"Ask …"、"Allo…"），见 [models.md](models.md)"窄栏"。
+- 读屏名总是全名"Permission mode: Ask each time"（借用 Claude 定时任务卡片上的"Permission mode: {mode}"；截断时靠它读出全名）。
+  看得见的模式名在这个名字的末尾、不在开头；名字包含看得见的文字，符合 WCAG 2.5.3。
+- 悬停两行：第一行全名"Permission mode: Ask each time"（截断时看全名）；第二行照 Claude 是当前模式的说明："Allow all"时
+  "Edits, writes, and commands will run without asking."（确认框里的同一句），"Ask each time"没有说明，用 Claude /permissions
+  命令的说明"Change the permission mode"。原来的"Set the permission mode for this session"不再用。读屏的描述只有第二行
+  （`aria-describedby` 指向藏起来的第二行，不让 `title` 整个变成描述、把全名念两遍）。
+- 生成中仍可用，菜单开着时生成开始也不关（同原来）；后台进程退出、重新载入、打开中、打开失败时不可用（`aria-disabled`，
+  样式同模型按钮），开着的菜单关闭（原来不关），开着的"Switch to “Allow all”?"确认框也关上、按取消算（不切换，焦点回到
+  权限按钮；2026-10-22 审查时补上：不关的话确认后会把切换发给已退出或正在重启的后台进程）；这时悬停的第二行和读屏的描述是原因，就是按钮位置的说明：
+  "Mori’s background process crashed"、"Restarting…"、"Starting…"、"Session didn’t open"（[models.md](models.md)
+  "不可用时、按钮消失时的焦点"）。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 每次询问 | 新会话、重新载入后；或你切回来 | 顶栏按钮"Ask each time" | 打开菜单 |
-| 全部允许 | 你确认切换后 | 顶栏按钮"Allow all"，用警示色 | 打开菜单 |
+| 每次询问 | 新会话、重新载入后；或你切回来 | 权限按钮"Ask each time ▾"（只有文字，窄时截断） | 打开菜单 |
+| 全部允许 | 你确认切换后 | 权限按钮"Allow all ▾"（只有文字），用警示色（字是较深的 `--color-warn-text`） | 打开菜单 |
 | 菜单打开 | 你点了按钮 | 两个选项"Ask each time""Allow all"，当前项打勾；"Allowed for this session:"及其列表（Run commands、Write files……，没有时"None"），每项一个"Forget"；底部说明"Applies to this session only. New sessions start with “Ask each time”."（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.1：说明改为 `Applies to all agents in this session. New sessions start at Ask each time.`，模式与列表作用于这个用户会话的全部 Agent） | 选择；清除一项（Forget）；Esc 关闭菜单 |
 | 确认切到全部允许 | 你在菜单里选了"Allow all" | 对话框："Switch to “Allow all”?"和"Edits, writes, and commands will run without asking."，按钮"Allow all"和"Cancel"，焦点在"Cancel" | Allow all；Cancel（Esc） |
 | 切换时有挂起的卡 | 同上，确认后（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.1：所有 Agent 挂起的请求一并允许，之后后台实例也不再出卡） | 挂起的卡按允许处理（`mori.approval_end`，由"Allow all"决定），工具卡标"Allow all" | — |

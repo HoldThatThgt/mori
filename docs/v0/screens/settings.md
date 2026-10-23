@@ -37,7 +37,7 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 | `models.json` 里有 `//` 注释 | 手工加的注释（pi 读 `models.json` 时允许 `//` 注释和多余的逗号，Mori 读法相同） | 列表照常显示；保存连接、保存模型、删除模型时"Couldn’t save: " / "Couldn’t delete the model: "+ 原文（`<路径> contains // comments that saving would remove; remove them or edit the file by hand`），文件不改，key 不改 | 删掉注释后再保存；或用编辑器手工改 |
 | 列表 | `config.get` 的 `connections` | 每个连接一张卡：名称、"<服务地址> · <接口类型>"、key 状态（"Key saved (encrypted)" / "No key"）；卡里每个模型一行：模型 ID、"Context window: 128,000 · Supports thinking · Default effort: High"（不支持思考时最后一段是"Doesn’t support thinking"）；默认模型标"Default" | Edit connection、Add model；每个模型：Set as default（不是默认时）、Test、Edit、Delete… |
 | 没有模型 | `connections` 为空（只在 `models.json` 被手工改空时出现；首次启动走 connection.md 的首次启动页） | "No models yet" | Add connection |
-| 有不是 Mori 写的 provider | `models.json` 里 `mori-endpoint*` 以外的 provider | 不列出（pi 照样能用它们，顶栏模型菜单也列出 pi 能用的全部模型，见 [models.md](models.md)） | — |
+| 有不是 Mori 写的 provider | `models.json` 里 `mori-endpoint*` 以外的 provider | 不列出（pi 照样能用它们，输入框下的模型菜单也列出 pi 能用的全部模型，见 [models.md](models.md)） | — |
 
 底部"Add connection"。
 
@@ -78,7 +78,7 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 | 添加 | 你在一个连接卡上点了"Add model" | 标题"Add model · <连接名>"；Model ID、Context window、Supports thinking、Default effort for new sessions；说明"Uses this connection’s base URL and key. You don’t need to enter the key again." | Save、Cancel |
 | 编辑 | 你点了模型行的"Edit" | 标题"Edit model · <连接名>"，其余同上，模型 ID 只读（说明"To change the model ID, delete this model and add it again"） | Save、Cancel |
 | 保存 | `model.save` | 回到列表，上方"Saved · Sessions already open use the new settings from their next message"；ID 已存在（添加时，界面先检查）"Couldn’t save: this connection already has a model with ID <ID>"；后台进程报错时"Couldn’t save: "+ 原文 | — |
-| 已经打开的会话 | 同"编辑连接"：用这个模型的会话换成新的模型对象；不再支持思考时思考强度按 pi 收紧为"Off"（顶栏随之变化） | 同上 | — |
+| 已经打开的会话 | 同"编辑连接"：用这个模型的会话换成新的模型对象；不再支持思考时思考强度按 pi 收紧为"Off"（输入框下的 Effort 按钮随之变化） | 同上 | — |
 
 ### 默认、测试与删除
 
@@ -90,11 +90,11 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 | 测试中 / 成功 / 失败 / 已取消 | `connection.test`（带 `providerId`、`modelId`），同 connection.md | 测试中按钮是"Testing…"；结果写在这一行下面 | Cancel |
 | 删除确认 | 你点了"Delete…" | 确认框"Delete model <ID>?"，说明"This deletes the model from the connection <名称>."；这是连接的最后一个模型时说明"This also deletes the connection <名称> and its key." | Delete；Cancel（焦点在"Cancel"） |
 | 不能删除 | 它是默认模型而还有别的模型；或它是唯一的模型 | "Delete…"不可用，悬停说明"Can’t delete the default model. Set another model as default first." / "Keep at least one model" | — |
-| 删除后 | `model.delete` | 列表上方"Deleted model <ID>"（连接一起删掉时"Deleted model <ID> and connection <名称>"）；这一行（或整张卡）消失；正在用它的会话：顶栏模型显示"<ID> (deleted)"，换一个模型再发；连接还在时下一条消息仍用打开时的设置，连接也删了时下一条消息失败（pi 的原文），见 [models.md](models.md) | — |
+| 删除后 | `model.delete` | 列表上方"Deleted model <ID>"（连接一起删掉时"Deleted model <ID> and connection <名称>"）；这一行（或整张卡）消失；正在用它的会话：输入框下的模型按钮显示"<ID> (deleted)"，换一个模型再发；连接还在时下一条消息仍用打开时的设置，连接也删了时下一条消息失败（pi 的原文），见 [models.md](models.md)（v1：不再出现，见 [../../v1/screens/model-chat.md](../../v1/screens/model-chat.md)"拒绝启动卡"） | — |
 
 ### 反例
 
-- 模型没标"Supports thinking"时，表单里没有"Default effort for new sessions"；顶栏的思考强度不可选（[models.md](models.md)）。
+- 模型没标"Supports thinking"时，表单里没有"Default effort for new sessions"；输入框下的 Effort 按钮不可选（[models.md](models.md)）。
 - "Add model"不出现 key 框，保存不改 `credentials.json`。
 
 ## AGENTS.md

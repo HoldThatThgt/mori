@@ -1,5 +1,5 @@
 /* 平行 Agent 与 TaskBoard 的界面（docs/specs/parallel-agents-taskboard.md §13；docs/v1/screens/team-*.md）：
-   顶栏的协作开关（这一栏不宽于 860px 时只有状态点）、回执、进展摘要、后台批准卡的归属行、待判断的消息、Stop team。 */
+   顶栏的协作开关（这一栏不宽于 600px 时只有状态点）、回执、进展摘要、后台批准卡的归属行、待判断的消息、Stop team。 */
 
 /* 协作开关：与权限按钮同一外观；打开（always、once）时用强调色 */
 .team-switch-wrap { position: relative; flex-shrink: 0; }
@@ -37,34 +37,16 @@
   color: var(--color-danger);
   font-size: var(--fs-small);
 }
-/* 窄栏（team-switch.md "窄栏"）。顶栏原有各档（chat.css、models.css、split.css）是按没有开关定的，按最宽的英文量
-   （"Effort: Unavailable"、截在 160px / 120px 的长模型 ID），每档刚过阈值时只剩约 8–25px："Team: Until done"
-   （约 108px）单栏要宽于约 835px、分屏要宽于约 856px 才放得下；"Team" 加状态点（约 55px）在 1400 宽右栏打开
-   （一栏 690px，模型按钮停在 120px）时也放不下。所以这一栏不宽于 860px 时开关只显示状态点（约 19px 宽），并且：
-   - 显示项目名时（单栏宽于 660px、分屏宽于 690px，阈值同 chat.css、split.css）面包屑至少留 105px（项目名最窄 40px、
-     ›、两个间距和会话名 36px），放不下时收短模型按钮（最窄 40px，models.css），不挤会话名；
-   - 分屏不宽于 600px 时按钮间距 6px、图标按钮 28px，不宽于 400px 时间距 2px、图标按钮 24px（每栏 280px 时没有开关
-     也只剩约 8px）。
-   composer-pickers 合入后顶栏只剩开关和两个图标按钮，这些阈值随之重定（docs/v1/defaults.md）。 */
-@container (max-width: 860px) {
+/* 窄栏（team-switch.md "窄栏"）：这一栏不宽于 600px 时开关只显示状态点（约 19px 宽）。顶栏只有"项目名 › 会话名"、
+   开关、右栏开关和分屏时的"Close pane"（chat.css），按很长的会话名、项目名收到 40px 算会话名的地方：最宽的
+   "Team: Until done"（约 105px）宽于 600px 时会话名至少还有约 315px（分屏 601px；单栏 601px 约 335px），
+   和 1280 宽分屏（约 510px）里只有状态点时差不多（约 307px）；不宽于 600px 时只有状态点，460px 一栏约 258px、
+   280px 约 173px（docs/v0/composer-pickers.md"TaskBoard 合入之后"）。阈值与输入框下面一行发送组只剩图标的一档
+   相同（600px，chat.css；docs/v1/defaults.md）。 */
+@container (max-width: 600px) {
   .team-switch { min-height: 22px; padding: 3px 6px; }
   .team-text { display: none; }
   .team-dot { display: block; }
-}
-.topbar .breadcrumb { min-width: 105px; }
-@container (max-width: 660px) {
-  .topbar .breadcrumb { min-width: 36px; }
-}
-@container (max-width: 690px) {
-  .center[data-split] .topbar .breadcrumb { min-width: 36px; }
-}
-@container (max-width: 600px) {
-  .center[data-split] .topbar-actions { gap: 6px; }
-  .center[data-split] .topbar-actions .icon-button { width: 28px; }
-}
-@container (max-width: 400px) {
-  .center[data-split] .topbar-actions { gap: 2px; }
-  .center[data-split] .topbar-actions .icon-button { width: 24px; }
 }
 
 /* 回执：对话流里的一行；合并会话里在工具卡下面 */

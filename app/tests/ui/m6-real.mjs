@@ -2,7 +2,8 @@
 // 状态表见 docs/v0/screens/settings.md、models.md、tools.md、slash.md；pi 的行为见 docs/v0/m6-checks.md。
 // 脚本不接触 key：只把走查数据目录里 Mori 加密保存的密文（credentials.json 与 Local State）复制到临时目录
 // （lib.mjs scratchUserData），之后也不打开它们（"添加模型不改 key"只比较 credentials.json 的修改时间和大小）。
-// 像负责人一样操作界面：设置页里添加模型、编辑模型、写 AGENTS.md；顶栏换模型和思考强度；工具页里启停技能、用表单添加
+// 像负责人一样操作界面：设置页里添加模型、编辑模型、写 AGENTS.md；输入框下面一行换范围和思考强度（2026-10-21 起这几个按钮
+// 从顶栏移到这一行，docs/v0/composer-pickers.md；走查 8 最后在分屏的一栏里再换一次）；工具页里启停技能、用表单添加
 // MCP 服务、添加本地包并按资源启停；输入框打 "/"；批准卡点"Allow once"。系统的选文件夹对话框经 app.evaluate 换成直接
 // 返回测试文件夹。项目技能和项目的 CLAUDE.md、用户级技能和提示词模板、MCP 服务（tests/mcp-server）、pi 包
 // （tests/pi-package 的副本）都是测试用的（synthetic）。
@@ -14,7 +15,9 @@
 // 结果写到 test-results/m6-real(-packaged).json，截图在 test-results/m6-real(-packaged)/。
 // v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；测试准备在复制出的配置里给两个临时项目
 // 授权公网、默认范围设为 [DeepSeek, GLM] 的分组。走查 1 改为在 设置 → Models 里给首选提供商加模型（等它的探针跑完）、
-// 在顶栏的范围菜单里选它；走查 8 改用 v1 的模型表单（Supports thinking、Default effort for new sessions）。
+// 在输入框下面一行的范围菜单里选它；走查 8 改用 v1 的模型表单（Supports thinking、Default effort for new sessions）。
+// 按钮状态的读法（composer-pickers.md"测试要改的地方"C1、C2）："不可用"读 aria-disabled（没有 data-pending），"切换中"读
+// data-pending；悬停按换行分开（范围按钮三行、Effort 两行），读屏的描述读 aria-describedby 指向的元素。
 
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,7 +26,10 @@ import {
   allowRealProject, appRoot, arg, createRecorder, launch, oneLine, REAL_GROUP, realProviders, scratchUserData, sleep,
 } from './lib.mjs';
 import { activeFile, PANE, samePath, stubFolder, topTitle, waitPanes, waitReady } from './m3-helpers.mjs';
-import { chooseThinking, modelRow, openToolsSection, providerCard, slashItems } from './m6-helpers.mjs';
+import { composerAt, slotSelector, waitPaneIdle, waitSplit } from './m5-helpers.mjs';
+import {
+  chooseThinking, modelRow, NOTE, openAndPlace, openToolsSection, POPUPS, providerCard, slashItems, splitOpen,
+} from './m6-helpers.mjs';
 
 const source = arg('source');
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -234,7 +240,8 @@ const turnCounts = (page) => page.evaluate((sel) => {
 }, PANE);
 
 /**
- * @brief 等本轮开始（运行中，或已经有了新的回复或错误卡），返回那一刻顶栏模型和思考按钮是否可用、悬停说明；
+ * @brief 等本轮开始（运行中，或已经有了新的回复或错误卡），返回那一刻输入框下面一行的范围和思考按钮：不可用
+ *        （aria-disabled 且没有 data-pending）、切换中（data-pending）、悬停说明（按行）、读屏的描述（aria-describedby）；
  *        20 秒内没有开始时为 null。
  */
 async function turnStart(page, before) {
@@ -246,8 +253,12 @@ async function turnStart(page, before) {
     const failed = root.querySelectorAll('[data-testid="error-card"]').length > errors;
     if (!running && !replied && !failed) return false;
     const button = (id) => {
-      const element = root.querySelector(`[data-testid="${id}"]`);
-      return element ? { disabled: element.disabled, title: element.title } : null;
+      const element = root.querySelector(`[data-testid="composer"] .composer-bottom [data-testid="${id}"]`);
+      if (!element) return null;
+      const refs = (element.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+      return { unavailable: element.getAttribute('aria-disabled') === 'true' && element.dataset.pending !== 'true',
+        pending: element.dataset.pending === 'true', tip: element.title ? element.title.split('\n') : [],
+        described: refs.map((ref) => document.getElementById(ref)?.textContent ?? '').join(' ') };
     };
     return { running, model: button('model-button'), thinking: button('thinking-button') };
   }, { sel: PANE, ...before }, { timeout: 20000 }).catch(() => null);
@@ -257,7 +268,7 @@ async function turnStart(page, before) {
 /**
  * @brief 按 Enter 发出输入框里的文字，等本轮结束；途中出批准卡时记下它，点"Allow once"。本轮没有开始、没有新的回复、
  *        或出了错误卡时抛错（这一项的流程记为 FAIL，不当成模型行为）。
- * @return { cards: 出现过的批准卡 [{ request, tool, title }], start: 本轮开始那一刻顶栏按钮的样子 }
+ * @return { cards: 出现过的批准卡 [{ request, tool, title }], start: 本轮开始那一刻输入框下面一行按钮的样子 }
  */
 async function submitTurn(page, timeout = 300000) {
   const before = await turnCounts(page);
@@ -333,7 +344,7 @@ async function toolInfo(page, name) {
   }, name);
 }
 
-// ---------- 走查 1：第二个模型与顶栏切换 ----------
+// ---------- 走查 1：第二个模型与输入框下面一行的范围菜单 ----------
 
 /** @brief model-config.json（测试数据目录的副本）。 */
 const modelConfig = (ctx) => readJson(join(ctx.userData, 'model-config.json'));
@@ -369,7 +380,7 @@ async function addModel(ctx) {
   return seen;
 }
 
-/** @brief 在顶栏打开范围菜单（v1），读出菜单的样子，选 pick，等按钮不再是切换中。 */
+/** @brief 在输入框下面一行打开范围菜单（v1），读出菜单的样子，选 pick，等按钮不再是切换中。 */
 async function switchModel(page, pick, name = '1-model-menu') {
   await pane(page).getByTestId('model-button').click();
   const menu = page.getByTestId('model-menu');
@@ -405,7 +416,7 @@ function recordAddModel(ctx, form, keyBefore) {
 }
 
 /**
- * @brief 走查 1（v1）：在 设置 → Models 给首选提供商加 deepseek-v4-pro（不填 key），在顶栏的范围菜单里选它，
+ * @brief 走查 1（v1）：在 设置 → Models 给首选提供商加 deepseek-v4-pro（不填 key），在输入框下面一行的范围菜单里选它，
  *        新回复来自它；设置里的默认范围不变。
  */
 async function item1(ctx) {
@@ -419,7 +430,9 @@ async function item1(ctx) {
   const ref = `${ctx.conn.provider}/${SECOND_MODEL}`;
   const menu = await switchModel(page, ref);
   const button = pane(page).getByTestId('model-button');
-  const shown = { text: (await button.innerText()).trim(), title: await button.getAttribute('title') };
+  const shown = { text: (await button.textContent()).trim(),
+    tip: ((await button.getAttribute('title')) ?? '').split('\n'),
+    inRow: await button.evaluate((el) => Boolean(el.closest('[data-testid="composer"] .composer-bottom'))) };
   await sendTurn(page, PROMPTS.today);
   await shot(page, '1-switched');
   const entries = sessionEntries(ctx.s1);
@@ -428,16 +441,18 @@ async function item1(ctx) {
   const picks = entries.filter((e) => e.type === 'custom' && e.customType === 'mori.pick').map((e) => e.data?.pick);
   const config = modelConfig(ctx);
   const current = menu.items.find((item) => item.pick === REAL_GROUP);
-  record('走查 1：顶栏范围菜单分 Groups、Providers、Models 三节，当前范围（测试分组）打勾，列出新加的模型，底部说明只作用于'
+  record('走查 1：输入框下面一行的范围菜单分 Groups、Providers、Models 三节，当前范围（测试分组）打勾，列出新加的模型，底部说明只作用于'
     + '这个会话，最后一项"Manage models"', menu.sections.join() === 'groups,providers,models' && current?.checked
     && menu.items.filter((item) => item.checked).length === 1 && menu.items.some((item) => item.pick === ref)
     && menu.note === 'Applies to this session only. New sessions use the default range from Settings.'
     && menu.last === 'Manage models', JSON.stringify(menu));
-  record('走查 1：选 deepseek-v4-pro：按钮显示它，悬停"<提供商名> · <区域>"；新回复来自 deepseek-v4-pro（会话文件里回复的'
-    + ' model 先是首选的第一个模型、后是 deepseek-v4-pro，记了一条 mori.pick）', shown.text === SECOND_MODEL
-    && shown.title.startsWith(`${ctx.conn.name} · `) && models[0] === ctx.conn.model && models.at(-1) === SECOND_MODEL
+  record('走查 1：选 deepseek-v4-pro：输入框下面一行的范围按钮显示它，悬停第一行是按钮文字、第二行"<提供商名> · <区域>"；'
+    + '新回复来自 deepseek-v4-pro（会话文件里回复的 model 先是首选的第一个模型、后是 deepseek-v4-pro，记了一条 mori.pick）',
+  shown.inRow && shown.text === SECOND_MODEL && shown.tip[0] === SECOND_MODEL
+    && (shown.tip[1] ?? '').startsWith(`${ctx.conn.name} · `) && models[0] === ctx.conn.model
+    && models.at(-1) === SECOND_MODEL
     && picks.at(-1) === ref, JSON.stringify({ shown, models, picks }));
-  record('反例：顶栏换范围不改设置里的默认范围（model-config.json 的 normalDefault 仍是测试分组）',
+  record('反例：在输入框下面一行换范围不改设置里的默认范围（model-config.json 的 normalDefault 仍是测试分组）',
     config?.normalDefault === REAL_GROUP, String(config?.normalDefault));
 }
 
@@ -502,8 +517,8 @@ async function item2(ctx) {
   recordAgents(ctx, seen);
   await backToChat(page);
   await newSession(page);
-  const model = (await pane(page).getByTestId('model-button').innerText()).trim();
-  record('反例：新会话仍用设置里的默认范围（测试分组，当前模型是首选的第一个；顶栏切换只作用于那个会话）',
+  const model = (await pane(page).getByTestId('model-button').textContent()).trim();
+  record('反例：新会话仍用设置里的默认范围（测试分组，当前模型是首选的第一个；在那一栏换的范围只作用于那个会话）',
     model === `${REAL_GROUP} · ${ctx.conn.model}`, model);
   await sendTurn(page, PROMPTS.intro);
   const reply = await lastAssistant(page);
@@ -987,10 +1002,11 @@ async function item7(ctx) {
 
 // ---------- 走查 8：思考强度 ----------
 
-/** @brief 顶栏思考按钮的样子，打开菜单读出各项、说明，再按 Esc 关上。 */
+/** @brief 输入框下面一行思考按钮的样子，打开菜单读出各项、说明，再按 Esc 关上。 */
 async function thinkingMenu(page, name) {
   const button = pane(page).getByTestId('thinking-button');
-  const head = { text: (await button.innerText()).trim(), reasoning: await button.getAttribute('data-reasoning') };
+  // textContent：会话面板窄时"Effort: "前缀藏起，但 textContent 里仍有（models.md"窄栏"）
+  const head = { text: (await button.textContent()).trim(), reasoning: await button.getAttribute('data-reasoning') };
   await button.click();
   const menu = page.getByTestId('thinking-menu');
   await menu.waitFor({ timeout: 5000 });
@@ -1039,7 +1055,7 @@ function levelAround(entries, text) {
   return { level, thinking: null };
 }
 
-/** @brief 走查 8 后半：新会话默认"Low"；切到"High"问鸡兔同笼（记下生成中顶栏按钮的样子），切到"Off"再问一道。 */
+/** @brief 走查 8 后半：新会话默认"Low"；切到"High"问鸡兔同笼（记下生成中这一行按钮的样子），切到"Off"再问一道。 */
 async function askWithThinking(ctx) {
   const { page } = ctx;
   await newSession(page);
@@ -1067,15 +1083,16 @@ function recordThinkingRun(ctx, run) {
     && run.menu.items.every((item) => !item.disabled) && run.menu.checked === 'low'
     && run.menu.note === 'Applies to this session only. Set each model’s default for new sessions in Settings.',
     JSON.stringify(run.menu));
-  record('走查 8：生成中顶栏的范围和思考按钮不可用，悬停"Can’t switch models until the response finishes"'
-    + '"Can’t change effort until the response finishes"',
-    run.start?.running === true && run.start.model?.disabled
-    && run.start.model.title === MODEL_BUSY && run.start.thinking?.disabled
-    && run.start.thinking.title === 'Can’t change effort until the response finishes', JSON.stringify(run.start));
-  record('反例：顶栏切换思考强度不改设置里的默认（modelThinkingLevels 仍是 low，没有写 defaultThinkingLevel）',
+  record('走查 8：生成中输入框下面一行的范围和思考按钮不可用（aria-disabled，仍能 Tab 到），范围按钮悬停的第三行'
+    + '"Can’t switch models until the response finishes"、Effort 悬停的第二行"Can’t change effort until the response '
+    + 'finishes"，读屏的描述里也是', run.start?.running === true && run.start.model?.unavailable
+    && run.start.model.tip[2] === MODEL_BUSY && run.start.model.described.endsWith(`. ${MODEL_BUSY}`)
+    && run.start.thinking?.unavailable && run.start.thinking.tip[1] === NOTE.effortBusy
+    && run.start.thinking.described === NOTE.effortBusy, JSON.stringify(run.start));
+  record('反例：在输入框下面一行切换思考强度不改设置里的默认（modelThinkingLevels 仍是 low，没有写 defaultThinkingLevel）',
     run.settings?.modelThinkingLevels?.[`${ctx.conn.provider}/${ctx.conn.model}`] === 'low'
     && run.settings?.defaultThinkingLevel === undefined, JSON.stringify(run.settings?.modelThinkingLevels));
-  record('走查 8：顶栏切到"高"后问鸡兔同笼：回复带思考内容（模型行为：DeepSeek 可能跳过思考）', run.high.thinking > 0,
+  record('走查 8：输入框下面一行切到"高"后问鸡兔同笼：回复带思考内容（模型行为：DeepSeek 可能跳过思考）', run.high.thinking > 0,
     JSON.stringify({ high: { thinking: run.high.thinking, text: oneLine(run.high.text, 80) } }), true);
   record('走查 8：切到"关"后再问一道：回复没有思考内容（pi 发 thinking: disabled）', run.off.thinking === 0,
     JSON.stringify({ off: { thinking: run.off.thinking, text: oneLine(run.off.text, 80) } }), true);
@@ -1093,19 +1110,24 @@ async function switchToUnmarked(ctx) {
   await page.waitForFunction((sel) => document.querySelector(`${sel} [data-testid="thinking-button"]`)
     ?.dataset.reasoning === 'false', PANE, { timeout: 5000 }).catch(() => {});
   const button = pane(page).getByTestId('thinking-button');
-  const state = { text: (await button.innerText()).trim(), reasoning: await button.getAttribute('data-reasoning'),
+  const state = { text: (await button.textContent()).trim(), reasoning: await button.getAttribute('data-reasoning'),
     level: await button.getAttribute('data-level') };
   await shot(page, '8-unmarked-switch');
-  record('走查 8：同一会话在顶栏把范围换到没标支持思考的 deepseek-v4-pro：思考按钮按当前模型变成"Effort: Unavailable"',
+  record('走查 8：同一会话在输入框下面一行把范围换到没标支持思考的 deepseek-v4-pro：思考按钮按当前模型变成"Effort: Unavailable"',
     state.text === 'Effort: Unavailable' && state.reasoning === 'false', JSON.stringify(state));
 }
 
-/** @brief 走查 8：把模型标为支持思考；顶栏"High"有思考内容，"Off"没有。之前先看反例：没标时不可选。 */
+/**
+ * @brief 走查 8：把模型标为支持思考；输入框下面一行"High"有思考内容，"Off"没有。之前先看反例：没标时不可选。
+ *        最后在分屏的一栏里换一次范围、发一句（splitPaneSwitch）。
+ */
 async function item8(ctx) {
   const { page } = ctx;
   await newSession(page);
+  ctx.s8 = await activeFile(page);
   const unmarked = await thinkingMenu(page, '8-unmarked');
-  record('反例：模型没标支持思考时，顶栏"Effort: Unavailable"，菜单里的强度都不可用，说明原因（英文，§9.2）并有"Open settings"',
+  record('反例：模型没标支持思考时，输入框下面一行"Effort: Unavailable"，菜单里的强度都不可用，说明原因（英文，§9.2）并有'
+    + '"Open settings"',
     unmarked.text === 'Effort: Unavailable' && unmarked.reasoning === 'false' && unmarked.items.length > 0
     && unmarked.items.every((item) => item.disabled) && unmarked.note.startsWith(UNSUPPORTED_NOTE)
     && unmarked.links.includes('Open settings'), JSON.stringify(unmarked));
@@ -1120,9 +1142,60 @@ async function item8(ctx) {
     && levels?.[`${ctx.conn.provider}/${ctx.conn.model}`] === 'low', JSON.stringify({ edited, model, levels }));
   await backToChat(page);
   const reopened = await pane(page).getByTestId('thinking-button').getAttribute('data-reasoning');
-  record('走查 8：已经打开的会话（用这个模型）的顶栏思考按钮随之可选', reopened === 'true', reopened);
+  record('走查 8：已经打开的会话（用这个模型）的思考按钮随之可选', reopened === 'true', reopened);
   recordThinkingRun(ctx, await askWithThinking(ctx));
   await switchToUnmarked(ctx);
+  await splitPaneSwitch(ctx);
+}
+
+/** @brief 分屏那一步要换到的模型：走查 1 加的 deepseek-v4-pro；没有时用默认分组里第二个提供商的第一个模型；都没有时为 null。 */
+function splitTarget(ctx) {
+  const models = modelConfig(ctx)?.providers?.find((item) => item.id === ctx.conn.provider)?.models ?? [];
+  if (models.some((model) => model.id === SECOND_MODEL)) {
+    return { ref: `${ctx.conn.provider}/${SECOND_MODEL}`, id: SECOND_MODEL };
+  }
+  const other = ctx.providers?.[1];
+  return other ? { ref: other.ref, id: other.model } : null;
+}
+
+/**
+ * @brief 走查 8 最后（composer-pickers.md"用真实模型走一遍"：含一次分屏里的一栏）：当前会话在左、item8 开头新建的会话 S8
+ *        在右分屏；右栏这一行的范围菜单往上打开、在右栏里（models.md"菜单的位置与键盘"）；在右栏的菜单里选另一个模型
+ *        （splitTarget），右栏的范围按钮显示它、左栏的范围不变；在右栏发一句，会话文件里这条回复来自它。最后关掉分屏。
+ */
+async function splitPaneSwitch(ctx) {
+  const { page } = ctx;
+  const target = splitTarget(ctx);
+  if (!ctx.s8 || !target) {
+    record('走查 8（分屏）：在分屏右栏这一行换范围，下一条回复来自新模型', false, 'no second model or session', true);
+    return;
+  }
+  await splitOpen(page, ctx.s8);
+  const right = `${slotSelector('right')} [data-testid="chat-pane"]`;
+  const button = (side) => page.locator(`${slotSelector(side)} [data-testid="composer"] .composer-bottom `
+    + '[data-testid="model-button"]');
+  const leftBefore = await button('left').getAttribute('data-pick');
+  const placed = await openAndPlace(page, { paneCss: right, ...POPUPS.model });
+  await button('right').click();
+  await page.getByTestId('model-menu').locator(`[role="menuitemradio"][data-pick="${target.ref}"]`).click();
+  await page.waitForFunction((css) => {
+    const element = document.querySelector(css);
+    return element?.dataset.pending !== 'true' && !element?.hasAttribute('aria-disabled');
+  }, `${slotSelector('right')} [data-testid="model-button"]`, { timeout: 15000 });
+  const shown = { right: (await button('right').innerText()).trim(),
+    pick: await button('right').getAttribute('data-pick'), left: await button('left').getAttribute('data-pick') };
+  await composerAt(page, 'right').fill(PROMPTS.today);
+  await composerAt(page, 'right').press('Enter');
+  await waitPaneIdle(page, 'right', 300000);
+  await shot(page, '8-split-switch');
+  const models = sessionEntries(ctx.s8).filter((e) => e.type === 'message' && e.message.role === 'assistant')
+    .map((e) => e.message.model);
+  record(`走查 8（分屏）：右栏这一行的范围菜单往上打开、在右栏里；选 ${target.id} 后右栏的范围按钮显示它，左栏的范围不变；`
+    + '在右栏发一句，会话文件里这条回复来自它', placed?.problems.length === 0 && shown.pick === target.ref
+    && shown.right === target.id && shown.left === leftBefore && models.at(-1) === target.id,
+  JSON.stringify({ placed: placed?.problems, shown, models }));
+  await page.locator(`${slotSelector('right')} [data-testid="close-pane"]`).click();
+  await waitSplit(page, false);
 }
 
 // ---------- 反例 ----------
@@ -1215,7 +1288,7 @@ const ctx = { conn, root, project: makeProject(root, 'm6-walk', PROJECT_SKILL),
 ctx.agentsFiles = projectAgentsFiles(ctx.project);
 ctx.userData = scratchUserData(source);
 // 测试准备（synthetic test setup，§14.1）：给两个临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
-allowRealProject(ctx.userData, [ctx.project, ctx.untrusted]);
+ctx.providers = allowRealProject(ctx.userData, [ctx.project, ctx.untrusted]);
 ctx.agentDir = join(ctx.userData, 'pi');
 try {
   await start(ctx);

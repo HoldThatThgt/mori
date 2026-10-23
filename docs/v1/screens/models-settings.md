@@ -29,7 +29,7 @@
 | 从 No model available 卡的“Open settings”进入 | 你点了它（§9.3） | 设置 → Models，滚到第一个被排除候选的提供商卡；原因是 `auth`、`quota` 时焦点在它的 Keys（第一行） | 同下 |
 | 从“Confirm zone”（拒绝启动卡）进入 | 你点了它（§4.6、§9.3） | 设置 → Models，滚到“区域未确认”那几行，焦点在 `blocked.zoneProviders` 第一个提供商那一行的“Confirm zone…” | Confirm zone… |
 | 从“Allow <zone> for this project”进入 | 你点了拒绝启动卡上的这个操作（§4.6、§9.3） | 设置 → Models 的 Project access，焦点在这个会话的项目那一行（路径按 §4.1 规范化后比较） | 勾选区域 |
-| 从“Manage models”进入 | 你点了顶栏菜单底部这一项（§9.2） | 设置 → Models，停在顶部 | — |
+| 从“Manage models”进入 | 你点了范围菜单底部这一项（§9.2） | 设置 → Models，停在顶部 | — |
 | 读取中 | `models.get` 还没返回 | “Loading…”（临时，走查时可以改），各节不显示 | — |
 | 读取失败 | `models.get` 返回 `error` | 原文 | 重新打开设置页 |
 | 配置读不出 | `models.get` 的 `loadError` 不为 null（`model-config.json` 存在但不是合法 JSON 或校验失败，§4.1） | 只显示这条错误：“Couldn’t read model settings: <路径>: <原文>”（拒绝启动卡 `config_invalid` 写“Model settings can’t be read: …”）和“Retry”；其他各节都不显示 | Retry（`models.reload`；修好文件后结果里 `loadError` 为 null 时显示完整的分节） |
@@ -80,7 +80,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 默认范围 | `config.normalDefault` | 标签“Default model range for new sessions”；下拉，分三节，节名“Groups”“Providers”“Models”（同顶栏菜单）；项：分组写 id，提供商写名称，模型写“<provider name> · <model id>”（同 Groups 成员的写法）；当前值选中；为 null 时“None”，“None”是第一项 | 选一项或“None” |
+| 默认范围 | `config.normalDefault` | 标签“Default model range for new sessions”；下拉，分三节，节名“Groups”“Providers”“Models”（同范围菜单）；项：分组写 id，提供商写名称，模型写“<provider name> · <model id>”（同 Groups 成员的写法）；当前值选中；为 null 时“None”，“None”是第一项 | 选一项或“None” |
 | 允许的区域 | `config.allowedZones` | 标签“Allowed zones for all projects”；Local、Intranet 两个勾选框；说明“Public providers can only be allowed per project, below.” | 勾选、取消勾选 |
 | 保存 | 改了上面任一项立即 `models.setDefaults`（`{ normalDefault, allowedZones }`） | 保存中控件不可用；失败时原文，控件回到保存前的值；成功时没有额外提示 | — |
 | 已有会话 | §5.1：已有会话的范围不随默认范围改变 | 不提示（规格没有提示文字） | — |

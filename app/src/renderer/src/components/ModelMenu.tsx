@@ -1,66 +1,49 @@
-// 顶栏的选择范围按钮和菜单（docs/v1/screens/model-menu.md）：Groups、Providers、Models 三节，每项标区域，
-// 本会话静态校验排除的项变淡但仍可以选，当前范围打勾；只作用于这个会话，新会话用设置里的默认范围。
-// 菜单的各项取自 session.pickOptions。思考强度按钮（ThinkingMenu.tsx）与它共用菜单的开关行为。
+// 输入框下面一行的选择范围按钮和菜单（docs/v1/screens/model-menu.md；这一行里的位置、悬停、不可用和窄栏见
+// docs/v0/screens/models.md）：Groups、Providers、Models 三节，每项标区域，本会话静态校验排除的项变淡但仍可以选，
+// 当前范围打勾；只作用于这个会话，新会话用设置里的默认范围。菜单的各项取自 session.pickOptions。
+// 开关、位置和焦点的行为在 rowMenu.ts；思考强度按钮（ThinkingMenu.tsx）、权限按钮（PermissionMenu.tsx）相同。
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import type { PickOption, Zone } from '../../../shared/models';
 import {
   clearPickError, loadPickOptions, setPick, usePendingSwitch, usePickError, usePickOptions, useRangeMenuRequest,
 } from '../state/modelActions';
-import { useOverlay } from '../state/overlays';
 import { openModelsSettings } from '../state/settings';
 import type { Tab } from '../state/store';
 import { Icon } from '../icons';
-import { moveMenuFocus, useOutsideClose } from './menu';
+import { firstMenuItem, moveMenuFocus } from './menu';
+import { useRowMenu, useRowPlacement, type RowMenu } from './rowMenu';
 
 /** 没读到菜单各项时用的空列表（固定一个引用，免得每次渲染都换新数组） */
 const NO_OPTIONS: PickOption[] = [];
 
-/** 生成中、准备中按钮的悬停说明（§9.2） */
+/** 准备中、生成中不能换范围的原因（§9.2；悬停的第三行） */
 const BUSY_TITLE = 'Can’t switch models until the response finishes';
+
+/** 没有当前模型时悬停的第二行 */
+const NO_CURRENT = 'No model can run in this session';
 
 /** 区域在标签里的写法 */
 const ZONE_LABELS: Readonly<Record<Zone, string>> = { local: 'Local', intranet: 'Intranet', public: 'Public' };
 
-/** @brief 顶栏切换菜单的开关。 */
-export interface SwitchMenu {
-  /** 菜单是否打开 */
-  open: boolean;
-  /** 打开或关闭菜单 */
-  setOpen: (open: boolean) => void;
-  /** 按钮和菜单外面的容器：在它之外按下鼠标时关闭 */
-  root: React.RefObject<HTMLDivElement | null>;
-  /** 按钮 */
-  button: React.RefObject<HTMLButtonElement | null>;
-  /** 选了一项之后：关闭菜单，焦点回到按钮 */
-  close: () => void;
+/** @brief 悬停说明的写法：每项一行，空的项不写。 */
+export function tipLines(...lines: (string | null)[]): string {
+  return lines.filter(Boolean).join('\n');
 }
 
 /**
- * @brief 顶栏切换菜单（选择范围、思考强度）的开关：Esc 关闭并把焦点还给按钮，点外面关闭；
- *        按钮变得不可用（开始生成、后台进程不可用）时关闭。
+ * @brief 读屏的描述：藏起来的元素，里面只有悬停说明第一行以外的部分（不让 Chromium 把整个 title 当成描述，
+ *        第一行和读屏名重复）。text 为空时不显示。
  */
-export function useSwitchMenu(disabled: boolean): SwitchMenu {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
-  const close = () => {
-    setOpen(false);
-    button.current?.focus();
-  };
-  useOverlay(open, close);
-  useOutsideClose(open, root, () => setOpen(false));
-  useEffect(() => {
-    if (disabled) setOpen(false);
-  }, [disabled]);
-  return { open, setOpen, root, button, close };
+export function Description({ id, text, testId }: { id: string; text: string | null; testId?: string }) {
+  return text ? <span id={id} hidden data-testid={testId}>{text}</span> : null;
 }
 
-/** @brief 菜单打开时焦点放在当前项上；没有可用的当前项时放在第一个可用的项上。 */
+/** @brief 菜单打开时焦点放在当前项上；没有可用的当前项时放在第一个可用的项上（例如"Open settings"）。 */
 export function useFocusCurrent(menu: React.RefObject<HTMLElement | null>): void {
   useEffect(() => {
     const current = menu.current?.querySelector<HTMLElement>('[aria-checked="true"]:not(:disabled)');
-    (current ?? menu.current?.querySelector<HTMLElement>('button:not(:disabled)'))?.focus();
+    (current ?? firstMenuItem(menu.current))?.focus();
   }, [menu]);
 }
 
@@ -85,35 +68,61 @@ interface RangeLabel {
   scope: string;
   /** 模型 id（范围是模型时是它，否则是当前模型）；没有时为空串 */
   model: string;
-  /** 悬停说明 */
-  title: string;
+  /** 悬停说明的第二行：当前模型的"<提供商名> · <区域>"，没有当前模型时 NO_CURRENT */
+  where: string;
 }
 
 /**
  * @brief 按钮上的文字（model-menu.md "选择范围按钮"）：分组或提供商 "<范围名> · <当前模型 id>"，没有当前模型时只写范围名；
- *        模型写模型 id；没有范围时 "No model range"。悬停写当前模型的 "<提供商名> · <区域>"。
+ *        模型写模型 id；没有范围时 "No model range"。悬停的第二行写当前模型的 "<提供商名> · <区域>"。
  *        还没读到菜单各项时，提供商名退回 id。
  */
 function rangeLabel(pick: string | null, current: string | null, options: PickOption[]): RangeLabel {
   const find = (value: string) => options.find((option) => option.pick === value);
-  const title = current
+  const where = current
     ? `${find(providerOf(current))?.label ?? providerOf(current)} · ${zoneLabel(find(current)?.zones ?? [])}`
-    : 'No model can run in this session';
-  if (pick === null) return { scope: 'No model range', model: '', title };
-  if (pick.includes('/')) return { scope: '', model: modelIdOf(pick), title };
-  return { scope: find(pick)?.label ?? pick, model: current ? modelIdOf(current) : '', title };
+    : NO_CURRENT;
+  if (pick === null) return { scope: 'No model range', model: '', where };
+  if (pick.includes('/')) return { scope: '', model: modelIdOf(pick), where };
+  return { scope: find(pick)?.label ?? pick, model: current ? modelIdOf(current) : '', where };
 }
 
-/** @brief 菜单里的一项。 */
+/** @brief 选择范围按钮的悬停说明和读屏的描述。 */
+interface RangeTip {
+  /** 悬停说明：按钮文字 / 提供商和区域 / 不可用的原因，每项一行 */
+  title: string;
+  /** 读屏的描述：第二行（" · "换成", "），不可用时加". <原因>"；切换中没有 */
+  description: string | null;
+}
+
+/**
+ * @brief 悬停说明分三行（docs/v0/composer-pickers.md"v1 之后的调整"）：按钮文字、"<提供商名> · <区域>"、不可用的原因。
+ *        切换中只有第一行（你选的范围），不写"No model can run in this session"。
+ * @param reason 不可用的原因；能用时为 null
+ */
+function rangeTip(text: string, where: string, switching: boolean, reason: string | null): RangeTip {
+  if (switching) return { title: text, description: null };
+  const description = where.replaceAll(' · ', ', ') + (reason ? `. ${reason}` : '');
+  return { title: tipLines(text, where, reason), description };
+}
+
+/**
+ * @brief 菜单里的一项。读屏名只有名字：看得见的区域标记用" · "分隔，读屏会念出来（ui-strings.md），所以它对读屏藏起，
+ *        区域改用逗号写进读屏的描述，被排除时描述里再加原因（描述来自 aria-describedby，title 不再变成描述）。
+ */
 function OptionItem({ option, current, onChoose }: { option: PickOption; current: string | null;
   onChoose: (pick: string) => void }) {
+  const describe = useId();
+  const zones = zoneLabel(option.zones);
+  const description = zones.replaceAll(' · ', ', ') + (option.reason ? `. ${option.reason}` : '');
   return (
     <button role="menuitemradio" aria-checked={option.pick === current} data-pick={option.pick}
       data-zone={option.zones.join(' ')} data-excluded={option.excluded ? 'true' : undefined}
       className={option.excluded ? 'pick-excluded' : undefined} title={option.reason ?? option.label}
-      onClick={() => onChoose(option.pick)}>
+      aria-describedby={describe} onClick={() => onChoose(option.pick)}>
       <span className="switch-text">{option.label}</span>
-      <span className="pick-zone">{zoneLabel(option.zones)}</span>
+      <span className="pick-zone" aria-hidden="true">{zones}</span>
+      <Description id={describe} text={description} />
       {option.pick === current && <Icon name="check" />}
     </button>
   );
@@ -156,10 +165,22 @@ function KindSection({ kind, title, options, current, onChoose }: { kind: 'group
   );
 }
 
+/** @brief 菜单的内容。 */
+interface PickPanelProps {
+  /** 菜单元素（以这一行定位时要量它） */
+  menu: React.RefObject<HTMLDivElement | null>;
+  /** 菜单各项 */
+  options: PickOption[];
+  /** 会话现在的选择范围 */
+  current: string | null;
+  /** 选了一项 */
+  onChoose: (pick: string) => void;
+  /** 点了"Manage models" */
+  onManage: () => void;
+}
+
 /** @brief 菜单：三节、底部说明与"Manage models"。打开时焦点在当前范围上。 */
-function PickPanel({ options, current, onChoose, onManage }: { options: PickOption[]; current: string | null;
-  onChoose: (pick: string) => void; onManage: () => void }) {
-  const menu = useRef<HTMLDivElement>(null);
+function PickPanel({ menu, options, current, onChoose, onManage }: PickPanelProps) {
   useFocusCurrent(menu);
   const props = { options, current, onChoose };
   return (
@@ -177,10 +198,11 @@ function PickPanel({ options, current, onChoose, onManage }: { options: PickOpti
 
 /**
  * @brief 菜单的开关与数据：会话的模型状态变了（换了范围、配置或档案变化）时重新读取菜单各项；打开菜单时也读一次、
- *        清掉换范围失败的一行；拒绝启动卡的"Change model…"打开这一栏的菜单。
+ *        清掉换范围失败的一行；拒绝启动卡的"Change model…"打开这一栏这一行的菜单。
+ * @param disabled 按钮不可用（准备中、生成中、不能发送）：不打开，开着的关闭
  */
-function useRangeMenu(tab: Tab, disabled: boolean) {
-  const menu = useSwitchMenu(disabled);
+function useRangeMenu(tab: Tab, disabled: boolean): RowMenu {
+  const menu = useRowMenu(tab, disabled);
   const request = useRangeMenuRequest();
   const handled = useRef(request.nonce);
   const ready = tab.sessionId !== null;
@@ -201,14 +223,26 @@ function useRangeMenu(tab: Tab, disabled: boolean) {
 }
 
 /**
- * @brief 顶栏的选择范围按钮和菜单。disabled 为真时（会话没打开、后台进程不可用）不能切换；准备中与生成中也不能切换。
- *        换范围的请求还没返回时按钮显示你选的范围、不可用（仍可聚焦，焦点留在按钮上）。
- *        面板窄时按钮收短：先截当前模型 id，再截范围名，完整的文字在悬停说明和读屏名称里（model-menu.md "窄栏"）。
- *        协作模式下（pickLocked）范围由角色的候选决定，按钮只显示正在用的模型、不能打开菜单。
+ * @brief 换范围失败的一行（role="alert"）：从这一行往上弹出、右边对齐范围按钮，放不下时挪进这一行；不算浮层。
+ *        下次打开菜单或 10 秒后消失（modelActions.ts）。
  */
-export function ModelMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
+function PickError({ tab, button }: { tab: Tab; button: React.RefObject<HTMLButtonElement | null> }) {
+  const message = usePickError((state) => state[tab.key]);
+  const line = useRef<HTMLDivElement>(null);
+  useRowPlacement(Boolean(message), button, line, 'anchor', message);
+  if (!message) return null;
+  return <div ref={line} className="pick-error" role="alert" data-testid="pick-error">
+    Couldn’t change the model range: {message}</div>;
+}
+
+/**
+ * @brief 输入框下面一行的模型按钮。协作模式下（pickLocked）范围由角色的候选决定，按钮只显示正在用的模型、
+ *        不能打开菜单；其他时候是选择范围按钮和菜单（RangeMenu）。
+ * @param unavailable 不能发送时的说明（"Starting…"等），这时不能切换
+ */
+export function ModelMenu({ tab, unavailable }: { tab: Tab; unavailable: string | null }) {
   if (tab.pickLocked) return <LockedModelButton tab={tab} />;
-  return <RangeMenu tab={tab} disabled={disabled} />;
+  return <RangeMenu tab={tab} unavailable={unavailable} />;
 }
 
 /** 协作模式下模型按钮的悬停说明（平行 Agent 规格 §12.11） */
@@ -231,15 +265,28 @@ function LockedModelButton({ tab }: { tab: Tab }) {
   );
 }
 
-/** @brief 顶栏的选择范围按钮和菜单（关闭模式；见 ModelMenu）。 */
-function RangeMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
+/**
+ * @brief 选择范围按钮和菜单（关闭协作模式时；见 ModelMenu）。unavailable 时和准备中、生成中一样
+ *        不能切换：按钮 aria-disabled（仍能 Tab 到，点了不开菜单），原因在悬停的第三行和读屏的描述里。
+ *        换范围或换强度的请求还没返回时按钮显示你选的范围、aria-disabled 并带 data-pending（焦点留在按钮上），
+ *        没有读屏的描述：空的 aria-description 不让 Chromium 把 title（带" · "）当成描述。
+ *        这一行放不下时按钮收短：先截当前模型 id，再截范围名，全文在悬停的第一行和读屏名里（models.md"窄栏"）。
+ */
+function RangeMenu({ tab, unavailable }: { tab: Tab; unavailable: string | null }) {
   const options = usePickOptions((state) => state[tab.key]) ?? NO_OPTIONS;
-  const pickError = usePickError((state) => state[tab.key]);
   const pending = usePendingSwitch((state) => state[tab.key]);
   const busy = tab.transcript.running || tab.transcript.sending;
-  const menu = useRangeMenu(tab, disabled || busy);
+  const reason = unavailable ?? (busy ? BUSY_TITLE : null);
+  const menu = useRangeMenu(tab, reason !== null);
+  const panel = useRef<HTMLDivElement>(null);
+  const tipId = useId();
+  useRowPlacement(menu.open, menu.button, panel, 'anchor');
   const shown = pending?.pick ? rangeLabel(pending.pick, null, options) : rangeLabel(tab.pick, tab.current, options);
-  const text = [shown.scope, shown.model].filter(Boolean).join(' · ');
+  const parts = [shown.scope, shown.model].filter(Boolean);
+  const text = parts.join(' · ');
+  // 读屏名里不用" · "（ui-strings.md：读屏会念出来），范围名和模型 id 之间用逗号；模型 id 里的"/"是数据，照原样
+  const name = `Model range: ${parts.join(', ')}`;
+  const tip = rangeTip(text, shown.where, pending !== undefined, reason);
 
   function choose(pick: string) {
     menu.close();
@@ -255,17 +302,20 @@ function RangeMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
     <div className="model-switch" ref={menu.root}>
       <button ref={menu.button} className="model-button" data-testid="model-button" aria-haspopup="menu"
         data-pick={tab.pick ?? undefined} data-current={tab.current ?? undefined} aria-expanded={menu.open}
-        aria-label={`Model range: ${text}`} disabled={disabled || busy} aria-disabled={pending ? true : undefined}
-        title={busy ? BUSY_TITLE : shown.title} onClick={() => { if (!pending) menu.setOpen(!menu.open); }}>
+        aria-label={name} aria-disabled={reason !== null || pending ? true : undefined}
+        data-pending={pending ? 'true' : undefined} aria-describedby={tip.description ? tipId : undefined}
+        aria-description={tip.description ? undefined : ''}
+        title={tip.title} onClick={() => { if (!pending && reason === null) menu.setOpen(!menu.open); }}>
         {shown.scope && <span className="switch-text range-scope">{shown.scope}</span>}
         {shown.model && (
           <span className="switch-text range-model">{shown.scope ? ` · ${shown.model}` : shown.model}</span>
         )}
         <Icon name="down" />
       </button>
-      {pickError && <div className="pick-error" role="alert" data-testid="pick-error">
-        Couldn’t change the model range: {pickError}</div>}
-      {menu.open && <PickPanel options={options} current={tab.pick} onChoose={choose} onManage={manage} />}
+      <Description id={tipId} text={tip.description} testId="model-tip" />
+      <PickError tab={tab} button={menu.button} />
+      {menu.open && <PickPanel menu={panel} options={options} current={tab.pick} onChoose={choose}
+        onManage={manage} />}
     </div>
   );
 }

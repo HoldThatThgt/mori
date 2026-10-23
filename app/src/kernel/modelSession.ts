@@ -62,7 +62,7 @@ const VIRTUAL_MODEL_NAME = 'Mori';
 const ABORTED_MESSAGE = 'Request was aborted';
 /** @brief 协作模式下对话会话 setPick 被拒绝的原文（平行 Agent 规格 §12.11，与模型按钮的悬停文字相同）。 */
 export const PICK_LOCKED_MESSAGE = 'Team mode picks the model for each agent';
-/** @brief 普通会话的候选来源：你在顶栏选的范围，只要求 tool_calling（统一模型提供商规格 §5.3 第 3 步）。 */
+/** @brief 普通会话的候选来源：你在范围菜单里选的范围，只要求 tool_calling（统一模型提供商规格 §5.3 第 3 步）。 */
 const PICK_SOURCE: CandidateSource = { kind: 'pick' };
 /** @brief 能力要求总是隐含 tool_calling（平行 Agent 规格 §4.1）。 */
 const TOOL_CALLING: readonly Requirement[] = [{ kind: 'tool_calling' }];
@@ -117,6 +117,16 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
     }, Math.max(0, ms));
     signal?.addEventListener('abort', onAbort, { once: true });
   });
+}
+
+/**
+ * @brief 等到 Date.now() 超过 at（之后写的条目与消息的时间戳都大于 at）。计时器按事件循环缓存的时钟算，到点时
+ *        Date.now() 可能还没走过 at，所以到点后再看一次，没过就接着等。
+ * @param at 毫秒时间戳
+ * @param signal 中止时以 AbortError 拒绝
+ */
+async function waitPast(at: number, signal?: AbortSignal): Promise<void> {
+  while (Date.now() <= at) await delay(at - Date.now() + 1, signal);
 }
 
 /** @brief 消息内容的纯文字（与 pi 排队区比较全文的写法相同）。 */
@@ -250,7 +260,7 @@ export interface ModelSessionOptions {
   cwd: string;
   /** @brief 发会话事件（不带信封）。 */
   emit(event: ModelEvent): void;
-  /** 候选来源（平行 Agent 规格 §12.1）；省略时为你在顶栏选的范围、只要求 tool_calling */
+  /** 候选来源（平行 Agent 规格 §12.1）；省略时为你在范围菜单里选的范围、只要求 tool_calling */
   source?: CandidateSource;
   /** 调度类别（平行 Agent 规格 §12.10），会话的请求与压缩请求都用它；省略时为 conversation */
   schedClass?: SchedClass;
@@ -896,7 +906,7 @@ export class ModelSession implements WrapperHost {
   }
 
   /**
-   * @brief 顶栏菜单的各项（§9.2、§9.5 session.pickOptions），按这个会话的项目与能力要求做静态校验；
+   * @brief 范围菜单的各项（§9.2、§9.5 session.pickOptions），按这个会话的项目与能力要求做静态校验；
    *        协作模式下锁定时为空（平行 Agent 规格 §12.11）。
    */
   async pickOptions(): Promise<PickOptions> {
@@ -1369,7 +1379,7 @@ export class ModelSession implements WrapperHost {
     if (strips.has(result.model)) this.writeRebuild(result.model, false);
     reply.current = result.model;
     this.emitState();
-    if (Date.now() <= entry.hideUntil) await delay(entry.hideUntil - Date.now() + 1, signal);
+    await waitPast(entry.hideUntil, signal);
     return { ref: result.model, excluded: [], restart: false };
   }
 
@@ -1392,7 +1402,7 @@ export class ModelSession implements WrapperHost {
       return { ref: null, excluded: result.excluded, restart: false };
     }
     this.recordSwitch({ ...entry, to: result.model });
-    if (Date.now() <= entry.hideUntil) await delay(entry.hideUntil - Date.now() + 1, signal);
+    await waitPast(entry.hideUntil, signal);
     const restart: TaskRestart = { from, to: result.model, reason, detail };
     this.writeEntry(MODEL_ENTRY_TYPES.taskRestart, { at: Date.now(), ...restart });
     this.restart = restart;

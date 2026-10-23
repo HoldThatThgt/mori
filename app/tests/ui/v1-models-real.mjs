@@ -26,6 +26,7 @@ import {
   openModelsSettings, openProjectFolder, prepareRealConfig, profileProblems, rangeButton, readJson,
   restoreFirstKey, scratchModelData, sourceProblems, switchNotices, TEST_GROUP, waitProfiles,
 } from './v1-real-helpers.mjs';
+import { pickers, ZONE_TEXT } from './v1-models-row-helpers.mjs';
 
 const source = arg('source') ? resolve(arg('source')) : null;
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -104,9 +105,14 @@ async function normalChat(ctx) {
   await openProjectFolder(ctx.app, ctx.page, ctx.project);
   ctx.sessionFile = await activeSessionFile(ctx.page);
   const button = await rangeButton(ctx.page);
+  const place = await pickers(ctx.page);
+  const hover = `${ctx.first.name} · ${ZONE_TEXT[ctx.first.zone] ?? 'Zone not confirmed'}`;
+  record(`MP-27 normal chat: the range button is in the message-box row, not the top bar (2026-10-21); hover line 1 is `
+    + `its text, line 2 "${hover}"`, Boolean(place) && place.inRow && !place.inTopbar && place.tip[0] === button?.text
+    && place.tip[1] === hover, JSON.stringify({ inRow: place?.inRow, inTopbar: place?.inTopbar, tip: place?.tip }));
   const turn = await sendAndWait(ctx, PROMPTS.HELLO);
   await shot(ctx.page, '02-normal');
-  record(`MP-27 normal chat: the new session's range is ${TEST_GROUP} with ${ctx.firstRef} first (top bar `
+  record(`MP-27 normal chat: the new session's range is ${TEST_GROUP} with ${ctx.firstRef} first (range button `
     + `"${TEST_GROUP} · ${ctx.first.models[0].id}"); ${ctx.firstRef} answers; no switch line, no error card`,
   button?.pick === TEST_GROUP && button?.text === `${TEST_GROUP} · ${ctx.first.models[0].id}`
     && refsOf(turn.messages).join() === ctx.firstRef && turn.messages.at(-1)?.stopReason === 'stop'

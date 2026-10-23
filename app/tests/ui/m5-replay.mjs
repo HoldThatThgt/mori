@@ -3,6 +3,9 @@
 // Esc、F8、预览对话框里改范围、改名、点发出的引用、删除），回放桥核对界面发出的每条命令都与录制时一致——带会话引用的
 // 消息连全文和 refs 一起比较；读原会话（session.read）的结果是录制时后台进程真的读到的。
 // 再按 docs/v0/screens/split.md 与 session-refs.md 检查界面。M1–M4 的回放检查仍由 m1–m4-replay 负责。
+// 2026-10-21 起（docs/v0/composer-pickers.md）：两栏都在等批准、一直在生成时把左栏收到 280–461px 各档、右边一栏收到 279px，
+// 量两栏的输入框下面一行、往上打开的菜单、同时只开一个浮层和两栏各一个圆环（narrowSplit）；F8 报告的"Model range"
+// "Effort""Pane width"（左右两栏各按一次）。
 // 用法（在 app/ 下）：node tests/ui/m5-replay.mjs [--only split-approvals,ref-turns]
 // 结果写到 test-results/m5-replay.json；截图在 test-results/m5-replay/。
 
@@ -15,9 +18,12 @@ import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
-  centerPoint, chipsAt, composerAt, dragWithHint, flashedAt, headingWhole, paneAt, pickRange, previewHeading,
-  previewState, sendAt, sentSessionRefs, splitState, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip,
-  waitSplit,
+  composerRow, openRingDetails, popoverChecks, REPLAY_TIP, ringState, rowProblems, rowSummary,
+} from './m1-layout.mjs';
+import {
+  centerPoint, chipsAt, closeRightPanel, composerAt, dragWithHint, flashedAt, headingWhole, paneAt, paneView,
+  pickRange, previewHeading, previewState, sendAt, sentSessionRefs, setSplitWidth, slotSelector, splitState,
+  viewProblems, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip, waitSplit,
 } from './m5-helpers.mjs';
 
 const only = arg('only')?.split(',');
@@ -32,6 +38,12 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 /** 预览和发给模型的内容里不该出现的界面文字 */
 const UI_WORDS = ['Copy', 'Attach message as context', 'Give feedback', 'Thought process', 'Thinking…', 'Running…',
   'Waiting for your approval', 'Stopped', 'open preview'];
+/** 两栏都在生成时把左栏依次收到的宽（composer-pickers.md"测试要改的地方"新加的检查第 2 条里分屏才有的窄栏和各档的边） */
+const NARROW_LEFT = [280, 340, 341, 400, 401, 460, 461];
+/** 量"生成中有字"时输入框里的字（不发出） */
+const NARROW_DRAFT = '窄栏里还没发出的字';
+/** 选择范围按钮悬停的第二行（回放桥合成的提供商名和区域） */
+const OPTS = { modelTip: REPLAY_TIP };
 
 /** @brief 读取一个 M5 录制文件。 */
 const readFixture = (name) => JSON.parse(readFileSync(join(fixtureDir, `${name}.json`), 'utf8'));
@@ -156,6 +168,7 @@ async function splitApprovals(page, h) {
   const [left, right] = promptsOf(fx);
   await sendAt(page, 'left', left.text);
   await sendAt(page, 'right', right.text);
+  await narrowSplit(page);
   const order = await answerInOrder(page, fx, { [a.sessionId]: 'left', [b.sessionId]: 'right' });
   await waitPaneIdle(page, 'left');
   await waitPaneIdle(page, 'right');
@@ -168,6 +181,71 @@ async function splitApprovals(page, h) {
   await rightPanelFollows(page);
   await f8Follows(page, h);
   await finish(page, 'split-approvals', fx);
+}
+
+/** @brief 量两栏输入框下面一行（输入框里有字和没字各一次），按"生成中"查；返回问题列表。 */
+async function bothRows(page, label) {
+  const bad = [];
+  for (const draft of ['', NARROW_DRAFT]) {
+    for (const side of ['left', 'right']) {
+      await composerAt(page, side).fill(draft);
+      const row = await composerRow(page, slotSelector(side));
+      const problems = rowProblems(row, 'running', OPTS);
+      const where = `${label} ${side}${draft ? '+字' : ''}`;
+      if (problems.length) bad.push(`${where}: ${problems.join('; ')} (${rowSummary(row)})`);
+    }
+  }
+  return bad;
+}
+
+/**
+ * @brief 两栏都在生成、回放桥停在等界面的 approval.answer 时（录制里先来右栏的卡，答了它左栏才继续、才来左栏的卡；
+ *        所以等到有一张批准卡、两栏都在生成，这时回放不往下走，不会再来新的卡关菜单）：
+ *        左栏收到 280–461px 各档、右边一栏收到 279px（.pane-slot 280px），两栏输入框下面一行都不换行、不超出输入框，
+ *        截短的先后和最窄对；280px 有字时权限菜单、▾ 菜单、圆环详情往上打开、在这一栏里；同时只开一个（oneAtATime）。
+ *        量完清掉输入框、两栏各一半，不发命令（回放桥核对）。
+ */
+async function narrowSplit(page) {
+  await page.locator(`${slotSelector('left')} [data-testid="approval-card"], ${slotSelector('right')} `
+    + '[data-testid="approval-card"]').first().waitFor({ timeout: 60000 });
+  await page.waitForFunction((slots) => slots.every((css) => document.querySelector(`${css} [data-testid="chat-pane"]`)
+    ?.dataset.running === 'true'), [slotSelector('left'), slotSelector('right')], { timeout: 60000 });
+  await closeRightPanel(page);
+  const bad = [];
+  for (const width of NARROW_LEFT) {
+    const got = await setSplitWidth(page, 'left', width);
+    bad.push(...(Math.abs(got - width) > 0.5 ? [`left ${got}px ≠ ${width}px`] : await bothRows(page, `${width}px`)));
+  }
+  const right = await setSplitWidth(page, 'right', 279);
+  bad.push(...(Math.abs(right - 279) > 0.5 ? [`right ${right}px`] : await bothRows(page, 'right 279px')));
+  record('分屏：两栏都在生成时，左栏 280–461px 各档、右边一栏 279px，两栏的输入框下面一行（空 / 有字）不换行、不超出输入框，'
+    + '每档该有的都在，截短的先后和最窄对，范围按钮和 Effort 不可用、原因对', bad.length === 0, bad.slice(0, 4).join(' | '));
+  await setSplitWidth(page, 'left', 280);
+  await composerAt(page, 'left').fill(NARROW_DRAFT);
+  const menus = await popoverChecks(page, slotSelector('left'), ['permission', 'queue', 'ring']);
+  record('分屏 280px 生成中有字：权限菜单、▾ 菜单、圆环详情往上打开，在这一栏会话面板和窗口里、不盖顶栏、不比这一行宽',
+    menus.length === 0, menus.join('; '));
+  await oneAtATime(page);
+  for (const side of ['left', 'right']) await composerAt(page, side).fill('');
+  await page.locator('[data-resize="split"]').dblclick();
+}
+
+/**
+ * @brief 开着权限菜单时点圆环：权限菜单关上、圆环详情开着（这一行的浮层同时只开一个，models.md"菜单的位置与键盘"）；
+ *        两栏各一个圆环、另一栏的详情没开。
+ */
+async function oneAtATime(page) {
+  const left = slotSelector('left');
+  await page.locator(`${left} [data-testid="permission-button"]`).click();
+  await page.getByTestId('permission-menu').waitFor({ timeout: 3000 }).catch(() => {});
+  const ring = await openRingDetails(page, left);
+  const menus = await page.getByTestId('permission-menu').count();
+  if (ring?.details) await page.keyboard.press('Escape');
+  const rings = await page.evaluate(() => [...document.querySelectorAll('.pane-slot:not([hidden])')]
+    .map((slot) => slot.querySelectorAll('[data-testid="usage"]').length));
+  const right = await ringState(page, slotSelector('right'));
+  record('分屏：开着权限菜单时点圆环，权限菜单关上、只开着圆环详情；两栏各有一个圆环', menus === 0 && Boolean(ring?.details)
+    && rings.join() === '1,1' && right?.details === null, JSON.stringify({ menus, details: ring?.details, rings }));
 }
 
 /** @brief 右栏跟随焦点所在的一栏：左栏改了 README.md，右栏写了 notes.md。 */
@@ -203,6 +281,30 @@ async function f8Follows(page, h) {
   record('F8 跟随焦点：报告里的"当前会话"是焦点所在的左栏，另有一行"分屏"写明两栏和焦点在左栏',
     field('Current session') === leftTitle && field('Split view')?.includes('(focus in the left pane)'),
     JSON.stringify(issue?.view));
+  await viewFields(page, issue?.view, 'left');
+  await composerAt(page, 'right').click();
+  await page.keyboard.press('F8');
+  await page.getByTestId('issue-dialog').waitFor({ timeout: 10000 });
+  await page.getByTestId('issue-what').fill('分屏时右栏的 F8');
+  await page.getByTestId('issue-dialog').getByRole('button', { name: 'Save' }).click();
+  await page.getByTestId('issue-saved').waitFor({ timeout: 5000 });
+  const rightIssue = (await h.status()).issues.at(-1);
+  await page.keyboard.press('Escape');
+  await viewFields(page, rightIssue?.view, 'right');
+}
+
+/**
+ * @brief F8 报告"Current view"的"Model range""Effort""Pane width"（f8.md"保存的内容"、composer-pickers.md"我自己定的"
+ *        第 16 条）：都是焦点所在那一栏的；Pane width 是那一栏 .chat-pane 的宽，右边那一栏比 .pane-slot 窄 1px；
+ *        三项的位置；"Model""Permission mode"照旧。view 是回放桥收到的报告字段（[{ label, value }]）。
+ */
+async function viewFields(page, view, side) {
+  const items = view ?? [];
+  const field = (label) => items.find((item) => item.label === label)?.value ?? null;
+  const problems = viewProblems(field, items.map((item) => item.label), await paneView(page, side), side);
+  record(`F8：在${side === 'left' ? '左' : '右'}栏按，"Current view"的"Model range""Model""Effort"是这一栏的，`
+    + `"Pane width"是这一栏 .chat-pane 的宽${side === 'right' ? '（比 .pane-slot 窄 1px）' : ''}，`
+    + '三项在"Model"前后和"Window size"后面', problems.length === 0, `${problems.join('; ')} ${JSON.stringify(items)}`);
 }
 
 /** @brief 走查 2：左栏的长命令在右栏生成时按 Esc，只停止左栏；右栏照常写完。 */

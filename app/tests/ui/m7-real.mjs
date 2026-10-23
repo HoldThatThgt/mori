@@ -33,8 +33,9 @@ import {
   dragSelect, jumpHighlight, PANE, popoverShown, selectLines, sessionEntries, viewerState, waitViewer,
 } from './m4-helpers.mjs';
 import {
-  backToChat, chooseTab, detailState, exportTo, flashVisible, mdHead, mdSections, noticeText, openReviewPage,
-  pressedRow, records, reviewState, selectRow, shotLink,
+  backToChat, chooseTab, detailState, exportTo, flashVisible, focusedPaneView, mdHead, mdSections, noticeText,
+  offPaneFieldProblems, openReviewPage, paneFieldProblems, pressedRow, records, reviewState, selectRow, shotLink,
+  viewFields,
 } from './m7-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -344,10 +345,20 @@ async function fileFeedback(ctx) {
   await backToChat(page);
 }
 
-/** @brief 两份 F8 报告：第一份保存后点"View in Review"（打开"UI issues"、选中它、右栏有截图），第二份点"Close"。 */
+/**
+ * @brief 两份 F8 报告：第一份保存后点"View in Review"（打开"UI issues"、选中它、右栏有截图），第二份点"Close"。
+ *        第一份在会话里按：报告"Current view"里"Model""Permission mode"照旧，多了"Model range""Effort""Pane width"
+ *        （docs/v0/composer-pickers.md"测试要改的地方"新检查第 9 条）。
+ */
 async function issueReports(ctx) {
   const { page } = ctx;
+  const pane = await focusedPaneView(page);
   const first = await saveReport(page, ISSUES[0]);
+  const fields = viewFields(first.file && existsSync(first.file) ? readFileSync(first.file, 'utf8') : '');
+  const wrong = paneFieldProblems(fields, pane);
+  record('走查 2：会话里按 F8，报告的"当前界面"里"Model""Permission mode"照旧，多了"Model range"（选择范围）、"Effort"'
+    + '（输入框下面一行 Effort 按钮的强度）和"Pane width"（焦点所在那一栏 .chat-pane 的宽度）；各项的先后照 ui-strings.md',
+  wrong.length === 0, JSON.stringify({ wrong, pane, fields }));
   await first.dialog.getByTestId('issue-open-review').click();
   await page.getByTestId('review-page').waitFor({ timeout: 10000 });
   const name = basename(first.file ?? '');
@@ -752,6 +763,10 @@ async function reportActions(ctx) {
     + '没有发消息给模型；重启前的第一份报告里有"发送"）；新报告在"界面问题"最上面', earlier.length > 0
     && actions.length > 0 && sent.length === 0 && Boolean(top) && md.includes('- Page: Review'),
   JSON.stringify({ file, actions, sent, earlier }));
+  const view = viewFields(md);
+  const wrong = offPaneFieldProblems(view);
+  record('工作回顾页上按 F8：报告的"当前界面"里"Pane width: None"（不在会话页，2026-10-21 加的一项），各项的先后照 ui-strings.md',
+    wrong.length === 0, JSON.stringify({ wrong, view }));
 }
 
 // ---------- 执行 ----------

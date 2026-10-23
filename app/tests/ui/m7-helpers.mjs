@@ -1,6 +1,7 @@
 // m7-app.mjs、m7-replay.mjs、m7-real.mjs 共用的工作回顾页面读取与操作（docs/v0/screens/review.md 的标识）：摘要里的时间、
 // 列表的行、读完、切分节、打开工作回顾、返回会话、选中一行、页面和详情此刻的样子、回到原位置的整轮高亮、列表和详情有没有
-// 横向溢出；导出（换掉主进程的保存对话框、读导出文件的开头、各节和截图链接、工具行下面的结果）。
+// 横向溢出；导出（换掉主进程的保存对话框、读导出文件的开头、各节和截图链接、工具行下面的结果）；
+// F8 报告"Current view"一节的各项与按 F8 时会话面板的样子（2026-10-21 加的 Model range、Effort、Pane width）。
 // 不记录检查结果（检查结果由调用方记录）。
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -223,6 +224,79 @@ export function mdSections(md) {
     const file = body.map((line) => /^- (?:Record file|Report file): (.+)$/.exec(line)?.[1]).find(Boolean);
     return { heading: body[0], name: file ? basename(file.trim()) : null, text: body.join('\n') };
   });
+}
+
+// ---------- F8 报告的"Current view"（docs/v0/screens/f8.md"保存的内容"、ui-strings.md"F8 报告"） ----------
+
+/** "Current view"各项的先后（ui-strings.md"F8 报告"；Model range、Effort、Pane width 是 2026-10-21 加的） */
+export const VIEW_ORDER = ['Page', 'Current session', 'Folder', 'Session file', 'Model range', 'Model', 'Effort',
+  'Running', 'Status line', 'Pending requests', 'Permission mode', 'Split view', 'Right panel', 'Window size',
+  'Pane width', 'Sidebar width', 'Right panel width', 'Background process'];
+
+/** @brief 报告（Markdown 全文）里"## Current view"一节的各项，按出现顺序：[{ label, value }]（与交给主进程的 view 同形）。 */
+export function viewFields(md) {
+  const text = md.replace(/\r\n/g, '\n');
+  const section = /\n## Current view\n\n([\s\S]*?)(?:\n\n## |\n*$)/.exec(text)?.[1] ?? '';
+  return section.split('\n').map((line) => /^- ([^:]+): (.*)$/.exec(line)).filter(Boolean)
+    .map((match) => ({ label: match[1], value: match[2] }));
+}
+
+/**
+ * @brief 按 F8 之前焦点所在那一栏的样子：.chat-pane 的宽度（不是 .pane-slot 的：分屏右边那一栏的 .chat-pane 有 1px 的
+ *        border-left，比 .pane-slot 窄 1px），输入框下面一行选择范围按钮的 data-pick / data-current、Effort 按钮和权限按钮
+ *        读屏名里的强度、模式名（没有这个按钮时为 null）。没有显示会话面板时 width 为 null。
+ */
+export function focusedPaneView(page) {
+  return page.evaluate(() => {
+    const slot = document.querySelector('.pane-slot[data-focused="true"]:not([hidden])')
+      ?? document.querySelector('.pane-slot:not([hidden])');
+    const pane = slot?.querySelector('[data-testid="chat-pane"]');
+    const row = pane?.querySelector('[data-testid="composer"] .composer-bottom');
+    const button = (id) => row?.querySelector(`[data-testid="${id}"]`) ?? null;
+    const name = (id, prefix) => button(id)?.getAttribute('aria-label')?.replace(prefix, '') ?? null;
+    const range = button('model-button');
+    return { width: pane ? pane.getBoundingClientRect().width : null, pick: range?.dataset.pick ?? null,
+      current: range?.dataset.current ?? null, effort: name('thinking-button', /^Effort: /),
+      permission: name('permission-button', /^Permission mode: /) };
+  });
+}
+
+/** @brief 各项的名字是否都是 VIEW_ORDER 里的、各只一次、先后与它相同。 */
+export const viewInOrder = (fields) => {
+  const labels = fields.map((field) => field.label);
+  return labels.every((label) => VIEW_ORDER.includes(label)) && new Set(labels).size === labels.length
+    && labels.every((label, index) => index === 0 || VIEW_ORDER.indexOf(label) > VIEW_ORDER.indexOf(labels[index - 1]));
+};
+
+/**
+ * @brief 会话里按 F8 时报告"Current view"与 view（focusedPaneView 的结果）对不上的项（composer-pickers.md"我自己定的"
+ *        第 16 条、新检查第 9 条）："Model range"是选择范围（data-pick，没有时 None）、"Model"是当前模型（data-current，
+ *        没有时 None）、"Effort"是 Effort 按钮显示的强度（没有这个按钮时 None）、"Permission mode"与权限按钮相同、
+ *        "Pane width"是焦点所在那一栏 .chat-pane 的宽度（"<数>px"，差 1px 以内）；各项先后照 VIEW_ORDER。都对时为空数组。
+ * @param fields viewFields 的结果，或交给主进程的报告里的 view
+ */
+export function paneFieldProblems(fields, view) {
+  const one = (label) => {
+    const found = fields.filter((field) => field.label === label);
+    return found.length === 1 ? found[0].value : null;
+  };
+  const width = /^(\d+(?:\.\d+)?)px$/.exec(one('Pane width') ?? '')?.[1];
+  return [
+    viewInOrder(fields) ? null : 'order',
+    one('Page') === 'Session' ? null : 'Page',
+    one('Model range') === (view.pick ?? 'None') ? null : 'Model range',
+    one('Model') === (view.current ?? 'None') ? null : 'Model',
+    one('Effort') === (view.effort ?? 'None') ? null : 'Effort',
+    one('Permission mode') !== null && one('Permission mode') === view.permission ? null : 'Permission mode',
+    width !== undefined && view.width !== null && Math.abs(Number(width) - view.width) <= 1 ? null : 'Pane width',
+  ].filter(Boolean);
+}
+
+/** @brief 不在会话页上按 F8 时报告"Current view"的问题：各项先后照 VIEW_ORDER，"Pane width"是"None"。都对时为空数组。 */
+export function offPaneFieldProblems(fields) {
+  const width = fields.filter((field) => field.label === 'Pane width');
+  return [viewInOrder(fields) ? null : 'order',
+    width.length === 1 && width[0].value === 'None' ? null : 'Pane width'].filter(Boolean);
 }
 
 /** @brief 等工具行下面的一行以 prefix 开头（最多 5 秒；上一次的结果还在时要等它换掉），返回它此刻的文字。 */

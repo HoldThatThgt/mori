@@ -228,13 +228,19 @@ export async function cardCounts(page) {
     unavailable: await page.locator(`${PANE} [data-testid="unavailable-card"]`).count() };
 }
 
-/** @brief 当前一栏顶栏的范围按钮：文字、data-pick、data-current、是否可用、悬停说明。 */
+/**
+ * @brief 当前一栏输入框下面一行的范围按钮：文字、data-pick、data-current；unavailable 为"不可用"（aria-disabled 且没有
+ *        data-pending），pending 为"切换中"（data-pending），tip 为按行分开的悬停说明（docs/v0/composer-pickers.md C1、C2）。
+ */
 export function rangeButton(page) {
   return page.evaluate((pane) => {
     const button = document.querySelector(`${pane} [data-testid="model-button"]`);
     if (!button) return null;
+    const pending = button.dataset.pending === 'true';
     return { text: button.textContent.replace(/▾/g, '').trim(), pick: button.dataset.pick ?? null,
-      current: button.dataset.current ?? null, disabled: button.disabled, title: button.getAttribute('title') };
+      current: button.dataset.current ?? null, pending,
+      unavailable: button.getAttribute('aria-disabled') === 'true' && !pending,
+      tip: (button.getAttribute('title') ?? '').split('\n') };
   }, PANE);
 }
 
