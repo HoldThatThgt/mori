@@ -1,0 +1,14 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.22:8000/version",
+ "note": "TensorRT-LLM /version (the same shape as vLLM /version)",
+ "basis": [
+  "https://github.com/NVIDIA/TensorRT-LLM/blob/main/tensorrt_llm/serve/openai_server.py (version: {\"version\": VERSION})"
+ ],
+ "status": 200,
+ "body": {
+  "version": "1.2.0"
+ }
+}

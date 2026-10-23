@@ -1,0 +1,121 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.13:8080/v1/models",
+ "note": "llama.cpp router mode /v1/models: loaded, unloaded with and without context_length, incomplete download",
+ "basis": [
+  "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/server-models.cpp (get_router_models: id, aliases, tags, object, owned_by \"llamacpp\", created, status {value, args}, architecture, source, can_remove; context_length = n_ctx_train when known; a running model also gets the child's model info keys it does not have yet (meta); unfinished downloads listed with status \"incomplete\")",
+  "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/server-models.h (status strings: downloading, incomplete, downloaded, unloaded, loading, loaded, sleeping; sources: preset, models_dir, cache)"
+ ],
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "qwen3-8b",
+    "aliases": [],
+    "tags": [],
+    "object": "model",
+    "owned_by": "llamacpp",
+    "created": 1792740400,
+    "status": {
+     "value": "loaded",
+     "args": [
+      "--ctx-size",
+      "16384"
+     ]
+    },
+    "architecture": {
+     "input_modalities": [
+      "text"
+     ],
+     "output_modalities": [
+      "text"
+     ]
+    },
+    "source": "models_dir",
+    "can_remove": false,
+    "context_length": 40960,
+    "meta": {
+     "vocab_type": 2,
+     "n_vocab": 151936,
+     "n_ctx": 16384,
+     "n_ctx_train": 40960,
+     "n_embd": 4096,
+     "n_params": 8190735360,
+     "size": 5027783488,
+     "ftype": "Q4_K - Medium"
+    }
+   },
+   {
+    "id": "llama-3.2-3b",
+    "aliases": [],
+    "tags": [],
+    "object": "model",
+    "owned_by": "llamacpp",
+    "created": 1792740400,
+    "status": {
+     "value": "unloaded",
+     "args": []
+    },
+    "architecture": {
+     "input_modalities": [
+      "text"
+     ],
+     "output_modalities": [
+      "text"
+     ]
+    },
+    "source": "models_dir",
+    "can_remove": false,
+    "context_length": 131072
+   },
+   {
+    "id": "phi-4-mini",
+    "aliases": [],
+    "tags": [],
+    "object": "model",
+    "owned_by": "llamacpp",
+    "created": 1792740400,
+    "status": {
+     "value": "unloaded",
+     "args": []
+    },
+    "architecture": {
+     "input_modalities": [
+      "text"
+     ],
+     "output_modalities": [
+      "text"
+     ]
+    },
+    "source": "preset",
+    "can_remove": false
+   },
+   {
+    "id": "ggml-org/gemma-3-12b-it-GGUF",
+    "aliases": [],
+    "tags": [],
+    "object": "model",
+    "owned_by": "llamacpp",
+    "created": 1792740400,
+    "status": {
+     "value": "incomplete",
+     "args": []
+    },
+    "architecture": {
+     "input_modalities": [
+      "text"
+     ],
+     "output_modalities": [
+      "text"
+     ]
+    },
+    "source": "cache",
+    "can_remove": true,
+    "sidecars": []
+   }
+  ],
+  "object": "list"
+ }
+}

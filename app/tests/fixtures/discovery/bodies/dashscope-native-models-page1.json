@@ -1,0 +1,323 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "https://dashscope.aliyuncs.com/api/v1/models?page_no=1&page_size=100",
+ "note": "Model Studio native /api/v1/models page 1: a full page of 100 models (4 described models, then 96 compact filler rows so that the reader asks for page 2)",
+ "basis": [
+  "https://help.aliyun.com/zh/model-studio/list-models (GET /api/v1/models: page_no from 1, page_size default 20, model; response success, request_id, output {total, page_no, page_size, models[{model, name, description, provider, inference_provider, capabilities (TG, VU, Reasoning, IG, TR, ...), features (function-calling, structured-outputs, web-search, cache, ...), prices, inference_metadata {request_modality, response_modality}, model_info {context_window, max_input_tokens, max_output_tokens, ...}}]})",
+  "docs/proposals/model-discovery.md section 14 (fields confirmed on the documented hosts; on dashscope.aliyuncs.com the path exists but its content is unverified)",
+  "filler-model-005 to filler-model-100 are synthetic padding (only model, capabilities, model_info), not real models: the reader pages on only after a full page of 100 (accepted decision A11)"
+ ],
+ "status": 200,
+ "body": {
+  "code": null,
+  "message": null,
+  "success": true,
+  "request_id": "d5f5201f-ee7a-9e3d-8569-bc0eedec21f1",
+  "output": {
+   "total": 101,
+   "page_no": 1,
+   "page_size": 100,
+   "models": [
+    {
+     "model": "qwen3.8-max",
+     "name": "Qwen3.8-Max",
+     "description": "Qwen3.8-Max model",
+     "provider": "qwen",
+     "inference_provider": "aliyun-bailian",
+     "capabilities": [
+      "TG",
+      "Reasoning"
+     ],
+     "features": [
+      "function-calling",
+      "structured-outputs",
+      "web-search"
+     ],
+     "prices": [
+      {
+       "range_name": "Default",
+       "prices": [
+        {
+         "type": "input_token",
+         "price": "2",
+         "price_unit": "per 1M tokens",
+         "price_name": "input"
+        },
+        {
+         "type": "output_token",
+         "price": "8",
+         "price_unit": "per 1M tokens",
+         "price_name": "output"
+        }
+       ]
+      }
+     ],
+     "published_time": "2026-09-01 12:00:00",
+     "inference_metadata": {
+      "request_modality": [
+       "Text"
+      ],
+      "response_modality": [
+       "Text"
+      ]
+     },
+     "model_info": {
+      "context_window": 131072,
+      "max_input_tokens": 130048,
+      "max_output_tokens": 16384,
+      "max_reasoning_tokens": null,
+      "reasoning_max_input_tokens": null,
+      "reasoning_max_output_tokens": null
+     }
+    },
+    {
+     "model": "qwen-vl-max",
+     "name": "Qwen-VL-Max",
+     "description": "Qwen-VL-Max model",
+     "provider": "qwen",
+     "inference_provider": "aliyun-bailian",
+     "capabilities": [
+      "TG",
+      "VU"
+     ],
+     "features": [
+      "structured-outputs"
+     ],
+     "prices": [
+      {
+       "range_name": "Default",
+       "prices": [
+        {
+         "type": "input_token",
+         "price": "2",
+         "price_unit": "per 1M tokens",
+         "price_name": "input"
+        },
+        {
+         "type": "output_token",
+         "price": "8",
+         "price_unit": "per 1M tokens",
+         "price_name": "output"
+        }
+       ]
+      }
+     ],
+     "published_time": "2026-09-01 12:00:00",
+     "inference_metadata": {
+      "request_modality": [
+       "Text",
+       "Image"
+      ],
+      "response_modality": [
+       "Text"
+      ]
+     },
+     "model_info": {
+      "context_window": 131072,
+      "max_input_tokens": 129024,
+      "max_output_tokens": 8192,
+      "max_reasoning_tokens": null,
+      "reasoning_max_input_tokens": null,
+      "reasoning_max_output_tokens": null
+     }
+    },
+    {
+     "model": "qwen-image-3.0-pro",
+     "name": "Qwen-Image-3.0-Pro",
+     "description": "Qwen-Image-3.0-Pro model",
+     "provider": "qwen",
+     "inference_provider": "aliyun-bailian",
+     "capabilities": [
+      "IG"
+     ],
+     "features": [
+      "model-experience"
+     ],
+     "prices": [
+      {
+       "range_name": "Default",
+       "prices": [
+        {
+         "type": "input_token",
+         "price": "2",
+         "price_unit": "per 1M tokens",
+         "price_name": "input"
+        },
+        {
+         "type": "output_token",
+         "price": "8",
+         "price_unit": "per 1M tokens",
+         "price_name": "output"
+        }
+       ]
+      }
+     ],
+     "published_time": "2026-09-01 12:00:00",
+     "inference_metadata": {
+      "request_modality": [
+       "Text"
+      ],
+      "response_modality": [
+       "Image"
+      ]
+     },
+     "model_info": {
+      "context_window": null,
+      "max_input_tokens": null,
+      "max_output_tokens": null,
+      "max_reasoning_tokens": null,
+      "reasoning_max_input_tokens": null,
+      "reasoning_max_output_tokens": null
+     }
+    },
+    {
+     "model": "text-embedding-v4",
+     "name": "Text-Embedding-V4",
+     "description": "Text-Embedding-V4 model",
+     "provider": "qwen",
+     "inference_provider": "aliyun-bailian",
+     "capabilities": [
+      "TR"
+     ],
+     "features": [
+      "batch"
+     ],
+     "prices": [
+      {
+       "range_name": "Default",
+       "prices": [
+        {
+         "type": "input_token",
+         "price": "2",
+         "price_unit": "per 1M tokens",
+         "price_name": "input"
+        },
+        {
+         "type": "output_token",
+         "price": "8",
+         "price_unit": "per 1M tokens",
+         "price_name": "output"
+        }
+       ]
+      }
+     ],
+     "published_time": "2026-09-01 12:00:00",
+     "inference_metadata": {
+      "request_modality": [
+       "Text"
+      ],
+      "response_modality": [
+       "Text"
+      ]
+     },
+     "model_info": {
+      "context_window": 8192,
+      "max_input_tokens": 8192,
+      "max_output_tokens": null,
+      "max_reasoning_tokens": null,
+      "reasoning_max_input_tokens": null,
+      "reasoning_max_output_tokens": null
+     }
+    },
+    {"model":"filler-model-005","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-006","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-007","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-008","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-009","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-010","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-011","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-012","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-013","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-014","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-015","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-016","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-017","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-018","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-019","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-020","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-021","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-022","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-023","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-024","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-025","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-026","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-027","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-028","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-029","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-030","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-031","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-032","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-033","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-034","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-035","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-036","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-037","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-038","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-039","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-040","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-041","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-042","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-043","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-044","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-045","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-046","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-047","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-048","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-049","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-050","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-051","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-052","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-053","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-054","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-055","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-056","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-057","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-058","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-059","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-060","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-061","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-062","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-063","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-064","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-065","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-066","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-067","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-068","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-069","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-070","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-071","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-072","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-073","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-074","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-075","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-076","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-077","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-078","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-079","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-080","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-081","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-082","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-083","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-084","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-085","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-086","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-087","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-088","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-089","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-090","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-091","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-092","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-093","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-094","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-095","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-096","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-097","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-098","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-099","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}},
+    {"model":"filler-model-100","capabilities":["TG"],"model_info":{"context_window":32768,"max_output_tokens":8192}}
+   ]
+  }
+ }
+}

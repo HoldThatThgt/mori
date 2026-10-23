@@ -1,0 +1,47 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "https://api.moonshot.cn/v1/models",
+ "note": "Kimi (Moonshot) /v1/models: context_length, supports_image_in, supports_video_in, supports_reasoning",
+ "basis": [
+  "https://platform.kimi.ai/docs/api/list-models (fields: id, object, created, owned_by, context_length, supports_image_in, supports_video_in, supports_reasoning; no response sample on the page)",
+  "Model ids and values are illustrative"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "kimi-k3",
+    "object": "model",
+    "created": 1792000000,
+    "owned_by": "moonshot",
+    "context_length": 1048576,
+    "supports_image_in": true,
+    "supports_video_in": true,
+    "supports_reasoning": true
+   },
+   {
+    "id": "kimi-k2-0905-preview",
+    "object": "model",
+    "created": 1757030400,
+    "owned_by": "moonshot",
+    "context_length": 262144,
+    "supports_image_in": false,
+    "supports_video_in": false,
+    "supports_reasoning": false
+   },
+   {
+    "id": "moonshot-v1-8k",
+    "object": "model",
+    "created": 1712000000,
+    "owned_by": "moonshot",
+    "context_length": 8192,
+    "supports_image_in": false,
+    "supports_video_in": false,
+    "supports_reasoning": false
+   }
+  ]
+ }
+}

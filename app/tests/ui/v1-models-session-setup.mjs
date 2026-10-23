@@ -14,7 +14,10 @@ import { appRoot, oneLine, sleep } from './lib.mjs';
 
 // ---------- 合成端点与转发代理（synthetic） ----------
 
-/** @brief 启动合成端点进程，收集它每个对话请求的一行 JSON 日志（加上收到的时刻）。 */
+/**
+ * @brief 启动合成端点进程，收集它每个对话请求的一行 JSON 日志（加上收到的时刻）。列表请求与详情请求的 JSON 行带 path
+ *        （model-discovery.md §13.1、server.mjs 开头"日志"），不是对话请求，不收集。
+ */
 function spawnFake(port, env) {
   const child = spawn(process.execPath, [join(appRoot, 'tests/fake-endpoint/server.mjs')], {
     env: { ...process.env, FAKE_PORT: String(port), FAKE_CHUNK_DELAY_MS: '10', FAKE_FIRST_DELAY_MS: '20', ...env },
@@ -32,7 +35,10 @@ function spawnFake(port, env) {
       rest = lines.pop();
       for (const line of lines.map((item) => item.trim())) {
         if (line.startsWith('{')) {
-          try { log.push({ ...JSON.parse(line), at: Date.now() }); } catch { /* 不是 JSON 的行不记 */ }
+          try {
+            const entry = JSON.parse(line);
+            if (!('path' in entry)) log.push({ ...entry, at: Date.now() });
+          } catch { /* 不是 JSON 的行不记 */ }
         } else if (line.includes('synthetic')) {
           clearTimeout(timer);
           done({ child, log });

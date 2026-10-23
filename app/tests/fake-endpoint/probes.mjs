@@ -1,6 +1,7 @@
 // 合成测试端点（synthetic）的探针部分：只用于测试，不是真实模型。
 // 认出 docs/specs/model-providers.md §7.3 第 1–9 步的请求，一律按"能力全通过"回答；
-// 模型 id 的后缀只关掉对应的探针能力（-notools、-nochoice、-noschema、-replay、-truncate），规则见 server.mjs 开头。
+// 模型 id 的后缀只关掉对应的探针能力（-notools、-nochoice、-noschema、-replay、-truncate），规则见 server.mjs 开头；
+// -alwaysthink 给每个回复加思考，在 server.mjs 里处理（探针的回复也一样）。
 
 import { contentText } from './replies.mjs';
 

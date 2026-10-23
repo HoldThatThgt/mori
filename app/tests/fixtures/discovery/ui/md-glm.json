@@ -1,0 +1,268 @@
+{
+ "source": "real",
+ "note": "Recorded from the real App by tests/ui/md-record.mjs; do not edit by hand.",
+ "name": "md-glm",
+ "description": "Settings → Models → Add provider: Fetch models from the real GLM address without an API key",
+ "covers": [
+  "MD-07"
+ ],
+ "recorded": "2026-10-23",
+ "address": "https://open.bigmodel.cn/api/paas/v4",
+ "endpoint": "http://127.0.0.1:4862/v1",
+ "model": "legacy/fake-legacy",
+ "notes": [
+  "Setup (synthetic test setup, docs/specs/model-discovery.md §13.1): model-config.json has one local provider Legacy endpoint (legacy/fake-legacy) on the synthetic endpoint http://127.0.0.1:4862/v1 (vllm shape), with a profile written the way Mori wrote it before model discovery (no auto.meta, reasoning field reasoning_content, verified); default range legacy/fake-legacy",
+  "No API key was entered: the commands carry no key and the fixture stores no request headers"
+ ],
+ "recordedAt": "2026-10-23T11:19:46.439Z",
+ "steps": [
+  {
+   "t": 4,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 5,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 9,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 13,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-md-record-data-JspWi4\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 17,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 21,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-md-record-data-JspWi4\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 25,
+   "command": {
+    "type": "models.get"
+   }
+  },
+  {
+   "t": 33,
+   "result": {
+    "type": "models.get",
+    "value": {
+     "error": null,
+     "config": {
+      "version": 1,
+      "providers": [
+       {
+        "id": "legacy",
+        "name": "Legacy endpoint",
+        "api": "openai-completions",
+        "baseUrl": "http://127.0.0.1:4862/v1",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "local",
+        "keys": [],
+        "nextKeyNumber": 1,
+        "models": [
+         {
+          "id": "fake-legacy",
+          "family": "",
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "reasoning": false,
+          "input": [
+           "text"
+          ]
+         }
+        ]
+       }
+      ],
+      "groups": [],
+      "normalDefault": "legacy/fake-legacy",
+      "allowedZones": [
+       "local",
+       "intranet"
+      ],
+      "projectZones": {}
+     },
+     "profiles": {
+      "legacy/fake-legacy": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "vllm",
+        "version": "0.10.1"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "verified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": 1792754379770,
+       "suite": 1
+      }
+     },
+     "keyStatus": {},
+     "thinkingDefaults": {
+      "legacy/fake-legacy": null
+     },
+     "zoneSuggestions": {
+      "legacy": "local"
+     },
+     "migration": null,
+     "projects": [],
+     "loadError": null,
+     "reserved": [
+      "mori",
+      "amazon-bedrock",
+      "ant-ling",
+      "anthropic",
+      "azure",
+      "baseten",
+      "cerebras",
+      "cloudflare-ai-gateway",
+      "cloudflare-workers-ai",
+      "deepseek",
+      "fireworks",
+      "github-copilot",
+      "google",
+      "google-vertex",
+      "groq",
+      "huggingface",
+      "kimi-coding",
+      "meta",
+      "minimax",
+      "minimax-cn",
+      "mistral",
+      "moonshotai",
+      "moonshotai-cn",
+      "nvidia",
+      "openai",
+      "openai-codex",
+      "opencode",
+      "opencode-go",
+      "openrouter",
+      "qwen-token-plan",
+      "qwen-token-plan-cn",
+      "qwen-token-plan-individual",
+      "radius",
+      "together",
+      "typesafe",
+      "vercel-ai-gateway",
+      "xai",
+      "xiaomi",
+      "xiaomi-token-plan-ams",
+      "xiaomi-token-plan-cn",
+      "xiaomi-token-plan-sgp",
+      "zai",
+      "zai-coding-cn"
+     ]
+    }
+   }
+  },
+  {
+   "t": 40,
+   "command": {
+    "type": "models.discover",
+    "target": {
+     "kind": "new",
+     "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+     "api": null,
+     "keySecret": null
+    }
+   }
+  },
+  {
+   "t": 184,
+   "result": {
+    "type": "models.discover",
+    "value": {
+     "error": null,
+     "cancelled": false,
+     "server": null,
+     "api": "openai-completions",
+     "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+     "name": "open.bigmodel.cn",
+     "anthropicShape": false,
+     "listError": {
+      "kind": "rejected",
+      "detail": "{\"error\":{\"code\":\"1001\",\"message\":\"Header中未收到Authorization参数，无法进行身份验证。\"}}"
+     },
+     "models": [],
+     "truncated": false,
+     "notListed": []
+    }
+   }
+  }
+ ]
+}

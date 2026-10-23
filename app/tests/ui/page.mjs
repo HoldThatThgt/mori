@@ -1,8 +1,104 @@
 // 界面测试共用的页面操作：发消息、等本轮结束、采样阶段行、读工具卡、首次启动表单（v1）、设置 → Models 的提供商卡与
 // Keys、打开文件夹。v1 的标识见 docs/v1/screens/first-run.md、models-settings.md，界面文字见 docs/v0/ui-strings.md。
+// 一键拉取模型（docs/specs/model-discovery.md §6、§13.4）：首次启动、Add provider 与卡上的 Fetch models 都是
+// "地址和 key → Fetch models → 在清单里勾选或用 Add a model ID 手填 → 加入"；fetchIn、pickIn、cardAddModels 是三处共用的
+// 操作（范围用选择器给出：首次启动表单、Add provider 表单或一张提供商卡）。
 
 /** "Open folder…"按钮的名字（侧栏、空状态与首次启动表单同一个词） */
 export const OPEN_FOLDER = 'Open folder…';
+
+/** 首次启动表单（first-run.md "界面测试用的标识"） */
+export const FIRST_RUN_FORM = '[data-testid="connection-form"]';
+/** 设置 → Models 的 Add provider 表单（models-settings.md "界面测试用的标识"） */
+export const PROVIDER_FORM = '[data-testid="provider-form"]';
+/** @brief 一张提供商卡的选择器（卡上的清单在卡里，models-settings.md "卡上的清单"）。 */
+export const cardScope = (provider) => `[data-testid="provider-card"][data-provider="${provider}"]`;
+
+/** 拉取之后清单、列表错误与命令失败的原文（§6.1–§6.3）：拉取前先把已有的标为旧的，只认新出现的 */
+const FETCH_OUTCOMES = '[data-testid="checklist"], [data-testid="list-error"], [data-testid="form-message"]';
+
+/**
+ * @brief 在 scope 里点 Fetch models，等这次拉取的结果（§6.1、§6.5）：清单、列表错误，或命令本身失败的原文。
+ *        之前的清单、列表错误与原文先标为旧的（再拉一次时它们会被换掉），只认这次新出现的。
+ * @param scope FIRST_RUN_FORM、PROVIDER_FORM 或 cardScope(<provider>)
+ * @return { state: 'list' | 'list-error' | 'command', kind: 列表错误的 data-kind（其余为 null）,
+ *         text: 显示的文字（前 300 字） }
+ */
+export async function fetchIn(page, scope, timeout = 60000) {
+  await page.evaluate(({ root, outcomes }) => {
+    for (const element of document.querySelectorAll(`${root} :is(${outcomes})`)) element.dataset.staleFetch = 'true';
+  }, { root: scope, outcomes: FETCH_OUTCOMES });
+  await page.locator(`${scope} [data-action="fetch-models"]`).click();
+  const handle = await page.waitForFunction((root) => {
+    const box = document.querySelector(root);
+    if (!box || box.querySelector('[data-testid="fetch-status"][data-state="fetching"]')) return false;
+    const fresh = (css) => [...box.querySelectorAll(css)].find((element) => element.dataset.staleFetch !== 'true');
+    const text = (element) => element.textContent.replace(/\s+/g, ' ').trim().slice(0, 300);
+    const list = fresh('[data-testid="checklist"]');
+    if (list) return { state: 'list', kind: null, text: text(list) };
+    const error = fresh('[data-testid="list-error"]');
+    if (error) return { state: 'list-error', kind: error.dataset.kind, text: text(error) };
+    const message = fresh('[data-testid="form-message"]');
+    return message ? { state: 'command', kind: null, text: text(message) } : false;
+  }, scope, { timeout });
+  return handle.jsonValue();
+}
+
+/** @brief 清单的一行（服务列出的或手填的，§6.2、§6.4）。 */
+const rowIn = (page, scope, id) => page.locator(`${scope} [data-testid="discovered-row"][data-model="${id}"]`);
+
+/**
+ * @brief 在 scope 的清单里只勾 specs 里的模型（§6.2–§6.4）：其余勾着的行取消勾选；清单里没有的 id 用 Add a model ID 手填
+ *        （加进来就是勾上的）；再按 spec 改这一行的 Context window、Max output、Supports thinking、Image input
+ *        （不给的不碰）。拉取之后才能用（fetchIn）。
+ * @param specs 模型 id，或 { id, contextWindow, maxTokens, reasoning, image }，按要加入的顺序
+ */
+export async function pickIn(page, scope, specs) {
+  const wanted = specs.map((spec) => (typeof spec === 'string' ? { id: spec } : spec));
+  const ids = new Set(wanted.map((spec) => spec.id));
+  const picked = await page.locator(`${scope} [data-testid="discovered-row"]`).evaluateAll((rows) => rows
+    .filter((row) => row.querySelector('input[name="pick"]')?.checked).map((row) => row.dataset.model));
+  for (const id of picked.filter((item) => !ids.has(item))) {
+    await rowIn(page, scope, id).locator('input[name="pick"]').uncheck();
+  }
+  for (const spec of wanted) {
+    const row = rowIn(page, scope, spec.id);
+    if (await row.count() === 0) {
+      await page.locator(`${scope} [data-testid="manual-model"] input[data-field="id"]`).fill(spec.id);
+      await page.locator(`${scope} [data-action="add-to-list"]`).click();
+      await row.waitFor({ timeout: 5000 });
+    } else {
+      await row.locator('input[name="pick"]').check();
+    }
+    for (const field of ['contextWindow', 'maxTokens']) {
+      if (spec[field] !== undefined) await row.locator(`input[data-field="${field}"]`).fill(String(spec[field]));
+    }
+    for (const field of ['reasoning', 'image']) {
+      if (spec[field] !== undefined) await row.locator(`input[data-field="${field}"]`).setChecked(spec[field]);
+    }
+  }
+}
+
+/**
+ * @brief 卡上的 Fetch models（§6.5）：拉取（用已保存的 key），在卡里的清单只勾 specs（没列出的手填，pickIn），
+ *        点"Add N models"（models.addModels），等清单关掉、新模型的行都出现；加入失败时返回清单里的原文。
+ * @return { fetch: fetchIn 的结果, error: 加入失败的原文，成功时为 null }
+ */
+export async function cardAddModels(page, provider, specs, timeout = 20000) {
+  const scope = cardScope(provider);
+  const fetch = await fetchIn(page, scope);
+  await pickIn(page, scope, specs);
+  await page.locator(`${scope} [data-action="add-models"]`).click();
+  const refs = specs.map((spec) => `${provider}/${typeof spec === 'string' ? spec : spec.id}`);
+  const handle = await page.waitForFunction(({ root, want }) => {
+    const card = document.querySelector(root);
+    const error = card?.querySelector('.card-checklist [data-testid="form-message"]');
+    if (error) return { error: error.textContent };
+    const rows = want.every((ref) => card?.querySelector(`[data-testid="model-row"][data-model="${ref}"]`));
+    return rows && !card.querySelector('.card-checklist') ? { error: null } : false;
+  }, { root: scope, want: refs }, { timeout });
+  return { fetch, ...(await handle.jsonValue()) };
+}
 
 /**
  * 首次启动表单下方"Test connection"的结果（含保存失败）开头的样子，FirstRunForm.tsx、state/settings.ts；
@@ -89,42 +185,71 @@ export function pageHelpers(page) {
     /** @brief 上下文用量（token 数，见 usageTokens）。 */
     usageTokens: () => usageTokens(page),
     /**
-     * @brief 填首次启动表单（v1，英文，docs/v1/screens/first-run.md）；不给的字段不碰。apiKey 为 null 时不碰 key 输入框。
+     * @brief 填首次启动表单（v1，docs/v1/screens/first-run.md；model-discovery.md §6.6、§13.4）：先填 Base URL 和
+     *        API key；它们改了，或表单还没拉取过时，Fetch models（fetchIn，拉取后改 Base URL 或 key 会回到开始，所以
+     *        改了就再拉一次）；之后填 Name、选区域，在清单里只勾要的模型（pickIn：清单里没有的用 Add a model ID 手填）。
+     *        不给的字段不碰；apiKey 为 null 时不碰 key 输入框。contextWindow、reasoning 改的是第一个模型那一行。
+     * @param modelId 要勾的模型（只有一个时）；models 给出时用 models（模型 id 或 pickIn 的 spec，按勾选顺序）
      * @param zone 网络区域 local / intranet / public（测试一律选 Local，除非要测公网）
+     * @return 这次拉取的结果（fetchIn）；没有拉取时为 null
      */
-    async fillConnection({ name, baseUrl, apiKey, modelId, contextWindow, zone, reasoning }) {
+    async fillConnection({ name, baseUrl, apiKey, modelId, models, contextWindow, zone, reasoning }) {
       const form = page.getByTestId('connection-form');
       const field = (label) => form.getByLabel(label, { exact: true });
+      const setText = async (label, value) => {
+        if ((await field(label).inputValue()) === value) return false;
+        await field(label).fill(value);
+        return true;
+      };
+      const urlChanged = baseUrl !== undefined && await setText('Base URL', baseUrl);
+      const keyChanged = apiKey !== null && apiKey !== undefined && await setText('API key', apiKey);
+      const fetched = await form.locator('[data-testid="checklist"], [data-testid="list-error"]').count() > 0;
+      const fetch = urlChanged || keyChanged || !fetched ? await fetchIn(page, FIRST_RUN_FORM) : null;
       if (name !== undefined) await field('Name').fill(name);
-      if (baseUrl !== undefined) await field('Base URL').fill(baseUrl);
       if (zone !== undefined) await form.locator(`input[name="zone"][value="${zone}"]`).check();
-      if (apiKey !== null && apiKey !== undefined) await field('API key').fill(apiKey);
-      if (modelId !== undefined) await field('Model ID').fill(modelId);
-      if (contextWindow !== undefined) await field('Context window').fill(String(contextWindow));
-      if (reasoning !== undefined) await form.getByLabel('Supports thinking').setChecked(reasoning);
+      const specs = models ?? (modelId === undefined ? null : [modelId]);
+      if (specs) {
+        const [first, ...rest] = specs.map((spec) => (typeof spec === 'string' ? { id: spec } : spec));
+        const values = Object.fromEntries(Object.entries({ contextWindow, reasoning })
+          .filter(([, value]) => value !== undefined));
+        await pickIn(page, FIRST_RUN_FORM, [{ ...first, ...values }, ...rest]);
+      }
+      return fetch;
     },
     /**
-     * @brief 首次启动：填表（区域默认 Local）→ Test connection → 成功后等探针都跑完（表单下方的探针状态不再是
-     *        verifying，规格 §14.4）。返回测试结果文字、是否成功和探针状态（data-state）。
+     * @brief 首次启动：Base URL 和 API key → Fetch models → 勾模型（默认 fake-coder；合成端点列出两行、类型不明，
+     *        默认都不勾，§13.4）→ Name → 区域（默认 Local）→ Test connection → 成功后等探针都跑完（表单下方的探针状态
+     *        不再是 verifying，规格 §14.4）。返回测试结果文字、是否成功、探针状态（data-state）、这次拉取的结果和
+     *        typed：勾着的行里用 Add a model ID 手填的模型 id（服务没列出，行上标"Entered by you"，§6.4）。
      *        名称默认 "Mori endpoint"，生成的提供商 id 为 mori-endpoint（同 v0 的连接 id，现有测试的模型全名不变）。
      */
-    async firstRun({ name = 'Mori endpoint', baseUrl, apiKey, modelId = 'fake-coder', zone = 'local', contextWindow,
-      reasoning, probeTimeout = 180000 } = {}) {
-      await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
-      await h.fillConnection({ name, baseUrl, apiKey, modelId, zone, contextWindow, reasoning });
+    async firstRun({ name = 'Mori endpoint', baseUrl, apiKey, modelId = 'fake-coder', models, zone = 'local',
+      contextWindow, reasoning, probeTimeout = 180000 } = {}) {
+      const form = page.getByTestId('connection-form');
+      await form.waitFor({ timeout: 60000 });
+      const fetch = await h.fillConnection({ name, baseUrl, apiKey, modelId, models, zone, contextWindow, reasoning });
+      const typed = await form.locator('[data-testid="discovered-row"]').evaluateAll((rows) => rows
+        .filter((row) => row.querySelector('input[name="pick"]')?.checked
+          && row.querySelector('[data-testid="row-tag"][data-kind="entered"]')).map((row) => row.dataset.model));
       const previous = await page.getByTestId('form-message').innerText().catch(() => null);
-      await page.getByTestId('connection-form').locator('[data-action="test"]').click();
+      await form.locator('[data-action="test"]').click();
       const text = await h.formMessage(previous, { test: true, timeout: 180000 });
       const ok = text.startsWith('Connected');
       const probe = ok ? await h.waitProbes(probeTimeout) : null;
-      return { ok, text, probe };
+      return { ok, text, probe, fetch, typed };
     },
     /**
      * @brief 只走流程的首次启动（M1 已测过表单）：同 firstRun，测试失败或探针没有验证通过时报错；之后等"Open folder…"。
+     *        model-discovery.md §13.4：这次 Fetch models 必须拿到列表、勾的模型必须是服务列出的（不是手填的），否则报错
+     *        （对的 key 拉取失败时不悄悄改成手填）。
      */
     async setupFirstRun(options) {
       const run = await h.firstRun(options);
       if (!run.ok || run.probe !== 'verified') throw new Error(`first run: ${run.text}; probe-status ${run.probe}`);
+      if (run.fetch && run.fetch.state !== 'list') {
+        throw new Error(`first run: Fetch models gave ${run.fetch.state} ${run.fetch.kind ?? ''}: ${run.fetch.text}`);
+      }
+      if (run.typed.length > 0) throw new Error(`first run: not listed by the server, typed: ${run.typed.join(', ')}`);
       await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
       return run;
     },
@@ -146,6 +271,8 @@ export function pageHelpers(page) {
     /** @brief 设置 → Models 的提供商卡（provider id）。 */
     providerCard: (provider = 'mori-endpoint') => page
       .locator(`[data-testid="provider-card"][data-provider="${provider}"]`),
+    /** @brief 卡上的 Fetch models → 勾选或手填 → Add N models（cardAddModels，§6.5）。 */
+    addModels: (specs, provider = 'mori-endpoint') => cardAddModels(page, provider, specs),
     /** @brief 在提供商卡的 Keys 里 Add key：填 Secret（Label 用默认），Save，等新行出现；返回新行数。 */
     async addKey(secret, provider = 'mori-endpoint') {
       const card = h.providerCard(provider);

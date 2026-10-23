@@ -1,0 +1,37 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.24:3000/v1/models?limit=1000",
+ "note": "New API /v1/models answered in the Anthropic shape (no success field; the header is still sent)",
+ "basis": [
+  "https://github.com/QuantumNous/new-api/blob/main/controller/model.go (ListModels default: {success: true, data, object: \"list\"}; buildOpenAIModel: created 1626777600, owned_by \"custom\" or the channel owner, supported_endpoint_types)",
+  "https://github.com/QuantumNous/new-api/blob/main/middleware/cors.go (Version middleware: response header X-New-Api-Version)",
+  "controller/model.go ListModels case ChannelTypeAnthropic: {data[{id, created_at = time.Unix(created).UTC() as RFC 3339, display_name = id, type \"model\"}], first_id, has_more: false, last_id}; dto json tags NOT checked (dto/openai_model.go has moved)",
+  "https://github.com/QuantumNous/new-api/blob/main/router/relay-router.go (GET /v1/models takes this branch when the request has both x-api-key and anthropic-version, as spec section 3.2 attempt 1 sends with a key)",
+  "https://github.com/QuantumNous/new-api/blob/main/main.go (server.Use(middleware.Version()): the header is on every response)"
+ ],
+ "status": 200,
+ "headers": {
+  "X-New-Api-Version": "v0.9.6"
+ },
+ "body": {
+  "data": [
+   {
+    "id": "claude-sonnet-4-5",
+    "created_at": "2021-07-20T10:40:00Z",
+    "display_name": "claude-sonnet-4-5",
+    "type": "model"
+   },
+   {
+    "id": "claude-haiku-4-5",
+    "created_at": "2021-07-20T10:40:00Z",
+    "display_name": "claude-haiku-4-5",
+    "type": "model"
+   }
+  ],
+  "first_id": "claude-sonnet-4-5",
+  "has_more": false,
+  "last_id": "claude-haiku-4-5"
+ }
+}

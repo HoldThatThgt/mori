@@ -1,0 +1,41 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "https://qianfan.baidubce.com/v2/models",
+ "note": "Baidu Qianfan /v2/models: field names NOT verified (no public docs or sample found)",
+ "basis": [
+  "No Qianfan documentation for GET /v2/models was found on 2026-10-23; a GET without a key answered 429 OverRateLimit",
+  "Shape follows docs/specs/model-discovery.md section 4.1 only: a window field from the table (max_input_tokens) and max_tokens, which section 4.1 reads for kind qianfan"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "ernie-5.0",
+    "object": "model",
+    "created": 1792000000,
+    "owned_by": "baidu",
+    "max_input_tokens": 122880,
+    "max_tokens": 65536
+   },
+   {
+    "id": "ernie-speed-128k",
+    "object": "model",
+    "created": 1792000000,
+    "owned_by": "baidu",
+    "max_input_tokens": 126976,
+    "max_tokens": 4096
+   },
+   {
+    "id": "ernie-lite-8k",
+    "object": "model",
+    "created": 1792000000,
+    "owned_by": "baidu",
+    "max_input_tokens": 8192,
+    "max_tokens": 8192
+   }
+  ]
+ }
+}

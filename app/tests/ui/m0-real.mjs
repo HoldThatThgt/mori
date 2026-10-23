@@ -40,7 +40,8 @@ async function setup() {
   const app = await launch();
   console.log(previous
     ? 'Mori 已打开：数据目录里已有模型配置，窗口打开在 Settings → Models。确认各提供商的 Network zone，需要时添加提供商并测试连接；'
-    : 'Mori 已打开：在首次启动表单里填 Name、Base URL、Network zone、API key、Model ID，测试连接后保存；');
+    : 'Mori 已打开：在首次启动表单里填 Base URL、API key，点 Fetch models，在清单里勾模型（没列出时用 Add a model ID '
+      + '手填），确认 Name、Network zone，测试连接后保存；');
   console.log('等每个模型的 Tool calling 都显示 Verified 后再关闭窗口（探针没跑完就关，下次启动会重新探测）。');
   await new Promise((done) => app.process().once('exit', done));
   console.log(`已退出。数据目录：${userData}`);

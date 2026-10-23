@@ -1,0 +1,67 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.10:8000/v1/models",
+ "note": "vLLM /v1/models: one base model and one LoRA adapter (parent set, max_model_len null)",
+ "basis": [
+  "https://github.com/vllm-project/vllm/blob/main/vllm/entrypoints/serve/engine/protocol.py (ModelCard: owned_by \"vllm\", root, parent, max_model_len, permission; ModelList)",
+  "https://github.com/vllm-project/vllm/blob/main/vllm/entrypoints/openai/models/serving.py (show_available_models: base card with max_model_len; LoRA cards with parent = base model name and no max_model_len)"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "Qwen/Qwen3-32B",
+    "object": "model",
+    "created": 1792740000,
+    "owned_by": "vllm",
+    "root": "/models/Qwen3-32B",
+    "parent": null,
+    "max_model_len": 32768,
+    "permission": [
+     {
+      "id": "modelperm-3f2a9c1e5b7d4e0f8a6b2c9d1e3f5a7b",
+      "object": "model_permission",
+      "created": 1792740000,
+      "allow_create_engine": false,
+      "allow_sampling": true,
+      "allow_logprobs": true,
+      "allow_search_indices": false,
+      "allow_view": true,
+      "allow_fine_tuning": false,
+      "organization": "*",
+      "group": null,
+      "is_blocking": false
+     }
+    ]
+   },
+   {
+    "id": "sql-lora",
+    "object": "model",
+    "created": 1792740000,
+    "owned_by": "vllm",
+    "root": "/adapters/sql-lora",
+    "parent": "Qwen/Qwen3-32B",
+    "max_model_len": null,
+    "permission": [
+     {
+      "id": "modelperm-9b1d3f5a7c2e4b6d8f0a1c3e5b7d9f2a",
+      "object": "model_permission",
+      "created": 1792740000,
+      "allow_create_engine": false,
+      "allow_sampling": true,
+      "allow_logprobs": true,
+      "allow_search_indices": false,
+      "allow_view": true,
+      "allow_fine_tuning": false,
+      "organization": "*",
+      "group": null,
+      "is_blocking": false
+     }
+    ]
+   }
+  ]
+ }
+}

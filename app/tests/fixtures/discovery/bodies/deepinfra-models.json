@@ -1,0 +1,139 @@
+{
+ "source": "real",
+ "recorded": "2026-10-23",
+ "url": "https://api.deepinfra.com/v1/openai/models",
+ "note": "DeepInfra /v1/openai/models (public list, no key), trimmed to 5 of 176 rows; rows unchanged",
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "BAAI/bge-m3",
+    "object": "model",
+    "created": 0,
+    "owned_by": "deepinfra",
+    "root": "BAAI/bge-m3",
+    "parent": null,
+    "metadata": {
+     "description": "BGE-M3 is a versatile text embedding model that supports multi-functionality, multi-linguality, and multi-granularity, allowing it to perform dense retrieval, multi-vector retrieval, and sparse retrieval in over 100 languages and with input sizes up to 8192 tokens. The model can be used in a retrieval pipeline with hybrid retrieval and re-ranking to achieve higher accuracy and stronger generalization capabilities. BGE-M3 has shown state-of-the-art performance on several benchmarks, including MKQA, MLDR, and NarritiveQA, and can be used as a drop-in replacement for other embedding models like DPR and BGE-v1.5.",
+     "context_length": 8192,
+     "max_tokens": 8192,
+     "pricing": {
+      "input_tokens": 0.01
+     },
+     "discount": null,
+     "tags": [
+      "embed"
+     ],
+     "default_width": null,
+     "default_height": null,
+     "default_iterations": null
+    }
+   },
+   {
+    "id": "zai-org/GLM-4.7",
+    "object": "model",
+    "created": 0,
+    "owned_by": "deepinfra",
+    "root": "zai-org/GLM-4.7",
+    "parent": null,
+    "metadata": {
+     "description": "GLM-4.7 is a state-of-the-art, multilingual Mixture-of-Experts (MoE) language model designed for complex reasoning, agentic coding, and tool use. Building on its predecessor GLM-4.6, it delivers significant improvements across key benchmarks, including multilingual SWE-bench, Terminal Bench, and reasoning-heavy evaluations like HLE. The model features advanced \"Interleaved Thinking\" and new \"Preserved Thinking\" modes, allowing it to reason before actions and maintain consistency across long, multi-turn tasks. With 358 billion parameters, GLM-4.7 excels in generating clean code, modern UI elements, and sophisticated reasoning outputs.",
+     "context_length": 202752,
+     "max_tokens": 202752,
+     "pricing": {
+      "input_tokens": 0.4,
+      "output_tokens": 1.75,
+      "cache_read_tokens": 0.08000000000000002
+     },
+     "discount": null,
+     "tags": [
+      "chat",
+      "prompt_cache",
+      "reasoning"
+     ],
+     "default_width": null,
+     "default_height": null,
+     "default_iterations": null
+    }
+   },
+   {
+    "id": "Qwen/Qwen3.5-35B-A3B",
+    "object": "model",
+    "created": 0,
+    "owned_by": "deepinfra",
+    "root": "Qwen/Qwen3.5-35B-A3B",
+    "parent": null,
+    "metadata": {
+     "description": "Qwen3.5-35B-A3B is an efficient Mixture-of-Experts model from Alibaba's Qwen3.5 series with 35B total parameters and only 3B activated per token. It features a 262K token context window (extensible to 1M with YaRN), thinking/reasoning mode, tool calling, and support for 201 languages. Delivers strong performance on reasoning, coding, and vision-language tasks at a fraction of the compute cost.",
+     "context_length": 262144,
+     "max_tokens": 262144,
+     "pricing": {
+      "input_tokens": 0.14,
+      "output_tokens": 1,
+      "cache_read_tokens": 0.05000000040000001
+     },
+     "discount": null,
+     "tags": [
+      "chat",
+      "vlm",
+      "vision",
+      "prompt_cache",
+      "reasoning_effort",
+      "reasoning"
+     ],
+     "default_width": null,
+     "default_height": null,
+     "default_iterations": null
+    }
+   },
+   {
+    "id": "Sao10K/L3-8B-Lunaris-v1-Turbo",
+    "object": "model",
+    "created": 0,
+    "owned_by": "deepinfra",
+    "root": "Sao10K/L3-8B-Lunaris-v1-Turbo",
+    "parent": null,
+    "metadata": {
+     "description": "",
+     "context_length": 8192,
+     "max_tokens": 8192,
+     "pricing": {
+      "input_tokens": 0.04,
+      "output_tokens": 0.05
+     },
+     "discount": null,
+     "tags": [
+      "chat"
+     ],
+     "default_width": null,
+     "default_height": null,
+     "default_iterations": null
+    }
+   },
+   {
+    "id": "black-forest-labs/FLUX-1-schnell",
+    "object": "model",
+    "created": 0,
+    "owned_by": "deepinfra",
+    "root": "black-forest-labs/FLUX-1-schnell",
+    "parent": null,
+    "metadata": {
+     "description": "FLUX.1 [schnell] is a 12 billion parameter rectified flow transformer capable of generating images from text descriptions. This model offers cutting-edge output quality and competitive prompt following, matching the performance of closed source alternatives. Trained using latent adversarial diffusion distillation, FLUX.1 [schnell] can generate high-quality images in only 1 to 4 steps.",
+     "context_length": null,
+     "max_tokens": null,
+     "pricing": {
+      "per_image_unit": 0.0005
+     },
+     "discount": null,
+     "tags": [
+      "image-gen"
+     ],
+     "default_width": 1024,
+     "default_height": 1024,
+     "default_iterations": 1
+    }
+   }
+  ]
+ }
+}

@@ -8,6 +8,7 @@
 // 之后作为测试准备退出 App，把这个提供商的 key 指向复制来的密文（只复制密文，不读 key）、给项目授权公网，再启动、
 // 在拒绝启动卡上 Verify now，接着走查。走查 6 改为"错的 key → 说明卡 → Open settings → Keys"，$变量与没有 key 的情形删去；
 // 压缩的准备改为在复制出的 model-config.json 里把窗口改小。
+// 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先 Fetch models，在清单里勾模型（没列出时手填）。
 // 2026-10-21 起（docs/v0/composer-pickers.md）：权限、选择范围、Effort 和上下文用量（圆环）在输入框下面一行：用量随回复增长
 // 读圆环的 data-tokens（page.mjs usageTokens），圆环的读屏名、悬停和颜色按真实的数核对；拒绝启动卡在输入框上方时这一行的样子；
 // 800 宽时这一行不换行、不溢出；压缩之后圆环的样子。
@@ -77,13 +78,15 @@ function pointKeyToCopiedCipher(dir, connection, project) {
 /**
  * @brief 走查 1（v1）：首次启动 → 填表（区域 Public，key 栏留空）→ 测试连接按真实端点的回答失败（没有 key 不带认证头）；
  *        测试准备（退出、key 指向复制来的密文、授权公网）→ 重新启动 → 打开文件夹 → 拒绝启动卡上 Verify now → 发第一条消息。
+ *        一键拉取模型（model-discovery.md §13.4）：填表是 Base URL（key 栏留空）→ Fetch models → 清单里勾这个模型；
+ *        要 key 的服务在拉取时就是列表错误（rejected），这时用 Add a model ID 手填（page.mjs fillConnection）。
  */
 async function item1(ctx) {
   const { page, h, connection } = ctx;
   await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
   record('1 首次启动只有首次启动表单', await page.getByTestId('sidebar').count() === 0);
   await shot(page, '1-first-run');
-  await h.fillConnection({ name: connection.name, baseUrl: connection.baseUrl, zone: 'public',
+  const fetched = await h.fillConnection({ name: connection.name, baseUrl: connection.baseUrl, zone: 'public',
     modelId: connection.model,
     contextWindow: connection.contextWindow });
   const note = await page.getByTestId('zone-public-note').innerText().catch(() => '');
@@ -91,7 +94,7 @@ async function item1(ctx) {
   const result = await h.formMessage(null, { test: true, timeout: 180000 });
   record('1 区域 Public 时说明"Public providers must be allowed per project…"；key 栏留空时测试连接失败（请求不带认证头，'
     + '真实端点的原文）', note.startsWith('Public providers must be allowed per project')
-    && /^(Connection failed|Failed)/.test(result), `${oneLine(note)}；${oneLine(result)}`);
+    && /^(Connection failed|Failed)/.test(result), `拉取：${JSON.stringify(fetched)}；${oneLine(note)}；${oneLine(result)}`);
   await shot(page, '1-test-no-key');
   await ctx.app.close();
   pointKeyToCopiedCipher(ctx.userData, connection, ctx.project);

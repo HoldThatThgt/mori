@@ -1,7 +1,9 @@
 // 合成测试端点（synthetic）的自检：在空闲端口上起几份 server.mjs（不同的环境变量），用 fetch 逐条检查
 // docs/specs/model-providers.md §14.1 的行为与原有关键词，docs/specs/parallel-agents-taskboard.md §17.1 的脚本模式
 // （scripts.mjs 的 tb-selfcheck-* 场景），以及 docs/specs/memory.md §14.1 的增强脚本（enhance.mjs，脚本文件写在临时目录）
-// 与协作模式增强的场景 mem-team（scenarios/mem.mjs，依据由环境变量给），每条打印 PASS/FAIL；有 FAIL 时退出码为 1。
+// 与协作模式增强的场景 mem-team（scenarios/mem.mjs，依据由环境变量给），docs/specs/model-discovery.md §13.1 的发现行为
+// （discovery.mjs 的每种 FAKE_LIST_SHAPE、FAKE_NO_V1_ROOT、FAKE_LIST_DELAY_MS、{port,path,key} 日志行、-alwaysthink），
+// 每条打印 PASS/FAIL；有 FAIL 时退出码为 1。
 // 用法（在 app/ 下）：node tests/fake-endpoint/selfcheck.mjs
 
 import { spawn } from 'node:child_process';
@@ -77,6 +79,8 @@ function takeEvent(raw, out) {
     if (delta.content || delta.reasoning_content || delta.tool_calls) {
       out.contentChunks += 1;
       out.firstAt ??= Date.now();
+      // 第一段内容是什么：reasoning、content 或 tool（-alwaysthink 要求思考在最前面）
+      out.firstKind ??= delta.reasoning_content ? 'reasoning' : delta.content ? 'content' : 'tool';
     }
   }
 }
@@ -115,7 +119,7 @@ async function chat(port, body, opts = {}) {
   if (opts.key) headers.Authorization = `Bearer ${opts.key}`;
   const timer = opts.timeoutMs ? setTimeout(() => controller.abort(), opts.timeoutMs) : null;
   const out = { status: 0, text: '', reasoning: '', calls: [], contentChunks: 0, done: false, error: null,
-    startedAt: Date.now(), firstAt: null };
+    startedAt: Date.now(), firstAt: null, firstKind: null };
   try {
     const res = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, { method: 'POST', headers,
       body: JSON.stringify({ model: 'fake-coder', stream: true, ...body }), signal: controller.signal });
@@ -404,11 +408,11 @@ async function checkExisting(a) {
   record('existing: usage chunk with include_usage', usage.done);
 }
 
-/** @brief 日志：METHOD url 行、启动的 synthetic 行、每个对话请求一行 JSON。 */
+/** @brief 日志：METHOD url 行、启动的 synthetic 行、每个对话请求一行 JSON（发现请求的 JSON 行带 path，另查）。 */
 function checkLogs(a) {
   record('log: startup line mentions synthetic', a.lines.some((l) => l.includes('synthetic')));
   record('log: "METHOD url" lines kept', a.lines.some((l) => l === '[fake-endpoint] POST /v1/chat/completions'));
-  const json = a.lines.filter((l) => l.startsWith('{')).map((l) => JSON.parse(l));
+  const json = jsonLines(a);
   const fields = json.every((e) => ['port', 'model', 'key', 'roles', 'status', 'probe'].every((k) => k in e));
   record('log: one JSON line per chat request with all fields', json.length > 0 && fields
     && json.length === a.lines.filter((l) => l.endsWith('POST /v1/chat/completions')).length);
@@ -485,8 +489,12 @@ const CREATE_ASK = user("Conversation since your last turn (the user's words are
 const createTurn = (rest, open) => [CREATE_SYSTEM, CREATE_ASK, ...rest, card('Team mode: on', 'Open requests:',
   ...open)];
 
-/** @brief 端点的 JSON 日志行。 */
-const jsonLines = (endpoint) => endpoint.lines.filter((l) => l.startsWith('{')).map((l) => JSON.parse(l));
+/** @brief 端点的全部 JSON 日志行。 */
+const allJsonLines = (endpoint) => endpoint.lines.filter((l) => l.startsWith('{')).map((l) => JSON.parse(l));
+/** @brief 对话请求的 JSON 日志行（发现请求的行带 path，不算）。 */
+const jsonLines = (endpoint) => allJsonLines(endpoint).filter((e) => !('path' in e));
+/** @brief 发现请求（列表与详情）的 JSON 日志行：{port, path, key}。 */
+const discoveryLines = (endpoint) => allJsonLines(endpoint).filter((e) => 'path' in e);
 
 /** @brief 发一个请求并取它的日志行（脚本端点上请求一个接一个发，新出现的那一行就是它的）。 */
 async function chatLogged(endpoint, body) {
@@ -807,6 +815,284 @@ async function checkMemTeam(e) {
     merged.calls[0]?.name === 'memory' && parsed(merged.calls[0].args)?.entry === 'user-rule', merged.calls[0]?.args);
 }
 
+// ---------- 发现（discovery.mjs，synthetic）：docs/specs/model-discovery.md §13.1 ----------
+
+/** 发现检查用的模型：第一个、第二个、其余在各形状里的详情不同（server.mjs 开头） */
+const SHAPE_MODELS = 'fake-coder,fake-slow,fake-third';
+/** 没设 FAKE_MAX_MODEL_LEN 时的窗口 W */
+const W = 131072;
+const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+
+/** @brief 发一个发现请求（opts.body 时为 POST JSON），返回 { status, headers, body（不是 JSON 时为 null）, ms }。 */
+async function fetchJson(port, path, opts = {}) {
+  const started = Date.now();
+  const init = { method: opts.body ? 'POST' : 'GET', headers: opts.headers ?? {}, signal: opts.signal };
+  if (opts.body) init.body = JSON.stringify(opts.body);
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, init);
+  const text = await res.text();
+  return { status: res.status, headers: res.headers, body: parsed(text), ms: Date.now() - started };
+}
+
+/** @brief 列表的行；不是列表时为空。 */
+async function listRowsOf(port, path = '/v1/models', headers = {}) {
+  return (await fetchJson(port, path, { headers })).body?.data ?? [];
+}
+
+/** @brief 起发现检查用的端点：每种 FAKE_LIST_SHAPE 一份，另有 FAKE_NO_V1_ROOT 与 FAKE_LIST_DELAY_MS。 */
+async function startShapes() {
+  const models = { FAKE_MODELS: SHAPE_MODELS };
+  const eps = {};
+  for (const shape of ['sglang', 'ollama', 'localai', 'tensorrt', 'litellm', 'newapi', 'rich', 'typed', 'nolist']) {
+    eps[shape] = await startEndpoint({ FAKE_LIST_SHAPE: shape, ...models });
+  }
+  eps.llamacpp = await startEndpoint({ FAKE_LIST_SHAPE: 'llamacpp', FAKE_SERVER_VERSION: 'b6123-abc', ...models });
+  eps.anthropic = await startEndpoint({ FAKE_LIST_SHAPE: 'anthropic', FAKE_REQUIRE_KEY: 'sk-ant-wxyz', ...models });
+  eps.noV1 = await startEndpoint({ FAKE_NO_V1_ROOT: '1' });
+  eps.delayed = await startEndpoint({ FAKE_LIST_DELAY_MS: '600' });
+  return eps;
+}
+
+/** @brief 默认形状 vllm 只改 owned_by；x-api-key 也过 key 检查；/api/v1/models 不算列表；列表以外的请求不查 key。 */
+async function checkDefaultShape(a, c) {
+  const row = (await listRowsOf(a.port, '/v1/models', { Authorization: 'Bearer key-aaaa1' }))[0];
+  record('MD-02 discovery vllm (default): rows are {id, object, owned_by: "vllm", max_model_len}; '
+    + 'only owned_by changed',
+    same(Object.keys(row ?? {}), ['id', 'object', 'owned_by', 'max_model_len']) && row.owned_by === 'vllm'
+    && row.object === 'model' && row.max_model_len === 4000, JSON.stringify(row));
+  const apiKey = await fetchJson(a.port, '/v1/models', { headers: { 'x-api-key': 'key-aaaa1' } });
+  const wrong = await fetchJson(a.port, '/v1/models', { headers: { 'x-api-key': 'key-zzzz9' } });
+  record('MD-08 discovery: a list request carrying only x-api-key passes the FAKE_KEYS check (wrong one is 401)',
+    apiKey.status === 200 && wrong.status === 401, `${apiKey.status} ${wrong.status}`);
+  const lmstudio = await fetchJson(c.port, '/api/v1/models');
+  const prefixed = await listRowsOf(c.port, '/glm/v1/models');
+  const root = await listRowsOf(c.port, '/models');
+  record('MD-12 discovery: /api/v1/models (LM Studio, §3.3 step 6) is 404; /models and prefixed /glm/v1/models '
+    + 'still list',
+    lmstudio.status === 404 && prefixed.length === 2 && root.length === 2, `${lmstudio.status}`);
+  const version = await fetchJson(a.port, '/version');
+  record('MD-10 discovery: requests other than the list are not key-checked (/version without a key on FAKE_KEYS)',
+    version.status === 200 && version.body?.version === '0.9.9');
+}
+
+/** @brief sglang：owned_by、parent、max_model_len 与 /model_info；llama.cpp：meta.n_ctx 与 /props。 */
+async function checkSglangAndLlamacpp(sglang, llamacpp) {
+  const rows = await listRowsOf(sglang.port);
+  const info = (await fetchJson(sglang.port, '/model_info')).body;
+  record('MD-12 discovery sglang: rows owned_by "sglang", parent null, max_model_len W; /model_info has '
+    + 'reasoning_parser, tool_call_parser, has_image_understanding false, is_generation true', rows.length === 3
+    && rows.every((r) => r.owned_by === 'sglang' && r.parent === null && r.max_model_len === W)
+    && info?.reasoning_parser === 'qwen3' && info.tool_call_parser === 'qwen25'
+    && info.has_image_understanding === false && info.is_generation === true, JSON.stringify([rows[0], info]));
+  const version = await fetchJson(sglang.port, '/version');
+  const others = [await fetchJson(sglang.port, '/api/version'), await fetchJson(sglang.port, '/props')];
+  record('MD-12 discovery sglang: /version answers; /api/version and /props are 404', version.body?.version === '0.10.1'
+    && others.every((r) => r.status === 404));
+  const llRows = await listRowsOf(llamacpp.port);
+  const props = (await fetchJson(llamacpp.port, '/props')).body;
+  record('MD-12 discovery llamacpp: rows owned_by "llamacpp" with meta.n_ctx W (n_ctx_train 2W); /props has n_ctx W, '
+    + 'vision false and build_info = FAKE_SERVER_VERSION', llRows.length === 3
+    && llRows.every((r) => r.owned_by === 'llamacpp' && r.meta?.n_ctx === W && r.meta.n_ctx_train === 2 * W)
+    && props?.default_generation_settings?.n_ctx === W && props.modalities?.vision === false
+    && props.build_info === 'b6123-abc', JSON.stringify([llRows[0], props]));
+  record('MD-12 discovery llamacpp: /model_info and /api/tags are 404 (other shapes only)',
+    (await fetchJson(llamacpp.port, '/model_info')).status === 404
+    && (await fetchJson(llamacpp.port, '/api/tags')).status === 404);
+}
+
+/** @brief Ollama：/v1/models、/api/version、/api/tags、/api/ps 与 POST /api/show。 */
+async function checkOllama(o) {
+  const rows = await listRowsOf(o.port);
+  record('MD-12 discovery ollama: /v1/models rows have owned_by "library" and created, no window', rows.length === 3
+    && rows.every((r) => r.owned_by === 'library' && Number.isInteger(r.created) && !('max_model_len' in r)),
+  JSON.stringify(rows[0]));
+  const version = (await fetchJson(o.port, '/api/version')).body;
+  const tags = (await fetchJson(o.port, '/api/tags')).body?.models ?? [];
+  const ps = (await fetchJson(o.port, '/api/ps')).body?.models ?? [];
+  record('MD-12 discovery ollama: /api/version; /api/tags has every model with details.family "llama" and no '
+    + 'capabilities; /api/ps has only the first model at context_length 8192', version?.version === '0.10.1'
+    && same(tags.map((t) => t.name), SHAPE_MODELS.split(',')) && tags.every((t) => t.details?.family === 'llama'
+    && !('capabilities' in t)) && ps.length === 1 && ps[0].name === 'fake-coder' && ps[0].context_length === 8192,
+  JSON.stringify([version, ps]));
+  const shows = await Promise.all(SHAPE_MODELS.split(',').map((model) => fetchJson(o.port, '/api/show',
+    { body: { model } })));
+  const caps = shows.map((s) => s.body?.capabilities?.join('+'));
+  record('MD-07/MD-12 discovery ollama: /api/show capabilities: first completion+tools+thinking, second '
+    + 'completion only, the rest completion+tools',
+  same(caps, ['completion+tools+thinking', 'completion', 'completion+tools']), caps.join(' | '));
+  const numCtx = shows.map((s) => /^num_ctx\s+(\d+)$/m.exec(s.body?.parameters ?? '')?.[1] ?? null);
+  const trained = shows.map((s) => s.body?.model_info?.['general.architecture'] === 'llama'
+    && s.body.model_info['llama.context_length']);
+  record('MD-07/MD-12 discovery ollama: only the second model\'s parameters have num_ctx 16384; every model_info '
+    + 'has the trained window W', same(numCtx, [null, '16384', null]) && trained.every((w) => w === W),
+  JSON.stringify(numCtx));
+  const missing = await fetchJson(o.port, '/api/show', { body: { model: 'nope' } });
+  record('MD-12 discovery ollama: /api/show of an unknown model is 404; /props is 404',
+    missing.status === 404 && (await fetchJson(o.port, '/props')).status === 404);
+}
+
+/** @brief LocalAI：只有 id、object 的行、/.well-known/localai.json、<base>/models/capabilities；TensorRT-LLM 的行。 */
+async function checkLocalaiAndTensorrt(localai, tensorrt) {
+  const rows = await listRowsOf(localai.port);
+  const known = (await fetchJson(localai.port, '/.well-known/localai.json')).body;
+  record('MD-12 discovery localai: rows have only id and object; /.well-known/localai.json has a version; '
+    + '/version answers',
+    rows.length === 3 && rows.every((r) => same(Object.keys(r), ['id', 'object'])) && known?.version === '0.10.1'
+    && (await fetchJson(localai.port, '/version')).body?.version === '0.10.1', JSON.stringify([rows[0], known]));
+  const caps = (await fetchJson(localai.port, '/v1/models/capabilities')).body?.data ?? [];
+  const atRoot = (await fetchJson(localai.port, '/models/capabilities')).body?.data ?? [];
+  record('MD-12 discovery localai: <base>/models/capabilities (under /v1 or the root) lists capabilities, '
+    + 'modalities and context_size W for every model', caps.length === 3 && atRoot.length === 3 && caps.every((m) =>
+    same(m.capabilities, ['chat', 'completion', 'tools']) && same(m.input_modalities, ['text'])
+    && same(m.output_modalities, ['text']) && m.context_size === W), JSON.stringify(caps[0]));
+  const trt = await listRowsOf(tensorrt.port);
+  record('MD-12 discovery tensorrt: rows owned_by "tensorrt_llm" without a window; /version answers', trt.length === 3
+    && trt.every((r) => r.owned_by === 'tensorrt_llm' && !('max_model_len' in r))
+    && (await fetchJson(tensorrt.port, '/version')).body?.version === '0.10.1', JSON.stringify(trt[0]));
+}
+
+/** @brief LiteLLM 的 created、mode、窗口与输出（第二行的输出等于窗口）；New API 的响应头、success 与端点类型。 */
+async function checkLitellmAndNewapi(litellm, newapi) {
+  const rows = await listRowsOf(litellm.port);
+  record('MD-07 discovery litellm: every row created 1677610602, owned_by "openai", mode "chat", max_input_tokens W, '
+    + 'supports_* false', rows.length === 3 && rows.every((r) => r.created === 1677610602 && r.owned_by === 'openai'
+    && r.mode === 'chat' && r.max_input_tokens === W && r.supports_reasoning === false
+    && r.supports_function_calling === false), JSON.stringify(rows[0]));
+  const outputs = rows.map((r) => r.max_output_tokens);
+  record('MD-07 discovery litellm: the second row\'s max_output_tokens equals its window, the others are W/16',
+    same(outputs, [W / 16, W, W / 16]), JSON.stringify(outputs));
+  const list = await fetchJson(newapi.port, '/v1/models');
+  record('MD-05 discovery newapi: X-New-Api-Version header, success: true, supported_endpoint_types on every row',
+    list.headers.get('x-new-api-version') === 'v0.9.0' && list.body?.success === true && list.body.data.length === 3
+    && list.body.data.every((r) => same(r.supported_endpoint_types, ['openai', 'anthropic'])),
+  JSON.stringify(list.body?.data?.[0]));
+}
+
+/** @brief Anthropic 形状：要 anthropic-version 头、只有 /v1/models、Anthropic 形状的体与错误、key 检查。 */
+async function checkAnthropicShape(an) {
+  const auth = { 'x-api-key': 'sk-ant-wxyz', 'anthropic-version': '2023-06-01' };
+  const noVersion = await fetchJson(an.port, '/v1/models', { headers: { 'x-api-key': 'sk-ant-wxyz' } });
+  record('MD-05 discovery anthropic: without anthropic-version the list is 400 with an Anthropic-shaped error',
+    noVersion.status === 400 && noVersion.body?.type === 'error'
+    && noVersion.body.error?.type === 'invalid_request_error', JSON.stringify(noVersion.body));
+  const list = await fetchJson(an.port, '/anthropic/v1/models', { headers: auth });
+  const row = list.body?.data?.[0];
+  record('MD-05 discovery anthropic: {data, has_more: false, first_id, last_id}; rows type "model" with '
+    + 'max_input_tokens W, max_tokens W/4 and capabilities image_input / thinking supported', list.status === 200
+    && list.body.has_more === false && list.body.first_id === 'fake-coder' && list.body.last_id === 'fake-third'
+    && row?.type === 'model' && row.max_input_tokens === W && row.max_tokens === W / 4
+    && row.capabilities?.image_input?.supported === true && row.capabilities.thinking?.supported === true,
+  JSON.stringify(list.body));
+  const bearer = await fetchJson(an.port, '/v1/models', { headers: { Authorization: 'Bearer sk-ant-wxyz',
+    'anthropic-version': '2023-06-01' } });
+  const wrong = await fetchJson(an.port, '/v1/models', { headers: { ...auth, 'x-api-key': 'sk-ant-nope' } });
+  record('MD-05 discovery anthropic: Bearer also passes FAKE_REQUIRE_KEY; a wrong key is 401 authentication_error',
+    bearer.status === 200 && wrong.status === 401 && wrong.body?.error?.type === 'authentication_error',
+    `${bearer.status} ${JSON.stringify(wrong.body)}`);
+  record('MD-05 discovery anthropic: /models (no /v1) is 404', (await fetchJson(an.port, '/models', { headers: auth }))
+    .status === 404);
+}
+
+/** @brief rich：DeepSeek 式字段；typed：type 与 embedding 行；nolist；FAKE_NO_V1_ROOT。 */
+async function checkRichTypedAndRoutes(eps) {
+  const rich = await listRowsOf(eps.rich.port);
+  record('MD-12/MD-13 discovery rich: context_window W and max_output_tokens W/16 on every row; the first row has '
+    + 'input_modalities [text, image] and an effort object, the others [text] and no effort', rich.length === 3
+    && rich.every((r) => r.context_window === W && r.max_output_tokens === W / 16)
+    && same(rich[0].input_modalities, ['text', 'image']) && typeof rich[0].effort === 'object'
+    && rich.slice(1).every((r) => same(r.input_modalities, ['text']) && !('effort' in r)), JSON.stringify(rich));
+  const typed = await listRowsOf(eps.typed.port);
+  record('MD-07 discovery typed: type "llm", "embedding" (second row), "llm"', same(typed.map((r) => r.type),
+    ['llm', 'embedding', 'llm']), JSON.stringify(typed));
+  const nolist = [await fetchJson(eps.nolist.port, '/models'), await fetchJson(eps.nolist.port, '/v1/models')];
+  record('MD-08/MD-09 discovery nolist: /models and /v1/models are both 404; /version still answers',
+    nolist.every((r) => r.status === 404) && (await fetchJson(eps.nolist.port, '/version')).status === 200);
+  const root = await fetchJson(eps.noV1.port, '/models');
+  const v1 = await listRowsOf(eps.noV1.port, '/v1/models');
+  record('MD-09 FAKE_NO_V1_ROOT=1: /models is 404, /v1/models lists', root.status === 404 && v1.length === 2,
+    `${root.status} ${v1.length}`);
+}
+
+/** @brief FAKE_LIST_DELAY_MS：列表等这么久；别的请求不等；等的时候断开，端点照样回答后面的请求。 */
+async function checkListDelay(delayed) {
+  const list = await fetchJson(delayed.port, '/v1/models');
+  const version = await fetchJson(delayed.port, '/version');
+  record('MD-06/MD-09 FAKE_LIST_DELAY_MS: the list answers after the delay; /version does not wait',
+    list.status === 200 && list.ms >= 550 && version.ms < 400, `${list.ms} ${version.ms}`);
+  const before = discoveryLines(delayed).length;
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 100);
+  const aborted = await fetchJson(delayed.port, '/models', { signal: controller.signal }).then(() => 'answered',
+    (error) => error.name);
+  const logged = discoveryLines(delayed).length > before;
+  await sleep(700);
+  const again = await fetchJson(delayed.port, '/v1/models');
+  record('MD-06/MD-09 FAKE_LIST_DELAY_MS: a request dropped during the delay is logged before the wait and the '
+    + 'endpoint keeps answering', aborted === 'AbortError' && logged && again.status === 200, `${aborted} ${logged}`);
+}
+
+/** @brief 不认识的 FAKE_LIST_SHAPE：启动时报错，退出码 1。 */
+async function checkUnknownShape() {
+  const port = await freePort();
+  const child = spawn(process.execPath, [join(here, 'server.mjs')], {
+    env: { ...process.env, FAKE_PORT: String(port), FAKE_LIST_SHAPE: 'bogus' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stderr = '';
+  child.stderr.on('data', (chunk) => { stderr += chunk; });
+  const code = await new Promise((resolve) => child.once('exit', resolve));
+  record('MD-07/MD-08/MD-09/MD-12 discovery: an unknown FAKE_LIST_SHAPE fails at start with exit code 1', code === 1
+    && stderr.includes('unknown FAKE_LIST_SHAPE "bogus"'), `${code} ${stderr}`);
+}
+
+/** @brief -alwaysthink：不论请求带不带思考参数都先回思考；本来就有思考的回复不变；其他探针行为不变。 */
+async function checkAlwaysThink(a) {
+  const key = 'key-aaaa1';
+  const model = 'fake-coder-alwaysthink';
+  const ready = await chat(a.port, { model, messages: [user('Reply with the single word: ready.')] }, { key });
+  record('MD-13 -alwaysthink: probe 1 without a thinking parameter streams reasoning_content first, then "ready"',
+    ready.text === 'ready' && ready.reasoning.length > 0 && ready.firstKind === 'reasoning', JSON.stringify(ready));
+  const plain = await chat(a.port, { model, messages: [user('plain')] }, { key });
+  record('MD-13 -alwaysthink: a non-probe reply also streams reasoning_content first, text unchanged',
+    plain.firstKind === 'reasoning' && plain.text === '这是一段只有文字的回复，用来测试流式输出。');
+  const own = await chat(a.port, { model, messages: [user('think first')] }, { key });
+  record('MD-13 -alwaysthink: a reply that already thinks keeps its own thinking',
+    own.reasoning.includes('THINKING-ONLY'));
+  const weather = await chat(a.port, { model, messages: [user(WEATHER)], tools: [weatherTool] }, { key });
+  record('MD-13 -alwaysthink: probe 3 still calls get_weather (other behaviour unchanged)',
+    weather.calls[0]?.name === 'get_weather' && weather.firstKind === 'reasoning');
+}
+
+/** @brief 发现请求的 JSON 日志行：只有 port、path、key；key 取 Bearer 或 x-api-key 的末 4 位；/metrics 不记。 */
+function checkDiscoveryLogs(a, eps) {
+  const all = [a, ...Object.values(eps)].flatMap((ep) => discoveryLines(ep).map((e) => ({ ...e, ep })));
+  record('MD-06/MD-10/MD-12 discovery log: every list or detail line has exactly port, path, key', all.length > 0
+    && all.every((e) => same(Object.keys(e).filter((k) => k !== 'ep'), ['port', 'path', 'key'])
+    && e.port === e.ep.port));
+  const onA = discoveryLines(a);
+  record('MD-06/MD-10/MD-12 discovery log: the key is the last 4 characters of Bearer or x-api-key, null without '
+    + 'a key; no query',
+    onA.some((e) => e.path === '/v1/models' && e.key === 'aaa1') && onA.some((e) => e.key === 'zzz9')
+    && onA.some((e) => e.path === '/version' && e.key === null)
+    && discoveryLines(eps.anthropic).some((e) => e.path === '/anthropic/v1/models' && e.key === 'wxyz')
+    && all.every((e) => !e.path.includes('?')), JSON.stringify(onA.slice(0, 6)));
+  const paths = discoveryLines(eps.ollama).map((e) => e.path);
+  record('MD-06/MD-10/MD-12 discovery log: GET details and POST /api/show are logged; /metrics is not',
+    paths.includes('/api/tags') && paths.filter((p) => p === '/api/show').length >= 4
+    && !all.some((e) => e.path === '/metrics') && a.lines.includes('[fake-endpoint] GET /metrics'));
+}
+
+/** @brief 发现的全部检查（形状与 FAKE_NO_V1_ROOT、FAKE_LIST_DELAY_MS）。 */
+async function checkDiscovery(a, c, eps) {
+  await checkDefaultShape(a, c);
+  await checkSglangAndLlamacpp(eps.sglang, eps.llamacpp);
+  await checkOllama(eps.ollama);
+  await checkLocalaiAndTensorrt(eps.localai, eps.tensorrt);
+  await checkLitellmAndNewapi(eps.litellm, eps.newapi);
+  await checkAnthropicShape(eps.anthropic);
+  await checkRichTypedAndRoutes(eps);
+  await checkListDelay(eps.delayed);
+  await checkUnknownShape();
+  await checkAlwaysThink(a);
+}
+
 const a = await startEndpoint({ FAKE_KEYS: 'key-aaaa1,key-bbbb2,key-cccc3', FAKE_LIMITED_KEYS: 'key-bbbb2',
   FAKE_LIMIT_MS: '1500', FAKE_QUOTA_KEYS: 'key-cccc3', FAKE_SERVER_VERSION: '0.9.9', FAKE_MAX_MODEL_LEN: '4000' });
 const b = await startEndpoint({ FAKE_NO_METRICS: '1', FAKE_REQUIRE_KEY: 'req-key-1' });
@@ -818,6 +1104,7 @@ writeFileSync(scriptFile, '{}');
 // synthetic：增强脚本文件与 mem-team 的依据（会话文件路径、条目 id 只是字符串，端点不读它们）
 const e = await startEndpoint({ FAKE_ENHANCE_SCRIPT: scriptFile, MEM_TEAM_SESSION: 'C:\\synthetic\\a.jsonl',
   MEM_TEAM_ENTRY: 'e1e2e3e4', MEM_TEAM_USER_ENTRY: 'user-rule', MEM_TEAM_OTHER_ENTRY: 'other-kind' });
+const shapes = await startShapes();
 try {
   await checkGets(a, c);
   await checkKeys(a, b, c);
@@ -839,8 +1126,10 @@ try {
   await checkStrictAndReasoningLog(d);
   await checkEnhance(e, d, scriptFile);
   await checkMemTeam(e);
+  await checkDiscovery(a, c, shapes);
   await checkCancel(a, b);
   checkLogs(a);
+  checkDiscoveryLogs(a, shapes);
 } catch (error) {
   record('selfcheck ran to the end', false, error.stack);
 } finally {
@@ -849,6 +1138,7 @@ try {
   c.kill();
   d.kill();
   e.kill();
+  for (const endpoint of Object.values(shapes)) endpoint.kill();
   rmSync(scriptDir, { recursive: true, force: true });
 }
 const failed = results.filter((r) => !r.ok).length;

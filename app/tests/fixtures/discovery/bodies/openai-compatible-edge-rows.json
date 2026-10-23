@@ -1,0 +1,65 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.30:8000/v1/models",
+ "note": "Generic OpenAI-compatible list with the edge rows spec sections 3.2, 4.1 and 4.3 need (not one server)",
+ "basis": [
+  "docs/specs/model-discovery.md sections 3.2 (duplicate ids), 4.1 (digit strings, explicit \"no\", max output not below the window, type \"model\" ignored), 4.3 (empty id, id with a space)",
+  "Field names are the section 4.1 paths; no particular server sends all of these rows"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "acme-large",
+    "object": "model",
+    "created": 1792000000,
+    "owned_by": "acme",
+    "context_length": "65536",
+    "max_completion_tokens": "8192",
+    "supports_reasoning": false,
+    "supports_image_in": false,
+    "supports_function_calling": false
+   },
+   {
+    "id": "acme-large",
+    "object": "model",
+    "created": 1792000001,
+    "owned_by": "acme",
+    "context_length": 4096
+   },
+   {
+    "id": "acme-small",
+    "object": "model",
+    "created": 1792000002,
+    "owned_by": "acme",
+    "context_window": 32768,
+    "max_output_tokens": 32768,
+    "type": "model"
+   },
+   {
+    "id": "acme-embed",
+    "object": "model",
+    "created": 1792000003,
+    "owned_by": "acme",
+    "type": "embedding",
+    "context_size": 8192
+   },
+   {
+    "id": "",
+    "object": "model",
+    "created": 1792000004,
+    "owned_by": "acme"
+   },
+   {
+    "id": "acme large v2",
+    "object": "model",
+    "created": 1792000005,
+    "owned_by": "acme",
+    "max_context_length": 131072
+   }
+  ]
+ }
+}

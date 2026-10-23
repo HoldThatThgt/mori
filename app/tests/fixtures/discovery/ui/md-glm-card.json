@@ -1,0 +1,795 @@
+{
+ "source": "real",
+ "note": "Recorded from the real App and the real server by tests/ui/md-real.mjs with the key saved in Mori; do not edit by hand.",
+ "name": "md-glm-card",
+ "description": "Settings → Models: Fetch models on the api-z-ai card with the saved key (https://api.z.ai/api/anthropic); the card showed the model list (11 models)",
+ "covers": [
+  "MD-07",
+  "MD-13"
+ ],
+ "recorded": "2026-10-24",
+ "address": "https://api.z.ai/api/anthropic",
+ "endpoint": "https://api.z.ai/api/anthropic",
+ "model": "api-z-ai/md-real-moved-GLM-5.3",
+ "notes": [
+  "Setup (synthetic test setup, docs/specs/model-discovery.md §13.1): a copy of the data dir this run built through the UI (first run with DeepSeek, then Add provider for GLM and OpenRouter; the keys were typed into Mori's API key fields and saved encrypted by Mori), encrypted key files only; renamed api-z-ai/GLM-5.3 (the provider's only model) to api-z-ai/md-real-moved-GLM-5.3 in the copied model-config.json",
+  "The card fetch used the key saved in Mori: the commands carry no key and the fixture stores no request headers"
+ ],
+ "recordedAt": "2026-10-23T17:37:25.382Z",
+ "steps": [
+  {
+   "t": 1,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 2,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 3,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 4,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-QsdSQT\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 6,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 6,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-m1-data-QsdSQT\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 8,
+   "command": {
+    "type": "models.get"
+   }
+  },
+  {
+   "t": 9,
+   "result": {
+    "type": "models.get",
+    "value": {
+     "error": null,
+     "config": {
+      "version": 1,
+      "providers": [
+       {
+        "id": "api-deepseek-com",
+        "name": "api.deepseek.com",
+        "api": "openai-completions",
+        "baseUrl": "https://api.deepseek.com",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "public",
+        "keys": [
+         {
+          "ref": "api-deepseek-com#1",
+          "label": "Key 1"
+         }
+        ],
+        "nextKeyNumber": 2,
+        "models": [
+         {
+          "id": "deepseek-flash",
+          "family": "",
+          "contextWindow": 1048576,
+          "maxTokens": 393216,
+          "reasoning": true,
+          "input": [
+           "text",
+           "image"
+          ]
+         },
+         {
+          "id": "deepseek-v4-pro",
+          "family": "",
+          "contextWindow": 65536,
+          "maxTokens": 16384,
+          "reasoning": true,
+          "input": [
+           "text"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "api-z-ai",
+        "name": "api.z.ai",
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.z.ai/api/anthropic",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "public",
+        "keys": [
+         {
+          "ref": "api-z-ai#1",
+          "label": "Key 1"
+         }
+        ],
+        "nextKeyNumber": 2,
+        "models": [
+         {
+          "id": "md-real-moved-GLM-5.3",
+          "family": "",
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "reasoning": false,
+          "input": [
+           "text"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "openrouter-ai",
+        "name": "openrouter.ai",
+        "api": "openai-completions",
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "public",
+        "keys": [
+         {
+          "ref": "openrouter-ai#1",
+          "label": "Key 1"
+         }
+        ],
+        "nextKeyNumber": 2,
+        "models": [
+         {
+          "id": "recursive/flint-v1.0:free",
+          "family": "",
+          "contextWindow": 262144,
+          "maxTokens": 235929,
+          "reasoning": true,
+          "input": [
+           "text"
+          ]
+         },
+         {
+          "id": "xingchen-agi/xing4.0-29b-a4b:free",
+          "family": "",
+          "contextWindow": 262144,
+          "maxTokens": 235929,
+          "reasoning": true,
+          "input": [
+           "text"
+          ]
+         }
+        ]
+       }
+      ],
+      "groups": [],
+      "normalDefault": "api-deepseek-com/deepseek-flash",
+      "allowedZones": [
+       "local",
+       "intranet"
+      ],
+      "projectZones": {}
+     },
+     "profiles": {
+      "api-deepseek-com/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "deepseek",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e8d1a648-81ab-4384-822e-408c2975b0ae)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "unverified",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 1048576,
+        "reported": 1048576,
+        "effective": 1048576,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": {
+        "contextWindow": 1048576,
+        "maxTokens": 393216,
+        "reasoning": true,
+        "image": true
+       },
+       "probedAt": 1792776985183,
+       "suite": 1
+      },
+      "api-deepseek-com/deepseek-v4-pro": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "deepseek",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: 2b6a499d-2072-4588-b20e-15022392698d)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": true,
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 65536,
+        "reported": 1048576,
+        "effective": 65536,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": {
+        "contextWindow": 1048576,
+        "maxTokens": 393216,
+        "reasoning": true,
+        "image": false
+       },
+       "probedAt": 1792777037804,
+       "suite": 1
+      },
+      "api-z-ai/md-real-moved-GLM-5.3": {
+       "status": "error",
+       "error": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703e0eb9b936d8747ac]\"},\"request_id\":\"20261024013703e0eb9b936d8747ac\"}",
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "error",
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d625db57f91f472b]\"},\"request_id\":\"20261024013703d625db57f91f472b\"}"
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": "Step 3 did not produce a valid call"
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "fail",
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703bcab924b3c404362]\"},\"request_id\":\"20261024013703bcab924b3c404362\"}"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "error",
+         "detail": "400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"code\":\"1211\",\"message\":\"[1211][Unknown Model, please check the model code.][20261024013703d02f23911d2c439d]\"},\"request_id\":\"20261024013703d02f23911d2c439d\"}"
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": "unknown",
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": {
+        "contextWindow": null,
+        "maxTokens": null,
+        "reasoning": null,
+        "image": null
+       },
+       "probedAt": 1792777023826,
+       "suite": 1
+      },
+      "openrouter-ai/recursive/flint-v1.0:free": {
+       "status": "error",
+       "error": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}",
+       "server": {
+        "kind": "openrouter",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "error",
+         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": "Step 3 did not produce a valid call"
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
+        },
+        "c": {
+         "outcome": "error",
+         "detail": "400: {\"message\":\"Reasoning is mandatory for this endpoint and cannot be disabled.\",\"code\":400,\"metadata\":{\"provider_name\":null}}"
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "not_required"
+       },
+       "context": {
+        "declared": 262144,
+        "reported": 262144,
+        "effective": 262144,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": {
+        "contextWindow": 262144,
+        "maxTokens": 235929,
+        "reasoning": true,
+        "image": false
+       },
+       "probedAt": 1792777014432,
+       "suite": 1
+      },
+      "openrouter-ai/xingchen-agi/xing4.0-29b-a4b:free": {
+       "status": "probing",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "b": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": "unknown",
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 262144,
+        "reported": null,
+        "effective": 262144,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": null,
+       "suite": 1
+      }
+     },
+     "keyStatus": {},
+     "thinkingDefaults": {
+      "api-deepseek-com/deepseek-flash": null,
+      "api-deepseek-com/deepseek-v4-pro": null,
+      "api-z-ai/md-real-moved-GLM-5.3": null,
+      "openrouter-ai/recursive/flint-v1.0:free": null,
+      "openrouter-ai/xingchen-agi/xing4.0-29b-a4b:free": null
+     },
+     "zoneSuggestions": {
+      "api-deepseek-com": "public",
+      "api-z-ai": "public",
+      "openrouter-ai": "public"
+     },
+     "migration": null,
+     "projects": [],
+     "loadError": null,
+     "reserved": [
+      "mori",
+      "amazon-bedrock",
+      "ant-ling",
+      "anthropic",
+      "azure",
+      "baseten",
+      "cerebras",
+      "cloudflare-ai-gateway",
+      "cloudflare-workers-ai",
+      "deepseek",
+      "fireworks",
+      "github-copilot",
+      "google",
+      "google-vertex",
+      "groq",
+      "huggingface",
+      "kimi-coding",
+      "meta",
+      "minimax",
+      "minimax-cn",
+      "mistral",
+      "moonshotai",
+      "moonshotai-cn",
+      "nvidia",
+      "openai",
+      "openai-codex",
+      "opencode",
+      "opencode-go",
+      "openrouter",
+      "qwen-token-plan",
+      "qwen-token-plan-cn",
+      "qwen-token-plan-individual",
+      "radius",
+      "together",
+      "typesafe",
+      "vercel-ai-gateway",
+      "xai",
+      "xiaomi",
+      "xiaomi-token-plan-ams",
+      "xiaomi-token-plan-cn",
+      "xiaomi-token-plan-sgp",
+      "zai",
+      "zai-coding-cn"
+     ]
+    }
+   }
+  },
+  {
+   "t": 956,
+   "command": {
+    "type": "models.discover",
+    "target": {
+     "kind": "provider",
+     "providerId": "api-z-ai"
+    }
+   }
+  },
+  {
+   "t": 1171,
+   "result": {
+    "type": "models.discover",
+    "value": {
+     "error": null,
+     "cancelled": false,
+     "server": {
+      "kind": "unknown",
+      "version": null
+     },
+     "api": "anthropic-messages",
+     "baseUrl": "https://api.z.ai/api/anthropic",
+     "name": "api.z.ai",
+     "anthropicShape": true,
+     "listError": null,
+     "models": [
+      {
+       "id": "glm-4.5",
+       "contextWindow": 128000,
+       "maxTokens": 16384,
+       "reasoning": false,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": false,
+        "maxTokens": false,
+        "reasoning": false,
+        "image": false,
+        "family": false
+       },
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
+       "id": "glm-4.5-air",
+       "contextWindow": 128000,
+       "maxTokens": 16384,
+       "reasoning": false,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": false,
+        "maxTokens": false,
+        "reasoning": false,
+        "image": false,
+        "family": false
+       },
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
+       "id": "glm-4.6",
+       "contextWindow": 128000,
+       "maxTokens": 16384,
+       "reasoning": false,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": false,
+        "maxTokens": false,
+        "reasoning": false,
+        "image": false,
+        "family": false
+       },
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
+       "id": "glm-4.7",
+       "contextWindow": 128000,
+       "maxTokens": 16384,
+       "reasoning": false,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": false,
+        "maxTokens": false,
+        "reasoning": false,
+        "image": false,
+        "family": false
+       },
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
+       "id": "glm-5",
+       "contextWindow": 128000,
+       "maxTokens": 16384,
+       "reasoning": false,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": false,
+        "maxTokens": false,
+        "reasoning": false,
+        "image": false,
+        "family": false
+       },
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
+       "id": "glm-5-turbo",
+       "contextWindow": 128000,
+       "maxTokens": 16384,
+       "reasoning": false,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": false,
+        "maxTokens": false,
+        "reasoning": false,
+        "image": false,
+        "family": false
+       },
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
+       "id": "glm-5.1",
+       "contextWindow": 128000,
+       "maxTokens": 16384,
+       "reasoning": false,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": false,
+        "maxTokens": false,
+        "reasoning": false,
+        "image": false,
+        "family": false
+       },
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
+       "id": "glm-5.2",
+       "contextWindow": 128000,
+       "maxTokens": 16384,
+       "reasoning": false,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": false,
+        "maxTokens": false,
+        "reasoning": false,
+        "image": false,
+        "family": false
+       },
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
+       "id": "glm-5.3",
+       "contextWindow": 128000,
+       "maxTokens": 16384,
+       "reasoning": false,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": false,
+        "maxTokens": false,
+        "reasoning": false,
+        "image": false,
+        "family": false
+       },
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
+       "id": "glm-5.3-flash",
+       "contextWindow": 128000,
+       "maxTokens": 16384,
+       "reasoning": false,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": false,
+        "maxTokens": false,
+        "reasoning": false,
+        "image": false,
+        "family": false
+       },
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
+       "id": "glm-5.3-flashx",
+       "contextWindow": 128000,
+       "maxTokens": 16384,
+       "reasoning": false,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": false,
+        "maxTokens": false,
+        "reasoning": false,
+        "image": false,
+        "family": false
+       },
+       "hints": [],
+       "unusable": null,
+       "added": false
+      }
+     ],
+     "truncated": false,
+     "notListed": [
+      "md-real-moved-GLM-5.3"
+     ]
+    }
+   }
+  }
+ ]
+}

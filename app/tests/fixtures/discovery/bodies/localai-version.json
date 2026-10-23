@@ -1,0 +1,15 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.21:8080/version",
+ "note": "LocalAI /version (the same shape as vLLM /version)",
+ "basis": [
+  "https://github.com/mudler/LocalAI/blob/master/core/http/routes/localai.go (GET /version: {\"version\": internal.PrintableVersion()})",
+  "https://github.com/mudler/LocalAI/blob/master/internal/version.go (PrintableVersion = \"<Version> (<Commit>)\"); version tag and commit are illustrative"
+ ],
+ "status": 200,
+ "body": {
+  "version": "v4.12.0 (5e1c9a7)"
+ }
+}

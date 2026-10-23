@@ -2,7 +2,7 @@
 
 实现时需要一个值、但还没有经过你确认的地方都登记在这里。每一项都是“临时默认值”，拿到依据后再定。
 第一张表是模型层，来源：[统一模型提供商构建规格](../specs/model-providers.md) §12；位置是规格 §2 定下的代码落点，时长都集中在 `app/src/kernel/modelTimings.ts`。
-后面的平行 Agent 与 TaskBoard、提示词分层与记忆各成一节，来源写在各节开头。
+后面的平行 Agent 与 TaskBoard、提示词分层与记忆、一键拉取模型各成一节，来源写在各节开头。
 v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规格取代的行在那里注明。
 
 | 默认值 | 取值 | 位置 | 理由 | 何时复查 |
@@ -25,9 +25,9 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 长输入探针的两个长度 | 有效窗口的 50%、90% | `app/src/kernel/probes.ts` | 一半看常用长度，九成看接近上限时是否静默截断；需要你同意后才跑 | 你走查时觉得 token 花得太多 |
 | 取消探针等请求数回落 | 5 秒 | `app/src/kernel/modelTimings.ts` | 服务端在断开后几十毫秒到几秒内释放请求（K7 实测几十毫秒）；5 秒内没回落就算不停 | 拿到 vLLM、SGLang、llama.cpp 的内网部署时 |
 | 4xx、5xx 响应体最多读 | 64 KB | `app/src/kernel/modelPool.ts` | 分类只需要错误信息；限量防止异常的大响应占内存 | — |
-| 区域建议 | 回环地址（127/8、`::1`、`localhost`）→ `local`；10/8、172.16/12、192.168/16、169.254/16、`fc00::/7`、`.local` 与不含点的主机名 → `intranet`；其余 → `public` | `app/src/kernel/modelConfig.ts`（首次启动与提供商表单的预选怎么拿到它，见 screens/models-settings.md 待定 8） | 只是预选建议，你确认后才生效；按地址的常见含义划分 | 遇到内网用公网段地址、或公网域名指向内网时 |
+| 区域建议 | 回环地址（127/8、`::1`、`localhost`）→ `local`；10/8、172.16/12、192.168/16、169.254/16、`fc00::/7`、`fe80::/10`、`.local` 与不含点的主机名 → `intranet`；IPv4 映射的 IPv6 地址按其中的 IPv4 判断；其余 → `public` | `app/src/shared/models.ts` `suggestZone`：后台进程（`app/src/kernel/modelConfig.ts`，`models.get` 的 `zoneSuggestions`）与界面（`app/src/renderer/src/components/settings/Checklist.tsx` `prefillDraft`：拉取后按 Base URL 框预选；`fields.tsx` `emptyProvider`：拉取前的初值；`Notices.tsx` 的 Confirm zone）共用 | 只是预选建议，你确认后才生效；按地址的常见含义划分 | 遇到内网用公网段地址、或公网域名指向内网时 |
 | 迁移时 `maxTokens` 缺失 / 不小于窗口 | pi 的默认 16384 / 窗口的一半 | `app/src/kernel/modelMigrate.ts` | 与 pi 自己的默认相同；v1 要求 `maxTokens` 小于窗口，取一半给输入留地方 | 你走查迁移结果时 |
-| 新模型表单的 Max output | 16384 与窗口一半中较小的 | `app/src/renderer/src/components/`（模型表单） | 同上一行的理由，与迁移一致 | 拿到内网端点时 |
+| 新模型表单的 Max output | 16384 与窗口一半中较小的 | `app/src/renderer/src/components/`（模型表单）；2026-10-23 起模型表单只剩 Edit，这条规则用在清单里没报告的值和手填的行（见下面“一键拉取模型”一节） | 同上一行的理由，与迁移一致 | 拿到内网端点时 |
 | 兼容选项的标签与说明 | 六个勾选框，标签写端点的情况，下面一行小字写勾了之后 Mori 怎么发请求，例如“Endpoint needs max_tokens instead of max_completion_tokens” / “Older endpoints don’t recognize max_completion_tokens”；全文见规格 §9.1；提供商卡上只列标签 | `app/src/shared/models.ts` `COMPAT_LABELS`、`COMPAT_HINTS`；`app/src/renderer/src/components/settings/fields.tsx` `CompatChecks`（提供商表单与首次启动表单共用） | v0 方案 5.2 要求每项配说明；沿用 english-ui 的英文（[v0/ui-strings.md](../v0/ui-strings.md)），v1 合并时一度只有规格原来的短标签、没有说明，2026-10-21 改回 | 你走查设置页与首次启动时；拿到内网端点时 |
 | pi 里的占位 `apiKey` | `mori-pool` | `app/src/kernel/modelCompile.ts` | pi 要有 key 才把提供商当作已配置（K1）；不保密，真正的 key 由模型池写进认证头，占位不会发到服务端（MP-32） | pi 升级时 |
 | 重做说明文字、各提示文字 | 规格 §6.1 的重做说明，§9 的界面文字 | `app/src/kernel/modelContext.ts`（重做说明）；`app/src/renderer/src/components/`（提示、阶段行、说明卡、拒绝启动卡） | 重做说明要让新模型知道前半段被隐藏、工作区可能已改；英文给模型读最稳 | 内网模型对英文说明的理解不好时；你走查时 |
@@ -99,3 +99,26 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 协作模式的增强运行里有需求等你拿主意 | 会话与 Team 都空闲时算结束、修订 `done`，需求留在 TaskBoard 上 | `app/src/kernel/enhanceRun.ts` | 看不见的会话没人回答，等下去就永远不结束 | 你走查协作模式的增强时 |
 | `agent` 调用方的 `save`、`update` 要带 `quote` | 必填 | `app/src/kernel/memoryRules.ts`（toolFieldError）、`app/src/kernel/memoryText.ts`（说明与 Correct form） | proposal §8.1 的依据是你的原话，记下的条目算“你说的” | 你走查对话里记一条、真实模型常漏写原话时 |
 | 在记忆页改一条“它学的” | 改后为 `You said`，之后增强不能再改它 | `app/src/kernel/memory.ts` | proposal §4 把你手写的算“你说的”；要退回可以回滚这次修改 | 你走查记忆页时 |
+
+## 一键拉取模型
+
+来源：[一键拉取模型规格](../specs/model-discovery.md) §11，另加清单的默认勾选（§6.2）与列表地址的试法（§3.2）；位置是规格 §2 定下的代码落点，时长放在 `app/src/kernel/modelTimings.ts`。
+检查记录见 [discovery-checks.md](discovery-checks.md)。
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 每个发现请求的时限（连接到读完响应体） | 15 秒；探针第 0 步的每个请求同样用它（原来是 120 秒的探针步时限，规格 §7.1） | `app/src/kernel/modelTimings.ts` | 发现只读列表和详情，不等模型生成；连不上的地址不让你在表单前干等。列表请求超时为 `unreachable`（“Timed out after 15s”），详情请求超时只按失败（规格 §4.2） | 拿到内网端点、量过列表与详情接口的响应时间时；Ollama 逐个读 `/api/show` 常超时时 |
+| 每个响应体最多读 | 8 MB | `app/src/kernel/modelDiscover.ts` | 列表带描述、价格等字段时可能较大；限量防止异常的大响应占内存。超过时列表请求按 `invalid`（“The model list is larger than 8 MB.”），详情请求按失败（规格 §5.3） | 遇到合法的列表超过 8 MB 时 |
+| 服务原文最多保留 | 2000 字 | `app/src/kernel/modelDiscover.ts`（`listError.detail`） | 原文只用来看懂为什么拿不到列表；服务回一整页 HTML 时不撑满表单 | 你走查列表错误时 |
+| 列表最多条数 | 1000；超过时只取前面的，`truncated: true`，清单写 “Showing the first 1,000 models.” | `app/src/kernel/discoverRead.ts`（截断规则） | 清单是用来勾选的；网关、OpenRouter 一次列出几十到几百个（proposal §2），1000 够用，再多也看不过来 | 遇到超过 1000 个模型、要的模型排在后面的网关时 |
+| Anthropic 形状列表最多页数 | 5（每页 `limit=1000`） | `app/src/kernel/modelDiscover.ts`（按 `has_more` 或 `hasMore`、`after_id` 翻页，规格 §3.2） | 兼容服务每页给的可能比 `limit` 少，要翻几页才拿全；页数上限防止翻页停不下来 | 遇到要翻 5 页以上的 Anthropic 兼容列表时 |
+| 百炼原生列表每页 / 最多页数 | 100 / 10 | `app/src/kernel/modelDiscover.ts`（`page_no`、`page_size`） | 原生列表分页、默认每页 20（proposal §14），每页 100 少翻几次；10 页 1000 个与列表的条数上限一致 | 用真实 key 核对 `dashscope.aliyuncs.com` 上的原生列表与 `page_size` 的上限时（proposal §14 未验证） |
+| 对同一个 origin 同时进行的读取请求 | 4；命令的发现、探针第 0 步、读版本合计，Ollama 的 `/api/show` 也在其中；多出来的排队（规格 §5.3） | `app/src/kernel/modelDiscover.ts` | 发现不经模型池、不占槽位，要自己限并发（规格 §9）；一次加入多个模型时各自的第 0 步、Ollama 逐个 POST `/api/show` 都打在同一个服务上，4 个不压满本机或内网的服务，又不至于等太久 | 拿到内网端点、量过详情接口与 `/api/show` 的耗时时 |
+| Ollama `/api/show` 最多读的模型数 | 100；超过的模型不读 `/api/show`，窗口按 `/api/ps`、`/api/tags` 能读到的 | `app/src/kernel/modelDiscover.ts` | 每个模型要一个 POST `/api/show`（读 Modelfile 的 `num_ctx`，0.30.0 以前还读 `capabilities`，规格 §4.2）；按每个 origin 4 个同时进行，模型再多时要等很久；超过 100 个的只用列表、`/api/tags`、`/api/ps` 已有的 | 拿到内网 Ollama、量过 `/api/show` 的耗时时 |
+| 清单显示过滤框的行数 | 超过 20 行，手填的行也算（占位 “Filter models”，按 id 子串过滤，不分大小写，不改勾选；被藏起来的勾选行照样加入，规格 §6.2） | `app/src/renderer/src/components/settings/Checklist.tsx` | 20 行以内一屏看得完；再多时按 id 找比滚动快 | 你走查清单时 |
+| `anthropic-version` 请求头 | `2023-06-01` | `app/src/kernel/discoverRead.ts`（列表地址的计划） | Anthropic 的接口要求带这个头，读列表也一样；合成端点的 `anthropic` 形状同样要求它（规格 §13.1） | Anthropic 发布新的 API 版本、或兼容服务拒绝这个值时 |
+| 没报告时的窗口 / 输出上限 | 128000 / 16384 与窗口一半中较小的；清单里标 “Not reported” | `app/src/shared/models.ts`（`UNREPORTED_CONTEXT_WINDOW`、`unreportedMaxTokens`，2026-10-23 实现时放在这里，一份规则两边用）：`app/src/kernel/discoverRead.ts`（读一行、§4.3 的最后检查）与界面都用它：清单里手填的行（`app/src/renderer/src/components/settings/Checklist.tsx` `enteredRow`）、改窗口时（`Checklist.tsx` `followWindow` 经 `fields.tsx` `defaultMaxOutput`）、模型行窗口提示的 Use（`settings/ModelRows.tsx` `sizeHints`，规格 §8） | 同模型层规格 §12（pi 的默认、原来新模型表单的 Max output）；不查 pi 的模型目录、不按名字猜（proposal §12 第 2 条），由探针与长输入测试再核实 | 同模型层“新模型表单的 Max output”一行；拿到内网端点时 |
+| 名称 | 主机名，端口不是协议默认端口时加 `:<端口>`（例如 `api.deepseek.com`、`10.0.0.5:8000`） | `app/src/kernel/discoverRead.ts` | 主机名就认得出是哪个服务；同一台机器上的几个服务靠端口区分；拉取后可以改 | 你走查时 |
+| 探针代价的说明 | “Each model is verified with up to 13 short requests.”（自动探针第 1–7 步最多 13 个请求） | `app/src/renderer/src/components/settings/`（Add provider 和卡上清单的底部，Add 按钮上方；首次启动表单在 Test connection 上方，规格 §6.6） | proposal §12 第 5 条：加入的模型全部自动跑探针，清单底部写明代价；在公网云上会花一点额度 | 探针步骤变化（`PROBE_SUITE` 改版）时 |
+| 清单的默认勾选 | 服务报告是聊天模型（`chat` 为真）的勾上，报告不是的不勾；不报告类型（`chat` 为 null）时，能加入的行只有一行就勾上，否则都不勾；Added、不能加入的行不勾 | `app/src/renderer/src/components/settings/Checklist.tsx` | proposal 已定（§12 第 1、4 条）：只按服务报告的类型判断，不按名字猜；OpenAI 这类不报告类型的列表里混着 embedding、语音和图片模型，全勾会加入不能对话的模型，所以只有一个时才勾，其余用 Select all | 你走查清单、常要手动 Select all 或取消勾选时 |
+| 列表地址最多试 3 次 | 没有 Anthropic 提示时最多 2 个（`<base>/models`；base 不以 `/v<数字>` 结尾时再试 `<base>/v1/models`）；有 Anthropic 提示时最多 3 个（`<base>/v1/models?limit=1000`、前缀 + `/models`、前缀 + `/v1/models`；主机是 `api.anthropic.com` 时只有第一个）；已有提供商不整理地址：`openai-*` 只试 `<baseUrl>/models`，`anthropic-messages` 同有 Anthropic 提示时的三个（前缀取 `baseUrl` 路径里 `anthropic` 那一段之前的部分；主机是 `api.anthropic.com` 或路径里没有这一段时只试第一个）；拿到列表、401/403 或连接失败、超时即停 | `app/src/kernel/discoverRead.ts`（列表地址的计划） | 补 `/v1`、去掉 `anthropic` 那一段对应 proposal §5.1、§5.3 写的两种常见填法（一键拉取模型 proposal 要求的功能，不算 fallback）；不再往下猜更多路径；认证失败和连不上时换地址也没用 | 遇到列表在别的路径上的服务时 |

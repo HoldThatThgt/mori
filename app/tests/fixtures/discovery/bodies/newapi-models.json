@@ -1,0 +1,68 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.24:3000/v1/models",
+ "note": "New API /v1/models: success true, supported_endpoint_types per model, X-New-Api-Version header",
+ "basis": [
+  "https://github.com/QuantumNous/new-api/blob/main/controller/model.go (ListModels default: {success: true, data, object: \"list\"}; buildOpenAIModel: created 1626777600, owned_by \"custom\" or the channel owner, supported_endpoint_types)",
+  "https://github.com/QuantumNous/new-api/blob/main/middleware/cors.go (Version middleware: response header X-New-Api-Version)",
+  "https://github.com/QuantumNous/new-api/blob/main/relaykit/types/endpoint_type.go (openai, openai-response, openai-response-compact, anthropic, gemini, jina-rerank, image-generation, embeddings, openai-video, ...)"
+ ],
+ "status": 200,
+ "headers": {
+  "X-New-Api-Version": "v0.9.6"
+ },
+ "body": {
+  "success": true,
+  "data": [
+   {
+    "id": "gpt-4o",
+    "object": "model",
+    "created": 1626777600,
+    "owned_by": "openai",
+    "supported_endpoint_types": [
+     "openai"
+    ]
+   },
+   {
+    "id": "claude-sonnet-4-5",
+    "object": "model",
+    "created": 1626777600,
+    "owned_by": "custom",
+    "supported_endpoint_types": [
+     "anthropic",
+     "openai"
+    ]
+   },
+   {
+    "id": "text-embedding-3-small",
+    "object": "model",
+    "created": 1626777600,
+    "owned_by": "openai",
+    "supported_endpoint_types": [
+     "embeddings"
+    ]
+   },
+   {
+    "id": "gemini-2.5-flash",
+    "object": "model",
+    "created": 1626777600,
+    "owned_by": "custom",
+    "supported_endpoint_types": [
+     "gemini"
+    ]
+   },
+   {
+    "id": "gpt-image-1",
+    "object": "model",
+    "created": 1626777600,
+    "owned_by": "openai",
+    "supported_endpoint_types": [
+     "image-generation"
+    ]
+   }
+  ],
+  "object": "list"
+ }
+}

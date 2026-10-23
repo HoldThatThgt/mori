@@ -361,6 +361,8 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
    pi 的 MCP 扩展不改。
 6. 模型层（2026-10-21 加，[specs/model-providers.md](specs/model-providers.md)）：Mori 自己的模型配置与迁移、选择器、按 key 的模型池、
    模型档案与探针；每个会话的模型请求经 Mori 的虚拟模型、流函数包装和模型池的 fetch 发出。
+   （2026-10-23 加：一键拉取模型，即你点 Fetch models 时读出服务的模型列表和它报告的窗口、输出上限、思考、图片，探针第 0 步用同一个读取器，
+   按 [specs/model-discovery.md](specs/model-discovery.md)。）
 7. 平行 Agent 与 TaskBoard（2026-10-21 加，[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md)）：读 `.mori/agents/*.md`，协作模式下的立项与对话，按 task 建实例会话，TaskBoard 服务、
    唤醒与交接、工作卡、写入排队，把后台实例的批准请求、回执和进展交给界面。
 8. 记忆、拼装与增强（2026-10-22 加，[specs/memory.md](specs/memory.md)）：记忆模块（条目、修订记录与回滚唯一的读写入口）与 memory 工具；

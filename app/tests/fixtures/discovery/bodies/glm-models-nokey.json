@@ -1,0 +1,13 @@
+{
+ "source": "real",
+ "recorded": "2026-10-23",
+ "url": "https://open.bigmodel.cn/api/paas/v4/models",
+ "note": "GLM /models without a key",
+ "status": 401,
+ "body": {
+  "error": {
+   "code": "1001",
+   "message": "Header中未收到Authorization参数，无法进行身份验证。"
+  }
+ }
+}

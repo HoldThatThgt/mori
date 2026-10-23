@@ -1,0 +1,69 @@
+{
+ "source": "real",
+ "recorded": "2026-10-24",
+ "url": "https://api.deepseek.com/models",
+ "note": "DeepSeek /models with the saved key, recorded by tests/ui/md-real.mjs through a local proxy (status and body only)",
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "deepseek-flash",
+    "object": "model",
+    "owned_by": "deepseek",
+    "name": "DeepSeek-V4.1-Flash",
+    "context_window": 1048576,
+    "max_output_tokens": 393216,
+    "input_modalities": [
+     "text",
+     "image"
+    ],
+    "output_modalities": [
+     "text"
+    ],
+    "effort": {
+     "supported_levels": [
+      "low",
+      "high",
+      "max"
+     ],
+     "default_level": "high"
+    },
+    "api_capabilities": {
+     "anthropic_messages": {
+      "system_prompt_update": "in-history",
+      "tool_update": "addition-only"
+     }
+    }
+   },
+   {
+    "id": "deepseek-v4-pro",
+    "object": "model",
+    "owned_by": "deepseek",
+    "name": "DeepSeek-V4-Pro",
+    "context_window": 1048576,
+    "max_output_tokens": 393216,
+    "input_modalities": [
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ],
+    "effort": {
+     "supported_levels": [
+      "low",
+      "high",
+      "max"
+     ],
+     "default_level": "high"
+    },
+    "api_capabilities": {
+     "anthropic_messages": {
+      "system_prompt_update": "leading-only",
+      "tool_update": "leading-only"
+     }
+    }
+   }
+  ]
+ }
+}

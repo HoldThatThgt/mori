@@ -16,6 +16,7 @@
 // v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；测试准备在复制出的配置里给两个临时项目
 // 授权公网、默认范围设为 [DeepSeek, GLM] 的分组。走查 1 改为在 设置 → Models 里给首选提供商加模型（等它的探针跑完）、
 // 在输入框下面一行的范围菜单里选它；走查 8 改用 v1 的模型表单（Supports thinking、Default effort for new sessions）。
+// 一键拉取模型（docs/specs/model-discovery.md §13.4）：走查 1 加模型改为卡上 Fetch models → 清单里勾（或手填）→ Add 1 model。
 // 按钮状态的读法（composer-pickers.md"测试要改的地方"C1、C2）："不可用"读 aria-disabled（没有 data-pending），"切换中"读
 // data-pending；悬停按换行分开（范围按钮三行、Effort 两行），读屏的描述读 aria-describedby 指向的元素。
 
@@ -30,6 +31,7 @@ import { composerAt, slotSelector, waitPaneIdle, waitSplit } from './m5-helpers.
 import {
   chooseThinking, modelRow, NOTE, openAndPlace, openToolsSection, POPUPS, providerCard, slashItems, splitOpen,
 } from './m6-helpers.mjs';
+import { cardScope, fetchIn, pickIn } from './page.mjs';
 
 const source = arg('source');
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -354,22 +356,23 @@ const toolCalling = (page, ref) => modelRow(page, ref).locator('[data-testid="pr
   .getAttribute('data-value', { timeout: 2000 }).catch(() => null);
 
 /**
- * @brief 设置 → Models 的提供商卡上点"Add model"，填 Model ID 和 Context window（不勾 Supports thinking），Save；
- *        等它的探针跑完（Tool calling 不再是验证中）。返回看到的。
+ * @brief 设置 → Models 的提供商卡上点"Fetch models"（用已保存的 key 拉取，model-discovery.md §6.5、§13.4）：卡里打开
+ *        清单，没有 key 框，清单开着时卡上的 Fetch models 不可用；只勾 deepseek-v4-pro（服务没列出时用 Add a model ID
+ *        手填），Context window 填 1,000,000、不勾 Supports thinking，Add 1 model；等它的探针跑完（Tool calling 不再是
+ *        验证中）。返回看到的。
  */
 async function addModel(ctx) {
   const { page } = ctx;
   await openSettings(page);
-  await providerCard(page, ctx.conn.provider).locator('[data-action="add-model"]').click();
-  const form = page.getByTestId('model-form');
-  await form.waitFor({ timeout: 10000 });
-  const seen = { title: await form.locator('h3').innerText(),
-    keyFields: await form.locator('input[type="password"]').count() };
-  await form.getByLabel('Model ID', { exact: true }).fill(SECOND_MODEL);
-  await form.getByLabel('Context window', { exact: true }).fill(String(CONTEXT));
+  const scope = cardScope(ctx.conn.provider);
+  const card = providerCard(page, ctx.conn.provider);
+  const fetch = await fetchIn(page, scope);
+  const seen = { fetch, keyFields: await card.locator('.card-checklist input[type="password"]').count(),
+    fetchDisabled: await card.locator('[data-action="fetch-models"]').isDisabled() };
+  await pickIn(page, scope, [{ id: SECOND_MODEL, contextWindow: CONTEXT, reasoning: false }]);
   await shot(page, '1-add-model');
-  await form.getByRole('button', { name: 'Save', exact: true }).click();
-  await form.waitFor({ state: 'detached', timeout: 15000 });
+  await card.locator('[data-action="add-models"]').click();
+  await card.locator('.card-checklist').waitFor({ state: 'detached', timeout: 15000 });
   const ref = `${ctx.conn.provider}/${SECOND_MODEL}`;
   seen.row = oneLine(await modelRow(page, ref).innerText({ timeout: 5000 }).catch(() => ''));
   const deadline = Date.now() + PROBE_WAIT_MS;
@@ -405,8 +408,9 @@ async function switchModel(page, pick, name = '1-model-menu') {
 function recordAddModel(ctx, form, keyBefore) {
   const models = modelConfig(ctx)?.providers?.find((item) => item.id === ctx.conn.provider)?.models ?? [];
   const added = models.find((model) => model.id === SECOND_MODEL);
-  record('走查 1：提供商卡上点"Add model"：标题"Add model · <提供商名>"，没有 key 框',
-    form.title === `Add model · ${ctx.conn.name}` && form.keyFields === 0, JSON.stringify(form));
+  record('走查 1：提供商卡上点"Fetch models"：用已保存的 key 拿到模型列表，卡里打开清单，没有 key 框，清单开着时卡上的'
+    + ' Fetch models 不可用', form.fetch?.state === 'list' && form.keyFields === 0 && form.fetchDisabled === true,
+  JSON.stringify(form));
   record('走查 1：保存后模型行出现（Context 1,000,000），自动跑探针，Tool calling 为 Verified；model-config.json 这个提供商下'
     + '多了这个模型（不支持思考）', form.row.includes(SECOND_MODEL) && form.row.includes('1,000,000')
     && form.toolCalling === 'verified' && added?.contextWindow === CONTEXT && added?.reasoning === false,

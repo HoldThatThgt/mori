@@ -510,8 +510,10 @@ async function setup({ app, page, h, project }) {
   const run = await h.firstRun({ baseUrl, apiKey: testKey });
   await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
   await openNewSession(app, page, project);
-  record('准备：首次启动、测试连接、等探针跑完、打开文件夹', run.ok && run.probe === 'verified',
-    `${oneLine(run.text)}；probe-status=${run.probe}`);
+  // model-discovery.md §13.4：首次启动先 Fetch models（拿到列表），在清单里勾 fake-coder（不是手填的）
+  record('准备：首次启动（Fetch models 拿到列表、勾 fake-coder）、测试连接、等探针跑完、打开文件夹',
+    run.ok && run.probe === 'verified' && run.fetch?.state === 'list' && run.typed.length === 0,
+    `${oneLine(run.text)}；probe-status=${run.probe}；fetch=${JSON.stringify(run.fetch)}；typed=${run.typed}`);
 }
 
 /** @brief 读取文件不出批准卡，工具卡没有标签。 */

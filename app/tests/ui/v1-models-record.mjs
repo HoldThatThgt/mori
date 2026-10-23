@@ -324,7 +324,8 @@ const thinking = {
     const model = info.config.providers.find((item) => item.id === ctx.first.id).models[0];
     const before = info.profiles[ctx.firstRef]?.probedAt ?? null;
     // 保存之后不再录 models.get：回放时界面保存后读到的仍是保存前的配置（回放桥直接应答写命令，同 m6-record.mjs）。
-    await d.cmd({ type: 'models.saveModel', providerId: ctx.first.id, adding: false,
+    // model-discovery.md §5.4：models.saveModel 只改已有的模型，没有 adding
+    await d.cmd({ type: 'models.saveModel', providerId: ctx.first.id,
       model: { ...model, reasoning: true }, thinkingLevel: 'medium' });
     if (!model.reasoning) await waitReprobe(d.page(), ctx.firstRef, before);
     const s = await d.create(ctx.cwd);

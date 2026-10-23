@@ -1,0 +1,43 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.15:1234/v1/models",
+ "note": "LM Studio OpenAI-compatible /v1/models (rows: id, object, owned_by; no created)",
+ "basis": [
+  "https://lmstudio.ai/docs/developer/openai-compat/models (documents the request only, no response sample)",
+  "Row shape {id, object: \"model\", owned_by: \"organization_owner\"} NOT verified against a server or source (LM Studio is closed source)",
+  "qwen3-8b-32k is a loaded instance id (see lmstudio-api-v1-models.json), listed instead of the key qwen/qwen3-8b: NOT verified"
+ ],
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "google/gemma-4-26b-a4b",
+    "object": "model",
+    "owned_by": "organization_owner"
+   },
+   {
+    "id": "deepseek-r1",
+    "object": "model",
+    "owned_by": "organization_owner"
+   },
+   {
+    "id": "mistralai/mathstral-7b-v0.1",
+    "object": "model",
+    "owned_by": "organization_owner"
+   },
+   {
+    "id": "text-embedding-nomic-embed-text-v1.5",
+    "object": "model",
+    "owned_by": "organization_owner"
+   },
+   {
+    "id": "qwen3-8b-32k",
+    "object": "model",
+    "owned_by": "organization_owner"
+   }
+  ],
+  "object": "list"
+ }
+}

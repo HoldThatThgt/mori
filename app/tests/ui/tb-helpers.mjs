@@ -84,10 +84,12 @@ export async function startTbEndpoint(port, proxyPort, env = {}) {
     env: { ...process.env, FAKE_PORT: String(port), FAKE_CHUNK_DELAY_MS: '5', FAKE_FIRST_DELAY_MS: '20', ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+  // 列表请求与详情请求的 JSON 行带 path（model-discovery.md §13.1、server.mjs 开头"日志"），不是对话请求，不记进 logs
   collectLines(child.stdout, (line) => {
     if (!line.startsWith('{')) return;
     try {
-      logs.push({ t: Date.now(), ...JSON.parse(line) });
+      const entry = JSON.parse(line);
+      if (!('path' in entry)) logs.push({ t: Date.now(), ...entry });
     } catch {
       // 不是日志行
     }

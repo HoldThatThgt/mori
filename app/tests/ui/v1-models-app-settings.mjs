@@ -21,6 +21,9 @@
 // 合成端点用 4500–4519 之间的端口（与并行跑的其他测试错开）。
 // 下面写进数据目录的 model-config.json、pi/models.json、pi/settings.json 和项目的 .mori/models.json 都是
 // synthetic test setup（测试准备），代码里逐处注明。key 都是测试自己生成的合成值，与任何真实服务无关。
+// 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动与 Add provider 是 Base URL 和 API key → Fetch models →
+// 在清单里勾模型（page.mjs fetchIn、pickIn）；卡上加模型是 Fetch models → 勾选 → Add 1 model（cardAddModels）；
+// 兼容选项在拉取后的 More settings 里；MP-24、MP-33 的检查照这个流程。合成端点的列表、详情请求的日志行（带 path）不算对话请求。
 
 import { spawn } from 'node:child_process';
 import {
@@ -30,6 +33,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import { activeFile, ctrlN, openRow, PANE, paneCount, stubFolder, waitPanes, waitReady } from './m3-helpers.mjs';
+import { cardAddModels, fetchIn, FIRST_RUN_FORM, pickIn, PROVIDER_FORM } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -151,7 +155,10 @@ function specId(name, taken) {
 
 // ---------- 合成端点 ----------
 
-/** @brief 启动一个合成端点（synthetic），收集它每个对话请求的 JSON 日志行。 */
+/**
+ * @brief 启动一个合成端点（synthetic），收集它每个对话请求的 JSON 日志行。列表请求与详情请求的 JSON 行带 path
+ *        （model-discovery.md §13.1、server.mjs 开头"日志"），不是对话请求，不收集。
+ */
 function startFake(port, env = {}) {
   const child = spawn(process.execPath, [join(appRoot, 'tests/fake-endpoint/server.mjs')], {
     env: { ...process.env, FAKE_PORT: String(port), FAKE_CHUNK_DELAY_MS: '5', FAKE_FIRST_DELAY_MS: '20',
@@ -169,7 +176,10 @@ function startFake(port, env = {}) {
       buffer = lines.pop();
       for (const line of lines) {
         if (line.startsWith('{')) {
-          try { fake.chats.push({ ...JSON.parse(line), at: Date.now() }); } catch { /* 不是日志行 */ }
+          try {
+            const entry = JSON.parse(line);
+            if (!('path' in entry)) fake.chats.push({ ...entry, at: Date.now() });
+          } catch { /* 不是日志行 */ }
         }
         if (line.includes('synthetic endpoint')) {
           clearTimeout(timer);
@@ -324,17 +334,22 @@ const toolCalling = (page, ref) => modelRow(page, ref).locator('[data-field="too
 const waitVerified = (page, ref, timeout = 60000) => poll(() => toolCalling(page, ref), (v) => v === 'verified',
   timeout, 300);
 
-/** @brief 设置页里新建提供商（Add provider 表单）。 */
+/**
+ * @brief 设置页里新建提供商（Add provider 表单，model-discovery.md §6.1、§13.4）：Base URL 和 API key → Fetch models →
+ *        Name、区域 → 清单里只勾 modelId（没列出的手填，page.mjs pickIn）→ Add 1 model，等表单关掉。返回拉取的结果。
+ */
 async function addProvider(page, { name, baseUrl, modelId = 'fake-coder', secret = '', zone = null }) {
   await page.locator('[data-action="add-provider"]').click();
   const form = page.getByTestId('provider-form');
-  await form.getByLabel('Name', { exact: true }).fill(name);
   await form.getByLabel('Base URL', { exact: true }).fill(baseUrl);
-  if (zone) await form.locator(`input[name="zone"][value="${zone}"]`).check();
   if (secret) await form.getByLabel('API key', { exact: true }).fill(secret);
-  await form.getByLabel('Model ID', { exact: true }).fill(modelId);
-  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  const fetched = await fetchIn(page, PROVIDER_FORM);
+  await form.getByLabel('Name', { exact: true }).fill(name);
+  if (zone) await form.locator(`input[name="zone"][value="${zone}"]`).check();
+  await pickIn(page, PROVIDER_FORM, [modelId]);
+  await form.locator('[data-action="add-models"]').click();
   await form.waitFor({ state: 'detached', timeout: 20000 });
+  return fetched;
 }
 
 /** @brief 在提供商卡上 Add key（label 为空时用默认的 "Key <n>"）。 */
@@ -353,13 +368,17 @@ const waitConfig = (dir, test, timeout = 15000) => poll(() => readConfig(dir), (
 const providerOf = (cfg, id) => cfg?.providers?.find((item) => item.id === id);
 const keyRefs = (cfg, id) => providerOf(cfg, id)?.keys.map((key) => key.ref) ?? null;
 
-/** @brief 首次启动表单：填写，返回预选的区域。 */
+/**
+ * @brief 首次启动表单（model-discovery.md §6.6、§13.4）：Base URL 和 API key → Fetch models → Name → 清单里只勾 modelId
+ *        （page.mjs pickIn），返回拉取后预选的区域。
+ */
 async function fillFirstRun(page, { name, baseUrl, secret, modelId }) {
   const form = page.getByTestId('connection-form');
-  await form.getByLabel('Name', { exact: true }).fill(name);
   await form.getByLabel('Base URL', { exact: true }).fill(baseUrl);
   if (secret) await form.getByLabel('API key', { exact: true }).fill(secret);
-  await form.getByLabel('Model ID', { exact: true }).fill(modelId);
+  await fetchIn(page, FIRST_RUN_FORM);
+  await form.getByLabel('Name', { exact: true }).fill(name);
+  await pickIn(page, FIRST_RUN_FORM, [modelId]);
   return form.locator('input[name="zone"]:checked').getAttribute('value');
 }
 
@@ -767,12 +786,14 @@ async function publicForm(ctx) {
     && text.startsWith('Tool calling failed verification: ') && text.endsWith(advice)
     && text.length > 'Tool calling failed verification: '.length + advice.length, `${first} | ${text}`);
   const before = readConfig(userData);
-  await page.getByTestId('connection-form').getByLabel('Model ID', { exact: true }).fill('fake-coder');
+  // model-discovery.md §13.4：改模型 id 改为在清单里换勾的模型（取消 fake-coder-notools，勾 fake-coder）
+  await pickIn(page, FIRST_RUN_FORM, ['fake-coder']);
   const second = await testConnection(page);
   const again = await probeStates(page, ['verified', 'failed', 'error']);
   const after = readConfig(userData);
   const provider = after?.providers?.[0];
-  record('MP-33 after editing the model id and testing again there is still one provider, with only the new model',
+  record('MP-33 after ticking another model in the checklist (fake-coder instead of fake-coder-notools) and testing '
+    + 'again there is still one provider, with only the new model',
     before?.providers.length === 1 && after?.providers.length === 1 && provider.id === before.providers[0].id
     && JSON.stringify(provider.models.map((m) => m.id)) === '["fake-coder"]'
     && after.normalDefault === `${provider.id}/fake-coder` && second.startsWith('Connected'),
@@ -1104,12 +1125,19 @@ const COMPAT_TEXTS = [
   ['Tool results must include the tool name', 'Some endpoints require a name field on tool result messages'],
 ];
 
-/** @brief Add provider 表单的兼容选项：六个勾选框各有标签和一行说明；API type 不是 OpenAI-compatible 时不显示。不保存。 */
+/**
+ * @brief Add provider 表单的兼容选项：六个勾选框各有标签和一行说明；API type 不是 OpenAI-compatible 时不显示。不保存。
+ *        一键拉取模型（model-discovery.md §6.1 第 7 项、§13.4）：兼容选项在拉取之后的"More settings"里，先 Fetch models
+ *        再点开它。
+ */
 async function compatOptions(ctx) {
   const { page } = ctx;
   await openSettings(page);
   await page.locator('[data-action="add-provider"]').click();
   const form = page.getByTestId('provider-form');
+  await form.getByLabel('Base URL', { exact: true }).fill(url(PORT.edits));
+  await fetchIn(page, PROVIDER_FORM);
+  await form.locator('[data-testid="more-settings"] summary').click();
   const rows = form.locator('.compat-checks label.check-row');
   const shown = await rows.evaluateAll((labels) => labels.map((label) => {
     const span = label.querySelector('span');
@@ -1120,7 +1148,7 @@ async function compatOptions(ctx) {
   const hidden = await rows.count();
   await api.selectOption('openai-completions');
   const back = await rows.count();
-  await form.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await form.locator('[data-action="close-form"]').click();
   await form.waitFor({ state: 'detached', timeout: 5000 });
   record('MP-24 Add provider: each compatibility option shows its label and a hint line (english-ui wording); '
     + 'the options are hidden for other API types', JSON.stringify(shown) === JSON.stringify(COMPAT_TEXTS)
@@ -1214,20 +1242,21 @@ async function editAddress(ctx) {
   `${result.value} | keys on ${PORT.moved}: ${[...new Set(fakes.moved.chats.map((c) => c.key))].join(',')}`);
 }
 
-/** @brief Models：加、编辑、上移、删除（确认框）。 */
+/**
+ * @brief Models：加、编辑、上移、删除（确认框）。加模型是卡上 Fetch models → 勾 fake-coder-b → Add 1 model
+ *        （models.addModels，model-discovery.md §6.5、§13.4）。
+ */
 async function editModels(ctx) {
   const { page, userData } = ctx;
   await openSettings(page);
-  await providerCard(page, 'loc').locator('[data-action="add-model"]').click();
-  let form = page.getByTestId('model-form');
-  await form.getByLabel('Model ID', { exact: true }).fill('fake-coder-b');
-  await form.getByRole('button', { name: 'Save', exact: true }).click();
-  await form.waitFor({ state: 'detached', timeout: 15000 });
+  const fetched = await cardAddModels(page, 'loc', ['fake-coder-b']);
   const added = await waitConfig(userData, (cfg) => providerOf(cfg, 'loc').models.length === 2);
-  record('MP-24 Models: Add model saves it at the end of the provider and shows its row', added.ok
-    && await modelRow(page, 'loc/fake-coder-b').count() === 1);
+  record('MP-24 Models: Fetch models on the card, tick fake-coder-b, Add 1 model saves it at the end of the provider '
+    + 'and shows its row', fetched.error === null && fetched.fetch.state === 'list' && added.ok
+    && JSON.stringify(providerOf(added.value, 'loc').models.map((m) => m.id)) === '["fake-coder","fake-coder-b"]'
+    && await modelRow(page, 'loc/fake-coder-b').count() === 1, JSON.stringify(fetched));
   await modelRow(page, 'loc/fake-coder-b').locator('[data-action="edit"]').click();
-  form = page.getByTestId('model-form');
+  const form = page.getByTestId('model-form');
   await form.getByLabel('Context window', { exact: true }).fill('65536');
   await form.getByRole('button', { name: 'Save', exact: true }).click();
   await form.waitFor({ state: 'detached', timeout: 15000 });
@@ -1680,17 +1709,24 @@ async function zoneSuggestions(ctx) {
   await zoneRules(ctx);
 }
 
-/** 各种地址与 §12 给出的建议区域 */
+/**
+ * 各种地址与 §12 给出的建议区域。一键拉取模型（model-discovery.md §6.1、§13.4）之后区域在 Fetch models 之后才预选，
+ * 每个地址都要发一次列表请求（不带 key），所以只用连不到任何真实服务的地址：本机回环的 9 号端口（没有服务在听；不用 11434，
+ * 本机的 Ollama 会回答）、解析不到的不含点的主机名与 .local 名字（内网），RFC 5737 的文档地址 192.0.2.1（IPv4 与 IPv4 映射的
+ * IPv6）和 RFC 6761 的 .invalid 域名（公网）。10/8、172.16/12、192.168/16、169.254/16、fc00::/7、fe80::/10 这些内网段的地址
+ * 可能就是你内网里的机器，App 测试不向它们发请求；它们和 172.16/12 的边界等全部取值由单元测试
+ * （tests/unit/shared-models.test.mjs 的 MP-08 zone suggestion）覆盖
+ */
 const ZONE_RULES = {
-  'http://127.5.5.5:8000/v1': 'local', 'http://localhost:11434/v1': 'local', 'http://[::1]:8000/v1': 'local',
-  'http://10.1.2.3:8000/v1': 'intranet', 'http://172.20.0.5/v1': 'intranet', 'http://172.32.0.1/v1': 'public',
-  'http://192.168.1.10/v1': 'intranet', 'http://169.254.1.1/v1': 'intranet', 'http://[fd00::1]:8000/v1': 'intranet',
-  'http://[fe80::1]/v1': 'intranet', 'http://[::ffff:192.168.1.10]/v1': 'intranet',
-  'http://[::ffff:8.8.8.8]/v1': 'public', 'http://box.local/v1': 'intranet', 'http://gpu-box:8000/v1': 'intranet',
-  'https://api.example.com/v1': 'public',
+  'http://127.5.5.5:9/v1': 'local', 'http://localhost:9/v1': 'local', 'http://[::1]:9/v1': 'local',
+  'http://mori-md-nohost.local/v1': 'intranet', 'http://mori-md-nohost:9/v1': 'intranet',
+  'http://192.0.2.1/v1': 'public', 'http://[::ffff:192.0.2.1]/v1': 'public', 'https://api.example.invalid/v1': 'public',
 };
 
-/** @brief 区域建议的规则（§12）：在 Add provider 表单里逐个输入地址，读预选的区域，不保存（只在界面里算，不发请求）。 */
+/**
+ * @brief 区域建议的规则（§12）：在 Add provider 表单里逐个输入地址、Fetch models（这些地址都拿不到列表，列表错误时
+ *        照样预填，model-discovery.md §6.3），读预选的区域，不保存。
+ */
 async function zoneRules(ctx) {
   const { page } = ctx;
   await page.locator('[data-action="add-provider"]').click();
@@ -1698,13 +1734,15 @@ async function zoneRules(ctx) {
   const wrong = [];
   for (const [address, zone] of Object.entries(ZONE_RULES)) {
     await form.getByLabel('Base URL', { exact: true }).fill(address);
+    const fetched = await fetchIn(page, PROVIDER_FORM);
     const chosen = await form.locator('input[name="zone"]:checked').getAttribute('value');
-    if (chosen !== zone) wrong.push(`${address} → ${chosen} (want ${zone})`);
+    if (chosen !== zone) wrong.push(`${address} → ${chosen} (want ${zone}; fetch ${fetched.state} ${fetched.kind})`);
   }
-  await form.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await form.locator('[data-action="close-form"]').click();
   await form.waitFor({ state: 'detached', timeout: 5000 });
-  record('MP-08 zone suggestions follow every §12 rule (loopback, 10/8, 172.16/12, 192.168/16, 169.254/16, fc00::/7, '
-    + 'fe80::/10, IPv4-mapped IPv6, .local, dotless host, others public)', wrong.length === 0, wrong.join('; '));
+  record('MP-08 zone suggestions are preselected after Fetch models for every zone (loopback and localhost local, '
+    + '.local and dotless host intranet, others incl. IPv4-mapped IPv6 public; private IP ranges in the unit test)',
+  wrong.length === 0, wrong.join('; '));
 }
 
 /** @brief 区域未确认时会话被拒绝；Confirm zone 带到区域未确认的那一行；确认后可以发送，用迁移来的 key。 */

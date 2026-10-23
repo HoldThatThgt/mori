@@ -17,6 +17,8 @@
 - 设置页的模型部分、首次启动表单、输入框下面一行的选择范围、对话流里的提示、阶段行、拒绝启动的说明；
 - 现有测试与回放随之调整（§14.4）。
 
+（2026-10-23 注：提供商表单、卡片上的 Add model、首次启动表单和探针第 0 步按一键拉取模型改，见 [model-discovery.md](model-discovery.md) §0。）
+
 **不在本规格实现**的部分只在有平行 Agent 与 TaskBoard 之后才有调用方，规则列在 §10，由那份规格按这些规则实现。
 
 本规格不留“以后再做”的条目：§14 的每一条验收都有对应的测试，`tests/spec-coverage.mjs` 检查每一条都有通过的结果（§14.3）。
@@ -61,6 +63,8 @@
 | 密钥 | `kernel/credentials.ts`、`main/credentials.ts` | key 按 `ref` 存取（§4.1） |
 | 进程桥协议 | `shared/models.ts`（新）、`shared/protocol.ts` | 命令、结果与事件（§9.5） |
 | 界面 | `renderer/src/components/` 与 `state/` | §9 |
+
+（2026-10-23 注：一键拉取模型新增 `kernel/discoverRead.ts`、`kernel/modelDiscover.ts` 和 `renderer/src/components/settings/Checklist.tsx`，并改 `probes.ts`、`modelProfiles.ts`、`modelCommands.ts`；`kernel/modelLayer.ts` 只加接线（按那边 §5.1 给已有提供商取 key、探针第 0 步的新依赖、`checkVersions` 改用读版本），`kernel/modelTimings.ts` 加发现请求的时限，见 [model-discovery.md](model-discovery.md) §2。）
 
 ## 3. 数据文件
 
@@ -406,13 +410,15 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 - 档案键：`<baseUrl>|<api>|<模型 id>|<服务版本>`。服务版本取自探针第 0 步，取不到时为 `unknown`。
 - 指纹：档案键加上配置里的 `contextWindow`、`maxTokens`、`reasoning`、`input`、`compat`。指纹变了，这个模型重新探测（proposal §10）。
 - 读服务版本的时机：后台进程启动时；会话新建或打开时，对它范围内的模型（异步，不挡打开）。读失败（连接、非 2xx、没有版本字段）时档案不变；只有读到与档案不同的版本才算版本变化。配置保存时立即按新指纹判断。
+  （2026-10-23 注：读版本每个提供商（`baseUrl` + `api`）读一次，结果对比它下面每个模型的档案：发列表请求，按那边 §3.3 全部判断种类，再发这个种类的版本请求，不发详情请求（那边 §4.2），不改 `reported`、`meta`；
+  拿到了列表，且种类变了、或读到的版本与档案里的不同时这个模型重新探测；版本请求失败时只比种类（本节“读失败时档案不变”仍然成立），拿不到列表时档案不变。原来被认成 vLLM 的 LocalAI、TensorRT-LLM 因此各重新探测一次，版本改为 `unknown`。见 [model-discovery.md](model-discovery.md) §3.3、§7.3。）
 
 ### 7.2 档案字段
 
 | 字段 | 取值 | 来源 |
 | --- | --- | --- |
 | `status` | `probing`、`ready`、`error`（附原文） | `error`：至少一步因连接或 HTTP 错误没有结果 |
-| `server` | `{ kind, version }`，`kind` 为 `vllm`、`sglang`、`ollama`、`llamacpp`、`unknown` | 第 0 步 |
+| `server` | `{ kind, version }`，`kind` 为 `vllm`、`sglang`、`ollama`、`llamacpp`、`unknown`（2026-10-23 注：扩展为 model-discovery.md §3.3 的全部种类；`auto` 另记第 0 步读到的 `meta`（输出上限、思考、图片），见 [model-discovery.md](model-discovery.md) §7.2） | 第 0 步 |
 | `tool_calling` | `verified`、`unverified`、`failed`，附第 3、4 步各自的结果 | 第 3、4 步 |
 | `tier` | `A`、`B`、`C` 或 `null`，附每级的结果 | 第 5–7 步（§7.5） |
 | `protocol_write` | 由 `tier` 派生：有等级为 `verified`；三级都判定为不通过为 `failed`；有一级因出错没有结果为 `unverified` | — |
@@ -433,7 +439,7 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 
 | 步 | 请求 | 判定 |
 | --- | --- | --- |
-| 0 | GET `<baseUrl>/models`、`<origin>/version`、`<origin>/api/version`、`<origin>/props`（不计入短请求） | `server`：vLLM 的 `/version`、Ollama 的 `/api/version`、llama.cpp 的 `/props`、SGLang 的 `/models` 里 `owned_by: sglang`；`reported` 窗口：`/models` 里本模型的 `max_model_len`，或 `/props` 的 `n_ctx` |
+| 0 | GET `<baseUrl>/models`、`<origin>/version`、`<origin>/api/version`、`<origin>/props`（不计入短请求） | `server`：vLLM 的 `/version`、Ollama 的 `/api/version`、llama.cpp 的 `/props`、SGLang 的 `/models` 里 `owned_by: sglang`；`reported` 窗口：`/models` 里本模型的 `max_model_len`，或 `/props` 的 `n_ctx`（2026-10-23 注：改为调用读取器的单模型模式，种类先看列表的 `owned_by` 等再看版本接口，每个请求用发现的时限；key 用那边 §5.1 对已有提供商的选法；同一个提供商同时进行的第 0 步合并列表与种类判断；Ollama 只读到训练窗口时 `reported` 窗口为 null，见 [model-discovery.md](model-discovery.md) §7.1、§7.2） |
 | 1 | “Reply with the single word: ready.” | 有正文即通过；`openai-completions` 记录推理字段名（pi-ai 记在思考块的 `thinkingSignature` 里；有 `reasoning_details` 时被覆盖成 JSON，这时按 `reasoning_content`） |
 | 2 | 只对 `reasoning: true` 的模型：同一句，分别用思考 `off` 和 `medium` | `can_disable`：`off` 时没有思考内容为 `true` |
 | 3 | 工具 `get_weather({ city: string, days: integer })`，“Use the tool to get the weather for Paris for the next 3 days.” | 调用了 `get_weather`，`city` 是字符串，`days` 是整数（不是字符串） |
@@ -543,9 +549,12 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
     key 的明文不能查看也不能改：换 key = 加新的再删旧的。删最后一个 key 时确认“Requests to <name> will be sent without an API key.”。没有 key 时说明“Requests are sent without an API key.”。
   - **Models**：每行模型 id、窗口、最大输出、模型族、支持思考；档案摘要：Tool calling（Verified / Not verified / Failed / Verifying… / Re-verifying…）、Handoff tier（A / B / C / —）、Context（有效窗口；截断时告警“Silently truncates long input”）、Reasoning field、Cancel（Verified / Not verified / Unknown）；探针出错时“Couldn’t verify: <原文>”。
     操作：“Verify”、“Long-input test…”、“Cancel test…”（只对 vLLM、SGLang、llama.cpp）、上移、下移、“Edit”、“Delete…”、“Test”。
+    （2026-10-23 注：行上按档案的 `reported` 加“(not reported)”和“Server reports …”等提示与“Use”，见 [model-discovery.md](model-discovery.md) §8。）
   - 模型表单：Model ID（编辑时只读，沿用 v0）、Context window、Max output（新建默认 16384 与窗口一半中较小的）、Family（可空）、Supports thinking、Image input、Default effort for new sessions（只在支持思考时；写 pi 设置的 `modelThinkingLevels`，沿用 v0）。
+    （2026-10-23 注：模型表单只剩 Edit（“Edit model · <provider name>”），卡上的“Add model”换成“Fetch models”，见 [model-discovery.md](model-discovery.md) §6.5。）
   - 提供商表单：Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Network zone（Local / Intranet / Public，按 §12 的规则预选建议值）、Concurrency per key、兼容选项；新建时还有第一个 key 和第一个模型。改地址的 origin 时按 §4.1 删除 key 并确认。
     新提供商保存失败时，删除本次新存的 key。兼容选项沿用 english-ui 的标签与说明，每个勾选框是标签加下面一行说明：“Endpoint doesn’t support the developer role”（“Sends the system prompt with the system role instead”）、“Endpoint doesn’t accept the store field”（“Leaves store out of requests”）、“Endpoint needs max_tokens instead of max_completion_tokens”（“Older endpoints don’t recognize max_completion_tokens”）、“Endpoint doesn’t report usage while streaming”（“Doesn’t send stream_options, so the context usage shown will be inaccurate”）、“Endpoint doesn’t support strict mode for tool parameters”（“Leaves strict out of tool definitions”）、“Tool results must include the tool name”（“Some endpoints require a name field on tool result messages”）；提供商卡上的“Compatibility options”只列标签。
+    （2026-10-23 注：新建时改为 Base URL、API key → Fetch models → 清单 → Add，Concurrency per key 与兼容选项收进 More settings，没有“第一个模型”；Edit provider 不变，见 [model-discovery.md](model-discovery.md) §6.1。）
   - 测试结果（Test connection、Test）：“Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>”；失败时“Connection failed: <原文>”；“Cancel”取消。
   - 确认对话框“Confirm zone…”：提供商名称与地址，Local / Intranet / Public 单选（预选建议值），“Confirm”/“Cancel”。
 - **Groups**：每个分组一行：id、有序的成员（“DeepSeek · all models” 或 “DeepSeek · deepseek-chat”），成员可以加入、去掉、上移、下移；“New group”、“Delete…”。
@@ -557,6 +566,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 - 删除、改地址、删最后一个 key 的确认框列出 §4.1 的连带改动。
 
 **首次启动表单**（v0 的连接表单，改为英文）：Name、Base URL、API type、Network zone（必选，按 §12 预选建议值）、API key（可空）、Model ID、Context window（默认 128000）、Max output（默认 16384 与窗口一半中较小的）、Supports thinking、兼容选项。
+（2026-10-23 注：改为 Base URL、API key → Fetch models → 清单，勾选的模型一次写入，再次保存时整体替换这个提供商和它的全部模型；Test connection 测第一个勾选的模型，见 [model-discovery.md](model-discovery.md) §6.6、§5.4。）
 
 - “Test connection”：表单有改动时先保存（`models.firstRun`：一次写入提供商、模型、key 和 `normalDefault`；同一张表单再次保存时整体替换这个提供商和它唯一的模型，不新建第二个），再测；成功后显示“Open folder…”，同时在后台跑探针，表单下方显示探针状态：
   “Verifying tool calling…” / “Tool calling verified” / “Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings.”（表单可以改，改了再测）/ “Couldn’t verify: <原文>” + “Verify again”。
@@ -600,6 +610,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 - `config.get` 只返回 `{ agentDir, settingsError, defaultThinkingLevel, firstRun, migrationError, configError, migratedNow }`（`migratedNow`：这次启动刚做完迁移，界面据此直接打开 设置 → Models，§4.5）：`firstRun` 只在 `model-config.json` 不存在、且没有迁移成（`models.json` 不存在、`providers` 为空或迁移失败）时为真；
   `migrationError` 在迁移失败时给出原文；`model-config.json` 存在但读不出时 `firstRun` 为假、`configError` 给出路径与原文（§4.1）。`models.firstRun` 在 `model-config.json` 已存在、且要写的不是这张首次启动表单自己建的那个提供商时拒绝。
 - 界面的操作记录（F8 报告的“Recent activity”，`state/actionLog.ts`）对 `models.*` 命令只记类型和 id（例如“Add key <providerId>”），从不包含 `secret`、`keySecret`。
+  （2026-10-23 注：`models.discover`、`models.discoverCancel`、`models.addModels` 的记法见 [model-discovery.md](model-discovery.md) §5.5；`models.saveModel` 不再加模型，“Add model <provider>/<id>”一行删掉，见那边 §5.4。）
 
 ### 9.5 载荷
 
@@ -633,10 +644,10 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 | 命令 | 参数 | 结果 |
 | --- | --- | --- |
 | `models.get` | — | `{ config /* key 只给 { ref, label } */, profiles, keyStatus, thinkingDefaults: Record<ref, ThinkingLevel \| null> /* pi 设置里按模型的新会话默认强度 */, zoneSuggestions: Record<providerId, zone>, migration: MigrationNotice \| null, projects: { path, zones /* 本机额外授权的区域 */, projectZones: Zone[] \| null /* .mori/models.json 的 allowedZones */, projectConfig: string \| null /* 这个文件的错误原文 */ }[], loadError: string \| null, reserved: string[] }` |
-| `models.firstRun` | `{ providerId: string \| null, provider, model, keySecret: string \| null }`（`providerId` 非空时整体替换这个提供商与它唯一的模型，`keySecret` 为空时保留已存的 key；写配置失败时删除本次新存的 key） | `{ providerId }` |
-| `models.saveProvider` | `{ id: string \| null, provider, keySecret?: string, model?, thinkingLevel?: ThinkingLevel }`（新建时带第一个 key（标签“Key 1”）和第一个模型及它的新会话默认强度） | `{ providerId }` |
+| `models.firstRun` | `{ providerId: string \| null, provider, model, keySecret: string \| null }`（`providerId` 非空时整体替换这个提供商与它唯一的模型，`keySecret` 为空时保留已存的 key；写配置失败时删除本次新存的 key）（2026-10-23 注：`model` 改为 `models`（1 个以上），整体替换这个提供商和它的全部模型，多个模型时默认范围为提供商 id，见 [model-discovery.md](model-discovery.md) §5.4） | `{ providerId }` |
+| `models.saveProvider` | `{ id: string \| null, provider, keySecret?: string, model?, thinkingLevel?: ThinkingLevel }`（新建时带第一个 key（标签“Key 1”）和第一个模型及它的新会话默认强度）（2026-10-23 注：`model?`、`thinkingLevel?` 改为 `models?`：新建时 1 个以上，编辑时不带，见 [model-discovery.md](model-discovery.md) §5.4） | `{ providerId }` |
 | `models.deleteProvider` | `{ id, dryRun: boolean }` | `{ consequences: string[] }`：确认框的各行（§4.1 的连带改动）；`dryRun` 为真时只算、不改 |
-| `models.saveModel` | `{ providerId, model, adding: boolean, thinkingLevel?: ThinkingLevel }` | — |
+| `models.saveModel` | `{ providerId, model, adding: boolean, thinkingLevel?: ThinkingLevel }`（2026-10-23 注：去掉 `adding`，只改已有的模型：`{ providerId, model, thinkingLevel? }`，模型不存在时 `error`；加模型只有 `saveProvider`、`firstRun`、`addModels`，原来 `adding: true` 的分支删掉；Edit 里没设过强度的模型，Default effort for new sessions 显示 `config.get` 的 `defaultThinkingLevel`（没有时 Medium），只在你改了时带 `thinkingLevel`，见 [model-discovery.md](model-discovery.md) §5.4） | — |
 | `models.deleteModel` | `{ providerId, modelId, dryRun: boolean }` | `{ consequences: string[] }`，同上 |
 | `models.moveModel` | `{ providerId, modelId, delta: -1 \| 1 }` | — |
 | `models.addKey` | `{ providerId, label, secret }` | `{ ref }` |
@@ -652,6 +663,8 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 | `models.verify` | `{ refs, tests: 'auto' \| 'long_input' \| 'cancel' }` | — |
 | `session.setPick` | `{ sessionId, pick }` | `ModelState` |
 | `session.pickOptions` | `{ sessionId }`（只读） | `{ options: { pick, kind: 'group' \| 'provider' \| 'model', label, zones: Zone[], excluded: boolean, reason: string \| null }[] }`：范围菜单的每一项，按这个会话的项目对它做静态校验（§9.2 的变淡与原因） |
+
+（2026-10-23 注：新命令 `models.discover`、`models.discoverCancel`、`models.addModels` 见 [model-discovery.md](model-discovery.md) §5；`ProfileView` 加 `reported`，见那边 §7.2。）
 
 `models.*` 的写命令保存后：编译（§4.4）、对所有打开的会话重新做静态校验并发 `mori.model_state`、需要时发起探针（§7.4）。
 段开始选定模型、段内换模型、段结束时，后台进程同样发 `mori.model_state`（`current`、`thinkingLevels`、`reasoning` 随之更新）。
@@ -784,6 +797,8 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | pi 里的占位 `apiKey` | `mori-pool` |
 | 重做说明文字、各提示文字 | §6.1、§9 |
 
+（2026-10-23 注：一键拉取模型的临时默认值见 [model-discovery.md](model-discovery.md) §11，登记在 v1/defaults.md 的“一键拉取模型”一节；新建模型的表单不再有，“新模型表单的 Max output”的规则用于清单里没报告的输出上限和手填的行，见那边 §4.1、§6.4。）
+
 ## 13. 要改的文件
 
 | 文件 | 改什么 |
@@ -913,3 +928,4 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 
 `npm run smoke`、`test:app`、`test:m1-app`…`test:m7-app`、各回放测试都通过，MP-37 才算通过。
 （2026-10-22 注：`test:m7-app`、`test:m7-replay` 由 [提示词分层与记忆规格](memory.md) §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放。）
+（2026-10-23 注：MP-01、MP-10、MP-24、MP-33 的条目文字不变，测试按一键拉取的流程写：首次启动、Add provider 和卡上加模型都走 Fetch models 与清单（或手填一行），见 [model-discovery.md](model-discovery.md) §13.4。）

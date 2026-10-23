@@ -2,6 +2,8 @@
 // 覆盖首次启动、测试连接与取消、代码块的"Copy code"、停止、排队与插话、三种错误来源、后台进程退出与重新载入、
 // 重启后布局还在。v1（docs/specs/model-providers.md §14.4）：首次启动是英文表单；重试改为 http-503-once 与
 // "Retrying 1/3"；key 被拒改为删 key、加错的 key → 说明卡 → Open settings（焦点在 Keys）→ 加回对的 key。
+// 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动是 Base URL 和 API key → Fetch models → 清单里勾模型；
+// 卡上加 fake-slow 改为卡上 Fetch models → 勾 fake-slow → Add 1 model（page.mjs cardAddModels）。
 // 2026-10-21 起（docs/v0/composer-pickers.md）：输入框下面一行的上下文用量圆环（docs/v0/screens/models.md"上下文用量
 // （圆环）"）：还没有消息、颜色分档（改小上下文窗口）、999,950 写成 1M、刚压缩完（pi 的压缩参数调到每轮都压缩）；
 // 准备中、切换中（很短的范围"o3"，范围菜单往上打开、右边对齐范围按钮）、后台进程退出、Restart 之后这一行的样子和焦点。
@@ -91,29 +93,44 @@ async function pickerOptions(app, page) {
  *        （"Testing…"、"Cancel" → "Test cancelled"）；401 原文；测试成功后等探针跑完，再"Open folder…"。
  *        测试取消用 fake-slow（合成端点对它第一个分块前等 8 秒），之后同一张表单改回 fake-coder 再测（整体替换，
  *        配置里仍只有一个提供商）。
+ *        一键拉取模型（model-discovery.md §13.4）：Base URL 和 API key → Fetch models → 清单；小字与 Name 必填的检查
+ *        也看拉取之后的表单（清单与字段）；错的 key 在 Fetch models 时就得到列表错误 rejected，手填 fake-coder 继续。
  */
 async function firstRun({ app, page, h, project, userData }) {
   const form = page.getByTestId('connection-form');
   await form.waitFor({ timeout: 60000 });
   record('首次启动：只有连接表单（没有侧栏和会话）', await page.getByTestId('sidebar').count() === 0);
   const small = await smallText(page);
-  record('首次启动：没有小于 12px 的文字', small.length === 0, small.slice(0, 3).join('; '));
-  await h.fillConnection({ name: 'x' });
+  await h.fillConnection({ baseUrl, apiKey: testKey, modelId: 'fake-coder', name: 'x' });
+  const fetched = await smallText(page);
+  record('首次启动：没有小于 12px 的文字（拉取前，以及拉取后的清单与字段）', small.length === 0 && fetched.length === 0
+    && await form.getByTestId('checklist').count() === 1, [...small, ...fetched].slice(0, 3).join('; '));
   await h.fillConnection({ name: '' });
   const nameError = await form.locator('[data-testid="field-error"][data-field="name"]').innerText().catch(() => '');
-  record('首次启动：没填的字段给出英文说明，Test connection 不可用', /^Name is required\.?$/.test(nameError)
-    && await form.locator('[data-action="test"]').isDisabled(), nameError);
+  const picked = await form.locator('[data-testid="discovered-row"] input[name="pick"]:checked').count();
+  record('首次启动：没填的字段给出英文说明，Test connection 不可用（清单里勾着 fake-coder，只差 Name）',
+    /^Name is required\.?$/.test(nameError) && picked === 1 && await form.locator('[data-action="test"]').isDisabled(),
+    `${nameError}；勾选 ${picked} 行`);
   await cancelFormTest({ page, h });
-  await h.fillConnection({ apiKey: 'wrong-key', modelId: 'fake-coder' });
+  const rejected = await h.fillConnection({ apiKey: 'wrong-key', modelId: 'fake-coder' });
   await form.locator('[data-action="test"]').click();
   const wrong = await h.formMessage('Test cancelled', { test: true });
-  record('首次启动：key 错误时显示错误原文', /^(Connection failed|Failed)/.test(wrong) && wrong.includes('401'), oneLine(wrong));
-  await h.fillConnection({ apiKey: testKey });
+  record('首次启动：key 错误时 Fetch models 得到列表错误 rejected，手填 fake-coder 后测试连接显示错误原文',
+    /^(Connection failed|Failed)/.test(wrong) && wrong.includes('401') && rejected?.state === 'list-error'
+    && rejected.kind === 'rejected', `${JSON.stringify(rejected)}；${oneLine(wrong)}`);
+  // 圆环的检查（composer-pickers）按 128,000 的窗口写；原来首次启动表单的默认窗口就是它，拉取之后清单行是合成端点报告的
+  // 131072，这里在清单行里改成 128000（model-discovery.md §6.2：行的 Context window 可以改）
+  const listed = await h.fillConnection({ apiKey: testKey, modelId: 'fake-coder', contextWindow: 128000 });
   await form.locator('[data-action="test"]').click();
   const ok = await h.formMessage(wrong, { test: true });
   await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
-  record('首次启动：测试连接成功，显示首字耗时，进入"Open folder…"', /^Connected · [Ff]irst token \d+ ?ms/.test(ok),
-    oneLine(ok));
+  // model-discovery.md §13.4：换回对的 key 后 Fetch models 拿到列表，fake-coder 在清单里勾（行上没有"Entered by you"）
+  const coder = '[data-testid="discovered-row"][data-model="fake-coder"]:has(input[name="pick"]:checked)';
+  const typed = await form.locator(coder).evaluateAll((rows) => rows
+    .map((row) => row.querySelector('[data-testid="row-tag"][data-kind="entered"]') !== null));
+  record('首次启动：换回对的 key 后 Fetch models 拿到列表、勾 fake-coder，测试连接成功，显示首字耗时，进入"Open folder…"',
+    /^Connected · [Ff]irst token \d+ ?ms/.test(ok) && listed?.state === 'list' && typed.join() === 'false',
+    `${JSON.stringify(listed)}；手填 ${typed.join()}；${oneLine(ok)}`);
   const probe = await h.waitProbes();
   const providers = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8')).providers;
   record('首次启动：探针跑完、tool calling 已验证；同一张表单保存了三次，配置里仍只有一个提供商',
@@ -194,15 +211,14 @@ async function copyCode({ app, page, h }) {
 
 /**
  * @brief 设置 → Models：模型行的"Test"测试中可以取消（models-settings.md "Models 行"：测试中"Testing…"与"Cancel"，
- *        结果写在这一行下面）；所以先在提供商卡上"Add model"加一个 fake-slow（合成端点对它第一个分块前等 8 秒），
- *        再用这一行的"Test"和"Cancel"。默认范围仍是 fake-coder（检查），之后的步骤不受影响。
+ *        结果写在这一行下面）；所以先在提供商卡上 Fetch models、在清单里勾 fake-slow、Add 1 model（合成端点对它第一个
+ *        分块前等 8 秒，model-discovery.md §6.5、§13.4），再用这一行的"Test"和"Cancel"。默认范围仍是 fake-coder（检查），
+ *        之后的步骤不受影响。
  */
 async function cancelTest({ page, h, userData }) {
   await h.openModels();
-  await h.providerCard().locator('[data-action="add-model"]').click();
-  const form = page.getByTestId('model-form');
-  await form.getByLabel('Model ID', { exact: true }).fill('fake-slow');
-  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  const added = await h.addModels(['fake-slow']);
+  if (added.error !== null) throw new Error(`add fake-slow: ${added.error}`);
   const row = page.locator('[data-testid="model-row"][data-model="mori-endpoint/fake-slow"]');
   await row.waitFor({ timeout: 15000 });
   await row.locator('[data-action="test"]').click();
@@ -213,7 +229,7 @@ async function cancelTest({ page, h, userData }) {
   const text = await result.innerText();
   record('设置：模型行的"Test"在测试中变为"Testing…"，可以取消，结果写在这一行下面', text === 'Test cancelled', text);
   const config = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8'));
-  record('设置："Add model"不改默认范围：normalDefault 仍是 mori-endpoint/fake-coder',
+  record('设置：卡上 Fetch models 加入模型不改默认范围：normalDefault 仍是 mori-endpoint/fake-coder',
     config.normalDefault === 'mori-endpoint/fake-coder', String(config.normalDefault));
   await page.getByRole('button', { name: 'Back to app' }).click();
 }
@@ -228,13 +244,14 @@ async function chooseRange(page, pick) {
   }, pick, { timeout: 30000 });
 }
 
-/** @brief 设置 → Models 里给合成端点加一个模型 id，等它的 tool calling 验证过（自动探测没跑时点一次 Verify）。 */
+/**
+ * @brief 设置 → Models 里给合成端点加一个模型 id，等它的 tool calling 验证过（自动探测没跑时点一次 Verify）。
+ *        一键拉取模型（model-discovery.md §6.5、§13.4）：卡上 Fetch models → 列表里没有的 id 用 Add a model ID 手填 → Add 1 model。
+ */
 async function addVerifiedModel(page, h, id) {
   await h.openModels();
-  await h.providerCard().locator('[data-action="add-model"]').click();
-  const form = page.getByTestId('model-form');
-  await form.getByLabel('Model ID', { exact: true }).fill(id);
-  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  const added = await h.addModels([id]);
+  if (added.error) throw new Error(`Add ${id}: ${added.error}`);
   const row = page.locator(`[data-testid="model-row"][data-model="mori-endpoint/${id}"]`);
   const verified = row.locator('[data-field="tool_calling"][data-value="verified"]');
   await row.waitFor({ timeout: 15000 });
@@ -568,7 +585,8 @@ async function ringTones({ project }, tokens) {
  */
 async function ringCompacted({ project }) {
   const settings = { compaction: { enabled: true, reserveTokens: 127500, keepRecentTokens: 1 } };
-  const fresh = await freshApp('mori-m1-app-compact-', project, { settings });
+  // 128,000 的窗口在清单行里填（拉取后清单行是合成端点报告的 131072，model-discovery.md §6.2）
+  const fresh = await freshApp('mori-m1-app-compact-', project, { settings, contextWindow: 128000 });
   try {
     const { page, h } = fresh;
     const compactions = () => page.getByText('Compacted session', { exact: true }).count();

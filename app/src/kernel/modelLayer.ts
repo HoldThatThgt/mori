@@ -14,6 +14,10 @@
 // - 原因文字：一律用 shared/models.ts 的 REASON_TEXTS、plainReasonText 与 selector.ts 的 availabilityText、triedText；
 // - 会话打开时：registerProject(cwd)（Project access 列出它）、checkVersions(refs)（§7.1，异步，不挡打开）；
 // - onModelsChanged(listener)：每次配置、档案或 key 记录变化后调用；emitGlobal(event) 发全局事件（§9.5）。
+//
+// 一键拉取模型（docs/specs/model-discovery.md §2）在这里只有接线，读取规则在 discoverRead.ts、modelDiscover.ts：
+// reader（命令、探针第 0 步与读版本共用的读取器）、readTarget(provider)（已有提供商按 §5.1 取 key，明文只在这里）、
+// 探针第 0 步的 readServer 依赖（§7.1）、checkVersions 每个提供商读一次版本（§7.3）。
 
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -30,19 +34,18 @@ import {
   zoneSuggestions,
 } from './modelConfig';
 import { ModelCompiler, type ReplayLookup } from './modelCompile';
+import { DiscoverReader, type ReadTarget } from './modelDiscover';
 import { runMigration, type PiSettingsView, type ThinkingCopy } from './modelMigrate';
 import { authHeaders, createModelPool, type ModelPool, type PoolKeySecret } from './modelPool';
 import {
   ProfileBook, buildProfile, needsProbe, profileFingerprint, profileView, reasoningOf, versionChanged, visionOf,
   withCancel, withLongInput, type AutoResults, type CancelResult, type LongInputResult, type ProfileTarget,
-  type StoredProfile,
+  type ServerRead, type StoredProfile, type VersionRead,
 } from './modelProfiles';
 import { MODEL_TIMINGS, type ModelTimings } from './modelTimings';
 import type { Availability, ModelCapabilities, ModelRef, ToolCallingState } from './modelTypes';
 import { createRuntime, globalSettings, loadPi, markRuntimeReady } from './pi';
-import {
-  ProbeRuns, detectServer, runAutoProbes, runCancelProbe, runLongInputProbe, type ProbeDeps,
-} from './probes';
+import { ProbeRuns, runAutoProbes, runCancelProbe, runLongInputProbe, type ProbeDeps } from './probes';
 import { expandPick, expandPicks, familyKey, type ExpandedPicks, type StaticCheckInput } from './selector';
 
 /** @brief 模型档案的文件名（在 userData 下，§3）。 */
@@ -132,6 +135,14 @@ type ProbeOutcome =
   | { kind: 'long_input'; result: LongInputResult }
   | { kind: 'cancel'; result: CancelResult };
 
+/** @brief 读版本时的一个提供商（baseUrl + api，model-discovery.md §7.3）：读一次，对比它下面的档案。 */
+interface VersionCheck {
+  /** 按它取 key 与地址（§5.1）：这个 baseUrl + api 下第一个出现的提供商 */
+  provider: ModelProvider;
+  /** 要对比的模型与读之前的档案 */
+  entries: { ref: ModelRef; stored: StoredProfile }[];
+}
+
 /** @brief 各文件的位置。 */
 interface LayerPaths {
   /** model-config.json */
@@ -152,6 +163,18 @@ export function allRefs(config: ModelConfig | null): ModelRef[] {
 /** @brief 档案对应的服务端模型。 */
 function targetOf(provider: ModelProvider, model: ProviderModel): ProfileTarget {
   return { baseUrl: provider.baseUrl, api: provider.api, model, compat: provider.compat };
+}
+
+/**
+ * @brief 配置里全部模型的 ref → 档案目标，一次快照建一次（model-discovery.md §9 安全与资源）：代替每个 ref 各找一遍
+ *        提供商和模型。提供商 id 唯一且不含 /、模型 id 在提供商内唯一（模型层规格 §4.1 校验），结果与 profileTarget 相同。
+ */
+function refTargets(config: ModelConfig | null): Map<ModelRef, ProfileTarget> {
+  const targets = new Map<ModelRef, ProfileTarget>();
+  for (const provider of config?.providers ?? []) {
+    for (const model of provider.models) targets.set(`${provider.id}/${model.id}`, targetOf(provider, model));
+  }
+  return targets;
 }
 
 /** @brief 探针开始时显示的步号与步数（running）。 */
@@ -223,6 +246,11 @@ async function readNotice(path: string): Promise<MigrationNotice | null> {
 export class ModelLayer {
   /** §12 的时长与次数 */
   readonly timings: ModelTimings = MODEL_TIMINGS;
+  /**
+   * 读取器（model-discovery.md §5.3）：models.discover 命令、探针第 0 步与读版本共用；每个请求的时限取 timings（§11），
+   * 不经模型池
+   */
+  readonly reader = new DiscoverReader({ timings: this.timings });
   private config: ModelConfig | null = null;
   private loadError: string | null = null;
   private migrationFailure: string | null = null;
@@ -238,6 +266,10 @@ export class ModelLayer {
   private readonly compiler: ModelCompiler;
   private readonly pool: ModelPool;
   private queue: Promise<unknown> = Promise.resolve();
+  /** 这一轮事件循环里探针进度已发过一条 mori.profiles，轮末的检查还没到（scheduleProfiles） */
+  private profilesThisTurn = false;
+  /** 那一条之后探针进度又变了：轮末补发一条最新的 */
+  private profilesPending = false;
 
   /**
    * @param runtime pi 的运行时（不读 models.json）
@@ -504,10 +536,45 @@ export class ModelLayer {
     this.emitGlobalEvent(event);
   }
 
-  /** @brief 发 mori.profiles：全部档案与正在跑的探针。 */
+  /** @brief 发 mori.profiles：全部档案与正在跑的探针；轮末要补发的那一条（scheduleProfiles）随之满足，不再另发。 */
   emitProfiles(): void {
-    this.emitGlobal({ type: 'mori.profiles', profiles: this.profiles.views(allRefs(this.config)),
+    this.profilesPending = false;
+    this.emitGlobal({ type: 'mori.profiles', profiles: this.profileViews(this.config),
       running: this.profiles.running() });
+  }
+
+  /**
+   * @brief 探针开始、每一步、结束时发 mori.profiles（§7.4、§9.5），一轮事件循环里最多两条、内容不变：这一轮的第一次
+   *        变化立即发（各步落在不同轮次时与逐次发送相同），之后的变化合并到轮末（setImmediate）补发一条最新的。
+   *        加入的每个模型都自动跑探针（model-discovery.md §5.4）：保存时 startProbes 一次开始全部加入的模型，共用的
+   *        第 0 步列表读完时全部模型在同一轮进入第 1 步；逐次发全部档案时消息数与总量随模型数平方增长，并挡住后台进程
+   *        （model-discovery.md §9 安全与资源；负责人：不能无限量地用内存、CPU）。
+   */
+  private scheduleProfiles(): void {
+    if (this.profilesThisTurn) {
+      this.profilesPending = true;
+      return;
+    }
+    this.profilesThisTurn = true;
+    setImmediate(() => this.endProfilesTurn());
+    this.emitProfiles();
+  }
+
+  /** @brief 轮末（scheduleProfiles，§9.5）：这一轮第一条之后探针进度又变了、也还没有别处发过时，补发一条最新的。 */
+  private endProfilesTurn(): void {
+    this.profilesThisTurn = false;
+    if (!this.profilesPending) return;
+    try {
+      this.emitProfiles();
+    } catch (error) {
+      console.error(`[kernel] cannot send mori.profiles: ${(error as Error).message}`);
+    }
+  }
+
+  /** @brief 全部模型的 ProfileView（mori.profiles、models.get）：ref → 目标按配置建一次（model-discovery.md §9）。 */
+  private profileViews(config: ModelConfig | null): Record<ModelRef, ProfileView> {
+    const targets = refTargets(config);
+    return this.profiles.views(allRefs(config), (ref) => targets.get(ref) ?? null);
   }
 
   // ---- models.get ----
@@ -516,7 +583,7 @@ export class ModelLayer {
   async info(): Promise<ModelsInfo> {
     const config = this.config;
     return {
-      error: null, config, profiles: this.profiles.views(allRefs(config)), keyStatus: this.pool.keyStatus(),
+      error: null, config, profiles: this.profileViews(config), keyStatus: this.pool.keyStatus(),
       thinkingDefaults: await readThinkingDefaults(allRefs(config)),
       zoneSuggestions: config ? zoneSuggestions(config) : {}, migration: this.notice,
       projects: await this.projectAccess(), loadError: this.loadError, reserved: [...this.reserved],
@@ -762,7 +829,8 @@ export class ModelLayer {
     this.probeFingerprints.set(ref, profileFingerprint(job.target, this.profiles.lookup(job.target)?.auto.server.version
       ?? null));
     this.profiles.setRunning(ref, ...firstStep(job.tests));
-    this.emitProfiles();
+    // 经 scheduleProfiles：保存时 startProbes 在同一轮开始全部加入的模型，第一个之后的合并到轮末一条
+    this.scheduleProfiles();
     let outcome: ProbeOutcome | null = null;
     try {
       outcome = await this.executeProbe(job, signal);
@@ -779,7 +847,8 @@ export class ModelLayer {
       this.profiles.clearRunning(ref);
       this.probeFingerprints.delete(ref);
     }
-    this.emitProfiles();
+    // §7.4 探针结束时发 mori.profiles，经 scheduleProfiles：同一轮结束的探针（例如 key 被拒时模型池一起失败的）合并
+    this.scheduleProfiles();
     this.notify({ kind: 'profiles', refs: [ref] });
   }
 
@@ -821,12 +890,16 @@ export class ModelLayer {
     }
   }
 
-  /** @brief 探针的依赖（§7.3）：pi 的 streamSimple、模型池 background 类别的 fetch、读服务端接口。 */
+  /**
+   * @brief 探针的依赖（§7.3）：pi 的 streamSimple、模型池 background 类别的 fetch、第 0 步的读取器
+   *        （model-discovery.md §7.1）、第 9 步读服务端接口。
+   */
   private probeDeps(ref: ModelRef, target: ProfileTarget, signal: AbortSignal): ProbeDeps {
     return {
       streamSimple: (model, context, options) => this.runtime.streamSimple(model, context, options),
       fetchFor: (request) => this.pool.createFetch({ ref: request.ref, api: target.api, sessionKey: `probe ${ref}`,
         cls: request.cls, signal: request.signal, attemptSignal: request.attemptSignal, onSent: request.onSent }),
+      readServer: (readSignal) => this.readServer(ref, readSignal),
       getText: (url, getSignal) => this.serverGet(ref, url, getSignal),
       now: () => Date.now(),
       timings: this.timings,
@@ -834,13 +907,14 @@ export class ModelLayer {
       onStep: (step, of) => {
         if (signal.aborted) return;
         this.profiles.setRunning(ref, step, of);
-        this.emitProfiles();
+        // 经 scheduleProfiles：共用的第 0 步列表读完时，全部模型在同一轮进入第 1 步
+        this.scheduleProfiles();
       },
     };
   }
 
   /**
-   * @brief 读服务端接口（探针第 0、9 步，§5.7 的指标）：GET，带这个提供商第一个 key 的认证头；不经模型池（不计入请求）。
+   * @brief 读服务端接口（探针第 9 步，§5.7 的指标）：GET，带这个提供商第一个 key 的认证头；不经模型池（不计入请求）。
    * @param ref 模型（决定提供商与接口）
    * @param url 完整地址
    * @param signal 取消
@@ -858,30 +932,83 @@ export class ModelLayer {
     return null;
   }
 
+  // ---- 读取器的接线（model-discovery.md §2） ----
+
   /**
-   * @brief 读服务版本（§7.1）：后台进程启动时、会话新建或打开时对它范围内的模型调用（异步，不挡打开）。
-   *        读到与档案不同的版本才算版本变化，这时重新自动探测；读失败时档案不变。
+   * @brief 已有提供商交给读取器的目标（model-discovery.md §5.1、§3.1）：地址与 Anthropic 提示按配置（api 为
+   *        anthropic-messages），不整理、不识别；key 用第一个不在 rate_limited、auth、quota 记录里的，都在时用第一个，
+   *        没有 key 时不带认证头（同 Test connection：只看有明文的 key，模型池也只有它们）。key 的明文不回到界面。
+   * @param provider 配置里的提供商
+   */
+  readTarget(provider: ModelProvider): ReadTarget {
+    const status = this.pool.keyStatus();
+    const usable = provider.keys.filter((key) => this.secrets.has(key.ref));
+    const ref = (usable.find((key) => status[key.ref] === undefined) ?? usable[0])?.ref ?? null;
+    return {
+      base: provider.baseUrl, anthropicHint: provider.api === 'anthropic-messages', existing: true,
+      secret: ref === null ? null : this.secrets.get(ref) ?? null,
+      // §5.3：同一个提供商（baseUrl + api + key 的 ref）同时进行的列表与种类判断只做一次
+      shareKey: `${provider.baseUrl}|${provider.api}|${ref ?? ''}`,
+    };
+  }
+
+  /**
+   * @brief 探针第 0 步（model-discovery.md §7.1）：按调用时的配置找到提供商，经读取器的单模型模式读；key 按 §5.1 选，
+   *        每个请求用读取器的时限（§11），只随这组探针的 signal 停止。
+   * @param ref 模型
+   * @param signal 这组探针的 signal
+   * @throws 模型已不在配置里
+   */
+  private readServer(ref: ModelRef, signal: AbortSignal): Promise<ServerRead> {
+    const found = this.lookupModel(ref);
+    if (!found) return Promise.reject(new Error(`${ref} is not in your model settings`));
+    return this.reader.single(this.readTarget(found.provider), found.model.id, signal);
+  }
+
+  /**
+   * @brief 读服务版本（§7.1；model-discovery.md §7.3）：后台进程启动时、会话新建或打开时对它范围内的模型调用
+   *        （异步，不挡打开）。每个提供商（baseUrl + api）经读取器读一次，结果按 versionChanged 对比它下面每个模型的
+   *        档案：种类变了、或读到了与档案不同的版本时重新自动探测；拿不到列表时档案不变。没有档案、正在探测的模型不参与，
+   *        同一个服务端模型只对比一次。
    * @param refs 模型
    */
   async checkVersions(refs: readonly ModelRef[]): Promise<void> {
+    const groups = new Map<string, VersionCheck>();
     const seen = new Set<string>();
-    await Promise.all(refs.map(async (ref) => {
-      const target = this.profileTarget(ref);
+    for (const ref of refs) {
+      const found = this.lookupModel(ref);
+      const target = found ? targetOf(found.provider, found.model) : null;
       const stored = target ? this.profiles.lookup(target) : undefined;
-      if (!target || !stored || this.probeRuns.isRunning(ref)) return;
-      const key = `${target.baseUrl}|${target.api}|${target.model.id}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      try {
-        const info = await detectServer(this.probeDeps(ref, target, new AbortController().signal), target.baseUrl,
-          target.model.id);
-        if (!versionChanged(stored, info.version)) return;
-        console.log(`[kernel] server version of ${ref} changed to ${info.version}; probing again`);
-        this.startProbes([ref], 'auto');
-      } catch (error) {
-        console.error(`[kernel] cannot read the server version of ${ref}: ${(error as Error).message}`);
-      }
-    }));
+      if (!found || !target || !stored || this.probeRuns.isRunning(ref)) continue;
+      const server = `${target.baseUrl}|${target.api}`;
+      if (seen.has(`${server}|${target.model.id}`)) continue;
+      seen.add(`${server}|${target.model.id}`);
+      const group = groups.get(server) ?? { provider: found.provider, entries: [] };
+      group.entries.push({ ref, stored });
+      groups.set(server, group);
+    }
+    await Promise.all([...groups.values()].map((group) => this.checkProviderVersion(group)));
+  }
+
+  /**
+   * @brief 读一个提供商的版本（model-discovery.md §7.3：列表请求、§3.3 的种类判断与版本请求，不发 §4.2 的详情请求，
+   *        不改 reported、meta），再对比它下面每个模型的档案。
+   * @param group 提供商（key 按 §5.1 选）与它下面要对比的档案
+   */
+  private async checkProviderVersion(group: VersionCheck): Promise<void> {
+    let read: VersionRead;
+    try {
+      read = await this.reader.version(this.readTarget(group.provider), new AbortController().signal);
+    } catch (error) {
+      console.error(`[kernel] cannot read the server version of ${group.provider.id}: ${(error as Error).message}`);
+      return;
+    }
+    for (const { ref, stored } of group.entries) {
+      if (!versionChanged(stored, read)) continue;
+      console.log(`[kernel] server of ${ref} changed to ${read.kind} ${read.version ?? 'unknown'}; probing again`);
+      const error = this.startProbes([ref], 'auto');
+      if (error !== null) console.error(`[kernel] cannot probe ${ref} again: ${error}`);
+    }
   }
 
   // ---- 启动 ----

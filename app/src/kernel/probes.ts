@@ -1,6 +1,8 @@
 // 探针（docs/specs/model-providers.md §7.3、§7.4）：第 0–9 步的请求与判定。
-// 依赖全部注入（pi 的 streamSimple、模型池给的 fetch、读服务端接口的 GET、时长与 signal），所以可以用替身做单元测试；
-// 档案的派生（能力三态、等级）在 modelProfiles.ts；第 5–7 步三种写法的请求改写与标签解析在 forcedWrite.ts（与强制填写共用）。
+// 依赖全部注入（pi 的 streamSimple、模型池给的 fetch、第 0 步的读取器、第 9 步读服务端接口的 GET、时长与 signal），
+// 所以可以用替身做单元测试；第 0 步改为调用读取器的单模型模式（docs/specs/model-discovery.md §7.1），种类、版本与
+// 报告值的读法在 discoverRead.ts、modelDiscover.ts；档案的派生（能力三态、等级）在 modelProfiles.ts；
+// 第 5–7 步三种写法的请求改写与标签解析在 forcedWrite.ts（与强制填写共用）。
 
 import { randomInt } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -10,7 +12,7 @@ import type {
 } from '@earendil-works/pi-ai';
 import type { ApiType, ProbeStepResult, ReasoningField, ServerKind, ThinkingLevel } from '../shared/models';
 import { forcedToolChoice, parseTagged, withJsonSchema, withStrictTools } from './forcedWrite';
-import type { AutoResults, AutoSteps, CancelResult, LongInputResult } from './modelProfiles';
+import type { AutoResults, AutoSteps, CancelResult, LongInputResult, ServerRead } from './modelProfiles';
 import type { ModelTimings } from './modelTimings';
 import type { ModelRef, SchedClass } from './modelTypes';
 
@@ -85,7 +87,10 @@ const CONTENT_EVENTS = new Set<AssistantMessageEvent['type']>([
   'text_start', 'text_delta', 'thinking_start', 'thinking_delta', 'toolcall_start', 'toolcall_delta',
 ]);
 
-/** @brief 有服务端进行中请求数可读的服务（第 9 步）。 */
+/**
+ * @brief 有服务端进行中请求数可读的服务（第 9 步）；model-discovery.md §7.2 不改：改认为 localai、tensorrt 的
+ *        不在其中，不显示 Cancel test…。
+ */
 const METRIC_KINDS: ReadonlySet<ServerKind> = new Set(['vllm', 'sglang', 'llamacpp']);
 
 // ---- 依赖与输入 ----
@@ -125,7 +130,14 @@ export interface ProbeDeps {
    */
   fetchFor(request: ProbeFetchRequest): FetchFunction;
   /**
-   * @brief 第 0 步与第 9 步的 GET（带这个提供商的认证由调用方处理）。
+   * @brief 第 0 步（model-discovery.md §7.1）：读取器的单模型模式读服务种类、版本、报告的窗口与 meta。
+   *        地址、key（§5.1 对已有提供商的选法）与每个请求的时限（§11 的发现时限，不是探针步时限）由调用方处理；
+   *        拿不到列表时种类按 §3.3 第 6 步能判断的判断，判断不了为 unknown，报告值各项为 null。
+   * @param signal 这组探针的 signal：只随它停止，不被 models.discover 或 models.discoverCancel 取消（§5.3）
+   */
+  readServer(signal: AbortSignal): Promise<ServerRead>;
+  /**
+   * @brief 第 9 步的 GET（带这个提供商的认证由调用方处理）；也给模型层规格 §5.7 的读指标用。
    * @param url 完整地址
    * @param signal 取消
    * @return 2xx 时的响应正文；连接失败或非 2xx 时为 null
@@ -447,107 +459,6 @@ export function reasoningFieldOf(messages: readonly (AssistantMessage | null)[])
   return 'none';
 }
 
-// ---- 第 0 步：服务种类、版本与报告的窗口 ----
-
-/** @brief 第 0 步读到的服务信息。 */
-export interface ServerInfo {
-  /** 服务种类 */
-  kind: ServerKind;
-  /** 服务版本；取不到时为 null */
-  version: string | null;
-  /** 服务报告的窗口；没有时为 null */
-  reported: number | null;
-}
-
-/** @brief 第 0 步四个 GET 的 JSON（取不到或不是 JSON 时为 null）。 */
-export interface ServerBodies {
-  /** <baseUrl>/models */
-  models: unknown;
-  /** <origin>/version（vLLM） */
-  version: unknown;
-  /** <origin>/api/version（Ollama） */
-  apiVersion: unknown;
-  /** <origin>/props（llama.cpp） */
-  props: unknown;
-}
-
-/** @brief 对象里字符串的 version 字段。 */
-function versionField(body: unknown): string | null {
-  const value = (body as { version?: unknown } | null)?.version;
-  return typeof value === 'string' && value !== '' ? value : null;
-}
-
-/** @brief 正整数，否则 null。 */
-function positiveInt(value: unknown): number | null {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null;
-}
-
-/** @brief llama.cpp /props 的 n_ctx（顶层或 default_generation_settings 里）。 */
-function propsWindow(props: unknown): number | null {
-  const body = props as { n_ctx?: unknown; default_generation_settings?: { n_ctx?: unknown } } | null;
-  return positiveInt(body?.n_ctx) ?? positiveInt(body?.default_generation_settings?.n_ctx);
-}
-
-/**
- * @brief 第 0 步的判定：SGLang 看 /models 里 owned_by: sglang，vLLM 看 /version，Ollama 看 /api/version，
- *        llama.cpp 看 /props；报告的窗口取 /models 里本模型的 max_model_len，或 /props 的 n_ctx。
- */
-export function judgeServer(bodies: ServerBodies, modelId: string): ServerInfo {
-  const data = (bodies.models as { data?: unknown } | null)?.data;
-  const entries = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
-  const entry = entries.find((item) => item?.id === modelId);
-  const reported = positiveInt(entry?.max_model_len) ?? propsWindow(bodies.props);
-  if (entries.some((item) => item?.owned_by === 'sglang')) {
-    return { kind: 'sglang', version: versionField(bodies.version), reported };
-  }
-  if (versionField(bodies.version)) return { kind: 'vllm', version: versionField(bodies.version), reported };
-  if (versionField(bodies.apiVersion)) return { kind: 'ollama', version: versionField(bodies.apiVersion), reported };
-  if (bodies.props !== null && typeof bodies.props === 'object') {
-    const build = (bodies.props as { build_info?: unknown }).build_info;
-    return { kind: 'llamacpp', version: typeof build === 'string' && build !== '' ? build : null, reported };
-  }
-  return { kind: 'unknown', version: null, reported };
-}
-
-/** @brief GET；getText 抛错时记日志并当作取不到（null）。 */
-async function safeGet(deps: Pick<ProbeDeps, 'getText'>, url: string, signal: AbortSignal): Promise<string | null> {
-  try {
-    return await deps.getText(url, signal);
-  } catch (error) {
-    if (!signal.aborted) console.error(`[kernel] probe GET ${url} failed: ${(error as Error).message}`);
-    return null;
-  }
-}
-
-/** @brief GET 并解析 JSON；取不到或不是 JSON 时为 null。 */
-async function getJson(deps: ProbeDeps, url: string): Promise<unknown> {
-  const text = await safeGet(deps, url, deps.signal);
-  if (text === null) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-/** @brief 去掉结尾的 /。 */
-function trimSlash(url: string): string {
-  return url.replace(/\/+$/, '');
-}
-
-/**
- * @brief 第 0 步：GET <baseUrl>/models、<origin>/version、<origin>/api/version、<origin>/props，判定服务。
- *        也用于 §7.1 在启动和会话打开时读服务版本（version 为 null 即读失败，档案不变）。
- */
-export async function detectServer(deps: ProbeDeps, baseUrl: string, modelId: string): Promise<ServerInfo> {
-  const origin = new URL(baseUrl).origin;
-  const [models, version, apiVersion, props] = await Promise.all([
-    getJson(deps, `${trimSlash(baseUrl)}/models`), getJson(deps, `${origin}/version`),
-    getJson(deps, `${origin}/api/version`), getJson(deps, `${origin}/props`),
-  ]);
-  return judgeServer({ models, version, apiVersion, props }, modelId);
-}
-
 // ---- 第 1–7 步 ----
 
 /** @brief 第 3、4 步的上下文的开头：用户的要求与带 get_weather 调用的助手消息。 */
@@ -696,14 +607,15 @@ async function tierSteps(run: Run): Promise<TierResults> {
 }
 
 /**
- * @brief 自动探针第 0–7 步（§7.3、§7.4）。
+ * @brief 自动探针第 0–7 步（§7.3、§7.4）。第 0 步经读取器（model-discovery.md §7.1），不计入短请求；
+ *        结果总带 meta（§7.2）。
  * @return 结果；这组探针被取消时为 null
  */
 export async function runAutoProbes(target: ProbeTarget, deps: ProbeDeps): Promise<AutoResults | null> {
   const run: Run = { deps, target };
   try {
     deps.onStep?.(0, AUTO_STEPS);
-    const server = await detectServer(deps, target.model.baseUrl, target.model.id);
+    const server = await deps.readServer(deps.signal);
     if (deps.signal.aborted) return null;
     const ready = await readySteps(run);
     const tools = await toolSteps(run);
@@ -713,7 +625,7 @@ export async function runAutoProbes(target: ProbeTarget, deps: ProbeDeps): Promi
     const field = target.model.api === 'openai-completions'
       ? reasoningFieldOf([...ready.messages, ...tools.messages]) : 'native';
     return { server: { kind: server.kind, version: server.version ?? 'unknown' }, reported: server.reported,
-      steps, field };
+      meta: server.meta, steps, field };
   } catch (error) {
     if (error instanceof ProbeCancelled || deps.signal.aborted) return null;
     throw error;
@@ -817,6 +729,16 @@ export async function runLongInputProbe(target: ProbeTarget, effective: number,
 }
 
 // ---- 第 9 步：断开后服务端是否停止 ----
+
+/** @brief GET；getText 抛错时记日志并当作取不到（null）。 */
+async function safeGet(deps: Pick<ProbeDeps, 'getText'>, url: string, signal: AbortSignal): Promise<string | null> {
+  try {
+    return await deps.getText(url, signal);
+  } catch (error) {
+    if (!signal.aborted) console.error(`[kernel] probe GET ${url} failed: ${(error as Error).message}`);
+    return null;
+  }
+}
 
 /**
  * @brief Prometheus 文本里一个指标的值（各标签组相加）。

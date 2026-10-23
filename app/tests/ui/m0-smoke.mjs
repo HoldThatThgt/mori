@@ -2,6 +2,8 @@
 // M1 起界面换成正式界面，这里只改了找元素的方式，检查的内容与 M0 相同（"未保存时不能测试连接"改为"测试连接会先保存"）。
 // v1（docs/specs/model-providers.md §14.4）：对 pi/models.json 的断言改为 model-config.json；改地址按 v1（key 被删、确认框）；
 // key 的占位文字改为 Keys 行的"Saved"；校验文字为英文。
+// 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先填 Base URL 和 API key、Fetch models，再在清单里勾
+// fake-coder（page.mjs）；错的 key 在拉取时就是列表错误 rejected，手填模型 ID 后继续。
 // 用法：
 //   node tests/ui/m0-smoke.mjs                         测开发构建（先 npm run build）
 //   node tests/ui/m0-smoke.mjs --exe <Mori.exe 路径>   测打包后的程序
@@ -58,15 +60,19 @@ function prepareDirs() {
   return { project, userData: join(root, 'user-data') };
 }
 
-/** @brief 在首次启动的表单（v1，英文）里用给定的 key 测试连接（会先保存），返回结果文字与是否成功。 */
+/**
+ * @brief 在首次启动的表单（v1，英文）里用给定的 key 测试连接（会先保存），返回结果文字、是否成功与拉取的结果。
+ *        一键拉取模型（model-discovery.md §13.4）：换了 key 就再 Fetch models；错的 key 在拉取时就得到列表错误
+ *        （rejected），这时 fake-coder 用 Add a model ID 手填（page.mjs pickIn）。
+ */
 async function saveAndTest(page, apiKey) {
   const h = pageHelpers(page);
-  await h.fillConnection({ name: 'Mori endpoint', baseUrl: `http://127.0.0.1:${port}/v1`, zone: 'local', apiKey,
-    modelId: 'fake-coder' });
+  const fetch = await h.fillConnection({ name: 'Mori endpoint', baseUrl: `http://127.0.0.1:${port}/v1`, zone: 'local',
+    apiKey, modelId: 'fake-coder' });
   const previous = await page.getByTestId('form-message').innerText().catch(() => null);
   await page.getByTestId('connection-form').locator('[data-action="test"]').click();
   const text = oneLine(await h.formMessage(previous, { test: true, timeout: 60000 }));
-  return { ok: text.startsWith('Connected'), text };
+  return { ok: text.startsWith('Connected'), text, fetch };
 }
 
 /**
@@ -82,22 +88,33 @@ function readConfigFiles(userData) {
  * @brief 首次启动表单（v1）：没填时不能测试并给出英文说明；错误的 key 显示错误原文；正确的 key 能连上；key 加密保存
  *        （model-config.json 只有 ref，pi 里只有占位 key）；改地址的 origin 时确认框说明 key 会被删，确认后 key 被删
  *        （规格 §4.1、§14.4），之后改回地址、加回 key。
+ *        一键拉取模型（model-discovery.md §13.4）：Name 必填的检查在拉取之后（Name 拉取后才出现，勾上 fake-coder，
+ *        Test connection 不可用只因为 Name 空着）；错的 key 在 Fetch models 时就得到列表错误 rejected，手填 fake-coder 继续。
  */
 async function connect(app, page, userData, project) {
   const h = pageHelpers(page);
   const form = page.getByTestId('connection-form');
   await form.waitFor({ timeout: 60000 });
-  await h.fillConnection({ name: 'x' });
+  await h.fillConnection({ baseUrl: `http://127.0.0.1:${port}/v1`, apiKey: testKey, modelId: 'fake-coder', name: 'x' });
   await h.fillConnection({ name: '' });
   const nameError = await form.locator('[data-testid="field-error"][data-field="name"]').innerText().catch(() => '');
   const disabled = await form.locator('[data-action="test"]').isDisabled();
-  record('没填连接时不能测试连接，字段旁给出英文说明', disabled && /^Name is required\.?$/.test(nameError),
-    `Test connection 不可用=${disabled}；${nameError}`);
+  const picked = await form.locator('[data-testid="discovered-row"] input[name="pick"]:checked').count();
+  record('没填连接时不能测试连接，字段旁给出英文说明', disabled && /^Name is required\.?$/.test(nameError) && picked === 1,
+    `Test connection 不可用=${disabled}；勾选 ${picked} 行；${nameError}`);
   const wrong = await saveAndTest(page, 'wrong-key');
-  record('错误的 key 显示错误原文', !wrong.ok && /^(Connection failed|Failed)/.test(wrong.text) && wrong.text.includes('401'),
-    wrong.text.slice(0, 160));
+  record('错误的 key 显示错误原文：Fetch models 时列表错误为 rejected，手填模型后测试连接给出 401 原文',
+    !wrong.ok && /^(Connection failed|Failed)/.test(wrong.text) && wrong.text.includes('401')
+      && wrong.fetch?.state === 'list-error' && wrong.fetch.kind === 'rejected',
+    `${JSON.stringify(wrong.fetch)}；${wrong.text.slice(0, 160)}`);
   const literal = await saveAndTest(page, testKey);
-  record('测试连接', literal.ok, literal.text.slice(0, 160));
+  // model-discovery.md §13.4：换回对的 key 后 Fetch models 拿到列表，fake-coder 是在清单里勾的（不是手填的）
+  const row = form.locator('[data-testid="discovered-row"][data-model="fake-coder"]');
+  const listed = { rows: await row.count(), picked: await row.locator('input[name="pick"]:checked').count(),
+    typed: await row.locator('[data-testid="row-tag"][data-kind="entered"]').count() };
+  record('测试连接（换回对的 key 后 Fetch models 拿到列表，在清单里勾 fake-coder）',
+    literal.ok && literal.fetch?.state === 'list' && listed.rows === 1 && listed.picked === 1 && listed.typed === 0,
+    `${JSON.stringify(literal.fetch)}；${JSON.stringify(listed)}；${literal.text.slice(0, 160)}`);
   const files = readConfigFiles(userData);
   const provider = JSON.parse(files.config).providers?.[0] ?? {};
   const ref = provider.keys?.[0]?.ref;

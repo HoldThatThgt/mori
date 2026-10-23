@@ -16,6 +16,8 @@
 // 结果写到 test-results/v1-models-app-session(-packaged).json，截图在 test-results/v1-models-app-session(-packaged)/。
 // 端口：4540–4549 是 Mori 连接的地址（代理或直连的合成端点），4550–4559 是代理后面的合成端点。
 // 测试里的 key 都是合成的测试值（synthetic），与任何真实服务无关。
+// 一键拉取模型（docs/specs/model-discovery.md §13.4）：MP-10 加模型改为卡上 Fetch models → 勾选或手填 → Add 1 model
+// （page.mjs cardAddModels）；合成端点的列表、详情请求的日志行（带 path）不算对话请求。
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,6 +34,7 @@ import {
   brief, customs, group, hasToolHistory, makeProject, model, projectKey, provider, readConfig, seedConfig,
   seedPiSettings, seedV0Session, startEndpoint, talk,
 } from './v1-models-session-setup.mjs';
+import { cardAddModels } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -287,18 +290,16 @@ function profileRow(page, ref) {
   }, ref);
 }
 
-/** @brief 在提供商卡上点"Add model"，按 spec 填模型表单并保存，等新行出现。 */
+/**
+ * @brief 在提供商卡上 Fetch models，在卡里的清单只勾 spec.id（合成端点没列出的 id 用 Add a model ID 手填），按 spec 改
+ *        Context window、Max output、Supports thinking，点 Add 1 model（models.addModels，model-discovery.md §6.5、§13.4），
+ *        等新行出现。
+ */
 async function addModelUi(page, providerId, spec) {
-  const card = page.locator(`[data-testid="provider-card"][data-provider="${providerId}"]`);
-  await card.locator('[data-action="add-model"]').click();
-  const form = card.getByTestId('model-form');
-  await form.waitFor({ timeout: 5000 });
-  await form.getByLabel('Model ID').fill(spec.id);
-  if (spec.ctx) await form.getByLabel('Context window').fill(String(spec.ctx));
-  if (spec.max) await form.getByLabel('Max output').fill(String(spec.max));
-  if (spec.reasoning) await form.getByLabel('Supports thinking').check();
-  await form.getByRole('button', { name: 'Save', exact: true }).click();
-  await form.waitFor({ state: 'detached', timeout: 15000 });
+  const row = { id: spec.id, ...(spec.ctx ? { contextWindow: spec.ctx } : {}),
+    ...(spec.max ? { maxTokens: spec.max } : {}), ...(spec.reasoning ? { reasoning: true } : {}) };
+  const added = await cardAddModels(page, providerId, [row]);
+  if (added.error !== null) throw new Error(`add ${providerId}/${spec.id}: ${added.error}`);
   await page.locator(`[data-testid="model-row"][data-model="${providerId}/${spec.id}"]`).waitFor({ timeout: 10000 });
 }
 

@@ -48,7 +48,7 @@ import {
   RING_NOTE, ringState, ringTexts, ROW, seenRows, setDefaultPick, splitOpen, startFakeEndpoint, tokenColors,
   waitVerified, watchRows,
 } from './m6-helpers.mjs';
-import { pageHelpers } from './page.mjs';
+import { fetchIn, pageHelpers, pickIn, PROVIDER_FORM } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -227,7 +227,8 @@ async function defaultTo(page, pick) {
 /** @brief 准备：首次启动填提供商、打开项目（会话 S1，还没有消息），窗口 1200×800（会话面板约 930px）。 */
 async function setup(ctx) {
   await resizeWindow(ctx.app, 1200, 800);
-  await firstRunAndOpen(ctx, { baseUrl, apiKey: testKey, project: ctx.project });
+  // 圆环的检查按 128,000 的窗口写；拉取后清单行是合成端点报告的 131072，在清单行里改（model-discovery.md §6.2）
+  await firstRunAndOpen(ctx, { baseUrl, apiKey: testKey, project: ctx.project, contextWindow: WINDOW });
   ctx.s1 = await activeFile(ctx.page);
   ctx.colors = await tokenColors(ctx.page, ['--color-faint', '--color-line', '--color-accent', '--color-warn-text',
     '--color-danger']);
@@ -512,17 +513,20 @@ async function pendingSwitch(ctx) {
 
 /**
  * @brief 准备中用的提供商（测试准备）：设置页 Add provider 加第二个合成端点（"Rate endpoint"，不填 key），等探针跑完，
- *        再给它 Add key（对话请求一直回 429）。回到会话。
+ *        再给它 Add key（对话请求一直回 429）。回到会话。一键拉取模型（model-discovery.md §6.1、§13.4）：Base URL →
+ *        Fetch models → 清单里只勾 MODEL → Name 改成 Rate endpoint（区域按 127.0.0.1 预选 Local）→ Add 1 model。
  */
 async function addRateProvider(ctx) {
   const { page, h } = ctx;
   await openModels(page);
   await page.locator('[data-action="add-provider"]').click();
   const form = page.getByTestId('provider-form');
-  await form.getByLabel('Name', { exact: true }).fill(RATE.name);
   await form.getByLabel('Base URL', { exact: true }).fill(`http://127.0.0.1:${ratePort}/v1`);
-  await form.getByLabel('Model ID', { exact: true }).fill(MODEL);
-  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  const fetched = await fetchIn(page, PROVIDER_FORM);
+  if (fetched.state !== 'list') throw new Error(`Rate endpoint: Fetch models gave ${JSON.stringify(fetched)}`);
+  await pickIn(page, PROVIDER_FORM, [MODEL]);
+  await form.getByLabel('Name', { exact: true }).fill(RATE.name);
+  await form.locator('[data-action="add-models"]').click();
   await form.waitFor({ state: 'detached', timeout: 20000 });
   await providerCard(page, RATE.id).waitFor({ timeout: 10000 });
   const probe = await waitVerified(page, `${RATE.id}/${MODEL}`);

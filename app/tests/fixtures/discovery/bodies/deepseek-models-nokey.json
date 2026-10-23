@@ -1,0 +1,8 @@
+{
+ "source": "real",
+ "recorded": "2026-10-23",
+ "url": "https://api.deepseek.com/models",
+ "note": "DeepSeek /models without a key",
+ "status": 401,
+ "body": "Authentication Fails (governor)"
+}

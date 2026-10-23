@@ -1,0 +1,22 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.18:1025/v1/models",
+ "note": "MindIE Service /v1/models (business port)",
+ "basis": [
+  "https://www.hiascend.com/doc_center/source/en/mindie/300/LLMframe/llmdev/mindie_service0320.html (list: {object, data[{id, object, created, owned_by: \"MindIE Server\"}]})"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "llama3-70b",
+    "object": "model",
+    "created": 1792700000,
+    "owned_by": "MindIE Server"
+   }
+  ]
+ }
+}

@@ -1,7 +1,9 @@
 // 最近的操作记录：只在本次运行的内存里，F8 报告界面问题时附上（方案 5.15，见 docs/v0/screens/f8.md）。
-// 只记操作的类型和不含机密的摘要：发送的消息只取前几十个字，模型层的命令（models.*）只记类型和 id，
+// 只记操作的类型和不含机密的摘要：发送的消息只取前几十个字，模型层的命令（models.*）只记类型和 id
+// （拉取模型的新提供商记 Base URL 的主机，docs/specs/model-discovery.md §5.5），
 // 从不记 key 的明文（secret、keySecret，docs/specs/model-providers.md §9.4）。
 
+import type { DiscoverTarget } from '../../../shared/models';
 import { KIND_ONE, type Command } from '../../../shared/protocol';
 import type { IssueAction } from '../../../shared/issues';
 
@@ -100,20 +102,37 @@ function describeM6Command(command: Command): string | null {
   }
 }
 
+/**
+ * @brief models.discover 的摘要（拉取规格 §5.5）：已有提供商记它的 id；新提供商记 Base URL 的主机（非默认端口时带端口），
+ *        不是 URL（或没有主机）时只记 Fetch models。不含 keySecret。
+ */
+function discoverText(target: DiscoverTarget): string {
+  if (target.kind === 'provider') return `Fetch models ${target.providerId}`;
+  const text = target.baseUrl.trim();
+  const host = URL.canParse(text) ? new URL(text).host : '';
+  return host ? `Fetch models ${host}` : 'Fetch models';
+}
+
 /** @brief 删除类命令的摘要：dryRun（确认框先算连带改动）不记。 */
 function deleteText(what: string, dryRun: boolean): string | null {
   return dryRun ? null : `Delete ${what}`;
 }
 
-/** @brief 模型层的写命令（§9.4、§9.5）的摘要：只记类型和 id，不含 secret、keySecret；只读的查询返回 null。 */
+/**
+ * @brief 模型层的写命令（§9.4、§9.5）与拉取模型（拉取规格 §5.5）的摘要：只记类型和 id，不含 secret、keySecret；
+ *        只读的查询返回 null。
+ */
 function describeModelCommand(command: Command): string | null {
   switch (command.type) {
     case 'models.firstRun': return `Save first-run provider ${command.providerId ?? command.provider.name}`;
     case 'models.saveProvider':
       return command.id ? `Save provider ${command.id}` : `Add provider ${command.provider.name}`;
     case 'models.deleteProvider': return deleteText(`provider ${command.id}`, command.dryRun);
-    case 'models.saveModel':
-      return `${command.adding ? 'Add' : 'Save'} model ${command.providerId}/${command.model.id}`;
+    // 拉取规格 §5.4：saveModel 只改已有的模型；加模型是 saveProvider、firstRun 与 addModels
+    case 'models.saveModel': return `Save model ${command.providerId}/${command.model.id}`;
+    case 'models.addModels': return `Add models ${command.providerId} · ${command.models.length}`;
+    case 'models.discover': return discoverText(command.target);
+    case 'models.discoverCancel': return 'Cancel fetch models';
     case 'models.deleteModel': return deleteText(`model ${command.providerId}/${command.modelId}`, command.dryRun);
     case 'models.moveModel': return `Move model ${command.providerId}/${command.modelId} ${command.delta}`;
     case 'models.addKey': return `Add key ${command.providerId}`;

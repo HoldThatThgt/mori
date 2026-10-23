@@ -1,0 +1,23 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.22:8000/v1/models",
+ "note": "TensorRT-LLM trtllm-serve /v1/models",
+ "basis": [
+  "https://github.com/NVIDIA/TensorRT-LLM/blob/main/tensorrt_llm/serve/openai_protocol.py (ModelCard: id, object, created, owned_by \"tensorrt_llm\")",
+  "https://github.com/NVIDIA/TensorRT-LLM/blob/main/tensorrt_llm/serve/openai_server.py (get_model: ModelList(data=[ModelCard(id=self.model)]))"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "nvidia/Llama-3.3-70B-Instruct-FP8",
+    "object": "model",
+    "created": 1792700200,
+    "owned_by": "tensorrt_llm"
+   }
+  ]
+ }
+}

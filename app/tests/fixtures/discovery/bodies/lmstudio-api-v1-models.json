@@ -1,0 +1,161 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.15:1234/api/v1/models",
+ "note": "LM Studio native /api/v1/models: loaded LLM, unloaded LLMs (one not trained for tool use), embedding, an LLM loaded under its own instance id",
+ "basis": [
+  "https://lmstudio.ai/docs/developer/rest/list (models[]: type llm|embedding|decision, publisher, key, display_name, architecture, quantization, size_bytes, params_string, loaded_instances[{id, config.context_length, ...}], max_context_length, format, capabilities {vision, trained_for_tool_use, reasoning {allowed_options, default}}, description, variants, selected_variant)",
+  "qwen/qwen3-8b is loaded under the instance id qwen3-8b-32k (loaded_instances[].id is \"a unique identifier for the loaded instance\"); that the OpenAI list then shows the instance id is NOT verified"
+ ],
+ "status": 200,
+ "body": {
+  "models": [
+   {
+    "type": "llm",
+    "publisher": "google",
+    "key": "google/gemma-4-26b-a4b",
+    "display_name": "Gemma 4 26B A4B",
+    "architecture": "gemma4",
+    "quantization": {
+     "name": "Q4_K_M",
+     "bits_per_weight": 4
+    },
+    "size_bytes": 16795000000,
+    "params_string": "26B",
+    "loaded_instances": [
+     {
+      "id": "google/gemma-4-26b-a4b",
+      "config": {
+       "context_length": 4096,
+       "eval_batch_size": 512,
+       "parallel": 4,
+       "flash_attention": true,
+       "offload_kv_cache_to_gpu": true
+      }
+     }
+    ],
+    "max_context_length": 262144,
+    "format": "gguf",
+    "capabilities": {
+     "vision": true,
+     "trained_for_tool_use": true,
+     "reasoning": {
+      "allowed_options": [
+       "off",
+       "on"
+      ],
+      "default": "on"
+     }
+    },
+    "description": null,
+    "variants": [
+     "google/gemma-4-26b-a4b@q4_k_m"
+    ],
+    "selected_variant": "google/gemma-4-26b-a4b@q4_k_m"
+   },
+   {
+    "type": "llm",
+    "publisher": "deepseek",
+    "key": "deepseek-r1",
+    "display_name": "DeepSeek R1",
+    "architecture": "qwen2",
+    "quantization": {
+     "name": "Q4_K_M",
+     "bits_per_weight": 4
+    },
+    "size_bytes": 4683073248,
+    "params_string": "7B",
+    "loaded_instances": [],
+    "max_context_length": 131072,
+    "format": "gguf",
+    "capabilities": {
+     "vision": false,
+     "trained_for_tool_use": true,
+     "reasoning": {
+      "allowed_options": [
+       "on"
+      ],
+      "default": "on"
+     }
+    },
+    "description": null
+   },
+   {
+    "type": "llm",
+    "publisher": "mistralai",
+    "key": "mistralai/mathstral-7b-v0.1",
+    "display_name": "Mathstral 7B",
+    "architecture": "mistral",
+    "quantization": {
+     "name": "Q4_K_M",
+     "bits_per_weight": 4
+    },
+    "size_bytes": 4372812000,
+    "params_string": "7B",
+    "loaded_instances": [],
+    "max_context_length": 32768,
+    "format": "gguf",
+    "capabilities": {
+     "vision": false,
+     "trained_for_tool_use": false
+    },
+    "description": null
+   },
+   {
+    "type": "embedding",
+    "publisher": "gaianet",
+    "key": "text-embedding-nomic-embed-text-v1.5",
+    "display_name": "Nomic Embed Text v1.5",
+    "quantization": {
+     "name": "F16",
+     "bits_per_weight": 16
+    },
+    "size_bytes": 274290560,
+    "params_string": null,
+    "loaded_instances": [],
+    "max_context_length": 2048,
+    "format": "gguf"
+   },
+   {
+    "type": "llm",
+    "publisher": "qwen",
+    "key": "qwen/qwen3-8b",
+    "display_name": "Qwen3 8B",
+    "architecture": "qwen3",
+    "quantization": {
+     "name": "Q4_K_M",
+     "bits_per_weight": 4
+    },
+    "size_bytes": 5027783488,
+    "params_string": "8B",
+    "loaded_instances": [
+     {
+      "id": "qwen3-8b-32k",
+      "config": {
+       "context_length": 32768,
+       "eval_batch_size": 512,
+       "parallel": 4,
+       "flash_attention": true,
+       "offload_kv_cache_to_gpu": true
+      }
+     }
+    ],
+    "max_context_length": 40960,
+    "format": "gguf",
+    "capabilities": {
+     "vision": false,
+     "trained_for_tool_use": true,
+     "reasoning": {
+      "allowed_options": [
+       "off",
+       "on"
+      ],
+      "default": "on"
+     }
+    },
+    "description": null
+   }
+  ]
+ }
+}

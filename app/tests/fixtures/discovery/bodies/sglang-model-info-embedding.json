@@ -1,0 +1,29 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.31:30000/model_info",
+ "note": "SGLang /model_info of an embedding server: is_generation false, no parsers",
+ "basis": [
+  "https://github.com/sgl-project/sglang/blob/main/python/sglang/srt/entrypoints/http_server.py (model_info: model_path, served_model_name, tokenizer_path, is_generation, preferred_sampling_params, weight_version, load_format, reasoning_parser, tool_call_parser, disaggregation_mode, has_image_understanding, has_audio_understanding, model_type, architectures)"
+ ],
+ "status": 200,
+ "body": {
+  "model_path": "BAAI/bge-m3",
+  "served_model_name": "BAAI/bge-m3",
+  "tokenizer_path": "BAAI/bge-m3",
+  "is_generation": false,
+  "preferred_sampling_params": null,
+  "weight_version": "default",
+  "load_format": "auto",
+  "reasoning_parser": null,
+  "tool_call_parser": null,
+  "disaggregation_mode": "null",
+  "has_image_understanding": false,
+  "has_audio_understanding": false,
+  "model_type": "xlm-roberta",
+  "architectures": [
+   "XLMRobertaModel"
+  ]
+ }
+}

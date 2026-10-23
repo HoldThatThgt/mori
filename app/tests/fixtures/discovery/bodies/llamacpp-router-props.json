@@ -1,0 +1,25 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.13:8080/props",
+ "note": "llama.cpp router mode /props without ?model= (n_ctx is a dummy 0)",
+ "basis": [
+  "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/server-models.cpp (get_router_props: role \"router\", max_instances, models_autoload, dummy model_alias/model_path, default_generation_settings {params: {}, n_ctx: 0}, ui_settings, build_info, cors_proxy_enabled)"
+ ],
+ "status": 200,
+ "body": {
+  "role": "router",
+  "max_instances": 4,
+  "models_autoload": true,
+  "model_alias": "llama-server",
+  "model_path": "none",
+  "default_generation_settings": {
+   "params": {},
+   "n_ctx": 0
+  },
+  "ui_settings": {},
+  "build_info": "b9104-6d1f0a2",
+  "cors_proxy_enabled": false
+ }
+}

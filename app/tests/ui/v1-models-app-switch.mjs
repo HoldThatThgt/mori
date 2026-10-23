@@ -603,8 +603,9 @@ async function probeAfterConversation(ctx) {
   const since = Date.now();
   await send(ctx, holder, 'wait 12s MP19 probe holder');
   await waitLine(ctx, M('q19p'), since);
-  const added = await bridge(ctx, { type: 'models.saveModel', providerId: 'q19p', model: modelOf('fake-coder-q19new'),
-    adding: true });
+  // model-discovery.md §5.4、§13.4：加模型的命令是 models.addModels（models.saveModel 只改已有的模型）
+  const added = await bridge(ctx, { type: 'models.addModels', providerId: 'q19p',
+    models: [modelOf('fake-coder-q19new')] });
   await sleep(1000);
   const tab = await sessionWith(ctx, 'q19p/fake-coder-q19p');
   await send(ctx, tab, 'plain MP19 conversation after probe');
@@ -876,7 +877,7 @@ async function notFound(ctx) {
     chatLogs(ctx, M('nf29'), later).length === 0 && second.switches.length === 1
       && chatLogs(ctx, M('nf29bk'), later).length === 1, brief(lineBrief(chatLogs(ctx, M('nf29bk'), later))));
   const saved = await bridge(ctx, { type: 'models.saveModel', providerId: 'nf29',
-    model: modelOf(M('nf29'), { maxTokens: 16000 }), adding: false });
+    model: modelOf(M('nf29'), { maxTokens: 16000 }) });
   const third = Date.now();
   const after = await sendWait(ctx, tab, 'plain MP29 not found third');
   record('MP-29 changing the model\'s configuration clears not_found: the next reply tries it again (404 again)',

@@ -1,0 +1,136 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.16:9997/v1/models",
+ "note": "Xinference /v1/models: chat LLM with tools and reasoning, VL LLM, generate-only LLM, embedding model",
+ "basis": [
+  "https://github.com/xorbitsai/inference/blob/main/xinference/api/restful_api.py (list_models: {id, object, created: 0, owned_by: \"xinference\", **model_info})",
+  "https://github.com/xorbitsai/inference/blob/main/xinference/model/llm/llm_family.py (LLMFamilyV2.to_description: model_type \"LLM\", model_ability (embed, generate, chat, tools, vision, audio, omni, reasoning, hybrid), model_family, context_length; DEFAULT_CONTEXT_LENGTH 2048)",
+  "https://github.com/xorbitsai/inference/blob/main/xinference/model/embedding/core.py (to_description: model_type \"embedding\", max_tokens, model_ability [\"embed\", ...])"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "qwen3",
+    "object": "model",
+    "created": 0,
+    "owned_by": "xinference",
+    "model_type": "LLM",
+    "address": "0.0.0.0:41237",
+    "accelerators": [
+     "0"
+    ],
+    "model_name": "qwen3",
+    "model_lang": [
+     "en",
+     "zh"
+    ],
+    "model_ability": [
+     "generate",
+     "chat",
+     "tools",
+     "reasoning",
+     "hybrid"
+    ],
+    "model_description": "qwen3 model",
+    "model_format": "pytorch",
+    "model_size_in_billions": 8,
+    "model_family": "qwen3",
+    "quantization": "none",
+    "multimodal_projector": null,
+    "model_hub": "huggingface",
+    "revision": null,
+    "context_length": 40960,
+    "strict_system_first": false
+   },
+   {
+    "id": "qwen2.5-vl-instruct",
+    "object": "model",
+    "created": 0,
+    "owned_by": "xinference",
+    "model_type": "LLM",
+    "address": "0.0.0.0:41237",
+    "accelerators": [
+     "0"
+    ],
+    "model_name": "qwen2.5-vl-instruct",
+    "model_lang": [
+     "en",
+     "zh"
+    ],
+    "model_ability": [
+     "chat",
+     "vision"
+    ],
+    "model_description": "qwen2.5-vl-instruct model",
+    "model_format": "pytorch",
+    "model_size_in_billions": 7,
+    "model_family": "qwen2.5-vl-instruct",
+    "quantization": "none",
+    "multimodal_projector": null,
+    "model_hub": "huggingface",
+    "revision": null,
+    "context_length": 128000,
+    "strict_system_first": false
+   },
+   {
+    "id": "my-base-llm",
+    "object": "model",
+    "created": 0,
+    "owned_by": "xinference",
+    "model_type": "LLM",
+    "address": "0.0.0.0:41237",
+    "accelerators": [
+     "0"
+    ],
+    "model_name": "my-base-llm",
+    "model_lang": [
+     "en",
+     "zh"
+    ],
+    "model_ability": [
+     "generate"
+    ],
+    "model_description": "my-base-llm model",
+    "model_format": "pytorch",
+    "model_size_in_billions": 1,
+    "model_family": "my-base-llm",
+    "quantization": "none",
+    "multimodal_projector": null,
+    "model_hub": "huggingface",
+    "revision": null,
+    "context_length": 2048,
+    "strict_system_first": false
+   },
+   {
+    "id": "bge-m3",
+    "object": "model",
+    "created": 0,
+    "owned_by": "xinference",
+    "model_type": "embedding",
+    "address": "0.0.0.0:41237",
+    "accelerators": [
+     "0"
+    ],
+    "model_name": "bge-m3",
+    "model_engine": "sentence_transformers",
+    "model_format": "pytorch",
+    "dimensions": 1024,
+    "max_tokens": 8192,
+    "language": [
+     "zh",
+     "en"
+    ],
+    "model_ability": [
+     "embed"
+    ],
+    "model_hub": "huggingface",
+    "model_revision": null,
+    "quantization": "none"
+   }
+  ]
+ }
+}
