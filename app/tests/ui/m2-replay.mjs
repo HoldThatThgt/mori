@@ -781,9 +781,12 @@ async function f8Save(page, dialog, key) {
   await dialog.getByTestId('issue-saved').waitFor({ timeout: 5000 });
   const saved = await dialog.getByTestId('issue-saved').innerText();
   const report = await page.evaluate(() => window.__replay.status.issues.at(-1));
-  record('f8：已保存：显示"已保存到 <路径>"、"打开所在文件夹"和"关闭"',
-    saved.includes('Saved to C:\\replay\\ui-issues\\replay-1.md')
+  const settingsLink = dialog.getByTestId('issue-open-settings');
+  record('f8：已保存：显示"已保存到 <路径>"、"打开所在文件夹"、"在设置中查看"（View in Settings，记忆规格 §10.9，'
+    + '原来的 View in Review 没有了）和"关闭"', saved.includes('Saved to C:\\replay\\ui-issues\\replay-1.md')
     && await dialog.getByRole('button', { name: 'Show in Explorer' }).count() === 1
+    && await settingsLink.count() === 1 && (await settingsLink.innerText()).trim() === 'View in Settings'
+    && await dialog.getByRole('button', { name: 'View in Review' }).count() === 0
     && await dialog.getByRole('button', { name: 'Close' }).count() === 1, oneLine(saved));
   checkReport(report, key);
   await dialog.getByRole('button', { name: 'Show in Explorer' }).click();

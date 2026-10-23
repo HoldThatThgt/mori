@@ -1,4 +1,5 @@
-// 界面测试用的回放进程桥：代替 preload 提供 window.mori，回放 tests/fixtures/m1–m7 里从真实会话录下的命令与事件。
+// 界面测试用的回放进程桥：代替 preload 提供 window.mori，回放 tests/fixtures/ 里录下的命令与事件（m1–m6、v1、tb 从真实会话
+// 录下；mem 从真实的 App 对合成端点录下，source 为 synthetic，记忆规格 §0 第 4 条）。
 // 界面发出的每条命令都要与录制时的下一条命令一致（类型、送达方式、文字、批准的选择、文件夹、会话文件、信任回答、
 // 名字），否则记为不一致并拒绝；一致时按录制的时间间隔（可加速）发出这条命令之后、下一条命令之前的事件，
 // 并在录制时的位置回复结果。
@@ -14,9 +15,9 @@
 // M6：config.get、tools.get、agents.get、session.commands 也是只读查询，按 session.list 的做法取界面所在这一段（或更早）录下的
 // 最后一个结果；没录过时 config.get 用 synthetic 的连接（下面 m6Config），其余给空结果。新命令（换模型、思考强度、设置页、
 // 工具页的写入）都要与录制一致。M1–M5 的录制里会话信息没有思考强度，按后台进程对不支持思考的模型的取值补上（synthetic）。
-// M7：录制里有一次重启（{ restart: true }）时，options.part 选重启前（before）或重启后（after）的一段回放，页面重新载入
-// 就是重启。保存反馈、保存报告返回录下的文件路径；工作回顾读记录、读截图按录制里的 review、shot 步骤回答（reviewStubs）；
-// 导出、在资源管理器里选中、打开文件夹没有录过，只记下调用。
+// 录制里有一次重启（{ restart: true }）时，options.part 选重启前（before）或重启后（after）的一段回放，页面重新载入
+// 就是重启。保存反馈、保存报告返回录下的文件路径；设置页 UI issues（记忆规格 §10.8，原 M7 工作回顾的界面问题部分）读报告、
+// 读截图按录制里的 issueList、shot 步骤回答（issuesStubs）；导出、在资源管理器里选中、打开文件夹只记下调用。
 // v1（docs/specs/model-providers.md §14.4）：models.get、session.pickOptions 也是只读查询，录制里没有时按 fixture.model 合成
 // （一个本机区域的提供商、一个模型、normalDefault 为它、档案已验证，synthetic）；会话信息与 mori.model_state 缺的 ModelState
 // 字段（pick、current、blocked）同样合成；models.* 的写命令照 connection.save 的方式应答（status.modelWrites 记下）；
@@ -24,7 +25,13 @@
 // 平行 Agent（docs/specs/parallel-agents-taskboard.md §17.4）：board.get 也是只读查询，录制里没有时合成一个空的 TaskBoard；
 // 会话信息与接上时的快照缺的协作字段（team、board、teamApprovals、deciding）按没有角色文件、没用过协作模式的会话合成，
 // session.clearQueue 的结果缺的 texts 按插话、排队合成（都是 synthetic）；session.prompt 还比较 team。
-// m6-replay.mjs、m7-replay.mjs 从这里读只读查询的列表（QUERIES）。
+// 记忆（docs/specs/memory.md §8、§14.4）：memory.list、memory.get、memory.revisions、enhance.get 也是只读查询，但不用
+// latestResult，按参数配对（结果配给它之前最近一条同类型命令，同 trustResults/readResult）：memory.list 按（cwd, layer,
+// kind），memory.get 按（cwd, layer, id），memory.revisions 按（cwd, layer, id；没有 id 是另一个键），enhance.get 按 cwd；
+// 在参数相同、录在当前这一段结束之前的结果里，取回放时刻当时或之后录下的第一个（同 session.state），没有时取其中最后
+// 一个；都没有时合成空结果（synthetic，keyedEmpty）。会话信息缺的 memoryNotice 按 null 补上；agents.get 的旧录制缺的
+// userTokens、total 按录下的内容补上（withAgentTokens，synthetic）。
+// m6-replay.mjs 从这里读只读查询的列表（QUERIES）；tb-replay.mjs、v1-models-replay.mjs 按文字读那一行。
 
 /** 截图返回的 1×1 PNG */
 const PIXEL = 'data:image/png;base64,'
@@ -37,7 +44,8 @@ const M3_INFO = { name: null, projectTrust: 'none', trustRemembered: false, trus
 /**
  * @brief synthetic：M1 录下的 session.create / session.open 结果里还没有批准设置（M2 才加），按后台进程对新会话的
  *        默认值（每次询问、没有已允许的工具）补上；M3 的字段同样按 M3_INFO 补上；平行 Agent 的协作字段按 TEAM_INFO
- *        补上（会话信息和接上时的快照 live 都补）。session.clearQueue 的结果没有 texts 时按插话、排队拼出。新录的原样返回。
+ *        补上（会话信息和接上时的快照 live 都补）；记忆规格 §9.9 的 memoryNotice 按 null 补上（没有待显示的提示）。
+ *        session.clearQueue 的结果没有 texts 时按插话、排队拼出。新录的原样返回。
  */
 function withDefaults(type, value, fixture) {
   if (type === 'session.clearQueue' && value && !('texts' in value)) {
@@ -48,7 +56,7 @@ function withDefaults(type, value, fixture) {
   }
   const live = value.live ? { ...teamInfo(), ...value.live } : value.live;
   return { ...M3_INFO, approval: { mode: 'ask', allowed: [] }, ...M6_INFO, ...v1ModelState(fixture, value),
-    ...teamInfo(), ...value, ...(live === undefined ? {} : { live }) };
+    ...teamInfo(), memoryNotice: null, ...value, ...(live === undefined ? {} : { live }) };
 }
 
 /**
@@ -66,11 +74,69 @@ function emptyBoard() {
   return { requests: [], teamEdited: false };
 }
 
-/** @brief synthetic：没录过的 M6 只读查询的空结果。 */
+/** @brief synthetic：没录过的 M6 只读查询的空结果（agents.get 的 token 数由 withAgentTokens 补上）。 */
 function m6Empty(type) {
   if (type === 'session.commands') return [];
   if (type === 'agents.get') return { userPath: 'replay\\AGENTS.md', content: null, effectivePath: null, loaded: null };
   return { cwd: null, projectTrust: null, tools: null, skills: [], packages: [], mcp: null, diagnostics: [] };
+}
+
+// ---------- 记忆（docs/specs/memory.md §8、§10.3、§14.4）：旧录制没有的，按后台进程的取法合成（synthetic） ----------
+
+/** 中日韩字符的码点范围（同 src/shared/memory.ts 的 CJK_RANGES，§6.3） */
+const CJK_RANGES = [[0x3000, 0x303f], [0x3040, 0x30ff], [0x3400, 0x4dbf], [0x4e00, 0x9fff], [0xac00, 0xd7af],
+  [0xf900, 0xfaff], [0xff00, 0xffef]];
+
+/** @brief §6.3 的 token 估算（同 src/shared/memory.ts estimateMemoryTokens）：中日韩字符每个 1，其余 ÷ 4 向上取整。 */
+function estimateTokens(text) {
+  let cjk = 0;
+  let other = 0;
+  for (const char of text) {
+    const code = char.codePointAt(0) ?? 0;
+    if (CJK_RANGES.some(([low, high]) => code >= low && code <= high)) cjk += 1;
+    else other += 1;
+  }
+  return cjk + Math.ceil(other / 4);
+}
+
+/**
+ * @brief synthetic：记忆规格 §10.3 给 agents.get 加的 token 数，旧录制与 m6Empty 里没有：userTokens 按录下的 content 估算
+ *        （content 为 null 时 0），total 等于 userTokens，loaded 里的字符串补为 { path, tokens: 0 }。新录的原样返回。
+ */
+function withAgentTokens(value) {
+  if (!value || ('userTokens' in value && 'total' in value)) return value;
+  const userTokens = typeof value.content === 'string' ? estimateTokens(value.content) : 0;
+  const loaded = Array.isArray(value.loaded)
+    ? value.loaded.map((item) => (typeof item === 'string' ? { path: item, tokens: 0 } : item)) : value.loaded;
+  return { ...value, loaded, userTokens, total: userTokens };
+}
+
+/** 按参数配对的只读查询（§8）：命令类型 → 配对的键（参数的列表） */
+const KEYED = {
+  'memory.list': (command) => [command.cwd ?? null, command.layer, command.kind],
+  'memory.get': (command) => [command.cwd ?? null, command.layer, command.id],
+  'memory.revisions': (command) => [command.cwd ?? null, command.layer, command.id ?? null],
+  'enhance.get': (command) => [command.cwd ?? null],
+};
+
+/** @brief synthetic：关着、没有运行过的增强（后台进程对没有 enhance.json 的项目的 enhance.get 结果）。 */
+function enhanceOff(cwd) {
+  return { cwd: cwd ?? '', enabled: false, pick: null, thinking: 'medium', team: false, time: '04:00', since: null,
+    last: { taste: null, strategy: null, review: null }, running: null, queued: 0, next: null, notice: null,
+    effortPicks: {}, error: null };
+}
+
+/** @brief synthetic：按参数配对的只读查询录制里没有时的空结果（§8）。 */
+function keyedEmpty(command) {
+  switch (command.type) {
+    case 'memory.list':
+      return { entries: [], usage: { used: 0, limit: 500, user: 0, project: 0 }, broken: [], last: null, error: null };
+    case 'memory.get': return { entry: null, revisions: [], backlinks: [], error: null };
+    case 'memory.revisions':
+      return command.id === undefined || command.id === null ? { revisions: [], error: null }
+        : { revision: null, error: null };
+    default: return enhanceOff(command.cwd);
+  }
 }
 
 /** @brief 后台进程退出后请求得到的错误，原文同 src/preload/index.ts。 */
@@ -218,9 +284,10 @@ function fileReader(steps) {
   };
 }
 
-/** 不占回放顺序的只读查询（m6-replay.mjs、m7-replay.mjs 也从这里读） */
+/** 不占回放顺序的只读查询（m6-replay.mjs 也从这里读；tb-replay.mjs、v1-models-replay.mjs 按文字读这一行） */
 export const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
-  'agents.get', 'session.commands', 'models.get', 'session.pickOptions', 'board.get'];
+  'agents.get', 'session.commands', 'models.get', 'session.pickOptions', 'board.get', 'memory.list', 'memory.get',
+  'memory.revisions', 'enhance.get'];
 
 /** @brief models.* 的写命令：回放桥直接应答（v1ModelWrite），不占回放顺序。 */
 const answeredWrite = (type) => type.startsWith('models.') && !QUERIES.includes(type);
@@ -299,8 +366,8 @@ function m6Normal(command) {
 }
 
 /**
- * @brief M7：录制里主进程保存反馈或报告的结果（文件的完整路径），按顺序；kind 为 feedback 或 issue。
- *        界面保存的第 n 份返回录下的第 n 个路径，"View in Review"就按它的文件名选中录下的记录。
+ * @brief 录制里主进程保存反馈或报告的结果（文件的完整路径），按顺序；kind 为 feedback 或 issue。
+ *        界面保存的第 n 份返回录下的第 n 个路径，F8 的"View in Settings"就按它的文件名选中录下的记录。
  */
 function recordedFiles(steps, kind) {
   return steps.filter((step) => step[kind]?.result?.file).map((step) => step[kind].result.file);
@@ -375,28 +442,29 @@ function desktopStubs(status, steps) {
 }
 
 /**
- * @brief M7：工作回顾的主进程调用。读记录（listReview）按录制里 review 步骤的顺序回答，取完后重复最后一个；读截图
- *        （reviewShot）按名字取录制里的 shot 步骤，在整个录制里找（截图是 ui-issues 里的同一个 PNG，重启前后不变）。
- *        导出、在资源管理器里选中、打开文件夹都没有录过：只记下调用，导出的结果是 replay 的路径（synthetic）。
- *        synthetic：没录过 review 时两类记录都为空，没录过的截图读不出来；测试不该用到。
+ * @brief 设置页 UI issues（记忆规格 §10.8，src/preload/index.ts 的 mori:issues-* 那几个调用）。读报告（listIssues）按录制里
+ *        issueList 步骤（{ result } 或 { error }）的顺序回答，取完后重复最后一个；读截图（issueShot）按名字取录制里的
+ *        shot 步骤，在整个录制里找（截图是 ui-issues 里的同一个 PNG，重启前后不变）。导出、显示导出的文件、在资源管理器里
+ *        选中、打开文件夹都没有录过：只记下调用，导出的结果是 replay 的路径（synthetic）。
+ *        synthetic：没录过 issueList 时列表为空，没录过的截图读不出来；测试不该用到。
  * @param steps 回放的步骤（重启前或重启后的一段）
  */
-function reviewStubs(status, fixture, steps) {
-  const lists = steps.filter((step) => step.review).map((step) => step.review);
+function issuesStubs(status, fixture, steps) {
+  const lists = steps.filter((step) => step.issueList).map((step) => step.issueList);
   const shots = fixture.steps.filter((step) => step.shot).map((step) => step.shot);
   const answer = (recorded, fallback) => (recorded?.error ? Promise.reject(new Error(recorded.error))
     : Promise.resolve(structuredClone(recorded ? recorded.result : fallback)));
   return {
-    listReview() {
-      status.reviewLists += 1;
-      return answer(lists[Math.min(status.reviewLists, lists.length) - 1], { feedback: [], issues: [] });
+    listIssues() {
+      status.issueLists += 1;
+      return answer(lists[Math.min(status.issueLists, lists.length) - 1], []);
     },
-    reviewShot(name) {
-      status.reviewShots.push(name);
+    issueShot(name) {
+      status.issueShots.push(name);
       const recorded = shots.find((shot) => shot.name === name);
       return recorded ? answer(recorded) : Promise.reject(new Error(`Synthetic: no recorded screenshot ${name}`));
     },
-    exportReview(request) {
+    exportIssues(request) {
       status.exports.push(structuredClone(request));
       return Promise.resolve({ file: `C:\\replay\\export\\replay-${status.exports.length}.md` });
     },
@@ -404,19 +472,19 @@ function reviewStubs(status, fixture, steps) {
       status.exportShown.push(file);
       return Promise.resolve();
     },
-    showReviewRecord(kind, name) {
-      status.recordShown.push({ kind, name });
+    showIssueRecord(name) {
+      status.recordShown.push(name);
       return Promise.resolve();
     },
-    openReviewFolder(kind) {
-      status.folders.push(kind);
+    openIssuesFolder() {
+      status.folders += 1;
       return Promise.resolve({ error: null });
     },
   };
 }
 
 /**
- * @brief M7：重启前（part 为 before）或重启后（after）的步骤；part 为空时是全部（restart 步骤不发事件、不占顺序）。
+ * @brief 重启前（part 为 before）或重启后（after）的步骤；part 为空时是全部（restart 步骤不发事件、不占顺序）。
  *        录制里没有 restart 步骤、或 part 不是这两种时报错。
  */
 function partOf(steps, part) {
@@ -431,7 +499,7 @@ function partOf(steps, part) {
  * @param fixture 录制文件内容
  * @param options.speed 加速倍数
  * @param options.maxGap 两个事件之间最多等待的毫秒数（加速后）
- * @param options.part M7：重启前（before）或重启后（after）的一段；不给时回放全部
+ * @param options.part 录制里有重启时：重启前（before）或重启后（after）的一段；不给时回放全部
  */
 export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = null } = {}) {
   const steps = partOf(fixture.steps, part);
@@ -440,8 +508,8 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
   // played：已经放完的段数（每条命令之后、下一条命令之前算一段）；played 等于 cursor 时回放桥在等界面的下一条命令。
   const status = { cursor: 0, played: 0, clock: 0, exited: false, exitCode: null, errors: [], commands: [], queries: [],
     playing: Promise.resolve(), idle: true, attention: 0, captures: 0, dialogAtCapture: [], issues: [], shown: [],
-    deleted: [], reads: [], opened: [], copied: [], feedback: [], failed: [], reviewLists: 0, reviewShots: [],
-    exports: [], exportShown: [], recordShown: [], folders: [], modelWrites: [] };
+    deleted: [], reads: [], opened: [], copied: [], feedback: [], failed: [], issueLists: 0, issueShots: [],
+    exports: [], exportShown: [], recordShown: [], folders: 0, modelWrites: [] };
   const { f8, feedback, stubs } = desktopStubs(status, steps);
   const created = steps.find((step) => step.result?.type === 'session.create')?.result.value;
   // synthetic：v1 的设置页（models.get）读到的 key 与项目；models.addKey / removeKey 的应答改它（v1ModelWrite）
@@ -499,6 +567,29 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     const end = marks[status.cursor] ?? steps.length;
     const found = steps.slice(0, end).filter((step) => step.result?.type === type && !step.result.error);
     return structuredClone(found.at(-1)?.result.value ?? fallback);
+  }
+
+  /** 按参数配对的只读查询的结果（§8）：{ index, step, key }，key 为它之前最近一条同类型命令的参数 */
+  const keyedSteps = steps.flatMap((step, index) => {
+    const type = step.result?.type;
+    if (!Object.hasOwn(KEYED, type ?? '')) return [];
+    const asked = steps.slice(0, index).findLast((item) => item.command?.type === type)?.command;
+    return asked ? [{ index, step, key: JSON.stringify(KEYED[type](asked)) }] : [];
+  });
+
+  /**
+   * @brief 回答按参数配对的只读查询（§8）：参数相同、录在当前这一段结束之前的结果里，取回放时刻当时或之后录下的第一个；
+   *        没有时取其中最后一个；都没有时为合成的空结果。录下的是失败时以它的原文失败。
+   */
+  function keyedResult(command) {
+    const end = marks[status.cursor] ?? steps.length;
+    const key = JSON.stringify(KEYED[command.type](command));
+    const matching = keyedSteps.filter((item) => item.index < end && item.step.result.type === command.type
+      && item.key === key);
+    const pick = matching.find((item) => item.step.t >= status.clock) ?? matching.at(-1);
+    if (!pick) return Promise.resolve(keyedEmpty(command));
+    if (pick.step.result.error) return Promise.reject(new Error(pick.step.result.error));
+    return Promise.resolve(structuredClone(pick.step.result.value));
   }
 
   /** 每个文件夹已经取走的 trust.check 结果数 */
@@ -595,10 +686,15 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
           status.queries.push(command);
           return Promise.resolve(latestResult(command.type, { ...emptyBoard(), error: null }));
         case 'tools.get':
-        case 'agents.get':
         case 'session.commands':
           status.queries.push(command);
           return Promise.resolve(latestResult(command.type, m6Empty(command.type)));
+        case 'agents.get':
+          status.queries.push(command);
+          return Promise.resolve(withAgentTokens(latestResult(command.type, m6Empty(command.type))));
+        case 'memory.list': case 'memory.get': case 'memory.revisions': case 'enhance.get':
+          status.queries.push(command);
+          return keyedResult(command);
         case 'connection.save': return Promise.resolve({ error: null });
         case 'models.firstRun': case 'models.saveProvider': case 'models.deleteProvider': case 'models.saveModel':
         case 'models.deleteModel': case 'models.moveModel': case 'models.addKey': case 'models.removeKey':
@@ -636,7 +732,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     },
     pickFolder() { return Promise.resolve(nextFolder()); },
     ...stubs,
-    ...reviewStubs(status, fixture, steps),
+    ...issuesStubs(status, fixture, steps),
   };
   const control = {
     status,

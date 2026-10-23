@@ -1,8 +1,9 @@
 // 平行 Agent 与 TaskBoard 的回放测试（docs/specs/parallel-agents-taskboard.md §17.1、§17.2 的回放层）：在 Electron 里载入
 // 真正的界面，用回放进程桥（tests/ui/harness）回放从真实会话录下的 tests/fixtures/tb/*.json（tb-record.mjs 录制，模型是
-// 负责人的 DeepSeek 与 GLM），以及 m1–m7 的一组录制。测试像你一样操作（Open folder…、发录制里的消息、/team、点协作开关、
+// 负责人的 DeepSeek 与 GLM），以及 m1–m6 的一组录制。测试像你一样操作（Open folder…、发录制里的消息、/team、点协作开关、
 // 权限菜单、批准卡上的 Alt+1），回放桥核对界面发出的每条命令都与录制一致；再按 docs/v1/screens/team-*.md 检查界面：
-//   TB-03：m1–m7 的录制在合成的空 TeamState/BoardView 下照常回放：开关一直是 Team: Off，没有回执、进展摘要、Stop team。
+//   TB-03：m1–m6 的录制在合成的空 TeamState/BoardView 下照常回放：开关一直是 Team: Off，没有回执、进展摘要、Stop team
+//     （m7 的录制随工作回顾删除，docs/specs/memory.md §14.4）。
 //   TB-04（tb-ask）：关闭模式下对话的 agent_message 是一张 "Ask reviewer" 工具卡，回答就是它的结果；没有回执、进展摘要、
 //     批准卡，侧栏里只有用户会话。
 //   TB-08（tb-team、tb-receipts）：三种回执的文字（§13.2，补充的原话超过 120 字符截断）与录下的写入一一对应；合并会话里
@@ -50,10 +51,9 @@ const PERMISSION_NOTE = 'Applies to all agents in this session. New sessions sta
 /** TaskBoard 的工具（§6.3），从不出卡 */
 const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit', 'request_update',
   'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close'];
-/** TB-03 回放的 m1–m7 录制（[目录, 名字, 段]）：只有新建会话、发消息、批准卡、打开会话的，每个里程碑至少一个 */
+/** TB-03 回放的 m1–m6 录制（[目录, 名字, 段]）：只有新建会话、发消息、批准卡、打开会话的，每个里程碑至少一个 */
 const TB03 = [['m1', 'readme'], ['m1', 'edit'], ['m1', 'command-fail'], ['m2', 'edit-allow'], ['m2', 'two-tools'],
-  ['m3', 'trust-deny'], ['m4', 'write-delete'], ['m4', 'stream-feedback'], ['m5', 'ref-reopen'], ['m6', 'slash'],
-  ['m7', 'review-changed', 'before']];
+  ['m3', 'trust-deny'], ['m4', 'write-delete'], ['m4', 'stream-feedback'], ['m5', 'ref-reopen'], ['m6', 'slash']];
 
 // ---------- 录制 ----------
 
@@ -274,7 +274,7 @@ async function answerCard(page, command) {
   await card.getByTestId(button[command.decision]).click();
 }
 
-// ---------- TB-03：m1–m7 的录制 ----------
+// ---------- TB-03：m1–m6 的录制 ----------
 
 /** @brief 照录制的命令一条条在界面里做（新建会话、打开会话、发消息、批准卡），每条之前等上一段放完。 */
 async function driveGeneric(page, steps) {
@@ -292,7 +292,7 @@ async function driveGeneric(page, steps) {
   await untilPlayed(page, commands.length, 'the last segment');
 }
 
-/** @brief TB-03：一个 m1–m7 的录制照常回放，开关一直是 Team: Off，没有任何协作的元素。 */
+/** @brief TB-03：一个 m1–m6 的录制照常回放，开关一直是 Team: Off，没有任何协作的元素。 */
 async function tb03(page, [dir, name, part]) {
   const fx = readFixture(dir, name);
   const steps = await load(page, fx, { part, speed: 6, maxGap: 400 });

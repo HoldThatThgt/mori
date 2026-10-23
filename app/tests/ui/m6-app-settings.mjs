@@ -343,10 +343,11 @@ async function settingsList(ctx) {
   const nav = await page.locator('[data-testid="settings-nav"] button').evaluateAll((items) => items.map((item) => ({
     section: item.dataset.section, text: item.textContent, current: item.getAttribute('aria-current') })));
   const backButton = await page.getByRole('button', { name: 'Back to app', exact: true }).count();
-  record('设置页：左边分节"Models""AGENTS.md"，打开时落在 Models（aria-current）；顶部"Back to app"',
-    nav.map((item) => `${item.section}:${item.text}`).join() === 'models:Models,agents:AGENTS.md'
-    && nav[0].current === 'page' && nav[1].current === null && backButton === 1 && landed.body === 'models',
-  JSON.stringify({ landed, nav }));
+  record('设置页：左边分节"Models""AGENTS.md""UI issues"（第三节，docs/specs/memory.md §10.8），打开时落在 Models'
+    + '（aria-current）；顶部"Back to app"',
+  nav.map((item) => `${item.section}:${item.text}`).join() === 'models:Models,agents:AGENTS.md,issues:UI issues'
+    && nav[0].current === 'page' && nav[1].current === null && nav[2].current === null && backButton === 1
+    && landed.body === 'models', JSON.stringify({ landed, nav }));
   const cards = await page.getByTestId('provider-card')
     .evaluateAll((items) => items.map((item) => item.dataset.provider));
   record('Models：一张提供商卡 mori-endpoint，下面是模型行 mori-endpoint/fake-coder', cards.join() === MAIN

@@ -4,21 +4,24 @@
 // --spec 选规格（默认 model）：
 //   model      docs/specs/model-providers.md §14.2（§14.3），编号 MP-n
 //   taskboard  docs/specs/parallel-agents-taskboard.md §17.2（§17.3），编号 TB-n
-// 层由结果文件决定（模型层 §14.3，TaskBoard §17.3）：
-//   层    model                                          taskboard
-//   单元  v1-unit.json（tests/unit/reporter.mjs 写的）    tb-unit.json（tests/unit/tb-reporter.mjs 写的）
-//   App   v1-models-app*.json（含 -existing）            tb-app*.json（含 tb-app-existing.json）
-//   回放  v1-models-replay*.json（含 -existing）         tb-replay*.json（含 tb-replay-existing.json）
-//   真实  v1-models-real.json                            tb-real.json
-// TaskBoard 的 tb-partial-*.json（--only 只跑一部分时写的）不计入任何层。
+//   memory     docs/specs/memory.md §14.2（§14.3），编号 MEM-n
+// 层由结果文件决定（模型层 §14.3，TaskBoard §17.3，记忆 §14.3）：
+//   层    model                                       taskboard                           memory
+//   单元  v1-unit.json（tests/unit/reporter.mjs）      tb-unit.json（tb-reporter.mjs）     mem-unit.json（mem-reporter.mjs）
+//   App   v1-models-app*.json（含 -existing）         tb-app*.json（含 -existing）        mem-app*.json（含 -existing）
+//   回放  v1-models-replay*.json（含 -existing）      tb-replay*.json（含 -existing）     mem-replay*.json（含 -existing）
+//   真实  v1-models-real.json                         tb-real.json                        mem-real.json
+// TaskBoard 的 tb-partial-*.json、记忆的 mem-partial-*.json（--only 只跑一部分时写的）不计入任何层。
 // 只认开发构建的结果；--packaged 时 App 与真实层改读带 -packaged 的结果文件（v1-models-app*-packaged.json、
-// v1-models-real-packaged.json；tb-app*-packaged.json、tb-real-packaged.json）。单元与回放不经过 Mori 的构建
+// v1-models-real-packaged.json；tb-app*-packaged.json、tb-real-packaged.json；mem-app*-packaged.json、
+// mem-real-packaged.json）。单元与回放不经过 Mori 的构建
 // （单元直接导入打包后的内核模块，回放在 harness 里载入界面），两种模式读同一份；带 -packaged 的回放结果不计入。
 // 不属于任何编号的检查只列出、不计入；它们只在这份规格的结果文件里找。
 // --allow-missing-real：真实层的结果文件还不存在时把真实层记为 pending、不算失败（负责人走查之前用）；最终一遍不能带它。
-// 用法（在 app/ 下）：node tests/spec-coverage.mjs [--spec model|taskboard] [--packaged] [--allow-missing-real]
+// 用法（在 app/ 下）：node tests/spec-coverage.mjs [--spec model|taskboard|memory] [--packaged] [--allow-missing-real]
 // 退出码：全部覆盖为 0，有缺口为 1，规格名不认识、规格表或结果文件读不出为 2。
 // 下面的函数导出给 tests/unit/taskboard/spec-coverage.test.mjs 检查；直接运行时才做检查。
+// 记忆规格的 --spec memory 在这台机器上带 --allow-missing-real 运行（真实层由负责人用数据目录跑，记忆规格 §0 第 4 条）。
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -50,7 +53,21 @@ export const SPECS = {
     strayLabel: 'a TB id',
     files: { unit: 'tb-unit.json', app: 'tb-app', replay: 'tb-replay', real: 'tb-real', partial: 'tb-partial-' },
   },
+  memory: {
+    path: 'docs/specs/memory.md',
+    section: '14.2',
+    row: /^\|\s*MEM-\d+\s*\|/,
+    prefix: 'MEM',
+    strayLabel: 'a MEM id',
+    files: { unit: 'mem-unit.json', app: 'mem-app', replay: 'mem-replay', real: 'mem-real', partial: 'mem-partial-' },
+  },
 };
+
+/** @brief 规格名的列表文字："model, taskboard or memory"（规格名不认识时的提示）。 */
+export function specNames() {
+  const names = Object.keys(SPECS);
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names.at(-1)}` : names.join('');
+}
 
 /** 规格里的层名 → 内部名 */
 const LAYER_NAMES = { 单元: 'unit', App: 'app', 回放: 'replay', 真实: 'real' };
@@ -230,7 +247,7 @@ function main(argv) {
   let items;
   let results;
   try {
-    if (!spec) throw new Error(`unknown --spec "${specName}" (expected ${Object.keys(SPECS).join(' or ')})`);
+    if (!spec) throw new Error(`unknown --spec "${specName}" (expected ${specNames()})`);
     items = parseSpecTable(spec, readFileSync(specPathOf(spec), 'utf8'));
     results = readResults(spec, options.packaged);
   } catch (error) {
