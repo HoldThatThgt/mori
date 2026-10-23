@@ -1,0 +1,22 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.18:1025/v2/models/llama3-70b/config",
+ "note": "MindIE Service /v2/models/<id>/config (Triton-compatible, max_seq_len at top level)",
+ "basis": [
+  "https://www.hiascend.com/doc_center/source/en/mindie/300/LLMframe/llmdev/mindie_service0083.html (response example: model_name, input_datatype, output_datatype, max_seq_len, npu_mem_size, cpu_mem_size, world_size, model_weight_path, model_instance_type; the page says the API is planned for deprecation)"
+ ],
+ "status": 200,
+ "body": {
+  "model_name": "llama3-70b",
+  "input_datatype": "INT64",
+  "output_datatype": "INT64",
+  "max_seq_len": 2560,
+  "npu_mem_size": 8,
+  "cpu_mem_size": 5,
+  "world_size": 8,
+  "model_weight_path": "llama3-70b-safetensors",
+  "model_instance_type": "Standard"
+ }
+}

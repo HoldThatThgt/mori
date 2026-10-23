@@ -18,28 +18,43 @@
 //     然后写 TB-46 的两个结果文件（tb-app-existing.json、tb-replay-existing.json，每条记 "TB-46 <脚本名>"），
 //     最后跑 node tests/spec-coverage.mjs --spec taskboard --allow-missing-real（记 "MEM-35 spec-coverage-taskboard"）。
 //     模型层与 TaskBoard 的真实层（MP-27；TB-04、TB-08、TB-34、TB-37、TB-45）本轮没有重跑，交付说明列为未验证。
+//   MD-15（docs/specs/model-discovery.md §13.3、§13.4，照 MEM-35 的写法）：套件列表 discovery = memory 再加记忆的 App
+//     套件（mem-app-prompt、-tool、-page、-enhance-a、-enhance-b、-team、-settings，与 npm 脚本 test:memory 的顺序相同）、
+//     test:mem-unit 与 mem-replay。App 层记进 md-app-existing.json：memory 的 App 套件，再接记忆的 App 套件；回放层记进
+//     md-replay-existing.json，依次为 test:unit、memory 的回放层（test:tb-unit、m1–m6 的回放、v1-models-replay、
+//     tb-replay）、test:mem-unit、mem-replay，然后四项附加检查：node tests/spec-coverage.mjs --spec model、
+//     --spec taskboard、--spec memory（都带 --allow-missing-real，各记 "MD-15 spec-coverage-<规格>"），最后
+//     node tests/md-markers.mjs（新加的行里没有推迟实现的标记，记 "MD-15 md-markers"）。另写 MP-37、TB-46、MEM-35 的
+//     结果文件（同样的套件，记 "<编号> <脚本名>"），各在读它的那项覆盖检查之前写：MP-37 在 --spec model 之前，TB-46
+//     在 --spec taskboard 之前，MEM-35 在 --spec memory 之前。TB-46、MEM-35 的那一项 "spec-coverage" 是模型层的覆盖检查：
+//     MD-15 的 spec-coverage-model 带 sameAs，结果同时记在 spec-coverage 的名字下，另写时按名字找到它。
+//     模型层、TaskBoard 与记忆的真实层（MP-27；TB-04、TB-08、TB-34、TB-37、TB-45；MEM-05、MEM-10、MEM-22、MEM-34）
+//     本轮没有重跑，交付说明列为未验证。
 // 各套件自己的结果文件照旧写（m1-app.json 等）；这里另把每个套件的输出存到 test-results/<日志目录>/<脚本名>.log
-// （MP-37 为 v1-models-existing，TB-46 为 tb-existing，MEM-35 为 mem-existing；脚本名里的 ":" 换成 "-"），失败时检查的
-// 细节里带它打印的 FAIL 行。
-// 套件要求 out/ 里已是最新构建（npm run test:v1-models、test:memory 先 electron-vite build，这里不构建；tb-build-base 只建
-// .tb-runs/base 的对照版）。现有套件用固定端口（4319–4371、4600–4699），不要和别的现有套件同时跑。
+// （MP-37 为 v1-models-existing，TB-46 为 tb-existing，MEM-35 为 mem-existing，MD-15 为 md-existing；脚本名里的 ":"
+// 换成 "-"），失败时检查的细节里带它打印的 FAIL 行（md-markers 另带命中的行）。
+// 套件要求 out/ 里已是最新构建（npm run test:v1-models、test:memory、test:discovery 先 electron-vite build，这里不构建；
+// tb-build-base 只建 .tb-runs/base 的对照版）。现有套件用固定端口（4319–4371、4500–4559、4600–4799；一键拉取模型的
+// 套件用 4800–4899），不要和别的现有套件同时跑。
 // 用法（在 app/ 下）：
-//   node tests/ui/v1-models-existing.mjs [--id MP-37|TB-46|MEM-35] [--only m0-smoke,m1-replay] [--exe <Mori.exe>]
-//     [--app-file <名字.json>] [--replay-file <名字.json>] [--suites models|taskboard|memory] [--with-unit]
-//     [--with-coverage]
+//   node tests/ui/v1-models-existing.mjs [--id MP-37|TB-46|MEM-35|MD-15] [--only m0-smoke,m1-replay]
+//     [--exe <Mori.exe>] [--app-file <名字.json>] [--replay-file <名字.json>]
+//     [--suites models|taskboard|memory|discovery] [--with-unit] [--with-coverage]
 // --app-file、--replay-file、--suites 换掉编号的默认值；--with-unit、--with-coverage 加上 test:unit 与模型层的覆盖检查
-// （TB-46、MEM-35 默认带）。
+// （TB-46、MEM-35、MD-15 默认带；MD-15 的模型层覆盖检查即 spec-coverage-model）。
+// --only 用脚本名或附加检查的名字（例如 --id MD-15 --only md-markers 只跑标记检查）。
 // --exe：只跑 App 套件（回放与附加检查不经过构建），把 --exe 传给支持它的套件，App 层的结果文件名在 .json 前加
-// -packaged（v1-models-app-existing-packaged.json、tb-app-existing-packaged.json、mem-app-existing-packaged.json）；
-// 另写的编号同样只写 App 层（加 -packaged）。
+// -packaged（v1-models-app-existing-packaged.json、tb-app-existing-packaged.json、mem-app-existing-packaged.json、
+// md-app-existing-packaged.json）；另写的编号同样只写 App 层（加 -packaged）。
 // m1-layout.mjs 是检查库、单独运行什么也不做：它的布局检查（含 §14.4 的 Models 分节测量）在 m1-replay 的 layout 一项里跑，
 // 随 m1-replay 记一条。退出码为 0 但一条 PASS 都没有的套件记为失败（没跑任何检查不能算通过）；覆盖检查与对照构建不打印
 // PASS 行，只看退出码。
 // --only 只跑一部分时结果写到部分结果文件，不写上面的文件，也不另写别的编号：MP-37 为
 // v1-models-existing-partial-app(-packaged).json / -partial-replay.json，TB-46 为
 // tb-partial-existing-app(-packaged).json / tb-partial-existing-replay.json，MEM-35 为
-// mem-partial-existing-app(-packaged).json / mem-partial-existing-replay.json。
-// 覆盖检查（tests/spec-coverage.mjs）只认跑全了的结果，一部分套件通过不能算 MP-37、TB-46 或 MEM-35 通过。
+// mem-partial-existing-app(-packaged).json / mem-partial-existing-replay.json，MD-15 为
+// md-partial-existing-app(-packaged).json / md-partial-existing-replay.json。
+// 覆盖检查（tests/spec-coverage.mjs）只认跑全了的结果，一部分套件通过不能算 MP-37、TB-46、MEM-35 或 MD-15 通过。
 // 参数不认识时退出码为 2。
 
 import { spawn } from 'node:child_process';
@@ -99,18 +114,49 @@ const COVERAGE_CHECK = { name: 'spec-coverage', takesExe: false,
 const TB_COVERAGE_CHECK = { name: 'spec-coverage-taskboard', takesExe: false,
   command: [join(appRoot, 'tests/spec-coverage.mjs'), '--spec', 'taskboard', '--allow-missing-real'],
   needsPass: false, failLine: /^ {2}TB-\d+ /, what: 'the TaskBoard coverage check exits 0' };
+/** 记忆的 App 套件（与 npm 脚本 test:memory 的顺序相同） */
+const MEM_APP_SUITES = ['mem-app-prompt', 'mem-app-tool', 'mem-app-page', 'mem-app-enhance-a', 'mem-app-enhance-b',
+  'mem-app-team', 'mem-app-settings'].map((name) => suite(name, true));
+/** MD-15：记忆的单元测试（package.json 的 test:mem-unit） */
+const MEM_UNIT_CHECK = { name: 'test:mem-unit', takesExe: false, shell: 'npm run test:mem-unit', needsPass: true,
+  failLine: FAIL_LINE, what: 'the memory unit tests pass' };
+/**
+ * MD-15 的模型层覆盖检查：与 COVERAGE_CHECK 是同一项检查（--spec model 即默认规格），记 "MD-15 spec-coverage-model"。
+ * sameAs：结果同时记在 COVERAGE_CHECK 的名字下，另写 TB-46、MEM-35 的结果文件时它们的 "spec-coverage" 一项按名字找到它
+ */
+const MODEL_COVERAGE_CHECK = { ...COVERAGE_CHECK, name: 'spec-coverage-model',
+  command: [join(appRoot, 'tests/spec-coverage.mjs'), '--spec', 'model', '--allow-missing-real'],
+  sameAs: COVERAGE_CHECK };
+/** MD-15：记忆的覆盖检查（真实层 MEM-05、MEM-10、MEM-22、MEM-34 本轮没有重跑） */
+const MEM_COVERAGE_CHECK = { name: 'spec-coverage-memory', takesExe: false,
+  command: [join(appRoot, 'tests/spec-coverage.mjs'), '--spec', 'memory', '--allow-missing-real'],
+  needsPass: false, failLine: /^ {2}MEM-\d+ /, what: 'the memory coverage check exits 0' };
+/**
+ * MD-15 的最后一项：这次工作新加的行里没有推迟实现的标记（tests/md-markers.mjs，规格 §13.3）。它打印 PASS / FAIL 行，
+ * 命中的行为 "<文件>:<行号>: <内容>"，失败时细节里带它们
+ */
+const MARKER_CHECK = { name: 'md-markers', takesExe: false, command: [join(appRoot, 'tests/md-markers.mjs')],
+  needsPass: true, failLine: /^FAIL\b|^app\/\S+:\d+: /, what: 'no deferral markers in the lines this work adds' };
+
+/** 记忆规格 §14.4 的 MEM-35 的套件列表（discovery 在它后面再加记忆自己的套件） */
+const MEMORY_LISTS = {
+  app: [...APP_SUITES, ...V1_APP_SUITES, TB_BASE, ...TB_APP_SUITES],
+  replay: [TB_UNIT_CHECK, ...REPLAY_SUITES, suite('v1-models-replay', false), suite('tb-replay', false)],
+};
 
 /**
  * @brief 套件列表：名字 → { app, replay }。
  *        models 为模型层 §14.4 的套件；taskboard 为 TaskBoard §17.4 的 TB-46：再加模型层的 App 与回放套件；
- *        memory 为记忆规格 §14.4 的 MEM-35：再加 TB-03 的对照构建、TaskBoard 的 App 套件、单元与回放。
+ *        memory 为记忆规格 §14.4 的 MEM-35：再加 TB-03 的对照构建、TaskBoard 的 App 套件、单元与回放；
+ *        discovery 为一键拉取模型规格 §13.3 的 MD-15：memory 再加记忆的 App 套件、test:mem-unit 与 mem-replay。
  */
 const SUITE_LISTS = {
   models: { app: APP_SUITES, replay: REPLAY_SUITES },
   taskboard: { app: [...APP_SUITES, ...V1_APP_SUITES], replay: [...REPLAY_SUITES, suite('v1-models-replay', false)] },
-  memory: {
-    app: [...APP_SUITES, ...V1_APP_SUITES, TB_BASE, ...TB_APP_SUITES],
-    replay: [TB_UNIT_CHECK, ...REPLAY_SUITES, suite('v1-models-replay', false), suite('tb-replay', false)],
+  memory: MEMORY_LISTS,
+  discovery: {
+    app: [...MEMORY_LISTS.app, ...MEM_APP_SUITES],
+    replay: [...MEMORY_LISTS.replay, MEM_UNIT_CHECK, suite('mem-replay', false)],
   },
 };
 
@@ -132,6 +178,11 @@ const PRESETS = {
     partial: 'mem-partial-existing-', logDir: 'mem-existing', suites: 'memory', withUnit: true,
     tail: [COVERAGE_CHECK, TB_COVERAGE_CHECK],
     also: [{ id: 'MP-37', before: COVERAGE_CHECK }, { id: 'TB-46', before: TB_COVERAGE_CHECK }] },
+  'MD-15': { appFile: 'md-app-existing.json', replayFile: 'md-replay-existing.json',
+    partial: 'md-partial-existing-', logDir: 'md-existing', suites: 'discovery', withUnit: true,
+    tail: [MODEL_COVERAGE_CHECK, TB_COVERAGE_CHECK, MEM_COVERAGE_CHECK, MARKER_CHECK],
+    also: [{ id: 'MP-37', before: MODEL_COVERAGE_CHECK }, { id: 'TB-46', before: TB_COVERAGE_CHECK },
+      { id: 'MEM-35', before: MEM_COVERAGE_CHECK }] },
 };
 
 /** @brief 参数不认识时打印原因并以退出码 2 结束。 */
@@ -165,7 +216,8 @@ function readOptions() {
   const exePath = arg('exe') ? resolve(arg('exe')) : null;
   const suffix = exePath ? '-packaged' : '';
   const logName = `${preset.logDir}${suffix}`;
-  const coverage = process.argv.includes('--with-coverage') && !preset.tail.includes(COVERAGE_CHECK);
+  const coverage = process.argv.includes('--with-coverage')
+    && !preset.tail.some((entry) => entry === COVERAGE_CHECK || entry.sameAs === COVERAGE_CHECK);
   return {
     id, preset, only, exePath, lists: SUITE_LISTS[listName], logName, logDir: join(appRoot, 'test-results', logName),
     appFile: only ? `${preset.partial}app${suffix}.json` : appFile.replace(/\.json$/, `${suffix}.json`),
@@ -183,7 +235,8 @@ const logFileOf = (entry) => `${entry.name.replace(/:/g, '-')}.log`;
 
 /**
  * @brief 以子进程跑一个套件或附加检查，输出同时打到终端并存进日志。
- * @param entry suite()、UNIT_CHECK、TB_UNIT_CHECK、COVERAGE_CHECK 或 TB_COVERAGE_CHECK
+ * @param entry suite() 或一项附加检查（UNIT_CHECK、TB_UNIT_CHECK、MEM_UNIT_CHECK、COVERAGE_CHECK、MODEL_COVERAGE_CHECK、
+ *        TB_COVERAGE_CHECK、MEM_COVERAGE_CHECK、MARKER_CHECK）
  * @param args 追加给脚本的参数（--exe）
  * @return { code, output, ms }；超时时 code 为 null
  */
@@ -224,7 +277,10 @@ function detailOf(entry, { code, output, ms }, note) {
   return code === 0 ? head : `${head}; ${fails.slice(0, 6).map((line) => oneLine(line, 160)).join(' | ')}`;
 }
 
-/** 每个跑过的套件的结果（按脚本名）：TB-46、MEM-35 据此另写别的编号的结果文件 */
+/**
+ * 每个跑过的套件的结果（按脚本名；带 sameAs 的附加检查另记在 sameAs 的名字下）：TB-46、MEM-35、MD-15 据此另写
+ * 别的编号的结果文件
+ */
 const outcomes = new Map();
 
 /** @brief 跑一项（skip 给出理由时不跑、记为通过并注明），返回 { ok, detail }。 */
@@ -255,6 +311,7 @@ async function runGroup(entries, resultFile, before = () => {}) {
     before(entry);
     const outcome = await runEntry(entry);
     outcomes.set(entry.name, outcome);
+    if (entry.sameAs) outcomes.set(entry.sameAs.name, outcome);
     recorder.record(`${id} ${entry.name}: ${entry.what}`, outcome.ok, outcome.detail);
   }
   return recorder.write(resultFile);
@@ -264,7 +321,8 @@ async function runGroup(entries, resultFile, before = () => {}) {
 const written = new Set();
 
 /**
- * @brief 跑全时另写别的编号的结果文件（TB-46 写 MP-37，规格 §17.4；MEM-35 写 MP-37 与 TB-46，记忆规格 §14.4）：
+ * @brief 跑全时另写别的编号的结果文件（TB-46 写 MP-37，规格 §17.4；MEM-35 写 MP-37 与 TB-46，记忆规格 §14.4；
+ *        MD-15 写 MP-37、TB-46 与 MEM-35，一键拉取模型规格 §13.3）：
  *        那个编号自己的套件与附加检查，用这次运行的结果，记 "<编号> <脚本名>"；--only 时不写（部分结果不能算通过）。
  *        --exe 时只写 App 层（加 -packaged）。
  */

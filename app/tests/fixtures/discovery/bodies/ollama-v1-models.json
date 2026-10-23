@@ -1,0 +1,41 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.14:11434/v1/models",
+ "note": "Ollama /v1/models: owned_by is the name namespace (library), created is the modification time",
+ "basis": [
+  "https://github.com/ollama/ollama/blob/main/openai/openai.go (Model {id, object, created, owned_by}; ToListCompletion: id = model or name, created = modified_at Unix, owned_by = model.ParseName(id).Namespace)",
+  "created matches modified_at in ollama-tags.json"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "qwen3:8b",
+    "object": "model",
+    "created": 1791853951,
+    "owned_by": "library"
+   },
+   {
+    "id": "gemma2:9b",
+    "object": "model",
+    "created": 1791940351,
+    "owned_by": "library"
+   },
+   {
+    "id": "llava:7b",
+    "object": "model",
+    "created": 1792026751,
+    "owned_by": "library"
+   },
+   {
+    "id": "nomic-embed-text:latest",
+    "object": "model",
+    "created": 1792113151,
+    "owned_by": "library"
+   }
+  ]
+ }
+}

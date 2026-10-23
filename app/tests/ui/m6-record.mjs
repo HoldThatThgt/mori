@@ -166,7 +166,8 @@ function common(steps, allowFail = []) {
 // ---------- 场景 ----------
 
 /**
- * @brief model-range（v1，顶栏范围）：在 Models 里给首选提供商加第二个模型（models.saveModel），等它的探针跑完；新会话
+ * @brief model-range（v1，顶栏范围）：在 Models 里给首选提供商加第二个模型（models.addModels，model-discovery.md §5.4、
+ *        §13.4：加模型不再经 models.saveModel），等它的探针跑完；新会话
  *        （默认范围是测试分组）先由分组的第一个候选回答，在顶栏选新加的模型（session.setPick）后再回答一句。
  */
 const modelRange = { name: 'model-range', dir: v1Dir, description: '在 Models 里给首选提供商加模型 deepseek-v4-pro；'
@@ -177,8 +178,8 @@ const modelRange = { name: 'model-range', dir: v1Dir, description: '在 Models �
     const before = await rec.cmd({ type: 'models.get' });
     const provider = before.config.providers.find((item) => item.id === args.provider);
     const base = provider.models[0];
-    await rec.cmd({ type: 'models.saveModel', providerId: args.provider, adding: true,
-      model: { ...base, id: args.SECOND_MODEL, family: '', reasoning: false } });
+    await rec.cmd({ type: 'models.addModels', providerId: args.provider,
+      models: [{ ...base, id: args.SECOND_MODEL, family: '', reasoning: false }] });
     const ref = `${args.provider}/${args.SECOND_MODEL}`;
     // 每 3 秒读一次档案（每次读都录下来，回放时界面读到的是最后一次）
     await rec.until(async () => {
@@ -212,7 +213,7 @@ const thinking = { name: 'thinking', dir: v1Dir, description: '在 Models 里把
     await args.config(rec);
     const before = await rec.cmd({ type: 'models.get' });
     const base = before.config.providers.find((item) => item.id === args.provider).models[0];
-    await rec.cmd({ type: 'models.saveModel', providerId: args.provider, adding: false,
+    await rec.cmd({ type: 'models.saveModel', providerId: args.provider,
       model: { ...base, reasoning: true }, thinkingLevel: 'medium' });
     const s = await args.create(rec, args.cwd);
     await rec.cmd({ type: 'session.setThinking', sessionId: s.sessionId, level: 'high' });

@@ -1,0 +1,70 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.23:4000/v1/models",
+ "note": "LiteLLM proxy /v1/models: created fixed, mode and token limits per model group; one row with false flags",
+ "basis": [
+  "https://github.com/BerriAI/litellm/blob/main/litellm/proxy/utils.py (create_model_info_response: id, object, created = DEFAULT_MODEL_CREATED_AT_TIME, owned_by = provider, mode, max_input_tokens, max_output_tokens when known)",
+  "https://github.com/BerriAI/litellm/blob/main/litellm/constants.py (DEFAULT_MODEL_CREATED_AT_TIME 1677610602)",
+  "Row \"gpt-4o-mini-flags\": supports_reasoning and supports_function_calling false are NOT in the main-branch /v1/models row; added to cover spec section 4.1 \"LiteLLM fills unknown booleans with false\" (LiteLLM model_info uses these keys)"
+ ],
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "gpt-4o",
+    "object": "model",
+    "created": 1677610602,
+    "owned_by": "openai",
+    "mode": "chat",
+    "max_input_tokens": 128000,
+    "max_output_tokens": 16384
+   },
+   {
+    "id": "claude-sonnet",
+    "object": "model",
+    "created": 1677610602,
+    "owned_by": "anthropic",
+    "mode": "chat",
+    "max_input_tokens": 200000,
+    "max_output_tokens": 64000
+   },
+   {
+    "id": "deepseek-chat",
+    "object": "model",
+    "created": 1677610602,
+    "owned_by": "deepseek",
+    "mode": "chat",
+    "max_input_tokens": 128000,
+    "max_output_tokens": 128000
+   },
+   {
+    "id": "text-embedding-3-small",
+    "object": "model",
+    "created": 1677610602,
+    "owned_by": "openai",
+    "mode": "embedding",
+    "max_input_tokens": 8191
+   },
+   {
+    "id": "my-vllm-model",
+    "object": "model",
+    "created": 1677610602,
+    "owned_by": "hosted_vllm"
+   },
+   {
+    "id": "gpt-4o-mini-flags",
+    "object": "model",
+    "created": 1677610602,
+    "owned_by": "openai",
+    "mode": "chat",
+    "max_input_tokens": 128000,
+    "max_output_tokens": 16384,
+    "supports_reasoning": false,
+    "supports_function_calling": false
+   }
+  ],
+  "object": "list"
+ }
+}

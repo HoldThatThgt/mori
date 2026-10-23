@@ -39,12 +39,15 @@ export async function resizeWindow(app, width, height) {
  * @brief 首次启动（v1，规格 §14.4）：填英文表单、区域选 Local、Test connection，等探针都跑完（表单下方的探针状态），
  *        再打开 project（系统对话框换成直接返回它）。trust 为 true / false 时在信任询问里选"Trust workspace" / "Don’t trust"；
  *        undefined 表示不会问。名称默认 "Mori endpoint"（提供商 id mori-endpoint）。
+ *        一键拉取模型（model-discovery.md §13.4，page.mjs firstRun）：先 Fetch models，这次拉取必须拿到列表（对的 key），
+ *        否则报错；modelId 不在列表里时用 Add a model ID 手填（m6-app-slash 的长模型 id）。
  */
 export async function firstRunAndOpen(ctx, { name = 'Mori endpoint', baseUrl, apiKey, modelId = 'fake-coder', project,
   trust, reasoning }) {
   const { page, h } = ctx;
   const run = await h.firstRun({ name, baseUrl, apiKey, modelId, reasoning });
   if (!run.ok || run.probe !== 'verified') throw new Error(`first run: ${run.text}; probes ${run.probe}`);
+  if (run.fetch?.state !== 'list') throw new Error(`first run: Fetch models gave ${JSON.stringify(run.fetch)}`);
   await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
   await openProject(ctx, project, trust);
 }

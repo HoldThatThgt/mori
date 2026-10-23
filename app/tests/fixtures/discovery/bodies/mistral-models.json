@@ -1,0 +1,140 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "https://api.mistral.ai/v1/models",
+ "note": "Mistral /v1/models: capabilities booleans, max_context_length, type \"base\"",
+ "basis": [
+  "https://github.com/mistralai/client-python/blob/main/src/mistralai/client/models/basemodelcard.py (BaseModelCard: id, capabilities, object, created, owned_by \"mistralai\", name, description, max_context_length (default 32768), aliases, deprecation, deprecation_replacement_model, default_model_temperature, type = \"base\" (const))",
+  "https://github.com/mistralai/client-python/blob/main/src/mistralai/client/models/modelcapabilities.py (completion_chat, function_calling, reasoning, completion_fim, fine_tuning, vision, ocr, classification, moderation, audio, audio_transcription, audio_transcription_realtime, audio_speech, unified_resources)",
+  "A GET without a key answered 401 {\"detail\":\"Invalid API Key\"} on 2026-10-23; ids and values are illustrative"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "mistral-medium-2508",
+    "object": "model",
+    "created": 1792000000,
+    "owned_by": "mistralai",
+    "capabilities": {
+     "completion_chat": true,
+     "function_calling": true,
+     "reasoning": false,
+     "completion_fim": false,
+     "fine_tuning": true,
+     "vision": true,
+     "ocr": false,
+     "classification": false,
+     "moderation": false,
+     "audio": false,
+     "audio_transcription": false,
+     "audio_transcription_realtime": false,
+     "audio_speech": false,
+     "unified_resources": false
+    },
+    "name": "mistral-medium-2508",
+    "description": "mistral-medium-2508 model",
+    "max_context_length": 131072,
+    "aliases": [
+     "mistral-medium-latest"
+    ],
+    "deprecation": null,
+    "deprecation_replacement_model": null,
+    "default_model_temperature": 0.3,
+    "type": "base"
+   },
+   {
+    "id": "magistral-medium-2509",
+    "object": "model",
+    "created": 1792000000,
+    "owned_by": "mistralai",
+    "capabilities": {
+     "completion_chat": true,
+     "function_calling": true,
+     "reasoning": true,
+     "completion_fim": false,
+     "fine_tuning": false,
+     "vision": true,
+     "ocr": false,
+     "classification": false,
+     "moderation": false,
+     "audio": false,
+     "audio_transcription": false,
+     "audio_transcription_realtime": false,
+     "audio_speech": false,
+     "unified_resources": false
+    },
+    "name": "magistral-medium-2509",
+    "description": "magistral-medium-2509 model",
+    "max_context_length": 131072,
+    "aliases": [],
+    "deprecation": null,
+    "deprecation_replacement_model": null,
+    "default_model_temperature": 0.7,
+    "type": "base"
+   },
+   {
+    "id": "codestral-2508",
+    "object": "model",
+    "created": 1792000000,
+    "owned_by": "mistralai",
+    "capabilities": {
+     "completion_chat": true,
+     "function_calling": true,
+     "reasoning": false,
+     "completion_fim": true,
+     "fine_tuning": false,
+     "vision": false,
+     "ocr": false,
+     "classification": false,
+     "moderation": false,
+     "audio": false,
+     "audio_transcription": false,
+     "audio_transcription_realtime": false,
+     "audio_speech": false,
+     "unified_resources": false
+    },
+    "name": "codestral-2508",
+    "description": "codestral-2508 model",
+    "max_context_length": 256000,
+    "aliases": [],
+    "deprecation": null,
+    "deprecation_replacement_model": null,
+    "default_model_temperature": 0.3,
+    "type": "base"
+   },
+   {
+    "id": "mistral-embed",
+    "object": "model",
+    "created": 1792000000,
+    "owned_by": "mistralai",
+    "capabilities": {
+     "completion_chat": false,
+     "function_calling": false,
+     "reasoning": false,
+     "completion_fim": false,
+     "fine_tuning": false,
+     "vision": false,
+     "ocr": false,
+     "classification": false,
+     "moderation": false,
+     "audio": false,
+     "audio_transcription": false,
+     "audio_transcription_realtime": false,
+     "audio_speech": false,
+     "unified_resources": false
+    },
+    "name": "mistral-embed",
+    "description": "mistral-embed model",
+    "max_context_length": 8192,
+    "aliases": [],
+    "deprecation": null,
+    "deprecation_replacement_model": null,
+    "default_model_temperature": null,
+    "type": "base"
+   }
+  ]
+ }
+}

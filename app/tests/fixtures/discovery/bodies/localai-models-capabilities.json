@@ -1,0 +1,70 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.21:8080/v1/models/capabilities",
+ "note": "LocalAI /v1/models/capabilities: chat with tools and thinking, VLM, embedding, loose file (no config)",
+ "basis": [
+  "https://github.com/mudler/LocalAI/blob/master/core/http/endpoints/openai/list_capabilities.go (ListModelCapabilitiesEndpoint: id, object, capabilities, input_modalities, output_modalities, context_size when > 0; models without a config get only id and object)",
+  "https://github.com/mudler/LocalAI/blob/master/core/schema/openai.go (ModelCapabilities: capabilities = usecase strings (chat, vision, transcript, tts, embeddings, image, video) plus \"tools\" and \"thinking\"; capabilities, input_modalities, output_modalities have no omitempty, context_size omitempty)",
+  "https://github.com/mudler/LocalAI/blob/master/core/http/endpoints/openai.go and routes/openai.go (served at /v1/models/capabilities and /models/capabilities)"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "qwen3-8b",
+    "object": "model",
+    "capabilities": [
+     "chat",
+     "completion",
+     "tools",
+     "thinking"
+    ],
+    "input_modalities": [
+     "text"
+    ],
+    "output_modalities": [
+     "text"
+    ],
+    "context_size": 8192
+   },
+   {
+    "id": "llava-1.6-mistral",
+    "object": "model",
+    "capabilities": [
+     "chat",
+     "vision"
+    ],
+    "input_modalities": [
+     "text",
+     "image"
+    ],
+    "output_modalities": [
+     "text"
+    ],
+    "context_size": 4096
+   },
+   {
+    "id": "text-embedding-ada-002",
+    "object": "model",
+    "capabilities": [
+     "embeddings"
+    ],
+    "input_modalities": [
+     "text"
+    ],
+    "output_modalities": null,
+    "context_size": 8192
+   },
+   {
+    "id": "my model.gguf",
+    "object": "model",
+    "capabilities": null,
+    "input_modalities": null,
+    "output_modalities": null
+   }
+  ]
+ }
+}

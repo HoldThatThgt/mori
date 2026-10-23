@@ -325,10 +325,18 @@ async function clickThinking(page, level) {
 /**
  * @brief 走查 8 的前半（v1）：设置 → Models 编辑模型，勾"Supports thinking"，新会话的强度照录制保存（models.saveModel 由
  *        回放桥直接应答，之后读到的 models.get 是录制里保存之后的结果）。
+ *        一键拉取模型（docs/specs/model-discovery.md §5.4、§13.4）：Edit 里没设过强度的模型，Default effort for new
+ *        sessions 显示录下的 thinkingDefaults（为 null 时 config.get 的 defaultThinkingLevel，没有时 Medium），只在你改了
+ *        时才带 thinkingLevel；models.saveModel 没有 adding。录制（旧的界面）总带 thinkingLevel：与显示的相同时不改，
+ *        这时不带（新会话按 pi 的 defaultThinkingLevel 得到同一个强度），不同时选它，这时带上。
  */
 async function markReasoning(page, fx) {
   const save = fx.steps.find((step) => step.command?.type === 'models.saveModel')?.command;
   const ref = `${save.providerId}/${save.model.id}`;
+  const config = fx.steps.find((step) => step.result?.type === 'config.get')?.result.value;
+  const models = fx.steps.find((step) => step.result?.type === 'models.get')?.result.value;
+  const shown = models?.thinkingDefaults?.[ref] ?? config?.defaultThinkingLevel ?? 'medium';
+  const changed = Boolean(save.thinkingLevel) && save.thinkingLevel !== shown;
   await openSettings(page, 'models');
   await modelRow(page, ref).locator('[data-action="edit"]').click();
   const form = page.getByTestId('model-form');
@@ -343,11 +351,16 @@ async function markReasoning(page, fx) {
   await form.waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
   const writes = (await page.evaluate(() => window.__replay.status.modelWrites))
     .filter((write) => write.type === 'models.saveModel');
+  const model = writes[0]?.model ?? {};
+  const sameModel = Object.keys(model).length === Object.keys(save.model).length
+    && Object.keys(save.model).every((key) => JSON.stringify(model[key]) === JSON.stringify(save.model[key]));
   record('thinking：编辑模型时 Model ID 只读；勾"Supports thinking"后才出现"Default effort for new sessions"（Off 到 Max，'
-    + '默认 Medium）；Save 发出 models.saveModel（reasoning: true，强度照录制）', before.readOnly && before.levelField === 0
-    && level.value === 'medium' && level.options.join() === 'Off,Minimal,Low,Medium,High,Extra high,Max'
-    && writes.length === 1 && writes[0].model.reasoning === true && writes[0].thinkingLevel === save.thinkingLevel,
-  JSON.stringify({ before, level, writes }));
+    + `没设过强度时显示 ${shown}）；Save 发出 models.saveModel（录下的模型、reasoning: true，没有 adding；强度照录制：`
+    + '与显示的相同时不带 thinkingLevel，不同时带上，model-discovery.md §5.4）', before.readOnly && before.levelField === 0
+    && level.value === shown && level.options.join() === 'Off,Minimal,Low,Medium,High,Extra high,Max'
+    && writes.length === 1 && writes[0].providerId === save.providerId && sameModel && model.reasoning === true
+    && !('adding' in writes[0]) && (changed ? writes[0].thinkingLevel === save.thinkingLevel
+    : !('thinkingLevel' in writes[0])), JSON.stringify({ before, level, shown, writes }));
   await leaveSettings(page, false);
 }
 

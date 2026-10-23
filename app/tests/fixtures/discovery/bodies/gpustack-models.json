@@ -1,0 +1,45 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.17/v1/models",
+ "note": "GPUStack /v1/models without with_meta (meta is null)",
+ "basis": [
+  "https://github.com/gpustack/gpustack/blob/main/gpustack/routes/openai.py (list models: openai Model {id, object, created, owned_by \"gpustack\", meta = route.meta only with with_meta=true, else None})",
+  "https://github.com/gpustack/gpustack/blob/main/gpustack/worker/model_meta.py (meta from the running backend: /v1/models data[0].meta plus max_model_len; MindIE: /info models[0] plus max_batch_total_tokens, max_input_length, ...)"
+ ],
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "qwen3-32b",
+    "created": 1792600000,
+    "object": "model",
+    "owned_by": "gpustack",
+    "meta": null
+   },
+   {
+    "id": "llama-3.3-70b",
+    "created": 1792600001,
+    "object": "model",
+    "owned_by": "gpustack",
+    "meta": null
+   },
+   {
+    "id": "deepseek-r1-distill-mindie",
+    "created": 1792600002,
+    "object": "model",
+    "owned_by": "gpustack",
+    "meta": null
+   },
+   {
+    "id": "bge-m3",
+    "created": 1792600003,
+    "object": "model",
+    "owned_by": "gpustack",
+    "meta": null
+   }
+  ],
+  "object": "list"
+ }
+}

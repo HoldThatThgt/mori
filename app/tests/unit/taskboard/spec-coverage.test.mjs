@@ -2,21 +2,25 @@
 // 的 TB 条目与层、tb- 结果文件按层归类（-packaged 只在 --packaged 时计入 App 与真实层、回放只认开发构建、
 // tb-partial-*.json 不计入）、不属于任何编号的检查只在这份规格的结果文件里找；不加 --spec 时模型层的规则不变。
 // 记忆规格（docs/specs/memory.md §14.3、§14.4）加的 --spec memory 同样检查：§14.2 的 MEM 条目与层、mem- 结果文件的归类。
+// 一键拉取模型规格（docs/specs/model-discovery.md §13.3）加的 --spec discovery 同样检查：§13.2 的 MD 条目与层、md- 结果
+// 文件的归类；另查带 skip / todo 标记的检查不算通过，以及严格模式的单元报告器（md-reporter.mjs 用的
+// createReporter(…, true)）把跳过的与 todo 的测试写成带标记的失败、套件自己的失败也记一条，不开严格模式时照旧。
 // §17.4 把覆盖检查算进 TB-46（现有功能不退步），所以检查名以 "TB-46 spec-coverage" 开头；TB-46 只列 App 与回放两层，
 // 这些单元检查不计入覆盖表，由 node --test 的退出码把关。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  SPECS, layerOfFile, parseSpecTable, specPathOf, startsWithId, strayChecks,
+  SPECS, cellOf, flagOfCheck, layerOfFile, parseSpecTable, passes, specPathOf, startsWithId, strayChecks,
 } from '../../spec-coverage.mjs';
+import { createReporter } from '../reporter.mjs';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const { model, taskboard, memory } = SPECS;
+const { model, taskboard, memory, discovery } = SPECS;
 
 /** @brief 按 [文件名, 期望的层] 逐个比对。 */
 function expectLayers(spec, packaged, cases) {
@@ -100,6 +104,143 @@ test('TB-46 spec-coverage maps mem- result files to layers (partial files never 
   ]);
 });
 
+test('TB-46 spec-coverage reads every MD row of model-discovery §13.2 with its layers', () => {
+  const items = parseSpecTable(discovery, readFileSync(specPathOf(discovery), 'utf8'));
+  assert.deepEqual(items.map((item) => item.id),
+    Array.from({ length: 15 }, (_, i) => `MD-${String(i + 1).padStart(2, '0')}`));
+  const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
+  assert.deepEqual(layersOf('MD-01'), ['unit']);
+  assert.deepEqual(layersOf('MD-06'), ['app', 'unit']);
+  assert.deepEqual(layersOf('MD-07'), ['app', 'replay']);
+  assert.deepEqual(layersOf('MD-08'), ['app']);
+  assert.deepEqual(layersOf('MD-12'), ['app', 'unit']);
+  assert.deepEqual(layersOf('MD-14'), ['real']);
+  assert.deepEqual(layersOf('MD-15'), ['app', 'replay']);
+  assert.equal(items.find((item) => item.id === 'MD-15').title, '现有功能不退步');
+});
+
+test('TB-46 spec-coverage maps md- result files to layers (partial files never count)', () => {
+  expectLayers(discovery, false, [
+    ['md-unit.json', 'unit'], ['md-app-form.json', 'app'], ['md-app-card.json', 'app'],
+    ['md-app-firstrun.json', 'app'], ['md-app-existing.json', 'app'], ['md-replay.json', 'replay'],
+    ['md-replay-existing.json', 'replay'], ['md-real.json', 'real'], ['md-app-existing-packaged.json', null],
+    ['md-real-packaged.json', null], ['md-replay-x-packaged.json', null], ['md-partial-existing-app.json', null],
+    ['md-partial-existing-replay.json', null], ['md-app-form.log', null], ['md-existing', null],
+    ['mem-unit.json', null], ['tb-app-existing.json', null], ['v1-models-replay.json', null],
+  ]);
+  expectLayers(discovery, true, [
+    ['md-app-existing-packaged.json', 'app'], ['md-app-existing.json', null], ['md-real-packaged.json', 'real'],
+    ['md-real.json', null], ['md-unit.json', 'unit'], ['md-replay.json', 'replay'],
+    ['md-partial-existing-app-packaged.json', null],
+  ]);
+  for (const spec of [model, taskboard, memory]) {
+    expectLayers(spec, false, [['md-unit.json', null], ['md-app-existing.json', null],
+      ['md-replay-existing.json', null], ['md-real.json', null]]);
+  }
+});
+
+test('TB-46 spec-coverage never counts a check with a skip or todo flag as passing', () => {
+  assert.equal(passes({ name: 'MD-01 a', ok: true }), true);
+  assert.equal(passes({ name: 'MD-01 a', ok: false }), false);
+  assert.equal(passes({ name: 'MD-01 a', ok: 'yes' }), false);
+  assert.equal(passes({ name: 'MD-01 a', ok: true, skip: true }), false);
+  assert.equal(passes({ name: 'MD-01 a', ok: true, todo: true }), false);
+  assert.deepEqual([{ skip: true }, { todo: true }, { ok: true }].map(flagOfCheck), ['skipped', 'todo', null]);
+  const item = { id: 'MD-01', title: 't', layers: new Set(['unit']) };
+  const unit = (checks) => [{ name: 'md-unit.json', layer: 'unit', checks }];
+  const ok = { name: 'MD-01 reads the base URL', ok: true, detail: '' };
+  const skipped = { name: 'MD-01 skipped one', ok: false, detail: 'skipped: no reason given', skip: true };
+  const cell = cellOf(item, 'unit', unit([ok, skipped]), false);
+  assert.equal(cell.state, 'fail');
+  assert.equal(cell.passed, 1);
+  assert.deepEqual(cell.failed.map((failed) => [failed.name, failed.flag]), [['MD-01 skipped one', 'skipped']]);
+  // 一个只带标记、ok 却为 true 的检查（不是严格模式的报告器写的）同样不算通过
+  const lone = cellOf(item, 'unit', unit([{ name: 'MD-01 lone', ok: true, todo: true }]), false);
+  assert.deepEqual([lone.state, lone.passed, lone.failed[0].flag], ['fail', 0, 'todo']);
+  assert.equal(cellOf(item, 'unit', unit([ok]), false).state, 'ok');
+  assert.deepEqual(strayChecks([item], unit([{ name: 'MD-99 x', ok: true, skip: true }])),
+    ['md-unit.json: "MD-99 x" (FAIL)']);
+});
+
+/**
+ * @brief 把一串事件交给 createReporter(file, strict) 生成的报告器，读回它写的结果文件（读完删除）。
+ * @return { checks, output, exitCode }：exitCode 为报告器设的 process.exitCode（之后还原）
+ */
+async function runReporter(events, strict) {
+  const file = `reporter-strict-check-${process.pid}.json`;
+  for (const spec of Object.values(SPECS)) assert.equal(layerOfFile(spec, file, false), null);
+  const before = process.exitCode;
+  process.exitCode = undefined;
+  let output = '';
+  const source = (async function* stream() { yield* events; })();
+  for await (const chunk of createReporter(file, strict)(source)) output += chunk;
+  const exitCode = process.exitCode;
+  process.exitCode = before;
+  const path = join(appRoot, 'test-results', file);
+  const { checks } = JSON.parse(readFileSync(path, 'utf8'));
+  rmSync(path);
+  return { checks, output, exitCode };
+}
+
+/**
+ * synthetic：node 24 的 node --test 发给报告器的事件形状（在这台机器上用 skip、todo、describe.skip、describe.todo、
+ * 函数抛错的 describe、钩子失败的 describe 与里面有测试失败的 describe 实际打印过 data 的字段后手写，node 24.19.0）：
+ * 跳过与 todo 报成 test:pass，标为 todo 的失败报成 test:fail，带标记的套件同样带 skip / todo；套件自己失败时
+ * details.error.failureType 为 testCodeFailure 或 hookFailed，只因里面的测试失败时为 subtestsFailed；
+ * test:diagnostic 等别的事件不记。
+ */
+const FLAG_EVENTS = [
+  { type: 'test:pass', data: { name: 'MD-01 plain', file: 'a.test.mjs', details: { type: 'test' } } },
+  { type: 'test:pass', data: { name: 'MD-01 skipped', skip: true, details: { type: 'test' } } },
+  { type: 'test:pass', data: { name: 'MD-02 skipped with a reason', skip: 'needs a server',
+    details: { type: 'test' } } },
+  { type: 'test:pass', data: { name: 'MD-03 marked todo', todo: true, details: { type: 'test' } } },
+  { type: 'test:fail', data: { name: 'MD-03 failing todo', todo: 'shape', details: { type: 'test',
+    error: { message: 'boom\nstack' } } } },
+  { type: 'test:pass', data: { name: 'MD-04 skipped suite', skip: true, details: { type: 'suite' } } },
+  { type: 'test:pass', data: { name: 'MD-04 suite', details: { type: 'suite' } } },
+  { type: 'test:fail', data: { name: 'MD-05 failing', details: { type: 'test', error: { message: 'bad' } } } },
+  { type: 'test:fail', data: { name: 'MD-05 suite', details: { type: 'suite',
+    error: { failureType: 'subtestsFailed', message: '1 subtest failed', cause: '1 subtest failed' } } } },
+  { type: 'test:fail', data: { name: 'MD-06 suite whose function throws', details: { type: 'suite',
+    error: { failureType: 'testCodeFailure', message: 'body', cause: { message: 'body\nstack' } } } } },
+  { type: 'test:diagnostic', data: { message: 'tests 7' } },
+];
+
+test('TB-46 spec-coverage: the strict unit reporter (md-reporter.mjs) fails skipped, todo and failed-suite checks',
+  async () => {
+    const { checks, output, exitCode } = await runReporter(FLAG_EVENTS, true);
+    assert.deepEqual(checks.map(({ name, ok, detail, skip, todo }) => ({ name, ok, detail, skip, todo })), [
+      { name: 'MD-01 plain', ok: true, detail: '', skip: undefined, todo: undefined },
+      { name: 'MD-01 skipped', ok: false, detail: 'skipped: no reason given', skip: true, todo: undefined },
+      { name: 'MD-02 skipped with a reason', ok: false, detail: 'skipped: needs a server', skip: true,
+        todo: undefined },
+      { name: 'MD-03 marked todo', ok: false, detail: 'todo: no reason given', skip: undefined, todo: true },
+      { name: 'MD-03 failing todo', ok: false, detail: 'todo: shape (it also failed: boom)', skip: undefined,
+        todo: true },
+      { name: 'MD-04 skipped suite', ok: false, detail: 'skipped: no reason given', skip: true, todo: undefined },
+      { name: 'MD-05 failing', ok: false, detail: 'bad', skip: undefined, todo: undefined },
+      { name: 'MD-06 suite whose function throws', ok: false, detail: 'body\nstack', skip: undefined, todo: undefined },
+    ]);
+    assert.equal(checks.filter(passes).length, 1);
+    assert.equal(exitCode, 1);
+    assert.match(output, /^FAIL MD-01 skipped — skipped: no reason given$/m);
+    assert.match(output, /^FAIL MD-06 suite whose function throws — body$/m);
+    assert.match(output, /1\/8 unit checks passed \(5 skipped or todo, counted as failures\)/);
+  });
+
+test('TB-46 spec-coverage: reporters without strict mode keep recording skipped and todo tests as passes',
+  async () => {
+    const { checks, output, exitCode } = await runReporter(FLAG_EVENTS, false);
+    assert.deepEqual(checks.map(({ name, ok, detail }) => [name, ok, detail]), [
+      ['MD-01 plain', true, ''], ['MD-01 skipped', true, ''], ['MD-02 skipped with a reason', true, ''],
+      ['MD-03 marked todo', true, ''], ['MD-03 failing todo', false, 'boom\nstack'], ['MD-05 failing', false, 'bad'],
+    ]);
+    assert.deepEqual(Object.keys(checks[1]), ['name', 'ok', 'detail', 'known', 'file']);
+    assert.equal(exitCode, undefined);
+    assert.match(output, /\n4\/6 unit checks passed\n$/);
+  });
+
 test('TB-46 spec-coverage lists strays only from the files of the chosen spec', () => {
   const items = [{ id: 'TB-01' }, { id: 'TB-46' }];
   const files = [{ name: 'tb-unit.json', checks: [
@@ -128,6 +269,6 @@ test('TB-46 spec-coverage exits 2 for an unknown --spec', () => {
   const run = spawnSync(process.execPath, [join(appRoot, 'tests/spec-coverage.mjs'), '--spec', 'board'],
     { cwd: appRoot, encoding: 'utf8' });
   assert.equal(run.status, 2);
-  assert.match(run.stderr, /unknown --spec "board" \(expected model, taskboard or memory\)/);
+  assert.match(run.stderr, /unknown --spec "board" \(expected model, taskboard, memory or discovery\)/);
   assert.equal(run.stdout, '');
 });

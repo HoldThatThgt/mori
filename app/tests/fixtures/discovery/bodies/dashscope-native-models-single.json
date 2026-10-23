@@ -1,0 +1,77 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "https://dashscope.aliyuncs.com/api/v1/models?model=qwen3.8-max",
+ "note": "Model Studio native /api/v1/models?model=<id> (probe step 0 single mode)",
+ "basis": [
+  "https://help.aliyun.com/zh/model-studio/list-models (GET /api/v1/models: page_no from 1, page_size default 20, model; response success, request_id, output {total, page_no, page_size, models[{model, name, description, provider, inference_provider, capabilities (TG, VU, Reasoning, IG, TR, ...), features (function-calling, structured-outputs, web-search, cache, ...), prices, inference_metadata {request_modality, response_modality}, model_info {context_window, max_input_tokens, max_output_tokens, ...}}]})",
+  "docs/proposals/model-discovery.md section 14 (fields confirmed on the documented hosts; on dashscope.aliyuncs.com the path exists but its content is unverified)"
+ ],
+ "status": 200,
+ "body": {
+  "code": null,
+  "message": null,
+  "success": true,
+  "request_id": "d5f5201f-ee7a-9e3d-8569-bc0eedec21f1",
+  "output": {
+   "total": 1,
+   "page_no": 1,
+   "page_size": 20,
+   "models": [
+    {
+     "model": "qwen3.8-max",
+     "name": "Qwen3.8-Max",
+     "description": "Qwen3.8-Max model",
+     "provider": "qwen",
+     "inference_provider": "aliyun-bailian",
+     "capabilities": [
+      "TG",
+      "Reasoning"
+     ],
+     "features": [
+      "function-calling",
+      "structured-outputs",
+      "web-search"
+     ],
+     "prices": [
+      {
+       "range_name": "Default",
+       "prices": [
+        {
+         "type": "input_token",
+         "price": "2",
+         "price_unit": "per 1M tokens",
+         "price_name": "input"
+        },
+        {
+         "type": "output_token",
+         "price": "8",
+         "price_unit": "per 1M tokens",
+         "price_name": "output"
+        }
+       ]
+      }
+     ],
+     "published_time": "2026-09-01 12:00:00",
+     "inference_metadata": {
+      "request_modality": [
+       "Text"
+      ],
+      "response_modality": [
+       "Text"
+      ]
+     },
+     "model_info": {
+      "context_window": 131072,
+      "max_input_tokens": 130048,
+      "max_output_tokens": 16384,
+      "max_reasoning_tokens": null,
+      "reasoning_max_input_tokens": null,
+      "reasoning_max_output_tokens": null
+     }
+    }
+   ]
+  }
+ }
+}

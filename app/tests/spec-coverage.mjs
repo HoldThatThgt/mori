@@ -1,27 +1,37 @@
 // 覆盖检查：读一份构建规格验收条目表的编号和每条的"层"，再读 test-results/ 里各层的结果文件；每个编号在它列出的
 // 每一层都要有名字以这个编号开头、结果为通过的检查，任何一个缺少就失败。
 // 同一编号同一层里有失败的检查（含标 known 的）也算没完成：通过的检查不能掩盖失败的那一条。
+// 带 skip 或 todo 标记的检查不论 ok 是什么都算失败（tests/unit/reporter.mjs 的严格模式写这两个标记，md-reporter.mjs
+// 用它；负责人为一键拉取模型规格 §13.3“不留未完成项”定的规则：跳过的与 todo 的测试不算通过）。
+// 其他规格的结果文件里没有这两个标记，结论不变。
 // --spec 选规格（默认 model）：
 //   model      docs/specs/model-providers.md §14.2（§14.3），编号 MP-n
 //   taskboard  docs/specs/parallel-agents-taskboard.md §17.2（§17.3），编号 TB-n
 //   memory     docs/specs/memory.md §14.2（§14.3），编号 MEM-n
-// 层由结果文件决定（模型层 §14.3，TaskBoard §17.3，记忆 §14.3）：
+//   discovery  docs/specs/model-discovery.md §13.2（§13.3），编号 MD-n
+// 层由结果文件决定（模型层 §14.3，TaskBoard §17.3，记忆 §14.3，一键拉取模型 §13.3）：
 //   层    model                                       taskboard                           memory
 //   单元  v1-unit.json（tests/unit/reporter.mjs）      tb-unit.json（tb-reporter.mjs）     mem-unit.json（mem-reporter.mjs）
 //   App   v1-models-app*.json（含 -existing）         tb-app*.json（含 -existing）        mem-app*.json（含 -existing）
 //   回放  v1-models-replay*.json（含 -existing）      tb-replay*.json（含 -existing）     mem-replay*.json（含 -existing）
 //   真实  v1-models-real.json                         tb-real.json                        mem-real.json
-// TaskBoard 的 tb-partial-*.json、记忆的 mem-partial-*.json（--only 只跑一部分时写的）不计入任何层。
+//   discovery：单元 md-unit.json（md-reporter.mjs，严格模式），App md-app*.json（含 -existing），
+//   回放 md-replay*.json（含 -existing），真实 md-real.json。
+// TaskBoard 的 tb-partial-*.json、记忆的 mem-partial-*.json、一键拉取模型的 md-partial-*.json（--only 只跑一部分时写的）
+// 不计入任何层。
 // 只认开发构建的结果；--packaged 时 App 与真实层改读带 -packaged 的结果文件（v1-models-app*-packaged.json、
 // v1-models-real-packaged.json；tb-app*-packaged.json、tb-real-packaged.json；mem-app*-packaged.json、
-// mem-real-packaged.json）。单元与回放不经过 Mori 的构建
+// mem-real-packaged.json；md-app*-packaged.json、md-real-packaged.json）。单元与回放不经过 Mori 的构建
 // （单元直接导入打包后的内核模块，回放在 harness 里载入界面），两种模式读同一份；带 -packaged 的回放结果不计入。
 // 不属于任何编号的检查只列出、不计入；它们只在这份规格的结果文件里找。
 // --allow-missing-real：真实层的结果文件还不存在时把真实层记为 pending、不算失败（负责人走查之前用）；最终一遍不能带它。
-// 用法（在 app/ 下）：node tests/spec-coverage.mjs [--spec model|taskboard|memory] [--packaged] [--allow-missing-real]
+// 用法（在 app/ 下）：
+//   node tests/spec-coverage.mjs [--spec model|taskboard|memory|discovery] [--packaged] [--allow-missing-real]
 // 退出码：全部覆盖为 0，有缺口为 1，规格名不认识、规格表或结果文件读不出为 2。
 // 下面的函数导出给 tests/unit/taskboard/spec-coverage.test.mjs 检查；直接运行时才做检查。
 // 记忆规格的 --spec memory 在这台机器上带 --allow-missing-real 运行（真实层由负责人用数据目录跑，记忆规格 §0 第 4 条）。
+// 一键拉取模型的 --spec discovery 同样（npm run test:discovery 的最后一步）；真实层 MD-14 由负责人用数据目录跑
+// md-real.mjs，最终一遍不带 --allow-missing-real（规格 §13.3）。
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -61,9 +71,17 @@ export const SPECS = {
     strayLabel: 'a MEM id',
     files: { unit: 'mem-unit.json', app: 'mem-app', replay: 'mem-replay', real: 'mem-real', partial: 'mem-partial-' },
   },
+  discovery: {
+    path: 'docs/specs/model-discovery.md',
+    section: '13.2',
+    row: /^\|\s*MD-\d+\s*\|/,
+    prefix: 'MD',
+    strayLabel: 'an MD id',
+    files: { unit: 'md-unit.json', app: 'md-app', replay: 'md-replay', real: 'md-real', partial: 'md-partial-' },
+  },
 };
 
-/** @brief 规格名的列表文字："model, taskboard or memory"（规格名不认识时的提示）。 */
+/** @brief 规格名的列表文字："model, taskboard, memory or discovery"（规格名不认识时的提示）。 */
 export function specNames() {
   const names = Object.keys(SPECS);
   return names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names.at(-1)}` : names.join('');
@@ -150,19 +168,29 @@ function readResults(spec, packaged) {
 /** @brief 检查名是否以 id 开头（MP-1 不匹配 MP-10）。 */
 export const startsWithId = (name, id) => new RegExp(`^${id}(?!\\d)`).test(String(name));
 
+/** @brief 检查带的跳过 / todo 标记（严格模式的单元报告器写的 skip、todo）：'skipped'、'todo'，没有时为 null。 */
+export const flagOfCheck = (check) => (check.skip ? 'skipped' : check.todo ? 'todo' : null);
+
+/** @brief 一条检查是否算通过：ok 为 true，并且没有跳过 / todo 标记。 */
+export const passes = (check) => check.ok === true && !flagOfCheck(check);
+
 /**
  * @brief 一个编号在一层的结论。
+ * @param item parseSpecTable 的一项
+ * @param layer 'unit'|'app'|'replay'|'real'
+ * @param files readResults 读到的结果文件（{ name, layer, checks }）
  * @param pending 真实层没有结果文件且带了 --allow-missing-real
- * @return { state: 'ok'|'fail'|'missing'|'pending'|'n/a', passed, failed: [{ name, file }] }
+ * @return { state: 'ok'|'fail'|'missing'|'pending'|'n/a', passed, failed: [{ name, file, known, flag, detail }] }；
+ *         flag 为 flagOfCheck 的结果（带跳过 / todo 标记的检查算失败）
  */
-function cellOf(item, layer, files, pending) {
+export function cellOf(item, layer, files, pending) {
   if (!item.layers.has(layer)) return { state: 'n/a', passed: 0, failed: [] };
   const checks = files.filter((file) => file.layer === layer)
     .flatMap((file) => file.checks.map((check) => ({ ...check, file: file.name })))
     .filter((check) => startsWithId(check.name, item.id));
-  const passed = checks.filter((check) => check.ok === true).length;
-  const failed = checks.filter((check) => check.ok !== true).map((check) => ({ name: check.name, file: check.file,
-    known: Boolean(check.known), detail: String(check.detail ?? '') }));
+  const passed = checks.filter(passes).length;
+  const failed = checks.filter((check) => !passes(check)).map((check) => ({ name: check.name, file: check.file,
+    known: Boolean(check.known), flag: flagOfCheck(check), detail: String(check.detail ?? '') }));
   if (layer === 'real' && pending) return { state: 'pending', passed, failed };
   if (failed.length) return { state: 'fail', passed, failed };
   return { state: passed > 0 ? 'ok' : 'missing', passed, failed };
@@ -181,11 +209,12 @@ function cellText(cell) {
 
 /**
  * @brief 这份规格的结果文件里不属于任何编号的检查。
- * @return 每条一行文字：文件名、检查名（截到 100 字符），失败的带 (FAIL)
+ * @return 每条一行文字：文件名、检查名（截到 100 字符），不算通过的（见 passes）带 (FAIL)
  */
 export function strayChecks(items, files) {
-  return files.flatMap((file) => file.checks.filter((check) => !items.some((item) => startsWithId(check.name,
-    item.id))).map((check) => `${file.name}: "${String(check.name).slice(0, 100)}"${check.ok ? '' : ' (FAIL)'}`));
+  const stray = (check) => !items.some((item) => startsWithId(check.name, item.id));
+  return files.flatMap((file) => file.checks.filter(stray)
+    .map((check) => `${file.name}: "${String(check.name).slice(0, 100)}"${passes(check) ? '' : ' (FAIL)'}`));
 }
 
 /** @brief 打印表格与缺口，返回有没有缺口。 */
@@ -201,7 +230,8 @@ function report(spec, items, files, pending) {
       const cell = cells[i];
       if (cell.state === 'missing') gaps.push(`${item.id} ${title}: no passing check (${item.title})`);
       for (const failed of cell.state === 'fail' ? cell.failed : []) {
-        gaps.push(`${item.id} ${title}: ${failed.known ? 'KNOWN ' : ''}FAIL "${failed.name}" in ${failed.file}`
+        const flag = failed.flag ? ` (${failed.flag})` : '';
+        gaps.push(`${item.id} ${title}: ${failed.known ? 'KNOWN ' : ''}FAIL${flag} "${failed.name}" in ${failed.file}`
           + `${failed.detail ? ` — ${failed.detail.replace(/\s+/g, ' ').slice(0, 160)}` : ''}`);
       }
     });

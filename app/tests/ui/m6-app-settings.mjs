@@ -15,6 +15,8 @@
 //   node tests/ui/m6-app-settings.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m6-app-settings(-packaged).json，截图在 test-results/m6-app-settings(-packaged)/。
 // 用系统编辑器打开：经 app.evaluate 换掉主进程的 shell.openPath，只记下路径（不真的打开程序，与 m4-app.mjs 相同）。
+// 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先 Fetch models，"Supports thinking"看的是清单里
+// fake-coder 那一行的勾选框（page.mjs）。
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -297,21 +299,24 @@ async function noteSmall(ctx, where, selector) {
 // ---------- 步骤：首次启动与列表 ----------
 
 /**
- * @brief 首次启动（v1）：表单里有"Supports thinking"（不勾），首次启动表单没有新会话思考强度（勾上也没有，建好后在
- *        设置 → Models 里改，first-run.md）；测试连接成功、等探针跑完后打开项目。
+ * @brief 首次启动（v1）：拉取后清单里 fake-coder 一行有"Supports thinking"（服务没报告，不勾），首次启动表单没有新会话
+ *        思考强度（勾上也没有，建好后在 设置 → Models 里改，first-run.md；model-discovery.md §5.4、§13.4：这项检查从拉取前的
+ *        表单移到拉取后的清单）；测试连接成功、等探针跑完后打开项目。
  */
 async function firstRun(ctx) {
   const { page, h } = ctx;
   const form = page.getByTestId('connection-form');
   await form.waitFor({ timeout: 60000 });
-  const box = form.getByLabel('Supports thinking');
+  const fetched = await h.fillConnection({ baseUrl, apiKey: testKey });
+  const box = form.locator('[data-testid="discovered-row"][data-model="fake-coder"] input[data-field="reasoning"]');
   const level = () => form.getByLabel(LEVEL_FIELD).count();
-  const before = { checked: await box.isChecked(), select: await level() };
+  const before = { checked: await box.isChecked(), select: await level(), label: await box.getAttribute('aria-label') };
   await box.check();
   const checked = await level();
   await box.uncheck();
-  record('首次启动：表单里有"Supports thinking"（不勾）；首次启动表单没有"Default effort for new sessions"（勾上也没有）',
-    before.checked === false && before.select === 0 && checked === 0, JSON.stringify({ before, checked }));
+  record('首次启动：拉取后清单里 fake-coder 一行有"Supports thinking"（不勾）；首次启动表单没有"Default effort for new '
+    + 'sessions"（勾上也没有）', fetched?.state === 'list' && before.label === 'Supports thinking for fake-coder'
+    && before.checked === false && before.select === 0 && checked === 0, JSON.stringify({ fetched, before, checked }));
   await h.setupFirstRun({ baseUrl, apiKey: testKey });
   firstRunFiles(ctx);
   await stubFolder(ctx.app, ctx.project);

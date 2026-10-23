@@ -1,0 +1,73 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.25:3000/v1/models",
+ "note": "One API /v1/models: known models carry permission; a custom model name gets permission null",
+ "basis": [
+  "https://github.com/songquanpeng/one-api/blob/main/controller/model.go (OpenAIModels: id, object, created 1626777600, owned_by, permission, root, parent; ListModels adds models not in the built-in list with owned_by \"custom\" and no permission, which serialises as null)"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "gpt-4o",
+    "object": "model",
+    "created": 1626777600,
+    "owned_by": "openai",
+    "permission": [
+     {
+      "id": "modelperm-LwHkVFn8AcMItP432fKKDIKJ",
+      "object": "model_permission",
+      "created": 1626777600,
+      "allow_create_engine": true,
+      "allow_sampling": true,
+      "allow_logprobs": true,
+      "allow_search_indices": false,
+      "allow_view": true,
+      "allow_fine_tuning": false,
+      "organization": "*",
+      "group": null,
+      "is_blocking": false
+     }
+    ],
+    "root": "gpt-4o",
+    "parent": null
+   },
+   {
+    "id": "qwen-max",
+    "object": "model",
+    "created": 1626777600,
+    "owned_by": "ali",
+    "permission": [
+     {
+      "id": "modelperm-LwHkVFn8AcMItP432fKKDIKJ",
+      "object": "model_permission",
+      "created": 1626777600,
+      "allow_create_engine": true,
+      "allow_sampling": true,
+      "allow_logprobs": true,
+      "allow_search_indices": false,
+      "allow_view": true,
+      "allow_fine_tuning": false,
+      "organization": "*",
+      "group": null,
+      "is_blocking": false
+     }
+    ],
+    "root": "qwen-max",
+    "parent": null
+   },
+   {
+    "id": "my custom model",
+    "object": "model",
+    "created": 1626777600,
+    "owned_by": "custom",
+    "permission": null,
+    "root": "my custom model",
+    "parent": null
+   }
+  ]
+ }
+}

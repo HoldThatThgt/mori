@@ -1,0 +1,53 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
+ "note": "Model Studio compatible-mode /v1/models: OpenAI list shape assumed (NOT verified)",
+ "basis": [
+  "docs/proposals/model-discovery.md section 14 (compatible-mode /models fields are undocumented)",
+  "The plain OpenAI shape {object, data[{id, object, created, owned_by}]} is an assumption"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "qwen3.8-max",
+    "object": "model",
+    "created": 1792000000,
+    "owned_by": "system"
+   },
+   {
+    "id": "qwen-vl-max",
+    "object": "model",
+    "created": 1792000001,
+    "owned_by": "system"
+   },
+   {
+    "id": "qwen-image-3.0-pro",
+    "object": "model",
+    "created": 1792000002,
+    "owned_by": "system"
+   },
+   {
+    "id": "text-embedding-v4",
+    "object": "model",
+    "created": 1792000003,
+    "owned_by": "system"
+   },
+   {
+    "id": "deepseek-v4-pro",
+    "object": "model",
+    "created": 1792000004,
+    "owned_by": "system"
+   },
+   {
+    "id": "qwen-turbo-unlisted",
+    "object": "model",
+    "created": 1792000005,
+    "owned_by": "system"
+   }
+  ]
+ }
+}

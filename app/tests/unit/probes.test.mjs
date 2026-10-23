@@ -1,5 +1,7 @@
 // kernel/probes.ts 的单元测试（规格 §7.3、§7.4）：各步的请求写法、思考强度、判定、首个内容的时限、取消，
 // 以及与合成端点（tests/fake-endpoint/probes.mjs）的约定一致。替身 streamSimple 只在本文件里用（synthetic）。
+// 第 0 步改为调用读取器的单模型模式（docs/specs/model-discovery.md §7.1）：这里的 ProbeDeps.readServer 是替身，
+// 给出读取器对合成端点默认形状读到的结果；第 0 步本身的用例按 §3.3 改写后在 tests/unit/discovery/profile-step0.test.mjs。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -120,7 +122,7 @@ function stubPool({ delayMs = 0 } = {}) {
   return { fetchFor, requests };
 }
 
-/** 第 0 步与第 9 步 GET 的替身：url → 正文（没有的为 null）。 */
+/** 第 9 步 GET 的替身（也给 §5.7 的读指标）：url → 正文（没有的为 null）。 */
 function stubGet(bodies) {
   const urls = [];
   const getText = async (url) => {
@@ -131,20 +133,31 @@ function stubGet(bodies) {
   return { getText, urls };
 }
 
-/** vLLM 形状的第 0 步接口。 */
-const VLLM = {
-  '/v1/models': JSON.stringify({ object: 'list',
-    data: [{ id: 'fake-coder', owned_by: 'fake', max_model_len: 65536 }] }),
-  '/version': JSON.stringify({ version: '0.10.1' }),
-};
+/**
+ * 第 0 步读取器的结果（synthetic）：读取器对合成端点默认形状（owned_by "vllm"、max_model_len 65536、/version 0.10.1，
+ * model-discovery.md §13.1）读到的种类、版本、报告的窗口与 meta。
+ */
+const SERVER_READ = Object.freeze({ kind: 'vllm', version: '0.10.1', reported: 65536,
+  meta: Object.freeze({ maxTokens: null, reasoning: null, image: null }) });
+
+/** 第 0 步 readServer 的替身：记下每次调用的 signal，给出 server。 */
+function stubReadServer(server = SERVER_READ) {
+  const signals = [];
+  const readServer = async (signal) => {
+    signals.push(signal);
+    return server;
+  };
+  return { readServer, signals };
+}
 
 /** 探针的依赖。 */
-function depsFor({ stream, pool = stubPool(), get = stubGet(VLLM), signal = new AbortController().signal,
-  ...rest }) {
+function depsFor({ stream, pool = stubPool(), get = stubGet({}), read = stubReadServer(),
+  signal = new AbortController().signal, ...rest }) {
   const steps = [];
-  const deps = { streamSimple: stream.streamSimple, fetchFor: pool.fetchFor, getText: get.getText, now: () => 1000,
-    timings: TIMINGS, signal, onStep: (step, of) => steps.push([step, of]), ...rest };
-  return { deps, steps, pool, get, stream };
+  const deps = { streamSimple: stream.streamSimple, fetchFor: pool.fetchFor, readServer: read.readServer,
+    getText: get.getText, now: () => 1000, timings: TIMINGS, signal, onStep: (step, of) => steps.push([step, of]),
+    ...rest };
+  return { deps, steps, pool, get, read, stream };
 }
 
 /** 一次探针的目标。 */
@@ -233,10 +246,14 @@ test('MP-10 tool schemas: get_weather(city string, days integer), submit_outcome
 // ---- 第 0–7 步：合成端点上的判定 ----
 
 test('MP-10 all-pass model on the fake endpoint: tool calling verified, tier A, vLLM server', async () => {
-  const { deps, steps } = depsFor({ stream: fakeEndpoint() });
+  const { deps, steps, read, get } = depsFor({ stream: fakeEndpoint() });
   const auto = await probes.runAutoProbes(targetFor(piModel()), deps);
   assert.deepEqual(auto.server, { kind: 'vllm', version: '0.10.1' });
   assert.equal(auto.reported, 65536);
+  // 第 0 步只经读取器（model-discovery.md §7.1），带这组探针自己的 signal；结果总带 meta（§7.2）
+  assert.deepEqual(read.signals, [deps.signal]);
+  assert.deepEqual(get.urls, [], 'step 0 sends no GET of its own');
+  assert.deepEqual(auto.meta, { maxTokens: null, reasoning: null, image: null });
   const outcomes = Object.fromEntries(Object.entries(auto.steps).map(([name, result]) => [name, result.outcome]));
   assert.deepEqual(outcomes, { ready: 'pass', thinking: 'not_applicable', call: 'pass', result: 'pass',
     replay: 'not_applicable', a: 'pass', b: 'pass', c: 'not_run' });
@@ -634,42 +651,6 @@ test('MP-10 payload helpers leave other fields alone and keep existing text opti
   assert.deepEqual(anthropic.tools.map((tool) => tool.strict), [undefined, true]);
 });
 
-// ---- 第 0 步 ----
-
-test('MP-10 step 0 GETs <baseUrl>/models, /version, /api/version and /props', async () => {
-  const get = stubGet({});
-  const { deps } = depsFor({ stream: scripted({}), get });
-  const info = await probes.detectServer(deps, 'http://10.0.0.5:8000/v1/', 'qwen');
-  assert.deepEqual(info, { kind: 'unknown', version: null, reported: null });
-  assert.deepEqual(get.urls.sort(), ['http://10.0.0.5:8000/api/version', 'http://10.0.0.5:8000/props',
-    'http://10.0.0.5:8000/v1/models', 'http://10.0.0.5:8000/version']);
-});
-
-test('MP-10 step 0 server kinds: vLLM, SGLang, Ollama, llama.cpp, unknown; reported window', () => {
-  const models = (ownedBy, extra = {}) => ({ data: [{ id: 'q', owned_by: ownedBy, ...extra }] });
-  const judge = (bodies) => probes.judgeServer({ models: null, version: null, apiVersion: null, props: null,
-    ...bodies }, 'q');
-  assert.deepEqual(judge({ models: models('vllm', { max_model_len: 32768 }), version: { version: '0.10.1' } }),
-    { kind: 'vllm', version: '0.10.1', reported: 32768 });
-  assert.deepEqual(judge({ models: models('sglang'), version: { version: '0.4.9' } }),
-    { kind: 'sglang', version: '0.4.9', reported: null });
-  assert.deepEqual(judge({ apiVersion: { version: '0.9.0' } }), { kind: 'ollama', version: '0.9.0', reported: null });
-  assert.deepEqual(judge({ props: { default_generation_settings: { n_ctx: 8192 }, build_info: 'b5000-abc' } }),
-    { kind: 'llamacpp', version: 'b5000-abc', reported: 8192 });
-  assert.deepEqual(judge({ props: { n_ctx: 4096 } }), { kind: 'llamacpp', version: null, reported: 4096 });
-  assert.deepEqual(judge({ models: { data: [{ id: 'other', max_model_len: 1 }] } }),
-    { kind: 'unknown', version: null, reported: null });
-  assert.deepEqual(judge({ version: { version: '' } }), { kind: 'unknown', version: null, reported: null });
-});
-
-test('MP-12 a server without a version gives profile version unknown', async () => {
-  const get = stubGet({ '/v1/models': VLLM['/v1/models'] });
-  const { deps } = depsFor({ stream: scripted({}), get });
-  const auto = await probes.runAutoProbes(targetFor(piModel()), deps);
-  assert.deepEqual(auto.server, { kind: 'unknown', version: 'unknown' });
-  assert.equal(auto.reported, 65536);
-});
-
 // ---- 取消：同一个模型同时只跑一组 ----
 
 test('MP-10 a new probe set for the same model cancels the old one', async () => {
@@ -697,6 +678,23 @@ test('MP-10 a cancelled probe set stops sending and returns null', async () => {
   const { deps } = depsFor({ stream, signal: controller.signal });
   assert.equal(await probes.runAutoProbes(targetFor(piModel()), deps), null);
   assert.ok(!stream.calls.some(({ context }) => lastUserText(context) === P.temperature));
+});
+
+test('MP-10 a probe set cancelled during step 0 returns null and sends no request of steps 1-7', async () => {
+  const controller = new AbortController();
+  const stream = scripted({});
+  // 读取器只随这组探针的 signal 停止（model-discovery.md §5.3）：取消时以 signal.reason 拒绝
+  const asked = [];
+  const readServer = (signal) => new Promise((_resolve, reject) => {
+    asked.push(signal);
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  });
+  const { deps } = depsFor({ stream, signal: controller.signal, read: { readServer } });
+  const pending = probes.runAutoProbes(targetFor(piModel()), deps);
+  assert.deepEqual(asked, [controller.signal], 'step 0 is reading when the probe set is cancelled');
+  controller.abort();
+  assert.equal(await pending, null);
+  assert.equal(stream.calls.length, 0);
 });
 
 // ---- 第 8 步：长输入（需要同意） ----

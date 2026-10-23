@@ -1,0 +1,26 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.31:30000/v1/models",
+ "note": "SGLang /v1/models of an embedding server (pairs with sglang-model-info-embedding.json)",
+ "basis": [
+  "https://github.com/sgl-project/sglang/blob/main/python/sglang/srt/entrypoints/openai/protocol.py (ModelCard: owned_by \"sglang\", root, parent, max_model_len)",
+  "https://github.com/sgl-project/sglang/blob/main/python/sglang/srt/entrypoints/http_server.py (available_models: base card max_model_len = context_len; LoRA cards parent = served model, max_model_len None)"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "BAAI/bge-m3",
+    "object": "model",
+    "created": 1792740200,
+    "owned_by": "sglang",
+    "root": "BAAI/bge-m3",
+    "parent": null,
+    "max_model_len": 8192
+   }
+  ]
+ }
+}

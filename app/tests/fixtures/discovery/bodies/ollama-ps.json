@@ -1,0 +1,34 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.14:11434/api/ps",
+ "note": "Ollama /api/ps: only qwen3:8b is loaded, with its current context_length",
+ "basis": [
+  "https://github.com/ollama/ollama/blob/main/api/types.go (ProcessResponse.models[]: name, model, size, digest, details, expires_at, size_vram, context_length)"
+ ],
+ "status": 200,
+ "body": {
+  "models": [
+   {
+    "name": "qwen3:8b",
+    "model": "qwen3:8b",
+    "size": 6654289920,
+    "digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+    "details": {
+     "parent_model": "",
+     "format": "gguf",
+     "family": "qwen3",
+     "families": [
+      "qwen3"
+     ],
+     "parameter_size": "8.2B",
+     "quantization_level": "Q4_K_M"
+    },
+    "expires_at": "2026-10-23T17:04:12.345+08:00",
+    "size_vram": 6654289920,
+    "context_length": 8192
+   }
+  ]
+ }
+}

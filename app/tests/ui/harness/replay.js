@@ -31,6 +31,13 @@
 // 在参数相同、录在当前这一段结束之前的结果里，取回放时刻当时或之后录下的第一个（同 session.state），没有时取其中最后
 // 一个；都没有时合成空结果（synthetic，keyedEmpty）。会话信息缺的 memoryNotice 按 null 补上；agents.get 的旧录制缺的
 // userTokens、total 按录下的内容补上（withAgentTokens，synthetic）。
+// 一键拉取模型（docs/specs/model-discovery.md §13.4）：models.discover 也是只读查询，按参数配对（KEYED，同记忆的查询）：
+// 新提供商按（kind, 去掉首尾空白的 baseUrl, api），已有提供商按（kind, providerId）；keySecret 不参与配对（录制里从不带
+// key，回放时你填的 key 不影响用哪一次录下的结果）；没录过时合成一个命令失败的结果（synthetic，discoverMissing）。
+// models.addModels 照其他 models.* 写命令应答（v1ModelWrite，status.modelWrites 记下）；models.discoverCancel 应答
+// { error: null }，记在 status.discoverCancels，不算写命令。models.get、models.reload 录制里有时先用录制的：在界面所在
+// 这一段（及之前）录下的结果里，取"录制里它之前的 models.* 写命令条数"不超过界面已发的写命令条数（status.modelWrites）
+// 的最后一个（modelsResult）；录制里没有写命令时就是原来的这一段最后一个结果，都没有时才按 fixture.model 合成。
 // m6-replay.mjs 从这里读只读查询的列表（QUERIES）；tb-replay.mjs、v1-models-replay.mjs 按文字读那一行。
 
 /** 截图返回的 1×1 PNG */
@@ -111,13 +118,34 @@ function withAgentTokens(value) {
   return { ...value, loaded, userTokens, total: userTokens };
 }
 
-/** 按参数配对的只读查询（§8）：命令类型 → 配对的键（参数的列表） */
+/**
+ * @brief models.discover 配对的键（model-discovery.md §5.1、§13.4）：新提供商为（kind, 去掉首尾空白的 baseUrl, api），
+ *        已有提供商为（kind, providerId）；keySecret 不参与配对。
+ */
+function discoverKey(command) {
+  const { target } = command;
+  return target?.kind === 'provider' ? ['provider', target.providerId]
+    : ['new', String(target?.baseUrl ?? '').trim(), target?.api ?? null];
+}
+
+/** 按参数配对的只读查询（§8；models.discover 见 discoverKey）：命令类型 → 配对的键（参数的列表） */
 const KEYED = {
   'memory.list': (command) => [command.cwd ?? null, command.layer, command.kind],
   'memory.get': (command) => [command.cwd ?? null, command.layer, command.id],
   'memory.revisions': (command) => [command.cwd ?? null, command.layer, command.id ?? null],
   'enhance.get': (command) => [command.cwd ?? null],
+  'models.discover': discoverKey,
 };
+
+/**
+ * @brief synthetic：录制里没有这个地址（或提供商）的 models.discover 时的结果：命令本身失败（DiscoverResult 的 error，
+ *        model-discovery.md §5.2），其余为空。测试不该用到。
+ */
+function discoverMissing(command) {
+  return { error: `Synthetic: no recorded models.discover for ${JSON.stringify(discoverKey(command))}`,
+    cancelled: false, server: null, api: 'openai-completions', baseUrl: '', name: '', anthropicShape: false,
+    listError: null, models: [], truncated: false, notListed: [] };
+}
 
 /** @brief synthetic：关着、没有运行过的增强（后台进程对没有 enhance.json 的项目的 enhance.get 结果）。 */
 function enhanceOff(cwd) {
@@ -135,6 +163,7 @@ function keyedEmpty(command) {
     case 'memory.revisions':
       return command.id === undefined || command.id === null ? { revisions: [], error: null }
         : { revision: null, error: null };
+    case 'models.discover': return discoverMissing(command);
     default: return enhanceOff(command.cwd);
   }
 }
@@ -208,8 +237,9 @@ function v1Config(value) {
 }
 
 /**
- * @brief synthetic：models.* 的写命令照 connection.save 的方式应答（不占回放顺序，结果没有错误）。models.addKey 与
- *        models.removeKey 改合成的 keys，之后的 models.get 读到改过的样子；其余写命令只记下。
+ * @brief synthetic：models.* 的写命令照 connection.save 的方式应答（不占回放顺序，结果没有错误；含一键拉取模型的
+ *        models.addModels，model-discovery.md §13.4）。models.addKey 与 models.removeKey 改合成的 keys，之后的
+ *        models.get 读到改过的样子；其余写命令只记下。
  */
 function v1ModelWrite(command, state) {
   state.writes.push(command);
@@ -287,10 +317,22 @@ function fileReader(steps) {
 /** 不占回放顺序的只读查询（m6-replay.mjs 也从这里读；tb-replay.mjs、v1-models-replay.mjs 按文字读这一行） */
 export const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
   'agents.get', 'session.commands', 'models.get', 'session.pickOptions', 'board.get', 'memory.list', 'memory.get',
-  'memory.revisions', 'enhance.get'];
+  'memory.revisions', 'enhance.get', 'models.discover'];
 
-/** @brief models.* 的写命令：回放桥直接应答（v1ModelWrite），不占回放顺序。 */
+/** @brief models.* 的写命令：回放桥直接应答（v1ModelWrite；models.discoverCancel 另记），不占回放顺序。 */
 const answeredWrite = (type) => type.startsWith('models.') && !QUERIES.includes(type);
+
+/** 回放桥照 connection.save 的方式应答的 models.* 写命令（v1ModelWrite；含一键拉取模型的 models.addModels） */
+const MODEL_WRITES = new Set(['models.firstRun', 'models.saveProvider', 'models.deleteProvider', 'models.saveModel',
+  'models.addModels', 'models.deleteModel', 'models.moveModel', 'models.addKey', 'models.removeKey', 'models.moveKey',
+  'models.saveGroup', 'models.deleteGroup', 'models.setDefaults', 'models.setProjectZones', 'models.confirmZone',
+  'models.dismissMigration', 'models.verify']);
+
+/**
+ * @brief 改配置的 models.* 写命令（界面经 writeModels 发出、之后重新 models.get 的那些）：models.get 按它们在录制里的
+ *        条数配给界面（modelsResult）。models.reload 是读取，models.discoverCancel 不写配置，都不算。
+ */
+const configWrite = (type) => answeredWrite(type) && type !== 'models.reload' && type !== 'models.discoverCancel';
 
 /** @brief 录制里由界面主动发出的命令（只读查询与直接应答的 models.* 写命令除外）的下标。 */
 function boundaries(steps) {
@@ -509,7 +551,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
   const status = { cursor: 0, played: 0, clock: 0, exited: false, exitCode: null, errors: [], commands: [], queries: [],
     playing: Promise.resolve(), idle: true, attention: 0, captures: 0, dialogAtCapture: [], issues: [], shown: [],
     deleted: [], reads: [], opened: [], copied: [], feedback: [], failed: [], issueLists: 0, issueShots: [],
-    exports: [], exportShown: [], recordShown: [], folders: 0, modelWrites: [] };
+    exports: [], exportShown: [], recordShown: [], folders: 0, modelWrites: [], discoverCancels: 0 };
   const { f8, feedback, stubs } = desktopStubs(status, steps);
   const created = steps.find((step) => step.result?.type === 'session.create')?.result.value;
   // synthetic：v1 的设置页（models.get）读到的 key 与项目；models.addKey / removeKey 的应答改它（v1ModelWrite）
@@ -566,6 +608,26 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
   function latestResult(type, fallback) {
     const end = marks[status.cursor] ?? steps.length;
     const found = steps.slice(0, end).filter((step) => step.result?.type === type && !step.result.error);
+    return structuredClone(found.at(-1)?.result.value ?? fallback);
+  }
+
+  /** 每一步之前录制里改配置的 models.* 写命令条数（configWrite；modelsResult 用） */
+  const writesBefore = [];
+  steps.reduce((count, step, index) => {
+    writesBefore[index] = count;
+    return count + (step.command && configWrite(step.command.type) ? 1 : 0);
+  }, 0);
+
+  /**
+   * @brief 回答 models.get、models.reload（model-discovery.md §13.4：录制里有时先用录制的）：界面所在这一段（及之前）
+   *        录下的成功结果里，录制里它之前的写命令条数不超过界面已发的写命令条数的最后一个；没有时用 fallback。
+   *        录制里没有写命令时与 latestResult 相同。
+   */
+  function modelsResult(type, fallback) {
+    const end = marks[status.cursor] ?? steps.length;
+    const sent = status.modelWrites.filter((command) => configWrite(command.type)).length;
+    const found = steps.slice(0, end).filter((step, index) => step.result?.type === type && !step.result.error
+      && writesBefore[index] <= sent);
     return structuredClone(found.at(-1)?.result.value ?? fallback);
   }
 
@@ -668,16 +730,36 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     });
   }
 
+  /**
+   * @brief 回放桥直接回答的 models.* 命令（不占回放顺序）：读取（models.get、models.reload 按 modelsResult）、
+   *        拉取（models.discover 按参数配对，model-discovery.md §13.4）、取消拉取与写命令（v1ModelWrite）；
+   *        别的命令为 null。
+   */
+  function modelsAnswer(command) {
+    switch (command.type) {
+      case 'models.get':
+      case 'models.reload':
+        status.queries.push(command);
+        return Promise.resolve(modelsResult(command.type, v1ModelsInfo(fixture,
+          created?.contextUsage?.contextWindow ?? 128000, models)));
+      case 'models.discover':
+        status.queries.push(command);
+        return keyedResult(command);
+      case 'models.discoverCancel':
+        status.discoverCancels += 1;
+        return Promise.resolve({ error: null });
+      default:
+        return MODEL_WRITES.has(command.type) ? Promise.resolve(v1ModelWrite(command, models)) : null;
+    }
+  }
+
   const bridge = {
     request(command) {
       if (status.exited) return Promise.reject(crashed(status.exitCode));
+      const answered = modelsAnswer(command);
+      if (answered) return answered;
       switch (command.type) {
         case 'config.get': return Promise.resolve(v1Config(latestResult('config.get', m6Config(fixture, saved))));
-        case 'models.get':
-        case 'models.reload':
-          status.queries.push(command);
-          return Promise.resolve(latestResult(command.type, v1ModelsInfo(fixture,
-            created?.contextUsage?.contextWindow ?? 128000, models)));
         case 'session.pickOptions':
           status.queries.push(command);
           return Promise.resolve(latestResult(command.type, v1PickOptions(fixture)));
@@ -696,11 +778,6 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
           status.queries.push(command);
           return keyedResult(command);
         case 'connection.save': return Promise.resolve({ error: null });
-        case 'models.firstRun': case 'models.saveProvider': case 'models.deleteProvider': case 'models.saveModel':
-        case 'models.deleteModel': case 'models.moveModel': case 'models.addKey': case 'models.removeKey':
-        case 'models.moveKey': case 'models.saveGroup': case 'models.deleteGroup': case 'models.setDefaults':
-        case 'models.setProjectZones': case 'models.confirmZone': case 'models.dismissMigration': case 'models.verify':
-          return Promise.resolve(v1ModelWrite(command, models));
         case 'connection.testCancel': return Promise.resolve({ cancelled: false });
         case 'connection.test':
           return Promise.resolve({ ok: true, cancelled: false, firstTokenMs: 1, totalMs: 2, text: 'ok', thinking: false,

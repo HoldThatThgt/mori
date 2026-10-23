@@ -1,0 +1,33 @@
+{
+ "source": "synthetic",
+ "synthetic": true,
+ "recorded": "2026-10-23",
+ "url": "http://192.0.2.21:8080/v1/models",
+ "note": "LocalAI /v1/models: rows are only {id, object}; \"my model.gguf\" is a loose file without a config",
+ "basis": [
+  "https://github.com/mudler/LocalAI/blob/master/core/http/endpoints/openai/list.go (ListModelsEndpoint: OpenAIModel {id, object: \"model\"})",
+  "https://github.com/mudler/LocalAI/blob/master/core/schema/openai.go (OpenAIModel)"
+ ],
+ "status": 200,
+ "body": {
+  "object": "list",
+  "data": [
+   {
+    "id": "qwen3-8b",
+    "object": "model"
+   },
+   {
+    "id": "llava-1.6-mistral",
+    "object": "model"
+   },
+   {
+    "id": "text-embedding-ada-002",
+    "object": "model"
+   },
+   {
+    "id": "my model.gguf",
+    "object": "model"
+   }
+  ]
+ }
+}

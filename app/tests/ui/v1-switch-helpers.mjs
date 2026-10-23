@@ -27,6 +27,7 @@ export const STOPPED_TEXT = 'Stopped · Changes made so far stay as they are';
 
 /**
  * @brief 启动一个合成端点进程，等它打出 synthetic 启动行；每个对话请求的 JSON 日志行（带收到的时刻 t）放进 sink。
+ *        列表请求与详情请求的 JSON 行（带 path，model-discovery.md §13.1、server.mjs 开头"日志"）不是对话请求，不放进去。
  * @param port 端口
  * @param env 额外的环境变量（FAKE_KEYS、FAKE_LIMITED_KEYS 等）
  * @param sink 日志行数组
@@ -44,7 +45,8 @@ export function startEndpoint(port, env, sink) {
     for (const line of lines) {
       if (!line.startsWith('{')) continue;
       try {
-        sink.push({ t: Date.now(), ...JSON.parse(line) });
+        const entry = JSON.parse(line);
+        if (!('path' in entry)) sink.push({ t: Date.now(), ...entry });
       } catch {
         // 不是日志行
       }

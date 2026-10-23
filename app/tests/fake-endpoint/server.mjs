@@ -1,7 +1,8 @@
 // 合成测试端点（synthetic）：只用于本地验证管线，不是真实模型。
-// 实现 OpenAI 兼容的 /v1/models 与流式 /v1/chat/completions，另有 /version、/metrics（docs/specs/model-providers.md §14.1）。
+// 实现 OpenAI 兼容的 /v1/models 与流式 /v1/chat/completions，另有 /version、/metrics（docs/specs/model-providers.md §14.1），
+// 以及一键拉取模型要的各种列表形状与详情接口（docs/specs/model-discovery.md §13.1，见下面的“发现”）。
 // 多个提供商 = 多个端口（各起一个进程）。关键词回复在 replies.mjs，探针在 probes.mjs，脚本模式在 scripts.mjs，
-// 增强脚本在 enhance.mjs。
+// 增强脚本在 enhance.mjs，列表与详情的形状在 discovery.mjs。
 //
 // 判断顺序：认证与 -replay 的拒绝 → 探针 → -404、-hang、-stall → pi 的压缩请求 → 脚本模式 → 增强脚本 → 关键词。
 // 增强脚本（docs/specs/memory.md §14.1，规则逐条列在 enhance.mjs 开头）：请求里没有 tb-scenario、最后一条用户消息是
@@ -60,7 +61,7 @@
 //   - 第 8 步（本端点的约定，规格没有给原文）：用户消息含 "What is the passphrase?"：复述其中 "The passphrase is <暗号>"
 //     的暗号。
 //   - 第 9 步（本端点的约定，规格没有给原文）：用户消息以 "Count from 1 to <N>" 开头：逐行数到 N（最多 400），是长输出。
-//   - 开了思考（请求带 reasoning_effort 且不是 none）时先返回一段 reasoning_content，没开时没有思考。
+//   - 开了思考（请求带 reasoning_effort 且不是 none）时先返回一段 reasoning_content，没开时没有思考（-alwaysthink 除外）。
 // 模型 ID 的后缀（以 "-" 分开的段，可以叠加，例如 fake-coder-stall-nocancel）：
 //   - 只关掉对应的探针能力：-notools（第 3 步不调工具）、-nochoice（第 5 步忽略指定调用，只回文字）、
 //     -noschema（第 6 步忽略 schema）、-truncate（第 8 步估算输入超过 max_model_len 的 70% 时静默丢掉开头，答不出暗号）、
@@ -68,29 +69,90 @@
 //     或那个调用是本端点开着思考时发出的，就返回 400，探针第 4 步"不带"推理内容时因此被拒；对所有请求都生效）。
 //   - 只作用于不是探针的请求：-404（返回 404）、-hang（不回响应头，等对方断开）、-stall（回了响应头后不发内容）。
 //   - -nocancel：对方中途断开后，/metrics 的进行中计数 10 秒后才回落（对所有请求都生效，探针第 9 步靠它判出 false）。
+//   - -alwaysthink：不论请求带不带思考参数，每个回复（探针、对话、压缩请求）都先回一段 reasoning_content，像总在思考的
+//     模型；回复本来就有思考（think first、thinking check）时不变。探针因此给没勾 Supports thinking 的模型记下推理字段
+//     reasoning_content（model-discovery.md §8 的 "This model returned thinking content."）。
 //
-// 认证（只对 /models 与 /chat/completions）：
-//   - FAKE_REQUIRE_KEY：设置后要求 Authorization: Bearer <该值>，否则 401。
+// 认证（只对列表请求与 /chat/completions；列表以外的发现请求不查 key。下面的“key”是 Authorization: Bearer 的值，
+// 列表请求没有 Bearer 时取 x-api-key）：
+//   - FAKE_REQUIRE_KEY：设置后要求 key 为该值，否则 401。
 //   - FAKE_KEYS：逗号分隔的可接受 key（没设时不检查），不在其中为 401。
 //   - FAKE_QUOTA_KEYS：其中的 key 的对话请求返回 402，type 与 code 为 insufficient_quota。
 //   - FAKE_LIMITED_KEYS：其中的 key 的对话请求返回 429 带 Retry-After（秒）；从这个 key 第一次被限流起 FAKE_LIMIT_MS
 //     之后恢复，Retry-After 为剩下的秒数；没设 FAKE_LIMIT_MS 时一直限流，Retry-After 为 60。
 //   - 上面两个列表里写 "none" 表示不带 key 的请求（没有 key 的提供商）。
 // 其他接口：
-//   - GET /version：{"version": FAKE_SERVER_VERSION}（vLLM 的形状，默认 "0.10.1"）；/api/version、/props 为 404。
-//   - GET /models：FAKE_MODELS（逗号分隔，默认 "fake-coder,fake-slow"）各一项，带 max_model_len = FAKE_MAX_MODEL_LEN
-//     （默认 131072）。
-//   - GET /metrics：Prometheus 文本，vllm:num_requests_running 为进行中的对话请求数；FAKE_NO_METRICS=1 时 404。
-// 日志：每个请求一行 "[fake-endpoint] METHOD url"；每个对话请求另打一行 JSON
+//   - GET /version：每种列表形状都回答 {"version": FAKE_SERVER_VERSION}（vLLM 的形状，默认 "0.10.1"）；
+//     /api/version 只在 ollama 形状、/props 只在 llamacpp 形状回答，其他形状为 404。
+//   - GET /metrics：Prometheus 文本，vllm:num_requests_running 为进行中的对话请求数（各形状一样）；FAKE_NO_METRICS=1 时 404。
+//   - 没有的接口（/info、/v2/models/<id>/config、POST /v1/messages 等）为 404，没有正文。
+//
+// 发现（docs/specs/model-discovery.md §13.1；形状在 discovery.mjs，字段名的依据是规格 §3.3、§4.1、§4.2，数值都是手写的）：
+//   - 列表请求 = GET 路径以 /models 结尾（query 不看，/glm/v1/models 这种前缀照样算）；/api/v1/models 除外：那是 LM Studio
+//     的原生接口（§3.3 第 6 步），本端点为 404。顺序：先等 FAKE_LIST_DELAY_MS 毫秒（默认 0；对方中途断开就不再回答，
+//     测取消与 15 秒时限）→ 这个形状没有这个列表接口时 404 → 按上面的认证查 key，不认识为 401（测 rejected）→ 回列表。
+//   - FAKE_MODELS（逗号分隔，默认 "fake-coder,fake-slow"）决定列表里的 id 与顺序；下面的“第一个”“第二个”按这个顺序；
+//     W = FAKE_MAX_MODEL_LEN（默认 131072）；“W/4”等都向下取整。列表体为 {"object":"list","data":[行…]}（另注的除外）。
+//   - FAKE_NO_V1_ROOT=1：只有以 /v1/models 结尾的路径回答列表，/models 为 404（测补 /v1：填 http://127.0.0.1:<端口>
+//     时 ① /models 404、② /v1/models 成功，建议的 Base URL 为 …/v1）。
+//   - FAKE_LIST_SHAPE（默认 vllm；不认识的值启动时报错，退出码 1）。每种后面是读取器（kernel/discoverRead.ts、
+//     modelDiscover.ts）应读出的种类与值；没写的 reasoning、image、family、chat 都是没报告（null），没有提示：
+//     vllm：行 {id, object:"model", owned_by:"vllm", max_model_len:W}（原来的 owned_by 是 "fake"，只改了这一处）。
+//       种类 vllm（§3.3 第 3 步），版本读 /version，档案键照旧（vllm|0.10.1）；窗口 W，输出上限为默认值。
+//     sglang：行 {id, object, created, owned_by:"sglang", root:id, parent:null, max_model_len:W}；GET /model_info
+//       {is_generation:true, has_image_understanding:false, reasoning_parser:"qwen3", tool_call_parser:"qwen25", …}。
+//       种类 sglang，版本读 /version；窗口 W；思考为真；图片明确没有（false）；没有 no_tools。
+//     ollama：/v1/models 的行 {id, object, created, owned_by:"library"}（没有窗口）；GET /api/version {version:
+//       FAKE_SERVER_VERSION}；GET /api/tags（每个模型 name、details.family "llama"，没有 capabilities）；GET /api/ps
+//       （只有第一个模型，context_length 8192）；POST /api/show {"model":<id>}（parameters：第二个有 num_ctx 16384；
+//       model_info 的 llama.context_length 为 W；capabilities：第一个 completion、tools、thinking，第二个只有
+//       completion，其余 completion、tools；不认识的模型 404）。种类 ollama（第 6 步），版本读 /api/version；
+//       第一个窗口 8192、思考为真；第二个窗口 16384、思考明确没有、no_tools；其余窗口 W 带 trained_window
+//       （探针第 0 步的 reported 窗口为 null，§7.2）、思考明确没有；图片都明确没有；family 都是 llama；chat 都为真。
+//     llamacpp：行 {id, object, created, owned_by:"llamacpp", meta:{n_ctx_train:2W, n_ctx:W}}；GET /props
+//       {default_generation_settings:{n_ctx:W}, modalities:{vision:false}, build_info:FAKE_SERVER_VERSION, …}。
+//       种类 llamacpp，版本为 build_info（/props 只请求一次）；窗口 W（取 n_ctx，不取 n_ctx_train）；图片明确没有。
+//     localai：行只有 {id, object}；GET /.well-known/localai.json {name:"LocalAI", version}；GET <base>/models/capabilities
+//       （任何以 /models/capabilities 结尾的路径）{data:[{id, capabilities:["chat","completion","tools"],
+//       input_modalities:["text"], output_modalities:["text"], context_size:W}]}；也回答 /version。
+//       种类 localai（第 6 步，不再凭 /version 认作 vLLM），版本 null；窗口 W；思考、图片明确没有；chat 为真。
+//     tensorrt：行 {id, object, created, owned_by:"tensorrt_llm"}（没有窗口）；也回答 /version。
+//       种类 tensorrt，版本 null；窗口与输出上限都是默认值。
+//     litellm：行 {id, object, created:1677610602, owned_by:"openai", mode:"chat", max_input_tokens:W,
+//       max_output_tokens, supports_reasoning:false, supports_function_calling:false}；第二行的 max_output_tokens 等于 W，
+//       其余为 W/16。种类 litellm（第 4 步），版本 null；窗口 W；第二行的输出上限不算报告（默认值），其余为 W/16；
+//       chat 为真；LiteLLM 的 false 按没报告（思考没报告、没有 no_tools，§4.1）。
+//     newapi：响应头 X-New-Api-Version: v0.9.0，体 {success:true, object:"list", data}；行 {id, object,
+//       created:1626777600, owned_by:"custom", supported_endpoint_types:["openai","anthropic"]}。
+//       种类 newapi（第 1 步），版本 null；chat 为真；api 仍按地址（§3.4）。
+//     anthropic：只有以 /v1/models 结尾的路径有列表（/models 为 404），要求 anthropic-version 请求头（没有时 400，
+//       {type:"error", error:{type:"invalid_request_error", …}}；key 不对时 401 为 authentication_error）；体
+//       {data, has_more:false, first_id, last_id}（一页给出全部），行 {type:"model", id, display_name, created_at,
+//       max_input_tokens:W, max_tokens:W/4, capabilities:{image_input:{supported:true}, thinking:{supported:true}}}。
+//       地址带 anthropic 段（例如 http://127.0.0.1:<端口>/anthropic）时：种类 unknown、anthropicShape 为真
+//       （Anthropic-compatible server），api 为 anthropic-messages；窗口 W；输出上限 W/4；思考、图片为真。
+//       没有 Anthropic 提示时请求不带 anthropic-version，列表为 400 → invalid。
+//     rich：DeepSeek 式的行 {id, object, owned_by:"deepseek", context_window:W, max_output_tokens:W/16,
+//       input_modalities}；第一行 input_modalities 为 ["text","image"] 并带 effort 对象，其余为 ["text"]、没有 effort。
+//       种类 unknown；窗口 W；输出上限 W/16；第一行思考、图片为真；其余思考没报告、图片明确没有。
+//     typed：行 {id, object, type}：第二行 type 为 "embedding"，其余为 "llm"。种类 unknown；第二行 chat 为假，其余为真。
+//     nolist：所有列表请求都是 404（listError 为 no_list）。
+//   - 列表以外的发现请求（版本 /version、/api/version、/props，§3.3 第 6 步，§4.2 的详情）不查 key，也不等
+//     FAKE_LIST_DELAY_MS。
+// 日志：每个请求一行 "[fake-endpoint] METHOD url"；列表请求与列表以外的发现请求（除 /metrics 以外的 GET，以及
+//   POST /api/show；不论回答什么）各打一行 JSON {"port","path"(不含 query),"key"(Authorization: Bearer 的 key，没有时
+//   x-api-key，末 4 位；没有为 null)}，在等 FAKE_LIST_DELAY_MS 之前打；对话请求的 JSON 行没有 path 字段，以此区分。
+//   每个对话请求另打一行 JSON
 //   {"port","model","key"(key 末 4 位，没有为 null),"roles"(消息角色序列),"status"(-hang 为 null),"probe"}，
 //   后面接着 scripts.mjs 的 logFields（agent、kind、task、scenario、k、j、tools、toolChoice、format、calls；
 //   不是脚本模式时 scenario 为 null，其余照样算）、"enhance"（enhance.mjs 认出的增强会话的种类 taste、strategy、
 //   review，不是增强会话时为 null），最后是 "strictTools"（function.strict 为 true 的工具名）与
 //   "reasoning"（请求是否带思考参数：reasoning_effort、reasoning、thinking、enable_thinking 之一），
 //   平行 Agent 规格 §7.5 的 A 级只给交接的工具加 strict、关闭思考由它们检查。
+//   启动时一行 "[fake-endpoint] synthetic endpoint on http://127.0.0.1:<端口>/v1 (model "fake-coder", list shape "<形状>")"。
 // 工具调用 id："call_fake_<端口>_<进程启动时刻>_<进程内计数>"，并行的请求之间、端点重启前后都不重复。
 // 其他环境变量：FAKE_PORT（默认 4319）、FAKE_CHUNK_DELAY_MS（默认 20）、FAKE_FIRST_DELAY_MS（默认 0）、
-//   FAKE_ENHANCE_SCRIPT（增强脚本文件，见 enhance.mjs）。
+//   FAKE_ENHANCE_SCRIPT（增强脚本文件，见 enhance.mjs）；发现用的 FAKE_LIST_SHAPE、FAKE_NO_V1_ROOT、FAKE_LIST_DELAY_MS 见上。
 
 import http from 'node:http';
 import { createHash } from 'node:crypto';
@@ -98,6 +160,7 @@ import { contentText, isSummaryRequest, planReply, summaryReply } from './replie
 import { probeReply, probeStep, replayRejected, thinkingOn } from './probes.mjs';
 import { logFields, scriptReply, sessionOf, withoutWorkCards } from './scripts.mjs';
 import { enhanceKindOf, enhanceReply } from './enhance.mjs';
+import { LIST_SHAPES, detailAnswer, isListPath, listAnswer, listServed } from './discovery.mjs';
 
 const env = process.env;
 const port = Number(env.FAKE_PORT ?? 4319);
@@ -119,7 +182,18 @@ const config = {
   noMetrics: env.FAKE_NO_METRICS === '1',
   maxModelLen: Number(env.FAKE_MAX_MODEL_LEN ?? 131072),
   models: listOf(env.FAKE_MODELS ?? 'fake-coder,fake-slow'),
+  /** 列表与详情的形状（discovery.mjs） */
+  shape: env.FAKE_LIST_SHAPE || 'vllm',
+  /** 只在以 /v1/models 结尾的路径回答列表 */
+  noV1Root: env.FAKE_NO_V1_ROOT === '1',
+  /** 列表请求等这么久再回 */
+  listDelayMs: Number(env.FAKE_LIST_DELAY_MS ?? 0),
 };
+
+if (!LIST_SHAPES.includes(config.shape)) {
+  console.error(`[fake-endpoint] unknown FAKE_LIST_SHAPE "${config.shape}"; expected one of ${LIST_SHAPES.join(', ')}`);
+  process.exit(1);
+}
 
 /** 运行中的状态 */
 const state = {
@@ -139,13 +213,15 @@ const state = {
 /** 工具调用 id 的前缀：端口与进程启动时刻，端点重启或多个端点之间也不重复 */
 const callIdPrefix = `call_fake_${port}_${Date.now().toString(36)}`;
 
-const SUFFIXES = new Set(['notools', 'nochoice', 'noschema', 'replay', 'truncate', '404', 'hang', 'stall', 'nocancel']);
+const SUFFIXES = new Set(['notools', 'nochoice', 'noschema', 'replay', 'truncate', '404', 'hang', 'stall', 'nocancel',
+  'alwaysthink']);
 const NO_KEY = 'none';
 const NOCANCEL_MS = 10000;
 const SLOW_MS = 8000;
 const UNLIMITED_RETRY_AFTER_S = 60;
 const OVERFLOW_MESSAGE = "This model's maximum context length is 1000 tokens";
 const REPLAY_THINKING = 'Synthetic reasoning before answering.';
+const ALWAYS_THINKING = 'Synthetic reasoning from a model that always thinks.';
 const REPLAY_MESSAGE = 'The reasoning_content in the thinking mode must be passed back to the API.';
 const MORI_NOTE = '[Mori] The previous model';
 const COMPACTED = 'The conversation history before this point was compacted';
@@ -414,6 +490,8 @@ async function handleChat(req, res) {
     : conversationPlan(body, flags, info);
   if (plan.failure) return fail(plan.failure);
   const { reply } = plan;
+  // -alwaysthink：不论请求带不带思考参数都先回一段思考（探针、对话、压缩请求都一样），已有思考的回复不变
+  if (flags.has('alwaysthink') && !reply.thinking) reply.thinking = ALWAYS_THINKING;
   const lastText = plan.lastText ?? '';
   assignCallIds(reply, flags);
   const slow = body.model === 'fake-slow' || /\bslow\b/.test(lastText);
@@ -440,27 +518,57 @@ function metricsText() {
   ].join('\n');
 }
 
-/** @brief GET 接口（/version、/metrics、/models）；处理了返回 true。 */
-function handleGet(req, res, path) {
-  if (path === '/version') {
-    sendJson(res, 200, { version: config.version });
-    return true;
+/** @brief 发现请求的 key：Authorization: Bearer，没有时看 x-api-key（Anthropic 的写法）；都没有为 null。 */
+function discoveryKey(req) {
+  return bearer(req) ?? req.headers['x-api-key'] ?? null;
+}
+
+/** @brief 列表与详情请求一行 JSON 日志：{port, path（不含 query）, key（末 4 位，没有为 null）}。 */
+function logDiscovery(req, path) {
+  const key = discoveryKey(req);
+  console.log(JSON.stringify({ port: req.socket.localPort, path, key: key ? key.slice(-4) : null }));
+}
+
+/** @brief 没有这个接口：404，没有正文。 */
+function notFound(res) {
+  res.writeHead(404);
+  res.end();
+}
+
+/** @brief 列表请求：先等 FAKE_LIST_DELAY_MS（对方断开就不回），再看接口在不在（404）、key（401），然后按形状回答。 */
+async function handleList(req, res, path) {
+  res.on('close', () => { res.fakeClosed = true; });
+  if (config.listDelayMs > 0) await sleep(config.listDelayMs);
+  if (res.fakeClosed) return;
+  if (!listServed(path, config)) {
+    notFound(res);
+    return;
   }
-  if (path === '/metrics' && !config.noMetrics) {
+  const answer = listAnswer(req.headers, config, keyFailure(discoveryKey(req), false));
+  sendJson(res, answer.status, answer.body, answer.headers);
+}
+
+/** @brief 列表以外的发现请求（版本、§3.3 第 6 步、§4.2 的详情）：按形状回答，不查 key；没有这个接口为 404。 */
+async function handleDetail(req, res, path) {
+  const request = req.method === 'POST' ? await readJson(req) : null;
+  const answer = detailAnswer(req.method, path, request, config);
+  if (answer) sendJson(res, answer.status, answer.body);
+  else notFound(res);
+}
+
+/** @brief 一个请求：/metrics、对话、发现请求（GET 与 Ollama 的 POST /api/show，各打一行 JSON 日志）；其他为 404。 */
+async function route(req, res, path) {
+  if (req.method === 'GET' && path === '/metrics') {
+    if (config.noMetrics) return notFound(res);
     res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
     res.end(metricsText());
-    return true;
+    return;
   }
-  if (!path.endsWith('/models')) return false;
-  const failure = keyFailure(bearer(req), false);
-  if (failure) {
-    sendJson(res, failure.status, failure.body);
-    return true;
-  }
-  const data = config.models.map((id) => ({ id, object: 'model', owned_by: 'fake',
-    max_model_len: config.maxModelLen }));
-  sendJson(res, 200, { object: 'list', data });
-  return true;
+  if (req.method === 'POST' && path.endsWith('/chat/completions')) return handleChat(req, res);
+  if (req.method !== 'GET' && !(req.method === 'POST' && path === '/api/show')) return notFound(res);
+  logDiscovery(req, path);
+  if (req.method === 'GET' && isListPath(path)) return handleList(req, res, path);
+  return handleDetail(req, res, path);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -468,13 +576,7 @@ const server = http.createServer(async (req, res) => {
   res.on('error', (error) => console.error('[fake-endpoint] response error', error));
   const path = (req.url ?? '').split('?')[0];
   try {
-    if (req.method === 'GET' && handleGet(req, res, path)) return;
-    if (req.method === 'POST' && path.endsWith('/chat/completions')) {
-      await handleChat(req, res);
-      return;
-    }
-    res.writeHead(404);
-    res.end();
+    await route(req, res, path);
   } catch (error) {
     console.error('[fake-endpoint] error', error);
     if (!res.headersSent) sendJson(res, 400, errorBody(String(error)));
@@ -482,5 +584,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
-  console.log(`[fake-endpoint] synthetic endpoint on http://127.0.0.1:${port}/v1 (model "${modelId}")`);
+  console.log(`[fake-endpoint] synthetic endpoint on http://127.0.0.1:${port}/v1 (model "${modelId}", `
+    + `list shape "${config.shape}")`);
 });

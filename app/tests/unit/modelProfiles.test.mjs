@@ -73,14 +73,23 @@ test('MP-12 a model is probed when it has no profile or its fingerprint changed'
   assert.equal(P.needsProbe(target({ compat: { requiresToolResultName: true } }), profile), true);
 });
 
+/**
+ * 读版本的结果（model-discovery.md §7.3，VersionRead）：默认是读到了 vLLM 0.10.1；拿不到列表时为 NOT_READ。
+ */
+const versionRead = (overrides = {}) => ({ listed: true, kind: 'vllm', version: '0.10.1', versionRead: true,
+  ...overrides });
+const NOT_READ = { listed: false, kind: 'unknown', version: null, versionRead: false };
+
 test('MP-12 version change: a failed read keeps the profile; only a different version counts', () => {
   const profile = stored();
-  assert.equal(P.versionChanged(profile, null), false);
-  assert.equal(P.versionChanged(profile, '0.10.1'), false);
-  assert.equal(P.versionChanged(profile, '0.11.0'), true);
-  assert.equal(P.versionChanged(undefined, '0.11.0'), false);
+  assert.equal(P.versionChanged(profile, NOT_READ), false);
+  assert.equal(P.versionChanged(profile, versionRead({ version: null, versionRead: false })), false,
+    'a failed version request with the same kind keeps the profile');
+  assert.equal(P.versionChanged(profile, versionRead()), false);
+  assert.equal(P.versionChanged(profile, versionRead({ version: '0.11.0' })), true);
+  assert.equal(P.versionChanged(undefined, versionRead({ version: '0.11.0' })), false);
   const unknown = stored(target(), autoResults({ server: { kind: 'unknown', version: 'unknown' } }));
-  assert.equal(P.versionChanged(unknown, '0.10.1'), true);
+  assert.equal(P.versionChanged(unknown, versionRead()), true, 'the kind changed from unknown to vllm');
 });
 
 // ---- 能力三态与等级（§7.2、§7.3、§7.5） ----
