@@ -1,5 +1,5 @@
-// 模型层的时长与次数（docs/specs/model-providers.md §12；docs/specs/parallel-agents-taskboard.md §15，
-// 登记在 docs/v1/defaults.md）。
+// 模型层的时长与次数（docs/specs/model-providers.md §12；docs/specs/parallel-agents-taskboard.md §15；
+// docs/specs/model-discovery.md §11，登记在 docs/v1/defaults.md）。
 // 纯函数以参数接收 ModelTimings，测试可以传入缩短的值。
 
 import { MODEL_LIMITS } from '../shared/models';
@@ -46,6 +46,11 @@ export interface ModelTimings {
   readonly longInputFractions: readonly number[];
   /** 取消探针（第 9 步）断开后等进行中请求数回落的时间（§7.3） */
   readonly cancelProbeWindowMs: number;
+  /**
+   * 发现与读服务信息的每个请求的时限（连接到读完响应体）：models.discover、探针第 0 步、读版本共用
+   * （model-discovery.md §5.3、§7.1、§11）
+   */
+  readonly discoverRequestTimeoutMs: number;
   /** 4xx、5xx 响应体最多读的字节数（§8.4） */
   readonly errorBodyMaxBytes: number;
   /** 注册到 pi 的占位 apiKey，不保密；真正的 key 由模型池写进认证头（§4.4、§8.4） */
@@ -60,7 +65,10 @@ export interface ModelTimings {
   readonly maxKeys: number;
 }
 
-/** @brief §12 的临时默认值；并发与 key 数的上限与 shared/models.ts 的配置校验共用一份。 */
+/**
+ * @brief §12 的临时默认值（发现请求的时限见 model-discovery.md §11）；并发与 key 数的上限与 shared/models.ts 的
+ *        配置校验共用一份。
+ */
 export const MODEL_TIMINGS: ModelTimings = Object.freeze({
   queueTimeoutMs: 60_000,
   reservedSlots: 1,
@@ -79,6 +87,7 @@ export const MODEL_TIMINGS: ModelTimings = Object.freeze({
   tierCRepetitions: 3,
   longInputFractions: Object.freeze([0.5, 0.9]),
   cancelProbeWindowMs: 5_000,
+  discoverRequestTimeoutMs: 15_000,
   errorBodyMaxBytes: 64 * 1024,
   placeholderApiKey: 'mori-pool',
   concurrencyDefault: MODEL_LIMITS.concurrencyDefault,

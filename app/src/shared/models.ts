@@ -41,6 +41,23 @@ export const MODEL_LIMITS = Object.freeze({
   maxKeys: 8,
 });
 
+/**
+ * @brief 服务没报告时的窗口（model-discovery.md §11，同 §12 的新模型表单）；读取器（kernel/discoverRead.ts）与清单里
+ *        手填的行（renderer settings/fields.tsx）共用。
+ */
+export const UNREPORTED_CONTEXT_WINDOW = 128000;
+
+/** @brief 服务没报告输出上限时的上限值（model-discovery.md §11：16384 与窗口一半中较小的）。 */
+const UNREPORTED_MAX_TOKENS = 16384;
+
+/**
+ * @brief 没报告时的输出上限：16384 与窗口一半中较小的（model-discovery.md §4.1、§4.3、§11；§12）。
+ * @param contextWindow 窗口（正整数）
+ */
+export function unreportedMaxTokens(contextWindow: number): number {
+  return Math.min(UNREPORTED_MAX_TOKENS, Math.floor(contextWindow / 2));
+}
+
 /** @brief 提供商与分组 id 的规则（§4.1、§12）。 */
 export const ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
@@ -476,8 +493,52 @@ export interface ProbeStepResult {
   detail: string | null;
 }
 
-/** @brief 推理服务的种类（探针第 0 步）。 */
-export type ServerKind = 'vllm' | 'sglang' | 'ollama' | 'llamacpp' | 'unknown';
+/**
+ * @brief 推理服务的种类（探针第 0 步与一键拉取模型，docs/specs/model-discovery.md §3.3）；
+ *        前四种与 unknown 是模型层原来的五种，档案里的旧值都在其中。
+ */
+export const SERVER_KINDS = [
+  'vllm', 'sglang', 'llamacpp', 'ollama', 'lmstudio', 'xinference', 'gpustack', 'mindie', 'tgi', 'lmdeploy',
+  'localai', 'tensorrt', 'litellm', 'newapi', 'oneapi', 'deepseek', 'moonshot', 'dashscope', 'qianfan', 'openrouter',
+  'anthropic', 'unknown',
+] as const;
+export type ServerKind = (typeof SERVER_KINDS)[number];
+
+/**
+ * @brief "Detected: …" 一行的种类名（model-discovery.md §3.3）；unknown 写 OpenAI-compatible server，
+ *        列表是 Anthropic 形状时见 serverKindLabel。
+ */
+export const SERVER_KIND_LABELS: Readonly<Record<ServerKind, string>> = Object.freeze({
+  vllm: 'vLLM', sglang: 'SGLang', llamacpp: 'llama.cpp', ollama: 'Ollama', lmstudio: 'LM Studio',
+  xinference: 'Xinference', gpustack: 'GPUStack', mindie: 'MindIE', tgi: 'TGI', lmdeploy: 'LMDeploy',
+  localai: 'LocalAI', tensorrt: 'TensorRT-LLM', litellm: 'LiteLLM', newapi: 'New API', oneapi: 'One API',
+  deepseek: 'DeepSeek', moonshot: 'Moonshot AI', dashscope: 'Alibaba Cloud Model Studio', qianfan: 'Baidu Qianfan',
+  openrouter: 'OpenRouter', anthropic: 'Anthropic', unknown: 'OpenAI-compatible server',
+});
+
+/**
+ * @brief 种类名（model-discovery.md §3.3）：unknown 且列表是 Anthropic 形状时为 Anthropic-compatible server，
+ *        否则取 SERVER_KIND_LABELS。
+ * @param anthropicShape DiscoverResult.anthropicShape
+ */
+export function serverKindLabel(kind: ServerKind, anthropicShape: boolean): string {
+  return kind === 'unknown' && anthropicShape ? 'Anthropic-compatible server' : SERVER_KIND_LABELS[kind];
+}
+
+/**
+ * @brief 档案里服务报告的值（model-discovery.md §7.2、§8）：探针第 0 步按 §4.1 读到的，没报告为 null；
+ *        reasoning、image 明确报告“没有”时为 false。contextWindow 同 context.reported（Ollama 只读到训练窗口时为 null）。
+ */
+export interface ReportedValues {
+  /** 服务报告的窗口 */
+  contextWindow: number | null;
+  /** 服务报告的输出上限（不小于窗口的不算报告） */
+  maxTokens: number | null;
+  /** 服务报告的思考支持 */
+  reasoning: boolean | null;
+  /** 服务报告的图片输入 */
+  image: boolean | null;
+}
 
 /** @brief 推理内容的字段名：openai-completions 为前四种之一，另两种接口为 native。 */
 export type ReasoningField = 'reasoning_content' | 'reasoning' | 'reasoning_text' | 'none' | 'native';
@@ -510,6 +571,11 @@ export interface ProfileView {
   };
   /** 断开后服务端是否停止（第 9 步） */
   cancel_verified: boolean | 'unknown';
+  /**
+   * 第 0 步读到的服务报告的值（model-discovery.md §7.2）：模型行的“(not reported)”与“Server reports …”提示按它；
+   * 档案没有 meta（旧档案）或还没有档案时为 null
+   */
+  reported: ReportedValues | null;
   /** 最近一次探测完成的时刻（ms）；从未完成时为 null */
   probedAt: number | null;
   /** 探针套件版本 */
@@ -555,6 +621,21 @@ export type ProviderForm = z.infer<typeof ProviderFormSchema>;
 /** @brief 探针的种类：自动的第 0–7 步、需要同意的长输入（第 8 步）或取消（第 9 步）。 */
 export const PROBE_TESTS = ['auto', 'long_input', 'cancel'] as const;
 
+/** @brief 一次加入的模型（model-discovery.md §5.4）：1 个以上，按清单顺序；id 是否重复由后台进程判断。 */
+const AddedModelsSchema = z.array(ProviderModelSchema).min(1);
+
+/**
+ * @brief models.discover 要读的服务（model-discovery.md §5.1）：新提供商带你填的地址、改过的 API type（没改过为 null）
+ *        与临时 key（为 null 或空时不带认证头；只用于这次读取）；已有提供商用配置里的地址、接口与已保存的 key。
+ *        地址与 key 是否合格由后台进程检查（结果的 error）。
+ */
+export const DiscoverTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('new'), baseUrl: z.string(), api: z.enum(API_TYPES).nullable(),
+    keySecret: z.string().nullable() }),
+  z.object({ kind: z.literal('provider'), providerId: z.string().min(1) }),
+]);
+export type DiscoverTarget = z.infer<typeof DiscoverTargetSchema>;
+
 /** @brief 模型层的命令，由 protocol.ts 并进 CommandSchema。 */
 export const ModelCommandSchemas = [
   /** 测试连接：经模型池测这个模型；带 keyRef 时只用这个 key（Keys 行的 Test），不看它的不可用记录 */
@@ -562,18 +643,26 @@ export const ModelCommandSchemas = [
     keyRef: z.string().min(1).optional() }),
   /** 设置页 Models 的全部内容 */
   z.object({ type: z.literal('models.get') }),
-  /** 首次启动表单：一次写入提供商、模型、key 和 normalDefault；providerId 非空时整体替换它与它唯一的模型 */
+  /**
+   * 首次启动表单：一次写入提供商、勾选的全部模型、key 和 normalDefault（一个模型时为它，多个时为提供商 id，
+   * model-discovery.md §5.4）；providerId 非空时整体替换它与它的全部模型
+   */
   z.object({ type: z.literal('models.firstRun'), providerId: providerRef.nullable(), provider: ProviderFormSchema,
-    model: ProviderModelSchema, keySecret: z.string().min(1).nullable() }),
-  /** 新建（id 为 null，带第一个 key 和第一个模型及它的新会话思考强度）或修改提供商 */
+    models: AddedModelsSchema, keySecret: z.string().min(1).nullable() }),
+  /** 新建（id 为 null，带第一个 key 和清单里勾选的模型，model-discovery.md §5.4）或修改提供商（不带 models） */
   z.object({ type: z.literal('models.saveProvider'), id: providerRef.nullable(), provider: ProviderFormSchema,
-    keySecret: z.string().min(1).optional(), model: ProviderModelSchema.optional(),
-    thinkingLevel: z.enum(THINKING_LEVELS).optional() }),
+    keySecret: z.string().min(1).optional(), models: AddedModelsSchema.optional() }),
   /** 删除提供商；dryRun 为真时只算连带改动、不改配置（确认框先用它列出各项） */
   z.object({ type: z.literal('models.deleteProvider'), id: providerRef, dryRun: z.boolean() }),
-  /** 添加（adding 为真）或修改模型；thinkingLevel 写 pi 设置的 modelThinkingLevels */
+  /** 修改已有的模型（model-discovery.md §5.4：不再加模型）；thinkingLevel 写 pi 设置的 modelThinkingLevels */
   z.object({ type: z.literal('models.saveModel'), providerId: providerRef, model: ProviderModelSchema,
-    adding: z.boolean(), thinkingLevel: z.enum(THINKING_LEVELS).optional() }),
+    thinkingLevel: z.enum(THINKING_LEVELS).optional() }),
+  /** 卡上清单的 Add：加在这个提供商已有的模型之后；任一 id 已在其中或同一次里重复时整次拒绝（model-discovery.md §5.4） */
+  z.object({ type: z.literal('models.addModels'), providerId: providerRef, models: AddedModelsSchema }),
+  /** 读服务的模型列表（model-discovery.md §5.1）：不写配置、不进写入队列；同一时刻只做一次，新的取消旧的 */
+  z.object({ type: z.literal('models.discover'), target: DiscoverTargetSchema }),
+  /** 取消正在进行的 models.discover（model-discovery.md §5.3）；不取消探针第 0 步和读版本 */
+  z.object({ type: z.literal('models.discoverCancel') }),
   /** 删除模型；dryRun 同上 */
   z.object({ type: z.literal('models.deleteModel'), providerId: providerRef, modelId: z.string().min(1),
     dryRun: z.boolean() }),
@@ -687,6 +776,70 @@ export interface PickOptions extends ModelsResult {
   options: PickOption[];
 }
 
+/** @brief 清单行的提示（model-discovery.md §4.1、§4.2）：服务没列出工具支持；窗口是 Ollama 的训练窗口。 */
+export type DiscoverHint = 'no_tools' | 'trained_window';
+
+/** @brief 发现的一个模型（model-discovery.md §5.2），按服务列表的顺序。 */
+export interface DiscoveredModel {
+  /** 服务列表里的 id，原样 */
+  id: string;
+  /** 报告值或默认值（128000） */
+  contextWindow: number;
+  /** 报告值或默认值（16384 与窗口一半中较小的），总是小于 contextWindow */
+  maxTokens: number;
+  /** 支持思考：报告值，没报告时为 false */
+  reasoning: boolean;
+  /** 图片输入：报告值，没报告时为 false */
+  image: boolean;
+  /** 模型族；没报告时为空字符串 */
+  family: string;
+  /** 服务报告的类型是不是聊天模型；不报告为 null */
+  chat: boolean | null;
+  /**
+   * 逐个字段是不是服务报告的：contextWindow、maxTokens 有报告值为真；reasoning、image 有报告值或明确报告“没有”为真；
+   * family 有值为真
+   */
+  reported: { contextWindow: boolean; maxTokens: boolean; reasoning: boolean; image: boolean; family: boolean };
+  /** 清单行的提示 */
+  hints: DiscoverHint[];
+  /** 不能加入的原因（the ID is empty、the ID contains spaces）；能加入为 null */
+  unusable: string | null;
+  /** 只对已有提供商：这个 id 已在配置里 */
+  added: boolean;
+}
+
+/** @brief 拿不到模型列表的原因（model-discovery.md §3.2、§5.2）。 */
+export interface DiscoverListError {
+  /** 认证被拒、连不上或超时、服务没有列表接口、读不出列表 */
+  kind: 'rejected' | 'unreachable' | 'no_list' | 'invalid';
+  /** rejected、invalid 为服务的原文（最多 2000 字，key 换成 ***）；unreachable 为连接错误或超时；no_list 为空字符串 */
+  detail: string;
+}
+
+/** @brief models.discover 的结果（model-discovery.md §5.2）；只在界面的表单状态里，表单关闭就丢掉。 */
+export interface DiscoverResult extends ModelsResult {
+  /** 被 models.discoverCancel 或新的一次发现取消 */
+  cancelled: boolean;
+  /** 认出的服务种类与版本；没拿到列表时为 null */
+  server: { kind: ServerKind; version: string | null } | null;
+  /** API type：你改过的，否则按 Anthropic 提示；已有提供商为配置里的 */
+  api: ApiType;
+  /** 建议的 Base URL（补 /v1 成功时是 <base>/v1，否则是整理后的 base；已有提供商为配置里的） */
+  baseUrl: string;
+  /** 建议的名称：主机名，非默认端口时加 :<端口> */
+  name: string;
+  /** 列表是 Anthropic 形状（对象有 has_more） */
+  anthropicShape: boolean;
+  /** 拿不到列表的原因；拿到时为 null */
+  listError: DiscoverListError | null;
+  /** 发现的模型，列表顺序 */
+  models: DiscoveredModel[];
+  /** 列表超过 1000 条，只取了前面的 */
+  truncated: boolean;
+  /** 只对已有提供商：配置里有、列表里没有的模型 id；没拿到列表时为空 */
+  notListed: string[];
+}
+
 /** @brief models.addKey 的结果。 */
 export interface KeyAdded extends ModelsResult {
   /** 新 key 的 ref */
@@ -720,6 +873,9 @@ export interface ModelCommandResults {
   'models.addKey': KeyAdded;
   'models.deleteProvider': DeleteResult;
   'models.saveModel': ModelsResult;
+  'models.addModels': ModelsResult;
+  'models.discover': DiscoverResult;
+  'models.discoverCancel': ModelsResult;
   'models.deleteModel': DeleteResult;
   'models.moveModel': ModelsResult;
   'models.removeKey': ModelsResult;

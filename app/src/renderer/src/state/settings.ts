@@ -1,11 +1,13 @@
 // 设置页（docs/v1/screens/models-settings.md）的状态与命令：当前分节、Models 分节的数据（models.get 的结果，
 // 两次读取之间由全局事件 mori.profiles、mori.key_status 更新）、正在跑的探针、测试连接的结果、进入时要落到的位置。
-// 写命令成功后重新 models.get（models-settings.md "来源"）。进入设置页默认落在 Models；F8 的"View in Settings"
-// 落在 UI issues（docs/specs/memory.md §10.8，showSettingsSection）。
+// 写命令成功后重新 models.get（models-settings.md "来源"）；拉取模型（models.discover、models.discoverCancel）不是写命令，
+// 不重新 models.get，结果只交给表单（docs/specs/model-discovery.md §5.1）。进入设置页默认落在 Models；
+// F8 的"View in Settings"落在 UI issues（docs/specs/memory.md §10.8，showSettingsSection）。
 
 import { create } from 'zustand';
 import type {
-  ConfigInfo, KeyStatus, ModelCommand, ModelsInfo, ModelsResult, ProbeProgress, ProfileView,
+  ConfigInfo, DiscoverResult, DiscoverTarget, KeyStatus, ModelCommand, ModelsInfo, ModelsResult, ProbeProgress,
+  ProfileView,
 } from '../../../shared/models';
 import type { EventEnvelope, GlobalEventEnvelope, TestResult } from '../../../shared/protocol';
 import { recordAction } from './actionLog';
@@ -100,6 +102,27 @@ export async function writeModels<T extends ModelsResult>(command: ModelCommand)
   } catch (error) {
     return { error: describe(command.type, error) } as T;
   }
+}
+
+// ---- 拉取模型（docs/specs/model-discovery.md §5.1–§5.3） ----
+
+/**
+ * @brief 读服务的模型列表（models.discover，§5.1）：不进写入队列、不重新 models.get，结果只放进表单状态（§9）。
+ *        命令本身出错时返回 error 为原文的失败结果（§5.2：cancelled 为假，其余为空）。
+ * @param target 新提供商（Base URL 框的值、改过的 API type、临时 key）或已有提供商
+ */
+export async function discoverModels(target: DiscoverTarget): Promise<DiscoverResult> {
+  try {
+    return await request<DiscoverResult>({ type: 'models.discover', target });
+  } catch (error) {
+    return { error: describe('models.discover', error), cancelled: false, server: null, api: 'openai-completions',
+      baseUrl: '', name: '', anthropicShape: false, listError: null, models: [], truncated: false, notListed: [] };
+  }
+}
+
+/** @brief 取消正在进行的 models.discover（§5.3）；被取消的那次随后返回 cancelled: true。 */
+export function cancelDiscover(): void {
+  void request({ type: 'models.discoverCancel' }).catch((error) => describe('models.discoverCancel', error));
 }
 
 /** @brief 打开设置页时重新读取 config.get（pi 设置读不出时的原文）；失败时原文显示在设置页里。 */

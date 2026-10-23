@@ -1,48 +1,52 @@
-// 模型表单（新建 / Edit，§9.1）：按"Save"保存（models.saveModel）。New-session thinking level 写 pi 设置的
-// modelThinkingLevels，Edit 时显示 models.get 的 thinkingDefaults 里保存的值；Edit 时只有你改过它或刚勾上
-// Supports thinking 才发送（没设过时不替你写入）。状态表见 models-settings.md "模型表单"。
+// 模型表单（只有 Edit，§9.1；docs/specs/model-discovery.md §5.4、§6.5：没有新建，新模型从卡上的 Fetch models 加入）：
+// 按"Save"保存（models.saveModel）。Default effort for new sessions 写 pi 设置的 modelThinkingLevels：
+// 设过强度的显示 models.get 的 thinkingDefaults 里的值，没设过的显示 config.get 的 defaultThinkingLevel（没有时 Medium）；
+// 只有你在这张表单里改了它才发送（没改时不替你写入）。状态表见 models-settings.md "模型表单（Edit）"。
 
 import { useState } from 'react';
 import type { ModelProvider, ProviderModel } from '../../../../shared/models';
 import { useSettings, writeModels } from '../../state/settings';
-import {
-  emptyModel, hasErrors, modelDraft, modelErrors, ModelFields, shownErrors, toModel, useDraft,
-} from './fields';
+import { useApp } from '../../state/store';
+import { hasErrors, modelDraft, ModelFields, shownErrors, sizeErrors, toModel, useDraft, useMounted } from './fields';
 
 /** @brief 模型表单的参数。 */
 export interface ModelEditorProps {
   /** 所在的提供商 */
   provider: ModelProvider;
-  /** 要改的模型；新建时为 null */
-  model: ProviderModel | null;
+  /** 要改的模型（配置里已有的） */
+  model: ProviderModel;
   /** 保存成功或点了 Cancel */
   onClose: () => void;
 }
 
-/** @brief 模型表单。 */
+/** @brief 模型表单（Edit）。 */
 export function ModelEditor({ provider, model, onClose }: ModelEditorProps) {
-  const savedLevel = useSettings((state) => (model ? state.info?.thinkingDefaults[`${provider.id}/${model.id}`] ?? null
-    : null));
-  const { draft, touched, edit } = useDraft(() => (model ? modelDraft(model, savedLevel) : emptyModel()));
+  const ref = `${provider.id}/${model.id}`;
+  const savedLevel = useSettings((state) => state.info?.thinkingDefaults[ref] ?? null);
+  // 拉取规格 §5.4：没设过强度时显示新会话实际用的 defaultThinkingLevel；它也没有时 modelDraft 显示 Medium
+  const piLevel = useApp((state) => state.config?.defaultThinkingLevel ?? null);
+  const { draft, touched, edit } = useDraft(() => modelDraft(model, savedLevel ?? piLevel));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const adding = model === null;
-  const others = adding ? provider.models.map((item) => item.id) : [];
-  const errors = modelErrors(draft, others);
+  const mounted = useMounted();
+  // models-settings.md "模型表单（Edit）"字段错误：界面只查窗口与 Max output；Model ID 只读，不查
+  const errors = sizeErrors(draft.contextWindow, draft.maxTokens);
   async function save() {
-    const sendLevel = draft.reasoning && (adding || touched.has('thinkingLevel') || touched.has('reasoning'));
+    // 拉取规格 §5.4：只有你改了 Default effort for new sessions（勾着 Supports thinking 时才显示）才带 thinkingLevel
+    const sendLevel = draft.reasoning && touched.has('thinkingLevel');
     setBusy(true);
     const result = await writeModels({ type: 'models.saveModel', providerId: provider.id, model: toModel(draft),
-      adding, ...(sendLevel ? { thinkingLevel: draft.thinkingLevel } : {}) });
+      ...(sendLevel ? { thinkingLevel: draft.thinkingLevel } : {}) });
     setBusy(false);
-    if (result.error === null) onClose();
-    else setError(result.error);
+    // 同一时刻只开一张表单（models-settings.md "卡上的 Fetch models"）：表单已被换掉时不再关，免得关掉换上来的那张
+    if (result.error !== null) setError(result.error);
+    else if (mounted.current) onClose();
   }
   return (
     <form className="settings-form mf-grid" data-testid="model-form" noValidate
       onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <h3>{adding ? 'Add model' : 'Edit model'} · {provider.name}</h3>
-      <ModelFields draft={draft} edit={edit} errors={shownErrors(errors, touched)} editing={!adding} full thinking />
+      <h3>Edit model · {provider.name}</h3>
+      <ModelFields draft={draft} edit={edit} errors={shownErrors(errors, touched)} />
       <div className="form-actions">
         <button type="submit" className="button primary" disabled={busy || hasErrors(errors)}>Save</button>
         <button type="button" className="button" disabled={busy} onClick={onClose}>Cancel</button>

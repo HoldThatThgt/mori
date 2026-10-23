@@ -1,11 +1,12 @@
-// 提供商表单、模型表单与首次启动表单共用的字段与界面先做的检查（docs/v1/screens/models-settings.md "字段错误的文字"，
-// 规格 §4.1、§9.1、§12）。字段值按输入框的文字保存，检查通过后再转成配置里的类型。
+// 提供商表单、模型表单、首次启动表单与拉取模型的清单共用的字段与界面先做的检查
+// （docs/v1/screens/models-settings.md "字段错误的文字"，规格 §4.1、§9.1、§12；清单的行与 Add a model ID 用同一组检查，
+// docs/specs/model-discovery.md §6.2、§6.4）。字段值按输入框的文字保存，检查通过后再转成配置里的类型。
 
-import { useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import {
   API_TYPE_LABELS, API_TYPES, COMPAT_HINTS, COMPAT_LABELS, COMPAT_OPTIONS, ConcurrencySchema, MODEL_LIMITS,
-  ProviderFormSchema, suggestZone, THINKING_LEVELS, ZONES, type ApiType, type Compat, type ProviderForm,
-  type ProviderModel, type ThinkingLevel, type Zone,
+  ProviderFormSchema, suggestZone, THINKING_LEVELS, UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens, ZONES,
+  type ApiType, type Compat, type ProviderForm, type ProviderModel, type ThinkingLevel, type Zone,
 } from '../../../../shared/models';
 import { FieldError, ZONE_LABELS } from './common';
 
@@ -14,21 +15,23 @@ export const THINKING_NAMES: Readonly<Record<ThinkingLevel, string>> = {
   off: 'Off', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max',
 };
 
-/** 新模型的上下文窗口（models-settings.md，临时） */
-const DEFAULT_WINDOW = 128000;
-/** 新模型的 Max output 上限（§12：16384 与窗口一半中较小的） */
-const DEFAULT_MAX_OUTPUT = 16384;
-/** 新模型的思考强度（models-settings.md，临时） */
+/**
+ * Edit 里这个模型没设过强度、config.get 也没有 defaultThinkingLevel 时显示的强度（拉取规格 §5.4"没有时 Medium"；
+ * models-settings.md "模型表单（Edit）"没设过强度一行）
+ */
 const DEFAULT_THINKING: ThinkingLevel = 'medium';
 
-/** @brief 新模型的 Max output：16384 与窗口一半中较小的（§12）；窗口不是正整数时为 16384。 */
+/**
+ * @brief 没报告时的 Max output：16384 与窗口一半中较小的（§12；model-discovery.md §4.3、§11，规则取自 shared/models.ts
+ *        的 unreportedMaxTokens，与读取器共用一份）；窗口不是正整数时按没报告的窗口（UNREPORTED_CONTEXT_WINDOW）算，
+ *        为 16384。
+ */
 export function defaultMaxOutput(window: string): string {
-  const value = positiveInt(window);
-  return String(value === null ? DEFAULT_MAX_OUTPUT : Math.min(DEFAULT_MAX_OUTPUT, Math.floor(value / 2)));
+  return String(unreportedMaxTokens(positiveInt(window) ?? UNREPORTED_CONTEXT_WINDOW));
 }
 
 /** @brief 输入框的文字是正整数时返回它，否则为 null。 */
-function positiveInt(text: string): number | null {
+export function positiveInt(text: string): number | null {
   const value = /^\s*\d+\s*$/.test(text) ? Number(text) : NaN;
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
@@ -44,6 +47,25 @@ export function useDraft<T extends object>(initial: () => T) {
     setTouched((current) => new Set([...current, ...Object.keys(patch)]));
   };
   return { draft, setDraft, touched, edit };
+}
+
+/** @brief useDraft 的返回值：草稿、改草稿（setDraft 不算改过）、改过的字段与 edit（算改过）。 */
+export type DraftForm<T extends object> = ReturnType<typeof useDraft<T>>;
+
+/**
+ * @brief 表单还开着没有（current 为真表示还挂着）。设置页同一时刻只开一张表单，打开别的就关掉它
+ *        （models-settings.md "卡上的 Fetch models"）：写命令返回时表单已被换掉，就不再关表单，
+ *        免得关掉换上来的那张、或因此取消那张卡上的拉取。
+ */
+export function useMounted(): { readonly current: boolean } {
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  return mounted;
 }
 
 /** @brief 字段错误：字段名 → 文字。 */
@@ -69,33 +91,33 @@ export interface ProviderDraft {
   baseUrl: string;
   /** 接口类型 */
   api: ApiType;
-  /** 网络区域；Edit 区域还没确认的（迁移来的）提供商时为 null，要你选 */
+  /**
+   * 网络区域；Edit 区域还没确认的（迁移来的）提供商时为 null，要你选。新提供商拉取后按建议值预选，
+   * 你改选过（useDraft 的 touched 有 zone）之后再拉取不覆盖（拉取规格 §6.1，见 Checklist.tsx 的 prefillDraft）
+   */
   zone: Zone | null;
-  /** 你手动选过区域（之后不再随地址改） */
-  zoneChosen: boolean;
   /** 每个 key 的并发上限（输入框的文字） */
   concurrency: string;
   /** 兼容选项 */
   compat: Compat;
 }
 
-/** @brief 新提供商的草稿：区域按空地址的建议，并发上限为默认值。 */
+/** @brief 新提供商的草稿：区域按空地址的建议（拉取后再按 Base URL 框预选，拉取规格 §6.1），并发上限为默认值。 */
 export function emptyProvider(): ProviderDraft {
-  return { name: '', baseUrl: '', api: 'openai-completions', zone: suggestZone(''), zoneChosen: false,
+  return { name: '', baseUrl: '', api: 'openai-completions', zone: suggestZone(''),
     concurrency: String(MODEL_LIMITS.concurrencyDefault), compat: {} };
 }
 
 /**
- * @brief 改提供商草稿：新建时你还没手动选过区域，地址一改预选就跟着改（models-settings.md "区域的建议值"）。
- * @param follow 区域随地址变（新建、首次启动）
+ * @brief 地址的 origin（协议、主机、端口）；不是合法 URL 时为 null。Edit 提供商按它判断要不要先确认删除 key
+ *        （§4.1）；首次启动表单按它判断内存里的 key 用不用（拉取规格 §6.6，2026-10-23 负责人决定）。
  */
-export function providerPatch(draft: ProviderDraft, patch: Partial<ProviderDraft>, follow: boolean):
-  Partial<ProviderDraft> {
-  if (patch.zone !== undefined) return { ...patch, zoneChosen: true };
-  if (patch.baseUrl !== undefined && follow && !draft.zoneChosen) {
-    return { ...patch, zone: suggestZone(patch.baseUrl) };
+export function originOf(url: string): string | null {
+  try {
+    return new URL(url.trim()).origin;
+  } catch {
+    return null;
   }
-  return patch;
 }
 
 /** @brief 提供商字段的检查（§4.1）。 */
@@ -119,16 +141,14 @@ export function toProviderForm(draft: ProviderDraft): ProviderForm {
 
 // ---- 模型字段 ----
 
-/** @brief 模型表单的草稿。 */
+/** @brief 模型表单（Edit）的草稿。 */
 export interface ModelDraft {
-  /** 模型 id */
+  /** 模型 id（只读） */
   id: string;
   /** 上下文窗口（输入框的文字） */
   contextWindow: string;
-  /** 最大输出（输入框的文字） */
+  /** 最大输出（输入框的文字；不随窗口变） */
   maxTokens: string;
-  /** 你改过最大输出（之后不再随窗口变） */
-  maxChosen: boolean;
   /** 模型族 */
   family: string;
   /** 支持思考 */
@@ -139,45 +159,41 @@ export interface ModelDraft {
   thinkingLevel: ThinkingLevel;
 }
 
-/** @brief 新模型的草稿（§9.1、§12）。 */
-export function emptyModel(): ModelDraft {
-  const contextWindow = String(DEFAULT_WINDOW);
-  return { id: '', contextWindow, maxTokens: defaultMaxOutput(contextWindow), maxChosen: false, family: '',
-    reasoning: false, image: false, thinkingLevel: DEFAULT_THINKING };
-}
-
 /**
- * @brief 已有模型的草稿（Edit）；Max output 不再随窗口变。
- * @param savedLevel models.get 的 thinkingDefaults 里这个模型的新会话强度；没设时为 null（显示默认值）
+ * @brief 已有模型的草稿（Edit，拉取规格 §5.4；models-settings.md "模型表单（Edit）"）；Max output 不随窗口变。
+ * @param savedLevel 要显示的新会话强度：thinkingDefaults 里这个模型的值，没设过时 config.get 的 defaultThinkingLevel；
+ *        都没有时为 null（显示 Medium）
  */
 export function modelDraft(model: ProviderModel, savedLevel: ThinkingLevel | null): ModelDraft {
   return { id: model.id, contextWindow: String(model.contextWindow), maxTokens: String(model.maxTokens),
-    maxChosen: true, family: model.family, reasoning: model.reasoning, image: model.input.length > 1,
+    family: model.family, reasoning: model.reasoning, image: model.input.length > 1,
     thinkingLevel: savedLevel ?? DEFAULT_THINKING };
 }
 
-/** @brief 改模型草稿：你没改过 Max output 时它随窗口变。 */
-export function modelPatch(draft: ModelDraft, patch: Partial<ModelDraft>): Partial<ModelDraft> {
-  if (patch.maxTokens !== undefined) return { ...patch, maxChosen: true };
-  if (patch.contextWindow !== undefined && !draft.maxChosen) {
-    return { ...patch, maxTokens: defaultMaxOutput(patch.contextWindow) };
-  }
-  return patch;
+/**
+ * @brief 模型 id 的检查（§4.1）：非空、不含空白，与 otherIds 不重复。清单的 Add a model ID 用它
+ *        （model-discovery.md §6.4）；模型表单（Edit）的 Model ID 只读，不查。
+ * @param otherIds 不能重复的 id（清单的全部行与这个提供商已有的模型）
+ * @return 错误文字；没有错误时为 undefined
+ */
+export function idError(id: string, otherIds: readonly string[]): string | undefined {
+  if (!/^\S+$/.test(id)) return 'Model ID must be non-empty and contain no spaces.';
+  return otherIds.includes(id) ? 'Model IDs must be unique within a provider.' : undefined;
 }
 
 /**
- * @brief 模型字段的检查（§4.1）。
- * @param otherIds 同一提供商里别的模型的 id（新建时检查重复）
+ * @brief 窗口与 Max output 的检查（§4.1）：都是正整数，Max output 小于窗口。模型表单与清单的行共用
+ *        （model-discovery.md §6.2）。
+ * @param contextWindow 窗口输入框的文字
+ * @param maxTokens Max output 输入框的文字
  */
-export function modelErrors(draft: ModelDraft, otherIds: readonly string[]): FieldErrors {
-  const window = positiveInt(draft.contextWindow);
-  const max = positiveInt(draft.maxTokens);
-  const idError = !/^\S+$/.test(draft.id) ? 'Model ID must be non-empty and contain no spaces.'
-    : otherIds.includes(draft.id) ? 'Model IDs must be unique within a provider.' : undefined;
+export function sizeErrors(contextWindow: string, maxTokens: string): FieldErrors {
+  const window = positiveInt(contextWindow);
+  const max = positiveInt(maxTokens);
   const maxError = max === null ? 'Max output must be a whole number above 0.'
     : window !== null && max >= window ? 'Max output must be smaller than the context window.' : undefined;
   const windowError = window === null ? 'Context window must be a whole number above 0.' : undefined;
-  return { id: idError, contextWindow: windowError, maxTokens: maxError };
+  return { contextWindow: windowError, maxTokens: maxError };
 }
 
 /** @brief 草稿转成配置里的模型。 */
@@ -297,39 +313,32 @@ export interface ModelFieldsProps {
   draft: ModelDraft;
   /** 改草稿 */
   edit: (patch: Partial<ModelDraft>) => void;
-  /** 显示的字段错误 */
+  /** 显示的字段错误（Context window、Max output） */
   errors: FieldErrors;
-  /** Edit：Model ID 只读 */
-  editing: boolean;
-  /** 设置页的模型表单另有 Family、Image input；首次启动表单没有 */
-  full: boolean;
-  /**
-   * 显示 Default effort for new sessions（勾了 Supports thinking 时）：设置页的模型表单与新建提供商的第一个模型有，
-   * 首次启动表单没有
-   */
-  thinking: boolean;
 }
 
-/** @brief 模型字段：Model ID、Context window、Max output、（Family）、Supports thinking、（Image input、思考强度）。 */
-export function ModelFields({ draft, edit, errors, editing, full, thinking }: ModelFieldsProps) {
-  const set = (patch: Partial<ModelDraft>) => edit(modelPatch(draft, patch));
+/**
+ * @brief 模型表单（Edit）的字段（models-settings.md "模型表单（Edit）"）：Model ID（只读）、Context window、
+ *        Max output（不随窗口变）、Family、Supports thinking、Image input、Default effort for new sessions
+ *        （勾了 Supports thinking 时）。
+ */
+export function ModelFields({ draft, edit, errors }: ModelFieldsProps) {
   return (
     <>
-      <TextRow label="Model ID" field="id" error={errors.id} value={draft.id} readOnly={editing}
-        onChange={(id) => set({ id })} spellCheck={false} />
+      <Row label="Model ID">{(id) => <input id={id} value={draft.id} readOnly spellCheck={false} />}</Row>
       <TextRow label="Context window" field="contextWindow" error={errors.contextWindow} inputMode="numeric"
-        value={draft.contextWindow} onChange={(contextWindow) => set({ contextWindow })} />
+        value={draft.contextWindow} onChange={(contextWindow) => edit({ contextWindow })} />
       <TextRow label="Max output" field="maxTokens" error={errors.maxTokens} inputMode="numeric"
-        value={draft.maxTokens} onChange={(maxTokens) => set({ maxTokens })} />
-      {full && <TextRow label="Family" field="family" value={draft.family} placeholder="Optional"
-        onChange={(family) => set({ family })} />}
-      <CheckRow label="Supports thinking" checked={draft.reasoning} onChange={(reasoning) => set({ reasoning })} />
-      {full && <CheckRow label="Image input" checked={draft.image} onChange={(image) => set({ image })} />}
-      {thinking && draft.reasoning && (
+        value={draft.maxTokens} onChange={(maxTokens) => edit({ maxTokens })} />
+      <TextRow label="Family" field="family" value={draft.family} placeholder="Optional"
+        onChange={(family) => edit({ family })} />
+      <CheckRow label="Supports thinking" checked={draft.reasoning} onChange={(reasoning) => edit({ reasoning })} />
+      <CheckRow label="Image input" checked={draft.image} onChange={(image) => edit({ image })} />
+      {draft.reasoning && (
         <Row label="Default effort for new sessions">
           {(id) => (
             <select id={id} value={draft.thinkingLevel}
-              onChange={(event) => set({ thinkingLevel: event.target.value as ThinkingLevel })}>
+              onChange={(event) => edit({ thinkingLevel: event.target.value as ThinkingLevel })}>
               {THINKING_LEVELS.map((level) => <option key={level} value={level}>{THINKING_NAMES[level]}</option>)}
             </select>
           )}

@@ -2,17 +2,23 @@
 // 经 ModelLayer.save 校验、编译到 pi（出错回滚）、原子写文件、交给模型池、通知会话重新做静态校验、按 §7.4 发起探针。
 // 新 key 先请主进程加密保存，配置写失败时删掉本次新存的 key（§9.1）；删掉的 key 在配置保存后删除密文。
 // 结果都带 error：失败时是原文，配置不变。
+// 一键拉取模型（docs/specs/model-discovery.md §5）：models.discover、models.discoverCancel 不进修改队列，交给模型层的
+// 读取器；加模型只有 saveProvider（新建）、firstRun、addModels，一次命令一次编译、一次写入，加入的模型都自动探测；
+// saveModel 只改已有的模型。
 
 import {
   DEFAULT_ZONES, MODEL_LIMITS,
-  type DeleteResult, type KeyAdded, type ModelCommand, type ModelConfig, type ModelProvider, type ModelsInfo,
-  type ModelsResult, type ProviderModel, type ProviderSaved, type ThinkingLevel,
+  type DeleteResult, type DiscoverResult, type DiscoverTarget, type KeyAdded, type ModelCommand, type ModelConfig,
+  type ModelPick, type ModelProvider, type ModelsInfo, type ModelsResult, type ProviderModel, type ProviderSaved,
+  type ThinkingLevel,
 } from '../shared/models';
 import { setModelThinkingLevel } from './config';
+import { normalizeBaseUrl } from './discoverRead';
 import {
   applyAddressChange, deleteGroup, deleteModel, deleteProvider, findProvider, generateId, nextKeyRef,
   normalizeProjectPath, takenIds, type CascadeResult,
 } from './modelConfig';
+import { discoverFailure, type DiscoverRequest } from './modelDiscover';
 import { getModelLayer, type ModelLayer } from './modelLayer';
 import type { ModelRef } from './modelTypes';
 
@@ -44,6 +50,7 @@ const HEADER_SAFE_KEY = /^[\x21-\x7e]+$/;
 /**
  * @brief 检查要保存的 key 能写进请求头：去掉首尾空白后只含可打印 ASCII、没有空格。
  *        粘贴带进来的零宽字符、全角字符、换行会让发请求时写头失败，所以保存前就拒绝。
+ *        models.discover 的临时 key 按同一条规则检查（model-discovery.md §5.1）。
  * @param secret 你填的 key
  * @return 去掉首尾空白后的 key
  * @throws key 含不能写进请求头的字符（错误文字不带 key）
@@ -77,6 +84,11 @@ function requireProvider(config: ModelConfig, providerId: string): ModelProvider
 /** @brief 换掉配置里同 id 的提供商。 */
 function replaceProvider(config: ModelConfig, provider: ModelProvider): ModelConfig {
   return { ...config, providers: config.providers.map((item) => (item.id === provider.id ? provider : item)) };
+}
+
+/** @brief 这些模型的 <provider>/<model>，按给出的顺序（model-discovery.md §5.4：加入的模型全部自动探测）。 */
+function modelRefs(providerId: string, models: readonly ProviderModel[]): ModelRef[] {
+  return models.map((model) => `${providerId}/${model.id}`);
 }
 
 /**
@@ -151,37 +163,52 @@ async function write<T extends object>(layer: ModelLayer, type: string,
 
 // ---- 首次启动（§9.1、§9.4） ----
 
-/** @brief 首次启动表单第一次保存：一次写入提供商、模型、key 与 normalDefault。 */
-function firstRunCreate(layer: ModelLayer, command: Cmd<'models.firstRun'>): Draft {
-  const id = generateId(command.provider.name, layer.reserved);
-  const provider: ModelProvider = { id, ...command.provider, keys: [], nextKeyNumber: 1, models: [command.model] };
-  const base: ModelConfig = { ...emptyConfig(), providers: [provider], normalDefault: `${id}/${command.model.id}` };
-  const { config, newKey } = withFirstKey(base, id, command.keySecret);
-  return { next: config, previous: null, newKey, probeRefs: [`${id}/${command.model.id}`] };
+/**
+ * @brief 首次启动表单的默认范围（model-discovery.md §5.4）：只有一个模型时为 <provider>/<model>，多个时为提供商 id。
+ * @param providerId 提供商
+ * @param models 勾选的模型（1 个以上）
+ */
+function firstRunDefault(providerId: string, models: readonly ProviderModel[]): ModelPick {
+  return models.length === 1 ? `${providerId}/${models[0].id}` : providerId;
 }
 
 /**
- * @brief 同一张首次启动表单再次保存：整体替换这个提供商和它唯一的模型；keySecret 为空时保留已存的 key，
- *        有时换成新 key（旧 key 保存后删除）；地址的 origin 变了时按 §4.1 删除已存的 key。
+ * @brief 首次启动表单第一次保存：一次写入提供商、勾选的全部模型（按清单顺序）、key 与 normalDefault；
+ *        加入的模型都自动探测（model-discovery.md §5.4）。
+ */
+function firstRunCreate(layer: ModelLayer, command: Cmd<'models.firstRun'>): Draft {
+  const id = generateId(command.provider.name, layer.reserved);
+  const provider: ModelProvider = { id, ...command.provider, keys: [], nextKeyNumber: 1, models: [...command.models] };
+  const base: ModelConfig = { ...emptyConfig(), providers: [provider],
+    normalDefault: firstRunDefault(id, command.models) };
+  const { config, newKey } = withFirstKey(base, id, command.keySecret);
+  return { next: config, previous: null, newKey, probeRefs: modelRefs(id, command.models) };
+}
+
+/**
+ * @brief 同一张首次启动表单再次保存：整体替换这个提供商和它的全部模型（model-discovery.md §5.4）；keySecret 为空时
+ *        保留已存的 key，有时换成新 key（旧 key 保存后删除）；地址的 origin 变了时按 §4.1 删除已存的 key。
  */
 function firstRunReplace(config: ModelConfig, command: Cmd<'models.firstRun'>, providerId: string): Draft {
   const old = requireProvider(config, providerId);
   const moved = applyAddressChange(old, command.provider.baseUrl);
   const removedKeyRefs = [...moved.removedKeyRefs];
-  let provider: ModelProvider = { ...moved.provider, ...command.provider, models: [command.model] };
+  let provider: ModelProvider = { ...moved.provider, ...command.provider, models: [...command.models] };
   if (command.keySecret) {
     removedKeyRefs.push(...provider.keys.map((key) => key.ref));
     provider = { ...provider, keys: [] };
   }
-  const ref = `${providerId}/${command.model.id}`;
-  const base = { ...replaceProvider(config, provider), normalDefault: ref };
+  const refs = modelRefs(providerId, command.models);
+  const base = { ...replaceProvider(config, provider), normalDefault: firstRunDefault(providerId, command.models) };
   const { config: next, newKey } = withFirstKey(base, providerId, command.keySecret);
-  const removedRefs = old.models.map((model) => `${providerId}/${model.id}`).filter((item) => item !== ref);
-  return { next, previous: config, newKey, removedKeyRefs, removedRefs, probeRefs: [ref] };
+  const kept = new Set(refs);
+  const removedRefs = modelRefs(providerId, old.models).filter((ref) => !kept.has(ref));
+  return { next, previous: config, newKey, removedKeyRefs, removedRefs, probeRefs: refs };
 }
 
 /**
  * @brief models.firstRun：model-config.json 已存在、且要写的不是这张表单自己建的提供商时拒绝（§9.4）。
+ *        一次编译、一次写入；不写新会话的思考强度（model-discovery.md §5.4）。
  */
 function firstRun(layer: ModelLayer, command: Cmd<'models.firstRun'>): Promise<ProviderSaved> {
   return write(layer, command.type, async (config) => {
@@ -214,17 +241,23 @@ function joinWarnings(...warnings: (string | null)[]): string | null {
 
 // ---- 提供商 ----
 
-/** @brief 新建提供商（§9.1）：id 由名称生成，带第一个模型和可选的第一个 key，排在最后。 */
+/**
+ * @brief 新建提供商（§9.1）：id 由名称生成，带清单里勾选的模型（model-discovery.md §5.4：1 个以上，按清单顺序，
+ *        全部自动探测）和可选的第一个 key，排在最后。
+ */
 function providerCreate(layer: ModelLayer, config: ModelConfig, command: Cmd<'models.saveProvider'>): Draft {
-  if (!command.model) throw new Error('A new provider needs its first model');
+  if (!command.models) throw new Error('A new provider needs at least one model');
   const id = generateId(command.provider.name, takenIds(config, layer.reserved));
-  const provider: ModelProvider = { id, ...command.provider, keys: [], nextKeyNumber: 1, models: [command.model] };
+  const provider: ModelProvider = { id, ...command.provider, keys: [], nextKeyNumber: 1, models: [...command.models] };
   const base = { ...config, providers: [...config.providers, provider] };
   const { config: next, newKey } = withFirstKey(base, id, command.keySecret);
-  return { next, previous: config, newKey, probeRefs: [`${id}/${command.model.id}`] };
+  return { next, previous: config, newKey, probeRefs: modelRefs(id, command.models) };
 }
 
-/** @brief 修改提供商（§4.1）：地址的 origin 变了时删除它的全部 key；key 与模型不在这里改。 */
+/**
+ * @brief 修改提供商（§4.1）：地址的 origin 变了时删除它的全部 key；key 与模型不在这里改（带了 models 也不看，
+ *        同原来不看 model）。
+ */
 function providerEdit(config: ModelConfig, providerId: string, command: Cmd<'models.saveProvider'>): Draft {
   const moved = applyAddressChange(requireProvider(config, providerId), command.provider.baseUrl);
   const provider: ModelProvider = { ...moved.provider, ...command.provider };
@@ -232,17 +265,18 @@ function providerEdit(config: ModelConfig, providerId: string, command: Cmd<'mod
     removedKeyRefs: moved.removedKeyRefs };
 }
 
-/** @brief models.saveProvider：新建（id 为 null）或修改。 */
+/**
+ * @brief models.saveProvider：新建（id 为 null）或修改。新建时不写新会话的思考强度（model-discovery.md §5.4：
+ *        勾了 Supports thinking 的模型按 pi 设置的 defaultThinkingLevel，之后在 Edit 里设）。
+ */
 function saveProvider(layer: ModelLayer, command: Cmd<'models.saveProvider'>): Promise<ProviderSaved> {
   return write(layer, command.type, async (current) => {
     const config = requireConfig(layer, current);
     const draft = command.id === null ? providerCreate(layer, config, command)
       : providerEdit(config, command.id, command);
-    const saved = await saveDraft(layer, draft);
+    const warning = await saveDraft(layer, draft);
     const providerId = command.id ?? draft.next.providers[draft.next.providers.length - 1].id;
-    const thinking = command.id === null && command.model
-      ? await saveThinking(providerId, command.model, command.thinkingLevel) : null;
-    return { value: { providerId }, warning: joinWarnings(saved, thinking) };
+    return { value: { providerId }, warning };
   }, { providerId: command.id ?? '' });
 }
 
@@ -264,22 +298,44 @@ function remove(layer: ModelLayer, type: string, dryRun: boolean,
 
 // ---- 模型 ----
 
-/** @brief models.saveModel：添加（排在最后）或修改模型；再写 pi 设置的新会话思考强度（沿用 v0）。 */
+/**
+ * @brief models.saveModel：只改已有的模型（model-discovery.md §5.4：加模型只有 saveProvider、firstRun、addModels），
+ *        模型不存在时报错；再写 pi 设置的新会话思考强度（沿用 v0）。指纹变了的模型保存后按 §7.4 重新探测。
+ */
 function saveModel(layer: ModelLayer, command: Cmd<'models.saveModel'>): Promise<ModelsResult> {
-  const { providerId, model, adding } = command;
+  const { providerId, model } = command;
   return write(layer, command.type, async (current) => {
     const config = requireConfig(layer, current);
     const provider = requireProvider(config, providerId);
-    const exists = provider.models.some((item) => item.id === model.id);
-    if (adding && exists) throw new Error(`Model ${model.id} already exists in ${provider.name}`);
-    if (!adding && !exists) throw new Error(`${providerId}/${model.id} is not in your model settings`);
-    const models = adding ? [...provider.models, model]
-      : provider.models.map((item) => (item.id === model.id ? model : item));
-    const ref = `${providerId}/${model.id}`;
+    if (!provider.models.some((item) => item.id === model.id)) {
+      throw new Error(`${providerId}/${model.id} is not in your model settings`);
+    }
+    const models = provider.models.map((item) => (item.id === model.id ? model : item));
     const saved = await saveDraft(layer, { next: replaceProvider(config, { ...provider, models }), previous: config,
-      newKey: null, probeRefs: adding ? [ref] : [] });
+      newKey: null });
     const thinking = await saveThinking(providerId, model, command.thinkingLevel);
     return { value: {}, warning: joinWarnings(saved, thinking) };
+  }, {});
+}
+
+/**
+ * @brief models.addModels（model-discovery.md §5.4）：卡上清单的 Add，加在这个提供商已有的模型之后，按清单顺序；
+ *        任一 id 已在其中、或同一次里重复时整次拒绝（“<id> is already in <provider name>.”），配置不变。
+ *        一次编译、一次写入；加入的每个模型都自动探测。
+ */
+function addModels(layer: ModelLayer, command: Cmd<'models.addModels'>): Promise<ModelsResult> {
+  return write(layer, command.type, async (current) => {
+    const config = requireConfig(layer, current);
+    const provider = requireProvider(config, command.providerId);
+    const ids = new Set(provider.models.map((model) => model.id));
+    for (const model of command.models) {
+      if (ids.has(model.id)) throw new Error(`${model.id} is already in ${provider.name}.`);
+      ids.add(model.id);
+    }
+    const models = [...provider.models, ...command.models];
+    const warning = await saveDraft(layer, { next: replaceProvider(config, { ...provider, models }), previous: config,
+      newKey: null, probeRefs: modelRefs(provider.id, command.models) });
+    return { value: {}, warning };
   }, {});
 }
 
@@ -450,6 +506,57 @@ async function dismissMigration(layer: ModelLayer): Promise<ModelsResult> {
   }
 }
 
+// ---- 拉取模型（model-discovery.md §5.1–§5.3） ----
+
+/**
+ * @brief models.discover 要读的新提供商（§5.1、§3.1）：按 §3.1 整理地址；key 去掉首尾空白，为空时不带认证头，
+ *        否则按保存 key 的同一条规则检查。key 只在这次读取里用：不存、不进模型池、不写日志。
+ * @throws 地址不是 http 或 https URL；key 含不能写进请求头的字符（错误文字不带 key）
+ */
+function newTarget(target: Extract<DiscoverTarget, { kind: 'new' }>): DiscoverRequest {
+  const normalized = normalizeBaseUrl(target.baseUrl);
+  if (!normalized) throw new Error('Base URL must be an http or https URL.');
+  const key = target.keySecret?.trim() ?? '';
+  return { base: normalized.base, anthropicHint: normalized.anthropicHint, existing: false,
+    secret: key === '' ? null : headerSafeSecret(key), shareKey: null, api: target.api, configured: [] };
+}
+
+/**
+ * @brief models.discover 要读的已有提供商（§5.1）：地址与 api 用配置里的，不整理、不识别；key 由模型层按 §5.1 选，
+ *        不回到界面；configured 给结果的 added、notListed。
+ * @throws 没有配置或读不出；提供商不存在
+ */
+function providerTarget(layer: ModelLayer, providerId: string): DiscoverRequest {
+  const provider = requireProvider(requireConfig(layer, layer.getConfig()), providerId);
+  return { ...layer.readTarget(provider), api: provider.api, configured: provider.models.map((model) => model.id) };
+}
+
+/**
+ * @brief models.discover（§5.1–§5.3）：不进修改队列（layer.edit）、不写配置；同一时刻只做一次，由读取器取消正在进行的
+ *        那次。命令本身失败（地址、key 不合格，提供商不存在）时 error 为原文，这时也取消正在进行的那次（§5.3：
+ *        新的一次到来时取消旧的）。
+ */
+async function discover(layer: ModelLayer, command: Cmd<'models.discover'>): Promise<DiscoverResult> {
+  const { target } = command;
+  try {
+    const request = target.kind === 'new' ? newTarget(target) : providerTarget(layer, target.providerId);
+    return await layer.reader.command(request);
+  } catch (error) {
+    layer.reader.cancelCommand();
+    return discoverFailure(failure(command.type, error));
+  }
+}
+
+/** @brief models.discoverCancel（§5.3）：取消正在进行的 models.discover，没有时什么也不做；不取消探针第 0 步与读版本。 */
+function discoverCancel(layer: ModelLayer): ModelsResult {
+  try {
+    layer.reader.cancelCommand();
+    return { error: null };
+  } catch (error) {
+    return { error: failure('models.discoverCancel', error) };
+  }
+}
+
 /** @brief 删除与改动类的写命令；不是这几种时返回 undefined。 */
 function handleEdit(layer: ModelLayer, command: ModelsCommand): Promise<unknown> | undefined {
   switch (command.type) {
@@ -473,7 +580,7 @@ function handleEdit(layer: ModelLayer, command: ModelsCommand): Promise<unknown>
 }
 
 /**
- * @brief 执行一条 models.* 命令（§9.5）。
+ * @brief 执行一条 models.* 命令（§9.5；model-discovery.md §5）。
  * @param command 已经过 zod 校验的命令
  */
 export async function handleModelsCommand(command: ModelsCommand): Promise<unknown> {
@@ -484,6 +591,9 @@ export async function handleModelsCommand(command: ModelsCommand): Promise<unkno
     case 'models.firstRun': return firstRun(layer, command);
     case 'models.saveProvider': return saveProvider(layer, command);
     case 'models.saveModel': return saveModel(layer, command);
+    case 'models.addModels': return addModels(layer, command);
+    case 'models.discover': return discover(layer, command);
+    case 'models.discoverCancel': return discoverCancel(layer);
     case 'models.moveModel': return moveModel(layer, command);
     case 'models.addKey': return addKey(layer, command);
     case 'models.removeKey': return removeKey(layer, command);

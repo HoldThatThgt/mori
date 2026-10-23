@@ -1,13 +1,16 @@
 // 模型档案（docs/specs/model-providers.md §7.1、§7.2、§7.4、§7.5）：档案键与指纹、model-profiles.json 的读写、
 // 由探针结果派生能力三态与交接写入等级、给界面的 ProfileView，以及选择器第 3 步用的 tool_calling 状态。
 // 档案描述的是服务端上的模型（地址、接口、模型 id、服务版本），所以按这几项存，不按 Mori 的提供商 id 存。
+// 一键拉取模型（docs/specs/model-discovery.md §7.2、§7.3）：auto.meta 记第 0 步读到的报告值，ProfileView.reported
+// 给模型行的提示；server.kind 为 §3.3 的全部种类；versionChanged 按读版本的结果（种类、版本）判断要不要重新探测。
 
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { z } from 'zod';
-import type {
-  ApiType, Capability, Compat, ProbeProgress, ProbeStepResult, ProfileView, ProviderModel, ReasoningField,
-  ServerKind,
+import {
+  SERVER_KINDS,
+  type ApiType, type Capability, type Compat, type ProbeProgress, type ProbeStepResult, type ProfileView,
+  type ProviderModel, type ReasoningField, type ReportedValues, type ServerKind,
 } from '../shared/models';
 import type { ModelRef, ToolCallingState } from './modelTypes';
 
@@ -49,12 +52,51 @@ export interface AutoSteps {
   c: ProbeStepResult;
 }
 
+/**
+ * @brief 第 0 步按 model-discovery.md §4.1 读到的、窗口以外的报告值（§7.2 auto.meta）：没报告为 null；
+ *        reasoning、image 明确报告“没有”时为 false。
+ */
+export interface ServerMeta {
+  /** 服务报告的输出上限（不小于窗口的不算报告） */
+  maxTokens: number | null;
+  /** 服务报告的思考支持 */
+  reasoning: boolean | null;
+  /** 服务报告的图片输入 */
+  image: boolean | null;
+}
+
+/** @brief 读取器单模型模式的结果（探针第 0 步，model-discovery.md §7.1），由 modelDiscover.ts 给出。 */
+export interface ServerRead {
+  /** 服务种类：拿不到列表时按 §3.3 第 6 步能判断的，判断不了为 unknown */
+  kind: ServerKind;
+  /** 服务版本（§3.3 的读法）；这个种类没有版本请求或读不到时为 null */
+  version: string | null;
+  /** 服务报告的窗口；Ollama 只读到训练窗口、模型不在列表里或拿不到列表时为 null（§7.2） */
+  reported: number | null;
+  /** 窗口以外的报告值；拿不到列表或模型不在列表里时各项为 null */
+  meta: ServerMeta;
+}
+
+/** @brief 读版本的结果（model-discovery.md §7.3），每个提供商（baseUrl + api）读一次。 */
+export interface VersionRead {
+  /** 拿到了模型列表 */
+  listed: boolean;
+  /** 按 §3.3 认出的种类；没拿到列表时为 unknown */
+  kind: ServerKind;
+  /** 读到的版本；这个种类没有版本请求或没读到时为 null */
+  version: string | null;
+  /** 这个种类有版本请求并且读到了版本 */
+  versionRead: boolean;
+}
+
 /** @brief 一组自动探针（第 0–7 步）的结果，由 probes.ts 给出。 */
 export interface AutoResults {
   /** 第 0 步：服务种类与版本；版本取不到时为 unknown */
   server: { kind: ServerKind; version: string };
-  /** 第 0 步：服务报告的窗口（/models 的 max_model_len 或 /props 的 n_ctx）；没有时为 null */
+  /** 第 0 步：服务报告的窗口（model-discovery.md §4.1、§4.2 的读法；Ollama 只读到训练窗口时为 null）；没有时为 null */
   reported: number | null;
+  /** 第 0 步：窗口以外的报告值（model-discovery.md §7.2）；2026-10-23 以前的档案没有这一项，照样读、不重新探测 */
+  meta?: ServerMeta;
   /** 各步的判定 */
   steps: AutoSteps;
   /** 第 1、2、4 步观察到的推理字段名（openai-completions）；没有思考内容时为 none，其他接口为 native */
@@ -138,12 +180,16 @@ export function needsProbe(target: ProfileTarget, stored: StoredProfile | undefi
 }
 
 /**
- * @brief 读到的服务版本是否算版本变化：读失败（null）时档案不变；只有读到与档案不同的版本才算（§7.1）。
- * @param read 这次读到的版本；连接失败、非 2xx、没有版本字段时为 null
+ * @brief 读版本的结果是否要重新探测（§7.1；model-discovery.md §7.3）：拿不到列表时档案不变；拿到列表且种类与档案不同时
+ *        重新探测；种类相同时只有读到了版本（versionRead）且与档案不同才算。种类本来没有版本请求、或版本请求失败时
+ *        versionRead 为假，只比种类。
+ * @param stored 这个模型的档案；没有时为 undefined
+ * @param read 这个模型所在提供商（baseUrl + api）的读版本结果
  */
-export function versionChanged(stored: StoredProfile | undefined, read: string | null): boolean {
-  if (!stored || read === null) return false;
-  return read !== stored.auto.server.version;
+export function versionChanged(stored: StoredProfile | undefined, read: VersionRead): boolean {
+  if (!stored || !read.listed) return false;
+  if (read.kind !== stored.auto.server.kind) return true;
+  return read.versionRead && read.version !== stored.auto.server.version;
 }
 
 // ---- 能力三态与等级（§7.2、§7.3、§7.5） ----
@@ -213,6 +259,17 @@ export function cancelVerifiedOf(cancel: CancelResult | null): boolean | 'unknow
   return cancel?.verified ?? 'unknown';
 }
 
+/**
+ * @brief reported（model-discovery.md §7.2）：第 0 步读到的服务报告的值，窗口同 context.reported；
+ *        档案没有 meta（2026-10-23 以前的旧档案）时为 null，模型行只按推理字段提示（§8）。
+ * @param auto 档案的第 0–7 步结果
+ */
+export function reportedOf(auto: AutoResults): ReportedValues | null {
+  const meta = auto.meta;
+  if (!meta) return null;
+  return { contextWindow: auto.reported, maxTokens: meta.maxTokens, reasoning: meta.reasoning, image: meta.image };
+}
+
 /** @brief status：至少一步出错没有结果为 error（附第一条原文），否则 ready。 */
 export function statusOf(stored: StoredProfile): { status: 'ready' | 'error'; error: string | null } {
   const steps = [...Object.values(stored.auto.steps), stored.longInput?.step, stored.cancel?.step];
@@ -241,6 +298,8 @@ function probingView(target: ProfileTarget): ProfileView {
     reasoning: reasoningOf(target.api, null),
     context: contextOf(target.model, null, null),
     cancel_verified: 'unknown',
+    // model-discovery.md §7.2：还没有档案，没有报告值
+    reported: null,
     probedAt: null,
     suite: PROBE_SUITE,
   };
@@ -260,6 +319,7 @@ function storedView(target: ProfileTarget, stored: StoredProfile): ProfileView {
     reasoning: reasoningOf(target.api, stored.auto),
     context: contextOf(target.model, stored.auto.reported, stored.longInput),
     cancel_verified: cancelVerifiedOf(stored.cancel),
+    reported: reportedOf(stored.auto),
     probedAt: stored.probedAt,
     suite: stored.suite,
   };
@@ -335,6 +395,15 @@ const StepSchema = z.object({
   detail: z.string().nullable(),
 });
 
+/**
+ * auto.meta（model-discovery.md §7.2）：可选，2026-10-23 以前的档案没有这一项，照样读、不重新探测（PROBE_SUITE 不变）
+ */
+const MetaSchema = z.object({
+  maxTokens: z.number().int().positive().nullable(),
+  reasoning: z.boolean().nullable(),
+  image: z.boolean().nullable(),
+});
+
 const StoredProfileSchema = z.object({
   key: z.string(),
   fingerprint: z.string(),
@@ -342,8 +411,10 @@ const StoredProfileSchema = z.object({
   api: z.enum(['openai-completions', 'openai-responses', 'anthropic-messages']),
   modelId: z.string(),
   auto: z.object({
-    server: z.object({ kind: z.enum(['vllm', 'sglang', 'ollama', 'llamacpp', 'unknown']), version: z.string() }),
+    // model-discovery.md §7.2：§3.3 的全部种类，原来的五种都在其中
+    server: z.object({ kind: z.enum(SERVER_KINDS), version: z.string() }),
     reported: z.number().int().positive().nullable(),
+    meta: MetaSchema.optional(),
     steps: z.object({ ready: StepSchema, thinking: StepSchema, call: StepSchema, result: StepSchema,
       replay: StepSchema, a: StepSchema, b: StepSchema, c: StepSchema }),
     field: z.enum(['reasoning_content', 'reasoning', 'reasoning_text', 'none', 'native']),
@@ -415,6 +486,14 @@ export async function writeProfiles(path: string, profiles: readonly StoredProfi
 /** @brief 同一个服务端模型（地址、接口、模型 id）只留一个档案，不论服务版本。 */
 function sameModel(stored: StoredProfile, target: ProfileTarget): boolean {
   return stored.baseUrl === target.baseUrl && stored.api === target.api && stored.modelId === target.model.id;
+}
+
+/**
+ * @brief 服务端模型（地址、接口、模型 id，§7.1）的索引键，与 sameModel 的判断一致；写成 JSON 数组，
+ *        地址或模型 id 里有 | 时也不会混淆。
+ */
+function serverModelId(baseUrl: string, api: ApiType, modelId: string): string {
+  return JSON.stringify([baseUrl, api, modelId]);
 }
 
 /** @brief ProfileBook 的参数。 */
@@ -500,16 +579,27 @@ export class ProfileBook {
   }
 
   /**
-   * @brief 界面的档案（mori.profiles、models.get）。
+   * @brief 界面的档案（mori.profiles、models.get）。加入的每个模型都自动跑探针（model-discovery.md §5.4），每次快照
+   *        都算全部模型，所以一次调用只按服务端模型给档案建一次索引，整次随模型数线性增长，不再每个 ref 各找一遍
+   *        （model-discovery.md §9 安全与资源；负责人：不能无限量地用内存、CPU）。
    * @param refs 配置里的全部模型
+   * @param resolve ref → 服务端模型（调用方按配置建好一次的索引）；省略时用构造时的 resolve
    * @return 没有档案、也不在探测的模型不出现
    */
-  views(refs: readonly ModelRef[]): Record<ModelRef, ProfileView> {
+  views(refs: readonly ModelRef[], resolve?: (ref: ModelRef) => ProfileTarget | null): Record<ModelRef, ProfileView> {
+    const find = resolve ?? ((ref: ModelRef) => this.options.resolve(ref));
+    const byModel = new Map<string, StoredProfile>();
+    for (const stored of this.profiles) {
+      const id = serverModelId(stored.baseUrl, stored.api, stored.modelId);
+      // 同 lookup 的 find：有重复时取第一个
+      if (!byModel.has(id)) byModel.set(id, stored);
+    }
     const out: Record<ModelRef, ProfileView> = {};
     for (const ref of refs) {
-      const target = this.options.resolve(ref);
+      const target = find(ref);
       if (!target) continue;
-      const view = profileView(target, this.lookup(target), this.isRunning(ref));
+      const stored = byModel.get(serverModelId(target.baseUrl, target.api, target.model.id));
+      const view = profileView(target, stored, this.isRunning(ref));
       if (view) out[ref] = view;
     }
     return out;
