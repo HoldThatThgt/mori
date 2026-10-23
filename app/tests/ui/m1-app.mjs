@@ -118,7 +118,9 @@ async function firstRun({ app, page, h, project, userData }) {
   record('首次启动：key 错误时 Fetch models 得到列表错误 rejected，手填 fake-coder 后测试连接显示错误原文',
     /^(Connection failed|Failed)/.test(wrong) && wrong.includes('401') && rejected?.state === 'list-error'
     && rejected.kind === 'rejected', `${JSON.stringify(rejected)}；${oneLine(wrong)}`);
-  const listed = await h.fillConnection({ apiKey: testKey, modelId: 'fake-coder' });
+  // 圆环的检查（composer-pickers）按 128,000 的窗口写；原来首次启动表单的默认窗口就是它，拉取之后清单行是合成端点报告的
+  // 131072，这里在清单行里改成 128000（model-discovery.md §6.2：行的 Context window 可以改）
+  const listed = await h.fillConnection({ apiKey: testKey, modelId: 'fake-coder', contextWindow: 128000 });
   await form.locator('[data-action="test"]').click();
   const ok = await h.formMessage(wrong, { test: true });
   await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
@@ -242,13 +244,14 @@ async function chooseRange(page, pick) {
   }, pick, { timeout: 30000 });
 }
 
-/** @brief 设置 → Models 里给合成端点加一个模型 id，等它的 tool calling 验证过（自动探测没跑时点一次 Verify）。 */
+/**
+ * @brief 设置 → Models 里给合成端点加一个模型 id，等它的 tool calling 验证过（自动探测没跑时点一次 Verify）。
+ *        一键拉取模型（model-discovery.md §6.5、§13.4）：卡上 Fetch models → 列表里没有的 id 用 Add a model ID 手填 → Add 1 model。
+ */
 async function addVerifiedModel(page, h, id) {
   await h.openModels();
-  await h.providerCard().locator('[data-action="add-model"]').click();
-  const form = page.getByTestId('model-form');
-  await form.getByLabel('Model ID', { exact: true }).fill(id);
-  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  const added = await h.addModels([id]);
+  if (added.error) throw new Error(`Add ${id}: ${added.error}`);
   const row = page.locator(`[data-testid="model-row"][data-model="mori-endpoint/${id}"]`);
   const verified = row.locator('[data-field="tool_calling"][data-value="verified"]');
   await row.waitFor({ timeout: 15000 });
@@ -582,7 +585,8 @@ async function ringTones({ project }, tokens) {
  */
 async function ringCompacted({ project }) {
   const settings = { compaction: { enabled: true, reserveTokens: 127500, keepRecentTokens: 1 } };
-  const fresh = await freshApp('mori-m1-app-compact-', project, { settings });
+  // 128,000 的窗口在清单行里填（拉取后清单行是合成端点报告的 131072，model-discovery.md §6.2）
+  const fresh = await freshApp('mori-m1-app-compact-', project, { settings, contextWindow: 128000 });
   try {
     const { page, h } = fresh;
     const compactions = () => page.getByText('Compacted session', { exact: true }).count();

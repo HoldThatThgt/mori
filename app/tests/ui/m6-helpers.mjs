@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { appRoot, sleep } from './lib.mjs';
 import { PANE, paneOf, rowOf, settle, stubFolder, waitReady } from './m3-helpers.mjs';
 import { waitPaneReady, waitSplit } from './m5-helpers.mjs';
-import { OPEN_FOLDER } from './page.mjs';
+import { cardAddModels, OPEN_FOLDER } from './page.mjs';
 
 /**
  * @brief 启动合成端点（synthetic），等它打出启动行；最多等 15 秒。
@@ -45,11 +45,12 @@ export async function resizeWindow(app, width, height) {
  *        undefined 表示不会问。名称默认 "Mori endpoint"（提供商 id mori-endpoint）。
  *        一键拉取模型（model-discovery.md §13.4，page.mjs firstRun）：先 Fetch models，这次拉取必须拿到列表（对的 key），
  *        否则报错；modelId 不在列表里时用 Add a model ID 手填（m6-app-slash 的长模型 id）。
+ *        contextWindow 给出时在清单行里改上下文窗口（不给时是合成端点报告的 131072）。
  */
 export async function firstRunAndOpen(ctx, { name = 'Mori endpoint', baseUrl, apiKey, modelId = 'fake-coder', project,
-  trust, reasoning }) {
+  trust, reasoning, contextWindow }) {
   const { page, h } = ctx;
-  const run = await h.firstRun({ name, baseUrl, apiKey, modelId, reasoning });
+  const run = await h.firstRun({ name, baseUrl, apiKey, modelId, reasoning, contextWindow });
   if (!run.ok || run.probe !== 'verified') throw new Error(`first run: ${run.text}; probes ${run.probe}`);
   if (run.fetch?.state !== 'list') throw new Error(`first run: Fetch models gave ${JSON.stringify(run.fetch)}`);
   await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
@@ -103,22 +104,14 @@ export async function waitVerified(page, ref, timeout = 120000) {
 }
 
 /**
- * @brief 设置 → Models 的提供商卡上"Add model"：填 Model ID、Context window、Max output（小于窗口），Save，等新行出现、
+ * @brief 设置 → Models 的提供商卡上加一个模型（一键拉取模型，model-discovery.md §6.5、§13.4）：卡上 Fetch models →
+ *        清单里勾它（列表里没有时用 Add a model ID 手填），改 Context window、Max output → Add 1 model，等新行出现、
  *        探针跑完（不跑完时这个模型被静态校验排除）。返回 Tool calling 的取值。设置页要已经在 Models 一节。
- * @param model.id 模型 id；model.contextWindow 上下文长度；model.maxTokens 最大输出（不给时取窗口的一半与 16384 中较小的）
+ * @param model.id 模型 id；model.contextWindow 上下文长度；model.maxTokens 最大输出（不给时随窗口取一半与 16384 中较小的）
  */
 export async function addModelUi(page, provider, { id, contextWindow, maxTokens }) {
-  await providerCard(page, provider).locator('[data-action="add-model"]').click();
-  const form = page.getByTestId('model-form');
-  await form.waitFor({ timeout: 5000 });
-  await form.getByLabel('Model ID', { exact: true }).fill(id);
-  if (contextWindow) {
-    await form.getByLabel('Context window', { exact: true }).fill(String(contextWindow));
-    const max = maxTokens ?? Math.min(16384, Math.floor(contextWindow / 2));
-    await form.getByLabel('Max output', { exact: true }).fill(String(max));
-  }
-  await form.getByRole('button', { name: 'Save', exact: true }).click();
-  await form.waitFor({ state: 'detached', timeout: 15000 });
+  const added = await cardAddModels(page, provider, [{ id, contextWindow, maxTokens }]);
+  if (added.error) throw new Error(`Add ${provider}/${id}: ${added.error}`);
   await modelRow(page, `${provider}/${id}`).waitFor({ timeout: 10000 });
   return waitVerified(page, `${provider}/${id}`);
 }

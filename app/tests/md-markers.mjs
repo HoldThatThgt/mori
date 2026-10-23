@@ -1,5 +1,5 @@
 // MD-15 的一项附加检查（docs/specs/model-discovery.md §13.3；负责人的规则：不留未完成项）：这次工作新加的行里
-// 不能有推迟实现的标记。新加的行 = 已跟踪的文件：HEAD 与 app-v0 的 merge-base 到工作区的 git diff 里新增的行；
+// 不能有推迟实现的标记。新加的行 = 已跟踪的文件：HEAD 与 origin/app-v0 的 merge-base 到工作区的 git diff 里新增的行；
 // 没跟踪、也没被忽略的文件（git ls-files --others --exclude-standard）：每一行。只看 app/src 与 app/tests，
 // 不看 app/tests/fixtures/（录下的服务数据，不是这次写的代码）。没改过的旧代码里本来就有这些词，所以只看新加的行；
 // 只有行尾 CR 变了的行（例如编辑器把整个文件从 LF 换成 CRLF）不算新加的行（--ignore-cr-at-eol）。
@@ -9,15 +9,18 @@
 // 每个命中打印一行 "<文件>:<行号>: <内容>"（文件相对仓库根目录），最后一行 "PASS MD-15 …" 或 "FAIL MD-15 …"
 // （同其他套件；tests/ui/v1-models-existing.mjs --id MD-15 把它记作 "MD-15 md-markers"）。
 // 用法（在 app/ 下）：node tests/md-markers.mjs
-// 退出码：没有命中为 0，有命中为 1，git 命令失败（例如没有 app-v0 分支）为 2。
+// 退出码：没有命中为 0，有命中为 1，git 命令失败（例如没有 origin/app-v0）为 2。
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const repoRoot = resolve(import.meta.dirname, '..', '..');
-/** 这次工作从它分出：比较的起点是 HEAD 与它的 merge-base */
-const BASE_BRANCH = 'app-v0';
+/**
+ * 这次工作从它分出：比较的起点是 HEAD 与它的 merge-base。用远端的 app-v0：分支合并的是 origin/app-v0（合并后
+ * 本地的 app-v0 可能还停在旧的提交上，那时它带进来的别人的行会被算成这次新加的）
+ */
+const BASE_BRANCH = 'origin/app-v0';
 /** 只看这两处，录下的服务数据不看（git 的 pathspec，相对仓库根目录） */
 const PATHSPECS = ['app/src', 'app/tests', ':(exclude)app/tests/fixtures'];
 /** 命中一行时打印的内容最多多少字符 */
