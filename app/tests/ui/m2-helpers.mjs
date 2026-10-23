@@ -1,4 +1,4 @@
-// M2 测试（m2-app.mjs、m2-replay.mjs、m2-real.mjs）共用的页面读取：输入框下面一行的权限按钮和其余几项（选择范围、Effort、
+// M2 测试（m2-app.mjs、m2-replay.mjs、m2-real.mjs；F8 的几项也给 mem-app-settings.mjs 用）共用的页面读取：输入框下面一行的权限按钮和其余几项（选择范围、Effort、
 // 上下文用量圆环、不能发送时的说明）、往上打开的权限菜单的位置、文字和底色的对比度、F8 报告"Current view"里新加的三项。
 // 2026-10-21 起权限、选择范围（v1）、Effort 和上下文用量从顶栏移到输入框下面一行（docs/v0/composer-pickers.md、
 // screens/approval.md、models.md、chat.md、f8.md）。按钮状态的读法照 composer-pickers.md"测试要改的地方"C1 / C2：
@@ -414,5 +414,21 @@ export function f8ViewProblems(fields, facts) {
     [next('Session file', 'Model range') && next('Model range', 'Model') && next('Model', 'Effort')
       && next('Effort', 'Running') && next('Window size', 'Pane width') && next('Pane width', 'Sidebar width'),
     `order ${labels.join(', ')}`],
+  ]);
+}
+
+/**
+ * @brief 不在会话页上按 F8 时报告"Current view"与规定不符的地方（f8.md"保存的内容"）："Pane width"是"None"，
+ *        各在一处，紧跟"Window size"、在"Sidebar width"前面。原来由 m7-app.mjs 在工作回顾页上检查，工作回顾删除后
+ *        由 mem-app-settings.mjs 在设置页、记忆页和 Customize 页上检查。
+ * @param fields [{ label, value }]（viewFields 的结果）
+ */
+export function offPaneViewProblems(fields) {
+  const labels = fields.map((field) => field.label);
+  const widths = fields.filter((field) => field.label === 'Pane width');
+  const next = (a, b) => labels.includes(a) && labels.indexOf(b) === labels.indexOf(a) + 1;
+  return failed([
+    [widths.length === 1 && widths[0].value === 'None', `Pane width ${JSON.stringify(widths.map((f) => f.value))}`],
+    [next('Window size', 'Pane width') && next('Pane width', 'Sidebar width'), `order ${labels.join(', ')}`],
   ]);
 }

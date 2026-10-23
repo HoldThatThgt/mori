@@ -1,8 +1,12 @@
 // 合成测试端点（synthetic）：只用于本地验证管线，不是真实模型。
 // 实现 OpenAI 兼容的 /v1/models 与流式 /v1/chat/completions，另有 /version、/metrics（docs/specs/model-providers.md §14.1）。
-// 多个提供商 = 多个端口（各起一个进程）。关键词回复在 replies.mjs，探针在 probes.mjs，脚本模式在 scripts.mjs。
+// 多个提供商 = 多个端口（各起一个进程）。关键词回复在 replies.mjs，探针在 probes.mjs，脚本模式在 scripts.mjs，
+// 增强脚本在 enhance.mjs。
 //
-// 判断顺序：认证与 -replay 的拒绝 → 探针 → -404、-hang、-stall → pi 的压缩请求 → 脚本模式 → 关键词。
+// 判断顺序：认证与 -replay 的拒绝 → 探针 → -404、-hang、-stall → pi 的压缩请求 → 脚本模式 → 增强脚本 → 关键词。
+// 增强脚本（docs/specs/memory.md §14.1，规则逐条列在 enhance.mjs 开头）：请求里没有 tb-scenario、最后一条用户消息是
+// 增强会话的第一条消息（附录 B 的第一句开头），且 FAKE_ENHANCE_SCRIPT 指向的脚本文件里有这种时按脚本回复；
+// 这时同样不用下面的关键词规则与故障关键词。
 // 脚本模式（docs/specs/parallel-agents-taskboard.md §17.1，规则逐条列在 scripts.mjs 开头）：请求里出现 "tb-scenario:<名字>"
 // 时按那个场景的脚本回复，不用下面的关键词规则，也不用 http-NNN、overflow-once、slow、drop-after-first 这些故障关键词。
 // "最后一条用户消息"不算只有工作卡（<mori-work-card>…</mori-work-card>）的那条。
@@ -80,17 +84,20 @@
 // 日志：每个请求一行 "[fake-endpoint] METHOD url"；每个对话请求另打一行 JSON
 //   {"port","model","key"(key 末 4 位，没有为 null),"roles"(消息角色序列),"status"(-hang 为 null),"probe"}，
 //   后面接着 scripts.mjs 的 logFields（agent、kind、task、scenario、k、j、tools、toolChoice、format、calls；
-//   不是脚本模式时 scenario 为 null，其余照样算），最后是 "strictTools"（function.strict 为 true 的工具名）与
+//   不是脚本模式时 scenario 为 null，其余照样算）、"enhance"（enhance.mjs 认出的增强会话的种类 taste、strategy、
+//   review，不是增强会话时为 null），最后是 "strictTools"（function.strict 为 true 的工具名）与
 //   "reasoning"（请求是否带思考参数：reasoning_effort、reasoning、thinking、enable_thinking 之一），
 //   平行 Agent 规格 §7.5 的 A 级只给交接的工具加 strict、关闭思考由它们检查。
 // 工具调用 id："call_fake_<端口>_<进程启动时刻>_<进程内计数>"，并行的请求之间、端点重启前后都不重复。
-// 其他环境变量：FAKE_PORT（默认 4319）、FAKE_CHUNK_DELAY_MS（默认 20）、FAKE_FIRST_DELAY_MS（默认 0）。
+// 其他环境变量：FAKE_PORT（默认 4319）、FAKE_CHUNK_DELAY_MS（默认 20）、FAKE_FIRST_DELAY_MS（默认 0）、
+//   FAKE_ENHANCE_SCRIPT（增强脚本文件，见 enhance.mjs）。
 
 import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { contentText, isSummaryRequest, planReply, summaryReply } from './replies.mjs';
 import { probeReply, probeStep, replayRejected, thinkingOn } from './probes.mjs';
 import { logFields, scriptReply, sessionOf, withoutWorkCards } from './scripts.mjs';
+import { enhanceKindOf, enhanceReply } from './enhance.mjs';
 
 const env = process.env;
 const port = Number(env.FAKE_PORT ?? 4319);
@@ -359,13 +366,15 @@ function keywordPlan(body, messages) {
 }
 
 /**
- * @brief 不是探针的请求的计划：压缩请求回摘要；有 tb-scenario 时按脚本；其他按关键词。-replay 开着思考时附思考。
+ * @brief 不是探针的请求的计划：压缩请求回摘要；有 tb-scenario 时按脚本；增强会话有脚本时按增强脚本；其他按关键词。
+ *        -replay 开着思考时附思考。
  * @return { failure } 或 { reply, lastText（关键词模式下最后一条用户消息的文字，slow、drop-after-first 用） }
  */
 function conversationPlan(body, flags, info) {
   const messages = body.messages ?? [];
   if (isSummaryRequest(messages)) return { reply: summaryReply() };
-  const plan = info.scenario !== null ? scriptReply(body, flags, info) : keywordPlan(body, withoutWorkCards(messages));
+  const plan = info.scenario !== null ? scriptReply(body, flags, info)
+    : enhanceReply(messages, info.scenario) ?? keywordPlan(body, withoutWorkCards(messages));
   if (plan.reply && flags.has('replay') && thinkingOn(body) && !plan.reply.thinking) {
     plan.reply.thinking = REPLAY_THINKING;
   }
@@ -388,7 +397,9 @@ async function handleChat(req, res) {
   const flags = flagsOf(body.model);
   const step = probeStep(messages);
   const info = sessionOf(messages);
-  const log = (status, calls = []) => logRequest(req, body, step > 0, status, logFields(body, info, calls));
+  const enhance = enhanceKindOf(messages, info.scenario);
+  const log = (status, calls = []) => logRequest(req, body, step > 0, status,
+    { ...logFields(body, info, calls), enhance });
   trackRunning(res, flags);
   const replay = replayRejected(body, flags, state.reasonedCalls)
     ? { status: 400, body: errorBody(REPLAY_MESSAGE, 'invalid_request_error') } : null;

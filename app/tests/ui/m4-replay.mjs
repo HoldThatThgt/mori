@@ -15,8 +15,8 @@ import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
-  changeList, composerChips, dragSelect, expandChange, jumpHighlight, lastReplyHasActions, PANE, popoverShown,
-  replyActionRows, selectLines, sentQuotes, viewerState, waitViewer,
+  changeList, composerChips, dragSelect, expandChange, FEEDBACK_NOTE_OFF, feedbackNote, jumpHighlight,
+  lastReplyHasActions, PANE, popoverShown, replyActionRows, selectLines, sentQuotes, viewerState, waitViewer,
 } from './m4-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -303,6 +303,7 @@ async function streamFeedback(page, h) {
   const kept = await page.evaluate(() => window.getSelection().toString());
   const running = await page.locator(PANE).getAttribute('data-running');
   await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
+  const note = await feedbackNote(page);
   await page.evaluate(() => { window.__replay.feedback.error = 'Synthetic save failure'; });
   await page.getByTestId('feedback-input').pressSequentially('希望短一点', { delay: 50 });
   await page.getByTestId('feedback-form').getByRole('button', { name: 'Save' }).click();
@@ -314,10 +315,14 @@ async function streamFeedback(page, h) {
   const status = await h.status();
   record('stream-feedback：生成中选中一句话，浮层出现，新流入的文字不清掉选区', shown && running === 'true'
     && kept === sentence && [...sentence].length === 12, JSON.stringify({ shown, running, kept }));
-  record('stream-feedback：保存失败保留已输入的文字并显示原文；再记录后"已记录 · 在工作回顾中查看"',
+  record('stream-feedback：保存失败保留已输入的文字并显示原文；再记录后"已记录"（Saved，没有链接，记忆规格 §10.7）',
     error === 'Couldn’t save your feedback: Synthetic save failure' && typed === '希望短一点'
-    && saved === 'Saved · View in Review',
+    && saved === 'Saved',
     JSON.stringify({ error, typed, saved }));
+  const asked = status.queries.filter((query) => query.type === 'enhance.get');
+  record('stream-feedback：底部说明是没开增强时的整段（记忆规格 §10.7：表单打开时问一次 enhance.get，录制里没有它，'
+    + '回放桥合成关着的增强，synthetic）', note === FEEDBACK_NOTE_OFF && asked.length >= 1
+    && asked.every((query) => typeof query.cwd === 'string'), JSON.stringify({ note, asked }));
   record('stream-feedback：反馈只交给主进程保存（原文、期望、回复的消息时间），没有发给后台进程任何命令',
     status.feedback.length === 1 && status.feedback[0].quote === sentence && status.feedback[0].expected === '希望短一点'
     && typeof status.feedback[0].source.time === 'number' && status.commands.length === 2, JSON.stringify({

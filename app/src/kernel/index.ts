@@ -1,11 +1,15 @@
 // 后台进程入口（utilityProcess）：接收主进程转交的 MessagePort，校验并分发命令，广播事件，按要求有序退出。
 
 import type { MessagePortMain } from 'electron';
-import { CommandSchema, type EventEnvelope, type GlobalEventEnvelope, type KernelMessage } from '../shared/protocol';
+import {
+  CommandSchema, type EventEnvelope, type GlobalEvent, type GlobalEventEnvelope, type KernelMessage,
+} from '../shared/protocol';
 import { handleCommand } from './commands';
 import { onStoreKeyResult } from './credentials';
+import { startEnhance, stopEnhance } from './enhance';
 import { setUserData } from './instances';
 import { closeSharedServers, startSharedServers } from './mcpShare';
+import { startMemory } from './memory';
 import { startModelLayer } from './modelLayer';
 import { loadPi } from './pi';
 import { shutdownSessions } from './sessions';
@@ -27,6 +31,11 @@ function emit(envelope: EventEnvelope | GlobalEventEnvelope): void {
   for (const port of ports) post(port, envelope);
 }
 
+/** @brief 广播一个全局事件（模型层、记忆与增强的事件）。 */
+function emitGlobal(event: GlobalEvent): void {
+  emit({ kind: 'event', sessionId: null, event });
+}
+
 /**
  * @brief 主进程送来 userData 与全部 key 后启动模型层（读配置或迁移、编译到 pi、建模型池，§4、§8）。
  *        启动失败时记录；之后的模型层命令都按失败回复。
@@ -36,8 +45,7 @@ function emit(envelope: EventEnvelope | GlobalEventEnvelope): void {
 async function startModels(userData: string, keys: Record<string, string>): Promise<void> {
   try {
     const pi = await loadPi();
-    await startModelLayer({ userData, agentDir: pi.getAgentDir(), keys,
-      emitGlobal: (event) => emit({ kind: 'event', sessionId: null, event }) });
+    await startModelLayer({ userData, agentDir: pi.getAgentDir(), keys, emitGlobal });
   } catch (error) {
     console.error(`[kernel] model layer did not start: ${(error as Error).message}`);
   }
@@ -90,16 +98,23 @@ process.parentPort.on('message', (event) => {
   if (message?.type === 'start') {
     // 每个用户会话的 TaskBoard 放在 <userData>/teams/<会话 id> 下（平行 Agent 规格 §3）。
     setUserData(message.userData);
-    void startModels(message.userData, message.keys);
+    // 记忆（docs/specs/memory.md §6）：记下记忆目录与全局事件的发送；增强调度在模型层启动之后开始（§9.3）。
+    startMemory(message.userData, emitGlobal);
+    const userData = message.userData;
+    void startModels(userData, message.keys)
+      .then(() => startEnhance({ userData, emitGlobal }))
+      .catch((error: unknown) => console.error(`[kernel] enhancement did not start: ${String(error)}`));
     // 照 Claude 桌面版，启动时就起用户级启用的 stdio MCP 服务（docs/v0/m6-mcp-shared.md），在后台连接、不挡住命令。
     // 主进程把后台进程放进作业对象之后才发 key（kernel-process.ts），这之后起的服务进程都在作业里。
     void startSharedServers();
   }
   if (message?.type === 'store-key-result') onStoreKeyResult(message.id, message.error);
   if (message?.type === 'shutdown') {
-    // 先停止并释放所有会话，再关掉共享的 MCP 服务（照 pi 的做法结束进程树），然后通知主进程；
-    // 主进程随后结束整个进程树，清掉命令留下的子进程（pi #9129）。
-    void shutdownSessions()
+    // 先停下增强（正在跑的那一次记失败，docs/specs/memory.md §9.6），再停止并释放所有会话，再关掉共享的 MCP 服务
+    // （照 pi 的做法结束进程树），然后通知主进程；主进程随后结束整个进程树，清掉命令留下的子进程（pi #9129）。
+    void stopEnhance()
+      .catch((error: unknown) => console.error(`[kernel] stopping enhancement failed: ${String(error)}`))
+      .then(() => shutdownSessions())
       .catch((error: unknown) => console.error(`[kernel] releasing the sessions failed: ${String(error)}`))
       .then(() => closeSharedServers())
       .finally(() => process.parentPort.postMessage({ type: 'shutdown-done' }));

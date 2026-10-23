@@ -7,6 +7,7 @@ import {
   type QuoteRef, type SavedSession,
 } from '../../../shared/protocol';
 import { emptyBoard, soloTeamState, type BoardView, type TeamState } from '../../../shared/team';
+import type { MemoryNotice } from '../../../shared/memory';
 import { loadArchived } from './archive';
 import { emptyTranscript, type Transcript } from './model';
 
@@ -92,6 +93,11 @@ export interface Tab extends ModelState {
   transcriptJump: (QuoteJump & { itemKey: string; keys?: string[] }) | null;
   /** 正在读取或没能加入的会话引用（输入框上方，不随草稿保存；docs/v0/screens/session-refs.md） */
   refPending: PendingRef[];
+  /**
+   * 增强改了东西后这个项目新建的第一个会话顶部的提示（docs/specs/memory.md §9.9、§10.6）；没有、Dismiss 或
+   * 切走再回来之后为 null
+   */
+  memoryNotice: MemoryNotice | null;
   /** 打开中、可用、打开失败 */
   phase: 'opening' | 'ready' | 'failed';
   /** 打开失败或重新载入失败的原文 */
@@ -110,8 +116,8 @@ export interface PendingRef {
   problem: string | null;
 }
 
-/** @brief 中栏显示什么：会话、设置页、工具页（M6）或工作回顾（M7）。 */
-export type View = 'chat' | 'settings' | 'tools' | 'review';
+/** @brief 中栏显示什么：会话、设置页、工具页（M6）或记忆页（docs/specs/memory.md §10.1，替换 M7 的工作回顾）。 */
+export type View = 'chat' | 'settings' | 'tools' | 'memory';
 
 /** @brief 后台进程状态。 */
 export type KernelStatus = 'connecting' | 'ready' | 'exited' | 'reloading';
@@ -184,7 +190,7 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
     thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, pickLocked: false, contextUsage: null,
     approval: DEFAULT_APPROVAL, team: soloTeamState(false), board: emptyBoard(), transcript: emptyTranscript, draft: '',
     draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
-    refPending: [], phase: 'opening', error: null, ...fields };
+    refPending: [], memoryNotice: null, phase: 'opening', error: null, ...fields };
 }
 
 /**

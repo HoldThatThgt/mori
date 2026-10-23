@@ -1,5 +1,6 @@
 // F8 报告界面问题（方案 5.15，状态表见 docs/v0/screens/f8.md）：先截下当前窗口，截完才显示报告框，
 // 所以截图里没有报告框本身。保存在本机（主进程写文件），不经过后台进程和 pi，也不发给模型。
+// 保存后可以在设置页的 UI issues 里查看（docs/specs/memory.md §10.8、§10.9）。
 
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
@@ -8,8 +9,8 @@ import { mainError } from '../state/bridge';
 import { recentActions, recordAction } from '../state/actionLog';
 import { useLayout } from '../state/layout';
 import { useOverlay } from '../state/overlays';
-import { fileName, openReview, reviewChanged } from '../state/review';
-import { activeTab, useApp, type AppState, type KernelStatus, type Tab } from '../state/store';
+import { activeTab, useApp, type AppState, type KernelStatus, type Tab, type View } from '../state/store';
+import { fileName, issuesChanged, openIssues } from '../state/uiIssues';
 import { THINKING_LABELS } from '../../../shared/protocol';
 import { Icon } from '../icons';
 import { sessionTitle } from './ChatPane';
@@ -42,12 +43,12 @@ const KERNEL_TEXT: Record<KernelStatus, string> = {
   connecting: 'Starting…', ready: 'Running', exited: 'Crashed', reloading: 'Restarting…',
 };
 
-/** 右栏：会话的右栏，或工作回顾页上的详情（docs/v0/screens/review.md，宽度与会话的右栏共用） */
+/** 右栏：会话的右栏，或设置页 UI issues、记忆页的详情（宽度与会话的右栏共用） */
 const RIGHT_PANEL = 'aside.right-panel';
 
-/** 中栏页面的名字 */
-const PAGE_NAME: Record<AppState['view'], string> = {
-  chat: 'Session', settings: 'Settings', tools: 'Customize', review: 'Review',
+/** 中栏页面的名字（docs/specs/memory.md §10.9） */
+const PAGE_NAME: Record<View, string> = {
+  chat: 'Session', settings: 'Settings', tools: 'Customize', memory: 'Memory',
 };
 
 /** @brief 当前显示的页面。 */
@@ -60,7 +61,7 @@ function pageName(state: AppState): string {
 
 /**
  * @brief 一栏的实际宽度；与保存的宽度不同（被收紧或收起）时一并写出。
- * @param selector 这一栏的元素（右栏是 aside.right-panel：会话的右栏或工作回顾的详情）
+ * @param selector 这一栏的元素（右栏是 aside.right-panel：会话的右栏或设置页、记忆页的详情）
  */
 function columnWidth(selector: string, saved: number): string {
   const element = document.querySelector(selector);
@@ -239,7 +240,7 @@ function IssueForm({ capture, onSaved }: { capture: WindowCapture; onSaved: (fil
         captureId: capture.captureId, captureError: capture.error, what, expect, view, actions,
       });
       onSaved(saved.file);
-      reviewChanged();
+      issuesChanged();
     } catch (failure) {
       setError(mainError('saveIssue', failure));
     } finally {
@@ -270,15 +271,15 @@ function IssueForm({ capture, onSaved }: { capture: WindowCapture; onSaved: (fil
   );
 }
 
-/** @brief "View in Review"：关闭报告框，打开工作回顾的"UI issues"，选中这一份。 */
-function viewInReview(file: string): void {
+/** @brief "View in Settings"：关闭报告框，打开设置页的"UI issues"，选中这一份。 */
+function viewInSettings(file: string): void {
   if (!closeIssueReport()) return;
-  openReview('issues', fileName(file));
+  openIssues(fileName(file));
 }
 
 /**
- * @brief 已保存：路径、"Show in Explorer"、"View in Review"（只在显示工作区时有：首次启动、读取连接中或失败的页面上
- *        没有工作回顾）、"Close"。
+ * @brief 已保存：路径、"Show in Explorer"、"View in Settings"（只在显示工作区时有：首次启动、读取连接中或失败的页面上
+ *        没有设置页）、"Close"。
  */
 function SavedView({ file }: { file: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -298,8 +299,8 @@ function SavedView({ file }: { file: string }) {
       <div className="issue-actions">
         <button className="button" onClick={() => void showInFolder()}><Icon name="folder" />Show in Explorer</button>
         {workspace && (
-          <button className="button" data-testid="issue-open-review" onClick={() => viewInReview(file)}>
-            View in Review</button>
+          <button className="button" data-testid="issue-open-settings" onClick={() => viewInSettings(file)}>
+            View in Settings</button>
         )}
         <button className="button" onClick={closeIssueReport}>Close</button>
       </div>

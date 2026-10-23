@@ -279,10 +279,15 @@ async function newFromSaved(ctx) {
   await waitPanes(page, before + 1);
   await waitReady(page);
   await settle(page);
-  const heading = await paneOf(page).locator('.empty-chat h1').innerText({ timeout: 5000 }).catch(() => '');
+  // 新会话的项目名取顶栏（.chat-project），不取空状态的标题：这时项目里有连不上的 MCP 服务（broken），pi 的 MCP 扩展
+  // 在会话打开后几百毫秒内发 "MCP servers need attention"，对话流有了这一项，空状态就不显示；它与这里的读取谁先谁后
+  // 只差几毫秒（docs/specs/memory.md §14.4，2026-10-22 改）。
+  const pane = paneOf(page);
+  const heading = await pane.locator('.chat-project').innerText({ timeout: 5000 }).catch(() => '');
+  const title = await pane.getByTestId('session-title').innerText({ timeout: 5000 }).catch(() => '');
   record('保存后"已保存 · 新建的会话才会连接它"后面的"新建会话"：在跟随的项目里新建一个会话并切过去',
-    text.startsWith('Saved · Only new sessions will connect to it') && heading === 'project',
-    JSON.stringify({ text, heading }));
+    text.startsWith('Saved · Only new sessions will connect to it') && heading === 'project' && title === 'New session',
+    JSON.stringify({ text, heading, title }));
   return page.locator('.pane-slot:not([hidden])').first().getAttribute('data-tab');
 }
 

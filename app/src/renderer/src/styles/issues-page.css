@@ -1,0 +1,193 @@
+/* 设置页的 UI issues（docs/specs/memory.md §10.8，沿用 M7 工作回顾 docs/v0/screens/review.md 的样子）：
+   标题带未处理的条数；工具行；每份报告一行摘要，已处理的变淡，选中的高亮；详情在右栏（.right-panel），
+   截图点开浮在最上层。列表随设置页的内容区（.settings-body）滚动。字号不小于 12px。 */
+
+/* 标题与未处理的条数 */
+.issues-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.issues-head h2 { display: inline-flex; align-items: center; gap: 8px; }
+.issues-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
+}
+.issues-reading { color: var(--color-faint); }
+
+/* 工具行 */
+.issues-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 12px; }
+.issues-toolbar .button { padding: 5px 12px; }
+.issues-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.issues-switch .tools-switch { display: inline-block; }
+.issues-switch[aria-checked='true'] .tools-switch { background-color: var(--color-accent); }
+.issues-switch[aria-checked='true'] .tools-switch-knob { transform: translateX(14px); }
+
+/* 工具行下面的结果 */
+.issues-section > .issues-notice { margin: 0 0 12px; }
+.issues-notice .text-link { margin-left: 10px; }
+
+/* 读取中、读取失败、空、都已隐藏 */
+.issues-content > .form-message { margin: 4px 0 10px; }
+.issues-content > .form-message .text-link { margin-left: 10px; }
+.issues-state { margin: 16px 0; color: var(--color-faint); line-height: 1.7; }
+.issues-hidden { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 16px 0; }
+.issues-hidden .issues-state { margin: 0; }
+
+/* 列表：每份报告一行摘要，向两边伸出行的内边距，文字与标题对齐（内容区左右内边距至少 16px）。
+   列宽是 minmax(0, 1fr)：隐式的 auto 列会被不换行的错误行撑大，超出内容区；固定为内容区的宽度后这些行在行内截断加省略号 */
+.issues-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  margin: 0 -12px;
+  padding: 0;
+  list-style: none;
+}
+.issues-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  text-align: left;
+}
+.issues-row[aria-pressed='true'], .issues-row[aria-pressed='true']:hover { background: var(--color-accent-tint); }
+.issues-row:focus-visible { outline-offset: -2px; }
+.issues-row-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.issues-row-title.broken { color: var(--color-danger); }
+.issues-row-error {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  line-height: 1.6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.issues-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-width: 0;
+  color: var(--color-faint);
+  font-size: var(--fs-small);
+}
+.issues-row-time { flex-shrink: 0; }
+.issues-tag {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  line-height: 18px;
+}
+.issues-tag.done { color: var(--color-ok); }
+.issues-row.handled :is(.issues-row-title, .issues-row-error, .issues-row-time) { opacity: .55; }
+
+/* 详情（右栏） */
+.issues-detail-time { margin: 0 0 10px; color: var(--color-muted); font-size: var(--fs-small); }
+.issues-detail-label { margin: 16px 0 6px; color: var(--color-faint); font-size: var(--fs-small); font-weight: 500; }
+.issues-detail-text {
+  margin: 0;
+  color: var(--color-text);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.issues-detail-loading { margin: 0; color: var(--color-faint); font-size: var(--fs-small); }
+.issues-detail-body .form-message { margin: 0; }
+.issues-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-line);
+}
+.issues-detail-body > .form-message[role='alert'] { margin-top: 12px; }
+.issues-shot {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-s);
+  cursor: zoom-in;
+}
+.issues-shot img { display: block; max-width: 100%; height: auto; }
+.issues-detail-more { margin-top: 10px; }
+.issues-detail-more summary {
+  width: fit-content;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+.issues-detail-more pre, .issues-detail-broken pre {
+  max-height: 320px;
+  margin: 6px 0 0;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  color: var(--color-prose);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.issues-detail-broken pre { color: var(--color-danger); }
+
+/* 放大的截图：盖住整个窗口，按原尺寸显示，大于窗口时缩到窗口内（在确认对话框之上、F8 报告框之下） */
+.shot-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #0f1115a6;
+}
+.shot-viewer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  max-height: 100%;
+}
+.shot-viewer img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 96px);
+  border-radius: var(--radius-s);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-pop);
+  object-fit: contain;
+}

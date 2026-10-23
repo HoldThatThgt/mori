@@ -12,7 +12,7 @@ import { guardLeave, leaveAllowed } from './leaveGuard';
 import { emptyTranscript, pushItem, startIndexFor, type Transcript } from './model';
 import { openInSplit, placeInSplit, showInFocused, withoutPane, type Side } from './split';
 import {
-  activeTab, modelStateOf, newTab, sameFile, tabByFile, updateTab, useApp, type AppState, type Tab,
+  activeTab, modelStateOf, newTab, sameFile, shownKeys, tabByFile, updateTab, useApp, type AppState, type Tab,
 } from './store';
 import { trustFor } from './trust';
 
@@ -36,14 +36,37 @@ export async function loadSessions(): Promise<void> {
 /**
  * @brief 把会话信息写进会话。批准设置以后台进程返回的为准（新建和重新打开的会话都是"Ask each time"）；
  *        协作状态与 TaskBoard 视图同样（平行 Agent 规格 §13.10），挂起的后台批准卡与待判断的消息接到对话流上。
+ *        增强的提示（docs/specs/memory.md §9.9、§10.6）只在打开时取：后台进程只给新建的会话带上它（打开已有的为 null），
+ *        会话已经打开后（Check again 等）不再取，Dismiss 过的不会回来；旧的录制里没有这一项时按没有。
  */
 export function withInfo(tab: Tab, info: SessionInfo): Tab {
   return { ...tab, sessionId: info.sessionId, cwd: info.cwd, sessionFile: info.sessionFile, name: info.name,
     projectTrust: info.projectTrust, trustRemembered: info.trustRemembered, trustSaveError: info.trustSaveError,
     extensionErrors: info.extensionErrors, ...modelStateOf(info),
     contextUsage: info.contextUsage, approval: info.approval, team: info.team, board: info.board,
+    memoryNotice: tab.phase === 'opening' ? info.memoryNotice ?? null : tab.memoryNotice,
     transcript: withTeamInfo(tab.transcript, info), phase: 'ready', error: null, interrupted: false };
 }
+
+/** @brief 新会话顶部增强提示的 Dismiss（docs/specs/memory.md §10.6）：这次打开里不再显示。 */
+export function dismissMemoryNotice(key: string): void {
+  recordAction('Dismiss memory notice');
+  updateTab(key, (tab) => ({ ...tab, memoryNotice: null }));
+}
+
+/**
+ * @brief 增强的提示只在这次打开里显示（docs/specs/memory.md §10.6）：会话不再显示在中栏的任一栏里（切到别的会话、
+ *        分屏里这一栏换成别的会话或关掉）时清掉它，切回来不再显示。只是去设置页、记忆页（例如点了 View）不算切走。
+ */
+useApp.subscribe((state, previous) => {
+  if (state.activeKey === previous.activeKey && state.split === previous.split) return;
+  const shown = shownKeys(state);
+  const hidden = shownKeys(previous).filter((key) => !shown.includes(key));
+  const clear = (tab: Tab) => hidden.includes(tab.key) && tab.memoryNotice !== null;
+  if (!state.tabs.some(clear)) return;
+  useApp.setState((current) => ({ tabs: current.tabs.map((tab) => (clear(tab) ? { ...tab, memoryNotice: null }
+    : tab)) }));
+});
 
 /** @brief 扩展在会话打开过程中发的通知：接在对话流后面（extension-ui.md）。 */
 function withNotices(transcript: Transcript, notices: ExtensionNotice[]): Transcript {

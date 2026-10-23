@@ -14,8 +14,8 @@ import {
   type TeamMode, type WakeKind,
 } from '../../../shared/team';
 import {
-  blocksFromContent, contentText, emptyTranscript, messageTime, parseRejection, pushItem, resultPatch, type ToolCall,
-  type Transcript,
+  blocksFromContent, contentText, emptyTranscript, messageTime, parseRejection, pushItem, resultMemory, resultPatch,
+  type ToolCall, type Transcript,
 } from './model';
 import { attachReceipt, RECEIPT_TOOLS } from './teamEvents';
 
@@ -58,6 +58,7 @@ function addAssistant(state: Transcript, message: Message, entryId: string): Tra
 /**
  * @brief 把工具结果合并到对应的工具调用。Mori 拒绝的固定写法（parseRejection）显示"Denied"，
  *        先于"Stopped"的原文判断：你按停止时挂着的卡回给模型的也是拒绝。
+ *        memory 工具结果的 details 一并记下，重新打开的会话里工具卡仍有 View in Memory（docs/specs/memory.md §7.5）。
  */
 function addToolResult(state: Transcript, message: Message): Transcript {
   const id = String(message.toolCallId);
@@ -67,7 +68,8 @@ function addToolResult(state: Transcript, message: Message): Transcript {
   const rejected = message.isError ? parseRejection(output) : null;
   const failed = ABORTED_TOOL.test(output) ? 'stopped' as const : 'failed' as const;
   const status = rejected ? 'rejected' as const : message.isError ? failed : 'done' as const;
-  const done = { ...tool, status, output, patch: resultPatch(message), reason: rejected?.reason ?? null };
+  const done = { ...tool, status, output, patch: resultPatch(message), memory: resultMemory(message),
+    reason: rejected?.reason ?? null };
   return { ...state, tools: { ...state.tools, [id]: done } };
 }
 

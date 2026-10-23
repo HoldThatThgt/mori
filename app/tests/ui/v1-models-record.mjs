@@ -1,6 +1,6 @@
 // 从真实会话录制 v1 模型层回放用的 fixture（tests/fixtures/v1/*.json，docs/specs/model-providers.md §14.1、§14.2 的
 // 回放层：换模型、重做、回到首选、拒绝启动、输入框下面一行的选择范围与思考强度）。
-// 做法同 m7-record.mjs：页面里的录制器直接通过 window.mori（与界面相同的进程桥）发会话命令，记下命令、结果和后台进程
+// 做法同原 m7-record.mjs（随工作回顾删除，docs/specs/memory.md §14.4）：页面里的录制器直接通过 window.mori（与界面相同的进程桥）发会话命令，记下命令、结果和后台进程
 // 转发的全部事件及其时间。不同的是故障与恢复按 §14.1 用真实方式触发：
 //   - 准备（synthetic test setup，v1-real-helpers.mjs）：复制负责人的数据目录（只复制加密的文件，不读 key），在复制出的
 //     model-config.json 里建分组 [首选提供商, 第二个提供商] 作为默认范围、给临时项目授权公网（blocked 场景不授权），
@@ -49,7 +49,7 @@ const PROMPTS = {
 
 // ---------- 页面里的录制器 ----------
 
-/** @brief 页面里的录制器（同 m7-record.mjs）：记录命令、结果和事件；turn_end 后读一次 session.state（像界面一样）。 */
+/** @brief 页面里的录制器（同原 m7-record.mjs）：记录命令、结果和事件；turn_end 后读一次 session.state（像界面一样）。 */
 function installRecorder(offset) {
   const rec = {
     t0: performance.now() - offset,

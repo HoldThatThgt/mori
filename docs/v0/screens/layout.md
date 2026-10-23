@@ -47,11 +47,13 @@ M1 只列本次运行打开过的会话；M3 起换成项目 → 会话树，状
 | 底部（M2 起） | — | "Report a UI issue (F8)"和"Settings"；收起为图标栏时是两个图标按钮 | 报告界面问题（见 [f8.md](f8.md)）、设置 |
 
 Customize 页（工具页，M6）的入口"Customize"在"Open folder…"下面，见 [tools.md](tools.md)；
-工作回顾（Review，M7）的入口"Review"在"Customize"下面，见 [review.md](review.md)。
+工作回顾（Review，M7）的入口"Review"在"Customize"下面，见 [review.md](review.md)
+（v1：见 docs/specs/memory.md §10.1：同一位置换成"Memory"，打开记忆页；后台进程退出时不可用，悬停"Mori’s background process crashed. Restart it to continue."）。
 
 ## 设置页外框
 
 - 中栏换成设置页，顶部"Back to app"；M6 起左边是分节列表（"Connections and models"、"AGENTS.md"），见 [settings.md](settings.md)
   （v1：见 docs/specs/model-providers.md §9.1："Connections and models"分节改为"Models"，状态表见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)）。
-  Customize 页（工具页，M6）外框相同，见 [tools.md](tools.md)；工作回顾（Review，M7）顶部相同，详情放在右栏，见 [review.md](review.md)。
+  Customize 页（工具页，M6）外框相同，见 [tools.md](tools.md)；工作回顾（Review，M7）顶部相同，详情放在右栏，见 [review.md](review.md)
+  （v1：见 docs/specs/memory.md §10.1、§10.8：由记忆页（Memory）取代，顶部与右栏相同；设置页左边在"AGENTS.md"下面加第三节"UI issues"，在这一节时右栏可以打开）。
 - 会话面板保持挂载、只隐藏，所以返回后滚动位置、草稿、展开状态都在。

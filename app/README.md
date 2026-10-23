@@ -14,14 +14,17 @@ M5：左右分屏（拖会话到中栏、右键菜单、焦点所在的一栏、
 发出后跳回原会话）（[检查记录](../docs/v0/m5-checks.md)）。
 M6：设置页（多个连接与模型、默认模型、思考强度（Effort）、用户级 AGENTS.md）、输入框下面一行按会话换模型和思考强度（2026-10-21 前在顶栏）、
 工具页（Customize：内置工具、技能、MCP、插件）、输入框的"/"补全（[检查记录](../docs/v0/m6-checks.md)）。
-当前处于 M7：工作回顾页（Review："Feedback"和"UI issues"两个列表、右栏详情与截图、标已处理（"Resolve"）与
+M7：工作回顾页（Review："Feedback"和"UI issues"两个列表、右栏详情与截图、标已处理（"Resolve"）与
 "Hide resolved"、回到原位置、"Export as Markdown…"）与一键导出安装包（仓库根目录的 `build-installer.cmd`，见下）；
-只差负责人走查（[检查记录](../docs/v0/m7-checks.md)）。
+工作回顾页已由记忆页替换、不再走查，一键导出安装包只差负责人走查（[检查记录](../docs/v0/m7-checks.md)）。
 英文界面（`english-ui` 分支）：界面和 Mori 写出的文字（F8 报告、导出、操作记录、引用块）全部改为英文，有对应处照 Claude 桌面版的
 用词（[术语表](../docs/v0/ui-strings.md)）；安装包只带英文界面；只差负责人走查（[检查记录](../docs/v0/english-ui-checks.md)）。
 输入框下面一行（`composer-pickers` 分支）：模型（选择范围）、Effort、只有文字的权限按钮和上下文用量圆环从顶栏移到文字框下面那一行，
 顶栏只留会话名、协作开关和这一栏的按钮；只差负责人走查，以及认可有意跳过的 fixture 录制一步
 （[检查记录](../docs/v0/composer-pickers-checks.md)）。
+当前处于提示词分层与记忆（[规格](../docs/specs/memory.md)）：system prompt 的身份段与四个记忆分节、memory 工具、
+记忆页（"Memory"，替换工作回顾）、每个项目的增强任务；反馈作为开了增强的项目的增强依据，F8 界面问题挪到设置页的"UI issues"
+（[检查记录](../docs/v1/memory-checks.md)）。
 
 ## 准备
 
@@ -89,10 +92,9 @@ cmd /c build-installer.cmd --no-open --no-pause
 | `node tests/ui/m6-record.mjs --source <走查数据目录> [--only …]` | 从真实会话录制 `tests/fixtures/m6/`（换模型、思考强度、AGENTS.md、项目技能、MCP、插件、"/"命令） |
 | `node tests/ui/m6-pi-config.mjs [--check]` | 用 pi 自己的 `pi config` 组件录下启停的写法（`tests/fixtures/m6/pi-config-toggles.json`），M6 测试拿 Mori 的写入与它比较；`--check` 在 pi 升级时核对 |
 | `node tests/ui/m6-mcp-cost.mjs [--servers N] [--exe …]` | 测量打开 1、5、10 个会话时 MCP 服务的进程数和内存（共享连接：每个服务始终 1 个进程） |
-| `npm run test:m7-app` | M7 整机测试：真正的 Mori 对合成端点，工作回顾（入口、两个分节、一行摘要、读不出来的记录、右栏详情与放大截图、标已处理与"Hide resolved"、回到原位置的各种结果、导出为 Markdown、打开文件夹，反馈表单和 F8 报告框里的"View in Review"）；测打包结果加 `--exe …` |
-| `node tests/ui/m7-record.mjs --source <走查数据目录> [--only …]` | 从真实会话录制 `tests/fixtures/m7/`（反馈这条回复、回复里的一句、阅读器里的两行和一份 F8 报告，重启后读记录和截图、回到原位置；回复不在了，其中指向会话里不存在的回复的那份反馈是 synthetic）；除了命令和事件，还录主进程读到的记录、截图、保存反馈和报告的结果；录下的不合要求时不写入，打印 FAIL |
-| `npm run test:m7-replay` | M7 界面测试：回放 `tests/fixtures/m7/`，重启前后分两段（重启前在界面里写下反馈和 F8 报告，交给主进程的反馈与录制时逐字核对；重启后工作回顾的一行摘要、详情和截图，回到原位置的命令与高亮，回复不在了不发 `session.open`）；导出、打开文件夹没有录过，只核对界面交出去的记录名 |
-| `node tests/ui/m7-real.mjs --source <走查数据目录> [--exe …] [--only …]` | M7 真实端点走查（走查 1–4 与反例）：在界面里写下反馈和 F8 报告，重启后都在工作回顾里、各自回到原位置，标已处理与"Hide resolved"（重启后还在），两类导出为 Markdown（保存对话框换成临时目录）；反例：在侧栏删掉的会话是"Session deleted"，回复不在了（指向会话里不存在的回复的那份反馈是 synthetic），导出不复制截图，工作回顾里的操作不发消息给模型；只删临时数据目录里的测试会话 |
+| `npm run test:mem-unit` | 记忆的单元测试（`node --test`，`tests/unit/memory/`） |
+| `npm run test:memory` | 提示词分层与记忆的单元、App、回放测试和现有套件，最后检查规格 §14 的每一条都有通过的结果（工作回顾的 M7 套件已去掉，UI issues 与反馈的检查在这里） |
+| `node tests/ui/mem-real.mjs --source <走查数据目录>` | 提示词分层与记忆的真实模型一层（DeepSeek 与 GLM，规格 §14.1）；脚本只复制加密的文件，不读 key |
 | `npx electron tests/prechecks/esm-utility/main.cjs` | 预检：utilityProcess 能否运行 ESM 入口 |
 | `npx electron tests/prechecks/job-object/main.cjs` | 预检：后台进程放进 Windows 作业对象后，它留下的孤儿进程能随作业一起结束 |
 | `node tests/ui/m0-real.mjs --user-data <目录> [--setup]` | 真实端点走查（M0 走查 2–3）；`--setup` 先打开 Mori 让你填连接，脚本不接触 key |
@@ -102,13 +104,16 @@ cmd /c build-installer.cmd --no-open --no-pause
 - pi 的配置与会话：`%APPDATA%\Mori\pi`（`models.json`、`sessions/`、`trust.json` 等，格式与 pi 命令行相同）。
   M6 起设置页和工具页直接读写这里的 `models.json`（连接与模型）、`settings.json`（默认模型、按模型的思考强度、技能 / 插件的启停，
   写法与 `pi config` 相同；停用项目自己的技能写项目的 `.pi/settings.json`）、`mcp.json`（MCP 服务）和 `AGENTS.md`（用户级）。
-- 各会话的草稿（含引用芯片）、已归档的会话列表、栏宽和分屏比例、工作回顾的已处理标记和"Hide resolved"：
+- 各会话的草稿（含引用芯片）、已归档的会话列表、栏宽和分屏比例、设置页"UI issues"的已处理标记和"Hide resolved"：
   Mori 窗口的本机存储（`localStorage`，在 `%APPDATA%\Mori` 下）。
   会话引用的来源（原会话、第几轮）写在发出它的会话文件里（pi 的自定义条目 `mori.ref`），原会话删除后引用时的原文仍在。
-- 对内容的反馈：`%APPDATA%\Mori\feedback\*.json`，每份一个文件，只记录、不发给模型；F8 报告在 `%APPDATA%\Mori\ui-issues\`。
-  M7 起工作回顾读这两个文件夹（只读不改）。界面问题的报告和截图都在 `ui-issues` 里，交给别人时把这个文件夹打成 zip，
-  或用工作回顾的"Export as Markdown…"（只写一个 `.md`，截图链接指向原来的 PNG）。
+- 对内容的反馈：`%APPDATA%\Mori\feedback\*.json`，每份一个文件；开了增强的项目由增强任务作为依据读，没开的只保存。
+  F8 报告在 `%APPDATA%\Mori\ui-issues\`，设置页的"UI issues"读这个文件夹（只读不改）。界面问题的报告和截图都在 `ui-issues` 里，
+  交给别人时把这个文件夹打成 zip，或用"UI issues"的"Export as Markdown…"（只写一个 `.md`，截图链接指向原来的 PNG）。
   删除会话是永久的（照 Claude 桌面版）；想留着以后再看的会话用"Archive"（归档）。
+- 记忆：`%APPDATA%\Mori\memory`（`user/` 用户级，`projects/--<编码后的工作目录>--/` 本项目：索引、`entries/` 条目、
+  `revisions/` 修订记录、`enhance.json` 增强设置与水位、`sessions/` 增强任务的会话），只由 Mori 的记忆模块写，
+  格式见[规格 §3](../docs/specs/memory.md)。不进仓库。
 - 测试时用环境变量 `MORI_USER_DATA` 指向临时目录，不会碰到日常使用的数据。
 
 ## 连接真实端点

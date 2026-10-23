@@ -139,6 +139,30 @@ function describeTeamCommand(command: Command): string | null {
     case 'session.setTeam': return `Team ${command.mode}`;
     case 'session.recheckAgents': return 'Check agent files';
     case 'session.stopTeam': return 'Stop team';
+    default: return describeMemoryCommand(command);
+  }
+}
+
+/** @brief enhance.set 只带开关（记忆页的 Enhancement 开关），不带设置对话框的各项。 */
+function onlySwitch(command: Extract<Command, { type: 'enhance.set' }>): boolean {
+  return command.enabled !== undefined && command.pick === undefined && command.thinking === undefined
+    && command.team === undefined && command.time === undefined;
+}
+
+/**
+ * @brief 记忆与增强的写命令（docs/specs/memory.md §8）的摘要；读取类（memory.list、memory.get、memory.revisions、
+ *        enhance.get）不记。
+ */
+function describeMemoryCommand(command: Command): string | null {
+  switch (command.type) {
+    case 'memory.save': return command.id === undefined ? 'Save memory entry' : 'Edit memory entry';
+    case 'memory.delete': return 'Delete memory entry';
+    case 'memory.move': return command.from === 'project' ? 'Move to user level' : 'Move to this project';
+    case 'memory.rollback': return 'Roll back revision';
+    case 'enhance.set':
+      if (!onlySwitch(command)) return `Save enhancement settings ${command.cwd}`;
+      return `${command.enabled ? 'Turn on' : 'Turn off'} enhancement ${command.cwd}`;
+    case 'enhance.run': return `Run enhancement now ${command.cwd}`;
     default: return null;
   }
 }

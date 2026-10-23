@@ -51,6 +51,7 @@
 //   为 null）、k、j、tools（请求里的工具名）、toolChoice（指定的函数名或 tool_choice 字符串，没有时为 null）、
 //   format（response_format.type，没有时为 null）、calls（回复里调用的工具名）。
 // App 测试要用的场景写在 scenarios/<套件>.mjs（导出 SCENARIOS，步骤用 steps.mjs 的构造函数），这里并入；
+// 不是脚本模式的增强会话另有增强脚本（enhance.mjs，docs/specs/memory.md §14.1）；
 // 下面 tb-selfcheck-* 三个由 selfcheck.mjs 使用。
 
 import { existsSync, readdirSync } from 'node:fs';
@@ -161,7 +162,10 @@ export const SCENARIOS = {
   }],
 };
 
-/** 各套件的场景文件所在的目录：每个文件导出 SCENARIOS（名字以 "tb-<套件>-" 开头），在这里并入上面的场景表 */
+/**
+ * 各套件的场景文件所在的目录：每个文件导出 SCENARIOS（名字以 "tb-<套件>-" 开头；记忆规格 §14.1 的协作模式增强
+ * 在 mem.mjs，名字以 "mem-" 开头），在这里并入上面的场景表
+ */
 const SCENARIO_DIR = join(import.meta.dirname, 'scenarios');
 const scenarioFiles = existsSync(SCENARIO_DIR)
   ? readdirSync(SCENARIO_DIR).filter((f) => f.endsWith('.mjs')).sort() : [];

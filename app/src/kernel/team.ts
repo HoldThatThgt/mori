@@ -17,7 +17,7 @@ import {
   BASE_ROLE, TEAM_ENTRY_TYPES, TEAM_TOOLS, TeamEntrySchema, seatRolesOf, type DecidingMessage, type PromptBehavior,
   type ReceiptEntryData, type RoleSummary, type TeamApprovalEnd, type TeamApprovalRequest, type TeamDeciding,
   type TeamHolders, type TeamMode, type TeamState, type TeamSwitch, type TeamToolName, type TitleContext,
-  type ToolCallBrief, type WakeKind,
+  type ToolCallBrief, type WakeKind, type InstanceKind,
 } from '../shared/team';
 import {
   applyRestartRecovery, findRequest, findTask, isTaskEnded, liveTaskIds, loadBoard, markAsked, markStopped, newBoard,
@@ -33,6 +33,7 @@ import {
 import { boardTools, guardToolCall, type BoardToolExecutor, type ToolSessionInfo } from './boardTools';
 import { nextTag, tagResult } from './evidence';
 import { shapeFor as formShape, writeModeOf, type WriteMode } from './handoffForm';
+import { instanceSeats, memoryCallerFor } from './memoryAssemble';
 import type { RequestShape, ShapeAttempt } from './modelSession';
 import type { CandidateSource, SchedClass } from './modelTypes';
 import {
@@ -41,8 +42,9 @@ import {
 import { messageText, turnCount, type SessionEntryLike } from './sessionReader';
 import { teamExtension, type TeamHooks } from './teamExtension';
 import { UserFlow, missingProgress } from './teamFlow';
-import type {
-  HeldItem, InstanceApprovalRequest, InstanceSpec, StopReason, TeamArgs, TeamHost, TeamLike, UserAttach,
+import {
+  MEMORY_TOOL, type HeldItem, type InstanceApprovalRequest, type InstanceSpec, type StopReason, type TeamArgs,
+  type TeamHost, type TeamLike, type UserAttach,
 } from './teamHost';
 import {
   LANE_IDS, hasQueued, laneActive, newLane, takeBatch, type DeliveryMeta, type Lane, type TeamDelivery,
@@ -205,6 +207,11 @@ export class Team implements TeamLike {
   private inbox: Promise<void> = Promise.resolve();
   /** 上一次发出的 mori.team_state（没变时不重发） */
   private lastState = '';
+  /**
+   * 还没做完的后续：运行结束后排着或做着的 afterRun、TaskBoard 写出之后的唤醒与调度。不为 0 时下一步可能还没排上，
+   * busy() 仍为真（增强运行的结束条件，记忆规格 §9.6）
+   */
+  private followUps = 0;
   /** mori.board 的合并发送（§13.3） */
   private readonly boardEvents: Throttle;
 
@@ -446,10 +453,13 @@ export class Team implements TeamLike {
     return card === null ? 0 : cardTokens(card);
   }
 
-  /** @brief 有任何 Agent 在运行或排队、或有待判断的消息（拒绝关闭、归档、删除，§11.5）。 */
+  /**
+   * @brief 有任何 Agent 在运行或排队、或有待判断的消息（拒绝关闭、归档、删除，§11.5）；一次运行结束或 TaskBoard 写入之后
+   *        下一步还没排上时也算（followUps，记忆规格 §9.6：增强运行等 Team 空闲才结束）。
+   */
   busy(): boolean {
     const status = this.host.status(this.userId);
-    return this.background() || this.user.busy || Boolean(status?.running || status?.preparing);
+    return this.followUps > 0 || this.background() || this.user.busy || Boolean(status?.running || status?.preparing);
   }
 
   /** @brief 关闭用户会话前：关闭全部实例会话（会话文件与 board.json 留着），不再发事件。 */
@@ -491,6 +501,34 @@ export class Team implements TeamLike {
     if (text === this.lastState) return;
     this.lastState = text;
     this.host.emitUser(this.userId, { type: 'mori.team_state', ...state });
+  }
+
+  /** @brief 开始一段后续（followUps）：做完之前 busy() 仍为真。 */
+  private holdFollowUp(): void {
+    this.followUps += 1;
+  }
+
+  /** @brief 一段后续做完：都做完时协作状态变了就发 mori.team_state（看它重新判断的一方由此看到真正的空闲）。 */
+  private releaseFollowUp(): void {
+    this.followUps -= 1;
+    if (this.followUps === 0) this.emitState();
+  }
+
+  /**
+   * @brief 排一次运行结束之后的处理（setTimeout(0)，§14.2），排着与做着的期间算一段后续。
+   * @param lane 结束的会话
+   * @param first 在 afterRun 之前要做的（可以没有）
+   */
+  private queueAfterRun(lane: Lane, first?: () => void): void {
+    this.holdFollowUp();
+    setTimeout(() => {
+      try {
+        first?.();
+        this.afterRun(lane);
+      } finally {
+        this.releaseFollowUp();
+      }
+    }, 0);
   }
 
   /** @brief TaskBoard 视图变了（合并发送，最多每 250 毫秒一次）。 */
@@ -646,10 +684,11 @@ export class Team implements TeamLike {
 
   /**
    * @brief 写出之后：发 mori.board，按写入前后的比较唤醒（§9.1），重新调度（§9.2）。写出之前 pump 不开始任何运行
-   *        （§3：board.json 先写出，再唤醒或开始任何人）。
+   *        （§3：board.json 先写出，再唤醒或开始任何人）。写出到唤醒、调度做完算一段后续（followUps）。
    */
   private committed(before: Board, after: Board): void {
     this.unsaved += 1;
+    this.holdFollowUp();
     const saved = this.saving.then(() => saveBoard(this.args.teamDir, after)).catch((error: unknown) => {
       console.error(`[kernel] ${this.userId}: the TaskBoard was not written: ${(error as Error).message}`);
     }).finally(() => {
@@ -662,7 +701,7 @@ export class Team implements TeamLike {
       for (const wake of wakesAfter(before, after, this.subscribers)) this.wake(wake);
       for (const lane of this.lanes.values()) if (lane.kind === 'task') this.releaseIfDone(lane);
       this.schedule();
-    });
+    }).finally(() => this.releaseFollowUp());
   }
 
   /** @brief 一次唤醒（§9.1）：交给结案、结案的全部结束、立项、对话汇报、订阅；交给角色的由调度开始。 */
@@ -905,7 +944,7 @@ export class Team implements TeamLike {
     lane.inflight = [];
     lane.stop = null;
     lane.pendingCursor = undefined;
-    setTimeout(() => this.afterRun(lane), 0);
+    this.queueAfterRun(lane);
   }
 
   /**
@@ -916,8 +955,10 @@ export class Team implements TeamLike {
   private afterRun(lane: Lane): void {
     if (this.closed) return;
     if (lane === this.user && this.pendingLock && this.userIdle()) {
-      // 先改锁定，再开始下一次（投递队列里的程序投递按此刻的模式选模型，§12.1）
-      void this.applyLock().catch((error: unknown) => this.lockFailed(error)).then(() => this.afterRun(lane));
+      // 先改锁定，再开始下一次（投递队列里的程序投递按此刻的模式选模型，§12.1）；改锁定的期间也算后续
+      this.holdFollowUp();
+      void this.applyLock().catch((error: unknown) => this.lockFailed(error)).then(() => this.afterRun(lane))
+        .finally(() => this.releaseFollowUp());
       return;
     }
     this.pump(lane);
@@ -942,7 +983,7 @@ export class Team implements TeamLike {
   userReplyDone(): void {
     this.user.busy = false;
     if (this.user.run === null && this.user.settling === null) this.user.stop = null;
-    setTimeout(() => this.afterRun(this.user), 0);
+    this.queueAfterRun(this.user);
   }
 
   /**
@@ -951,10 +992,9 @@ export class Team implements TeamLike {
    */
   replyEnded(): void {
     if (this.closed) return;
-    setTimeout(() => {
+    this.queueAfterRun(this.user, () => {
       if (this.userIdle() && this.user.run === null) this.user.stop = null;
-      this.afterRun(this.user);
-    }, 0);
+    });
   }
 
   /**
@@ -1020,14 +1060,24 @@ export class Team implements TeamLike {
     };
     return {
       id: lane.id, dir: this.sessionsDir, parentSession: this.userSessionFile(), cwd: this.args.cwd, kind, instance,
-      tools: toolAllowlist(role, kind, lane.readOnly, this.args.baseTools, lane.team), appendPrompt,
-      teamExtension: teamExtension(this.laneHooks(lane)), model: this.modelOptions(lane, role),
-      trust: this.args.trust, approval: this.args.approval, owner: this.userId,
+      tools: [...toolAllowlist(role, kind, lane.readOnly, this.args.baseTools, lane.team), ...this.memoryTools(kind)],
+      appendPrompt, teamExtension: teamExtension(this.laneHooks(lane)), model: this.modelOptions(lane, role),
+      trust: this.args.trust, approval: this.args.approval, memory: { enhance: this.args.enhance }, owner: this.userId,
       onEvent: (event) => this.laneEvent(lane, event),
       onModelEvent: (event) => this.onModelEvent(lane, event),
       onApprovalRequest: (request) => this.onApprovalRequest(lane, request),
       onApprovalEnd: (end) => this.onApprovalEnd(end),
     };
+  }
+
+  /**
+   * @brief 追加在白名单（roles.ts toolAllowlist 的结果）后面的 memory（记忆规格 §7.6）：分开时的立项实例；增强会话的
+   *        Team 里另有 task 实例（含只读 task）。其他实例没有，pi 按白名单不注册它。
+   * @param kind 实例的种类
+   */
+  private memoryTools(kind: InstanceKind): string[] {
+    const caller = memoryCallerFor(instanceSeats(kind), this.args.enhance?.task ?? null, kind);
+    return caller === null ? [] : [MEMORY_TOOL];
   }
 
   /** @brief 用户会话的文件（实例头部的 parentSession）。 */
@@ -1090,14 +1140,17 @@ export class Team implements TeamLike {
     await model.setTeamLock(false, this.roleSource(lane, role));
   }
 
-  /** @brief 调度类别（§12.10）：task、订阅、立项与结案；临时提问继承发送方的类别。 */
+  /**
+   * @brief 调度类别（§12.10）：task、订阅、立项与结案；临时提问继承发送方的类别。
+   *        增强会话的对话是 background（记忆规格 §9.6），从它发出的临时提问随之为 background。
+   */
   private schedClassOf(lane: Lane): SchedClass {
     switch (lane.kind) {
       case 'task': return 'task';
       case 'subscription': return 'background';
       case 'create':
       case 'close': return 'decision';
-      case 'user': return 'conversation';
+      case 'user': return this.args.enhance ? 'background' : 'conversation';
       case 'ask': {
         const parent = lane.parent === null ? undefined : this.lanes.get(lane.parent);
         return parent ? this.schedClassOf(parent) : 'conversation';
@@ -1185,7 +1238,7 @@ export class Team implements TeamLike {
     lane.settling = settling;
     void settling.then(() => {
       if (lane.settling === settling) lane.settling = null;
-      if (lane === this.user && !this.user.busy) setTimeout(() => this.afterRun(this.user), 0);
+      if (lane === this.user && !this.user.busy) this.queueAfterRun(this.user);
     });
   }
 
@@ -1364,22 +1417,31 @@ export class Team implements TeamLike {
     this.nextUserRun = { mode, allowed: this.applyDialogTools(mode) };
   }
 
-  /** @brief 按模式启用对话的工具（§5.2、§5.5）；返回 tool_call 要限制的条目（不限制时为 null）。 */
+  /**
+   * @brief 按模式启用对话的工具（§5.2、§5.5）；返回 tool_call 要限制的条目（不限制时为 null）。dialogTools 给出条目时，
+   *        这次运行的身份是主 Agent（关闭模式）或兼立项（合并会话）的，后面加上 memory（记忆规格 §7.6，与 agent_message
+   *        一样由 Mori 给，不受角色 tools 限制）；分开时的对话没有它。没有条目、回到关闭模式恢复记下的那一组时也启用
+   *        memory（没注册时不启用）；没有记下的那一组时不重设启用的工具。
+   */
   private applyDialogTools(mode: TeamMode): string[] | null {
     const api = this.userApi;
     if (!api) return null;
     if (mode !== 'off') this.registerUserTools();
-    const entries = dialogTools(this.args.roles, mode !== 'off', this.args.baseTools);
+    const listed = dialogTools(this.args.roles, mode !== 'off', this.args.baseTools);
     const registered = api.getAllTools().map((tool) => tool.name);
-    if (entries !== null) {
+    if (listed !== null) {
+      const entries = mode === 'off' || this.merged ? [...listed, MEMORY_TOOL] : listed;
       api.setActiveTools(registered.filter((name) => matchesToolEntries(entries, name)));
       return entries;
     }
     const active = api.getActiveTools();
-    const wanted = new Set(this.offRestore === null ? active
-      : [...this.offRestore, ...active.filter((name) => !this.wasTeamActive(name))]);
+    const restoring = this.offRestore;
+    const wanted = new Set(restoring === null ? active
+      : [...restoring, ...active.filter((name) => !this.wasTeamActive(name))]);
     this.offRestore = null;
     if (hasOtherRoles(this.roles)) wanted.add('agent_message');
+    // 恢复记下的那一组时 memory 也在关闭模式那一组里（记忆规格 §7.6）：记下的 tools 早于记忆功能时不含它
+    if (restoring !== null) wanted.add(MEMORY_TOOL);
     const next = [...wanted].filter((name) => registered.includes(name));
     if (next.length !== active.length || next.some((name) => !active.includes(name))) api.setActiveTools(next);
     this.lastOffTools = api.getActiveTools();

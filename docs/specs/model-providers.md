@@ -876,7 +876,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-34 | 准备中 | 段开始的等待和重建期间用户消息已显示、停止可用；停止后消息撤回、文字回到输入框；准备中再发的消息作为排队消息在回复开始后交给 pi；准备中再发一条后按停止：两条文字都回到输入框，合成端点没有收到请求 | App |
 | MP-35 | 思考强度 | 第一个候选是推理模型时新会话按它的按模型默认强度开始，请求带思考参数；换到不支持思考的模型时 pi 收紧；Effort 菜单的可选强度随当前模型；把强度改成 high 后关闭再打开会话，仍是 high；段内从非推理模型换到推理模型后 Effort 菜单的强度变为可选 | App |
 | MP-36 | 回复进行中改配置 | 回复中删除它正在用的提供商：下一个请求换到下一个候选并提示；改它的兼容选项：本段继续用它；当前模型在段内被另一个会话造成冷却：下一个请求不发出就换模型 | App |
-| MP-37 | 现有功能不退步 | §14.4 的全部现有测试通过 | App、回放 |
+| MP-37 | 现有功能不退步 | §14.4 的全部现有测试通过（2026-10-22 注：m7 的 App 与回放由提示词分层与记忆规格 §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放） | App、回放 |
 
 ### 14.3 不留未完成项
 
@@ -884,6 +884,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 
 - 层由结果文件决定：`v1-unit.json`（`node --test` 的结果转成 `createRecorder` 的格式）为单元；`v1-models-app*.json` 为 App；`v1-models-replay.json` 为回放；`v1-models-real.json` 为真实。
 - `npm run test:v1-models` 依次跑单元、App、回放测试，再依次跑 §14.4 的现有套件，每个套件按退出码在 `v1-models-app-existing.json` 或 `v1-models-replay-existing.json` 记一条“MP-37 <脚本名>”，最后运行覆盖检查。
+  （2026-10-22 注：m7 的 App 与回放由 [提示词分层与记忆规格](memory.md) §14.4 删除，现有套件为 smoke、m1–m6 的 App 与回放；这两个结果文件也由它的 MEM-35 一并写出。）
 - 真实层（MP-27）由 `v1-models-real.mjs` 写结果，覆盖检查同样要求它通过。
 - 只认开发构建的结果；打包构建另跑一遍时结果文件带 `-packaged`，覆盖检查对两者分别执行。
 
@@ -899,9 +900,9 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | `m2-app.mjs`、`m2-replay.mjs` | F8 检查前保存 key 的准备改为 Models → Add key（`models.addKey`，回放由桥应答）；“报告里没有 key”的检查不变 |
 | `m6-app-settings.mjs` | 连接、模型、默认模型、删除的步骤删去，由 `v1-models-*.mjs` 覆盖；思考强度与 AGENTS.md 的步骤保留并改用新表单 |
 | `m6-replay.mjs` | 设置页分节导航的检查改到 Models 分节；删除 `m6/model-switch.json`、`m6/thinking.json` 后，另录 `fixtures/v1/thinking.json`（输入框下面一行的思考强度）取代思考菜单的回放检查 |
-| `m7-app.mjs` | “工作回顾不发模型请求”的检查只数 `probe: false` 的请求 |
-| `m7-replay.mjs` 与其余回放脚本 | 各自的 `QUERIES` 加 `models.get` |
-| 其余 `m1`–`m7` 的 App 测试 | 只换首次启动的写法，其余不变 |
+| `m7-app.mjs`（2026-10-22 注：已删除，见提示词分层与记忆规格 §14.4） | “工作回顾不发模型请求”的检查只数 `probe: false` 的请求 |
+| `m7-replay.mjs` 与其余回放脚本（2026-10-22 注：`m7-replay.mjs` 已删除，同上） | 各自的 `QUERIES` 加 `models.get` |
+| 其余 `m1`–`m7` 的 App 测试（2026-10-22 注：m7 的已删除，同上） | 只换首次启动的写法，其余不变 |
 | 回放：`tests/ui/harness/replay.js` | `models.get` 加进只读查询；录制里没有时用 fixture 的 `model` 合成（一个本机区域的提供商、一个模型、`normalDefault` 为它、档案已验证，代码里注明 synthetic）；`ModelState` 的新字段同样合成；`models.*` 的写命令照 `connection.save` 的方式应答；`harness/main.jsx` 加 `fixtures/v1` |
 | 回放：`m6/model-switch.json`、`m6/thinking.json`、`m1/no-key.json` | 删除（v1 不再有这些命令和情形），对应检查从 `m6-replay.mjs`、`m1-replay.mjs` 去掉，由 MP-23 和 `fixtures/v1/thinking.json` 的回放取代；`m1/wrong-key.json` 的“去设置”检查改为说明卡 |
 | `m0-real.mjs` | 断言改为 `model-config.json`、`credentials.json` |
@@ -911,3 +912,4 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | 全部 `*-real.mjs`、`*-record.mjs` | 提供商从 `model-config.json` 取，不再找 `pi/models.json` 的 `mori-endpoint`；按 §14.1 复制模型配置并给临时项目授权公网 |
 
 `npm run smoke`、`test:app`、`test:m1-app`…`test:m7-app`、各回放测试都通过，MP-37 才算通过。
+（2026-10-22 注：`test:m7-app`、`test:m7-replay` 由 [提示词分层与记忆规格](memory.md) §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放。）

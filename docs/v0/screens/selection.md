@@ -86,10 +86,10 @@ Quoting src/a.ts, lines 3–5:
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 已有一张在写 | 表单开着时又点了"Give feedback" | 不换掉那张表单（免得丢掉写了一半的字），焦点回到它的输入框；表单开着时不出选区浮层 | 写完或关掉 |
-| 打开 | 你点了浮层的"Feedback"或回复下的"Give feedback" | 浮层表单（读屏名称"Feedback"）：引用的原文（最多 4 行，可滚动）、"What result were you hoping for?"输入框（焦点在这里）、底部"This is only saved to Review and isn’t sent to the model. To have Mori act on it, use “Attach as context” instead."、"Cancel"和"Save" | 输入；"Save"或 Ctrl+Enter 提交；Esc 或"Cancel"关闭；点表单外面不关（免得丢掉写了一半的字） |
+| 打开（v1：见 docs/specs/memory.md §10.7：底部说明按这个会话的项目是否开着增强取整段：开着时"Saved as evidence for this project’s daily enhancement. To have Mori act on it now, use “Attach as context” instead."，没开、没有项目、后台进程退出或读不到时"This project doesn’t have enhancement on, so feedback is only saved. To have Mori act on it, use “Attach as context” instead."；打开时发 `enhance.get`，返回之前这一行留空） | 你点了浮层的"Feedback"或回复下的"Give feedback" | 浮层表单（读屏名称"Feedback"）：引用的原文（最多 4 行，可滚动）、"What result were you hoping for?"输入框（焦点在这里）、底部"This is only saved to Review and isn’t sent to the model. To have Mori act on it, use “Attach as context” instead."、"Cancel"和"Save" | 输入；"Save"或 Ctrl+Enter 提交；Esc 或"Cancel"关闭；点表单外面不关（免得丢掉写了一半的字） |
 | 没写字 | 输入框为空 | "Save"不可用 | — |
 | 保存中 | 主进程在写文件 | "Saving…"，按钮不可用；Esc 不关 | — |
-| 已记录 | 主进程写好 `<userData>/feedback/<时间>.json` | 表单换成"Saved · View in Review"（M7 起"View in Review"是链接），约 3 秒后关闭；对话流、会话、模型都没有变化 | Esc 立即关闭；点链接打开工作回顾（Review）并选中这一条（[review.md](review.md)） |
+| 已记录（v1：见 docs/specs/memory.md §10.7：只显示"Saved"，没有链接，约 3 秒后关闭；没有工作回顾，反馈出现在它支撑的条目和修订里） | 主进程写好 `<userData>/feedback/<时间>.json` | 表单换成"Saved · View in Review"（M7 起"View in Review"是链接），约 3 秒后关闭；对话流、会话、模型都没有变化 | Esc 立即关闭；点链接打开工作回顾（Review）并选中这一条（[review.md](review.md)） |
 | 保存失败 | 主进程写入失败 | 保留输入的文字，显示"Couldn’t save your feedback: "加原文 | 再试 |
 | 流式输出中 | 引用的回复还在生成 | 表单照常；输入不被打断；引用的原文在打开时就定下来 | 同上 |
 

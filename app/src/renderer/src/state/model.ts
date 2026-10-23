@@ -7,6 +7,7 @@ import {
   REASON_TEXTS, isUntilReason, plainReasonText, type CandidateExclusion, type ModelReason,
 } from '../../../shared/models';
 import type { ReceiptEntryData, TeamApprovalRequest, TeamDeciding, TeamMode, WakeKind } from '../../../shared/team';
+import { isMemoryToolDetails, type MemoryToolDetails } from '../../../shared/memory';
 
 /** @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md。 */
 export type ToolStatus =
@@ -28,6 +29,11 @@ export interface ToolCall {
   output: string;
   /** 编辑工具返回的 unified diff */
   patch: string | null;
+  /**
+   * memory 工具结果的 details（docs/specs/memory.md §7.4、§7.5：修订、层、种类、条目），工具卡的 View in Memory 按它打开
+   * 记忆页；别的工具、失败的调用、还没有结果时为 null
+   */
+  memory: MemoryToolDetails | null;
   /** 实时运行时开始执行的时刻（ms）；从会话记录载入时为 null */
   startedAt: number | null;
   /** 实时运行时的耗时（ms）；从会话记录载入时为 null */
@@ -272,8 +278,8 @@ export function setPendingQueued(state: Transcript, text: string, add: boolean):
 
 /** @brief 新建一次工具调用。 */
 export function newTool(id: string, name: string): ToolCall {
-  return { id, name, argsText: '', args: null, status: 'preparing', output: '', patch: null, startedAt: null,
-    durationMs: null, reason: null, allowedBy: null, gate: null };
+  return { id, name, argsText: '', args: null, status: 'preparing', output: '', patch: null, memory: null,
+    startedAt: null, durationMs: null, reason: null, allowedBy: null, gate: null };
 }
 
 /** 卡还挂着时你按了停止：工具卡上显示的理由 */
@@ -310,6 +316,15 @@ export function contentText(content: unknown): string {
 export function resultPatch(result: unknown): string | null {
   const patch = (result as { details?: { patch?: unknown } } | undefined)?.details?.patch;
   return typeof patch === 'string' && patch.length > 0 ? patch : null;
+}
+
+/**
+ * @brief 取 memory 工具结果里给界面的位置（details，docs/specs/memory.md §7.4）；实时事件的 result 与会话记录里的
+ *        toolResult 消息都把它放在 details。不是 memory 的结果（别的工具、旧会话、出错没有 details）时为 null。
+ */
+export function resultMemory(result: unknown): MemoryToolDetails | null {
+  const details = (result as { details?: unknown } | undefined)?.details;
+  return isMemoryToolDetails(details) ? details : null;
 }
 
 /** @brief 把 pi 助手消息的最终内容转成段落；思考一律收起。 */

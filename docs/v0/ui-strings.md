@@ -59,14 +59,29 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 引用（芯片、预览） | Context · …（芯片、读取中的芯片、预览标题）/ Remove context / Cancel attaching “<name>” / Not attached / the attached text | Attached context | 负责人定；读屏名在 "Context" 后用冒号（"Context: src/a.ts · lines 3–5, jump to source"、"Remove context: …"）。给模型的文字不变，仍是 "Quoting …:" 和 "[Quote] …"。工作回顾里反馈记录的 "Quoted text" 是反馈针对的原文，不属于这个功能，不改 |
 | 问 Mori | Attach as context | Attach as context | 负责人定：选区浮层的按钮与会话菜单同一个词；操作记录 "Attach as context (file)" / "Attach as context (response)" |
 | 反馈（选区） / 反馈这条回复 | Feedback / Give feedback | Feedback、Give feedback | |
-| 工作回顾 | Review | Review | 负责人定；导航和页标题 |
-| 对内容的反馈（分节） | Feedback | Feedback | |
-| 界面问题 / 报告界面问题 | UI issue（报告标题）、UI issues（分节）/ Report a UI issue | —（Claude 的 "Report a bug" 是发给 Anthropic 的，不是一回事） | |
+| 工作回顾 | Review | Review | 负责人定；导航和页标题（v1：见 docs/specs/memory.md §10.1：工作回顾页由记忆页替换，导航和页标题改为 "Memory"，见下面 "记忆" 一行；UI issues 移到设置页，§10.8） |
+| 对内容的反馈（分节） | Feedback | Feedback | （v1：见 docs/specs/memory.md §10.7：这一节不再有，反馈出现在它支撑的条目的 Evidence 和用到它的修订里） |
+| 界面问题 / 报告界面问题 | UI issue（报告标题）、UI issues（分节）/ Report a UI issue | —（Claude 的 "Report a bug" 是发给 Anthropic 的，不是一回事） | （v1：见 docs/specs/memory.md §10.8："UI issues" 是设置页的第三节） |
 | 已处理 / 未处理 | Resolved / Unresolved | Resolved | 动作 "Resolve" / "Reopen"（Claude 评论用的词），"Hide resolved" / "Show resolved" |
 | 回到原位置 / 回到原会话 | Jump to source / Jump to session | Jump to session | |
 | 原文已变化 | Source changed | —（最近的是 "Outdated"） | 与 "Jump to source" 同一个 source；工作回顾里只写原因 "This response is no longer in the session." |
 | 原会话已删除 | Session deleted | Session deleted | |
 | 文件已被删除或移动 | File not found | File not found | 芯片和阅读器同一句 |
+| 记忆 | Memory | — | v1（docs/specs/memory.md §1、§10.1）：左栏入口（在原来 Review 的位置）、页标题、F8 的 Page、操作记录 "Open Memory"；四种条目的统称 |
+| 事实（种类） | Facts | — | 记忆页的分节；工具结果里同样写 "Facts"（"Saved to Facts (user level): …"）（记忆规格 §1、§7.4） |
+| 三种规则（种类名） | TASTE / STRATEGY / REVIEW | — | 名字，全大写照 proposal，句子里不改写（"Running STRATEGY enhancement…"）；"REVIEW" 是一种条目，不是工作回顾的 "Review"（记忆规格 §1） |
+| AGENT（记忆页的分节） | AGENT | — | 列出这个项目加载的 AGENTS.md；文件名照写 AGENTS.md（记忆规格 §10.3） |
+| 修订记录 | Revisions | — | 记忆页的分节；条目详情里改过它的记录叫 "History"（记忆规格 §10.1、§10.5） |
+| 增强模式 / 增强任务 | Enhancement（开关、对话框 "Enhancement settings"）/ enhancement（句子里） | — | "Running TASTE enhancement…"、"Created Oct 23 by enhancement"；操作记录 "Turn on enhancement <cwd>"（记忆规格 §1、§8、§10.4） |
+| 你说的 / 它学的 | You said / Learned | — | 条目行右边的标记、详情的第二行；在记忆页新增或修改后都是 "You said"（记忆规格 §1、§10.1） |
+| 记忆的层（用户级 / 本项目） | User / Project（分段按钮）；user-level / user level / this project（句子里） | 见 "用户级 / 本项目" | 同 "用户级 / 本项目" 一行：形容词写 "user-level entries"，名词写 "Move to user level"、"(user level)"（记忆规格 §1、§7.4） |
+| 删除（记忆条目） | Delete…（详情里的按钮）/ Delete（确认框的按钮）/ Deleting… / Deleted（修订里的改动、工具结果 "Deleted from …"） | Delete…、Delete、Deleting… | 同 "删除 / 移除" 一行；memory 工具的动作名是 forget，界面、修订和工具结果一律写 Delete 一族，不写 "Forget"（"Forget" 只用于权限菜单）（记忆规格 §1、§10.1） |
+| 提升 / 放回 | Move to user level / Move to this project | — | 详情里的按钮与操作记录同一句；修订里的改动、说明和条目的 Revisions 行写过去式 "Moved to user level" / "Moved to this project"（记忆规格 §1、§3.2、§3.3、§8） |
+| 增强用的模型 | Model range | — | 增强设置对话框的字段，同 "选择范围" 一行；下拉同设置页 Defaults，不提供 None（记忆规格 §10.4） |
+| 以协作模式运行增强 | Run with team mode | — | 增强设置对话框 "Team mode" 下的勾选框（记忆规格 §10.4） |
+| 回滚这次修订 | Roll back this revision（按钮）/ Rollback（列表的标记、修订的谁）/ Rolled back: <标题>（修订标题）/ Couldn’t roll back: … | — | 一键，不确认；操作记录 "Roll back revision"（记忆规格 §6.5、§8、§10.5） |
+| 在记忆页查看 | View in Memory | — | memory 工具卡状态行后面的按钮；新会话提示的按钮写 "View"，操作记录两者都写 "View in Memory"（记忆规格 §7.5、§8、§10.6） |
+| 在设置页查看（F8） | View in Settings | — | F8 保存后的按钮，取代 "View in Review"，打开设置页的 UI issues 并选中这一条（记忆规格 §10.9） |
 | 思考（内容） | Thinking…（进行中）/ Thought process（完成后的块） | Thinking…、Thought process | |
 | 思考强度 | Effort | Effort、Effort: {value}、Default effort level | 会话定的（待负责人确认），不用 "Thinking"；pi 叫 thinking level；"支持思考" 仍写 "Supports thinking" |
 | 思考强度的档位 | Off / Minimal / Low / Medium / High / Extra high / Max | Off / — / Low / Medium / High / Extra high / Max | minimal 没有 Claude 对应，用 pi 的名字 |
@@ -79,7 +94,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 后台进程 | Mori’s background process（F8 字段名 "Background process"） | — | 意外退出一律写 "crashed"（Claude："Claude Code crashed"），不写 "stopped"；"Stopped" 只留给停止按钮的结果 |
 | 重新载入（后台进程） | Restart / Restarting… / Restarted | Restart、Restarting Claude Code on {host}… | Claude 重启本地进程用 restart；"Reload" 只留给文件阅读器的 "Reload file" |
 | 设置 | Settings / Open settings | Settings、Open settings | 卡片和思考强度菜单里打开 Settings → Models 的按钮都叫 "Open settings"，范围菜单里是 "Manage models"；v0 错误卡上的 "Go to settings" v1 已删除（规格 §9.3） |
-| 返回会话 | Back to app | Back to app | 设置、Customize、Review 三页的返回按钮，操作记录同 |
+| 返回会话 | Back to app | Back to app | 设置、Customize、Review 三页的返回按钮，操作记录同（v1：见 docs/specs/memory.md §10.1：Review 换成 Memory） |
 | 工具（页） | Customize（导航、页标题、F8 的 Page、操作记录 "Open Customize"） | Customize | Claude 开关技能、插件、连接器的页面叫 Customize；Claude 单独的 "Tools" 不是页名。分节标题 Built-in tools / Skills / Plugins / MCP 不变 |
 | 内置工具 | Built-in tools | Built-in | |
 | 技能 | skill / Skills | Skills、Skill | |
@@ -121,7 +136,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 
 | 中文 | 英文 |
 | --- | --- |
-| 新会话 / 打开文件夹… / 工具 / 工作回顾 / 报告界面问题（F8） / 设置 | New session / Open folder… / Customize / Review / Report a UI issue (F8) / Settings |
+| 新会话 / 打开文件夹… / 工具 / 工作回顾 / 报告界面问题（F8） / 设置 | New session / Open folder… / Customize / Review / Report a UI issue (F8) / Settings（v1：见 docs/specs/memory.md §10.1：Review 换成 Memory） |
 | 展开侧栏 / 收起侧栏 | Open sidebar / Close sidebar（收起时带状态："Open sidebar (a session needs approval)"、"(a session needs input)"、"(a session has an error)"、"(a session has unread results)"） |
 | 后台进程退出后导航不可用的提示 | Mori’s background process crashed. Restart it to continue. |
 | 正在读取会话… / 读取会话列表失败：… / 重试 | Loading sessions… / Couldn’t load sessions: … / Retry |
@@ -195,7 +210,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 会话引用的预览 | Context · <name> / Turn N · ~1,200 characters · Not attached / From … to … / Done / Cancel / Close |
 | 预览的说明 | This session is still running. Only the N finished turns are listed.（只有 1 轮时 "Only 1 finished turn is listed."）/ Source changed · Showing the attached text（还有 Session deleted · …、The session no longer has finished turns · …、Couldn’t read the session: … · …）/ The session changed since you attached it, so the range was reset to the default. |
 | 没能加入 | “<name>” has no finished turns yet, so there’s nothing to attach. / Couldn’t attach “<name>” as context: … |
-| 反馈表单 | What result were you hoping for? / This is only saved to Review and isn’t sent to the model. To have Mori act on it, use “Attach as context” instead. / Save / Saving… / Saved · View in Review |
+| 反馈表单 | What result were you hoping for? / This is only saved to Review and isn’t sent to the model. To have Mori act on it, use “Attach as context” instead. / Save / Saving… / Saved · View in Review（v1：见 docs/specs/memory.md §10.7：底部说明按这个会话的项目是否开着增强二选一，整段是 "Saved as evidence for this project’s daily enhancement. To have Mori act on it now, use “Attach as context” instead."，或者（没开、没有项目、后台进程退出或读不出增强设置时）"This project doesn’t have enhancement on, so feedback is only saved. To have Mori act on it, use “Attach as context” instead."；保存后只写 "Saved"，没有链接） |
 | 带引用的消息打开 "/" 列表 | Prompt templates and skills don’t work in a message with attached context. Remove the context first. |
 
 ### 右栏（改动、文件阅读器）
@@ -230,7 +245,7 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 
 | 中文 | 英文 |
 | --- | --- |
-| 页头 | Back to app / Settings；左侧分节 Models / AGENTS.md（读屏名 "Settings sections"） |
+| 页头 | Back to app / Settings；左侧分节 Models / AGENTS.md（读屏名 "Settings sections"）（v1：见 docs/specs/memory.md §10.8：左侧分节为 Models / AGENTS.md / UI issues；UI issues 的文字同下面 "工作回顾" 一节的 UI issues 部分） |
 | Models 分节 | 标题 Models；从上到下：迁移说明、区域未确认、Defaults、Providers、Groups、Project access / Loading… / 配置读不出 "Couldn’t read model settings: <路径>: <原文>" 和 Retry |
 | 迁移说明 | Imported your model settings from models.json / Imported: <name>, … / Renamed provider <from> to <id> / Dropped <subject>: <reason> / Add the API key again for: <name>, … / Kept the saved key for: <name>, …; the key written in models.json was ignored. / Dismiss |
 | 区域未确认 | Confirm the network zone of these providers. Sessions don’t use them until you do. / <name> · <base URL> / Confirm zone…；对话框 Confirm network zone / Confirm / Cancel |
@@ -252,7 +267,7 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 | 范围菜单 | 按钮 "<范围名> · <当前模型 id>"（范围是模型时只写模型 id；没有当前模型时只写范围名）/ No model range；按钮在输入框下面一行，读屏名 "Model range: <按钮文字>"（" · " 换成 ", "）；悬停三行：第一行按钮文字，第二行 "<provider name> · <区域>"（没有当前模型时 "No model can run in this session"），不可用时第三行原因（准备中、生成中 "Can’t switch models until the response finishes"）；菜单和切换失败的一行从输入框下面一行往上打开；菜单 Groups / Providers / Models（Models 按提供商分小节），每项右边标区域（"Local · Public"，未确认时 "Zone not confirmed"；每项的读屏名只有名字，区域写进读屏的描述，用逗号："Local, Public"，被排除时再加 ". <原因>"）/ Applies to this session only. New sessions use the default range from Settings. / Manage models；换不了时 "Couldn’t change the model range: …" |
 | 思考强度菜单 | Effort: High / Unavailable / Applies to this session only. Set each model’s default for new sessions in Settings. / Open settings；不支持思考：This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”. |
 | 发送、停止、排队（只有图标时） | 读屏名 "Send" / "Stop" / "Queue" / "More send options"（都是 Claude 原词）；悬停 "Send (Enter)"、"Stop response (Esc)"、"Queue for later (Enter)"（Claude 的 "Queue for later"；原来是 "Send after the current turn (Enter)"）；▾ 菜单里 "Steer"，≤ 400px 时加上 "Queue for later"：项的名字只有文字，快捷键是旁边的提示（"Enter"、"Ctrl+Enter"，`aria-hidden`，另放在 `aria-keyshortcuts`），不写成 "Queue · Enter" |
-| AGENTS.md | User / In effect: <path> / <path> takes precedence, so what you write here has no effect. / <path> is in effect now. After you save, this AGENTS.md is loaded instead. / Save / Discard changes / Unsaved changes / Saved · Applies to new sessions / Open in default app |
+| AGENTS.md | User / In effect: <path> / <path> takes precedence, so what you write here has no effect. / <path> is in effect now. After you save, this AGENTS.md is loaded instead. / Save / Discard changes / Unsaved changes / Saved · Applies to new sessions / Open in default app（v1：见 docs/specs/memory.md §10.3：生效的文件和每个加载的文件旁写 token 数 "<n> tokens"（1 时 "1 token"），合计超过 500 时警告 "Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short."） |
 | 离开确认 | Discard changes to AGENTS.md? / Your edits haven’t been saved. Leaving now discards them. / Discard / Keep editing |
 
 ### Customize 页（工具页）和 "/" 列表
@@ -276,10 +291,13 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 | 标题 | Report a UI issue |
 | 字段 | What went wrong / What you expected |
 | 说明 | Includes a screenshot, the current view, and your recent activity. Saved on this computer and never sent to the model. |
-| 按钮和结果 | Save / Saving… / Cancel / Saved to <file> / Show in Explorer / View in Review / Close |
+| 按钮和结果 | Save / Saving… / Cancel / Saved to <file> / Show in Explorer / View in Review / Close（v1：见 docs/specs/memory.md §10.9："View in Review" 改为 "View in Settings"，打开设置页的 UI issues 并选中这一条） |
 | 错误 | Couldn’t capture a screenshot: … / Couldn’t save the report: … |
 
 ### 工作回顾
+
+（v1：见 docs/specs/memory.md §10.1、§10.7、§10.8：工作回顾页由记忆页替换，记忆页的文字见规格 §10。下面 UI issues 的文字照旧，放在设置页的 UI issues 一节，"页头"、"分节" 两行不再有；
+Feedback 一节和反馈的空列表、详情、导出不再有。依据的 "Jump to source" 与跳不过去时的文字见规格 §10.2。）
 
 | 中文 | 英文 |
 | --- | --- |
@@ -379,11 +397,13 @@ Assistant: <回复正文>
 - Windows: …
 ```
 
-- 没打开会话时 "Current session: None" 一行代替会话的几项；"Page" 的取值：Session / Settings / Customize / Review / First run / Loading… / Couldn’t load model settings。
+- 没打开会话时 "Current session: None" 一行代替会话的几项；"Page" 的取值：Session / Settings / Customize / Review / First run / Loading… / Couldn’t load model settings（v1：见 docs/specs/memory.md §10.9：去掉 Review，加 Memory；在设置页的 UI issues 时是 Settings）。
 - 解析要求：标题行 `/^# UI issue · (.+)$/`；六节的标题与 `ISSUE_SECTIONS` 一字不差（What went wrong、What you expected、Screenshot、Current view、Recent activity、Versions）；截图行 `/^!\[Screenshot\]\((.+)\)$/`；截图失败行写成 `Couldn’t capture a screenshot: <原文>`（撇号是 U+2019，冒号后一个空格），读的一方用 `/^Couldn’t capture a screenshot:\s*/` 去掉前缀（各节读出来时去掉了首尾空白，原文为空时冒号后就没有空格）；"(left blank)" 与 `reviewText.ts` 的 `EMPTY_FIELD` 相同。
 - 报告里你写的一行如果像 Markdown 标题，前面加 `\`，不会被当成一节。
 
 ### 工作回顾的导出
+
+（v1：见 docs/specs/memory.md §10.7、§10.8：反馈的导出不再有；UI issues 的导出照旧，在设置页。）
 
 默认文件名：`feedback-<YYYY-MM-DD>.md`、`ui-issues-<YYYY-MM-DD>.md`（与记录文件夹 `feedback/`、`ui-issues/` 同名；保存对话框标题 "Export as Markdown"）。内容：
 
@@ -431,7 +451,7 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 | 测试连接 | Test connection <provider>/<id>（Keys 的行的 Test 加 " with key <ref>"）/ Cancel connection test |
 | 输入框下面一行 | Set model range <范围> / Change effort for this session: <level>（<level> 是 pi 的取值，如 high、xhigh） |
 | Customize 页 | Open Customize / Enable（Disable）<单数的类别> <path>（Enable skill …、Disable extension …、Enable prompt template …）/ Enable all in plugin（Disable all in plugin）<source> / Add plugin from folder <path> / Remove plugin <source> / Save MCP server <name> / Enable（Disable）MCP server <name> / Remove MCP server <name> / Switch MCP server <name> to direct calls |
-| 工作回顾 | Open Review / View in Review / Review: Feedback / View record: UI issues / Resolve / Reopen / Hide resolved / Show resolved / Export: Feedback / Open folder: UI issues / Show record in Explorer / Jump to source from Review |
+| 工作回顾 | Open Review / View in Review / Review: Feedback / View record: UI issues / Resolve / Reopen / Hide resolved / Show resolved / Export: Feedback / Open folder: UI issues / Show record in Explorer / Jump to source from Review（v1：见 docs/specs/memory.md §8：这一行由记忆页的动作记录替换：Open Memory、Memory: <层或分节>、View in Memory、Dismiss memory notice、Jump to source from Memory、F8 的 View in Settings，以及命令的 Save memory entry、Roll back revision、Turn on enhancement <cwd> 等，全文见规格 §8；设置页的 UI issues 沿用 View record: UI issues、Resolve、Reopen、Hide resolved、Show resolved、Export: UI issues、Open folder: UI issues、Show record in Explorer；Review: Feedback、Export: Feedback 不再有） |
 | 其他 | Report a UI issue / Restart background process |
 
 "Feedback"、"UI issues" 是分节名（大写开头），所以放在冒号后面，不嵌进句子中间。
@@ -439,6 +459,8 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 ## 实现时要一起改的地方
 
 - 复数：标 `"plural": true` 的条目要按数量选单复数（导出条数、隐藏条数、改动次数、字数、MCP 服务的会话数、已完成的轮数、模型数、剩余秒数）。
+  （v1：见 docs/specs/memory.md §10.3–§10.5：另有 token 数 "1 token" / "<n> tokens"（记忆页 AGENT 节、设置页 AGENTS.md、修订详情）和修订详情的会话数 "1 session" / "<n> sessions"；
+  增强状态行与修订详情里 1000 起写 "<n>k tokens"（四舍五入到整数）；"<m> feedback" 不分单复数。）
 - `ToolsPlugins.tsx` 的开关读屏名要单数（Enable extension x），需要一张单数的分类名表 `KIND_ONE`（extension / skill / prompt template / theme，放在 `shared/protocol.ts` 的 `RESOURCE_KINDS` 旁边）；分节标题仍用复数。`actionLog.ts:93` 的操作记录也用这张表（`command.kind` 是 pi 的复数键）。
 - `Sidebar.tsx:66` 收起侧栏时的读屏名要一张小写分句的表 `RAIL_TEXT`（a session needs approval / a session needs input / a session has an error / a session has unread results），不再拼 `STATUS_TEXT`。
 - `ChatPane.tsx:50` 上下文用量的读屏名自己拼（"Context usage 42%, about 53,760 of 128,000 tokens"），不再复用悬停说明 `detail`。（2026-10-21 起被 [composer-pickers.md](composer-pickers.md) 取代：用量改成圆环，读屏名 "Usage: Context approximately … of … tokens (N%)"；这里留作记录）

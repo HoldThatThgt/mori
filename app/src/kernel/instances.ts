@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import type { SessionManager, SettingsManager } from '@earendil-works/pi-coding-agent';
 import type { EventEnvelope } from '../shared/protocol';
 import { TEAM_ENTRY_TYPES } from '../shared/team';
+import { instanceSeats } from './memoryAssemble';
 import type { Pi } from './pi';
 import type { SessionSetup } from './sessions';
 import type { InstanceSpec } from './teamHost';
@@ -52,7 +53,8 @@ export function instanceEnvelope(envelope: EventEnvelope): void {
 
 /**
  * @brief 建实例会话要用的、与用户会话不同的部分（§8.2）：工具白名单、附加段、mori-team、沿用的信任与批准状态、
- *        批准请求 id 的前缀 `<实例 id>:` 与交给 Team 的批准回调、交给 Team 的 pi 事件。
+ *        批准请求 id 的前缀 `<实例 id>:` 与交给 Team 的批准回调、交给 Team 的 pi 事件；记忆设置与按种类定下的身份
+ *        （docs/specs/memory.md §5.1、§9.6）。
  * @param spec 实例的设置
  * @param settings 这个实例自己的 SettingsManager（pi 的设置与加载器不能在会话之间共用，§14.1）
  * @param sessionId 实例的 pi 会话 id（重新打开时取会话文件头部的 id）
@@ -65,5 +67,6 @@ export function instanceSetup(spec: InstanceSpec, settings: SettingsManager, ses
       onEnd: (end) => spec.onApprovalEnd(end) },
     teamExtension: spec.teamExtension, appendPrompt: spec.appendPrompt, tools: spec.tools,
     onEvent: (event) => spec.onEvent(event),
+    memory: spec.memory, seats: () => instanceSeats(spec.kind),
   };
 }

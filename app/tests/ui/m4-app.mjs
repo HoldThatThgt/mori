@@ -28,7 +28,7 @@ import {
 import {
   assistantIndexWith, changeList, clearSelection, lastReplyHasActions, composerChips, dragSelect, expandChange, jumpHighlight, messageCounts, PANE,
   popoverButtons, popoverShown, refEntries, sessionEntries, replyActionRows, savedDraftRefs, savedFeedback, selectBetween, selectLines,
-  sentQuotes, viewerState, waitViewer,
+  sentQuotes, textPoints, viewerState, waitViewer, FEEDBACK_NOTE_OFF, feedbackNote,
 } from './m4-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
@@ -46,8 +46,8 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 
 const TITLE = '# Mori fixture project';
 const NOTE = 'Only edits and writes are listed. Files changed by commands aren’t included.';
-const FEEDBACK_NOTE = 'This is only saved to Review and isn’t sent to the model. '
-  + 'To have Mori act on it, use “Attach as context” instead.';
+/** 反馈表单的底部说明：这个项目没开增强时的整段（docs/specs/memory.md §10.7、§14.4） */
+const FEEDBACK_NOTE = FEEDBACK_NOTE_OFF;
 
 // ---------- 准备 ----------
 
@@ -543,15 +543,16 @@ async function feedback(ctx) {
   await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
   const form = page.getByTestId('feedback-form');
   await form.waitFor({ timeout: 3000 });
+  // 说明在 enhance.get 返回之前留空（§10.7）：先等它有文字再比对全文
+  const note = await feedbackNote(page);
   const view = await form.evaluate((el) => ({ quote: el.querySelector('.feedback-quote')?.textContent,
-    label: el.querySelector('.feedback-label')?.childNodes[0]?.textContent, note: el.querySelector('.feedback-note')
-      ?.textContent, focused: document.activeElement === el.querySelector('textarea'),
+    label: el.querySelector('.feedback-label')?.childNodes[0]?.textContent,
+    focused: document.activeElement === el.querySelector('textarea'),
     disabled: [...el.querySelectorAll('button')].find((b) => b.textContent === 'Save')?.disabled,
     highlight: CSS.highlights.has('mori-quote') }));
-  record('反馈表单：引用的原文、"希望得到什么结果？"、焦点在输入框、没写字时"记录"不可用、底部说明、选区保持高亮',
-    view.quote === '只有文字的回复' && view.label === 'What result were you hoping for?' && view.note === FEEDBACK_NOTE
-    && view.focused
-    && view.disabled && view.highlight, JSON.stringify(view));
+  record('反馈表单：引用的原文、"希望得到什么结果？"、焦点在输入框、没写字时"记录"不可用、底部说明（没开增强时的整段）、'
+    + '选区保持高亮', view.quote === '只有文字的回复' && view.label === 'What result were you hoping for?'
+    && note === FEEDBACK_NOTE && view.focused && view.disabled && view.highlight, JSON.stringify({ ...view, note }));
   const dir = join(ctx.userData, 'feedback');
   if (existsSync(dir)) renameSync(dir, `${dir}-away`);
   writeFileSync(dir, 'not a folder');
@@ -569,7 +570,7 @@ async function feedback(ctx) {
   const records = savedFeedback(ctx.userData);
   const latest = records.at(-1);
   const after = await messageCounts(page);
-  record('走查 4：提交后提示"已记录 · 在工作回顾中查看"，当前会话没有新消息', saved === 'Saved · View in Review'
+  record('走查 4：提交后提示"已记录"（Saved，没有链接，记忆规格 §10.7），当前会话没有新消息', saved === 'Saved'
     && JSON.stringify(before) === JSON.stringify(after), JSON.stringify({ saved, before, after }));
   record('反馈记录（JSON）：期望、原文、锚点（会话文件、条目 id、消息时间）、会话', latest?.expected === '希望先给结论'
     && latest.quote === '只有文字的回复' && latest.source.kind === 'message' && typeof latest.source.entryId === 'string'
@@ -602,6 +603,44 @@ async function feedbackReply(ctx) {
     kept === '写了一半' && focused && formQuote === quote && noPopover, JSON.stringify({ kept, focused, noPopover }));
 }
 
+/**
+ * @brief 等内容再长一截、跟随把对话流滚到底（最多 1.5 秒）。
+ * @return 等到了为 true；内容不再变长或没有在跟随时为 false。
+ */
+async function followedOnce(page) {
+  const height = await paneOf(page).locator('.conversation').evaluate((el) => el.scrollHeight);
+  return page.waitForFunction(({ pane, before }) => {
+    const el = document.querySelector(`${pane} .conversation`);
+    return el.scrollHeight > before && el.scrollHeight - el.scrollTop - el.clientHeight <= 1;
+  }, { pane: PANE, before: height }, { timeout: 1500 }).then(() => true, () => false);
+}
+
+/**
+ * @brief 生成中的拖选：像你一样先把那句话滚到眼前，等跟随自己滚到底（直到那句话下面至少还有 90px），
+ *        再往上滚到它在视野中间（至少 60px），然后拖选，拖选时不再滚动。等的这一次让跟随记下最新的“自动滚到底的位置”，
+ *        往上滚就比它更靠上、算离开底部，之后流入的字不再滚动对话流（Transcript.tsx 的 useFollow）。
+ *        不这样做时（原有的时序竞争）：滚到眼前的位置离底部不到 24px，跟随恢复；或者记下的位置还是按住鼠标之前的，
+ *        往上滚不算离开底部。两种情况下按下鼠标之前流入的字都会把对话流滚到底，鼠标落到别的行。
+ * @param box 对话流在视口里的位置。
+ * @param index 正在流式输出的那条回复是第几条助手消息。
+ * @param wanted 要选中的字（取第一处）。
+ */
+async function selectWhileStreaming(page, box, index, wanted) {
+  const target = `${PANE} [data-testid="assistant"]`;
+  const middle = box.y + box.height / 2;
+  await textPoints(page, target, wanted, index);
+  let seen = null;
+  for (let tries = 0; tries < 20; tries += 1) {
+    const followed = await followedOnce(page);
+    seen = await textPoints(page, target, wanted, index, false);
+    if (!followed || !seen || seen.y1 + 90 < box.y + box.height) break;
+  }
+  await page.mouse.move(box.x + box.width / 2, middle);
+  await page.mouse.wheel(0, Math.min(-60, Math.round((seen?.y1 ?? middle) - middle)));
+  await sleep(300);
+  await dragSelect(page, target, wanted, index, false);
+}
+
 /** @brief 走查 4：流式输出时选中一句话点"Feedback"：选区不被打断，写字不被打断，提交后"Saved"，没有新消息。 */
 async function streamingFeedback(ctx) {
   const { page, h } = ctx;
@@ -626,11 +665,7 @@ async function streamingFeedback(ctx) {
   await page.mouse.up();
   record('生成中在对话流里按住鼠标：暂停自动跟随（下面的字不被滚走），显示"有新内容"', atDown <= 24 && whileHeld > atDown
     && hasNew === 1, JSON.stringify({ atDown, whileHeld, hasNew }));
-  // 像你一样先往上滚一点看前面的字（离开底部，不再自动跟随），再拖选。
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.wheel(0, -200);
-  await sleep(300);
-  await dragSelect(page, `${PANE} [data-testid="assistant"]`, '河边的柳树发了新芽', index, 'end');
+  await selectWhileStreaming(page, box, index, '河边的柳树发了新芽');
   const shown = await popoverShown(page);
   const running = await paneOf(page).getAttribute('data-running');
   await sleep(600);
@@ -664,12 +699,8 @@ async function keysWithPopover(ctx) {
   await page.waitForFunction(() => [...document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="assistant"]')]
     .at(-1)?.textContent?.includes('第一段'), null, { timeout: 20000 });
   const index = await paneOf(page).getByTestId('assistant').count() - 1;
-  // 像你一样先往上滚一点（离开底部，不再自动跟随），再拖选。
   const box = await paneOf(page).locator('.conversation').boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.wheel(0, -200);
-  await sleep(300);
-  await dragSelect(page, `${PANE} [data-testid="assistant"]`, '春天来了', index);
+  await selectWhileStreaming(page, box, index, '春天来了');
   const opened = await popoverShown(page);
   await page.keyboard.press('Escape');
   await sleep(300);

@@ -1,5 +1,5 @@
 // M4 测试（m4-app.mjs、m4-replay.mjs、m4-real.mjs）共用的页面操作：选字（程序选区或真的拖鼠标）、选区浮层、
-// 引用芯片、发出的引用、文件阅读器、右栏改动列表、回到原位置的高亮、反馈表单与保存的反馈、会话文件里的条目。
+// 引用芯片、发出的引用、文件阅读器、右栏改动列表、回到原位置的高亮、反馈表单（底部说明）与保存的反馈、会话文件里的条目。
 // 只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -13,8 +13,8 @@ export const PANE = '.pane-slot:not([hidden]) [data-testid="chat-pane"]';
 
 /**
  * @brief 在页面里找到 selector 匹配的第 index 个元素里的文字 text（可以跨几个文字节点，例如语法高亮的代码），
- *        先把它所在的元素滚进视野（block 为 scrollIntoView 的 block，默认滚到中间），返回它在视口里的起止坐标
- *        （第一个字的左边、最后一个字的右边，取各自那一行的竖直中点）；找不到时为 null。
+ *        先把它所在的元素滚进视野（block 为 scrollIntoView 的 block，默认滚到中间；为 false 时不滚），返回它在视口里的
+ *        起止坐标（第一个字的左边、最后一个字的右边，取各自那一行的竖直中点）；找不到时为 null。
  */
 export function textPoints(page, selector, text, index = 0, block = 'center') {
   return page.evaluate(({ selector: css, text: wanted, index: nth, block: align }) => {
@@ -40,7 +40,7 @@ export function textPoints(page, selector, text, index = 0, block = 'center') {
       range.setEnd(node, inner + 1);
       return range;
     };
-    charRect(at).startContainer.parentElement?.scrollIntoView({ block: align });
+    if (align) charRect(at).startContainer.parentElement?.scrollIntoView({ block: align });
     const a = charRect(at).getBoundingClientRect();
     const b = charRect(at + wanted.length - 1).getBoundingClientRect();
     return { x1: a.left + 1, y1: a.top + a.height / 2, x2: b.right - 1, y2: b.top + b.height / 2 };
@@ -49,8 +49,9 @@ export function textPoints(page, selector, text, index = 0, block = 'center') {
 
 /**
  * @brief 真的拖鼠标选中 selector 里的 text；找不到时返回 false。
- * @param block 先把文字所在的元素滚到哪里（textPoints）。生成中选字用 'end'：滚到中间时这一段下面可能只剩不到
- *        BOTTOM_SLACK 的内容，对话流按"在底部"恢复跟随，量好坐标到按下鼠标之间流入一行就把字往上推一行。
+ * @param block 先把文字所在的元素滚到哪里（textPoints；false 时不滚）。生成中选字用 'end'：滚到中间时这一段下面可能
+ *        只剩不到 BOTTOM_SLACK 的内容，对话流按"在底部"恢复跟随，量好坐标到按下鼠标之间流入一行就把字往上推一行；
+ *        或者先自己滚好位置再传 false（m4-app.mjs 的 selectWhileStreaming）。
  */
 export async function dragSelect(page, selector, text, index = 0, block = 'center') {
   const points = await textPoints(page, selector, text, index, block);
@@ -239,6 +240,20 @@ export function jumpHighlight(page) {
     return { text: ranges.map((range) => range.toString()).join(''),
       flashed: document.querySelectorAll('.jump-flash').length };
   });
+}
+
+/** 反馈表单的底部说明：这个项目没开增强（会话没有项目、读不出增强设置时同样）的整段（docs/specs/memory.md §10.7） */
+export const FEEDBACK_NOTE_OFF = 'This project doesn’t have enhancement on, so feedback is only saved. '
+  + 'To have Mori act on it, use “Attach as context” instead.';
+
+/**
+ * @brief 反馈表单的底部说明（data-testid="feedback-note"）：enhance.get 返回之前这一行留空（§10.7），先等它有文字，
+ *        返回全文；等不到时返回空串。
+ */
+export async function feedbackNote(page, timeout = 10000) {
+  await page.waitForFunction(() => Boolean(document.querySelector('[data-testid="feedback-note"]')?.textContent),
+    null, { timeout }).catch(() => {});
+  return page.evaluate(() => document.querySelector('[data-testid="feedback-note"]')?.textContent ?? '');
 }
 
 /** @brief 保存的反馈（<userData>/feedback/*.json），按文件名排序。 */

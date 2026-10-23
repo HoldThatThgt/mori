@@ -1,15 +1,28 @@
 // 设置页的"AGENTS.md"（docs/v0/screens/settings.md）：用户级 AGENTS.md 的编辑器（有未保存的改动时离开先问），
 // 和焦点会话的项目加载了哪些文件（只列出，可以用"Open in default app"打开）。
+// 每个文件的 token 数与合计超过 500 的警告（docs/specs/memory.md §10.3）写在单独的元素里，路径与生效说明的文字不变。
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { MEMORY_LIMIT } from '../../../shared/memory';
 import type { AgentsInfo } from '../../../shared/protocol';
 import { describe, request } from '../state/bridge';
 import { setLeaveGuard, useLeave } from '../state/leaveGuard';
 import { focusedSession, type FocusedSession, type Notice } from '../state/settings';
 import { folderName } from './ChatPane';
 
+/** 有未保存的改动时离开确认框的标题 */
+const LEAVE_TITLE = 'Discard changes to AGENTS.md?';
 /** 有未保存的改动时离开确认框的说明 */
-const LEAVE_TEXT = 'Your edits haven’t been saved. Leaving now discards them.';
+export const LEAVE_TEXT = 'Your edits haven’t been saved. Leaving now discards them.';
+
+/** @brief AGENTS.md 合计超过上限时的警告（§10.3，设置页与记忆页的 AGENT 节共用）。 */
+export const AGENTS_OVER_TEXT = `Over ${MEMORY_LIMIT} tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep `
+  + 'prompts short.';
+
+/** @brief 一个文件的 token 数：`<n> tokens`，1 时 `1 token`（§10.3）。 */
+export function tokenCount(count: number): string {
+  return count === 1 ? '1 token' : `${count} tokens`;
+}
 
 /** @brief 保存的状态。 */
 type SaveStatus = { kind: 'idle' } | { kind: 'saving' } | { kind: 'saved' } | { kind: 'failed'; error: string };
@@ -48,7 +61,7 @@ function useLeaveCheck(dirty: boolean, editor: RefObject<HTMLTextAreaElement | n
   // 离开没有发生（例如"Open folder…"时取消了选择）时也一样，屏幕上不会留下没有检查的改动。
   useEffect(() => {
     if (!dirty) return;
-    setLeaveGuard({ text: LEAVE_TEXT, discard });
+    setLeaveGuard({ title: LEAVE_TITLE, text: LEAVE_TEXT, discard });
     return () => setLeaveGuard(null);
   }, [dirty, discard]);
   useEffect(() => {
@@ -96,8 +109,13 @@ function statusNotice(status: SaveStatus, dirty: boolean): Notice | null {
   return status.kind === 'saved' ? { tone: 'ok', text: 'Saved · Applies to new sessions' } : null;
 }
 
-/** @brief "Open in default app"（主进程 openPath）；打不开时显示原文。 */
-function OpenInEditor({ path, cwd }: { path: string; cwd: string }) {
+/**
+ * @brief "Open in default app"（主进程 openPath）；打不开时显示原文。disabled 时不可用、悬停 title
+ *        （记忆页在后台进程退出时，§10.10）。
+ */
+export function OpenInEditor({ path, cwd, disabled = false, title }: {
+  path: string; cwd: string; disabled?: boolean; title?: string;
+}) {
   const [error, setError] = useState<string | null>(null);
   async function open() {
     try {
@@ -108,7 +126,8 @@ function OpenInEditor({ path, cwd }: { path: string; cwd: string }) {
   }
   return (
     <>
-      <button className="text-link" onClick={() => void open()}>Open in default app</button>
+      <button className="text-link" disabled={disabled} title={title} onClick={() => void open()}>
+        Open in default app</button>
       {error && (
         <p className="form-message error agents-open-error" role="alert">
           Couldn’t open this file with the default app: {error}
@@ -134,7 +153,10 @@ function effectiveText(path: string, userPath: string): { warn: boolean; text: s
   return { warn: true, text: `${path} is in effect now. After you save, this AGENTS.md is loaded instead.` };
 }
 
-/** @brief 生效的文件：文字见 effectiveText；可以用"Open in default app"打开它（例如先把 CLAUDE.md 的内容抄过来）。 */
+/**
+ * @brief 生效的文件：文字见 effectiveText，后面单独一个元素写它的 token 数（§10.3）；可以用"Open in default app"打开它
+ *        （例如先把 CLAUDE.md 的内容抄过来）。
+ */
 function EffectiveFile({ info }: { info: AgentsInfo }) {
   const path = info.effectivePath;
   if (!path) return null;
@@ -142,9 +164,16 @@ function EffectiveFile({ info }: { info: AgentsInfo }) {
   return (
     <div className="agents-line">
       <span className={warn ? 'agents-effective warn' : 'agents-effective'} data-testid="agents-effective">{text}</span>
+      <span className="agents-token-count" data-testid="agents-tokens">{tokenCount(info.userTokens)}</span>
       <OpenInEditor path={path} cwd={parentDir(path)} />
     </div>
   );
+}
+
+/** @brief 合计超过上限时的警告（§10.3）；没有超过时不显示。 */
+function AgentsOver({ total }: { total: number }) {
+  if (total <= MEMORY_LIMIT) return null;
+  return <p className="form-message agents-over" role="status" data-testid="agents-over">{AGENTS_OVER_TEXT}</p>;
 }
 
 /** @brief 用户级 AGENTS.md：路径、生效的文件、编辑框、"Save"与"Discard changes"。 */
@@ -181,8 +210,8 @@ function UserAgents({ info, onSaved }: { info: AgentsInfo | null; onSaved: (cont
   );
 }
 
-/** @brief 项目级（只列出）：焦点会话的资源加载器实际加载的文件，不含 agentDir 里的那个。 */
-function ProjectAgents({ session, loaded }: { session: FocusedSession | null; loaded: string[] | null }) {
+/** @brief 项目级（只列出）：焦点会话的资源加载器实际加载的文件与各自的 token 数，不含 agentDir 里的那个。 */
+function ProjectAgents({ session, loaded }: { session: FocusedSession | null; loaded: AgentsInfo['loaded'] }) {
   if (!session || !loaded) {
     return (
       <div className="agents-project" data-testid="agents-loaded">
@@ -200,8 +229,12 @@ function ProjectAgents({ session, loaded }: { session: FocusedSession | null; lo
       </p>
       {loaded.length === 0 && <p className="settings-empty">This project doesn’t load an AGENTS.md or CLAUDE.md</p>}
       <ul className="agents-files">
-        {loaded.map((path) => (
-          <li key={path}><span className="agents-path">{path}</span><OpenInEditor path={path} cwd={session.cwd} /></li>
+        {loaded.map((file) => (
+          <li key={file.path}>
+            <span className="agents-path">{file.path}</span>
+            <span className="agents-tokens">{tokenCount(file.tokens)}</span>
+            <OpenInEditor path={file.path} cwd={session.cwd} />
+          </li>
         ))}
       </ul>
     </div>
@@ -224,6 +257,7 @@ export function AgentsSection() {
         <>
           <UserAgents info={info} onSaved={onSaved} />
           {info && <ProjectAgents session={session} loaded={info.loaded} />}
+          {info && <AgentsOver total={info.total} />}
         </>
       )}
     </div>

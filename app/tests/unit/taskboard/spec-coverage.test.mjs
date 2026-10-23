@@ -1,6 +1,7 @@
 // tests/spec-coverage.mjs 的单元测试（docs/specs/parallel-agents-taskboard.md §17.3、§17.4）：--spec taskboard 读 §17.2
 // 的 TB 条目与层、tb- 结果文件按层归类（-packaged 只在 --packaged 时计入 App 与真实层、回放只认开发构建、
 // tb-partial-*.json 不计入）、不属于任何编号的检查只在这份规格的结果文件里找；不加 --spec 时模型层的规则不变。
+// 记忆规格（docs/specs/memory.md §14.3、§14.4）加的 --spec memory 同样检查：§14.2 的 MEM 条目与层、mem- 结果文件的归类。
 // §17.4 把覆盖检查算进 TB-46（现有功能不退步），所以检查名以 "TB-46 spec-coverage" 开头；TB-46 只列 App 与回放两层，
 // 这些单元检查不计入覆盖表，由 node --test 的退出码把关。
 
@@ -15,7 +16,7 @@ import {
 } from '../../spec-coverage.mjs';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const { model, taskboard } = SPECS;
+const { model, taskboard, memory } = SPECS;
 
 /** @brief 按 [文件名, 期望的层] 逐个比对。 */
 function expectLayers(spec, packaged, cases) {
@@ -73,6 +74,32 @@ test('TB-46 spec-coverage keeps the model layer rules when --spec is not given',
   assert.deepEqual([...items.find((item) => item.id === 'MP-37').layers].sort(), ['app', 'replay']);
 });
 
+test('TB-46 spec-coverage reads every MEM row of memory §14.2 with its layers', () => {
+  const items = parseSpecTable(memory, readFileSync(specPathOf(memory), 'utf8'));
+  assert.deepEqual(items.map((item) => item.id),
+    Array.from({ length: 37 }, (_, i) => `MEM-${String(i + 1).padStart(2, '0')}`));
+  const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
+  assert.deepEqual(layersOf('MEM-10'), ['app', 'real', 'replay', 'unit']);
+  assert.deepEqual(layersOf('MEM-12'), ['unit']);
+  assert.deepEqual(layersOf('MEM-34'), ['real']);
+  assert.deepEqual(layersOf('MEM-35'), ['app', 'replay']);
+  assert.equal(items.find((item) => item.id === 'MEM-35').title, '现有功能不退步');
+});
+
+test('TB-46 spec-coverage maps mem- result files to layers (partial files never count)', () => {
+  expectLayers(memory, false, [
+    ['mem-unit.json', 'unit'], ['mem-app-prompt.json', 'app'], ['mem-app-existing.json', 'app'],
+    ['mem-replay.json', 'replay'], ['mem-replay-existing.json', 'replay'], ['mem-real.json', 'real'],
+    ['mem-app-existing-packaged.json', null], ['mem-real-packaged.json', null],
+    ['mem-partial-existing-app.json', null], ['mem-partial-app-prompt.json', null], ['mem-app-prompt.log', null],
+    ['tb-unit.json', null], ['v1-models-app-existing.json', null],
+  ]);
+  expectLayers(memory, true, [
+    ['mem-app-existing-packaged.json', 'app'], ['mem-app-existing.json', null], ['mem-real-packaged.json', 'real'],
+    ['mem-unit.json', 'unit'], ['mem-replay.json', 'replay'], ['mem-partial-existing-app-packaged.json', null],
+  ]);
+});
+
 test('TB-46 spec-coverage lists strays only from the files of the chosen spec', () => {
   const items = [{ id: 'TB-01' }, { id: 'TB-46' }];
   const files = [{ name: 'tb-unit.json', checks: [
@@ -101,6 +128,6 @@ test('TB-46 spec-coverage exits 2 for an unknown --spec', () => {
   const run = spawnSync(process.execPath, [join(appRoot, 'tests/spec-coverage.mjs'), '--spec', 'board'],
     { cwd: appRoot, encoding: 'utf8' });
   assert.equal(run.status, 2);
-  assert.match(run.stderr, /unknown --spec "board" \(expected model or taskboard\)/);
+  assert.match(run.stderr, /unknown --spec "board" \(expected model, taskboard or memory\)/);
   assert.equal(run.stdout, '');
 });

@@ -8,14 +8,18 @@
 // 平行 Agent（docs/specs/parallel-agents-taskboard.md §2、§4.4、§5、§8.2、§11、§13.10、§14）：用户会话打开时读角色文件，
 // 合格时建它的 Team（team.ts）；实例会话（instances.ts）与用户会话在同一张表里，但不进侧栏、事件交给 Team。
 // 这里为 Team 提供 TeamHost：建、开、关实例，程序的投递，对话的回复，停止；协作模式下的用户消息与命令交给 Team。
+// 提示词分层与记忆（docs/specs/memory.md §4、§5、§7、§9.6、§9.9）：每个会话带必需的 mori-memory（memoryExtension.ts），
+// 会话打开时读记忆的快照；新建的会话带上增强留下的提示；增强任务的看不见的会话也走用户会话的路径（startHeadless），
+// 它的事件只交给这次运行，界面的命令拿不到它。
 
 import { existsSync } from 'node:fs';
 import type {
   AgentSession, AgentSessionEvent, ExtensionFactory, PromptOptions as PiPromptOptions, SessionEntry, SessionManager,
   SettingsManager,
 } from '@earendil-works/pi-coding-agent';
+import type { EnhanceTask, MemoryNotice } from '../shared/memory';
 import {
-  BLOCKED_PROMPT_MESSAGE, STOPPED_BEFORE_SENDING, type ModelEvent, type ModelPick, type PickOptions,
+  BLOCKED_PROMPT_MESSAGE, STOPPED_BEFORE_SENDING, type ModelBlocked, type ModelEvent, type ModelPick, type PickOptions,
 } from '../shared/models';
 import type {
   ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, EventEnvelope, ExtensionNotice, KernelEvent,
@@ -27,11 +31,19 @@ import {
   type TeamSwitch,
 } from '../shared/team';
 import { ApprovalPolicy, type ApprovalGate, type GateOutput } from './approval';
+import { takeNotice } from './enhance';
 import { PendingRefs, quotableEntries, supplementEntry } from './entries';
 import { ExtensionUi } from './extensionUi';
 import { slimEvent } from './events';
 import { instanceEnvelope, instanceSetup, newInstanceManager, teamDirOf } from './instances';
 import { createSharedTransport, loadMcpShare } from './mcpShare';
+import type { RunHandle } from './memory';
+import { userRunSeats, type SessionSeat } from './memoryAssemble';
+import {
+  MEMORY_EXTENSION, MEMORY_EXTENSION_PATH, memoryExtension, memorySetup, sessionPosition, type EnhanceSessionSpec,
+  type MemorySessionSpec,
+} from './memoryExtension';
+import type { EvidenceScope, MemoryPosition } from './memoryTool';
 import { getModelLayer } from './modelLayer';
 import { ModelSession, type PrepareResult } from './modelSession';
 import { loadPi } from './pi';
@@ -124,6 +136,13 @@ interface Entry {
   emit: Emit;
   /** 实例会话：pi 事件交给 Team，不发给界面（§8.2）；用户会话为 null */
   onEvent: ((event: AgentSessionEvent) => void) | null;
+  /**
+   * 增强任务的看不见的会话（记忆规格 §9.6）：事件只交给这次运行，会话列表、按文件找会话与界面的命令都不认它；
+   * 它的实例会话不算（本来就不在界面上）
+   */
+  headless: boolean;
+  /** 新建时带上的增强提示（记忆规格 §9.9）；打开已有会话、看不见的会话与实例会话为 null */
+  memoryNotice: MemoryNotice | null;
 }
 
 const sessions = new Map<string, Entry>();
@@ -206,6 +225,7 @@ function describeEntry(entry: Entry): SessionInfo {
     contextUsage: session.getContextUsage() ?? null,
     approval: entry.gate.state(),
     ...teamPart(entry),
+    memoryNotice: entry.memoryNotice,
   };
 }
 
@@ -243,6 +263,8 @@ interface UserStart extends StartArgs {
   decision?: TrustDecision;
   /** 已经读好的角色；省略时读角色文件 */
   roles?: RoleLoad;
+  /** 增强任务的看不见的会话（记忆规格 §9.6）：这次增强运行；普通会话省略 */
+  enhance?: EnhanceSessionSpec;
 }
 
 /** @brief 建一个会话要用的、用户会话与各种实例会话不同的部分（平行 Agent 规格 §8.2）。 */
@@ -267,14 +289,22 @@ export interface SessionSetup {
   tools: string[] | null;
   /** 实例会话的 pi 事件交给 Team；用户会话为 null */
   onEvent: ((event: AgentSessionEvent) => void) | null;
+  /** 记忆设置（记忆规格 §7.6、§9.6）：增强会话与它的实例带这次运行 */
+  memory: MemorySessionSpec;
+  /** @brief 这次运行的身份（记忆规格 §5.1）：用户会话按 Team 此刻的模式，实例会话按种类。 */
+  seats(): ReadonlySet<SessionSeat>;
 }
 
 /**
  * @brief 资源加载器与 createAgentSession 默认建的相同（同一个 settingsManager），另有几个 inline extension，
- *        顺序为 mori-models、mori-team（有 Team 时）、mori-approval、mcp（平行 Agent 规格 §8.2、§14.3：context 处理器先模型层
- *        后工作卡，tool_call 处理器先 mori-team 的拒绝后批准）。项目信任已经判断好，pi 在加载项目资源之前问时直接交给它。
+ *        顺序为 mori-models、mori-team（有 Team 时）、mori-memory、mori-approval、mcp（平行 Agent 规格 §8.2、§14.3，
+ *        记忆规格 §5.3：context 处理器先模型层后工作卡；mori-memory 在 mori-team 设好这次运行的工具之后写身份段；
+ *        tool_call 处理器先 mori-team 的拒绝，再 mori-memory 的拒绝，最后批准）。项目信任已经判断好，pi 在加载项目资源之前
+ *        问时直接交给它。pi 读进来的 SYSTEM.md 由 mori-memory 覆盖（记忆规格 §4.3），这里记一条日志。
+ * @param memory 这个会话的 mori-memory
  */
-async function loadResources(cwd: string, setup: SessionSetup, gate: ApprovalGate, models: ExtensionFactory) {
+async function loadResources(cwd: string, setup: SessionSetup, gate: ApprovalGate, models: ExtensionFactory,
+  memory: ExtensionFactory) {
   const pi = await loadPi();
   // MCP 照 pi 命令行的注册方式作为内置扩展加入（方案第 6 节）：`pi config` 和设置里的 -builtin:mcp 对它有效；
   // bindExtensions 发 session_start 时它在后台连接服务。codemode 不进 v0，所以服务要用直接调用方式。
@@ -284,12 +314,14 @@ async function loadResources(cwd: string, setup: SessionSetup, gate: ApprovalGat
     replaceable: true, builtin: true };
   const team = setup.teamExtension ? [{ name: TEAM_EXTENSION, factory: setup.teamExtension }] : [];
   const extensionFactories = [{ name: MODEL_EXTENSION, factory: models }, ...team,
-    { name: APPROVAL_EXTENSION, factory: gate.extension() }, mcp];
+    { name: MEMORY_EXTENSION, factory: memory }, { name: APPROVAL_EXTENSION, factory: gate.extension() }, mcp];
   const append = setup.appendPrompt;
   const resourceLoader = new pi.DefaultResourceLoader({ cwd, agentDir: pi.getAgentDir(),
     settingsManager: setup.settings, extensionFactories,
     ...(append.length > 0 ? { appendSystemPromptOverride: (base: string[]) => [...base, ...append] } : {}) });
   await resourceLoader.reload({ resolveProjectTrust: async () => setup.trust.trusted });
+  const system = resourceLoader.getSystemPromptSource();
+  if (system) console.log(`[kernel] SYSTEM.md is not used: ${system.path}`);
   return resourceLoader;
 }
 
@@ -303,21 +335,30 @@ async function createSettings(cwd: string, trust: TrustDecision): Promise<Settin
 }
 
 /**
+ * @brief 必需的扩展在错误原文里的名字；不是必需的扩展为 null（mori-team 只在给了它的会话里必需）。
+ * @param path 扩展的路径（`<inline:名字>`）
+ * @param team 这个会话带 mori-team
+ */
+function requiredExtension(path: string, team: boolean): string | null {
+  if (path === APPROVAL_EXTENSION_PATH) return 'approval';
+  if (path === MODEL_EXTENSION_PATH) return 'model layer';
+  if (path === MEMORY_EXTENSION_PATH) return 'memory';
+  return team && path === TEAM_EXTENSION_PATH ? 'team' : null;
+}
+
+/**
  * @brief 检查扩展的加载错误：批准扩展没加载上时，pi 没有 tool_call 处理器就不经询问直接执行；模型层扩展没加载上时，
- *        换模型后被隐藏的过程会发给新模型；给了 mori-team 而它没加载上时，TaskBoard 的工具与限制都不在（§8.2）。
- *        这些情况都不打开会话。
+ *        换模型后被隐藏的过程会发给新模型；给了 mori-team 而它没加载上时，TaskBoard 的工具与限制都不在（§8.2）；
+ *        mori-memory 没加载上时，身份段、记忆分节与记忆目录的写保护都不在（记忆规格 §5.3）。这些情况都不打开会话。
  * @param team 这个会话带 mori-team
  * @return 加载失败的扩展（路径和原文）
  */
 function checkExtensions(session: AgentSession, errors: { path: string; error: string }[], team: boolean): string[] {
   for (const error of errors) console.error(`[kernel] extension failed to load: ${error.path}: ${error.error}`);
-  const required = errors.find((error) => error.path === APPROVAL_EXTENSION_PATH
-    || error.path === MODEL_EXTENSION_PATH || (team && error.path === TEAM_EXTENSION_PATH));
+  const required = errors.find((error) => requiredExtension(error.path, team) !== null);
   if (required) {
     session.dispose();
-    const which = required.path === APPROVAL_EXTENSION_PATH ? 'approval'
-      : required.path === MODEL_EXTENSION_PATH ? 'model layer' : 'team';
-    throw new Error(`The ${which} extension failed to load: ${required.error}`);
+    throw new Error(`The ${requiredExtension(required.path, team)} extension failed to load: ${required.error}`);
   }
   return errors.map((error) => `${error.path}: ${error.error}`);
 }
@@ -342,8 +383,29 @@ async function createModelSession(args: StartArgs, extra: InstanceSpec['model'],
   return model;
 }
 
+/** @brief 增强任务的看不见的会话（记忆规格 §9.6）：带着这次增强运行的用户会话。 */
+function isHeadless(setup: SessionSetup): boolean {
+  return setup.kind === 'user' && setup.memory.enhance !== null;
+}
+
 /**
- * @brief 建 pi 会话并登记：虚拟模型、思考强度（§11.1）、流函数包装（§11.2）、扩展、事件转发。
+ * @brief memory 工具执行时 agent 调用方的位置（记忆规格 §7.3）：用户会话记它自己的文件与最后一条你的消息；
+ *        分开时的立项实例记它所属的用户会话的文件，条目为 null。用户会话已不在时抛错（工具按写入失败报告）。
+ * @param setup 这个会话的设置
+ * @param sessionId 这个会话的 pi 会话 id
+ */
+function positionFor(setup: SessionSetup, sessionId: string): () => MemoryPosition {
+  const userId = setup.owner ?? sessionId;
+  return () => {
+    const user = sessions.get(userId);
+    if (!user) throw new Error(`The user session ${userId} is not open`);
+    return sessionPosition(user.session, setup.owner === null);
+  };
+}
+
+/**
+ * @brief 建 pi 会话并登记：记忆的快照与 mori-memory（记忆规格 §5.2，在建资源加载器之前）、虚拟模型、思考强度（§11.1）、
+ *        流函数包装（§11.2）、扩展、事件转发。看不见的会话的扩展询问不出卡（实例的做法，记忆规格 §9.6）。
  * @param args 打开会话的参数
  * @param setup 这种会话的设置
  * @param model 模型层的会话接线
@@ -351,10 +413,13 @@ async function createModelSession(args: StartArgs, extra: InstanceSpec['model'],
 async function createEntry(args: StartArgs, setup: SessionSetup, model: ModelSession): Promise<Entry> {
   const pi = await loadPi();
   const sessionId = args.sessionManager.getSessionId();
+  const memory = memoryExtension(await memorySetup({ cwd: args.cwd, kind: setup.kind, spec: setup.memory,
+    seats: () => setup.seats(), position: positionFor(setup, sessionId) }));
+  const headless = isHeadless(setup);
   const gate = setup.approval.gate({ ...setup.gate, send: (event) => args.emit({ kind: 'event', sessionId, event }) });
-  const ui = new ExtensionUi(args.emit, setup.kind !== 'user');
+  const ui = new ExtensionUi(args.emit, setup.kind !== 'user' || headless);
   try {
-    const resourceLoader = await loadResources(args.cwd, setup, gate, model.extension());
+    const resourceLoader = await loadResources(args.cwd, setup, gate, model.extension(), memory);
     const virtual = await model.register();
     // 新会话按第一个候选取思考强度；打开已有会话时不传，pi 从会话记录恢复（§11.1）。
     const thinkingLevel = args.restored ? undefined : model.newSessionThinking(setup.settings);
@@ -376,7 +441,7 @@ async function createEntry(args: StartArgs, setup: SessionSetup, model: ModelSes
     const entry: Entry = { session, gate, ui, cwd: args.cwd, running: false, openedAt: Date.now(),
       toolStarts: new Map(), notices: ui.ready(), model, preparing: null, trust: setup.trust, extensionErrors,
       refs: new PendingRefs(), runStart: undefined, kind: setup.kind, owner: setup.owner, team: null, stop: null,
-      emit: args.emit, onEvent: setup.onEvent };
+      emit: args.emit, onEvent: setup.onEvent, headless, memoryNotice: null };
     sessions.set(sessionId, entry);
     session.subscribe((event) => forward(entry, event));
     return entry;
@@ -401,19 +466,31 @@ async function readRoles(cwd: string): Promise<RoleLoad> {
  * @brief 建用户会话的 Team 的参数（§2、§3）。
  * @param args 打开会话的参数
  * @param roles 合格的角色
- * @param setup 用户会话的设置（信任、批准状态、默认工具所在的设置）
+ * @param setup 用户会话的设置（信任、批准状态、默认工具所在的设置、增强会话的这次运行）
  */
 function teamArgs(args: StartArgs, roles: RoleLoad, setup: SessionSetup): TeamArgs {
   const userSessionId = args.sessionManager.getSessionId();
   return { userSessionId, userSessionFile: args.sessionManager.getSessionFile() ?? null, cwd: args.cwd, roles,
     teamDir: teamDirOf(userSessionId), baseTools: setup.settings.getDefaultTools() ?? PI_DEFAULT_TOOLS,
-    trust: setup.trust, approval: setup.approval, restored: args.restored };
+    trust: setup.trust, approval: setup.approval, restored: args.restored, enhance: setup.memory.enhance };
+}
+
+/**
+ * @brief 用户会话的批准状态（一个用户会话一份，实例共用）：增强任务的看不见的会话一开始就是 all，命令、MCP、插件工具
+ *        一律自动执行（记忆规格 §9.6）。
+ */
+function userApproval(args: UserStart): ApprovalPolicy {
+  const approval = new ApprovalPolicy();
+  if (args.enhance) approval.setMode('all');
+  return approval;
 }
 
 /**
  * @brief 新建或打开一个用户会话：读角色文件；有问题时会话照"只有基座"建立并按 agents_invalid 拒绝启动（§4.4），
  *        合格时在建资源加载器之前建 Team（它的 mori-team 扩展要进扩展列表），会话建好后交给它（attachUser）。
  *        对话持有者的正文进 system prompt 的附加段（基座没有，与 v0 相同，§8.5）。失败时注销虚拟模型。
+ *        每次运行的身份按 Team 此刻的模式（没有 Team 时是主 Agent，记忆规格 §5.1）；增强任务的看不见的会话另按
+ *        记忆规格 §9.6：调度类别 background、批准状态 all，这次运行经记忆设置交给 mori-memory 与 Team 的实例。
  */
 async function startUser(args: UserStart): Promise<Entry> {
   const roles = args.roles ?? await readRoles(args.cwd);
@@ -425,13 +502,15 @@ async function startUser(args: UserStart): Promise<Entry> {
   const source = dialog?.file ? { source: { kind: 'pick' as const, requires: dialog.requires } } : {};
   let team: TeamLike | null = null;
   // 用户会话这次请求的工作卡算进接手判断与窗口估算（§8.3 最后一条、§12.6）。
-  const extra = { ...source, extraContextTokens: () => team?.cardTokens() ?? 0 };
+  const extra = { ...source, extraContextTokens: () => team?.cardTokens() ?? 0,
+    ...(args.enhance ? { schedClass: 'background' as const } : {}) };
   const model = await createModelSession(args, extra, (event) => args.emit({ kind: 'event', sessionId, event }));
   try {
     if (!valid) await model.setAgentProblems(roles.problems);
-    const setup: SessionSetup = { kind: 'user', owner: null, trust, approval: new ApprovalPolicy(),
+    const setup: SessionSetup = { kind: 'user', owner: null, trust, approval: userApproval(args),
       gate: { prefix: '' }, settings: await createSettings(args.cwd, trust), teamExtension: null,
-      appendPrompt: dialog?.body ? [dialog.body] : [], tools: null, onEvent: null };
+      appendPrompt: dialog?.body ? [dialog.body] : [], tools: null, onEvent: null,
+      memory: { enhance: args.enhance ?? null }, seats: () => userRunSeats(team?.mode ?? null, team?.merged ?? false) };
     team = valid ? createTeam(host, teamArgs(args, roles, setup)) : null;
     const entry = await createEntry(args, { ...setup, teamExtension: team?.userExtension() ?? null }, model);
     await attachTeam(entry, team);
@@ -466,17 +545,22 @@ async function closeTeam(team: TeamLike): Promise<void> {
   }
 }
 
-/** @brief 在指定目录新建 pi 会话。 */
+/**
+ * @brief 在指定目录新建 pi 会话。会话建好之后取走这个项目待显示的增强提示（记忆规格 §9.9，只有新建的会话带上；
+ *        enhance.ts 的 takeNotice 读不出时记日志并返回 null，会话照常打开）。
+ */
 export async function createSession(cwd: string, emit: Emit, trust?: TrustAnswer): Promise<SessionInfo> {
   const pi = await loadPi();
   if (!existsSync(cwd)) throw new Error(`Project folder not found: ${cwd}`);
-  return describeEntry(await startUser({ cwd, sessionManager: pi.SessionManager.create(cwd), emit, trust,
-    restored: false }));
+  const entry = await startUser({ cwd, sessionManager: pi.SessionManager.create(cwd), emit, trust, restored: false });
+  entry.memoryNotice = await takeNotice(cwd);
+  return describeEntry(entry);
 }
 
-/** @brief 已打开的、会话文件是 sessionFile 的用户会话（实例会话不在界面上，§8.1）。 */
+/** @brief 已打开的、会话文件是 sessionFile 的用户会话（实例会话不在界面上，§8.1；看不见的会话也不算，记忆规格 §9.6）。 */
 function entryByFile(sessionFile: string): Entry | undefined {
-  return [...sessions.values()].find((entry) => entry.kind === 'user' && entry.session.sessionFile === sessionFile);
+  return [...sessions.values()].find((entry) => entry.kind === 'user' && !entry.headless
+    && entry.session.sessionFile === sessionFile);
 }
 
 /** @brief 还开着的会话的状态（侧栏）；没有 Team 时没有后台的运行与批准。 */
@@ -516,14 +600,15 @@ function refreshTools(session: AgentSession): void {
  * @brief 从会话文件打开会话（侧栏点开、后台进程重启后），返回 pi 记录的当前分支，界面据此画对话流。
  *        已经打开的直接返回它和它这一刻的样子（界面重新加载后接上）；正在打开的等它打开完再这样返回。同一个会话文件
  *        不会有两个写入者。接上这一路没有等待，之后的事件都排在这个结果后面送到界面；打开过程中扩展的通知只随真正
- *        打开它的那次结果交出，接上时不再交（界面重新加载前已经显示过）。
+ *        打开它的那次结果交出，接上时不再交（界面重新加载前已经显示过）。增强的提示只随新建的那次结果交出，
+ *        接上已有会话时不带（记忆规格 §9.9）。
  */
 export async function openSession(sessionFile: string, emit: Emit, trust?: TrustAnswer): Promise<OpenedSession> {
   while (opening.has(sessionFile)) await opening.get(sessionFile)?.catch(() => undefined);
   const live = entryByFile(sessionFile);
   if (live) {
-    return { ...describeEntry(live), extensionNotices: [], entries: live.session.sessionManager.getBranch(),
-      live: snapshot(live) };
+    return { ...describeEntry(live), extensionNotices: [], memoryNotice: null,
+      entries: live.session.sessionManager.getBranch(), live: snapshot(live) };
   }
   return whileOpening(sessionFile, openFromFile(sessionFile, emit, trust));
 }
@@ -564,28 +649,49 @@ function completedPart(branch: SessionEntry[], leafId: string | null): SessionEn
 }
 
 /**
+ * @brief 依据跳转的落点（记忆规格 §8、§10.2）：完整的当前分支上这个条目，或它之上最近的一条你的消息或助手回复
+ *        （程序投递的不算，同 quotableEntries 的规则）。
+ * @param branch 完整的当前分支（从根起，不截到已完成的轮次）
+ * @param entryId 依据记下的条目 id
+ * @return 落点的条目 id；条目不在这条分支上（或它之上没有这样的消息）时为 null
+ */
+function anchorOn(branch: readonly SessionEntry[], entryId: string): string | null {
+  const at = branch.findIndex((item) => item.id === entryId);
+  if (at < 0) return null;
+  // mori.wake 条目写在它指向的消息之后：按整条分支认出程序投递的消息
+  const messages = new Set(quotableEntries(branch).filter((item) => item.type === 'message').map((item) => item.id));
+  return branch.slice(0, at + 1).findLast((item) => messages.has(item.id))?.id ?? null;
+}
+
+/**
  * @brief 读出一个会话已完成的部分（会话引用，docs/v0/screens/session-refs.md）。后台进程里开着的会话读它自己的分支，
  *        在生成时只交出已完成的轮次；没开着的用 SessionManager.open 读（不创建会话、不加载扩展、不问信任）。
  *        程序投递到用户会话的消息不交（entries.ts quotableEntries，平行 Agent 规格 §13.11）。
+ * @param sessionFile 会话文件
+ * @param anchor 依据跳转要找的条目 id（记忆规格 §8）：带了时结果的 anchor 在完整的当前分支上算（anchorOn）
  */
-export async function readSession(sessionFile: string): Promise<SessionContent> {
+export async function readSession(sessionFile: string, anchor?: string): Promise<SessionContent> {
+  const anchored = (branch: readonly SessionEntry[]) => (anchor === undefined ? {}
+    : { anchor: anchorOn(branch, anchor) });
   const live = entryByFile(sessionFile);
   if (live) {
     const branch = live.session.sessionManager.getBranch();
     const unfinished = live.runStart !== undefined;
     return { sessionFile, cwd: live.cwd, name: live.session.sessionName ?? null, unfinished,
-      entries: quotableEntries(unfinished ? completedPart(branch, live.runStart ?? null) : branch) };
+      entries: quotableEntries(unfinished ? completedPart(branch, live.runStart ?? null) : branch),
+      ...anchored(branch) };
   }
   if (!existsSync(sessionFile)) throw new Error(`Session file not found: ${sessionFile}`);
   const pi = await loadPi();
   const manager = pi.SessionManager.open(sessionFile);
+  const branch = manager.getBranch();
   return { sessionFile, cwd: manager.getCwd(), name: manager.getSessionName() ?? null,
-    entries: quotableEntries(manager.getBranch()), unfinished: false };
+    entries: quotableEntries(branch), unfinished: false, ...anchored(branch) };
 }
 
 /** @brief 还开着、但还没保存（没有会话文件）的用户会话：界面重新加载后也能在侧栏看到、打开、删除。 */
 function unsavedLive(listed: SavedSession[]): SavedSession[] {
-  return [...sessions.values()].filter((entry) => entry.kind === 'user' && entry.session.sessionFile
+  return [...sessions.values()].filter((entry) => entry.kind === 'user' && !entry.headless && entry.session.sessionFile
     && !existsSync(entry.session.sessionFile)
     && !listed.some((item) => item.sessionFile === entry.session.sessionFile)).map((entry) => ({
     sessionFile: entry.session.sessionFile!, sessionId: entry.session.sessionId, cwd: entry.cwd,
@@ -616,7 +722,7 @@ export async function listSessions(): Promise<SavedSession[]> {
  */
 export async function renameSession(sessionId: string | undefined, sessionFile: string | undefined,
   name: string): Promise<{ name: string | null }> {
-  const entry = (sessionId ? sessions.get(sessionId) : undefined)
+  const entry = (sessionId ? visibleEntry(sessionId) : undefined)
     ?? (sessionFile ? entryByFile(sessionFile) : undefined);
   if (entry) {
     entry.session.setSessionName(name);
@@ -630,8 +736,21 @@ export async function renameSession(sessionId: string | undefined, sessionFile: 
   return { name: manager.getSessionName() ?? null };
 }
 
-/** @brief 取出已打开的会话。 */
+/** @brief 界面的命令能用的会话：看不见的会话不算（记忆规格 §9.6）；不在时为 undefined。 */
+function visibleEntry(sessionId: string): Entry | undefined {
+  const entry = sessions.get(sessionId);
+  return entry?.headless ? undefined : entry;
+}
+
+/** @brief 取出界面的命令要用的会话（看不见的会话不算）。 */
 function requireEntry(sessionId: string): Entry {
+  const entry = visibleEntry(sessionId);
+  if (!entry) throw new Error(`Unknown session ${sessionId}`);
+  return entry;
+}
+
+/** @brief 取出会话表里的任何会话（Team 的操作用：增强会话的 Team 也要停、排队它的用户会话）。 */
+function anyEntry(sessionId: string): Entry {
   const entry = sessions.get(sessionId);
   if (!entry) throw new Error(`Unknown session ${sessionId}`);
   return entry;
@@ -764,7 +883,11 @@ function settleRun(entry: Entry): void {
  */
 export function prompt(sessionId: string, text: string,
   options: PromptOptions): PromptAccepted | Promise<PromptAccepted> {
-  const entry = requireEntry(sessionId);
+  return promptEntry(requireEntry(sessionId), text, options);
+}
+
+/** @brief prompt 的做法（看不见的会话的第一条消息也走这里，记忆规格 §9.6）。 */
+function promptEntry(entry: Entry, text: string, options: PromptOptions): PromptAccepted | Promise<PromptAccepted> {
   if (entry.model.isBlocked()) {
     promptError(entry, { message: BLOCKED_PROMPT_MESSAGE, text, refs: options.refs ?? null, running: entry.running,
       queued: [] });
@@ -1024,7 +1147,11 @@ function takePiQueue(entry: Entry): string[] {
  *        text 是第一条、queued 是其余的（text 为 null 只表示程序的投递没能发出，§5.6）。
  */
 export async function abort(sessionId: string): Promise<{ aborted: true }> {
-  const entry = requireEntry(sessionId);
+  return abortEntry(requireEntry(sessionId));
+}
+
+/** @brief abort 的做法（看不见的会话停止时也走这里，记忆规格 §9.6）。 */
+async function abortEntry(entry: Entry): Promise<{ aborted: true }> {
   entry.stop = 'dialog';
   const withdrawn = entry.team ? dialogStopTexts(entry.team) : null;
   if (entry.preparing?.phase === 'preparing') {
@@ -1138,7 +1265,11 @@ export function boardView(sessionId: string): BoardView & { error: null } {
  *        没有 Team 时什么都不做。
  */
 export async function stopTeam(sessionId: string): Promise<{ texts: string[]; error: null }> {
-  const entry = requireEntry(sessionId);
+  return stopTeamOf(requireEntry(sessionId));
+}
+
+/** @brief stopTeam 的做法（看不见的会话停止时也走这里，记忆规格 §9.6）。 */
+async function stopTeamOf(entry: Entry): Promise<{ texts: string[]; error: null }> {
   if (!entry.team) return { texts: [], error: null };
   const fromPi = takePiQueue(entry);
   // 对话在准备中（pi 的排队区这时是空的）：待判断的消息随准备中撤回的消息一起交回（startReply 的 giveBack），
@@ -1208,7 +1339,7 @@ async function startInstance(spec: InstanceSpec, manager: SessionManager, restor
 
 /** @brief 开着的实例会话；不在或不是实例时报错。 */
 function requireInstance(sessionId: string): Entry {
-  const entry = requireEntry(sessionId);
+  const entry = anyEntry(sessionId);
   if (entry.kind === 'user') throw new Error(`${sessionId} is not an instance session`);
   return entry;
 }
@@ -1268,7 +1399,7 @@ async function dialogStart(userSessionId: string, item: HeldItem,
 
 /** @brief 停止一个会话的运行（实例或对话）：先记下原因（§9.4），准备中时取消准备。 */
 async function abortFor(sessionId: string, reason: StopReason): Promise<void> {
-  const entry = requireEntry(sessionId);
+  const entry = anyEntry(sessionId);
   entry.stop = reason;
   await stopRun(entry);
 }
@@ -1298,7 +1429,7 @@ const host: TeamHost = {
   closeInstance,
   deliver,
   dialogStart,
-  dialogQueue: (userSessionId, item, behavior) => dispatch(requireEntry(userSessionId), item, behavior),
+  dialogQueue: (userSessionId, item, behavior) => dispatch(anyEntry(userSessionId), item, behavior),
   abort: abortFor,
   answerApproval: answerInstance,
   status: (sessionId) => {
@@ -1312,6 +1443,166 @@ const host: TeamHost = {
   },
   emitUser,
 };
+
+// ---- 增强任务的看不见的会话（记忆规格 §9.6，enhanceRun.ts 用） ----
+
+/** @brief 建一个看不见的会话要用的设置。 */
+export interface HeadlessSpec {
+  /** 项目的工作目录 */
+  cwd: string;
+  /** 会话文件所在的目录：`<userData>/memory/projects/--<key>--/sessions`（不在 <agentDir>/sessions） */
+  dir: string;
+  /** 任务 */
+  task: EnhanceTask;
+  /** beginRun 返回的句柄：这个会话与它的实例的 memory 写入都并进这次运行的修订（§9.8） */
+  run: RunHandle;
+  /** 这次运行的依据范围（§9.7） */
+  scope: EvidenceScope;
+  /** 选择范围：写进这个会话的 mori.pick */
+  pick: ModelPick;
+  /** 思考强度：会话建好后 setThinkingLevel */
+  thinking: ThinkingLevel;
+  /** 建好后进入协作模式（always） */
+  team: boolean;
+  /** @brief 这个会话的每个信封事件（不发给界面）。 */
+  onEvent: (envelope: EventEnvelope) => void;
+}
+
+/** @brief 交给增强运行的看不见的会话（§9.6）。 */
+export interface HeadlessSession {
+  /** pi 会话 id */
+  sessionId: string;
+  /** 会话文件；pi 还没写盘时也是它将来的路径 */
+  sessionFile: string | null;
+  /** 它的 TaskBoard 目录 `<userData>/teams/<会话 id>`（协作模式下的实例会话文件在它的 sessions/ 下） */
+  teamDir: string;
+  /** @brief 发出前（选范围、思考强度、协作模式都做完之后）的拒绝启动；能启动时为 null。 */
+  blocked(): ModelBlocked | null;
+  /** @brief 发第一条消息：普通发送路径（先准备，协作模式下先经立项判断），结果都经事件回来。 */
+  send(text: string): void;
+  /** @brief 会话空闲（不在生成、不在准备中），并且它的 Team 没有 Agent 在运行、排队或有待判断的消息。 */
+  idle(): boolean;
+  /** @brief 已经开始过：看到过准备中、运行中或 Team 在忙（之后一直为真）。 */
+  started(): boolean;
+  /** @brief 用户会话当前分支上最后一条助手消息的 stopReason 与 errorMessage；没有助手消息时为 null。 */
+  lastAssistant(): { stopReason: string; errorMessage: string | null } | null;
+  /** @brief 当前分支上第一条 role: user 的消息之后有助手消息（关闭模式下没有时这次运行失败）。 */
+  hasAssistantAfterFirst(): boolean;
+  /** @brief 停止：先 abort，有 Team 时再 stopTeam。 */
+  stop(): Promise<void>;
+  /** @brief 关闭会话（连同它的 Team）；已经关闭时什么都不做。 */
+  close(): Promise<void>;
+}
+
+/** @brief 这个会话此刻在准备中、在运行，或它的 Team 在忙（§9.6 的“开始”）。 */
+function busyNow(entry: Entry): boolean {
+  return entry.preparing !== null || entry.running || (entry.team?.busy() ?? false);
+}
+
+/** @brief 分支上的消息里判断要用的字段。 */
+interface BranchMessage {
+  /** 角色 */
+  role: string;
+  /** 助手消息的结束原因 */
+  stopReason?: string;
+  /** 助手消息出错时的原文 */
+  errorMessage?: string;
+}
+
+/** @brief 用户会话当前分支上的消息，按顺序。 */
+function branchMessages(entry: Entry): BranchMessage[] {
+  return entry.session.sessionManager.getBranch()
+    .flatMap((item) => (item.type === 'message' ? [item.message as unknown as BranchMessage] : []));
+}
+
+/** @brief 最后一条助手消息的结束原因与错误原文；没有助手消息时为 null。 */
+function lastAssistantOf(entry: Entry): { stopReason: string; errorMessage: string | null } | null {
+  const last = branchMessages(entry).findLast((message) => message.role === 'assistant');
+  return last ? { stopReason: last.stopReason ?? '', errorMessage: last.errorMessage ?? null } : null;
+}
+
+/** @brief 第一条 role: user 的消息之后有助手消息。 */
+function assistantAfterFirst(entry: Entry): boolean {
+  const messages = branchMessages(entry);
+  const first = messages.findIndex((message) => message.role === 'user');
+  return first >= 0 && messages.slice(first + 1).some((message) => message.role === 'assistant');
+}
+
+/**
+ * @brief 发出前的设置（§9.6）：范围写进这个会话的 mori.pick（在协作模式锁定范围之前），思考强度，team 为真时进入
+ *        协作模式（角色文件有问题、没有 Team 时不进入，拒绝启动由 blocked() 给出）。失败时关闭会话并抛出。
+ */
+async function prepareHeadless(entry: Entry, spec: HeadlessSpec): Promise<void> {
+  try {
+    await entry.model.setPick(spec.pick);
+    entry.session.setThinkingLevel(spec.thinking);
+    if (spec.team && entry.team) await entry.team.setMode('on');
+  } catch (error) {
+    console.error(`[kernel] the enhancement session ${entry.session.sessionId} did not start: ${errorText(error)}`);
+    await closeEntry(entry);
+    throw error;
+  }
+}
+
+/** @brief 交给增强运行的操作。 */
+function headlessHandle(entry: Entry, started: () => boolean): HeadlessSession {
+  const sessionId = entry.session.sessionId;
+  return {
+    sessionId, sessionFile: entry.session.sessionFile ?? null, teamDir: teamDirOf(sessionId),
+    blocked: () => entry.model.state().blocked,
+    send: (text) => {
+      void promptEntry(entry, text, {});
+      started();
+    },
+    idle: () => isIdle(entry) && !(entry.team?.busy() ?? false),
+    started,
+    lastAssistant: () => lastAssistantOf(entry),
+    hasAssistantAfterFirst: () => assistantAfterFirst(entry),
+    stop: async () => {
+      await abortEntry(entry);
+      if (entry.team) await stopTeamOf(entry);
+    },
+    close: async () => {
+      if (sessions.get(sessionId) === entry) await closeEntry(entry);
+    },
+  };
+}
+
+/**
+ * @brief 建立增强任务的看不见的会话（§9.6）：走用户会话的路径（startUser），会话文件放在 spec.dir（侧栏与 session.list
+ *        都没有它）；事件只交给 spec.onEvent；扩展的询问不出卡；批准状态一开始就是 all（实例共用）；项目信任按已存的
+ *        决定（没有时不信任、不询问）；调度类别 background；建好后写 mori.pick、设思考强度，team 为真时进入协作模式。
+ *        建立或其中一步失败时抛出（已建好的会话先关闭）。
+ * @param spec 这次运行的会话设置
+ */
+export async function startHeadless(spec: HeadlessSpec): Promise<HeadlessSession> {
+  if (!existsSync(spec.cwd)) throw new Error(`Project folder not found: ${spec.cwd}`);
+  const pi = await loadPi();
+  let entry: Entry | null = null;
+  let seen = false;
+  const started = () => {
+    if (!seen && entry !== null) seen = busyNow(entry);
+    return seen;
+  };
+  const emit: Emit = (envelope) => {
+    started();
+    spec.onEvent(envelope);
+  };
+  entry = await startUser({ cwd: spec.cwd, sessionManager: pi.SessionManager.create(spec.cwd, spec.dir), emit,
+    trust: undefined, restored: false, enhance: { task: spec.task, run: spec.run, scope: spec.scope } });
+  await prepareHeadless(entry, spec);
+  return headlessHandle(entry, started);
+}
+
+/**
+ * @brief 这个会话文件的用户会话在后台进程里开着，并且在运行、准备中或它的 Team 有 Agent 在运行、排队或有待判断的消息
+ *        （§9.5“跑的时候没在生成”的反面）。
+ * @param sessionFile pi 会话列表里的会话文件
+ */
+export function sessionGenerating(sessionFile: string): boolean {
+  const entry = entryByFile(sessionFile);
+  return entry !== undefined && (!isIdle(entry) || (entry.team?.busy() ?? false));
+}
 
 /**
  * @brief 退出前停止并释放所有会话（含实例会话）；挂起的批准先按拒绝处理，pi 才不会卡在等待上。

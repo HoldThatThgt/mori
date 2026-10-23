@@ -3,10 +3,15 @@
 // 一个完整的会话面板；在面板里按下鼠标或焦点进入它，焦点就切到这一栏（split.md）。模型层（docs/v1/screens/model-menu.md、
 // model-chat.md）：输入框下面一行的选择范围，输入框上方的拒绝启动卡。平行 Agent（docs/v1/screens/team-switch.md）：
 // 协作开关是顶栏右边一组的第一个，在右栏开关之前。
+// 记忆（docs/specs/memory.md §10.6）：增强改了东西后这个项目新建的第一个会话，对话流上面有一行提示。
 
 import { useRef } from 'react';
 import { reload } from '../state/actions';
+import { memoryNoticeText, type MemoryNotice } from '../../../shared/memory';
 import { seatRolesOf } from '../../../shared/team';
+import { recordAction } from '../state/actionLog';
+import { openMemoryAt } from '../state/memory';
+import { dismissMemoryNotice } from '../state/projects';
 import { skillCommandText } from '../state/skillText';
 import { closePane, focusComposer, focusPane } from '../state/split';
 import { useApp, type KernelStatus, type Tab } from '../state/store';
@@ -86,7 +91,30 @@ function trustText(tab: Tab, agentDir: string): string | null {
   return `This workspace isn’t trusted, so its extensions and settings weren’t loaded · ${how}`;
 }
 
-/** @brief 信任与扩展的横幅（sessions.md "项目信任"）。 */
+/**
+ * @brief 增强的提示（docs/specs/memory.md §10.6）：View 打开记忆页 → Project → Revisions，选中最近的那次修订；
+ *        Dismiss 之后这次打开里不再显示。后台进程退出时 View 不可用，悬停说明原因（§10.10）。
+ */
+function MemoryNoticeBanner({ tab, notice }: { tab: Tab; notice: MemoryNotice }) {
+  const exited = useApp((state) => state.kernel === 'exited');
+  const view = () => {
+    recordAction('View in Memory');
+    openMemoryAt({ cwd: tab.cwd, layer: 'project', revision: notice.revisions.at(-1) });
+  };
+  return (
+    <div className="banner" role="status" data-testid="memory-notice">
+      <span>{memoryNoticeText(notice)}</span>
+      <button className="button" data-testid="memory-notice-view" disabled={exited}
+        title={exited ? 'Mori’s background process crashed. Restart it to continue.' : undefined}
+        onClick={view}>View</button>
+      {/* .banner .button 的 margin-left: auto 让 View 靠右；Dismiss 紧跟在它后面。标识按 docs/v1/screens/memory-chat.md */}
+      <button className="button" style={{ marginLeft: 0 }} data-action="dismiss"
+        onClick={() => dismissMemoryNotice(tab.key)}>Dismiss</button>
+    </div>
+  );
+}
+
+/** @brief 信任与扩展的横幅（sessions.md "项目信任"），以及增强的提示。 */
 function SessionBanners({ tab }: { tab: Tab }) {
   const agentDir = useApp((state) => state.config?.agentDir ?? '');
   const trust = trustText(tab, agentDir);
@@ -102,6 +130,7 @@ function SessionBanners({ tab }: { tab: Tab }) {
           {tab.extensionErrors.map((error) => <span key={error} className="banner-detail">{error}</span>)}
         </div>
       )}
+      {tab.memoryNotice && <MemoryNoticeBanner tab={tab} notice={tab.memoryNotice} />}
     </>
   );
 }

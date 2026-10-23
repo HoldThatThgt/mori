@@ -1,0 +1,3602 @@
+{
+ "source": "synthetic",
+ "note": "Recorded from the real App against the synthetic endpoint by tests/ui/mem-record.mjs (docs/specs/memory.md §0 item 4: no data directory with a key on this machine); do not edit by hand.",
+ "name": "mem-page",
+ "description": "On the Memory page (Project, Facts) three entries are added with New entry (the third one links to the second with [[slug]]), the second is edited, the first deleted, the second moved to user level, and in User → Revisions the move is rolled back. The last segment has only read-only queries: back to Project, Facts, open two entries, TASTE, Facts, Revisions and one revision.",
+ "covers": "MEM-14, MEM-30",
+ "endpoint": "http://127.0.0.1:4770/v1",
+ "model": "mem/fake-coder",
+ "notes": [
+  "Setup (synthetic test setup, docs/specs/memory.md §14.1): model-config.json has one local provider MEM (fake-coder; fake-think marked Supports thinking; fake-coder-404) on the synthetic endpoint http://127.0.0.1:4770/v1, default range mem/fake-coder, profiles given as verified; enhancement replies come from the synthetic enhancement script (FAKE_ENHANCE_SCRIPT)"
+ ],
+ "recordedAt": "2026-10-22T14:44:00.370Z",
+ "steps": [
+  {
+   "t": 7,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 8,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 15,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 21,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 27,
+   "command": {
+    "type": "models.get"
+   }
+  },
+  {
+   "t": 38,
+   "result": {
+    "type": "models.get",
+    "value": {
+     "error": null,
+     "config": {
+      "version": 1,
+      "providers": [
+       {
+        "id": "mem",
+        "name": "MEM",
+        "api": "openai-completions",
+        "baseUrl": "http://127.0.0.1:4770/v1",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "local",
+        "keys": [],
+        "nextKeyNumber": 1,
+        "models": [
+         {
+          "id": "fake-coder",
+          "family": "",
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "reasoning": false,
+          "input": [
+           "text"
+          ]
+         },
+         {
+          "id": "fake-think",
+          "family": "",
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "reasoning": true,
+          "input": [
+           "text"
+          ]
+         },
+         {
+          "id": "fake-coder-404",
+          "family": "",
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "reasoning": false,
+          "input": [
+           "text"
+          ]
+         }
+        ]
+       }
+      ],
+      "groups": [],
+      "normalDefault": "mem/fake-coder",
+      "allowedZones": [
+       "local",
+       "intranet"
+      ],
+      "projectZones": {}
+     },
+     "profiles": {
+      "mem/fake-coder": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "vllm",
+        "version": "0.10.1"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": true,
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": true,
+       "probedAt": 1792680230707,
+       "suite": 1
+      },
+      "mem/fake-think": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "vllm",
+        "version": "0.10.1"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": true,
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": true,
+       "probedAt": 1792680230707,
+       "suite": 1
+      },
+      "mem/fake-coder-404": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "vllm",
+        "version": "0.10.1"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": true,
+        "replay": "unknown"
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": true,
+       "probedAt": 1792680230707,
+       "suite": 1
+      }
+     },
+     "keyStatus": {},
+     "thinkingDefaults": {
+      "mem/fake-coder": null,
+      "mem/fake-think": null,
+      "mem/fake-coder-404": null
+     },
+     "zoneSuggestions": {
+      "mem": "local"
+     },
+     "migration": null,
+     "projects": [],
+     "loadError": null,
+     "reserved": [
+      "mori",
+      "amazon-bedrock",
+      "ant-ling",
+      "anthropic",
+      "azure",
+      "baseten",
+      "cerebras",
+      "cloudflare-ai-gateway",
+      "cloudflare-workers-ai",
+      "deepseek",
+      "fireworks",
+      "github-copilot",
+      "google",
+      "google-vertex",
+      "groq",
+      "huggingface",
+      "kimi-coding",
+      "meta",
+      "minimax",
+      "minimax-cn",
+      "mistral",
+      "moonshotai",
+      "moonshotai-cn",
+      "nvidia",
+      "openai",
+      "openai-codex",
+      "opencode",
+      "opencode-go",
+      "openrouter",
+      "qwen-token-plan",
+      "qwen-token-plan-cn",
+      "qwen-token-plan-individual",
+      "radius",
+      "together",
+      "typesafe",
+      "vercel-ai-gateway",
+      "xai",
+      "xiaomi",
+      "xiaomi-token-plan-ams",
+      "xiaomi-token-plan-cn",
+      "xiaomi-token-plan-sgp",
+      "zai",
+      "zai-coding-cn"
+     ]
+    }
+   }
+  },
+  {
+   "t": 54,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page"
+   }
+  },
+  {
+   "t": 63,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 68,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page"
+   }
+  },
+  {
+   "t": 319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a16411-9aa8-743d-b9f1-4e9672c15aac",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a16411-9aa8-743d-b9f1-4e9672c15aac",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 324,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a16411-9aa8-743d-b9f1-4e9672c15aac",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\2026-10-22T14-43-57-738Z_01a16411-9aa8-743d-b9f1-4e9672c15aac.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "memory"
+     ],
+     "pick": "mem/fake-coder",
+     "current": "mem/fake-coder",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 128000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     },
+     "team": {
+      "mode": "off",
+      "holders": {
+       "dialog": "mori",
+       "create": "mori",
+       "close": "mori"
+      },
+      "roles": [],
+      "busy": false,
+      "background": false
+     },
+     "board": {
+      "requests": [],
+      "teamEdited": false
+     },
+     "teamApprovals": [],
+     "deciding": {
+      "role": "mori",
+      "since": null,
+      "queue": []
+     },
+     "memoryNotice": null
+    }
+   }
+  },
+  {
+   "t": 334,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 340,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [],
+     "usage": {
+      "used": 0,
+      "limit": 500,
+      "user": 0,
+      "project": 0
+     },
+     "broken": [],
+     "last": null,
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 344,
+   "command": {
+    "type": "enhance.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page"
+   }
+  },
+  {
+   "t": 349,
+   "result": {
+    "type": "enhance.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+     "enabled": false,
+     "pick": null,
+     "thinking": "medium",
+     "team": false,
+     "time": "04:00",
+     "since": null,
+     "last": {
+      "taste": null,
+      "strategy": null,
+      "review": null
+     },
+     "running": null,
+     "queued": 0,
+     "next": null,
+     "notice": null,
+     "effortPicks": {
+      "mem": false,
+      "mem/fake-coder": false,
+      "mem/fake-think": true,
+      "mem/fake-coder-404": false
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 355,
+   "command": {
+    "type": "memory.save",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact",
+    "abstract": "The staging server is staging.internal",
+    "detail": "Use it for manual checks before a release."
+   }
+  },
+  {
+   "t": 402,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.memory_changed",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+     "layers": [
+      "project"
+     ],
+     "kinds": [
+      "fact"
+     ],
+     "revision": "20261022-224358-sjei"
+    }
+   }
+  },
+  {
+   "t": 403,
+   "result": {
+    "type": "memory.save",
+    "value": {
+     "error": null,
+     "revision": "20261022-224358-sjei",
+     "id": "the-staging-server-is-staging-internal"
+    }
+   }
+  },
+  {
+   "t": 403,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 445,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-staging-server-is-staging-internal",
+       "abstract": "The staging server is staging.internal",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 10,
+      "limit": 500,
+      "user": 0,
+      "project": 10
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-sjei",
+      "time": "2026-10-22T22:43:58.054+08:00",
+      "by": "You",
+      "title": "You · Added Facts: The staging server is staging.internal",
+      "status": "done",
+      "layers": [
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 1,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 0
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 445,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 455,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-staging-server-is-staging-internal",
+       "abstract": "The staging server is staging.internal",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 10,
+      "limit": 500,
+      "user": 0,
+      "project": 10
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-sjei",
+      "time": "2026-10-22T22:43:58.054+08:00",
+      "by": "You",
+      "title": "You · Added Facts: The staging server is staging.internal",
+      "status": "done",
+      "layers": [
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 1,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 0
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 460,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "the-staging-server-is-staging-internal"
+   }
+  },
+  {
+   "t": 482,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "the-staging-server-is-staging-internal",
+      "abstract": "The staging server is staging.internal",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Use it for manual checks before a release.",
+      "evidence": [],
+      "history": [],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\the-staging-server-is-staging-internal.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjei",
+       "time": "2026-10-22T22:43:58.054+08:00",
+       "by": "You",
+       "title": "You · Added Facts: The staging server is staging.internal",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 486,
+   "command": {
+    "type": "memory.save",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact",
+    "abstract": "Releases go out on Tuesdays",
+    "detail": "Freeze changes the evening before."
+   }
+  },
+  {
+   "t": 507,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.memory_changed",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+     "layers": [
+      "project"
+     ],
+     "kinds": [
+      "fact"
+     ],
+     "revision": "20261022-224358-sjej"
+    }
+   }
+  },
+  {
+   "t": 507,
+   "result": {
+    "type": "memory.save",
+    "value": {
+     "error": null,
+     "revision": "20261022-224358-sjej",
+     "id": "releases-go-out-on-tuesdays"
+    }
+   }
+  },
+  {
+   "t": 507,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 530,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-staging-server-is-staging-internal",
+       "abstract": "The staging server is staging.internal",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "releases-go-out-on-tuesdays",
+       "abstract": "Releases go out on Tuesdays",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 18,
+      "limit": 500,
+      "user": 0,
+      "project": 18
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-sjej",
+      "time": "2026-10-22T22:43:58.162+08:00",
+      "by": "You",
+      "title": "You · Added Facts: Releases go out on Tuesdays",
+      "status": "done",
+      "layers": [
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 1,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 0
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 530,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 543,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-staging-server-is-staging-internal",
+       "abstract": "The staging server is staging.internal",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "releases-go-out-on-tuesdays",
+       "abstract": "Releases go out on Tuesdays",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 18,
+      "limit": 500,
+      "user": 0,
+      "project": 18
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-sjej",
+      "time": "2026-10-22T22:43:58.162+08:00",
+      "by": "You",
+      "title": "You · Added Facts: Releases go out on Tuesdays",
+      "status": "done",
+      "layers": [
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 1,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 0
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 543,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "the-staging-server-is-staging-internal"
+   }
+  },
+  {
+   "t": 572,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "the-staging-server-is-staging-internal",
+      "abstract": "The staging server is staging.internal",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Use it for manual checks before a release.",
+      "evidence": [],
+      "history": [],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\the-staging-server-is-staging-internal.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjei",
+       "time": "2026-10-22T22:43:58.054+08:00",
+       "by": "You",
+       "title": "You · Added Facts: The staging server is staging.internal",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 572,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 599,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "releases-go-out-on-tuesdays",
+      "abstract": "Releases go out on Tuesdays",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Freeze changes the evening before.",
+      "evidence": [],
+      "history": [],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\releases-go-out-on-tuesdays.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjej",
+       "time": "2026-10-22T22:43:58.162+08:00",
+       "by": "You",
+       "title": "You · Added Facts: Releases go out on Tuesdays",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 606,
+   "command": {
+    "type": "memory.save",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact",
+    "abstract": "The release checklist lives in docs/release.md",
+    "detail": "Follow it in order; [[releases-go-out-on-tuesdays]] says which day."
+   }
+  },
+  {
+   "t": 650,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.memory_changed",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+     "layers": [
+      "project"
+     ],
+     "kinds": [
+      "fact"
+     ],
+     "revision": "20261022-224358-sjek"
+    }
+   }
+  },
+  {
+   "t": 650,
+   "result": {
+    "type": "memory.save",
+    "value": {
+     "error": null,
+     "revision": "20261022-224358-sjek",
+     "id": "the-release-checklist-lives-in-docs-release-md"
+    }
+   }
+  },
+  {
+   "t": 650,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 686,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-staging-server-is-staging-internal",
+       "abstract": "The staging server is staging.internal",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "releases-go-out-on-tuesdays",
+       "abstract": "Releases go out on Tuesdays",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 30,
+      "limit": 500,
+      "user": 0,
+      "project": 30
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-sjek",
+      "time": "2026-10-22T22:43:58.298+08:00",
+      "by": "You",
+      "title": "You · Added Facts: The release checklist lives in docs/release.md",
+      "status": "done",
+      "layers": [
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 1,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 0
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 686,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 703,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-staging-server-is-staging-internal",
+       "abstract": "The staging server is staging.internal",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "releases-go-out-on-tuesdays",
+       "abstract": "Releases go out on Tuesdays",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 30,
+      "limit": 500,
+      "user": 0,
+      "project": 30
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-sjek",
+      "time": "2026-10-22T22:43:58.298+08:00",
+      "by": "You",
+      "title": "You · Added Facts: The release checklist lives in docs/release.md",
+      "status": "done",
+      "layers": [
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 1,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 0
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 704,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 736,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "releases-go-out-on-tuesdays",
+      "abstract": "Releases go out on Tuesdays",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Freeze changes the evening before.",
+      "evidence": [],
+      "history": [],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\releases-go-out-on-tuesdays.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjej",
+       "time": "2026-10-22T22:43:58.162+08:00",
+       "by": "You",
+       "title": "You · Added Facts: Releases go out on Tuesdays",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [
+      {
+       "layer": "project",
+       "kind": "fact",
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 736,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "the-release-checklist-lives-in-docs-release-md"
+   }
+  },
+  {
+   "t": 765,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "the-release-checklist-lives-in-docs-release-md",
+      "abstract": "The release checklist lives in docs/release.md",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Follow it in order; [[releases-go-out-on-tuesdays]] says which day.",
+      "evidence": [],
+      "history": [],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\the-release-checklist-lives-in-docs-release-md.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjek",
+       "time": "2026-10-22T22:43:58.298+08:00",
+       "by": "You",
+       "title": "You · Added Facts: The release checklist lives in docs/release.md",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 772,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 808,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "releases-go-out-on-tuesdays",
+      "abstract": "Releases go out on Tuesdays",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Freeze changes the evening before.",
+      "evidence": [],
+      "history": [],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\releases-go-out-on-tuesdays.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjej",
+       "time": "2026-10-22T22:43:58.162+08:00",
+       "by": "You",
+       "title": "You · Added Facts: Releases go out on Tuesdays",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [
+      {
+       "layer": "project",
+       "kind": "fact",
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 819,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 845,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "releases-go-out-on-tuesdays",
+      "abstract": "Releases go out on Tuesdays",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Freeze changes the evening before.",
+      "evidence": [],
+      "history": [],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\releases-go-out-on-tuesdays.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjej",
+       "time": "2026-10-22T22:43:58.162+08:00",
+       "by": "You",
+       "title": "You · Added Facts: Releases go out on Tuesdays",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [
+      {
+       "layer": "project",
+       "kind": "fact",
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 850,
+   "command": {
+    "type": "memory.save",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact",
+    "id": "releases-go-out-on-tuesdays",
+    "abstract": "Releases go out on Tuesday mornings",
+    "detail": "Freeze changes the evening before."
+   }
+  },
+  {
+   "t": 874,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.memory_changed",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+     "layers": [
+      "project"
+     ],
+     "kinds": [
+      "fact"
+     ],
+     "revision": "20261022-224358-sjel"
+    }
+   }
+  },
+  {
+   "t": 874,
+   "result": {
+    "type": "memory.save",
+    "value": {
+     "error": null,
+     "revision": "20261022-224358-sjel",
+     "id": "releases-go-out-on-tuesdays"
+    }
+   }
+  },
+  {
+   "t": 874,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 902,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-staging-server-is-staging-internal",
+       "abstract": "The staging server is staging.internal",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "releases-go-out-on-tuesdays",
+       "abstract": "Releases go out on Tuesday mornings",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 32,
+      "limit": 500,
+      "user": 0,
+      "project": 32
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-sjel",
+      "time": "2026-10-22T22:43:58.529+08:00",
+      "by": "You",
+      "title": "You · Changed Facts: Releases go out on Tuesday mornings",
+      "status": "done",
+      "layers": [
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 1,
+       "deleted": 0,
+       "moved": 0
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 902,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 912,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-staging-server-is-staging-internal",
+       "abstract": "The staging server is staging.internal",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "releases-go-out-on-tuesdays",
+       "abstract": "Releases go out on Tuesday mornings",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 32,
+      "limit": 500,
+      "user": 0,
+      "project": 32
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-sjel",
+      "time": "2026-10-22T22:43:58.529+08:00",
+      "by": "You",
+      "title": "You · Changed Facts: Releases go out on Tuesday mornings",
+      "status": "done",
+      "layers": [
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 1,
+       "deleted": 0,
+       "moved": 0
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 912,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 933,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "releases-go-out-on-tuesdays",
+      "abstract": "Releases go out on Tuesday mornings",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Freeze changes the evening before.",
+      "evidence": [],
+      "history": [
+       "Oct 22 · You: Edited on the Memory page"
+      ],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\releases-go-out-on-tuesdays.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjel",
+       "time": "2026-10-22T22:43:58.529+08:00",
+       "by": "You",
+       "title": "You · Changed Facts: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 1,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjej",
+       "time": "2026-10-22T22:43:58.162+08:00",
+       "by": "You",
+       "title": "You · Added Facts: Releases go out on Tuesdays",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [
+      {
+       "layer": "project",
+       "kind": "fact",
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 933,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 955,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "releases-go-out-on-tuesdays",
+      "abstract": "Releases go out on Tuesday mornings",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Freeze changes the evening before.",
+      "evidence": [],
+      "history": [
+       "Oct 22 · You: Edited on the Memory page"
+      ],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\releases-go-out-on-tuesdays.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjel",
+       "time": "2026-10-22T22:43:58.529+08:00",
+       "by": "You",
+       "title": "You · Changed Facts: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 1,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjej",
+       "time": "2026-10-22T22:43:58.162+08:00",
+       "by": "You",
+       "title": "You · Added Facts: Releases go out on Tuesdays",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [
+      {
+       "layer": "project",
+       "kind": "fact",
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 962,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "the-staging-server-is-staging-internal"
+   }
+  },
+  {
+   "t": 983,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "the-staging-server-is-staging-internal",
+      "abstract": "The staging server is staging.internal",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Use it for manual checks before a release.",
+      "evidence": [],
+      "history": [],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\the-staging-server-is-staging-internal.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjei",
+       "time": "2026-10-22T22:43:58.054+08:00",
+       "by": "You",
+       "title": "You · Added Facts: The staging server is staging.internal",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 987,
+   "command": {
+    "type": "memory.delete",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "the-staging-server-is-staging-internal"
+   }
+  },
+  {
+   "t": 1007,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.memory_changed",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+     "layers": [
+      "project"
+     ],
+     "kinds": [
+      "fact"
+     ],
+     "revision": "20261022-224358-vbjf"
+    }
+   }
+  },
+  {
+   "t": 1007,
+   "result": {
+    "type": "memory.delete",
+    "value": {
+     "error": null,
+     "revision": "20261022-224358-vbjf",
+     "id": null
+    }
+   }
+  },
+  {
+   "t": 1007,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 1027,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "releases-go-out-on-tuesdays",
+       "abstract": "Releases go out on Tuesday mornings",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 22,
+      "limit": 500,
+      "user": 0,
+      "project": 22
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-vbjf",
+      "time": "2026-10-22T22:43:58.662+08:00",
+      "by": "You",
+      "title": "You · Deleted Facts: The staging server is staging.internal",
+      "status": "done",
+      "layers": [
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 0,
+       "deleted": 1,
+       "moved": 0
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1027,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 1035,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "releases-go-out-on-tuesdays",
+       "abstract": "Releases go out on Tuesday mornings",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 22,
+      "limit": 500,
+      "user": 0,
+      "project": 22
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-vbjf",
+      "time": "2026-10-22T22:43:58.662+08:00",
+      "by": "You",
+      "title": "You · Deleted Facts: The staging server is staging.internal",
+      "status": "done",
+      "layers": [
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 0,
+       "deleted": 1,
+       "moved": 0
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1036,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "the-staging-server-is-staging-internal"
+   }
+  },
+  {
+   "t": 1043,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": null,
+     "revisions": [],
+     "backlinks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1045,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 1070,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "releases-go-out-on-tuesdays",
+      "abstract": "Releases go out on Tuesday mornings",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Freeze changes the evening before.",
+      "evidence": [],
+      "history": [
+       "Oct 22 · You: Edited on the Memory page"
+      ],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\releases-go-out-on-tuesdays.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjel",
+       "time": "2026-10-22T22:43:58.529+08:00",
+       "by": "You",
+       "title": "You · Changed Facts: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 1,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjej",
+       "time": "2026-10-22T22:43:58.162+08:00",
+       "by": "You",
+       "title": "You · Added Facts: Releases go out on Tuesdays",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [
+      {
+       "layer": "project",
+       "kind": "fact",
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1075,
+   "command": {
+    "type": "memory.move",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "from": "project",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 1115,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.memory_changed",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+     "layers": [
+      "user",
+      "project"
+     ],
+     "kinds": [
+      "fact"
+     ],
+     "revision": "20261022-224358-vbjg"
+    }
+   }
+  },
+  {
+   "t": 1115,
+   "result": {
+    "type": "memory.move",
+    "value": {
+     "error": null,
+     "revision": "20261022-224358-vbjg",
+     "id": "releases-go-out-on-tuesdays"
+    }
+   }
+  },
+  {
+   "t": 1115,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 1134,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 22,
+      "limit": 500,
+      "user": 10,
+      "project": 12
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-vbjg",
+      "time": "2026-10-22T22:43:58.766+08:00",
+      "by": "You",
+      "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+      "status": "done",
+      "layers": [
+       "user",
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 1
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1134,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 1143,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 22,
+      "limit": 500,
+      "user": 10,
+      "project": 12
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-vbjg",
+      "time": "2026-10-22T22:43:58.766+08:00",
+      "by": "You",
+      "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+      "status": "done",
+      "layers": [
+       "user",
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 1
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1143,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 1148,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": null,
+     "revisions": [],
+     "backlinks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1150,
+   "command": {
+    "type": "memory.list",
+    "cwd": null,
+    "layer": "user",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 1156,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "releases-go-out-on-tuesdays",
+       "abstract": "Releases go out on Tuesday mornings",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 10,
+      "limit": 500,
+      "user": 10,
+      "project": 0
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-vbjg",
+      "time": "2026-10-22T22:43:58.766+08:00",
+      "by": "You",
+      "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+      "status": "done",
+      "layers": [
+       "user",
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 1
+      },
+      "rollbackOf": null
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1163,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "user",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 1177,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "releases-go-out-on-tuesdays",
+      "abstract": "Releases go out on Tuesday mornings",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "user",
+      "details": "Freeze changes the evening before.",
+      "evidence": [],
+      "history": [
+       "Oct 22 · You: Edited on the Memory page",
+       "Oct 22 · You: Moved to user level"
+      ],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\user\\entries\\releases-go-out-on-tuesdays.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-vbjg",
+       "time": "2026-10-22T22:43:58.766+08:00",
+       "by": "You",
+       "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [
+      {
+       "layer": "project",
+       "kind": "fact",
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1185,
+   "command": {
+    "type": "memory.revisions",
+    "cwd": null,
+    "layer": "user"
+   }
+  },
+  {
+   "t": 1190,
+   "result": {
+    "type": "memory.revisions",
+    "value": {
+     "revisions": [
+      {
+       "id": "20261022-224358-vbjg",
+       "time": "2026-10-22T22:43:58.766+08:00",
+       "by": "You",
+       "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": null
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1199,
+   "command": {
+    "type": "memory.revisions",
+    "cwd": null,
+    "layer": "user",
+    "id": "20261022-224358-vbjg"
+   }
+  },
+  {
+   "t": 1203,
+   "result": {
+    "type": "memory.revisions",
+    "value": {
+     "revision": {
+      "id": "20261022-224358-vbjg",
+      "time": "2026-10-22T22:43:58.766+08:00",
+      "by": "You",
+      "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+      "status": "done",
+      "layers": [
+       "user",
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 1
+      },
+      "rollbackOf": null,
+      "changes": [
+       {
+        "action": "moved",
+        "kind": "fact",
+        "from": {
+         "layer": "project",
+         "slug": "releases-go-out-on-tuesdays"
+        },
+        "to": {
+         "layer": "user",
+         "slug": "releases-go-out-on-tuesdays"
+        },
+        "before": "---\nkind: fact\nabstract: \"Releases go out on Tuesday mornings\"\nsource: user\ncreated: \"2026-10-22 · You\"\nmodified: \"2026-10-22 · You\"\nevidence: []\n---\n## Evidence\n\n## Details\nFreeze changes the evening before.\n\n## Revisions\n- Oct 22 · You: Edited on the Memory page\n",
+        "after": "---\nkind: fact\nabstract: \"Releases go out on Tuesday mornings\"\nsource: user\ncreated: \"2026-10-22 · You\"\nmodified: \"2026-10-22 · You\"\nevidence: []\n---\n## Evidence\n\n## Details\nFreeze changes the evening before.\n\n## Revisions\n- Oct 22 · You: Edited on the Memory page\n- Oct 22 · You: Moved to user level\n",
+        "note": "Moved to user level"
+       }
+      ],
+      "notes": null,
+      "run": null,
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page"
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1209,
+   "command": {
+    "type": "memory.rollback",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "user",
+    "id": "20261022-224358-vbjg"
+   }
+  },
+  {
+   "t": 1249,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.memory_changed",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+     "layers": [
+      "user",
+      "project"
+     ],
+     "kinds": [
+      "fact"
+     ],
+     "revision": "20261022-224358-vbjh"
+    }
+   }
+  },
+  {
+   "t": 1249,
+   "result": {
+    "type": "memory.rollback",
+    "value": {
+     "error": null,
+     "revision": "20261022-224358-vbjh",
+     "id": null
+    }
+   }
+  },
+  {
+   "t": 1249,
+   "command": {
+    "type": "memory.revisions",
+    "cwd": null,
+    "layer": "user"
+   }
+  },
+  {
+   "t": 1265,
+   "result": {
+    "type": "memory.revisions",
+    "value": {
+     "revisions": [
+      {
+       "id": "20261022-224358-vbjh",
+       "time": "2026-10-22T22:43:58.901+08:00",
+       "by": "Rollback",
+       "title": "Rolled back: You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": "20261022-224358-vbjg"
+      },
+      {
+       "id": "20261022-224358-vbjg",
+       "time": "2026-10-22T22:43:58.766+08:00",
+       "by": "You",
+       "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": null
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1265,
+   "command": {
+    "type": "memory.revisions",
+    "cwd": null,
+    "layer": "user"
+   }
+  },
+  {
+   "t": 1271,
+   "result": {
+    "type": "memory.revisions",
+    "value": {
+     "revisions": [
+      {
+       "id": "20261022-224358-vbjh",
+       "time": "2026-10-22T22:43:58.901+08:00",
+       "by": "Rollback",
+       "title": "Rolled back: You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": "20261022-224358-vbjg"
+      },
+      {
+       "id": "20261022-224358-vbjg",
+       "time": "2026-10-22T22:43:58.766+08:00",
+       "by": "You",
+       "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": null
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1271,
+   "command": {
+    "type": "memory.revisions",
+    "cwd": null,
+    "layer": "user",
+    "id": "20261022-224358-vbjg"
+   }
+  },
+  {
+   "t": 1275,
+   "result": {
+    "type": "memory.revisions",
+    "value": {
+     "revision": {
+      "id": "20261022-224358-vbjg",
+      "time": "2026-10-22T22:43:58.766+08:00",
+      "by": "You",
+      "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+      "status": "done",
+      "layers": [
+       "user",
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 1
+      },
+      "rollbackOf": null,
+      "changes": [
+       {
+        "action": "moved",
+        "kind": "fact",
+        "from": {
+         "layer": "project",
+         "slug": "releases-go-out-on-tuesdays"
+        },
+        "to": {
+         "layer": "user",
+         "slug": "releases-go-out-on-tuesdays"
+        },
+        "before": "---\nkind: fact\nabstract: \"Releases go out on Tuesday mornings\"\nsource: user\ncreated: \"2026-10-22 · You\"\nmodified: \"2026-10-22 · You\"\nevidence: []\n---\n## Evidence\n\n## Details\nFreeze changes the evening before.\n\n## Revisions\n- Oct 22 · You: Edited on the Memory page\n",
+        "after": "---\nkind: fact\nabstract: \"Releases go out on Tuesday mornings\"\nsource: user\ncreated: \"2026-10-22 · You\"\nmodified: \"2026-10-22 · You\"\nevidence: []\n---\n## Evidence\n\n## Details\nFreeze changes the evening before.\n\n## Revisions\n- Oct 22 · You: Edited on the Memory page\n- Oct 22 · You: Moved to user level\n",
+        "note": "Moved to user level"
+       }
+      ],
+      "notes": null,
+      "run": null,
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page"
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1276,
+   "command": {
+    "type": "memory.revisions",
+    "cwd": null,
+    "layer": "user",
+    "id": "20261022-224358-vbjg"
+   }
+  },
+  {
+   "t": 1279,
+   "result": {
+    "type": "memory.revisions",
+    "value": {
+     "revision": {
+      "id": "20261022-224358-vbjg",
+      "time": "2026-10-22T22:43:58.766+08:00",
+      "by": "You",
+      "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+      "status": "done",
+      "layers": [
+       "user",
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 1
+      },
+      "rollbackOf": null,
+      "changes": [
+       {
+        "action": "moved",
+        "kind": "fact",
+        "from": {
+         "layer": "project",
+         "slug": "releases-go-out-on-tuesdays"
+        },
+        "to": {
+         "layer": "user",
+         "slug": "releases-go-out-on-tuesdays"
+        },
+        "before": "---\nkind: fact\nabstract: \"Releases go out on Tuesday mornings\"\nsource: user\ncreated: \"2026-10-22 · You\"\nmodified: \"2026-10-22 · You\"\nevidence: []\n---\n## Evidence\n\n## Details\nFreeze changes the evening before.\n\n## Revisions\n- Oct 22 · You: Edited on the Memory page\n",
+        "after": "---\nkind: fact\nabstract: \"Releases go out on Tuesday mornings\"\nsource: user\ncreated: \"2026-10-22 · You\"\nmodified: \"2026-10-22 · You\"\nevidence: []\n---\n## Evidence\n\n## Details\nFreeze changes the evening before.\n\n## Revisions\n- Oct 22 · You: Edited on the Memory page\n- Oct 22 · You: Moved to user level\n",
+        "note": "Moved to user level"
+       }
+      ],
+      "notes": null,
+      "run": null,
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page"
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1287,
+   "command": {
+    "type": "memory.revisions",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project"
+   }
+  },
+  {
+   "t": 1306,
+   "result": {
+    "type": "memory.revisions",
+    "value": {
+     "revisions": [
+      {
+       "id": "20261022-224358-vbjh",
+       "time": "2026-10-22T22:43:58.901+08:00",
+       "by": "Rollback",
+       "title": "Rolled back: You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": "20261022-224358-vbjg"
+      },
+      {
+       "id": "20261022-224358-vbjg",
+       "time": "2026-10-22T22:43:58.766+08:00",
+       "by": "You",
+       "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-vbjf",
+       "time": "2026-10-22T22:43:58.662+08:00",
+       "by": "You",
+       "title": "You · Deleted Facts: The staging server is staging.internal",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 1,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjel",
+       "time": "2026-10-22T22:43:58.529+08:00",
+       "by": "You",
+       "title": "You · Changed Facts: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 1,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjek",
+       "time": "2026-10-22T22:43:58.298+08:00",
+       "by": "You",
+       "title": "You · Added Facts: The release checklist lives in docs/release.md",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjej",
+       "time": "2026-10-22T22:43:58.162+08:00",
+       "by": "You",
+       "title": "You · Added Facts: Releases go out on Tuesdays",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjei",
+       "time": "2026-10-22T22:43:58.054+08:00",
+       "by": "You",
+       "title": "You · Added Facts: The staging server is staging.internal",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1312,
+   "command": {
+    "type": "enhance.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page"
+   }
+  },
+  {
+   "t": 1315,
+   "result": {
+    "type": "enhance.get",
+    "value": {
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+     "enabled": false,
+     "pick": null,
+     "thinking": "medium",
+     "team": false,
+     "time": "04:00",
+     "since": null,
+     "last": {
+      "taste": null,
+      "strategy": null,
+      "review": null
+     },
+     "running": null,
+     "queued": 0,
+     "next": null,
+     "notice": null,
+     "effortPicks": {
+      "mem": false,
+      "mem/fake-coder": false,
+      "mem/fake-think": true,
+      "mem/fake-coder-404": false
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1322,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 1330,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "releases-go-out-on-tuesdays",
+       "abstract": "Releases go out on Tuesday mornings",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 22,
+      "limit": 500,
+      "user": 0,
+      "project": 22
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-vbjh",
+      "time": "2026-10-22T22:43:58.901+08:00",
+      "by": "Rollback",
+      "title": "Rolled back: You · Moved to user level: Releases go out on Tuesday mornings",
+      "status": "done",
+      "layers": [
+       "user",
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 1
+      },
+      "rollbackOf": "20261022-224358-vbjg"
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1338,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 1368,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "releases-go-out-on-tuesdays",
+      "abstract": "Releases go out on Tuesday mornings",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Freeze changes the evening before.",
+      "evidence": [],
+      "history": [
+       "Oct 22 · You: Edited on the Memory page"
+      ],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\releases-go-out-on-tuesdays.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-vbjh",
+       "time": "2026-10-22T22:43:58.901+08:00",
+       "by": "Rollback",
+       "title": "Rolled back: You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": "20261022-224358-vbjg"
+      },
+      {
+       "id": "20261022-224358-vbjg",
+       "time": "2026-10-22T22:43:58.766+08:00",
+       "by": "You",
+       "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjel",
+       "time": "2026-10-22T22:43:58.529+08:00",
+       "by": "You",
+       "title": "You · Changed Facts: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 1,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjej",
+       "time": "2026-10-22T22:43:58.162+08:00",
+       "by": "You",
+       "title": "You · Added Facts: Releases go out on Tuesdays",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [
+      {
+       "layer": "project",
+       "kind": "fact",
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1379,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "the-release-checklist-lives-in-docs-release-md"
+   }
+  },
+  {
+   "t": 1407,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "the-release-checklist-lives-in-docs-release-md",
+      "abstract": "The release checklist lives in docs/release.md",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Follow it in order; [[releases-go-out-on-tuesdays]] says which day.",
+      "evidence": [],
+      "history": [],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\the-release-checklist-lives-in-docs-release-md.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-sjek",
+       "time": "2026-10-22T22:43:58.298+08:00",
+       "by": "You",
+       "title": "You · Added Facts: The release checklist lives in docs/release.md",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1411,
+   "command": {
+    "type": "memory.get",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "releases-go-out-on-tuesdays"
+   }
+  },
+  {
+   "t": 1438,
+   "result": {
+    "type": "memory.get",
+    "value": {
+     "entry": {
+      "id": "releases-go-out-on-tuesdays",
+      "abstract": "Releases go out on Tuesday mornings",
+      "source": "user",
+      "created": "2026-10-22 · You",
+      "modified": "2026-10-22 · You",
+      "kind": "fact",
+      "layer": "project",
+      "details": "Freeze changes the evening before.",
+      "evidence": [],
+      "history": [
+       "Oct 22 · You: Edited on the Memory page"
+      ],
+      "file": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-UeVDIr\\memory\\projects\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-Kinxxh-mem-page--\\entries\\releases-go-out-on-tuesdays.md"
+     },
+     "revisions": [
+      {
+       "id": "20261022-224358-vbjh",
+       "time": "2026-10-22T22:43:58.901+08:00",
+       "by": "Rollback",
+       "title": "Rolled back: You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": "20261022-224358-vbjg"
+      },
+      {
+       "id": "20261022-224358-vbjg",
+       "time": "2026-10-22T22:43:58.766+08:00",
+       "by": "You",
+       "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjel",
+       "time": "2026-10-22T22:43:58.529+08:00",
+       "by": "You",
+       "title": "You · Changed Facts: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 1,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjej",
+       "time": "2026-10-22T22:43:58.162+08:00",
+       "by": "You",
+       "title": "You · Added Facts: Releases go out on Tuesdays",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "backlinks": [
+      {
+       "layer": "project",
+       "kind": "fact",
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1448,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "taste"
+   }
+  },
+  {
+   "t": 1463,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [],
+     "usage": {
+      "used": 0,
+      "limit": 500,
+      "user": 0,
+      "project": 0
+     },
+     "broken": [],
+     "last": null,
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1469,
+   "command": {
+    "type": "memory.list",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "kind": "fact"
+   }
+  },
+  {
+   "t": 1477,
+   "result": {
+    "type": "memory.list",
+    "value": {
+     "entries": [
+      {
+       "id": "the-release-checklist-lives-in-docs-release-md",
+       "abstract": "The release checklist lives in docs/release.md",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      },
+      {
+       "id": "releases-go-out-on-tuesdays",
+       "abstract": "Releases go out on Tuesday mornings",
+       "source": "user",
+       "created": "2026-10-22 · You",
+       "modified": "2026-10-22 · You"
+      }
+     ],
+     "usage": {
+      "used": 22,
+      "limit": 500,
+      "user": 0,
+      "project": 22
+     },
+     "broken": [],
+     "last": {
+      "id": "20261022-224358-vbjh",
+      "time": "2026-10-22T22:43:58.901+08:00",
+      "by": "Rollback",
+      "title": "Rolled back: You · Moved to user level: Releases go out on Tuesday mornings",
+      "status": "done",
+      "layers": [
+       "user",
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 1
+      },
+      "rollbackOf": "20261022-224358-vbjg"
+     },
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1485,
+   "command": {
+    "type": "memory.revisions",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project"
+   }
+  },
+  {
+   "t": 1497,
+   "result": {
+    "type": "memory.revisions",
+    "value": {
+     "revisions": [
+      {
+       "id": "20261022-224358-vbjh",
+       "time": "2026-10-22T22:43:58.901+08:00",
+       "by": "Rollback",
+       "title": "Rolled back: You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": "20261022-224358-vbjg"
+      },
+      {
+       "id": "20261022-224358-vbjg",
+       "time": "2026-10-22T22:43:58.766+08:00",
+       "by": "You",
+       "title": "You · Moved to user level: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "user",
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 1
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-vbjf",
+       "time": "2026-10-22T22:43:58.662+08:00",
+       "by": "You",
+       "title": "You · Deleted Facts: The staging server is staging.internal",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 1,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjel",
+       "time": "2026-10-22T22:43:58.529+08:00",
+       "by": "You",
+       "title": "You · Changed Facts: Releases go out on Tuesday mornings",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 1,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjek",
+       "time": "2026-10-22T22:43:58.298+08:00",
+       "by": "You",
+       "title": "You · Added Facts: The release checklist lives in docs/release.md",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjej",
+       "time": "2026-10-22T22:43:58.162+08:00",
+       "by": "You",
+       "title": "You · Added Facts: Releases go out on Tuesdays",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261022-224358-sjei",
+       "time": "2026-10-22T22:43:58.054+08:00",
+       "by": "You",
+       "title": "You · Added Facts: The staging server is staging.internal",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "fact"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1505,
+   "command": {
+    "type": "memory.revisions",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page",
+    "layer": "project",
+    "id": "20261022-224358-vbjh"
+   }
+  },
+  {
+   "t": 1508,
+   "result": {
+    "type": "memory.revisions",
+    "value": {
+     "revision": {
+      "id": "20261022-224358-vbjh",
+      "time": "2026-10-22T22:43:58.901+08:00",
+      "by": "Rollback",
+      "title": "Rolled back: You · Moved to user level: Releases go out on Tuesday mornings",
+      "status": "done",
+      "layers": [
+       "user",
+       "project"
+      ],
+      "kinds": [
+       "fact"
+      ],
+      "counts": {
+       "added": 0,
+       "changed": 0,
+       "deleted": 0,
+       "moved": 1
+      },
+      "rollbackOf": "20261022-224358-vbjg",
+      "changes": [
+       {
+        "action": "moved",
+        "kind": "fact",
+        "from": {
+         "layer": "user",
+         "slug": "releases-go-out-on-tuesdays"
+        },
+        "to": {
+         "layer": "project",
+         "slug": "releases-go-out-on-tuesdays"
+        },
+        "before": "---\nkind: fact\nabstract: \"Releases go out on Tuesday mornings\"\nsource: user\ncreated: \"2026-10-22 · You\"\nmodified: \"2026-10-22 · You\"\nevidence: []\n---\n## Evidence\n\n## Details\nFreeze changes the evening before.\n\n## Revisions\n- Oct 22 · You: Edited on the Memory page\n- Oct 22 · You: Moved to user level\n",
+        "after": "---\nkind: fact\nabstract: \"Releases go out on Tuesday mornings\"\nsource: user\ncreated: \"2026-10-22 · You\"\nmodified: \"2026-10-22 · You\"\nevidence: []\n---\n## Evidence\n\n## Details\nFreeze changes the evening before.\n\n## Revisions\n- Oct 22 · You: Edited on the Memory page\n"
+       }
+      ],
+      "notes": null,
+      "run": null,
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-Kinxxh\\mem-page"
+     },
+     "error": null
+    }
+   }
+  }
+ ]
+}
