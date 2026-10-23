@@ -17,6 +17,7 @@
   会话、技能、MCP、插件包、AGENTS.md、自动重试和上下文压缩都用 pi 自己的机制和配置文件。
   pi 没有的能力，v0 也先不做；唯一的例外是一个最小批准扩展。
 - **Mori 自己写的**：界面（主体工作）、离线安装包、进程桥、最小批准扩展、反馈与 F8 记录。
+  （2026-10-22 加：记忆（身份段与记忆分节的拼装、记忆模块、memory 工具、记忆页）和每个项目的增强任务，见 [specs/memory.md](specs/memory.md)。）
 - **外壳**：Electron + React/TS。demo 的布局、视觉、`resize.js`、选区和拖拽交互移植过来；demo 的 JS 逻辑不沿用。
 - **里程碑**：M0 壳与安装包之后，M1–M7 都是界面里程碑，验收都是"在界面上看到、做到什么"。
 
@@ -52,6 +53,7 @@
    （2026-10-21：协作模式下界面显示你自己定义的角色名和 “Request 1”“T1” 编号，按 [specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md)；“实例”“权限会话”这类实现用语仍不出现。）
 5. **配置就是 pi 的配置**：界面读写 pi 自己的配置文件，不另建一套格式。
    （2026-10-21 改：模型这一层改用 Mori 自己的模型配置，从 `models.json` 迁移一次，见 [specs/model-providers.md](specs/model-providers.md)；其余配置仍是 pi 的。）
+   （2026-10-22 改：记忆文件也是例外：`<userData>/memory/` 下的条目、修订记录与增强设置是 Mori 自己的格式，只由记忆模块读写，见 [specs/memory.md](specs/memory.md) §3；AGENTS.md 仍是 pi 的。）
 
 ## 3. 后端与外壳选择
 
@@ -87,7 +89,10 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | Plugin | pi packages（一个包打包扩展、技能、提示词、主题） | 工具页添加本地包、按资源启停 |
 | 项目信任 | pi 提供判断与存储（`hasTrustRequiringProjectResources`、`trust.json`） | 何时弹窗由 Mori 接线（SDK 默认不问，见第 6 节） |
 | 批准 | **Mori 最小扩展** | 批准卡、权限切换 |
-| 选区反馈、F8 界面问题 | **Mori** | 记录、收件箱、导出 |
+| 选区反馈、F8 界面问题 | **Mori** | 记录、收件箱、导出（2026-10-22 改：反馈不再单独成列表，作为开了增强的项目的增强依据；F8 界面问题挪到设置页"UI issues"，见 [specs/memory.md](specs/memory.md) §10.7–§10.9） |
+| system prompt 拼装（2026-10-22 加） | **Mori**（inline extension `mori-memory`，经 pi 的 `before_agent_start`，[specs/memory.md](specs/memory.md) §4、§5） | — |
+| 记忆与记忆页（2026-10-22 加） | **Mori**（记忆模块、memory 工具，[specs/memory.md](specs/memory.md) §3、§6、§7） | 记忆页（"Memory"）替换工作回顾：浏览、编辑、移动、回滚；对话里的 memory 工具卡 |
+| 增强任务（2026-10-22 加） | **Mori**（每个项目的开关与每天的时刻、全应用串行的队列、看不见的会话，[specs/memory.md](specs/memory.md) §9） | 记忆页本项目顶部的开关、状态行、"Run now"、"Enhancement settings"；新会话顶部的提示 |
 | 离线安装、进程桥 | **Mori** | — |
 
 **pi 没有、v0 也不补的能力**（以后真用起来缺了再加）：
@@ -99,7 +104,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - MCP 每个会话的连接状态：pi 没有提供；v0 显示 pi 给出的工具列表和错误原文，加上共享连接的进程状态，不显示"Connected"。
 - MCP 的 codemode 和延迟加载方式：v0 只支持直接调用。
 
-**界面上 v0 不做的**（2026-10-21 起多 agent 与任务记录按 [specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) 做；监督、模型判决式验收仍不做）：任务记录、多 agent、监督、模型判决式验收、定时回顾、模型池、内嵌浏览器、交互式终端、
+**界面上 v0 不做的**（2026-10-21 起多 agent 与任务记录按 [specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) 做；监督、模型判决式验收仍不做；2026-10-22 起定时回顾由增强任务替代，见 [specs/memory.md](specs/memory.md) §9）：任务记录、多 agent、监督、模型判决式验收、定时回顾、模型池、内嵌浏览器、交互式终端、
 暗色模式（CSS 先 token 化，以后成本很低）、demo 里的项目主页和任务阶段面板。
 
 ## 5. 界面与交互
@@ -115,14 +120,14 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **窄窗口**：窄于 1024px 时左栏自动收起，窄于 800px 时右栏浮在上层；最小窗口 800×600。
 - **左栏**：
   - "New session"作主按钮（Ctrl+N），"Open folder…"。
-  - 导航：工具（Customize）、工作回顾（Review）。
+  - 导航：工具（Customize）、工作回顾（Review）。（2026-10-22 改：工作回顾换成记忆（"Memory"），见 [specs/memory.md](specs/memory.md) §10.1。）
   - 项目→会话树。
   - 底部："Settings"和"Report a UI issue (F8)"。
 - **中栏**：
   - 顶栏：会话名、模型、思考强度（Effort）、权限（"Ask each time" / "Allow all"）、上下文用量、右栏开关。
   - 下方依次是对话流、阶段行、排队区和输入框。发送和停止按钮在同一位置。
 - **右栏**：本会话的改动和文件阅读，见 5.9。
-- 工具、设置、工作回顾这几个独立页面顶部都有"Back to app"。
+- 工具、设置、工作回顾（2026-10-22 起为记忆页）这几个独立页面顶部都有"Back to app"。
   返回时恢复分屏、滚动位置、右栏打开的文件和各会话草稿。
 
 ### 5.2 首次启动与连接
@@ -248,6 +253,9 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **反馈**（"Feedback"）：只问"What result were you hoping for?"，底部写
   "This is only saved to Review and isn’t sent to the model. To have Mori act on it, use “Attach as context” instead."。
   提交后提示"Saved · View in Review"；保存失败时保留已输入的文字并显示错误。
+  （2026-10-22 改：底部说明按这个项目是否开了增强写：开了是"Saved as evidence for this project’s daily enhancement. To have Mori act on it now, use “Attach as context” instead."，
+  没开是"This project doesn’t have enhancement on, so feedback is only saved. To have Mori act on it, use “Attach as context” instead."；
+  提交后只提示"Saved"，见 [specs/memory.md](specs/memory.md) §10.7。）
 - 锚点：会话与消息的记录 id，或文件路径加内容哈希、行范围和原文。
 
 ### 5.11 分屏与会话引用
@@ -274,6 +282,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   并设定新会话默认的思考强度（"Default effort for new sessions"，pi 的 thinking level）。
   顶栏按会话切换思考强度（"Effort: High"）；模型不支持思考时这一项不可选，并说明原因。
 - **用户级 AGENTS.md**：编辑 `<agentDir>/AGENTS.md`，标出当前实际生效的是哪个文件。有未保存改动时离开，先询问。
+  （2026-10-22 加：每个文件的 token 数，合计超过 500 时标出来、不截断，见 [specs/memory.md](specs/memory.md) §10.3。）
+- **界面问题**（"UI issues"，2026-10-22 加）：工作回顾里的 F8 报告列表与详情挪到这里，在 AGENTS.md 下面，见 [specs/memory.md](specs/memory.md) §10.8。
 
 ### 5.13 工具页（Customize）
 
@@ -297,6 +307,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **输入框 "/"**：列出 pi 的提示词模板和技能命令，选中后插入。
 
 ### 5.14 工作回顾页（Review）
+
+（2026-10-22 改：工作回顾页由记忆页（"Memory"）替换，见 [specs/memory.md](specs/memory.md) §10；反馈不再单独成列表，界面问题挪到设置页（5.12）。下面是 v0 的做法。）
 
 v0 只汇总和导出，不做定时回顾和候选整理。
 
@@ -331,7 +343,7 @@ app/
 docs/v0/                     screens/（每屏一张状态表）、defaults.md
 ```
 
-**后台进程（utilityProcess）只做七件事**（第 5 件 2026-10-20 加，第 6、7 件 2026-10-21 加）：
+**后台进程（utilityProcess）只做八件事**（第 5 件 2026-10-20 加，第 6、7 件 2026-10-21 加，第 8 件 2026-10-22 加）：
 
 1. 调用 pi SDK：新建或打开会话、`prompt`、`steer`、`followUp`、`clearQueue`、`abort`、改名、读写配置。
 2. 转发事件：`session.subscribe` 收到的事件原样转发，外面包一层 `{ sessionId, event }`。
@@ -346,16 +358,20 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
    模型档案与探针；每个会话的模型请求经 Mori 的虚拟模型、流函数包装和模型池的 fetch 发出。
 7. 平行 Agent 与 TaskBoard（2026-10-21 加，[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md)）：读 `.mori/agents/*.md`，协作模式下的立项与对话，按 task 建实例会话，TaskBoard 服务、
    唤醒与交接、工作卡、写入排队，把后台实例的批准请求、回执和进展交给界面。
+8. 记忆、拼装与增强（2026-10-22 加，[specs/memory.md](specs/memory.md)）：记忆模块（条目、修订记录与回滚唯一的读写入口）与 memory 工具；
+   inline extension `mori-memory` 每次运行写身份段和四个记忆分节；每个项目的增强任务（每天的时刻与补跑、全应用串行的队列、看不见的会话）。
 
 **会话与数据**
 
 - `host.ts` 持有 `Map<sessionId, AgentSession>`，每个会话用 `createAgentSession` 独立创建；
   打开过的会话一直保持存活，直到归档、删除或退出；界面重新加载也不停，重新加载后的界面接上它们（2026-10-19 改为照 Claude 桌面版：
-  会话不因不在屏幕上而停）。不做调度、优先级或并发限制（模型请求的排队和优先级属于第 6 件事，2026-10-21；后台实例的同时运行上限属于第 7 件事）。
+  会话不因不在屏幕上而停）。不做调度、优先级或并发限制（模型请求的排队和优先级属于第 6 件事，2026-10-21；后台实例的同时运行上限属于第 7 件事；
+  增强任务的一个定时器和全应用同一时刻只跑一个的队列属于第 8 件事，2026-10-22）。
 - 历史：后台进程调用 `SessionManager.open(path).getBranch()`，把当前分支的条目交给界面；不自己解析会话文件。
 - 引用来源用 pi 的自定义条目（`appendCustomEntry("mori.ref", …)`）写进会话文件，它不进入模型上下文。
 - 会话内容只存一份，就是 pi 的会话文件（2026-10-21：协作模式另存 `<userData>/teams/<会话 id>/` 下的 TaskBoard 和各实例的 pi 会话文件）。Mori 自己只保存：界面状态（栏宽、分屏、各会话草稿、已归档的会话列表）、
   反馈和 F8 报告，以及加密后的 API key（`<userData>/credentials.json`）。
+  （2026-10-22 加：记忆 `<userData>/memory/`：条目、修订记录、增强设置与水位、增强任务的会话文件，见 [specs/memory.md](specs/memory.md) §3。）
 - API key：主进程用 Electron safeStorage 加密保存；启动时解密，经进程通道交给后台进程，
   后台进程用 pi 的 `setRuntimeApiKey` 只放在内存里。key 不进 `models.json`，也不进任何进程的环境变量。
   （2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §8.4：一个提供商可以有多个 key，按引用存；明文只在模型池的内存里，pi 只拿到占位 key。）
@@ -410,10 +426,10 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
 | M1 对话 | 移植 demo 布局与视觉；首次启动连接表单；打开文件夹；对话流、工具卡、阶段行；停止、排队、插话；错误与后台进程退出提示 | pi 的插话是否会跳过本轮剩余的工具调用（决定工具卡是否需要"已跳过"） | 1. 首次启动 → 填连接 → 测试成功 → 选文件夹 → 发第一条消息<br>2. 先看到"Waiting for the model… Ns"，再看到流式 Markdown；有思考内容时显示"Thinking…"，正文开始后思考折叠<br>3. 工具卡从"Running…"变为"Done"，可以展开参数和输出；上下文用量随对话增长<br>4. 生成中排队一条、插话一条：两条先出现在排队区；插话那条在本轮工具执行完后进入对话流，排队那条在本轮结束后进入<br>5. 运行一个耗时命令时按 Esc：命令卡显示"Stopped"，提示"Stopped · Changes made so far stay as they are"，排队消息回到输入框<br>6. key 填错：看到错误原文和"Go to settings"；key 写成一个没设置的 `$变量`：看到找不到 key 的错误和"Go to settings"<br>7. 在任务管理器里结束 Mori 的后台进程：看到退出提示和"Restart"，输入框里的草稿还在<br>8. 把上下文长度临时设成 8k 并长聊：看到"Compacting session…"，对话流留下"Compacted session"<br>9. 拖动左右分隔线、双击恢复，重启后宽度还在；窗口拉到 800 宽时没有内容被裁掉；没有小于 12px 的文字<br>10. 用拼音输入时按 Enter 选词，不会发送<br><br>反例：失败的命令不显示"Done"；没有事件时阶段行不显示"Responding…" |
 | M2 批准与 F8 | 最小批准扩展与批准卡；权限菜单；任务栏闪烁；F8 报告界面问题 | — | 1. 让它改一个文件：批准卡显示每处替换的原文和新文；允许后工具卡执行并完成，展开能看到实际 diff<br>2. 拒绝并写理由：工具卡显示"Denied · <理由>"，模型的下一条回复出现在它之后<br>3. 在输入框打字时出现批准卡：继续打字、按 Enter 都不会批准；Alt+1 允许<br>4. 选"Allow “Run commands” for this session"：之后的命令不出卡，标"Allowed for this session"；权限菜单里能看到并清除（"Forget"）；新会话重新询问<br>5. 切到"Allow all"先弹确认；之后改文件不出卡；切回后又出卡<br>6. 有批准卡时按 Esc：按拒绝处理，并停止生成<br>7. 切到别的窗口等批准：任务栏闪烁<br>8. 按 F8 写一条：生成带截图的 Markdown 文件，点"Show in Explorer"能看到<br><br>反例：等批准时阶段行显示"Waiting for your approval"，不显示"Responding…"或"Running…"；读取文件不出卡 |
 | M3 项目与会话 | 侧栏项目→会话树；新建、改名、归档、删除、恢复；右键菜单；项目信任弹窗；状态点；按会话保存草稿；扩展的询问（从 M6 提前）；界面重新加载后接上后台进程里的会话（2026-10-19 加） | — | 1. 打开两个文件夹，各建两个会话并各发一条消息：侧栏按项目分组，会话名取第一条消息的前 20 个字<br>2. 只用键盘：Ctrl+N 新建，Shift+F10 打开右键菜单改名<br>3. 改名后重启 App：名字和完整对话都在<br>4. 归档一个会话：侧栏移到"Archived"，可以恢复；删除一个会话：确认后永久删除，重启后不再出现；正在生成的会话不能归档或删除（2026-10-19 改）<br>5. 打开带 `.pi/extensions` 的仓库：先弹信任询问；选"Don’t trust"后该扩展注册的工具不出现；勾"Remember my choice"后重启不再询问<br>6. 在 A 写半句话，切到 B 再回 A，草稿还在；重启后也在<br>7. 不可见的会话生成完成时，侧栏显示"Unread"，点开后消失<br><br>反例：打开带 `.pi/extensions` 的仓库，任何情况下都不会不经询问就加载扩展 |
-| M4 改动与选区 | 右栏改动列表与 diff；只读文件阅读器；选区"Attach as context"（问 Mori）与"Feedback"；回复下的"Copy"、"Attach message as context"、"Give feedback" | — | 1. 让它改两个文件：右栏列出两个文件，点开按时间显示每次编辑的 diff，顶部注明命令改动不在此列<br>2. 点工具卡里的文件路径打开阅读器；删掉这个文件再点，显示"File not found"<br>3. 在阅读器里选一段点"Attach as context"：输入框出现带来源的芯片；发送后点芯片回到原位置；重启后仍能点回<br>4. 流式输出时选中一句话点"Feedback"：选区不被打断；提交后提示"Saved · View in Review"，当前会话没有新消息<br>5. 不用鼠标选字，用回复下的"Attach message as context"完成同样的引用<br><br>反例：原文已变化时，芯片保留当时的原文并提示"Source changed" |
+| M4 改动与选区 | 右栏改动列表与 diff；只读文件阅读器；选区"Attach as context"（问 Mori）与"Feedback"；回复下的"Copy"、"Attach message as context"、"Give feedback" | — | 1. 让它改两个文件：右栏列出两个文件，点开按时间显示每次编辑的 diff，顶部注明命令改动不在此列<br>2. 点工具卡里的文件路径打开阅读器；删掉这个文件再点，显示"File not found"<br>3. 在阅读器里选一段点"Attach as context"：输入框出现带来源的芯片；发送后点芯片回到原位置；重启后仍能点回<br>4. 流式输出时选中一句话点"Feedback"：选区不被打断；提交后提示"Saved · View in Review"（2026-10-22 改：只提示"Saved"，见 [specs/memory.md](specs/memory.md) §10.7），当前会话没有新消息<br>5. 不用鼠标选字，用回复下的"Attach message as context"完成同样的引用<br><br>反例：原文已变化时，芯片保留当时的原文并提示"Source changed" |
 | M5 分屏与会话引用 | 左右分屏；拖会话引用；右键菜单的"Open in split view"和"Attach as context" | — | 1. 把会话 B 拖到 A 的右侧：放下前出现"Drop to open in split view on the right"；两边各自发消息、各自批准<br>2. 在左栏按 Esc 只停止左栏；F8 和右栏跟随焦点所在的一栏<br>3. 拖动分屏中线调整比例<br>4. 把会话 C 拖进输入框：预览按"Turn N"标出内容和总字数；改成第 3–5 轮后发送<br>5. 点消息里的引用跳回 C；C 改名后仍有效；C 删除后芯片显示"Session deleted"，原文仍可查看<br>6. 用右键菜单完成同样的分屏和引用<br><br>反例：关闭分屏不停止正在生成的会话；预览里没有按钮文字等界面文字 |
 | M6 设置与工具页 | 多个模型与切换；思考强度（Effort）；用户级 AGENTS.md；工具页（Customize：内置工具、Skill、MCP、Plugin）；输入框 "/" 补全 | pi 如何在 prompt 中展开 "/名称"；MCP 扩展的通知在 SDK 下能否拿到 | 1. 加第二个模型，在顶栏切换，新回复来自新模型<br>2. 在用户级 AGENTS.md 写"每次回答以'收到'开头"：新会话的第一条回复符合；设置页标出生效的文件<br>3. 在已信任项目的 `.pi/skills` 放一个技能：工具页出现并标"Project"；停用后 `settings.json` 出现与 `pi config` 相同的条目，新会话问"你能用哪些技能"时没有它<br>4. 用表单添加一个 stdio MCP 服务：保存后看到它注册的工具名；调用它的工具会出批准卡<br>5. MCP 服务的命令写错：看到 pi 给出的错误原文<br>6. 添加一个本地文件夹的 pi 包：列出包内资源，可以按资源启停<br>7. 输入 "/"：列出提示词模板和技能命令<br>8. 把模型标为"Supports thinking"，顶栏切到"High"：回复带思考内容；切到"Off"：不再有思考内容<br><br>反例：模型没标"Supports thinking"时，思考强度不可选；项目未信任时项目技能不出现；没有注册任何工具的 MCP 服务不显示"Connected" |
-| M7 工作回顾（Review） | 反馈收件箱（Feedback）、界面问题收件箱（UI issues）、"Resolved"、导出；一键导出安装包（2026-10-21 加） | — | 1. M4 起写的反馈都在，点开跳回原位置<br>2. M2 起的 F8 报告都在"UI issues"里，带截图<br>3. 点"Resolve"标为已处理后，可以用"Hide resolved"筛掉<br>4. 两类都能导出为 Markdown（"Export as Markdown…"）<br>5. 双击 `build-installer.cmd`：结束时打开 `release\`，里面是安装包；任何一步失败时停下并说明哪一步 |
+| M7 工作回顾（Review） | 反馈收件箱（Feedback）、界面问题收件箱（UI issues）、"Resolved"、导出；一键导出安装包（2026-10-21 加）（2026-10-22 改：工作回顾由记忆页替换，走查 1–4 不再做，见 [specs/memory.md](specs/memory.md) §10、§14.4） | — | 1. M4 起写的反馈都在，点开跳回原位置<br>2. M2 起的 F8 报告都在"UI issues"里，带截图<br>3. 点"Resolve"标为已处理后，可以用"Hide resolved"筛掉<br>4. 两类都能导出为 Markdown（"Export as Markdown…"）<br>5. 双击 `build-installer.cmd`：结束时打开 `release\`，里面是安装包；任何一步失败时停下并说明哪一步 |
 
 界面改为英文之后（第 11 节"显示语言"，不兼容旧的中文记录），M4 走查 3、M5 走查 5、M7 走查 1–2 要用英文构建新建的会话、
 引用和 F8 报告来做：M2–M7 的构建存下的 F8 报告在工作回顾里列为读不出来的记录，旧消息里的中文引用块按全文显示、没有芯片
@@ -429,7 +445,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 2. **完成顺序**：写状态表 → 从真实会话录 fixture → 界面测试 → 实现 → 用真实模型走一遍 → 你走查。缺一步不算完成。
 3. **每一步都可以走查**：一步只做一屏的状态或一族事件，每步都有你能在 App 里看到的变化。
 4. **不造后端**：pi 有的能力直接用；pi 没有的，先回到第 4 节确认是否在 v0 范围内，不在就不写。
-   每加一段非界面代码，都要能指向第 6 节"后台进程只做七件事"或第 4 节表中标 Mori 的行。
+   每加一段非界面代码，都要能指向第 6 节"后台进程只做八件事"或第 4 节表中标 Mori 的行。
 5. **CI 把关**：`src/` 中出现"示例/演示/mock"即失败，界面字串里出现中文也失败（2026-10-21 加）；界面测试回放的事件必须来自真实录制，手写的要标明。
 6. **诚实交付**：交付说明列出未验证的项；遇到阻塞就停下来报告并给出选项，不写假实现，不静默换路线。
    临时默认值（2 万字、兼容选项说明、401 文字匹配等）登记在 `docs/v0/defaults.md`。
@@ -445,6 +461,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 - 修改 :553：允许使用默认值，但要标"临时默认值"并登记。
 - 废止 :244、:270–272、:281 等 demo 示例条款。工具页、设置和工作回顾保留界面形态，但必须接 pi 的真实数据。
 - 多 agent、通信、协作、Chrome、模型池五份子 proposal，以及工作回顾的定时与反证流程，本轮都不实现。（多 agent、通信、协作三份已被平行 Agent 与 TaskBoard Proposal 第四版取代，2026-10-21 起按其规格实现）
+  （2026-10-22 改：工作回顾的定时与反证流程由[提示词分层与记忆 Proposal](proposals/prompt-and-memory.md) 的增强任务替代，用依据核对、修订记录与回滚代替反证，见 [specs/memory.md](specs/memory.md) §9。）
 - 2026-10-19 的两份重设计草案（平行 Agent 与 TaskBoard、统一模型提供商）不在 v0 范围，v0 稳定后再对照。
   2026-10-21：统一模型提供商 proposal 第四版的普通模式部分开始实现（[specs/model-providers.md](specs/model-providers.md)），它取代模型池子 proposal 中“不自动切换”的规则。同日平行 Agent 与 TaskBoard 第四版开始按 [specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) 实现。
 
@@ -506,6 +523,17 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 - 模型层（2026-10-21）：按统一模型提供商 proposal 第四版和构建规格（[specs/model-providers.md](specs/model-providers.md)）实现普通模式的模型层；
   界面文字是英文，与 `english-ui` 合并后按 [v0/ui-strings.md](v0/ui-strings.md) 的术语表统一（例如思考强度写 Effort、"Model ID"、"Base URL"）。
 - 平行 Agent 与 TaskBoard（2026-10-21）：按 proposal 第四版和构建规格（[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md)）实现；新写的界面用英文，按 [v0/ui-strings.md](v0/ui-strings.md) 的术语表。负责人不在时定下的选择列在 [v1/team-checks.md](v1/team-checks.md)。
+- 提示词分层与记忆（2026-10-22）：按 [proposal 第一版](proposals/prompt-and-memory.md)和构建规格（[specs/memory.md](specs/memory.md)）实现，proposal §14 的四步一起交付；
+  临时默认值登记在 [v1/defaults.md](v1/defaults.md)，检查记录在 [v1/memory-checks.md](v1/memory-checks.md)。
+  - proposal 的决定（§15；§16 的默认做法一并采用）：system prompt 分身份与 harness、AGENT（就是 AGENTS.md，留在仓库）、记忆三块；
+    记忆是事实、TASTE、STRATEGY、REVIEW 四种条目，一行 abstract 链一份 detail，按席位分发，每种用户级与本项目合计 500 token，超了拒绝、不截断；
+    事实由主 Agent、立项 Agent 用 memory 工具记，subagent 不写；增强任务每天固定时刻跑（默认 04:00，没开 Mori 时下次启动补跑），
+    是看不见的会话，只读当天结束的会话，直接改本项目“它学的”条目、每次一条修订记录、可以回滚，用依据核对代替反证；
+    它的工具不限、命令和 MCP 自动执行，只限能写的文件；记忆存在本机，不进仓库；记忆页替换工作回顾（M7 的工作回顾不再走查），
+    反馈作为增强的依据，F8 界面问题挪到设置页。
+  - 写规格时定的（规格 §0）：增强任务打开协作模式时由立项 Agent 和 task 实例拿 memory 工具，关闭时是主 Agent；
+    身份段总是用 Mori 的，项目或用户级有 `SYSTEM.md` 也不用；每天的时刻（也是日界）每个项目一份，放在增强设置里；
+    这台机器没有带 key 的数据目录，回放的 fixture 从真实的 App 对合成端点录制（标 synthetic），真实模型套件写好、标为未运行。
 - 实现者：全部由 Claude 实现，你按界面走查签收。
 
 **待确认**（括号里是默认推荐，没有异议就按默认执行）

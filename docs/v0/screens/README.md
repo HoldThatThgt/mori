@@ -21,7 +21,7 @@
 | [models.md](models.md) | 顶栏的模型菜单与思考强度（Effort，每一栏各一组） | M6 |
 | [tools.md](tools.md) | Customize 页（工具页）：内置工具、技能、MCP、插件（pi 包）；启停照 pi config 的写法 | M6 |
 | [slash.md](slash.md) | 输入框的"/"补全（提示词模板、技能命令）与技能调用的显示 | M6 |
-| [review.md](review.md) | 工作回顾（Review）：对内容的反馈与界面问题的列表、详情、已处理与隐藏、回到原位置、导出为 Markdown | M7 |
+| [review.md](review.md) | 工作回顾（Review）：对内容的反馈与界面问题的列表、详情、已处理与隐藏、回到原位置、导出为 Markdown（v1：见 docs/specs/memory.md §10.1、§10.8：由记忆页（Memory）取代，界面问题挪到设置页的"UI issues"，状态表见 [../../v1/screens/memory-page.md](../../v1/screens/memory-page.md)、[settings-issues.md](../../v1/screens/settings-issues.md)） | M7 |
 
 pi 事件名以 `@earendil-works/pi-coding-agent` 1.3.0 的 `AgentSessionEvent` 为准；
 `message_update` 经后台进程精简为 `{ type, contentIndex, delta, toolCallId, toolName, args }`（见 `app/src/kernel/events.ts`）。

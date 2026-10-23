@@ -1,9 +1,11 @@
-# 屏幕状态表（v1：模型层、平行 Agent 与 TaskBoard）
+# 屏幕状态表（v1：模型层、平行 Agent 与 TaskBoard、提示词分层与记忆）
 
 每屏一张状态表：状态 ｜ 来源 ｜ 必须可见 ｜ 可做的操作。实现该屏之前写好，实现与测试都以它为准（AGENTS.md 第 1 条）。
 依据：模型层的表按 [统一模型提供商构建规格](../../specs/model-providers.md)（在这几个文件里称“规格”），它实现 [统一模型提供商 Proposal](../../proposals/model-providers.md) 第四版；
 `team-*.md` 按 [平行 Agent 与 TaskBoard 构建规格](../../specs/parallel-agents-taskboard.md)（在 `team-*.md` 里称“规格”，本文件称“TaskBoard 规格”），
-它实现 [平行 Agent 与 TaskBoard Proposal](../../proposals/parallel-agents-taskboard.md) 第四版。
+它实现 [平行 Agent 与 TaskBoard Proposal](../../proposals/parallel-agents-taskboard.md) 第四版；
+`memory-*.md` 与 `settings-issues.md` 按 [提示词分层与记忆构建规格](../../specs/memory.md)（在这几个文件里称“规格”，本文件称“记忆规格”），
+它实现 [提示词分层与记忆 Proposal](../../proposals/prompt-and-memory.md) 第一版（2026-10-22）。
 
 “来源”只能是：规格 §9.5 的事件（`mori.model_state`、`mori.model_switch`、`mori.model_rebuild`、`mori.model_wait`、
 `mori.model_queue`、`mori.model_retry`、`mori.model_unavailable`、`mori.profiles`、`mori.key_status`）、命令的结果（`models.*`、
@@ -14,6 +16,11 @@
 `session.stopTeam`、`session.clearQueue` 的 `texts`；`session.prompt` 的 `team: 'once'`、`approval.answer` 的后台 `requestId`）、
 `SessionInfo` 与 `LiveSnapshot` 的 `team`、`board`、`teamApprovals`、`deciding`，`LiveStatus` 的 `teamBusy`、`teamApproval`，
 `ModelState` 的 `pickLocked` 与 `blocked.kind` 的 `agents_invalid`，会话文件里的 `mori.receipt`、`mori.progress`、`mori.wake`（`mori.team` 不显示）。
+`memory-*.md` 与 `settings-issues.md` 另有记忆规格 §8 的来源：命令的结果（`memory.list`、`memory.get`、`memory.save`、`memory.delete`、`memory.move`、
+`memory.revisions`、`memory.rollback`、`enhance.get`、`enhance.set`、`enhance.run`；`error` 只有原因，界面加前缀）、全局事件（`mori.memory_changed`、`mori.enhance_progress`）、
+`SessionInfo.memoryNotice`（只有 `session.create` 带）、memory 工具结果的 `details`（`revision`、`kind`、`layer`、`entry`，实时的与会话文件里的）、
+`agents.get` 新加的 `loaded: { path, tokens }[]`、`userTokens`、`total`，以及主进程的 `mori:issues-*` 通道（由 `mori:review-*` 去掉反馈部分改名）
+和已有的 `mori:read-file`（反馈依据的 `Jump to source` 用它只读地读 `<userData>\feedback\<文件名>`）。
 
 | 文件 | 内容 | 取代 v0 的 |
 | --- | --- | --- |
@@ -26,8 +33,13 @@
 | [team-approvals.md](team-approvals.md) | 后台实例的批准卡与归属、和对话自己的卡怎样排、全部允许与本会话不再询问作用于全部 Agent、权限菜单说明、侧栏状态、F8 计数 | 补充 [v0 approval.md](../../v0/screens/approval.md) |
 | [team-stop.md](team-stop.md) | 待判断的消息（`<create role> is deciding…`、排队区的 `Waiting for <create role>`、撤回）、Esc 与 `Stop team`、回到输入框的文字、侧栏“Running”、正在生成时不能归档删除 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的排队区与停止、[model-chat.md](model-chat.md) 的准备中、[v0 sessions.md](../../v0/screens/sessions.md) 的状态与归档删除 |
 | [team-blocked.md](team-blocked.md) | `agents_invalid` 的拒绝启动卡（§4.4 的每一行、Check again）、`Turn off team mode`、协作模式下锁定的模型按钮、右栏的后台改动说明 | 补充 [model-chat.md](model-chat.md) 的拒绝启动卡、[model-menu.md](model-menu.md) 的按钮、[v0 changes.md](../../v0/screens/changes.md) |
+| [memory-page.md](memory-page.md) | 记忆页：左栏 `Memory`、`User` ｜ `Project` 与跟随的项目、六个分节、用量与 `Last change`、列表与读不出来的条目、条目详情（Evidence、Details 与 `[[slug]]`、Linked from、History）、编辑与新增、离开确认、删除、移动、依据回到原位置、AGENT、Revisions 与回滚、数据何时读、后台进程退出 | [v0 review.md](../../v0/screens/review.md)（工作回顾，M7）的入口、页面、反馈部分与回到原位置；[v0 layout.md](../../v0/screens/layout.md) 左栏的“Review” |
+| [memory-enhance.md](memory-enhance.md) | 记忆页 `Project` 顶部的增强：开关、状态行（规格 §10.4 的每一种）、`Run now`、`Enhancement settings` 对话框、进度事件 | 新增（v0 没有对应的屏） |
+| [memory-chat.md](memory-chat.md) | memory 工具卡（标题、免批准、`View in Memory`、失败）、工具页的 `memory` 行、记忆目录的写保护、新会话顶部的提示、反馈表单的说明与 `Saved` | 补充 [v0 tool-cards.md](../../v0/screens/tool-cards.md)、[v0 tools.md](../../v0/screens/tools.md)；取代 [v0 selection.md](../../v0/screens/selection.md)“反馈”的底部说明与 `Saved · View in Review` |
+| [settings-issues.md](settings-issues.md) | 设置 → `UI issues`（列表、详情与截图、Hide resolved、导出、打开文件夹）、F8 的 `View in Settings` 与 `Page`、设置 → AGENTS.md 的 token 数与超出标记 | [v0 review.md](../../v0/screens/review.md) 的 UI issues 部分与主进程通道；[v0 f8.md](../../v0/screens/f8.md) 的 `View in Review`；补充 [v0 settings.md](../../v0/screens/settings.md) 的 AGENTS.md 节 |
 
 时刻 `hh:mm:ss` 一律是本地时间（24 小时制，`shared/models.ts` 的 `formatClock`），由事件里的毫秒时刻（`until`）换算。
+记忆的几张表里日期写 `<Mon D>`（例如 `Oct 22`），时间写 `<Mon D> <hh:mm>`（本地时间，24 小时制，`shared/memory.ts` 的 `monthDay`、`monthDayTime`）。
 `<provider>/<model>` 是模型的全名（规格 §1）。
 
 ## 界面文字
@@ -46,6 +58,9 @@
   “Allow once”“Allow “…” for this session”“Deny”、“N more”、侧栏状态“Running”“Needs approval”）用 [v0 ui-strings.md](../../v0/ui-strings.md) 的英文
   （与 `english-ui` 合并后，2026-10-21）。角色名、需求和 task 的标题原样显示；基座的角色名 `mori` 显示为 `Mori`。
 - `<create role>`、`<close role>` 取 `TeamState.holders` 的 `create`、`close`；进展摘要“当前在做什么”的英文动词见 team-stream.md。
+- `memory-*.md` 与 `settings-issues.md` 的新界面文字按记忆规格 §10 原文（`Memory`、`You said`、`Learned`、`Jump to source`、`Roll back this revision`、`Enhancement` 等）；
+  记忆规格自己标“临时”的文字（登记在记忆规格 §12 与 [v1/defaults.md](../defaults.md)）写作“（临时，规格 §12）”，规格没给、各表定的写作“（临时，走查时可以改）”。
+  设置页左侧多了第三节 `UI issues`（记忆规格 §10.8），它的文字沿用 M7 的英文（[v0 review.md](../../v0/screens/review.md)）。种类名 `TASTE`、`STRATEGY`、`REVIEW` 全大写，事实写 `Facts`。
 
 ## 需要规格回答
 
@@ -61,6 +76,9 @@
 7. `Stop team` 的显示条件（`TeamState.busy` 含对话自己的运行）；`Stop team` 时待判断的消息经哪里回到输入框；重新载入的快照没有 `since`（team-stop.md）。
 8. 说明卡上的 `Turn off team mode` 是否直接回到 `off`；右栏说明在 `BoardView` 里没有依据；`agents_invalid` 而模式不是 `off`（team-blocked.md）。
    问题列表 `ModelBlocked.problems` 与动作 `turn_off_team` 已由 `shared/models.ts` 定下，规格 §16 应补上。
+9. （9–11 问记忆规格）界面怎么认出依据里的 TaskBoard 实例会话（本表按 `<userData>\teams\…\sessions\` 路径判断）；`entry` 为 null 时那一句显示在哪里（跳转后中栏已是会话）（memory-page.md）。
+10. `Project` 的用量含用户级，但只改用户级的 `mori.memory_changed` 按“这一层”不重读 `Project`；本表让 `Project` 的前四节也重读（memory-page.md）。
+11. 修订详情每处改动的 `<abstract>`：`RevisionChange` 没有这个字段（memory-page.md）。
 
 ## 界面测试用的标识（汇总）
 
@@ -96,3 +114,13 @@
 | `blocked-card[data-kind="agents_invalid"]`、`agent-problem`；`data-action="check-agents"`、`data-action="turn-off-team"` | 角色文件的拒绝启动卡、问题行、Check again、Turn off team mode（`agent-problem` 该文件定，临时） | team-blocked.md |
 | `model-button` 的 `data-locked="true"` | 协作模式下锁定的模型按钮（该文件定，临时） | team-blocked.md |
 | `team-changes-note` | 右栏的后台改动说明 | team-blocked.md |
+| `nav-memory`、`memory-page`、`memory-scope-user`、`memory-scope-project`、`memory-section-<facts\|taste\|strategy\|review\|agent\|revisions>` | 记忆页的入口、页面、层与分节（记忆规格 §10.11） | memory-page.md |
+| `memory-usage`、`memory-last-change`、`memory-new`、`memory-list`、`memory-row`（`data-id`、`data-source`）、`memory-broken` | 前四节的用量与列表 | memory-page.md |
+| `memory-detail`、`memory-evidence`、`memory-jump`、`memory-jump-status`、`memory-backlinks`、`memory-history`、`memory-error`、`memory-edit`、`memory-delete`、`memory-move` | 条目详情 | memory-page.md |
+| `memory-form`（`memory-abstract`、`memory-details`、`memory-save`）；`leave-dialog` | 编辑与新增、离开确认（`leave-dialog` 沿用 v0） | memory-page.md |
+| `memory-agent-file`、`memory-agent-total` | 记忆页的 AGENT | memory-page.md |
+| `revision-row`（`data-id`）、`revision-detail`、`revision-rollback` | Revisions 与回滚 | memory-page.md |
+| `memory-enhance`、`enhance-switch`、`enhance-status`、`enhance-run`、`enhance-settings`、`enhance-dialog`（`enhance-model`、`enhance-effort`、`enhance-team`、`enhance-time`、`enhance-save`）；`enhance-error` | 增强一块与设置对话框（`enhance-error` 该文件定，临时） | memory-enhance.md |
+| `tool-memory-view`、`memory-notice`、`memory-notice-view`、`feedback-note`、`feedback-saved` | 工具卡的 View in Memory、新会话提示、反馈表单（提示里 `Dismiss` 的 `data-action="dismiss"` 该文件定，临时） | memory-chat.md |
+| `settings-nav` 的 `button[data-section="issues"]`；`issues-*`（由 M7 的 `review-*` 改名）；`issue-open-settings` | 设置页的 UI issues、F8 的 View in Settings | settings-issues.md |
+| `agents-tokens`、`.agents-tokens`、`agents-over` | 设置页 AGENTS.md 节的 token 数与超出标记 | settings-issues.md |

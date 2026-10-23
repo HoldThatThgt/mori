@@ -5,6 +5,14 @@
 读的记录：对内容的反馈是 [selection.md](selection.md) "反馈"存下的 JSON；界面问题是 [f8.md](f8.md) "保存的内容"里的报告。
 回到原位置照 [selection.md](selection.md) "回到原位置"。
 
+> v1 已取代本文（docs/specs/memory.md §10.1、§10.8）：左栏"Review"换成"Memory"，工作回顾页由记忆页取代，状态表见
+> [../../v1/screens/memory-page.md](../../v1/screens/memory-page.md)；本文只是 v0 的记录。
+> 界面问题（列表、详情与截图、"Resolve"/"Reopen"、"Hide resolved"、"Export as Markdown…"、"Open folder"）挪到设置页第三节"UI issues"，文字不变，
+> 后台进程退出时照常可用；测试标识 `review-*` 改为 `issues-*`，主进程通道 `mori:review-*` 去掉反馈部分、改名 `mori:issues-*`；
+> 状态表见 [../../v1/screens/settings-issues.md](../../v1/screens/settings-issues.md)。
+> 对内容的反馈不再单独成列表，没有导出和已处理：开了增强的项目由增强任务作为依据读取，反馈出现在条目的 Evidence 和修订里（§10.7）；
+> 回到原位置推广为记忆页依据的"Jump to source"（§10.2）；F8 保存后的"View in Review"改为"View in Settings"（§10.9）。
+
 2026-10-21 负责人决定（开工时问的）：
 
 - **三级结构**，与现有界面一致：左栏顶层入口"Review"；中栏是列表，每条一段摘要；点一条在右栏打开详情。

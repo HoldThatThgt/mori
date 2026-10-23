@@ -3,6 +3,9 @@
 日期：2026-10-21。机器：Windows 11（10.0.28000），Node 24.19.0；Electron 44.9.0；pi 1.3.0。
 分支 `m7-work-review`（基于 `app-v0` 的 `c24ee0e`，即 M6 合并之后）。M7 的改动还没有提交。
 
+> 2026-10-22 注：工作回顾页由记忆页（Memory）替换，不再走查（[提示词分层与记忆 Proposal](../proposals/prompt-and-memory.md) §16）。
+> UI issues 挪到设置页，反馈作为增强任务的依据，实现见 [docs/specs/memory.md](../specs/memory.md) §10；M7 的测试与 fixture 删除（规格 §14.4）。下面是 M7 当时的记录。
+
 ## 状态
 
 按 AGENTS.md 的完成顺序（状态表 → 真实会话录 fixture → 界面测试 → 实现 → 真实模型走一遍 → 你走查），只差你走查。

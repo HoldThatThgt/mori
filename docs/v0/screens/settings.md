@@ -10,11 +10,13 @@
 | 分节 | 内容 |
 | --- | --- |
 | Connections and models（v1：见 docs/specs/model-providers.md §9.1：由 Models 分节取代） | 连接列表、每个连接下的模型、默认模型、每个模型是否支持思考和新会话默认的思考强度 |
-| AGENTS.md | 用户级 AGENTS.md 编辑器；当前会话的项目加载了哪些文件 |
+| AGENTS.md（v1：见 docs/specs/memory.md §10.3：另写每个文件的 token 数与超过 500 的警告，见下"AGENTS.md"） | 用户级 AGENTS.md 编辑器；当前会话的项目加载了哪些文件 |
 
 - 打开设置页时落在"Connections and models"；"Go to settings"（错误卡）落在出错会话所用模型的连接上，打开"Edit connection"，焦点在 API key。
   （v1：见 docs/specs/model-providers.md §9.1、§9.3：落在 Models；"Go to settings"删除，说明卡的"Open settings"滚到提供商卡、焦点在 Keys。）
 - 分节列表可以用 Tab 和 ↑ ↓ 切换；当前分节高亮（`aria-current`）。
+- （v1：见 docs/specs/memory.md §10.8：在"AGENTS.md"下面加第三节"UI issues"，内容是 M7 工作回顾的 UI issues，文字不变，在这一节时右栏可以打开；
+  打开设置页仍落在 Models，F8 的"View in Settings"直接进"UI issues"并选中那一份。状态表见 [../../v1/screens/settings-issues.md](../../v1/screens/settings-issues.md)。）
 
 ## 连接与模型
 
@@ -102,6 +104,9 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AGENTS.MD`、`CLAUDE.md`、`CLAUDE.MD`；先读 agentDir 的一个，
 再从文件系统根到工作目录逐级读（m6-checks.md）。不受项目信任控制。
 
+> v1：见 docs/specs/memory.md §10.3：生效文件那一行与每个加载的文件旁另写 token 数（`<n> tokens`，1 时 `1 token`），合计超过 500 时警告
+> "Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short."；token 数写在单独的元素里，生效文件那一行与路径的文字不变。`agents.get` 的 `loaded` 改为 `{ path, tokens }[]`，另有 `userTokens`、`total`。
+
 ### 用户级
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
@@ -142,9 +147,9 @@ pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AG
 
 | 元素 | 标识 |
 | --- | --- |
-| 设置页 | `data-testid="settings-page"`；分节按钮 `data-testid="settings-nav"` 里的 `button[data-section]`（`connections` / `agents`；v1：见 docs/specs/model-providers.md §9.1，`connections` 改为 `models`） |
+| 设置页 | `data-testid="settings-page"`；分节按钮 `data-testid="settings-nav"` 里的 `button[data-section]`（`connections` / `agents`；v1：见 docs/specs/model-providers.md §9.1，`connections` 改为 `models`；docs/specs/memory.md §10.8，另有 `issues`） |
 | 连接卡（v1：见 docs/specs/model-providers.md §9.1，改为 `provider-card`，见 v1/screens/models-settings.md） | `[data-testid="connection-card"][data-provider]`；模型行 `[data-testid="model-row"][data-model]`（`provider/id`），默认的带 `data-default="true"`；行里的"Edit""Delete…"带 `data-action`（`edit`、`delete`），卡上的带 `edit-connection`、`add-model`，底部"Add connection"带 `add-connection` |
 | 表单（v1：见 docs/specs/model-providers.md §9.1：提供商表单改为 `provider-form`，`connection-form` 只留给首次启动表单） | 添加连接、编辑连接都是 `data-testid="connection-form"`（M1 的测试沿用）；添加 / 编辑模型 `data-testid="model-form"` |
 | 结果文字 | 表单里 `data-testid="form-message"`（M1 沿用）；模型行里的测试结果 `data-testid="model-test"` |
-| AGENTS.md | 编辑框 `data-testid="agents-editor"`；生效的文件 `data-testid="agents-effective"`；项目级列表 `data-testid="agents-loaded"` |
+| AGENTS.md（v1：见 docs/specs/memory.md §10.3：另有 `agents-tokens`、`.agents-tokens`、`agents-over`） | 编辑框 `data-testid="agents-editor"`；生效的文件 `data-testid="agents-effective"`；项目级列表 `data-testid="agents-loaded"` |
 | 离开确认 | `data-testid="leave-dialog"` |
