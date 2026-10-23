@@ -3,11 +3,11 @@
 日期：2026-10-21 至 2026-10-22（下面的时刻都是 git 提交用的 −04:00）。机器：Windows 11（10.0.28000），Node 24.19.0；
 Electron 44.9.0；pi 1.3.0；electron-builder 26.17.0；playwright-core 1.64.1。
 分支 `composer-pickers`，基于 `app-v0` 的 `046a9ca`（v1-taskboard 合入之后；本机和 origin 的 `app-v0` 都是它），
-11 个提交：`cde2f24`（状态表和方案）、`9a7e8f9`（设计改到 v1 的选择范围按钮上）、`09f10bb`（实现和测试）、
+12 个提交：`cde2f24`（状态表和方案）、`9a7e8f9`（设计改到 v1 的选择范围按钮上）、`09f10bb`（实现和测试）、
 `797bbf6`（第一轮测试和静态审查后的修正）、`5b2bcdb`（顶栏放下协作开关）、`4b7f5fc`（开发构建全部套件跑下来后的修正；
 另含两处内核的竞态修正，见"交付了什么"最后一行）、`3a9a669`（视觉走查的修正）、`c673735`（真实模型走查的修正）、
-`f8066b2`（打包版的修正）、`8adedda`（这份记录），以及最终审查后的修正"composer-pickers: final review fixes"
-（见"最终审查之后改的"；要合并的是这最后一个提交，不是 `8adedda`）。本机还留着 v1 合入前停下的
+`f8066b2`（打包版的修正）、`8adedda`（这份记录）、`a40910e`（最终审查后的修正"composer-pickers: final review fixes"，见"最终审查之后改的"），
+以及按日志核对这份记录后的更正"composer-pickers: check record corrections"（只改这份记录；要合并的是这最后一个提交）。本机还留着 v1 合入前停下的
 `composer-pickers-wip-prev1`（`d21ff35`，不合并，合并后可删）。
 设计说明在 [composer-pickers.md](composer-pickers.md)（为什么、宽度怎样估的、每处按推荐定的），这里记做了什么、测了什么、
 哪里和方案不同、还有什么没验证。分支没有推送，也没有合并进 `app-v0`（合并由发起这一步的会话在最后做）。
@@ -134,7 +134,7 @@ session" 和"Change the permission mode"是 /effort、/permissions 命令的说�
 | 50 | 新卡来了或按钮变得不可用时，只在焦点原本在那个控件里时才把焦点放回按钮 | 一律放回 | v1 之前那次实现 |
 | 51 | 项目名靠很大的 `flex-shrink`（1e6）先收短，最长 160px、最窄 40px | 用脚本量 | v1 之前那次实现 |
 | 52 | F8 字段的顺序："Model range"在"Model"前，"Effort"在"Model"后，"Pane width"在"Window size"后（[screens/f8.md](screens/f8.md)） | 别的顺序 | 实现 |
-| 53 | 新加的 `m6-app-row.mjs` 加进 `package.json` 的 `test:m6-app`，端口 4364、4365。v1 之前开始实现时 `m6-app-settings` 已过 2000 行（2050 行），所以另起一个文件；v1 合入后它是 1228 行，仍保留拆分（这一行的行为本来就和设置页无关） | 塞进已有文件 | 测试编写、核对 |
+| 53 | 新加的 `m6-app-row.mjs` 加进 `package.json` 的 `test:m6-app`，端口 4364、4365。v1 之前开始实现时 `m6-app-settings` 已过 2000 行（2050 行），所以另起一个文件；`046a9ca`（v1、TaskBoard 合入后）上它是 1213 行（这一步改过后 1228 行），仍保留拆分（这一行的行为本来就和设置页无关） | 塞进已有文件 | 测试编写、核对 |
 | 54 | `m6-helpers` 的 `rangeDescription` 也把每一个" · "换成", "，与 App 和另四个 helper 一致 | 只换最后一个 | 核对 |
 
 ### 静态审查之后改的（2026-10-22，`797bbf6`）
@@ -189,7 +189,7 @@ session" 和"Change the permission mode"是 /effort、/permissions 命令的说�
 | 90 | `tb-app-roles` TB-03 在打包版里把对照（开发构建的 base）系统提示词里 pi 文档的路径前缀换成打包版的 `resources/app.asar/node_modules/`，其余逐字节比较；打包版按设计少一步 | 另建打包版的对照；打包版跳过 TB-03 | 打包版 |
 | 91 | `m1-real` 走查 8 按会话文件照 pi 的 `getContextUsage` 规则判断有没有用量（`usageAfterCompaction`）；models.md"刚压缩完"一行写上这种情形 | 按"最后一项是回复"判断（4 遍里 1 遍误报） | 打包版 |
 | 92 | `m1-real` 走查 3 的反例两遍没过（模型把命令写成 `ls does-not-exist-dir; echo "exit=$?"`，以 0 结束），重跑，没有改测试 | 改提示词或检查 | 打包版 |
-| 93 | 打包版没有跑 `v1-models-existing.mjs --exe`：它只是用 `--exe` 重跑同样的 m0–m7 App 套件，这些已直接跑过；所以打包版的 MP-37 / TB-46 汇总文件没有写（最终审查后在 HEAD 的打包程序上跑了，见第 101 条） | 再跑一遍（约 48 分钟） | 打包版 |
+| 93 | 打包版没有跑 `v1-models-existing.mjs --exe`：它只是用 `--exe` 重跑同样的 m0–m7 App 套件，这些已直接跑过；所以打包版的 MP-37 / TB-46 汇总文件没有写（最终审查后在 `a40910e` 的打包程序上跑了，见第 101 条） | 再跑一遍（约 48 分钟） | 打包版 |
 | 94 | 视觉走查：280px 在分屏左栏量（单栏最窄约 300px）；"准备中"截的是有字的（单个"Queue"）；0% 的圆环用 1,000,000 的窗口，50 / 80 / 95% 用按实测 783 token 定的窗口，刚压缩完用另一个开着自动压缩的实例；"Team: Until done"没有截（要有未完成的请求） | — | 视觉走查 |
 
 ### 最终审查之后改的（2026-10-22 晚，"composer-pickers: final review fixes"）
@@ -206,7 +206,7 @@ session" 和"Change the permission mode"是 /effort、/permissions 命令的说�
 | 100 | 新加的检查：`tb-app-stop` 的 `row` 一步（TB-54：后台有 Agent、对话在回复、输入框有字时，单栏 930–300px 和分屏右栏 296–279px 这一行不溢出，锁定的模型按钮、Stop team 的宽和只有图标、≤ 340px 收起；键盘按 Stop team 后焦点回文字框；新的合成脚本 `tb-stop-row`、`tb-stop-row2`）；`m6-helpers` 认得 Stop team 和 `data-locked`；`m5-app` 的 `teamOther` 和改过的 `closeKeeps`（两栏右栏状态不同时用鼠标点另一栏的协作开关和"Close pane"）；`m2-app` 的 `confirmOnKernelExit`（"Switch to “Allow all”?"开着时后台进程退出）；`m3-app-live` 的 `extCardClosesRow`（扩展的询问卡来了时权限菜单和圆环详情关上，合成扩展加了 `/mori-late`）；`v1-models-existing.mjs` 的 App 套件加上 `m6-app-row` | 不加 | 审查第 7、9、10 条 |
 | 101 | 在最后的代码的开发构建上重跑 TB-46 汇总（`v1-models-existing.mjs --id TB-46`），在重新打的包上跑 `--exe`（第 93 条没跑的那一遍），两个覆盖检查的开发和 `--packaged` 四种都要绿。做到了，见"最终审查之后重跑" | 在合并说明里写明两个覆盖检查只因汇总过时是红的 | 审查第 1 条 |
 | 102 | 注释和记录说明里剩下的"顶栏"改掉：`modelSession.ts`、`modelTypes.ts`、`roles.ts`、`shared/models.ts` 的注释；`tb-app-models` 的注释和 TB-38 一条记录的说明（编号不变）；`team-stop.md`、`team-blocked.md` 的状态表和旧的"Can't change the model while generating" | 不改 | 审查第 4、5、6 条 |
-| 103 | `unit/modelConfig.test.mjs` 里四处 `mkdtempSync` 的临时目录用完删掉（`t.after`），不再在 `%TEMP%` 留下 `mori-config-*`、`mori-project-*` | 不管 | 审查第 26 条 |
+| 103 | `unit/modelConfig.test.mjs` 里四处 `mkdtempSync` 的临时目录用完删掉（`t.after`），这个文件不再在 `%TEMP%` 留下 `mori-config-*`、`mori-project-*`（`modelLayer`、`modelMigrate`、`modelProfiles` 等别的单元测试仍留下 `mori-layer-*`、`mori-project-*`、`mori-migrate-*`、`mori-profiles-*`，没有改） | 不管 | 审查第 26 条 |
 | 104 | 4px 间距时焦点环离按钮 1px 写进 models.md"窄栏"、chat.md"顶栏"和 defaults.md | 只写在 CSS 注释里 | 审查第 11 条 |
 | 105 | Stop team ≤ 760px 就只有图标（原来和"Stop"一样 ≤ 600px）：第 100 条新加的 TB-54 检查量出来，带字的 Stop team（约 110px）在 601px 的面板里、生成中有字、"Effort: Unavailable"时把模式名截到不到两个字母，违反"宽于 400px 时不截模式名"；按最挤估算 601–708px 都会这样，760px 留出余量。单栏 TB-54 的宽度加上每条边界的两侧（930、761、760、709、681、680、601、600、461、460、401、400、341、340、300px，第 106 条又加了 521、520px） | 让模式名在这时也能截（改规格）；Stop team 一直只有图标 | 最终审查后跑 `tb-app-stop` 时发现 |
 | 106 | 有 Stop team 时"Queue"从 ≤ 520px 起就收起、只留 ▾（没有时是 ≤ 400px）：同样是 TB-54 量出来的，461px、401px 的面板生成中有字时模式名被截；按最挤估算 401–426px、461–482px 都会这样。单栏 TB-54 的宽度再加上 521、520px | Stop team 在 ≤ 520px 收进 ▾ 的菜单（准备中没有 ▾） | 同上 |
@@ -275,8 +275,8 @@ team-stop.md、team-blocked.md 的位置说法。`docs/specs/model-providers.md`
     里原有的 TB-39。
 - **别的范围的测试修正**：`tb-app-stop` TB-42 等删除确认框关上再看目录（`4b7f5fc`，第 85 条）；`tb-app-roles` TB-03 打包版
   系统提示词里 pi 文档的路径（`f8066b2`，第 90 条）；`m0-real`"只连配置的端点"认每个提供商（`c673735`，第 87 条）；
-  `m4-app`、`m4-real` 走查 4 拖选前滚到底边（`4b7f5fc`，第 81 条）；`m5-real` 走查 2 的等待（这次提交，第 107 条）；
-  `unit/modelConfig.test.mjs` 用完删临时目录（这次提交，第 103 条）。
+  `m4-app`、`m4-real` 走查 4 拖选前滚到底边（`4b7f5fc`，第 81 条）；`m5-real` 走查 2 的等待（`a40910e`，第 107 条）；
+  `unit/modelConfig.test.mjs` 用完删临时目录（`a40910e`，第 103 条）。
 - **留给之后的一步**：`mcpConfig.ts`、`main/credentials.ts` 的同步改名替换还没有同样的重试（第 84 条，没有套件因它失败）；
   `m5-replay.mjs` 第 462 行（助手消息）、`m1-real.mjs` 第 184 行（工具卡）有和第 107 条同样的 `querySelector` 加
   `:last-of-type` 写法（取到的不一定是最后一条），没有改，那两处现在没有失败；`m5-real.mjs` 第 66、266 行这一步之前就超过
@@ -583,9 +583,10 @@ m6-app-slash 106、m5-app 53、m3-app 156、m1-replay 94，都通过。
 
 - **你的走查**（这一步的，以及还没签收的 M2–M7、英文界面）。
 - **最终审查的修正之后，真实模型走查只重走了 `m5-real`**：`m0-real` 到 `m4-real`、`m6-real`、`m7-real`、`v1-models-real`、
-  `tb-real` 两边都是在 `3a9a669` 的构建上跑的（代码与 `8adedda` 相同），没有在最后的代码上重跑。最终审查改了这一行的行为
-  （Stop team ≤ 760px 只有图标、有 Stop team 时 ≤ 520px 和 ≤ 340px 收起排队的按钮、顶栏右边一组点完才切焦点、切换中带空的
-  `aria-description`），这些只由合成端点的整机测试在两种构建上测过；`tb-real` 的协作模式截图是改之前的样子。
+  `tb-real` 开发构建跑在 `3a9a669` 的构建上、打包程序跑在 `c673735` 上打的包上（两者的程序代码都与 `8adedda` 相同），
+  没有在最后的代码上重跑。最终审查改了这一行的行为（Stop team ≤ 760px 只有图标、有 Stop team 时 ≤ 520px 和 ≤ 340px
+  收起排队的按钮、顶栏右边一组点完才切焦点、切换中带空的 `aria-description`），这些只由合成端点的整机测试在两种构建上测过；
+  `tb-real` 的协作模式截图是改之前的样子。
 - **只能用手看的几项**（静态审查后的待验证清单列的，测试只覆盖了其中能自动查的部分）：鼠标点"Toggle changes"之后没有焦点环、
   按下拖出开关再松开时这一栏才得到焦点（视觉走查只看了 Tab 到的焦点环）；鼠标停在圆环上、焦点在文字框时按 Esc 停止生成并藏起
   提示，以及分屏时另一栏悬停的情况；范围菜单每一项的读屏名和描述，以及"Send"、"Stop"、"Queue"的描述，要在 DevTools 的
@@ -613,13 +614,15 @@ m6-app-slash 106、m5-app 53、m3-app 156、m1-replay 94，都通过。
 - 打包版和视觉走查清理临时目录时，视觉走查用的通配符可能也删掉了更早几轮留在 `%TEMP%` 的合成端点运行目录（没有你的数据）；
   更早会话留下的 `mori-v1-real-data-*`、`mori-v1-real-*`、`mori-tb-real-*` 还在 `%TEMP%`。这一步打包版真实走查留下的四个项目目录
   （`mori-v1-real-kcigMV`、`mori-tb-real-ask-Zy2mXw`、`mori-tb-real-team-sg0TIV`、`mori-tb-real-approval-UBUs1Z`，只有
-  `project/`，没有数据副本）原来漏删了，最终审查后做修正的会话删了（按它的记录，之后没有再核对）。`unit/modelConfig.test.mjs`
-  以前每跑一次留下几个 `mori-config-*` 目录（`%TEMP%` 里有几千个 10-22 的），最终审查后改成用完就删（第 103 条），已经留下的没有删。
+  `project/`，没有数据副本）原来漏删了，最终审查后做修正的会话删了（提交之后核对过，四个都已不在）。`unit/modelConfig.test.mjs`
+  以前每跑一次留下几个 `mori-config-*` 目录（现在 `%TEMP%` 里有 231 个，审查意见里写的"几千个"数错了），
+  最终审查后改成用完就删（第 103 条），已经留下的没有删。
 - **最终审查之后的重跑又在 `%TEMP%` 留下 566 个 `mori-*` 目录**（10-22 14:47 以后建的：各套件的合成数据目录、项目目录和
   单元测试的 `mori-team-*`、`mori-migrate-*`、`mori-profiles-*`、`mori-layer-*` 等；名字里没有 `real`，`m5-real` 只把你的数据
   当 `--source`，没有留下副本）。最后一个会话要删它们时被自动模式的权限拦下，**没有删**；清单在本会话草稿目录的
   `todelete.txt`，要你或之后的会话删。同一时段 `%TEMP%` 里还有不是 Mori 测试建的目录（`mori-dbg-*`、`spec04-*`、
-  `har-gui-sdk-*` 等），不在清单里。
+  `har-gui-sdk-*` 等），不在清单里。清单是 20:33 写的；之后提交前跑的单元（20:44）又留下 25 个（`mori-layer-*` 5 个、
+  `mori-migrate-*` 11 个、`mori-profiles-*` 8 个、`mori-project-*` 1 个，第 103 条之外的单元测试建的），也不在清单里。
 - 真实走查时自动模式的分类器拦下了一条会列出 `credentials.json` 里引用名（不含值）的命令，没有换别的办法去看，脚本照常自己处理
   副本里的 key。
 - `docs/v1/team-checks.md` 第 119 行仍写着 TaskBoard 的 App 和真实套件没有跑过 `--exe`（是 TaskBoard 的记录，没有改）。
