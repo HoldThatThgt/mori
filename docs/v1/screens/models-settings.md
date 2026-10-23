@@ -466,7 +466,7 @@ Add provider 表单的“Fetch cancelled”显示到你再点 Fetch models 或�
 Add a model ID 加入后输入框清空；模型行的提示在模型行说明下面、档案摘要上面；Use 失败的原文在这一行里；
 表单与卡上清单底部关闭用的 Cancel 的标识 `data-action="close-form"`。
 
-实现时定的（2026-10-23，都是临时，走查时可以改；见 [discovery-checks.md](../discovery-checks.md) 的 A16–A19）：
+实现时定的（2026-10-23，都是临时，走查时可以改；见 [discovery-checks.md](../discovery-checks.md) 的 A16–A19、A22、A23）：
 Add provider 里改 Base URL 或 API key 时，拉取命令出错的原文与上次保存失败的原文一起清掉；卡上的“Fetch cancelled”与拉取命令出错的原文
 留到你再点这张卡的 Fetch models；在清单的过滤框和 Add a model ID 的输入框里按 Enter 什么也不做（不会按下“Add N models”）；
 清单是一张表，表头就是 §6.2 的列名（Model ID、Context window、Max output、Supports thinking、Image input），放在最高 440px、
@@ -528,6 +528,7 @@ Add provider 里改 Base URL 或 API key 时，拉取命令出错的原文与上
 | Groups | 行 `[data-testid="group-row"][data-group]`；成员 `[data-testid="group-member"][data-member]`；成员选择 `data-testid="member-picker"`，项 `data-member`、已选的带 `aria-checked="true"`；`New group` `data-action="new-group"`，内联表单 `data-testid="group-form"`，id 错误 `data-testid="group-error"`；空状态 `data-testid="groups-empty"` |
 | Project access | 行 `[data-testid="project-row"][data-path]`；勾选框 `[data-testid="project-zone"][data-zone]`；项目配置错误 `data-testid="project-config-error"`；公网确认 `data-testid="public-dialog"`；空状态 `data-testid="projects-empty"` |
 
-清单行与 Add a model ID 的 `data-field` 取自 `app/src/renderer/src/components/settings/fields.tsx`：`id`、`contextWindow`、`maxTokens`
-是现在模型表单字段错误（`FieldError`）的 `data-field`；`reasoning`、`image` 是 `ModelDraft` 里两个勾选框的键。
+清单行与 Add a model ID 的 `data-field` 取自 `app/src/renderer/src/components/settings/fields.tsx`：`contextWindow`、`maxTokens`
+是模型表单（Edit）字段错误（`FieldError`）的 `data-field`；`id` 沿用原来模型表单 Model ID 字段错误的名字，现在只在 Add a model ID 用
+（Edit 的 Model ID 只读、不查）；`reasoning`、`image` 是 `ModelDraft` 里两个勾选框的键。
 现在的模型表单只在字段错误上带 `data-field`，输入框本身没有；清单行和 Add a model ID 的输入框直接带它。

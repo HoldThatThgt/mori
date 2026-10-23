@@ -39,7 +39,7 @@
 | 字段 | 写到哪里 | 说明 |
 | --- | --- | --- |
 | Base URL | `baseUrl` | 必填，http 或 https URL；占位“http://host:8000/v1”（沿用 v0/ui-strings.md）；拉取中只读。拉取后结果的 `baseUrl`（建议的 Base URL）与你填的不同（两边去掉首尾空白和结尾的 `/` 后比较）时框里换成它，这次替换不算你改了 Base URL；拿到了列表时下面一行“Updated to <url> so the model list loads.”，列表错误时只换框、不写这一行（发现规格 §6.1 第 3 项）。拉取后你改了它，回到“开始” |
-| API key | 主进程加密保存，`keys: [{ ref: <id>#1, label: "Key 1" }]` | 可空（空时请求不带认证头，§8.4）；密码框；拉取中只读；占位文字：没保存过时“Optional”（临时，走查时可以改），保存过、且 Base URL 框的地址与保存的提供商是同一个 origin 时“Saved. Leave empty to keep it.”（发现规格 §6.6），origin 不同时“Optional”（2026-10-23 负责人决定，见下“保存后改到别的 origin”）；不回填明文。拉取时作为 `keySecret` 只用于这次拉取，不存、不进模型池、不写日志（发现规格 §5.1、§9）；点 Test connection 保存时才加密保存。保存后框清空，表单把这张表单里最后填过的 key 留在内存里：之后再拉取而框是空的时用它作为 `keySecret`；它不显示，框空时保存不再发送（照旧保留已存的 key），表单关闭就丢掉（发现规格 §6.6）。拉取后你改了它，回到“开始” |
+| API key | 主进程加密保存，`keys: [{ ref: <id>#1, label: "Key 1" }]` | 可空（空时请求不带认证头，§8.4）；密码框；拉取中只读；占位文字：没保存过时“Optional”（临时，走查时可以改）；保存过、提供商存着这张表单保存的 key（某次保存时框里有 key，且之后没有带着不同的 origin、框空着保存），且 Base URL 框的地址与保存的提供商是同一个 origin 时“Saved. Leave empty to keep it.”（发现规格 §6.6）；其余情形都是“Optional”：每次都框空着保存、从没发过 key，已存的 key 因带着不同的 origin、框空着保存被删，或 Base URL 框的 origin 与保存的不同（2026-10-23 负责人决定，见下“保存后改到别的 origin”）；不回填明文。拉取时作为 `keySecret` 只用于这次拉取，不存、不进模型池、不写日志（发现规格 §5.1、§9）；点 Test connection 保存时才加密保存。保存后框清空，表单把这张表单保存时最后发出的那个 key 留在内存里（之后框空着保存不改它；提供商没有 key 时内存里也没有）：之后再拉取而框是空的、占位是“Saved. Leave empty to keep it.”时用它作为 `keySecret`；它不显示，框空时保存不再发送（照旧保留已存的 key），表单关闭就丢掉（发现规格 §6.6）。拉取后你改了它，回到“开始” |
 | Fetch models | — | `models.discover`（`target.kind: 'new'`）；Base URL 不是 http/https URL 时不可用；拉取中为“Fetching models…”，不可用。拉取后仍在 API key 下方，再点就是再拉一次：清单、列表错误和手填的行从头来（发现规格 §6.1） |
 | Detected | — | 一行“Detected: <种类名> <版本>”：种类名按 `SERVER_KIND_LABELS`，`unknown` 且 `anthropicShape` 为假时写“OpenAI-compatible server”，为真时写“Anthropic-compatible server”；`server.version` 为 null 时不写版本；没拿到列表（`server` 为 null）时不显示（发现规格 §3.3、§6.1） |
 | Name | 提供商 `name`；提供商 `id` 由它生成（§4.1） | 必填；预填结果的 `name`（Base URL 的主机名，端口不是协议默认端口时加“:<端口>”，发现规格 §3.4）。你在这张表单里改过之后，再拉取不覆盖；没改过时每次拉取按新结果重新预填（发现规格 §6.1） |
@@ -63,7 +63,7 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 开始 | 表单刚出现；或拉取后你改了 Base URL 或 API key（清单、列表错误、手填的行都清掉，Name 等字段一起收起，发现规格 §6.1）；或拉取已取消 | 只有 Base URL、API key、“Fetch models”；Base URL 不是 http/https URL 时 Fetch models 不可用，改过的 Base URL 旁显示字段错误“Base URL must be an http or https URL.” | 填写；Fetch models |
-| 拉取中 | 你点了 Fetch models（第一次，或拉取后再点）：`models.discover`（`target: { kind: 'new', baseUrl: Base URL 框的值, api: 你在 API type 里改过的值，没改过为 null, keySecret: API key 框的值；框为空、这张表单保存过、且 Base URL 框的地址与保存的提供商是同一个 origin 时为内存里最后填过的 key（发现规格 §6.6；origin 的条件是 2026-10-23 负责人决定），否则为 null }`） | 按钮“Fetching models…”，不可用；旁边“Cancel”；Base URL、API key 只读（发现规格 §6.1）；没有关闭表单的 Cancel | Cancel（`models.discoverCancel`） |
+| 拉取中 | 你点了 Fetch models（第一次，或拉取后再点）：`models.discover`（`target: { kind: 'new', baseUrl: Base URL 框的值, api: 你在 API type 里改过的值，没改过为 null, keySecret: API key 框的值；框为空、且 API key 的占位是“Saved. Leave empty to keep it.”（这张表单保存过、提供商存着它保存的 key、Base URL 框的地址与保存的提供商是同一个 origin，见“表单字段”的 API key）时为内存里的 key（发现规格 §6.6；origin 的条件是 2026-10-23 负责人决定），否则为 null }`） | 按钮“Fetching models…”，不可用；旁边“Cancel”；Base URL、API key 只读（发现规格 §6.1）；没有关闭表单的 Cancel | Cancel（`models.discoverCancel`） |
 | 已取消 | `models.discover` 返回 `cancelled: true` | 回到开始，显示“Fetch cancelled” | Fetch models |
 | 拉取的命令失败 | `models.discover` 返回 `error`（Base URL 或 key 不合格，例如“API key contains characters that cannot be sent in a header”，发现规格 §5.1） | 回到开始，Fetch models 下方原文（位置临时，走查时可以改） | 修改后再 Fetch models |
 | 拉取后 | `models.discover` 返回，`error` 为 null、`cancelled` 为假、`listError` 为 null | 依次：Base URL、API key 与“Fetch models”（仍在 API key 下方）；Detected 一行；建议的 Base URL 不同（去掉首尾空白和结尾 `/` 后比较）时换掉框里的值并显示“Updated to <url> so the model list loads.”；Name、API type、Network zone 预填（你在这张表单里改过的不覆盖）；清单（models-settings.md“清单”：默认勾选、“Not reported”、“Not a chat model”、“Can’t add this model: …”、两种提示、行数超过 20 时的过滤框、“Showing the first 1,000 models.”；列表为空时“Models (0)”和“The server didn’t list any models.”）；Add a model ID；More settings（API type 为 OpenAI-compatible 时）；探针代价一句；Test connection | 改 Name、API type、区域；勾选、改值；Select all；Clear selection；过滤；Add to list；More settings；Test connection；再点 Fetch models；改 Base URL 或 API key 回到开始 |
@@ -74,9 +74,9 @@
 | 填写 | 拉取后你改了任一字段或勾选 | 字段错误时字段旁英文错误；勾选数为 0、勾选的行有错误、或 Name、Network zone 有错误时 Test connection 不可用 | Test connection |
 | 保存中 | 你点了 Test connection，表单有改动（从没保存过也算有改动，临时，走查时可以改）：`models.firstRun`（`providerId` 第一次为 null，之后为上次返回的 id；`provider` 为 Name、Base URL 框、API type、Network zone、Concurrency per key 的默认值、兼容选项；`models` 为勾选的行，按清单顺序，过滤框藏起来的勾选行也算；API key 框为空时 `keySecret` 为 null，保留已存的 key，内存里的 key 不再发送） | 按钮“Saving…”（临时，走查时可以改），不可用 | — |
 | 保存失败 | `models.firstRun` 返回 `error`（配置写失败时本次新存的 key 已删除） | “Couldn’t save: <原文>”（临时，走查时可以改）；不开始测试 | 修改后再试 |
-| 已保存 | `models.firstRun` 返回 `providerId`、`error` 为 null | API key 框清空，占位“Saved. Leave empty to keep it.”（发现规格 §6.6）；这张表单里最后填过的 key 留在表单内存里，不显示；接着开始测试 | — |
-| 保存后再拉取 | 保存过之后你改了 Base URL（同一个 origin，例如只改路径）回到开始再 Fetch models，或再点 Fetch models，API key 框是空的 | `models.discover` 的 `keySecret` 为内存里最后填过的 key：要 key 的服务不会因为框空而报 `rejected`（发现规格 §6.6、MD-11）；框里仍是空的 | 同拉取中 |
-| 保存后改到别的 origin | 保存过之后你把 Base URL 改成另一个 origin（协议、主机或端口不同），API key 框是空的（2026-10-23 负责人决定，发现规格 §6.6） | API key 的占位为“Optional”（不是“Saved. Leave empty to keep it.”）；Fetch models 不带内存里的 key（`keySecret` 为 null，要 key 的服务报 `rejected`），因为这时保存会按 §4.1 删除已存的 key；改回保存时的 origin 后占位与内存里的 key 恢复；带着不同的 origin 保存之后内存里的 key 丢掉 | 在 API key 框填 key；同拉取中 |
+| 已保存 | `models.firstRun` 返回 `providerId`、`error` 为 null | API key 框清空；提供商存着 key 时（这次或之前的保存发过 key，且没有被带着另一个 origin、框空着的保存删掉）占位“Saved. Leave empty to keep it.”，否则“Optional”（发现规格 §6.6 的“同现在”，2026-10-23 负责人决定）；提供商存着 key 时，这张表单保存时最后发出的那个 key 留在表单内存里，不显示，没有 key 时内存里也没有；接着开始测试 | — |
+| 保存后再拉取 | 保存过、提供商存着 key（占位为“Saved. Leave empty to keep it.”）之后你改了 Base URL（同一个 origin，例如只改路径）回到开始再 Fetch models，或再点 Fetch models，API key 框是空的 | `models.discover` 的 `keySecret` 为内存里的 key（保存时最后发出的那个）：要 key 的服务不会因为框空而报 `rejected`（发现规格 §6.6、MD-11）；框里仍是空的 | 同拉取中 |
+| 保存后改到别的 origin | 保存过之后你把 Base URL 改成另一个 origin（协议、主机或端口不同），API key 框是空的（2026-10-23 负责人决定，发现规格 §6.6） | API key 的占位为“Optional”（不是“Saved. Leave empty to keep it.”）；Fetch models 不带内存里的 key（`keySecret` 为 null，要 key 的服务报 `rejected`），因为这时保存会按 §4.1 删除已存的 key；改回保存时的 origin 后占位与内存里的 key 恢复；带着不同的 origin、框空着保存之后内存里的 key 丢掉，占位为“Optional”（Base URL 框已是新保存的 origin 也一样） | 在 API key 框填 key；同拉取中 |
 | 测试中 | 保存成功后（或表单没改动时）`connection.test`（`{ providerId, modelId: 第一个勾选的模型 }`，发现规格 §6.6） | 按钮“Testing…”（临时，走查时可以改），旁边“Cancel”；没有 30 秒总时限：排队按 §8.2，每次尝试按首个内容的时限（120 秒），`server` 不重试 | Cancel（`connection.testCancel`） |
 | 测试已取消 | `connection.test` 返回已取消 | “Test cancelled”（临时，走查时可以改） | 再次测试 |
 | 测试失败 | `connection.test` 返回 `error` | “Connection failed: <原文>”（§9.1；没有原文时“Connection failed: No response”）；不出现 Open folder… | 修改，再 Test connection |
@@ -135,7 +135,8 @@ Fetch models 不可用；表单回到开始或开始新的一次拉取时，测�
 标题“Connect a model”与说明、拉取与清单的文字（含“The server didn’t list any models.”）、Max output 随窗口变的规则、
 拉取中两个框只读、再拉一次时保留你改过的值与区域的预选、Base URL 换框与说明句的条件、探针代价一句（在 Test connection 上方）、
 More settings 在非 OpenAI-compatible 时不显示、保存后 API key 的占位“Saved. Leave empty to keep it.”与内存里的 key，
-都已由发现规格 §6 给出，不再是本表定的。
+都已由发现规格 §6 给出，不再是本表定的。保存过、提供商却没有 key 时（每次都框空着保存，或 key 因改 origin 被删）占位仍是“Optional”：
+照这次之前首次启动表单的做法（只在存着 key 时写已保存，发现规格 §6.6 的“同现在”），不是本表另定的。
 
 ## 需要规格回答
 

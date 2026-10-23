@@ -1,7 +1,7 @@
 {
  "source": "synthetic",
  "synthetic": true,
- "note": "Recorded from the real App by tests/ui/md-record.mjs against the synthetic endpoint (until MD-14 records DeepSeek with the owner's key); do not edit by hand.",
+ "note": "Recorded from the real App by tests/ui/md-record.mjs against the synthetic endpoint (kept synthetic beside the real md-deepseek-card.json, MD-14: this recording's two Add provider flows, typed list, five §8 hints and Legacy card cannot be recorded against the real DeepSeek, §13.1); do not edit by hand.",
  "name": "md-deepseek",
  "description": "Add provider from a DeepSeek-style list (Select all, one Max output lowered with thinking and image unticked, one Context window lowered, one Context window and Max output raised above the reported window), Add provider from a typed list (default picks), wait for the probes, reopen Settings, Fetch models on the Legacy endpoint card",
  "covers": [

@@ -549,12 +549,8 @@ async function discover(layer: ModelLayer, command: Cmd<'models.discover'>): Pro
 
 /** @brief models.discoverCancel（§5.3）：取消正在进行的 models.discover，没有时什么也不做；不取消探针第 0 步与读版本。 */
 function discoverCancel(layer: ModelLayer): ModelsResult {
-  try {
-    layer.reader.cancelCommand();
-    return { error: null };
-  } catch (error) {
-    return { error: failure('models.discoverCancel', error) };
-  }
+  layer.reader.cancelCommand();
+  return { error: null };
 }
 
 /** @brief 删除与改动类的写命令；不是这几种时返回 undefined。 */

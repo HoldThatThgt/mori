@@ -236,6 +236,55 @@ test('MD-12 an unanswered /api/version only counts when the first row could make
     read('localai', null, false));
 });
 
+// ---- 规格更正 5（规划会话，2026-10-23，审查 C12）：读版本时 /api/version 没有回答不算种类变化 ----
+
+/** Ollama 形状的合成服务（synthetic）：列表行带 owned_by 与 created，/api/version 按 how 回答。 */
+const OLLAMA_AT = 'http://127.0.0.1:9020/v1';
+
+/** @brief /v1/models 回答 Ollama 形状的列表；/api/version 按 how：hang 一直不回答（超时），404，或 { version }。 */
+function ollamaVersion(how) {
+  return (call) => {
+    if (call.path === '/v1/models') {
+      return json({ object: 'list', data: [{ id: 'qwen3:8b', object: 'model', created: 1790000000,
+        owned_by: 'library' }] });
+    }
+    if (call.path !== '/api/version') return empty(404);
+    if (how === 'hang') return hang(call);
+    return how === 404 ? empty(404) : json({ version: how });
+  };
+}
+
+/** @brief 一个提供商 o（qwen3:8b），档案为 ollama 0.12.0。 */
+async function ollamaProvider() {
+  const config = configOf([configProvider('o', OLLAMA_AT, ['qwen3:8b'])]);
+  const profiles = [profile('ollama', '0.12.0', { baseUrl: OLLAMA_AT, modelId: 'qwen3:8b' })];
+  const harness = scratchLayer(ModelLayer, reservedIds(['openai']), { config, profiles });
+  await harness.layer.load({}, [], null);
+  return harness;
+}
+
+test('MD-12 checkVersions: list ok and /api/version timing out keeps the ollama profile and probes nothing',
+  { timeout: 60_000 }, async (t) => {
+    captureConsole(t);
+    stubGlobalFetch(t, ollamaVersion('hang'));
+    const { layer } = await ollamaProvider();
+    const before = layer.getProfiles().lookupRef('o/qwen3:8b');
+    await layer.checkVersions(['o/qwen3:8b']);
+    assert.deepEqual(layer.getProfiles().running(), [], 'no re-probe after an unanswered /api/version');
+    assert.deepEqual(layer.getProfiles().lookupRef('o/qwen3:8b'), before, 'the profile is unchanged');
+  });
+
+test('MD-12 checkVersions: list ok and /api/version answering 404 is a changed kind, so the model is probed again',
+  { timeout: 60_000 }, async (t) => {
+    captureConsole(t);
+    stubGlobalFetch(t, ollamaVersion(404));
+    const { layer } = await ollamaProvider();
+    await layer.checkVersions(['o/qwen3:8b']);
+    assert.deepEqual(layer.getProfiles().running().map((item) => item.ref), ['o/qwen3:8b'],
+      'an HTTP answer counts as evidence: kind unknown differs from the stored ollama');
+    await probesIdle(layer);
+  });
+
 // ---- checkVersions：每个提供商（baseUrl + api）读一次 ----
 
 /** 两个提供商 p、q 在同一个服务上，r 在另一个（synthetic）。 */

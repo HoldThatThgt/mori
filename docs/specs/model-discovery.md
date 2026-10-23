@@ -5,7 +5,7 @@
 本文是 proposal 的实现说明：proposal 讲心智模型，本文讲在 Mori 里怎么做、做到什么算完成。
 两者冲突时以 proposal 为准；本文不另加 proposal 没有的行为（§11 的临时默认值除外）。proposal 没定、实现又必须有一个值的地方，
 本文给出临时默认值，登记在 [v1/defaults.md](../v1/defaults.md) 的“一键拉取模型”一节（§11）。检查记录、实测结果与未验证项在
-`docs/v1/discovery-checks.md`（实现时新建）。
+[v1/discovery-checks.md](../v1/discovery-checks.md)。
 
 本文扩展 [统一模型提供商构建规格](model-providers.md)（下称“模型层规格”）：配置、编译、选择器、模型池、探针的判定都不变；
 本文改到的模型层规格条目在那边注明“（2026-10-23 注：见 model-discovery.md §n）”。在 [app-v0](../app-v0.md) §6“后台进程只做八件事”里属于第 6 件（模型层）。
@@ -69,6 +69,14 @@
 | 界面 | `renderer/src/components/settings/ProviderForm.tsx`、`Checklist.tsx`（新）、`ModelRows.tsx`、`Providers.tsx`、`FirstRunForm.tsx`；`state/settings.ts`、`state/actionLog.ts` | §6、§8；screens 见 [models-settings.md](../v1/screens/models-settings.md)、[first-run.md](../v1/screens/first-run.md) |
 
 每个文件不超过 2000 行，每个函数不超过 50 行、不超过 5 个入参（AGENTS.md）；`modelLayer.ts`（1002 行）只加上面那一行的接线，`modelSession.ts`（1626 行）不改。
+
+（2026-10-23 注：审查 C11 的资源修法也落在 `modelLayer.ts` 与 `modelProfiles.ts`，不只是上面的接线。`modelLayer.ts`：探针开始、每一步、结束引起的
+`mori.profiles`，一轮事件循环里第一条立即发、之后的合并到轮末（setImmediate）补发一条最新的（`scheduleProfiles`、`endProfilesTurn`）；
+拼档案视图时按配置建一次 ref → 目标的索引（`refTargets`、`profileViews`，`mori.profiles` 与 `models.get` 共用）。`modelProfiles.ts`：
+`ProfileBook.views(refs, resolve?)` 每次调用给档案建一次索引，`resolve` 由调用方传入上面的索引。载荷同模型层规格 §9.5；
+代码注释写的出处是 §9“安全与资源”与负责人的要求“不能无限量地用内存、CPU”；§9 本身只写 key、origin、每个 origin 的并发与不缓存，
+这条修法记在这里。为什么改、实测与剩下的代价见
+[discovery-checks.md](../v1/discovery-checks.md)“已知的限制与没验证的”。）
 
 ## 3. 地址、列表与服务种类
 
@@ -378,7 +386,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 - 结果 `{ listed, kind, version, versionRead }`：拿到列表时 `listed` 为真；这个种类有版本请求并且读到了版本时 `versionRead` 为真。
   `listed` 为真且种类与档案里的不同时，这个模型重新探测；种类相同时，只有 `versionRead` 为真、读到的版本与档案里的不同才重新探测。
   版本请求失败（连接、非 2xx、没有版本字段）时只比种类，不比版本；拿不到列表时档案不变（同现在，模型层规格 §7.1、MP-12）。
-  第 6 步的请求连接失败或超时、种类因此判断为 unknown 时，按拿不到列表处理（档案不变；proposal §10 第 5 条“读失败不算变化”，2026-10-23 实现时补）。
+  第 6 步的请求连接失败或超时、种类因此判断为 unknown 时，按拿不到列表处理（档案不变；HTTP 回答（404 等）照样是判断种类的依据；只对读版本，探针第 0 步（§7.1）判断不了仍记 unknown。规格更正（规划会话，2026-10-23，审查 C12）：proposal §10 第 5 条“读失败不算变化”、模型层规格 MP-12）。
   种类本来就没有版本请求的（版本为 null），只在种类变了时重新探测。`modelProfiles.ts` 的 `versionChanged` 照此改。
 
 ## 8. 模型行的提示
@@ -530,15 +538,35 @@ App 结果写 `md-app-existing.json`，回放结果写 `md-replay-existing.json`
 
 ### 13.4 现有测试
 
+（2026-10-23 注：实现后按实际改动重写。下表列出这次改到的每个现有测试文件——`git diff --name-only 54f0758 -- app/tests` 里不是新加的那些；
+新加的 `md-*` 文件、`tests/unit/discovery/`、`tests/fake-endpoint/discovery.mjs` 与 fixture 不在表里——和改了什么；最后一段写没改的。）
+
 | 现有 | 改法 |
 | --- | --- |
-| `tests/ui/page.mjs` 的首次启动（大多数 App 测试经它） | 填 Base URL 和 API key → Fetch models → 勾 `fake-coder`（合成端点列表两行、类型不明，默认都不勾）→ Name 仍填“Mori endpoint”（有几十处按 `mori-endpoint` 引用）→ 区域选 Local → Test connection；其余同现在 |
-| `m0-smoke.mjs`、`m1-app.mjs`、`m6-app-settings.mjs`、`m6-app-mcp-shared.mjs`、`mem-app-settings.mjs`、`v1-models-app-session.mjs`、`v1-models-app-settings.mjs`、`v1-models-app-switch.mjs` | 首次启动照 `page.mjs` 的新写法。在拉取之前检查的（例如 `m1-app.mjs` 的 Name 必填、`m6-app-settings.mjs` 首次启动表单上的 Supports thinking）改到拉取之后的清单或字段上；错的 key 在 Fetch 时就得到 `list-error`（`rejected`），再手填模型 ID 继续。卡上 `[data-action="add-model"]` 加模型的（`m1-app.mjs` 的 `fake-slow`、`v1-models-app-session.mjs` 的 `addModelUi`）改为卡上 Fetch models → 勾选或手填 → `add-models`。经进程桥直接发 `models.saveProvider`（带 `model`）、`models.firstRun`、`models.saveModel { adding: true }` 准备配置的，改发 `models`（数组）或 `models.addModels`。MP-24、MP-33 的检查照新流程 |
-| `m1-real.mjs`、`m6-real.mjs`、`m6-record.mjs` | 首次启动与加模型照上一行 |
-| `tests/unit/probes.test.mjs` | 第 0 步的用例（四个固定 GET、`judge({ apiVersion })` 认作 Ollama、`judge({ props })` 认作 llama.cpp、`VLLM` 样本的 `owned_by: 'fake'`）按 §3.3 改写并移到 `tests/unit/discovery/`，名字仍以 MP-10、MP-12 开头 |
-| `tests/ui/v1-models-existing.mjs` | 加预设 `MD-15`（§13.3） |
-| `tests/ui/harness/replay.js` | `models.discover` 的结果由 fixture 应答；`models.addModels` 照其他写命令应答；录制里有 `models.get` 时先用录制的 |
-| `tests/fake-endpoint/server.mjs` | 默认形状只把列表行的 `owned_by` 改成 `vllm`（§13.1）；加 §13.1 的其他行为；文件开头注释照改 |
+| `tests/ui/page.mjs`（首次启动与加模型的共用操作，大多数 App 测试经它） | 首次启动：填 Base URL 和 API key → Fetch models → 勾 `fake-coder`（合成端点列表两行、类型不明，默认都不勾）→ Name 仍填“Mori endpoint”（有几十处按 `mori-endpoint` 引用）→ 区域选 Local → Test connection；其余同现在。新加三处共用的操作：`fetchIn`（点 Fetch models，等这次的清单、列表错误或命令失败的原文）、`pickIn`（只勾给出的模型，清单里没有的用 Add a model ID 手填，再按需改 Context window、Max output、Supports thinking、Image input）、`cardAddModels` 与 `h.addModels`（卡上 Fetch models → 勾选或手填 → Add N models）。`fillConnection` 在 Base URL、API key 改了或还没拉取过时 Fetch models，返回这次拉取的结果；`firstRun` 另返回拉取结果和手填的模型；`setupFirstRun` 在拉取没拿到列表、或勾的模型是手填的时报错（对的 key 拉取失败时不悄悄改成手填） |
+| `m0-smoke.mjs`、`m1-app.mjs` | 首次启动照 `page.mjs` 的新写法。Name 必填的检查改到拉取之后（清单里勾着 `fake-coder`，只差 Name；`m1-app.mjs` 的小字检查也看拉取后的清单与字段）；错的 key 在 Fetch models 时就得到 `list-error`（`rejected`），再手填 `fake-coder`、测试连接看 401 原文；换回对的 key 后检查拉取拿到列表、`fake-coder` 是在清单里勾的。`m1-app.mjs` 卡上加 `fake-slow` 改为卡上 Fetch models → 勾 `fake-slow` → Add 1 model（`h.addModels`）；主进程被强行结束的一步（`mainKilled`）的首次启动改用 `setupFirstRun` |
+| `m6-app-settings.mjs` | 首次启动表单上的 Supports thinking 检查改到拉取后清单里 `fake-coder` 一行的勾选框 |
+| `m2-app.mjs`、`m6-helpers.mjs` | 准备一步的首次启动另查 Fetch models 拿到了列表：`m2-app.mjs` 记进检查（另查 `fake-coder` 不是手填的）；`m6-helpers.mjs` 的 `firstRunAndOpen` 没拿到列表时报错，模型不在列表里时照样手填（`m6-app-slash.mjs` 的长模型 id） |
+| `v1-models-app-session.mjs` | MP-10 的 `addModelUi` 改为卡上 Fetch models → 勾选或手填 → Add 1 model（`cardAddModels`）；合成端点日志里带 `path` 的列表与详情请求行（§13.1）不算对话请求，不收集 |
+| `v1-models-app-settings.mjs` | Add provider 与首次启动表单改为 Base URL 和 API key → Fetch models → Name、区域 → 清单里勾（`fetchIn`、`pickIn`）；MP-33 的改模型 id 改为在清单里换勾的模型；MP-24 的兼容选项先 Fetch models 再点开 More settings，加模型改用 `cardAddModels`；关表单按 `data-action="close-form"`；MP-08 的区域建议现在每个地址都要先拉取一次（不带 key），所以只用连不到任何真实服务的地址（本机 9 号端口、解析不到的主机名、RFC 5737 与 RFC 6761 的地址），内网网段的取值只由单元测试 `tests/unit/shared-models.test.mjs` 检查；合成端点日志里带 `path` 的行不收集 |
+| `v1-models-app-switch.mjs` | 经进程桥加模型的 `models.saveModel { adding: true }` 改发 `models.addModels`；改模型的 `models.saveModel` 去掉 `adding: false` |
+| `tests/ui/tb-helpers.mjs`、`tests/ui/v1-switch-helpers.mjs`（TaskBoard、记忆与模型层的 App 测试共用） | 收集合成端点日志时丢掉带 `path` 的列表与详情请求的 JSON 行（§13.1），只记对话请求 |
+| `m1-real.mjs`、`m6-real.mjs`、`m0-real.mjs` | `m1-real.mjs` 首次启动照 `page.mjs`（key 栏留空，要 key 的服务拉取时为 `rejected`，这时手填）；`m6-real.mjs` 走查 1 加模型改为卡上 Fetch models → 勾（或手填）→ Add 1 model；`m0-real.mjs` 只改给你看的说明（先 Fetch models 再勾模型） |
+| `m6-record.mjs`、`v1-models-record.mjs` | `m6-record.mjs` 的 model-range 加模型改发 `models.addModels`；两个文件里改模型的 `models.saveModel` 都去掉 `adding` |
+| `tests/ui/m6-replay.mjs` | 走查 8（markReasoning）：Edit 里没设过强度时显示录下的 `thinkingDefaults`，没有时 `config.get` 的 `defaultThinkingLevel`（再没有时 Medium）；检查 `models.saveModel` 没有 `adding`，强度与显示的相同时不带 `thinkingLevel`、不同时带上（§5.4） |
+| `tests/ui/harness/replay.js` | `models.discover` 是按参数配对的只读查询（新提供商按 kind、去掉首尾空白的 baseUrl、api，已有提供商按 providerId；`keySecret` 不参与），没录过时合成一个命令失败的结果（synthetic）；`models.addModels` 照其他 `models.*` 写命令应答；`models.discoverCancel` 应答 `{ error: null }`，不算写命令；`models.get`、`models.reload` 按界面已发的写命令条数取录制里对应的那一个（录制里没有写命令时同原来，取这一段最后一个） |
+| `tests/ui/harness/main.jsx` | 加载 `fixtures/discovery/ui/*.json`（§13.1） |
+| `tests/unit/probes.test.mjs` | 第 0 步的用例（四个固定 GET、`judge({ apiVersion })` 认作 Ollama、`judge({ props })` 认作 llama.cpp、`VLLM` 样本的 `owned_by: 'fake'`、没有版本时版本为 unknown）按 §3.3 改写并移到 `tests/unit/discovery/profile-step0.test.mjs`，名字仍以 MP-10、MP-12 开头；这里的第 0 步改用替身 `readServer`，另加一条：第 0 步中取消时返回 null、不发第 1–7 步的请求 |
+| `tests/unit/modelProfiles.test.mjs` | MP-12 的 `versionChanged` 改收读版本的结果 `{ listed, kind, version, versionRead }`（§7.3） |
+| `tests/unit/reporter.mjs`、`tests/spec-coverage.mjs`、`tests/unit/taskboard/spec-coverage.test.mjs` | 报告器加严格模式（`md-reporter.mjs` 用：跳过的与标为待办的测试、套件自己的失败都记为失败）；覆盖检查加 `--spec discovery`（§13.3），带跳过或待办标记的检查一律不算通过；TB-46 的单元测试加查 `--spec discovery` 读到 §13.2 的每个 MD 条目与层、`md-` 结果文件归到哪一层（`md-partial-*` 不算），带标记的检查不算通过，以及严格模式的报告器把跳过的、待办的测试与套件自己的失败记为失败、不开严格模式时照旧 |
+| `tests/ui/v1-models-existing.mjs` | 加套件组 `discovery` 和预设 `MD-15`（§13.3），最后一项附加检查是 `tests/md-markers.mjs`（这次新加的行里没有推迟实现的标记） |
+| `tests/fake-endpoint/server.mjs`、`probes.mjs`、`selfcheck.mjs` | `server.mjs`：默认形状只把列表行的 `owned_by` 改成 `vllm`（§13.1），加 §13.1 的其他行为（形状在新加的 `discovery.mjs`），文件开头注释照改；`probes.mjs` 只改开头注释（`-alwaysthink` 在 `server.mjs` 里处理）；`selfcheck.mjs` 加 §13.1 发现行为的自检 |
 | 模型层规格 §14.2 | MP-01、MP-10、MP-24、MP-33 的条目文字不变，测试按新流程写；在那边 §14.4 注明 |
 
-TaskBoard 与记忆的 App 测试直接写 `model-config.json` 准备配置、不发这些命令，不用改（实现时再 grep 一遍确认）。
+没改的：`m3-app.mjs`、`m4-app.mjs`、`m5-app.mjs`、`m6-app-mcp-shared.mjs`、`m6-app-tools.mjs`、`m6-app-slash.mjs`
+的首次启动经 `page.mjs` 的 `setupFirstRun` 或 `m6-helpers.mjs` 的 `firstRunAndOpen`，随它们改，文件本身不用改；
+`mem-app-settings.mjs` 只等首次启动表单出现、在上面按 F8，不填表单；回放套件除 `m6-replay.mjs` 外都没改
+（回放桥 `harness/replay.js` 按上表改）。
+TaskBoard 与记忆的 App 测试直接写 `model-config.json` 准备配置，不填首次启动表单，也不发 `models.saveProvider`、`models.firstRun`、
+`models.saveModel`；它们要改的只有上面 `tb-helpers.mjs`、`v1-switch-helpers.mjs` 两个 helper：合成端点现在也给列表与详情请求打
+JSON 行（§13.1），收集时跳过带 `path` 的行。

@@ -27,20 +27,48 @@
 | # | 更正 | 依据 |
 | --- | --- | --- |
 | 1 | 规格更正（规划会话，2026-10-23）：§4.1 `chat` 先看 `capabilities.completion_chat`（布尔），再看 `type` | proposal §7：Mistral 的 `capabilities.completion_chat` 照通用规则读到；Mistral 的行同时有 `type: "base"`（或 `"fine-tuned"`），按原来的顺序 `type` 先下结论为假，每个 Mistral 聊天模型都会标 Not a chat model。规格与 proposal 冲突时以 proposal 为准，所以是规格的错，不是新的决定 |
-
 | 2 | 规格更正（规划会话，2026-10-23）：§4.1 `contextWindow` 里 `meta.max_model_len`、`meta.n_ctx`、`meta.max_total_tokens` 三项（相对顺序不变）放在 `context_length` 之前 | 对照 llama.cpp 源码（`server-models.cpp`）：router 模式每行的 `context_length` 是 `n_ctx_train`（训练窗口），已加载模型的 `meta.n_ctx`（实际在用的窗口）只补进行里没有的键；按原来的顺序会读成训练窗口。`meta.*` 只出现在 llama.cpp 与 GPUStack `with_meta` 的行里，总是实际在用的窗口，proposal §7 |
 | 3 | 规格更正（规划会话，2026-10-23）：§4.2 百炼一行，`inference_metadata.request_modality` 原样合并进行、按 §4.1 读，只有文字的模型因此明确报告没有图片；`capabilities`、`features`、`model_info` 不原样合并 | 原来只按对应取正面的值，只有文字的模型的图片为“没报告”；原样合并 `capabilities`（例如 `["TG"]`）会让 §4.1 把 `chat` 读成假、`VU` 也不算图片，所以只合并这一个字段 |
 | 4 | 规格更正（规划会话，2026-10-23）：§3.2、§3.3 里对象有 `has_more` 或 `hasMore` 即为 Anthropic 形状，翻页的游标取 `last_id` 或 `lastId`（查询参数仍是 `after_id`） | MD-14 用你的 key 录下的 z.ai 列表（`glm-models-1.json`）是 `{ data, firstId, hasMore, lastId }`：按原来的写法认不出 Anthropic 形状，GLM 的 Add provider 写 “Detected: OpenAI-compatible server”，`hasMore` 为真时也不会翻页。API type 仍只看地址 |
+| 5 | 规格更正（规划会话，2026-10-23，审查 C12）：§7.3 读版本时，第 6 步的请求连接失败或超时、种类因此判断为 unknown 的，按拿不到列表处理（档案不变）；404 等 HTTP 回答照样是判断种类的依据；只对读版本，探针第 0 步（§7.1）判断不了仍记 unknown | proposal §10 第 5 条“版本读不到时只比种类（同现在：读失败不算变化）”与模型层规格 MP-12“版本接口连不上时档案不变”。Ollama 的 `/api/version` 既是第 6 步的判断又是版本请求：它超时会让种类读成 unknown，原来按“种类不同即重新探测”会把这个提供商下每个模型都重新探测。单元测试：`profile-versions.test.mjs` 的 “list ok and /api/version timing out keeps the ollama profile” 与 “answering 404 is a changed kind” |
 
 ## 已知的限制与没验证的
 
 - llama.cpp router 模式里没加载的模型只有 `context_length`（训练窗口），清单把它当报告的窗口、没有提示；§6.2 的 `trained_window` 提示只写给 Ollama，不另加（规划会话，2026-10-23）。
-- 一次加入很多模型时的 `mori.profiles`（审查 C11）：原来每个探针开始、每一步、结束各发一份全部档案，一次加入 468 个模型时后台进程卡住数秒、序列化几百 MB。
+- 一次加入很多模型时的 `mori.profiles`（审查 C11；改在 `modelLayer.ts`、`modelProfiles.ts`，见规格 §2 的 2026-10-23 注）：原来每个探针开始、每一步、结束各发一份全部档案，
+  一次加入 468 个模型时后台进程卡住数秒、序列化几百 MB。
   现在同一轮事件循环里的变化合成一份（第一份立即发、其余在这一轮结束时发最新的一份），拼档案视图由每个模型线性查找改为一次建索引；载荷与模型层规格 §9.5 相同。
-  剩下的：真实写档案时每个探针在自己的一轮里结束，仍各发一份全部档案（实测 1000 个模型约 1000 份、合计约 1 GB，30 秒内陆续发出、发完即释放，后台进程最长停顿 0.5 秒），
-  每个探针结束也重写一次整个 `model-profiles.json`。再合并要按时间节流或成批写，规格没有这样的值，没有做；要做时需要你定一个新的临时默认值。
+  剩下的：探针第 2–7 步的开始（各等前一步请求的回复）和每个探针的结束各落在自己的一轮里，是那一轮的第一份、立即发，所以仍各发一份全部档案，总量随模型数平方增长。
+  请求成功时每个模型约 7 份（模型都勾了 Supports thinking、要跑第 2 步；没勾的跳过第 2 步，少一份）：
+  实测 100 个模型 684 份、合计约 54 MB；468 个模型 3208 份、合计约 1.2 GB，约 71 秒内陆续发出，后台进程最长停顿约 0.06 秒；
+  key 被拒时模型池让排队的请求一起失败，各步合并，只剩每个探针的结束各发一份（真实写档案时每个探针在自己的一轮里结束；实测 1000 个模型约 1000 份、合计约 1 GB，
+  30 秒内陆续发出、发完即释放，后台进程最长停顿 0.5 秒）。另外每个探针结束都重写一次整个 `model-profiles.json`。
+  实测的做法（脚本在会话的临时目录，不进仓库）：esbuild 打包真实的 `kernel/modelLayer.ts`，替身 fetch 让列表 300 毫秒后回 N 个 OpenRouter 形状的模型；
+  请求成功的那组对话请求 20–80 毫秒后回 HTTP 200（读完响应体、放回槽位），模型池每个 key 4 个，档案写入换成内存里的替身。
+  再合并要按时间节流或成批写，规格没有这样的值，没有做；要做时需要你定一个新的临时默认值（定下后登记在 [defaults.md](defaults.md)“一键拉取模型”一节）。
 - 审查 C8 的修法（保存成功晚到时不关掉已经换成的别的表单）同样用在了 Edit provider 和模型表单（Edit）：它们原来有同样的问题，修法只是落实“同一时刻只开一张”。
 - SGLang 没有 `/version` 接口（版本在 `/server_info`，按 2026-10-23 的 `http_server.py`）：照 §3.3 与模型层规格 §7.1，SGLang 的版本仍为 null，档案键为 `sglang|unknown`，同这次之前（规划会话，2026-10-23：不改）。
+- 原来被认成 vLLM 的 LocalAI、TensorRT-LLM（规格 §3.3）：升级后第一次读版本（§7.3）认出种类变成 `localai` / `tensorrt`，
+  这个提供商下种类记成 `vllm` 的每个模型各重新自动探测一次（日志“server of <ref> changed to localai unknown; probing again”，
+  TensorRT-LLM 为 `tensorrt unknown`；会再花一次自动探针的请求）；之后种类为 `localai` / `tensorrt`、版本为 null
+  （档案里写 `unknown`），档案键最后一段由原来的 vLLM 版本变成 `unknown`，之后的读版本不再重新探测；
+  这两种不再显示 Cancel test…（§7.2）。用 MD-12 的单元测试（`app/tests/unit/discovery/profile-versions.test.mjs`）
+  和 App 测试（`app/tests/ui/md-app-card.mjs` 的 shapes 一步）在合成端点的 `localai`、`tensorrt` 形状上检查；
+  没有真实的 LocalAI、TensorRT-LLM 部署，没在真实服务上验证。
+- 模型层、TaskBoard 与记忆的真实层（MP-27；TB-04、TB-08、TB-34、TB-37、TB-45；MEM-05、MEM-10、MEM-22、MEM-34）本轮没有重跑，未验证
+  （`app/tests/ui/v1-models-existing.mjs` 开头 MD-15 一段；[memory-checks.md](memory-checks.md)“未验证”对模型层与
+  TaskBoard 的真实层也这样写）。
+- 只有 OpenRouter、DeepSeek、z.ai 的 Anthropic 兼容列表（GLM）和 DeepInfra 是从真实服务录的（下面“录制的样本”；
+  `open.bigmodel.cn` 只录到不带 key 的 401）。其余的种类与服务——vLLM、SGLang、llama.cpp、Ollama、LM Studio、TGI、LocalAI、
+  Xinference、GPUStack、MindIE、LMDeploy、TensorRT-LLM、LiteLLM、New API、One API、Moonshot AI、百炼、千帆、Anthropic，
+  以及种类为 `unknown` 的 Together、Mistral——只对手写（synthetic）的响应体检查过（其中几种另有合成端点的形状，
+  `app/tests/fake-endpoint/discovery.mjs`），没在真实服务上验证（`app/tests/fixtures/discovery/bodies/README.md` 的“手写样本”；
+  其中标“没核实”的有 LM Studio `/v1/models` 的行、百炼 compatible-mode 列表的形状、千帆的字段名、
+  New API Anthropic 形状列表的 json 字段名）。
+- GLM 的 OpenAI 形式地址（`open.bigmodel.cn/api/paas/v4/models`）带 key 时有没有列表、火山方舟有没有列表，都没有试
+  （proposal §14）；MD-14 带 key 只试了 `https://api.z.ai/api/anthropic`。
+- 百炼：`dashscope.aliyuncs.com` 上原生 `/api/v1/models` 的返回内容、`page_size=100` 是否被接受，以及 compatible-mode
+  `/models` 的形状，都没有用真实 key 核对（proposal §14；[defaults.md](defaults.md)“百炼原生列表每页 / 最多页数”一行）。
 
 ## 实现时定下的（规格没写、实现必须有一个值的地方）
 
@@ -67,7 +95,7 @@
 | D17 | 操作记录里新提供商的主机 | `new URL(baseUrl).host`（非默认端口带端口）；不是 URL 时只记“Fetch models” |
 | D18 | 没报告时的窗口与输出上限 | 放在 `shared/models.ts`（`UNREPORTED_CONTEXT_WINDOW`、`unreportedMaxTokens`），读取器与清单共用一份；defaults.md 的位置一栏已改 |
 
-实现各路报上来、我接受的（A1–A21，`discovery-accepted-decisions.md`）：
+实现各路报上来、我接受的（A1–A21，`discovery-accepted-decisions.md`），以及审查的修法里定下的界面细节（A22、A23）：
 
 | # | 情形 | 做法 |
 | --- | --- | --- |
@@ -92,6 +120,8 @@
 | A19 | “Updated to …”的位置、拉取中的 fetch-status | 在 Detected 一行之后（§6.1 的顺序）；拉取中 fetch-status 没有文字 |
 | A20 | 首次启动（临时） | 内存里的 key 是上次保存成功时发出的 key；“有改动”指提供商字段与勾选的模型和上次保存的不同，或 key 框不空；保存中、测试中两个框只读、Fetch models 不可用；回到开始或新的一次拉取时清掉测试结果、探针状态与 Open folder…；有清单时加宽到 720px |
 | A21 | 模型行的 Use | 与 Verify、上移下移共用这一行的“保存中”；“(not reported)”的括号部分在一个 span 里 |
+| A22 | Add provider 加入中（Adding…，临时；审查 C7） | Base URL、API key 只读，Fetch models 不可用：免得加入还没返回时回到开始、收起清单（models-settings.md“加入中”一行的操作为“—”）；首次启动表单保存中、测试中同样（A20） |
+| A23 | 卡上拉取中关掉这张卡的清单（临时；审查 C13） | 拉取中打开别的表单（Edit、Add provider、模型的 Edit、别的卡的 Fetch models）时，这次拉取被取消（A15、§5.3），卡上的按钮旁显示“Fetch cancelled”，留到再点这张卡的 Fetch models（同 A16；models-settings.md“卡上的 Fetch models”的“已取消”一行） |
 
 ## 录制的样本
 
@@ -104,6 +134,7 @@
 | `glm-models-nokey.json` | 真实录制（2026-10-23，`https://open.bigmodel.cn/api/paas/v4/models`，不带 key：401；不能说明 GLM 有没有列表接口，proposal §14） |
 | `deepseek-models.json` | 真实录制（2026-10-23，`https://api.deepseek.com/models`，带你的 key，MD-14 的录制；2 个模型，带 `context_window`、`max_output_tokens`、`input_modalities`、`effort`，与官方文档一致），取代原来的 synthetic 样本 |
 | `glm-models-1.json` | 真实录制（2026-10-23，`https://api.z.ai/api/anthropic/v1/models?limit=1000`，带你的 key，MD-14 的录制；11 个模型）：GLM 的 Anthropic 兼容地址**有**列表（proposal §14 原来以为没有） |
+| `deepinfra-models.json` | 真实录制（2026-10-23，`https://api.deepinfra.com/v1/openai/models`，公开列表，不带 key；从 176 行里截了 5 行，行内容不改）：规格 §13.1 原列为手写，因有可用的公开接口改用真实录制。它的输出上限在 `metadata.max_tokens`，不在 §4.1 的路径里（`README.md` 已知问题 3），MD-03 的“不小于窗口的不算报告”另由 LiteLLM 样本、`openai-compatible-edge-rows.json` 和把 DeepInfra 每行的值放到 §4.1 输出上限路径上的 synthetic 用例（`rules-rows.test.mjs`）检查 |
 | 其余（`README.md` 列出） | synthetic，各自写明依据（核对过的源码或文档地址） |
 
 回放 fixture（`app/tests/fixtures/discovery/ui/`）：`md-openrouter.json`（真实，公开列表）、`md-glm.json`（真实，不带 key 的 401）、`md-deepseek-card.json` 与 `md-glm-card.json`（真实，MD-14 用你的 key 从卡上拉取录下）、`md-deepseek.json` 与 `md-shapes.json`（synthetic：合成端点的 rich、typed、ollama 等形状，覆盖真实服务给不出的清单情形与 §8 的五种提示）。

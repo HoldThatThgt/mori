@@ -8,7 +8,8 @@
 //     真实录制的清单）。
 //   md-glm（source real，MD-07）：Fetch models https://open.bigmodel.cn/api/paas/v4（不带 key，服务拒绝；真实录制的
 //     列表错误）。
-//   md-deepseek（source synthetic，MD-07、MD-13；负责人的 key 用 md-real.mjs 真实录制 DeepSeek 之前用它，MD-14）：
+//   md-deepseek（source synthetic，MD-07、MD-13；它的场景（按地址两次 Add provider、typed 列表、§8 的五种提示、
+//     Legacy 卡）对真实的 DeepSeek 录不出，所以 md-real.mjs 录下真实的 md-deepseek-card.json（MD-14）后它仍保留，§13.1）：
 //     合成端点的 rich 形状（DeepSeek 式字段）给出清单：Select all，fake-ds-vision 的 Max output 改为 4096、取消 Supports
 //     thinking 与 Image input，fake-ds-long 的 Context window 改小为 32768（Max output 随之按 §4.3 取报告值），
 //     fake-ds-alwaysthink（合成端点总先回一段思考）的 Context window 改大为 262144、Max output 改为 200000（加入后
@@ -403,7 +404,9 @@ const deepseekScenario = {
       `card result ${oneLine(JSON.stringify(card), 300)}`),
       ...deepseekProfiles(steps, ctx)];
   },
-  sourceNote: ' against the synthetic endpoint (until MD-14 records DeepSeek with the owner\'s key)',
+  sourceNote: ' against the synthetic endpoint (kept synthetic beside the real md-deepseek-card.json, MD-14: this '
+    + 'recording\'s two Add provider flows, typed list, five §8 hints and Legacy card cannot be recorded against the '
+    + 'real DeepSeek, §13.1)',
   syntheticSteps: 'the checklist edits before Add are synthetic',
 };
 

@@ -297,8 +297,6 @@ export interface ManualControl {
 export interface ChecklistControl {
   /** 拉取的结果；还没拉取时为 null */
   result: DiscoverResult | null;
-  /** 全部行：服务列出的（列表顺序）加手填的（加入顺序） */
-  rows: ChecklistRow[];
   /** 显示着的行：过滤框藏起来的不在其中 */
   shown: ChecklistRow[];
   /** 有过滤框：拿到了列表，且行数（含手填的行）超过 20 */
@@ -380,7 +378,7 @@ export function useChecklist(result: DiscoverResult | null, existing: readonly s
   const invalid = useMemo(() => rows.some((row) => row.picked
     && hasErrors(sizeErrors(row.contextWindow, row.maxTokens))), [rows]);
   const manual = manualControl(rows, existing, entry, setEntry, setRows);
-  return { result, rows, shown, filterable, filter, setFilter, edit, selectShown, manual, picked, invalid };
+  return { result, shown, filterable, filter, setFilter, edit, selectShown, manual, picked, invalid };
 }
 
 // ---- 拉取的按钮与说明 ----
