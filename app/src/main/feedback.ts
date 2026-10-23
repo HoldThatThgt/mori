@@ -1,5 +1,7 @@
 // F8 报告界面问题（方案 5.15，状态表见 docs/v0/screens/f8.md）：截下当前窗口、保存报告、在资源管理器里选中。
-// 对内容的反馈（方案 5.10，M4，见 docs/v0/screens/selection.md）：每份存成一个 JSON 文件，只记录、不发给模型。
+// 报告在设置页的 UI issues 里查看（main/issues.ts，docs/specs/memory.md §10.8）。
+// 对内容的反馈（方案 5.10，M4，见 docs/v0/screens/selection.md）：每份存成一个 JSON 文件；开了增强的项目，
+// 后台进程读它们作为增强的依据（docs/specs/memory.md §9.5、§10.7），这里只保存。
 // 截图与保存都在主进程里完成，不经过后台进程和 pi，后台进程退出后也能报告。
 // 报告只写界面交来的字段（IssueReport、Feedback），界面从不交 API key。
 
@@ -8,7 +10,7 @@ import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { release } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { app, ipcMain, shell, type IpcMainInvokeEvent, type WebContents } from 'electron';
-import { FeedbackSchema, type SavedFeedback } from '../shared/feedback';
+import { FeedbackSchema, type SavedFeedback, type StoredFeedback } from '../shared/feedback';
 import type { IssueReport, SavedIssue, WindowCapture } from '../shared/issues';
 
 /** 暂存的截图最多几张；只有最近打开的报告框会用到，更早的丢掉 */
@@ -25,7 +27,7 @@ export function issuesDir(): string {
 }
 
 /** @brief 对内容的反馈保存的文件夹（临时默认值，见 docs/v0/defaults.md）。 */
-export function feedbackDir(): string {
+function feedbackDir(): string {
   return join(app.getPath('userData'), 'feedback');
 }
 
@@ -96,8 +98,8 @@ function oneLine(text: string): string {
 }
 
 /**
- * @brief 你写的原文；没写时为"(left blank)"。像 Markdown 标题的行前面加 "\"（M7 的工作回顾按报告的标题切节，
- *        你写的一行"## What you expected"不能被当成标题）。
+ * @brief 你写的原文；没写时为"(left blank)"。像 Markdown 标题的行前面加 "\"（设置页的 UI issues 按报告的标题切节，
+ *        main/issues.ts，你写的一行"## What you expected"不能被当成标题）。
  */
 function written(text: string): string {
   return text.trim().replace(/^( {0,3})(#{1,6})(?=\s|$)/gm, '$1\\$2') || '(left blank)';
@@ -114,7 +116,10 @@ function versions(): string[] {
   ];
 }
 
-/** @brief 报告的 Markdown；M7 的工作回顾按这些标题读取（main/review.ts ISSUE_SECTIONS）。shot 是"Screenshot"一节的内容。 */
+/**
+ * @brief 报告的 Markdown；设置页的 UI issues 按这些标题读取（main/issues.ts ISSUE_SECTIONS）。
+ *        shot 是"Screenshot"一节的内容。
+ */
 function issueMarkdown(report: IssueReport, when: Date, shot: string): string {
   return [
     `# UI issue · ${localTime(when)}`, '',
@@ -153,7 +158,7 @@ function saveFeedback(value: unknown): SavedFeedback {
     const dir = feedbackDir();
     mkdirSync(dir, { recursive: true });
     const file = join(dir, `${freeName(dir, fileStamp(now), ['.json'])}.json`);
-    const record = { createdAt: now.toISOString(), ...feedback };
+    const record: StoredFeedback = { createdAt: now.toISOString(), ...feedback };
     writeFileSync(file, `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
     return { file };
   } catch (error) {

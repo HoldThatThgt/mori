@@ -6,6 +6,7 @@ import {
   ModelCommandSchemas, THINKING_LEVELS, type ModelEvent, type ModelGlobalEvent, type ModelState,
   type ThinkingLevel,
 } from './models';
+import { MemoryCommandSchemas, type MemoryGlobalEvent, type MemoryNotice } from './memory';
 import {
   TEAM_SWITCH, type BoardView, type TeamApprovalRequest, type TeamDeciding, type TeamEvent, type TeamState,
 } from './team';
@@ -151,7 +152,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   /** pi 的会话列表（全部项目） */
   z.object({ type: z.literal('session.list') }),
   /** 读出一个会话当前分支的条目（会话引用）；不打开会话，在生成时只给已完成的轮次 */
-  z.object({ type: z.literal('session.read'), sessionFile: z.string().min(1) }),
+  z.object({ type: z.literal('session.read'), sessionFile: z.string().min(1), anchor: z.string().min(1).optional() }),
   /**
    * 改名：打开中的会话用 sessionId（经 pi 的 setSessionName）；没打开的用 sessionFile（写进会话文件）。
    * 两个都给时以打开中的会话为准。
@@ -249,6 +250,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.recheckAgents'), sessionId }),
   /** Stop team：停止这个用户会话的全部 Agent（§11.4） */
   z.object({ type: z.literal('session.stopTeam'), sessionId }),
+  // ---- v1：提示词分层与记忆（docs/specs/memory.md §8） ----
+  ...MemoryCommandSchemas,
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 
@@ -278,8 +281,12 @@ export interface AgentsInfo {
   content: string | null;
   /** agentDir 里实际生效的文件（AGENTS.override.md、AGENTS.md、AGENTS.MD、CLAUDE.md、CLAUDE.MD 中第一个存在的）；都没有时为 null */
   effectivePath: string | null;
-  /** 焦点会话加载的其他文件（不含 agentDir 的那个），按 pi 的顺序；没有会话时为 null */
-  loaded: string[] | null;
+  /** 焦点会话加载的其他文件（不含 agentDir 的那个）与各自的 token 数（docs/specs/memory.md §10.3），按 pi 的顺序；没有会话时为 null */
+  loaded: { path: string; tokens: number }[] | null;
+  /** 生效的用户级文件（effectivePath）的 token 数；没有时为 0 */
+  userTokens: number;
+  /** userTokens 加 loaded 各项之和；超过 500 时界面标出来 */
+  total: number;
 }
 
 /** @brief 工具页的一个工具（pi getAllTools 的一项，不含 hidden）。 */
@@ -495,6 +502,8 @@ export interface SessionInfo extends ModelState {
   teamApprovals: TeamApprovalRequest[];
   /** 待判断、还没交给对话的消息与正在判断的那条开始的时刻，与 mori.team_deciding 的载荷相同（§5.3、§13.10） */
   deciding: TeamDeciding;
+  /** 增强改了东西后这个项目新建的第一个会话带上的提示（docs/specs/memory.md §9.9）；别的会话为 null */
+  memoryNotice: MemoryNotice | null;
 }
 
 /** @brief 一个等你回答的扩展询问（mori.ui_request）。 */
@@ -585,6 +594,11 @@ export interface SessionContent {
   entries: SessionEntry[];
   /** 会话在生成，最后一轮还没完成、没有交出 */
   unfinished: boolean;
+  /**
+   * 带了 anchor 时（记忆的依据跳转，docs/specs/memory.md §10.2）：完整的当前分支上（不截到已完成的轮次）这个条目或它之上
+   * 最近的一条你的消息或助手回复（不含程序投递）的条目 id；条目不在当前分支上时为 null。没带 anchor 时没有这个字段
+   */
+  anchor?: string | null;
 }
 
 /** @brief session.state 的结果。 */
@@ -780,7 +794,7 @@ export interface EventEnvelope {
 }
 
 /** @brief 不属于某个会话的全局事件（模型层 §9.5：mori.profiles、mori.key_status）。 */
-export type GlobalEvent = ModelGlobalEvent;
+export type GlobalEvent = ModelGlobalEvent | MemoryGlobalEvent;
 
 /** @brief 后台进程广播的全局事件。 */
 export interface GlobalEventEnvelope {

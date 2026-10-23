@@ -6,7 +6,7 @@ import type { ApprovalEndBy, ForwardedEvent, QuoteRef, SlimMessageUpdate, ToolGa
 import { BLOCKED_PROMPT_MESSAGE, STOPPED_BEFORE_SENDING, formatClock } from '../../../shared/models';
 import {
   blocksFromContent, contentText, messageTime, newTool, parseRejection, pendingPrompt, pushItem, reasonText,
-  resultPatch, type Block, type Item, type ModelStage, type Stage, type ToolCall, type Transcript,
+  resultMemory, resultPatch, type Block, type Item, type ModelStage, type Stage, type ToolCall, type Transcript,
 } from './model';
 import { skillCommandText } from './skillText';
 import { applyTeamEvent, dropFailedWake, takeWake } from './teamEvents';
@@ -224,7 +224,10 @@ function applyToolGate(state: Transcript, event: EventOf<'mori.tool_gate'>, now:
   return { ...next, stage: { kind: 'tool', since: now, detail: id } };
 }
 
-/** @brief 处理工具执行事件。已拒绝的调用之后的 tool_execution_end（isError）只记下输出，不改变状态。 */
+/**
+ * @brief 处理工具执行事件。已拒绝的调用之后的 tool_execution_end（isError）只记下输出，不改变状态。
+ *        结果里的 diff 与 memory 工具的位置（docs/specs/memory.md §7.5）记到这次调用上。
+ */
 function applyToolExecution(state: Transcript, event: EventOf<'tool_execution_start' | 'tool_execution_update'
   | 'tool_execution_end'>, now: number): Transcript {
   if (event.type === 'tool_execution_start') return applyToolStart(state, event, now);
@@ -236,7 +239,8 @@ function applyToolExecution(state: Transcript, event: EventOf<'tool_execution_st
   const next = updateTool(state, event.toolCallId, event.toolName, (tool) => ({
     ...tool, status: tool.status === 'rejected' ? 'rejected' : status,
     output: contentText((event.result as { content?: unknown } | undefined)?.content),
-    patch: resultPatch(event.result), durationMs: event.durationMs ?? (tool.startedAt ? now - tool.startedAt : null),
+    patch: resultPatch(event.result), memory: resultMemory(event.result),
+    durationMs: event.durationMs ?? (tool.startedAt ? now - tool.startedAt : null),
   }));
   return { ...next, stage: nextStage(next, now) };
 }
