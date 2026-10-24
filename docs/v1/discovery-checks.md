@@ -211,7 +211,8 @@
 ## 真实端点上看到的（MD-14，2026-10-23）
 
 - DeepSeek：列表读出的窗口 1048576、输出上限 393216、思考、图片（只有 deepseek-flash）都与官方文档一致；勾选加入后探针完成。
-- OpenRouter：468 个模型，过滤框按 id 子串过滤；加入一个免费、列出工具的模型。OpenRouter 的免费模型都要求思考，探针第 1–7 步里关闭思考的请求被拒（400 “Reasoning is mandatory”），档案为出错：这是模型层规格 §7.3 的判定（不是一键拉取的范围），可作为模型层的后续。
+- OpenRouter：468 个模型，过滤框按 id 子串过滤；加入一个免费、列出工具的模型。加入的免费模型 `recursive/flint-v1.0:free` 要求思考，探针里关闭思考的请求（第 2、3、5、6、7 步；第 1 步用 `medium`，没有被拒）回 400 “Reasoning is mandatory”，档案为出错：这是模型层规格 §7.3 的判定（不是一键拉取的范围）。
+  （2026-10-24 更正：原来写“OpenRouter 的免费模型都要求思考”不对，列出工具的 17 个免费模型里只有 2 个要求思考；模型层的处理见模型层规格 §7.7 与 [models-checks.md](models-checks.md)“思考关不掉的模型：实测”。）
 - GLM（`https://api.z.ai/api/anthropic`）：带 key 时第一个列表地址就拿到 11 个模型；列表里是小写的 `glm-5.3`，按 MD-14 手填的 `GLM-5.3` 照 §6.4 算作另一个 id，服务也认它，探针完成、工具调用已验证。
 - z.ai 的 Anthropic 形状列表用驼峰的 `hasMore`、`lastId`（规格写的是 `has_more`、`last_id`），按原来的规格认不出 Anthropic 形状、Detected 写 OpenAI-compatible server；已按上面“规格更正”第 4 条改为两种写法都认。
 - 一次完整的 MD-14 运行会花一点额度：首次启动与加入后的 DeepSeek、GLM 探针；录制时 DeepSeek 经本机转发，读版本认作 unknown，会再探测一次。

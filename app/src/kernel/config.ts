@@ -13,6 +13,11 @@ import { globalSettings } from './pi';
 const DEFAULT_THINKING_LEVEL: ThinkingLevel = 'medium';
 /** 测试连接的最大输出（沿用 v0，见 docs/v0/defaults.md） */
 const TEST_MAX_TOKENS = 512;
+/**
+ * 测试连接对勾了 Supports thinking 的模型用的思考强度（§7.7、§12“测试连接的思考强度”）：同探针第 1 步，
+ * 第一次探测之前也不发“关闭思考”；没勾的模型不带
+ */
+const TEST_REASONING = 'medium' satisfies ThinkingLevel;
 /** 测试连接回复的开头最多显示的字符数（§9.1） */
 const TEST_REPLY_CHARS = 200;
 /** pi 表示“不限时”的 timeoutMs：排队与重试的时限由模型池执行，首个内容的时限由这里执行（§8.4、§11.6 K11） */
@@ -158,7 +163,9 @@ export async function testConnection(request: TestRequest): Promise<TestResult> 
   try {
     const stream = layer.getRuntime().streamSimple(model, { messages: [message] }, {
       apiKey: layer.timings.placeholderApiKey, fetch, signal: AbortSignal.any([run.controller.signal, attempt.signal]),
-      maxRetries: 0, timeoutMs: NO_TIMEOUT_MS, maxTokens: TEST_MAX_TOKENS });
+      maxRetries: 0, timeoutMs: NO_TIMEOUT_MS, maxTokens: TEST_MAX_TOKENS,
+      // §7.7：勾了 Supports thinking 的模型带 medium，否则不带
+      reasoning: model.reasoning ? TEST_REASONING : undefined });
     await drainTest(stream, run, result);
   } catch (error) {
     result.error = (error as Error).message;

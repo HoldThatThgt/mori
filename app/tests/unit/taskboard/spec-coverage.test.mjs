@@ -5,15 +5,18 @@
 // 一键拉取模型规格（docs/specs/model-discovery.md §13.3）加的 --spec discovery 同样检查：§13.2 的 MD 条目与层、md- 结果
 // 文件的归类；另查带 skip / todo 标记的检查不算通过，以及严格模式的单元报告器（md-reporter.mjs 用的
 // createReporter(…, true)）把跳过的与 todo 的测试写成带标记的失败、套件自己的失败也记一条，不开严格模式时照旧。
+// 2026-10-24（模型层规格 §7.7、§14.3）：§14.2 加了 MP-38–MP-40；reporter.mjs 的默认导出（v1-unit.json）也是严格模式，
+// 把它复制到临时目录（它按自己的位置找 test-results/，所以写不到真的 v1-unit.json）再让 node --test 用它来检查。
 // §17.4 把覆盖检查算进 TB-46（现有功能不退步），所以检查名以 "TB-46 spec-coverage" 开头；TB-46 只列 App 与回放两层，
 // 这些单元检查不计入覆盖表，由 node --test 的退出码把关。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   SPECS, cellOf, flagOfCheck, layerOfFile, parseSpecTable, passes, specPathOf, startsWithId, strayChecks,
 } from '../../spec-coverage.mjs';
@@ -74,8 +77,14 @@ test('TB-46 spec-coverage keeps the model layer rules when --spec is not given',
     ['v1-models-replay.json', 'replay'], ['tb-app-existing-packaged.json', null],
   ]);
   const items = parseSpecTable(model, readFileSync(specPathOf(model), 'utf8'));
-  assert.equal(items.length, 37);
-  assert.deepEqual([...items.find((item) => item.id === 'MP-37').layers].sort(), ['app', 'replay']);
+  // 2026-10-24（model-providers.md §7.7）：§14.2 加了 MP-38–MP-40
+  assert.deepEqual(items.map((item) => item.id),
+    Array.from({ length: 40 }, (_, i) => `MP-${String(i + 1).padStart(2, '0')}`));
+  const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
+  assert.deepEqual(layersOf('MP-37'), ['app', 'replay']);
+  assert.deepEqual(layersOf('MP-38'), ['app', 'unit']);
+  assert.deepEqual(layersOf('MP-39'), ['app', 'unit']);
+  assert.deepEqual(layersOf('MP-40'), ['real']);
 });
 
 test('TB-46 spec-coverage reads every MEM row of memory §14.2 with its layers', () => {
@@ -240,6 +249,34 @@ test('TB-46 spec-coverage: reporters without strict mode keep recording skipped 
     assert.equal(exitCode, undefined);
     assert.match(output, /\n4\/6 unit checks passed\n$/);
   });
+
+/** synthetic：一个通过、一个跳过、一个标为 todo 的测试文件 */
+const FLAGGED_TESTS = `import { test } from 'node:test';
+test('MP-01 synthetic pass', () => {});
+test('MP-01 synthetic skipped', { skip: 'synthetic' }, () => {});
+test('MP-01 synthetic todo', { todo: true }, () => {});
+`;
+
+test('TB-46 spec-coverage: the default unit reporter (reporter.mjs, v1-unit.json) is strict too', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'mori-reporter-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'tests', 'unit'), { recursive: true });
+  const copy = join(root, 'tests', 'unit', 'reporter.mjs');
+  copyFileSync(join(appRoot, 'tests', 'unit', 'reporter.mjs'), copy);
+  writeFileSync(join(root, 'flagged.test.mjs'), FLAGGED_TESTS);
+  // 不带 NODE_TEST_CONTEXT：子进程是一次独立的 node --test，报告器在它自己的进程里跑
+  const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
+  const run = spawnSync(process.execPath, ['--test', `--test-reporter=${pathToFileURL(copy).href}`,
+    join(root, 'flagged.test.mjs')], { cwd: root, encoding: 'utf8', env });
+  const { checks } = JSON.parse(readFileSync(join(root, 'test-results', 'v1-unit.json'), 'utf8'));
+  assert.deepEqual(checks.map(({ name, ok, skip, todo }) => [name, ok, skip, todo]), [
+    ['MP-01 synthetic pass', true, undefined, undefined],
+    ['MP-01 synthetic skipped', false, true, undefined],
+    ['MP-01 synthetic todo', false, undefined, true],
+  ]);
+  assert.equal(run.status, 1, run.stdout + run.stderr);
+  assert.match(run.stdout, /1\/3 unit checks passed \(2 skipped or todo, counted as failures\)/);
+});
 
 test('TB-46 spec-coverage lists strays only from the files of the chosen spec', () => {
   const items = [{ id: 'TB-01' }, { id: 'TB-46' }];

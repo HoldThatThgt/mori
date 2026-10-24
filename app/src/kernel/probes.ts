@@ -1,4 +1,5 @@
-// 探针（docs/specs/model-providers.md §7.3、§7.4）：第 0–9 步的请求与判定。
+// 探针（docs/specs/model-providers.md §7.3、§7.4）：第 0–9 步的请求与判定；思考关不掉的模型的判定、各步的强度与
+// 输出上限规则见 §7.7。
 // 依赖全部注入（pi 的 streamSimple、模型池给的 fetch、第 0 步的读取器、第 9 步读服务端接口的 GET、时长与 signal），
 // 所以可以用替身做单元测试；第 0 步改为调用读取器的单模型模式（docs/specs/model-discovery.md §7.1），种类、版本与
 // 报告值的读法在 discoverRead.ts、modelDiscover.ts；档案的派生（能力三态、等级）在 modelProfiles.ts；
@@ -75,6 +76,15 @@ export const OUTCOME_TOOL: Tool = {
 
 /** @brief 自动探针的步数（第 0–7 步）。 */
 const AUTO_STEPS = 8;
+
+/** @brief §7.7、§12：思考关不掉的模型在探针里代替 off 的强度（同第 1 步与回传检查）。 */
+export const REFUSED_OFF_LEVEL: ThinkingLevel = 'medium';
+
+/** @brief §7.7：回复停在探针输出上限、只有思考时这一步（出错）的说明。 */
+export const OUTPUT_LIMIT_TEXT = 'Stopped at the probe output limit before answering';
+
+/** @brief §7.7：第 2 步关闭思考被拒时说明的开头，后接服务的错误原文；只存在档案里，界面不显示。 */
+export const OFF_REFUSED_PREFIX = 'Thinking can’t be turned off: ';
 
 /** @brief pi 估算 token 的方式：每 4 个字符算 1 个 token（pi 的 estimateTokens）。 */
 const CHARS_PER_TOKEN = 4;
@@ -165,15 +175,18 @@ export interface ProbeDeps {
 export interface ProbeTarget {
   /** <provider>/<model> */
   ref: ModelRef;
-  /** pi 里注册的实际模型（api、baseUrl、id、reasoning、compat） */
+  /** pi 里注册的实际模型（api、baseUrl、id、reasoning、compat；§7.7 的“没有 Off”标记 thinkingLevelMap） */
   model: Model<Api>;
 }
 
 /** @brief 一次探针请求的结果。 */
 export interface ProbeReply {
-  /** 结束的助手消息；出错、或收到内容即断开时为 null */
+  /**
+   * 结束的助手消息；出错、或收到内容即断开时为 null。§7.7：停在输出上限、只有思考时保留消息（error 为
+   * OUTPUT_LIMIT_TEXT），推理字段名仍可从中读出
+   */
   message: AssistantMessage | null;
-  /** 出错（连接、HTTP 错误、超时）时的原文；没有出错时为 null */
+  /** 出错（连接、HTTP 错误、超时、§7.7 的输出上限）时的原文；没有出错时为 null */
   error: string | null;
   /** 最后一次 HTTP 响应的状态；没有收到响应时为 null */
   status: number | null;
@@ -297,7 +310,10 @@ async function send(run: Run, req: ProbeRequest): Promise<ProbeReply> {
   }
 }
 
-/** @brief 整理一次请求的结果：取消时抛出；超时与出错的消息写成 error。 */
+/**
+ * @brief 整理一次请求的结果：取消时抛出；超时与出错的消息写成 error；§7.7：停在输出上限、只有思考的回复也写成
+ *        error（保留消息；status 仍是 HTTP 状态，所以不算被拒）。
+ */
 function finish(run: Run, reply: ProbeReply, timedOut: boolean): ProbeReply {
   if (run.deps.signal.aborted) throw new ProbeCancelled();
   const seconds = run.deps.timings.probeStepTimeoutMs / 1000;
@@ -308,6 +324,8 @@ function finish(run: Run, reply: ProbeReply, timedOut: boolean): ProbeReply {
   if (message && (message.stopReason === 'error' || message.stopReason === 'aborted')) {
     return { ...reply, message: null, error: message.errorMessage ?? `Request ended with ${message.stopReason}` };
   }
+  // §7.7 输出上限：对第 1–9 步都按出错处理，不判为不通过
+  if (stoppedAtLimit(message)) return { ...reply, error: OUTPUT_LIMIT_TEXT };
   return reply;
 }
 
@@ -335,6 +353,13 @@ function toolCall(message: AssistantMessage | null, name: string): ToolCall | un
   return message?.content.find((block): block is ToolCall => block.type === 'toolCall' && block.name === name);
 }
 
+/** @brief §7.7 输出上限：回复因输出上限停下（stopReason 为 length），没有正文也没有工具调用、只有思考。 */
+export function stoppedAtLimit(message: AssistantMessage | null): boolean {
+  if (!message || message.stopReason !== 'length') return false;
+  if (replyText(message).trim() !== '' || message.content.some((block) => block.type === 'toolCall')) return false;
+  return hasThinking(message);
+}
+
 /** @brief 一步的结果。 */
 function step(outcome: ProbeStepResult['outcome'], detail: string | null = null): ProbeStepResult {
   return { outcome, detail };
@@ -351,10 +376,32 @@ export function judgeReady(reply: ProbeReply): ProbeStepResult {
     : step('fail', 'The reply has no text')));
 }
 
-/** @brief 第 2 步（思考 off 的那次）：没有思考内容即能关掉思考。 */
+/** @brief 第 2 步（思考 off 的那次）：没有思考内容即能关掉思考（§7.7 判定表的前两行，off 的其他错误为出错）。 */
 export function judgeThinkingOff(reply: ProbeReply): ProbeStepResult {
   return judged(reply, (message) => (hasThinking(message)
     ? step('fail', 'The reply has thinking content with thinking off') : step('pass')));
+}
+
+/** @brief 第 2 步的判定（§7.7）。 */
+export interface ThinkingJudgement {
+  /** 第 2 步的结果 */
+  step: ProbeStepResult;
+  /** off 被服务以 400 或 422 拒绝、medium 有正文（档案的 off_refused） */
+  offRefused: boolean;
+}
+
+/**
+ * @brief 第 2 步（§7.7 的判定表，两次一起判）：off 没被拒时按 judgeThinkingOff；off 被拒（400、422）而 medium 有正文
+ *        为不通过、off_refused，说明为 OFF_REFUSED_PREFIX 加 off 的原文；medium 出错时用 medium 的说明出错；
+ *        medium 没出错但没有正文时用 off 的原文出错。
+ * @param off 思考 off 的那次
+ * @param medium 思考 medium 的那次
+ */
+export function judgeThinkingStep(off: ProbeReply, medium: ProbeReply): ThinkingJudgement {
+  if (!rejected(off)) return { step: judgeThinkingOff(off), offRefused: false };
+  if (medium.error !== null) return { step: step('error', medium.error), offRefused: false };
+  if (replyText(medium.message).trim() === '') return { step: step('error', off.error), offRefused: false };
+  return { step: step('fail', `${OFF_REFUSED_PREFIX}${off.error}`), offRefused: true };
 }
 
 /** @brief 第 3 步：调用了 get_weather，city 是字符串，days 是整数（不是字符串）。 */
@@ -493,17 +540,39 @@ export function withoutReplayCompat(model: Model<Api>): Model<Api> {
   return { ...model, compat } as Model<Api>;
 }
 
+/**
+ * @brief §7.7：去掉“没有 Off”标记（thinkingLevelMap.off 为 null）的模型副本，第 1–7 步都在它上面发；
+ *        thinkingLevelMap 的其他键保留，去掉后为空时不带这一项；不改原模型。
+ */
+export function withoutNoOffMarker(model: Model<Api>): Model<Api> {
+  const { thinkingLevelMap, ...rest } = model;
+  if (thinkingLevelMap?.off !== null) return { ...model };
+  const levels = { ...thinkingLevelMap };
+  delete levels.off;
+  return Object.keys(levels).length > 0 ? { ...rest, thinkingLevelMap: levels } : rest;
+}
+
+/** @brief §7.7：本组第 3、4、6、7 步（第 8、9 步按档案存的 off_refused）的思考强度：判出 off_refused 为 medium，否则 off。 */
+export function probeThinking(offRefused: boolean): ThinkingLevel {
+  return offRefused ? REFUSED_OFF_LEVEL : 'off';
+}
+
 /** @brief 第 1、2 步的结果与观察到思考内容的消息。 */
 interface ReadyResults {
   /** 第 1 步 */
   ready: ProbeStepResult;
   /** 第 2 步 */
   thinking: ProbeStepResult;
+  /** 第 2 步判出 off_refused（§7.7）；reasoning 为 false 的模型为 false */
+  offRefused: boolean;
   /** 用来找推理字段名的消息 */
   messages: (AssistantMessage | null)[];
 }
 
-/** @brief 第 1 步（reasoning 为 true 的模型思考 medium，否则 off）与第 2 步（只对 reasoning 为 true：off 与 medium）。 */
+/**
+ * @brief 第 1 步（reasoning 为 true 的模型思考 medium，否则 off）与第 2 步（只对 reasoning 为 true：off 与 medium，
+ *        按 §7.7 的判定表一起判）。
+ */
 async function readySteps(run: Run): Promise<ReadyResults> {
   const { model } = run.target;
   const ask = (level: ThinkingLevel) => send(run, { model, context: { messages: [user(run, PROBE_PROMPTS.ready)] },
@@ -511,12 +580,13 @@ async function readySteps(run: Run): Promise<ReadyResults> {
   run.deps.onStep?.(1, AUTO_STEPS);
   const first = await ask(model.reasoning ? 'medium' : 'off');
   if (!model.reasoning) {
-    return { ready: judgeReady(first), thinking: step('not_applicable'), messages: [first.message] };
+    return { ready: judgeReady(first), thinking: step('not_applicable'), offRefused: false, messages: [first.message] };
   }
   run.deps.onStep?.(2, AUTO_STEPS);
   const off = await ask('off');
   const medium = await ask('medium');
-  return { ready: judgeReady(first), thinking: judgeThinkingOff(off),
+  const thinking = judgeThinkingStep(off, medium);
+  return { ready: judgeReady(first), thinking: thinking.step, offRefused: thinking.offRefused,
     messages: [first.message, off.message, medium.message] };
 }
 
@@ -532,16 +602,19 @@ interface ToolResults {
   messages: (AssistantMessage | null)[];
 }
 
-/** @brief 第 3 步（思考 off）与第 4 步：第 3 步没通过时第 4 步不跑。 */
-async function toolSteps(run: Run): Promise<ToolResults> {
+/**
+ * @brief 第 3 步与第 4 步：第 3 步没通过时第 4 步不跑。
+ * @param thinking 第 3、4 步的思考强度：按本组第 2 步的 probeThinking（§7.7），回传检查不受它影响
+ */
+async function toolSteps(run: Run, thinking: ThinkingLevel): Promise<ToolResults> {
   const { model } = run.target;
   run.deps.onStep?.(3, AUTO_STEPS);
-  const first = await send(run, { model, context: weatherContext(run), thinking: 'off' });
+  const first = await send(run, { model, context: weatherContext(run), thinking });
   const call = judgeWeatherCall(first);
   run.deps.onStep?.(4, AUTO_STEPS);
   let result = step('not_run', 'Step 3 did not produce a valid call');
   if (call.outcome === 'pass' && first.message) {
-    result = judgeTemperature(await send(run, { model, context: resultContext(run, first.message), thinking: 'off' }));
+    result = judgeTemperature(await send(run, { model, context: resultContext(run, first.message), thinking }));
   }
   const check = model.api === 'openai-completions' && model.reasoning
     ? await replayCheck(run) : { replay: step('not_applicable'), messages: [] };
@@ -551,6 +624,7 @@ async function toolSteps(run: Run): Promise<ToolResults> {
 /**
  * @brief 第 4 步的回传检查：思考 medium 再跑一次第 3 步，保留返回的助手消息；“带上”原样发出，
  *        “不带”去掉思考块、在模型副本上关掉 requiresReasoningContentOnAssistantMessages 后发出。
+ *        §7.7：run.target.model 已是没有“没有 Off”标记的副本，强度不变。
  */
 async function replayCheck(run: Run): Promise<{ replay: ProbeStepResult; messages: (AssistantMessage | null)[] }> {
   const { model } = run.target;
@@ -577,29 +651,36 @@ interface TierResults {
   c: ProbeStepResult;
 }
 
+/** @brief 第 7 步的条件用：判定为不通过或不适用（§7.3、§7.7）。 */
+function failedOrNotApplicable(result: ProbeStepResult): boolean {
+  return result.outcome === 'fail' || result.outcome === 'not_applicable';
+}
+
 /**
- * @brief 第 5、6、7 步（思考 off）。第 7 步只在第 5 步判定不通过、且第 6 步判定不通过或不适用时跑；
- *        服务端对第 5、6 步回 4xx 也算判定为不通过（§7.3）。
+ * @brief 第 5、6、7 步。第 5 步思考 off；本组第 2 步判出 off_refused 时第 5 步不适用、不发，第 6、7 步用 medium，
+ *        否则第 6、7 步也是 off（§7.7）。第 7 步只在第 5 步判定不通过或不适用、且第 6 步判定不通过或不适用时跑
+ *        （§7.7，对所有模型）；服务端对第 5、6 步回 4xx 也算判定为不通过（§7.3）。
+ * @param offRefused 本组第 2 步判出 off_refused
  */
-async function tierSteps(run: Run): Promise<TierResults> {
+async function tierSteps(run: Run, offRefused: boolean): Promise<TierResults> {
   const { model } = run.target;
   const api = model.api as ApiType;
+  const thinking = probeThinking(offRefused);
   run.deps.onStep?.(5, AUTO_STEPS);
-  const a = judgeOutcomeCall(await send(run, { model, thinking: 'off',
+  // §7.7：A 级要关闭思考（平行 Agent 规格 §7.5），关不掉的模型不适用
+  const a = offRefused ? step('not_applicable') : judgeOutcomeCall(await send(run, { model, thinking: 'off',
     context: { messages: [user(run, PROBE_PROMPTS.outcome)], tools: [OUTCOME_TOOL] },
     toolChoice: forcedToolChoice(api, OUTCOME_TOOL.name),
     onPayload: (payload) => withStrictTools(api, payload, OUTCOME_TOOL.name) }));
   run.deps.onStep?.(6, AUTO_STEPS);
   const b = api === 'anthropic-messages' ? step('not_applicable') : judgeJsonOutcome(await send(run, {
-    model, thinking: 'off', context: { messages: [user(run, PROBE_PROMPTS.json)] },
+    model, thinking, context: { messages: [user(run, PROBE_PROMPTS.json)] },
     onPayload: (payload) => withJsonSchema(api, payload, OUTCOME_SCHEMA_NAME, OUTCOME_SCHEMA) }));
   run.deps.onStep?.(7, AUTO_STEPS);
-  if (a.outcome !== 'fail' || (b.outcome !== 'fail' && b.outcome !== 'not_applicable')) {
-    return { a, b, c: step('not_run') };
-  }
+  if (!failedOrNotApplicable(a) || !failedOrNotApplicable(b)) return { a, b, c: step('not_run') };
   const replies: ProbeReply[] = [];
   for (let i = 0; i < run.deps.timings.tierCRepetitions; i += 1) {
-    const reply = await send(run, { model, thinking: 'off', context: { messages: [user(run, PROBE_PROMPTS.tagged)] } });
+    const reply = await send(run, { model, thinking, context: { messages: [user(run, PROBE_PROMPTS.tagged)] } });
     replies.push(reply);
     if (reply.error !== null || !parseTagged(replyText(reply.message), OUTCOMES)) break;
   }
@@ -608,24 +689,26 @@ async function tierSteps(run: Run): Promise<TierResults> {
 
 /**
  * @brief 自动探针第 0–7 步（§7.3、§7.4）。第 0 步经读取器（model-discovery.md §7.1），不计入短请求；
- *        结果总带 meta（§7.2）。
+ *        结果总带 meta（§7.2）与 offRefused（§7.7）。第 1–7 步与回传检查都在没有“没有 Off”标记的副本上发，
+ *        第 3–7 步的强度按本组第 2 步，不看档案（§7.7）。
  * @return 结果；这组探针被取消时为 null
  */
 export async function runAutoProbes(target: ProbeTarget, deps: ProbeDeps): Promise<AutoResults | null> {
-  const run: Run = { deps, target };
+  // §7.7：已经标记过的模型点 Verify 时第 2 步仍然重新测
+  const run: Run = { deps, target: { ref: target.ref, model: withoutNoOffMarker(target.model) } };
   try {
     deps.onStep?.(0, AUTO_STEPS);
     const server = await deps.readServer(deps.signal);
     if (deps.signal.aborted) return null;
     const ready = await readySteps(run);
-    const tools = await toolSteps(run);
-    const tiers = await tierSteps(run);
+    const tools = await toolSteps(run, probeThinking(ready.offRefused));
+    const tiers = await tierSteps(run, ready.offRefused);
     const steps: AutoSteps = { ready: ready.ready, thinking: ready.thinking, call: tools.call, result: tools.result,
       replay: tools.replay, ...tiers };
     const field = target.model.api === 'openai-completions'
       ? reasoningFieldOf([...ready.messages, ...tools.messages]) : 'native';
     return { server: { kind: server.kind, version: server.version ?? 'unknown' }, reported: server.reported,
-      meta: server.meta, steps, field };
+      meta: server.meta, steps, field, offRefused: ready.offRefused };
   } catch (error) {
     if (error instanceof ProbeCancelled || deps.signal.aborted) return null;
     throw error;
@@ -677,7 +760,7 @@ export interface LongInputTrial {
   detail: string | null;
 }
 
-/** @brief 第 8 步一个长度的判定。 */
+/** @brief 第 8 步一个长度的判定；§7.7：停在输出上限的回复是出错（HTTP 状态 200），不记 rejected，也不记 silent。 */
 export function judgeLongInputTrial(reply: ProbeReply, word: string, tokens: number): LongInputTrial {
   if (reply.error !== null) {
     const outcome = reply.status !== null && reply.status >= 400 ? 'rejected' : 'error';
@@ -705,11 +788,13 @@ export function judgeLongInput(trials: readonly LongInputTrial[]): LongInputResu
 }
 
 /**
- * @brief 长输入探针（第 8 步，需要你同意，§7.4）：按有效窗口的 50%、90% 各发一次（思考 off）。
+ * @brief 长输入探针（第 8 步，需要你同意，§7.4）：按有效窗口的 50%、90% 各发一次，用编译后的模型；
+ *        思考强度按档案存的 off_refused（§7.7：为真时 medium，否则 off）。
  * @param effective 档案当前的有效窗口
+ * @param offRefused 档案的 auto.offRefused 为真（§7.7）
  * @return 结果；被取消时为 null
  */
-export async function runLongInputProbe(target: ProbeTarget, effective: number,
+export async function runLongInputProbe(target: ProbeTarget, effective: number, offRefused: boolean,
   deps: ProbeDeps): Promise<LongInputResult | null> {
   const run: Run = { deps, target };
   const word = deps.randomWord?.() ?? randomPassphrase();
@@ -717,7 +802,7 @@ export async function runLongInputProbe(target: ProbeTarget, effective: number,
     deps.onStep?.(8, 1);
     const trials: LongInputTrial[] = [];
     for (const tokens of longInputLengths(effective, deps.timings)) {
-      const reply = await send(run, { model: target.model, thinking: 'off',
+      const reply = await send(run, { model: target.model, thinking: probeThinking(offRefused),
         context: { messages: [user(run, longInputPrompt(word, tokens))] } });
       trials.push(judgeLongInputTrial(reply, word, tokens));
     }
@@ -798,10 +883,12 @@ function sleepFor(ms: number, signal: AbortSignal): Promise<void> {
 /**
  * @brief 取消探针（第 9 步，需要你同意，§7.4）：只对 vLLM、SGLang、llama.cpp。先读基线，再发长输出请求，
  *        收到第一段输出后断开；等 §12 的时长后再读一次。
+ *        用编译后的模型，思考强度按档案存的 off_refused（§7.7：为真时 medium，否则 off）。
  * @param kind 档案里的服务种类
+ * @param offRefused 档案的 auto.offRefused 为真（§7.7）
  * @return 结果；被取消时为 null
  */
-export async function runCancelProbe(target: ProbeTarget, kind: ServerKind,
+export async function runCancelProbe(target: ProbeTarget, kind: ServerKind, offRefused: boolean,
   deps: ProbeDeps): Promise<CancelResult | null> {
   if (!METRIC_KINDS.has(kind)) return { step: step('not_applicable'), verified: 'unknown' };
   const run: Run = { deps, target };
@@ -810,7 +897,7 @@ export async function runCancelProbe(target: ProbeTarget, kind: ServerKind,
     deps.onStep?.(9, 1);
     const baseline = await readRunningRequests(deps, target.model.baseUrl, kind, deps.signal);
     if (baseline === null) return noMetric;
-    const reply = await send(run, { model: target.model, thinking: 'off', stopOnContent: true,
+    const reply = await send(run, { model: target.model, thinking: probeThinking(offRefused), stopOnContent: true,
       maxTokens: deps.timings.probeCancelMaxTokens, context: { messages: [user(run, PROBE_PROMPTS.count)] } });
     if (!reply.content) {
       return { step: step('error', reply.error ?? 'No output before the request ended'), verified: 'unknown' };

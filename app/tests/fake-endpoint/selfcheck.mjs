@@ -3,6 +3,8 @@
 // （scripts.mjs 的 tb-selfcheck-* 场景），以及 docs/specs/memory.md §14.1 的增强脚本（enhance.mjs，脚本文件写在临时目录）
 // 与协作模式增强的场景 mem-team（scenarios/mem.mjs，依据由环境变量给），docs/specs/model-discovery.md §13.1 的发现行为
 // （discovery.mjs 的每种 FAKE_LIST_SHAPE、FAKE_NO_V1_ROOT、FAKE_LIST_DELAY_MS、{port,path,key} 日志行、-alwaysthink），
+// 以及 docs/specs/model-providers.md §7.7、§14.1 的 2026-10-24 补丁（-nooff 的 400 原文、/openrouter.ai/v1 前缀、
+// 日志的 effort 字段、按 reasoning.effort 认出开了思考、-thinklong、-nooff 的判断顺序），
 // 每条打印 PASS/FAIL；有 FAIL 时退出码为 1。
 // 用法（在 app/ 下）：node tests/fake-endpoint/selfcheck.mjs
 
@@ -16,6 +18,7 @@ import { CLOSE_REQUEST_TAGS, END_TEXT, KIND_ORDER, NO_STEP_TEXT, RESTART_PREFIX,
   WORK_CARD_CLOSE, WORK_CARD_OPEN } from './scripts.mjs';
 import { ENHANCE_DONE } from './enhance.mjs';
 import { MEM_TEAM_TEXT } from './scenarios/mem.mjs';
+import { NOOFF_ERROR_BODY, THINKLONG_THINKING, explicitThinkingOff, requestedEffort, thinkingOn } from './probes.mjs';
 
 const here = import.meta.dirname;
 const overflowUrl = pathToFileURL(join(here, '..', '..', 'node_modules', '@earendil-works', 'pi-ai', 'dist', 'utils',
@@ -72,6 +75,7 @@ function takeEvent(raw, out) {
     const delta = choice.delta ?? {};
     if (delta.content) out.text += delta.content;
     if (delta.reasoning_content) out.reasoning += delta.reasoning_content;
+    if (choice.finish_reason) out.finish = choice.finish_reason;
     for (const call of delta.tool_calls ?? []) {
       out.calls[call.index] ??= { id: call.id, name: call.function?.name, args: '' };
       out.calls[call.index].args += call.function?.arguments ?? '';
@@ -110,8 +114,9 @@ async function readStream(res, out, controller, opts) {
 
 /**
  * @brief 发一个流式对话请求。
- * @param opts { key, abortAfterFirst, onFirst, timeoutMs }
- * @return { status, headers, body（错误体）, text, reasoning, calls, contentChunks, done, error, startedAt, firstAt }
+ * @param opts { key, abortAfterFirst, onFirst, timeoutMs, path（请求路径，默认 /v1/chat/completions） }
+ * @return { status, headers, body（错误体，不是 JSON 时为 null）, raw（错误体原文）, text, reasoning, calls,
+ *         contentChunks, done, error, startedAt, firstAt, finish（最后的 finish_reason） }
  */
 async function chat(port, body, opts = {}) {
   const controller = new AbortController();
@@ -119,14 +124,16 @@ async function chat(port, body, opts = {}) {
   if (opts.key) headers.Authorization = `Bearer ${opts.key}`;
   const timer = opts.timeoutMs ? setTimeout(() => controller.abort(), opts.timeoutMs) : null;
   const out = { status: 0, text: '', reasoning: '', calls: [], contentChunks: 0, done: false, error: null,
-    startedAt: Date.now(), firstAt: null, firstKind: null };
+    startedAt: Date.now(), firstAt: null, firstKind: null, finish: null };
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, { method: 'POST', headers,
-      body: JSON.stringify({ model: 'fake-coder', stream: true, ...body }), signal: controller.signal });
+    const res = await fetch(`http://127.0.0.1:${port}${opts.path ?? '/v1/chat/completions'}`, { method: 'POST',
+      headers, body: JSON.stringify({ model: 'fake-coder', stream: true, ...body }), signal: controller.signal });
     out.status = res.status;
     out.headers = res.headers;
-    if (!res.ok) out.body = await res.json().catch(() => null);
-    else await readStream(res, out, controller, opts);
+    if (!res.ok) {
+      out.raw = await res.text().catch(() => null);
+      out.body = out.raw === null ? null : parsed(out.raw);
+    } else await readStream(res, out, controller, opts);
   } catch (error) {
     out.error = error.name === 'AbortError' ? 'aborted' : String(error.cause?.code ?? error.message);
   } finally {
@@ -1093,6 +1100,253 @@ async function checkDiscovery(a, c, eps) {
   await checkAlwaysThink(a);
 }
 
+// ---------- 思考关不掉的模型（docs/specs/model-providers.md §7.7、§14.1 的 2026-10-24 补丁），synthetic ----------
+
+/** -nooff 的 400 响应体：照规格 §14.1 写出的原文（与 probes.mjs 的常量分开写，逐字节对照） */
+const NOOFF_BODY_EXPECTED = '{"error":{"message":"Reasoning is mandatory for this endpoint and cannot be disabled.",'
+  + '"code":400,"metadata":{"provider_name":null}}}';
+/** pi 只在地址含 openrouter.ai 时用 OpenRouter 的写法：测试的提供商地址是 http://127.0.0.1:<端口>/openrouter.ai/v1 */
+const OPENROUTER_BASE = '/openrouter.ai/v1';
+const OPENROUTER_CHAT = `${OPENROUTER_BASE}/chat/completions`;
+const READY = 'Reply with the single word: ready.';
+const PLAIN_TEXT = '这是一段只有文字的回复，用来测试流式输出。';
+/** 三种明确的"关闭思考"写法（§14.1）：OpenRouter、Together、DeepSeek / z.ai / Anthropic */
+const OFF_SPELLINGS = [['reasoning.effort "none"', { reasoning: { effort: 'none' } }],
+  ['reasoning.enabled false', { reasoning: { enabled: false } }],
+  ['thinking.type "disabled"', { thinking: { type: 'disabled' } }]];
+/** 判断顺序检查的端点 g 接受的 key 与不认识的 key（synthetic，不是真实的 key） */
+const NOOFF_ORDER_KEY = 'key-dddd4';
+const NOOFF_ORDER_BAD_KEY = 'key-zzzz8';
+
+/** @brief 发一个请求并取它的日志行（这个端点上请求一个接一个发，新出现的那一行就是它的）；opts 同 chat。 */
+async function chatLoggedAt(endpoint, body, opts = {}) {
+  const before = jsonLines(endpoint).length;
+  const out = await chat(endpoint.port, body, opts);
+  for (let i = 0; i < 40 && jsonLines(endpoint).length <= before; i += 1) await sleep(25);
+  return { out, log: jsonLines(endpoint)[before] ?? {} };
+}
+
+/** @brief -nooff：三种"关闭思考"写法都是 400，响应体逐字节为录下的原文；探针与非探针都一样；不看路径前缀。 */
+async function checkNoOffRefusal(f) {
+  record('MP-38 -nooff: the exported 400 body is the recorded OpenRouter text byte for byte',
+    NOOFF_ERROR_BODY === NOOFF_BODY_EXPECTED, NOOFF_ERROR_BODY);
+  for (const [name, off] of OFF_SPELLINGS) {
+    const { out, log } = await chatLoggedAt(f, { model: 'fake-coder-nooff', messages: [user(READY)], ...off },
+      { path: OPENROUTER_CHAT });
+    record(`MP-38 -nooff: probe step 2 with ${name} is 400 with the recorded body byte for byte (JSON)`,
+      out.status === 400 && out.raw === NOOFF_BODY_EXPECTED
+      && out.headers.get('content-type') === 'application/json' && log.status === 400 && log.probe === true,
+      `${out.status} ${out.raw} ${JSON.stringify(log)}`);
+  }
+  const plain = await chat(f.port, { model: 'fake-coder-nooff', messages: [user('plain')],
+    reasoning: { effort: 'none' } });
+  record('MP-38 -nooff: a non-probe request with thinking off is refused the same way (all requests)',
+    plain.status === 400 && plain.raw === NOOFF_BODY_EXPECTED, `${plain.status} ${plain.raw}`);
+  const v1 = await chat(f.port, { model: 'fake-coder-nooff', messages: [user(READY)], thinking: { type: 'disabled' } });
+  record('MP-38 -nooff: the refusal does not depend on the path prefix (/v1 too)',
+    v1.status === 400 && v1.raw === NOOFF_BODY_EXPECTED);
+  const other = await chat(f.port, { model: 'fake-coder', messages: [user(READY)], reasoning: { effort: 'none' } },
+    { path: OPENROUTER_CHAT });
+  record('MP-38 without -nooff the same thinking-off request is answered, without thinking',
+    other.done && other.text === 'ready' && other.reasoning === '', JSON.stringify(other));
+}
+
+/** @brief -nooff：不带思考参数、带强度时照常回答并带思考；只有三种写法算"关闭思考"。 */
+async function checkNoOffAnswers(f) {
+  const model = 'fake-coder-nooff';
+  const bare = await chat(f.port, { model, messages: [user(READY)] }, { path: OPENROUTER_CHAT });
+  record('MP-38 -nooff: without thinking parameters the probe answers normally with thinking content',
+    bare.done && bare.text === 'ready' && bare.reasoning.length > 0 && bare.firstKind === 'reasoning',
+    JSON.stringify(bare));
+  const medium = await chat(f.port, { model, messages: [user(READY)], reasoning: { effort: 'medium' } },
+    { path: OPENROUTER_CHAT });
+  record('MP-38 -nooff: with reasoning.effort "medium" the probe answers normally with thinking',
+    medium.done && medium.text === 'ready' && medium.reasoning.length > 0);
+  const tools = await chat(f.port, { model, messages: [user(WEATHER)], tools: [weatherTool],
+    reasoning: { effort: 'medium' } }, { path: OPENROUTER_CHAT });
+  record('MP-38 -nooff: probe 3 at medium still calls get_weather (other probe behaviour unchanged)',
+    tools.calls[0]?.name === 'get_weather' && tools.reasoning.length > 0);
+  const session = await chat(f.port, { model, messages: [user('plain')], reasoning: { effort: 'minimal' } },
+    { path: OPENROUTER_CHAT });
+  record('MP-39 -nooff: a session request at reasoning.effort "minimal" is answered (200, thinking), not 400',
+    session.status === 200 && session.done && session.text === PLAIN_TEXT && session.reasoning.length > 0,
+    JSON.stringify(session));
+  const bareChat = await chat(f.port, { model, messages: [user('plain')] });
+  record('MP-39 -nooff: a non-probe reply without thinking parameters answers normally with thinking content',
+    bareChat.done && bareChat.text === PLAIN_TEXT && bareChat.reasoning.length > 0);
+  const notOff = [{ reasoning: { effort: 'low', enabled: true } }, { thinking: { type: 'enabled' } },
+    { reasoning_effort: 'none' }];
+  const answered = await Promise.all(notOff.map((extra) => chat(f.port, { model, messages: [user(READY)], ...extra })));
+  record('MP-38 -nooff: only the three explicit off spellings are refused (enabled true, thinking enabled and a '
+    + 'top-level reasoning_effort "none" are answered)', answered.every((r) => r.done && r.text === 'ready'),
+    answered.map((r) => r.status).join());
+}
+
+/** @brief /openrouter.ai/v1 前缀：列表与对话照常回答（路由只看路径结尾）；/version、/metrics 仍在 origin 下。 */
+async function checkOpenRouterPrefix(f) {
+  const prefixed = await fetchJson(f.port, `${OPENROUTER_BASE}/models`);
+  const root = await fetchJson(f.port, '/v1/models');
+  record('MP-38 /openrouter.ai/v1 prefix: GET /openrouter.ai/v1/models is the same list as /v1/models',
+    prefixed.status === 200 && same(prefixed.body, root.body) && prefixed.body?.data?.[0]?.id === 'fake-coder',
+    JSON.stringify(prefixed.body));
+  const ready = await chat(f.port, { messages: [user(READY)] }, { path: OPENROUTER_CHAT });
+  const plain = await chat(f.port, { messages: [user('plain')] }, { path: OPENROUTER_CHAT });
+  record('MP-38 /openrouter.ai/v1 prefix: POST /openrouter.ai/v1/chat/completions answers probes and chat',
+    ready.done && ready.text === 'ready' && plain.done && plain.text === PLAIN_TEXT);
+  await sleep(100);
+  record('MP-38 /openrouter.ai/v1 prefix: logged as "METHOD url", a chat JSON line and a list {port, path, key} line',
+    f.lines.includes(`[fake-endpoint] POST ${OPENROUTER_CHAT}`)
+    && discoveryLines(f).some((e) => e.path === `${OPENROUTER_BASE}/models`)
+    && jsonLines(f).length === f.lines.filter((l) => l.endsWith('/chat/completions')).length);
+  const version = await fetchJson(f.port, '/version');
+  record('MP-38 /openrouter.ai/v1 prefix: /version and /metrics stay at the origin',
+    version.status === 200 && version.body?.version === '0.10.1' && (await running(f.port)) === 0);
+}
+
+/** @brief 日志的 effort 字段：reasoning_effort ?? reasoning.effort ?? null，接在 reasoning 后面，原有字段不变。 */
+async function checkEffortLog(f) {
+  const cases = [[{ reasoning_effort: 'high' }, 'high'], [{ reasoning: { effort: 'minimal' } }, 'minimal'],
+    [{ reasoning: { effort: 'none' } }, 'none'], [{}, null], [{ reasoning: { enabled: false } }, null],
+    [{ reasoning_effort: 'low', reasoning: { effort: 'high' } }, 'low']];
+  const wrong = [];
+  for (const [extra, effort] of cases) {
+    const { log } = await chatLoggedAt(f, { messages: [user('plain')], ...extra }, { path: OPENROUTER_CHAT });
+    if (log.effort !== effort) wrong.push(`${JSON.stringify(extra)} -> ${JSON.stringify(log.effort)}`);
+  }
+  record('MP-39 log: "effort" is reasoning_effort ?? reasoning.effort ?? null (the raw requested level)',
+    wrong.length === 0, wrong.join('; '));
+  const { log } = await chatLoggedAt(f, { messages: [user('plain')], reasoning: { effort: 'medium' } });
+  const keys = Object.keys(log);
+  const old = ['port', 'model', 'key', 'roles', 'status', 'probe', 'enhance', ...SCRIPT_LOG_FIELDS];
+  record('MP-39 log: "effort" comes last, right after "reasoning"; every old field is kept',
+    keys.at(-1) === 'effort' && keys.at(-2) === 'reasoning' && old.every((k) => k in log) && log.reasoning === true,
+    keys.join());
+  const refused = (await chatLoggedAt(f, { model: 'fake-coder-nooff', messages: [user(READY)],
+    reasoning: { effort: 'none' } }, { path: OPENROUTER_CHAT })).log;
+  record('MP-39 log: a refused -nooff request logs status 400 and effort "none"', refused.status === 400
+    && refused.effort === 'none' && refused.model === 'fake-coder-nooff', JSON.stringify(refused));
+}
+
+/** @brief probes.mjs 的纯函数：每一条 [说明, 是否成立]，失败时列出说明。 */
+function checkThinkingPredicates() {
+  const cases = [['thinkingOn effort medium', thinkingOn({ reasoning: { effort: 'medium' } })],
+    ['thinkingOn reasoning_effort low', thinkingOn({ reasoning_effort: 'low' })],
+    ['not thinkingOn effort none', !thinkingOn({ reasoning: { effort: 'none' } })],
+    ['not thinkingOn reasoning_effort none', !thinkingOn({ reasoning_effort: 'none' })],
+    ['not thinkingOn without parameters', !thinkingOn({})],
+    ['not thinkingOn enabled true', !thinkingOn({ reasoning: { enabled: true } })],
+    ['not thinkingOn thinking enabled', !thinkingOn({ thinking: { type: 'enabled' } })],
+    ['requestedEffort xhigh', requestedEffort({ reasoning: { effort: 'xhigh' } }) === 'xhigh'],
+    ['requestedEffort null without parameters', requestedEffort({}) === null],
+    ...OFF_SPELLINGS.map(([name, off]) => [`explicitThinkingOff ${name}`, explicitThinkingOff(off)]),
+    ['not explicitThinkingOff without parameters', !explicitThinkingOff({})],
+    ['not explicitThinkingOff reasoning_effort none', !explicitThinkingOff({ reasoning_effort: 'none' })],
+    ['not explicitThinkingOff effort low', !explicitThinkingOff({ reasoning: { effort: 'low' } })]];
+  const wrong = cases.filter(([, ok]) => !ok).map(([name]) => name);
+  record('MP-38/MP-39 thinkingOn: reasoning_effort or reasoning.effort, not "none"; explicitThinkingOff: exactly '
+    + 'the three spellings', wrong.length === 0, wrong.join('; '));
+}
+
+/** @brief "开了思考" = reasoning_effort 或 reasoning.effort 且不是 none（thinkingOn 与 thinking check）。 */
+async function checkThinkingOn(f) {
+  checkThinkingPredicates();
+  const onProbe = await chat(f.port, { messages: [user(READY)], reasoning: { effort: 'medium' } },
+    { path: OPENROUTER_CHAT });
+  const offProbe = await chat(f.port, { messages: [user(READY)], reasoning: { effort: 'none' } },
+    { path: OPENROUTER_CHAT });
+  record('MP-38 thinkingOn: probe 1 with reasoning.effort "medium" carries reasoning_content; "none" does not',
+    onProbe.text === 'ready' && onProbe.reasoning.length > 0 && offProbe.text === 'ready'
+    && offProbe.reasoning === '');
+  const check = await chat(f.port, { messages: [user('thinking check')], reasoning: { effort: 'high' } });
+  const none = await chat(f.port, { messages: [user('thinking check')], reasoning: { effort: 'none' } });
+  record('MP-39 thinking check: reasoning.effort "high" is thinking on ("收到思考参数：high" with thinking); '
+    + '"none" is "没有思考参数"', check.text === '收到思考参数：high' && check.reasoning.length > 0
+    && none.text === '没有思考参数' && none.reasoning === '', `${check.text} / ${none.text}`);
+}
+
+/** @brief -thinklong：探针开了思考时只回超过 256 token 的思考、以 length 结束；没开时照常；非探针不受影响。 */
+async function checkThinkLong(f) {
+  const model = 'fake-coder-thinklong';
+  const long = await chat(f.port, { model, messages: [user(READY)], reasoning_effort: 'medium' });
+  record('MP-38 -thinklong: with thinking on a probe streams only thinking (> 256 tokens, > 1100 chars), no text, '
+    + 'and ends with finish_reason "length"', long.done && long.status === 200 && long.text === ''
+    && long.calls.length === 0 && long.reasoning === THINKLONG_THINKING && long.reasoning.length > 1100
+    && Math.ceil(long.reasoning.length / 4) > 256 && long.finish === 'length',
+    `${long.status} ${long.finish} ${long.reasoning.length} ${long.text}`);
+  const openRouter = await chat(f.port, { model, messages: [user(WEATHER)], tools: [weatherTool],
+    reasoning: { effort: 'medium' } }, { path: OPENROUTER_CHAT });
+  record('MP-38 -thinklong: thinking on via reasoning.effort works the same (probe 3: no tool call, length)',
+    openRouter.calls.length === 0 && openRouter.text === '' && openRouter.finish === 'length');
+  const { out: pass, log: passLog } = await chatLoggedAt(f, { model, messages: [user(passphrasePrompt(200))],
+    reasoning_effort: 'medium' });
+  const count = await chat(f.port, { model, messages: [user('Count from 1 to 400, one number per line.')],
+    reasoning_effort: 'medium' });
+  record('MP-38 -thinklong: probe steps 8 (passphrase) and 9 (count) at medium also stop at the limit with only '
+    + 'thinking', pass.text === '' && pass.calls.length === 0 && pass.finish === 'length'
+    && pass.reasoning === THINKLONG_THINKING && passLog.probe === true && count.text === ''
+    && count.calls.length === 0 && count.finish === 'length' && count.reasoning === THINKLONG_THINKING,
+    `${pass.finish} ${pass.text} ${JSON.stringify(passLog)} / ${count.finish}`);
+  const off = await chat(f.port, { model, messages: [user(READY)] });
+  const offTool = await chat(f.port, { model, messages: [user(WEATHER)], tools: [weatherTool] });
+  const offPass = await chat(f.port, { model, messages: [user(passphrasePrompt(200))] });
+  record('MP-38 -thinklong: with thinking off the probe is answered as usual (ready / get_weather / ZEBRA-42, '
+    + 'stop / tool_calls / stop)', off.text === 'ready' && off.reasoning === '' && off.finish === 'stop'
+    && offTool.calls[0]?.name === 'get_weather' && offTool.finish === 'tool_calls'
+    && offPass.text === 'ZEBRA-42' && offPass.reasoning === '' && offPass.finish === 'stop',
+    `${off.finish} ${offTool.finish} ${offPass.text}`);
+  const chatReply = await chat(f.port, { model, messages: [user('plain')], reasoning_effort: 'medium' });
+  record('MP-38 -thinklong: a non-probe request at medium is unaffected (text, finish_reason "stop")',
+    chatReply.text === PLAIN_TEXT && chatReply.finish === 'stop');
+  const normal = await chat(f.port, { messages: [user(READY)], reasoning_effort: 'medium' });
+  record('MP-38 without -thinklong a probe at medium ends with finish_reason "stop" and has text',
+    normal.text === 'ready' && normal.finish === 'stop' && normal.reasoning.length > 0);
+}
+
+/**
+ * @brief -nooff 的判断顺序（server.mjs 开头）：认证 → -nooff → -replay → -404、-hang、-stall。
+ * @param f 不查 key 的端点
+ * @param g 设了 FAKE_KEYS（synthetic 的 key）的端点
+ */
+async function checkNoOffOrder(f, g) {
+  const off = { model: 'fake-coder-nooff', messages: [user(READY)], reasoning: { effort: 'none' } };
+  const denied = await chat(g.port, off, { key: NOOFF_ORDER_BAD_KEY, path: OPENROUTER_CHAT });
+  const allowed = await chat(g.port, off, { key: NOOFF_ORDER_KEY, path: OPENROUTER_CHAT });
+  record('MP-38 -nooff order: the key is checked first (a wrong key is 401, the right key gets the 400 body)',
+    denied.status === 401 && allowed.status === 400 && allowed.raw === NOOFF_BODY_EXPECTED,
+    `${denied.status} ${denied.raw} / ${allowed.status}`);
+  const stacked = await Promise.all(['404', 'hang', 'stall'].map((suffix) => chat(f.port,
+    { model: `fake-coder-nooff-${suffix}`, messages: [user('plain')], reasoning: { effort: 'none' } },
+    { path: OPENROUTER_CHAT, timeoutMs: 2000 })));
+  record('MP-38 -nooff order: refused before -404, -hang and -stall (stacked suffixes get the 400 body at once)',
+    stacked.every((r) => r.status === 400 && r.raw === NOOFF_BODY_EXPECTED),
+    stacked.map((r) => `${r.status} ${r.error ?? ''}`).join(', '));
+  const notOff = await chat(f.port, { model: 'fake-coder-nooff-404', messages: [user('plain')],
+    reasoning: { effort: 'medium' } }, { path: OPENROUTER_CHAT });
+  record('MP-38 -nooff order: without thinking off a stacked -404 still answers 404', notOff.status === 404);
+  // 先在 -nooff-replay 上开着思考调一次工具（调用记进 -replay 的名单），再关着思考、不带推理内容回传
+  const model = 'fake-coder-nooff-replay';
+  const first = await chat(f.port, { model, messages: [user(WEATHER)], tools: [weatherTool],
+    reasoning: { effort: 'medium' } }, { path: OPENROUTER_CHAT });
+  const follow = (name) => chat(f.port, { model: name, messages: step4Messages(first.calls[0]), tools: [weatherTool],
+    reasoning: { effort: 'none' } }, { path: OPENROUTER_CHAT });
+  const both = await follow(model);
+  const replayOnly = await follow('fake-coder-replay');
+  record('MP-38 -nooff order: refused before -replay (both apply: the -nooff body; -replay alone: its own 400)',
+    first.calls[0]?.name === 'get_weather' && both.status === 400 && both.raw === NOOFF_BODY_EXPECTED
+    && replayOnly.status === 400 && replayOnly.raw !== NOOFF_BODY_EXPECTED, `${both.raw} / ${replayOnly.raw}`);
+}
+
+/** @brief 2026-10-24 补丁（§7.7、§14.1）的全部检查，都在单独的端点上（不影响其他检查对日志行的计数）。 */
+async function checkReasoningMandatory(f, g) {
+  await checkNoOffRefusal(f);
+  await checkNoOffAnswers(f);
+  await checkOpenRouterPrefix(f);
+  await checkEffortLog(f);
+  await checkThinkingOn(f);
+  await checkThinkLong(f);
+  await checkNoOffOrder(f, g);
+}
+
 const a = await startEndpoint({ FAKE_KEYS: 'key-aaaa1,key-bbbb2,key-cccc3', FAKE_LIMITED_KEYS: 'key-bbbb2',
   FAKE_LIMIT_MS: '1500', FAKE_QUOTA_KEYS: 'key-cccc3', FAKE_SERVER_VERSION: '0.9.9', FAKE_MAX_MODEL_LEN: '4000' });
 const b = await startEndpoint({ FAKE_NO_METRICS: '1', FAKE_REQUIRE_KEY: 'req-key-1' });
@@ -1105,6 +1359,10 @@ writeFileSync(scriptFile, '{}');
 const e = await startEndpoint({ FAKE_ENHANCE_SCRIPT: scriptFile, MEM_TEAM_SESSION: 'C:\\synthetic\\a.jsonl',
   MEM_TEAM_ENTRY: 'e1e2e3e4', MEM_TEAM_USER_ENTRY: 'user-rule', MEM_TEAM_OTHER_ENTRY: 'other-kind' });
 const shapes = await startShapes();
+// 2026-10-24 补丁（§7.7、§14.1）的检查单独用一份端点：/openrouter.ai/v1 前缀的请求不进 a 的日志行计数；
+// g 设了 FAKE_KEYS（synthetic 的 key），测 -nooff 排在认证之后
+const f = await startEndpoint({});
+const g = await startEndpoint({ FAKE_KEYS: NOOFF_ORDER_KEY });
 try {
   await checkGets(a, c);
   await checkKeys(a, b, c);
@@ -1127,6 +1385,7 @@ try {
   await checkEnhance(e, d, scriptFile);
   await checkMemTeam(e);
   await checkDiscovery(a, c, shapes);
+  await checkReasoningMandatory(f, g);
   await checkCancel(a, b);
   checkLogs(a);
   checkDiscoveryLogs(a, shapes);
@@ -1138,6 +1397,8 @@ try {
   c.kill();
   d.kill();
   e.kill();
+  f.kill();
+  g.kill();
   for (const endpoint of Object.values(shapes)) endpoint.kill();
   rmSync(scriptDir, { recursive: true, force: true });
 }

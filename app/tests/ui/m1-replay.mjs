@@ -322,6 +322,9 @@ async function queueSteerCheck(page, h) {
  */
 async function crashedRow(page, before) {
   const row = await composerRow(page);
+  // 菜单在按钮变得不可用之后的 effect 里关上（rowMenu.ts useRowMenu），晚于"crashed"那次渲染；先等它关上再数，
+  // 不然量到的是关上之前的一刻（2026-10-24，思考关不掉的模型的完整回归里在本机连续出现，见 docs/v1/models-checks.md）
+  await page.getByTestId('permission-menu').waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
   const menus = await page.getByTestId('permission-menu').count();
   const ring = await openRingDetails(page);
   await page.keyboard.press('Escape');

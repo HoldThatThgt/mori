@@ -47,6 +47,8 @@
   white-space: nowrap;
 }
 .switch-menu .menu-note { padding-top: 8px; border-top: 1px solid var(--color-line); }
+/* 思考关不掉的模型（规格 §7.7）：Effort 菜单底部说明下面另起一行的那句，不另起一节 */
+.switch-menu .menu-note + .menu-note { padding-top: 0; border-top: 0; }
 /* 范围菜单的三节（Groups、Providers、Models）；每项右侧标区域（不收短），名字放不下时截断，全名在悬停说明里；
    本会话静态校验排除的项变淡，仍可以选 */
 .pick-section + .pick-section { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--color-line); }

@@ -8,6 +8,12 @@
 取代 [v0 settings.md](../../v0/screens/settings.md) 的“Connections and models”分节；AGENTS.md 分节不变。
 界面文字为英文（规格 §0），写法按 [v0/ui-strings.md](../../v0/ui-strings.md)。标了“（临时，走查时可以改）”的文字规格没给，是本表定的。
 
+2026-10-24 补（规格 §7.7“思考关不掉的模型”，负责人选定方案 B）：档案摘要加“Thinking: Can’t be turned off”（第 2 步的说明只存在
+`model-profiles.json` 里，`ProfileView` 不带，设置页不显示）；模型表单（Edit）的
+Default effort for new sessions 对这类模型不列 Off、存着的 Off 显示为 Minimal；三处测试对勾了 Supports thinking 的模型带 `medium`；
+补丁之前留下的“Couldn’t verify: <原文>”（服务回的 400）点一次 Verify 重新测，不自动重跑；回复停在探针输出上限、只有思考时显示为出错。
+改动的行都标了“2026-10-24 补”。
+
 ## 来源
 
 | 来源 | 内容 |
@@ -16,9 +22,9 @@
 | `models.*` 写命令的结果 | `error: string \| null`；`models.saveProvider` 另给 `providerId`（新建时收 `models`：清单里勾选的行，拉取规格 §5.4），`models.addKey` 另给 `ref`；`models.addModels`（`{ providerId, models }`，拉取规格 §5.4）只有 `error` |
 | `models.discover` 的结果（拉取规格 §5.2） | `DiscoverResult`：`error`（命令本身失败）、`cancelled`、`server`（`{ kind: ServerKind, version }`，没拿到列表时为 null）、`api`、`baseUrl`（建议的 Base URL）、`name`、`anthropicShape`、`listError`（`{ kind: 'rejected' \| 'unreachable' \| 'no_list' \| 'invalid', detail }` 或 null）、`models`（`DiscoveredModel[]`，列表顺序：`id`、`contextWindow`、`maxTokens`、`reasoning`、`image`、`family`、`chat`、`reported`、`hints`、`unusable`、`added`）、`truncated`、`notListed`。只在表单状态里，表单关闭就丢掉，不缓存（拉取规格 §9） |
 | `models.discoverCancel` 的结果 | `{ error }`；被取消的那次 `models.discover` 返回 `cancelled: true`（拉取规格 §5.3） |
-| `mori.profiles`（全局信封） | 全部 `ProfileView`，以及 `running: { ref, step, of }[]`（正在跑的探针）。`ProfileView.reported`：`{ contextWindow, maxTokens, reasoning, image }`（各项为 number / boolean 或 null），档案没有 `meta` 时整个为 null；Ollama 只读到训练窗口时 `contextWindow` 为 null（训练窗口不记作报告，拉取规格 §7.2） |
+| `mori.profiles`（全局信封） | 全部 `ProfileView`，以及 `running: { ref, step, of }[]`（正在跑的探针）。`ProfileView.reported`：`{ contextWindow, maxTokens, reasoning, image }`（各项为 number / boolean 或 null），档案没有 `meta` 时整个为 null；Ollama 只读到训练窗口时 `contextWindow` 为 null（训练窗口不记作报告，拉取规格 §7.2）。`ProfileView.reasoning.off_refused`（2026-10-24 补，规格 §7.2、§7.7）：第 2 步关闭思考被 400 或 422 拒绝、开思考（`medium`）有正文时为 true，这时 `can_disable` 为 false；补丁之前的档案（没有 `auto.offRefused`）读作 false，不重新探测。`ProfileView` 不带第 1、2 步与回传检查各自的结果（只有由它们得出的 `reasoning` 各值，以及出错时的 `status`、`error`）；规格 §7.7 写明第 2 步的说明（含“Thinking can’t be turned off: <原文>”）只存在 `model-profiles.json` 第 2 步的结果里，`ProfileView` 不带 |
 | `mori.key_status`（全局信封） | 全部有记录的 key：`ref → { state: 'rate_limited' \| 'auth' \| 'quota', until }`；key 的记录变化时发出 |
-| `connection.test` 的结果 | `{ providerId, modelId, keyRef? }` 的测试结果：成功（首字时间、总时间、是否有思考内容、回复开头）、失败（原文）、已取消 |
+| `connection.test` 的结果 | `{ providerId, modelId, keyRef? }` 的测试结果：成功（首字时间、总时间、是否有思考内容、回复开头）、失败（原文）、已取消。（2026-10-24 补，规格 §7.7、§12：测的模型勾了 Supports thinking 时请求带思考 `medium`，否则不带思考参数；命令与结果的字段不变） |
 | `config.get` 的结果 | `configError`（配置读不出，§4.1）、`settingsError`（pi 的 `settings.json` 读不出，沿用 v0）、`defaultThinkingLevel`（pi 设置的默认思考强度；模型表单 Edit 里没设过强度的模型显示它，拉取规格 §5.4） |
 | `shared/models.ts` | `suggestZone`（按 Base URL 预选区域，§12；拉取规格 §3.4）、`SERVER_KIND_LABELS`（Detected 一行的种类名，拉取规格 §3.3） |
 | 你的操作 | 打开分节、打开表单、填 Base URL 和 API key、Fetch models、勾选清单的行、改值、Add a model ID、Use、确认框、勾选 |
@@ -289,13 +295,17 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 | Use 保存中 | 你点了某条提示的“Use”：`models.saveModel`（`{ providerId, model: 按下表改过的模型 }`，不带 `thinkingLevel`，拉取规格 §5.4、§8） | 这个 Use 不可用（同立即保存） | — |
 | Use 成功 | 返回无错误 | 行按新值显示，这条提示消失；指纹变了，自动重新探测（Tool calling “Re-verifying…”，§7.4） | — |
 | Use 失败 | 返回 `error` | 这一行里原文；配置不变 | 再点 Use |
-| 档案摘要 | `profiles[ref]`（`mori.profiles` 更新） | Tool calling：Verified / Not verified / Failed / Verifying… / Re-verifying…；Handoff tier：A / B / C / —；Context：有效窗口；Reasoning field：`reasoning_content` / `reasoning` / `reasoning_text` / `none` / `native`；Cancel：Verified（`true`）/ Not verified（`false`）/ Unknown（`unknown`） | — |
+| 档案摘要 | `profiles[ref]`（`mori.profiles` 更新） | Tool calling：Verified / Not verified / Failed / Verifying… / Re-verifying…；Handoff tier：A / B / C / —；Context：有效窗口；Reasoning field：`reasoning_content` / `reasoning` / `reasoning_text` / `none` / `native`；Thinking：Can’t be turned off（只在 `reasoning.off_refused` 为真时有这一项，放在 Reasoning field 后面；为假时没有这一项，2026-10-24 补，见下“思考关不掉”）；Cancel：Verified（`true`）/ Not verified（`false`）/ Unknown（`unknown`） | — |
 | 从未验证、探测中 | `running` 里有这个 ref，且档案从没完成过（`probedAt` 为 null 或 `status` 为 `probing`） | Tool calling “Verifying…” | — |
 | 重新验证中 | `running` 里有这个 ref，且档案完成过（指纹或服务版本变了、你点了 Verify、需要同意的探针，§7.4） | Tool calling “Re-verifying…”，其余仍显示旧结果，结果出来后替换；选择仍按旧结果 | — |
-| 探针出错 | `profile.status` 为 `error` | “Couldn’t verify: <原文>” | Verify |
+| 探针出错 | `profile.status` 为 `error` | “Couldn’t verify: <原文>”（<原文> 是第一个出错的步的说明，规格 §7.2；见下“探针各步的说明显示在哪里”） | Verify |
+| 思考关不掉（2026-10-24 补，规格 §7.7） | `profiles[ref].reasoning.off_refused` 为真：第 2 步关闭思考被 400 或 422 拒绝、开思考有正文 | 档案摘要多一项“Thinking: Can’t be turned off”。第 2 步判为不通过、不算出错，所以不因此显示“Couldn’t verify”；这一组第 2 步判出之后第 3、4、6、7 步用开思考（`medium`），Tool calling 按这样跑的第 3、4 步显示；Handoff tier 只会是 B、C 或 —，不会是 A（第 5 步不适用）；Reasoning field 照旧。第 2 步的说明“Thinking can’t be turned off: <原文>”只存在 `model-profiles.json` 里，`ProfileView` 不带，设置页不显示（规格 §7.7） | Verify（第 1–7 步总在没有标记的副本上发，第 2 步重新测） |
+| 补丁之前验证失败的这类模型（2026-10-24 补，规格 §7.7） | 补丁之前探测过的思考关不掉的模型：当时第 2 步的关闭思考被 400 拒绝算出错（之后关闭思考的第 3 步等也被拒），`profile.status` 为 `error`；旧档案没有 `auto.offRefused`，读作 false，不自动重新探测、不加迁移 | 照旧：“Couldn’t verify: <原文>”（服务回的 400）（第 2 步的原文，例如 OpenRouter 的“Reasoning is mandatory for this endpoint and cannot be disabled.”）、Tool calling “Not verified”、没有 Thinking 一项；不出别的提示 | Verify：点一次即按 §7.7 重新测；开思考能答时结果换成上一行的样子（“Couldn’t verify”消失，多“Thinking: Can’t be turned off”） |
+| 停在探针输出上限（2026-10-24 补，规格 §7.7） | 第 1–9 步任一步的回复因输出上限停下（`stopReason` 为 `length`），没有正文也没有工具调用、只有思考：这一步出错，说明“Stopped at the probe output limit before answering”；`profile.status` 为 `error` | 这一步是第一个出错的步时显示“Couldn’t verify: Stopped at the probe output limit before answering”。只是出错、不是不通过：是第 3、4 步时 Tool calling 为 Not verified 而不是 Failed；是第 8 步时不告警“Silently truncates long input” | Verify |
+| 关不掉、开思考也没答上（2026-10-24 补，规格 §7.7 第 2 步表第 4 行） | 第 2 步关闭思考被 400 或 422 拒绝，开思考（`medium`）出错或没有正文：这一步出错，`can_disable` 为 `unknown`，`off_refused` 不为真；`profile.status` 为 `error` | 第 2 步是第一个出错的步时“Couldn’t verify: <说明>”：`medium` 出错时是它的说明（停在探针输出上限时就是“Stopped at the probe output limit before answering”），`medium` 没出错但没有正文时是 `off` 被拒的原文（服务的原文（以状态码开头，例如 “400 …”）或“422 …”）；没有 Thinking 一项；这一组没判出 `off_refused`，第 3–7 步照原来关闭思考 | Verify |
 | 静默截断 | `context.truncation` 为 `silent` | Context 显示降下后的有效窗口，告警“Silently truncates long input” | — |
-| Verify | 你点了“Verify”：`models.verify`（`{ refs: [这个模型], tests: 'auto' }`，第 0–7 步） | 进入 Verifying… / Re-verifying… | — |
-| 测试 | 你点了行的“Test”：`connection.test`（`{ providerId, modelId }`，用第一个可用的 key） | 结果写在这一行下面，文字同提供商的 Test connection；测试中“Testing…”与“Cancel” | Cancel |
+| Verify | 你点了“Verify”：`models.verify`（`{ refs: [这个模型], tests: 'auto' }`，第 0–7 步） | 进入 Verifying… / Re-verifying…（2026-10-24 补：第 1–7 步在没有“没有 Off”标记的模型副本上发，已经显示“Thinking: Can’t be turned off”的模型照样重新测第 2 步，这一次判出能关闭时第 3–7 步关闭思考、结果里没有 Thinking 一项；重新验证中这一项按旧结果留着，结果出来后替换，规格 §7.7） | — |
+| 测试 | 你点了行的“Test”：`connection.test`（`{ providerId, modelId }`，用第一个可用的 key） | 结果写在这一行下面，文字同提供商的 Test connection；测试中“Testing…”与“Cancel”（2026-10-24 补：勾了 Supports thinking 的模型带 `medium`，见“测试结果的文字”） | Cancel |
 | 移动 | `models.moveModel`，立即保存 | 新顺序；分组展开顺序随之变 | — |
 | 删除确认 | 你点了“Delete…” | 确认框，文字见下；是最后一个模型时写“This is the last model of <name>; the provider and its keys are deleted too.” | Delete；Cancel（焦点在 Cancel） |
 | 已删除 | `models.deleteModel` 返回无错误 | 行（或整张卡）消失；正在用它的回复下一个请求换模型（model-chat.md，原因 `missing`）；它的探针出队 | — |
@@ -314,6 +324,14 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 `reported` 为 null 时只可能显示第四行：它不看 `reported`，旧档案也显示。
 Ollama 只读到训练窗口的模型，`reported.contextWindow` 为 null，所以第一行不出现（训练窗口不是 Ollama 实际用的窗口，拉取规格 §7.2）。
 
+探针各步的说明显示在哪里（2026-10-24 按现在的界面查，`ModelRows.tsx`、`FirstRunForm.tsx`；第 2 步的那句由规格 §7.7 写明）：设置页只经档案的 `error`
+（第一个出错的步的说明，规格 §7.2）显示“Couldn’t verify: <原文>”；判定为不通过的步的说明（第 5、6 步被拒的原文，以及第 2 步的
+“Thinking can’t be turned off: <原文>”）不显示。首次启动表单另外显示第 3、4 步不通过的说明（“Tool calling failed verification: <detail>”，
+[first-run.md](first-run.md)）。所以规格 §7.7 的两句说明里：“Thinking can’t be turned off: <原文>”是不通过，只存在 `model-profiles.json`
+第 2 步的结果里，`ProfileView` 不带，界面不显示，设置页看到的是档案摘要的“Thinking: Can’t be turned off”；
+“Stopped at the probe output limit before answering”是出错，出现在“Couldn’t verify: …”里（它是第一个出错的步时；
+第 2 步关闭思考被拒、开思考停在输出上限时也是这一句，见“关不掉、开思考也没答上”）。
+
 ### 需要你同意的探针
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
@@ -322,6 +340,8 @@ Ollama 只读到训练窗口的模型，`reported.contextWindow` 为 null，所�
 | 取消探针确认 | 你点了“Cancel test…” | 确认框，文字见下 | Run test（`tests: 'cancel'`）；Cancel |
 | 运行中 | `mori.profiles` 的 `running` 有这个 ref | 同“重新验证中” | — |
 | 结果 | 探针结束后的 `mori.profiles` | Context 更新（截断时告警）；Cancel 更新为 Verified / Not verified / Unknown | — |
+| 思考关不掉的模型（2026-10-24 补，规格 §7.7） | 档案里存的 `reasoning.off_refused` 为真 | 两个确认框的文字不变；第 8、9 步用编译后的模型、按档案里存的 `off_refused` 选强度：为真时用 `medium`，否则同原来；界面没有别的变化 | — |
+| 停在探针输出上限（2026-10-24 补，规格 §7.7；对所有模型） | 第 8 步的回复因输出上限停下，只有思考、没有正文 | 这一步出错（不是答不出暗号）：“Couldn’t verify: Stopped at the probe output limit before answering”（它是第一个出错的步时）；不告警“Silently truncates long input”，有效窗口不降 | Verify；再点“Long-input test…” |
 
 ### 模型表单（Edit）
 
@@ -332,6 +352,7 @@ Ollama 只读到训练窗口的模型，`reported.contextWindow` 为 null，所�
 | Edit | 你点了行的“Edit” | 标题“Edit model · <provider name>”（临时，走查时可以改）；字段 Model ID（只读）、Context window、Max output（不随窗口变）、Family（可空，占位“Optional”）、Supports thinking、Image input、Default effort for new sessions（只在勾了 Supports thinking 时，写 pi 设置的 `modelThinkingLevels`；选项 Off / Minimal / Low / Medium / High / Extra high / Max） | Save；Cancel |
 | 设过强度 | `thinkingDefaults` 里有这个模型的值 | Default effort for new sessions 显示它 | 改选 |
 | 没设过强度 | `thinkingDefaults` 里这个模型为 null（例如从清单加入、之后没在 Edit 里设过的模型，拉取规格 §5.4） | Default effort for new sessions 显示 `config.get` 的 `defaultThinkingLevel`（新会话实际用的强度）；`defaultThinkingLevel` 也没有时显示 Medium（拉取规格 §5.4） | 改选 |
+| 思考关不掉的模型（2026-10-24 补，规格 §7.7） | `profiles[<provider id>/<model id>].reasoning.off_refused` 为真（重新验证中按旧结果；没有档案、从未验证的探测中、为假时照旧有 Off） | Default effort for new sessions 的选项没有 Off：Minimal / Low / Medium / High / Extra high / Max。按上两行要显示的强度是 Off（设过 Off，或没设过而 `defaultThinkingLevel` 是 Off）时显示 Minimal（pi 对这个模型用的就是它）。存着的 Off 照存：你没改这一项时 Save 不带 `thinkingLevel`（同下“保存”） | 改选（改了才写，写你选的那一档） |
 | 字段错误 | 界面先查：窗口不是正整数、Max output 不是正整数或不小于窗口 | 字段旁英文错误（见下“字段错误的文字”），Save 不可用 | 修改 |
 | 保存 | `models.saveModel`（`{ providerId, model, thinkingLevel? }`，只改已有的模型；只有你在这张表单里改了 Default effort for new sessions 时才带 `thinkingLevel`，没改时不写 `modelThinkingLevels`，拉取规格 §5.4） | 成功：表单关闭，行更新，指纹变了时自动开始探针；失败（例如模型已不存在）：表单里原文 | — |
 
@@ -371,6 +392,10 @@ Test connection、Keys 的 Test、模型行的 Test 共用：
 | 成功 | “Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>” |
 | 失败 | “Connection failed: <原文>”（没有原文时“Connection failed: No response”）；命令本身出错时“Couldn’t test the connection: <原文>” |
 | 已取消 | “Test cancelled”（临时，走查时可以改） |
+
+（2026-10-24 补，规格 §7.7、§12）三处测试测的模型勾了 Supports thinking 时，请求带思考 `medium`（同探针第 1 步），否则不带思考参数；
+这样第一次探测之前，思考关不掉的模型也不会因为“关闭思考”被 400 拒绝。界面没有新文字：结果仍是上表的写法，
+勾了 Supports thinking 的模型成功时比原来更常带“ · Includes thinking”。
 
 ## 确认框的文字
 
@@ -447,6 +472,22 @@ Test connection、Keys 的 Test、模型行的 Test 共用：
 - 改了默认范围，已有会话的范围不变。
 - Defaults、Groups、Project access、Keys、上移下移、模型行提示的 Use 没有 Save 按钮。
 
+思考关不掉的模型（2026-10-24 补，规格 §7.7）：
+
+- 只按探针第 2 步认出：清单、模型行的提示都不读服务列表里的标记（OpenRouter 的 `reasoning.mandatory`、Anthropic 的
+  `capabilities.thinking.types.disabled.supported`），不按模型名判断，清单不因此改 Supports thinking 的默认值。
+- 第 2 步关闭思考被拒、开思考有正文时不算出错：这类模型重新验证后不显示“Couldn’t verify”，档案摘要不显示第 2 步的原文
+  （开思考也没答上时是出错，见“关不掉、开思考也没答上”）。
+- 补丁之前留下的“Couldn’t verify: <原文>”（服务回的 400）不自动重新探测、不迁移、不另加提示，等你点 Verify。
+- `off_refused` 为假的模型（包括关闭思考时照样思考的 `can_disable: false`）档案摘要没有 Thinking 一项，Edit 里照旧列 Off；
+  不写“Thinking: Can be turned off”。
+- Edit 里显示成 Minimal 的 Off 不被改写成 Minimal：只在你改了 Default effort for new sessions 时写。
+- 测试连接与探针被拒后不换个强度重发；测试连接的结果没有新文字。
+- 不按地址或接口加提示，也不要你取消勾选 Supports thinking：Mori 发给有标记的模型的每个请求都带强度（探针第 1–7 步按本组第 2 步、
+  第 8、9 步按档案，用 `medium`；测试连接 `medium`；会话经虚拟模型路由的请求、压缩与重建、换模型后重发由 pi 收紧，Off 变成 `minimal`；
+  TaskBoard 的 A 级只在 `can_disable` 为真时用），所以在哪个地址上 pi 都不会写“关闭思考”（规格 §7.7）。
+  唯一的已知限制是会话里的 Minimal 没有探针测过、只在 OpenRouter 上实测过（规格 §7.7 末尾、proposal §10），设置页不为它加提示。
+
 ## 本表定下的界面细节
 
 规格没给、本表定的（都是临时，走查时可以改）：读取中“Loading…”；立即保存成功不提示；迁移说明各行的写法；
@@ -474,6 +515,11 @@ Add provider 里改 Base URL 或 API key 时，拉取命令出错的原文与上
 拉取中 `fetch-status` 没有文字（按钮已写“Fetching models…”）；加入中（Adding…）Base URL、API key 只读，Fetch models 不可用；
 关掉卡上正在拉取的清单时，卡上的按钮旁显示“Fetch cancelled”。
 
+思考关不掉的模型（规格 §7.7）另定的（2026-10-24，都是临时，走查时可以改）：
+“Thinking: Can’t be turned off”在档案摘要里放在 Reasoning field 后面、Cancel 前面，写法同其他项（标签“Thinking”，值“Can’t be turned off”）；
+补丁之前的“Couldn’t verify: <原文>”（服务回的 400）行不加任何提示；Edit 表单开着时 `mori.profiles` 更新了 `off_refused`，
+Default effort for new sessions 的选项随之变（显示的 Off 换成 Minimal，或 Off 回到选项里）。
+
 ## 需要规格回答
 
 已回答：
@@ -498,6 +544,13 @@ Add provider 里改 Base URL 或 API key 时，拉取命令出错的原文与上
 - （已回答：拉取规格 §6.2）**列表为空**：“Models (0)”，下面一句“The server didn’t list any models.”，再下面是 Add a model ID。
 - （已回答：拉取规格 §5.4）**Edit 里没设过的思考强度**：显示 `config.get` 的 `defaultThinkingLevel`（没有时 Medium），只在你改了时写入；
   `models.saveModel` 去掉 `adding`，模型表单没有新建模式。见“模型表单（Edit）”。
+- （已回答：规格 §7.7）**第 2 步的说明“Thinking can’t be turned off: <原文>”显示在哪里**：只存在 `model-profiles.json` 第 2 步的结果里，
+  `ProfileView` 不带，界面不显示；设置页看到的是档案摘要的“Thinking: Can’t be turned off”（原来是本表定的，现在由规格写明）。
+  见“思考关不掉”与“探针各步的说明显示在哪里”。
+- （已回答：规格 §7.7）**z.ai、Together 地址**：不再是已知限制，Mori 发给有标记的模型的每个请求都带强度，pi 不会写“关闭思考”；
+  原来“在那里取消勾选 Supports thinking”的说法删掉。见“反例”。
+- （已回答：规格 §7.7）**关闭思考被拒、开思考也出错或没有正文时“Couldn’t verify”写什么**：`medium` 出错时用它的说明（含输出上限那一句），
+  `medium` 没出错但没有正文时用 `off` 的原文。见“关不掉、开思考也没答上”。
 
 待回答：没有。
 
@@ -521,9 +574,9 @@ Add provider 里改 Base URL 或 API key 时，拉取命令出错的原文与上
 | Add a model ID | 一行 `data-testid="manual-model"`；输入框 `input[data-field="id"]`；字段错误 `[data-testid="field-error"][data-field="id"]`；按钮 `data-action="add-to-list"` |
 | 卡上的清单 | 清单、列表错误、Add a model ID、Add 按钮同上；Not listed 一行 `data-testid="not-listed"`；卡里没有 `detected-server`；清单开着时卡上的 `[data-action="fetch-models"]` 为 `disabled` |
 | Keys | 行 `[data-testid="key-row"][data-ref]`，记录 `data-testid="key-state"`（`data-state` 为 `rate_limited` / `auth` / `quota`）；按钮 `data-action`：`key-up`、`key-down`、`key-test`、`key-remove`；内联表单 `data-testid="key-form"`；没有 key 的说明 `data-testid="no-keys"`；行下的测试结果 `data-testid="key-test"` |
-| Models 行 | `[data-testid="model-row"][data-model]`（`provider/id`，沿用 v0）；档案摘要 `data-testid="profile"`，各项 `data-field`（`tool_calling`、`tier`、`context`、`reasoning`、`cancel`）与 `data-value`；截断告警 `data-testid="truncation-warning"`；探针出错 `data-testid="probe-error"`；按钮 `data-action`：`verify`、`long-input`、`cancel-test`、`up`、`down`、`edit`、`delete`、`test`；测试结果 `data-testid="model-test"`（沿用 v0） |
+| Models 行 | `[data-testid="model-row"][data-model]`（`provider/id`，沿用 v0）；档案摘要 `data-testid="profile"`，各项 `data-field`（`tool_calling`、`tier`、`context`、`reasoning`、`cancel`）与 `data-value`；思考关不掉时多一项 `data-field="thinking_off"`、`data-value="refused"`（“Thinking: Can’t be turned off”；`off_refused` 为假时没有这一项，2026-10-24 补）；截断告警 `data-testid="truncation-warning"`；探针出错 `data-testid="probe-error"`（停在探针输出上限的“Couldn’t verify: Stopped at the probe output limit before answering”、关不掉而开思考也没答上的第 2 步说明也在这里）；按钮 `data-action`：`verify`、`long-input`、`cancel-test`、`up`、`down`、`edit`、`delete`、`test`；测试结果 `data-testid="model-test"`（沿用 v0） |
 | 模型行的提示 | 没报告 `[data-testid="not-reported"][data-field]`（`contextWindow`、`maxTokens`），在 `model-row` 里；提示 `[data-testid="model-hint"][data-kind]`：`context`、`max-output`、`reasoning`、`thinking-seen`、`image`（依次是“模型行的提示”表的五行）；提示的 Use `data-action="use-reported"` |
-| 模型表单 | `data-testid="model-form"`（沿用 v0，只有 Edit）；字段错误同提供商表单（`contextWindow`、`maxTokens`） |
+| 模型表单 | `data-testid="model-form"`（沿用 v0，只有 Edit）；字段错误同提供商表单（`contextWindow`、`maxTokens`）；Default effort for new sessions 的下拉按标签找（同现在，没有新标识），思考关不掉的模型里没有 `option[value="off"]`，存着的 Off 显示时下拉的值为 `minimal`（2026-10-24 补） |
 | 确认框 | 删除、改地址、删最后一个 key、需要同意的探针都是 `data-testid="confirm-dialog"`，`data-kind`：`delete-provider`、`delete-model`、`delete-group`、`address-change`、`last-key`、`long-input`、`cancel-test`；连带改动列表 `data-testid="cascade"` |
 | Groups | 行 `[data-testid="group-row"][data-group]`；成员 `[data-testid="group-member"][data-member]`；成员选择 `data-testid="member-picker"`，项 `data-member`、已选的带 `aria-checked="true"`；`New group` `data-action="new-group"`，内联表单 `data-testid="group-form"`，id 错误 `data-testid="group-error"`；空状态 `data-testid="groups-empty"` |
 | Project access | 行 `[data-testid="project-row"][data-path]`；勾选框 `[data-testid="project-zone"][data-zone]`；项目配置错误 `data-testid="project-config-error"`；公网确认 `data-testid="public-dialog"`；空状态 `data-testid="projects-empty"` |

@@ -315,14 +315,22 @@ export interface ModelFieldsProps {
   edit: (patch: Partial<ModelDraft>) => void;
   /** 显示的字段错误（Context window、Max output） */
   errors: FieldErrors;
+  /**
+   * 这个模型思考关不掉（档案 reasoning.off_refused，规格 §7.7）：Default effort for new sessions 不列 Off，
+   * 草稿是 off 时显示 Minimal（草稿仍是 off，只有改选才写）
+   */
+  noOff: boolean;
 }
 
 /**
  * @brief 模型表单（Edit）的字段（models-settings.md "模型表单（Edit）"）：Model ID（只读）、Context window、
  *        Max output（不随窗口变）、Family、Supports thinking、Image input、Default effort for new sessions
- *        （勾了 Supports thinking 时）。
+ *        （勾了 Supports thinking 时；noOff 时没有 Off，存着的 Off 显示为 Minimal，§7.7）。
  */
-export function ModelFields({ draft, edit, errors }: ModelFieldsProps) {
+export function ModelFields({ draft, edit, errors, noOff }: ModelFieldsProps) {
+  // §7.7：pi 对这个模型把 Off 提到 Minimal，所以显示 Minimal；存着的 off 不改写
+  const levels = noOff ? THINKING_LEVELS.filter((level) => level !== 'off') : THINKING_LEVELS;
+  const shown = noOff && draft.thinkingLevel === 'off' ? 'minimal' : draft.thinkingLevel;
   return (
     <>
       <Row label="Model ID">{(id) => <input id={id} value={draft.id} readOnly spellCheck={false} />}</Row>
@@ -337,9 +345,9 @@ export function ModelFields({ draft, edit, errors }: ModelFieldsProps) {
       {draft.reasoning && (
         <Row label="Default effort for new sessions">
           {(id) => (
-            <select id={id} value={draft.thinkingLevel}
+            <select id={id} value={shown}
               onChange={(event) => edit({ thinkingLevel: event.target.value as ThinkingLevel })}>
-              {THINKING_LEVELS.map((level) => <option key={level} value={level}>{THINKING_NAMES[level]}</option>)}
+              {levels.map((level) => <option key={level} value={level}>{THINKING_NAMES[level]}</option>)}
             </select>
           )}
         </Row>

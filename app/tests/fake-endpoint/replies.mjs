@@ -1,5 +1,8 @@
 // 合成测试端点（synthetic）的关键词回复：只用于本地验证管线，不是真实模型。规则逐条列在 server.mjs 开头。
 
+// 与 probes.mjs 互相 import：两边只在调用时用到对方的函数声明，模块求值时不用，循环引用没有问题
+import { requestedEffort, thinkingOn } from './probes.mjs';
+
 /** "long reply" 的回复：四段，每段一句开头不同的话重复几次 */
 const longReply = ['第一段：春天来了，河边的柳树发了新芽。', '第二段：夏天的午后，蝉在树上一直叫。',
   '第三段：秋天的稻田一片金黄，风吹过沙沙作响。', '第四段：冬天下了第一场雪，屋顶都白了。']
@@ -64,8 +67,9 @@ function requestReply(userText, body) {
     return { text: marker ? `系统提示里有 ${marker}` : '系统提示里没有标记', toolCalls: [] };
   }
   if (userText.includes('thinking check')) {
-    const effort = body.reasoning_effort;
-    if (!effort) return { text: '没有思考参数', toolCalls: [] };
+    // §14.1（2026-10-24）：开了思考 = 带 reasoning_effort 或 reasoning.effort 且不是 none（probes.mjs 的 thinkingOn）
+    if (!thinkingOn(body)) return { text: '没有思考参数', toolCalls: [] };
+    const effort = requestedEffort(body);
     return { thinking: `思考强度参数 ${effort}，这是思考内容。`, text: `收到思考参数：${effort}`, toolCalls: [] };
   }
   return null;

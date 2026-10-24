@@ -16,6 +16,11 @@
 //   写到 rejected）；每次截图之前读窗口的文字，出现 key 时不截；最后一条检查核对窗口的文字、Mori 的输出和这次用过的
 //   数据目录里（加密的 credentials.json 之外）都没有 key 的明文。运行它的进程从负责人的 env 文件读出 key 放进环境变量
 //   （不回显：例如 set +x 的包装脚本用 awk 读出后 export）。
+//   建目录的步骤与问题清单与 v1-models-real.mjs 的 key 方式共用（模型层规格 §14.1 的 2026-10-24 补，选项 A），在
+//   v1-real-helpers.mjs：typeKey、firstRunDeepSeek、firstRunProblems、addProviderUi、tickOnly、chooseGlm、
+//   glmAddProblems、addedProblems、savedProblems、providerBrief、地址的默认值 KEY_MODE_URLS 与 PROBE_MS。这里自己的是
+//   OpenRouter 只勾哪一行（chooseFree）、检查的名字与 detail、MD_REAL_* 环境变量（地址经 baseUrl 传进去）、截图前的
+//   key 核对（shot）与换成 *** 的做法。
 // 第一次启动（直接对真实地址）：
 //   deepseek：DeepSeek 卡上的 Fetch models（用已保存的 key）→ 清单里文档列出的模型的 Context window、Max output、
 //             Supports thinking、Image input 与 DeepSeek 官方文档一致（DEEPSEEK_DOCS 写明地址与核对日期）；已在提供商里的
@@ -69,20 +74,22 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import {
-  addModelId, apiForUrl, bodyEnvelope, brief, cardIds, cardOf, checkSource, DEEPSEEK_DOCS, fetchedState, findSecrets,
-  freeToolRow, GLM_MANUAL_ID, installRecorder, localDate, manualState, modelRowOf, modelRowState, modelsGet, OPENING,
-  OPENROUTER_BASE, pickOnly, pollFor, prepareDirect, prepareRecord, probeStatus, readJson, readRows, recBegin, recCmd,
-  recEnd, recUiCommand, redactor, rowOf, rowsFollow, startListProxy, stopListProxy, thousands, UNREPORTED_WINDOW,
-  unreportedMax, waitFetched, waitModelRow, waitProbed, waitText,
+  addModelId, bodyEnvelope, brief, cardIds, cardOf, checkSource, DEEPSEEK_DOCS, fetchedState, findSecrets, freeToolRow,
+  GLM_MANUAL_ID, installRecorder, localDate, manualState, modelRowOf, modelRowState, modelsGet, OPENING,
+  OPENROUTER_BASE, pickOnly, pollFor, prepareDirect, prepareRecord, readJson, readRows, recBegin, recCmd, recEnd,
+  recUiCommand, redactor, rowOf, rowsFollow, startListProxy, stopListProxy, thousands, UNREPORTED_WINDOW, unreportedMax,
+  waitFetched, waitModelRow, waitProbed,
 } from './md-real-helpers.mjs';
-import { openModelsSettings } from './v1-real-helpers.mjs';
+// key 方式建目录的步骤与问题清单（与 v1-models-real.mjs 共用）；PROBE_MS 为一个模型的自动探针跑完的时限（15 分钟）
+import {
+  addedProblems, addProviderUi, chooseGlm, firstRunDeepSeek, firstRunProblems, glmAddProblems, KEY_MODE_URLS,
+  openModelsSettings, PROBE_MS, providerBrief, tickOnly,
+} from './v1-real-helpers.mjs';
 
 /** 转发代理的端口（真实层 4880–4889） */
 const PROXY_PORT = 4881;
 /** 一次拉取的时限（列表请求 15 秒、最多 3 次，§11） */
 const FETCH_MS = 90000;
-/** 一个模型的自动探针跑完的时限 */
-const PROBE_MS = 15 * 60 * 1000;
 /** “几百个模型”（MD-14 OpenRouter）的下限 */
 const MANY = 200;
 /** 驱动的名字（--only） */
@@ -103,13 +110,12 @@ const REPLAY_MS = 20 * 60 * 1000;
 const REPLAY_RESULT = join(appRoot, 'test-results/md-replay.json');
 /** key 方式的 key 的环境变量（三个都要有值） */
 const KEY_VARS = { deepseek: 'MD_REAL_DEEPSEEK_KEY', glm: 'MD_REAL_GLM_KEY', openrouter: 'MD_REAL_OPENROUTER_KEY' };
-/** key 方式的地址的环境变量与没给时的地址（OpenRouter 的地址固定为 OPENROUTER_BASE） */
-const URL_VARS = { deepseek: ['MD_REAL_DEEPSEEK_URL', 'https://api.deepseek.com'],
-  glm: ['MD_REAL_GLM_URL', 'https://api.z.ai/api/anthropic'] };
-/** 首次启动表单下方测试连接的结果（含保存失败）的开头（first-run.md 状态表） */
-const TEST_DONE = /^(Connected|Connection failed|Test cancelled|Couldn[’']t (save|test))/;
-/** 测试连接的时限（首个内容 120 秒，加上保存） */
-const TEST_MS = 180000;
+/**
+ * key 方式的地址的环境变量与没给时的地址（共用的 KEY_MODE_URLS；OpenRouter 的地址固定为 OPENROUTER_BASE）。
+ * 给了环境变量时用它的值，经 firstRunDeepSeek、addProviderUi 的 baseUrl 传进去。
+ */
+const URL_VARS = { deepseek: ['MD_REAL_DEEPSEEK_URL', KEY_MODE_URLS.deepseek],
+  glm: ['MD_REAL_GLM_URL', KEY_MODE_URLS.glm] };
 /** fixture 或样本里出现了 key 时的问题（写之前已换成 ***） */
 const LEAKED = 'an API key typed into Mori appears in the recording (replaced by *** before writing)';
 
@@ -812,79 +818,18 @@ function writeGlmBodies({ state, captures }) {
   `${files.join(', ') || 'nothing written'} — ${brief(found)}`);
 }
 
-// ---------- key 方式：只经界面建数据目录 ----------
-
-/** @brief 一个提供商保存下来的样子（检查的 detail 用；key 只有 ref 与 label）。 */
-const providerBrief = (p) => (p ? { id: p.id, name: p.name, baseUrl: p.baseUrl, api: p.api, zone: p.zone,
-  keys: p.keys.length, models: p.models.map((model) => model.id) } : null);
-
-/** @brief 保存下来的提供商与界面填的、勾的对不上的地方（名称为地址的主机，§3.4；API type 按地址，§3.4）。 */
-function savedProblems(provider, { baseUrl, models }) {
-  if (!provider) return ['no provider was saved'];
-  const want = { name: new URL(baseUrl).host, baseUrl, api: apiForUrl(baseUrl), zone: 'public', keys: 1, models };
-  const got = providerBrief(provider);
-  return Object.keys(want).filter((key) => !same(got[key], want[key]))
-    .map((key) => `${key} ${JSON.stringify(got[key])}, want ${JSON.stringify(want[key])}`);
-}
+// ---------- key 方式：只经界面建数据目录（步骤与问题清单在 v1-real-helpers.mjs，与 v1-models-real.mjs 共用） ----------
 
 /**
- * @brief 把 key 输进 scope 里的 API key 框：先核对它是密码框（截图里只显示圆点），不是时不输入、抛错（调用方记成一条
- *        失败的 setup 检查）。
- */
-async function typeKey(scope, key) {
-  const input = scope.getByLabel('API key', { exact: true });
-  const type = await input.getAttribute('type');
-  if (type !== 'password') throw new Error(`the API key field has type ${type}, not password; no key was typed`);
-  await input.fill(key);
-}
-
-/**
- * @brief 首次启动表单（§6.6）：填 DeepSeek 的 Base URL 与 API key（typeKey）→ Fetch models → 只勾 DEEPSEEK_DOCS 里服务
- *        列出的第一个模型 → Public → Test connection，等结果文字与这个模型的探针跑完。
- * @return { state, rows, doc, picked（勾完之后勾着的 id）, text, provider, probed, probe }
- */
-async function firstRunSteps() {
-  const form = ctx.page.getByTestId('connection-form');
-  await form.getByLabel('Base URL', { exact: true }).fill(keyEnv.urls.deepseek);
-  await typeKey(form, keyEnv.keys.deepseek);
-  await form.locator('[data-action="fetch-models"]').click();
-  const state = await waitFetched(form, FETCH_MS);
-  const rows = await readRows(form);
-  await shot('setup-first-run');
-  const doc = DEEPSEEK_DOCS.models.find((item) => rows.some((row) => row.id === item.id && row.pickable)) ?? null;
-  if (!doc) return { state, rows, doc, picked: [], text: null, provider: null, probed: false, probe: null };
-  await pickOnly(form, doc.id);
-  const picked = (await readRows(form)).filter((row) => row.picked).map((row) => row.id);
-  await form.locator('input[name="zone"][value="public"]').check();
-  const since = Date.now() - 1000;
-  await form.locator('[data-action="test"]').click();
-  const text = await waitText(ctx.page, { root: '[data-testid="connection-form"]',
-    css: '[data-testid="form-message"]', pattern: TEST_DONE }, TEST_MS);
-  const provider = (await modelsGet(ctx.page)).config.providers[0] ?? null;
-  const connected = Boolean(text?.startsWith('Connected')) && provider !== null;
-  const probed = connected && await waitProbed(ctx.page, `${provider.id}/${doc.id}`, since, PROBE_MS);
-  await shot('setup-first-run-tested');
-  return { state, rows, doc, picked, text, provider, probed, probe: await probeStatus(ctx.page) };
-}
-
-/**
- * @brief key 方式第一步：全新的数据目录启动到首次启动表单，经表单接上 DeepSeek（firstRunSteps），记一条检查，关掉 Mori。
+ * @brief key 方式第一步：全新的数据目录启动到首次启动表单，经表单接上 DeepSeek（共用的 firstRunDeepSeek，截图用这里的
+ *        shot：截之前查窗口的文字里有没有 key），按共用的 firstRunProblems 记一条检查，关掉 Mori。
  * @return 保存的 DeepSeek 提供商 id；没接上时为 null
  */
 async function setupFirstRun(userData) {
   await launchMori(userData, 'connection-form');
-  const run = await firstRunSteps();
-  const { state, doc, provider, picked } = run;
-  const problems = [
-    ...(state.checklist && !state.listError && state.commandError === null ? [] : ['no checklist']),
-    ...(state.detected?.text === 'Detected: DeepSeek' ? [] : [`Detected ${brief(state.detected)}`]),
-    ...(doc ? [] : ['the server lists no model of DEEPSEEK_DOCS']),
-    ...(doc && !same(picked, [doc.id]) ? [`ticked: ${picked.join(', ') || 'none'}`] : []),
-    ...(run.text?.startsWith('Connected') ? [] : [`test result ${run.text}`]),
-    ...(doc ? savedProblems(provider, { baseUrl: keyEnv.urls.deepseek, models: [doc.id] }) : []),
-    ...(run.probed && run.probe?.state === 'verified' ? [] : [`probes ${run.probed ? 'done' : 'not done'}, `
-      + `probe status ${brief(run.probe)}`]),
-  ];
+  const run = await firstRunDeepSeek(ctx.page, { baseUrl: keyEnv.urls.deepseek, key: keyEnv.keys.deepseek, shot });
+  const { doc, provider, picked } = run;
+  const problems = firstRunProblems(run, keyEnv.urls.deepseek);
   record('MD-14 real setup: first run with DeepSeek (Base URL typed, API key typed into its password field): Fetch '
     + `models opens the checklist with "Detected: DeepSeek"; with only ${doc?.id ?? 'a documented model'} ticked and `
     + 'zone Public, Test connection saves the provider (the Base URL host, OpenAI-compatible, Public, one saved key, '
@@ -895,86 +840,26 @@ async function setupFirstRun(userData) {
 }
 
 /**
- * @brief 设置 → Models → Add provider（§6.1）：Base URL 与 API key（typeKey）→ Fetch models → choose(form, state, rows)
- *        只勾要的行（返回勾上的 id，勾不成时 null，这时关掉表单）→ Public → Add，等表单关掉、新卡出现。
- * @return { state, rows, picked, provider（新的提供商；没有时 null）, since（点 Add 前的时刻）, error（表单里的原文） }
+ * @brief OpenRouter（md-real.mjs 自己的选法，给共用的 addProviderUi）：只勾第一个免费、有工具支持的模型（freeToolRow，
+ *        共用的 tickOnly）。
  */
-async function addProviderUi({ baseUrl, key, choose }) {
-  const before = await cardIds(ctx.page);
-  await ctx.page.locator('[data-action="add-provider"]').click();
-  const form = ctx.page.getByTestId('provider-form');
-  await form.getByLabel('Base URL', { exact: true }).fill(baseUrl);
-  await typeKey(form, key);
-  await form.locator('[data-action="fetch-models"]').click();
-  const state = await waitFetched(form, FETCH_MS);
-  const rows = await readRows(form);
-  const picked = await choose(form, state, rows);
-  const since = Date.now() - 1000;
-  if (!picked) {
-    await form.locator('[data-action="close-form"]').click();
-    return { state, rows, picked, provider: null, since, error: null };
-  }
-  await form.locator('input[name="zone"][value="public"]').check();
-  await form.locator('[data-action="add-models"]').click();
-  const closed = await form.waitFor({ state: 'detached', timeout: 30000 }).then(() => true, () => false);
-  const error = closed ? null : await form.getByTestId('form-message').textContent().catch(() => null);
-  const after = closed ? await pollFor(() => cardIds(ctx.page), (ids) => ids.length > before.length, 15000) : before;
-  const id = after.find((item) => !before.includes(item));
-  const provider = (await modelsGet(ctx.page)).config.providers.find((item) => item.id === id) ?? null;
-  return { state, rows, picked, provider, since, error };
-}
-
-/** @brief 只勾 id 这一行，读回勾着的：只有它时返回 id，否则 null。 */
-async function tickOnly(form, id) {
-  await pickOnly(form, id);
-  const picked = (await readRows(form)).filter((row) => row.picked).map((row) => row.id);
-  return same(picked, [id]) ? id : null;
-}
-
-/** @brief GLM：服务列出了 GLM-5.3 时只勾那一行；没列出时（或列表错误）用 Add a model ID 手填，手填的行勾上（§6.4）。 */
-async function chooseGlm(form, state, rows) {
-  if (rows.some((row) => row.id === GLM_MANUAL_ID)) return tickOnly(form, GLM_MANUAL_ID);
-  if (state.checklist) await form.locator('[data-action="clear-selection"]').click();
-  await addModelId(form, GLM_MANUAL_ID);
-  const picked = (await readRows(form)).filter((row) => row.picked).map((row) => row.id);
-  return same(picked, [GLM_MANUAL_ID]) ? GLM_MANUAL_ID : null;
-}
-
-/** @brief OpenRouter：只勾第一个免费、有工具支持的模型（freeToolRow）。 */
 async function chooseFree(form, state, rows) {
   const target = state.checklist ? freeToolRow(rows) : undefined;
   return target ? tickOnly(form, target.id) : null;
 }
 
 /**
- * @brief 一次 Add provider 的检查的问题：拉取的结果（detected 给出时 Detected 一行的文字，§6.1）、勾选、表单的原文与
- *        保存下来的提供商。
- */
-function addedProblems(added, baseUrl, detected = null) {
-  const { state, picked } = added;
-  return [
-    ...(state.commandError === null && !state.cancelled && (state.checklist || state.listError) ? []
-      : [`fetch: ${brief({ commandError: state.commandError, cancelled: state.cancelled })}`]),
-    ...(detected && state.detected?.text !== detected ? [`Detected ${brief(state.detected)}`] : []),
-    ...(picked ? [] : ['the wanted row could not be ticked alone']),
-    ...(added.error ? [`Add failed: ${added.error}`] : []),
-    ...(picked ? savedProblems(added.provider, { baseUrl, models: [picked] }) : []),
-  ];
-}
-
-/**
- * @brief key 方式第二步：重新打开 Mori（首次启动保存过，进入三栏布局），设置 → Models → Add provider 加 GLM 与
- *        OpenRouter，各记一条检查；等它们的探针跑完（之后复制这个目录时不会因档案没写完而重新探测）再关掉 Mori。
+ * @brief key 方式第二步：重新打开 Mori（首次启动保存过，进入三栏布局），设置 → Models → Add provider（共用的
+ *        addProviderUi）加 GLM（chooseGlm，问题清单 glmAddProblems）与 OpenRouter（chooseFree，问题清单 addedProblems），
+ *        各记一条检查；等它们的探针跑完（之后复制这个目录时不会因档案没写完而重新探测）再关掉 Mori。
  * @return { glm, openrouter }：两个新提供商的 id；没加成的为 null
  */
 async function setupProviders(userData) {
   await startApp(userData);
-  const glm = await addProviderUi({ baseUrl: keyEnv.urls.glm, key: keyEnv.keys.glm, choose: chooseGlm });
+  const glm = await addProviderUi(ctx.page, { baseUrl: keyEnv.urls.glm, key: keyEnv.keys.glm, choose: chooseGlm });
   // z.ai 的 Anthropic 兼容列表用 hasMore、lastId（规格更正 4，§3.2、§3.3）：拿到列表时 Detected 写 Anthropic-compatible
-  // server；列表错误时没有 Detected 一行（§6.1）
-  const glmDetected = glm.state.checklist ? 'Detected: Anthropic-compatible server' : null;
-  const glmProblems = [...addedProblems(glm, keyEnv.urls.glm, glmDetected),
-    ...(glm.state.listError && glm.state.detected ? [`Detected with a list error ${brief(glm.state.detected)}`] : [])];
+  // server；列表错误时没有 Detected 一行（§6.1）。两种情况都在 glmAddProblems 里
+  const glmProblems = glmAddProblems(glm, keyEnv.urls.glm);
   record(`MD-14 real setup: Add provider for GLM (${keyEnv.urls.glm} and its API key in the password field): Fetch `
     + 'models shows the model list with "Detected: Anthropic-compatible server" (or a list error without a Detected '
     + `line); ${GLM_MANUAL_ID} is entered with Add a model ID (or ticked when the server lists it) and Add saves the `
@@ -982,7 +867,8 @@ async function setupProviders(userData) {
   brief({ problems: glmProblems, detected: glm.state.detected,
     listError: glm.state.listError, title: glm.state.title, ids: glm.rows.map((row) => row.id).slice(0, 40),
     provider: providerBrief(glm.provider) }));
-  const free = await addProviderUi({ baseUrl: OPENROUTER_BASE, key: keyEnv.keys.openrouter, choose: chooseFree });
+  const free = await addProviderUi(ctx.page, { baseUrl: OPENROUTER_BASE, key: keyEnv.keys.openrouter,
+    choose: chooseFree });
   const freeProblems = addedProblems(free, OPENROUTER_BASE, 'Detected: OpenRouter');
   record(`MD-14 real setup: Add provider for OpenRouter (${OPENROUTER_BASE} and its API key in the password field): `
     + 'Fetch models opens the checklist with "Detected: OpenRouter"; the first free model with tool support (id '

@@ -31,6 +31,8 @@
 // 在参数相同、录在当前这一段结束之前的结果里，取回放时刻当时或之后录下的第一个（同 session.state），没有时取其中最后
 // 一个；都没有时合成空结果（synthetic，keyedEmpty）。会话信息缺的 memoryNotice 按 null 补上；agents.get 的旧录制缺的
 // userTokens、total 按录下的内容补上（withAgentTokens，synthetic）。
+// 思考关不掉的模型（docs/specs/model-providers.md §7.7，2026-10-24）：EnhanceInfo 多了 noOffPicks，之前录下的 enhance.get
+// 结果与 enhance.set 结果里的 info 没有它时补成 []（withNoOffPicks，synthetic，同 M6_INFO；记忆规格 §8 的 2026-10-24 注）。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：models.discover 也是只读查询，按参数配对（KEYED，同记忆的查询）：
 // 新提供商按（kind, 去掉首尾空白的 baseUrl, api），已有提供商按（kind, providerId）；keySecret 不参与配对（录制里从不带
 // key，回放时你填的 key 不影响用哪一次录下的结果）；没录过时合成一个命令失败的结果（synthetic，discoverMissing）。
@@ -52,9 +54,11 @@ const M3_INFO = { name: null, projectTrust: 'none', trustRemembered: false, trus
  * @brief synthetic：M1 录下的 session.create / session.open 结果里还没有批准设置（M2 才加），按后台进程对新会话的
  *        默认值（每次询问、没有已允许的工具）补上；M3 的字段同样按 M3_INFO 补上；平行 Agent 的协作字段按 TEAM_INFO
  *        补上（会话信息和接上时的快照 live 都补）；记忆规格 §9.9 的 memoryNotice 按 null 补上（没有待显示的提示）。
- *        session.clearQueue 的结果没有 texts 时按插话、排队拼出。新录的原样返回。
+ *        session.clearQueue 的结果没有 texts 时按插话、排队拼出。enhance.set 结果里的 info 没有 noOffPicks 时补成 []
+ *        （withNoOffPicks）。新录的原样返回。
  */
 function withDefaults(type, value, fixture) {
+  if (type === 'enhance.set') return withNoOffPicks(type, value);
   if (type === 'session.clearQueue' && value && !('texts' in value)) {
     return { ...value, texts: [...value.steering, ...value.followUp] };
   }
@@ -151,7 +155,20 @@ function discoverMissing(command) {
 function enhanceOff(cwd) {
   return { cwd: cwd ?? '', enabled: false, pick: null, thinking: 'medium', team: false, time: '04:00', since: null,
     last: { taste: null, strategy: null, review: null }, running: null, queued: 0, next: null, notice: null,
-    effortPicks: {}, error: null };
+    effortPicks: {}, noOffPicks: [], error: null };
+}
+
+/**
+ * @brief synthetic（同 M6_INFO 的做法）：EnhanceInfo.noOffPicks 是 2026-10-24 加的（模型层规格 §7.7；记忆规格 §8 的
+ *        2026-10-24 注），之前录下的 enhance.get 结果与 enhance.set 结果里的 info 没有它，按"没有思考关不掉的模型"补成 []；
+ *        effortPicks 不变，录下的 fixture 照样有效。新录的（已有 noOffPicks）原样返回。
+ */
+function withNoOffPicks(type, value) {
+  if (type === 'enhance.get' && value && !('noOffPicks' in value)) return { ...value, noOffPicks: [] };
+  if (type === 'enhance.set' && value?.info && !('noOffPicks' in value.info)) {
+    return { ...value, info: { ...value.info, noOffPicks: [] } };
+  }
+  return value;
 }
 
 /** @brief synthetic：按参数配对的只读查询录制里没有时的空结果（§8）。 */
@@ -651,7 +668,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     const pick = matching.find((item) => item.step.t >= status.clock) ?? matching.at(-1);
     if (!pick) return Promise.resolve(keyedEmpty(command));
     if (pick.step.result.error) return Promise.reject(new Error(pick.step.result.error));
-    return Promise.resolve(structuredClone(pick.step.result.value));
+    return Promise.resolve(withNoOffPicks(command.type, structuredClone(pick.step.result.value)));
   }
 
   /** 每个文件夹已经取走的 trust.check 结果数 */

@@ -4,7 +4,13 @@
 // 多个提供商 = 多个端口（各起一个进程）。关键词回复在 replies.mjs，探针在 probes.mjs，脚本模式在 scripts.mjs，
 // 增强脚本在 enhance.mjs，列表与详情的形状在 discovery.mjs。
 //
-// 判断顺序：认证与 -replay 的拒绝 → 探针 → -404、-hang、-stall → pi 的压缩请求 → 脚本模式 → 增强脚本 → 关键词。
+// 判断顺序：认证 → -nooff 的拒绝 → -replay 的拒绝 → 探针 → -404、-hang、-stall → pi 的压缩请求 → 脚本模式 → 增强脚本
+// → 关键词。
+// 路由只看路径的结尾（2026-10-24 补，§14.1）：对话 = POST 路径以 /chat/completions 结尾，列表 = GET 路径以 /models 结尾
+// （见下面的“发现”），所以任何路径前缀下都是同样的接口。pi 只在地址含 openrouter.ai 时用 OpenRouter 的写法
+// （思考写成 reasoning: {effort}，关闭思考写成 reasoning: {effort: "none"}），测试的提供商地址因此写
+// http://127.0.0.1:<端口>/openrouter.ai/v1：/openrouter.ai/v1/models 与 /openrouter.ai/v1/chat/completions 照常回答；
+// /version、/metrics 等仍在 origin 下（内核按 origin 去请求它们）。
 // 增强脚本（docs/specs/memory.md §14.1，规则逐条列在 enhance.mjs 开头）：请求里没有 tb-scenario、最后一条用户消息是
 // 增强会话的第一条消息（附录 B 的第一句开头），且 FAKE_ENHANCE_SCRIPT 指向的脚本文件里有这种时按脚本回复；
 // 这时同样不用下面的关键词规则与故障关键词。
@@ -27,8 +33,9 @@
 //   - 用户消息含 "agents check"：系统提示里有 MORI-AGENTS-<字母数字> 时回复"系统提示里有 <它>"，否则"系统提示里没有标记"
 //     （M6：测用户级 AGENTS.md 进了新会话的系统提示）。
 //   - 用户消息含 "which model"：回复"模型：<请求里的 model>"（M6：测范围菜单换模型后新回复来自新模型）。
-//   - 用户消息含 "thinking check"：请求带 reasoning_effort 时先流式返回一段思考，再回复"收到思考参数：<值>"；
-//     不带时只回复"没有思考参数"（M6：测思考强度，pi 对 OpenAI 兼容端点在模型标了支持思考时才发这个参数）。
+//   - 用户消息含 "thinking check"：开了思考（见下面探针一节最后一条）时先流式返回一段思考，再回复"收到思考参数：<值>"
+//     （值为 reasoning_effort ?? reasoning.effort）；没开时只回复"没有思考参数"（M6：测思考强度，pi 对 OpenAI 兼容端点
+//     在模型标了支持思考时才发这个参数）。
 //   - 用户消息含 "wait <秒数>s then run: <命令>"：等这么多秒再调用 bash 工具执行该命令（测界面重新加载后才来的批准请求）。
 //   - 用户消息含 "wait <秒数>s"：等这么多秒再回复一段文字（测生成中切走、"Unread"）。
 //   - 用户消息含 "code block"：返回一段带 ts 代码块的 Markdown。
@@ -61,7 +68,8 @@
 //   - 第 8 步（本端点的约定，规格没有给原文）：用户消息含 "What is the passphrase?"：复述其中 "The passphrase is <暗号>"
 //     的暗号。
 //   - 第 9 步（本端点的约定，规格没有给原文）：用户消息以 "Count from 1 to <N>" 开头：逐行数到 N（最多 400），是长输出。
-//   - 开了思考（请求带 reasoning_effort 且不是 none）时先返回一段 reasoning_content，没开时没有思考（-alwaysthink 除外）。
+//   - 开了思考时先返回一段 reasoning_content，没开时没有思考（-alwaysthink、-nooff 除外）。"开了思考"（2026-10-24 补，
+//     §14.1；probes.mjs 的 thinkingOn）：请求带 reasoning_effort 或 reasoning.effort（取前者），且不是 "none"。
 // 模型 ID 的后缀（以 "-" 分开的段，可以叠加，例如 fake-coder-stall-nocancel）：
 //   - 只关掉对应的探针能力：-notools（第 3 步不调工具）、-nochoice（第 5 步忽略指定调用，只回文字）、
 //     -noschema（第 6 步忽略 schema）、-truncate（第 8 步估算输入超过 max_model_len 的 70% 时静默丢掉开头，答不出暗号）、
@@ -72,6 +80,17 @@
 //   - -alwaysthink：不论请求带不带思考参数，每个回复（探针、对话、压缩请求）都先回一段 reasoning_content，像总在思考的
 //     模型；回复本来就有思考（think first、thinking check）时不变。探针因此给没勾 Supports thinking 的模型记下推理字段
 //     reasoning_content（model-discovery.md §8 的 "This model returned thinking content."）。
+//   - -nooff（2026-10-24 补，§7.7、§14.1；对所有请求，探针与否都一样，在认证之后、-replay 之前判断，被拒时叠加的
+//     -replay、-404、-hang、-stall 都不起作用）：请求里带明确的
+//     "关闭思考"（reasoning.effort 为 "none"、reasoning.enabled 为 false、thinking.type 为 "disabled" 之一；
+//     probes.mjs 的 explicitThinkingOff）时回 400，响应体逐字节为 2026-10-24 在 OpenRouter 上录下的原文
+//     {"error":{"message":"Reasoning is mandatory for this endpoint and cannot be disabled.","code":400,
+//     "metadata":{"provider_name":null}}}（probes.mjs 的 NOOFF_ERROR_BODY，不换行）；不带思考参数、或带强度时照常回答，
+//     并且总带思考内容（同 -alwaysthink，回复本来有思考时不变）。普通地址下 pi 关思考时什么也不发，所以这个后缀只在
+//     /openrouter.ai/v1 前缀的地址下（或单元层替身写出那几种写法时）回 400。
+//   - -thinklong（2026-10-24 补，§7.7、§14.1；只对探针，第 1–9 步）：开了思考时只流式返回一段超过 256 token 的思考
+//     （probes.mjs 的 THINKLONG_THINKING，超过 1100 字，每块 64 字），没有正文和工具调用，以 finish_reason "length"
+//     结束（测探针的输出上限规则）；没开思考时照常回答探针。不是探针的请求不受影响。
 //
 // 认证（只对列表请求与 /chat/completions；列表以外的发现请求不查 key。下面的“key”是 Authorization: Bearer 的值，
 // 列表请求没有 Bearer 时取 x-api-key）：
@@ -148,7 +167,9 @@
 //   不是脚本模式时 scenario 为 null，其余照样算）、"enhance"（enhance.mjs 认出的增强会话的种类 taste、strategy、
 //   review，不是增强会话时为 null），最后是 "strictTools"（function.strict 为 true 的工具名）与
 //   "reasoning"（请求是否带思考参数：reasoning_effort、reasoning、thinking、enable_thinking 之一），
-//   平行 Agent 规格 §7.5 的 A 级只给交接的工具加 strict、关闭思考由它们检查。
+//   平行 Agent 规格 §7.5 的 A 级只给交接的工具加 strict、关闭思考由它们检查；
+//   再后面是 "effort"（2026-10-24 补，§14.1：reasoning_effort ?? reasoning.effort ?? null，请求里的思考强度原值，
+//   用来看会话的 Off 实际发的是 minimal、测试连接发的是 medium、-nooff 被拒的请求发的是 none）。
 //   启动时一行 "[fake-endpoint] synthetic endpoint on http://127.0.0.1:<端口>/v1 (model "fake-coder", list shape "<形状>")"。
 // 工具调用 id："call_fake_<端口>_<进程启动时刻>_<进程内计数>"，并行的请求之间、端点重启前后都不重复。
 // 其他环境变量：FAKE_PORT（默认 4319）、FAKE_CHUNK_DELAY_MS（默认 20）、FAKE_FIRST_DELAY_MS（默认 0）、
@@ -157,7 +178,8 @@
 import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { contentText, isSummaryRequest, planReply, summaryReply } from './replies.mjs';
-import { probeReply, probeStep, replayRejected, thinkingOn } from './probes.mjs';
+import { NOOFF_ERROR_BODY, NOOFF_STATUS, noOffRejected, probeReply, probeStep, replayRejected, requestedEffort,
+  thinkingOn } from './probes.mjs';
 import { logFields, scriptReply, sessionOf, withoutWorkCards } from './scripts.mjs';
 import { enhanceKindOf, enhanceReply } from './enhance.mjs';
 import { LIST_SHAPES, detailAnswer, isListPath, listAnswer, listServed } from './discovery.mjs';
@@ -214,7 +236,7 @@ const state = {
 const callIdPrefix = `call_fake_${port}_${Date.now().toString(36)}`;
 
 const SUFFIXES = new Set(['notools', 'nochoice', 'noschema', 'replay', 'truncate', '404', 'hang', 'stall', 'nocancel',
-  'alwaysthink']);
+  'alwaysthink', 'nooff', 'thinklong']);
 const NO_KEY = 'none';
 const NOCANCEL_MS = 10000;
 const SLOW_MS = 8000;
@@ -222,6 +244,8 @@ const UNLIMITED_RETRY_AFTER_S = 60;
 const OVERFLOW_MESSAGE = "This model's maximum context length is 1000 tokens";
 const REPLAY_THINKING = 'Synthetic reasoning before answering.';
 const ALWAYS_THINKING = 'Synthetic reasoning from a model that always thinks.';
+/** -nooff 的模型总在思考：没有思考的回复补上这一段（§14.1，2026-10-24） */
+const NOOFF_THINKING = 'Synthetic reasoning from a model whose thinking cannot be turned off.';
 const REPLAY_MESSAGE = 'The reasoning_content in the thinking mode must be passed back to the API.';
 const MORI_NOTE = '[Mori] The previous model';
 const COMPACTED = 'The conversation history before this point was compacted';
@@ -235,10 +259,10 @@ function errorBody(message, type, code) {
   return { error: code ? { message, type, code } : { message, type } };
 }
 
-/** @brief 以 JSON 回复。 */
+/** @brief 以 JSON 回复；body 已是 JSON 文字（字符串）时原样发出（-nooff 的 400 要逐字节照录下的原文）。 */
 function sendJson(res, status, body, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'application/json', ...headers });
-  res.end(JSON.stringify(body));
+  res.end(typeof body === 'string' ? body : JSON.stringify(body));
 }
 
 /** @brief 请求里的 Bearer key；没有时为 null。 */
@@ -332,14 +356,16 @@ function strictToolNames(body) {
 
 /**
  * @brief 每个对话请求一行 JSON 日志；extra 是 scripts.mjs 的 logFields，接在原有字段后面；
- *        最后是 strictTools 与 reasoning（请求是否带思考参数）。
+ *        然后是 strictTools 与 reasoning（请求是否带思考参数），最后是 effort（§14.1，2026-10-24：
+ *        reasoning_effort ?? reasoning.effort ?? null，请求里的思考强度原值）。
  */
 function logRequest(req, body, probe, status, extra) {
   const key = bearer(req);
   const roles = (body.messages ?? []).map((m) => m.role);
   const line = { port: req.socket.localPort, model: body.model ?? null, key: key ? key.slice(-4) : null, roles, status,
     probe, ...extra, strictTools: strictToolNames(body),
-    reasoning: REASONING_FIELDS.some((field) => body[field] !== undefined && body[field] !== null) };
+    reasoning: REASONING_FIELDS.some((field) => body[field] !== undefined && body[field] !== null),
+    effort: requestedEffort(body) };
   console.log(JSON.stringify(line));
 }
 
@@ -353,7 +379,10 @@ function pieces(text, size) {
 /** @brief 一次回复的增量序列：[delta, 发完是否等一个分块间隔]。 */
 function deltas(reply) {
   const out = [];
-  for (const piece of pieces(reply.thinking ?? '', 4)) out.push([{ reasoning_content: piece }, true]);
+  // thinkingPiece：-thinklong 的长思考用大一些的分块（probes.mjs），其他回复每块 4 个字
+  for (const piece of pieces(reply.thinking ?? '', reply.thinkingPiece ?? 4)) {
+    out.push([{ reasoning_content: piece }, true]);
+  }
   for (const piece of pieces(reply.text, 2)) out.push([{ content: piece }, true]);
   // 多个调用按 OpenAI 的分块格式：每个调用先发带 id 和名字的头，再分段发参数；tool_calls[].index 区分是第几个调用。
   for (const [index, call] of reply.toolCalls.entries()) {
@@ -391,7 +420,9 @@ async function streamReply(res, reply, opts) {
     if (pause) await sleep(chunkDelayMs);
   }
   if (!open()) return;
-  send({ index: 0, delta: {}, finish_reason: reply.toolCalls.length > 0 ? 'tool_calls' : 'stop' });
+  // finishReason：-thinklong 停在输出上限时为 "length"（§7.7）；没有时按有没有工具调用
+  const finish = reply.finishReason ?? (reply.toolCalls.length > 0 ? 'tool_calls' : 'stop');
+  send({ index: 0, delta: {}, finish_reason: finish });
   if (opts.includeUsage) {
     const usage = { prompt_tokens: opts.promptTokens, completion_tokens: 20, total_tokens: opts.promptTokens + 20 };
     res.write(`data: ${JSON.stringify({ ...base, choices: [], usage })}\n\n`);
@@ -477,21 +508,25 @@ async function handleChat(req, res) {
   const log = (status, calls = []) => logRequest(req, body, step > 0, status,
     { ...logFields(body, info, calls), enhance });
   trackRunning(res, flags);
+  // §14.1（2026-10-24）-nooff：明确的"关闭思考"回 400，响应体逐字节照 OpenRouter 的原文（字符串原样发出）
+  const noOff = noOffRejected(body, flags) ? { status: NOOFF_STATUS, body: NOOFF_ERROR_BODY } : null;
   const replay = replayRejected(body, flags, state.reasonedCalls)
     ? { status: 400, body: errorBody(REPLAY_MESSAGE, 'invalid_request_error') } : null;
   const fail = (failure) => {
     log(failure.status);
     sendJson(res, failure.status, failure.body, failure.headers);
   };
-  const early = keyFailure(bearer(req), true) ?? replay;
+  const early = keyFailure(bearer(req), true) ?? noOff ?? replay;
   if (early) return fail(early);
   if (step === 0 && nonProbeSuffix(res, body, flags, log)) return;
   const plan = step > 0 ? { reply: probeReply(step, body, flags, config.maxModelLen) }
     : conversationPlan(body, flags, info);
   if (plan.failure) return fail(plan.failure);
   const { reply } = plan;
-  // -alwaysthink：不论请求带不带思考参数都先回一段思考（探针、对话、压缩请求都一样），已有思考的回复不变
+  // -alwaysthink：不论请求带不带思考参数都先回一段思考（探针、对话、压缩请求都一样），已有思考的回复不变；
+  // -nooff 同样总在思考（§14.1：不带思考参数、带强度都照常回答并带思考内容）
   if (flags.has('alwaysthink') && !reply.thinking) reply.thinking = ALWAYS_THINKING;
+  if (flags.has('nooff') && !reply.thinking) reply.thinking = NOOFF_THINKING;
   const lastText = plan.lastText ?? '';
   assignCallIds(reply, flags);
   const slow = body.model === 'fake-slow' || /\bslow\b/.test(lastText);

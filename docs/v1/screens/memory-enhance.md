@@ -2,6 +2,8 @@
 
 依据：提示词分层与记忆构建规格（[memory.md](../../specs/memory.md)，下称“规格”）§10.4（增强一块）、§9.1（设置与开关）、§9.3–§9.4（什么时候跑、队列）、
 §9.6（失败的原因）、§9.8–§9.10（结果、你看到什么、中途退出）、§8（命令、进度事件、动作记录）、§10.10（后台进程退出时）；proposal §10.5。
+2026-10-24 补：设置对话框的 `Effort` 对思考关不掉的模型不列 Off，按统一模型提供商构建规格（[model-providers.md](../../specs/model-providers.md)，下称“模型层规格”）§7.7、§9.1；
+数据来自 `enhance.get` 新加的 `noOffPicks`（模型层规格 §7.7；规格 §8 `enhance.get` 一行、§10.4 的 2026-10-24 注）。
 新增的界面（v0 没有对应的屏），在记忆页 `Project` 层、分节上面（[memory-page.md](memory-page.md)）；增强改了东西之后新会话顶部的提示见 [memory-chat.md](memory-chat.md)。
 界面文字为英文，按规格 §10.4 原文。规格标了“临时”的文字（登记在规格 §12）写作“（临时，规格 §12）”；规格没给、本表定的写作“（临时，走查时可以改）”。
 
@@ -9,7 +11,8 @@
 
 | 来源 | 内容 |
 | --- | --- |
-| `enhance.get { cwd }` 的结果 | `EnhanceInfo`：`enabled`、`pick`（没有默认范围时 null）、`thinking`、`team`、`time`（`HH:MM`）、`since`、`last`（三个任务各自的上次结果：`day`、`at`、`status`（`done` / `failed` / `skipped`）、`error`、`revision`、`tokens`、`counts`）、`running`（这个项目正在跑的 `{ task, day }`）、`queued`（这个项目在队列里排着的项数，不含正在跑的）、`next`（下次到点的时刻）、`effortPicks`（模型设置里每个选择范围按 §9.1 取到的第一个候选是否标了 Supports thinking，取不到候选的范围不在里面；设置对话框的 `Effort` 用）、`error`（读不出设置、项目目录被占用） |
+| `enhance.get { cwd }` 的结果 | `EnhanceInfo`：`enabled`、`pick`（没有默认范围时 null）、`thinking`、`team`、`time`（`HH:MM`）、`since`、`last`（三个任务各自的上次结果：`day`、`at`、`status`（`done` / `failed` / `skipped`）、`error`、`revision`、`tokens`、`counts`）、`running`（这个项目正在跑的 `{ task, day }`）、`queued`（这个项目在队列里排着的项数，不含正在跑的）、`next`（下次到点的时刻）、`effortPicks`（模型设置里每个选择范围按 §9.1 取到的第一个候选是否标了 Supports thinking，取不到候选的范围不在里面；设置对话框的 `Effort` 用）、`error`（读不出设置、项目目录被占用）（2026-10-24 补：另有 `noOffPicks`，见下一行） |
+| `enhance.get { cwd }` 的结果里的 `noOffPicks`（2026-10-24 补，模型层规格 §7.7） | `ModelPick[]`：第一个候选（按 §9.1 的取法，同 `effortPicks`）的档案 `reasoning.off_refused` 为真的那些选择范围；那个候选没有档案时按假（不在里面），取不到候选的范围也不在里面。设置对话框的 `Effort` 用，下文称所选范围在 `noOffPicks` 里为“第一个候选没有 Off”。`effortPicks` 不变（仍是 `Record<ModelPick, boolean>`，录下的回放 fixture 照样有效） |
 | `enhance.set { cwd, enabled?, pick?, thinking?, team?, time? }` 的结果 | `{ error, info: EnhanceInfo }` |
 | `enhance.run { cwd }` 的结果 | `{ error }`：排进队列（§9.9） |
 | `mori.enhance_progress { cwd, task, day, phase, error?, revision? }` | 全局事件：每个任务排队（`queued`）、开始（`running`）、结束（`done`）、跳过（`skipped`）、失败（`failed`）时 |
@@ -41,7 +44,7 @@ token 数不到 1000 写 `<n> tokens`（1 时 `1 token`），1000 起写 `<n>k t
   `enhance.set` 期间又发了 `enhance.get`（例如收到进度事件，那次读可能在设置写进之前）：不用这次的 `info`，返回后再读一次 `enhance.get`（临时，走查时可以改）。
 
 打开时取的值（§9.1）：`pick` 取设置里新会话的默认范围，`thinking` 取它第一个候选的默认思考强度，`team` 为假，`time` 为 `04:00`（已有的值保留）；
-从打开那天读起，关着期间的日子不补。
+从打开那天读起，关着期间的日子不补。（2026-10-24 补：取到的是 Off 而第一个候选没有 Off 时照存 `off`，对话框里显示为 `Minimal`，见“设置对话框”。）
 
 ## 状态行
 
@@ -88,6 +91,8 @@ token 数不到 1000 写 `<n> tokens`（1 时 `1 token`），1000 起写 `<n>k t
 | `Effort` | `info.thinking`；`info.effortPicks[<所选范围>]`（后台进程按 §9.1 取默认强度的规则取第一个候选，§8） | 标签 `Effort`；下拉（`enhance-effort`）是 pi 的七档，文字同顶栏：`Off`、`Minimal`、`Low`、`Medium`、`High`、`Extra high`、`Max` | 选一档 |
 | `Effort` 不可用 | `effortPicks[<所选范围>]` 为假：第一个候选的模型没标 Supports thinking | 下拉不可用，悬停 `This model isn’t marked “Supports thinking”`（同输入框下面一行的 Effort 按钮）；保持原来的值（临时，走查时可以改） | — |
 | `Effort` 没有范围 | 下拉没有选中范围，或所选范围不在 `effortPicks` 里（取不到候选） | 下拉不可用，悬停 `Choose a model first.`；保持原来的值（临时，走查时可以改） | 选一个范围 |
+| `Effort` 没有 Off（2026-10-24 补，模型层规格 §7.7、§9.1） | `effortPicks[<所选范围>]` 为真，且所选范围在 `info.noOffPicks` 里（`effortPicks` 为假时按“`Effort` 不可用”，不看 `noOffPicks`） | 下拉不列 `Off`（不是变淡），从 `Minimal` 起，其余同 `Effort`；没有悬停说明（模型层规格只给了输入框下面一行的 Effort 菜单那一句，临时，走查时可以改） | 选一档 |
+| 存的是 Off、第一个候选没有 Off（2026-10-24 补，模型层规格 §7.7） | 草稿的强度是 `off`（`info.thinking` 为 `off`，或草稿是 Off 时改选了这样的范围），所选范围同上一行（在 `noOffPicks` 里） | 下拉显示 `Minimal`（增强会话经虚拟模型路由，pi 按实际模型把 Off 提到 Minimal，用的就是它）；不动 `Effort` 就保存时照存：`enhance.set` 带 `thinking: 'off'`；改选第一个候选有 Off 的范围时显示回 `Off` | 选另一档 |
 | `Team mode` | `info.team` | 标签 `Team mode`；勾选框 `Run with team mode`（`enhance-team`），下面一行 `Uses this project’s agents in .mori/agents.`（临时，规格 §12） | 勾选 |
 | `Daily time` | `info.time` | 标签 `Daily time`；`<input type="time">`（`enhance-time`），下面一行 `Runs once a day at this time. Conversations before it count as the previous day.`（临时，规格 §12） | 改时间 |
 | 时间清空 | 你清空了时间框、点了 `Save` | 显示 `Choose a time.`，不发命令 | 填时间 |
@@ -98,6 +103,8 @@ token 数不到 1000 写 `<n> tokens`（1 时 `1 token`），1000 起写 `<n>k t
 
 - 开关关着时也能打开对话框、保存设置（规格没有限制）；保存不改开关。
 - 选了范围之后 `Effort` 不自动换成那个模型的默认强度（规格只在打开开关时取默认值，临时，走查时可以改）。
+- （2026-10-24）有没有 Off 按最近一次 `enhance.get` 的 `noOffPicks`：对话框开着时重新探测改了档案，下拉不跟着变，下次读 `enhance.get` 时按新的
+  （同 `effortPicks`，不轮询）。界面不自己读档案或 `models.get` 判断有没有 Off（第一个候选只有后台进程取得出来）。
 
 ## 进度
 
@@ -123,6 +130,8 @@ token 数不到 1000 写 `<n> tokens`（1 时 `1 token`），1000 起写 `<n>k t
 - 关掉开关不撤销已写入的改动；它们在那条修订里，可以回滚。
 - `User` 层没有增强一块；不开记忆页时界面不读 `enhance.get`（反馈表单除外，memory-chat.md）。
 - 跳过的运行没有修订，不出现在 `Revisions` 里。
+- （2026-10-24，模型层规格 §7.7）第一个候选没有 Off 时 `Effort` 不列 `Off`，但不把已经存的 `off` 改写成 `minimal`（照存）；
+  增强运行时 pi 按实际模型把 Off 提到 Minimal，服务不回 400。第一个候选有 Off、或没标 Supports thinking 时下拉照旧（七档；不可用时照旧不可用）。
 
 ## 本表定下的界面细节
 
@@ -130,9 +139,22 @@ token 数不到 1000 写 `<n> tokens`（1 时 `1 token`），1000 起写 `<n>k t
 `Run now` 发出中不可用；`Couldn’t run enhancement: …` 在下一次重读时换回状态行；对话框 Esc 等于 `Cancel`；`pick` 为 null 时下拉没有选中项、不选就保存不带 `pick`；
 `Effort` 不可用时保持原来的值、改范围时不自动换强度，没有选中范围或范围取不到候选时不可用、悬停 `Choose a model first.`；保存中 `Save` 不可用；
 `enhance.set`、`enhance.run` 的结果在页面换了项目时不改状态行，`enhance.set` 期间又读了 `enhance.get` 时不用它的 `info`、返回后再读一次。按 `shared/memory.ts` 的 `enhanceStatusText`：`Last run` 的时刻取那一天最晚的 `last.at`。
+（2026-10-24，模型层规格 §7.7 只定了“不列 Off、存的 Off 照存、显示为 Minimal”）`Effort` 没有 Off 时没有悬停说明；存的是 Off、显示 `Minimal` 时
+在下拉里再点 `Minimal` 不算改动（它已经是显示的值，同输入框下面一行的 Effort 菜单点当前项），保存仍写 `off`；对话框开着时档案变了不跟着变。
 
 规格自己标“临时”、登记在规格 §12 的：关着的状态行、排着的状态行、全部跳过的状态行、`Uses this project’s agents in .mori/agents.`、
 `Runs once a day at this time. Conversations before it count as the previous day.`。
+
+## 需要规格回答
+
+已回答：
+
+- （已回答：模型层规格 §7.7）**“第一个候选没有 Off”从哪里来**：第一个候选由后台进程按规格 §9.1 取，界面在范围是分组或提供商时算不出来。
+  模型层规格 §7.7 定为 `EnhanceInfo` 加 `noOffPicks: ModelPick[]`（第一个候选的档案 `reasoning.off_refused` 为真的范围，没有档案按假），
+  `effortPicks` 不变（录下的回放 fixture 照样有效）；没有采用把 `effortPicks` 的值改成对象的建议。规格 §8 `enhance.get` 一行与 §10.4
+  加 2026-10-24 注。见“来源”的 `noOffPicks` 一行与“设置对话框”的 `Effort` 没有 Off。
+
+待回答：没有。
 
 ## 界面测试用的标识
 
@@ -144,3 +166,4 @@ token 数不到 1000 写 `<n> tokens`（1 时 `1 token`），1000 起写 `<n>k t
 | 按钮 | `enhance-run`、`enhance-settings` |
 | 开关失败 | `data-testid="enhance-error"`（本表定，临时） |
 | 设置对话框 | `enhance-dialog`，内含 `enhance-model`、`enhance-effort`、`enhance-team`、`enhance-time`、`enhance-save`；`Choose a time.` 与保存失败的文字是对话框里的 `role="alert"`（本表定，临时） |
+| `Effort` 的强度（2026-10-24，模型层规格 §7.7） | `enhance-effort` 里每档一个 `option`，`value` 为强度（现有代码）；所选范围在 `info.noOffPicks` 里时没有 `option[value="off"]`（MP-39）；存的是 Off 时 `enhance-effort` 的 `value` 为 `minimal`，不动它保存时 `enhance.set` 的 `thinking` 为 `off` |

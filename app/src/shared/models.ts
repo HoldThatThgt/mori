@@ -561,9 +561,14 @@ export interface ProfileView {
   structured_output: Capability;
   /** 配置声明了图像输入为 unverified，否则 failed */
   vision: Capability;
-  /** 推理字段、能否关掉思考、要不要回传推理内容 */
+  /** 推理字段、能否关掉思考、要不要回传推理内容、关闭思考是否被服务拒绝 */
   reasoning: {
     field: ReasoningField; can_disable: boolean | 'unknown'; replay: 'required' | 'not_required' | 'unknown';
+    /**
+     * 第 2 步关闭思考被服务以 400 或 422 拒绝、medium 有正文（§7.7）；这时 can_disable 为 false。
+     * 补丁之前的档案（没有 auto.offRefused）为 false
+     */
+    off_refused: boolean;
   };
   /** 窗口：配置声明的、服务报告的（没有时为 null）、有效的；长输入是否被静默截断 */
   context: {

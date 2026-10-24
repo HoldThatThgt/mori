@@ -35,7 +35,10 @@ function toolCalling(profile: ProfileView | null, running: boolean): { value: st
   return { value: profile.tool_calling.state, text: texts[profile.tool_calling.state] };
 }
 
-/** @brief 档案摘要（§9.1）；探针出错时"Couldn't verify: <原文>"，静默截断时告警。 */
+/**
+ * @brief 档案摘要（§9.1）；探针出错时"Couldn't verify: <原文>"，静默截断时告警。思考关不掉的模型
+ *        （reasoning.off_refused，§7.7）在 Reasoning field 后、Cancel 前多一项"Thinking: Can’t be turned off"。
+ */
 function ProfileSummary({ modelRef }: { modelRef: string }) {
   const { profile, running } = useProfile(modelRef);
   const tool = toolCalling(profile, running);
@@ -52,6 +55,10 @@ function ProfileSummary({ modelRef }: { modelRef: string }) {
             text={thousands(profile.context.effective)} />
           <Item field="reasoning" label="Reasoning field" value={profile.reasoning.field}
             text={profile.reasoning.field} />
+          {/* §7.7：第 2 步的说明只存在档案里，这里只写这一项；为假时没有它 */}
+          {profile.reasoning.off_refused && (
+            <Item field="thinking_off" label="Thinking" value="refused" text="Can’t be turned off" />
+          )}
           <Item field="cancel" label="Cancel" value={String(cancel)} text={cancelText} />
         </>
       )}

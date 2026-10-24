@@ -1,7 +1,8 @@
 // 输入框下面一行的思考强度按钮（"Effort"）和菜单（docs/v0/screens/models.md，v1 改动见 docs/v1/screens/model-menu.md
 // "思考强度"）：只作用于这个会话，新会话的默认在设置里按模型设定；可选的强度取当前模型（实际模型）的。
 // 模型没标"Supports thinking"时按钮写"Unavailable"、能点开，菜单里的强度都不可用（不是藏起来），并说明原因、
-// 可以打开 Settings → Models。开关、位置和焦点的行为在 rowMenu.ts。
+// 可以打开 Settings → Models。思考关不掉的模型（规格 §7.7、§9.2）：thinkingLevels 里没有 off，菜单就没有 Off，
+// 底部多一句说明；会话是 Off 时 thinkingLevel 已由 pi 收紧成 minimal，界面不另外判断。开关、位置和焦点的行为在 rowMenu.ts。
 
 import { useId, useRef } from 'react';
 import { THINKING_LABELS, type ThinkingLevel } from '../../../shared/protocol';
@@ -15,6 +16,9 @@ import { useRowMenu, useRowPlacement } from './rowMenu';
 
 /** 模型没标支持思考时菜单里列出（都不可用）的强度：标了支持思考、没有强度映射的模型可选的 off–high（pi-ai models.js） */
 const PLAIN_LEVELS: ThinkingLevel[] = ['off', 'minimal', 'low', 'medium', 'high'];
+
+/** 思考关不掉的模型的菜单底部说明（规格 §7.7、§9.2）：在原来的底部说明下面单独一行，不是菜单项 */
+const NO_OFF_TEXT = 'This model can’t turn thinking off.';
 
 /** 模型没标支持思考时菜单里的说明（§9.2） */
 const UNSUPPORTED_TEXT = 'This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and '
@@ -39,10 +43,13 @@ interface ThinkingPanelProps {
 
 /**
  * @brief 菜单：可选的强度（当前的打勾）和底部说明；模型没标支持思考时强度都不可用，换成原因和"Open settings"。
+ *        支持思考而 levels 里没有 off 时（规格 §7.7）底部说明下面再加一句"This model can’t turn thinking off."。
  *        打开时焦点在当前项上（都不可用时在"Open settings"上）。
  */
 function ThinkingPanel({ menu, levels, current, reasoning, onChoose, onSettings }: ThinkingPanelProps) {
   useFocusCurrent(menu);
+  // §7.7：只看 reasoning 与 pi 给的 levels，界面不读档案（model-menu.md"思考关不掉"）
+  const noOff = reasoning && !levels.includes('off');
   return (
     <div ref={menu} className="menu switch-menu thinking-menu" role="menu" aria-label="Effort"
       data-testid="thinking-menu" onKeyDown={moveMenuFocus}>
@@ -53,9 +60,12 @@ function ThinkingPanel({ menu, levels, current, reasoning, onChoose, onSettings 
         </button>
       ))}
       {reasoning ? (
-        <p className="menu-note">
-          Applies to this session only. Set each model’s default for new sessions in Settings.
-        </p>
+        <>
+          <p className="menu-note">
+            Applies to this session only. Set each model’s default for new sessions in Settings.
+          </p>
+          {noOff && <p className="menu-note" data-testid="thinking-off-note">{NO_OFF_TEXT}</p>}
+        </>
       ) : (
         <>
           <p className="menu-note">{UNSUPPORTED_TEXT}</p>

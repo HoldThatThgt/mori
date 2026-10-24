@@ -238,7 +238,211 @@ first-run.md 还沿用它的“首次启动之后：打开文件夹”一节，�
    第 47 行（“连接表单只写“Save connection””）、[v0/screens/README.md](../v0/screens/README.md) 里 connection.md 那一行；
    代码注释 `renderer/src/styles/settings.css:3`、`:131` 也还提到“Connections and models”和已删掉的 key 提示。
 
+## 思考关不掉的模型：实测（2026-10-24，分支 `claude/v1-reasoning-mandatory`）
+
+为规格 §7.7（2026-10-24 补丁，负责人选定方案 B）在实现之前测的三项。做法：一个只在规划会话临时目录里的脚本（不进仓库），
+用 pi-ai 1.3.0 的 `streamSimple` 照探针的写法发出（同样的提示、`get_weather` 工具、`{ outcome }` 的 JSON schema、最大输出 256 token），
+模型按 Mori 编译的样子写（`openai-completions`、地址 `https://openrouter.ai/api/v1`、勾 Supports thinking；“有标记”即加 `thinkingLevelMap: { off: null }`）。
+key 由脚本从你的 `openrouter.env` 读出、不打印；记录里只有状态、发出的 `reasoning` 字段和回复摘要。共 27 个请求，全是 HTTP 200 或预期的 400。
+
+| 模型 | 请求 | 发出的 `reasoning` | 结果 |
+| --- | --- | --- | --- |
+| `recursive/flint-v1.0:free` | 第 1 步，`medium` | `{ effort: "medium" }` | 200，“ready” |
+| 同上 | 第 2 步的关思考，没有标记 | `{ effort: "none" }` | 400 `{"error":{"message":"Reasoning is mandatory for this endpoint and cannot be disabled.","code":400,"metadata":{"provider_name":null}}}` |
+| 同上 | 同一句，有标记、不传强度 | 不发 | 200，“ready”，有思考 |
+| 同上 | 第 3、4、6 步，`medium` | `{ effort: "medium" }` | 都通过：`get_weather({ city: "Paris", days: 3 })`、回答含 21、`{"outcome":"ok"}` |
+| 同上 | 第 7 步连发 3 次，`medium` | `{ effort: "medium" }` | 3 次都通过（输出 111–187 token） |
+| 同上 | 第 3、4 步，有标记、不传强度 | 不发 | 都通过 |
+| `liquid/lfm-2.5-2.6b:free` | 第 1 步，`medium` | `{ effort: "medium" }` | 200，“ready” |
+| 同上 | 第 2 步的关思考，没有标记 | `{ effort: "none" }` | 400，原文同上 |
+| 同上 | 同一句，有标记、不传强度 | 不发 | 200，“ready”，有思考 |
+| 同上 | 第 3、4、6 步，`medium` | `{ effort: "medium" }` | 都通过（第 6 步 `{"outcome": "fail"}`，在枚举内） |
+| 同上 | 第 7 步连发 3 次，`medium` | `{ effort: "medium" }` | 3 次都停在 256 token（`finish_reason: length`），只有约 900 字思考、没有正文：按 §7.7 的输出上限规则为出错 |
+| 同上 | 第 3、4 步，有标记、不传强度 | 不发 | 都通过 |
+| `openai/gpt-oss-20b`（列 `[high, medium, low]`） | `minimal`、`medium` | `{ effort: "minimal" }` / `"medium"` | 都是 200、正常回答 |
+| `z-ai/glm-5.3-flash`（列 `[max, high, low]`） | `minimal`、`medium`、`low` | 各自的值 | 都是 200、正常回答（`medium` 时回复里没有思考内容） |
+
+结论（已写进规格 §7.7 末尾）：
+
+1. 探针用 `medium` 可行；最大输出维持 256，但必须有“停在输出上限、只有思考算出错”的规则（lfm 的第 7 步）。lfm 第 6 步通过，真实探测时得 B 级、不跑第 7 步。
+2. 不传 `reasoning` 字段时 OpenRouter 按默认思考、正常回答：有标记的模型即使收到不带强度的请求（标记这道保险）也不会出错；按规格 §7.7 Mori 本来就不发这样的请求（测试连接、探针带 `medium`，换模型后重发收紧成 `minimal`）。
+3. 强度不在模型的 `supported_efforts` 里时 OpenRouter 不拒绝：会话里 Off 提到的 `minimal` 能发。只测了 OpenRouter；Anthropic、百炼、MiniMax 的必须思考的模型没有测。
+
+另外更正 [discovery-checks.md](discovery-checks.md) 第 170 行的说法：OpenRouter 列出工具的 17 个免费模型里只有 2 个要求思考（上面两个），不是全部；探针第 1 步（`medium`）没有被拒，被拒的是关闭思考的第 2、3、5、6、7 步。
+
+## 思考关不掉的模型：实现与检查（2026-10-24，分支 `claude/v1-reasoning-mandatory-impl-640e42`）
+
+按规格 §7.7 与它链接的 2026-10-24 补实现（基于 `claude/v1-reasoning-mandatory` 的 `b885773`，即 `app-v0` 的 `ab57183` 加文档；
+之后合并了 `origin/app-v0` 的 `31597b7`，只带进 composer-pickers 两处测试的时序修正）。提交：`0f791cf` 实现，`a0fb11c` 测试，
+`17134f6` 真实层的共用建目录，`8881767` 合并 `app-v0`，`b38f0fe` `m1-replay` 的时序修正，以及记这一节的提交。没有推送、没有合并。
+
+### 你给这次工作定的规则（2026-10-24，原话转述）
+
+1. **什么都不推后**：§7.7 的每一条和 MP-38、MP-39、MP-40 在它列的每一层都实现并通过；不留 TODO、“以后再做”“未实现”的说明、
+   桩，也不留跳过的、todo 的、已知失败的测试。用测试守住：`node tests/spec-coverage.mjs --spec model` 要通过（含 MP-40）；
+   跳过的与 todo 的测试算失败；加一项以新编号开头的检查，在这次新加或改动的文件里查 TODO / FIXME / “not implemented” / “later”。
+2. **§7.7 没写的不做**：不读 `reasoning.mandatory` 等列表里的标记，不按模型名判断，不加配置项，不在被拒后换个强度重发，
+   不迁移、不自动重新探测旧档案；每条新代码路径都指向规格的一节。规格有挡路的缺口、或与已合并的界面矛盾时，停下来带选项问你。
+3. **真实层（MP-40）**：用 `HoldThatThgt` 目录下 `openrouter.env` 里的 key，经 `MP_REAL_OPENROUTER_KEY` 传入（§14.1），
+   不打印、不写日志、不提交；免费模型每天有请求上限，真实运行要少。
+
+做法按你一贯的偏好：先写契约（`shared/` 的类型、内核接口、文件归属），再用 Workflow 并行实现（四条互不相交的线，各带审查），
+然后只读审查（五个角度，每条发现三位对抗核实），再写测试（五条线，各带审查），最后依次跑测试。
+
+### 你在这次工作中定的（2026-10-24）
+
+- **真实层的数据目录（选项 A，“用 env 里的 key 新建数据目录”）**：本机没有你的 Mori 数据目录（`C:\Users\56865` 下没有
+  `model-config.json`，2026-10-21 跑 MP-27 用的目录与它的结果文件也不在了），MP-27 原来的 `--source` 方式跑不了。按你选的，
+  `v1-models-real.mjs` 加了 key 方式：不给 `--source`，`MP_REAL_DEEPSEEK_KEY`、`MP_REAL_GLM_KEY`、`MP_REAL_OPENROUTER_KEY`
+  （由运行它的进程从 `deepseek.env`、`glm.env`、`openrouter.env` 读出、不打印），只经界面建新的数据目录：首次启动表单接
+  DeepSeek，Add provider 接 GLM 与 OpenRouter；建目录的步骤从 `md-real.mjs` 移到 `v1-real-helpers.mjs`，两边共用（MD-14 的
+  名字、环境变量与地址覆盖不变，一次逐条比对的审查确认行为相同）；之后照原样跑 MP-27 与 MP-40。`--source` 方式不变。
+  已写进规格 §14.1 的 2026-10-24 补。我另定的一点：OpenRouter 的 Add provider 就是 MP-40 那条“找不到时用
+  `MP_REAL_OPENROUTER_KEY` 经 Add provider 加入”，在建目录时做、只勾 flint，lfm 再经卡上的 Fetch models 加入；
+  建目录时不先加别的免费模型，免得同一天把免费模型多探测一遍。
+- **MP-40 的 lfm 一条（选项 B，“现在就改 MP-40”）**：原来写 lfm“`tool_calling: verified`、等级 B”。两次真实运行都没过，
+  原因都在服务或模型：第一次 OpenRouter 回 429（上游限流），第二次第 6 步把 256 token 全用在思考上，按 §7.7 的输出上限规则为
+  出错，第 7 步不跑、等级为空。你定：lfm 在 `tool_calling: verified`、`off_refused: true`，且等级 B **或**第 6 步出错为
+  “Stopped at the probe output limit before answering”（只能是出错，不能是不通过）时通过；理由是 lfm 在 `medium` 下第 6 步的
+  思考长度不定，在 256 的上限上两样都可能，这一条要验证的是必须思考的模型变得可用；探针上限不调，不为它另加一次真实运行
+  （只在覆盖检查需要新的结果文件时才跑）。已改规格 §14.2 的 MP-40 一行（2026-10-24 负责人改）与 `v1-models-real.mjs` 的检查
+  （`lfmTierOk`，只认这两种结果）。原来的结果文件里是按旧条件记的失败，覆盖检查读不到新条件下的结果，所以照你的条件又跑了一次（第三次，结果见下）。
+- **到此为止，lfm 一条记为未验证（“到此为止，记为未验证”）**：第三次的第 6 步又被 OpenRouter 上游限流（429）之后，你定不再跑
+  真实层、不再改 MP-40 的写法，把 lfm 那一条记为未验证（外部限流）。另两个选项你没有选：把 lfm 换成便宜的付费模型
+  `openai/gpt-oss-20b`；以后再试 lfm。之后照下面“以后要补跑时”的命令补。
+
+### 我替你定的（走查时都可以改）
+
+1. **契约**：`modelCompile.ts` 的查档案改为一个 `ProfileLookup`，一次给出 `{ replayRequired, offRefused }`（原来的
+   `ReplayLookup` 只给回传一项）；`modelProfiles.ts` 的 `compileFlagsOf` 给编译和 `storeProbe` 的比较共用。
+   `probes.ts` 的第 8、9 步多一个参数 `offRefused`（档案里存的），`runAutoProbes` 不看档案、按本组第 2 步。
+2. **输出上限的回复保留消息**：停在输出上限、只有思考的回复记为出错，但消息不丢（推理字段名仍能从它读出）；HTTP 状态仍是
+   200，所以不算“被拒”（第 5、6 步、回传检查只认 400、422），第 8 步不记 `silent`。
+3. **第 5 步不适用时不发请求**；第 7 步的条件“第 5 步不通过或不适用、且第 6 步不通过或不适用”对所有模型都按这个写。
+4. **Edit 表单的 noOff** 由 `ModelEditor.tsx` 按 `mori.profiles` 里这个模型的档案算出、传给 `fields.tsx` 的 `ModelFields`
+   （§13 只列了 `fields.tsx`；`ModelEditor.tsx` 是持有模型 ref 的那个组件，只加了一行）。
+5. **Effort 菜单的说明**另起一行，加了一条 CSS（`.switch-menu .menu-note + .menu-note`）去掉第二条说明上面的分隔线和留白，
+   让它是“底部说明下面另起一行”，不像另一节（model-menu.md 的临时细节）。
+6. **回放**：之前录下的 `enhance.get` 结果和 `enhance.set` 结果里的 `info` 没有 `noOffPicks`，回放桥补成 `[]`
+   （`harness/replay.js` 的 `withNoOffPicks`，synthetic，同 `M6_INFO` 的做法）；fixture 不重录，`effortPicks` 不变。
+7. **守住规则 1 的两处测试改动**：模型层单元报告器（`v1-unit.json`）改为严格模式（跳过的与 todo 的测试记为失败，同
+   `md-reporter.mjs`）；`tests/md-markers.mjs` 加 `--id`（默认 MD-15），新的单元测试 `tests/unit/mp-markers.test.mjs`
+   以 “MP-38 no deferral markers …” 跑 `node tests/md-markers.mjs --id MP-38`，查这次新加的行。
+8. **Effort 按钮的位置**：规格与状态表写“输入框下面一行”，composer-pickers 之后它在输入框里的那一行（`Composer.tsx`
+   渲染 `ThinkingMenu`）；是同一个组件，行为（菜单项、说明）与位置无关，所以没有当作矛盾来问。
+
+### 实现了什么（每条都指向规格的一节）
+
+- 第 2 步按 §7.7 的判定表判（`judgeThinkingStep`）：关思考被 400 或 422 拒绝、`medium` 有正文为不通过、`off_refused`，说明
+  “Thinking can’t be turned off: <原文>”只存在 `model-profiles.json`（真实运行里是
+  `400: {"message":"Reasoning is mandatory for this endpoint and cannot be disabled.",…}`）；`medium` 出错用它的说明，
+  没有正文用 `off` 的原文，都是出错。档案存 `auto.offRefused`（schema 可选，旧档案读作 false、不重新探测，`PROBE_SUITE` 不变）。
+- 第 1–7 步与回传检查都在去掉“没有 Off”标记的模型副本上发；本组判出 `off_refused` 时第 3、4、6、7 步用 `medium`、第 5 步
+  不适用；第 8、9 步用编译后的模型、按档案选强度；输出上限规则对第 1–9 步。
+- 编译：`off_refused` 的模型带 `thinkingLevelMap: { off: null }`（写在模型上，三种接口都写，不在 `compat`）；`off_refused`
+  或回传变了时重新注册这个提供商，变回 false 时标记随之去掉。
+- 测试连接：勾了 Supports thinking 的模型带 `medium`。§11.2 换模型后重发：会话强度按新模型 `clampThinkingLevel`。
+- 界面：档案摘要 “Thinking: Can’t be turned off”（Reasoning field 之后、Cancel 之前）；Effort 菜单没有 Off、底部
+  “This model can’t turn thinking off.”（会话是 Off 时按钮已由 pi 收紧成 Minimal）；Edit 的 Default effort 与增强设置的
+  Effort 不列 Off、存着的 Off 显示 Minimal 照存（后者按 `enhance.get` 的新字段 `noOffPicks`）。
+
+### 结果
+
+| 层 | 结果 |
+| --- | --- |
+| `npm run check`、构建 | 通过 |
+| 单元：`test:unit`（严格） / `test:mem-unit` / `test:tb-unit` / `test:md-unit` | 418 / 222 / 335 / 197，全部通过；MP-38 27 项、MP-39 19 项 |
+| 合成端点自检（`tests/fake-endpoint/selfcheck.mjs`） | 192 / 192（新加 33 项：`-nooff` 的三种关思考写法与原文逐字节、`/openrouter.ai/v1` 前缀、`effort` 日志、`thinkingOn`、`-thinklong`、`-nooff` 的判断顺序） |
+| App：`v1-models-app-nooff.mjs`（新，MP-38、MP-39 的 App 层，加进 `test:v1-models`） | 32 / 32（开发构建） |
+| 打包程序（测试分层第 4 条，只做冒烟：没改打包配置、主进程与 preload） | `npm run dist:dir` 通过；`m0-smoke --exe` 18 项通过、1 项 KNOWN（pi #9129）；`v1-models-app-nooff --exe` 32 / 32 |
+| 现有套件：`v1-models-existing.mjs --id MD-15`（m0–m6、`v1-models-app-*`、`tb-app-*`、`mem-app-*` 的 App，全部回放，单元，标记检查） | 3634 项通过、1 项 KNOWN（pi #9129），各套件都是退出码 0；`md-app-form` 82、`md-app-card` 68、`md-app-firstrun` 114、`md-replay` 69 |
+| 只读审查（五个角度、每条三位对抗核实） | 两条发现都被驳倒（都早于这次的改动，见下面“一并查到的”） |
+| 真实层（key 方式，三次） | MP-27 三次都全部通过；MP-40 除 lfm 那一条外三次都通过（每次 22 / 23），lfm 见下 |
+
+真实层看到的（DeepSeek `deepseek-flash`、GLM `GLM-5.3`、OpenRouter 的两个免费模型；数据目录只经界面建出）：
+
+- MP-27：两个模型的探针合理（DeepSeek 的种类按地址认作 `deepseek`）；正常对话；段开始与段内各换一次模型（真实的 401）；
+  恢复 key、重新启动后回到首选。
+- flint：档案 `ready`、`tool_calling: verified`、等级 B（第 5 步不适用、第 6 步通过）、`off_refused: true`，模型行有
+  “Thinking: Can’t be turned off”；Test 成功（“Connected · … · Includes thinking”）；DeepSeek 上设成 Off 的会话把范围换到
+  flint 后按钮是 “Effort: Minimal”、菜单没有 Off、有那句说明，发一条消息由 flint 正常回答，没有错误卡。
+- lfm（MP-40 要求 `tool_calling: verified`、等级 B）：第一次探针被 OpenRouter 回 429
+  “liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream”（服务那边，探针按 §7.3 记为出错）；第二次第 1–5 步与回传
+  检查都如预期（`tool_calling: verified`、`off_refused: true`），第 6 步（JSON schema，`medium`）把 256 token 全用在思考上，
+  按 §7.7 的输出上限规则为出错，“Stopped at the probe output limit before answering”，第 7 步因此不跑，等级为 null。
+  规划时的实测里它第 6 步通过过一次，所以这是模型在 256 的上限上的不确定，不是 Mori 的问题；你因此改了 MP-40（见上面“你在这次工作中定的”）。
+  第三次（按改过的条件）：第 1–5 步与回传检查同上，第 6 步又被 OpenRouter 回 429（`model_rate_limit_exceeded`，
+  `limit_source: upstream_provider_shared_pool`，提供方 Liquid，`Retry-After: 1`），探针按 §7.3 记为出错（429 不算不通过），
+  不是改过的条件接受的两种结果之一，所以这一条仍没通过。三次里 lfm 两次被服务限流（第一次在探针里、第三次在第 6 步），
+  一次第 6 步停在输出上限。你定到此为止、记为未验证（见“未验证”）。
+- key 没有出现在任何地方：结果文件、日志、截图之前的窗口文字、三次用过的数据目录（加密的 `credentials.json` 都已删）与这次
+  会话的临时目录共 461,428 个文件，以及仓库里 787 个文件和这个分支的全部提交，都查过，没有命中。
+
+### 测试中发现并已修正的问题
+
+1. **真实层的预检**（一次只读审查，跑真实层之前）：`v1-real-helpers.mjs` 的 `profileProblems` 只认一键拉取之前的五种服务，
+   DeepSeek 的档案种类 `deepseek` 会让 MP-27 每次都失败；改为认 `SERVER_KINDS` 的全部种类。另几处加固：准备与启动出错时
+   照样写结果、删掉 `credentials.json`；lfm 没加成时不再连带跳过 flint 的检查；测试连接一出错就读到“Couldn’t test …”。
+2. **现有套件的时序**：第一次完整回归里 `m2-app`、`m5-app`、`m6-app-slash`、`m1-replay` 各有一条失败（都是输入框下面一行的
+   焦点与布局）。逐个重跑：`m2-app` 通过；`m5-app`、`m6-app-slash` 的失败正是 `app-v0` 后来修的两处时序（量到发送中、分屏的
+   延后聚焦），合并 `31597b7` 带进来；`m1-replay` 的 “reload：…开着的权限菜单关上” 在这台机器上每次都失败，把这个分支改过的
+   界面文件和回放桥换回 `31597b7` 的版本也一样失败（两次），所以不是这次带来的：菜单在按钮变得不可用之后的 effect 里关上，
+   测试在那之前就数了。只改测试（先等菜单关上再数，最多 3 秒），之后 3 次都 94 / 94，完整回归里也通过。
+
+### 一并查到的（没有改，供你参考）
+
+- 探针结束保存档案时，写 `model-profiles.json` 失败会跳过重新编译，而内存里的档案已经是新的（设置页显示 “Can’t be turned off”、
+  Effort 菜单仍有 Off）。这个先存后编译的次序在这次之前就有（回传推理那一项同样），写失败要重试多次之后才会发生，§7.7 没有
+  写写失败时怎么办，所以没改。
+- `memory-enhance.md` 的 Effort 一行和 `MemoryEnhance.tsx` 第 19 行的注释还写“同顶栏”（composer-pickers 之前的说法）；这次
+  只改了这个分支自己的笔误“菜单菜单”。
+
 ## 未验证
 
 - 内网 vLLM、SGLang、llama.cpp、Ollama：只用合成端点模拟过它们的版本接口、指标、截断和取消；真实的 429 `Retry-After`、5xx、长输入截断没有在真实端点上触发过。
 - 需要你同意的两个探针（长输入、取消）只在合成端点上跑过。
+- 思考关不掉的模型（2026-10-24）：
+  - 只在 OpenRouter 上实测过；Anthropic、百炼、MiniMax 等别的服务上必须思考的模型没有测（§7.7 末尾、proposal §10 的已知限制）。
+  - 会话里 Off 提到的 Minimal 没有探针测过，只实测过它在 OpenRouter 上能发（flint 收到 Minimal 正常回答）。
+  - z.ai、Together 的地址按规格不受影响（有标记的模型每个请求都带强度），没有在真实端点上测。
+  - TaskBoard 实例、增强会话、压缩与重建经虚拟模型路由、由 pi 收紧强度：按代码与 pi 1.3.0 的源码核对过，只有对话请求在 App 层
+    （`fake-coder-nooff`）与真实层（flint）实测过，这几种请求没有对有标记的模型单独跑。
+  - 需要你同意的第 8、9 步按档案选强度只在单元层测过（替身的流），没有对合成端点或真实模型跑。
+  - **MP-40 的 lfm 一条（`liquid/lfm-2.5-2.6b:free`）未验证：外部限流**（你 2026-10-24 定：到此为止，记为未验证；MP-40 的写法
+    不再改）。三次真实运行（key 方式，2026-10-24）：
+    1. 探针被 OpenRouter 回 429：“liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream”。
+    2. 第 1–5 步与回传检查如预期，第 6 步（JSON schema，`medium`）停在 256 token 的输出上限、只有思考，按 §7.7 为出错
+       （“Stopped at the probe output limit before answering”）。这一次按改过的 MP-40 会通过，但它的结果文件是按旧的写法
+       （“等级 B”）记的，覆盖检查读到的是失败。
+    3. 按改过的写法：第 1–5 步与回传检查如预期（`tool_calling: verified`、`off_refused: true`），第 6 步被 OpenRouter 回 429：
+       `code 429`、`provider_error_code: model_rate_limit_exceeded`、`limit_source: upstream_provider_shared_pool`、
+       提供方 Liquid、`Retry-After: 1`、“Please retry shortly, or add your own key …”。探针按 §7.3 记为出错，等级为空，
+       不是改过的写法接受的两种结果之一。
+    三次里 MP-27 与 MP-40 的其余各条都通过（每次 22 / 23）；Mori 的行为都按规格（429 记为出错，停在输出上限记为出错）。
+  - 所以现在 `node tests/spec-coverage.mjs --spec model` 只差这一条（MP-40 的真实层）。TaskBoard、记忆、一键拉取模型的覆盖检查
+    （`--spec taskboard`、`--spec memory`、`--spec discovery`，都带 `--allow-missing-real`）也失败：它们读的现有套件结果
+    （`tb-replay-existing.json`、`mem-replay-existing.json`、`md-replay-existing.json`）里记着那一次运行时模型层覆盖检查的结论
+    （失败），要等 MP-40 有一次通过的真实结果、之后再跑一遍 `v1-models-existing.mjs --id MD-15` 才会变成通过。除此之外这几项
+    覆盖检查没有别的缺口（第二遍完整回归 3634 项通过、1 项 KNOWN）。
+
+以后要补跑时（在 `app/` 下，PowerShell；免费模型每天有请求上限，挑 OpenRouter 不忙的时候）：
+
+```powershell
+npx electron-vite build
+# key 方式：三个 key 由你从 HoldThatThgt 下的 env 文件读出、设在这个进程里（不要打印）；不给 --source
+$env:MP_REAL_DEEPSEEK_KEY = '<deepseek.env 的 DEEPSEEK_NODE_KEYS>'
+$env:MP_REAL_GLM_KEY = '<glm.env 的 api_key_env>'
+$env:MP_REAL_OPENROUTER_KEY = '<openrouter.env 的 OPEN_ROUTER_NODE_KEYS>'
+node tests/ui/v1-models-real.mjs
+Remove-Item Env:MP_REAL_DEEPSEEK_KEY, Env:MP_REAL_GLM_KEY, Env:MP_REAL_OPENROUTER_KEY
+node tests/spec-coverage.mjs --spec model
+# 上一条通过之后（约 95 分钟）：
+node tests/ui/v1-models-existing.mjs --id MD-15
+node tests/spec-coverage.mjs --spec model
+node tests/spec-coverage.mjs --spec taskboard --allow-missing-real
+node tests/spec-coverage.mjs --spec memory --allow-missing-real
+node tests/spec-coverage.mjs --spec discovery --allow-missing-real
+```
+
+脚本一启动就把三个变量读进内存并从它自己的环境里删掉，之后启动的 Mori 拿不到；结果写到 `test-results/v1-models-real.json`，
+key 方式建的数据目录在系统临时目录下（`mori-v1-real-keys-*`，用完删掉加密的 `credentials.json`）。

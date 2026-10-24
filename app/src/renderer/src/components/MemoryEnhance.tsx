@@ -176,21 +176,26 @@ function ModelField({ config, value, onChange }: {
 /**
  * @brief Effort 下拉：pi 的七档；模型设置读到之前不可用；所选范围的第一个候选（后台进程按 §9.1 取，
  *        EnhanceInfo.effortPicks）没标支持思考时不可用；没有选中范围或范围取不到候选时不可用（悬停 Choose a model
- *        first.）；不可用时保持原来的值。
+ *        first.）；不可用时保持原来的值。第一个候选思考关不掉时（noOff，model-providers.md §7.7）不列 Off，
+ *        草稿是 off 时显示 Minimal（草稿与 Save 仍是 off）。
  * @param thinks 第一个候选是否标了支持思考；没有选中范围或范围取不到候选时为 undefined
+ * @param noOff 所选范围在 info.noOffPicks 里，且 thinks 为真（§7.7）
  */
-function EffortField({ value, ready, thinks, onChange }: {
-  value: ThinkingLevel; ready: boolean; thinks: boolean | undefined; onChange: (level: ThinkingLevel) => void;
+function EffortField({ value, ready, thinks, noOff, onChange }: {
+  value: ThinkingLevel; ready: boolean; thinks: boolean | undefined; noOff: boolean;
+  onChange: (level: ThinkingLevel) => void;
 }) {
   const id = useId();
   const hover = !ready ? undefined : thinks === undefined ? NO_RANGE_EFFORT : thinks ? undefined : UNSUPPORTED_EFFORT;
+  // §7.7：增强会话里 pi 按实际模型把 Off 提到 Minimal，所以显示 Minimal；存着的 off 不改写，没有悬停说明
+  const levels = noOff ? THINKING_LEVELS.filter((level) => level !== 'off') : THINKING_LEVELS;
   return (
     <div className="mf-row">
       <label htmlFor={id}>Effort</label>
-      <select id={id} className="mf-control" data-testid="enhance-effort" value={value}
-        disabled={!ready || hover !== undefined} title={hover}
+      <select id={id} className="mf-control" data-testid="enhance-effort"
+        value={noOff && value === 'off' ? 'minimal' : value} disabled={!ready || hover !== undefined} title={hover}
         onChange={(event) => onChange(event.target.value as ThinkingLevel)}>
-        {THINKING_LEVELS.map((level) => <option key={level} value={level}>{THINKING_LABELS[level]}</option>)}
+        {levels.map((level) => <option key={level} value={level}>{THINKING_LABELS[level]}</option>)}
       </select>
     </div>
   );
@@ -272,6 +277,8 @@ function EnhanceDialog({ info, onClose }: { info: EnhanceInfo; onClose: () => vo
   const titleId = useId();
   const pick = chosenPick(config, draft.pick);
   const thinks: boolean | undefined = pick ? info.effortPicks[pick] : undefined;
+  // §7.7：effortPicks 为真时才看 noOffPicks（memory-enhance.md"Effort 没有 Off"）；按最近一次 enhance.get，不跟着档案变
+  const noOff = thinks === true && pick !== '' && info.noOffPicks.includes(pick);
   const { timeError, clearTimeError, error, busy, save } = useDialogSave(draft, pick, onClose);
   useOverlay(true, () => (busy ? false : onClose()));
   // 打开时焦点在第一个控件上；模型配置读到之前 Model range 不可用，读到后焦点移到它。
@@ -286,7 +293,7 @@ function EnhanceDialog({ info, onClose }: { info: EnhanceInfo; onClose: () => vo
         <div className="mf-grid">
           <ModelField config={config} value={pick} onChange={(next) => setDraft({ ...draft, pick: next })} />
           <EffortField value={draft.thinking} ready={config !== null || configError !== null} thinks={thinks}
-            onChange={(thinking) => setDraft({ ...draft, thinking })} />
+            noOff={noOff} onChange={(thinking) => setDraft({ ...draft, thinking })} />
           <TeamAndTime draft={draft} timeError={timeError} onChange={(patch) => {
             if (patch.time) clearTimeError();
             setDraft({ ...draft, ...patch });
