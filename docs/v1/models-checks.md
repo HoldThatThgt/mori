@@ -300,6 +300,13 @@ key 由脚本从你的 `openrouter.env` 读出、不打印；记录里只有状�
   已写进规格 §14.1 的 2026-10-24 补。我另定的一点：OpenRouter 的 Add provider 就是 MP-40 那条“找不到时用
   `MP_REAL_OPENROUTER_KEY` 经 Add provider 加入”，在建目录时做、只勾 flint，lfm 再经卡上的 Fetch models 加入；
   建目录时不先加别的免费模型，免得同一天把免费模型多探测一遍。
+- **MP-40 的 lfm 一条（选项 B，“现在就改 MP-40”）**：原来写 lfm“`tool_calling: verified`、等级 B”。两次真实运行都没过，
+  原因都在服务或模型：第一次 OpenRouter 回 429（上游限流），第二次第 6 步把 256 token 全用在思考上，按 §7.7 的输出上限规则为
+  出错，第 7 步不跑、等级为空。你定：lfm 在 `tool_calling: verified`、`off_refused: true`，且等级 B **或**第 6 步出错为
+  “Stopped at the probe output limit before answering”（只能是出错，不能是不通过）时通过；理由是 lfm 在 `medium` 下第 6 步的
+  思考长度不定，在 256 的上限上两样都可能，这一条要验证的是必须思考的模型变得可用；探针上限不调，不为它另加一次真实运行
+  （只在覆盖检查需要新的结果文件时才跑）。已改规格 §14.2 的 MP-40 一行（2026-10-24 负责人改）与 `v1-models-real.mjs` 的检查
+  （`lfmTierOk`，只认这两种结果）。原来的结果文件里是按旧条件记的失败，覆盖检查读不到新条件下的结果，所以照你的条件又跑了一次（第三次，结果见下）。
 
 ### 我替你定的（走查时都可以改）
 
@@ -347,7 +354,7 @@ key 由脚本从你的 `openrouter.env` 读出、不打印；记录里只有状�
 | 打包程序（测试分层第 4 条，只做冒烟：没改打包配置、主进程与 preload） | `npm run dist:dir` 通过；`m0-smoke --exe` 18 项通过、1 项 KNOWN（pi #9129）；`v1-models-app-nooff --exe` 32 / 32 |
 | 现有套件：`v1-models-existing.mjs --id MD-15`（m0–m6、`v1-models-app-*`、`tb-app-*`、`mem-app-*` 的 App，全部回放，单元，标记检查） | 3634 项通过、1 项 KNOWN（pi #9129），各套件都是退出码 0；`md-app-form` 82、`md-app-card` 68、`md-app-firstrun` 114、`md-replay` 69 |
 | 只读审查（五个角度、每条三位对抗核实） | 两条发现都被驳倒（都早于这次的改动，见下面“一并查到的”） |
-| 真实层（key 方式，两次） | MP-27 两次都全部通过；MP-40 除 lfm 那一条外两次都通过，lfm 见下 |
+| 真实层（key 方式，三次） | MP-27 三次都全部通过；MP-40 除 lfm 那一条外三次都通过（每次 22 / 23），lfm 见下 |
 
 真实层看到的（DeepSeek `deepseek-flash`、GLM `GLM-5.3`、OpenRouter 的两个免费模型；数据目录只经界面建出）：
 
@@ -360,8 +367,12 @@ key 由脚本从你的 `openrouter.env` 读出、不打印；记录里只有状�
   “liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream”（服务那边，探针按 §7.3 记为出错）；第二次第 1–5 步与回传
   检查都如预期（`tool_calling: verified`、`off_refused: true`），第 6 步（JSON schema，`medium`）把 256 token 全用在思考上，
   按 §7.7 的输出上限规则为出错，“Stopped at the probe output limit before answering”，第 7 步因此不跑，等级为 null。
-  规划时的实测里它第 6 步通过过一次，所以这是模型在 256 的上限上的不确定，不是 Mori 的问题。这一条怎么算已问你（见“未验证”）。
-- key 没有出现在任何地方：结果文件、日志、截图之前的窗口文字、两次用过的数据目录（加密的 `credentials.json` 已删）共 3786 个
+  规划时的实测里它第 6 步通过过一次，所以这是模型在 256 的上限上的不确定，不是 Mori 的问题；你因此改了 MP-40（见上面“你在这次工作中定的”）。
+  第三次（按改过的条件）：第 1–5 步与回传检查同上，第 6 步又被 OpenRouter 回 429（`model_rate_limit_exceeded`，
+  `limit_source: upstream_provider_shared_pool`，提供方 Liquid，`Retry-After: 1`），探针按 §7.3 记为出错（429 不算不通过），
+  不是改过的条件接受的两种结果之一，所以这一条仍没通过。三次里 lfm 两次被服务限流（第一次在探针里、第三次在第 6 步），
+  一次第 6 步停在输出上限。
+- key 没有出现在任何地方：结果文件、日志、截图之前的窗口文字、三次用过的数据目录（加密的 `credentials.json` 已删）共 3786 个
   文件，以及仓库里 787 个文件和这个分支的全部提交，都查过，没有命中。
 
 ### 测试中发现并已修正的问题
@@ -394,5 +405,7 @@ key 由脚本从你的 `openrouter.env` 读出、不打印；记录里只有状�
   - TaskBoard 实例、增强会话、压缩与重建经虚拟模型路由、由 pi 收紧强度：按代码与 pi 1.3.0 的源码核对过，只有对话请求在 App 层
     （`fake-coder-nooff`）与真实层（flint）实测过，这几种请求没有对有标记的模型单独跑。
   - 需要你同意的第 8、9 步按档案选强度只在单元层测过（替身的流），没有对合成端点或真实模型跑。
-  - MP-40 的 lfm 一条（等级 B）在真实层两次都没有通过（429，然后第 6 步停在输出上限），已带选项问你；在你回答之前
-    `spec-coverage --spec model` 只差这一条。
+  - MP-40 的 lfm 一条在真实层三次都没有通过：第一次与第三次是 OpenRouter 对这个免费模型的上游限流（429），第二次第 6 步停在
+    输出上限（按改过的条件这一次会通过，但那次的结果文件是按旧条件记的）。`spec-coverage --spec model` 只差这一条；TaskBoard、
+    记忆、一键拉取模型的覆盖检查读的现有套件结果里带着那次模型层覆盖检查的结论，所以也跟着失败，要在 MP-40 有通过的结果之后
+    再跑一遍 `v1-models-existing.mjs --id MD-15`。怎么继续已问你。
