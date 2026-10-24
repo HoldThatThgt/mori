@@ -307,6 +307,9 @@ key 由脚本从你的 `openrouter.env` 读出、不打印；记录里只有状�
   思考长度不定，在 256 的上限上两样都可能，这一条要验证的是必须思考的模型变得可用；探针上限不调，不为它另加一次真实运行
   （只在覆盖检查需要新的结果文件时才跑）。已改规格 §14.2 的 MP-40 一行（2026-10-24 负责人改）与 `v1-models-real.mjs` 的检查
   （`lfmTierOk`，只认这两种结果）。原来的结果文件里是按旧条件记的失败，覆盖检查读不到新条件下的结果，所以照你的条件又跑了一次（第三次，结果见下）。
+- **到此为止，lfm 一条记为未验证（“到此为止，记为未验证”）**：第三次的第 6 步又被 OpenRouter 上游限流（429）之后，你定不再跑
+  真实层、不再改 MP-40 的写法，把 lfm 那一条记为未验证（外部限流）。另两个选项你没有选：把 lfm 换成便宜的付费模型
+  `openai/gpt-oss-20b`；以后再试 lfm。之后照下面“以后要补跑时”的命令补。
 
 ### 我替你定的（走查时都可以改）
 
@@ -371,9 +374,9 @@ key 由脚本从你的 `openrouter.env` 读出、不打印；记录里只有状�
   第三次（按改过的条件）：第 1–5 步与回传检查同上，第 6 步又被 OpenRouter 回 429（`model_rate_limit_exceeded`，
   `limit_source: upstream_provider_shared_pool`，提供方 Liquid，`Retry-After: 1`），探针按 §7.3 记为出错（429 不算不通过），
   不是改过的条件接受的两种结果之一，所以这一条仍没通过。三次里 lfm 两次被服务限流（第一次在探针里、第三次在第 6 步），
-  一次第 6 步停在输出上限。
-- key 没有出现在任何地方：结果文件、日志、截图之前的窗口文字、三次用过的数据目录（加密的 `credentials.json` 已删）共 3786 个
-  文件，以及仓库里 787 个文件和这个分支的全部提交，都查过，没有命中。
+  一次第 6 步停在输出上限。你定到此为止、记为未验证（见“未验证”）。
+- key 没有出现在任何地方：结果文件、日志、截图之前的窗口文字、三次用过的数据目录（加密的 `credentials.json` 都已删）与这次
+  会话的临时目录共 461,428 个文件，以及仓库里 787 个文件和这个分支的全部提交，都查过，没有命中。
 
 ### 测试中发现并已修正的问题
 
@@ -405,7 +408,41 @@ key 由脚本从你的 `openrouter.env` 读出、不打印；记录里只有状�
   - TaskBoard 实例、增强会话、压缩与重建经虚拟模型路由、由 pi 收紧强度：按代码与 pi 1.3.0 的源码核对过，只有对话请求在 App 层
     （`fake-coder-nooff`）与真实层（flint）实测过，这几种请求没有对有标记的模型单独跑。
   - 需要你同意的第 8、9 步按档案选强度只在单元层测过（替身的流），没有对合成端点或真实模型跑。
-  - MP-40 的 lfm 一条在真实层三次都没有通过：第一次与第三次是 OpenRouter 对这个免费模型的上游限流（429），第二次第 6 步停在
-    输出上限（按改过的条件这一次会通过，但那次的结果文件是按旧条件记的）。`spec-coverage --spec model` 只差这一条；TaskBoard、
-    记忆、一键拉取模型的覆盖检查读的现有套件结果里带着那次模型层覆盖检查的结论，所以也跟着失败，要在 MP-40 有通过的结果之后
-    再跑一遍 `v1-models-existing.mjs --id MD-15`。怎么继续已问你。
+  - **MP-40 的 lfm 一条（`liquid/lfm-2.5-2.6b:free`）未验证：外部限流**（你 2026-10-24 定：到此为止，记为未验证；MP-40 的写法
+    不再改）。三次真实运行（key 方式，2026-10-24）：
+    1. 探针被 OpenRouter 回 429：“liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream”。
+    2. 第 1–5 步与回传检查如预期，第 6 步（JSON schema，`medium`）停在 256 token 的输出上限、只有思考，按 §7.7 为出错
+       （“Stopped at the probe output limit before answering”）。这一次按改过的 MP-40 会通过，但它的结果文件是按旧的写法
+       （“等级 B”）记的，覆盖检查读到的是失败。
+    3. 按改过的写法：第 1–5 步与回传检查如预期（`tool_calling: verified`、`off_refused: true`），第 6 步被 OpenRouter 回 429：
+       `code 429`、`provider_error_code: model_rate_limit_exceeded`、`limit_source: upstream_provider_shared_pool`、
+       提供方 Liquid、`Retry-After: 1`、“Please retry shortly, or add your own key …”。探针按 §7.3 记为出错，等级为空，
+       不是改过的写法接受的两种结果之一。
+    三次里 MP-27 与 MP-40 的其余各条都通过（每次 22 / 23）；Mori 的行为都按规格（429 记为出错，停在输出上限记为出错）。
+  - 所以现在 `node tests/spec-coverage.mjs --spec model` 只差这一条（MP-40 的真实层）。TaskBoard、记忆、一键拉取模型的覆盖检查
+    （`--spec taskboard`、`--spec memory`、`--spec discovery`，都带 `--allow-missing-real`）也失败：它们读的现有套件结果
+    （`tb-replay-existing.json`、`mem-replay-existing.json`、`md-replay-existing.json`）里记着那一次运行时模型层覆盖检查的结论
+    （失败），要等 MP-40 有一次通过的真实结果、之后再跑一遍 `v1-models-existing.mjs --id MD-15` 才会变成通过。除此之外这几项
+    覆盖检查没有别的缺口（第二遍完整回归 3634 项通过、1 项 KNOWN）。
+
+以后要补跑时（在 `app/` 下，PowerShell；免费模型每天有请求上限，挑 OpenRouter 不忙的时候）：
+
+```powershell
+npx electron-vite build
+# key 方式：三个 key 由你从 HoldThatThgt 下的 env 文件读出、设在这个进程里（不要打印）；不给 --source
+$env:MP_REAL_DEEPSEEK_KEY = '<deepseek.env 的 DEEPSEEK_NODE_KEYS>'
+$env:MP_REAL_GLM_KEY = '<glm.env 的 api_key_env>'
+$env:MP_REAL_OPENROUTER_KEY = '<openrouter.env 的 OPEN_ROUTER_NODE_KEYS>'
+node tests/ui/v1-models-real.mjs
+Remove-Item Env:MP_REAL_DEEPSEEK_KEY, Env:MP_REAL_GLM_KEY, Env:MP_REAL_OPENROUTER_KEY
+node tests/spec-coverage.mjs --spec model
+# 上一条通过之后（约 95 分钟）：
+node tests/ui/v1-models-existing.mjs --id MD-15
+node tests/spec-coverage.mjs --spec model
+node tests/spec-coverage.mjs --spec taskboard --allow-missing-real
+node tests/spec-coverage.mjs --spec memory --allow-missing-real
+node tests/spec-coverage.mjs --spec discovery --allow-missing-real
+```
+
+脚本一启动就把三个变量读进内存并从它自己的环境里删掉，之后启动的 Mori 拿不到；结果写到 `test-results/v1-models-real.json`，
+key 方式建的数据目录在系统临时目录下（`mori-v1-real-keys-*`，用完删掉加密的 `credentials.json`）。
