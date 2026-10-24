@@ -746,4 +746,6 @@ MEM-27、MEM-19）。程序没有改。按负责人 2026-10-23 的新测试做�
 
 **一并查到的**：一次只读审查确认这两处修正没有问题，每个修正一位审查者，每条发现再由一位审查者尝试驳倒。审查还发现
 `m5-app.mjs` 的 `splitRows`、`splitRight`、`effortAt280` 等的是 `.stop-button`。这个按钮在发送中也会出现，三处接着都按
-"生成中"量，属于同一类时序问题，锁屏时可能偶发失败。这次不在范围内，没有改，也还没有看到它失败过。
+"生成中"量，属于同一类时序问题，锁屏时可能偶发失败（还没有看到它失败过）。负责人随后让一起改：`m5-helpers.mjs` 新加
+`waitPaneRunning`（只认 `data-running="true"`），三处改用它；`waitPaneIdle` 的第一步也改用它，行为不变。之后 `npm run check`、
+build、`test:unit` 372 通过，`m5-app` 55 / 55，`m6-replay` 66 / 66（它也用 `waitPaneIdle`），屏幕没锁。
