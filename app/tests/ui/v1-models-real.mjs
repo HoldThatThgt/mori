@@ -21,7 +21,8 @@
 //   1. 设置 → Models：卡上的 Fetch models（或 Add provider：https://openrouter.ai/api/v1，key 只输进 Mori 的密码框，输入前
 //      核对框的 type 是 password；区域 Public）→ 过滤、勾上两个模型 → Add 2 models。
 //   2. 等它们的探针跑完：flint 档案 ready、tool_calling verified、off_refused 为真，模型行有 "Thinking: Can’t be turned off"；
-//      lfm tool_calling verified、等级 B。
+//      lfm tool_calling verified、off_refused 为真，等级 B 或第 6 步出错为 "Stopped at the probe output limit before
+//      answering"（只能是出错，不能是不通过；§14.2 MP-40 的 2026-10-24 负责人改）。
 //   3. flint 模型行的 Test（测试连接）成功。
 //   4. 原来是 Off 的会话：新会话在默认范围里由首选（DeepSeek，有 Off 的模型）开始，Effort 菜单里选 Off；再把范围换成 flint：
 //      Effort 按钮显示 Minimal，菜单没有 Off、有 "This model can’t turn thinking off."；发一条消息，flint 正常回答（会话文件里
@@ -389,9 +390,24 @@ async function noOffProbes(ctx) {
     && shown.text === THINKING_OFF_TEXT, JSON.stringify({ profile: noOffBrief(a), shown }));
   const b = await lfmProfile(ctx, lfm);
   await shot(ctx.page, '07-nooff-probed');
-  record(`MP-40 ${lfm}: after Add its probes finish with tool calling verified and handoff tier B`,
-    b.profile?.tool_calling?.state === 'verified' && b.profile.tier?.level === 'B',
-    JSON.stringify({ profile: noOffBrief(b.profile), note: b.note }));
+  record(`MP-40 ${lfm}: after Add its probes finish with tool calling verified, reasoning.off_refused true, and `
+    + `handoff tier B or step 6 an error "${OUTPUT_LIMIT_TEXT}" (never a fail)`,
+  b.profile?.tool_calling?.state === 'verified' && b.profile.reasoning?.off_refused === true && lfmTierOk(b.profile),
+  JSON.stringify({ profile: noOffBrief(b.profile), step6: b.profile?.tier?.b ?? null, note: b.note }));
+}
+
+/** MP-40 lfm 第 6 步停在探针输出上限时的说明（§7.7，同 probes.ts 的 OUTPUT_LIMIT_TEXT） */
+const OUTPUT_LIMIT_TEXT = 'Stopped at the probe output limit before answering';
+
+/**
+ * @brief MP-40 lfm 的等级一项（§14.2 MP-40 的 2026-10-24 负责人改）：等级 B，或第 6 步出错、说明是输出上限那一句
+ *        （只能是出错，不能是不通过）。lfm 在 medium 下第 6 步的思考长度不定，在 256 token 的探针上限上两样都可能。
+ * @param profile lfm 的档案；没有时为 null
+ */
+function lfmTierOk(profile) {
+  if (profile?.tier?.level === 'B') return true;
+  const step6 = profile?.tier?.b;
+  return step6?.outcome === 'error' && step6.detail === OUTPUT_LIMIT_TEXT;
 }
 
 /**
