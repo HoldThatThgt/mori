@@ -397,6 +397,16 @@ key 由脚本从你的 `openrouter.env` 读出、不打印；记录里只有状�
 - `memory-enhance.md` 的 Effort 一行和 `MemoryEnhance.tsx` 第 19 行的注释还写“同顶栏”（composer-pickers 之前的说法）；这次
   只改了这个分支自己的笔误“菜单菜单”。
 
+### 合并到 app-v0（2026-10-24）
+
+你要求按 AGENTS.md 合并并推送（“merge claude/v1-reasoning-mandatory-impl-640e42 into app-v0 following AGENTS.md (suites
+related to any conflicts plus the coverage checks), then push app-v0”）。合并前取了 `origin/app-v0`：仍是 `31597b7`，分支早已
+合并过它，所以合并提交 `3e062c2` 没有冲突，合并后的树与分支的 `ceaaf6e` 完全相同（`git diff` 为空）；这一段记录再作为一次合并
+带进 `app-v0`（同 `31597b7` 的做法）。按测试分层第 3 条，没有冲突时只跑覆盖检查（结果文件是分支上同一棵树跑出的）：
+`--spec model` 只差 MP-40 的 lfm 一条；`--spec taskboard`、`--spec memory`、`--spec discovery`（都带 `--allow-missing-real`）的
+缺口都是现有套件结果里记着的那次模型层覆盖检查的结论，同样只连着 lfm 这一条。这是你已经接受的（lfm 一条记为未验证，见“未验证”），
+不挡推送；没有别的失败或新的缺口。之后推送 `app-v0`，核对本地 `app-v0` 与 `origin/app-v0` 一致；主检出里没有跟踪的 `eval/` 没有动。
+
 ## 未验证
 
 - 内网 vLLM、SGLang、llama.cpp、Ollama：只用合成端点模拟过它们的版本接口、指标、截断和取消；真实的 429 `Retry-After`、5xx、长输入截断没有在真实端点上触发过。
