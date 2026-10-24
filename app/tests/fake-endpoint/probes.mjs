@@ -2,6 +2,13 @@
 // 认出 docs/specs/model-providers.md §7.3 第 1–9 步的请求，一律按"能力全通过"回答；
 // 模型 id 的后缀只关掉对应的探针能力（-notools、-nochoice、-noschema、-replay、-truncate），规则见 server.mjs 开头；
 // -alwaysthink 给每个回复加思考，在 server.mjs 里处理（探针的回复也一样）。
+// 2026-10-24（§7.7、§14.1）：
+//   - "开了思考"（thinkingOn）：请求带 reasoning_effort 或 reasoning.effort（pi 的 OpenRouter 写法），且不是 "none"；
+//     requestedEffort 给出请求里的强度原值（日志的 "effort" 字段）。
+//   - -nooff（对所有请求，判定在这里，回 400 在 server.mjs）：请求里带明确的"关闭思考"（explicitThinkingOff 的三种写法）
+//     时回 400，响应体逐字节为 NOOFF_ERROR_BODY（2026-10-24 在 OpenRouter 上录下的原文）。
+//   - -thinklong（只对探针）：开了思考时回一段超过 256 token 的思考（THINKLONG_THINKING），没有正文，
+//     finish_reason 为 "length"（回复的 finishReason）；没开思考时照常回答。
 
 import { contentText } from './replies.mjs';
 
@@ -26,10 +33,59 @@ const COUNT_MAX = 400;
 const TRUNCATE_RATIO = 0.7;
 const PROBE_THINKING = 'Synthetic reasoning for this probe.';
 
-/** @brief 请求是否开了思考：pi 对 OpenAI 兼容端点开思考时带 reasoning_effort。 */
+/** -nooff 拒绝"关闭思考"时的 HTTP 状态（§14.1，2026-10-24） */
+export const NOOFF_STATUS = 400;
+/** -nooff 拒绝时响应体里的 message 原文（OpenRouter，2026-10-24 实测） */
+export const NOOFF_MESSAGE = 'Reasoning is mandatory for this endpoint and cannot be disabled.';
+/** -nooff 拒绝时的响应体，逐字节照 2026-10-24 在 OpenRouter 上录下的原文发出（§14.1） */
+export const NOOFF_ERROR_BODY = `{"error":{"message":"${NOOFF_MESSAGE}","code":400,`
+  + '"metadata":{"provider_name":null}}}';
+/** -thinklong 的思考：远超 256 token（按每 token 约 4 个字符，超过 1100 字），只有思考没有正文（§7.7 输出上限） */
+export const THINKLONG_THINKING = ('Synthetic long reasoning for this probe: it keeps weighing the question and '
+  + 'never reaches an answer. ').repeat(18);
+/** -thinklong 的回复以这个 finish_reason 结束（输出上限） */
+export const THINKLONG_FINISH = 'length';
+/** -thinklong 的思考每个分块的字数（大一些，避免几百个分块拖慢探针） */
+const THINKLONG_PIECE = 64;
+
+/**
+ * @brief 请求里的思考强度原值（§14.1 日志的 "effort" 字段）：reasoning_effort ?? reasoning.effort ?? null。
+ * @param body 对话请求体
+ * @return 强度原值（通常是字符串，例如 "medium"、"minimal"、"none"）；都没有时为 null
+ */
+export function requestedEffort(body) {
+  return body.reasoning_effort ?? body.reasoning?.effort ?? null;
+}
+
+/**
+ * @brief 请求是否开了思考（§14.1，2026-10-24）：带 reasoning_effort 或 reasoning.effort（pi 的 OpenRouter 写法），
+ *        且不是 "none"。
+ * @param body 对话请求体
+ */
 export function thinkingOn(body) {
-  const effort = body.reasoning_effort;
+  const effort = requestedEffort(body);
   return typeof effort === 'string' && effort !== 'none';
+}
+
+/**
+ * @brief 请求里是否带明确的"关闭思考"（§7.7、§14.1）：reasoning.effort 为 "none"（OpenRouter）、
+ *        reasoning.enabled 为 false（Together）或 thinking.type 为 "disabled"（DeepSeek、z.ai、Anthropic）。
+ *        不带思考参数不算。
+ * @param body 对话请求体
+ */
+export function explicitThinkingOff(body) {
+  return body.reasoning?.effort === 'none' || body.reasoning?.enabled === false
+    || body.thinking?.type === 'disabled';
+}
+
+/**
+ * @brief -nooff 模型拒绝的请求（§14.1，对所有请求，探针与否都一样）：带明确的"关闭思考"；
+ *        这时回 NOOFF_STATUS，响应体为 NOOFF_ERROR_BODY。
+ * @param body 对话请求体
+ * @param flags 模型 id 的后缀集合
+ */
+export function noOffRejected(body, flags) {
+  return flags.has('nooff') && explicitThinkingOff(body);
 }
 
 /** @brief 认出探针第几步：看最后一条消息；不是探针时为 0（第 1、2 步都返回 1）。 */
@@ -86,13 +142,19 @@ function probeAnswer(step, body, flags, window) {
 }
 
 /**
- * @brief 探针的回复：开了思考时附一段 reasoning_content。
+ * @brief 探针的回复：开了思考时附一段 reasoning_content；-thinklong 开了思考时只回一段很长的思考，以输出上限结束（§7.7）。
  * @param step 探针第几步（probeStep 的结果，大于 0）
  * @param body 请求体
  * @param flags 模型 id 的后缀集合
  * @param window 这个端点报告的窗口（max_model_len），-truncate 用
+ * @return { text, toolCalls, thinking?（思考）, finishReason?（没有时按有没有工具调用为 tool_calls 或 stop）,
+ *         thinkingPiece?（思考每个分块的字数，没有时为 4） }
  */
 export function probeReply(step, body, flags, window) {
+  if (flags.has('thinklong') && thinkingOn(body)) {
+    return { thinking: THINKLONG_THINKING, text: '', toolCalls: [], finishReason: THINKLONG_FINISH,
+      thinkingPiece: THINKLONG_PIECE };
+  }
   const reply = probeAnswer(step, body, flags, window);
   if (thinkingOn(body)) reply.thinking = PROBE_THINKING;
   return reply;

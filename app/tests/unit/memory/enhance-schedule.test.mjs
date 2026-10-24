@@ -528,6 +528,8 @@ test('MEM-25 a Run now still running when its day ends: that day is queued again
  * @brief 带完整模型配置的模型层替身（synthetic）：提供商 fake（think 标了 Supports thinking、plain 没标）与 other
  *        （deep 标了）；分组 fast（plain、think）、slow（plain）、empty（没有成员）。静态校验只放过 fake/think
  *        （其余 tool calling 未验证）；在 narrowedIn 这个项目里，项目配置把 fast 缩小成 fake/plain。
+ *        档案（2026-10-24，model-providers.md §7.7，enhance.get 的 noOffPicks）：fake/think 的思考关不掉
+ *        （reasoning.off_refused 为真），other/deep 能关，fake/plain 没有档案。
  * @param narrowedIn 项目配置缩小了 fast 的项目
  */
 function thinkingModelLayer(narrowedIn) {
@@ -553,6 +555,12 @@ function thinkingModelLayer(narrowedIn) {
     staticBase: () => ({ configError: null, projectError: null, projectZones: null, allowedZones: ['public'],
       exists: () => true, zoneOf: () => 'public', capabilities: () => ({}), familyOf: () => '',
       toolCalling: (ref) => (ref === 'fake/think' ? 'verified' : 'unverified') }),
+    profileOf: (ref) => {
+      if (ref === 'fake/plain') return null;
+      const offRefused = ref === 'fake/think';
+      return { status: 'ready', reasoning: { field: 'reasoning_content', can_disable: !offRefused,
+        replay: 'not_required', off_refused: offRefused } };
+    },
   };
 }
 
@@ -582,12 +590,18 @@ test('MEM-17 effortPicks: per model range, whether its first candidate after the
       'fake/plain': false, 'other/deep': true },
     'fast skips plain in the static check; slow, other and fake/plain fall back to the first expanded candidate; '
       + 'empty has no candidate and is left out');
-    assert.equal((await env.k.enhance.enhanceInfo(b)).effortPicks.fast, false, 'in the project’s own context');
-    assert.deepEqual((await env.k.enhance.setEnhance(a, { team: true })).info.effortPicks, info.effortPicks);
-    // 模型层还在启动（synthetic：还没有模型层）：enhance.get 不等它，没有 effortPicks
+    // 2026-10-24（model-providers.md §7.7）：noOffPicks 按同一个第一个候选的档案；other 的 deep 能关，plain 没有档案
+    assert.deepEqual(info.noOffPicks, ['fast', 'fake', 'fake/think'],
+      'fast and fake start with think, whose thinking cannot be turned off');
+    const narrowed = await env.k.enhance.enhanceInfo(b);
+    assert.equal(narrowed.effortPicks.fast, false, 'in the project’s own context');
+    assert.deepEqual(narrowed.noOffPicks, ['fake', 'fake/think'], 'fast starts with plain in the narrowed project');
+    const set = await env.k.enhance.setEnhance(a, { team: true });
+    assert.deepEqual([set.info.effortPicks, set.info.noOffPicks], [info.effortPicks, info.noOffPicks]);
+    // 模型层还在启动（synthetic：还没有模型层）：enhance.get 不等它，没有 effortPicks，也没有 noOffPicks
     hooks().modelLayer = null;
     const starting = await within(env.k.enhance.enhanceInfo(a), 5000, 'enhance.get while the model layer starts');
-    assert.deepEqual([starting.effortPicks, starting.error], [{}, null]);
+    assert.deepEqual([starting.effortPicks, starting.noOffPicks, starting.error], [{}, [], null]);
   });
 
 test('MEM-25 when a run’s final progress arrives, enhance.get no longer reports that run as running', async (t) => {

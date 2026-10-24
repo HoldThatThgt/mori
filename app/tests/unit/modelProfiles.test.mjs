@@ -1,5 +1,8 @@
 // kernel/modelProfiles.ts 的单元测试（规格 §7.1、§7.2、§7.4、§7.5）：档案键与指纹、版本变化、能力三态与等级、
 // 重新验证期间按旧结果选择、model-profiles.json 的原子写与宽容读。
+// 2026-10-24（§7.7，MP-38 单元层）：auto.offRefused 写出、读回后仍为真并编译出“没有 Off”的标记；没有这一项的旧档案
+// 照读、off_refused 为假、不重新探测（PROBE_SUITE 不变）；reasoningOf 三种接口都给 off_refused，第 2 步被拒判为 fail
+// 时 can_disable 为假。档案与配置都是 synthetic。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,6 +12,8 @@ import { join } from 'node:path';
 import { loadKernelModule } from './load.mjs';
 
 const P = await loadKernelModule('src/kernel/modelProfiles.ts');
+const C = await loadKernelModule('src/kernel/modelCompile.ts');
+const { MODEL_TIMINGS } = await loadKernelModule('src/kernel/modelTimings.ts');
 
 /** 一步的结果。 */
 const s = (outcome, detail = null) => ({ outcome, detail });
@@ -133,16 +138,16 @@ test('MP-10 structured_output from step 6, vision from the configured input', ()
 test('MP-10 reasoning: completions uses the observed field and steps 2 and 4; other APIs are native', () => {
   const auto = autoResults({ field: 'reasoning_content' }, { thinking: pass, replay: fail });
   assert.deepEqual(P.reasoningOf('openai-completions', auto),
-    { field: 'reasoning_content', can_disable: true, replay: 'required' });
+    { field: 'reasoning_content', can_disable: true, replay: 'required', off_refused: false });
   const other = autoResults({ field: 'reasoning' }, { thinking: fail, replay: pass });
   assert.deepEqual(P.reasoningOf('openai-completions', other),
-    { field: 'reasoning', can_disable: false, replay: 'not_required' });
+    { field: 'reasoning', can_disable: false, replay: 'not_required', off_refused: false });
   assert.deepEqual(P.reasoningOf('openai-completions', autoResults()),
-    { field: 'none', can_disable: 'unknown', replay: 'unknown' });
+    { field: 'none', can_disable: 'unknown', replay: 'unknown', off_refused: false });
   assert.deepEqual(P.reasoningOf('openai-responses', auto),
-    { field: 'native', can_disable: true, replay: 'not_required' });
+    { field: 'native', can_disable: true, replay: 'not_required', off_refused: false });
   assert.deepEqual(P.reasoningOf('anthropic-messages', null),
-    { field: 'native', can_disable: 'unknown', replay: 'not_required' });
+    { field: 'native', can_disable: 'unknown', replay: 'not_required', off_refused: false });
 });
 
 test('MP-11 context: effective is the smaller of declared and reported; silent truncation lowers it', () => {
@@ -185,7 +190,7 @@ test('MP-10 profile view for a stored profile', () => {
   assert.equal(view.protocol_write, 'verified');
   assert.equal(view.structured_output, 'verified');
   assert.equal(view.vision, 'unverified');
-  assert.deepEqual(view.reasoning, { field: 'none', can_disable: 'unknown', replay: 'unknown' });
+  assert.deepEqual(view.reasoning, { field: 'none', can_disable: 'unknown', replay: 'unknown', off_refused: false });
   assert.deepEqual(view.context, { declared: 131072, reported: 65536, effective: 65536, truncation: 'unknown' });
   assert.equal(view.cancel_verified, 'unknown');
   assert.equal(view.probedAt, 5000);
@@ -322,4 +327,124 @@ test('MP-12 a changed address is a different server model: no profile, probing w
   assert.equal(profiles.lookupRef('local/fake-coder'), undefined);
   profiles.setRunning('local/fake-coder', 0, 8);
   assert.equal(profiles.toolCallingFor('local/fake-coder'), 'probing');
+});
+
+// ---- 思考关不掉的模型：档案里的 offRefused（§7.7，MP-38） ----
+
+const APIS = ['openai-completions', 'openai-responses', 'anthropic-messages'];
+const NOOFF_REF = 'or/fake-coder-nooff';
+/** 第 2 步被拒时存下的说明（synthetic，按 §7.7 的写法与 OpenRouter 的原文）：只存在档案里 */
+const REFUSED_DETAIL = 'Thinking can’t be turned off: 400 Reasoning is mandatory for this endpoint and cannot be '
+  + 'disabled.';
+
+/** 勾了 Supports thinking 的模型（接口 api，OpenRouter 前缀的地址，synthetic）。 */
+function thinkingTarget(api) {
+  return target({ api, baseUrl: 'http://127.0.0.1:4319/openrouter.ai/v1' },
+    { id: 'fake-coder-nooff', reasoning: true });
+}
+
+/**
+ * 第 2 步判出 off_refused 的第 0–7 步结果（synthetic，按 §7.7）：第 2 步 fail 并带被拒的说明，第 5 步不适用，
+ * 第 6 步通过（anthropic-messages 不适用，第 7 步通过）。
+ */
+function refusedAuto(api) {
+  const anthropic = api === 'anthropic-messages';
+  return autoResults({ field: api === 'openai-completions' ? 'reasoning_content' : 'native', offRefused: true },
+    { thinking: s('fail', REFUSED_DETAIL), replay: pass, a: na, b: anthropic ? na : pass,
+      c: anthropic ? pass : notRun });
+}
+
+/** 只有 t 这个模型的配置（提供商 or，没有 key，synthetic）。 */
+function configOf(t) {
+  const provider = { id: 'or', name: 'OpenRouter', api: t.api, baseUrl: t.baseUrl, zone: 'local', compat: t.compat,
+    concurrency: 4, keys: [], nextKeyNumber: 1, models: [t.model] };
+  return { version: 1, providers: [provider], groups: [], normalDefault: NOOFF_REF, allowedZones: ['local'],
+    projectZones: {} };
+}
+
+/** 照 modelLayer.ts 的 profileLookup：按 ProfileBook 里这个模型的档案给编译项（compileFlagsOf）。 */
+function lookupIn(profiles) {
+  return (provider, model) => P.compileFlagsOf(provider.api,
+    profiles.lookup({ baseUrl: provider.baseUrl, api: provider.api, model, compat: provider.compat })?.auto);
+}
+
+/** 按档案文件 path 重新读档案（同后台进程重新启动），把 t 的配置编译成 pi 的注册内容，返回这个模型的那一项。 */
+async function compiledFrom(path, t) {
+  const profiles = book(path, { [NOOFF_REF]: t });
+  await profiles.load();
+  return C.compileInputs(configOf(t), lookupIn(profiles), MODEL_TIMINGS.placeholderApiKey).get('or').models[0];
+}
+
+test('MP-38 profiles: auto.offRefused true is written, read back still true, and compiles into the no-Off marker',
+  async () => {
+    for (const api of APIS) {
+      const t = thinkingTarget(api);
+      const profile = stored(t, refusedAuto(api));
+      const path = tempPath();
+      await P.writeProfiles(path, [profile]);
+      assert.equal(JSON.parse(readFileSync(path, 'utf8')).profiles[0].auto.offRefused, true, `${api}: in the file`);
+      const [read] = await P.readProfiles(path);
+      assert.deepEqual(read, profile, api);
+      assert.equal(read.auto.offRefused, true, `${api}: the schema keeps offRefused`);
+      assert.deepEqual(P.compileFlagsOf(api, read.auto), { replayRequired: false, offRefused: true }, api);
+      const view = P.profileView(t, read, false);
+      assert.deepEqual([view.status, view.reasoning.off_refused, view.reasoning.can_disable], ['ready', true, false],
+        `${api}: a refused step 2 is not an error`);
+      assert.ok(!JSON.stringify(view).includes('Thinking can’t be turned off'),
+        `${api}: the step 2 detail stays in the profile file, the view does not carry it`);
+      assert.equal(P.needsProbe(t, read), false, api);
+      const model = await compiledFrom(path, t);
+      assert.deepEqual(model.thinkingLevelMap, { off: null }, `${api}: compiled into the marker`);
+      assert.ok(!Object.hasOwn(model.compat ?? {}, 'thinkingLevelMap'), `${api}: not inside compat`);
+    }
+  });
+
+test('MP-38 profiles: an old profile without offRefused reads, off_refused false, no re-probe, PROBE_SUITE unchanged',
+  async () => {
+    const t = thinkingTarget('openai-completions');
+    const auto = autoResults({ field: 'reasoning_content' }, { thinking: pass, replay: pass });
+    const old = structuredClone(stored(t, auto));
+    delete old.auto.offRefused;
+    assert.ok(!Object.hasOwn(old.auto, 'offRefused'), 'synthetic: a profile written before 2026-10-24');
+    const path = tempPath();
+    writeFileSync(path, JSON.stringify({ version: 1, profiles: [old] }));
+    const [read] = await P.readProfiles(path);
+    assert.deepEqual(read, old, 'read as written: nothing is filled in or migrated');
+    assert.ok(!Object.hasOwn(read.auto, 'offRefused'));
+    assert.equal(P.needsProbe(t, read), false, 'not probed again');
+    assert.equal(P.versionChanged(read, versionRead()), false);
+    assert.equal(P.PROBE_SUITE, 1, 'the probe suite version is unchanged');
+    assert.equal(read.suite, P.PROBE_SUITE);
+    assert.deepEqual(P.reasoningOf(t.api, read.auto),
+      { field: 'reasoning_content', can_disable: true, replay: 'not_required', off_refused: false });
+    assert.deepEqual(P.compileFlagsOf(t.api, read.auto), { replayRequired: false, offRefused: false });
+    const profiles = book(path, { [NOOFF_REF]: t });
+    await profiles.load();
+    assert.equal(profiles.views([NOOFF_REF])[NOOFF_REF].reasoning.off_refused, false);
+    assert.equal(profiles.toolCallingFor(NOOFF_REF), 'verified');
+    assert.ok(!Object.hasOwn(await compiledFrom(path, t), 'thinkingLevelMap'), 'compiled without the marker');
+  });
+
+test('MP-38 reasoningOf: off_refused for all three APIs; the refused step 2 is fail, so can_disable is false', () => {
+  assert.deepEqual(P.reasoningOf('openai-completions', refusedAuto('openai-completions')),
+    { field: 'reasoning_content', can_disable: false, replay: 'not_required', off_refused: true });
+  for (const api of ['openai-responses', 'anthropic-messages']) {
+    assert.deepEqual(P.reasoningOf(api, refusedAuto(api)),
+      { field: 'native', can_disable: false, replay: 'not_required', off_refused: true }, api);
+  }
+  // probes.ts 每次都写 offRefused：能关闭的、思考关了仍有思考内容的都为 false
+  const able = autoResults({ field: 'reasoning_content', offRefused: false }, { thinking: pass, replay: pass });
+  const thinksAnyway = autoResults({ field: 'reasoning_content', offRefused: false }, { thinking: fail, replay: pass });
+  for (const api of APIS) {
+    assert.deepEqual([P.reasoningOf(api, able).can_disable, P.reasoningOf(api, able).off_refused], [true, false], api);
+    assert.deepEqual([P.reasoningOf(api, thinksAnyway).can_disable, P.reasoningOf(api, thinksAnyway).off_refused],
+      [false, false], api);
+    assert.equal(P.reasoningOf(api, null).off_refused, false, `${api}: no profile`);
+    assert.deepEqual(P.compileFlagsOf(api, refusedAuto(api)), { replayRequired: false, offRefused: true }, api);
+    assert.deepEqual(P.compileFlagsOf(api, undefined), { replayRequired: false, offRefused: false }, api);
+  }
+  const replayToo = autoResults({ field: 'reasoning_content', offRefused: true },
+    { thinking: s('fail', REFUSED_DETAIL), replay: fail });
+  assert.deepEqual(P.compileFlagsOf('openai-completions', replayToo), { replayRequired: true, offRefused: true });
+  assert.deepEqual(P.compileFlagsOf('anthropic-messages', replayToo), { replayRequired: false, offRefused: true });
 });

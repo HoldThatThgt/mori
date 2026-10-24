@@ -930,6 +930,12 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
   经设置页的 Add provider 用这个 key 加入（同一键拉取模型的 MD-14）；两样都没有时 MP-40 停下来报告，同 MP-27。
   复制出的配置里已经有 `recursive/flint-v1.0:free` 或 `liquid/lfm-2.5-2.6b:free` 时先删掉，再经卡上的 Fetch models 加入。
   “原来是 Off 的会话”：先在一个有 Off 的模型（DeepSeek）上把会话设成 Off，再把范围换成 flint；免费模型每天有请求上限，与 `md-real.mjs` 同一天跑时注意。
+- （2026-10-24 补，负责人定：选项 A，“用 env 里的 key 新建数据目录”）本机没有负责人的数据目录时，`v1-models-real.mjs` 另有 key 方式：
+  不给 `--source`，环境变量 `MP_REAL_DEEPSEEK_KEY`、`MP_REAL_GLM_KEY`、`MP_REAL_OPENROUTER_KEY` 都有值（由运行它的进程从 `HoldThatThgt` 目录下的
+  `deepseek.env`、`glm.env`、`openrouter.env` 读出、不打印）；脚本只经界面建一个新的数据目录：首次启动表单接 DeepSeek，再经 Add provider 接 GLM
+  与 OpenRouter（建目录的代码从 `md-real.mjs` 的 key 方式移到共用的辅助模块，两边共用），之后照原样跑 MP-27 与 MP-40。key 不打印、不写进日志、
+  结果文件与提交；`--source` 方式不变。OpenRouter 的 Add provider 就是 MP-40 上面那条“找不到时用 `MP_REAL_OPENROUTER_KEY` 经 Add provider 加入”：
+  在这次建的数据目录里做、同时勾上 flint，lfm 再经卡上的 Fetch models 加入；建目录时不先加一个免费模型，免得同一天把免费模型多探测一遍（每天有请求上限）。
 - 认证：`FAKE_KEYS` 是逗号分隔的可接受 key（没设时不检查）；`FAKE_LIMITED_KEYS` 里的 key 返回 429 带 `Retry-After`，`FAKE_LIMIT_MS` 之后恢复（没设时一直限流）；`FAKE_QUOTA_KEYS` 里的 key 返回 402 `insufficient_quota`。
 - 关键词（在最后一条用户消息里）：`http-NNN`（每次都返回 NNN）、`http-NNN-once`（这个会话第一次返回 NNN，之后正常）、`overflow-once`（第一次返回 400 `This model's maximum context length is 1000 tokens`、`context_length_exceeded`，压缩后正常）、`drop-after-first`（发出第一段内容后断开）、`slow`，以及现有的全部关键词。
 - `GET /version` 返回 `FAKE_SERVER_VERSION`（默认 vLLM 的形状）；`FAKE_NO_METRICS=1` 时 `/metrics` 返回 404；`/models` 带 `max_model_len`；`/metrics` 报告进行中的请求数。

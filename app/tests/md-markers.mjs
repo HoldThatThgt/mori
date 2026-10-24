@@ -6,10 +6,12 @@
 // 标记见 MARKERS（四个英文标记与一个中文标记，英文的不分大小写）；模式里用字符类，这个文件自己的模式不会认出自己。
 // FLAG_FILES 的三个文件实现"跳过的与标为待办的测试算失败"（单元报告器的严格模式与覆盖检查，§13.3），那里全小写的
 // 英文"待办"一词是 node --test 的标记名（data 的字段名），不算推迟的标记；大写或大小写混写的照查，另外四个标记也照查。
-// 每个命中打印一行 "<文件>:<行号>: <内容>"（文件相对仓库根目录），最后一行 "PASS MD-15 …" 或 "FAIL MD-15 …"
-// （同其他套件；tests/ui/v1-models-existing.mjs --id MD-15 把它记作 "MD-15 md-markers"）。
-// 用法（在 app/ 下）：node tests/md-markers.mjs
-// 退出码：没有命中为 0，有命中为 1，git 命令失败（例如没有 origin/app-v0）为 2。
+// 每个命中打印一行 "<文件>:<行号>: <内容>"（文件相对仓库根目录），最后一行 "PASS <编号> md-markers: …" 或
+// "FAIL <编号> md-markers: …"（同其他套件；tests/ui/v1-models-existing.mjs --id MD-15 把它记作 "MD-15 md-markers"）。
+// 编号默认 MD-15；--id 换成别的验收条目（2026-10-24，思考关不掉的模型：负责人要求以新编号命名一项同样的检查，
+// tests/unit/mp-markers.test.mjs 用 --id MP-38 跑它，模型层规格 §7.7、§14.2）。只换打印的名字，查的行与标记不变。
+// 用法（在 app/ 下）：node tests/md-markers.mjs [--id <编号>]
+// 退出码：没有命中为 0，有命中为 1，git 命令失败（例如没有 origin/app-v0）或参数不对为 2。
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -25,6 +27,19 @@ const BASE_BRANCH = 'origin/app-v0';
 const PATHSPECS = ['app/src', 'app/tests', ':(exclude)app/tests/fixtures'];
 /** 命中一行时打印的内容最多多少字符 */
 const TEXT_MAX = 200;
+/** 不带 --id 时 PASS / FAIL 行用的编号 */
+const DEFAULT_ID = 'MD-15';
+
+/**
+ * @brief 读命令行的 --id <编号>（例如 MP-38）；不带时为 DEFAULT_ID。
+ * @param args process.argv 去掉前两项
+ * @return 编号；参数不对（--id 后面没有值、值不是“字母-数字”的编号、有别的参数）时为 null
+ */
+function idOfArgs(args) {
+  if (args.length === 0) return DEFAULT_ID;
+  if (args.length !== 2 || args[0] !== '--id') return null;
+  return /^[A-Z]+-\d+$/.test(args[1]) ? args[1] : null;
+}
 
 /**
  * @brief 推迟实现的标记。pattern 为模式（字符类让这一行的源码不匹配它自己）；flagName 为 FLAG_FILES 里先从行里去掉的
@@ -92,8 +107,11 @@ function untrackedLines() {
 const hasMarker = ({ file, text }) => MARKERS.some((marker) => marker.pattern.test(
   marker.flagName && FLAG_FILES.has(file) ? text.replace(marker.flagName, '') : text));
 
-/** @brief 读出新加的行、找标记、打印并设置退出码。 */
-function main() {
+/**
+ * @brief 读出新加的行、找标记、打印并设置退出码。
+ * @param id PASS / FAIL 行里的编号
+ */
+function main(id) {
   let base;
   let lines;
   try {
@@ -102,7 +120,7 @@ function main() {
       '--ignore-cr-at-eol', base, '--', ...PATHSPECS]);
     lines = [...addedLinesOfDiff(diff), ...untrackedLines()];
   } catch (error) {
-    console.log(`FAIL MD-15 md-markers: cannot list the added lines (${String(error.message).split('\n')[0]})`);
+    console.log(`FAIL ${id} md-markers: cannot list the added lines (${String(error.message).split('\n')[0]})`);
     process.exit(2);
   }
   const hits = lines.filter(hasMarker);
@@ -110,9 +128,14 @@ function main() {
   const files = new Set(lines.map((entry) => entry.file)).size;
   const scope = `${lines.length} added lines in ${files} files under app/src and app/tests (fixtures excluded), `
     + `compared with ${base.slice(0, 7)} (merge-base of HEAD and ${BASE_BRANCH}) plus untracked files`;
-  console.log(hits.length ? `FAIL MD-15 md-markers: ${hits.length} deferral markers in ${scope}`
-    : `PASS MD-15 md-markers: no deferral markers in ${scope}`);
+  console.log(hits.length ? `FAIL ${id} md-markers: ${hits.length} deferral markers in ${scope}`
+    : `PASS ${id} md-markers: no deferral markers in ${scope}`);
   process.exitCode = hits.length ? 1 : 0;
 }
 
-main();
+const runId = idOfArgs(process.argv.slice(2));
+if (runId === null) {
+  console.log('FAIL md-markers: usage: node tests/md-markers.mjs [--id <ID>], for example --id MP-38');
+  process.exit(2);
+}
+main(runId);

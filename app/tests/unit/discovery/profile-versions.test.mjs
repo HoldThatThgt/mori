@@ -103,8 +103,9 @@ test('MD-12 localai and tensorrt shapes once judged vLLM: probed again once, the
       // 取消探针（第 9 步）只对 vllm、sglang、llamacpp（§7.2）：不读指标、不发请求，界面因此不显示 Cancel test…
       const metrics = [];
       const deps = { getText: async (url) => metrics.push(url) && null, signal: signal() };
-      assert.deepEqual(await probes.runCancelProbe({ ref: 'p/fake-coder', model: { baseUrl: base } }, shape, deps),
-        { step: { outcome: 'not_applicable', detail: null }, verified: 'unknown' }, shape);
+      // 第 3 个参数是档案存的 offRefused（模型层规格 §7.7，2026-10-24）：这个档案没有，为 false
+      const cancel = await probes.runCancelProbe({ ref: 'p/fake-coder', model: { baseUrl: base } }, shape, false, deps);
+      assert.deepEqual(cancel, { step: { outcome: 'not_applicable', detail: null }, verified: 'unknown' }, shape);
       assert.equal(await probes.readRunningRequests(deps, base, shape, signal()), null, shape);
       assert.deepEqual(metrics, [], shape);
     }

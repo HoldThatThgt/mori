@@ -2,7 +2,9 @@
 // 同时在终端逐条打印 PASS / FAIL。默认导出写 v1-unit.json（模型层，docs/specs/model-providers.md §14.3），
 // 测试名以那份规格 §14.2 的编号开头（例如 "MP-05 group members expand in order"）；
 // tb-reporter.mjs 用同一个工厂写 tb-unit.json（平行 Agent 与 TaskBoard，docs/specs/parallel-agents-taskboard.md §17.3）。
-// 严格模式（md-reporter.mjs，一键拉取模型 docs/specs/model-discovery.md §13.3）：node --test 把跳过的（data.skip）与
+// 默认导出（v1-unit.json）从 2026-10-24 起用严格模式（负责人的规则：跳过的与标为 todo 的测试算失败；思考关不掉的模型，
+// 模型层规格 §7.7、§14.3），同 md-reporter.mjs。
+// 严格模式（md-reporter.mjs 与默认导出；一键拉取模型 docs/specs/model-discovery.md §13.3）：node --test 把跳过的（data.skip）与
 // 标为 todo 的（data.todo）测试报成 test:pass（标为 todo 的失败报成不影响退出码的 test:fail），严格模式把它们记为失败：
 // ok: false，detail 为 "skipped: <原因>" 或 "todo: <原因>"，并带上 skip: true 或 todo: true（spec-coverage.mjs 见到
 // 这两个标记一律不算通过）；带这两个标记的套件（describe.skip 不报告它里面的测试）同样记一条。有这样的检查时
@@ -58,7 +60,7 @@ function checkOf(event, strict) {
 /**
  * @brief 生成一个报告器：只收测试，套件本身不记（严格模式下带跳过 / todo 标记的套件与自己失败的套件除外）。
  * @param resultFile test-results/ 下的结果文件名，例如 'v1-unit.json'
- * @param strict 严格模式（md-reporter.mjs）：跳过与 todo 的测试记为失败，见文件开头；默认 false
+ * @param strict 严格模式（md-reporter.mjs 与默认导出）：跳过与 todo 的测试记为失败，见文件开头；默认 false
  * @return node --test 的报告器（异步生成器函数）
  */
 export function createReporter(resultFile, strict = false) {
@@ -82,5 +84,5 @@ export function createReporter(resultFile, strict = false) {
   };
 }
 
-/** @brief 模型层的单元结果：test-results/v1-unit.json。 */
-export default createReporter('v1-unit.json');
+/** @brief 模型层的单元结果：test-results/v1-unit.json（严格模式，2026-10-24 起）。 */
+export default createReporter('v1-unit.json', true);

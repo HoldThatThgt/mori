@@ -191,9 +191,11 @@ test('MEM-30 the results of enhance.* commands have the §8 shapes', async (t) =
   await K.startEnhance({ userData, emitGlobal: () => undefined,
     clock: { now: () => Date.now(), setTimeout: () => 0, clearTimeout: () => undefined } });
   const info = await send({ type: 'enhance.get', cwd });
-  assert.deepEqual(keys(info), ['cwd', 'effortPicks', 'enabled', 'error', 'last', 'next', 'notice', 'pick', 'queued',
-    'running', 'since', 'team', 'thinking', 'time']);
+  assert.deepEqual(keys(info), ['cwd', 'effortPicks', 'enabled', 'error', 'last', 'next', 'noOffPicks', 'notice',
+    'pick', 'queued', 'running', 'since', 'team', 'thinking', 'time']);
   assert.equal(typeof info.effortPicks, 'object', 'effortPicks is a map from model range to Supports thinking');
+  // 2026-10-24（model-providers.md §7.7）：noOffPicks 是第一个候选的思考关不掉的那些范围
+  assert.ok(Array.isArray(info.noOffPicks), 'noOffPicks is a list of model ranges');
   assert.deepEqual(keys(info.last), ['review', 'strategy', 'taste']);
   assert.deepEqual([info.cwd, info.enabled, info.error, info.running, info.queued, info.next, info.notice],
     [cwd, false, null, null, 0, null, null], 'no enhance.json: off, never run');
@@ -202,6 +204,7 @@ test('MEM-30 the results of enhance.* commands have the §8 shapes', async (t) =
   assert.deepEqual(keys(set), ['error', 'info']);
   assert.equal(set.error, null);
   assert.deepEqual([set.info.time, set.info.team, set.info.enabled], ['05:30', true, false]);
+  assert.deepEqual(keys(set.info), keys(info), 'enhance.set gives the same EnhanceInfo shape, noOffPicks included');
   const settings = JSON.parse(readOrNull(join(K.projectDir(cwd).dir, 'enhance.json')));
   assert.deepEqual([settings.time, settings.team, settings.enabled], ['05:30', true, false]);
   const run = await send({ type: 'enhance.run', cwd });
