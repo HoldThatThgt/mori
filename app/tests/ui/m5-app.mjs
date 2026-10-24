@@ -29,7 +29,7 @@ import {
   centerPoint, chipsAt, closeRightPanel, composerAt, dragWithHint, flashedAt, headingTruncated, headingWhole, paneAt,
   paneView, pickRange, previewHeading, previewState, reportField, reportLabels, savedLayout, sendAt, sentSessionRefs,
   setSplitWidth, slotSelector, smallText, splitState, titleProblems, titleRoom, viewProblems, waitPaneIdle,
-  waitPaneReady, waitPreview, waitSessionChip, waitSplit,
+  waitPaneReady, waitPaneRunning, waitPreview, waitSessionChip, waitSplit,
 } from './m5-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
@@ -614,8 +614,7 @@ async function stopBoth(page) {
 async function splitRows(ctx) {
   const { page } = ctx;
   await sendAt(page, 'left', 'wait 90s');
-  await page.waitForFunction((css) => document.querySelector(`${css} .stop-button`), slotSelector('left'),
-    { timeout: 20000 });
+  await waitPaneRunning(page, 'left');
   // 右栏跟随焦点所在的一栏、按各自的会话开关：焦点到了这一栏之后再关，这个会话的右栏才是关着的
   await closeRightPanel(page);
   const sweep = await splitSweep(page, 'left', { widths: SPLIT_WIDTHS, state: 'running', other: 'idle' });
@@ -645,8 +644,7 @@ async function splitRows(ctx) {
 async function splitRight(ctx) {
   const { page } = ctx;
   await sendAt(page, 'right', 'wait 60s');
-  await page.waitForFunction((css) => document.querySelector(`${css} .stop-button`), slotSelector('right'),
-    { timeout: 20000 });
+  await waitPaneRunning(page, 'right');
   await closeRightPanel(page);
   const right = await splitSweep(page, 'right', { widths: [279], state: 'running', other: 'running' });
   const rings = await page.evaluate(() => [...document.querySelectorAll('.pane-slot:not([hidden])')]
@@ -1108,8 +1106,7 @@ async function effortAt280(page) {
       return button?.dataset.level === want && !button.dataset.pending;
     }, { css: slotSelector('left'), want: level }, { timeout: 10000 });
     await sendAt(page, 'left', 'wait 20s');
-    await page.waitForFunction((css) => document.querySelector(`${css} .stop-button`), slotSelector('left'),
-      { timeout: 20000 });
+    await waitPaneRunning(page, 'left');
     await composerAt(page, 'left').fill(SPLIT_DRAFT);
     const row = await composerRow(page, slotSelector('left'));
     seen.push(row?.items.effort?.label);

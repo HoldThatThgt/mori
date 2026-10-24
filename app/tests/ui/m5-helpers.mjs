@@ -56,11 +56,19 @@ export function waitPaneReady(page, side, timeout = 30000) {
     && !document.querySelector(`${css} [data-testid="not-ready"]`), slotSelector(side), { timeout });
 }
 
+/**
+ * @brief 等某一栏开始生成（data-running）。发送中不算："Stop"在发送中就出现，这时这一行有字时是单个"Queue"、
+ *        文字框的提示也不是生成中的，等"Stop"之后按"生成中"量会偶发量错（2026-10-24，锁屏时发送中更久）。
+ */
+export function waitPaneRunning(page, side, timeout = 20000) {
+  return page.waitForFunction((sel) => document.querySelector(sel)?.dataset.running === 'true',
+    `${slotSelector(side)} [data-testid="chat-pane"]`, { timeout });
+}
+
 /** @brief 等某一栏开始生成、再等它结束。 */
 export async function waitPaneIdle(page, side, timeout = 120000) {
   const css = `${slotSelector(side)} [data-testid="chat-pane"]`;
-  await page.waitForFunction((sel) => document.querySelector(sel)?.dataset.running === 'true', css,
-    { timeout: 20000 }).catch(() => {});
+  await waitPaneRunning(page, side).catch(() => {});
   await page.waitForFunction((sel) => {
     const pane = document.querySelector(sel);
     return pane?.dataset.running === 'false' && pane?.dataset.sending === 'false';

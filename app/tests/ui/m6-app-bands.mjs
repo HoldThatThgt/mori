@@ -202,10 +202,15 @@ export function recordSweep(name, samples, state, wanted = SPLIT_WANTED) {
     ? `${bad.slice(0, 8).join(' | ')} missed=${missed.join()}` : `widths ${widths.map(at1).join(', ')}`);
 }
 
-/** @brief 等 side 那一栏开始（want 为 true）或结束生成。 */
+/**
+ * @brief 等 side 那一栏开始（want 为 true）或结束生成。开始只认 data-running：发送中（data-sending）这一行有字时是单个
+ *        "Queue"、没有 ▾"More send options"（Composer.tsx 的 SendGroup），量"生成中有字"要等真的在生成（2026-10-24，
+ *        锁屏时发送中更久，量到的是发送中）；结束要生成和发送都结束。
+ */
 export const waitRunningAt = (page, side, want = true, timeout = 30000) => page.waitForFunction(({ css, on }) => {
   const pane = document.querySelector(css);
-  return (pane?.dataset.running === 'true' || pane?.dataset.sending === 'true') === on;
+  if (on) return pane?.dataset.running === 'true';
+  return pane?.dataset.running !== 'true' && pane?.dataset.sending !== 'true';
 }, { css: paneCss(side), on: want }, { timeout });
 
 /** @brief 停下所有在生成的栏（点"Stop"），等它们都结束。 */

@@ -1222,7 +1222,13 @@ export function paneProblems(report, state) {
   return report.panes.map((pane, index) => [...topProblems(pane), ...rowProblems(pane, states[index])]);
 }
 
-/** @brief 在会话行上按 Shift+F10，用 ↓ 走到"Open in split view"再 Enter，等分屏、右边那一栏就绪。 */
+/**
+ * @brief 在会话行上按 Shift+F10，用 ↓ 走到"Open in split view"再 Enter，等分屏、右边那一栏就绪，再等焦点落进焦点所在
+ *        一栏的文字框、再等两帧。菜单关上之后会话树才调 focusComposer()（SessionTree.tsx 的 sessionAction）：它等下一帧，
+ *        浮层还开着时再等几帧（锁屏时帧被节流，晚得更多）；不等它，调用方接着把焦点放到别处、按键时会被它拉回文字框
+ *        （2026-10-24，bandBlocked 的 Tab 顺序偶发为空）。已在界面里的会话只有 focusComposer() 会把焦点放进文字框；
+ *        新打开的会话文字框挂载时自带 autoFocus，focusComposer() 在它就绪的同一刻调用，最晚在接着的两帧里落下。
+ */
 export async function splitOpen(page, file) {
   await rowOf(page, file).first().focus();
   await page.keyboard.press('Shift+F10');
@@ -1236,6 +1242,9 @@ export async function splitOpen(page, file) {
   await page.keyboard.press('Enter');
   await waitSplit(page);
   await waitPaneReady(page, 'right');
+  await page.waitForFunction(() => document.activeElement === document
+    .querySelector('.pane-slot[data-focused="true"]:not([hidden]) .composer textarea'), null, { timeout: 10000 });
+  await settle(page);
 }
 
 /** @brief 显示着的各栏 .chat-pane 的宽度（从左到右，不取整）。 */
