@@ -749,3 +749,19 @@ MEM-27、MEM-19）。程序没有改。按负责人 2026-10-23 的新测试做�
 "生成中"量，属于同一类时序问题，锁屏时可能偶发失败（还没有看到它失败过）。负责人随后让一起改：`m5-helpers.mjs` 新加
 `waitPaneRunning`（只认 `data-running="true"`），三处改用它；`waitPaneIdle` 的第一步也改用它，行为不变。之后 `npm run check`、
 build、`test:unit` 372 通过，`m5-app` 55 / 55，`m6-replay` 66 / 66（它也用 `waitPaneIdle`），屏幕没锁。
+
+**推送前的完整回归**（AGENTS.md 测试分层第 3 条，开发构建，2026-10-24，没有锁屏）：`npm run check`、build、`test:md-unit` 197，
+`md-app-form` 82、`md-app-card` 68、`md-app-firstrun` 114、`md-replay` 69，都通过；`v1-models-existing.mjs --id MD-15`
+（m0–m6、`v1-models-*`、`tb-*`、`mem-*` 的 App 套件，各回放、单元、覆盖检查与标记检查）3582 项通过、1 项 KNOWN（pi #9129），
+只有 `m5-app` 一项失败（54 / 55），汇总和覆盖检查里的另外 10 条失败都是它连带的：
+
+- "分屏 280px、生成中有字：…Esc 回到 ▾…"：Esc 之后焦点在 body 上，不在 ▾"More send options"上（Tab 的路径、菜单的
+  第一项和 ↓ 之后的一项都对）。之后在同一个构建上把 `m5-app` 交替跑了 6 遍：这个分支的测试 3 遍都是 55 / 55；
+  `ab57183` 的 `m5-app.mjs`、`m5-helpers.mjs` 3 遍里 2 遍失败在"Effort 是"Medium"和"Minimal""（就是上面修的那类），
+  Esc 这条 6 遍都没有再出现。一次只读分析（三个角度各一位，再由一位逐条核实）确认它与这个分支的两次提交无关：ba5f24e
+  只改 m6 的文件，`m5-app` 不导入它们；e03daf0 只让 `splitRows` 开始量的时刻晚到真的在生成，离 Esc 还有整轮宽度的扫描和
+  `popoverChecks`，Esc 那一刻两种写法的状态相同。原因没有查到（可信度低）：正常的 Esc 路径同步地把焦点放回 ▾；要落到 body，
+  ▾ 当时必须不可用或已卸载（它用真的 `disabled`，别的三个按钮用 `aria-disabled`），或者有一次落在不能获得焦点处的点击，
+  这次的数据里都看不到。没有改测试，也没有改程序。下一次失败时，在 `queueForLater` 的细节里记下焦点所在的一栏、这一栏的
+  `data-running` / `data-sending`、▾ 是否还在、是否 `disabled`，以及拒绝启动卡，就能分清。另一个可做的是在 `useRowMenu`
+  的 `dismiss` 之后，焦点没落到按钮上时回到文字框（models.md"不可用或按钮消失时"）；这是程序的改动，没有做。
