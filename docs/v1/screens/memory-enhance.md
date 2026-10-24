@@ -91,7 +91,7 @@ token 数不到 1000 写 `<n> tokens`（1 时 `1 token`），1000 起写 `<n>k t
 | `Effort` | `info.thinking`；`info.effortPicks[<所选范围>]`（后台进程按 §9.1 取默认强度的规则取第一个候选，§8） | 标签 `Effort`；下拉（`enhance-effort`）是 pi 的七档，文字同顶栏：`Off`、`Minimal`、`Low`、`Medium`、`High`、`Extra high`、`Max` | 选一档 |
 | `Effort` 不可用 | `effortPicks[<所选范围>]` 为假：第一个候选的模型没标 Supports thinking | 下拉不可用，悬停 `This model isn’t marked “Supports thinking”`（同输入框下面一行的 Effort 按钮）；保持原来的值（临时，走查时可以改） | — |
 | `Effort` 没有范围 | 下拉没有选中范围，或所选范围不在 `effortPicks` 里（取不到候选） | 下拉不可用，悬停 `Choose a model first.`；保持原来的值（临时，走查时可以改） | 选一个范围 |
-| `Effort` 没有 Off（2026-10-24 补，模型层规格 §7.7、§9.1） | `effortPicks[<所选范围>]` 为真，且所选范围在 `info.noOffPicks` 里（`effortPicks` 为假时按“`Effort` 不可用”，不看 `noOffPicks`） | 下拉不列 `Off`（不是变淡），从 `Minimal` 起，其余同 `Effort`；没有悬停说明（模型层规格只给了输入框下面一行的 Effort 菜单菜单那一句，临时，走查时可以改） | 选一档 |
+| `Effort` 没有 Off（2026-10-24 补，模型层规格 §7.7、§9.1） | `effortPicks[<所选范围>]` 为真，且所选范围在 `info.noOffPicks` 里（`effortPicks` 为假时按“`Effort` 不可用”，不看 `noOffPicks`） | 下拉不列 `Off`（不是变淡），从 `Minimal` 起，其余同 `Effort`；没有悬停说明（模型层规格只给了输入框下面一行的 Effort 菜单那一句，临时，走查时可以改） | 选一档 |
 | 存的是 Off、第一个候选没有 Off（2026-10-24 补，模型层规格 §7.7） | 草稿的强度是 `off`（`info.thinking` 为 `off`，或草稿是 Off 时改选了这样的范围），所选范围同上一行（在 `noOffPicks` 里） | 下拉显示 `Minimal`（增强会话经虚拟模型路由，pi 按实际模型把 Off 提到 Minimal，用的就是它）；不动 `Effort` 就保存时照存：`enhance.set` 带 `thinking: 'off'`；改选第一个候选有 Off 的范围时显示回 `Off` | 选另一档 |
 | `Team mode` | `info.team` | 标签 `Team mode`；勾选框 `Run with team mode`（`enhance-team`），下面一行 `Uses this project’s agents in .mori/agents.`（临时，规格 §12） | 勾选 |
 | `Daily time` | `info.time` | 标签 `Daily time`；`<input type="time">`（`enhance-time`），下面一行 `Runs once a day at this time. Conversations before it count as the previous day.`（临时，规格 §12） | 改时间 |
