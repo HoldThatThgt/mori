@@ -11,7 +11,8 @@ Electron 44.9.0；pi 1.3.0；electron-builder 26.17.0；playwright-core 1.64.1�
 `composer-pickers-wip-prev1`（`d21ff35`，不合并，合并后可删）。
 设计说明在 [composer-pickers.md](composer-pickers.md)（为什么、宽度怎样估的、每处按推荐定的），这里记做了什么、测了什么、
 哪里和方案不同、还有什么没验证。分支没有推送，也没有合并进 `app-v0`（合并由发起这一步的会话在最后做）。
-合入 `app-v0` 之后又与 v1-memory 合并，经过和合并后的结果见最后一节"合入 v1-memory（origin/app-v0 54f0758）之后"。
+合入 `app-v0` 之后又与 v1-memory 合并，经过和合并后的结果见"合入 v1-memory（origin/app-v0 54f0758）之后"；
+一键拉取模型合入之后两处测试的时序修正见最后一节"合入一键拉取模型（ab57183）之后：两处测试的时序"。
 
 ## 状态
 
@@ -720,3 +721,29 @@ MEM-27、MEM-19）。程序没有改。按负责人 2026-10-23 的新测试做�
 - 移到 `mem-app-settings` 的 3 条 F8 检查没有 MEM 编号，记忆规格的覆盖检查把它们列为不计入。
 - `tb-app-roles` 比对的基线 `.tb-runs/base` 是之前建的，没有重建。
 - 上面"未验证"一节里这一步自己的各项，合并没有改变。
+
+## 合入一键拉取模型（ab57183）之后：两处测试的时序
+
+2026-10-24，分支 `claude/distracted-liskov-473288`，从 `app-v0` 的 `ab57183` 开出。只改了测试（`m6-app-bands.mjs`、`m6-helpers.mjs`），
+程序没有改。[../v1/discovery-checks.md](../v1/discovery-checks.md)"合并到 app-v0"记着 `m6-app-slash` 的两条失败；
+两条的原因都在测试怎么等，不是一键拉取模型带来的：
+
+- "280px、生成中有字、Effort "High""：`waitRunningAt` 把发送中（`data-sending`）也算作开始生成，`layoutReport` 量到的是
+  发送中的单个"Queue"（`Composer.tsx` 的 `SendGroup`），没有 ▾"More send options"。现在等开始只认 `data-running="true"`，
+  等结束仍要生成和发送都结束。量"生成中有字"和"生成中"的三处（`bandTyped`、`bandSingle`、`bandEffort`）都用它，一起改好了。
+- "拒绝启动：从文字框 Tab 依次是权限 → 范围 → 圆环"：会话树的"Open in split view"（`SessionTree.tsx` 的
+  `sessionAction`）在菜单关上之后才调 `focusComposer()`。它先等一帧，浮层还没退出时最多再等 5 帧，锁屏时帧被节流，
+  晚得更多。`splitOpen` 原来不等它，于是晚到的聚焦把焦点从权限按钮拉回文字框。现在 `splitOpen` 等右栏就绪之后，
+  再等焦点落进焦点所在一栏的文字框，然后再等两帧。所有调用它的地方都因此不受影响：`ensureSplit`、`bandBlocked`、
+  `m6-app-slash` 的 `splitLayout`、`m6-app-row` 的 `prepSplit` 和 `providerRange`、`m6-real` 的走查 8。
+
+**结果**（开发构建，合成端点，一个接一个跑，开始和结束时都没有锁屏（没有 `LogonUI`））：`npm run check`、build、`test:unit` 372
+都通过；`m6-app-slash` 连续三遍 106 / 106（每遍约 3.3 分钟）；`m1-app` 47 / 47，其中"复制代码"那条在屏幕解锁时通过，
+锁屏时剪贴板为空的情况与 [english-ui-checks.md](english-ui-checks.md) 记的相同；`m6-app-row` 45 / 45。按测试分层只跑了
+第 1、2 层。完整回归、打包版和真实模型走查没有跑，因为只改了测试的等待，模型看到的和做的都没变。
+
+**没验证**：没有在锁屏时重跑。原来的两条失败都出现在锁屏时；现在的等待在锁屏时只会更久，不会更早结束，但没有实测。
+
+**一并查到的**：一次只读审查确认这两处修正没有问题，每个修正一位审查者，每条发现再由一位审查者尝试驳倒。审查还发现
+`m5-app.mjs` 的 `splitRows`、`splitRight`、`effortAt280` 等的是 `.stop-button`。这个按钮在发送中也会出现，三处接着都按
+"生成中"量，属于同一类时序问题，锁屏时可能偶发失败。这次不在范围内，没有改，也还没有看到它失败过。
