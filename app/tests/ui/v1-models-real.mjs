@@ -336,7 +336,7 @@ function setupNoOff(ctx) {
 /**
  * @brief MP-40 加入：设置 → Models；有 OpenRouter 的提供商时用它卡上的 Fetch models，没有时 Add provider（key 输进密码框，
  *        区域 Public）；过滤、勾上 ctx.noOff.add（两个免费模型；key 方式下只有 lfm，flint 建目录时已加）、Add。
- * @return 两个模型都存进了配置（之后的步骤要它们）
+ * @return flint 存进了配置（之后的步骤要它）；lfm 有没有存进记在 ctx.noOff.lfmSaved，只有探针那一步要它
  */
 async function noOffAdd(ctx) {
   const ids = ctx.noOff.add;
@@ -356,25 +356,42 @@ async function noOffAdd(ctx) {
   JSON.stringify({ problems, providerId: added.providerId, title: added.state.title, listed: added.ticked?.listed,
     filter: added.ticked?.filter }));
   ctx.noOff.providerId = provider?.id ?? null;
-  return Object.values(NO_OFF_MODELS).every((id) => provider?.models.some((model) => model.id === id));
+  const saved = (id) => Boolean(provider?.models.some((model) => model.id === id));
+  ctx.noOff.lfmSaved = saved(NO_OFF_MODELS.lfm);
+  return saved(NO_OFF_MODELS.flint);
 }
 
-/** @brief MP-40 探针：等两个模型的探针跑完；flint 的档案与模型行的 Thinking 一项，lfm 的工具调用与等级。 */
+/**
+ * @brief lfm 的档案：没存进配置时不等（note 写明）；存进了时等它的探针跑完，时限内没跑完时 note 为报错。
+ * @return { profile（没有时 null）, note（没有时 null） }
+ */
+async function lfmProfile(ctx, lfm) {
+  if (!ctx.noOff.lfmSaved) return { profile: null, note: `${lfm} was not saved (see the MP-40 add check)` };
+  try {
+    return { profile: (await waitProfiles(ctx.page, [lfm], PROBE_MS)).profiles[lfm], note: null };
+  } catch (error) {
+    return { profile: null, note: errorLine(error, 300) };
+  }
+}
+
+/**
+ * @brief MP-40 探针：flint 与 lfm 分开等、分开记（lfm 没加成或探针没跑完时 flint 的检查与之后的步骤照常走）：
+ *        flint 的档案与模型行的 Thinking 一项，lfm 的工具调用与等级。时限为 PROBE_MS（免费模型慢，同 md-real.mjs）。
+ */
 async function noOffProbes(ctx) {
   const [flint, lfm] = [noOffRef(ctx, 'flint'), noOffRef(ctx, 'lfm')];
-  // 两个模型的自动探针跑完的时限：免费模型慢（PROBE_MS，同 md-real.mjs）
-  const info = await waitProfiles(ctx.page, [flint, lfm], PROBE_MS);
+  const a = (await waitProfiles(ctx.page, [flint], PROBE_MS)).profiles[flint];
   // 界面收到同一个 mori.profiles 之后才重画模型行：最多等 10 秒
   const shown = await pollFor(() => thinkingOffItem(ctx.page, flint), (item) => item?.value === 'refused', 10000);
-  await shot(ctx.page, '07-nooff-probed');
-  const a = info.profiles[flint];
   record(`MP-40 ${flint}: after Add its probes finish with status ready, tool calling verified and `
     + `reasoning.off_refused true, and its model row shows "${THINKING_OFF_TEXT}"`, a?.status === 'ready'
     && a.tool_calling?.state === 'verified' && a.reasoning?.off_refused === true && shown?.value === 'refused'
     && shown.text === THINKING_OFF_TEXT, JSON.stringify({ profile: noOffBrief(a), shown }));
-  const b = info.profiles[lfm];
+  const b = await lfmProfile(ctx, lfm);
+  await shot(ctx.page, '07-nooff-probed');
   record(`MP-40 ${lfm}: after Add its probes finish with tool calling verified and handoff tier B`,
-    b?.tool_calling?.state === 'verified' && b.tier?.level === 'B', JSON.stringify({ profile: noOffBrief(b) }));
+    b.profile?.tool_calling?.state === 'verified' && b.profile.tier?.level === 'B',
+    JSON.stringify({ profile: noOffBrief(b.profile), note: b.note }));
 }
 
 /**
@@ -454,8 +471,8 @@ const NO_OFF_STEPS = [['add', noOffAdd], ['probes', noOffProbes], ['test', noOff
   ['switch', noOffSwitch], ['answer', noOffAnswer]];
 
 /**
- * @brief 跑 MP-40 的步骤：一步抛错时记一条失败、收尾并停下；加入没有存进配置（noOffAdd 返回 false，它已记了失败）时
- *        停下，之后的步骤要那两个模型。
+ * @brief 跑 MP-40 的步骤：一步抛错时记一条失败、收尾并停下；flint 没有存进配置（noOffAdd 返回 false，它已记了失败）时
+ *        停下，之后的步骤要它（lfm 没存进时只有探针那一步记 lfm 的失败，其余照走）。
  */
 async function runNoOff(ctx) {
   for (const [name, step] of NO_OFF_STEPS) {
@@ -590,6 +607,81 @@ async function dataSource(ctx) {
   return built;
 }
 
+/**
+ * @brief Mori 启动之前的准备：临时项目与五个文件、复制数据目录（scratchModelData）、synthetic test setup（§14.1：
+ *        分组作为默认范围、给临时项目授权公网、备份首选的 key 密文）与 MP-40 的准备（setupNoOff）。出错时抛出。
+ * @param found findRealProviders 的结果
+ * @param dir 要复制的数据目录（--source 或 key 方式建的）
+ */
+function prepareRun(ctx, found, dir) {
+  Object.assign(ctx, found, { firstRef: `${found.first.id}/${found.first.models[0].id}`,
+    secondRef: `${found.second.id}/${found.second.models[0].id}` });
+  ctx.project = prepareProject('mori-v1-real-').project;
+  addNotes(ctx.project);
+  ctx.userData = scratchModelData(dir);
+  ctx.cipher = prepareRealConfig(ctx.userData, found, [ctx.project]);
+  // MP-40 的准备（§14.1 的 2026-10-24 补）：找 OpenRouter 的提供商，去掉复制出的配置里已有的两个免费模型
+  ctx.noOff = setupNoOff(ctx);
+}
+
+/** MP-27 的步骤（按顺序；一步出错时记一条失败、收尾，接着走下一步） */
+const STEPS = [['probes', probes], ['normalChat', normalChat], ['switchAtStart', switchAtStart],
+  ['backToFirst', (c) => backToFirst(c, 'after the switch at reply start')], ['switchMidReply', switchMidReply],
+  ['backAgain', (c) => backToFirst(c, 'after the mid-reply switch')]];
+
+/**
+ * @brief 启动 Mori，按顺序走 MP-27 的步骤，再走 MP-40（有准备好时）；最后记页面错误的检查（MP-40 开始之后的记给
+ *        MP-40）。启动 Mori 出错时抛出（各步里的错在这里记下，不抛出）。
+ */
+async function runSteps(ctx) {
+  try {
+    await startApp(ctx);
+    for (const [name, step] of STEPS) {
+      try {
+        await step(ctx);
+      } catch (error) {
+        record(`MP-27 ${name}: flow`, false, errorLine(error, 400));
+        await recover(ctx, name);
+      }
+    }
+    if (ctx.noOff) {
+      // 之后的页面错误记给 MP-40
+      ctx.noOffFrom = ctx.pageErrors.length;
+      await runNoOff(ctx);
+    }
+  } finally {
+    const errors27 = ctx.pageErrors.slice(0, ctx.noOffFrom ?? ctx.pageErrors.length);
+    record('MP-27 page has no errors', errors27.length === 0, errors27.slice(0, 3).join(' | '));
+    if (ctx.noOffFrom !== undefined) {
+      const errors40 = ctx.pageErrors.slice(ctx.noOffFrom);
+      record('MP-40 page has no errors while the MP-40 steps run', errors40.length === 0,
+        errors40.slice(0, 3).join(' | '));
+    }
+  }
+}
+
+/**
+ * @brief 收尾（不管前面成功与否都做）：关掉 Mori；删掉复制出的数据目录与 key 方式建的目录里 Mori 加密保存的 key
+ *        （credentials.json）。ctx.userData 只会是复制出的目录或 key 方式建的目录，不会是 --source 给的目录。
+ */
+async function cleanUp(ctx) {
+  await ctx.app?.close().catch(() => {});
+  if (ctx.project) console.log(`[v1-models-real] project in ${ctx.project}; data in ${ctx.userData}`);
+  const kept = [];
+  for (const folder of new Set([ctx.userData, ctx.keyDir].filter(Boolean))) {
+    try {
+      rmSync(join(folder, 'credentials.json'), { force: true });
+    } catch (error) {
+      kept.push(folder);
+      console.error(`[v1-models-real] could not remove ${join(folder, 'credentials.json')}: ${errorLine(error, 300)}`);
+    }
+  }
+  if (ctx.keyDir) {
+    console.log(`[v1-models-real] key mode: data dir built in ${ctx.keyDir} (credentials.json `
+      + `${kept.includes(ctx.keyDir) ? 'NOT removed, delete it by hand' : 'removed'})`);
+  }
+}
+
 const ctx = { pageErrors: [], keyMode: false };
 let found = null;
 let dir = null;
@@ -611,52 +703,22 @@ try {
       + 'node tests/ui/v1-models-real.mjs [--exe <Mori.exe>]');
   }
 }
-if (found) {
-  Object.assign(ctx, found, { firstRef: `${found.first.id}/${found.first.models[0].id}`,
-    secondRef: `${found.second.id}/${found.second.models[0].id}` });
-  const made = prepareProject('mori-v1-real-');
-  ctx.project = made.project;
-  addNotes(ctx.project);
-  ctx.userData = scratchModelData(dir);
-  // synthetic test setup（§14.1）：分组作为默认范围、给临时项目授权公网、备份首选的 key 密文。
-  ctx.cipher = prepareRealConfig(ctx.userData, found, [ctx.project]);
-  // MP-40 的准备（§14.1 的 2026-10-24 补）：找 OpenRouter 的提供商，去掉复制出的配置里已有的两个免费模型
-  ctx.noOff = setupNoOff(ctx);
-  const steps = [['probes', probes], ['normalChat', normalChat], ['switchAtStart', switchAtStart],
-    ['backToFirst', (c) => backToFirst(c, 'after the switch at reply start')], ['switchMidReply', switchMidReply],
-    ['backAgain', (c) => backToFirst(c, 'after the mid-reply switch')]];
-  try {
-    await startApp(ctx);
-    for (const [name, step] of steps) {
-      try {
-        await step(ctx);
-      } catch (error) {
-        record(`MP-27 ${name}: flow`, false, errorLine(error, 400));
-        await recover(ctx, name);
-      }
-    }
-    if (ctx.noOff) {
-      // 之后的页面错误记给 MP-40
-      ctx.noOffFrom = ctx.pageErrors.length;
-      await runNoOff(ctx);
-    }
-  } finally {
-    const errors27 = ctx.pageErrors.slice(0, ctx.noOffFrom ?? ctx.pageErrors.length);
-    record('MP-27 page has no errors', errors27.length === 0, errors27.slice(0, 3).join(' | '));
-    if (ctx.noOffFrom !== undefined) {
-      const errors40 = ctx.pageErrors.slice(ctx.noOffFrom);
-      record('MP-40 page has no errors while the MP-40 steps run', errors40.length === 0,
-        errors40.slice(0, 3).join(' | '));
-    }
-    await ctx.app?.close().catch(() => {});
-    console.log(`[v1-models-real] project in ${ctx.project}; data in ${ctx.userData}`);
-    rmSync(join(ctx.userData, 'credentials.json'), { force: true });
+try {
+  if (found) {
+    prepareRun(ctx, found, dir);
+    await runSteps(ctx);
   }
+} catch (error) {
+  // 启动之前的准备或启动 Mori 出错（各步里的错已在 runSteps 里记下）：记一条失败；结果文件照写、密文照删（finally）
+  record('MP-27 start: flow (temp project, copying the data dir, synthetic test setup, launching Mori)', false,
+    errorLine(error, 600));
+  if (ctx.noOff === undefined) {
+    record(NO_OFF_SETUP, false, `not run: the MP-27 start failed before the MP-40 setup: ${errorLine(error, 400)}`);
+  } else if (ctx.noOff && ctx.noOffFrom === undefined) {
+    record('MP-40 start: flow', false, `not run: the MP-27 start failed: ${errorLine(error, 400)}`);
+  }
+} finally {
+  await cleanUp(ctx);
+  await sleep(200);
+  process.exitCode = write(`v1-models-real${suffix}.json`) ? 0 : 1;
 }
-if (ctx.keyDir) {
-  // key 方式建的目录里也有 Mori 加密保存的 key：跑完删掉这份密文（建目录的两次启动都已关掉 Mori）
-  rmSync(join(ctx.keyDir, 'credentials.json'), { force: true });
-  console.log(`[v1-models-real] key mode: data dir built in ${ctx.keyDir} (credentials.json removed)`);
-}
-await sleep(200);
-process.exitCode = write(`v1-models-real${suffix}.json`) ? 0 : 1;

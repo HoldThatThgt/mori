@@ -1,4 +1,4 @@
-// v1 模型层的真实走查与录制（v1-models-real.mjs、v1-models-record.mjs）共用的准备与操作，做法按
+// v1 模型层的真实走查与录制（v1-models-real.mjs、v1-models-record.mjs；key 方式另有 md-real.mjs）共用的准备与操作，做法按
 // docs/specs/model-providers.md §14.1"真实模型与录制"：
 // 1. 复制数据目录：只复制加密的 credentials.json、Electron 的 Local State（解密要用）、model-config.json、
 //    model-profiles.json 和 pi/settings.json（按模型的思考强度）；不复制 pi/models.json，从不读取或打印 key。
@@ -11,9 +11,12 @@
 //    复制出的配置里已有那两个免费模型时先去掉（synthetic test setup）；经卡上的 Fetch models（或 Add provider，key 只输进
 //    Mori 的密码框）过滤、勾选、加入；输入框下面一行的范围与 Effort 菜单的操作。拉取与清单的读法用 md-real-helpers.mjs 的。
 // 6. key 方式（§14.1 的 2026-10-24 补，负责人定：选项 A）：只经界面建数据目录的步骤——首次启动表单接 DeepSeek
-//    （firstRunDeepSeek）、Add provider（addProviderUi，GLM 用 chooseGlm）、key 只输进 Mori 的密码框（typeKey）——与
-//    这几步的问题清单（firstRunProblems、glmAddProblems、addedProblems、savedProblems）；md-real.mjs 与 v1-models-real.mjs
-//    共用，检查的名字由各自的脚本定。
+//    （firstRunDeepSeek）、Add provider（addProviderUi，GLM 用 chooseGlm，只勾一行用 tickOnly）、key 只输进 Mori 的
+//    密码框（typeKey）——与这几步的问题清单（firstRunProblems、glmAddProblems、addedProblems、savedProblems）；
+//    md-real.mjs（MD-14 的 key 方式）与 v1-models-real.mjs（MP-27、MP-40 的 key 方式）共用，两边不留自己的副本。
+//    检查的名字、截图（shot 由调用方给）、OpenRouter 只勾哪一行由各自的脚本定（md-real.mjs 用自己的 chooseFree；
+//    v1-models-real.mjs 给这里的 addOpenRouter 传 ids，它建在 tickModels 上）；地址默认为 KEY_MODE_URLS，md-real.mjs
+//    用 MD_REAL_DEEPSEEK_URL、MD_REAL_GLM_URL 改时把地址经 baseUrl 传进来。
 // 只读页面和磁盘，不记录检查结果（由调用方记录）。
 
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -89,7 +92,7 @@ export function findRealProviders(config, { first, second } = {}) {
   const byId = (id) => config.providers.find((provider) => provider.id === id);
   const a = first ? byId(first) : config.providers.find((provider) => looksLike(provider, /deepseek/i));
   const b = second ? byId(second) : config.providers.find((provider) => provider !== a
-    && looksLike(provider, /glm|bigmodel|zhipu/i));
+    && looksLike(provider, /glm|bigmodel|zhipu|z\.ai/i));
   const ids = config.providers.map((provider) => provider.id).join(', ');
   if (!a) throw new Error(`No first provider (${first ?? 'DeepSeek'}) in model-config.json; providers: ${ids}`);
   if (!b) {
@@ -286,9 +289,15 @@ export async function waitProfiles(page, refs, timeoutMs = 600000) {
   }
 }
 
-/** 合理的探针结果允许的取值（§7.2） */
+/** 合理的探针结果允许的推理字段（§7.2） */
 const FIELDS = ['reasoning_content', 'reasoning', 'reasoning_text', 'none', 'native'];
-const SERVERS = ['vllm', 'sglang', 'ollama', 'llamacpp', 'unknown'];
+/**
+ * 允许的服务种类：一键拉取模型之后第 0 步存读取器认出的种类（拉取规格 §3.3 的表，同 shared/models.ts 的
+ * SERVER_KINDS；例如 api.deepseek.com 是 deepseek，api.z.ai 是 unknown），不再只是 §7.2 原来的五种
+ */
+const SERVERS = ['vllm', 'sglang', 'llamacpp', 'ollama', 'lmstudio', 'xinference', 'gpustack', 'mindie', 'tgi',
+  'lmdeploy', 'localai', 'tensorrt', 'litellm', 'newapi', 'oneapi', 'deepseek', 'moonshot', 'dashscope', 'qianfan',
+  'openrouter', 'anthropic', 'unknown'];
 
 /**
  * @brief 一个真实模型的档案是否合理（MP-27"探针结果合理"）：探测完成、工具调用已验证、有交接写入等级、
@@ -333,8 +342,11 @@ export const NO_OFF_NOTE = 'This model can’t turn thinking off.';
 export const THINKING_OFF_TEXT = 'Thinking: Can’t be turned off';
 /** 一次拉取的时限（列表请求 15 秒、最多 3 次，docs/specs/model-discovery.md §11） */
 const FETCH_MS = 90000;
-/** 模型行 Test 的结果开头（models-settings.md"测试结果的文字"） */
-const TEST_DONE = /^(Connected|Connection failed|Test cancelled)/;
+/**
+ * 模型行 Test 的结果开头（models-settings.md"测试结果的文字"；connection.test 请求本身出错时同一处写
+ * "Couldn’t test the connection: …"，settings.ts 的 runTest）
+ */
+const TEST_DONE = /^(Connected|Connection failed|Test cancelled|Couldn[’']t test)/;
 /** 测试连接的时限（首个内容 120 秒，加上排队） */
 const TEST_MS = 180000;
 

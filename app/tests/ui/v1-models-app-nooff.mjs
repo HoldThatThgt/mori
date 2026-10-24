@@ -60,7 +60,7 @@ const LIMIT_TEXT = `Couldn’t verify: ${LIMIT_DETAIL}`;
 /** 合成端点 "plain" 的回复 */
 const PLAIN_REPLY = '这是一段只有文字的回复，用来测试流式输出。';
 /** 测试连接结果的开头（models-settings.md"测试结果的文字"） */
-const TEST_DONE = /^(Connected|Connection failed|Test cancelled)/;
+const TEST_DONE = /^(Connected|Connection failed|Test cancelled|Couldn[’']t test)/;
 /** 没有 Off 的模型的强度（pi 的七档去掉 Off，§7.7） */
 const NO_OFF_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 /** Default effort for new sessions 的标签（ui-strings.md） */
