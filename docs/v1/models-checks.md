@@ -238,6 +238,38 @@ first-run.md 还沿用它的“首次启动之后：打开文件夹”一节，�
    第 47 行（“连接表单只写“Save connection””）、[v0/screens/README.md](../v0/screens/README.md) 里 connection.md 那一行；
    代码注释 `renderer/src/styles/settings.css:3`、`:131` 也还提到“Connections and models”和已删掉的 key 提示。
 
+## 思考关不掉的模型：实测（2026-10-24，分支 `claude/v1-reasoning-mandatory`）
+
+为规格 §7.7（2026-10-24 补丁，负责人选定方案 B）在实现之前测的三项。做法：一个只在规划会话临时目录里的脚本（不进仓库），
+用 pi-ai 1.3.0 的 `streamSimple` 照探针的写法发出（同样的提示、`get_weather` 工具、`{ outcome }` 的 JSON schema、最大输出 256 token），
+模型按 Mori 编译的样子写（`openai-completions`、地址 `https://openrouter.ai/api/v1`、勾 Supports thinking；“有标记”即加 `thinkingLevelMap: { off: null }`）。
+key 由脚本从你的 `openrouter.env` 读出、不打印；记录里只有状态、发出的 `reasoning` 字段和回复摘要。共 27 个请求，全是 HTTP 200 或预期的 400。
+
+| 模型 | 请求 | 发出的 `reasoning` | 结果 |
+| --- | --- | --- | --- |
+| `recursive/flint-v1.0:free` | 第 1 步，`medium` | `{ effort: "medium" }` | 200，“ready” |
+| 同上 | 第 2 步的关思考，没有标记 | `{ effort: "none" }` | 400 `{"error":{"message":"Reasoning is mandatory for this endpoint and cannot be disabled.","code":400,"metadata":{"provider_name":null}}}` |
+| 同上 | 同一句，有标记、不传强度 | 不发 | 200，“ready”，有思考 |
+| 同上 | 第 3、4、6 步，`medium` | `{ effort: "medium" }` | 都通过：`get_weather({ city: "Paris", days: 3 })`、回答含 21、`{"outcome":"ok"}` |
+| 同上 | 第 7 步连发 3 次，`medium` | `{ effort: "medium" }` | 3 次都通过（输出 111–187 token） |
+| 同上 | 第 3、4 步，有标记、不传强度 | 不发 | 都通过 |
+| `liquid/lfm-2.5-2.6b:free` | 第 1 步，`medium` | `{ effort: "medium" }` | 200，“ready” |
+| 同上 | 第 2 步的关思考，没有标记 | `{ effort: "none" }` | 400，原文同上 |
+| 同上 | 同一句，有标记、不传强度 | 不发 | 200，“ready”，有思考 |
+| 同上 | 第 3、4、6 步，`medium` | `{ effort: "medium" }` | 都通过（第 6 步 `{"outcome": "fail"}`，在枚举内） |
+| 同上 | 第 7 步连发 3 次，`medium` | `{ effort: "medium" }` | 3 次都停在 256 token（`finish_reason: length`），只有约 900 字思考、没有正文：按 §7.7 的输出上限规则为出错 |
+| 同上 | 第 3、4 步，有标记、不传强度 | 不发 | 都通过 |
+| `openai/gpt-oss-20b`（列 `[high, medium, low]`） | `minimal`、`medium` | `{ effort: "minimal" }` / `"medium"` | 都是 200、正常回答 |
+| `z-ai/glm-5.3-flash`（列 `[max, high, low]`） | `minimal`、`medium`、`low` | 各自的值 | 都是 200、正常回答（`medium` 时回复里没有思考内容） |
+
+结论（已写进规格 §7.7 末尾）：
+
+1. 探针用 `medium` 可行；最大输出维持 256，但必须有“停在输出上限、只有思考算出错”的规则（lfm 的第 7 步）。lfm 第 6 步通过，真实探测时得 B 级、不跑第 7 步。
+2. 不传 `reasoning` 字段时 OpenRouter 按默认思考、正常回答：有标记的模型即使收到不带强度的请求（标记这道保险）也不会出错；按规格 §7.7 Mori 本来就不发这样的请求（测试连接、探针带 `medium`，换模型后重发收紧成 `minimal`）。
+3. 强度不在模型的 `supported_efforts` 里时 OpenRouter 不拒绝：会话里 Off 提到的 `minimal` 能发。只测了 OpenRouter；Anthropic、百炼、MiniMax 的必须思考的模型没有测。
+
+另外更正 [discovery-checks.md](discovery-checks.md) 第 170 行的说法：OpenRouter 列出工具的 17 个免费模型里只有 2 个要求思考（上面两个），不是全部；探针第 1 步（`medium`）没有被拒，被拒的是关闭思考的第 2、3、5、6、7 步。
+
 ## 未验证
 
 - 内网 vLLM、SGLang、llama.cpp、Ollama：只用合成端点模拟过它们的版本接口、指标、截断和取消；真实的 429 `Retry-After`、5xx、长输入截断没有在真实端点上触发过。

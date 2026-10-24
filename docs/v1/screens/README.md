@@ -21,13 +21,21 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 （`models.get` 与 `mori.profiles` 的档案里服务报告的窗口、输出上限、思考、图片；档案没有 `meta` 时为 null；Ollama 只读到训练窗口时窗口为 null，
 发现规格 §7.2），以及 `shared/models.ts` 的 `suggestZone`（按表单里的 Base URL 预选区域，发现规格 §3.4）与 `SERVER_KIND_LABELS`
 （Detected 一行的种类名，§3.3）。首次启动表单还用到你在这张表单里最后填过的 key（只在表单内存里，发现规格 §6.6），属于“你刚做的操作”。
+思考关不掉的模型（2026-10-24 补丁，规格 §7.7）另有一个来源：`ProfileView.reasoning.off_refused`（`models.get` 与 `mori.profiles` 的档案；
+第 2 步关闭思考被服务以 400 或 422 拒绝、开思考（`medium`）有正文时为真，旧档案没有这个字段时读作 `false`），档案摘要的“Thinking: Can’t be turned off”与
+模型表单（Edit）的 Default effort for new sessions 不列 Off 按它；增强设置的 Effort 不列 Off 不按它，按 `EnhanceInfo.noOffPicks`（见下面 `memory-*.md` 的来源）；
+输入框下面一行的 Effort 菜单底部的“This model can’t turn thinking off.”按已有的 `ModelState.reasoning` 与 `ModelState.thinkingLevels`
+（当前模型支持思考而强度里没有 `off`），不另加来源。第 2 步的说明“Thinking can’t be turned off: <原文>”只存在档案文件
+（`model-profiles.json`）第 2 步的结果里，`ProfileView` 不带，不是界面的来源，界面不显示（规格 §7.7）。
 `team-*.md` 另有 TaskBoard 规格 §13.10–§13.11 的来源：事件（`mori.team_state`、`mori.board`、`mori.receipt`、`mori.progress`、`mori.wake`、
 `mori.team_deciding`、`mori.team_approval_request`、`mori.team_approval_end`）、命令的结果（`session.setTeam`、`board.get`、`session.recheckAgents`、
 `session.stopTeam`、`session.clearQueue` 的 `texts`；`session.prompt` 的 `team: 'once'`、`approval.answer` 的后台 `requestId`）、
 `SessionInfo` 与 `LiveSnapshot` 的 `team`、`board`、`teamApprovals`、`deciding`，`LiveStatus` 的 `teamBusy`、`teamApproval`，
 `ModelState` 的 `pickLocked` 与 `blocked.kind` 的 `agents_invalid`，会话文件里的 `mori.receipt`、`mori.progress`、`mori.wake`（`mori.team` 不显示）。
 `memory-*.md` 与 `settings-issues.md` 另有记忆规格 §8 的来源：命令的结果（`memory.list`、`memory.get`、`memory.save`、`memory.delete`、`memory.move`、
-`memory.revisions`、`memory.rollback`、`enhance.get`、`enhance.set`、`enhance.run`；`error` 只有原因，界面加前缀）、全局事件（`mori.memory_changed`、`mori.enhance_progress`）、
+`memory.revisions`、`memory.rollback`、`enhance.get`、`enhance.set`、`enhance.run`；`error` 只有原因，界面加前缀；
+`enhance.get` 的结果和 `enhance.set` 的 `info` 都是 `EnhanceInfo`，2026-10-24 起含 `noOffPicks: ModelPick[]`：第一个候选（按记忆规格 §9.1 的取法，同 `effortPicks`）
+的档案 `reasoning.off_refused` 为真的那些范围，没有档案按假，增强设置的 Effort 不列 Off 按它；`effortPicks` 不变（规格 §7.7，记忆规格 §8 的 `enhance.get` 一行））、全局事件（`mori.memory_changed`、`mori.enhance_progress`）、
 `SessionInfo.memoryNotice`（只有 `session.create` 带）、memory 工具结果的 `details`（`revision`、`kind`、`layer`、`entry`，实时的与会话文件里的）、
 `agents.get` 新加的 `loaded: { path, tokens }[]`、`userTokens`、`total`，以及主进程的 `mori:issues-*` 通道（由 `mori:review-*` 去掉反馈部分改名）
 和已有的 `mori:read-file`（反馈依据的 `Jump to source` 用它只读地读 `<userData>\feedback\<文件名>`）。
@@ -61,6 +69,9 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
   “Effort: High”、生成中的悬停）、v0 错误卡的“Put your last message back in the message box”、“Stopped · …”
   “Compacted session”、排队区的“Queued”都是 english-ui 定的英文（v0/ui-strings.md）。
 - 设置页左侧的分节按钮写“Models”（规格 §9.1 的叫法），“AGENTS.md”分节与“Back to app”不变。
+- 思考关不掉的模型的文字按规格 §7.7 原文（2026-10-24 补丁）：档案摘要“Thinking: Can’t be turned off”、Effort 菜单底部“This model can’t turn thinking off.”，
+  探针出错的说明“Stopped at the probe output limit before answering”（同其他出错原文，出现在“Couldn’t verify: …”后面）；
+  第 2 步的说明“Thinking can’t be turned off: <原文>”只存在档案文件（`model-profiles.json`）里，界面不显示（[v0/ui-strings.md](../../v0/ui-strings.md) 设置一节）。
 - 区域在标签、单选、勾选框、标记里写作 Local / Intranet / Public；在句子里写区域代码（`local`、`intranet`、`public`），
   例如“Allow public for this project”“zone public is not allowed for this project”（规格 §4.6、§5.3、§9.1）。
 - `team-*.md` 的新界面文字按 TaskBoard 规格 §13 原文（`Team: Off`、`Request 1 registered · <title>`、`Stop team`、`Fix the agent files` 等）；
@@ -99,6 +110,15 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
       空列表为“Models (0)”和“The server didn’t list any models.”（§6.2）；列表错误时手填的行列在错误一句下面，没有标题、Select all、Clear selection 和过滤框（§6.3）；
     - 卡上的清单不显示 Detected，清单开着时卡上的 Fetch models 不可用（§6.5）；Edit 里没设过强度的模型显示 `config.get` 的 `defaultThinkingLevel`（§5.4）；
     - 首次启动有探针代价一句、没有关闭表单的 Cancel、More settings 只有兼容选项且非 OpenAI-compatible 时不显示、保存后框空时用内存里的 key 再拉取（§6.6）。
+13. （已回答：规格 §7.7）思考关不掉的模型（2026-10-24 补丁）：
+    - 增强设置的 `Effort` 怎样知道“第一个候选没有 Off”（memory-enhance.md）：`enhance.get` 的 `EnhanceInfo` 加 `noOffPicks: ModelPick[]`，
+      是第一个候选（按记忆规格 §9.1 的取法，同 `effortPicks`）的档案 `reasoning.off_refused` 为真的那些范围，没有档案按假；
+      `effortPicks` 不变（仍表示是否标了 Supports thinking，录下的回放 fixture 照样有效），没有采用把 `effortPicks` 的值改成对象的建议。
+      所选范围在 `noOffPicks` 里时 Effort 不列 Off；已经存成 Off 的照存，显示为 Minimal。记忆规格 §8 的 `enhance.get` 一行与 §10.4 的 Effort 一行已加 2026-10-24 注。
+    - 第 2 步的说明“Thinking can’t be turned off: <原文>”显示在哪里（models-settings.md 原来作为本表定的细节）：只存在档案（`model-profiles.json`）
+      第 2 步的结果里，`ProfileView` 不带，界面不显示；设置页看到的是档案摘要的“Thinking: Can’t be turned off”。
+    - 第 2 步 `off` 被拒、`medium` 出错或没有正文时这一步是出错，“Couldn’t verify: …”后面的说明：`medium` 出错时用它的说明
+      （可能是“Stopped at the probe output limit before answering”），`medium` 没出错但没有正文时用 `off` 的原文。
 
 ## 界面测试用的标识（汇总）
 
@@ -113,6 +133,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `provider-card`、`provider-zone`、`providers-empty`、`test-result`、`provider-form` | Providers | models-settings.md |
 | `key-row`、`key-state`、`key-form`、`key-test`、`no-keys` | Keys | models-settings.md |
 | `model-row`、`profile`、`truncation-warning`、`probe-error`、`model-test`、`model-form` | Models 行与模型表单（`model-row`、`model-test`、`model-form` 沿用 v0） | models-settings.md |
+| `profile` 里的 `[data-field="thinking_off"][data-value="refused"]` | 档案摘要的“Thinking: Can’t be turned off”，只在 `ProfileView.reasoning.off_refused` 时有（规格 §7.7，2026-10-24 补丁） | models-settings.md |
 | `confirm-dialog`（`data-kind`）、`cascade`、`public-dialog` | 确认框 | models-settings.md |
 | `group-row`、`group-member`、`member-picker`、`group-form`、`group-error`、`groups-empty` | Groups | models-settings.md |
 | `project-row`、`project-zone`、`project-config-error`、`projects-empty` | Project access | models-settings.md |
@@ -132,6 +153,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `model-hint`（`data-kind` 为 `context` / `max-output` / `reasoning` / `thinking-seen` / `image`）、`data-action="use-reported"` | Models 行的 Server reports … 提示与 Use（发现规格 §8） | models-settings.md |
 | `model-button`、`model-menu`、`model-menu-note`、`pick-error` | 输入框下面一行的范围按钮与菜单（前两个沿用 v0） | model-menu.md |
 | `thinking-button`、`thinking-menu` | 思考强度（沿用 v0） | model-menu.md |
+| `thinking-off-note` | 思考强度菜单底部的“This model can’t turn thinking off.”：当前模型支持思考而 `thinkingLevels` 里没有 `off` 时（规格 §7.7、§9.2，2026-10-24 补丁） | model-menu.md |
 | `notice`（`data-kind="model-switch"` / `"rebuild"`）、`stage`（`data-kind`）、`queue`、`error-card` | 对话流提示、阶段行、排队区、错误卡（`notice`、`stage`、`queue`、`error-card` 沿用 v0） | model-chat.md |
 | `unavailable-card`、`blocked-card`、`candidate` | No model available 卡、拒绝启动卡、卡里的候选行 | model-chat.md |
 | `data-action="open-settings"` | 说明卡、拒绝启动卡、思考菜单里打开 设置 → Models 的按钮 | model-chat.md、model-menu.md |

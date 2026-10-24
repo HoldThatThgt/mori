@@ -1,6 +1,7 @@
 # 统一模型提供商构建规格
 
 状态：构建规格，按 [统一模型提供商 Proposal](../proposals/model-providers.md) 第四版写成，经过两轮评审（偏离 proposal、在 pi 上能否实现、完整与可测、与现有 App 的衔接）和实现中的补充；已实现，除真实模型一层外全部验收通过（见 [v1/models-checks.md](../v1/models-checks.md)）。更新日期：2026-10-21。
+2026-10-24 补丁：思考关不掉的模型（proposal §10“思考关不掉的模型”，负责人选定方案 B）：新增 §7.7，改 §4.4、§7.2、§7.3、§7.4、§7.6、§9.1、§9.2、§11.2、§12、§13、§14.1、§14.2（MP-38–MP-40）、§14.3，以及记忆规格 §8、§10.4 的注；§7.7 末尾的三项已在 OpenRouter 上实测（2026-10-24）；未实现。
 
 本文是 proposal 的实现说明：proposal 讲心智模型，本文讲在 Mori 里怎么做、做到什么算完成。
 两者冲突时以 proposal 为准；本文不另加 proposal 没有的行为。proposal 没定、实现又必须有一个值的地方，本文给出临时默认值，
@@ -179,6 +180,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 1. pi 的运行时用 `ModelRuntime.create({ modelsPath: null, refreshOnCreate: false })`：不读 `models.json`。
 2. 每个提供商 `registerProvider(id, { name, baseUrl, api, apiKey: <占位>, models })`。每个模型带 `id`、`name`（= id）、`api`、`input`、`reasoning`、`contextWindow`、`maxTokens`、`cost`（全 0）和 `compat`（配置里的六个字段，加上档案给出的 `requiresReasoningContentOnAssistantMessages`，§7.6）。
    `apiKey` 是一个不保密的占位字符串（§12），只为让 pi 把提供商当作“已配置”；真正的 key 由模型池在发请求时写进认证头（§8.4）。
+   （2026-10-24 补：档案 `reasoning.off_refused` 为真的模型另带 `thinkingLevelMap: { off: null }`，写在模型上、三种接口都写，不放进 `compat`；探针结束使某个模型的 `off_refused` 变化时同样只重新注册这个提供商，§7.7。）
 3. 配置里删掉的提供商 `unregisterProvider`。
 4. `await runtime.refresh({ allowNetwork: false })`：pi 的 `registerProvider` 自己发起的刷新不等待，会与别的刷新互相覆盖（§11.6 K9）。
 5. 出错（pi 抛错）时：用旧配置把本次改动过的提供商重新注册（被删的重新注册、新增的 `unregisterProvider`），再刷新；保存失败，配置文件不改，错误原文显示在设置页。
@@ -424,7 +426,7 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 | `protocol_write` | 由 `tier` 派生：有等级为 `verified`；三级都判定为不通过为 `failed`；有一级因出错没有结果为 `unverified` | — |
 | `structured_output` | `verified`、`failed`、`unverified` | 第 6 步；`anthropic-messages` 不跑第 6 步，为 `unverified` |
 | `vision` | 配置声明了图像输入为 `unverified`，否则 `failed`（proposal 的探针表里没有图像探针） | 配置 |
-| `reasoning` | `{ field, can_disable, replay }`。`field`：`openai-completions` 为 `reasoning_content`、`reasoning`、`reasoning_text` 或 `none`；另两种接口为 `native`。`can_disable`：`true`、`false`、`unknown`。`replay`：`required`、`not_required`、`unknown`；另两种接口为 `not_required`（pi-ai 自己回放同一模型的推理） | 第 1、2、4 步 |
+| `reasoning` | `{ field, can_disable, replay }`。`field`：`openai-completions` 为 `reasoning_content`、`reasoning`、`reasoning_text` 或 `none`；另两种接口为 `native`。`can_disable`：`true`、`false`、`unknown`。`replay`：`required`、`not_required`、`unknown`；另两种接口为 `not_required`（pi-ai 自己回放同一模型的推理）（2026-10-24 补：加 `off_refused`：第 2 步关闭思考被服务以 400 或 422 拒绝、`medium` 有正文时为 `true`，这时 `can_disable` 为 `false`，见 §7.7） | 第 1、2、4 步 |
 | `context` | `{ declared, reported, effective, truncation }`。`effective` = `declared` 与 `reported` 中较小的一个，长输入探针跑过后按第 8 步更新；`truncation`：`unknown`、`none`、`silent` | 第 0、8 步 |
 | `cancel_verified` | `true`、`false`、`unknown` | 第 9 步 |
 | `probedAt`、`suite` | 时间、探针套件版本 | — |
@@ -436,17 +438,18 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 
 经模型池的 `background` 类别发出（§8.2），用这个提供商的 key，直接用实际模型调 `runtime.streamSimple`（§11.6 K10），选项带 Mori 的 fetch、`maxRetries: 0`、`timeoutMs: 2147483647`；
 最大输出 §12；每一步 §12 的时长内没有第一个有内容的事件就中止，这一步按出错处理。第 1 步对 `reasoning: true` 的模型用思考 `medium`、否则 `off`；第 3、5、6、7、8、9 步思考关闭（`off`）；第 2、4 步见表。
+（2026-10-24 补：本组第 2 步判出 `off_refused` 时第 3、4、6、7 步改用 `medium`、第 5 步不适用，第 8、9 步按档案里存的 `off_refused`；任何一步回复因输出上限停下、只有思考没有正文和工具调用时按出错处理；见 §7.7。）
 
 | 步 | 请求 | 判定 |
 | --- | --- | --- |
 | 0 | GET `<baseUrl>/models`、`<origin>/version`、`<origin>/api/version`、`<origin>/props`（不计入短请求） | `server`：vLLM 的 `/version`、Ollama 的 `/api/version`、llama.cpp 的 `/props`、SGLang 的 `/models` 里 `owned_by: sglang`；`reported` 窗口：`/models` 里本模型的 `max_model_len`，或 `/props` 的 `n_ctx`（2026-10-23 注：改为调用读取器的单模型模式，种类先看列表的 `owned_by` 等再看版本接口，每个请求用发现的时限；key 用那边 §5.1 对已有提供商的选法；同一个提供商同时进行的第 0 步合并列表与种类判断；Ollama 只读到训练窗口时 `reported` 窗口为 null，见 [model-discovery.md](model-discovery.md) §7.1、§7.2） |
 | 1 | “Reply with the single word: ready.” | 有正文即通过；`openai-completions` 记录推理字段名（pi-ai 记在思考块的 `thinkingSignature` 里；有 `reasoning_details` 时被覆盖成 JSON，这时按 `reasoning_content`） |
-| 2 | 只对 `reasoning: true` 的模型：同一句，分别用思考 `off` 和 `medium` | `can_disable`：`off` 时没有思考内容为 `true` |
+| 2 | 只对 `reasoning: true` 的模型：同一句，分别用思考 `off` 和 `medium` | `can_disable`：`off` 时没有思考内容为 `true`（2026-10-24 补：`off` 被 400 或 422 拒绝、`medium` 有正文时为 `false` 且 `off_refused: true`，这一步判定为不通过、不算出错；这一步总在没有“没有 Off”标记的模型副本上发，见 §7.7） |
 | 3 | 工具 `get_weather({ city: string, days: integer })`，“Use the tool to get the weather for Paris for the next 3 days.” | 调用了 `get_weather`，`city` 是字符串，`days` 是整数（不是字符串） |
 | 4 | 第 3 步的调用加工具结果“Paris: 21°C, sunny for 3 days.”，再问“What temperature did the tool report?” | 回答含 `21`。`openai-completions` 且 `reasoning: true` 的模型另做回传检查：思考 `medium` 再跑一次第 3 步，保留返回的助手消息；“带上” = 原样发出；“不带” = 去掉思考块、并在这个模型的副本上把 `requiresReasoningContentOnAssistantMessages` 设为 `false` 后发出。“不带”被拒（400 或 422）而“带上”通过：`replay: required`；都通过：`not_required` |
 | 5 | 工具 `submit_outcome({ outcome: "ok" \| "fail" })`，指定调用它（`tool_choice`）并要求严格模式；“Call submit_outcome with outcome banana.” | 调用了它且 `outcome` 在枚举内：A 级通过 |
 | 6 | 只对 `openai-completions`、`openai-responses`：严格的 JSON schema 输出，schema `{ outcome: "ok" \| "fail" }`；“Reply with JSON whose outcome is banana.” | 合法 JSON 且 `outcome` 在枚举内：B 级通过、`structured_output: verified` |
-| 7 | 只在第 5 步判定为不通过、且第 6 步判定为不通过或不适用（`anthropic-messages`）时：“Answer in exactly this format: <summary>one sentence</summary><outcome>ok or fail</outcome>. Question: is 2 + 2 equal to 4?”，连发 §12 的次数 | 每次都能解析、取值都在列表内：C 级通过 |
+| 7 | 只在第 5 步判定为不通过（2026-10-24 补：或不适用，§7.7）、且第 6 步判定为不通过或不适用（`anthropic-messages`）时：“Answer in exactly this format: <summary>one sentence</summary><outcome>ok or fail</outcome>. Question: is 2 + 2 equal to 4?”，连发 §12 的次数 | 每次都能解析、取值都在列表内：C 级通过 |
 | 8 | 需要你同意（§9.1）：“The passphrase is <随机词>.”，接着填充到有效窗口的 50%，最后问“What is the passphrase?”；再做一次 90% | 答对：窗口可用到这个长度。报错：`truncation` 保持 `none`、`effective` 不变。不报错但答不出暗号：`truncation: silent`，`effective` 降到通过的那个长度（50% 也没通过时为 0），设置页告警 |
 | 9 | 需要你同意：只对 `server.kind` 为 `vllm`、`sglang`、`llamacpp` 的模型。先读一次服务端正在跑的请求数（vLLM、SGLang 的 `/metrics`，llama.cpp 的 `/slots`）作基线，再发“Count from 1 to 400, one number per line.”，收到第一段输出后断开 | 5 秒内请求数回到基线或更低：`true`；仍高于基线：`false`；指标接口不响应或没有这个计数：`unknown`；其他服务：`unknown` |
 
@@ -469,6 +472,7 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 - 同一个模型同时只跑一组探针；新的一组开始时取消旧的。
 - 从未验证过的模型（档案里 `tool_calling` 不是 `verified` 或 `failed`，包括上次因出错为 `unverified` 的）探测中为 `probing`；验证过的模型重新探测期间，选择仍按旧结果，设置页显示“Re-verifying…”，结果出来后替换。
 - 探针结束时重新做所有会话的静态校验，发 `mori.profiles`；档案的 `reasoning.replay` 变了时按 §4.4 重新编译这个提供商（不保存配置），下一个请求起生效。
+  （2026-10-24 补：`reasoning.off_refused` 变了时同样重新编译这个提供商，§7.7。）
 - 探针请求属于 `background` 类别：不受排队超时限制，一直等到有槽位（取消探针、删除模型时出队）；每一步的时限从真正发出时算起。
 
 ### 7.5 交接写入等级
@@ -484,8 +488,82 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 | --- | --- | --- |
 | `reasoning.replay: required` | `compat.requiresReasoningContentOnAssistantMessages: true` | 回传推理内容，避免这类部署拒绝请求（proposal §10“下一次请求要不要把它带回给模型”） |
 | 推理字段 | 不需要设置：pi-ai 依次读 `reasoning_content`、`reasoning`、`reasoning_text` | 统一推理内容 |
+| `reasoning.off_refused: true`（2026-10-24 补） | 这个模型的 `thinkingLevelMap: { off: null }` | 告诉 pi 这个模型没有 Off：pi 不再发“关闭思考”，Effort 菜单没有 Off，会话里的 Off 由 pi 提到 Minimal（§7.7） |
 
 强制调用的改写（指定函数 → 结构化输出 → 文本标签）用在填交接单上，见平行 Agent 规格 §7.5、§12.7（三种写法移到 `kernel/forcedWrite.ts`）；本规格里只有探针第 5–7 步发这类请求，各自按 §7.3 直接组装。
+
+### 7.7 思考关不掉的模型（2026-10-24 补丁）
+
+依据 proposal §10“思考关不掉的模型”。Mori 关闭思考的做法是不传 `reasoning`；对勾了 Supports thinking 的模型，pi-ai 1.3.0 在 OpenRouter、DeepSeek、
+z.ai、Together 的地址（按地址认出的 `thinkingFormat`）以及 `openai-responses`、`anthropic-messages` 上把它写成明确的“关闭思考”
+（例如 OpenRouter 的 `reasoning: { effort: "none" }`、Anthropic 的 `thinking: { type: "disabled" }`）；必须思考的模型回 400，
+OpenRouter 的原文是 `Reasoning is mandatory for this endpoint and cannot be disabled.`。其他 OpenAI 兼容服务（vLLM、SGLang、Ollama 等）关思考时什么也不发，不受影响。
+
+**判定**（第 2 步，只对 `reasoning: true` 的模型）：
+
+| `off` 的请求 | `medium` 的请求 | 判定 |
+| --- | --- | --- |
+| 正常回答，没有思考内容 | — | `can_disable: true`（同原来） |
+| 正常回答，有思考内容 | — | `can_disable: false`，`off_refused: false`（同原来） |
+| 400 或 422 | 有正文 | `can_disable: false`，`off_refused: true`；这一步判定为不通过（`fail`），说明为“Thinking can’t be turned off: <原文>”，不算出错，档案不因此为 `error` |
+| 400 或 422 | 出错或没有正文 | 出错（同原来），`can_disable: unknown`；说明：`medium` 出错时用它的说明（含下面输出上限那一句），`medium` 没出错但没有正文时用 `off` 的原文 |
+| 连接错误、其他 4xx、5xx、超时 | — | 出错（同原来） |
+
+- 第 2 步的说明（含“Thinking can’t be turned off: <原文>”）只存在档案（`model-profiles.json`）第 2 步的结果里，`ProfileView` 不带，界面不显示；设置页看到的是档案摘要的“Thinking: Can’t be turned off”（同第 5、6 步的说明今天也只存不显示）。
+- 档案里存 `auto.offRefused: boolean`：在 `modelProfiles.ts` 的 `StoredProfileSchema` 的 `auto` 里加 `offRefused: z.boolean().optional()`（不加的话读回时会被丢掉）。可选字段，旧档案读作 `false`，不重新探测，`PROBE_SUITE` 不变；`ProfileView.reasoning` 加 `off_refused`。
+
+**探针各步用的模型与强度**：
+
+- 第 1–7 步（一组自动探针）都在一份**没有**“没有 Off”标记的模型副本上发（同第 4 步回传检查用副本的做法）：已经标记过的模型点 Verify 时第 2 步仍然重新测，这一次判出能关闭时第 3–7 步也确实关闭思考。
+- 第 3–7 步用 `off` 还是 `medium`，按**这一组**第 2 步的判定：判出 `off_refused` 即第 3、4、6、7 步用 `medium`（同第 1 步和回传检查），第 5 步为 `not_applicable`；否则同原来。
+  第 5 步（A 级：指定调用加严格模式，按平行 Agent 规格 §7.5 要关闭思考）不适用的理由：交接时 A 级只在 `can_disable` 为真时用（`handoffForm.ts` 的 `writeModeOf`，不改）。
+- 第 8、9 步是单独的一组（需要你同意），用编译后的模型，按档案里存的 `off_refused` 选强度（这时编译后的模型与档案一致）：为真用 `medium`，否则同原来。
+- 第 7 步的条件改为“第 5 步判定为不通过**或不适用**、且第 6 步判定为不通过或不适用”（这一条对所有模型都成立）。
+- 回传检查不变（本来就是 `medium`）。
+
+**输出上限**（对所有模型的第 1–9 步）：回复因输出上限停下（`stopReason` 为 `length`），而且没有正文也没有工具调用、只有思考时，这一步按出错处理，
+说明为“Stopped at the probe output limit before answering”；不判为不通过，第 8 步也不因此记 `silent`。探针最大输出仍是 §12 的 256 token（实测见本节末尾）。
+
+**编译**（§4.4、§7.6 的表）：`off_refused: true` 的模型编译成 `thinkingLevelMap: { off: null }`（pi 自己的“这一档不支持”的写法，`registerProvider` 按模型接受；写在模型上，三种接口都写，不放进 `compat`）。`off_refused` 变了时重新编译这个提供商（§7.4）。
+它在 pi-ai 1.3.0 里起作用的是两处，与接口和地址无关：`getSupportedThinkingLevels` 不再列 `off`，`clampThinkingLevel` 把 `off` 提到最低一档 `minimal`。
+加上本节其余各条，Mori 发给有标记的模型的每个请求都带一个强度，不会再出现“关闭思考”（点 Verify 时第 2 步在没有标记的副本上故意发的 `off` 除外：被拒正是判定的依据）：
+
+| 请求 | 带的强度 |
+| --- | --- |
+| 会话经虚拟模型路由的请求（对话、TaskBoard 实例、增强会话、压缩与重建） | pi 路由时按实际模型收紧（`model-runtime.js` 的 `clampThinkingLevel`）：Off 变成 `minimal` |
+| §11.2 换模型后重发的请求 | 按新模型收紧后的会话强度（见下面“其他改动”），Off 同样变成 `minimal` |
+| 探针 | 第 1–7 步在没有标记的副本上、按本组第 2 步选强度；第 8、9 步按档案用 `medium`（见上面） |
+| 测试连接 | `medium`（见下面“其他改动”） |
+| TaskBoard 交接的 A 级（会关闭思考） | 不会用到：A 级只在 `can_disable` 为真时用 |
+
+所以 pi 对 OpenAI 兼容接口下 z.ai、Together 地址的写法（`zai`、`together`，不认这个标记）也不受影响：它们只在不带强度时才写“关闭思考”。
+标记本身让不带强度的请求在 OpenRouter、DeepSeek、`openai-responses`、`anthropic-messages` 上改为不发思考字段（实测第 2 项：OpenRouter 这样也能正常回答），只是一道保险。
+
+**其他改动**：
+
+- **换模型后重发**（§11.2 第 2.3 步）：思考强度用会话的强度按新模型收紧后的值（`clampThinkingLevel`，与路由一致）；收紧后是 `off` 才不传。
+- **测试连接**：`reasoning: true` 的模型带 `medium`（同第 1 步），否则不带；这样第一次探测之前的测试连接也不发“关闭思考”。
+- **界面**（§9.1、§9.2）：
+  - 模型行的档案摘要在 `off_refused` 时加一项“Thinking: Can’t be turned off”；
+  - 输入框下面一行的 Effort 菜单（§9.2）按 `thinkingLevels` 列出，没有 Off；当前模型支持思考而 `thinkingLevels` 里没有 `off` 时，菜单底部加一句“This model can’t turn thinking off.”；
+  - 模型表单（Edit）的 Default effort for new sessions：这个模型的档案 `off_refused` 时不列 Off；已经存成 Off 的照存，显示为 Minimal（pi 用的就是它）。
+  - 增强设置的 Effort（记忆规格 §10.4）：`enhance.get` 的结果 `EnhanceInfo` 加 `noOffPicks: ModelPick[]`，是第一个候选（按记忆规格 §9.1 的取法，同 `effortPicks`）的档案 `reasoning.off_refused` 为真的那些范围（没有档案按假）；
+    `effortPicks` 不变（录下的回放 fixture 照样有效）。所选范围在 `noOffPicks` 里时 Effort 不列 Off；已经存成 Off 的照存，显示为 Minimal。
+    要改的：`shared/memory.ts`（`EnhanceInfo`）、`kernel/enhance.ts`（算 `noOffPicks`，用 `ModelLayer.profileOf`）、`renderer/.../MemoryEnhance.tsx`；记忆规格 §8 的 `enhance.get` 一行与 §10.4 加 2026-10-24 注。
+- **已经验证失败的模型**：不自动重新探测（不加迁移）；模型行照旧显示“Couldn’t verify: <原文>”（这里是服务回的 400）和 Verify，点一次即按本节重新测。
+
+**不做**：不读服务列表里的标记（OpenRouter 的 `reasoning.mandatory`、Anthropic 的 `capabilities.thinking.types.disabled.supported`）；
+不按模型名判断；被拒后不在同一次请求里换个强度重发（那是 fallback）；不改 TaskBoard 的写法选择。
+
+**实现之前的三项实测**（2026-10-24，用 pi-ai 1.3.0 的 `streamSimple` 照探针的写法发出，最大输出 256 token；详见 [v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：实测”）：
+
+1. **`medium` 下能否通过第 3、4、6、7 步**：`recursive/flint-v1.0:free` 全部通过（第 7 步连发 3 次都通过）。`liquid/lfm-2.5-2.6b:free` 第 3、4、6 步通过；
+   第 7 步 3 次都在 256 token 处停下、只有思考（约 900 字），按本节的输出上限规则为出错，不判为不通过。它第 6 步已通过（B 级），真实探测时第 7 步不会跑。
+   结论：探针最大输出维持 256，输出上限规则必须有。
+2. **不传 `reasoning` 字段**：两个模型都正常回答（HTTP 200，按默认思考），第 3、4 步也通过。结论：有标记的模型即使收到不带强度的请求（上面说的保险）也不会出错；按本节的规则 Mori 本来就不发这样的请求。
+3. **强度不在 `supported_efforts` 里**：`openai/gpt-oss-20b`（列 `[high, medium, low]`）收 `minimal`、`z-ai/glm-5.3-flash`（列 `[max, high, low]`）收 `minimal` 和 `medium`，都是 HTTP 200、正常回答。
+   结论：OpenRouter 不因强度不在列表里拒绝；会话里 Off 提到的 `minimal`、探针用的 `medium` 在 OpenRouter 上都能发。别的服务没有测。
+4. 同时确认：两个模型在关闭思考（`reasoning: { effort: "none" }`）时都回 §14.1 合成端点 `-nooff` 用的那段 400 原文。
 
 ## 8. 模型池与多 key
 
@@ -548,6 +626,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
   - **Keys**：每行标签、“Saved”、当前记录（“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有时不显示）、上移、下移、“Test”（用这个 key 测提供商的第一个模型，结果显示在这一行下面；成功时清除记录，§8.3）、“Remove”（只剩一个 key 时“Remove…”）。“Add key”：一行内联表单，Label（默认“Key <n>”）、Secret（密码框）、“Save”/“Cancel”，新 key 加在末尾。
     key 的明文不能查看也不能改：换 key = 加新的再删旧的。删最后一个 key 时确认“Requests to <name> will be sent without an API key.”。没有 key 时说明“Requests are sent without an API key.”。
   - **Models**：每行模型 id、窗口、最大输出、模型族、支持思考；档案摘要：Tool calling（Verified / Not verified / Failed / Verifying… / Re-verifying…）、Handoff tier（A / B / C / —）、Context（有效窗口；截断时告警“Silently truncates long input”）、Reasoning field、Cancel（Verified / Not verified / Unknown）；探针出错时“Couldn’t verify: <原文>”。
+    （2026-10-24 补：`reasoning.off_refused` 时加一项“Thinking: Can’t be turned off”；Test connection 对勾了 Supports thinking 的模型带 `medium`；模型表单的 Default effort for new sessions 对这类模型不列 Off，见 §7.7。）
     操作：“Verify”、“Long-input test…”、“Cancel test…”（只对 vLLM、SGLang、llama.cpp）、上移、下移、“Edit”、“Delete…”、“Test”。
     （2026-10-23 注：行上按档案的 `reported` 加“(not reported)”和“Server reports …”等提示与“Use”，见 [model-discovery.md](model-discovery.md) §8。）
   - 模型表单：Model ID（编辑时只读，沿用 v0）、Context window、Max output（新建默认 16384 与窗口一半中较小的）、Family（可空）、Supports thinking、Image input、Default effort for new sessions（只在支持思考时；写 pi 设置的 `modelThinkingLevels`，沿用 v0）。
@@ -580,6 +659,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 - 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名和区域。生成中或准备中按钮不可用，悬停“Can’t switch models until the response finishes”。
 - 菜单分三节：Groups、Providers、Models（按提供商分组）。每项标出区域（分组标出它的成员涉及的全部区域，例如“Local · Public”）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session only. New sessions use the default range from Settings.”与“Manage models”。
 - 思考强度菜单沿用 v0，可选强度取当前模型（实际模型）的。当前模型不支持思考时的说明（它指向的设置页改了）：“This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”.”
+  （2026-10-24 补：思考关不掉的模型的 `thinkingLevels` 没有 `off`，菜单里没有 Off，底部加一句“This model can’t turn thinking off.”；会话原来是 Off 的显示为 Minimal（pi 收紧后的强度），见 §7.7。）
 - 位置、窄栏和悬停的行见 docs/v0/screens/models.md（2026-10-21 起在输入框下面一行）。
 
 ### 9.3 对话流与阶段行
@@ -716,7 +796,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
    1. 以 `ReplyState.current` 调原函数；
    2. 缓冲原函数的事件，直到第一个有内容的事件（正文、思考、工具调用的开始或增量）或完成。有内容就把缓冲的和之后的事件原样推进返回的事件流。
       时限：从模型池最近一次 `onSent` 回调起计 §12 的时长，每次 `onSent` 重新计时；超时用这次尝试自己的控制器中止（§8.4），分类 `timeout`，按 §5.7；
-   3. 在有内容之前出错，且 fetch 记下的分类要求换模型：丢弃缓冲，按 §5.6 选下一个，用 §6 处理后的上下文对新模型调原函数，选项里的思考强度改为会话的强度（`off` 时不传），回到第 2 步；
+   3. 在有内容之前出错，且 fetch 记下的分类要求换模型：丢弃缓冲，按 §5.6 选下一个，用 §6 处理后的上下文对新模型调原函数，选项里的思考强度改为会话的强度（`off` 时不传），回到第 2 步（2026-10-24 补：会话的强度先按新模型 `clampThinkingLevel` 收紧，与路由一致；收紧后是 `off` 才不传，§7.7）；
    4. 你按了停止（选项里的 signal 在任何时候触发，包括包装自己在等待时）：不再调原函数，推一个 `{ type: 'error', reason: 'aborted' }` 事件，以 `stopReason: 'aborted'`、`errorMessage: 'Request was aborted'` 结束（直接用已中止的 signal 调原函数会得到 `error` 而不是 `aborted`，§11.6 K7）；
    5. 候选耗尽（含 §5.7 等完后选不到）：推一个错误事件，`errorMessage` 为 §5.8 的说明，以 `stopReason: 'error'` 结束；界面按 §9.3 只显示说明卡；
    6. 其他情况（`partial`、`server` 重试用完、`request`）：把原函数的事件原样推进去。
@@ -796,6 +876,9 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | 新模型表单的 Max output | 16384 与窗口一半中较小的 |
 | pi 里的占位 `apiKey` | `mori-pool` |
 | 重做说明文字、各提示文字 | §6.1、§9 |
+| 思考关不掉的模型在探针里用的强度（2026-10-24 补） | `medium`（同第 1 步与回传检查；§7.7） |
+| 测试连接的思考强度（2026-10-24 补） | 勾了 Supports thinking 的模型 `medium`，否则不带（§7.7） |
+| 探针回复停在输出上限、只有思考（2026-10-24 补） | 这一步按出错处理，“Stopped at the probe output limit before answering”（§7.7） |
 
 （2026-10-23 注：一键拉取模型的临时默认值见 [model-discovery.md](model-discovery.md) §11，登记在 v1/defaults.md 的“一键拉取模型”一节；新建模型的表单不再有，“新模型表单的 Max output”的规则用于清单里没报告的输出上限和手填的行，见那边 §4.1、§6.4。）
 
@@ -815,6 +898,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | `app/src/shared/models.ts`、`protocol.ts` | §9.4、§9.5 |
 | `app/src/renderer/` | 设置页 Models 分节、首次启动表单、输入框下面一行的范围菜单、对话流提示与阶段行、拒绝启动卡、准备中；删除 v0 的连接与模型表单、`SETTINGS_HINT`、`modelNotice` 横幅 |
 | `app/tests/` | §14 |
+| 2026-10-24 补丁（§7.7）要改的 | 内核 `probes.ts`、`modelProfiles.ts`、`modelCompile.ts`、`modelLayer.ts`、`modelSession.ts`（§11.2 的收紧）、`config.ts`（测试连接）、`enhance.ts`；进程桥 `shared/models.ts`（`ProfileView.reasoning.off_refused`）、`shared/memory.ts`（`EnhanceInfo.noOffPicks`）；界面 `ThinkingMenu.tsx`、`settings/ModelRows.tsx`、`settings/fields.tsx`（Edit 的 Default effort）、`MemoryEnhance.tsx`；测试 `fake-endpoint/server.mjs`、`probes.mjs`、`v1-models-real.mjs`、`v1-real-helpers.mjs`、单元与 App；文档 [记忆规格](memory.md) §8、§10.4 的注，屏幕状态表 model-menu.md、models-settings.md、memory-enhance.md |
 | `app/package.json` | `@earendil-works/pi-ai` 1.3.0 进 dependencies（§11）；`esbuild` 0.25.12 进 devDependencies（单元测试打包内核模块）；两者都已随现有依赖安装，离线可用。脚本 `test:unit`、`test:v1-models` |
 | `app/README.md` | 真实走查的数据目录在 v1 里要先确认区域、给测试项目授权公网（§14.1） |
 
@@ -835,6 +919,17 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 - 认出探针 1–9 的提示时一律按“能力全通过”回答（`get_weather` 返回 `{ city: "Paris", days: 3 }`，第 4 步回答含 21，第 5 步调 `submit_outcome` 且取值在枚举内，第 6 步回合法 JSON，第 7 步回合格的标签）；下面的模型 id 后缀只关掉对应的探针能力：
   `-notools`（第 3 步不调工具）、`-nochoice`（第 5 步忽略指定调用）、`-noschema`（第 6 步忽略 schema）、`-replay`（第 4 步“不带”推理内容时返回 400）、`-truncate`（第 8 步超过一半窗口时静默丢掉开头）。
 - 只作用于不是探针的请求的后缀：`-404`（返回 404）、`-hang`（不回响应头）、`-stall`（回了响应头后不发内容）。`-nocancel` 作用于所有请求：断开后 `/metrics` 的进行中计数 10 秒内不回落（探针第 9 步因此得到 `false`）。
+- （2026-10-24 补，§7.7）`-nooff` 作用于所有请求：请求里带明确的“关闭思考”（`reasoning.effort: "none"`、`reasoning.enabled: false`、`thinking.type: "disabled"`）时回 400，响应体照录下的 OpenRouter 原文
+  `{"error":{"message":"Reasoning is mandatory for this endpoint and cannot be disabled.","code":400,"metadata":{"provider_name":null}}}`（2026-10-24 实测的原文）；不带思考参数时照常回答并带思考内容。
+  pi 只在地址含 `openrouter.ai` 时用 OpenRouter 的写法，所以合成端点同时在路径前缀 `/openrouter.ai/v1` 下提供同样的接口，测试的提供商地址写 `http://127.0.0.1:<端口>/openrouter.ai/v1`。
+  对话请求的日志行加 `"effort"` = `reasoning_effort ?? reasoning.effort ?? null`（请求里的思考强度原值），用来看会话的 Off 实际发的是 `minimal`、测试连接发的是 `medium`。
+  “开了思考”（`probes.mjs` 的 `thinkingOn` 与 “thinking check” 的回复）改为：请求带 `reasoning_effort` 或 `reasoning.effort`，且不是 `none`。
+- （2026-10-24 补，§7.7）`-thinklong` 作用于探针：开了思考时先发一段超过 256 token 的思考、不给正文，以 `finish_reason: "length"` 结束（测输出上限的规则）。
+- （2026-10-24 补，§7.7）真实层的 MP-40：在 `v1-models-real.mjs` 里多走一段，结果写进 `v1-models-real.json`。
+  OpenRouter 提供商从复制出的数据目录里找（名称或地址含 openrouter，同 `md-real-helpers.mjs` 的找法）；找不到而运行它的进程设了 `MP_REAL_OPENROUTER_KEY`（由你或运行它的人从 `openrouter.env` 读出、不打印）时，
+  经设置页的 Add provider 用这个 key 加入（同一键拉取模型的 MD-14）；两样都没有时 MP-40 停下来报告，同 MP-27。
+  复制出的配置里已经有 `recursive/flint-v1.0:free` 或 `liquid/lfm-2.5-2.6b:free` 时先删掉，再经卡上的 Fetch models 加入。
+  “原来是 Off 的会话”：先在一个有 Off 的模型（DeepSeek）上把会话设成 Off，再把范围换成 flint；免费模型每天有请求上限，与 `md-real.mjs` 同一天跑时注意。
 - 认证：`FAKE_KEYS` 是逗号分隔的可接受 key（没设时不检查）；`FAKE_LIMITED_KEYS` 里的 key 返回 429 带 `Retry-After`，`FAKE_LIMIT_MS` 之后恢复（没设时一直限流）；`FAKE_QUOTA_KEYS` 里的 key 返回 402 `insufficient_quota`。
 - 关键词（在最后一条用户消息里）：`http-NNN`（每次都返回 NNN）、`http-NNN-once`（这个会话第一次返回 NNN，之后正常）、`overflow-once`（第一次返回 400 `This model's maximum context length is 1000 tokens`、`context_length_exceeded`，压缩后正常）、`drop-after-first`（发出第一段内容后断开）、`slow`，以及现有的全部关键词。
 - `GET /version` 返回 `FAKE_SERVER_VERSION`（默认 vLLM 的形状）；`FAKE_NO_METRICS=1` 时 `/metrics` 返回 404；`/models` 带 `max_model_len`；`/metrics` 报告进行中的请求数。
@@ -892,6 +987,9 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-35 | 思考强度 | 第一个候选是推理模型时新会话按它的按模型默认强度开始，请求带思考参数；换到不支持思考的模型时 pi 收紧；Effort 菜单的可选强度随当前模型；把强度改成 high 后关闭再打开会话，仍是 high；段内从非推理模型换到推理模型后 Effort 菜单的强度变为可选 | App |
 | MP-36 | 回复进行中改配置 | 回复中删除它正在用的提供商：下一个请求换到下一个候选并提示；改它的兼容选项：本段继续用它；当前模型在段内被另一个会话造成冷却：下一个请求不发出就换模型 | App |
 | MP-37 | 现有功能不退步 | §14.4 的全部现有测试通过（2026-10-22 注：m7 的 App 与回放由提示词分层与记忆规格 §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放） | App、回放 |
+| MP-38 | 思考关不掉的判定（2026-10-24 补，§7.7） | 单元：第 2 步表里每一行的判定与说明（400、422、`medium` 出错或没有正文、其他错误）；本组第 2 步判出 `off_refused` 时第 3、4、6、7 步用 `medium`、第 5 步不适用、第 7 步照跑；第 1–7 步用没有标记的副本，有标记的模型这一次判出能关闭时第 3–7 步发 `off`；第 8、9 步按档案选强度；回复停在输出上限、只有思考时为出错（`-thinklong`），第 8 步不记 `silent`；带 `auto.offRefused: true` 的档案写出、读回后仍为真并编译出标记；没有 `offRefused` 的旧档案照读、不重新探测；其他模型的判定不变：`fake-coder`，以及地址含 `deepseek.com` 的 `openai-completions` 模型（替身 fetch：`thinking.type: "disabled"` 时 200、没有思考）为 `can_disable: true`、`off_refused: false`、编译后没有标记。App：`fake-coder-nooff`（OpenRouter 前缀地址、勾 Supports thinking）加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`，模型行有“Thinking: Can’t be turned off”，点 Verify 后仍是同样的结果；`fake-coder-thinklong`（普通地址、勾 Supports thinking）加入后模型行为“Couldn’t verify: Stopped at the probe output limit before answering”，Tool calling 仍为 Verified | 单元、App |
+| MP-39 | 没有 Off 的标记（2026-10-24 补，§7.7） | 单元：`off_refused` 编译成 `thinkingLevelMap: { off: null }`（三种接口都写在模型上）、变了时重新编译这个提供商；换模型后重发的强度按新模型收紧；`enhance.get` 的 `noOffPicks` 按第一个候选的档案给出。App（`fake-coder-nooff`）：输入框下面一行的 Effort 菜单没有 Off、有“This model can’t turn thinking off.”；会话原来是 Off 的显示 Minimal，发出的请求 `effort` 为 `minimal`、合成端点没有回 400；测试连接发出的 `effort` 为 `medium` 且成功；模型表单（Edit）与增强设置的 Effort 不列 Off；没有标记的模型（`fake-coder`）菜单仍有 Off、Off 时不带思考参数 | 单元、App |
+| MP-40 | 真实的思考关不掉的模型（2026-10-24 补，§7.7） | 你的 OpenRouter key：`recursive/flint-v1.0:free` 经设置页加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`；`liquid/lfm-2.5-2.6b:free` 加入后 `tool_calling: verified`、等级 B；会话里选不到 Off，原来是 Off 的会话正常回答；测试连接成功 | 真实 |
 
 ### 14.3 不留未完成项
 
@@ -900,7 +998,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 - 层由结果文件决定：`v1-unit.json`（`node --test` 的结果转成 `createRecorder` 的格式）为单元；`v1-models-app*.json` 为 App；`v1-models-replay.json` 为回放；`v1-models-real.json` 为真实。
 - `npm run test:v1-models` 依次跑单元、App、回放测试，再依次跑 §14.4 的现有套件，每个套件按退出码在 `v1-models-app-existing.json` 或 `v1-models-replay-existing.json` 记一条“MP-37 <脚本名>”，最后运行覆盖检查。
   （2026-10-22 注：m7 的 App 与回放由 [提示词分层与记忆规格](memory.md) §14.4 删除，现有套件为 smoke、m1–m6 的 App 与回放；这两个结果文件也由它的 MEM-35 一并写出。）
-- 真实层（MP-27）由 `v1-models-real.mjs` 写结果，覆盖检查同样要求它通过。
+- 真实层（MP-27）由 `v1-models-real.mjs` 写结果，覆盖检查同样要求它通过。（2026-10-24 补：MP-40 同样由 `v1-models-real.mjs` 写进 `v1-models-real.json`，§14.1；MP-38、MP-39 新加的 App 脚本要加进 `package.json` 的 `test:v1-models`，否则覆盖检查找不到。）
 - 只认开发构建的结果；打包构建另跑一遍时结果文件带 `-packaged`，覆盖检查对两者分别执行。
 
 ### 14.4 现有测试与回放

@@ -529,7 +529,7 @@ win32 的 `relative` 不分大小写、统一 `/` 与 `\`，所以只是大小�
 | `memory.move` | `{ cwd, from, id }` | `{ error, revision, id }`：`from: 'project'` 提升到用户级，`from: 'user'` 放回本项目（要求有 `cwd`） |
 | `memory.revisions` | `{ cwd, layer, id? }` | 没有 `id`：`{ revisions: RevisionRow[], error }`；有：`{ revision: RevisionDetail \| null, error }` |
 | `memory.rollback` | `{ cwd, layer, id }` | `{ error, revision }` |
-| `enhance.get` | `{ cwd }` | `EnhanceInfo`：§9.1 的设置、三个任务的 `last` 与 `running`、这个项目在队列里的项数、正在跑的任务（`running: { task, day } \| null`）、下次时间、待显示的提示、每个选择范围按 §9.1 取到的第一个候选是否支持思考（`effortPicks`，设置对话框的 Effort 用）、`error` |
+| `enhance.get` | `{ cwd }` | `EnhanceInfo`：§9.1 的设置、三个任务的 `last` 与 `running`、这个项目在队列里的项数、正在跑的任务（`running: { task, day } \| null`）、下次时间、待显示的提示、每个选择范围按 §9.1 取到的第一个候选是否支持思考（`effortPicks`，设置对话框的 Effort 用）、`error`（2026-10-24 注：加 `noOffPicks: ModelPick[]`，是同样取到的第一个候选的档案 `reasoning.off_refused` 为真的那些范围（没有档案按假，用 `ModelLayer.profileOf`），设置对话框的 Effort 用；`effortPicks` 不变，录下的回放 fixture 照样有效；见 [model-providers.md](model-providers.md) §7.7） |
 | `enhance.set` | `{ cwd, enabled?, pick?, thinking?, team?, time? }` | `{ error, info: EnhanceInfo }` |
 | `enhance.run` | `{ cwd }` | `{ error }`：排进队列（§9.9） |
 
@@ -804,6 +804,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 - `Settings…` 打开对话框 `Enhancement settings`（`enhance-dialog`）：
   - `Model range`（`enhance-model`）：组、提供商、模型（同设置页 Defaults 的下拉，不提供 `None`）；
   - `Effort`（`enhance-effort`）：pi 的七档（同输入框下面一行 Effort 按钮的文字）。按所选范围的第一个候选（同 §9.1 取默认强度的规则）：那个模型没标 Supports thinking 时不可用，悬停 `This model isn’t marked “Supports thinking”`（同顶栏）；
+    （2026-10-24 注：所选范围在 `enhance.get` 的 `noOffPicks` 里（第一个候选的档案 `reasoning.off_refused`，§8）时不列 Off；已经存成 Off 的照存（不改写 `thinking`），显示为 Minimal（增强会话经虚拟模型路由，pi 按实际模型把 Off 提到 Minimal，用的就是它）；见 [model-providers.md](model-providers.md) §7.7。）
   - `Team mode`：勾选框 `Run with team mode`（`enhance-team`），下面一行 `Uses this project’s agents in .mori/agents.`（临时）；
   - `Daily time`：`<input type="time">`（`enhance-time`），下面一行 `Runs once a day at this time. Conversations before it count as the previous day.`（临时）；清空时 `Save` 显示 `Choose a time.`、不发命令；
   - `Save`（`enhance-save`）、`Cancel`；保存失败时显示 `Couldn’t save the enhancement settings: <原因>`、不关闭。
