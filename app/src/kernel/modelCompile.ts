@@ -1,5 +1,6 @@
-// 编译到 pi（docs/specs/model-providers.md §4.4、§7.6）：把 model-config.json 的提供商与模型注册成 pi 的提供商，
-// 按档案设兼容选项（reasoning.replay 为 required 时回传推理内容），配置里删掉的提供商从 pi 去掉，出错时回滚。
+// 编译到 pi（docs/specs/model-providers.md §4.4、§7.6、§7.7）：把 model-config.json 的提供商与模型注册成 pi 的提供商，
+// 按档案设 §7.6 表里的适配（reasoning.replay 为 required 时回传推理内容；reasoning.off_refused 为真时模型带
+// thinkingLevelMap: { off: null }，告诉 pi 这个模型没有 Off，§7.7），配置里删掉的提供商从 pi 去掉，出错时回滚。
 // 纯函数（providerInput、compileInputs、compilePlan、rollbackPlan）不碰 pi，单元测试直接检查（MP-02）；
 // ModelCompiler 记住上一次成功注册的内容，只重新注册本次改动过的提供商。
 
@@ -12,12 +13,20 @@ export type ProviderInput = Parameters<ModelRuntime['registerProvider']>[1];
 /** @brief pi 里一个模型的注册内容。 */
 export type ModelInput = NonNullable<ProviderInput['models']>[number];
 
+/** @brief 档案给一个模型的编译项（§7.6 的表）。 */
+export interface CompileFlags {
+  /** 档案的 reasoning.replay 为 required：compat.requiresReasoningContentOnAssistantMessages 设为 true */
+  replayRequired: boolean;
+  /** 档案的 reasoning.off_refused 为真（§7.7）：模型带 thinkingLevelMap: { off: null } */
+  offRefused: boolean;
+}
+
 /**
- * @brief 判断某个模型的档案是否要求回传推理内容（§7.2 reasoning.replay 为 required）。
+ * @brief 查某个模型的档案给出的编译项（§7.6）；没有档案时两项都为 false。
  * @param provider 模型所在的提供商（按要编译的配置）
  * @param model 模型
  */
-export type ReplayLookup = (provider: ModelProvider, model: ProviderModel) => boolean;
+export type ProfileLookup = (provider: ModelProvider, model: ProviderModel) => CompileFlags;
 
 /** @brief 编译用到的 pi 运行时操作（ModelRuntime 的子集，测试可以用替身）。 */
 export interface CompileRuntime {
@@ -45,30 +54,33 @@ const ZERO_COST = Object.freeze({ input: 0, output: 0, cacheRead: 0, cacheWrite:
  *        requiresReasoningContentOnAssistantMessages；只对 openai-completions 生效，其余接口不写。
  * @param provider 提供商
  * @param model 模型
- * @param replayRequired 档案要求回传推理内容
+ * @param lookup 查档案给出的编译项（这里只用 replayRequired）
  * @return compat；不写时为 undefined
  */
 export function modelCompat(provider: ModelProvider, model: ProviderModel,
-  replayRequired: ReplayLookup): (Compat & { requiresReasoningContentOnAssistantMessages?: boolean }) | undefined {
+  lookup: ProfileLookup): (Compat & { requiresReasoningContentOnAssistantMessages?: boolean }) | undefined {
   if (provider.api !== 'openai-completions') return undefined;
   const compat: Compat & { requiresReasoningContentOnAssistantMessages?: boolean } = { ...provider.compat };
-  if (replayRequired(provider, model)) compat.requiresReasoningContentOnAssistantMessages = true;
+  if (lookup(provider, model).replayRequired) compat.requiresReasoningContentOnAssistantMessages = true;
   return Object.keys(compat).length > 0 ? compat : undefined;
 }
 
 /**
- * @brief 一个模型的注册内容：id、name（= id）、api、input、reasoning、contextWindow、maxTokens、cost（全 0）、compat。
+ * @brief 一个模型的注册内容：id、name（= id）、api、input、reasoning、contextWindow、maxTokens、cost（全 0）、compat，
+ *        档案 reasoning.off_refused 为真时另带 thinkingLevelMap: { off: null }（§7.7）。
  * @param provider 提供商
  * @param model 模型
- * @param replayRequired 档案要求回传推理内容
+ * @param lookup 查档案给出的编译项（§7.6）
  */
-export function modelInput(provider: ModelProvider, model: ProviderModel, replayRequired: ReplayLookup): ModelInput {
+export function modelInput(provider: ModelProvider, model: ProviderModel, lookup: ProfileLookup): ModelInput {
   const input: ModelInput = {
     id: model.id, name: model.id, api: provider.api, input: [...model.input], reasoning: model.reasoning,
     contextWindow: model.contextWindow, maxTokens: model.maxTokens, cost: { ...ZERO_COST },
   };
-  const compat = modelCompat(provider, model, replayRequired);
+  const compat = modelCompat(provider, model, lookup);
   if (compat) (input as { compat?: unknown }).compat = compat;
+  // §7.7：pi 自己的“这一档不支持”的写法；写在模型上、三种接口都写，不放进 compat；每个模型一个新对象
+  if (lookup(provider, model).offRefused) (input as { thinkingLevelMap?: unknown }).thinkingLevelMap = { off: null };
   return input;
 }
 
@@ -76,28 +88,28 @@ export function modelInput(provider: ModelProvider, model: ProviderModel, replay
  * @brief 一个提供商的注册内容（§4.4 第 2 步）：apiKey 是不保密的占位，只让 pi 把提供商当作已配置（§11.6 K1）；
  *        真正的 key 由模型池在发请求时写进认证头（§8.4）。
  * @param provider 提供商
- * @param replayRequired 档案要求回传推理内容
+ * @param lookup 查档案给出的编译项（§7.6）
  * @param placeholderApiKey 占位 key（§12 的 mori-pool）
  */
-export function providerInput(provider: ModelProvider, replayRequired: ReplayLookup,
+export function providerInput(provider: ModelProvider, lookup: ProfileLookup,
   placeholderApiKey: string): ProviderInput {
   return {
     name: provider.name, baseUrl: provider.baseUrl, api: provider.api, apiKey: placeholderApiKey,
-    models: provider.models.map((model) => modelInput(provider, model, replayRequired)),
+    models: provider.models.map((model) => modelInput(provider, model, lookup)),
   };
 }
 
 /**
  * @brief 整个配置的注册内容，按提供商 id。
  * @param config 配置；读不出或不存在时为 null（没有提供商）
- * @param replayRequired 档案要求回传推理内容
+ * @param lookup 查档案给出的编译项（§7.6）
  * @param placeholderApiKey 占位 key
  */
-export function compileInputs(config: ModelConfig | null, replayRequired: ReplayLookup,
+export function compileInputs(config: ModelConfig | null, lookup: ProfileLookup,
   placeholderApiKey: string): Map<string, ProviderInput> {
   const inputs = new Map<string, ProviderInput>();
   for (const provider of config?.providers ?? []) {
-    inputs.set(provider.id, providerInput(provider, replayRequired, placeholderApiKey));
+    inputs.set(provider.id, providerInput(provider, lookup, placeholderApiKey));
   }
   return inputs;
 }
@@ -192,11 +204,11 @@ export class ModelCompiler {
    * @brief 编译一份配置（§4.4）：只重新注册改动过的提供商，去掉删掉的，再 await 刷新。
    *        pi 抛错时按旧内容回滚（§4.4 第 5 步）并抛出原错误，记住的内容不变。
    * @param config 要编译的配置；null 表示没有提供商
-   * @param replayRequired 档案要求回传推理内容
+   * @param lookup 查档案给出的编译项（§7.6）
    * @throws pi 拒绝注册或刷新失败时的原错误
    */
-  async compile(config: ModelConfig | null, replayRequired: ReplayLookup): Promise<void> {
-    const next = compileInputs(config, replayRequired, this.placeholderApiKey);
+  async compile(config: ModelConfig | null, lookup: ProfileLookup): Promise<void> {
+    const next = compileInputs(config, lookup, this.placeholderApiKey);
     const plan = compilePlan(next, this.registered);
     if (plan.register.length === 0 && plan.unregister.length === 0) return;
     try {

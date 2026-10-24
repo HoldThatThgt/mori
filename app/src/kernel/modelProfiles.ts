@@ -3,6 +3,7 @@
 // 档案描述的是服务端上的模型（地址、接口、模型 id、服务版本），所以按这几项存，不按 Mori 的提供商 id 存。
 // 一键拉取模型（docs/specs/model-discovery.md §7.2、§7.3）：auto.meta 记第 0 步读到的报告值，ProfileView.reported
 // 给模型行的提示；server.kind 为 §3.3 的全部种类；versionChanged 按读版本的结果（种类、版本）判断要不要重新探测。
+// 适配层（§7.6、§7.7）：auto.offRefused 记第 2 步判出的“关闭思考被拒”，compileFlagsOf 给编译用的档案项。
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -12,6 +13,7 @@ import {
   type ApiType, type Capability, type Compat, type ProbeProgress, type ProbeStepResult, type ProfileView,
   type ProviderModel, type ReasoningField, type ReportedValues, type ServerKind,
 } from '../shared/models';
+import type { CompileFlags } from './modelCompile';
 import type { ModelRef, ToolCallingState } from './modelTypes';
 import { renameReplacing } from './renameRetry';
 
@@ -37,7 +39,10 @@ export interface ProfileTarget {
 export interface AutoSteps {
   /** 第 1 步：有正文 */
   ready: ProbeStepResult;
-  /** 第 2 步：思考 off 时没有思考内容为 pass，有为 fail；reasoning 为 false 的模型 not_applicable */
+  /**
+   * 第 2 步：思考 off 时没有思考内容为 pass，有为 fail；off 被 400 或 422 拒绝、medium 有正文时也为 fail（§7.7）；
+   * reasoning 为 false 的模型 not_applicable
+   */
   thinking: ProbeStepResult;
   /** 第 3 步：调用 get_weather，参数类型正确 */
   call: ProbeStepResult;
@@ -45,11 +50,11 @@ export interface AutoSteps {
   result: ProbeStepResult;
   /** 第 4 步的回传检查（openai-completions 且 reasoning 为 true）：pass 为 not_required，fail 为 required */
   replay: ProbeStepResult;
-  /** 第 5 步：A 级 */
+  /** 第 5 步：A 级；本组判出 offRefused 时 not_applicable（§7.7） */
   a: ProbeStepResult;
   /** 第 6 步：B 级；anthropic-messages 为 not_applicable */
   b: ProbeStepResult;
-  /** 第 7 步：C 级；第 5、6 步没有都判定为不通过时 not_run */
+  /** 第 7 步：C 级；第 5、6 步不是都判定为不通过或不适用时 not_run（§7.7） */
   c: ProbeStepResult;
 }
 
@@ -102,11 +107,19 @@ export interface AutoResults {
   steps: AutoSteps;
   /** 第 1、2、4 步观察到的推理字段名（openai-completions）；没有思考内容时为 none，其他接口为 native */
   field: ReasoningField;
+  /**
+   * 第 2 步关闭思考被服务以 400 或 422 拒绝、medium 有正文（§7.7）。probes.ts 每次都写；
+   * 2026-10-24 以前的档案没有这一项，读作 false，不重新探测（PROBE_SUITE 不变）
+   */
+  offRefused?: boolean;
 }
 
 /** @brief 长输入探针（第 8 步）的结果。 */
 export interface LongInputResult {
-  /** 这一步的判定：pass 为得出了 truncation，error 为有一个长度因连接或超时没有结果 */
+  /**
+   * 这一步的判定：pass 为得出了 truncation，error 为有一个长度因连接或超时没有结果，或停在探针输出上限、
+   * 只有思考（§7.7，不记 silent）
+   */
   step: ProbeStepResult;
   /** 判出的截断方式；出错时为 null（保持原值） */
   truncation: 'none' | 'silent' | null;
@@ -232,14 +245,30 @@ export function visionOf(model: ProviderModel): Capability {
   return (model.input as readonly string[]).includes('image') ? 'unverified' : 'failed';
 }
 
-/** @brief reasoning：openai-completions 取探针观察到的字段与第 2、4 步；另两种接口为 native、not_required。 */
+/**
+ * @brief reasoning：openai-completions 取探针观察到的字段与第 2、4 步；另两种接口为 native、not_required。
+ *        off_refused 三种接口都取 auto.offRefused（§7.7），没有档案或旧档案为 false；can_disable 仍按第 2 步。
+ */
 export function reasoningOf(api: ApiType, auto: AutoResults | null): ProfileView['reasoning'] {
   const thinking = auto?.steps.thinking.outcome;
   const can_disable = thinking === 'pass' ? true : thinking === 'fail' ? false : 'unknown';
-  if (api !== 'openai-completions') return { field: 'native', can_disable, replay: 'not_required' };
+  // §7.7：关闭思考被拒的第 2 步是 fail，所以这时 can_disable 为 false
+  const off_refused = auto?.offRefused === true;
+  if (api !== 'openai-completions') return { field: 'native', can_disable, replay: 'not_required', off_refused };
   const replayStep = auto?.steps.replay.outcome;
   const replay = replayStep === 'pass' ? 'not_required' : replayStep === 'fail' ? 'required' : 'unknown';
-  return { field: auto?.field ?? 'none', can_disable, replay };
+  return { field: auto?.field ?? 'none', can_disable, replay, off_refused };
+}
+
+/**
+ * @brief 档案给出的编译项（§7.6 的表）：reasoning.replay 为 required、reasoning.off_refused 为真（§7.7）；
+ *        没有档案时两项都为 false。
+ * @param api 接口类型
+ * @param auto 档案的第 0–7 步结果；没有档案时为 undefined
+ */
+export function compileFlagsOf(api: ApiType, auto: AutoResults | undefined): CompileFlags {
+  const reasoning = reasoningOf(api, auto ?? null);
+  return { replayRequired: reasoning.replay === 'required', offRefused: reasoning.off_refused };
 }
 
 /**
@@ -419,6 +448,8 @@ const StoredProfileSchema = z.object({
     steps: z.object({ ready: StepSchema, thinking: StepSchema, call: StepSchema, result: StepSchema,
       replay: StepSchema, a: StepSchema, b: StepSchema, c: StepSchema }),
     field: z.enum(['reasoning_content', 'reasoning', 'reasoning_text', 'none', 'native']),
+    // §7.7：可选，2026-10-24 以前的档案没有这一项；不写进 schema 的话读回时会被丢掉
+    offRefused: z.boolean().optional(),
   }),
   longInput: z.object({ step: StepSchema, truncation: z.enum(['none', 'silent']).nullable(),
     limit: z.number().int().min(0).nullable() }).nullable(),

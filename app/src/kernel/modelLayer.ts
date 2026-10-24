@@ -33,12 +33,12 @@ import {
   projectAllowedZones, readModelConfig, readProjectModels, reservedIds, splitRef, writeJsonAtomic, zoneOfRef,
   zoneSuggestions,
 } from './modelConfig';
-import { ModelCompiler, type ReplayLookup } from './modelCompile';
+import { ModelCompiler, type ProfileLookup } from './modelCompile';
 import { DiscoverReader, type ReadTarget } from './modelDiscover';
 import { runMigration, type PiSettingsView, type ThinkingCopy } from './modelMigrate';
 import { authHeaders, createModelPool, type ModelPool, type PoolKeySecret } from './modelPool';
 import {
-  ProfileBook, buildProfile, needsProbe, profileFingerprint, profileView, reasoningOf, versionChanged, visionOf,
+  ProfileBook, buildProfile, compileFlagsOf, needsProbe, profileFingerprint, profileView, versionChanged, visionOf,
   withCancel, withLongInput, type AutoResults, type CancelResult, type LongInputResult, type ProfileTarget,
   type ServerRead, type StoredProfile, type VersionRead,
 } from './modelProfiles';
@@ -617,7 +617,7 @@ export class ModelLayer {
     // 先从模型池撤下要删的 key，再让 pi 看到新地址（§4.1：key 不会发到新的地址）
     const held = this.withholdKeys(options.removedKeyRefs ?? []);
     try {
-      await this.compiler.compile(parsed.config, this.replayLookup);
+      await this.compiler.compile(parsed.config, this.profileLookup);
     } catch (error) {
       this.restoreKeys(held);
       throw error;
@@ -686,11 +686,12 @@ export class ModelLayer {
     this.notice = null;
   }
 
-  /** @brief 档案要求回传推理内容（§7.6），按要编译的配置里的提供商与模型查档案。 */
-  private readonly replayLookup: ReplayLookup = (provider, model) => {
-    const stored = this.profiles.lookup(targetOf(provider, model));
-    return stored !== undefined && reasoningOf(provider.api, stored.auto).replay === 'required';
-  };
+  /**
+   * @brief 档案给出的编译项（§7.6：回传推理内容；§7.7：没有 Off），按要编译的配置里的提供商与模型查档案；
+   *        没有档案时两项都为 false。
+   */
+  private readonly profileLookup: ProfileLookup = (provider, model) =>
+    compileFlagsOf(provider.api, this.profiles.lookup(targetOf(provider, model))?.auto);
 
   /**
    * @brief 写配置失败后把运行时恢复成保存前的配置；恢复失败只记录。
@@ -698,7 +699,7 @@ export class ModelLayer {
    */
   private async restoreCompile(previous: ModelConfig | null): Promise<boolean> {
     try {
-      await this.compiler.compile(previous, this.replayLookup);
+      await this.compiler.compile(previous, this.profileLookup);
       return true;
     } catch (error) {
       console.error(`[kernel] cannot restore the previous model settings in pi: ${(error as Error).message}`);
@@ -737,7 +738,7 @@ export class ModelLayer {
   /** @brief 编译刚读出的配置；pi 拒绝时按读不出处理（会话按 config_invalid 拒绝启动），记录原文。 */
   private async compileLoaded(): Promise<void> {
     try {
-      await this.compiler.compile(this.config, this.replayLookup);
+      await this.compiler.compile(this.config, this.profileLookup);
     } catch (error) {
       this.loadError = `${this.paths.config}: ${(error as Error).message}`;
       this.config = null;
@@ -862,16 +863,21 @@ export class ModelLayer {
     }
     const stored = this.profiles.lookup(job.target);
     if (!stored) return null;
+    // §7.7：第 8、9 步按档案里存的 off_refused 选强度（这时编译后的模型与档案一致）
+    const offRefused = stored.auto.offRefused === true;
     if (job.tests === 'long_input') {
       const effective = profileView(job.target, stored, false)?.context.effective ?? job.target.model.contextWindow;
-      const result = await runLongInputProbe(target, effective, deps);
+      const result = await runLongInputProbe(target, effective, offRefused, deps);
       return result ? { kind: 'long_input', result } : null;
     }
-    const result = await runCancelProbe(target, stored.auto.server.kind, deps);
+    const result = await runCancelProbe(target, stored.auto.server.kind, offRefused, deps);
     return result ? { kind: 'cancel', result } : null;
   }
 
-  /** @brief 保存探针结果（在 edit 里）；reasoning.replay 变了时重新编译（只有这个提供商的注册内容会变，§7.4）。 */
+  /**
+   * @brief 保存探针结果（在 edit 里）；没有旧档案、或档案给出的编译项（reasoning.replay、reasoning.off_refused）变了时
+   *        重新编译（只有这个提供商的注册内容会变，§7.4、§7.7）。
+   */
   private async storeProbe(job: ProbeJob, outcome: ProbeOutcome): Promise<void> {
     const previous = this.profiles.lookup(job.target);
     const now = Date.now();
@@ -880,11 +886,13 @@ export class ModelLayer {
     else if (!previous) return;
     else if (outcome.kind === 'long_input') next = withLongInput(previous, outcome.result, now);
     else next = withCancel(previous, outcome.result, now);
-    const replayBefore = previous ? reasoningOf(job.target.api, previous.auto).replay : null;
+    const before = previous ? compileFlagsOf(job.target.api, previous.auto) : null;
     await this.profiles.save(next);
-    if (reasoningOf(job.target.api, next.auto).replay === replayBefore) return;
+    const after = compileFlagsOf(job.target.api, next.auto);
+    // §7.4（2026-10-24 补）：有旧档案时只在 replay 或 off_refused 变了才重新编译
+    if (before && before.replayRequired === after.replayRequired && before.offRefused === after.offRefused) return;
     try {
-      await this.compiler.compile(this.config, this.replayLookup);
+      await this.compiler.compile(this.config, this.profileLookup);
     } catch (error) {
       console.error(`[kernel] cannot recompile after the profile of ${job.ref} changed: ${(error as Error).message}`);
     }

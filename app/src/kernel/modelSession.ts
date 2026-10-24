@@ -149,6 +149,20 @@ export function exhaustionText(excluded: readonly CandidateExclusion[], compacti
   return `${head}: ${excluded.map((item) => `${item.ref} — ${item.detail}`).join('; ')}`;
 }
 
+/**
+ * @brief 换模型后重发的思考强度（§11.2 第 2.3 步的 2026-10-24 补、§7.7“其他改动”）：会话的强度按新模型收紧
+ *        （clampThinkingLevel，与 pi 路由时的收紧相同；没有 Off 的模型把 off 提到 minimal），收紧后是 off 才不传。
+ * @param model 换到的实际模型
+ * @param level 会话的思考强度
+ * @param clamp pi-ai 的 clampThinkingLevel
+ * @return 重发选项里的 reasoning；收紧后是 off 时为 undefined
+ */
+export function resendReasoning(model: Model<Api>, level: ThinkingLevel,
+  clamp: PiAi['clampThinkingLevel']): SimpleStreamOptions['reasoning'] {
+  const clamped = clamp(model, level);
+  return clamped === 'off' ? undefined : clamped;
+}
+
 /** @brief pi 报“没有可压缩的”（对话太短或刚压缩过，§6.3 第 1 步跳过）。 */
 function isNothingToCompact(message: string): boolean {
   return message.startsWith('Nothing to compact') || message.startsWith('Already compacted');
@@ -649,15 +663,16 @@ class StreamWrapper {
   }
 
   /**
-   * @brief 换到新模型后的请求（§11.2 第 3 步）：§6 处理后的上下文，思考强度改为会话的强度（off 时不传）。
+   * @brief 换到新模型后的请求（§11.2 第 3 步）：§6 处理后的上下文，思考强度改为会话的强度按新模型收紧后的值
+   *        （§7.7，resendReasoning；收紧后是 off 才不传）。
    *        末尾的工作卡先拿下、处理之后接回，卡片总在最后（平行 Agent 规格 §8.3）。
    */
   private retarget(request: RequestState, ref: ModelRef): RequestState {
     const model = this.host.physical(ref);
     const detached = detachWorkCard(request.context.messages);
     const messages = reattachWorkCard(this.host.processMessages(detached.messages), detached.card);
-    const level = this.host.thinkingLevel();
-    const options: SimpleStreamOptions = { ...request.options, reasoning: level === 'off' ? undefined : level };
+    const reasoning = resendReasoning(model, this.host.thinkingLevel(), this.host.piAi.clampThinkingLevel);
+    const options: SimpleStreamOptions = { ...request.options, reasoning };
     return { model, context: { ...request.context, messages }, options, ref };
   }
 

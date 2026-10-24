@@ -195,13 +195,18 @@ async function defaultPick(): Promise<ModelPick | null> {
 }
 
 /**
+ * @brief 取第一个候选与它的档案要用到的模型层部分（§9.1 的取法；§8 effortPicks、noOffPicks，model-providers.md §7.7）。
+ */
+export type PickLayer = Pick<ModelLayer, 'expandPickIn' | 'staticBase' | 'profileOf'>;
+
+/**
  * @brief 范围在这个项目里的第一个候选（§9.1，同 ModelSession.newSessionThinking 的规则）：静态校验后的第一个候选，
  *        没有时展开的第一个；都没有时为 null。
  * @param layer 模型层
  * @param context 这个项目的项目配置与允许的区域（projectContext）
  * @param pick 选择范围；没有时为 null
  */
-function firstCandidate(layer: ModelLayer, context: ProjectContext, pick: ModelPick | null): ModelRef | null {
+function firstCandidate(layer: PickLayer, context: ProjectContext, pick: ModelPick | null): ModelRef | null {
   const candidates = pick === null ? null : layer.expandPickIn(context, pick);
   return staticCheck({ ...layer.staticBase(context), pick, candidates }).first ?? candidates?.[0] ?? null;
 }
@@ -220,7 +225,10 @@ async function defaultThinking(cwd: string, pick: ModelPick | null): Promise<Thi
     ?? settings.getDefaultThinkingLevel() ?? 'medium';
 }
 
-// ---- 设置对话框的 Effort（§8 effortPicks、§10.4） ----
+// ---- 设置对话框的 Effort（§8 effortPicks、noOffPicks，§10.4） ----
+
+/** @brief 设置对话框的 Effort 用的两项（EnhanceInfo 的 effortPicks、noOffPicks，§8）。 */
+type PickThinking = Pick<EnhanceInfo, 'effortPicks' | 'noOffPicks'>;
 
 /** @brief 模型配置里的每个选择范围（同顶栏菜单的各项，selector.pickOptions）：分组、提供商、`<provider>/<model>`。 */
 function configPicks(config: ModelConfig): ModelPick[] {
@@ -236,27 +244,42 @@ function marksThinking(config: ModelConfig, ref: ModelRef): boolean {
 }
 
 /**
- * @brief 设置对话框的 Effort 用（§8 effortPicks、§10.4）：模型配置里每个选择范围在这个项目里按 §9.1 的规则取到的
- *        第一个候选（firstCandidate）是否标了 Supports thinking；取不到候选的范围不出现。不在记忆的写入队列里算，
- *        也不等模型层启动（currentModelLayer）：模型层还没启动好（还在启动，或没能启动、启动时已记日志）、没有配置时
- *        为空；读项目配置出错时记错误日志，为空。
+ * @brief 设置对话框的 Effort 用（§8 effortPicks 与 noOffPicks、§10.4；model-providers.md §7.7）：模型配置里每个
+ *        选择范围在这个项目里按 §9.1 的规则取到的第一个候选（firstCandidate）是否标了 Supports thinking
+ *        （effortPicks[pick]），以及它的档案（layer.profileOf）reasoning.off_refused 是否为真（为真时 pick 在
+ *        noOffPicks 里；没有档案按假）。取不到候选的范围两边都不出现。
+ * @param layer 模型层
+ * @param context 这个项目的项目配置与允许的区域（projectContext）
+ * @param config 模型配置
+ */
+export function pickThinking(layer: PickLayer, context: ProjectContext, config: ModelConfig): PickThinking {
+  const effortPicks: Record<ModelPick, boolean> = {};
+  const noOffPicks: ModelPick[] = [];
+  for (const pick of configPicks(config)) {
+    const first = firstCandidate(layer, context, pick);
+    if (first === null) continue;
+    effortPicks[pick] = marksThinking(config, first);
+    // §7.7：第一个候选的思考关不掉（档案 off_refused），Effort 不列 Off
+    if (layer.profileOf(first)?.reasoning.off_refused === true) noOffPicks.push(pick);
+  }
+  return { effortPicks, noOffPicks };
+}
+
+/**
+ * @brief 这个项目的 pickThinking（§8、§10.4）。不在记忆的写入队列里算，也不等模型层启动（currentModelLayer）：
+ *        模型层还没启动好（还在启动，或没能启动、启动时已记日志）、没有配置时两项都为空；读项目配置出错时记错误日志，
+ *        两项都为空。
  * @param cwd 项目的工作目录
  */
-async function effortPicks(cwd: string): Promise<Record<ModelPick, boolean>> {
+async function pickThinkingIn(cwd: string): Promise<PickThinking> {
   try {
     const layer = currentModelLayer();
     const config = layer?.getConfig() ?? null;
-    if (layer === null || config === null) return {};
-    const context = await layer.projectContext(cwd);
-    const picks: Record<ModelPick, boolean> = {};
-    for (const pick of configPicks(config)) {
-      const first = firstCandidate(layer, context, pick);
-      if (first !== null) picks[pick] = marksThinking(config, first);
-    }
-    return picks;
+    if (layer === null || config === null) return { effortPicks: {}, noOffPicks: [] };
+    return pickThinking(layer, await layer.projectContext(cwd), config);
   } catch (error) {
-    console.error(`[kernel] reading which model ranges support thinking in ${cwd} failed: ${errorText(error)}`);
-    return {};
+    console.error(`[kernel] reading the thinking of the model ranges in ${cwd} failed: ${errorText(error)}`);
+    return { effortPicks: {}, noOffPicks: [] };
   }
 }
 
@@ -765,11 +788,12 @@ export async function stopEnhance(): Promise<void> {
 
 /**
  * @brief enhance.get（§8）：设置、三个任务的 last、这个项目正在跑的与排着的项数、下次到点的时刻、待显示的提示、
- *        每个选择范围的第一个候选是否支持思考（effortPicks）、读设置的错误。文件不存在时是关着、没有运行过的样子。
+ *        每个选择范围的第一个候选是否支持思考（effortPicks）、思考是否关不掉（noOffPicks，model-providers.md §7.7）、
+ *        读设置的错误。文件不存在时是关着、没有运行过的样子。
  * @param cwd 项目的工作目录
  */
 export async function enhanceInfo(cwd: string): Promise<EnhanceInfo> {
-  const [{ file, error }, picks] = await Promise.all([loadFile(cwd), effortPicks(cwd)]);
+  const [{ file, error }, picks] = await Promise.all([loadFile(cwd), pickThinkingIn(cwd)]);
   const base = file ?? freshFile();
   const enabled = error === null && base.enabled;
   const running = current?.item.cwd === cwd ? { task: current.item.task, day: current.item.day } : null;
@@ -778,7 +802,7 @@ export async function enhanceInfo(cwd: string): Promise<EnhanceInfo> {
     last: { taste: base.tasks.taste.last, strategy: base.tasks.strategy.last, review: base.tasks.review.last },
     running, queued: queue.filter((item) => item.cwd === cwd).length,
     next: enabled ? nextBoundary(clock.now(), base.time) : null, notice: error === null ? base.notice : null,
-    effortPicks: picks, error };
+    effortPicks: picks.effortPicks, noOffPicks: picks.noOffPicks, error };
 }
 
 /** @brief 改完 enhance.json 之后的调度（§9.1、§9.3、§9.4）：关掉时停下这个项目；开着时改了时刻重新排；开关或时刻变了重设定时器。 */

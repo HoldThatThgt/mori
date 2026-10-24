@@ -421,6 +421,11 @@ export interface EnhanceInfo {
    * 第一个候选是否标了 Supports thinking；取不到候选的范围不出现
    */
   effortPicks: Record<ModelPick, boolean>;
+  /**
+   * 设置对话框的 Effort 用（§10.4 的 2026-10-24 注，model-providers.md §7.7）：按同样取法取到的第一个候选的档案
+   * reasoning.off_refused 为真的那些选择范围；那个候选没有档案时按假，取不到候选的范围也不在里面
+   */
+  noOffPicks: ModelPick[];
   /** 读设置出错、项目目录被占用时的原因；否则为 null */
   error: string | null;
 }
