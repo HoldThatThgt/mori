@@ -3,7 +3,7 @@
 // 做法同原 m7-record.mjs（随工作回顾删除，docs/specs/memory.md §14.4）：页面里的录制器直接通过 window.mori（与界面相同的进程桥）发会话命令，记下命令、结果和后台进程
 // 转发的全部事件及其时间。不同的是故障与恢复按 §14.1 用真实方式触发：
 //   - 准备（synthetic test setup，v1-real-helpers.mjs）：复制负责人的数据目录（只复制加密的文件，不读 key），在复制出的
-//     model-config.json 里建分组 [首选提供商, 第二个提供商] 作为默认范围、给临时项目授权公网（blocked 场景不授权），
+//     model-config.json 里建分组 [首选提供商, 第二个提供商] 作为默认范围（2026-10-26 起没有网络区域，不再授权公网），
 //     把首选提供商 key 的密文另存到备用 ref。
 //   - 故障：在界面里（设置 → Models → Keys）给首选提供商加一个错的 key（sk-invalid）、删掉原来的 key，之后它的请求得到
 //     真实的 401：在回复开始前做就是段开始时换模型（switch-start），在一个连续调用工具的回复进行中做就是段内换模型
@@ -11,7 +11,7 @@
 //     记一个 { note } 步骤；它们引起的事件（mori.key_status 等）照常录下。
 //   - 恢复：退出 App，把复制出的配置里首选提供商的 key 改指备用 ref，重新启动；前后的步骤都留在 fixture 里，中间是
 //     { restart: true }（同 M7，回放用 ?part=before|after）。
-//   - 写配置的 models.* 命令由回放桥像 connection.save 一样直接应答、不占回放顺序（§14.4）：授权公网经 window.mori 直接发、
+//   - 写配置的 models.* 命令由回放桥像 connection.save 一样直接应答、不占回放顺序（§14.4）：blocked 删掉与重建分组经 window.mori 直接发、
 //     记一个 { note } 步骤；标"支持思考"的 models.saveModel 照常录下（同 m6-record.mjs，m6-replay.mjs 照它在设置页里勾选）。
 //     只读的 models.get、session.pickOptions 照常录下。
 // 录完先核对场景要的东西真的发生了（check）；不符合时不写进 fixtures，写到 test-results/v1-models-record/<名字>.rejected.json。

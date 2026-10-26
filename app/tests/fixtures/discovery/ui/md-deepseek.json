@@ -8,7 +8,7 @@
   "MD-07",
   "MD-13"
  ],
- "recorded": "2026-10-23",
+ "recorded": "2026-10-26",
  "address": [
   "http://127.0.0.1:4860/v1",
   "http://127.0.0.1:4861/v1",
@@ -21,33 +21,33 @@
   "No API key was entered: the commands carry no key and the fixture stores no request headers",
   "Synthetic endpoints: http://127.0.0.1:4860/v1 FAKE_LIST_SHAPE=rich FAKE_MODELS=fake-ds-vision,fake-ds-long,fake-ds-alwaysthink; http://127.0.0.1:4861/v1 FAKE_LIST_SHAPE=typed FAKE_MODELS=fake-coder,fake-embed (tests/fake-endpoint/server.mjs); the checklist edits before Add are synthetic"
  ],
- "recordedAt": "2026-10-23T11:19:56.335Z",
+ "recordedAt": "2026-10-26T14:56:30.712Z",
  "steps": [
   {
-   "t": 3,
+   "t": 2,
    "command": {
     "type": "session.list"
    }
   },
   {
-   "t": 4,
+   "t": 3,
    "result": {
     "type": "session.list",
     "value": []
    }
   },
   {
+   "t": 5,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
    "t": 7,
-   "command": {
-    "type": "config.get"
-   }
-  },
-  {
-   "t": 10,
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-md-record-data-EymSB2\\pi",
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-md-record-data-IXWZeY\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -58,17 +58,17 @@
    }
   },
   {
-   "t": 14,
+   "t": 9,
    "command": {
     "type": "config.get"
    }
   },
   {
-   "t": 17,
+   "t": 11,
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-md-record-data-EymSB2\\pi",
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-md-record-data-IXWZeY\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -79,13 +79,13 @@
    }
   },
   {
-   "t": 20,
+   "t": 12,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 27,
+   "t": 15,
    "result": {
     "type": "models.get",
     "value": {
@@ -100,7 +100,6 @@
         "baseUrl": "http://127.0.0.1:4862/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -118,12 +117,7 @@
        }
       ],
       "groups": [],
-      "normalDefault": "legacy/fake-legacy",
-      "allowedZones": [
-       "local",
-       "intranet"
-      ],
-      "projectZones": {}
+      "normalDefault": "legacy/fake-legacy"
      },
      "profiles": {
       "legacy/fake-legacy": {
@@ -165,17 +159,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       }
      },
@@ -183,11 +177,7 @@
      "thinkingDefaults": {
       "legacy/fake-legacy": null
      },
-     "zoneSuggestions": {
-      "legacy": "local"
-     },
      "migration": null,
-     "projects": [],
      "loadError": null,
      "reserved": [
       "mori",
@@ -238,7 +228,7 @@
    }
   },
   {
-   "t": 35,
+   "t": 18,
    "command": {
     "type": "models.discover",
     "target": {
@@ -250,7 +240,7 @@
    }
   },
   {
-   "t": 69,
+   "t": 36,
    "result": {
     "type": "models.discover",
     "value": {
@@ -281,6 +271,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -300,6 +291,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -319,6 +311,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -330,7 +323,7 @@
    }
   },
   {
-   "t": 75,
+   "t": 41,
    "command": {
     "type": "models.saveProvider",
     "id": null,
@@ -338,7 +331,6 @@
      "name": "127.0.0.1:4860",
      "baseUrl": "http://127.0.0.1:4860/v1",
      "api": "openai-completions",
-     "zone": "local",
      "concurrency": 4,
      "compat": {}
     },
@@ -377,7 +369,7 @@
    }
   },
   {
-   "t": 149,
+   "t": 66,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -423,17 +415,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -475,16 +467,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -500,7 +492,7 @@
    }
   },
   {
-   "t": 151,
+   "t": 67,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -546,17 +538,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -598,16 +590,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -650,16 +642,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -702,16 +694,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -737,7 +729,7 @@
    }
   },
   {
-   "t": 151,
+   "t": 67,
    "result": {
     "type": "models.saveProvider",
     "value": {
@@ -747,13 +739,13 @@
    }
   },
   {
-   "t": 154,
+   "t": 70,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 161,
+   "t": 72,
    "result": {
     "type": "models.get",
     "value": {
@@ -768,7 +760,6 @@
         "baseUrl": "http://127.0.0.1:4862/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -791,7 +782,6 @@
         "baseUrl": "http://127.0.0.1:4860/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -829,12 +819,7 @@
        }
       ],
       "groups": [],
-      "normalDefault": "legacy/fake-legacy",
-      "allowedZones": [
-       "local",
-       "intranet"
-      ],
-      "projectZones": {}
+      "normalDefault": "legacy/fake-legacy"
      },
      "profiles": {
       "legacy/fake-legacy": {
@@ -876,17 +861,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -928,16 +913,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -980,16 +965,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1032,16 +1017,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -1053,12 +1038,7 @@
       "127-0-0-1-4860/fake-ds-long": null,
       "127-0-0-1-4860/fake-ds-alwaysthink": null
      },
-     "zoneSuggestions": {
-      "legacy": "local",
-      "127-0-0-1-4860": "local"
-     },
      "migration": null,
-     "projects": [],
      "loadError": null,
      "reserved": [
       "mori",
@@ -1109,7 +1089,7 @@
    }
   },
   {
-   "t": 166,
+   "t": 76,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -1155,17 +1135,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -1207,16 +1187,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1259,16 +1239,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1311,16 +1291,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -1346,7 +1326,7 @@
    }
   },
   {
-   "t": 174,
+   "t": 80,
    "command": {
     "type": "models.discover",
     "target": {
@@ -1358,7 +1338,7 @@
    }
   },
   {
-   "t": 514,
+   "t": 180,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -1404,17 +1384,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -1456,16 +1436,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1508,16 +1488,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1560,16 +1540,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -1595,7 +1575,7 @@
    }
   },
   {
-   "t": 536,
+   "t": 195,
    "result": {
     "type": "models.discover",
     "value": {
@@ -1626,6 +1606,7 @@
         "image": false,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1645,6 +1626,7 @@
         "image": false,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1656,7 +1638,7 @@
    }
   },
   {
-   "t": 540,
+   "t": 198,
    "command": {
     "type": "models.saveProvider",
     "id": null,
@@ -1664,7 +1646,6 @@
      "name": "127.0.0.1:4861",
      "baseUrl": "http://127.0.0.1:4861/v1",
      "api": "openai-completions",
-     "zone": "local",
      "concurrency": 4,
      "compat": {}
     },
@@ -1683,7 +1664,7 @@
    }
   },
   {
-   "t": 606,
+   "t": 214,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -1729,17 +1710,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -1781,16 +1762,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1833,16 +1814,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1885,16 +1866,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1937,16 +1918,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -1977,7 +1958,7 @@
    }
   },
   {
-   "t": 607,
+   "t": 214,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -2023,17 +2004,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -2075,16 +2056,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2127,16 +2108,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2179,16 +2160,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2231,16 +2212,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -2271,7 +2252,7 @@
    }
   },
   {
-   "t": 607,
+   "t": 214,
    "result": {
     "type": "models.saveProvider",
     "value": {
@@ -2281,13 +2262,13 @@
    }
   },
   {
-   "t": 610,
+   "t": 216,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 614,
+   "t": 219,
    "result": {
     "type": "models.get",
     "value": {
@@ -2302,7 +2283,6 @@
         "baseUrl": "http://127.0.0.1:4862/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -2325,7 +2305,6 @@
         "baseUrl": "http://127.0.0.1:4860/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -2368,7 +2347,6 @@
         "baseUrl": "http://127.0.0.1:4861/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -2386,12 +2364,7 @@
        }
       ],
       "groups": [],
-      "normalDefault": "legacy/fake-legacy",
-      "allowedZones": [
-       "local",
-       "intranet"
-      ],
-      "projectZones": {}
+      "normalDefault": "legacy/fake-legacy"
      },
      "profiles": {
       "legacy/fake-legacy": {
@@ -2433,17 +2406,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -2485,16 +2458,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2537,16 +2510,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2589,16 +2562,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2641,16 +2614,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -2663,13 +2636,7 @@
       "127-0-0-1-4860/fake-ds-alwaysthink": null,
       "127-0-0-1-4861/fake-coder": null
      },
-     "zoneSuggestions": {
-      "legacy": "local",
-      "127-0-0-1-4860": "local",
-      "127-0-0-1-4861": "local"
-     },
      "migration": null,
-     "projects": [],
      "loadError": null,
      "reserved": [
       "mori",
@@ -2720,7 +2687,7 @@
    }
   },
   {
-   "t": 619,
+   "t": 221,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -2766,17 +2733,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -2818,16 +2785,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2870,16 +2837,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2922,16 +2889,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2974,16 +2941,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -3014,7 +2981,7 @@
    }
   },
   {
-   "t": 635,
+   "t": 289,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -3060,17 +3027,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -3112,16 +3079,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3164,16 +3131,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3216,16 +3183,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3268,16 +3235,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -3308,7 +3275,7 @@
    }
   },
   {
-   "t": 641,
+   "t": 291,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -3354,17 +3321,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -3406,16 +3373,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3458,16 +3425,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3510,16 +3477,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3562,16 +3529,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -3602,7 +3569,7 @@
    }
   },
   {
-   "t": 727,
+   "t": 335,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -3648,17 +3615,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -3700,16 +3667,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3752,16 +3719,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3804,16 +3771,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3856,16 +3823,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -3896,7 +3863,7 @@
    }
   },
   {
-   "t": 757,
+   "t": 415,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -3942,17 +3909,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -3994,16 +3961,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4046,16 +4013,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4098,16 +4065,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4150,16 +4117,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -4190,7 +4157,7 @@
    }
   },
   {
-   "t": 772,
+   "t": 417,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -4236,17 +4203,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -4288,16 +4255,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4340,16 +4307,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4392,16 +4359,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4444,16 +4411,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -4484,7 +4451,7 @@
    }
   },
   {
-   "t": 836,
+   "t": 460,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -4530,17 +4497,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -4582,16 +4549,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4634,16 +4601,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4686,16 +4653,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4738,16 +4705,310 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
+       "probedAt": null,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "127-0-0-1-4860/fake-ds-vision",
+       "step": 4,
+       "of": 8
+      },
+      {
+       "ref": "127-0-0-1-4860/fake-ds-long",
+       "step": 4,
+       "of": 8
+      },
+      {
+       "ref": "127-0-0-1-4860/fake-ds-alwaysthink",
+       "step": 1,
+       "of": 8
+      },
+      {
+       "ref": "127-0-0-1-4861/fake-coder",
+       "step": 4,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 492,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "legacy/fake-legacy": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "vllm",
+        "version": "0.10.1"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "verified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1793026585256,
+       "suite": 1
+      },
+      "127-0-0-1-4860/fake-ds-vision": {
+       "status": "probing",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "b": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 131072,
+        "reported": null,
+        "effective": 131072
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": null,
+       "suite": 1
+      },
+      "127-0-0-1-4860/fake-ds-long": {
+       "status": "probing",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "b": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 32768,
+        "reported": null,
+        "effective": 32768
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": null,
+       "suite": 1
+      },
+      "127-0-0-1-4860/fake-ds-alwaysthink": {
+       "status": "probing",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "b": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 262144,
+        "reported": null,
+        "effective": 262144
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": null,
+       "suite": 1
+      },
+      "127-0-0-1-4861/fake-coder": {
+       "status": "probing",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "b": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000
+       },
+       "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -4770,7 +5031,7 @@
       },
       {
        "ref": "127-0-0-1-4861/fake-coder",
-       "step": 3,
+       "step": 4,
        "of": 8
       }
      ]
@@ -4778,7 +5039,7 @@
    }
   },
   {
-   "t": 851,
+   "t": 804,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -4824,17 +5085,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -4876,16 +5137,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4928,16 +5189,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4980,16 +5241,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -5032,604 +5293,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": null,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "127-0-0-1-4860/fake-ds-vision",
-       "step": 4,
-       "of": 8
-      },
-      {
-       "ref": "127-0-0-1-4860/fake-ds-long",
-       "step": 4,
-       "of": 8
-      },
-      {
-       "ref": "127-0-0-1-4860/fake-ds-alwaysthink",
-       "step": 3,
-       "of": 8
-      },
-      {
-       "ref": "127-0-0-1-4861/fake-coder",
-       "step": 4,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 1147,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "legacy/fake-legacy": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "vllm",
-        "version": "0.10.1"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "A",
-        "a": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "b": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "verified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": 1792754386443,
-       "suite": 1
-      },
-      "127-0-0-1-4860/fake-ds-vision": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 131072,
-        "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "127-0-0-1-4860/fake-ds-long": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 32768,
-        "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "127-0-0-1-4860/fake-ds-alwaysthink": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "127-0-0-1-4861/fake-coder": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "127-0-0-1-4860/fake-ds-vision",
-       "step": 5,
-       "of": 8
-      },
-      {
-       "ref": "127-0-0-1-4860/fake-ds-long",
-       "step": 4,
-       "of": 8
-      },
-      {
-       "ref": "127-0-0-1-4860/fake-ds-alwaysthink",
-       "step": 3,
-       "of": 8
-      },
-      {
-       "ref": "127-0-0-1-4861/fake-coder",
-       "step": 4,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 1163,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "legacy/fake-legacy": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "vllm",
-        "version": "0.10.1"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "A",
-        "a": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "b": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "verified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": 1792754386443,
-       "suite": 1
-      },
-      "127-0-0-1-4860/fake-ds-vision": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 131072,
-        "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "127-0-0-1-4860/fake-ds-long": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 32768,
-        "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "127-0-0-1-4860/fake-ds-alwaysthink": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 262144,
-        "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
-       "suite": 1
-      },
-      "127-0-0-1-4861/fake-coder": {
-       "status": "probing",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "unverified",
-        "call": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "result": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": null,
-        "a": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "b": {
-         "outcome": "not_run",
-         "detail": null
-        },
-        "c": {
-         "outcome": "not_run",
-         "detail": null
-        }
-       },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "none",
-        "can_disable": "unknown",
-        "replay": "unknown"
-       },
-       "context": {
-        "declared": 128000,
-        "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
-       },
-       "cancel_verified": "unknown",
-       "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -5647,7 +5320,7 @@
       },
       {
        "ref": "127-0-0-1-4860/fake-ds-alwaysthink",
-       "step": 4,
+       "step": 3,
        "of": 8
       },
       {
@@ -5660,7 +5333,7 @@
    }
   },
   {
-   "t": 1166,
+   "t": 805,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -5706,17 +5379,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -5758,16 +5431,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -5810,16 +5483,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -5862,16 +5535,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -5914,16 +5587,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -5941,7 +5614,7 @@
       },
       {
        "ref": "127-0-0-1-4860/fake-ds-alwaysthink",
-       "step": 4,
+       "step": 3,
        "of": 8
       },
       {
@@ -5954,7 +5627,7 @@
    }
   },
   {
-   "t": 1242,
+   "t": 819,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -6000,17 +5673,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -6052,16 +5725,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -6104,16 +5777,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -6156,16 +5829,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -6208,16 +5881,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -6240,7 +5913,7 @@
       },
       {
        "ref": "127-0-0-1-4861/fake-coder",
-       "step": 5,
+       "step": 4,
        "of": 8
       }
      ]
@@ -6248,7 +5921,7 @@
    }
   },
   {
-   "t": 1244,
+   "t": 849,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -6294,17 +5967,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -6346,16 +6019,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -6398,16 +6071,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -6450,16 +6123,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -6502,16 +6175,310 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
+       "probedAt": null,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "127-0-0-1-4860/fake-ds-vision",
+       "step": 5,
+       "of": 8
+      },
+      {
+       "ref": "127-0-0-1-4860/fake-ds-long",
+       "step": 5,
+       "of": 8
+      },
+      {
+       "ref": "127-0-0-1-4860/fake-ds-alwaysthink",
+       "step": 4,
+       "of": 8
+      },
+      {
+       "ref": "127-0-0-1-4861/fake-coder",
+       "step": 5,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 897,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "legacy/fake-legacy": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "vllm",
+        "version": "0.10.1"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "verified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1793026585256,
+       "suite": 1
+      },
+      "127-0-0-1-4860/fake-ds-vision": {
+       "status": "probing",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "b": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 131072,
+        "reported": null,
+        "effective": 131072
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": null,
+       "suite": 1
+      },
+      "127-0-0-1-4860/fake-ds-long": {
+       "status": "probing",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "b": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 32768,
+        "reported": null,
+        "effective": 32768
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": null,
+       "suite": 1
+      },
+      "127-0-0-1-4860/fake-ds-alwaysthink": {
+       "status": "probing",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "b": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 262144,
+        "reported": null,
+        "effective": 262144
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": null,
+       "suite": 1
+      },
+      "127-0-0-1-4861/fake-coder": {
+       "status": "probing",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "unverified",
+        "call": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "result": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": null,
+        "a": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "b": {
+         "outcome": "not_run",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "unverified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000
+       },
+       "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -6542,7 +6509,7 @@
    }
   },
   {
-   "t": 1258,
+   "t": 898,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -6588,17 +6555,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -6640,16 +6607,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -6692,16 +6659,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -6744,16 +6711,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -6796,16 +6763,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -6836,7 +6803,7 @@
    }
   },
   {
-   "t": 1337,
+   "t": 944,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -6882,17 +6849,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -6934,16 +6901,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -6986,16 +6953,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -7038,16 +7005,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -7090,16 +7057,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -7130,7 +7097,7 @@
    }
   },
   {
-   "t": 1429,
+   "t": 1084,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -7176,17 +7143,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -7228,16 +7195,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -7280,16 +7247,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -7332,16 +7299,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -7384,16 +7351,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -7424,7 +7391,7 @@
    }
   },
   {
-   "t": 1432,
+   "t": 1086,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -7470,17 +7437,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -7522,22 +7489,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792754394073,
+       "catalog": null,
+       "probedAt": 1793026588754,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-long": {
@@ -7579,16 +7546,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -7631,16 +7598,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -7683,24 +7650,29 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
      },
      "running": [
       {
+       "ref": "127-0-0-1-4860/fake-ds-vision",
+       "step": 7,
+       "of": 8
+      },
+      {
        "ref": "127-0-0-1-4860/fake-ds-long",
-       "step": 6,
+       "step": 7,
        "of": 8
       },
       {
@@ -7718,7 +7690,7 @@
    }
   },
   {
-   "t": 1443,
+   "t": 1088,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -7764,17 +7736,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -7816,50 +7788,50 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792754394073,
+       "catalog": null,
+       "probedAt": 1793026588754,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-long": {
-       "status": "probing",
+       "status": "ready",
        "error": null,
        "server": {
         "kind": "unknown",
         "version": "unknown"
        },
        "tool_calling": {
-        "state": "unverified",
+        "state": "verified",
         "call": {
-         "outcome": "not_run",
+         "outcome": "pass",
          "detail": null
         },
         "result": {
-         "outcome": "not_run",
+         "outcome": "pass",
          "detail": null
         }
        },
        "tier": {
-        "level": null,
+        "level": "A",
         "a": {
-         "outcome": "not_run",
+         "outcome": "pass",
          "detail": null
         },
         "b": {
-         "outcome": "not_run",
+         "outcome": "pass",
          "detail": null
         },
         "c": {
@@ -7867,23 +7839,28 @@
          "detail": null
         }
        },
-       "protocol_write": "unverified",
-       "structured_output": "unverified",
+       "protocol_write": "verified",
+       "structured_output": "verified",
        "vision": "failed",
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
-        "reported": null,
-        "effective": 32768,
-        "truncation": "unknown"
+        "reported": 131072,
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
-       "reported": null,
-       "probedAt": null,
+       "reported": {
+        "contextWindow": 131072,
+        "maxTokens": 8192,
+        "reasoning": null,
+        "image": false
+       },
+       "catalog": null,
+       "probedAt": 1793026588757,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-alwaysthink": {
@@ -7925,16 +7902,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -7977,16 +7954,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -8012,7 +7989,7 @@
    }
   },
   {
-   "t": 1446,
+   "t": 1090,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -8058,17 +8035,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -8110,22 +8087,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792754394073,
+       "catalog": null,
+       "probedAt": 1793026588754,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-long": {
@@ -8167,22 +8144,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": 131072,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": null,
         "image": false
        },
-       "probedAt": 1792754394087,
+       "catalog": null,
+       "probedAt": 1793026588757,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-alwaysthink": {
@@ -8224,16 +8201,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -8276,16 +8253,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -8306,7 +8283,7 @@
    }
   },
   {
-   "t": 1520,
+   "t": 1131,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -8352,17 +8329,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -8404,22 +8381,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792754394073,
+       "catalog": null,
+       "probedAt": 1793026588754,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-long": {
@@ -8461,22 +8438,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": 131072,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": null,
         "image": false
        },
-       "probedAt": 1792754394087,
+       "catalog": null,
+       "probedAt": 1793026588757,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-alwaysthink": {
@@ -8518,16 +8495,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -8570,16 +8547,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -8600,7 +8577,7 @@
    }
   },
   {
-   "t": 1524,
+   "t": 1134,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -8646,17 +8623,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -8698,22 +8675,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792754394073,
+       "catalog": null,
+       "probedAt": 1793026588754,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-long": {
@@ -8755,22 +8732,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": 131072,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": null,
         "image": false
        },
-       "probedAt": 1792754394087,
+       "catalog": null,
+       "probedAt": 1793026588757,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-alwaysthink": {
@@ -8812,16 +8789,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -8864,22 +8841,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792754394164,
+       "catalog": null,
+       "probedAt": 1793026588801,
        "suite": 1
       }
      },
@@ -8894,7 +8871,7 @@
    }
   },
   {
-   "t": 1751,
+   "t": 1410,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -8940,17 +8917,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -8992,22 +8969,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792754394073,
+       "catalog": null,
+       "probedAt": 1793026588754,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-long": {
@@ -9049,22 +9026,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": 131072,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": null,
         "image": false
        },
-       "probedAt": 1792754394087,
+       "catalog": null,
+       "probedAt": 1793026588757,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-alwaysthink": {
@@ -9106,16 +9083,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -9158,22 +9135,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792754394164,
+       "catalog": null,
+       "probedAt": 1793026588801,
        "suite": 1
       }
      },
@@ -9188,7 +9165,7 @@
    }
   },
   {
-   "t": 2048,
+   "t": 1707,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -9234,17 +9211,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -9286,22 +9263,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792754394073,
+       "catalog": null,
+       "probedAt": 1793026588754,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-long": {
@@ -9343,22 +9320,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": 131072,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": null,
         "image": false
        },
-       "probedAt": 1792754394087,
+       "catalog": null,
+       "probedAt": 1793026588757,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-alwaysthink": {
@@ -9400,16 +9377,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -9452,22 +9429,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792754394164,
+       "catalog": null,
+       "probedAt": 1793026588801,
        "suite": 1
       }
      },
@@ -9482,7 +9459,7 @@
    }
   },
   {
-   "t": 2435,
+   "t": 2099,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -9528,17 +9505,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -9580,22 +9557,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792754394073,
+       "catalog": null,
+       "probedAt": 1793026588754,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-long": {
@@ -9637,22 +9614,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": 131072,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": null,
         "image": false
        },
-       "probedAt": 1792754394087,
+       "catalog": null,
+       "probedAt": 1793026588757,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-alwaysthink": {
@@ -9694,16 +9671,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": null,
-        "effective": 262144,
-        "truncation": "unknown"
+        "effective": 262144
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -9746,22 +9723,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792754394164,
+       "catalog": null,
+       "probedAt": 1793026588801,
        "suite": 1
       }
      },
@@ -9776,7 +9753,7 @@
    }
   },
   {
-   "t": 2438,
+   "t": 2100,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -9822,17 +9799,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -9874,22 +9851,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792754394073,
+       "catalog": null,
+       "probedAt": 1793026588754,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-long": {
@@ -9931,22 +9908,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": 131072,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": null,
         "image": false
        },
-       "probedAt": 1792754394087,
+       "catalog": null,
+       "probedAt": 1793026588757,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-alwaysthink": {
@@ -9988,22 +9965,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": null,
         "image": false
        },
-       "probedAt": 1792754395079,
+       "catalog": null,
+       "probedAt": 1793026589768,
        "suite": 1
       },
       "127-0-0-1-4861/fake-coder": {
@@ -10045,22 +10022,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792754394164,
+       "catalog": null,
+       "probedAt": 1793026588801,
        "suite": 1
       }
      },
@@ -10069,17 +10046,17 @@
    }
   },
   {
-   "t": 2667,
+   "t": 2285,
    "command": {
     "type": "config.get"
    }
   },
   {
-   "t": 2670,
+   "t": 2286,
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-md-record-data-EymSB2\\pi",
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-md-record-data-IXWZeY\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -10090,13 +10067,13 @@
    }
   },
   {
-   "t": 2672,
+   "t": 2288,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 2674,
+   "t": 2289,
    "result": {
     "type": "models.get",
     "value": {
@@ -10111,7 +10088,6 @@
         "baseUrl": "http://127.0.0.1:4862/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -10134,7 +10110,6 @@
         "baseUrl": "http://127.0.0.1:4860/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -10177,7 +10152,6 @@
         "baseUrl": "http://127.0.0.1:4861/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -10195,12 +10169,7 @@
        }
       ],
       "groups": [],
-      "normalDefault": "legacy/fake-legacy",
-      "allowedZones": [
-       "local",
-       "intranet"
-      ],
-      "projectZones": {}
+      "normalDefault": "legacy/fake-legacy"
      },
      "profiles": {
       "legacy/fake-legacy": {
@@ -10242,17 +10211,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754386443,
+       "catalog": null,
+       "probedAt": 1793026585256,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-vision": {
@@ -10294,22 +10263,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": true,
         "image": true
        },
-       "probedAt": 1792754394073,
+       "catalog": null,
+       "probedAt": 1793026588754,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-long": {
@@ -10351,22 +10320,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 32768,
         "reported": 131072,
-        "effective": 32768,
-        "truncation": "unknown"
+        "effective": 32768
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": null,
         "image": false
        },
-       "probedAt": 1792754394087,
+       "catalog": null,
+       "probedAt": 1793026588757,
        "suite": 1
       },
       "127-0-0-1-4860/fake-ds-alwaysthink": {
@@ -10408,22 +10377,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 262144,
         "reported": 131072,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 131072,
         "maxTokens": 8192,
         "reasoning": null,
         "image": false
        },
-       "probedAt": 1792754395079,
+       "catalog": null,
+       "probedAt": 1793026589768,
        "suite": 1
       },
       "127-0-0-1-4861/fake-coder": {
@@ -10465,22 +10434,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": null,
         "image": null
        },
-       "probedAt": 1792754394164,
+       "catalog": null,
+       "probedAt": 1793026588801,
        "suite": 1
       }
      },
@@ -10492,13 +10461,7 @@
       "127-0-0-1-4860/fake-ds-alwaysthink": null,
       "127-0-0-1-4861/fake-coder": null
      },
-     "zoneSuggestions": {
-      "legacy": "local",
-      "127-0-0-1-4860": "local",
-      "127-0-0-1-4861": "local"
-     },
      "migration": null,
-     "projects": [],
      "loadError": null,
      "reserved": [
       "mori",
@@ -10549,7 +10512,7 @@
    }
   },
   {
-   "t": 2681,
+   "t": 2295,
    "command": {
     "type": "models.discover",
     "target": {
@@ -10559,7 +10522,7 @@
    }
   },
   {
-   "t": 2686,
+   "t": 2297,
    "result": {
     "type": "models.discover",
     "value": {
@@ -10590,6 +10553,7 @@
         "image": false,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": true
@@ -10609,6 +10573,7 @@
         "image": false,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false

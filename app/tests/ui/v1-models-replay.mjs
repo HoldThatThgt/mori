@@ -387,6 +387,7 @@ async function blockedCheck(page, h) {
   const options = resultsOf(steps, 'session.pickOptions').at(-1)?.options ?? [];
   const [first, second] = commandsOf(steps).filter((c) => c.type === 'session.prompt');
   await h.openFolder();
+  await waitReady(page);
   await sendRecorded(h, first);
   await page.locator(`${PANE} [data-testid="blocked-card"]`).waitFor({ timeout: 60000 });
   const card = await blockedCard(page);
