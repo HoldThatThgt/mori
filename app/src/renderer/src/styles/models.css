@@ -49,6 +49,8 @@
 .switch-menu .menu-note { padding-top: 8px; border-top: 1px solid var(--color-line); }
 /* 思考关不掉的模型（规格 §7.7）：Effort 菜单底部说明下面另起一行的那句，不另起一节 */
 .switch-menu .menu-note + .menu-note { padding-top: 0; border-top: 0; }
+/* 模型菜单在协作模式下（或三节都空时）说明是第一项：上面没有东西，不画分隔线 */
+.switch-menu .menu-note:first-child { padding-top: 0; border-top: 0; }
 /* 模型菜单里的 Task mode 一行（docs/v1/screens/team-switch.md）：说明之下另起一组，名字和第二行在左，开关的样子在右
    （同 Customize 的开关 .tools-switch，tools.css；这里只是样子，不另算控件）；切换失败的一行在它下面，用警示色 */
 .task-mode-group { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--color-line); }

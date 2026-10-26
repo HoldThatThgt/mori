@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { MODES_TEXT } from '../fake-endpoint/scenarios/modes.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
 import {
-  appLogLines, brief, captureOrder, clickTeamSwitch, closeTbApp, contentText, customOf, instanceFiles,
+  appLogLines, brief, captureOrder, clickTeamSwitch, closeModelMenu, closeTbApp, contentText, customOf, instanceFiles,
   instanceSuffix, kernelEvents, liveInfo, messagesOf, missingSteps, newSession, openSessionIn, orderOf, paneSel,
   modelMenuSel, openModelMenu, paneState, poll, quoteChipsOf, quoteReply, readBoard, readJsonl, receiptsOf,
   reopenSession, restartTbApp, taskModeRow,
@@ -131,6 +131,8 @@ async function teamCommand(ctx, tab, text, want) {
 
 /** 回复进行中模型菜单的说明（docs/v1/screens/model-menu.md“回复进行中的菜单”） */
 const BUSY_NOTE = 'Can’t switch models until the response finishes';
+/** 协作模式下模型菜单的说明（§12.11） */
+const TASK_PICKS = 'Task mode picks the model for each agent';
 
 /** @brief 开着的模型菜单此刻的样子：范围的项有几个、几个不可用，说明的文字，Task mode 一行可不可用，焦点在哪个标识上。 */
 const menuLook = (ctx, tab) => ctx.page.locator(modelMenuSel(tab)).evaluate((el) => {
@@ -862,6 +864,14 @@ async function stageBackground(ctx, who) {
     label: await stopButton.getAttribute('aria-label').catch(() => null),
     title: await stopButton.getAttribute('title').catch(() => null),
     team: (await liveInfo(ctx, who.sessionFile)).team, pane: await paneState(ctx.page, who.tab) };
+  await openModelMenu(ctx, who.tab);
+  const menu = { ...(await menuLook(ctx, who.tab)),
+    background: (await liveInfo(ctx, who.sessionFile)).team.background };
+  await closeModelMenu(ctx, who.tab);
+  record('TB-53 while only background agents run (the dialog idle, T1 running) the model menu is as when idle: the '
+    + 'Task mode row is usable and the note is not the "response" one (task mode is on, so the menu has only the '
+    + `note "${TASK_PICKS}", no disabled range item)`, menu.background === true && menu.row && menu.items === 0
+    && menu.disabled === 0 && menu.note === TASK_PICKS, brief(menu));
   const other = await newSession(ctx);
   await sleep(500);
   const hidden = { status: await sidebarStatus(ctx, who.tab), visible: await ctx.page

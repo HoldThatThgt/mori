@@ -21,7 +21,8 @@ import {
   instanceFiles, instanceSuffix, kernelEvents, lineBrief, liveInfo, messagesOf, missingSteps, oneLine, openSessionIn,
   paneSel, paneState, poll, progressOf, readBoard, readJsonl, receiptsOf, reopenSession, scenarioLines,
   scenarioRequests, seedTeamUserData, sendMessage, shot, showTab, sleep, SPLIT_ROLES, startTbApp, startTbEndpoint,
-  stopTbEndpoint, suiteArgs, tbModel, tbProvider, tbRecorder, teamDir, tempProject, tempUserData, transcriptItems,
+  stopTbEndpoint, suiteArgs, taskModeRow, tbModel, tbProvider, tbRecorder, teamDir, teamSwitch, tempProject,
+  tempUserData, transcriptItems,
   userSession, waitApprovalCard, waitTaskPhase, waitTeamIdle, watchTaskPhases, writeRoles,
 } from './tb-helpers.mjs';
 import { withoutWorkCards } from '../fake-endpoint/scripts.mjs';
@@ -460,17 +461,31 @@ async function teamStop(ctx) {
   const deciding = await poll(async () => (await liveInfo(ctx, who.sessionFile)).deciding.queue
     .some((item) => item.text === msg2), 10000);
   const before = readBoard(ctx, sid);
+  const modeBefore = await teamSwitch(ctx, who.tab);
   const stopAt = Date.now();
   await clickStopTeam(ctx, who.tab);
   await settle(ctx, who, 30000);
   const obs = { before, stopAt, deciding, cardId, msg2, after: readBoard(ctx, sid),
     pane: await paneState(ctx.page, who.tab), info: await liveInfo(ctx, who.sessionFile) };
+  teamStopMode(modeBefore, await teamSwitch(ctx, who.tab), await taskModeRow(ctx, who.tab));
   await sleep(8000);
   obs.later = readBoard(ctx, sid);
   obs.lines = scenarioLines(ctx.ep, 'tb-stop-team', { since: stopAt + 300 });
   await teamStopChecks(ctx, who, obs);
   await teamStopIssue(ctx, who);
   await teamHandBack(ctx, who, obs);
+}
+
+/**
+ * @brief TB-35：Stop agents 不改模式（team-stop.md“之后”）：停之前是做完为止（需求开着），之后模型按钮仍是“Task mode · …”，
+ *        菜单里 Task mode 一行仍开着、第二行仍是 Until done · …。
+ */
+function teamStopMode(before, after, row) {
+  record('TB-35 Stop agents does not change task mode: "Until done" (request 1 still open) before and after, the '
+    + 'model button still "Task mode · <model id>" and the Task mode row still checked with "Until done · Ends when '
+    + 'open requests are done"', before.mode === 'once' && after.mode === 'once'
+    && after.text.startsWith('Task mode · ') && row.checked === 'true'
+    && row.hint === 'Until done · Ends when open requests are done', brief({ before, after, row }));
 }
 
 /** @brief TB-35：Stop agents 之后全部停下、批准按拒绝、消息回到输入框、等回复的以 Stopped by the user. 结束、task 停下。 */
@@ -1081,8 +1096,9 @@ async function rowSweep(ctx, who, other) {
 async function rowFitChecks(ctx, who, { single, split }) {
   const off = (samples) => samples.filter((s) => s.problems.length > 0 || Math.abs(s.width - s.want) >= 1);
   const fine = (samples) => off(samples).length === 0;
-  // 记录里先放有问题的样子（记录的说明有长度上限），再放每个宽度这一行的几项
-  const detail = (samples) => brief({ off: off(samples), all: samples.map((s) => `${s.width}:${s.items}`) });
+  // 记录里先放有问题的样子（记录的说明有长度上限），再放每个宽度这一行的几项、模型按钮与 Stop agents 的宽
+  const detail = (samples) => brief({ off: off(samples), all: samples.map((s) => `${s.width}:${s.items}`
+    + `:model ${s.model?.width}:stop ${s.stopTeam?.width}`) }, 3000);
   record('TB-54 composer row with an agent in the background while the dialog replies and the input box has a draft '
     + '(single pane 930 to 300px, both sides of every band edge): one line inside the message box; the task-mode model '
     + 'button "Task mode · <model id>" sits where the range button was (at least 40px, 36px at 340px or narrower, the '

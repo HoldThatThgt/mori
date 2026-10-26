@@ -33,8 +33,8 @@ import {
   killTbKernel, messagesOf, missingSteps, newSession, openProject, paneSel, paneState, poll,
   progressOf, readBoard, readJsonl, receiptsOf, reopenSession, restartTbApp, scenarioLines, scenarioRequests,
   seedTeamUserData, sendMessage, showTab, sleep, shot, startTbApp, startTbEndpoint, stopTbEndpoint, suiteArgs,
-  modelButtonSel, modelMenuSel, SPLIT_ROLES, taskModeRow, tbModel, tbProvider, tbRecorder, teamStateOf, teamSwitch,
-  tempProject, tempUserData, userSession,
+  modelButtonSel, modelMenuSel, SPLIT_ROLES, taskModeRow, taskRowSel, tbModel, tbProvider, tbRecorder, teamStateOf,
+  teamSwitch, tempProject, tempUserData, userSession,
   waitTeamIdle, writeRole, writeRoles,
 } from './tb-helpers.mjs';
 
@@ -551,10 +551,12 @@ async function menuStaysOpen(ctx, tab) {
   const menu = ctx.page.locator(modelMenuSel(tab));
   const look = () => menu.evaluate((el) => ({ sections: el.querySelectorAll('[data-section]').length,
     note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null,
+    tail: [...el.children].slice(-3).map((child) => child.dataset.testid ?? child.dataset.action ?? child.className),
     focused: document.activeElement?.dataset.testid ?? null }));
   await clickTeamSwitch(ctx, tab, 'always', { keepOpen: true });
   await poll(async () => (await look()).sections === 0, 10000);
   const on = { open: await menu.count(), ...await look() };
+  await watchPending(ctx, tab);
   await ctx.page.keyboard.press('Space');
   await ctx.page.waitForFunction((css) => document.querySelector(css)?.dataset.teamMode === 'off',
     modelButtonSel(tab), { timeout: 10000 }).catch(() => {});
@@ -564,14 +566,47 @@ async function menuStaysOpen(ctx, tab) {
   await menu.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   const closed = { open: await menu.count(),
     focus: await ctx.page.evaluate(() => document.activeElement?.dataset.testid ?? null) };
+  const order = ['model-menu-note', 'task-mode-group', 'manage-models'];
   record('TB-53 clicking the Task mode row keeps the model menu open with the focus on the row: turned on, the '
     + 'Groups/Providers/Models sections give way to the note "Task mode picks the model for each agent"; Space on the '
-    + 'still-focused row turns it off and the sections and "Applies to this session only. …" come back; Esc closes the '
-    + 'menu and the focus returns to the model button',
+    + 'still-focused row turns it off and the sections and "Applies to this session only. …" come back, followed by '
+    + 'the Task mode row and Manage models (the sections, the note, Task mode, Manage models); Esc closes the menu and '
+    + 'the focus returns to the model button',
   on.open === 1 && on.sections === 0 && on.note === TASK_PICKS && on.focused === 'team-switch' && off.open === 1
-    && off.sections > 0 && off.note?.startsWith('Applies to this session only.') && off.focused === 'team-switch'
-    && closed.open === 0 && closed.focus === 'model-button',
+    && off.sections > 0 && off.note?.startsWith('Applies to this session only.') && same(off.tail, order)
+    && same(on.tail, order) && off.focused === 'team-switch' && closed.open === 0 && closed.focus === 'model-button',
   brief({ on, off, closed }));
+  await pendingChecks(ctx, tab);
+}
+
+/**
+ * @brief 切换中（team-switch.md“切换中”）：在这一行出现 data-pending 的那一刻记下它的样子与焦点，并在这时再点它一下
+ *        （synthetic：切换中的点击不应再发 session.setTeam）。结果在 window.__pendingSeen。
+ */
+function watchPending(ctx, tab) {
+  return ctx.page.locator(taskRowSel(tab)).evaluate((row) => {
+    window.__pendingSeen = null;
+    const observer = new MutationObserver(() => {
+      if (row.dataset.pending !== 'true' || window.__pendingSeen) return;
+      window.__pendingSeen = { aria: row.getAttribute('aria-disabled'), disabled: row.disabled,
+        checked: row.getAttribute('aria-checked'), focused: document.activeElement === row };
+      row.click();
+      observer.disconnect();
+    });
+    observer.observe(row, { attributes: true, attributeFilter: ['data-pending'] });
+  });
+}
+
+/** @brief watchPending 看到的切换中，加 F8 里这一次切换只记了一条（切换中的那一下点击没有再发命令）。 */
+async function pendingChecks(ctx, tab) {
+  const seen = await ctx.page.evaluate(() => window.__pendingSeen);
+  const actions = await recentActions(ctx, tab, 'TB-53 check of the switches');
+  const offs = actions.filter((line) => line.endsWith('Task mode off'));
+  record('TB-53 while switching the Task mode row keeps its look but is unavailable: aria-disabled="true" and '
+    + 'data-pending="true" (not natively disabled, still aria-checked as before) with the focus kept on it; a click '
+    + 'at that moment does nothing (F8 lists one "Task mode off" for that switch, not two)', seen?.aria === 'true'
+    && seen.disabled === false && seen.checked === 'true' && seen.focused === true && offs.length === 1,
+  brief({ seen, actions: actions.slice(-6) }));
 }
 
 // ---------- TB-01：角色文件校验 ----------
@@ -778,13 +813,13 @@ async function fixed(ctx, who, project) {
     actions.filter((line) => line.endsWith('Check agent files')).length >= 2, brief(actions.slice(-12)));
 }
 
-/** @brief 按 F8、写一句、保存，读保存的报告里“Recent activity”一节的各行。 */
-async function recentActions(ctx, tab) {
+/** @brief 按 F8、写一句（what）、保存，读保存的报告里“Recent activity”一节的各行。 */
+async function recentActions(ctx, tab, what = 'TB-01 check of the recent actions') {
   await showTab(ctx, tab);
   await ctx.page.locator(`${paneSel(tab)} .composer textarea`).press('F8');
   const dialog = ctx.page.getByTestId('issue-dialog');
   await dialog.waitFor({ timeout: 15000 });
-  await dialog.getByTestId('issue-what').fill('TB-01 check of the recent actions');
+  await dialog.getByTestId('issue-what').fill(what);
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   const saved = dialog.getByTestId('issue-saved');
   await saved.waitFor({ timeout: 15000 });

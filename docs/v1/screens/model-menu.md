@@ -41,7 +41,7 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 菜单 | 你点了按钮 | 三节，节名“Groups”“Providers”“Models”；Groups 的项写分组 id，Providers 的项写提供商名称，Models 按提供商分小节（小节名是提供商名称），项写模型 id；每项只写名字（2026-10-26 改：右侧的区域标记删掉）；当前范围（`pick`）打勾；三节下面是说明“Applies to this session only. New sessions use the default range from Settings.”，再下面是 Task mode 一行（team-switch.md），最后一项“Manage models” | ↑ ↓、Enter 选择；Esc、点外面关闭 |
-| 协作模式的菜单（2026-10-26） | `ModelState.pickLocked` 为真 | 没有三节；说明 `Task mode picks the model for each agent`（同按钮悬停的第二行，在说明的位置），下面是 Task mode 一行和“Manage models”；打开时焦点在 Task mode 一行上（没有打勾的范围项） | 切 Task mode；Manage models；Esc |
+| 协作模式的菜单（2026-10-26） | `ModelState.pickLocked` 为真 | 没有三节；说明 `Task mode picks the model for each agent`（同按钮悬停的第二行，在说明的位置；它是菜单的第一项，上面不画分隔线），下面是 Task mode 一行和“Manage models”；打开时焦点在 Task mode 一行上（没有打勾的范围项） | 切 Task mode；Manage models；Esc |
 | 回复进行中的菜单（2026-10-26） | 准备中或生成中，`pickLocked` 为假 | 三节照常列出，但每项不可用（`disabled`，↑ ↓ 跳过，打勾的项仍打勾）；说明换成“Can’t switch models until the response finishes”；Task mode 一行和“Manage models”可用；打开时焦点在 Task mode 一行上。回复在菜单开着时开始：项变为不可用，焦点原来在某一项上的移到 Task mode 一行；回复结束时项恢复可用 | 切 Task mode；Manage models；Esc |
 | 换范围之后 | 你选了一项 | 菜单关闭，焦点回到按钮（下面“切换中”） | — |
 | 被排除的项 | 这一项展开后的全部候选都被本会话的静态校验排除（§9.2） | 这一项变淡，悬停写原因：每个候选一行“<provider>/<model> — <原因>”（原因用 §5.3 的界面文字，例如“tool calling not verified yet”“tool calling failed verification”；行的写法临时，走查时可以改）；仍可以选（选了以后由拒绝启动卡说明） | 选择 |

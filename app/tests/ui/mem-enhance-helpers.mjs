@@ -551,6 +551,22 @@ export function switchState(ctx) {
     disabled: el.disabled, title: el.getAttribute('title') }));
 }
 
+/**
+ * @brief 开关中（enhance.set 还没返回，memory-enhance.md“开关中”）：开关变为不可用的那一刻记下 aria-checked 与
+ *        disabled，结果在 window.__enhancePending（没看到时为 null）。在点开关之前调用。
+ */
+export function watchSwitchPending(ctx) {
+  return ctx.page.getByTestId('enhance-switch').evaluate((el) => {
+    window.__enhancePending = null;
+    const observer = new MutationObserver(() => {
+      if (!el.disabled || window.__enhancePending) return;
+      window.__enhancePending = { checked: el.getAttribute('aria-checked'), disabled: el.disabled };
+      observer.disconnect();
+    });
+    observer.observe(el, { attributes: true, attributeFilter: ['disabled'] });
+  });
+}
+
 /** @brief 点开关，等它可用且 aria-checked 为 want（等不到时照常返回）。 */
 export async function clickSwitch(ctx, want) {
   await ctx.page.getByTestId('enhance-switch').click();

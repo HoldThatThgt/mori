@@ -1,6 +1,7 @@
 // 合成端点（synthetic）的脚本：tests/ui/tb-app-models.mjs 用的场景（docs/specs/parallel-agents-taskboard.md
 // TB-38 模型选择、TB-39 task 中途换模型、TB-40 候选耗尽、TB-41 调度类别、TB-47 继续会话时换了模型、
-// TB-52 后台实例的模型提示，含交给结案时清掉），格式见 scripts.mjs 开头；名字都以 tb-models- 开头。
+// TB-52 后台实例的模型提示，含交给结案时清掉；TB-38 也含对话段内换模型时的模型按钮），格式见 scripts.mjs 开头；
+// 名字都以 tb-models- 开头。
 // 每个场景在自己的用户会话里跑（脚本按请求里第一个 tb-scenario 认），k 是这个会话里的投递序号。
 // 故障只来自步骤里的 fail（模型 id 以 -404 结尾的模型由 server.mjs 对每个不是探针的请求返回 404）。
 // 这里另外导出套件要比较的文字（MODELS_TEXT），scripts.mjs 只并入 SCENARIOS。
@@ -23,6 +24,8 @@ export const MODELS_TEXT = {
   /** 交给结案时清掉提示：fake-n2 第一次回复前等多久（这一行带着提示）、结案第一次回复前等多久（交到结案的这一行） */
   noteWaitMs: 3000,
   noteCloseWaitMs: 3000,
+  /** 对话段内换模型：fake-cs2 回复前等多久（这时模型按钮是"Task mode · fake-cs2"） */
+  chatSwWaitMs: 4000,
 };
 
 /** @brief 1..n。 */
@@ -223,6 +226,14 @@ export const SCENARIOS = {
 
   // TB-40 对话候选耗尽（chat 的模型总是 404）：说明卡。立项不登记，消息交给对话。
   'tb-models-chat404': [planner({ 1: [say('No collaboration needed.')] })],
+
+  // TB-38 协作模式下对话段内换模型（team-blocked.md“段内换了模型”）：立项不登记；chat 的第一个请求在 fake-cs1 上 429
+  // （原地换到 fake-cs2），fake-cs2 等一会儿再回复，这时锁定的模型按钮是"Task mode · fake-cs2"。
+  'tb-models-chatsw': [planner({ 1: [say('No collaboration needed.')] }),
+    { role: 'chat', kind: 'team-dialog', deliveries: {
+      1: [fail(429, { model: 'fake-cs1', retryAfter: 60 }),
+        together(wait(MODELS_TEXT.chatSwWaitMs), say('Chat on the second model.'))],
+    } }],
 
   // TB-40 临时提问候选耗尽（oracle 的模型总是 404）：发送方的工具结果报错并列出原因。
   'tb-models-ask': [chatOff({ 1: [call('agent_message', { to: 'oracle',

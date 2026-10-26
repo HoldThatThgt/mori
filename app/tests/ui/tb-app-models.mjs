@@ -2,15 +2,16 @@
 // 真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点的脚本模式（tests/fake-endpoint/scenarios/models.mjs，synthetic），
 // 逐条验收这些编号在 App 层的通过条件：
 //   TB-38 模型选择、TB-39 task 中途换模型、TB-40 候选耗尽（§12.5 表的每一行）、TB-41 调度类别、
-//   TB-47 继续会话时换了模型、TB-52 后台实例的模型提示（含交给结案时清掉）。
+//   TB-47 继续会话时换了模型、TB-52 后台实例的模型提示（含交给结案时清掉）；TB-38 也含协作模式下对话段内换模型时的
+//   模型按钮（chatsw）。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs models）：
 //   MORI_APP_DIR=.tb-runs/models node tests/ui/tb-app-models.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/tb-app-models(-packaged).json（--only 时 tb-partial-app-models…），截图在
 // test-results/tb-app-models/。
 // 端口（§17.1 的 4600–4699 里分给本套件的 4650–4659）：合成端点 4650，记录代理 4651（看完整的请求体），
 // 4652 是另一个合成端点：每个回复前等 100 秒，只给从没探测过的 tbp/fake-probing 用（它的探针一直在跑，选择器按 probing）。
-// 测试准备（synthetic test setup，逐处注明）：数据目录里写好二十一个本机提供商与它们的模型档案（跳过探针；tbc/fake-c 为
-// C 级，tbk2/fake-k2 的档案要求推理回放，tbp/fake-probing 没有档案），pi 的默认思考强度 low；十六个临时项目，各自的
+// 测试准备（synthetic test setup，逐处注明）：数据目录里写好二十三个本机提供商与它们的模型档案（跳过探针；tbc/fake-c 为
+// C 级，tbk2/fake-k2 的档案要求推理回放，tbp/fake-probing 没有档案），pi 的默认思考强度 low；十七个临时项目，各自的
 // 角色文件见 PROJECTS。时长都是真实值（modelTimings.ts：排队超时 60 秒、候选耗尽最长等 60 秒）：要等的几种情形
 // （探测中的候选、立项排队超时、task 与探针排队不超时、留出的槽位）放在 longBatch 一步里同时进行，其余步骤按顺序，
 // 同一时间只开一个 App。
@@ -19,8 +20,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MODELS_TEXT } from '../fake-endpoint/scenarios/models.mjs';
 import {
-  allowAll, brief, closeTbApp, contentText, customOf, instanceFiles, kernelEvents, liveInfo, messagesOf, missingSteps,
-  openSessionIn, paneSel, paneState, phasesOf, poll, progressOf, readBoard, readJsonl, receiptsOf, scenarioLines,
+  allowAll, brief, clickTeamSwitch, closeTbApp, contentText, customOf, instanceFiles, kernelEvents, liveInfo,
+  messagesOf, missingSteps, openSessionIn, paneSel, paneState, phasesOf, poll, progressOf, readBoard, readJsonl,
+  receiptsOf, scenarioLines,
   scenarioRequests, seedTeamUserData, sendMessage, setProgressOpen, shot, showTab, sleep, startTbApp, startTbEndpoint,
   stopTbEndpoint, suiteArgs, tbModel, tbProvider, tbRecorder, teamSwitch, tempProject, tempUserData, userSession,
   waitTaskPhase, waitTeamIdle, watchTaskPhases, writeRoles,
@@ -114,7 +116,8 @@ function blockedCard(ctx, tab) {
     const card = document.querySelector(css);
     if (!card) return null;
     const actions = [...card.querySelectorAll('[data-action]')].map((el) => el.dataset.action);
-    return { kind: card.dataset.kind, actions,
+    const labels = [...card.querySelectorAll('[data-action]')].map((el) => el.textContent.trim());
+    return { kind: card.dataset.kind, actions, labels,
       candidates: [...card.querySelectorAll('[data-testid="candidate"]')].map((el) => ({ ref: el.dataset.ref,
         reason: el.dataset.reason })) };
   }, `${paneSel(tab)} [data-testid="blocked-card"]`);
@@ -158,6 +161,7 @@ const PROJECTS = {
   cwake: [CHAT, plannerOn(['tbcw/fake-cw']), EXECUTOR],
   closer: [CHAT, CREATOR, role('closer', 'Closes each request', { seats: ['close'], models: ['tbcl/fake-close-404'] }),
     EXECUTOR],
+  chatsw: [chatOn(['tbcs1/fake-cs1', 'tbcs2/fake-cs2']), PLANNER, EXECUTOR],
   chat404: [chatOn(['tbk/fake-chat-404']), PLANNER, EXECUTOR,
     role('oracle', 'Answers one question', { models: ['tbo4/fake-ask-404'] })],
   q1task: [CHAT, PLANNER, executorOn(['tbq1/fake-q1'])],
@@ -181,7 +185,8 @@ function providers() {
     p('tbs1', [m('fake-sw1')]), p('tbs2', [m('fake-sw2')]), p('tbs3', [m('fake-sw3')]),
     p('tbn1', [m('fake-n1')]), p('tbn2', [m('fake-n2')]),
     p('tbw', [m('fake-sub-404')]), p('tbcw', [m('fake-cw')]), p('tbcl', [m('fake-close-404')]),
-    p('tbk', [m('fake-chat-404')]), p('tbo4', [m('fake-ask-404')]),
+    p('tbk', [m('fake-chat-404')]), p('tbo4', [m('fake-ask-404')]), p('tbcs1', [m('fake-cs1')]),
+    p('tbcs2', [m('fake-cs2')]),
     p('tbq1', [m('fake-q1'), m('fake-q1b')], { concurrency: 1 }), p('tbq2', [m('fake-qa')], { concurrency: 1 }),
     p('tbq3', [m('fake-qc'), m('fake-qd')], { concurrency: 1 }), p('tbr', [m('fake-r')], { concurrency: 4 }),
     p('tbk1', [m('fake-k1')]), p('tbk2', [m('fake-k2', { reasoning: true })]),
@@ -490,13 +495,16 @@ async function checkReserve(ctx, r) {
 // ---------- TB-38：选择、锁定的模型按钮、思考强度（tb-models-sel） ----------
 
 /**
- * @brief 开着的模型菜单此刻的样子：范围的节与项有几个、说明的文字、从上到下的按钮（标识或动作）、焦点在哪个标识上。
+ * @brief 开着的模型菜单此刻的样子：范围的节与项有几个、说明的文字、说明是不是第一项和它上沿分隔线的粗细、从上到下的按钮
+ *        （标识或动作）、焦点在哪个标识上。
  */
 function menuNow(ctx, tab) {
   return ctx.page.locator(`${paneSel(tab)} [data-testid="model-menu"]`).evaluate((el) => ({
     sections: el.querySelectorAll('[data-section]').length,
     radios: el.querySelectorAll('[role="menuitemradio"]').length,
     note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null,
+    noteFirst: el.firstElementChild?.dataset.testid === 'model-menu-note',
+    noteLine: el.firstElementChild ? getComputedStyle(el.firstElementChild).borderTopWidth : null,
     items: [...el.querySelectorAll('button')].map((item) => item.dataset.testid ?? item.dataset.action ?? ''),
     focused: document.activeElement?.dataset.testid ?? null }));
 }
@@ -551,12 +559,13 @@ function selLocked(ctx, who, lock) {
   const lines2 = lock.button.title?.split('\n') ?? [];
   record('TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" (chat\'s model in '
     + 'use; data-locked, still a menu button) with hover "Task mode · fake-other" / "Task mode picks the model for '
-    + 'each '
-    + 'agent"; clicking it opens a menu with only that note, the Task mode row (focused) and Manage models — no '
-    + 'Groups/Providers/Models; Enter on the button opens it too (2026-10-26, §12.11)',
+    + 'each agent"; clicking it opens a menu with only that note (first, no separator line above it), the Task mode '
+    + 'row (focused) and Manage models — no Groups/Providers/Models; Enter on the button opens it too (2026-10-26, '
+    + '§12.11)',
   lock.mode === 'once' && lock.button.locked && lock.button.text === 'Task mode · fake-other'
     && lines2[0] === 'Task mode · fake-other' && lines2[1] === LOCKED_TITLE && lock.button.popup === 'menu'
     && lock.clicked?.sections === 0 && lock.clicked.radios === 0 && lock.clicked.note === LOCKED_TITLE
+    && lock.clicked.noteFirst && lock.clicked.noteLine === '0px'
     && same(lock.clicked.items, ['team-switch', 'manage-models']) && lock.clicked.focused === 'team-switch'
     && lock.afterEnter === 1 && lock.t1 === 'active', brief(lock));
   record('TB-38 task mode: session.setPick is refused with "Task mode picks the model for each agent" and '
@@ -643,6 +652,7 @@ async function gone(ctx) {
   const before = await modelButton(ctx, who.tab);
   const removed = await tryBridge(ctx, { type: 'models.deleteProvider', id: 'tbg', dryRun: false });
   const card = await poll(() => blockedCard(ctx, who.tab), 10000);
+  const during = await modelButton(ctx, who.tab);
   const modeBefore = (await teamSwitch(ctx, who.tab)).mode;
   await ctx.page.locator(`${paneSel(who.tab)} [data-testid="blocked-card"] [data-action="turn-off-team"]`).click();
   const off = await poll(async () => (await teamSwitch(ctx, who.tab)).mode === 'off', 10000);
@@ -653,9 +663,12 @@ async function gone(ctx) {
     progress: (await progressOf(ctx, who.tab))[0] };
   record('TB-38 in task mode the blocked card of the dialog session has no "Change model…": with the provider of '
     + 'chat\'s only model deleted in Settings, the card (pick_missing) offers "Turn off task mode" and Open settings '
-    + 'instead (the model button reads "Task mode · fake-gone")', removed.error === null && removed.value?.error === null
-    && card?.kind === 'pick_missing' && same(card.actions, ['turn-off-team', 'open-settings']) && modeBefore === 'once'
-    && before.locked && before.text === 'Task mode · fake-gone', brief({ card, modeBefore, before, removed }));
+    + 'instead (the model button reads "Task mode · fake-gone" before, and only "Task mode" while blocked with no '
+    + 'current model)', removed.error === null && removed.value?.error === null && card?.kind === 'pick_missing'
+    && same(card.actions, ['turn-off-team', 'open-settings'])
+    && same(card.labels, ['Turn off task mode', 'Open settings']) && modeBefore === 'once' && before.locked
+    && before.text === 'Task mode · fake-gone' && during.locked
+    && during.text === 'Task mode' && during.current === null, brief({ card, modeBefore, before, during, removed }));
   const t1 = taskOf(board, 'T1');
   const exec = lines(ctx, 'tb-models-gone', { agent: 'executor' });
   record('TB-38 Turn off task mode on the blocked card goes straight to off although request 1 is still open, and '
@@ -888,9 +901,43 @@ async function closer(ctx) {
     baton.reason, baton.routedTo], woken: woken[0]?.info.last.slice(0, 120) }));
 }
 
-/** @brief 对话候选耗尽：统一模型提供商规格 §9.3 的说明卡（不变），没有 v0 的错误卡。 */
+/**
+ * @brief TB-38 协作模式下对话段内换了模型（team-blocked.md“段内换了模型”）：在模型菜单里打开 Task mode（一直打开），
+ *        chat 的第一个请求在 fake-cs1 上 429、原地换到 fake-cs2；这一段里锁定的模型按钮从“Task mode · fake-cs1”
+ *        变为“Task mode · fake-cs2”，回复来自 fake-cs2。最后关掉 Task mode。
+ */
+async function chatsw(ctx) {
+  const who = await openIn(ctx, ctx.p.chatsw);
+  await clickTeamSwitch(ctx, who.tab, 'always');
+  const before = await modelButton(ctx, who.tab);
+  who.since = Date.now();
+  await sendMessage(ctx, who.tab, 'Switch the dialog tb-scenario:tb-models-chatsw');
+  const switched = await poll(async () => {
+    const button = await modelButton(ctx, who.tab);
+    return button.text === 'Task mode · fake-cs2' ? button : null;
+  }, 30000, 100);
+  const running = (await paneState(ctx.page, who.tab)).running;
+  if (!(await waitReply(ctx, who, 'Chat on the second model.'))) throw new Error('chat never replied');
+  await settle(ctx, who, 30000);
+  const chat = lines(ctx, 'tb-models-chatsw', { agent: 'chat' }).map((line) => [line.model, line.status ?? 200]);
+  record('TB-38 task mode, the dialog switches model within its segment (fake-cs1 answers 429): the locked model '
+    + 'button follows it, "Task mode · fake-cs1" before and "Task mode · fake-cs2" while that segment still runs; the '
+    + 'reply comes from fake-cs2', before.locked && before.text === 'Task mode · fake-cs1' && switched?.locked === true
+    && switched.current === 'tbcs2/fake-cs2' && running && chat.at(-1)?.[0] === 'fake-cs2'
+    && chat.some(([model]) => model === 'fake-cs1'), brief({ before, switched, running, chat }));
+  await clickTeamSwitch(ctx, who.tab, 'off');
+}
+
+/**
+ * @brief 对话候选耗尽：统一模型提供商规格 §9.3 的说明卡（不变），没有 v0 的错误卡。先在模型菜单里打开 Task mode
+ *        （一直打开，这一轮结束后仍锁定），卡上 Open settings 旁有 Turn off task mode；点它按开关的规则关掉
+ *        （没有未关闭的需求，回到 off），卡上的这个按钮随之消失（team-blocked.md）。
+ */
 async function chat404(ctx) {
-  const who = await begin(ctx, ctx.p.chat404, 'Talk to me tb-scenario:tb-models-chat404');
+  const who = await openIn(ctx, ctx.p.chat404);
+  await clickTeamSwitch(ctx, who.tab, 'always');
+  who.since = Date.now();
+  await sendMessage(ctx, who.tab, 'Talk to me tb-scenario:tb-models-chat404');
   await poll(async () => (await paneState(ctx.page, who.tab)).unavailable.length > 0, 30000);
   await settle(ctx, who, 30000);
   const pane = await paneState(ctx.page, who.tab);
@@ -901,6 +948,23 @@ async function chat404(ctx) {
     && same(card.candidates.map((c) => [c.ref, c.reason]), [['tbk/fake-chat-404', 'not_found']])
     && card.candidates[0].text.includes('model not found on the server') && pane.errors.length === 0,
   brief({ unavailable: pane.unavailable, errors: pane.errors }));
+  await chat404TurnOff(ctx, who);
+}
+
+/** @brief chat404 的后半：说明卡上的 Turn off task mode（§12.11）。 */
+async function chat404TurnOff(ctx, who) {
+  const cardSel = `${paneSel(who.tab)} [data-testid="unavailable-card"]`;
+  const actions = () => ctx.page.locator(`${cardSel} [data-action]`)
+    .evaluateAll((els) => els.map((el) => [el.dataset.action, el.textContent.trim()]));
+  const before = { mode: (await teamSwitch(ctx, who.tab)).mode, actions: await actions() };
+  await ctx.page.locator(`${cardSel} [data-action="turn-off-team"]`).click();
+  const off = await poll(async () => (await teamSwitch(ctx, who.tab)).mode === 'off', 10000);
+  const after = { button: await modelButton(ctx, who.tab), actions: await actions() };
+  record('TB-40 in task mode the "No model available" card offers "Turn off task mode" next to Open settings; with '
+    + 'no open request a click turns task mode off (the switch rule), the model button unlocks and the card keeps '
+    + 'only Open settings', before.mode === 'always' && same(before.actions, [['open-settings', 'Open settings'],
+    ['turn-off-team', 'Turn off task mode']]) && off && !after.button.locked && !after.button.text.startsWith('Task')
+    && same(after.actions, [['open-settings', 'Open settings']]), brief({ before, after }));
 }
 
 /** @brief 临时提问候选耗尽：发送方的工具结果报错，列出原因。 */
@@ -965,7 +1029,7 @@ function finalChecks(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { longBatch, sel, fam, gone, sw, note, cdead, cwake, closer, chat404, askNoModel, cont };
+const steps = { longBatch, sel, fam, gone, sw, note, cdead, cwake, closer, chatsw, chat404, askNoModel, cont };
 
 const ctx = { userData: tempUserData('mori-tb-models-data-'), exePath: args.exePath, pageErrors: [] };
 try {

@@ -108,7 +108,7 @@
 
 规格没给、本表定的（都是临时，走查时可以改）：Check again 出错时按钮上方一行原文；会话不空闲时 `Check again` 的悬停；
 `name` 三种问题的完整写法；`Turn off task mode` 在拒绝启动卡上占 `Change model…` 的位置、在说明卡上放在 `Open settings` 旁；
-锁定的模型按钮只写模型 id、不带 ▾，没有当前模型时 `No model`，锁定时悬停不随生成中改变；右栏两行说明的先后。
+锁定的模型按钮“Task mode · <模型 id>”（2026-10-26 前只写模型 id、不带 ▾），没有当前模型时“Task mode”，锁定时悬停不随生成中改变；右栏两行说明的先后。
 
 ## 需要规格回答
 
@@ -130,5 +130,5 @@
 | 卡上的问题 | 每行 `data-testid="agent-problem"`（本表定，临时） |
 | Check again | 卡上 `data-action="check-agents"`（动作 `check_agents`，`_` 换成 `-`，同 model-chat.md 的写法） |
 | Turn off task mode | 拒绝启动卡与说明卡上 `data-action="turn-off-team"`（动作 `turn_off_team`，同上） |
-| 模型按钮 | `data-testid="model-button"`（沿用 v0），锁定时 `data-locked="true"`、`aria-disabled="true"`（本表定，临时） |
+| 模型按钮 | `data-testid="model-button"`（沿用 v0），锁定时 `data-locked="true"`（本表定，临时；2026-10-26 起锁定时能打开菜单，不再 `aria-disabled`），`data-team-mode` 见 team-switch.md |
 | 右栏说明 | `data-testid="team-changes-note"`（§13.12）；改动列表 `data-testid="changes"`（沿用 v0） |
