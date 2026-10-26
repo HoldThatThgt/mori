@@ -22,6 +22,8 @@
 //   docs/v1/screens/models-settings.md“界面测试用的标识”；首次启动表单见 first-run.md。
 // - key 方式（md-real.mjs 不给 --source、由环境变量给 key 时）：key 换成 *** 的写法（redactor）、在 Mori 的输出与数据目录
 //   里找 key 的明文（findSecrets，只报出现的地方，不报 key）。
+// - pi 自带的模型表（2026-10-26，WP-15，规格 §4.4、MD-17）：piEntriesAt 由测试自己从 pi-ai 读（不经 src/），给 md-real.mjs
+//   的 glm-pi 驱动独立算出清单与模型行该显示的值。
 // 只读页面和磁盘、发界面操作；不改 Mori 的源码。
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -29,6 +31,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { join } from 'node:path';
 import zlib from 'node:zlib';
+import { builtinProviders } from '@earendil-works/pi-ai/providers/all';
 import { editModelConfig, oneLine, scratchUserData, sleep } from './lib.mjs';
 
 /**
@@ -60,6 +63,24 @@ const MOVED_PREFIX = 'md-real-moved-';
 export const UNREPORTED_WINDOW = 128000;
 /** @brief 没报告时的输出上限（§11）：16384 与窗口一半中较小的。 */
 export const unreportedMax = (window) => Math.min(16384, Math.floor(window / 2));
+
+/**
+ * @brief pi 自带的模型表里与 baseUrl 同一个 origin 的聊天模型条目（规格 §4.4；测试从 pi-ai 读，独立于 src/ 的实现）：
+ *        id → { provider（pi 的提供商显示名）, contextWindow, maxTokens, reasoning }。同一个 id 有几个条目时取 pi 列出的
+ *        第一个（z.ai 的 origin 下没有这种情形）。
+ */
+export function piEntriesAt(baseUrl) {
+  const origin = new URL(baseUrl).origin;
+  const entries = new Map();
+  for (const provider of builtinProviders()) {
+    for (const model of provider.getModels()) {
+      if (!URL.canParse(model.baseUrl) || new URL(model.baseUrl).origin !== origin || entries.has(model.id)) continue;
+      entries.set(model.id, { provider: provider.name, contextWindow: model.contextWindow, maxTokens: model.maxTokens,
+        reasoning: model.reasoning === true });
+    }
+  }
+  return entries;
+}
 
 /** @brief 读 JSON 文件。 */
 export const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
@@ -532,7 +553,8 @@ export async function waitFetched(scope, timeout = 90000) {
 
 /**
  * @brief 清单（或列表错误下手填的行）里显示着的每一行：id、data-chat、Added、不能加入、勾选与能不能勾、两个数字框的值、
- *        两个勾选框、Not reported 的字段、标记与提示。
+ *        两个勾选框、标"Default"的字段（2026-10-26 起取代 Not reported，只在值仍是默认值时）、标记与提示；
+ *        标"From pi"的字段与它们的悬停（2026-10-26，WP-15）。
  */
 export function readRows(scope) {
   return scope.locator('[data-testid="discovered-row"]').evaluateAll((rows) => rows.map((row) => {
@@ -544,17 +566,24 @@ export function readRows(scope) {
       pickable: pick ? !pick.disabled : false,
       contextWindow: box('contextWindow')?.value ?? null, maxTokens: box('maxTokens')?.value ?? null,
       reasoning: box('reasoning')?.checked ?? null, image: box('image')?.checked ?? null,
-      notReported: kinds('[data-testid="not-reported"]', 'field'), tags: kinds('[data-testid="row-tag"]', 'kind'),
-      hints: kinds('[data-testid="row-hint"]', 'kind') };
+      defaults: kinds('[data-testid="default-value"]', 'field'), tags: kinds('[data-testid="row-tag"]', 'kind'),
+      hints: kinds('[data-testid="row-hint"]', 'kind'), pi: kinds('[data-testid="pi-value"]', 'field'),
+      piTitles: [...row.querySelectorAll('[data-testid="pi-value"]')].map((el) => el.title) };
   }));
 }
 
-/** @brief 一个模型行此刻的样子：Tool calling 的 data-value、提示（kind 与文字）、(not reported) 的字段。 */
+/**
+ * @brief 一个模型行此刻的样子：行上的 data-probe（tool calling 的验证状态，2026-10-26 起取代档案摘要的 Tool calling）、
+ *        提示（kind 与文字）、标"(default)"的字段；说明一行的文字、标"(from pi)"的字段与它们的悬停（2026-10-26，WP-15）。
+ */
 export function modelRowState(row) {
-  return row.evaluate((el) => ({ tool: el.querySelector('[data-field="tool_calling"]')?.dataset.value ?? null,
+  return row.evaluate((el) => ({ tool: el.dataset.probe ?? null,
     hints: [...el.querySelectorAll('[data-testid="model-hint"]')].map((hint) => ({ kind: hint.dataset.kind,
       text: hint.querySelector('span')?.textContent ?? hint.textContent })),
-    notReported: [...el.querySelectorAll('[data-testid="not-reported"]')].map((item) => item.dataset.field) }));
+    defaults: [...el.querySelectorAll('[data-testid="default-value"]')].map((item) => item.dataset.field),
+    meta: el.querySelector('.model-meta')?.textContent ?? '',
+    pi: [...el.querySelectorAll('[data-testid="pi-value"]')].map((item) => item.dataset.field),
+    piTitles: [...el.querySelectorAll('[data-testid="pi-value"]')].map((item) => item.title) }));
 }
 
 /** @brief Add a model ID：填 id、点 Add to list（§6.4）。 */

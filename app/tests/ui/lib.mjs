@@ -69,11 +69,6 @@ export function scratchUserData(source, { withKey = true } = {}) {
 /** 测试准备（§14.1）给真实提供商建的默认分组 id */
 export const REAL_GROUP = 'real-providers';
 
-/** @brief 项目路径的规范化写法（规格 §4.1 projectZones 的键）：全部小写、/ 分隔、无结尾 /。 */
-export function projectKey(path) {
-  return resolve(path).replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
-}
-
 /**
  * @brief 读数据目录里 model-config.json 的提供商（只读非机密部分：id、名称、地址、模型）；按 DeepSeek、GLM、其余的
  *        顺序排。没有提供商时报错（数据目录要先用 v1 打开一次，§14.1）。
@@ -87,44 +82,27 @@ export function realProviders(dir) {
   const providers = [...config.providers].sort((a, b) => rank(a) - rank(b));
   if (providers.length === 0) throw new Error(`No providers in ${join(dir, 'model-config.json')}`);
   return providers.map((provider) => ({ provider: provider.id, name: provider.name, baseUrl: provider.baseUrl,
-    api: provider.api, zone: provider.zone, model: provider.models[0].id,
+    api: provider.api, model: provider.models[0].id,
     ref: `${provider.id}/${provider.models[0].id}`,
     contextWindow: provider.models[0].contextWindow,
     models: provider.models.map((model) => model.id), keys: provider.keys.map((key) => key.ref) }));
 }
 
 /**
- * @brief 测试准备（规格 §14.1，synthetic test setup）：在复制出的 model-config.json 里给临时项目授权公网
- *        （projectZones[项目] = ["public"]），建一个分组 [DeepSeek 提供商, GLM 提供商]（只有一个时就是它）作为默认范围。
- *        之后的界面操作照常。返回用到的提供商（同 realProviders）。
+ * @brief 测试准备（规格 §14.1，synthetic test setup）：在复制出的 model-config.json 里建一个分组
+ *        [DeepSeek 提供商, GLM 提供商]（只有一个时就是它）作为默认范围。之后的界面操作照常。返回用到的提供商（同 realProviders）。
+ *        2026-10-26 起没有网络区域（负责人走查 M3），不再给临时项目授权公网。
  * @param userData scratchUserData 复制出的数据目录
- * @param projects 要授权的临时项目文件夹（一个或多个）
  */
-export function allowRealProject(userData, projects) {
+export function useRealGroup(userData) {
   const file = join(userData, 'model-config.json');
   const config = JSON.parse(readFileSync(file, 'utf8'));
   const providers = realProviders(userData).slice(0, 2);
-  for (const project of [projects].flat()) config.projectZones[projectKey(project)] = ['public'];
   config.groups = config.groups.filter((group) => group.id !== REAL_GROUP);
   config.groups.push({ id: REAL_GROUP, members: providers.map((item) => item.provider) });
   config.normalDefault = REAL_GROUP;
   writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
   return providers;
-}
-
-/**
- * @brief 测试准备（规格 §14.1，synthetic test setup）：Mori 已经启动之后才建的临时项目，经进程桥直接发
- *        models.setProjectZones 授权公网（与 allowRealProject 写的是同一个字段；Mori 运行时配置在后台进程里，改文件不生效）。
- *        不经界面，也不进录制器（录制器只记 rec.cmd 发的命令）。
- * @param page Mori 的页面
- * @param projects 项目文件夹（一个或多个）
- */
-export async function allowProjectsLive(page, projects) {
-  for (const path of [projects].flat()) {
-    const result = await page.evaluate((cwd) => window.mori.request({ type: 'models.setProjectZones', path: cwd,
-      zones: ['public'] }), path);
-    if (result?.error) throw new Error(`cannot allow public for ${path}: ${result.error}`);
-  }
 }
 
 /**

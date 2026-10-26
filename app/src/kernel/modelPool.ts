@@ -80,6 +80,12 @@ export interface PoolFetchOptions {
   attemptSignal?: AbortSignal;
   /** key 的 Test 与用它的 Test connection（§8.3）：只用这个 key、不看它的记录、不换 key */
   keyRef?: string;
+  /**
+   * 测试连接（connection.test，§8.3 的 2026-10-26 补）：不看任何不可用记录，总是发出——提供商的 connection、模型的
+   * not_found、timeout、held 都不挡它；不指定 key 时按顺序用第一个没有记录的 key，全部都有记录时用第一个（排除这次换掉的）。
+   * 结果照常写记录。省略时为 false
+   */
+  ignoreRecords?: boolean;
   /** 5xx 是否原地重试；测试连接为 false（§9.1）。省略时为 true */
   serverRetries?: boolean;
   /** @brief 每一次真正发出时调用（含换 key、原地重试，§8.4 第 3 步）。 */
@@ -142,6 +148,18 @@ interface Lease {
   capped: boolean;
   /** 取槽位时提供商的配置代数；结果回来时代数变了，说明配置改过、记录清过，这次的结果不再写记录 */
   generation: number;
+}
+
+/** 取槽位时要哪些 key（tryTake）。 */
+interface KeyWant {
+  /** 指定的 key（key 的 Test，§8.3）：只看它、不看它的记录；没有时为 undefined */
+  forced: string | undefined;
+  /** 这次调用里已经换掉的 key，不再选（§5.5） */
+  exclude: ReadonlySet<string>;
+  /** 调度类别 */
+  cls: SchedClass;
+  /** 测试连接：可选的 key 都有记录时照样用它们（PoolFetchOptions.ignoreRecords） */
+  ignoreRecords: boolean;
 }
 
 /** 一次 fetch 调用的上下文。 */
@@ -419,7 +437,21 @@ export class ModelPool {
   }
 
   /**
-   * @brief 记下发出后超时的模型（§5.7）：timeout 或 held，到时刻恢复。记录由调用方按档案的 cancel_verified 算出。
+   * @brief 测试连接成功之后（§8.3，2026-10-26 补）：清除用到的 key 的 rate_limited、auth、quota（clearKeyRecord），以及这次
+   *        成功证明不成立的两条记录：提供商的 connection、这个模型的 not_found。timeout、held 留着：§5.7 等的是旧请求停下，
+   *        测试成功说明不了这一点。
+   * @param ref 测的模型 <provider>/<model>
+   * @param keyRef 用到的 key；null 为没有 key 的提供商的“无 key”
+   */
+  clearAfterTest(ref: ModelRef, keyRef: string | null): void {
+    const providerId = providerOf(ref);
+    this.state(providerId).connection = null;
+    if (this.modelRecords.get(ref)?.state === 'not_found') this.modelRecords.delete(ref);
+    this.clearKeyRecord(providerId, keyRef);
+  }
+
+  /**
+   * @brief 记下超时的模型，到时刻恢复：会话请求发出后超时为 held（§5.7），压缩请求超时为 timeout（§6.4）。
    * @param ref <provider>/<model>
    * @param state timeout 或 held
    * @param until 恢复时刻（ms）
@@ -440,15 +472,6 @@ export class ModelPool {
     this.state(providerId).connection = { state, until };
     this.emitKeyStatus();
     this.pump(providerId);
-  }
-
-  /**
-   * @brief 清除一个模型的记录（例如 held 期间读指标确认旧请求已停）。
-   * @param ref <provider>/<model>
-   */
-  clearModelRecord(ref: ModelRef): void {
-    this.modelRecords.delete(ref);
-    this.pump(providerOf(ref));
   }
 
   /**
@@ -705,19 +728,19 @@ export class ModelPool {
 
   // ---- 槽位与排队（§8.1、§8.2） ----
 
-  /** @brief 取槽位与 key：不可用时立即失败，有空槽位就占上，否则排队。 */
+  /** @brief 取槽位与 key：不可用时立即失败（测试连接不看记录，ignoreRecords），有空槽位就占上，否则排队。 */
   private acquire(ctx: CallContext): Promise<Lease> {
     if (this.abortKind(ctx)) return Promise.reject(this.abortFailure(ctx));
     const { keyRef, ref } = ctx.options;
-    if (keyRef === undefined) {
+    if (checksAvailability(ctx)) {
       const availability = this.callAvailability(ctx);
       if (!availability.available) return Promise.reject(this.unavailableFailure(ctx, availability));
-    } else if (!this.state(ctx.providerId).keys.some((key) => key.ref === keyRef)) {
+    } else if (keyRef !== undefined && !this.state(ctx.providerId).keys.some((key) => key.ref === keyRef)) {
       this.record(ctx, { keyRef, cls: 'request', status: null, retryAfterMs: null, sentAt: null });
       this.log(`${ref} (${ctx.options.sessionKey}) key ${keyRef} is not saved`);
       return Promise.reject(new Error(`Key ${keyRef} is not saved for ${ctx.providerId}`));
     }
-    const lease = this.tryTake(ctx.providerId, { forced: keyRef, exclude: ctx.rotated, cls: ctx.options.cls });
+    const lease = this.tryTake(ctx.providerId, wantOf(ctx));
     return lease ? Promise.resolve(lease) : this.enqueue(ctx);
   }
 
@@ -762,16 +785,14 @@ export class ModelPool {
     const state = this.providers.get(providerId);
     if (!state || state.queue.length === 0) return;
     for (const waiter of [...state.queue].sort(compareWaiters)) {
-      const { keyRef } = waiter.ctx.options;
-      if (keyRef === undefined) {
+      if (checksAvailability(waiter.ctx)) {
         const availability = this.callAvailability(waiter.ctx);
         if (!availability.available) {
           waiter.reject(this.unavailableFailure(waiter.ctx, availability));
           continue;
         }
       }
-      const lease = this.tryTake(providerId, { forced: keyRef, exclude: waiter.ctx.rotated,
-        cls: waiter.ctx.options.cls });
+      const lease = this.tryTake(providerId, wantOf(waiter.ctx));
       if (lease) waiter.resolve(lease);
     }
   }
@@ -780,17 +801,12 @@ export class ModelPool {
    * @brief 按 key 的顺序取第一个可用且有空槽位的 key（§8.2）；指定了 key 时只看它、不看它的记录。
    *        task、background 类别在一个 key 上最多占（并发上限 − reservedSlots）个、至少 1 个（平行 Agent 规格 §12.10）。
    * @param providerId 提供商 id
-   * @param want forced：指定的 key（key 的 Test），没有时为 undefined；exclude：这次调用里已经换掉的 key，不再选（§5.5）；
-   *        cls：调度类别
+   * @param want 要哪些 key（KeyWant）
    */
-  private tryTake(providerId: string,
-    want: { forced: string | undefined; exclude: ReadonlySet<string>; cls: SchedClass }): Lease | null {
+  private tryTake(providerId: string, want: KeyWant): Lease | null {
     const state = this.providers.get(providerId);
     if (!state?.config) return null;
-    const now = this.clock.now();
-    const candidates: (string | null)[] = want.forced !== undefined ? [want.forced]
-      : this.slotKeys(state).filter((keyRef) => !(keyRef !== null && want.exclude.has(keyRef))
-        && !isRecordActive(this.keyRecordOf(state, keyRef), now));
+    const candidates = want.forced !== undefined ? [want.forced] : this.candidateKeys(state, want);
     const capped = CAPPED_CLASSES.has(want.cls);
     for (const keyRef of candidates) {
       const slot = keyRef ?? PSEUDO_SLOT;
@@ -802,6 +818,17 @@ export class ModelPool {
       return { providerId, keyRef, secret, released: false, capped, generation: state.generation };
     }
     return null;
+  }
+
+  /**
+   * @brief 没有指定 key 时按顺序可选的 key（§8.2）：去掉这次调用里换掉的（§5.5）和有不可用记录的；测试连接
+   *        （ignoreRecords，§8.3 的 2026-10-26 补）在剩下的都有记录时照样用它们，按顺序第一个有空槽位的。
+   */
+  private candidateKeys(state: ProviderState, want: KeyWant): (string | null)[] {
+    const now = this.clock.now();
+    const fresh = this.slotKeys(state).filter((keyRef) => !(keyRef !== null && want.exclude.has(keyRef)));
+    const usable = fresh.filter((keyRef) => !isRecordActive(this.keyRecordOf(state, keyRef), now));
+    return usable.length === 0 && want.ignoreRecords ? fresh : usable;
   }
 
   /**
@@ -1047,6 +1074,20 @@ export class ModelPool {
       this.log(`attempt record listener failed: ${String(error)}`);
     }
   }
+}
+
+/** @brief 一次调用取槽位时要的 key（KeyWant）。 */
+function wantOf(ctx: CallContext): KeyWant {
+  return { forced: ctx.options.keyRef, exclude: ctx.rotated, cls: ctx.options.cls,
+    ignoreRecords: ctx.options.ignoreRecords === true };
+}
+
+/**
+ * @brief 这次调用发出前要不要看模型此刻可不可用（§8.2）：指定了 key 的 Test（§8.3）与测试连接（ignoreRecords，
+ *        §8.3 的 2026-10-26 补）不看，总是发出。
+ */
+function checksAvailability(ctx: CallContext): boolean {
+  return ctx.options.keyRef === undefined && ctx.options.ignoreRecords !== true;
 }
 
 /**

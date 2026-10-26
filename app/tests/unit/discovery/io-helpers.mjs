@@ -200,15 +200,14 @@ export function providerModel(id, overrides = {}) {
 
 /** @brief §4.1 形状的一个提供商（synthetic）：keys 为 ref 的列表，标签 Key 1、Key 2…。 */
 export function configProvider(id, baseUrl, modelIds, { keys = [], api = 'openai-completions' } = {}) {
-  return { id, name: id.toUpperCase(), api, baseUrl, zone: 'local', compat: {}, concurrency: 4,
+  return { id, name: id.toUpperCase(), api, baseUrl, compat: {}, concurrency: 4,
     keys: keys.map((ref, index) => ({ ref, label: `Key ${index + 1}` })), nextKeyNumber: keys.length + 1,
     models: modelIds.map((modelId) => providerModel(modelId)) };
 }
 
 /** @brief 这些提供商的配置（§4.1）。 */
 export function configOf(providers) {
-  return { version: 1, providers, groups: [], normalDefault: null, allowedZones: ['local', 'intranet'],
-    projectZones: {} };
+  return { version: 1, providers, groups: [], normalDefault: null };
 }
 
 /**

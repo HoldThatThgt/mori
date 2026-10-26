@@ -1,12 +1,13 @@
 // 选择器（docs/specs/model-providers.md §5.1、§5.3、§4.6、§5.8；docs/specs/parallel-agents-taskboard.md §12.1、§12.2、
 // §12.9、§12.11）：纯函数。
-// 展开选择范围、按第 1–6 步逐项过滤并给出排除原因（第 3 步含角色的能力要求与要避开的模型族）、会话启动的静态校验、
+// 展开选择范围、按第 1、3–6 步逐项过滤并给出排除原因（第 3 步含角色的能力要求与要避开的模型族；第 2 步网络区域
+// 2026-10-26 按负责人走查 M3 删掉，其余各步编号不变）、会话启动的静态校验、
 // 范围菜单各项的静态校验、候选耗尽时的等待判断。
 // 约定：CandidateExclusion.detail 是 §5.3“界面文字”列的完整文字（带 until 部分），界面与说明卡直接显示它。
 
-import { REASON_TEXTS, ZONES, plainReasonText } from '../shared/models';
+import { REASON_TEXTS, plainReasonText } from '../shared/models';
 import type {
-  BlockedAction, CandidateExclusion, Capability, ModelBlocked, ModelConfig, ModelReason, PickOption, Zone,
+  BlockedAction, CandidateExclusion, Capability, ModelBlocked, ModelConfig, ModelReason, PickOption,
 } from '../shared/models';
 import type { ModelTimings } from './modelTimings';
 import type {
@@ -147,8 +148,8 @@ export function triedText(tried: TriedReason): string {
 
 /** @brief 静态校验要用的输入：选择器输入的第 1–3 步部分（§4.6）。 */
 export type StaticSelectorInput = Pick<
-  SelectorInput, 'candidates' | 'exists' | 'removedRefs' | 'zoneOf' | 'allowedZones' | 'toolCalling' | 'requires'
-  | 'capabilities' | 'avoidFamilies' | 'familyOf'
+  SelectorInput, 'candidates' | 'exists' | 'removedRefs' | 'toolCalling' | 'requires' | 'capabilities' | 'avoidFamilies'
+  | 'familyOf'
 >;
 
 /**
@@ -161,7 +162,7 @@ function missingExclusion(input: Pick<SelectorInput, 'removedRefs'>, ref: ModelR
 }
 
 /**
- * @brief 第 1–3 步（静态）：名字在配置里、区域已确认且允许、tool_calling 已验证，再按角色的能力要求与要避开的模型族。
+ * @brief 第 1、3 步（静态）：名字在配置里、tool_calling 已验证，再按角色的能力要求与要避开的模型族。
  * @param input 选择器输入
  * @param ref 候选
  * @return 第一个不满足的条件；都满足为 null
@@ -169,11 +170,6 @@ function missingExclusion(input: Pick<SelectorInput, 'removedRefs'>, ref: ModelR
 function staticExclusion(input: StaticSelectorInput, ref: ModelRef): CandidateExclusion | null {
   if (!input.exists(ref)) {
     return missingExclusion(input, ref);
-  }
-  const zone = input.zoneOf(ref);
-  if (zone === null) return { ref, reason: 'zone_unconfirmed', detail: REASON_TEXTS.zone_unconfirmed() };
-  if (!input.allowedZones.includes(zone)) {
-    return { ref, reason: 'zone_blocked', detail: REASON_TEXTS.zone_blocked(zone) };
   }
   const tools = input.toolCalling(ref);
   if (tools !== 'verified') return { ref, reason: tools, detail: REASON_TEXTS[tools]() };
@@ -348,8 +344,6 @@ export interface StaticCheckInput extends Omit<StaticSelectorInput, 'candidates'
   pick: string | null;
   /** 按 §5.1 展开的候选；范围指向的名字不存在时为 null（pick_missing） */
   candidates: readonly ModelRef[] | null;
-  /** 项目配置 .mori/models.json 写的 allowedZones；没写或没有这个文件为 null（决定能否提供 allow_zone） */
-  projectZones: readonly Zone[] | null;
   /**
    * 卡上换模型的操作（平行 Agent 规格 §12.11）：change_model（你选范围的会话）、turn_off_team（协作模式下的对话会话）、
    * null（角色会话，不提供）；省略时为 change_model
@@ -377,11 +371,11 @@ export interface StaticCheckResult {
  * @param actions 操作
  */
 function plainBlocked(kind: ModelBlocked['kind'], detail: string, actions: BlockedAction[]): ModelBlocked {
-  return { kind, detail, candidates: [], actions, verifyRefs: [], zone: null, zoneProviders: [], problems: [] };
+  return { kind, detail, candidates: [], actions, verifyRefs: [], problems: [] };
 }
 
 /**
- * @brief 卡上换模型的操作（§4.6 的 Change model；平行 Agent 规格 §12.11：协作模式下的对话会话改为 Turn off team mode，
+ * @brief 卡上换模型的操作（§4.6 的 Change model；平行 Agent 规格 §12.11：协作模式下的对话会话改为 Turn off task mode，
  *        角色会话不提供），后面跟 Open settings。
  * @param input 静态校验的输入
  */
@@ -398,49 +392,17 @@ function modelActions(input: Pick<StaticCheckInput, 'modelAction'>): BlockedActi
 function candidateBlocked(input: StaticCheckInput, excluded: CandidateExclusion[]): ModelBlocked {
   const probing = excluded.find((item) => item.reason === 'probing');
   if (probing) {
-    return { kind: 'verifying', detail: probing.ref, candidates: excluded, actions: [], verifyRefs: [], zone: null,
-      zoneProviders: [], problems: [] };
+    return { kind: 'verifying', detail: probing.ref, candidates: excluded, actions: [], verifyRefs: [], problems: [] };
   }
   const verifyRefs = excluded.filter((item) => item.reason === 'unverified').map((item) => item.ref);
-  const zone = allowableZone(input, excluded);
-  const zoneProviders = [...new Set(excluded.filter((item) => item.reason === 'zone_unconfirmed')
-    .map((item) => providerOf(item.ref)))];
-  const actions: BlockedAction[] = [];
-  if (verifyRefs.length > 0) actions.push('verify');
-  if (zone !== null) actions.push('allow_zone');
-  if (zoneProviders.length > 0) actions.push('confirm_zone');
+  const actions: BlockedAction[] = verifyRefs.length > 0 ? ['verify'] : [];
   actions.push(...modelActions(input));
-  return { kind: 'no_candidate', detail: '', candidates: excluded, actions, verifyRefs, zone, zoneProviders,
-    problems: [] };
-}
-
-/**
- * @brief Allow <区域> for this project 的区域：第一个 zone_blocked 候选的区域，且项目配置没有排除它。
- * @param input 静态校验的输入
- * @param excluded 全部候选的排除原因
- * @return 区域；没有这个操作时为 null
- */
-function allowableZone(input: StaticCheckInput, excluded: CandidateExclusion[]): Zone | null {
-  for (const item of excluded) {
-    if (item.reason !== 'zone_blocked') continue;
-    const zone = input.zoneOf(item.ref);
-    if (zone !== null && (input.projectZones === null || input.projectZones.includes(zone))) return zone;
-  }
-  return null;
-}
-
-/**
- * @brief 模型全名里的提供商 id（第一个 / 之前）。
- * @param ref <provider>/<model>
- */
-export function providerOf(ref: ModelRef): string {
-  const slash = ref.indexOf('/');
-  return slash < 0 ? ref : ref.slice(0, slash);
+  return { kind: 'no_candidate', detail: '', candidates: excluded, actions, verifyRefs, problems: [] };
 }
 
 /**
  * @brief 会话启动的静态校验（§4.6）：先看角色文件的问题（agents_invalid，平行 Agent 规格 §4.4），再依次检查用户级配置、
- *        项目配置、有没有范围、范围是否存在，再按第 1–3 步过滤候选。
+ *        项目配置、有没有范围、范围是否存在，再按第 1、3 步过滤候选。
  * @param input 静态校验的输入
  * @return ModelState.blocked 与静态校验后的第一个候选
  */
@@ -468,7 +430,7 @@ export function staticCheck(input: StaticCheckInput): StaticCheckResult {
 
 // ---- 范围菜单的各项（§9.2、§9.5 session.pickOptions） ----
 
-/** @brief 范围菜单各项的输入：配置、项目配置的分组缩小，以及这个会话的第 1–3 步输入。 */
+/** @brief 范围菜单各项的输入：配置、项目配置的分组缩小，以及这个会话的第 1、3 步输入。 */
 export interface PickOptionsInput extends Omit<StaticSelectorInput, 'candidates'> {
   /** 用户级配置 */
   config: Pick<ModelConfig, 'providers' | 'groups'>;
@@ -477,24 +439,22 @@ export interface PickOptionsInput extends Omit<StaticSelectorInput, 'candidates'
 }
 
 /**
- * @brief 菜单的一项：展开后按第 1–3 步做静态校验；全部候选都被排除时 excluded 为真，reason 每个候选一行。
+ * @brief 菜单的一项：展开后按第 1、3 步做静态校验；全部候选都被排除时 excluded 为真，reason 每个候选一行。
  * @param input 菜单各项的输入
  * @param item 这一项的选择范围、种类与文字
  */
 function pickOption(input: PickOptionsInput, item: Pick<PickOption, 'pick' | 'kind' | 'label'>): PickOption {
   const candidates = expandPick(input.config, item.pick, input.projectGroups) ?? [];
-  const used = new Set(candidates.map((ref) => input.zoneOf(ref)));
-  const zones = ZONES.filter((zone) => used.has(zone));
   const result = selectStatic({ ...input, candidates });
-  if (result.model !== null) return { ...item, zones, excluded: false, reason: null };
+  if (result.model !== null) return { ...item, excluded: false, reason: null };
   const reason = result.excluded.map((exclusion) => `${exclusion.ref} — ${exclusion.detail}`).join('\n');
-  return { ...item, zones, excluded: true, reason };
+  return { ...item, excluded: true, reason };
 }
 
 /**
  * @brief 范围菜单的各项（§9.2）：先全部分组（文字为 id），再全部提供商（文字为名称），再按提供商列出模型（文字为模型 id），
- *        各按配置里的顺序；每项标出展开后候选涉及的区域，全部候选都被本会话的静态校验排除时标为 excluded 并给出原因。
- * @param input 配置、项目配置的分组缩小与这个会话的第 1–3 步输入
+ *        各按配置里的顺序；全部候选都被本会话的静态校验排除时标为 excluded 并给出原因。
+ * @param input 配置、项目配置的分组缩小与这个会话的第 1、3 步输入
  */
 export function pickOptions(input: PickOptionsInput): PickOption[] {
   const { groups, providers } = input.config;

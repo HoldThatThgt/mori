@@ -5,7 +5,7 @@
 // - 数据目录（synthetic test setup）：model-config.json、model-profiles.json（"旧档案"：没有 auto.meta，表示一键拉取模型
 //   之前写的档案，§7.2）、pi/settings.json；
 // - App：启动（收集主进程与后台进程的输出、页面报错）、关闭、经进程桥发命令（window.mori.request）、打开设置 → Models；
-// - 读：models.get 的档案、提供商卡（拉取的按钮、清单的行、列表错误、Add a model ID 一行）、模型行（not reported 与提示）。
+// - 读：models.get 的档案、提供商卡（拉取的按钮、清单的行、列表错误、Add a model ID 一行）、模型行（(default) 与提示）。
 // 只读页面和磁盘、发界面操作与进程桥命令，不记录检查结果（由 md-app-card.mjs 记录）。
 
 import { spawn } from 'node:child_process';
@@ -121,11 +121,11 @@ export function modelOf(id, { contextWindow = 131072, maxTokens = 8192, reasonin
 }
 
 /**
- * @brief 一个提供商的配置：本机区域，没有 key（启动后经 models.addKey 加，密文由 Mori 自己加密保存）。
+ * @brief 一个提供商的配置：本机地址，没有 key（启动后经 models.addKey 加，密文由 Mori 自己加密保存）。
  * @param api 接口（默认 openai-completions）
  */
 export function providerOf(id, name, port, models, api = 'openai-completions') {
-  return { id, name, api, baseUrl: baseOf(port), zone: 'local', compat: {}, concurrency: 4,
+  return { id, name, api, baseUrl: baseOf(port), compat: {}, concurrency: 4,
     keys: [], nextKeyNumber: 1, models };
 }
 
@@ -138,11 +138,10 @@ const step = (outcome) => ({ outcome, detail: null });
  * @param baseUrl 提供商地址
  * @param model modelOf 的结果
  * @param opts { kind（服务种类，默认 vllm）, version（默认 FAKE_VERSION）, reported（auto.reported，默认 null）,
- *              field（推理字段，默认 none）, cancel（cancel_verified；null 为没跑过）, probedAt,
- *              api（提供商的接口，默认 openai-completions） }
+ *              field（推理字段，默认 none）, probedAt, api（提供商的接口，默认 openai-completions） }
  */
 export function oldProfile(baseUrl, model, opts = {}) {
-  const { kind = 'vllm', version = FAKE_VERSION, reported = null, field = 'none', cancel = null } = opts;
+  const { kind = 'vllm', version = FAKE_VERSION, reported = null, field = 'none' } = opts;
   const api = opts.api ?? 'openai-completions';
   const key = [baseUrl, api, model.id, version].join('|');
   const fingerprint = JSON.stringify([key, model.contextWindow, model.maxTokens, model.reasoning, model.input, []]);
@@ -151,7 +150,6 @@ export function oldProfile(baseUrl, model, opts = {}) {
     auto: { server: { kind, version }, reported, field,
       steps: { ready: step('pass'), thinking: step(model.reasoning ? 'pass' : 'not_applicable'), call: step('pass'),
         result: step('pass'), replay: step('not_applicable'), a: step('pass'), b: step('pass'), c: step('not_run') } },
-    longInput: null, cancel: cancel === null ? null : { step: step('pass'), verified: cancel },
     probedAt: opts.probedAt ?? Date.now() - 3600000, suite: 1,
   };
 }
@@ -164,8 +162,7 @@ export function oldProfile(baseUrl, model, opts = {}) {
 export function seedUserData(setup) {
   const userData = mkdtempSync(join(tmpdir(), 'mori-md-card-'));
   mkdirSync(join(userData, 'pi'), { recursive: true });
-  const config = { version: 1, providers: setup.providers, groups: [], normalDefault: setup.normalDefault ?? null,
-    allowedZones: ['local', 'intranet'], projectZones: {} };
+  const config = { version: 1, providers: setup.providers, groups: [], normalDefault: setup.normalDefault ?? null };
   writeFileSync(join(userData, 'model-config.json'), `${JSON.stringify(config, null, 2)}\n`);
   const profiles = { version: 1, profiles: setup.profiles ?? [] };
   writeFileSync(join(userData, 'model-profiles.json'), `${JSON.stringify(profiles, null, 2)}\n`);
@@ -268,7 +265,9 @@ export const modelRow = (page, ref) => page.locator(`[data-testid="model-row"][d
 /**
  * @brief 一张提供商卡此刻的样子：卡头的 Fetch models（文字、是否不可用）、拉取中的 Cancel、拉取的状态、清单、列表错误、
  *        Detected 一行的个数、Not listed 一行、清单的行（勾选、标记、提示、输入框是否不可用）、Add 按钮、卡里的原文、
- *        卡上 Add model 按钮的个数、模型行的顺序、卡里任何地方有没有"Fetch cancelled"这句。卡不在时为 null。
+ *        卡上 Add model 按钮的个数、模型行的顺序、卡里任何地方有没有"Fetch cancelled"这句、卡上清单里出现的
+ *        Name、API type、More settings、Network zone（extras，models-settings.md“卡上的 Fetch models”：都不该有）。
+ *        卡不在时为 null。
  */
 export function cardState(page, id) {
   return page.evaluate((providerId) => {
@@ -300,6 +299,9 @@ export function cardState(page, id) {
       addModel: card.querySelectorAll('[data-action="add-model"]').length,
       models: [...card.querySelectorAll('[data-testid="model-row"]')].map((row) => row.dataset.model),
       cancelledText: card.textContent.includes('Fetch cancelled'),
+      extras: [...card.querySelectorAll('.card-checklist label, .card-checklist summary')].map(text)
+        .filter((label) => ['Name', 'API type', 'More settings', 'Network zone'].includes(label))
+        .concat([...card.querySelectorAll('.card-checklist input[name="zone"]')].map(() => 'zone radio')),
     };
   }, id);
 }
@@ -326,8 +328,10 @@ export const typeManual = (page, id, text) => cardOf(page, id)
   .locator('[data-testid="manual-model"] input[data-field="id"]').fill(text);
 
 /**
- * @brief 一行模型此刻的样子：说明（窗口、最大输出…）、(not reported) 的字段、提示（data-kind、文字、有没有 Use）、
- *        Tool calling 与 Context 的 data-value、有没有 Cancel test…。行不在时为 null。
+ * @brief 一行模型此刻的样子：说明（窗口、最大输出…）、标了"(default)"的字段与它们的悬停说明、提示（data-kind、文字、
+ *        有没有 Use）、行上的 data-probe（tool calling 的验证状态）、状态行的 data-state（没有状态行时为 null）、行里的
+ *        错误原文。行不在时为 null。2026-10-26（WP-02，models-settings.md "Models 行"）：没有档案摘要（Context、Cancel test…），
+ *        "(not reported)"改为只在值仍是默认值时标的"(default)"。
  */
 export function modelRowState(page, ref) {
   return page.evaluate((key) => {
@@ -336,12 +340,12 @@ export function modelRowState(page, ref) {
     const text = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);
     return {
       meta: text(row.querySelector('.model-meta')),
-      notReported: [...row.querySelectorAll('[data-testid="not-reported"]')].map((el) => el.dataset.field),
+      defaults: [...row.querySelectorAll('[data-testid="default-value"]')].map((el) => el.dataset.field),
+      defaultTitles: [...row.querySelectorAll('[data-testid="default-value"]')].map((el) => el.title),
       hints: [...row.querySelectorAll('[data-testid="model-hint"]')].map((el) => ({ kind: el.dataset.kind,
         text: text(el.querySelector('.muted')), use: Boolean(el.querySelector('[data-action="use-reported"]')) })),
-      tool: row.querySelector('[data-field="tool_calling"]')?.dataset.value ?? null,
-      context: row.querySelector('[data-field="context"]')?.dataset.value ?? null,
-      cancelTest: Boolean(row.querySelector('[data-action="cancel-test"]')),
+      tool: row.dataset.probe ?? null,
+      status: row.querySelector('[data-testid="probe-status"]')?.dataset.state ?? null,
       error: text(row.querySelector('.form-message.error')),
     };
   }, ref);

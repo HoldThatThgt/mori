@@ -35,7 +35,6 @@ import type {
   SelectorInput, SelectorResult, TaskRestart, TriedReason, UnavailableInfo,
 } from './modelTypes';
 import { loadPi, type Pi } from './pi';
-import { readRunningRequests } from './probes';
 import {
   availabilityText, checkCurrent, exhaustionWait, intersectCandidates, pickOptions, select, staticCheck,
   type StaticCheckInput, type StaticCheckResult,
@@ -61,7 +60,7 @@ const VIRTUAL_MODEL_NAME = 'Mori';
 /** @brief 用户停止时合成的中止说明（§11.2 第 4 步）。 */
 const ABORTED_MESSAGE = 'Request was aborted';
 /** @brief 协作模式下对话会话 setPick 被拒绝的原文（平行 Agent 规格 §12.11，与模型按钮的悬停文字相同）。 */
-export const PICK_LOCKED_MESSAGE = 'Team mode picks the model for each agent';
+export const PICK_LOCKED_MESSAGE = 'Task mode picks the model for each agent';
 /** @brief 普通会话的候选来源：你在范围菜单里选的范围，只要求 tool_calling（统一模型提供商规格 §5.3 第 3 步）。 */
 const PICK_SOURCE: CandidateSource = { kind: 'pick' };
 /** @brief 能力要求总是隐含 tool_calling（平行 Agent 规格 §4.1）。 */
@@ -420,13 +419,12 @@ class StreamWrapper {
   private async runReply(request: RequestState, out: AssistantMessageEventStream): Promise<void> {
     let current = request;
     for (;;) {
-      const baseline = await this.runningRequests(current.ref, current.options?.signal, true);
       const result = await this.attempt(current, out, true);
       if (result.delivered) {
         this.finish(current, result, out);
         return;
       }
-      const next = await this.afterFailure(current, result, baseline, out);
+      const next = await this.afterFailure(current, result, out);
       if (!next) return;
       current = next;
     }
@@ -436,7 +434,7 @@ class StreamWrapper {
    * @brief 在有内容之前失败之后（§11.2 第 3–6 步）：停止 → 合成 aborted；要换模型 → 换；其他原样推进。
    * @return 换到的下一个请求；已经结束时为 null
    */
-  private async afterFailure(request: RequestState, result: AttemptResult, baseline: number | null,
+  private async afterFailure(request: RequestState, result: AttemptResult,
     out: AssistantMessageEventStream): Promise<RequestState | null> {
     const signal = request.options?.signal;
     if (signal?.aborted) {
@@ -444,7 +442,7 @@ class StreamWrapper {
       return null;
     }
     this.markDropped(request, result);
-    const failure = this.host.hasReply() ? await this.failureOf(request, result, baseline) : null;
+    const failure = this.host.hasReply() ? await this.failureOf(request, result) : null;
     if (!failure) {
       this.passthrough(request, result, out);
       return null;
@@ -570,9 +568,8 @@ class StreamWrapper {
    * @brief 这次失败要不要换模型、原因是什么（§5.4、§5.7）。
    * @return 要换时的原因；不换（server 重试用完、request、partial 等）为 null
    */
-  private async failureOf(request: RequestState, result: AttemptResult,
-    baseline: number | null): Promise<SwitchFailure | null> {
-    if (result.timedOut) return this.timeoutFailure(request, baseline);
+  private async failureOf(request: RequestState, result: AttemptResult): Promise<SwitchFailure | null> {
+    if (result.timedOut) return this.timeoutFailure(request);
     const record = result.record;
     if (!record) return null;
     if (record.cls === 'partial') {
@@ -595,70 +592,26 @@ class StreamWrapper {
   }
 
   /**
-   * @brief 发出后超时（§5.7）：cancel_verified 为真时记 timeout 立即换；为假时进入 held、读指标确认停下；
-   *        unknown 时进入 held、等满再换（注明没能确认）。等待中你按停止即中止。
+   * @brief 发出后超时（§5.7，2026-10-26 改：只有这一种处理）：模型进入 held，等满 §12 的时长再换，换模型提示注明
+   *        没能确认旧请求停下（unconfirmed）。等待中你按停止即中止。
    */
-  private async timeoutFailure(request: RequestState, baseline: number | null): Promise<SwitchFailure> {
+  private async timeoutFailure(request: RequestState): Promise<SwitchFailure> {
     const { layer } = this.host;
-    const pool = layer.getPool();
-    const cancel = layer.profileOf(request.ref)?.cancel_verified ?? 'unknown';
-    const now = Date.now();
-    if (cancel === true) {
-      pool.markModel(request.ref, 'timeout', now + layer.timings.timeoutCooldownMs);
-      return { reason: 'timeout', detail: REASON_TEXTS.timeout(null), unconfirmed: false };
-    }
-    const until = now + layer.timings.heldMs;
-    pool.markModel(request.ref, 'held', until);
-    const confirmed = await this.waitHeld(request.ref, until, cancel === false ? baseline : null,
-      request.options?.signal);
-    if (confirmed) pool.clearModelRecord(request.ref);
-    return { reason: 'timeout', detail: REASON_TEXTS.timeout(null), unconfirmed: !confirmed };
+    const until = Date.now() + layer.timings.heldMs;
+    layer.getPool().markModel(request.ref, 'held', until);
+    await this.waitHeld(request.ref, until, request.options?.signal);
+    return { reason: 'timeout', detail: REASON_TEXTS.timeout(null), unconfirmed: true };
   }
 
-  /**
-   * @brief 等旧请求停下（§5.7）：有基线时每隔 §12 的间隔读一次服务端正在跑的请求数，回到基线或更低即确认；
-   *        没有基线时等满 held 的时长。阶段行经 mori.model_wait（kind: held）显示。
-   * @return 确认已停下
-   */
-  private async waitHeld(ref: ModelRef, until: number, baseline: number | null,
-    signal: AbortSignal | undefined): Promise<boolean> {
+  /** @brief 等满 held 的时长（§5.7）：阶段行经 mori.model_wait（kind: held）显示，结束或你按停止时清掉。 */
+  private async waitHeld(ref: ModelRef, until: number, signal: AbortSignal | undefined): Promise<void> {
     const wait = { kind: 'held' as const, model: ref };
     this.host.emit({ type: 'mori.model_wait', active: true, ...wait, reason: 'held', detail: REASON_TEXTS.held(until),
       until });
     try {
-      if (baseline === null) {
-        await delay(until - Date.now(), signal);
-        return false;
-      }
-      while (Date.now() < until) {
-        await delay(Math.min(this.host.layer.timings.heldPollMs, until - Date.now()), signal);
-        const count = await this.runningRequests(ref, signal, false);
-        if (count !== null && count <= baseline) return true;
-      }
-      return false;
+      await delay(until - Date.now(), signal);
     } finally {
       this.host.emit({ type: 'mori.model_wait', active: false, ...wait, reason: null, detail: '', until: null });
-    }
-  }
-
-  /**
-   * @brief 读服务端正在跑的请求数（§5.7 的基线与确认，探针第 9 步的指标）。
-   * @param onlyUnverified 只对 cancel_verified 为 false 的模型读（发每次尝试之前的基线）
-   * @return 读不到、或不需要读时为 null
-   */
-  private async runningRequests(ref: ModelRef, signal: AbortSignal | undefined,
-    onlyUnverified: boolean): Promise<number | null> {
-    const { layer } = this.host;
-    const profile = layer.profileOf(ref);
-    const found = layer.lookupModel(ref);
-    if (!profile || !found || (onlyUnverified && profile.cancel_verified !== false)) return null;
-    try {
-      return await readRunningRequests({ getText: (url, getSignal) => layer.serverGet(ref, url, getSignal) },
-        found.provider.baseUrl, profile.server.kind, signal ?? new AbortController().signal);
-    } catch (error) {
-      if (signal?.aborted) throw abortError();
-      console.error(`[kernel] cannot read the running requests of ${ref}: ${(error as Error).message}`);
-      return null;
     }
   }
 
@@ -737,7 +690,6 @@ export class ModelSession implements WrapperHost {
   private source: CandidateSource;
   private locked = false;
   private agentProblems: string[] = [];
-  private project: ProjectContext | null = null;
   private candidates: readonly ModelRef[] = [];
   /** 取交集时去掉的候选（不在 within 里，平行 Agent 规格 §12.1），按角色的顺序 */
   private outside: readonly ModelRef[] = [];
@@ -765,14 +717,13 @@ export class ModelSession implements WrapperHost {
   }
 
   /**
-   * @brief 建立会话接线：加载 pi 与 pi-ai，订阅模型层的变化，登记项目（Project access）。
+   * @brief 建立会话接线：加载 pi 与 pi-ai，订阅模型层的变化。
    * @param options 模型层、会话 id、工作文件夹与 emit；角色会话另有候选来源、调度类别、种类与平行 Agent 的回调
    */
   static async create(options: ModelSessionOptions): Promise<ModelSession> {
     const self = new ModelSession(options);
     [self.pi, self.piAi] = await Promise.all([loadPi(), loadPiAi()]);
     self.unsubscribe = options.layer.onModelsChanged((change) => self.onModelsChanged(change));
-    options.layer.registerProject(options.cwd);
     return self;
   }
 
@@ -818,7 +769,6 @@ export class ModelSession implements WrapperHost {
   private async computeStatic(): Promise<void> {
     const project = await this.layer.projectContext(this.cwd);
     const { pick, candidates } = this.sourceCandidates(project);
-    this.project = project;
     this.candidates = candidates ?? [];
     this.check = staticCheck({ ...this.layer.staticBase(project), pick, candidates, removedRefs: this.removedRefs,
       requires: this.requires(), avoidFamilies: this.avoidFamilies(), modelAction: this.modelAction(),
@@ -856,7 +806,7 @@ export class ModelSession implements WrapperHost {
 
   /**
    * @brief 拒绝启动卡上换模型的操作（平行 Agent 规格 §12.11）：你选范围的会话为 Change model；协作模式下的对话会话
-   *        为 Turn off team mode；角色会话（实例）不提供。
+   *        为 Turn off task mode；角色会话（实例）不提供。
    */
   private modelAction(): StaticCheckInput['modelAction'] {
     if (this.locked) return 'turn_off_team';
@@ -930,7 +880,7 @@ export class ModelSession implements WrapperHost {
     const project = await this.layer.projectContext(this.cwd);
     const base = this.layer.staticBase(project);
     return { error: null, options: pickOptions({ config, projectGroups: project.project?.groups,
-      exists: base.exists, zoneOf: base.zoneOf, allowedZones: base.allowedZones, toolCalling: base.toolCalling,
+      exists: base.exists, toolCalling: base.toolCalling,
       requires: this.requires(), capabilities: base.capabilities, familyOf: base.familyOf }) };
   }
 
@@ -1506,14 +1456,13 @@ export class ModelSession implements WrapperHost {
   // ---- 选择与等待（§5.3、§5.8） ----
 
   /**
-   * @brief 选择器的输入：候选、第 1–4 步的查询（第 3 步含这个会话的能力要求与这一刻要避开的模型族）、项目允许的区域、
+   * @brief 选择器的输入：候选、第 1、3、4 步的查询（第 3 步含这个会话的能力要求与这一刻要避开的模型族）、
    *        这段（可以没有）。
    */
   private selectorInput(reply?: ReplyState): SelectorInput {
     const { layer } = this;
     return {
       candidates: this.candidates, exists: (ref) => layer.exists(ref), removedRefs: this.removedRefs,
-      zoneOf: (ref) => layer.zoneOf(ref), allowedZones: this.project?.allowedZones ?? [],
       toolCalling: (ref) => layer.toolCallingOf(ref), requires: this.requires(),
       capabilities: (ref) => layer.capabilitiesOf(ref), avoidFamilies: this.avoidFamilies(),
       familyOf: (ref) => layer.familyOf(ref), availability: (ref) => layer.availabilityOf(ref), reply,

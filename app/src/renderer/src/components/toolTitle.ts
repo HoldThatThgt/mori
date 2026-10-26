@@ -5,8 +5,8 @@ import { memoryToolTitle } from '../../../shared/memory';
 import { isTeamTool, toolCallTitle } from '../../../shared/team';
 import type { ToolCall } from '../state/model';
 
-/** memory 工具的名字（docs/specs/memory.md §7.1） */
-const MEMORY_TOOL = 'memory';
+/** memory 工具的名字（docs/specs/memory.md §7.1）；Customize 的内置工具一节也用它认出 memory 那一行 */
+export const MEMORY_TOOL = 'memory';
 
 /** 命令标题最多显示的字数 */
 const COMMAND_MAX = 80;

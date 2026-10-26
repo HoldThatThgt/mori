@@ -4,7 +4,7 @@
 // 发出的相同（trust.check 后 session.create、/task <文字> 去掉前缀以 team: 'once' 发出、开关是 session.setTeam、
 // 后台批准卡的回答是 approval.answer），记下命令、结果和后台进程转发的全部事件及其时间。模型是负责人的两个真实模型
 // （默认 DeepSeek 与 GLM，都是 C 级），数据目录的做法见 tb-real-helpers.mjs（只复制加密的文件，不读 key；
-// 分组 [DeepSeek, GLM] 为默认范围、临时项目授权公网，synthetic test setup）。角色文件 executor、reviewer
+// 分组 [DeepSeek, GLM] 为默认范围，synthetic test setup）。角色文件 executor、reviewer
 // （reviewer 的 models 是第二个提供商），基座持有对话、立项与结案（合并会话）。
 //   tb-ask（TB-04、TB-53）：关闭模式下让对话用 agent_message 问 reviewer 一个问题（开只读的临时提问实例，由 GLM 回答）；
 //     之后点开关两次：off → always → off。
@@ -388,11 +388,11 @@ async function restartMori(state, note) {
 async function recordOnce(scenario, found) {
   const cwd = sumProject(`mori-tb-record-${scenario.name}-`);
   writeRealRoles(cwd, found);
-  const { userData } = prepareRealData(source, found, [cwd]);
+  const { userData } = prepareRealData(source, found);
   const state = { userData, app: null, page: null, kept: [] };
   const ctx = { ...found, cwd, state, notes: [`Setup (synthetic test setup, spec §17.1 / model spec §14.1): copied `
     + `the encrypted data files; group ${TB_GROUP} = [${found.first.id}, ${found.second.id}] is the default range; `
-    + 'the project is allowed public; role files executor and reviewer (models: '
+    + 'role files executor and reviewer (models: '
     + `[${found.second.id}]) in .mori/agents; the base agent holds dialog, create and close`] };
   ctx.restart = (note) => restartMori(state, note);
   try {

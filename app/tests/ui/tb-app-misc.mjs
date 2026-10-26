@@ -46,8 +46,8 @@ const OFF_KINDS = ['dialog', 'off-dialog'];
 /** pi 压缩请求的系统提示开头（replies.mjs SUMMARY_SYSTEM）与压缩之后第一条消息的开头 */
 const SUMMARY_SYSTEM = 'You are a context summarization assistant.';
 const COMPACTED = 'The conversation history before this point was compacted';
-/** 右栏的文字（§13.12；v0 changes.md 的两句，english-ui 的写法） */
-const TEAM_NOTE = "Changes made by team tasks aren’t listed here.";
+/** 右栏的文字（§13.12，2026-10-26 改，与 subagent 规格同一句；v0 changes.md 的两句，english-ui 的写法） */
+const TEAM_NOTE = 'Changes made by other agents aren’t listed here.';
 const NO_CHANGES = 'No changes yet.';
 const V0_NOTE = 'Only edits and writes are listed. Files changed by commands aren’t included.';
 const RIGHT_TOGGLE = 'button[aria-label="Toggle changes"]';
@@ -177,18 +177,19 @@ async function titles(ctx) {
   if (!(await waitReceipt(ctx, who.tab, { kind: 'registered', request: 1 }))) throw new Error('no receipt');
   await dialogIdle(ctx, who);
   const during = await cardTitles(ctx, who);
-  const modeDuring = (await ctx.page.locator(`${paneSel(who.tab)} [data-testid="team-switch"]`)
-    .getAttribute('data-mode'));
+  const modeDuring = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-button"]`)
+    .getAttribute('data-team-mode');
   await settle(ctx, who);
   const after = await cardTitles(ctx, who);
-  const modeAfter = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="team-switch"]`).getAttribute('data-mode');
+  const modeAfter = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-button"]`)
+    .getAttribute('data-team-mode');
   ctx.misc.titlesCards = after;
   record('TB-55 tool cards in the dialog of a merged session (lead holds dialog and create): request_submit '
     + '"Register a request", task_create "Create a task", board_read "Read the board" / "Read request 1" / "Read T1", '
     + 'read_session "Read executor’s work on T1", and the three agent_message forms: to a task "Message T1", '
     + 'to a role that opens an ask instance "Ask executor", into a seat session "Message closer"',
   same(during, TITLES_CARDS) && modeDuring === 'once', brief({ during, modeDuring }));
-  record('TB-55 the tool card titles stay as they were when the run went that way after team mode returns to off '
+  record('TB-55 the tool card titles stay as they were when the run went that way after task mode returns to off '
     + '(the message into closer\'s close session still reads "Message closer", not "Ask closer")',
   same(after, TITLES_CARDS) && modeAfter === 'off', brief({ after, modeAfter }));
   await titleRows(ctx, who);

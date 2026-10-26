@@ -89,8 +89,8 @@ function takeEvent(raw, out) {
   }
 }
 
-/** @brief 读 SSE 响应体；opts.abortAfterFirst 时收到第一段内容后先调 opts.onFirst，再断开。 */
-async function readStream(res, out, controller, opts) {
+/** @brief 读 SSE 响应体。 */
+async function readStream(res, out) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -103,18 +103,12 @@ async function readStream(res, out, controller, opts) {
       takeEvent(buffer.slice(0, at), out);
       buffer = buffer.slice(at + 2);
     }
-    if (opts.abortAfterFirst && out.contentChunks > 0) {
-      await opts.onFirst?.();
-      controller.abort();
-      out.error = 'aborted';
-      return;
-    }
   }
 }
 
 /**
  * @brief 发一个流式对话请求。
- * @param opts { key, abortAfterFirst, onFirst, timeoutMs, path（请求路径，默认 /v1/chat/completions） }
+ * @param opts { key, timeoutMs, path（请求路径，默认 /v1/chat/completions） }
  * @return { status, headers, body（错误体，不是 JSON 时为 null）, raw（错误体原文）, text, reasoning, calls,
  *         contentChunks, done, error, startedAt, firstAt, finish（最后的 finish_reason） }
  */
@@ -133,7 +127,7 @@ async function chat(port, body, opts = {}) {
     if (!res.ok) {
       out.raw = await res.text().catch(() => null);
       out.body = out.raw === null ? null : parsed(out.raw);
-    } else await readStream(res, out, controller, opts);
+    } else await readStream(res, out);
   } catch (error) {
     out.error = error.name === 'AbortError' ? 'aborted' : String(error.cause?.code ?? error.message);
   } finally {
@@ -147,13 +141,6 @@ async function get(port, path, key) {
   const headers = key ? { Authorization: `Bearer ${key}` } : {};
   const res = await fetch(`http://127.0.0.1:${port}${path}`, { headers });
   return { status: res.status, text: await res.text() };
-}
-
-/** @brief /metrics 里的进行中请求数；没有时为 null。 */
-async function running(port) {
-  const { status, text } = await get(port, '/metrics');
-  const match = /^vllm:num_requests_running\{[^}]*\} ([\d.]+)$/m.exec(text);
-  return status === 200 && match ? Number(match[1]) : null;
 }
 
 const user = (content) => ({ role: 'user', content });
@@ -172,13 +159,7 @@ function step4Messages(call, reasoning) {
     user('What temperature did the tool report?')];
 }
 
-/** @brief 第 8 步的提示：开头放暗号，填充到约 tokens 个 token，最后问暗号。 */
-function passphrasePrompt(tokens) {
-  const filler = 'The quick brown fox jumps over the lazy dog. '.repeat(Math.ceil((tokens * 4) / 45));
-  return `The passphrase is ZEBRA-42.\n${filler.slice(0, tokens * 4)}\nWhat is the passphrase?`;
-}
-
-/** @brief GET 接口：/version、/models、/metrics、/api/version、/props。 */
+/** @brief GET 接口：/version、/models、/api/version、/props。 */
 async function checkGets(a, c) {
   const version = await get(a.port, '/version');
   record('GET /version returns FAKE_SERVER_VERSION in vLLM shape', JSON.parse(version.text).version === '0.9.9',
@@ -189,10 +170,6 @@ async function checkGets(a, c) {
   const coder = models.data.find((m) => m.id === 'fake-coder');
   record('GET /v1/models lists fake-coder with max_model_len', coder?.max_model_len === 4000, JSON.stringify(models));
   record('GET /v1/models checks the key (401 without one)', (await get(a.port, '/v1/models')).status === 401);
-  const metrics = await get(a.port, '/metrics');
-  record('GET /metrics is Prometheus text with vllm:num_requests_running 0',
-    metrics.status === 200 && metrics.text.includes('# TYPE vllm:num_requests_running gauge')
-    && (await running(a.port)) === 0, metrics.text);
   record('GET /api/version and /props are 404',
     (await get(a.port, '/api/version')).status === 404 && (await get(a.port, '/props')).status === 404);
 }
@@ -293,43 +270,6 @@ async function checkReplay(a) {
   record('-replay: non-probe reply carries reasoning_content when thinking is on', chatReply.reasoning.length > 0);
 }
 
-/** @brief 第 8 步：没有 -truncate 时 50%、90% 都答对；-truncate 时 50% 答对、90% 答不出。 */
-async function checkLongInput(a) {
-  const key = 'key-aaaa1';
-  const ask = (model, tokens) => chat(a.port, { model, messages: [user(passphrasePrompt(tokens))] }, { key });
-  const half = await ask('fake-coder', 2000);
-  const most = await ask('fake-coder', 3600);
-  record('probe 8: passphrase recalled at 50% and 90% of max_model_len',
-    half.text === 'ZEBRA-42' && most.text === 'ZEBRA-42', `${half.text} / ${most.text}`);
-  const tHalf = await ask('fake-coder-truncate', 2000);
-  const tMost = await ask('fake-coder-truncate', 3600);
-  record('-truncate: 50% recalled, 90% silently loses the passphrase (200, no error)',
-    tHalf.text === 'ZEBRA-42' && tMost.status === 200 && tMost.text !== 'ZEBRA-42', `${tHalf.text} / ${tMost.text}`);
-}
-
-/** @brief 第 9 步与 /metrics：断开后计数回落；-nocancel 10 秒内不回落；FAKE_NO_METRICS=1 为 404。 */
-async function checkCancel(a, b) {
-  const key = 'key-aaaa1';
-  const count = { messages: [user('Count from 1 to 300, one number per line.')] };
-  let during = null;
-  const first = await chat(a.port, count, { key, abortAfterFirst: true, onFirst: async () => {
-    during = await running(a.port);
-  } });
-  await sleep(200);
-  record('probe 9: long output; /metrics counts it while running and drops after disconnect',
-    during === 1 && first.error === 'aborted' && (await running(a.port)) === 0, `during=${during}`);
-  const stuck = await chat(a.port, { ...count, model: 'fake-coder-nocancel' }, { key, abortAfterFirst: true });
-  await sleep(500);
-  const after = await running(a.port);
-  record('-nocancel: count stays up after disconnect (probe 9 too)', stuck.error === 'aborted' && after === 1,
-    `after=${after}`);
-  const full = await chat(a.port, { ...count, model: 'fake-coder-nocancel' }, { key });
-  record('-nocancel: a completed request does not linger', full.done && (await running(a.port)) === 1);
-  await sleep(10000);
-  record('-nocancel: count drops after 10 s', (await running(a.port)) === 0);
-  record('FAKE_NO_METRICS=1: /metrics is 404', (await get(b.port, '/metrics')).status === 404);
-}
-
 /** @brief 只作用于非探针请求的后缀：-404、-400、-hang、-stall。 */
 async function checkNonProbeSuffixes(a) {
   const key = 'key-aaaa1';
@@ -348,8 +288,6 @@ async function checkNonProbeSuffixes(a) {
   const stall = await chat(a.port, { ...plain, model: 'fake-coder-stall' }, { key, timeoutMs: 600 });
   record('-stall: headers 200 then no content', stall.status === 200 && stall.contentChunks === 0
     && stall.error === 'aborted');
-  await sleep(100);
-  record('-hang/-stall: disconnect drops the running count', (await running(a.port)) === 0);
 }
 
 /** @brief 关键词 http-NNN、http-NNN-once。 */
@@ -1069,7 +1007,7 @@ async function checkAlwaysThink(a) {
     weather.calls[0]?.name === 'get_weather' && weather.firstKind === 'reasoning');
 }
 
-/** @brief 发现请求的 JSON 日志行：只有 port、path、key；key 取 Bearer 或 x-api-key 的末 4 位；/metrics 不记。 */
+/** @brief 发现请求的 JSON 日志行：只有 port、path、key；key 取 Bearer 或 x-api-key 的末 4 位。 */
 function checkDiscoveryLogs(a, eps) {
   const all = [a, ...Object.values(eps)].flatMap((ep) => discoveryLines(ep).map((e) => ({ ...e, ep })));
   record('MD-06/MD-10/MD-12 discovery log: every list or detail line has exactly port, path, key', all.length > 0
@@ -1083,9 +1021,8 @@ function checkDiscoveryLogs(a, eps) {
     && discoveryLines(eps.anthropic).some((e) => e.path === '/anthropic/v1/models' && e.key === 'wxyz')
     && all.every((e) => !e.path.includes('?')), JSON.stringify(onA.slice(0, 6)));
   const paths = discoveryLines(eps.ollama).map((e) => e.path);
-  record('MD-06/MD-10/MD-12 discovery log: GET details and POST /api/show are logged; /metrics is not',
-    paths.includes('/api/tags') && paths.filter((p) => p === '/api/show').length >= 4
-    && !all.some((e) => e.path === '/metrics') && a.lines.includes('[fake-endpoint] GET /metrics'));
+  record('MD-06/MD-10/MD-12 discovery log: GET details and POST /api/show are logged',
+    paths.includes('/api/tags') && paths.filter((p) => p === '/api/show').length >= 4);
 }
 
 /** @brief 发现的全部检查（形状与 FAKE_NO_V1_ROOT、FAKE_LIST_DELAY_MS）。 */
@@ -1184,7 +1121,7 @@ async function checkNoOffAnswers(f) {
     answered.map((r) => r.status).join());
 }
 
-/** @brief /openrouter.ai/v1 前缀：列表与对话照常回答（路由只看路径结尾）；/version、/metrics 仍在 origin 下。 */
+/** @brief /openrouter.ai/v1 前缀：列表与对话照常回答（路由只看路径结尾）；/version 仍在 origin 下。 */
 async function checkOpenRouterPrefix(f) {
   const prefixed = await fetchJson(f.port, `${OPENROUTER_BASE}/models`);
   const root = await fetchJson(f.port, '/v1/models');
@@ -1201,8 +1138,8 @@ async function checkOpenRouterPrefix(f) {
     && discoveryLines(f).some((e) => e.path === `${OPENROUTER_BASE}/models`)
     && jsonLines(f).length === f.lines.filter((l) => l.endsWith('/chat/completions')).length);
   const version = await fetchJson(f.port, '/version');
-  record('MP-38 /openrouter.ai/v1 prefix: /version and /metrics stay at the origin',
-    version.status === 200 && version.body?.version === '0.10.1' && (await running(f.port)) === 0);
+  record('MP-38 /openrouter.ai/v1 prefix: /version stays at the origin',
+    version.status === 200 && version.body?.version === '0.10.1');
 }
 
 /** @brief 日志的 effort 字段：reasoning_effort ?? reasoning.effort ?? null，接在 reasoning 后面，原有字段不变。 */
@@ -1279,23 +1216,12 @@ async function checkThinkLong(f) {
     reasoning: { effort: 'medium' } }, { path: OPENROUTER_CHAT });
   record('MP-38 -thinklong: thinking on via reasoning.effort works the same (probe 3: no tool call, length)',
     openRouter.calls.length === 0 && openRouter.text === '' && openRouter.finish === 'length');
-  const { out: pass, log: passLog } = await chatLoggedAt(f, { model, messages: [user(passphrasePrompt(200))],
-    reasoning_effort: 'medium' });
-  const count = await chat(f.port, { model, messages: [user('Count from 1 to 400, one number per line.')],
-    reasoning_effort: 'medium' });
-  record('MP-38 -thinklong: probe steps 8 (passphrase) and 9 (count) at medium also stop at the limit with only '
-    + 'thinking', pass.text === '' && pass.calls.length === 0 && pass.finish === 'length'
-    && pass.reasoning === THINKLONG_THINKING && passLog.probe === true && count.text === ''
-    && count.calls.length === 0 && count.finish === 'length' && count.reasoning === THINKLONG_THINKING,
-    `${pass.finish} ${pass.text} ${JSON.stringify(passLog)} / ${count.finish}`);
   const off = await chat(f.port, { model, messages: [user(READY)] });
   const offTool = await chat(f.port, { model, messages: [user(WEATHER)], tools: [weatherTool] });
-  const offPass = await chat(f.port, { model, messages: [user(passphrasePrompt(200))] });
-  record('MP-38 -thinklong: with thinking off the probe is answered as usual (ready / get_weather / ZEBRA-42, '
-    + 'stop / tool_calls / stop)', off.text === 'ready' && off.reasoning === '' && off.finish === 'stop'
-    && offTool.calls[0]?.name === 'get_weather' && offTool.finish === 'tool_calls'
-    && offPass.text === 'ZEBRA-42' && offPass.reasoning === '' && offPass.finish === 'stop',
-    `${off.finish} ${offTool.finish} ${offPass.text}`);
+  record('MP-38 -thinklong: with thinking off the probe is answered as usual (ready / get_weather, stop / '
+    + 'tool_calls)', off.text === 'ready' && off.reasoning === '' && off.finish === 'stop'
+    && offTool.calls[0]?.name === 'get_weather' && offTool.finish === 'tool_calls',
+    `${off.finish} ${offTool.finish}`);
   const chatReply = await chat(f.port, { model, messages: [user('plain')], reasoning_effort: 'medium' });
   record('MP-38 -thinklong: a non-probe request at medium is unaffected (text, finish_reason "stop")',
     chatReply.text === PLAIN_TEXT && chatReply.finish === 'stop');
@@ -1351,7 +1277,7 @@ async function checkReasoningMandatory(f, g) {
 
 const a = await startEndpoint({ FAKE_KEYS: 'key-aaaa1,key-bbbb2,key-cccc3', FAKE_LIMITED_KEYS: 'key-bbbb2',
   FAKE_LIMIT_MS: '1500', FAKE_QUOTA_KEYS: 'key-cccc3', FAKE_SERVER_VERSION: '0.9.9', FAKE_MAX_MODEL_LEN: '4000' });
-const b = await startEndpoint({ FAKE_NO_METRICS: '1', FAKE_REQUIRE_KEY: 'req-key-1' });
+const b = await startEndpoint({ FAKE_REQUIRE_KEY: 'req-key-1' });
 const c = await startEndpoint({ FAKE_LIMITED_KEYS: 'none' });
 const d = await startEndpoint({});
 const scriptDir = mkdtempSync(join(tmpdir(), 'mori-enhance-script-'));
@@ -1371,7 +1297,6 @@ try {
   await checkProbesPass(a);
   await checkProbeSuffixes(a);
   await checkReplay(a);
-  await checkLongInput(a);
   await checkNonProbeSuffixes(a);
   await checkHttpKeywords(a);
   await checkOtherKeywords(a);
@@ -1388,7 +1313,6 @@ try {
   await checkMemTeam(e);
   await checkDiscovery(a, c, shapes);
   await checkReasoningMandatory(f, g);
-  await checkCancel(a, b);
   checkLogs(a);
   checkDiscoveryLogs(a, shapes);
 } catch (error) {

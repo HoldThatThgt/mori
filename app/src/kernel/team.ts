@@ -370,7 +370,7 @@ export class Team implements TeamLike {
 
   /**
    * @brief session.setTeam（§5.1）：打开为 always；关掉时满足“回到 off 的条件”为 off，否则 once；协作模式下对话会话
-   *        被拒绝启动时直接回到 off（拒绝启动卡的 Turn off team mode）。
+   *        被拒绝启动时直接回到 off（拒绝启动卡的 Turn off task mode）。
    * @param mode on / off
    */
   async setMode(mode: TeamSwitch): Promise<TeamState> {
@@ -396,7 +396,7 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief Stop team（§11.4）：清空全部投递队列（记日志），交给角色的与结案正在处理的 task 变为 stopped，
+   * @brief Stop agents（§11.4）：清空全部投递队列（记日志），交给角色的与结案正在处理的 task 变为 stopped，
    *        停止全部 Agent（原因 user；挂起的批准按拒绝处理），待判断的消息回到输入框。
    * @return 回到输入框的消息，按发送顺序
    */
@@ -909,7 +909,7 @@ export class Team implements TeamLike {
   private async deliverBatch(lane: Lane, batch: TeamDelivery[]): Promise<void> {
     try {
       if (lane !== this.user) await this.ensureOpen(lane);
-      // 建、开实例会话期间到来的停止（Stop team、Esc、撤销需求）：这次投递不发出，按被停止、没开始的运行处理（§9.4、§11.4）
+      // 建、开实例会话期间到来的停止（Stop agents、Esc、撤销需求）：这次投递不发出，按被停止、没开始的运行处理（§9.4、§11.4）
       if (lane.stop !== null || this.closed) return await this.deliveryDone(lane);
       let text = joinDeliveries(batch);
       if (lane.kind === 'create') text = this.withCatchUp(lane, text);
@@ -1627,7 +1627,7 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief 停止全部 Agent（Stop team，§11.4）：清空全部会话的投递队列（记日志；等回复的以 Stopped by the user. 结束，
+   * @brief 停止全部 Agent（Stop agents，§11.4）：清空全部会话的投递队列（记日志；等回复的以 Stopped by the user. 结束，
    *        丢弃的 ask_user、relay 把 asked 改回假），运行中与排队中的 task、结案在处理或排队的 task 变为 stopped，
    *        停止每个在运行或准备中的会话（原因 user；挂起的批准由会话表按拒绝处理）。
    */
@@ -1649,7 +1649,7 @@ export class Team implements TeamLike {
     this.emitState();
   }
 
-  /** @brief 丢弃一个会话的投递队列（Stop team，§8.2、§11.4）。 */
+  /** @brief 丢弃一个会话的投递队列（Stop agents，§8.2、§11.4）。 */
   private dropQueue(lane: Lane): void {
     const dropped = [...lane.solo, ...lane.queue];
     lane.solo = [];

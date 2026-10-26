@@ -3,10 +3,12 @@
 // tb-partial-*.json 不计入）、不属于任何编号的检查只在这份规格的结果文件里找；不加 --spec 时模型层的规则不变。
 // 记忆规格（docs/specs/memory.md §14.3、§14.4）加的 --spec memory 同样检查：§14.2 的 MEM 条目与层、mem- 结果文件的归类。
 // 一键拉取模型规格（docs/specs/model-discovery.md §13.3）加的 --spec discovery 同样检查：§13.2 的 MD 条目与层、md- 结果
-// 文件的归类；另查带 skip / todo 标记的检查不算通过，以及严格模式的单元报告器（md-reporter.mjs 用的
-// createReporter(…, true)）把跳过的与 todo 的测试写成带标记的失败、套件自己的失败也记一条，不开严格模式时照旧。
+// 文件的归类；另查带 skip / todo 标记的检查不算通过，以及单元报告器（createReporter）把跳过的与 todo 的测试写成带标记的
+// 失败、套件自己的失败也记一条。
 // 2026-10-24（模型层规格 §7.7、§14.3）：§14.2 加了 MP-38–MP-40；reporter.mjs 的默认导出（v1-unit.json）也是严格模式，
 // 把它复制到临时目录（它按自己的位置找 test-results/，所以写不到真的 v1-unit.json）再让 node --test 用它来检查。
+// 2026-10-26（AGENTS.md“不留未完成项，不做规格外的东西”）：每个单元报告器都是严格模式，工厂不再有不严格的写法；
+// 名字以这份规格的前缀开头、编号却不在验收表里的检查算缺口（unknownIdChecks），不再只是列出。
 // §17.4 把覆盖检查算进 TB-46（现有功能不退步），所以检查名以 "TB-46 spec-coverage" 开头；TB-46 只列 App 与回放两层，
 // 这些单元检查不计入覆盖表，由 node --test 的退出码把关。
 
@@ -18,7 +20,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
-  SPECS, cellOf, flagOfCheck, layerOfFile, parseSpecTable, passes, specPathOf, startsWithId, strayChecks,
+  SPECS, cellOf, flagOfCheck, idOfCheck, layerOfFile, parseSpecTable, passes, specPathOf, startsWithId, strayChecks,
+  unknownIdChecks,
 } from '../../spec-coverage.mjs';
 import { createReporter } from '../reporter.mjs';
 
@@ -78,14 +81,18 @@ test('TB-46 spec-coverage keeps the model layer rules when --spec is not given',
     ['v1-models-replay.json', 'replay'], ['tb-app-existing-packaged.json', null],
   ]);
   const items = parseSpecTable(model, readFileSync(specPathOf(model), 'utf8'));
-  // 2026-10-24（model-providers.md §7.7）：§14.2 加了 MP-38–MP-40
+  // 2026-10-24（model-providers.md §7.7）：§14.2 加了 MP-38–MP-40；2026-10-26（§8.3 的补，WP-02）加了 MP-41；
+  // 2026-10-26（负责人走查 M7，WP-04）删了 MP-11（需要同意的探针），编号不再使用
   assert.deepEqual(items.map((item) => item.id),
-    Array.from({ length: 40 }, (_, i) => `MP-${String(i + 1).padStart(2, '0')}`));
+    Array.from({ length: 41 }, (_, i) => `MP-${String(i + 1).padStart(2, '0')}`).filter((id) => id !== 'MP-11'));
   const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
+  // 2026-10-26（§9.1“拖动排序”，WP-03）：MP-24 加了单元层（移动的 delta 与一次移动多格）
+  assert.deepEqual(layersOf('MP-24'), ['app', 'unit']);
   assert.deepEqual(layersOf('MP-37'), ['app', 'replay']);
   assert.deepEqual(layersOf('MP-38'), ['app', 'unit']);
   assert.deepEqual(layersOf('MP-39'), ['app', 'unit']);
   assert.deepEqual(layersOf('MP-40'), ['real']);
+  assert.deepEqual(layersOf('MP-41'), ['unit']);
 });
 
 test('TB-46 spec-coverage reads every MEM row of memory §14.2 with its layers', () => {
@@ -117,9 +124,12 @@ test('TB-46 spec-coverage maps mem- result files to layers (partial files never 
 
 test('TB-46 spec-coverage reads every MD row of model-discovery §13.2 with its layers', () => {
   const items = parseSpecTable(discovery, readFileSync(specPathOf(discovery), 'utf8'));
+  // MD-16、MD-17：2026-10-26 负责人走查回答 1（按地址取 pi 自带的模型表，WP-15）
   assert.deepEqual(items.map((item) => item.id),
-    Array.from({ length: 15 }, (_, i) => `MD-${String(i + 1).padStart(2, '0')}`));
+    Array.from({ length: 17 }, (_, i) => `MD-${String(i + 1).padStart(2, '0')}`));
   const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
+  assert.deepEqual(layersOf('MD-16'), ['unit']);
+  assert.deepEqual(layersOf('MD-17'), ['real', 'replay', 'unit']);
   assert.deepEqual(layersOf('MD-01'), ['unit']);
   assert.deepEqual(layersOf('MD-06'), ['app', 'unit']);
   assert.deepEqual(layersOf('MD-07'), ['app', 'replay']);
@@ -169,22 +179,22 @@ test('TB-46 spec-coverage never counts a check with a skip or todo flag as passi
   const lone = cellOf(item, 'unit', unit([{ name: 'MD-01 lone', ok: true, todo: true }]), false);
   assert.deepEqual([lone.state, lone.passed, lone.failed[0].flag], ['fail', 0, 'todo']);
   assert.equal(cellOf(item, 'unit', unit([ok]), false).state, 'ok');
-  assert.deepEqual(strayChecks([item], unit([{ name: 'MD-99 x', ok: true, skip: true }])),
+  assert.deepEqual(unknownIdChecks(discovery, [item], unit([{ name: 'MD-99 x', ok: true, skip: true }])),
     ['md-unit.json: "MD-99 x" (FAIL)']);
 });
 
 /**
- * @brief 把一串事件交给 createReporter(file, strict) 生成的报告器，读回它写的结果文件（读完删除）。
+ * @brief 把一串事件交给 createReporter(file) 生成的报告器，读回它写的结果文件（读完删除）。
  * @return { checks, output, exitCode }：exitCode 为报告器设的 process.exitCode（之后还原）
  */
-async function runReporter(events, strict) {
+async function runReporter(events) {
   const file = `reporter-strict-check-${process.pid}.json`;
   for (const spec of Object.values(SPECS)) assert.equal(layerOfFile(spec, file, false), null);
   const before = process.exitCode;
   process.exitCode = undefined;
   let output = '';
   const source = (async function* stream() { yield* events; })();
-  for await (const chunk of createReporter(file, strict)(source)) output += chunk;
+  for await (const chunk of createReporter(file)(source)) output += chunk;
   const exitCode = process.exitCode;
   process.exitCode = before;
   const path = join(appRoot, 'test-results', file);
@@ -218,9 +228,9 @@ const FLAG_EVENTS = [
   { type: 'test:diagnostic', data: { message: 'tests 7' } },
 ];
 
-test('TB-46 spec-coverage: the strict unit reporter (md-reporter.mjs) fails skipped, todo and failed-suite checks',
+test('TB-46 spec-coverage: the unit reporter fails skipped, todo and failed-suite checks',
   async () => {
-    const { checks, output, exitCode } = await runReporter(FLAG_EVENTS, true);
+    const { checks, output, exitCode } = await runReporter(FLAG_EVENTS);
     assert.deepEqual(checks.map(({ name, ok, detail, skip, todo }) => ({ name, ok, detail, skip, todo })), [
       { name: 'MD-01 plain', ok: true, detail: '', skip: undefined, todo: undefined },
       { name: 'MD-01 skipped', ok: false, detail: 'skipped: no reason given', skip: true, todo: undefined },
@@ -238,18 +248,6 @@ test('TB-46 spec-coverage: the strict unit reporter (md-reporter.mjs) fails skip
     assert.match(output, /^FAIL MD-01 skipped — skipped: no reason given$/m);
     assert.match(output, /^FAIL MD-06 suite whose function throws — body$/m);
     assert.match(output, /1\/8 unit checks passed \(5 skipped or todo, counted as failures\)/);
-  });
-
-test('TB-46 spec-coverage: reporters without strict mode keep recording skipped and todo tests as passes',
-  async () => {
-    const { checks, output, exitCode } = await runReporter(FLAG_EVENTS, false);
-    assert.deepEqual(checks.map(({ name, ok, detail }) => [name, ok, detail]), [
-      ['MD-01 plain', true, ''], ['MD-01 skipped', true, ''], ['MD-02 skipped with a reason', true, ''],
-      ['MD-03 marked todo', true, ''], ['MD-03 failing todo', false, 'boom\nstack'], ['MD-05 failing', false, 'bad'],
-    ]);
-    assert.deepEqual(Object.keys(checks[1]), ['name', 'ok', 'detail', 'known', 'file']);
-    assert.equal(exitCode, undefined);
-    assert.match(output, /\n4\/6 unit checks passed\n$/);
   });
 
 /** synthetic：一个通过、一个跳过、一个标为 todo 的测试文件 */
@@ -280,14 +278,19 @@ test('TB-46 spec-coverage: the default unit reporter (reporter.mjs, v1-unit.json
   assert.match(run.stdout, /1\/3 unit checks passed \(2 skipped or todo, counted as failures\)/);
 });
 
-test('TB-46 spec-coverage lists strays only from the files of the chosen spec', () => {
+test('TB-46 spec-coverage lists strays only from the files of the chosen spec; a TB id not in the table is a gap',
+  () => {
   const items = [{ id: 'TB-01' }, { id: 'TB-46' }];
   const files = [{ name: 'tb-unit.json', checks: [
     { name: 'TB-01 roles are checked', ok: true }, { name: 'TB-010 not an item', ok: true },
     { name: 'MP-01 model item', ok: false }, { name: 'TB-46 spec-coverage x', ok: true },
+    { name: 'spec ids: no id here', ok: true },
   ] }];
-  assert.deepEqual(strayChecks(items, files),
-    ['tb-unit.json: "TB-010 not an item"', 'tb-unit.json: "MP-01 model item" (FAIL)']);
+  assert.deepEqual(strayChecks(taskboard, files),
+    ['tb-unit.json: "MP-01 model item" (FAIL)', 'tb-unit.json: "spec ids: no id here"']);
+  assert.deepEqual(unknownIdChecks(taskboard, items, files), ['tb-unit.json: "TB-010 not an item"']);
+  assert.deepEqual(['TB-010 x', 'TB-46 y', 'MP-01 z', 'x TB-01'].map((name) => idOfCheck(taskboard, { name })),
+    ['TB-010', 'TB-46', null, null]);
   assert.equal(startsWithId('TB-46 test:unit', 'TB-46'), true);
   assert.equal(startsWithId('TB-460 x', 'TB-46'), false);
 });

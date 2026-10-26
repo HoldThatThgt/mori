@@ -62,7 +62,7 @@ const TODAY = localDay();
 /** §10.2 的说明原文 */
 const JUMP = {
   deleted: 'Session deleted', gone: 'This message is no longer in the session.',
-  team: 'This is a team task’s session, which can’t be opened.',
+  team: 'This is a background agent’s session, which can’t be opened.',
   removed: 'The feedback file was removed.', notRecorded: 'Opened the session; the exact message wasn’t recorded.',
 };
 /** 附录 A.4 agent 调用方的 Correct form（§7.4 第二行） */
@@ -1015,7 +1015,7 @@ async function jumpsBlocked(ctx) {
 async function jumpsOther(ctx) {
   const team = (await selectJump(ctx, 'team')).view.evidence[0] ?? {};
   record('MEM-15 §10.2 row 2: evidence in a TaskBoard instance session (<userData>\\teams\\<id>\\sessions\\…) says '
-    + '“This is a team task’s session, which can’t be opened.” and Jump to source is disabled',
+    + '“This is a background agent’s session, which can’t be opened.” and Jump to source is disabled',
   team.status === JUMP.team && team.disabled === true && ctx.j.team.session.includes('\\teams\\'), brief(team));
   await jumpNull(ctx);
   const reply = await runJump(ctx, 'fbreply');

@@ -62,8 +62,8 @@ export function describeCommand(command: Command): string | null {
     case 'ui.answer':
       return command.value === null ? 'Extension question: cancelled' : 'Extension question: answered';
     case 'session.prompt': {
-      // 带 team: 'once'（/task <文字>）的发送记 Send (team)（平行 Agent 规格 §13.10）。
-      if (command.team === 'once') return `Send (team): ${preview(command.text)}`;
+      // 带 team: 'once'（/task <文字>）的发送记 Send (task mode)（平行 Agent 规格 §13.10，2026-10-26 改）。
+      if (command.team === 'once') return `Send (task mode): ${preview(command.text)}`;
       const how = command.behavior === 'steer' ? 'Steer' : command.behavior === 'followUp' ? 'Queue' : 'Send';
       return `${how}: ${preview(command.text)}`;
     }
@@ -91,6 +91,7 @@ function describeM6Command(command: Command): string | null {
     case 'agents.save': return 'Save user-level AGENTS.md';
     case 'resource.toggle':
       return `${command.enabled ? 'Enable' : 'Disable'} ${KIND_ONE[command.kind]} ${command.path}`;
+    case 'tools.setDefault': return `${command.enabled ? 'Enable' : 'Disable'} tool ${command.name}`;
     case 'package.add': return `Add plugin from folder ${command.path}`;
     case 'package.setAll': return `${command.enabled ? 'Enable' : 'Disable'} all in plugin ${command.source}`;
     case 'package.remove': return `Remove plugin ${command.source}`;
@@ -140,13 +141,10 @@ function describeModelCommand(command: Command): string | null {
     case 'models.moveKey': return `Move key ${command.ref} ${command.delta}`;
     case 'models.saveGroup': return `${command.creating ? 'Create' : 'Save'} group ${command.id}`;
     case 'models.deleteGroup': return deleteText(`group ${command.id}`, command.dryRun);
-    case 'models.setDefaults':
-      return `Set defaults ${command.normalDefault ?? 'None'} · ${command.allowedZones.join(' ')}`;
-    case 'models.setProjectZones': return `Set project zones ${command.path} · ${command.zones.join(' ')}`;
-    case 'models.confirmZone': return `Confirm zone ${command.providerId} · ${command.zone}`;
+    case 'models.setDefaults': return `Set defaults ${command.normalDefault ?? 'None'}`;
     case 'models.dismissMigration': return 'Dismiss migration notice';
     case 'models.reload': return 'Reload model settings';
-    case 'models.verify': return `Verify ${command.refs.join(' ')} (${command.tests})`;
+    case 'models.verify': return `Verify ${command.refs.join(' ')}`;
     case 'session.setPick': return `Set model range ${command.pick}`;
     default: return describeTeamCommand(command);
   }
@@ -155,9 +153,9 @@ function describeModelCommand(command: Command): string | null {
 /** @brief 平行 Agent 与 TaskBoard 的命令（§13.10）的摘要；board.get 是只读查询，不记。 */
 function describeTeamCommand(command: Command): string | null {
   switch (command.type) {
-    case 'session.setTeam': return `Team ${command.mode}`;
+    case 'session.setTeam': return `Task mode ${command.mode}`;
     case 'session.recheckAgents': return 'Check agent files';
-    case 'session.stopTeam': return 'Stop team';
+    case 'session.stopTeam': return 'Stop agents';
     default: return describeMemoryCommand(command);
   }
 }

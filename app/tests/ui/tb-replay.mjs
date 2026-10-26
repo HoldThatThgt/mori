@@ -1,8 +1,10 @@
 // 平行 Agent 与 TaskBoard 的回放测试（docs/specs/parallel-agents-taskboard.md §17.1、§17.2 的回放层）：在 Electron 里载入
 // 真正的界面，用回放进程桥（tests/ui/harness）回放从真实会话录下的 tests/fixtures/tb/*.json（tb-record.mjs 录制，模型是
-// 负责人的 DeepSeek 与 GLM），以及 m1–m6 的一组录制。测试像你一样操作（Open folder…、发录制里的消息、/task、点协作开关、
+// 负责人的 DeepSeek 与 GLM），以及 m1–m6 的一组录制。测试像你一样操作（Open folder…、发录制里的消息、/task、在模型菜单里点
+// Task mode 一行、
 // 权限菜单、批准卡上的 Alt+1），回放桥核对界面发出的每条命令都与录制一致；再按 docs/v1/screens/team-*.md 检查界面：
-//   TB-03：m1–m6 的录制在合成的空 TeamState/BoardView 下照常回放：开关一直是 Team: Off，没有回执、进展摘要、Stop team
+//   TB-03：m1–m6 的录制在合成的空 TeamState/BoardView 下照常回放：模型按钮一直是 off（没有 "Task mode"），没有回执、
+//     进展摘要、Stop agents
 //     （m7 的录制随工作回顾删除，docs/specs/memory.md §14.4）。
 //   TB-04（tb-ask）：关闭模式下对话的 agent_message 是一张 "Ask reviewer" 工具卡，回答就是它的结果；没有回执、进展摘要、
 //     批准卡，侧栏里只有用户会话。
@@ -14,8 +16,10 @@
 //     等批准时 "Waiting for your approval"。
 //   TB-34（tb-approval）：后台批准卡在用户会话那一栏、卡头 "<role> · T1 · <title>"、编号 <实例 id>:approval-<n>；
 //     侧栏等你批准；对话一轮结束不清掉卡；Alt+1 允许；TaskBoard 工具从不出卡；权限菜单的说明。
-//   TB-53（tb-ask、tb-team）：三种文字与悬停、aria-checked、三种点击（off → always → off、once → always → once）、
-//     打开中与后台进程退出时不可用、窄栏（不宽于 600px）只显示状态点、做完为止在汇报的那一轮结束时回到 Team: Off。
+//   TB-53（tb-ask、tb-team；2026-10-26 起开关在模型菜单里，docs/v1/screens/team-switch.md）：模型按钮上的
+//     "Task mode · <模型 id>" 与 data-team-mode、Task mode 一行的 aria-checked 与第二行、三种点击（off → always → off、
+//     once → always → once，菜单不关）、打开中与后台进程退出时切不了、做完为止在汇报的那一轮结束时回到 off；
+//     切换失败的一行在菜单里与输入框下面一行上方（synthetic：回放桥 failNext 让 session.setTeam 失败，不占回放顺序）。
 //   TB-58（tb-ask、tb-team）：每次模式改变对话流里一行（Task mode on / on until done / off），/task 进入时在你的消息之前，
 //     重新打开后一样（2026-10-26；录制要在这之后重录，才有 mori.team_mode 事件）。
 // 录制文件还不存在时，每个对应编号记一条失败"<编号> replay fixture missing"（不造假录制）。
@@ -31,6 +35,7 @@ import { _electron as electron } from 'playwright-core';
 import { build } from 'vite';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
+import { PICK_ERROR, placeProblems, popupBox } from './m6-helpers.mjs';
 import { modeNoticesOf, progressOf, receiptsOf, setProgressOpen, transcriptItems } from './tb-helpers.mjs';
 import { expectedTitle, label } from './tb-real-helpers.mjs';
 
@@ -42,14 +47,32 @@ mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder('replay harness');
 const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) }).catch(() => {});
 
-/** 开关的三种文字与悬停（§13.1）；<create role> 是基座 Mori */
+/** Task mode 一行在三种模式下的 aria-checked 与第二行（§13.1）；<create role> 是基座 Mori */
 const SWITCH = {
-  off: { text: 'Team: Off', title: 'Turn on team mode', checked: 'false' },
-  always: { text: 'Team: On', title: 'Messages go to Mori first', checked: 'true' },
-  once: { text: 'Team: Until done', title: 'Team mode ends when open requests are done', checked: 'true' },
+  off: { checked: 'false', hint: null },
+  always: { checked: 'true', hint: 'Messages go to Mori first' },
+  once: { checked: 'true', hint: 'Until done · Ends when open requests are done' },
 };
 /** 对话流里模式提示的文字（§13.11，TB-58） */
 const NOTICE = { always: 'Task mode on', once: 'Task mode on until done', off: 'Task mode off' };
+/** 协作模式下模型按钮悬停的第二行（§12.11） */
+const TASK_PICKS = 'Task mode picks the model for each agent';
+/** 当前一栏的模型按钮、模型菜单、菜单里的 Task mode 一行 */
+const BUTTON = `${PANE} [data-testid="model-button"]`;
+const MENU = `${PANE} [data-testid="model-menu"]`;
+const ROW = `${MENU} [data-testid="team-switch"]`;
+/** 当前一栏切换失败的一行（菜单开着时在菜单里，关着时在输入框下面一行上方；team-switch.md“切换失败”） */
+const TEAM_ERROR = `${PANE} [data-testid="team-error"]`;
+/** 回放桥 failNext 让 session.setTeam 失败时的原文（synthetic）：菜单开着时点 Task mode 一行、菜单关着时 /task on */
+const TEAM_FAIL = { menu: 'Synthetic: session.setTeam failed (menu)', command: 'Synthetic: session.setTeam failed' };
+/** @brief 切换失败那一行的文字（§13.1）。 */
+const teamFailText = (message) => `Couldn’t change task mode: ${message}`;
+/**
+ * 本测试用 failNext 注入的失败原文，每注入一次记一条：界面照例（异常分支记错误日志）为它写一条
+ * "[renderer] session.setTeam failed: <原文>"（state/bridge.ts describe），"the page has no errors" 每次注入只扣掉
+ * 一条（同 m1-replay.mjs），多的照样算错。
+ */
+const injected = [];
 /** 权限菜单的说明（§11.1） */
 const PERMISSION_NOTE = 'Applies to all agents in this session. New sessions start at Ask each time.';
 /** TaskBoard 的工具（§6.3），从不出卡 */
@@ -171,13 +194,14 @@ async function load(page, fx, { part = null, speed = 4, maxGap = 600 } = {}) {
 }
 
 /**
- * @brief 在页面里装一个 MutationObserver，只在变化时记下当前一栏：协作开关（模式、aria-checked、文字、读屏名称、悬停、
- *        是否可用）、进展摘要的标题行与 task 行、出现过的批准卡，以及回执、进展摘要、Stop team、批准卡归属行、
- *        右栏说明出现过的最多个数。结果在 window.__tbWatch。
+ * @brief 在页面里装一个 MutationObserver，只在变化时记下当前一栏：模型按钮上的模式（data-team-mode、看得到的字、
+ *        是否 aria-disabled）、显示"Starting…"时能不能切 Task mode（opening：看到几次、其中几次模型按钮可用或模型菜单开着）、
+ *        进展摘要的标题行与 task 行、出现过的批准卡，以及回执、进展摘要、Stop agents、批准卡归属行、右栏说明出现过的最多个数。
+ *        结果在 window.__tbWatch。
  */
 function watchTeam(page) {
   return page.evaluate((pane) => {
-    const seen = { switches: [], rows: [], cards: [], max: {} };
+    const seen = { switches: [], rows: [], cards: [], max: {}, opening: { seen: 0, usable: 0 } };
     const last = new Map();
     const push = (list, key, item) => {
       const value = JSON.stringify(item);
@@ -191,11 +215,15 @@ function watchTeam(page) {
     const scan = () => {
       const root = document.querySelector(pane);
       if (!root) return;
-      const sw = root.querySelector('[data-testid="team-switch"]');
-      if (sw) {
-        push(seen.switches, 'switch', { mode: sw.dataset.mode, checked: sw.getAttribute('aria-checked'),
-          text: sw.querySelector('.team-text')?.textContent ?? '', label: sw.getAttribute('aria-label'),
-          title: sw.getAttribute('title'), disabled: sw.disabled });
+      const button = root.querySelector('[data-testid="model-button"]');
+      if (button) {
+        push(seen.switches, 'switch', { mode: button.dataset.teamMode ?? null, text: button.textContent.trim(),
+          disabled: button.getAttribute('aria-disabled') === 'true' });
+      }
+      if (root.querySelector('[data-testid="not-ready"]')?.textContent === 'Starting…') {
+        seen.opening.seen += 1;
+        const open = button && button.getAttribute('aria-disabled') !== 'true';
+        if (open || root.querySelector('[data-testid="model-menu"]')) seen.opening.usable += 1;
       }
       for (const [name, css] of Object.entries(counts)) {
         seen.max[name] = Math.max(seen.max[name] ?? 0, root.querySelectorAll(css).length);
@@ -247,6 +275,23 @@ async function finish(page, id, label_, steps) {
     status.errors.join('; ') || `commands ${status.commands.map((c) => c.type).join(', ')}`);
 }
 
+/** @brief 让回放桥的下一条界面命令以 text 失败（synthetic，不占回放顺序），并记下界面因此该写的那条错误日志。 */
+async function failNext(page, text) {
+  injected.push(text);
+  await page.evaluate((message) => { window.__replay.failNext = message; }, text);
+}
+
+/** @brief 页面错误里去掉每次注入的那一条（"[renderer] <命令> failed: <原文>"，各扣一次）并清空记录，剩下的是真的报错。 */
+function unexpectedErrors(errors) {
+  const left = [...errors];
+  const ours = (line, text) => /^\[renderer\] [\w.]+ failed: /.test(line) && line.endsWith(` failed: ${text}`);
+  for (const text of injected.splice(0)) {
+    const index = left.findIndex((line) => ours(line, text));
+    if (index >= 0) left.splice(index, 1);
+  }
+  return left;
+}
+
 /** @brief 点侧栏"Open folder…"（回放桥返回下一条 session.create 的文件夹）；有信任询问时按 trust 回答；等会话就绪。 */
 async function openFolder(page, trust = null) {
   await page.getByTestId('sidebar').getByRole('button', { name: 'Open folder…' }).click();
@@ -296,20 +341,20 @@ async function driveGeneric(page, steps) {
   await untilPlayed(page, commands.length, 'the last segment');
 }
 
-/** @brief TB-03：一个 m1–m6 的录制照常回放，开关一直是 Team: Off，没有任何协作的元素。 */
+/** @brief TB-03：一个 m1–m6 的录制照常回放，模型按钮一直是 off（没有 "Task mode"），没有任何协作的元素。 */
 async function tb03(page, [dir, name, part]) {
   const fx = readFixture(dir, name);
   const steps = await load(page, fx, { part, speed: 6, maxGap: 400 });
   await driveGeneric(page, steps);
   const seen = await watched(page);
-  const off = seen.switches.every((s) => s.mode === 'off' && s.checked === 'false' && s.text === SWITCH.off.text
-    && s.title === SWITCH.off.title);
+  const off = seen.switches.every((s) => s.mode === 'off' && !s.text.startsWith('Task mode'));
   const status = await page.evaluate(() => window.__replay.status);
   const total = commandsOf(steps).length;
   await shot(page, `tb03-${dir}-${name}`);
   record(`TB-03 replay ${dir}/${name}${part ? ` (${part})` : ''}: the recording replays as before under the synthetic `
-    + `empty TeamState/BoardView (all ${total} commands match); the switch shows "Team: Off" (aria-checked false, `
-    + 'hover "Turn on team mode") throughout; no receipt, no progress summary, no Stop team, no approval attribution',
+    + `empty TeamState/BoardView (all ${total} commands match); the model button stays in off mode `
+    + '(data-team-mode off, no "Task mode" on it) throughout; no receipt, no progress summary, no Stop agents, no '
+    + 'approval attribution',
   status.errors.length === 0 && status.cursor === total && seen.switches.length > 0 && off
     && Object.values(seen.max).every((n) => n === 0),
   oneLine(JSON.stringify({ errors: status.errors, cursor: status.cursor, total, max: seen.max,
@@ -318,7 +363,7 @@ async function tb03(page, [dir, name, part]) {
 
 // ---------- TB-04、TB-53：tb-ask ----------
 
-/** @brief tb-ask 的开头：打开中开关不可用；就绪后是 Team: Off；发录制里的问题，等这一轮放完。 */
+/** @brief tb-ask 的开头：打开中切不了 Task mode；就绪后是 off；发录制里的问题，等这一轮放完。 */
 async function askRun(page, fx) {
   const steps = await load(page, fx);
   const prompt = commandsOf(steps).find((c) => c.type === 'session.prompt');
@@ -354,76 +399,144 @@ async function askChecks(page, steps) {
     && reply.replace(/\s+/g, ' ').includes(want.replace(/[`*]/g, '').replace(/\s+/g, ' ').slice(0, 20)),
   oneLine(JSON.stringify({ cards, answer, body, reply }), 600));
   record('TB-04 replay tb-ask: the ask is not a team action — no receipt, no progress summary, no approval card, the '
-    + 'switch stays "Team: Off" during the ask; the sidebar lists only user sessions (no instance session file)',
+    + 'model button stays in off mode during the ask; the sidebar lists only user sessions (no instance session file)',
   seen.max.receipt === 0 && seen.max.progress === 0 && seen.cards.length === 0 && rows.length >= 1
     && rows.every((file) => file && !/[\\/]teams[\\/]/.test(file) && !/\.ask\./.test(file))
     && seen.switches.every((s) => s.mode === 'off'), oneLine(JSON.stringify({ max: seen.max, rows }), 600));
 }
 
-/** @brief TB-53（tb-ask）：打开中不可用；off → always → off 两次点击；三种状态的文字、悬停与 aria-checked。 */
+/** @brief 当前一栏模型按钮上的模式（不打开菜单）：data-team-mode、看得到的字、悬停、aria-disabled。 */
+const buttonNow = (page) => page.locator(BUTTON).evaluate((el) => ({ mode: el.dataset.teamMode ?? null,
+  text: el.textContent.trim(), title: el.getAttribute('title') ?? '',
+  disabled: el.getAttribute('aria-disabled') === 'true' }));
+
+/** @brief 打开当前一栏的模型菜单（开着时不动），等 Task mode 一行出现。 */
+async function openMenu(page) {
+  if (!(await page.locator(MENU).count())) await page.locator(BUTTON).click();
+  await page.locator(ROW).waitFor({ timeout: 10000 });
+}
+
+/** @brief 关上当前一栏的模型菜单：开着时再点一下模型按钮（不按 Esc，免得停掉回放里的回复）。 */
+async function closeMenu(page) {
+  if (await page.locator(MENU).count()) await page.locator(BUTTON).click();
+  await page.locator(MENU).waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+}
+
+/**
+ * @brief 当前一栏 Task mode 的样子：模型按钮（buttonNow）加菜单里的这一行（data-mode、aria-checked、role、读屏名称、
+ *        第二行、可不可用）；打开菜单读，keepOpen 为假时读完关上。
+ */
+async function switchNow(page, keepOpen = false) {
+  await openMenu(page);
+  const row = await page.locator(ROW).evaluate((el) => ({ rowMode: el.dataset.mode,
+    checked: el.getAttribute('aria-checked'), role: el.getAttribute('role'), label: el.getAttribute('aria-label'),
+    hint: el.querySelector('[data-testid="team-hint"]')?.textContent ?? null,
+    rowDisabled: el.disabled || el.getAttribute('aria-disabled') === 'true' }));
+  const state = { ...(await buttonNow(page)), ...row };
+  if (!keepOpen) await closeMenu(page);
+  return state;
+}
+
+/** @brief 在模型菜单里点 Task mode 一行，等模型按钮的 data-team-mode 变成 want；菜单不关。 */
+async function clickRow(page, want) {
+  await openMenu(page);
+  await page.locator(ROW).click();
+  await page.waitForFunction(({ css, mode }) => document.querySelector(css)?.dataset.teamMode === mode,
+    { css: BUTTON, mode: want }, { timeout: 10000 });
+}
+
+/**
+ * @brief Task mode 的样子与表相同（§13.1、§12.11）：这一行是 menuitemcheckbox、读屏名称 "Task mode"、aria-checked 与
+ *        第二行按模式；off 时模型按钮上没有 "Task mode"，打开时是 "Task mode · <模型 id>"、悬停第二行 TASK_PICKS。
+ */
+const sameSwitch = (s, want) => s.rowMode === s.mode && s.role === 'menuitemcheckbox' && s.label === 'Task mode'
+  && s.checked === want.checked && s.hint === want.hint && !s.rowDisabled
+  && (s.mode === 'off' ? !s.text.startsWith('Task mode')
+    : s.text.startsWith('Task mode · ') && s.title.split('\n')[1] === TASK_PICKS);
+
+/** @brief TB-53（tb-ask）：打开中切不了；off → always → off 两次点击（菜单不关）；两种状态的按钮与这一行。 */
 async function askSwitch(page, steps) {
-  const opening = (await watched(page)).switches.find((s) => s.disabled);
-  const sw = page.locator(`${PANE} [data-testid="team-switch"]`);
-  const states = [await switchNow(page)];
-  await sw.click();
-  await page.waitForFunction((css) => document.querySelector(css)?.dataset.mode === 'always',
-    `${PANE} [data-testid="team-switch"]`, { timeout: 10000 });
-  states.push(await switchNow(page));
-  await sw.click();
-  await page.waitForFunction((css) => document.querySelector(css)?.dataset.mode === 'off',
-    `${PANE} [data-testid="team-switch"]`, { timeout: 10000 });
-  states.push(await switchNow(page));
-  record('TB-53 replay tb-ask: while the session is opening the switch is visible but disabled ("Team: Off")',
-    opening?.text === SWITCH.off.text && opening.disabled === true, JSON.stringify(opening));
-  record('TB-53 replay tb-ask: off shows "Team: Off" / hover "Turn on team mode" / aria-checked false; a click sends '
-    + 'session.setTeam on → "Team: On" / "Messages go to Mori first" / aria-checked true; a second click sends '
-    + 'session.setTeam off and, with no open request, returns to "Team: Off"; no confirmation',
+  const { opening } = await watched(page);
+  const states = [await switchNow(page, true)];
+  await clickRow(page, 'always');
+  states.push(await switchNow(page, true));
+  await clickRow(page, 'off');
+  states.push(await switchNow(page, true));
+  const focused = await page.evaluate((css) => document.activeElement === document.querySelector(css), ROW);
+  await closeMenu(page);
+  record('TB-53 replay tb-ask: while the session is opening ("Starting…") task mode cannot be switched: no usable '
+    + 'model button and no model menu', opening.seen > 0 && opening.usable === 0, JSON.stringify(opening));
+  record('TB-53 replay tb-ask: off — the model button without "Task mode", the Task mode row unchecked with no second '
+    + 'line; a click sends session.setTeam on → "Task mode · <model id>", the row checked with "Messages go to Mori '
+    + 'first"; a second click sends session.setTeam off and, with no open request, returns to off; the menu stays '
+    + 'open with the focus on the row; no confirmation',
   states.map((s) => s.mode).join() === 'off,always,off' && states.every((s) => sameSwitch(s, SWITCH[s.mode]))
-    && await page.getByTestId('confirm-dialog').count() === 0, JSON.stringify(states));
+    && focused && await page.getByTestId('confirm-dialog').count() === 0, JSON.stringify({ states, focused }));
   await finish(page, 'TB-53', 'tb-ask', steps);
 }
 
-/** @brief 当前一栏开关此刻的样子。 */
-const switchNow = (page) => page.locator(`${PANE} [data-testid="team-switch"]`).evaluate((el) => ({
-  mode: el.dataset.mode, checked: el.getAttribute('aria-checked'), text: el.querySelector('.team-text')?.textContent,
-  label: el.getAttribute('aria-label'), title: el.getAttribute('title'), disabled: el.disabled,
-  wide: getComputedStyle(el.querySelector('.team-text')).display !== 'none',
-  dot: getComputedStyle(el.querySelector('.team-dot')).display !== 'none', shown: el.innerText.trim(),
-}));
-/** @brief 开关的文字、读屏名称、悬停、aria-checked 与表相同。 */
-const sameSwitch = (s, want) => s.text === want.text && s.label === want.text && s.title === want.title
-  && s.checked === want.checked;
-
-/** @brief TB-53：窄栏（这一栏不宽于 600px）只显示状态点，读屏名称仍是完整文字；宽栏是完整文字、没有状态点。 */
-async function narrowSwitch(page, app) {
-  const wide = await switchNow(page);
-  await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
-    win.setMinimumSize(400, 400);
-    win.setSize(620, 800);
-  });
-  await page.waitForFunction((pane) => document.querySelector(pane)?.getBoundingClientRect().width <= 600, PANE,
-    { timeout: 10000 }).catch(() => {});
-  const width = await page.locator(PANE).evaluate((el) => el.getBoundingClientRect().width);
-  const narrow = await switchNow(page);
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1200, 800));
-  await shot(page, 'tb53-narrow');
-  record('TB-53 replay: in a pane 600px wide or narrower the switch shows only the status dot (no text; the '
-    + 'accessible name stays the full text); in a wider pane the full text shows without the dot',
-  width <= 600 && !narrow.wide && narrow.dot && narrow.shown === ''
-    && narrow.label === SWITCH[narrow.mode].text && wide.wide && !wide.dot,
-  JSON.stringify({ width, wide, narrow }));
+/** @brief TB-53：后台进程退出（界面没准备好）时模型按钮不可用、点了不开菜单，仍是最后知道的模式。 */
+async function exitedSwitch(page) {
+  const before = await buttonNow(page);
+  await page.evaluate(() => window.__replay.exit(1));
+  await page.waitForFunction((css) => document.querySelector(css)?.getAttribute('aria-disabled') === 'true',
+    BUTTON, { timeout: 10000 }).catch(() => {});
+  const after = await buttonNow(page);
+  await page.locator(BUTTON).click({ force: true }).catch(() => {});
+  await sleep(300);
+  const menu = await page.locator(MENU).count();
+  record('TB-53 replay: after the kernel exits the model button is aria-disabled, a click opens no model menu (so task '
+    + 'mode cannot be switched), and it keeps the last known mode and text', after.disabled && !before.disabled
+    && after.mode === before.mode && after.text === before.text && menu === 0, JSON.stringify({ before, after, menu }));
 }
 
-/** @brief TB-53：后台进程退出（界面没准备好）时开关不可用，文字是最后知道的模式。 */
-async function exitedSwitch(page) {
-  const before = await switchNow(page);
-  await page.evaluate(() => window.__replay.exit(1));
-  await page.waitForFunction((css) => document.querySelector(css)?.disabled === true,
-    `${PANE} [data-testid="team-switch"]`, { timeout: 10000 }).catch(() => {});
-  const after = await switchNow(page);
-  record('TB-53 replay: after the kernel exits the switch is disabled and keeps the last known text',
-    after.disabled && after.text === before.text && !before.disabled, JSON.stringify({ before, after }));
+/** @brief 开着的模型菜单里切换失败那一行：文字、role、是不是紧跟在 Task mode 一行下面；这一行的模式、切换中、焦点。 */
+const menuError = (page) => page.locator(MENU).evaluate((menu) => {
+  const row = menu.querySelector('[data-testid="team-switch"]');
+  const line = menu.querySelector('[data-testid="team-error"]');
+  return { text: line?.textContent ?? null, role: line?.getAttribute('role') ?? null,
+    underRow: Boolean(line) && line.previousElementSibling === row, mode: row?.dataset.mode ?? null,
+    pending: row?.getAttribute('aria-disabled') === 'true', focused: document.activeElement === row };
+});
+
+/** @brief 菜单关着时切换失败那一行（输入框下面一行上方）：文字、role、在不在模型菜单里。 */
+const lineError = (page) => page.locator(TEAM_ERROR).evaluate((el) => ({ text: el.textContent,
+  role: el.getAttribute('role'), inMenu: Boolean(el.closest('[data-testid="model-menu"]')) }));
+
+/**
+ * @brief TB-53（tb-ask，synthetic：回放桥 failNext 让 session.setTeam 失败，不占回放顺序）：切换失败的一行
+ *        "Couldn’t change task mode: <原文>"（role=alert）。菜单开着时紧跟在 Task mode 一行下面，这一行回到 off、
+ *        焦点留在它上面；菜单关着时（/task on 失败）从输入框下面一行往上弹出、右边对齐模型按钮（同换范围失败），
+ *        模型按钮仍是 off，约 10 秒后自己消失。
+ */
+async function failedSwitch(page) {
+  await openMenu(page);
+  await failNext(page, TEAM_FAIL.menu);
+  await page.locator(ROW).click();
+  await page.locator(`${MENU} [data-testid="team-error"]`).waitFor({ timeout: 5000 });
+  const open = await menuError(page);
+  await closeMenu(page);
+  await failNext(page, TEAM_FAIL.command);
+  await typeAndSend(page, '/task on');
+  await page.waitForFunction(({ css, want }) => document.querySelector(css)?.textContent === want,
+    { css: TEAM_ERROR, want: teamFailText(TEAM_FAIL.command) }, { timeout: 5000 }).catch(() => {});
+  const geo = await popupBox(page, { popup: TEAM_ERROR, anchor: PICK_ERROR.opener });
+  const closed = { ...await lineError(page), button: await buttonNow(page) };
+  const start = Date.now();
+  const gone = await page.locator(TEAM_ERROR).waitFor({ state: 'detached', timeout: 13000 })
+    .then(() => true, () => false);
+  const waited = Date.now() - start;
+  const problems = placeProblems(geo, { ...PICK_ERROR, popup: TEAM_ERROR });
+  record('TB-53 replay tb-ask (synthetic failure): with the model menu open, a failed switch shows "Couldn’t change '
+    + 'task mode: <error>" (role=alert) right under the Task mode row; the row stays off, is usable again and keeps '
+    + 'the focus', open.text === teamFailText(TEAM_FAIL.menu) && open.role === 'alert' && open.underRow
+    && open.mode === 'off' && !open.pending && open.focused, JSON.stringify(open));
+  record('TB-53 replay tb-ask (synthetic failure): with the menu closed, a failed /task on shows the same line '
+    + '(role=alert) above the composer row, right-aligned with the model button like a failed range change; the '
+    + 'model button stays off; the line goes away by itself after about 10 seconds',
+  closed.text === teamFailText(TEAM_FAIL.command) && closed.role === 'alert' && !closed.inMenu
+    && closed.button.mode === 'off' && problems.length === 0 && gone && waited > 8000,
+  JSON.stringify({ closed, problems, gone, waited }));
 }
 
 /** @brief TB-58（tb-ask）：开关点了两次（off → always → off），对话流末尾两行 Task mode on、Task mode off。 */
@@ -435,18 +548,18 @@ async function askNotices(page) {
 }
 
 /** @brief tb-ask 的全部检查。 */
-async function askFixture(page, fx, app) {
+async function askFixture(page, fx) {
   const steps = await askRun(page, fx);
   await askChecks(page, steps);
   await askSwitch(page, steps);
   await askNotices(page);
-  await narrowSwitch(page, app);
+  await failedSwitch(page);
   await exitedSwitch(page);
 }
 
 // ---------- TB-08、TB-37、TB-53：tb-team ----------
 
-/** @brief tb-team 重启前的一段：Allow all、/task、登记后点开关两次，等全部放完；返回观察到的东西。 */
+/** @brief tb-team 重启前的一段：Allow all、/task、登记后在模型菜单里点 Task mode 一行两次，等全部放完；返回观察到的东西。 */
 async function teamRun(page, fx) {
   const steps = await load(page, fx, { part: 'before' });
   const prompt = commandsOf(steps).find((c) => c.type === 'session.prompt');
@@ -454,14 +567,12 @@ async function teamRun(page, fx) {
   await allowAll(page);
   await typeAndSend(page, `/task ${prompt.text}`);
   await page.locator(`${PANE} [data-testid="receipt"][data-kind="registered"]`).first().waitFor({ timeout: 120000 });
-  const sw = page.locator(`${PANE} [data-testid="team-switch"]`);
-  const states = [await switchNow(page)];
+  const states = [await switchNow(page, true)];
   for (const want of ['always', 'once']) {
-    await sw.click();
-    await page.waitForFunction(({ css, mode }) => document.querySelector(css)?.dataset.mode === mode,
-      { css: `${PANE} [data-testid="team-switch"]`, mode: want }, { timeout: 10000 });
-    states.push(await switchNow(page));
+    await clickRow(page, want);
+    states.push(await switchNow(page, true));
   }
+  await closeMenu(page);
   await untilPlayed(page, commandsOf(steps).length, 'the whole tb-team run');
   await sleep(800);
   return { steps, states };
@@ -594,17 +705,18 @@ function teamClosed(board, snap, holders, cwd) {
   oneLine(JSON.stringify({ title, collapsed, open, chains }), 1500));
 }
 
-/** @brief TB-53 tb-team：/task 进入做完为止；once → always → once（需求还开着）；汇报那一轮结束时回到 Team: Off。 */
+/** @brief TB-53 tb-team：/task 进入做完为止；once → always → once（需求还开着）；汇报那一轮结束时回到 off。 */
 async function teamSwitchChecks(page, steps, states) {
   const final = await switchNow(page);
   const modes = resultsOf(steps, 'session.setTeam').map((v) => v.mode);
-  record('TB-53 replay tb-team: "/task <text>" turns the switch to "Team: Until done" (hover "Team mode ends when open '
-    + 'requests are done", aria-checked true); a click sends session.setTeam on → "Team: On"; a click with the '
-    + 'request still open sends session.setTeam off and the switch shows "Team: Until done", not "Team: Off"',
+  record('TB-53 replay tb-team: "/task <text>" puts task mode in once (the model button "Task mode · <model id>", the '
+    + 'row checked with "Until done · Ends when open requests are done"); a click sends session.setTeam on → always '
+    + '("Messages go to Mori first"); a click with the request still open sends session.setTeam off and it stays once '
+    + '("Until done · …"), not off',
   states.map((s) => s.mode).join() === 'once,always,once' && states.every((s) => sameSwitch(s, SWITCH[s.mode]))
     && modes.join() === 'always,once', JSON.stringify({ states, modes }));
-  record('TB-53 replay tb-team: once the request is done and the report turn ends, the switch returns to "Team: Off" '
-    + 'by itself (mori.team_state)',
+  record('TB-53 replay tb-team: once the request is done and the report turn ends, task mode returns to off by itself '
+    + '(mori.team_state; the model button without "Task mode", the row unchecked)',
   final.mode === 'off' && sameSwitch(final, SWITCH.off), JSON.stringify(final));
 }
 
@@ -854,7 +966,7 @@ async function guarded(page, errors, { id, label: name }, run) {
     record(`${id} replay ${name}: flow`, false, oneLine(error, 600));
     await shot(page, `${name.replace(/\W+/g, '-')}-error`);
   }
-  const mine = errors.slice(before);
+  const mine = unexpectedErrors(errors.slice(before));
   record(`${id} replay ${name}: the page has no errors`, mine.length === 0, mine.slice(0, 5).join(' | '));
 }
 

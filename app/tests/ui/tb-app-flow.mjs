@@ -169,7 +169,7 @@ async function offPlain(ctx) {
   const sw = await teamSwitch(ctx, who.tab);
   const stream = await snapshotStream(ctx, who);
   record('main path (a) off mode without role files: a normal message gets the plain reply as in v0; the request has '
-    + 'no TaskBoard tool and no team section; no receipt or progress summary; the switch stays Team: Off; '
+    + 'no TaskBoard tool and no team section; no receipt or progress summary; task mode stays off (model button); '
     + 'no teams/<id> folder',
   pane.assistants.at(-1) === PLAIN && pane.errors.length === 0 && request !== undefined
     && !request.tools.some((name) => TEAM_TOOLS.includes(name)) && !request.system.includes(SHARED_PART)
@@ -292,7 +292,7 @@ async function mergedSegments(ctx, who, obs) {
   const team = requests.filter((item) => item.t < obs.offSince);
   const off = requests.filter((item) => item.t >= obs.offSince);
   record('TB-10 merged session: the merged create segment (with the shared segment) is in the system prompt of every '
-    + 'team-mode request of the user session, and in off mode (after the request closed and Team: Until done ended) '
+    + 'team-mode request of the user session, and in off mode (after the request closed and the once mode ended) '
     + 'neither is there',
   team.length >= 6 && team.every((item) => item.system.includes(MERGED_SENTENCE) && item.system.includes(SHARED_PART))
     && obs.modeAfter.mode === 'off' && off.length === 1 && !off[0].system.includes(MERGED_SENTENCE)
@@ -466,7 +466,7 @@ async function renumberProgress(ctx, who, board, pending) {
 
 // ---------- TB-37：Queued 与 Stopped（合并会话，脚本 tb-flow-queue） ----------
 
-/** @brief 五个只读 task：第五个超过同时运行的上限显示 Queued；Stop team 后都为 Stopped，需求为 Stopped。 */
+/** @brief 五个只读 task：第五个超过同时运行的上限显示 Queued；Stop agents 后都为 Stopped，需求为 Stopped。 */
 async function queueStop(ctx) {
   const who = await begin(ctx, ctx.merged, 'Read the README five times tb-scenario:tb-flow-queue');
   const queued = await waitTaskPhase(ctx, who.tab, { task: 'T5', phase: 'queued' }, 30000);
@@ -480,7 +480,7 @@ async function queueStop(ctx) {
   await sendMessage(ctx, who.tab, 'Cancel it');
   await settle(ctx, who, 60000);
   const [after] = await progressOf(ctx, who.tab);
-  record('TB-37 phase texts Queued and Stopped: with four tasks running the fifth reads "Queued"; after Stop team '
+  record('TB-37 phase texts Queued and Stopped: with four tasks running the fifth reads "Queued"; after Stop agents '
     + 'the tasks read "Stopped" and the request "Stopped"; cancelling it afterwards reads "Cancelled" (no role '
     + 'files: the rows name no role)',
   queued === 'T5 Read 5 · Queued' && running === 'T4 Read 4 · Starting'
@@ -491,7 +491,7 @@ async function queueStop(ctx) {
 
 /**
  * @brief 写入锁的持有者被停止时等锁的 task 读 "Waiting to change files (T1, stopped)"（脚本 tb-flow-lockstop）：
- *        Stop team 停下持有锁的 T1 与只读的 T2；交回 T2，它完成后依赖它的写 task T3 等 T1 的锁。
+ *        Stop agents 停下持有锁的 T1 与只读的 T2；交回 T2，它完成后依赖它的写 task T3 等 T1 的锁。
  */
 async function lockStop(ctx) {
   const who = await begin(ctx, ctx.merged, 'Change two files tb-scenario:tb-flow-lockstop');
@@ -507,7 +507,7 @@ async function lockStop(ctx) {
   await sendMessage(ctx, who.tab, 'Cancel it');
   await settle(ctx, who, 60000);
   record('TB-37 a write task waiting for the lock of a stopped task reads "Waiting to change files (T1, stopped)" '
-    + '(T1 holds the lock while stopped after Stop team; T3 was handed over when its dependency T2 finished)',
+    + '(T1 holds the lock while stopped after Stop agents; T3 was handed over when its dependency T2 finished)',
   stopped === 'T1 Hold the lock · Stopped' && waiting === 'T3 Second write · Waiting to change files '
     + '(T1, stopped)' && board?.lock === 'T1' && board.tasks[0].status === 'stopped',
   brief({ stopped, waiting, lock: board?.lock, tasks: board?.tasks.map((t) => `${t.id}:${t.status}`) }));

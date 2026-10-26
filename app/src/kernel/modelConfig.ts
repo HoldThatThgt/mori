@@ -1,14 +1,14 @@
 // 用户级模型配置 model-config.json 与项目配置 .mori/models.json（docs/specs/model-providers.md §4.1–§4.3、§5.1、§12）：
-// 跨字段校验、由名称生成 id、新 key 的编号、删除的连带改动、改地址删 key、项目路径规范化、项目配置的解析与允许的区域、
-// 选择范围的分类与展开、区域建议、旧会话的选择范围。
+// 跨字段校验、由名称生成 id、新 key 的编号、删除的连带改动、改地址删 key、项目配置的解析、
+// 选择范围的分类与展开、旧会话的选择范围。
 // 纯函数不读文件、不取时间；文件读写只在本文件末尾的几个函数里（原子写：先写临时文件再改名）。
 
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, posix, win32 } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
-  addressChangeText, DEFAULT_ZONES, ModelConfigSchema, ProjectModelsFileSchema, VIRTUAL_PROVIDER_ID, ZONES, suggestZone,
-  type ModelConfig, type ModelGroup, type ModelPick, type ModelProvider, type ProjectModelsFile, type Zone,
+  addressChangeText, ModelConfigSchema, ProjectModelsFileSchema, VIRTUAL_PROVIDER_ID,
+  type ModelConfig, type ModelGroup, type ModelPick, type ModelProvider, type ProjectModelsFile,
 } from '../shared/models';
 import type { ModelRef } from './modelTypes';
 import { renameReplacing } from './renameRetry';
@@ -110,18 +110,9 @@ function checkKeyNumbers(config: ModelConfig, previous: ModelConfig | null, issu
   });
 }
 
-/** @brief allowedZones 只能是 local、intranet 的子集（公网只能按项目授权）。 */
-function checkAllowedZones(config: ModelConfig, issues: ConfigIssue[]): void {
-  config.allowedZones.forEach((zone, index) => {
-    if (!(DEFAULT_ZONES as readonly string[]).includes(zone)) {
-      issues.push({ path: ['allowedZones', index], message: `${zone} can only be allowed per project` });
-    }
-  });
-}
-
 /**
  * @brief 跨字段校验（单字段的规则由 ModelConfigSchema 检查）：id 唯一且不是保留 id、key ref 全局唯一、
- *        引用的名字存在、nextKeyNumber 只增不减、allowedZones 不含 public。
+ *        引用的名字存在、nextKeyNumber 只增不减。
  * @param config 已通过 ModelConfigSchema 的配置
  * @param options 保留 id 与保存前的配置
  * @return 全部错误；没有错误时为空数组
@@ -132,7 +123,6 @@ export function validateConfig(config: ModelConfig, options: ValidateOptions): C
   checkKeyRefs(config, issues);
   checkReferences(config, issues);
   checkKeyNumbers(config, options.previous ?? null, issues);
-  checkAllowedZones(config, issues);
   return issues;
 }
 
@@ -284,15 +274,6 @@ export function modelExists(config: ModelConfig, ref: ModelRef): boolean {
 /** @brief 分组成员（提供商 id 或 <provider>/<model>）在配置里。 */
 function memberExists(config: ModelConfig, member: string): boolean {
   return splitRef(member) ? modelExists(config, member) : findProvider(config, member) !== undefined;
-}
-
-/**
- * @brief 模型所在提供商的区域（§5.3 第 2 步）。
- * @return 区域；区域未确认或模型不在配置里时为 null
- */
-export function zoneOfRef(config: ModelConfig, ref: ModelRef): Zone | null {
-  const split = splitRef(ref);
-  return split ? findProvider(config, split.providerId)?.zone ?? null : null;
 }
 
 // ---- 展开（§5.1、§4.3） ----
@@ -504,20 +485,7 @@ export function applyAddressChange(provider: ModelProvider, baseUrl: string): Ad
   };
 }
 
-// ---- 项目路径、项目配置与允许的区域（§4.1、§4.3） ----
-
-/**
- * @brief 规范化项目路径（§4.1 projectZones 的键）：全部小写、/ 分隔、无结尾 /，并去掉 . 与 .. 段；
- *        因此路径比较不分大小写（Windows）。
- * @param path 项目文件夹的绝对路径
- */
-export function normalizeProjectPath(path: string): string {
-  const windows = /^[A-Za-z]:/.test(path) || path.includes('\\');
-  let normal = windows ? win32.normalize(path).replace(/\\/g, '/') : posix.normalize(path);
-  normal = normal.toLowerCase();
-  while (normal.length > 1 && normal.endsWith('/')) normal = normal.slice(0, -1);
-  return normal;
-}
+// ---- 项目配置（§4.3） ----
 
 /** @brief 项目配置的解析结果：没有文件时 file 为 null；无效时是原因或校验原文（拒绝启动卡显示）。 */
 export type ProjectConfigParse = { ok: true; file: ProjectModelsFile | null } | { ok: false; error: string };
@@ -541,7 +509,7 @@ function checkProjectGroups(config: ModelConfig, file: ProjectModelsFile): strin
 }
 
 /**
- * @brief 解析并校验项目配置（§4.3）：严格校验（只能写 allowedZones 与 groups）、分组存在、列出的项属于用户的分组、
+ * @brief 解析并校验项目配置（§4.3）：严格校验（只能写 groups）、分组存在、列出的项属于用户的分组、
  *        列表不为空。
  * @param text 文件内容；文件不存在时为 null
  * @param config 用户级配置
@@ -562,31 +530,6 @@ export function parseProjectModels(text: string | null, config: ModelConfig): Pr
   }
   const error = checkProjectGroups(config, parsed.data);
   return error === null ? { ok: true, file: parsed.data } : { ok: false, error };
-}
-
-/**
- * @brief 一个项目允许的区域（§4.3）：用户级 allowedZones，加上 projectZones[项目路径]，再与项目配置的 allowedZones
- *        （若写了）取交集。按 local、intranet、public 的顺序。
- * @param config 用户级配置
- * @param projectPath 项目文件夹（任意写法，按 normalizeProjectPath 查授权）
- * @param project 项目配置；没有文件时为 null
- */
-export function projectAllowedZones(config: ModelConfig, projectPath: string,
-  project: ProjectModelsFile | null): Zone[] {
-  const extra = config.projectZones[normalizeProjectPath(projectPath)] ?? [];
-  const granted = new Set<Zone>([...config.allowedZones, ...extra]);
-  const limit = project?.allowedZones;
-  return ZONES.filter((zone) => granted.has(zone) && (!limit || limit.includes(zone)));
-}
-
-// ---- 区域建议（§12，规则在 shared/models.ts 的 suggestZone） ----
-
-/**
- * @brief 每个提供商按地址建议的区域（models.get 的 zoneSuggestions）。
- * @param config 当前配置
- */
-export function zoneSuggestions(config: ModelConfig): Record<string, Zone> {
-  return Object.fromEntries(config.providers.map((provider) => [provider.id, suggestZone(provider.baseUrl)]));
 }
 
 // ---- 会话的选择范围（§5.1） ----

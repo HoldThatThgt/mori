@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { probeStep } from '../fake-endpoint/probes.mjs';
 import { contentText, isSummaryRequest } from '../fake-endpoint/replies.mjs';
 import { appRoot, oneLine, sleep } from './lib.mjs';
@@ -145,9 +145,8 @@ export function model(id, { ctx = 128000, max = 16384, reasoning = false } = {})
 }
 
 /** @brief 一个提供商（openai-completions，没有 key）。 */
-export function provider(id, name, baseUrl, models, { zone = 'local', concurrency = 4 } = {}) {
-  return { id, name, api: 'openai-completions', baseUrl, zone, compat: {}, concurrency, keys: [], nextKeyNumber: 1,
-    models };
+export function provider(id, name, baseUrl, models, { concurrency = 4 } = {}) {
+  return { id, name, api: 'openai-completions', baseUrl, compat: {}, concurrency, keys: [], nextKeyNumber: 1, models };
 }
 
 /** @brief 一个分组。 */
@@ -155,8 +154,7 @@ export const group = (id, members) => ({ id, members });
 
 /** @brief 启动前写好 model-config.json（synthetic test setup：跳过界面上的配置步骤，测的是会话一侧）。 */
 export function seedConfig(ctx, { providers, groups = [], normalDefault = null }) {
-  const config = { version: 1, providers, groups, normalDefault, allowedZones: ['local', 'intranet'],
-    projectZones: {} };
+  const config = { version: 1, providers, groups, normalDefault };
   writeFileSync(join(ctx.userData, 'model-config.json'), `${JSON.stringify(config, null, 2)}\n`);
 }
 
@@ -179,9 +177,6 @@ export function makeProject(ctx, name, extra = {}) {
   }
   return project;
 }
-
-/** @brief 规范化的项目路径（§4.1：全部小写、/ 分隔）。 */
-export const projectKey = (path) => resolve(path).replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
 
 /**
  * @brief 写一个 v0 的旧会话（synthetic test setup）：没有 mori.pick，有 model_change 和一条带 provider/model 的助手消息，

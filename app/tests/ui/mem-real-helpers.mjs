@@ -60,7 +60,7 @@ export const PAGE_TASTE = {
 
 /**
  * @brief 检查负责人的数据目录（§14.1 同平行 Agent 规格 §17.1）：有 model-config.json、credentials.json、Local State，
- *        两个真实提供商（默认 DeepSeek 与 GLM，区域已确认），每个都有 key，并且 key 的 ref 在 credentials.json 里
+ *        两个真实提供商（默认 DeepSeek 与 GLM），每个都有 key，并且 key 的 ref 在 credentials.json 里
  *        （只看键名，不读、不打印、不解密密文）。
  * @param source --source 的值（已 resolve）；没给时为 null
  * @return { found }，或 { error }（一句说明，给命令行）

@@ -13,7 +13,7 @@ import { setLeaveGuard, useLeave } from '../state/leaveGuard';
 import type { Notice } from '../state/settings';
 import { useApp } from '../state/store';
 import { folderName } from './ChatPane';
-import { thousands } from './settings/common';
+import { thousands } from './settings/format';
 
 /** 这一节的第一行：说明写在这里的就是每个会话都读的 AGENTS.md（照 Claude 桌面版 Global instructions 的说明） */
 const INTRO_TEXT = 'Instructions here are saved in the AGENTS.md file that every session reads. Use this for '

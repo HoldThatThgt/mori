@@ -4,7 +4,7 @@
 // v1（docs/v1/screens/model-chat.md）：准备中（发了消息、pi 还没开始）可以停止，再发的按排队处理（不能插话），
 // 显示在排队区；会话被拒绝启动时可以打字，但发送不可用（Enter 不发送，草稿不丢）。
 // 平行 Agent（docs/v1/screens/team-switch.md、team-stop.md）：/task on、/task off 在生成中、被拒绝启动时也按命令处理；
-// 排队区里有立项还没判断完的消息；后台有 Agent 在运行或排队时停止按钮旁有 Stop team。
+// 排队区里有立项还没判断完的消息；后台有 Agent 在运行或排队时停止按钮旁有 Stop agents。
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { roleLabel } from '../../../shared/team';
@@ -81,7 +81,7 @@ interface RowButtonProps {
   tabKey: string;
   /** 类名（send-button、stop-button、queue-button） */
   className: string;
-  /** 名字（读屏名；会话面板宽于 600px 时也是按钮上的字，Stop team 宽于 760px 时才是） */
+  /** 名字（读屏名；会话面板宽于 600px 时也是按钮上的字，Stop agents 宽于 760px 时才是） */
   label: string;
   /** 悬停说明 */
   title: string;
@@ -112,8 +112,8 @@ function RowButton({ tabKey, className, label, title, icon, disabled, testId, on
 }
 
 /**
- * @brief 生成中且有字时的"Queue ▾"：主按钮排队，▾"More send options"的菜单里是"Steer"；会话面板 ≤ 400px（有 Stop team
- *        时 ≤ 520px）时主按钮收起（chat.css），菜单里多出"Queue for later"一项；≤ 340px 有 Stop team 时整组收起（Enter、Ctrl+Enter 照样用），
+ * @brief 生成中且有字时的"Queue ▾"：主按钮排队，▾"More send options"的菜单里是"Steer"；会话面板 ≤ 400px（有 Stop agents
+ *        时 ≤ 520px）时主按钮收起（chat.css），菜单里多出排队的那一项；≤ 340px 有 Stop agents 时整组收起（Enter、Ctrl+Enter 照样用），
  *        开着的菜单随之关上。菜单往上打开、右边对齐 ▾，打开时焦点在第一项，点外面、Tab 移出时关闭，Esc 回到 ▾。
  */
 function QueueMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
@@ -220,19 +220,20 @@ function placeholderText(running: boolean, sending: boolean): string {
 }
 
 /**
- * @brief Stop team（平行 Agent 规格 §11.4、§13.6）：停止这个会话的全部 Agent，不确认；会话面板 ≤ 760px 时就只有
+ * @brief Stop agents（平行 Agent 规格 §11.4、§13.6；2026-10-26 前叫 Stop team）：停止这个会话的全部 Agent，不确认；
+ *        会话面板 ≤ 760px 时就只有
  *        图标（比"Stop"的 600px 早，带字时 601–708px 最挤会截模式名，chat.css）。
  */
 function StopTeamButton({ tabKey }: { tabKey: string }) {
-  return <RowButton tabKey={tabKey} className="stop-team-button" label="Stop team" testId="stop-team"
+  return <RowButton tabKey={tabKey} className="stop-team-button" label="Stop agents" testId="stop-team"
     title="Stop all agents in this session" icon="stop" onClick={() => void stopTeam(tabKey)} />;
 }
 
 /**
  * @brief 发送组：不能发送时的说明（放不下时截短，悬停看全文）；生成中有字时"Queue ▾"、准备中有字时只有一个按钮的
  *        "Queue"（准备中不能插话），加上"Stop"；空闲时的"Send"；后台有 Agent 在运行或排队时，"Stop"或"Send"前的
- *        Stop team。会话被拒绝启动时发送不可用（原因在输入框上方的拒绝启动卡里），/task on、/task off 除外。
- *        会话面板 ≤ 340px 时有 Stop team 就收起排队的按钮（chat.css，models.md"窄栏"）。
+ *        Stop agents。会话被拒绝启动时发送不可用（原因在输入框上方的拒绝启动卡里），/task on、/task off 除外。
+ *        会话面板 ≤ 340px 时有 Stop agents 就收起排队的按钮（chat.css，models.md"窄栏"）。
  */
 function SendGroup({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
   const { running, sending } = tab.transcript;
@@ -266,7 +267,7 @@ function SendGroup({ tab, notReady, hasText }: { tab: Tab; notReady: string | nu
  * @brief 文字框下面一行（docs/v0/screens/chat.md"输入框下面一行"、models.md）：左端权限；右边选择范围、Effort、
  *        上下文用量圆环，最右是发送组。各项都是这一行的直接子项（截短的先后靠 flex-shrink，它只在兄弟之间分宽度，
  *        chat.css）。选择范围、Effort 和圆环在第一次打开中、打开失败时不显示；Restart 之后重新打开中仍显示上一次的值
- *        （不可用，ModelState 没有清空）。没有当前模型时没有 Effort。Stop team 出现、准备中的"Queue"因此藏起时
+ *        （不可用，ModelState 没有清空）。没有当前模型时没有 Effort。Stop agents 出现、准备中的"Queue"因此藏起时
  *        焦点在它上面的回到文字框。
  */
 function ComposerRow({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
