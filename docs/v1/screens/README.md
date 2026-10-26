@@ -43,7 +43,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | 文件 | 内容 | 取代 v0 的 |
 | --- | --- | --- |
 | [models-settings.md](models-settings.md) | 设置 → Models：迁移说明、区域未确认与 Confirm zone、Defaults、Providers（提供商卡、提供商表单的 Base URL 与 API key → Fetch models → 清单 → Add、清单、列表错误、Add a model ID、More settings、卡片上的 Fetch models 与 Not listed by the server、Keys、Models 行与 not reported、Server reports … 提示与 Use、模型表单（只剩 Edit）、档案摘要、需要同意的探针）、Groups、Project access、删除与改地址的确认、配置读不出（拉取模型的部分按发现规格） | [v0 settings.md](../../v0/screens/settings.md)“Connections and models” |
-| [first-run.md](first-run.md) | 首次启动表单（Base URL 与 API key → Fetch models → 清单、Name、API type、网络区域、Add a model ID、More settings 里的兼容选项（只在 OpenAI-compatible 时显示）、探针代价一句；拉取中两个框只读、再拉一次、保存后用内存里的 key 再拉取；没有关闭表单的 Cancel）、Test connection（先保存勾选的全部模型，再测第一个勾选的）、这个模型的探针状态、默认范围（一个模型时是它，多个时是提供商）、Public 的说明、迁移失败（按规格与发现规格 §5.4、§6.1、§6.6） | [v0 connection.md](../../v0/screens/connection.md) 的表单与首次启动 |
+| [first-run.md](first-run.md) | 首次启动表单（Base URL 与 API key → Fetch models → 清单、Name、API type、网络区域、Add a model ID、More settings 里的兼容选项（只在 OpenAI-compatible 时显示）、探针代价一句；拉取中两个框只读、再拉一次、保存后用内存里的 key 再拉取；没有关闭表单的 Cancel）、Test connection（先保存勾选的全部模型，再测第一个勾选的；成功就进入主窗口，2026-10-26 起表单下方没有探针状态）、默认范围（一个模型时是它，多个时是提供商）、Public 的说明、迁移失败（按规格与发现规格 §5.4、§6.1、§6.6） | [v0 connection.md](../../v0/screens/connection.md) 的表单与首次启动 |
 | [model-menu.md](model-menu.md) | 输入框下面一行的选择范围按钮与菜单、按当前模型的思考强度菜单、准备中与生成中不可用 | [v0 models.md](../../v0/screens/models.md) |
 | [model-chat.md](model-chat.md) | 换模型与重建的提示、阶段行（等模型、等它停下、排队、重试、重建）、准备中、No model available 卡、拒绝启动卡、v0 错误卡的规则 | [v0 chat.md](../../v0/screens/chat.md) 的阶段行重试、错误卡“Go to settings”、v0 的模型按钮 |
 | [team-switch.md](team-switch.md) | 顶栏的协作开关（Off / On / Until done、窄栏、不可用）、`/team on`、`/team off`、`/team <文字>`、只有 `/team`，模式怎样变 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的顶栏与输入框 |
@@ -55,7 +55,8 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | [memory-page.md](memory-page.md) | 记忆页：左栏 `Memory`、`User` ｜ `Project` 与跟随的项目、六个分节、用量与 `Last change`、列表与读不出来的条目、条目详情（Evidence、Details 与 `[[slug]]`、Linked from、History）、编辑与新增、离开确认、删除、移动、依据回到原位置、AGENT、Revisions 与回滚、数据何时读、后台进程退出 | [v0 review.md](../../v0/screens/review.md)（工作回顾，M7）的入口、页面、反馈部分与回到原位置；[v0 layout.md](../../v0/screens/layout.md) 左栏的“Review” |
 | [memory-enhance.md](memory-enhance.md) | 记忆页 `Project` 顶部的增强：开关、状态行（规格 §10.4 的每一种）、`Run now`、`Enhancement settings` 对话框、进度事件 | 新增（v0 没有对应的屏） |
 | [memory-chat.md](memory-chat.md) | memory 工具卡（标题、免批准、`View in Memory`、失败）、工具页的 `memory` 行、记忆目录的写保护、新会话顶部的提示、反馈表单的说明与 `Saved` | 补充 [v0 tool-cards.md](../../v0/screens/tool-cards.md)、[v0 tools.md](../../v0/screens/tools.md)；取代 [v0 selection.md](../../v0/screens/selection.md)“反馈”的底部说明与 `Saved · View in Review` |
-| [settings-issues.md](settings-issues.md) | 设置 → `UI issues`（列表、详情与截图、Hide resolved、导出、打开文件夹）、F8 的 `View in Settings` 与 `Page`、设置 → AGENTS.md 的 token 数与超出标记 | [v0 review.md](../../v0/screens/review.md) 的 UI issues 部分与主进程通道；[v0 f8.md](../../v0/screens/f8.md) 的 `View in Review`；补充 [v0 settings.md](../../v0/screens/settings.md) 的 AGENTS.md 节 |
+| [settings-issues.md](settings-issues.md) | 设置 → `UI issues`（列表、详情与截图、Hide resolved、导出、打开文件夹）、F8 的 `View in Settings` 与 `Page`（2026-10-26 改：AGENTS.md 的 token 数随 AGENTS.md 挪到 Customize，见下一行） | [v0 review.md](../../v0/screens/review.md) 的 UI issues 部分与主进程通道；[v0 f8.md](../../v0/screens/f8.md) 的 `View in Review` |
+| [customize-agents-md.md](customize-agents-md.md) | Customize → `Instructions`（用户级 AGENTS.md，2026-10-26 负责人走查 M4、M15）：最后一节、跟随 Customize 的会话、不等 `tools.get`；用户级编辑器、项目加载的文件、token 数与 2,000 token 的提醒线、离开确认；记忆页的 `Edit in Customize` | [v0 settings.md](../../v0/screens/settings.md) 的 AGENTS.md 节；补充 [v0 tools.md](../../v0/screens/tools.md) 的外框 |
 
 时刻 `hh:mm:ss` 一律是本地时间（24 小时制，`shared/models.ts` 的 `formatClock`），由事件里的毫秒时刻（`until`）换算。
 记忆的几张表里日期写 `<Mon D>`（例如 `Oct 22`），时间写 `<Mon D> <hh:mm>`（本地时间，24 小时制，`shared/memory.ts` 的 `monthDay`、`monthDayTime`）。
@@ -69,7 +70,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
   模型按钮生成中的悬停规格 §9.2 已给英文（“Can’t switch models until the response finishes”）；思考强度菜单（强度名、
   “Effort: High”、生成中的悬停）、v0 错误卡的“Put your last message back in the message box”、“Stopped · …”
   “Compacted session”、排队区的“Queued”都是 english-ui 定的英文（v0/ui-strings.md）。
-- 设置页左侧的分节按钮写“Models”（规格 §9.1 的叫法），“AGENTS.md”分节与“Back to app”不变。
+- 设置页左侧的分节按钮写“Models”（规格 §9.1 的叫法），“Back to app”不变（2026-10-26 改：“AGENTS.md”分节挪到 Customize，见 customize-agents-md.md）。
 - 思考关不掉的模型的文字按规格 §7.7 原文（2026-10-24 补丁）：档案摘要“Thinking: Can’t be turned off”、Effort 菜单底部“This model can’t turn thinking off.”，
   探针出错的说明“Stopped at the probe output limit before answering”（同其他出错原文，出现在“Couldn’t verify: …”后面）；
   第 2 步的说明“Thinking can’t be turned off: <原文>”只存在档案文件（`model-profiles.json`）里，界面不显示（[v0/ui-strings.md](../../v0/ui-strings.md) 设置一节）。
@@ -141,7 +142,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `field-error`（`data-field`） | 提供商表单、模型表单、首次启动表单的字段错误 | models-settings.md、first-run.md |
 | `form-message` | 表单的结果文字（沿用 v0） | models-settings.md、first-run.md |
 | `data-action="test-cancel"` | 三处测试与首次启动测试中的“Cancel” | models-settings.md、first-run.md |
-| `connection-form`、`first-run-loading`、`migration-error`、`zone-public-note`、`probe-status`、`open-folder` | 首次启动（`connection-form`、`open-folder` 沿用 v0） | first-run.md |
+| `connection-form`、`first-run-loading`、`migration-error`、`zone-public-note`、`open-folder`、`connected` | 首次启动（`connection-form`、`open-folder` 沿用 v0；`open-folder` 是主窗口的 Open a folder 提示，`connected` 是其中测试成功的结果；2026-10-26 起没有 `probe-status`） | first-run.md |
 | `data-action="fetch-models"`、`data-action="fetch-cancel"`、`fetch-status`（`data-state` 为 `fetching` / `cancelled`）；拉取中 Base URL、API key 输入框的 `readonly`；`data-action="close-form"` | 提供商表单、首次启动表单与提供商卡上的 Fetch models（卡上的取代 `data-action="add-model"`）、拉取中的 Cancel、拉取的状态、拉取中只读的两个框（发现规格 §6.1、§6.5）；提供商表单与卡上清单底部关闭用的 Cancel（拉取中照样可用；首次启动没有） | models-settings.md、first-run.md |
 | `detected-server`（`data-kind` 为 `ServerKind`）、`base-url-note` | 认出的服务（卡上的清单不显示）、Base URL 换成建议值的说明（只在拿到列表时，发现规格 §6.1 第 3 项） | models-settings.md、first-run.md |
 | `list-error`（`data-kind` 为 `rejected` / `unreachable` / `no_list` / `invalid`） | 列表错误（发现规格 §6.3） | models-settings.md、first-run.md |
@@ -176,4 +177,4 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `memory-enhance`、`enhance-switch`、`enhance-status`、`enhance-run`、`enhance-settings`、`enhance-dialog`（`enhance-model`、`enhance-effort`、`enhance-team`、`enhance-time`、`enhance-save`）；`enhance-error` | 增强一块与设置对话框（`enhance-error` 该文件定，临时） | memory-enhance.md |
 | `tool-memory-view`、`memory-notice`、`memory-notice-view`、`feedback-note`、`feedback-saved` | 工具卡的 View in Memory、新会话提示、反馈表单（提示里 `Dismiss` 的 `data-action="dismiss"` 该文件定，临时） | memory-chat.md |
 | `settings-nav` 的 `button[data-section="issues"]`；`issues-*`（由 M7 的 `review-*` 改名）；`issue-open-settings` | 设置页的 UI issues、F8 的 View in Settings | settings-issues.md |
-| `agents-tokens`、`.agents-tokens`、`agents-over` | 设置页 AGENTS.md 节的 token 数与超出标记 | settings-issues.md |
+| `tools-nav` 的 `button[data-section="agents"]`、`agents-section`、`agents-tokens`、`.agents-tokens`、`agents-over` | Customize 的 Instructions 一节、它的 token 数与超出标记（2026-10-26 从设置页挪来） | customize-agents-md.md |

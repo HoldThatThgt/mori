@@ -452,7 +452,7 @@ function fileStubs(status, steps) {
 }
 
 /**
- * @brief 不经过后台进程的桌面能力（任务栏闪烁、F8 截图与保存、打开所在文件夹、保存反馈）：只记下调用。
+ * @brief 不经过后台进程的桌面能力（任务栏闪烁、正在生成的会话数、F8 截图与保存、打开所在文件夹、保存反馈）：只记下调用。
  *        返回的 f8、feedback 由测试改写，制造截图失败、保存失败或较慢的截图与保存。
  *        保存的结果：录制里有 issue、feedback 步骤（M7）时是录下的路径，否则（synthetic）是 replay 的路径。
  */
@@ -465,6 +465,10 @@ function desktopStubs(status, steps) {
     requestAttention() {
       status.attention += 1;
       return Promise.resolve();
+    },
+    // 2026-10-26（docs/v0/screens/window.md）：界面报告给主进程的正在生成的会话数，按顺序记下
+    setBusySessions(count) {
+      status.busySessions.push(count);
     },
     async captureWindow() {
       status.captures += 1;
@@ -566,9 +570,9 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
   const listeners = { event: new Set(), exit: new Set(), ready: new Set() };
   // played：已经放完的段数（每条命令之后、下一条命令之前算一段）；played 等于 cursor 时回放桥在等界面的下一条命令。
   const status = { cursor: 0, played: 0, clock: 0, exited: false, exitCode: null, errors: [], commands: [], queries: [],
-    playing: Promise.resolve(), idle: true, attention: 0, captures: 0, dialogAtCapture: [], issues: [], shown: [],
-    deleted: [], reads: [], opened: [], copied: [], feedback: [], failed: [], issueLists: 0, issueShots: [],
-    exports: [], exportShown: [], recordShown: [], folders: 0, modelWrites: [], discoverCancels: 0 };
+    playing: Promise.resolve(), idle: true, attention: 0, busySessions: [], captures: 0, dialogAtCapture: [],
+    issues: [], shown: [], deleted: [], reads: [], opened: [], copied: [], feedback: [], failed: [], issueLists: 0,
+    issueShots: [], exports: [], exportShown: [], recordShown: [], folders: 0, modelWrites: [], discoverCancels: 0 };
   const { f8, feedback, stubs } = desktopStubs(status, steps);
   const created = steps.find((step) => step.result?.type === 'session.create')?.result.value;
   // synthetic：v1 的设置页（models.get）读到的 key 与项目；models.addKey / removeKey 的应答改它（v1ModelWrite）

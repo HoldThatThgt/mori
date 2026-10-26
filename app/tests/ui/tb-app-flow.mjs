@@ -50,10 +50,15 @@ const IDENTITY_TEXT = [
     + "reason as its result: follow it and don't repeat the call.",
   'The sections after the project information hold what Mori has learned with this user: <taste> how to talk with '
     + 'the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> '
-    + 'what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and '
-    + "questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they "
-    + 'need into the task description or the question.',
+    + 'what is true about the user and this project. Follow them unless the user says otherwise.',
 ].join('\n');
+/** 附录 A.1.1（2026-10-26）：请求的工具里有 task_create、agent_message 或 subagent 时接在 A.1 第三行末尾（记忆规格 §4.1） */
+const HANDOFF_TEXT = 'Tasks you create and questions you send to other agents are worked on by agents that don\'t see '
+  + '<facts>: write the facts they need into the task description or the question.';
+const HANDOFF_TOOLS = ['task_create', 'agent_message', 'subagent'];
+/** @brief 这个请求的身份段开头：A.1，有交出去的工具时加一个空格与 A.1.1，然后空一行是 <tools>。 */
+const identityHead = (item) => `${IDENTITY_TEXT}${item.tools.some((name) => HANDOFF_TOOLS.includes(name))
+  ? ` ${HANDOFF_TEXT}` : ''}\n\n<tools>\n`;
 /** TaskBoard 的工具名（§6.3） */
 const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit', 'request_update',
   'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close'];
@@ -387,10 +392,11 @@ async function sysmd(ctx) {
   const team = requests.filter((item) => item.t < offSince);
   const off = requests.filter((item) => item.t >= offSince);
   // 记忆规格 §4.3、§14.4：身份段总是 Mori 的，项目的 SYSTEM.md 不进 system prompt
-  const identity = (item) => item.system.startsWith(IDENTITY_TEXT) && !item.system.includes('MORI-SYSTEM-MD');
+  const identity = (item) => item.system.startsWith(identityHead(item)) && !item.system.includes('MORI-SYSTEM-MD');
   record('TB-10 with .pi/SYSTEM.md in the (trusted) project: neither the team-mode nor the off-mode request has the '
-    + 'SYSTEM.md text and both start with Mori\'s identity (memory spec §4.3, Appendix A.1); the team-mode request '
-    + 'still has the merged create segment, the off-mode request after it has none',
+    + 'SYSTEM.md text and both start with Mori\'s identity (memory spec §4.3, Appendix A.1, with A.1.1 when the '
+    + 'request has task_create or agent_message); the team-mode request still has the merged create segment, the '
+    + 'off-mode request after it has none',
   team.length === 2 && team.every((item) => identity(item) && item.system.includes(MERGED_SENTENCE))
     && off.length === 1 && identity(off[0]) && !off[0].system.includes(MERGED_SENTENCE),
   brief({ team: team.map((item) => [item.info.kind, item.system.slice(0, 80)]),

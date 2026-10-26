@@ -102,7 +102,7 @@ function ListHead({ list, project, waiting }: { list: MemoryListResult; project:
   );
 }
 
-/** @brief 列表的一行：abstract，右边 You said / Learned 与修改日期；选中的高亮。 */
+/** @brief 列表的一行：abstract，右边 You said / Added by Mori / Learned 与修改日期；选中的高亮。 */
 function EntryButton({ entry }: { entry: EntryRow }) {
   const selected = useMemory((state) => state.panel.kind === 'entry' && state.panel.id === entry.id);
   const unavailable = useUnavailable();

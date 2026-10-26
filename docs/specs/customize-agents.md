@@ -237,7 +237,7 @@ seats: [close]
 ### 6.4 New agent 与 Edit 表单
 
 在列表上方展开一张表单（`data-testid="agent-form"`、`data-mode` 为 `new` / `edit`），同一时刻只有一张；打开别的表单或换分节时收起
-（有改动时离开先问，写法同 AGENTS.md 编辑器的离开确认：标题 `Discard this agent?`，说明 `Your changes haven’t been saved. Leaving now discards them.`）。
+（有改动时离开先问，写法同 AGENTS.md 编辑器的离开确认：标题 `Discard this agent?`，说明 `Your edits haven’t been saved. Leaving now discards them.`）。
 
 | 字段 | 控件 | 说明（字段下面一行） |
 | --- | --- | --- |

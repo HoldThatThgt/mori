@@ -2,21 +2,36 @@
 // M1 起界面换成正式界面，这里只改了找元素的方式，检查的内容与 M0 相同（"未保存时不能测试连接"改为"测试连接会先保存"）。
 // v1（docs/specs/model-providers.md §14.4）：对 pi/models.json 的断言改为 model-config.json；改地址按 v1（key 被删、确认框）；
 // key 的占位文字改为 Keys 行的"Saved"；校验文字为英文。
+// 2026-10-26（WP-13）：多一条 mermaid 图（新依赖，打包后单独载入的代码块），对外连接的检查照旧覆盖它；测打包程序时
+// 另查 app.asar 的 node_modules 里没有 mermaid 和它的依赖（mermaid 是 devDependencies，构建时打进 out/renderer）。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先填 Base URL 和 API key、Fetch models，再在清单里勾
 // fake-coder（page.mjs）；错的 key 在拉取时就是列表错误 rejected，手填模型 ID 后继续。
+// 2026-10-26（负责人走查 M27，docs/v0/screens/window.md）：关掉窗口改为藏进系统托盘，原来"运行中关闭窗口：程序退出"
+// 一项改为：关掉窗口不退出、命令照常运行、第一次弹气泡；再启动一次只叫出窗口；点托盘图标回到窗口；托盘菜单"Exit"
+// 先问（确认框经 tray-helpers.mjs 换掉，按测试给的按钮回答），选"Quit anyway"后有序退出、不留下命令进程。
+// 审查修正（同日）：托盘菜单"Show App"回到窗口；应用菜单是 File（只有"Exit"）、Edit、View、Window，File → Exit 与托盘的
+// "Exit"同一个确认框。
+// 集成修正（同日）：后台进程意外退出后点托盘"Exit"，Mori 10 秒内退出（原来没有窗口、没有托盘图标却一直不退出）。
 // 用法：
 //   node tests/ui/m0-smoke.mjs                         测开发构建（先 npm run build）
 //   node tests/ui/m0-smoke.mjs --exe <Mori.exe 路径>   测打包后的程序
 // 结果写到 test-results/m0-smoke.json；任何一项失败时退出码为 1。
 
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import {
+  closeSync, existsSync, mkdtempSync, writeFileSync, mkdirSync, openSync, readFileSync, readSync, statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
 import { startNetWatch } from './net-watch.mjs';
 import { describeProcesses, sleepProcessIds as testSleeps } from './lib.mjs';
 import { pageHelpers } from './page.mjs';
+import {
+  APP_MENU, appMenu, balloonCalls, clickFileExit, clickTrayIcon, clickTrayItem, closeWindow, exitFromTray, findTray,
+  launchSecond, messageBoxes, NOTICE_MARKER, NOTICE_TEXT, NOTICE_TITLE, QUIT_DETAIL, recordBalloons, stubMessageBox, TRAY_ITEMS,
+  waitWindow, windowState,
+} from './tray-helpers.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
 const exeIndex = process.argv.indexOf('--exe');
@@ -61,18 +76,26 @@ function prepareDirs() {
 }
 
 /**
- * @brief 在首次启动的表单（v1，英文）里用给定的 key 测试连接（会先保存），返回结果文字、是否成功与拉取的结果。
+ * @brief 在首次启动的表单（v1，英文）里用给定的 key 测试连接（会先保存），返回结果文字、是否成功、拉取的结果，以及
+ *        点 Test connection 之前清单里 fake-coder 一行的样子（listed：行数、勾着的、标"Entered by you"的）。
  *        一键拉取模型（model-discovery.md §13.4）：换了 key 就再 Fetch models；错的 key 在拉取时就得到列表错误
  *        （rejected），这时 fake-coder 用 Add a model ID 手填（page.mjs pickIn）。
+ *        2026-10-26（first-run.md）：测试成功时表单关掉、进入主窗口，结果文字在 Open a folder 提示里（page.mjs testResult）。
+ *        since 是点 Test connection 之前的时刻（等这次保存引起的探针用，page.mjs waitProbes）。
  */
 async function saveAndTest(page, apiKey) {
   const h = pageHelpers(page);
+  const form = page.getByTestId('connection-form');
   const fetch = await h.fillConnection({ name: 'Mori endpoint', baseUrl: `http://127.0.0.1:${port}/v1`, zone: 'local',
     apiKey, modelId: 'fake-coder' });
-  const previous = await page.getByTestId('form-message').innerText().catch(() => null);
-  await page.getByTestId('connection-form').locator('[data-action="test"]').click();
-  const text = oneLine(await h.formMessage(previous, { test: true, timeout: 60000 }));
-  return { ok: text.startsWith('Connected'), text, fetch };
+  const row = form.locator('[data-testid="discovered-row"][data-model="fake-coder"]');
+  const listed = { rows: await row.count(), picked: await row.locator('input[name="pick"]:checked').count(),
+    typed: await row.locator('[data-testid="row-tag"][data-kind="entered"]').count() };
+  const previous = await form.getByTestId('form-message').innerText().catch(() => null);
+  const since = Date.now();
+  await form.locator('[data-action="test"]').click();
+  const text = oneLine(await h.testResult(previous, 60000));
+  return { ok: text.startsWith('Connected'), text, fetch, listed, since };
 }
 
 /**
@@ -109,12 +132,13 @@ async function connect(app, page, userData, project) {
     `${JSON.stringify(wrong.fetch)}；${wrong.text.slice(0, 160)}`);
   const literal = await saveAndTest(page, testKey);
   // model-discovery.md §13.4：换回对的 key 后 Fetch models 拿到列表，fake-coder 是在清单里勾的（不是手填的）
-  const row = form.locator('[data-testid="discovered-row"][data-model="fake-coder"]');
-  const listed = { rows: await row.count(), picked: await row.locator('input[name="pick"]:checked').count(),
-    typed: await row.locator('[data-testid="row-tag"][data-kind="entered"]').count() };
-  record('测试连接（换回对的 key 后 Fetch models 拿到列表，在清单里勾 fake-coder）',
-    literal.ok && literal.fetch?.state === 'list' && listed.rows === 1 && listed.picked === 1 && listed.typed === 0,
-    `${JSON.stringify(literal.fetch)}；${JSON.stringify(listed)}；${literal.text.slice(0, 160)}`);
+  const { listed } = literal;
+  const handedOver = await form.count() === 0 && await page.getByTestId('sidebar').count() === 1;
+  record('测试连接（换回对的 key 后 Fetch models 拿到列表，在清单里勾 fake-coder）；成功后首次启动表单关掉，进入主窗口，'
+    + '"Connected · …"在 Open a folder 提示里',
+  literal.ok && literal.fetch?.state === 'list' && listed.rows === 1 && listed.picked === 1 && listed.typed === 0
+    && handedOver, `${JSON.stringify(literal.fetch)}；${JSON.stringify(listed)}；主窗口 ${handedOver}；`
+    + `${literal.text.slice(0, 160)}`);
   const files = readConfigFiles(userData);
   const provider = JSON.parse(files.config).providers?.[0] ?? {};
   const ref = provider.keys?.[0]?.ref;
@@ -123,8 +147,10 @@ async function connect(app, page, userData, project) {
       && provider.keys?.length === 1 && Boolean(ref) && Boolean(JSON.parse(files.credentials)[ref]),
     `keys=${JSON.stringify(provider.keys)}；含明文：config=${files.config.includes(testKey)}`
       + ` pi=${files.pi.includes(testKey)} credentials=${files.credentials.includes(testKey)}`);
-  const probe = await h.waitProbes();
-  record('首次启动：测试成功后等探针跑完，tool calling 已验证', probe === 'verified', `probe-status=${probe}`);
+  // 错的 key 那次保存已存下 error 档案；这次保存会重新探测，等完成时刻不早于点 Test connection 的新档案
+  const probe = await h.waitProbes(literal.since);
+  record('首次启动：测试成功后等这次保存引起的探针跑完（经进程桥读 models.get 的档案），tool calling 已验证',
+    probe === 'verified', `probe=${probe}`);
   await h.openFolder(app, project);
   // M2 起命令要先批准；冒烟测的是批准之外的行为，先切到全部允许。
   await h.allowAll();
@@ -213,6 +239,12 @@ async function chatChecks(app, page, project) {
   const tokens = await page.locator('.prose pre span[style*="--sdm-c"]').count();
   record('代码块由 shiki 高亮（离线）', tokens > 3, `带颜色的 token ${tokens} 个`);
 
+  // 2026-10-26 走查 M16：mermaid 第一次遇到图时才载入（单独的代码块，打包程序里从 app.asar 读），不联网（下面 netCheck）。
+  await sendAndWait(page, 'mermaid diagram');
+  const drawn = await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="mermaid-diagram"]')]
+    .some((host) => host.shadowRoot?.querySelector('svg')), null, { timeout: 20000 }).then(() => true, () => false);
+  record('mermaid 图画出来了（单独载入的代码块，离线）', drawn);
+
   const editCard = await sendAndWait(page, 'edit README');
   const diffText = oneLine(await page.getByTestId('tool-diff').last().evaluate((element) => {
     const pre = element.querySelector('diffs-container')?.shadowRoot?.querySelector('pre');
@@ -268,27 +300,146 @@ async function concurrencyCheck(page, project) {
     `两边都结束=${outcome.both}，增量交替次数=${outcome.switches}，工具调用 A=${outcome.toolsA} B=${outcome.toolsB}`);
 }
 
+/** @brief 窗口回到桌面上（显示着、没有最小化）。 */
+const onScreen = (state) => state.visible && !state.minimized;
+/** @brief 窗口藏进托盘（不显示、也不是最小化）。 */
+const offScreen = (state) => !state.visible && !state.minimized;
+
 /**
- * @brief 命令运行中关闭窗口：程序应自行退出、不弹错误框，并且不留下任何命令进程——
- *        包括这次的 sleep 127，以及前面 #9129 检查里 pi 留下的孤儿进程（M1 起后台进程放在作业对象里）。
- * @param baseline 启动 Mori 之前就已存在的 sleep.exe
+ * @brief 等确认框弹出（记下的个数到 count，最多 5 秒），再等 500 毫秒看 Mori 有没有开始退出；返回记下的确认框。
+ *        不固定等 2 秒，快速集要在 2 分钟内跑完（AGENTS.md"测试分层"）。
  */
-async function closeWhileRunning(app, page, baseline) {
+async function waitBoxes(app, count) {
+  const deadline = Date.now() + 5000;
+  let boxes = await messageBoxes(app);
+  while (boxes.length < count && Date.now() < deadline) {
+    await sleep(100);
+    boxes = await messageBoxes(app);
+  }
+  await sleep(500);
+  return boxes;
+}
+
+/**
+ * @brief 命令运行中关掉窗口（2026-10-26 改，docs/v0/screens/window.md）：窗口藏进托盘，程序不退出，命令照常运行；
+ *        第一次关窗口弹气泡"Mori runs in the system tray"、写下标记文件。返回这次的 sleep 127 进程。
+ */
+async function closeToTray(app, page, userData) {
   const before = new Set(sleepProcessIds());
   await pageHelpers(page).send('run: sleep 127');
   await page.getByTestId('tool-card').last().getByText('Running…').waitFor({ timeout: 20000 });
   await sleep(1000);
   const started = sleepProcessIds().filter((pid) => !before.has(pid));
+  await recordBalloons(app);
+  let exited = false;
+  app.process().once('exit', () => { exited = true; });
+  await closeWindow(app);
+  await sleep(1500);
+  const state = await windowState(app);
+  const running = sleepProcessIds();
+  const alive = started.filter((pid) => running.includes(pid));
+  record('运行中关掉窗口：窗口藏进托盘，程序不退出，命令照常运行', !exited && state && !state.visible && !state.minimized
+    && started.length > 0 && alive.length === started.length,
+    `退出=${exited}；窗口=${JSON.stringify(state)}；这次的 sleep.exe ${started.length} 个，还在运行 ${alive.length} 个`);
+  const balloons = await balloonCalls(app);
+  const marker = existsSync(join(userData, NOTICE_MARKER));
+  const first = balloons[0];
+  record('第一次关掉窗口：托盘气泡"Mori runs in the system tray"和说明（info 图标），写下标记文件',
+    balloons.length === 1 && first.title === NOTICE_TITLE && first.content === NOTICE_TEXT && first.iconType === 'info'
+    && marker, `气泡 ${JSON.stringify(balloons)}；标记文件=${marker}`);
+  return started;
+}
+
+/**
+ * @brief 窗口藏着时：再启动一次 Mori，第二个进程马上退出（退出码 0），已在运行的 Mori 把窗口叫出来；再关窗口不再弹气泡；
+ *        点托盘图标回到窗口。
+ */
+async function reopenFromTray(app, userData) {
+  const code = await launchSecond({ exePath, userData });
+  const shown = await waitWindow(app, onScreen, 5000);
+  record('再启动一次 Mori：第二个进程马上退出（退出码 0），已在运行的 Mori 把窗口叫出来', code === 0 && shown.ok,
+    `第二个进程的退出码=${code}；窗口=${JSON.stringify(shown.state)}`);
+  await closeWindow(app);
+  const hidden = (await waitWindow(app, offScreen, 5000)).state;
+  const balloons = await balloonCalls(app);
+  const tray = await findTray(app);
+  await clickTrayIcon(app);
+  const back = await waitWindow(app, onScreen, 5000);
+  record('再关窗口不再弹气泡；左键点托盘图标回到窗口', !hidden?.visible && balloons.length === 1 && tray.tray && back.ok,
+    `关后窗口=${JSON.stringify(hidden)}；气泡 ${balloons.length} 次；托盘=${JSON.stringify(tray)}；`
+    + `点后窗口=${JSON.stringify(back.state)}`);
+}
+
+/** @brief 托盘菜单"Show App"：关掉窗口后点它，藏起的窗口回到桌面上。 */
+async function showFromMenu(app) {
+  await closeWindow(app);
+  const hidden = await waitWindow(app, offScreen, 5000);
+  await clickTrayItem(app, 'Show App');
+  const back = await waitWindow(app, onScreen, 5000);
+  record('托盘菜单"Show App"：藏起的窗口回到桌面上', hidden.ok && back.ok,
+    `关后窗口=${JSON.stringify(hidden.state)}；点后窗口=${JSON.stringify(back.state)}`);
+}
+
+/**
+ * @brief 应用菜单是 File、Edit、View、Window，File 里只有"Exit"；命令运行中点 File → Exit 同托盘的"Exit"先问（同样的
+ *        确认框），选"Cancel"不退出。在 exitCancelled 之后调用（确认框已换成按"Cancel"回答，第一个是托盘"Exit"的）。
+ */
+async function fileExitCancelled(app) {
+  const menu = await appMenu(app);
+  record('应用菜单：File（只有"Exit"）、Edit、View、Window', JSON.stringify(menu) === JSON.stringify(APP_MENU),
+    JSON.stringify(menu));
+  await clickFileExit(app);
+  const boxes = await waitBoxes(app, 2);
+  record('命令运行中点 File → Exit：同托盘"Exit"的确认框；选"Cancel"不退出',
+    boxes.length === 2 && JSON.stringify(boxes[1].options) === JSON.stringify(boxes[0].options)
+    && app.process().exitCode === null, oneLine(JSON.stringify(boxes.slice(1)), 400));
+}
+
+/**
+ * @brief 托盘菜单只有"Show App"、分隔线、"Exit"；命令运行中点"Exit"先问（"Mori is still working"），选"Cancel"什么都不变。
+ * @param started 这次的 sleep 127 进程
+ */
+async function exitCancelled(app, started) {
+  const tray = await findTray(app);
+  record('托盘菜单："Show App"、分隔线、"Exit"', JSON.stringify(tray.items) === JSON.stringify(TRAY_ITEMS),
+    JSON.stringify(tray));
+  await stubMessageBox(app, 1);
+  await clickTrayItem(app, 'Exit');
+  const boxes = await waitBoxes(app, 1);
+  const box = boxes[0]?.options;
+  const count = QUIT_DETAIL.exec(box?.detail ?? '');
+  record('命令运行中点托盘"Exit"：确认框"Mori is still working"，说明会话数，按钮"Quit anyway""Cancel"，'
+    + '默认与 Esc 都是"Cancel"',
+    boxes.length === 1 && box.type === 'warning' && box.message === 'Mori is still working' && Number(count?.[1]) >= 1
+    && JSON.stringify(box.buttons) === '["Quit anyway","Cancel"]' && box.defaultId === 1 && box.cancelId === 1,
+    oneLine(JSON.stringify(boxes), 400));
+  const running = sleepProcessIds();
+  const alive = started.filter((pid) => running.includes(pid));
+  const state = await windowState(app);
+  record('确认框选"Cancel"：Mori 不退出，命令照常运行', app.process().exitCode === null && Boolean(state)
+    && alive.length === started.length, `这次的 sleep.exe ${started.length} 个，还在运行 ${alive.length} 个`);
+}
+
+/**
+ * @brief 确认框选"Quit anyway"：程序 10 秒内退出、不弹错误框，并且不留下任何命令进程——包括这次的 sleep 127，
+ *        以及前面 #9129 检查里 pi 留下的孤儿进程（M1 起后台进程放在作业对象里；有序关闭从关窗口挪到了真正退出）。
+ * @param baseline 启动 Mori 之前就已存在的 sleep.exe
+ */
+async function exitAnyway(app, baseline) {
   const fromRun = sleepProcessIds().filter((pid) => !baseline.has(pid));
   const diagBefore = describeProcesses(fromRun);
+  await stubMessageBox(app, 0);
   const exited = new Promise((r) => app.process().once('exit', () => r(true)));
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
+  await clickTrayItem(app, 'Exit').catch(() => {});
   const ok = await Promise.race([exited, sleep(10000).then(() => false)]);
   await sleep(1000);
   const left = sleepProcessIds().filter((pid) => !baseline.has(pid));
-  if (left.length) console.log(`DIAG before close:\n  ${diagBefore.join('\n  ')}\nDIAG left:\n  ${describeProcesses(left).join('\n  ')}`);
-  record('运行中关闭窗口：程序退出且不留下任何命令进程（含 #9129 留下的）', ok && started.length > 0 && left.length === 0,
-    `10 秒内退出=${ok}；这次的 sleep.exe ${started.length} 个，本次运行启动的共 ${fromRun.length} 个，退出后剩 ${left.length} 个`);
+  if (left.length) {
+    const lines = (list) => list.map((line) => `\n  ${line}`).join('');
+    console.log(`DIAG before exit:${lines(diagBefore)}\nDIAG left:${lines(describeProcesses(left))}`);
+  }
+  record('确认框选"Quit anyway"：程序 10 秒内退出且不留下任何命令进程（含 #9129 留下的）', ok && left.length === 0,
+    `10 秒内退出=${ok}；本次运行启动的 sleep.exe 共 ${fromRun.length} 个，退出后剩 ${left.length} 个`);
   return ok;
 }
 
@@ -309,9 +460,13 @@ function kernelPid(rootPid) {
   return Number(kernel[0]);
 }
 
-/** @brief 后台进程意外退出：界面提示、请求立即失败；刷新页面后提示仍在。 */
+/**
+ * @brief 后台进程意外退出：界面提示、请求立即失败；刷新页面后提示仍在。之后点托盘"Exit"：没有会话在生成（数是 0），
+ *        不问，Mori 10 秒内退出（docs/v0/screens/window.md"窗口藏着时后台进程意外退出"的 Exit）。
+ */
 async function crashCheck(env) {
   const app = await electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
+  let exited = false;
   try {
     const page = await app.firstWindow();
     // v1：设置 → Models 的提供商卡上"Test connection"用第一个可用的 key 测第一个模型；Keys 行显示"Saved"，不回填明文。
@@ -339,8 +494,50 @@ async function crashCheck(env) {
     record('后台进程意外退出：提示出现、请求立即失败、刷新后仍提示',
       before.startsWith('rejected') && after.startsWith('rejected') && banner,
       `后台进程 PID ${pid}；退出后请求=${before}；刷新后提示=${banner}，请求=${after}`);
+    await stubMessageBox(app, 1);
+    exited = await exitFromTray(app, 10000);
+    const boxes = exited ? [] : await messageBoxes(app).catch((error) => `cannot read: ${oneLine(error)}`);
+    record('后台进程意外退出后点托盘"Exit"：不问，Mori 10 秒内退出', exited, JSON.stringify({ exited, boxes }));
   } finally {
-    await app.close().catch(() => {});
+    // 没退出时强行结束：Playwright 的 close 也走 app.quit()，退不出时会一直等下去
+    if (!exited) app.process().kill();
+  }
+}
+
+/** 只在渲染进程里用、构建时由 Vite 打进 out/renderer 的 mermaid 和它的依赖（devDependencies），不该出现在 app.asar 里 */
+const BUNDLED_ONLY = ['mermaid', '@mermaid-js/parser', 'cytoscape', 'katex'];
+
+/** @brief app.asar 的文件头（asar 格式：前 8 字节是头的长度，之后的 pickle 里第 4–8 字节是 JSON 的长度，再接 JSON）。 */
+function asarHeader(file) {
+  const fd = openSync(file, 'r');
+  try {
+    const head = Buffer.alloc(16);
+    readSync(fd, head, 0, 16, 0);
+    const json = Buffer.alloc(head.readUInt32LE(12));
+    readSync(fd, json, 0, json.length, 16);
+    return JSON.parse(json.toString('utf8'));
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * @brief 打包程序（--exe）的 app.asar：node_modules 下的顶层包里没有 mermaid 和它的依赖（2026-10-26 WP-13 审查：
+ *        electron-builder 会把每个生产依赖的 node_modules 打进 app.asar，mermaid 因此放在 devDependencies）；
+ *        结果里写 app.asar 的大小。
+ */
+function asarCheck(exe) {
+  const name = 'app.asar 的 node_modules 里没有 mermaid 和它的依赖（构建时已打进 out/renderer）';
+  try {
+    const file = join(dirname(exe), 'resources', 'app.asar');
+    const modules = asarHeader(file).files.node_modules?.files ?? {};
+    const names = Object.entries(modules).flatMap(([top, entry]) => (top.startsWith('@')
+      ? Object.keys(entry.files ?? {}).map((child) => `${top}/${child}`) : [top]));
+    const found = BUNDLED_ONLY.filter((item) => names.includes(item));
+    record(name, names.length > 0 && found.length === 0,
+      `app.asar ${statSync(file).size} 字节；node_modules 顶层包 ${names.length} 个；多出的：${found.join(', ') || '无'}`);
+  } catch (error) {
+    record(name, false, oneLine(error, 300));
   }
 }
 
@@ -353,6 +550,7 @@ function netCheck(seen) {
     (seen.errors.length ? `；采样错误：${oneLine(seen.errors[0], 120)}` : ''));
 }
 
+if (exePath) asarCheck(exePath);
 const baseline = new Set(sleepProcessIds());
 const fake = await startFakeEndpoint();
 const { project, userData } = prepareDirs();
@@ -372,7 +570,12 @@ try {
   await timeoutCheck(page);
   await concurrencyCheck(page, project);
   netCheck(net.seen);
-  closed = await closeWhileRunning(app, page, baseline);
+  const started = await closeToTray(app, page, userData);
+  await reopenFromTray(app, userData);
+  await showFromMenu(app);
+  await exitCancelled(app, started);
+  await fileExitCancelled(app);
+  closed = await exitAnyway(app, baseline);
 } catch (error) {
   record('冒烟流程', false, oneLine(error, 300));
 } finally {

@@ -7,6 +7,7 @@ import { IssueReporter } from './components/IssueDialog';
 import { SelectionPopover } from './components/SelectionPopover';
 import { TrustDialog } from './components/TrustDialog';
 import { connectKernel } from './state/actions';
+import { reportBusySessions } from './state/busySessions';
 import 'streamdown/styles.css';
 import './styles/tokens.css';
 import './styles/layout.css';
@@ -24,6 +25,7 @@ import './styles/slash.css';
 import './styles/team.css';
 
 connectKernel();
+reportBusySessions();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

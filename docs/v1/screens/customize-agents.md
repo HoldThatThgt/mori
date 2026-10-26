@@ -64,7 +64,7 @@
 | 不能保存 | Name 或 Description 为空、`Use these, in order` 的列表为空、`Only these` 一个都没勾 | Save 不可用 | — |
 | 保存中 | `roles.save` 还没返回 | Save 变为 `Saving…`，表单不可改 | — |
 | 保存失败 | `roles.save` 返回 `error` | 表单保留你写的；下面 `Couldn’t save:` 和问题行（每条一行），例如 `name "reviewer" is already used by .mori/agents/rev.md`、`A file named .mori/agents/reviewer.md already exists.`、`This agent file no longer exists.` | 改后再存 |
-| 有改动时离开 | 换分节、Back to app、打开别的表单、点侧栏的会话 | 确认框 `Discard this agent?` / `Your changes haven’t been saved. Leaving now discards them.`（同 AGENTS.md 编辑器的离开确认） | Discard；Keep editing |
+| 有改动时离开 | 换分节、Back to app、打开别的表单、点侧栏的会话 | 确认框 `Discard this agent?` / `Your edits haven’t been saved. Leaving now discards them.`（同 AGENTS.md 编辑器的离开确认） | Discard；Keep editing |
 
 ## 删除
 

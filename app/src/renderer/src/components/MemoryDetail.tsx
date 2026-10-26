@@ -19,7 +19,8 @@ import { SESSION_DELETED } from '../state/refActions';
 import { useApp } from '../state/store';
 import { Icon } from '../icons';
 import { ConfirmDialog } from './ConfirmDialog';
-import { LoadError, MemoryMarkdown, unavailableTitle } from './MemoryCommon';
+import { Markdown } from './Markdown';
+import { LoadError, unavailableTitle } from './MemoryCommon';
 import { MemoryForm } from './MemoryForm';
 import { RevisionDetailView } from './MemoryRevisions';
 
@@ -154,7 +155,7 @@ function Details({ entry }: { entry: EntryDetail }) {
     <section className="memory-block">
       <h3 className="memory-label">Details</h3>
       <div className="memory-details">
-        {entry.details.trim() && <MemoryMarkdown text={text} components={components} />}
+        {entry.details.trim() && <Markdown text={text} components={components} />}
       </div>
     </section>
   );

@@ -162,6 +162,29 @@
 .prose table { border-collapse: collapse; font-size: var(--fs-small); }
 .prose th, .prose td { padding: 6px 10px; border: 1px solid var(--color-line); text-align: left; vertical-align: top; }
 .prose th { background: var(--color-surface); font-weight: 600; }
+/* 图片：streamdown 用 Tailwind 的 hidden 藏起没载入的图，这里补上；替代文字"Image not available" */
+.prose [data-streamdown='image'] { max-width: 100%; }
+.prose [data-streamdown='image'].hidden { display: none; }
+.prose [data-streamdown='image-fallback'] { color: var(--color-muted); font-size: var(--fs-small); font-style: italic; }
+/* mermaid 图（MermaidBlock.tsx；docs/v0/screens/chat.md"图"）：SVG 在 shadow DOM 里，框和代码块一样；画好前是空框 */
+.prose .mermaid-diagram {
+  margin: 0 0 12px;
+  padding: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-canvas);
+}
+.prose .mermaid-diagram[aria-busy='true'] { min-height: 96px; }
+/* mermaid 画图时用的容器：铺满窗口但看不见、不挡鼠标（量字的大小要在文档里排版） */
+.mermaid-stage {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
 
 /* 思考 */
 .thinking { margin: 0 0 10px; color: var(--color-faint); font-size: var(--fs-small); }
@@ -429,9 +452,39 @@
 }
 .usage-head { display: flex; justify-content: space-between; gap: 12px; color: var(--color-text); }
 .usage-head span:last-child { color: var(--color-muted); white-space: nowrap; }
-.usage-bar { height: 4px; margin-top: 8px; overflow: hidden; border-radius: 2px; background: var(--color-line); }
-.usage-bar span { display: block; height: 100%; background: var(--ring-color); }
 .usage-note { margin: 6px 0 0; color: var(--color-muted); line-height: 1.6; }
+/* 分项（models.md"详情里的分项"）：4px 的分段条，各段按 token 数占比（flex-grow 是 token 数，写在元素上），
+   段间 2px 的空白露出详情的底色，不为 0 的段至少 2px；每项一行照 Claude：10px 的色块、名字、数（淡）、
+   44px 宽右对齐的百分比。颜色见 tokens.css 的 --color-part-*（defaults.md"上下文分项的颜色"） */
+.usage-bar { display: flex; gap: 2px; height: 4px; margin-top: 8px; overflow: hidden; border-radius: 2px; }
+.usage-segment { flex: 0 1 0; min-width: 2px; height: 100%; }
+.usage-parts { margin: 8px 0 0; padding: 0; list-style: none; }
+.usage-part { display: flex; align-items: center; gap: 6px; line-height: 1.7; }
+.usage-swatch { flex: none; width: 10px; height: 10px; border-radius: 2px; }
+.usage-part-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-part-count { flex: none; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.usage-part-percent {
+  flex: none;
+  width: 44px;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.part-systemPrompt { background: var(--color-part-prompt); }
+.part-systemTools { background: var(--color-part-tools); }
+.part-mcpTools { background: var(--color-part-mcp); }
+.part-memoryFiles { background: var(--color-part-memory); }
+.part-skills { background: var(--color-part-skills); }
+.part-messages { background: var(--color-part-messages); }
+.part-autocompactBuffer { background: var(--color-faint); }
+.part-freeSpace { background: var(--color-line); }
 
 .menu {
   position: absolute;

@@ -39,6 +39,7 @@
 //   - 用户消息含 "wait <秒数>s then run: <命令>"：等这么多秒再调用 bash 工具执行该命令（测界面重新加载后才来的批准请求）。
 //   - 用户消息含 "wait <秒数>s"：等这么多秒再回复一段文字（测生成中切走、"Unread"）。
 //   - 用户消息含 "code block"：返回一段带 ts 代码块的 Markdown。
+//   - 用户消息含 "mermaid diagram"：返回一段带 mermaid 流程图代码块的 Markdown（2026-10-26，测图离线画出）。
 //   - 用户消息含 "echo back"：回复"收到的全文："加这条用户消息的全文（测引用块确实发给了模型）。
 //   - 用户消息含 "long reply"：流式返回四段较长的文字（测生成中选字、反馈）。
 //   - 用户消息含 "think first"：先流式返回一段思考（reasoning_content），再返回一句文字（测会话引用不含思考）。
@@ -75,7 +76,9 @@
 //     -noschema（第 6 步忽略 schema）、-truncate（第 8 步估算输入超过 max_model_len 的 70% 时静默丢掉开头，答不出暗号）、
 //     -replay（开了思考时每次回复都带 reasoning_content；有带工具调用、没有 reasoning_content 的助手消息，且这次请求开了思考
 //     或那个调用是本端点开着思考时发出的，就返回 400，探针第 4 步"不带"推理内容时因此被拒；对所有请求都生效）。
-//   - 只作用于不是探针的请求：-404（返回 404）、-hang（不回响应头，等对方断开）、-stall（回了响应头后不发内容）。
+//   - 只作用于不是探针的请求：-404（返回 404）、-400（返回 400）、-hang（不回响应头，等对方断开）、-stall（回了响应头后
+//     不发内容）。-400 是 2026-10-26 加的：模型池对 400 不记不可用（§5.4 request），同一个模型可以反复测试连接、每次都
+//     到端点；-404 会让模型池记下 not_found，之后没改配置的测试不再发出（md-app-firstrun 的 A20 检查因此用 -400）。
 //   - -nocancel：对方中途断开后，/metrics 的进行中计数 10 秒后才回落（对所有请求都生效，探针第 9 步靠它判出 false）。
 //   - -alwaysthink：不论请求带不带思考参数，每个回复（探针、对话、压缩请求）都先回一段 reasoning_content，像总在思考的
 //     模型；回复本来就有思考（think first、thinking check）时不变。探针因此给没勾 Supports thinking 的模型记下推理字段
@@ -235,8 +238,8 @@ const state = {
 /** 工具调用 id 的前缀：端口与进程启动时刻，端点重启或多个端点之间也不重复 */
 const callIdPrefix = `call_fake_${port}_${Date.now().toString(36)}`;
 
-const SUFFIXES = new Set(['notools', 'nochoice', 'noschema', 'replay', 'truncate', '404', 'hang', 'stall', 'nocancel',
-  'alwaysthink', 'nooff', 'thinklong']);
+const SUFFIXES = new Set(['notools', 'nochoice', 'noschema', 'replay', 'truncate', '404', '400', 'hang', 'stall',
+  'nocancel', 'alwaysthink', 'nooff', 'thinklong']);
 const NO_KEY = 'none';
 const NOCANCEL_MS = 10000;
 const SLOW_MS = 8000;
@@ -443,11 +446,16 @@ function readJson(req) {
   });
 }
 
-/** @brief 不是探针的请求按 -404、-hang、-stall 处理；处理了返回 true。 */
+/** @brief 不是探针的请求按 -404、-400、-hang、-stall 处理；处理了返回 true。 */
 function nonProbeSuffix(res, body, flags, log) {
   if (flags.has('404')) {
     log(404);
     sendJson(res, 404, errorBody(`The model \`${body.model}\` does not exist.`, 'NotFoundError', 404));
+    return true;
+  }
+  if (flags.has('400')) {
+    log(400);
+    sendJson(res, 400, errorBody(`Synthetic bad request for \`${body.model}\`.`, 'invalid_request_error', 400));
     return true;
   }
   if (flags.has('hang')) {

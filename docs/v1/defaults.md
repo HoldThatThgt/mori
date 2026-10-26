@@ -100,8 +100,11 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 看不见的会话遇到还没有信任决定的项目 | 按不信任，不加载项目的扩展与技能，不询问 | `app/src/kernel/sessions.ts`（startHeadless） | 没有人回答信任询问；v0 的规则是不经询问不加载项目扩展 | 你走查增强、需要增强用项目扩展时 |
 | 增强运行中关掉这个项目的增强 | 正在跑的那一次立即停止、记为失败（`Enhancement was turned off`），水位不动 | `app/src/kernel/enhance.ts` | 关掉就是不要它再跑；没读完的部分下次打开后照 `since` 的规则处理 | 你走查时 |
 | 协作模式的增强运行里有需求等你拿主意 | 会话与 Team 都空闲时算结束、修订 `done`，需求留在 TaskBoard 上 | `app/src/kernel/enhanceRun.ts` | 看不见的会话没人回答，等下去就永远不结束 | 你走查协作模式的增强时 |
-| `agent` 调用方的 `save`、`update` 要带 `quote` | 必填 | `app/src/kernel/memoryRules.ts`（toolFieldError）、`app/src/kernel/memoryText.ts`（说明与 Correct form） | proposal §8.1 的依据是你的原话，记下的条目算“你说的” | 你走查对话里记一条、真实模型常漏写原话时 |
-| 在记忆页改一条“它学的” | 改后为 `You said`，之后增强不能再改它 | `app/src/kernel/memory.ts` | proposal §4 把你手写的算“你说的”；要退回可以回滚这次修改 | 你走查记忆页时 |
+| `agent` 调用方的 `save`、`update` 要带 `quote` | 必填 | `app/src/kernel/memoryRules.ts`（toolFieldError）、`app/src/kernel/memoryText.ts`（说明与 Correct form） | proposal §8.1 的依据是你的原话；主动记的（2026-10-26）也一样，是你说出事实或纠正它的那句话 | 你走查对话里记一条、真实模型常漏写原话时 |
+| 在记忆页改一条“它学的”或“Mori 记的” | 改后为 `You said`，之后增强不能再改它 | `app/src/kernel/memory.ts` | proposal §4 把你手写的算“你说的”；要退回可以回滚这次修改 | 你走查记忆页时 |
+| memory 工具没给 `asked`（2026-10-26，规格 §6.4、§12） | 按 `false`：记下的条目算 Mori 记的（`source: agent`，`Added by Mori`） | `app/src/kernel/memoryRules.ts` `sourceAfter`；`app/src/kernel/memoryTool.ts`（schema） | 标错成“你说的”会让增强永远改不了它；标成 Mori 记的，最坏是增强改了它或把它移到别的种类，你的原话还在、可以回滚 | 真实模型走查（mem-real 的 dialog）里模型常把“记一下”的话也漏给 `asked` 时 |
+| Mori 主动改一条“你说的”（2026-10-26） | 仍是 `You said`；`asked` 为假时只把 `learned` 改为 `agent` | `app/src/kernel/memoryRules.ts` `sourceAfter` | Mori 自己改不该把你说的条目交给增强 | 你走查时 |
+| 增强把 Mori 记的条目移到另一种（2026-10-26，规格 §6.9） | 只移本项目 `agent` 条目、这次运行的种类是一端；不要求依据；slug 不变（`<kind>-<日期>-<4 位>` 里的旧种类名照留）；加在目标种类末尾，回滚回到原种类末尾 | `app/src/kernel/memory.ts`（`update` 带目标种类）、`app/src/kernel/memoryRules.ts`（`writeRefusal`、`mergeRunChange`）、`app/src/kernel/memoryTool.ts`（`move`） | 移动不改条目的内容，你的原话与原来的依据都在；要求新依据会让前几天记的条目永远移不动；改 slug 要改文件名和 `[[slug]]` 链接 | 你走查重新归类、觉得移动也该带依据时 |
 
 ## Customize › Agents
 

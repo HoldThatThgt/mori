@@ -17,6 +17,21 @@ export interface ToolsState {
   error: string | null;
 }
 
+/**
+ * @brief Customize 的分节：读 tools.get 的四节（Built-in tools、Skills、MCP、Plugins）和最后一节 Instructions
+ *        （agents：用户级 AGENTS.md，自己读 agents.get，docs/v1/screens/customize-agents-md.md）。
+ */
+export type ToolsSection = 'builtin' | 'skills' | 'mcp' | 'plugins' | 'agents';
+
+/** @brief Customize 选中的分节。 */
+export interface ToolsNav {
+  /** 选中的分节；null 或这一节此刻不在列表里时是第一节（有会话时 Built-in tools，没有时 Skills） */
+  chosen: ToolsSection | null;
+}
+
+/** @brief Customize 选中的分节：每次进入时由 openTools 设好（侧栏进入为 null，记忆页的 Edit in Customize 为 agents）。 */
+export const useToolsNav = create<ToolsNav>(() => ({ chosen: null }));
+
 /** 离开工具页后的状态：下次进入时先显示"Loading…" */
 const EMPTY: ToolsState = { sessionId: null, info: null, error: null };
 

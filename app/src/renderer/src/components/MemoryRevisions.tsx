@@ -5,12 +5,13 @@
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { useShallow } from 'zustand/react/shallow';
 import {
-  countsText, formatTokens, KIND_LABEL, monthDay, monthDayTime, type RevisionAction, type RevisionChange,
+  changeKindText, countsText, formatTokens, monthDay, monthDayTime, type RevisionAction, type RevisionChange,
   type RevisionDetail, type RevisionRow, type RevisionRun,
 } from '../../../shared/memory';
 import { rollbackRevision, selectRevision, useMemory, useUnavailable } from '../state/memory';
+import { Markdown } from './Markdown';
 import { moveMenuFocus } from './menu';
-import { LoadError, MemoryMarkdown, unavailableTitle } from './MemoryCommon';
+import { LoadError, unavailableTitle } from './MemoryCommon';
 
 /** 改动前后的对照：上下合并、长行折行（同 Diff.tsx，M4） */
 const DIFF_OPTIONS = { diffStyle: 'unified', overflow: 'wrap' } as const;
@@ -89,8 +90,9 @@ function changeAbstract(change: RevisionChange): string {
 }
 
 /**
- * @brief 一处改动：`<Added|Changed|Deleted|Moved> · <KIND> · <abstract>`、依据（`Evidence: …`）或说明（`Note: …`，
- *        内核读出的原文不带这两个前缀）、前后两份 detail 文件的对照；点小标题展开、收起（同 M4 的卡片），默认展开。
+ * @brief 一处改动：`<Added|Changed|Deleted|Moved> · <KIND> · <abstract>`（移到另一种时 `Changed · <原> → <目标> · …`，
+ *        §6.9）、依据（`Evidence: …`）或说明（`Note: …`，内核读出的原文不带这两个前缀）、前后两份 detail 文件的对照；
+ *        点小标题展开、收起（同 M4 的卡片），默认展开。
  */
 function ChangeBlock({ change }: { change: RevisionChange }) {
   const from = change.from?.slug ?? change.to?.slug ?? 'entry';
@@ -98,7 +100,7 @@ function ChangeBlock({ change }: { change: RevisionChange }) {
   return (
     <details className="memory-change" open>
       <summary className="memory-change-title">
-        {ACTION_LABEL[change.action]} · {KIND_LABEL[change.kind]} · {changeAbstract(change)}</summary>
+        {ACTION_LABEL[change.action]} · {changeKindText(change)} · {changeAbstract(change)}</summary>
       {change.evidence && <p className="memory-change-note">Evidence: {change.evidence}</p>}
       {change.note && <p className="memory-change-note">Note: {change.note}</p>}
       <div className="memory-diff">
@@ -125,7 +127,7 @@ function RevisionBody({ revision }: { revision: RevisionDetail }) {
       {revision.notes !== null && (
         <section className="memory-block">
           <h3 className="memory-label">Notes</h3>
-          <div className="memory-details"><MemoryMarkdown text={revision.notes} /></div>
+          <div className="memory-details"><Markdown text={revision.notes} /></div>
         </section>
       )}
       <div className="memory-actions">
