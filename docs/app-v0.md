@@ -76,8 +76,9 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 不联网），经 streamdown 的自定义渲染接口接上，见 [v0/screens/chat.md](v0/screens/chat.md)"图"。它放在 `devDependencies`：
 只在渲染进程里用，构建时由 Vite 打进 `out/renderer`；electron-builder 会把每个生产依赖的 `node_modules` 另外打进 `app.asar`，
 放在 `dependencies` 时会多带 mermaid 和它的 112 个依赖（磁盘上约 130MB，多半是 source map），程序里没有任何地方载入它们。
-`app.asar` 改前 149,536,141 字节、安装包 141,528,594 字节（app-v0 在 2026-10-26 01:18 的构建）；改后只多 `out/renderer`
-里 mermaid 的约 6.4MB，由集成阶段打包后量（`m0-smoke --exe` 记下 `app.asar` 的大小并查其中没有 mermaid）。）
+`app.asar` 改前 149,536,141 字节、安装包 141,528,594 字节（app-v0 在 2026-10-26 01:18 的构建）；集成时（2026-10-26，
+合进当时的 app-v0 后打包）`app.asar` 156,325,955 字节（多 6,789,814，含其间合进的别的包）、安装包 142,569,816 字节
+（多 1,041,222）；`m0-smoke --exe` 查过 `app.asar` 的 `node_modules` 里没有 mermaid 和它的依赖。）
 
 ## 4. 谁负责什么
 
