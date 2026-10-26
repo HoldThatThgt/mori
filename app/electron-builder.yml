@@ -7,6 +7,9 @@ files:
   - out/**
   - package.json
 asar: true
+# 托盘图标（src/main/tray.ts）：Windows 用系统接口按路径读 .ico，放进 app.asar.unpacked，让它读的是磁盘上的文件。
+asarUnpack:
+  - out/main/chunks/*.ico
 npmRebuild: false
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/

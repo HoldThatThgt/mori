@@ -75,10 +75,25 @@ export function isUnsaved(row: Row): boolean {
   return !(row.tab?.transcript.firstUserText ?? row.tab?.preview ?? row.saved?.firstMessage);
 }
 
+/** @brief 这个状态算正在生成（"Running"、"Needs approval"、"Needs input"）。 */
+function busyStatus(status: SessionStatus | null): boolean {
+  return status === 'running' || status === 'approval' || status === 'question';
+}
+
 /** @brief 正在生成（"Running"、"Needs approval"、"Needs input"）：不能归档、删除。 */
 export function isBusy(row: Row): boolean {
-  const status = rowStatus(row);
-  return status === 'running' || status === 'approval' || status === 'question';
+  return busyStatus(rowStatus(row));
+}
+
+/**
+ * @brief 正在生成的会话数，与 isBusy 同一规则：本次打开过的看对话流，其余看会话列表带回的 live（界面重新加载后还没点开的）。
+ *        托盘菜单的"Exit"按它决定先不先问（docs/v0/screens/window.md）。
+ */
+export function busyCount(tabs: Tab[], sessions: SavedSession[]): number {
+  const open = tabs.filter((tab) => busyStatus(sessionStatus(tab))).length;
+  const others = sessions.filter((saved) => busyStatus(savedStatus(saved, null))
+    && !tabs.some((tab) => sameFile(tab.sessionFile, saved.sessionFile))).length;
+  return open + others;
 }
 
 /** @brief 名字或第一条消息的前 TITLE_LENGTH 个字（改名框预先填的名字，不带省略号）。 */

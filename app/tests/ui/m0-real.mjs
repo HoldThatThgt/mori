@@ -1,5 +1,6 @@
 // M0 真实端点走查（走查项 2–3）：测试连接 →"总结 README"，确认流式文字与原生工具调用。
-// 脚本不接触 key：先用 --setup 打开 Mori，由你在界面里填连接并保存（key 由 Mori 加密保存），等探针显示 Verified 后关闭窗口；
+// 脚本不接触 key：先用 --setup 打开 Mori，由你在界面里填连接并保存（key 由 Mori 加密保存），等探针显示 Verified 后
+// 从托盘菜单选"Exit"退出（2026-10-26 起关掉窗口只是藏进托盘）；
 // 之后不带 --setup 运行，脚本用同一个数据目录走查。用法：
 //   node tests/ui/m0-real.mjs --user-data <目录> --setup [--exe <Mori.exe 路径>]
 //   node tests/ui/m0-real.mjs --user-data <目录> [--exe <Mori.exe 路径>]
@@ -32,8 +33,8 @@ const launch = () => {
 };
 
 /**
- * @brief --setup：打开 Mori，等你填好连接、保存并关闭窗口。数据目录里已有 v1 的 model-config.json 或 v0 的
- *        pi/models.json（迁移）时，窗口直接打开 设置 → Models 而不是首次启动表单（§4.5）。
+ * @brief --setup：打开 Mori，等你填好连接、保存并从托盘菜单"Exit"退出（关掉窗口只是藏进托盘，docs/v0/screens/window.md）。
+ *        数据目录里已有 v1 的 model-config.json 或 v0 的 pi/models.json（迁移）时，窗口直接打开 设置 → Models 而不是首次启动表单（§4.5）。
  */
 async function setup() {
   const previous = existsSync(join(userData, 'model-config.json')) || existsSync(join(userData, 'pi', 'models.json'));
@@ -42,7 +43,8 @@ async function setup() {
     ? 'Mori 已打开：数据目录里已有模型配置，窗口打开在 Settings → Models。确认各提供商的 Network zone，需要时添加提供商并测试连接；'
     : 'Mori 已打开：在首次启动表单里填 Base URL、API key，点 Fetch models，在清单里勾模型（没列出时用 Add a model ID '
       + '手填），确认 Name、Network zone，测试连接后保存；');
-  console.log('等每个模型的 Tool calling 都显示 Verified 后再关闭窗口（探针没跑完就关，下次启动会重新探测）。');
+  console.log('等每个模型的 Tool calling 都显示 Verified 后，右键系统托盘里的 Mori 图标选 Exit 退出'
+    + '（关掉窗口只是藏进托盘；探针没跑完就退出，下次启动会重新探测）。');
   await new Promise((done) => app.process().once('exit', done));
   console.log(`已退出。数据目录：${userData}`);
 }

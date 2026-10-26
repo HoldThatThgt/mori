@@ -83,7 +83,7 @@ token 用 `estimateMemoryTokens`，每个文件单独算（中日韩字符每个
 | 离开时有未保存的改动 | 你点了 `Back to app`、换到 Customize 的另一节（点或 ↑ ↓，2026-10-26 改：原来 Customize 换分节不问）、点了侧栏的会话 / 项目行的 +（2026-10-26 起取代 `New session`） / `Open folder…` / `Memory` / `Settings`、按 Ctrl+N、F8 报告框的 `View in Settings` | 确认框 `Discard changes to AGENTS.md?`，说明 `Your edits haven’t been saved. Leaving now discards them.`；按钮 `Discard` 和 `Keep editing`，焦点在 `Keep editing`，Esc 等于 `Keep editing` | Discard（编辑框回到读到的内容，照常离开；离开没有发生时，例如取消了选文件夹，留在这里，没有未保存的改动）；Keep editing（留在这里，什么都不变：点的已归档会话不恢复，焦点回到编辑框） |
 | 点当前分节 | 你点了已经选中的 `Instructions` | 不问，什么都不变 | — |
 | 把会话拖到 Customize 上 | 中栏是 Customize 时不能放下（同设置页，v0 split.md） | 不离开、不问，改动还在 | — |
-| 关闭 Mori 窗口 | — | 不问（交付说明列出，同 v0） | — |
+| 关闭 Mori 窗口 | — | 不问（交付说明列出，同 v0）。2026-10-26 起（WP-20，[v0 window.md](../../v0/screens/window.md)）关掉窗口只是藏进系统托盘，编辑框里的改动原样留着，回到窗口时还在；托盘菜单或 File 菜单的 `Exit` 退出时也不问这件事（它们只在有会话正在生成时问），没保存的改动随退出丢掉 | — |
 
 ## 后台进程退出时
 

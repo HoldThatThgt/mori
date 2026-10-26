@@ -13,7 +13,8 @@
 // 用户级 AGENTS.md（2026-10-26 负责人走查 M4 起是 Customize 的最后一节 Instructions，docs/v1/screens/customize-agents-md.md：
 // 分节的顺序与名字、第一行说明、空状态、保存与 Ctrl+S、撤销改动、生效的文件、AGENTS.override.md 与 CLAUDE.md 的警示、新会话的系统提示里有、
 // 之前打开的会话没有、离开时有未保存改动的确认框（含换分节、Memory、Settings）、已在 Customize 时点 Customize 与点当前分节
-// 不问、拖到 Customize 上、取消选文件夹、已归档的会话、关闭窗口时不问）、项目级列表与用系统编辑器打开、跟随 Customize 的会话
+// 不问、拖到 Customize 上、取消选文件夹、已归档的会话、关闭窗口时不问（2026-10-26 起关窗口藏进托盘，
+// docs/v0/screens/window.md：改动留着；从托盘菜单"Exit"退出时也不问））、项目级列表与用系统编辑器打开、跟随 Customize 的会话
 // （归档后换成没有会话、会话还在打开中时不说没有会话、后台进程退出时不是"Loading…"、Restart 后重新读取失败）；
 // settings.json 读不出；输入框下面一行的窄栏（2026-10-21 起选择范围、Effort、权限按钮从顶栏移到这一行，
 // docs/v0/composer-pickers.md：按 680 / 600 / 460 / 400 / 340px 分档，范围按钮任何宽度最长 200px，菜单往上打开）；
@@ -38,6 +39,9 @@ import {
   seenStates, startFakeEndpoint, watchStates,
 } from './m6-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
+import {
+  closeWindow, exitFromTray, messageBoxes, recordBalloons, stubMessageBox, waitWindow, windowState,
+} from './tray-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -1328,20 +1332,35 @@ async function reopen(ctx) {
 }
 
 /**
- * @brief AGENTS.md 有未保存的改动时关闭 Mori 窗口（主进程里关窗口，同点右上角的关闭）：不问，直接关闭（Mori 退出），
- *        AGENTS.md 不变（settings.md"关闭 Mori 窗口时不问"）。
+ * @brief AGENTS.md 有未保存的改动时关闭 Mori 窗口（主进程里关窗口，同点右上角的关闭）：不问；2026-10-26 起窗口藏进托盘
+ *        （docs/v0/screens/window.md），Mori 不退出，回到窗口时改动还在。再从托盘菜单"Exit"退出（没有会话在生成）：
+ *        也不问，直接退出，AGENTS.md 不变（settings.md"关闭 Mori 窗口时不问"）。确认框换成按"Cancel"回答：
+ *        弹了确认框 Mori 就不会退出，这时读出确认框，再用 Playwright 的 close 收尾。
  */
 async function closeWithDraft(ctx) {
   const { page } = ctx;
   await openAgents(page);
-  await page.getByTestId('agents-editor').fill(`${ctx.agentsSaved}关窗口前没保存的一行\n`);
+  const draft = `${ctx.agentsSaved}关窗口前没保存的一行\n`;
+  await page.getByTestId('agents-editor').fill(draft);
   const status = (await agentsState(page)).status;
-  const closed = ctx.app.waitForEvent('close', { timeout: 30000 }).then(() => true, () => false);
-  await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {});
-  const ok = await closed;
-  if (!ok) await ctx.app.close().catch(() => {});
-  record('AGENTS.md 有未保存的改动时关闭 Mori 窗口：不问，直接关闭；AGENTS.md 不变', status === 'Unsaved changes' && ok
-    && readText(userAgents(ctx)) === ctx.agentsSaved, JSON.stringify({ status, closed: ok }));
+  await recordBalloons(ctx.app);
+  await closeWindow(ctx.app);
+  await sleep(1000);
+  const hidden = await windowState(ctx.app);
+  const leaveAsked = await page.evaluate(() => Boolean(document.querySelector('[data-testid="leave-dialog"]')));
+  await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.show());
+  const shown = await waitWindow(ctx.app, (state) => state.visible, 5000);
+  const back = await agentsState(page);
+  record('AGENTS.md 有未保存的改动时关闭 Mori 窗口：不问，窗口藏进托盘（Mori 不退出），回到窗口时改动还在',
+    status === 'Unsaved changes' && hidden?.visible === false && !leaveAsked && shown.ok && back.editor === draft
+    && back.status === 'Unsaved changes',
+    JSON.stringify({ status, hidden, leaveAsked, shown: shown.state, back: back.status }));
+  await stubMessageBox(ctx.app, 1);
+  const exited = await exitFromTray(ctx.app);
+  const boxes = exited ? [] : await messageBoxes(ctx.app).catch((error) => `cannot read: ${oneLine(error)}`);
+  if (!exited) await ctx.app.close().catch(() => {});
+  record('有未保存的改动时从托盘菜单"Exit"退出（没有会话在生成）：不问，直接退出；AGENTS.md 不变',
+    exited && readText(userAgents(ctx)) === ctx.agentsSaved, JSON.stringify({ exited, boxes }));
 }
 
 /**

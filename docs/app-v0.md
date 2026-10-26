@@ -101,6 +101,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | 记忆与记忆页（2026-10-22 加） | **Mori**（记忆模块、memory 工具，[specs/memory.md](specs/memory.md) §3、§6、§7） | 记忆页（"Memory"）替换工作回顾：浏览、编辑、移动、回滚；对话里的 memory 工具卡 |
 | 增强任务（2026-10-22 加） | **Mori**（每个项目的开关与每天的时刻、全应用串行的队列、看不见的会话，[specs/memory.md](specs/memory.md) §9） | 记忆页本项目顶部的开关、状态行、"Run now"、"Enhancement settings"；新会话顶部的提示 |
 | 离线安装、进程桥 | **Mori** | — |
+| 窗口、系统托盘与退出（2026-10-26 加） | **Mori**（主进程，照 Claude 桌面版：关掉窗口留在托盘、单实例、有会话正在生成时退出先问，[v0/screens/window.md](v0/screens/window.md)） | 托盘图标与菜单（"Show App"、"Exit"）、应用菜单的 File → Exit、第一次关窗口的气泡、退出前的确认框 |
 
 **pi 没有、v0 也不补的能力**（以后真用起来缺了再加）：
 
@@ -127,6 +128,10 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   （2026-10-26 走查 M23：右栏没有上限，拖到中栏只剩 300px 为止；右栏顶部照 Claude 加"Expand" / "Collapse"，展开时中栏藏起、右栏占满，
   见 [v0/screens/layout.md](v0/screens/layout.md)。）
 - **窄窗口**：窄于 1024px 时左栏自动收起，窄于 800px 时右栏浮在上层；最小窗口 800×600。
+- **关掉窗口**（2026-10-26 改，照 Claude 桌面版，[v0/screens/window.md](v0/screens/window.md)）：窗口藏进系统托盘，会话照常运行，后台进程不关；
+  第一次关时托盘气泡说明"Mori runs in the system tray"。点托盘图标、托盘菜单"Show App"或再次启动 Mori 回到窗口；
+  托盘菜单"Exit"或菜单栏的 File → Exit 才退出，有会话正在生成时先问（"Mori is still working"、"Quit anyway"）。
+  M0 起"关掉窗口即退出"不再成立。
 - **左栏**：
   - "New session"作主按钮（Ctrl+N），"Open folder…"。（2026-10-26 改：主按钮去掉，照 Claude 桌面版每个项目行右端一个 +，在这个项目里新建；Ctrl+N 不变；收起的图标栏保留一个 +。见 [v0/screens/sessions.md](v0/screens/sessions.md)"项目行的 +"。）
   - 导航：工具（Customize）、工作回顾（Review）。（2026-10-22 改：工作回顾换成记忆（"Memory"），见 [specs/memory.md](specs/memory.md) §10.1。）
@@ -222,7 +227,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   - 拒绝（"Deny"），可以写理由（"Tell the model why (optional)"），理由会作为工具结果回给模型。
 - **焦点**：卡片出现时不抢输入框焦点，没有默认按钮，Enter 不会批准。
   用 Tab 或 Alt+1 / Alt+2 / Alt+3 选择；焦点在卡片上时 Esc 等于拒绝。
-- **提醒**：窗口不在前台时任务栏闪烁。
+- **提醒**：窗口不在前台时任务栏闪烁。（2026-10-26 加：窗口藏在托盘里时先以最小化的样子放回任务栏再闪烁，[v0/screens/window.md](v0/screens/window.md)）
 - **权限菜单**（输入框下面一行的左端；2026-10-21 前在顶栏）：
   - 按钮只有文字（"Ask each time ▾" / "Allow all ▾"，"Allow all"用警示色），没有图标；窄时模式名截断，全名在悬停说明和读屏名里。
   - 只作用于当前会话；新会话都从"Ask each time"开始。（2026-10-21：作用于这个会话的全部 Agent，菜单说明改为"Applies to all agents in this session. New sessions start at Ask each time."，后台实例的批准卡标出角色和 task，[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) §11）
@@ -347,7 +352,10 @@ v0 只汇总和导出，不做定时回顾和候选整理。
 app/
   src/shared/protocol.ts     Mori 自己的命令（zod 校验）；pi 事件只 import 类型，不重新定义
   src/main/
-    index.ts                 窗口、菜单；utilityProcess.fork 启动后台进程，退出时通知界面
+    index.ts                 窗口、菜单；utilityProcess.fork 启动后台进程，退出时通知界面；单实例；关窗口藏起、真正退出时
+                             有序关闭后台进程（2026-10-26 改：原来是关窗口即退出）
+    tray.ts                  系统托盘与退出（2026-10-26 加）：图标与菜单、应用菜单（File → Exit）、第一次关窗口的气泡、
+                             有会话正在生成时退出先问
     feedback.ts              反馈与 F8（截图用 capturePage；不依赖 pi，后台进程退出也能记录）
     credentials.ts           API key 用系统加密保存；启动时解密后经进程通道交给后台进程
   src/preload/               contextBridge 暴露 window.mori，用 MessagePort 直连后台进程
@@ -392,6 +400,7 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
 - 引用来源用 pi 的自定义条目（`appendCustomEntry("mori.ref", …)`）写进会话文件，它不进入模型上下文。
 - 会话内容只存一份，就是 pi 的会话文件（2026-10-21：协作模式另存 `<userData>/teams/<会话 id>/` 下的 TaskBoard 和各实例的 pi 会话文件）。Mori 自己只保存：界面状态（栏宽、分屏、各会话草稿、已归档的会话列表）、
   反馈和 F8 报告，以及加密后的 API key（`<userData>/credentials.json`）。
+  （2026-10-26 加：空的标记文件 `<userData>/tray-notice-shown`，第一次关窗口的托盘气泡显示过之后写下，[v0/screens/window.md](v0/screens/window.md)。）
   （2026-10-22 加：记忆 `<userData>/memory/`：条目、修订记录、增强设置与水位、增强任务的会话文件，见 [specs/memory.md](specs/memory.md) §3。）
 - API key：主进程用 Electron safeStorage 加密保存；启动时解密，经进程通道交给后台进程，
   后台进程用 pi 的 `setRuntimeApiKey` 只放在内存里。key 不进 `models.json`，也不进任何进程的环境变量。
