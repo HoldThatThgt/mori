@@ -8,7 +8,7 @@ import {
   memo, useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode,
 } from 'react';
 import {
-  serverKindLabel, suggestZone, UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens, type DiscoveredModel,
+  serverKindLabel, UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens, type DiscoveredModel,
   type DiscoverHint, type DiscoverListError, type DiscoverResult, type DiscoverTarget, type ProviderModel,
 } from '../../../../shared/models';
 import { cancelDiscover, discoverModels } from '../../state/settings';
@@ -135,9 +135,8 @@ export interface Prefill {
 }
 
 /**
- * @brief 拉取后预填（§6.1 第 3、4 项）：建议的 Base URL 与框里的不同时换进框（不算你改了 Base URL）；Name、API type、
- *        Network zone 你在这张表单里改过的留着，没改过的 Name、API type 取结果，区域按框里的地址用 suggestZone 预选
- *        （§3.4；models-settings.md "区域的建议值"）。More settings 里的值不在结果里，原样留着。
+ * @brief 拉取后预填（§6.1 第 3、4 项）：建议的 Base URL 与框里的不同时换进框（不算你改了 Base URL）；Name、API type
+ *        你在这张表单里改过的留着，没改过的取结果（§3.4）。More settings 里的值不在结果里，原样留着。
  * @param edited 你改过的字段（useDraft 的 touched）
  */
 export function prefillDraft(draft: ProviderDraft, edited: ReadonlySet<string>, result: DiscoverResult): Prefill {
@@ -145,7 +144,7 @@ export function prefillDraft(draft: ProviderDraft, edited: ReadonlySet<string>, 
   const baseUrl = replace ? result.baseUrl : draft.baseUrl;
   return {
     draft: { ...draft, baseUrl, name: edited.has('name') ? draft.name : result.name,
-      api: edited.has('api') ? draft.api : result.api, zone: edited.has('zone') ? draft.zone : suggestZone(baseUrl) },
+      api: edited.has('api') ? draft.api : result.api },
     note: replace && result.listError === null ? result.baseUrl : null,
   };
 }

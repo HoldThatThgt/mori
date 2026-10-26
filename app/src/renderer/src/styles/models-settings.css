@@ -19,7 +19,7 @@ fieldset.mf-row { align-items: start; }
 .mf-row > legend { float: left; width: 150px; padding: 0; }
 fieldset.mf-row > legend + .mf-control { grid-column: 2; }
 .mf-control { display: grid; gap: 4px; min-width: 0; }
-.mf-grid input:not([type='checkbox'], [type='radio']), .mf-grid select, .key-form input, .group-form input {
+.mf-grid input:not([type='checkbox']), .mf-grid select, .key-form input, .group-form input {
   width: 100%;
   min-width: 0;
   padding: 7px 10px;
@@ -35,7 +35,6 @@ fieldset.mf-row > legend + .mf-control { grid-column: 2; }
   outline-offset: 0;
 }
 .mf-grid input[aria-invalid='true'] { border-color: var(--color-danger); }
-.radio-line { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .field-error { color: var(--color-danger); font-size: var(--fs-small); }
 .mf-grid .form-actions { margin-top: 4px; }
 .first-run-form { margin-bottom: 8px; }
@@ -60,8 +59,6 @@ fieldset.mf-row > legend + .mf-control { grid-column: 2; }
 .models-notice h3 { margin: 0; }
 .models-notice p { margin: 0; }
 .models-notice ul { display: grid; gap: 4px; margin: 0; padding-left: 18px; }
-.zones-unconfirmed ul { padding: 0; list-style: none; width: 100%; }
-.zones-unconfirmed li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 
 /* 提供商卡 */
 .provider-card {
@@ -210,13 +207,6 @@ fieldset.mf-row > legend + .mf-control { grid-column: 2; }
 .group-form { display: grid; gap: 8px; margin-top: 8px; }
 .group-form > label { display: grid; gap: 4px; max-width: 280px; color: var(--color-muted); }
 .group-form .field-error { margin: 0; }
-
-/* Project access */
-.project-row { display: grid; gap: 4px; }
-.project-path { font-family: var(--font-mono); font-size: var(--fs-small); overflow-wrap: anywhere; }
-.project-row > .muted { font-size: var(--fs-small); }
-.zone-check { display: grid; }
-.zone-check .field-hint { margin: 0 0 0 24px; }
 
 /* 对话框 */
 .model-dialog { width: min(460px, 100%); }

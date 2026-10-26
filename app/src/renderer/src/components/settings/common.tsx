@@ -1,9 +1,9 @@
 // 设置 → Models 与首次启动表单共用的小件（docs/v1/screens/models-settings.md）：对话框、字段错误、测试中与测试结果、
-// 上移下移按钮、数字与区域的写法。
+// 上移下移按钮、数字的写法。
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import type { DeleteResult, ModelCommand, Zone } from '../../../../shared/models';
+import type { DeleteResult, ModelCommand } from '../../../../shared/models';
 import { describe, request } from '../../state/bridge';
 import { Icon } from '../../icons';
 import { useOverlay } from '../../state/overlays';
@@ -27,9 +27,6 @@ export function useImmediateSave<T>() {
   return { pending, busy: pending !== null, error, save };
 }
 
-/** @brief 区域的界面文字。 */
-export const ZONE_LABELS: Readonly<Record<Zone, string>> = { local: 'Local', intranet: 'Intranet', public: 'Public' };
-
 /** @brief 数字按千分位写（models-settings.md "模型行"）。 */
 export function thousands(value: number): string {
   return value.toLocaleString('en-US');
@@ -37,13 +34,13 @@ export function thousands(value: number): string {
 
 /** @brief 对话框的内容与状态。 */
 export interface ModelDialogProps {
-  /** 测试标识：confirm-dialog、zone-dialog、public-dialog */
+  /** 测试标识：confirm-dialog */
   testId: string;
   /** confirm-dialog 的种类（data-kind） */
   kind?: string;
   /** 标题 */
   title: string;
-  /** 正文：说明、连带改动、单选等 */
+  /** 正文：说明、连带改动等 */
   children: ReactNode;
   /** 确认按钮的文字 */
   confirmLabel: string;
@@ -53,8 +50,6 @@ export interface ModelDialogProps {
   busy: boolean;
   /** 失败的原文；没有时为 null */
   error: string | null;
-  /** 打开时焦点放在哪里：取消按钮，或第一个选中的单选 */
-  focus?: 'cancel' | 'checked';
   /** 点了确认 */
   onConfirm: () => void;
   /** 点了取消或按了 Esc */
@@ -75,8 +70,7 @@ function trapTab(event: React.KeyboardEvent<HTMLDivElement>): void {
 
 /** @brief 设置 → Models 的对话框：盖住整个窗口；Esc 等于 Cancel（进行中不能关）；失败时原文留在框里。 */
 export function ModelDialog(props: ModelDialogProps) {
-  const { testId, kind, title, children, confirmLabel, tone, busy, error, focus = 'cancel', onConfirm,
-    onCancel } = props;
+  const { testId, kind, title, children, confirmLabel, tone, busy, error, onConfirm, onCancel } = props;
   const box = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useOverlay(true, () => {
@@ -85,9 +79,8 @@ export function ModelDialog(props: ModelDialogProps) {
   });
   useEffect(() => {
     if (busy) return;
-    const checked = focus === 'checked' ? box.current?.querySelector<HTMLElement>('input:checked') : null;
-    (checked ?? box.current?.querySelector<HTMLElement>('[data-role="cancel"]'))?.focus();
-  }, [busy, error, focus]);
+    box.current?.querySelector<HTMLElement>('[data-role="cancel"]')?.focus();
+  }, [busy, error]);
   return createPortal(
     <div className="dialog-backdrop" onMouseDown={(event) => event.target === event.currentTarget
       && event.preventDefault()}>

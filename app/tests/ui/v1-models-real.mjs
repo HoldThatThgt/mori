@@ -40,7 +40,9 @@
 //   node tests/ui/v1-models-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--first <id>] [--second <id>]
 //   （数据目录里没有 OpenRouter 的提供商时，运行它的进程另设 MP_REAL_OPENROUTER_KEY）
 //   key 方式（环境变量里有三个 key）：node tests/ui/v1-models-real.mjs [--exe <Mori.exe>]
-// 结果写到 test-results/v1-models-real(-packaged).json，截图在 test-results/v1-models-real(-packaged)/。
+//   只走 MP-27（测试分层第 5 条：只跑覆盖这次变化的用例）：再加 --only MP-27，不准备、不走 MP-40
+// 结果写到 test-results/v1-models-real(-packaged).json（--only MP-27 时写 v1-models-real-mp27(-packaged).json，
+// 不覆盖完整一次的结果，spec-coverage 也不把它算作真实层），截图在 test-results/v1-models-real(-packaged)/。
 // 没有 --source 又没有三个 key、或没有第二个真实提供商时停下来报告（MP-27 与 MP-40 都记为失败，§14.1）。
 
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
@@ -76,6 +78,12 @@ const redact = redactor(secrets);
 const source = arg('source') ? resolve(arg('source')) : null;
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
+/** --only MP-27：只走 MP-27 的步骤（不准备、不走 MP-40）；--only 只接受 MP-27 */
+const only = arg('only');
+if (only && only !== 'MP-27') {
+  console.error(`[v1-models-real] --only takes MP-27 (got ${only})`);
+  process.exit(1);
+}
 const shots = join(appRoot, `test-results/v1-models-real${suffix}`);
 mkdirSync(shots, { recursive: true });
 const recorder = createRecorder(exePath ?? 'dev build');
@@ -636,8 +644,9 @@ function prepareRun(ctx, found, dir) {
   addNotes(ctx.project);
   ctx.userData = scratchModelData(dir);
   ctx.cipher = prepareRealConfig(ctx.userData, found);
-  // MP-40 的准备（§14.1 的 2026-10-24 补）：找 OpenRouter 的提供商，去掉复制出的配置里已有的两个免费模型
-  ctx.noOff = setupNoOff(ctx);
+  // MP-40 的准备（§14.1 的 2026-10-24 补）：找 OpenRouter 的提供商，去掉复制出的配置里已有的两个免费模型；
+  // --only MP-27 时不准备（ctx.noOff 一开始就是 null）
+  if (!only) ctx.noOff = setupNoOff(ctx);
 }
 
 /** MP-27 的步骤（按顺序；一步出错时记一条失败、收尾，接着走下一步） */
@@ -698,7 +707,7 @@ async function cleanUp(ctx) {
   }
 }
 
-const ctx = { pageErrors: [], keyMode: false };
+const ctx = { pageErrors: [], keyMode: false, noOff: only ? null : undefined };
 let found = null;
 let dir = null;
 try {
@@ -710,8 +719,10 @@ try {
     + `${ctx.keyMode ? `; key mode: data dir built through the UI in ${dir}` : ''}`);
 } catch (error) {
   record('MP-27 setup: the data dir has two real providers (spec §14.1)', false, errorLine(error, 600));
-  record(NO_OFF_SETUP, false, `not run: MP-40 runs on the copied data dir of MP-27 and its first provider (a model `
-    + `with Off), and the MP-27 setup failed: ${errorLine(error, 400)}`);
+  if (!only) {
+    record(NO_OFF_SETUP, false, 'not run: MP-40 runs on the copied data dir of MP-27 and its first provider (a model '
+      + `with Off), and the MP-27 setup failed: ${errorLine(error, 400)}`);
+  }
   if (!source && !ctx.keyMode) {
     console.error('[v1-models-real] usage: node tests/ui/v1-models-real.mjs --source <Mori v1 user data dir> '
       + '[--exe <Mori.exe>] [--first <id>] [--second <id>]');
@@ -736,5 +747,5 @@ try {
 } finally {
   await cleanUp(ctx);
   await sleep(200);
-  process.exitCode = write(`v1-models-real${suffix}.json`) ? 0 : 1;
+  process.exitCode = write(`v1-models-real${only ? '-mp27' : ''}${suffix}.json`) ? 0 : 1;
 }

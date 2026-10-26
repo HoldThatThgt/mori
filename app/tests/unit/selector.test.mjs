@@ -9,7 +9,7 @@ import { fakeClock, loadKernelModule } from './load.mjs';
 const selector = await loadKernelModule('src/kernel/selector.ts');
 const {
   expandPick, select, selectStatic, staticCheck, checkCurrent, canRecover, exhaustionWait,
-  RECOVERING_REASONS, providerOf, pickOptions,
+  RECOVERING_REASONS, pickOptions,
 } = selector;
 
 /** 一个模型配置项。 */
@@ -105,9 +105,8 @@ test('MP-05 provider pick expands to its models; model pick is itself', () => {
 });
 
 test('MP-05 model ids may contain a slash: the provider is before the first slash', () => {
-  const cfg = { providers: [provider('hf', 'local', ['org/name'])], groups: [] };
+  const cfg = { providers: [provider('hf', ['org/name'])], groups: [] };
   assert.deepEqual(expandPick(cfg, 'hf/org/name'), ['hf/org/name']);
-  assert.equal(providerOf('hf/org/name'), 'hf');
 });
 
 test('MP-30 a pick naming nothing in the config expands to null (pick_missing)', () => {
@@ -370,8 +369,8 @@ function menuInput(over = {}) {
 }
 
 /** glm 的模型 tool calling 判定不通过，ds 的还没验证，其余已验证。 */
-const glmFailsDsUnverified = (ref) => (providerOf(ref) === 'glm' ? 'failed'
-  : providerOf(ref) === 'ds' ? 'unverified' : 'verified');
+const glmFailsDsUnverified = (ref) => (ref.startsWith('glm/') ? 'failed'
+  : ref.startsWith('ds/') ? 'unverified' : 'verified');
 
 test('MP-23 menu lists groups, then providers, then models per provider, labelled id / name / model id', () => {
   const options = pickOptions(menuInput());
@@ -412,7 +411,7 @@ test('MP-23 items whose candidates all fail the static check are excluded with o
 
 test('MP-23 the menu follows the project\'s .mori/models.json group narrowing', () => {
   assert.equal(pickOptions(menuInput()).every((o) => !o.excluded), true);
-  const glmFails = (ref) => (providerOf(ref) === 'glm' ? 'failed' : 'verified');
+  const glmFails = (ref) => (ref.startsWith('glm/') ? 'failed' : 'verified');
   const open = pickOptions(menuInput({ toolCalling: glmFails }));
   assert.equal(open.find((o) => o.pick === 'mixed').excluded, false);
   const narrowed = pickOptions(menuInput({ toolCalling: glmFails, projectGroups: { mixed: ['glm/glm-4.5'] } }));

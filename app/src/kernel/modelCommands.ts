@@ -7,7 +7,7 @@
 // saveModel 只改已有的模型。
 
 import {
-  DEFAULT_ZONES, MODEL_LIMITS,
+  MODEL_LIMITS,
   type DeleteResult, type DiscoverResult, type DiscoverTarget, type KeyAdded, type ModelCommand, type ModelConfig,
   type ModelPick, type ModelProvider, type ModelsInfo, type ModelsResult, type ProviderModel, type ProviderSaved,
   type ThinkingLevel,
@@ -15,8 +15,8 @@ import {
 import { setModelThinkingLevel } from './config';
 import { normalizeBaseUrl } from './discoverRead';
 import {
-  applyAddressChange, deleteGroup, deleteModel, deleteProvider, findProvider, generateId, nextKeyRef,
-  normalizeProjectPath, takenIds, type CascadeResult,
+  applyAddressChange, deleteGroup, deleteModel, deleteProvider, findProvider, generateId, nextKeyRef, takenIds,
+  type CascadeResult,
 } from './modelConfig';
 import { discoverFailure, type DiscoverRequest } from './modelDiscover';
 import { getModelLayer, type ModelLayer } from './modelLayer';
@@ -61,10 +61,9 @@ export function headerSafeSecret(secret: string): string {
   return trimmed;
 }
 
-/** @brief 新建配置（首次启动表单第一次保存时）：没有分组、没有默认范围，所有项目默认允许 local 与 intranet。 */
+/** @brief 新建配置（首次启动表单第一次保存时）：没有提供商、分组和默认范围。 */
 function emptyConfig(): ModelConfig {
-  return { version: 1, providers: [], groups: [], normalDefault: null, allowedZones: [...DEFAULT_ZONES],
-    projectZones: {} };
+  return { version: 1, providers: [], groups: [], normalDefault: null };
 }
 
 /** @brief 有配置时返回它；首次启动前或读不出时报错。 */
@@ -419,7 +418,7 @@ function moveKey(layer: ModelLayer, command: Cmd<'models.moveKey'>): Promise<Mod
   }, {});
 }
 
-// ---- 分组、默认值、区域 ----
+// ---- 分组、默认值 ----
 
 /** @brief models.saveGroup：新建（creating 为真，id 不能与提供商、分组或保留 id 重复）或修改成员。 */
 function saveGroup(layer: ModelLayer, command: Cmd<'models.saveGroup'>): Promise<ModelsResult> {
@@ -440,7 +439,7 @@ function saveGroup(layer: ModelLayer, command: Cmd<'models.saveGroup'>): Promise
 }
 
 /**
- * @brief 改配置里的一处（默认值、项目授权、区域确认）并保存。
+ * @brief 改配置里的一处（默认范围）并保存。
  * @param change 由当前配置算出新配置
  */
 function update(layer: ModelLayer, type: string,
@@ -452,26 +451,12 @@ function update(layer: ModelLayer, type: string,
   }, {});
 }
 
-/** @brief models.setProjectZones：本机为这个项目在 allowedZones 之外额外允许的区域；为空时删掉这一项（§4.1）。 */
-function setProjectZones(config: ModelConfig, command: Cmd<'models.setProjectZones'>): ModelConfig {
-  const path = normalizeProjectPath(command.path);
-  const projectZones = { ...config.projectZones };
-  if (command.zones.length === 0) delete projectZones[path];
-  else projectZones[path] = [...command.zones];
-  return { ...config, projectZones };
-}
-
-/** @brief models.confirmZone：确认（或改）一个提供商的区域。 */
-function confirmZone(config: ModelConfig, command: Cmd<'models.confirmZone'>): ModelConfig {
-  return replaceProvider(config, { ...requireProvider(config, command.providerId), zone: command.zone });
-}
-
 // ---- 读取、重读、探针 ----
 
 /** @brief 读取失败时的 models.get 结果。 */
 function emptyInfo(error: string): ModelsInfo {
-  return { error, config: null, profiles: {}, keyStatus: {}, thinkingDefaults: {}, zoneSuggestions: {},
-    migration: null, projects: [], loadError: null, reserved: [] };
+  return { error, config: null, profiles: {}, keyStatus: {}, thinkingDefaults: {}, migration: null, loadError: null,
+    reserved: [] };
 }
 
 /** @brief models.get / models.reload。 */
@@ -564,12 +549,7 @@ function handleEdit(layer: ModelLayer, command: ModelsCommand): Promise<unknown>
     case 'models.deleteGroup':
       return remove(layer, command.type, command.dryRun, (config) => deleteGroup(config, command.id));
     case 'models.setDefaults':
-      return update(layer, command.type, (config) => ({ ...config, normalDefault: command.normalDefault,
-        allowedZones: [...command.allowedZones] }));
-    case 'models.setProjectZones':
-      return update(layer, command.type, (config) => setProjectZones(config, command));
-    case 'models.confirmZone':
-      return update(layer, command.type, (config) => confirmZone(config, command));
+      return update(layer, command.type, (config) => ({ ...config, normalDefault: command.normalDefault }));
     default:
       return undefined;
   }
