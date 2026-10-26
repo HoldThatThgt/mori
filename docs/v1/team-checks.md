@@ -166,7 +166,10 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
   F8 的操作记录；回放桥把两个只读命令当作只读查询。
 - 做的时候补进规格与状态表的（都在 M14 和负责人的回答之内）：结案会话写的一棒总有 `View transcript`（结案的交接不记会话位置）；
   有页签时 `Expand` / `Collapse` 与关闭只在页签那一行（WP-13 之后）；后台进程退出后读与停止照发、显示进程桥的原文与 `Retry`；
-  TB-88 的套件改名 `tb-app-tasks-owner.mjs`（`spec-ids` 把名字含 `real` 的界面测试算真实层）；TB-46 的单元测试不再要求编号只到 TB-57。
+  TB-88 的套件叫 `tb-app-tasks-owner.mjs`（结果 `tb-app-tasks-owner.json`，计入 App 层）；TB-46 的单元测试不再要求编号只到 TB-57。
+- 合进 `app-v0` 的 531419c（加严的 `spec-ids`）与 WP-02 之后（af541d2）：`npm run check` 通过，`test:unit` 481/481（TaskBoard 的四项
+  `spec-ids` 都通过：每层都有测试、编号都在表里、没有空的或总是通过的测试、npm 脚本跑全部 App 与回放套件），`test:tb-unit` 357/357，构建通过；
+  这次合并没有改到 Background tasks 的文件，界面用例没有重跑。
 
 ### 测试（AGENTS.md 测试分层，每次改动的那几层）
 
