@@ -136,10 +136,12 @@ test('MP-08 compat keeps only the values v0 wrote when ticked; the rest is liste
     thinkingFormat: 'qwen', supportsUsageInStreaming: false, supportsStrictMode: false,
   } }) } });
   assert.deepEqual(result.config.providers[0].compat, { supportsStore: false, maxTokensField: 'max_tokens',
-    requiresToolResultName: true, supportsUsageInStreaming: false, supportsStrictMode: false });
+    requiresToolResultName: true, supportsUsageInStreaming: false });
+  // 2026-10-26（负责人走查 M1）：strict 模式不再是兼容选项（pi 默认就不发 strict），同其他不认识的字段一样丢弃并列出
   assert.deepEqual(result.notice.dropped, [
     { subject: 'e compat.supportsDeveloperRole', reason: 'value true is not supported' },
     { subject: 'e compat.thinkingFormat', reason: 'not a supported compat option' },
+    { subject: 'e compat.supportsStrictMode', reason: 'not a supported compat option' },
   ]);
 });
 

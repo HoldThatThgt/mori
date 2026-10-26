@@ -125,7 +125,8 @@ export function NoticeLine({ notice, testId }: { notice: Notice | null | undefin
 }
 
 /**
- * @brief 测试按钮：测试中显示"Testing…"和旁边的"Cancel"（三处测试共用 data-action="test-cancel"）。
+ * @brief 测试按钮：测试中显示"Testing…"和旁边的"Cancel"（提供商卡与 Keys 的行两处共用 data-action="test-cancel"；
+ *        2026-10-26 起模型行没有 Test）。
  * @param at 测试位置（state/settings.ts 的 testAt）
  */
 export function TestButton({ at, label, action, onTest }: {

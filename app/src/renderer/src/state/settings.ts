@@ -246,8 +246,8 @@ export async function runTest(target: TestTarget): Promise<{ ok: boolean; notice
 }
 
 /**
- * @brief 设置页里的一次测试：结果写在 key 指定的位置（提供商卡、key 行、模型行）。同一时刻只测一个。
- * @param key 位置，例如 provider:<id>、key:<ref>、model:<provider>/<id>
+ * @brief 设置页里的一次测试：结果写在 key 指定的位置（提供商卡、key 行；2026-10-26 起模型行没有 Test）。同一时刻只测一个。
+ * @param key 位置：provider:<id> 或 key:<ref>
  */
 export async function testAt(key: string, target: TestTarget): Promise<void> {
   if (useSettings.getState().testing !== null) return;
