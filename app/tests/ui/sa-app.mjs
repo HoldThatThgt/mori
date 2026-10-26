@@ -199,9 +199,11 @@ async function normal(ctx) {
     + 'memory) and no agent_message', req !== undefined && req.tools.includes('subagent')
     && !req.tools.includes('agent_message'), brief({ tools: req?.tools }));
   record('SA-17 normal mode = v0 + subagent: the tools are exactly read, bash, edit, write, memory and subagent; '
-    + `<tools> lists "${SHOWS.snippet}" with its guideline; nothing under teams/ before the first subagent call`,
+    + `<tools> lists "${SHOWS.snippet}" (no guideline: its words are in the tool description); nothing under teams/ `
+  + 'before the first subagent call',
   req !== undefined && same(sorted(req.tools), ['bash', 'edit', 'memory', 'read', 'subagent', 'write'])
-    && req.system.includes(SHOWS.snippet) && req.system.includes('Use subagent when the user asks for subagents')
+    && req.system.includes(SHOWS.snippet) && !req.system.includes('Use subagent when the user asks for subagents')
+    && /when the user asks for subagents or parallel agents/.test(JSON.stringify(req.body.tools))
     && !existsSync(teamDir(ctx, who.sessionId)), brief({ tools: req?.tools,
     teams: existsSync(teamDir(ctx, who.sessionId)) }));
   record('SA-10 the identity section names only the handoff tool this run has: '
@@ -257,8 +259,36 @@ function parallelRun(ctx, who, seen) {
     stages.some((text) => /^Running 3 agents \d/.test(text)), brief([...new Set(seen.map((item) => item.stage))]));
 }
 
+/**
+ * @brief 一轮结束后 subagent 的卡在哪个步骤组里（WP-14，docs/v0/screens/chat.md“步骤组”）：{ group（卡在组里）, hidden（组折着、
+ *        卡不显示）, row（摘要行的字）, expanded }；然后点开那一行（有的话），之后的检查照常看得到卡。
+ */
+async function foldOf(page, pane) {
+  const state = await page.evaluate((css) => {
+    const root = document.querySelector(css);
+    const member = root?.querySelector('[data-tool="subagent"]')?.closest('[data-step-group]') ?? null;
+    const row = member ? root.querySelector(`[data-testid="step-group"][data-group="${member.dataset.stepGroup}"]`)
+      : null;
+    return { group: member !== null, hidden: member?.hidden ?? null, row: row?.textContent.trim() ?? null,
+      expanded: row?.getAttribute('aria-expanded') ?? null };
+  }, pane);
+  if (state.row !== null) {
+    const id = await page.locator(`${pane} [data-tool="subagent"]`).first()
+      .evaluate((el) => el.closest('[data-step-group]')?.dataset.stepGroup ?? '');
+    await page.locator(`${pane} [data-testid="step-group"][data-group="${id}"]`).click();
+  }
+  const card = await page.locator(`${pane} [data-tool="subagent"]`).first()
+    .evaluate((el) => ({ visible: el.closest('[hidden]') === null, open: el.open })).catch(() => null);
+  return { ...state, card };
+}
+
 /** @brief SA-11：结束后的卡片收起，标题、状态、每一行；点开一行看 Agent prompt 与 Response。 */
 async function parallelCard(ctx, who) {
+  const fold = await foldOf(ctx.page, paneSel(who.tab));
+  record('SA-11 after the turn the subagent card is one step of it: it folds into the "1 step" row with the turn\'s '
+    + 'other steps (WP-14) and, when that row is opened, the card itself is still collapsed',
+  fold.group && fold.hidden === true && /^\W*1 step$/.test(fold.row ?? '') && fold.card?.visible === true
+    && fold.card.open === false, brief(fold));
   const [card] = await cardsOf(ctx, who.tab);
   record('SA-11 when the call ends the card collapses once: "Ran 3 agents" with the status "Done · <s>"',
     card?.title === 'Ran 3 agents' && /^Done · \d/.test(card.status) && !card.open, brief(card));

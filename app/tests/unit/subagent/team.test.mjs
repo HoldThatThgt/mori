@@ -7,9 +7,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { loadKernelModule } from '../load.mjs';
 import {
   SPLIT, TeamModule, beginRun, deps, fakeHost, finishRun, nextDelivery, roles, runDelivery, setup, until,
 } from '../taskboard/teamHarness.mjs';
+
+/** 内核模块（subagent 的工具白名单） */
+const load = { subagent: await loadKernelModule('src/kernel/subagent.ts') };
 
 /** 只有基座（没有角色文件）。 */
 const BASE = roles.parseRoleFiles([], deps);
@@ -156,7 +160,7 @@ test('SA-05 SA-08 read-only and general subagents: their tools, the role body an
     const specs = deliveries.map((item) => host.entry(item.id).spec);
     assert.deepEqual(specs.map((spec) => spec.tools), [['read', 'ls'], ['read', 'bash', 'edit', 'write', 'mcp__*'],
       ['read', 'bash'], ['read', 'ls']]);
-    const S = await import('../load.mjs').then((load) => load.loadKernelModule('src/kernel/subagent.ts'));
+    const S = load.subagent;
     assert.deepEqual(specs[0].appendPrompt, [S.subagentSegment(true)], 'the base has no body; no shared segment');
     assert.deepEqual(specs[1].appendPrompt, [S.subagentSegment(false)]);
     assert.deepEqual(specs[2].appendPrompt, ['MORI-ROLE-reviewer', S.subagentSegment(false)]);
@@ -288,4 +292,38 @@ test('SA-15 a successful edit by a general subagent sets teamEdited; a read-only
   await editing;
   assert.equal(team.teamEdited, true);
   await until(() => team.view().teamEdited === true, 'the board view');
+});
+
+// ---------- WP-10 合并之后才通过的两条（walkthrough-fixes 会话 2026-10-26：测试先写，照常运行） ----------
+
+test('SA-05 read-only subagents get their tools through the same function as Task mode\'s read-only instances: '
+  + 'the read class of the base tools plus ls', () => {
+  const base = roles.findRole(BASE.roles, 'mori');
+  const reviewer = roles.findRole(TOOLED.roles, 'reviewer');
+  const S = load.subagent;
+  for (const role of [base, reviewer]) {
+    const own = roles.toolAllowlist(role, 'task', true, ['read', 'bash', 'edit', 'write'], true)
+      .filter((name) => !['board_read', 'read_session', 'agent_message', 'task_handoff'].includes(name));
+    assert.deepEqual(S.subagentTools(role, true, ['read', 'bash', 'edit', 'write']), own,
+      `${role.name}: the subagent's read-only tools equal the read-only task instance's own tools`);
+    assert.ok(own.includes('ls'), `${role.name}: a read-only instance always has ls (WP-10)`);
+  }
+});
+
+test('TB-04 off mode: the ask instance opened by agent_message has the role body and the ask segment but no '
+  + 'TaskBoard shared segment (there is no TaskBoard in off mode; subagent spec §5.1, TaskBoard spec appendix A)',
+async () => {
+  const { team, user, host } = await setup(SPLIT);
+  startUserRun(team, user);
+  const ask = user.api.tools.get('agent_message');
+  const pending = ask.execute('c1', ask.prepareArguments({ to: 'executor', text: 'Is a.ts safe?' }), undefined,
+    undefined, {});
+  const delivery = await nextDelivery(host, 'U.ask.1.executor');
+  const prompt = host.entry('U.ask.1.executor').spec.appendPrompt;
+  assert.equal(prompt[0], 'MORI-ROLE-executor', 'the role body first');
+  assert.ok(prompt.some((part) => part.startsWith('Another agent asked you one question.')), 'the ask segment');
+  assert.ok(!prompt.some((part) => part.includes("one of several agents that work together on Mori's TaskBoard")),
+    `no shared segment: ${JSON.stringify(prompt)}`);
+  await runDelivery(host, delivery, [{ text: 'Yes.' }]);
+  await pending;
 });

@@ -366,15 +366,20 @@ const SA_PROMPT = 'Use the subagent tool to run two subagents at the same time: 
   + '`node --version` in this project and reports the version it prints. Do not do either yourself. Then tell me both '
   + 'results in one sentence.';
 
-/** @brief 一边等 work() 做完，一边允许这期间到来的每张后台批准卡。 */
+/** 一张后台批准卡挂着多久再允许（像人看一眼再点；subagent 的进展最多每 250 毫秒发一次，这样录下“等你批准”的那一行） */
+const CARD_READ_MS = 1500;
+
+/** @brief 一边等 work() 做完，一边允许这期间到来的每张后台批准卡（每张挂满 CARD_READ_MS 再允许）。 */
 async function answerWhile(d, sessionId, work) {
   const answered = new Set();
+  const seen = new Map();
   const watcher = (async () => {
     while (!answered.done) {
       for (const item of await pendingApprovals(d, sessionId, answered)) {
-        await allow(d, sessionId, item.requestId, answered);
+        if (!seen.has(item.requestId)) seen.set(item.requestId, Date.now());
+        if (Date.now() - seen.get(item.requestId) >= CARD_READ_MS) await allow(d, sessionId, item.requestId, answered);
       }
-      await sleep(500);
+      await sleep(250);
     }
   })();
   try {
@@ -409,6 +414,7 @@ const subagentScenario = {
     const end = eventsOf(before, id, 'tool_execution_end').find((e) => e.toolName === 'subagent');
     const rows = end?.result?.details?.agents ?? [];
     const updates = eventsOf(before, id, 'tool_execution_update').filter((e) => e.toolName === 'subagent');
+    const waiting = updates.some((e) => e.partialResult?.details?.agents?.some((row) => row.phase === 'approval'));
     const asked = eventsOf(before, id, 'mori.team_approval_request');
     const opened = values(after, 'session.open')[0];
     const reopened = (opened?.entries ?? []).some((e) => e.type === 'message' && e.message?.role === 'toolResult'
@@ -419,6 +425,7 @@ const subagentScenario = {
       ...need(rows.every((row) => row.phase === 'done'), 'not every subagent is done'),
       ...need(updates.length > 1, `${updates.length} progress updates`),
       ...need(asked.some((a) => a.subagent !== null && a.task === null), 'no attributed approval card'),
+      ...need(waiting, 'no progress update with a row waiting for approval'),
       ...need(after.length > 0 && reopened, 'the reopened session has no subagent result with details')];
   },
 };

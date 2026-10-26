@@ -159,6 +159,29 @@ async function drive(page, steps) {
   await untilPlayed(page, commands.length, 'the last segment');
 }
 
+/**
+ * @brief 一轮结束后 subagent 的卡在哪个步骤组里（WP-14，docs/v0/screens/chat.md“步骤组”）：{ group（卡在组里）, hidden（组折着、
+ *        卡不显示）, row（摘要行的字）, expanded }；然后点开那一行（有的话），之后的检查照常看得到卡。
+ */
+async function foldOf(page, pane) {
+  const state = await page.evaluate((css) => {
+    const root = document.querySelector(css);
+    const member = root?.querySelector('[data-tool="subagent"]')?.closest('[data-step-group]') ?? null;
+    const row = member ? root.querySelector(`[data-testid="step-group"][data-group="${member.dataset.stepGroup}"]`)
+      : null;
+    return { group: member !== null, hidden: member?.hidden ?? null, row: row?.textContent.trim() ?? null,
+      expanded: row?.getAttribute('aria-expanded') ?? null };
+  }, pane);
+  if (state.row !== null) {
+    const id = await page.locator(`${pane} [data-tool="subagent"]`).first()
+      .evaluate((el) => el.closest('[data-step-group]')?.dataset.stepGroup ?? '');
+    await page.locator(`${pane} [data-testid="step-group"][data-group="${id}"]`).click();
+  }
+  const card = await page.locator(`${pane} [data-tool="subagent"]`).first()
+    .evaluate((el) => ({ visible: el.closest('[hidden]') === null, open: el.open })).catch(() => null);
+  return { ...state, card };
+}
+
 /** @brief 点开第一张 subagent 卡（收起时）与它的第 index 行，读 Agent prompt 与 Response 和每一行。 */
 async function openRow(page, index) {
   const card = page.locator(`${PANE} [data-tool="subagent"]`).first();
@@ -205,6 +228,11 @@ async function before(page, fx) {
     && [...states].some((state) => /^(Read|Run) /.test(state)), oneLine(JSON.stringify({ states: [...states],
     opens: [...new Set(running.map((card) => card.open))], statuses: [...new Set(running.map((card) => card.status))],
     counts: [...new Set(running.map((card) => card.rows.length))] }), 900));
+  const fold = await foldOf(page, PANE);
+  record('SA-11 replay sa-subagent: after the turn the subagent card folds into the turn\'s "<n> steps" row (WP-14) '
+    + 'and, when that row is opened, the card itself is still collapsed', fold.group && fold.hidden === true
+    && /^\W*\d+ steps?( · \d+ failed)?$/.test(fold.row ?? '') && fold.card?.visible === true
+    && fold.card.open === false, oneLine(JSON.stringify(fold), 600));
   const final = seen.cards.at(-1);
   record(`SA-11 replay sa-subagent: when the call ends the card collapses once to "Ran ${n} agents" · "Done · <s>"`,
     final?.title === `Ran ${n} agents` && !final.open && /^Done · \d/.test(final.status),
