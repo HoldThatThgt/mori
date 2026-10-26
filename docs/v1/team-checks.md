@@ -163,7 +163,16 @@
 3. 一次调用、一次回复都不设条数上限；全部同时开始，用满 key 并发设置的全部槽位，多出来的排队、不超时（新的调度类别 `subagent`）。
 4. 保留普通模式下的 `agent_message`。
 
-### 状态（随各包合并更新；最后一次 2026-10-26，合过本地 `app-v0` 的 `d07cc41`，即 WP-10 与 WP-14）
+### 状态（随各包合并更新；最后一次 2026-10-26，合过本地 `app-v0` 的 `25d06fb`，即 WP-10、WP-14 与 customize-agents）
+
+第二轮审查之后（2026-10-26，8 条；合过本地 `app-v0` 的 `25d06fb`，即 customize-agents）：TaskBoard 的后台卡不改阶段行有了用例
+（`tb-replay --only tb-approval` 的 `TB-34 replay tb-approval: a TaskBoard background card leaves the stage line alone …`；对 e7c332b 的旧 fixture
+跑这一条失败、对重录的通过；单元 TB-34 另查 task 实例的卡 `subagent` 为 `null`）；`role` 不写枚举是给模型的变化，真实模型那一层用
+`tb-real --only ask`（`sa-real` 的项目没有角色文件，发不出带 `role` 的 schema；关闭模式、有别的角色的对话是最窄的一个）：新加的
+`TB-04 real ask: off mode with other roles the dialog's requests also carry subagent, whose role parameter is a plain string without an enum …`
+通过，模型照旧用 `agent_message` 问角色。结果：`npm run check` 通过；`test:unit` 481/481、`test:tb-unit` 350/350、`test:sa-unit` 29/29、
+`test:mem-unit` 239/239、`test:md-unit` 222/222、`test:ag-unit` 42/42、合成端点自检 184/184；`tb-replay --only tb-approval` 8/8；
+真实 `tb-real --only ask` 9/9；`npm run test:quick` 4/4（84 秒）。
 
 审查之后（2026-10-26，walkthrough-fixes 会话转来的 14 条，先写测试再改）：阶段行在普通模式 subagent 的批准卡挂着时写 `Waiting for your approval`
 （`StageLine.tsx`；TaskBoard 的后台卡仍不改阶段行）；`role` 不写枚举（“要你决定的”第 3 条）；秒数文字合进 `components/duration.ts`；
