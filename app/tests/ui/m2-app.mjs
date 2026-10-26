@@ -13,6 +13,7 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m2-app.mjs                         测开发构建
 //   node tests/ui/m2-app.mjs --exe <Mori.exe 路径>   测打包后的程序
+//   node tests/ui/m2-app.mjs --only 步骤1,步骤2       只跑这几步（setup 总是跑；测试分层第 2 条）
 // 结果写到 test-results/m2-app.json（文件名带 -packaged 后缀区分），截图在 test-results/m2-app/。
 // 主进程里的 flashFrame 和 shell.showItemInFolder 经 app.evaluate 换成记录调用的版本（后者不会真的打开资源管理器）；
 // 保存报告的 IPC 处理（mori:save-issue）临时包一层延迟，用来测"Saving…"；最小窗口经 BrowserWindow.setSize 设置。
@@ -34,6 +35,7 @@ import { clickTrayIcon, closeWindow, findTray, recordBalloons, waitWindow, windo
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
+const only = arg('only')?.split(',');
 const port = 4322;
 const baseUrl = `http://127.0.0.1:${port}/v1`;
 // 合成端点要求的 key：只是测试值，与任何真实服务无关；F8 报告里不能出现它。
@@ -1833,6 +1835,7 @@ page.on('pageerror', (error) => pageErrors.push(error.message));
 const ctx = { app, page, h: pageHelpers(page), project, userData, issue: null, request: null };
 try {
   for (const [name, step] of Object.entries(steps)) {
+    if (only && name !== 'setup' && !only.includes(name)) continue;
     try {
       await step(ctx);
     } catch (error) {

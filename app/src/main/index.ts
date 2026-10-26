@@ -213,8 +213,11 @@ app.on('will-quit', (event) => {
   event.preventDefault();
   if (shuttingDown) return;
   shuttingDown = true;
+  // 再退出要放到下一轮事件循环：Electron 在 will-quit 的处理返回之后才复位"正在退出"，在那之前 app.quit() 不起作用。
+  // 后台进程已经不在（意外退出后点"Exit"）时 shutdownKernel 马上返回，直接 app.quit() 会让 Mori 没有窗口、没有托盘图标
+  // 却一直不退出（还占着单实例锁，再启动也打不开）。
   void shutdownKernel().finally(() => {
     kernelStopped = true;
-    app.quit();
+    setImmediate(() => app.quit());
   });
 });

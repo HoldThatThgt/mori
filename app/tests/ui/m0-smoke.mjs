@@ -11,6 +11,7 @@
 // 先问（确认框经 tray-helpers.mjs 换掉，按测试给的按钮回答），选"Quit anyway"后有序退出、不留下命令进程。
 // 审查修正（同日）：托盘菜单"Show App"回到窗口；应用菜单是 File（只有"Exit"）、Edit、View、Window，File → Exit 与托盘的
 // "Exit"同一个确认框。
+// 集成修正（同日）：后台进程意外退出后点托盘"Exit"，Mori 10 秒内退出（原来没有窗口、没有托盘图标却一直不退出）。
 // 用法：
 //   node tests/ui/m0-smoke.mjs                         测开发构建（先 npm run build）
 //   node tests/ui/m0-smoke.mjs --exe <Mori.exe 路径>   测打包后的程序
@@ -27,8 +28,8 @@ import { startNetWatch } from './net-watch.mjs';
 import { describeProcesses, sleepProcessIds as testSleeps } from './lib.mjs';
 import { pageHelpers } from './page.mjs';
 import {
-  APP_MENU, appMenu, balloonCalls, clickFileExit, clickTrayIcon, clickTrayItem, closeWindow, findTray, launchSecond,
-  messageBoxes, NOTICE_MARKER, NOTICE_TEXT, NOTICE_TITLE, QUIT_DETAIL, recordBalloons, stubMessageBox, TRAY_ITEMS,
+  APP_MENU, appMenu, balloonCalls, clickFileExit, clickTrayIcon, clickTrayItem, closeWindow, exitFromTray, findTray,
+  launchSecond, messageBoxes, NOTICE_MARKER, NOTICE_TEXT, NOTICE_TITLE, QUIT_DETAIL, recordBalloons, stubMessageBox, TRAY_ITEMS,
   waitWindow, windowState,
 } from './tray-helpers.mjs';
 
@@ -301,6 +302,23 @@ async function concurrencyCheck(page, project) {
 
 /** @brief 窗口回到桌面上（显示着、没有最小化）。 */
 const onScreen = (state) => state.visible && !state.minimized;
+/** @brief 窗口藏进托盘（不显示、也不是最小化）。 */
+const offScreen = (state) => !state.visible && !state.minimized;
+
+/**
+ * @brief 等确认框弹出（记下的个数到 count，最多 5 秒），再等 500 毫秒看 Mori 有没有开始退出；返回记下的确认框。
+ *        不固定等 2 秒，快速集要在 2 分钟内跑完（AGENTS.md"测试分层"）。
+ */
+async function waitBoxes(app, count) {
+  const deadline = Date.now() + 5000;
+  let boxes = await messageBoxes(app);
+  while (boxes.length < count && Date.now() < deadline) {
+    await sleep(100);
+    boxes = await messageBoxes(app);
+  }
+  await sleep(500);
+  return boxes;
+}
 
 /**
  * @brief 命令运行中关掉窗口（2026-10-26 改，docs/v0/screens/window.md）：窗口藏进托盘，程序不退出，命令照常运行；
@@ -342,8 +360,7 @@ async function reopenFromTray(app, userData) {
   record('再启动一次 Mori：第二个进程马上退出（退出码 0），已在运行的 Mori 把窗口叫出来', code === 0 && shown.ok,
     `第二个进程的退出码=${code}；窗口=${JSON.stringify(shown.state)}`);
   await closeWindow(app);
-  await sleep(1000);
-  const hidden = await windowState(app);
+  const hidden = (await waitWindow(app, offScreen, 5000)).state;
   const balloons = await balloonCalls(app);
   const tray = await findTray(app);
   await clickTrayIcon(app);
@@ -356,7 +373,7 @@ async function reopenFromTray(app, userData) {
 /** @brief 托盘菜单"Show App"：关掉窗口后点它，藏起的窗口回到桌面上。 */
 async function showFromMenu(app) {
   await closeWindow(app);
-  const hidden = await waitWindow(app, (state) => !state.visible && !state.minimized, 5000);
+  const hidden = await waitWindow(app, offScreen, 5000);
   await clickTrayItem(app, 'Show App');
   const back = await waitWindow(app, onScreen, 5000);
   record('托盘菜单"Show App"：藏起的窗口回到桌面上', hidden.ok && back.ok,
@@ -372,8 +389,7 @@ async function fileExitCancelled(app) {
   record('应用菜单：File（只有"Exit"）、Edit、View、Window', JSON.stringify(menu) === JSON.stringify(APP_MENU),
     JSON.stringify(menu));
   await clickFileExit(app);
-  await sleep(2000);
-  const boxes = await messageBoxes(app);
+  const boxes = await waitBoxes(app, 2);
   record('命令运行中点 File → Exit：同托盘"Exit"的确认框；选"Cancel"不退出',
     boxes.length === 2 && JSON.stringify(boxes[1].options) === JSON.stringify(boxes[0].options)
     && app.process().exitCode === null, oneLine(JSON.stringify(boxes.slice(1)), 400));
@@ -389,8 +405,7 @@ async function exitCancelled(app, started) {
     JSON.stringify(tray));
   await stubMessageBox(app, 1);
   await clickTrayItem(app, 'Exit');
-  await sleep(2000);
-  const boxes = await messageBoxes(app);
+  const boxes = await waitBoxes(app, 1);
   const box = boxes[0]?.options;
   const count = QUIT_DETAIL.exec(box?.detail ?? '');
   record('命令运行中点托盘"Exit"：确认框"Mori is still working"，说明会话数，按钮"Quit anyway""Cancel"，'
@@ -445,9 +460,13 @@ function kernelPid(rootPid) {
   return Number(kernel[0]);
 }
 
-/** @brief 后台进程意外退出：界面提示、请求立即失败；刷新页面后提示仍在。 */
+/**
+ * @brief 后台进程意外退出：界面提示、请求立即失败；刷新页面后提示仍在。之后点托盘"Exit"：没有会话在生成（数是 0），
+ *        不问，Mori 10 秒内退出（docs/v0/screens/window.md"窗口藏着时后台进程意外退出"的 Exit）。
+ */
 async function crashCheck(env) {
   const app = await electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
+  let exited = false;
   try {
     const page = await app.firstWindow();
     // v1：设置 → Models 的提供商卡上"Test connection"用第一个可用的 key 测第一个模型；Keys 行显示"Saved"，不回填明文。
@@ -475,8 +494,13 @@ async function crashCheck(env) {
     record('后台进程意外退出：提示出现、请求立即失败、刷新后仍提示',
       before.startsWith('rejected') && after.startsWith('rejected') && banner,
       `后台进程 PID ${pid}；退出后请求=${before}；刷新后提示=${banner}，请求=${after}`);
+    await stubMessageBox(app, 1);
+    exited = await exitFromTray(app, 10000);
+    const boxes = exited ? [] : await messageBoxes(app).catch((error) => `cannot read: ${oneLine(error)}`);
+    record('后台进程意外退出后点托盘"Exit"：不问，Mori 10 秒内退出', exited, JSON.stringify({ exited, boxes }));
   } finally {
-    await app.close().catch(() => {});
+    // 没退出时强行结束：Playwright 的 close 也走 app.quit()，退不出时会一直等下去
+    if (!exited) app.process().kill();
   }
 }
 

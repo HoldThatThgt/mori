@@ -29,7 +29,7 @@ Claude 的原文取自它的主进程字符串表（`resources/en-US.json`）；
 | 退出，有会话正在生成 | 托盘菜单"Exit"或应用菜单 File → Exit，界面报告的数 N 大于 0 | Windows 警告对话框，标题"Mori is still working"，说明"Mori is working in 1 session. Quitting now will interrupt that work."（N 大于 1 时"… in N sessions. …"），按钮"Quit anyway"和"Cancel"，Enter 与 Esc 都是"Cancel"；窗口开着时对话框挂在窗口上，窗口藏着时单独弹出 | Quit anyway（同上一行退出，正在生成的回复和命令被中断，同原来关窗口）；Cancel（什么都不变，会话照常运行） |
 | 确认框开着时又点"Exit" | 同上 | 不弹第二个确认框 | — |
 | 窗口藏着时出现批准卡 | `mori.approval_request`（协作模式的 `mori.team_approval_request` 同样），窗口藏在托盘里 | 窗口以最小化的样子回到任务栏（不抢焦点、不弹到前面），任务栏按钮闪烁；见 [approval.md](approval.md)"任务栏闪烁" | 点任务栏按钮或托盘图标回到 Mori（停止闪烁） |
-| 窗口藏着时后台进程意外退出 | 主进程收到后台进程 `exit`（非有意关闭） | 托盘图标照旧；打开窗口后看到 [chat.md](chat.md)"后台进程退出"的横幅和"Restart" | 打开窗口；Exit |
+| 窗口藏着时后台进程意外退出 | 主进程收到后台进程 `exit`（非有意关闭） | 托盘图标照旧；打开窗口后看到 [chat.md](chat.md)"后台进程退出"的横幅和"Restart" | 打开窗口；Exit（数已是 0，不问；没有要关的后台进程，进程马上结束——2026-10-26 集成时修正：原来这时 Mori 没有窗口、没有托盘图标却一直不退出，还占着单实例锁） |
 
 其他退出的方式不经过这两个"Exit"，也不问：
 - 测试用 Playwright 的 `app.close()`（直接 `app.quit()`）结束 Mori：照样有序关闭后台进程，只是不先确认，所以界面测试的收尾
@@ -64,7 +64,8 @@ Claude 的原文取自它的主进程字符串表（`resources/en-US.json`）；
 ## 界面测试怎样碰到托盘
 
 托盘和它的菜单没有界面元素，Playwright 点不到。测试在主进程里（`app.evaluate`）用 Node 的 `inspector` 会话按原型
-（`Tray.prototype`、`Menu.prototype`）找出 Mori 建的托盘和托盘菜单（`Runtime.queryObjects`），再发出托盘的 `click`、
+（`Tray.prototype`、`Menu.prototype`）找出 Mori 建的托盘和托盘菜单（`Runtime.queryObjects`；找到的对象里有不是真正实例的，
+原生方法对它们报"Illegal invocation"，跳过），再发出托盘的 `click`、
 调用菜单项的 `click()`；气泡和确认框分别把 `Tray.prototype.displayBalloon`、`dialog.showMessageBox` 换成记录调用的版本
 （确认框按测试给的按钮回答）；应用菜单经 `Menu.getApplicationMenu()` 读出，File → Exit 同样调用菜单项的 `click()`。
 这些都只在测试进程里做，`src/` 里没有给测试用的入口（`tests/ui/tray-helpers.mjs`）。

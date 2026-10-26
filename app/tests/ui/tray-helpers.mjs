@@ -44,8 +44,17 @@ async function locateTray({ Tray, Menu }) {
     session.disconnect();
     delete globalThis.__moriFind;
   }
-  const labels = (menu) => menu.items.map((item) => (item.type === 'separator' ? '—' : item.label));
-  globalThis.__moriTray = globalThis.__moriFoundTray.find((tray) => !tray.isDestroyed()) ?? null;
+  // 按原型找到的不全是真正的实例（原生方法对它们报"Illegal invocation"，也没有 items），这些跳过
+  const labels = (menu) => (Array.isArray(menu.items)
+    ? menu.items.map((item) => (item.type === 'separator' ? '—' : item.label)) : []);
+  const alive = (tray) => {
+    try {
+      return !tray.isDestroyed();
+    } catch {
+      return false;
+    }
+  };
+  globalThis.__moriTray = globalThis.__moriFoundTray.find(alive) ?? null;
   globalThis.__moriTrayMenu = globalThis.__moriFoundMenu
     .find((menu) => labels(menu).includes('Show App') && labels(menu).includes('Exit')) ?? null;
   delete globalThis.__moriFoundTray;
