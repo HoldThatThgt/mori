@@ -303,7 +303,7 @@ seats: [close]
 | 层 | 位置 | 说明 |
 | --- | --- | --- |
 | 单元 | `tests/unit/agents/*.test.mjs`（`node --test`，同 TaskBoard 的打包方式） | 写法与读回、逐个文件的检查、路径检查、候选与原因、白话文字 |
-| App | `tests/ui/ag-app.mjs` | Electron + 合成端点；项目与 `.mori/agents` 由测试写好，模型配置与档案按 `v1-switch-helpers.seedUserData`（synthetic，不跑探针）；端口见检查记录 |
+| App | `tests/ui/ag-app.mjs` | Electron + 合成端点；项目与 `.mori/agents` 由测试写好，模型配置与档案按 `v1-switch-helpers.seedUserData`（synthetic，不跑探针）；端口 4960–4969（2026-10-26 与走查会话约定，其他套件不用） |
 | 回放、真实模型 | 不做 | 这一节不改发给模型的文字、工具、批准或会话事件：写出的是 TaskBoard 规格早就支持的角色文件，角色进会话的路径由 TB-01、TB-02、TB-38 覆盖（AGENTS.md 完成顺序第 2 条：只改界面与文件时可以跳过，检查记录写明） |
 
 ### 9.2 验收条目
