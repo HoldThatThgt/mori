@@ -188,7 +188,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | --- | --- |
 | 工具卡标题 | Read src/a.ts · lines 10–29 / Read src/a.ts · from line 10 / Run npm test / Edit src/a.ts / Write src/a.ts / Search / Find / List |
 | 工具卡状态 | 见术语表；失败的命令 "Failed · Exit code 1" |
-| subagent 卡片（[subagent-card.md](../v1/screens/subagent-card.md)） | 标题 Running 3 agents / Ran 3 agents / Run 3 agents；状态 1 of 3 done · 12s / Done · 48s / Done · 1 failed · 48s / Failed / Stopped / Interrupted；每一行 Starting / Waiting for DeepSeek / Waiting for your approval / Read src/a.ts / Done / Failed · … / Stopped，"· reviewer"、"· Read-only"、"· 12 tool uses"；展开一行 Agent prompt、Response；批准卡的归属 "Mori · Fix the retry loop"；右栏 Changes made by other agents aren’t listed here.；工具页的说明 Runs agents in parallel. Only when Task mode is off. |
+| subagent 卡片（[subagent-card.md](../v1/screens/subagent-card.md)） | 标题 Running 3 agents / Ran 3 agents / Run 3 agents；状态 1 of 3 done · 12s / Done · 48s / Done · 1 failed · 48s / Failed / Stopped / Interrupted；每一行 Starting / Waiting for DeepSeek / Waiting for your approval / Read src/a.ts / Done / Failed · … / Stopped，"· reviewer"、"· Read-only"、"· 12 tool uses"；展开一行 Agent prompt、Response；批准卡的归属 "Mori · Fix the retry loop"；右栏 Changes made by other agents aren’t listed here.；工具页那一行下面的原因 Mori turns this on when Task mode is off. |
 | 标签 | Allowed for this session / Allow all |
 | 批准卡标题（bash） | Run a command |
 | 批准卡按钮 | Allow once / Allow “Run commands” for this session / Deny |

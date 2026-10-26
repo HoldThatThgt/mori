@@ -43,9 +43,9 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
 
 | 工作包 | 本规格用到的 |
 | --- | --- |
-| WP-08 | Customize 工具列表的开关（pi 的 `defaultTools`）与说明行；只读的实例总有 `ls`，找到 `rg.exe`、`fd.exe` 时才有 `grep`、`find`（§5.3） |
-| WP-10 | Task mode 改名（`/task`、`Stop agents`）；各角色提示词的“谁看得到什么”；关掉 Task mode 后保留 `board_read`、`read_session`（§2 与它共存） |
-| WP-11 | 身份段里关于交出去的活的那一句按启用的工具写（§6.4 在它的条件里加 `subagent`） |
+| WP-08（已合并，`app-v0` 的 3aa835c） | Customize › Built-in tools 的开关（存为 pi 用户级的 `defaultTools`）与没有开关的行下面的原因（`.tools-row-note`）；只读的实例取 `defaultTools` 中的读取类，`grep`、`find` 只在你打开它们时有（要 `rg.exe`、`fd.exe`）（§2、§5.3） |
+| WP-10 | Task mode 改名（`/task`、`Stop agents`）；各角色提示词的“谁看得到什么”；关掉 Task mode 后保留 `board_read`、`read_session`（§2 与它共存）；只读的实例总有 `ls`（WP-08 留给它，§5.3） |
+| WP-11（已合并，`app-v0` 的 1aa1d79） | 身份段里关于交出去的活的那一句只在有交出去的工具时出现，条件里已有 `subagent`（§6.4 把句子改为按工具拼） |
 | WP-14 | 一轮结束后把步骤折成一行（§7.5） |
 
 语言：同 TaskBoard 规格 §0：界面与给模型的文字用英文，文档与注释用中文。
@@ -68,8 +68,10 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
   增强会话（记忆规格 §9：每天的增强任务在看不见的会话里跑，`args.enhance` 不为空）。
 - 注册：`mori-team` 在用户会话载入时注册（`defaultActive: false`），每次运行开始前按这次运行的模式启用或停用（TaskBoard 规格 §5.2、§5.5 的同一处，
   `team.ts` 的 `applyDialogTools`）。Task mode 下 `mori-team` 的 `tool_call` 处理器照 §5.5 拒绝它（运行中被重新启用时）。
-- 工具页（Customize › Tools）：一行 `subagent`，来源 `Mori`，说明行 `Runs agents in parallel. Only when Task mode is off.`；
-  没有开关（负责人 2026-10-26 回答 3：开关只给 pi 的 8 个内置工具，其余行写一行原因）。
+- 工具页（Customize › Tools）：一行 `subagent`，来源 `Mori`，工具说明照 v0 的行；没有开关，行下面的原因（WP-08 的 `.tools-row-note`）
+  `Mori turns this on when Task mode is off.`（负责人 2026-10-26 回答 3：开关只给 pi 的 8 个内置工具，其余行写一行原因；
+  句式照 WP-08 给 TaskBoard 工具与 `memory` 写的 `Mori turns this on and off with Task mode.`、`Mori turns this on for the main agent.`。
+  `subagent` 由 `mori-team` 注册，但不能归进 TaskBoard 工具那一类，那一句对它不对）。
 
 ## 3. 工具定义
 
@@ -149,7 +151,7 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
 | --- | --- |
 | 通用，基座 `mori` | 与基座相同（TaskBoard 规格 §4.2）：pi 设置里的默认工具（WP-08 起就是你在 Customize 里打开的内置工具）加上直接调用方式的 MCP 工具（`mcp__*`） |
 | 通用，角色 | 角色的 `tools`；没写时与基座相同 |
-| 只读（`read_only: true`） | 上面那一组中的读取类（TaskBoard 规格 §8.1，不含 MCP），加上 WP-08 的规则：总有 `ls`，`grep`、`find` 只在找到 `rg.exe`、`fd.exe` 时有。默认设置下就是 `read`、`ls` |
+| 只读（`read_only: true`） | 与 Task mode 的只读实例用同一个函数（`roles.ts`）：上面那一组中的读取类（TaskBoard 规格 §8.1，不含 MCP；WP-08 起基座那一组是 `defaultTools`），加上总有的 `ls`（WP-10）；`grep`、`find` 只在你在 Customize › Built-in tools 打开它们时有（WP-08，要 `rg.exe`、`fd.exe`）。默认设置下就是 `read`、`ls` |
 
 - 都不含 `memory`、`agent_message`、`subagent` 和 TaskBoard 的工具。
 - 批准：读取类免批准（TaskBoard 规格 §11.2），所以只读 subagent 从不出批准卡；通用 subagent 的 `bash`、`edit`、`write` 等照这个用户会话的权限模式
@@ -385,7 +387,7 @@ interface SubagentRow {
 | 进展的合并发送间隔 | 250 毫秒 |
 | 行里失败原因的显示长度 | 80 字符 |
 | 卡片的展开 | 执行中展开，结束时收起一次 |
-| 工具页的说明行 | `Runs agents in parallel. Only when Task mode is off.` |
+| 工具页那一行下面的原因 | `Mori turns this on when Task mode is off.`（句式照 WP-08） |
 | 界面文字 | §7 |
 
 ## 11. 对其他规格与文档的改动
@@ -425,6 +427,7 @@ interface SubagentRow {
 | `app/src/kernel/modelPool.ts`、`modelTypes.ts`、`modelTimings.ts` | 调度类别 `subagent`（§5.4） |
 | `app/src/kernel/memoryText.ts`、`memoryAssemble.ts` | §6.4：`HANDOFF_TEXT` 换成按工具拼的函数；`tests/unit/memory/text-identity.test.mjs` 与 `tests/ui/mem-app-prompt.mjs` 的期望照改（普通模式的工具清单多 `subagent`） |
 | `app/src/kernel/sessions.ts`、`shared/protocol.ts`、`shared/team.ts` | `runningTools[].partial`、`TeamApprovalRequest.subagent`（§9.2） |
+| `app/src/renderer/src/components/ToolsBuiltin.tsx` | `moriNote`：`subagent` 写 §2 的原因（`subagent` 不进 `shared/team.ts` 的 `isTeamTool`，那一组是 TaskBoard 的工具） |
 | `app/src/renderer/src/components/SubagentCard.tsx`（新）、`ToolCard.tsx`、`ApprovalCard.tsx`、`ChangesPanel.tsx`、`state/transcript.ts`、`state/history.ts`、`styles/` | §7 |
 | `app/tests/` | §14 |
 | `app/package.json` | 脚本 `test:sa-unit`、`test:subagent` |
@@ -474,11 +477,11 @@ interface SubagentRow {
 
 | 编号 | 条目 | 通过条件 | 层 |
 | --- | --- | --- | --- |
-| SA-01 | 什么时候有 | 普通模式的用户会话的请求里有 `subagent`（没有角色文件、只有基座时也有；对话持有者写了 `tools: [read]` 时也有）；Task mode 下的运行没有（含合并会话），运行中被启用时调用被拒绝；立项、结案、task、临时提问、subagent 自己、增强会话的请求里都没有；工具页有一行 `subagent`，来源 `Mori`，说明行按 §2，没有开关；有别的角色时 `agent_message` 仍在 | 单元、App |
+| SA-01 | 什么时候有 | 普通模式的用户会话的请求里有 `subagent`（没有角色文件、只有基座时也有；对话持有者写了 `tools: [read]` 时也有）；Task mode 下的运行没有（含合并会话），运行中被启用时调用被拒绝；立项、结案、task、临时提问、subagent 自己、增强会话的请求里都没有；工具页有一行 `subagent`，来源 `Mori`，没有开关，行下面的原因按 §2；有别的角色时 `agent_message` 仍在 | 单元、App |
 | SA-02 | 定义与归一 | schema 按 §3.1（`role` 只在有别的角色时出现，枚举基座在前、含对话持有者）；说明、`<tools>` 里的一行、准则逐字按 §6.1（有、没有别的角色两种）；§3.2 的每一种写法归一后相同；`subagent_type` 被丢掉 | 单元 |
 | SA-03 | 执行时的检查 | §3.3 表的每一行：错误两行、文字逐字；被拒绝的调用不开实例、不写 `teams/` 下的文件；一次调用 6 个、同一次回复里再调用一次 3 个都照常开出（没有条数上限） | 单元、App |
 | SA-04 | 同时运行 | 3 个 subagent 的请求在端点日志里时间重叠（不是一个接一个）；每个 subagent 一条新会话（id `….ask.<n>.<role>`、`mori.instance` 的 `kind` 为 `ask`、`parentSession` 指向用户会话），不在侧栏；运行结束后实例关闭、文件保留；结果按参数顺序 | App、真实 |
-| SA-05 | 工具 | 只读 subagent 的请求里只有 `read`、`ls`（找到 `rg`、`fd` 时加 `grep`、`find`）；通用的基座 subagent 的请求里的工具与基座相同（默认设置下 `read`、`bash`、`edit`、`write`，加上直接调用方式的 MCP 工具）；写了 `tools: [read, bash]` 的角色的通用 subagent 只有这两个、只读时只有 `read`、`ls`；都没有 `memory`、`agent_message`、`subagent`、TaskBoard 的工具 | 单元、App、真实 |
+| SA-05 | 工具 | 只读 subagent 的请求里只有 `read`、`ls`（在 Built-in tools 打开 `grep`、`find` 时加上它们）；通用的基座 subagent 的请求里的工具与基座相同（默认设置下 `read`、`bash`、`edit`、`write`，加上直接调用方式的 MCP 工具）；写了 `tools: [read, bash]` 的角色的通用 subagent 只有这两个、只读时只有 `read`、`ls`；都没有 `memory`、`agent_message`、`subagent`、TaskBoard 的工具 | 单元、App、真实 |
 | SA-06 | 槽位与排队 | 一个并发 4 的 key 上开 6 个 subagent：同时 4 个请求在途（不留槽位），另外 2 个等到有一个结束才发出，那一行显示 `Waiting for <提供商名>`；把排队超时调短（合成计时）后等待的 subagent 不超时、不换模型；严格优先的顺序 `conversation` > `decision` > `subagent` > `task` > `background`（排队时别的会话的对话请求先发出）；并发 1 时一个接一个跑完、都成功 | 单元、App |
 | SA-07 | 候选与角色 | 基座的 subagent 按会话的范围选；角色的 subagent 按角色的 `models` 与对话范围的交集、顺序按角色，system prompt 里有角色正文；交集为空时只有那一个失败，原因列出每个候选被排除的原因，其余照常 | 单元、App |
 | SA-08 | subagent 的 system prompt 与投递 | 以身份段开头，记忆分节只有 `strategy`、`review`；附加段是角色正文 + §6.1 的 subagent 段（只读、通用两种写法），没有 TaskBoard 的共用段；投递按 §6.2；请求末尾没有工作卡 | 单元、App |
