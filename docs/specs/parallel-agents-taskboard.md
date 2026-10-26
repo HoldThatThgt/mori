@@ -1491,6 +1491,7 @@ interface TaskDetail {
 - 层由结果文件决定：`tb-unit.json` 为单元；`tb-app*.json` 为 App；`tb-replay*.json` 为回放；`tb-real.json` 为真实。与模型层相同的规则：`-packaged.json` 只在 `--packaged` 时计入 App 与真实层，
   回放只认开发构建；`--only` 写的部分结果命名为 `tb-partial-*.json`，不计入任何层；`--allow-missing-real` 同样可用。不加 `--spec` 时仍是模型层的检查，行为不变。
 - `npm run test:taskboard` 依次跑单元、构建、App、回放、§17.4 的现有套件（每个套件按退出码记一条 “TB-46 <脚本名>”），最后运行覆盖检查。
+  App 里含 `tb-app-tasks.mjs`（TB-80–TB-87、TB-89）与 `tb-app-tasks-owner.mjs`（TB-88，默认读这台机器上的 `%APPDATA%\Mori`）。
 - 真实层（TB-04、TB-08、TB-34、TB-37、TB-45）由 `tb-real.mjs` 写结果，覆盖检查同样要求它通过；真实层的检查只断言 §17.1 列出的程序保证的事。
 - TB-80–TB-89（Background tasks，2026-10-26）：TB-58–TB-79 留给同一轮走查的其他包；它的 App 套件 `tb-app-tasks*.mjs` 用端口 4950–4959（4600–4699 已被现有的 tb 套件用满）；TB-88 读负责人的数据，只能在这台机器上跑，结果文件 `tb-app-tasks-owner.json` 计入 App 层（名字里不用 `real`：`spec-ids.test.mjs` 把 `tests/ui/` 下名字含 `real` 的文件算真实层）；
   TB-89 的真实层由 `tb-real.mjs` 加一段写进 `tb-real.json`。

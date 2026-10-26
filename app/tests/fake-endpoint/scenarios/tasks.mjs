@@ -95,6 +95,19 @@ export const SCENARIOS = {
     } },
   ],
 
+  // TB-80（WP-09 之后）：立项登记一个 task 后，对话的回复等 10 秒才开始写；套件在回复进行中打开模型菜单，点
+  // See background tasks。T1（只读）读一个文件后等很久（之后的步骤让后台进程退出、重启 App）。
+  'tb-tasks-menu': [
+    { role: 'planner', kind: 'create', deliveries: {
+      1: [call('request_submit', { title: 'Look at the menu', goal: 'The menu opens Background tasks' }),
+        call('task_create', readTask('Read in the background', 'executor')), say('Registered request 1.')],
+    } },
+    { role: 'chat', kind: 'team-dialog', deliveries: { 1: [together(wait(10000), say('Planner registered it.'))] } },
+    { role: 'executor', kind: 'task', task: 'T1', deliveries: {
+      1: [call('read', { path: 'README.md' }), together(wait(LONG), say('Never reached.'))],
+    } },
+  ],
+
   // TB-85：T1（只读）读一个文件后等很久，套件在这时重启 App；重新打开后它在 Finished，Stopped (Mori restarted)，
   // 会话从文件读出。
   'tb-tasks-restart': [

@@ -5,7 +5,8 @@
 // 含表格）；T1–T6 与结案会话都能打开，记下 T4 的会话（约 1 MB）打开并显示完的用时。
 // 只复制这两样：不读、不复制数据目录里的 credentials.json、pi/auth.json；数据不进仓库，只能在这台机器上跑。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs tasks）：
-//   MORI_APP_DIR=.tb-runs/tasks node tests/ui/tb-app-tasks-owner.mjs --source <负责人的数据目录> [--session <会话 id>]
+//   MORI_APP_DIR=.tb-runs/tasks node tests/ui/tb-app-tasks-owner.mjs [--source <负责人的数据目录>] [--session <会话 id>]
+// --source 默认是这台机器上 Mori 的数据目录 %APPDATA%\Mori（npm run test:taskboard 这样跑）；那里没有这条会话时失败。
 // 结果写到 test-results/tb-app-tasks-owner.json（计入 App 层，§17.3），截图在 test-results/tb-app-tasks-owner/。
 // 端口（§17.3 的 4950–4959）：合成端点 4952、记录代理 4953（模型配置指向它；这一步不应有任何请求）。
 
@@ -130,7 +131,7 @@ async function transcriptChecks(ctx) {
 }
 
 const ctx = { userData: tempUserData('mori-tb-tasks-owner-'), exePath: args.exePath, pageErrors: [] };
-const source = arg('source');
+const source = arg('source') ?? (process.env.APPDATA ? join(process.env.APPDATA, 'Mori') : null);
 try {
   if (!source) throw new Error('Usage: node tests/ui/tb-app-tasks-owner.mjs --source <data dir> [--session <id>]');
   await setup(ctx, source, arg('session') ?? DEFAULT_SESSION);

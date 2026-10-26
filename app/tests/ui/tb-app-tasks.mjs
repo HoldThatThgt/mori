@@ -5,8 +5,9 @@
 //   TB-86 界面文字与键盘、TB-87 现有功能不退步、TB-89 停止一个 task。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs tasks）：
 //   MORI_APP_DIR=.tb-runs/tasks node tests/ui/tb-app-tasks.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
-// 步骤：plain、empty、entries、list、taskview、transcript、keys、stop、readonly、reload、approval、menu、errors、restart
-// （entries 到 reload 共用一个会话，按这个顺序；errors 让后台进程退出，restart 最后跑，重启 App）。
+// 步骤：plain、empty、entries、list、taskview、transcript、folding、keys、stop、readonly、reload、approval、menu、errors、
+// restart（entries 到 reload 共用一个会话，按这个顺序；folding 要 WP-14 的步骤组、menu 要 WP-09 的模型菜单，合并之前
+// 这两步失败；errors 让后台进程退出，restart 最后跑，重启 App）。
 // 结果写到 test-results/tb-app-tasks(-packaged).json（--only 时 tb-partial-app-tasks…），截图在 test-results/tb-app-tasks/。
 // 端口（§17.3：tb-app-tasks*.mjs 用 4950–4959）：合成端点 4950，记录代理 4951。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里写好一个本机提供商（写入等级 A、能关思考，跳过探针）；
@@ -592,20 +593,81 @@ async function approval(ctx) {
 
 // ---------- TB-80 模型菜单（WP-09 之后） ----------
 
-/** @brief 模型菜单协作模式那一段最后一项 See background tasks：关上菜单，打开右栏到 Background tasks（TB-80）。 */
+/** @brief 模型菜单里 See background tasks 那一项：{ text, role, last（是 Task mode 那一段的最后一项） }；没有时为 null。 */
+function menuItem(ctx) {
+  return ctx.page.locator('[data-testid="model-menu"] [data-action="see-background-tasks"]').evaluate((el) => {
+    const group = el.closest('.task-mode-group');
+    const items = group ? [...group.querySelectorAll('[role^="menuitem"]')] : [];
+    return { text: el.textContent.trim(), role: el.getAttribute('role'), last: items.at(-1) === el };
+  }, null, { timeout: 5000 }).catch(() => null);
+}
+
+/**
+ * @brief 模型菜单 Task mode 那一段的最后一项 See background tasks（WP-09 把协作模式移进模型菜单之后）：回复进行中也能用，
+ *        点它关上菜单、打开右栏到 Background tasks（TB-80）。
+ */
 async function menu(ctx) {
-  const who = await flowSession(ctx);
-  await closedPanel(ctx, who);
-  await ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-button"]`).click();
-  const item = ctx.page.locator('[data-testid="model-menu"] [data-action="see-background-tasks"]');
-  const text = await item.textContent({ timeout: 5000 }).catch(() => null);
-  if (text !== null) await item.click();
+  const project = tempProject('mori-tb-tasks-menu-');
+  writeRoles(project, SPLIT_ROLES);
+  const who = await begin(ctx, project, `Look at the menu ${tag('menu')}`);
+  await waitBoard(ctx, who, (board) => board.tasks.length === 1, 'T1');
+  const replying = await poll(async () => (await paneState(ctx.page, who.tab))?.running === true, 10000, 100);
+  // WP-09 之前协作模式下模型按钮是锁定的、点不开：这一项记为失败（下面的 record），不在这里抛出
+  await ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-button"]`).click({ timeout: 5000 }).catch(() => {});
+  const item = await menuItem(ctx);
+  if (item) await ctx.page.locator('[data-testid="model-menu"] [data-action="see-background-tasks"]').click();
   const menuGone = await ctx.page.locator('[data-testid="model-menu"]').count() === 0;
   const tabs = await bgTabs(ctx);
-  record('TB-80 the model menu\'s Task mode part ends with "See background tasks", which closes the menu and opens '
-    + 'the right panel at Background tasks',
-  text === 'See background tasks' && menuGone && tabs.find((tab) => tab.tab === 'tasks')?.selected === 'true',
-  brief({ text, menuGone, tabs }));
+  const still = (await paneState(ctx.page, who.tab))?.running === true;
+  record('TB-80 the model menu\'s Task mode part ends with "See background tasks" (a menu item), usable while a reply '
+    + 'is running; it closes the menu and opens the right panel at Background tasks',
+  item?.text === 'See background tasks' && item.role === 'menuitem' && item.last && Boolean(replying) && still
+    && menuGone && tabs.find((tab) => tab.tab === 'tasks')?.selected === 'true',
+  brief({ item, replying, still, menuGone, tabs }));
+  const report = await issueReport(ctx, who.tab, 'See background tasks');
+  record('TB-80 F8 records "Open background tasks" for the model menu item',
+    report.actions.some((line) => line.includes('Open background tasks')), brief(report.actions.slice(-4)));
+}
+
+// ---------- TB-83 实例会话里的步骤组（WP-14 之后） ----------
+
+/** @brief 会话视图里的步骤组：[{ text, expanded }] 与看得见的工具卡数。 */
+function stepGroups(ctx) {
+  return ctx.page.locator('[data-testid="bg-transcript"]').evaluate((root) => ({
+    groups: [...root.querySelectorAll('[data-testid="step-group"]')].map((el) => ({ text: el.textContent.trim(),
+      expanded: el.getAttribute('aria-expanded') })),
+    visibleTools: [...root.querySelectorAll('[data-testid="tool-card"]')].filter((el) => el.checkVisibility()).length,
+  }), null, { timeout: 5000 }).catch(() => null);
+}
+
+/**
+ * @brief 实例会话里一轮结束后的步骤折叠同对话流（§13.13.4，WP-14 合入后；docs/v0/screens/chat.md“步骤组”）：做完的 T1 会话里
+ *        思考与工具卡折成一行 “▸ <n> steps”，点开看到工具卡；运行中的 T3 正在做的那一组全部显示。
+ */
+async function folding(ctx) {
+  const who = await flowSession(ctx);
+  await openList(ctx, who);
+  await openTranscript(ctx, '[data-testid="bg-task"][data-task="T1"] .bg-task-links', null);
+  await waitTranscript(ctx, 'task');
+  const folded = await stepGroups(ctx);
+  record('TB-83 a finished instance session folds its steps as the chat does: one line "▸ <n> steps" '
+    + '(aria-expanded false) and no tool card showing',
+  folded?.groups.length > 0 && folded.groups.every((group) => group.expanded === 'false'
+    && /^▸ \d+ steps?( · \d+ failed)?$/.test(group.text)) && folded.visibleTools === 0, brief(folded));
+  if (folded?.groups.length) {
+    await ctx.page.locator('[data-testid="bg-transcript"] [data-testid="step-group"]').first().click();
+  }
+  const opened = await stepGroups(ctx);
+  record('TB-83 clicking the line expands the group ("▾ <n> steps", aria-expanded true) and its tool cards show',
+    opened?.groups[0]?.expanded === 'true' && opened.groups[0].text.startsWith('▾ ') && opened.visibleTools > 0,
+    brief(opened));
+  await clickBack(ctx);
+  await openTranscript(ctx, '[data-testid="bg-task"][data-task="T3"] .bg-task-links', null);
+  await waitTranscript(ctx, 'task');
+  const running = await stepGroups(ctx);
+  record('TB-83 the running T3 session shows its current group in full (no folded line for it)',
+    running?.groups.every((group) => group.expanded !== 'false') && running.visibleTools > 0, brief(running));
+  await clickBack(ctx);
 }
 
 // ---------- TB-82、TB-83、TB-89：读不到、停不了 ----------
@@ -671,8 +733,8 @@ async function restart(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { plain, empty, entries, list, taskview, transcript, keys, stop, readonly, reload, approval, menu,
-  errors, restart };
+const steps = { plain, empty, entries, list, taskview, transcript, folding, keys, stop, readonly, reload, approval,
+  menu, errors, restart };
 
 const ctx = { userData: tempUserData('mori-tb-tasks-data-'), exePath: args.exePath, pageErrors: [] };
 try {

@@ -176,15 +176,17 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
 | 构建 | `node tests/ui/tb-build.mjs tasks` 通过 |
 | `npm run test:unit` | 461/461（含 `spec-ids`：TB-80–TB-89 列出的每一层都有测试；MP-38：新加的行里没有推迟实现的标记） |
 | `npm run test:tb-unit` | 357/357（新：`tasks.test.mjs` 14 项、`taskList.test.mjs` 9 项） |
-| `tb-app-tasks.mjs --only` | plain、empty、entries、list、taskview、transcript、keys、stop、readonly、reload、approval、errors、restart 每一步最近一次都通过（分几次跑，端口 4950–4951；结果是 `tb-partial-app-tasks.json`，不计入覆盖检查） |
+| `tb-app-tasks.mjs --only` | plain、empty、entries、list、taskview、transcript、keys、stop、readonly、reload、approval、errors、restart 每一步最近一次都通过；folding、menu 等 WP-14、WP-09（下面）（分几次跑，端口 4950–4951；结果是 `tb-partial-app-tasks.json`，不计入覆盖检查） |
 | `tb-app-tasks-owner.mjs`（TB-88） | 通过：`Finished` 里 T6–T1 全是 Done、没有 `Running`；T2 3 条、T5 1 条、T6 2 条消息全文（T6 两条含表格）；T1–T6 与结案会话都能打开，T4（约 1 MB）的会话 261 ms 显示完；没有发模型请求。只复制那条会话的文件与 `teams/<id>`，没有读 `credentials.json`、`pi/auth.json` |
 | `npm run test:quick` | 没跑：走查第二波的集成会话占着快速集的端口（走查修复会话 2026-10-26 的要求），合进 `app-v0` 时跑 |
-| 整套 `tb-app-tasks*.mjs`、`tb-replay`、TB-46 汇总、`spec-coverage --spec taskboard` | 负责人要求推送前的完整回归里跑（测试分层第 3 条） |
+| 整套 `tb-app-tasks*.mjs`、`tb-replay`、TB-46 汇总、`spec-coverage --spec taskboard` | 负责人要求推送前的完整回归里跑（测试分层第 3 条）；两个 `tb-app-tasks*.mjs` 已加进 `npm run test:taskboard` |
 
 ### 等别的包的（包一合并就做）
 
-- WP-09（模型菜单里的 Task mode）：`See background tasks`（TB-80）。用例 `tb-app-tasks.mjs` 的 `menu` 一步已写好，现在不跑。
-- WP-14（一轮结束后折叠步骤）：实例会话里的步骤照对话流折叠（§13.13.4）。
+- WP-09（模型菜单里的 Task mode）：`See background tasks`（TB-80）。`tb-app-tasks.mjs` 的 `menu` 一步已写好（Task mode 那一段的
+  最后一项、回复进行中也能用、F8 记 `Open background tasks`），现在跑是失败：协作模式下模型按钮锁定、点不开（2026-10-26 跑过一次）。
+- WP-14（一轮结束后折叠步骤）：实例会话里的步骤照对话流折叠（§13.13.4）。`folding` 一步已写好（做完的 T1 会话折成
+  “▸ <n> steps”、点开看到工具卡；运行中的 T3 那一组全部显示），现在跑前两项失败（还没有步骤组），第三项通过。
 - WP-10（发给模型的文字）：TB-89 的 fixture `tests/fixtures/tb/stop-task.json`（`tb-record.mjs --only stop-task`）与
   `tb-real.mjs --only stop`，脚本都已写好；WP-10 改了模型读的文字，在它之前录的要重录，所以等它。在那之前 `tb-replay` 的
   TB-89 记 “replay fixture missing”。
