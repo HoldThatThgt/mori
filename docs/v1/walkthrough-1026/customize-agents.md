@@ -42,7 +42,7 @@ WP-05（`34fa29a`）与 WP-09（`e55b28b`）；没有推送，没有合进 `app-
 | --- | --- | --- |
 | 检查与构建 | `npm run check`、`npx electron-vite build` | 通过 |
 | 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334；合入 WP-02 之后 33/33、475/475、334/334；合入 WP-05（app-v0 `34fa29a`）之后 33/33、465/465、334/334 |
-| App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`；为行与用例表补的用例再跑 `--only AG-01,AG-02,AG-04,AG-07,AG-09` 与 `--only AG-04`。端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”）；AG-08 没有跑（等 WP-09）。合入 WP-05 之后再跑第一条命令：44 条通过，失败的仍只有 AG-10 那一条。改用 WP-03 的拖动排序之后跑 `--only AG-04`：11 条全部通过。合入 WP-09、做完 Manage agents 之后跑 `--only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-08,AG-09,AG-10`：49 条全部通过，没有失败 |
+| App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`；为行与用例表补的用例再跑 `--only AG-01,AG-02,AG-04,AG-07,AG-09` 与 `--only AG-04`。端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”）；AG-08 没有跑（等 WP-09）。合入 WP-05 之后再跑第一条命令：44 条通过，失败的仍只有 AG-10 那一条。改用 WP-03 的拖动排序之后跑 `--only AG-04`：11 条全部通过。合入 WP-09、做完 Manage agents 之后跑 `--only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-08,AG-09,AG-10`：49 条全部通过，没有失败。AG-04 的拖动排序检查加上下半边那一次之后再跑 `--only AG-04`：11 条全部通过 |
 | 快速集 `npm run test:quick`；`tb-app-models.mjs --only sel`（TB-38） | 还没有跑：两者用共用的端口（m0-smoke 的 4319、TaskBoard 的 4600 段），第二波（WP-10 到 WP-14）的集成方占着；走查会话同意在第二波结束后跑，那时先再合一次 `app-v0`（WP-10 改 Task mode），再跑这两项 | — |
 | 完整回归、覆盖检查 | 按规则只在负责人要求推送前跑（`npm run test:agents`、`v1-models-existing.mjs --id AG-11`） | — |
 | 回放、真实模型 | 不做：这一节不改发给模型的文字、工具、批准或会话事件（规格 §9.1）；`mcp__*` 在角色文件里与基座的白名单是同一个写法 | — |
@@ -98,7 +98,7 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 | [customize-agents](../screens/customize-agents.md) | 表单 · 编辑 | `ag-app.mjs --only AG-06`：“AG-06 Edit fills the form with the file’s values and warns that the header’s comments go”；“AG-06 Save keeps the file name and writes requires, differ_from and subscribe back unchanged, without comments” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 文件头有注释 | `ag-app.mjs --only AG-06`：“AG-06 Edit fills the form with the file’s values and warns that the header’s comments go” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · Jobs 被别人认领 | `ag-app.mjs --only AG-05`：“AG-05 a job another file claims can’t be ticked and says who does it”；新建表单里的那一项见“表单 · 新建” |
-| [customize-agents](../screens/customize-agents.md) | 表单 · 选模型 | `ag-app.mjs --only AG-04`：“AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool”；“AG-04 the model list reorders as in Settings › Models: a Reorder handle from two items, a line where it drops, arrow keys that keep focus, and each move announced” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 选模型 | `ag-app.mjs --only AG-04`：“AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool”；“AG-04 the model list reorders as in Settings › Models: a Reorder handle from two items; dropped on the top half of an item it goes before it, on the bottom half after it, with the line there; arrow keys keep focus; each move is announced” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 选工具 | `ag-app.mjs --only AG-04`：“AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool”；“AG-04 the file .mori/agents/reviewer.md is written exactly as §5.1 says” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 不能保存 | `ag-app.mjs --only AG-05`：“AG-05 Save is unavailable without a name, a description, a model in the list or a tool; the description stops at 200 characters with an n/200 count” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 保存中 | `ag-app.mjs --only AG-04`：“AG-04 while saving, the button reads "Saving…" and the form can’t be changed” |
@@ -130,9 +130,27 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 
 ## 等负责人定的
 
-- **All MCP tools 写进文件的样子**：现在写 `mcp__*`，为此 TaskBoard 规格 §4.1、§4.4 放开了这个写法（临时默认值，
-  [../defaults.md](../defaults.md)“Customize › Agents”）。另两个做法：表单不提供 All MCP tools；或按此刻的 MCP 服务各写一个
-  `mcp__<服务>__*`（以后加的服务不包括）。2026-10-26 已经经走查会话问负责人。
+负责人不在时（2026-10-26 起，原话 "unattended mode, pick recommended option for questions and log them, I will read them
+after"），每个问题按推荐做完、登记临时默认值，记在这里，等负责人回来看。
+
+- **All MCP tools 写进文件的样子**
+  - 问题：表单 Tools 的 `All MCP tools` 写进角色文件是什么样子？TaskBoard 规格 §4.4 原来不认 `mcp__*` 这个写法，
+    只认 `mcp__<服务>__<工具或 *>`。
+  - 选项：(1) 写 `mcp__*`（全部 MCP 工具，同基座的白名单写法，以后加的服务也算在内；TaskBoard 规格 §4.1、§4.4 为它放开）；
+    (2) 表单不提供 `All MCP tools`；(3) 按此刻的 MCP 服务各写一个 `mcp__<服务>__*`（以后加的服务不包括）。
+  - 选了：(1)，推荐的。临时默认值登记在 [../defaults.md](../defaults.md)“Customize › Agents”的“All MCP tools 写进文件的样子”，
+    TaskBoard 规格 §4.1、§4.4 有带日期的注。2026-10-26 经走查会话问过负责人，没有回答前照 (1)。
+  - 做在：`kernel/roles.ts`（`toolProblems` 认 `ALL_MCP_TOOLS`）、`components/ToolsAgentForm.tsx`（`All MCP tools` → `mcp__*`）、
+    `shared/roles.ts`（`toolsText` 把它写成 all MCP tools）。
+  - 测在：单元 `taskboard/roles.test.mjs`“TB-01 §4.4 row: unknown tool; TaskBoard tools are added by Mori”（`mcp__*` 合格、
+    `mcp__` 不合格），`agents/roleFiles.test.mjs`、`agents/roleCommands.test.mjs` 的 AG-04（写出并读回 `"mcp__*"`），
+    `agents/text.test.mjs`“AG-09 tools: written ones joined, mcp__* as all MCP tools; …”；App `ag-app.mjs --only AG-04`
+    “AG-04 the file .mori/agents/reviewer.md is written exactly as §5.1 says”、`--only AG-09`“AG-09 needs without a tier note,
+    all MCP tools, other settings, and No prompt”。
+  - 改成 (2) 或 (3) 时：去掉 TaskBoard 规格的放开与 `ALL_MCP_TOOLS`，表单相应改，上面这些用例照改。
+
+（拖动排序的放法不在这里：走查会话按推荐定了两处都用 WP-03 的规则，上半边插在前面、下半边插在后面，这一节已经照做，见上面
+“统一拖动排序”与状态表“选模型”。）
 
 ## 没有验证的
 

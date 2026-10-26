@@ -287,32 +287,44 @@ function checkNewDefaults(form) {
 /** @brief 柄的悬停（Claude 的说法，同 Settings › Models）。 */
 const REORDER_TITLE = 'Drag or use the arrow keys to reorder';
 
-/** @brief strong 的柄上先按下、再按上：各自之后的顺序与 modelListState。 */
-async function pressBothWays(page) {
-  const down = await pressModelHandle(page, 'strong', 'ArrowDown');
-  const downList = (await formSnapshot(page)).modelList;
-  const up = await pressModelHandle(page, 'strong', 'ArrowUp');
-  const upList = (await formSnapshot(page)).modelList;
-  return { down, downList, up, upList };
+/**
+ * @brief 下半边那一次：把 strong（第一项）拖到 zg/glm-4.6 的下半边，再在 strong 的柄上按上、下、上；返回拖动中的样子、
+ *        放下后的顺序与每次按键之后的顺序、焦点与播报（从 [zg/glm-4.6, strong] 起，最后回到 [strong, zg/glm-4.6]）。
+ */
+async function afterAndKeys(page) {
+  const after = await dragModelRange(page, 'strong', 'zg/glm-4.6', 'after');
+  const afterList = (await formSnapshot(page)).modelList;
+  const keys = [];
+  for (const key of ['ArrowUp', 'ArrowDown', 'ArrowUp']) {
+    const state = await pressModelHandle(page, 'strong', key);
+    keys.push({ key, list: (await formSnapshot(page)).modelList, focus: state.focus, said: state.said });
+  }
+  return { after, afterList, keys };
 }
 
 /**
  * @brief 表单的模型列表用 Settings › Models 的拖动排序（规格 §6.4、状态表“选模型”）：一项时没有柄，两项时每项一个柄；
- *        拖到另一项的上半边时那一项上沿一条线、被拖的项变淡，放下后排到它前面；方向键移一格、焦点留在柄上；每次移动都播报。
+ *        拖到另一项的上半边时那一项上沿一条线、放下后排到它前面，下半边时下沿一条线、排到它后面，被拖的项变淡；
+ *        方向键移一格、焦点留在柄上；每次移动都播报。
  */
-function checkReorder({ one, two, during, dragged, down, downList, up, upList }) {
+function checkReorder({ one, two, during, dragged, after, afterList, keys }) {
   const said = (position) => `strong was dropped at position ${position} of 2.`;
-  record('AG-04 the model list reorders as in Settings › Models: a Reorder handle from two items, a line where it drops,'
-    + ' arrow keys that keep focus, and each move announced',
+  const ZS = ['zg/glm-4.6', 'strong'];
+  const SZ = ['strong', 'zg/glm-4.6'];
+  const wantKeys = [[SZ, 1], [ZS, 2], [SZ, 1]];
+  record('AG-04 the model list reorders as in Settings › Models: a Reorder handle from two items; dropped on the top '
+    + 'half of an item it goes before it, on the bottom half after it, with the line there; arrow keys keep focus; '
+    + 'each move is announced',
   JSON.stringify(one.handles) === '[null]'
     && JSON.stringify(two.handles) === JSON.stringify([`Reorder zg/glm-4.6|${REORDER_TITLE}`,
       `Reorder strong|${REORDER_TITLE}`])
     && JSON.stringify(during.drops) === '["zg/glm-4.6:before"]' && JSON.stringify(during.dragging) === '["strong"]'
-    && / 0px 2px 0px 0px inset$/.test(during.lines[0] ?? '')
-    && JSON.stringify(dragged) === '["strong","zg/glm-4.6"]'
-    && JSON.stringify(downList) === '["zg/glm-4.6","strong"]' && down.focus === 'Reorder strong' && down.said === said(2)
-    && JSON.stringify(upList) === '["strong","zg/glm-4.6"]' && up.focus === 'Reorder strong' && up.said === said(1),
-  brief({ one: one.handles, two: two.handles, during, dragged, down, downList, up, upList }));
+    && / 0px 2px 0px 0px inset$/.test(during.lines[0] ?? '') && JSON.stringify(dragged) === JSON.stringify(SZ)
+    && JSON.stringify(after.drops) === '["zg/glm-4.6:after"]' && JSON.stringify(after.dragging) === '["strong"]'
+    && / 0px -2px 0px 0px inset$/.test(after.lines[0] ?? '') && JSON.stringify(afterList) === JSON.stringify(ZS)
+    && keys.every((step, index) => JSON.stringify(step.list) === JSON.stringify(wantKeys[index][0])
+      && step.focus === 'Reorder strong' && step.said === said(wantKeys[index][1])),
+  brief({ one: one.handles, two: two.handles, during, dragged, after, afterList, keys }));
 }
 
 /** @brief 填好表单：名字、说明、职责、模型（两项，拖动与方向键换顺序）、工具、正文。 */
@@ -331,7 +343,7 @@ async function fillReviewer() {
   const two = await modelListState(page);
   const during = await dragModelRange(page, 'strong', 'zg/glm-4.6', 'before');
   const dragged = (await formSnapshot(page)).modelList;
-  checkReorder({ one, two, during, dragged, ...await pressBothWays(page) });
+  checkReorder({ one, two, during, dragged, ...await afterAndKeys(page) });
   await form.getByRole('radio', { name: 'Only these' }).check();
   const noTools = await formSnapshot(page);
   for (const tool of ['read', 'grep', 'All MCP tools']) await setCheck(page, 'agent-tools-field', tool, true);
