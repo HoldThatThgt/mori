@@ -30,7 +30,7 @@ import {
   allowedOverflow, effortTipProblems, f8ViewProblems, modeProblems, paneFacts, PERMISSION_MENU, permissionMenuProblems,
   permissionState, permissionTipProblems, rangeTipProblems, ROW, ROW_HEIGHT, rowLog, rowMenuState, viewFields, watchRow,
 } from './m2-helpers.mjs';
-import { OPEN_FOLDER, pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers, showStep } from './page.mjs';
 import { clickTrayIcon, closeWindow, findTray, recordBalloons, waitWindow, windowState } from './tray-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -582,6 +582,7 @@ async function editApprove({ page, h, project }) {
   await waitIdle(page);
   const card = paneOf(page).getByTestId('tool-card').last();
   const status = await card.getAttribute('data-status');
+  await showStep(card);
   await card.locator('summary').click();
   const diff = await card.getByTestId('tool-diff').waitFor({ timeout: 10000 }).then(() => true, () => false);
   const readme = readFileSync(join(project, 'README.md'), 'utf8');
@@ -621,8 +622,12 @@ async function rejectReason({ page, h, project }) {
   await page.screenshot({ path: join(shots, '03-rejected.png') });
 }
 
-/** @brief 最后一张工具卡的状态行与悬停提示；标题里的"Edit"是否完整可见、状态行是否超出卡片。 */
-function lastToolLayout(page) {
+/**
+ * @brief 最后一张工具卡的状态行与悬停提示；标题里的"Edit"是否完整可见、状态行是否超出卡片。一轮结束后卡折在步骤组里
+ *        （chat.md"步骤组"），先展开那一组再量。
+ */
+async function lastToolLayout(page) {
+  await showStep(paneOf(page).getByTestId('tool-card').last());
   return paneOf(page).getByTestId('tool-card').last().evaluate((card) => {
     const status = card.querySelector('[data-testid="tool-status"]');
     const box = (selector) => card.querySelector(selector)?.getBoundingClientRect() ?? { right: 0, width: 0 };
@@ -654,6 +659,7 @@ async function longReason({ page, h }) {
     view.titleWidth > 0 && view.verbShown && view.statusInside, JSON.stringify(view));
   await page.screenshot({ path: join(shots, '03-long-reason.png') });
   const card = paneOf(page).getByTestId('tool-card').last();
+  await showStep(card);
   await card.locator('summary').click();
   const body = await card.locator('.tool-body').innerText({ timeout: 5000 }).catch(() => '');
   await card.locator('summary').click();

@@ -154,7 +154,7 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 会话依据，会话在侧栏里 | 依据的 `session`（会话文件路径）+ `entry`；侧栏的会话列表；`session.read { sessionFile, anchor: entry }` 的 `anchor`（这个条目或它之上最近的一条你的消息或助手回复，不含程序投递；在完整的当前分支上找，会话正在生成、文件很大时一样，§8） | 打开那个会话（已归档的先恢复；分屏时放进焦点所在的一栏，同 M7），在对话流里找到含这个条目的那一轮（用户消息、助手回复或其中的工具调用），滚过去高亮（同 M7 的时长，约 4 秒）；F8 记 `Jump to source from Memory` | — |
+| 会话依据，会话在侧栏里 | 依据的 `session`（会话文件路径）+ `entry`；侧栏的会话列表；`session.read { sessionFile, anchor: entry }` 的 `anchor`（这个条目或它之上最近的一条你的消息或助手回复，不含程序投递；在完整的当前分支上找，会话正在生成、文件很大时一样，§8） | 打开那个会话（已归档的先恢复；分屏时放进焦点所在的一栏，同 M7），在对话流里找到含这个条目的那一轮（用户消息、助手回复或其中的工具调用），滚过去高亮（同 M7 的时长，约 4 秒）；那条消息里有块在折起的步骤组里时先展开那些组（2026-10-26 走查 M18，[../../v0/screens/chat.md](../../v0/screens/chat.md)"步骤组"）；F8 记 `Jump to source from Memory` | — |
 | 正在检查 | `session.read` 还没返回 | 按钮 `Opening…`，不可再点 | — |
 | 条目不在当前分支 | `session.read` 的 `anchor` 为 `null`（会话当前分支上没有这个条目）；或打开会话后对话流里找不到那条消息 | 留在记忆页，状态行 `This message is no longer in the session.` | — |
 | 会话已删除 | 会话列表读完了、里面没有它，本次也没有打开它；或 `session.read` 报会话文件不在（`Session file not found…`） | 状态行 `Session deleted`，`Jump to source` 不可用（同 M7） | — |

@@ -29,9 +29,10 @@
 // 布局：MORI_USER_DATA=<根>/data，agentDir=<根>/data/pi（第 9 步是 <根>/data-off）；用户目录用真的（os.homedir()），
 // 只有 userData 是临时的。
 // 用法（在 app/ 下，先 npm run build）：
-//   node tests/ui/m6-app-mcp-shared.mjs [--exe <Mori.exe 路径>]
+//   node tests/ui/m6-app-mcp-shared.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m6-app-mcp-shared(-packaged).json，截图和服务日志在 test-results/m6-app-mcp-shared(-packaged)/。
-// 各步骤按顺序依赖前一步留下的会话和进程，所以不提供 --only。
+// 各步骤按顺序依赖前一步留下的会话和进程：--only 只跑列出的步骤（startup 总是跑；测试分层第 2 条），按 steps 的顺序把
+// 它依赖的步骤一起写上（例如 concurrency 要 sharing、runFolderUser、runFolderProject、roots 建的会话和发过的请求）。
 
 import { execFileSync } from 'node:child_process';
 import {
@@ -47,9 +48,10 @@ import {
 } from './m3-helpers.mjs';
 import { paneAt, sendAt, slotSelector, splitState, waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import { descendantsOf, openToolsSection, processList, startFakeEndpoint } from './m6-helpers.mjs';
-import { OPEN_FOLDER, pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers, showStep } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
+const only = arg('only')?.split(',');
 const suffix = exePath ? '-packaged' : '';
 const port = 4366;
 const baseUrl = `http://127.0.0.1:${port}/v1`;
@@ -229,6 +231,7 @@ const folders = (...dirs) => dirs.map((dir) => resolve(dir).toLowerCase()).sort(
 async function cardOutput(page, slot = '.pane-slot:not([hidden])') {
   const card = page.locator(`${slot} [data-testid="chat-pane"] [data-testid="tool-card"]`).last();
   const status = await card.getAttribute('data-status', { timeout: 5000 });
+  await showStep(card);
   if (!(await card.evaluate((element) => element.open))) await card.locator('summary').click();
   await card.locator('.tool-body').waitFor({ timeout: 5000 });
   const output = await card.evaluate((element) => {
@@ -528,6 +531,7 @@ async function startTwoSlow(ctx) {
   }
   for (const side of ['left', 'right']) {
     const card = paneAt(page, side).getByTestId('tool-card').last();
+    await showStep(card);
     if (!(await card.evaluate((element) => element.open))) await card.locator('summary').click();
   }
   return titles;
@@ -1109,6 +1113,7 @@ const layout = makeLayout();
 const ctx = { ...layout, pageErrors: [], kernelLog: [], seen: new Set(), pids: {}, files: {} };
 try {
   for (const [name, step] of Object.entries(steps)) {
+    if (only && name !== 'startup' && !only.includes(name)) continue;
     try {
       await step(ctx);
     } catch (error) {
