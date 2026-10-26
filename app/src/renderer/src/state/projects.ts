@@ -38,12 +38,14 @@ export async function loadSessions(): Promise<void> {
  *        协作状态与 TaskBoard 视图同样（平行 Agent 规格 §13.10），挂起的后台批准卡与待判断的消息接到对话流上。
  *        增强的提示（docs/specs/memory.md §9.9、§10.6）只在打开时取：后台进程只给新建的会话带上它（打开已有的为 null），
  *        会话已经打开后（Check again 等）不再取，Dismiss 过的不会回来；旧的录制里没有这一项时按没有。
+ *        上下文用量的分项同样：早于分项的录制里没有这一项时按没有（docs/v0/screens/models.md"回放旧的录制"）。
  */
 export function withInfo(tab: Tab, info: SessionInfo): Tab {
   return { ...tab, sessionId: info.sessionId, cwd: info.cwd, sessionFile: info.sessionFile, name: info.name,
     projectTrust: info.projectTrust, trustRemembered: info.trustRemembered, trustSaveError: info.trustSaveError,
     extensionErrors: info.extensionErrors, ...modelStateOf(info),
-    contextUsage: info.contextUsage, approval: info.approval, team: info.team, board: info.board,
+    contextUsage: info.contextUsage, contextBreakdown: info.contextBreakdown ?? null, approval: info.approval,
+    team: info.team, board: info.board,
     memoryNotice: tab.phase === 'opening' ? info.memoryNotice ?? null : tab.memoryNotice,
     transcript: withTeamInfo(tab.transcript, info), phase: 'ready', error: null, interrupted: false };
 }
@@ -81,12 +83,15 @@ function withoutMark(marks: AppState['rowMarks'], file: string | null): AppState
   return rest;
 }
 
-/** @brief 加入一个会话并切到它：side 为空时放进焦点所在的那一栏，否则在这一侧分屏打开（docs/v0/screens/split.md）。 */
+/**
+ * @brief 加入一个会话并切到它：side 为空时放进焦点所在的那一栏，否则在这一侧分屏打开（docs/v0/screens/split.md）。
+ *        首次启动测试成功的"Connected · …"只显示到有会话放进中栏为止（docs/v1/screens/first-run.md），这里清掉。
+ */
 function addTab(tab: Tab, side?: Side): void {
   useApp.setState((state) => {
     const next = { ...state, tabs: [...state.tabs, tab] };
     return { tabs: next.tabs, ...(side ? placeInSplit(next, tab.key, side) : showInFocused(next, tab.key)),
-      view: 'chat' };
+      view: 'chat', connected: null };
   });
 }
 
@@ -105,7 +110,6 @@ export async function createSessionIn(cwd: string): Promise<void> {
     const info = await request<SessionInfo>({ type: 'session.create', cwd, trust });
     updateTab(tab.key, (current) => withInfo({ ...current,
       transcript: withNotices(current.transcript, info.extensionNotices) }, info));
-    useApp.setState({ firstRun: false });
   } catch (error) {
     markFailed(tab.key, 'session.create', error);
   }
@@ -118,13 +122,29 @@ export async function openFolder(): Promise<void> {
   if (cwd) await createSessionIn(cwd);
 }
 
-/** @brief "New session"（Ctrl+N）：在当前会话所在的项目里新建；没有当前会话时等于"Open folder…"。 */
+/**
+ * @brief Ctrl+N、收起的图标栏上的 +、Customize 的"New session"：在当前会话所在的项目里新建；没有当前会话时等于
+ *        "Open folder…"。
+ */
 export async function newSession(): Promise<void> {
   if (!(await leaveAllowed())) return;
   recordAction('New session');
   const current = activeTab();
   if (current) await createSessionIn(current.cwd);
   else await openFolder();
+}
+
+/**
+ * @brief 项目行的 +（"New session in <folder>"，docs/v0/screens/sessions.md"项目行的 +"）：先过离开确认，再在这个项目里
+ *        新建会话、放进焦点所在的那一栏。leaving 在确认可以离开之后、新建之前调用（浮动的左栏据此收起）；
+ *        你选"Keep editing"时什么都不做。
+ */
+export function newSessionIn(cwd: string, leaving: () => void): void {
+  guardLeave(() => {
+    recordAction('New session');
+    leaving();
+    void createSessionIn(cwd);
+  });
 }
 
 /**

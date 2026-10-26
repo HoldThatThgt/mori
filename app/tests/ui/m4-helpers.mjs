@@ -1,5 +1,6 @@
 // M4 测试（m4-app.mjs、m4-replay.mjs、m4-real.mjs）共用的页面操作：选字（程序选区或真的拖鼠标）、选区浮层、
 // 引用芯片、发出的引用、文件阅读器、右栏改动列表、回到原位置的高亮、反馈表单（底部说明）与保存的反馈、会话文件里的条目。
+// 2026-10-26 起（WP-13）还有阅读器的 Markdown 预览、切到源码、预览里的 mermaid 图。
 // 只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -201,15 +202,27 @@ export async function expandChange(page, path) {
   await sleep(300);
 }
 
-/** @brief 文件阅读器：路径、状态说明、前几行、高亮的行、"Source changed"的提示。 */
+/**
+ * @brief 文件阅读器：路径、状态说明、前几行、高亮的行、"Source changed"的提示；2026-10-26 起（changes.md"显示 Markdown
+ *        预览"、"复制路径"）还有：显示的是预览还是源码（mode，读不出内容时为 null）、切换按钮的读屏名（没有时 null）、
+ *        路径按钮的读屏名和是否不可用、复制路径后的提示。
+ */
 export async function viewerState(page) {
   const viewer = page.getByTestId('file-viewer');
   if (await viewer.count() === 0) return null;
   return page.getByTestId('right-panel').evaluate((panel) => {
     const lines = [...panel.querySelectorAll('[data-testid="file-content"] [data-line]')];
+    const pathButton = panel.querySelector('[data-testid="file-path"]');
+    const preview = panel.querySelector('[data-testid="file-preview"]');
     return {
-      path: panel.querySelector('[data-testid="file-path"]')?.textContent ?? '',
-      fullPath: panel.querySelector('[data-testid="file-path"]')?.getAttribute('title') ?? '',
+      path: pathButton?.textContent ?? '',
+      fullPath: pathButton?.getAttribute('title') ?? '',
+      pathLabel: pathButton?.getAttribute('aria-label') ?? '',
+      pathDisabled: pathButton?.disabled ?? null,
+      copied: panel.querySelector('[data-testid="path-copied"]')?.textContent ?? '',
+      copyFailed: panel.querySelector('[data-testid="path-copy-failed"]')?.textContent ?? '',
+      mode: preview ? 'preview' : panel.querySelector('[data-testid="file-content"]') ? 'source' : null,
+      modeButton: panel.querySelector('[data-testid="viewer-mode"]')?.getAttribute('aria-label') ?? null,
       state: panel.querySelector('[data-testid="file-state"]')?.textContent ?? '',
       loading: panel.textContent.includes('Loading…'),
       lineCount: lines.length,
@@ -228,6 +241,45 @@ export function waitViewer(page, timeout = 10000) {
     const viewer = document.querySelector('[data-testid="file-viewer"]');
     return viewer && !viewer.textContent.includes('Loading…');
   }, null, { timeout });
+}
+
+/**
+ * @brief 阅读器显示的是 Markdown 预览时点"View source"切到源码，等行号出现（2026-10-26 起 .md 文件默认是预览，
+ *        changes.md"显示 Markdown 预览"）；已经是源码或读不出内容时不动。按行检查的测试打开文件后先调它。
+ */
+export async function viewSource(page) {
+  if (await page.getByTestId('file-preview').count() === 0) return;
+  await page.getByTestId('right-panel').getByRole('button', { name: 'View source', exact: true }).click();
+  await page.getByTestId('file-content').waitFor({ timeout: 5000 });
+}
+
+/**
+ * @brief Markdown 预览里渲染出的东西：标题、列表项、表格、代码块、图（shadow DOM 里有 SVG 的、还在画的）、
+ *        图片的替代文字、带源码行号的元素数；没有预览时为 null。
+ */
+export function previewState(page) {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-testid="file-preview"]');
+    if (!root) return null;
+    const hosts = [...root.querySelectorAll('[data-testid="mermaid-diagram"]')];
+    return {
+      headings: [...root.querySelectorAll('[data-streamdown^="heading"]')].map((element) => element.textContent),
+      items: root.querySelectorAll('li').length,
+      tables: root.querySelectorAll('table').length,
+      codeBlocks: [...root.querySelectorAll('[data-streamdown="code-block"]')].map((block) => block.dataset.language),
+      diagrams: hosts.filter((host) => host.shadowRoot?.querySelector('svg')).length,
+      drawing: hosts.filter((host) => host.getAttribute('aria-busy') === 'true').length,
+      imageFallback: root.querySelector('[data-streamdown="image-fallback"]')?.textContent ?? '',
+      lineRows: root.querySelectorAll('[data-line]').length,
+      positioned: root.querySelectorAll('[data-line-start]').length,
+    };
+  });
+}
+
+/** @brief 等预览里的 mermaid 图画好（shadow DOM 里有 SVG）；超时返回 false。 */
+export function waitDiagram(page, scope, timeout = 20000) {
+  return page.waitForFunction((css) => [...document.querySelectorAll(`${css} [data-testid="mermaid-diagram"]`)]
+    .some((host) => host.shadowRoot?.querySelector('svg')), scope, { timeout }).then(() => true, () => false);
 }
 
 // ---------- 高亮、反馈 ----------

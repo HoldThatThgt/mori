@@ -22,7 +22,7 @@ import type {
   McpTransportSendOptions, ProgressNotification, Root,
 } from '@earendil-works/pi-mcp';
 import type { SharedServerState } from '../shared/protocol';
-import { loadPi, type Pi } from './pi';
+import { createSettingsManager, loadPi, type Pi } from './pi';
 
 /** pi 的包名（核对按路径找到的包） */
 const PI_PACKAGE = '@earendil-works/pi-coding-agent';
@@ -793,7 +793,7 @@ function isCurrentUserKey(key: string): boolean {
 async function userMcpEnabled(): Promise<boolean> {
   const pi = await loadPi();
   const agentDir = pi.getAgentDir();
-  const settingsManager = pi.SettingsManager.create(agentDir, agentDir, { projectTrusted: false });
+  const settingsManager = await createSettingsManager(agentDir, agentDir, { projectTrusted: false });
   const manager = new pi.DefaultPackageManager({ cwd: agentDir, agentDir, settingsManager,
     builtinExtensions: ['mcp'] });
   const paths = await manager.resolve(async () => 'skip');

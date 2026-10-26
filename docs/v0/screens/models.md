@@ -17,7 +17,7 @@
 | pi 的 `thinking_level_changed` 事件 | 新的强度（例如换模型后 pi 改了强度） |
 | `session.pickOptions`（只读） | 范围菜单的各项：全部分组、提供商、模型，按这个会话的项目做静态校验（变淡与原因），带区域；会话打开后、`pick` / `current` / `blocked` 变了、每次打开菜单时读 |
 | 会话运行状态 | 准备中（`sending`，pi 还没开始，规格 §11.4）与生成中 |
-| `session.state` → pi `getContextUsage()` | 上下文用量 `{ tokens, contextWindow, percent }`；打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新（M1 起，不加命令）。pi 的类型说明是"Estimated context tokens"：最后一次回复报的用量，加上之后的消息按字数估，不告诉哪一部分是估算 |
+| `session.state` → pi `getContextUsage()` | 上下文用量 `{ tokens, contextWindow, percent }`；打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新（M1 起，不加命令）。pi 的类型说明是"Estimated context tokens"：最后一次回复报的用量，加上之后的消息按字数估，不告诉哪一部分是估算。2026-10-26 起（WP-12）同一个结果和会话信息里还有分项 `contextBreakdown`（后台进程按 pi 会话算，见下面"详情里的分项"） |
 
 ## 位置
 
@@ -99,20 +99,64 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 不显示 | 第一次打开中、打开失败；或 pi 返回空（没有模型，或模型的上下文长度不是正数） | 没有圆环（同原来不显示用量） | — |
-| 还没有消息 | `tokens` 为 0：pi 只估算对话里的消息，不算系统提示词和工具说明，还没有消息时就是 0 | 空圆环（只有底圈，实线）；悬停"Context window"；读屏名"Context window"，描述（`aria-describedby`）"Send a message to see context usage." | 打开详情 |
-| 有用量 | `tokens`、`contextWindow`、`percent` | 圆环从正上方顺时针按百分比填充，强调色；悬停"Context ≈ 15.4k / 128k (12%)"；读屏名"Usage: Context approximately 15,360 of 128,000 tokens (12%)" | 打开详情 |
+| 还没有消息 | `tokens` 为 0：pi 在第一次运行开始时才把系统提示词和工具说明写进对话（一条 system 消息），之前对话里什么都没有，估出来就是 0；`contextBreakdown` 为 null | 空圆环（只有底圈，实线）；悬停"Context window"；读屏名"Context window"，描述（`aria-describedby`）"Send a message to see context usage." | 打开详情 |
+| 有用量 | `tokens`、`contextWindow`、`percent`；`contextBreakdown` | 圆环从正上方顺时针按百分比填充，强调色；悬停"Context ≈ 15.4k / 128k (12%)"；读屏名"Usage: Context approximately 15,360 of 128,000 tokens (12%)"；描述是详情里显示的各分项（"System prompt approximately 505 tokens (0.4%), System tools approximately 1,123 tokens (0.9%), …, Free space approximately 96,256 tokens (75.2%)"，见"详情里的分项"） | 打开详情 |
 | 快满 | 四舍五入后显示的百分比 ≥ 75（与悬停、读屏里的数一致：74.5% 显示"75%"，也用警示色） | 填充改用警示色（较深的 `--color-warn-text`）；≥ 90 用危险色（照 Claude 的分档，登记在 defaults.md）。不靠颜色也看得出：有填充时底圈是浅的 `--color-line`，三种填充和它的对比度都 ≥ 3:1，填到哪里看得出（空圆环的 `--color-faint` 底圈和填充几乎一样亮，所以有填充时换掉） | 同上 |
 | 刚压缩完 | `tokens` 为 null（pi：压缩之后还没有算用量的回复；上下文太小被截断、pi 从上下文去掉的回复不算，这时对话流最后一项是那条回复） | 空圆环，底圈是虚线（与"还没有消息"分得开）；悬停"Context window"；读屏名"Context window"，描述"Just compacted. Context usage shows after the next response." | 打开详情 |
-| 详情 | 你点了圆环或在它上面按 Enter / Space | 照 Claude 的用量浮层，从圆环往上弹出（宽 260px，不超过这一行）：第一行左边"Context window"，右边与悬停相同的 summary"≈ 15.4k / 128k (12%)"；下面一条 4px 的进度条（颜色同圆环）。还没有消息、刚压缩完时右边空着，进度条的位置换成那句说明（"Send a message to see context usage."，或"Just compacted. Context usage shows after the next response."）。开着时用量刷新，详情跟着变 | Esc 关闭，焦点留在圆环；点外面或 Tab 移走也关闭（焦点在新的位置）；再点圆环关闭 |
-| 后台进程退出、Restart 之后重新打开中 | 同 chat.md"后台进程退出" | 圆环和详情保留最后一次读到的用量（同原来；重新打开时 `contextUsage` 不清空） | 打开详情 |
+| 详情 | 你点了圆环或在它上面按 Enter / Space | 照 Claude 的用量浮层，从圆环往上弹出（宽 260px，不超过这一行）：第一行左边"Context window"，右边与悬停相同的 summary"≈ 15.4k / 128k (12%)"；下面一条 4px 的分段条，再下面每个分项一行（见"详情里的分项"），一打开就显示（Claude 要再点一下"Context window"那一行才展开；2026-10-26 按推荐定，WP-12）。还没有消息、刚压缩完时右边空着，条和分项的位置换成那句说明（"Send a message to see context usage."，或"Just compacted. Context usage shows after the next response."）。开着时用量刷新，详情跟着变 | Esc 关闭，焦点留在圆环；点外面或 Tab 移走也关闭（焦点在新的位置）；再点圆环关闭 |
+| 回放旧的录制 | 录制早于分项（`session.state`、会话信息里没有 `contextBreakdown`），按没有 | 有用量时详情只有第一行（没有条和分项），描述没有分项；只在界面测试的回放里出现，App 里有用量时总有分项 | 同"详情" |
+| 后台进程退出、Restart 之后重新打开中 | 同 chat.md"后台进程退出" | 圆环和详情保留最后一次读到的用量和分项（同原来；重新打开时 `contextUsage`、`contextBreakdown` 不清空） | 打开详情 |
 
-- 详情是不抢焦点的浮层：里面没有能停的东西，焦点一直在圆环上；圆环带 `aria-expanded`，详情开着时还有指向它的
+- 详情是不抢焦点的浮层：里面没有能停的东西（分项也只是字，不做 Claude 那样能点开的"Context window"一行和
+  "MCP tools"、"Memory files"的子列表），焦点一直在圆环上；圆环带 `aria-expanded`，详情开着时还有指向它的
   `aria-controls`（关着时详情不在页面里，不设）。
-  详情里的内容都在圆环的读屏名和描述里，读屏用户不打开详情也不缺信息。
+  详情里的内容都在圆环的读屏名和描述里（分项在描述里），读屏用户不打开详情也不缺信息。
 - 详情只是看数，不算阻塞的浮层：与选区浮层一样不挡 Alt+1 / Alt+2 / Alt+3 和 Ctrl+N（批准卡来了照样能答）；焦点在圆环上时 Esc 先关它。
-- 点圆环、打开详情都不发任何命令（只用已经刷新到的 `contextUsage`）。
-- 不做 Claude 详情里的"Compact session"和"Compacts automatically at {pct}%"：手动压缩不在方案第 4 节里，
-  pi 的自动压缩阈值是留出的 token 数、不是百分比，写出来不准。
+- 点圆环、打开详情都不发任何命令（只用已经刷新到的 `contextUsage` 和 `contextBreakdown`）。
+- 不做 Claude 详情里的"Compact session"、"Compacts automatically at {pct}%"和"Last updated {time}. Send a message to refresh."：
+  手动压缩不在方案第 4 节里；pi 的自动压缩阈值是留出的 token 数、不是百分比，所以写成分项里的"Autocompact buffer"
+  （token 数是准的）；分项和用量同时刷新，不会比用量旧。
+
+### 详情里的分项
+
+2026-10-26 负责人走查 M11（"show detail of Context window, like claude"）加的。名字照 Claude 桌面版用量浮层里的分项
+（它显示 Claude Code `/context` 给的分项），只列 Mori 算得准的几项；数都由后台进程给（`contextBreakdown`，
+`kernel/contextBreakdown.ts`），界面不自己算。
+
+| 分项 | 是什么 | 来源 |
+| --- | --- | --- |
+| System prompt | 系统提示词里除下面几项以外的全部：preamble（Mori 的身份段）、tools、rules、docs、addendum、cwd、mori_team 等分节，和不分节的正文 | pi-ai `getCurrentSystemMessage(session.messages)`：重放对话里每一条 system 消息之后的当前提示词（分节按名字替换、null 删掉） |
+| System tools | 发给模型的工具说明（名字、说明、参数，按 JSON 算），MCP 的除外 | 同上的 `toolsAdded`（重放之后的当前工具）；按 pi `getAllTools()` 的 `sourceInfo.path` 分 |
+| MCP tools | MCP 服务的工具说明（`sourceInfo.path` 为 `builtin:mcp`）；只算已经声明给模型的（在 `toolsAdded` 里），还没声明的（deferred、codemode 方式）不算 | 同上 |
+| Memory files | AGENTS.md（project_context 分节）和记忆的四个分节（taste、strategy、review、facts）合成一项（Claude 把 CLAUDE.md 和记忆都算在"Memory files"里；2026-10-26 按推荐定，WP-12） | 同上 |
+| Skills | 技能列表（skills 分节） | 同上 |
+| Messages | 余下的：`tokens` 减去上面五项，不小于 0（对话里的消息、工具结果、回复，加上估算的误差）；这样各项加起来等于第一行的用量，同 Claude | pi `getContextUsage()` |
+| Autocompact buffer | pi 自动压缩留出的 token 数（`reserveTokens`）：用量超过窗口减它时 pi 压缩；关掉了自动压缩时没有这一项 | pi `settingsManager.getCompactionSettings(session.model)`，与 pi 判断要不要压缩时的调用相同（项目 `.pi/settings.json` 能改它） |
+| Free space | 窗口 − `tokens` − 留出的，不小于 0 | `contextWindow` |
+
+- 上面五项按 Mori 的估算（`estimateMemoryTokens`：中日韩字符每个 1，其余字符数 ÷ 4 向上取整；记忆页和 AGENTS.md 的
+  token 数也这样算），不按 pi 的字数 ÷ 4：负责人的会话里中文的 AGENTS.md 按 pi 算只有 284，按 Mori 算 709，
+  第一次请求服务报的 2,354 与 Mori 估的约 2.47k 只差约 5%（pi 的低约 17%）。
+- 窗口就是第一行的 `contextWindow`：pi 取最近一次回复的实际模型的窗口（设置里填的 Context window），还没有回复时取
+  虚拟模型的（第一个候选的）；pi 判断要不要自动压缩也用回复的那个模型的窗口，所以"Autocompact buffer"和
+  "Free space"与 pi 什么时候压缩一致。不是档案里的有效窗口（服务报的更小时取小的），见
+  [../../v1/walkthrough-1026/WP-12.md](../../v1/walkthrough-1026/WP-12.md)。
+- 顺序固定，照 Claude Code `/context` 的顺序：System prompt、System tools、MCP tools、Memory files、Skills、Messages、
+  Autocompact buffer、Free space（Claude 桌面版按大小排；Mori 不排，颜色和位置不随回复跳动）。token 数为 0 的不显示
+  （没有 MCP 服务就没有"MCP tools"）。
+- 每行：10×10px 的色块、名字（`--color-text`）、"≈ 1.1k"（同第一行的缩写；Autocompact buffer 是设置的值，不加"≈ "）、
+  占窗口的百分比，一位小数（"0.1%"，同 Claude 的 `toFixed(1)`；不到 0.05% 写"0.0%"），右对齐、宽 44px（同 Claude）；
+  数用 `--color-muted`、百分比用 `--color-text`（同 Claude 的 text-muted / text-primary），等宽数字；字 12px；
+  名字太长时截短（260px 里八个名字都放得下）。
+- 分段条：同样的顺序从左往右，每段宽按 token 数占比（不为 0 的段至少 2px），段与段之间 2px 的空白；
+  Autocompact buffer 是灰色（`--color-faint`），Free space 是条的底色（`--color-line`）；条的总长是窗口（各段加起来
+  超过窗口时是各段的和，同 Claude）。前六项的颜色见 defaults.md"上下文分项的颜色"；不靠颜色时看每行的名字和数。
+- 读屏的描述：显示出来的各行按同样的顺序，用", "连起来，每项"<名字> approximately <完整的数> tokens (<百分比>)"
+  （Autocompact buffer 不写"approximately"）；不用" / "。
+- 例子（负责人 2026-10-26 的会话 `01a175e1`，DeepSeek deepseek-flash，窗口 1,048,576，最后一次回复 96,361）：第一行
+  "≈ 96.4k / 1M (9%)"；System prompt ≈ 505（0.0%）、System tools ≈ 1.1k（0.1%，read、bash、edit、write、memory）、
+  Memory files ≈ 709（0.1%，AGENTS.md）、Messages ≈ 94k（9.0%）、Autocompact buffer 16.4k（1.6%，pi 的默认 16,384）、
+  Free space ≈ 935.8k（89.2%）。诊断里按 128,000 的窗口算的例子是错的：这个会话的窗口是 deepseek-flash 设置里的 1,048,576。
 
 ## 菜单的位置与键盘
 
@@ -248,5 +292,5 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 | 选择范围按钮 | `data-testid="model-button"`（在这一行里），`data-pick`、`data-current`（没有时不带），切换中 `data-pending="true"`；悬停的描述元素 `data-testid="model-tip"`（藏起来，在 `.model-switch` 里、按钮外面）；菜单 `data-testid="model-menu"`，节 `[data-section]`，项 `role="menuitemradio"`、`data-pick`、`data-zone`、`data-excluded`；`data-testid="model-menu-note"`；`data-action="manage-models"`；切换失败 `data-testid="pick-error"`（v1 model-menu.md） |
 | 思考按钮 | `data-testid="thinking-button"`（`data-level` 为当前强度，不支持思考时 `data-reasoning="false"`，切换中（换强度或换范围）`data-pending="true"`）；菜单 `data-testid="thinking-menu"`，项 `role="menuitemradio"`，`data-level` |
 | 权限按钮 | `data-testid="permission-button"`；模式名在 `.permission-text` 里（是否截短比它的 `getBoundingClientRect().width` 和全文的宽，不用 `scrollWidth`：截短时两者可能相等）；按钮里没有图标，只有 ▾（≤ 460px 时也没有） |
-| 圆环 | `data-testid="usage"`（按钮，每栏一个；`aria-expanded`，详情开着时 `aria-controls`；`data-state` 为 `empty` / `compacted` / `used`）。`data-tokens`、`data-percent`：还没有消息时是 `0`、`0`；有用量时是 pi 给的数和四舍五入的百分比；刚压缩完时没有这两个属性。详情 `data-testid="usage-details"`；悬停提示 `data-testid="usage-tip"`（`aria-hidden`） |
+| 圆环 | `data-testid="usage"`（按钮，每栏一个；`aria-expanded`，详情开着时 `aria-controls`；`data-state` 为 `empty` / `compacted` / `used`）。`data-tokens`、`data-percent`：还没有消息时是 `0`、`0`；有用量时是 pi 给的数和四舍五入的百分比；刚压缩完时没有这两个属性。详情 `data-testid="usage-details"`；悬停提示 `data-testid="usage-tip"`（`aria-hidden`）。详情里的分项（2026-10-26 起）：每行 `data-testid="usage-part"`，`data-part` 为分项的键（`systemPrompt`、`systemTools`、`mcpTools`、`memoryFiles`、`skills`、`messages`、`autocompactBuffer`、`freeSpace`）、`data-tokens` 为后台进程给的数；行里 `.usage-swatch`（色块）、`.usage-part-name`、`.usage-part-count`、`.usage-part-percent`；分段条 `data-testid="usage-bar"`，每段 `data-testid="usage-segment"`、`data-part` 同上；读屏的描述（有用量时是分项，没有数据时是那句说明）是圆环 `aria-describedby` 指向的藏起来的元素 |
 | 发送、停止、排队 | 类名不变：`.send-button`、`.stop-button`、`.split-button`；准备中只有一个按钮的"Queue"是 `.queue-button`（新的，不在 `.split-button` 里）；只显示图标时名字在 `aria-label`；▾ 菜单的项 `role="menuitem"`，带 `aria-keyshortcuts` |

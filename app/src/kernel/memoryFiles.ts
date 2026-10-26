@@ -5,7 +5,8 @@
 
 import { resolve } from 'node:path';
 import {
-  ENHANCE_TASKS, KIND_LABEL, MEMORY_DEFAULTS, MEMORY_KINDS, MEMORY_LAYERS, evidenceLine, type EnhanceTask,
+  ENHANCE_TASKS, KIND_LABEL, MEMORY_DEFAULTS, MEMORY_KINDS, MEMORY_LAYERS, changeKindText, evidenceLine,
+  type EnhanceTask,
   type EntryPlace, type EntrySource, type MemoryBy, type MemoryKind, type MemoryLayer, type RevisionAction,
   type RevisionChange, type RevisionCounts, type RevisionDetail, type RevisionRow, type RevisionRun,
   type RevisionStatus, type StoredEvidence,
@@ -143,7 +144,7 @@ export interface DetailFile {
   history: string[];
 }
 
-const SOURCES: readonly EntrySource[] = ['user', 'learned'];
+const SOURCES: readonly EntrySource[] = ['user', 'agent', 'learned'];
 
 /** 程序生成的三个小标题（§3.2） */
 const EVIDENCE_HEADING = '## Evidence';
@@ -325,13 +326,29 @@ const STATUSES: readonly RevisionStatus[] = ['done', 'failed', 'running'];
 const CHANGE_HEADING = /^## (Added|Changed|Deleted|Moved to user level|Moved to this project) · (.+?) · (.+)$/;
 const NOTES_HEADING = '## Notes';
 
-/** @brief 修订小节的标题：`## <Added|Changed|Deleted> · <KIND> · <slug>` 或移动的 `<原层 slug> → <目标层 slug>`。 */
+/**
+ * @brief 修订小节的标题：`## <Added|Changed|Deleted> · <KIND> · <slug>`（移到另一种时种类写作 `<原 KIND> → <目标 KIND>`，
+ *        §6.9）或移动的 `<原层 slug> → <目标层 slug>`。
+ */
 function changeHeading(change: RevisionChange): string {
-  const kind = KIND_LABEL[change.kind];
   if (change.action === 'moved') {
-    return `## ${MOVE_TEXT[change.to!.layer]} · ${kind} · ${change.from!.slug} → ${change.to!.slug}`;
+    return `## ${MOVE_TEXT[change.to!.layer]} · ${KIND_LABEL[change.kind]} · ${change.from!.slug} → ${change.to!.slug}`;
   }
-  return `## ${ACTION_HEAD[change.action]} · ${kind} · ${(change.to ?? change.from)!.slug}`;
+  return `## ${ACTION_HEAD[change.action]} · ${changeKindText(change)} · ${(change.to ?? change.from)!.slug}`;
+}
+
+/**
+ * @brief 小节标题里的种类：一种的名字，或 Changed 的 `<原 KIND> → <目标 KIND>`（§6.9）。
+ * @throws Error 种类不认识，或别的动作写了两种
+ */
+function headingKinds(text: string, action: RevisionAction, line: string): Pick<RevisionChange, 'kind' | 'fromKind'> {
+  const [first, second] = text.split(' → ');
+  const kind = KIND_BY_LABEL.get(second ?? first);
+  const fromKind = second === undefined ? undefined : KIND_BY_LABEL.get(first);
+  if (!kind || (second !== undefined && (!fromKind || action !== 'changed'))) {
+    throw new Error(`Unknown kind in “${line}”.`);
+  }
+  return fromKind ? { kind, fromKind } : { kind };
 }
 
 /**
@@ -460,12 +477,13 @@ function safeSlug(slug: string, line: string): string {
 function parseHeading(line: string, layer: MemoryLayer): Omit<RevisionChange, 'before' | 'after'> | null {
   const match = CHANGE_HEADING.exec(line);
   if (!match) return null;
-  const kind = KIND_BY_LABEL.get(match[2]);
-  if (!kind) throw new Error(`Unknown kind in “${line}”.`);
   const action = ACTION_BY_HEAD.get(match[1]);
+  const kinds = headingKinds(match[2], action ?? 'moved', line);
+  const { kind } = kinds;
   if (action) {
     const place: EntryPlace = { layer, slug: safeSlug(match[3], line) };
-    return { action, kind, from: action === 'added' ? null : place, to: action === 'deleted' ? null : { ...place } };
+    return { action, ...kinds, from: action === 'added' ? null : place,
+      to: action === 'deleted' ? null : { ...place } };
   }
   const to: MemoryLayer = match[1] === MOVE_TEXT.user ? 'user' : 'project';
   const [fromSlug, toSlug] = match[3].split(' → ');

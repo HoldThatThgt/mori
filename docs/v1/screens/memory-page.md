@@ -66,7 +66,7 @@
 | 最近一次修订 | `memory.list` 的 `last` 不为 null | 同一行 `Last change <Mon D> · Added 1, changed 1`（`memory-last-change`；日期取 `last.time`；计数为 0 的不写，都为 0 时 `No changes`） | 点它：切到 `Revisions` 选中那一次（有未保存的编辑时先问） |
 | 没有修订 | `last` 为 null | 不写 `Last change` | — |
 | `New entry` | — | 同一行按钮 `New entry`（`memory-new`） | 打开新增表单（下面“编辑与新增”；有未保存的编辑时先问） |
-| 列表 | `memory.list` 的 `entries` | `memory-list` 里每条一行（`memory-row`，`data-id` 为 id，`data-source` 为 `user` / `learned`）：abstract；右边 `You said` 或 `Learned` 与修改日期 `<Mon D>`（取 `modified` 的日期）；顺序就是进 prompt 的顺序 | ↑ ↓ 在行之间移动焦点（同 M7）；Enter 或点击选中，右栏打开详情（有未保存的编辑时先问） |
+| 列表 | `memory.list` 的 `entries` | `memory-list` 里每条一行（`memory-row`，`data-id` 为 id，`data-source` 为 `user` / `agent` / `learned`）：abstract；右边 `You said`、`Added by Mori`（Mori 主动记的，照 Claude 的 `Added by Claude`；2026-10-26，规格 §0 第 5 条）或 `Learned` 与修改日期 `<Mon D>`（取 `modified` 的日期）；顺序就是进 prompt 的顺序 | ↑ ↓ 在行之间移动焦点（同 M7）；Enter 或点击选中，右栏打开详情（有未保存的编辑时先问） |
 | 选中 | 你选了一行 | 这一行高亮；右栏是它的详情 | — |
 | 读不出来的条目 | `memory.list` 的 `broken` | 每个一行（`memory-broken`）：第一行 `Couldn’t read the entry <文件名>`，下一行是原因；不能选中（规格 §10.1）；排在条目之后（临时，走查时可以改）；不进 prompt | — |
 | 没有条目 | `entries` 与 `broken` 都为空 | `No entries yet.` | `New entry` |
@@ -82,10 +82,10 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 读取中 | `memory.get` 还没返回 | `aside.right-panel[data-testid="memory-detail"]` 里 `Loading…`（临时，走查时可以改） | — |
-| 标题 | `memory.get` 的 `entry` | 标题是 abstract；右上角 ×，读屏名称 `Close details`（同 M7，临时，走查时可以改）；下面一行 `<KIND> · <User\|Project> · <You said\|Learned> · Created <Mon D> by <you\|Mori\|enhancement> · Modified <Mon D> by <you\|Mori\|enhancement>`（`created`、`modified` 里的 `You`、`Mori`、`Enhancement` 分别写 `you`、`Mori`、`enhancement`） | 关闭（×，有未保存的编辑时先问） |
+| 标题 | `memory.get` 的 `entry` | 标题是 abstract；右上角 ×，读屏名称 `Close details`（同 M7，临时，走查时可以改）；下面一行 `<KIND> · <User\|Project> · <You said\|Added by Mori\|Learned> · Created <Mon D> by <you\|Mori\|enhancement> · Modified <Mon D> by <you\|Mori\|enhancement>`（`created`、`modified` 里的 `You`、`Mori`、`Enhancement` 分别写 `you`、`Mori`、`enhancement`） | 关闭（×，有未保存的编辑时先问） |
 | `Evidence` | `entry.evidence` | 小标题 `Evidence`，块 `memory-evidence`；每项一行：`<Mon D> · Session “<title>”: “<quote>”` 或 `<Mon D> · Feedback: “<quote>”`（没有 `quote` 时去掉 `: “…”`；`<title>` 先按 `session` 在侧栏找到会话、用现在的名字，找不到时用存下的 `title`），后面 `Jump to source`（`memory-jump`，下面“依据回到原位置”） | Jump to source |
 | 没有依据 | `evidence` 为空（例如你在记忆页写的） | `No evidence recorded.` | — |
-| `Details` | `entry.details` | 小标题 `Details`；按 Markdown 渲染；`[[slug]]` 渲染成链接（同层先找，找不到再找另一层）；找不到时显示原文、不可点 | 点链接：在详情里打开那一条；中栏换到它所在的层与分节并选中它（临时，走查时可以改）；有未保存的编辑时先问 |
+| `Details` | `entry.details` | 小标题 `Details`；按 Markdown 渲染（与对话流是同一个组件 `components/Markdown.tsx`，2026-10-26 起 mermaid 代码块画成图，见 ../../v0/screens/chat.md"图"）；`[[slug]]` 渲染成链接（同层先找，找不到再找另一层）；找不到时显示原文、不可点 | 点链接：在详情里打开那一条；中栏换到它所在的层与分节并选中它（临时，走查时可以改）；有未保存的编辑时先问 |
 | `Linked from` | `memory.get` 的 `backlinks` | 小标题 `Linked from`，块 `memory-backlinks`；每条一行 `<KIND> · <abstract>`（临时，走查时可以改）；没有反向链接时不显示这一块 | 点一行：同 `[[slug]]`（临时，走查时可以改） |
 | `History` | `entry.history`（`## Revisions` 的行）与 `memory.get` 的 `revisions` | 小标题 `History`，块 `memory-history`：先是 `## Revisions` 的每一行原文（例如 `Oct 25 · Enhancement: …`），再是改过它的每次修订一行：标题与时间 `<Mon D> <hh:mm>`（时间写法临时，走查时可以改）；两者都没有时不显示这一块（临时，走查时可以改） | 点修订那一行：切到 `Revisions` 选中那一次（有未保存的编辑时先问） |
 | 操作 | — | `Edit`（`memory-edit`）、`Delete…`（`memory-delete`）；`Project` 时 `Move to user level`，`User` 且有跟随的项目时 `Move to this project`（`memory-move`）；`User` 而没有跟随的项目时没有移动按钮 | 见下面三节 |
@@ -105,7 +105,7 @@
 | 新增 | 你点了 `New entry` | 右栏打开空的同一个表单；种类按当前分节、层按当前的 `User` / `Project`（事实也一样）；中栏的选中去掉（临时，走查时可以改） | 编辑；Save；Cancel |
 | 表单检查 | 你点了 `Save` | 有问题时在字段下方显示、不发命令：`Abstract is required.`（去掉首尾空白后为空）、`Abstract must be at most 200 characters.`、`Details must be at most 4,000 characters.` | 修改 |
 | 保存中 | `memory.save` 还没返回 | `Save` 不可用（临时，走查时可以改） | — |
-| 已保存（编辑） | `memory.save { cwd, layer, kind, id, abstract, detail }` 返回 `error: null` | 表单关闭，详情按新内容重读：`Learned` 的条目变为 `You said`（`source: user`，§6.4）；`History` 多一行 `<Mon D> · You: Edited on the Memory page`；`Revisions` 多一条 `You · Changed <KIND>: …`（§6.5）；F8 记 `Edit memory entry` | — |
+| 已保存（编辑） | `memory.save { cwd, layer, kind, id, abstract, detail }` 返回 `error: null` | 表单关闭，详情按新内容重读：`Learned`、`Added by Mori` 的条目变为 `You said`（`source: user`，§6.4）；`History` 多一行 `<Mon D> · You: Edited on the Memory page`；`Revisions` 多一条 `You · Changed <KIND>: …`（§6.5）；F8 记 `Edit memory entry` | — |
 | 已保存（新增） | 同上，不带 `id`；结果的 `id` | 新条目加在列表末尾（`You said`），选中它，右栏是它的详情；`Revisions` 多一条 `You · Added <KIND>: …`；F8 记 `Save memory entry` | — |
 | 保存失败 | 结果的 `error` | 详情顶部 `Couldn’t save: <原因>`（`memory-error`），表单与文字保留 | 修改后再 Save；Cancel |
 | Cancel | 你点了 `Cancel` | 不问（`Cancel` 不在规格 §10.1 要先问的操作里），丢掉表单里的字：编辑时回到详情，新增时右栏关闭 | — |
@@ -115,14 +115,14 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 有未保存的改动时离开 | 表单里的字与打开表单时不同（临时，走查时可以改），你做了下面列出的任一操作 | 确认框（`leave-dialog`，同设置页 AGENTS.md 的确认框与焦点规则，标题由登记的检查给出）：标题 `Discard changes to this entry?`（临时，规格 §12），说明 `Your edits haven’t been saved. Leaving now discards them.`，按钮 `Discard`、`Keep editing`；焦点在 `Keep editing`，Esc 等于 `Keep editing` | Discard；Keep editing |
+| 有未保存的改动时离开 | 表单里的字与打开表单时不同（临时，走查时可以改），你做了下面列出的任一操作 | 确认框（`leave-dialog`，同 Customize 的 Instructions（用户级 AGENTS.md，2026-10-26 前在设置页）的确认框与焦点规则，标题由登记的检查给出）：标题 `Discard changes to this entry?`（临时，规格 §12），说明 `Your edits haven’t been saved. Leaving now discards them.`，按钮 `Discard`、`Keep editing`；焦点在 `Keep editing`，Esc 等于 `Keep editing` | Discard；Keep editing |
 | Discard | 你点了 `Discard` | 表单关闭、丢掉改动，然后照常做你刚才的操作 | — |
 | Keep editing | 你点了 `Keep editing` 或按 Esc | 留在表单，什么都不变（你点的会话不打开、已归档的不恢复），焦点回到表单 | 继续编辑 |
 | 跟随的项目变了时 Keep editing | 分屏换焦点等让跟随的项目改变，你在确认框选了 `Keep editing` | 页面留在原来的项目；表单关闭（保存或 `Cancel`）之后再跟随焦点会话的项目（临时，走查时可以改） | 继续编辑 |
 | 没有改动 | 表单里的字与打开时相同 | 不问，直接做 | — |
 
 要先问的操作（§10.1）：换右栏内容的操作（选另一行、`New entry`、换层、换分节、详情里的 `[[slug]]` 与 `Linked from`、`History` 与 `Last change` 的链接、关闭详情）、
-`Jump to source`、`Edit in Settings`，以及已有的离开入口（`Back to app`；侧栏的会话、`New session`、`Open folder…`、`Customize`、`Settings`、Ctrl+N，同设置页 AGENTS.md 的列表；
+`Jump to source`、`Edit in Customize`（2026-10-26 改，原来是 `Edit in Settings`），以及已有的离开入口（`Back to app`；侧栏的会话、项目行的 +（2026-10-26 起取代 `New session`）、`Open folder…`、`Customize`、`Settings`、Ctrl+N，同 Customize 的 Instructions 的列表；
 分屏换焦点导致跟随的项目改变）。`Linked from` 与关闭详情两项是本表加的（临时，走查时可以改）。
 
 ## 删除
@@ -179,16 +179,16 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 读取中 | `agents.get` 还没返回 | `Loading…`（临时，走查时可以改） | — |
-| 读取失败 | `agents.get` 报错 | 原文（同设置页 AGENTS.md 节的“读取失败”，临时，走查时可以改） | 换分节再回来 |
-| 用户级一行 | `agents.get` 的 `effectivePath`、`userTokens` | 第一行（`memory-agent-file`）：agentDir 里生效的那个文件的路径、`<n> tokens`（1 时 `1 token`）；`Edit in Settings` | Edit in Settings：打开设置页的 AGENTS.md 节（有未保存的编辑时先问） |
-| 用户级没有生效的文件 | `effectivePath` 为 null | 第一行写 `No user-level AGENTS.md`（临时，走查时可以改），仍有 `Edit in Settings` | Edit in Settings |
-| 项目的文件（`Project`） | `agents.get { sessionId: 跟随的会话 }` 的 `loaded`，按 pi 的顺序 | 每个文件一行（`memory-agent-file`）：路径、`<n> tokens`；`Open in default app`（同设置页） | Open in default app |
-| `User` 层 | — | 只列用户级那一行 | Edit in Settings |
-| 合计 | `agents.get` 的 `total`（没有会话时就是 `userTokens`） | 下面一行 `<total> / 500 tokens`（`memory-agent-total`；合计等于各行之和） | — |
-| 超出 | `total` > 500 | 合计为警告色，加 `Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short.`（不截断仓库里的文件，proposal §5.2） | 编辑文件 |
+| 读取失败 | `agents.get` 报错 | 原文（同 Customize 的 Instructions 一节的“读取失败”，临时，走查时可以改） | 换分节再回来 |
+| 用户级一行 | `agents.get` 的 `effectivePath`、`userTokens` | 第一行（`memory-agent-file`）：agentDir 里生效的那个文件的路径、`<n> tokens`（1 时 `1 token`，1000 起按千分位写，2026-10-26 改）；`Edit in Customize`（2026-10-26 改） | Edit in Customize：打开 Customize，落在最后一节 Instructions（有未保存的编辑时先问；操作记录 `Open Customize → Instructions`） |
+| 用户级没有生效的文件 | `effectivePath` 为 null | 第一行写 `No user-level AGENTS.md`（临时，走查时可以改），仍有 `Edit in Customize` | Edit in Customize |
+| 项目的文件（`Project`） | `agents.get { sessionId: 跟随的会话 }` 的 `loaded`，按 pi 的顺序 | 每个文件一行（`memory-agent-file`）：路径、`<n> tokens`；`Open in default app`（同 Customize 的 Instructions 一节） | Open in default app |
+| `User` 层 | — | 只列用户级那一行 | Edit in Customize |
+| 合计 | `agents.get` 的 `total`（没有会话时就是 `userTokens`） | 下面一行 `<total> / 2,000 tokens`（2026-10-26 改：原来是 500；数字按千分位写）（`memory-agent-total`；合计等于各行之和） | — |
+| 超出 | `total` > 2000（负责人 2026-10-26 定，`AGENTS_LIMIT`） | 合计为警告色，加 `Over 2,000 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short.`（不截断仓库里的文件，proposal §5.2） | 编辑文件 |
 
 - token 用 `estimateMemoryTokens`，每个文件单独算，文字是 pi 加载结果里的内容（已去 BOM），不含 pi 加的开头一句与包装标签（§10.3）。
-- `AGENT` 不是记忆：没有用量一行、`New entry`、详情；记忆页不编辑 AGENTS.md（用户级到设置页编辑，项目的文件在默认程序里打开）。
+- `AGENT` 不是记忆：没有用量一行、`New entry`、详情；记忆页不编辑 AGENTS.md（用户级到 Customize 编辑，项目的文件在默认程序里打开）。
 
 ## Revisions
 
@@ -200,8 +200,8 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 | 没有修订 | `revisions` 为空 | `No revisions yet.`（临时，走查时可以改） | — |
 | 读取中 / 重读 / 读取失败 | 同前四节 | 同前四节：`Loading…`；`Couldn’t load memory: <原因>` | 同前四节 |
 | 详情 | `memory.revisions { cwd, layer, id }` 的 `revision` | 右栏 `revision-detail`：标题；一行时间与谁 `<Mon D> <hh:mm> · <You\|Mori\|Enhancement\|Rollback>`（写法临时，走查时可以改）；增强运行另有一行 `Day <Mon D> · <n> sessions · <m> feedback · <k> tokens`（单数 `1 session`、`1 token`；token 写法同增强状态行：不到 1000 写 `<n> tokens`，1000 起写 `<n>k tokens`）；运行中（`run.tokens` 为 null）时不写 token 那一段（临时，走查时可以改） | 关闭 |
-| 每处改动 | `revision.changes` | 每处一块：`<Added\|Changed\|Deleted\|Moved> · <KIND> · <abstract>`；下一行是依据（`Evidence: <原文>`）或说明（`Note: <原文>`），有时才显示；改动前后的对照（M4 的 diff 组件比较 `before` 与 `after` 两份 detail 文件；新增时前面为空，删除时后面为空，移动时前面是原层、后面是目标层的文件） | 展开、收起对照（同 M4，临时，走查时可以改） |
-| `Notes` | `revision.notes`（增强运行最后一条回复） | 小标题 `Notes`，按 Markdown 渲染；没有时不显示 | — |
+| 每处改动 | `revision.changes` | 每处一块：`<Added\|Changed\|Deleted\|Moved> · <KIND> · <abstract>`（增强任务把 Mori 记的条目移到另一种时 `Changed · <原 KIND> → <目标 KIND> · <abstract>`，对照里 `kind:` 一行不同、`## Revisions` 多一行 `Moved from <KIND> to <KIND>: …`；2026-10-26，规格 §6.9）；下一行是依据（`Evidence: <原文>`）或说明（`Note: <原文>`），有时才显示；改动前后的对照（M4 的 diff 组件比较 `before` 与 `after` 两份 detail 文件；新增时前面为空，删除时后面为空，移动时前面是原层、后面是目标层的文件） | 展开、收起对照（同 M4，临时，走查时可以改） |
+| `Notes` | `revision.notes`（增强运行最后一条回复） | 小标题 `Notes`，按 Markdown 渲染（同 Details）；没有时不显示 | — |
 | `Roll back this revision` | — | 按钮 `Roll back this revision`（`revision-rollback`）；一键，不确认（proposal §6.4） | 点击：`memory.rollback { cwd, layer, id }` |
 | 不能回滚 | `status` 为 `running`；或 `counts` 全为 0（没有改动） | 按钮不可用（规格没给悬停文字） | — |
 | 回滚中 | `memory.rollback` 还没返回 | 按钮不可用（临时，走查时可以改） | — |
@@ -229,7 +229,7 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 已在记忆页 | 后台进程退出 | 页面保留最后读到的内容（退出时还没返回的 `memory.list`、`memory.get`、`memory.revisions`、`agents.get`、`enhance.get` 不把列表、详情、状态行换成错误；标题旁的 `Loading…` 去掉）；所有操作不可用（换层、换分节、选行、`New entry`、`Edit`、`Save`、`Delete…`、移动、`Jump to source`、`Edit in Settings`、增强一块、回滚），悬停 `Mori’s background process crashed. Restart it to continue.`；页面顶部是已有的全局退出横幅（`Mori’s background process crashed · Unfinished responses were interrupted` 与 `Restart`，同 M7 工作回顾），不另加 | `Restart`；`Back to app`（照常可用，临时，走查时可以改） |
+| 已在记忆页 | 后台进程退出 | 页面保留最后读到的内容（退出时还没返回的 `memory.list`、`memory.get`、`memory.revisions`、`agents.get`、`enhance.get` 不把列表、详情、状态行换成错误；标题旁的 `Loading…` 去掉）；所有操作不可用（换层、换分节、选行、`New entry`、`Edit`、`Save`、`Delete…`、移动、`Jump to source`、`Edit in Customize`、增强一块、回滚），悬停 `Mori’s background process crashed. Restart it to continue.`；页面顶部是已有的全局退出横幅（`Mori’s background process crashed · Unfinished responses were interrupted` 与 `Restart`，同 M7 工作回顾），不另加 | `Restart`；`Back to app`（照常可用，临时，走查时可以改） |
 | 编辑中退出 | 同上 | 表单和文字保留，`Save` 不可用 | — |
 | 重新连上 | 你点了 `Restart`，后台进程重新连上 | 重读当前层、分节和开着的详情；在 `Project` 时先等跟随的会话打开好（同 Customize） | 照常 |
 
@@ -285,7 +285,7 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 | 列表 | `memory-list`；行 `memory-row`（`data-id`、`data-source`）；读不出来的 `memory-broken` |
 | 条目详情 | `aside.right-panel[data-testid="memory-detail"]`；`memory-evidence`、`memory-jump`、`memory-jump-status`、`memory-backlinks`、`memory-history`、`memory-error`；按钮 `memory-edit`、`memory-delete`、`memory-move` |
 | 表单 | `memory-form`，内含 `memory-abstract`、`memory-details`、`memory-save` |
-| 离开确认 | `data-testid="leave-dialog"`（沿用设置页 AGENTS.md） |
+| 离开确认 | `data-testid="leave-dialog"`（沿用 AGENTS.md 一节的，v0 起） |
 | 删除确认框 | 规格没给标识：`role="dialog"`，按标题文字找 |
 | AGENT | `memory-agent-file`、`memory-agent-total` |
 | Revisions | 行 `revision-row`（`data-id`）；详情 `revision-detail`；`revision-rollback` |

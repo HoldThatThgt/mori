@@ -1,5 +1,5 @@
 /* M6：settings（docs/v0/screens/settings.md）。照 Claude 桌面版：左边分节列表、右边这一节的内容；
-   连接卡与模型行、模型表单的思考设置、AGENTS.md 编辑器。中栏较窄时分节列表排到内容上方。
+   连接卡与模型行、模型表单的思考设置（AGENTS.md 编辑器 2026-10-26 挪到 Customize，样式在 tools.css）。中栏较窄时分节列表排到内容上方。
    分节列表的宽度让最长的 "Connections and models"（13px 约 142px，按钮左右内边距共 24px）排在一行。 */
 .settings-page { container-type: inline-size; }
 .settings-layout { display: flex; flex: 1; min-height: 0; }
@@ -78,41 +78,6 @@
 }
 .settings-page .model-meta { color: var(--color-muted); font-size: var(--fs-small); }
 .settings-page .model-row .form-message { margin-top: 6px; }
-
-/* AGENTS.md */
-.agents-user, .agents-project { margin-top: 18px; }
-.agents-user > .muted, .agents-project > .muted { margin: 0 0 8px; }
-.agents-path {
-  margin: 0;
-  color: var(--color-prose);
-  font-family: var(--font-mono);
-  font-size: var(--fs-small);
-  overflow-wrap: anywhere;
-}
-.agents-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 6px; }
-.agents-effective { color: var(--color-ok); font-size: var(--fs-small); overflow-wrap: anywhere; }
-.agents-effective.warn { color: var(--color-warn); }
-.agents-line .agents-open-error, .agents-files .agents-open-error { flex-basis: 100%; margin: 0; }
-.agents-editor {
-  display: block;
-  width: 100%;
-  min-height: 260px;
-  margin-top: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--color-line-strong);
-  border-radius: 8px;
-  background: var(--color-canvas);
-  font-family: var(--font-mono);
-  font-size: var(--fs-body);
-  line-height: 1.6;
-  resize: vertical;
-}
-.agents-editor:focus { outline: 2px solid #b8c9eb; outline-offset: 0; }
-.agents-editor:disabled { background: var(--color-surface); }
-.agents-user .form-actions { align-items: center; }
-.agents-user .agents-status { margin: 0; }
-.agents-files { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.agents-files li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 
 /* 中栏较窄（最小窗口宽度 800px、侧栏展开时）：分节列表横排在内容上方 */
 @container (max-width: 620px) {

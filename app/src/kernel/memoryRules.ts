@@ -79,19 +79,60 @@ function userEntryRefusal(abstract: string): string {
     + 'final reply.';
 }
 
+/** @brief 增强移的不是 Mori 记的条目时的原文（§7.4、§6.9）。 */
+function notAgentRefusal(abstract: string): string {
+  return `“${abstract}” wasn’t added by Mori; only entries added by Mori can be moved.`;
+}
+
+/** @brief 增强把条目移到它现在的种类时的原文（§7.4、§6.9）。 */
+function alreadyRefusal(abstract: string, kind: MemoryKind): string {
+  return `“${abstract}” is already in ${KIND_LABEL[kind]}.`;
+}
+
+/** @brief 要写的位置（§6.4）。 */
+export interface WriteTarget {
+  /** 条目所在（新增时写入）的层 */
+  layer: MemoryLayer;
+  /** 条目现在（新增时写入）的种类 */
+  kind: MemoryKind;
+  /** 现有条目的来源；新增时为 null */
+  source: EntrySource | null;
+  /** 现有条目的 abstract（拒绝的原文用） */
+  abstract?: string;
+  /** 移到另一种时的目标种类（只有增强的 move，§6.9）；别的写入没有 */
+  toKind?: MemoryKind;
+}
+
 /**
  * @brief 谁能改什么（§6.4）：记忆页与回滚（caller 为 null）两层全部；agent 事实两层、TASTE/STRATEGY/REVIEW 只有本项目；
- *        增强只有本项目这一种的 learned 条目。
+ *        增强只有本项目这一种的 learned 与 agent 条目，移动时只移本项目的 agent 条目、这次的种类是一端（§6.9）。
  * @param caller memory 工具的调用方；记忆页与回滚为 null
- * @param target 要写的位置；source 为现有条目的来源（新增时为 null），abstract 用于拒绝增强改你写的条目的原文
+ * @param target 要写的位置
  * @return 拒绝的原文（§7.4）；可以写时为 null
  */
-export function writeRefusal(caller: MemoryCaller | null, target: { layer: MemoryLayer; kind: MemoryKind;
-  source: EntrySource | null; abstract?: string }): string | null {
+export function writeRefusal(caller: MemoryCaller | null, target: WriteTarget): string | null {
   if (caller === null) return null;
   if (caller.kind === 'agent') return target.layer === 'user' && target.kind !== 'fact' ? USER_RULES_REFUSAL : null;
-  if (target.layer !== 'project' || target.kind !== caller.task) return otherKindRefusal(caller.task);
-  return target.source === 'user' ? userEntryRefusal(target.abstract ?? '') : null;
+  const ends = target.toKind === undefined ? [target.kind] : [target.kind, target.toKind];
+  if (target.layer !== 'project' || !ends.includes(caller.task)) return otherKindRefusal(caller.task);
+  const abstract = target.abstract ?? '';
+  if (target.source === 'user') return userEntryRefusal(abstract);
+  if (target.toKind === undefined) return null;
+  if (target.source !== 'agent') return notAgentRefusal(abstract);
+  return target.toKind === target.kind ? alreadyRefusal(abstract, target.kind) : null;
+}
+
+/**
+ * @brief 写入之后条目的来源（§6.4）：记忆页为 user；增强新增为 learned、修改与移动不变；agent 调用方 asked 为真时为
+ *        user，否则 user 条目仍为 user、其余为 agent（2026-10-26，§0 第 5 条）。
+ * @param caller memory 工具的调用方；记忆页为 null
+ * @param asked agent 调用方：你明确要它记（memory 工具的 asked）；别的写入方不看
+ * @param current 现有条目的来源；新增时为 null
+ */
+export function sourceAfter(caller: MemoryCaller | null, asked: boolean, current: EntrySource | null): EntrySource {
+  if (caller === null) return 'user';
+  if (caller.kind === 'enhance') return current ?? 'learned';
+  return asked || current === 'user' ? 'user' : 'agent';
 }
 
 // ---- 条目匹配（§7.4） ----
@@ -112,8 +153,8 @@ export interface Candidate {
 
 /**
  * @brief 把两层的全部条目分成调用方能改的范围与范围之外要再找的（§7.4）：agent 的范围是本项目四种与用户级事实，
- *        之外是用户级 TASTE/STRATEGY/REVIEW；增强的范围是本项目这一种（含 user 条目），之外是第一条消息列出的其余条目
- *        （两层的 TASTE/STRATEGY/REVIEW 里的其他部分）。
+ *        之外是用户级 TASTE/STRATEGY/REVIEW；增强的范围是本项目这一种（含 user 条目）加上本项目四种里 Mori 记的条目
+ *        （移到另一种，§6.9），之外是第一条消息列出的其余条目（两层的 TASTE/STRATEGY/REVIEW 里的其他部分）。
  * @param caller 调用方
  * @param all 两层的全部条目
  */
@@ -121,7 +162,7 @@ export function matchScope(caller: MemoryCaller, all: readonly Candidate[]): { c
   others: Candidate[] } {
   const inScope = (item: Candidate) => (caller.kind === 'agent'
     ? item.layer === 'project' || item.kind === 'fact'
-    : item.layer === 'project' && item.kind === caller.task);
+    : item.layer === 'project' && (item.kind === caller.task || item.source === 'agent'));
   const listed = (item: Candidate) => caller.kind === 'agent' || item.kind !== 'fact';
   return { candidates: all.filter(inScope), others: all.filter((item) => !inScope(item) && listed(item)) };
 }
@@ -152,7 +193,7 @@ function severalError(caller: MemoryCaller, entry: string, found: readonly Candi
 
 /** @brief 找不到时的原文：列出调用方能改的条目（增强不列你写的），最多 10 条；没有时写 (none)。 */
 function notFoundError(caller: MemoryCaller, entry: string, candidates: readonly Candidate[]): string {
-  const changeable = candidates.filter((item) => caller.kind === 'agent' || item.source === 'learned');
+  const changeable = candidates.filter((item) => caller.kind === 'agent' || item.source !== 'user');
   const listed = changeable.slice(0, MEMORY_DEFAULTS.candidatesMax)
     .map((item) => `${item.layer}/${item.id}: ${item.abstract}`);
   return `No entry matches “${entry}”. Entries you can change: ${listed.length > 0 ? listed.join('; ') : '(none)'}`;
@@ -188,12 +229,16 @@ function charCount(text: string): number {
   return [...text].length;
 }
 
-type ToolAction = 'save' | 'update' | 'forget';
+type ToolAction = 'save' | 'update' | 'forget' | 'move';
 
-/** 每种调用方、每个动作的必填字段（§7.1），按检查的顺序 */
-const REQUIRED: Readonly<Record<MemoryCaller['kind'], Readonly<Record<ToolAction, readonly string[]>>>> = {
+/**
+ * 每种调用方、每个动作的必填字段（§7.1），按检查的顺序；agent 没有 move（schema 不给）。增强的依据在执行时查，
+ * 因为 move 不要依据（2026-10-26，§6.9）
+ */
+const REQUIRED: Readonly<Record<MemoryCaller['kind'], Readonly<Partial<Record<ToolAction, readonly string[]>>>>> = {
   agent: { save: ['kind', 'abstract', 'quote'], update: ['entry', 'note', 'quote'], forget: ['entry', 'note'] },
-  enhance: { save: ['abstract'], update: ['entry', 'note'], forget: ['entry', 'note'] },
+  enhance: { save: ['abstract', 'evidence'], update: ['entry', 'note', 'evidence'],
+    forget: ['entry', 'note', 'evidence'], move: ['entry', 'kind', 'note'] },
 };
 
 /** 各字段的最长字符数（§12） */
@@ -216,8 +261,9 @@ function lengthError(field: string, value: unknown, required: boolean): string |
 }
 
 /**
- * @brief memory 工具的字段检查（§7.4、§7.1）：先查必填（`<field> is required for <action>.`），再查长度与 abstract 一行；
- *        增强的每项依据的 quote 不超过 600。schema 已由 pi 校验（类型、枚举、evidence 的项数）。
+ * @brief memory 工具的字段检查（§7.4、§7.1）：先查必填（`<field> is required for <action>.`），增强的 kind 只给 move
+ *        （`kind is only for move.`），再查长度与 abstract 一行；增强的每项依据的 quote 不超过 600。
+ *        schema 已由 pi 校验（类型、枚举、evidence 的项数）。
  * @param args 归一后的参数
  * @param caller 调用方
  * @return 错误原文（第一行；Correct form 由工具加）；没有问题时为 null
@@ -228,6 +274,7 @@ export function toolFieldError(args: Record<string, unknown>, caller: MemoryCall
   for (const field of required) {
     if (args[field] === undefined || args[field] === null) return `${field} is required for ${action}.`;
   }
+  if (caller.kind === 'enhance' && action !== 'move' && args.kind !== undefined) return 'kind is only for move.';
   for (const field of ['abstract', 'detail', 'note', 'quote']) {
     const error = lengthError(field, args[field], required.includes(field));
     if (error) return error;
@@ -274,15 +321,21 @@ function placeKey(change: RevisionChange): string {
   return place ? `${place.layer}/${place.slug}` : '';
 }
 
-/** @brief 同一条目的两次改动合成一节：before 取第一次之前，after 取最后一次之后；先加后删时为 null。 */
+/**
+ * @brief 同一条目的两次改动合成一节：before 取第一次之前，after 取最后一次之后；先加后删时为 null。
+ *        种类（§6.9）：删除记在运行前的种类；新增、修改记在最后的种类，修改时运行前的种类不同就记下 fromKind。
+ */
 function combine(first: RevisionChange, next: RevisionChange): RevisionChange | null {
   const { before } = first;
   const { after } = next;
   if (before === '' && after === '') return null;
   const place = (next.to ?? next.from ?? first.to ?? first.from)!;
   const action = before === '' ? 'added' : after === '' ? 'deleted' : 'changed';
-  const merged: RevisionChange = { action, kind: next.kind, from: action === 'added' ? null : { ...place },
+  const startKind = first.fromKind ?? first.kind;
+  const kind = action === 'deleted' ? startKind : next.kind;
+  const merged: RevisionChange = { action, kind, from: action === 'added' ? null : { ...place },
     to: action === 'deleted' ? null : { ...place }, before, after };
+  if (action === 'changed' && startKind !== kind) merged.fromKind = startKind;
   const evidence = joinEvidence(first.evidence, next.evidence);
   if (evidence) merged.evidence = evidence;
   const note = next.note ?? first.note;

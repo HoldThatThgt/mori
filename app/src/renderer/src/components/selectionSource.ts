@@ -1,5 +1,6 @@
 // 读出当前选区能不能引用、引用什么（docs/v0/screens/selection.md "选区浮层"）：
-// 起止都在 pi 的同一条助手回复里（data-quote-source="message"），或都在文件阅读器的内容里（data-quote-source="file"）。
+// 起止都在 pi 的同一条助手回复里（data-quote-source="message"），或都在文件阅读器的内容里（data-quote-source="file"），
+// 或都在阅读器的 Markdown 预览里（data-quote-source="preview"，2026-10-26 走查 M24：引用的是源码行）。
 
 import type { FeedbackRef } from '../state/feedbackForm';
 import { useApp } from '../state/store';
@@ -91,6 +92,46 @@ function filePick(element: HTMLElement, range: Range): SelectionPick | null {
   return { tabKey, ref: { quote, source: { kind: 'file', path, sha256: sha, startLine, endLine } }, range };
 }
 
+/** 阅读器的 Markdown 预览元素 → 文件的各行（FileViewer 渲染预览时登记；预览里的选区按它取源码） */
+export const previewLines = new WeakMap<HTMLElement, string[]>();
+
+/** @brief 选区里实际选中了字的第一个和最后一个文字节点（端点落在元素边上、只选了空白的一端不算）；没有时为 null。 */
+function selectedTexts(range: Range): [Text, Text] | null {
+  const root = range.commonAncestorContainer;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let first: Text | null = null;
+  let last: Text | null = null;
+  for (let node = root.nodeType === Node.TEXT_NODE ? root : walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node as Text;
+    if (!range.intersectsNode(text)) continue;
+    const from = text === range.startContainer ? range.startOffset : 0;
+    const to = text === range.endContainer ? range.endOffset : text.length;
+    if (!text.data.slice(from, to).trim()) continue;
+    first ??= text;
+    last = text;
+  }
+  return first && last ? [first, last] : null;
+}
+
+/**
+ * @brief Markdown 预览里的选区：两端选中的字所在的、最近的带源码行的元素（段落、列表项、表格的一行、标题、代码块，
+ *        或其中的粗体、链接），取较早的起始行到较晚的结束行，原文是这几整行源码（与在源码视图里选中这几行相同）。
+ *        一端落在没有源码行的字上（代码块标题上的语言名）时为 null。
+ */
+function previewPick(element: HTMLElement, range: Range): SelectionPick | null {
+  const { tab: tabKey, path, sha } = element.dataset;
+  const lines = previewLines.get(element);
+  const ends = selectedTexts(range);
+  if (!tabKey || !path || sha === undefined || !lines || !ends) return null;
+  const [first, last] = ends.map((node) => node.parentElement?.closest<HTMLElement>('[data-line-start]'));
+  if (!first || !last || !element.contains(first) || !element.contains(last)) return null;
+  const startLine = Math.min(Number(first.dataset.lineStart), Number(last.dataset.lineStart));
+  const endLine = Math.max(Number(first.dataset.lineEnd), Number(last.dataset.lineEnd));
+  const quote = lines.slice(startLine - 1, endLine).join('\n');
+  if (!quote.trim()) return null;
+  return { tabKey, ref: { quote, source: { kind: 'file', path, sha256: sha, startLine, endLine } }, range };
+}
+
 /** @brief 当前选区能引用时返回它，否则为 null。 */
 export function readSelection(): SelectionPick | null {
   const selection = window.getSelection();
@@ -100,5 +141,6 @@ export function readSelection(): SelectionPick | null {
   if (!element) return null;
   if (element.dataset.quoteSource === 'message') return messagePick(element, range, selection.toString());
   if (element.dataset.quoteSource === 'file') return filePick(element, range);
+  if (element.dataset.quoteSource === 'preview') return previewPick(element, range);
   return null;
 }

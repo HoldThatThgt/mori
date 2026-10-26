@@ -5,7 +5,7 @@
 §6.1–§6.5（Add provider 表单、清单、列表错误、Add a model ID、卡上的 Fetch models）、§7.2（档案的报告值）、§8（模型行的提示）、
 §11（临时默认值）。
 不加前缀的“规格”指[统一模型提供商构建规格](../../specs/model-providers.md)。
-取代 [v0 settings.md](../../v0/screens/settings.md) 的“Connections and models”分节；AGENTS.md 分节不变。
+取代 [v0 settings.md](../../v0/screens/settings.md) 的“Connections and models”分节；AGENTS.md 分节不变（2026-10-26 改：AGENTS.md 挪到 Customize，见 [customize-agents-md.md](customize-agents-md.md)）。
 界面文字为英文（规格 §0），写法按 [v0/ui-strings.md](../../v0/ui-strings.md)。标了“（临时，走查时可以改）”的文字规格没给，是本表定的。
 
 2026-10-24 补（规格 §7.7“思考关不掉的模型”，负责人选定方案 B）：档案摘要加“Thinking: Can’t be turned off”（第 2 步的说明只存在
@@ -37,7 +37,7 @@ Default effort for new sessions 对这类模型不列 Off、存着的 Off 显示
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 打开设置页 | 你点了侧栏“Settings” | 左侧分节“Models”（取代“Connections and models”）与“AGENTS.md”；落在 Models | 切换分节 |
+| 打开设置页 | 你点了侧栏“Settings” | 左侧分节“Models”（取代“Connections and models”）与“UI issues”（2026-10-26 改：“AGENTS.md”挪到 Customize）；落在 Models | 切换分节 |
 | 迁移后第一次启动 | 后台进程这次启动迁移成功（§4.5）；`models.get` 的 `migration` 不为 null | 启动后直接打开 设置 → Models，顶部是迁移说明 | 同下 |
 | 从拒绝启动卡的“Open settings”进入 | 你点了它（§4.6） | 设置 → Models，停在顶部 | 同下 |
 | 从 No model available 卡的“Open settings”进入 | 你点了它（§9.3） | 设置 → Models，滚到第一个被排除候选的提供商卡；原因是 `auth`、`quota` 时焦点在它的 Keys（第一行） | 同下 |

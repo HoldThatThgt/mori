@@ -6,7 +6,8 @@
 //          编辑 Learned 后标 You said；表单的三句不发命令；离开确认框；详情的各块与反向链接；mori.memory_changed 的刷新
 //          （列表与滚动位置保留、编辑中不重读、条目被删后详情关闭），运行结束后 Revisions 的 Running 变为结束状态；
 //          跟随的会话还在打开时 Project 保留已有列表、New entry 等它，User 照常读、New entry 可用；
-//   MEM-16 AGENT 与设置页 AGENTS.md 的 token、合计与超出说明，agents.get 的新字段；
+//   MEM-16 AGENT 与 Customize 的 Instructions 一节（用户级 AGENTS.md，2026-10-26 从设置页挪来）的 token、合计与超出说明（2,000），
+//          Edit in Customize，agents.get 的新字段；
 //   MEM-07 预算的 App 部分：用量（含中日韩字符）、恰好 500 允许、501 拒绝且什么都没写、写用户级超出某个项目、移动与回滚
 //          同样检查、删除不受限、手改超出时 Over the limit 且全部进 prompt；
 //   MEM-08 修订记录的 App 部分：记忆页一次保存、删除、移动、回滚各一条，移动写进两层，kinds、counts，列表时间倒序且最多
@@ -31,12 +32,13 @@ import { basename, join, resolve } from 'node:path';
 import { appRoot, arg } from './lib.mjs';
 import { feedbackNote } from './m4-helpers.mjs';
 import {
-  AGENTS_OVER, CRASHED, FEEDBACK_OFF, FEEDBACK_ON, LEAVE_TEXT, LEAVE_TITLE, NO_PROJECT_HOVER, SECTIONS, abstractsFor,
-  addDays, asciiText, backToApp, chooseScope, chooseSection, dayOf, deleteOpenEntry, detailState, detailText,
-  enhanceJson, estimate, evidenceLine, fillForm, goMemory, hhmm, indexSlugs, layerDir, layerSnapshot, localDate,
-  localIso, memoryState, monthDay, monthDayTime, moveOpenEntry, newEntry, openMemoryPage, readText, revisionField,
-  revisionFiles, revisionIdAt, revisionRowId, rollbackOpenRevision, saveForm, seedEnhance, seedKind, seedProject,
-  seedRevision, selectRevisionRow, selectRow, usageOf, waitDetail, waitLoaded, waitRow, watched, watchList,
+  AGENTS_LIMIT, AGENTS_OVER, CRASHED, FEEDBACK_OFF, FEEDBACK_ON, LEAVE_TEXT, LEAVE_TITLE, NO_PROJECT_HOVER, SECTIONS,
+  abstractsFor, addDays, asciiText, backToApp, chooseScope, chooseSection, dayOf, deleteOpenEntry, detailState,
+  detailText, enhanceJson, estimate, evidenceLine, fillForm, goMemory, hhmm, indexSlugs, layerDir, layerSnapshot,
+  localDate, localIso, memoryState, monthDay, monthDayTime, moveOpenEntry, newEntry, openMemoryPage, readText,
+  revisionField, revisionFiles, revisionIdAt, revisionRowId, rollbackOpenRevision, saveForm, seedEnhance, seedKind,
+  seedProject, seedRevision, selectRevisionRow, selectRow, thousands, usageOf, waitDetail, waitLoaded, waitRow, watched,
+  watchList,
 } from './mem-page-helpers.mjs';
 import {
   bridge, brief, closeTbApp, killTbKernel, openProject, paneSel, poll, readJsonl, scenarioRequests, seedTeamUserData,
@@ -72,9 +74,9 @@ const today = () => monthDay(localDate(Date.now()));
 
 // ---------- 测试数据（synthetic test setup） ----------
 
-/** AGENTS.md：用户级（含中日韩字符）、项目 A（超过 500 token）、项目 B（1 token） */
+/** AGENTS.md：用户级（含中日韩字符）、项目 A（超过 2,000 token，2026-10-26 提醒线由 500 改为 2000）、项目 B（1 token） */
 const USER_AGENTS = '# User rules\n\nAnswer in English. 注释用中文。\n';
-const P1_AGENTS = `# Project A\n\n${'Keep functions short and name them clearly. '.repeat(48)}\n项目说明。\n`;
+const P1_AGENTS = `# Project A\n\n${'Keep functions short and name them clearly. '.repeat(190)}\n项目说明。\n`;
 const P2_AGENTS = 'abc';
 /** 条目的 abstract */
 const DEPLOY = 'The staging server is at 10.0.0.9';
@@ -120,11 +122,24 @@ function p1Facts(ctx) {
     { slug: 'ci-runs-nightly', abstract: CI, details: CI_DETAILS, ...learned },
     { slug: 'fact-move-a', abstract: MOVE_A, details: 'Seeded in project A.', ...learned },
     { slug: 'broken-entry', abstract: 'Broken entry', text: 'This file lost its frontmatter.\n' },
-    ...Array.from({ length: 30 }, (_, index) => ({ slug: `fact-${String(index + 1).padStart(2, '0')}`,
-      abstract: `Filler fact ${String(index + 1).padStart(2, '0')} about the layout`,
-      source: index % 2 ? 'learned' : 'user', created: '2026-10-18 · You', modified: '2026-10-18 · You' })),
+    ...Array.from({ length: 30 }, (_, index) => fillerFact(index)),
   ];
 }
+
+/** 填充条目的来源，轮流：你说的、它学的、Mori 记的（2026-10-26，§0 第 5 条） */
+const FILLER_SOURCES = ['user', 'learned', 'agent'];
+
+/** @brief 第 index 条填充的事实（synthetic）：Mori 记的那几条由 Mori 写下。 */
+function fillerFact(index) {
+  const source = FILLER_SOURCES[index % 3];
+  const stamp = `2026-10-18 · ${source === 'agent' ? 'Mori' : 'You'}`;
+  return { slug: `fact-${String(index + 1).padStart(2, '0')}`,
+    abstract: `Filler fact ${String(index + 1).padStart(2, '0')} about the layout`, source, created: stamp,
+    modified: stamp };
+}
+
+/** 列表行与详情里来源的写法（§10.1） */
+const SOURCE_TAG = { user: 'You said', learned: 'Learned', agent: 'Added by Mori' };
 
 /** @brief 测试准备（synthetic）：用户级的记忆。 */
 function seedUser(ctx) {
@@ -329,8 +344,9 @@ async function nav(ctx) {
     .evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')));
   const review = await page.locator('[data-testid="sidebar"] button').filter({ hasText: /^Review$/ }).count()
     + await page.locator('[data-testid="nav-review"]').count();
+  // 2026-10-26 起展开的左栏顶部没有"New session"（换成项目行的 +，docs/v0/screens/sessions.md"项目行的 +"）。
   record('MEM-14 the sidebar has Memory (nav-memory) right below Customize, where Review used to be, and no Review '
-    + 'entry', same(items, ['New session (Ctrl+N)', 'Open folder…', 'Customize', 'Memory']) && review === 0,
+    + 'entry', same(items, ['Open folder…', 'Customize', 'Memory']) && review === 0,
   brief({ items, review }));
   await openMemoryPage(page);
   const state = await memoryState(page);
@@ -350,10 +366,10 @@ async function nav(ctx) {
   const agent = await memoryState(page);
   const tokens = estimate(USER_AGENTS);
   record('MEM-16 AGENT with no session lists only the user-level AGENTS.md: its path, "<n> tokens" equal to '
-    + '§6.3 of its content, Edit in Settings, and the total "<n> / 500 tokens"', agent.agentFiles.length === 1
+    + '§6.3 of its content, Edit in Customize, and the total "<n> / 2,000 tokens"', agent.agentFiles.length === 1
     && samePath(agent.agentFiles[0].path, join(ctx.userData, 'pi', 'AGENTS.md'))
     && agent.agentFiles[0].tokens === `${tokens} tokens` && agent.agentFiles[0].buttons.some((button) => button.label
-      === 'Edit in Settings') && agent.agentTotal === `${tokens} / 500 tokens` && !agent.agentTotalOver,
+      === 'Edit in Customize') && agent.agentTotal === `${tokens} / 2,000 tokens` && !agent.agentTotalOver,
   brief({ files: agent.agentFiles, total: agent.agentTotal, tokens }));
   await chooseSection(page, 'facts');
   await backToApp(page);
@@ -479,10 +495,11 @@ async function listChecks(ctx) {
     state.last?.label === `Last change ${day} · Changed 1`, brief(state.last));
   const rowsOk = same(state.rows.map((row) => row.id), readable.map((item) => item.slug))
     && state.rows.every((row, index) => row.source === readable[index].source && same(row.meta,
-      [readable[index].source === 'user' ? 'You said' : 'Learned', monthDay(readable[index].modified)]));
+      [SOURCE_TAG[readable[index].source], monthDay(readable[index].modified)]))
+    && state.rows.some((row) => row.source === 'agent');
   record('MEM-14 the list has one row per entry in index (prompt) order with data-id and data-source, its abstract, '
-    + 'and You said / Learned with the modified date <Mon D> on the right', rowsOk,
-  brief(state.rows.slice(0, 4)));
+    + 'and You said / Learned / Added by Mori (data-source agent, 2026-10-26) with the modified date <Mon D> on the '
+    + 'right', rowsOk, brief(state.rows.slice(0, 4)));
   const broken = state.broken[0];
   record('MEM-14 an entry that can’t be read is one row (memory-broken) after the entries: “Couldn’t read the entry '
     + 'broken-entry.md” and the reason on the next line; it can’t be selected', state.broken.length === 1
@@ -580,10 +597,27 @@ async function linksAndBacklinks(ctx) {
   await waitDetail(page, false);
 }
 
+/** @brief MEM-14（2026-10-26）：Mori 记的一条（fact-03）的详情，来历一行写 Added by Mori。 */
+async function agentDetail(ctx) {
+  const { page } = ctx;
+  await page.locator('[data-testid="memory-row"][data-id="fact-03"]').scrollIntoViewIfNeeded();
+  await selectRow(page, 'fact-03');
+  const detail = await poll(async () => {
+    const value = await detailState(page);
+    return value?.title === 'Filler fact 03 about the layout' ? value : null;
+  }, 10000, 100) ?? await detailState(page);
+  record('MEM-14 an entry added by Mori has the detail line “Facts · Project · Added by Mori · Created Oct 18 by Mori · '
+    + 'Modified Oct 18 by Mori”', detail?.meta === 'Facts · Project · Added by Mori · Created Oct 18 by Mori · '
+    + 'Modified Oct 18 by Mori', brief({ title: detail?.title, meta: detail?.meta }));
+  await page.locator('[data-testid="memory-detail"] button[aria-label="Close details"]').click();
+  await waitDetail(page, false);
+}
+
 /** @brief 列表与详情。 */
 async function detail(ctx) {
   await listChecks(ctx);
   await detailBlocks(ctx);
+  await agentDetail(ctx);
 }
 
 // ---------- mori.memory_changed 的刷新（MEM-14） ----------
@@ -782,11 +816,15 @@ async function leaveDialog(ctx) {
   await leaveOthers(ctx);
 }
 
-/** @brief 别的离开入口同样先问（分节、New entry、Back to app、侧栏的会话），Esc 等于 Keep editing；Discard 照常去做。 */
+/**
+ * @brief 别的离开入口同样先问（分节、New entry、Back to app、项目行的 +、侧栏的会话），Esc 等于 Keep editing；
+ *        Discard 照常去做。
+ */
 async function leaveOthers(ctx) {
   const { page } = ctx;
   const ways = [['section', page.getByTestId('memory-section-strategy')], ['new', page.getByTestId('memory-new')],
     ['back', page.locator('[data-testid="memory-page"] .topbar button', { hasText: 'Back to app' })],
+    ['plus', page.getByTestId('project-new-session').first()],
     ['sidebar', page.locator(`.session-item[data-row="${ctx.b1}"]`)]];
   const results = [];
   for (const [name, locator] of ways) {
@@ -800,7 +838,7 @@ async function leaveOthers(ctx) {
     if (!onPage) break;
   }
   record('MEM-14 the other ways out ask the same way before leaving the edit (a section, New entry, Back to app, a '
-    + 'session in the sidebar), and Esc keeps editing', results.length === ways.length
+    + 'project’s +, a session in the sidebar), and Esc keeps editing', results.length === ways.length
     && results.every((item) => item.asked && item.kept && item.onPage), brief(results));
   if (!results.every((item) => item.onPage)) throw new Error(`left the Memory page without asking: ${brief(results)}`);
   const file = readText(join(baseOf(ctx, 'p1'), 'entries', 'reply-style.md'));
@@ -1272,10 +1310,10 @@ async function markerDetails(ctx) {
     brief({ next }));
 }
 
-// ---------- AGENT 与设置页（MEM-16） ----------
+// ---------- AGENT 与 Customize 的 Instructions 一节（MEM-16） ----------
 
-/** @brief 记忆页 AGENT 的一行 token 数字。 */
-const tokensIn = (text) => Number(/^(\d+) tokens?$/.exec(text ?? '')?.[1] ?? NaN);
+/** @brief 记忆页 AGENT 的一行 token 数字（1000 起带千分位的逗号）。 */
+const tokensIn = (text) => Number(/^([\d,]+) tokens?$/.exec(text ?? '')?.[1]?.replaceAll(',', '') ?? NaN);
 
 /** @brief 记忆页 AGENT：项目 B（1 token）、项目 A（超出）、User 层。 */
 async function agentSection(ctx) {
@@ -1293,34 +1331,40 @@ async function agentSection(ctx) {
   const { a, b } = results;
   record('MEM-16 AGENT lists the user-level file first and then the files the project loads, each with its own '
     + '“<n> tokens” (“1 token” for 1) equal to §6.3 of its content; project files have Open in default app',
-  samePath(a.files[0]?.path, join(ctx.userData, 'pi', 'AGENTS.md')) && a.own?.tokens === `${a.want} tokens`
+  samePath(a.files[0]?.path, join(ctx.userData, 'pi', 'AGENTS.md'))
+    && a.own?.tokens === `${thousands(a.want)} tokens` && a.want >= 1000
     && b.own?.tokens === '1 token' && b.want === 1
     && a.own.buttons.some((item) => item.label === 'Open in default app'),
   brief({ a: a.files, b: b.files }));
-  record('MEM-16 the total “<total> / 500 tokens” equals the sum of the rows; over 500 it is in the warning colour '
-    + 'with “Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short.”, otherwise '
-    + 'without it',
-  a.total === `${a.sum} / 500 tokens · ${AGENTS_OVER}` && a.over && a.sum > 500
-    && b.total === (b.sum > 500 ? `${b.sum} / 500 tokens · ${AGENTS_OVER}` : `${b.sum} / 500 tokens`)
-    && b.over === b.sum > 500, brief({ a: [a.total, a.sum], b: [b.total, b.sum] }));
+  const totalText = (sum) => `${thousands(sum)} / 2,000 tokens${sum > AGENTS_LIMIT ? ` · ${AGENTS_OVER}` : ''}`;
+  record('MEM-16 the total “<total> / 2,000 tokens” (thousands with a comma) equals the sum of the rows; over 2,000 '
+    + 'it is in the warning colour with “Over 2,000 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep '
+    + 'prompts short.”, otherwise without it',
+  a.total === totalText(a.sum) && a.over && a.sum > AGENTS_LIMIT
+    && b.total === totalText(b.sum) && b.over === b.sum > AGENTS_LIMIT,
+  brief({ a: [a.total, a.sum], b: [b.total, b.sum] }));
   await chooseScope(page, 'user');
   const user = await memoryState(page);
   record('MEM-16 on User, AGENT lists only the user-level file and the total is its tokens',
-    user.agentFiles.length === 1 && user.agentTotal === `${estimate(USER_AGENTS)} / 500 tokens`,
+    user.agentFiles.length === 1 && user.agentTotal === `${estimate(USER_AGENTS)} / 2,000 tokens`,
   brief(user.agentFiles));
-  await page.locator('[data-testid="memory-agent-file"] button', { hasText: 'Edit in Settings' }).click();
-  const opened = await page.locator('.settings-section[data-section="agents"]').waitFor({ timeout: 10000 })
-    .then(() => true, () => false);
-  record('MEM-16 Edit in Settings opens the AGENTS.md section of Settings', opened, '');
+  await page.locator('[data-testid="memory-agent-file"] button', { hasText: 'Edit in Customize' }).click();
+  const opened = await page.locator('[data-testid="tools-page"] [data-testid="agents-section"]')
+    .waitFor({ timeout: 10000 }).then(() => true, () => false);
+  const current = await page.locator('[data-testid="tools-nav"] [aria-current="page"]').getAttribute('data-section')
+    .catch(() => null);
+  record('MEM-16 Edit in Customize opens Customize on its Instructions section, the AGENTS.md editor (2026-10-26: '
+    + 'was Edit in Settings)',
+    opened && current === 'agents', brief({ opened, current }));
 }
 
-/** @brief 设置页 AGENTS.md 节（焦点会话 tab）的 token 元素。 */
-async function settingsAgents(ctx, tab) {
+/** @brief Customize 的 Instructions 一节（跟随焦点会话 tab；进入 Customize 后点最后一节 Instructions）的 token 元素。 */
+async function customizeAgents(ctx, tab) {
   const { page } = ctx;
   await focusTab(ctx, tab);
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
-  await page.locator('[data-testid="settings-nav"] button[data-section="agents"]').click();
+  await page.getByTestId('nav-tools').click();
+  await page.locator('[data-testid="tools-nav"] button[data-section="agents"]').click();
+  await page.getByTestId('tools-page').getByTestId('agents-section').waitFor({ timeout: 10000 });
   await page.locator('[data-testid="agents-tokens"]').waitFor({ timeout: 10000 });
   await page.locator('[data-testid="agents-loaded"] .agents-path').first().waitFor({ timeout: 10000 });
   return page.evaluate(() => {
@@ -1333,21 +1377,22 @@ async function settingsAgents(ctx, tab) {
   });
 }
 
-/** @brief 设置页 AGENTS.md 节的 token 与超出说明；agents.get 的新字段。 */
-async function settingsChecks(ctx) {
-  const a = await settingsAgents(ctx, ctx.a1);
-  const b = await settingsAgents(ctx, ctx.b1);
+/** @brief Customize 的 Instructions 一节的 token 与超出说明；agents.get 的新字段。 */
+async function customizeChecks(ctx) {
+  const a = await customizeAgents(ctx, ctx.a1);
+  const b = await customizeAgents(ctx, ctx.b1);
   const userPath = join(ctx.userData, 'pi', 'AGENTS.md');
   const own = (state, folder) => state.counts[state.paths.findIndex((path) => samePath(path,
     join(resolve(folder), 'AGENTS.md')))];
-  record('MEM-16 Settings › AGENTS.md shows the same token counts in their own elements: agents-tokens after the '
+  record('MEM-16 Customize › Instructions shows the same token counts in their own elements: agents-tokens after the '
     + 'effective file (whose text stays “In effect: <path>”), .agents-tokens on each loaded file',
   samePath(a.effective, `In effect: ${userPath}`) && a.tokens === `${estimate(USER_AGENTS)} tokens`
-    && own(a, ctx.p1) === `${estimate(P1_AGENTS)} tokens` && own(b, ctx.p2) === '1 token'
+    && own(a, ctx.p1) === `${thousands(estimate(P1_AGENTS))} tokens` && own(b, ctx.p2) === '1 token'
     && a.paths.every((path) => !/token/.test(path)), brief({ a, b }));
   const sum = (state) => tokensIn(state.tokens) + state.counts.reduce((total, item) => total + tokensIn(item), 0);
-  record('MEM-16 Settings › AGENTS.md shows agents-over with the same text when the total is over 500 (project A) and '
-    + 'not otherwise (project B)', a.over === AGENTS_OVER && (sum(b) > 500 ? b.over === AGENTS_OVER : b.over === null),
+  record('MEM-16 Customize › Instructions shows agents-over with the same text when the total is over 2,000 '
+    + '(project A) and not otherwise (project B)', a.over === AGENTS_OVER
+    && (sum(b) > AGENTS_LIMIT ? b.over === AGENTS_OVER : b.over === null),
   brief({ a: a.over, b: b.over, sumB: sum(b) }));
   const session = await userSession(ctx, ctx.a1);
   const info = await bridge(ctx, { type: 'agents.get', sessionId: session.sessionId });
@@ -1359,10 +1404,10 @@ async function settingsChecks(ctx) {
     userTokens: info.userTokens, total: info.total }));
 }
 
-/** @brief AGENT 与设置页。 */
+/** @brief AGENT 与 Customize 的 Instructions 一节。 */
 async function agents(ctx) {
   await agentSection(ctx);
-  await settingsChecks(ctx);
+  await customizeChecks(ctx);
 }
 
 // ---------- 增强运行中（MEM-14、MEM-08、MEM-09） ----------

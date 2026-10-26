@@ -259,7 +259,7 @@ export function memView(page) {
     }) : [];
     const rows = (id) => [...document.querySelectorAll(`[data-testid="${id}"]`)].map((el) => ({ id: el.dataset.id,
       source: el.dataset.source ?? null, title: text(el.querySelector('.memory-row-title')),
-      pressed: el.getAttribute('aria-pressed') === 'true' }));
+      tag: text(el.querySelector('.memory-tag')), pressed: el.getAttribute('aria-pressed') === 'true' }));
     return {
       page: Boolean(document.querySelector('[data-testid="memory-page"]')), scope: pressed('memory-scope-'),
       section: pressed('memory-section-'), rows: rows('memory-row'), revisions: rows('revision-row'),
@@ -269,6 +269,7 @@ export function memView(page) {
       loadError: text(document.querySelector('[data-testid="memory-page"] .memory-load-error')),
       empty: text(document.querySelector('[data-testid="memory-page"] .memory-state')),
       detail: Boolean(detail), entryTitle: text(detail?.querySelector('.memory-entry .memory-detail-title')),
+      entryMeta: text(detail?.querySelector('.memory-entry .memory-detail-meta')),
       revisionTitle: text(detail?.querySelector('[data-testid="revision-detail"] .memory-detail-title')),
       evidence, enhanceStatus: text(document.querySelector('[data-testid="enhance-status"]')),
       enhanceError: text(document.querySelector('[data-testid="enhance-error"]')),

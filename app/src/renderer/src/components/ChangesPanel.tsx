@@ -8,6 +8,7 @@ import type { Tab } from '../state/store';
 import { Icon } from '../icons';
 import { Diff } from './Diff';
 import { FileViewer } from './FileViewer';
+import { PanelExpand } from './PanelExpand';
 import { displayPath, pathKey } from './toolTitle';
 
 /** @brief 一个文件的全部改动。 */
@@ -68,7 +69,8 @@ function ChangesList({ tab, onClose }: { tab: Tab; onClose: () => void }) {
   return (
     <>
       <div className="panel-header">
-        <Icon name="file" />This session’s changes
+        <Icon name="file" /><span className="panel-title">This session’s changes</span>
+        <PanelExpand tab={tab} />
         <button className="icon-button" onClick={onClose} aria-label="Close panel"><Icon name="close" /></button>
       </div>
       <div className="panel-body" data-testid="changes">

@@ -10,13 +10,14 @@
 | 分节 | 内容 |
 | --- | --- |
 | Connections and models（v1：见 docs/specs/model-providers.md §9.1：由 Models 分节取代） | 连接列表、每个连接下的模型、默认模型、每个模型是否支持思考和新会话默认的思考强度 |
-| AGENTS.md（v1：见 docs/specs/memory.md §10.3：另写每个文件的 token 数与超过 500 的警告，见下"AGENTS.md"） | 用户级 AGENTS.md 编辑器；当前会话的项目加载了哪些文件 |
+| AGENTS.md（v1：见 docs/specs/memory.md §10.3：另写每个文件的 token 数与超过 500 的警告，见下"AGENTS.md"） | 用户级 AGENTS.md 编辑器；当前会话的项目加载了哪些文件（2026-10-26 改：负责人走查 M4，整节挪到 Customize 的最后一节 Instructions，提醒线改为 2,000（M15）；状态表见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)，设置页不再有这一节） |
 
 - 打开设置页时落在"Connections and models"；"Go to settings"（错误卡）落在出错会话所用模型的连接上，打开"Edit connection"，焦点在 API key。
   （v1：见 docs/specs/model-providers.md §9.1、§9.3：落在 Models；"Go to settings"删除，说明卡的"Open settings"滚到提供商卡、焦点在 Keys。）
 - 分节列表可以用 Tab 和 ↑ ↓ 切换；当前分节高亮（`aria-current`）。
 - （v1：见 docs/specs/memory.md §10.8：在"AGENTS.md"下面加第三节"UI issues"，内容是 M7 工作回顾的 UI issues，文字不变，在这一节时右栏可以打开；
   打开设置页仍落在 Models，F8 的"View in Settings"直接进"UI issues"并选中那一份。状态表见 [../../v1/screens/settings-issues.md](../../v1/screens/settings-issues.md)。）
+  （2026-10-26 改：AGENTS.md 挪走后设置页只有 Models、UI issues 两节，"UI issues" 在 Models 下面。）
 
 ## 连接与模型
 
@@ -101,55 +102,22 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 
 ## AGENTS.md
 
-pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AGENTS.MD`、`CLAUDE.md`、`CLAUDE.MD`；先读 agentDir 的一个，
-再从文件系统根到工作目录逐级读（m6-checks.md）。不受项目信任控制。
-
-> v1：见 docs/specs/memory.md §10.3：生效文件那一行与每个加载的文件旁另写 token 数（`<n> tokens`，1 时 `1 token`），合计超过 500 时警告
-> "Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short."；token 数写在单独的元素里，生效文件那一行与路径的文字不变。`agents.get` 的 `loaded` 改为 `{ path, tokens }[]`，另有 `userTokens`、`total`。
-
-### 用户级
-
-| 状态 | 来源 | 必须可见 | 可做的操作 |
-| --- | --- | --- | --- |
-| 读取中 | `agents.get` 还没返回 | "Loading…"，编辑框不可用 | — |
-| 读取失败 | `agents.get` 报错 | 原文 | 重新打开这一节 |
-| 文件不存在 | `agents.get` 的 `content` 为 null | 路径 `<agentDir>\AGENTS.md`；"This file doesn’t exist yet. Saving creates it."；空编辑框 | 编辑、Save |
-| 已有文件 | `content` | 路径；编辑框里是文件内容 | 编辑 |
-| 生效的是这个文件 | `agents.get` 的 `effectivePath`（agentDir 里第一个存在的）就是 `<agentDir>\AGENTS.md` | "In effect: <路径>" | Open in default app |
-| 被 AGENTS.override.md 盖住 | `effectivePath` 是 `AGENTS.override.md`（pi 的顺序里只有它排在 `AGENTS.md` 前面） | 警示色"<路径> takes precedence, so what you write here has no effect." | Open in default app |
-| 现在生效的是 CLAUDE.md | 还没有 `AGENTS.md`，`effectivePath` 是 `CLAUDE.md` / `CLAUDE.MD`（排在 `AGENTS.md` 后面） | 警示色"<路径> is in effect now. After you save, this AGENTS.md is loaded instead."；保存后变成"In effect: <agentDir>\AGENTS.md" | Open in default app（可以先把内容抄过来） |
-| 有未保存的改动 | 你改了编辑框 | "Save"可用，旁边"Unsaved changes" | Save（Ctrl+S 也可以）；Discard changes（回到读到的内容） |
-| 保存中 / 已保存 / 保存失败 | `agents.save` | "Saving…"、"Saved · Applies to new sessions"、"Couldn’t save: "+ 原文（保留你写的字） | — |
-| 离开时有未保存的改动 | 你点了"Back to app"、换到另一节、点了侧栏的会话 / "New session" / "Open folder…" / "Customize"、按 Ctrl+N（把会话拖到设置页上不能放下，见 [split.md](split.md)，所以不会离开） | 确认框"Discard changes to AGENTS.md?"，说明"Your edits haven’t been saved. Leaving now discards them."；按钮"Discard"和"Keep editing"，焦点在"Keep editing"，Esc 等于"Keep editing" | Discard（编辑框回到读到的内容，照常离开；离开没有发生时，例如取消了选文件夹，留在这里，没有未保存的改动）；Keep editing（留在这里，什么都不变：点的已归档会话不恢复，焦点回到编辑框） |
-
-关闭 Mori 窗口时不问（交付说明列出）。（2026-10-26 改，[window.md](window.md)：关掉窗口只是藏进系统托盘，编辑框里的改动原样留着，回到窗口时还在；托盘菜单或 File 菜单的"Exit"退出时也不问这件事（它们只在有会话正在生成时问），没保存的改动随退出丢掉。）
-
-### 项目级（只列出）
-
-| 状态 | 来源 | 必须可见 | 可做的操作 |
-| --- | --- | --- | --- |
-| 有焦点会话 | `agents.get`（带焦点会话的 sessionId）的 `loaded`：这个会话的资源加载器实际加载的文件（`getAgentsFiles()`，去掉 agentDir 里的那个） | 标题"Files loaded by <项目名>"；每个文件一行完整路径；没有时"This project doesn’t load an AGENTS.md or CLAUDE.md"；说明"Read when the session opens. If you change a file later, only new sessions pick it up. Project files can’t be edited here." | 每行"Open in default app"（主进程 `openPath`，M4 起的做法） |
-| 没有打开的会话 | 没有焦点会话 | 标题"Files loaded by the project"，说明"Open a session to see which files its project loads." | — |
-
-### 反例
-
-- 项目级的文件不能在 Mori 里编辑。
-- 写进 AGENTS.md 的要求只对之后新建的会话生效，已经打开的会话不变（界面明说）。
+> 2026-10-26 改（负责人走查 M4、M15）：这一节整个挪到 Customize（最后一节 `Instructions`，跟随 Customize 的会话，不等 `tools.get`），合计的提醒线由 500 改为 2,000；原来这里的状态表（用户级、项目级、离开确认、反例）连同 v1 加的 token 数一起搬到 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)，在那里维护。设置页不再有会先问的编辑器。
 
 ## 照 Claude 桌面版
 
 | 交互 | 做法 |
 | --- | --- |
 | 设置页的结构 | 左边分节列表、右边内容，顶部返回 |
-| 有未保存的改动时离开 | 先问，默认按钮是留下 |
+| 有未保存的改动时离开 | 先问，默认按钮是留下（2026-10-26：AGENTS.md 挪到 Customize 后，设置页里没有会先问的编辑器） |
 
 ## 界面测试用的标识
 
 | 元素 | 标识 |
 | --- | --- |
-| 设置页 | `data-testid="settings-page"`；分节按钮 `data-testid="settings-nav"` 里的 `button[data-section]`（`connections` / `agents`；v1：见 docs/specs/model-providers.md §9.1，`connections` 改为 `models`；docs/specs/memory.md §10.8，另有 `issues`） |
+| 设置页 | `data-testid="settings-page"`；分节按钮 `data-testid="settings-nav"` 里的 `button[data-section]`（`connections` / `agents`；2026-10-26 改：`agents` 挪到 Customize 的 `tools-nav`；v1：见 docs/specs/model-providers.md §9.1，`connections` 改为 `models`；docs/specs/memory.md §10.8，另有 `issues`） |
 | 连接卡（v1：见 docs/specs/model-providers.md §9.1，改为 `provider-card`，见 v1/screens/models-settings.md） | `[data-testid="connection-card"][data-provider]`；模型行 `[data-testid="model-row"][data-model]`（`provider/id`），默认的带 `data-default="true"`；行里的"Edit""Delete…"带 `data-action`（`edit`、`delete`），卡上的带 `edit-connection`、`add-model`，底部"Add connection"带 `add-connection` |
 | 表单（v1：见 docs/specs/model-providers.md §9.1：提供商表单改为 `provider-form`，`connection-form` 只留给首次启动表单） | 添加连接、编辑连接都是 `data-testid="connection-form"`（M1 的测试沿用）；添加 / 编辑模型 `data-testid="model-form"` |
 | 结果文字 | 表单里 `data-testid="form-message"`（M1 沿用）；模型行里的测试结果 `data-testid="model-test"` |
-| AGENTS.md（v1：见 docs/specs/memory.md §10.3：另有 `agents-tokens`、`.agents-tokens`、`agents-over`） | 编辑框 `data-testid="agents-editor"`；生效的文件 `data-testid="agents-effective"`；项目级列表 `data-testid="agents-loaded"` |
-| 离开确认 | `data-testid="leave-dialog"` |
+| AGENTS.md | 2026-10-26 挪到 Customize，见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)"界面测试用的标识" |
+| 离开确认 | `data-testid="leave-dialog"`（Customize 的 Instructions 与记忆页的表单用） |

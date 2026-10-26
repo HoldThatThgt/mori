@@ -248,10 +248,21 @@ async function instanceFiles(sessions: readonly DaySession[]): Promise<EvidenceS
 }
 
 /** @brief 第一条消息里的现有条目（附录 B）。 */
-type CurrentEntries = Pick<FirstMessageInput, 'userEntries' | 'projectEntries' | 'details' | 'used'>;
+type CurrentEntries = Pick<FirstMessageInput, 'userEntries' | 'projectEntries' | 'agentFacts' | 'details' | 'used'>;
 
 /**
- * @brief 现有条目（附录 B）：用户级与本项目三种（读得出来的，按索引顺序）、本项目这一种的 detail、这一种的用量（§6.3）。
+ * @brief 本项目 Mori 记的事实（附录 B 的 `Facts added by Mori:`，§6.9）：读得出来的、source agent 的，按索引顺序。
+ * @throws Error 读记忆出错（原因原文）
+ */
+async function agentFacts(cwd: string): Promise<CurrentEntries['agentFacts']> {
+  const facts = await list(cwd, 'project', 'fact');
+  if (facts.error !== null) throw new Error(facts.error);
+  return facts.entries.filter((entry) => entry.source === 'agent').map(({ id, abstract }) => ({ id, abstract }));
+}
+
+/**
+ * @brief 现有条目（附录 B）：用户级与本项目三种（读得出来的，按索引顺序）、本项目 Mori 记的事实、本项目这一种的 detail、
+ *        这一种的用量（§6.3）。
  * @throws Error 读记忆出错（原因原文）
  */
 async function currentEntries(cwd: string, task: EnhanceTask): Promise<CurrentEntries> {
@@ -273,7 +284,7 @@ async function currentEntries(cwd: string, task: EnhanceTask): Promise<CurrentEn
     const detail = await detailOf(cwd, 'project', id);
     if (detail) details.push({ id, source: detail.source, details: detail.details, evidence: detail.evidence });
   }
-  return { userEntries, projectEntries, details, used };
+  return { userEntries, projectEntries, agentFacts: await agentFacts(cwd), details, used };
 }
 
 /** @brief 一次运行的材料：列出的会话与反馈、依据范围、第一条消息。 */
