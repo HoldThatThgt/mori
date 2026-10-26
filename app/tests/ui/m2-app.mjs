@@ -995,8 +995,8 @@ async function twoCommands({ page, h }) {
 
 /**
  * 新的批准卡来时要关闭的这一行的浮层（approval.md"选项"、models.md"新的批准卡或询问卡来了"）：打开它的按钮、浮层、
- * 要不要先在输入框里打字（"Queue ▾"只在生成中有字时出现）。批准卡只在生成中来，范围、Effort 菜单在生成开始时已经关闭、
- * 按钮不可用（models.md"什么时候自动关"），所以生成中能开着的是这三个。
+ * 要不要先在输入框里打字（"Queue ▾"只在生成中有字时出现）。批准卡只在生成中来，Effort 菜单在生成开始时已经关闭、
+ * 按钮不可用（models.md"什么时候自动关"）；范围菜单 2026-10-26 起生成中也能打开，新的卡来了照样关（useRowMenu），这里不另查。
  */
 const CARD_OVERLAYS = [
   { name: '权限菜单', tag: 'm2-card-menu', button: permissionButton,

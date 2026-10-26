@@ -24,7 +24,7 @@ import {
   memoryGet, memoryList, memProjectDir, memRecorder, monthDay, monthDayTime, nextBoundary, noticeOf,
   openMemoryProject, phaseBrief, quietScript, readEnhance, revisionView, runEnabled, runRevisions,
   same, say, seededEffortPicks, seedFeedback, seedSession, seedTeamDir, sleep, switchState, toolResultsOf, waitFor,
-  waitSettled, waitStatus, watchFeedbackNote, writeEnhance, writeScript,
+  waitSettled, waitStatus, watchFeedbackNote, watchSwitchPending, writeEnhance, writeScript,
 } from './mem-enhance-helpers.mjs';
 import {
   bridge, closeTbApp, contentText, kernelEvents, newSession, openSessionIn, paneSel, paneState, poll, seedTeamUserData,
@@ -199,7 +199,12 @@ async function settingsEnable(ctx) {
   record('MEM-25 status line, off: "Off · Each day, three background runs review this project’s sessions and '
     + 'improve its TASTE, STRATEGY, and REVIEW"; the switch is off and Run now is disabled',
   off === OFF_TEXT && offSwitch.checked === 'false' && !(await runEnabled(ctx)), brief([off, offSwitch]));
+  await watchSwitchPending(ctx);
   await clickSwitch(ctx, true);
+  const pending = await ctx.page.evaluate(() => window.__enhancePending);
+  record('MEM-17 while the switch is being turned on (enhance.set not back yet) it keeps its old state (aria-checked '
+    + 'false) and is unavailable (disabled)', pending?.checked === 'false' && pending.disabled === true,
+  brief(pending));
   const file = readEnhance(ctx.userData, cwd);
   const today = todayOf();
   record('MEM-17 turning the switch on writes enhance.json with the default range (me), the first candidate’s '

@@ -781,7 +781,7 @@ export const bandKey = (w) => [680, 600, 460, 400, 340, 320].filter((edge) => w 
  * 各状态下这一行从左到右该有的几项（chat.md"输入框下面一行"的状态表）：idle 空闲、running 生成中、typed 生成中有字、
  * preparing 准备中、prepTyped 准备中有字（单个"Queue"）、exited 后台进程退出 / 重新载入中 / Restart 之后重新打开中、
  * opening 第一次打开中、failed 打开失败、blocked 拒绝启动且没有当前模型（没有 Effort；圆环按 pi 的结果，可能不在）；
- * 协作模式下后台有 Agent（有 Stop team）时：teamRunning 生成中、teamTyped 生成中有字（≤ 340px 时"Queue ▾"收起，
+ * 协作模式下后台有 Agent（有 Stop agents）时：teamRunning 生成中、teamTyped 生成中有字（≤ 340px 时"Queue ▾"收起，
  * 同 teamRunning，models.md"窄栏"）
  */
 export const KINDS = { idle: 'permission,model,thinking,usage,send', running: 'permission,model,thinking,usage,stop',
@@ -796,7 +796,7 @@ const kindsMatch = (kinds, state, w) => kinds === (state === 'teamTyped' && w <=
 
 /**
  * @brief 每一栏顶栏此刻的样子（在页面里执行）：宽度、左边、是不是分屏、内边距、项目名的宽度（不显示时 0）、›、会话名（宽度、
- *        全宽、文字）、顶栏上的按钮（读屏名称、宽度）、协作开关（宽度、文字和状态点看不看得见）、顶栏里有没有这一行的按钮
+ *        全宽、文字）、顶栏上的按钮（读屏名称、宽度）、顶栏里有没有协作开关（2026-10-26 起不该有）和这一行的按钮
  *        （不该有）、溢出、裁切，和会话名还能变宽多少
  *        （slack：会话名右边到面包屑右边、面包屑到按钮组的距离减去顶栏的 gap、按钮组右边到顶栏内边距，三段相加）。
  */
@@ -811,7 +811,6 @@ export function topFacts(panes) {
     const crumb = bar.querySelector('.breadcrumb');
     const actions = bar.querySelector('.topbar-actions');
     const title = bar.querySelector('[data-testid="session-title"]');
-    const team = bar.querySelector('[data-testid="team-switch"]');
     const slack = (right(crumb) - right(title)) + (actions.getBoundingClientRect().left - right(crumb)
       - (parseFloat(style.columnGap) || 0)) + (box.right - parseFloat(style.paddingRight) - right(actions));
     const clipped = [...bar.querySelectorAll('.breadcrumb > *, .topbar-actions > *')].filter(visible).filter((el) => {
@@ -824,9 +823,8 @@ export function topFacts(panes) {
       title: width(title), titleFull: title.scrollWidth, titleText: title.textContent, slack, clipped,
       overflow: [bar, crumb, actions].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.className),
       buttons: [...actions.querySelectorAll('button')].filter(visible)
-        .map((el) => ({ name: el.getAttribute('aria-label'), width: width(el), team: el === team })),
-      team: team && { width: width(team), text: visible(team.querySelector('.team-text')),
-        dot: visible(team.querySelector('.team-dot')) },
+        .map((el) => ({ name: el.getAttribute('aria-label'), width: width(el) })),
+      team: bar.querySelectorAll('[data-testid="team-switch"], [role="switch"]').length,
       pickers: ['model-button', 'thinking-button', 'permission-button', 'usage']
         .filter((id) => bar.querySelector(`[data-testid="${id}"]`)) };
   });
@@ -864,7 +862,7 @@ export function rowFrame(panes) {
  * @brief 每一栏这一行里各个按钮（在页面里执行）：宽度、读屏名称、悬停说明（按行）、textContent、innerText（看得见的字）、
  *        看得见的和全部的 svg 个数、左右内边距、是否 aria-disabled、带不带这个属性、是否切换中（data-pending）、是否 disabled、
  *        读屏的描述、data-reasoning、data-current、是否协作模式下锁定的模型按钮（data-locked）；不显示的为 null。还有权限按钮
- *        是不是"Allow all"（.all）、"Effort: "前缀看不看得见，以及 Stop team。
+ *        是不是"Allow all"（.all）、"Effort: "前缀看不看得见，以及 Stop agents（标识仍是 .stop-team-button）。
  */
 export function rowControls(panes) {
   const visible = (el) => Boolean(el) && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden'
@@ -953,28 +951,20 @@ export const layoutBrief = (report) => JSON.stringify({ window: report.window, s
     width: at1(pane.width), items: pane.frame.items.map((item) => `${item.kind}:${at1(item.width)}`).join(' '),
     title: `${at1(pane.top.title)}/${pane.top.titleFull}`, project: at1(pane.top.project) })) });
 
-/** 协作开关的读屏名称（docs/v1/screens/team-switch.md） */
-const TEAM_NAME = /^Team: (Off|On|Until done)$/;
-
 /**
- * @brief 一栏顶栏不符合 chat.md"顶栏"的地方（空数组为符合）：只有"项目名 › 会话名"、协作开关、右栏开关和分屏时的
- *        "Close pane"，没有范围、Effort、权限按钮和圆环；协作开关宽于 600px 时是完整文字、没有状态点，≤ 600px 时只有
- *        状态点（team-switch.md"窄栏"）；≤ 400px 时两个图标按钮 28px；> 320px 时有项目名（最长 160px）和 ›，≤ 320px 时
+ * @brief 一栏顶栏不符合 chat.md"顶栏"的地方（空数组为符合）：只有"项目名 › 会话名"、右栏开关和分屏时的"Close pane"，
+ *        没有协作开关（2026-10-26 起在模型菜单里，team-switch.md）、范围、Effort、权限按钮和圆环；
+ *        ≤ 400px 时两个图标按钮 28px；> 320px 时有项目名（最长 160px）和 ›，≤ 320px 时
  *        没有；会话名截断时项目名已收到 40px、会话名占满剩下的地方（差 2px 以内）；460px 时会话名至少 253px、280px 和 279px 时
  *        至少 168px（只有状态点时算出的 258、173、172px 留 5、5、4px）；不溢出、不裁切。
  */
 export function topProblems({ top }) {
   const problems = [];
-  const [team, ...icons] = top.buttons;
+  const icons = top.buttons;
   const names = icons.map((button) => button.name).join();
   const iconNames = top.split ? 'Toggle changes,Close pane' : 'Toggle changes';
-  if (!team?.team || !TEAM_NAME.test(team.name) || names !== iconNames) {
-    problems.push(`top buttons ${top.buttons.map((button) => button.name).join()}`);
-  }
-  const narrow = top.width <= 600;
-  if (!top.team || top.team.text === narrow || top.team.dot !== narrow || (narrow && top.team.width > 20)) {
-    problems.push(`team switch ${JSON.stringify(top.team)}`);
-  }
+  if (names !== iconNames) problems.push(`top buttons ${names}`);
+  if (top.team) problems.push(`top bar has ${top.team} task mode switch(es)`);
   if (top.pickers.length) problems.push(`top bar still has ${top.pickers.join()}`);
   if (top.width <= 400 && icons.some((button) => Math.abs(button.width - 28) > 0.5)) {
     problems.push(`icon buttons ${icons.map((button) => at1(button.width)).join('/')}px`);
@@ -1029,26 +1019,32 @@ export function permissionProblems({ width: w, frame, controls: { permission: p,
   return problems;
 }
 
-/** 协作模式下模型按钮的悬停（平行 Agent 规格 §12.11） */
-export const LOCKED_TITLE = 'Team mode picks the model for each agent';
+/** 协作模式下模型按钮悬停的第二行（平行 Agent 规格 §12.11，2026-10-26 改） */
+export const LOCKED_TITLE = 'Task mode picks the model for each agent';
 
 /**
- * @brief 协作模式下锁定的模型按钮（规格 §12.11、team-blocked.md，composer-pickers-checks.md 第 69 条）：在范围按钮的位置，
- *        读屏名称"Model: <模型 id>"，悬停只有"Team mode picks the model for each agent"，aria-disabled，没有 ▾；
- *        这一项不窄于最窄、按钮不宽于 200px；放不下时字截短（带"…"），截短的按钮撑满最窄；≤ 340px 时内边距 4px。
+ * @brief 协作模式下的模型按钮（规格 §12.11、team-switch.md"模型按钮上的模式"，2026-10-26 WP-09 改）：在范围按钮的位置，
+ *        文字"Task mode · <模型 id>"，读屏名称"Model: Task mode, <模型 id>"，悬停第一行是按钮文字、第二行
+ *        "Task mode picks the model for each agent"、不能发送时第三行是原因，读屏的描述是后两行（". "隔开）；只在不能发送时
+ *        aria-disabled（回复进行中也能打开菜单）；▾ 按档；这一项不窄于最窄、按钮不宽于 200px；放不下时先截模型 id、再截
+ *        "Task mode"，截短的按钮撑满最窄；≤ 340px 时内边距 4px。
  */
 function lockedProblems(w, frame, m, texts) {
   const problems = [];
-  if (m.name !== `Model: ${m.text}` || m.tip.join('|') !== LOCKED_TITLE) {
+  const reason = frame.wait;
+  if (!m.text.startsWith('Task mode') || m.name !== `Model: ${m.text.replace(/ · /g, ', ')}` || m.tip[0] !== m.text
+    || m.tip[1] !== LOCKED_TITLE || (m.tip[2] ?? null) !== reason || m.tip.length > 3) {
     problems.push(`locked "${m.text}" / "${m.name}" / "${m.tip.join(' | ')}"`);
   }
-  if (!m.aria || m.allSvgs !== 0 || m.disabled) problems.push(`locked aria ${m.aria}, icons ${m.allSvgs}`);
-  const item = frame.items.find((entry) => entry.kind === 'model')?.width ?? m.width;
-  const cut = Boolean(texts?.scope) && texts.scope.width < texts.scope.full - 0.01;
-  if (m.width > RANGE_MAX + 0.5 || item < least('model', w) - 0.5) problems.push(`locked ${at1(m.width)}px`);
-  if (cut && (m.width < least('model', w) - 0.5 || !texts.scope.ellipsis)) {
-    problems.push(`locked cut at ${at1(m.width)}px`);
+  if (m.described !== [LOCKED_TITLE, reason].filter(Boolean).join('. ')) {
+    problems.push(`locked description "${m.described}"`);
   }
+  if (m.aria !== Boolean(reason) || (!reason && m.hasAria) || m.disabled) problems.push(`locked aria ${m.aria}`);
+  const item = frame.items.find((entry) => entry.kind === 'model')?.width ?? m.width;
+  const cut = [texts?.scope, texts?.model].some((fact) => Boolean(fact) && fact.width < fact.full - 0.01);
+  if (m.width > RANGE_MAX + 0.5 || item < least('model', w) - 0.5) problems.push(`locked ${at1(m.width)}px`);
+  if (cut && m.width < least('model', w) - 0.5) problems.push(`locked cut at ${at1(m.width)}px`);
+  if (m.svgs !== (bandOf(w).arrows ? 1 : 0)) problems.push(`locked icons ${m.svgs}`);
   if (w <= 340 && m.pad.some((pad) => pad !== 4)) problems.push(`locked padding ${m.pad}`);
   return problems;
 }
@@ -1056,12 +1052,13 @@ function lockedProblems(w, frame, m, texts) {
 /**
  * @brief 选择范围按钮（models.md"选择范围按钮""窄栏"，composer-pickers.md"v1 之后的调整"）：读屏名称"Model range: <按钮文字>"
  *        （" · "换成", "）；悬停三行：按钮文字 / "<提供商名>"（没有当前模型时"No model can run in this session"）/ 不可用时的原因；
- *        准备中、生成中、不能发送时 aria-disabled（能用时不带这个属性，不在切换中）；读屏的描述是第二行加
+ *        只在不能发送时 aria-disabled（2026-10-26 起准备中、生成中也能打开菜单切 Task mode，原因仍在第三行；能用时不带这个
+ *        属性，不在切换中）；读屏的描述是第二行加
  *        ". <原因>"；宽度在最窄和 200px 之间；▾ 按档；≤ 340px 时内边距 4px。
  */
 export function modelProblems({ width: w, frame, controls: { model: m }, texts }) {
   if (!m) return [];
-  if (m.locked) return lockedProblems(w, frame, m, texts);
+  if (m.locked || m.text.startsWith('Task mode')) return lockedProblems(w, frame, m, texts);
   const reason = frame.wait ?? (frame.running ? NOTE.modelBusy : null);
   const second = m.current ? PROVIDER_LINE.test(m.tip[1] ?? '') : m.tip[1] === NOTE.noModel;
   const problems = [];
@@ -1069,7 +1066,7 @@ export function modelProblems({ width: w, frame, controls: { model: m }, texts }
     problems.push(`range "${m.text}" / "${m.name}" / "${m.tip[0]}"`);
   }
   if (!second || (m.tip[2] ?? null) !== reason || m.tip.length > 3) problems.push(`range tip "${m.tip.join(' | ')}"`);
-  if (m.aria !== Boolean(reason) || (!reason && m.hasAria) || m.pending) {
+  if (m.aria !== Boolean(frame.wait) || (!frame.wait && m.hasAria) || m.pending) {
     problems.push(`range aria-disabled ${m.aria} (attribute ${m.hasAria}, pending ${m.pending})`);
   }
   if (m.described !== rangeDescription(m.tip)) problems.push(`range description "${m.described}"`);
@@ -1119,7 +1116,7 @@ export function effortProblems({ width: w, frame, controls: { thinking: t, prefi
 }
 
 /**
- * @brief 一个只有图标或带文字的发送组按钮：> textAbove（默认 600px，Stop team 760px）时看得见文字 word；更窄时只有图标
+ * @brief 一个只有图标或带文字的发送组按钮：> textAbove（默认 600px，Stop agents 760px）时看得见文字 word；更窄时只有图标
  *        （innerText 为空）、读屏名称 word、悬停 tip、宽 size。
  */
 export function sendButtonProblems(button, w, { word, tip, size, textAbove = 600 }) {
@@ -1141,7 +1138,7 @@ function ringProblems(c, state) {
 }
 
 /**
- * @brief 生成中有字时的"Queue ▾"（models.md"窄栏"）：≤ foldAt（400px；有 Stop team 时 520px）时"Queue"收起、只留 ▾，
+ * @brief 生成中有字时的"Queue ▾"（models.md"窄栏"）：≤ foldAt（400px；有 Stop agents 时 520px）时"Queue"收起、只留 ▾，
  *        ▾ 在 ≤ 600px 时 24px。
  */
 function queueProblems(c, w, foldAt = 400) {
@@ -1160,9 +1157,9 @@ function queueProblems(c, w, foldAt = 400) {
  * @brief 圆环和发送组（models.md"窄栏"、chat.md 的状态表）："Send" / "Stop" / "Queue" > 600px 带文字，≤ 600px 只有图标
  *        （各 32px，≤ 340px 时"Send"、"Stop"和准备中的"Queue" 28px），▾ 24px；生成中有字、≤ 400px 时"Queue"收起；
  *        准备中有字时是单个"Queue"（.queue-button，没有 ▾，≤ 400px 也在）；拒绝启动时"Send"是 disabled。
- *        协作模式下后台有 Agent 时（teamRunning、teamTyped）"Stop"前有 Stop team（> 760px 带字，更窄时只有图标、同"Stop"
+ *        协作模式下后台有 Agent 时（teamRunning、teamTyped）"Stop"前有 Stop agents（> 760px 带字，更窄时只有图标、同"Stop"
  *        的大小，悬停"Stop all agents in this session"）；teamTyped ≤ 520px 时"Queue"收起、只留 ▾，≤ 340px 时整组收起；
- *        别的状态没有 Stop team。
+ *        别的状态没有 Stop agents。
  */
 export function sendProblems({ width: w, controls: c }, state) {
   const problems = [...ringProblems(c, state)];
@@ -1176,12 +1173,12 @@ export function sendProblems({ width: w, controls: c }, state) {
     problems.push(...sendButtonProblems(c.stop, w, { word: 'Stop', tip: 'Stop response (Esc)', size: small }));
   }
   if (team) {
-    problems.push(...sendButtonProblems(c.stopTeam, w, { word: 'Stop team', tip: 'Stop all agents in this session',
+    problems.push(...sendButtonProblems(c.stopTeam, w, { word: 'Stop agents', tip: 'Stop all agents in this session',
       size: small, textAbove: 760 }));
-  } else if (c.stopTeam) problems.push('Stop team shown');
+  } else if (c.stopTeam) problems.push('Stop agents shown');
   if (state === 'typed') problems.push(...queueProblems(c, w));
   if (state === 'teamTyped' && w > 340) problems.push(...queueProblems(c, w, 520));
-  if (state === 'teamTyped' && w <= 340 && (c.toggle || c.queue)) problems.push('"Queue ▾" not folded for Stop team');
+  if (state === 'teamTyped' && w <= 340 && (c.toggle || c.queue)) problems.push('"Queue ▾" not folded for Stop agents');
   if (state === 'prepTyped') {
     problems.push(...sendButtonProblems(c.queueOne, w, { word: 'Queue', tip: 'Queue for later (Enter)', size: small }));
     if (c.toggle || c.queue) problems.push('the preparing "Queue" has a ▾');

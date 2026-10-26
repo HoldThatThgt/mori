@@ -48,14 +48,14 @@ function actionLabel(action: BlockedAction): string {
     case 'change_model': return 'Change model…';
     case 'open_settings': return 'Open settings';
     case 'check_agents': return 'Check again';
-    case 'turn_off_team': return 'Turn off team mode';
+    case 'turn_off_team': return 'Turn off task mode';
   }
 }
 
 /**
  * @brief 点了一个操作：Verify now 探测还没验证的候选；Change model 打开这一栏的范围菜单；
- *        Open settings 打开 设置 → Models 的顶部；Check again 重新读角色文件；Turn off team mode 关掉协作模式。
- * @return Verify now、Check again、Turn off team mode 失败时的原文；其余为 null
+ *        Open settings 打开 设置 → Models 的顶部；Check again 重新读角色文件；Turn off task mode 关掉协作模式。
+ * @return Verify now、Check again、Turn off task mode 失败时的原文；其余为 null
  */
 async function runAction(action: BlockedAction, blocked: ModelBlocked, tab: Tab): Promise<string | null> {
   switch (action) {

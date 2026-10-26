@@ -160,7 +160,7 @@ test('TB-38 a role\'s models expand in order without repeats; the ask intersecti
   assert.deepEqual(selector.intersectCandidates(['b/m1'], ['a/m1']), []);
 });
 
-test('TB-38 blocked cards: Change model for your range, Turn off team mode when locked, neither for a role', () => {
+test('TB-38 blocked cards: Change model for your range, Turn off task mode when locked, neither for a role', () => {
   const base = { ...input(['p/a'], { tools: { 'p/a': 'failed' } }), configError: null, projectError: null,
     pick: 'p', candidates: ['p/a'] };
   assert.deepEqual(selector.staticCheck(base).blocked.actions, ['change_model', 'open_settings']);

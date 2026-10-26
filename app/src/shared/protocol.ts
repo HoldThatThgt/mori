@@ -255,7 +255,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('board.get'), sessionId }),
   /** 拒绝启动卡的 Check again：重新读、重新校验角色文件；只在会话空闲时可用（§4.4） */
   z.object({ type: z.literal('session.recheckAgents'), sessionId }),
-  /** Stop team：停止这个用户会话的全部 Agent（§11.4） */
+  /** Stop agents（session.stopTeam）：停止这个用户会话的全部 Agent（§11.4） */
   z.object({ type: z.literal('session.stopTeam'), sessionId }),
   /** Background tasks 的 task 视图：一个 task 的详情（只读，§13.13.3） */
   z.object({ type: z.literal('board.readTask'), sessionId, task: z.string().regex(TASK_ID_PATTERN) }),

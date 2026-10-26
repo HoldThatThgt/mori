@@ -1,8 +1,8 @@
-// 会话面板：顶栏（"项目名 › 会话名"、协作开关、右栏开关；分屏时"Close pane"）、对话流、阶段行、后台进程退出提示、批准卡、
+// 会话面板：顶栏（"项目名 › 会话名"、右栏开关；分屏时"Close pane"）、对话流、阶段行、后台进程退出提示、批准卡、
 // 排队区、拒绝启动卡与输入框（文字框下面一行有权限、选择范围、Effort、上下文用量和发送，Composer.tsx）。分屏时每一栏是
 // 一个完整的会话面板；在面板里按下鼠标或焦点进入它，焦点就切到这一栏（split.md）。模型层（docs/v1/screens/model-menu.md、
 // model-chat.md）：输入框下面一行的选择范围，输入框上方的拒绝启动卡。平行 Agent（docs/v1/screens/team-switch.md）：
-// 协作开关是顶栏右边一组的第一个，在右栏开关之前。
+// Task mode 在模型菜单里（2026-10-26 前是顶栏右边一组第一个的协作开关）。
 // 记忆（docs/specs/memory.md §10.6）：增强改了东西后这个项目新建的第一个会话，对话流上面有一行提示。
 
 import { useRef } from 'react';
@@ -23,7 +23,6 @@ import { PaneTitle } from './PaneTitle';
 import { QuestionCard } from './QuestionCard';
 import { StageLine } from './StageLine';
 import { TasksButton } from './TasksButton';
-import { TeamSwitch } from './TeamSwitch';
 import { Transcript } from './Transcript';
 
 /** 没有名字时会话名取第一条消息的前几个字（方案 5.3） */
@@ -146,14 +145,14 @@ export interface PaneProps {
   onToggleRight: () => void;
 }
 
-/** @brief 按下的地方是不是顶栏右边一组的按钮（协作开关、右栏开关、"Close pane"）。 */
+/** @brief 按下的地方是不是顶栏右边一组的按钮（右栏开关、"Close pane"）。 */
 function isTopBarAction(target: EventTarget): boolean {
   return target instanceof Element && target.closest('.topbar-actions button') !== null;
 }
 
 /**
  * @brief 在面板里按下鼠标或焦点进入面板时把焦点切到这一栏（split.md"焦点所在的一栏"）。例外：鼠标主键按在顶栏右边一组的
- *        按钮（协作开关、右栏开关、"Close pane"）上时，到这一下按完才切（split.md"右栏开关"）。分屏时右栏跟随焦点所在的
+ *        按钮（右栏开关、"Close pane"）上时，到这一下按完才切（split.md"右栏开关"）。分屏时右栏跟随焦点所在的
  *        一栏，按下那一刻就切的话右栏先换成这一栏的开关状态（例如关着）、两栏变宽、按钮被挤到别处，松开时不在按钮上，
  *        这一下就点空了。按完是 click（右栏开关里先切焦点再开关；另两个按钮点完由下面的计时切，关掉的那一栏已不在分屏里时
  *        focusPane 不做事），或在别处松开：click 和 pointerup 在同一个任务里派发，下一个任务时还在按着就说明没点成，
@@ -191,12 +190,10 @@ function usePaneFocus(key: string, onToggleRight: () => void) {
 }
 
 /**
- * @brief 顶栏："项目名 › 会话名"和这一栏的按钮：协作开关（界面没准备好时不可用）、右栏开关、分屏时"Close pane"
- *        （docs/v0/screens/chat.md"顶栏"）。会话名放不下时项目名先收短，会话面板 ≤ 320px 时不显示项目名（chat.css）。
+ * @brief 顶栏："项目名 › 会话名"和这一栏的按钮：右栏开关、分屏时"Close pane"（docs/v0/screens/chat.md"顶栏"；
+ *        2026-10-26 前右栏开关之前还有协作开关，现在是模型菜单里的 Task mode 一行）。会话名放不下时项目名先收短，会话面板 ≤ 320px 时不显示项目名（chat.css）。
  */
 function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab }) {
-  const kernel = useApp((state) => state.kernel);
-  const notReady = notReadyText(kernel, tab) !== null;
   return (
     <header className="topbar">
       <div className="breadcrumb">
@@ -205,7 +202,6 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
         <PaneTitle tab={tab} />
       </div>
       <div className="topbar-actions">
-        <TeamSwitch tab={tab} disabled={notReady} />
         <button className="icon-button right-toggle" onClick={onToggleRight} aria-pressed={rightOpen}
           aria-label="Toggle changes" title="This session’s changes"><Icon name="right" /></button>
         {split && (

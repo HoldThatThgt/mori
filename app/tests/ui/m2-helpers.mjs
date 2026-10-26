@@ -158,10 +158,11 @@ export function permissionTipProblems(control, mode, reason) {
 /**
  * @brief 选择范围按钮的悬停和读屏与 reason（不可用的原因；能用时为 null）的规定不符的地方（composer-pickers.md
  *        "v1 之后的调整"的悬停表）：悬停第一行是按钮文字，读屏名"Model range: <按钮文字>"（" · "换成", "）；第二行"<提供商名>"或
- *        "No model can run in this session"（2026-10-26 起不带区域）；不可用时第三行是原因；读屏的描述是第二行加". <原因>"；
- *        不可用时 aria-disabled、没有 data-pending、仍能 Tab 到。
+ *        "No model can run in this session"（2026-10-26 起不带区域）；有原因时第三行是原因；读屏的描述是第二行加". <原因>"；
+ *        不可用（blocking 为真，默认有原因就算）时 aria-disabled、没有 data-pending、仍能 Tab 到。2026-10-26 起准备中、
+ *        生成中按钮可用（能打开菜单切 Task mode，docs/v1/screens/model-menu.md），原因仍在第三行：这时 blocking 传 false。
  */
-export function rangeTipProblems(control, reason) {
+export function rangeTipProblems(control, reason, blocking = Boolean(reason)) {
   if (!control) return ['no model range button in the message box row'];
   const { lines } = control;
   const where = lines[1] ?? '';
@@ -172,7 +173,7 @@ export function rangeTipProblems(control, reason) {
     [Boolean(lines[1]), `title line 2 "${lines[1] ?? ''}"`],
     [reason ? lines.length === 3 && lines[2] === reason : lines.length === 2, `title ${JSON.stringify(lines)}`],
     [control.description === want, `description "${control.description}" (want "${want}")`],
-    [reason ? control.off && !control.pending && control.tabbable : !control.off,
+    [blocking ? control.off && !control.pending && control.tabbable : !control.off && !control.pending,
       `aria-disabled ${control.off}, data-pending ${control.pending}, tabbable ${control.tabbable}`],
   ]);
 }

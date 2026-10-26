@@ -49,7 +49,7 @@ export interface DeliveryMeta {
   closeAsk?: number;
   /** 分开时的立项会话：用户消息的投递（Delivery.user）里你输入的原文，这次运行开始判断它（§5.3、§5.4） */
   userText?: string;
-  /** 转告与问你拿主意（relay、ask_user）标了 asked 的 task 与需求：被 Stop team 丢弃时改回假（§11.4） */
+  /** 转告与问你拿主意（relay、ask_user）标了 asked 的 task 与需求：被 Stop agents 丢弃时改回假（§11.4） */
   asked?: { tasks: string[]; requests: number[] };
 }
 
