@@ -38,7 +38,7 @@ function auto({ meta, kind = 'vllm', version = '0.10.1', reported = 65536 } = {}
 
 /** @brief 一个档案。 */
 function stored(results = auto({ meta: META }), t = target()) {
-  return P.buildProfile({ target: t, auto: results, previous: undefined, now: 5000 });
+  return P.buildProfile({ target: t, auto: results, now: 5000 });
 }
 
 /** 临时目录里的档案文件路径。 */

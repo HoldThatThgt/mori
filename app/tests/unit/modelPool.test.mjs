@@ -890,13 +890,6 @@ test('MP-18 a held model is not sent to until held expires; a timeout model like
   assert.equal(stub.calls.length, 0);
 });
 
-test('MP-18 held can be cleared once metrics show the old request stopped', () => {
-  const { pool, timers } = setup();
-  pool.markModel('p/m1', 'held', timers.now() + 120_000);
-  pool.clearModelRecord('p/m1');
-  assert.equal(pool.availability('p/m1').available, true);
-});
-
 test('MP-18 a queued request for a model that becomes held fails at once', async () => {
   const { pool, stub, timers } = setup({ concurrency: 1 });
   await occupy(pool, stub);

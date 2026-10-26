@@ -7,7 +7,7 @@
 // 用法（在 app/ 下）：node tests/ui/m1-replay.mjs [--only readme,stop]
 // 结果写到 test-results/m1-replay.json；截图在 test-results/m1-replay/。
 
-import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -837,26 +837,10 @@ async function openFailedCheck(page, h, { app }) {
  * @brief key 填错（v1，docs/specs/model-providers.md §9.3、§14.4）：v0 错误卡的"Go to settings"删除，认证类错误由模型层处理，
  *        换不到模型时对话流是一张说明卡（"No model available"，候选行"API key rejected"，"Open settings"），没有错误卡；
  *        "Open settings"打开 设置 → Models，焦点在出错提供商的 Keys。
- *        m1/wrong-key.json 是 v0 录下的（pi 的 401 错误，没有 mori.model_unavailable）：这时只能查错误卡显示 401 原文、
- *        不再有"Go to settings"；说明卡的检查标 KNOWN，等用 m1-record.mjs 以 v1 重新录制。
  */
 async function wrongKeyCheck(page, h) {
   await h.load('wrong-key');
-  const fixture = JSON.parse(readFileSync(join(appRoot, 'tests/fixtures/m1/wrong-key.json'), 'utf8'));
-  const recordedV1 = fixture.steps.some((step) => step.envelope?.event.type === 'mori.model_unavailable');
   await h.send('你好');
-  if (!recordedV1) {
-    const card = page.getByTestId('error-card');
-    await card.waitFor({ timeout: 10000 });
-    const text = await card.innerText();
-    record('wrong-key：v0 的录制回放时错误卡显示 401 原文，不再有"Go to settings"（§9.3 删除）', text.includes('401')
-      && !text.includes('Go to settings')
-      && await card.getByRole('button', { name: 'Go to settings' }).count() === 0, oneLine(text));
-    record('wrong-key：说明卡（"API key rejected"、"Open settings"，没有错误卡）', false,
-      'm1/wrong-key.json 是 v0 录下的，没有 mori.model_unavailable；用 m1-record.mjs --only wrong-key 以 v1 重新录制', true);
-    await page.screenshot({ path: join(shots, 'wrong-key.png') });
-    return;
-  }
   const card = page.getByTestId('unavailable-card');
   await card.waitFor({ timeout: 10000 });
   const text = oneLine(await card.innerText());

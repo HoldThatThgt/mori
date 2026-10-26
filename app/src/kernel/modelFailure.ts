@@ -182,7 +182,7 @@ export function classifyThrown(facts: ThrownFacts): Classification {
 /**
  * @brief 一次失败要写的不可用记录（§5.4 处理列、§8.3、§12）。
  *
- * timeout 的记录取决于档案的 cancel_verified，由 timeoutEffect 给出；其余分类不写记录。
+ * timeout 的记录由流函数包装写（会话请求为 held，§5.7；压缩请求为 timeout，§6.4）；其余分类不写记录。
  * @param classification 分类与 Retry-After
  * @param now 当前时刻（ms）
  * @param timings §12 的时长
@@ -207,19 +207,6 @@ export function failureEffect(classification: Classification, now: number,
     default:
       return null;
   }
-}
-
-/**
- * @brief 发出后超时的模型要写的记录（§5.7）：证明断开即停止的为 timeout，否则为 held。
- * @param cancelVerified 档案的 cancel_verified
- * @param now 当前时刻（ms）
- * @param timings §12 的时长
- */
-export function timeoutEffect(cancelVerified: boolean | 'unknown', now: number, timings: ModelTimings): FailureEffect {
-  if (cancelVerified === true) {
-    return { scope: 'model', record: { state: 'timeout', until: now + timings.timeoutCooldownMs } };
-  }
-  return { scope: 'model', record: { state: 'held', until: now + timings.heldMs } };
 }
 
 /**

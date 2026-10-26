@@ -35,7 +35,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 换了模型 | `mori.model_switch` 事件（运行中），或会话文件里的同名条目（打开、重新载入时） | 一行“Switched model: A → B · <原因>”；有被隐藏的过程（事件的 `hidden`、条目的 `hideUntil > replyStartedAt`）时加“ The new model redoes this response.”。`cancel_verified` 为 `unknown`、等满后换的，原因后加“ · Couldn’t confirm it stopped”（临时，走查时可以改；界面怎么认出见“需要规格回答”） | — |
+| 换了模型 | `mori.model_switch` 事件（运行中），或会话文件里的同名条目（打开、重新载入时） | 一行“Switched model: A → B · <原因>”；有被隐藏的过程（事件的 `hidden`、条目的 `hideUntil > replyStartedAt`）时加“ The new model redoes this response.”。`cancel_verified` 为 `unknown`、等满后换的，原因后加“ · Couldn’t confirm it stopped”（临时，走查时可以改；界面怎么认出见“需要规格回答”）（2026-10-26 改，负责人走查 M7：`cancel_verified` 删掉，发出后超时的换模型都是等满后换的，事件与条目的 `unconfirmed` 为真，都加这一句；规格 §5.7） | — |
 | 被隐藏的过程 | §6.1：会话文件不改 | 换模型之前那段的助手消息和工具卡照常显示，不变淡、不折叠（规格没要求标出） | — |
 | 第一个请求就换 | `mori.model_switch`，`hidden` 为假 | 只有换模型的一行，没有错误卡（MP-14） | — |
 | 重建了对话 | `mori.model_rebuild` 事件，或 `mori.rebuild` 条目 | `summary` 为真：“Rebuilt the conversation for <B>: summary + recent turns”；为假：“Rebuilt the conversation for <B>: recent turns without tool calls”（§6.3 第 4 步） | — |
@@ -102,7 +102,7 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 
 | 操作 | 来源 | 结果 |
 | --- | --- | --- |
-| Verify now（`verify`） | 你点了它：`models.verify`（`{ refs: blocked.verifyRefs, tests: 'auto' }`） | `mori.model_state` 变为 `verifying`（没有 Verify now）；探针结束后自动重新校验，通过时卡消失 |
+| Verify now（`verify`） | 你点了它：`models.verify`（`{ refs: blocked.verifyRefs }`；2026-10-26 改：去掉 `tests: 'auto'`，规格 §9.5） | `mori.model_state` 变为 `verifying`（没有 Verify now）；探针结束后自动重新校验，通过时卡消失 |
 | Change model…（`change_model`）（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时不提供，换成 `Turn off team mode`（`turn_off_team`）：`session.setTeam { mode: 'off' }`，直接回到 `off`，§5.1） | 你点了它 | 打开这一栏输入框下面一行的范围菜单（model-menu.md；往上打开，盖住这张卡；Esc 或选了以后焦点在范围按钮） |
 | Open settings（`open_settings`） | 你点了它 | 设置 → Models，停在顶部 |
 
@@ -149,6 +149,7 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 - “Couldn’t confirm it stopped”（§5.7）：`mori.model_switch` 的事件与条目都没有字段标出“等满了也没能确认停下”。
   `cancel_verified` 为 `false`（读指标确认停下后换）和 `unknown`（等满后换）的换模型，界面从 `reason`、`detail` 分不出来，
   需要规格定由哪个字段（例如 `detail` 的固定写法）告诉界面。
+  （已回答：规格 §9.5 的 `unconfirmed`。2026-10-26 起探针第 9 步删掉，发出后超时只有等满再换一种，规格 §5.7。）
 
 ## 界面测试用的标识
 

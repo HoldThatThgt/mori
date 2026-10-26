@@ -1,6 +1,6 @@
 // 合成测试端点（synthetic）的探针部分：只用于测试，不是真实模型。
-// 认出 docs/specs/model-providers.md §7.3 第 1–9 步的请求，一律按"能力全通过"回答；
-// 模型 id 的后缀只关掉对应的探针能力（-notools、-nochoice、-noschema、-replay、-truncate），规则见 server.mjs 开头；
+// 认出 docs/specs/model-providers.md §7.3 第 1–7 步的请求，一律按"能力全通过"回答；
+// 模型 id 的后缀只关掉对应的探针能力（-notools、-nochoice、-noschema、-replay），规则见 server.mjs 开头；
 // -alwaysthink 给每个回复加思考，在 server.mjs 里处理（探针的回复也一样）。
 // 2026-10-24（§7.7、§14.1）：
 //   - "开了思考"（thinkingOn）：请求带 reasoning_effort 或 reasoning.effort（pi 的 OpenRouter 写法），且不是 "none"；
@@ -9,6 +9,7 @@
 //     时回 400，响应体逐字节为 NOOFF_ERROR_BODY（2026-10-24 在 OpenRouter 上录下的原文）。
 //   - -thinklong（只对探针）：开了思考时回一段超过 256 token 的思考（THINKLONG_THINKING），没有正文，
 //     finish_reason 为 "length"（回复的 finishReason）；没开思考时照常回答。
+// 2026-10-26（负责人走查 M7）：探针第 8、9 步删掉，第 8 步的暗号、第 9 步的长输出与 -truncate 随之删掉。
 
 import { contentText } from './replies.mjs';
 
@@ -22,15 +23,6 @@ const PROMPTS = {
 };
 /** 第 4 步的工具结果 */
 const WEATHER_RESULT = 'Paris: 21°C, sunny for 3 days.';
-/** 第 8 步的约定：开头 "The passphrase is <暗号>."，结尾问 "What is the passphrase?" */
-const PASSPHRASE_QUESTION = 'What is the passphrase?';
-const PASSPHRASE = /passphrase is[:\s]*"?([A-Za-z0-9_-]+)/i;
-const NO_PASSPHRASE = "I don't see a passphrase.";
-/** 第 9 步的约定：提示以 "Count from 1 to <N>" 开头，回一个长输出 */
-const COUNT = /^Count from 1 to (\d+)/i;
-const COUNT_MAX = 400;
-/** -truncate：估算的输入超过窗口的这个比例时静默丢掉开头（暗号随之丢失） */
-const TRUNCATE_RATIO = 0.7;
 const PROBE_THINKING = 'Synthetic reasoning for this probe.';
 
 /** -nooff 拒绝"关闭思考"时的 HTTP 状态（§14.1，2026-10-24） */
@@ -95,33 +87,16 @@ export function probeStep(messages) {
   if (last?.role === 'tool') return text.includes(WEATHER_RESULT) ? 4 : 0;
   if (last?.role !== 'user') return 0;
   const steps = [[PROMPTS.ready, 1], [PROMPTS.weather, 3], [PROMPTS.temperature, 4], [PROMPTS.outcome, 5],
-    [PROMPTS.json, 6], [PASSPHRASE_QUESTION, 8]];
+    [PROMPTS.json, 6]];
   for (const [prompt, step] of steps) if (text.includes(prompt)) return step;
-  if (text.includes('<summary>') && text.includes('<outcome>')) return 7;
-  return COUNT.test(text) ? 9 : 0;
-}
-
-/** @brief 第 8 步的回答：找到暗号就复述；-truncate 且输入超过窗口的 TRUNCATE_RATIO 时答不出。 */
-function passphraseAnswer(messages, flags, window) {
-  const tokens = Math.ceil(JSON.stringify(messages).length / 4);
-  if (flags.has('truncate') && tokens > window * TRUNCATE_RATIO) return NO_PASSPHRASE;
-  const all = messages.map((m) => contentText(m.content)).join('\n');
-  return PASSPHRASE.exec(all)?.[1] ?? NO_PASSPHRASE;
-}
-
-/** @brief 第 9 步的长输出：从 1 数到 N（最多 COUNT_MAX），每行一个。 */
-function countReply(messages) {
-  const asked = COUNT.exec(contentText(messages[messages.length - 1]?.content).trim())?.[1];
-  const n = Math.min(Number(asked ?? 1), COUNT_MAX);
-  return Array.from({ length: n }, (_, i) => String(i + 1)).join('\n');
+  return text.includes('<summary>') && text.includes('<outcome>') ? 7 : 0;
 }
 
 /** @brief 各步的回答（不含思考）。 */
-function probeAnswer(step, body, flags, window) {
+function probeAnswer(step, body, flags) {
   const text = (value) => ({ text: value, toolCalls: [] });
   const call = (name, args) => ({ text: '', toolCalls: [{ name, args }] });
   const tools = (body.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
-  const messages = body.messages ?? [];
   if (step === 1) return text('ready');
   if (step === 3) {
     if (flags.has('notools') || !tools.includes('get_weather')) return text('It is probably sunny in Paris.');
@@ -136,9 +111,7 @@ function probeAnswer(step, body, flags, window) {
     const schema = body.response_format?.type === 'json_schema' && !flags.has('noschema');
     return text(JSON.stringify({ outcome: schema ? 'ok' : 'banana' }));
   }
-  if (step === 7) return text('<summary>The sky is clear today.</summary><outcome>ok</outcome>');
-  if (step === 8) return text(passphraseAnswer(messages, flags, window));
-  return text(countReply(messages));
+  return text('<summary>The sky is clear today.</summary><outcome>ok</outcome>');
 }
 
 /**
@@ -146,16 +119,15 @@ function probeAnswer(step, body, flags, window) {
  * @param step 探针第几步（probeStep 的结果，大于 0）
  * @param body 请求体
  * @param flags 模型 id 的后缀集合
- * @param window 这个端点报告的窗口（max_model_len），-truncate 用
  * @return { text, toolCalls, thinking?（思考）, finishReason?（没有时按有没有工具调用为 tool_calls 或 stop）,
  *         thinkingPiece?（思考每个分块的字数，没有时为 4） }
  */
-export function probeReply(step, body, flags, window) {
+export function probeReply(step, body, flags) {
   if (flags.has('thinklong') && thinkingOn(body)) {
     return { thinking: THINKLONG_THINKING, text: '', toolCalls: [], finishReason: THINKLONG_FINISH,
       thinkingPiece: THINKLONG_PIECE };
   }
-  const reply = probeAnswer(step, body, flags, window);
+  const reply = probeAnswer(step, body, flags);
   if (thinkingOn(body)) reply.thinking = PROBE_THINKING;
   return reply;
 }

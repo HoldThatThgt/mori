@@ -1,11 +1,10 @@
 // 设置 → Models 与首次启动表单共用的小件（docs/v1/screens/models-settings.md）：对话框、字段错误、测试中与测试结果、
-// 上移下移按钮、数字的写法。
+// 立即保存、数字的写法。拖动排序在 Reorder.tsx（2026-10-26 取代上移下移按钮）。
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { DeleteResult, ModelCommand } from '../../../../shared/models';
 import { describe, request } from '../../state/bridge';
-import { Icon } from '../../icons';
 import { useOverlay } from '../../state/overlays';
 import { cancelTest, useSettings, writeModels, type Notice } from '../../state/settings';
 
@@ -141,21 +140,6 @@ export function TestButton({ at, label, action, onTest }: {
 export function TestNotice({ at, testId }: { at: string; testId: string }) {
   const notice = useSettings((state) => state.tests[at]);
   return <NoticeLine notice={notice} testId={testId} />;
-}
-
-/** @brief 上移、下移：第一行没有上移、最后一行没有下移；读屏名称"Move up""Move down"。 */
-export function MoveButtons({ index, count, busy, actions, onMove }: {
-  index: number; count: number; busy: boolean; actions: [string, string]; onMove: (delta: -1 | 1) => void;
-}) {
-  return (
-    <>
-      {index > 0 && <button className="icon-button move-button" aria-label="Move up" title="Move up"
-        data-action={actions[0]} disabled={busy} onClick={() => onMove(-1)}><Icon name="arrow" /></button>}
-      {index < count - 1 && <button className="icon-button move-button" aria-label="Move down" title="Move down"
-        data-action={actions[1]} disabled={busy} onClick={() => onMove(1)}>
-        <Icon name="arrow" className="flip" /></button>}
-    </>
-  );
 }
 
 /** @brief 删除的确认流程：先 dryRun 算出连带改动，确认框列出它们，确认后真正删除（§4.1、§9.5）。 */

@@ -50,7 +50,7 @@ function autoProbes(reader, target, modelId) {
   const model = { id: modelId, name: modelId, api: 'openai-completions', provider: 'local', baseUrl: target.base,
     input: ['text'], reasoning: false, contextWindow: 131072, maxTokens: 16384,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } };
-  const deps = { streamSimple: failingStream, fetchFor: () => globalThis.fetch, getText: async () => null,
+  const deps = { streamSimple: failingStream, fetchFor: () => globalThis.fetch,
     readServer: (readSignal) => reader.single(target, modelId, readSignal), now: () => 1000,
     timings: MODEL_TIMINGS, signal: signal() };
   return probes.runAutoProbes({ ref: `local/${modelId}`, model }, deps);
@@ -122,7 +122,7 @@ test('MP-12 a server without a version gives profile version unknown and an unch
   const profileTarget = { baseUrl: target.base, api: 'openai-completions', compat: {},
     model: { id: 'fake-coder', family: '', contextWindow: 131072, maxTokens: 16384, reasoning: false,
       input: ['text'] } };
-  const stored = P.buildProfile({ target: profileTarget, auto, previous: undefined, now: 1 });
+  const stored = P.buildProfile({ target: profileTarget, auto, now: 1 });
   assert.equal(stored.key, 'http://127.0.0.1:4319/v1|openai-completions|fake-coder|unknown');
 });
 
@@ -220,8 +220,8 @@ test('MD-12 a reported Ollama window lowers the effective window; the trained-on
       model: { id, family: '', contextWindow: 131072, maxTokens: 16384, reasoning: false, input: ['text'] } });
     for (const [id, effective, reported] of [['fake-coder', 8192, 8192], ['fake-third', 131072, null]]) {
       const auto = await autoProbes(reader, target, id);
-      const view = P.profileView(profileTarget(id), P.buildProfile({ target: profileTarget(id), auto,
-        previous: undefined, now: 1 }), false);
+      const view = P.profileView(profileTarget(id), P.buildProfile({ target: profileTarget(id), auto, now: 1 }),
+        false);
       assert.equal(view.context.effective, effective, id);
       assert.equal(view.context.reported, reported, id);
       assert.equal(view.reported.contextWindow, reported, id);

@@ -248,6 +248,8 @@ flowchart LR
 | 长输入是报错还是被静默截断（请求较长，先征得用户同意再跑） | 有效窗口；会截断时告警 |
 | 断开连接后服务端是否真的停止（要故意断连，先征得用户同意再跑） | 超时后能不能立即换模型 |
 
+（2026-10-26 改，负责人走查 M7，原话“Verify / Long-input test… / Test / Tool calling / Handoff tier — delete, keep connection test & auto capability fill only”；决定 1：“Delete them from the app and the spec; after a timeout Mori always waits 2 minutes before switching”。上表最后两行——长输入测试与取消测试——连同它们的按钮和确认框一起删掉，探针只剩自动跑的那些。于是：有效窗口就是配置的窗口与服务报告的窗口中较小的，Mori 不再自己核实一个猜出来的窗口，也不再有“会截断”的告警；请求发出后超时时，Mori 总是让这个模型等满 2 分钟、确认旧请求停了再换下一个（§8 表里“先取消，确认旧请求停了再换”就是这样做到的），换模型的提示注明没能确认它停下。负责人现在用的 DeepSeek、z.ai 从来没跑过这两个测试，超时时本来就是等满 2 分钟。）
+
 添加时只填地址和 key、一键拉取模型列表并预填各个字段，见 [一键拉取模型 Proposal](model-discovery.md)（第一版已定，2026-10-23）。
 
 **思考关不掉的模型**（2026-10-24 定）。有的模型必须思考：请求里写“关闭思考”，服务直接回 400（OpenRouter 的“Reasoning is mandatory for this endpoint and cannot be disabled.”，

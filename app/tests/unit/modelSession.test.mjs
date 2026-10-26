@@ -4,6 +4,8 @@
 // clampThinkingLevel 按新模型收紧，收紧后是 off 才不传；新模型按 modelCompile.ts 编译（带不带“没有 Off”的标记）。
 // 另经真正的 ModelSession 走一次段内换模型（流函数包装里的重发，StreamWrapper.retarget）：模型层、模型池的 fetch、
 // pi 会话与 pi 的流函数都是替身（synthetic，同 tests/unit/taskboard/model.test.mjs 的 TB-18），第一个候选回 429。
+// 2026-10-26（§5.7，负责人走查 M7）：同一套替身走一次发出后超时（MP-18）：第一个候选不回答，等满 held 再换，
+// 换模型带 unconfirmed，等待期间不发别的请求。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -135,10 +137,17 @@ function switchConfig(reasoning) {
     normalDefault: 'pair' };
 }
 
+/** 一直不回答的请求（synthetic）：这次尝试被中止时以中止的原因出错。 */
+function untilAborted(signal) {
+  return new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  });
+}
+
 /**
  * 模型层的替身（synthetic）：按 config 回答静态校验；pi 里的实际模型按 modelCompile.ts 编译（next 的档案判出
  * off_refused 时带标记），补上 pi 注册后才有的 provider、baseUrl。模型池只建 fetch：发出时按 status[ref]（默认 200）
- * 记一次尝试并回答。
+ * 记一次尝试并回答；status[ref] 为 'hang' 时发出后不回答（同合成端点的 -hang），直到这次尝试被中止。
  * @param config switchConfig 的配置
  * @param offRefused next 的档案判出思考关不掉
  */
@@ -162,12 +171,13 @@ function switchLayer(config, offRefused) {
       return async () => {
         const code = status[options.ref] ?? 200;
         options.onSent?.();
+        if (code === 'hang') return untilAborted(options.attemptSignal);
         options.onRecord?.({ ref: options.ref, keyRef: null, cls: code === 429 ? 'rate_limited' : 'ok', status: code,
           retryAfterMs: null, hadOutput: false, sentAt: Date.now() });
         return new Response('{}', { status: code });
       };
     },
-    markModel() {}, markProvider() {}, clearModelRecord() {},
+    markModel() {}, markProvider() {},
   };
   const runtime = { registerVirtualModel() {}, async refresh() {}, unregisterVirtualModel() {},
     getModel: physical, getPhysicalModel: physical };
@@ -183,7 +193,7 @@ function switchLayer(config, offRefused) {
     lookupModel: lookup, profileOf: () => null, getPool: () => pool, async checkVersions() {},
     getRuntime: () => runtime,
   };
-  return { layer, status, physical };
+  return { layer, status };
 }
 
 /** pi 的流函数替身（synthetic）：记下每次调用；经 options.fetch 发出，HTTP 错误时推 error，否则回一段正文。 */
@@ -224,14 +234,14 @@ function syntheticManager() {
 }
 
 /**
- * 会话的强度为 level 时走一次段内换模型（synthetic 的会话与端点）：or/first 回 429，包装换到 or/next 重发。
- * @param next { reasoning: next 勾了 Supports thinking, offRefused: next 的档案判出思考关不掉 }
+ * 开始一段回复（synthetic 的会话）：建 ModelSession、载入范围、接上 pi 会话的替身，按“hi”准备好这一段。
+ * @param layer switchLayer 的模型层替身
  * @param level 会话的思考强度（pi 会话的 thinkingLevel）
- * @return 每次发出的模型与选项
+ * @param emit 收后台进程的事件
+ * @return { reply（发这段回复的请求，返回 pi 的结果）, calls（每次发出的模型与选项） }
  */
-async function resendAfterSwitch(next, level) {
-  const { layer, status, physical } = switchLayer(switchConfig(next.reasoning), next.offRefused);
-  const model = await ModelSession.create({ layer, sessionId: 's1', cwd: 'D:\\p', emit: () => {} });
+async function startReply(layer, level, emit = () => {}) {
+  const model = await ModelSession.create({ layer, sessionId: 's1', cwd: 'D:\\p', emit });
   const manager = syntheticManager();
   await model.loadPick(manager, true);
   const calls = [];
@@ -242,11 +252,24 @@ async function resendAfterSwitch(next, level) {
   const signal = new AbortController().signal;
   await model.prepare('hi', signal);
   assert.equal(model.state().current, 'or/first', 'synthetic setup check: the first candidate is used first');
-  status['or/first'] = 429;
   const sent = { systemPrompt: '',
     messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }], timestamp: 1 }] };
-  const message = await piSession.agent.streamFunction(physical('or', 'first'), sent,
-    { sessionId: 's1', signal }).result();
+  const first = layer.getRuntime().getPhysicalModel('or', 'first');
+  const reply = () => piSession.agent.streamFunction(first, sent, { sessionId: 's1', signal }).result();
+  return { reply, calls };
+}
+
+/**
+ * 会话的强度为 level 时走一次段内换模型（synthetic 的会话与端点）：or/first 回 429，包装换到 or/next 重发。
+ * @param next { reasoning: next 勾了 Supports thinking, offRefused: next 的档案判出思考关不掉 }
+ * @param level 会话的思考强度（pi 会话的 thinkingLevel）
+ * @return 每次发出的模型与选项
+ */
+async function resendAfterSwitch(next, level) {
+  const { layer, status } = switchLayer(switchConfig(next.reasoning), next.offRefused);
+  const { reply, calls } = await startReply(layer, level);
+  status['or/first'] = 429;
+  const message = await reply();
   assert.equal(message.stopReason, 'stop', 'the resend on or/next answers');
   assert.deepEqual(calls.map((call) => call.ref), ['or/first', 'or/next']);
   return calls;
@@ -273,4 +296,32 @@ test('MP-39 model switch in a reply: an unmarked reasoning model with Off sends 
 test('MP-39 model switch in a reply: a model without Supports thinking gets no reasoning at high', async () => {
   const calls = await resendAfterSwitch({ reasoning: false, offRefused: false }, 'high');
   assert.equal(calls[1].options.reasoning, undefined, 'clamped for or/next: it only has Off');
+});
+
+// ---- 发出后超时（§5.7；2026-10-26 改：总是等满 held 再换） ----
+
+test('MP-18 no first content in time: the model is held for the full wait, then the reply switches with '
+  + 'unconfirmed; nothing else is sent to the server', async () => {
+  const { layer, status } = switchLayer(switchConfig(false), false);
+  // synthetic 的短时长：首个内容 30 ms、held 150 ms（§12 是 120 s、2 分钟）
+  layer.timings = { ...layer.timings, firstContentTimeoutMs: 30, heldMs: 150 };
+  const marks = [];
+  layer.getPool().markModel = (ref, state, until) => marks.push({ ref, state, wait: until - Date.now() });
+  const events = [];
+  const { reply, calls } = await startReply(layer, 'off', (event) => events.push({ event, at: Date.now() }));
+  status['or/first'] = 'hang';
+  const message = await reply();
+  assert.equal(message.stopReason, 'stop', 'or/next answers the same reply');
+  assert.deepEqual(calls.map((call) => call.ref), ['or/first', 'or/next'],
+    'one request on each model: no second copy on or/first, no request of Mori’s own while waiting');
+  assert.deepEqual(marks.map(({ ref, state }) => [ref, state]), [['or/first', 'held']], 'held, not timeout');
+  assert.ok(marks[0].wait > 100 && marks[0].wait <= 150, `held until the full wait: ${marks[0].wait} ms`);
+  const waits = events.filter(({ event }) => event.type === 'mori.model_wait' && event.kind === 'held');
+  assert.deepEqual(waits.map(({ event }) => [event.active, event.model]), [[true, 'or/first'], [false, 'or/first']]);
+  assert.ok(waits[1].at - waits[0].at >= 140, `waited ${waits[1].at - waits[0].at} ms of 150`);
+  const switched = events.find(({ event }) => event.type === 'mori.model_switch')?.event;
+  assert.deepEqual([switched?.from, switched?.to, switched?.reason, switched?.unconfirmed],
+    ['or/first', 'or/next', 'timeout', true]);
+  assert.ok(events.findIndex(({ event }) => event === switched) > events.indexOf(waits[1]),
+    'the switch comes after the wait ends');
 });

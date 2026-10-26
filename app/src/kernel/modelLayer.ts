@@ -8,9 +8,9 @@
 // - 静态校验的输入：projectContext(cwd) → ProjectContext；staticBase(context) 给出 selector.staticCheck 除
 //   pick、candidates 之外的全部输入；expandPickIn(context, pick) / expandPickFor(cwd, pick) 展开范围（§5.1、§4.3），
 //   expandPicksIn(context, picks) 依次展开角色的 models（平行 Agent 规格 §12.1）；
-// - 选择器第 1、3、4 步（第 2 步网络区域 2026-10-26 删掉）：exists(ref)、toolCallingOf(ref)、availabilityOf(ref)，角色会话第 3 步的
-//   capabilitiesOf(ref)、familyOf(ref)（平行 Agent 规格 §12.2、§12.9）；档案 profileOf(ref)
-//   （§5.7 用 cancel_verified）；serverGet(ref, url, signal) 读服务端接口（§5.7 发出前读基线，配合 probes.readRunningRequests）；
+// - 选择器第 1、3、4 步（第 2 步网络区域 2026-10-26 删掉）：exists(ref)、toolCallingOf(ref)、availabilityOf(ref)，
+//   角色会话第 3 步的 capabilitiesOf(ref)、familyOf(ref)（平行 Agent 规格 §12.2、§12.9）；档案 profileOf(ref)
+//   （换模型时的有效窗口）；
 // - 原因文字：一律用 shared/models.ts 的 REASON_TEXTS、plainReasonText 与 selector.ts 的 availabilityText、triedText；
 // - 会话打开时：checkVersions(refs)（§7.1，异步，不挡打开）；
 // - onModelsChanged(listener)：每次配置、档案或 key 记录变化后调用；emitGlobal(event) 发全局事件（§9.5）。
@@ -23,7 +23,7 @@ import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ModelRuntime } from '@earendil-works/pi-coding-agent';
 import {
-  THINKING_LEVELS, type ApiType, type MigrationNotice, type ModelConfig, type ModelGlobalEvent, type ModelPick,
+  THINKING_LEVELS, type MigrationNotice, type ModelConfig, type ModelGlobalEvent, type ModelPick,
   type ModelProvider, type ModelsInfo, type ProfileView, type ProjectModelsFile, type ProviderModel, type ThinkingLevel,
 } from '../shared/models';
 import { requestStoreKey } from './credentials';
@@ -34,25 +34,21 @@ import {
 import { ModelCompiler, type ProfileLookup } from './modelCompile';
 import { DiscoverReader, type ReadTarget } from './modelDiscover';
 import { runMigration, type PiSettingsView, type ThinkingCopy } from './modelMigrate';
-import { authHeaders, createModelPool, type ModelPool, type PoolKeySecret } from './modelPool';
+import { createModelPool, type ModelPool, type PoolKeySecret } from './modelPool';
 import {
   ProfileBook, buildProfile, compileFlagsOf, needsProbe, profileFingerprint, profileView, versionChanged, visionOf,
-  withCancel, withLongInput, type AutoResults, type CancelResult, type LongInputResult, type ProfileTarget,
-  type ServerRead, type StoredProfile, type VersionRead,
+  type AutoResults, type ProfileTarget, type ServerRead, type StoredProfile, type VersionRead,
 } from './modelProfiles';
 import { MODEL_TIMINGS, type ModelTimings } from './modelTimings';
 import type { Availability, ModelCapabilities, ModelRef, ToolCallingState } from './modelTypes';
 import { createRuntime, globalSettings, markRuntimeReady } from './pi';
-import { ProbeRuns, runAutoProbes, runCancelProbe, runLongInputProbe, type ProbeDeps } from './probes';
+import { AUTO_STEPS, ProbeRuns, runAutoProbes, type ProbeDeps } from './probes';
 import { expandPick, expandPicks, familyKey, type ExpandedPicks, type StaticCheckInput } from './selector';
 
 /** @brief 模型档案的文件名（在 userData 下，§3）。 */
 export const MODEL_PROFILES_FILE = 'model-profiles.json';
 /** @brief 迁移说明的文件名（在 userData 下，§3）。 */
 export const MODEL_MIGRATION_FILE = 'model-migration.json';
-
-/** @brief 探针的种类（models.verify 的 tests）：自动的第 0–7 步、长输入（第 8 步）、取消（第 9 步）。 */
-export type ProbeTests = 'auto' | 'long_input' | 'cancel';
 
 /** @brief 配置、档案或 key 记录的一次变化（onModelsChanged 的参数）。 */
 export type ModelsChange =
@@ -117,15 +113,7 @@ interface ProbeJob {
   target: ProfileTarget;
   /** pi 里注册的实际模型 */
   model: NonNullable<ReturnType<ModelRuntime['getModel']>>;
-  /** 种类 */
-  tests: ProbeTests;
 }
-
-/** @brief 一组探针的结果。 */
-type ProbeOutcome =
-  | { kind: 'auto'; auto: AutoResults }
-  | { kind: 'long_input'; result: LongInputResult }
-  | { kind: 'cancel'; result: CancelResult };
 
 /** @brief 读版本时的一个提供商（baseUrl + api，model-discovery.md §7.3）：读一次，对比它下面的档案。 */
 interface VersionCheck {
@@ -167,12 +155,6 @@ function refTargets(config: ModelConfig | null): Map<ModelRef, ProfileTarget> {
     for (const model of provider.models) targets.set(`${provider.id}/${model.id}`, targetOf(provider, model));
   }
   return targets;
-}
-
-/** @brief 探针开始时显示的步号与步数（running）。 */
-function firstStep(tests: ProbeTests): [number, number] {
-  if (tests === 'auto') return [0, 8];
-  return tests === 'long_input' ? [8, 1] : [9, 1];
 }
 
 /** @brief 读 pi 设置里迁移要用的三项（§4.5）。 */
@@ -353,7 +335,7 @@ export class ModelLayer {
     return this.pool.availability(ref);
   }
 
-  /** @brief 界面看到的档案（含 cancel_verified、context.effective）；没有档案也不在探测时为 null。 */
+  /** @brief 界面看到的档案（含 context.effective）；没有档案也不在探测时为 null。 */
   profileOf(ref: ModelRef): ProfileView | null {
     const target = this.profileTarget(ref);
     return target ? profileView(target, this.profiles.lookup(target), this.profiles.isRunning(ref)) : null;
@@ -723,7 +705,7 @@ export class ModelLayer {
     }
     const forced = new Set(probeRefs);
     const refs = allRefs(this.config).filter((ref) => forced.has(ref) || this.needsAutoProbe(ref));
-    if (refs.length > 0) this.startProbes(refs, 'auto');
+    if (refs.length > 0) this.startProbes(refs);
     this.emitProfiles();
     this.notify({ kind: 'config', removedRefs: [...removedRefs] });
   }
@@ -744,16 +726,14 @@ export class ModelLayer {
   }
 
   /**
-   * @brief 发起探针（§7.4）：每个模型一组，新的一组取消旧的；在后台跑，不等结果。
-   *        长输入与取消探针要求这个模型已有档案（有效窗口、服务种类取自档案）。
+   * @brief 发起自动探针第 0–7 步（§7.4）：每个模型一组，新的一组取消旧的；在后台跑，不等结果。
    * @param refs 模型
-   * @param tests 种类
-   * @return 不能发起时的原文（模型不在配置里、还没有档案）；可以时为 null，这时全部已开始
+   * @return 不能发起时的原文（模型不在配置里）；可以时为 null，这时全部已开始
    */
-  startProbes(refs: readonly ModelRef[], tests: ProbeTests): string | null {
+  startProbes(refs: readonly ModelRef[]): string | null {
     const jobs: ProbeJob[] = [];
     for (const ref of refs) {
-      const job = this.probeJob(ref, tests);
+      const job = this.probeJob(ref);
       if (typeof job === 'string') return job;
       jobs.push(job);
     }
@@ -764,13 +744,12 @@ export class ModelLayer {
   }
 
   /** @brief 一组探针要用的模型与档案；不能跑时返回原文。 */
-  private probeJob(ref: ModelRef, tests: ProbeTests): ProbeJob | string {
+  private probeJob(ref: ModelRef): ProbeJob | string {
     const target = this.profileTarget(ref);
     const split = splitRef(ref);
     const model = target && split ? this.runtime.getModel(split.providerId, split.modelId) : undefined;
     if (!target || !model) return `${ref} is not in your model settings`;
-    if (tests !== 'auto' && !this.profiles.lookup(target)) return `${ref} has not been verified yet; run Verify first`;
-    return { ref, target, model, tests };
+    return { ref, target, model };
   }
 
   /** @brief 跑一组探针：进度经 mori.profiles 发出；仍是这个模型当前的一组时保存结果；结束后通知订阅者。 */
@@ -779,18 +758,17 @@ export class ModelLayer {
     const signal = this.probeRuns.begin(ref);
     this.probeFingerprints.set(ref, profileFingerprint(job.target, this.profiles.lookup(job.target)?.auto.server.version
       ?? null));
-    this.profiles.setRunning(ref, ...firstStep(job.tests));
+    this.profiles.setRunning(ref, 0, AUTO_STEPS);
     // 经 scheduleProfiles：保存时 startProbes 在同一轮开始全部加入的模型，第一个之后的合并到轮末一条
     this.scheduleProfiles();
-    let outcome: ProbeOutcome | null = null;
-    try {
-      outcome = await this.executeProbe(job, signal);
-    } catch (error) {
-      console.error(`[kernel] probe ${job.tests} for ${ref} failed: ${(error as Error).message}`);
-    }
+    const auto = await runAutoProbes({ ref, model: job.model }, this.probeDeps(ref, job.target, signal))
+      .catch((error: unknown) => {
+        console.error(`[kernel] probes for ${ref} failed: ${(error as Error).message}`);
+        return null;
+      });
     const current = this.probeRuns.end(ref, signal);
-    if (current && outcome) {
-      await this.edit(() => this.storeProbe(job, outcome)).catch((error: unknown) => {
+    if (current && auto) {
+      await this.edit(() => this.storeProbe(job, auto)).catch((error: unknown) => {
         console.error(`[kernel] cannot save the profile of ${ref}: ${(error as Error).message}`);
       });
     }
@@ -803,39 +781,13 @@ export class ModelLayer {
     this.notify({ kind: 'profiles', refs: [ref] });
   }
 
-  /** @brief 按种类跑探针；被取消时为 null。 */
-  private async executeProbe(job: ProbeJob, signal: AbortSignal): Promise<ProbeOutcome | null> {
-    const deps = this.probeDeps(job.ref, job.target, signal);
-    const target = { ref: job.ref, model: job.model };
-    if (job.tests === 'auto') {
-      const auto = await runAutoProbes(target, deps);
-      return auto ? { kind: 'auto', auto } : null;
-    }
-    const stored = this.profiles.lookup(job.target);
-    if (!stored) return null;
-    // §7.7：第 8、9 步按档案里存的 off_refused 选强度（这时编译后的模型与档案一致）
-    const offRefused = stored.auto.offRefused === true;
-    if (job.tests === 'long_input') {
-      const effective = profileView(job.target, stored, false)?.context.effective ?? job.target.model.contextWindow;
-      const result = await runLongInputProbe(target, effective, offRefused, deps);
-      return result ? { kind: 'long_input', result } : null;
-    }
-    const result = await runCancelProbe(target, stored.auto.server.kind, offRefused, deps);
-    return result ? { kind: 'cancel', result } : null;
-  }
-
   /**
    * @brief 保存探针结果（在 edit 里）；没有旧档案、或档案给出的编译项（reasoning.replay、reasoning.off_refused）变了时
    *        重新编译（只有这个提供商的注册内容会变，§7.4、§7.7）。
    */
-  private async storeProbe(job: ProbeJob, outcome: ProbeOutcome): Promise<void> {
+  private async storeProbe(job: ProbeJob, auto: AutoResults): Promise<void> {
     const previous = this.profiles.lookup(job.target);
-    const now = Date.now();
-    let next: StoredProfile;
-    if (outcome.kind === 'auto') next = buildProfile({ target: job.target, auto: outcome.auto, previous, now });
-    else if (!previous) return;
-    else if (outcome.kind === 'long_input') next = withLongInput(previous, outcome.result, now);
-    else next = withCancel(previous, outcome.result, now);
+    const next = buildProfile({ target: job.target, auto, now: Date.now() });
     const before = previous ? compileFlagsOf(job.target.api, previous.auto) : null;
     await this.profiles.save(next);
     const after = compileFlagsOf(job.target.api, next.auto);
@@ -850,7 +802,7 @@ export class ModelLayer {
 
   /**
    * @brief 探针的依赖（§7.3）：pi 的 streamSimple、模型池 background 类别的 fetch、第 0 步的读取器
-   *        （model-discovery.md §7.1）、第 9 步读服务端接口。
+   *        （model-discovery.md §7.1）。
    */
   private probeDeps(ref: ModelRef, target: ProfileTarget, signal: AbortSignal): ProbeDeps {
     return {
@@ -858,7 +810,6 @@ export class ModelLayer {
       fetchFor: (request) => this.pool.createFetch({ ref: request.ref, api: target.api, sessionKey: `probe ${ref}`,
         cls: request.cls, signal: request.signal, attemptSignal: request.attemptSignal, onSent: request.onSent }),
       readServer: (readSignal) => this.readServer(ref, readSignal),
-      getText: (url, getSignal) => this.serverGet(ref, url, getSignal),
       now: () => Date.now(),
       timings: this.timings,
       signal,
@@ -869,25 +820,6 @@ export class ModelLayer {
         this.scheduleProfiles();
       },
     };
-  }
-
-  /**
-   * @brief 读服务端接口（探针第 9 步，§5.7 的指标）：GET，带这个提供商第一个 key 的认证头；不经模型池（不计入请求）。
-   * @param ref 模型（决定提供商与接口）
-   * @param url 完整地址
-   * @param signal 取消
-   * @return 2xx 时的正文；非 2xx 时为 null；连接失败时抛出
-   */
-  async serverGet(ref: ModelRef, url: string, signal: AbortSignal): Promise<string | null> {
-    const found = this.lookupModel(ref);
-    const api: ApiType = found?.provider.api ?? 'openai-completions';
-    const first = found?.provider.keys[0];
-    const secret = first ? this.secrets.get(first.ref) ?? null : null;
-    const response = await fetch(url, { headers: authHeaders(new Headers(), api, secret),
-      signal: AbortSignal.any([signal, AbortSignal.timeout(this.timings.probeStepTimeoutMs)]) });
-    if (response.ok) return response.text();
-    await response.body?.cancel().catch(() => undefined);
-    return null;
   }
 
   // ---- 读取器的接线（model-discovery.md §2） ----
@@ -964,7 +896,7 @@ export class ModelLayer {
     for (const { ref, stored } of group.entries) {
       if (!versionChanged(stored, read)) continue;
       console.log(`[kernel] server of ${ref} changed to ${read.kind} ${read.version ?? 'unknown'}; probing again`);
-      const error = this.startProbes([ref], 'auto');
+      const error = this.startProbes([ref]);
       if (error !== null) console.error(`[kernel] cannot probe ${ref} again: ${error}`);
     }
   }
@@ -1029,7 +961,7 @@ export class ModelLayer {
   async startupProbes(migrated: boolean): Promise<void> {
     const refs = allRefs(this.config);
     const probe = migrated ? refs : refs.filter((ref) => this.needsAutoProbe(ref));
-    if (probe.length > 0) this.startProbes(probe, 'auto');
+    if (probe.length > 0) this.startProbes(probe);
     await this.checkVersions(refs.filter((ref) => !probe.includes(ref)));
   }
 }

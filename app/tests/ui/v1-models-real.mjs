@@ -174,7 +174,7 @@ async function probes(ctx) {
       + 'an effective window within the declared one, a known reasoning field and server kind; the Models row '
       + 'is verified (data-probe)',
     problems.length === 0 && shown === 'verified', JSON.stringify({ problems, shown, server: p?.server,
-      tier: p?.tier?.level, context: p?.context, reasoning: p?.reasoning, cancel: p?.cancel_verified }));
+      tier: p?.tier?.level, context: p?.context, reasoning: p?.reasoning }));
   }
   await shot(ctx.page, '01-profiles');
   await ctx.page.getByTestId('settings-page').getByRole('button', { name: 'Back to app' }).click();

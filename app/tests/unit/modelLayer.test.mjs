@@ -161,7 +161,7 @@ function storedProfile(target) {
     steps: { ready: pass, thinking: { outcome: 'not_applicable', detail: null }, call: pass, result: pass,
       replay: { outcome: 'not_applicable', detail: null }, a: pass, b: pass,
       c: { outcome: 'not_run', detail: null } } };
-  return mp.buildProfile({ target, auto, previous: undefined, now: 5 });
+  return mp.buildProfile({ target, auto, now: 5 });
 }
 
 /** 给运行时补上 getModel 与 streamSimple（synthetic）：每次请求记下模型 id，立即以连接错误结束。 */

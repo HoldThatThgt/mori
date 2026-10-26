@@ -1,5 +1,6 @@
 // shared/models.ts 的单元测试：§5.3 原因文字、§9.1 的英文标签、配置与项目配置的单字段校验、自定义条目的类型名、
-// §9.5 命令的参数；MP-06 没有网络区域（2026-10-26，负责人走查 M3）。
+// §9.5 命令的参数（2026-10-26：移动的 delta 与 movedItems，§9.1“拖动排序”）；MP-06 没有网络区域（2026-10-26，
+// 负责人走查 M3）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -228,6 +229,27 @@ test('MP-30 delete commands take dryRun so the dialog can list the consequences 
     assert.equal(parseCommand({ ...command, dryRun: false }).success, true, command.type);
     assert.equal(parseCommand(command).success, false, `${command.type} without dryRun`);
   }
+});
+
+test('MP-24 models.moveModel and models.moveKey take any non-zero whole delta (one drop moves several places)', () => {
+  const commands = [{ type: 'models.moveModel', providerId: 'loc', modelId: 'fake-coder' },
+    { type: 'models.moveKey', providerId: 'loc', ref: 'loc#2' }];
+  for (const command of commands) {
+    for (const delta of [-3, -1, 1, 2]) {
+      assert.equal(parseCommand({ ...command, delta }).success, true, `${command.type} delta ${delta}`);
+    }
+    for (const delta of [0, 1.5, '1', null]) {
+      assert.equal(parseCommand({ ...command, delta }).success, false, `${command.type} delta ${delta}`);
+    }
+  }
+});
+
+test('MP-24 movedItems puts one item at a new place and keeps the others in order', () => {
+  const items = ['a', 'b', 'c'];
+  assert.deepEqual(models.movedItems(items, 2, 0), ['c', 'a', 'b']);
+  assert.deepEqual(models.movedItems(items, 0, 2), ['b', 'c', 'a']);
+  assert.deepEqual(models.movedItems(items, 1, 1), ['a', 'b', 'c']);
+  assert.deepEqual(items, ['a', 'b', 'c'], 'the list passed in is not changed');
 });
 
 test('MP-23 session.pickOptions takes only the session id', () => {

@@ -60,7 +60,7 @@ function storedProfiles(provider) {
     steps: { ready: pass, thinking: skip, call: pass, result: pass, replay: skip, a: pass, b: pass,
       c: { outcome: 'not_run', detail: null } } };
   return provider.models.map((model) => kernel.profiles.buildProfile({ target: { baseUrl: provider.baseUrl,
-    api: provider.api, model, compat: provider.compat }, auto, previous: undefined, now: 5 }));
+    api: provider.api, model, compat: provider.compat }, auto, now: 5 }));
 }
 
 /** @brief pi 的 streamSimple 替身（synthetic）：每个请求立即以连接错误结束。 */

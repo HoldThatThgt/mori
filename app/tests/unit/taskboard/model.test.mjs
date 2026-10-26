@@ -245,7 +245,7 @@ function fakeLayer(config = pickConfig()) {
         return new Response('{}', { status });
       };
     },
-    markModel() {}, markProvider() {}, clearModelRecord() {},
+    markModel() {}, markProvider() {},
   };
   const runtime = { registerVirtualModel() {}, async refresh() {}, unregisterVirtualModel() {},
     getModel: (p, id) => physical(p, id), getPhysicalModel: (p, id) => (lookup(`${p}/${id}`) ? physical(p, id)
@@ -846,7 +846,7 @@ test('TB-38 the model layer reads capabilities from the profile, or from the set
   const auto = { server: { kind: 'unknown', version: 'unknown' }, reported: 800, field: 'none',
     steps: { ready: pass, thinking: { outcome: 'not_applicable', detail: null }, call: pass, result: pass,
       replay: { outcome: 'not_applicable', detail: null }, a: fail, b: fail, c: pass } };
-  const stored = mp.buildProfile({ target, auto, previous: undefined, now: 5 });
+  const stored = mp.buildProfile({ target, auto, now: 5 });
   const paths = { config: join(dir, 'model-config.json'), profiles: join(dir, 'model-profiles.json'),
     notice: join(dir, 'model-migration.json'), v0Models: join(dir, 'agent', 'models.json') };
   writeFileSync(paths.config, JSON.stringify(config));

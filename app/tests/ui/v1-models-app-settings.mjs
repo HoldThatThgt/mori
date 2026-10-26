@@ -12,7 +12,7 @@
 //         不合格的模型、改写的 id、默认范围、思考强度复制、迁移来的提供商没有区域、探针通过后马上能用、迁移后改 models.json 不生效、
 //         Dismiss、迁移失败不写配置、迁移后这次启动停在 设置 → Models）；
 //   MP-24 设置页的增删改立即写进配置并影响静态校验、确认框的连带改动、改地址删 key 且新端口收不到旧 key、分组的错误、
-//         key 明文不回到界面、兼容选项的标签与说明；
+//         key 明文不回到界面、兼容选项的标签与说明（2026-10-26 起拖动排序在 v1-models-app-reorder.mjs）；
 //   MP-26 key 不落盘（数据目录的全部文件、迁移说明、日志、本测试的结果）、Add key 后 F8 报告里没有 key；
 //   MP-30 删除的连带改动；
 //   MP-33 首次启动（打开文件夹后直接发送、tool calling 判定失败的说明、改模型 id 再测仍只有一个提供商）；
@@ -1093,7 +1093,10 @@ async function compatOptions(ctx) {
   JSON.stringify(cards));
 }
 
-/** @brief Keys：加、上移、删（不是最后一个时不确认）、删最后一个（确认、Cancel、Remove）；明文不回到界面。 */
+/**
+ * @brief Keys：加、删（不是最后一个时不确认）、删最后一个（确认、Cancel、Remove）；明文不回到界面。
+ *        拖动排序（2026-10-26，负责人走查 M5，取代上移）在 v1-models-app-reorder.mjs。
+ */
 async function editKeys(ctx) {
   const { page, userData } = ctx;
   await openSettings(page);
@@ -1110,10 +1113,6 @@ async function editKeys(ctx) {
   const shown = await page.evaluate(async () => JSON.stringify(await window.mori.request({ type: 'models.get' })));
   record('MP-24 key plaintext never comes back to the UI (page text, input values, models.get)',
     secretsIn(dom).length === 0 && secretsIn(shown).length === 0, `${secretsIn(dom)} ${secretsIn(shown)}`);
-  await card.locator('[data-testid="key-row"][data-ref="loc#2"] [data-action="key-up"]').click();
-  const moved = await waitConfig(userData, (cfg) => keyRefs(cfg, 'loc')?.[0] === 'loc#2');
-  record('MP-24 Keys: Move up reorders the keys in model-config.json at once', moved.ok,
-    JSON.stringify(keyRefs(moved.value, 'loc')));
   await card.locator('[data-testid="key-row"][data-ref="loc#2"] [data-action="key-remove"]').click();
   const removed = await waitConfig(userData, (cfg) => JSON.stringify(keyRefs(cfg, 'loc')) === '["loc#1"]');
   const creds = await credsWithout(userData, 'loc#2');
@@ -1181,8 +1180,8 @@ async function editAddress(ctx) {
 }
 
 /**
- * @brief Models：加、编辑、上移、删除（确认框）。加模型是卡上 Fetch models → 勾 fake-coder-b → Add 1 model
- *        （models.addModels，model-discovery.md §6.5、§13.4）。
+ * @brief Models：加、编辑、删除（确认框）。加模型是卡上 Fetch models → 勾 fake-coder-b → Add 1 model
+ *        （models.addModels，model-discovery.md §6.5、§13.4）。拖动排序（2026-10-26，取代上移）在 v1-models-app-reorder.mjs。
  */
 async function editModels(ctx) {
   const { page, userData } = ctx;
@@ -1199,9 +1198,7 @@ async function editModels(ctx) {
   await form.getByRole('button', { name: 'Save', exact: true }).click();
   await form.waitFor({ state: 'detached', timeout: 15000 });
   const edited = await waitConfig(userData, (cfg) => providerOf(cfg, 'loc').models[1]?.contextWindow === 65536);
-  await modelRow(page, 'loc/fake-coder-b').locator('[data-action="up"]').click();
-  const moved = await waitConfig(userData, (cfg) => providerOf(cfg, 'loc').models[0].id === 'fake-coder-b');
-  record('MP-24 Models: Edit saves the new context window; Move up reorders the models', edited.ok && moved.ok,
+  record('MP-24 Models: Edit saves the new context window', edited.ok,
     JSON.stringify(providerOf(readConfig(userData), 'loc').models.map((m) => [m.id, m.contextWindow])));
   await modelRow(page, 'loc/fake-coder-b').locator('[data-action="delete"]').click();
   const dialog = dialogOf(page, 'delete-model');
@@ -1213,7 +1210,7 @@ async function editModels(ctx) {
     && deleted.ok && await modelRow(page, 'loc/fake-coder-b').count() === 0, title);
 }
 
-/** @brief Groups：新分组 id 的错误、建立、加成员、上移、只剩一个成员、改成员立即影响会话、删除。 */
+/** @brief Groups：新分组 id 的错误、建立、加成员、只剩一个成员、改成员立即影响会话、删除（成员的拖动排序在 reorder 套件）。 */
 async function editGroups(ctx) {
   const { page, userData } = ctx;
   await openSettings(page);
@@ -1239,11 +1236,10 @@ async function editGroups(ctx) {
   const chosen = row.locator('[data-testid="member-picker"] [data-member="intra/fake-coder"]');
   const locked = await chosen.getAttribute('aria-checked') === 'true' && await chosen.isDisabled();
   await row.locator('[data-testid="member-picker"] [data-member="loc"]').click();
-  await waitConfig(userData, (cfg) => cfg.groups.find((g) => g.id === 'duo')?.members.length === 2);
-  await row.locator('[data-testid="group-member"][data-member="loc"] [data-action="member-up"]').click();
-  const order = await waitConfig(userData, (cfg) => cfg.groups.find((g) => g.id === 'duo')?.members[0] === 'loc');
-  record('MP-24 Groups: Create, Add member (already chosen members ticked and unavailable) and Move up save at once',
-    created.ok && locked && order.ok, JSON.stringify(order.value?.groups));
+  const order = await waitConfig(userData, (cfg) => JSON.stringify(cfg.groups.find((g) => g.id === 'duo')?.members)
+    === '["intra/fake-coder","loc"]');
+  record('MP-24 Groups: Create and Add member (already chosen members ticked and unavailable) save at once, the new '
+    + 'member at the end', created.ok && locked && order.ok, JSON.stringify(order.value?.groups));
   await row.locator('[data-testid="group-member"][data-member="intra/fake-coder"] [data-action="member-remove"]')
     .click();
   await waitConfig(userData, (cfg) => cfg.groups.find((g) => g.id === 'duo')?.members.length === 1);

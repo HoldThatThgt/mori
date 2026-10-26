@@ -335,7 +335,7 @@ async function addNoOffStep(ctx, ep) {
 
 /**
  * @brief 再跑一次自动探针：同样的结果，合成端点的日志里这次又有一个第 2 步关闭思考的 400。2026-10-26 起能用的模型行上没有
- *        Verify（models-settings.md "Models 行"），所以经进程桥发 models.verify（tests auto，同拒绝启动卡的 Verify now 与
+ *        Verify（models-settings.md "Models 行"），所以经进程桥发 models.verify（第 0–7 步，同拒绝启动卡的 Verify now 与
  *        状态行的 Verify again）。
  */
 async function verifyNoOffStep(ctx, ep) {
@@ -344,7 +344,7 @@ async function verifyNoOffStep(ctx, ep) {
   const before = (await modelsInfo(page)).profiles[REF.nooff]?.probedAt ?? 0;
   const mark = ep.log.length;
   const sent = await page.evaluate((command) => window.mori.request(command),
-    { type: 'models.verify', refs: [REF.nooff], tests: 'auto' });
+    { type: 'models.verify', refs: [REF.nooff] });
   const profiles = await waitProfiles(page, [REF.nooff], (profile) => finished(profile)
     && profile.probedAt > before);
   await offRefusedChecks(page, profiles[REF.nooff], 'after models.verify');

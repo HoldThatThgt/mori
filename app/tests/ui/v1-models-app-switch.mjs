@@ -6,8 +6,8 @@
 //   node tests/ui/v1-models-app-switch.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/v1-models-app-switch(-packaged).json，截图在 test-results/v1-models-app-switch(-packaged)/。
 // 测试准备（synthetic test setup，代码里逐处注明）：
-//   - 启动前写 model-config.json（几十个提供商与分组，key 不写）与 model-profiles.json（已验证的档案，cancel_verified
-//     按需要给 true / false / unknown），以及 pi 的 settings.json（压缩只保留最近 1 个 token，短对话也能压缩）；
+//   - 启动前写 model-config.json（几十个提供商与分组，key 不写）与 model-profiles.json（已验证的档案），以及 pi 的
+//     settings.json（压缩只保留最近 1 个 token，短对话也能压缩）；
 //   - 启动后经 models.addKey 加 key（密文由 Mori 自己加密保存）；
 //   - 部分提供商经本脚本的记录代理（v1-switch-helpers.mjs startProxy）连到合成端点：看请求体（重做时发给新模型的上下文、
 //     说明文字、压缩请求）和认证头，并在指定的那一次请求上断开连接（真实的连接失败）；
@@ -15,6 +15,8 @@
 // 时长都是 §12 的真实值：结果未知（120 s 首个内容时限 + 2 min held）、排队超时 60 s、候选耗尽最长等 60 s 各跑一次，
 // 放在 longBatch 一步里同时进行；429 的恢复用 FAKE_LIMIT_MS 给的短 Retry-After。
 // 步骤之间互不依赖（各用自己的提供商和会话），只有 reopen15 依赖 redo15（--only reopen15 时一起跑）。
+// 2026-10-26（WP-04，负责人走查 M7 决定 1）：取消测试删掉，档案没有 cancel_verified；MP-18 只剩“等满 2 分钟再换”，
+// 原来按 cancel_verified 为 true、false 分的两组情形与它们的端点（-nocancel、FAKE_NO_METRICS）删掉。
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,9 +38,8 @@ const { record, write } = createRecorder(exePath ?? 'dev build');
 const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) }).catch(() => {});
 
 /** 本脚本用的端口（4520–4539）：合成端点、记录代理，4539 不监听（连接失败） */
-const PORT = { ok: 4520, keys2: 4521, lim1: 4522, limAll: 4523, short: 4524, long: 4525, slow: 4526, hangT: 4527,
-  hangF: 4528, stallF: 4529, noMetrics: 4530, quota: 4531, auth: 4532, keyless: 4533, proxyA: 4534, proxyB: 4535,
-  proxyH: 4536, closed: 4539 };
+const PORT = { ok: 4520, keys2: 4521, lim1: 4522, limAll: 4523, short: 4524, long: 4525, slow: 4526, hang: 4530,
+  quota: 4531, auth: 4532, keyless: 4533, proxyA: 4534, proxyB: 4535, proxyH: 4536, closed: 4539 };
 
 // 合成端点认的 key：只是测试值（synthetic），与任何真实服务无关；末 4 位各不相同，合成端点的日志据此认出用的是哪个。
 const K = { m03a: 'sk-synthetic-mp03-a001', m03b: 'sk-synthetic-mp03-b002', l25a: 'sk-synthetic-mp25-c003',
@@ -61,14 +62,13 @@ const ENDPOINTS = [
     FAKE_LIMIT_MS: '6000' }],
   [PORT.long, { FAKE_LIMITED_KEYS: [K.l20x, K.l20c, K.l17a, K.l17b].join(','), FAKE_LIMIT_MS: '100000' }],
   [PORT.slow, { FAKE_FIRST_DELAY_MS: '7000' }],
-  [PORT.hangT, {}], [PORT.hangF, {}], [PORT.stallF, {}],
-  [PORT.noMetrics, { FAKE_NO_METRICS: '1' }],
+  [PORT.hang, {}],
   [PORT.quota, { FAKE_QUOTA_KEYS: K.q1 }],
   [PORT.auth, { FAKE_KEYS: `${K.good14},${K.good29}` }],
   [PORT.keyless, { FAKE_LIMITED_KEYS: 'none', FAKE_LIMIT_MS: '15000' }],
 ];
 
-/** 提供商：[id, 端口, { keys, concurrency, model, cancel, window, maxTokens, reasoning }]；模型 id 默认 fake-coder-<id> */
+/** 提供商：[id, 端口, { keys, concurrency, model, window, maxTokens, reasoning }]；模型 id 默认 fake-coder-<id> */
 const PROVIDERS = [
   ['okd', PORT.ok],
   ['m03', PORT.keys2, { keys: [K.m03a, K.m03b], concurrency: 1 }], ['m03b', PORT.lim1, { keys: [K.l25a, K.l25b] }],
@@ -76,14 +76,10 @@ const PROVIDERS = [
   ['m14', PORT.auth, { keys: [K.bad14] }], ['m14bk', PORT.ok],
   ['m16', PORT.ok], ['m16bk', PORT.ok], ['m17', PORT.ok], ['m17bk', PORT.ok], ['q17', PORT.ok, { concurrency: 1 }],
   ['w17a', PORT.long, { keys: [K.l17a] }], ['w17b', PORT.long, { keys: [K.l17b] }],
-  ['h17', PORT.noMetrics, { model: 'fake-coder-stall-h17', cancel: 'unknown' }], ['h17bk', PORT.ok],
-  ['t18h', PORT.hangT, { model: 'fake-coder-hang-t18h', cancel: true }], ['t18hbk', PORT.ok],
-  ['t18s', PORT.hangT, { model: 'fake-coder-stall-t18s', cancel: true }], ['t18sbk', PORT.ok],
-  ['f18h', PORT.hangF, { model: 'fake-coder-hang-nocancel-f18h', cancel: false }], ['f18hbk', PORT.ok],
-  ['f18s', PORT.stallF, { model: 'fake-coder-stall-nocancel-f18s', cancel: false }], ['f18sbk', PORT.ok],
-  ['u18h', PORT.noMetrics, { model: 'fake-coder-hang-u18h', cancel: 'unknown' }], ['u18hbk', PORT.ok],
-  ['u18s', PORT.noMetrics, { model: 'fake-coder-stall-u18s', cancel: 'unknown' }], ['u18sbk', PORT.ok],
-  ['s18', PORT.noMetrics, { model: 'fake-coder-stall-s18', cancel: 'unknown' }],
+  ['h17', PORT.hang, { model: 'fake-coder-stall-h17' }], ['h17bk', PORT.ok],
+  ['t18h', PORT.hang, { model: 'fake-coder-hang-t18h' }], ['t18hbk', PORT.ok],
+  ['t18s', PORT.hang, { model: 'fake-coder-stall-t18s' }], ['t18sbk', PORT.ok],
+  ['s18', PORT.hang, { model: 'fake-coder-stall-s18' }],
   ['q19', PORT.ok, { concurrency: 1 }], ['q19p', PORT.ok, { concurrency: 1 }],
   ['qt19', PORT.ok, { concurrency: 1 }], ['qt19bk', PORT.ok], ['c19', PORT.ok, { concurrency: 2 }],
   ['d19', PORT.keys2, { keys: [K.m03a, K.m03b], concurrency: 1 }],
@@ -113,8 +109,7 @@ const OPTS = Object.fromEntries(PROVIDERS.map(([id, port, opts = {}]) => [id, { 
 /** 分组：id → 成员 */
 const GROUPS = {
   g04: ['m04', 'm04bk'], g14: ['m14', 'm14bk'], g16: ['m16', 'm16bk'], g17: ['m17', 'm17bk'], g17w: ['w17a', 'w17b'],
-  gh17: ['h17', 'h17bk'], gt18h: ['t18h', 't18hbk'], gt18s: ['t18s', 't18sbk'], gf18h: ['f18h', 'f18hbk'],
-  gf18s: ['f18s', 'f18sbk'], gu18h: ['u18h', 'u18hbk'], gu18s: ['u18s', 'u18sbk'], gqt19: ['qt19', 'qt19bk'],
+  gh17: ['h17', 'h17bk'], gt18h: ['t18h', 't18hbk'], gt18s: ['t18s', 't18sbk'], gqt19: ['qt19', 'qt19bk'],
   g19r: ['r19', 'r19bk'], g20c: ['x20', 'y20'], g29n: ['nf29', 'nf29bk'], g29c: ['cn29', 'cn29bk'],
   g29k: ['kl29', 'kl29bk'], g36d: ['d36', 'd36bk'], g36c: ['cc36', 'cc36bk'], g13a: ['a13a', 'b13a'],
   g13b: ['a13b', 'b13b', 'c13b'], g13c: ['a13c', 'b13c'], g13d: ['a13d', 'b13d'], g13e: ['a13e', 'b13e'],
@@ -145,12 +140,6 @@ function buildConfig() {
     { concurrency: opts.concurrency }));
   const groups = Object.entries(GROUPS).map(([id, members]) => ({ id, members }));
   return { version: 1, providers, groups, normalDefault: 'okd' };
-}
-
-/** @brief 测试准备：cancel_verified 按提供商给出（其余档案没跑过取消探针）。 */
-function cancels() {
-  return Object.fromEntries(PROVIDERS.filter(([, , opts]) => opts?.cancel !== undefined)
-    .map(([id, , opts]) => [R(id), opts.cancel]));
 }
 
 // ---------- 小工具 ----------
@@ -1327,13 +1316,9 @@ const LONG = [
   { key: 'p20x', pick: 'p20x', pre: 'plain MP20 give up first', text: 'plain MP20 give up second' },
   { key: 'qt19x', pick: 'qt19', text: 'wait 75s MP19 timeout holder', waitLine: 'qt19' },
   { key: 'qt19y', pick: 'gqt19', text: 'plain MP19 queue timeout' },
-  { key: 't18h', pick: 'gt18h', text: 'plain MP18 true hang' },
-  { key: 't18s', pick: 'gt18s', text: 'plain MP18 true stall' },
-  { key: 'f18h', pick: 'gf18h', text: 'plain MP18 false hang' },
-  { key: 'f18s', pick: 'gf18s', text: 'plain MP18 false stall' },
-  { key: 'u18h', pick: 'gu18h', text: 'plain MP18 unknown hang' },
-  { key: 'u18s', pick: 'gu18s', text: 'plain MP18 unknown stall' },
-  { key: 's18', pick: 's18', text: 'plain MP18 single unknown' },
+  { key: 't18h', pick: 'gt18h', text: 'plain MP18 timeout hang' },
+  { key: 't18s', pick: 'gt18s', text: 'plain MP18 timeout stall' },
+  { key: 's18', pick: 's18', text: 'plain MP18 single candidate' },
   { key: 'h17', pick: 'gh17', text: 'plain MP17 stop while held' },
 ];
 
@@ -1352,8 +1337,8 @@ async function startLong(ctx) {
   return runs;
 }
 
-/** @brief 结果未知的一个会话：换模型事件、阶段行、提示、请求数。 */
-async function unknownOutcome(ctx, run, id) {
+/** @brief 发出后超时的一个会话：换模型事件、阶段行、提示、请求数。 */
+async function timeoutOutcome(ctx, run, id) {
   const switches = await moriEvents(ctx, run.tab, 'mori.model_switch', run.sentAt);
   const stages = (await stagesOf(ctx.page, run.tab, run.sentAt)).map((item) => item.v);
   const state = await paneState(ctx.page, run.tab);
@@ -1362,37 +1347,22 @@ async function unknownOutcome(ctx, run, id) {
     backup: OPTS[`${id}bk`] ? chatLogs(ctx, M(`${id}bk`), run.sentAt).length : 0 };
 }
 
-/** @brief MP-18：cancel_verified 为 true 时超时后立即换；为 false 时读指标确认停下后换；unknown 时等满 2 分钟再换。 */
-async function checkUnknown(ctx, runs) {
+/** @brief MP-18（§5.7，2026-10-26 改）：发出后超时，阶段行显示等它停下，等满 2 分钟再换，提示注明没能确认停下。 */
+async function checkTimeout(ctx, runs) {
   const heldText = (id) => new RegExp(`^held\\|Waiting to make sure ${R(id)} stopped · until ${CLOCK}$`);
   const common = (r) => r.event?.reason === 'timeout' && r.lines === 1 && r.backup === 1 && r.state.errors.length === 0
     && r.state.switches.length === 1 && r.state.assistants.at(-1)?.includes(PLAIN);
   for (const [id, kind] of [['t18h', '-hang'], ['t18s', '-stall']]) {
-    const r = await unknownOutcome(ctx, runs[id], id);
-    record(`MP-18 ${kind} with cancel_verified true: after the 120 s first-content limit the reply switches model at `
-      + 'once (no waiting to make sure it stopped), the fake endpoint gets no second copy of the request',
-    common(r) && r.after >= 115 && r.after <= 135 && r.held.length === 0 && !r.event.unconfirmed
-      && !r.state.switches[0].text.includes('Couldn’t confirm'), brief(r));
-  }
-  for (const [id, kind] of [['f18h', '-hang-nocancel'], ['f18s', '-stall-nocancel']]) {
-    const r = await unknownOutcome(ctx, runs[id], id);
-    record(`MP-18 ${kind} with cancel_verified false: after the timeout the stage line shows "Waiting to make sure `
-      + '<model> stopped · until hh:mm:ss", Mori reads the server metrics and switches once they are back to the '
-      + 'baseline (well before 2 min), without "couldn\'t confirm"',
-    common(r) && r.held.length >= 1 && heldText(id).test(r.held[0]) && r.after >= 120 && r.after <= 160
-      && !r.event.unconfirmed && !r.state.switches[0].text.includes('Couldn’t confirm'), brief(r));
-  }
-  for (const [id, kind] of [['u18h', '-hang'], ['u18s', '-stall']]) {
-    const r = await unknownOutcome(ctx, runs[id], id);
-    record(`MP-18 ${kind} with cancel_verified unknown (FAKE_NO_METRICS=1): the stage line shows waiting to make sure `
-      + 'it stopped, after the full 2 min the reply switches model and continues; the notice says "couldn\'t confirm '
-      + 'it stopped"; no second copy of the request reaches the fake endpoint',
+    const r = await timeoutOutcome(ctx, runs[id], id);
+    record(`MP-18 ${kind}: after the 120 s first-content limit the stage line shows "Waiting to make sure <model> `
+      + 'stopped · until hh:mm:ss", after the full 2 min the reply switches model and continues; the notice says '
+      + '"couldn\'t confirm it stopped"; no second copy of the request reaches the fake endpoint',
     common(r) && r.held.length >= 1 && heldText(id).test(r.held[0]) && r.after >= 235 && r.event.unconfirmed
       && r.state.switches[0].text.includes('Couldn’t confirm it stopped'), brief(r));
   }
-  const single = await unknownOutcome(ctx, runs.s18, 's18');
-  record('MP-18 only one candidate (cancel_verified unknown): after the timeout and the full 2 min wait, one "No '
-    + 'model available" card and no error card',
+  const single = await timeoutOutcome(ctx, runs.s18, 's18');
+  record('MP-18 only one candidate: after the timeout and the full 2 min wait, one "No model available" card and no '
+    + 'error card',
   single.lines === 1 && single.held.length >= 1 && single.state.unavailable.length === 1
     && single.state.errors.length === 0 && single.state.switches.length === 0, brief(single));
 }
@@ -1447,7 +1417,7 @@ async function longBatch(ctx) {
   await stopHeld(ctx, runs.h17);
   for (const item of LONG) await waitTabIdle(ctx.page, runs[item.key].tab, 330000);
   await checkWaits(ctx, runs);
-  await checkUnknown(ctx, runs);
+  await checkTimeout(ctx, runs);
 }
 
 // ---------- 主流程 ----------
@@ -1469,7 +1439,7 @@ async function setup(ctx) {
   installRules(ctx);
   mkdirSync(join(ctx.userData, 'pi'), { recursive: true });
   // 测试准备（synthetic test setup）：配置、已验证的档案、pi 压缩只保留最近 1 个 token（短对话也有可压缩的内容）。
-  seedUserData(ctx.userData, buildConfig(), cancels(), { compaction: { keepRecentTokens: 1 } });
+  seedUserData(ctx.userData, buildConfig(), { compaction: { keepRecentTokens: 1 } });
   await startApp(ctx);
   await addKeys(ctx);
   ctx.home = await openFolder(ctx, ctx.project);

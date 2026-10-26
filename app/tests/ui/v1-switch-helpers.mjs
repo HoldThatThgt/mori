@@ -148,9 +148,8 @@ const step = (outcome) => ({ outcome, detail: null });
 /**
  * @brief 已验证的档案（synthetic test setup）：tool_calling 已验证、A 级；键与指纹按 kernel/modelProfiles.ts 的写法算，
  *        这样启动时不重新探测。
- * @param cancel cancel_verified：true / false / 'unknown'；undefined 表示取消探针没跑过（也是 unknown）
  */
-export function profileOf(baseUrl, model, cancel) {
+export function profileOf(baseUrl, model) {
   const key = [baseUrl, 'openai-completions', model.id, FAKE_VERSION].join('|');
   const fingerprint = JSON.stringify([key, model.contextWindow, model.maxTokens, model.reasoning, model.input, []]);
   const thinking = model.reasoning ? 'pass' : 'not_applicable';
@@ -159,17 +158,15 @@ export function profileOf(baseUrl, model, cancel) {
     auto: { server: { kind: 'vllm', version: FAKE_VERSION }, reported: null, field: 'none',
       steps: { ready: step('pass'), thinking: step(thinking), call: step('pass'), result: step('pass'),
         replay: step('not_applicable'), a: step('pass'), b: step('pass'), c: step('not_run') } },
-    longInput: null, cancel: cancel === undefined ? null : { step: step('pass'), verified: cancel },
     probedAt: Date.now(), suite: 1,
   };
 }
 
 /**
  * @brief 写 model-config.json、model-profiles.json 与 pi 的 settings.json（synthetic test setup）。
- * @param cancels <provider>/<model> → cancel_verified
  * @param piSettings pi 的设置（例如压缩保留的 token 数）
  */
-export function seedUserData(userData, config, cancels, piSettings) {
+export function seedUserData(userData, config, piSettings) {
   writeFileSync(join(userData, 'model-config.json'), `${JSON.stringify(config, null, 2)}\n`);
   const profiles = [];
   const seen = new Set();
@@ -178,7 +175,7 @@ export function seedUserData(userData, config, cancels, piSettings) {
       const id = `${provider.baseUrl}|${model.id}`;
       if (seen.has(id)) continue;
       seen.add(id);
-      profiles.push(profileOf(provider.baseUrl, model, cancels[`${provider.id}/${model.id}`]));
+      profiles.push(profileOf(provider.baseUrl, model));
     }
   }
   writeFileSync(join(userData, 'model-profiles.json'), `${JSON.stringify({ version: 1, profiles }, null, 2)}\n`);
