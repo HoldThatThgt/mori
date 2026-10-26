@@ -32,7 +32,7 @@ const PROXY = 4621;
 const THINKING = 'Synthetic reasoning before answering.';
 /** 程序给的固定文字（§10.1、§10.2） */
 const SHOWS = {
-  noTasksOff: 'There are no tasks when team mode is off.',
+  noTasksOff: 'There are no tasks when task mode is off.',
   turnCap: 'Message limit reached: at most 5 questions per turn.',
   ownSession: "You can't send a message to your own session.",
   whichRequest: 'Say which request (request: N).',
@@ -210,7 +210,7 @@ function offAskSeat(ctx, who, said) {
   planner?.first?.data?.kind === 'ask' && said[1]?.error === false && said[1].text === ASK_TEXT.plannerAnswer
     && !suffixes.some((suffix) => suffix === 'create' || suffix.startsWith('close.')) && same(kinds, ['ask']),
   brief({ suffixes, kinds, result: said[1] }));
-  record('TB-04 off mode: agent_message to a task is refused with "There are no tasks when team mode is off."',
+  record('TB-04 off mode: agent_message to a task is refused with "There are no tasks when task mode is off."',
     said[3]?.error === true && said[3].first === SHOWS.noTasksOff, brief(said[3]));
 }
 

@@ -147,9 +147,23 @@ async function lookbackDrive(ctx, project) {
   if (mode !== 'off') return { ...take, unmet: `task mode is ${mode} after the request ended, not off` };
   const askedAt = Date.now();
   await sendMessage(ctx, take.who.tab, PROMPTS.LOOKBACK_ASK);
-  const idle = await waitTeamIdle(ctx, take.who, { timeout: DRIVE_MS, stableMs: 3000 });
+  // 关闭模式下对话有自己的 bash 等工具，“每次询问”下它的命令出 v0 的批准卡：照样点“Allow once”，否则一直等批准
+  const idle = await settleAnswering(ctx, take.who, take.cards);
   return { ...take, askedAt,
     unmet: idle ? null : 'the question after task mode went off did not finish in 15 minutes' };
+}
+
+/** @brief 等用户会话与整个协作空闲（连续 3 秒，最多 15 分钟），其间出现的批准卡都点“Allow once”；返回是否空闲了。 */
+async function settleAnswering(ctx, who, cards) {
+  const since = Date.now();
+  let calm = null;
+  while (Date.now() - since < DRIVE_MS) {
+    await answerCards(ctx, who, cards);
+    calm = (await idleNow(ctx, who)) ? calm ?? Date.now() : null;
+    if (calm && Date.now() - calm > 3000) return true;
+    await sleep(500);
+  }
+  return false;
 }
 
 /** @brief 用户会话与整个协作此刻空闲（TeamState.busy 为假、对话不在运行或准备中、界面不在生成或发送）。 */

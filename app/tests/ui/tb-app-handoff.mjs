@@ -885,10 +885,12 @@ async function closeReportStream(ctx, who, watch, wakes) {
   const wakeEntries = customOf(entries, 'mori.wake');
   record('TB-31 after the request closes the dialog is woken to report: one hidden request_closed delivery (mori.wake '
     + 'and a mori.wake entry pointing at it, no bubble), the report is its own turn with its own reply actions (the '
-    + 'turn before it keeps its actions, under its progress summary), and [Mori] text never appears in your '
-    + 'messages, the input box or the queue',
+    + 'turn before it keeps its actions, under its progress summary; after it only the "Task mode off" line of '
+    + 'TB-58, as /task\'s once ends with that turn), and [Mori] text never appears in your messages, the input box '
+    + 'or the queue',
   same(wakes.map((wake) => wake.kind), ['request_closed']) && wakeEntries.length === 1
-    && wakeEntries[0].kind === 'request_closed' && reportAt === items.length - 1 && items[reportAt].actions
+    && wakeEntries[0].kind === 'request_closed' && reportAt >= 0 && items[reportAt].actions
+    && same(items.slice(reportAt + 1).map((item) => `${item.kind}:${item.text}`), ['team-mode:Task mode off'])
     && before.some((item) => item.actions) && before.filter((item) => item.kind === 'user').length === 1
     && watch.samples() > 20 && watch.seen.length === 0
     && !items.some((item) => item.text.includes('[Mori]')),

@@ -196,7 +196,8 @@ async function load(page, fx, { part = null, speed = 4, maxGap = 600 } = {}) {
 /**
  * @brief 在页面里装一个 MutationObserver，只在变化时记下当前一栏：模型按钮上的模式（data-team-mode、看得到的字、
  *        是否 aria-disabled）、显示"Starting…"时能不能切 Task mode（opening：看到几次、其中几次模型按钮可用或模型菜单开着）、
- *        进展摘要的标题行与 task 行、出现过的批准卡，以及回执、进展摘要、Stop agents、批准卡归属行、右栏说明出现过的最多个数。
+ *        进展摘要的标题行与 task 行、出现过的批准卡，以及回执、进展摘要、Stop agents、批准卡归属行、右栏说明、模式提示
+ *        （TB-58）出现过的最多个数。
  *        结果在 window.__tbWatch。
  */
 function watchTeam(page) {
@@ -211,7 +212,7 @@ function watchTeam(page) {
     };
     const counts = { receipt: '[data-testid="receipt"]', progress: '[data-testid="progress"]',
       stopTeam: '[data-testid="stop-team"]', attribution: '[data-testid="approval-attribution"]',
-      teamNote: '[data-testid="team-changes-note"]' };
+      teamNote: '[data-testid="team-changes-note"]', modeNotice: '[data-kind="team-mode"]' };
     const scan = () => {
       const root = document.querySelector(pane);
       if (!root) return;
@@ -354,7 +355,7 @@ async function tb03(page, [dir, name, part]) {
   record(`TB-03 replay ${dir}/${name}${part ? ` (${part})` : ''}: the recording replays as before under the synthetic `
     + `empty TeamState/BoardView (all ${total} commands match); the model button stays in off mode `
     + '(data-team-mode off, no "Task mode" on it) throughout; no receipt, no progress summary, no Stop agents, no '
-    + 'approval attribution',
+    + 'approval attribution, no mode notice line',
   status.errors.length === 0 && status.cursor === total && seen.switches.length > 0 && off
     && Object.values(seen.max).every((n) => n === 0),
   oneLine(JSON.stringify({ errors: status.errors, cursor: status.cursor, total, max: seen.max,

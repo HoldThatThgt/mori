@@ -1308,9 +1308,11 @@ async function restart(ctx) {
     if (!same(notices, prior.notices)) noticeDiffs.push({ name, before: prior.notices, after: notices });
   }
   record('TB-05 the mode is kept across reopening: after restarting Mori each session\'s model button shows the mode '
-    + 'it had before ("Task mode · …" for the session left in always, off for the once session that ended)',
-  Object.values(modes).every(([prior, now]) => prior === now) && modes.switching?.[1] === 'always'
-    && modes.switching[2].startsWith('Task mode · ') && modes.once?.[1] === 'off', brief(modes));
+    + 'it had before ("Task mode · …" for the sessions left in always, off for the once session that ended and for '
+    + 'switching, which ends with /task off)', Object.values(modes).every(([prior, now]) => prior === now)
+    && Object.values(modes).some(([prior]) => prior === 'always') && Object.values(modes).every(([, now, text]) =>
+    (now === 'always') === text.startsWith('Task mode · ')) && modes.once?.[1] === 'off'
+    && modes.switching?.[1] === 'off', brief(modes));
   record('TB-08 live and reopened order are the same: after restarting Mori and reopening, the user messages, '
     + 'replies, receipts and progress summaries of every session come in the same order as live',
   named.length >= 5 && diffs.length === 0, brief({ named, diffs }, 3000));
