@@ -95,10 +95,12 @@ export async function backToApp(page) {
   await waitReady(page);
 }
 
-/** @brief 等 设置 → Models 里 ref 那一行的探针跑完、Tool calling 为 Verified（规格 §7.3）；返回最后的取值。 */
+/**
+ * @brief 等 设置 → Models 里 ref 那一行的探针跑完、tool calling 为 verified（规格 §7.3）；返回最后的取值。
+ *        2026-10-26（WP-02）：读行上的 data-probe（models-settings.md "Models 行"），取值同原来档案摘要的 Tool calling。
+ */
 export async function waitVerified(page, ref, timeout = 120000) {
-  const value = () => modelRow(page, ref).locator('[data-field="tool_calling"]').getAttribute('data-value',
-    { timeout: 2000 }).catch(() => null);
+  const value = () => modelRow(page, ref).getAttribute('data-probe', { timeout: 2000 }).catch(() => null);
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline && await value() !== 'verified') await sleep(500);
   return value();
@@ -107,7 +109,7 @@ export async function waitVerified(page, ref, timeout = 120000) {
 /**
  * @brief 设置 → Models 的提供商卡上加一个模型（一键拉取模型，model-discovery.md §6.5、§13.4）：卡上 Fetch models →
  *        清单里勾它（列表里没有时用 Add a model ID 手填），改 Context window、Max output → Add 1 model，等新行出现、
- *        探针跑完（不跑完时这个模型被静态校验排除）。返回 Tool calling 的取值。设置页要已经在 Models 一节。
+ *        探针跑完（不跑完时这个模型被静态校验排除）。返回行上 data-probe 的取值（同原来的 Tool calling）。设置页要已经在 Models 一节。
  * @param model.id 模型 id；model.contextWindow 上下文长度；model.maxTokens 最大输出（不给时随窗口取一半与 16384 中较小的）
  */
 export async function addModelUi(page, provider, { id, contextWindow, maxTokens }) {

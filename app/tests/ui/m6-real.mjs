@@ -354,9 +354,8 @@ async function toolInfo(page, name) {
 /** @brief model-config.json（测试数据目录的副本）。 */
 const modelConfig = (ctx) => readJson(join(ctx.userData, 'model-config.json'));
 
-/** @brief 一个模型行的档案里 Tool calling 的取值（data-value）；没有时为 null。 */
-const toolCalling = (page, ref) => modelRow(page, ref).locator('[data-testid="profile"] [data-field="tool_calling"]')
-  .getAttribute('data-value', { timeout: 2000 }).catch(() => null);
+/** @brief 一个模型行上 tool calling 的验证状态（data-probe，2026-10-26 起取代档案摘要的 Tool calling）；没有时为 null。 */
+const toolCalling = (page, ref) => modelRow(page, ref).getAttribute('data-probe', { timeout: 2000 }).catch(() => null);
 
 /**
  * @brief 设置 → Models 的提供商卡上点"Fetch models"（用已保存的 key 拉取，model-discovery.md §6.5、§13.4）：卡里打开

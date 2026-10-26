@@ -5,32 +5,32 @@
 // Fetch models（回放桥按地址用录下的 models.discover 结果回答），在清单里勾选、过滤、改值，Add；卡上的 Fetch models 与 Add；
 // 模型行提示的 Use。界面发出的写命令由回放桥直接应答（status.modelWrites），测试拿它与录制里的命令、或按规格独立算出的
 // 命令比较；期望的文字、勾选与提示由录下的结果按规格 §6.2、§6.3、§8 独立算出，不从 src/ 引用。
-//   md-openrouter（MD-07）：真实的几百行清单：标题、默认勾选、Not reported（改值后仍在）、no_tools 提示、过滤框（不分
+//   md-openrouter（MD-07）：真实的几百行清单：标题、默认勾选、Default（改了值就不标）、no_tools 提示、过滤框（不分
 //     大小写）、Select all 与 Clear selection 只作用于显示着的行、Add 的文字随勾选数变、被过滤框藏起来的勾选行照样加入。
 //   md-glm（MD-07、MD-15）：真实的列表错误（服务拒绝）的两句，没有清单的标题、Select all、Clear selection 和过滤框；
 //     在 API key 框填了一个 synthetic 的 key，回放桥照样按地址用录下的结果回答（key 不参与配对）。
 //   md-deepseek（MD-07、MD-13、MD-15）：DeepSeek 式清单（类型不明、多行时都不勾，不超过 20 行时没有过滤框，Select all，
 //     改值的检查与错误时 Add 不可用、只有勾选的行的错误挡住 Add，改窗口时 Max output 随之变，Add 发出的命令与录制的相同）；
-//     typed 清单（chat 真的勾上、假的不勾并写 Not a chat model，Not reported 改值后仍在，没报告的 Max output 随窗口变）；
-//     加入后设置页的模型行（录下的档案：not reported、§8 表的五种提示与 Use 的改动，含窗口改回报告值时 Max output 一起
+//     typed 清单（chat 真的勾上、假的不勾并写 Not a chat model，Default 只在值仍是默认值时，没报告的 Max output 随窗口变）；
+//     加入后设置页的模型行（录下的档案：(default)、§8 表的五种提示与 Use 的改动，含窗口改回报告值时 Max output 一起
 //     改小，旧档案只有第四种）；Legacy endpoint 卡上的 Fetch models（已加入的行标 Added、不能勾也不能改，
 //     能加入的只有一行时默认勾上，Clear selection 与 Select all 只作用于能勾的行，Add 发 models.addModels）。回放桥：设置页
 //     先是录下的 models.get，每次加入后按写命令的条数换成录制里的下一个；models.addModels 照其他写命令应答。
 //   md-shapes（MD-07、MD-13；对合成端点录下，source 为 synthetic）：id 含空格的行（Can’t add this model，只有勾选框
 //     不可用；能加入的只有另一行，默认勾上；Select all 不勾它）；空列表的一句（Models (0)，下面是 Add a model ID）；
 //     Ollama 的清单（服务报告类型的行都勾上、trained_window 与 no_tools 两种提示、改窗口时没报告的 Max output 随之变，
-//     Add 发出录制的命令）；加入后的模型行（训练窗口写 (not reported)、没有窗口的提示；改小过窗口的行有窗口的提示）；
-//     Use 发出录制的 models.saveModel，提示消失，之后 Tool calling 照录下的重新探测显示 Re-verifying…（data-value 与
-//     文字），最后是 Verified，录下的最后一个档案的 probedAt 比 Use 之后读到的新。
+//     Add 发出录制的命令）；加入后的模型行（训练窗口不写 (default)、没有窗口的提示；改小过窗口的行有窗口的提示）；
+//     Use 发出录制的 models.saveModel，提示消失，之后行上的 data-probe 照录下的重新探测变为 reverifying（2026-10-26 起
+//     能用的模型重新验证时没有状态行、不写 Re-verifying…），最后是 verified，录下的最后一个档案的 probedAt 比 Use 之后读到的新。
 //     回放桥直接应答设置页的 models.* 写命令，不回放事件（它只在界面主动发出的命令之后回放事件，§13.4）：测试在页面
 //     载入前（addInitScript）记下界面经 window.mori.onEvent 挂上的监听，Use 之后把录制里 Use 之后后台进程转发的事件
 //     原样、按顺序交给它们（captureListeners、feedEvent），每个事件之后读一次 Tool calling。
 //   md-*-card（MD-07、MD-13）：md-real.mjs 用卡上保存的 key（--source 的数据目录，或按负责人的 key 经界面新建的数据目录），
 //     从真实的 App 对真实的服务录下的卡上拉取
 //     （md-deepseek-card、md-glm-card）。tests/fixtures/discovery/ui/ 里有几份就回放几份（这些文件就是数据，同其他录制；
-//     一份都没有时不记检查）。设置页先是录制里卡上拉取之前的 models.get（模型行的 (not reported) 与 §8 的提示照它的
+//     一份都没有时不记检查）。设置页先是录制里卡上拉取之前的 models.get（模型行的 (default) 与 §8 的提示照它的
 //     档案）；卡上的 Fetch models（回放桥按提供商用录下的 models.discover 回答）之后的期望全部由录下的结果独立算出：
-//     默认勾选（chat、Added、unusable）、Not reported 按录下的 reported、标记与提示、Models (N)、过滤框与截断说明、
+//     默认勾选（chat、Added、unusable）、Default 按录下的 reported 与值、标记与提示、Models (N)、过滤框与截断说明、
 //     卡里没有 Detected 一行；拉取时已在提供商里的 id（按那个 models.get 的配置）标 Added；Not listed 一行；有
 //     listError 时 §6.3 的两句。录制里有界面发的 models.addModels（md-real.mjs 记下、按配置的变化核对过）时照它勾选、
 //     改值（改了窗口的行检查 Max output 按 §4.3 随之变），Add 发出同样的命令；加入后的模型行照录制里加入之后最后一个
@@ -39,6 +39,9 @@
 // "<编号> replay fixture missing"（不造假录制）；--only 里的名字不是其中之一、也没有那份 md-*-card.json 时记一条失败。
 // 用法（在 app/ 下）：node tests/ui/md-replay.mjs [--only md-openrouter,md-glm,md-deepseek,md-shapes,<md-*-card 的名字>]
 // 结果写到 test-results/md-replay.json（--only 时 md-partial-replay.json，不计入覆盖检查）；截图在 test-results/md-replay/。
+// 2026-10-26（WP-02，负责人走查 M6、M7）：清单的"Not reported"与模型行的"(not reported)"改为"Default""(default)"，只在值
+// 仍是 Mori 的默认值时标（改成别的值就不标、改回又标）；上面的写法已照这条改过。模型行
+// 没有档案摘要：Tool calling 改读行上的 data-probe 和状态行（能用的模型没有状态行）。trained_window 的提示改短。
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -71,7 +74,7 @@ const LIST_ERROR = {
 const STILL = 'You can still add model IDs below.';
 /** §6.2 行上的提示 */
 const HINT_TEXT = { no_tools: 'The server doesn’t list tool support for this model.',
-  trained_window: 'Trained context window. Ollama may use a smaller one; run the long-input test after adding.' };
+  trained_window: 'Trained context window. Ollama may use a smaller one.' };
 /** §6.2 Context window、Max output 的字段错误（模型层的同一组文字） */
 const WINDOW_ERROR = 'Context window must be a whole number above 0.';
 const MAX_ERROR = 'Max output must be smaller than the context window.';
@@ -86,6 +89,16 @@ const addLabel = (n) => (n === 0 ? 'Add models' : n === 1 ? 'Add 1 model' : `Add
 const fmt = (n) => n.toLocaleString('en-US');
 /** @brief 没报告时的输出上限：16384 与窗口一半中较小的（§4.3、§11）。 */
 const unreportedMax = (window) => Math.min(16384, Math.floor(window / 2));
+/** 没报告时的窗口（§11） */
+const UNREPORTED_WINDOW = 128000;
+/**
+ * @brief 标"Default"/"(default)"的字段（§6.2、§8，2026-10-26 起）：服务没报告、而且值仍等于默认值（窗口 128000；
+ *        Max output 为按当前窗口算的默认值）。
+ * @param unreported { contextWindow, maxTokens }：服务没报告这一项
+ */
+const defaultFields = (unreported, window, max) => [
+  ...(unreported.contextWindow && window === UNREPORTED_WINDOW ? ['contextWindow'] : []),
+  ...(unreported.maxTokens && max === unreportedMax(window) ? ['maxTokens'] : [])];
 /** @brief 两个值的 JSON 相同。 */
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 /** @brief 检查的 detail。 */
@@ -102,7 +115,7 @@ function canonical(value) {
 
 /**
  * @brief 清单每一行该显示的（§6.2，独立实现）：默认勾选、能不能勾、能不能改（Added 的行不能改）、两个数字、两个勾选框、
- *        Not reported、标记与提示。
+ *        Default（没报告且值仍是默认值，2026-10-26）、标记与提示。
  * @param models 录下的 DiscoverResult.models
  */
 function expectRows(models) {
@@ -110,8 +123,8 @@ function expectRows(models) {
   return models.map((m) => ({ id: m.id, chat: m.chat === null ? 'unknown' : String(m.chat),
     picked: !m.added && m.unusable === null && (m.chat ?? usable === 1), pickDisabled: m.added || m.unusable !== null,
     locked: m.added, window: String(m.contextWindow), max: String(m.maxTokens), reasoning: m.reasoning, image: m.image,
-    notReported: [...(m.reported.contextWindow ? [] : ['contextWindow']),
-      ...(m.reported.maxTokens ? [] : ['maxTokens'])],
+    defaults: defaultFields({ contextWindow: !m.reported.contextWindow, maxTokens: !m.reported.maxTokens },
+      m.contextWindow, m.maxTokens),
     tags: [...(m.chat === false ? [{ kind: 'not-chat', text: 'Not a chat model' }] : []),
       ...(m.added ? [{ kind: 'added', text: 'Added' }] : []),
       ...(m.unusable !== null ? [{ kind: 'unusable', text: `Can’t add this model: ${m.unusable}` }] : [])],
@@ -152,11 +165,17 @@ function expectHints(api, model, profile) {
   return out;
 }
 
-/** @brief 模型行说明的开头（§8）：窗口与 Max output，没报告的后面写 (not reported)。 */
+/** @brief 模型行上标"(default)"的字段（§8，2026-10-26）：档案有报告值、这一项没报告、配置的值仍是默认值。 */
+const rowDefaults = (model, reported) => (reported === null ? [] : defaultFields({
+  contextWindow: reported.contextWindow === null, maxTokens: reported.maxTokens === null },
+model.contextWindow, model.maxTokens));
+
+/** @brief 模型行说明的开头（§8）：窗口与 Max output，没报告且仍是默认值的后面写 (default)。 */
 function metaStart(model, reported) {
-  const nr = (value) => (reported !== null && value === null ? ' (not reported)' : '');
-  return `Context window: ${fmt(model.contextWindow)}${nr(reported?.contextWindow)} · Max output: `
-    + `${fmt(model.maxTokens)}${nr(reported?.maxTokens)}`;
+  const marks = rowDefaults(model, reported);
+  const nr = (field) => (marks.includes(field) ? ' (default)' : '');
+  return `Context window: ${fmt(model.contextWindow)}${nr('contextWindow')} · Max output: `
+    + `${fmt(model.maxTokens)}${nr('maxTokens')}`;
 }
 
 /** @brief §3.4：区域的建议值里本测试用到的两种：127.x 为本机，其余公网主机为 Public（§12）。 */
@@ -218,9 +237,9 @@ const cards = (page) => page.locator('[data-testid="provider-card"]').evaluateAl
 
 /**
  * @brief 清单此刻的样子（scope 为 Add provider 表单或提供商卡的选择器）：标题、Select all / Clear selection / 过滤框、
- *        截断说明、列表错误、每一行（勾选、数字、勾选框、Not reported、标记、提示、字段错误）与 Add 按钮；另有
+ *        截断说明、列表错误、每一行（勾选、数字、勾选框、Default、标记、提示、字段错误）与 Add 按钮；另有
  *        Not listed 一行与 Detected 一行的文字（没有时为 null），以及有没有空列表的一句。
- *        Not reported 记它的 data-field；文字不是"Not reported"时记成"<field>=<文字>"，与期望的比较时不相等。
+ *        Default 记它的 data-field；文字不是"Default"时记成"<field>=<文字>"，与期望的比较时不相等。
  */
 const checklistOf = (page, scope) => page.evaluate((root) => {
   const base = document.querySelector(root);
@@ -229,7 +248,7 @@ const checklistOf = (page, scope) => page.evaluate((root) => {
   const filter = base?.querySelector('[data-testid="checklist-filter"]');
   const add = base?.querySelector('[data-action="add-models"]');
   const texts = (el, sel) => [...el.querySelectorAll(sel)].map((x) => ({ kind: x.dataset.kind, text: x.textContent }));
-  const marker = (x) => (x.textContent === 'Not reported' ? x.dataset.field : `${x.dataset.field}=${x.textContent}`);
+  const marker = (x) => (x.textContent === 'Default' ? x.dataset.field : `${x.dataset.field}=${x.textContent}`);
   const rows = [...(base?.querySelectorAll('[data-testid="discovered-row"]') ?? [])].map((tr) => {
     const pick = tr.querySelector('input[name="pick"]');
     const value = (field) => tr.querySelector(`input[data-field="${field}"]`);
@@ -237,7 +256,7 @@ const checklistOf = (page, scope) => page.evaluate((root) => {
       label: pick.getAttribute('aria-label'), window: value('contextWindow').value, max: value('maxTokens').value,
       reasoning: value('reasoning').checked, image: value('image').checked,
       locked: ['contextWindow', 'maxTokens', 'reasoning', 'image'].every((field) => value(field).disabled),
-      notReported: [...tr.querySelectorAll('[data-testid="not-reported"]')].map(marker),
+      defaults: [...tr.querySelectorAll('[data-testid="default-value"]')].map(marker),
       tags: texts(tr, '[data-testid="row-tag"]'), hints: texts(tr, '[data-testid="row-hint"]'),
       errors: [...tr.querySelectorAll('[data-testid="field-error"]')].map((x) => ({ field: x.dataset.field,
         text: x.textContent })) };
@@ -259,7 +278,7 @@ const checklistOf = (page, scope) => page.evaluate((root) => {
 /** @brief 一行的比较形式（expectRows 的字段）。 */
 const shapeOf = (row) => ({ id: row.id, chat: row.chat, picked: row.picked, pickDisabled: row.pickDisabled,
   locked: row.locked, window: row.window, max: row.max, reasoning: row.reasoning, image: row.image,
-  notReported: row.notReported, tags: row.tags, hints: row.hints });
+  defaults: row.defaults, tags: row.tags, hints: row.hints });
 
 /** @brief Add provider：填 Base URL（和 API key），Fetch models，等清单或列表错误出来；返回表单的选择器。 */
 async function fetchNew(page, baseUrl, key = '') {
@@ -307,18 +326,19 @@ function prefixes(ids) {
 /** @brief 显示着的行：id 含过滤框的文字（不分大小写）。 */
 const shownBy = (ids, needle) => ids.filter((id) => id.toLowerCase().includes(needle.toLowerCase()));
 
-/** @brief 拉取后的清单：标题、行与列表顺序、默认勾选、Not reported、标记与提示、过滤框、Add models 不可用。 */
+/** @brief 拉取后的清单：标题、行与列表顺序、默认勾选、Default、标记与提示、过滤框、Add models 不可用。 */
 async function openrouterList(page, scope, result) {
   const s = await checklistOf(page, scope);
   const want = expectRows(result.models);
   const got = s.rows.map(shapeOf);
   const bad = got.map((row, i) => (same(row, want[i]) ? null : { got: row, want: want[i] })).filter(Boolean);
-  const unreported = want.filter((row) => row.notReported.length).length;
+  const unreported = want.filter((row) => row.defaults.length).length;
   const hinted = want.filter((row) => row.hints.length).length;
   record(`MD-07 replay md-openrouter: the real list shows "Models (${result.models.length})" and one row per `
     + `recorded model in list order with its values; the default picks follow the reported type (none reported: `
-    + `${want.filter((r) => r.picked).length} ticked); "Not reported" on the ${unreported} rows whose value the `
-    + `server didn't report; "${HINT_TEXT.no_tools}" on the ${hinted} rows with the hint; each row's box reads `
+    + `${want.filter((r) => r.picked).length} ticked); "Default" on the ${unreported} rows whose value the `
+    + `server didn't report and still is the default; "${HINT_TEXT.no_tools}" on the ${hinted} rows with the hint; `
+    + `each row's box reads `
     + '"Add <id>"',
   s.title === `Models (${result.models.length})` && got.length === want.length && bad.length === 0
     && s.rows.every((row) => row.label === `Add ${row.id}`) && unreported > 0 && hinted > 0,
@@ -369,24 +389,26 @@ async function openrouterFilter(page, scope, ids) {
   return a;
 }
 
-/** @brief Not reported 改值后仍在；勾上这一行，过滤框藏起其余勾选的行后 Add，命令里有全部勾选的行。 */
+/** @brief Default 改了值就不标；勾上这一行，过滤框藏起其余勾选的行后 Add，命令里有全部勾选的行。 */
 async function openrouterAdd(page, scope, result, picked) {
   const target = result.models.find((m) => !m.reported.maxTokens && !picked.includes(m.id));
   if (!target) {
     record('MD-07 replay md-openrouter: the recording has a row whose Max output the server didn\'t report outside the '
-      + 'ticked rows (to check "Not reported" after a change)', false, brief({ picked: picked.length }));
+      + 'ticked rows (to check "Default" after a change)', false, brief({ picked: picked.length }));
     return;
   }
-  const value = Math.min(1000, target.contextWindow - 1);
+  const first = Math.min(1000, target.contextWindow - 1);
+  // 改成的值不能恰好是默认值（窗口很小时默认值也可能是 1000）
+  const value = first === unreportedMax(target.contextWindow) ? first - 1 : first;
   await filterTo(page, scope, target.id.toUpperCase());
   const row = rowAt(page, scope, target.id);
   await row.locator('input[data-field="maxTokens"]').fill(String(value));
   await row.locator('input[name="pick"]').check();
   const s = await checklistOf(page, scope);
   const edited = s.rows.find((r) => r.id === target.id);
-  record(`MD-07 replay md-openrouter: "Not reported" next to the Max output of ${target.id} stays after changing it `
-    + `to ${value}; ticking it makes "${addLabel(picked.length + 1)}" while the other ticked rows are hidden`,
-  edited?.max === String(value) && edited.notReported.includes('maxTokens') && edited.picked
+  record(`MD-07 replay md-openrouter: "Default" next to the Max output of ${target.id} goes away after changing it `
+    + `to ${value} (no longer the default); ticking it makes "${addLabel(picked.length + 1)}" while the other ticked `
+    + 'rows are hidden', edited?.max === String(value) && !edited.defaults.includes('maxTokens') && edited.picked
     && s.add?.text === addLabel(picked.length + 1) && s.rows.length < result.models.length,
   brief({ edited, add: s.add }));
   const { command, closed } = await clickAdd(page, scope, scope);
@@ -455,10 +477,10 @@ async function richList(page, scope, result) {
   const s = await checklistOf(page, scope);
   const want = expectRows(result.models);
   record(`MD-07 replay md-deepseek: the DeepSeek-style list shows "Models (${result.models.length})" with the recorded `
-    + 'values; the server reports no model type and several rows can be added, so none is ticked; no "Not reported" '
+    + 'values; the server reports no model type and several rows can be added, so none is ticked; no "Default" '
     + `(every value reported); "${addLabel(0)}" is unavailable; with ${result.models.length} rows (not more than 20) `
     + 'there is no filter box', s.title === `Models (${result.models.length})`
-    && same(s.rows.map(shapeOf), want) && want.every((row) => !row.picked && row.notReported.length === 0)
+    && same(s.rows.map(shapeOf), want) && want.every((row) => !row.picked && row.defaults.length === 0)
     && s.add?.text === addLabel(0) && s.add.disabled && result.models.length <= 20 && s.filter === null
     && s.selectAll && s.clear, brief({ got: s.rows.map(shapeOf), want, filter: s.filter }));
   await page.locator(`${scope} [data-action="select-all"]`).click();
@@ -507,10 +529,10 @@ async function richEdits(page, scope, result, recorded) {
   const wanted = recorded.find((r) => r.id === long.id).contextWindow;
   const over = await editSize(page, scope, long.id, 'contextWindow', wanted);
   record(`MD-07 replay md-deepseek: lowering the Context window of ${long.id} to ${low} (below the reported max output `
-    + `${long.maxTokens}) makes Max output ${unreportedMax(low)} with "Not reported"; setting it to ${wanted} brings `
-    + `back the reported ${long.maxTokens} without "Not reported"`, under.row.max === String(unreportedMax(low))
-    && under.row.notReported.includes('maxTokens') && over.row.max === String(long.maxTokens)
-    && !over.row.notReported.includes('maxTokens') && over.row.window === String(wanted), brief({ under, over }));
+    + `${long.maxTokens}) makes Max output ${unreportedMax(low)} with "Default"; setting it to ${wanted} brings `
+    + `back the reported ${long.maxTokens} without "Default"`, under.row.max === String(unreportedMax(low))
+    && under.row.defaults.includes('maxTokens') && over.row.max === String(long.maxTokens)
+    && !over.row.defaults.includes('maxTokens') && over.row.window === String(wanted), brief({ under, over }));
   for (const m of result.models.filter((item) => item.id !== long.id)) {
     const want = wantOf(m);
     const row = rowAt(page, scope, m.id);
@@ -542,7 +564,7 @@ async function richFlow(page, fx) {
   closed && canonical(command) === canonical(saved), brief({ command, saved }));
 }
 
-/** @brief 第二个提供商：typed 清单的默认勾选与 Not a chat model、Not reported 改值后仍在，Add 1 model。 */
+/** @brief 第二个提供商：typed 清单的默认勾选与 Not a chat model、Default 只在值仍是默认值时，Add 1 model。 */
 async function typedFlow(page, fx) {
   const typed = pairs(fx.steps, 'models.discover')[1];
   const saved = writesOf(fx)[1];
@@ -551,79 +573,80 @@ async function typedFlow(page, fx) {
   const want = expectRows(typed.value.models);
   const picked = want.filter((row) => row.picked).length;
   record('MD-07 replay md-deepseek typed list: the row the server reports as a chat model is ticked, the embedding row '
-    + '(chat false) is not and reads "Not a chat model"; both values of every row read "Not reported" (not reported '
-    + `by the server); the button reads "${addLabel(picked)}"`, same(s.rows.map(shapeOf), want)
+    + '(chat false) is not and reads "Not a chat model"; both values of every row read "Default" (not reported '
+    + `by the server, Mori's defaults); the button reads "${addLabel(picked)}"`, same(s.rows.map(shapeOf), want)
     && want.some((r) => r.chat === 'true' && r.picked) && want.some((r) => r.chat === 'false' && !r.picked)
-    && want.every((r) => r.notReported.length === 2) && s.add?.text === addLabel(picked),
+    && want.every((r) => r.defaults.length === 2) && s.add?.text === addLabel(picked),
   brief({ got: s.rows.map(shapeOf), want, add: s.add }));
   const first = typed.value.models[0];
   // 窗口改成没报告的输出上限：Max output 随之变为它的一半（§4.3），看得出变了
   const low = first.maxTokens;
   const changed = await editSize(page, scope, first.id, 'contextWindow', low);
   const back = await editSize(page, scope, first.id, 'contextWindow', first.contextWindow);
-  record(`MD-07 replay md-deepseek typed list: "Not reported" next to the Context window of ${first.id} stays after `
-    + `changing the value to ${low} and back; the unreported Max output follows the window (${unreportedMax(low)}, `
-    + `then ${first.maxTokens}) and keeps "Not reported"`, changed.row.notReported.includes('contextWindow')
-    && changed.row.window === String(low) && changed.row.max === String(unreportedMax(low))
-    && changed.row.notReported.includes('maxTokens') && back.row.notReported.includes('contextWindow')
-    && back.row.notReported.includes('maxTokens') && back.row.max === String(first.maxTokens)
-    && unreportedMax(low) !== first.maxTokens, brief({ changed, back }));
+  record(`MD-07 replay md-deepseek typed list: "Default" next to the Context window of ${first.id} goes away after `
+    + `changing the value to ${low} and comes back with the default; the unreported Max output follows the window `
+    + `(${unreportedMax(low)}, then ${first.maxTokens}) and, being the default each time, keeps "Default"`,
+  !changed.row.defaults.includes('contextWindow') && changed.row.window === String(low)
+    && changed.row.max === String(unreportedMax(low)) && changed.row.defaults.includes('maxTokens')
+    && back.row.defaults.includes('contextWindow') && back.row.defaults.includes('maxTokens')
+    && back.row.max === String(first.maxTokens) && unreportedMax(low) !== first.maxTokens, brief({ changed, back }));
   const { command, closed } = await clickAdd(page, scope, scope);
   record(`MD-07 replay md-deepseek typed list: "${addLabel(picked)}" sends the recorded models.saveProvider (only the `
     + 'default-ticked row); the form closes', closed && canonical(command) === canonical(saved),
   brief({ command, saved }));
 }
 
-/** @brief 设置页此刻的模型行：说明、(not reported)、提示（种类、文字、Use）。 */
+/** @brief 设置页此刻的模型行：说明、(default)、提示（种类、文字、Use）。 */
 const modelRowsOf = (page) => page.locator('[data-testid="model-row"]').evaluateAll((rows) => rows.map((row) => ({
   ref: row.dataset.model, meta: row.querySelector('.model-meta')?.textContent ?? '',
-  notReported: [...row.querySelectorAll('[data-testid="not-reported"]')].map((el) => el.dataset.field),
+  defaults: [...row.querySelectorAll('[data-testid="default-value"]')].map((el) => el.dataset.field),
   hints: [...row.querySelectorAll('[data-testid="model-hint"]')].map((el) => ({ kind: el.dataset.kind,
     text: el.querySelector('.muted')?.textContent ?? '', use: el.querySelector('[data-action="use-reported"]')
       ?.textContent ?? null })) })));
 
-/** @brief 设置页某个 models.get 结果里每个模型该显示的：ref、说明开头、(not reported)、提示。 */
+/** @brief 设置页某个 models.get 结果里每个模型该显示的：ref、说明开头、(default)、提示。 */
 function expectModelRows(info) {
   return info.config.providers.flatMap((provider) => provider.models.map((model) => {
     const ref = `${provider.id}/${model.id}`;
     const profile = info.profiles[ref];
     const reported = profile?.reported ?? null;
     return { ref, provider: provider.id, model, meta: metaStart(model, reported),
-      notReported: reported === null ? [] : ['contextWindow', 'maxTokens'].filter((f) => reported[f] === null),
+      defaults: rowDefaults(model, reported),
       hints: expectHints(provider.api, model, profile) };
   }));
 }
 
-/** @brief 模型行与录下的档案一致的前一半：行的顺序、说明开头与 (not reported)。 */
+/** @brief 模型行与录下的档案一致的前一半：行的顺序、说明开头与 (default)。 */
 const metaMatch = (got, want) => got.length === want.length && want.every((w, i) => got[i].ref === w.ref
-  && got[i].meta.startsWith(w.meta) && same(got[i].notReported, w.notReported));
+  && got[i].meta.startsWith(w.meta) && same(got[i].defaults, w.defaults));
 /** @brief 后一半：行的顺序、提示的种类与文字、每条都有 Use。 */
 const hintsMatch = (got, want) => got.length === want.length && want.every((w, i) => got[i].ref === w.ref
   && same(got[i].hints, w.hints.map((h) => ({ kind: h.kind, text: h.text, use: 'Use' }))));
-/** @brief 模型行与录下的档案一致：说明开头与 (not reported)、提示的种类与文字、每条都有 Use。 */
+/** @brief 模型行与录下的档案一致：说明开头与 (default)、提示的种类与文字、每条都有 Use。 */
 const rowsMatch = (got, want) => metaMatch(got, want) && hintsMatch(got, want);
 
-/** @brief 旧档案（reported 为 null）的模型行：没有 (not reported)，提示只有 §8 表的第四种。 */
+/** @brief 旧档案（reported 为 null）的模型行：没有 (default)，提示只有 §8 表的第四种。 */
 function oldProfileCheck(got, info, label) {
   const old = expectModelRows(info).filter((w) => info.profiles[w.ref] && info.profiles[w.ref].reported === null);
   const rows = old.map((w) => got.find((g) => g.ref === w.ref));
   record(`MD-13 replay md-deepseek ${label}: a profile written before model discovery (no reported values) shows no `
-    + '"(not reported)" and of the §8 hints only "This model returned thinking content." with Use',
-  old.length > 0 && rows.every((g) => g && g.notReported.length === 0 && same(g.hints.map((h) => h.kind),
+    + '"(default)" and of the §8 hints only "This model returned thinking content." with Use',
+  old.length > 0 && rows.every((g) => g && g.defaults.length === 0 && same(g.hints.map((h) => h.kind),
     ['thinking-seen']) && g.hints[0].text === 'This model returned thinking content.' && g.hints[0].use === 'Use'),
   brief({ old: old.map((w) => w.ref), rows }));
 }
 
-/** @brief 加入后的设置页：(not reported)、五种提示、旧档案。 */
+/** @brief 加入后的设置页：(default)、五种提示、旧档案。 */
 async function settingsRows(page, info) {
   const want = expectModelRows(info);
   const got = await modelRowsOf(page);
   await shot(page, 'md-deepseek-settings');
   const kinds = new Set(want.flatMap((w) => w.hints.map((h) => h.kind)));
-  record('MD-13 replay md-deepseek: model rows write "(not reported)" after the configured Context window and Max '
-    + 'output exactly where the recorded profile has no reported value (the typed model: both), and nowhere else',
-  rowsMatch(got, want) && want.some((w) => w.notReported.length === 2), brief({ got, want: want.map((w) => ({
-    ref: w.ref, meta: w.meta, notReported: w.notReported })) }));
+  record('MD-13 replay md-deepseek: model rows write "(default)" after the configured Context window and Max '
+    + 'output exactly where the recorded profile has no reported value and the configured value is still Mori\'s '
+    + 'default (the typed model: both), and nowhere else', rowsMatch(got, want)
+    && want.some((w) => w.defaults.length === 2), brief({ got, want: want.map((w) => ({
+    ref: w.ref, meta: w.meta, defaults: w.defaults })) }));
   const lowers = want.some((w) => w.hints.some((h) => h.kind === 'context' && h.model.maxTokens < w.model.maxTokens));
   record('MD-13 replay md-deepseek: each model row shows the §8 hints its recorded profile and config call for, in the '
     + `table's order, each with Use, and no others; the recording covers all five (${HINT_KINDS.join(', ')}), one `
@@ -766,38 +789,39 @@ function cardRecording(fx) {
 }
 
 /**
- * @brief 设置页此刻的模型行与录下的 models.get 一致（MD-13）：(not reported) 只在档案没有报告值的地方；§8 的提示照档案
+ * @brief 设置页此刻的模型行与录下的 models.get 一致（MD-13）：(default) 只在档案没有报告值、值仍是默认值的地方；§8 的提示照档案
  *        与配置，按表的顺序，每条有 Use。
  * @param label 检查名里的说明
  */
 function cardModelRows(got, info, label) {
   const want = expectModelRows(info);
-  const marks = want.reduce((n, w) => n + w.notReported.length, 0);
+  const marks = want.reduce((n, w) => n + w.defaults.length, 0);
   const count = want.reduce((n, w) => n + w.hints.length, 0);
   const kinds = [...new Set(want.flatMap((w) => w.hints.map((h) => h.kind)))];
-  record(`MD-13 replay ${label}: each of the ${want.length} model rows writes "(not reported)" after the configured `
-    + `Context window and Max output exactly where its recorded profile has no reported value (${marks} in all) and `
-    + 'nowhere else', metaMatch(got, want), brief({
-    got: got.map((g) => ({ ref: g.ref, meta: g.meta, notReported: g.notReported })),
-    want: want.map((w) => ({ ref: w.ref, meta: w.meta, notReported: w.notReported })) }));
+  record(`MD-13 replay ${label}: each of the ${want.length} model rows writes "(default)" after the configured `
+    + `Context window and Max output exactly where its recorded profile has no reported value and the value is still `
+    + `the default (${marks} in all) and nowhere else`, metaMatch(got, want), brief({
+    got: got.map((g) => ({ ref: g.ref, meta: g.meta, defaults: g.defaults })),
+    want: want.map((w) => ({ ref: w.ref, meta: w.meta, defaults: w.defaults })) }));
   record(`MD-13 replay ${label}: each model row shows the §8 hints its recorded profile and config call for, in the `
     + `table's order, each with Use, and no others (${count} in all${kinds.length ? `: ${kinds.join(', ')}` : ''})`,
   hintsMatch(got, want), brief({ got: got.map((g) => ({ ref: g.ref, hints: g.hints })),
     want: want.map((w) => ({ ref: w.ref, hints: w.hints.map((h) => h.text) })) }));
 }
 
-/** @brief 卡上的清单（§6.2、§6.5）：行、默认勾选、Not reported、标记与提示、读屏名、Add 按钮；标题行、过滤框、截断说明。 */
+/** @brief 卡上的清单（§6.2、§6.5）：行、默认勾选、Default、标记与提示、读屏名、Add 按钮；标题行、过滤框、截断说明。 */
 function cardList(name, rec, s) {
   const { models, truncated } = rec.result;
   const want = expectRows(models);
   const got = s.rows.map(shapeOf);
   const bad = got.map((row, i) => (same(row, want[i]) ? null : { got: row, want: want[i] })).filter(Boolean);
   const picked = want.filter((row) => row.picked).length;
-  const unreported = want.filter((row) => row.notReported.length).length;
+  const unreported = want.filter((row) => row.defaults.length).length;
   record(`MD-07 replay ${name}: Fetch models on the ${rec.providerId} card shows "Models (${models.length})" and one `
     + `row per recorded model in list order with its values; ${picked} ticked by default (by the recorded chat type; `
-    + 'with no type, only when a single row can be added; never Added or unusable rows); "Not reported" on the '
-    + `${unreported} rows whose values the server didn't report; marks and hints as recorded; each box reads `
+    + 'with no type, only when a single row can be added; never Added or unusable rows); "Default" on the '
+    + `${unreported} rows whose values the server didn't report and still are the defaults; marks and hints as `
+    + 'recorded; each box reads '
     + `"Add <id>"; the button reads "${addLabel(picked)}"`, s.title === `Models (${models.length})`
     && got.length === want.length && bad.length === 0 && s.rows.every((row) => row.label === `Add ${row.id}`)
     && s.add?.text === addLabel(picked) && s.add.disabled === (picked === 0),
@@ -856,7 +880,7 @@ function cardListError(name, rec, s) {
 
 /**
  * @brief 勾上录下的一个模型、照它改值。改了 Context window 时检查 Max output 按 §4.3 随之变：服务报告的输出上限小于
- *        新窗口时用它，否则为没报告时的默认值并标 Not reported。
+ *        新窗口时用它，否则为没报告时的默认值并标 Default。
  * @param source 录下的结果里这一行
  * @param model 录下的 models.addModels 里这个模型
  */
@@ -868,9 +892,9 @@ async function cardEdit(page, { name, scope, source, model }) {
     const keep = Boolean(source.reported.maxTokens) && source.maxTokens < model.contextWindow;
     const max = keep ? source.maxTokens : unreportedMax(model.contextWindow);
     record(`MD-07 replay ${name}: changing the Context window of ${model.id} from ${source.contextWindow} to `
-      + `${model.contextWindow} makes Max output ${max} (§4.3: ${keep ? 'the reported value, no "Not reported"'
-        : 'the unreported default, with "Not reported"'})`, after?.window === String(model.contextWindow)
-      && after.max === String(max) && after.notReported.includes('maxTokens') === !keep, brief(after));
+      + `${model.contextWindow} makes Max output ${max} (§4.3: ${keep ? 'the reported value, no "Default"'
+        : 'the unreported default, with "Default"'})`, after?.window === String(model.contextWindow)
+      && after.max === String(max) && after.defaults.includes('maxTokens') === !keep, brief(after));
   }
   const max = row.locator('input[data-field="maxTokens"]');
   if (await max.inputValue() !== String(model.maxTokens)) await max.fill(String(model.maxTokens));
@@ -961,20 +985,21 @@ function captureListeners() {
   } });
 }
 
-/** @brief 模型行档案摘要里 Tool calling 的选择器（ModelRows.tsx 的 data-value：verifying、reverifying、verified…）。 */
-const toolSel = (ref) => `[data-testid="model-row"][data-model="${attr(ref)}"] [data-testid="profile"] `
-  + '[data-field="tool_calling"]';
+/** @brief 模型行的选择器：行上的 data-probe 是 tool calling 的验证状态（verifying、reverifying、verified…，2026-10-26 起）。 */
+const toolSel = (ref) => `[data-testid="model-row"][data-model="${attr(ref)}"]`;
 
-/** Tool calling 显示的文字（models-settings.md "档案摘要"：Verified / Not verified / Failed / Verifying… / Re-verifying…） */
-const TOOL_TEXT = { verified: 'Verified', unverified: 'Not verified', failed: 'Failed', verifying: 'Verifying…',
-  reverifying: 'Re-verifying…' };
-/** @brief Tool calling 一项的比较形式："<data-value> | <显示的文字>"。 */
-const toolLine = (state) => `${state} | Tool calling: ${TOOL_TEXT[state]}`;
+/**
+ * 状态行的文字（models-settings.md "Models 行"，2026-10-26）：能用的模型（verified、重新验证中）没有状态行；第一次验证中
+ * "Verifying…"。本测试只回放 Use 之后的重新探测，用不到失败与出错两种
+ */
+const STATUS_TEXT = { verified: '', reverifying: '', verifying: 'Verifying…' };
+/** @brief 比较形式："<data-probe> | <状态行的文字>"。 */
+const toolLine = (state) => `${state} | ${STATUS_TEXT[state] ?? `(no expectation for ${state})`}`;
 
-/** @brief ref 这一行此刻的 Tool calling（toolLine 的形式）；没有这一行时为 null。 */
+/** @brief ref 这一行此刻的 tool calling（toolLine 的形式）；没有这一行时为 null。 */
 const toolNow = (page, ref) => page.evaluate((sel) => {
   const el = document.querySelector(sel);
-  return el ? `${el.dataset.value} | ${el.textContent}` : null;
+  return el ? `${el.dataset.probe} | ${el.querySelector('[data-testid="probe-status"]')?.textContent ?? ''}` : null;
 }, toolSel(ref));
 
 /**
@@ -986,7 +1011,7 @@ const feedEvent = (page, { envelope, ref, want }) => page.evaluate(async ({ env,
   for (const listener of window.__mdListeners ?? []) listener(structuredClone(env));
   const read = () => {
     const el = document.querySelector(sel);
-    return el ? `${el.dataset.value} | ${el.textContent}` : null;
+    return el ? `${el.dataset.probe} | ${el.querySelector('[data-testid="probe-status"]')?.textContent ?? ''}` : null;
   };
   const end = Date.now() + 2000;
   do {
@@ -996,16 +1021,16 @@ const feedEvent = (page, { envelope, ref, want }) => page.evaluate(async ({ env,
 }, { env: envelope, sel: toolSel(ref), wanted: want });
 
 /**
- * @brief Tool calling 该显示的（models-settings.md "档案摘要""重新验证中"，独立实现）：running 里有它、档案完成过
+ * @brief 行上 data-probe 该是的（models-settings.md "Models 行""重新验证中"，独立实现）：running 里有它、档案完成过
  *        （不在探测中，tool_calling 为 verified 或 failed）时 reverifying；running 里有它或还在探测中时 verifying；
- *        否则为档案的 tool_calling.state。
+ *        否则为档案的 tool_calling.state，没有档案时 unverified（2026-10-26 WP-02 评审改，原来没有档案时总是 verifying）。
  */
 function expectTool(profile, running) {
   const verified = Boolean(profile) && profile.status !== 'probing'
     && ['verified', 'failed'].includes(profile.tool_calling.state);
   if (running && verified) return 'reverifying';
-  if (running || !profile || profile.status === 'probing') return 'verifying';
-  return profile.tool_calling.state;
+  if (running || profile?.status === 'probing') return 'verifying';
+  return profile?.tool_calling.state ?? 'unverified';
 }
 
 /** @brief 关掉 Add provider 表单（拉取后底部的 Cancel），等它消失。 */
@@ -1077,8 +1102,8 @@ async function emptyList(page, discover) {
 
 /**
  * @brief Ollama 形状的清单（§6.2、§4.2）：服务报告每行都是聊天模型，都勾上；只有训练窗口的行带 trained_window 的
- *        提示，没有工具能力的行带 no_tools；没报告的 Max output 写 Not reported。照录制改小一行的窗口：没报告的
- *        Max output 随之变（§4.3），Not reported 留着；Add 发出录制里的 models.saveProvider。
+ *        提示，没有工具能力的行带 no_tools；没报告、仍是默认值的 Max output 写 Default。照录制改小一行的窗口：没报告的
+ *        Max output 随之变成新窗口的默认值（§4.3），Default 留着；Add 发出录制里的 models.saveProvider。
  */
 async function ollamaList(page, fx, discover) {
   const scope = await fetchNew(page, discover.command.target.baseUrl);
@@ -1088,8 +1113,9 @@ async function ollamaList(page, fx, discover) {
   record(`MD-07 replay md-shapes: the Ollama list ticks every row the server reports as a chat model `
     + `("${addLabel(want.length)}"); "${HINT_TEXT.trained_window}" on the row with only a trained window `
     + `(${hinted('trained_window').join(', ')}); "${HINT_TEXT.no_tools}" on ${hinted('no_tools').join(', ')}; `
-    + '"Not reported" next to every Max output (Ollama reports none)', same(s.rows.map(shapeOf), want)
-    && want.every((row) => row.picked && row.notReported.includes('maxTokens')) && hinted('trained_window').length === 1
+    + '"Default" next to every Max output (Ollama reports none; each is the default for its window)',
+  same(s.rows.map(shapeOf), want) && want.every((row) => row.picked && row.defaults.includes('maxTokens'))
+    && hinted('trained_window').length === 1
     && hinted('no_tools').length === 1 && s.add?.text === addLabel(want.length) && !s.add.disabled,
   brief({ got: s.rows.map(shapeOf), want, add: s.add }));
   const [saved] = writesOf(fx);
@@ -1098,8 +1124,9 @@ async function ollamaList(page, fx, discover) {
   const edit = await editSize(page, scope, lowered.id, 'contextWindow', lowered.contextWindow);
   const max = unreportedMax(lowered.contextWindow);
   record(`MD-07 replay md-shapes: lowering the Context window of ${lowered.id} to ${lowered.contextWindow} makes `
-    + `the unreported Max output ${max} and keeps "Not reported"`, edit.row?.window === String(lowered.contextWindow)
-    && edit.row.max === String(max) && edit.row.notReported.includes('maxTokens') && lowered.maxTokens === max,
+    + `the unreported Max output ${max} (the default for it) and keeps "Default"`,
+  edit.row?.window === String(lowered.contextWindow)
+    && edit.row.max === String(max) && edit.row.defaults.includes('maxTokens') && lowered.maxTokens === max,
   brief(edit));
   const { command, closed } = await clickAdd(page, scope, scope);
   record(`MD-07 replay md-shapes: "${addLabel(saved.models.length)}" sends the recorded models.saveProvider (every `
@@ -1108,8 +1135,9 @@ async function ollamaList(page, fx, discover) {
 }
 
 /**
- * @brief 加入后的模型行（MD-13，录制里加入之后最后一个 models.get，探针都完成了）：(not reported) 与 §8 的提示照
- *        档案；只有训练窗口的模型 reported 窗口为 null（§7.2）：窗口后写 (not reported)，没有窗口的提示；窗口在清单里
+ * @brief 加入后的模型行（MD-13，录制里加入之后最后一个 models.get，探针都完成了）：(default) 与 §8 的提示照
+ *        档案；只有训练窗口的模型 reported 窗口为 null（§7.2），窗口是训练窗口、不是默认值：不写 (default)（2026-10-26），
+ *        没有窗口的提示；窗口在清单里
  *        改小过的模型有"Server reports a context window of …"。
  * @return 期望的模型行（expectModelRows）
  */
@@ -1123,14 +1151,15 @@ function shapesRows(got, info, discover) {
   // 清单里改过窗口的模型：保存的窗口与列表里的不同（按录下的配置）
   const edited = added.filter((w) => w.model.contextWindow !== discover.value.models
     .find((m) => m.id === w.model.id).contextWindow).map((w) => w.model.id);
-  record(`MD-13 replay md-shapes: after the add every model row writes "(not reported)" exactly where its recorded `
-    + `profile has no reported value; the model with only a trained window (${trained.join(', ')}) writes it after `
-    + 'the Context window and has no context hint; only the model whose window was lowered in the checklist '
+  record(`MD-13 replay md-shapes: after the add every model row writes "(default)" exactly where its recorded `
+    + `profile has no reported value and the value is the default; the model with only a trained window `
+    + `(${trained.join(', ')}) has no "(default)" after its Context window (the trained window is not the default) and `
+    + 'no context hint; only the model whose window was lowered in the checklist '
     + `(${edited.join(', ')}) shows "Server reports a context window of …" with Use; the added models have no `
     + 'other hints', rowsMatch(got, want) && added.length === discover.value.models.length && trained.length === 1
-    && byId(trained[0])?.notReported.includes('contextWindow') && byId(trained[0]).hints.length === 0
+    && !byId(trained[0])?.defaults.includes('contextWindow') && byId(trained[0]).hints.length === 0
     && edited.length === 1 && same(lowered, edited) && added.reduce((n, w) => n + w.hints.length, 0) === 1, brief({ got,
-    want: want.map((w) => ({ ref: w.ref, meta: w.meta, notReported: w.notReported, hints: w.hints.map((h) => h.kind) }))
+    want: want.map((w) => ({ ref: w.ref, meta: w.meta, defaults: w.defaults, hints: w.hints.map((h) => h.kind) }))
   }));
   return want;
 }
@@ -1148,8 +1177,8 @@ async function clickUse(page, ref, kind) {
 
 /**
  * @brief Use 之后的重新探测（MD-13，models-settings.md "Use 成功""重新验证中"）：把录制里 Use 之后后台进程转发的事件
- *        按顺序交给界面，每个事件之后 Tool calling 的 data-value 与文字照它的档案与 running（expectTool、TOOL_TEXT）：
- *        先是 Verified，其中有 Re-verifying…，最后是 Verified；录下的最后一个档案的 probedAt 比 Use 之后的 models.get
+ *        按顺序交给界面，每个事件之后行上的 data-probe 与状态行照它的档案与 running（expectTool、STATUS_TEXT）：
+ *        先是 verified，其中有 reverifying，最后是 verified，能用的模型一直没有状态行；录下的最后一个档案的 probedAt 比 Use 之后的 models.get
  *        里的新（这次 Use 之后确实重新探测出了新结果）。
  * @param at 录制里 Use 发出的 models.saveModel 的位置
  */
@@ -1169,8 +1198,9 @@ async function reprobeCheck(page, fx, at, ref) {
   const last = envelopes.findLast(({ event }) => event.type === 'mori.profiles')?.event.profiles[ref];
   await shot(page, 'md-shapes-reprobed');
   record(`MD-13 replay md-shapes: Use re-probes ${ref}: fed the ${envelopes.length} events the background process `
-    + 'sent after the recorded Use, Tool calling follows each one ("Verified", then "Re-verifying…" while the probe '
-    + 'runs, then "Verified" again) and the last profile carries a newer probe time than the one read after Use',
+    + 'sent after the recorded Use, the row\'s data-probe follows each one (verified, then reverifying while the probe '
+    + 'runs, then verified again) with no status line on this usable model, and the last profile carries a newer '
+    + 'probe time than the one read after Use',
   same(seen, expected) && states[0] === 'verified' && states.includes('reverifying') && states.at(-1) === 'verified'
     && last?.probedAt > before?.probedAt,
   brief({ seen: seen.join(' > '), expected: expected.join(' > '), probedAt: [before?.probedAt, last?.probedAt] }));

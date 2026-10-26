@@ -16,7 +16,7 @@
 //         再次保存、A20）都让测试失败：勾 fake-coder-400（合成端点对不是探针的请求回 400，server.mjs 的 -400 后缀）；
 //         探针状态经进程桥读 models.get 的档案（page.mjs readProbe），给你看的在会话的拒绝启动卡上；
 //   MD-08 手填一行（首次启动部分）：拿到列表与列表错误（nolist、401）时都能手填加入，列表错误时手填的行在错误下面；
-//         id 检查与重复；Entered by you 与 Not reported；
+//         id 检查与重复；Entered by you 与 Default（2026-10-26 起取代 Not reported，只在值仍是默认值时标）；
 //   MD-07 在首次启动表单里的一条：过滤框打开时 Select all、Clear selection 只作用于显示着的行（藏起来的勾选行照样保存
 //         记在 MD-11 的“保存中”）。
 // 用法（在 app/ 下，先构建；本套件不构建）：
@@ -73,8 +73,9 @@ const LISTED = ['fake-coder', 'fake-coder-notools', 'fake-coder-b'];
 /**
  * 测试连接会失败的模型（synthetic）：合成端点对它不是探针的请求回 400（server.mjs 的 -400 后缀），探针照常通过。
  * 2026-10-26 起测试成功就关掉首次启动表单（first-run.md），要留在表单上接着测的保存都勾它（用 Add a model ID 手填）。
- * 用 400 不用 404：模型池对 404 记下 not_found（§8.3），之后没改配置的测试连接不再发出（结果是 "Connection error."），
- * A20 的"没有改动时不保存、测试带着存着的 key"就查不到端点；400 不留记录
+ * 当初用 400 不用 404：那时模型池对 404 记下 not_found（§8.3）之后，没改配置的测试连接不再发出（"Connection error."），
+ * A20 的"没有改动时不保存、测试带着存着的 key"就查不到端点。2026-10-26（WP-02，§8.3 的补充）起测试连接总是发出、
+ * 不看这些记录，404 也可以；400 照旧不改
  */
 const FAILING = 'fake-coder-400';
 /** many 端点的 1001 个模型 id（超过 §11 的 1000 条） */
@@ -389,11 +390,11 @@ async function listedFetch(ctx) {
   const rows = state.rows;
   record('MD-11 after fetch: checklist "Models (3)" in list order with Select all and Clear selection; vLLM reports no '
     + 'type and three rows can be added, so none is ticked; the window 131072 is reported and Max output 16384 is '
-    + '"Not reported"; no "Added" row (first run)', state.checklist && state.heading === 'Models (3)' && state.selectAll
-    && state.clearSelection && JSON.stringify(rows.map((row) => row.id)) === JSON.stringify(LISTED)
+    + 'the default ("Default"); no "Added" row (first run)', state.checklist && state.heading === 'Models (3)'
+    && state.selectAll && state.clearSelection && JSON.stringify(rows.map((row) => row.id)) === JSON.stringify(LISTED)
     && rows.every((row) => !row.picked && !row.added && !row.tags.some((tag) => tag.kind === 'added')
       && row.chat === 'unknown' && row.contextWindow === '131072' && row.maxTokens === '16384'
-      && JSON.stringify(row.notReported) === '["maxTokens:Not reported"]' && row.pickLabel === `Add ${row.id}`),
+      && JSON.stringify(row.defaults) === '["maxTokens:Default"]' && row.pickLabel === `Add ${row.id}`),
   brief({ heading: state.heading, rows }));
   record('MD-11 after fetch: the blocks follow §6.1/§6.6 order (Base URL, API key, Fetch models, Detected, the note, '
     + 'Name, API type, Network zone, checklist, Add a model ID, More settings, the probe-cost note, Test connection)',
@@ -423,11 +424,11 @@ async function listedManual(ctx) {
   const added = await readForm(page);
   const typed = rowIn(added, 'fake-coder-typed');
   record('MD-08 first run with a list: Add to list puts the row at the end of the checklist, ticked, tagged "Entered '
-    + 'by you", 128000 / 16384 both "Not reported", Supports thinking and Image input unticked; the box is cleared',
+    + 'by you", 128000 / 16384 both "Default", Supports thinking and Image input unticked; the box is cleared',
   added.rows.at(-1)?.id === 'fake-coder-typed' && typed.picked && !typed.reasoning && !typed.image
     && JSON.stringify(typed.tags) === '[{"kind":"entered","text":"Entered by you"}]'
     && typed.contextWindow === '128000' && typed.maxTokens === '16384'
-    && JSON.stringify(typed.notReported) === '["contextWindow:Not reported","maxTokens:Not reported"]'
+    && JSON.stringify(typed.defaults) === '["contextWindow:Default","maxTokens:Default"]'
     && added.manual.value === '' && !added.test.disabled, brief(typed));
   await page.locator(`${FORM} [data-action="select-all"]`).click();
   const all = await readForm(page);
@@ -502,9 +503,9 @@ async function listedFilling(ctx) {
   await setRowValue(page, 'fake-coder', 'contextWindow', '20000');
   const small = await readForm(page);
   const row = rowIn(small, 'fake-coder');
-  record('MD-11 filling in: window 20000 makes the untouched Max output 10000 (half the window, "Not reported"); the '
-    + 'window keeps no "Not reported" (the server reported it) and Test connection is available again',
-  row.maxTokens === '10000' && JSON.stringify(row.notReported) === '["maxTokens:Not reported"]'
+  record('MD-11 filling in: window 20000 makes the untouched Max output 10000 (half the window, the default, '
+    + '"Default"); the window has no "Default" (the server reported it) and Test connection is available again',
+  row.maxTokens === '10000' && JSON.stringify(row.defaults) === '["maxTokens:Default"]'
     && row.errors.length === 0 && !small.test.disabled, brief(row));
   await setRowValue(page, 'fake-coder', 'contextWindow', '131072');
   const chats = chatLogs(endpoints.listed).length + chatLogs(endpoints.slow).length;
@@ -1190,11 +1191,11 @@ async function nolistTags(ctx) {
   const hints = ollama.rows.map((row) => row.hints.join('+'));
   const texts = await page.locator(`${FORM} [data-testid="row-hint"]`).allTextContents();
   record('MD-11 after fetch (Ollama): "Detected: Ollama 0.10.1"; the second row hints "The server doesn’t list tool '
-    + 'support for this model." and the third "Trained context window. Ollama may use a smaller one; run the '
-    + 'long-input test after adding."', ollama.detected?.text === 'Detected: Ollama 0.10.1'
+    + 'support for this model." and the third "Trained context window. Ollama may use a smaller one." (2026-10-26: '
+    + 'no long-input test to point to)', ollama.detected?.text === 'Detected: Ollama 0.10.1'
     && JSON.stringify(hints) === '["","no_tools","trained_window"]'
     && texts.includes('The server doesn’t list tool support for this model.')
-    && texts.includes('Trained context window. Ollama may use a smaller one; run the long-input test after adding.'),
+    && texts.includes('Trained context window. Ollama may use a smaller one.'),
   brief({ detected: ollama.detected, hints }));
 }
 
@@ -1234,9 +1235,9 @@ async function nolistManual(ctx) {
   const state = await readForm(page);
   const entered = (row) => row.picked && JSON.stringify(row.tags) === '[{"kind":"entered","text":"Entered by you"}]'
     && row.contextWindow === '128000' && row.maxTokens === '16384' && !row.reasoning && !row.image
-    && JSON.stringify(row.notReported) === '["contextWindow:Not reported","maxTokens:Not reported"]';
+    && JSON.stringify(row.defaults) === '["contextWindow:Default","maxTokens:Default"]';
   record('MD-08 first run with nolist: the entered rows are listed under the list error in the order added, ticked, '
-    + '"Entered by you", 128000 / 16384 "Not reported"; there is no "Models (N)", Select all, Clear selection or '
+    + '"Entered by you", 128000 / 16384 "Default"; there is no "Models (N)", Select all, Clear selection or '
     + 'filter',
   JSON.stringify(state.rows.map((row) => row.id)) === '["fake-slow","fake-coder"]'
     && state.rows.every((row) => row.afterListError === true && entered(row)) && !state.checklist
@@ -1356,8 +1357,8 @@ async function rejectedFetch(ctx) {
   await addManual(page, 'fake-coder');
   const row = rowIn(await readForm(page), 'fake-coder');
   record('MD-08 first run with a 401 list error: the entered row is listed under the error, ticked, "Entered by you", '
-    + '128000 / 16384 "Not reported"', row?.afterListError === true && row.picked && row.tags[0]?.kind === 'entered'
-    && row.contextWindow === '128000' && row.maxTokens === '16384' && row.notReported.length === 2, brief(row));
+    + '128000 / 16384 "Default"', row?.afterListError === true && row.picked && row.tags[0]?.kind === 'entered'
+    && row.contextWindow === '128000' && row.maxTokens === '16384' && row.defaults.length === 2, brief(row));
 }
 
 /** @brief 保存失败（synthetic test setup：同名文件夹挡住 model-config.json 的写入）：原文、不开始测试、key 已删。 */

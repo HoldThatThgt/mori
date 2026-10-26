@@ -20,9 +20,9 @@
 //     Fetch models 一个有 id 含空格的行的列表（vllm 默认形状：fake-coder 与 "bad id"，后者 Can’t add this model）、
 //     一个空列表、一个 ollama 形状的列表（olla-ps 的窗口来自 /api/ps，olla-ctx 来自 num_ctx、带 no_tools，olla-train
 //     只有训练窗口、带 trained_window）；Ollama 的清单把 olla-ps 的 Context window 改小为 4096 后 Add 3 models，等探针
-//     结束，回到设置页（olla-ps 有 "Server reports a context window of 8,192."，olla-train 的窗口 not reported），
+//     结束，回到设置页（olla-ps 有 "Server reports a context window of 8,192."，olla-train 的窗口服务没报告），
 //     点这条提示的 Use（models.saveModel 与之后的 models.get），录下之后后台进程转发的 mori.profiles：olla-ps 先在
-//     running 里（重新探测，界面为 Re-verifying…），最后完成。
+//     running 里（重新探测，行上的 data-probe 为 reverifying；2026-10-26 起界面不写 Re-verifying…），最后完成。
 // 准备（synthetic test setup）：数据目录里一个本机区域的提供商 Legacy endpoint（legacy/fake-legacy，合成端点 4862 的
 // vllm 默认形状，列表为 fake-legacy、fake-coder），档案是一键拉取模型之前的写法（没有 auto.meta，推理字段
 // reasoning_content，已验证；model-discovery.md §7.2、§8 的旧档案），默认范围 legacy/fake-legacy；它让 App 不进首次启动，

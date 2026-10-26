@@ -200,9 +200,9 @@ export interface ChecklistRow {
   image: boolean;
   /** 勾选 */
   picked: boolean;
-  /** 窗口不是服务报告的：旁边写 Not reported，你改了值也留着 */
+  /** 窗口不是服务报告的（框里的值仍是默认值时旁边写 Default，isDefault） */
   windowUnreported: boolean;
-  /** Max output 不是服务报告的，或随窗口按 §4.3 退回了默认值：旁边写 Not reported，你改了值也留着 */
+  /** Max output 不是服务报告的，或随窗口按 §4.3 退回了默认值（框里的值仍是默认值时旁边写 Default，isDefault） */
   maxUnreported: boolean;
   /** 服务报告的输出上限；没报告为 null（改窗口时按 §4.3 用它） */
   reportedMax: number | null;
@@ -239,7 +239,7 @@ function listedRows(models: readonly DiscoveredModel[]): ChecklistRow[] {
   }));
 }
 
-/** @brief 手填的一行（§6.4）：勾上；窗口与 Max output 取没报告时的默认值并标 Not reported；思考、图片不勾。 */
+/** @brief 手填的一行（§6.4）：勾上；窗口与 Max output 取没报告时的默认值（标 Default）；思考、图片不勾。 */
 function enteredRow(id: string): ChecklistRow {
   return { id, contextWindow: String(UNREPORTED_CONTEXT_WINDOW),
     maxTokens: String(unreportedMaxTokens(UNREPORTED_CONTEXT_WINDOW)), maxChosen: false, reasoning: false,
@@ -248,7 +248,7 @@ function enteredRow(id: string): ChecklistRow {
 
 /**
  * @brief Max output 随窗口变（§4.3、§6.2）：服务报告了输出上限、且它小于新窗口时用报告的值；
- *        否则为 16384 与新窗口一半中较小的，并标 Not reported。
+ *        否则为 16384 与新窗口一半中较小的（没报告的默认值，标 Default）。
  * @param window 新窗口输入框的文字
  */
 function followWindow(reportedMax: number | null, window: string): Pick<ChecklistRow, 'maxTokens' | 'maxUnreported'> {
@@ -508,7 +508,7 @@ export function AddFooter({ count, blocked, busy, onClose }: AddFooterProps) {
 /** @brief 行上的提示的文字（§6.2）。 */
 const HINT_TEXTS: Readonly<Record<DiscoverHint, string>> = {
   no_tools: 'The server doesn’t list tool support for this model.',
-  trained_window: 'Trained context window. Ollama may use a smaller one; run the long-input test after adding.',
+  trained_window: 'Trained context window. Ollama may use a smaller one.',
 };
 
 /** @brief 行里两个数字框的列名（§6.2；读屏名"<列名> for <id>"，models-settings.md "清单的行"）。 */
@@ -547,9 +547,23 @@ interface SizeCellProps {
   onEdit: (id: string, patch: RowPatch) => void;
 }
 
-/** @brief Context window 或 Max output 的数字框（不写千分位）、Not reported 与字段错误（§6.2）；Added 的行不能改。 */
+/** “Default”的悬停说明（models-settings.md “清单的行”，临时，走查时可以改） */
+const DEFAULT_TITLE = 'The server didn’t report this, so Mori used a default. Change it if you know the real value.';
+
+/**
+ * @brief 这一格旁边写不写“Default”（§6.2，2026-10-26 负责人走查 M6 改，原来写“Not reported”、改了值也留着）：服务没报告
+ *        这一项，而且框里的值仍是 Mori 的默认值（窗口 128000；Max output 为按这一行窗口算的默认值，§4.3、§11）。
+ *        你改成别的值就不写，改回默认值又写。
+ */
+function isDefault(row: ChecklistRow, field: 'contextWindow' | 'maxTokens'): boolean {
+  if (field === 'contextWindow') {
+    return row.windowUnreported && positiveInt(row.contextWindow) === UNREPORTED_CONTEXT_WINDOW;
+  }
+  return row.maxUnreported && positiveInt(row.maxTokens) === Number(defaultMaxOutput(row.contextWindow));
+}
+
+/** @brief Context window 或 Max output 的数字框（不写千分位）、Default 与字段错误（§6.2）；Added 的行不能改。 */
 function SizeCell({ row, field, error, onEdit }: SizeCellProps) {
-  const unreported = field === 'contextWindow' ? row.windowUnreported : row.maxUnreported;
   const change = (value: string) => onEdit(row.id, field === 'contextWindow' ? { contextWindow: value }
     : { maxTokens: value });
   return (
@@ -557,7 +571,8 @@ function SizeCell({ row, field, error, onEdit }: SizeCellProps) {
       <input inputMode="numeric" data-field={field} aria-label={`${SIZE_LABELS[field]} for ${row.id}`}
         value={row[field]} disabled={row.source?.added} aria-invalid={error ? true : undefined}
         onChange={(event) => change(event.target.value)} />
-      {unreported && <span className="not-reported" data-testid="not-reported" data-field={field}>Not reported</span>}
+      {isDefault(row, field) && <span className="default-value" data-testid="default-value" data-field={field}
+        title={DEFAULT_TITLE}>Default</span>}
       <FieldError field={field} error={error} />
     </td>
   );

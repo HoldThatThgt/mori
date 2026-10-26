@@ -118,6 +118,6 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 | 设置页 | `data-testid="settings-page"`；分节按钮 `data-testid="settings-nav"` 里的 `button[data-section]`（`connections` / `agents`；2026-10-26 改：`agents` 挪到 Customize 的 `tools-nav`；v1：见 docs/specs/model-providers.md §9.1，`connections` 改为 `models`；docs/specs/memory.md §10.8，另有 `issues`） |
 | 连接卡（v1：见 docs/specs/model-providers.md §9.1，改为 `provider-card`，见 v1/screens/models-settings.md） | `[data-testid="connection-card"][data-provider]`；模型行 `[data-testid="model-row"][data-model]`（`provider/id`），默认的带 `data-default="true"`；行里的"Edit""Delete…"带 `data-action`（`edit`、`delete`），卡上的带 `edit-connection`、`add-model`，底部"Add connection"带 `add-connection` |
 | 表单（v1：见 docs/specs/model-providers.md §9.1：提供商表单改为 `provider-form`，`connection-form` 只留给首次启动表单） | 添加连接、编辑连接都是 `data-testid="connection-form"`（M1 的测试沿用）；添加 / 编辑模型 `data-testid="model-form"` |
-| 结果文字 | 表单里 `data-testid="form-message"`（M1 沿用）；模型行里的测试结果 `data-testid="model-test"` |
+| 结果文字 | 表单里 `data-testid="form-message"`（M1 沿用）；模型行里的测试结果 `data-testid="model-test"`（2026-10-26 起 v1 的模型行没有 Test，`model-test` 删掉，见 v1/screens/models-settings.md） |
 | AGENTS.md | 2026-10-26 挪到 Customize，见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)"界面测试用的标识" |
 | 离开确认 | `data-testid="leave-dialog"`（Customize 的 Instructions 与记忆页的表单用） |

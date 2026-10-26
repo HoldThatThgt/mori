@@ -12,6 +12,11 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m1-app.mjs                         测开发构建
 //   node tests/ui/m1-app.mjs --exe <Mori.exe 路径>   测打包后的程序
+//   node tests/ui/m1-app.mjs --only 步骤1,步骤2       只跑这几步（firstRun 总是跑；测试分层第 2 条）；步骤名是下面 steps 的键，
+//                                                    以及最后的 layoutRestart、ringRuns、mainKilled
+// 2026-10-26（WP-02，负责人走查 M7，models-settings.md "Models 行"）：模型行没有 Test、档案摘要和常显的 Verify：设置页的取消测试
+// 改用提供商卡的 Test connection（先把 fake-slow 移到第一个）；加模型后等行上的 data-probe 为 verified，出错时点状态行的
+// "Verify again"。
 // 结果写到 test-results/m1-app.json（文件名带 -packaged 后缀区分），截图在 test-results/m1-app/。
 
 import { execFileSync, spawn } from 'node:child_process';
@@ -31,6 +36,9 @@ import { pageHelpers } from './page.mjs';
 import { partsBrief, partsProblems, readParts } from './ring-parts.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
+const only = arg('only')?.split(',');
+/** @brief 这一步要不要跑：没有 --only 时都跑；firstRun 总是跑（其余步骤都要它打开的会话）。 */
+const wanted = (name) => !only || name === 'firstRun' || only.includes(name);
 const suffix = exePath ? '-packaged' : '';
 const port = 4321;
 const baseUrl = `http://127.0.0.1:${port}/v1`;
@@ -255,11 +263,18 @@ async function copyCode({ app, page, h }) {
     && copied.includes('return a + b;') && !copied.includes('下面是一段代码'), oneLine(copied));
 }
 
+/** @brief 等提供商卡 mori-endpoint 的第一个模型行是 ref（上移下移立即保存，§9.1）。 */
+function firstModelIs(page, ref) {
+  return page.waitForFunction((want) => document.querySelector('[data-testid="provider-card"]'
+    + '[data-provider="mori-endpoint"] [data-testid="model-row"]')?.dataset.model === want, ref, { timeout: 15000 });
+}
+
 /**
- * @brief 设置 → Models：模型行的"Test"测试中可以取消（models-settings.md "Models 行"：测试中"Testing…"与"Cancel"，
- *        结果写在这一行下面）；所以先在提供商卡上 Fetch models、在清单里勾 fake-slow、Add 1 model（合成端点对它第一个
- *        分块前等 8 秒，model-discovery.md §6.5、§13.4），再用这一行的"Test"和"Cancel"。默认范围仍是 fake-coder（检查），
- *        之后的步骤不受影响。
+ * @brief 设置 → Models：提供商卡的"Test connection"测试中可以取消（models-settings.md "提供商卡"：测试中"Testing…"与
+ *        "Cancel"，结果写在卡里）。Test connection 测提供商的第一个模型，所以先在卡上 Fetch models、在清单里勾 fake-slow、
+ *        Add 1 model（合成端点对它第一个分块前等 8 秒，model-discovery.md §6.5、§13.4），用它这一行的 Move up 把它移到
+ *        第一个，测完再移回去。默认范围仍是 fake-coder（检查），之后的步骤不受影响。
+ *        2026-10-26（WP-02，负责人走查 M7）：原来用模型行的"Test"，模型行上的 Test 删掉了。
  */
 async function cancelTest({ page, h, userData }) {
   await h.openModels();
@@ -267,13 +282,19 @@ async function cancelTest({ page, h, userData }) {
   if (added.error !== null) throw new Error(`add fake-slow: ${added.error}`);
   const row = page.locator('[data-testid="model-row"][data-model="mori-endpoint/fake-slow"]');
   await row.waitFor({ timeout: 15000 });
-  await row.locator('[data-action="test"]').click();
-  await row.getByRole('button', { name: 'Testing…' }).waitFor({ timeout: 10000 });
-  await row.locator('[data-action="test-cancel"]').click();
-  const result = row.getByTestId('model-test');
+  await row.locator('[data-action="up"]').click();
+  await firstModelIs(page, 'mori-endpoint/fake-slow');
+  const card = h.providerCard();
+  await card.locator('[data-action="test-provider"]').click();
+  await card.getByRole('button', { name: 'Testing…' }).waitFor({ timeout: 10000 });
+  await card.locator('[data-action="test-cancel"]').click();
+  const result = card.getByTestId('test-result');
   await result.waitFor({ timeout: 15000 });
   const text = await result.innerText();
-  record('设置：模型行的"Test"在测试中变为"Testing…"，可以取消，结果写在这一行下面', text === 'Test cancelled', text);
+  record('设置：提供商卡的"Test connection"（测第一个模型 fake-slow）在测试中变为"Testing…"，可以取消，结果写在卡里',
+    text === 'Test cancelled', text);
+  await row.locator('[data-action="down"]').click();
+  await firstModelIs(page, 'mori-endpoint/fake-coder');
   const config = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8'));
   record('设置：卡上 Fetch models 加入模型不改默认范围：normalDefault 仍是 mori-endpoint/fake-coder',
     config.normalDefault === 'mori-endpoint/fake-coder', String(config.normalDefault));
@@ -291,7 +312,8 @@ async function chooseRange(page, pick) {
 }
 
 /**
- * @brief 设置 → Models 里给合成端点加一个模型 id，等它的 tool calling 验证过（自动探测没跑时点一次 Verify）。
+ * @brief 设置 → Models 里给合成端点加一个模型 id，等它的 tool calling 验证过（行上的 data-probe；探针出错、tool calling
+ *        没验证时点一次状态行的"Verify again"，models-settings.md "Models 行"）。
  *        一键拉取模型（model-discovery.md §6.5、§13.4）：卡上 Fetch models → 列表里没有的 id 用 Add a model ID 手填 → Add 1 model。
  */
 async function addVerifiedModel(page, h, id) {
@@ -299,10 +321,10 @@ async function addVerifiedModel(page, h, id) {
   const added = await h.addModels([id]);
   if (added.error) throw new Error(`Add ${id}: ${added.error}`);
   const row = page.locator(`[data-testid="model-row"][data-model="mori-endpoint/${id}"]`);
-  const verified = row.locator('[data-field="tool_calling"][data-value="verified"]');
+  const verified = page.locator(`[data-testid="model-row"][data-model="mori-endpoint/${id}"][data-probe="verified"]`);
   await row.waitFor({ timeout: 15000 });
   if (!await verified.waitFor({ timeout: 60000 }).then(() => true, () => false)) {
-    await row.locator('[data-action="verify"]').click();
+    await row.locator('[data-testid="probe-status"] [data-action="verify"]').click();
     await verified.waitFor({ timeout: 120000 });
   }
   await page.getByRole('button', { name: 'Back to app' }).click();
@@ -730,6 +752,7 @@ const steps = { firstRun, firstMessage, ringParts, copyCode, cancelTest, shortRa
   kernelExit };
 try {
   for (const [name, step] of Object.entries(steps)) {
+    if (!wanted(name)) continue;
     try {
       await step(ctx);
     } catch (error) {
@@ -737,12 +760,14 @@ try {
       await page.screenshot({ path: join(shots, `${name}-error.png`) }).catch(() => {});
     }
   }
-  Object.assign(ctx, await layoutRestart(ctx));
-  app = ctx.app;
-  page = ctx.page;
+  if (wanted('layoutRestart')) {
+    Object.assign(ctx, await layoutRestart(ctx));
+    app = ctx.app;
+    page = ctx.page;
+  }
   await app.close().catch(() => {});
-  await ringRuns(ctx);
-  await mainKilled(ctx).catch((error) => record('崩溃：流程', false, oneLine(error, 400)));
+  if (wanted('ringRuns')) await ringRuns(ctx);
+  if (wanted('mainKilled')) await mainKilled(ctx).catch((error) => record('崩溃：流程', false, oneLine(error, 400)));
 } catch (error) {
   record('布局重启：流程', false, oneLine(error, 400));
 } finally {
