@@ -4,20 +4,27 @@
 // pi 的 8 个内置工具各有开关（读屏名称 "Enable tool <名字>"，没写 defaultTools 时开着 read、bash、edit、write）、grep 与 find
 // 下面写要的程序；别的行（Mori 的 TaskBoard 工具与 memory、MCP、插件、扩展的工具）没有开关、下面一行原因；
 // 打开、关掉写用户级 settings.json 的 defaultTools（+名字 / -名字，只改这一项，别的字段和键的顺序不变，与默认相同时去掉）；
-// 开着的会话不变，工具页"New session"建的会话照新的设置（工具页、发给模型的工具、调用 ls 不出批准卡）；
-// settings.json 不是 JSON 时"Couldn’t save: "加原文、开关回去、文件不变；受信任项目的 .pi/settings.json 改了的工具只读。
+// 开着的会话不变，工具页"New session"建的会话照新的设置（工具页、发给模型的工具、system prompt 的工具清单与规则、
+// 调用 ls 不出批准卡）；写入中开关不可用；F8 的"Recent activity"记 Enable / Disable tool <名字>；
+// settings.json 不是 JSON 时"Couldn’t save: "加原文、开关回去、文件不变；重启后重新打开的会话照新的设置，PATH 上没有 rg、fd 时
+// grep、find 调用失败、工具卡写 pi 的原文；受信任项目的 .pi/settings.json 改了的工具只读（悬停提示同下面一行）。
+// 2026-10-26 补（状态表各行的用例，WP-08.md）：turnOn 的 prompt check、turnOff 的写入中与操作记录、新步骤 reopen、
+// projectOverride 的悬停。
 // 合成的东西：端点、MCP 服务（tests/mcp-server）、pi 包（tests/pi-package 的副本）、扩展、角色文件和设置文件都是 synthetic。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m6-app-tool-switches.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
-// setup 总是跑；别的步骤开头都把 settings.json 的 defaultTools 去掉（测试准备），可以单独跑；projectOverride 打开另一个项目，
-// 放在最后。结果写到 test-results/m6-app-tool-switches(-packaged).json，截图在 test-results/m6-app-tool-switches(-packaged)/；
-// 全部通过时删掉临时目录。
+// setup 总是跑；别的步骤开头都把 settings.json 的 defaultTools 去掉（测试准备），可以单独跑；reopen 关掉 Mori 再用去掉了 rg、fd
+// 的 PATH 启动；projectOverride 打开另一个项目，放在最后。结果写到 test-results/m6-app-tool-switches(-packaged).json，截图在
+// test-results/m6-app-tool-switches(-packaged)/；全部通过时删掉临时目录。
 
+import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
-import { lastReply, lastToolCard, paneOf, settle, waitPanes, waitReady } from './m3-helpers.mjs';
+import {
+  activeFile, lastReply, lastToolCard, openRow, paneOf, rowOf, settle, waitPanes, waitReady,
+} from './m3-helpers.mjs';
 import { firstRunAndOpen, openProject, openToolsSection, startFakeEndpoint } from './m6-helpers.mjs';
 import {
   BUILTIN_LEAD, expectedNotes, PI_DEFAULT_TOOLS, PI_TOOLS, TOOL_REASONS, toolNeeds, toolRows,
@@ -50,6 +57,15 @@ const MARKER = { key: 'moriSwitchTestMarker', value: 'synthetic: written by m6-a
 const PROJECT_TOOLS = ['+grep', '-edit'];
 const ENABLED_BY_PROJECT = 'Turned on in this project’s .pi/settings.json. To change it, edit that file.';
 const DISABLED_BY_PROJECT = 'Turned off in this project’s .pi/settings.json. To change it, edit that file.';
+/** pi 的 shell 规则（pi 1.3.0 system-prompt.js）：有 bash、没有 grep / find / ls 时在 <rules> 里 */
+const BASH_RULE = 'Use bash for file operations like ls, rg, find';
+/** pi 固定的一条规则（<rules> 读对了的参照） */
+const CONCISE_RULE = 'Be concise in your responses';
+/** pi 的原文（pi 1.3.0 core/tools/grep.js、find.js）：PATH 与 <agentDir>\bin 里都没有、离线不下载时 */
+const RG_MISSING = 'ripgrep (rg) is not available and could not be downloaded';
+const FD_MISSING = 'fd is not available and could not be downloaded';
+/** pi 找 rg、fd 时认的程序（utils/tools-manager.js：rg；fd、fdfind） */
+const SEARCH_PROGRAMS = ['rg.exe', 'fd.exe', 'fdfind.exe'];
 
 // ---------- 准备 ----------
 
@@ -123,6 +139,24 @@ function resetDefaults(ctx) {
   writeFileSync(settingsFile(ctx), JSON.stringify(value, null, 2));
 }
 
+/**
+ * @brief 测试准备：PATH 去掉每个含 rg.exe、fd.exe、fdfind.exe 的目录（同 m0-shell 去掉 bash 的做法），pi 在 PATH 上找不到
+ *        它们；变量名照 process.env 里原来的写法（Windows 上不分大小写，有两份时子进程拿到哪一份说不准）。
+ */
+function withoutSearchPrograms() {
+  const name = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'Path';
+  const keep = (process.env[name] ?? '').split(';').filter(Boolean)
+    .filter((dir) => !SEARCH_PROGRAMS.some((exe) => existsSync(join(dir, exe))));
+  return { [name]: keep.join(';') };
+}
+
+/** @brief 在 env 下仍找得到的 rg、fd：where.exe 找得到的，或 <agentDir>\bin 里有的（pi 先看那里）；都没有时为 []。 */
+function searchProgramsFound(ctx, env) {
+  const where = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'where.exe');
+  return SEARCH_PROGRAMS.filter((exe) => existsSync(join(ctx.agentDir, 'bin', exe))
+    || spawnSync(where, [exe], { env: { ...process.env, ...env }, windowsHide: true }).status === 0);
+}
+
 // ---------- 页面 ----------
 
 /** @brief 一个工具行。 */
@@ -187,17 +221,100 @@ async function modelTools(ctx) {
   return /可用的工具：([^\n]*)/.exec(reply)?.[1].split(',').map((name) => name.trim()).filter(Boolean) ?? [];
 }
 
+/**
+ * @brief 发 "prompt check"（合成端点回答这次请求的 system prompt 里 <tools> 列出的工具名与 <rules> 的各行），
+ *        返回 { tools, rules }。
+ */
+async function promptView(ctx) {
+  await ctx.h.send('prompt check');
+  await ctx.h.idle(60000);
+  const reply = await lastReply(ctx.page);
+  const tools = /工具清单：([^\n]*)/.exec(reply)?.[1].split(',').map((name) => name.trim()).filter(Boolean) ?? [];
+  const rules = /规则：([^\n]*)/.exec(reply)?.[1].split(' / ').map((line) => line.trim()).filter(Boolean) ?? [];
+  return { tools, rules };
+}
+
+/** @brief 发一条让模型调用工具的消息，等这一轮结束，返回最后一张工具卡（标题的动词、状态、展开后的文字）。 */
+async function callCard(ctx, text) {
+  await ctx.h.send(text);
+  await ctx.h.idle(60000);
+  const card = await lastToolCard(ctx.page);
+  const title = await paneOf(ctx.page).getByTestId('tool-card').last().locator('.tool-verb').innerText()
+    .catch(() => '');
+  return { title, status: card.status, body: card.body };
+}
+
+/**
+ * @brief 开始记录 name 那一行的开关第一次不可用时的样子（MutationObserver 记 disabled 加上的那一刻的 aria-checked：
+ *        写入加重新读取只有几十毫秒，轮询抓不到；回调在下一个任务之前运行，那时开关还不可用）。
+ */
+function watchBusy(page, name) {
+  return page.evaluate((tool) => {
+    window.__switchBusy = null;
+    window.__switchObserver?.disconnect();
+    const mine = (node) => node instanceof Element && node.getAttribute('role') === 'switch'
+      && node.closest('[data-testid="tool-row"]')?.dataset.tool === tool;
+    window.__switchObserver = new MutationObserver((records) => {
+      const added = records.find((item) => mine(item.target) && item.target.hasAttribute('disabled'));
+      if (added && window.__switchBusy === null) window.__switchBusy = added.target.getAttribute('aria-checked');
+    });
+    window.__switchObserver.observe(document.querySelector('[data-testid="tools-page"]'), { subtree: true,
+      attributes: true, attributeFilter: ['disabled'] });
+  }, name);
+}
+
+/** @brief watchBusy 开始之后那个开关第一次不可用时的 aria-checked（"true" / "false"）；一直没有不可用过时为 null。 */
+const busySeen = (page) => page.evaluate(() => {
+  window.__switchObserver?.disconnect();
+  return window.__switchBusy;
+});
+
+/** @brief Markdown 里"## 标题"下的各行（去掉首尾空白，不含空行）。 */
+function mdSection(md, title) {
+  const lines = md.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === `## ${title}`);
+  if (start < 0) return [];
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
+  return lines.slice(start + 1, end < 0 ? undefined : end).map((line) => line.trim()).filter(Boolean);
+}
+
+/**
+ * @brief 在当前会话里按 F8、写两句（synthetic）、保存，读保存的报告里"Recent activity"的动作文字（去掉时刻，从早到晚），
+ *        关掉报告框。
+ */
+async function recentActivity(page) {
+  await page.locator('.pane-slot:not([hidden]) .composer textarea').first().press('F8');
+  const dialog = page.getByTestId('issue-dialog');
+  await dialog.getByTestId('issue-what').waitFor({ timeout: 15000 });
+  await dialog.getByTestId('issue-what').fill('Synthetic: tool switch check');
+  await dialog.getByTestId('issue-expect').fill('Synthetic: the switches are in Recent activity');
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  const saved = page.getByTestId('issue-saved');
+  await saved.waitFor({ timeout: 15000 });
+  const path = /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
+  const md = path && existsSync(path) ? readFileSync(path, 'utf8') : '';
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+  return mdSection(md, 'Recent activity').map((line) => line.replace(/^- \d{2}:\d{2}:\d{2} /, ''));
+}
+
 // ---------- 步骤 ----------
 
-/** @brief 准备：首次启动填连接，打开已信任的项目 main，发一条消息。 */
-async function setup(ctx) {
-  ctx.app = await launch({ exePath, userData: ctx.userData });
+/** @brief 用 ctx.userData 启动 Mori（env 里的环境变量盖过本进程的），记下页面报错。 */
+async function startApp(ctx, env = {}) {
+  ctx.app = await launch({ exePath, userData: ctx.userData, env });
   ctx.page = await ctx.app.firstWindow();
   ctx.page.on('pageerror', (error) => ctx.pageErrors.push(error.message));
   ctx.h = pageHelpers(ctx.page);
+}
+
+/** @brief 准备：首次启动填连接，打开已信任的项目 main，发一条消息；记下这个会话的文件（reopen 重启后打开它）。 */
+async function setup(ctx) {
+  await startApp(ctx);
   await firstRunAndOpen(ctx, { baseUrl, apiKey: testKey, project: ctx.main, trust: true });
   await ctx.h.send('plain hello');
   await ctx.h.idle(60000);
+  ctx.mainFile = await activeFile(ctx.page);
   ctx.baseline = others(settingsJson(ctx));
   record('准备：首次启动填连接，打开已信任的项目 main 并发一条消息；settings.json 里预先写的字段还在',
     settingsJson(ctx)?.[MARKER.key] === MARKER.value, settingsText(ctx) ?? 'no settings.json');
@@ -264,6 +381,7 @@ async function turnOn(ctx) {
   await backToChat(page);
   const old = await modelTools(ctx);
   record('M12 开着的会话里发给模型的工具没有 ls', old.length > 0 && !old.includes('ls'), old.join(', '));
+  const oldPrompt = await promptView(ctx);
   await builtinView(page);
   await newFromTools(page);
   const fresh = await builtinView(page);
@@ -272,6 +390,12 @@ async function turnOn(ctx) {
   const now = await modelTools(ctx);
   record('M12 工具页"New session"建的会话里 ls 是"Enabled"、开关开着，发给模型的工具里有 ls', ls?.state === 'Enabled'
     && ls.checked === true && now.includes('ls'), JSON.stringify({ ls, now }));
+  const newPrompt = await promptView(ctx);
+  record('M12 打开 ls 后 system prompt 随之变（2026-10-26 补）：开着的会话的 <tools> 没有 ls、<rules> 仍有"Use bash for file '
+    + 'operations like ls, rg, find"；"New session" 建的会话的 <tools> 列出 ls、<rules> 不再有这一条（其余规则照旧）',
+  oldPrompt.tools.includes('bash') && !oldPrompt.tools.includes('ls') && oldPrompt.rules.includes(BASH_RULE)
+    && newPrompt.tools.includes('ls') && newPrompt.tools.includes('bash') && !newPrompt.rules.includes(BASH_RULE)
+    && newPrompt.rules.includes(CONCISE_RULE), JSON.stringify({ oldPrompt, newPrompt }));
   await ctx.h.send('call tool: ls');
   await ctx.h.idle(60000);
   const card = await lastToolCard(page);
@@ -284,7 +408,10 @@ async function turnOn(ctx) {
   await shot(page, 'turn-on');
 }
 
-/** @brief 关掉 bash（["-bash"]，再打开 ls 是 ["-bash", "+ls"]）；关掉 ls、再打开 bash 时 defaultTools 去掉。 */
+/**
+ * @brief 关掉 bash（["-bash"]，再打开 ls 是 ["-bash", "+ls"]）；关掉 ls、再打开 bash 时 defaultTools 去掉。每按一次，写入与
+ *        重新读取结束前那一行的开关已是按下后的样子、不可用，之后可用；F8 的"Recent activity"按顺序记下这四次（2026-10-26 补）。
+ */
 async function turnOff(ctx) {
   resetDefaults(ctx);
   const { page } = ctx;
@@ -293,16 +420,26 @@ async function turnOff(ctx) {
     ['bash', true, undefined]];
   const seen = [];
   for (const [name, want, expected] of steps) {
+    await watchBusy(page, name);
     const row = await flipTool(page, name, want);
+    const busy = await busySeen(page);
     const saved = settingsJson(ctx);
-    seen.push({ name, want, checked: row?.checked, error: row?.error, saved: saved?.defaultTools ?? null,
-      ok: row?.checked === want && !row.error && same(saved?.defaultTools, expected)
+    seen.push({ name, want, checked: row?.checked, error: row?.error, saved: saved?.defaultTools ?? null, busy,
+      disabled: row?.disabled ?? null, ok: row?.checked === want && !row.error && same(saved?.defaultTools, expected)
         && others(saved) === ctx.baseline });
   }
   record('M12 关掉 bash 写 ["-bash"]，再打开 ls 写 ["-bash", "+ls"]（先 - 后 +），关掉 ls 回到 ["-bash"]，打开 bash 后'
     + '与 pi 的默认相同、defaultTools 这一项去掉；别的字段和键的顺序一直不变', seen.every((item) => item.ok),
   JSON.stringify(seen));
+  record('M12 写入中（2026-10-26 补）：每按一次开关，写完并重新读取之前这一行的开关已经是按下后的样子、不可用，'
+    + '读完后照常可用', seen.every((item) => item.busy === String(item.want) && item.disabled === false),
+  JSON.stringify(seen));
   await backToChat(page);
+  const activity = await recentActivity(page);
+  const switches = activity.filter((text) => /^(Enable|Disable) tool /.test(text));
+  record('M12 操作记录（2026-10-26 补）：F8 报告的"Recent activity"按顺序记下这四次："Disable tool bash"、"Enable tool ls"、'
+    + '"Disable tool ls"、"Enable tool bash"', same(switches.slice(-4), ['Disable tool bash', 'Enable tool ls',
+    'Disable tool ls', 'Enable tool bash']), JSON.stringify(activity.slice(-12)));
 }
 
 /** @brief settings.json 不是 JSON：按开关时这一行下面"Couldn’t save: <路径>: <原文>"，开关回到关着，文件不变。 */
@@ -344,8 +481,54 @@ async function projectOverride(ctx) {
     && edit?.checked === false && edit.disabled === true && same(edit.notes, [DISABLED_BY_PROJECT])
     && edit.state === 'Not enabled' && read?.checked === true && read.disabled === false,
   JSON.stringify({ grep, edit, read }));
+  const hover = {};
+  for (const name of ['grep', 'edit', 'read']) {
+    hover[name] = await toolRow(page, name).getByRole('switch').getAttribute('title');
+  }
+  record('M12 本项目的设置改了它：悬停（2026-10-26 补）：不可用的开关悬停提示与下面一行同一句，grep "Turned on in this '
+    + 'project’s .pi/settings.json. …"、edit "Turned off in …"；可以开关的 read 没有悬停提示',
+  hover.grep === ENABLED_BY_PROJECT && hover.edit === DISABLED_BY_PROJECT && hover.read === null,
+  JSON.stringify(hover));
   await shot(page, 'project-override');
   await backToChat(page);
+}
+
+/**
+ * @brief 打开 ls、grep、find，关掉 Mori，再用 PATH 去掉了 rg、fd 的环境启动（测试准备），从侧栏重新打开 setup 里在开关之前就
+ *        建好的会话：三行都是"Enabled"、开关开着，发给模型的工具里有它们（tools.md"按了开关"：含重启后重新打开的会话）；
+ *        在这个会话里调用 grep、find 都失败，工具卡写 pi 的原文（tools.md"grep、find"）。
+ */
+async function reopen(ctx) {
+  resetDefaults(ctx);
+  await builtinView(ctx.page);
+  const flips = [];
+  for (const name of ['ls', 'grep', 'find']) flips.push(await flipTool(ctx.page, name, true));
+  const saved = settingsJson(ctx)?.defaultTools ?? null;
+  await backToChat(ctx.page);
+  await ctx.app.close();
+  const env = withoutSearchPrograms();
+  ctx.searchFound = searchProgramsFound(ctx, env);
+  await startApp(ctx, env);
+  await rowOf(ctx.page, ctx.mainFile).waitFor({ timeout: 60000 });
+  await openRow(ctx.page, ctx.mainFile);
+  const view = await builtinView(ctx.page);
+  const rows = ['ls', 'grep', 'find'].map((name) => view.rows.find((row) => row.name === name));
+  await backToChat(ctx.page);
+  const tools = await modelTools(ctx);
+  record('M12 打开 ls、grep、find 后重启 Mori，从侧栏重新打开开关之前就建好的会话（2026-10-26 补）：三行都是"Enabled"、'
+    + '开关开着，发给模型的工具里有它们', flips.every((row) => row?.checked === true && !row.error)
+    && rows.every((row) => row?.state === 'Enabled' && row.checked === true)
+    && ['ls', 'grep', 'find'].every((name) => tools.includes(name)), JSON.stringify({ saved, rows, tools }));
+  const grep = await callCard(ctx, 'call tool: grep {"pattern":"Mori"}');
+  const find = await callCard(ctx, 'call tool: find {"pattern":"*.md"}');
+  record('M12 grep、find 要的程序不在时（2026-10-26 补；测试准备：PATH 去掉含 rg.exe、fd.exe 的目录，<agentDir>\\bin 里也没有）'
+    + '调用失败：工具卡"Search"、"Find"是失败，展开后是 pi 的原文"ripgrep (rg) is not available and could not be '
+    + 'downloaded"与"fd is not available and could not be downloaded"', ctx.searchFound.length === 0
+    && grep.title === 'Search' && grep.status === 'failed' && grep.body.includes(RG_MISSING)
+    && find.title === 'Find' && find.status === 'failed' && find.body.includes(FD_MISSING),
+  JSON.stringify({ found: ctx.searchFound, grep: { ...grep, body: oneLine(grep.body, 200) },
+    find: { ...find, body: oneLine(find.body, 200) } }));
+  await shot(ctx.page, 'reopen');
 }
 
 /** @brief JSON 相同（数组、键的顺序都算）。 */
@@ -353,7 +536,7 @@ function same(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-const steps = { setup, rows, turnOn, turnOff, writeFailure, projectOverride };
+const steps = { setup, rows, turnOn, turnOff, writeFailure, reopen, projectOverride };
 
 const fake = await startFakeEndpoint(port, testKey);
 const layout = makeLayout();

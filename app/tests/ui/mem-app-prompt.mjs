@@ -4,6 +4,8 @@
 // scenarios/mem-prompt.mjs、增强脚本 enhance.mjs、关键词模式），逐条验收这些编号在 App 层的通过条件：
 //   MEM-01 身份与 harness 段、MEM-02 四个分节、MEM-03 分发表、MEM-04 会话打开时定下、MEM-05 记忆页的条目进 prompt、
 //   MEM-11 协作模式下谁有工具、MEM-13 记忆目录写保护、MEM-37 必需的记忆扩展。
+// 另借 split 步骤查 docs/v0/screens/tools.md"内置工具"列表一行的两条（名字以 M12 开头，不属于记忆规格；2026-10-26 补，
+// WP-08 的状态表各行的用例）：分开配置的用户会话只列 3 个 TaskBoard 工具，"Enabled"到下一条消息才随 Task mode 变。
 // 断言看两处：记录代理收到的真实请求（system prompt 与 tools 参数，tb-helpers startTbEndpoint / scenarioRequests），
 // 以及会话文件（pi-ai 的 getCurrentSystemMessage 读回会话当前的分节，§11.2 M7）。
 // 用法（在 app/ 下，用 out/ 的构建，或 MORI_APP_DIR 指向的构建）：
@@ -577,15 +579,21 @@ function promptSections(ctx, who, reqs, count1) {
 
 // ---------- 步骤 toolsPage：工具页上 memory 的来源 ----------
 
+/** @brief 让 tab 这个会话在前面，打开 Customize → Built-in tools 读每一行（m6-tools-helpers toolRows），再 Back to app。 */
+async function builtinToolRows(ctx, tab) {
+  await showTab(ctx, tab);
+  await openToolsSection(ctx.page, 'builtin');
+  const rows = await toolRows(ctx.page);
+  await ctx.page.locator('[data-testid="tools-page"] .topbar button', { hasText: 'Back to app' }).click();
+  await ctx.page.locator(`.pane-slot:not([hidden]) ${paneSel(tab)}`).waitFor({ timeout: 10000 });
+  return rows;
+}
+
 /** @brief MEM-11：工具页（Customize → 内置工具）上 memory 那一行的来源写 Mori，没有开关，下面一行原因（2026-10-26，WP-08）。 */
 async function toolsPage(ctx) {
   const who = ctx.main;
   if (!who) throw new Error('the prompt step did not run');
-  await showTab(ctx, who.tab);
-  await openToolsSection(ctx.page, 'builtin');
-  const rows = await toolRows(ctx.page);
-  await ctx.page.locator('[data-testid="tools-page"] .topbar button', { hasText: 'Back to app' }).click();
-  await ctx.page.locator(`.pane-slot:not([hidden]) ${paneSel(who.tab)}`).waitFor({ timeout: 10000 });
+  const rows = await builtinToolRows(ctx, who.tab);
   const row = rows.find((item) => item.name === 'memory');
   record('MEM-11 the Tools page lists the memory tool with source "Mori" (like the TaskBoard tools), no switch, and '
     + 'the line "Mori turns this on for the main agent." under it', row?.tag === 'Mori' && row.checked === null
@@ -663,11 +671,16 @@ async function split(ctx) {
   const who = { tab: await openProject(ctx, ctx.split) };
   ctx.splitWho = who;
   const t = {};
+  const rows = {};
   t.s1 = await send(ctx, who, 'Hello in off mode');
   t.n1 = systemCount(who.sessionFile);
+  rows.off = await builtinToolRows(ctx, who.tab);
   await clickTeamSwitch(ctx, who.tab, 'always');
+  rows.switched = await builtinToolRows(ctx, who.tab);
   t.s2 = await send(ctx, who, 'Please check the notes', 180000);
   t.n2 = systemCount(who.sessionFile);
+  t.read = Date.now();
+  rows.team = await builtinToolRows(ctx, who.tab);
   t.s4 = await send(ctx, who, 'One more question in team mode');
   t.n4 = systemCount(who.sessionFile);
   await clickTeamSwitch(ctx, who.tab, 'off');
@@ -681,6 +694,38 @@ async function split(ctx) {
   splitInstances(ctx, who);
   splitTools(ctx, who, req);
   splitPatches(who, req, t);
+  splitToolsPage(ctx, req, rows, t);
+}
+
+/** 分开配置时用户会话注册的 TaskBoard 工具（docs/v0/screens/tools.md"内置工具"的列表：分开时 3 个） */
+const SPLIT_USER_TOOLS = ['agent_message', 'board_read', 'read_session'];
+
+/**
+ * @brief tools.md"内置工具"列表一行（2026-10-26 补，WP-08 的状态表各行的用例）：分开配置的用户会话只列 3 个 TaskBoard 工具
+ *        （来源 Mori、没有开关、下面一行原因）；"Enabled"是这个会话上一轮运行时的样子（每行与那一轮请求的 tools 一致）：
+ *        开关 Task mode 之后不变，到下一条消息开始才变成 Task mode 的。读工具页不发请求。
+ */
+function splitToolsPage(ctx, req, rows, t) {
+  const board = (list) => list.filter((row) => row.tag === 'Mori' && row.name !== 'memory');
+  const listed = Object.values(rows).every((list) => same(board(list).map((row) => row.name).sort(), SPLIT_USER_TOOLS)
+    && board(list).every((row) => row.checked === null && same(row.notes, [TOOL_REASONS.task])));
+  record('M12 Customize › Built-in tools of a split-config user session lists exactly the three TaskBoard tools '
+    + 'board_read, read_session and agent_message (source "Mori", no switch, "Mori turns this on and off with Task '
+    + 'mode." under each), before and after Task mode is turned on', listed,
+  brief(Object.fromEntries(Object.entries(rows).map(([key, list]) => [key, board(list).map((row) => row.name)]))));
+  const offRun = req.offDialog.at(-1);
+  const teamRun = requestsOf(ctx, t.s2, (info) => info.scenario === 'mem-prompt-split' && info.role === 'chat'
+    && info.kind === 'team-dialog', t.read).at(-1);
+  const states = (list) => list.map((row) => `${row.name}:${row.state}`);
+  const matches = (list, run) => Boolean(run) && list.length > 0
+    && list.every((row) => (row.state === 'Enabled') === run.tools.includes(row.name));
+  record('M12 "Enabled" on the Tools page is how the session ran last: right after Task mode is turned on every row '
+    + 'is unchanged (the tools of the last off-mode request); after the next message the rows are the tools of that '
+    + 'Task mode run (team.ts beforeUserRun)', matches(rows.off, offRun)
+    && same(states(rows.switched), states(rows.off)) && matches(rows.team, teamRun)
+    && !same(states(rows.team), states(rows.switched)),
+  brief({ off: states(rows.off), switched: states(rows.switched), team: states(rows.team), offTools: offRun?.tools,
+    teamTools: teamRun?.tools }));
 }
 
 /** @brief 分开配置的请求，按会话分好。 */
