@@ -9,33 +9,34 @@
  "notes": [
   "Setup (synthetic test setup, docs/specs/memory.md §14.1): model-config.json has one local provider MEM (fake-coder; fake-think marked Supports thinking; fake-coder-404) on the synthetic endpoint http://127.0.0.1:4770/v1, default range mem/fake-coder, profiles given as verified; enhancement replies come from the synthetic enhancement script (FAKE_ENHANCE_SCRIPT)"
  ],
- "recordedAt": "2026-10-22T14:44:25.690Z",
+ "recordedAt": "2026-10-26T06:21:19.731Z",
+ "timeZone": "America/New_York",
  "steps": [
   {
-   "t": 3,
+   "t": 2,
    "command": {
     "type": "session.list"
    }
   },
   {
-   "t": 4,
+   "t": 3,
    "result": {
     "type": "session.list",
     "value": []
    }
   },
   {
-   "t": 8,
+   "t": 7,
    "command": {
     "type": "config.get"
    }
   },
   {
-   "t": 11,
+   "t": 9,
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-QsEi6B\\pi",
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-data-JyPiHt\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -46,13 +47,13 @@
    }
   },
   {
-   "t": 14,
+   "t": 12,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 20,
+   "t": 15,
    "result": {
     "type": "models.get",
     "value": {
@@ -152,7 +153,8 @@
        "reasoning": {
         "field": "none",
         "can_disable": true,
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
@@ -161,7 +163,8 @@
         "truncation": "unknown"
        },
        "cancel_verified": true,
-       "probedAt": 1792680246741,
+       "reported": null,
+       "probedAt": 1792995664416,
        "suite": 1
       },
       "mem/fake-think": {
@@ -203,7 +206,8 @@
        "reasoning": {
         "field": "none",
         "can_disable": true,
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
@@ -212,7 +216,8 @@
         "truncation": "unknown"
        },
        "cancel_verified": true,
-       "probedAt": 1792680246741,
+       "reported": null,
+       "probedAt": 1792995664416,
        "suite": 1
       },
       "mem/fake-coder-404": {
@@ -254,7 +259,8 @@
        "reasoning": {
         "field": "none",
         "can_disable": true,
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
@@ -263,7 +269,8 @@
         "truncation": "unknown"
        },
        "cancel_verified": true,
-       "probedAt": 1792680246741,
+       "reported": null,
+       "probedAt": 1792995664416,
        "suite": 1
       }
      },
@@ -328,14 +335,14 @@
    }
   },
   {
-   "t": 29,
+   "t": 21,
    "command": {
     "type": "trust.check",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 34,
+   "t": 23,
    "result": {
     "type": "trust.check",
     "value": {
@@ -345,17 +352,17 @@
    }
   },
   {
-   "t": 36,
+   "t": 24,
    "command": {
     "type": "session.create",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 176,
+   "t": 71,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -371,10 +378,10 @@
    }
   },
   {
-   "t": 176,
+   "t": 71,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.board",
      "requests": [],
@@ -383,13 +390,13 @@
    }
   },
   {
-   "t": 178,
+   "t": 73,
    "result": {
     "type": "session.create",
     "value": {
-     "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-data-QsEi6B\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-mem-record-TbCbOs-mem-enhance--\\2026-10-22T14-44-11-428Z_01a16411-d023-735a-9f0a-d42fbbb43174.jsonl",
+     "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-data-JyPiHt\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-mem-record-qajlQ3-mem-enhance--\\2026-10-26T06-21-06-606Z_01a176de-aaad-75e0-818f-165b1739b18e.jsonl",
      "name": null,
      "projectTrust": "none",
      "trustRemembered": false,
@@ -417,6 +424,7 @@
       "contextWindow": 128000,
       "percent": 0
      },
+     "contextBreakdown": null,
      "approval": {
       "mode": "ask",
       "allowed": []
@@ -447,18 +455,18 @@
    }
   },
   {
-   "t": 184,
+   "t": 76,
    "command": {
     "type": "session.prompt",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "text": "plain: I like answers that start with the conclusion."
    }
   },
   {
-   "t": 187,
+   "t": 77,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.model_state",
      "pick": "mem/fake-coder",
@@ -474,7 +482,7 @@
    }
   },
   {
-   "t": 188,
+   "t": 78,
    "result": {
     "type": "session.prompt",
     "value": {
@@ -484,20 +492,20 @@
    }
   },
   {
-   "t": 193,
+   "t": 81,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "agent_start"
     }
    }
   },
   {
-   "t": 194,
+   "t": 81,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -513,30 +521,30 @@
    }
   },
   {
-   "t": 194,
+   "t": 81,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "turn_start"
     }
    }
   },
   {
-   "t": 195,
+   "t": 82,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_start",
      "message": {
       "role": "system",
       "content": "",
       "sections": {
-       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-mem-record-TbCbOs/mem-enhance\n</cwd>"
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-mem-record-qajlQ3/mem-enhance\n</cwd>"
       },
-      "timestamp": 1792680251579,
+      "timestamp": 1792995666658,
       "toolsAdded": [
        {
         "name": "read",
@@ -659,7 +667,7 @@
        },
        {
         "name": "memory",
-        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example \"the intranet model is now at 10.0.0.9, note it\" or \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
         "parameters": {
          "type": "object",
          "properties": {
@@ -701,6 +709,9 @@
           },
           "quote": {
            "type": "string"
+          },
+          "asked": {
+           "type": "boolean"
           }
          },
          "required": [
@@ -714,20 +725,20 @@
    }
   },
   {
-   "t": 195,
+   "t": 82,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_end",
      "message": {
       "role": "system",
       "content": "",
       "sections": {
-       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-mem-record-TbCbOs/mem-enhance\n</cwd>"
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-mem-record-qajlQ3/mem-enhance\n</cwd>"
       },
-      "timestamp": 1792680251579,
+      "timestamp": 1792995666658,
       "toolsAdded": [
        {
         "name": "read",
@@ -850,7 +861,7 @@
        },
        {
         "name": "memory",
-        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example \"the intranet model is now at 10.0.0.9, note it\" or \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
         "parameters": {
          "type": "object",
          "properties": {
@@ -892,6 +903,9 @@
           },
           "quote": {
            "type": "string"
+          },
+          "asked": {
+           "type": "boolean"
           }
          },
          "required": [
@@ -905,10 +919,10 @@
    }
   },
   {
-   "t": 195,
+   "t": 82,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_start",
      "message": {
@@ -919,16 +933,16 @@
         "text": "plain: I like answers that start with the conclusion."
        }
       ],
-      "timestamp": 1792680251579
+      "timestamp": 1792995666657
      }
     }
    }
   },
   {
-   "t": 195,
+   "t": 82,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_end",
      "message": {
@@ -939,42 +953,30 @@
         "text": "plain: I like answers that start with the conclusion."
        }
       ],
-      "timestamp": 1792680251579
+      "timestamp": 1792995666657
      }
     }
    }
   },
   {
-   "t": 197,
+   "t": 84,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.entry_id",
      "role": "user",
-     "entryId": "7840c29b",
-     "time": 1792680251579,
+     "entryId": "263bb2df",
+     "time": 1792995666657,
      "refs": null
     }
    }
   },
   {
-   "t": 454,
+   "t": 273,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
-    "event": {
-     "type": "mori.board",
-     "requests": [],
-     "teamEdited": false
-    }
-   }
-  },
-  {
-   "t": 518,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_start",
      "message": {
@@ -1003,17 +1005,17 @@
        }
       },
       "stopReason": "pending",
-      "timestamp": 1792680251827,
-      "responseId": "chatcmpl-fake-1792680251848"
+      "timestamp": 1792995666775,
+      "responseId": "chatcmpl-fake-1792995666790"
      }
     }
    }
   },
   {
-   "t": 519,
+   "t": 273,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1024,10 +1026,10 @@
    }
   },
   {
-   "t": 519,
+   "t": 274,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1039,10 +1041,10 @@
    }
   },
   {
-   "t": 529,
+   "t": 284,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1054,10 +1056,10 @@
    }
   },
   {
-   "t": 544,
+   "t": 300,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1069,10 +1071,10 @@
    }
   },
   {
-   "t": 560,
+   "t": 315,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1084,10 +1086,22 @@
    }
   },
   {
-   "t": 576,
+   "t": 330,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 331,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1099,10 +1113,10 @@
    }
   },
   {
-   "t": 592,
+   "t": 346,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1114,10 +1128,10 @@
    }
   },
   {
-   "t": 608,
+   "t": 361,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1129,10 +1143,10 @@
    }
   },
   {
-   "t": 624,
+   "t": 376,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1144,10 +1158,10 @@
    }
   },
   {
-   "t": 640,
+   "t": 392,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1159,10 +1173,10 @@
    }
   },
   {
-   "t": 655,
+   "t": 407,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1174,10 +1188,10 @@
    }
   },
   {
-   "t": 671,
+   "t": 423,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1189,10 +1203,10 @@
    }
   },
   {
-   "t": 690,
+   "t": 440,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -1203,10 +1217,10 @@
    }
   },
   {
-   "t": 690,
+   "t": 440,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_end",
      "message": {
@@ -1221,12 +1235,12 @@
       "provider": "mem",
       "model": "fake-coder",
       "usage": {
-       "input": 561,
+       "input": 516,
        "output": 20,
        "cacheRead": 0,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 581,
+       "totalTokens": 536,
        "cost": {
         "input": 0,
         "output": 0,
@@ -1236,34 +1250,34 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1792680251827,
-      "responseId": "chatcmpl-fake-1792680251848",
+      "timestamp": 1792995666775,
+      "responseId": "chatcmpl-fake-1792995666790",
       "rawStopReason": "stop",
-      "durationMs": 251,
+      "durationMs": 242,
       "thinkingLevel": "off"
      }
     }
    }
   },
   {
-   "t": 691,
+   "t": 440,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.entry_id",
      "role": "assistant",
-     "entryId": "d395c778",
-     "time": 1792680251827,
+     "entryId": "f4c652d5",
+     "time": 1792995666775,
      "refs": null
     }
    }
   },
   {
-   "t": 691,
+   "t": 441,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "turn_end",
      "message": {
@@ -1278,12 +1292,12 @@
       "provider": "mem",
       "model": "fake-coder",
       "usage": {
-       "input": 561,
+       "input": 516,
        "output": 20,
        "cacheRead": 0,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 581,
+       "totalTokens": 536,
        "cost": {
         "input": 0,
         "output": 0,
@@ -1293,10 +1307,10 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1792680251827,
-      "responseId": "chatcmpl-fake-1792680251848",
+      "timestamp": 1792995666775,
+      "responseId": "chatcmpl-fake-1792995666790",
       "rawStopReason": "stop",
-      "durationMs": 251,
+      "durationMs": 242,
       "thinkingLevel": "off"
      },
      "toolResults": []
@@ -1304,17 +1318,17 @@
    }
   },
   {
-   "t": 691,
+   "t": 441,
    "command": {
     "type": "session.state",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174"
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e"
    }
   },
   {
-   "t": 692,
+   "t": 441,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "agent_end",
      "messages": [
@@ -1322,10 +1336,10 @@
        "role": "system",
        "content": "",
        "sections": {
-        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-mem-record-TbCbOs/mem-enhance\n</cwd>"
+        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-mem-record-qajlQ3/mem-enhance\n</cwd>"
        },
-       "timestamp": 1792680251579,
+       "timestamp": 1792995666658,
        "toolsAdded": [
         {
          "name": "read",
@@ -1448,7 +1462,7 @@
         },
         {
          "name": "memory",
-         "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+         "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example \"the intranet model is now at 10.0.0.9, note it\" or \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
          "parameters": {
           "type": "object",
           "properties": {
@@ -1490,6 +1504,9 @@
            },
            "quote": {
             "type": "string"
+           },
+           "asked": {
+            "type": "boolean"
            }
           },
           "required": [
@@ -1507,7 +1524,7 @@
          "text": "plain: I like answers that start with the conclusion."
         }
        ],
-       "timestamp": 1792680251579
+       "timestamp": 1792995666657
       },
       {
        "role": "assistant",
@@ -1521,12 +1538,12 @@
        "provider": "mem",
        "model": "fake-coder",
        "usage": {
-        "input": 561,
+        "input": 516,
         "output": 20,
         "cacheRead": 0,
         "cacheWrite": 0,
         "reasoning": 0,
-        "totalTokens": 581,
+        "totalTokens": 536,
         "cost": {
          "input": 0,
          "output": 0,
@@ -1536,10 +1553,10 @@
         }
        },
        "stopReason": "stop",
-       "timestamp": 1792680251827,
-       "responseId": "chatcmpl-fake-1792680251848",
+       "timestamp": 1792995666775,
+       "responseId": "chatcmpl-fake-1792995666790",
        "rawStopReason": "stop",
-       "durationMs": 251,
+       "durationMs": 242,
        "thinkingLevel": "off"
       }
      ],
@@ -1548,10 +1565,10 @@
    }
   },
   {
-   "t": 693,
+   "t": 442,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "agent_settled",
      "aborted": false
@@ -1559,10 +1576,10 @@
    }
   },
   {
-   "t": 693,
+   "t": 442,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.model_state",
      "pick": "mem/fake-coder",
@@ -1578,10 +1595,10 @@
    }
   },
   {
-   "t": 693,
+   "t": 442,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -1597,10 +1614,10 @@
    }
   },
   {
-   "t": 693,
+   "t": 442,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.prompt_done",
      "running": false
@@ -1608,23 +1625,33 @@
    }
   },
   {
-   "t": 695,
+   "t": 445,
    "result": {
     "type": "session.state",
     "value": {
      "contextUsage": {
-      "tokens": 581,
+      "tokens": 536,
       "contextWindow": 128000,
-      "percent": 0.45390624999999996
+      "percent": 0.41875
+     },
+     "contextBreakdown": {
+      "systemPrompt": 474,
+      "memoryFiles": 0,
+      "skills": 0,
+      "systemTools": 1191,
+      "mcpTools": 0,
+      "messages": 0,
+      "autocompactBuffer": 16384,
+      "freeSpace": 111080
      }
     }
    }
   },
   {
-   "t": 695,
+   "t": 446,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -1640,10 +1667,10 @@
    }
   },
   {
-   "t": 696,
+   "t": 446,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -1659,10 +1686,10 @@
    }
   },
   {
-   "t": 718,
+   "t": 594,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.board",
      "requests": [],
@@ -1671,16 +1698,16 @@
    }
   },
   {
-   "t": 1032,
+   "t": 920,
    "command": {
     "type": "memory.list",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project",
     "kind": "fact"
    }
   },
   {
-   "t": 1035,
+   "t": 922,
    "result": {
     "type": "memory.list",
     "value": {
@@ -1698,18 +1725,18 @@
    }
   },
   {
-   "t": 1037,
+   "t": 924,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 1039,
+   "t": 926,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": false,
      "pick": null,
      "thinking": "medium",
@@ -1731,32 +1758,33 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 1040,
+   "t": 928,
    "command": {
     "type": "enhance.set",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "enabled": true
    }
   },
   {
-   "t": 1065,
+   "t": 952,
    "result": {
     "type": "enhance.set",
     "value": {
      "error": null,
      "info": {
-      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
       "enabled": true,
       "pick": "mem/fake-coder",
       "thinking": "medium",
       "team": false,
       "time": "04:00",
-      "since": "2026-10-22",
+      "since": "2026-10-25",
       "last": {
        "taste": null,
        "strategy": null,
@@ -1764,7 +1792,7 @@
       },
       "running": null,
       "queued": 0,
-      "next": 1792699200000,
+      "next": 1793001600000,
       "notice": null,
       "effortPicks": {
        "mem": false,
@@ -1772,21 +1800,22 @@
        "mem/fake-think": true,
        "mem/fake-coder-404": false
       },
+      "noOffPicks": [],
       "error": null
      }
     }
    }
   },
   {
-   "t": 1069,
+   "t": 955,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 1070,
+   "t": 956,
    "result": {
     "type": "memory.revisions",
     "value": {
@@ -1796,56 +1825,56 @@
    }
   },
   {
-   "t": 1101,
+   "t": 979,
    "command": {
     "type": "enhance.run",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 1104,
+   "t": 981,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "taste",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "queued"
     }
    }
   },
   {
-   "t": 1104,
+   "t": 981,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "strategy",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "queued"
     }
    }
   },
   {
-   "t": 1104,
+   "t": 981,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "review",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "queued"
     }
    }
   },
   {
-   "t": 1104,
+   "t": 981,
    "result": {
     "type": "enhance.run",
     "value": {
@@ -1854,56 +1883,56 @@
    }
   },
   {
-   "t": 1105,
+   "t": 982,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "taste",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "running"
     }
    }
   },
   {
-   "t": 1129,
+   "t": 997,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "taste"
      ],
-     "revision": "20261022-224412-wnn3"
+     "revision": "20261026-022107-wxw8"
     }
    }
   },
   {
-   "t": 1129,
+   "t": 997,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 1160,
+   "t": 1019,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "running",
        "layers": [
         "project"
@@ -1925,24 +1954,24 @@
    }
   },
   {
-   "t": 1412,
+   "t": 1290,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 1414,
+   "t": 1292,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": null,
       "strategy": null,
@@ -1950,10 +1979,10 @@
      },
      "running": {
       "task": "taste",
-      "day": "2026-10-22"
+      "day": "2026-10-25"
      },
      "queued": 2,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": null,
      "effortPicks": {
       "mem": false,
@@ -1961,29 +1990,30 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 1414,
+   "t": 1292,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 1416,
+   "t": 1293,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": null,
       "strategy": null,
@@ -1991,10 +2021,10 @@
      },
      "running": {
       "task": "taste",
-      "day": "2026-10-22"
+      "day": "2026-10-25"
      },
      "queued": 2,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": null,
      "effortPicks": {
       "mem": false,
@@ -2002,29 +2032,30 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 1416,
+   "t": 1293,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 1417,
+   "t": 1297,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": null,
       "strategy": null,
@@ -2032,10 +2063,10 @@
      },
      "running": {
       "task": "taste",
-      "day": "2026-10-22"
+      "day": "2026-10-25"
      },
      "queued": 2,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": null,
      "effortPicks": {
       "mem": false,
@@ -2043,29 +2074,30 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 1417,
+   "t": 1297,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 1418,
+   "t": 1298,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": null,
       "strategy": null,
@@ -2073,10 +2105,10 @@
      },
      "running": {
       "task": "taste",
-      "day": "2026-10-22"
+      "day": "2026-10-25"
      },
      "queued": 2,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": null,
      "effortPicks": {
       "mem": false,
@@ -2084,47 +2116,48 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 3100,
+   "t": 2889,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "taste"
      ],
-     "revision": "20261022-224412-wnn3"
+     "revision": "20261026-022107-wxw8"
     }
    }
   },
   {
-   "t": 3100,
+   "t": 2889,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 3118,
+   "t": 2906,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "running",
        "layers": [
         "project"
@@ -2146,57 +2179,42 @@
    }
   },
   {
-   "t": 4116,
+   "t": 3877,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "taste"
      ],
-     "revision": "20261022-224412-wnn3"
+     "revision": "20261026-022107-wxw8"
     }
    }
   },
   {
-   "t": 4116,
+   "t": 3877,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 4121,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "task": "taste",
-     "day": "2026-10-22",
-     "phase": "done",
-     "revision": "20261022-224412-wnn3"
-    }
-   }
-  },
-  {
-   "t": 4129,
+   "t": 3887,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -2218,56 +2236,71 @@
    }
   },
   {
-   "t": 4138,
+   "t": 3889,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "task": "taste",
+     "day": "2026-10-25",
+     "phase": "done",
+     "revision": "20261026-022107-wxw8"
+    }
+   }
+  },
+  {
+   "t": 3890,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.enhance_progress",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "strategy",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "running"
     }
    }
   },
   {
-   "t": 4156,
+   "t": 3910,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "strategy"
      ],
-     "revision": "20261022-224415-gmbg"
+     "revision": "20261026-022110-rjdf"
     }
    }
   },
   {
-   "t": 4156,
+   "t": 3910,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 4172,
+   "t": 3931,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "running",
        "layers": [
         "project"
@@ -2284,10 +2317,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -2309,32 +2342,32 @@
    }
   },
   {
-   "t": 4424,
+   "t": 4192,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 4426,
+   "t": 4194,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:15.504+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:10.454-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224412-wnn3",
-       "tokens": 2627,
+       "revision": "20261026-022107-wxw8",
+       "tokens": 2722,
        "counts": {
         "added": 1,
         "changed": 0,
@@ -2346,21 +2379,21 @@
      },
      "running": {
       "task": "strategy",
-      "day": "2026-10-22"
+      "day": "2026-10-25"
      },
      "queued": 1,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -2368,37 +2401,38 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 4440,
+   "t": 4194,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 4442,
+   "t": 4195,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:15.504+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:10.454-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224412-wnn3",
-       "tokens": 2627,
+       "revision": "20261026-022107-wxw8",
+       "tokens": 2722,
        "counts": {
         "added": 1,
         "changed": 0,
@@ -2410,21 +2444,21 @@
      },
      "running": {
       "task": "strategy",
-      "day": "2026-10-22"
+      "day": "2026-10-25"
      },
      "queued": 1,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -2432,62 +2466,48 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 5253,
+   "t": 4957,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "strategy"
      ],
-     "revision": "20261022-224415-gmbg"
+     "revision": "20261026-022110-rjdf"
     }
    }
   },
   {
-   "t": 5253,
+   "t": 4957,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 5258,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "task": "strategy",
-     "day": "2026-10-22",
-     "phase": "done",
-     "revision": "20261022-224415-gmbg"
-    }
-   }
-  },
-  {
-   "t": 5268,
+   "t": 4968,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -2504,10 +2524,136 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "taste"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 4970,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.enhance_progress",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "task": "strategy",
+     "day": "2026-10-25",
+     "phase": "done",
+     "revision": "20261026-022110-rjdf"
+    }
+   }
+  },
+  {
+   "t": 4972,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.enhance_progress",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "task": "review",
+     "day": "2026-10-25",
+     "phase": "running"
+    }
+   }
+  },
+  {
+   "t": 4990,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.memory_changed",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "layers": [
+      "project"
+     ],
+     "kinds": [
+      "review"
+     ],
+     "revision": "20261026-022111-afg2"
+    }
+   }
+  },
+  {
+   "t": 4990,
+   "command": {
+    "type": "memory.revisions",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+    "layer": "project"
+   }
+  },
+  {
+   "t": 5004,
+   "result": {
+    "type": "memory.revisions",
+    "value": {
+     "revisions": [
+      {
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
+       "by": "Enhancement",
+       "title": "REVIEW enhancement · Oct 25",
+       "status": "running",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "review"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
+       "by": "Enhancement",
+       "title": "STRATEGY enhancement · Oct 25",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "strategy"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
+       "by": "Enhancement",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -2530,142 +2676,31 @@
   },
   {
    "t": 5274,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "task": "review",
-     "day": "2026-10-22",
-     "phase": "running"
-    }
-   }
-  },
-  {
-   "t": 5294,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "layers": [
-      "project"
-     ],
-     "kinds": [
-      "review"
-     ],
-     "revision": "20261022-224416-lgbz"
-    }
-   }
-  },
-  {
-   "t": 5294,
-   "command": {
-    "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-    "layer": "project"
-   }
-  },
-  {
-   "t": 5312,
-   "result": {
-    "type": "memory.revisions",
-    "value": {
-     "revisions": [
-      {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
-       "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
-       "status": "running",
-       "layers": [
-        "project"
-       ],
-       "kinds": [
-        "review"
-       ],
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0,
-        "moved": 0
-       },
-       "rollbackOf": null
-      },
-      {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
-       "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
-       "status": "done",
-       "layers": [
-        "project"
-       ],
-       "kinds": [
-        "strategy"
-       ],
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0,
-        "moved": 0
-       },
-       "rollbackOf": null
-      },
-      {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
-       "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
-       "status": "done",
-       "layers": [
-        "project"
-       ],
-       "kinds": [
-        "taste"
-       ],
-       "counts": {
-        "added": 1,
-        "changed": 0,
-        "deleted": 0,
-        "moved": 0
-       },
-       "rollbackOf": null
-      }
-     ],
-     "error": null
-    }
-   }
-  },
-  {
-   "t": 5571,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 5572,
+   "t": 5276,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:15.504+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:10.454-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224412-wnn3",
-       "tokens": 2627,
+       "revision": "20261026-022107-wxw8",
+       "tokens": 2722,
        "counts": {
         "added": 1,
         "changed": 0,
@@ -2673,12 +2708,12 @@
        }
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:16.640+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:11.535-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224415-gmbg",
-       "tokens": 1278,
+       "revision": "20261026-022110-rjdf",
+       "tokens": 1326,
        "counts": {
         "added": 0,
         "changed": 0,
@@ -2689,21 +2724,21 @@
      },
      "running": {
       "task": "review",
-      "day": "2026-10-22"
+      "day": "2026-10-25"
      },
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -2711,37 +2746,38 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 5587,
+   "t": 5276,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 5588,
+   "t": 5277,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:15.504+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:10.454-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224412-wnn3",
-       "tokens": 2627,
+       "revision": "20261026-022107-wxw8",
+       "tokens": 2722,
        "counts": {
         "added": 1,
         "changed": 0,
@@ -2749,12 +2785,12 @@
        }
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:16.640+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:11.535-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224415-gmbg",
-       "tokens": 1278,
+       "revision": "20261026-022110-rjdf",
+       "tokens": 1326,
        "counts": {
         "added": 0,
         "changed": 0,
@@ -2765,21 +2801,21 @@
      },
      "running": {
       "task": "review",
-      "day": "2026-10-22"
+      "day": "2026-10-25"
      },
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -2787,62 +2823,63 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 6374,
+   "t": 6004,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "review"
      ],
-     "revision": "20261022-224416-lgbz"
+     "revision": "20261026-022111-afg2"
     }
    }
   },
   {
-   "t": 6374,
+   "t": 6004,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 6378,
+   "t": 6016,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "review",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "done",
-     "revision": "20261022-224416-lgbz"
+     "revision": "20261026-022111-afg2"
     }
    }
   },
   {
-   "t": 6388,
+   "t": 6017,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -2859,10 +2896,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -2879,10 +2916,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -2904,32 +2941,32 @@
    }
   },
   {
-   "t": 6691,
+   "t": 6329,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 6693,
+   "t": 6330,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:15.504+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:10.454-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224412-wnn3",
-       "tokens": 2627,
+       "revision": "20261026-022107-wxw8",
+       "tokens": 2722,
        "counts": {
         "added": 1,
         "changed": 0,
@@ -2937,12 +2974,12 @@
        }
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:16.640+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:11.535-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224415-gmbg",
-       "tokens": 1278,
+       "revision": "20261026-022110-rjdf",
+       "tokens": 1326,
        "counts": {
         "added": 0,
         "changed": 0,
@@ -2950,12 +2987,12 @@
        }
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:17.762+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:12.582-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224416-lgbz",
-       "tokens": 1276,
+       "revision": "20261026-022111-afg2",
+       "tokens": 1324,
        "counts": {
         "added": 0,
         "changed": 0,
@@ -2965,18 +3002,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -2984,37 +3021,38 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 8087,
+   "t": 7578,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 8089,
+   "t": 7579,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:15.504+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:10.454-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224412-wnn3",
-       "tokens": 2627,
+       "revision": "20261026-022107-wxw8",
+       "tokens": 2722,
        "counts": {
         "added": 1,
         "changed": 0,
@@ -3022,12 +3060,12 @@
        }
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:16.640+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:11.535-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224415-gmbg",
-       "tokens": 1278,
+       "revision": "20261026-022110-rjdf",
+       "tokens": 1326,
        "counts": {
         "added": 0,
         "changed": 0,
@@ -3035,12 +3073,12 @@
        }
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:17.762+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:12.582-04:00",
        "status": "done",
        "error": null,
-       "revision": "20261022-224416-lgbz",
-       "tokens": 1276,
+       "revision": "20261026-022111-afg2",
+       "tokens": 1324,
        "counts": {
         "added": 0,
         "changed": 0,
@@ -3050,18 +3088,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -3069,29 +3107,30 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 8092,
+   "t": 7583,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 8096,
+   "t": 7587,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -3108,10 +3147,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -3128,10 +3167,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -3153,56 +3192,56 @@
    }
   },
   {
-   "t": 8127,
+   "t": 7614,
    "command": {
     "type": "enhance.run",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 8129,
+   "t": 7615,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "taste",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "queued"
     }
    }
   },
   {
-   "t": 8129,
+   "t": 7615,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "strategy",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "queued"
     }
    }
   },
   {
-   "t": 8129,
+   "t": 7615,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "review",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "queued"
     }
    }
   },
   {
-   "t": 8129,
+   "t": 7616,
    "result": {
     "type": "enhance.run",
     "value": {
@@ -3211,112 +3250,112 @@
    }
   },
   {
-   "t": 8130,
+   "t": 7616,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "taste",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "running"
     }
    }
   },
   {
-   "t": 8141,
+   "t": 7632,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "taste",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "skipped"
     }
    }
   },
   {
-   "t": 8146,
+   "t": 7633,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "strategy",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "running"
     }
    }
   },
   {
-   "t": 8152,
+   "t": 7649,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "strategy",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "skipped"
     }
    }
   },
   {
-   "t": 8164,
+   "t": 7650,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "review",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "running"
     }
    }
   },
   {
-   "t": 8180,
+   "t": 7665,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "review",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "skipped"
     }
    }
   },
   {
-   "t": 8433,
+   "t": 7920,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 8435,
+   "t": 7922,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.519+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.196-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3324,8 +3363,8 @@
        "counts": null
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.213-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3333,8 +3372,8 @@
        "counts": null
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.229-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3344,18 +3383,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -3363,33 +3402,34 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 8435,
+   "t": 7922,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 8437,
+   "t": 7924,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.519+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.196-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3397,8 +3437,8 @@
        "counts": null
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.213-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3406,8 +3446,8 @@
        "counts": null
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.229-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3417,18 +3457,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -3436,33 +3476,34 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 8437,
+   "t": 7924,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 8438,
+   "t": 7926,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.519+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.196-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3470,8 +3511,8 @@
        "counts": null
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.213-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3479,8 +3520,8 @@
        "counts": null
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.229-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3490,18 +3531,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -3509,33 +3550,34 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 8438,
+   "t": 7926,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 8440,
+   "t": 7928,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.519+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.196-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3543,8 +3585,8 @@
        "counts": null
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.213-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3552,8 +3594,8 @@
        "counts": null
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.229-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3563,18 +3605,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -3582,33 +3624,34 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 8450,
+   "t": 7941,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 8452,
+   "t": 7943,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.519+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.196-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3616,8 +3659,8 @@
        "counts": null
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.213-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3625,8 +3668,8 @@
        "counts": null
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.229-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3636,18 +3679,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -3655,33 +3698,34 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 8452,
+   "t": 7943,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 8454,
+   "t": 7944,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.519+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.196-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3689,8 +3733,8 @@
        "counts": null
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.213-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3698,8 +3742,8 @@
        "counts": null
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.229-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3709,18 +3753,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -3728,33 +3772,34 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 8454,
+   "t": 7957,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 8455,
+   "t": 7958,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.519+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.196-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3762,8 +3807,8 @@
        "counts": null
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.213-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3771,8 +3816,8 @@
        "counts": null
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.229-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3782,18 +3827,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -3801,33 +3846,34 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 8466,
+   "t": 7958,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 8468,
+   "t": 7960,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.519+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.196-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3835,8 +3881,8 @@
        "counts": null
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.213-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3844,8 +3890,8 @@
        "counts": null
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.229-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3855,18 +3901,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -3874,33 +3920,34 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 8481,
+   "t": 7973,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 8483,
+   "t": 7974,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.519+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.196-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3908,8 +3955,8 @@
        "counts": null
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.213-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3917,8 +3964,8 @@
        "counts": null
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.229-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3928,18 +3975,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -3947,33 +3994,34 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 10017,
+   "t": 9479,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 10018,
+   "t": 9481,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.519+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.196-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3981,8 +4029,8 @@
        "counts": null
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.213-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -3990,8 +4038,8 @@
        "counts": null
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.229-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -4001,18 +4049,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -4020,29 +4068,30 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 10021,
+   "t": 9485,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 10024,
+   "t": 9488,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -4059,10 +4108,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -4079,10 +4128,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -4104,10 +4153,10 @@
    }
   },
   {
-   "t": 10069,
+   "t": 9526,
    "command": {
     "type": "enhance.set",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "pick": "mem/fake-coder-404",
     "thinking": "medium",
     "team": false,
@@ -4115,23 +4164,23 @@
    }
   },
   {
-   "t": 10081,
+   "t": 9536,
    "result": {
     "type": "enhance.set",
     "value": {
      "error": null,
      "info": {
-      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
       "enabled": true,
       "pick": "mem/fake-coder-404",
       "thinking": "medium",
       "team": false,
       "time": "04:00",
-      "since": "2026-10-22",
+      "since": "2026-10-25",
       "last": {
        "taste": {
-        "day": "2026-10-22",
-        "at": "2026-10-22T22:44:19.519+08:00",
+        "day": "2026-10-25",
+        "at": "2026-10-26T02:21:14.196-04:00",
         "status": "skipped",
         "error": null,
         "revision": null,
@@ -4139,8 +4188,8 @@
         "counts": null
        },
        "strategy": {
-        "day": "2026-10-22",
-        "at": "2026-10-22T22:44:19.536+08:00",
+        "day": "2026-10-25",
+        "at": "2026-10-26T02:21:14.213-04:00",
         "status": "skipped",
         "error": null,
         "revision": null,
@@ -4148,8 +4197,8 @@
         "counts": null
        },
        "review": {
-        "day": "2026-10-22",
-        "at": "2026-10-22T22:44:19.561+08:00",
+        "day": "2026-10-25",
+        "at": "2026-10-26T02:21:14.229-04:00",
         "status": "skipped",
         "error": null,
         "revision": null,
@@ -4159,18 +4208,18 @@
       },
       "running": null,
       "queued": 0,
-      "next": 1792699200000,
+      "next": 1793001600000,
       "notice": {
        "revisions": [
-        "20261022-224412-wnn3"
+        "20261026-022107-wxw8"
        ],
        "counts": {
         "taste": 1,
         "strategy": 0,
         "review": 0
        },
-       "from": "2026-10-22",
-       "to": "2026-10-22"
+       "from": "2026-10-25",
+       "to": "2026-10-25"
       },
       "effortPicks": {
        "mem": false,
@@ -4178,24 +4227,25 @@
        "mem/fake-think": true,
        "mem/fake-coder-404": false
       },
+      "noOffPicks": [],
       "error": null
      }
     }
    }
   },
   {
-   "t": 10087,
+   "t": 9541,
    "command": {
     "type": "session.prompt",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "text": "plain: one more message for the next enhancement run."
    }
   },
   {
-   "t": 10087,
+   "t": 9542,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.model_state",
      "pick": "mem/fake-coder",
@@ -4211,7 +4261,7 @@
    }
   },
   {
-   "t": 10087,
+   "t": 9542,
    "result": {
     "type": "session.prompt",
     "value": {
@@ -4221,20 +4271,20 @@
    }
   },
   {
-   "t": 10088,
+   "t": 9543,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "agent_start"
     }
    }
   },
   {
-   "t": 10088,
+   "t": 9543,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.board",
      "requests": [],
@@ -4243,10 +4293,10 @@
    }
   },
   {
-   "t": 10088,
+   "t": 9543,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -4262,20 +4312,20 @@
    }
   },
   {
-   "t": 10088,
+   "t": 9544,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "turn_start"
     }
    }
   },
   {
-   "t": 10088,
+   "t": 9544,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_start",
      "message": {
@@ -4286,16 +4336,16 @@
         "text": "plain: one more message for the next enhancement run."
        }
       ],
-      "timestamp": 1792680261475
+      "timestamp": 1792995676121
      }
     }
    }
   },
   {
-   "t": 10089,
+   "t": 9544,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_end",
      "message": {
@@ -4306,30 +4356,30 @@
         "text": "plain: one more message for the next enhancement run."
        }
       ],
-      "timestamp": 1792680261475
+      "timestamp": 1792995676121
      }
     }
    }
   },
   {
-   "t": 10089,
+   "t": 9544,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.entry_id",
      "role": "user",
-     "entryId": "da182fc5",
-     "time": 1792680261475,
+     "entryId": "35d030b4",
+     "time": 1792995676121,
      "refs": null
     }
    }
   },
   {
-   "t": 10152,
+   "t": 9603,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_start",
      "message": {
@@ -4358,17 +4408,17 @@
        }
       },
       "stopReason": "pending",
-      "timestamp": 1792680261478,
-      "responseId": "chatcmpl-fake-1792680261482"
+      "timestamp": 1792995676124,
+      "responseId": "chatcmpl-fake-1792995676128"
      }
     }
    }
   },
   {
-   "t": 10152,
+   "t": 9603,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4379,10 +4429,10 @@
    }
   },
   {
-   "t": 10152,
+   "t": 9603,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4394,10 +4444,10 @@
    }
   },
   {
-   "t": 10168,
+   "t": 9617,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4409,10 +4459,10 @@
    }
   },
   {
-   "t": 10183,
+   "t": 9632,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4424,10 +4474,10 @@
    }
   },
   {
-   "t": 10199,
+   "t": 9648,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4439,10 +4489,10 @@
    }
   },
   {
-   "t": 10215,
+   "t": 9663,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4454,10 +4504,10 @@
    }
   },
   {
-   "t": 10230,
+   "t": 9678,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4469,10 +4519,10 @@
    }
   },
   {
-   "t": 10246,
+   "t": 9694,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4484,10 +4534,10 @@
    }
   },
   {
-   "t": 10262,
+   "t": 9709,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4499,10 +4549,10 @@
    }
   },
   {
-   "t": 10277,
+   "t": 9724,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4514,10 +4564,10 @@
    }
   },
   {
-   "t": 10294,
+   "t": 9740,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4529,10 +4579,10 @@
    }
   },
   {
-   "t": 10309,
+   "t": 9756,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4544,10 +4594,10 @@
    }
   },
   {
-   "t": 10325,
+   "t": 9771,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_update",
      "update": {
@@ -4558,10 +4608,10 @@
    }
   },
   {
-   "t": 10325,
+   "t": 9772,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "message_end",
      "message": {
@@ -4576,12 +4626,12 @@
       "provider": "mem",
       "model": "fake-coder",
       "usage": {
-       "input": 601,
+       "input": 557,
        "output": 20,
        "cacheRead": 0,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 621,
+       "totalTokens": 577,
        "cost": {
         "input": 0,
         "output": 0,
@@ -4591,34 +4641,34 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1792680261478,
-      "responseId": "chatcmpl-fake-1792680261482",
+      "timestamp": 1792995676124,
+      "responseId": "chatcmpl-fake-1792995676128",
       "rawStopReason": "stop",
-      "durationMs": 235,
+      "durationMs": 225,
       "thinkingLevel": "off"
      }
     }
    }
   },
   {
-   "t": 10326,
+   "t": 9772,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.entry_id",
      "role": "assistant",
-     "entryId": "f89e66e1",
-     "time": 1792680261478,
+     "entryId": "aafd6e31",
+     "time": 1792995676124,
      "refs": null
     }
    }
   },
   {
-   "t": 10326,
+   "t": 9772,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "turn_end",
      "message": {
@@ -4633,12 +4683,12 @@
       "provider": "mem",
       "model": "fake-coder",
       "usage": {
-       "input": 601,
+       "input": 557,
        "output": 20,
        "cacheRead": 0,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 621,
+       "totalTokens": 577,
        "cost": {
         "input": 0,
         "output": 0,
@@ -4648,10 +4698,10 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1792680261478,
-      "responseId": "chatcmpl-fake-1792680261482",
+      "timestamp": 1792995676124,
+      "responseId": "chatcmpl-fake-1792995676128",
       "rawStopReason": "stop",
-      "durationMs": 235,
+      "durationMs": 225,
       "thinkingLevel": "off"
      },
      "toolResults": []
@@ -4659,17 +4709,17 @@
    }
   },
   {
-   "t": 10326,
+   "t": 9772,
    "command": {
     "type": "session.state",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174"
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e"
    }
   },
   {
-   "t": 10326,
+   "t": 9772,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "agent_end",
      "messages": [
@@ -4681,7 +4731,7 @@
          "text": "plain: one more message for the next enhancement run."
         }
        ],
-       "timestamp": 1792680261475
+       "timestamp": 1792995676121
       },
       {
        "role": "assistant",
@@ -4695,12 +4745,12 @@
        "provider": "mem",
        "model": "fake-coder",
        "usage": {
-        "input": 601,
+        "input": 557,
         "output": 20,
         "cacheRead": 0,
         "cacheWrite": 0,
         "reasoning": 0,
-        "totalTokens": 621,
+        "totalTokens": 577,
         "cost": {
          "input": 0,
          "output": 0,
@@ -4710,10 +4760,10 @@
         }
        },
        "stopReason": "stop",
-       "timestamp": 1792680261478,
-       "responseId": "chatcmpl-fake-1792680261482",
+       "timestamp": 1792995676124,
+       "responseId": "chatcmpl-fake-1792995676128",
        "rawStopReason": "stop",
-       "durationMs": 235,
+       "durationMs": 225,
        "thinkingLevel": "off"
       }
      ],
@@ -4722,10 +4772,10 @@
    }
   },
   {
-   "t": 10326,
+   "t": 9772,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "agent_settled",
      "aborted": false
@@ -4733,10 +4783,10 @@
    }
   },
   {
-   "t": 10326,
+   "t": 9773,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.model_state",
      "pick": "mem/fake-coder",
@@ -4752,10 +4802,10 @@
    }
   },
   {
-   "t": 10326,
+   "t": 9773,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -4771,10 +4821,10 @@
    }
   },
   {
-   "t": 10326,
+   "t": 9773,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.prompt_done",
      "running": false
@@ -4782,23 +4832,33 @@
    }
   },
   {
-   "t": 10327,
+   "t": 9773,
    "result": {
     "type": "session.state",
     "value": {
      "contextUsage": {
-      "tokens": 621,
+      "tokens": 577,
       "contextWindow": 128000,
-      "percent": 0.48515625
+      "percent": 0.45078124999999997
+     },
+     "contextBreakdown": {
+      "systemPrompt": 474,
+      "memoryFiles": 0,
+      "skills": 0,
+      "systemTools": 1191,
+      "mcpTools": 0,
+      "messages": 0,
+      "autocompactBuffer": 16384,
+      "freeSpace": 111039
      }
     }
    }
   },
   {
-   "t": 10340,
+   "t": 9773,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -4814,10 +4874,10 @@
    }
   },
   {
-   "t": 10340,
+   "t": 9773,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -4833,10 +4893,10 @@
    }
   },
   {
-   "t": 10340,
+   "t": 9802,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a16411-d023-735a-9f0a-d42fbbb43174",
+    "sessionId": "01a176de-aaad-75e0-818f-165b1739b18e",
     "event": {
      "type": "mori.board",
      "requests": [],
@@ -4845,24 +4905,24 @@
    }
   },
   {
-   "t": 10653,
+   "t": 10115,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 10657,
+   "t": 10118,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -4879,10 +4939,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -4899,10 +4959,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -4924,28 +4984,28 @@
    }
   },
   {
-   "t": 10660,
+   "t": 10120,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 10662,
+   "t": 10122,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder-404",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.519+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.196-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -4953,8 +5013,8 @@
        "counts": null
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.213-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -4962,8 +5022,8 @@
        "counts": null
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:14.229-04:00",
        "status": "skipped",
        "error": null,
        "revision": null,
@@ -4973,18 +5033,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -4992,61 +5052,62 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 10737,
+   "t": 10165,
    "command": {
     "type": "enhance.run",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 10739,
+   "t": 10167,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "taste",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "queued"
     }
    }
   },
   {
-   "t": 10739,
+   "t": 10167,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "strategy",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "queued"
     }
    }
   },
   {
-   "t": 10739,
+   "t": 10167,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "review",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "queued"
     }
    }
   },
   {
-   "t": 10740,
+   "t": 10167,
    "result": {
     "type": "enhance.run",
     "value": {
@@ -5055,56 +5116,56 @@
    }
   },
   {
-   "t": 10741,
+   "t": 10167,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "taste",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "running"
     }
    }
   },
   {
-   "t": 10779,
+   "t": 10186,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "taste"
      ],
-     "revision": "20261022-224422-hny9"
+     "revision": "20261026-022116-fby3"
     }
    }
   },
   {
-   "t": 10779,
+   "t": 10186,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 10819,
+   "t": 10219,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224422-hny9",
-       "time": "2026-10-22T22:44:22.160+08:00",
+       "id": "20261026-022116-fby3",
+       "time": "2026-10-26T02:21:16.761-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "running",
        "layers": [
         "project"
@@ -5121,10 +5182,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -5141,10 +5202,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -5161,10 +5222,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -5186,189 +5247,189 @@
    }
   },
   {
-   "t": 10997,
+   "t": 10250,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "taste"
      ],
-     "revision": "20261022-224422-hny9"
+     "revision": "20261026-022116-fby3"
     }
    }
   },
   {
-   "t": 10997,
+   "t": 10250,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 11002,
+   "t": 10262,
+   "result": {
+    "type": "memory.revisions",
+    "value": {
+     "revisions": [
+      {
+       "id": "20261026-022116-fby3",
+       "time": "2026-10-26T02:21:16.761-04:00",
+       "by": "Enhancement",
+       "title": "TASTE enhancement · Oct 25",
+       "status": "failed",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "taste"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
+       "by": "Enhancement",
+       "title": "REVIEW enhancement · Oct 25",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "review"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
+       "by": "Enhancement",
+       "title": "STRATEGY enhancement · Oct 25",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "strategy"
+       ],
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      },
+      {
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
+       "by": "Enhancement",
+       "title": "TASTE enhancement · Oct 25",
+       "status": "done",
+       "layers": [
+        "project"
+       ],
+       "kinds": [
+        "taste"
+       ],
+       "counts": {
+        "added": 1,
+        "changed": 0,
+        "deleted": 0,
+        "moved": 0
+       },
+       "rollbackOf": null
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 10263,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "taste",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "failed",
      "error": "No model available",
-     "revision": "20261022-224422-hny9"
+     "revision": "20261026-022116-fby3"
     }
    }
   },
   {
-   "t": 11018,
-   "result": {
-    "type": "memory.revisions",
-    "value": {
-     "revisions": [
-      {
-       "id": "20261022-224422-hny9",
-       "time": "2026-10-22T22:44:22.160+08:00",
-       "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
-       "status": "failed",
-       "layers": [
-        "project"
-       ],
-       "kinds": [
-        "taste"
-       ],
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0,
-        "moved": 0
-       },
-       "rollbackOf": null
-      },
-      {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
-       "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
-       "status": "done",
-       "layers": [
-        "project"
-       ],
-       "kinds": [
-        "review"
-       ],
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0,
-        "moved": 0
-       },
-       "rollbackOf": null
-      },
-      {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
-       "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
-       "status": "done",
-       "layers": [
-        "project"
-       ],
-       "kinds": [
-        "strategy"
-       ],
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0,
-        "moved": 0
-       },
-       "rollbackOf": null
-      },
-      {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
-       "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
-       "status": "done",
-       "layers": [
-        "project"
-       ],
-       "kinds": [
-        "taste"
-       ],
-       "counts": {
-        "added": 1,
-        "changed": 0,
-        "deleted": 0,
-        "moved": 0
-       },
-       "rollbackOf": null
-      }
-     ],
-     "error": null
-    }
-   }
-  },
-  {
-   "t": 11019,
+   "t": 10264,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "strategy",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "running"
     }
    }
   },
   {
-   "t": 11047,
+   "t": 10279,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "strategy"
      ],
-     "revision": "20261022-224422-hnya"
+     "revision": "20261026-022116-t96t"
     }
    }
   },
   {
-   "t": 11047,
+   "t": 10279,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 11079,
+   "t": 10325,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224422-hnya",
-       "time": "2026-10-22T22:44:22.431+08:00",
+       "id": "20261026-022116-t96t",
+       "time": "2026-10-26T02:21:16.855-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "running",
        "layers": [
         "project"
@@ -5385,10 +5446,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224422-hny9",
-       "time": "2026-10-22T22:44:22.160+08:00",
+       "id": "20261026-022116-fby3",
+       "time": "2026-10-26T02:21:16.761-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "failed",
        "layers": [
         "project"
@@ -5405,10 +5466,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -5425,10 +5486,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -5445,10 +5506,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -5470,378 +5531,42 @@
    }
   },
   {
-   "t": 11079,
-   "command": {
-    "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
-   }
-  },
-  {
-   "t": 11159,
-   "result": {
-    "type": "enhance.get",
-    "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "enabled": true,
-     "pick": "mem/fake-coder-404",
-     "thinking": "medium",
-     "team": false,
-     "time": "04:00",
-     "since": "2026-10-22",
-     "last": {
-      "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.385+08:00",
-       "status": "failed",
-       "error": "No model available",
-       "revision": "20261022-224422-hny9",
-       "tokens": 0,
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0
-       }
-      },
-      "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
-       "status": "skipped",
-       "error": null,
-       "revision": null,
-       "tokens": 0,
-       "counts": null
-      },
-      "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
-       "status": "skipped",
-       "error": null,
-       "revision": null,
-       "tokens": 0,
-       "counts": null
-      }
-     },
-     "running": {
-      "task": "strategy",
-      "day": "2026-10-22"
-     },
-     "queued": 1,
-     "next": 1792699200000,
-     "notice": {
-      "revisions": [
-       "20261022-224412-wnn3"
-      ],
-      "counts": {
-       "taste": 1,
-       "strategy": 0,
-       "review": 0
-      },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
-     },
-     "effortPicks": {
-      "mem": false,
-      "mem/fake-coder": false,
-      "mem/fake-think": true,
-      "mem/fake-coder-404": false
-     },
-     "error": null
-    }
-   }
-  },
-  {
-   "t": 11159,
-   "command": {
-    "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
-   }
-  },
-  {
-   "t": 11226,
-   "result": {
-    "type": "enhance.get",
-    "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "enabled": true,
-     "pick": "mem/fake-coder-404",
-     "thinking": "medium",
-     "team": false,
-     "time": "04:00",
-     "since": "2026-10-22",
-     "last": {
-      "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.385+08:00",
-       "status": "failed",
-       "error": "No model available",
-       "revision": "20261022-224422-hny9",
-       "tokens": 0,
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0
-       }
-      },
-      "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
-       "status": "skipped",
-       "error": null,
-       "revision": null,
-       "tokens": 0,
-       "counts": null
-      },
-      "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
-       "status": "skipped",
-       "error": null,
-       "revision": null,
-       "tokens": 0,
-       "counts": null
-      }
-     },
-     "running": {
-      "task": "strategy",
-      "day": "2026-10-22"
-     },
-     "queued": 1,
-     "next": 1792699200000,
-     "notice": {
-      "revisions": [
-       "20261022-224412-wnn3"
-      ],
-      "counts": {
-       "taste": 1,
-       "strategy": 0,
-       "review": 0
-      },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
-     },
-     "effortPicks": {
-      "mem": false,
-      "mem/fake-coder": false,
-      "mem/fake-think": true,
-      "mem/fake-coder-404": false
-     },
-     "error": null
-    }
-   }
-  },
-  {
-   "t": 11226,
-   "command": {
-    "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
-   }
-  },
-  {
-   "t": 11228,
-   "result": {
-    "type": "enhance.get",
-    "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "enabled": true,
-     "pick": "mem/fake-coder-404",
-     "thinking": "medium",
-     "team": false,
-     "time": "04:00",
-     "since": "2026-10-22",
-     "last": {
-      "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.385+08:00",
-       "status": "failed",
-       "error": "No model available",
-       "revision": "20261022-224422-hny9",
-       "tokens": 0,
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0
-       }
-      },
-      "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
-       "status": "skipped",
-       "error": null,
-       "revision": null,
-       "tokens": 0,
-       "counts": null
-      },
-      "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
-       "status": "skipped",
-       "error": null,
-       "revision": null,
-       "tokens": 0,
-       "counts": null
-      }
-     },
-     "running": {
-      "task": "strategy",
-      "day": "2026-10-22"
-     },
-     "queued": 1,
-     "next": 1792699200000,
-     "notice": {
-      "revisions": [
-       "20261022-224412-wnn3"
-      ],
-      "counts": {
-       "taste": 1,
-       "strategy": 0,
-       "review": 0
-      },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
-     },
-     "effortPicks": {
-      "mem": false,
-      "mem/fake-coder": false,
-      "mem/fake-think": true,
-      "mem/fake-coder-404": false
-     },
-     "error": null
-    }
-   }
-  },
-  {
-   "t": 11228,
-   "command": {
-    "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
-   }
-  },
-  {
-   "t": 11231,
-   "result": {
-    "type": "enhance.get",
-    "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "enabled": true,
-     "pick": "mem/fake-coder-404",
-     "thinking": "medium",
-     "team": false,
-     "time": "04:00",
-     "since": "2026-10-22",
-     "last": {
-      "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.385+08:00",
-       "status": "failed",
-       "error": "No model available",
-       "revision": "20261022-224422-hny9",
-       "tokens": 0,
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0
-       }
-      },
-      "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.536+08:00",
-       "status": "skipped",
-       "error": null,
-       "revision": null,
-       "tokens": 0,
-       "counts": null
-      },
-      "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
-       "status": "skipped",
-       "error": null,
-       "revision": null,
-       "tokens": 0,
-       "counts": null
-      }
-     },
-     "running": {
-      "task": "strategy",
-      "day": "2026-10-22"
-     },
-     "queued": 1,
-     "next": 1792699200000,
-     "notice": {
-      "revisions": [
-       "20261022-224412-wnn3"
-      ],
-      "counts": {
-       "taste": 1,
-       "strategy": 0,
-       "review": 0
-      },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
-     },
-     "effortPicks": {
-      "mem": false,
-      "mem/fake-coder": false,
-      "mem/fake-think": true,
-      "mem/fake-coder-404": false
-     },
-     "error": null
-    }
-   }
-  },
-  {
-   "t": 11231,
+   "t": 10330,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "strategy"
      ],
-     "revision": "20261022-224422-hnya"
+     "revision": "20261026-022116-t96t"
     }
    }
   },
   {
-   "t": 11231,
+   "t": 10330,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 11236,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "task": "strategy",
-     "day": "2026-10-22",
-     "phase": "failed",
-     "error": "No model available",
-     "revision": "20261022-224422-hnya"
-    }
-   }
-  },
-  {
-   "t": 11251,
+   "t": 10346,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224422-hnya",
-       "time": "2026-10-22T22:44:22.431+08:00",
+       "id": "20261026-022116-t96t",
+       "time": "2026-10-26T02:21:16.855-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "failed",
        "layers": [
         "project"
@@ -5858,10 +5583,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224422-hny9",
-       "time": "2026-10-22T22:44:22.160+08:00",
+       "id": "20261026-022116-fby3",
+       "time": "2026-10-26T02:21:16.761-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "failed",
        "layers": [
         "project"
@@ -5878,10 +5603,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -5898,10 +5623,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -5918,10 +5643,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -5943,56 +5668,72 @@
    }
   },
   {
-   "t": 11257,
+   "t": 10346,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "task": "strategy",
+     "day": "2026-10-25",
+     "phase": "failed",
+     "error": "No model available",
+     "revision": "20261026-022116-t96t"
+    }
+   }
+  },
+  {
+   "t": 10347,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.enhance_progress",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "task": "review",
-     "day": "2026-10-22",
+     "day": "2026-10-25",
      "phase": "running"
     }
    }
   },
   {
-   "t": 11278,
+   "t": 10365,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "review"
      ],
-     "revision": "20261022-224422-ktnx"
+     "revision": "20261026-022116-t96u"
     }
    }
   },
   {
-   "t": 11278,
+   "t": 10365,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 11376,
+   "t": 10401,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224422-ktnx",
-       "time": "2026-10-22T22:44:22.662+08:00",
+       "id": "20261026-022116-t96u",
+       "time": "2026-10-26T02:21:16.941-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "running",
        "layers": [
         "project"
@@ -6009,10 +5750,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224422-hnya",
-       "time": "2026-10-22T22:44:22.431+08:00",
+       "id": "20261026-022116-t96t",
+       "time": "2026-10-26T02:21:16.855-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "failed",
        "layers": [
         "project"
@@ -6029,10 +5770,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224422-hny9",
-       "time": "2026-10-22T22:44:22.160+08:00",
+       "id": "20261026-022116-fby3",
+       "time": "2026-10-26T02:21:16.761-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "failed",
        "layers": [
         "project"
@@ -6049,10 +5790,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -6069,10 +5810,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -6089,10 +5830,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -6114,226 +5855,42 @@
    }
   },
   {
-   "t": 11376,
-   "command": {
-    "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
-   }
-  },
-  {
-   "t": 11422,
-   "result": {
-    "type": "enhance.get",
-    "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "enabled": true,
-     "pick": "mem/fake-coder-404",
-     "thinking": "medium",
-     "team": false,
-     "time": "04:00",
-     "since": "2026-10-22",
-     "last": {
-      "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.385+08:00",
-       "status": "failed",
-       "error": "No model available",
-       "revision": "20261022-224422-hny9",
-       "tokens": 0,
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0
-       }
-      },
-      "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.618+08:00",
-       "status": "failed",
-       "error": "No model available",
-       "revision": "20261022-224422-hnya",
-       "tokens": 0,
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0
-       }
-      },
-      "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
-       "status": "skipped",
-       "error": null,
-       "revision": null,
-       "tokens": 0,
-       "counts": null
-      }
-     },
-     "running": {
-      "task": "review",
-      "day": "2026-10-22"
-     },
-     "queued": 0,
-     "next": 1792699200000,
-     "notice": {
-      "revisions": [
-       "20261022-224412-wnn3"
-      ],
-      "counts": {
-       "taste": 1,
-       "strategy": 0,
-       "review": 0
-      },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
-     },
-     "effortPicks": {
-      "mem": false,
-      "mem/fake-coder": false,
-      "mem/fake-think": true,
-      "mem/fake-coder-404": false
-     },
-     "error": null
-    }
-   }
-  },
-  {
-   "t": 11422,
-   "command": {
-    "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
-   }
-  },
-  {
-   "t": 11423,
-   "result": {
-    "type": "enhance.get",
-    "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "enabled": true,
-     "pick": "mem/fake-coder-404",
-     "thinking": "medium",
-     "team": false,
-     "time": "04:00",
-     "since": "2026-10-22",
-     "last": {
-      "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.385+08:00",
-       "status": "failed",
-       "error": "No model available",
-       "revision": "20261022-224422-hny9",
-       "tokens": 0,
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0
-       }
-      },
-      "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.618+08:00",
-       "status": "failed",
-       "error": "No model available",
-       "revision": "20261022-224422-hnya",
-       "tokens": 0,
-       "counts": {
-        "added": 0,
-        "changed": 0,
-        "deleted": 0
-       }
-      },
-      "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:19.561+08:00",
-       "status": "skipped",
-       "error": null,
-       "revision": null,
-       "tokens": 0,
-       "counts": null
-      }
-     },
-     "running": {
-      "task": "review",
-      "day": "2026-10-22"
-     },
-     "queued": 0,
-     "next": 1792699200000,
-     "notice": {
-      "revisions": [
-       "20261022-224412-wnn3"
-      ],
-      "counts": {
-       "taste": 1,
-       "strategy": 0,
-       "review": 0
-      },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
-     },
-     "effortPicks": {
-      "mem": false,
-      "mem/fake-coder": false,
-      "mem/fake-think": true,
-      "mem/fake-coder-404": false
-     },
-     "error": null
-    }
-   }
-  },
-  {
-   "t": 11424,
+   "t": 10420,
    "envelope": {
     "kind": "event",
     "sessionId": null,
     "event": {
      "type": "mori.memory_changed",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "layers": [
       "project"
      ],
      "kinds": [
       "review"
      ],
-     "revision": "20261022-224422-ktnx"
+     "revision": "20261026-022116-t96u"
     }
    }
   },
   {
-   "t": 11424,
+   "t": 10420,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 11429,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.enhance_progress",
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
-     "task": "review",
-     "day": "2026-10-22",
-     "phase": "failed",
-     "error": "No model available",
-     "revision": "20261022-224422-ktnx"
-    }
-   }
-  },
-  {
-   "t": 11441,
+   "t": 10433,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224422-ktnx",
-       "time": "2026-10-22T22:44:22.662+08:00",
+       "id": "20261026-022116-t96u",
+       "time": "2026-10-26T02:21:16.941-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "failed",
        "layers": [
         "project"
@@ -6350,10 +5907,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224422-hnya",
-       "time": "2026-10-22T22:44:22.431+08:00",
+       "id": "20261026-022116-t96t",
+       "time": "2026-10-26T02:21:16.855-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "failed",
        "layers": [
         "project"
@@ -6370,10 +5927,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224422-hny9",
-       "time": "2026-10-22T22:44:22.160+08:00",
+       "id": "20261026-022116-fby3",
+       "time": "2026-10-26T02:21:16.761-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "failed",
        "layers": [
         "project"
@@ -6390,10 +5947,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -6410,10 +5967,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -6430,10 +5987,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -6455,31 +6012,47 @@
    }
   },
   {
-   "t": 11539,
-   "command": {
-    "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+   "t": 10433,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.enhance_progress",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "task": "review",
+     "day": "2026-10-25",
+     "phase": "failed",
+     "error": "No model available",
+     "revision": "20261026-022116-t96u"
+    }
    }
   },
   {
-   "t": 11541,
+   "t": 10469,
+   "command": {
+    "type": "enhance.get",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
+   }
+  },
+  {
+   "t": 10488,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder-404",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.385+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.828-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-hny9",
+       "revision": "20261026-022116-fby3",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6488,11 +6061,11 @@
        }
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.618+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.908-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-hnya",
+       "revision": "20261026-022116-t96t",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6501,11 +6074,11 @@
        }
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.812+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.998-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-ktnx",
+       "revision": "20261026-022116-t96u",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6516,18 +6089,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -6535,36 +6108,37 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 11570,
+   "t": 10488,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 11574,
+   "t": 10490,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder-404",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.385+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.828-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-hny9",
+       "revision": "20261026-022116-fby3",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6573,11 +6147,11 @@
        }
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.618+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.908-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-hnya",
+       "revision": "20261026-022116-t96t",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6586,11 +6160,11 @@
        }
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.812+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.998-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-ktnx",
+       "revision": "20261026-022116-t96u",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6601,18 +6175,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -6620,36 +6194,37 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 11739,
+   "t": 10490,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 11741,
+   "t": 10491,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder-404",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.385+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.828-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-hny9",
+       "revision": "20261026-022116-fby3",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6658,11 +6233,11 @@
        }
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.618+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.908-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-hnya",
+       "revision": "20261026-022116-t96t",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6671,11 +6246,11 @@
        }
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.812+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.998-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-ktnx",
+       "revision": "20261026-022116-t96u",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6686,18 +6261,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -6705,36 +6280,37 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 13156,
+   "t": 10491,
    "command": {
     "type": "enhance.get",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
    }
   },
   {
-   "t": 13158,
+   "t": 10493,
    "result": {
     "type": "enhance.get",
     "value": {
-     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
      "enabled": true,
      "pick": "mem/fake-coder-404",
      "thinking": "medium",
      "team": false,
      "time": "04:00",
-     "since": "2026-10-22",
+     "since": "2026-10-25",
      "last": {
       "taste": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.385+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.828-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-hny9",
+       "revision": "20261026-022116-fby3",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6743,11 +6319,11 @@
        }
       },
       "strategy": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.618+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.908-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-hnya",
+       "revision": "20261026-022116-t96t",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6756,11 +6332,11 @@
        }
       },
       "review": {
-       "day": "2026-10-22",
-       "at": "2026-10-22T22:44:22.812+08:00",
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.998-04:00",
        "status": "failed",
        "error": "No model available",
-       "revision": "20261022-224422-ktnx",
+       "revision": "20261026-022116-t96u",
        "tokens": 0,
        "counts": {
         "added": 0,
@@ -6771,18 +6347,18 @@
      },
      "running": null,
      "queued": 0,
-     "next": 1792699200000,
+     "next": 1793001600000,
      "notice": {
       "revisions": [
-       "20261022-224412-wnn3"
+       "20261026-022107-wxw8"
       ],
       "counts": {
        "taste": 1,
        "strategy": 0,
        "review": 0
       },
-      "from": "2026-10-22",
-      "to": "2026-10-22"
+      "from": "2026-10-25",
+      "to": "2026-10-25"
      },
      "effortPicks": {
       "mem": false,
@@ -6790,29 +6366,546 @@
       "mem/fake-think": true,
       "mem/fake-coder-404": false
      },
+     "noOffPicks": [],
      "error": null
     }
    }
   },
   {
-   "t": 13163,
+   "t": 10576,
+   "command": {
+    "type": "enhance.get",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
+   }
+  },
+  {
+   "t": 10578,
+   "result": {
+    "type": "enhance.get",
+    "value": {
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "enabled": true,
+     "pick": "mem/fake-coder-404",
+     "thinking": "medium",
+     "team": false,
+     "time": "04:00",
+     "since": "2026-10-25",
+     "last": {
+      "taste": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.828-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-fby3",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "strategy": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.908-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96t",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "review": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.998-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96u",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      }
+     },
+     "running": null,
+     "queued": 0,
+     "next": 1793001600000,
+     "notice": {
+      "revisions": [
+       "20261026-022107-wxw8"
+      ],
+      "counts": {
+       "taste": 1,
+       "strategy": 0,
+       "review": 0
+      },
+      "from": "2026-10-25",
+      "to": "2026-10-25"
+     },
+     "effortPicks": {
+      "mem": false,
+      "mem/fake-coder": false,
+      "mem/fake-think": true,
+      "mem/fake-coder-404": false
+     },
+     "noOffPicks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 10578,
+   "command": {
+    "type": "enhance.get",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
+   }
+  },
+  {
+   "t": 10579,
+   "result": {
+    "type": "enhance.get",
+    "value": {
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "enabled": true,
+     "pick": "mem/fake-coder-404",
+     "thinking": "medium",
+     "team": false,
+     "time": "04:00",
+     "since": "2026-10-25",
+     "last": {
+      "taste": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.828-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-fby3",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "strategy": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.908-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96t",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "review": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.998-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96u",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      }
+     },
+     "running": null,
+     "queued": 0,
+     "next": 1793001600000,
+     "notice": {
+      "revisions": [
+       "20261026-022107-wxw8"
+      ],
+      "counts": {
+       "taste": 1,
+       "strategy": 0,
+       "review": 0
+      },
+      "from": "2026-10-25",
+      "to": "2026-10-25"
+     },
+     "effortPicks": {
+      "mem": false,
+      "mem/fake-coder": false,
+      "mem/fake-think": true,
+      "mem/fake-coder-404": false
+     },
+     "noOffPicks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 10654,
+   "command": {
+    "type": "enhance.get",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
+   }
+  },
+  {
+   "t": 10655,
+   "result": {
+    "type": "enhance.get",
+    "value": {
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "enabled": true,
+     "pick": "mem/fake-coder-404",
+     "thinking": "medium",
+     "team": false,
+     "time": "04:00",
+     "since": "2026-10-25",
+     "last": {
+      "taste": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.828-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-fby3",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "strategy": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.908-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96t",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "review": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.998-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96u",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      }
+     },
+     "running": null,
+     "queued": 0,
+     "next": 1793001600000,
+     "notice": {
+      "revisions": [
+       "20261026-022107-wxw8"
+      ],
+      "counts": {
+       "taste": 1,
+       "strategy": 0,
+       "review": 0
+      },
+      "from": "2026-10-25",
+      "to": "2026-10-25"
+     },
+     "effortPicks": {
+      "mem": false,
+      "mem/fake-coder": false,
+      "mem/fake-think": true,
+      "mem/fake-coder-404": false
+     },
+     "noOffPicks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 10655,
+   "command": {
+    "type": "enhance.get",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
+   }
+  },
+  {
+   "t": 10656,
+   "result": {
+    "type": "enhance.get",
+    "value": {
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "enabled": true,
+     "pick": "mem/fake-coder-404",
+     "thinking": "medium",
+     "team": false,
+     "time": "04:00",
+     "since": "2026-10-25",
+     "last": {
+      "taste": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.828-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-fby3",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "strategy": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.908-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96t",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "review": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.998-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96u",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      }
+     },
+     "running": null,
+     "queued": 0,
+     "next": 1793001600000,
+     "notice": {
+      "revisions": [
+       "20261026-022107-wxw8"
+      ],
+      "counts": {
+       "taste": 1,
+       "strategy": 0,
+       "review": 0
+      },
+      "from": "2026-10-25",
+      "to": "2026-10-25"
+     },
+     "effortPicks": {
+      "mem": false,
+      "mem/fake-coder": false,
+      "mem/fake-think": true,
+      "mem/fake-coder-404": false
+     },
+     "noOffPicks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 10748,
+   "command": {
+    "type": "enhance.get",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
+   }
+  },
+  {
+   "t": 10750,
+   "result": {
+    "type": "enhance.get",
+    "value": {
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "enabled": true,
+     "pick": "mem/fake-coder-404",
+     "thinking": "medium",
+     "team": false,
+     "time": "04:00",
+     "since": "2026-10-25",
+     "last": {
+      "taste": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.828-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-fby3",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "strategy": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.908-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96t",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "review": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.998-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96u",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      }
+     },
+     "running": null,
+     "queued": 0,
+     "next": 1793001600000,
+     "notice": {
+      "revisions": [
+       "20261026-022107-wxw8"
+      ],
+      "counts": {
+       "taste": 1,
+       "strategy": 0,
+       "review": 0
+      },
+      "from": "2026-10-25",
+      "to": "2026-10-25"
+     },
+     "effortPicks": {
+      "mem": false,
+      "mem/fake-coder": false,
+      "mem/fake-think": true,
+      "mem/fake-coder-404": false
+     },
+     "noOffPicks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 12085,
+   "command": {
+    "type": "enhance.get",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance"
+   }
+  },
+  {
+   "t": 12087,
+   "result": {
+    "type": "enhance.get",
+    "value": {
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
+     "enabled": true,
+     "pick": "mem/fake-coder-404",
+     "thinking": "medium",
+     "team": false,
+     "time": "04:00",
+     "since": "2026-10-25",
+     "last": {
+      "taste": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.828-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-fby3",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "strategy": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.908-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96t",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      },
+      "review": {
+       "day": "2026-10-25",
+       "at": "2026-10-26T02:21:16.998-04:00",
+       "status": "failed",
+       "error": "No model available",
+       "revision": "20261026-022116-t96u",
+       "tokens": 0,
+       "counts": {
+        "added": 0,
+        "changed": 0,
+        "deleted": 0
+       }
+      }
+     },
+     "running": null,
+     "queued": 0,
+     "next": 1793001600000,
+     "notice": {
+      "revisions": [
+       "20261026-022107-wxw8"
+      ],
+      "counts": {
+       "taste": 1,
+       "strategy": 0,
+       "review": 0
+      },
+      "from": "2026-10-25",
+      "to": "2026-10-25"
+     },
+     "effortPicks": {
+      "mem": false,
+      "mem/fake-coder": false,
+      "mem/fake-think": true,
+      "mem/fake-coder-404": false
+     },
+     "noOffPicks": [],
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 12090,
    "command": {
     "type": "memory.revisions",
-    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-mem-record-TbCbOs\\mem-enhance",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-mem-record-qajlQ3\\mem-enhance",
     "layer": "project"
    }
   },
   {
-   "t": 13171,
+   "t": 12095,
    "result": {
     "type": "memory.revisions",
     "value": {
      "revisions": [
       {
-       "id": "20261022-224422-ktnx",
-       "time": "2026-10-22T22:44:22.662+08:00",
+       "id": "20261026-022116-t96u",
+       "time": "2026-10-26T02:21:16.941-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "failed",
        "layers": [
         "project"
@@ -6829,10 +6922,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224422-hnya",
-       "time": "2026-10-22T22:44:22.431+08:00",
+       "id": "20261026-022116-t96t",
+       "time": "2026-10-26T02:21:16.855-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "failed",
        "layers": [
         "project"
@@ -6849,10 +6942,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224422-hny9",
-       "time": "2026-10-22T22:44:22.160+08:00",
+       "id": "20261026-022116-fby3",
+       "time": "2026-10-26T02:21:16.761-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "failed",
        "layers": [
         "project"
@@ -6869,10 +6962,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224416-lgbz",
-       "time": "2026-10-22T22:44:16.679+08:00",
+       "id": "20261026-022111-afg2",
+       "time": "2026-10-26T02:21:11.566-04:00",
        "by": "Enhancement",
-       "title": "REVIEW enhancement · Oct 22",
+       "title": "REVIEW enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -6889,10 +6982,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224415-gmbg",
-       "time": "2026-10-22T22:44:15.542+08:00",
+       "id": "20261026-022110-rjdf",
+       "time": "2026-10-26T02:21:10.485-04:00",
        "by": "Enhancement",
-       "title": "STRATEGY enhancement · Oct 22",
+       "title": "STRATEGY enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"
@@ -6909,10 +7002,10 @@
        "rollbackOf": null
       },
       {
-       "id": "20261022-224412-wnn3",
-       "time": "2026-10-22T22:44:12.512+08:00",
+       "id": "20261026-022107-wxw8",
+       "time": "2026-10-26T02:21:07.572-04:00",
        "by": "Enhancement",
-       "title": "TASTE enhancement · Oct 22",
+       "title": "TASTE enhancement · Oct 25",
        "status": "done",
        "layers": [
         "project"

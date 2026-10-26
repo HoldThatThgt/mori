@@ -120,11 +120,24 @@ function p1Facts(ctx) {
     { slug: 'ci-runs-nightly', abstract: CI, details: CI_DETAILS, ...learned },
     { slug: 'fact-move-a', abstract: MOVE_A, details: 'Seeded in project A.', ...learned },
     { slug: 'broken-entry', abstract: 'Broken entry', text: 'This file lost its frontmatter.\n' },
-    ...Array.from({ length: 30 }, (_, index) => ({ slug: `fact-${String(index + 1).padStart(2, '0')}`,
-      abstract: `Filler fact ${String(index + 1).padStart(2, '0')} about the layout`,
-      source: index % 2 ? 'learned' : 'user', created: '2026-10-18 · You', modified: '2026-10-18 · You' })),
+    ...Array.from({ length: 30 }, (_, index) => fillerFact(index)),
   ];
 }
+
+/** 填充条目的来源，轮流：你说的、它学的、Mori 记的（2026-10-26，§0 第 5 条） */
+const FILLER_SOURCES = ['user', 'learned', 'agent'];
+
+/** @brief 第 index 条填充的事实（synthetic）：Mori 记的那几条由 Mori 写下。 */
+function fillerFact(index) {
+  const source = FILLER_SOURCES[index % 3];
+  const stamp = `2026-10-18 · ${source === 'agent' ? 'Mori' : 'You'}`;
+  return { slug: `fact-${String(index + 1).padStart(2, '0')}`,
+    abstract: `Filler fact ${String(index + 1).padStart(2, '0')} about the layout`, source, created: stamp,
+    modified: stamp };
+}
+
+/** 列表行与详情里来源的写法（§10.1） */
+const SOURCE_TAG = { user: 'You said', learned: 'Learned', agent: 'Added by Mori' };
 
 /** @brief 测试准备（synthetic）：用户级的记忆。 */
 function seedUser(ctx) {
@@ -480,10 +493,11 @@ async function listChecks(ctx) {
     state.last?.label === `Last change ${day} · Changed 1`, brief(state.last));
   const rowsOk = same(state.rows.map((row) => row.id), readable.map((item) => item.slug))
     && state.rows.every((row, index) => row.source === readable[index].source && same(row.meta,
-      [readable[index].source === 'user' ? 'You said' : 'Learned', monthDay(readable[index].modified)]));
+      [SOURCE_TAG[readable[index].source], monthDay(readable[index].modified)]))
+    && state.rows.some((row) => row.source === 'agent');
   record('MEM-14 the list has one row per entry in index (prompt) order with data-id and data-source, its abstract, '
-    + 'and You said / Learned with the modified date <Mon D> on the right', rowsOk,
-  brief(state.rows.slice(0, 4)));
+    + 'and You said / Learned / Added by Mori (data-source agent, 2026-10-26) with the modified date <Mon D> on the '
+    + 'right', rowsOk, brief(state.rows.slice(0, 4)));
   const broken = state.broken[0];
   record('MEM-14 an entry that can’t be read is one row (memory-broken) after the entries: “Couldn’t read the entry '
     + 'broken-entry.md” and the reason on the next line; it can’t be selected', state.broken.length === 1
@@ -581,10 +595,27 @@ async function linksAndBacklinks(ctx) {
   await waitDetail(page, false);
 }
 
+/** @brief MEM-14（2026-10-26）：Mori 记的一条（fact-03）的详情，来历一行写 Added by Mori。 */
+async function agentDetail(ctx) {
+  const { page } = ctx;
+  await page.locator('[data-testid="memory-row"][data-id="fact-03"]').scrollIntoViewIfNeeded();
+  await selectRow(page, 'fact-03');
+  const detail = await poll(async () => {
+    const value = await detailState(page);
+    return value?.title === 'Filler fact 03 about the layout' ? value : null;
+  }, 10000, 100) ?? await detailState(page);
+  record('MEM-14 an entry added by Mori has the detail line “Facts · Project · Added by Mori · Created Oct 18 by Mori · '
+    + 'Modified Oct 18 by Mori”', detail?.meta === 'Facts · Project · Added by Mori · Created Oct 18 by Mori · '
+    + 'Modified Oct 18 by Mori', brief({ title: detail?.title, meta: detail?.meta }));
+  await page.locator('[data-testid="memory-detail"] button[aria-label="Close details"]').click();
+  await waitDetail(page, false);
+}
+
 /** @brief 列表与详情。 */
 async function detail(ctx) {
   await listChecks(ctx);
   await detailBlocks(ctx);
+  await agentDetail(ctx);
 }
 
 // ---------- mori.memory_changed 的刷新（MEM-14） ----------

@@ -45,8 +45,9 @@ export const SECTION_ID: Readonly<Record<MemorySection, string>> = {
   fact: 'facts', taste: 'taste', strategy: 'strategy', review: 'review', agent: 'agent', revisions: 'revisions',
 };
 
-/** @brief 条目来源的标记（§10.1）。 */
-export const SOURCE_LABEL: Readonly<Record<EntrySource, string>> = { user: 'You said', learned: 'Learned' };
+/** @brief 条目来源的标记（§10.1）：Mori 记的照 Claude 的 “Added by Claude”（2026-10-26）。 */
+export const SOURCE_LABEL: Readonly<Record<EntrySource, string>> = { user: 'You said', agent: 'Added by Mori',
+  learned: 'Learned' };
 
 /** @brief 后台进程退出时所有操作的悬停说明（§10.10，同 Customize）。 */
 const CRASHED_TEXT = 'Mori’s background process crashed. Restart it to continue.';
