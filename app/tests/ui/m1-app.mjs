@@ -263,7 +263,7 @@ async function copyCode({ app, page, h }) {
     && copied.includes('return a + b;') && !copied.includes('下面是一段代码'), oneLine(copied));
 }
 
-/** @brief 等提供商卡 mori-endpoint 的第一个模型行是 ref（上移下移立即保存，§9.1）。 */
+/** @brief 等提供商卡 mori-endpoint 的第一个模型行是 ref（拖动排序与方向键立即保存，§9.1）。 */
 function firstModelIs(page, ref) {
   return page.waitForFunction((want) => document.querySelector('[data-testid="provider-card"]'
     + '[data-provider="mori-endpoint"] [data-testid="model-row"]')?.dataset.model === want, ref, { timeout: 15000 });
@@ -272,9 +272,10 @@ function firstModelIs(page, ref) {
 /**
  * @brief 设置 → Models：提供商卡的"Test connection"测试中可以取消（models-settings.md "提供商卡"：测试中"Testing…"与
  *        "Cancel"，结果写在卡里）。Test connection 测提供商的第一个模型，所以先在卡上 Fetch models、在清单里勾 fake-slow、
- *        Add 1 model（合成端点对它第一个分块前等 8 秒，model-discovery.md §6.5、§13.4），用它这一行的 Move up 把它移到
- *        第一个，测完再移回去。默认范围仍是 fake-coder（检查），之后的步骤不受影响。
+ *        Add 1 model（合成端点对它第一个分块前等 8 秒，model-discovery.md §6.5、§13.4），在它这一行的拖动柄上按方向键上
+ *        把它移到第一个，测完按方向键下移回去。默认范围仍是 fake-coder（检查），之后的步骤不受影响。
  *        2026-10-26（WP-02，负责人走查 M7）：原来用模型行的"Test"，模型行上的 Test 删掉了。
+ *        2026-10-26（WP-03，负责人走查 M5）：上移、下移按钮删掉，改用拖动柄的方向键（models-settings.md "拖动排序"）。
  */
 async function cancelTest({ page, h, userData }) {
   await h.openModels();
@@ -282,7 +283,7 @@ async function cancelTest({ page, h, userData }) {
   if (added.error !== null) throw new Error(`add fake-slow: ${added.error}`);
   const row = page.locator('[data-testid="model-row"][data-model="mori-endpoint/fake-slow"]');
   await row.waitFor({ timeout: 15000 });
-  await row.locator('[data-action="up"]').click();
+  await row.locator('[data-action="reorder"]').press('ArrowUp');
   await firstModelIs(page, 'mori-endpoint/fake-slow');
   const card = h.providerCard();
   await card.locator('[data-action="test-provider"]').click();
@@ -293,7 +294,7 @@ async function cancelTest({ page, h, userData }) {
   const text = await result.innerText();
   record('设置：提供商卡的"Test connection"（测第一个模型 fake-slow）在测试中变为"Testing…"，可以取消，结果写在卡里',
     text === 'Test cancelled', text);
-  await row.locator('[data-action="down"]').click();
+  await row.locator('[data-action="reorder"]').press('ArrowDown');
   await firstModelIs(page, 'mori-endpoint/fake-coder');
   const config = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8'));
   record('设置：卡上 Fetch models 加入模型不改默认范围：normalDefault 仍是 mori-endpoint/fake-coder',

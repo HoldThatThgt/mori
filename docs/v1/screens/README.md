@@ -137,6 +137,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | 模型行说明一行里的 `[data-field="thinking_off"]` | “Thinking can’t be turned off”，只在 `ProfileView.reasoning.off_refused` 时有（规格 §7.7，2026-10-24 补丁；2026-10-26 起从档案摘要移到说明一行，没有 `data-value`） | models-settings.md |
 | `confirm-dialog`（`data-kind`）、`cascade`、`public-dialog` | 确认框 | models-settings.md |
 | `group-row`、`group-member`、`member-picker`、`group-form`、`group-error`、`groups-empty` | Groups | models-settings.md |
+| `data-action="reorder"`、行上的 `data-drop`（`before` / `after`）与 `data-dragging`、`reorder-status`（`data-list`） | 拖动排序：Keys、Models、分组成员的拖动柄、放下的线、被拖的行、读屏播报区（2026-10-26，负责人走查 M5，取代 `key-up`、`key-down`、`up`、`down`、`member-up`、`member-down`） | models-settings.md |
 | `project-row`、`project-zone`、`project-config-error`、`projects-empty` | Project access | models-settings.md |
 | `field-error`（`data-field`） | 提供商表单、模型表单、首次启动表单的字段错误 | models-settings.md、first-run.md |
 | `form-message` | 表单的结果文字（沿用 v0） | models-settings.md、first-run.md |

@@ -85,6 +85,8 @@ test('TB-46 spec-coverage keeps the model layer rules when --spec is not given',
   assert.deepEqual(items.map((item) => item.id),
     Array.from({ length: 41 }, (_, i) => `MP-${String(i + 1).padStart(2, '0')}`).filter((id) => id !== 'MP-11'));
   const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
+  // 2026-10-26（§9.1“拖动排序”，WP-03）：MP-24 加了单元层（移动的 delta 与一次移动多格）
+  assert.deepEqual(layersOf('MP-24'), ['app', 'unit']);
   assert.deepEqual(layersOf('MP-37'), ['app', 'replay']);
   assert.deepEqual(layersOf('MP-38'), ['app', 'unit']);
   assert.deepEqual(layersOf('MP-39'), ['app', 'unit']);
