@@ -46,7 +46,8 @@ import {
 import type { EvidenceScope, MemoryPosition } from './memoryTool';
 import { getModelLayer } from './modelLayer';
 import { ModelSession, type PrepareResult } from './modelSession';
-import { loadPi } from './pi';
+import { createSettingsManager, loadPi } from './pi';
+import { applyShell, findShell } from './shell';
 import { findRole, loadRoles, type RoleLoad } from './roles';
 import { createTeam } from './team';
 import type {
@@ -320,6 +321,8 @@ async function loadResources(cwd: string, setup: SessionSetup, gate: ApprovalGat
     settingsManager: setup.settings, extensionFactories,
     ...(append.length > 0 ? { appendSystemPromptOverride: (base: string[]) => [...base, ...append] } : {}) });
   await resourceLoader.reload({ resolveProjectTrust: async () => setup.trust.trusted });
+  // reload 让设置按文件重新合并、丢掉内存里的覆盖，而 bash 工具在建会话时取 shellPath：再放一次（方案第 6 节"Shell"）。
+  applyShell(setup.settings, await findShell(pi));
   const system = resourceLoader.getSystemPromptSource();
   if (system) console.log(`[kernel] SYSTEM.md is not used: ${system.path}`);
   return resourceLoader;
@@ -331,7 +334,7 @@ async function loadResources(cwd: string, setup: SessionSetup, gate: ApprovalGat
  */
 async function createSettings(cwd: string, trust: TrustDecision): Promise<SettingsManager> {
   const pi = await loadPi();
-  return pi.SettingsManager.create(cwd, pi.getAgentDir(), { projectTrusted: trust.trusted });
+  return createSettingsManager(cwd, pi.getAgentDir(), { projectTrusted: trust.trusted });
 }
 
 /**
