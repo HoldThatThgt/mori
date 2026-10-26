@@ -1,11 +1,13 @@
-// Groups：每个分组一行，有序的成员可以加入、去掉、上移、下移，每次改动立即保存（models.saveGroup，§9.1）；
-// New group 内联表单；Delete 先确认。状态表见 docs/v1/screens/models-settings.md "Groups"。
+// Groups：每个分组一行，有序的成员可以加入、去掉、拖动排序（2026-10-26 负责人走查 M5，取代上移下移，见 Reorder.tsx），
+// 每次改动立即保存（models.saveGroup，§9.1）；New group 内联表单；Delete 先确认。
+// 状态表见 docs/v1/screens/models-settings.md "Groups"与"拖动排序"。
 
 import { useState } from 'react';
-import { ID_PATTERN, type ModelConfig, type ModelGroup } from '../../../../shared/models';
+import { ID_PATTERN, movedItems, type ModelConfig, type ModelGroup } from '../../../../shared/models';
 import { useOverlay } from '../../state/overlays';
 import { writeModels } from '../../state/settings';
-import { DeleteDialog, MoveButtons, useDeleteFlow, useImmediateSave } from './common';
+import { DeleteDialog, useDeleteFlow, useImmediateSave } from './common';
+import { ReorderHandle, ReorderStatus, useReorderRow, type ReorderList } from './Reorder';
 
 /** @brief 成员的写法：提供商成员"<name> · all models"，模型成员"<name> · <model id>"。 */
 export function memberLabel(config: ModelConfig, member: string): string {
@@ -51,37 +53,38 @@ function idError(id: string, config: ModelConfig, reserved: readonly string[]): 
   return taken ? `${id} is already used by a provider or group.` : null;
 }
 
-/** @brief 一个分组的成员行。 */
-function MemberRow({ config, members, index, busy, onSave }: {
-  config: ModelConfig; members: string[]; index: number; busy: boolean; onSave: (members: string[]) => void;
+/** @brief 成员的读屏名（柄的“Reorder <名字>”与播报）：“ · ”换成“, ”，读屏不念分隔符（ui-strings 写法约定）。 */
+const spokenMember = (config: ModelConfig, member: string): string =>
+  memberLabel(config, member).replaceAll(' · ', ', ');
+
+/** @brief 一个分组的成员行：拖动柄、成员的写法、Remove。 */
+function MemberRow({ config, list, members, index, onSave }: {
+  config: ModelConfig; list: ReorderList; members: string[]; index: number; onSave: (members: string[]) => void;
 }) {
   const member = members[index];
-  function move(delta: -1 | 1) {
-    const next = [...members];
-    [next[index], next[index + delta]] = [next[index + delta], next[index]];
-    onSave(next);
-  }
+  const drop = useReorderRow(list, index);
   return (
-    <li className="group-member" data-testid="group-member" data-member={member}>
+    <li className="group-member" data-testid="group-member" data-member={member} {...drop}>
+      <ReorderHandle list={list} index={index} />
       <span>{memberLabel(config, member)}</span>
       <span className="row-actions">
-        <MoveButtons index={index} count={members.length} busy={busy} actions={['member-up', 'member-down']}
-          onMove={move} />
-        <button className="button compact" data-action="member-remove" disabled={busy || members.length === 1}
+        <button className="button compact" data-action="member-remove" disabled={list.busy || members.length === 1}
           onClick={() => onSave(members.filter((item) => item !== member))}>Remove</button>
       </span>
     </li>
   );
 }
 
-/** @brief 一个分组：成员的每次改动立即保存；失败时原文，列表回到保存前。 */
+/** @brief 一个分组：成员的每次改动（加入、去掉、拖动排序）立即保存；失败时原文，列表回到保存前。 */
 function GroupRow({ config, group }: { config: ModelConfig; group: ModelGroup }) {
   const { pending, busy, error, save } = useImmediateSave<string[]>();
   const [picking, setPicking] = useState(false);
   const flow = useDeleteFlow((dryRun) => ({ type: 'models.deleteGroup', id: group.id, dryRun }));
   const members = pending?.value ?? group.members;
-  const saveMembers = (next: string[]) => void save(next, { type: 'models.saveGroup', id: group.id, members: next,
+  const saveMembers = (next: string[]) => save(next, { type: 'models.saveGroup', id: group.id, members: next,
     creating: false });
+  const list: ReorderList = { id: `members:${group.id}`, labels: members.map((item) => spokenMember(config, item)),
+    busy, move: (from, to) => saveMembers(movedItems(members, from, to)) };
   return (
     <li className="group-row" data-testid="group-row" data-group={group.id}>
       <div className="row-line">
@@ -94,14 +97,15 @@ function GroupRow({ config, group }: { config: ModelConfig; group: ModelGroup })
         </span>
       </div>
       <ol className="member-list">
-        {members.map((member, index) => <MemberRow key={member} config={config} members={members} index={index}
-          busy={busy} onSave={saveMembers} />)}
+        {members.map((member, index) => <MemberRow key={member} config={config} list={list} members={members}
+          index={index} onSave={(next) => void saveMembers(next)} />)}
       </ol>
+      <ReorderStatus list={list} />
       {members.length === 1 && (
         <p className="field-hint">A group needs at least one member; delete the group instead.</p>
       )}
       {picking && <MemberPicker config={config} chosen={members} lockChosen onClose={() => setPicking(false)}
-        onPick={(member) => { setPicking(false); saveMembers([...members, member]); }} />}
+        onPick={(member) => { setPicking(false); void saveMembers([...members, member]); }} />}
       {error && <p className="form-message error" role="alert">{error}</p>}
       <DeleteDialog flow={flow} kind="delete-group" title={`Delete group ${group.id}?`} />
     </li>

@@ -24,28 +24,20 @@ export interface ModelTimings {
   readonly serverRetryDelaysMs: readonly number[];
   /** 一次尝试发出后等第一个有内容的事件的时限（§5.4 timeout） */
   readonly firstContentTimeoutMs: number;
-  /** 超时后、已验证断开即停止的模型不可用的时间（§5.7 timeout） */
+  /** 压缩请求超时后模型不可用的时间（§6.4 timeout） */
   readonly timeoutCooldownMs: number;
-  /** 超时后不能确认停止的模型等它停下的最长时间（§5.7 held） */
+  /** 会话请求发出后超时、等模型停下的时间，等满再换（§5.7 held） */
   readonly heldMs: number;
-  /** held 期间读服务端指标确认停下的间隔（§5.7） */
-  readonly heldPollMs: number;
   /** 候选耗尽时最长等待的时间（§5.8） */
   readonly exhaustionMaxWaitMs: number;
   /** 候选耗尽时重新选的间隔（§5.8） */
   readonly exhaustionRecheckMs: number;
   /** 探针请求的最大输出 token（§7.3） */
   readonly probeMaxTokens: number;
-  /** 取消探针（第 9 步）长输出请求的最大输出 token（§7.3） */
-  readonly probeCancelMaxTokens: number;
   /** 探针每一步等第一个有内容的事件的时限（§7.3） */
   readonly probeStepTimeoutMs: number;
   /** C 级文本标签探针（第 7 步）连发的次数（§7.3） */
   readonly tierCRepetitions: number;
-  /** 长输入探针（第 8 步）填充到有效窗口的比例，按顺序（§7.3） */
-  readonly longInputFractions: readonly number[];
-  /** 取消探针（第 9 步）断开后等进行中请求数回落的时间（§7.3） */
-  readonly cancelProbeWindowMs: number;
   /**
    * 发现与读服务信息的每个请求的时限（连接到读完响应体）：models.discover、探针第 0 步、读版本共用
    * （model-discovery.md §5.3、§7.1、§11）
@@ -78,15 +70,11 @@ export const MODEL_TIMINGS: ModelTimings = Object.freeze({
   firstContentTimeoutMs: 120_000,
   timeoutCooldownMs: 60_000,
   heldMs: 120_000,
-  heldPollMs: 5_000,
   exhaustionMaxWaitMs: 60_000,
   exhaustionRecheckMs: 5_000,
   probeMaxTokens: 256,
-  probeCancelMaxTokens: 2_048,
   probeStepTimeoutMs: 120_000,
   tierCRepetitions: 3,
-  longInputFractions: Object.freeze([0.5, 0.9]),
-  cancelProbeWindowMs: 5_000,
   discoverRequestTimeoutMs: 15_000,
   errorBodyMaxBytes: 64 * 1024,
   placeholderApiKey: 'mori-pool',

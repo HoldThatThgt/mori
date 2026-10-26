@@ -537,8 +537,7 @@ const SWAPPED = ['lai/lai-model', 'trt/trt-model'];
 function shapesSetup() {
   const providers = Object.entries(SHAPES).map(([id, [port, , models]]) => providerOf(id, `Shape ${id}`, port,
     models.map((model) => modelOf(model))));
-  const profiles = ['lai', 'trt'].map((id) => oldProfile(baseOf(SHAPES[id][0]), modelOf(SHAPES[id][2][0]),
-    { cancel: true }));
+  const profiles = ['lai', 'trt'].map((id) => oldProfile(baseOf(SHAPES[id][0]), modelOf(SHAPES[id][2][0])));
   return { userData: seedUserData({ providers, profiles }), profiles };
 }
 

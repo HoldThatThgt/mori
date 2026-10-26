@@ -138,11 +138,10 @@ const step = (outcome) => ({ outcome, detail: null });
  * @param baseUrl 提供商地址
  * @param model modelOf 的结果
  * @param opts { kind（服务种类，默认 vllm）, version（默认 FAKE_VERSION）, reported（auto.reported，默认 null）,
- *              field（推理字段，默认 none）, cancel（cancel_verified；null 为没跑过）, probedAt,
- *              api（提供商的接口，默认 openai-completions） }
+ *              field（推理字段，默认 none）, probedAt, api（提供商的接口，默认 openai-completions） }
  */
 export function oldProfile(baseUrl, model, opts = {}) {
-  const { kind = 'vllm', version = FAKE_VERSION, reported = null, field = 'none', cancel = null } = opts;
+  const { kind = 'vllm', version = FAKE_VERSION, reported = null, field = 'none' } = opts;
   const api = opts.api ?? 'openai-completions';
   const key = [baseUrl, api, model.id, version].join('|');
   const fingerprint = JSON.stringify([key, model.contextWindow, model.maxTokens, model.reasoning, model.input, []]);
@@ -151,7 +150,6 @@ export function oldProfile(baseUrl, model, opts = {}) {
     auto: { server: { kind, version }, reported, field,
       steps: { ready: step('pass'), thinking: step(model.reasoning ? 'pass' : 'not_applicable'), call: step('pass'),
         result: step('pass'), replay: step('not_applicable'), a: step('pass'), b: step('pass'), c: step('not_run') } },
-    longInput: null, cancel: cancel === null ? null : { step: step('pass'), verified: cancel },
     probedAt: opts.probedAt ?? Date.now() - 3600000, suite: 1,
   };
 }

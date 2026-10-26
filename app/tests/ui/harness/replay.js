@@ -211,8 +211,9 @@ function v1ModelState(fixture, value) {
  * @brief synthetic：models.get 的结果（规格 §9.5），录制里没有时按 fixture.model 合成：一个本机区域的提供商、一个模型、
  *        normalDefault 为它、档案已验证；一个 key（只有 ref 与 label）。keys 由 models.addKey / removeKey 的应答更新
  *        （state.keys），界面写命令之后重新读到的就是改过的样子。档案带上模型行读的 reported（null：没有报告值，不标
- *        "(default)"）与 reasoning.off_refused（false），同 ProfileView（2026-10-26 WP-02：模型行只读这几项）；catalog 为
- *        null（没有取自 pi 模型表的值，不标 "(from pi)"，2026-10-26 WP-15）。
+ *        "(default)"）与 reasoning.off_refused（false），同 ProfileView（2026-10-26 WP-02：模型行只读这几项；WP-04：
+ *        ProfileView 去掉 context.truncation 与 cancel_verified）；catalog 为 null（没有取自 pi 模型表的值，不标
+ *        "(from pi)"，2026-10-26 WP-15）。
  * @param state 回放桥里合成的设置状态：keys、nextKeyNumber、projects
  */
 function v1ModelsInfo(fixture, contextWindow, state) {
@@ -224,8 +225,8 @@ function v1ModelsInfo(fixture, contextWindow, state) {
     tier: { level: 'A', a: step('pass'), b: step('pass'), c: step('not_run') }, protocol_write: 'verified',
     structured_output: 'verified', vision: 'failed',
     reasoning: { field: 'none', can_disable: 'unknown', replay: 'not_required', off_refused: false },
-    context: { declared: contextWindow, reported: null, effective: contextWindow, truncation: 'unknown' },
-    cancel_verified: 'unknown', reported: null, catalog: null, probedAt: 0, suite: 1 };
+    context: { declared: contextWindow, reported: null, effective: contextWindow }, reported: null, catalog: null,
+    probedAt: 0, suite: 1 };
   const model = { id, family: '', contextWindow, maxTokens: Math.min(16384, Math.floor(contextWindow / 2)),
     reasoning: false, input: ['text'] };
   const config = { version: 1, providers: [{ id: provider, name: 'replay', api: 'openai-completions',

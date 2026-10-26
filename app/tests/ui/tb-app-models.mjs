@@ -322,7 +322,7 @@ async function orderRun(ctx, r) {
   o.h1.since = Date.now();
   await sendMessage(ctx, o.h1.tab, 'Hold the slot tb-scenario:tb-models-hold-order');
   o.h1.line = await poll(() => lines(ctx, 'tb-models-hold-order')[0], 15000, 100);
-  o.verify = await tryBridge(ctx, { type: 'models.verify', refs: ['tbq1/fake-q1b'], tests: 'auto' });
+  o.verify = await tryBridge(ctx, { type: 'models.verify', refs: ['tbq1/fake-q1b'] });
   await sleep(700);
   o.task.since = Date.now();
   await sendMessage(ctx, o.task.tab, 'Queue a task tb-scenario:tb-models-order-task', { team: true });
@@ -346,7 +346,7 @@ async function longBatch(ctx) {
   r.q2 = await begin(ctx, ctx.p.q2, 'Plan after a wait tb-scenario:tb-models-dectime');
   r.h3 = await holdSlot(ctx, 'tbq3/fake-qc', 'tb-models-hold-task');
   r.verifyQd = Date.now();
-  r.verifyQdResult = await tryBridge(ctx, { type: 'models.verify', refs: ['tbq3/fake-qd'], tests: 'auto' });
+  r.verifyQdResult = await tryBridge(ctx, { type: 'models.verify', refs: ['tbq3/fake-qd'] });
   await sleep(500);
   r.q3 = await begin(ctx, ctx.p.q3, 'Queue a patient task tb-scenario:tb-models-tasknotime');
   await reserveStart(ctx, r);

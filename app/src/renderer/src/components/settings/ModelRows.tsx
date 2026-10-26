@@ -2,18 +2,20 @@
 // “Thinking can’t be turned off”）；服务没报告、值仍是 Mori 默认值的窗口与最大输出标“(default)”，取自 pi 自带模型表的
 // 标“(from pi)”（2026-10-26，WP-15），报告值或 pi 的值与配置不一致时一行提示和 Use（docs/specs/model-discovery.md §8，
 // 规则在 modelHints.ts）；模型不能用（tool calling 没验证通过）时一行状态与 Verify again；
-// 上移下移、Edit、Delete。模型表单只有 Edit（拉取规格 §6.5），卡上的清单放在这一块的末尾。
+// 行左端的拖动柄（2026-10-26 负责人走查 M5，取代上移下移，见 Reorder.tsx）、Edit、Delete。模型表单只有 Edit
+// （拉取规格 §6.5），卡上的清单放在这一块的末尾。
 // 状态表见 docs/v1/screens/models-settings.md “Models 行”（2026-10-26 负责人走查 M6、M7、M8：档案摘要、Verify、
-// 需要你同意的两种探针和行上的 Test 删掉；探针第 0–7 步照旧自动跑，选择器、编译与 TaskBoard 照旧读档案）。
+// 需要你同意的两种探针和行上的 Test 删掉；探针第 0–7 步照旧自动跑，选择器、编译与 TaskBoard 照旧读档案）与“拖动排序”。
 
 import { useState, type ReactNode } from 'react';
 import type { ModelCommand, ModelProvider, ProfileView, ProviderModel } from '../../../../shared/models';
 import { useProfile, writeModels } from '../../state/settings';
-import { DeleteDialog, MoveButtons, useDeleteFlow } from './common';
+import { DeleteDialog, useDeleteFlow } from './common';
 import { thousands } from './format';
 import { ModelEditor } from './ModelEditor';
 import { modelHints, piRowTitle, valueMarks, type ModelHint, type ValueMark } from './modelHints';
 import { probeState, statusLine, type StatusLine } from './probeStatus';
+import { ReorderHandle, ReorderStatus, useOrderedSave, useReorderRow, type ReorderList } from './Reorder';
 
 // ---- tool calling 的状态行（§7.4；models-settings.md “Models 行”，规则见 probeStatus.ts） ----
 
@@ -88,7 +90,7 @@ function ModelMeta({ model, profile }: { model: ProviderModel; profile: ProfileV
   );
 }
 
-/** @brief 一行模型的立即保存（Verify again、上移下移、提示的 Use）：保存中按钮不可用，失败时原文写在这一行里。 */
+/** @brief 一行模型的立即保存（Verify again、提示的 Use）：保存中按钮不可用，失败时原文写在这一行里。 */
 function useRowSave() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,17 +108,20 @@ export interface ModelRowProps {
   provider: ModelProvider;
   /** 这个模型 */
   model: ProviderModel;
-  /** 在 models 里的位置 */
+  /** 在显示的顺序里的位置 */
   index: number;
+  /** 这个提供商的 Models 列表（拖动排序） */
+  list: ReorderList;
   /** 点了 Edit */
   onEdit: () => void;
 }
 
 /** @brief 一行模型。 */
-export function ModelRow({ provider, model, index, onEdit }: ModelRowProps) {
+export function ModelRow({ provider, model, index, list, onEdit }: ModelRowProps) {
   const ref = `${provider.id}/${model.id}`;
   const { profile, running } = useProfile(ref);
   const { busy, error, run } = useRowSave();
+  const drop = useReorderRow(list, index);
   const flow = useDeleteFlow((dryRun) => ({ type: 'models.deleteModel', providerId: provider.id, modelId: model.id,
     dryRun }));
   // 拉取规格 §8：Use 立即保存按表改过的模型，不带 thinkingLevel；指纹变了由后台进程重新探测（模型层规格 §7.4）
@@ -124,14 +129,13 @@ export function ModelRow({ provider, model, index, onEdit }: ModelRowProps) {
     model: changed });
   const line = statusLine(profile, running);
   return (
-    <li className="model-row" data-testid="model-row" data-model={ref} data-probe={probeState(profile, running)}>
+    <li className="model-row" data-testid="model-row" data-model={ref} data-probe={probeState(profile, running)}
+      {...drop}>
       <div className="row-line">
+        <ReorderHandle list={list} index={index} />
         <span className="model-info"><span className="model-id">{model.id}</span>
           <ModelMeta model={model} profile={profile} /></span>
         <span className="row-actions">
-          <MoveButtons index={index} count={provider.models.length} busy={busy} actions={['up', 'down']}
-            onMove={(delta) => void run({ type: 'models.moveModel', providerId: provider.id, modelId: model.id,
-              delta })} />
           <button className="button compact" data-action="edit" onClick={onEdit}>Edit</button>
           <button className="button compact danger" data-action="delete" onClick={() => void flow.start()}>
             Delete…</button>
@@ -140,7 +144,7 @@ export function ModelRow({ provider, model, index, onEdit }: ModelRowProps) {
       {modelHints(provider.api, model, profile).map((hint) => (
         <HintLine key={hint.kind} hint={hint} busy={busy} onUse={() => use(hint.model)} />))}
       {line && <ProbeLine line={line} busy={busy}
-        onVerify={() => void run({ type: 'models.verify', refs: [ref], tests: 'auto' })} />}
+        onVerify={() => void run({ type: 'models.verify', refs: [ref] })} />}
       {error && <p className="form-message error" role="alert">{error}</p>}
       <DeleteDialog flow={flow} kind="delete-model" title={`Delete model ${model.id}?`} />
     </li>
@@ -161,17 +165,24 @@ export interface ModelRowsProps {
   children?: ReactNode;
 }
 
-/** @brief Models 一块：模型行、Edit 时就地换成模型表单、卡上的清单在最后。 */
+/**
+ * @brief Models 一块：模型行（拖动排序，一次移动一条 models.moveModel，移动失败的原文在列表下面）、Edit 时就地换成
+ *        模型表单（那一行没有柄、不能放下）、卡上的清单在最后。
+ */
 export function ModelRows({ provider, editing, onEdit, onClose, children }: ModelRowsProps) {
+  const order = useOrderedSave(`models:${provider.id}`, provider.models, (model) => model.id,
+    (model, delta) => ({ type: 'models.moveModel', providerId: provider.id, modelId: model.id, delta }));
   return (
     <div className="card-block">
       <h4>Models</h4>
       <ul className="row-list">
-        {provider.models.map((model, index) => (editing === model.id
+        {order.items.map((model, index) => (editing === model.id
           ? <li key={model.id}><ModelEditor provider={provider} model={model} onClose={onClose} /></li>
-          : <ModelRow key={model.id} provider={provider} model={model} index={index}
+          : <ModelRow key={model.id} provider={provider} model={model} index={index} list={order.list}
             onEdit={() => onEdit(model.id)} />))}
       </ul>
+      <ReorderStatus list={order.list} />
+      {order.error && <p className="form-message error" role="alert">{order.error}</p>}
       {children}
     </div>
   );
