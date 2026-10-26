@@ -14,7 +14,7 @@ import {
 
 const K = await loadTextKernel();
 const AGENT = { kind: 'agent' };
-const RELAY_ONLY = 'Team mode is on: the dialog agent only relays; the work is done in tasks.';
+const RELAY_ONLY = 'Task mode is on: the dialog agent only relays; the work is done in tasks.';
 
 test('MEM-11 memoryCallerFor: user sessions always register it; create has it; close, ask, subscription do not', () => {
   const { memoryCallerFor, instanceSeats, userRunSeats } = K.assemble;

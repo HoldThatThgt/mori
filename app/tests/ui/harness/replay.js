@@ -19,7 +19,7 @@
 // 就是重启。保存反馈、保存报告返回录下的文件路径；设置页 UI issues（记忆规格 §10.8，原 M7 工作回顾的界面问题部分）读报告、
 // 读截图按录制里的 issueList、shot 步骤回答（issuesStubs）；导出、在资源管理器里选中、打开文件夹只记下调用。
 // v1（docs/specs/model-providers.md §14.4）：models.get、session.pickOptions 也是只读查询，录制里没有时按 fixture.model 合成
-// （一个本机区域的提供商、一个模型、normalDefault 为它、档案已验证，synthetic）；会话信息与 mori.model_state 缺的 ModelState
+// （一个本机地址的提供商、一个模型、normalDefault 为它、档案已验证，synthetic）；会话信息与 mori.model_state 缺的 ModelState
 // 字段（pick、current、blocked）同样合成；models.* 的写命令照 connection.save 的方式应答（status.modelWrites 记下）；
 // config.get 补上 v1 的 firstRun 等字段。
 // 平行 Agent（docs/specs/parallel-agents-taskboard.md §17.4）：board.get 也是只读查询，录制里没有时合成一个空的 TaskBoard；
@@ -208,11 +208,13 @@ function v1ModelState(fixture, value) {
 }
 
 /**
- * @brief synthetic：models.get 的结果（规格 §9.5），录制里没有时按 fixture.model 合成：一个本机区域的提供商、一个模型、
+ * @brief synthetic：models.get 的结果（规格 §9.5），录制里没有时按 fixture.model 合成：一个本机地址的提供商、一个模型、
  *        normalDefault 为它、档案已验证；一个 key（只有 ref 与 label）。keys 由 models.addKey / removeKey 的应答更新
  *        （state.keys），界面写命令之后重新读到的就是改过的样子。档案带上模型行读的 reported（null：没有报告值，不标
- *        "(default)"）与 reasoning.off_refused（false），同 ProfileView（2026-10-26 WP-02：模型行只读这几项）。
- * @param state 回放桥里合成的设置状态：keys、nextKeyNumber、projects
+ *        "(default)"）与 reasoning.off_refused（false），同 ProfileView（2026-10-26 WP-02：模型行只读这几项；WP-04：
+ *        ProfileView 去掉 context.truncation 与 cancel_verified）；catalog 为 null（没有取自 pi 模型表的值，不标
+ *        "(from pi)"，2026-10-26 WP-15）。
+ * @param state 回放桥里合成的设置状态：keys、nextKeyNumber
  */
 function v1ModelsInfo(fixture, contextWindow, state) {
   const ref = fixture.model ?? FALLBACK_MODEL;
@@ -223,24 +225,23 @@ function v1ModelsInfo(fixture, contextWindow, state) {
     tier: { level: 'A', a: step('pass'), b: step('pass'), c: step('not_run') }, protocol_write: 'verified',
     structured_output: 'verified', vision: 'failed',
     reasoning: { field: 'none', can_disable: 'unknown', replay: 'not_required', off_refused: false },
-    context: { declared: contextWindow, reported: null, effective: contextWindow, truncation: 'unknown' },
-    cancel_verified: 'unknown', reported: null, probedAt: 0, suite: 1 };
+    context: { declared: contextWindow, reported: null, effective: contextWindow }, reported: null, catalog: null,
+    probedAt: 0, suite: 1 };
   const model = { id, family: '', contextWindow, maxTokens: Math.min(16384, Math.floor(contextWindow / 2)),
     reasoning: false, input: ['text'] };
   const config = { version: 1, providers: [{ id: provider, name: 'replay', api: 'openai-completions',
-    baseUrl: fixture.endpoint ?? 'http://127.0.0.1:9/v1', compat: {}, concurrency: 4, zone: 'local',
+    baseUrl: fixture.endpoint ?? 'http://127.0.0.1:9/v1', compat: {}, concurrency: 4,
     keys: state.keys.map((key) => ({ ...key })), nextKeyNumber: state.nextKeyNumber, models: [model] }], groups: [],
-  normalDefault: ref, allowedZones: ['local', 'intranet'], projectZones: {} };
+  normalDefault: ref };
   return { error: null, config, profiles: { [ref]: profile }, keyStatus: {}, thinkingDefaults: { [ref]: null },
-    zoneSuggestions: { [provider]: 'local' }, migration: null, projects: state.projects.map((path) => ({ path,
-      zones: [], projectZones: null, projectConfig: null })), loadError: null, reserved: ['mori'] };
+    migration: null, loadError: null, reserved: ['mori'] };
 }
 
 /** @brief synthetic：session.pickOptions 的结果，录制里没有时按 fixture.model 合成：这个提供商和它的模型，都可用。 */
 function v1PickOptions(fixture) {
   const ref = fixture.model ?? FALLBACK_MODEL;
   const provider = ref.slice(0, ref.indexOf('/'));
-  const item = (pick, kind, label) => ({ pick, kind, label, zones: ['local'], excluded: false, reason: null });
+  const item = (pick, kind, label) => ({ pick, kind, label, excluded: false, reason: null });
   return { error: null, options: [item(provider, 'provider', 'replay'),
     item(ref, 'model', ref.slice(ref.indexOf('/') + 1))] };
 }
@@ -343,8 +344,7 @@ const answeredWrite = (type) => type.startsWith('models.') && !QUERIES.includes(
 /** 回放桥照 connection.save 的方式应答的 models.* 写命令（v1ModelWrite；含一键拉取模型的 models.addModels） */
 const MODEL_WRITES = new Set(['models.firstRun', 'models.saveProvider', 'models.deleteProvider', 'models.saveModel',
   'models.addModels', 'models.deleteModel', 'models.moveModel', 'models.addKey', 'models.removeKey', 'models.moveKey',
-  'models.saveGroup', 'models.deleteGroup', 'models.setDefaults', 'models.setProjectZones', 'models.confirmZone',
-  'models.dismissMigration', 'models.verify']);
+  'models.saveGroup', 'models.deleteGroup', 'models.setDefaults', 'models.dismissMigration', 'models.verify']);
 
 /**
  * @brief 改配置的 models.* 写命令（界面经 writeModels 发出、之后重新 models.get 的那些）：models.get 按它们在录制里的
@@ -576,10 +576,9 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     issueShots: [], exports: [], exportShown: [], recordShown: [], folders: 0, modelWrites: [], discoverCancels: 0 };
   const { f8, feedback, stubs } = desktopStubs(status, steps);
   const created = steps.find((step) => step.result?.type === 'session.create')?.result.value;
-  // synthetic：v1 的设置页（models.get）读到的 key 与项目；models.addKey / removeKey 的应答改它（v1ModelWrite）
+  // synthetic：v1 的设置页（models.get）读到的 key；models.addKey / removeKey 的应答改它（v1ModelWrite）
   const models = { keys: [{ ref: `${(fixture.model ?? FALLBACK_MODEL).split('/')[0]}#1`, label: 'Key 1' }],
-    nextKeyNumber: 2, projects: created?.cwd ? [created.cwd.replace(/\\/g, '/').toLowerCase()] : [],
-    writes: status.modelWrites };
+    nextKeyNumber: 2, writes: status.modelWrites };
   const saved = { connection: { name: 'replay', baseUrl: fixture.endpoint, api: 'openai-completions', apiKey: '',
     modelId: fixture.model.split('/').pop(), contextWindow: created?.contextUsage?.contextWindow ?? 128000,
     compat: [] }, keySaved: true };

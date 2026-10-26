@@ -8,7 +8,7 @@
 //   node tests/ui/m6-record.mjs --source <走查数据目录> [--only name1,name2] [--exe <Mori.exe>]
 // 走查数据目录是负责人在 Mori（v1）里保存过提供商的目录（key 由 Mori 加密保存）；脚本只复制密文文件，不读取 key。
 // v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取（lib.mjs realProviders）；每个场景的临时
-// 项目先在复制出的配置里授权公网、默认范围设为测试分组 [DeepSeek, GLM]（lib.mjs allowRealProject，测试准备）。
+// 先在复制出的配置里把默认范围设为测试分组 [DeepSeek, GLM]（lib.mjs useRealGroup，测试准备）。
 // 范围（model-range：在 Models 里加模型、在输入框下面一行的范围菜单里选）与思考强度（thinking）两个场景写到 tests/fixtures/v1/；
 // v0 的 model-switch 场景删去（v1 没有 model.save、session.setModel）。
 // MCP 场景用 tests/mcp-server/server.mjs（synthetic，本地 stdio 服务），插件场景用 tests/pi-package（synthetic 包）的副本。
@@ -18,7 +18,7 @@
 import { cpSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, launch, oneLine, prepareProject, REAL_GROUP, realProviders, scratchUserData,
+  appRoot, arg, launch, oneLine, prepareProject, REAL_GROUP, realProviders, scratchUserData, useRealGroup,
 } from './lib.mjs';
 
 const source = arg('source');
@@ -496,7 +496,7 @@ async function runScenario(scenario, context, state) {
 }
 
 /**
- * @brief 每个场景一个新的临时数据目录、一个新的临时项目和一次新的启动：启动前在复制出的配置里给项目授权公网、默认范围
+ * @brief 每个场景一个新的临时数据目录、一个新的临时项目和一次新的启动：启动前在复制出的配置里把默认范围
  *        设为测试分组（测试准备，§14.1）。出错也会关掉 Mori、删掉临时目录。
  */
 async function recordFresh(scenario, context) {
@@ -504,8 +504,8 @@ async function recordFresh(scenario, context) {
   const made = prepareProject('mori-m6-record-');
   const cwd = join(made.root, `m6-${scenario.name}`);
   renameSync(made.project, cwd);
-  // 测试准备（synthetic test setup）：项目授权公网，默认范围为 [DeepSeek, GLM] 的分组
-  allowRealProject(userData, cwd);
+  // 测试准备（synthetic test setup）：默认范围为 [DeepSeek, GLM] 的分组
+  useRealGroup(userData);
   // 项目文件夹在 Mori 关闭之后才删（MCP 服务以它为工作目录，开着时删不掉）
   const state = { userData, mori: null, root: made.root, cwd };
   try {

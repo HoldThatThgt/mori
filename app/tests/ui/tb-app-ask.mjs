@@ -32,7 +32,7 @@ const PROXY = 4621;
 const THINKING = 'Synthetic reasoning before answering.';
 /** 程序给的固定文字（§10.1、§10.2） */
 const SHOWS = {
-  noTasksOff: 'There are no tasks when team mode is off.',
+  noTasksOff: 'There are no tasks when task mode is off.',
   turnCap: 'Message limit reached: at most 5 questions per turn.',
   ownSession: "You can't send a message to your own session.",
   whichRequest: 'Say which request (request: N).',
@@ -43,7 +43,7 @@ const SHOWS = {
 /** 写入与命令类工具（临时提问、订阅的请求里不该有） */
 const WRITE_TOOLS = ['bash', 'edit', 'write', 'powershell'];
 /** 订阅实例的工具：基座默认工具的读取类（read）+ board_read、read_session、agent_message（§8.1、§6.3） */
-const SUB_TOOLS = ['agent_message', 'board_read', 'read', 'read_session'];
+const SUB_TOOLS = ['agent_message', 'board_read', 'ls', 'read', 'read_session'];
 
 // ---------- 小工具 ----------
 
@@ -136,7 +136,7 @@ async function setup(ctx) {
   await startTbApp(ctx);
 }
 
-/** @brief 在 project 里开一个新会话，发第一条消息（默认带 /team）；返回 { tab, sessionId, sessionFile, since }。 */
+/** @brief 在 project 里开一个新会话，发第一条消息（默认带 /task）；返回 { tab, sessionId, sessionFile, since }。 */
 async function begin(ctx, project, text, { team = true } = {}) {
   const tab = await openSessionIn(ctx, project);
   const since = Date.now();
@@ -179,10 +179,11 @@ function offAskInstance(ctx, who, said) {
   const banned = [...WRITE_TOOLS, 'agent_message'];
   record('TB-04 off mode: agent_message to memory opens a new read-only ask instance — session ask.1.memory under '
     + 'teams/<id>/sessions whose first entry is mori.instance { kind: ask, role: memory }, every request has the ask '
-    + 'segment and only the read tool (no bash, edit, write or agent_message, although memory has bash/edit/write)',
+    + 'segment and only the read tools read and ls (no bash, edit, write or agent_message, although memory has '
+    + 'bash/edit/write: it writes no tools, so it has the base tools, §8.1)',
   memory !== null && memory.first?.customType === 'mori.instance' && memory.first.data?.kind === 'ask'
     && memory.first.data.role === 'memory' && requests.length === 2
-    && requests.every((item) => same(item.tools, ['read']) && item.system.includes(SEGMENT_SENTENCES.ask))
+    && requests.every((item) => same(item.tools, ['read', 'ls']) && item.system.includes(SEGMENT_SENTENCES.ask))
     && !requests.some((item) => item.tools.some((name) => banned.includes(name))),
   brief({ file: memory?.id, first: memory?.first, tools: requests.map((item) => item.tools) }));
   const lines = scenarioLines(ctx.ep, 'tb-ask-off', { agent: 'memory', kind: 'ask' });
@@ -209,7 +210,7 @@ function offAskSeat(ctx, who, said) {
   planner?.first?.data?.kind === 'ask' && said[1]?.error === false && said[1].text === ASK_TEXT.plannerAnswer
     && !suffixes.some((suffix) => suffix === 'create' || suffix.startsWith('close.')) && same(kinds, ['ask']),
   brief({ suffixes, kinds, result: said[1] }));
-  record('TB-04 off mode: agent_message to a task is refused with "There are no tasks when team mode is off."',
+  record('TB-04 off mode: agent_message to a task is refused with "There are no tasks when task mode is off."',
     said[3]?.error === true && said[3].first === SHOWS.noTasksOff, brief(said[3]));
 }
 
@@ -640,7 +641,7 @@ function subsReadOnly(ctx, { ro, failed, cancel }) {
     .filter((file) => instanceSuffix(who.sessionId, file.id).startsWith('sub.')));
   const bash = results(instanceOf(ctx, ro, 'sub.1.memory')?.entries ?? [], 'bash');
   record('TB-33 a subscription instance is read-only: mori.instance { kind: subscription }, every request has the '
-    + 'subscription segment and exactly read, board_read, read_session and agent_message (no bash, edit, write, '
+    + 'subscription segment and exactly read, ls, board_read, read_session and agent_message (no bash, edit, write, '
     + 'task_handoff or request_* tools); memory\'s bash call is answered "Tool bash not found" and runs nothing',
   requests.length >= 4 && requests.every((item) => same([...item.tools].sort(), SUB_TOOLS)
     && item.system.includes(SEGMENT_SENTENCES.subscription)) && files.length === 3

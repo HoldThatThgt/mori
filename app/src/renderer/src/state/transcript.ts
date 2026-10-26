@@ -492,6 +492,7 @@ export function applyEvent(state: Transcript, event: ForwardedEvent, now: number
     case 'mori.model_retry':
       return applyModelWait(state, event, now);
     case 'mori.team_state':
+    case 'mori.team_mode':
     case 'mori.board':
     case 'mori.receipt':
     case 'mori.progress':

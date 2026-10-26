@@ -1,7 +1,7 @@
 // 输入框下面一行换选择范围、换思考强度（docs/v1/screens/model-menu.md）：只作用于这个会话，不改设置里的默认范围。
 // 请求期间按钮显示你选的值、不可用；返回后以后台进程给出的模型状态为准。换范围失败时从输入框下面一行往上弹出一行原文，
 // 换思考强度失败时对话流里一张错误卡（同 v0）；按钮都回到原来的值。拒绝启动卡上的 Verify now、Check again、
-// Turn off team mode（docs/specs/parallel-agents-taskboard.md §4.4、§5.1）也在这里。
+// Turn off task mode（docs/specs/parallel-agents-taskboard.md §4.4、§5.1）也在这里。
 
 import { create, type StoreApi } from 'zustand';
 import type { Command, ModelState, TeamCommandResults, ThinkingLevel } from '../../../shared/protocol';
@@ -126,13 +126,13 @@ export function openRangeMenu(key: string): void {
 }
 
 /**
- * @brief 拒绝启动卡的"Verify now"：探测还没验证的候选（models.verify，tests 为 auto）。之后由 mori.model_state 更新卡片。
+ * @brief 拒绝启动卡的"Verify now"：探测还没验证的候选（models.verify，第 0–7 步）。之后由 mori.model_state 更新卡片。
  * @return 失败时的原文；成功时为 null
  */
 export async function verifyNow(refs: string[]): Promise<string | null> {
   if (refs.length === 0) return null;
   try {
-    const result = await request<ModelsResult>({ type: 'models.verify', refs, tests: 'auto' });
+    const result = await request<ModelsResult>({ type: 'models.verify', refs });
     if (result.error) throw new Error(result.error);
     return null;
   } catch (error) {
@@ -160,7 +160,7 @@ export async function checkAgents(key: string): Promise<string | null> {
 }
 
 /**
- * @brief 拒绝启动卡与说明卡的"Turn off team mode"（平行 Agent 规格 §5.1、§12.11）：关掉协作模式，返回的协作状态记到
+ * @brief 拒绝启动卡与说明卡的"Turn off task mode"（平行 Agent 规格 §5.1、§12.11）：关掉协作模式，返回的协作状态记到
  *        会话上；之后由 mori.model_state 更新模型按钮与卡片。
  * @return 失败时的原文；成功时为 null
  */

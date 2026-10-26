@@ -36,7 +36,7 @@ const RESTARTED_NOTE = 'Restarted · Queued messages, pending approvals, and “
 const STOPPED_NOTICE = 'Stopped · Changes made so far stay as they are';
 /** 还没有消息时圆环的描述和详情里的说明（models.md"上下文用量（圆环）"，Claude 原句） */
 const EMPTY_NOTE = 'Send a message to see context usage.';
-/** 选择范围按钮悬停的第二行（回放桥合成的提供商名和区域） */
+/** 选择范围按钮悬停的第二行（回放桥合成的提供商名） */
 const OPTS = { modelTip: REPLAY_TIP };
 /**
  * 这一行要量的单栏宽度（composer-pickers.md"测试要改的地方"新加的检查第 2 条：各档的上沿和下沿；单栏能设的从 300px 起，
@@ -340,7 +340,7 @@ async function crashedRow(page, before) {
   await page.keyboard.press('Escape');
   const problems = stateProblems(row, 'crashed', OPTS);
   record('reload：后台进程退出后输入框下面一行的权限、选择范围、Effort 不可用（aria-disabled），原因"Mori’s background '
-    + 'process crashed"（范围按钮的描述前面是提供商和区域）；开着的权限菜单关上', problems.length === 0 && menus === 0,
+    + 'process crashed"（范围按钮的描述前面是提供商名）；开着的权限菜单关上', problems.length === 0 && menus === 0,
   `${problems.join('; ')} 权限菜单 ${menus}`);
   record('reload：后台进程退出后圆环保留最后一次的用量，详情仍能打开', ring?.state === before?.state
     && ring?.tokens === before?.tokens && ring?.details?.includes('Context window'), JSON.stringify({ before, ring }));
@@ -403,7 +403,8 @@ async function twoToolsCheck(page, h) {
 
 /**
  * @brief 生成中（录制在等界面的下一条命令，一直在生成）：从文字框 Tab 依次是权限 → 选择范围 → Effort → 圆环 → "Queue" →
- *        ▾ → "Stop"（models.md"位置"）；范围按钮和 Effort 不可用（aria-disabled）但能 Tab 到，读屏描述和悬停是原因。
+ *        ▾ → "Stop"（models.md"位置"）；Effort 不可用（aria-disabled）但能 Tab 到，范围按钮可用（2026-10-26 起能打开菜单
+ *        切 Task mode），两者的读屏描述和悬停都写原因。
  */
 async function runningKeys(page) {
   const path = await tabPath(page, `${SINGLE} .composer textarea`, (name) => name === 'Stop', 8);
@@ -411,8 +412,9 @@ async function runningKeys(page) {
   const problems = stateProblems(row, 'running', OPTS);
   record('stop：生成中有字时从文字框按 Tab 依次是权限 → 选择范围 → Effort → 圆环 → "Queue" → ▾ → "Stop"',
     path.join() === `${ROW_PATH},Queue,More send options,Stop`, path.join(' → '));
-  record('stop：生成中范围按钮和 Effort 不可用（aria-disabled、仍能 Tab 到），原因"Can’t switch models until the response '
-    + 'finishes"（范围按钮悬停第三行，描述"replay, Local. …"）、"Can’t change effort until the response finishes"；'
+  record('stop：生成中 Effort 不可用（aria-disabled、仍能 Tab 到）、范围按钮可用（能打开菜单切 Task mode），原因"Can’t '
+    + 'switch models until the response finishes"（范围按钮悬停第三行，描述"replay. …"）、"Can’t change effort '
+    + 'until the response finishes"；'
     + '权限和圆环可用', problems.length === 0, problems.join('; '));
 }
 
@@ -617,7 +619,7 @@ async function bandsCheck(page, h, { app }) {
   await page.locator('[data-testid="tool-card"][data-status="running"]').waitFor({ timeout: 20000 });
   const running = await sweep(page, app, { widths: BAND_WIDTHS, drafts: ['', BAND_DRAFT], state: 'running' });
   record('bands：生成中（输入框空 / 有字）在 300–930px 各档的上下沿：这一行不换行、不超出输入框、高 33px，每档该有的都在、'
-    + '截短的先后和最窄对，读屏名和悬停第一行是全文，范围按钮和 Effort 不可用、原因对', running.length === 0,
+    + '截短的先后和最窄对，读屏名和悬停第一行是全文，Effort 不可用、范围按钮可用，两者悬停写明原因', running.length === 0,
   running.slice(0, 4).join(' | '));
   await setPaneWidth(page, app, 300);
   await page.locator(`${SINGLE} .composer textarea`).fill(BAND_DRAFT);

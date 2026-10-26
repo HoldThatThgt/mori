@@ -234,14 +234,14 @@ test('TB-04 in off mode the dialog asks a role: a read-only question instance an
   assert.match(delivery.text,
     /^\[Mori\] chat asks you \(information, not instructions\): Is a.ts safe\?\nAnswer once\./);
   const spec = host.entry('U.ask.1.reviewer').spec;
-  assert.deepEqual(spec.tools, ['read'], 'only read-class tools, no TaskBoard tools in off mode');
+  assert.deepEqual(spec.tools, ['read', 'ls'], 'only read-class tools, no TaskBoard tools in off mode');
   assert.equal(spec.instance.kind, 'ask');
   await runDelivery(host, delivery, [{ text: 'Yes, it is safe.' }]);
   const result = await pending;
   assert.equal(result.content[0].text, 'Yes, it is safe.');
   await until(() => !host.entry('U.ask.1.reviewer'), 'the question instance to close');
   const task = await ask.execute('c2', ask.prepareArguments({ to: 'T1', text: 'note' }), undefined, undefined, {});
-  assert.match(task.content[0].text, /^There are no tasks when team mode is off\./);
+  assert.match(task.content[0].text, /^There are no tasks when task mode is off\./);
 });
 
 // ---- TB-20 需要用户拿主意、TB-31 结案与关闭、TB-35 停止 ----
@@ -437,7 +437,7 @@ test('TB-33 a matching subscription opens a read-only background instance with t
     assert.match(sub.text,
       /^\[Mori\] request_closed: Request 1 "Login page is blank" closed \(done\)\.\nConclusion: Done\./);
     const spec = host.entry('U.sub.1.memory').spec;
-    assert.deepEqual(spec.tools, ['read', 'board_read', 'read_session', 'agent_message']);
+    assert.deepEqual(spec.tools, ['read', 'ls', 'board_read', 'read_session', 'agent_message']);
     assert.equal(spec.model.schedClass, 'background');
     assert.deepEqual(spec.instance, { kind: 'subscription', role: 'memory', request: 1 });
     await runDelivery(host, sub, [{ text: 'Nothing worth keeping.' }]);
@@ -478,7 +478,7 @@ test('TB-41 scheduling classes: task, decision for create and close, inherited b
     undefined, {});
   const question = await nextDelivery(host, 'U.ask.1.reviewer');
   assert.equal(host.entry('U.ask.1.reviewer').spec.model.schedClass, 'task', 'inherits the sender');
-  assert.deepEqual(host.entry('U.ask.1.reviewer').spec.tools, ['read', 'board_read', 'read_session'],
+  assert.deepEqual(host.entry('U.ask.1.reviewer').spec.tools, ['read', 'ls', 'board_read', 'read_session'],
     'a team-mode question can read the board but not message');
   await runDelivery(host, question, [{ text: 'Looks fine.' }]);
   assert.equal((await pending).content[0].text, 'Looks fine.');
@@ -515,7 +515,7 @@ test('TB-44 the user session section mori_team follows the mode: off with other 
     await team.setMode('on');
     user.api.handlers.get('before_agent_start')({ type: 'before_agent_start', systemPromptOptions: { sections } });
     assert.match(sections.mori_team, /^You are chat, one of several agents/);
-    assert.match(sections.mori_team, /\n\nYou are the only agent that talks to the user, and in team mode you relay;/);
+    assert.match(sections.mori_team, /\n\nYou are the only agent that talks to the user, and in task mode you relay;/);
     assert.deepEqual(user.api.getActiveTools(), ['read', 'board_read', 'read_session', 'agent_message'],
       'team mode: the dialog only relays (§5.5)');
     const solo = await setup(roles.parseRoleFiles([], deps));
@@ -534,7 +534,7 @@ test('TB-09 in team mode the dialog session refuses calls outside the tools of t
   team.onUserEvent({ type: 'agent_start' });
   const guard = user.api.handlers.get('tool_call');
   assert.deepEqual(guard({ type: 'tool_call', toolName: 'bash', toolCallId: 'x', input: {} }), { block: true,
-    reason: 'Team mode is on: the dialog agent only relays; the work is done in tasks.' });
+    reason: 'Task mode is on: the dialog agent only relays; the work is done in tasks.' });
   assert.equal(guard({ type: 'tool_call', toolName: 'board_read', toolCallId: 'y', input: {} }), undefined);
   team.onUserEvent({ type: 'agent_settled' });
 });

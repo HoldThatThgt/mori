@@ -27,11 +27,11 @@ function caps(over = {}) {
     effectiveWindow: 131072, probing: false, ...over };
 }
 
-/** 选择器输入：默认全部存在、区域 local 且允许、tool_calling 已验证、可用。 */
+/** 选择器输入：默认全部存在、tool_calling 已验证、可用。 */
 function input(candidates, over = {}) {
   const { tools = {}, capsOf = {}, families = {}, ...rest } = over;
   return {
-    candidates, exists: () => true, zoneOf: () => 'local', allowedZones: ['local', 'intranet'],
+    candidates, exists: () => true,
     toolCalling: (ref) => tools[ref] ?? 'verified', availability: () => ({ available: true }),
     capabilities: (ref) => caps(capsOf[ref]), familyOf: (ref) => families[ref] ?? ref, now: 1_000_000, ...rest,
   };
@@ -108,7 +108,7 @@ test('TB-38 sessions without role requirements never consult the capabilities (s
 test('TB-38 the static check reports verifying while a role requirement waits for a probe', () => {
   const probing = { protocolWrite: 'unverified', tier: null, probing: true };
   const { blocked, first } = selector.staticCheck({ ...input(['p/a']), configError: null, projectError: null,
-    pick: 'p', candidates: ['p/a'], projectZones: null, requires: [{ kind: 'protocol_write', min: 'C' }],
+    pick: 'p', candidates: ['p/a'], requires: [{ kind: 'protocol_write', min: 'C' }],
     capabilities: () => caps(probing) });
   assert.equal(first, null);
   assert.equal(blocked.kind, 'verifying');
@@ -144,11 +144,10 @@ function pickConfig() {
   const model = (id, family = '', contextWindow = 100_000) => ({ id, family, contextWindow, maxTokens: 100,
     reasoning: false, input: ['text'] });
   const provider = (id, models) => ({ id, name: id.toUpperCase(), api: 'openai-completions',
-    baseUrl: `http://127.0.0.1:9000/${id}`, zone: 'local', compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
+    baseUrl: `http://127.0.0.1:9000/${id}`, compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
     models });
   return { version: 1, providers: [provider('a', [model('m1', 'qwen', 1000), model('m2', 'qwen')]),
-    provider('b', [model('m1', 'glm')])], groups: [{ id: 'all', members: ['a', 'b'] }], normalDefault: 'all',
-  allowedZones: ['local', 'intranet'], projectZones: {} };
+    provider('b', [model('m1', 'glm')])], groups: [{ id: 'all', members: ['a', 'b'] }], normalDefault: 'all' };
 }
 
 test('TB-38 a role\'s models expand in order without repeats; the ask intersection keeps the role order', () => {
@@ -161,9 +160,9 @@ test('TB-38 a role\'s models expand in order without repeats; the ask intersecti
   assert.deepEqual(selector.intersectCandidates(['b/m1'], ['a/m1']), []);
 });
 
-test('TB-38 blocked cards: Change model for your range, Turn off team mode when locked, neither for a role', () => {
+test('TB-38 blocked cards: Change model for your range, Turn off task mode when locked, neither for a role', () => {
   const base = { ...input(['p/a'], { tools: { 'p/a': 'failed' } }), configError: null, projectError: null,
-    pick: 'p', candidates: ['p/a'], projectZones: null };
+    pick: 'p', candidates: ['p/a'] };
   assert.deepEqual(selector.staticCheck(base).blocked.actions, ['change_model', 'open_settings']);
   assert.deepEqual(selector.staticCheck({ ...base, modelAction: 'turn_off_team' }).blocked.actions,
     ['turn_off_team', 'open_settings']);
@@ -177,12 +176,12 @@ test('TB-38 blocked cards: Change model for your range, Turn off team mode when 
 test('TB-01 agents_invalid wins over every other reason and lists the problems with Check again', () => {
   const problems = ['.mori/agents/a.md: unknown field "foo"', '.mori/agents/b.md: unknown seat "boss"'];
   const { blocked, first } = selector.staticCheck({ ...input(['p/a']), configError: 'bad config', projectError: null,
-    pick: 'p', candidates: ['p/a'], projectZones: null, agentProblems: problems });
+    pick: 'p', candidates: ['p/a'], agentProblems: problems });
   assert.equal(first, null);
   assert.deepEqual(blocked, { kind: 'agents_invalid', detail: '', candidates: [], actions: ['check_agents'],
-    verifyRefs: [], zone: null, zoneProviders: [], problems });
+    verifyRefs: [], problems });
   assert.equal(selector.staticCheck({ ...input(['p/a']), configError: null, projectError: null, pick: 'p',
-    candidates: ['p/a'], projectZones: null, agentProblems: [] }).blocked, null);
+    candidates: ['p/a'], agentProblems: [] }).blocked, null);
 });
 
 test('TB-38 the model menu marks ranges whose models all miss the dialog holder\'s requires', () => {
@@ -246,7 +245,7 @@ function fakeLayer(config = pickConfig()) {
         return new Response('{}', { status });
       };
     },
-    markModel() {}, markProvider() {}, clearModelRecord() {},
+    markModel() {}, markProvider() {},
   };
   const runtime = { registerVirtualModel() {}, async refresh() {}, unregisterVirtualModel() {},
     getModel: (p, id) => physical(p, id), getPhysicalModel: (p, id) => (lookup(`${p}/${id}`) ? physical(p, id)
@@ -255,18 +254,14 @@ function fakeLayer(config = pickConfig()) {
     timings: { ...MODEL_TIMINGS, exhaustionMaxWaitMs: 0 },
     onModelsChanged(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     notify(change) { for (const listener of listeners) listener(change); },
-    registerProject() {},
     getConfig: () => config,
     async projectContext() {
-      return { path: 'd:/p', project: null, projectError: null, allowedZones: ['local', 'intranet'],
-        projectZones: null };
+      return { project: null, projectError: null };
     },
     expandPicksIn: (_project, picks) => selector.expandPicks(config, picks),
-    staticBase: (project) => ({ configError: null, projectError: null, projectZones: null,
-      allowedZones: project.allowedZones, exists: (ref) => !!lookup(ref), zoneOf: () => 'local',
+    staticBase: () => ({ configError: null, projectError: null, exists: (ref) => !!lookup(ref),
       toolCalling: (ref) => state.tools[ref] ?? 'verified', capabilities, familyOf }),
     exists: (ref) => !!lookup(ref),
-    zoneOf: () => 'local',
     toolCallingOf: (ref) => state.tools[ref] ?? 'verified',
     availabilityOf: (ref) => state.avail[ref] ?? { available: true },
     capabilitiesOf: capabilities,
@@ -720,7 +715,7 @@ function poolSetup(concurrency) {
   });
   const pool = createModelPool({ timings: MODEL_TIMINGS, clock: timers, fetch, log: () => {} });
   pool.setProviders([{ id: 'p', name: 'P', api: 'openai-completions', baseUrl: 'http://127.0.0.1:9000/p',
-    zone: 'local', compat: {}, concurrency, keys: [{ ref: 'p#1', label: 'Key 1' }], nextKeyNumber: 2,
+    compat: {}, concurrency, keys: [{ ref: 'p#1', label: 'Key 1' }], nextKeyNumber: 2,
     models: [{ id: 'm1', family: '', contextWindow: 1000, maxTokens: 100, reasoning: false, input: ['text'] }] }]);
   pool.setKeys('p', [{ ref: 'p#1', secret: 'secret-p1' }]);
   /** 发一个请求：who 写进请求体，cls 为调度类别。 */
@@ -851,7 +846,7 @@ test('TB-38 the model layer reads capabilities from the profile, or from the set
   const auto = { server: { kind: 'unknown', version: 'unknown' }, reported: 800, field: 'none',
     steps: { ready: pass, thinking: { outcome: 'not_applicable', detail: null }, call: pass, result: pass,
       replay: { outcome: 'not_applicable', detail: null }, a: fail, b: fail, c: pass } };
-  const stored = mp.buildProfile({ target, auto, previous: undefined, now: 5 });
+  const stored = mp.buildProfile({ target, auto, now: 5 });
   const paths = { config: join(dir, 'model-config.json'), profiles: join(dir, 'model-profiles.json'),
     notice: join(dir, 'model-migration.json'), v0Models: join(dir, 'agent', 'models.json') };
   writeFileSync(paths.config, JSON.stringify(config));

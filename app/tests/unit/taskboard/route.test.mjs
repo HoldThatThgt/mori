@@ -180,14 +180,14 @@ test('TB-27 messages to an ended task are refused', () => {
 
 // ---- TB-04 关闭模式下的临时提问 ----
 
-test('TB-04 team mode off: every role message opens an ad-hoc question; tasks are refused; 5 per turn', () => {
+test('TB-04 task mode off: every role message opens an ad-hoc question; tasks are refused; 5 per turn', () => {
   const dialog = { kind: 'dialog', role: 'chat', request: null, session: R.USER_SESSION };
   for (const to of ['memory', 'planner', 'chat', 'Mori']) {
     const result = R.routeAgentMessage(message({ mode: 'off', sender: dialog, to }));
     assert.deepEqual(result.route, { kind: 'ask', role: to.toLowerCase() }, to);
   }
   assert.equal(R.routeAgentMessage(message({ mode: 'off', sender: dialog, to: 'T1' })).error,
-    'There are no tasks when team mode is off.');
+    'There are no tasks when task mode is off.');
   assert.equal(R.routeAgentMessage(message({ mode: 'off', sender: dialog, to: 'memory', sentThisTurn: 4 })).error,
     null);
   assert.equal(R.routeAgentMessage(message({ mode: 'off', sender: dialog, to: 'memory', sentThisTurn: 5 })).error,

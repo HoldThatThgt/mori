@@ -70,11 +70,11 @@ function useSlashTrigger(tab: Tab, notReady: string | null) {
 }
 
 /**
- * @brief Mori 的 /team 优先于同名的提示词模板和技能，也不列在补全里（平行 Agent 规格 §5.1）：去掉名为 team 的项。
+ * @brief Mori 的 /task 优先于同名的提示词模板和技能，也不列在补全里（平行 Agent 规格 §5.1）：去掉名为 task 的项。
  */
-function withoutTeam(load: SlashLoad): SlashLoad {
+function withoutTask(load: SlashLoad): SlashLoad {
   if (load.status !== 'ready') return load;
-  return { status: 'ready', commands: load.commands.filter((command) => command.name !== 'team') };
+  return { status: 'ready', commands: load.commands.filter((command) => command.name !== 'task') };
 }
 
 /**
@@ -87,7 +87,7 @@ export function useSlashMenu(tab: Tab, notReady: string | null,
   const trigger = useSlashTrigger(tab, notReady);
   const open = trigger.query !== null;
   const quoted = hasQuotes(tab);
-  const load = withoutTeam(useSlashCommands(open && !quoted, tab.sessionId));
+  const load = withoutTask(useSlashCommands(open && !quoted, tab.sessionId));
   const groups = open && !quoted && load.status === 'ready' ? filterCommands(load.commands, trigger.query ?? '') : [];
   const items = groups.flatMap((group) => group.items);
   // 高亮位置跟着筛选词：筛选词变了回到第一项

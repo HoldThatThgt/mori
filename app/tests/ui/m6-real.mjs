@@ -15,8 +15,8 @@
 //   node tests/ui/m6-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,5,6,7,8,c,t]
 // t（2026-10-26，负责人走查 M12）：Customize 的内置工具里打开 ls，新会话里真实模型用 ls 列出文件（只跑它：--only t）。
 // 结果写到 test-results/m6-real(-packaged).json，截图在 test-results/m6-real(-packaged)/。
-// v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；测试准备在复制出的配置里给两个临时项目
-// 授权公网、默认范围设为 [DeepSeek, GLM] 的分组。走查 1 改为在 设置 → Models 里给首选提供商加模型（等它的探针跑完）、
+// v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；测试准备在复制出的配置里把
+// 默认范围设为 [DeepSeek, GLM] 的分组。走查 1 改为在 设置 → Models 里给首选提供商加模型（等它的探针跑完）、
 // 在输入框下面一行的范围菜单里选它；走查 8 改用 v1 的模型表单（Supports thinking、Default effort for new sessions）。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：走查 1 加模型改为卡上 Fetch models → 清单里勾（或手填）→ Add 1 model。
 // 按钮状态的读法（composer-pickers.md"测试要改的地方"C1、C2）："不可用"读 aria-disabled（没有 data-pending），"切换中"读
@@ -26,7 +26,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statS
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, REAL_GROUP, realProviders, scratchUserData, sleep,
+  appRoot, arg, createRecorder, launch, oneLine, REAL_GROUP, realProviders, scratchUserData, sleep, useRealGroup,
 } from './lib.mjs';
 import { activeFile, PANE, samePath, stubFolder, topTitle, waitPanes, waitReady } from './m3-helpers.mjs';
 import { composerAt, slotSelector, waitPaneIdle, waitSplit } from './m5-helpers.mjs';
@@ -452,7 +452,7 @@ async function item1(ctx) {
     && menu.items.filter((item) => item.checked).length === 1 && menu.items.some((item) => item.pick === ref)
     && menu.note === 'Applies to this session only. New sessions use the default range from Settings.'
     && menu.last === 'Manage models', JSON.stringify(menu));
-  record('走查 1：选 deepseek-v4-pro：输入框下面一行的范围按钮显示它，悬停第一行是按钮文字、第二行"<提供商名> · <区域>"；'
+  record('走查 1：选 deepseek-v4-pro：输入框下面一行的范围按钮显示它，悬停第一行是按钮文字、第二行"<提供商名>"；'
     + '新回复来自 deepseek-v4-pro（会话文件里回复的 model 先是首选的第一个模型、后是 deepseek-v4-pro，记了一条 mori.pick）',
   shown.inRow && shown.text === SECOND_MODEL && shown.tip[0] === SECOND_MODEL
     && (shown.tip[1] ?? '').startsWith(`${ctx.conn.name} · `) && models[0] === ctx.conn.model
@@ -1086,7 +1086,7 @@ async function askWithThinking(ctx) {
     settings: readJson(join(ctx.agentDir, 'settings.json')) };
 }
 
-/** @brief 走查 8 后半的检查：新会话的默认强度、生成中按钮不可用、高 / 关两次回复。 */
+/** @brief 走查 8 后半的检查：新会话的默认强度、生成中思考按钮不可用（范围按钮可用）、高 / 关两次回复。 */
 function recordThinkingRun(ctx, run) {
   record('走查 8：新会话的思考强度是设置里的默认"低"；菜单列出关、最低、低、中、高，"低"打勾，说明只作用于这个会话',
     run.initial === 'low' && run.menu.text === 'Effort: Low' && run.menu.reasoning === 'true'
@@ -1094,9 +1094,10 @@ function recordThinkingRun(ctx, run) {
     && run.menu.items.every((item) => !item.disabled) && run.menu.checked === 'low'
     && run.menu.note === 'Applies to this session only. Set each model’s default for new sessions in Settings.',
     JSON.stringify(run.menu));
-  record('走查 8：生成中输入框下面一行的范围和思考按钮不可用（aria-disabled，仍能 Tab 到），范围按钮悬停的第三行'
-    + '"Can’t switch models until the response finishes"、Effort 悬停的第二行"Can’t change effort until the response '
-    + 'finishes"，读屏的描述里也是', run.start?.running === true && run.start.model?.unavailable
+  record('走查 8：生成中输入框下面一行的思考按钮不可用（aria-disabled，仍能 Tab 到），范围按钮可用（2026-10-26 起能打开菜单'
+    + '切 Task mode），范围按钮悬停的第三行"Can’t switch models until the response finishes"、Effort 悬停的第二行'
+    + '"Can’t change effort until the response finishes"，读屏的描述里也是', run.start?.running === true
+    && run.start.model && !run.start.model.unavailable
     && run.start.model.tip[2] === MODEL_BUSY && run.start.model.described.endsWith(`. ${MODEL_BUSY}`)
     && run.start.thinking?.unavailable && run.start.thinking.tip[1] === NOTE.effortBusy
     && run.start.thinking.described === NOTE.effortBusy, JSON.stringify(run.start));
@@ -1344,8 +1345,8 @@ const ctx = { conn, root, project: makeProject(root, 'm6-walk', PROJECT_SKILL),
   untrusted: makeProject(root, 'm6-untrusted', UNTRUSTED_SKILL), pageErrors: [], skillDisabled: false };
 ctx.agentsFiles = projectAgentsFiles(ctx.project);
 ctx.userData = scratchUserData(source);
-// 测试准备（synthetic test setup，§14.1）：给两个临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
-ctx.providers = allowRealProject(ctx.userData, [ctx.project, ctx.untrusted]);
+// 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组
+ctx.providers = useRealGroup(ctx.userData);
 ctx.agentDir = join(ctx.userData, 'pi');
 try {
   await start(ctx);

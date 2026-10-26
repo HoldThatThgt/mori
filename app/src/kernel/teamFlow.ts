@@ -461,7 +461,7 @@ export class UserFlow {
   }
 
   /**
-   * @brief Esc 或 Stop team（§11.4）：待判断队列里的消息全部离开；stop 停下正在判断的立项（与别的 Agent），之后
+   * @brief Esc 或 Stop agents（§11.4）：待判断队列里的消息全部离开；stop 停下正在判断的立项（与别的 Agent），之后
    *        已经写下的回执与进展摘要的位置写在对话流末尾。对话正在为它准备中的那条由会话表随准备中一起撤回。
    * @param stop 停止；judging 为真时有一条正在判断
    * @return 回到输入框的消息原文，按发送顺序

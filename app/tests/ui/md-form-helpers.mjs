@@ -4,8 +4,7 @@
 // - 合成端点（tests/fake-endpoint/server.mjs，synthetic）：一个端口一种形状（4800–4819），收集列表、详情与对话请求的
 //   JSON 日志行（带收到的时刻 t）；
 // - 数据目录（synthetic test setup）：model-config.json 里有一个已有的提供商（地址指向没有服务的端口，新卡应排在它后面），
-//   allowedZones 为空（没有任何区域默认允许，测发现不按区域过滤）；model-profiles.json 用 tb-helpers.mjs 的 tbProfile
-//   （跳过它的探针）；pi/settings.json 为空对象；
+//   model-profiles.json 用 tb-helpers.mjs 的 tbProfile（跳过它的探针）；pi/settings.json 为空对象；
 // - App：启动、关闭，收集主进程与后台进程的输出和页面 console；在预加载脚本的隔离环境里包一层
 //   MessagePort.prototype.postMessage（页面里的 window.mori 是只读的），记下发出的命令（keySecret、secret 只记末 4 位）
 //   与 models.discover 的结果摘要；
@@ -18,7 +17,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync, watch } from 'node:fs';
 import { join, relative } from 'node:path';
-import { appRoot, editModelConfig, launch, oneLine, sleep } from './lib.mjs';
+import { appRoot, launch, oneLine, sleep } from './lib.mjs';
 import { seedTeamUserData, tbModel, tbProvider, tempUserData } from './tb-helpers.mjs';
 import { stopEndpoint } from './v1-switch-helpers.mjs';
 
@@ -121,15 +120,12 @@ export const urlOf = (port, path = '/v1') => `http://127.0.0.1:${port}${path}`;
 
 /**
  * @brief 新的数据目录（synthetic test setup）：一个已有的提供商 seed（一个模型，地址是没有服务的端口，档案已验证，
- *        启动时不探测），allowedZones 为空，pi/settings.json 为空对象。
+ *        启动时不探测），pi/settings.json 为空对象。
  */
 export function seedUserData() {
   const userData = tempUserData('mori-md-form-');
   const provider = { ...tbProvider(SEED_ID, SEED_PORT, [tbModel('seed-model')]), name: 'Seed' };
   seedTeamUserData(userData, { providers: [provider] });
-  editModelConfig(userData, (config) => {
-    config.allowedZones = [];
-  });
   return userData;
 }
 
@@ -395,7 +391,6 @@ function readFormInPage(parts) {
   const list = parts.list(form, tools, parts.row);
   const fetchButton = form.querySelector('[data-action="fetch-models"]');
   const message = form.querySelector('[data-testid="form-message"]');
-  const zone = form.querySelectorAll('input[name="zone"]');
   const more = form.querySelector('[data-testid="more-settings"]');
   const status = form.querySelector('[data-testid="fetch-status"]');
   const detected = form.querySelector('[data-testid="detected-server"]');
@@ -403,8 +398,6 @@ function readFormInPage(parts) {
     title: text(form.querySelector('h3')),
     labels: [...form.querySelectorAll('label, legend')].map((el) => text(el)).filter(Boolean),
     baseUrl: input('Base URL'), apiKey: input('API key'), name: input('Name'), api: input('API type'),
-    zone: zone.length ? [...zone].find((radio) => radio.checked)?.value ?? null : undefined,
-    zoneCount: zone.length,
     fetch: button('fetch-models'), fetchCancel: button('fetch-cancel'),
     status: status ? { state: status.dataset.state, text: text(status), role: status.getAttribute('role') } : null,
     detected: detected ? { kind: detected.dataset.kind, text: text(detected) } : null,

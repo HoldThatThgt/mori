@@ -2,7 +2,7 @@
 // 以及 Mori 写的引用来源（mori.ref 条目，记到它指向的你的消息上）、模型层的换模型与重建（mori.model_switch、
 // mori.rebuild 条目，docs/v1/screens/model-chat.md）。系统消息、用量、选择范围（mori.pick）等记录不显示。
 // 平行 Agent（docs/specs/parallel-agents-taskboard.md §13.11）：mori.receipt 是回执行，mori.progress 是进展摘要的位置
-// （内容用会话信息里的 TaskBoard 视图），mori.wake 把它指向的用户消息变成不显示的 wake 条目，mori.team 不显示。
+// （内容用会话信息里的 TaskBoard 视图），mori.wake 把它指向的用户消息变成不显示的 wake 条目，mori.team 是一行模式提示。
 
 import { z } from 'zod';
 import {
@@ -18,7 +18,7 @@ import {
   resultSubagent,
   type ToolCall, type Transcript,
 } from './model';
-import { attachReceipt, RECEIPT_TOOLS } from './teamEvents';
+import { addModeNotice, attachReceipt, RECEIPT_TOOLS } from './teamEvents';
 
 /** mori.ref 条目的内容（会话文件里读出来的，先校验） */
 const RefDataSchema = z.object({ messageId: z.string(), refs: z.array(QuoteRefSchema) });
@@ -141,7 +141,7 @@ function addWake(state: Transcript, messageId: string, kind: WakeKind): Transcri
 }
 
 /**
- * @brief 协作写的条目（§13.11）；内容不对时记录错误、不显示。mori.team 不显示（不经这里）。
+ * @brief 协作写的条目（§13.11）；内容不对时记录错误、不显示。mori.team 的模式提示在 transcriptFromEntries 里加。
  * @param index 这条在 entries 里的下标（回执找它之后的工具结果）
  */
 function addTeamEntry(state: Transcript, entry: Extract<SessionEntry, { type: 'custom' }>, entries: SessionEntry[],
@@ -198,13 +198,17 @@ function teamModeOf(entry: SessionEntry): TeamMode | null {
 }
 
 /**
- * @brief 由会话记录重建对话流。没有结果的工具调用保持"Interrupted"。
+ * @brief 由会话记录重建对话流。没有结果的工具调用保持"Interrupted"。每条 mori.team 是一行模式提示（§13.11）；
  *        每次运行从一条用户消息开始，按那时最后一条 mori.team 的模式记下运行的模式（工具卡的 Message / Ask，§13.8）。
  */
 export function transcriptFromEntries(entries: SessionEntry[]): Transcript {
   let latest: TeamMode = 'off';
   return entries.reduce((state, entry, index) => {
-    latest = teamModeOf(entry) ?? latest;
+    const mode = teamModeOf(entry);
+    if (mode !== null) {
+      latest = mode;
+      return addModeNotice(state, mode);
+    }
     const user = entry.type === 'message' && (entry.message as unknown as Message).role === 'user';
     return addEntry(user ? { ...state, runTeamMode: latest } : state, entry, entries, index);
   }, emptyTranscript);

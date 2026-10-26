@@ -21,7 +21,7 @@ Needs approval，本会话已允许 = Allowed for this session，每次询问 = 
 | `LiveStatus.teamApproval` | 侧栏里没在中栏显示的会话（界面重新载入后还没点开的）是否有后台批准卡 |
 | `mori.board` 的 `TaskView.phase` | `approval`：进展摘要这一行 `Waiting for your approval` |
 | 主进程的窗口焦点 | 任务栏闪烁（v0） |
-| 你的操作 | 卡上的选择、Esc、`Stop team`、权限菜单 |
+| 你的操作 | 卡上的选择、Esc、`Stop agents`、权限菜单 |
 
 `<role>` 是事件里的 `role`，基座（`mori`）显示为 `Mori`；`T1`、`<task title>` 是 `task`、`taskTitle` 原文。
 
@@ -46,7 +46,7 @@ Needs approval，本会话已允许 = Allowed for this session，每次询问 = 
 | 拒绝 | Alt+3，或理由框里按 Enter；随后 `mori.team_approval_end`（拒绝） | 卡片消失；理由作为那个实例的工具结果回给它（v0 的固定写法 `Rejected by the user.` / `Rejected by the user. Reason: <理由>`） | — |
 | 焦点在卡上按 Esc | 你的操作 | 没有浮层时等于拒绝这张卡（带理由框里的文字），同 v0 | — |
 | 焦点不在卡上按 Esc、点停止 | 你的操作（§11.4） | 只停对话这一回合和为它判断的立项（team-stop.md）；后台实例的卡**不变**，继续挂着 | — |
-| `Stop team` | `session.stopTeam`；随后每张卡的 `mori.team_approval_end`（拒绝，由停止决定） | 全部批准卡（对话的和后台的）按拒绝处理并消失（§11.4） | — |
+| `Stop agents` | `session.stopTeam`；随后每张卡的 `mori.team_approval_end`（拒绝，由停止决定） | 全部批准卡（对话的和后台的）按拒绝处理并消失（§11.4） | — |
 | 实例的请求因别的原因结束 | `mori.team_approval_end`（例如撤销需求停止了这个实例，§7.6） | 卡片消失 | — |
 | 对话一轮结束 | 用户会话的 `agent_settled` | 后台的卡**不清掉**（§11.3） | 照常选择 |
 | 切换会话、去设置页再回来 | — | 卡片还在（同 v0） | — |

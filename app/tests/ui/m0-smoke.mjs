@@ -107,7 +107,7 @@ function prepareDirs() {
 async function saveAndTest(page, apiKey) {
   const h = pageHelpers(page);
   const form = page.getByTestId('connection-form');
-  const fetch = await h.fillConnection({ name: 'Mori endpoint', baseUrl: `http://127.0.0.1:${port}/v1`, zone: 'local',
+  const fetch = await h.fillConnection({ name: 'Mori endpoint', baseUrl: `http://127.0.0.1:${port}/v1`,
     apiKey, modelId: 'fake-coder' });
   const row = form.locator('[data-testid="discovered-row"][data-model="fake-coder"]');
   const listed = { rows: await row.count(), picked: await row.locator('input[name="pick"]:checked').count(),

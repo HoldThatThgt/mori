@@ -1,5 +1,5 @@
 // v1 模型层的整机测试（会话一侧）：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint，synthetic），
-// 覆盖 docs/specs/model-providers.md §14.2 中 MP-09、MP-10、MP-11、MP-12、MP-21、MP-22、MP-23、MP-34、MP-35 在 App 层的通过条件。
+// 覆盖 docs/specs/model-providers.md §14.2 中 MP-09、MP-10、MP-12、MP-21、MP-22、MP-23、MP-34、MP-35 在 App 层的通过条件。
 // 界面文字、状态与标识见 docs/v1/screens/model-chat.md、model-menu.md、models-settings.md。
 // 每个场景用一个新的数据目录和自己的合成端点，启动前写好 model-config.json（synthetic test setup，代码里注明）；
 // 场景之间互不依赖，可以用 --only 只跑其中几个。
@@ -8,21 +8,23 @@
 // v1-models-row-helpers.mjs）；场景 row 另查这一行里范围按钮的位置、宽度、截短、悬停、菜单往上打开、键盘、后台进程退出与
 // 重新载入、分屏 280px 的一栏（多个提供商的范围只在 v1 的配置里有）。
 // 合成端点前面放一个本进程里的转发代理（synthetic，v1-models-session-setup.mjs）：记下每个请求的请求体（发给模型的上下文、
-// 思考参数、压缩请求、认证头），MP-21、MP-22 另用它让压缩（摘要）请求返回 400，制造"压缩出错"。MP-11 的取消探针直连合成端点
-// （断开要直接传到端点）。
+// 思考参数、压缩请求、认证头），MP-21、MP-22 另用它让压缩（摘要）请求返回 400，制造"压缩出错"。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/v1-models-app-session.mjs [--exe <Mori.exe 路径>] [--only 场景1,场景2]
-// 场景：blocked、configInvalid、probes、consent、fingerprint、handover、compaction、range、row、preparing、thinking。
+// 场景：blocked、configInvalid、probes、fingerprint、handover、compaction、range、row、preparing、thinking。
 // 结果写到 test-results/v1-models-app-session(-packaged).json，截图在 test-results/v1-models-app-session(-packaged)/。
 // 端口：4540–4549 是 Mori 连接的地址（代理或直连的合成端点），4550–4559 是代理后面的合成端点。
 // 测试里的 key 都是合成的测试值（synthetic），与任何真实服务无关。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：MP-10 加模型改为卡上 Fetch models → 勾选或手填 → Add 1 model
 // （page.mjs cardAddModels）；合成端点的列表、详情请求的日志行（带 path）不算对话请求。
 // 2026-10-26（WP-02，负责人走查 M7、M8，models-settings.md "Models 行"）：模型行没有档案摘要和需要同意的探针的按钮。
-// MP-10 的等级、推理字段读 models.get 的档案，tool calling 读档案与行上的 data-probe、判定失败的状态行；MP-11 经进程桥发
-// models.verify（tests long_input / cancel）、读档案（这一条由 WP-04 删除）；MP-12 的重新验证看行上的 data-probe，
-// 全程没有状态行。WP-02 评审补：场景 probes 点 pv/fake-coder-notools 状态行的 Verify again（重新探测、Verifying…、回到
-// failed 并再带 Verify again）。
+// MP-10 的等级、推理字段读 models.get 的档案，tool calling 读档案与行上的 data-probe、判定失败的状态行；MP-12 的重新验证
+// 看行上的 data-probe，全程没有状态行。WP-02 评审补：场景 probes 点 pv/fake-coder-notools 状态行的 Verify again
+// （重新探测、Verifying…、回到 failed 并再带 Verify again）。
+// 2026-10-26（WP-04，负责人走查 M7 决定 1）：长输入、取消两个探针删掉，场景 consent（MP-11）同删。
+// 2026-10-26（WP-05，负责人走查 M3）：没有网络区域。场景 blocked 的 no_candidate 用“地址上没有服务”与“tool calling 判定
+// 不通过”两种原因（原来另有公网、区域未确认），没有 Allow <zone>、Confirm zone 两个操作；场景 range 的菜单项没有区域标记，
+// 悬停第二行只有提供商名（MP-06 的两条 App 检查）。
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,7 +38,7 @@ import {
   rangeDescription, rangeMenuPlace, rangeName, resetWindow, rowFacts, seenPickers, setRightPanel, watchPickers,
 } from './v1-models-row-helpers.mjs';
 import {
-  brief, customs, group, hasToolHistory, makeProject, model, projectKey, provider, readConfig, seedConfig,
+  brief, customs, group, hasToolHistory, makeProject, model, provider, readConfig, seedConfig,
   seedPiSettings, seedV0Session, startEndpoint, talk,
 } from './v1-models-session-setup.mjs';
 import { cardAddModels } from './page.mjs';
@@ -485,10 +487,10 @@ async function verifyingStep(ctx) {
     && bar?.text === 'slowg · slow-coder', `card=${JSON.stringify(await blockedState(page))} button=${bar?.text}`);
 }
 
-/** @brief no_candidate：三种排除原因、五个操作；每个操作的去处（不改配置）。 */
+/** @brief no_candidate：两种排除原因、三个操作；每个操作的去处（不改配置）。 */
 async function noCandidateStep(ctx) {
   const { page } = ctx;
-  await waitProfiles(page, ['dead/dead-coder'], finished, 60000);
+  await waitProfiles(page, ['dead/dead-coder', 'nt/nt-coder-notools'], finished, 60000);
   await choosePick(page, 'mix');
   const card = await waitBlocked(page, 'no_candidate');
   record('MP-09 no_candidate: card text "This session can\'t start: no model fits."',
@@ -496,31 +498,11 @@ async function noCandidateStep(ctx) {
   const lines = card.candidates.map((item) => `${item.reason}:${item.text}`);
   record('MP-09 no_candidate: one line per candidate with its reason', same(lines, [
     'unverified:dead/dead-coder — tool calling not verified yet',
-    'zone_blocked:pubp/pub-coder — zone public is not allowed for this project',
-    'zone_unconfirmed:unc/unc-coder — network zone not confirmed']), lines.join(' | '));
-  record('MP-09 no_candidate: actions Verify now / Allow public for this project / Confirm zone / Change model… / '
-    + 'Open settings, in this order', same(card.actions, [['verify', 'Verify now'],
-    ['allow-zone', 'Allow public for this project'], ['confirm-zone', 'Confirm zone'],
-    ['change-model', 'Change model…'], ['open-settings', 'Open settings']]), JSON.stringify(card.actions));
-  await clickCardAction(page, 'confirm-zone');
-  const zoneFocus = await until(() => page.evaluate(() => {
-    const el = document.activeElement;
-    return el?.matches('[data-action="confirm-zone"]')
-      ? el.closest('[data-testid="zone-unconfirmed"]')?.dataset.provider ?? '' : null;
-  }), 5000, 200);
-  record('MP-09 no_candidate: "Confirm zone" opens Settings → Models with focus on the unconfirmed provider\'s row',
-    zoneFocus === 'unc', `focused confirm-zone of ${zoneFocus}`);
-  await backToChat(page);
-  await clickCardAction(page, 'allow-zone');
-  const projectFocus = await until(() => page.evaluate(() => {
-    const el = document.activeElement;
-    return el?.matches('[data-testid="project-zone"]')
-      ? `${el.closest('[data-testid="project-row"]')?.dataset.path}|${el.dataset.zone}` : null;
-  }), 5000, 200);
-  const [path, zone] = (projectFocus ?? '|').split('|');
-  record('MP-09 no_candidate: "Allow public for this project" opens Project access with focus on this project',
-    projectKey(path || '.') === projectKey(ctx.project) && zone === 'public', `focused ${projectFocus}`);
-  await backToChat(page);
+    'failed:nt/nt-coder-notools — tool calling failed verification']), lines.join(' | '));
+  record('MP-09 no_candidate: actions Verify now / Change model… / Open settings, in this order (no zone actions)',
+    same(card.actions, [['verify', 'Verify now'], ['change-model', 'Change model…'],
+      ['open-settings', 'Open settings']]),
+    JSON.stringify(card.actions));
   await noCandidateMenuAndSettings(ctx);
 }
 
@@ -560,31 +542,6 @@ async function verifyNowStep(ctx) {
   const reply = await lastReply(page);
   record('MP-09 Verify now: the session can send afterwards', reply.includes(PLAIN_REPLY)
     && dead.log.some((line) => !line.probe && line.status === 200), oneLine(reply, 80));
-}
-
-/** @brief Allow <zone>：勾 Public 并确认后，只因区域被排除的会话可以发送。 */
-async function allowZoneStep(ctx) {
-  const { page } = ctx;
-  await ctrlN(page);
-  await waitBlocked(page, 'no_pick');
-  await choosePick(page, 'pubg');
-  const card = await waitBlocked(page, 'no_candidate');
-  record('MP-09 no_candidate (zone only): actions Allow public… / Change model… / Open settings',
-    same(card.actions.map(([action]) => action), ['allow-zone', 'change-model', 'open-settings']),
-    JSON.stringify(card.actions));
-  await clickCardAction(page, 'allow-zone');
-  const box = page.locator('[data-testid="project-zone"][data-zone="public"]:focus');
-  await box.waitFor({ timeout: 5000 });
-  // 勾 Public 先弹确认框，确认前勾选框不变（受控），所以用 click 而不是 check。
-  await box.click();
-  const dialog = page.getByTestId('public-dialog');
-  await dialog.waitFor({ timeout: 5000 });
-  await dialog.locator('.dialog-actions button:not([data-role="cancel"])').click();
-  await dialog.waitFor({ state: 'detached', timeout: 5000 });
-  await backToChat(page);
-  const cleared = await until(async () => (await blockedState(page)) === null, 15000, 300);
-  record('MP-09 Allow public for this project: after allowing in Project access the card clears', Boolean(cleared),
-    JSON.stringify(await blockedState(page)));
 }
 
 /** @brief pick_missing：会话的范围指向的分组被删掉。 */
@@ -634,23 +591,20 @@ async function blockedScenario(ctx) {
   // 慢端点：每个请求先等 6 秒，第一次探测要半分钟以上，这期间会话按 verifying 拒绝启动。
   const slow = await startEndpoint(ctx, PORT + 1, { FAKE_FIRST_DELAY_MS: '6000' });
   ctx.project = makeProject(ctx, 'proj');
-  ctx.broken = makeProject(ctx, 'proj-broken', { '.mori/models.json': '{ "allowedZones": ["local"], "bogus": true }\n' });
-  // synthetic test setup：五个提供商（本机、公网、区域未确认、地址上没有服务、慢）与四个分组，没有默认范围。
+  ctx.broken = makeProject(ctx, 'proj-broken', { '.mori/models.json': '{ "bogus": true }\n' });
+  // synthetic test setup：四个提供商（本机、tool calling 判定不通过、地址上没有服务、慢）与三个分组，没有默认范围。
   seedConfig(ctx, { providers: [
     provider('local1', 'Local One', main.url, [model('fake-coder')]),
-    provider('pubp', 'Public P', main.url, [model('pub-coder')], { zone: 'public' }),
-    provider('unc', 'Unconfirmed P', main.url, [model('unc-coder')], { zone: null }),
+    provider('nt', 'No Tools P', main.url, [model('nt-coder-notools')]),
     provider('dead', 'Dead P', `http://127.0.0.1:${PORT + 2}/v1`, [model('dead-coder')]),
     provider('slowp', 'Slow P', slow.url, [model('slow-coder')]),
-  ], groups: [group('mix', ['dead', 'pubp', 'unc']), group('slowg', ['slowp']), group('tmpg', ['local1']),
-    group('pubg', ['pubp'])] });
+  ], groups: [group('mix', ['dead', 'nt']), group('slowg', ['slowp']), group('tmpg', ['local1'])] });
   await startApp(ctx);
   ctx.startedAt = Date.now();
   await step(ctx, 'no_pick', () => noPickStep(ctx));
   await step(ctx, 'verifying', () => verifyingStep(ctx));
   await step(ctx, 'no_candidate', () => noCandidateStep(ctx));
   await step(ctx, 'verify now', () => verifyNowStep(ctx));
-  await step(ctx, 'allow zone', () => allowZoneStep(ctx));
   await step(ctx, 'pick_missing', () => pickMissingStep(ctx));
   await step(ctx, 'project_config', () => projectConfigStep(ctx));
 }
@@ -723,6 +677,11 @@ async function probeRowsStep(ctx) {
   record('MP-10 pv/fake-coder: tool calling verified, handoff tier A, reasoning field none (profile); the row is '
     + 'verified with no status line', rowMatches(profiles['pv/fake-coder'], base, { tool_calling: 'verified',
     tier: 'A', reasoning: 'none' }), rowFactsOf(profiles['pv/fake-coder'], base));
+  // 2026-10-26 负责人走查 M7：行上不再有探针按钮（WP-02 删按钮，WP-04 删第 8、9 步）；原来在 MP-11 的 consent 场景里查
+  const has = (action) => Boolean(base?.actions.includes(action));
+  record('MP-10 a verified model row offers Edit and Delete and no "Verify", "Test", "Long-input test…" or '
+    + '"Cancel test…" (2026-10-26)', has('edit') && has('delete')
+    && !['verify', 'test', 'long-input', 'cancel-test'].some(has), base?.actions.join(','));
   for (const spec of PROBE_MODELS) {
     const ref = `pv/${spec.id}`;
     const row = await profileRow(page, ref);
@@ -815,85 +774,6 @@ async function probesScenario(ctx) {
   await step(ctx, 'rows', () => probeRowsStep(ctx));
   await step(ctx, 'verify again', () => verifyAgainStep(ctx, ep));
   await step(ctx, 'background queue', () => probeQueueStep(ctx, ep));
-}
-
-// ---------- 场景：需要同意的探针（MP-11） ----------
-
-/** @brief 合成端点日志里的探针请求条数。 */
-const probeLines = (ep) => ep.log.filter((line) => line.probe).length;
-
-/**
- * @brief 经进程桥发需要同意的探针（models.verify，tests 为 long_input 或 cancel），等档案的 probedAt 变化。
- *        2026-10-26（负责人走查 M7）：设置页的两个按钮与确认框删掉，界面上没有入口；后台进程的这两步留到 WP-04 删除，
- *        这里只经进程桥查它们还照规格判定（MP-11 由 WP-04 一并删除）。
- * @return 命令的错误、之后的档案、这期间合成端点多了几条探针请求、模型行此刻的样子
- */
-async function consent(ctx, ep, ref, tests) {
-  const { page } = ctx;
-  const before = (await modelsInfo(page)).profiles[ref]?.probedAt ?? 0;
-  const lines = probeLines(ep);
-  const result = await page.evaluate((command) => window.mori.request(command),
-    { type: 'models.verify', refs: [ref], tests });
-  const profiles = await waitProfiles(page, [ref], (profile) => (profile?.probedAt ?? 0) > before, 240000);
-  await sleep(500);
-  return { error: result?.error ?? null, profile: profiles[ref], added: probeLines(ep) - lines,
-    row: await profileRow(page, ref) };
-}
-
-/** @brief 长输入探针（经进程桥）：不截断的模型 truncation none；-truncate 判出静默截断，有效窗口降下；行上没有告警。 */
-async function longInputStep(ctx, e1) {
-  const plain = await consent(ctx, e1, 'lp/fake-coder', 'long_input');
-  record('MP-11 long-input (models.verify through the bridge): a model that keeps long input stays truncation none',
-    plain.error === null && plain.added >= 2 && plain.profile.context.truncation === 'none'
-    && plain.profile.context.effective === 8192, `+${plain.added} probes, ${JSON.stringify(plain.profile.context)}`);
-  const cut = await consent(ctx, e1, 'lp/fake-coder-truncate', 'long_input');
-  record('MP-11 long-input: -truncate is judged silent and the effective window drops; the Models row shows no '
-    + 'warning and no status line (2026-10-26)', cut.profile.context.truncation === 'silent'
-    && cut.profile.context.effective < 8192 && cut.row?.status === null && !/truncat/i.test(cut.row.meta),
-  `${JSON.stringify(cut.profile.context)} row=${JSON.stringify(cut.row)}`);
-}
-
-/** @brief 取消探针（经进程桥）：/metrics 回落为 true，-nocancel 为 false，没有指标为 unknown；行上没有 Cancel test…。 */
-async function cancelStep(ctx, e1, e2) {
-  const row = await profileRow(ctx.page, 'lp/fake-coder');
-  record('MP-11 the Models row has no "Long-input test…", "Cancel test…", "Verify" or "Test" (2026-10-26)',
-    Boolean(row) && !['long-input', 'cancel-test', 'verify', 'test'].some((action) => row.actions.includes(action)),
-    row?.actions.join(','));
-  const ok = await consent(ctx, e1, 'lp/fake-coder', 'cancel');
-  record('MP-11 cancel: metrics fall back after disconnect → cancel_verified true',
-    ok.error === null && ok.added >= 1 && ok.profile.cancel_verified === true,
-    `+${ok.added} ${ok.profile.cancel_verified}`);
-  const stuck = await consent(ctx, e1, 'lp/fake-coder-nocancel', 'cancel');
-  record('MP-11 cancel: -nocancel → cancel_verified false', stuck.profile.cancel_verified === false,
-    String(stuck.profile.cancel_verified));
-  const blind = await consent(ctx, e2, 'nm/fake-coder', 'cancel');
-  // consent 等到档案的 probedAt 变化才返回，即取消探针确实跑过；没有指标时不必再发长输出请求。
-  record('MP-11 cancel: FAKE_NO_METRICS=1 → the test runs and gives cancel_verified unknown',
-    blind.profile.cancel_verified === 'unknown', `+${blind.added} probe requests, ${blind.profile.cancel_verified}`);
-}
-
-/** @brief 场景 consent（MP-11）。 */
-async function consentScenario(ctx) {
-  const env = { FAKE_MAX_MODEL_LEN: '8192', FAKE_MODELS: 'fake-coder,fake-coder-truncate,fake-coder-nocancel' };
-  const e1 = await startEndpoint(ctx, PORT, env, { proxy: false });
-  const e2 = await startEndpoint(ctx, PORT + 1, { ...env, FAKE_NO_METRICS: '1', FAKE_MODELS: 'fake-coder' },
-    { proxy: false });
-  const small = (id) => model(id, { ctx: 8192, max: 1024 });
-  // synthetic test setup：窗口 8192 的模型（长输入探针的请求不太大）；第二个端点没有 /metrics。
-  seedConfig(ctx, { providers: [
-    provider('lp', 'Long Provider', e1.url, [small('fake-coder'), small('fake-coder-truncate'),
-      small('fake-coder-nocancel')]),
-    provider('nm', 'No Metrics', e2.url, [small('fake-coder')]),
-  ], normalDefault: 'lp' });
-  await startApp(ctx);
-  await waitProfiles(ctx.page, ['lp/fake-coder', 'lp/fake-coder-truncate', 'lp/fake-coder-nocancel', 'nm/fake-coder']);
-  const untouched = (await modelsInfo(ctx.page)).profiles['lp/fake-coder'];
-  record('MP-11 the automatic probes leave long input and cancel untested (truncation unknown, cancel unknown)',
-    untouched.context.truncation === 'unknown' && untouched.cancel_verified === 'unknown',
-    `${untouched.context.truncation}/${untouched.cancel_verified}`);
-  await openModels(ctx.page);
-  await step(ctx, 'long input', () => longInputStep(ctx, e1));
-  await step(ctx, 'cancel', () => cancelStep(ctx, e1, e2));
 }
 
 // ---------- 场景：指纹与服务版本（MP-12） ----------
@@ -1270,7 +1150,8 @@ async function readMenu(page) {
   const state = await menu.evaluate((element) => ({
     sections: [...element.querySelectorAll('[data-section]')].map((item) => item.dataset.section),
     items: [...element.querySelectorAll('[role="menuitemradio"]')].map((item) => ({ pick: item.dataset.pick,
-      label: item.querySelector('.switch-text')?.textContent, zone: item.querySelector('.pick-zone')?.textContent,
+      label: item.querySelector('.switch-text')?.textContent, zoneMark: Boolean(item.querySelector('.pick-zone'))
+        || 'zone' in item.dataset,
       checked: item.getAttribute('aria-checked') === 'true', excluded: item.dataset.excluded === 'true',
       title: item.title, section: item.closest('[data-section]')?.dataset.section })),
     providerNames: [...element.querySelectorAll('.model-group-name')].map((item) => item.textContent),
@@ -1287,11 +1168,13 @@ async function menuStep(ctx) {
   const { page } = ctx;
   const bar = await pickers(page);
   record('MP-23 label: a group range shows "<group id> · <current model id>"; hover line 1 is the button text, '
-    + 'line 2 "<provider name> · <zone>"', bar.text === 'g1 · m1' && bar.pick === 'g1' && bar.current === 'p1/m1'
-    && bar.tip[0] === 'g1 · m1' && bar.tip[1] === 'Provider One · Local' && bar.tip.length === 2, JSON.stringify(bar));
+    + 'line 2 "<provider name>"', bar.text === 'g1 · m1' && bar.pick === 'g1' && bar.current === 'p1/m1'
+    && bar.tip[0] === 'g1 · m1' && bar.tip[1] === 'Provider One' && bar.tip.length === 2, JSON.stringify(bar));
+  record('MP-06 the range button hover line 2 is only the provider name ("Provider One", no " · <zone>")',
+    bar.tip[1] === 'Provider One', JSON.stringify(bar.tip));
   record('MP-23 the range button is in the message-box row, not the top bar: name "Model range: g1, m1", described '
-    + 'by hover line 2 as "Provider One, Local" (a hidden model-tip outside the button), no aria-disabled while usable',
-  bar.inRow && !bar.inTopbar && bar.name === rangeName('g1 · m1') && bar.described === 'Provider One, Local'
+    + 'by hover line 2 as "Provider One" (a hidden model-tip outside the button), no aria-disabled while usable',
+  bar.inRow && !bar.inTopbar && bar.name === rangeName('g1 · m1') && bar.described === 'Provider One'
     && bar.tipOutside && bar.ariaDisabled === null && !bar.disabled, JSON.stringify(bar));
   const menu = await readMenu(page);
   record('MP-23 menu: opens upward from the message-box row, right-aligned with the range button, 300px wide, inside '
@@ -1303,19 +1186,22 @@ async function menuStep(ctx) {
   record('MP-23 menu: sections Groups / Providers / Models (models under provider names)',
     same(menu.sections.filter((item) => ['groups', 'providers', 'models'].includes(item)),
       ['groups', 'providers', 'models'])
-    && same(picks('groups'), ['g1', 'gpub'])
-    && same(picks('providers'), ['Provider One', 'Provider Two', 'Provider Three', 'Public Provider'])
-    && same(picks('models'), ['m1', 'm1b', 'm2a', 'm3', 'pm'])
-    && same(menu.providerNames, ['Provider One', 'Provider Two', 'Provider Three', 'Public Provider']),
+    && same(picks('groups'), ['g1', 'gbad'])
+    && same(picks('providers'), ['Provider One', 'Provider Two', 'Provider Three', 'No Tools Provider'])
+    && same(picks('models'), ['m1', 'm1b', 'm2a', 'm3', 'pn-notools'])
+    && same(menu.providerNames, ['Provider One', 'Provider Two', 'Provider Three', 'No Tools Provider']),
     JSON.stringify({ sections: menu.sections, names: menu.providerNames, items: menu.items.map((item) => item.pick) }));
   const byPick = Object.fromEntries(menu.items.map((item) => [item.pick, item]));
-  const faded = ['gpub', 'pp', 'pp/pm'].every((pick) => byPick[pick]?.excluded
-    && byPick[pick].title.includes('pp/pm — zone public is not allowed for this project'));
+  const faded = ['gbad', 'pn', 'pn/pn-notools'].every((pick) => byPick[pick]?.excluded
+    && byPick[pick].title.includes('pn/pn-notools — tool calling failed verification'));
   record('MP-23 menu: items whose candidates are all excluded are faded with the reason on hover, still selectable',
-    faded && !byPick.g1?.excluded && !byPick.p2?.excluded, JSON.stringify(['gpub', 'pp', 'pp/pm', 'g1'].map((pick) =>
-      [pick, byPick[pick]?.excluded, byPick[pick]?.title])));
-  record('MP-23 menu: zones marked, the current range ticked, bottom note and "Manage models"',
-    byPick.g1?.checked && byPick.g1.zone === 'Local' && byPick.pp?.zone === 'Public'
+    faded && !byPick.g1?.excluded && !byPick.p2?.excluded, JSON.stringify(['gbad', 'pn', 'pn/pn-notools', 'g1']
+      .map((pick) => [pick, byPick[pick]?.excluded, byPick[pick]?.title])));
+  record('MP-06 the range menu items carry no zone mark (no .pick-zone, no data-zone); each shows only its name',
+    menu.items.length > 0 && menu.items.every((item) => !item.zoneMark), JSON.stringify(menu.items
+      .map((item) => [item.pick, item.label, item.zoneMark])));
+  record('MP-23 menu: the current range ticked, bottom note and "Manage models"',
+    byPick.g1?.checked
     && menu.note === 'Applies to this session only. New sessions use the default range from Settings.'
     && menu.manage === 'Manage models', JSON.stringify({ g1: byPick.g1, note: menu.note, manage: menu.manage }));
 }
@@ -1356,32 +1242,40 @@ async function pickStep(ctx, ep) {
   await until(() => page.evaluate((selector) => document.querySelector(selector)?.dataset.running === 'true', PANE),
     10000, 100);
   const busy = await pickers(page);
-  const { hit, opened } = await forceClickRange(page);
-  record(`MP-23 generating: the range and Effort buttons are unavailable (aria-disabled, still focusable); range hover `
-    + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, busy.unavailable && !busy.disabled
-    && same(busy.tip, ['m3', 'Provider Three · Local', BUSY_TITLE]) && busy.thinking?.unavailable === true
+  const { hit, menu } = await clickBusyRange(page);
+  record(`MP-23 generating: the Effort button is unavailable (aria-disabled, still focusable) and the range button `
+    + 'stays usable (2026-10-26: it opens the menu to switch task mode); range hover '
+    + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, !busy.unavailable && !busy.disabled
+    && same(busy.tip, ['m3', 'Provider Three', BUSY_TITLE]) && busy.thinking?.unavailable === true
     && !busy.thinking.disabled && same(busy.thinking.tip, ['Effort: Unavailable', EFFORT_BUSY]), JSON.stringify(busy));
-  record('MP-23 generating: the range description is "Provider Three, Local. <reason>", the Effort description is the '
-    + 'reason (no line 1); clicking the unavailable range button opens no menu',
-  busy.described === rangeDescription('Provider Three · Local', BUSY_TITLE) && busy.thinking?.described === EFFORT_BUSY
-    && hit && opened === 0, `${busy.described} | ${busy.thinking?.described} | hit ${hit} | menus ${opened}`);
+  record('MP-23 generating: the range description is "Provider Three. <reason>", the Effort description is the '
+    + `reason (no line 1); clicking the range button opens its menu with every range item disabled and the note `
+    + `"${BUSY_TITLE}" (docs/v1/screens/model-menu.md)`,
+  busy.described === rangeDescription('Provider Three', BUSY_TITLE) && busy.thinking?.described === EFFORT_BUSY
+    && hit && menu !== null && menu.items > 0 && menu.disabled === menu.items && menu.note === BUSY_TITLE,
+  `${busy.described} | ${busy.thinking?.described} | hit ${hit} | menu ${JSON.stringify(menu)}`);
   await waitIdle(page, 30000);
   ctx.s3 = await activeFile(page);
 }
 
 /**
- * @brief 在不可用（aria-disabled）的范围按钮中间真的点一下鼠标（Playwright 的 click() 会一直等它可用，所以用 force），
- *        返回点的那一点是否落在按钮上（force 不查有没有东西盖着：点到别的东西上也不会开菜单，检查就白过了）和开了几个菜单。
+ * @brief 回复进行中在范围按钮中间点一下鼠标（2026-10-26 起按钮可用，model-menu.md"回复进行中的菜单"），返回点的那一点
+ *        是否落在按钮上，和打开的菜单里范围的项有几个、几个不可用、说明的文字（没开菜单时为 null）；看完按 Esc 关上。
  */
-async function forceClickRange(page) {
+async function clickBusyRange(page) {
   const range = paneOf(page).getByTestId('model-button');
   const hit = await range.evaluate((el) => {
     const box = el.getBoundingClientRect();
     return el.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
   });
-  await range.click({ force: true });
-  await sleep(300);
-  return { hit, opened: await page.getByTestId('model-menu').count() };
+  await range.click();
+  const menu = await page.getByTestId('model-menu').evaluate((el) => {
+    const items = [...el.querySelectorAll('[role="menuitemradio"]')];
+    return { items: items.length, disabled: items.filter((item) => item.disabled).length,
+      note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null };
+  }, null, { timeout: 3000 }).catch(() => null);
+  if (menu) await page.keyboard.press('Escape');
+  return { hit, menu };
 }
 
 /** @brief 改设置里的默认范围：已有会话不变，新会话用新的。 */
@@ -1434,16 +1328,19 @@ async function reopenStep(ctx) {
 async function rangeScenario(ctx) {
   const ep = await startEndpoint(ctx, PORT);
   const project = makeProject(ctx, 'proj');
-  // synthetic test setup：三个本机提供商、一个公网提供商（这个项目没有授权公网），默认范围 g1。
+  // synthetic test setup：三个本机提供商、一个 tool calling 判定不通过的提供商（菜单里变淡），默认范围 g1。
   seedConfig(ctx, { providers: [
     provider('p1', 'Provider One', ep.url, [model('m1'), model('m1b')]),
     provider('p2', 'Provider Two', ep.url, [model('m2a')]),
     provider('p3', 'Provider Three', ep.url, [model('m3')]),
-    provider('pp', 'Public Provider', ep.url, [model('pm')], { zone: 'public' }),
-  ], groups: [group('g1', ['p1', 'p3/m3']), group('gpub', ['pp'])], normalDefault: 'g1' });
+    provider('pn', 'No Tools Provider', ep.url, [model('pn-notools')]),
+  ], groups: [group('g1', ['p1', 'p3/m3']), group('gbad', ['pn'])], normalDefault: 'g1' });
   ctx.v0File = seedV0Session(ctx, resolve(project), 'p1', 'm1b');
   await startApp(ctx);
-  await waitProfiles(ctx.page, ['p1/m1', 'p1/m1b', 'p2/m2a', 'p3/m3', 'pp/pm']);
+  await waitProfiles(ctx.page, ['p1/m1', 'p1/m1b', 'p2/m2a', 'p3/m3']);
+  // pn 的 tool calling 永远验证不了（菜单里变淡的原因）：等它的探针跑完、判定为 failed
+  await waitProfiles(ctx.page, ['pn/pn-notools'],
+    (profile) => finished(profile) && profile.tool_calling?.state === 'failed');
   await openProject(ctx, project);
   await step(ctx, 'menu', () => menuStep(ctx));
   await step(ctx, 'pick', () => pickStep(ctx, ep));
@@ -1455,7 +1352,7 @@ async function rangeScenario(ctx) {
 // ---------- 场景：输入框下面一行里的范围按钮（MP-23；composer-pickers.md"测试要改的地方"新加的检查） ----------
 
 /** 文字约 161px（按钮约 193px，Segoe UI 12px）的提供商范围：宽于 680px 时完整显示，600px 最挤时先截模型 id */
-const WIDE = { pick: 'wide', text: 'Wide Provider · wide-coder-v2', hover: 'Wide Provider · Local' };
+const WIDE = { pick: 'wide', text: 'Wide Provider · wide-coder-v2', hover: 'Wide Provider' };
 /** 名字很长的提供商：280px 一栏里的范围菜单（收到这一行的宽，约 226px）放不下它的名字 */
 const LONG_NAME = 'Provider With A Really Long Display Name';
 /** 分屏时左右两栏 */
@@ -1571,7 +1468,7 @@ async function rowCrowdedStep(ctx) {
     && !isCut(texts.scope) && !isCut(texts.permission) && !isCut(texts.effort) && frameProblems(facts).length === 0,
   JSON.stringify({ width: at1(width), kinds: kindsOf(facts), texts, problems: frameProblems(facts) }));
   record('MP-23 600px pane, generating: the cut range button keeps the whole text in hover line 1 and in its name; '
-    + 'line 3 and the description give the reason; it is aria-disabled but still focusable', bar.unavailable
+    + 'line 3 and the description give the reason; it stays usable (2026-10-26, not aria-disabled)', !bar.unavailable
     && !bar.disabled && same(bar.tip, [WIDE.text, WIDE.hover, BUSY_TITLE]) && bar.name === rangeName(WIDE.text)
     && bar.described === rangeDescription(WIDE.hover, BUSY_TITLE), JSON.stringify(bar));
   await composer(page).fill('');
@@ -1638,7 +1535,7 @@ async function openInSplit(page, file) {
 /**
  * @brief 1200 宽分屏、右栏开（两栏各 280px，右边一栏的会话面板 279px）。右栏（提供商范围）生成中有字：范围按钮在最窄、
  *        模型 id 和范围名都截了，其余各项不窄于最窄（新加的检查第 3 条）。左栏 no_pick：没有 Effort、"No model range"、
- *        "Send"不可用、不溢出（第 10 条）；选分组后先截模型 id；范围菜单收到这一行的宽，项名截断、区域完整（第 4 条）。
+ *        "Send"不可用、不溢出（第 10 条）；选分组后先截模型 id；范围菜单收到这一行的宽，项名截断（第 4 条）。
  */
 async function rowSplitStep(ctx) {
   const { page } = ctx;
@@ -1718,9 +1615,9 @@ async function narrowGroup(page) {
   await menuGone(page);
   const long = items?.find((item) => item.pick === 'longp');
   record(`MP-23 range menu in a ${at1(w)}px pane: as wide as the row (not 300px), upward, inside the pane; a long name `
-    + 'is cut with "…" and whole in its hover, every zone label stays whole', place?.problems.length === 0
-    && isCut(long?.label) && long.label.ellipsis && long.title === LONG_NAME
-    && items.every((item) => !isCut(item.zone)), `${place?.problems.join('; ')} ${placeBrief(place?.geo)}; `
+    + 'is cut with "…" and whole in its hover', place?.problems.length === 0
+    && isCut(long?.label) && long.label.ellipsis && long.title === LONG_NAME,
+  `${place?.problems.join('; ')} ${placeBrief(place?.geo)}; `
     + `${JSON.stringify(long)}`);
 }
 
@@ -1759,7 +1656,7 @@ const waitStage = (page, kind, timeout = 15000) => until(async () => {
 /**
  * @brief 准备中的输入框下面一行（composer-pickers.md 新加的检查第 11 条、chat.md"准备中"）：按钮位置是"Stop"；有字时左边是
  *        只有一个按钮的"Queue"（没有 ▾），占位文字"Enter to queue · Shift+Enter for new line"；会话面板 400px 时"Queue"
- *        仍在（只有图标，32px）；范围按钮的描述"<提供商名>, <区域>. <原因>"，Effort 的描述是原因。留下输入框里的字。
+ *        仍在（只有图标，32px）；范围按钮的描述"<提供商名>. <原因>"，Effort 的描述是原因。留下输入框里的字。
  */
 async function preparingRow(ctx, bar) {
   const { app, page } = ctx;
@@ -1770,8 +1667,8 @@ async function preparingRow(ctx, bar) {
     + 'it; placeholder "Enter to queue · Shift+Enter for new line"', kindsOf(wide).endsWith('queue-one,stop')
     && wide.sizes.toggle === null && placeholder === 'Enter to queue · Shift+Enter for new line',
   `${kindsOf(wide)}; ▾ ${wide.sizes.toggle}; "${placeholder}"`);
-  record(`MP-23 preparing: the range description is "Rate Provider, Local. ${BUSY_TITLE}", the Effort description is `
-    + `"${EFFORT_BUSY}"`, bar.described === rangeDescription('Rate Provider · Local', BUSY_TITLE)
+  record(`MP-23 preparing: the range description is "Rate Provider. ${BUSY_TITLE}", the Effort description is `
+    + `"${EFFORT_BUSY}"`, bar.described === rangeDescription('Rate Provider', BUSY_TITLE)
     && bar.thinking?.described === EFFORT_BUSY, `${bar.described} | ${bar.thinking?.described}`);
   const width = await fitPane(app, page, 400);
   const narrow = await rowFacts(page);
@@ -1783,7 +1680,7 @@ async function preparingRow(ctx, bar) {
   await resetWindow(app, page);
 }
 
-/** @brief 准备中等模型：消息已显示、阶段行、停止可用、范围与 Effort 不可用；再发一条进排队区；停止后两条文字回到输入框。 */
+/** @brief 准备中等模型：消息已显示、阶段行、停止可用、Effort 不可用（范围按钮可用）；再发一条进排队区；停止后两条文字回到输入框。 */
 async function stopWhilePreparingStep(ctx, ep) {
   const { page } = ctx;
   await ctrlN(page);
@@ -1796,8 +1693,9 @@ async function stopWhilePreparingStep(ctx, ep) {
     + 'hh:mm:ss", Stop is available', /^Waiting for a model · rate limited until \d\d:\d\d:\d\d$/.test(stage?.text ?? '')
     && same(users, ['plain second']) && stop, `${stage?.text}; users ${JSON.stringify(users)}; stop ${stop}`);
   const bar = await pickers(page);
-  record(`MP-23 preparing: the range and Effort buttons are unavailable (aria-disabled, still focusable); range hover `
-    + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, bar.unavailable && !bar.disabled
+  record(`MP-23 preparing: the Effort button is unavailable (aria-disabled, still focusable) and the range button `
+    + 'stays usable (2026-10-26: it opens the menu to switch task mode); range hover '
+    + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, !bar.unavailable && !bar.disabled
     && bar.tip[2] === BUSY_TITLE && bar.thinking?.unavailable === true && !bar.thinking.disabled
     && bar.thinking.tip[1] === EFFORT_BUSY, JSON.stringify(bar));
   await preparingRow(ctx, bar);
@@ -1954,7 +1852,7 @@ async function thinkingScenario(ctx) {
 
 const SCENARIOS = {
   blocked: [blockedScenario, 'MP-09'], configInvalid: [configInvalidScenario, 'MP-09'],
-  probes: [probesScenario, 'MP-10'], consent: [consentScenario, 'MP-11'], fingerprint: [fingerprintScenario, 'MP-12'],
+  probes: [probesScenario, 'MP-10'], fingerprint: [fingerprintScenario, 'MP-12'],
   handover: [handoverScenario, 'MP-21'], compaction: [compactionScenario, 'MP-22'], range: [rangeScenario, 'MP-23'],
   row: [rowScenario, 'MP-23'], preparing: [preparingScenario, 'MP-34'], thinking: [thinkingScenario, 'MP-35'],
 };

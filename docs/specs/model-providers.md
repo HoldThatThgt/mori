@@ -2,6 +2,13 @@
 
 状态：构建规格，按 [统一模型提供商 Proposal](../proposals/model-providers.md) 第四版写成，经过两轮评审（偏离 proposal、在 pi 上能否实现、完整与可测、与现有 App 的衔接）和实现中的补充；已实现，除真实模型一层外全部验收通过（见 [v1/models-checks.md](../v1/models-checks.md)）。更新日期：2026-10-21。
 2026-10-24 补丁：思考关不掉的模型（proposal §10“思考关不掉的模型”，负责人选定方案 B）：新增 §7.7，改 §4.4、§7.2、§7.3、§7.4、§7.6、§9.1、§9.2、§11.2、§12、§13、§14.1、§14.2（MP-38–MP-40）、§14.3，以及记忆规格 §8、§10.4 的注；§7.7 末尾的三项已在 OpenRouter 上实测（2026-10-24）；已实现（2026-10-24，分支 `claude/v1-reasoning-mandatory-impl-640e42`，检查记录见 [v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：实现与检查”）。
+2026-10-26 补丁（负责人走查 M3，原话“we do not need to separate local, intranet or public model”）：去掉网络区域与按项目授权，
+推翻 proposal §12 第 2 条“公网默认不允许，只能按项目授权”。改 §0、§1、§3、§4.1、§4.3、§4.5、§4.6、§5.3、§5.8、§8.3、§9.1、§9.2、
+§9.3、§9.5、§12、§13、§14.1、§14.2（MP-01、MP-06、MP-07、MP-08、MP-24、MP-33）、§14.4。选择器原来的第 2 步删掉，其余各步编号不变
+（各处对第 3–6 步的引用不用改）。不写兼容代码：还写着 `zone`、`allowedZones`、`projectZones` 的 `model-config.json` 按 §4.1
+“启动时配置读不出”处理（校验原文指出这几个字段），把它们从文件里删掉一次后点 Retry；项目配置里的 `allowedZones` 同样按 `project_config`
+报错。后果：会话、压缩、增强任务、平行 Agent 与自动换模型都可以把项目的代码发给范围里的任何一个提供商，范围（分组和项目配置的缩小）是唯一的限制。
+检查记录见 [v1/walkthrough-1026/WP-05.md](../v1/walkthrough-1026/WP-05.md)。
 
 本文是 proposal 的实现说明：proposal 讲心智模型，本文讲在 Mori 里怎么做、做到什么算完成。
 两者冲突时以 proposal 为准；本文不另加 proposal 没有的行为。proposal 没定、实现又必须有一个值的地方，本文给出临时默认值，
@@ -11,7 +18,7 @@
 
 **本规格实现**普通模式下的模型层，即今天 App 里的每个会话（主 Agent，就是 v0 的那个 Agent）和后台调用（测试连接、探针、上下文压缩）用到的全部内容：
 
-- Mori 自己的模型配置（分组、提供商、多个 key、模型、网络区域、项目授权与项目配置）、编译到 pi、从 v0 的 `models.json` 迁移；
+- Mori 自己的模型配置（分组、提供商、多个 key、模型与项目配置）、编译到 pi、从 v0 的 `models.json` 迁移；
 - 选择范围与选择器、会话启动校验、按可用性换 key 与换模型、重做与重建上下文、候选耗尽；
 - 模型档案与探针（含交接写入等级 A/B/C 的判定）、适配层中普通模式用得到的部分；
 - 按 key 的模型池（并发、排队、简单优先级、记住不可用）；
@@ -40,7 +47,6 @@
 | 一段工作 | reply，`ReplyState` | 普通模式下主 Agent 回答一条消息的过程（§5.2） |
 | 能力要求 | requires | 本规格里只有主 Agent 的 `[tool_calling]`（proposal §5）；平行 Agent 规格 §12.2 加上角色的 `requires` |
 | 模型档案 | profile，`ModelProfile` | §7 |
-| 网络区域 | zone：`local` / `intranet` / `public` | §4.3 |
 | 普通模式 | — | 协作模式关闭（协作模式见平行 Agent 规格 §5） |
 
 ## 2. 组件与代码落点
@@ -71,7 +77,7 @@
 
 | 文件 | 内容 | 谁写 |
 | --- | --- | --- |
-| `<userData>/model-config.json` | 用户级模型配置（§4.1），包括本机的项目授权 | 后台进程；原子写（先写临时文件再改名） |
+| `<userData>/model-config.json` | 用户级模型配置（§4.1） | 后台进程；原子写（先写临时文件再改名） |
 | `<userData>/model-profiles.json` | 模型档案（§7.2） | 后台进程 |
 | `<userData>/model-migration.json` | 迁移说明（§4.5），你点 Dismiss 后删除 | 后台进程 |
 | `<userData>/credentials.json` | key 的密文，`{ <ref>: <base64 密文> }`（M0 起的格式不变） | 主进程（safeStorage） |
@@ -95,7 +101,6 @@
       "name": "DeepSeek",
       "api": "openai-completions",
       "baseUrl": "https://api.deepseek.com",
-      "zone": "public",
       "compat": { "maxTokensField": "max_tokens" },
       "concurrency": 4,
       "keys": [{ "ref": "deepseek-2#1", "label": "Key 1" }],
@@ -107,9 +112,7 @@
     }
   ],
   "groups": [{ "id": "cloud", "members": ["deepseek-2/deepseek-chat", "glm"] }],
-  "normalDefault": "cloud",
-  "allowedZones": ["local", "intranet"],
-  "projectZones": { "d:/work/tool": ["public"] }
+  "normalDefault": "cloud"
 }
 ```
 
@@ -119,7 +122,6 @@
 | `providers[].name` | 非空，界面显示用 |
 | `providers[].api` | `openai-completions`、`openai-responses`、`anthropic-messages`（v0 的 `API_TYPES`） |
 | `providers[].baseUrl` | http 或 https URL |
-| `providers[].zone` | `local`、`intranet`、`public`；只有迁移来、还没确认的提供商可以是 `null`（§4.5） |
 | `providers[].compat` | 只能写 v0 的 `COMPAT_OPTIONS` 里的六个字段，值同 v0；只对 `openai-completions` 生效 |
 | `providers[].concurrency` | 每个 key 的并发上限，整数 1–64，新建默认 4 |
 | `providers[].keys` | 0–8 个，顺序就是使用顺序。`ref` 全局唯一，只含 `[A-Za-z0-9._#-]`；`label` 非空。没有 key 的提供商发请求时不带认证头（例如本机 Ollama，§8.4） |
@@ -127,8 +129,6 @@
 | `providers[].models` | 至少 1 个，列出的顺序就是范围里的顺序。`id` 非空、不含空白，同一提供商内唯一，建好后不能改；`family` 可以为空字符串；`contextWindow` 正整数；`maxTokens` 正整数且小于 `contextWindow`；`reasoning` 布尔；`input` 为 `["text"]` 或 `["text","image"]` |
 | `groups[]` | `id` 规则同提供商 id。`members` 是有序、不重复的成员，至少 1 个：已存在的提供商 id（它的全部模型），或已存在的 `<provider>/<model>`（只这一个模型）。同一个提供商或模型可以在多个分组里 |
 | `normalDefault` | 一个选择范围（§4.2）或 `null`；指向的名字必须存在 |
-| `allowedZones` | 所有项目默认允许的区域，只能是 `local`、`intranet` 的子集，默认两者都有。公网只能按项目授权（proposal §12 第 2 条） |
-| `projectZones` | 本机按项目授权：键是项目文件夹的规范化路径（绝对路径、全部小写、`/` 分隔、无结尾 `/`），值是在 `allowedZones` 之外为这个项目额外允许的区域。路径比较不分大小写（Windows） |
 
 **删除的连带改动**（确认框列出每一项）：
 
@@ -143,6 +143,7 @@
 **改提供商地址**：`baseUrl` 的 origin（协议、主机、端口）变了时，保存会删除它的全部 key，确认框写“Changing the base URL removes this provider’s N saved keys. Add them again after saving.”（沿用 v0“改了服务地址就要重新填写 key”，key 不会发到新的地址）。
 
 **启动时配置读不出**：`model-config.json` 存在但不是合法 JSON 或校验失败时，不迁移、不显示首次启动表单、不覆盖文件；所有会话按 `config_invalid` 拒绝启动，设置页 Models 只显示这条错误（“Couldn’t read model settings: <文件路径>: <校验原文>”）和“Retry”。
+（2026-10-26 注，负责人走查 M3：网络区域去掉后，还写着 `providers[].zone`、`allowedZones`、`projectZones` 的旧文件同样走这一条，校验原文是 zod 的“Unrecognized key”并指出位置，例如 `providers.0: Unrecognized key: "zone"; Unrecognized keys: "allowedZones", "projectZones"`；不写兼容代码，把这几个字段从文件里删掉后点“Retry”。）
 
 key：明文只经进程通道交给后台进程，放在模型池的内存里（§8.4），不进 pi、不进任何配置文件、不回到界面。从 v0 迁移来的 key 沿用原来的 `ref`（就是 v0 的提供商 id）。
 
@@ -151,27 +152,20 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 - 选择范围是一个字符串：等于某个分组 id 就是分组；等于某个提供商 id 就是提供商；含 `/` 就是 `<提供商>/<模型>`。分组和提供商共用名字空间，所以不会有歧义。
 - 引用的名字不存在时报错“<名字> is not in your model settings”，并说明谁引用了它（默认范围、本会话的范围、项目配置的哪一项）。
 
-### 4.3 网络区域、项目授权与项目配置
+### 4.3 项目配置
 
-一个项目（会话的工作文件夹）允许的区域：
+（2026-10-26 改，负责人走查 M3：网络区域与按项目授权去掉，本节原来的区域规则删掉；项目配置只剩 `groups`。任何提供商都可以在任何项目里用，会话的范围（§5.1）是唯一的限制。）
 
-1. 用户级 `allowedZones`；
-2. 加上 `projectZones[项目路径]`（本机授权，只在设置页 Project access 里改，§9.1）；
-3. 再与 `<project>/.mori/models.json` 的 `allowedZones`（若写了）取交集。
-
-`<project>/.mori/models.json` 严格校验，只能写两项：
+`<project>/.mori/models.json` 严格校验，只能写一项：
 
 ```json
-{ "allowedZones": ["local"], "groups": { "cloud": ["glm/glm-4.6"] } }
+{ "groups": { "cloud": ["glm/glm-4.6"] } }
 ```
 
-- `allowedZones`：只会缩小（与前两步的结果取交集）。
 - `groups`：把用户的某个分组在这个项目里缩小到它的一部分。列出的每一项必须是用户这个分组的成员，或者是某个提供商成员下的模型（把这个提供商缩小到这个模型）。
   展开顺序按用户分组里成员的顺序；同一提供商成员缩小成多个模型时，按提供商里列出的模型顺序。
-- 分组不存在、列出的项不属于用户的这个分组、某个分组的列表为空、有别的字段、文件不是合法 JSON、文件读不出（不存在除外）：会话按 `project_config` 拒绝启动，显示原因或校验原文。
-- 不能新增提供商、模型或 key。项目没有这个文件时只按前两步算。
-
-区域只约束会话的模型请求（含它的压缩）。探针、测试连接、key 的 Test 是你在设置页发起的、只发合成内容，不按项目区域过滤；区域未确认的提供商也可以探测和测试。
+- 分组不存在、列出的项不属于用户的这个分组、某个分组的列表为空、有别的字段（包括原来的 `allowedZones`）、文件不是合法 JSON、文件读不出（不存在除外）：会话按 `project_config` 拒绝启动，显示原因或校验原文。
+- 不能新增提供商、模型或 key。项目没有这个文件时范围不缩小。
 
 ### 4.4 编译到 pi
 
@@ -198,7 +192,6 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 | `credentials.json` 里以 provider id 为 `ref` 的密文 | `keys: [{ ref: <provider id>, label: "Key 1" }]`，`nextKeyNumber: 1` |
 | provider 的 `apiKey` 字段（手写在 `models.json` 里的明文） | 没有同 `ref` 的密文时交给主进程加密存为 `ref` = provider id 的 key；已有密文时以密文为准，在说明里注明；以 `$` 开头的环境变量写法不迁移，在说明里列出“需要重新填写 key” |
 | 每个模型 | `id` 不变；`contextWindow`、`maxTokens` 取原值，没有时取 pi 的默认（128000、16384）；`maxTokens` 不小于窗口时取窗口的一半；`reasoning` 原值；`input` 原值或 `["text"]`；`family` 为空。不合格的模型丢弃并列出；一个合格模型都没有的 provider 不迁移 |
-| 网络区域 | `zone: null`（未确认），设置页按 §12 的规则给出建议，由你确认 |
 | pi 设置的 `defaultProvider` / `defaultModel` | `normalDefault` = `<provider>/<model>`（按改写后的 id；找不到时为 `null`） |
 | pi 设置的 `modelThinkingLevels` | 原样保留；改写了 id 的，把旧键复制到新键（旧键不删） |
 | 分组 | 不新建 |
@@ -216,7 +209,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 | --- | --- | --- | --- |
 | 可以发送 | 至少剩一个候选 | — | — |
 | `verifying` | 没有候选通过，而且被排除的候选里至少一个是 `probing` | Verifying <模型>… | 无（探针结束自动重新校验） |
-| `no_candidate` | 没有候选通过，没有在验证中的 | This session can’t start: no model fits. 加每个候选及原因 | Verify now（有 `unverified` 的候选时）；Allow <区域> for this project（有 `zone_blocked` 的候选、且项目配置没有排除这个区域时：打开 设置 → Project access，焦点在这个项目）；Confirm zone（有 `zone_unconfirmed` 的候选时：打开 设置 → Models 顶部区域未确认的几行）；Change model…；Open settings |
+| `no_candidate` | 没有候选通过，没有在验证中的 | This session can’t start: no model fits. 加每个候选及原因 | Verify now（有 `unverified` 的候选时）；Change model…；Open settings |
 | `no_pick` | 会话没有范围（§5.1） | No default model range; pick one. | Change model…；Open settings |
 | `pick_missing` | 范围指向的名字不存在 | <名字> is not in your model settings. | Change model…；Open settings |
 | `project_config` | 项目配置无效（§4.3） | .mori/models.json: <原因或原文> | Open settings |
@@ -259,15 +252,13 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 
 ### 5.3 选择器
 
-`select(input) → { model | null, excluded: [{ ref, reason, detail }] }`，纯函数。输入：候选列表、项目允许的区域、档案、可用性快照、`ReplyState`（可以没有）、当前时刻、时长表。
+`select(input) → { model | null, excluded: [{ ref, reason, detail }] }`，纯函数。输入：候选列表、档案、可用性快照、`ReplyState`（可以没有）、当前时刻、时长表。
 
 按顺序对每个候选判断，第一个不满足的条件就是它的排除原因：
 
 | 步 | 条件 | 原因代码 | 界面文字 |
 | --- | --- | --- | --- |
 | 1 | 名字在配置里 | `missing` | not in your model settings / removed from your model settings（回复进行中被删时） |
-| 2 | 提供商区域已确认 | `zone_unconfirmed` | network zone not confirmed |
-| 2 | 区域在项目允许的区域里 | `zone_blocked` | zone <区域> is not allowed for this project |
 | 3 | 档案的 `tool_calling` 为已验证（§7.4 重新验证期间按旧结果） | `probing` / `unverified` / `failed` | verifying… / tool calling not verified yet / tool calling failed verification |
 | 3 | 角色会话：满足角色的 `requires`、不是要避开的模型族（平行 Agent 规格 §12.2、§12.9，2026-10-21 加） | `requires_unmet` / `same_family` | <不满足的那项> / same model family as the author (<族>) |
 | 4 | 可用（§8.3） | `rate_limited` / `auth` / `quota` / `connection` / `not_found` / `timeout` / `held` | rate limited until hh:mm:ss / API key rejected / quota exhausted / can’t connect until hh:mm:ss / model not found on the server / no response; unavailable until hh:mm:ss / waiting to make sure it stopped, until hh:mm:ss |
@@ -275,6 +266,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 | 5 | 段内选择时，排在 `current` 之后（不在 `skipped` 里，也不是排在它前面的） | `earlier` | skipped at the start of this reply |
 | 6 | 能接手这段对话（§6.2，只在要换到它时判断） | `no_handover` | conversation too long for this model / couldn’t rebuild the conversation: <原文> |
 
+- 第 2 步（网络区域：`zone_unconfirmed`、`zone_blocked`）2026-10-26 按负责人走查 M3 删掉；其余各步编号不变，第 1、3 步是静态校验。
 - 第 1–3 步是静态校验（§4.6）；第 4–6 步只在选模型时判断。`queue_timeout` 不会出现在可用性里：它只让这一次请求换模型，记进 `tried`（文字“waited 60 s for a free slot”）。
 - 没有 `ReplyState` 或段刚开始：选通过的第一个。段内：`current` 仍通过第 1–5 步就继续用它；否则只在排在 `current` 之后的候选里按顺序选。
 - 展示原因时用“界面文字”列；`<它的原因文字>` 不带 until 部分。排除结果里的 `detail` 就是完整的界面文字（含 until）。界面文字只有一份，放在 `shared/models.ts`，后台进程（重做说明、没有可用模型的说明）和界面（卡片、菜单）共用。
@@ -327,18 +319,21 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 
 一次尝试按 §5.4 的 `timeout` 超时：Mori 中止这次尝试（关闭连接）。
 
-- 档案的 `cancel_verified` 为 `true`（探针证明断开后服务端会停止，§7.3）：这个模型不可用一段时间（`timeout`，§12），立即按 §5.6 换模型。
-- `cancel_verified` 为 `false`（探针读得到服务端指标，但断开后请求没有停）：发每次尝试之前读一次服务端正在跑的请求数作基线（§7.3 第 9 步的指标）；超时后模型进入 `held`，
-  每隔 §12 的间隔读一次，回到基线或更低即视为旧请求已停，立即按 §5.6 换模型；最长等 `held` 的时长。
-- `cancel_verified` 为 `unknown`（没有指标可读）：模型进入 `held`，等满 §12 的时长后按 §5.6 换模型，换模型提示注明“Couldn’t confirm it stopped”。
+- 模型进入 `held`，等满 §12 的时长后按 §5.6 换模型，换模型提示注明“Couldn’t confirm it stopped”（`mori.model_switch` 的 `unconfirmed`，§9.5）。
+  Mori 不读服务端的指标，也不提前结束等待：等满就是确认旧请求停下的办法。
 - 等待时阶段行显示“Waiting to make sure <模型> stopped · until hh:mm:ss”（`mori.model_wait`，`kind: held`）；你可以按停止。同一个请求不会同时在两个模型上跑（proposal §8、§12 第 4 条）。
+
+（2026-10-26 改，负责人走查 M7，决定 1：“Delete them from the app and the spec; after a timeout Mori always waits 2 minutes before
+switching”。原来按档案的 `cancel_verified`（探针第 9 步，需要你同意的取消测试）分三种：为 `true` 时记 `timeout`、立即换；为 `false`
+时发每次尝试之前读服务端正在跑的请求数作基线，超时后每隔 5 秒读一次，回到基线即换；为 `unknown` 时等满再换。第 9 步删掉（§7.3）后
+`cancel_verified` 不再有，只留最后一种。负责人的 DeepSeek、z.ai 模型从来没跑过取消测试，本来就是这一种，超时处理没有变化。）
 
 ### 5.8 候选耗尽
 
 选不到模型时先等：
 
 - 阶段行显示“Waiting for a model · <最先恢复的那个候选的原因>”（`mori.model_wait`），在最早的恢复时刻、探针结束时、或每隔 §12 的间隔重新选，最长等 §12 的时长。
-- 剩下的候选都是不会自己恢复的原因（`missing`、`zone_*`、`unverified`、`failed`、`auth`、`quota`、`not_found`、`tried`、`earlier`、`no_handover`）时不等。会恢复的是 `probing`、`rate_limited`、`connection`、`timeout`、`held`，但本段已在 `tried` 或 `earlier` 里的候选不算（它们恢复了本段也不会再选）。
+- 剩下的候选都是不会自己恢复的原因（`missing`、`unverified`、`failed`、`auth`、`quota`、`not_found`、`tried`、`earlier`、`no_handover`）时不等。会恢复的是 `probing`、`rate_limited`、`connection`、`timeout`、`held`，但本段已在 `tried` 或 `earlier` 里的候选不算（它们恢复了本段也不会再选）。
 - 等到了：继续（模型变了就按 §5.6 写换模型条目）。
 - 没等到：发 `mori.model_unavailable`，对话流显示一张说明卡“No model available”：每个候选及原因，“Open settings”；这次请求以错误结束，pi 的错误卡不另外显示（§9.3）。
 - 段开始时（§11.4）就选不到时同样先等；没等到时消息不发出：后台进程只发 `mori.model_unavailable`（`firstRequest: true`，`text` 为这条消息，`queued` 为准备中又发的消息），界面撤回这条用户消息、把文字放回输入框，显示同一张说明卡，不发 `mori.prompt_error`。
@@ -427,9 +422,13 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 | `structured_output` | `verified`、`failed`、`unverified` | 第 6 步；`anthropic-messages` 不跑第 6 步，为 `unverified` |
 | `vision` | 配置声明了图像输入为 `unverified`，否则 `failed`（proposal 的探针表里没有图像探针） | 配置 |
 | `reasoning` | `{ field, can_disable, replay }`。`field`：`openai-completions` 为 `reasoning_content`、`reasoning`、`reasoning_text` 或 `none`；另两种接口为 `native`。`can_disable`：`true`、`false`、`unknown`。`replay`：`required`、`not_required`、`unknown`；另两种接口为 `not_required`（pi-ai 自己回放同一模型的推理）（2026-10-24 补：加 `off_refused`：第 2 步关闭思考被服务以 400 或 422 拒绝、`medium` 有正文时为 `true`，这时 `can_disable` 为 `false`，见 §7.7） | 第 1、2、4 步 |
-| `context` | `{ declared, reported, effective, truncation }`。`effective` = `declared` 与 `reported` 中较小的一个，长输入探针跑过后按第 8 步更新；`truncation`：`unknown`、`none`、`silent` | 第 0、8 步 |
-| `cancel_verified` | `true`、`false`、`unknown` | 第 9 步 |
+| `context` | `{ declared, reported, effective }`。`effective` = `declared` 与 `reported` 中较小的一个 | 第 0 步 |
 | `probedAt`、`suite` | 时间、探针套件版本 | — |
+
+（2026-10-26 改，负责人走查 M7，决定 1：长输入、取消两个探针（原第 8、9 步）删掉，`context` 去掉 `truncation`（原来长输入探针判出的
+截断方式，判出静默截断时 `effective` 还会降到通过的长度），`cancel_verified` 一项删掉（§5.7 只剩等满再换一种）。
+`model-profiles.json` 里 2026-10-26 以前的档案可能带这两步的结果（`longInput`、`cancel`）：读的时候丢掉（档案的格式按 `z.object` 读，
+不认识的字段不留），档案照用、不重新探测，`PROBE_SUITE` 不变；下一次写档案文件时这两项就不在了。不加迁移。）
 
 能力三态：已验证、未验证、验证失败（proposal §4）。本规格里关键能力 `tool_calling` 必须已验证才满足（§5.3 第 3 步）；
 `protocol_write`、`structured_output`、`vision`、`context` 在设置页显示，供 §10 的 Agent 定义使用。（2026-10-26 注，负责人走查 M7：设置页的模型行不再列档案的各项，这几项只留在档案里，由选择器按 Agent 定义的 `requires` 检查；拒绝启动卡与说明卡照旧写出不满足的原因，例如“handoff tier C is below B”。）
@@ -437,8 +436,11 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 ### 7.3 探针
 
 经模型池的 `background` 类别发出（§8.2），用这个提供商的 key，直接用实际模型调 `runtime.streamSimple`（§11.6 K10），选项带 Mori 的 fetch、`maxRetries: 0`、`timeoutMs: 2147483647`；
-最大输出 §12；每一步 §12 的时长内没有第一个有内容的事件就中止，这一步按出错处理。第 1 步对 `reasoning: true` 的模型用思考 `medium`、否则 `off`；第 3、5、6、7、8、9 步思考关闭（`off`）；第 2、4 步见表。
-（2026-10-24 补：本组第 2 步判出 `off_refused` 时第 3、4、6、7 步改用 `medium`、第 5 步不适用，第 8、9 步按档案里存的 `off_refused`；任何一步回复因输出上限停下、只有思考没有正文和工具调用时按出错处理；见 §7.7。）
+最大输出 §12；每一步 §12 的时长内没有第一个有内容的事件就中止，这一步按出错处理。第 1 步对 `reasoning: true` 的模型用思考 `medium`、否则 `off`；第 3、5、6、7 步思考关闭（`off`）；第 2、4 步见表。
+（2026-10-24 补：本组第 2 步判出 `off_refused` 时第 3、4、6、7 步改用 `medium`、第 5 步不适用；任何一步回复因输出上限停下、只有思考没有正文和工具调用时按出错处理；见 §7.7。）
+（2026-10-26 改，负责人走查 M7，决定 1：需要你同意的第 8 步（长输入：带暗号的长提示填到有效窗口的 50%、90%，判断报错还是静默截断）
+和第 9 步（取消：对 vLLM、SGLang、llama.cpp 读 `/metrics` 或 `/slots` 的进行中请求数，发长输出请求、收到第一段后断开，看计数是否回落）
+从表里删掉，探针只有自动的第 0–7 步。档案里随之去掉 `context.truncation` 与 `cancel_verified`（§7.2），§5.7 只剩等满再换。）
 
 | 步 | 请求 | 判定 |
 | --- | --- | --- |
@@ -450,8 +452,6 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 | 5 | 工具 `submit_outcome({ outcome: "ok" \| "fail" })`，指定调用它（`tool_choice`）并要求严格模式；“Call submit_outcome with outcome banana.” | 调用了它且 `outcome` 在枚举内：A 级通过 |
 | 6 | 只对 `openai-completions`、`openai-responses`：严格的 JSON schema 输出，schema `{ outcome: "ok" \| "fail" }`；“Reply with JSON whose outcome is banana.” | 合法 JSON 且 `outcome` 在枚举内：B 级通过、`structured_output: verified` |
 | 7 | 只在第 5 步判定为不通过（2026-10-24 补：或不适用，§7.7）、且第 6 步判定为不通过或不适用（`anthropic-messages`）时：“Answer in exactly this format: <summary>one sentence</summary><outcome>ok or fail</outcome>. Question: is 2 + 2 equal to 4?”，连发 §12 的次数 | 每次都能解析、取值都在列表内：C 级通过 |
-| 8 | 需要你同意（§9.1）：“The passphrase is <随机词>.”，接着填充到有效窗口的 50%，最后问“What is the passphrase?”；再做一次 90% | 答对：窗口可用到这个长度。报错：`truncation` 保持 `none`、`effective` 不变。不报错但答不出暗号：`truncation: silent`，`effective` 降到通过的那个长度（50% 也没通过时为 0），设置页告警 |
-| 9 | 需要你同意：只对 `server.kind` 为 `vllm`、`sglang`、`llamacpp` 的模型。先读一次服务端正在跑的请求数（vLLM、SGLang 的 `/metrics`，llama.cpp 的 `/slots`）作基线，再发“Count from 1 to 400, one number per line.”，收到第一段输出后断开 | 5 秒内请求数回到基线或更低：`true`；仍高于基线：`false`；指标接口不响应或没有这个计数：`unknown`；其他服务：`unknown` |
 
 各接口的请求写法（经 `toolChoice` 选项和 `onPayload`）：
 
@@ -468,8 +468,9 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 
 - 自动（第 0–7 步）：后台进程启动时，对还没有档案的模型（上次探测没跑完 App 就关了）；添加或修改模型或提供商之后（加 key、删 key 也算修改提供商：这个提供商里档案不是已验证或验证失败的模型重新探测）；迁移之后；首次启动表单保存之后；指纹或服务版本变化之后。
 - 你点“Verify”、或拒绝启动卡上的“Verify now”之后。（2026-10-26 注：模型行上常显的“Verify”删掉，只在 tool calling 没验证通过时，模型行的状态行带“Verify again”，发同样的 `models.verify`，见 §9.1。）
-- 需要你同意（第 8、9 步）：只在设置页模型行上点“Long-input test…”或“Cancel test…”并确认之后；确认框写明大约多少 token（第 8 步按有效窗口的 50% + 90% 估算）。
-  （2026-10-26 注，负责人走查 M7：这两个按钮与确认框从设置页删掉，界面上不再能发起第 8、9 步；后台进程里的这两步、`models.verify` 的 `tests: 'long_input' | 'cancel'` 和 §5.7 按 `cancel_verified` 分的三种处理由下一包（WP-04）删除。）
+  （2026-10-26 改，负责人走查 M7：原来这里还有一条“需要你同意（第 8、9 步）：只在设置页模型行上点‘Long-input test…’或‘Cancel test…’
+  并确认之后”。两个按钮与确认框先从设置页删掉（WP-02），第 8、9 步本身随后删掉（§7.3 的 2026-10-26 改）；`models.verify` 只跑第 0–7 步，
+  不再带 `tests`（§9.5）。）
 - 同一个模型同时只跑一组探针；新的一组开始时取消旧的。
 - 从未验证过的模型（档案里 `tool_calling` 不是 `verified` 或 `failed`，包括上次因出错为 `unverified` 的）探测中为 `probing`；验证过的模型重新探测期间，选择仍按旧结果，设置页显示“Re-verifying…”，结果出来后替换。（2026-10-26 注：设置页不再写“Re-verifying…”，tool calling 验证过的模型重新探测时模型行没有状态行，§9.1。）
 - 探针结束时重新做所有会话的静态校验，发 `mori.profiles`；档案的 `reasoning.replay` 变了时按 §4.4 重新编译这个提供商（不保存配置），下一个请求起生效。
@@ -518,12 +519,13 @@ OpenRouter 的原文是 `Reasoning is mandatory for this endpoint and cannot be 
 - 第 1–7 步（一组自动探针）都在一份**没有**“没有 Off”标记的模型副本上发（同第 4 步回传检查用副本的做法）：已经标记过的模型点 Verify 时第 2 步仍然重新测，这一次判出能关闭时第 3–7 步也确实关闭思考。
 - 第 3–7 步用 `off` 还是 `medium`，按**这一组**第 2 步的判定：判出 `off_refused` 即第 3、4、6、7 步用 `medium`（同第 1 步和回传检查），第 5 步为 `not_applicable`；否则同原来。
   第 5 步（A 级：指定调用加严格模式，按平行 Agent 规格 §7.5 要关闭思考）不适用的理由：交接时 A 级只在 `can_disable` 为真时用（`handoffForm.ts` 的 `writeModeOf`，不改）。
-- 第 8、9 步是单独的一组（需要你同意），用编译后的模型，按档案里存的 `off_refused` 选强度（这时编译后的模型与档案一致）：为真用 `medium`，否则同原来。
+- （2026-10-26 删，负责人走查 M7：原来这里写第 8、9 步按档案里存的 `off_refused` 选强度；这两步已删掉，§7.3。）
 - 第 7 步的条件改为“第 5 步判定为不通过**或不适用**、且第 6 步判定为不通过或不适用”（这一条对所有模型都成立）。
 - 回传检查不变（本来就是 `medium`）。
 
-**输出上限**（对所有模型的第 1–9 步）：回复因输出上限停下（`stopReason` 为 `length`），而且没有正文也没有工具调用、只有思考时，这一步按出错处理，
-说明为“Stopped at the probe output limit before answering”；不判为不通过，第 8 步也不因此记 `silent`。探针最大输出仍是 §12 的 256 token（实测见本节末尾）。
+**输出上限**（对所有模型的第 1–7 步；2026-10-26 改：原来是第 1–9 步）：回复因输出上限停下（`stopReason` 为 `length`），而且没有正文也没有工具调用、只有思考时，这一步按出错处理，
+说明为“Stopped at the probe output limit before answering”；不判为不通过。探针最大输出仍是 §12 的 256 token（实测见本节末尾）。
+（2026-10-26 删：原来这里还写“第 8 步也不因此记 `silent`”，第 8 步已删掉。）
 
 **编译**（§4.4、§7.6 的表）：`off_refused: true` 的模型编译成 `thinkingLevelMap: { off: null }`（pi 自己的“这一档不支持”的写法，`registerProvider` 按模型接受；写在模型上，三种接口都写，不放进 `compat`）。`off_refused` 变了时重新编译这个提供商（§7.4）。
 它在 pi-ai 1.3.0 里起作用的是两处，与接口和地址无关：`getSupportedThinkingLevels` 不再列 `off`，`clampThinkingLevel` 把 `off` 提到最低一档 `minimal`。
@@ -533,7 +535,7 @@ OpenRouter 的原文是 `Reasoning is mandatory for this endpoint and cannot be 
 | --- | --- |
 | 会话经虚拟模型路由的请求（对话、TaskBoard 实例、增强会话、压缩与重建） | pi 路由时按实际模型收紧（`model-runtime.js` 的 `clampThinkingLevel`）：Off 变成 `minimal` |
 | §11.2 换模型后重发的请求 | 按新模型收紧后的会话强度（见下面“其他改动”），Off 同样变成 `minimal` |
-| 探针 | 第 1–7 步在没有标记的副本上、按本组第 2 步选强度；第 8、9 步按档案用 `medium`（见上面） |
+| 探针 | 第 1–7 步在没有标记的副本上、按本组第 2 步选强度（2026-10-26 删：原来还有“第 8、9 步按档案用 `medium`”） |
 | 测试连接 | `medium`（见下面“其他改动”） |
 | TaskBoard 交接的 A 级（会关闭思考） | 不会用到：A 级只在 `can_disable` 为真时用 |
 
@@ -597,7 +599,7 @@ OpenRouter 的原文是 `Reasoning is mandatory for this endpoint and cannot be 
 key 的“Test”（§9.1）和用它的“Test connection”不看这个 key 的记录，直接发出；成功时清除它的 `rate_limited`、`auth`、`quota` 并重新做静态校验。
 （2026-10-26 补，负责人走查 WP-01 的观察：首次启动里一次 404 失败后什么都不改再点 Test connection，结果是“Connection failed: Connection error.”、请求没有发出——模型池按上表给这个模型记了 `not_found`，不带 key 的 Test connection 按“可用”判断，不可用就不发；401 之后同样被 key 的 `auth` 挡住。测试是你点的，要报告服务这一次的真实回答，失败也不能让下一次测试等或不发。）
 测试连接与 key 的“Test”（`connection.test`）**不看任何不可用记录**：提供商的 `connection`、模型的 `not_found`、`timeout`、`held`、key 的记录都不挡它，总是发出（排队按 §8.2，同原来）。不带 key 时按顺序用第一个没有记录的 key，全部 key（或“无 key”）都有记录时用第一个；得到 401、429、额度错误时照原来换到下一个没有记录的 key（§5.5），没有就报告这一次的结果。失败照常写记录（会话照旧按记录挑模型）；成功时清除用到的 key 的 `rate_limited`、`auth`、`quota`，以及提供商的 `connection` 和这个模型的 `not_found`（测试刚证明它们不成立）；`timeout`、`held` 不清（§5.7 等的是旧请求停下，测试成功不能说明这一点）。会话、压缩与探针的请求不变。
-槽位满不算不可用（排队）。记录只在内存里，后台进程重启后清空。只改提供商的名称、并发上限、区域或模型列表不清除记录。
+槽位满不算不可用（排队）。记录只在内存里，后台进程重启后清空。只改提供商的名称、并发上限或模型列表不清除记录。
 
 ### 8.4 发请求用的 fetch
 
@@ -620,50 +622,53 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 
 取代 v0 的“Connections and models”分节（[v0/screens/settings.md](../v0/screens/settings.md)）。从上到下：
 
-- **迁移说明**（§4.5，有时）与**区域未确认**的提供商（有时，每个一行“Confirm zone…”）。
-- 设置页的每个修改（Defaults、Groups、Project access、Keys、上移下移）立即保存；表单（提供商、模型）按“Save”保存。
+- （2026-10-26 改，负责人走查 M3：区域未确认的几行、Defaults 的 Allowed zones、提供商卡与表单的 Network zone、确认区域的对话框和 Project access 一节都删掉。）
+- **迁移说明**（§4.5，有时）。
+- 设置页的每个修改（Defaults、Groups、Keys、上移下移）立即保存；表单（提供商、模型）按“Save”保存。
+  （2026-10-26 注，负责人走查 M5：上移下移换成下一条的拖动排序，同样立即保存。）
+- **拖动排序**（2026-10-26 补，负责人走查 M5“use drag to order model, not arrow button”，取代 Keys、Models、分组成员的上移、下移）：
+  提供商卡里的 Models、Keys 与每个分组的成员三种列表，有两行以上时每行左端一个拖动柄（读屏名“Reorder <名字>”，悬停“Drag or use the arrow keys to reorder”，都是 Claude 的说法）。
+  用鼠标拖柄，放到同一个列表里别的行的上半边（插在它前面）或下半边（插在它后面），放下前那一行的上沿或下沿显示一条线；焦点在柄上时按上、下方向键把这一行移一格。
+  一次放下或一次方向键立即保存一次：Models 发一条 `models.moveModel`、Keys 发一条 `models.moveKey`（`delta` 为移动的格数，往前为负，§9.5），分组发一条 `models.saveGroup`（新的成员顺序）；
+  保存中列表按新顺序显示、柄不响应；失败时回到原顺序，原文显示在这个列表下面；成功后读屏播报“<名字> was dropped at position <n> of <count>.”（Claude 的说法），方向键移动的那一行的柄留着焦点（保存失败、这一行回到原位置时也是）。
+  只能放在同一个列表里（别的提供商的列表、Keys 与 Models 之间、别的分组都不行）。提供商与分组本身没有顺序可排（同原来）。状态表见 docs/v1/screens/models-settings.md“拖动排序”。
 - **Defaults**：
   - Default model range for new sessions：下拉，按分组、提供商、模型分三节；可以为空（“None”）。
-  - Allowed zones for all projects：Local、Intranet 两个勾选框；说明“Public providers can only be allowed per project, below.”。
-- **Providers**：每个提供商一张卡：名称、地址、接口类型、区域、每个 key 的并发上限、兼容选项（2026-10-26 注，负责人走查 M1：只在接口为 `openai-completions` 时有这一行，同表单）；“Edit”、“Delete…”、“Test connection”（用第一个可用的 key 测第一个模型，结果文字同 v0）。
-  - **Keys**：每行标签、“Saved”、当前记录（“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有时不显示）、上移、下移、“Test”（用这个 key 测提供商的第一个模型，结果显示在这一行下面；成功时清除记录，§8.3）、“Remove”（只剩一个 key 时“Remove…”）。“Add key”：一行内联表单，Label（默认“Key <n>”）、Secret（密码框）、“Save”/“Cancel”，新 key 加在末尾。
+- **Providers**：每个提供商一张卡：名称、地址、接口类型、每个 key 的并发上限、兼容选项（2026-10-26 注，负责人走查 M1：只在接口为 `openai-completions` 时有这一行，同表单）；“Edit”、“Delete…”、“Test connection”（用第一个可用的 key 测第一个模型，结果文字同 v0）。
+  - **Keys**：每行标签、“Saved”、当前记录（“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有时不显示）、上移、下移、“Test”（用这个 key 测提供商的第一个模型，结果显示在这一行下面；成功时清除记录，§8.3）、“Remove”（只剩一个 key 时“Remove…”）。“Add key”：一行内联表单，Label（默认“Key <n>”）、Secret（密码框）、“Save”/“Cancel”，新 key 加在末尾。（2026-10-26 注，负责人走查 M5：上移、下移换成上面的拖动柄。）
     key 的明文不能查看也不能改：换 key = 加新的再删旧的。删最后一个 key 时确认“Requests to <name> will be sent without an API key.”。没有 key 时说明“Requests are sent without an API key.”。
   - **Models**：每行模型 id、窗口、最大输出、模型族、支持思考；档案摘要：Tool calling（Verified / Not verified / Failed / Verifying… / Re-verifying…）、Handoff tier（A / B / C / —）、Context（有效窗口；截断时告警“Silently truncates long input”）、Reasoning field、Cancel（Verified / Not verified / Unknown）；探针出错时“Couldn’t verify: <原文>”。
     （2026-10-24 补：`reasoning.off_refused` 时加一项“Thinking: Can’t be turned off”；Test connection 对勾了 Supports thinking 的模型带 `medium`；模型表单的 Default effort for new sessions 对这类模型不列 Off，见 §7.7。）
     操作：“Verify”、“Long-input test…”、“Cancel test…”（只对 vLLM、SGLang、llama.cpp）、上移、下移、“Edit”、“Delete…”、“Test”。
-    （2026-10-26 注，负责人走查 M7、M8：模型行只留模型 id、说明一行（窗口、最大输出、模型族、支持思考，`off_refused` 时最后加“ · Thinking can’t be turned off”）、“Use”的提示和一行状态；档案摘要（Tool calling、Handoff tier、Context、Reasoning field、Cancel）、截断告警、“Verify”、“Long-input test…”、“Cancel test…”、“Test”都删掉，操作只剩上移、下移、“Edit”、“Delete…”。状态行只在模型不能用时有：从没完成过验证、正在验证时“Verifying…”；tool calling 判定为不通过时“Tool calling failed verification: <detail>”，没验证（第 3、4 步出错）时“Couldn’t verify: <原文>”，没有档案又不在探测（探针抛错、档案没建成、探针没能开始）时“Couldn’t verify”，这几种带“Verify again”（`models.verify`，`tests: 'auto'`）。tool calling 验证通过的模型（重新验证中、其他步出错的）没有状态行。测试连接留在提供商卡的“Test connection”和 Keys 的“Test”。服务没报告、值仍等于 Mori 默认值的窗口与最大输出标“(default)”，见 [model-discovery.md](model-discovery.md) §8。状态表见 docs/v1/screens/models-settings.md“Models 行”。）
+    （2026-10-26 注，负责人走查 M7、M8：模型行只留模型 id、说明一行（窗口、最大输出、模型族、支持思考，`off_refused` 时最后加“ · Thinking can’t be turned off”）、“Use”的提示和一行状态；档案摘要（Tool calling、Handoff tier、Context、Reasoning field、Cancel）、截断告警、“Verify”、“Long-input test…”、“Cancel test…”、“Test”都删掉，操作只剩上移、下移、“Edit”、“Delete…”。状态行只在模型不能用时有：从没完成过验证、正在验证时“Verifying…”；tool calling 判定为不通过时“Tool calling failed verification: <detail>”，没验证（第 3、4 步出错）时“Couldn’t verify: <原文>”，没有档案又不在探测（探针抛错、档案没建成、探针没能开始）时“Couldn’t verify”，这几种带“Verify again”（`models.verify`，第 0–7 步；2026-10-26 起不带 `tests`，§9.5）。tool calling 验证通过的模型（重新验证中、其他步出错的）没有状态行。测试连接留在提供商卡的“Test connection”和 Keys 的“Test”。服务没报告、值仍等于 Mori 默认值的窗口与最大输出标“(default)”，见 [model-discovery.md](model-discovery.md) §8。状态表见 docs/v1/screens/models-settings.md“Models 行”。负责人走查 M5：上移、下移再换成行左端的拖动柄，见上面“拖动排序”。）（2026-10-26 补，负责人走查回答 1，WP-15：服务没报告的窗口、最大输出、是否支持思考按服务地址取 pi 自带的模型表，模型行标“(from pi)”，仍是默认值的模型多三条 pi 的提示，见 [model-discovery.md](model-discovery.md) §4.4、§8；有效窗口（§7.2）仍是配置与服务报告中较小的，pi 的值不参与。）
     （2026-10-23 注：行上按档案的 `reported` 加“(not reported)”和“Server reports …”等提示与“Use”，见 [model-discovery.md](model-discovery.md) §8。）
   - 模型表单：Model ID（编辑时只读，沿用 v0）、Context window、Max output（新建默认 16384 与窗口一半中较小的）、Family（可空）、Supports thinking、Image input、Default effort for new sessions（只在支持思考时；写 pi 设置的 `modelThinkingLevels`，沿用 v0）。
     （2026-10-23 注：模型表单只剩 Edit（“Edit model · <provider name>”），卡上的“Add model”换成“Fetch models”，见 [model-discovery.md](model-discovery.md) §6.5。）
-  - 提供商表单：Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Network zone（Local / Intranet / Public，按 §12 的规则预选建议值）、Concurrency per key、兼容选项；新建时还有第一个 key 和第一个模型。改地址的 origin 时按 §4.1 删除 key 并确认。
+  - 提供商表单：Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Concurrency per key、兼容选项；新建时还有第一个 key 和第一个模型。改地址的 origin 时按 §4.1 删除 key 并确认。
     新提供商保存失败时，删除本次新存的 key。兼容选项沿用 english-ui 的标签与说明，每个勾选框是标签加下面一行说明：“Endpoint doesn’t support the developer role”（“Sends the system prompt with the system role instead”）、“Endpoint doesn’t accept the store field”（“Leaves store out of requests”）、“Endpoint needs max_tokens instead of max_completion_tokens”（“Older endpoints don’t recognize max_completion_tokens”）、“Endpoint doesn’t report usage while streaming”（“Doesn’t send stream_options, so the context usage shown will be inaccurate”）、“Endpoint doesn’t support strict mode for tool parameters”（“Leaves strict out of tool definitions”）、“Tool results must include the tool name”（“Some endpoints require a name field on tool result messages”）；提供商卡上的“Compatibility options”只列标签。
     （2026-10-26 注，负责人走查 M1：兼容选项的图例下面加一行说明“Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this server rejects requests.”（pi 按地址认出 DeepSeek 等服务、自己调整请求；首次启动表单同）；“Endpoint doesn’t support strict mode for tool parameters”一项删掉：pi 1.3.0 默认就不发 strict，探针要 strict 时自己加（§7.3），勾不勾都一样。§4.1 的 `compat.supportsStrictMode` 照样能写在配置里、读得出，编译照旧交给 pi，界面不显示、保存时原样保留，不加迁移；从 v0 迁移时它不再算兼容选项，同其他不认识的字段一样丢弃并列在说明里（§4.5）。）
     （2026-10-23 注：新建时改为 Base URL、API key → Fetch models → 清单 → Add，Concurrency per key 与兼容选项收进 More settings，没有“第一个模型”；Edit provider 不变，见 [model-discovery.md](model-discovery.md) §6.1。）
   - 测试结果（Test connection、Test；2026-10-26 注：失败后再测照样发出，§8.3 的 2026-10-26 补）：“Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>”；失败时“Connection failed: <原文>”；“Cancel”取消。
-  - 确认对话框“Confirm zone…”：提供商名称与地址，Local / Intranet / Public 单选（预选建议值），“Confirm”/“Cancel”。
-- **Groups**：每个分组一行：id、有序的成员（“DeepSeek · all models” 或 “DeepSeek · deepseek-chat”），成员可以加入、去掉、上移、下移；“New group”、“Delete…”。
+- **Groups**：每个分组一行：id、有序的成员（“DeepSeek · all models” 或 “DeepSeek · deepseek-chat”），成员可以加入、去掉、上移、下移；“New group”、“Delete…”。（2026-10-26 注，负责人走查 M5：成员的上移、下移换成拖动柄，见上面“拖动排序”。）
   - New group：输入 id（规则同提供商 id；错误“<id> is already used by a provider or group.”、“Use lowercase letters, digits, and hyphens.”）。
   - Add member：每个提供商一节，第一项“<name> · all models”，其后是它的各个模型；已在分组里的项打勾、不可再选。
   - 只剩一个成员时 Remove 不可用，说明“A group needs at least one member; delete the group instead.”。
-- **Project access**：已知项目（侧栏里的项目）各一行，显示项目路径和这个项目允许的区域；每个不在 `allowedZones` 里的区域一个勾选框。勾上 `public` 先确认：
-  “Allow public providers for this project?”，正文“Code and files from <项目路径> may be sent to: <公网提供商名，逗号分隔>.”，“Allow”/“Cancel”。项目配置排除了这个区域时勾选框不可用，说明“.mori/models.json in this project doesn’t allow <zone>.”。
 - 删除、改地址、删最后一个 key 的确认框列出 §4.1 的连带改动。
 
-**首次启动表单**（v0 的连接表单，改为英文）：Name、Base URL、API type、Network zone（必选，按 §12 预选建议值）、API key（可空）、Model ID、Context window（默认 128000）、Max output（默认 16384 与窗口一半中较小的）、Supports thinking、兼容选项。
+**首次启动表单**（v0 的连接表单，改为英文）：Name、Base URL、API type、API key（可空）、Model ID、Context window（默认 128000）、Max output（默认 16384 与窗口一半中较小的）、Supports thinking、兼容选项。
 （2026-10-23 注：改为 Base URL、API key → Fetch models → 清单，勾选的模型一次写入，再次保存时整体替换这个提供商和它的全部模型；Test connection 测第一个勾选的模型，见 [model-discovery.md](model-discovery.md) §6.6、§5.4。）
 
 - “Test connection”：表单有改动时先保存（`models.firstRun`：一次写入提供商、模型、key 和 `normalDefault`；同一张表单再次保存时整体替换这个提供商和它唯一的模型，不新建第二个），再测；成功后显示“Open folder…”，同时在后台跑探针，表单下方显示探针状态：
   “Verifying tool calling…” / “Tool calling verified” / “Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings.”（表单可以改，改了再测）/ “Couldn’t verify: <原文>” + “Verify again”。
   （2026-10-26 注，负责人走查 M2：测试成功就关掉首次启动表单、进入主窗口，“Connected · …”在主窗口的 Open a folder 提示里显示一次；表单下方不再有 Open folder… 与探针状态，上面这几句从首次启动删掉。探针照样在后台跑，进度显示在打开文件夹后会话的拒绝启动卡上（验证中“Verifying <模型>…”，判定失败或出错时 `no_candidate` 卡写出原因）；测试失败、已取消时表单同现在，可以改了再测。见 docs/v1/screens/first-run.md“测试成功之后：主窗口”。）
-- 区域选 Public 时，区域下方说明“Public providers must be allowed per project. You’ll be asked when you open a folder.”；打开文件夹后，会话的拒绝启动卡显示“Allow public for this project”。
 - 已经有配置时不显示首次启动表单（`config.get` 的 `firstRun`，§9.4）；配置存在但读不出时也不显示（§4.1）。
 - 测试连接不用 v0 的 30 秒总时限：排队按 §8.2，每次尝试按 §5.4 的首个内容时限，不做原地重试（`server` 直接报告）。
 
 ### 9.2 选择范围按钮与思考强度（输入框下面一行）
 
-- 协作模式下（`ModelState.pickLocked`，平行 Agent 规格 §12.11）模型按钮只显示正在用的模型，不能打开菜单。
-- 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名和区域。生成中或准备中按钮不可用，悬停“Can’t switch models until the response finishes”。
-- 菜单分三节：Groups、Providers、Models（按提供商分组）。每项标出区域（分组标出它的成员涉及的全部区域，例如“Local · Public”）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session only. New sessions use the default range from Settings.”与“Manage models”。
+- 协作模式下（平行 Agent 规格 §12.11、§13.1，2026-10-26 WP-09 改）模型按钮显示“Task mode · <正在用的模型 id>”，菜单照常能打开：`ModelState.pickLocked` 时没有三节，只有说明 `Task mode picks the model for each agent`、Task mode 一行和“Manage models”。
+- 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名（2026-10-26 改，负责人走查 M3：原来是提供商名和区域）。生成中或准备中按钮仍可用（2026-10-26 WP-09 改），悬停的最后一行是“Can’t switch models until the response finishes”；打开的菜单里三节的项不可用、说明换成同一句，只能切 Task mode。
+- 菜单分三节：Groups、Providers、Models（按提供商分组）。每项只写名字（2026-10-26 改，负责人走查 M3：不再标区域）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session only. New sessions use the default range from Settings.”与“Manage models”。
 - 思考强度菜单沿用 v0，可选强度取当前模型（实际模型）的。当前模型不支持思考时的说明（它指向的设置页改了）：“This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”.”
   （2026-10-24 补：思考关不掉的模型的 `thinkingLevels` 没有 `off`，菜单里没有 Off，底部加一句“This model can’t turn thinking off.”；会话原来是 Off 的显示为 Minimal（pi 收紧后的强度），见 §7.7。）
 - 位置、窄栏和悬停的行见 docs/v0/screens/models.md（2026-10-21 起在输入框下面一行）。
@@ -687,7 +692,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 - pi 的 `auto_retry_*` 不再出现（§5.5），阶段行的重试由 `mori.model_retry` 提供；它在下一个有内容的事件、下一次 `mori.model_retry` 或回复结束时清掉。
 - 被拒绝启动的会话里，发送与需要模型的斜杠命令（例如 `/compact`）都不可用。
 - 阶段行：模型层的等待（等模型、等它停下、排队、原地重试、重建）进行时，取代 v0 的“Waiting for the model…”，同样在后面显示已经等了多少秒。
-- 拒绝启动卡：“Verifying <模型>…”写第一个正在验证的候选；“Confirm zone”和“Allow <区域> for this project”都打开 设置 → Models（前者落在区域未确认的那几行，后者落在 Project access 的这个项目）。
+- 拒绝启动卡：“Verifying <模型>…”写第一个正在验证的候选。
 
 ### 9.4 进程桥：保留、删除、改写
 
@@ -706,8 +711,8 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 { pick: string | null; current: string | null /* <provider>/<model> */;
   blocked: null | { kind: 'verifying' | 'no_candidate' | 'no_pick' | 'pick_missing' | 'project_config' | 'config_invalid';
     detail: string; candidates: { ref: string; reason: string; detail: string }[];
-    actions: ('verify' | 'allow_zone' | 'confirm_zone' | 'change_model' | 'open_settings')[];
-    verifyRefs: string[]; zone: string | null; zoneProviders: string[] };
+    actions: ('verify' | 'change_model' | 'open_settings')[];
+    verifyRefs: string[] };
   thinkingLevel: ThinkingLevel; thinkingLevels: ThinkingLevel[]; reasoning: boolean }
 ```
 
@@ -729,26 +734,24 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 
 | 命令 | 参数 | 结果 |
 | --- | --- | --- |
-| `models.get` | — | `{ config /* key 只给 { ref, label } */, profiles, keyStatus, thinkingDefaults: Record<ref, ThinkingLevel \| null> /* pi 设置里按模型的新会话默认强度 */, zoneSuggestions: Record<providerId, zone>, migration: MigrationNotice \| null, projects: { path, zones /* 本机额外授权的区域 */, projectZones: Zone[] \| null /* .mori/models.json 的 allowedZones */, projectConfig: string \| null /* 这个文件的错误原文 */ }[], loadError: string \| null, reserved: string[] }` |
+| `models.get` | — | `{ config /* key 只给 { ref, label } */, profiles, keyStatus, thinkingDefaults: Record<ref, ThinkingLevel \| null> /* pi 设置里按模型的新会话默认强度 */, migration: MigrationNotice \| null, loadError: string \| null, reserved: string[] }`（2026-10-26 去掉 `zoneSuggestions` 与 `projects`，负责人走查 M3） |
 | `models.firstRun` | `{ providerId: string \| null, provider, model, keySecret: string \| null }`（`providerId` 非空时整体替换这个提供商与它唯一的模型，`keySecret` 为空时保留已存的 key；写配置失败时删除本次新存的 key）（2026-10-23 注：`model` 改为 `models`（1 个以上），整体替换这个提供商和它的全部模型，多个模型时默认范围为提供商 id，见 [model-discovery.md](model-discovery.md) §5.4） | `{ providerId }` |
 | `models.saveProvider` | `{ id: string \| null, provider, keySecret?: string, model?, thinkingLevel?: ThinkingLevel }`（新建时带第一个 key（标签“Key 1”）和第一个模型及它的新会话默认强度）（2026-10-23 注：`model?`、`thinkingLevel?` 改为 `models?`：新建时 1 个以上，编辑时不带，见 [model-discovery.md](model-discovery.md) §5.4） | `{ providerId }` |
 | `models.deleteProvider` | `{ id, dryRun: boolean }` | `{ consequences: string[] }`：确认框的各行（§4.1 的连带改动）；`dryRun` 为真时只算、不改 |
 | `models.saveModel` | `{ providerId, model, adding: boolean, thinkingLevel?: ThinkingLevel }`（2026-10-23 注：去掉 `adding`，只改已有的模型：`{ providerId, model, thinkingLevel? }`，模型不存在时 `error`；加模型只有 `saveProvider`、`firstRun`、`addModels`，原来 `adding: true` 的分支删掉；Edit 里没设过强度的模型，Default effort for new sessions 显示 `config.get` 的 `defaultThinkingLevel`（没有时 Medium），只在你改了时带 `thinkingLevel`，见 [model-discovery.md](model-discovery.md) §5.4） | — |
 | `models.deleteModel` | `{ providerId, modelId, dryRun: boolean }` | `{ consequences: string[] }`，同上 |
-| `models.moveModel` | `{ providerId, modelId, delta: -1 \| 1 }` | — |
+| `models.moveModel` | `{ providerId, modelId, delta: -1 \| 1 }`（2026-10-26 改，负责人走查 M5：`delta` 为不等于 0 的整数，即移动的格数，往前为负；一次放下一条命令，只写一次配置、编译一次；移出列表时 `error`） | — |
 | `models.addKey` | `{ providerId, label, secret }` | `{ ref }` |
 | `models.removeKey` | `{ providerId, ref }` | — |
-| `models.moveKey` | `{ providerId, ref, delta: -1 \| 1 }` | — |
+| `models.moveKey` | `{ providerId, ref, delta: -1 \| 1 }`（2026-10-26 改，同 `models.moveModel`：`delta` 为不等于 0 的整数） | — |
 | `models.saveGroup` | `{ id, members, creating: boolean }` | — |
 | `models.deleteGroup` | `{ id, dryRun: boolean }` | `{ consequences: string[] }`，同上 |
-| `models.setDefaults` | `{ normalDefault: string \| null, allowedZones }` | — |
-| `models.setProjectZones` | `{ path, zones }` | — |
-| `models.confirmZone` | `{ providerId, zone }` | — |
+| `models.setDefaults` | `{ normalDefault: string \| null }`（2026-10-26 去掉 `allowedZones`；`models.setProjectZones`、`models.confirmZone` 删掉，负责人走查 M3） | — |
 | `models.dismissMigration` | — | — |
 | `models.reload` | — | 同 `models.get` |
-| `models.verify` | `{ refs, tests: 'auto' \| 'long_input' \| 'cancel' }` | — |
+| `models.verify` | `{ refs }`：跑第 0–7 步（2026-10-26 改，负责人走查 M7：原来是 `{ refs, tests: 'auto' \| 'long_input' \| 'cancel' }`，长输入、取消两个探针删掉后去掉 `tests`，§7.3） | — |
 | `session.setPick` | `{ sessionId, pick }` | `ModelState` |
-| `session.pickOptions` | `{ sessionId }`（只读） | `{ options: { pick, kind: 'group' \| 'provider' \| 'model', label, zones: Zone[], excluded: boolean, reason: string \| null }[] }`：范围菜单的每一项，按这个会话的项目对它做静态校验（§9.2 的变淡与原因） |
+| `session.pickOptions` | `{ sessionId }`（只读） | `{ options: { pick, kind: 'group' \| 'provider' \| 'model', label, excluded: boolean, reason: string \| null }[] }`：范围菜单的每一项，按这个会话的项目对它做静态校验（§9.2 的变淡与原因） |
 
 （2026-10-23 注：新命令 `models.discover`、`models.discoverCancel`、`models.addModels` 见 [model-discovery.md](model-discovery.md) §5；`ProfileView` 加 `reported`，见那边 §7.2。）
 
@@ -763,7 +766,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 | 规则 | 依据 | 落点 |
 | --- | --- | --- |
 | 子 Agent 按自己的 `models`、`requires` 选，只能落在用户为主 Agent 选的范围里（两者展开后的交集，顺序按子 Agent 的候选）；没有交集时这次提问失败并说明原因（子 Agent = 普通模式下对话 Agent 临时去问的只读实例） | proposal §5 | §12.1、§10.1 |
-| 协作模式下用户不选，范围按钮只显示正在用的模型；按做这个 task 的角色的 `models`、`requires` 选，基座与没写 `models` 的角色用会话的选择范围 | proposal §5 | §12.1、§12.11 |
+| 协作模式下用户不选，模型按钮显示“Task mode · <正在用的模型 id>”（2026-10-26 WP-09；原为只显示正在用的模型）；按做这个 task 的角色的 `models`、`requires` 选，基座与没写 `models` 的角色用会话的选择范围 | proposal §5 | §12.1、§12.11 |
 | `.mori/agents/*.md` 的 `models`（每项是一个选择范围）与 `requires`（`tool_calling`、`protocol_write`、`protocol_write>=B`、`structured_output`、`vision`、`context>=N`）。判定用 §7.2 的档案字段：`tool_calling`、`protocol_write`、`structured_output` 必须已验证；`vision` 为 `unverified`（配置声明了图像输入）即满足；`context>=N` 比较 `effective` | proposal §4、§6 | §4.1、§12.2 |
 | Agent 定义引用的名字不存在时拒绝启动，说明缺哪一项、哪个 Agent 用到它 | proposal §6 | §4.4、§12.3 |
 | 继续已有的对话、立项、结案会话，或交回同一角色的 task 会话时模型变了：按本规格 §6.2 判断能否转写，不能就按 §6.3 重建 | proposal §9 | §12.6 |
@@ -869,15 +872,12 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | HTTP 404 | 模型不可用，直到提供商或这个模型的配置改变 |
 | 5xx 原地重试 | 3 次，间隔 2、4、8 秒 |
 | 发出后等第一个有内容的事件 | 120 秒 |
-| 超时后已验证取消的模型不可用（`timeout`） | 60 秒 |
-| 超时后不能确认停止的模型等它停下（`held`） / 读指标确认的间隔 | 2 分钟 / 5 秒 |
+| 压缩请求超时后模型不可用（`timeout`，§6.4）（2026-10-26 改：原来写“超时后已验证取消的模型不可用”，§5.7 不再有这种情况） | 60 秒 |
+| 发出后超时的模型等它停下（`held`，§5.7）（2026-10-26 改：去掉“读指标确认的间隔 5 秒”） | 2 分钟 |
 | 候选耗尽时最长等 / 重新选的间隔 | 60 秒 / 5 秒 |
-| 探针最大输出 / 每一步等第一个有内容的事件 | 256 token（第 9 步 2048）/ 120 秒 |
+| 探针最大输出 / 每一步等第一个有内容的事件 | 256 token / 120 秒（2026-10-26 改：去掉“第 9 步 2048”） |
 | C 级文本标签连发次数 | 3 |
-| 长输入探针的两个长度 | 有效窗口的 50%、90% |
-| 取消探针等请求数回落 | 5 秒 |
 | 4xx、5xx 响应体最多读 | 64 KB |
-| 区域建议 | 回环地址（127/8、`::1`、`localhost`）→ `local`；10/8、172.16/12、192.168/16、169.254/16、`fc00::/7`、`fe80::/10`、`.local` 与不含点的主机名 → `intranet`；IPv4 映射的 IPv6 地址按其中的 IPv4 判断；其余 → `public`。这个规则放在 `shared/models.ts`，后台进程和界面（表单的预选）共用 |
 | 迁移时 `maxTokens` 缺失 / 不小于窗口 | pi 的默认 16384 / 窗口的一半 |
 | 新模型表单的 Max output | 16384 与窗口一半中较小的 |
 | pi 里的占位 `apiKey` | `mori-pool` |
@@ -886,6 +886,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | 测试连接的思考强度（2026-10-24 补） | 勾了 Supports thinking 的模型 `medium`，否则不带（§7.7） |
 | 探针回复停在输出上限、只有思考（2026-10-24 补） | 这一步按出错处理，“Stopped at the probe output limit before answering”（§7.7） |
 
+（2026-10-26 删，负责人走查 M7：“长输入探针的两个长度（有效窗口的 50%、90%）”“取消探针等请求数回落（5 秒）”两行随第 8、9 步删掉，§7.3。）
 （2026-10-23 注：一键拉取模型的临时默认值见 [model-discovery.md](model-discovery.md) §11，登记在 v1/defaults.md 的“一键拉取模型”一节；新建模型的表单不再有，“新模型表单的 Max output”的规则用于清单里没报告的输出上限和手填的行，见那边 §4.1、§6.4。）
 
 ## 13. 要改的文件
@@ -905,8 +906,8 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | `app/src/renderer/` | 设置页 Models 分节、首次启动表单、输入框下面一行的范围菜单、对话流提示与阶段行、拒绝启动卡、准备中；删除 v0 的连接与模型表单、`SETTINGS_HINT`、`modelNotice` 横幅 |
 | `app/tests/` | §14 |
 | 2026-10-24 补丁（§7.7）要改的 | 内核 `probes.ts`、`modelProfiles.ts`、`modelCompile.ts`、`modelLayer.ts`、`modelSession.ts`（§11.2 的收紧）、`config.ts`（测试连接）、`enhance.ts`；进程桥 `shared/models.ts`（`ProfileView.reasoning.off_refused`）、`shared/memory.ts`（`EnhanceInfo.noOffPicks`）；界面 `ThinkingMenu.tsx`、`settings/ModelRows.tsx`、`settings/fields.tsx`（Edit 的 Default effort）、`MemoryEnhance.tsx`；测试 `fake-endpoint/server.mjs`、`probes.mjs`、`v1-models-real.mjs`、`v1-real-helpers.mjs`、单元与 App；文档 [记忆规格](memory.md) §8、§10.4 的注，屏幕状态表 model-menu.md、models-settings.md、memory-enhance.md |
+| 2026-10-26 删掉第 8、9 步（负责人走查 M7）要改的 | 内核 `probes.ts`（长输入、取消、读进行中请求数）、`modelProfiles.ts`（`longInput`、`cancel`、`truncation`、`cancel_verified`）、`modelLayer.ts`（探针种类、`serverGet`）、`modelSession.ts`（§5.7 只留等满再换）、`modelPool.ts`（提前解除 `held`）、`modelFailure.ts`（`timeoutEffect`）、`modelTimings.ts`、`modelCommands.ts`；进程桥 `shared/models.ts`（`ProfileView`、`models.verify`）；界面 `state/actionLog.ts`；合成端点 `-truncate`、`-nocancel`、`/metrics`、`FAKE_NO_METRICS`；单元与 App 测试（MP-11 删除，MP-18、MP-38 改写）。逐条见 docs/v1/walkthrough-1026/WP-04.md |
 | `app/package.json` | `@earendil-works/pi-ai` 1.3.0 进 dependencies（§11）；`esbuild` 0.25.12 进 devDependencies（单元测试打包内核模块）；两者都已随现有依赖安装，离线可用。脚本 `test:unit`、`test:v1-models` |
-| `app/README.md` | 真实走查的数据目录在 v1 里要先确认区域、给测试项目授权公网（§14.1） |
 
 ## 14. 验收
 
@@ -914,7 +915,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 
 | 层 | 位置 | 说明 |
 | --- | --- | --- |
-| 单元 | `tests/unit/*.test.mjs`（`node --test`），经 esbuild 把内核模块打包到 `test-results/` 再导入 | 纯函数：配置校验与连带改动、名字解析、区域、迁移、选择器、失败分类、上下文规则、档案判定、模型池；时长与 `now()` 用假时钟，覆盖全部到期与恢复规则 |
+| 单元 | `tests/unit/*.test.mjs`（`node --test`），经 esbuild 把内核模块打包到 `test-results/` 再导入 | 纯函数：配置校验与连带改动、名字解析、迁移、选择器、失败分类、上下文规则、档案判定、模型池；时长与 `now()` 用假时钟，覆盖全部到期与恢复规则 |
 | 合成端点 | `tests/fake-endpoint/server.mjs`（synthetic） | 见下面的“合成端点的行为” |
 | App | `tests/ui/v1-models-*.mjs` | Electron + 合成端点，逐条验收 |
 | 回放 | `tests/fixtures/v1/*.json` | 从真实会话录制：换模型、重做、拒绝启动、范围菜单的界面 |
@@ -922,9 +923,12 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 
 合成端点的行为（文件开头注释逐条列出；只用于测试）：
 
-- 认出探针 1–9 的提示时一律按“能力全通过”回答（`get_weather` 返回 `{ city: "Paris", days: 3 }`，第 4 步回答含 21，第 5 步调 `submit_outcome` 且取值在枚举内，第 6 步回合法 JSON，第 7 步回合格的标签）；下面的模型 id 后缀只关掉对应的探针能力：
-  `-notools`（第 3 步不调工具）、`-nochoice`（第 5 步忽略指定调用）、`-noschema`（第 6 步忽略 schema）、`-replay`（第 4 步“不带”推理内容时返回 400）、`-truncate`（第 8 步超过一半窗口时静默丢掉开头）。
-- 只作用于不是探针的请求的后缀：`-404`（返回 404）、`-hang`（不回响应头）、`-stall`（回了响应头后不发内容）。`-nocancel` 作用于所有请求：断开后 `/metrics` 的进行中计数 10 秒内不回落（探针第 9 步因此得到 `false`）。
+- 认出探针 1–7 的提示时一律按“能力全通过”回答（`get_weather` 返回 `{ city: "Paris", days: 3 }`，第 4 步回答含 21，第 5 步调 `submit_outcome` 且取值在枚举内，第 6 步回合法 JSON，第 7 步回合格的标签）；下面的模型 id 后缀只关掉对应的探针能力：
+  `-notools`（第 3 步不调工具）、`-nochoice`（第 5 步忽略指定调用）、`-noschema`（第 6 步忽略 schema）、`-replay`（第 4 步“不带”推理内容时返回 400）。
+- 只作用于不是探针的请求的后缀：`-404`（返回 404）、`-hang`（不回响应头）、`-stall`（回了响应头后不发内容）。
+- （2026-10-26 删，负责人走查 M7：探针第 8、9 步删掉，合成端点随之去掉 `-truncate`（第 8 步超过一半窗口时静默丢掉开头）、`-nocancel`
+  （断开后 `/metrics` 的进行中计数 10 秒内不回落）、`GET /metrics`（报告进行中的请求数）与 `FAKE_NO_METRICS=1`（`/metrics` 返回 404），以及
+  第 8 步的暗号、第 9 步的长输出回答；探针提示的范围从 1–9 改为 1–7。）
 - （2026-10-24 补，§7.7）`-nooff` 作用于所有请求：请求里带明确的“关闭思考”（`reasoning.effort: "none"`、`reasoning.enabled: false`、`thinking.type: "disabled"`）时回 400，响应体照录下的 OpenRouter 原文
   `{"error":{"message":"Reasoning is mandatory for this endpoint and cannot be disabled.","code":400,"metadata":{"provider_name":null}}}`（2026-10-24 实测的原文）；不带思考参数时照常回答并带思考内容。
   pi 只在地址含 `openrouter.ai` 时用 OpenRouter 的写法，所以合成端点同时在路径前缀 `/openrouter.ai/v1` 下提供同样的接口，测试的提供商地址写 `http://127.0.0.1:<端口>/openrouter.ai/v1`。
@@ -944,17 +948,17 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
   在这次建的数据目录里做、同时勾上 flint，lfm 再经卡上的 Fetch models 加入；建目录时不先加一个免费模型，免得同一天把免费模型多探测一遍（每天有请求上限）。
 - 认证：`FAKE_KEYS` 是逗号分隔的可接受 key（没设时不检查）；`FAKE_LIMITED_KEYS` 里的 key 返回 429 带 `Retry-After`，`FAKE_LIMIT_MS` 之后恢复（没设时一直限流）；`FAKE_QUOTA_KEYS` 里的 key 返回 402 `insufficient_quota`。
 - 关键词（在最后一条用户消息里）：`http-NNN`（每次都返回 NNN）、`http-NNN-once`（这个会话第一次返回 NNN，之后正常）、`overflow-once`（第一次返回 400 `This model's maximum context length is 1000 tokens`、`context_length_exceeded`，压缩后正常）、`drop-after-first`（发出第一段内容后断开）、`slow`，以及现有的全部关键词。
-- `GET /version` 返回 `FAKE_SERVER_VERSION`（默认 vLLM 的形状）；`FAKE_NO_METRICS=1` 时 `/metrics` 返回 404；`/models` 带 `max_model_len`；`/metrics` 报告进行中的请求数。
+- `GET /version` 返回 `FAKE_SERVER_VERSION`（默认 vLLM 的形状）；`/models` 带 `max_model_len`。
 - 多个提供商 = 多个端口。保留现有的 `METHOD url` 日志行和启动时的 `synthetic` 行，另每个请求一行 JSON（端口、模型、key 末 4 位、消息角色序列、状态、`probe: true|false`）。
 - 合成端点只提供 `chat/completions`：`openai-responses`、`anthropic-messages` 的请求写法和认证头只在单元层用替身 fetch 截下请求检查（MP-10、MP-32）。
 
 真实模型与录制：
 
 - 两个真实提供商：DeepSeek 和 GLM（你在 Mori 的数据目录里保存它们的 key；脚本只复制加密的文件，不读 key）。没有第二个时 MP-27 停下来报告。
-- `lib.mjs` 的 `scratchUserData` 也复制 `model-config.json`、`model-profiles.json`；真实与录制脚本在复制出的配置里给它们的临时项目写 `projectZones: ["public"]`，并建一个分组 `[deepseek 提供商, glm 提供商]` 作为默认范围（测试准备，代码里注明），之后的界面操作照常。
+- `lib.mjs` 的 `scratchUserData` 也复制 `model-config.json`、`model-profiles.json`；真实与录制脚本在复制出的配置里建一个分组 `[deepseek 提供商, glm 提供商]` 作为默认范围（测试准备，代码里注明），之后的界面操作照常。（2026-10-26 改，负责人走查 M3：不再给临时项目写 `projectZones`；复制前源数据目录的 `model-config.json` 里不能再有 `zone`、`allowedZones`、`projectZones`，否则复制出的配置按 §4.1 读不出。）
 - 故障用真实方式触发、并且能恢复：脚本启动前把复制出的 `credentials.json` 里首选提供商的密文另存一份到一个备用 `ref`（只复制密文）；要制造故障时在界面里删掉首选的 key、加一个错的 key（`sk-invalid`），之后的请求得到真实的 401 → `auth` → 换模型；
   在回复开始前换掉就是段开始时换模型，在一个多工具调用的回复进行中换掉就是段内换模型。要恢复时退出 App，把配置里首选的 key 改指备用 `ref`，重新启动，下一段用回首选。脚本记录每一步，fixture 里注明。
-- 你的数据目录要先用 v1 打开一次：确认迁移来的提供商区域为 Public（GLM 在 v0 里加好就会一起迁移）。
+- 你的数据目录要先用 v1 打开一次（GLM 在 v0 里加好就会一起迁移）。
 
 ### 14.2 验收条目
 
@@ -962,30 +966,29 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 
 | 编号 | 条目 | 通过条件 | 层 |
 | --- | --- | --- | --- |
-| MP-01 | 配置校验 | 未知字段、重复 id、分组与提供商重名、保留 id、`maxTokens` 不小于窗口、`allowedZones` 含 `public`、引用不存在的名字、`nextKeyNumber` 回退都报错并指出位置；配置读不出时会话按 `config_invalid` 拒绝启动，文件不被覆盖；由名称生成 id（大小写、非字母数字、截断、与保留 id 或已有 id 冲突加 `-2`）；删掉 key 后新 key 的编号不复用；配置读不出时不显示首次启动表单 | 单元、App |
+| MP-01 | 配置校验 | 未知字段（包括 2026-10-26 删掉的 `zone`、`allowedZones`、`projectZones`）、重复 id、分组与提供商重名、保留 id、`maxTokens` 不小于窗口、引用不存在的名字、`nextKeyNumber` 回退都报错并指出位置；配置读不出时会话按 `config_invalid` 拒绝启动，文件不被覆盖；由名称生成 id（大小写、非字母数字、截断、与保留 id 或已有 id 冲突加 `-2`）；删掉 key 后新 key 的编号不复用；配置读不出时不显示首次启动表单 | 单元、App |
 | MP-02 | 编译到 pi | 保存后 pi 按提供商与模型找到模型；pi 里只有占位 key；删除的提供商从 pi 去掉；编译出错时回滚、文件不变 | 单元、App |
 | MP-03 | 多个 key | 一个提供商两个 key、并发各 1：两个会话同时发送，分别用两个 key；第一个 key 被 429 后请求改用第二个 key，不提示换模型；用到的行为：`FAKE_KEYS` 两个 key、`FAKE_LIMITED_KEYS` 第一个 | App |
 | MP-04 | key 全部不可用 | 两个 key 都 429：按候选换到下一个提供商，对话流一行换模型提示，没有错误卡 | App |
 | MP-05 | 选择范围展开 | 分组成员顺序，提供商成员 → 它的模型顺序，模型成员 → 它自己；去重保留第一次；项目配置缩小分组（部分成员、或提供商缩小到模型）后按 §4.3 的顺序 | 单元 |
-| MP-06 | 网络区域 | 公网提供商在没有授权的项目里被排除并给出原因；Project access 勾选 public 先确认，确认后可用、取消不写；项目配置缩小区域后被排除、对应勾选框不可用；项目配置不能放宽；项目路径大小写与分隔符不同仍按同一项目授权 | 单元、App |
-| MP-07 | 项目配置 | 未知字段、坏 JSON、不存在的分组、不属于用户分组的项都让会话按 `project_config` 拒绝启动并显示原因 | 单元、App |
-| MP-08 | 从 v0 迁移 | 全部 provider 迁入；key 沿用原 `ref`；手写明文 key 加密保存、密文优先；`$ENV`、不支持的接口、丢弃的兼容字段、不合格的模型、改写的 id（含冲突与保留 id）列在说明里；默认模型成为默认范围；`modelThinkingLevels` 复制到新键；区域建议按 §12；区域未确认的提供商在确认前被排除；迁移后改 `models.json` 不再生效；说明 Dismiss 后不再显示；迁移失败时不写配置；迁移后这次启动停在 设置 → Models | 单元、App |
+| MP-06 | 没有网络区域（2026-10-26 改，负责人走查 M3；原来是“网络区域”） | 单元：配置与提供商表单的 schema 没有区域字段，写了 `zone`、`allowedZones`、`projectZones` 的配置按未知字段报错并指出位置，项目配置里的 `allowedZones` 同样报未知字段；静态校验不按区域排除候选，拒绝启动卡的操作只有 Verify now、Change model…、Open settings；范围菜单的项没有区域。App：在一个新打开、从没授权过的项目里新建会话，没有拒绝启动卡，发送后合成端点收到请求；设置页 Models 没有 Project access、Allowed zones、区域未确认的几行，提供商卡与 Add provider、Edit provider 没有 Network zone；首次启动表单没有 Network zone 和 Public 的说明；范围菜单的项没有区域标记，范围按钮悬停的第二行只有提供商名 | 单元、App |
+| MP-07 | 项目配置 | 未知字段（包括原来的 `allowedZones`）、坏 JSON、不存在的分组、不属于用户分组的项都让会话按 `project_config` 拒绝启动并显示原因 | 单元、App |
+| MP-08 | 从 v0 迁移 | 全部 provider 迁入；key 沿用原 `ref`；手写明文 key 加密保存、密文优先；`$ENV`、不支持的接口、丢弃的兼容字段、不合格的模型、改写的 id（含冲突与保留 id）列在说明里；默认模型成为默认范围；`modelThinkingLevels` 复制到新键；迁移来的提供商没有区域、迁移后马上可以用（2026-10-26 改，原来是区域建议与确认前被排除）；迁移后改 `models.json` 不再生效；说明 Dismiss 后不再显示；迁移失败时不写配置；迁移后这次启动停在 设置 → Models | 单元、App |
 | MP-09 | 会话启动校验 | §4.6 表中每种结果的卡片文字与操作；“Verify now”跑完探针后自动解除；全部在验证中时显示 verifying、没有 Verify now；被拒绝时发送不可用，后台进程也拒绝 | App、回放 |
 | MP-10 | 档案与探针 | （2026-10-26 注：App 层读 `models.get` 的档案，模型行只看 `data-probe` 与状态行，§9.1；`fake-coder-notools` 的状态行带“Verify again”，点它重新跑第 0–7 步：行变为 `reverifying`、状态行“Verifying…”不带按钮，合成端点收到新的探针请求，结束后回到 `failed` 并再带“Verify again”；探针出错的状态行同样带“Verify again”；对话占着槽位时加的模型，从行出现到验证通过一直是“Verifying…”，不出现“Couldn’t verify”；没有档案又不在探测时状态行是“Couldn’t verify”加“Verify again”，界面测试造不出这种档案，在单元层查 `probeStatus.ts`）添加模型后自动跑第 0–7 步；合成端点上 `tool_calling`、A/B/C 等级（各后缀分别降级）、推理字段、`replay`、`can_disable`、`server` 判定正确；三种接口的请求写法按 §7.3 的表；探针走 `background` 类别；新的一组探针开始时旧的被取消；`anthropic-messages` 上 A、C 都不通过时 `tier: null`（§7.5）；`-replay` 模型探测完成后不保存配置，下一条消息里别的模型带工具调用的助手消息带有 `reasoning_content`（合成端点日志）；三种接口的请求写法在单元层用替身 fetch 检查 | 单元、App |
-| MP-11 | 需要同意的探针 | （2026-10-26 注：设置页的两个按钮与确认框删掉，App 层经进程桥发 `models.verify`（`tests` 为 `long_input`、`cancel`）、读档案，不再查确认框与告警；整条由 WP-04 删除）长输入与取消探针只在确认后运行；静默截断被判出并告警；`/metrics` 回落时 `cancel_verified` 为真，不回落为假，没有指标为 `unknown`；`-nocancel` 为 `false`，`FAKE_NO_METRICS=1` 为 `unknown` | App |
-| MP-12 | 指纹与版本 | 改窗口或服务版本变化后重新探测；重新探测期间旧结果继续用于选择、已打开的会话仍可发送；版本接口连不上时档案不变 | 单元、App |
+| MP-12 | 指纹与版本 | 改窗口或服务版本变化后重新探测；重新探测期间旧结果继续用于选择、已打开的会话仍可发送；版本接口连不上时档案不变（2026-10-26 补，负责人走查 M7：带长输入、取消两步结果（`longInput`、`cancel`）的旧档案照读，这两项读的时候丢掉，档案其余各项不变、不重新探测，下一次写档案文件时不再写出，§7.2） | 单元、App |
 | MP-13 | 粘性与回到首选 | 段内换到第二候选后一直用它；首选在段开始时不可用、段内恢复后第二候选又失败，换到第三个而不是首选；下一段首选可用时用回首选；第二条消息的第一次请求沿用段开始时（§11.4）选的模型；插话（含在最后一条回答之后送达的）不开始新段；溢出恢复后 `tried` 保留；回放层覆盖界面上的换模型提示与回到首选 | 单元、App、回放 |
 | MP-14 | 第一个请求就失败 | 首选 401（错的 key）：同一个请求发给第二候选，对话流有换模型提示，没有错误卡 | App、回放 |
 | MP-15 | 段内换模型（重做） | 第三个请求时首选不可用：新模型收到的上下文里没有之前的助手消息和工具结果，这段的用户消息末尾带说明；新模型自己的消息之后不被隐藏；两次换模型时区间取并集、只有一段说明；会话文件和界面保留被隐藏的过程；重新打开后仍然隐藏；排队消息那一段被重做时，上一段的回答仍发给新模型；排队消息在上一段还在调工具时排进来、它那一段被重做时，上一段的回答完整地发给新模型；换到窗口更小的模型后触发阈值压缩，摘要请求里没有被隐藏的过程 | 单元、App、回放 |
 | MP-16 | 原地重试 | `http-503-once`：阶段行显示“Retrying (1/3)”，不换模型；`http-503`：重试用完后显示错误卡，不换模型 | App |
 | MP-17 | 不换的情况与停止 | 400、有输出后中断都不换模型；你按停止不换；在排队中、等模型中、等它停下时按停止：对话流显示已停止而不是错误卡，合成端点没有收到新的请求；两个会话排同一个提供商，停止一个，另一个照常发出 | App |
-| MP-18 | 结果未知 | `-hang` 与 `-stall`：`cancel_verified` 为 `true` 时立即换模型；为 `false`（`-nocancel`）时读指标确认停下后换模型；为 `unknown`（`FAKE_NO_METRICS=1`）时阶段行显示等它停下，等满后换模型继续这次回复，提示注明 Couldn’t confirm it stopped；期间合成端点没有收到同一请求的第二份；只有一个候选时等满后显示说明卡，没有错误卡 | 单元、App |
+| MP-18 | 结果未知 | `-hang` 与 `-stall`：阶段行显示等它停下，等满 2 分钟后换模型继续这次回复，提示注明 Couldn’t confirm it stopped；期间合成端点没有收到同一请求的第二份；只有一个候选时等满后显示说明卡，没有错误卡（2026-10-26 改，负责人走查 M7：原来按 `cancel_verified` 分三种，为 `true` 时立即换、为 `false`（`-nocancel`）时读指标确认停下后换、为 `unknown`（`FAKE_NO_METRICS=1`）时等满再换；第 9 步删掉后只有等满再换，§5.7。单元层：超时的模型进入 `held`、等满后换模型并带 `unconfirmed`，等待期间不读服务端） | 单元、App |
 | MP-19 | 排队与优先级 | 并发 1 时第二个请求排队，阶段行显示等待；探针排在对话之后；排队超时后换模型；调低并发、删 key、加 key 时按 §8.2；会话 2 段内遇到会话 1 造成的全部 key 冷却：直接换模型，不排队；并发 1、对话占着槽位时添加模型：探针等对话结束后完成，档案为 verified | 单元、App |
 | MP-20 | 候选耗尽 | 全部不可用时先等并显示原因，恢复后继续；只剩不会恢复的原因时不等；等不到时一张说明卡、没有错误卡；段开始时消息撤回、文字放回输入框；压缩时选不到模型报压缩失败；用到的行为：`FAKE_LIMIT_MS` 让限流在等待期间恢复 | 单元、App |
 | MP-21 | 接手判断与重建 | 要求回传推理的模型接手带别的模型工具调用的对话：段开始时重建（对话太短时只去掉工具调用和思考），重建后的上下文保留压缩摘要；段内只去掉、不压缩；窗口不够时段开始重建、段内排除；重建的压缩失败时换下一个候选；重建时没有 v0 的压缩提示和错误卡；重建的压缩失败后换到下一个候选，对话流没有错误卡 | 单元、App |
 | MP-22 | 压缩走 Mori | `overflow-once` 触发的溢出恢复与到阈值的自动压缩都经模型池、用当前模型和 key；压缩出错不换模型；压缩请求的首个内容时限生效 | App |
 | MP-23 | 选择范围（输入框下面一行） | 可以选分组、提供商或模型；写进会话文件，重新打开后沿用；改了设置里的默认范围，已有会话（包括没切换过的）的范围不变；v0 旧会话打开后用它最后用过的模型；不改默认范围；生成中与准备中不能改；范围按钮的文字格式“<范围名> · <当前模型 id>”；被排除的项变淡并有原因；底部说明 | App、回放 |
-| MP-24 | 设置页 | Providers、Keys、Models、Groups、Defaults、Project access 的增删改都写进配置并立即影响静态校验；删除与改地址的连带改动列在确认框里；改地址的 origin 后 key 被删，合成端点日志里新端口没有收到旧 key；分组编辑的错误与“至少一个成员”；key 的明文不回到界面 | App |
+| MP-24 | 设置页 | Providers、Keys、Models、Groups、Defaults 的增删改都写进配置并立即影响静态校验（2026-10-26：Project access 删掉，负责人走查 M3）；删除与改地址的连带改动列在确认框里；改地址的 origin 后 key 被删，合成端点日志里新端口没有收到旧 key；分组编辑的错误与“至少一个成员”；key 的明文不回到界面（2026-10-26 补，负责人走查 M5，§9.1“拖动排序”：单元：`models.moveModel`、`models.moveKey` 的 `delta` 接受不等于 0 的整数、不接受 0 与小数；一次移动多格（往前、往后）得到对的顺序，移出列表、找不到时出错。App（`v1-models-app-reorder.mjs`）：三个模型、三个 key、三个成员的分组，各行有拖动柄（读屏名“Reorder <名字>”、悬停“Drag or use the arrow keys to reorder”），没有上移、下移；只有一行的列表没有柄；用鼠标把最后一个模型拖到第一个：放下前那一行上沿有线、被拖的行变淡，放下后配置里的顺序对，F8 报告的操作记录里只有一条“Move model <ref> -2”；在柄上按方向键下移一格：配置随之变，保存中列表已按新顺序显示、柄全部 `aria-disabled`、不能拖，焦点留在这一行的柄上，播报区“<名字> was dropped at position <n> of <count>.”；第一行按上不发命令；Keys 拖动与方向键同样（`models.moveKey`）；分组的成员拖动与方向键（`models.saveGroup`）；把 key 的柄拖到模型行上不显示线、松开后线与变淡都消失、什么都不变；正在 Edit 的模型那一行（模型表单）没有柄，把别的模型拖到它上面不显示线、松开后什么都不变；经进程桥先改了 Keys、Models 的顺序（界面没重新读）再在界面上按方向键，后台进程拒绝：原文在列表下面、不在那一行里，列表回到原顺序，焦点留在这一行的柄上，不播报，配置不变；分组同样（经进程桥删掉这个分组，界面发的 `models.saveGroup` 被拒绝，原文在这一组下面）。集成时按状态表逐行补（2026-10-26）：Keys、分组只有一行时也没有柄；柄的鼠标是抓手；线是那一行上沿或下沿 2px 的内阴影，被拖的行不透明度 0.45；放下后顺序不变的位置（被拖的行自己、上一行的下半边、下一行的上半边）不显示线，松开后什么都不变；保存中在柄上按方向键不发命令） | 单元、App |
 | MP-25 | 只有一层重试 | 429 时没有 pi 的 `auto_retry_start`；打开工具页、改思考强度等触发 pi reload 之后仍然没有；合成端点日志里每次尝试逐条对得上 | App |
 | MP-26 | key 不落盘 | 配置文件、档案、迁移说明、会话文件、日志、测试结果里没有 key 明文；F8 报告（最近的操作与报告正文）里没有 key：Add key 后按 F8 保存报告检查 | App |
 | MP-27 | 真实模型 | 两个真实提供商：正常对话；按 §14.1 的方法在段开始和段内各换一次模型（真实的 401）；恢复首选的 key 并重新启动后，下一段用回首选；探针结果合理 | 真实 |
@@ -994,15 +997,17 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-30 | 删除的连带改动 | §4.1 的每一项，含删最后一个模型删掉提供商、分组变空、`normalDefault` 置空、打开的会话按 `pick_missing` 拒绝 | 单元、App |
 | MP-31 | 槽位不泄漏 | 正常结束、出错、停止、中止后占用数归零；4xx 读完响应体即释放 | 单元、App |
 | MP-32 | 认证头 | 三种接口各写对认证头；没有 key 的提供商不带认证头；pi 的占位 key 不会发到服务端；三种接口在单元层检查，`openai-completions` 另在 App 层检查 | 单元、App |
-| MP-33 | 首次启动 | 填表（含区域）→ 测试连接 → 进入主窗口（Open a folder 提示里一行“Connected · …”）→ 打开文件夹；区域为 Public 时会话的拒绝启动卡带“Allow public for this project”，授权（确认框）后可以发送；探针判定失败时会话的拒绝启动卡说明原因；测试失败后表单留着，改勾选的模型再测：配置里仍只有一个提供商（2026-10-26 按负责人走查 M2 改写） | App |
+| MP-33 | 首次启动 | 填表 → 测试连接 → 进入主窗口（Open a folder 提示里一行“Connected · …”）→ 打开文件夹 → 可以发送（2026-10-26 改，负责人走查 M3：没有区域，原来公网地址要在拒绝启动卡上授权）；探针判定失败时会话的拒绝启动卡说明原因；测试失败后表单留着，改勾选的模型再测：配置里仍只有一个提供商（2026-10-26 按负责人走查 M2 改写） | App |
 | MP-34 | 准备中 | 段开始的等待和重建期间用户消息已显示、停止可用；停止后消息撤回、文字回到输入框；准备中再发的消息作为排队消息在回复开始后交给 pi；准备中再发一条后按停止：两条文字都回到输入框，合成端点没有收到请求 | App |
 | MP-35 | 思考强度 | 第一个候选是推理模型时新会话按它的按模型默认强度开始，请求带思考参数；换到不支持思考的模型时 pi 收紧；Effort 菜单的可选强度随当前模型；把强度改成 high 后关闭再打开会话，仍是 high；段内从非推理模型换到推理模型后 Effort 菜单的强度变为可选 | App |
 | MP-36 | 回复进行中改配置 | 回复中删除它正在用的提供商：下一个请求换到下一个候选并提示；改它的兼容选项：本段继续用它；当前模型在段内被另一个会话造成冷却：下一个请求不发出就换模型 | App |
 | MP-37 | 现有功能不退步 | §14.4 的全部现有测试通过（2026-10-22 注：m7 的 App 与回放由提示词分层与记忆规格 §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放） | App、回放 |
-| MP-38 | 思考关不掉的判定（2026-10-24 补，§7.7） | 单元：第 2 步表里每一行的判定与说明（400、422、`medium` 出错或没有正文、其他错误）；本组第 2 步判出 `off_refused` 时第 3、4、6、7 步用 `medium`、第 5 步不适用、第 7 步照跑；第 1–7 步用没有标记的副本，有标记的模型这一次判出能关闭时第 3–7 步发 `off`；第 8、9 步按档案选强度；回复停在输出上限、只有思考时为出错（`-thinklong`），第 8 步不记 `silent`；带 `auto.offRefused: true` 的档案写出、读回后仍为真并编译出标记；没有 `offRefused` 的旧档案照读、不重新探测；其他模型的判定不变：`fake-coder`，以及地址含 `deepseek.com` 的 `openai-completions` 模型（替身 fetch：`thinking.type: "disabled"` 时 200、没有思考）为 `can_disable: true`、`off_refused: false`、编译后没有标记。App：`fake-coder-nooff`（OpenRouter 前缀地址、勾 Supports thinking）加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`，模型行有“Thinking: Can’t be turned off”，点 Verify 后仍是同样的结果；`fake-coder-thinklong`（普通地址、勾 Supports thinking）加入后模型行为“Couldn’t verify: Stopped at the probe output limit before answering”，Tool calling 仍为 Verified（2026-10-26 改，§9.1：模型行说明一行最后有“Thinking can’t be turned off”，经进程桥再发一次 `models.verify` 后仍是同样的结果；`fake-coder-thinklong` 的档案为 `error`、说明“Stopped at the probe output limit before answering”，tool calling 仍为 `verified`，模型能用，模型行没有状态行） | 单元、App |
+| MP-38 | 思考关不掉的判定（2026-10-24 补，§7.7） | 单元：第 2 步表里每一行的判定与说明（400、422、`medium` 出错或没有正文、其他错误）；本组第 2 步判出 `off_refused` 时第 3、4、6、7 步用 `medium`、第 5 步不适用、第 7 步照跑；第 1–7 步用没有标记的副本，有标记的模型这一次判出能关闭时第 3–7 步发 `off`；回复停在输出上限、只有思考时为出错（`-thinklong`）（2026-10-26 删，负责人走查 M7：原来还有“第 8、9 步按档案选强度”“第 8 步不记 `silent`”，这两步已删掉，§7.3）；带 `auto.offRefused: true` 的档案写出、读回后仍为真并编译出标记；没有 `offRefused` 的旧档案照读、不重新探测；其他模型的判定不变：`fake-coder`，以及地址含 `deepseek.com` 的 `openai-completions` 模型（替身 fetch：`thinking.type: "disabled"` 时 200、没有思考）为 `can_disable: true`、`off_refused: false`、编译后没有标记。App：`fake-coder-nooff`（OpenRouter 前缀地址、勾 Supports thinking）加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`，模型行有“Thinking: Can’t be turned off”，点 Verify 后仍是同样的结果；`fake-coder-thinklong`（普通地址、勾 Supports thinking）加入后模型行为“Couldn’t verify: Stopped at the probe output limit before answering”，Tool calling 仍为 Verified（2026-10-26 改，§9.1：模型行说明一行最后有“Thinking can’t be turned off”，经进程桥再发一次 `models.verify` 后仍是同样的结果；`fake-coder-thinklong` 的档案为 `error`、说明“Stopped at the probe output limit before answering”，tool calling 仍为 `verified`，模型能用，模型行没有状态行） | 单元、App |
 | MP-39 | 没有 Off 的标记（2026-10-24 补，§7.7） | 单元：`off_refused` 编译成 `thinkingLevelMap: { off: null }`（三种接口都写在模型上）、变了时重新编译这个提供商；换模型后重发的强度按新模型收紧；`enhance.get` 的 `noOffPicks` 按第一个候选的档案给出。App（`fake-coder-nooff`）：输入框下面一行的 Effort 菜单没有 Off、有“This model can’t turn thinking off.”；会话原来是 Off 的显示 Minimal，发出的请求 `effort` 为 `minimal`、合成端点没有回 400；测试连接（2026-10-26 注：提供商卡的 Test connection，模型行没有 Test 了）发出的 `effort` 为 `medium` 且成功；模型表单（Edit）与增强设置的 Effort 不列 Off；没有标记的模型（`fake-coder`）菜单仍有 Off、Off 时不带思考参数 | 单元、App |
 | MP-40 | 真实的思考关不掉的模型（2026-10-24 补，§7.7） | 你的 OpenRouter key：`recursive/flint-v1.0:free` 经设置页加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`；`liquid/lfm-2.5-2.6b:free` 加入后 `tool_calling: verified`、`off_refused: true`，且等级 B 或第 6 步出错为“Stopped at the probe output limit before answering”（只能是出错，不能是不通过）（2026-10-24 负责人改，原来只写“等级 B”：lfm 在 `medium` 下第 6 步的思考长度不定，在 256 token 的探针上限上有时答完（B 级）、有时只有思考就停下（按本节的输出上限规则为出错，第 7 步不跑，等级为空）；这一条要验证的是必须思考的模型变得可用，探针上限不调，见 [v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：实现与检查”）；会话里选不到 Off，原来是 Off 的会话正常回答；测试连接成功 | 真实 |
 | MP-41 | 测试连接总是发出（2026-10-26 补，§8.3） | 单元：key 都在 `auth`（或 `rate_limited`、`quota`）、提供商在 `connection`、模型在 `not_found`、`timeout`、`held` 时，测试连接的请求（`connection.test` 用的 fetch）照样发出，会话的请求照旧不发；不带 key 时用第一个没有记录的 key，全部有记录时用第一个 key，401 后照样换到没有记录的 key；失败照常写记录；成功时清除用到的 key 的记录、提供商的 `connection` 与这个模型的 `not_found`，`timeout`、`held` 留着 | 单元 |
+
+（2026-10-26 删，负责人走查 M7，决定 1：MP-11“需要同意的探针”（长输入与取消探针只在确认后运行；静默截断被判出并告警；`/metrics` 回落时 `cancel_verified` 为真，不回落为假，没有指标为 `unknown`）随第 8、9 步一起删掉，单元与 App 测试同删；它在 App 层顺带查的“模型行没有 Verify、Test、Long-input test…、Cancel test…”移到 MP-10（`v1-models-app-session.mjs` 的 `probes` 场景）；编号不再使用。新条目照旧从 MP-42 起编。）
 
 ### 14.3 不留未完成项
 
@@ -1019,7 +1024,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | 现有 | 改法 |
 | --- | --- |
 | `tests/fake-endpoint/server.mjs` | 加 §14.1 的行为；默认模型 `fake-coder` 能通过探针第 0–7 步，现有关键词的回答不变 |
-| `tests/ui/page.mjs`、`m6-helpers.mjs` 的首次启动 | 填英文表单、区域选 Local；等 `mori.profiles` 里这个模型的探针都跑完（Models 行显示等级）再打开文件夹 |
+| `tests/ui/page.mjs`、`m6-helpers.mjs` 的首次启动 | 填英文表单（2026-10-26：没有区域，不再选 Local）；等 `mori.profiles` 里这个模型的探针都跑完（Models 行显示等级）再打开文件夹 |
 | `m0-smoke.mjs` | 对 `pi/models.json` 的断言改为对 `model-config.json`；编辑连接与“改地址要重新填 key”的步骤改为 v1 的改地址（key 被删、确认框）；key 占位文字改为 Keys 行的“Saved”；中文的校验文字改为英文 |
 | `m1-app.mjs` | 重试检查改为 `http-503-once` 与“Retrying (1/3)”；改错 key 再“Go to settings”的步骤改为：删 key、加一个错的 key → §9.3 的说明卡（“API key rejected”、“Open settings”，焦点在 Keys）→ 加回对的 key；首次启动的中文校验改为英文 |
 | `m1-layout.mjs` | 设置页的测量改为 Models 分节（提供商卡与提供商表单） |
@@ -1029,16 +1034,18 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | `m7-app.mjs`（2026-10-22 注：已删除，见提示词分层与记忆规格 §14.4） | “工作回顾不发模型请求”的检查只数 `probe: false` 的请求 |
 | `m7-replay.mjs` 与其余回放脚本（2026-10-22 注：`m7-replay.mjs` 已删除，同上） | 各自的 `QUERIES` 加 `models.get` |
 | 其余 `m1`–`m7` 的 App 测试（2026-10-22 注：m7 的已删除，同上） | 只换首次启动的写法，其余不变 |
-| 回放：`tests/ui/harness/replay.js` | `models.get` 加进只读查询；录制里没有时用 fixture 的 `model` 合成（一个本机区域的提供商、一个模型、`normalDefault` 为它、档案已验证，代码里注明 synthetic）；`ModelState` 的新字段同样合成；`models.*` 的写命令照 `connection.save` 的方式应答；`harness/main.jsx` 加 `fixtures/v1` |
+| 回放：`tests/ui/harness/replay.js` | `models.get` 加进只读查询；录制里没有时用 fixture 的 `model` 合成（一个本机地址的提供商、一个模型、`normalDefault` 为它、档案已验证，代码里注明 synthetic）；`ModelState` 的新字段同样合成；`models.*` 的写命令照 `connection.save` 的方式应答；`harness/main.jsx` 加 `fixtures/v1` |
 | 回放：`m6/model-switch.json`、`m6/thinking.json`、`m1/no-key.json` | 删除（v1 不再有这些命令和情形），对应检查从 `m6-replay.mjs`、`m1-replay.mjs` 去掉，由 MP-23 和 `fixtures/v1/thinking.json` 的回放取代；`m1/wrong-key.json` 的“去设置”检查改为说明卡 |
 | `m0-real.mjs` | 断言改为 `model-config.json`、`credentials.json` |
 | `m1-real.mjs`、`m1-record.mjs` | 首次启动的走查用一个空的复制数据目录；走查 6 改为“错的 key → 说明卡 → Open settings → Keys”，`$变量` 与没有 key 的情形删去（v1 里没有 key 就不带认证头）；压缩的准备改为在复制出的 `model-config.json` 里把窗口改小 |
 | `m2-real.mjs` | F8 的准备改为 Add key |
 | `m6-real.mjs`、`m6-record.mjs` | 走查 1 与 8 改为在 Models 里加模型、在范围菜单里选；读 `model-config.json`；重新录制范围与思考强度的 fixture |
-| 全部 `*-real.mjs`、`*-record.mjs` | 提供商从 `model-config.json` 取，不再找 `pi/models.json` 的 `mori-endpoint`；按 §14.1 复制模型配置并给临时项目授权公网 |
+| 全部 `*-real.mjs`、`*-record.mjs` | 提供商从 `model-config.json` 取，不再找 `pi/models.json` 的 `mori-endpoint`；按 §14.1 复制模型配置（2026-10-26：不再给临时项目授权公网） |
 
 `npm run smoke`、`test:app`、`test:m1-app`…`test:m7-app`、各回放测试都通过，MP-37 才算通过。
 （2026-10-22 注：`test:m7-app`、`test:m7-replay` 由 [提示词分层与记忆规格](memory.md) §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放。）
 （2026-10-23 注：MP-01、MP-10、MP-24、MP-33 的条目文字不变，测试按一键拉取的流程写：首次启动、Add provider 和卡上加模型都走 Fetch models 与清单（或手填一行），见 [model-discovery.md](model-discovery.md) §13.4。）
 （2026-10-26 注，负责人走查 M1、M6、M7、M8（WP-02）：模型行没有档案摘要、Verify、Test 与需要同意的探针，现有测试改读行的 `data-probe`（取代 `data-field="tool_calling"`）、状态行 `probe-status` 与 `models.get` 的档案；`m1-app.mjs` 设置页里取消测试改用提供商卡的 Test connection（先把 `fake-slow` 移到第一个）；`m0-smoke.mjs` 读表单结果时不再等 Playwright 的默认 30 秒（表单下方还没有结果时不等），并加一项“401 之后什么都不改再测，请求照样发出”（MP-41 的 App 侧，结果不计入覆盖检查）。逐条见 docs/v1/walkthrough-1026/WP-02.md。）
 （2026-10-26 注：MP-33 的条目文字按“测试成功就进入主窗口”改写（负责人走查 M2，docs/v1/screens/first-run.md）：探针状态的检查从表单下方移到会话的拒绝启动卡与 `models.get` 的档案，改模型再测放在测试失败之后。）
+（2026-10-26 注，负责人走查 M7（WP-04）：探针第 8、9 步删掉后，测试里写档案的辅助函数（`v1-switch-helpers.mjs`、`tb-helpers.mjs`、`md-card-helpers.mjs`）不再写 `longInput`、`cancel`；经进程桥发 `models.verify` 的现有测试不再带 `tests`；`harness/replay.js` 合成的档案去掉 `context.truncation` 与 `cancel_verified`；合成端点的自检（`selfcheck.mjs`）去掉 `-truncate`、`-nocancel`、`/metrics` 的检查。录下的 fixture 里 `mori.profiles` 事件的档案仍带这两项（录制时的原样），界面不读它们，不重录。）
+（2026-10-26 注，负责人走查 M5（WP-03）：上移、下移按钮删掉，换成拖动柄。`v1-models-app-settings.mjs` 的 MP-24 不再点上移（Keys、Models、Groups 三条记录名去掉“Move up”），排序的检查都在新套件 `v1-models-app-reorder.mjs`（加进 `test:v1-models`）；`m1-app.mjs` 设置里取消测试的准备改为在 `fake-slow` 那一行的柄上按方向键上移、测完按下移回。逐条见 docs/v1/walkthrough-1026/WP-03.md。）

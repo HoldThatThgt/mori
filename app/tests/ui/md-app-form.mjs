@@ -8,8 +8,8 @@
 //   MD-08 手填一行：拿到列表、列表错误（nolist、401）时都能手填加入，列表错误时手填的行列在错误下面；id 检查与重复；
 //         Entered by you 与 Default；
 //   MD-09 加入新提供商：开始只有 Base URL、API key、Fetch models；拉取中两个框只读、关闭表单会取消拉取；预填的 Name、
-//         API type、Network zone 可改；FAKE_NO_V1_ROOT 换框并写说明、nolist 只换框；改 Base URL 或 key 清掉清单；再拉一次
-//         不覆盖改过的 Name、API type、区域，改过的 API type 作为 target.api 发出；Add 一次写入全部勾选的模型（顺序同清单）、
+//         API type 可改；FAKE_NO_V1_ROOT 换框并写说明、nolist 只换框；改 Base URL 或 key 清掉清单；再拉一次
+//         不覆盖改过的 Name、API type，改过的 API type 作为 target.api 发出；Add 一次写入全部勾选的模型（顺序同清单）、
 //         全部开始探针；保存失败时本次新存的 key 被删除；More settings 的并发与兼容选项保存进配置；Fetch cancelled；
 //         Adding… 时两个框只读、Fetch models 不可用；
 //         界面细节（docs/v1/discovery-checks.md A16–A19）：改 Base URL 也清掉 Fetch cancelled，改 Base URL 或 key 清掉
@@ -17,9 +17,9 @@
 //         （A17）；清单表头为 §6.2 的列名、最高 440px 的滚动框与固定的表头、数字框为 inputMode numeric 的文字框、
 //         不能加入的行只有勾选框不可用、Fetch models 不是主按钮（A18）；拉取中 fetch-status 为没有文字的 role=status（A19）；
 //   MD-06 发现命令（App，新提供商）：新提供商的 key 只用于这次读取（合成端点日志的末 4 位），配置、档案、日志、Fetch 后
-//         按 F8 保存的报告里都没有；每个请求 15 秒时限（FAKE_LIST_DELAY_MS 16000）；不按项目区域过滤。
+//         按 F8 保存的报告里都没有；每个请求 15 秒时限（FAKE_LIST_DELAY_MS 16000）。
 // 准备（synthetic test setup）：数据目录里先写好 model-config.json 与 model-profiles.json（md-form-helpers.mjs 的
-// seedUserData：一个已有的提供商 seed，allowedZones 为空），不经首次启动表单；之后全部经界面操作。发出的命令（target.api、
+// seedUserData：一个已有的提供商 seed），不经首次启动表单；之后全部经界面操作。发出的命令（target.api、
 // models.discoverCancel、models.saveProvider）从预加载脚本的隔离环境里记下（md-form-helpers.mjs 的命令记录，key 只记末 4 位）。
 // 用法（在 app/ 下，先构建）：node tests/ui/md-app-form.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/md-app-form(-packaged).json；--only 时写 md-partial-app-form(-packaged).json（不计入覆盖检查）。
@@ -126,8 +126,8 @@ const ctx = { userData: seedUserData(), exePath, logs: [], pageErrors: [] };
 const rowIn = (state, id) => state?.rows.find((row) => row.id === id) ?? null;
 /** @brief 表单状态里的行 id 与勾选，例如 "a+ b-"。 */
 const picks = (state) => (state?.rows ?? []).map((row) => `${row.id}${row.picked ? '+' : '-'}`).join(' ');
-/** @brief 表单里没有拉取后的字段（回到开始）：没有 Name、API type、区域、清单、列表错误、Add a model ID、底部。 */
-const atStart = (state) => Boolean(state) && state.name === null && state.api === null && state.zoneCount === 0
+/** @brief 表单里没有拉取后的字段（回到开始）：没有 Name、API type、清单、列表错误、Add a model ID、底部。 */
+const atStart = (state) => Boolean(state) && state.name === null && state.api === null
   && !state.checklist && state.listError === null && state.manual === null && state.more === null
   && state.add === null && state.cost === null && state.detected === null && state.rows.length === 0;
 /** @brief 配置里的一个提供商。 */
@@ -156,7 +156,7 @@ async function startState() {
   await openAddProvider(page);
   const s0 = await formState(page);
   record('MD-09 start: the Add provider form shows only Base URL, API key (password box, placeholder "Optional"), '
-    + 'Fetch models (below the API key) and Cancel; no Name, API type, Network zone, checklist, More settings or Add',
+    + 'Fetch models (below the API key) and Cancel; no Name, API type, checklist, More settings or Add',
   s0?.title === 'Add provider' && JSON.stringify(s0.labels) === '["Base URL","API key"]' && atStart(s0)
     && s0.baseUrl?.placeholder === 'http://host:8000/v1' && s0.baseUrl.value === ''
     && s0.apiKey?.type === 'password' && s0.apiKey.placeholder === 'Optional' && s0.fetch?.text === 'Fetch models'
@@ -706,7 +706,7 @@ async function manualErrors() {
 
 // ---------- MD-09：预填、再拉一次、target.api ----------
 
-/** @brief FAKE_NO_V1_ROOT：Base URL 换成 …/v1 并写说明；Name、API type、Network zone 预填且可改；改 API type 不清掉清单。 */
+/** @brief FAKE_NO_V1_ROOT：Base URL 换成 …/v1 并写说明；Name、API type 预填且可改；改 API type 不清掉清单。 */
 async function prefillAndEdit() {
   const { page } = ctx;
   await openAddProvider(page);
@@ -717,25 +717,24 @@ async function prefillAndEdit() {
     + 'Detected: vLLM 0.10.1', s.baseUrl.value === urlFor('nov1') && s.note === `Updated to ${urlFor('nov1')} so the `
     + 'model list loads.' && s.detected?.text === 'Detected: vLLM 0.10.1' && s.detected.kind === 'vllm'
     && picks(s) === 'v1-model+', brief({ base: s.baseUrl.value, note: s.note, detected: s.detected }));
-  record('MD-09 after the fetch Name, API type and Network zone are prefilled (host:port, OpenAI-compatible, Local); '
+  record('MD-09 after the fetch Name and API type are prefilled (host:port, OpenAI-compatible); '
     + 'the first fetch sends target.api null', s.name?.value === hostFor('nov1')
-    && s.api?.value === 'openai-completions' && s.zone === 'local' && first.entry?.command.target.api === null
+    && s.api?.value === 'openai-completions' && first.entry?.command.target.api === null
     && first.entry.command.target.kind === 'new',
-  brief({ name: s.name, api: s.api?.value, zone: s.zone, target: first.entry?.command.target }));
+  brief({ name: s.name, api: s.api?.value, target: first.entry?.command.target }));
   await setName('Prefill Edited');
   await field(page, 'API type').selectOption('anthropic-messages');
-  await page.locator(`${FORM} input[name="zone"][value="intranet"]`).check();
   const edited = await formState(page);
-  record('MD-09 the prefilled Name, API type and Network zone are editable; changing the API type keeps the checklist '
+  record('MD-09 the prefilled Name and API type are editable; changing the API type keeps the checklist '
     + 'and its ticks', edited.name.value === 'Prefill Edited' && edited.api.value === 'anthropic-messages'
-    && edited.zone === 'intranet' && picks(edited) === 'v1-model+' && edited.checklist,
-  brief({ name: edited.name.value, api: edited.api.value, zone: edited.zone, picks: picks(edited) }));
+    && picks(edited) === 'v1-model+' && edited.checklist,
+  brief({ name: edited.name.value, api: edited.api.value, picks: picks(edited) }));
   const again = await fetchNow(ctx);
   const a = again.state;
-  record('MD-09 Fetch models again keeps your edited Name, API type and zone and sends the edited API type as '
+  record('MD-09 Fetch models again keeps your edited Name and API type and sends the edited API type as '
     + 'target.api', again.entry?.command.target.api === 'anthropic-messages' && a.name?.value === 'Prefill Edited'
-    && a.api?.value === 'anthropic-messages' && a.zone === 'intranet' && a.checklist,
-  brief({ target: again.entry?.command.target, name: a.name?.value, api: a.api?.value, zone: a.zone }));
+    && a.api?.value === 'anthropic-messages' && a.checklist,
+  brief({ target: again.entry?.command.target, name: a.name?.value, api: a.api?.value }));
   await addressAndKeyEdits();
 }
 
@@ -757,10 +756,10 @@ async function addressAndKeyEdits() {
   const keyed = await formState(page);
   record('MD-09 editing the API key after a fetch clears the checklist the same way', t.checklist && atStart(keyed),
     brief({ before: t.checklist, after: keyed.checklist }));
-  record('MD-09 after the address change the next fetch still keeps the edited Name, API type and zone (target.api '
+  record('MD-09 after the address change the next fetch still keeps the edited Name and API type (target.api '
     + 'anthropic-messages)', third.entry?.command.target.api === 'anthropic-messages' && t.name?.value
-    === 'Prefill Edited' && t.api?.value === 'anthropic-messages' && t.zone === 'intranet',
-  brief({ target: third.entry?.command.target, name: t.name?.value, api: t.api?.value, zone: t.zone }));
+    === 'Prefill Edited' && t.api?.value === 'anthropic-messages',
+  brief({ target: third.entry?.command.target, name: t.name?.value, api: t.api?.value }));
   await closeForm(page);
   await openAddProvider(page);
   const p = (await fetchWith(ctx, urlFor('plain'), '')).state;
@@ -838,7 +837,7 @@ async function addProvider() {
   brief({ order, rows, verifying: seen.verifying, probed: probed.value }));
 }
 
-/** @brief 配置里的新提供商：名称、地址、区域、More settings 的并发与兼容选项、第一个 key、模型的值与顺序。 */
+/** @brief 配置里的新提供商：名称、地址、More settings 的并发与兼容选项、第一个 key、模型的值与顺序。 */
 function checkSavedProvider(provider, refsBefore) {
   const refs = credentialRefs(ctx.userData);
   const models = provider?.models ?? [];
@@ -847,10 +846,11 @@ function checkSavedProvider(provider, refsBefore) {
     + 'model-config.json',
     provider?.concurrency === 7 && JSON.stringify(provider.compat) === '{"maxTokensField":"max_tokens"}',
     brief({ concurrency: provider?.concurrency, compat: provider?.compat }));
-  record('MD-09 the saved provider: name "Form Add", the fetched address, OpenAI-compatible, Local, the key as "Key 1" '
+  record('MD-09 the saved provider: name "Form Add", the fetched address, OpenAI-compatible, no zone, the key as '
+    + '"Key 1" '
     + '(credentials.json gets its ref), models with the checklist values (entered row 128000 / 16384)',
   provider?.name === 'Form Add' && provider.baseUrl === urlFor('add') && provider.api === 'openai-completions'
-    && provider.zone === 'local' && provider.keys.length === 1 && provider.keys[0].label === 'Key 1'
+    && !('zone' in provider) && provider.keys.length === 1 && provider.keys[0].label === 'Key 1'
     && refs.includes(provider.keys[0].ref) && !refsBefore.includes(provider.keys[0].ref)
     && byId['add-a']?.contextWindow === 131072 && byId['add-a'].maxTokens === 16384 && byId['add-c']?.contextWindow
     === 128000 && byId['add-c'].maxTokens === 16384 && models.every((m) => m.family === '' && !m.reasoning),
@@ -871,9 +871,8 @@ async function failedSave() {
   await openAddProvider(page);
   await fetchWith(ctx, urlFor('fail'), KEY.fail);
   await setName('Fail Save');
-  // 预填的 API type 与区域改过后照样保存（MD-09"预填且可改"，最后一条检查看配置）
+  // 预填的 API type 改过后照样保存（MD-09"预填且可改"，最后一条检查看配置）
   await field(page, 'API type').selectOption('openai-responses');
-  await page.locator(`${FORM} input[name="zone"][value="intranet"]`).check();
   const file = join(userData, 'model-config.json');
   const before = readText(file);
   const refsBefore = credentialRefs(userData);
@@ -902,10 +901,10 @@ async function failedSave() {
   const closed = await clickAdd();
   const saved = await poll(() => providerIn('fail-save'), Boolean, 10000);
   record('MD-09 after the file is writable again the same form saves: the provider and its key ref are stored, with '
-    + 'the API type and zone you changed (OpenAI Responses, Intranet)', closed && saved.ok
+    + 'the API type you changed (OpenAI Responses)', closed && saved.ok
     && credentialRefs(userData).includes(saved.value.keys[0]?.ref) && saved.value.api === 'openai-responses'
-    && saved.value.zone === 'intranet' && saved.value.name === 'Fail Save',
-  brief({ keys: saved.value?.keys, api: saved.value?.api, zone: saved.value?.zone }));
+    && saved.value.name === 'Fail Save',
+  brief({ keys: saved.value?.keys, api: saved.value?.api }));
 }
 
 // ---------- MD-09：改 Base URL 或 key 清掉的文字（A16） ----------
@@ -1000,7 +999,7 @@ async function saveErrorCleared() {
   await closeForm(page);
 }
 
-// ---------- MD-06：key、F8、时限、区域 ----------
+// ---------- MD-06：key、F8、时限 ----------
 
 /** @brief 新提供商的 key 只用于这次读取：列表请求带它，不存盘、不进 F8 报告；关掉表单后不留着。 */
 async function keyOnlyForFetch() {
@@ -1052,23 +1051,6 @@ async function requestTimeout() {
   await closeForm(page);
 }
 
-/** @brief 不按项目区域过滤：没有任何默认允许的区域，选 Public 再拉取，照样拿到列表。 */
-async function notZoneFiltered() {
-  const { page } = ctx;
-  await openAddProvider(page);
-  await fetchWith(ctx, urlFor('plain'), '');
-  await page.locator(`${FORM} input[name="zone"][value="public"]`).check();
-  const since = Date.now();
-  const again = await fetchNow(ctx);
-  const config = configOf(ctx.userData);
-  record('MD-06 discovery is not filtered by zone: with no zone allowed by default (allowedZones []) and Public '
-    + 'chosen, Fetch models still reads the list', JSON.stringify(config?.allowedZones) === '[]'
-    && again.state.zone === 'public' && again.state.checklist && again.state.rows.length === 2
-    && again.entry?.result?.listError === null && listLines(eps.plain, since).length > 0,
-  brief({ allowed: config?.allowedZones, zone: again.state.zone, result: again.entry?.result }));
-  await closeForm(page);
-}
-
 // ---------- 运行 ----------
 
 /** 步骤：名字 → [函数, 出错时记的编号] */
@@ -1077,7 +1059,7 @@ const STEPS = {
   markers: [markersAndEdits, 'MD-07'], filter: [filterBox, 'MD-07'], look: [checklistLookAndButtons, 'MD-07'],
   manual: [manualWithList, 'MD-08'], manualErrors: [manualErrors, 'MD-08'], prefill: [prefillAndEdit, 'MD-09'],
   add: [addProvider, 'MD-09'], failedSave: [failedSave, 'MD-09'], cleared: [cancelThenEditUrl, 'MD-09'],
-  keyOnly: [keyOnlyForFetch, 'MD-06'], timeout: [requestTimeout, 'MD-06'], zones: [notZoneFiltered, 'MD-06'],
+  keyOnly: [keyOnlyForFetch, 'MD-06'], timeout: [requestTimeout, 'MD-06'],
 };
 
 /** @brief 跑一个步骤；出错时记一条失败（编号开头）并截图，关掉还开着的表单。 */

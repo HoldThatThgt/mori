@@ -81,8 +81,8 @@ type SendHow = 'idle' | 'pending' | 'steer' | 'followUp';
  * @brief 发送输入框里的文字和引用芯片：发给模型的全文是引用块加你的文字（quotes.ts composePrompt），
  *        芯片随命令带给后台进程，pi 记下这条消息后写成 mori.ref 条目。会话被拒绝启动时不发送（草稿不丢，§4.6）。
  *        准备中再发的按排队处理（准备中不能插话，§11.4），由后台进程暂存，pi 开始后作为排队消息交给 pi。
- *        协作（平行 Agent 规格 §5.1）：原文是 /team on、/team off 时不发消息、改协作模式（被拒绝启动时也照样执行），
- *        只清空文字、芯片留着；只有 /team 时不发送；/team <文字> 去掉前缀、带 team: 'once' 发出。分开时立项先判断的
+ *        协作（平行 Agent 规格 §5.1）：原文是 /task on、/task off 时不发消息、改协作模式（被拒绝启动时也照样执行），
+ *        只清空文字、芯片留着；只有 /task 时不发送；/task <文字> 去掉前缀、带 team: 'once' 发出。分开时立项先判断的
  *        消息在准备中再发时不进暂存区，由待判断队列显示在排队区（§5.3）；不经立项的扩展命令由后台进程暂存，按结果的
  *        held 显示在排队区。
  * @param behavior 生成中时：steer 插话，followUp 排队；空闲时不传
@@ -174,7 +174,7 @@ export async function stop(key: string): Promise<void> {
 }
 
 /**
- * @brief Stop team（平行 Agent 规格 §11.4、§13.6）：停止这个会话的全部 Agent；结果里的待判断消息按发送顺序放回输入框。
+ * @brief Stop agents（平行 Agent 规格 §11.4、§13.6）：停止这个会话的全部 Agent；结果里的待判断消息按发送顺序放回输入框。
  *        对话在回复时“已停止”一行由它的 agent_settled 写（按停止处理）；对话没在回复时命令返回后写一行。
  */
 export async function stopTeam(key: string): Promise<void> {
@@ -464,7 +464,7 @@ export function handleKernelExit(): void {
     rowMarks: { ...state.rowMarks, ...Object.fromEntries(state.saved.sessions.filter((item) => item.live?.running
       && !state.tabs.some((tab) => sameFile(tab.sessionFile, item.sessionFile)))
       .map((item) => [item.sessionFile, 'error' as const])) },
-    // 协作：后台的 Agent、批准卡和待判断的消息随后台进程一起没了；开关保留最后知道的模式（team-switch.md）。
+    // 协作：后台的 Agent、批准卡和待判断的消息随后台进程一起没了；模型按钮保留最后知道的模式（team-switch.md）。
     tabs: state.tabs.map((tab) => ({ ...tab, sessionId: null,
       interrupted: tab.interrupted || tab.transcript.running || tab.transcript.sending,
       team: { ...tab.team, busy: false, background: false },

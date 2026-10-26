@@ -1,12 +1,15 @@
 // 平行 Agent 与 TaskBoard 的真实模型一层（docs/specs/parallel-agents-taskboard.md §17.1“真实模型一层”、§17.2 的
-// TB-04、TB-08、TB-34、TB-37、TB-45）：真正的 Mori 对负责人的两个真实模型（默认 DeepSeek 与 GLM，都是 C 级），全部经界面操作。
+// TB-04、TB-08、TB-34、TB-37、TB-45、TB-59）：真正的 Mori 对负责人的两个真实模型（默认 DeepSeek 与 GLM，都是 C 级），全部经界面操作。
 // 准备（synthetic test setup，见 tb-real-helpers.mjs）：复制数据目录（只复制加密的文件，不读 key，不写来源目录）；
-// 分组 [DeepSeek, GLM] 为默认范围；每个临时项目授权公网；两个提供商的地址改指本机 4690 端口上的转发代理（只记请求体，
+// 分组 [DeepSeek, GLM] 为默认范围；两个提供商的地址改指本机 4690 端口上的转发代理（只记请求体，
 // 用来看发给模型的工具）；角色文件 executor、reviewer（reviewer 的 models 是第二个提供商），基座持有对话、立项与结案。
 // 三个驱动（§17.1），每个在自己的临时项目和会话里：
 //   ask：关闭模式下让对话用 agent_message 问 reviewer 一个问题（临时提问）。
-//   team：/team 让 executor 修好失败的测试（只改 sum.js）并跑 npm test、reviewer 复核；“Ask each time”，出现的后台批准卡都允许。
-//   approval：“Ask each time”下 /team 让 executor 运行 node --version（task 跑命令，出后台批准卡），允许。
+//   team：/task 让 executor 修好失败的测试（只改 sum.js）并跑 npm test、reviewer 复核；“Ask each time”，出现的后台批准卡都允许。
+//   approval：“Ask each time”下 /task 让 executor 运行 node --version（task 跑命令，出后台批准卡），允许。
+//   lookback（TB-59，2026-10-26）：/task 让 executor 只读地列出文件；需求关闭、Task mode 回到 off 之后问那份清单。
+//     程序保证的：关闭模式的请求有 board_read、read_session、没有登记需求和建 task 的工具，末尾的工作卡写 Task mode: off，
+//     对话流里有 Task mode off；模型有没有去读、回复里有没有让你调工具只写进 note。
 // 检查只断言程序保证的事（§17.1 的列表）：回执与 board.json 的写入一一对应；每个交接的证据编号都在那个实例会话里；
 // 对话会话的请求里没有写入类工具；后台批准卡写明角色与 task；每个实例的每次运行结束后 task 处于 §9.4 规定的状态，
 // 每个 task 到了终态、waiting_user 或交给结案；进展摘要的需求与 task 标题等于 board.json 里的，task 行的当前在做什么等于
@@ -14,16 +17,17 @@
 // 回答的内容、用了哪个模型）只写进结果的 note。前提没满足（对话没调 agent_message、没出批准卡、需求 15 分钟内没到终态）
 // 时最多重跑 2 次，记在 note 里；仍不满足按失败。15 分钟只是驱动脚本的时限。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs real）：
-//   MORI_APP_DIR=.tb-runs/real node tests/ui/tb-real.mjs --source <数据目录> [--exe <Mori.exe>] [--only ask,team,approval]
+//   MORI_APP_DIR=.tb-runs/real node tests/ui/tb-real.mjs --source <数据目录> [--exe <Mori.exe>]
+//     [--only ask,team,approval,lookback]
 // 结果写到 test-results/tb-real(-packaged).json（--only 时 tb-partial-real…，不计入覆盖检查），截图在 test-results/tb-real/。
 
 import { mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { allowProjectsLive, appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
+import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
   approvalCardsOf, bridge, captureOrder, closeTbApp, contentText, customOf, instanceFiles, kernelEvents, liveInfo,
-  messagesOf, openProject, paneSel, paneState, phasesOf, readBoard, readJsonl, receiptsOf, sendMessage, startTbApp,
-  userSession, waitTeamIdle, watchTaskPhases,
+  messagesOf, modeNoticesOf, OFF_CARD_TOOLS, openProject, paneSel, paneState, phasesOf, readBoard, readJsonl,
+  receiptsOf, sendMessage, startTbApp, userSession, waitTeamIdle, watchTaskPhases,
 } from './tb-helpers.mjs';
 import {
   approvalProblems, ASK_FORBIDDEN, chatRequests, evidenceProblems, prepareRealData, progressProblems, PROMPTS,
@@ -48,6 +52,11 @@ const DRIVE_MS = 15 * 60 * 1000;
 const ATTEMPTS = 3;
 /** 对话会话在协作模式下的种类（附录 A：合并会话的立项段、分开时协作模式的对话段） */
 const DIALOG_KINDS = ['merged-create', 'team-dialog'];
+/** 关闭模式下对话会话的种类（有别的角色时是关闭模式的对话段，没有时没有段） */
+const OFF_KINDS = ['off-dialog', 'dialog'];
+/** 关闭模式下不该有的立项工具（§5.2，TB-59） */
+const CREATE_ONLY = ['request_submit', 'request_update', 'request_cancel', 'task_create', 'task_edit',
+  'reply_via_dialog'];
 
 // ---------- 小工具 ----------
 
@@ -80,12 +89,11 @@ function modelsUsed(requests) {
 
 // ---------- 驱动 ----------
 
-/** @brief 每次尝试一个新的临时项目（失败的测试与角色文件），经进程桥授权公网（synthetic test setup）。 */
+/** @brief 每次尝试一个新的临时项目（失败的测试与角色文件）。 */
 async function newProject(ctx, name) {
   const project = sumProject(`mori-tb-real-${name}-`);
   writeRealRoles(project, ctx.found);
   ctx.projects.push(resolve(project, '..'));
-  await allowProjectsLive(ctx.page, [project]);
   return project;
 }
 
@@ -103,7 +111,7 @@ async function askDrive(ctx, project) {
 }
 
 /**
- * @brief team / approval：发 /team <文字>，界面上出现的后台批准卡都点“Allow once”（记下卡与对应的事件），
+ * @brief team / approval：发 /task <文字>，界面上出现的后台批准卡都点“Allow once”（记下卡与对应的事件），
  *        直到需求都到终态、协作空闲（连续 3 秒）；空闲了一分钟需求还开着、或 15 分钟到了就结束。
  */
 async function teamDrive(ctx, project, prompt) {
@@ -126,6 +134,36 @@ async function teamDrive(ctx, project, prompt) {
   const unmet = !board?.requests.length ? 'no request was registered'
     : !ended ? `the request did not reach a terminal state (${board.requests.map((r) => r.status)})` : null;
   return { who, cards, unmet, ms: Date.now() - since };
+}
+
+/**
+ * @brief lookback（TB-59）：先照 team 的走法跑完 /task 的需求，等模式回到 off，再在关闭模式下问那份清单，
+ *        等它和整个协作空闲。
+ */
+async function lookbackDrive(ctx, project) {
+  const take = await teamDrive(ctx, project, PROMPTS.LOOKBACK);
+  if (take.unmet) return take;
+  const mode = (await liveInfo(ctx, take.who.sessionFile).catch(() => null))?.team.mode ?? null;
+  if (mode !== 'off') return { ...take, unmet: `task mode is ${mode} after the request ended, not off` };
+  const askedAt = Date.now();
+  await sendMessage(ctx, take.who.tab, PROMPTS.LOOKBACK_ASK);
+  // 关闭模式下对话有自己的 bash 等工具，“每次询问”下它的命令出 v0 的批准卡：照样点“Allow once”，否则一直等批准
+  const idle = await settleAnswering(ctx, take.who, take.cards);
+  return { ...take, askedAt,
+    unmet: idle ? null : 'the question after task mode went off did not finish in 15 minutes' };
+}
+
+/** @brief 等用户会话与整个协作空闲（连续 3 秒，最多 15 分钟），其间出现的批准卡都点“Allow once”；返回是否空闲了。 */
+async function settleAnswering(ctx, who, cards) {
+  const since = Date.now();
+  let calm = null;
+  while (Date.now() - since < DRIVE_MS) {
+    await answerCards(ctx, who, cards);
+    calm = (await idleNow(ctx, who)) ? calm ?? Date.now() : null;
+    if (calm && Date.now() - calm > 3000) return true;
+    await sleep(500);
+  }
+  return false;
 }
 
 /** @brief 用户会话与整个协作此刻空闲（TeamState.busy 为假、对话不在运行或准备中、界面不在生成或发送）。 */
@@ -267,6 +305,35 @@ function cardChecks(name, cards, { board, instances, note }) {
   }
 }
 
+/**
+ * @brief TB-59：关闭模式下问清单的请求都有两个只读工具、没有立项工具，末尾的工作卡写 Task mode: off，对话流里有
+ *        Task mode off。模型读没读、回复里有没有让你调工具只写进 note。
+ */
+async function lookbackChecks(ctx, take, notes) {
+  const { who } = take;
+  const requests = chatRequests(ctx.proxy, { since: take.askedAt, cwd: who.project })
+    .filter((r) => OFF_KINDS.includes(r.info.kind));
+  const bad = requests.filter((r) => !['board_read', 'read_session'].every((name) => r.tools.includes(name))
+    || r.tools.some((name) => CREATE_ONLY.includes(name)) || !r.card.startsWith('<mori-work-card>\nTask mode: off\n')
+    || !r.card.includes(`\n${OFF_CARD_TOOLS}`));
+  const notices = await modeNoticesOf(ctx, who.tab);
+  const entries = readJsonl(who.sessionFile).slice(1);
+  const after = entries.filter((entry) => Date.parse(entry.timestamp ?? '') >= take.askedAt);
+  const called = messagesOf(after, 'assistant').flatMap((m) => (m.content ?? []).filter((p) => p.type === 'toolCall')
+    .map((p) => p.name));
+  const replies = messagesOf(after, 'assistant').map((m) => contentText(m.content)).join('\n');
+  const note = `${notes.join('; ')}${notes.length ? '; ' : ''}model: ${brief({ called,
+    toolSyntaxInReply: /\b(read_session|board_read)\s*\{/.test(replies), reply: replies.slice(0, 400),
+    used: modelsUsed(requests) }, 1200)}`;
+  record('TB-59 real lookback: after the request ended and task mode went back to off, every request of the dialog '
+    + 'for the follow-up question has board_read and read_session and no create tool, and ends with the work card '
+    + '"Task mode: off" (with the line that tools are the agent\'s, never the user\'s); the transcript shows "Task '
+    + 'mode off"', requests.length > 0 && bad.length === 0
+    && notices.some((item) => item.mode === 'off' && item.text === 'Task mode off'),
+  `${brief({ requests: requests.length, bad: bad.map((r) => [r.tools, r.card.slice(0, 80)]), notices }, 1200)}`
+    + ` — ${note}`);
+}
+
 // ---------- 执行 ----------
 
 /** 驱动：名字、做一次、核对、前提没满足时记失败的编号 */
@@ -277,6 +344,7 @@ const DRIVES = [
   { name: 'approval', ids: ['TB-34', 'TB-45'], drive: (ctx, p) => teamDrive(ctx, p, PROMPTS.APPROVAL),
     check: (ctx, take, notes) => teamChecks(ctx, 'approval', take, notes),
     unmet: (take) => take.cards.length === 0 ? 'no background approval card appeared' : null },
+  { name: 'lookback', ids: ['TB-59'], drive: lookbackDrive, check: lookbackChecks },
 ];
 
 /** @brief 跑一个驱动：前提没满足时换一个新项目重跑，最多 ATTEMPTS 次；然后核对最后一次。 */
@@ -308,14 +376,14 @@ const ctx = { exePath, pageErrors: [], appLog: [], projects: [] };
 try {
   if (!source) throw new Error('Missing --source <Mori data dir with the two real providers>');
   ctx.found = realProvidersOf(source);
-  record(`TB-45 real setup: two real providers ${refOf(ctx.found.first)} and ${refOf(ctx.found.second)} with `
-    + 'confirmed zones', true, `${ctx.found.first.name} (${ctx.found.first.zone}), ${ctx.found.second.name} `
-    + `(${ctx.found.second.zone})`);
+  const { first, second } = ctx.found;
+  record(`TB-45 real setup: two real providers ${refOf(first)} and ${refOf(second)}`, first.id !== second.id,
+    `${first.name}, ${second.name}`);
 } catch (error) {
   record('TB-45 real setup: the data dir has two real providers (model spec §14.1)', false, oneLine(error, 600));
 }
 if (ctx.found) {
-  const data = prepareRealData(source, ctx.found, [], PROXY);
+  const data = prepareRealData(source, ctx.found, PROXY);
   ctx.userData = data.userData;
   try {
     ctx.proxy = await startForwardProxy(PROXY, data.routes);

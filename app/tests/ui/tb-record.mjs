@@ -1,19 +1,19 @@
 // 从真实会话录制平行 Agent 与 TaskBoard 回放用的 fixture（tests/fixtures/tb/*.json，
-// docs/specs/parallel-agents-taskboard.md §17.1 的回放层：关闭模式下的临时提问、/team 的回执与进展摘要、后台实例的批准卡）。
+// docs/specs/parallel-agents-taskboard.md §17.1 的回放层：关闭模式下的临时提问、/task 的回执与进展摘要、后台实例的批准卡）。
 // 做法同 v1-models-record.mjs：页面里的录制器直接通过 window.mori（与界面相同的进程桥）发会话命令，命令的写法与界面
-// 发出的相同（trust.check 后 session.create、/team <文字> 去掉前缀以 team: 'once' 发出、开关是 session.setTeam、
+// 发出的相同（trust.check 后 session.create、/task <文字> 去掉前缀以 team: 'once' 发出、开关是 session.setTeam、
 // 后台批准卡的回答是 approval.answer），记下命令、结果和后台进程转发的全部事件及其时间。模型是负责人的两个真实模型
 // （默认 DeepSeek 与 GLM，都是 C 级），数据目录的做法见 tb-real-helpers.mjs（只复制加密的文件，不读 key；
-// 分组 [DeepSeek, GLM] 为默认范围、临时项目授权公网，synthetic test setup）。角色文件 executor、reviewer
+// 分组 [DeepSeek, GLM] 为默认范围，synthetic test setup）。角色文件 executor、reviewer
 // （reviewer 的 models 是第二个提供商），基座持有对话、立项与结案（合并会话）。
 //   tb-ask（TB-04、TB-53）：关闭模式下让对话用 agent_message 问 reviewer 一个问题（开只读的临时提问实例，由 GLM 回答）；
 //     之后点开关两次：off → always → off。
-//   tb-team（TB-08、TB-37、TB-53）：切到 Allow all，/team 让 executor 修好失败的测试、reviewer 复核；登记之后点开关两次：
+//   tb-team（TB-08、TB-37、TB-53）：切到 Allow all，/task 让 executor 修好失败的测试、reviewer 复核；登记之后点开关两次：
 //     once → always → once（需求还开着，回不到 off）；等需求到终态、对话汇报完、模式回到 off；退出、重新启动，
 //     打开同一个会话（{ restart: true } 之后的一段，回放用 ?part=after）。
-//   tb-receipts（TB-08、TB-37）：Allow all 下 /team 让 executor 跑一个 90 秒的命令；它运行时发一条超过 120 字符的补充、
+//   tb-receipts（TB-08、TB-37）：Allow all 下 /task 让 executor 跑一个 90 秒的命令；它运行时发一条超过 120 字符的补充、
 //     再发一条撤销：三种回执都有，需求以 cancelled 结束。
-//   tb-approval（TB-34）：“Ask each time”下 /team 让 executor 运行 node --version：后台实例的批准卡出现后先发一条问进展的消息，
+//   tb-approval（TB-34）：“Ask each time”下 /task 让 executor 运行 node --version：后台实例的批准卡出现后先发一条问进展的消息，
 //     等那一轮结束（卡不清掉）再允许；之后的卡一律允许。
 //   sa-subagent（docs/specs/subagent.md SA-11、SA-14、SA-17）：普通模式、没有角色文件，主 Agent 用 subagent 开两个
 //     （只读的读 README.md，通用的跑 node --version，后台批准卡允许）；重启后打开同一个会话。fixture 在 tests/fixtures/sa。
@@ -100,7 +100,7 @@ function driver(state) {
       await d.cmd({ type: 'trust.check', cwd });
       return d.cmd({ type: 'session.create', cwd });
     },
-    /** 发一条消息（team 为真时以 team: 'once' 发出，即 /team <文字>），等这一次运行结束 */
+    /** 发一条消息（team 为真时以 team: 'once' 发出，即 /task <文字>），等这一次运行结束 */
     async say(session, text, team = false) {
       const before = await d.count(session.sessionId, 'agent_settled');
       await d.cmd({ type: 'session.prompt', sessionId: session.sessionId, text, ...(team ? { team: 'once' } : {}) });
@@ -220,12 +220,12 @@ const askScenario = {
 };
 
 /**
- * @brief tb-team：Allow all 下 /team 修好失败的测试；登记之后开关 once → always → once；等需求关闭、汇报完、回到 off；
+ * @brief tb-team：Allow all 下 /task 修好失败的测试；登记之后开关 once → always → once；等需求关闭、汇报完、回到 off；
  *        重启后打开同一个会话。
  */
 const teamScenario = {
   name: 'tb-team', covers: 'TB-08, TB-37, TB-53',
-  description: 'Allow all, then "/team" asks to fix the failing npm test (executor) and verify it (reviewer) in a '
+  description: 'Allow all, then "/task" asks to fix the failing npm test (executor) and verify it (reviewer) in a '
     + 'merged session (the base agent holds dialog, create and close). After the registered receipt the switch is '
     + 'clicked twice (once → always → once, the request is still open). The request runs to a terminal state, the '
     + 'dialog reports, the mode returns to off. Then Mori restarts and the same session is opened again.',
@@ -249,12 +249,14 @@ const teamScenario = {
     const id = values(before, 'session.create')[0]?.sessionId;
     const receipts = eventsOf(before, id, 'mori.receipt');
     const modes = values(before, 'session.setTeam').map((v) => v.mode);
+    const notices = eventsOf(before, id, 'mori.team_mode').map((e) => e.mode);
     const opened = values(after, 'session.open')[0];
     const entries = (opened?.entries ?? []).filter((e) => e.type === 'custom');
     return [...common(before), ...need(failures(after).length === 0, `failed after: ${failures(after)}`),
       ...need(receipts.some((r) => r.kind === 'registered'), 'no registered receipt'),
       ...need(eventsOf(before, id, 'mori.progress').length > 0, 'no mori.progress'),
       ...need(JSON.stringify(modes) === '["always","once"]', `switch results ${modes}`),
+      ...need(JSON.stringify(notices) === '["once","always","once","off"]', `mori.team_mode events ${notices}`),
       ...closedProblems(before, id), ...need(after.length > 0, 'no restart'),
       ...need(entries.some((e) => e.customType === 'mori.receipt')
         && entries.some((e) => e.customType === 'mori.progress'), 'reopened session has no receipt or progress'),
@@ -263,12 +265,12 @@ const teamScenario = {
 };
 
 /**
- * @brief tb-receipts：Allow all 下 /team 让 executor 跑一个 90 秒的命令；它运行时再发一条超过 120 字符的补充、一条撤销：
+ * @brief tb-receipts：Allow all 下 /task 让 executor 跑一个 90 秒的命令；它运行时再发一条超过 120 字符的补充、一条撤销：
  *        合并会话写下三种回执（registered、added、cancelled），运行中的实例被停止，需求以 cancelled 结束。
  */
 const receiptsScenario = {
   name: 'tb-receipts', covers: 'TB-08, TB-37',
-  description: 'Allow all, then "/team" asks executor to run a 90-second command. While the task runs, a second '
+  description: 'Allow all, then "/task" asks executor to run a 90-second command. While the task runs, a second '
     + 'message adds a constraint in the user’s words (longer than 120 characters) and a third message cancels the '
     + 'request. The merged session writes all three kinds of receipt (registered, added, cancelled); the running task '
     + 'instance is stopped and the request ends cancelled; the mode returns to off.',
@@ -302,7 +304,7 @@ const receiptsScenario = {
 /** @brief tb-approval：“Ask each time”下 task 实例运行命令出后台批准卡；卡挂着时问一次进展，那一轮结束后再允许。 */
 const approvalScenario = {
   name: 'tb-approval', covers: 'TB-34',
-  description: 'Ask each time: "/team" asks executor to run node --version. The task instance\'s bash shows a '
+  description: 'Ask each time: "/task" asks executor to run node --version. The task instance\'s bash shows a '
     + 'background approval card in the user session; while it is pending another message asks for progress and that '
     + 'turn ends (the card stays); then the card is allowed, and any later card is allowed too. The request runs to '
     + 'a terminal state and the dialog reports.',
@@ -460,11 +462,11 @@ async function restartMori(state, note) {
 async function recordOnce(scenario, found) {
   const cwd = sumProject(`mori-tb-record-${scenario.name}-`);
   if (!scenario.noRoles) writeRealRoles(cwd, found);
-  const { userData } = prepareRealData(source, found, [cwd]);
+  const { userData } = prepareRealData(source, found);
   const state = { userData, app: null, page: null, kept: [] };
   const ctx = { ...found, cwd, state, notes: [`Setup (synthetic test setup, spec §17.1 / model spec §14.1): copied `
     + `the encrypted data files; group ${TB_GROUP} = [${found.first.id}, ${found.second.id}] is the default range; `
-    + `the project is allowed public; ${scenario.noRoles ? 'no role files (the base agent only)'
+    + `${scenario.noRoles ? 'no role files (the base agent only)'
       : `role files executor and reviewer (models: [${found.second.id}]) in .mori/agents; the base agent holds `
       + 'dialog, create and close'}`] };
   ctx.restart = (note) => restartMori(state, note);

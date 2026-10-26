@@ -13,7 +13,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, scratchUserData,
+  appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, scratchUserData, useRealGroup,
   sleep,
 } from './lib.mjs';
 import {
@@ -699,8 +699,8 @@ async function step(ctx, name, fn) {
 realProviders(source);
 const { project, root } = prepareProject('mori-m2-real-');
 const userData = scratchUserData(source);
-// 测试准备（synthetic test setup，§14.1）：给临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
-allowRealProject(userData, project);
+// 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组
+useRealGroup(userData);
 const ctx = { project, userData };
 const pageErrors = [];
 // 复制密文之后的每一步（包括启动）都在 try 里，出错也会删掉临时目录。

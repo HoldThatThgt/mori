@@ -112,7 +112,13 @@ test('TB-37 progress words: duration, request state, task phase, handoff chain',
     'Stopped (Mori restarted)');
   const chain = [{ role: 'executor', outcome: 'done', line: 'Fixed' },
     { role: 'mori', outcome: null, line: team.PROGRAM_HANDOFF_LINES.no_handoff }];
-  assert.equal(team.chainText(chain), 'executor: Fixed → Mori: no handoff');
+  assert.equal(team.chainText(chain, true), 'executor: Fixed → Mori: no handoff');
+  assert.equal(team.chainText(chain, false), 'Fixed → no handoff', 'TB-37 no role files: no role names (M13)');
+});
+
+test('TB-58 the mode notice reads Task mode on / on until done / off, like Claude\'s Fast mode on / off', () => {
+  assert.deepEqual(['always', 'once', 'off'].map(team.modeNoticeText),
+    ['Task mode on', 'Task mode on until done', 'Task mode off']);
 });
 
 test('TB-12 custom entries written by Mori parse with their schemas', () => {

@@ -5,7 +5,7 @@
 // 选脚本：请求里（system、developer、全部 user 消息，含工作卡）按消息顺序出现的第一个 "tb-scenario:<名字>"。
 //   脚本模式下不用普通的关键词规则，也不用模型层的故障关键词（http-NNN、http-NNN-once、overflow-once、slow、
 //   drop-after-first）：故障只来自脚本的 fail 步骤。照旧生效的：探针（先认）、pi 的压缩请求（回摘要）、
-//   认证（FAKE_*_KEYS）、模型 id 的后缀（-nochoice、-noschema 见 handoff；-404、-hang、-stall、-nocancel、-replay 与
+//   认证（FAKE_*_KEYS）、模型 id 的后缀（-nochoice、-noschema 见 handoff；-404、-hang、-stall、-replay 与
 //   模型 fake-slow 同 server.mjs 开头），它们是测试显式写下的配置，不随文字传到别的会话。
 // 认会话：键为（角色，种类，task）。
 //   - 角色：system 里第一个 "MORI-ROLE-<名字>"（测试写进 .mori/agents/<名字>.md 的正文），没有时为 BASE_ROLE（基座）。
@@ -79,9 +79,9 @@ export const SEGMENT_SENTENCES = {
   subagent: 'You are a subagent: the main agent gave you one task and waits for your final reply.',
   ask: 'Another agent asked you one question.',
   subscription: 'You were woken by a moment you subscribed to.',
-  'merged-create': 'You talk to the user and you decide what happens with every user message in team mode.',
-  create: 'You decide what happens with every user message in team mode.',
-  'team-dialog': 'You are the only agent that talks to the user, and in team mode you relay; '
+  'merged-create': 'You talk to the user and you decide what happens with every user message in task mode.',
+  create: 'You decide what happens with every user message in task mode.',
+  'team-dialog': 'You are the only agent that talks to the user, and in task mode you relay; '
     + 'you do not decide or do the work.',
   'off-dialog': 'You can ask another role one question with agent_message; it answers once and cannot change files.',
 };

@@ -1,18 +1,32 @@
-// 协作的事件归并进对话流（docs/specs/parallel-agents-taskboard.md §5.3、§5.6、§11.3、§13.2、§13.3、§13.6、§13.7；
-// 状态表 docs/v1/screens/team-stream.md、team-stop.md、team-approvals.md）：回执、进展摘要的位置、不显示的程序投递、
-// 待判断的消息、后台实例的批准卡。纯函数，由 transcript.ts 调用；协作状态与 TaskBoard 视图记在会话上（actions.ts）。
+// 协作的事件归并进对话流（docs/specs/parallel-agents-taskboard.md §5.3、§5.6、§11.3、§13.2、§13.3、§13.6、§13.7、
+// §13.11；状态表 docs/v1/screens/team-stream.md、team-stop.md、team-approvals.md、team-switch.md）：模式改变的提示、
+// 回执、进展摘要的位置、不显示的程序投递、待判断的消息、后台实例的批准卡。纯函数，由 transcript.ts 调用；
+// 协作状态与 TaskBoard 视图记在会话上（actions.ts）。
 
 import type { ForwardedEvent } from '../../../shared/protocol';
-import type { DecidingMessage, ReceiptEntryData, ReceiptKind } from '../../../shared/team';
+import type { DecidingMessage, ReceiptEntryData, ReceiptKind, TeamMode } from '../../../shared/team';
 import {
-  addPendingPrompt, pendingPrompt, pushItem, setPendingQueued, type DecidingState, type Transcript,
+  addPendingPrompt, pendingPrompt, pushItem, setPendingQueued, type DecidingState, type Item, type Transcript,
 } from './model';
 
 type EventOf<T extends ForwardedEvent['type']> = Extract<ForwardedEvent, { type: T }>;
 
 /** @brief 协作的事件（protocol.ts 的 TeamEvent）。 */
-export type TeamTranscriptEvent = EventOf<'mori.team_state' | 'mori.board' | 'mori.receipt' | 'mori.progress'
-  | 'mori.wake' | 'mori.team_deciding' | 'mori.team_approval_request' | 'mori.team_approval_end'>;
+export type TeamTranscriptEvent = EventOf<'mori.team_state' | 'mori.team_mode' | 'mori.board' | 'mori.receipt'
+  | 'mori.progress' | 'mori.wake' | 'mori.team_deciding' | 'mori.team_approval_request' | 'mori.team_approval_end'>;
+
+/**
+ * @brief 模式改变的一行提示（mori.team_mode 事件与重新打开时的 mori.team 条目，§13.11）：接在对话流末尾；末尾是准备中
+ *        先显示的你的消息时放在它之前（后台进程在把这条消息交给 pi 之前写条目，重新打开时提示就在这条消息之前）。
+ * @param mode 新的模式
+ */
+export function addModeNotice(state: Transcript, mode: TeamMode): Transcript {
+  const next = pushItem(state, { kind: 'team-mode', mode });
+  const last = state.items.at(-1);
+  if (last?.kind !== 'user' || !last.pending) return next;
+  const notice = next.items[next.items.length - 1] as Item;
+  return { ...next, items: [...state.items.slice(0, -1), notice, last] };
+}
 
 /** @brief 写这种回执的立项工具（合并会话里回执画在这次调用的工具卡下面，team-stream.md "回执"）。 */
 export const RECEIPT_TOOLS: Readonly<Record<ReceiptKind, string>> = Object.freeze({
@@ -127,6 +141,7 @@ function applyTeamApproval(state: Transcript,
 /** @brief 把一个协作的事件归并进对话流；协作状态与 TaskBoard 视图不在对话流里（actions.ts 记到会话上）。 */
 export function applyTeamEvent(state: Transcript, event: TeamTranscriptEvent): Transcript {
   switch (event.type) {
+    case 'mori.team_mode': return addModeNotice(state, event.mode);
     case 'mori.receipt': return applyReceipt(state, event);
     case 'mori.progress': return pushItem(state, { kind: 'progress', request: event.request });
     case 'mori.wake': return applyWake(state, event);

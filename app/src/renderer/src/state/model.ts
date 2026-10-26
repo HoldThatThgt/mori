@@ -139,6 +139,12 @@ export type Item =
   | { kind: 'notify'; key: string; text: string; level: 'info' | 'warning' | 'error' }
   /** 回执的一行（mori.receipt，平行 Agent 规格 §13.2） */
   | { kind: 'receipt'; key: string; receipt: ReceiptEntryData }
+  /** 模式改变的一行提示（mori.team_mode 事件、mori.team 条目，§13.11） */
+  | {
+    kind: 'team-mode'; key: string;
+    /** 新的模式 */
+    mode: TeamMode;
+  }
   /** 进展摘要的位置（mori.progress，§13.3）：内容取会话的 TaskBoard 视图里这个需求 */
   | {
     kind: 'progress'; key: string;
@@ -227,7 +233,7 @@ export interface Transcript {
   /** 收到 mori.wake、还没等到同样文字的 message_start 的程序投递，按到达顺序（§13.7） */
   wakes: { text: string; kind: WakeKind }[];
   /**
-   * 你正在撤回、停止或 Stop team（命令还没返回）：这期间待判断队列里少了的消息是被拿回输入框，
+   * 你正在撤回、停止或 Stop agents（命令还没返回）：这期间待判断队列里少了的消息是被拿回输入框，
    * 不是交给了对话（applyDeciding 不把它们显示成待发或暂存的消息）
    */
   decidingHold: boolean;

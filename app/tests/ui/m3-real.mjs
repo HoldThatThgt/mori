@@ -23,7 +23,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, w
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, scratchUserData,
+  appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, scratchUserData, useRealGroup,
   sleep,
 } from './lib.mjs';
 import { pageHelpers } from './page.mjs';
@@ -667,11 +667,12 @@ async function item2(ctx) {
     `按了 ${path.length} 次 Shift+Tab：${path.join(' → ')}`);
   // 2026-10-21 起顶栏只有会话名、协作开关和右栏开关，权限、选择范围、Effort 和上下文用量移到输入框下面一行、文字框之后
   // （composer-pickers.md）：不再经过它们。M6 是 8 次，TaskBoard 在顶栏加了协作开关（parallel-agents-taskboard.md §13.1，
-  // 一个真正可以聚焦的按钮）是 9 次，现在是 6 次（右栏开关 → 协作开关 → 左栏分隔线 → 左栏底部的两个按钮 → 会话行）。
+  // 一个真正可以聚焦的按钮）是 9 次，composer-pickers 之后 6 次；2026-10-26 协作开关移进模型菜单（WP-09），现在是 5 次
+  // （右栏开关 → 左栏分隔线 → 左栏底部的两个按钮 → 会话行）。
   const rowStop = (label) => /^(Permission mode|Model range|Effort|Usage): /.test(label) || label === 'Context window';
-  record('2 从新会话的输入框 Shift+Tab 几次（不超过 6 次，先到顶栏的右栏开关和协作开关，再经过左栏底部的按钮）回到会话树'
-    + '（sessions.md 走查 2 的路径），不经过输入框下面一行的按钮', path.length <= 6 && path[0] === 'Toggle changes'
-    && /^Team: /.test(path[1]) && !path.some(rowStop) && focused.row === row.id,
+  record('2 从新会话的输入框 Shift+Tab 几次（不超过 5 次，先到顶栏的右栏开关，再经过左栏底部的按钮）回到会话树'
+    + '（sessions.md 走查 2 的路径），不经过输入框下面一行的按钮', path.length <= 5 && path[0] === 'Toggle changes'
+    && !path.some((label) => /^Team: |^Task mode/.test(label)) && !path.some(rowStop) && focused.row === row.id,
   `按了 ${path.length} 次：${path.join(' → ')}`);
   if (focused.row !== row.id) await rowOf(page, row.file).focus();
   await renameByKeyboard(ctx, row);
@@ -1675,8 +1676,8 @@ const root = mkdtempSync(join(tmpdir(), 'mori-m3-real-'));
 // s：走查 1–2 建的会话；untrusted：走查 5 里不信任时保存的会话文件。
 const ctx = { dirs: makeDirs(root), s: {}, untrusted: null, pageErrors: [], restarts: { total: 0, forced: 0 } };
 ctx.userData = scratchUserData(source);
-// 测试准备（synthetic test setup，§14.1）：给临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
-allowRealProject(ctx.userData, Object.entries(ctx.dirs).filter(([key]) => key !== 'markers').map(([, dir]) => dir));
+// 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组
+useRealGroup(ctx.userData);
 // 复制密文之后的每一步（包括启动）都在 try 里，出错也会删掉临时目录。
 try {
   await start(ctx);

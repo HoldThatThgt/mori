@@ -40,7 +40,7 @@ import {
   fetchModels, fetchObserved, FORM, GATE_BODY, GATE_PROBE_MESSAGE, lastDiscover, listLogs, openFolderFromPrompt,
   openMoreSettings, pickRow,
   plainChats, poll, readForm, readMain, resultText, rowIn, rowsDigest, sendText, sentCommands, setApi, setBaseUrl,
-  setKey, setName, setRowValue, setZone, startApp, startEndpoint, startListGate, stopEndpoint, stopListGate,
+  setKey, setName, setRowValue, startApp, startEndpoint, startListGate, stopEndpoint, stopListGate,
   testConnection, typeManual, waitProbe, waitTestResult, watchCards, watchCommands, watchedCards, watchedStates,
 } from './md-firstrun-helpers.mjs';
 import { activeFile, chooseMenuItem } from './m3-helpers.mjs';
@@ -93,7 +93,6 @@ const TEXT = {
   stillAdd: 'You can still add model IDs below.',
   noList: 'This server doesn’t list its models.',
   emptyList: 'The server didn’t list any models.',
-  publicNote: 'Public providers must be allowed per project. You’ll be asked when you open a folder.',
   compat: 'Endpoint needs max_tokens instead of max_completion_tokens',
   idSpaces: 'Model ID must be non-empty and contain no spaces.',
   idUnique: 'Model IDs must be unique within a provider.',
@@ -384,9 +383,8 @@ async function listedFetch(ctx) {
     + 'http://127.0.0.1:4840/v1 so the model list loads."', state.baseUrl.value === url(PORT.listed)
     && state.baseUrlNote === `Updated to ${url(PORT.listed)} so the model list loads.`,
   brief([state.baseUrl.value, state.baseUrlNote]));
-  record('MD-11 after fetch: Name is prefilled with the host and port "127.0.0.1:4840", API type OpenAI-compatible, '
-    + 'Network zone Local (suggestZone for 127.0.0.1)', state.name === '127.0.0.1:4840'
-    && state.api === 'openai-completions' && state.zone === 'local', brief([state.name, state.api, state.zone]));
+  record('MD-11 after fetch: Name is prefilled with the host and port "127.0.0.1:4840", API type OpenAI-compatible',
+    state.name === '127.0.0.1:4840' && state.api === 'openai-completions', brief([state.name, state.api]));
   const rows = state.rows;
   record('MD-11 after fetch: checklist "Models (3)" in list order with Select all and Clear selection; vLLM reports no '
     + 'type and three rows can be added, so none is ticked; the window 131072 is reported and Max output 16384 is '
@@ -397,8 +395,8 @@ async function listedFetch(ctx) {
       && JSON.stringify(row.defaults) === '["maxTokens:Default"]' && row.pickLabel === `Add ${row.id}`),
   brief({ heading: state.heading, rows }));
   record('MD-11 after fetch: the blocks follow §6.1/§6.6 order (Base URL, API key, Fetch models, Detected, the note, '
-    + 'Name, API type, Network zone, checklist, Add a model ID, More settings, the probe-cost note, Test connection)',
-  state.order && state.blocks === 13, `order ${state.order}, blocks ${state.blocks}`);
+    + 'Name, API type, checklist, Add a model ID, More settings, the probe-cost note, Test connection)',
+  state.order && state.blocks === 12, `order ${state.order}, blocks ${state.blocks}`);
   record('MD-11 after fetch: "Each model is verified with up to 13 short requests." is above Test connection, which is '
     + 'unavailable with no ticked model; no close-form Cancel; More settings is there for OpenAI-compatible',
   state.probeCost === TEXT.cost && state.test?.text === 'Test connection' && state.test.disabled
@@ -440,8 +438,8 @@ async function listedManual(ctx) {
   brief({ all: all.rows.map((row) => row.picked), none: none.rows.map((row) => row.picked) }));
 }
 
-/** @brief 改 API type（清单不变、More settings 随之隐藏或出现）与区域为 Public 的说明。 */
-async function listedApiAndZone(ctx) {
+/** @brief 改 API type：清单不变、More settings 随之隐藏或出现。 */
+async function listedApi(ctx) {
   const { page } = ctx;
   await pickRow(page, 'fake-coder', true);
   const before = await readForm(page);
@@ -454,17 +452,12 @@ async function listedApiAndZone(ctx) {
   const back = await readForm(page);
   record('MD-11 changing API type back to OpenAI-compatible shows More settings again; the checklist is unchanged',
     back.moreSettings && rowsDigest(back) === rowsDigest(before), brief(back.rows));
-  await setZone(page, 'public');
-  const pub = await readForm(page);
-  record('MD-11 Network zone Public shows "Public providers must be allowed per project. You’ll be asked when you open '
-    + 'a folder."', pub.zone === 'public' && pub.publicNote === TEXT.publicNote, brief(pub.publicNote));
 }
 
-/** @brief 再拉一次：改过的 Name、API type、区域、兼容选项留着，改过的 API type 作为 target.api 发出，清单从头来。 */
+/** @brief 再拉一次：改过的 Name、API type、兼容选项留着，改过的 API type 作为 target.api 发出，清单从头来。 */
 async function listedRefetch(ctx) {
   const { page } = ctx;
   await setName(page, 'Fake first run');
-  await setZone(page, 'intranet');
   await openMoreSettings(page);
   await compatBox(page, TEXT.compat).check();
   await setApi(page, 'openai-responses');
@@ -473,9 +466,9 @@ async function listedRefetch(ctx) {
   const sent = await lastDiscover(ctx, since);
   record('MD-11 fetching again: the edited API type goes out as target.api (openai-responses) with the key in the box',
     sent?.api === 'openai-responses' && sent.key === tail(KEY.one), brief(sent));
-  record('MD-11 fetching again: the edited Name, API type and Network zone are not overwritten; the checklist starts '
+  record('MD-11 fetching again: the edited Name and API type are not overwritten; the checklist starts '
     + 'over with the default ticks (none) and the entered row is gone', state.name === 'Fake first run'
-    && state.api === 'openai-responses' && state.zone === 'intranet' && state.rows.every((row) => !row.picked)
+    && state.api === 'openai-responses' && state.rows.every((row) => !row.picked)
     && JSON.stringify(state.rows.map((row) => row.id)) === JSON.stringify(LISTED), brief(state.rows));
   await setApi(page, 'openai-completions');
   await openMoreSettings(page);
@@ -531,10 +524,10 @@ async function listedSave(ctx) {
   samples.some((s) => s.test === 'Saving…' && locked(s)) && samples.some((s) => s.test === 'Testing…' && locked(s)
     && s.testCancel), brief(samples.map((s) => `${s.test}/${s.testCancel}`)));
   const runs = await saveAndTest(ctx, since);
-  record('MD-11 saving: one models.firstRun (providerId null, the typed key, the Base URL box, API type and zone of '
+  record('MD-11 saving: one models.firstRun (providerId null, the typed key, the Base URL box and API type of '
     + 'the form, models = the one ticked row) and then connection.test for that model',
   runs[0]?.type === 'models.firstRun' && runs[0].providerId === null && runs[0].key === tail(KEY.one)
-    && runs[0].baseUrl === url(PORT.listed) && runs[0].api === 'openai-completions' && runs[0].zone === 'intranet'
+    && runs[0].baseUrl === url(PORT.listed) && runs[0].api === 'openai-completions'
     && JSON.stringify(runs[0].models) === '["fake-coder"]' && runs[1]?.type === 'connection.test'
     && runs[1].providerId === 'fake-first-run' && runs[1].modelId === 'fake-coder' && runs.length === 2, brief(runs));
   record('MD-11 test passed: "Connected · First token Nms · Total Nms"', CONNECTED.test(resultText(done) ?? ''),
@@ -576,10 +569,10 @@ function listedSavedConfig(userData) {
   const config = readConfig(userData);
   const provider = config?.providers?.[0];
   record('MD-11 saved with one ticked model: one provider fake-first-run named "Fake first run" on '
-    + 'http://127.0.0.1:4840/v1 (OpenAI-compatible, zone intranet, compat max_tokens, Concurrency per key 4) with only '
+    + 'http://127.0.0.1:4840/v1 (OpenAI-compatible, no zone, compat max_tokens, Concurrency per key 4) with only '
     + 'fake-coder (131072 / 16384), one key fake-first-run#1 "Key 1" and normalDefault fake-first-run/fake-coder',
   config?.providers.length === 1 && provider.id === 'fake-first-run' && provider.name === 'Fake first run'
-    && provider.baseUrl === url(PORT.listed) && provider.api === 'openai-completions' && provider.zone === 'intranet'
+    && provider.baseUrl === url(PORT.listed) && provider.api === 'openai-completions' && !('zone' in provider)
     && provider.compat?.maxTokensField === 'max_tokens' && provider.concurrency === 4
     && JSON.stringify(modelIds(provider)) === '["fake-coder"]' && provider.models[0].contextWindow === 131072
     && provider.models[0].maxTokens === 16384 && JSON.stringify(provider.keys)
@@ -645,7 +638,7 @@ async function listed() {
     await listedCancel(ctx);
     await listedFetch(ctx);
     await listedManual(ctx);
-    await listedApiAndZone(ctx);
+    await listedApi(ctx);
     await listedRefetch(ctx);
     await listedFilling(ctx);
     await listedSave(ctx);
@@ -754,11 +747,11 @@ async function keysOtherOrigin(ctx) {
   sent?.key === null && lists.length > 0 && lists.every((line) => line.key === null)
     && state.listError?.kind === 'rejected' && state.listError.text[0] === `The server rejected the API key: ${DENIED}`
     && state.listError.text[1] === TEXT.stillAdd, brief({ sent, lists, listError: state.listError }));
-  record('MD-11 list error: no Detected line, no "Models (N)", Select all, Clear selection or filter; Name, API type '
-    + 'and zone are prefilled; Add a model ID, More settings and the probe-cost note are there; Test connection is '
+  record('MD-11 list error: no Detected line, no "Models (N)", Select all, Clear selection or filter; Name and API '
+    + 'type are prefilled; Add a model ID, More settings and the probe-cost note are there; Test connection is '
     + 'unavailable with nothing entered', !state.detected && !state.checklist && !state.selectAll
     && !state.clearSelection && !state.filter && state.name === '127.0.0.1:4842' && state.api === 'openai-completions'
-    && state.zone === 'local' && Boolean(state.manual) && state.moreSettings && state.probeCost === TEXT.cost
+    && Boolean(state.manual) && state.moreSettings && state.probeCost === TEXT.cost
     && state.test.disabled && state.closeForm === 0, brief(state));
   await setBaseUrl(page, url(PORT.listed));
   const back = await readForm(page);
@@ -994,10 +987,10 @@ async function changesName(ctx, first) {
   const done = await testConnection(ctx);
   const runs = await saveAndTest(ctx, since);
   const provider = readConfig(userData)?.providers;
-  const same = (run) => ['baseUrl', 'api', 'zone'].every((key) => run[key] === first.save?.[key])
+  const same = (run) => ['baseUrl', 'api'].every((key) => run[key] === first.save?.[key])
     && JSON.stringify(run.models) === JSON.stringify(first.save?.models);
   record('MD-11 the form changed (A20): changing only Name makes Test connection save again: one models.firstRun '
-    + '(same provider id, no key, the new Name, the same Base URL, API type, zone and models) and then '
+    + '(same provider id, no key, the new Name, the same Base URL, API type and models) and then '
     + 'connection.test; the saved provider is renamed and keeps its key',
   runs.length === 2 && runs[0].type === 'models.firstRun' && runs[0].providerId === first.providerId
     && runs[0].key === null && runs[0].name === 'Renamed first run' && same(runs[0])
@@ -1211,9 +1204,9 @@ async function nolistError(ctx) {
     && state.listError.text[1] === TEXT.stillAdd && state.baseUrl.value === url(PORT.nolist)
     && state.baseUrlNote === null && !state.detected && listLogs(endpoints.nolist, since).length > 0,
   brief({ listError: state.listError, baseUrl: state.baseUrl.value, note: state.baseUrlNote }));
-  record('MD-11 list error (nolist): Name "127.0.0.1:4843", API type and Network zone are prefilled; the probe-cost '
+  record('MD-11 list error (nolist): Name "127.0.0.1:4843" and API type are prefilled; the probe-cost '
     + 'note is above Test connection; no close-form Cancel', state.name === '127.0.0.1:4843'
-    && state.api === 'openai-completions' && state.zone === 'local' && state.probeCost === TEXT.cost
+    && state.api === 'openai-completions' && state.probeCost === TEXT.cost
     && state.order && state.closeForm === 0 && state.cancelButtons.length === 0, brief(state));
 }
 

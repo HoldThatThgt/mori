@@ -49,11 +49,11 @@ export const PANES = '.pane-slot:not([hidden]) [data-testid="chat-pane"]';
 /**
  * 范围按钮的读屏名称、悬停说明的第二行和读屏的描述（v1：docs/v1/screens/model-menu.md"选择范围按钮"，
  * composer-pickers.md"悬停和读屏的描述"：读屏名称"Model range: <按钮文字>"，悬停第一行是按钮文字、第二行
- * "<提供商名> · <区域>"，描述是第二行、" · "换成", "；首次启动的提供商名 "Mori endpoint"、区域 Local）
+ * "<提供商名>"，描述是第二行；首次启动的提供商名 "Mori endpoint"；2026-10-26 起不带区域）
  */
 export const MODEL_LABEL = `Model range: ${MODEL_ID}`;
-export const MODEL_TIP = 'Mori endpoint · Local';
-export const MODEL_DESCRIBED = 'Mori endpoint, Local';
+export const MODEL_TIP = 'Mori endpoint';
+export const MODEL_DESCRIBED = 'Mori endpoint';
 /** 范围换成这个提供商之后按钮上的字（"<提供商名> · <当前模型 id>"，很长，最挤的情况） */
 export const PROVIDER_TEXT = `Mori endpoint · ${MODEL_ID}`;
 /** 改名后很长的会话名（顶栏的检查量会话名能用多宽，chat.md"顶栏"） */
@@ -359,9 +359,9 @@ export async function bandTyped(ctx) {
   });
   await shot(page, 'bands-typed-279');
   recordSweep('各档的上沿和下沿（分屏，279–681px）、生成中、两栏输入框都有字（这一行最挤：Ask each time、Effort: Unavailable、'
-    + '很长的"<提供商名> · <模型 id>"、"Queue ▾"、"Stop"）：顶栏只有会话名、协作开关和两个按钮，会话名有地方；这一行不换行、不超出输入框、'
+    + '很长的"<提供商名> · <模型 id>"、"Queue ▾"、"Stop"）：顶栏只有会话名和两个按钮，会话名有地方；这一行不换行、不超出输入框、'
     + '高 33px，每档该收的收起（"Effort: "、发送组的文字、▾、≤ 400px 收起"Queue"），截短按说明 → 范围（先模型 id 再范围名）'
-    + ' → 模式名 → Effort 的先后，宽于 400px 时模式名不截，三个按钮不窄于最窄；范围、Effort 不可用、原因在第三 / 第二行',
+    + ' → 模式名 → Effort 的先后，宽于 400px 时模式名不截，三个按钮不窄于最窄；范围按钮的原因在第三行（2026-10-26 起仍可打开菜单）、Effort 不可用、原因在第二行',
   samples, 'typed');
   const placed = samples.flatMap((sample) => sample.extra);
   record('各档、生成中有字：两栏的圆环详情、权限菜单和"Queue"的下拉都往上打开、整个在这一栏和窗口里、不盖到顶栏；'
@@ -383,7 +383,7 @@ export async function bandTyped(ctx) {
 
 /**
  * @brief 打开 side 那一栏的范围菜单（这一行只有 226px 时菜单收到这一行的宽），量每一项：名字（.switch-text）放不下时截断加
- *        "…"，区域（.pick-zone）和 ✓ 不收；每项的 title 是全名或原因。Esc 关上。
+ *        "…"，✓ 不收；每项的 title 是全名或原因。Esc 关上。
  */
 export async function menuItemsFit(page, side) {
   await page.locator(`${slotCss(side)} ${ROW} [data-testid="model-button"]`).click();
@@ -402,7 +402,7 @@ export async function menuItemsFit(page, side) {
           ellipsis: getComputedStyle(el).textOverflow === 'ellipsis' };
       };
       return { pick: item.dataset.pick, title: item.title, name: fit(item.querySelector('.switch-text')),
-        zone: fit(item.querySelector('.pick-zone')), inside: item.scrollWidth <= item.clientWidth + 1 };
+        inside: item.scrollWidth <= item.clientWidth + 1 };
     }));
   const width = await page.getByTestId('model-menu').evaluate((el) => el.getBoundingClientRect().width);
   await page.keyboard.press('Escape');
@@ -411,7 +411,7 @@ export async function menuItemsFit(page, side) {
 
 /**
  * @brief 分屏、两栏空闲（输入框里还有字，"Send"可用）：拖到各档的上沿和下沿量两栏，每处打开两栏的范围、Effort、权限菜单和
- *        圆环详情；顶栏 ≤ 400px 时内边距收小；280px 时范围菜单收到这一行的宽、项名截断、区域完整。最后（右栏 279px）在右栏按
+ *        圆环详情；顶栏 ≤ 400px 时内边距收小；280px 时范围菜单收到这一行的宽、项名截断。最后（右栏 279px）在右栏按
  *        F8，报告的"Current view"里"Pane width"是右栏 .chat-pane 的宽度（比 .pane-slot 窄 1px），还有"Model range"、
  *        "Effort""Model""Permission mode"。
  */
@@ -444,10 +444,10 @@ export async function bandIdle(ctx) {
 export function recordNarrowMenu(seen) {
   const cut = (fact) => fact && fact.width < fact.full - 0.01;
   const long = seen?.items.filter((item) => cut(item.name)) ?? [];
-  record('280px 一栏（这一行约 226px）：范围菜单收到这一行的宽；放不下的项名（很长的模型 id）截断加"…"，区域和 ✓ 不收、'
+  record('280px 一栏（这一行约 226px）：范围菜单收到这一行的宽；放不下的项名（很长的模型 id）截断加"…"，✓ 不收、'
     + '不溢出；每项的悬停是全名', Boolean(seen) && seen.width <= 227 && long.length > 0
     && long.every((item) => item.name.ellipsis && item.title.length > 0)
-    && seen.items.every((item) => item.inside && (!item.zone || !cut(item.zone))), JSON.stringify(seen));
+    && seen.items.every((item) => item.inside), JSON.stringify(seen));
 }
 
 /** @brief 最新的一份 F8 报告（<userData>/ui-issues 里最后一个 .md）的文字；没有时为空串。 */
@@ -618,7 +618,7 @@ export function recordEffortBands(seen) {
 /**
  * @brief 后台进程退出时会话 A 的这一行（chat.md"后台进程退出"）：开着的权限菜单关闭；权限、范围、Effort 按钮不可用
  *        （aria-disabled），权限、Effort 悬停的第二行、范围按钮的第三行和读屏的描述是"Mori’s background process crashed"
- *        （范围按钮的描述前面是提供商和区域；权限、Effort 的描述里没有第一行）；圆环保留最后一次的用量（data-tokens 不变），
+ *        （范围按钮的描述前面是提供商名；权限、Effort 的描述里没有第一行）；圆环保留最后一次的用量（data-tokens 不变），
  *        详情仍能打开。
  */
 export async function recordExited(ctx, before, menuClosed) {
@@ -643,7 +643,7 @@ export async function recordExited(ctx, before, menuClosed) {
 }
 
 /**
- * @brief watchRows 的一个样子里三个按钮都不可用、读屏的描述是 wait（范围按钮是"<提供商名>, <区域>. <wait>"）。
+ * @brief watchRows 的一个样子里三个按钮都不可用、读屏的描述是 wait（范围按钮是"<提供商名>. <wait>"）。
  */
 export const reopenReasons = (row, wait) => ['permission', 'model', 'thinking'].every((kind) => row[kind]?.aria)
   && row.permission.reason === wait && row.thinking.reason === wait

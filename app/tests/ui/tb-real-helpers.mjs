@@ -21,7 +21,7 @@ import { sessionOf } from '../fake-endpoint/scripts.mjs';
 import { oneLine } from './lib.mjs';
 import { contentText, readJsonl, tempProject, writeRoles } from './tb-helpers.mjs';
 import {
-  findRealProviders, projectKey, readJson, scratchModelData, sourceProblems, writeJson,
+  findRealProviders, readJson, scratchModelData, sourceProblems, writeJson,
 } from './v1-real-helpers.mjs';
 
 /** 测试准备建的分组 id（默认范围） */
@@ -53,6 +53,11 @@ export const PROMPTS = {
   SUPPLEMENT: 'One more constraint for request 1, in my own words: when the slow job finishes, report the exact line '
     + 'it printed and how long it took, and do not change any file in this project.',
   CANCEL: 'Please cancel request 1; I no longer need the slow job.',
+  /** TB-59 回看：只读的 task 列出文件，结果放在它的最后一段回复里 */
+  LOOKBACK: 'Have executor list every file in this project, one line per file with its size, as a read-only task. '
+    + 'I only need the list; do not change any file.',
+  /** TB-59 回看：Task mode 关掉之后问那份清单 */
+  LOOKBACK_ASK: 'Where is the full file list from that task? Show me all of it here.',
 };
 
 // ---------- 数据目录与模型 ----------
@@ -72,22 +77,21 @@ export function realProvidersOf(source) {
 export const refOf = (provider) => `${provider.id}/${provider.models[0].id}`;
 
 /**
- * @brief 复制数据目录并做测试准备（synthetic test setup）：分组 [first, second] 为默认范围，projects 授权公网；
+ * @brief 复制数据目录并做测试准备（synthetic test setup）：分组 [first, second] 为默认范围（2026-10-26 起没有网络区域，
+ *        不再给临时项目授权公网）；
  *        proxyPort 给出时两个提供商的地址改指本机转发代理 http://127.0.0.1:<port>/p/<provider id>，档案跟着改地址。
  * @param source 负责人的数据目录（只读）
  * @param found realProvidersOf 的结果
- * @param projects 要授权公网的临时项目
  * @param proxyPort 转发代理的端口；不给时不改地址
  * @return { userData, routes（提供商 id → 真实地址，给 startForwardProxy） }
  */
-export function prepareRealData(source, found, projects, proxyPort = null) {
+export function prepareRealData(source, found, proxyPort = null) {
   const userData = scratchModelData(source);
   const configFile = join(userData, 'model-config.json');
   const config = readJson(configFile);
   config.groups = [...config.groups.filter((group) => group.id !== TB_GROUP),
     { id: TB_GROUP, members: [found.first.id, found.second.id] }];
   config.normalDefault = TB_GROUP;
-  for (const project of projects) config.projectZones[projectKey(project)] = ['public'];
   const routes = {};
   if (proxyPort !== null) {
     for (const provider of config.providers.filter((item) => [found.first.id, found.second.id].includes(item.id))) {
@@ -195,7 +199,8 @@ function systemOf(body) {
 
 /**
  * @brief 代理记下的对话请求（有 messages 的 POST），从 since 起、system 里有 cwd 的（每个驱动一个临时项目），每项
- *        { t, provider, model, tools（工具名）, info（scripts.mjs sessionOf：kind、role、task、k） }。
+ *        { t, provider, model, tools（工具名）, info（scripts.mjs sessionOf：kind、role、task、k）,
+ *        card（请求末尾的工作卡全文，没有时为空串） }。
  * @param proxy startForwardProxy 的结果
  * @param where { since, cwd }
  */
@@ -209,8 +214,9 @@ export function chatRequests(proxy, { since = 0, cwd = null } = {}) {
       .map((m) => contentText(m.content)).join('\n');
     if (cwd && !system.replace(/\\/g, '/').toLowerCase().includes(cwd.replace(/\\/g, '/').toLowerCase())) continue;
     const tools = (body.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
+    const last = contentText(body.messages.at(-1)?.content);
     out.push({ t: item.t, provider: item.provider, model: body.model, tools, info: sessionOf(messages),
-      status: item.status });
+      status: item.status, card: last.trimStart().startsWith('<mori-work-card>') ? last : '' });
   }
   return out;
 }

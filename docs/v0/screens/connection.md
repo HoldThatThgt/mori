@@ -4,7 +4,7 @@
 
 > v1 已取代本文（docs/specs/model-providers.md §9.1、§9.3）：v0 的连接表单（`ConnectionForm.tsx`）已删除，本文的字段和状态表只是 v0 的记录，
 > 里面的文字（"Loading connections…"、"Couldn’t load connections: …"、"Save"、"Saved" 等）界面上已经没有了。现在的状态表：
-> 首次启动表单（加了网络区域，写 Mori 的 `model-config.json`，§4.1）见 [../../v1/screens/first-run.md](../../v1/screens/first-run.md)；
+> 首次启动表单（写 Mori 的 `model-config.json`，§4.1；原来加的网络区域 2026-10-26 删掉）见 [../../v1/screens/first-run.md](../../v1/screens/first-run.md)；
 > "Settings → Connections and models"由 Settings → Models 取代，见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)；
 > "Go to settings"删除（§9.3）。只有下面"首次启动之后：打开文件夹"一节仍然有效（first-run.md 沿用它）。界面文字见 [../ui-strings.md](../ui-strings.md)"首次启动""设置"。
 
