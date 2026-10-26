@@ -339,14 +339,9 @@ export const OPENROUTER_KEY_VAR = 'MP_REAL_OPENROUTER_KEY';
 /** Effort 菜单底部的说明（model-menu.md"思考关不掉"、docs/v0/ui-strings.md） */
 export const NO_OFF_NOTE = 'This model can’t turn thinking off.';
 /** 档案摘要多的一项（models-settings.md"思考关不掉"） */
-export const THINKING_OFF_TEXT = 'Thinking: Can’t be turned off';
+export const THINKING_OFF_TEXT = 'Thinking can’t be turned off';
 /** 一次拉取的时限（列表请求 15 秒、最多 3 次，docs/specs/model-discovery.md §11） */
 const FETCH_MS = 90000;
-/**
- * 模型行 Test 的结果开头（models-settings.md"测试结果的文字"；connection.test 请求本身出错时同一处写
- * "Couldn’t test the connection: …"，settings.ts 的 runTest）
- */
-const TEST_DONE = /^(Connected|Connection failed|Test cancelled|Couldn[’']t test)/;
 /** 测试连接的时限（首个内容 120 秒，加上排队） */
 const TEST_MS = 180000;
 
@@ -526,22 +521,24 @@ export function noOffAddProblems(added, provider, ids, form) {
   return problems;
 }
 
-/** @brief 模型行档案摘要里的 Thinking 一项（data-field="thinking_off"）：data-value 与文字；没有这一项时为 null。 */
+/**
+ * @brief 模型行说明一行里的"Thinking can’t be turned off"（data-field="thinking_off"，2026-10-26 起；原来是档案摘要的
+ *        Thinking 一项）：它的文字；没有时为 null。
+ */
 export const thinkingOffItem = (page, ref) => modelRowOf(page, ref).evaluate((row) => {
   const item = row.querySelector('[data-field="thinking_off"]');
-  return item ? { value: item.dataset.value ?? null, text: item.textContent } : null;
+  return item ? { text: item.textContent } : null;
 });
 
 /**
- * @brief 模型行的 Test（connection.test，用第一个可用的 key）：点它，等这一行下面出现测试结果的文字。
- * @return 结果的文字；TEST_MS 内没有结果时为 null
+ * @brief 测一个模型的连接：经进程桥发 connection.test（用第一个可用的 key，同提供商卡的 Test connection 发的命令）。
+ *        2026-10-26 起模型行没有 Test（models-settings.md "Models 行"），卡上的 Test connection 只测第一个模型。
+ * @return connection.test 的结果（TestResult）；命令出错时为 { ok: false, error }
  */
-export async function testModelRow(page, ref) {
-  const row = modelRowOf(page, ref);
-  await row.scrollIntoViewIfNeeded();
-  await row.locator('[data-action="test"]').click();
-  return waitText(page, { root: `[data-testid="model-row"][data-model="${attr(ref)}"]`,
-    css: '[data-testid="model-test"]', pattern: TEST_DONE }, TEST_MS);
+export async function testModelBridge(page, ref) {
+  const at = ref.indexOf('/');
+  return page.evaluate((command) => window.mori.request(command).catch((error) => ({ ok: false,
+    error: String(error) })), { type: 'connection.test', providerId: ref.slice(0, at), modelId: ref.slice(at + 1) });
 }
 
 /** @brief 设置页顶部"Back to app"，等设置页关掉（不等会话：可能还没有打开的会话）。 */

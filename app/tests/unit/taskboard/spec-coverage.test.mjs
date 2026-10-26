@@ -83,14 +83,15 @@ test('TB-46 spec-coverage keeps the model layer rules when --spec is not given',
     ['v1-models-replay.json', 'replay'], ['tb-app-existing-packaged.json', null],
   ]);
   const items = parseSpecTable(model, readFileSync(specPathOf(model), 'utf8'));
-  // 2026-10-24（model-providers.md §7.7）：§14.2 加了 MP-38–MP-40
+  // 2026-10-24（model-providers.md §7.7）：§14.2 加了 MP-38–MP-40；2026-10-26（§8.3 的补，WP-02）加了 MP-41
   assert.deepEqual(items.map((item) => item.id),
-    Array.from({ length: 40 }, (_, i) => `MP-${String(i + 1).padStart(2, '0')}`));
+    Array.from({ length: 41 }, (_, i) => `MP-${String(i + 1).padStart(2, '0')}`));
   const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
   assert.deepEqual(layersOf('MP-37'), ['app', 'replay']);
   assert.deepEqual(layersOf('MP-38'), ['app', 'unit']);
   assert.deepEqual(layersOf('MP-39'), ['app', 'unit']);
   assert.deepEqual(layersOf('MP-40'), ['real']);
+  assert.deepEqual(layersOf('MP-41'), ['unit']);
 });
 
 test('TB-46 spec-coverage reads every MEM row of memory §14.2 with its layers', () => {
