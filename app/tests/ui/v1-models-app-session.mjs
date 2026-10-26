@@ -1329,7 +1329,10 @@ async function rangeScenario(ctx) {
   ], groups: [group('g1', ['p1', 'p3/m3']), group('gbad', ['pn'])], normalDefault: 'g1' });
   ctx.v0File = seedV0Session(ctx, resolve(project), 'p1', 'm1b');
   await startApp(ctx);
-  await waitProfiles(ctx.page, ['p1/m1', 'p1/m1b', 'p2/m2a', 'p3/m3', 'pn/pn-notools']);
+  await waitProfiles(ctx.page, ['p1/m1', 'p1/m1b', 'p2/m2a', 'p3/m3']);
+  // pn 的 tool calling 永远验证不了（菜单里变淡的原因）：等它的探针跑完、判定为 failed
+  await waitProfiles(ctx.page, ['pn/pn-notools'],
+    (profile) => finished(profile) && profile.tool_calling?.state === 'failed');
   await openProject(ctx, project);
   await step(ctx, 'menu', () => menuStep(ctx));
   await step(ctx, 'pick', () => pickStep(ctx, ep));

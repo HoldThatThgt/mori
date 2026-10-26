@@ -175,7 +175,8 @@ async function openChecklist(env, state) {
   record('MD-10 the card’s checklist shows no "Detected: …" line', state?.detected === 0 && anywhere === 0,
     brief({ inCard: state?.detected, anywhere }));
   record('MD-10 the card’s checklist has no Name, API type or More settings, and no Network zone (2026-10-26)',
-    Array.isArray(state?.extras) && state.extras.length === 0, brief(state?.extras));
+    state?.checklist === true && Array.isArray(state.extras) && state.extras.length === 0,
+  brief({ checklist: state?.checklist, extras: state?.extras }));
   const coder = state?.rows.find((row) => row.id === 'fake-coder');
   record('MD-10 a model already in the provider is marked "Added" and locked: not picked, pick box and every field '
     + 'disabled', Boolean(coder?.added && coder.tags.includes('added:Added') && coder.picked === false
