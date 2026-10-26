@@ -6,8 +6,8 @@ import type { AgentSession, AgentSessionEvent, ExtensionFactory } from '@earendi
 import type { ModelEvent } from '../shared/models';
 import type { ApprovalDecision, KernelEvent, QuoteRef, SessionInfo } from '../shared/protocol';
 import type {
-  InstanceEntryData, InstanceKind, PromptBehavior, TeamApprovalEnd, TeamApprovalRequest, TeamMode, TeamState,
-  TeamSwitch,
+  InstanceEntryData, InstanceKind, PromptBehavior, SessionOf, TaskDetail, TeamApprovalEnd, TeamApprovalRequest,
+  TeamMode, TeamState, TeamSwitch,
 } from '../shared/team';
 import type { ApprovalPolicy } from './approval';
 import type { EnhanceSessionSpec, MemorySessionSpec } from './memoryExtension';
@@ -230,6 +230,12 @@ export interface TeamLike {
   answerApproval(requestId: string, decision: ApprovalDecision, reason?: string): boolean;
   /** @brief SessionInfo 与快照的协作部分（§13.10）。 */
   info(): Pick<SessionInfo, 'team' | 'board' | 'teamApprovals' | 'deciding'>;
+  /** @brief board.readTask（§13.13.3，只读）：task 的详情；没有这个 task 时抛错。 */
+  readTask(task: string): TaskDetail;
+  /** @brief board.readSession（§13.13.4，只读）：实例会话或结案会话的当前分支；task、需求或会话不存在时抛错。 */
+  readSession(of: SessionOf): Promise<{ entries: unknown[]; running: boolean }>;
+  /** @brief session.stopTask（§13.13.7）：停止一个 task；不能停或不存在时抛错。 */
+  stopTask(task: string): Promise<void>;
   /** @brief 侧栏的状态（LiveStatus 的 teamBusy、teamApproval）。 */
   live(): { teamBusy: boolean; teamApproval: boolean };
   /**

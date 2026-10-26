@@ -200,6 +200,14 @@ export interface TaskView {
   modelNote: string | null;
   /** 交接链，按先后 */
   chain: HandoffLink[];
+  /** 建立的时刻（ms）：Background tasks 卡片的时长（§13.13.2） */
+  createdAt: number;
+  /** 结束的时刻（ms）；没结束为 null */
+  closedAt: number | null;
+  /** 全部依赖（卡片的 Depends on，§13.13.2） */
+  dependsOn: string[];
+  /** 在这个 task 上有实例会话的角色，按第一次接手的先后（§13.13.2 的 View transcript） */
+  sessionRoles: string[];
 }
 
 /** @brief 一个需求的视图（§13.10）。 */
@@ -224,6 +232,8 @@ export interface RequestView {
   question: string | null;
   /** 这个需求的全部 task，按编号 */
   tasks: TaskView[];
+  /** 这个需求的结案会话已经建立（task 视图的 View transcript (closing)，§13.13.3） */
+  closeSession: boolean;
 }
 
 /** @brief 一个用户会话的 TaskBoard 视图（§13.10）。 */
@@ -237,6 +247,82 @@ export interface BoardView {
 /** @brief 没有需求的 TaskBoard 视图（还没用过协作模式的会话）。 */
 export function emptyBoard(): BoardView {
   return { requests: [], teamEdited: false };
+}
+
+// ---- Background tasks（§13.13） ----
+
+/** @brief 交接的去向（board.json 的 Handoff.routedTo，§7.1）。 */
+export type HandoffRoute = { kind: 'role'; role: string } | { kind: 'close' } | { kind: 'create' }
+  | { kind: 'end'; status: 'done' | 'failed' };
+
+/** @brief task 视图里的一棒（board.readTask，§13.13.3）：交接的全部字段。 */
+export interface HandoffDetail {
+  /** 这个 task 上的第几棒，从 1 开始 */
+  n: number;
+  /** 交出这一棒的角色：from 去掉 close: 前缀；程序写的为 mori */
+  role: string;
+  /** 结案会话写的 */
+  byClose: boolean;
+  /** 交接的结果；程序写的一棒为 null */
+  outcome: HandoffOutcome | null;
+  /** 程序写的一棒的原因；实例自己的交接为 null */
+  reason: HandoffReason | null;
+  /** 结论全文；need_user 时是要用户拿主意的问题 */
+  conclusion: string;
+  /** 写下的下一棒；没写为 null */
+  next: string | null;
+  /** 写了却不生效的 next；没有时为 null */
+  suggestedNext: string | null;
+  /** 未结事项 */
+  openItems: string[];
+  /** 证据：编号、交接时记下的工具调用标题、结果不是错误 */
+  evidence: { tag: string; title: string; ok: boolean }[];
+  /** 去向 */
+  routedTo: HandoffRoute;
+  /** 交接的时刻（ms） */
+  at: number;
+  /** 有会话位置时：读谁的会话（结案写的为结案持有者）与这一棒的回合；没有时为 null */
+  session: { role: string; turns: [number, number] } | null;
+}
+
+/** @brief 一个 task 的详情（board.readTask 的结果，§13.13.3）。 */
+export interface TaskDetail {
+  /** 编号 */
+  id: string;
+  /** 所属需求 */
+  request: number;
+  /** 需求的标题 */
+  requestTitle: string;
+  /** 标题 */
+  title: string;
+  /** 说明全文（立项写的） */
+  description: string;
+  /** 只读的 task */
+  readOnly: boolean;
+  /** 指派给谁（角色名） */
+  assignee: string;
+  /** 依赖的 task 与它们此刻的状态 */
+  dependsOn: { id: string; title: string; status: TaskStatus }[];
+  /** 状态 */
+  status: TaskStatus;
+  /** 留给这个 task 的消息，board.json 原样 */
+  messages: { from: string; text: string; at: number }[];
+  /** 全部交接，按先后 */
+  handoffs: HandoffDetail[];
+}
+
+/** @brief board.readSession 读哪一条会话（§13.13.4）：一个 task 上某个角色的 task 实例会话，或一个需求的结案会话。 */
+export type SessionOf = { kind: 'task'; task: string; role: string } | { kind: 'close'; request: number };
+
+/** 可以单独停止的 task 的 phase（§13.13.7）：交给了角色，实例在运行、等批准、排队、等写入锁或刚交出去 */
+const STOPPABLE_PHASES: readonly TaskPhase[] = ['starting', 'running', 'approval', 'queued', 'lock_wait'];
+
+/**
+ * @brief 这个 task 能不能单独停止（Stop this task，§13.13.7）：active、交给了角色（不是结案）、phase 在上面几种。
+ * @param task task 的视图
+ */
+export function canStopTask(task: Pick<TaskView, 'status' | 'phase'>): boolean {
+  return task.status === 'active' && STOPPABLE_PHASES.includes(task.phase);
 }
 
 // ---- Agent 用的工具（§6.3） ----

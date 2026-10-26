@@ -2,10 +2,12 @@
 // 投影成界面看的 BoardView（需求状态、task 的 phase、等待的 task、当前工具调用、模型提示、交接链），
 // 以及 mori.board 的合并发送（最多每 250 毫秒一次，§15）。投影是纯函数。
 
-import type { BoardView, RequestView, TaskPhase, TaskView, TeamHolders, ToolCallBrief } from '../shared/team';
-import { findTask, requestState, ruledOut, tasksOf } from './board';
+import type {
+  BoardView, HandoffDetail, RequestView, SessionOf, TaskDetail, TaskPhase, TaskView, TeamHolders, ToolCallBrief,
+} from '../shared/team';
+import { findRequest, findTask, requestState, ruledOut, tasksOf } from './board';
 import { handoffLink } from './boardText';
-import type { Board, BoardTask, ScheduleWait } from './teamTypes';
+import type { Board, BoardTask, Handoff, ScheduleWait } from './teamTypes';
 
 /** @brief mori.board 合并发送的间隔（§13.3、§15），毫秒。 */
 export const BOARD_EVENT_INTERVAL_MS = 250;
@@ -30,6 +32,8 @@ export interface ViewInput {
   live: ReadonlyMap<string, TaskLive>;
   /** 有实例做过成功的 edit、write（§13.12） */
   teamEdited: boolean;
+  /** 这条实例会话有没有：开着，或会话文件已写盘（TaskView.sessionRoles、RequestView.closeSession，§13.13） */
+  hasSession: (of: SessionOf) => boolean;
 }
 
 /** @brief 还没完成的依赖。 */
@@ -69,6 +73,21 @@ function holderOf(task: BoardTask, holders: TeamHolders): string | null {
   return task.holder.kind === 'role' ? task.holder.role : holders.close;
 }
 
+/** 结案会话写的一棒的 from 前缀（§6.1 Handoff.from） */
+const CLOSE_PREFIX = 'close:';
+
+/**
+ * @brief 在这个 task 上有实例会话的角色（TaskView.sessionRoles）：按第一次接手的先后（每一棒的交出方与去向，再是
+ *        持有者与指派），只留有会话的。
+ */
+function sessionRoles(task: BoardTask, input: ViewInput): string[] {
+  const holder = task.holder?.kind === 'role' ? [task.holder.role] : [];
+  const order = [...task.handoffs.flatMap((handoff) => [handoff.from,
+    ...(handoff.routedTo.kind === 'role' ? [handoff.routedTo.role] : [])]), ...holder, task.assignee];
+  return [...new Set(order)].filter((role) => !role.startsWith(CLOSE_PREFIX)
+    && input.hasSession({ kind: 'task', task: task.id, role }));
+}
+
 /**
  * @brief 一个 task 的视图（§13.10）。
  * @param board TaskBoard
@@ -80,7 +99,8 @@ export function taskView(board: Board, task: BoardTask, input: ViewInput): TaskV
     id: task.id, title: task.title, status: task.status, assignee: task.assignee,
     holder: holderOf(task, input.holders), ...phaseOf(board, task, input),
     modelNote: input.live.get(task.id)?.modelNote ?? null,
-    chain: task.handoffs.map(handoffLink),
+    chain: task.handoffs.map(handoffLink), createdAt: task.createdAt, closedAt: task.closedAt,
+    dependsOn: [...task.dependsOn], sessionRoles: sessionRoles(task, input),
   };
 }
 
@@ -95,8 +115,43 @@ export function boardView(board: Board, input: ViewInput): BoardView {
     createdAt: request.createdAt, closedAt: request.closedAt, conclusion: request.conclusion,
     ruledOut: ruledOut(board, request.no), question: request.question,
     tasks: tasksOf(board, request.no).map((task) => taskView(board, task, input)),
+    closeSession: input.hasSession({ kind: 'close', request: request.no }),
   }));
   return { requests, teamEdited: input.teamEdited };
+}
+
+/** @brief task 视图里的一棒（§13.13.3）：交接的全部字段；结案写的一棒交出方为结案持有者，读结案会话。 */
+function handoffDetail(handoff: Handoff): HandoffDetail {
+  const byClose = handoff.from.startsWith(CLOSE_PREFIX);
+  const role = byClose ? handoff.from.slice(CLOSE_PREFIX.length) : handoff.from;
+  return {
+    n: handoff.n, role, byClose, outcome: handoff.outcome, reason: handoff.reason, conclusion: handoff.conclusion,
+    next: handoff.next, suggestedNext: handoff.suggestedNext, openItems: [...handoff.openItems],
+    evidence: handoff.evidence.map((item) => ({ tag: item.tag, title: item.title, ok: item.ok })),
+    routedTo: handoff.routedTo, at: handoff.at,
+    session: handoff.session ? { role, turns: [...handoff.session.turns] } : null,
+  };
+}
+
+/**
+ * @brief 一个 task 的详情（board.readTask，§13.13.3）：说明全文、依赖与它们此刻的状态、留给它的消息、每一棒的全部字段。
+ * @param board TaskBoard
+ * @param id task 编号
+ * @return 没有这个 task 时为 null
+ */
+export function taskDetail(board: Board, id: string): TaskDetail | null {
+  const task = findTask(board, id);
+  if (!task) return null;
+  return {
+    id: task.id, request: task.request, requestTitle: findRequest(board, task.request)?.title ?? '',
+    title: task.title, description: task.description, readOnly: task.readOnly, assignee: task.assignee,
+    dependsOn: task.dependsOn.map((dep) => {
+      const found = findTask(board, dep);
+      return { id: dep, title: found?.title ?? '', status: found?.status ?? 'pending' };
+    }),
+    status: task.status, messages: task.messages.map((item) => ({ ...item })),
+    handoffs: task.handoffs.map(handoffDetail),
+  };
 }
 
 /**

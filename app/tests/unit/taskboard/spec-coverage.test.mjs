@@ -37,8 +37,11 @@ function expectLayers(spec, packaged, cases) {
 
 test('TB-46 spec-coverage reads every TB row of §17.2 with its layers', () => {
   const items = parseSpecTable(taskboard, readFileSync(specPathOf(taskboard), 'utf8'));
-  assert.deepEqual(items.map((item) => item.id),
-    Array.from({ length: 57 }, (_, i) => `TB-${String(i + 1).padStart(2, '0')}`));
+  const ids = items.map((item) => item.id);
+  assert.deepEqual(ids.slice(0, 57), Array.from({ length: 57 }, (_, i) => `TB-${String(i + 1).padStart(2, '0')}`));
+  // 2026-10-26 起的走查包各用一段编号（§17.3）：Background tasks 是 TB-80–TB-89
+  assert.deepEqual(ids.filter((id) => /^TB-8\d$/.test(id)), Array.from({ length: 10 }, (_, i) => `TB-${80 + i}`));
+  assert.equal(new Set(ids).size, ids.length, 'every id once');
   const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
   assert.deepEqual(layersOf('TB-46'), ['app', 'replay']);
   assert.deepEqual(layersOf('TB-45'), ['real']);

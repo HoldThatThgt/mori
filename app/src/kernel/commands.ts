@@ -12,8 +12,9 @@ import {
 } from './resources';
 import {
   abort, answerApproval, answerQuestion, boardView, clearQueue, closeSession, createSession, forgetApproval,
-  listSessions, openSession, prompt, readSession, recheckAgents, renameSession, sessionCommands, sessionPickOptions,
-  sessionState, setApprovalMode, setSessionPick, setSessionThinking, setTeamMode, stopTeam,
+  listSessions, openSession, prompt, readBoardSession, readBoardTask, readSession, recheckAgents, renameSession,
+  sessionCommands, sessionPickOptions, sessionState, setApprovalMode, setSessionPick, setSessionThinking, setTeamMode,
+  stopBoardTask, stopTeam,
 } from './sessions';
 import { checkTrust } from './trust';
 
@@ -90,6 +91,9 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
     case 'board.get': return boardView(command.sessionId);
     case 'session.recheckAgents': return recheckAgents(command.sessionId);
     case 'session.stopTeam': return stopTeam(command.sessionId);
+    case 'board.readTask': return readBoardTask(command.sessionId, command.task);
+    case 'board.readSession': return readBoardSession(command.sessionId, command.of);
+    case 'session.stopTask': return stopBoardTask(command.sessionId, command.task);
     default: return undefined;
   }
 }
