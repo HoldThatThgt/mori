@@ -55,6 +55,11 @@
 // synthetic-openrouter-first-run 只把 config.get 改成首次启动）：首次启动表单的清单里取自 pi 的行写 From pi，手填的行不写。
 // md-deepseek-pi-thinking（synthetic：md-deepseek 最后的设置页，一个探针读到推理字段的档案补了只有思考为真的 catalog，
 // harness/main.jsx 的 synthetic-deepseek-pi-thinking）：§8 表第四行在 pi 的思考提示出现时不出。
+// md-deepseek-no-profile（MD-18，2026-10-26 补；synthetic：md-deepseek 最后的设置页，一个模型的档案去掉，harness/main.jsx 的
+// synthetic-deepseek-no-profile）：没有档案、不在探测的模型行是“Couldn’t verify”加 Verify again，点它发 models.verify；回放桥
+// 让这条写命令失败（replay.js 的 failModelWrite）时原文写在这一行里。
+// md-glm-pi-card 另查取消勾选取自 pi 的 Supports thinking 后不写 From pi、再勾上又写；md-openrouter-first-run 另查同一格的值
+// 同时是 pi 的值与默认值时只写 From pi（2026-10-26 补，WP-15 的状态表各行）。
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -133,6 +138,12 @@ const FIRST_RUN = 'synthetic-openrouter-first-run';
 const PI_THINKING = 'synthetic-deepseek-pi-thinking';
 /** PI_THINKING 里补了 catalog 的模型（同 harness/main.jsx） */
 const PI_THINKING_REF = '127-0-0-1-4860/fake-ds-alwaysthink';
+/** md-deepseek 最后的设置页、去掉一个已配置模型的档案（synthetic，harness/main.jsx 的 deepseekNoProfile，2026-10-26 补） */
+const NO_PROFILE = 'synthetic-deepseek-no-profile';
+/** NO_PROFILE 里没有档案的模型（同 harness/main.jsx 的 NO_PROFILE_REF） */
+const NO_PROFILE_REF = '127-0-0-1-4860/fake-ds-alwaysthink';
+/** 回放桥让 Verify again 的 models.verify 以这段原文失败（synthetic，replay.js 的 control.failModelWrite） */
+const VERIFY_FAILURE = 'Synthetic models.verify failure (replay)';
 /** @brief 录下的 DiscoveredModel 里取自 pi 的项（§5.2 catalog；改动之前的录制没有这个字段，算没有）。 */
 const piOf = (m) => (m.catalog ? PI_FIELDS.filter((field) => m.catalog[field]) : []);
 /** @brief 两个值的 JSON 相同。 */
@@ -1073,6 +1084,7 @@ async function cardCheck(page, name) {
     const source = piChecklist(name, rec, s);
     if (source) await piEdit(page, { name, scope, source });
     if (name === PI_CARD) {
+      await piThinkingToggle(page, { where: name, scope, models: rec.result.models });
       await manualPi(page, { where: name, scope, baseUrl: rec.provider.baseUrl,
         listed: rec.result.models.map((m) => m.id) });
     }
@@ -1131,6 +1143,51 @@ async function piEdit(page, { name, scope, source }) {
   changed?.window === String(low) && !changed.pi.includes('contextWindow') && maxFollows(changed, wantLow)
     && back?.window === String(source.contextWindow) && back.pi.includes('contextWindow') && maxFollows(back, wantBack)
     && back.max === String(source.maxTokens), brief({ changed, back }));
+}
+
+/**
+ * @brief 取消勾选一行取自 pi 的 Supports thinking（§6.2“From pi”：改成别的值就不写，改回又写，2026-10-26 补）：取消后这一格
+ *        不写 From pi，再勾上又写，这一行的标记回到拉取时的样子（之后的 Add 照常）。
+ * @param models 录下的结果里的行
+ */
+async function piThinkingToggle(page, { where, scope, models }) {
+  const source = models.find((m) => !m.added && piOf(m).includes('reasoning')) ?? null;
+  if (source === null) {
+    record(`MD-17 replay ${where}: the recording has a row whose Supports thinking came from pi's model list`, false,
+      brief(models.map((m) => m.id).slice(0, 10)));
+    return;
+  }
+  const box = rowAt(page, scope, source.id).locator('input[data-field="reasoning"]');
+  await box.setChecked(false);
+  const off = (await checklistOf(page, scope)).rows.find((row) => row.id === source.id);
+  await box.setChecked(true);
+  const on = (await checklistOf(page, scope)).rows.find((row) => row.id === source.id);
+  record(`MD-17 replay ${where}: unticking Supports thinking of ${source.id} (from pi) drops its "${FROM_PI}" on that `
+    + `box only; ticking it again brings "${FROM_PI}" back`, off?.reasoning === false && !off.pi.includes('reasoning')
+    && same(off.pi, piOf(source).filter((field) => field !== 'reasoning')) && on?.reasoning === true
+    && same(on.pi, piOf(source)), brief({ off: off?.pi, on: on?.pi, want: piOf(source) }));
+}
+
+/**
+ * @brief 同一格只写一个标记（§6.2“From pi”：同一格里不再写 Default，2026-10-26 补）：找一行 Max output 取自 pi、不超过
+ *        16384 的（例如 OpenRouter 自己不报告最大输出的行，pi 给 4,096），把它的窗口改成 pi 的输出上限的两倍：Max output
+ *        跟着窗口取 pi 的值（§4.3），这个数同时也是按新窗口算的默认值，这一格只写 From pi、不写 Default。之后改回录下的窗口。
+ */
+async function piDefaultCell(page, { where, scope, models }) {
+  const source = models.find((m) => !m.added && piOf(m).includes('maxTokens') && m.maxTokens <= 16384) ?? null;
+  if (source === null) {
+    record(`MD-17 replay ${where}: the recording has a row whose Max output (at most 16384) came from pi's model list`,
+      false, brief(models.map((m) => m.id).slice(0, 10)));
+    return;
+  }
+  const window = source.maxTokens * 2;
+  const both = (await editSize(page, scope, source.id, 'contextWindow', window)).row;
+  await editSize(page, scope, source.id, 'contextWindow', source.contextWindow);
+  record(`MD-17 replay ${where}: with the Context window of ${source.id} at ${window}, its Max output `
+    + `${source.maxTokens} is both pi's value and the default for that window; the cell reads only "${FROM_PI}", `
+    + 'not "Default"',
+  both?.max === String(source.maxTokens) && unreportedMax(window) === source.maxTokens
+    && both.pi.includes('maxTokens') && !both.defaults.includes('maxTokens'), brief(both));
 }
 
 /**
@@ -1264,6 +1321,59 @@ async function piThinkingCheck(page) {
   brief(got.map((g) => ({ ref: g.ref, hints: g.hints.map((h) => h.kind) }))));
 }
 
+/** @brief 模型行的 data-probe、状态行（data-state、文字、Verify again 的文字与是否可用）与行里的错误原文；行不在时为 null。 */
+const statusRowOf = (page, ref) => page.evaluate((key) => {
+  const row = document.querySelector(`[data-testid="model-row"][data-model="${key}"]`);
+  const line = row?.querySelector('[data-testid="probe-status"]');
+  const button = line?.querySelector('[data-action="verify"]');
+  return row && { probe: row.dataset.probe ?? null, state: line?.dataset.state ?? null,
+    text: line?.querySelector('span')?.textContent ?? null, button: button?.textContent ?? null,
+    enabled: button ? !button.disabled : null,
+    error: row.querySelector('.form-message.error[role="alert"]')?.textContent ?? null };
+}, ref);
+
+/** @brief 回放桥收到的 models.verify（status.modelWrites 里的）。 */
+const verifyWrites = async (page) => (await writes(page)).filter((command) => command.type === 'models.verify');
+
+/**
+ * @brief 没有档案、不在探测的模型行（models-settings.md “Models 行”，2026-10-26 补，MD-18）：回放 NO_PROFILE（synthetic：
+ *        md-deepseek 最后的设置页，NO_PROFILE_REF 的档案去掉，同 harness/main.jsx）。这一行 data-probe 为 unverified，
+ *        状态行是出错的一类、文字正好是“Couldn’t verify”（没有冒号和原文），带 Verify again；点它发 models.verify
+ *        （refs 只有这一行，不带 tests）。回放桥让下一条写命令失败（failModelWrite，synthetic）后再点：原文写在这一行里，
+ *        状态行与 Verify again 仍在、按钮重新可用。
+ */
+async function noProfileCheck(page) {
+  await load(page, NO_PROFILE);
+  await page.locator(`[data-testid="model-row"][data-model="${NO_PROFILE_REF}"]`).waitFor({ timeout: 10000 });
+  const first = await statusRowOf(page, NO_PROFILE_REF);
+  await shot(page, 'md-deepseek-no-profile');
+  record(`MD-18 replay ${NO_PROFILE} (synthetic: md-deepseek's last Settings without the profile of ${NO_PROFILE_REF}, `
+    + 'not probing): the row\'s data-probe is unverified and its status line (data-state error) reads exactly '
+    + '"Couldn’t verify" with "Verify again"', first?.probe === 'unverified' && first.state === 'error'
+    && first.text === 'Couldn’t verify' && first.button === 'Verify again' && first.enabled === true
+    && first.error === null, brief(first));
+  const verify = page.locator(`[data-testid="model-row"][data-model="${NO_PROFILE_REF}"] [data-action="verify"]`);
+  await verify.click();
+  await page.waitForFunction(() => window.__replay.status.modelWrites.some((c) => c.type === 'models.verify'), null,
+    { timeout: 10000 }).catch(() => {});
+  const sent = await verifyWrites(page);
+  record(`MD-18 replay ${NO_PROFILE}: "Verify again" sends models.verify for this model only, without tests `
+    + `({ type: "models.verify", refs: ["${NO_PROFILE_REF}"] })`, same(sent, [{ type: 'models.verify',
+    refs: [NO_PROFILE_REF] }]), brief(sent));
+  await page.evaluate((message) => { window.__replay.failModelWrite = message; }, VERIFY_FAILURE);
+  await verify.click();
+  await page.waitForFunction(({ ref, text }) => document.querySelector(`[data-testid="model-row"][data-model="${ref}"] `
+    + '.form-message.error[role="alert"]')?.textContent === text, { ref: NO_PROFILE_REF, text: VERIFY_FAILURE },
+  { timeout: 10000 }).catch(() => {});
+  const failed = await statusRowOf(page, NO_PROFILE_REF);
+  const refused = await page.evaluate(() => window.__replay.status.failed.map((c) => c.type));
+  record(`MD-18 replay ${NO_PROFILE}: when the models.verify command itself fails (synthetic: the replay bridge `
+    + 'answers it with an error), its raw text shows in this row (role="alert"); the status line and "Verify again" '
+    + 'stay and the button is usable again', failed?.error === VERIFY_FAILURE && failed.state === 'error'
+    && failed.text === 'Couldn’t verify' && failed.button === 'Verify again' && failed.enabled === true
+    && same(refused, ['models.verify']) && (await verifyWrites(page)).length === 1, brief({ failed, refused }));
+}
+
 /**
  * @brief 首次启动表单的清单（first-run.md "清单""Add a model ID"，2026-10-26）：回放 md-openrouter 录下的真实列表（回放
  *        桥的 config.get 改成首次启动，synthetic），在表单里填录下的 Base URL、Fetch models：每一行同 Add provider 的
@@ -1292,6 +1402,7 @@ async function firstRunPiCheck(page) {
     + `"${piListTitle('<provider>')}"; "Default" only on unreported defaults; the recording has such rows`,
   s.title === `Models (${result.models.length})` && got.length === want.length && bad.length === 0 && titled
     && pis.length > 0, brief({ rows: got.length, bad: bad.slice(0, 3), pi: pis.map((m) => m.id).slice(0, 10) }));
+  await piDefaultCell(page, { where: 'first-run form', scope, models: result.models });
   await manualPi(page, { where: 'first-run form', scope, baseUrl: command.target.baseUrl,
     listed: result.models.map((m) => m.id) });
 }
@@ -1589,6 +1700,8 @@ const FIXTURES = [
   { name: 'md-deepseek', ids: ['MD-07', 'MD-13', 'MD-15'], check: deepseekCheck },
   // synthetic：md-deepseek 最后的设置页，一个档案补了取自 pi 的 catalog
   { name: 'md-deepseek-pi-thinking', file: 'md-deepseek', ids: ['MD-17'], check: piThinkingCheck },
+  // synthetic：md-deepseek 最后的设置页，一个模型没有档案（2026-10-26 补）
+  { name: 'md-deepseek-no-profile', file: 'md-deepseek', ids: ['MD-18'], check: noProfileCheck },
   { name: 'md-shapes', ids: ['MD-07', 'MD-13'], check: shapesCheck },
 ];
 

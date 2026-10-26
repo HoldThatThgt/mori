@@ -19,6 +19,8 @@
 // （synthetic，见 openrouterFirstRun），测首次启动表单的清单里取自 pi 模型表的值（2026-10-26，WP-15）。
 // synthetic-deepseek-pi-thinking 是 md-deepseek 最后的设置页、一个档案补了取自 pi 的 catalog（synthetic，见
 // deepseekPiThinking），测第四种提示让给 pi 的那一条。
+// synthetic-deepseek-no-profile 是 md-deepseek 最后的设置页、去掉一个已配置模型的档案（synthetic，见 deepseekNoProfile，
+// 2026-10-26 补），测没有档案、不在探测的模型行。
 
 import { createReplayBridge } from './replay.js';
 
@@ -324,6 +326,36 @@ function deepseekPiThinking() {
   return { ...base, source: 'synthetic', name: 'synthetic-deepseek-pi-thinking', steps };
 }
 
+/** synthetic-deepseek-no-profile 里去掉档案的模型（md-deepseek 里已配置、探测过的一个） */
+const NO_PROFILE_REF = '127-0-0-1-4860/fake-ds-alwaysthink';
+
+/** @brief 一个 mori.profiles 信封去掉 NO_PROFILE_REF 的档案与正在跑的探针。 */
+function withoutProfileEnvelope(envelope) {
+  const event = envelope?.event;
+  if (event?.type !== 'mori.profiles') return envelope;
+  const profiles = Object.fromEntries(Object.entries(event.profiles ?? {}).filter(([ref]) => ref !== NO_PROFILE_REF));
+  const running = (event.running ?? []).filter((item) => item.ref !== NO_PROFILE_REF);
+  return { ...envelope, event: { ...event, profiles, running } };
+}
+
+/**
+ * @brief synthetic（2026-10-26 补）：md-deepseek（对合成端点录下）最后一个 models.get 换掉录制里每一个 models.get（设置页一开始
+ *        就是加入之后的样子），并去掉 NO_PROFILE_REF 的档案（录下的 mori.profiles 信封里也去掉它的档案与正在跑的探针）。
+ *        真实的后台进程只在探针抛错、档案没建成、探针没能开始时有这种模型（models-settings.md “Models 行”的“没有档案、
+ *        不在探测”），App 测试造不出来；只用来测这一行的状态行“Couldn’t verify”与 Verify again（md-replay.mjs）。
+ */
+function deepseekNoProfile() {
+  const base = fixture('md-deepseek');
+  const last = base.steps.findLast((step) => step.result?.type === 'models.get' && !step.result.error).result.value;
+  const value = structuredClone(last);
+  delete value.profiles[NO_PROFILE_REF];
+  const steps = base.steps.map((step) => {
+    if (step.result?.type === 'models.get' && !step.result.error) return { ...step, result: { ...step.result, value } };
+    return step.envelope ? { ...step, envelope: withoutProfileEnvelope(step.envelope) } : step;
+  });
+  return { ...base, source: 'synthetic', name: 'synthetic-deepseek-no-profile', steps };
+}
+
 /** synthetic 的录制：名字 → 拼法 */
 const SYNTHETIC = { 'synthetic-long-history': longHistory, 'synthetic-long-steps': longSteps,
   'synthetic-mcp-setup': mcpSetup,
@@ -333,7 +365,7 @@ const SYNTHETIC = { 'synthetic-long-history': longHistory, 'synthetic-long-steps
   'synthetic-mermaid-stop-label': () => replyWith(MERMAID_STOPPED.label, 'synthetic-mermaid-stop-label',
     { stopped: true }),
   'synthetic-code-stream': codeStream, 'synthetic-openrouter-first-run': openrouterFirstRun,
-  'synthetic-deepseek-pi-thinking': deepseekPiThinking };
+  'synthetic-deepseek-pi-thinking': deepseekPiThinking, 'synthetic-deepseek-no-profile': deepseekNoProfile };
 
 if (params.get('keepDrafts') !== '1') {
   localStorage.removeItem('mori.drafts');

@@ -4,7 +4,8 @@
 //   MD-07 清单：默认勾选的三种情况（typed 的 embedding 行不勾、只有一个模型时勾上、多个类型不明时都不勾）；Select all 与
 //         Clear selection 只作用于显示着的、能勾的行（过滤框开着时）；Default（只在值仍是默认值时）、Not a chat model、
 //         Can’t add this model、两种提示；空列表的一句；改窗口时 Max output 随之变、错误时 Add 不可用；超过 20 行时的
-//         过滤框（不分大小写，被藏起来的勾选行照样加入）；Add 的按钮文字随勾选数变；
+//         过滤框（不分大小写，被藏起来的勾选行照样加入）；Add 的按钮文字随勾选数变；2026-10-26 补（WP-15）：pi 不认得的
+//         地址（127.0.0.1，合成端点 4946）上 pi 按名字认得的模型不取 pi 的值（步骤 piNamed）；
 //   MD-08 手填一行：拿到列表、列表错误（nolist、401）时都能手填加入，列表错误时手填的行列在错误下面；id 检查与重复；
 //         Entered by you 与 Default；
 //   MD-09 加入新提供商：开始只有 Base URL、API key、Fetch models；拉取中两个框只读、关闭表单会取消拉取；预填的 Name、
@@ -30,6 +31,7 @@
 import { chmodSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder } from './lib.mjs';
+import { piEntriesAt } from './md-real-helpers.mjs';
 import {
   FORM, SEED_ID, addManual, addingSeen, brief, chatLines, checklistLook, checklistScroll, closeApp, closeForm,
   commandsOf, configOf, credentialRefs, fetchNow, fetchWith, field, fillAddress, filesWithSecrets, formState,
@@ -83,6 +85,8 @@ const ENDPOINTS = {
   twenty: [4812, { FAKE_MODELS: TWENTY.join(',') }],
   add: [4813, { FAKE_MODELS: 'add-a,add-b', FAKE_REQUIRE_KEY: KEY.add }],
   fail: [4814, { FAKE_MODELS: 'fail-model', FAKE_REQUIRE_KEY: KEY.fail }],
+  // 2026-10-26 补（WP-15）：pi 的模型表里有的 id，窗口与输出上限都不报告（walkthrough-1026 各包的 4920–4949）
+  piNamed: [4946, { FAKE_LIST_SHAPE: 'tensorrt', FAKE_MODELS: 'glm-5.3' }],
 };
 /** 启动的合成端点：名字 → md-form-helpers.mjs startEndpoint 的结果 */
 const eps = {};
@@ -614,6 +618,32 @@ async function enterDoesNothing() {
   await closeForm(page);
 }
 
+// ---------- MD-07：pi 不认得的地址上同名的模型不取 pi 的值（2026-10-26 补，WP-15） ----------
+
+/** pi 的模型表里有、按名字会被“猜”的 id（pi 的 Z.AI 条目：1,000,000 / 131,072 / 支持思考） */
+const PI_NAMED = 'glm-5.3';
+
+/**
+ * @brief 服务没报告的值只按服务地址取 pi 的模型表（拉取规格 §4.4；models-settings.md 反例“仍不按模型名猜”）：127.0.0.1 上
+ *        的合成端点（tensorrt 形状，窗口与输出上限都不报告）列出 glm-5.3，pi 的 Z.AI 地址有这个 id（测试自己从 pi-ai 读，
+ *        md-real-helpers.mjs 的 piEntriesAt）。pi 不认得 127.0.0.1，这一行不取 pi 的值：128000 / 16384 都写 Default、没有
+ *        From pi、Supports thinking 不勾。
+ */
+async function piUnknownAddress() {
+  const { page } = ctx;
+  const known = piEntriesAt('https://api.z.ai/api/anthropic').get(PI_NAMED) ?? null;
+  await openAddProvider(page);
+  const s = (await fetchWith(ctx, urlFor('piNamed'), '')).state;
+  const row = rowIn(s, PI_NAMED);
+  record(`MD-07 a model pi knows by name (${PI_NAMED}: pi’s model list has it for https://api.z.ai) on an address pi `
+    + 'does not know (127.0.0.1) takes nothing from pi: Context window 128000 and Max output 16384 both "Default", no '
+    + '"From pi", Supports thinking unticked', known !== null && known.contextWindow !== 128000
+    && row?.window === '128000'
+    && row.max === '16384' && JSON.stringify(row.defaults) === '["contextWindow:Default","maxTokens:Default"]'
+    && row.pis.length === 0 && !row.reasoning, brief({ known, row }));
+  await closeForm(page);
+}
+
 // ---------- MD-08：手填一行 ----------
 
 /** @brief 拿到列表时：id 检查与重复、Entered by you 与 Default、默认值、可以加多个。 */
@@ -697,6 +727,12 @@ async function manualErrors() {
     s.baseUrl.value === urlFor('nolist') && s.note === null && s.detected === null
     && s.name?.value === hostFor('nolist'),
     brief({ base: s.baseUrl.value, note: s.note, detected: s.detected }));
+  // models-settings.md“列表错误”（2026-10-26 改：Network zone 删掉）：Add provider 表单里 Name、API type 照样预填
+  record('MD-09 list error (nolist): the Add provider form still prefills Name (host:port) and API type '
+    + '(OpenAI-compatible) and has no Network zone (no zone radios, no "Network zone")',
+  s.name?.value === hostFor('nolist') && s.api?.value === 'openai-completions' && s.zone?.radios === 0
+    && s.zone.words === false && !s.labels.includes('Network zone'),
+  brief({ name: s.name?.value, api: s.api?.value, zone: s.zone, labels: s.labels }));
   await manualUnderError('401', 'keyed', urlFor('keyed'), KEY.wrong, { kind: 'rejected', id: 'rj-model',
     first: (text) => text.startsWith('The server rejected the API key: ')
       && text.includes('Incorrect API key provided'),
@@ -1056,7 +1092,8 @@ async function requestTimeout() {
 /** 步骤：名字 → [函数, 出错时记的编号] */
 const STEPS = {
   start: [startState, 'MD-09'], fetching: [fetchingState, 'MD-09'], defaults: [defaultPicks, 'MD-07'],
-  markers: [markersAndEdits, 'MD-07'], filter: [filterBox, 'MD-07'], look: [checklistLookAndButtons, 'MD-07'],
+  markers: [markersAndEdits, 'MD-07'], piNamed: [piUnknownAddress, 'MD-07'], filter: [filterBox, 'MD-07'],
+  look: [checklistLookAndButtons, 'MD-07'],
   manual: [manualWithList, 'MD-08'], manualErrors: [manualErrors, 'MD-08'], prefill: [prefillAndEdit, 'MD-09'],
   add: [addProvider, 'MD-09'], failedSave: [failedSave, 'MD-09'], cleared: [cancelThenEditUrl, 'MD-09'],
   keyOnly: [keyOnlyForFetch, 'MD-06'], timeout: [requestTimeout, 'MD-06'],

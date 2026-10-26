@@ -40,6 +40,8 @@
 // { error: null }，记在 status.discoverCancels，不算写命令。models.get、models.reload 录制里有时先用录制的：在界面所在
 // 这一段（及之前）录下的结果里，取"录制里它之前的 models.* 写命令条数"不超过界面已发的写命令条数（status.modelWrites）
 // 的最后一个（modelsResult）；录制里没有写命令时就是原来的这一段最后一个结果，都没有时才按 fixture.model 合成。
+// 2026-10-26 补（synthetic）：control.failModelWrite 有值时下一条 models.* 写命令以它为原文失败（{ error }，只用一次，
+// 记在 status.failed），测设置页把写命令的原文写在发起的地方（md-replay.mjs 的模型行 Verify again）。
 // m6-replay.mjs 从这里读只读查询的列表（QUERIES）；tb-replay.mjs、v1-models-replay.mjs 按文字读那一行。
 
 /** 截图返回的 1×1 PNG */
@@ -569,6 +571,20 @@ function listGate(hold) {
 }
 
 /**
+ * @brief synthetic（2026-10-26 补）：control.failModelWrite 有值时这一条 models.* 写命令以它为原文失败（{ error }，同后台
+ *        进程拒绝一条写命令），只用一次；记在 status.failed，不进 status.modelWrites、不改回放桥的配置。
+ * @param control 回放桥的控制对象（window.__replay）
+ * @param status 回放桥的状态（control.status）
+ * @param command 界面发的写命令
+ */
+function failedModelWrite(control, status, command) {
+  const message = control.failModelWrite;
+  control.failModelWrite = null;
+  status.failed.push(command);
+  return { error: message };
+}
+
+/**
  * @brief 创建回放进程桥。
  * @param fixture 录制文件内容
  * @param options.speed 加速倍数
@@ -782,7 +798,9 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
         status.discoverCancels += 1;
         return Promise.resolve({ error: null });
       default:
-        return MODEL_WRITES.has(command.type) ? Promise.resolve(v1ModelWrite(command, models)) : null;
+        if (!MODEL_WRITES.has(command.type)) return null;
+        return Promise.resolve(control.failModelWrite ? failedModelWrite(control, status, command)
+          : v1ModelWrite(command, models));
     }
   }
 
@@ -852,6 +870,8 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     failNext: null,
     /** 测试控制：放开 holdList 压住的 session.list（没有压住时什么都不做） */
     releaseList: gate.release,
+    /** synthetic（2026-10-26 补）：下一条 models.* 写命令以这段原文失败（failedModelWrite）；null 表示照常应答 */
+    failModelWrite: null,
     /** @brief 模拟后台进程退出。 */
     exit(code = 1) {
       status.exited = true;

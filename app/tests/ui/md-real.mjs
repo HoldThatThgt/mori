@@ -41,7 +41,9 @@
 //             (from pi)、(default) 与 §8 表后三行的提示 → 依次点 pi 的提示的 Use（三种都点到；你设的 8192 不被提示）→
 //             重新探测跑完；档案没有报告的窗口、有效窗口是配置的。全程录成回放 fixture md-glm-pi-card.json（md-replay.mjs
 //             的 MD-17 回放层）。最后在 glm-5.3-flash（配置是 pi 的 1,000,000 / 131,072 / 思考）上开新会话发一轮，
-//             回复完成、没有错误卡（2026-10-26 审查后补：这一轮发出 max_tokens 131,072）。
+//             回复完成、没有错误卡（2026-10-26 审查后补：这一轮发出 max_tokens 131,072；2026-10-26 覆盖审查补：临时项目里
+//             的 pi 扩展在 before_provider_request 里记下请求体，查这一轮的 max_tokens 就是它，打开项目时选信任；会话之前
+//             先用 Edit 把 flash 的 Max output 改成别的值再改回，查“(from pi)”随之消失、又出现）。
 // 回放用的 fixture（§13.1 回放层：DeepSeek 的清单与加入后（清单里把窗口改小）设置页的 models.get、mori.profiles，
 // GLM 的列表或列表错误）：格式同 md-record.mjs（外层 source、note、name、description、covers、recorded、address、
 // endpoint、model、notes、recordedAt、steps；步骤 { t, command } / { t, result } / { t, envelope }，界面发的写命令为
@@ -80,7 +82,9 @@
 // test-results/md-real(-packaged)/。端口：真实层的 4880–4889 里用 4881（只在 record 那次启动里监听）。
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import {
@@ -99,8 +103,9 @@ import {
   firstRunDeepSeek, firstRunProblems, glmAddProblems, KEY_MODE_URLS, leaveSettings, openModelsSettings,
   openProjectFolder, PROBE_MS, providerBrief, tickOnly,
 } from './v1-real-helpers.mjs';
-// glm-pi 的会话一轮（2026-10-26，WP-15 审查后补）：发消息、等本轮结束
+// glm-pi 的会话一轮（2026-10-26，WP-15 审查后补）：发消息、等本轮结束；临时项目里有记请求体的扩展，打开时要选信任
 import { pageHelpers } from './page.mjs';
+import { stubFolder, waitReady } from './m3-helpers.mjs';
 
 /** 转发代理的端口（真实层 4880–4889） */
 const PROXY_PORT = 4881;
@@ -994,7 +999,35 @@ async function piDriveAdd(card, { provider, picks, configured, result, entries, 
     problems.push(...await piAfterUses(refs, used));
   }
   await saveFixture('md-glm-pi-card', meta, problems);
+  if (added) await piEditBack(card, { provider, ref: refs[0], entry: entries.get(ids[0]) });
   if (added) await piTurn(refs[0]);
+}
+
+/**
+ * @brief 用 Edit 改一个取自 pi 的值（models-settings.md“取自 pi”：改成别的值后不再标，改回又标；2026-10-26 补，模型层屏的
+ *        覆盖审查）：ref 的 Max output 改成 pi 的值减 1，这一项不再写“(from pi)”（窗口照写）；改回 pi 的值又写。fixture
+ *        已经写下，这两次保存不进录制；每次保存后指纹变了、自动重新探测（标记只看配置与 pi 的条目，不等它跑完）。
+ * @param entry pi 的模型表里这个模型的条目（piEntriesAt）
+ */
+async function piEditBack(card, { provider, ref, entry }) {
+  const id = ref.slice(provider.id.length + 1);
+  const save = async (value) => {
+    await modelRowOf(card, ref).locator('[data-action="edit"]').click();
+    const form = card.getByTestId('model-form');
+    await form.waitFor({ timeout: 10000 });
+    await form.getByLabel('Max output', { exact: true }).fill(String(value));
+    await form.getByRole('button', { name: 'Save', exact: true }).click();
+    await form.waitFor({ state: 'detached', timeout: 15000 });
+    await pollFor(() => piModels(provider, [id]), (models) => models[ref]?.maxTokens === value, 15000);
+    return pollFor(() => modelRowState(modelRowOf(card, ref)),
+      (state) => state.pi.includes('maxTokens') === (value === entry?.maxTokens), 10000);
+  };
+  const changed = await save(entry.maxTokens - 1);
+  const back = await save(entry.maxTokens);
+  record(`MD-17 real GLM: Edit sets the Max output of ${ref} to ${thousands(entry.maxTokens - 1)} and its "(from pi)" `
+    + `goes away while the window keeps it; setting it back to pi's ${thousands(entry.maxTokens)} with Edit brings `
+    + '"(from pi)" back', !changed.pi.includes('maxTokens') && changed.pi.includes('contextWindow')
+    && back.pi.includes('maxTokens'), brief({ changed: changed.pi, back: back.pi }));
 }
 
 /**
@@ -1063,7 +1096,7 @@ async function piTurn(ref) {
   const project = ctx.piProject;
   const model = (await piModels({ id: ref.slice(0, ref.indexOf('/')) }, [ref.slice(ref.indexOf('/') + 1)]))[ref];
   await leaveSettings(ctx.page);
-  await openProjectFolder(ctx.app, ctx.page, project);
+  await openTrusted(project);
   await chooseRange(ctx.page, ref);
   const file = await activeSessionFile(ctx.page);
   const h = pageHelpers(ctx.page);
@@ -1079,6 +1112,11 @@ async function piTurn(ref) {
     + 'comes from it with stop reason "stop" and there is no error card (no 400 from the server)',
   last?.ref === ref && last.stopReason === 'stop' && cards.errors === 0,
   brief({ model, last, cards, errors: errors.map((text) => oneLine(text, 300)) }));
+  const sent = loggedPayloads().filter((line) => line.last.includes(PI_TURN));
+  record(`MD-17 real GLM: the request of that turn (logged by a project extension on pi's before_provider_request) `
+    + `carries max_tokens ${thousands(model?.maxTokens ?? 0)}, the Max output taken from pi's model list`,
+  sent.length > 0 && sent.every((line) => line.max_tokens === model?.maxTokens),
+  brief({ sent, want: model?.maxTokens }));
   await openModelsSettings(ctx.page);
 }
 
@@ -1091,7 +1129,53 @@ function piTurnProject() {
   const { root, project } = prepareProject('mori-md-real-');
   ctx.projects.push(root);
   ctx.piProject = project;
-  return 'a temporary project for the glm-pi session turn (no grant: network zones were removed on 2026-10-26)';
+  ctx.piPayloads = join(root, 'payloads.jsonl');
+  const extension = join(project, '.pi', 'extensions', 'payload-log.ts');
+  mkdirSync(dirname(extension), { recursive: true });
+  writeFileSync(extension, payloadLogSource(ctx.piPayloads));
+  return 'a temporary project for the glm-pi session turn (no grant: network zones were removed on 2026-10-26), '
+    + 'with a project extension that logs the max_tokens of each request pi sends (before_provider_request)';
+}
+
+/**
+ * @brief 测试准备（synthetic test setup，2026-10-26 补）：临时项目里的 pi 扩展，在 pi 的 before_provider_request 里把每个
+ *        请求体的模型、max_tokens 与最后一条用户消息（前 4000 字）追加到 file（项目外的一个文件），不改请求体。只记这三项，
+ *        不记认证头和 key。
+ */
+function payloadLogSource(file) {
+  return [
+    "import { appendFileSync } from 'node:fs';",
+    '',
+    'const text = (content) => (typeof content === \'string\' ? content',
+    '  : (content ?? []).map((part) => part?.text ?? \'\').join(\'\'));',
+    '',
+    'export default function (pi) {',
+    "  pi.on('before_provider_request', (event) => {",
+    '    const payload = event.payload ?? {};',
+    "    const users = (payload.messages ?? []).filter((message) => message.role === 'user');",
+    '    const line = { model: payload.model ?? null, max_tokens: payload.max_tokens ?? null,',
+    '      last: text(users.at(-1)?.content).slice(0, 4000) };',
+    `    appendFileSync(${JSON.stringify(file)}, \`\${JSON.stringify(line)}\\n\`);`,
+    '    return undefined;',
+    '  });',
+    '}',
+    '',
+  ].join('\n');
+}
+
+/** @brief 临时项目里的扩展记下的请求（payloadLogSource）；没有文件时为空。 */
+const loggedPayloads = () => (existsSync(ctx.piPayloads ?? '') ? readFileSync(ctx.piPayloads, 'utf8')
+  .split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)) : []);
+
+/** @brief 打开 project（系统对话框换成直接返回它）；问信任时选“Trust workspace”（项目里有扩展），等会话就绪。 */
+async function openTrusted(project) {
+  await stubFolder(ctx.app, project);
+  await ctx.page.getByTestId('sidebar').getByRole('button', { name: 'Open folder…', exact: true }).click();
+  const trust = ctx.page.getByTestId('trust-dialog');
+  if (await trust.waitFor({ timeout: 10000 }).then(() => true, () => false)) {
+    await trust.getByRole('button', { name: 'Trust workspace', exact: true }).click();
+  }
+  await waitReady(ctx.page);
 }
 
 /**

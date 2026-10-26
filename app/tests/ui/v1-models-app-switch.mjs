@@ -14,7 +14,10 @@
 //   - MP-29 额度用完后重新启动那个合成端点、不再带 FAKE_QUOTA_KEYS（额度已充值）。
 // 时长都是 §12 的真实值：结果未知（120 s 首个内容时限 + 2 min held）、排队超时 60 s、候选耗尽最长等 60 s 各跑一次，
 // 放在 longBatch 一步里同时进行；429 的恢复用 FAKE_LIMIT_MS 给的短 Retry-After。
-// 步骤之间互不依赖（各用自己的提供商和会话），只有 reopen15 依赖 redo15（--only reopen15 时一起跑）。
+// 步骤之间互不依赖（各用自己的提供商和会话），只有 reopen15 依赖 redo15、reopen18 依赖 longBatch（--only 只写前者时
+// 一起跑）。2026-10-26 补：reopen18（重启后打开 -hang 的会话，换模型的条目照样写“Couldn’t confirm it stopped”）；authKey 里
+// 只改名称与并发上限后 key 的记录仍在（MP-29，models-settings.md 反例），以及 key 1 有记录时卡上的 Test connection 用第一个
+// 没有记录的 key（MP-41，models-settings.md “提供商卡”的“失败后再测”）。
 // 2026-10-26（WP-04，负责人走查 M7 决定 1）：取消测试删掉，档案没有 cancel_verified；MP-18 只剩“等满 2 分钟再换”，
 // 原来按 cancel_verified 为 true、false 分的两组情形与它们的端点（-nocancel、FAKE_NO_METRICS）删掉。
 
@@ -802,6 +805,8 @@ async function authKey(ctx) {
   record('MP-29 the rejected key is remembered: the next reply goes straight to key 2',
     same(secondLines.map((line) => `${line.status}:${line.key}`), [`200:${tail(K.good29)}`]),
     brief(lineBrief(secondLines)));
+  await cardFirstFreeKey(ctx);
+  await nameKeepsRecords(ctx, tab);
   await bridge(ctx, { type: 'models.removeKey', providerId: 'au29', ref: ctx.refs.au29[0] });
   const readded = await bridge(ctx, { type: 'models.addKey', providerId: 'au29', label: 'Key 3', secret: K.bad29 });
   await bridge(ctx, { type: 'models.moveKey', providerId: 'au29', ref: readded.ref, delta: -1 });
@@ -1418,6 +1423,74 @@ async function longBatch(ctx) {
   for (const item of LONG) await waitTabIdle(ctx.page, runs[item.key].tab, 330000);
   await checkWaits(ctx, runs);
   await checkTimeout(ctx, runs);
+  ctx.long18 = { file: await fileOf(ctx, runs.t18h.tab) };
+}
+
+/**
+ * @brief MP-18（model-chat.md“换了模型”，2026-10-26 改：条目的 unconfirmed 也算）：重启 Mori、打开 longBatch 里 -hang 那个
+ *        会话（等满 2 分钟后换了模型）：会话文件里换模型的条目 unconfirmed 为真，打开时按条目显示的换模型提示仍写
+ *        “ · Couldn’t confirm it stopped”。
+ */
+async function reopen18(ctx) {
+  const file = ctx.long18?.file;
+  if (!file) throw new Error('longBatch did not leave the -hang session file');
+  await ctx.app.close().catch(() => {});
+  await startApp(ctx);
+  await ctx.page.locator(`.session-item[data-file=${JSON.stringify(file)}]`).click();
+  const tab = await visibleReady(ctx);
+  const shown = await poll(async () => {
+    const list = (await paneState(ctx.page, tab)).switches;
+    return list.length > 0 ? list : null;
+  }, 30000);
+  const entries = readFileSync(file, 'utf8').split(/\r?\n/).filter((line) => line.includes('mori.model_switch'));
+  record('MP-18 after restarting Mori and reopening the -hang session, the model-switch entry in the session file '
+    + 'has unconfirmed true and the notice shown from it still reads "… · Couldn’t confirm it stopped"',
+  shown?.length === 1 && shown[0].reason === 'timeout' && shown[0].text.includes('Couldn’t confirm it stopped')
+    && entries.length === 1 && entries[0].includes('"unconfirmed":true'), brief({ shown, entries: entries.length }));
+}
+
+/**
+ * @brief MP-29（models-settings.md 反例，2026-10-26：“只改提供商名称、并发上限或模型列表，不清除 key 与提供商的记录”）：
+ *        au29 的 key 1 记为 Rejected 之后只改名称和并发上限（models.saveProvider，同设置页 Edit 的命令）：key 1 的记录
+ *        仍是 Rejected，下一段仍直接用 key 2。
+ */
+async function nameKeepsRecords(ctx, tab) {
+  const saved = await saveProvider(ctx, 'au29', { name: 'AU29 Renamed', concurrency: 3 });
+  const rows = await keyRows(ctx, 'au29');
+  await backToChat(ctx);
+  const since = Date.now();
+  await sendWait(ctx, tab, 'plain MP29 auth after rename');
+  const lines = chatLogs(ctx, M('au29'), since);
+  record('MP-29 changing only the provider name and the concurrency keeps the key records: key 1 still shows '
+    + '"Rejected" and the next reply goes straight to key 2', saved.error === null && rows[0]?.state === 'auth'
+    && rows[0]?.text === 'Rejected' && same(lines.map((line) => `${line.status}:${line.key}`),
+    [`200:${tail(K.good29)}`]), brief({ error: saved.error, rows, lines: lineBrief(lines) }));
+  await saveProvider(ctx, 'au29', {});
+}
+
+/**
+ * @brief 提供商卡的“失败后再测”（models-settings.md “提供商卡”，规格 §8.3；2026-10-26 补，复核：原来只在单元层）：au29 的
+ *        key 1 记为 Rejected、key 2 没有记录时点卡上的 Test connection，用第一个没有记录的 key——只发出一次、只带 key 2
+ *        （不先试 key 1），结果“Connected · …”，key 1 仍是 Rejected（成功只清用到的 key 的记录）。
+ */
+async function cardFirstFreeKey(ctx) {
+  const { page } = ctx;
+  await keyRows(ctx, 'au29');
+  const card = page.locator('[data-testid="provider-card"][data-provider="au29"]');
+  const since = Date.now();
+  await card.locator('[data-action="test-provider"]').click();
+  const result = await poll(async () => {
+    const text = await card.getByTestId('test-result').textContent({ timeout: 1000 }).catch(() => '');
+    return /^(Connected|Connection failed)/.test(text ?? '') ? text : null;
+  }, 30000);
+  const rows = await keyRows(ctx, 'au29');
+  await backToChat(ctx);
+  const lines = chatLogs(ctx, M('au29'), since);
+  record('MP-41 provider card Test connection uses the first key without a record (§8.3, models-settings.md provider '
+    + 'card "retest after a failure"): with key 1 "Rejected" and key 2 clear it sends once, with key 2 only, shows '
+    + '"Connected · …", and key 1 stays "Rejected"', /^Connected · /.test(result ?? '')
+    && same(lines.map((line) => `${line.status}:${line.key}`), [`200:${tail(K.good29)}`])
+    && rows[0]?.state === 'auth' && rows[1]?.state === null, brief({ result, lines: lineBrief(lines), rows }));
 }
 
 // ---------- 主流程 ----------
@@ -1427,7 +1500,7 @@ const steps = {
   stopQueued, stopWaitingModel, queueStage, probeAfterConversation, lowerConcurrency, removeKeyQueued, addKeyQueued,
   cooledByOther, slotsReleased, authHeaders, authKey, quotaKey, notFound, connectionFails, keylessLimited,
   deleteCurrent, compatChange, sticky, thirdNotPreferred, steerSameReply, overflowKeepsReply, redo15, union15,
-  follow15, followTool15, compact15, exhaustion, noWaitAtStart, compactionNoModel, reopen15,
+  follow15, followTool15, compact15, exhaustion, noWaitAtStart, compactionNoModel, reopen15, reopen18,
 };
 
 /** @brief 启动全部合成端点与记录代理，写配置，启动 Mori，加 key，打开项目。 */
@@ -1448,7 +1521,10 @@ async function setup(ctx) {
 const ctx = { userData: mkdtempSync(join(tmpdir(), 'mori-v1-switch-data-')),
   project: prepareProject('mori-v1-switch-').project, project2: prepareProject('mori-v1-switch-compact-').project,
   logs: [], endpoints: {}, refs: {}, sids: {}, rules: {}, pageErrors: [] };
-const wanted = only && only.includes('reopen15') && !only.includes('redo15') ? [...only, 'redo15'] : only;
+// reopen15 依赖 redo15、reopen18 依赖 longBatch：--only 只写后者时一起跑
+const needs = { reopen15: 'redo15', reopen18: 'longBatch' };
+const wanted = only && [...only, ...Object.entries(needs).filter(([step, before]) => only.includes(step)
+  && !only.includes(before)).map(([, before]) => before)];
 try {
   await setup(ctx);
   const probesAtStart = ctx.logs.filter((line) => line.probe).length;

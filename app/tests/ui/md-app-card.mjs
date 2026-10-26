@@ -276,9 +276,9 @@ async function addTwo(env) {
   const done = await waitProfiles(page, ['cardp/fake-new-a', 'cardp/fake-new-b'], verified, 120000);
   const probes = ['fake-new-a', 'fake-new-b'].map((id) => probeLines(env.fakes.card, since, id).length);
   record('MD-10 the added models start probing at once: "Verifying…" on both rows (data-probe verifying, status line '
-    + 'verifying), probe requests for each, then verified', rows.every((row) => row?.tool === 'verifying'
-    && row.status === 'verifying') && probes.every((n) => n > 0) && done.ok,
-  brief({ rows: rows.map((row) => [row?.tool, row?.status]), probes, done: done.ok }));
+    + 'verifying with the text "Verifying…"), probe requests for each, then verified', rows.every((row) => row?.tool
+    === 'verifying' && row.status === 'verifying' && row.statusText === 'Verifying…') && probes.every((n) => n > 0)
+    && done.ok, brief({ rows: rows.map((row) => [row?.tool, row?.status, row?.statusText]), probes, done: done.ok }));
 }
 
 /** @brief Edit 里没设过强度的模型显示 config.get 的 defaultThinkingLevel；没改就不写（§5.4）。 */
@@ -800,7 +800,8 @@ const HINTS = {
   hv: [PORT.hintsVllm, { FAKE_MAX_MODEL_LEN: '65536' }, [modelOf('win-big', { maxTokens: 65536 }),
     modelOf('seen-alwaysthink', { contextWindow: 65536, maxTokens: 16384 }),
     modelOf('old-think', { contextWindow: 100000, maxTokens: 8192 })]],
-  hr: [PORT.hintsRich, { FAKE_LIST_SHAPE: 'rich' }, [modelOf('rich-a', { maxTokens: 16384 }), modelOf('rich-b'),
+  hr: [PORT.hintsRich, { FAKE_LIST_SHAPE: 'rich' }, [modelOf('rich-a', { maxTokens: 16384, family: 'rich' }),
+    modelOf('rich-b'),
     modelOf('rich-c', { contextWindow: 4096, maxTokens: 2048 })]],
   ht: [PORT.hintsTyped, { FAKE_LIST_SHAPE: 'typed' }, [modelOf('typed-a', { contextWindow: 128000,
     maxTokens: 16384 })]],
@@ -880,6 +881,30 @@ async function defaultAfterEdit(env) {
   record('MD-13 after Edit sets typed-a’s Max output to 8,000 its "(default)" goes away; the window, still 128,000, '
     + 'keeps it', saved.ok && row.ok && Boolean(row.value.meta?.includes('Max output: 8,000 ·')
     || row.value.meta?.endsWith('Max output: 8,000')), brief({ saved: saved.value, row: row.value }));
+  await defaultBack(env);
+}
+
+/**
+ * @brief 改回默认值又标（models-settings.md “Models 行”的“默认值”，2026-10-26 补）：再用 Edit 把 typed-a 的 Max output 改回
+ *        16,384（窗口 128,000 时的默认值），Save 后这一项又写“(default)”，悬停说明照旧。
+ */
+async function defaultBack(env) {
+  const { page, userData } = env.ctx;
+  await modelRow(page, 'ht/typed-a').locator('[data-action="edit"]').click();
+  const form = cardOf(page, 'ht').getByTestId('model-form');
+  await form.waitFor({ timeout: 10000 });
+  await form.getByLabel('Max output', { exact: true }).fill('16384');
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  await form.waitFor({ state: 'detached', timeout: 15000 });
+  const saved = await poll(() => providerIn(configOf(userData), 'ht')?.models[0]?.maxTokens,
+    (value) => value === 16384, 10000);
+  const row = await poll(() => modelRowState(page, 'ht/typed-a'), (state) => same(state?.defaults,
+    ['contextWindow', 'maxTokens']), 10000);
+  record('MD-13 setting typed-a’s Max output back to the default 16,384 with Edit shows "Max output: 16,384 (default)" '
+    + 'again, with the hover explanation', saved.ok && row.ok
+    && Boolean(row.value.meta?.includes('Max output: 16,384 (default)'))
+    && row.value.defaultTitles.every((title) => title === DEFAULT_TITLE),
+  brief({ saved: saved.value, row: row.value }));
 }
 
 /** @brief §8 表五行的显示条件（正反两面）与顺序。 */
@@ -1025,6 +1050,67 @@ async function editMedium(env) {
   await form.waitFor({ state: 'detached', timeout: 10000 });
 }
 
+/** 说明一行的整行（models-settings.md “Models 行”的“模型行”：窗口 · 最大输出 · Family（不为空时） · Supports thinking（勾了时）） */
+const META = {
+  richA: 'Context window: 131,072 · Max output: 16,384 · Family: rich',
+  richB: 'Context window: 131,072 · Max output: 8,192',
+  typed: 'Context window: 128,000 (default) · Max output: 16,384 (default)',
+  richAUsed: 'Context window: 131,072 · Max output: 8,192 · Family: rich · Supports thinking',
+};
+
+/**
+ * @brief 说明一行整行逐字比较（2026-10-26 补，独立核对 WP-02 的用例表）：rich-a 有模型族（Family: rich），rich-b 的模型族为空
+ *        （没有 Family 一段），typed-a 两个值都是没报告的默认值（各带 “(default)”）；都没勾 Supports thinking、思考关得掉。
+ */
+function rowLines(rows) {
+  const metas = { richA: rows['hr/rich-a']?.meta, richB: rows['hr/rich-b']?.meta, typed: rows['ht/typed-a']?.meta };
+  record(`MD-13 the description line reads exactly "Context window: <window> · Max output: <max output> · Family: `
+    + `<family>" (models-settings.md "Models 行"): rich-a "${META.richA}"; rich-b, whose family is empty, has no `
+    + `Family part: "${META.richB}"; typed-a "${META.typed}"`, metas.richA === META.richA && metas.richB === META.richB
+    && metas.typed === META.typed, brief(metas));
+}
+
+/**
+ * @brief 模型行没有档案摘要（models-settings.md “Models 行”与标识表“删掉的”，2026-10-26 负责人走查 M7、M8；写法同
+ *        v1-models-app-settings.mjs 的 noZoneSettings）：页面上没有删掉的标识，每一行里没有档案摘要的字样与删掉的按钮，
+ *        也没有 Long-input test…、Cancel test… 的入口，所以它们的确认框打不开。
+ */
+async function noProfileSummary(page) {
+  const seen = await page.getByTestId('models-section').evaluate((root) => {
+    const rows = [...root.querySelectorAll('[data-testid="model-row"]')];
+    const words = [/Tool calling(?! failed verification)/, /Handoff tier/, /\bContext\b(?! window)/, /Reasoning field/,
+      /\bCancel\b/, /Silently truncates long input/, /Long-input test/, /Cancel test/];
+    const stray = (el) => ['test', 'long-input', 'cancel-test'].includes(el.dataset.action)
+      || (el.dataset.action === 'verify' && !el.closest('[data-testid="probe-status"]'));
+    return { rows: rows.length,
+      ids: ['profile', 'truncation-warning', 'probe-error', 'not-reported', 'model-test']
+        .filter((id) => document.querySelector(`[data-testid="${id}"]`)),
+      words: rows.flatMap((row) => words.filter((word) => word.test(row.textContent))
+        .map((word) => `${row.dataset.model}: ${word.source}`)),
+      actions: rows.flatMap((row) => [...row.querySelectorAll('[data-action]')].filter(stray)
+        .map((el) => `${row.dataset.model}: ${el.dataset.action}`)),
+      entries: document.querySelectorAll('[data-action="long-input"], [data-action="cancel-test"]').length,
+      dialogs: document.querySelectorAll('[data-testid="confirm-dialog"][data-kind="long-input"], '
+        + '[data-testid="confirm-dialog"][data-kind="cancel-test"]').length };
+  });
+  record('MD-13 the model rows show no profile summary (2026-10-26): none of the removed test ids profile, '
+    + 'truncation-warning, probe-error, not-reported, model-test on the page; in none of the rows "Tool calling", '
+    + '"Handoff tier", "Context" (other than "Context window"), "Reasoning field", "Cancel", "Silently truncates long '
+    + 'input", "Long-input test" or "Cancel test"; no "Test" button and no "Verify" outside a status line',
+  seen.rows === HINTED.length + OLD_HINTED.length && seen.ids.length === 0 && seen.words.length === 0
+    && seen.actions.length === 0, brief(seen));
+  record('MD-13 the confirm dialogs of the removed probes can’t be opened: no long-input or cancel-test entry anywhere '
+    + 'on the page, and no confirm dialog of kind long-input or cancel-test', seen.rows > 0 && seen.entries === 0
+    && seen.dialogs === 0, brief({ rows: seen.rows, entries: seen.entries, dialogs: seen.dialogs }));
+}
+
+/** @brief 用了几条提示之后 rich-a 的说明一行（Supports thinking 勾上、Max output 改成服务报告的 8,192）。 */
+async function usedLine(page) {
+  const row = await modelRowState(page, 'hr/rich-a');
+  record(`MD-13 after Use ticked Supports thinking and set Max output, rich-a's description line reads exactly `
+    + `"${META.richAUsed}"`, row?.meta === META.richAUsed, brief(row?.meta));
+}
+
 /** @brief hints 一步。 */
 async function hintsStep() {
   const fakes = {};
@@ -1051,8 +1137,11 @@ async function hintsStep() {
     hintConditions(rows);
     hintAbsences(env, rows, views);
     oldProfileHints(rows, views);
+    rowLines(rows);
+    await noProfileSummary(ctx.page);
     await defaultAfterEdit(env);
     await hintUses(env);
+    await usedLine(ctx.page);
     await editMedium(env);
   } catch (error) {
     record('MD-13 hints step ran to the end', false, brief(error?.stack ?? error));

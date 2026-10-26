@@ -1231,6 +1231,66 @@ async function checkThinkLong(f) {
 }
 
 /**
+ * @brief -toollong（2026-10-26 补）：只有探针第 3、4 步不论开没开思考都只回很长的思考、以 length 结束；第 1 步与不是探针的
+ *        请求照常。
+ */
+async function checkToolLong(f) {
+  const model = 'fake-coder-toollong';
+  const step3 = await chat(f.port, { model, messages: [user(WEATHER)], tools: [weatherTool] });
+  const call = { id: 'call_selfcheck_toollong', name: 'get_weather', args: '{"city":"Paris","days":3}' };
+  const step4 = await chat(f.port, { model, messages: step4Messages(call), tools: [weatherTool] });
+  record('MP-38 -toollong: probe steps 3 and 4 with thinking off stream only thinking (> 1100 chars), no text and no '
+    + 'tool call, and end with finish_reason "length"', [step3, step4].every((r) => r.status === 200 && r.text === ''
+    && r.calls.length === 0 && r.reasoning === THINKLONG_THINKING && r.finish === 'length'),
+  `${step3.finish} ${step3.calls.length} / ${step4.finish} ${step4.text}`);
+  const ready = await chat(f.port, { model, messages: [user(READY)] });
+  const plain = await chat(f.port, { model, messages: [user('plain')] });
+  record('MP-38 -toollong: probe step 1 and a non-probe request are answered as usual (ready / plain text, stop)',
+    ready.text === 'ready' && ready.finish === 'stop' && plain.text === PLAIN_TEXT && plain.finish === 'stop',
+    `${ready.text} ${ready.finish} / ${plain.finish}`);
+}
+
+/**
+ * @brief -offlong、-offsilent（2026-10-26 补，与 -nooff 一起）：第 1 步的 medium 照常；第 2 步的 off 被拒（400）之后，下一次
+ *        medium 的第 1、2 步提示：-offlong 只回很长的思考、以 length 结束，-offsilent 只回思考、正常结束、没有正文；
+ *        再下一次 medium 又照常（记录只用一次）。
+ */
+async function checkRefusedOffFollowUp(f) {
+  const medium = { messages: [user(READY)], reasoning: { effort: 'medium' } };
+  const off = { messages: [user(READY)], reasoning: { effort: 'none' } };
+  const runs = {};
+  for (const suffix of ['offlong', 'offsilent']) {
+    const model = `fake-coder-nooff-${suffix}`;
+    const send = (body) => chat(f.port, { model, ...body }, { path: OPENROUTER_CHAT });
+    runs[suffix] = { first: await send(medium), refused: await send(off), next: await send(medium),
+      again: await send(medium) };
+  }
+  const fine = (r) => r.status === 200 && r.text === 'ready' && r.finish === 'stop';
+  const { offlong: long, offsilent: silent } = runs;
+  record('MP-38 -nooff-offlong: step 1 at medium answers "ready"; after the refused off (400 body) the next medium '
+    + 'ready prompt streams only thinking and ends with "length"; the one after answers "ready" again',
+  fine(long.first) && long.refused.status === 400 && long.refused.raw === NOOFF_BODY_EXPECTED
+    && long.next.status === 200 && long.next.text === '' && long.next.reasoning === THINKLONG_THINKING
+    && long.next.finish === 'length' && fine(long.again), JSON.stringify([long.first.finish, long.refused.status,
+    long.next.finish, long.next.text, long.again.text]));
+  record('MP-38 -nooff-offsilent: after the refused off the next medium ready prompt has thinking but no text and ends '
+    + 'with "stop"; the one after answers "ready" again', fine(silent.first) && silent.refused.status === 400
+    && silent.next.status === 200 && silent.next.text === '' && silent.next.reasoning.length > 0
+    && silent.next.finish === 'stop' && fine(silent.again), JSON.stringify([silent.next.finish, silent.next.text,
+    silent.again.text]));
+}
+
+/** @brief FAKE_SERVE_404=1（2026-10-26 补）：-404 的模型照常回答；没有它时同一个请求是 404。 */
+async function checkServe404(f, h) {
+  const body = { model: 'fake-coder-404', messages: [user('plain')] };
+  const broken = await chat(f.port, body);
+  const fixed = await chat(h.port, body);
+  record('MP-41 FAKE_SERVE_404=1: a -404 model is answered as usual (the server was fixed); without it the same '
+    + 'request is 404', broken.status === 404 && fixed.status === 200 && fixed.text === PLAIN_TEXT,
+  `${broken.status} / ${fixed.status} ${fixed.text}`);
+}
+
+/**
  * @brief -nooff 的判断顺序（server.mjs 开头）：认证 → -nooff → -replay → -404、-hang、-stall。
  * @param f 不查 key 的端点
  * @param g 设了 FAKE_KEYS（synthetic 的 key）的端点
@@ -1273,6 +1333,8 @@ async function checkReasoningMandatory(f, g) {
   await checkThinkingOn(f);
   await checkThinkLong(f);
   await checkNoOffOrder(f, g);
+  await checkToolLong(f);
+  await checkRefusedOffFollowUp(f);
 }
 
 const a = await startEndpoint({ FAKE_KEYS: 'key-aaaa1,key-bbbb2,key-cccc3', FAKE_LIMITED_KEYS: 'key-bbbb2',
@@ -1291,6 +1353,8 @@ const shapes = await startShapes();
 // g 设了 FAKE_KEYS（synthetic 的 key），测 -nooff 排在认证之后
 const f = await startEndpoint({});
 const g = await startEndpoint({ FAKE_KEYS: NOOFF_ORDER_KEY });
+// 2026-10-26 补：-404 的模型照常回答的一份端点（FAKE_SERVE_404）
+const h = await startEndpoint({ FAKE_SERVE_404: '1' });
 try {
   await checkGets(a, c);
   await checkKeys(a, b, c);
@@ -1313,6 +1377,7 @@ try {
   await checkMemTeam(e);
   await checkDiscovery(a, c, shapes);
   await checkReasoningMandatory(f, g);
+  await checkServe404(f, h);
   checkLogs(a);
   checkDiscoveryLogs(a, shapes);
 } catch (error) {
@@ -1325,6 +1390,7 @@ try {
   e.kill();
   f.kill();
   g.kill();
+  h.kill();
   for (const endpoint of Object.values(shapes)) endpoint.kill();
   rmSync(scriptDir, { recursive: true, force: true });
 }

@@ -21,7 +21,8 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/v1-models-app-settings.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/v1-models-app-settings(-packaged).json，截图在 test-results/v1-models-app-settings(-packaged)/。
-// 合成端点用 4500–4519 之间的端口（与并行跑的其他测试错开）。
+// 合成端点用 4500–4519 之间的端口（与并行跑的其他测试错开）；2026-10-26 补的 testRecords 与 keyTestRecords（MP-41，Keys 一行的
+// Test，U17）共用 4945（walkthrough-1026 各包的 4920–4949）。
 // 下面写进数据目录的 model-config.json、pi/models.json、pi/settings.json 和项目的 .mori/models.json 都是
 // synthetic test setup（测试准备），代码里逐处注明。key 都是测试自己生成的合成值，与任何真实服务无关。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动与 Add provider 是 Base URL 和 API key → Fetch models →
@@ -31,9 +32,8 @@
 // （settingsEdits 另写一个 Anthropic Messages 的提供商看卡）；模型行的 tool calling 读行上的 data-probe，探针出错读状态行
 // probe-status；点 Test connection 之前读表单结果不等（page.mjs textNow）。
 
-import { spawn } from 'node:child_process';
 import {
-  existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
+  existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -42,6 +42,10 @@ import { activeFile, ctrlN, openRow, PANE, paneCount, stubFolder, waitPanes, wai
 import { poll, readJson, readText } from './md-card-helpers.mjs';
 import { readMain, waitProbe } from './md-firstrun-helpers.mjs';
 import { cardAddModels, CONNECTED, fetchIn, FIRST_RUN_FORM, pickIn, PROVIDER_FORM, textNow } from './page.mjs';
+import {
+  cardText, chatsOf, choosePick, dialogInfo, filesUnder, menuPicks, paneReply, sendOnly, sendText, startFake, stopFake,
+  testOnce, TEXTAREA, trySend, waitCard, waitReply,
+} from './v1-settings-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -51,9 +55,9 @@ const shots = join(appRoot, 'test-results', RESULT);
 mkdirSync(shots, { recursive: true });
 const { results, record, write } = createRecorder(exePath ?? 'dev build');
 
-/** 合成端点的端口（4500–4519） */
+/** 合成端点的端口（4500–4519；records 为 4945） */
 const PORT = { keyed: 4500, invalid: 4503, fresh: 4504, seeded: 4505, moved: 4506, migrate: 4507, cascade: 4508,
-  edits: 4509, reprobe: 4510 };
+  edits: 4509, reprobe: 4510, records: 4945 };
 /** @brief 端口对应的 baseUrl。 */
 const url = (port) => `http://127.0.0.1:${port}/v1`;
 
@@ -74,6 +78,7 @@ const KEY = {
   num3: 'synthetic-v1-settings-key-num3-N3N3',
   wrong: 'synthetic-v1-settings-key-wrong-W1R1',
   right: 'synthetic-v1-settings-key-right-R1G1',
+  keyTest: 'synthetic-v1-settings-key-keytest-T2K2',
 };
 const SECRETS = Object.values(KEY);
 const last4 = (key) => key.slice(-4);
@@ -81,8 +86,6 @@ const last4 = (key) => key.slice(-4);
 const PLACEHOLDER_TAIL = last4('mori-pool');
 /** 合成端点 "plain" 的回复 */
 const REPLY = '这是一段只有文字的回复，用来测试流式输出。';
-const TEXTAREA = '.pane-slot:not([hidden]) .composer textarea';
-const CARD = '.pane-slot:not([hidden]) [data-testid="blocked-card"]';
 
 /** 收集到的全部日志（每个 App 的 stdout/stderr 与界面 console），MP-26 检查里面没有 key */
 const allLogs = [];
@@ -139,46 +142,6 @@ function specId(name, taken) {
     if (!taken.has(id)) return id;
   }
 }
-
-// ---------- 合成端点 ----------
-
-/**
- * @brief 启动一个合成端点（synthetic），收集它每个对话请求的 JSON 日志行。列表请求与详情请求的 JSON 行带 path
- *        （model-discovery.md §13.1、server.mjs 开头"日志"），不是对话请求，不收集。
- */
-function startFake(port, env = {}) {
-  const child = spawn(process.execPath, [join(appRoot, 'tests/fake-endpoint/server.mjs')], {
-    env: { ...process.env, FAKE_PORT: String(port), FAKE_CHUNK_DELAY_MS: '5', FAKE_FIRST_DELAY_MS: '20',
-      FAKE_MODELS: 'fake-coder,fake-coder-b,fake-coder-notools', ...env },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const fake = { child, port, chats: [] };
-  let buffer = '';
-  return new Promise((done, fail) => {
-    const timer = setTimeout(() => fail(new Error(`fake endpoint ${port} did not start within 15 s`)), 15000);
-    child.stderr.on('data', () => {});
-    child.stdout.on('data', (chunk) => {
-      buffer += String(chunk);
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-      for (const line of lines) {
-        if (line.startsWith('{')) {
-          try {
-            const entry = JSON.parse(line);
-            if (!('path' in entry)) fake.chats.push({ ...entry, at: Date.now() });
-          } catch { /* 不是日志行 */ }
-        }
-        if (line.includes('synthetic endpoint')) {
-          clearTimeout(timer);
-          done(fake);
-        }
-      }
-    });
-  });
-}
-
-/** @brief 不是探针的对话请求（since 之后）。 */
-const chatsOf = (fake, since = 0) => fake.chats.filter((chat) => !chat.probe && chat.at >= since);
 
 // ---------- App ----------
 
@@ -239,81 +202,9 @@ async function openFolder(ctx, folder) {
   return activeFile(page);
 }
 
-/** @brief 当前一栏的拒绝启动卡：kind、主文字、全文、按钮与候选；没有卡时为 null。 */
-function cardState(page) {
-  return page.evaluate((selector) => {
-    const card = document.querySelector(selector);
-    if (!card) return null;
-    return { kind: card.dataset.kind, title: card.querySelector('.model-card-title')?.textContent ?? '',
-      text: card.textContent ?? '',
-      actions: [...card.querySelectorAll('button[data-action]')].map((b) => ({ action: b.dataset.action,
-        label: b.textContent })),
-      candidates: [...card.querySelectorAll('[data-testid="candidate"]')].map((c) => ({ ref: c.dataset.ref,
-        reason: c.dataset.reason, text: c.textContent })) };
-  }, CARD);
-}
-const waitCard = (page, test, timeout = 60000) => poll(() => cardState(page), test, timeout, 250);
-const cardText = (state) => (state ? `${state.kind}: ${state.title} [${state.actions.map((a) => a.label)
-  .join(', ')}] ${state.candidates.map((c) => `${c.ref}=${c.reason}`).join(', ')}` : 'no card');
-
-/** @brief 发一条消息，等助手回复出现且本轮结束（或出现错误卡）；返回最后一条回复。 */
-async function sendText(ctx, text) {
-  const { page } = ctx;
-  const read = () => page.evaluate((selector) => {
-    const pane = document.querySelector(selector);
-    const list = pane?.querySelectorAll('[data-testid="assistant"]') ?? [];
-    return { count: list.length, idle: pane?.dataset.running === 'false' && pane?.dataset.sending === 'false',
-      text: list[list.length - 1]?.textContent ?? '',
-      error: pane?.querySelector('[data-testid="error-card"], [data-testid="unavailable-card"]')?.textContent ?? null };
-  }, PANE);
-  const before = (await read()).count;
-  await page.locator(TEXTAREA).fill(text);
-  await page.locator(TEXTAREA).press('Enter');
-  return (await poll(read, (s) => (s.count > before && s.idle) || s.error, 90000, 250)).value;
-}
-
-/** @brief 被拒绝启动时试着发送：发送按钮是否不可用、Enter 后草稿是否还在、对话流和合成端点有没有新东西。 */
-async function trySend(ctx, fake, text) {
-  const { page } = ctx;
-  const since = Date.now();
-  const users = await page.locator(`${PANE} [data-testid="user-message"]`).count();
-  await page.locator(TEXTAREA).fill(text);
-  const disabled = await page.locator(`${PANE} .send-button`).isDisabled();
-  await page.locator(TEXTAREA).press('Enter');
-  await sleep(1500);
-  const kept = (await page.locator(TEXTAREA).inputValue()) === text;
-  const added = (await page.locator(`${PANE} [data-testid="user-message"]`).count()) - users;
-  await page.locator(TEXTAREA).fill('');
-  return { disabled, kept, added, requests: chatsOf(fake, since).length };
-}
-
-/** @brief 在当前一栏输入框下面一行的范围菜单里选 pick，等按钮的 data-pick 变过去。 */
-async function choosePick(page, pick) {
-  const button = page.locator(`${PANE} [data-testid="model-button"]`);
-  await button.click();
-  await page.locator(`[data-testid="model-menu"] [role="menuitemradio"][data-pick="${pick}"]`).click();
-  return poll(() => button.getAttribute('data-pick'), (value) => value === pick, 10000);
-}
-
-/** @brief 范围菜单的全部项（data-pick），看完按 Esc 关上。 */
-async function menuPicks(page) {
-  await page.locator(`${PANE} [data-testid="model-button"]`).click();
-  await page.getByTestId('model-menu').waitFor({ timeout: 5000 });
-  const picks = await page.locator('[data-testid="model-menu"] [role="menuitemradio"]')
-    .evaluateAll((items) => items.map((item) => item.dataset.pick));
-  await page.keyboard.press('Escape');
-  return picks;
-}
-
 const providerCard = (page, id) => page.locator(`[data-testid="provider-card"][data-provider="${id}"]`);
 const modelRow = (page, ref) => page.locator(`[data-testid="model-row"][data-model="${ref}"]`);
 const dialogOf = (page, kind) => page.locator(`[data-testid="confirm-dialog"][data-kind="${kind}"]`);
-
-/** @brief 对话框的标题、全文和连带改动列表。 */
-function dialogInfo(dialog) {
-  return dialog.evaluate((box) => ({ title: box.querySelector('h2')?.textContent ?? '', text: box.textContent ?? '',
-    cascade: [...box.querySelectorAll('[data-testid="cascade"] li')].map((li) => li.textContent) }));
-}
 
 /** @brief 模型行上 tool calling 的验证状态（data-probe，models-settings.md "Models 行"；取值同原来档案摘要的 Tool calling）。 */
 const toolCalling = (page, ref) => modelRow(page, ref).getAttribute('data-probe', { timeout: 5000 }).catch(() => null);
@@ -390,19 +281,6 @@ async function testConnection(page) {
 /** @brief 等 credentials.json 里没有 ref（主进程删密文可能晚于配置写入），最多 5 秒；value 是最后读到的全部 ref。 */
 const credsWithout = (dir, ref) => poll(() => Object.keys(readJson(join(dir, 'credentials.json')) ?? {}),
   (refs) => !refs.includes(ref), 5000);
-
-/** @brief 文件夹下的全部文件（递归）。 */
-function filesUnder(dir) {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    try {
-      return statSync(path).isDirectory() ? filesUnder(path) : [path];
-    } catch {
-      return [];
-    }
-  });
-}
 
 /** @brief 文件夹里含任何 key 明文（UTF-8 或 UTF-16）的文件；skip 里的文件不看。 */
 function filesWithSecrets(dir, skip = []) {
@@ -818,15 +696,20 @@ async function freshProject(ctx, project) {
 async function noZoneSettings(ctx) {
   const { page, userData } = ctx;
   await openSettings(page);
+  // models-settings.md 标识表“删掉的”一行：这些标识在页面上（含对话框）都不在
   const seen = await page.getByTestId('models-section').evaluate((root) => ({
-    gone: ['project-access', 'project-row', 'allowed-zone', 'zone-unconfirmed', 'provider-zone']
-      .filter((id) => root.querySelector(`[data-testid="${id}"]`)),
+    gone: ['project-access', 'project-row', 'project-zone', 'project-config-error', 'projects-empty', 'allowed-zone',
+      'zone-unconfirmed', 'zone-dialog', 'public-dialog', 'provider-zone']
+      .filter((id) => document.querySelector(`[data-testid="${id}"]`)),
+    actions: ['confirm-zone', 'allow-zone'].filter((id) => document.querySelector(`[data-action="${id}"]`)),
     words: ['Project access', 'Allowed zones', 'Network zone', 'Confirm zone']
       .filter((w) => root.textContent.includes(w)),
   }));
   record('MP-06 Settings → Models has no Project access, no "Allowed zones for all projects", no unconfirmed-zone '
-    + 'rows and no "Network zone" on the provider card', seen.gone.length === 0 && seen.words.length === 0,
-  JSON.stringify(seen));
+    + 'rows and no "Network zone" on the provider card (none of the removed test ids: project-access, project-row, '
+    + 'project-zone, project-config-error, projects-empty, allowed-zone, zone-unconfirmed, zone-dialog, public-dialog, '
+    + 'provider-zone, confirm-zone, allow-zone)', seen.gone.length === 0 && seen.actions.length === 0
+    && seen.words.length === 0, JSON.stringify(seen));
   const id = readConfig(userData)?.providers?.[0]?.id;
   await providerCard(page, id).locator('[data-action="edit-provider"]').click();
   const edit = page.getByTestId('provider-form');
@@ -953,15 +836,17 @@ async function invalidProjects(ctx, projects) {
 async function settingsEdits() {
   const userData = tempDir('mori-v1s-edits-');
   const project = makeProject(tempDir('mori-v1s-edits-proj-'), 'proj');
-  // synthetic test setup：MP-07 的三个提供商，再加一个接口为 Anthropic Messages 的（compatOptions 看它的卡）
+  // synthetic test setup：MP-07 的三个提供商，再加一个接口为 Anthropic Messages 的、一个存着兼容选项的（compatOptions
+  // 看它们的卡与 Edit）
   const team = teamConfig(PORT.edits);
-  writeJson(configFile(userData), { ...team, providers: [...team.providers, ANTHROPIC_SEED] });
+  writeJson(configFile(userData), { ...team, providers: [...team.providers, ANTHROPIC_SEED, COMPAT_SEED] });
   let ctx;
   try {
     ctx = await startApp(userData);
     ctx.main = await openFolder(ctx, project);
     await waitCard(ctx.page, (s) => s === null, 60000);
     await editDefaults(ctx);
+    await defaultsFailure(ctx);
     await editProvider(ctx);
     await compatOptions(ctx);
     await editKeys(ctx);
@@ -1001,6 +886,40 @@ async function editDefaults(ctx) {
 }
 
 /**
+ * @brief Defaults 的保存中与保存失败（models-settings.md “Defaults”的“保存”）：经进程桥建一个分组 gone，打开设置页（页面读到
+ *        它），再经进程桥删掉它（页面不重新读，还在下拉里），在下拉里选它：保存中下拉不可用、显示选的值；后台进程拒绝
+ *        （配置校验：gone 不在设置里），原文显示在这一节下面，下拉回到保存前的值，配置不变。
+ */
+async function defaultsFailure(ctx) {
+  const { page, userData } = ctx;
+  const bridge = (command) => page.evaluate((item) => window.mori.request(item), command);
+  await bridge({ type: 'models.saveGroup', id: 'gone', members: ['intra/fake-coder'], creating: true });
+  await openSettings(page);
+  await bridge({ type: 'models.deleteGroup', id: 'gone', dryRun: false });
+  const pick = page.getByTestId('default-pick');
+  await pick.evaluate((select) => {
+    window.__defaultsSeen = [];
+    const take = () => window.__defaultsSeen.push(`${select.disabled}|${select.value}`);
+    window.__defaultsObserver = new MutationObserver(take);
+    window.__defaultsObserver.observe(select.closest('section'), { subtree: true, childList: true, attributes: true });
+  });
+  await pick.selectOption('gone');
+  const error = page.locator('[data-testid="defaults"] .form-message.error');
+  const text = await error.textContent({ timeout: 10000 }).catch(() => null);
+  const seen = await page.evaluate(() => {
+    window.__defaultsObserver.disconnect();
+    return window.__defaultsSeen;
+  });
+  const after = { value: await pick.inputValue(), disabled: await pick.isDisabled() };
+  record('MP-24 Defaults: while the default range saves the select is unavailable showing the new value; when the '
+    + 'save fails (the group was deleted behind the page) the raw text shows under Defaults, the select goes back to '
+    + 'the value before and the config keeps it', seen.includes('true|gone') && text?.includes('gone is not in your '
+    + 'model settings') && after.value === 'team' && !after.disabled && readConfig(userData)?.normalDefault === 'team',
+  JSON.stringify({ seen, text, after }));
+  await backToChat(page);
+}
+
+/**
  * @brief 编辑提供商：并发上限立即写进配置，打开的会话照常可以发送；新建提供商。2026-10-26 起 Edit 里没有区域，
  *        原来按区域重新校验的那一半删掉（删除提供商让会话 pick_missing 由 deletedProvider 查）。
  */
@@ -1035,6 +954,15 @@ async function editProvider(ctx) {
  * 只用来看卡上没有"Compatibility options"一行（models-settings.md "提供商卡"，2026-10-26）
  */
 const ANTHROPIC_SEED = { ...seedProvider('anth', 'Anth E', 9), api: 'anthropic-messages' };
+
+/**
+ * settingsEdits 里存着兼容选项的 OpenAI-compatible 提供商（synthetic test setup，2026-10-26 补）：地址同样是本机 9 号端口；
+ * compat 里有两个有勾选框的（developer role、max_tokens，键的先后与表单相反）和 2026-10-26 起没有勾选框的 supportsStrictMode
+ */
+const STORED_COMPAT = { supportsStrictMode: false, maxTokensField: 'max_tokens', supportsDeveloperRole: false };
+const COMPAT_SEED = { ...seedProvider('cmp', 'Compat F', 9), compat: STORED_COMPAT };
+/** @brief 按键名排序后的 JSON（比较 compat 时不计键的先后）。 */
+const sortedJson = (value) => JSON.stringify(Object.fromEntries(Object.entries(value ?? {}).sort()));
 
 /** 兼容选项上面的一行说明（models-settings.md "提供商表单：Edit"，2026-10-26 负责人走查 M1） */
 const COMPAT_HINT = 'Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if '
@@ -1091,6 +1019,43 @@ async function compatOptions(ctx) {
   record('MP-24 provider cards show "Compatibility options" only for OpenAI-compatible providers: Local A "None"; '
     + 'Anth E (Anthropic Messages) has no such row', cards.loc === 'None' && 'anth' in cards && cards.anth === null,
   JSON.stringify(cards));
+  record('MP-24 the card lists the ticked compatibility options by label only, comma-separated, in the form’s order '
+    + '(Compat F: developer role, then max_tokens), without their hint lines; the stored supportsStrictMode has no '
+    + 'checkbox since 2026-10-26 and is not listed', cards.cmp === `${COMPAT_TEXTS[0][0]}, ${COMPAT_TEXTS[2][0]}`,
+  JSON.stringify(cards.cmp));
+  await compatEdit(ctx);
+}
+
+/**
+ * @brief Edit provider 的兼容选项（models-settings.md “提供商表单：Edit”，2026-10-26 负责人走查 M1）：标题、图例下面一行说明、
+ *        正好五个勾选框（没有 strict mode），存着的两项勾着；只改并发上限再 Save，存着的 compat 原样保留（supportsStrictMode
+ *        也在）。
+ */
+async function compatEdit(ctx) {
+  const { page, userData } = ctx;
+  await providerCard(page, 'cmp').locator('[data-action="edit-provider"]').click();
+  const form = page.getByTestId('provider-form');
+  await form.waitFor({ timeout: 5000 });
+  const shown = await form.evaluate((root) => ({ title: root.querySelector('h3')?.textContent ?? '',
+    legend: root.querySelector('.compat-checks legend')?.textContent ?? null,
+    hint: root.querySelector('.compat-checks [data-testid="compat-hint"]')?.textContent ?? null,
+    rows: [...root.querySelectorAll('.compat-checks label.check-row')].map((label) => {
+      const span = label.querySelector('span');
+      return [span?.firstChild?.textContent ?? '', span?.querySelector('small')?.textContent ?? ''];
+    }), ticked: [...root.querySelectorAll('.compat-checks label.check-row input')].map((input) => input.checked) }));
+  await form.getByLabel('Concurrency per key', { exact: true }).fill('3');
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  await form.waitFor({ state: 'detached', timeout: 15000 });
+  const saved = await waitConfig(userData, (cfg) => providerOf(cfg, 'cmp')?.concurrency === 3);
+  const compat = providerOf(saved.value, 'cmp')?.compat ?? null;
+  record('MP-24 Edit provider (OpenAI-compatible) "Edit provider · Compat F": under the legend "Compatibility options" '
+    + 'the hint line, then exactly the five options with labels and hint lines (no strict-mode option), the stored '
+    + 'two (developer role, max_tokens) ticked; saving only the concurrency keeps the stored compat as it was, '
+    + 'supportsStrictMode included', shown.title === 'Edit provider · Compat F'
+    && shown.legend === 'Compatibility options' && shown.hint === COMPAT_HINT
+    && JSON.stringify(shown.rows) === JSON.stringify(COMPAT_TEXTS)
+    && JSON.stringify(shown.ticked) === '[true,false,true,false,false]' && saved.ok
+    && sortedJson(compat) === sortedJson(STORED_COMPAT), JSON.stringify({ shown, compat }));
 }
 
 /**
@@ -1539,8 +1504,17 @@ async function migratedLanding(ctx) {
   const landed = await poll(() => page.getByTestId('migration-notice').isVisible().catch(() => false), Boolean, 30000);
   const nav = await page.evaluate(() => document.querySelector('[data-testid="settings-nav"] [aria-current="page"]')
     ?.dataset.section ?? null);
+  // models-settings.md 表下的顺序（2026-10-26 改）：迁移说明 → Defaults → Providers → Groups，标题就是这几个名字
+  const blocks = await page.getByTestId('models-section').evaluate((root) => [...root.children]
+    .filter((el) => el.tagName !== 'H2').map((el) => [el.dataset.testid ?? el.tagName,
+      el.querySelector('h3')?.textContent ?? null]));
   record('MP-08 after migrating, this launch opens Settings → Models with the migration notice on top', landed.ok
-    && await page.getByTestId('settings-page').isVisible() && nav === 'models', `nav ${nav}`);
+    && await page.getByTestId('settings-page').isVisible() && nav === 'models'
+    && blocks[0]?.[0] === 'migration-notice', `nav ${nav}; ${JSON.stringify(blocks)}`);
+  record('MP-24 Settings → Models shows its sections from top to bottom as the migration notice, Defaults, Providers, '
+    + 'Groups, titled "Defaults", "Providers", "Groups" (no zone or Project access section, 2026-10-26)',
+  JSON.stringify(blocks) === JSON.stringify([['migration-notice', 'Imported your model settings from models.json'],
+    ['defaults', 'Defaults'], ['providers', 'Providers'], ['groups', 'Groups']]), JSON.stringify(blocks));
   await shot(ctx, 'mp08-notice');
   const lines = await page.locator('[data-testid="migration-notice"] li').allTextContents();
   const has = (text) => lines.some((line) => line.includes(text));
@@ -1699,6 +1673,63 @@ const probeFailed = async (page, ref) => (await toolCalling(page, ref)) === 'unv
 /** @brief 合成端点 since 之后收到的、带这个 key 的请求（探针或对话）。 */
 const requestsWith = (fake, key, since) => fake.chats.filter((chat) => chat.key === last4(key) && chat.at >= since);
 
+/** @brief 合成端点重新启动（synthetic test setup）：结束原来的进程，在同一个端口按 env 再起一份。 */
+async function restartFake(name, env) {
+  const { port } = fakes[name];
+  await stopFake(fakes[name]);
+  fakes[name] = await startFake(port, env);
+}
+
+/**
+ * @brief 探针出错的状态行（models-settings.md “Models 行”的“探针出错”）：文字正好是“Couldn’t verify: ”加档案的 error
+ *        （第一个出错的步的说明，这里是合成端点 401 的原文），后面是“Verify again”。
+ */
+async function errorLine(page, ref, label) {
+  const error = (await page.evaluate(() => window.mori.request({ type: 'models.get' }))).profiles?.[ref]?.error ?? null;
+  const line = await modelRow(page, ref).locator('[data-testid="probe-status"]').evaluate((el) => ({
+    state: el.dataset.state, text: el.querySelector('span')?.textContent ?? null,
+    button: el.querySelector('[data-action="verify"]')?.textContent ?? null })).catch(() => null);
+  record(`MP-10 ${label}: the status line reads exactly "Couldn’t verify: <the profile's error>" (here the endpoint's `
+    + '401 text) followed by "Verify again"', Boolean(error) && error.includes('401') && line?.state === 'error'
+    && line.text === `Couldn’t verify: ${error}` && line.button === 'Verify again', JSON.stringify({ error, line }));
+}
+
+/** @brief 一行 key 的记录（“Rejected”等）；没有记录时为 null。 */
+const keyState = (page, id, ref) => providerCard(page, id)
+  .locator(`[data-testid="key-row"][data-ref="${ref}"] [data-testid="key-state"]`)
+  .textContent({ timeout: 1000 }).catch(() => null);
+
+/** @brief 点一次卡上的 Test connection（testOnce；requests 为 null 时端点停着、不等请求）。 */
+const testCardOnce = (page, providerId, requests) => testOnce(providerCard(page, providerId),
+  { action: 'test-provider', label: 'Test connection', result: 'test-result' }, requests);
+/** @brief 点一次 Keys 一行的“Test”（testOnce；requests 为 null 时端点停着、不等请求）。 */
+const testKeyOnce = (row, requests) => testOnce(row, { action: 'key-test', label: 'Test', result: 'key-test' },
+  requests);
+
+/**
+ * @brief 提供商卡的“失败后再测”（models-settings.md “提供商卡”，规格 §8.3）：kr#1（错的 key）记为 Rejected 之后什么都不改，
+ *        连点两次 Test connection：每次都发出请求（带 kr#1）、结果都是 401 的原文，第二次不因上一次失败而等。再把合成端点
+ *        重启为认这个 key（synthetic test setup：服务那边改好了）：Test connection 成功，kr#1 的记录消失。
+ */
+async function retestCard(ctx) {
+  const { page } = ctx;
+  const requests = () => requestsWith(fakes.reprobe, KEY.wrong, 0).filter((chat) => !chat.probe);
+  const rejected = await keyState(page, 'kr', 'kr#1');
+  const tries = [await testCardOnce(page, 'kr', requests), await testCardOnce(page, 'kr', requests)];
+  record('MP-41 provider card, retest after a failure (§8.3): with key 1 recorded as "Rejected", pressing Test '
+    + 'connection twice without changing anything sends a request with that key each time and shows the server’s '
+    + 'answer each time ("Connection failed: 401 …", not "Connection error."); the second test does not wait',
+  rejected === 'Rejected' && tries.every((t) => t.sent === 1 && t.result?.startsWith('Connection failed: ')
+    && t.result.includes('401') && !t.result.includes('Connection error.')) && tries[1].ms < 5000,
+  JSON.stringify({ rejected, tries }));
+  await restartFake('reprobe', { FAKE_KEYS: [KEY.right, KEY.wrong].join(',') });
+  const fixed = await testCardOnce(page, 'kr', requests);
+  const cleared = await poll(() => keyState(page, 'kr', 'kr#1'), (state) => state === null, 10000);
+  record('MP-41 provider card: once the server takes key 1 (synthetic: the endpoint restarted with it), Test '
+    + 'connection uses it, shows "Connected · …" and clears its "Rejected" record', fixed.sent === 1
+    && fixed.result?.startsWith('Connected · ') && cleared.ok, JSON.stringify({ fixed, state: cleared.value }));
+}
+
 /**
  * @brief 规格 §7.4：加 key、删 key 也算修改提供商，档案不是 verified / failed 的模型自动重新探测。
  *   没有 key 时探针出错；加错的 key：重新探测、仍出错；加对的 key、删掉错的：重新探测并通过，全程不点 Verify。
@@ -1714,6 +1745,7 @@ async function keyReprobe() {
     const { page } = ctx;
     await openSettings(page);
     const initial = await poll(() => probeFailed(page, ref), Boolean, 60000);
+    await errorLine(page, ref, 'no key');
     let since = Date.now();
     await addKey(page, 'kr', KEY.wrong);
     const wrong = await poll(async () => requestsWith(fakes.reprobe, KEY.wrong, since).length > 0
@@ -1721,6 +1753,9 @@ async function keyReprobe() {
     record('MP-10 adding a key re-probes the never-verified model without Verify; with a wrong key the probes '
       + 'end in an error (status line with "Verify again")', initial.ok && wrong.ok, `no key: error ${initial.ok}; `
       + `wrong key requests ${requestsWith(fakes.reprobe, KEY.wrong, since).length}, error ${wrong.ok}`);
+    await errorLine(page, ref, 'wrong key');
+    await retestCard(ctx);
+    await restartFake('reprobe', { FAKE_KEYS: KEY.right });
     since = Date.now();
     await addKey(page, 'kr', KEY.right);
     await waitConfig(userData, (cfg) => keyRefs(cfg, 'kr')?.length === 2);
@@ -1741,16 +1776,182 @@ async function keyReprobe() {
   }
 }
 
+// ---------- MP-41：测试连接总是发出，成功时清除提供商的 connection 与模型的 not_found（规格 §8.3 的 2026-10-26 补） ----------
+
+/** 连接失败后提供商不可用的时间（规格 §12 connectionCooldownMs 的临时默认值，kernel/modelTimings.ts） */
+const CONNECTION_COOLDOWN_MS = 30000;
+/** 候选都在等 connection 恢复时阶段行的写法（model-chat.md“等模型”，§5.3 第 4 步的界面文字） */
+const WAITING_CONNECTION = /^Waiting for a model · can’t connect until \d\d:\d\d:\d\d/;
+/** testRecords、keyTestRecords 的模型 fake-coder-404 收到的不是探针的请求（测试的与会话的；端点重启后读新的进程） */
+const recordRequests = () => fakes.records.chats.filter((chat) => !chat.probe && chat.model === 'fake-coder-404');
+
+/**
+ * @brief 提供商的 connection 与模型的 not_found 之下再测（规格 §8.3）：端点停掉（synthetic test setup：服务连不上）后点一次
+ *        测试，失败，提供商记下 connection——当前一栏的会话（模型记着 not_found，还没发过）发出后整轮在等（阶段行
+ *        “Waiting for a model · can’t connect until …”）；端点以 FAKE_SERVE_404 重新启动（服务修好了）后再点一次。设置页开着时
+ *        调用，结束时停在会话页；返回各项（testKey 是修好后那次测试请求的 key 末 4 位），由调用方记录。
+ * @param test (requests) => 点一次测试（testCardOnce 或 testKeyOnce）
+ */
+async function downThenFixed(ctx, test) {
+  const { page } = ctx;
+  await stopFake(fakes.records);
+  const downAt = Date.now();
+  const down = await test(null);
+  await backToChat(page);
+  const before = await sendOnly(page, 'plain after the failed test');
+  const waiting = await poll(() => paneReply(page), (s) => WAITING_CONNECTION.test(s.stage ?? ''), 15000, 100);
+  await openSettings(page);
+  fakes.records = await startFake(PORT.records, { FAKE_SERVE_404: '1' });
+  const since = Date.now();
+  const fixed = await test(recordRequests);
+  const testKey = recordRequests().find((chat) => chat.at >= since && !(chat.tools?.length > 0))?.key ?? null;
+  await backToChat(page);
+  const reply = await waitReply(page, before, 60000);
+  const served = recordRequests().find((chat) => chat.at >= since && chat.tools?.length > 0) ?? null;
+  return { down, waited: waiting.ok, stage: waiting.value?.stage ?? null, fixed, testKey, reply, served,
+    ms: served ? served.at - downAt : null };
+}
+
+/** @brief downThenFixed 修好之后的那次测试发出并成功，等着的那一轮在 connection 自己到期之前至少 5 秒就发出并得到回答。 */
+const fixedInTime = (run) => run.fixed.sent >= 1 && run.fixed.result?.startsWith('Connected · ')
+  && Boolean(run.reply?.text.includes(REPLY)) && run.served?.status === 200 && run.ms !== null
+  && run.ms < CONNECTION_COOLDOWN_MS - 5000;
+/** @brief downThenFixed 的结果摘要（检查的 detail）。 */
+const runBrief = (run) => JSON.stringify({ down: run.down.result, stage: run.stage, fixed: run.fixed,
+  testKey: run.testKey, reply: oneLine(run.reply?.error ?? run.reply?.text ?? ''), status: run.served?.status ?? null,
+  ms: run.ms });
+
+/**
+ * @brief 卡上的 Test connection（models-settings.md “提供商卡”的“失败后再测”）：fake-coder-404 的提供商（合成端点对不是探针的
+ *        请求回 404）。Test connection 失败（404）后什么都不改再测：照样发出、又是 404 的原文。打开文件夹，范围就是它的新会话
+ *        没有被拒绝启动；再经 downThenFixed：端点停掉时测试失败、这一轮在等 connection，端点修好后测试成功并清除这个模型的
+ *        not_found 与提供商的 connection（2026-10-26 补，复核：原来界面上只查了 not_found，清 connection 只在单元层）。
+ */
+async function testRecords() {
+  const userData = tempDir('mori-v1s-records-');
+  const project = makeProject(tempDir('mori-v1s-records-proj-'), 'proj');
+  writeJson(configFile(userData), seedConfig({ providers: [seedProvider('nf', 'Not Found', PORT.records,
+    ['fake-coder-404'])], normalDefault: 'nf' }));
+  let ctx;
+  try {
+    ctx = await startApp(userData);
+    const { page } = ctx;
+    await openSettings(page);
+    await waitVerified(page, 'nf/fake-coder-404', 90000);
+    const tries = [await testCardOnce(page, 'nf', recordRequests), await testCardOnce(page, 'nf', recordRequests)];
+    record('MP-41 a 404 on Test connection does not stop the next one: pressing it again without changing anything '
+      + 'sends the request again and shows the server’s 404 text again', tries.every((t) => t.sent === 1
+      && t.result?.startsWith('Connection failed: ') && t.result.includes('404')), JSON.stringify(tries));
+    await backToChat(page);
+    await openFolder(ctx, project);
+    const card = await waitCard(page, (s) => s === null, 15000);
+    await openSettings(page);
+    const run = await downThenFixed(ctx, (requests) => testCardOnce(page, 'nf', requests));
+    record('MP-41 provider card: with the endpoint stopped Test connection fails ("Connection failed: …") and the '
+      + 'provider is recorded as unreachable: the session’s turn waits with "Waiting for a model · can’t connect '
+      + 'until hh:mm:ss"', run.down.result?.startsWith('Connection failed: ') && run.waited, runBrief(run));
+    record('MP-41 after the server is fixed (synthetic: the endpoint started again serving the -404 model) Test '
+      + 'connection shows "Connected · …" and clears the model’s not_found and the provider’s connection: the new '
+      + 'session on it is not blocked, and its waiting turn goes out and is answered well before the connection '
+      + `record would run out (${CONNECTION_COOLDOWN_MS / 1000} s after the failed test)`, card.ok && fixedInTime(run),
+    `card: ${cardText(card.value)}; ${runBrief(run)}`);
+  } catch (error) {
+    record('MP-41 testRecords: flow', false, oneLine(error, 400));
+    await shot(ctx, 'testRecords-error');
+  } finally {
+    await closeApp(ctx, 'MP-41');
+  }
+}
+
+// ---------- MP-41：Keys 一行的“Test”同样不看任何不可用记录，成功后清除提供商的 connection 与模型的 not_found（U17） ----------
+
+/**
+ * @brief 模型的 not_found 之下（models-settings.md Keys 的“Test 中”，U17）：第一次 Test 得到 404，模型记下 not_found——
+ *        会话发出时整轮停在“model not found on the server”、端点收不到请求（记录确实在）；这时什么都不改再点 Test，照样带
+ *        这个 key 马上发出（不等）、又是 404 的原文。之后另开一个会话（还没发过）留给 keyTestConnection。
+ */
+async function keyTestNotFound(ctx, row, projects) {
+  const { page } = ctx;
+  const first = await testKeyOnce(row, recordRequests);
+  await backToChat(page);
+  await openFolder(ctx, projects[0]);
+  const since = Date.now();
+  const blocked = await sendText(ctx, 'plain while the model is not found');
+  const sent = recordRequests().filter((chat) => chat.at >= since).length;
+  record('MP-41 Keys row "Test" (U17), the record is there: a first Test gets the server’s 404 ("Connection failed: '
+    + '404 …") and the model is recorded as not found: a session on it ends the turn with "model not found on the '
+    + 'server" and the server gets no request', first.sent === 1 && first.result?.startsWith('Connection failed: ')
+    && first.result.includes('404') && Boolean(blocked?.error?.includes('model not found on the server')) && sent === 0,
+  JSON.stringify({ first, blocked: oneLine(blocked?.error ?? blocked?.text ?? ''), sent }));
+  await openFolder(ctx, projects[1]);
+  await openSettings(page);
+  const again = await testKeyOnce(row, recordRequests);
+  const keyed = recordRequests().at(-1)?.key ?? null;
+  record('MP-41 Keys row "Test" ignores the model’s not_found (models-settings.md Keys "Test 中", U17): pressed again '
+    + 'without changing anything it sends the request with this key at once (the result within 5 s) and shows the '
+    + 'server’s 404 text again, not "Connection error."', again.sent === 1 && again.ms < 5000
+    && again.result?.startsWith('Connection failed: ') && again.result.includes('404')
+    && !again.result.includes('Connection error.') && keyed === last4(KEY.keyTest), JSON.stringify({ again, keyed }));
+}
+
+/**
+ * @brief 提供商的 connection 与模型的 not_found 之下（models-settings.md Keys 的“Test 结果”，规格 §8.3，U17）：经 downThenFixed，
+ *        端点停掉后 Test 失败、另开的会话这一轮在等 connection；端点修好后 Test 在两条记录之下照样带这个 key 发出、成功，
+ *        并清除两条：等着的那一轮在 connection 自己到期（停掉后点 Test 起 30 秒）之前就发出并得到回答。
+ */
+async function keyTestConnection(ctx, row) {
+  const run = await downThenFixed(ctx, (requests) => testKeyOnce(row, requests));
+  record('MP-41 with the endpoint stopped the Keys row "Test" fails ("Connection failed: …") and the provider is '
+    + 'recorded as unreachable: a new session’s turn waits with "Waiting for a model · can’t connect until hh:mm:ss"',
+  run.down.result?.startsWith('Connection failed: ') && run.waited, runBrief(run));
+  record('MP-41 Keys row "Test" ignores the provider’s connection and the model’s not_found, and on success clears '
+    + 'both (models-settings.md Keys "Test 结果", §8.3, U17): with the endpoint back (synthetic: restarted serving '
+    + 'the -404 model) it sends with this key and shows "Connected · …"; the waiting turn then goes out and is '
+    + 'answered well before the connection record would run out '
+    + `(${CONNECTION_COOLDOWN_MS / 1000} s after the failed Test)`, fixedInTime(run)
+    && run.testKey === last4(KEY.keyTest), runBrief(run));
+}
+
+/**
+ * @brief Keys 一行的“Test”与卡上的 Test connection 走同一条路（U17）：一个模型 fake-coder-404 的提供商，在界面上加一个 key；
+ *        not_found 之下照样发出（keyTestNotFound），connection 与 not_found 之下照样发出、成功后两条都清除（keyTestConnection）。
+ */
+async function keyTestRecords() {
+  await restartFake('records', {});
+  const userData = tempDir('mori-v1s-keytest-');
+  const projects = ['p1', 'p2'].map((name) => makeProject(tempDir('mori-v1s-keytest-proj-'), name));
+  // synthetic test setup：只有 fake-coder-404 一个模型、没有 key 的提供商（key 在界面上加），默认范围就是它
+  writeJson(configFile(userData), seedConfig({ providers: [seedProvider('kt', 'Key Test', PORT.records,
+    ['fake-coder-404'])], normalDefault: 'kt' }));
+  let ctx;
+  try {
+    ctx = await startApp(userData);
+    await openSettings(ctx.page);
+    await waitVerified(ctx.page, 'kt/fake-coder-404', 90000);
+    await addKey(ctx.page, 'kt', KEY.keyTest);
+    const row = providerCard(ctx.page, 'kt').locator('[data-testid="key-row"][data-ref="kt#1"]');
+    await row.waitFor({ timeout: 10000 });
+    await keyTestNotFound(ctx, row, projects);
+    await keyTestConnection(ctx, row);
+  } catch (error) {
+    record('MP-41 keyTestRecords: flow', false, oneLine(error, 400));
+    await shot(ctx, 'keyTestRecords-error');
+  } finally {
+    await closeApp(ctx, 'MP-41');
+  }
+}
+
 // ---------- 运行 ----------
 
 const steps = { configInvalid, firstRunLocal, noZones, firstRunToolFailure, projectRules, settingsEdits,
-  cascades, keyReprobe, migration, migrationFailure };
+  cascades, keyReprobe, testRecords, keyTestRecords, migration, migrationFailure };
 
 const keyed = [KEY.first, KEY.spare].join(',');
 const fakeEnv = {
   keyed: [PORT.keyed, { FAKE_KEYS: keyed }], invalid: [PORT.invalid], fresh: [PORT.fresh], seeded: [PORT.seeded],
   moved: [PORT.moved], migrate: [PORT.migrate, { FAKE_KEYS: [KEY.v0plain, KEY.v0cipher].join(',') }],
   cascade: [PORT.cascade], edits: [PORT.edits], reprobe: [PORT.reprobe, { FAKE_KEYS: KEY.right }],
+  records: [PORT.records],
 };
 for (const [name, [port, env]] of Object.entries(fakeEnv)) fakes[name] = await startFake(port, env);
 try {
