@@ -38,7 +38,7 @@ import { basename, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, sleep } from './lib.mjs';
 import {
   activeFile, archivedState, chooseMenuItem, clickOpenFolder, ctrlN, expandArchived, PANE, paneOf, rowOf, settle,
-  stubFolder, until, waitIdle, waitReady,
+  startDelete, stubFolder, until, waitIdle, waitReady,
 } from './m3-helpers.mjs';
 import { composerAt, waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import {
@@ -1252,8 +1252,9 @@ async function leaveToS1(ctx) {
 
 /**
  * @brief 跟随的会话换了（customize-agents-md.md"用户级"与"项目加载的文件"，2026-10-26 补）：m6empty 的新会话与 S1 分屏，
- *        焦点在 m6empty 时开 Instructions 写草稿，在侧栏归档 m6empty：跟到剩下的 S1，带它重新读取。用户级 AGENTS.md 先写长
- *        （synthetic，前后两个会话的合计都超过 2,000），最后写回原来的内容。检查见 followChecks。
+ *        焦点在 m6empty 时开 Instructions 写草稿，在侧栏删除 m6empty（来源里的"删除"；"归档"见 agentsNoProjectFile 前面
+ *        没有剩下一栏的那一路，删除是永久删掉测试自己临时数据目录里的会话文件）：跟到剩下的 S1，带它重新读取。
+ *        用户级 AGENTS.md 先写长（synthetic，前后两个会话的合计都超过 2,000），最后写回原来的内容。检查见 followChecks。
  */
 async function followAnother(ctx, other) {
   const { page } = ctx;
@@ -1276,7 +1277,7 @@ async function followAnother(ctx, other) {
     const draft = `${long}换到分屏另一栏之后还在的草稿\n`;
     await page.getByTestId('agents-editor').fill(draft);
     await watchAgents(page);
-    await chooseMenuItem(page, emptyFile, 'Archive');
+    await (await startDelete(page, emptyFile)).getByRole('button', { name: 'Delete', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('[data-testid="agents-loaded"] .agents-files li'), null,
       { timeout: 15000 }).catch(() => {});
     await settle(page);
@@ -1298,7 +1299,7 @@ function followChecks(ctx, { before, seen, after, draft }) {
   const title = `Files loaded by ${basename(ctx.project)}`;
   const texts = seen.map((item) => item.loaded ?? '');
   const between = seen.filter((item) => item.loaded?.startsWith(title) && item.loaded.includes('Loading…'));
-  record('跟随的会话换了（分屏里归档 Customize 跟随的 m6empty，跟到剩下的 S1）：带新的会话重新读取，项目一栏换成'
+  record('跟随的会话换了（分屏里删除 Customize 跟随的 m6empty，跟到剩下的 S1）：带新的会话重新读取，项目一栏换成'
     + `"${title}"并列出 <m6proj>\\AGENTS.md；编辑框里没保存的字和"Unsaved changes"还在`, after.loadedTitle === title
     && after.loadedFiles.some((path) => samePath(path, join(ctx.project, 'AGENTS.md'))) && after.editor === draft
     && after.status === 'Unsaved changes', JSON.stringify({ title: after.loadedTitle, files: after.loadedFiles,

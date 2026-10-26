@@ -1668,6 +1668,8 @@ async function untrustedAgents(ctx) {
   await openToolsSection(page, 'agents');
   await page.waitForFunction(() => document.querySelector('[data-testid="agents-loaded"] .agents-files li'), null,
     { timeout: 15000 }).catch(() => {});
+  // 信任说明来自 tools.get，单独跑时它可能比 agents.get 晚回来：等它出现再读（不出现时下面的检查失败）。
+  await page.getByTestId('tools-trust').waitFor({ timeout: 15000 }).catch(() => {});
   const agents = { trust: (await toolsHead(page)).trust, ...await agentsLoaded(page) };
   record('没有信任的项目时 Instructions 一节（2026-10-26 补）：顶部仍有"This workspace isn’t trusted, so its skills and '
     + 'settings aren’t listed"，这一节照常列出项目加载的文件（"Files loaded by untrusted"和 <untrusted>\\AGENTS.md）',
