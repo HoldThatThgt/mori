@@ -159,6 +159,30 @@ test('TB-82 a baton the close session writes is byClose with the close role; a p
     assert.equal(closing.session, null, 'the close session records no session position');
   });
 
+test('TB-82 after the session is reopened, a program baton\'s session is found from the instance files on disk',
+  async () => {
+    // synthetic：重新打开前 board.json 里已有程序写的一棒，会话位置指向磁盘上 executor 的实例会话；没有开着的实例
+    const prepareUser = async (user, cwd) => {
+      const file = writeInstanceFile(cwd, 'U.t1.executor', 'I read it and stopped.');
+      const now = Date.now();
+      const request = B.submitRequest(B.newBoard(), { title: 'Login page is blank', goal: 'Fix it', acceptance: null,
+        quote: null }, { message: 'fix the login page', history: [] }, now);
+      const created = B.createTask(request.board, { request: 1, title: 'Find and fix', description: 'Fix it',
+        assignee: 'executor', readOnly: false, dependsOn: [] }, now);
+      const board = structuredClone(created.board);
+      B.findTask(board, 'T1').handoffs.push({ n: 1, from: 'mori', outcome: null, conclusion: 'Ended without a handoff',
+        next: null, openItems: [], evidence: [], session: { file, turns: [1, 1] }, routedTo: { kind: 'close' },
+        reason: 'no_handoff', suggestedNext: null, authorFamilies: [], at: now });
+      await B.saveBoard(join(cwd, 'teams', 'U'), B.markStopped(board, ['T1'], 'user'));
+    };
+    const { team } = await setup(SPLIT, 'A', { prepareUser });
+    assert.equal([...team.lanes.values()].some((lane) => lane.task === 'T1'), false, 'no instance lane is open');
+    const [program] = team.readTask('T1').handoffs;
+    assert.deepEqual([program.role, program.session?.role], ['mori', 'executor']);
+    const read = await team.readSession({ kind: 'task', task: 'T1', role: program.session.role });
+    assert.ok(read.entries.length > 0, 'the executor session reads from its file');
+  });
+
 test('TB-82 board.readTask for a task that does not exist says so', async () => {
   const { team } = await setup(SPLIT, 'A');
   assert.throws(() => team.readTask('T9'), { message: 'T9 does not exist.' });
@@ -296,26 +320,26 @@ test('TB-89 Stop this task stops only that instance with reason user; the task i
     await finishRun(host, second, workThen('done'));
   });
 
-test('TB-89 the dialog reply runs on: stopping a task does not abort it, and it completes normally', async () => {
-  const { team, host, user } = await setup(SPLIT, 'C');
-  addTask(team);
-  const start = await nextDelivery(host, 'U.t1.executor');
-  await beginRun(host, start);
-  // 对话正在回复（synthetic：直接驱动用户会话的一次运行）
-  user.running = true;
-  user.spec.onEvent({ type: 'agent_start' });
-  userMessage(user, 'How is T1 going?');
-  await team.stopTask('T1');
-  assert.deepEqual(host.aborts, [{ id: 'U.t1.executor', reason: 'user' }], 'only the T1 instance is stopped');
-  assert.equal(user.running, true, 'the dialog reply is still running');
-  await assistantTurn(user, { text: 'T1 is stopped; I can hand it back.' });
-  user.running = false;
-  user.spec.onEvent({ type: 'agent_settled' });
-  const last = user.session.sessionManager.buildSessionContext().messages.at(-1);
-  assert.deepEqual([last.role, last.stopReason], ['assistant', 'stop'], 'the reply completes normally');
-  assert.deepEqual(host.aborts, [{ id: 'U.t1.executor', reason: 'user' }], 'the reply was never aborted');
-  await finishRun(host, start, [{ text: 'Interrupted.' }]);
-});
+test('TB-89 the dialog reply runs on: stopping a task aborts only that instance, never the dialog reply',
+  async () => {
+    const { team, host, user } = await setup(SPLIT, 'C');
+    addTask(team);
+    const start = await nextDelivery(host, 'U.t1.executor');
+    await beginRun(host, start);
+    // 对话正在回复（synthetic：直接驱动用户会话的一次运行）
+    user.running = true;
+    user.spec.onEvent({ type: 'agent_start' });
+    userMessage(user, 'How is T1 going?');
+    await team.stopTask('T1');
+    assert.deepEqual(host.aborts, [{ id: 'U.t1.executor', reason: 'user' }], 'only the T1 instance is stopped');
+    // 回复照常写完、结束：这期间与之后都没有停止对话（停止只经 host.abort，这里记下每一次）
+    await assistantTurn(user, { text: 'T1 is stopped; I can hand it back.' });
+    user.running = false;
+    user.spec.onEvent({ type: 'agent_settled' });
+    await settle();
+    assert.deepEqual(host.aborts, [{ id: 'U.t1.executor', reason: 'user' }], 'the dialog reply was never aborted');
+    await finishRun(host, start, [{ text: 'Interrupted.' }]);
+  });
 
 test('TB-89 stopping drops the queue of that instance, ends waits on it and keeps the write lock', async () => {
   const { team, host } = await setup(SPLIT, 'A');

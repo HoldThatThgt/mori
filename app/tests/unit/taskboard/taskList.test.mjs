@@ -136,7 +136,8 @@ test('TB-82 an open view re-reads when the task changes, at most once a second; 
   for (const now of [0, 100, 250, 600]) { change(T0 + now); run(T0 + now); }
   for (const now of [1100, 1150, 1900, 2950]) { run(T0 + now); change(T0 + now); }
   run(Infinity);
-  assert.deepEqual(reads.map((at) => at - T0), [0, 1000, 2000, 3000], 'the first read at once, then at most one a second');
+  assert.deepEqual(reads.map((at) => at - T0), [0, 1000, 2000, 3000],
+    'the first read at once, then at most one a second');
   assert.ok(reads.every((at, i) => i === 0 || at - reads[i - 1] >= 1000), 'no two reads less than a second apart');
   // 运行结束之后（enabled 为假）不再因变化重新读；还没读过时总读一次
   assert.equal(L.rereadWait({ last: 500, pending: false }, 3000, false), null);

@@ -1202,14 +1202,16 @@ interface TaskView {
   （读屏名 `View transcript for <close role> on Request 1`）。
 - `Prompt`：task 的说明全文（`description`，立项写的；Markdown）。（Claude 把子 Agent 收到的那段叫 prompt。）
 - `Depends on`（有时）：每个依赖一行 `T2 <title> · <状态>`，点它打开那个 task 的视图（`Back` 仍回到列表）。
-- `Messages`（有时）：留给这个 task 的消息（§10.1），按时间，每条一行 `<from> · hh:mm`，下面是全文（Markdown，表格照常；WP-13 合入后 mermaid 同对话流）。
+- `Messages`（有时）：留给这个 task 的消息（§10.1），按时间，每条一行 `<from> · hh:mm`，下面是全文（Markdown，表格照常，mermaid 画成图，同对话流）。
 - `Handoffs`（有时）：每一棒，按先后：
   - 头一行 `#<n> <role> · <结果> → <去向>`：`<role>` 是交出这一棒的角色（结案会话写的为结案持有者，程序写的为 `Mori`）；结果与去向的英文见 §15；
     程序写的一棒结果写 `PROGRAM_HANDOFF_LINES` 的文字（`no handoff` 等）；
   - 结论全文（Markdown）；`Open items` 每条一行；`Evidence` 每条一行 `✓ #3 Run npm test` 或 `✗ #4 …`（标题是交接时记下的 `title`）；
     `Suggested next: <role>`（`suggestedNext`，有时）；
   - 这一棒有会话位置（`session` 不为 null）时 `View transcript`（打开这个角色在这个 task 上的会话）；结案会话写的一棒总有 `View transcript`，
-    打开这个需求的结案会话（结案的交接不记会话位置）；程序写的一棒没有会话位置时没有这个按钮。
+    打开这个需求的结案会话（结案的交接不记会话位置）；程序写的一棒没有会话位置时没有这个按钮。程序写的一棒有会话位置时（实例跑过之后
+    没交接、出错或没有模型，§7.4）头一行仍写 `Mori`，`View transcript` 打开的是那个实例的会话：`HandoffDetail.session.role` 是按
+    这一棒记下的会话文件找出的实例角色，不是 `mori`（2026-10-26 审查 #2，临时默认值，docs/v1/defaults.md）。
 - 内容来自 `board.readTask`：打开时读一次；之后这个 task 的 `TaskView` 在 `mori.board` 里变了时重新读，最多每秒一次（§15）。
   读不到时 `Couldn’t load T1: <原文>` 与 `Retry`。
 

@@ -510,8 +510,9 @@ function menuNow(ctx, tab) {
 }
 
 /**
- * @brief 协作模式下的模型按钮（2026-10-26 起能打开菜单，§12.11）：样子；点击打开的菜单只有说明、Task mode 一行和
- *        Manage models，焦点在 Task mode 一行上；Esc 关上；焦点在按钮上按 Enter 同样打开。
+ * @brief 协作模式下的模型按钮（2026-10-26 起能打开菜单，§12.11）：样子；点击打开的菜单只有说明、Task mode 一行、
+ *        See background tasks、Manage agents 和 Manage models，焦点在 Task mode 一行上；Esc 关上；焦点在按钮上按 Enter
+ *        同样打开。
  */
 async function lockedView(ctx, who) {
   const button = await modelButton(ctx, who.tab);

@@ -76,7 +76,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 锁定 | `ModelState.pickLocked` 为真 | 输入框下面一行原来范围按钮的位置（同样的最窄宽度和截短，v0 models.md“窄栏”）：“Task mode · <当前模型 id>”和 ▾，`data-locked="true"`；悬停第二行 `Task mode picks the model for each agent`；打开的菜单只有同一句说明、Task mode 一行、`See background tasks`（§13.13.1）、“Manage agents”（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条“Manage agents 在模型菜单里一直显示”）和“Manage models”（§12.11） | 打开菜单；关掉 Task mode；Manage agents；Manage models |
+| 锁定 | `ModelState.pickLocked` 为真 | 输入框下面一行原来范围按钮的位置（同样的最窄宽度和截短，v0 models.md“窄栏”）：“Task mode · <当前模型 id>”和 ▾，`data-locked="true"`；悬停第二行 `Task mode picks the model for each agent`；打开的菜单只有同一句说明、Task mode 一行、`See background tasks`（§13.13.1）、“Manage agents”（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条“Manage agents 在模型菜单里一直显示”）和“Manage models”（§12.11） | 打开菜单；关掉 Task mode；See background tasks；Manage agents；Manage models |
 | 锁定、没有当前模型 | `pickLocked` 为真，`current` 为 null（被拒绝启动） | 按钮文字“Task mode”（临时，走查时可以改），悬停同上 | 同上 |
 | 锁定、准备中或生成中 | 同上 | 悬停仍是这两行（不加“Can’t switch models until the response finishes”，临时，走查时可以改）；菜单照常能打开 | 同上 |
 | 段内换了模型 | `mori.model_state` | 按钮里的模型 id 换成新模型的 | — |

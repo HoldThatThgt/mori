@@ -183,7 +183,8 @@ export const SCENARIOS = {
     { role: 'executor', kind: 'task', task: 'T1', deliveries: {
       1: [together(wait(5000), call('task_handoff', { task: '{task}', conclusion: 'Ready for review',
         outcome: 'continue', next: 'reviewer' }))],
-      2: [call('task_handoff', { task: '{task}', conclusion: 'No way forward', outcome: 'dead_end', next: 'reviewer' })],
+      2: [call('task_handoff', { task: '{task}', conclusion: 'No way forward', outcome: 'dead_end',
+        next: 'reviewer' })],
     } },
     { role: 'reviewer', kind: 'task', task: 'T1', deliveries: {
       1: [together(wait(5000), call('task_handoff', { task: '{task}', conclusion: 'Wrong', outcome: 'fail',

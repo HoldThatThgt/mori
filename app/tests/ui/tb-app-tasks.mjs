@@ -555,19 +555,15 @@ async function stop(ctx) {
   await openList(ctx, who);
   const since = Date.now();
   const before = scenarioLines(ctx.ep, 'tb-tasks-flow', { agent: 'executor', kind: 'task', task: 'T3' }).length;
-  // 从 task 的视图停：视图的第二行随 mori.board 实时变为 Stopped，停止按钮停止中不可用、停下后没有
-  await clickCard(ctx, 'T3');
-  await waitTaskView(ctx, 'T3');
+  // 从卡片停，一直留在列表里直到交回之后（审查 #13）：中间不重新挂载 T3 的停止按钮，停止的回复晚于 mori.board 到时
+  // 会不会把按钮留成不可用，交回之后才看得出来（从 task 的视图停在 approval 一步）
   await watchMoments(ctx);
-  await ctx.page.locator('[data-testid="bg-task-view"] .bg-task-head [data-action="stop-task"]').click();
-  const view = await waitTaskView(ctx, 'T3', (item) => item.line.includes(' · Stopped · '));
-  const { stopping } = await momentsSeen(ctx);
-  const left = await ctx.page.locator('[data-testid="bg-task-view"] [data-action="stop-task"]').count();
-  record('TB-89 "Stop this task" in the task view (no confirmation): the button is disabled while stopping, then the '
-    + 'view\'s second line turns to "Stopped" live and the button goes away',
-  stopping && Boolean(view) && left === 0, brief({ stopping, line: view?.line, left }));
-  await clickBack(ctx);
+  await ctx.page.locator('[data-testid="bg-task"][data-task="T3"] [data-action="stop-task"]').click();
   const stopped = await waitCard(ctx, 'T3', (card) => card.section === 'finished' && card.phase === 'stopped');
+  const { stopping } = await momentsSeen(ctx);
+  record('TB-89 "Stop this task" on a card (no confirmation): the button is disabled while stopping, then the card '
+    + 'moves to Finished as "Stopped" without the button', stopping && Boolean(stopped) && stopped.stop === false,
+  brief({ stopping, line: stopped?.line, stop: stopped?.stop }));
   const row = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="progress-task"][data-task="T3"]`)
     .textContent().catch(() => '');
   const stopAll = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="stop-team"]`).count();
@@ -608,8 +604,10 @@ async function handBack(ctx, who, since) {
   const back = await waitCard(ctx, 'T3', (card) => card.section === 'running', 30000);
   // 交回后 T3 又可以停（脚本让它先等 3 秒再跑命令）：停止按钮在、可用（停止的回复不会让它一直不可用）
   const again = await waitCard(ctx, 'T3', (card) => card.section === 'running' && card.stop, 10000);
-  record('TB-89 after the hand-back T3\'s card has "Stop this task" again and it is enabled (a stop reply that comes '
-    + 'after the board update does not leave it disabled)', again?.stopDisabled === false,
+  // 停止的回复与 mori.board 谁先到在这里定不了（mori.board 要等 board.json 写出，回复通常先到）；回复晚到的那一种由
+  // taskList.test.mjs 的 TB-89（stopReplyState）守住，这里守住从停下到交回之间不重新挂载、交回后按钮可用
+  record('TB-89 after the hand-back T3\'s card has "Stop this task" again and it is enabled (the list stays mounted '
+    + 'from the stop to the hand-back)', again?.stopDisabled === false,
   brief({ line: again?.line, stop: again?.stop, disabled: again?.stopDisabled }));
   const resumed = await poll(() => scenarioLines(ctx.ep, 'tb-tasks-flow', { agent: 'executor', kind: 'task',
     task: 'T3' }).find((line) => String(line.k) === '2'), 60000);
@@ -670,6 +668,13 @@ async function readonly(ctx) {
     bad?.error === 'reviewer has no session on T1.' && none?.error === 'Request 9 does not exist.',
     brief({ bad: bad?.error, none: none?.error }));
   await otherSessionReads(ctx, who);
+  await afterModeOff(ctx, who);
+}
+
+/**
+ * @brief 协作模式关掉之后（TB-84）：页签、列表、阶段行按钮、task 的视图与会话照常；模型菜单里那一项照常（条件同页签）。
+ */
+async function afterModeOff(ctx, who) {
   await bridge(ctx, { type: 'session.setTeam', sessionId: who.sessionId, mode: 'off' });
   // 等界面跟上：模型按钮上不再是 Task mode
   await poll(async () => (await teamSwitch(ctx, who.tab)).mode === 'off', 10000, 100);
@@ -764,7 +769,18 @@ async function approval(ctx) {
   live?.running === 'true' && live.tools.some((tool) => tool.status === 'running')
     && live.doing === 'Waiting for your approval', brief(live));
   await clickBack(ctx);
-  await ctx.page.locator('[data-testid="bg-task"][data-task="T1"] [data-action="stop-task"]').click();
+  // 从 task 的视图停：视图的第二行随 mori.board 实时变为 Stopped，停止按钮停止中不可用、停下后没有
+  await clickCard(ctx, 'T1');
+  await waitTaskView(ctx, 'T1');
+  await watchMoments(ctx);
+  await ctx.page.locator('[data-testid="bg-task-view"] .bg-task-head [data-action="stop-task"]').click();
+  const view = await waitTaskView(ctx, 'T1', (item) => item.line.includes(' · Stopped · '));
+  const { stopping } = await momentsSeen(ctx);
+  const left = await ctx.page.locator('[data-testid="bg-task-view"] [data-action="stop-task"]').count();
+  record('TB-89 "Stop this task" in the task view (no confirmation): the button is disabled while stopping, then the '
+    + 'view\'s second line turns to "Stopped" live and the button goes away',
+  stopping && Boolean(view) && left === 0, brief({ stopping, line: view?.line, left }));
+  await clickBack(ctx);
   const gone = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="approval-card"]`).waitFor({ state: 'detached',
     timeout: 15000 }).then(() => true, () => false);
   const stopped = await waitCard(ctx, 'T1', (item) => item.phase === 'stopped');
@@ -988,9 +1004,10 @@ async function liveview(ctx) {
   const first = await waitTaskView(ctx, 'T1');
   const third = await waitTaskView(ctx, 'T1', (view) => view.handoffs.length >= 3, 60000);
   const heads = third?.handoffs.map((item) => item.head) ?? [];
-  record('TB-82 an open task view is read again when the task changes, without reopening it: opened before the first '
-    + 'baton, it then shows "#3 executor · Dead end → reviewer"',
-  first?.handoffs.length === 0 && heads[2] === '#3 executor · Dead end → reviewer',
+  // 和视图第一次读到的比（第一棒前等 5 秒、第二棒前再等 5 秒，第一次读到时最多一两棒）
+  record('TB-82 an open task view is read again when the task changes, without reopening it: it first showed fewer '
+    + 'than three batons, then "#3 executor · Dead end → reviewer"',
+  (first?.handoffs.length ?? 3) < 3 && heads[2] === '#3 executor · Dead end → reviewer',
   brief({ first: first?.handoffs.length, heads }));
   await clickBack(ctx);
   await settle(ctx, who, 120000);
@@ -1042,12 +1059,14 @@ async function pairSession(ctx, which) {
 const selectedTab = async (ctx) => (await bgTabs(ctx)).find((item) => item.selected === 'true')?.tab ?? null;
 
 /**
- * @brief 在页面里记下切换之后 task 视图里出现过的内容属于哪个会话（Alpha / Beta），返回取记录的函数。
- *        切到另一个会话的那一刻起，视图里不该出现上一个会话读到的说明与交接。
+ * @brief 在页面里记下 task 视图里出现过的内容属于哪个会话（Alpha / Beta），返回 { mark（在切换的那一刻放一个
+ *        "switch"：之后视图一变就记一次，内容没换也记）, seen（取记录） }。切到另一个会话的那一刻起，视图里不该出现
+ *        上一个会话读到的说明与交接。
  */
 async function watchViews(ctx) {
   await ctx.page.evaluate(() => {
     window.__bgViews = [];
+    window.__bgViewsMark = () => window.__bgViews.push('switch');
     const note = () => {
       const text = document.querySelector('[data-testid="bg-task-view"]')?.textContent ?? '';
       const who = text.includes('Alpha description') ? 'alpha' : text.includes('Beta description') ? 'beta' : 'none';
@@ -1058,10 +1077,13 @@ async function watchViews(ctx) {
     window.__bgViewsObserver = new MutationObserver(note);
     window.__bgViewsObserver.observe(document.body, { subtree: true, childList: true, characterData: true });
   });
-  return () => ctx.page.evaluate(() => {
-    window.__bgViewsObserver?.disconnect();
-    return window.__bgViews;
-  });
+  return {
+    mark: () => ctx.page.evaluate(() => window.__bgViewsMark()),
+    seen: () => ctx.page.evaluate(() => {
+      window.__bgViewsObserver?.disconnect();
+      return window.__bgViews;
+    }),
+  };
 }
 
 /**
@@ -1086,13 +1108,16 @@ async function sessions(ctx) {
   await clickTab(ctx, 'tasks');
   await clickCard(ctx, 'T1');
   await waitTaskView(ctx, 'T1', (view) => view.prompt.includes('Alpha description'));
-  const seen = await watchViews(ctx);
+  const watch = await watchViews(ctx);
+  await watch.mark();
   await showTab(ctx, b.tab);
   const own = await waitTaskView(ctx, 'T1', (view) => view.prompt.includes('Beta description'));
   await sleep(1500);
-  const views = await seen();
+  const views = await watch.seen();
+  const afterSwitch = views.slice(views.indexOf('switch') + 1);
   record('TB-82 two sessions both at their T1 view: switching to the other shows its own T1 at once, never the '
-    + 'previous session\'s prompt or handoffs', Boolean(own) && !views.slice(1).includes('alpha'), brief(views));
+    + 'previous session\'s prompt or handoffs', Boolean(own) && views.includes('switch') && afterSwitch.length > 0
+    && !afterSwitch.includes('alpha'), brief(views));
   await splitButton(ctx, a, b);
 }
 
@@ -1155,7 +1180,7 @@ async function menu(ctx) {
   const who = await begin(ctx, project, `Look at the menu ${tag('menu')}`);
   await waitBoard(ctx, who, (board) => board.tasks.length === 1, 'T1');
   const replying = await poll(async () => (await paneState(ctx.page, who.tab))?.running === true, 10000, 100);
-  const during = await tasksButton(ctx, who.tab);
+  const during = await waitButton(ctx, who, '1 running task') ?? await tasksButton(ctx, who.tab);
   record('TB-80 the stage-line button shows while the dialog is replying ("1 running task")',
     Boolean(replying) && during?.text === '1 running task', brief({ replying, during }));
   // 点不开或没有这一项时记为失败（下面的 record），不在这里抛出
