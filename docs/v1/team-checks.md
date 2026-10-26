@@ -212,7 +212,8 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
 | `tb-app-tasks.mjs --only folding`、`--only tabs`（WP-14 合入后） | 都通过（folding 三项；tabs 三项，先展开折起的组再点路径） |
 | `tb-replay --only stop-task`（TB-89） | 六项都通过：停之前卡片在 `Running`、有 `Stop this task`，点它发出录制里的 `session.stopTask`；之后在 `Finished`、`Stopped`；交回后回到 `Running`、最后在 `Finished`；界面发出的命令与录制一致；页面没有错误 |
 | `tb-app-tasks-owner.mjs`（TB-88） | 通过：`Finished` 里 T6–T1 全是 Done、没有 `Running`；T2 3 条、T5 1 条、T6 2 条消息全文（T6 两条含表格）；T1–T6 与结案会话都能打开，T4（约 1 MB）的会话 261 ms 显示完（WP-14 合入、会话视图折叠之后再跑一次，照样通过，206 ms）；没有发模型请求。只复制那条会话的文件与 `teams/<id>`，没有读 `credentials.json`、`pi/auth.json` |
-| `npm run test:quick` | a37dbbf 之后通过：4/4，87 秒（m0-smoke 31、tb-replay 14、mem-replay 17、m1-replay 16 项）；WP-09 之后通过：4/4，81 秒 |
+| `npm run test:quick` | a37dbbf 之后通过：4/4，87 秒（m0-smoke 31、tb-replay 14、mem-replay 17、m1-replay 16 项）；WP-09 之后通过：4/4，81 秒；第二波合完之后（29d28a9）通过：4/4，87 秒（tb-replay 18、m0-smoke 31、mem-replay 17、m1-replay 16 项） |
+| `tb-real.mjs --only stop`（TB-89 真实层，29d28a9） | 通过：负责人的 DeepSeek 与 GLM（复制的 `mori-real-data`，不读 key）；运行中的 T1 点 `Stop this task` 后是 `stopped`（`stopReason: user`、持有者 executor 保留）、没有程序写的交接，交回之前它的实例没有发请求；交回后在同一个实例会话里继续（只有一个会话文件，有 `[Mori] T1 is back with you.`）、做完到结案、需求 `done`；之后没有悬着的 task；页面没有错误、代理转发了每个请求；用时 55 秒。结果是 `tb-partial-real.json`（--only），计入真实层的在推送前的完整回归里产生 |
 | 整套 `tb-app-tasks*.mjs`、`tb-replay`、TB-46 汇总、`spec-coverage --spec taskboard` | 负责人要求推送前的完整回归里跑（测试分层第 3 条）；两个 `tb-app-tasks*.mjs` 已加进 `npm run test:taskboard` |
 
 ### 等别的包的（包一合并就做）
@@ -222,8 +223,8 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
   （aria-expanded 为 false，▸ / ▾ 是样式画的）、没有看得见的工具卡；点开后三张工具卡都在；运行中的 T3 没有折起的一行。
 - WP-10（发给模型的文字）：合进来了（8f50a42）。TB-89 的 fixture `tests/fixtures/tb/stop-task.json` 录好了（10fb133，
   `MORI_APP_DIR=.tb-runs/real node tests/ui/tb-record.mjs --source %TEMP%mori-real-data --only stop-task`，负责人的
-  DeepSeek 与 GLM，第一次就录成，2104 步），`tb-replay --only stop-task` 六项都通过。还没做的：`tb-real.mjs --only stop`——
-  它的转发代理在 4690（TaskBoard 共用的 4600 段），走查修复会话要等第二波都合完才让用这些端口，那时跑。
+  DeepSeek 与 GLM，第一次就录成，2104 步），`tb-replay --only stop-task` 六项都通过；第二波合完、拿到共用端口之后
+  `tb-real.mjs --only stop` 也跑了（下面“测试”）。
 
 ### 状态表的每一行与用例（AGENTS.md“不留未完成项”第 4 条，2026-10-26）
 
