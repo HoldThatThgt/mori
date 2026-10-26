@@ -221,7 +221,9 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
   customize-agents.md §6.6 都写两项；`ModelMenu` 里三个“关上菜单再去”的处理合成一个 `thenClose`（函数不超过 50 行）；
   `ag-app.mjs` 的 AG-08 在 Task mode 打开时的顺序里加上 `see-background-tasks`。`npm run check` 通过，`test:unit` 477/477，
   `test:tb-unit` 377/377，`ag-app --only AG-08` 四项都通过，`tb-app-tasks --only menu`、`--only stop,readonly` 都通过
-  （`readonly` 要和 `stop` 一起跑：它等全部 task 结束，单独跑时 T3 一直在等）。
+  （`readonly` 要和 `stop` 一起跑：它等全部 task 结束，单独跑时 T3 一直在等）。拿到共用端口之后（e44c3da）：
+  `tb-app-models --only sel` 五项都通过（TB-38：Task mode 下的菜单是说明、Task mode 一行、See background tasks、Manage agents、
+  Manage models），`npm run test:quick` 4/4（86 秒）。
 
 ### 测试（AGENTS.md 测试分层，每次改动的那几层）
 
@@ -309,7 +311,7 @@ TB-88 的在 `tests/ui/tb-app-tasks-owner.mjs`（整套就是一步）；检查�
 | team-tasks 关闭、重新打开、重启、删除 | 删除会话 | `restart`：“TB-85 deleting the session takes its Background tasks with it: the panel is gone and teams/<id> is deleted” |
 | team-stream 内容 | task 行与标题行通往 Background tasks（2026-10-26 的注；审查 #4 改了标题行图标按钮的说法） | `entries`：同 team-tasks 入口的“进展摘要”（“TB-80 the title row has an icon button … highlights that request's tasks”） |
 | model-menu 状态 | 菜单（审查 #1：Task mode 一行之后接 `See background tasks`） | `menu`：“TB-80 the model menu's Task mode part has "See background tasks" right after the Task mode row …”；`plain`：“TB-80 the model menu of a session with no request and task mode off has no "See background tasks"” |
-| model-menu 状态 | 协作模式的菜单（审查 #1、#5） | `tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" … the Task mode row (focused), See background tasks, Manage agents and Manage models …”（customize-agents 合入后的顺序；等共用端口） |
+| model-menu 状态 | 协作模式的菜单（审查 #1、#5） | `tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" … the Task mode row (focused), See background tasks, Manage agents and Manage models …”（customize-agents 合入后的顺序；e44c3da 上通过） |
 | model-menu 状态 | 回复进行中的菜单（审查 #1） | `menu`：“TB-80 the model menu's Task mode part has "See background tasks" right after the Task mode row (a menu item, above Manage agents), usable while a reply is running …” |
 | team-switch 位置 | Task mode 一行与 `See background tasks`、“Manage models”的先后（审查 #1） | 同 model-menu 的两行（`menu` 的 last、TB-38 的 items） |
 | split 右栏 | 右栏开关（审查 #15：阶段行的 `{n} running tasks` 同样点完才切焦点） | `sessions`：“TB-80 in split view, clicking the stage-line button of the pane without focus works …” |
