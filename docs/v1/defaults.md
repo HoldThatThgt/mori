@@ -132,11 +132,10 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 
 | 默认值 | 取值 | 位置 | 理由 | 何时复查 |
 | --- | --- | --- | --- | --- |
-| 一次调用的 subagent 数 | 1–4 | `app/src/shared/subagent.ts` | 与每个 key 的默认并发 4、TaskBoard 同时运行的 task 上限 4 一致；更多的分到下一次调用 | 你走查时觉得不够 |
-| 一次回复的 subagent 上限 | 8（替换原来关闭模式下 `agent_message` 每回合 5 条） | `app/src/shared/subagent.ts` | 够分两批（看一遍、再核对一遍）；防止弱模型一直开下去停不下来 | 走查中碰到上限时 |
+| 一次调用、一次回复的 subagent 数 | 不设上限 | — | 负责人 2026-10-26 定（“as many as main agent want”）；同时在途的请求只受每个 key 的并发设置约束 | 走查中碰到一次开太多、内存或上下文吃紧时 |
 | `description` / `prompt` 长度 | 1–80 / 1–8000 字符 | `app/src/shared/subagent.ts` | 描述是卡片上的一行（同 task 标题 80）；提示要能把背景写全，比 Agent 消息的 4000 宽一些 | 你走查时 |
-| 结果里每个回复的长度 | 16000 字符，超出截掉并注明 | `app/src/kernel/subagent.ts` | 4 个回复合计不超过约 16000 token，小窗口的模型也放得下 | 内网小窗口模型上看到效果时 |
-| 调度类别 | `task`：一个 key 上最多占（并发上限 − 1）个槽位，不排队超时 | `app/src/kernel/team.ts`（`schedClassOf`） | 留一个槽位给你别的对话（team-checks #34）；`conversation` 类别等槽位超过 60 秒会换模型或失败 | 拿到内网端点、知道它的并发时 |
+| 结果里每个回复的长度 | 16000 字符，超出截掉并注明 | `app/src/kernel/subagent.ts` | 每个回复约 4000 token 以内；几个回复一起进主 Agent 的上下文，小窗口的模型也放得下 | 内网小窗口模型上看到效果时 |
+| 调度类别 | `subagent`：严格优先排在 `decision` 之后、`task` 之前；不受“留一个槽位”的限制；不排队超时 | `app/src/kernel/modelPool.ts`、`app/src/kernel/team.ts`（`schedClassOf`） | 负责人 2026-10-26 定“用满并发设置”；`conversation` 类别等槽位超过 60 秒会换模型或失败，subagent 多于槽位时要能排队等 | 拿到内网端点、知道它的并发时 |
 | 进展的合并发送间隔 | 250 毫秒 | `app/src/kernel/subagent.ts` | 同 `mori.board`：工具调用很密时不刷屏 | — |
 | 行里失败原因的显示长度 | 80 字符，悬停看全文 | `app/src/renderer/src/components/SubagentCard.tsx` | 一行放得下 | 你走查时 |
 | 卡片的展开 | 执行中展开，结束时收起一次 | `app/src/renderer/src/components/SubagentCard.tsx` | 执行中看得到每个 subagent 在做什么；结束后只占一行（走查 M18 要的“结束后折起来”） | 你走查时 |
