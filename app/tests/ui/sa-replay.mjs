@@ -230,6 +230,16 @@ async function before(page, fx) {
     && [...states].some((state) => /^(Read|Run) /.test(state)), oneLine(JSON.stringify({ states: [...states],
     opens: [...new Set(running.map((card) => card.open))], statuses: [...new Set(running.map((card) => card.status))],
     counts: [...new Set(running.map((card) => card.rows.length))] }), 900));
+  const preparing = seen.cards.filter((card) => card.status === 'Preparing…');
+  const titleOf = (k) => (k === 0 ? 'Running agents' : k === 1 ? 'Running agent' : `Running ${k} agents`);
+  record('SA-11 replay sa-subagent: while the arguments stream in the card is open with "Preparing…", titled "Running '
+    + 'agents" until a description has arrived and then by the count so far; one row per description received, with '
+    + 'no state', preparing.length > 0 && preparing.some((card) => card.title === 'Running agents')
+    && preparing.every((card) => card.open && card.title === titleOf(card.rows.length)
+      && card.rows.every((row, i) => row[0].startsWith(rows[i]?.description ?? '\u0000') && row[1] === '')),
+  oneLine(JSON.stringify(preparing.map((card) => [card.title, card.open, card.rows])), 900));
+  record('SA-11 replay sa-subagent: while the general subagent\'s approval card is pending the stage line reads '
+    + '"Waiting for your approval"', seen.stages.includes('Waiting for your approval'), seen.stages.join(' | '));
   const fold = await foldOf(page, PANE);
   record('SA-11 replay sa-subagent: after the turn the subagent card folds into the turn\'s "<n> steps" row (WP-14) '
     + 'and, when that row is opened, the card itself is still collapsed', fold.group && fold.hidden === true

@@ -10,9 +10,11 @@
 //   并发 4，会话默认的范围）与 sax（fake-x，不在对话的范围里）；用户级记忆四种各一条；三个临时项目：没有角色文件的
 //   pBase、带 chat（对话）、reviewer、loner 的 pRoles。步骤各用自己的会话，按顺序跑，同一时间只开一个 App。
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { KILL_TASKS, PARALLEL_TASKS, SA_TEXT, SLOT_TASKS } from '../fake-endpoint/scenarios/sa.mjs';
+import {
+  KILL_TASKS, PARALLEL_TASKS, QUEUED_TASKS, REFUSED_TASKS, SA_TEXT, SLOT_TASKS,
+} from '../fake-endpoint/scenarios/sa.mjs';
 import { SEGMENT_SENTENCES, SHARED_SENTENCE } from '../fake-endpoint/scripts.mjs';
 import { appRoot, arg } from './lib.mjs';
 import { toolRows } from './m6-tools-helpers.mjs';
@@ -54,6 +56,10 @@ const SHOWS = {
     + 'into the prompt.',
   snippet: '- subagent: Run subagents in parallel and get their final replies',
   onlyMori: 'Only mori runs here; leave role out.',
+  ghost: 'tasks[1].role "ghost" is not a role here. Roles: mori, chat, loner, reviewer.',
+  correctForm: 'Correct form: subagent {"tasks":[{"description":"Map the capture loop","prompt":"<the whole task>",'
+    + '"read_only":true}]}',
+  waiting: 'Waiting for your approval',
 };
 /** 用户级记忆（synthetic）：四种各一条 */
 const MEMORY = { taste: 'SA-TASTE-LINE', strategy: 'SA-STRATEGY-LINE', review: 'SA-REVIEW-LINE', fact: 'SA-FACT-LINE' };
@@ -77,6 +83,16 @@ const helperRequests = (ctx, scenario, key) => scenarioRequests(ctx.ep, scenario
 /** @brief 某个用户会话的实例会话后缀。 */
 const suffixesOf = (ctx, who) => instanceFiles(ctx, who.sessionId).map((file) => instanceSuffix(who.sessionId, file.id))
   .sort();
+
+/** @brief 这个会话 teams/ 下的每个文件与它的字节数（比较一次调用前后有没有写过）；目录不存在时为空。 */
+function teamFiles(ctx, sessionId) {
+  const dir = teamDir(ctx, sessionId);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { recursive: true }).map(String).sort().flatMap((name) => {
+    const stat = statSync(join(dir, name));
+    return stat.isFile() ? [`${name}:${stat.size}`] : [];
+  });
+}
 
 /** @brief 测试准备（synthetic test setup）：项目、角色文件、记忆、数据目录与合成端点，启动 App。 */
 async function setup(ctx) {
@@ -215,6 +231,13 @@ async function normal(ctx) {
   const row = await subagentToolRow(ctx, who.tab);
   record(`SA-01 Customize › Tools has a subagent row from Mori with no switch and the reason "${SHOWS.reason}"`,
     row?.tag === 'Mori' && row.checked === null && same(row.notes, [SHOWS.reason]), brief(row));
+  await sendMessage(ctx, who.tab, 'Hello in task mode tb-scenario:sa-normal', { team: true });
+  await settle(ctx, who, 60000);
+  const merged = scenarioRequests(ctx.ep, 'sa-normal', { agent: 'mori', kind: 'merged-create' });
+  record('SA-01 in Task mode the merged session (no role files: the base holds dialog, create and close) has no '
+    + 'subagent: none of its requests lists it, while they have task_create', merged.length >= 1
+    && merged.every((item) => !item.tools.includes('subagent') && item.tools.includes('task_create')),
+  brief({ tools: merged.map((item) => item.tools) }));
   const roles = await begin(ctx, ctx.pRoles, 'Say hello tb-scenario:sa-normal');
   await settle(ctx, roles, 60000);
   const [chat] = scenarioRequests(ctx.ep, 'sa-normal', { agent: 'chat', kind: 'off-dialog' });
@@ -359,13 +382,20 @@ function parallelResult(ctx, who) {
 async function refused(ctx, who) {
   const [, result] = subagentResults(who);
   record(`SA-03 a call with role in a project without other roles is refused: "${SHOWS.onlyMori}" and the correct form`,
-    result?.error === true && result.text === `${SHOWS.onlyMori}\nCorrect form: subagent {"tasks":[{"description":`
-      + '"Map the capture loop","prompt":"<the whole task>","read_only":true}]}', brief(result));
+    result?.error === true && result.text === `${SHOWS.onlyMori}\n${SHOWS.correctForm}`, brief(result));
+  await openCard(ctx, who.tab, 1);
   const cards = await cardsOf(ctx, who.tab);
   record('SA-03 the refused call\'s card reads "Run agent" · "Failed · <first line>"; no new instance opened and the '
     + 'endpoint got no request for it', cards[1]?.title === 'Run agent'
     && cards[1].status === `Failed · ${SHOWS.onlyMori}` && same(suffixesOf(ctx, who), ['ask.1.mori', 'ask.2.mori',
     'ask.3.mori']) && helperRequests(ctx, 'sa-parallel', 'refused').length === 0, brief(cards[1]));
+  const opened = await openRow(ctx, who.tab, 1, 1);
+  const [only] = cards[1]?.rows ?? [];
+  record('SA-03 the refused call\'s card has one row per task drawn from its arguments: "Ask a role · reviewer" with '
+    + 'no state (pending); opening it shows only Agent prompt, the prompt it was given', cards[1]?.rows.length === 1
+    && only?.label === 'Ask a role · reviewer' && only.state === '' && only.phase === 'pending'
+    && same(opened.labels, ['Agent prompt']) && opened.prompt === REFUSED_TASKS[0].prompt,
+  brief({ rows: cards[1]?.rows, opened }));
 }
 
 // ---------- SA-06：槽位 ----------
@@ -409,8 +439,13 @@ const sidebarStatus = (ctx, tab) => ctx.page.locator(`.session-item[data-row="${
 async function answerFront(ctx, tab, key) {
   const card = await frontCard(ctx, tab, 15000);
   if (!card) return null;
-  const rows = (await cardsOf(ctx, tab))[0]?.rows ?? [];
-  const seen = { ...card, rows: rows.map((row) => row.state), sidebar: await sidebarStatus(ctx, tab) };
+  // 读这一回合的卡（最后一张）；那一行的进展最多每 250 毫秒发一次（§5.5），批准卡可能先到
+  const rows = await poll(async () => {
+    const now = (await cardsOf(ctx, tab)).at(-1)?.rows ?? [];
+    return now.some((row) => row.state === SHOWS.waiting) ? now : null;
+  }, 3000, 100) ?? (await cardsOf(ctx, tab)).at(-1)?.rows ?? [];
+  const seen = { ...card, rows: rows.map((row) => row.state), sidebar: await sidebarStatus(ctx, tab),
+    stage: await stageText(ctx, tab) };
   const pane = ctx.page.locator(paneSel(tab));
   if (card.subagent === 'Try a command' && key === 'Alt+1') {
     await pane.getByTestId('approval-reason').fill('not now');
@@ -448,6 +483,9 @@ function approvalChecks(ctx, who, cards) {
     + 'and data-subagent; its row reads "Waiting for your approval"; the sidebar shows the session waiting',
   run?.attribution === 'Mori · Run the echo' && run.agent === 'mori' && run.rows[0] === 'Waiting for your approval'
     && run.sidebar === 'approval' && deny?.attribution === 'Mori · Try a command', brief(cards));
+  record(`SA-12 while a general subagent's approval card is pending the stage line reads "${SHOWS.waiting}" `
+    + '(not "Running 3 agents <s>"), like the main agent\'s own approval', cards.length === 2
+    && cards.every((card) => card.stage === SHOWS.waiting), brief(cards.map((card) => card.stage)));
   const [result] = subagentResults(who);
   const rows = result?.details?.agents ?? [];
   record('SA-12 allowed with Alt+1 it goes on; the denial reason becomes the other subagent\'s tool result; the '
@@ -475,7 +513,8 @@ async function stop(ctx) {
   const stopped = instanceFiles(ctx, who.sessionId).flatMap((file) => messagesOf(file.entries))
     .filter((m) => m.role === 'toolResult' && m.toolName === 'bash').map((m) => contentText(m.content));
   record('SA-13 stopping the reply stops every subagent: the card and both rows read Stopped, the pending card is '
-    + 'denied by the stop, and the endpoint gets no request from them afterwards', card?.status === 'Stopped'
+    + 'denied by the stop, and the endpoint gets no request from them afterwards; the title reads "Ran 2 agents"',
+  card?.title === 'Ran 2 agents' && card.status === 'Stopped'
     && same(card.rows.map((row) => row.state), ['Stopped', 'Stopped']) && after.length === 0 && stopped.length === 1
     && /stop/i.test(stopped[0]), brief({ card, after: after.length, stopped }));
   record('SA-13 no "Stop agents" button next to the composer while subagents run', stopTeam === 0, brief({ stopTeam }));
@@ -612,11 +651,53 @@ async function rolesStep(ctx) {
     + 'main agent\'s result is an error', alone?.title === 'Ran agent' && alone.status === 'Failed'
     && (alone.rows[0]?.state ?? '').startsWith('Failed · No model in your range fits loner') && failed?.error === true,
   brief({ alone, failed: failed?.text.slice(0, 200) }));
+  await unknownRole(ctx, who);
+}
+
+/** @brief sa-roles 第三回合：role 写了这个项目没有的角色：§3.3 的两行到模型，不开实例，teams/ 下不多写东西。 */
+async function unknownRole(ctx, who) {
+  const files = teamFiles(ctx, who.sessionId);
+  const suffixes = suffixesOf(ctx, who);
+  await sendMessage(ctx, who.tab, 'Now a role that is not here');
+  await settle(ctx, who, 60000);
+  const [, , ghost] = subagentResults(who);
+  record(`SA-03 with other roles an unknown role reaches the §3.3 check (role has no enum): the model gets `
+    + `"${SHOWS.ghost}" and the correct form; no instance opens, nothing is written under teams/ and the endpoint `
+    + 'gets no request for it', ghost?.error === true && ghost.text === `${SHOWS.ghost}\n${SHOWS.correctForm}`
+    && same(suffixesOf(ctx, who), suffixes) && same(teamFiles(ctx, who.sessionId), files)
+    && helperRequests(ctx, 'sa-roles', 'roles-ghost').length === 0,
+  brief({ ghost, suffixes: suffixesOf(ctx, who), files: teamFiles(ctx, who.sessionId).length }));
+}
+
+// ---------- SA-11：排在同一个回复里的命令之后 ----------
+
+/**
+ * @brief sa-queued：同一个回复里先一条要批准的命令、后一次 subagent：命令的批准卡挂着时 subagent 的卡是
+ *        "Running 2 agents" · "Queued"，每项一行；允许之后照常跑完。
+ */
+async function queued(ctx) {
+  const who = await begin(ctx, ctx.pBase, 'Command first tb-scenario:sa-queued');
+  const pane = ctx.page.locator(paneSel(who.tab));
+  await pane.getByTestId('approval-card').first().waitFor({ timeout: 30000 });
+  await poll(async () => (await cardsOf(ctx, who.tab))[0]?.rows.length === QUEUED_TASKS.length || null, 10000, 100)
+    .catch(() => null);
+  const [held] = await cardsOf(ctx, who.tab);
+  await pane.locator('.composer textarea').focus();
+  await ctx.page.keyboard.press('Alt+1');
+  await settle(ctx, who, 60000);
+  const [result] = subagentResults(who);
+  const labels = QUEUED_TASKS.map((item) => `${item.description} · Read-only`);
+  record('SA-11 a subagent call behind a command that waits for approval in the same reply reads "Running 2 agents" · '
+    + '"Queued", open, one row per task with its description and no state; it runs once the command is allowed',
+  held?.title === 'Running 2 agents' && held.status === 'Queued' && held.open
+    && same(held.rows.map((row) => row.label), labels) && held.rows.every((row) => row.state === '')
+    && same(result?.details?.agents?.map((row) => row.phase), ['done', 'done']),
+  brief({ held, phases: result?.details?.agents?.map((row) => row.phase) }));
 }
 
 // ---------- 主流程 ----------
 
-const steps = { normal, parallel, slots, approval, stop, reload, kill, edits, roles: rolesStep };
+const steps = { normal, parallel, queued, slots, approval, stop, reload, kill, edits, roles: rolesStep };
 
 const ctx = { userData: tempUserData('mori-sa-data-'), exePath: args.exePath, pageErrors: [] };
 try {

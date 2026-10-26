@@ -106,7 +106,8 @@ function roleDescription(roles: readonly RoleDef[]): string {
 }
 
 /**
- * @brief 工具的参数 schema（§3.1）：role 只在有别的角色时出现。
+ * @brief 工具的参数 schema（§3.1）：role 只在有别的角色时出现；不写枚举（说明里列出角色），写错的角色由 §3.3 的检查
+ *        给出两行错误，不被 pi 的 schema 校验先拦下。
  * @param roles 这个用户会话的全部角色（基座在最后）
  */
 export function subagentSchema(roles: readonly RoleDef[]): JsonSchema {
@@ -119,7 +120,7 @@ export function subagentSchema(roles: readonly RoleDef[]): JsonSchema {
       + "for the user's approval. Otherwise it has your tools." },
   };
   if (hasOtherRoles(roles)) {
-    properties.role = { type: 'string', enum: subagentRoleNames(roles), description: roleDescription(roles) };
+    properties.role = { type: 'string', description: roleDescription(roles) };
   }
   return {
     type: 'object',

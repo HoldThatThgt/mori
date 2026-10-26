@@ -57,9 +57,13 @@ test('SA-02 without other roles the schema is §3.1 without role: tasks of descr
   assert.equal(schema.properties.tasks.maxItems, undefined, 'no count cap');
 });
 
-test('SA-02 with other roles role is an enum with mori first and the dialog holder included', () => {
+test('SA-02 with other roles role is a plain string (no enum, so an unknown role reaches the §3.3 check instead of '
+  + 'pi\'s schema validation); its description names the roles', () => {
   const role = S.subagentSchema(WITH_ROLES.roles).properties.tasks.items.properties.role;
-  assert.deepEqual(role.enum, ['mori', 'chat', 'reviewer']);
+  assert.equal(role.type, 'string');
+  assert.equal(role.enum, undefined, 'no enum');
+  assert.deepEqual(S.subagentRoleNames(WITH_ROLES.roles), ['mori', 'chat', 'reviewer'],
+    'the §3.3 check lists mori first and the dialog holder included');
   assert.equal(role.description, 'Who does it: mori (general-purpose, the default) or one of these roles, which '
     + 'bring their own tools: chat: Talks to you; reviewer: Reviews code.');
 });

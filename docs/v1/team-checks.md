@@ -199,12 +199,14 @@ DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Question
 
 | 屏 | 行 | 用例 |
 | --- | --- | --- |
-| [subagent-card.md](screens/subagent-card.md) 卡片 | 准备中、等待执行 | `sa-replay`（sa-subagent）`SA-11 replay sa-subagent: while running the card is open …`（状态依次 Preparing…、Queued） |
+| [subagent-card.md](screens/subagent-card.md) 卡片 | 准备中 | `sa-replay`（sa-subagent）`SA-11 replay sa-subagent: while the arguments stream in the card is open with "Preparing…" …`（`Running agents`，之后按已收到的项数；每项一行、状态空着） |
+| 同上 | 等待执行 | `sa-app --only queued` `SA-11 a subagent call behind a command that waits for approval in the same reply reads "Running 2 agents" · "Queued" …` |
+| 同上 | 阶段行：有 subagent 等你批准时 `Waiting for your approval` | `sa-app --only approval` `SA-12 while a general subagent's approval card is pending the stage line reads "Waiting for your approval" …`；`sa-replay` `SA-11 replay sa-subagent: while the general subagent's approval card is pending the stage line reads …` |
 | 同上 | 执行中（标题、`<d> of <n> done · <s>`、展开、阶段行） | `sa-app --only parallel` `SA-11 while running the card is open …`、`SA-11 the stage line reads …`；`sa-replay` 同名 |
 | 同上 | 结束（`Ran <n> agents · Done · <s>`、收起一次；`Done · 1 failed`） | `sa-app --only parallel` `SA-11 when the call ends the card collapses once …`；`--only roles` `SA-11 a role row reads …` |
 | 同上 | 全部失败（`Failed`） | `sa-app --only roles` `SA-11 when every subagent failed the card reads "Ran agent" · "Failed" …` |
-| 同上 | 被拒绝（`Run <n> agents · Failed · <原因>`） | `sa-app --only parallel` `SA-03 the refused call's card reads "Run agent" …` |
-| 同上 | 已停止 | `sa-app --only stop` `SA-13 stopping the reply stops every subagent …` |
+| 同上 | 被拒绝（`Run <n> agents · Failed · <原因>`；按参数画出各行，状态空着；点开一行只有 Agent prompt） | `sa-app --only parallel` `SA-03 the refused call's card reads "Run agent" …`、`SA-03 the refused call's card has one row per task drawn from its arguments …`；`--only roles` `SA-03 with other roles an unknown role reaches the §3.3 check …` |
+| 同上 | 已停止（`Ran <n> agents` · `Stopped`） | `sa-app --only stop` `SA-13 stopping the reply stops every subagent … the title reads "Ran 2 agents"` |
 | 同上 | 已中断 | `sa-app --only kill` `SA-14 when the background process exits …` |
 | 同上 | 重新打开（已结束；没有结果的按参数画） | `sa-app --only kill` `SA-14 reopening an ended call …`、`SA-14 reopened after a restart …`；`sa-replay` `SA-14 replay sa-subagent: reopened …` |
 | 同上 | 界面重新载入（执行中） | `sa-app --only reload` `SA-14 after Ctrl+R the running card comes back …`、`SA-14 after the reload the card keeps updating …` |
@@ -218,7 +220,7 @@ DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Question
 | subagent-card.md 右栏；[changes.md](../v0/screens/changes.md) 两行；[team-blocked.md](screens/team-blocked.md) 两行（说明改为 `Changes made by other agents aren’t listed here.`） | 通用 subagent 改过文件；没有 Agent 改过文件 | `sa-app --only edits` `SA-15 a read-only subagent does not set the note …`；task 改过文件的两行 `tb-app-misc --only changes` `TB-57 …`（期望的文字已改） |
 | [team-approvals.md](screens/team-approvals.md) | 后台实例要批准（归属 `<Role> · <description>`、`data-subagent`）；界面重新载入 | `sa-app --only approval` `SA-12 a general subagent running a command shows …`、`SA-12 allowed with Alt+1 …`、`SA-12 choosing "Allow bash for this session" …`；`--only reload` `SA-12 the pending approval card of a subagent is still there after the reload …`；`sa-real` `SA-12 real command on …` |
 | [tools.md](../v0/screens/tools.md) | 不是 pi 内置工具的行（`subagent` 的原因） | `sa-app --only normal` `SA-01 Customize › Tools has a subagent row …`；`m6-app-tool-switches --only setup,rows` `M12 没有开关的行 …`；`tb-app-roles --only v0same` `TB-03 off mode without role files: the Tools page rows …` |
-| [tool-cards.md](../v0/screens/tool-cards.md) | 标题对照表的 `subagent` 一行 | `sa-app --only parallel` 与 `--only refused` 的标题检查（Running / Ran / Run） |
+| [tool-cards.md](../v0/screens/tool-cards.md) | 标题对照表的 `subagent` 一行 | `sa-app --only parallel` 的 `SA-11 while running the card is open …`（Running）、`SA-11 when the call ends the card collapses once …`（Ran）、`SA-03 the refused call's card reads "Run agent" …`（Run） |
 
 ### 等别的包合并之后做的
 
@@ -240,7 +242,9 @@ DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Question
 2. **交出去的活那一句怎么写**（规格 §6.4、记忆规格附录 A.1.1）
    - 问题：WP-11 的那一句是固定的，只说 task 与问题；普通模式只有 `subagent` 时，它让模型去找不存在的工具，或把事实写进卡上的
      `description` 而不是 `prompt`。
-   - 选项：① 按这次运行启用的 `task_create`、`agent_message`、`subagent` 拼，Task mode 的文字与 WP-11 逐字相同；② 照旧用固定的句子；
+   - 选项：① 按这次运行启用的 `task_create`、`agent_message`、`subagent` 拼：同时有 `task_create` 与 `agent_message` 的会话（Task mode 的
+     合并会话、分开时的立项）与 WP-11 逐字相同，Task mode 下只有 `agent_message` 的（分开时的对话，task、结案、订阅实例）改为只说问题的那一句；
+     ② 照旧用固定的句子；
      ③ 普通模式不加这一句，只靠工具说明里的“Each subagent starts with no context except the prompt you write”。
    - 选了：①（推荐，walkthrough-fixes 会话转达“现在就写”），登记为临时默认值（[defaults.md](defaults.md) 的“交出去的活那一句”一行）。
    - 实现：`app/src/kernel/memoryText.ts`（`HANDOFF_PARTS`、`handoffText`；`HANDOFF_TEXT` 由它拼出）。
@@ -248,6 +252,15 @@ DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Question
      ends the third line only when …`；App `mem-app-prompt --only prompt,snapshot,merged,split,restart`、`tb-app-flow --only sysmd`
      （期望的句子由 `tests/ui/tb-helpers.mjs` 的 `expectedHandoff` 另行拼出）；真实 `mem-real --only dialog,page`、`tb-real --only ask`、
      `sa-real`。
+
+3. **有别的角色时 `role` 写不写枚举**（规格 §3.1、§3.3；2026-10-26 审查发现）
+   - 问题：写了枚举时，写错的角色在执行前就被 pi 的 schema 校验以 `Validation failed for tool "subagent"` 拒绝，§3.3 的原因（列出可用的
+     角色）与 `Correct form` 到不了模型。
+   - 选项：① 不写枚举，说明里列出角色，写错的由 §3.3 的检查拒绝；② 保留枚举，接受 pi 的校验文字。
+   - 选了：①（推荐，walkthrough-fixes 会话转达），登记为临时默认值（[defaults.md](defaults.md) 的“`role` 参数的写法”一行）。
+   - 实现：`app/src/kernel/subagent.ts`（`subagentSchema`）。
+   - 测试：单元 `SA-02 with other roles role is a plain string (no enum …`；App `sa-app --only roles` `SA-03 with other roles an unknown role
+     reaches the §3.3 check (role has no enum) …`（模型收到的两行逐字、不开实例、`teams/` 下不多写文件、端点没有它的请求）。
 
 ### 未验证
 

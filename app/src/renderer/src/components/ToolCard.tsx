@@ -13,6 +13,7 @@ import type { ToolCall, ToolStatus } from '../state/model';
 import { openFile } from '../state/quotes';
 import { useApp } from '../state/store';
 import { Diff } from './Diff';
+import { seconds } from './duration';
 import { SubagentCard } from './SubagentCard';
 import { toolTitle } from './toolTitle';
 
@@ -49,11 +50,6 @@ export function useNow(active: boolean): number {
     return () => clearInterval(timer);
   }, [active]);
   return now;
-}
-
-/** @brief 秒数文字。 */
-export function seconds(ms: number): string {
-  return ms < 10_000 ? `${(ms / 1000).toFixed(1).replace(/\.0$/, '')}s` : `${Math.round(ms / 1000)}s`;
 }
 
 /** @brief 超过 max 个字时截断加"…"。 */

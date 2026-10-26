@@ -25,6 +25,10 @@ export const SA_TEXT = {
   reviewed: 'REVIEWED-A-TS',
   base: 'BASE-PART-DONE',
   rolesDone: 'Roles round over.',
+  taskMode: 'Hello from task mode.',
+  queuedDone: 'The queued call ran after the command.',
+  queueRead: 'QUEUED-READ-DONE',
+  queueList: 'QUEUED-LIST-DONE',
 };
 
 /** @brief 一项（提示里带脚本名与关键词）。 */
@@ -78,13 +82,24 @@ export const ROLE_TASKS = [
   item('sa-roles', 'roles-base', 'Base part', 'say you are done.'),
 ];
 
+/** sa-roles 第三回合：role 写了这个项目没有的角色（被 §3.3 的检查拒绝，不开实例） */
+export const GHOST_TASKS = [item('sa-roles', 'roles-ghost', 'Ghost part', 'this never runs.', { role: 'ghost' })];
+
+/** sa-queued 的两项（只读）：同一个回复里排在一条要批准的命令之后 */
+export const QUEUED_TASKS = [
+  item('sa-queued', 'queue-read', 'Read after the command', 'read README.md.', { read_only: true }),
+  item('sa-queued', 'queue-list', 'List after the command', 'list the project folder.', { read_only: true }),
+];
+
 /** @brief 一个 subagent 条目（基座或 role），按关键词认出。 */
 const helper = (scenario, match, steps, role = 'mori') => ({ role, kind: 'subagent', match,
   deliveries: { 1: steps } });
 
 export const SCENARIOS = {
   // 没有调用 subagent 的一回合（工具清单、system prompt、没有实例与 teams/ 下的文件）
+  // 第二条（会话里的第 2 条消息）用 /task 发：Task mode 下的合并会话（基座持有三项权限）没有 subagent
   'sa-normal': [{ role: 'mori', kind: 'dialog', deliveries: { 1: [say(SA_TEXT.hello)] } },
+    { role: 'mori', kind: 'merged-create', deliveries: { 2: [call('reply_via_dialog', {}), say(SA_TEXT.taskMode)] } },
     { role: 'chat', kind: 'off-dialog', deliveries: { 1: [say(SA_TEXT.hello)] } }],
   // 三个 subagent 同时跑；第二回合的调用被拒绝
   'sa-parallel': [
@@ -141,13 +156,23 @@ export const SCENARIOS = {
     helper('sa-edit', 'edit', [call('edit', { path: 'src/a.ts',
       edits: [{ oldText: 'return a + b;', newText: 'return a + b + 0;' }] }), say(SA_TEXT.edited)]),
   ],
-  // 角色：reviewer 用范围里的 fake-b，loner 选不到模型，基座照常；第二回合只开 loner（全部失败）
+  // 角色：reviewer 用范围里的 fake-b，loner 选不到模型，基座照常；第二回合只开 loner（全部失败）；第三回合写了没有的角色
   'sa-roles': [
     { role: 'chat', kind: 'off-dialog', deliveries: {
       1: [call('subagent', { tasks: ROLE_TASKS }), say(SA_TEXT.rolesDone)],
       2: [call('subagent', { tasks: [ROLE_TASKS[1]] }), say(SA_TEXT.rolesDone)],
+      3: [call('subagent', { tasks: GHOST_TASKS }), say(SA_TEXT.rolesDone)],
     } },
     helper('sa-roles', 'roles-rev', [call('read', { path: 'src/a.ts' }), say(SA_TEXT.reviewed)], 'reviewer'),
     helper('sa-roles', 'roles-base', [say(SA_TEXT.base)]),
+  ],
+  // 同一个回复里先一条要批准的命令、后一次 subagent：命令的批准卡挂着时 subagent 的卡是 Queued
+  'sa-queued': [
+    { role: 'mori', kind: 'dialog', deliveries: {
+      1: [together(call('bash', { command: 'echo before-the-agents' }), call('subagent', { tasks: QUEUED_TASKS })),
+        say(SA_TEXT.queuedDone)],
+    } },
+    helper('sa-queued', 'queue-read', [call('read', { path: 'README.md' }), say(SA_TEXT.queueRead)]),
+    helper('sa-queued', 'queue-list', [call('ls', { path: '.' }), say(SA_TEXT.queueList)]),
   ],
 };

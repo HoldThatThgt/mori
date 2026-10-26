@@ -818,7 +818,7 @@ function splitPatches(who, req, t) {
 
 // ---------- 步骤 readonly：关闭模式下 chat.md 写 tools: [read] ----------
 
-/** @brief chat.md 写 tools: [read] 的关闭模式对话（关键词模式）：<tools> 只有 read、没有 shell 规则、有 memory。 */
+/** @brief chat.md 写 tools: [read] 的关闭模式对话（关键词模式）：<tools> 只有 read 与 subagent、没有 shell 规则、有 memory。 */
 async function readonly(ctx) {
   const who = { tab: await openProject(ctx, ctx.readonly) };
   const s1 = await send(ctx, who, 'plain question one');
@@ -827,10 +827,11 @@ async function readonly(ctx) {
   const n2 = systemCount(who.sessionFile);
   const reqs = requestsOf(ctx, s1, (info) => info.role === 'chat' && info.kind === 'off-dialog');
   const problems = reqs[0] ? identityProblems(reqs[0]) : ['no request'];
-  record('MEM-02 off mode with chat.md "tools: [read]": the first run\'s <tools> lists only read, as in the request\'s '
-    + 'tools, and <rules> has no shell rule; the second run writes no patch', problems.length === 0
-    && sameSet(reqs[0].tools, ['read', 'agent_message', 'memory'])
-    && listedTools(parsePrompt(reqs[0].system).tools)?.join() === 'read' && n1 === 1 && n2 === 1,
+  // 普通模式另有 subagent（docs/specs/subagent.md §2：Task mode 关闭时总有，对话持有者写了 tools: [read] 时也有）
+  record('MEM-02 off mode with chat.md "tools: [read]": the first run\'s <tools> lists only read and subagent, as in '
+    + 'the request\'s tools, and <rules> has no shell rule; the second run writes no patch', problems.length === 0
+    && sameSet(reqs[0].tools, ['read', 'agent_message', 'memory', 'subagent'])
+    && listedTools(parsePrompt(reqs[0].system).tools)?.join() === 'read,subagent' && n1 === 1 && n2 === 1,
   brief({ problems, tools: reqs[0]?.tools, n1, n2 }));
   record('MEM-11 off mode with chat.md "tools: [read]": the dialog holder still has the memory tool (Mori adds it '
     + 'after the role\'s tools)', reqs.length >= 2 && reqs.every((item) => item.tools.includes('memory')),

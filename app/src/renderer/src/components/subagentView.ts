@@ -8,6 +8,7 @@ import {
 } from '../../../shared/subagent';
 import { BASE_ROLE, roleLabel, toolCallTitle } from '../../../shared/team';
 import type { ToolCall, ToolStatus } from '../state/model';
+import { seconds } from './duration';
 
 /** 卡片还没结束的几种状态（准备中、排队、执行中；等批准不会出现在 subagent 这个调用本身上） */
 const ACTIVE: readonly ToolStatus[] = ['preparing', 'queued', 'awaiting', 'running'];
@@ -56,11 +57,6 @@ export function subagentCardTitle(tool: ToolCall): string {
   return subagentTitle(titleForm(tool), tool.subagent?.agents.length ?? taskCount(tool));
 }
 
-/** @brief 秒数文字（同 v0 工具卡）。 */
-function secondsText(ms: number): string {
-  return ms < 10_000 ? `${(ms / 1000).toFixed(1).replace(/\.0$/, '')}s` : `${Math.round(ms / 1000)}s`;
-}
-
 /** @brief 结束了的卡片的状态：有 details 时按每一行；没有时是被拒绝（Failed · <原因第一行>）或开始前被停止。 */
 function endedStatus(tool: ToolCall): string {
   const rows = tool.subagent?.agents;
@@ -73,7 +69,7 @@ function endedStatus(tool: ToolCall): string {
   if (rows.every((row) => row.phase === 'failed')) return 'Failed';
   const failed = rows.filter((row) => row.phase !== 'done').length;
   return ['Done', ...(failed > 0 ? [`${failed} failed`] : []),
-    ...(tool.durationMs !== null ? [secondsText(tool.durationMs)] : [])].join(' · ');
+    ...(tool.durationMs !== null ? [seconds(tool.durationMs)] : [])].join(' · ');
 }
 
 /**
@@ -89,7 +85,7 @@ export function subagentStatus(tool: ToolCall, now: number): string {
     case 'running': {
       const rows = tool.subagent?.agents ?? [];
       const total = rows.length || (taskCount(tool) ?? 0);
-      const elapsed = tool.startedAt === null ? '' : ` · ${secondsText(Math.max(0, now - tool.startedAt))}`;
+      const elapsed = tool.startedAt === null ? '' : ` · ${seconds(Math.max(0, now - tool.startedAt))}`;
       return `${endedCount(rows)} of ${total} done${elapsed}`;
     }
     case 'interrupted': return 'Interrupted';

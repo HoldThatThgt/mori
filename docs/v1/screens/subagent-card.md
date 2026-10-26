@@ -31,7 +31,7 @@
 | 执行中 | `tool_execution_start` 之后，`tool_execution_update` | `Running <n> agents` · `<d> of <n> done · <秒数>`（例如 `1 of 3 done · 12s`）；卡片自动展开，每个 subagent 一行（见下表） | 收起；点一行展开它 |
 | 结束 | `tool_execution_end`，`isError` 为假 | `Ran <n> agents` · `Done · <耗时>`；有失败或停止的行时 `Done · <k> failed · <耗时>`（停止的也算进 `<k>`，临时，走查时可以改）；结束时自动收起一次 | 展开看每一行 |
 | 全部失败 | `tool_execution_end`，`isError` 为真，`details` 里每一行都是 `failed` 或 `stopped`（你没按停止） | `Ran <n> agents` · `Failed`；自动收起一次 | 同上 |
-| 被拒绝（没开 subagent） | `tool_execution_end`，`isError` 为真，没有 `details` | `Run <n> agents` · `Failed · <错误第一行>`（例如 `Failed · tasks must have 1–4 entries; run more in another call.`）；按参数画出各行，状态空着 | 展开看行（只有 `Agent prompt`） |
+| 被拒绝（没开 subagent） | `tool_execution_end`，`isError` 为真，没有 `details` | `Run <n> agents` · `Failed · <错误第一行>`（例如 `Failed · Only mori runs here; leave role out.`）；按参数画出各行，状态空着 | 展开看行（只有 `Agent prompt`） |
 | 已停止 | 你停止了这次回复（Esc 或停止按钮） | 至少开过一个时 `Ran <n> agents`，否则 `Run <n> agents`；状态 `Stopped`；还没结束的行变为 `Stopped` | 展开看行 |
 | 已中断 | 后台进程退出时还没结束；或重新打开时这次调用没有结果 | `Running` 的标题改为 `Ran`/`Run`（按有没有 `details`）；状态 `Interrupted`；没结束的行 `Interrupted` | 展开看行 |
 | 重新打开（已结束） | 会话文件里的工具结果与 `details` | 与结束时相同（收起；耗时不显示，同 v0） | 展开看行 |

@@ -90,7 +90,7 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
           "description": { "type": "string", "description": "3-6 words the user sees for this subagent, e.g. \"Map the capture loop\"." },
           "prompt": { "type": "string", "description": "The whole task: what to look at, what to find out or change, and what to report back. The subagent sees nothing else." },
           "read_only": { "type": "boolean", "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools." },
-          "role": { "type": "string", "enum": ["mori", "<其他角色名>"], "description": "Who does it: mori (general-purpose, the default) or one of these roles, which bring their own tools: <name: description; …>." }
+          "role": { "type": "string", "description": "Who does it: mori (general-purpose, the default) or one of these roles, which bring their own tools: <name: description; …>." }
         },
         "required": ["description", "prompt"]
       }
@@ -100,8 +100,10 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
 }
 ```
 
-- `role` 只在这个项目有别的角色时出现（`hasOtherRoles`，TaskBoard 规格 §5.2）：枚举是全部角色名，基座 `mori` 在最前（对话持有者自己的角色也在里面：
-  同一个角色的另一个会话不算自己，§10.1）；说明里的角色说明同 `next`、`assignee` 的写法（TaskBoard 规格 §6.3，基座为 `BASE_ROLE_DESCRIPTION`）。
+- `role` 只在这个项目有别的角色时出现（`hasOtherRoles`，TaskBoard 规格 §5.2）；说明里的角色说明同 `next`、`assignee` 的写法（TaskBoard 规格 §6.3，
+  基座为 `BASE_ROLE_DESCRIPTION`）。不写枚举（2026-10-26 临时默认值，见 [v1/defaults.md](../v1/defaults.md)）：有枚举时 pi 在执行前就以
+  `Validation failed for tool "subagent"` 拒绝写错的角色，§3.3 那两行到不了模型。可用的角色由 §3.3 的检查给出：全部角色名，基座 `mori` 在最前
+  （对话持有者自己的角色也在里面：同一个角色的另一个会话不算自己，§10.1）。
 - 没有条数上限（负责人 2026-10-26：“as many as main agent want”）。
 
 ### 3.2 参数归一（`prepareArguments`，TaskBoard 规格 §14.6 T-P1）
@@ -254,7 +256,8 @@ Stopped by the user.
 句子：`<主语> are worked on by agents that don't see <facts>: write the facts they need into <写进哪里>.`；主语两项用 ` and ` 连，三项 `A, B and C`，
 首字母大写；写进哪里两项用 ` or `，三项 `X, Y or Z`。都没有时不加（WP-11 不变）。
 
-- `task_create` 与 `agent_message`（Task mode）：与 WP-11 现在的文字逐字相同；
+- `task_create` 与 `agent_message`（Task mode 的合并会话、分开时的立项）：与 WP-11 现在的文字逐字相同；
+- 只有 `agent_message`（Task mode 下分开时的对话，task、结案、订阅实例）：`Questions you send to other agents are worked on by agents that don't see <facts>: write the facts they need into the question.`（2026-10-26 前是 WP-11 那一句）；
 - 普通模式、没有别的角色：`Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.`；
 - 普通模式、有别的角色：`Questions you send to other agents and prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the question or the prompt.`
 
@@ -391,7 +394,8 @@ interface SubagentRow {
 | 卡片的展开 | 执行中展开，结束时收起一次 |
 | 工具页那一行下面的原因 | `Mori turns this on when Task mode is off.`（句式照 WP-08） |
 | 原来的准则放在哪里 | 并进工具的说明第三行，不写 `promptGuidelines`（§6.1、§6.4；另外两种：保留准则、普通模式 549 token；缩短准则，522 token） |
-| 交出去的活那一句 | 按这次运行启用的工具拼（§6.4），Task mode 的文字不变（另外两种：照旧用固定的句子；普通模式不加这一句） |
+| 交出去的活那一句 | 按这次运行启用的工具拼（§6.4），同时有 `task_create` 与 `agent_message` 时与 WP-11 逐字相同（另外两种：照旧用固定的句子；普通模式不加这一句） |
+| `role` 的写法 | 字符串，不写枚举（§3.1；另一种：保留枚举，写错的角色由 pi 的校验报错，没有 §3.3 的两行） |
 | 界面文字 | §7 |
 
 ## 11. 对其他规格与文档的改动
@@ -402,7 +406,7 @@ interface SubagentRow {
 | --- | --- |
 | `docs/specs/parallel-agents-taskboard.md` §0 | “本规格实现”加一句：普通模式的 `subagent` 见本规格 |
 | 同 §5.2 | “唯一多出来的…”改为：普通模式下对话多一个 `subagent`（见本规格），有别的角色时另有 `agent_message`；与 v0 的差别只有这些（含 WP-10 保留的 `board_read`、`read_session`） |
-| 同 §8.1 表“临时提问”一行 | “什么时候新建”加“或普通模式的 `subagent`（本规格 §4）”；工具“角色工具中的读取类；普通模式的通用 subagent 为角色的工具（本规格 §5.3）”；调度类别“继承发送方的类别；普通模式的 `subagent` 为 `subagent`” |
+| 同 §8.1 表“临时提问”一行 | 会话一栏改为“每次提问一条，只读（普通模式的通用 subagent 除外，本规格 §5.3），回答完就结束”；“什么时候新建”加“或普通模式的 `subagent`（本规格 §4）”；工具“角色工具中的读取类；普通模式的通用 subagent 为角色的工具（本规格 §5.3）”；调度类别“继承发送方的类别；普通模式的 `subagent` 为 `subagent`” |
 | 同 §11.3 | `mori.team_approval_request` 加 `subagent`；卡头的归属有 subagent 时写 `<role> · <description>` |
 | 同 §12.1 表 | “关闭模式下的临时提问”一行注明也用于普通模式的 subagent（本规格 §5.4），内容不变 |
 | 同 §12.10 | 类别加 `subagent`（顺序、不留槽位、不排队超时，本规格 §5.4）；“临时提问继承发送方的类别”后加“（普通模式的 subagent 除外）” |
@@ -487,7 +491,7 @@ interface SubagentRow {
 | --- | --- | --- | --- |
 | SA-01 | 什么时候有 | 普通模式的用户会话的请求里有 `subagent`（没有角色文件、只有基座时也有；对话持有者写了 `tools: [read]` 时也有）；Task mode 下的运行没有（含合并会话），运行中被启用时调用被拒绝；立项、结案、task、临时提问、subagent 自己、增强会话的请求里都没有；工具页有一行 `subagent`，来源 `Mori`，没有开关，行下面的原因按 §2；有别的角色时 `agent_message` 仍在 | 单元、App |
 | SA-02 | 定义与归一 | schema 按 §3.1（`role` 只在有别的角色时出现，枚举基座在前、含对话持有者）；说明、`<tools>` 里的一行逐字按 §6.1（有、没有别的角色两种），没有 `promptGuidelines`；§3.2 的每一种写法归一后相同；`subagent_type` 被丢掉 | 单元 |
-| SA-03 | 执行时的检查 | §3.3 表的每一行：错误两行、文字逐字；被拒绝的调用不开实例、不写 `teams/` 下的文件；一次调用 6 个、同一次回复里再调用一次 3 个都照常开出（没有条数上限） | 单元、App |
+| SA-03 | 执行时的检查 | §3.3 表的每一行：错误两行、文字逐字（有别的角色时写错的角色也到这一项，不被 schema 校验先拦下）；被拒绝的调用不开实例、不写 `teams/` 下的文件；一次调用 6 个、同一次回复里再调用一次 3 个都照常开出（没有条数上限） | 单元、App |
 | SA-04 | 同时运行 | 3 个 subagent 的请求在端点日志里时间重叠（不是一个接一个）；每个 subagent 一条新会话（id `….ask.<n>.<role>`、`mori.instance` 的 `kind` 为 `ask`、`parentSession` 指向用户会话），不在侧栏；运行结束后实例关闭、文件保留；结果按参数顺序 | App、真实 |
 | SA-05 | 工具 | 只读 subagent 的请求里只有 `read`、`ls`（在 Built-in tools 打开 `grep`、`find` 时加上它们）；通用的基座 subagent 的请求里的工具与基座相同（默认设置下 `read`、`bash`、`edit`、`write`，加上直接调用方式的 MCP 工具）；写了 `tools: [read, bash]` 的角色的通用 subagent 只有这两个、只读时只有 `read`、`ls`；都没有 `memory`、`agent_message`、`subagent`、TaskBoard 的工具 | 单元、App、真实 |
 | SA-06 | 槽位与排队 | 一个并发 4 的 key 上开 6 个 subagent：同时 4 个请求在途（不留槽位），另外 2 个等到有一个结束才发出，那一行显示 `Waiting for <提供商名>`；等待的 subagent 不排队超时、不换模型（单元层用合成计时把时间推过 10 分钟）；严格优先的顺序 `conversation` > `decision` > `subagent` > `task` > `background`（排队时别的会话的对话请求先发出）；并发 1 时一个接一个跑完、都成功 | 单元、App |
