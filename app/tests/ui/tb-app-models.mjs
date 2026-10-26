@@ -641,6 +641,27 @@ async function fam(ctx) {
 // ---------- TB-38：协作模式下被拒绝启动，Turn off task mode（tb-models-gone） ----------
 
 /**
+ * @brief 被拒绝启动时在输入框里（team-switch.md“被拒绝启动时输入 /task on、/task off”）：/task <文字> 与其他消息一样
+ *        不发送、草稿不丢；清掉草稿之后 /task on 照样执行（不发消息，模式变为一直打开，仍被拒绝启动、卡还在）。
+ *        /task off 与卡上的 Turn off task mode 走同一个 session.setTeam off（gone 点卡上的按钮）。
+ */
+async function blockedCommands(ctx, who) {
+  const users = (await paneState(ctx.page, who.tab)).users.length;
+  await sendMessage(ctx, who.tab, 'More work please', { team: true });
+  await sleep(1000);
+  const text = { draft: (await paneState(ctx.page, who.tab)).draft, mode: (await teamSwitch(ctx, who.tab)).mode };
+  await sendMessage(ctx, who.tab, '/task on');
+  const on = await poll(async () => (await teamSwitch(ctx, who.tab)).mode === 'always', 10000);
+  const pane = await paneState(ctx.page, who.tab);
+  const after = { draft: pane.draft, users: pane.users.length, card: (await blockedCard(ctx, who.tab))?.kind ?? null };
+  record('TB-38 while the dialog session is blocked in task mode, "/task <text>" is not sent like any other message '
+    + '(the draft stays, the mode stays once) and "/task on" still runs: no message, the input is cleared, the mode '
+    + 'becomes always and the blocked card stays', text.draft === '/task More work please' && text.mode === 'once'
+    && on && after.draft === '' && after.users === users && after.card === 'pick_missing',
+  brief({ users, text, on, after }));
+}
+
+/**
  * @brief chat 唯一的模型所在的提供商在设置里被删掉（models.deleteProvider，同 设置 → Models 的 Delete…；2026-10-26 起
  *        没有网络区域，原来是收回项目的公网授权）：拒绝启动卡（pick_missing）上没有 Change model、有 Turn off task mode；
  *        点后回到 off、T1 stopped。
@@ -654,6 +675,7 @@ async function gone(ctx) {
   const card = await poll(() => blockedCard(ctx, who.tab), 10000);
   const during = await modelButton(ctx, who.tab);
   const modeBefore = (await teamSwitch(ctx, who.tab)).mode;
+  await blockedCommands(ctx, who);
   await ctx.page.locator(`${paneSel(who.tab)} [data-testid="blocked-card"] [data-action="turn-off-team"]`).click();
   const off = await poll(async () => (await teamSwitch(ctx, who.tab)).mode === 'off', 10000);
   const stopped = await waitTaskPhase(ctx, who.tab, { task: 'T1', phase: 'stopped' }, 15000);

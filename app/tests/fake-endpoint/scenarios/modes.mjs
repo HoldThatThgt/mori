@@ -105,9 +105,10 @@ export const SCENARIOS = {
     { role: 'mori', kind: 'merged-create',
       deliveries: { 1: [together(wait(6000), say('No collaboration needed.'))] } },
   ],
-  // TB-05 关闭模式的运行中打开协作模式：这次运行的第二个请求仍是关闭模式的工具、没有工作卡、关闭模式的段。
+  // TB-05 关闭模式的运行中打开协作模式：这次运行的第二个请求仍是关闭模式的工具、没有工作卡、关闭模式的段；首块前等 8 秒，
+  // 其间点开 Task mode，再在输入框里输入 /task off（Ctrl+Enter）、/task on（Enter）（2026-10-26：原来等 5 秒）。
   'tb-modes-runon': [
-    chatOff({ 1: [together(wait(5000), call('read', { path: 'README.md' })), say('Read it.')] }),
+    chatOff({ 1: [together(wait(8000), call('read', { path: 'README.md' })), say('Read it.')] }),
     planner({ 1: [say('Answer directly.')] }), chatTeam({ 2: [say('Team reply.')] }),
   ],
   // TB-05 协作模式的运行中关掉：这次运行的第二个请求仍是协作模式的工具、工作卡与段。

@@ -127,9 +127,9 @@ const requestAt = (ctx, scenario, where) => {
     && (j === undefined || item.info.j === j));
 };
 
-/** @brief 在输入框里写一条 /task 命令并按 Enter，等模型按钮的 data-team-mode 变成 want。 */
-async function teamCommand(ctx, tab, text, want) {
-  await sendMessage(ctx, tab, text);
+/** @brief 在输入框里写一条 /task 命令并按 key（默认 Enter），等模型按钮的 data-team-mode 变成 want。 */
+async function teamCommand(ctx, tab, text, want, key = 'Enter') {
+  await sendMessage(ctx, tab, text, { key });
   await ctx.page.waitForFunction(({ css, mode }) => document.querySelector(css)?.dataset.teamMode === mode,
     { css: `${paneSel(tab)} [data-testid="model-button"]`, mode: want }, { timeout: 10000 });
 }
@@ -574,6 +574,22 @@ const teamShape = (request) => request !== undefined && request.info.kind === 't
   && cardOf(request).startsWith(CARD_OPEN) && request.system.includes(TEAM_DIALOG)
   && request.system.includes(SHARED_PART);
 
+/**
+ * @brief 回复进行中在输入框里输入 /task off（Ctrl+Enter）与 /task on（Enter）（team-switch.md“生成中输入 /task on、
+ *        /task off”）：都按命令处理，等模型按钮变过去；返回 { before, off, on, running（两条命令之后对话仍在回复） }。
+ */
+async function busyCommands(ctx, who) {
+  await closeModelMenu(ctx, who.tab);
+  const before = await composerOf(ctx, who.tab);
+  const look = async () => ({ ...(await composerOf(ctx, who.tab)), mode: (await teamSwitch(ctx, who.tab)).mode,
+    rows: (await queueRows(ctx, who.tab)).length });
+  await teamCommand(ctx, who.tab, '/task off', 'off', 'Control+Enter');
+  const off = await look();
+  await teamCommand(ctx, who.tab, '/task on', 'always');
+  const on = await look();
+  return { before, off, on, running: (await paneState(ctx.page, who.tab)).running };
+}
+
 /** @brief 关闭模式的运行中打开协作模式（脚本 tb-modes-runon）：这次运行不变，下一条按协作模式。 */
 async function runOn(ctx) {
   const scenario = 'tb-modes-runon';
@@ -589,12 +605,20 @@ async function runOn(ctx) {
     + 'turns task mode on', pane.running === true && during.items > 0 && during.disabled === during.items
     && during.note === BUSY_NOTE && during.row && during.focused === 'team-switch' && sw.mode === 'always',
   brief({ running: pane.running, during, sw }));
+  const busy = await busyCommands(ctx, who);
   await settle(ctx, who, 60000);
   await sendMessage(ctx, who.tab, 'Now in team mode');
   await settle(ctx, who, 60000);
   const first = requestAt(ctx, scenario, { agent: 'chat', k: 1, j: 0 });
   const second = requestAt(ctx, scenario, { agent: 'chat', k: 1, j: 1 });
   const next = requestAt(ctx, scenario, { agent: 'chat', k: 2, j: 0 });
+  record('TB-05 during a reply /task off with Ctrl+Enter and /task on with Enter are commands, not a steer or a '
+    + 'queued message (team-switch.md): the mode goes off, then always; the input is cleared each time, no new '
+    + 'bubble, nothing in the queue area, and no user message of the run\'s next request is a /task command',
+  busy.running && busy.off.mode === 'off' && busy.on.mode === 'always' && [busy.off, busy.on].every((item) =>
+    item.draft === '' && item.users === busy.before.users && item.rows === 0) && second !== undefined
+    && !second.messages.some((m) => m.role === 'user' && /\/task (on|off)/i.test(contentText(m.content))),
+  brief(busy));
   record('TB-05 turning team mode on during an off-mode run does not change that run: its second request (after the '
     + 'Task mode row was turned on) still has bash, edit, write and agent_message, no work card and the off-mode '
     + 'section; '
@@ -951,14 +975,17 @@ async function stageBackground(ctx, who) {
 
 // ---------- TB-56：待判断的消息 ----------
 
-/** @brief 对话回复中发三条（Enter、Ctrl+Enter、Enter）：按顺序判断，排队与插话，最后一条判断完时对话已空闲（tb-modes-q3）。 */
+/**
+ * @brief 对话回复中发三条（Enter、Ctrl+Enter、Enter；C 写成 /task Message C：协作模式下只去掉前缀，team-switch.md
+ *        “生成中输入 /task <文字>”）：按顺序判断，排队与插话，最后一条判断完时对话已空闲（tb-modes-q3）。
+ */
 async function queueThree(ctx) {
   const scenario = 'tb-modes-q3';
   const who = await begin(ctx, ctx.split, `Queue three tb-scenario:${scenario}`, { on: true });
   await waitLine(ctx, scenario, { agent: 'chat', kind: 'team-dialog', k: 1 });
   await sendMessage(ctx, who.tab, 'Message A');
   await sendMessage(ctx, who.tab, 'Message B', { key: 'Control+Enter' });
-  await sendMessage(ctx, who.tab, 'Message C');
+  await sendMessage(ctx, who.tab, 'Message C', { team: true });
   await settle(ctx, who, 90000);
   const history = await queueHistory(ctx, who.tab);
   const early = history.find((item) => same(item.rows, ['A', 'B', 'C']
@@ -966,8 +993,10 @@ async function queueThree(ctx) {
   const creates = ['A', 'B', 'C'].map((name, i) => requestAt(ctx, scenario, { agent: 'planner', kind: 'create',
     k: i + 2, j: 0 }));
   record('TB-56 three messages sent while the dialog replies are judged in order: the queue area lists them as '
-    + '"Waiting for planner" in send order, and planner\'s deliveries 2, 3, 4 are A, B, C one after the other',
-  early !== undefined && creates.every((item, i) => item?.info.last.includes(`${NEW_MESSAGE}Message ${'ABC'[i]}`))
+    + '"Waiting for planner" in send order, and planner\'s deliveries 2, 3, 4 are A, B, C one after the other (C '
+    + 'is sent as "/task Message C": in task mode only the prefix comes off, neither its row nor its delivery has '
+    + '"/task")', early !== undefined && creates.every((item, i) => item?.info.last
+    .includes(`${NEW_MESSAGE}Message ${'ABC'[i]}`)) && !creates[2].info.last.includes('/task')
     && creates[0].t < creates[1].t && creates[1].t < creates[2].t,
   brief({ early, creates: creates.map((c) => c?.t) }));
   const judged = history.find((item) => item.rows.includes(`${STEERED}|Message B|`)
@@ -1174,6 +1203,21 @@ async function template(ctx) {
     && words[0]?.text === text && userIndex >= 0 && receipt > userIndex
     && receipt < assistantAfter(entries, userIndex) && items[bubble + 1]?.kind === 'receipt',
   brief({ delivery, words, userIndex, receipt, items: streamShape(items) }));
+  const names = await slashNames(ctx, who.tab);
+  record('TB-05 the "/" list (v0 slash.md) leaves out the prompt template named task (.pi/prompts/task.md: Mori\'s '
+    + '/task comes first) and still lists the other one, tbtmpl', names.includes('tbtmpl') && !names.includes('task'),
+  brief(names));
+}
+
+/** @brief 在输入框里只写 "/"，读“/”补全列表里每一项的名字（data-name），再清空输入框。 */
+async function slashNames(ctx, tab) {
+  const box = ctx.page.locator(`${paneSel(tab)} .composer textarea`);
+  await box.fill('/');
+  const menu = ctx.page.locator(`${paneSel(tab)} [data-testid="slash-menu"]`);
+  await menu.locator('[role="option"][data-name="tbtmpl"]').waitFor({ timeout: 10000 }).catch(() => {});
+  const names = await menu.locator('[role="option"]').evaluateAll((els) => els.map((el) => el.dataset.name));
+  await box.fill('');
+  return names;
 }
 
 // ---------- TB-08：合并会话的回执 ----------
