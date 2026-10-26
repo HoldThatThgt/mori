@@ -392,7 +392,7 @@ interface SubagentRow {
 | `docs/v0/ui-strings.md` | 术语表与“工具卡”一节加本规格的词 |
 | `docs/v1/defaults.md` | 新增“普通模式的 subagent 工具”一节（§10）；“给 `conversation`、`decision` 留的槽位”一行注明不约束 `subagent` |
 | `docs/v1/screens/README.md` | 列出 `subagent-card.md` 与它的来源（§9） |
-| `AGENTS.md` | 常用命令加 `npm run test:subagent`；仓库结构里 `docs/specs/` 列出本规格 |
+| `AGENTS.md` | 常用命令加 `npm run test:sa-unit` 与 `npm run test:subagent`（后者跑整套界面测试，加进“只在推送到远端之前跑”那一句的列表）；仓库结构里 `docs/specs/` 列出本规格 |
 | `docs/v1/team-checks.md` | 新增“普通模式的 subagent 工具”一节：检查记录、负责人的回答、未验证项 |
 
 ## 12. 要改的代码
@@ -437,9 +437,22 @@ interface SubagentRow {
   主 Agent 的工具结果按 §6.3 的格式；“每次询问”下通用 subagent 跑命令时出带 `<Role> · <description>` 的批准卡。模型是否调用 `subagent`、分几份、回复内容只写进 note；
   驱动消息写明“用 subagent 分 3 份看这几个文件夹”，没调用时最多重跑 2 次（同 TaskBoard 规格 §17.1）。
 
-### 14.2 验收条目
+### 14.2 什么时候跑哪些（按 AGENTS.md“测试分层”，2026-10-26 改）
 
-每条测试的名字以条目编号开头。`tests/spec-coverage.mjs --spec subagent` 检查每一条在它列出的每一层都有通过的结果（同 TaskBoard 规格 §17.3）。
+| 时候 | 跑什么 |
+| --- | --- |
+| 每次改动（含合并 `app-v0` 之后） | `npm run check`、构建、`npm run test:unit`、`npm run test:sa-unit` 与改动涉及的其他单元测试脚本（`test:mem-unit` 等）；界面只跑 `npm run test:quick` |
+| 新增或改写的界面用例 | 只用 `--only` 跑这几个：`sa-app.mjs`、`sa-replay.mjs` 里这次新加或改的 SA 用例，改写后的 TB-03、TB-04（在它们所在的脚本里用 `--only`）；不跑整个套件，也不跑覆盖同一界面的其他套件 |
+| 模型看到的或做的有变化（本规格是） | 录 fixture（`tb-record.mjs` 的 subagent 一种）与真实模型一层只跑覆盖这次变化的用例：SA-16 的两次，DeepSeek 与 GLM 各一遍 |
+| 负责人要求推送到远端之前 | 完整回归：`npm run test:subagent`（单元、整套 `sa-app`、`sa-replay`，最后 `spec-coverage --spec subagent`），以及 AGENTS.md 列的其他整套与覆盖检查（`test:taskboard`、`test:memory` 等）；打包后 `m0-smoke --exe` |
+
+- 每次跑界面用例之前、之后告诉 walkthrough-fixes 会话（端口固定为 4970–4979，测试仍串行）。
+- 推送前才跑的层没跑时，检查记录写明哪些是只用 `--only` 跑过的、哪些留到推送前。
+
+### 14.3 验收条目
+
+每条测试的名字以条目编号开头。推送前，`tests/spec-coverage.mjs --spec subagent` 检查每一条在它列出的每一层都有通过的结果（同 TaskBoard 规格 §17.3）；
+平时不跑这个检查（§14.2）。
 
 | 编号 | 条目 | 通过条件 | 层 |
 | --- | --- | --- | --- |
@@ -459,4 +472,4 @@ interface SubagentRow {
 | SA-14 | 重新载入、重启与重新打开 | Ctrl+R 之后 subagent 照常运行、卡片按快照恢复每一行并继续更新；后台进程退出后卡片与没结束的行为 `Interrupted`；重新打开结束了的会话，卡片的行与结束时相同（来自 `details`）；没有结果的调用按参数画出行、`Interrupted` | App、回放 |
 | SA-15 | 右栏 | 通用 subagent 改过文件后右栏显示 `Changes made by other agents aren’t listed here.`、列表里没有它改的文件；只读 subagent 不触发；没有 subagent 改过文件时与 v0 相同 | App |
 | SA-16 | 真实模型 | §14.1 真实模型一层：DeepSeek 与 GLM 各一次（一次只读的分析、一次让通用 subagent 跑一条命令），程序保证的各项通过 | 真实 |
-| SA-17 | 现有功能不退步 | 改写后的 TB-03 与 TB-04 通过；`npm run test:taskboard`、`npm run test:memory` 的套件与覆盖检查通过 | App、回放 |
+| SA-17 | 现有功能不退步 | 每次改动：改写后的 TB-03 与 TB-04（`--only`）与 `npm run test:quick` 通过；推送前：`npm run test:taskboard`、`npm run test:memory` 的整套与覆盖检查通过（§14.2） | App、回放 |
