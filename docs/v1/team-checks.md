@@ -165,6 +165,19 @@
 
 ### 状态（随各包合并更新；最后一次 2026-10-26，合过本地 `app-v0` 的 `d07cc41`，即 WP-10 与 WP-14）
 
+审查之后（2026-10-26，walkthrough-fixes 会话转来的 14 条，先写测试再改）：阶段行在普通模式 subagent 的批准卡挂着时写 `Waiting for your approval`
+（`StageLine.tsx`；TaskBoard 的后台卡仍不改阶段行）；`role` 不写枚举（“要你决定的”第 3 条）；秒数文字合进 `components/duration.ts`；
+`tb-approval` 用今天的程序从真实会话重录（批准请求带 `subagent: null`，`tb-replay --only tb-approval` 7/7）；新加或补全的用例：
+准备中（`sa-replay`）、等待执行（`sa-app --only queued`，新的合成脚本 `sa-queued`）、阶段行等你批准（`sa-app --only approval`、`sa-replay`）、
+被拒绝的卡按参数画的行与 Agent prompt、停止后的 `Ran 2 agents`、有别的角色时写错的角色（`sa-app --only roles`）、Task mode 下的合并会话没有
+`subagent`（单元 SA-01 与 `sa-app --only normal`）、MEM-02 readonly 的期望补上 `subagent`（`mem-app-prompt.mjs` 在合 WP-10 时是自动合并，
+没有冲突，这一条是审查时补的）。结果：`npm run check` 通过；`test:unit` 477/477、`test:tb-unit` 350/350、`test:sa-unit` 29/29、
+`test:mem-unit` 239/239、`test:md-unit` 222/222、合成端点自检 184/184；`sa-app --only normal,parallel,queued,approval,stop,roles` 全过、
+`sa-replay` 16/16；用共用端口的：`npm run test:quick` 4/4（82 秒）、`tb-app-roles --only v0same` 11/11（改写后的 TB-03）、
+`mem-app-prompt --only prompt,merged,split,readonly` 与 `--only prompt,snapshot,merged`（`merged` 要先跑 `snapshot`）全过（MEM-01 实测 500 token、
+MEM-02 readonly 过）、真实模型 `tb-real --only team` 10/10：这次运行里 task 实例（`t1.executor`、`t1.reviewer`、`t2.reviewer`）与结案实例的
+会话文件里是只说问题的那一句，合并会话里是 WP-11 那一句。
+
 合 WP-14 时做的：`sa-app`、`sa-replay` 点开或读一张 subagent 卡之前先用 `tests/ui/page.mjs` 的 `showStep` 点开它所在的步骤组（一轮结束后卡片在
 折起的组里）。合并后 `test:unit` 477/477、`test:tb-unit` 350/350、`test:sa-unit` 28/28、`test:mem-unit` 239/239、`test:md-unit` 222/222、
 合成端点自检 184/184、`npm run check` 通过；整套 `sa-app` 43/43、`sa-replay` 14/14（SA-11 折进 `1 step`、展开那一行时卡片是收起的，两层都过）。
@@ -269,3 +282,5 @@ DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Question
 - **同时很多 subagent**：并发 4 的 key 上 6 个在合成端点上验证过；更多的同时会话（超过 6 个）没有测量（同 TaskBoard 规格 §14.6）。
 - **通用 subagent 同时改同一个文件**：没有隔离也没有写入锁（规格 §0 不做），互相覆盖的情形没有测试。
 - **右栏不列 subagent 改的文件**：只显示一句说明（规格 §0 不做、§7.6）。
+- **Task mode 下分开时的对话那一句**：改为只说问题的那一句，真实模型没有跑到：`tb-real` 的设置里基座持有对话、立项与结案（合并会话），
+  走不到分开时的对话；合成端点上 `tb-app-flow`、`mem-app-prompt --only split` 的期望由 `expectedHandoff` 另行拼出，跑过。
