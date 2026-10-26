@@ -12,7 +12,8 @@
 // 旁边另有 Mori 一侧的检查（写进的文件、会话文件里的记录、界面状态）。每一轮都检查确实发出并有了回复（没有错误卡），
 // 发不出去时这一项的流程记为 FAIL，不会被当成模型行为。
 // 用法（在 app/ 下，先 npm run build）：
-//   node tests/ui/m6-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,5,6,7,8,c]
+//   node tests/ui/m6-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,5,6,7,8,c,t]
+// t（2026-10-26，负责人走查 M12）：Customize 的内置工具里打开 ls，新会话里真实模型用 ls 列出文件（只跑它：--only t）。
 // 结果写到 test-results/m6-real(-packaged).json，截图在 test-results/m6-real(-packaged)/。
 // v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；测试准备在复制出的配置里给两个临时项目
 // 授权公网、默认范围设为 [DeepSeek, GLM] 的分组。走查 1 改为在 设置 → Models 里给首选提供商加模型（等它的探针跑完）、
@@ -82,6 +83,7 @@ const PROMPTS = {
   packageCall: '请调用 package_hello 工具（不需要参数），然后用一句话告诉我它返回了什么。',
   reason1: '笼子里有鸡和兔共 35 只，脚共 94 只。鸡兔各几只？只给出答案，不要调用任何工具。',
   reason2: '一个数加上它的一半等于 45，这个数是多少？只给出答案，不要调用任何工具。',
+  ls: '请调用 ls 工具（不要用 bash 或 read）列出当前文件夹里的文件，然后用一句话告诉我有哪些文件。',
 };
 
 // ---------- 测试文件（synthetic） ----------
@@ -1271,6 +1273,52 @@ async function counterExamples(ctx) {
   await untrustedSkill(ctx);
 }
 
+// ---------- 内置工具的开关（2026-10-26，负责人走查 M12） ----------
+
+/** @brief settings.json 去掉 defaultTools 之后的其余字段（看开关没有动别的字段）。 */
+function otherSettings(value) {
+  const { defaultTools: _tools, ...rest } = value ?? {};
+  return JSON.stringify(rest);
+}
+
+/**
+ * @brief 负责人走查 M12（docs/v0/screens/tools.md"内置工具"）：Customize → Built-in tools 里打开 ls：开关开着、这个会话里
+ *        仍是"Not enabled"，复制出的 settings.json 的 defaultTools 有 "+ls"、别的字段不变；工具页的"New session"建的会话里
+ *        ls 是"Enabled"，真实模型用 ls 列出项目文件：一张"List"卡、Done、没有批准卡（模型没有调用 ls 时记 KNOWN：模型行为）。
+ *        最后把开关关回去，defaultTools 回到原样。
+ */
+async function itemToolSwitch(ctx) {
+  const { page } = ctx;
+  const file = join(ctx.agentDir, 'settings.json');
+  const before = readJson(file);
+  await openToolsSection(page, 'builtin');
+  const row = page.locator('[data-testid="tool-row"][data-tool="ls"]');
+  const on = await flip(page, row, true);
+  const state = await row.locator('.tools-state').innerText();
+  const after = readJson(file);
+  await shot(page, 't-ls-on');
+  record('M12：内置工具里打开 ls：开关开着、这个会话里仍是"Not enabled"；settings.json 的 defaultTools 有 "+ls"，别的字段不变',
+    on.settled && on.checked === 'true' && !on.error && state === 'Not enabled'
+    && (after?.defaultTools ?? []).includes('+ls') && otherSettings(after) === otherSettings(before),
+  JSON.stringify({ on, state, before: before?.defaultTools ?? null, after: after?.defaultTools ?? null }));
+  await clickNewSession(page, toolsNewSession(page));
+  const info = await toolInfo(page, 'ls');
+  await backToChat(page);
+  const turn = await sendTurn(page, PROMPTS.ls);
+  const card = await lastToolCard(page);
+  const listed = card?.title.startsWith('List') ?? false;
+  record('M12：新会话的工具页里 ls 是"Enabled"', info?.active === 'true' && info.state === 'Enabled', JSON.stringify(info));
+  record('M12：真实模型在新会话里用 ls 列出文件：一张"List"卡、Done，没有批准卡（模型没调用 ls 时记 KNOWN）',
+    listed && card.status === 'done' && turn.cards.length === 0, JSON.stringify({ card, cards: turn.cards }), !listed);
+  await shot(page, 't-ls-call');
+  await openToolsSection(page, 'builtin');
+  const off = await flip(page, row, false);
+  await backToChat(page);
+  record('M12：关回 ls 之后 settings.json 的 defaultTools 回到原样', off.settled
+    && JSON.stringify(readJson(file)?.defaultTools ?? null) === JSON.stringify(before?.defaultTools ?? null),
+  JSON.stringify(readJson(file)?.defaultTools ?? null));
+}
+
 // ---------- 执行 ----------
 
 /**
@@ -1303,13 +1351,14 @@ ctx.agentDir = join(ctx.userData, 'pi');
 try {
   await start(ctx);
   await openFolder(ctx, ctx.project, 'Trust workspace');
-  const items = { 1: item1, 2: item2, 3: item3, 4: item4, 5: item5, 6: item6, 7: item7, 8: item8, c: counterExamples };
+  const items = { 1: item1, 2: item2, 3: item3, 4: item4, 5: item5, 6: item6, 7: item7, 8: item8, c: counterExamples,
+    t: itemToolSwitch };
   for (const [item, fn] of Object.entries(items)) {
     if (!wanted(item)) continue;
     try {
       await fn(ctx);
     } catch (error) {
-      record(`${item === 'c' ? '反例' : `走查 ${item}`}：流程`, false, oneLine(error, 400));
+      record(`${{ c: '反例', t: 'M12' }[item] ?? `走查 ${item}`}：流程`, false, oneLine(error, 400));
       await shot(ctx.page, `${item}-error`);
       await recover(ctx.page);
     }

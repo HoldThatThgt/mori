@@ -91,6 +91,7 @@ function describeM6Command(command: Command): string | null {
     case 'agents.save': return 'Save user-level AGENTS.md';
     case 'resource.toggle':
       return `${command.enabled ? 'Enable' : 'Disable'} ${KIND_ONE[command.kind]} ${command.path}`;
+    case 'tools.setDefault': return `${command.enabled ? 'Enable' : 'Disable'} tool ${command.name}`;
     case 'package.add': return `Add plugin from folder ${command.path}`;
     case 'package.setAll': return `${command.enabled ? 'Enable' : 'Disable'} all in plugin ${command.source}`;
     case 'package.remove': return `Remove plugin ${command.source}`;

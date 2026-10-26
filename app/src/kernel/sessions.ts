@@ -50,7 +50,7 @@ import { getModelLayer } from './modelLayer';
 import { ModelSession, type PrepareResult } from './modelSession';
 import { createSettingsManager, loadPi } from './pi';
 import { applyShell, findShell } from './shell';
-import { findRole, loadRoles, type RoleLoad } from './roles';
+import { findRole, loadRoles, PI_DEFAULT_TOOLS, type RoleLoad } from './roles';
 import { createTeam } from './team';
 import type {
   HeldItem, HostEntry, InstanceSpec, SegmentPreference, StopReason, TeamArgs, TeamHost, TeamLike,
@@ -165,8 +165,6 @@ export const TEAM_EXTENSION = 'mori-team';
 export const TEAM_EXTENSION_PATH = `<inline:${TEAM_EXTENSION}>`;
 /** pi 的会话列表里没有你的消息时 firstMessage 的写法（session-manager.js buildSessionInfo） */
 const NO_MESSAGES = '(no messages)';
-/** pi 设置没有 defaultTools 时默认启用的工具（pi core/settings-manager.js DEFAULT_TOOL_NAMES） */
-const PI_DEFAULT_TOOLS: readonly string[] = ['read', 'bash', 'edit', 'write'];
 /** 会话在生成（含协作模式下有 Agent 在运行、排队或有待判断的消息）时拒绝的原文 */
 const GENERATING = 'This session is still running. Stop it first.';
 
