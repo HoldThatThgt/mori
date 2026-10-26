@@ -259,7 +259,7 @@ seats: [close]
 | Name | 文本框 | `Lowercase letters, digits, and -. The file is saved as .mori/agents/<name>.md.`（编辑时 `The file name stays <file>.`） |
 | Description | 文本框（≤ 200 字符，显示 `n/200`） | `Other agents read this when they decide who does what.` |
 | Jobs | 三个勾选框 `Talks to you`、`Plans requests`、`Closes requests` | `Leave all off for an agent that only works on tasks. Jobs no agent takes stay with Mori.`；被别的文件认领的那一项不可用，旁边写 `<name> does this` |
-| Models | 单选 `Same as the session’s model range` / `Use these, in order`；选后者时一个有序列表与 `Add model range`（下拉：Groups、Providers、Models 三节，同模型菜单的顺序与文字） | 列表拖动排序：把一项拖到另一项上，它就排到那一项的位置（WP-03 还没合入，先用这一节自己的拖动列表；WP-03 合入后与 Settings › Models 的列表用同一个组件），每项有移除按钮；列表为空时不能保存 |
+| Models | 单选 `Same as the session’s model range` / `Use these, in order`；选后者时一个有序列表与 `Add model range`（下拉：Groups、Providers、Models 三节，同模型菜单的顺序与文字） | 列表拖动排序：把一项拖到另一项上，它就排到那一项的位置（WP-03 还没合入，先用这一节自己的拖动列表。Mori 最后只留一份拖动排序的实现：WP-03 先合入时，这一节合入 app-v0 时改用它的组件；WP-03 只在 Settings › Models 里就地排序、没有可以共用的组件时，把这一节的列表挪成共用组件，两处都用它。另一份删掉；2026-10-26 走查会话定，集成时查），每项有移除按钮；列表为空时不能保存 |
 | Tools | 单选 `Same as Mori` / `Only these`；选后者时 `piTools` 每个一个勾选框，再加 `All MCP tools` | 一个都不勾时不能保存 |
 | Prompt | 多行文本框 | `What this agent does and how. Added to its system prompt.` |
 
