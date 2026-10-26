@@ -26,6 +26,41 @@
 - **TaskBoard 规格 §4.1、§4.4**：角色文件的 `tools` 可以写 `mcp__*`（全部 MCP 工具，同基座的白名单写法），给表单的
   All MCP tools 用（临时，已问负责人，见下面“等负责人定的”）。
 
-## 测试
+## 测试（按 AGENTS.md“测试分层”，2026-10-26 改）
 
-见下面“测试结果”。
+先写测试再写实现（提交 `945d73c` 在实现 `12e5afc` 之前）：规格 §9.2 的 AG-01–AG-11 每一条在它列出的每一层都有测试，
+`tests/unit/spec-ids.test.mjs` 查过（`agents` 已加进 `tests/spec-coverage.mjs` 的 `SPECS`）。
+
+| 层 | 跑了什么 | 结果 |
+| --- | --- | --- |
+| 检查与构建 | `npm run check`、`npx electron-vite build` | 通过 |
+| 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334 |
+| App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`，端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”） |
+| 快速集 `npm run test:quick` | 没有跑：走查会话要求第二波集成方占着快速集的端口时不跑，集成时跑 | — |
+| 完整回归、覆盖检查 | 按规则只在负责人要求推送前跑（`npm run test:agents`、`v1-models-existing.mjs --id AG-11`） | — |
+| 回放、真实模型 | 不做：这一节不改发给模型的文字、工具、批准或会话事件（规格 §9.1）；`mcp__*` 在角色文件里与基座的白名单是同一个写法 | — |
+
+改到的现有套件（只改了期望的分节列表，没有运行，留给推送前的 AG-11）：`m6-app-tools.mjs`（有会话时的分节、Skills 的 ↓
+落在 Agents、Tab 走 14 步）、`m6-app-settings.mjs`、`m6-replay.mjs`；单元 `taskboard/roles.test.mjs`（`mcp__*` 合格）、
+`taskboard/spec-coverage.test.mjs`（规格名多了 agents），都已通过。
+
+测试时发现的：合成提供商不能叫 `deepseek`（pi 的内置提供商 id，模型配置整份被拒），App 套件改用 `ds`、`zg`。
+
+## 没有做完的
+
+- **AG-08 模型菜单的 Manage agents**：要放在 WP-09 加的 Task mode 那一行下面，WP-09 还没合进 `app-v0`。测试已经写好
+  （`ag-app.mjs` 的 AG-08、AG-10 的第二条），WP-09 一合入就做，同时改 `docs/v1/screens/model-menu.md`。
+- **WP-02**（精简模型卡）还没合入；这一节不依赖它，合入后再合一次 `app-v0` 跑第 1、2 层。
+- **表单的拖动列表**：WP-03（Settings › Models 的拖动排序）还没合入，先用这一节自己的列表（规格 §6.4 写明）；WP-03 合入后
+  如果它有可以共用的组件就换过去。
+
+## 等负责人定的
+
+- **All MCP tools 写进文件的样子**：现在写 `mcp__*`，为此 TaskBoard 规格 §4.1、§4.4 放开了这个写法（临时默认值，
+  [../defaults.md](../defaults.md)“Customize › Agents”）。另两个做法：表单不提供 All MCP tools；或按此刻的 MCP 服务各写一个
+  `mcp__<服务>__*`（以后加的服务不包括）。2026-10-26 已经经走查会话问负责人。
+
+## 没有验证的
+
+- 读不出 `.mori/agents`（权限）时的 `Couldn’t load agents` 与 Retry：单元测试用读不出的路径查了 `roles.get` 的结果；
+  界面上要把测试目录的权限改掉才造得出，没有做。
