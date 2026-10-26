@@ -219,7 +219,7 @@ async function narrowSplit(page) {
   const right = await setSplitWidth(page, 'right', 279);
   bad.push(...(Math.abs(right - 279) > 0.5 ? [`right ${right}px`] : await bothRows(page, 'right 279px')));
   record('分屏：两栏都在生成时，左栏 280–461px 各档、右边一栏 279px，两栏的输入框下面一行（空 / 有字）不换行、不超出输入框，'
-    + '每档该有的都在，截短的先后和最窄对，范围按钮和 Effort 不可用、原因对', bad.length === 0, bad.slice(0, 4).join(' | '));
+    + '每档该有的都在，截短的先后和最窄对，Effort 不可用、范围按钮可用，两者悬停写明原因', bad.length === 0, bad.slice(0, 4).join(' | '));
   await setSplitWidth(page, 'left', 280);
   await composerAt(page, 'left').fill(NARROW_DRAFT);
   const menus = await popoverChecks(page, slotSelector('left'), ['permission', 'queue', 'ring']);

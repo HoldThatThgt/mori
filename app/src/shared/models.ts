@@ -432,7 +432,7 @@ export type BlockedKind = (typeof BLOCKED_KINDS)[number];
 
 /**
  * @brief 拒绝启动卡上的操作（§4.6）；check_agents 是 Check again（平行 Agent 规格 §4.4），
- *        turn_off_team 是协作模式下代替 change_model 的 Turn off team mode（平行 Agent 规格 §5.1、§12.11）。
+ *        turn_off_team 是协作模式下代替 change_model 的 Turn off task mode（平行 Agent 规格 §5.1、§12.11）。
  */
 export const BLOCKED_ACTIONS = [
   'verify', 'allow_zone', 'confirm_zone', 'change_model', 'open_settings', 'check_agents', 'turn_off_team',
@@ -474,7 +474,7 @@ export interface ModelState {
   /** 当前模型标了支持思考 */
   reasoning: boolean;
   /**
-   * 对话会话在协作模式下为真（平行 Agent 规格 §12.11）：范围按钮只显示正在用的模型、不能打开菜单，
+   * 对话会话在协作模式下为真（平行 Agent 规格 §12.11）：模型按钮显示“Task mode · <正在用的模型 id>”、菜单里没有范围的几节，
    * session.setPick 被拒绝，session.pickOptions 返回空
    */
   pickLocked: boolean;

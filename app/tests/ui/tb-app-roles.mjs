@@ -514,7 +514,8 @@ async function topBarHasNoSwitch(ctx, tab) {
 
 /**
  * @brief 点了 Task mode 一行菜单不关、焦点留在这一行（§13.1）：打开后范围的三节换成说明“Task mode picks the model for
- *        each agent”（pickLocked），再点一下关掉，三节和原来的说明回来；Esc 关菜单、焦点回到模型按钮。
+ *        each agent”（pickLocked）；切换中这一行只是 aria-disabled，焦点不掉，所以接着按 Space 就能关掉，三节和原来的
+ *        说明回来；Esc 关菜单、焦点回到模型按钮。
  */
 async function menuStaysOpen(ctx, tab) {
   const menu = ctx.page.locator(modelMenuSel(tab));
@@ -524,7 +525,9 @@ async function menuStaysOpen(ctx, tab) {
   await clickTeamSwitch(ctx, tab, 'always', { keepOpen: true });
   await poll(async () => (await look()).sections === 0, 10000);
   const on = { open: await menu.count(), ...await look() };
-  await clickTeamSwitch(ctx, tab, 'off', { keepOpen: true });
+  await ctx.page.keyboard.press('Space');
+  await ctx.page.waitForFunction((css) => document.querySelector(css)?.dataset.teamMode === 'off',
+    modelButtonSel(tab), { timeout: 10000 }).catch(() => {});
   await poll(async () => (await look()).sections > 0, 10000);
   const off = { open: await menu.count(), ...await look() };
   await ctx.page.keyboard.press('Escape');
@@ -532,11 +535,12 @@ async function menuStaysOpen(ctx, tab) {
   const closed = { open: await menu.count(),
     focus: await ctx.page.evaluate(() => document.activeElement?.dataset.testid ?? null) };
   record('TB-53 clicking the Task mode row keeps the model menu open with the focus on the row: turned on, the '
-    + 'Groups/Providers/Models sections give way to the note "Task mode picks the model for each agent"; turned off, '
-    + 'the sections and "Applies to this session only. …" come back; Esc closes the menu and the focus returns to the '
-    + 'model button', on.open === 1 && on.sections === 0 && on.note === TASK_PICKS && on.focused === 'team-switch'
-    && off.open === 1 && off.sections > 0 && off.note?.startsWith('Applies to this session only.')
-    && off.focused === 'team-switch' && closed.open === 0 && closed.focus === 'model-button',
+    + 'Groups/Providers/Models sections give way to the note "Task mode picks the model for each agent"; Space on the '
+    + 'still-focused row turns it off and the sections and "Applies to this session only. …" come back; Esc closes the '
+    + 'menu and the focus returns to the model button',
+  on.open === 1 && on.sections === 0 && on.note === TASK_PICKS && on.focused === 'team-switch' && off.open === 1
+    && off.sections > 0 && off.note?.startsWith('Applies to this session only.') && off.focused === 'team-switch'
+    && closed.open === 0 && closed.focus === 'model-button',
   brief({ on, off, closed }));
 }
 

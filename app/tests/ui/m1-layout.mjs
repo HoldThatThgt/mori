@@ -349,7 +349,10 @@ const ORDER = ['permission', 'model', 'effort', 'ring', 'wait', 'queue', 'stop',
 /** 不能发送时按钮位置的说明，也是这一行按钮不可用的原因（models.md"不可用时、按钮消失时的焦点"） */
 export const REASONS = { crashed: 'Mori’s background process crashed', restarting: 'Restarting…',
   reopening: 'Starting…', opening: 'Starting…', failed: 'Session didn’t open' };
-/** 准备中、生成中选择范围按钮和 Effort 不可用的原因（ui-strings.md"选择范围、Effort 按钮的悬停"） */
+/**
+ * 准备中、生成中 Effort 不可用的原因、选择范围按钮悬停第三行的原因（ui-strings.md"选择范围、Effort 按钮的悬停"；
+ * 2026-10-26 起范围按钮这时仍可用）
+ */
 export const BUSY = { model: 'Can’t switch models until the response finishes',
   effort: 'Can’t change effort until the response finishes' };
 /** 能用时悬停的第二行（approval.md"权限菜单"、models.md"思考强度"、model-menu.md"选择范围按钮"） */

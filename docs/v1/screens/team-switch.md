@@ -40,7 +40,7 @@ model-selection panel”、M21 “team mode should be task mode”，WP-09）：
 | 回复进行中 | 对话在回复或准备中 | 菜单照常能打开：范围的项不可用（`disabled`，↑ ↓ 跳过），菜单的说明换成 `Can’t switch models until the response finishes`；这一行照常可用（§13.1） | 点击；只影响之后发出的消息，正在进行的回合按它开始时的模式跑完（§5.1） |
 | 只有后台在运行 | `TeamState.busy`，对话空闲 | 同一般：范围的项可用，这一行可用 | 点击 |
 | 界面没准备好 | 会话还在打开（“Starting…”）、后台进程通道没接上、后台进程已退出 | 模型按钮不可用（`aria-disabled`，悬停的最后一行是原因，model-menu.md），菜单打不开、开着的关上，所以不能切换；第一次打开中、打开失败时没有模型按钮 | — |
-| 切换中 | 你点了这一行，`session.setTeam` 还没返回 | 这一行保持原来的样子、不可用（`disabled`，焦点留在菜单里）（临时，走查时可以改） | — |
+| 切换中 | 你点了这一行，`session.setTeam` 还没返回 | 这一行保持原来的样子、不可用：`aria-disabled="true"`、`data-pending="true"`，点击、Enter、Space 不起作用；焦点留在这一行，↑ ↓ 照常（不用真正的 `disabled`：焦点会掉到 body，菜单里的键盘就不起作用了，同模型按钮切换中的 `data-pending`）（临时，走查时可以改） | 返回后再按 Space 或点击 |
 | 已切换 | `session.setTeam` 返回 `TeamState`，或随后的 `mori.team_state` | 这一行的 `aria-checked`、`data-mode`、第二行，模型按钮的文字和 `data-team-mode` 按新的 `mode`；对话流不加任何一行（`mori.team` 不显示，§13.11）；菜单的上半部分随 `mori.model_state` 的 `pickLocked` 换 | — |
 | 切换失败 | `session.setTeam` 返回 `error` | 这一行回到原来的模式；一行 `Couldn’t change task mode: <原文>`（`role="alert"`）：菜单开着时在这一行下面，菜单关着时（例如 `/team on` 失败）从输入框下面一行往上弹出、右边对齐模型按钮（同 model-menu.md 的“切换失败”）；下次切换或 10 秒后消失（临时，走查时可以改） | 再点 |
 | 角色文件有错 | `ModelState.blocked.kind` 为 `agents_invalid` | 这一行不可用（先改角色文件，Check again，team-blocked.md）；菜单其余照常 | — |
@@ -107,7 +107,7 @@ Mori 的 `/team` 优先于同名的 pi 提示词模板和技能；`/team` 不列
 
 ## 本表定下的界面细节
 
-规格没给、本表定的（都是临时，走查时可以改）：点了这一行菜单不关、焦点留在这一行；切换中这一行保持原样、不可用；
+规格没给、本表定的（都是临时，走查时可以改）：点了这一行菜单不关、焦点留在这一行；切换中这一行保持原样、不可用（`aria-disabled`，焦点不掉）；
 `once` 的第二行 `Until done · Ends when open requests are done`；`off` 没有第二行（不写“Turn on task mode”）；
 切换失败那一行 `Couldn’t change task mode: <原文>` 的位置（菜单开着时在这一行下面，关着时在输入框下面一行上方）与消失时机；
 模型按钮“Task mode · <模型 id>”跟着 `TeamState.mode`（不等 `pickLocked`）、没有当前模型时只有“Task mode”；读屏名“Model: Task mode, <模型 id>”；
@@ -125,6 +125,6 @@ Mori 的 `/team` 优先于同名的 pi 提示词模板和技能；`/team` 不列
 
 | 元素 | 标识 |
 | --- | --- |
-| Task mode 一行 | 每一栏模型菜单（`data-testid="model-menu"`）里 `[data-testid="team-switch"]`（§13.1），`role="menuitemcheckbox"`，`aria-checked`（`once`、`always` 为 `true`），`data-mode` 为 `off` / `once` / `always`；第二行 `data-testid="team-hint"`（本表定，临时） |
+| Task mode 一行 | 每一栏模型菜单（`data-testid="model-menu"`）里 `[data-testid="team-switch"]`（§13.1），`role="menuitemcheckbox"`，`aria-checked`（`once`、`always` 为 `true`），`data-mode` 为 `off` / `once` / `always`，切换中 `aria-disabled="true"`、`data-pending="true"`（`agents_invalid` 时是 `disabled`）；第二行 `data-testid="team-hint"`（本表定，临时） |
 | 模型按钮上的模式 | `data-testid="model-button"` 的 `data-team-mode`（`off` / `once` / `always`），`pickLocked` 时 `data-locked="true"`（model-menu.md） |
 | 切换失败 | `data-testid="team-error"`（本表定，临时） |

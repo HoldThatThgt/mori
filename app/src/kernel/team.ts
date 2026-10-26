@@ -369,7 +369,7 @@ export class Team implements TeamLike {
 
   /**
    * @brief session.setTeam（§5.1）：打开为 always；关掉时满足“回到 off 的条件”为 off，否则 once；协作模式下对话会话
-   *        被拒绝启动时直接回到 off（拒绝启动卡的 Turn off team mode）。
+   *        被拒绝启动时直接回到 off（拒绝启动卡的 Turn off task mode）。
    * @param mode on / off
    */
   async setMode(mode: TeamSwitch): Promise<TeamState> {

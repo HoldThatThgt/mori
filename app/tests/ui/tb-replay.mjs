@@ -18,7 +18,8 @@
 //     侧栏等你批准；对话一轮结束不清掉卡；Alt+1 允许；TaskBoard 工具从不出卡；权限菜单的说明。
 //   TB-53（tb-ask、tb-team；2026-10-26 起开关在模型菜单里，docs/v1/screens/team-switch.md）：模型按钮上的
 //     "Task mode · <模型 id>" 与 data-team-mode、Task mode 一行的 aria-checked 与第二行、三种点击（off → always → off、
-//     once → always → once，菜单不关）、打开中与后台进程退出时切不了、做完为止在汇报的那一轮结束时回到 off。
+//     once → always → once，菜单不关）、打开中与后台进程退出时切不了、做完为止在汇报的那一轮结束时回到 off；
+//     切换失败的一行在菜单里与输入框下面一行上方（synthetic：回放桥 failNext 让 session.setTeam 失败，不占回放顺序）。
 // 录制文件还不存在时，每个对应编号记一条失败"<编号> replay fixture missing"（不造假录制）。
 // 用法（在 app/ 下）：node tests/ui/tb-replay.mjs [--only tb-team,m1/readme]
 // 结果写到 test-results/tb-replay.json（--only 时 tb-partial-replay.json，不计入覆盖检查）；截图在 test-results/tb-replay/。
@@ -32,6 +33,7 @@ import { _electron as electron } from 'playwright-core';
 import { build } from 'vite';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
+import { PICK_ERROR, placeProblems, popupBox } from './m6-helpers.mjs';
 import { progressOf, receiptsOf, setProgressOpen, transcriptItems } from './tb-helpers.mjs';
 import { expectedTitle, label } from './tb-real-helpers.mjs';
 
@@ -55,6 +57,18 @@ const TASK_PICKS = 'Task mode picks the model for each agent';
 const BUTTON = `${PANE} [data-testid="model-button"]`;
 const MENU = `${PANE} [data-testid="model-menu"]`;
 const ROW = `${MENU} [data-testid="team-switch"]`;
+/** 当前一栏切换失败的一行（菜单开着时在菜单里，关着时在输入框下面一行上方；team-switch.md“切换失败”） */
+const TEAM_ERROR = `${PANE} [data-testid="team-error"]`;
+/** 回放桥 failNext 让 session.setTeam 失败时的原文（synthetic）：菜单开着时点 Task mode 一行、菜单关着时 /team on */
+const TEAM_FAIL = { menu: 'Synthetic: session.setTeam failed (menu)', command: 'Synthetic: session.setTeam failed' };
+/** @brief 切换失败那一行的文字（§13.1）。 */
+const teamFailText = (message) => `Couldn’t change task mode: ${message}`;
+/**
+ * 本测试用 failNext 注入的失败原文，每注入一次记一条：界面照例（异常分支记错误日志）为它写一条
+ * "[renderer] session.setTeam failed: <原文>"（state/bridge.ts describe），"the page has no errors" 每次注入只扣掉
+ * 一条（同 m1-replay.mjs），多的照样算错。
+ */
+const injected = [];
 /** 权限菜单的说明（§11.1） */
 const PERMISSION_NOTE = 'Applies to all agents in this session. New sessions start at Ask each time.';
 /** TaskBoard 的工具（§6.3），从不出卡 */
@@ -257,6 +271,23 @@ async function finish(page, id, label_, steps) {
     status.errors.join('; ') || `commands ${status.commands.map((c) => c.type).join(', ')}`);
 }
 
+/** @brief 让回放桥的下一条界面命令以 text 失败（synthetic，不占回放顺序），并记下界面因此该写的那条错误日志。 */
+async function failNext(page, text) {
+  injected.push(text);
+  await page.evaluate((message) => { window.__replay.failNext = message; }, text);
+}
+
+/** @brief 页面错误里去掉每次注入的那一条（"[renderer] <命令> failed: <原文>"，各扣一次）并清空记录，剩下的是真的报错。 */
+function unexpectedErrors(errors) {
+  const left = [...errors];
+  const ours = (line, text) => /^\[renderer\] [\w.]+ failed: /.test(line) && line.endsWith(` failed: ${text}`);
+  for (const text of injected.splice(0)) {
+    const index = left.findIndex((line) => ours(line, text));
+    if (index >= 0) left.splice(index, 1);
+  }
+  return left;
+}
+
 /** @brief 点侧栏"Open folder…"（回放桥返回下一条 session.create 的文件夹）；有信任询问时按 trust 回答；等会话就绪。 */
 async function openFolder(page, trust = null) {
   await page.getByTestId('sidebar').getByRole('button', { name: 'Open folder…' }).click();
@@ -395,7 +426,8 @@ async function switchNow(page, keepOpen = false) {
   await openMenu(page);
   const row = await page.locator(ROW).evaluate((el) => ({ rowMode: el.dataset.mode,
     checked: el.getAttribute('aria-checked'), role: el.getAttribute('role'), label: el.getAttribute('aria-label'),
-    hint: el.querySelector('[data-testid="team-hint"]')?.textContent ?? null, rowDisabled: el.disabled }));
+    hint: el.querySelector('[data-testid="team-hint"]')?.textContent ?? null,
+    rowDisabled: el.disabled || el.getAttribute('aria-disabled') === 'true' }));
   const state = { ...(await buttonNow(page)), ...row };
   if (!keepOpen) await closeMenu(page);
   return state;
@@ -454,11 +486,61 @@ async function exitedSwitch(page) {
     && after.mode === before.mode && after.text === before.text && menu === 0, JSON.stringify({ before, after, menu }));
 }
 
+/** @brief 开着的模型菜单里切换失败那一行：文字、role、是不是紧跟在 Task mode 一行下面；这一行的模式、切换中、焦点。 */
+const menuError = (page) => page.locator(MENU).evaluate((menu) => {
+  const row = menu.querySelector('[data-testid="team-switch"]');
+  const line = menu.querySelector('[data-testid="team-error"]');
+  return { text: line?.textContent ?? null, role: line?.getAttribute('role') ?? null,
+    underRow: Boolean(line) && line.previousElementSibling === row, mode: row?.dataset.mode ?? null,
+    pending: row?.getAttribute('aria-disabled') === 'true', focused: document.activeElement === row };
+});
+
+/** @brief 菜单关着时切换失败那一行（输入框下面一行上方）：文字、role、在不在模型菜单里。 */
+const lineError = (page) => page.locator(TEAM_ERROR).evaluate((el) => ({ text: el.textContent,
+  role: el.getAttribute('role'), inMenu: Boolean(el.closest('[data-testid="model-menu"]')) }));
+
+/**
+ * @brief TB-53（tb-ask，synthetic：回放桥 failNext 让 session.setTeam 失败，不占回放顺序）：切换失败的一行
+ *        "Couldn’t change task mode: <原文>"（role=alert）。菜单开着时紧跟在 Task mode 一行下面，这一行回到 off、
+ *        焦点留在它上面；菜单关着时（/team on 失败）从输入框下面一行往上弹出、右边对齐模型按钮（同换范围失败），
+ *        模型按钮仍是 off，约 10 秒后自己消失。
+ */
+async function failedSwitch(page) {
+  await openMenu(page);
+  await failNext(page, TEAM_FAIL.menu);
+  await page.locator(ROW).click();
+  await page.locator(`${MENU} [data-testid="team-error"]`).waitFor({ timeout: 5000 });
+  const open = await menuError(page);
+  await closeMenu(page);
+  await failNext(page, TEAM_FAIL.command);
+  await typeAndSend(page, '/team on');
+  await page.waitForFunction(({ css, want }) => document.querySelector(css)?.textContent === want,
+    { css: TEAM_ERROR, want: teamFailText(TEAM_FAIL.command) }, { timeout: 5000 }).catch(() => {});
+  const geo = await popupBox(page, { popup: TEAM_ERROR, anchor: PICK_ERROR.opener });
+  const closed = { ...await lineError(page), button: await buttonNow(page) };
+  const start = Date.now();
+  const gone = await page.locator(TEAM_ERROR).waitFor({ state: 'detached', timeout: 13000 })
+    .then(() => true, () => false);
+  const waited = Date.now() - start;
+  const problems = placeProblems(geo, { ...PICK_ERROR, popup: TEAM_ERROR });
+  record('TB-53 replay tb-ask (synthetic failure): with the model menu open, a failed switch shows "Couldn’t change '
+    + 'task mode: <error>" (role=alert) right under the Task mode row; the row stays off, is usable again and keeps '
+    + 'the focus', open.text === teamFailText(TEAM_FAIL.menu) && open.role === 'alert' && open.underRow
+    && open.mode === 'off' && !open.pending && open.focused, JSON.stringify(open));
+  record('TB-53 replay tb-ask (synthetic failure): with the menu closed, a failed /team on shows the same line '
+    + '(role=alert) above the composer row, right-aligned with the model button like a failed range change; the '
+    + 'model button stays off; the line goes away by itself after about 10 seconds',
+  closed.text === teamFailText(TEAM_FAIL.command) && closed.role === 'alert' && !closed.inMenu
+    && closed.button.mode === 'off' && problems.length === 0 && gone && waited > 8000,
+  JSON.stringify({ closed, problems, gone, waited }));
+}
+
 /** @brief tb-ask 的全部检查。 */
 async function askFixture(page, fx) {
   const steps = await askRun(page, fx);
   await askChecks(page, steps);
   await askSwitch(page, steps);
+  await failedSwitch(page);
   await exitedSwitch(page);
 }
 
@@ -849,7 +931,7 @@ async function guarded(page, errors, { id, label: name }, run) {
     record(`${id} replay ${name}: flow`, false, oneLine(error, 600));
     await shot(page, `${name.replace(/\W+/g, '-')}-error`);
   }
-  const mine = errors.slice(before);
+  const mine = unexpectedErrors(errors.slice(before));
   record(`${id} replay ${name}: the page has no errors`, mine.length === 0, mine.slice(0, 5).join(' | '));
 }
 

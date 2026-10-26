@@ -135,9 +135,10 @@ const BUSY_NOTE = 'Can’t switch models until the response finishes';
 /** @brief 开着的模型菜单此刻的样子：范围的项有几个、几个不可用，说明的文字，Task mode 一行可不可用，焦点在哪个标识上。 */
 const menuLook = (ctx, tab) => ctx.page.locator(modelMenuSel(tab)).evaluate((el) => {
   const items = [...el.querySelectorAll('[role="menuitemradio"]')];
+  const row = el.querySelector('[data-testid="team-switch"]');
   return { items: items.length, disabled: items.filter((item) => item.disabled).length,
     note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null,
-    row: el.querySelector('[data-testid="team-switch"]')?.disabled === false,
+    row: Boolean(row) && !row.disabled && row.getAttribute('aria-disabled') !== 'true',
     focused: document.activeElement?.dataset.testid ?? null };
 });
 

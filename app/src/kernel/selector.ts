@@ -381,7 +381,7 @@ function plainBlocked(kind: ModelBlocked['kind'], detail: string, actions: Block
 }
 
 /**
- * @brief 卡上换模型的操作（§4.6 的 Change model；平行 Agent 规格 §12.11：协作模式下的对话会话改为 Turn off team mode，
+ * @brief 卡上换模型的操作（§4.6 的 Change model；平行 Agent 规格 §12.11：协作模式下的对话会话改为 Turn off task mode，
  *        角色会话不提供），后面跟 Open settings。
  * @param input 静态校验的输入
  */

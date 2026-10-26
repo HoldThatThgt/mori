@@ -187,7 +187,7 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 
 | 浮层 | 生成开始（准备中、生成中） | 不能发送（后台进程退出、重新载入、打开中、打开失败） | 其他 |
 | --- | --- | --- | --- |
-| 范围菜单 | 不关（2026-10-26 起；范围的项变为不可用，只有 Task mode 一行和“Manage models”能用） | 关闭 |
+| 范围菜单 | 不关（2026-10-26 起；范围的项变为不可用，只有 Task mode 一行和“Manage models”能用） | 关闭 | 按钮消失时（打开失败）跟着关 |
 | Effort 菜单 | 关闭（按钮不可用） | 关闭 | 按钮消失时（打开失败；没有当前模型时的 Effort）跟着关 |
 | 权限菜单 | 不关（生成中仍可用，同原来） | 关闭（原来不关，一起改） | — |
 | 圆环详情 | 不关 | 不关（圆环保留最后的用量） | 只在圆环消失时（打开失败、pi 返回空）跟着关 |
@@ -234,7 +234,7 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 | 宽 | 会话面板宽于 680px | 权限"Ask each time ▾"；选择范围按钮（最长 200px，任何宽度都是这个上限）；"Effort: High ▾"；圆环；带文字的"Send"、"Stop"、"Queue ▾"；间距 8px | 全部 |
 | 稍窄 | ≤ 760px | 协作模式下的 Stop agents 只显示图标（32px，读屏名"Stop agents"、悬停"Stop all agents in this session"），比"Send"、"Stop"早：带字时约 110px，601–708px 的面板最挤时（生成中有字、"Effort: Unavailable"）会把模式名截到只剩一两个字母（2026-10-22 最终审查后 `tb-app-stop` 量出来的；那时叫"Stop team"，2026-10-26 改名为"Stop agents"、模型按钮在协作模式下变为"Task mode · <模型 id>"，这一档和下面"有 Stop agents、≤ 520px"在 WP-09 合入时重新量） | 同上 |
 | 较窄 | ≤ 680px | Effort 按钮只显示强度："High ▾"、"Unavailable ▾" | 同上 |
-| 窄 | ≤ 600px | "Send"、"Stop"、"Queue"只显示图标（Stop agents 从 760px 起已经只有图标）（"Send"是圆形的强调色按钮，"Stop"是圆形按钮，"Queue"用新图标 `queue`、连着它的 ▾），名字在读屏名里："Send"（悬停"Send (Enter)"）、"Stop"（悬停"Stop response (Esc)"）、"Queue"（悬停"Queue for later (Enter)"）、▾"More send options"。"Send"、"Stop"、"Queue"各 32px 宽，▾ 24px（原来 32px）。顶栏的协作开关在同一档只剩状态点（[chat.md](chat.md)"顶栏"） | 同上 |
+| 窄 | ≤ 600px | "Send"、"Stop"、"Queue"只显示图标（Stop agents 从 760px 起已经只有图标）（"Send"是圆形的强调色按钮，"Stop"是圆形按钮，"Queue"用新图标 `queue`、连着它的 ▾），名字在读屏名里："Send"（悬停"Send (Enter)"）、"Stop"（悬停"Stop response (Esc)"）、"Queue"（悬停"Queue for later (Enter)"）、▾"More send options"。"Send"、"Stop"、"Queue"各 32px 宽，▾ 24px（原来 32px）。顶栏没有协作开关，也没有只剩状态点的窄样子（2026-10-26 WP-09，开关移进了范围菜单） | 同上 |
 | 有 Stop agents、≤ 520px | 协作模式下后台有 Agent，会话面板 ≤ 520px | 生成中有字时"Queue"就收起，只留 ▾（菜单里多出"Queue for later"），同下面"很窄"一档，只是更早：Stop agents 多占约 36–40px，不收的话 401–426px 和 461–482px 的面板最挤时（"Effort: Unavailable"）会截模式名（2026-10-22 最终审查后 `tb-app-stop` 量出来的）；焦点在"Queue"上时回到文字框 | 同"很窄" |
 | 更窄 | ≤ 460px | 权限、范围、Effort 按钮去掉 ▾，这一行的间距收小到 4px；这一行按钮的键盘焦点环离按钮 1px（全局是 2px，间距只有 4px 时环碰到旁边的按钮、被后面的按钮盖住一截） | 同上 |
 | 很窄 | ≤ 400px | 生成中、输入框有字时，"Queue"按钮收起，只留 ▾"More send options"，它的菜单里是"Queue for later"（快捷键提示 Enter）和"Steer"（快捷键提示 Ctrl+Enter）；"Stop"留在原位。准备中有字时的"Queue"只有一个按钮（不能插话，没有 ▾），不收起（32px） | 点 ▾ 选；Enter 排队、Ctrl+Enter 插话、Esc 停止照旧 |
@@ -270,7 +270,8 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 - 权限按钮任何宽度都没有图标、不会只剩图标；最窄时两种模式看得见的开头不同（"Ask …"、"Allo…"），不只差颜色。
 - 宽于 400px 时，权限的模式名不会因为范围按钮的文字长而被截短（范围按钮先截）。
 - 顶栏上不再有范围按钮、Effort、权限和用量。
-- 准备中、生成中范围按钮和 Effort 不会真的 `disabled`（焦点不会掉到页面开头），原因读得到。
+- 准备中、生成中 Effort 不会真的 `disabled`（焦点不会掉到页面开头），原因读得到；范围按钮照常可用（2026-10-26 WP-09），
+  菜单里变为不可用的范围项上的焦点移到 Task mode 一行；Task mode 一行切换中也只是 `aria-disabled`，焦点留在它上面。
 
 ## 照 Claude 桌面版
 

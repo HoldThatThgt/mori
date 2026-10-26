@@ -1,8 +1,9 @@
 // 模型菜单里的 Task mode 一行（docs/specs/parallel-agents-taskboard.md §13.1；docs/v1/screens/team-switch.md）：
 // 2026-10-26 负责人走查 M10、M21 起取代顶栏的协作开关。role="menuitemcheckbox"，点击、Enter、Space 不需要确认：
-// off → always，always → off（还不能回到 off 时 once），once → always；菜单不关，焦点留在这一行。切换中、会话按
-// agents_invalid 拒绝启动时不可用；回复进行中照常可用（只影响之后的消息）。切换失败的一行也在这里：菜单开着时在这一行
-// 下面（TeamErrorNote），关着时从输入框下面一行往上弹出（TeamErrorLine，同换范围失败）。
+// off → always，always → off（还不能回到 off 时 once），once → always；菜单不关，焦点留在这一行。切换中不可用但仍能
+// 停焦点（aria-disabled，同模型按钮的 data-pending：变成真正的 disabled 时焦点会掉到 body，↑ ↓ 和 Space 都不再起作用）；
+// 会话按 agents_invalid 拒绝启动时不可用（disabled）；回复进行中照常可用（只影响之后的消息）。切换失败的一行也在这里：
+// 菜单开着时在这一行下面（TeamErrorNote），关着时从输入框下面一行往上弹出（TeamErrorLine，同换范围失败）。
 
 import { useId, useRef } from 'react';
 import { roleLabel, type TeamState } from '../../../shared/team';
@@ -24,7 +25,10 @@ function errorText(message: string): string {
   return `Couldn’t change task mode: ${message}`;
 }
 
-/** @brief 模型菜单里的 Task mode 一行：名字和第二行在左，开关的样子在右（同 Customize 的开关，不另算控件）。 */
+/**
+ * @brief 模型菜单里的 Task mode 一行：名字和第二行在左，开关的样子在右（同 Customize 的开关，不另算控件）。
+ *        切换中带 aria-disabled 与 data-pending、样子不变，点击、Enter、Space 不起作用，焦点留在这一行。
+ */
 export function TeamSwitch({ tab }: { tab: Tab }) {
   const pending = useTeamPending((state) => Boolean(state[tab.key]));
   const hintId = useId();
@@ -34,7 +38,8 @@ export function TeamSwitch({ tab }: { tab: Tab }) {
   return (
     <button role="menuitemcheckbox" aria-checked={mode !== 'off'} className="task-mode-item" data-testid="team-switch"
       data-mode={mode} aria-label="Task mode" aria-describedby={hint ? hintId : undefined}
-      disabled={pending || invalid} onClick={() => toggleTeam(tab.key)}>
+      aria-disabled={pending || undefined} data-pending={pending ? 'true' : undefined} disabled={invalid}
+      onClick={() => { if (!pending) toggleTeam(tab.key); }}>
       <span className="task-mode-text">
         <span>Task mode</span>
         {hint && <span id={hintId} className="task-mode-hint" data-testid="team-hint">{hint}</span>}

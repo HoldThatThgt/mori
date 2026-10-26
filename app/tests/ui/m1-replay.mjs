@@ -619,7 +619,7 @@ async function bandsCheck(page, h, { app }) {
   await page.locator('[data-testid="tool-card"][data-status="running"]').waitFor({ timeout: 20000 });
   const running = await sweep(page, app, { widths: BAND_WIDTHS, drafts: ['', BAND_DRAFT], state: 'running' });
   record('bands：生成中（输入框空 / 有字）在 300–930px 各档的上下沿：这一行不换行、不超出输入框、高 33px，每档该有的都在、'
-    + '截短的先后和最窄对，读屏名和悬停第一行是全文，范围按钮和 Effort 不可用、原因对', running.length === 0,
+    + '截短的先后和最窄对，读屏名和悬停第一行是全文，Effort 不可用、范围按钮可用，两者悬停写明原因', running.length === 0,
   running.slice(0, 4).join(' | '));
   await setPaneWidth(page, app, 300);
   await page.locator(`${SINGLE} .composer textarea`).fill(BAND_DRAFT);

@@ -281,7 +281,7 @@ models: [strong]
 - 启用的工具只在每次运行开始前按这次运行的模式设置，模式改变时不立即换。进入协作模式前最后一次关闭模式的运行启用的工具名写进 `mori.team { mode, tools }`；
   回到 `off` 时恢复最后一条带 `tools` 的条目里的那一组，加上之后新注册、默认启用的工具；重新打开会话、`Check again` 之后同样。
 - 对话的工作卡写明当前模式、每个未关闭需求一行、这条消息上立项的决定与最后一段文字（§8.3）。
-- 模型：协作模式下按对话持有者的 `models`（基座按会话的选择范围），你不选，范围按钮只显示正在用的模型（§12.11）。
+- 模型：协作模式下按对话持有者的 `models`（基座按会话的选择范围），你不选；模型按钮显示“Task mode · <正在用的模型 id>”，菜单里没有范围的几节（§12.11）。
 
 ### 5.6 程序投递到用户会话
 
@@ -947,7 +947,8 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
   打开时下面一行小字，也是读屏的描述：`always` 为 `Messages go to <create role> first`，`once` 为 `Until done · Ends when open requests are done`；`off` 没有。
   标识 `data-testid="team-switch"`、`data-mode`。
 - 点击、Enter、Space：`off` → `always`；`always` → `off`（不能回到 `off` 时 `once`，§5.1）；`once` → `always`。不需要确认；菜单不关，焦点留在这一行，
-  范围的几节随 `pickLocked` 换成说明或换回来。切换中、或会话按 `agents_invalid` 拒绝启动时这一行不可用。
+  范围的几节随 `pickLocked` 换成说明或换回来。切换中、或会话按 `agents_invalid` 拒绝启动时这一行不可用（切换中只是 `aria-disabled`，
+  焦点留在这一行）。
 - 菜单什么时候能打开：界面准备好、没有在换范围时。回复进行中（准备中、生成中）也能打开：三节的项不可用（↑ ↓ 跳过），说明换成
   `Can’t switch models until the response finishes`；Task mode 一行照常可以点，只影响之后发出的消息（§5.1）。界面没准备好时按钮不可用、菜单打不开，这时不能切换。
 - 不打开菜单也看得出模式：模型按钮的文字 `Task mode · <模型 id>` 与 `data-team-mode`（§12.11）。
@@ -1318,7 +1319,7 @@ interface TaskView {
 | TB-50 | `next` 与 `assignee` 的枚举 | 去掉自己、含 `mori`、说明写法与权限加注；只有基座时 task 实例没有 `next` | 单元 |
 | TB-51 | 投递队列 | 运行中到来的两次程序投递合并成一次、按到达顺序分段；用户消息的投递不与程序投递合并且排在前面；过期的投递不发出；排在一条段开始时选不到模型的消息之后的 `request_closed` 投递仍然发出 | 单元、App |
 | TB-52 | 后台实例的模型提示 | 实例换模型后进展摘要这一行末尾显示 `Switched model: A → B · <原因>`，下一次运行开始时清掉 | App |
-| TB-53 | Task mode 开关 | （2026-10-26 改，§13.1）顶栏没有开关；模型菜单里的 Task mode 一行：`menuitemcheckbox`、`aria-checked`、`always` 与 `once` 的第二行文字、三种点击（不确认、菜单不关、焦点留在这一行）；模型按钮的 `Task mode · <模型 id>` 与 `data-team-mode`；回复进行中菜单能打开、模型的项不可用、这一行照常能切换；界面没准备好时菜单打不开 | App、回放 |
+| TB-53 | Task mode 开关 | （2026-10-26 改，§13.1）顶栏没有开关；模型菜单里的 Task mode 一行：`menuitemcheckbox`、`aria-checked`、`always` 与 `once` 的第二行文字、三种点击（不确认、菜单不关、焦点留在这一行，接着按 Space 能再切换）；切换失败的一行（菜单开着时在这一行下面、关着时在输入框下面一行上方，10 秒后消失）；F8 记 `Task mode <mode>`、`Send (task mode): <摘要>`；模型按钮的 `Task mode · <模型 id>` 与 `data-team-mode`；回复进行中菜单能打开、模型的项不可用、这一行照常能切换；界面没准备好时菜单打不开 | 单元、App、回放 |
 | TB-54 | 阶段行与 Stop agents | 分开时立项判断、对话没在运行时阶段行 `<create role> is deciding… · Ns`；对话在回复时显示对话自己的阶段；合并会话不显示；后台在运行时有 `Stop agents`；侧栏状态在只有后台运行时为生成中 | App |
 | TB-55 | 工具卡标题 | §13.8 每个工具的标题（三种 `agent_message`） | 单元、App |
 | TB-56 | 待判断的消息 | 对话回复中发的三条消息按顺序判断，排队区标 `Waiting for <create role>`；判断后 Enter 为排队、Ctrl+Enter 为插话；判断结束时对话已空闲则开始新的回复；“撤回”带回还没开始判断的消息；以 `/` 开头的扩展命令不经立项；对话在为别的消息准备中时判断完的消息排在它之后；提示词模板的展开文字出现在立项的投递里、需求记原文；扩展命令用 `sendUserMessage` 开始的运行的工作卡有 `No decision` 行 | App |

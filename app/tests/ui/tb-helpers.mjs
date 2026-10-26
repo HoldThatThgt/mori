@@ -561,7 +561,8 @@ export async function closeModelMenu(ctx, tab) {
 
 /**
  * @brief 打开模型菜单读 Task mode 一行（team-switch.md“Task mode 一行”）：{ mode（data-mode）, checked（aria-checked）,
- *        role, label（读屏名称）, hint（第二行，没有时 null）, described（读屏的描述）, disabled, focused（焦点在它上面） }。
+ *        role, label（读屏名称）, hint（第二行，没有时 null）, described（读屏的描述）, disabled（disabled 或
+ *        aria-disabled：切换中只有后者）, focused（焦点在它上面） }。
  * @param opts { keepOpen：为真时读完不关菜单 }
  */
 export async function taskModeRow(ctx, tab, { keepOpen = false } = {}) {
@@ -570,8 +571,8 @@ export async function taskModeRow(ctx, tab, { keepOpen = false } = {}) {
     const ids = (el.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
     return { mode: el.dataset.mode, checked: el.getAttribute('aria-checked'), role: el.getAttribute('role'),
       label: el.getAttribute('aria-label'), hint: el.querySelector('[data-testid="team-hint"]')?.textContent ?? null,
-      described: ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' '), disabled: el.disabled,
-      focused: document.activeElement === el };
+      described: ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' '),
+      disabled: el.disabled || el.getAttribute('aria-disabled') === 'true', focused: document.activeElement === el };
   });
   if (!keepOpen) await closeModelMenu(ctx, tab);
   return row;
