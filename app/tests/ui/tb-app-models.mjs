@@ -554,19 +554,23 @@ async function sel(ctx) {
   selThinking(ctx, who, lock);
 }
 
-/** @brief TB-38：协作模式下模型按钮显示“Task mode · <模型 id>”、菜单只有说明与 Task mode 一行、setPick 被拒绝、pickOptions 为空。 */
+/**
+ * @brief TB-38：协作模式下模型按钮显示“Task mode · <模型 id>”、菜单只有说明、Task mode 一行、See background tasks 与
+ *        Manage models、setPick 被拒绝、pickOptions 为空。
+ */
 function selLocked(ctx, who, lock) {
   const lines2 = lock.button.title?.split('\n') ?? [];
   record('TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" (chat\'s model in '
     + 'use; data-locked, still a menu button) with hover "Task mode · fake-other" / "Task mode picks the model for '
     + 'each agent"; clicking it opens a menu with only that note (first, no separator line above it), the Task mode '
-    + 'row (focused) and Manage models — no Groups/Providers/Models; Enter on the button opens it too (2026-10-26, '
-    + '§12.11)',
+    + 'row (focused), See background tasks and Manage models — no Groups/Providers/Models; Enter on the button opens '
+    + 'it too (2026-10-26, §12.11, §13.13.1)',
   lock.mode === 'once' && lock.button.locked && lock.button.text === 'Task mode · fake-other'
     && lines2[0] === 'Task mode · fake-other' && lines2[1] === LOCKED_TITLE && lock.button.popup === 'menu'
     && lock.clicked?.sections === 0 && lock.clicked.radios === 0 && lock.clicked.note === LOCKED_TITLE
     && lock.clicked.noteFirst && lock.clicked.noteLine === '0px'
-    && same(lock.clicked.items, ['team-switch', 'manage-models']) && lock.clicked.focused === 'team-switch'
+    && same(lock.clicked.items, ['team-switch', 'see-background-tasks', 'manage-models'])
+    && lock.clicked.focused === 'team-switch'
     && lock.afterEnter === 1 && lock.t1 === 'active', brief(lock));
   record('TB-38 task mode: session.setPick is refused with "Task mode picks the model for each agent" and '
     + 'session.pickOptions returns no options', lock.refused.error?.includes(LOCKED_TITLE) === true

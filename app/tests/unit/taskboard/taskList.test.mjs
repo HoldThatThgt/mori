@@ -113,6 +113,36 @@ test('TB-82 a handoff head reads #n role · outcome → route in the §15 words'
   for (const [item, want] of cases) assert.equal(L.handoffHead(item, HOLDERS), want);
 });
 
+test('TB-82 an open view re-reads when the task changes, at most once a second; changes in between merge', () => {
+  // 照 useThrottledRead 的做法模拟：每次 TaskView 变了问 rereadWait；不为 null 时等那么久读一次，等的时候再变的合并
+  const reads = [];
+  const state = { last: 0, pending: false };
+  const timers = [];
+  const change = (now) => {
+    const wait = L.rereadWait(state, now, true);
+    if (wait === null) return;
+    state.pending = true;
+    timers.push(now + wait);
+  };
+  const run = (until) => {
+    while (timers.length && timers[0] <= until) {
+      const at = timers.shift();
+      state.pending = false;
+      state.last = at;
+      reads.push(at);
+    }
+  };
+  // 时刻从 T0 起（last 为 0 表示还没读过，真实的 Date.now() 不会是 0）
+  for (const now of [0, 100, 250, 600]) { change(T0 + now); run(T0 + now); }
+  for (const now of [1100, 1150, 1900, 2950]) { run(T0 + now); change(T0 + now); }
+  run(Infinity);
+  assert.deepEqual(reads.map((at) => at - T0), [0, 1000, 2000, 3000], 'the first read at once, then at most one a second');
+  assert.ok(reads.every((at, i) => i === 0 || at - reads[i - 1] >= 1000), 'no two reads less than a second apart');
+  // 运行结束之后（enabled 为假）不再因变化重新读；还没读过时总读一次
+  assert.equal(L.rereadWait({ last: 500, pending: false }, 3000, false), null);
+  assert.equal(L.rereadWait({ last: 0, pending: false }, 3000, false), 0);
+});
+
 test('TB-82 evidence, dependency and message lines', () => {
   assert.equal(L.evidenceLine({ tag: '#3', title: 'Run npm test', ok: true }), '✓ #3 Run npm test');
   assert.equal(L.evidenceLine({ tag: '#4', title: 'Run npm run lint', ok: false }), '✗ #4 Run npm run lint');
@@ -162,4 +192,17 @@ test('TB-83 a delivery is a user bubble; a tool without a result is Running… w
   assert.equal(running.items[0].text, '[Mori] You are executor on T1.');
   assert.equal(running.tools.c1.status, 'running');
   assert.equal(L.sessionTranscript(entries, false).tools.c1.status, 'interrupted', 'after the run: as the chat does');
+});
+
+// ---- TB-89 停止一个 task ----
+
+test('TB-89 the stop reply keeps the button disabled only while the stop is still pending on the board', () => {
+  // 回复先到：mori.board 里它还可以停，按钮仍不可用，等 settleStop
+  assert.deepEqual(L.stopReplyState({ stopping: true, error: null }, null), { stopping: true, error: null });
+  // mori.board 先到（settleStop 已经清掉）：回复不能再把它设回不可用，交回之后按钮可用
+  assert.deepEqual(L.stopReplyState({ stopping: false, error: null }, null), { stopping: false, error: null });
+  assert.deepEqual(L.stopReplyState(undefined, null), { stopping: false, error: null });
+  // 失败：按钮可用，原文留着
+  assert.deepEqual(L.stopReplyState({ stopping: true, error: null }, "T1 isn't running."),
+    { stopping: false, error: "T1 isn't running." });
 });

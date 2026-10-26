@@ -43,7 +43,9 @@ export function bgCards(ctx) {
     requestTitle: el.querySelector('.bg-task-line span')?.getAttribute('title') ?? null,
     deps: el.querySelector('.bg-task-links .muted')?.textContent ?? null,
     links: [...el.querySelectorAll('[data-action="view-transcript"]')].map((link) => link.textContent),
-    stop: Boolean(el.querySelector('[data-action="stop-task"]')), finished: el.classList.contains('finished'),
+    stop: Boolean(el.querySelector('[data-action="stop-task"]')),
+    stopDisabled: el.querySelector('[data-action="stop-task"]')?.disabled ?? null,
+    finished: el.classList.contains('finished'),
     error: el.querySelector('.bg-error')?.textContent ?? null })));
 }
 

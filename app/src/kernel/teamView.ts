@@ -120,16 +120,23 @@ export function boardView(board: Board, input: ViewInput): BoardView {
   return { requests, teamEdited: input.teamEdited };
 }
 
-/** @brief task 视图里的一棒（§13.13.3）：交接的全部字段；结案写的一棒交出方为结案持有者，读结案会话。 */
-function handoffDetail(handoff: Handoff): HandoffDetail {
+/** @brief 一个实例会话文件是这个 task 上哪个角色的；不是这个 task 的实例会话时为 null。 */
+export type InstanceRoleOf = (task: string, file: string) => string | null;
+
+/**
+ * @brief task 视图里的一棒（§13.13.3）：交接的全部字段；结案写的一棒交出方为结案持有者，读结案会话。程序写的一棒交出方
+ *        为 mori，有会话位置时（实例运行过）会话是那个实例的：按会话文件找它的角色。
+ */
+function handoffDetail(task: string, handoff: Handoff, roleOf: InstanceRoleOf): HandoffDetail {
   const byClose = handoff.from.startsWith(CLOSE_PREFIX);
   const role = byClose ? handoff.from.slice(CLOSE_PREFIX.length) : handoff.from;
+  const sessionRole = handoff.session && handoff.reason !== null ? roleOf(task, handoff.session.file) ?? role : role;
   return {
     n: handoff.n, role, byClose, outcome: handoff.outcome, reason: handoff.reason, conclusion: handoff.conclusion,
     next: handoff.next, suggestedNext: handoff.suggestedNext, openItems: [...handoff.openItems],
     evidence: handoff.evidence.map((item) => ({ tag: item.tag, title: item.title, ok: item.ok })),
     routedTo: handoff.routedTo, at: handoff.at,
-    session: handoff.session ? { role, turns: [...handoff.session.turns] } : null,
+    session: handoff.session ? { role: sessionRole, turns: [...handoff.session.turns] } : null,
   };
 }
 
@@ -137,9 +144,10 @@ function handoffDetail(handoff: Handoff): HandoffDetail {
  * @brief 一个 task 的详情（board.readTask，§13.13.3）：说明全文、依赖与它们此刻的状态、留给它的消息、每一棒的全部字段。
  * @param board TaskBoard
  * @param id task 编号
+ * @param roleOf 程序写的一棒的会话文件是哪个角色的
  * @return 没有这个 task 时为 null
  */
-export function taskDetail(board: Board, id: string): TaskDetail | null {
+export function taskDetail(board: Board, id: string, roleOf: InstanceRoleOf): TaskDetail | null {
   const task = findTask(board, id);
   if (!task) return null;
   return {
@@ -150,7 +158,7 @@ export function taskDetail(board: Board, id: string): TaskDetail | null {
       return { id: dep, title: found?.title ?? '', status: found?.status ?? 'pending' };
     }),
     status: task.status, messages: task.messages.map((item) => ({ ...item })),
-    handoffs: task.handoffs.map(handoffDetail),
+    handoffs: task.handoffs.map((handoff) => handoffDetail(task.id, handoff, roleOf)),
   };
 }
 

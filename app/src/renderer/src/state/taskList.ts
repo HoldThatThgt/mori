@@ -201,3 +201,41 @@ export function sessionTranscript(entries: SessionEntry[], running: boolean): Tr
     tool.status === 'interrupted' ? { ...tool, status: 'running' as const } : tool]));
   return { ...state, tools };
 }
+
+// ---- 停止一个 task（§13.13.7） ----
+
+/** @brief 一个 task 的停止状态：stopping 为真时按钮不可用；error 为失败的原文。 */
+export interface StopState {
+  /** 停止的命令还没返回，或返回了而 mori.board 里它还可以停 */
+  stopping: boolean;
+  /** 失败的原文；没有时为 null */
+  error: string | null;
+}
+
+/**
+ * @brief session.stopTask 返回之后的停止状态：成功时只有还在停止中（mori.board 里它还可以停，settleStop 还没清掉）才保持
+ *        不可用；mori.board 先到、已经清掉时不再设回不可用（否则交回之后按钮一直不可用）。失败时可用，原文留着。
+ * @param current 返回时的停止状态
+ * @param error 命令的原文；成功时为 null
+ */
+export function stopReplyState(current: StopState | undefined, error: string | null): StopState {
+  return { stopping: error === null && current?.stopping === true, error };
+}
+
+// ---- 重新读（§13.13.3、§13.13.4、§15） ----
+
+/** 两次重新读之间至少隔这么多毫秒（最多每秒一次，§15，临时默认值，docs/v1/defaults.md） */
+export const REREAD_MS = 1000;
+
+/**
+ * @brief TaskView 变了时多久之后重新读：已经在等的合并（null）；读过之后 enabled 为假（运行结束）不再读（null）；还没读过
+ *        总读一次；否则离上次读满 REREAD_MS。
+ * @param state 上次读的时刻（还没读过为 0）、是否已经在等
+ * @param now 现在（ms）
+ * @param enabled 为假时只读第一次
+ * @return 等多少毫秒；不读时为 null
+ */
+export function rereadWait(state: { last: number; pending: boolean }, now: number, enabled: boolean): number | null {
+  if (state.pending || (!enabled && state.last > 0)) return null;
+  return state.last === 0 ? 0 : Math.max(0, state.last + REREAD_MS - now);
+}

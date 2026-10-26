@@ -1283,12 +1283,14 @@ function missingText(of: SessionOf): string {
 }
 
 /** @brief board.readTask（只读，§13.13.3）：一个 task 的详情；不能读时 error 为原文。 */
-export function readBoardTask(sessionId: string, task: string): { task: TaskDetail | null; error: string | null } {
+export function readBoardTask(sessionId: string,
+  task: string): { task: TaskDetail; error: null } | { task: null; error: string } {
   const team = requireEntry(sessionId).team;
   try {
     if (!team) throw new Error(missingText({ kind: 'task', task, role: '' }));
     return { task: team.readTask(task), error: null };
   } catch (error) {
+    console.error(`[kernel] board.readTask ${task} failed: ${(error as Error).message}`);
     return { task: null, error: (error as Error).message };
   }
 }

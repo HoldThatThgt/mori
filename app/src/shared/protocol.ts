@@ -813,8 +813,8 @@ export interface TeamCommandResults {
   'session.recheckAgents': SessionInfo & TeamResult;
   /** texts：回到输入框的待判断消息，按发送顺序（§11.4） */
   'session.stopTeam': { texts: string[] } & TeamResult;
-  /** task：这个 task 的详情；error 不为 null 时为 null（§13.13.3） */
-  'board.readTask': { task: TaskDetail | null } & TeamResult;
+  /** task：这个 task 的详情；读不到时 task 为 null、error 是原文（§13.13.3） */
+  'board.readTask': { task: TaskDetail; error: null } | { task: null; error: string };
   /** entries：会话的当前分支；running：实例正在运行（§13.13.4） */
   'board.readSession': { entries: SessionEntry[]; running: boolean } & TeamResult;
   /** 只有 error（§13.13.7） */

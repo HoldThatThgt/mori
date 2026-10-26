@@ -27,7 +27,7 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 会话没有需求、协作模式 `off` | `BoardView.requests` 为空，`TeamState.mode` 为 `off` | 右栏与现在完全相同：顶部 “This session’s changes”，没有页签；阶段行没有按钮；模型菜单里没有 `See background tasks`（TB-03） | — |
-| 有需求，或协作模式打开 | `BoardView.requests` 不为空，或 `mode` 不是 `off` | 右栏顶部两个页签 `Changes`、`Background tasks`（`role="tablist"`，选中的 `aria-selected="true"`），这一行右端 `Expand` / `Collapse` 与 `Close panel`（v0 layout.md“右栏展开”），在列表、task 的视图、会话里都在顶部；“This session’s changes” 这一行不再显示，`Changes` 页签下的内容与现在相同，文件阅读器自己那一行只留 `← Changes` 与路径；模型菜单 Task mode 那一段（`.task-mode-group`）的最后一项 `See background tasks` | 点页签切换（按会话记住，不跨重新打开；展开状态不变）；点菜单那一项：关上菜单，打开右栏到 `Background tasks`（回复进行中能打开菜单时同样可用） |
+| 有需求，或协作模式打开 | `BoardView.requests` 不为空，或 `mode` 不是 `off` | 右栏顶部两个页签 `Changes`、`Background tasks`（`role="tablist"`，选中的 `aria-selected="true"`），这一行右端 `Expand` / `Collapse` 与 `Close panel`（v0 layout.md“右栏展开”），在列表、task 的视图、会话里都在顶部；“This session’s changes” 这一行不再显示，`Changes` 页签下的内容与现在相同，文件阅读器自己那一行不再重复 `Expand` / `Collapse` 与 `Close panel`（其余按钮同 v0 changes.md）；模型菜单 Task mode 那一段（`.task-mode-group`）的最后一项 `See background tasks` | 点页签切换（按会话记住，不跨重新打开；展开状态不变）；点菜单那一项：关上菜单，打开右栏到 `Background tasks`（回复进行中能打开菜单时同样可用） |
 | TaskBoard 上有 task | `BoardView` 里有 `TaskView` | 阶段行右端一个按钮：有 `pending`、`active`、`waiting_user` 的 task 时 `1 running task` / `{n} running tasks`（n 是这几种的个数），否则 `1 task finished` / `{n} tasks finished`（n 是全部 task 数，含 `stopped`）；悬停 `Show this session’s background tasks`；对话在不在回复都显示，阶段文字在它左边 | 点它：右栏关着或在 `Changes` 时打开到 `Background tasks`（停在上次看的那一层）；已经在 `Background tasks` 时关上右栏 |
 | 右栏开着且在 `Background tasks` | 你的操作 | 阶段行按钮 `aria-pressed="true"` | 同上 |
 | 进展摘要（team-stream.md） | `mori.progress` 与 `BoardView` | 每个 task 行是按钮，悬停与读屏名 `Open T1 <title> in Background tasks`；标题行右端一个图标按钮，悬停与读屏名 `Open Request 1 in Background tasks`；标题行本身仍是展开、折叠 | 点 task 行：打开右栏到这个 task 的视图；点图标按钮：打开右栏到列表，滚到这个需求的第一个 task，这个需求的卡片短暂高亮（同引用跳转的高亮） |
@@ -60,7 +60,7 @@
 | 结案会话已建立 | `RequestView.closeSession` | `View transcript (closing)`（读屏名 `View transcript for <close role> on Request 1`） | 打开结案会话 |
 | 可以停止 | 同列表 | 标题右边 `Stop this task` | 停止 |
 | 有依赖 | `dependsOn` | `Depends on`，每个依赖一行 `T2 <title> · <状态>`（状态同卡片的当前在做什么，已结束时为 `Done` / `Failed` / `Cancelled`） | 点一行：打开那个 task 的视图（`Back` 仍回到列表） |
-| 有留给 task 的消息 | `messages` | `Messages`，按时间，每条一行 `<from> · hh:mm`，下面是全文按 Markdown（表格照常；WP-13 合入后 mermaid 同对话流）；`<from>` 是角色名（基座 `Mori`） | — |
+| 有留给 task 的消息 | `messages` | `Messages`，按时间，每条一行 `<from> · hh:mm`，下面是全文按 Markdown（表格照常，mermaid 画成图，同对话流）；`<from>` 是角色名（基座 `Mori`） | — |
 | 有交接 | `handoffs` | `Handoffs`，按先后，每一棒：头一行 `#<n> <role> · <结果> → <去向>`（下表）；结论全文（Markdown）；有时 `Open items` 每条一行、`Evidence` 每条一行 `✓ #3 Run npm test` / `✗ #4 …`、`Suggested next: <role>`；有会话位置时、或结案会话写的一棒 `View transcript`（结案的交接不记会话位置） | `View transcript`：打开这个角色在这个 task 上的会话；结案写的一棒打开结案会话 |
 | 程序写的一棒 | `outcome` 为 null，`role` 为 `mori` | 头一行的结果写 `PROGRAM_HANDOFF_LINES` 的文字：`#2 Mori · no handoff → <close role> (closing)` | — |
 | task 在运行 | 这个 task 的 `TaskView` 在 `mori.board` 里变了 | 重新读 `board.readTask`，最多每秒一次；第二行随 `mori.board` 实时更新 | — |

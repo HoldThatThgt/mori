@@ -6,11 +6,10 @@ import { useEffect, useRef } from 'react';
 import { canStopTask, type BoardView, type TaskView } from '../../../shared/team';
 import { backTo, settleStop, showTasksAt, stopKey, stopTask, useStopState } from '../state/backgroundTasks';
 import type { Tab, TasksBack } from '../state/store';
-import { cardParts, listedTasks, transcriptButtons, type ListedTask, type TaskContext } from '../state/taskList';
+import {
+  cardParts, listedTasks, rereadWait, transcriptButtons, type ListedTask, type TaskContext,
+} from '../state/taskList';
 import { Icon } from '../icons';
-
-/** 重新读的最短间隔（§15，临时默认值，docs/v1/defaults.md），毫秒 */
-const REREAD_MS = 1000;
 
 /** @brief 拼文字要用的上下文（同进展摘要）。 */
 export function taskContext(tab: Tab): TaskContext {
@@ -34,9 +33,9 @@ export function useThrottledRead(key: string, read: () => void, enabled = true):
   latest.current = read;
   useEffect(() => {
     const current = state.current;
-    // 还没读过时总要读一次（last 为 0）；读过之后 enabled 为假就不再读
-    if (current.timer !== null || (!enabled && current.last > 0)) return;
-    const wait = Math.max(0, current.last + REREAD_MS - Date.now());
+    // 还没读过时总要读一次（last 为 0）；读过之后 enabled 为假就不再读；等的时候再变的合并（taskList.ts rereadWait）
+    const wait = rereadWait({ last: current.last, pending: current.timer !== null }, Date.now(), enabled);
+    if (wait === null) return;
     current.timer = setTimeout(() => {
       current.timer = null;
       current.last = Date.now();

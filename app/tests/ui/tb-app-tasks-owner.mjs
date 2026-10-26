@@ -10,7 +10,7 @@
 // 结果写到 test-results/tb-app-tasks-owner.json（计入 App 层，§17.3），截图在 test-results/tb-app-tasks-owner/。
 // 端口（§17.3 的 4950–4959）：合成端点 4952、记录代理 4953（模型配置指向它；这一步不应有任何请求）。
 
-import { cpSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   brief, closeTbApp, paneSel, poll, seedTeamUserData, shot, startTbApp, startTbEndpoint, stopTbEndpoint, suiteArgs,
@@ -60,6 +60,7 @@ async function setup(ctx, source, id) {
     found.file));
   cpSync(join(source, 'teams', id), join(ctx.userData, 'teams', id), { recursive: true });
   ctx.sessionFile = join(ctx.userData, 'pi', 'sessions', found.dir, found.file);
+  ctx.sessionId = id;
   ctx.ep = await startTbEndpoint(PORT, PROXY);
   seedTeamUserData(ctx.userData, { providers: [tbProvider('tbowner', PROXY, [tbModel('fake-coder-tbowner')])] });
   await startTbApp(ctx);
@@ -86,26 +87,69 @@ async function listChecks(ctx, tab) {
     const list = await bgCards(ctx);
     return list.length === 6 ? list : null;
   }, 20000) ?? await bgCards(ctx);
+  const sections = await ctx.page.locator('[data-testid="bg-section"]').evaluateAll((els) => els.map((el) => el.dataset
+    .section));
   record('TB-88 the owner\'s Har-GUI board: Finished lists T6–T1, all Done, and there is no Running section',
     cards.map((card) => card.task).join(',') === 'T6,T5,T4,T3,T2,T1'
       && cards.every((card) => card.section === 'finished' && card.phase === 'done'
-        && card.line.includes(' · Done · ')),
-    brief(cards.map((card) => `${card.task}:${card.section}:${card.phase}`)));
+        && card.line.includes(' · Done · ')) && sections.length === 1 && sections[0] === 'finished',
+    brief({ cards: cards.map((card) => `${card.task}:${card.section}:${card.phase}`), sections }));
 }
 
-/** @brief T2、T5、T6 的消息全文在 task 的视图里（T6 的两条含表格）（TB-88）。 */
+/** @brief 只留字母与数字（中文没有空格、表格的格之间在 textContent 里也没有分隔，所以按整段字比，不按词）。 */
+const lettersOf = (text) => text.replace(/[^\p{L}]+/gu, '');
+
+/**
+ * @brief Markdown 原文画出来之后看得到的字母：去掉 mermaid 块（画成图，图里的字不是原文）、链接地址与代码块的开头一行，
+ *        再只留字母。数字不比：有序列表的序号是样式画的，不在文字里，而段落里的 “13.” 不是列表、照原样显示。
+ */
+function shownLetters(markdown) {
+  return lettersOf(markdown.replace(/^\s*(\x60{3}|~~~)mermaid[^\n]*\n[\s\S]*?^\s*\1\s*$/gm, '')
+    .replace(/\]\([^)]*\)/g, ']').replace(/^\s*(\x60{3}|~~~)[^\n]*$/gm, ''));
+}
+
+/**
+ * @brief 原文画出来的字是否整段在视图里那一条的文字里（视图前面多一行 <from> · hh:mm）。
+ * @return 在时为 null；否则是原文里第一处对不上的地方前后的字
+ */
+function mismatch(markdown, view) {
+  const want = shownLetters(markdown);
+  const have = lettersOf(view);
+  if (have.includes(want)) return null;
+  let same = 0;
+  const start = have.indexOf(want.slice(0, 20));
+  while (start >= 0 && same < want.length && want[same] === have[start + same]) same += 1;
+  return { at: same, of: want.length, want: want.slice(Math.max(0, same - 20), same + 20),
+    have: start >= 0 ? have.slice(start + Math.max(0, same - 20), start + same + 20) : null };
+}
+
+/**
+ * @brief T2、T5、T6 的消息全文在 task 的视图里（T6 的两条含表格）（TB-88）：每条消息按 board.json 的原文画出来的字
+ *        （shownLetters）整段在视图里那一条的文字里。
+ */
 async function messageChecks(ctx) {
+  const board = JSON.parse(readFileSync(join(ctx.userData, 'teams', ctx.sessionId, 'board.json'), 'utf8'));
   const counts = {};
   for (const task of ['T2', 'T5', 'T6']) {
     await clickCard(ctx, task);
     const view = await waitTaskView(ctx, task);
-    counts[task] = { messages: view?.messages.length ?? -1, tables: view?.messages.filter((item) => item.table).length,
-      longest: Math.max(0, ...(view?.messages ?? []).map((item) => item.text.length)) };
+    const source = board.tasks.find((item) => item.id === task)?.messages ?? [];
+    const shown = view?.messages ?? [];
+    // 视图里每条消息的文字，不含 mermaid 图（同 shownLetters 不比图）
+    const texts = await ctx.page.locator('[data-testid="bg-message"]').evaluateAll((els) => els.map((el) => {
+      const copy = el.cloneNode(true);
+      copy.querySelectorAll('[data-testid="mermaid-diagram"]').forEach((diagram) => diagram.remove());
+      return copy.textContent;
+    }));
+    counts[task] = { messages: shown.length, tables: shown.filter((item) => item.table).length,
+      longest: Math.max(0, ...shown.map((item) => item.text.length)),
+      missing: source.map((item, index) => mismatch(item.text, texts[index] ?? ''))
+        .filter((item) => item !== null), same: source.length === shown.length };
     await clickBack(ctx);
   }
   record('TB-88 the task views hold the full messages: T2 has 3, T5 has 1, T6 has 2 (both with tables)',
-    counts.T2?.messages === 3 && counts.T5?.messages === 1 && counts.T6?.messages === 2 && counts.T6.tables === 2,
-    brief(counts));
+    counts.T2?.messages === 3 && counts.T5?.messages === 1 && counts.T6?.messages === 2 && counts.T6.tables === 2
+      && ['T2', 'T5', 'T6'].every((task) => counts[task].same && counts[task].missing.length === 0), brief(counts));
 }
 
 /** @brief T1–T6 与结案会话都能打开；记下 T4 的会话打开并显示完的用时（TB-88）。 */

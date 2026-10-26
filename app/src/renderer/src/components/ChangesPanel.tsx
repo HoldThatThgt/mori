@@ -140,7 +140,8 @@ export function RightPanel({ tab, onClose }: { tab: Tab; onClose: () => void }) 
   return (
     <>
       <PanelTabs tab={tab} onClose={onClose} />
-      {tab.rightTab === 'tasks' ? <BackgroundTasks tab={tab} />
+      {/* 按会话建：换到另一个会话时 task 的视图与会话不留着上一个会话读到的（两个会话都有 T1） */}
+      {tab.rightTab === 'tasks' ? <BackgroundTasks key={tab.key} tab={tab} />
         : <ChangesSide tab={tab} onClose={onClose} tabbed />}
     </>
   );

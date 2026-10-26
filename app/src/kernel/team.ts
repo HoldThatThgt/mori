@@ -6,7 +6,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type {
   AgentSessionEvent, BeforeAgentStartEvent, ExtensionAPI, ExtensionFactory, ToolCallEventResult, ToolResultEvent,
   ToolResultEventResult,
@@ -592,9 +592,24 @@ export class Team implements TeamLike {
    * @return 详情；没有这个 task 时抛出 T9 does not exist.
    */
   readTask(id: string): TaskDetail {
-    const detail = taskDetail(this.board, id);
+    const detail = taskDetail(this.board, id, (task, file) => this.instanceRole(task, file));
     if (!detail) throw new Error(`${id} does not exist.`);
     return detail;
+  }
+
+  /**
+   * @brief 一个实例会话文件是这个 task 上哪个角色的（程序写的一棒的 View transcript，§13.13.3）：开着的实例按它的文件，
+   *        没开着的按 knownFiles（id 为 <用户>.<task>.<角色>）；按文件名比，不比目录的写法。
+   * @return 不是这个 task 的实例会话时为 null
+   */
+  private instanceRole(task: string, file: string): string | null {
+    const name = basename(file);
+    const lane = [...this.lanes.values()].find((item) => item.kind === 'task' && item.task === task
+      && item.file !== null && basename(item.file) === name);
+    if (lane) return lane.role;
+    const prefix = LANE_IDS.task(this.userId, task, '').id;
+    const known = [...this.knownFiles].find(([id, path]) => id.startsWith(prefix) && basename(path) === name);
+    return known ? known[0].slice(prefix.length) : null;
   }
 
   /** @brief board.readSession（§13.13.4，只读）：见 teamTools.readBackgroundSession。 */

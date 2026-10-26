@@ -12,8 +12,9 @@ const UNTIL_STOPPED = 600000;
 
 /** task 的说明（Prompt 里按 Markdown 画出表格） */
 export const TASKS_PROMPT = 'Find why the login page is blank.\n\n| step | what |\n| - | - |\n| 1 | read the route |';
-/** T1 留在自己 task 上的消息（task 视图的 Messages，含表格；T1 开始时立项可能还没建 T2，所以不留给 T2） */
-export const TASKS_MESSAGE = 'Check these files:\n\n| file | why |\n| - | - |\n| src/login.ts | blank page |';
+/** T1 留在自己 task 上的消息（task 视图的 Messages，含表格与 mermaid 图；T1 开始时立项可能还没建 T2，所以不留给 T2） */
+export const TASKS_MESSAGE = 'Check these files:\n\n| file | why |\n| - | - |\n| src/login.ts | blank page |\n\n'
+  + '```mermaid\ngraph TD\n  Route --> Login\n```';
 /** T1 的结论：超过进展摘要第一句的长度，task 视图里是全文 */
 export const TASKS_CONCLUSION = 'The route for /login was missing. '
   + 'The router skipped the page when the session cookie was empty, so nothing rendered. '
@@ -32,6 +33,24 @@ const closeLast = (conclusion) => [call('task_handoff', { task: '{task}', conclu
 /** @brief 一个写 task 的建立参数。 */
 const writeTask = (title, assignee, extra = {}) => ({ request: 1, title, description: title, assignee,
   read_only: false, ...extra });
+/**
+ * @brief 两个会话各自的一个只读 task（tb-app-tasks.mjs 的 sessions：两个会话都有 T1，切换、分屏时各看各的）：
+ *        executor 读一个文件后以 done 交接，结案关闭。
+ */
+const pairScenario = (title, description) => [
+  { role: 'planner', kind: 'create', deliveries: {
+    1: [call('request_submit', { title, goal: description }),
+      call('task_create', { request: 1, title, description, assignee: 'executor', read_only: true }),
+      say('Registered request 1.')],
+  } },
+  { role: 'chat', kind: 'team-dialog', deliveries: { 1: [say('Planner registered it.')], 2: [say('Done.')] } },
+  { role: 'executor', kind: 'task', task: 'T1', deliveries: {
+    1: [call('read', { path: 'README.md' }), call('task_handoff', { task: '{task}', conclusion: `${title} done`,
+      outcome: 'done', evidence: ['{tag:read}'] })],
+  } },
+  { role: 'planner', kind: 'close', deliveries: { 1: closeLast(`${title} closed`) } },
+];
+
 /** @brief 一个只读 task 的建立参数。 */
 const readTask = (title, assignee, extra = {}) => ({ request: 1, title, description: title, assignee,
   read_only: true, ...extra });
@@ -39,7 +58,8 @@ const readTask = (title, assignee, extra = {}) => ({ request: 1, title, descript
 export const SCENARIOS = {
   // TB-80–TB-87、TB-89：T1（只读，executor）在自己的 task 上留一条带表格的消息、读一个文件后带证据与未结事项以 done 交接；
   // T2（只读，reviewer，依赖 T1）读一个文件后 pass；T3（写，executor）跑一条命令后等很久（套件在这时停下它）；
-  // T4（写，executor）等 T3 的写入锁。你的第二条消息让立项把 T3 交回 executor（继续原来的会话），T3、T4 做完后关闭。
+  // T4（写，executor）等 T3 的写入锁。你的第二条消息让立项把 T3 交回 executor（继续原来的会话，先等 3 秒，套件在这时看
+  // 停止按钮），T3、T4 做完后关闭。
   'tb-tasks-flow': [
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Fix the login page', goal: 'The login page shows the form' }),
@@ -65,7 +85,7 @@ export const SCENARIOS = {
     } },
     { role: 'executor', kind: 'task', task: 'T3', deliveries: {
       1: [call('bash', { command: 'echo started' }), together(wait(UNTIL_STOPPED), say('Still going.'))],
-      2: [call('bash', { command: 'echo resumed' }),
+      2: [together(wait(3000), call('bash', { command: 'echo resumed' })),
         call('task_handoff', { task: '{task}', conclusion: 'Long change done', outcome: 'done',
           evidence: ['{tag:bash}'] })],
     } },
@@ -151,6 +171,49 @@ export const SCENARIOS = {
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: { 1: [say('Planner registered it.')] } },
   ],
+
+  // TB-82：打开着的 task 视图随 TaskView 重新读。T1（只读）：executor 等 5 秒后 continue → reviewer（等 5 秒）fail →
+  // executor dead_end → reviewer blocked → 结案 close_failed。套件在第一棒之前打开 T1 的视图，一直不关。
+  'tb-tasks-live': [
+    { role: 'planner', kind: 'create', deliveries: {
+      1: [call('request_submit', { title: 'Watch the view', goal: 'The open view follows the task' }),
+        call('task_create', readTask('Chain in view', 'executor')), say('Registered request 1.')],
+    } },
+    { role: 'chat', kind: 'team-dialog', deliveries: { 1: [say('Planner registered it.')], 2: [say('T1 failed.')] } },
+    { role: 'executor', kind: 'task', task: 'T1', deliveries: {
+      1: [together(wait(5000), call('task_handoff', { task: '{task}', conclusion: 'Ready for review',
+        outcome: 'continue', next: 'reviewer' }))],
+      2: [call('task_handoff', { task: '{task}', conclusion: 'No way forward', outcome: 'dead_end', next: 'reviewer' })],
+    } },
+    { role: 'reviewer', kind: 'task', task: 'T1', deliveries: {
+      1: [together(wait(5000), call('task_handoff', { task: '{task}', conclusion: 'Wrong', outcome: 'fail',
+        next: 'executor' }))],
+      2: [call('task_handoff', { task: '{task}', conclusion: 'Blocked', outcome: 'blocked' })],
+    } },
+    { role: 'planner', kind: 'close', deliveries: {
+      1: [call('task_handoff', { task: '{task}', conclusion: 'Closing as failed', outcome: 'close_failed' }),
+        call('request_close', { request: '{request}', outcome: 'failed', conclusion: 'T1 failed' }),
+        say('Request closed.')],
+    } },
+  ],
+
+  // TB-82、TB-83：程序写的一棒的 View transcript 打开那个实例的会话。executor 的模型没有写入等级（tb-app-tasks.mjs 的
+  // tbplain，synthetic），读一个文件后不交接就结束：程序写一棒 no handoff 交给结案，结案 close_done。
+  'tb-tasks-program': [
+    { role: 'planner', kind: 'create', deliveries: {
+      1: [call('request_submit', { title: 'End without a handoff', goal: 'The program writes the baton' }),
+        call('task_create', readTask('Read and stop', 'executor')), say('Registered request 1.')],
+    } },
+    { role: 'chat', kind: 'team-dialog', deliveries: { 1: [say('Planner registered it.')], 2: [say('Done.')] } },
+    { role: 'executor', kind: 'task', task: 'T1', deliveries: {
+      1: [call('read', { path: 'README.md' }), say('I read it and stopped here.')],
+    } },
+    { role: 'planner', kind: 'close', deliveries: { 1: closeLast('Read and closed') } },
+  ],
+
+  // TB-80、TB-82、team-tasks.md“入口”：两个会话都有 T1（标题、说明不同），切换与分屏时各看各的。
+  'tb-tasks-pair-a': pairScenario('Alpha task', 'Alpha description: read the readme for alpha'),
+  'tb-tasks-pair-b': pairScenario('Beta task', 'Beta description: read the readme for beta'),
 
   // TB-80：立项登记一个 task 后，对话的回复等 10 秒才开始写；套件在回复进行中打开模型菜单，点
   // See background tasks。T1（只读）读一个文件后等很久（之后的步骤让后台进程退出、重启 App）。

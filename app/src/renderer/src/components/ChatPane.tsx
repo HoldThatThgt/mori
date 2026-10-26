@@ -145,14 +145,18 @@ export interface PaneProps {
   onToggleRight: () => void;
 }
 
-/** @brief 按下的地方是不是顶栏右边一组的按钮（右栏开关、"Close pane"）。 */
+/**
+ * @brief 按下的地方是不是会开关右栏的按钮：顶栏右边一组（右栏开关、"Close pane"），以及阶段行的 "{n} running tasks"
+ *        （§13.13.1，打开或关上右栏，同样会被挤走）。
+ */
 function isTopBarAction(target: EventTarget): boolean {
-  return target instanceof Element && target.closest('.topbar-actions button') !== null;
+  return target instanceof Element
+    && target.closest('.topbar-actions button, [data-testid="tasks-button"]') !== null;
 }
 
 /**
  * @brief 在面板里按下鼠标或焦点进入面板时把焦点切到这一栏（split.md"焦点所在的一栏"）。例外：鼠标主键按在顶栏右边一组的
- *        按钮（右栏开关、"Close pane"）上时，到这一下按完才切（split.md"右栏开关"）。分屏时右栏跟随焦点所在的
+ *        按钮（右栏开关、"Close pane"）或阶段行的 "{n} running tasks" 上时，到这一下按完才切（split.md"右栏开关"）。分屏时右栏跟随焦点所在的
  *        一栏，按下那一刻就切的话右栏先换成这一栏的开关状态（例如关着）、两栏变宽、按钮被挤到别处，松开时不在按钮上，
  *        这一下就点空了。按完是 click（右栏开关里先切焦点再开关；另两个按钮点完由下面的计时切，关掉的那一栏已不在分屏里时
  *        focusPane 不做事），或在别处松开：click 和 pointerup 在同一个任务里派发，下一个任务时还在按着就说明没点成，

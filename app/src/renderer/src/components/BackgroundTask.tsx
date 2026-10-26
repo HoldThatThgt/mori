@@ -23,10 +23,11 @@ type Read = { status: 'loading' } | { status: 'ready'; detail: TaskDetail } | { 
  * @brief 一棒交接（§13.13.3）：头一行、结论全文、未结事项、证据、建议的下一棒、View transcript（有会话位置时；结案写的
  *        一棒总有，打开结案会话）。
  */
-function Handoff({ tab, task, handoff, context }: { tab: Tab; task: string;
+function Handoff({ tab, detail, handoff, context }: { tab: Tab; detail: TaskDetail;
   handoff: TaskDetail['handoffs'][number]; context: TaskContext }) {
+  const task = detail.id;
   const open = () => {
-    const of = handoff.byClose ? { kind: 'close' as const, request: findListed(tab.board, task)?.request.no ?? 0 }
+    const of = handoff.byClose ? { kind: 'close' as const, request: detail.request }
       : { kind: 'task' as const, task, role: handoff.session?.role ?? handoff.role };
     showTasksAt(tab.key, { level: 'transcript', of, back: { level: 'task', task } });
   };
@@ -84,7 +85,7 @@ function Detail({ tab, detail, context }: { tab: Tab; detail: TaskDetail; contex
       {detail.handoffs.length > 0 && (
         <section className="bg-part">
           <h4 className="bg-label">Handoffs</h4>
-          {detail.handoffs.map((handoff) => <Handoff key={handoff.n} tab={tab} task={detail.id} handoff={handoff}
+          {detail.handoffs.map((handoff) => <Handoff key={handoff.n} tab={tab} detail={detail} handoff={handoff}
             context={context} />)}
         </section>
       )}
@@ -101,9 +102,8 @@ export function BackgroundTask({ tab, task }: { tab: Tab; task: string }) {
   const load = useCallback(() => {
     const sessionId = commandSession(tab);
     if (sessionId === null) return;
-    readTask(sessionId, task).then((result) => setRead(result.error || !result.task
-      ? { status: 'error', error: result.error ?? `${task} does not exist.` }
-      : { status: 'ready', detail: result.task }),
+    readTask(sessionId, task).then((result) => setRead(result.error === null
+      ? { status: 'ready', detail: result.task } : { status: 'error', error: result.error }),
     (error: unknown) => setRead({ status: 'error', error: error instanceof Error ? error.message : String(error) }));
   }, [tab.sessionId, task]);
   // 会话重新打开（后台进程重启）之后也重新读

@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { join } from 'node:path';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
 import {
-  B, SPLIT, addTask, beginRun, finishRun, nextDelivery, runDelivery, setup, until, workThen,
+  B, SPLIT, addTask, assistantTurn, beginRun, finishRun, nextDelivery, runDelivery, setup, until, userMessage, workThen,
 } from './teamHarness.mjs';
 import { loadKernelModule } from '../load.mjs';
 
@@ -151,8 +151,12 @@ test('TB-82 a baton the close session writes is byClose with the close role; a p
     const [program, closing] = team.readTask('T1').handoffs;
     assert.deepEqual([program.role, program.outcome, program.reason, program.byClose],
       ['mori', null, 'no_handoff', false]);
+    // 程序写的一棒的会话位置是那个实例的会话（executor 的），不是 mori 的（§13.13.3）
+    assert.equal(program.session?.role, 'executor');
+    const read = await team.readSession({ kind: 'task', task: 'T1', role: program.session.role });
+    assert.ok(read.entries.length > 0, 'the executor session of T1 reads');
     assert.deepEqual([closing.role, closing.byClose, closing.outcome], ['planner', true, 'close_done']);
-    assert.equal(closing.session?.role ?? 'planner', 'planner');
+    assert.equal(closing.session, null, 'the close session records no session position');
   });
 
 test('TB-82 board.readTask for a task that does not exist says so', async () => {
@@ -237,6 +241,18 @@ test('TB-84 board.readSession reports a missing session, task or request in the 
   await assert.rejects(team.readSession({ kind: 'close', request: 9 }), { message: 'Request 9 does not exist.' });
 });
 
+test('TB-84 a session reads only its own TaskBoard: a task or request only another session has does not exist',
+  async () => {
+    const a = await setup(SPLIT, 'A');
+    const b = await setup(SPLIT, 'A');
+    addTask(b.team);
+    assert.equal(b.team.readTask('T1').id, 'T1', 'the other session has T1 and request 1');
+    assert.throws(() => a.team.readTask('T1'), { message: 'T1 does not exist.' });
+    await assert.rejects(a.team.readSession({ kind: 'task', task: 'T1', role: 'executor' }),
+      { message: 'T1 does not exist.' });
+    await assert.rejects(a.team.readSession({ kind: 'close', request: 1 }), { message: 'Request 1 does not exist.' });
+  });
+
 test('TB-84 the read commands keep working after task mode is turned off', async () => {
   const { team, host } = await setup(SPLIT, 'A');
   await team.setMode('on');
@@ -279,6 +295,27 @@ test('TB-89 Stop this task stops only that instance with reason user; the task i
     assert.equal(team.mode, 'off', 'the mode is unchanged');
     await finishRun(host, second, workThen('done'));
   });
+
+test('TB-89 the dialog reply runs on: stopping a task does not abort it, and it completes normally', async () => {
+  const { team, host, user } = await setup(SPLIT, 'C');
+  addTask(team);
+  const start = await nextDelivery(host, 'U.t1.executor');
+  await beginRun(host, start);
+  // 对话正在回复（synthetic：直接驱动用户会话的一次运行）
+  user.running = true;
+  user.spec.onEvent({ type: 'agent_start' });
+  userMessage(user, 'How is T1 going?');
+  await team.stopTask('T1');
+  assert.deepEqual(host.aborts, [{ id: 'U.t1.executor', reason: 'user' }], 'only the T1 instance is stopped');
+  assert.equal(user.running, true, 'the dialog reply is still running');
+  await assistantTurn(user, { text: 'T1 is stopped; I can hand it back.' });
+  user.running = false;
+  user.spec.onEvent({ type: 'agent_settled' });
+  const last = user.session.sessionManager.buildSessionContext().messages.at(-1);
+  assert.deepEqual([last.role, last.stopReason], ['assistant', 'stop'], 'the reply completes normally');
+  assert.deepEqual(host.aborts, [{ id: 'U.t1.executor', reason: 'user' }], 'the reply was never aborted');
+  await finishRun(host, start, [{ text: 'Interrupted.' }]);
+});
 
 test('TB-89 stopping drops the queue of that instance, ends waits on it and keeps the write lock', async () => {
   const { team, host } = await setup(SPLIT, 'A');

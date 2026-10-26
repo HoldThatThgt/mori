@@ -2,9 +2,10 @@
 // docs/v0/screens/models.md）：Groups、Providers、Models 三节，本会话静态校验排除的项变淡但仍可以选，
 // 当前范围打勾；只作用于这个会话，新会话用设置里的默认范围。菜单的各项取自 session.pickOptions。
 // 菜单里还有 Task mode 一行（TeamSwitch.tsx，docs/v1/screens/team-switch.md；2026-10-26 负责人走查 M10、M21 从顶栏移来）：
-// 协作模式下按钮显示"Task mode · <模型 id>"，菜单只有说明、这一行和"Manage models"；回复进行中菜单也能打开，三节的项
-// 不可用，只能切 Task mode。Task mode 那一段的最后一项是 "See background tasks"（平行 Agent 规格 §13.13.1，条件同右栏的页签），
-// 回复进行中也能用。开关、位置和焦点的行为在 rowMenu.ts；思考强度按钮（ThinkingMenu.tsx）、权限按钮（PermissionMenu.tsx）相同。
+// 协作模式下按钮显示"Task mode · <模型 id>"，菜单只有说明、这一行、"See background tasks"和"Manage models"；回复进行中
+// 菜单也能打开，三节的项不可用，只能切 Task mode。Task mode 那一段的最后一项是 "See background tasks"（平行 Agent 规格
+// §13.13.1，条件同右栏的页签），回复进行中也能用。开关、位置和焦点的行为在 rowMenu.ts；思考强度按钮（ThinkingMenu.tsx）、
+// 权限按钮（PermissionMenu.tsx）相同。
 
 import { useEffect, useId, useRef } from 'react';
 import type { PickOption } from '../../../shared/models';

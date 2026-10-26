@@ -8,6 +8,7 @@ import { roleLabel, type SessionOf } from '../../../shared/team';
 import { recordAction } from './actionLog';
 import { describe, request } from './bridge';
 import { updateTab, useApp, type RightTab, type Tab, type TasksAt, type TasksBack } from './store';
+import { stopReplyState, type StopState } from './taskList';
 
 /** @brief 操作记录里打开一条会话的写法（§13.13.6）：`View transcript: T1 · <role>` / `View transcript: Request 1 · closing`。 */
 function transcriptAction(of: SessionOf): string {
@@ -77,14 +78,6 @@ export function readSession(sessionId: string, of: SessionOf): Promise<TeamComma
   return request<TeamCommandResults['board.readSession']>({ type: 'board.readSession', sessionId, of });
 }
 
-/** @brief 一个 task 的停止状态：stopping 为真时按钮不可用；error 为失败的原文（§13.13.7）。 */
-export interface StopState {
-  /** 停止的命令还没返回，或返回了而 mori.board 里它还可以停 */
-  stopping: boolean;
-  /** 失败的原文；没有时为 null */
-  error: string | null;
-}
-
 /** @brief 每个（会话，task）的停止状态，键为 `<界面里的标识>|<task>`。 */
 export const useStopState = create<Record<string, StopState>>(() => ({}));
 
@@ -108,7 +101,7 @@ export async function stopTask(tabKey: string, task: string): Promise<void> {
   } catch (thrown) {
     error = describe('session.stopTask', thrown);
   }
-  useStopState.setState({ [key]: { stopping: error === null, error } });
+  useStopState.setState({ [key]: stopReplyState(useStopState.getState()[key], error) });
 }
 
 /** @brief 这个 task 不再可以停（停下了或交给了下一方）：清掉停止中的状态，失败的原文留着。 */
