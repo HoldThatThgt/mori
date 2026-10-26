@@ -561,6 +561,20 @@ function partOf(steps, part) {
 }
 
 /**
+ * @brief synthetic（2026-10-26 补）：control.failModelWrite 有值时这一条 models.* 写命令以它为原文失败（{ error }，同后台
+ *        进程拒绝一条写命令），只用一次；记在 status.failed，不进 status.modelWrites、不改回放桥的配置。
+ * @param control 回放桥的控制对象（window.__replay）
+ * @param status 回放桥的状态（control.status）
+ * @param command 界面发的写命令
+ */
+function failedModelWrite(control, status, command) {
+  const message = control.failModelWrite;
+  control.failModelWrite = null;
+  status.failed.push(command);
+  return { error: message };
+}
+
+/**
  * @brief 创建回放进程桥。
  * @param fixture 录制文件内容
  * @param options.speed 加速倍数
@@ -773,19 +787,9 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
         return Promise.resolve({ error: null });
       default:
         if (!MODEL_WRITES.has(command.type)) return null;
-        return Promise.resolve(control.failModelWrite ? failedModelWrite(command) : v1ModelWrite(command, models));
+        return Promise.resolve(control.failModelWrite ? failedModelWrite(control, status, command)
+          : v1ModelWrite(command, models));
     }
-  }
-
-  /**
-   * @brief synthetic（2026-10-26 补）：control.failModelWrite 有值时这一条 models.* 写命令以它为原文失败（{ error }，同后台
-   *        进程拒绝一条写命令），只用一次；记在 status.failed，不进 status.modelWrites、不改回放桥的配置。
-   */
-  function failedModelWrite(command) {
-    const message = control.failModelWrite;
-    control.failModelWrite = null;
-    status.failed.push(command);
-    return { error: message };
   }
 
   const bridge = {
@@ -852,10 +856,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     feedback,
     /** synthetic：下一条界面命令直接以这段原文失败（测发送时就失败）；null 表示照常回放 */
     failNext: null,
-    /**
-     * synthetic（2026-10-26 补）：下一条 models.* 写命令以这段原文失败（返回 { error }，测设置页把写命令的原文写在发起的
-     * 地方，例如模型行 Verify again 的命令本身出错）；null 表示照常应答
-     */
+    /** synthetic（2026-10-26 补）：下一条 models.* 写命令以这段原文失败（failedModelWrite）；null 表示照常应答 */
     failModelWrite: null,
     /** @brief 模拟后台进程退出。 */
     exit(code = 1) {

@@ -490,18 +490,24 @@ const OFF_REFUSED_PREFIX = 'Thinking can’t be turned off: ';
 async function prePatchStep(ctx, ep) {
   await stopApp(ctx);
   const raw = prePatchProfile(ctx, ep);
+  const launched = ep.log.length;
   await startApp(ctx);
   const { page } = ctx;
   await toModels(page);
   const before = await rowWhen(page, REF.nooff, settledRow);
   const hints = await modelRow(page, REF.nooff).locator('[data-testid="model-hint"]').count();
+  // 启动时没有重新探测：重启之后合成端点没有收到这个模型的探针请求
+  const relaunched = linesOf(ep, launched, NOOFF, true).length;
   record('MP-38 a fake-coder-nooff profile from before the patch (no auto.offRefused, step 2’s 400 counted as an '
     + 'error) is not re-probed at launch: the row is unverified with the status line "Couldn’t verify: <the 400 '
-    + `text>" and "Verify again", no "${THINKING_OFF_TEXT}" and no hint`, raw.startsWith('400')
+    + `text>" and "Verify again", no "${THINKING_OFF_TEXT}" and no hint`, raw.startsWith('400') && relaunched === 0
     && errorRow(before, `Couldn’t verify: ${raw}`) && before.thinkingOff === null && hints === 0,
-  brief({ raw, before, hints }));
+  brief({ raw, before, hints, relaunched }));
+  const probedAt = (await modelsInfo(page)).profiles[REF.nooff]?.probedAt ?? 0;
   const mark = ep.log.length;
   await modelRow(page, REF.nooff).locator('[data-testid="probe-status"] [data-action="verify"]').click();
+  // 一组探针要几秒：先等档案换成这一次的结果，再等模型行跟上（rowWhen 只等 10 秒）
+  await waitProfiles(page, [REF.nooff], (profile) => finished(profile) && profile.probedAt > probedAt);
   const after = await rowWhen(page, REF.nooff, offRefusedRow);
   const refused = linesOf(ep, mark, NOOFF, true).filter((line) => line.status === 400 && line.effort === 'none');
   record('MP-38 "Verify again" on that row tests again under §7.7 (a new explicit-off 400 on the fake endpoint): the '
