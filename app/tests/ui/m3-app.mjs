@@ -12,6 +12,8 @@
 // 项目信任（询问框、不信任、Esc、记住、信任后扩展的工具与批准卡、trust.json、重启后再问或不再问、
 // 不信任时保存的会话信任后重新打开也有扩展的工具、后台进程层面的反例）；草稿（切换、设置页、重启）；
 // 状态（生成中、有新结果、等你批准、出错、后台进程退出与重新载入）；窄窗口的图标栏圆点与浮动左栏；
+// 项目行的 +（2026-10-26 起取代左栏顶部的"New session"：读屏名、不是 Tab 停靠点、淡色与悬停、在另一个项目里新建、
+// 浮动左栏里点了收起、左栏很窄时仍在、后台进程退出时不可用）；
 // Ctrl+N 不起作用的情况（菜单、信任询问、浮动左栏、按住不放、输入框下面一行的菜单；圆环详情不算）；
 // 输入框下面一行（2026-10-21 从顶栏移来，docs/v0/composer-pickers.md"测试要改的地方"）：Shift+Tab 回会话树 5 次、
 // 从文字框 Tab 的顺序、空闲时各按钮的悬停与读屏的描述、新会话的空圆环和悬停提示、有用量时圆环的读屏名和悬停、
@@ -1127,30 +1129,31 @@ async function sidebarTo(page, want) {
 }
 
 /**
- * @brief 左栏和会话文件为 file 的会话行此刻的样子：宽度、内容放不下的会话行和"New session"按钮、状态文字和圆点、
- *        "Ctrl+N"、"New session"占几行。
+ * @brief 左栏和会话文件为 file 的会话行此刻的样子：宽度、内容放不下的会话行和项目行、状态文字和圆点、
+ *        这一行所在项目的 + 是否显示并且在项目行和左栏之内。
  */
 function sidebarState(page, file) {
   return page.evaluate((want) => {
     const sidebar = document.querySelector('.sidebar');
     const row = [...document.querySelectorAll('.session-item')].find((item) => item.dataset.file === want);
     const width = (el) => (el ? Math.round(el.getBoundingClientRect().width) : 0);
-    const hint = document.querySelector('[data-testid="new-session"] .nav-hint');
-    const wider = [...sidebar.querySelectorAll('.session-item, [data-testid="new-session"]')]
+    const heading = row?.closest('.project-group')?.querySelector('.project-heading');
+    const plus = heading?.querySelector('[data-testid="project-new-session"]')?.getBoundingClientRect();
+    const wider = [...sidebar.querySelectorAll('.session-item, .project-heading')]
       .filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent.trim().slice(0, 20));
     return { sidebar: width(sidebar), overflow: wider,
       text: width(row?.querySelector('.session-status-text')), dot: width(row?.querySelector('.session-status')),
       dotTip: row?.querySelector('.session-status')?.getAttribute('title') ?? null,
       name: row?.getAttribute('aria-label') ?? row?.textContent ?? '',
-      hint: Boolean(hint && hint.getClientRects().length > 0),
-      newLines: document.querySelector('[data-testid="new-session"] .nav-label')?.getClientRects().length ?? 0 };
+      plus: Boolean(plus && plus.width > 0 && plus.right <= heading.getBoundingClientRect().right + 1
+        && plus.right <= sidebar.getBoundingClientRect().right) };
   }, file);
 }
 
 /**
  * @brief 接着"Needs approval"：左栏拉到最窄 180px（< 220px，layout.css 的 @container）时会话行只留状态圆点
- *        （文字藏起、仍在读屏名里，悬停圆点看 title），"Ctrl+N"藏起，"New session"不折行，左栏不溢出；
- *        宽时状态文字和"Ctrl+N"都显示。最后把左栏挪回原来的宽度。
+ *        （文字藏起、仍在读屏名里，悬停圆点看 title），项目行的 + 仍在、在项目行和左栏之内，左栏不溢出；
+ *        宽时状态文字和 + 都显示。最后把左栏挪回原来的宽度。
  */
 async function narrowSidebar(ctx, file) {
   const { page } = ctx;
@@ -1162,10 +1165,10 @@ async function narrowSidebar(ctx, file) {
   await shot(page, '11-status-narrow-sidebar');
   await sidebarTo(page, original);
   record('左栏窄于 220px（拉到 180px）：会话行只留状态圆点（"Needs approval"藏起、仍在读屏名里，圆点悬停看 title），'
-    + '"Ctrl+N"藏起，"New session"一行，会话行和"New session"不溢出；宽时状态文字和"Ctrl+N"都显示', wide.sidebar >= 220 && wide.text > 1
-    && wide.hint && narrow.sidebar < 220 && narrow.text <= 1 && narrow.dot > 0 && narrow.dotTip === 'Needs approval'
-    && narrow.name.includes('Needs approval') && !narrow.hint && narrow.newLines === 1 && narrow.overflow.length === 0,
-  JSON.stringify({ wide, narrow }));
+    + '项目行的 + 仍在、在项目行和左栏之内，会话行和项目行不溢出；宽时状态文字和 + 都显示', wide.sidebar >= 220
+    && wide.text > 1 && wide.plus && narrow.sidebar < 220 && narrow.text <= 1 && narrow.dot > 0
+    && narrow.dotTip === 'Needs approval' && narrow.name.includes('Needs approval') && narrow.plus
+    && narrow.overflow.length === 0, JSON.stringify({ wide, narrow }));
 }
 
 /** @brief 不可见的会话等你批准：行显示"Needs approval"；回去拒绝这张卡。 */
@@ -1249,12 +1252,13 @@ async function statusKernelExit(ctx) {
   killKernel(app);
   await paneOf(page).getByTestId('kernel-exit').waitFor({ timeout: 10000 });
   const error = await waitStatus(page, A1, 'error', 5000);
-  const button = page.getByTestId('new-session');
-  const folder = page.getByTestId('sidebar').getByRole('button', { name: 'Open folder…' });
-  const tip = await button.getAttribute('title');
-  record('后台进程意外退出：退出时正在生成的会话显示"出错"；"新会话""打开文件夹…"不可用，悬停说明"后台进程已退出，先重新载入"',
-    error && await button.isDisabled() && await folder.isDisabled() && tip === CRASHED_TIP,
-    `${JSON.stringify(await rowState(page, A1))}；提示 ${tip}`);
+  const pluses = await plusButtons(page);
+  const folder = page.getByTestId('nav-open-folder');
+  const tip = await folder.getAttribute('title');
+  record('后台进程意外退出：退出时正在生成的会话显示"出错"；每个项目行的 + 和左栏的"打开文件夹…"都不可用，悬停说明'
+    + '"后台进程已退出，先重新载入"', error && pluses.length > 0
+    && pluses.every((plus) => plus.disabled === true && plus.tip === CRASHED_TIP) && await folder.isDisabled()
+    && tip === CRASHED_TIP, `${JSON.stringify(await rowState(page, A1))}；+ ${JSON.stringify(pluses)}；提示 ${tip}`);
   await exitedRow(ctx, before);
   await shot(page, '12-kernel-exit');
   const away = `${ctx.files.F}.away`;
@@ -1265,8 +1269,11 @@ async function statusKernelExit(ctx) {
     if (existsSync(away)) renameSync(away, ctx.files.F);
   }
   const cleared = await waitStatus(page, A1, null, 30000);
-  record('重新载入：打开过的会话重新打开，"出错"在重新打开成功后消失；"新会话"重新可用', cleared,
-    JSON.stringify(await rowState(page, A1)));
+  const back = await plusButtons(page);
+  record('重新载入：打开过的会话重新打开，"出错"在重新打开成功后消失；项目行的 + 重新可用（悬停回到"New session in <文件夹名>"）',
+    cleared && back.length > 0
+      && back.every((plus) => plus.disabled === false && plus.tip === `New session in ${plus.name}`),
+    JSON.stringify({ row: await rowState(page, A1), plus: back }));
   await retryFailed(ctx);
   await waitReady(page);
 }
@@ -1339,7 +1346,7 @@ async function restartRow(ctx, before) {
   await paneOf(page).getByTestId('model-button').focus();
   await watchRow(page);
   await clickRestart(page);
-  await page.waitForFunction(() => !document.querySelector('[data-testid="new-session"]')?.disabled, null,
+  await page.waitForFunction(() => !document.querySelector('[data-testid="nav-open-folder"]')?.disabled, null,
     { timeout: 30000 });
   await page.waitForFunction(({ selector, text }) => document.querySelector(`${selector} [data-testid="not-ready"]`)
     ?.textContent === text, { selector: PANE, text: ROW_REASONS.failed }, { timeout: 30000 }).catch(() => {});
@@ -1373,6 +1380,84 @@ async function retryFailed(ctx) {
   const row = await rowWhen(page, (now) => usable(now.model));
   record('重新打开失败后放回会话文件、点会话行重试：打开成功，输入框下面一行的权限、选择范围、Effort 和圆环回来、能用',
     usable(row?.permission) && usable(row.model) && usable(row.thinking) && Boolean(row.usage), JSON.stringify(row));
+}
+
+// ---------- 项目行的 +（sessions.md"项目行的 +"） ----------
+
+/**
+ * @brief 会话树里每个项目行和它的 +：工作目录、项目行的文字和悬停，+ 的读屏名、悬停、tabIndex、是否不可用、
+ *        图标颜色、离项目行右边几 px。
+ */
+function plusButtons(page) {
+  return page.evaluate(() => [...document.querySelectorAll('[data-testid="session-tree"] .project-group')]
+    .map((group) => {
+      const heading = group.querySelector('.project-heading');
+      const plus = heading?.querySelector('[data-testid="project-new-session"]');
+      const right = (el) => el.getBoundingClientRect().right;
+      return { cwd: group.dataset.cwd, name: heading?.textContent?.trim() ?? '',
+        headingTip: heading?.getAttribute('title') ?? '', label: plus?.getAttribute('aria-label') ?? null,
+        tip: plus?.getAttribute('title') ?? null, tabIndex: plus?.tabIndex ?? null, disabled: plus?.disabled ?? null,
+        color: plus ? getComputedStyle(plus.querySelector('svg')).color : null,
+        gap: plus ? Math.round(right(heading) - right(plus)) : null };
+    }));
+}
+
+/** @brief 工作目录为 folder 的项目行上的 +。 */
+async function plusOf(page, folder) {
+  const index = (await treeState(page)).findIndex((group) => samePath(group.cwd, folder));
+  if (index < 0) throw new Error(`no project row for ${folder}`);
+  return page.locator('[data-testid="session-tree"] .project-group').nth(index).getByTestId('project-new-session');
+}
+
+/** @brief + 图标此刻的颜色。 */
+const plusColor = (plus) => plus.evaluate((el) => getComputedStyle(el.querySelector('svg')).color);
+
+/**
+ * @brief 点 folder 项目行上的 +，等新会话加入并就绪；返回新会话的行（当前会话那一行）、焦点是否在输入框、
+ *        会话面板多了几个。
+ */
+async function clickPlus(page, folder) {
+  const before = await paneCount(page);
+  await (await plusOf(page, folder)).click();
+  await waitPanes(page, before + 1);
+  await waitReady(page);
+  const row = await rowState(page, await activeFile(page));
+  return { row, focused: await waitComposerFocus(page), added: await paneCount(page) - before };
+}
+
+/**
+ * @brief 展开的左栏（宽窗口）：每个项目行右端一个 +，读屏名和悬停"New session in <文件夹名>"，tabIndex 为 -1（不是 Tab
+ *        停靠点，键盘用 Ctrl+N），项目行的文字仍只有文件夹名、悬停仍是完整路径；左栏顶部没有"New session"按钮；
+ *        + 平时淡色、悬停时变深。点另一个项目（alpha；当前会话是 floatingPlus 在 beta 新建的）的 +：在 alpha 新建会话、
+ *        放进中栏并切过去，名为"New session"，焦点在输入框。
+ */
+async function projectPlus(ctx) {
+  const { page } = ctx;
+  const { alpha, beta } = ctx.folders;
+  const pluses = await plusButtons(page);
+  const top = await page.locator('[data-testid="sidebar"] .sidebar-nav button').evaluateAll((items) => items
+    .map((item) => item.getAttribute('aria-label')));
+  record('项目行的 +：每个项目行右端一个 +，读屏名和悬停"New session in <文件夹名>"，tabIndex 为 -1（不是 Tab 停靠点）；'
+    + '项目行的文字仍只有文件夹名、悬停仍是完整路径；左栏顶部没有"New session"', pluses.length >= 2
+    && pluses.every((plus) => plus.label === `New session in ${plus.name}` && plus.tip === plus.label
+      && plus.tabIndex === -1 && plus.disabled === false && samePath(plus.headingTip, plus.cwd) && plus.gap <= 12)
+    && ['alpha', 'beta'].every((name) => pluses.some((plus) => plus.name === name))
+    && !top.some((label) => /New session/.test(label)),
+  JSON.stringify({ pluses, top }));
+  const plus = await plusOf(page, alpha);
+  await page.mouse.move(0, 0);
+  const muted = await plusColor(plus);
+  await plus.hover();
+  const hover = await plusColor(plus);
+  await page.mouse.move(0, 0);
+  record('项目行的 +：平时淡色，鼠标移上去时变深', Boolean(muted) && Boolean(hover) && muted !== hover,
+    JSON.stringify({ muted, hover }));
+  const current = await rowState(page, await activeFile(page));
+  const made = await clickPlus(page, alpha);
+  record('点另一个项目（alpha）行上的 +：在 alpha 新建一个会话并切过去，名为"New session"，焦点在输入框',
+    samePath(current?.cwd, beta) && made.added === 1 && made.row?.active && made.row.title === NEW_SESSION
+    && samePath(made.row.cwd, alpha) && made.focused, JSON.stringify({ current, ...made }));
+  await shot(page, '13b-project-plus');
 }
 
 // ---------- 窄窗口与 Ctrl+N ----------
@@ -1411,9 +1496,34 @@ async function narrowWindow(ctx) {
     ?.classList.contains('floating'), null, { timeout: 3000 }).then(() => true, () => false);
   const active = await page.locator('.pane-slot:not([hidden]) [data-testid="session-title"]').innerText();
   record('窄窗口：浮动展开的左栏里打开或切换会话后，左栏自动收起', closed && active === NAMES.A1, `顶栏 ${active}`);
+  await floatingPlus(ctx);
   await app.evaluate(restoreMain, ctx.bounds);
   ctx.bounds = null;
   await page.waitForFunction(() => innerWidth >= 1024, null, { timeout: 5000 });
+}
+
+/**
+ * @brief 窄窗口下浮动展开的左栏里点另一个项目（beta；当前会话 A1 在 alpha）行上的 +：在 beta 新建会话并切过去
+ *        （名为"New session"，焦点在输入框），浮动的左栏自动收起；收起的图标栏上有一个 +（"New session (Ctrl+N)"）。
+ */
+async function floatingPlus(ctx) {
+  const { page } = ctx;
+  const rail = await page.getByTestId('rail-new-session').evaluate((el) => ({ label: el.getAttribute('aria-label'),
+    tip: el.getAttribute('title'), shown: el.getClientRects().length > 0, icon: Boolean(el.querySelector('svg')) }))
+    .catch(() => null);
+  record('窄窗口：收起的图标栏上有一个 +，读屏名和悬停"New session (Ctrl+N)"', rail?.shown && rail.icon
+    && rail.label === 'New session (Ctrl+N)' && rail.tip === rail.label, JSON.stringify(rail));
+  await page.locator('.rail-toggle').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="sidebar"]')?.classList.contains('floating'),
+    null, { timeout: 3000 });
+  const inFloating = await page.getByTestId('rail-new-session').count();
+  const made = await clickPlus(page, ctx.folders.beta);
+  const closed = await page.waitForFunction(() => !document.querySelector('[data-testid="sidebar"]')
+    ?.classList.contains('floating'), null, { timeout: 3000 }).then(() => true, () => false);
+  record('窄窗口：浮动展开的左栏里没有图标栏的 +；点另一个项目（beta）行上的 +：在 beta 新建会话并切过去（名为'
+    + '"New session"，焦点在输入框），左栏自动收起', inFloating === 0 && closed && made.added === 1 && made.row?.active
+    && made.row.title === NEW_SESSION && samePath(made.row.cwd, ctx.folders.beta) && made.focused,
+  JSON.stringify({ inFloating, closed, ...made }));
 }
 
 /** @brief 按住 Ctrl+N 不放：重复按键不再新建，只有一个新会话。 */
@@ -1595,7 +1705,7 @@ async function recover(ctx) {
   }
   if (await page.getByTestId('kernel-exit').count() > 0) {
     await page.getByRole('button', { name: 'Restart' }).first().click();
-    await page.waitForFunction(() => !document.querySelector('[data-testid="new-session"]')?.disabled, null,
+    await page.waitForFunction(() => !document.querySelector('[data-testid="nav-open-folder"]')?.disabled, null,
       { timeout: 30000 });
   }
   const pane = paneOf(page);
@@ -1618,8 +1728,8 @@ const steps = {
   renamePrefill, renameEsc, renameEmpty, renameEscRunning, renameBlur, drafts, restartTree, restartOpen, renameUnopened,
   trustAsk, trustDeny, trustEsc, trustRememberDeny, trustCounterexample, deleteCancel, deleteConfirm, deleteRunning,
   deleteUnsaved, deleteFail, archiveActive, statusRunning, statusApproval, statusError, statusKernelExit, narrowWindow,
-  ctrlNRepeat, ctrlNMenus, restartDeleted, archiveRestore, archiveOpen, archiveDelete, trustAgain, zetaRemembered,
-  trustRemembered, ...liveSteps,
+  projectPlus, ctrlNRepeat, ctrlNMenus, restartDeleted, archiveRestore, archiveOpen, archiveDelete, trustAgain,
+  zetaRemembered, trustRemembered, ...liveSteps,
 };
 
 const fake = await startFakeEndpoint();

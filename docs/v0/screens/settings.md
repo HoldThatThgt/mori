@@ -120,7 +120,7 @@ pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AG
 | 现在生效的是 CLAUDE.md | 还没有 `AGENTS.md`，`effectivePath` 是 `CLAUDE.md` / `CLAUDE.MD`（排在 `AGENTS.md` 后面） | 警示色"<路径> is in effect now. After you save, this AGENTS.md is loaded instead."；保存后变成"In effect: <agentDir>\AGENTS.md" | Open in default app（可以先把内容抄过来） |
 | 有未保存的改动 | 你改了编辑框 | "Save"可用，旁边"Unsaved changes" | Save（Ctrl+S 也可以）；Discard changes（回到读到的内容） |
 | 保存中 / 已保存 / 保存失败 | `agents.save` | "Saving…"、"Saved · Applies to new sessions"、"Couldn’t save: "+ 原文（保留你写的字） | — |
-| 离开时有未保存的改动 | 你点了"Back to app"、换到另一节、点了侧栏的会话 / "New session" / "Open folder…" / "Customize"、按 Ctrl+N（把会话拖到设置页上不能放下，见 [split.md](split.md)，所以不会离开） | 确认框"Discard changes to AGENTS.md?"，说明"Your edits haven’t been saved. Leaving now discards them."；按钮"Discard"和"Keep editing"，焦点在"Keep editing"，Esc 等于"Keep editing" | Discard（编辑框回到读到的内容，照常离开；离开没有发生时，例如取消了选文件夹，留在这里，没有未保存的改动）；Keep editing（留在这里，什么都不变：点的已归档会话不恢复，焦点回到编辑框） |
+| 离开时有未保存的改动 | 你点了"Back to app"、换到另一节、点了侧栏的会话 / 项目行的 +（2026-10-26 起取代"New session"） / "Open folder…" / "Customize"、按 Ctrl+N（把会话拖到设置页上不能放下，见 [split.md](split.md)，所以不会离开） | 确认框"Discard changes to AGENTS.md?"，说明"Your edits haven’t been saved. Leaving now discards them."；按钮"Discard"和"Keep editing"，焦点在"Keep editing"，Esc 等于"Keep editing" | Discard（编辑框回到读到的内容，照常离开；离开没有发生时，例如取消了选文件夹，留在这里，没有未保存的改动）；Keep editing（留在这里，什么都不变：点的已归档会话不恢复，焦点回到编辑框） |
 
 关闭 Mori 窗口时不问（交付说明列出）。
 

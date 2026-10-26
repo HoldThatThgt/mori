@@ -16,7 +16,7 @@ import {
 } from '../shared/protocol';
 import { isMcpTool, readMcpServers } from './mcpConfig';
 import { MEMORY_EXTENSION_PATH } from './memoryExtension';
-import { loadPi, type Pi } from './pi';
+import { createSettingsManager, loadPi, type Pi } from './pi';
 import { togglePackageResource, toggleTopLevelResource, type ToggleContext } from './resourceToggles';
 import { sessionContext, TEAM_EXTENSION_PATH, type SessionContext } from './sessions';
 import { decideTrust } from './trust';
@@ -66,7 +66,7 @@ interface Views {
 
 /** @brief 用一份设置 resolve 一次。 */
 async function resolveView(pi: Pi, cwd: string, agentDir: string, projectTrusted: boolean): Promise<View> {
-  const settings = pi.SettingsManager.create(cwd, agentDir, { projectTrusted });
+  const settings = await createSettingsManager(cwd, agentDir, { projectTrusted });
   const manager = new pi.DefaultPackageManager({ cwd, agentDir, settingsManager: settings });
   return { settings, manager, paths: await manager.resolve(async () => 'skip') };
 }
@@ -324,7 +324,7 @@ export async function toggleResource(sessionId: string | undefined, kind: Resour
 async function userPackages(): Promise<{ settings: SettingsManager; manager: DefaultPackageManager }> {
   const pi = await loadPi();
   const agentDir = pi.getAgentDir();
-  const settings = pi.SettingsManager.create(agentDir, agentDir, { projectTrusted: false });
+  const settings = await createSettingsManager(agentDir, agentDir, { projectTrusted: false });
   return { settings, manager: new pi.DefaultPackageManager({ cwd: agentDir, agentDir, settingsManager: settings }) };
 }
 
