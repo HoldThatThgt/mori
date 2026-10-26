@@ -13,6 +13,7 @@ import { startMemory } from './memory';
 import { startModelLayer } from './modelLayer';
 import { loadPi } from './pi';
 import { shutdownSessions } from './sessions';
+import { findShell } from './shell';
 
 const ports = new Set<MessagePortMain>();
 
@@ -101,6 +102,9 @@ process.parentPort.on('message', (event) => {
     // 记忆（docs/specs/memory.md §6）：记下记忆目录与全局事件的发送；增强调度在模型层启动之后开始（§9.3）。
     startMemory(message.userData, emitGlobal);
     const userData = message.userData;
+    // 启动时就查一次 bash（方案第 6 节"Shell"），记下结果；之后建 pi 设置时复用它。
+    void loadPi().then((pi) => findShell(pi))
+      .catch((error: unknown) => console.error(`[kernel] shell lookup failed: ${String(error)}`));
     void startModels(userData, message.keys)
       .then(() => startEnhance({ userData, emitGlobal }))
       .catch((error: unknown) => console.error(`[kernel] enhancement did not start: ${String(error)}`));

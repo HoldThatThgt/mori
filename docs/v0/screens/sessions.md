@@ -28,11 +28,13 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 
 | 区域 | 内容 |
 | --- | --- |
-| 顶部 | "New session"主按钮（按钮上带"Ctrl+N"，读屏名称"New session (Ctrl+N)"）、"Open folder…"；后台进程已退出时两者都不可用，悬停说明"Mori’s background process crashed. Restart it to continue." |
-| 中间 | 项目 → 会话树 |
+| 顶部 | "Open folder…"（以及"Customize"、"Memory"，见 layout.md）；后台进程已退出时都不可用，悬停说明"Mori’s background process crashed. Restart it to continue."。2026-10-26 起（负责人走查 M9）这里不再有"New session"主按钮和它旁边的"Ctrl+N"：新会话从项目行右端的 +（见下"项目行的 +"）和 Ctrl+N 新建 |
+| 中间 | 项目 → 会话树；每个项目行右端一个 + |
 | 底部 | "Report a UI issue (F8)"、"Settings"（M2 起） |
 
-收起为图标栏时：展开、新会话、打开文件夹、报告界面问题、设置五个图标按钮；会话树不显示。
+收起为图标栏时：展开、新会话（+，读屏名称和悬停"New session (Ctrl+N)"）、打开文件夹、Customize、Memory、报告界面问题、设置
+七个图标按钮；会话树不显示（也就没有项目行的 +，所以图标栏保留这一个 +；2026-10-26 走查记录"按推荐定下的"，临时，见 ../defaults.md"项目行的 +"）。图标栏的 + 同 Ctrl+N：
+在当前会话所在的项目里新建，没有当前会话时等于"Open folder…"；展开的左栏里没有它。
 不在中栏显示的会话（包括界面重新加载后还没点开的会话）里有"Needs approval""Needs input""Error""Unread"时，
 "Open sidebar"按钮上显示其中最要紧的那个的圆点（按这个顺序），悬停和读屏名称为"Open sidebar (a session needs approval)"等
 （另外三种是"(a session needs input)"、"(a session has an error)"、"(a session has unread results)"）；
@@ -42,10 +44,10 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 正在读取 | 启动后 `session.list` 还没返回 | "Loading sessions…" | New session、Open folder… |
+| 正在读取 | 启动后 `session.list` 还没返回 | "Loading sessions…" | Open folder… |
 | 读取失败 | `session.list` 命令失败（后台进程没有回应；pi 自己不会报错） | "Couldn’t load sessions: "加原文；已有的列表保持显示 | "Retry" |
-| 没有会话 | 列表为空，本次也没打开过文件夹（也可能是 pi 读不了会话目录，pi 不区分） | 不显示树；中栏只说"Choose a project folder to start a session." | New session、Open folder… |
-| 有会话 | pi 的会话列表（`session.list` → `listAll()`），加上本次打开、还没保存的会话（协作模式：见 docs/specs/parallel-agents-taskboard.md §3、§14.5：实例会话存在 `<userData>/teams/<id>/sessions`，不进侧栏，也不算未保存的会话） | 按项目（会话的工作目录）分组：项目行显示文件夹名，悬停显示完整路径；项目下列出会话；当前会话高亮 | 点会话打开或切换；右键菜单；键盘见下 |
+| 没有会话 | 列表为空，本次也没打开过文件夹（也可能是 pi 读不了会话目录，pi 不区分） | 不显示树；中栏只说"Choose a project folder to start a session." | Open folder… |
+| 有会话 | pi 的会话列表（`session.list` → `listAll()`），加上本次打开、还没保存的会话（协作模式：见 docs/specs/parallel-agents-taskboard.md §3、§14.5：实例会话存在 `<userData>/teams/<id>/sessions`，不进侧栏，也不算未保存的会话） | 按项目（会话的工作目录）分组：项目行显示文件夹名，悬停显示完整路径，右端一个 +（见"项目行的 +"）；项目下列出会话；当前会话高亮 | 点会话打开或切换；点项目行的 + 在这个项目里新建；右键菜单；键盘见下 |
 | 重新读取 | 改名没打开的会话、归档、删除、后台进程重新载入之后（界面重新加载后还没点开的会话的名字、排序、状态另随事件更新） | 旧的树保持显示，结果回来后整体替换，不回到"Loading sessions…"；正在改名的行不被打断 | — |
 | 排序 | 会话的最后活动时间：pi 列表的 `modified`；本次运行里你发消息、以及你的消息或助手回复结束（`message_end`）的时间；新建会话的时间；取最新 | 项目按其中最新的会话排，会话在项目内从新到旧 | — |
 | 项目里没有会话了 | 归档或删除了项目里最后一个会话 | 项目行一起消失（方案"本次打开的文件夹"也算项目；空项目行没有可做的操作，交付说明列出） | — |
@@ -55,7 +57,7 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 | 项 | 来源 | 必须可见 |
 | --- | --- | --- |
 | 会话名 | 名字（pi 的 `session_info`：列表里的 `name`、打开时的会话名、`session_info_changed` 事件）；没有名字时第一条你的消息（列表里的 `firstMessage`，或本次对话流里的第一条消息）的前 20 个字，超出加"…"；都没有时"New session" | 省略号截断，不换行；悬停显示完整的名字或第一条消息 |
-| 状态 | 本次运行中打开过的会话，以及界面重新加载前就在后台进程里开着、还没点开的会话（见"界面重新加载"），见下表 | 圆点加文字，跟在会话名右边；侧栏窄于 220px 时只显示圆点（文字仍在读屏名称里，悬停圆点看文字），顶部"New session"也不再显示"Ctrl+N" |
+| 状态 | 本次运行中打开过的会话，以及界面重新加载前就在后台进程里开着、还没点开的会话（见"界面重新加载"），见下表 | 圆点加文字，跟在会话名右边；侧栏窄于 220px 时只显示圆点（文字仍在读屏名称里，悬停圆点看文字）；项目行的 + 任何宽度都在，项目名先省略号截断 |
 
 顶栏的会话名、会话面板的读屏名称、F8 报告里的"Current session"与会话行同一来源、同一规则（取代 chat.md 顶栏"会话名"原来的写法）。
 
@@ -73,12 +75,30 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 `agent_settled`、批准请求和扩展询问的开始与结束）；本轮结束时标"Unread"，后台进程意外退出时它在生成就标"Error"，
 点开后改按对话流判断。同一个会话同时挂着几个扩展询问时，结束一个就当作都没有了（交付说明列出）。
 
+### 项目行的 +
+
+2026-10-26 起（负责人走查 M9："instead of 'new session' button, add a + icon next to the project title on the right"）：
+照 Claude 桌面版，每个项目行右端一个 +，在这个项目里新建会话；取代左栏顶部的"New session"主按钮。
+
+| 状态 | 来源 | 必须可见 | 可做的操作 |
+| --- | --- | --- | --- |
+| 常态 | 项目行显示时 | 项目行右端一个淡色的 + 图标按钮（`--color-faint`），一直显示，不用悬停才出现；项目名在它左边，放不下时项目名省略号截断，+ 不挤出去；读屏名称和悬停"New session in <文件夹名>"（Claude 的"New session in {folder}"）；项目行其余地方悬停仍是完整路径，项目行的文字仍只有文件夹名 | 点 + |
+| 悬停 | 鼠标在 + 上 | + 变深（正文颜色），底色同别的图标按钮悬停时 | 点 + |
+| 点了 + | 你的操作 | 先过离开确认（有未保存的改动时，同 settings.md"离开时有未保存的改动"；选"Keep editing"时什么都不变，浮动的左栏也不收起）；然后在这个项目里新建会话（`session.create`，cwd 是这个项目的文件夹；需要时先问信任，同"打开文件夹"），放进焦点所在的那一栏并切过去（[split.md](split.md)），名为"New session"，焦点在输入框；在设置页、Customize、记忆页点时也回到会话面板；窄窗口下浮动展开的左栏随之收起；操作记录"New session"，后台进程那一条"New session in <dir> …"不变 | 输入 |
+| 上一个新会话还在打开 | 焦点会话还在"Starting…" | + 照常可用（同原来的"New session"按钮；只有 Ctrl+N 这时不起作用，见"Ctrl+N 不起作用"） | 点 + |
+| 后台进程已退出 | 主进程的退出通知 | 每个项目行的 + 都不可用（变淡），悬停"Mori’s background process crashed. Restart it to continue." | "Restart"之后重新可用 |
+| 左栏收起为图标栏 | 你点了"Close sidebar"，或窄窗口 | 没有项目行，也没有项目的 +；图标栏上的 + 见"左栏" | 图标栏的 +；"Open sidebar" |
+
+键盘：项目行的 + 不是 Tab 停靠点（`tabIndex` 为 -1），也不在 ↑ ↓ 的会话行里，所以走查 2 的 Shift+Tab 次数不变；
+用键盘新建会话是 Ctrl+N（在当前会话所在的项目里）。要在别的项目里新建，先用 ↑ ↓ 和 Enter 打开那个项目的一个会话，再按 Ctrl+N。
+
 ### 键盘
 
 - 整棵树只占一个 Tab 停靠点：从别处 Tab / Shift+Tab 进来时焦点落在当前会话行（没有时落在第一行）。
 - ↑ ↓ 在会话行之间移动焦点（跨项目，不打开会话）；Home / End 到第一行和最后一行。
 - Enter 或 Space 打开或切换这个会话，焦点进入它的输入框。点会话行也一样。
 - 菜单键或 Shift+F10 打开右键菜单。
+- 项目行的 + 只能用鼠标点（不是 Tab 停靠点，见"项目行的 +"），键盘新建会话用 Ctrl+N。
 - 走查 2 的路径：Ctrl+N（焦点在新会话的输入框）→ Shift+Tab 几次回到会话树（依次经过顶栏的右栏开关、协作开关、左栏分隔线、
   左栏底部的"Settings"和"Report a UI issue (F8)"，第 6 次落在新会话行；2026-10-21 起权限、模型和 Effort 按钮在输入框下面一行、
   文字框之后，不在这条路上，原来是第 8 次，[models.md](models.md)；2026-10-22 合入的协作开关在顶栏，多一次，
@@ -91,7 +111,8 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 | --- | --- | --- | --- |
 | 中栏没有会话 | 启动后还没点开会话；或当前会话被删除 | "Open a folder"、"Open folder…"；侧栏有会话时说明"Pick a session on the left to continue, or open a folder to start a new session."（取代 connection.md"等你选文件夹"里"已有连接"的情况；首次启动测试成功后仍用 connection.md 的文字，v1 起标题下面另有一行"Connected · …"，见 v1/screens/first-run.md） | Open folder…；点左侧会话；Ctrl+N |
 | 打开文件夹 | 你在系统对话框里选了文件夹 | 新会话出现在该项目下（名为"New session"）并成为当前会话，按钮位置"Starting…"；需要时先弹信任询问（见下） | 输入 |
-| 新会话（Ctrl+N 或"New session"） | 你的操作 | 在当前会话所在的项目里新建一个会话并切过去，焦点在输入框；没有当前会话时等于"Open folder…"；在设置页按时也回到会话面板 | 输入 |
+| 新会话（Ctrl+N，或收起的图标栏上的 +） | 你的操作 | 在当前会话所在的项目里新建一个会话并切过去，焦点在输入框；没有当前会话时等于"Open folder…"；在设置页按时也回到会话面板 | 输入 |
+| 在某个项目里新建（项目行的 +） | 你点了项目行右端的 + | 在这个项目里新建一个会话并切过去，焦点在输入框；见"项目行的 +" | 输入 |
 | Ctrl+N 不起作用 | 首次启动页；按住不放的重复按键；上一个新会话还在"Starting…"；有菜单、对话框、信任询问、改名框或 F8 报告框开着（包括窄窗口下浮动展开的左栏、输入框下面一行的权限、范围、Effort 菜单和"Queue"的下拉；上下文用量的详情不算）；后台进程已退出 | 什么都不发生 | — |
 | 打开已保存的会话 | 你点了一个本次还没打开的会话：`session.open`（会话文件） | 中栏立刻切到这个会话，按钮位置"Starting…"，顶栏先显示列表里的会话名，输入框下面一行还没有范围按钮、Effort 和上下文用量；打开后按 pi 记录的当前分支显示完整对话（先显示最近 50 条），输入框下面一行显示范围按钮、Effort 和上下文用量 | 继续对话 |
 | 正在打开时再点 | 同一个会话行 | 只切过去，不再发 `session.open` | — |
@@ -139,14 +160,14 @@ M5 起菜单是：Rename、Attach as context、Open in split view、Archive、De
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 归档 | 你在右键菜单选了"Archive"：后台进程里开着的会话（本次打开过的，或界面重新加载前就开着的）先关闭（`session.close`：停止 → 通知扩展 → 释放），再把会话文件记进本机的已归档列表（`localStorage` 的 `mori.archived`） | 不确认；会话行从项目下移到侧栏底部的"Archived"（项目里只剩它时项目行一起消失）；如果它是当前会话，中栏回到"Open a folder"；焦点移到屏幕上排在它下面的会话行（没有时上一行；收起的"Archived"里的不算）；草稿保留 | — |
+| 归档 | 你在右键菜单选了"Archive"：后台进程里开着的会话（本次打开过的，或界面重新加载前就开着的）先关闭（`session.close`：停止 → 通知扩展 → 释放），再把会话文件记进本机的已归档列表（`localStorage` 的 `mori.archived`） | 不确认；会话行从项目下移到侧栏底部的"Archived"（项目里只剩它时项目行一起消失）；如果它是当前会话，中栏回到"Open a folder"；焦点移到屏幕上排在它下面的会话行（没有时上一行；收起的"Archived"里的不算；再没有时左栏的"Open folder…"）；草稿保留 | — |
 | 归档失败 | `session.close` 报错 | 侧栏里一行"Couldn’t archive this session: "加原文，会话不变 | 再试 |
 | 已归档列表 | 本机的已归档列表里、pi 会话列表里也有的会话 | 侧栏底部一行"Archived N"（默认收起）；展开后列出这些会话，每行是会话名，悬停显示文件夹和完整名字 | 展开、收起；点一个已归档的会话：恢复并打开；右键：Unarchive、Delete… |
 | 恢复 | 你选了"Unarchive"，或点了已归档的会话 | 回到它的项目下，按最后活动排序；点的是会话行时同时打开它 | — |
 | 删除确认 | 你在右键菜单选了"Delete…" | 对话框"Delete “<会话名>”?"，说明"This session will be permanently deleted. This can’t be undone."；按钮"Delete"（危险色）和"Cancel"，焦点在"Cancel"，Tab 只在两个按钮之间切换 | Delete；Cancel 或 Esc |
 | 还没保存的新会话 | 会话还没有消息 | 说明改为"This session has no messages yet." | 同上 |
 | 删除中 | 你点了"Delete"：后台进程里开着的会话先关闭（同上）；没开着或打开失败的跳过这一步；再由主进程删除会话文件（只接受 `<agentDir>\sessions` 里的 `.jsonl`；还没保存的新会话没有文件可删）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.5：删除会话文件之后，按它第一行里的 id 一并永久删除 `<userData>/teams/<id>/`；归档不动它；`session.close` 同时关闭全部实例会话） | "Deleting…"，两个按钮不可用；Esc 不起作用 | — |
-| 已删除 | 各自需要的步骤都成功；然后重新读取列表 | 对话框关闭，会话行消失（也从已归档列表去掉）；如果它是当前会话，中栏回到"Open a folder"；焦点移到屏幕上排在它下面的会话行（没有时上一行，收起的"Archived"里的不算；再没有时"New session"）；草稿一起删除；重启后不再出现 | — |
+| 已删除 | 各自需要的步骤都成功；然后重新读取列表 | 对话框关闭，会话行消失（也从已归档列表去掉）；如果它是当前会话，中栏回到"Open a folder"；焦点移到屏幕上排在它下面的会话行（没有时上一行，收起的"Archived"里的不算；再没有时左栏的"Open folder…"）；草稿一起删除；重启后不再出现 | — |
 | 关闭失败 | `session.close` 报错 | 对话框里"Couldn’t delete this session: "加原文；什么都没变 | 再点"Delete"重试；Cancel（焦点回到会话行） |
 | 已关闭、删除文件失败 | 主进程删除文件报错；主进程把原文交回界面 | 对话框里"Couldn’t delete this session: "加原文；文件还在；会话已经关闭，变回没打开的会话（再点它会重新打开，"Allow for this session"的选择和权限回到"Ask each time"） | 再点"Delete"重试；Cancel |
 | 正在生成 | 会话在生成、等你批准或等你回答 | 菜单里"Archive""Delete…"不可用 | 先停止 |
@@ -198,7 +219,7 @@ M4 起输入框里的引用芯片也按会话文件存在本机（`localStorage`
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 意外退出 | 主进程的退出通知 | 会话行的"Running""Needs approval""Needs input"消失；退出时正在生成的会话（包括界面重新加载后还没点开的）显示"Error"；会话树保持原样；"New session""Open folder…"不可用 | 切换已打开的会话；点没打开的会话（中栏显示退出横幅，重新载入后自动打开它）；Restart |
+| 意外退出 | 主进程的退出通知 | 会话行的"Running""Needs approval""Needs input"消失；退出时正在生成的会话（包括界面重新加载后还没点开的）显示"Error"；会话树保持原样；项目行的 +、"Open folder…"不可用 | 切换已打开的会话；点没打开的会话（中栏显示退出横幅，重新载入后自动打开它）；Restart |
 | 重新载入 | 你点了"Restart" | 重新读取会话列表（旧的树保持显示）；打开过的会话照 chat.md 的做法重新打开，信任沿用本次的回答；会话名从会话文件恢复；"Error"在重新打开成功后消失 | — |
 | 界面重新加载 | 页面重新加载（例如 Electron 默认菜单的 Ctrl+R）：界面状态清空；后台进程里的会话照常运行（照 Claude 桌面版：会话不因窗口而停，只有停止、归档、删除或退出才停） | 重新读取会话列表；后台进程里打开着的会话在侧栏显示状态（`session.list` 带回的 `live`：Running、Needs approval、Needs input），之后随事件更新（见"状态"）；本次新建、还没发消息的会话也列出（后台进程把它补进列表，名为"New session"）；草稿还在（存在本机）；"Allow for this session"的选择和权限还在（会话没停）；本次运行里信任询问的回答清空，新打开的文件夹会再问 | 点会话接上 |
 | 接上后台进程里的会话 | 你点了一个还在后台进程里的会话：`session.open` 返回它这一刻的样子（已经写进会话文件的对话、`live`：是否在生成、正在生成的回复、正在执行的工具、挂着的批准请求和扩展询问、排队区）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.6、§13.10：另带协作模式、TaskBoard 视图、待判断的消息和挂起的后台批准卡，后台实例照常运行） | 不问信任；对话流显示到这一刻，正在生成的回复接着流入，正在执行的工具卡是"Running…"，挂着的批准卡和扩展询问照常出现；阶段行按这一刻定（模型还没开始回复时"Waiting for the model…"，只有思考时"Thinking…"）；之后的事件照常接着显示。扩展的通知不在会话记录里，界面重新加载前显示过的不再显示 | 照常操作 |
@@ -230,7 +251,7 @@ chat.md"会话还没保存过"的判断改为：这个会话没有你的消息�
 | 元素 | 标识 |
 | --- | --- |
 | 会话树 | `data-testid="session-tree"`（`role="tree"`）；项目 `.project-group[data-cwd]`；会话行 `.session-item[data-file]`（`role="treeitem"`，`data-row` 为行标识；还没保存的新会话也有路径） |
-| 新会话按钮 | `data-testid="new-session"` |
+| 新建会话的入口 | 项目行的 + `data-testid="project-new-session"`（在 `.project-heading` 里，没有文字）；图标栏上的 + `data-testid="rail-new-session"`（只在收起时有）；左栏的"Open folder…" `data-testid="nav-open-folder"`（中栏"Open a folder"页上的是 `open-folder`） |
 | 会话状态 | 会话行里的 `[data-testid="session-status"]`，`data-status` 为 `approval` / `question` / `running` / `error` / `unseen`；图标栏上的 `[data-testid="rail-status"]` |
 | 右键菜单 | `data-testid="session-menu"`，菜单项 `role="menuitem"` |
 | 改名输入框 | `data-testid="rename-input"`；错误 `data-testid="rename-error"` |

@@ -1,5 +1,6 @@
-// 左栏：品牌与收起、"New session"（Ctrl+N）、"Open folder…"、"Customize"（M6）、"Memory"（在 M7 "Review" 原来的位置，
-// docs/specs/memory.md §10.1；后台进程退出后不可用）、项目 → 会话树（SessionTree）、"Report a UI issue (F8)"、"Settings"。
+// 左栏：品牌与收起、"Open folder…"、"Customize"（M6）、"Memory"（在 M7 "Review" 原来的位置，docs/specs/memory.md §10.1；
+// 后台进程退出后不可用）、项目 → 会话树（SessionTree，每个项目行右端一个 + 新建会话）、"Report a UI issue (F8)"、
+// "Settings"。收起为图标栏时最上面多一个 +（"New session (Ctrl+N)"）：图标栏没有项目行（docs/v0/screens/sessions.md"左栏"）。
 
 import { openSettings, openTools } from '../state/actions';
 import { guardLeave } from '../state/leaveGuard';
@@ -9,11 +10,11 @@ import { isShown, sameFile, useApp, type AppState } from '../state/store';
 import { BrandMark, Icon } from '../icons';
 import { openIssueReport } from './IssueDialog';
 import { savedStatus, sessionStatus, type SessionStatus } from './sessionRows';
-import { SessionTree } from './SessionTree';
+import { CRASHED_HINT, SessionTree } from './SessionTree';
 
 /** F8 入口的文字；收起为图标栏时作为按钮的名称 */
 const REPORT_LABEL = 'Report a UI issue (F8)';
-/** 新会话按钮的名称 */
+/** 图标栏上 + 的名称 */
 const NEW_SESSION_LABEL = 'New session (Ctrl+N)';
 
 /** @brief 收起为图标栏时"Open sidebar"按钮上显示的状态（生成中不显示）。 */
@@ -37,20 +38,23 @@ function hiddenStatus(state: AppState): RailStatus | null {
 }
 
 /**
- * @brief 左栏顶部的导航："New session"、"Open folder…"、"Customize"、"Memory"（后台进程退出后都不可用，悬停说明原因）。
+ * @brief 左栏顶部的导航："Open folder…"、"Customize"、"Memory"；collapsed 为真（图标栏）时最上面还有 +，同 Ctrl+N。
+ *        后台进程退出后都不可用，悬停说明原因。
  */
-function SidebarNav() {
+function SidebarNav({ collapsed }: { collapsed: boolean }) {
   const view = useApp((state) => state.view);
   const exited = useApp((state) => state.kernel === 'exited');
-  const unavailable = exited ? 'Mori’s background process crashed. Restart it to continue.' : undefined;
+  const unavailable = exited ? CRASHED_HINT : undefined;
   return (
     <nav className="sidebar-nav">
-      <button className="nav-item primary" onClick={() => void newSession()} title={unavailable ?? NEW_SESSION_LABEL}
-        aria-label={NEW_SESSION_LABEL} data-testid="new-session" disabled={exited}>
-        <Icon name="plus" /><span className="nav-label">New session</span><span className="nav-hint">Ctrl+N</span>
-      </button>
+      {collapsed && (
+        <button className="nav-item primary" onClick={() => void newSession()} title={unavailable ?? NEW_SESSION_LABEL}
+          aria-label={NEW_SESSION_LABEL} data-testid="rail-new-session" disabled={exited}>
+          <Icon name="plus" />
+        </button>
+      )}
       <button className="nav-item" onClick={() => void openFolder()} title={unavailable ?? 'Open folder…'}
-        aria-label="Open folder…" disabled={exited}>
+        aria-label="Open folder…" data-testid="nav-open-folder" disabled={exited}>
         <Icon name="folder" /><span className="nav-label">Open folder…</span>
       </button>
       <button className={`nav-item${view === 'tools' ? ' active' : ''}`} onClick={openTools}
@@ -84,7 +88,7 @@ export function Sidebar({ collapsed, floating, onToggle, onNavigate, children }:
           {collapsed && railStatus && <span className={`rail-dot ${railStatus}`} data-testid="rail-status" />}
         </button>
       </div>
-      <SidebarNav />
+      <SidebarNav collapsed={collapsed} />
       <div className="sidebar-sessions">
         <SessionTree onNavigate={onNavigate} />
       </div>
