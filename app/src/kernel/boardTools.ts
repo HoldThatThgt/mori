@@ -196,10 +196,11 @@ export function toolSchema(name: TeamToolName, info: ToolSessionInfo): JsonSchem
 const ASK_DESCRIPTION = 'Ask another role one question. It answers once in a read-only session and cannot change '
   + 'files; its answer is the result of this call.';
 
-/** @brief 协作模式下的 agent_message（§10.1）。 */
+/** @brief 协作模式下的 agent_message（§10.1）；最后一句说明你看不到这些消息（M26）。 */
 const TEAM_MESSAGE_DESCRIPTION = 'Send a message to a role, or leave it on a task (to: T1; whoever works on the task '
   + 'sees it next, nobody is woken). A message to a role goes to the session that holds its seat (create or close), '
-  + 'or opens a one-time read-only question that is answered once. wait: true waits for the reply.';
+  + 'or opens a one-time read-only question that is answered once. wait: true waits for the reply. '
+  + 'The user never sees these messages.';
 
 /**
  * @brief agent_message 的说明：关闭模式下的临时提问实例没有它；对话会话的工具只注册一次，两种模式都用，
@@ -207,11 +208,14 @@ const TEAM_MESSAGE_DESCRIPTION = 'Send a message to a role, or leave it on a tas
  */
 function messageDescription(info: ToolSessionInfo): string {
   if (info.kind === 'dialog') {
-    return `${ASK_DESCRIPTION} In team mode: ${TEAM_MESSAGE_DESCRIPTION.charAt(0).toLowerCase()}`
+    return `${ASK_DESCRIPTION} In task mode: ${TEAM_MESSAGE_DESCRIPTION.charAt(0).toLowerCase()}`
       + TEAM_MESSAGE_DESCRIPTION.slice(1);
   }
   return info.team ? TEAM_MESSAGE_DESCRIPTION : ASK_DESCRIPTION;
 }
+
+/** @brief 合并会话里 reply_via_dialog 的说明：答复就是这次回复本身（§5.4、M26）。 */
+const MERGED_REPLY_DESCRIPTION = 'No collaboration needed: you answer the user directly in your reply.';
 
 /** @brief task_handoff 的说明：task 实例与结案会话不同（§6.3、§7.1）。 */
 function handoffDescription(info: ToolSessionInfo): string {
@@ -251,6 +255,7 @@ const DESCRIPTIONS: Readonly<Record<Exclude<TeamToolName, 'agent_message' | 'tas
 export function toolDescription(name: TeamToolName, info: ToolSessionInfo): string {
   if (name === 'agent_message') return messageDescription(info);
   if (name === 'task_handoff') return handoffDescription(info);
+  if (name === 'reply_via_dialog' && info.merged) return MERGED_REPLY_DESCRIPTION;
   return DESCRIPTIONS[name];
 }
 
@@ -274,7 +279,7 @@ const CLOSE_HANDOFF_USAGE = 'task_handoff {"task":"T1","conclusion":"<what it es
 /** @brief 各工具的正确写法（错误的第二行）。 */
 const USAGES: Readonly<Record<Exclude<TeamToolName, 'task_handoff'>, string>> = {
   board_read: 'board_read {} for the whole board, {"request":1} for a request, {"task":"T1"} for a task',
-  read_session: 'read_session {"task":"T1","role":"executor"}; page with "from" and "to" (turn numbers)',
+  read_session: 'read_session {"task":"T1","role":"<role>"}; page with "from" and "to" (turn numbers)',
   agent_message: 'agent_message {"to":"<role>","text":"<message>"} or {"to":"T1","text":"<note for the task>"}',
   request_submit: 'request_submit {"title":"<one line>","goal":"<what it must achieve>"}',
   request_update: 'request_update {"request":1} records this user message; add "quote" for other exact words',

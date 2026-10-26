@@ -3,7 +3,7 @@
 // M6：以 / 开头时输入框上方出"/"补全列表（SlashMenu.tsx），列表开着时 Enter 不发送。
 // v1（docs/v1/screens/model-chat.md）：准备中（发了消息、pi 还没开始）可以停止，再发的按排队处理（不能插话），
 // 显示在排队区；会话被拒绝启动时可以打字，但发送不可用（Enter 不发送，草稿不丢）。
-// 平行 Agent（docs/v1/screens/team-switch.md、team-stop.md）：/team on、/team off 在生成中、被拒绝启动时也按命令处理；
+// 平行 Agent（docs/v1/screens/team-switch.md、team-stop.md）：/task on、/task off 在生成中、被拒绝启动时也按命令处理；
 // 排队区里有立项还没判断完的消息；后台有 Agent 在运行或排队时停止按钮旁有 Stop agents。
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
@@ -156,7 +156,7 @@ function QueueMenu({ tab, disabled }: { tab: Tab; disabled: boolean }) {
   );
 }
 
-/** @brief 原文是 /team on 或 /team off：生成中、被拒绝启动时也照样执行（team-switch.md "输入框里的 /team"）。 */
+/** @brief 原文是 /task on 或 /task off：生成中、被拒绝启动时也照样执行（team-switch.md "输入框里的 /task"）。 */
 function isTeamSwitch(draft: string): boolean {
   return parseTeamCommand(draft).kind === 'switch';
 }
@@ -189,7 +189,7 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
     event.preventDefault();
     if (notReady || !hasText) return;
     if (tab.blocked && !isTeamSwitch(tab.draft)) return;
-    // 准备中（sending、还没 running）再发的由 send 按排队处理，Ctrl+Enter 也是（§11.4）；/team on、off 由 send 先认出。
+    // 准备中（sending、还没 running）再发的由 send 按排队处理，Ctrl+Enter 也是（§11.4）；/task on、off 由 send 先认出。
     if (busy) void send(tab.key, event.ctrlKey && running ? 'steer' : 'followUp');
     else void send(tab.key);
   }
@@ -232,7 +232,7 @@ function StopTeamButton({ tabKey }: { tabKey: string }) {
 /**
  * @brief 发送组：不能发送时的说明（放不下时截短，悬停看全文）；生成中有字时"Queue ▾"、准备中有字时只有一个按钮的
  *        "Queue"（准备中不能插话），加上"Stop"；空闲时的"Send"；后台有 Agent 在运行或排队时，"Stop"或"Send"前的
- *        Stop agents。会话被拒绝启动时发送不可用（原因在输入框上方的拒绝启动卡里），/team on、/team off 除外。
+ *        Stop agents。会话被拒绝启动时发送不可用（原因在输入框上方的拒绝启动卡里），/task on、/task off 除外。
  *        会话面板 ≤ 340px 时有 Stop agents 就收起排队的按钮（chat.css，models.md"窄栏"）。
  */
 function SendGroup({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {

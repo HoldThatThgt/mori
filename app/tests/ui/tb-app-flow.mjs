@@ -217,7 +217,7 @@ async function mergedOneSession(ctx, who) {
     && item.text === 'Registered request 1.');
   const kinds = [...new Set(lines.map((line) => line.kind))];
   const suffixes = instanceFiles(ctx, who.sessionId).map((file) => instanceSuffix(who.sessionId, file.id)).sort();
-  record('TB-10 merged session: the /team message is decided and answered in one run of the user session itself — '
+  record('TB-10 merged session: the /task message is decided and answered in one run of the user session itself — '
     + 'exactly the 3 scripted requests (request_submit, task_create, reply), one agent_start before the first '
     + 'agent_settled with the reply in it; no create or team-dialog session ever sends a request; no create '
     + 'session file (only t1.mori, t2.mori, close.1)',
@@ -339,10 +339,11 @@ async function mergedProgress(ctx, who, obs) {
   brief(items.map((item) => `${item.kind}${item.actions ? '*' : ''}:${item.text.slice(0, 30)}`)));
   const done = (await progressOf(ctx, who.tab))[0];
   record('TB-37 request state and task phase while a task waits for a decision: "Waiting for Mori" with T1 '
-    + '"Waiting for Mori" before you are asked, "Needs your decision" after; Done when it closes',
+    + '"Waiting for Mori" before you are asked, "Needs your decision" after; Done when it closes; with no role '
+    + 'files the task row has no role name (§13.3)',
   obs.waitingState?.state === 'waiting_create' && obs.waitingState.title.includes(' · Waiting for Mori · ')
-    && obs.waiting === 'T1 Read README · Mori · Waiting for Mori' && obs.askedState?.state === 'needs_decision'
-    && obs.askedState.title.includes(' · Needs your decision · ') && obs.asked === 'T1 Read README · Mori · Needs your '
+    && obs.waiting === 'T1 Read README · Waiting for Mori' && obs.askedState?.state === 'needs_decision'
+    && obs.askedState.title.includes(' · Needs your decision · ') && obs.asked === 'T1 Read README · Needs your '
     + 'decision' && done?.state === 'done' && done.title.includes(' · Done · '),
   brief({ waiting: obs.waiting, waitingTitle: obs.waitingState?.title, asked: obs.asked, done: done?.title }));
 }
@@ -450,12 +451,12 @@ async function renumberProgress(ctx, who, board, pending) {
   const dur = (no) => durationOf(board.requests[no - 1].closedAt - board.requests[no - 1].createdAt);
   record('TB-37 a cancelled request shows "Cancelled", a failed one "Failed", both with the duration up to closedAt '
     + 'and no task rows when collapsed; expanded: Cancelled rows, the failed task\'s chain, the ruled-out approach '
-    + 'and the conclusion; a pending task read "Waiting for T1"',
+    + 'and the conclusion; a pending task read "Waiting for T1"; with no role files the chain has no role names',
   collapsed.length === 2 && collapsed.every((block) => block.tasks.length === 0)
     && collapsed[0].title === `Request 1 · Two things · Cancelled · ${dur(1)}` && collapsed[0].state === 'cancelled'
     && collapsed[1].title === `Request 2 · Read src · Failed · ${dur(2)}` && collapsed[1].state === 'failed'
     && same(r1?.tasks.map((t) => t.text), ['T1 First thing · Cancelled', 'T2 Second thing · Cancelled'])
-    && r2?.chains.T3 === 'Mori: src has only a.ts → Mori: Reading src did not help'
+    && r2?.chains.T3 === 'src has only a.ts → Reading src did not help'
     && same(r2.ruledOut, ['Reading src did not help']) && r2.conclusion === 'Conclusion: Nothing useful in src'
     && pending === 'T2 Second thing · Waiting for T1',
   brief({ collapsed: collapsed.map((b) => b.title), r1: r1?.tasks, r2: r2 && { chains: r2.chains, ruled: r2.ruledOut,
@@ -480,9 +481,10 @@ async function queueStop(ctx) {
   await settle(ctx, who, 60000);
   const [after] = await progressOf(ctx, who.tab);
   record('TB-37 phase texts Queued and Stopped: with four tasks running the fifth reads "Queued"; after Stop agents '
-    + 'the tasks read "Stopped" and the request "Stopped"; cancelling it afterwards reads "Cancelled"',
-  queued === 'T5 Read 5 · Mori · Queued' && running === 'T4 Read 4 · Mori · Starting'
-    && t1 === 'T1 Read 1 · Mori · Stopped' && t5 === 'T5 Read 5 · Mori · Stopped' && block?.state === 'stopped'
+    + 'the tasks read "Stopped" and the request "Stopped"; cancelling it afterwards reads "Cancelled" (no role '
+    + 'files: the rows name no role)',
+  queued === 'T5 Read 5 · Queued' && running === 'T4 Read 4 · Starting'
+    && t1 === 'T1 Read 1 · Stopped' && t5 === 'T5 Read 5 · Stopped' && block?.state === 'stopped'
     && block.title.includes(' · Stopped · ') && after?.state === 'cancelled',
   brief({ queued, running, t1, t5, block: block?.title, after: after?.title }));
 }
@@ -506,7 +508,7 @@ async function lockStop(ctx) {
   await settle(ctx, who, 60000);
   record('TB-37 a write task waiting for the lock of a stopped task reads "Waiting to change files (T1, stopped)" '
     + '(T1 holds the lock while stopped after Stop agents; T3 was handed over when its dependency T2 finished)',
-  stopped === 'T1 Hold the lock · Mori · Stopped' && waiting === 'T3 Second write · Mori · Waiting to change files '
+  stopped === 'T1 Hold the lock · Stopped' && waiting === 'T3 Second write · Waiting to change files '
     + '(T1, stopped)' && board?.lock === 'T1' && board.tasks[0].status === 'stopped',
   brief({ stopped, waiting, lock: board?.lock, tasks: board?.tasks.map((t) => `${t.id}:${t.status}`) }));
 }
@@ -541,7 +543,7 @@ async function chainMainPath(ctx, who, board) {
   const wakeEntries = customOf(entries, 'mori.wake');
   const pane = await paneState(ctx.page, who.tab);
   const [block] = await progressOf(ctx, who.tab);
-  record('main path (c) split roles (chat, planner, executor, reviewer): the /team message is registered (receipt), '
+  record('main path (c) split roles (chat, planner, executor, reviewer): the /task message is registered (receipt), '
     + 'planner creates the tasks, T1 goes executor → reviewer → executor → planner (close), the request closes and '
     + 'chat is woken by a hidden request_closed delivery to report; the summary reaches Done',
   (await receiptsOf(ctx, who.tab)).length === 1 && board?.requests[0]?.status === 'done' && board.tasks.length === 4
@@ -718,10 +720,11 @@ async function ask(ctx) {
   const files = instanceFiles(ctx, who.sessionId);
   const rows = await ctx.page.locator('.session-item').evaluateAll((els) => els.map((el) => el.dataset.file));
   record('main path (d) off mode with other roles: agent_message to executor opens a read-only ask instance (its '
-    + 'requests have only read), its answer becomes the tool result in the dialog\'s reply, the ask session file '
+    + 'requests have only read and ls: executor writes no tools, §8.1), its answer becomes the tool result in the '
+    + 'dialog\'s reply, the ask session file '
     + 'is under teams/<id>/sessions and not in the sidebar',
   pane.assistants.at(-1) === 'Executor answered: README.md describes the fixture project.' && asks.length === 2
-    && asks.every((item) => same(item.tools, ['read'])) && files.length === 1
+    && asks.every((item) => same(item.tools, ['read', 'ls'])) && files.length === 1
     && instanceSuffix(who.sessionId, files[0].id) === 'ask.1.executor' && files[0].first?.data?.kind === 'ask'
     && !rows.some((file) => file && file.includes('.ask.')),
   brief({ reply: pane.assistants.at(-1), tools: asks.map((item) => item.tools), files: files.map((f) => f.id) }));
@@ -875,8 +878,19 @@ function startStateSampler(ctx) {
   ctx.sampling = loop().catch((error) => ctx.stateBad.push(`sampler: ${error.message}`));
 }
 
-/** @brief 套件结束时的检查：board.json 从没读到半截、没有留下临时文件；§13.3 的状态；端点没有多出来的请求。 */
-async function finalChecks(ctx) {
+/**
+ * @brief 套件结束时的检查：board.json 从没读到半截、没有留下临时文件；§13.3 的状态；端点没有多出来的请求。
+ *        前两条要整个套件的读数与采样，--only 时不做（只跑了几步，读数与采样不够，会误报失败）。
+ */
+function finalChecks(ctx) {
+  if (!args.only) totalChecks(ctx);
+  const missing = missingSteps(ctx.ep);
+  record('flow: the synthetic endpoint got no request that the scripts did not expect', missing.length === 0,
+    brief(missing.map((item) => item.line).slice(0, 5)));
+}
+
+/** @brief 整个套件的 TB-12（board.json 原子写出）与 TB-37（§13.3 的状态顺序）。 */
+function totalChecks(ctx) {
   const leftovers = [...ctx.watched.keys()].flatMap((id) => teamDirFiles(ctx, id).filter((name) => name !== 'board.json'
     && name !== 'sessions').map((name) => `${id}/${name}`));
   const writeErrors = appLogLines(ctx, /cannot write .*board\.json|the TaskBoard was not written/);
@@ -889,9 +903,6 @@ async function finalChecks(ctx) {
   record('TB-37 the request state on screen follows the order of §13.3 (computed from board.json) at every stable '
     + 'sample', ctx.stateSamples >= 10 && ctx.stateBad.length === 0,
   brief({ samples: ctx.stateSamples, bad: ctx.stateBad.slice(0, 8) }));
-  const missing = missingSteps(ctx.ep);
-  record('flow: the synthetic endpoint got no request that the scripts did not expect', missing.length === 0,
-    brief(missing.map((item) => item.line).slice(0, 5)));
 }
 
 // ---------- 主流程 ----------
@@ -916,7 +927,7 @@ try {
   }
   ctx.stopSampling = true;
   await ctx.sampling;
-  await finalChecks(ctx);
+  finalChecks(ctx);
 } finally {
   ctx.stopSampling = true;
   clearInterval(ctx.boardTimer);

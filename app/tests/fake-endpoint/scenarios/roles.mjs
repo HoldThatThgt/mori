@@ -28,7 +28,7 @@ const tryChanges = (mcp = null) => [
 ];
 
 export const SCENARIOS = {
-  // TB-01 / TB-09（分开配置：chat、planner、executor、reviewer、watcher）：关闭模式一问 → /team 登记 T1 给 executor →
+  // TB-01 / TB-09（分开配置：chat、planner、executor、reviewer、watcher）：关闭模式一问 → /task 登记 T1 给 executor →
   // executor 写 note.txt、continue 给 reviewer → reviewer 读、pass → planner 结案关闭 → watcher 订阅被唤醒 →
   // chat 汇报 → 回到关闭模式再问一次。
   'tb-roles-fields': [
@@ -91,7 +91,7 @@ export const SCENARIOS = {
       1: [call('reply_via_dialog', { note: 'Answer directly' }), say('No collaboration needed.')],
     } },
   ],
-  // TB-53：合并会话（没有角色文件）：/team 登记需求 1、T1 → T1 need_user → 程序唤醒立项、回复问你 → 你撤销需求。
+  // TB-53：合并会话（没有角色文件）：/task 登记需求 1、T1 → T1 need_user → 程序唤醒立项、回复问你 → 你撤销需求。
   'tb-roles-switch': [
     { role: 'mori', kind: 'merged-create', deliveries: {
       1: [call('request_submit', { title: 'Pick a file', goal: 'Know which file to read' }),
@@ -105,7 +105,7 @@ export const SCENARIOS = {
       1: [call('task_handoff', { task: '{task}', conclusion: 'Which file should I read?', outcome: 'need_user' })],
     } },
   ],
-  // TB-43（分开配置，项目扩展在实例里询问）：/team 登记 T1 给 executor → executor 读 README、done → planner 结案关闭 →
+  // TB-43（分开配置，项目扩展在实例里询问）：/task 登记 T1 给 executor → executor 读 README、done → planner 结案关闭 →
   // chat 汇报。
   'tb-roles-instances': [
     { role: 'planner', kind: 'create', deliveries: {

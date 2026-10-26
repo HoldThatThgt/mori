@@ -294,7 +294,7 @@ function resultTexts(ctx, sid, suffix, tool) {
 // ---------- TB-34：后台批准卡（脚本 tb-stop-approve） ----------
 
 /**
- * @brief 关闭模式下对话自己的命令先出一张卡（approval-1），然后 /team：T1 executor 的卡（归属、编号、侧栏、F8、
+ * @brief 关闭模式下对话自己的命令先出一张卡（approval-1），然后 /task：T1 executor 的卡（归属、编号、侧栏、F8、
  *        对话一轮结束不清掉）、Alt+1、拒绝带理由、Alt+2（本会话不再询问）、T2 reviewer 的写入卡切到全部允许。
  */
 async function approve(ctx) {

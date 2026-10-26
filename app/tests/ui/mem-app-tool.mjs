@@ -593,7 +593,7 @@ async function live(ctx) {
 // ---------- MEM-10、MEM-15：分开时的立项实例 ----------
 
 /**
- * @brief p2（分开配置）：关闭模式先聊一句，再 /team 一条消息；立项实例用 memory save 记一条事实（脚本 mem-tool-split）。
+ * @brief p2（分开配置）：关闭模式先聊一句，再 /task 一条消息；立项实例用 memory save 记一条事实（脚本 mem-tool-split）。
  *        依据的 session 是用户会话的文件、entry 为 null；用户会话里没有这张卡；Jump to source 打开会话、不定位。
  */
 async function split(ctx) {

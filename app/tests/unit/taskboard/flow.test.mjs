@@ -266,7 +266,7 @@ test('TB-56 TB-07 create sees the expanded template; the request records what yo
 
 // ---- 模式（§5.1、§12.11） ----
 
-test('TB-05 /team in off mode enters once; once returns to off when the turn ends with nothing open', async () => {
+test('TB-05 /task in off mode enters once; once returns to off when the turn ends with nothing open', async () => {
   const { team, host, user, state } = await setup();
   team.onUserPrompt({ text: 'quick question' }, undefined, 'once');
   const reply = await nextDialog(host);
