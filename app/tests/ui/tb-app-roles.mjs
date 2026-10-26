@@ -27,7 +27,7 @@ import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
 import { appRoot } from './lib.mjs';
 import { stubFolder } from './m3-helpers.mjs';
 import { fitPane, openToolsSection, resizeWindow } from './m6-helpers.mjs';
-import { toolRows } from './m6-tools-helpers.mjs';
+import { PI_DEFAULT_TOOLS, PI_TOOLS, TOOL_REASONS, toolRows, v0Fields } from './m6-tools-helpers.mjs';
 import {
   allowAll, bridge, brief, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents,
   killTbKernel, messagesOf, missingSteps, newSession, openProject, paneSel, paneState, poll,
@@ -282,6 +282,9 @@ const withoutMemoryTool = (body) => (body?.tools ?? []).filter((tool) => (tool.f
   !== MEMORY_TOOL);
 /** @brief 工具页的行去掉 memory 那一行（记忆规格 §14.4）。 */
 const withoutMemoryRow = (rows) => rows.filter((row) => row.name !== MEMORY_TOOL);
+/** @brief pi 的 8 个内置工具行都有开关，没写 defaultTools 时开着的正是 read、bash、edit、write（tools.md，WP-08）。 */
+const builtinSwitches = (rows) => PI_TOOLS.every((name) => rows.find((row) => row.name === name)?.checked
+  === PI_DEFAULT_TOOLS.includes(name));
 
 /**
  * @brief system prompt 去掉开头的身份段（记忆规格 §14.4）：从第一个 <addendum>、<project_context>、<skills> 或 <cwd>
@@ -354,8 +357,10 @@ async function v0Compare(ctx, who, request, tools) {
     baseSystem: comparable(baseSystem(ctx))?.length, head: request?.system.slice(0, 60) }));
   const rows = withoutMemoryRow(tools.rows);
   record('TB-03 off mode without role files: the Tools page rows (name, source, on/off, description) are the same as '
-    + 'in v0 once the memory row is left out (memory spec §14.4)', rows.length > 0 && same(rows, ctx.v0.tools.rows),
-  brief({ tb: tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`),
+    + 'in v0 once the memory row is left out (memory spec §14.4); since 2026-10-26 (WP-08) the eight pi rows also '
+    + 'have a switch, on for read, bash, edit and write', rows.length > 0
+    && same(rows.map(v0Fields), ctx.v0.tools.rows.map(v0Fields)) && builtinSwitches(rows),
+  brief({ tb: tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}|${row.checked}`),
     v0: ctx.v0.tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`) }));
   const files = filesUnder(join(ctx.userData, 'teams'));
   record('TB-03 off mode without role files: no instance is created (no instance session, the endpoint got exactly '
@@ -397,11 +402,14 @@ async function v0Roles(ctx, who, request, tools) {
   const others = rows.filter((row) => row.tag !== 'Mori');
   const userTools = TEAM_TOOLS.filter((name) => !['task_handoff', 'request_close'].includes(name));
   record('TB-03 off mode with another role: with the memory row left out, the Tools page lists the TaskBoard tools of '
-    + 'the user session (board_read … reply_via_dialog) with source "Mori" — only agent_message on — and every other '
-    + 'row is the same as in v0',
+    + 'the user session (board_read … reply_via_dialog) with source "Mori" — only agent_message on, no switch, and the '
+    + 'line "Mori turns this on and off with Task mode." under each (2026-10-26, WP-08) — and every other row is the '
+    + 'same as in v0',
   same(mori.map((row) => row.name).sort(), [...userTools].sort())
-    && mori.every((row) => (row.name === 'agent_message') === (row.active === 'true'))
-    && same(others, ctx.v0.tools.rows), brief(tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`)));
+    && mori.every((row) => (row.name === 'agent_message') === (row.active === 'true') && row.checked === null
+      && same(row.notes, [TOOL_REASONS.task]))
+    && same(others.map(v0Fields), ctx.v0.tools.rows.map(v0Fields)) && builtinSwitches(others),
+  brief(tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}|${row.notes.join(' ')}`)));
   const team = await teamStateOf(ctx, who.sessionFile);
   record('TB-02 only executor.md: every seat is held by mori and the only role file is executor',
     same(team?.holders, { dialog: 'mori', create: 'mori', close: 'mori' })
