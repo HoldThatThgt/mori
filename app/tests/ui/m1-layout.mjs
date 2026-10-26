@@ -11,7 +11,7 @@
 
 import { join } from 'node:path';
 import { oneLine, sleep } from './lib.mjs';
-import { showStep } from './page.mjs';
+import { expandSteps, showStep } from './page.mjs';
 
 /** @brief 页面里所有可见文字的字号；返回小于 12px 的元素描述。 */
 export function smallText(page) {
@@ -1075,10 +1075,12 @@ const visibleCard = (page) => page.evaluate((css) => {
 
 /**
  * @brief layout.md"右栏展开"（2026-10-26 补测）：右栏开着、展开前把对话流滚到中间、展开一张看得见的工具卡（点它的动词，
- *        不点路径）；"Expand"再"Collapse"后滚动位置和这张卡的展开状态都在（会话面板保持挂载）。
+ *        不点路径）；"Expand"再"Collapse"后滚动位置和这张卡的展开状态都在（会话面板保持挂载）。重新打开的会话里每一轮的卡
+ *        都折在"{n} steps"里（chat.md"步骤组"），先点开这一栏里折起的组，卡才看得见。
  */
 async function expandKeepsChecks(page, record) {
   await dockRight(page, true);
+  await expandSteps(page);
   await page.locator(`${SINGLE} [data-testid="transcript"]`).evaluate((element) => {
     element.scrollTop = Math.round((element.scrollHeight - element.clientHeight) / 2);
   });
