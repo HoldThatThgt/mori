@@ -924,7 +924,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
 - `ModelState` 加 `pickLocked: boolean`：对话会话在协作模式下为真；`session.setPick` 被拒绝（原文 `Task mode picks the model for each agent`），`session.pickOptions` 返回空。
 - 输入框下面一行的模型按钮（2026-10-26 负责人走查 M10、M21 改；之前协作模式下只显示正在用的模型、不能打开菜单）：协作模式下（`TeamState.mode` 不为 `off`）文字为
   `Task mode · <正在用的模型 id>`（没有当前模型时只有 `Task mode`），悬停第二行 `Task mode picks the model for each agent`；仍有 ▾，可以打开菜单。
-  `pickLocked` 时菜单里没有 Groups、Providers、Models 三节，换成一句说明 `Task mode picks the model for each agent`，下面是 Task mode 一行（§13.1）、`Manage agents`（2026-10-26 合入 Customize › Agents 时加，customize-agents.md §6.6）和 `Manage models`。
+  `pickLocked` 时菜单里没有 Groups、Providers、Models 三节，换成一句说明 `Task mode picks the model for each agent`，下面是 Task mode 一行（§13.1）、`Manage agents`（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条“Manage agents 在模型菜单里一直显示”）和 `Manage models`。
   按钮带 `data-team-mode`（`off` / `once` / `always`），`pickLocked` 时另带 `data-locked="true"`。
 - 拒绝启动卡与说明卡不提供 `Change model`，改为提供 `Turn off task mode`：拒绝启动卡上按 §5.1 直接回到 `off`；No model available 说明卡上按普通的开关规则（可能变为 `once`）。回到 `off` 后恢复，范围仍是你最后选的（协作模式不写 `mori.pick`）。
 - 角色会话的拒绝启动与说明卡不提供 `Change model`。
@@ -946,7 +946,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
 之前（2026-10-22 起）是顶栏右边一组第一个的 `role="switch"` 按钮，文字 `Team: Off` / `Team: On` / `Team: Until done`，不宽于 600px 时只显示状态点；
 这些都去掉了，顶栏只有“项目名 › 会话名”、右栏开关和分屏时的“Close pane”。状态表见 `docs/v1/screens/team-switch.md`。
 
-- 位置：模型菜单里范围的几节和说明之下、`Manage agents`（2026-10-26 合入 Customize › Agents 时加，customize-agents.md §6.6）与 `Manage models` 之上的一行（`pickLocked` 时菜单只有说明、这一行、`Manage agents` 和 `Manage models`，§12.11）。
+- 位置：模型菜单里范围的几节和说明之下、`Manage agents`（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条“Manage agents 在模型菜单里一直显示”）与 `Manage models` 之上的一行（`pickLocked` 时菜单只有说明、这一行、`Manage agents` 和 `Manage models`，§12.11）。
   `role="menuitemcheckbox"`，`aria-checked` 在 `once`、`always` 时为 `true`；读屏名称 `Task mode`，右边一个开关的样子（不另算控件）。
   打开时下面一行小字，也是读屏的描述：`always` 为 `Messages go to <create role> first`，`once` 为 `Until done · Ends when open requests are done`；`off` 没有。
   标识 `data-testid="team-switch"`、`data-mode`。
@@ -1308,7 +1308,7 @@ interface TaskView {
 | TB-35 | 停止 | 停止对话的回复只停对话和正在为它判断的立项、后台照常；`Stop agents` 停止全部 Agent、批准按拒绝、待判断的消息回到输入框、等回复的 `agent_message` 以 `Stopped by the user.` 结束、task（含交给结案而结案在处理的）变为 `stopped`、没有原因为 `error` 的交接、停止之后端点没有新的请求、不自动重新开始；之后立项 `task_edit` 交回能继续原来的会话（reviewer 被停止时交回 reviewer）；Esc 停止对话回复时，排着的 `request_closed` 汇报与合并会话里排着的 `need_user` 投递在停止后照常开始；对话回复中立项在判断第二条消息时按 Esc，没有新的回复开始；`Stop agents` 发生在结案运行与程序唤醒的立项运行中时没有强制填写、强制关闭、兜底投递，投递队列清空；F8 记 `Stop agents` | App |
 | TB-36 | 重新载入与重启 | 界面重新载入后后台照常运行，TaskBoard、待判断的消息和后台批准卡都接上；重启后非终态的 task 为 `stopped`、显示 `Stopped (Mori restarted)`、批准作废、回执和进展摘要都在；交回交给结案的 task 时结案会话被唤醒；全部结束而没关闭的需求在下一条消息时唤醒结案；重启前删掉 `reviewer.md` 后，holder 为 reviewer 的 task 交回时交给结案；登记之后 App 退出的需求在重新打开时补写进展摘要的位置 | App |
 | TB-37 | 进展摘要 | 挂在登记它的回复下面（对话回复时你又排了一条消息也一样）；标题行、task 行、当前在做什么取最近一次工具调用（与工具卡同一标题规则）、各种 `phase` 的文字、交接链（含程序写的一棒）；需求关闭后显示 `Done`/`Failed`/`Cancelled`、时长停在 `closedAt`、没有 `Running` 的行、有结论；实时更新；重新打开后内容一致；需求状态按 §13.3 的顺序取（`Waiting for <create role>`、`With <close role>` 等） | App、回放、真实 |
-| TB-38 | 模型选择 | 角色按自己的 `models`、`requires` 选；`requires_unmet` 与 `probing` 的原因；协作模式下模型按钮显示 `Task mode · <模型 id>`、打开的菜单只有说明、Task mode 一行、`Manage agents`（2026-10-26 合入 Customize › Agents 时加，customize-agents.md §6.6）和 `Manage models`、`setPick` 被拒绝、拒绝启动卡没有 `Change model`，回到 `off` 后范围不变；`differ_from: author` 排除改过代码的模型族；协作模式下对话会话被拒绝启动时卡上有 `Turn off task mode`，点后回到 `off`、未关闭需求的 task 变为 `stopped`；思考强度只作用于对话会话 | 单元、App |
+| TB-38 | 模型选择 | 角色按自己的 `models`、`requires` 选；`requires_unmet` 与 `probing` 的原因；协作模式下模型按钮显示 `Task mode · <模型 id>`、打开的菜单只有说明、Task mode 一行、`Manage agents`（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条“Manage agents 在模型菜单里一直显示”）和 `Manage models`、`setPick` 被拒绝、拒绝启动卡没有 `Change model`，回到 `off` 后范围不变；`differ_from: author` 排除改过代码的模型族；协作模式下对话会话被拒绝启动时卡上有 `Turn off task mode`，点后回到 `off`、未关闭需求的 task 变为 `stopped`；思考强度只作用于对话会话 | 单元、App |
 | TB-39 | task 中途换模型 | 有过程时结束本轮、写 `mori.model_switch` 与 `mori.task_restart`、新模型上的请求里没有之前的消息、继续的消息提示读自己的会话、继续的那一段从新模型开始而不是首选；第一个请求就失败时原地换 | 单元、App |
 | TB-40 | 候选耗尽 | §12.5 表的每一行 | App |
 | TB-41 | 调度类别 | `conversation` > `decision` > `task` > `background`；`decision` 排队超时换模型，`task`、`background` 不超时；4 个 task 实例占满一个并发 4 的 key 时，对话的请求不排队超时（留出的槽位） | 单元、App |
