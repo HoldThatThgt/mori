@@ -228,6 +228,26 @@ test('SA-09 progress goes through onUpdate as "<d> of <n> done" with details; al
     assert.match(failed.content[0].text, /^Subagent results .*\n\n### 1\. Three · Mori · failed\nNo model in your range/);
   });
 
+test('SA-06 a row\'s note follows the model layer: Waiting for <provider> while queued (cleared when the slot is '
+  + 'taken), Switched model, Waiting for a model; a started tool call clears it', () => {
+  const S = load.subagent;
+  const row = { description: 'd', role: 'mori', readOnly: false, prompt: 'p', phase: 'starting', toolUses: 0,
+    current: null, note: null, reply: null, error: null };
+  let changes = 0;
+  const slot = { row, changed: () => { changes += 1; } };
+  S.noteSubagentModel(slot, { type: 'mori.model_queue', active: true, provider: 'p', providerName: 'DeepSeek' });
+  assert.equal(row.note, 'Waiting for DeepSeek');
+  S.noteSubagentModel(slot, { type: 'mori.model_queue', active: false, provider: 'p', providerName: 'DeepSeek' });
+  assert.equal(row.note, null, 'the slot was taken');
+  S.noteSubagentModel(slot, { type: 'mori.model_switch', from: 'a/m', to: 'b/m', reason: 'rate_limited', detail: '' });
+  assert.match(row.note, /^Switched model: a\/m → b\/m · /);
+  S.noteSubagentTool(slot, { toolName: 'read', args: { path: 'a.ts' } });
+  assert.equal(row.note, null, 'a tool call clears the note');
+  assert.equal(row.phase, 'running');
+  assert.equal(row.toolUses, 1);
+  assert.equal(changes, 4);
+});
+
 // ---- SA-12 批准 ----
 
 test('SA-12 a general subagent asking for approval: the card carries its description; its row waits', async () => {

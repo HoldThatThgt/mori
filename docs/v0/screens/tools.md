@@ -37,7 +37,7 @@
 | 写入失败 | 命令报错：`settings.json` 不是 JSON 或不是对象（原文带文件路径）、拿不到文件锁 | 这一行下面"Couldn’t save: "+ 原文；开关回到原来的样子；文件不变 | 改好文件后再按 |
 | 本项目的设置改了它 | 受信任项目的 `.pi\settings.json` 也写了 `defaultTools`（pi 把 `+` / `-` 的写法接在用户级后面，普通工具名的写法整个代替），合并后这个工具与只按用户级时不同 | 开关显示合并后的样子、不可用，下面一行"Turned on in this project’s .pi/settings.json. To change it, edit that file."（关掉时"Turned off in …"，同技能）；合并后没变的工具照常可以开关 | — |
 | `grep`、`find` | — | 下面一行"Needs rg.exe in <agentDir>\bin or on PATH. Mori doesn’t download it."（`find` 是 fd.exe）。不检查有没有：Mori 让 pi 离线运行（`PI_OFFLINE`），pi 不下载它们，没有时调用失败，工具卡写 pi 的原文"ripgrep (rg) is not available and could not be downloaded"或"fd is not available and could not be downloaded" | — |
-| 不是 pi 内置工具的行 | 来源与工具名 | 没有开关，下面一行原因：TaskBoard 工具"Mori turns this on and off with Task mode."；`memory`"Mori turns this on for the main agent."（记忆规格 §7.6）；MCP 的工具"Turn its server on or off in MCP."；插件的工具"Turn it on or off in Plugins."；扩展文件的工具"Set by this extension. To change it, edit the extension file." | — |
+| 不是 pi 内置工具的行 | 来源与工具名 | 没有开关，下面一行原因：TaskBoard 工具"Mori turns this on and off with Task mode."；`memory`"Mori turns this on for the main agent."（记忆规格 §7.6）；`subagent`"Mori turns this on when Task mode is off."（docs/specs/subagent.md §2）；MCP 的工具"Turn its server on or off in MCP."；插件的工具"Turn it on or off in Plugins."；扩展文件的工具"Set by this extension. To change it, edit the extension file." | — |
 
 开关还管这几件事（2026-10-26，WP-08）：
 

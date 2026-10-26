@@ -138,26 +138,53 @@
 3. 一次调用、一次回复都不设条数上限；全部同时开始，用满 key 并发设置的全部槽位，多出来的排队、不超时（新的调度类别 `subagent`）。
 4. 保留普通模式下的 `agent_message`。
 
-### 状态（随各包合并更新）
+### 状态（随各包合并更新；最后一次 2026-10-26，合过本地 `app-v0` 的 `ba15b70`）
 
 | 层 | 结果 |
 | --- | --- |
-| 单元 | `npm run test:sa-unit` 24/25（SA-10 的按工具拼的那一句等 WP-10，见下）；`test:tb-unit` 334/334、`test:mem-unit` 239/239（普通模式多了 `subagent` 的几处期望已改）；`npm run test:unit` 463/463（含 spec-ids 与 MP-38）；`npm run check` 通过 |
-| App（合成端点，`sa-app.mjs`，端口 4970/4971） | 40/41：SA-10 等 WP-10 |
-| 回放（`sa-replay.mjs`） | 13/13：从真实 DeepSeek 会话录的 `tests/fixtures/sa/sa-subagent.json`（`tb-record.mjs` 的 sa-subagent），加 m1 的两个录制 |
-| 真实模型（`sa-real.mjs`，代理 4972） | DeepSeek 与 GLM 各跑只读的三路分工与通用 subagent 跑命令（带归属的批准卡）：程序保证的各项全部通过。GLM 的命令驱动重跑了 2 次：第一次提供商连不上，第二次 500 overloaded；第三次它先发了一次格式坏的工具参数（pi 拒绝），再照正确的写法重试 |
-| 改了期望的别的套件（只用 `--only`） | `mem-app-prompt`（prompt、snapshot、merged、split、restart）33/34：MEM-01 的身份段实际 562 token（见下）；`m6-app-tool-switches`（setup、rows）6/6；`tb-app-roles`（fields）12/12 |
+| 单元 | `npm run test:sa-unit` 26/28：没过的两条是先写好的 WP-10 部分（只读 subagent 经 Task mode 只读实例的同一个函数拿到 `ls`；关闭模式的临时提问不带共用段）；`test:unit` 485/485（含 spec-ids、MP-38）、`test:tb-unit` 334/334、`test:mem-unit` 239/239、合成端点自检 194/194；`npm run check` 通过 |
+| App（合成端点，`sa-app.mjs`，端口 4970/4971） | 42/43：没过的是 SA-11 折进 `<n> steps`（等 WP-14） |
+| 回放（`sa-replay.mjs`） | 13/14：没过的同上（等 WP-14）；fixture `tests/fixtures/sa/sa-subagent.json` 用新的给模型的文字从真实 DeepSeek 会话重录（批准卡挂 1.5 秒再允许，录下“等你批准”的那一行） |
+| 真实模型（`sa-real.mjs`，代理 4972） | 22/22：DeepSeek 与 GLM 各跑只读的三路分工与通用 subagent 跑命令（带归属的批准卡），没有重跑 |
+| 给模型的文字变了、覆盖它的别的用例（`--only`） | `mem-app-prompt`（prompt、snapshot、merged、split、restart）34/34，MEM-01 实测普通模式身份段 500 token；`tb-app-roles`（v0same、fields）21/21，TB-03 已改写为“v0 加 subagent”；`tb-app-flow`（sysmd）里身份段那一条通过（同一次的 TB-12、TB-37 是要整套样本的汇总检查，只跑 sysmd 时没有样本）；`m6-app-tool-switches`（setup、rows）6/6；`tb-app-misc`（changes、plainChanges）6/6；真实模型 `tb-real --only ask` 8/8、`mem-real --only dialog,page` 17/17 |
+
+### 状态表的行与用例（2026-10-26 负责人定：屏的规格由走查对照这张表核对）
+
+本分支新增或改动的状态表行，每行对应的界面用例（套件与 `--only` 的步骤名、检查名的开头）。SA 编号的验收由 spec-ids 与覆盖检查管。
+
+| 屏 | 行 | 用例 |
+| --- | --- | --- |
+| [subagent-card.md](screens/subagent-card.md) 卡片 | 准备中、等待执行 | `sa-replay`（sa-subagent）`SA-11 replay sa-subagent: while running the card is open …`（状态依次 Preparing…、Queued） |
+| 同上 | 执行中（标题、`<d> of <n> done · <s>`、展开、阶段行） | `sa-app --only parallel` `SA-11 while running the card is open …`、`SA-11 the stage line reads …`；`sa-replay` 同名 |
+| 同上 | 结束（`Ran <n> agents · Done · <s>`、收起一次；`Done · 1 failed`） | `sa-app --only parallel` `SA-11 when the call ends the card collapses once …`；`--only roles` `SA-11 a role row reads …` |
+| 同上 | 全部失败（`Failed`） | `sa-app --only roles` `SA-11 when every subagent failed the card reads "Ran agent" · "Failed" …` |
+| 同上 | 被拒绝（`Run <n> agents · Failed · <原因>`） | `sa-app --only parallel` `SA-03 the refused call's card reads "Run agent" …` |
+| 同上 | 已停止 | `sa-app --only stop` `SA-13 stopping the reply stops every subagent …` |
+| 同上 | 已中断 | `sa-app --only kill` `SA-14 when the background process exits …` |
+| 同上 | 重新打开（已结束；没有结果的按参数画） | `sa-app --only kill` `SA-14 reopening an ended call …`、`SA-14 reopened after a restart …`；`sa-replay` `SA-14 replay sa-subagent: reopened …` |
+| 同上 | 界面重新载入（执行中） | `sa-app --only reload` `SA-14 after Ctrl+R the running card comes back …`、`SA-14 after the reload the card keeps updating …` |
+| 同上 | 一轮结束后折进 `<n> steps`（WP-14） | `sa-app --only parallel` `SA-11 after the turn the subagent card is one step of it …`；`sa-replay` `SA-11 replay sa-subagent: after the turn …`（WP-14 合并前失败） |
+| subagent-card.md 每一行 | 开始了、还没调用工具（`Starting`）；执行中（工具标题） | `sa-app --only parallel` `SA-11 while running …` |
+| 同上 | 在等模型的槽位（`Waiting for <提供商>`、`Switched model …`） | `sa-app --only slots` `SA-06 a subagent waiting for a slot shows "Waiting for SAM" …`；`Switched model` 的文字在单元 `SA-06 a row's note follows the model layer …` |
+| 同上 | 等你批准 | `sa-app --only approval` `SA-12 a general subagent running a command shows …`；`sa-replay` `SA-11 replay sa-subagent: while running …`（含 Waiting for your approval） |
+| 同上 | 正常结束；点开一行（`Agent prompt`、`Response`） | `sa-app --only parallel` `SA-11 each row: …`、`SA-11 opening a row shows …`；`sa-replay` `SA-11 replay sa-subagent: opening a row …` |
+| 同上 | 失败（80 字符截断、悬停全文） | `sa-app --only roles` `SA-11 a role row reads …` |
+| 同上 | 被停止；中断 | `sa-app --only stop` `SA-13 …`；`--only kill` `SA-14 when the background process exits …` |
+| subagent-card.md 右栏；[changes.md](../v0/screens/changes.md) 两行；[team-blocked.md](screens/team-blocked.md) 两行（说明改为 `Changes made by other agents aren’t listed here.`） | 通用 subagent 改过文件；没有 Agent 改过文件 | `sa-app --only edits` `SA-15 a read-only subagent does not set the note …`；task 改过文件的两行 `tb-app-misc --only changes` `TB-57 …`（期望的文字已改） |
+| [team-approvals.md](screens/team-approvals.md) | 后台实例要批准（归属 `<Role> · <description>`、`data-subagent`）；界面重新载入 | `sa-app --only approval` `SA-12 a general subagent running a command shows …`、`SA-12 allowed with Alt+1 …`、`SA-12 choosing "Allow bash for this session" …`；`--only reload` `SA-12 the pending approval card of a subagent is still there after the reload …`；`sa-real` `SA-12 real command on …` |
+| [tools.md](../v0/screens/tools.md) | 不是 pi 内置工具的行（`subagent` 的原因） | `sa-app --only normal` `SA-01 Customize › Tools has a subagent row …`；`m6-app-tool-switches --only setup,rows` `M12 没有开关的行 …`；`tb-app-roles --only v0same` `TB-03 off mode without role files: the Tools page rows …` |
+| [tool-cards.md](../v0/screens/tool-cards.md) | 标题对照表的 `subagent` 一行 | `sa-app --only parallel` 与 `--only refused` 的标题检查（Running / Ran / Run） |
 
 ### 等别的包合并之后做的
 
-- WP-10：身份段里交出去的活那一句按工具拼（规格 §6.4；SA-10、记忆规格 §4.1 与附录 A.1.1 的文字）；TB-03 改写为“普通模式与 v0 的差别只有 `subagent`”；
-  TaskBoard 规格 §11 列的各行；关闭模式的临时提问（`agent_message` 开的）不带共用段。
+- WP-10：TaskBoard 规格 §11 列的各行（含 TB-03 那一行的文字）；关闭模式的临时提问（`agent_message` 开的）不带共用段；只读 subagent 改用 WP-10
+  给只读实例的函数拿 `ls`，删掉本分支自己加的那一份（单元测试已写好，现在失败）。
 - WP-14：一轮结束后 subagent 的卡随其他步骤折进 `<n> steps`（SA-11 的最后一项）。
 
 ### 要你决定的
 
-- **身份段的大小**（规格 §6.4，已经问过）：普通模式的会话从此总有 `subagent`，身份段多出它在 `<tools>` 里的一行（17 token）、准则（48）和交出去的那一句。
-  实测默认工具下的普通模式 562 token，超过记忆规格的 500。推荐：准则的话并进工具的说明（不在身份段里），去掉准则；加上按工具拼的那一句后正好 500。
+- **原来的准则放在哪里**（规格 §6.4，临时默认值已登记）：按推荐做了——准则的话并进工具的说明第三行，不写 `promptGuidelines`，
+  普通模式的身份段正好 500 token。另外两种：保留准则（549 token，超过记忆规格的上限）；缩短准则（522 token）。
 
 ### 未验证
 

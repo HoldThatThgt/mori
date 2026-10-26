@@ -141,10 +141,11 @@ export const SCENARIOS = {
     helper('sa-edit', 'edit', [call('edit', { path: 'src/a.ts',
       edits: [{ oldText: 'return a + b;', newText: 'return a + b + 0;' }] }), say(SA_TEXT.edited)]),
   ],
-  // 角色：reviewer 用范围里的 fake-b，loner 选不到模型，基座照常
+  // 角色：reviewer 用范围里的 fake-b，loner 选不到模型，基座照常；第二回合只开 loner（全部失败）
   'sa-roles': [
     { role: 'chat', kind: 'off-dialog', deliveries: {
       1: [call('subagent', { tasks: ROLE_TASKS }), say(SA_TEXT.rolesDone)],
+      2: [call('subagent', { tasks: [ROLE_TASKS[1]] }), say(SA_TEXT.rolesDone)],
     } },
     helper('sa-roles', 'roles-rev', [call('read', { path: 'src/a.ts' }), say(SA_TEXT.reviewed)], 'reviewer'),
     helper('sa-roles', 'roles-base', [say(SA_TEXT.base)]),

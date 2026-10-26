@@ -600,6 +600,15 @@ async function rolesStep(ctx) {
     + '1 tool use' && (open?.rows[1]?.state ?? '').startsWith('Failed · No model in your range fits loner')
     && open.rows[1].state.length <= 'Failed · '.length + 81 && open.rows[1].stateTitle === `Failed · ${rows[1]?.error}`,
   brief({ card, rows: open?.rows }));
+  await sendMessage(ctx, who.tab, 'Only the lonely part now');
+  await settle(ctx, who, 60000);
+  await openCard(ctx, who.tab, 1);
+  const [, alone] = await cardsOf(ctx, who.tab);
+  const [, failed] = subagentResults(who);
+  record('SA-11 when every subagent failed the card reads "Ran agent" · "Failed" and the row "Failed · <reason>"; the '
+    + 'main agent\'s result is an error', alone?.title === 'Ran agent' && alone.status === 'Failed'
+    && (alone.rows[0]?.state ?? '').startsWith('Failed · No model in your range fits loner') && failed?.error === true,
+  brief({ alone, failed: failed?.text.slice(0, 200) }));
 }
 
 // ---------- 主流程 ----------
