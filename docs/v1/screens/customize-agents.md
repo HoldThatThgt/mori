@@ -18,7 +18,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 分节 | 有跟随的会话 | 左边分节列表里 “Agents”（`data-section="roles"`），在 “Skills” 之后；没有会话时不出现 | 切换到这一节 |
+| 分节 | 有跟随的会话 | 左边分节列表里 “Agents”（`data-section="roles"`），在 “Skills” 之后、“MCP” 之前（Built-in tools、Skills、Agents、MCP、Plugins、Instructions）；没有会话时不出现 | 切换到这一节 |
 | 读取中 | `roles.get` 还没返回 | `Loading…` | — |
 | 读取失败 | `roles.get` 返回 `error`（目录读不出） | `Couldn’t load agents: <原文>` 和 “Retry” | Retry |
 | 标题 | — | `Agents`；一行说明 `Agents Mori can hand work to in Task mode. They’re files in this project’s .mori/agents folder.`（临时）；右边 “New agent” | New agent |
@@ -79,7 +79,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 菜单打开 | WP-09 之后的模型菜单 | Task mode 那一行下面 `Manage agents`（`data-action="manage-agents"`）；Task mode 开、关时都有 | 点：关菜单，打开 Customize 并选中 Agents |
+| 菜单打开 | WP-09 之后的模型菜单 | Task mode 那一行下面 `Manage agents`（`data-action="manage-agents"`）；Task mode 开、关时都有 | 点：关菜单，打开 Customize 并选中 Agents；操作记录 `Open Customize → Agents` |
 | Task mode 打开 | `pickLocked` | 模型那一节变灰、悬停 `Task mode picks the model for each agent`（WP-09）；`Manage agents` 照常可用 | 同上 |
 
 ## 反例

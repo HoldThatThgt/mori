@@ -69,7 +69,7 @@ WP-08（Customize 的内置工具开关）、WP-09（模型菜单里的 Task mod
 | 命令 | `kernel/roleCommands.ts`（新） | `roles.get`、`roles.save`、`roles.delete`：读写 `.mori/agents`，用模型层算候选与原因（§4、§5） |
 | 选择器 | `kernel/selector.ts`（改） | 导出一个候选的第 1–3 步排除（现在的 `staticExclusion`），给 `roles.get` 逐个模型判断 |
 | 进程桥 | `shared/roles.ts`（新）、`shared/protocol.ts`（改） | `RolesInfo`、`AgentView`、命令的 zod 定义；职责与要求的界面文字 |
-| 界面 | `renderer/src/components/ToolsAgents.tsx`、`ToolsAgentForm.tsx`（新）；`ToolsPage.tsx`、`ModelMenu.tsx`（改）；`state/roles.ts`（新） | §6 |
+| 界面 | `renderer/src/components/ToolsAgents.tsx`、`ToolsAgentForm.tsx`（新）；`ToolsPage.tsx`、`ModelMenu.tsx`、`state/tools.ts`（分节键）（改）；`state/roles.ts`（新） | §6 |
 
 ## 3. 数据文件（改 TaskBoard 规格 §3）
 
@@ -195,7 +195,7 @@ seats: [close]
 ### 5.6 操作记录
 
 界面的操作记录（F8 的 “Recent activity”）：`roles.save` 记 `Save agent <name>`，`roles.delete` 记 `Delete agent <name>`；
-“Manage agents” 记 `Open Customize`（与左栏入口相同）；`roles.get` 不记。
+“Manage agents” 记 `Open Customize → Agents`（同记忆页进入 Instructions 时的 `Open Customize → Instructions`）；`roles.get` 不记。
 
 ## 6. 界面
 
@@ -204,7 +204,11 @@ seats: [close]
 ### 6.1 分节
 
 - Customize 的分节加 “Agents”（`data-section="roles"`），排在 “Skills” 之后；只在有跟随的会话时出现（同 Built-in tools、MCP：agent 属于项目）。
-  与 “Instructions” 一节（WP-07 的 AGENTS.md 编辑器）不相邻（它在最后时自然如此；不是时在合并时调整）。
+  合入 WP-07 后的顺序：有会话时 Built-in tools、Skills、Agents、MCP、Plugins、Instructions；没有会话时 Skills、Plugins、
+  Instructions。与 “Instructions”（`data-section="agents"`，AGENTS.md 编辑器）不相邻。
+- 分节的键 `roles` 加进 `state/tools.ts` 的 `ToolsSection`；选中哪一节由 `useToolsNav` 管，“Manage agents” 用
+  `openTools('Open Customize → Agents', 'roles')` 落在这一节。这一节同 Instructions 一样不读 `tools.get`：自己读 `roles.get`，
+  `tools.get` 的 `Loading…` 与失败不挡它。
 - 标题 `Agents`，下面一行 `Agents Mori can hand work to in Task mode. They’re files in this project’s .mori/agents folder.`，右边 “New agent”。
 
 ### 6.2 列表
@@ -237,7 +241,8 @@ seats: [close]
 ### 6.4 New agent 与 Edit 表单
 
 在列表上方展开一张表单（`data-testid="agent-form"`、`data-mode` 为 `new` / `edit`），同一时刻只有一张；打开别的表单或换分节时收起
-（有改动时离开先问，写法同 AGENTS.md 编辑器的离开确认：标题 `Discard this agent?`，说明 `Your edits haven’t been saved. Leaving now discards them.`）。
+（有改动时离开先问：表单有改动时用 `state/leaveGuard.ts` 的 `setLeaveGuard` 登记检查，换分节、Back to app、点侧栏的会话
+都经过它，同 Instructions 一节；写法同 AGENTS.md 编辑器的离开确认：标题 `Discard this agent?`，说明 `Your edits haven’t been saved. Leaving now discards them.`）。
 
 | 字段 | 控件 | 说明（字段下面一行） |
 | --- | --- | --- |
@@ -286,13 +291,14 @@ seats: [close]
 | `docs/specs/parallel-agents-taskboard.md` | §3 角色文件一行的“谁写”；§4.3 注明 Customize › Agents 的改动同样只对新会话生效（本文 §5.5） |
 | `docs/v1/screens/customize-agents.md` | 新建状态表 |
 | `docs/v0/screens/tools.md` | 外框的分节一行加 “Agents”，指向新状态表 |
+| `docs/v1/screens/customize-agents-md.md` | “Customize 的分节”一行的列表加上 “Agents”（WP-07 的状态表） |
 | `docs/v1/screens/model-menu.md` | Task mode 一行下面的 “Manage agents” |
 | `docs/v0/ui-strings.md` | 术语表与 Customize 页的固定说法（§1、§6） |
 | `docs/v1/defaults.md` | 新的一节（§7） |
 | `AGENTS.md` | 仓库结构里加本规格；常用命令加 `npm run test:ag-unit` 与 `npm run test:agents`，并把 `test:agents` 列进“只在推送到远端之前跑”的那句 |
 | `app/src/kernel/` | `roles.ts`、`selector.ts`（改），`roleFiles.ts`、`roleCommands.ts`（新），`commands.ts`（接命令） |
 | `app/src/shared/` | `roles.ts`（新）、`protocol.ts` |
-| `app/src/renderer/` | `ToolsAgents.tsx`、`ToolsAgentForm.tsx`、`state/roles.ts`（新）；`ToolsPage.tsx`、`ModelMenu.tsx`、`actionLog.ts`、样式 |
+| `app/src/renderer/` | `ToolsAgents.tsx`、`ToolsAgentForm.tsx`、`state/roles.ts`（新）；`ToolsPage.tsx`、`state/tools.ts`、`ModelMenu.tsx`、`actionLog.ts`、样式 |
 | `app/tests/` | §9；`spec-coverage.mjs` 加 `--spec agents` |
 | `app/package.json` | 脚本 `test:ag-unit`、`test:agents` |
 
@@ -331,7 +337,7 @@ seats: [close]
 | AG-07 | 删除 | 确认框的文字；Cancel 不删；Delete 删掉文件、列表更新；文件已经不在也算成功 | App |
 | AG-08 | Manage agents | 模型菜单 Task mode 那一行下面有 `Manage agents`（Task mode 开、关都有）；点后打开 Customize 并选中 Agents，跟随这个会话 | App |
 | AG-09 | 展开的内容 | §6.3 每一块：两种 Models 写法、Model needs 的白话与 handoff tier 的说明、Tools 的两种写法与 `all MCP tools`、Other settings、Prompt、File 与操作 | 单元、App |
-| AG-10 | 操作记录 | F8 的 Recent activity 有 `Save agent <name>`、`Delete agent <name>` | App |
+| AG-10 | 操作记录 | F8 的 Recent activity 有 `Save agent <name>`、`Delete agent <name>`、`Open Customize → Agents` | App |
 | AG-11 | 现有功能不退步 | 每一步：`npm run test:unit`、`test:tb-unit`、`npm run test:quick` 通过；推送前的完整回归：`tb-app-roles`、`m6-app-tools`、WP-07 与 WP-09 改过的套件通过（App 层的结果只在这时写） | 单元、App |
 
 ### 9.3 不留未完成项
