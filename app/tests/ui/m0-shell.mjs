@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
 import {
-  allowRealProject, appRoot, arg, createRecorder, oneLine, prepareProject, scratchUserData,
+  appRoot, arg, createRecorder, oneLine, prepareProject, scratchUserData, useRealGroup,
 } from './lib.mjs';
 import { startFakeEndpoint } from './m6-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers, showStep } from './page.mjs';
@@ -210,7 +210,7 @@ async function realRun() {
   const emptyDir = mkdtempSync(join(tmpdir(), 'mori-shell-pf-'));
   const userData = scratchUserData(resolve(source));
   const { project } = prepareProject('mori-shell-real-');
-  allowRealProject(userData, project);
+  useRealGroup(userData);
   const env = strippedEnv(emptyDir, userData, [join(git.root, 'cmd')]);
   checkPrecondition('real', env, emptyDir);
   const { app, log, page } = await launchWith(env);

@@ -50,7 +50,7 @@ import { getModelLayer } from './modelLayer';
 import { ModelSession, type PrepareResult } from './modelSession';
 import { createSettingsManager, loadPi } from './pi';
 import { applyShell, findShell } from './shell';
-import { findRole, loadRoles, type RoleLoad } from './roles';
+import { findRole, loadRoles, PI_DEFAULT_TOOLS, type RoleLoad } from './roles';
 import { createTeam } from './team';
 import type {
   HeldItem, HostEntry, InstanceSpec, SegmentPreference, StopReason, TeamArgs, TeamHost, TeamLike,
@@ -88,7 +88,7 @@ interface Preparing {
   /** 程序的投递（平行 Agent 规格 §5.6、§8.2）：不展开模板与命令；没能发出时不回到输入框（mori.prompt_error 的 text 为 null） */
   program: boolean;
   /**
-   * 你停止对话的回复或按 Stop team 时 Team 撤回的待判断消息（§11.4），排在这条消息和暂存的消息之后、一起回到输入框
+   * 你停止对话的回复或按 Stop agents 时 Team 撤回的待判断消息（§11.4），排在这条消息和暂存的消息之后、一起回到输入框
    * （一个 mori.prompt_error，按发送顺序）；没有时为 null
    */
   withdrawn: Promise<string[]> | null;
@@ -165,8 +165,6 @@ export const TEAM_EXTENSION = 'mori-team';
 export const TEAM_EXTENSION_PATH = `<inline:${TEAM_EXTENSION}>`;
 /** pi 的会话列表里没有你的消息时 firstMessage 的写法（session-manager.js buildSessionInfo） */
 const NO_MESSAGES = '(no messages)';
-/** pi 设置没有 defaultTools 时默认启用的工具（pi core/settings-manager.js DEFAULT_TOOL_NAMES） */
-const PI_DEFAULT_TOOLS: readonly string[] = ['read', 'bash', 'edit', 'write'];
 /** 会话在生成（含协作模式下有 Agent 在运行、排队或有待判断的消息）时拒绝的原文 */
 const GENERATING = 'This session is still running. Stop it first.';
 
@@ -348,7 +346,7 @@ function requiredExtension(path: string, team: boolean): string | null {
   if (path === APPROVAL_EXTENSION_PATH) return 'approval';
   if (path === MODEL_EXTENSION_PATH) return 'model layer';
   if (path === MEMORY_EXTENSION_PATH) return 'memory';
-  return team && path === TEAM_EXTENSION_PATH ? 'team' : null;
+  return team && path === TEAM_EXTENSION_PATH ? 'TaskBoard' : null;
 }
 
 /**
@@ -834,7 +832,7 @@ interface PromptOptions {
   behavior?: PromptBehavior;
   /** 输入框里的引用芯片：pi 记下这条消息后写成 mori.ref 条目（entries.ts） */
   refs?: QuoteRef[];
-  /** 以 /team <文字> 发出（平行 Agent 规格 §5.1） */
+  /** 以 /task <文字> 发出（平行 Agent 规格 §5.1） */
   team?: 'once';
 }
 
@@ -904,7 +902,7 @@ function promptEntry(entry: Entry, text: string, options: PromptOptions): Prompt
     team.onUserPrompt(item, options.behavior, options.team);
     return { accepted: true, held: false };
   }
-  // /team /<扩展命令>：关闭模式下先进入 once，命令开始的运行才用协作模式的工具（平行 Agent 规格 §5.1、§5.3）
+  // /task /<扩展命令>：关闭模式下先进入 once，命令开始的运行才用协作模式的工具（平行 Agent 规格 §5.1、§5.3）
   if (team && options.team === 'once') {
     return team.enterOnce().then(() => ({ accepted: true, held: dispatch(entry, item, options.behavior) }));
   }

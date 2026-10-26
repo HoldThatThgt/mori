@@ -35,22 +35,21 @@ export function listed(id) {
   return { id, family: '', contextWindow: 32768, maxTokens: 8192, reasoning: false, input: ['text'] };
 }
 
-/** @brief 提供商表单的值（synthetic）：OpenAI-compatible、Local、没有兼容选项。 */
+/** @brief 提供商表单的值（synthetic）：OpenAI-compatible、没有兼容选项。 */
 export function form(name, baseUrl) {
-  return { name, api: 'openai-completions', baseUrl, compat: {}, concurrency: 4, zone: 'local' };
+  return { name, api: 'openai-completions', baseUrl, compat: {}, concurrency: 4 };
 }
 
 /** @brief 已有的提供商 p（synthetic，§4.1 的形状）：模型 m1、m2，key p#1。 */
 export function providerP() {
-  return { id: 'p', name: 'P', api: 'openai-completions', baseUrl: 'http://127.0.0.1:9/p/v1', zone: 'local',
+  return { id: 'p', name: 'P', api: 'openai-completions', baseUrl: 'http://127.0.0.1:9/p/v1',
     compat: {}, concurrency: 4, keys: [{ ref: 'p#1', label: 'Key 1' }], nextKeyNumber: 2,
     models: [listed('m1'), listed('m2')] };
 }
 
 /** @brief 只有提供商 p 的配置。 */
 export function configWithP() {
-  return { version: 1, providers: [providerP()], groups: [], normalDefault: 'p/m1', allowedZones: ['local', 'intranet'],
-    projectZones: {} };
+  return { version: 1, providers: [providerP()], groups: [], normalDefault: 'p/m1' };
 }
 
 /** @brief p 的每个模型一份全部通过的已存档案（同 modelLayer.test.mjs 的 storedProfile），它们不会被再探测。 */
@@ -61,7 +60,7 @@ function storedProfiles(provider) {
     steps: { ready: pass, thinking: skip, call: pass, result: pass, replay: skip, a: pass, b: pass,
       c: { outcome: 'not_run', detail: null } } };
   return provider.models.map((model) => kernel.profiles.buildProfile({ target: { baseUrl: provider.baseUrl,
-    api: provider.api, model, compat: provider.compat }, auto, previous: undefined, now: 5 }));
+    api: provider.api, model, compat: provider.compat }, auto, now: 5 }));
 }
 
 /** @brief pi 的 streamSimple 替身（synthetic）：每个请求立即以连接错误结束。 */

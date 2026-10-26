@@ -161,7 +161,7 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 | 会话列表没读好 | 侧栏的会话列表还在读或读取失败，会话也没有打开 | 同 M7：`Sessions are still loading. Try again in a moment.` / `Couldn’t load sessions, so the original session can’t be opened.`（列表读好了却打不开时 `The original session isn’t in your session list.`）；再点时清掉 | 稍后再点 |
 | 读会话文件出别的错 | `session.read` 的错误（例如文件被占用的 `EBUSY`） | 状态行原文 | 再点 |
 | 打开失败 | 会话打开报错 | 同 M7：中栏是这个会话，会话横幅 `Failed to open session: <原文>` | 在侧栏再点这个会话 |
-| TaskBoard 实例会话 | 依据的 `session` 是 `<userData>\teams\<会话 id>\sessions\` 下的文件（§3、§7.3；见“需要规格回答”） | 不打开（实例会话不进侧栏），状态行 `This is a team task’s session, which can’t be opened.` | — |
+| TaskBoard 实例会话 | 依据的 `session` 是 `<userData>\teams\<会话 id>\sessions\` 下的文件（§3、§7.3；见“需要规格回答”） | 不打开（实例会话不进侧栏），状态行 `This is a background agent’s session, which can’t be opened.` | — |
 | `entry` 为 null | 分开时立项记的依据（那时消息还没写进用户会话，§7.3） | 打开会话，不定位；`Opened the session; the exact message wasn’t recorded.`（显示在哪里见“需要规格回答”） | — |
 | 反馈依据，文件还在 | 依据的 `feedback`（文件名，不含目录）；经 `mori:read-file` 读到的那份反馈记录 | 跳到那条反馈的来源，同 M7 的三种跳法：回复里的选区、整条回复、文件里的选区（[v0 review.md](../../v0/screens/review.md)“回到原位置”） | — |
 | 反馈依据，跳不过去 | 同 M7 | 同 M7 的各条：`This response is no longer in the session.`、`Session deleted`、`The session wasn’t saved, so there’s no source to jump to.`、阅读器顶部 `Source changed · Attached text:`、`File not found`、会话列表没读好的三句 | 同 M7 |

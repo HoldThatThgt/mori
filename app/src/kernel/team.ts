@@ -60,8 +60,11 @@ export const TEAM_SECTION = 'mori_team';
 /** @brief 实例会话文件的目录名，在 <userData>/teams/<用户会话 id>/ 下（§3）。 */
 export const SESSIONS_DIR = 'sessions';
 
+/** @brief 关闭模式下 TaskBoard 上有过需求时，用户会话保留的两个只读工具（§5.2、§6.3）。 */
+const OFF_READERS: readonly TeamToolName[] = ['board_read', 'read_session'];
+
 /** @brief 协作模式下对话调用了这次运行之外的工具（§5.5）。 */
-export const RELAY_ONLY = 'Team mode is on: the dialog agent only relays; the work is done in tasks.';
+export const RELAY_ONLY = 'Task mode is on: the dialog agent only relays; the work is done in tasks.';
 
 /** @brief 等槽位的订阅（§9.5）。 */
 interface PendingSubscription {
@@ -203,7 +206,7 @@ export class Team implements TeamLike {
   private saving: Promise<void> = Promise.resolve();
   /** 已经写进内存、还没写出到 board.json 的写入数（不为 0 时 pump 等写出之后再开始运行，§3） */
   private unsaved = 0;
-  /** 协作模式下你的消息按发送顺序处理（/team 进入 once 时先写模式、改模型层的锁定） */
+  /** 协作模式下你的消息按发送顺序处理（/task 进入 once 时先写模式、改模型层的锁定） */
   private inbox: Promise<void> = Promise.resolve();
   /** 上一次发出的 mori.team_state（没变时不重发） */
   private lastState = '';
@@ -264,10 +267,8 @@ export class Team implements TeamLike {
     this.teamEdited = boardEdited(this.board) || await this.instancesEdited();
     await this.flow.prepare();
     if (this.args.restored) this.recoverAfterRestart(user);
-    if (this.mode !== 'off') {
-      this.registerUserTools();
-      await user.model.setTeamLock(true, this.dialogSource(true));
-    }
+    if (this.mode !== 'off' || this.boardUsed()) this.registerUserTools();
+    if (this.mode !== 'off') await user.model.setTeamLock(true, this.dialogSource(true));
     this.emitState();
     this.emitBoard();
   }
@@ -295,7 +296,7 @@ export class Team implements TeamLike {
    * @brief 这条消息是否交给 Team（§5.1、§5.3）：协作模式下，或带 team: 'once'；pi 的扩展命令照 v0 直接交给对话会话
    *        （记下它，它用 sendUserMessage 开始的运行的工作卡写 No decision）。
    * @param text 你输入的原文
-   * @param team 以 /team <文字> 发出
+   * @param team 以 /task <文字> 发出
    */
   takesPrompt(text: string, team: 'once' | undefined): boolean {
     if (this.mode === 'off' && team !== 'once') return false;
@@ -307,7 +308,7 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief /team /<扩展命令>（§5.1、§5.3）：命令照 v0 直接交给对话会话，关闭模式下先进入 once（按发送顺序，
+   * @brief /task /<扩展命令>（§5.1、§5.3）：命令照 v0 直接交给对话会话，关闭模式下先进入 once（按发送顺序，
    *        写 mori.team、改模型层的锁定），命令开始的运行用协作模式的工具。
    * @return 模式改好之后兑现，从不拒绝
    */
@@ -321,10 +322,10 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief 协作模式下的一条你的消息（§5.3），按发送顺序处理；/team <文字> 在关闭模式下先进入 once。
+   * @brief 协作模式下的一条你的消息（§5.3），按发送顺序处理；/task <文字> 在关闭模式下先进入 once。
    * @param item 消息与引用芯片
    * @param behavior 回复中发送时的选择
-   * @param team 以 /team <文字> 发出
+   * @param team 以 /task <文字> 发出
    */
   onUserPrompt(item: HeldItem, behavior: PromptBehavior | undefined, team: 'once' | undefined): void {
     this.inbox = this.inbox.then(() => this.takeUserPrompt(item, behavior, team)).catch((error: unknown) => {
@@ -369,7 +370,7 @@ export class Team implements TeamLike {
 
   /**
    * @brief session.setTeam（§5.1）：打开为 always；关掉时满足“回到 off 的条件”为 off，否则 once；协作模式下对话会话
-   *        被拒绝启动时直接回到 off（拒绝启动卡的 Turn off team mode）。
+   *        被拒绝启动时直接回到 off（拒绝启动卡的 Turn off task mode）。
    * @param mode on / off
    */
   async setMode(mode: TeamSwitch): Promise<TeamState> {
@@ -395,7 +396,7 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief Stop team（§11.4）：清空全部投递队列（记日志），交给角色的与结案正在处理的 task 变为 stopped，
+   * @brief Stop agents（§11.4）：清空全部投递队列（记日志），交给角色的与结案正在处理的 task 变为 stopped，
    *        停止全部 Agent（原因 user；挂起的批准按拒绝处理），待判断的消息回到输入框。
    * @return 回到输入框的消息，按发送顺序
    */
@@ -908,7 +909,7 @@ export class Team implements TeamLike {
   private async deliverBatch(lane: Lane, batch: TeamDelivery[]): Promise<void> {
     try {
       if (lane !== this.user) await this.ensureOpen(lane);
-      // 建、开实例会话期间到来的停止（Stop team、Esc、撤销需求）：这次投递不发出，按被停止、没开始的运行处理（§9.4、§11.4）
+      // 建、开实例会话期间到来的停止（Stop agents、Esc、撤销需求）：这次投递不发出，按被停止、没开始的运行处理（§9.4、§11.4）
       if (lane.stop !== null || this.closed) return await this.deliveryDone(lane);
       let text = joinDeliveries(batch);
       if (lane.kind === 'create') text = this.withCatchUp(lane, text);
@@ -1388,6 +1389,11 @@ export class Team implements TeamLike {
     };
   }
 
+  /** @brief 这个用户会话的 TaskBoard 上有过需求（关闭模式下保留两个只读工具、带关闭模式的工作卡，§5.2、§8.3）。 */
+  boardUsed(): boolean {
+    return this.board.requests.length > 0;
+  }
+
   /** @brief 用户会话的 TaskBoard 工具名（§5.5、§6.3）：board_read、read_session、agent_message，合并会话加立项的工具。 */
   private userToolNames(): TeamToolName[] {
     const entries = dialogTools(this.args.roles, true, this.args.baseTools) ?? [];
@@ -1421,16 +1427,18 @@ export class Team implements TeamLike {
    * @brief 按模式启用对话的工具（§5.2、§5.5）；返回 tool_call 要限制的条目（不限制时为 null）。dialogTools 给出条目时，
    *        这次运行的身份是主 Agent（关闭模式）或兼立项（合并会话）的，后面加上 memory（记忆规格 §7.6，与 agent_message
    *        一样由 Mori 给，不受角色 tools 限制）；分开时的对话没有它。没有条目、回到关闭模式恢复记下的那一组时也启用
-   *        memory（没注册时不启用）；没有记下的那一组时不重设启用的工具。
+   *        memory（没注册时不启用）；没有记下的那一组时不重设启用的工具。关闭模式下 TaskBoard 上有过需求时另外启用
+   *        board_read、read_session（§5.2，M22：关掉 Task mode 后还能回看任务的结果）。
    */
   private applyDialogTools(mode: TeamMode): string[] | null {
     const api = this.userApi;
     if (!api) return null;
-    if (mode !== 'off') this.registerUserTools();
+    const readers = mode === 'off' && this.boardUsed() ? OFF_READERS : [];
+    if (mode !== 'off' || readers.length > 0) this.registerUserTools();
     const listed = dialogTools(this.args.roles, mode !== 'off', this.args.baseTools);
     const registered = api.getAllTools().map((tool) => tool.name);
     if (listed !== null) {
-      const entries = mode === 'off' || this.merged ? [...listed, MEMORY_TOOL] : listed;
+      const entries = mode === 'off' || this.merged ? [...listed, MEMORY_TOOL, ...readers] : listed;
       api.setActiveTools(registered.filter((name) => matchesToolEntries(entries, name)));
       return entries;
     }
@@ -1440,6 +1448,7 @@ export class Team implements TeamLike {
       : [...restoring, ...active.filter((name) => !this.wasTeamActive(name))]);
     this.offRestore = null;
     if (hasOtherRoles(this.roles)) wanted.add('agent_message');
+    for (const name of readers) wanted.add(name);
     // 恢复记下的那一组时 memory 也在关闭模式那一组里（记忆规格 §7.6）：记下的 tools 早于记忆功能时不含它
     if (restoring !== null) wanted.add(MEMORY_TOOL);
     const next = [...wanted].filter((name) => registered.includes(name));
@@ -1493,10 +1502,13 @@ export class Team implements TeamLike {
     return card?.text ?? null;
   }
 
-  /** @brief 用户会话的工作卡：关闭模式没有；合并会话为立项的各行加 Team mode；分开时为对话卡（§8.3）。 */
+  /**
+   * @brief 用户会话的工作卡（§8.3）：关闭模式下 TaskBoard 上有过需求时为关闭模式的卡片（没有需求时没有，与 v0 相同）；
+   *        合并会话为立项的各行加 Task mode；分开时为对话卡。
+   */
   private userCard(messages: readonly unknown[]): ReturnType<typeof workCard> {
     const mode = this.user.run?.mode ?? this.mode;
-    if (mode === 'off') return null;
+    if (mode === 'off') return workCard('off', { board: this.board, holders: this.holders });
     const base = { board: this.board, holders: this.holders, mode };
     if (this.merged) return workCard('merged', base);
     const command = this.user.run?.command ?? null;
@@ -1565,8 +1577,9 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief 改协作模式（§5.1）：写 mori.team（进入协作模式时带上之前启用的工具，§5.5），第一次进入时注册对话的
-   *        TaskBoard 工具，对话空闲时改模型层的锁定（正在运行的回合按它开始时的模式跑完，结束后再改）。
+   * @brief 改协作模式（§5.1）：写 mori.team（进入协作模式时带上之前启用的工具，§5.5）并同时发 mori.team_mode（对话流里
+   *        一行提示，§13.11），第一次进入时注册对话的 TaskBoard 工具，对话空闲时改模型层的锁定（正在运行的回合按它开始时
+   *        的模式跑完，结束后再改）。
    * @param mode 新的模式
    */
   async changeMode(mode: TeamMode): Promise<void> {
@@ -1580,7 +1593,8 @@ export class Team implements TeamLike {
     // （offRestore；重新打开之后此刻启用的可能是协作模式的那一组）；从来没有时取此刻启用的工具（§5.5）
     if (tools) this.lastOffTools = [...tools];
     if (mode === 'off') this.offRestore = this.offRestore ?? this.lastOffTools;
-    this.writeUserEntry(TEAM_ENTRY_TYPES.team, tools ? { mode, tools } : { mode }, null);
+    // 对话流里的模式提示与条目同一时刻（§5.1、§13.11）
+    this.writeUserEntry(TEAM_ENTRY_TYPES.team, tools ? { mode, tools } : { mode }, { type: 'mori.team_mode', mode });
     const status = this.host.status(this.userId);
     if (status?.running || status?.preparing) this.pendingLock = true;
     else await this.applyLock();
@@ -1613,7 +1627,7 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief 停止全部 Agent（Stop team，§11.4）：清空全部会话的投递队列（记日志；等回复的以 Stopped by the user. 结束，
+   * @brief 停止全部 Agent（Stop agents，§11.4）：清空全部会话的投递队列（记日志；等回复的以 Stopped by the user. 结束，
    *        丢弃的 ask_user、relay 把 asked 改回假），运行中与排队中的 task、结案在处理或排队的 task 变为 stopped，
    *        停止每个在运行或准备中的会话（原因 user；挂起的批准由会话表按拒绝处理）。
    */
@@ -1635,7 +1649,7 @@ export class Team implements TeamLike {
     this.emitState();
   }
 
-  /** @brief 丢弃一个会话的投递队列（Stop team，§8.2、§11.4）。 */
+  /** @brief 丢弃一个会话的投递队列（Stop agents，§8.2、§11.4）。 */
   private dropQueue(lane: Lane): void {
     const dropped = [...lane.solo, ...lane.queue];
     lane.solo = [];

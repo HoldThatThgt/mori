@@ -1,8 +1,8 @@
-// 平行 Agent 与 TaskBoard 的 App 套件：角色、权限、关闭模式、对话只传话、实例会话、协作开关
+// 平行 Agent 与 TaskBoard 的 App 套件：角色、权限、关闭模式、对话只传话、实例会话、模型菜单里的 Task mode 一行
 // （docs/specs/parallel-agents-taskboard.md §17.2）。真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点的脚本模式
 // （tests/fake-endpoint/scenarios/roles.mjs，synthetic），逐条验收这些条目在 App 层的通过条件：
 //   TB-01 角色文件校验、TB-02 权限与基座、TB-03 关闭模式与 v0 一致（App 的部分；回放与 m1–m6 fixture 由回放套件做）、
-//   TB-09 对话只传话、TB-43 实例会话的存放与事件、TB-53 协作开关（App 的部分）。
+//   TB-09 对话只传话、TB-43 实例会话的存放与事件、TB-53 Task mode 开关（App 的部分；2026-10-26 起在模型菜单里）。
 // 记忆规格（docs/specs/memory.md §14.4）之后：TB-03 比较 system prompt 时两边都去掉开头的身份段（到第一个 <addendum>、
 // <project_context>、<skills> 或 <cwd> 段之前：新版是 Mori 的身份段，对照版是 pi 的身份句、<tools>、<rules>、<docs>），
 // 新版再去掉 taste、strategy、review、facts 四段；请求的工具列表在全部比较之前去掉 memory；工具页的行去掉 memory 那一行
@@ -26,14 +26,15 @@ import { ROLES_TEXT } from '../fake-endpoint/scenarios/roles.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
 import { appRoot } from './lib.mjs';
 import { stubFolder } from './m3-helpers.mjs';
-import { fitPane, openToolsSection, resizeWindow } from './m6-helpers.mjs';
-import { toolRows } from './m6-tools-helpers.mjs';
+import { openToolsSection } from './m6-helpers.mjs';
+import { PI_DEFAULT_TOOLS, PI_TOOLS, TOOL_REASONS, toolRows, v0Fields } from './m6-tools-helpers.mjs';
 import {
-  allowAll, bridge, brief, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents,
-  killTbKernel, messagesOf, missingSteps, newSession, openProject, paneSel, paneState, poll,
+  allowAll, bridge, brief, clickTeamSwitch, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents,
+  killTbKernel, messagesOf, missingSteps, newSession, OFF_CARD_TOOLS, openProject, paneSel, paneState, poll,
   progressOf, readBoard, readJsonl, receiptsOf, reopenSession, restartTbApp, scenarioLines, scenarioRequests,
   seedTeamUserData, sendMessage, showTab, sleep, shot, startTbApp, startTbEndpoint, stopTbEndpoint, suiteArgs,
-  SPLIT_ROLES, tbModel, tbProvider, tbRecorder, teamStateOf, teamSwitch, tempProject, tempUserData, userSession,
+  modelButtonSel, modelMenuSel, SPLIT_ROLES, taskModeRow, taskRowSel, tbModel, tbProvider, tbRecorder, teamStateOf,
+  teamSwitch, tempProject, tempUserData, userSession,
   waitTeamIdle, writeRole, writeRoles,
 } from './tb-helpers.mjs';
 
@@ -53,7 +54,7 @@ const PLAIN = '这是一段只有文字的回复，用来测试流式输出。';
 const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit', 'request_update',
   'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close'];
 /** §5.5 协作模式下对话调用范围外的工具的理由 */
-const RELAY_ONLY = 'Team mode is on: the dialog agent only relays; the work is done in tasks.';
+const RELAY_ONLY = 'Task mode is on: the dialog agent only relays; the work is done in tasks.';
 /** 关闭模式的对话段（附录 A）的第一句 */
 const OFF_SENTENCE = SEGMENT_SENTENCES['off-dialog'];
 
@@ -122,7 +123,7 @@ async function toolsPage(ctx, tab) {
   return { rows, follow };
 }
 
-/** @brief 对话流里 TaskBoard 才有的元素：回执、进展摘要、Stop team 按钮的个数。 */
+/** @brief 对话流里 TaskBoard 才有的元素：回执、进展摘要、Stop agents 按钮的个数。 */
 async function teamElements(ctx, tab) {
   const count = (css) => ctx.page.locator(`${paneSel(tab)} ${css}`).count();
   return { receipts: (await receiptsOf(ctx, tab)).length, progress: (await progressOf(ctx, tab)).length,
@@ -142,7 +143,29 @@ async function setup(ctx) {
   ctx.pm = lateMcpProject(ctx);
   ctx.seed = { providers, normalDefault: 'tba', trusted: [ctx.pm] };
   seedTeamUserData(ctx.baseData, ctx.seed);
+  addBaseFields(ctx.baseData);
   seedTeamUserData(ctx.userData, ctx.seed);
+}
+
+/** @brief 读、改、写数据目录里的一个 JSON 文件。 */
+function editJson(dir, name, change) {
+  const file = join(dir, name);
+  writeFileSync(file, `${JSON.stringify(change(JSON.parse(readFileSync(file, 'utf8'))), null, 2)}\n`);
+}
+
+/**
+ * @brief 测试准备（synthetic test setup）：对照构建（2e67197）的两个文件还要求 2026-10-26 删掉的字段，只给它的数据目录补上，
+ *        本构建的数据目录不动（它按未知字段拒绝这些字段）。model-config.json 的网络区域（负责人走查 M3）：两个本机提供商的
+ *        zone 为 local，allowedZones 为那时的默认（local、intranet），projectZones 为空，没有时对照构建读不出配置、拒绝启动
+ *        会话；model-profiles.json 的长输入与取消两步（走查 M7）：longInput 为 null、取消一步通过（同删掉之前的 tbProfile），
+ *        没有时对照构建丢掉档案、启动时重新探测。
+ */
+function addBaseFields(dir) {
+  editJson(dir, 'model-config.json', (config) => ({ ...config, allowedZones: ['local', 'intranet'], projectZones: {},
+    providers: config.providers.map((provider) => ({ ...provider, zone: 'local' })) }));
+  const cancel = { step: { outcome: 'pass', detail: null }, verified: true };
+  editJson(dir, 'model-profiles.json', (file) => ({ ...file,
+    profiles: file.profiles.map((profile) => ({ ...profile, longInput: null, cancel })) }));
 }
 
 /**
@@ -214,7 +237,8 @@ function watchEnvelopes(ctx) {
 
 /**
  * @brief 在页面里装一个记录器：任何会话面板显示“没准备好”（data-testid="not-ready"：正在启动、后台进程退出……）时，
- *        记下那一刻这一栏协作开关的 disabled 与文字（window.__tbNotReady，每项 { t, tab, text, disabled, switchText }）。
+ *        记下那一刻这一栏能不能切 Task mode（2026-10-26 起开关在模型菜单里）：有没有模型按钮、它是否 aria-disabled、
+ *        模型菜单是否开着（window.__tbNotReady，每项 { t, tab, text, button, disabled, menu }）。
  */
 function watchNotReady(ctx) {
   return ctx.page.evaluate(() => {
@@ -223,12 +247,13 @@ function watchNotReady(ctx) {
     const scan = () => {
       for (const pane of document.querySelectorAll('[data-testid="chat-pane"]')) {
         const wait = pane.querySelector('[data-testid="not-ready"]');
-        const sw = pane.querySelector('[data-testid="team-switch"]');
-        if (!wait || !sw) continue;
-        const item = { tab: pane.dataset.tab, text: wait.textContent, disabled: sw.disabled,
-          switchText: sw.querySelector('.team-text')?.textContent ?? '' };
+        if (!wait) continue;
+        const button = pane.querySelector('[data-testid="model-button"]');
+        const item = { tab: pane.dataset.tab, text: wait.textContent, button: Boolean(button),
+          disabled: button ? button.getAttribute('aria-disabled') === 'true' : null,
+          menu: Boolean(pane.querySelector('[data-testid="model-menu"]')) };
         const last = window.__tbNotReady.findLast((old) => old.tab === item.tab);
-        if (last && last.text === item.text && last.disabled === item.disabled) continue;
+        if (last && last.text === item.text && last.disabled === item.disabled && last.menu === item.menu) continue;
         window.__tbNotReady.push({ t: Date.now(), ...item });
       }
     };
@@ -270,7 +295,7 @@ async function base(ctx) {
 
 /** 关闭模式、有别的角色时用户会话 system prompt 的 mori_team 段（附录 A 关闭模式的对话段全文，§8.5） */
 const OFF_SEGMENT = `${OFF_SENTENCE}\n`
-  + 'If a request needs several kinds of work, you may suggest that the user sends it with /team.';
+  + 'If a request needs several kinds of work, you may suggest that the user sends it with /task.';
 
 /** @brief 请求体里工具的名字。 */
 const toolNames = (body) => (body?.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
@@ -282,6 +307,9 @@ const withoutMemoryTool = (body) => (body?.tools ?? []).filter((tool) => (tool.f
   !== MEMORY_TOOL);
 /** @brief 工具页的行去掉 memory 那一行（记忆规格 §14.4）。 */
 const withoutMemoryRow = (rows) => rows.filter((row) => row.name !== MEMORY_TOOL);
+/** @brief pi 的 8 个内置工具行都有开关，没写 defaultTools 时开着的正是 read、bash、edit、write（tools.md，WP-08）。 */
+const builtinSwitches = (rows) => PI_TOOLS.every((name) => rows.find((row) => row.name === name)?.checked
+  === PI_DEFAULT_TOOLS.includes(name));
 
 /**
  * @brief system prompt 去掉开头的身份段（记忆规格 §14.4）：从第一个 <addendum>、<project_context>、<skills> 或 <cwd>
@@ -354,8 +382,10 @@ async function v0Compare(ctx, who, request, tools) {
     baseSystem: comparable(baseSystem(ctx))?.length, head: request?.system.slice(0, 60) }));
   const rows = withoutMemoryRow(tools.rows);
   record('TB-03 off mode without role files: the Tools page rows (name, source, on/off, description) are the same as '
-    + 'in v0 once the memory row is left out (memory spec §14.4)', rows.length > 0 && same(rows, ctx.v0.tools.rows),
-  brief({ tb: tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`),
+    + 'in v0 once the memory row is left out (memory spec §14.4); since 2026-10-26 (WP-08) the eight pi rows also '
+    + 'have a switch, on for read, bash, edit and write', rows.length > 0
+    && same(rows.map(v0Fields), ctx.v0.tools.rows.map(v0Fields)) && builtinSwitches(rows),
+  brief({ tb: tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}|${row.checked}`),
     v0: ctx.v0.tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`) }));
   const files = filesUnder(join(ctx.userData, 'teams'));
   record('TB-03 off mode without role files: no instance is created (no instance session, the endpoint got exactly '
@@ -365,9 +395,10 @@ async function v0Compare(ctx, who, request, tools) {
   const pane = await paneState(ctx.page, who.tab);
   const sw = await teamSwitch(ctx, who.tab);
   const extra = await teamElements(ctx, who.tab);
-  record('TB-03 off mode without role files: the reply is the same as v0, the switch reads "Team: Off" and there is '
-    + 'no receipt, progress summary or Stop team', pane.assistants.at(-1) === ctx.v0.reply
-    && ctx.v0.reply === PLAIN && sw.text === 'Team: Off' && sw.mode === 'off' && same(extra,
+  record('TB-03 off mode without role files: the reply is the same as v0, the model button is in off mode '
+    + '(data-team-mode off, no "Task mode" on it) and there is no receipt, progress summary or Stop agents',
+  pane.assistants.at(-1) === ctx.v0.reply && ctx.v0.reply === PLAIN && sw.mode === 'off'
+    && !sw.text.startsWith('Task mode') && same(extra,
     { receipts: 0, progress: 0, stopTeam: 0 }), brief({ reply: pane.assistants.at(-1), sw, extra }));
   const team = await teamStateOf(ctx, who.sessionFile);
   record('TB-02 no role files: every seat is held by mori (TeamState.holders) and no role besides the base',
@@ -397,11 +428,14 @@ async function v0Roles(ctx, who, request, tools) {
   const others = rows.filter((row) => row.tag !== 'Mori');
   const userTools = TEAM_TOOLS.filter((name) => !['task_handoff', 'request_close'].includes(name));
   record('TB-03 off mode with another role: with the memory row left out, the Tools page lists the TaskBoard tools of '
-    + 'the user session (board_read … reply_via_dialog) with source "Mori" — only agent_message on — and every other '
-    + 'row is the same as in v0',
+    + 'the user session (board_read … reply_via_dialog) with source "Mori" — only agent_message on, no switch, and the '
+    + 'line "Mori turns this on and off with Task mode." under each (2026-10-26, WP-08) — and every other row is the '
+    + 'same as in v0',
   same(mori.map((row) => row.name).sort(), [...userTools].sort())
-    && mori.every((row) => (row.name === 'agent_message') === (row.active === 'true'))
-    && same(others, ctx.v0.tools.rows), brief(tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`)));
+    && mori.every((row) => (row.name === 'agent_message') === (row.active === 'true') && row.checked === null
+      && same(row.notes, [TOOL_REASONS.task]))
+    && same(others.map(v0Fields), ctx.v0.tools.rows.map(v0Fields)) && builtinSwitches(others),
+  brief(tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}|${row.notes.join(' ')}`)));
   const team = await teamStateOf(ctx, who.sessionFile);
   record('TB-02 only executor.md: every seat is held by mori and the only role file is executor',
     same(team?.holders, { dialog: 'mori', create: 'mori', close: 'mori' })
@@ -412,46 +446,63 @@ async function v0Roles(ctx, who, request, tools) {
 }
 
 
-// ---------- TB-53：协作开关 ----------
+// ---------- TB-53：模型菜单里的 Task mode 一行（2026-10-26 WP-09 起；之前是顶栏的协作开关） ----------
 
-/** 三种模式的文字与悬停（§13.1；<create role> 为基座时显示 Mori） */
+/** Task mode 一行在三种模式下的 aria-checked 与第二行（§13.1；<create role> 为基座时显示 Mori） */
 const SWITCH = {
-  off: { text: 'Team: Off', checked: 'false', title: 'Turn on team mode' },
-  always: { text: 'Team: On', checked: 'true', title: (role) => `Messages go to ${role} first` },
-  once: { text: 'Team: Until done', checked: 'true', title: 'Team mode ends when open requests are done' },
+  off: { checked: 'false', hint: () => null },
+  always: { checked: 'true', hint: (role) => `Messages go to ${role} first` },
+  once: { checked: 'true', hint: () => 'Until done · Ends when open requests are done' },
 };
+/** 协作模式下模型按钮悬停的第二行、协作模式的菜单里的说明（§12.11） */
+const TASK_PICKS = 'Task mode picks the model for each agent';
 
-/** @brief 开关此刻是不是 mode 的样子（文字、读屏名称、aria-checked、悬停、data-mode、role="switch"）。 */
-async function switchIs(ctx, tab, mode, createRole = 'Mori') {
-  const sw = await teamSwitch(ctx, tab);
-  const role = await ctx.page.locator(`${paneSel(tab)} [data-testid="team-switch"]`).getAttribute('role');
-  const want = SWITCH[mode];
-  const title = typeof want.title === 'function' ? want.title(createRole) : want.title;
-  return { ok: sw.mode === mode && sw.text === want.text && sw.label === want.text && sw.checked === want.checked
-    && sw.title === title && role === 'switch' && !sw.disabled, sw };
+/**
+ * @brief 模型按钮是不是 mode 的样子（team-switch.md“模型按钮上的模式”）：data-team-mode；off 时按钮上没有
+ *        “Task mode”，打开时文字“Task mode · <模型 id>”、读屏名“Model: Task mode, <模型 id>”、悬停第二行 TASK_PICKS。
+ */
+function buttonIs(sw, mode) {
+  if (mode === 'off') return sw.mode === 'off' && !sw.text.startsWith('Task mode');
+  return sw.mode === mode && /^Task mode · \S+$/.test(sw.text) && sw.label === `Model: ${sw.text.replace(' · ', ', ')}`
+    && sw.title?.split('\n')[1] === TASK_PICKS;
 }
 
-/** @brief 点开关，等 data-mode 变成 want；返回 switchIs 的结果。 */
+/**
+ * @brief 此刻是不是 mode 的样子：模型按钮（buttonIs），和模型菜单里 Task mode 一行的 role="menuitemcheckbox"、
+ *        aria-checked、读屏名“Task mode”、第二行与读屏的描述、可用。读完关上菜单。
+ */
+async function switchIs(ctx, tab, mode, createRole = 'Mori') {
+  const sw = await teamSwitch(ctx, tab);
+  const row = await taskModeRow(ctx, tab);
+  const want = SWITCH[mode];
+  const hint = want.hint(createRole);
+  return { ok: buttonIs(sw, mode) && row.mode === mode && row.role === 'menuitemcheckbox'
+    && row.checked === want.checked && row.label === 'Task mode' && row.hint === hint
+    && row.described === (hint ?? '') && !row.disabled, sw, row };
+}
+
+/** @brief 在模型菜单里点 Task mode 一行，等模型按钮的 data-team-mode 变成 want；返回 switchIs 的结果。 */
 async function clickTo(ctx, tab, want, createRole = 'Mori') {
-  const sel = `${paneSel(tab)} [data-testid="team-switch"]`;
-  await ctx.page.locator(sel).click();
-  await ctx.page.waitForFunction(({ css, mode }) => document.querySelector(css)?.dataset.mode === mode,
-    { css: sel, mode: want }, { timeout: 10000 }).catch(() => {});
+  await clickTeamSwitch(ctx, tab, want).catch(() => {});
   return switchIs(ctx, tab, want, createRole);
 }
 
 /**
- * @brief 合并会话（没有角色文件，脚本 tb-roles-switch）：三种文字与悬停、aria-checked、三种点击（off → always，
- *        always → off / once，once → always）、不需要确认；最后撤销需求回到 off。
+ * @brief 合并会话（没有角色文件，脚本 tb-roles-switch）：顶栏没有开关；两种文字与第二行、aria-checked、三种点击
+ *        （off → always，always → off / once，once → always）、不需要确认；点了之后菜单不关、焦点留在这一行，范围的
+ *        几节换成说明；最后撤销需求回到 off。
  */
 async function switches(ctx) {
   const project = tempProject('mori-tb-roles-switch-');
   const tab = await openProject(ctx, project);
   const who = await whoOf(ctx, tab);
   const since = Date.now();
+  await topBarHasNoSwitch(ctx, tab);
   const off0 = await switchIs(ctx, tab, 'off');
+  await menuStaysOpen(ctx, tab);
+  const off1 = await switchIs(ctx, tab, 'off');
   const on1 = await clickTo(ctx, tab, 'always');
-  const off1 = await clickTo(ctx, tab, 'off');
+  const offAgain = await clickTo(ctx, tab, 'off');
   await sendMessage(ctx, tab, 'Pick a file tb-scenario:tb-roles-switch', { team: true });
   const once = await poll(async () => ((await teamSwitch(ctx, tab)).mode === 'once'), 10000);
   const once1 = await switchIs(ctx, tab, 'once');
@@ -461,63 +512,119 @@ async function switches(ctx) {
   const once2 = await clickTo(ctx, tab, 'once');
   const board = readBoard(ctx, who.sessionId);
   const confirms = await seenOf(ctx, 'confirm-dialog', since);
-  record('TB-53 the switch is role="switch" with the three texts, hovers and aria-checked: "Team: Off" / "Turn on '
-    + 'team mode" / false; "Team: On" / "Messages go to Mori first" / true (base holds create); "Team: Until done" / '
-    + '"Team mode ends when open requests are done" / true; the screen-reader name is the full text',
-  off0.ok && on1.ok && once1.ok && onceIdle.ok, brief({ off0: off0.sw, on1: on1.sw, once1: once1.sw }));
+  record('TB-53 the Task mode row in the model menu is role="menuitemcheckbox" named "Task mode": off → '
+    + 'aria-checked false and no second line, the model button without "Task mode"; always → true, second line '
+    + '"Messages go to Mori first" (base holds create), button "Task mode · <model id>" with hover line 2 "Task mode '
+    + 'picks the model for each agent"; once → true, "Until done · Ends when open requests are done"; the second line '
+    + 'is also the screen-reader description', off0.ok && off1.ok && on1.ok && once1.ok && onceIdle.ok,
+  brief({ off0, on1, once1 }));
   record('TB-53 the three clicks: off → always; always → off when nothing is open; once → always; always → once '
     + 'while request 1 is open (T1 waits for your decision); no confirmation dialog for any click',
-  on1.ok && off1.ok && once && on2.ok && once2.ok && confirms.length === 0
-    && board?.requests[0]?.status === 'open', brief({ off1: off1.sw, on2: on2.sw, once2: once2.sw,
+  on1.ok && offAgain.ok && once && on2.ok && once2.ok && confirms.length === 0
+    && board?.requests[0]?.status === 'open', brief({ offAgain: offAgain.sw, on2: on2.sw, once2: once2.sw,
     request: board?.requests[0]?.status, confirms }));
   await sendMessage(ctx, tab, 'Cancel it');
   await settle(ctx, who, 60000);
   const back = await switchIs(ctx, tab, 'off');
-  record('TB-53 after the request is cancelled in "Team: Until done", the switch goes back to "Team: Off" by itself',
-    back.ok && readBoard(ctx, who.sessionId)?.requests[0]?.status === 'cancelled', brief(back.sw));
-  await narrow(ctx, tab);
+  record('TB-53 after the request is cancelled while "Until done", task mode goes back to off by itself (the row '
+    + 'unchecked, the model button without "Task mode")',
+  back.ok && readBoard(ctx, who.sessionId)?.requests[0]?.status === 'cancelled', brief(back));
+}
+
+/** @brief 顶栏只有右栏开关（不分屏时）：没有协作开关，也没有任何 team-switch 元素在模型菜单之外（§13.1）。 */
+async function topBarHasNoSwitch(ctx, tab) {
+  const bar = await ctx.page.locator(`${paneSel(tab)} > .topbar`).evaluate((el) => ({
+    buttons: [...el.querySelectorAll('.topbar-actions button')].map((button) => button.getAttribute('aria-label')),
+    switches: el.querySelectorAll('[data-testid="team-switch"], [role="switch"]').length }));
+  const outside = await ctx.page.locator(`${paneSel(tab)} [data-testid="team-switch"]`).count();
+  record('TB-53 the top bar has no task mode switch any more: its buttons are only "Toggle changes", and with the '
+    + 'model menu closed the pane has no team-switch element', same(bar.buttons, ['Toggle changes'])
+    && bar.switches === 0 && outside === 0, brief({ bar, outside }));
 }
 
 /**
- * @brief 窄栏（这一栏不宽于 600px，§15；composer-pickers 合入后由 860px 改为 600px）：右栏打开、把这一栏调到 601px 和
- *        600px（阈值的两边）。601px 时完整文字、没有状态点；600px 时只显示状态点（off 空心、always 实心），不显示文字，
- *        读屏名称与悬停仍是完整文字。之后关掉右栏、回到 1200 宽窗口。
+ * @brief 点了 Task mode 一行菜单不关、焦点留在这一行（§13.1）：打开后范围的三节换成说明“Task mode picks the model for
+ *        each agent”（pickLocked）；切换中这一行只是 aria-disabled，焦点不掉，所以接着按 Space 就能关掉，三节和原来的
+ *        说明回来；Esc 关菜单、焦点回到模型按钮。
  */
-async function narrow(ctx, tab) {
-  const pane = ctx.page.locator(paneSel(tab));
-  const width = () => pane.evaluate((el) => el.getBoundingClientRect().width);
-  await fitPane(ctx, 601, { right: true });
-  const wide = await switchLook(ctx, tab);
-  const wideWidth = await width();
-  await fitPane(ctx, 600, { right: true });
-  const narrowWidth = await width();
-  const offLook = await switchLook(ctx, tab);
-  await clickTo(ctx, tab, 'always');
-  const onLook = await switchLook(ctx, tab);
-  await clickTo(ctx, tab, 'off');
-  await shot(ctx, args, 'narrow-switch');
-  record('TB-53 in a pane 600px wide or narrower the switch shows only a status dot (hollow for off, filled for on) '
-    + 'and no text, and its screen-reader name and hover keep the full text; a 601px pane shows the full text and no '
-    + 'dot', Math.abs(narrowWidth - 600) < 0.5 && Math.abs(wideWidth - 601) < 0.5 && wide.text
-    && wide.shown === 'Team: Off' && !wide.dot
-    && !offLook.text && offLook.shown === '' && offLook.dot && !offLook.filled && offLook.label === 'Team: Off'
-    && offLook.title === 'Turn on team mode' && !onLook.text && onLook.shown === '' && onLook.dot && onLook.filled
-    && onLook.label === 'Team: On', brief({ wideWidth, narrowWidth, wide, offLook, onLook }));
-  await fitPane(ctx, 930);
-  await resizeWindow(ctx.app, 1200, 800);
+async function menuStaysOpen(ctx, tab) {
+  const menu = ctx.page.locator(modelMenuSel(tab));
+  const look = () => menu.evaluate((el) => ({ sections: el.querySelectorAll('[data-section]').length,
+    note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null,
+    tail: [...el.children].slice(-3).map((child) => child.dataset.testid ?? child.dataset.action ?? child.className),
+    focused: document.activeElement?.dataset.testid ?? null }));
+  await clickTeamSwitch(ctx, tab, 'always', { keepOpen: true });
+  await poll(async () => (await look()).sections === 0, 10000);
+  const on = { open: await menu.count(), ...await look() };
+  await watchPending(ctx, tab);
+  await ctx.page.keyboard.press('Space');
+  await ctx.page.waitForFunction((css) => document.querySelector(css)?.dataset.teamMode === 'off',
+    modelButtonSel(tab), { timeout: 10000 }).catch(() => {});
+  await poll(async () => (await look()).sections > 0, 10000);
+  const off = { open: await menu.count(), ...await look() };
+  off.enter = await enterTwice(ctx, tab);
+  await ctx.page.keyboard.press('Escape');
+  await menu.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+  const closed = { open: await menu.count(),
+    focus: await ctx.page.evaluate(() => document.activeElement?.dataset.testid ?? null) };
+  const order = ['model-menu-note', 'task-mode-group', 'manage-models'];
+  record('TB-53 clicking the Task mode row keeps the model menu open with the focus on the row: turned on, the '
+    + 'Groups/Providers/Models sections give way to the note "Task mode picks the model for each agent"; Space on the '
+    + 'still-focused row turns it off and the sections and "Applies to this session only. …" come back, followed by '
+    + 'the Task mode row and Manage models (the sections, the note, Task mode, Manage models); Enter on the row turns '
+    + 'it on and off again the same way; Esc closes the menu and the focus returns to the model button',
+  on.open === 1 && on.sections === 0 && on.note === TASK_PICKS && on.focused === 'team-switch' && off.open === 1
+    && off.sections > 0 && off.note?.startsWith('Applies to this session only.') && same(off.tail, order)
+    && same(on.tail, order) && off.focused === 'team-switch' && same(off.enter, ['always', 'off'])
+    && closed.open === 0 && closed.focus === 'model-button', brief({ on, off, closed }));
+  await pendingChecks(ctx, tab);
 }
 
-/** @brief 开关此刻显示的部分：完整文字是否可见、看得到的文字、状态点是否可见与是否实心、读屏名称与悬停。 */
-function switchLook(ctx, tab) {
-  return ctx.page.locator(`${paneSel(tab)} [data-testid="team-switch"]`).evaluate((el) => {
-    const shown = (node) => Boolean(node) && getComputedStyle(node).display !== 'none'
-      && node.getClientRects().length > 0;
-    const dot = el.querySelector('.team-dot');
-    const fill = dot ? getComputedStyle(dot).backgroundColor : '';
-    return { text: shown(el.querySelector('.team-text')), shown: el.innerText.trim(), dot: shown(dot),
-      filled: Boolean(fill) && fill !== 'rgba(0, 0, 0, 0)' && fill !== 'transparent',
-      label: el.getAttribute('aria-label'), title: el.getAttribute('title') };
+/** @brief 焦点在 Task mode 一行上按两次 Enter：每次等模型按钮的 data-team-mode 变了，返回两次之后的模式。 */
+async function enterTwice(ctx, tab) {
+  const modes = [];
+  for (const want of ['always', 'off']) {
+    await ctx.page.keyboard.press('Enter');
+    await ctx.page.waitForFunction(({ css, mode }) => document.querySelector(css)?.dataset.teamMode === mode,
+      { css: modelButtonSel(tab), mode: want }, { timeout: 10000 }).catch(() => {});
+    modes.push((await teamSwitch(ctx, tab)).mode);
+  }
+  return modes;
+}
+
+/**
+ * @brief 切换中（team-switch.md“切换中”）：在这一行出现 data-pending 的那一刻记下它的样子与焦点，并在这时再点它一下
+ *        （synthetic：切换中的点击不应再发 session.setTeam）。结果在 window.__pendingSeen。
+ */
+function watchPending(ctx, tab) {
+  return ctx.page.locator(taskRowSel(tab)).evaluate((row) => {
+    window.__pendingSeen = null;
+    const observer = new MutationObserver(() => {
+      if (row.dataset.pending !== 'true' || window.__pendingSeen) return;
+      window.__pendingSeen = { aria: row.getAttribute('aria-disabled'), disabled: row.disabled,
+        checked: row.getAttribute('aria-checked'), focused: document.activeElement === row };
+      row.click();
+      observer.disconnect();
+    });
+    observer.observe(row, { attributes: true, attributeFilter: ['data-pending'] });
   });
+}
+
+/**
+ * @brief watchPending 看到的切换中，加 F8 里每次切换只记了一条：点开、Space 关（切换中的那一下点击没有再发命令）、
+ *        Enter 开、Enter 关，共两条 Task mode on、两条 Task mode off。
+ */
+async function pendingChecks(ctx, tab) {
+  const seen = await ctx.page.evaluate(() => window.__pendingSeen);
+  const actions = await recentActions(ctx, tab, 'TB-53 check of the switches');
+  const offs = actions.filter((line) => line.endsWith('Task mode off'));
+  const ons = actions.filter((line) => line.endsWith('Task mode on'));
+  record('TB-53 while switching the Task mode row keeps its look but is unavailable: aria-disabled="true" and '
+    + 'data-pending="true" (not natively disabled, still aria-checked as before) with the focus kept on it; a click '
+    + 'at that moment does nothing (F8 lists one entry per switch: two "Task mode on" and two "Task mode off" for '
+    + 'click, Space, Enter, Enter — not a third off)', seen?.aria === 'true' && seen.disabled === false
+    && seen.checked === 'true' && seen.focused === true && offs.length === 2 && ons.length === 2,
+  brief({ seen, actions: actions.slice(-6) }));
 }
 
 // ---------- TB-01：角色文件校验 ----------
@@ -665,7 +772,7 @@ async function files(ctx) {
   await fixed(ctx, who, project);
 }
 
-/** @brief 拒绝启动时不能发送（Enter 不发出、草稿不丢），协作开关不可用（§13.1）。 */
+/** @brief 拒绝启动时不能发送（Enter 不发出、草稿不丢），模型菜单里的 Task mode 一行不可用（§13.1）。 */
 async function blockedSending(ctx, who) {
   const since = Date.now();
   const box = ctx.page.locator(`${paneSel(who.tab)} .composer textarea`);
@@ -674,11 +781,13 @@ async function blockedSending(ctx, who) {
   await sleep(1500);
   const pane = await paneState(ctx.page, who.tab);
   const sw = await teamSwitch(ctx, who.tab);
+  const row = await taskModeRow(ctx, who.tab);
   record('TB-01 while agents_invalid the session cannot send: Enter sends nothing (no request reaches the endpoint, '
     + 'no user bubble) and the draft stays', scenarioRequests(ctx.ep, null, { since }).length === 0
     && pane.users.length === 0 && pane.draft === 'plain while the agent files are wrong', brief(pane));
-  record('TB-53 the switch is not available while the session is refused with agents_invalid (§13.1)',
-    sw.disabled === true && sw.text === 'Team: Off', brief(sw));
+  record('TB-53 task mode cannot be switched while the session is refused with agents_invalid (§13.1): the model '
+    + 'menu opens but its Task mode row is disabled and unchecked, and the model button stays in off mode',
+  row.disabled === true && row.checked === 'false' && sw.mode === 'off', brief({ row, sw }));
   await box.fill('');
 }
 
@@ -722,13 +831,13 @@ async function fixed(ctx, who, project) {
     actions.filter((line) => line.endsWith('Check agent files')).length >= 2, brief(actions.slice(-12)));
 }
 
-/** @brief 按 F8、写一句、保存，读保存的报告里“Recent activity”一节的各行。 */
-async function recentActions(ctx, tab) {
+/** @brief 按 F8、写一句（what）、保存，读保存的报告里“Recent activity”一节的各行。 */
+async function recentActions(ctx, tab, what = 'TB-01 check of the recent actions') {
   await showTab(ctx, tab);
   await ctx.page.locator(`${paneSel(tab)} .composer textarea`).press('F8');
   const dialog = ctx.page.getByTestId('issue-dialog');
   await dialog.waitFor({ timeout: 15000 });
-  await dialog.getByTestId('issue-what').fill('TB-01 check of the recent actions');
+  await dialog.getByTestId('issue-what').fill(what);
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   const saved = dialog.getByTestId('issue-saved');
   await saved.waitFor({ timeout: 15000 });
@@ -773,7 +882,7 @@ const sortedTools = (request) => [...(request?.tools ?? [])].sort();
 
 /**
  * @brief 分开配置的整条路（脚本 tb-roles-fields）：先在关闭模式问一次，开关切到 always 再切回（悬停里的立项持有者），
- *        /team 登记 → executor 写 → reviewer 复核 → planner 结案 → watcher 订阅 → chat 汇报，回到关闭模式再问一次。
+ *        /task 登记 → executor 写 → reviewer 复核 → planner 结案 → watcher 订阅 → chat 汇报，回到关闭模式再问一次。
  */
 async function fields(ctx) {
   const project = tempProject('mori-tb-roles-fields-');
@@ -785,11 +894,11 @@ async function fields(ctx) {
   const on = await clickTo(ctx, tab, 'always', 'planner');
   const off = await clickTo(ctx, tab, 'off', 'planner');
   record('TB-02 the proposal §6.2 configuration (chat dialog, planner create + close, executor, reviewer) gives '
-    + 'holders {dialog: chat, create: planner, close: planner}; the switch hover in Team: On reads "Messages go to '
-    + 'planner first"', same(team?.holders, { dialog: 'chat', create: 'planner', close: 'planner' })
-    && on.ok && off.ok, brief({ holders: team?.holders, on: on.sw.title }));
-  record('TB-53 the hover names the create role of the session: "Messages go to planner first" when planner holds '
-    + 'create', on.ok && on.sw.title === 'Messages go to planner first', brief(on.sw));
+    + 'holders {dialog: chat, create: planner, close: planner}; with task mode on the second line of the Task mode '
+    + 'row reads "Messages go to planner first"', same(team?.holders, { dialog: 'chat', create: 'planner',
+    close: 'planner' }) && on.ok && off.ok, brief({ holders: team?.holders, on: on.row.hint }));
+  record('TB-53 the second line of the Task mode row names the create role of the session: "Messages go to planner '
+    + 'first" when planner holds create', on.ok && on.row.hint === 'Messages go to planner first', brief(on.row));
   await sendMessage(ctx, tab, 'Hello first tb-scenario:tb-roles-fields');
   await settle(ctx, who, 60000);
   await sendMessage(ctx, tab, 'Write the note tb-scenario:tb-roles-fields', { team: true });
@@ -863,21 +972,34 @@ function fieldUse(ctx, who, obs) {
     && create.every((request) => request.system.includes(body('planner'))), brief({ chat: chatReqs.length }));
 }
 
-/** @brief TB-09：协作模式下对话会话只传话，回到 off 后恢复；对话的工作卡带立项的决定与最后一段文字。 */
+/**
+ * @brief TB-09：协作模式下对话会话只传话（chat 没写 tools：读取类是 read、ls），回到 off 后恢复，TaskBoard 上有了需求
+ *        所以另有 board_read、read_session 与关闭模式的工作卡（TB-59）；对话的工作卡带立项的决定与最后一段文字。
+ */
 function dialogTools(ctx, obs) {
   const offReqs = requestsOf(ctx, 'tb-roles-fields', 'chat', 'off-dialog');
   const teamReqs = requestsOf(ctx, 'tb-roles-fields', 'chat', 'team-dialog');
   const first = offReqs.filter((request) => request.info.k === 1);
   const last = offReqs.filter((request) => request.info.k === 4);
-  record('TB-09 in team mode the dialog session\'s requests have no write or command tool (only read, board_read, '
-    + 'read_session, agent_message); back in off mode the requests have the same set as before team mode (read, '
-    + 'bash, edit, write, agent_message, and memory: memory spec §7.6)', teamReqs.length >= 2
-    && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'read', 'read_session']))
+  record('TB-09 in task mode the dialog session\'s requests have no write or command tool (only read, ls, '
+    + 'board_read, read_session, agent_message); back in off mode the requests have the set from before task mode '
+    + '(read, bash, edit, write, agent_message, and memory: memory spec §7.6) plus board_read and read_session '
+    + '(the board has a request now, TB-59)', teamReqs.length >= 2
+    && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'ls', 'read',
+      'read_session']))
     && first.length === 1 && last.length === 1
     && same(sortedTools(first[0]), ['agent_message', 'bash', 'edit', 'memory', 'read', 'write'])
-    && same(sortedTools(last[0]), sortedTools(first[0])) && obs.modeAfter === 'off',
+    && same(sortedTools(last[0]), [...sortedTools(first[0]), 'board_read', 'read_session'].sort())
+    && obs.modeAfter === 'off',
   brief({ team: teamReqs.map(sortedTools), off1: first.map(sortedTools), off4: last.map(sortedTools),
     mode: obs.modeAfter }));
+  const offCard = last[0]?.messages.filter((m) => m.role === 'user').map((m) => contentText(m.content)).at(-1) ?? '';
+  record('TB-59 split roles: back in off mode after the request closed, chat\'s request ends with the off-mode work '
+    + 'card ("Task mode: off", the line that tools are the agent\'s and never the user\'s, request 1 listed) and has '
+    + 'no create tool', offCard.startsWith('<mori-work-card>\nTask mode: off\n')
+    && offCard.includes(`\n${OFF_CARD_TOOLS}`) && /\n- Request 1: .* · done\n/.test(offCard)
+    && !(last[0]?.tools ?? []).some((name) => name.startsWith('request_') || name.startsWith('task_')),
+  brief(offCard));
   const card = teamReqs.find((request) => request.info.k === 2);
   const lastUser = card?.messages.filter((m) => m.role === 'user').map((m) => contentText(m.content)).at(-1) ?? '';
   const want = `For this message planner decided: new request (Request 1); their note: "${ROLES_TEXT.fieldsNote}"`;
@@ -957,7 +1079,7 @@ async function lateMcp(ctx) {
   const withMcp = requests.findIndex((request) => request.tools.includes(ROLES_TEXT.mcpTool));
   ctx.lateMcp = { tried, requests: requests.map(sortedTools) };
   record('TB-09 an MCP server that connects after the session opened: the dialog\'s first request has no MCP tool, '
-    + 'pi enables the server\'s tool once it registers, and the dialog calling it gets the §5.5 reason "Team mode is '
+    + 'pi enables the server\'s tool once it registers, and the dialog calling it gets the §5.5 reason "Task mode is '
     + 'on: the dialog agent only relays; the work is done in tasks."',
   (mcpLog.match(/"tools\/list"/g) ?? []).length >= 2 && requests.length >= 2
     && !requests[0].tools.includes(ROLES_TEXT.mcpTool)
@@ -1023,7 +1145,7 @@ async function openTrustingOnce(ctx, folder) {
 const samePath = (a, b) => typeof a === 'string' && typeof b === 'string'
   && a.replaceAll('\\', '/').toLowerCase() === b.replaceAll('\\', '/').toLowerCase();
 
-/** @brief 分开配置的 /team 流程：立项、task、结案三种实例；检查文件、侧栏、事件、扩展询问与信任。 */
+/** @brief 分开配置的 /task 流程：立项、task、结案三种实例；检查文件、侧栏、事件、扩展询问与信任。 */
 async function instances(ctx) {
   const project = tempProject('mori-tb-roles-inst-');
   writeRoles(project, SPLIT_ROLES);
@@ -1150,7 +1272,7 @@ async function restartDialog(ctx, who) {
   const off1 = requestsOf(ctx, 'tb-roles-restart', 'chat', 'off-dialog').filter((request) => request.info.k === 1);
   const off3 = requestsOf(ctx, 'tb-roles-restart', 'chat', 'off-dialog').filter((request) => request.info.k === 3);
   const team = requestsOf(ctx, 'tb-roles-restart', 'chat', 'team-dialog');
-  record('TB-09 after team mode, quitting Mori, reopening the session (still Team: On) and turning team mode off, '
+  record('TB-09 after task mode, quitting Mori, reopening the session (still in task mode) and turning it off, '
     + 'the dialog request has bash, edit and write again — the same tools as before team mode',
   kept.ok && off.ok && off1.length === 1 && off3.length === 1 && ['bash', 'edit', 'write']
     .every((tool) => off3[0].tools.includes(tool)) && same(sortedTools(off3[0]), sortedTools(off1[0]))
@@ -1181,12 +1303,15 @@ async function restartCheckAgain(ctx, whoC, pc) {
 
 // ---------- TB-53：界面没准备好时不可用 ----------
 
-/** @brief 打开会话时（Starting…）开关一直不可用；后台进程退出后开关不可用。 */
+/**
+ * @brief 打开会话时（Starting…）切不了 Task mode：没有模型按钮（第一次打开）或它不可用，模型菜单没开过；后台进程退出后
+ *        模型按钮不可用、点了不开菜单，仍显示最后知道的模式（2026-10-26 起开关在模型菜单里）。
+ */
 async function notReady(ctx) {
   const records = [...(ctx.notReadyBefore ?? []), ...await ctx.page.evaluate(() => window.__tbNotReady ?? [])];
   const opening = records.filter((item) => item.text === 'Starting…');
   const tab = await ctx.page.locator(SHOWN_PANE).first().getAttribute('data-tab');
-  // 退出前不在 off：“最后知道的 mode”与默认的 Team: Off 不同，检查才分得出来
+  // 退出前不在 off：“最后知道的 mode”与默认的 off 不同，检查才分得出来
   if ((await teamSwitch(ctx, tab)).mode === 'off') await clickTo(ctx, tab, 'always');
   const last = await teamSwitch(ctx, tab);
   await killTbKernel(ctx);
@@ -1195,12 +1320,17 @@ async function notReady(ctx) {
     const wait = await ctx.page.locator(`${paneSel(tab)} [data-testid="not-ready"]`).textContent().catch(() => null);
     return sw?.disabled && wait === 'Mori’s background process crashed' ? { sw, wait } : null;
   }, 20000);
-  record('TB-53 while the UI is not ready the switch is not available: disabled every time a pane showed "Starting…" '
-    + 'while its session opened, and disabled after the kernel exited ("Mori’s background process crashed"), still '
-    + 'showing the last mode',
-  opening.length >= 3 && opening.every((item) => item.disabled) && Boolean(exited) && last.mode !== 'off'
-    && exited.sw.mode === last.mode && exited.sw.text === last.text && exited.sw.checked === last.checked,
-  brief({ opening: opening.length, bad: opening.filter((i) => !i.disabled), last, exited }));
+  await ctx.page.locator(modelButtonSel(tab)).click().catch(() => {});
+  await sleep(300);
+  const menu = await ctx.page.locator(modelMenuSel(tab)).count();
+  const blocked = (item) => !item.menu && (!item.button || item.disabled);
+  record('TB-53 while the UI is not ready task mode cannot be switched: every time a pane showed "Starting…" while '
+    + 'its session opened there was no model button (first open) or it was aria-disabled, and no model menu was '
+    + 'open; after the kernel exited ("Mori’s background process crashed") the model button is aria-disabled, a '
+    + 'click opens no menu, and it still shows the last mode ("Task mode · …")',
+  opening.length >= 3 && opening.every(blocked) && Boolean(exited) && last.mode !== 'off'
+    && exited.sw.mode === last.mode && exited.sw.text === last.text && menu === 0,
+  brief({ opening: opening.length, bad: opening.filter((item) => !blocked(item)), last, exited, menu }));
 }
 
 // ---------- TB-43：mori-team 载入失败时会话不打开 ----------
@@ -1245,10 +1375,10 @@ async function teamFail(ctx) {
       .find((text) => text.includes('Failed to open session: ')) ?? null), 30000);
     const sessions = filesUnder(join(fctx.userData, 'pi', 'sessions'));
     const ready = await fctx.page.locator('[data-testid="chat-pane"] [data-testid="not-ready"]').allTextContents();
-    record('TB-43 when mori-team fails to load the session does not open: "Failed to open session: The team '
+    record('TB-43 when mori-team fails to load the session does not open: "Failed to open session: The TaskBoard '
       + 'extension failed to load: …" is shown, the pane stays "Session didn’t open" and no session file is written '
       + '(fault injected into a copy of the build)', typeof failed === 'string'
-      && failed.includes('The team extension failed to load') && failed.includes('synthetic fault injection')
+      && failed.includes('The TaskBoard extension failed to load') && failed.includes('synthetic fault injection')
       && sessions.length === 0
       && (ready.length === 0 || ready.every((text) => text === 'Session didn’t open')),
     brief({ failed, sessions, ready }));

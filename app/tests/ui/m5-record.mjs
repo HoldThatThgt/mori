@@ -14,7 +14,7 @@ import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 import {
-  allowProjectsLive, allowRealProject, appRoot, arg, launch, oneLine, prepareProject, realProviders, scratchUserData,
+  appRoot, arg, launch, oneLine, prepareProject, realProviders, scratchUserData, useRealGroup,
 } from './lib.mjs';
 
 const source = arg('source');
@@ -456,8 +456,6 @@ async function runScenario(scenario, context, state) {
   renameSync(made.project, cwd);
   let steps = [];
   try {
-    // 测试准备（synthetic test setup，§14.1）：这个临时项目授权公网
-    await allowProjectsLive(state.mori.page, cwd);
     steps = await runPhases(scenario, { ...prompts, cwd }, state);
   } finally {
     rmSync(made.root, { recursive: true, force: true });
@@ -482,8 +480,8 @@ async function runScenario(scenario, context, state) {
 /** @brief 每个场景一个新的临时数据目录和一次新的启动；出错也会关掉 Mori、删掉临时目录。 */
 async function recordFresh(scenario, context) {
   const userData = scratchUserData(source);
-  // 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组；项目建好后再授权公网
-  allowRealProject(userData, []);
+  // 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组
+  useRealGroup(userData);
   const state = { userData, mori: null };
   try {
     state.mori = await startMori(userData);

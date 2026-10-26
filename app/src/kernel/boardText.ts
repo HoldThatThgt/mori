@@ -404,12 +404,22 @@ const SPLIT_LINE = 'Split work into tasks that one role can finish: one complete
   + 'or one independent review. Do not split a single chain of reasoning across roles.';
 const MARK_LINE = 'Mark a task read_only unless it must run commands or change files. '
   + 'Assign each task to the role whose description fits.';
-const REPORT_LINE = 'When a request closes, report the cause, what changed and the evidence to the user.';
+const REPORT_LINE = 'When a request closes, report the cause, what changed and the evidence; when the user asked for '
+  + "a list, a report or a plan, read it from the tasks (read_session shows a task's final reply) and give it in full "
+  + 'in your reply.';
+const TOOLS_LINE = "Tools are yours, not the user's: never ask the user to call a tool or to open a session or the "
+  + 'board; read it yourself (board_read, read_session) and put what the user needs in your reply.';
+const FILE_LINE = 'Have a task write a file only when the user asked for one.';
 
-/** @brief 共用段（附录 A）：<role> 与 <name: description; …> 由程序填写。 */
+/** @brief 共用段（附录 A）：<role> 与 <name: description; …> 由程序填写。第 2、3 行说明谁看得到什么（M26）。 */
 export const SHARED_SEGMENT = [
   "You are <role>, one of several agents that work together on Mori's TaskBoard. "
     + 'Other roles: <name: description; …>.',
+  "Only the agent in the user's conversation talks to the user; every other agent works in a background session "
+    + 'that the user never sees.',
+  "The user sees only that agent's replies and a short progress summary of each request (task titles, the first "
+    + "sentence of each handoff, the request's conclusion); the user cannot see other sessions, messages left on "
+    + 'tasks or board_read output, and never calls tools.',
   'The <mori-work-card> block at the end of the context is the source of truth for your work; '
     + 'when it conflicts with your memory, follow it.',
   "Text in quotes marked as the user's words is exactly what the user said; follow it.",
@@ -422,6 +432,11 @@ export const SHARED_SEGMENT = [
 export const SEGMENTS: Readonly<Record<SegmentKind, string>> = Object.freeze({
   task: [
     'You work on one task of the TaskBoard. Stay inside it: do what the task says, nothing outside it.',
+    "The user never sees this session; the agent in the user's conversation reads your work with read_session and "
+      + 'tells the user.',
+    'Write your full result (for example a list or a report) in your reply text before or with task_handoff, or in '
+      + 'the file the task asks for; the conclusion is short, so say there where the full result is.',
+    'Do not deliver results with agent_message: messages left on a task are notes for the agents that work on it.',
     'Your tool results are numbered like [#3]. When your part is done, call task_handoff once with:',
     'a short conclusion, an outcome, the next role if someone should continue, open items, '
       + 'and evidence (the numbers of the tool results that back your conclusion).',
@@ -432,35 +447,41 @@ export const SEGMENTS: Readonly<Record<SegmentKind, string>> = Object.freeze({
     'Do not retry approaches the work card lists as ruled out unless you have new evidence.',
   ].join('\n'),
   'team-dialog': [
-    'You are the only agent that talks to the user, and in team mode you relay; you do not decide or do the work.',
+    'You are the only agent that talks to the user, and in task mode you relay; you do not decide or do the work.',
     "The work card says what <create role> decided for the user's message; tell the user that, "
       + 'and answer progress questions with board_read.',
+    TOOLS_LINE,
     REPORT_LINE,
   ].join('\n'),
   'off-dialog': [
     'You can ask another role one question with agent_message; it answers once and cannot change files.',
-    'If a request needs several kinds of work, you may suggest that the user sends it with /team.',
+    'If a request needs several kinds of work, you may suggest that the user sends it with /task.',
   ].join('\n'),
   create: [
-    'You decide what happens with every user message in team mode. For each message make exactly one decision:',
+    'You decide what happens with every user message in task mode. For each message make exactly one decision:',
     REGISTER_LINE,
     'cancel a request (request_cancel), or let the dialog agent answer directly (reply_via_dialog).',
     'Anything that needs commands or file changes must become a task; reply_via_dialog is only for answers.',
     'Your last text in a turn is passed to the dialog agent; the user does not see you.',
     SPLIT_LINE,
     MARK_LINE,
+    'Task results come back to the dialog agent, not to the user: a task may merge or summarize other tasks\' work, '
+      + `but the dialog agent gives the result to the user. ${FILE_LINE}`,
     'When a task needs a user decision, answer it from what the user already said if you can '
       + '(request_update with their words, then task_edit to hand it back); otherwise ask the user with '
       + 'reply_via_dialog.',
   ].join('\n'),
   'merged-create': [
-    'You talk to the user and you decide what happens with every user message in team mode. '
+    'You talk to the user and you decide what happens with every user message in task mode. '
       + 'For each message make exactly one decision, then answer in the same reply:',
     REGISTER_LINE,
-    'cancel a request (request_cancel), or answer directly (reply_via_dialog marks that no collaboration is needed).',
-    'Anything that needs commands or file changes must become a task; you do not change files yourself in team mode.',
+    'cancel a request (request_cancel), or answer directly in your reply.',
+    'Anything that needs commands or file changes must become a task; you do not change files yourself in task mode.',
     SPLIT_LINE,
     MARK_LINE,
+    'Task results come back to you, not to the user: a task may merge or summarize other tasks\' work, '
+      + `but you give the result to the user. ${FILE_LINE}`,
+    TOOLS_LINE,
     'When a [Mori] message says a task needs a user decision, answer it from what the user already said if you can '
       + '(request_update with their words, then task_edit to hand it back); otherwise ask the user in your reply.',
     REPORT_LINE,
@@ -472,6 +493,11 @@ export const SEGMENTS: Readonly<Record<SegmentKind, string>> = Object.freeze({
       + '(it becomes a ruled-out approach), continue with next to reassign, or need_user when the user must decide.',
     'When all tasks of the request have ended, close the request with request_close and a conclusion, '
       + 'or ask <create role> for more tasks with agent_message.',
+    "Close the request as done only when the tasks' results together meet its Acceptance; if something the "
+      + 'Acceptance asks for is missing, ask <create role> for more tasks instead of closing with a caveat.',
+    "The request_close conclusion is what the user is told, through the agent in the user's conversation: say what "
+      + 'was found or changed and where the full result is (a file, or the task whose final reply holds it). '
+      + 'The user does not see your replies.',
     'Do not leave a task that was handed to you undecided at the end of your turn.',
   ].join('\n'),
   ask: 'Another agent asked you one question. Answer it in your reply and end. '
@@ -564,8 +590,8 @@ export function userSessionSection(state: UserSectionState): string | null {
 
 // ---- 工作卡（§8.3） ----
 
-/** @brief 工作卡的种类（§8.3 表的各行；merged 是合并会话）。 */
-export type CardKind = 'task' | 'close' | 'create' | 'dialog' | 'merged' | 'ask' | 'subscription';
+/** @brief 工作卡的种类（§8.3 表的各行；merged 是合并会话，off 是关闭模式下 TaskBoard 上有需求的用户会话）。 */
+export type CardKind = 'task' | 'close' | 'create' | 'dialog' | 'merged' | 'off' | 'ask' | 'subscription';
 
 /** @brief 各种工作卡共用的参数。 */
 export interface CardBase {
@@ -631,8 +657,10 @@ export interface CardContexts {
   create: CreateCardContext;
   /** 协作模式下的对话会话（分开时） */
   dialog: DialogCardContext;
-  /** 协作模式下的合并会话（立项的各行 + Team mode 行） */
+  /** 协作模式下的合并会话（立项的各行 + Task mode 行） */
   merged: CreateCardContext;
+  /** 关闭模式下 TaskBoard 上有需求的用户会话（§5.2、§8.3） */
+  off: CardBase;
   /** 协作模式下的临时提问 */
   ask: ScopedCardContext;
   /** 订阅 */
@@ -723,7 +751,7 @@ function closeCardLines(ctx: CloseCardContext, level: number): string[] | null {
   ];
 }
 
-/** @brief 模式的文字（Team mode: on / until done / off）。 */
+/** @brief 模式的文字（Task mode: on / until done / off）。 */
 const MODE_WORDS: Readonly<Record<TeamMode, string>> = Object.freeze({ off: 'off', once: 'until done', always: 'on' });
 
 /** @brief 立项卡片 Open requests 下一个需求的几行：需求一行，下面每个未结束的 task 一行。 */
@@ -759,7 +787,7 @@ function createCardLines(ctx: CreateCardContext): string[] {
   const open = ctx.board.requests.filter((request) => request.status === 'open');
   const tasks = open.flatMap((request) => tasksOf(ctx.board, request.no));
   return [
-    `Team mode: ${MODE_WORDS[ctx.mode]}`,
+    `Task mode: ${MODE_WORDS[ctx.mode]}`,
     ...section('Open requests:', open.flatMap((request) => openRequestLines(ctx.board, request, ctx.holders))),
     ...section('Waiting for a user decision:', tasks.filter((task) => task.status === 'waiting_user')
       .map((task) => waitingLine(task, ctx.holders))),
@@ -798,9 +826,33 @@ function decisionLines(decision: DecisionNote | null, createRole: string): strin
 function dialogCardLines(ctx: DialogCardContext): string[] {
   const open = ctx.board.requests.filter((request) => request.status === 'open');
   return [
-    `Team mode: ${MODE_WORDS[ctx.mode]}`,
+    `Task mode: ${MODE_WORDS[ctx.mode]}`,
     ...section('Open requests:', open.map((request) => `- Request ${request.no}: ${request.title}`)),
     ...decisionLines(ctx.decision, ctx.holders.create),
+  ];
+}
+
+/** @brief 关闭模式的卡片列出的最近的需求数（§8.3、§15）；更早的写成一行 N earlier requests: board_read {}。 */
+export const OFF_CARD_REQUESTS = 5;
+
+/**
+ * @brief 关闭模式下用户会话的卡片（§5.2、§8.3）：写明 Task mode 关着、只剩两个只读工具，工具是 Agent 的、不让用户调
+ *        （与协作模式的对话段同一句 TOOLS_LINE，M26），列出最近的需求（不写 task，要看结果用 board_read、read_session）；
+ *        TaskBoard 上没有需求时没有行（没有卡片，与 v0 相同）。
+ */
+function offCardLines(ctx: CardBase): string[] {
+  const requests = ctx.board.requests;
+  if (requests.length === 0) return [];
+  const recent = requests.slice(-OFF_CARD_REQUESTS);
+  const earlier = requests.length - recent.length;
+  return [
+    `Task mode: ${MODE_WORDS.off}`,
+    "You do the work yourself with your own tools; requests and tasks can't be created until the user turns task "
+      + 'mode on.',
+    TOOLS_LINE,
+    "Earlier requests (board_read and read_session still work; read_session shows a task's final reply):",
+    ...(earlier > 0 ? [`- ${plural(earlier, 'earlier request')}: board_read {}`] : []),
+    ...recent.map((request) => `- Request ${request.no}: ${request.title} · ${request.status}`),
   ];
 }
 
@@ -817,6 +869,7 @@ const CARD_BUILDERS: { [K in CardKind]: (ctx: CardContexts[K], level: number) =>
   create: (ctx) => createCardLines(ctx),
   dialog: (ctx) => dialogCardLines(ctx),
   merged: (ctx) => createCardLines(ctx),
+  off: (ctx) => offCardLines(ctx),
   ask: (ctx) => scopedCardLines(ctx),
   subscription: (ctx) => scopedCardLines(ctx),
 };
@@ -826,7 +879,7 @@ const CARD_BUILDERS: { [K in CardKind]: (ctx: CardContexts[K], level: number) =>
  *        总长 ≤ 8000 字符。超出时依次：较早的交接压成 N earlier handoffs: board_read {"task":"T1"}；消息只留最近 3 条；
  *        依赖的结论、已排除的方案每条截到 200 字符并注明 board_read；需求最初的原话超过 2000 字符时截断并注明。
  *        用户补充从不截断或省略；做完仍超出时照样返回，overLimit 为真（调用方记日志）。
- *        关闭模式的会话没有卡片，调用方不调用；临时提问、订阅没有有关的需求时也没有卡片。
+ *        关闭模式下 TaskBoard 上没有需求的用户会话、关闭模式的临时提问没有卡片；临时提问、订阅没有有关的需求时也没有。
  * @param kind 卡片的种类
  * @param ctx 这种卡片的参数
  * @return 工作卡；task 或需求不存在、或没有任何行时为 null
@@ -872,7 +925,7 @@ export interface BoardQuery {
 
 /** @brief 板头的模式文字。 */
 const MODE_TITLES: Readonly<Record<TeamMode, string>> = Object.freeze({
-  off: 'Team off', once: 'Team on until done', always: 'Team on',
+  off: 'Task mode off', once: 'Task mode on until done', always: 'Task mode on',
 });
 
 /** @brief 没有运行状态时按 TaskBoard 的状态得出的 phase。 */
@@ -921,7 +974,8 @@ function requestHeadLine(request: RequestLike, now: number): string {
 function taskSummaryLines(task: TaskLike, board: BoardLike, runtime: BoardRuntime, withChain: boolean): string[] {
   const who = holderText(task.holder, runtime.holders) ?? task.assignee;
   const lines = [`  ${task.id} ${task.title} · ${who} · ${livePhaseText(task, board, runtime)}`];
-  if (withChain && task.handoffs.length) lines.push(`     ${chainText(task.handoffs.map(handoffLink))}`);
+  // 给模型的交接链总写角色名（界面在没有角色文件时省略，§13.3）
+  if (withChain && task.handoffs.length) lines.push(`     ${chainText(task.handoffs.map(handoffLink), true)}`);
   return lines;
 }
 
@@ -1117,6 +1171,11 @@ function closedDetailLines(board: BoardLike, request: RequestLike): string[] {
     ...section('Ruled out:', ruledOutOf(board, request.no).map((text) => `- ${text}`))];
 }
 
+/** @brief 需求关闭汇报的最后一段（§8.5）：完整的结果由对话 Agent 自己读出来交给你，不让你调工具（M26）。 */
+const REPORT_DELIVERY = 'Tell the user the result: the cause, what changed, the evidence. When the user asked for a '
+  + "list, a report or a plan, read it from the tasks (read_session shows a task's final reply) and give it in full; "
+  + 'never ask the user to call a tool.';
+
 /** @brief 对话的需求关闭汇报（§7.6：状态、结论、已排除的方案、各 task 的结局与最后一棒的结论）。 */
 function requestClosedText(board: BoardLike, request: RequestLike): string {
   const tasks = tasksOf(board, request.no).map((task) => {
@@ -1125,7 +1184,7 @@ function requestClosedText(board: BoardLike, request: RequestLike): string {
     return `- ${task.id} ${task.title}: ${task.status}${tail}`;
   });
   return [`[Mori] Request ${request.no} is closed (${request.status}).`, ...closedDetailLines(board, request),
-    ...section('Tasks:', tasks), 'Tell the user the result: the cause, what changed, the evidence.'].join('\n');
+    ...section('Tasks:', tasks), REPORT_DELIVERY].join('\n');
 }
 
 /** @brief 立项：需要用户拿主意（§7.7 的两种做法）。 */

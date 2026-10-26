@@ -12,10 +12,11 @@
 // 旁边另有 Mori 一侧的检查（写进的文件、会话文件里的记录、界面状态）。每一轮都检查确实发出并有了回复（没有错误卡），
 // 发不出去时这一项的流程记为 FAIL，不会被当成模型行为。
 // 用法（在 app/ 下，先 npm run build）：
-//   node tests/ui/m6-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,5,6,7,8,c]
+//   node tests/ui/m6-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,5,6,7,8,c,t]
+// t（2026-10-26，负责人走查 M12）：Customize 的内置工具里打开 ls，新会话里真实模型用 ls 列出文件（只跑它：--only t）。
 // 结果写到 test-results/m6-real(-packaged).json，截图在 test-results/m6-real(-packaged)/。
-// v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；测试准备在复制出的配置里给两个临时项目
-// 授权公网、默认范围设为 [DeepSeek, GLM] 的分组。走查 1 改为在 设置 → Models 里给首选提供商加模型（等它的探针跑完）、
+// v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；测试准备在复制出的配置里把
+// 默认范围设为 [DeepSeek, GLM] 的分组。走查 1 改为在 设置 → Models 里给首选提供商加模型（等它的探针跑完）、
 // 在输入框下面一行的范围菜单里选它；走查 8 改用 v1 的模型表单（Supports thinking、Default effort for new sessions）。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：走查 1 加模型改为卡上 Fetch models → 清单里勾（或手填）→ Add 1 model。
 // 按钮状态的读法（composer-pickers.md"测试要改的地方"C1、C2）："不可用"读 aria-disabled（没有 data-pending），"切换中"读
@@ -25,7 +26,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statS
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, REAL_GROUP, realProviders, scratchUserData, sleep,
+  appRoot, arg, createRecorder, launch, oneLine, REAL_GROUP, realProviders, scratchUserData, sleep, useRealGroup,
 } from './lib.mjs';
 import { activeFile, PANE, samePath, stubFolder, topTitle, waitPanes, waitReady } from './m3-helpers.mjs';
 import { composerAt, slotSelector, waitPaneIdle, waitSplit } from './m5-helpers.mjs';
@@ -82,6 +83,7 @@ const PROMPTS = {
   packageCall: '请调用 package_hello 工具（不需要参数），然后用一句话告诉我它返回了什么。',
   reason1: '笼子里有鸡和兔共 35 只，脚共 94 只。鸡兔各几只？只给出答案，不要调用任何工具。',
   reason2: '一个数加上它的一半等于 45，这个数是多少？只给出答案，不要调用任何工具。',
+  ls: '请调用 ls 工具（不要用 bash 或 read）列出当前文件夹里的文件，然后用一句话告诉我有哪些文件。',
 };
 
 // ---------- 测试文件（synthetic） ----------
@@ -354,9 +356,8 @@ async function toolInfo(page, name) {
 /** @brief model-config.json（测试数据目录的副本）。 */
 const modelConfig = (ctx) => readJson(join(ctx.userData, 'model-config.json'));
 
-/** @brief 一个模型行的档案里 Tool calling 的取值（data-value）；没有时为 null。 */
-const toolCalling = (page, ref) => modelRow(page, ref).locator('[data-testid="profile"] [data-field="tool_calling"]')
-  .getAttribute('data-value', { timeout: 2000 }).catch(() => null);
+/** @brief 一个模型行上 tool calling 的验证状态（data-probe，2026-10-26 起取代档案摘要的 Tool calling）；没有时为 null。 */
+const toolCalling = (page, ref) => modelRow(page, ref).getAttribute('data-probe', { timeout: 2000 }).catch(() => null);
 
 /**
  * @brief 设置 → Models 的提供商卡上点"Fetch models"（用已保存的 key 拉取，model-discovery.md §6.5、§13.4）：卡里打开
@@ -453,7 +454,7 @@ async function item1(ctx) {
     && menu.items.filter((item) => item.checked).length === 1 && menu.items.some((item) => item.pick === ref)
     && menu.note === 'Applies to this session only. New sessions use the default range from Settings.'
     && menu.last === 'Manage models', JSON.stringify(menu));
-  record('走查 1：选 deepseek-v4-pro：输入框下面一行的范围按钮显示它，悬停第一行是按钮文字、第二行"<提供商名> · <区域>"；'
+  record('走查 1：选 deepseek-v4-pro：输入框下面一行的范围按钮显示它，悬停第一行是按钮文字、第二行"<提供商名>"；'
     + '新回复来自 deepseek-v4-pro（会话文件里回复的 model 先是首选的第一个模型、后是 deepseek-v4-pro，记了一条 mori.pick）',
   shown.inRow && shown.text === SECOND_MODEL && shown.tip[0] === SECOND_MODEL
     && (shown.tip[1] ?? '').startsWith(`${ctx.conn.name} · `) && models[0] === ctx.conn.model
@@ -1087,7 +1088,7 @@ async function askWithThinking(ctx) {
     settings: readJson(join(ctx.agentDir, 'settings.json')) };
 }
 
-/** @brief 走查 8 后半的检查：新会话的默认强度、生成中按钮不可用、高 / 关两次回复。 */
+/** @brief 走查 8 后半的检查：新会话的默认强度、生成中思考按钮不可用（范围按钮可用）、高 / 关两次回复。 */
 function recordThinkingRun(ctx, run) {
   record('走查 8：新会话的思考强度是设置里的默认"低"；菜单列出关、最低、低、中、高，"低"打勾，说明只作用于这个会话',
     run.initial === 'low' && run.menu.text === 'Effort: Low' && run.menu.reasoning === 'true'
@@ -1095,9 +1096,10 @@ function recordThinkingRun(ctx, run) {
     && run.menu.items.every((item) => !item.disabled) && run.menu.checked === 'low'
     && run.menu.note === 'Applies to this session only. Set each model’s default for new sessions in Settings.',
     JSON.stringify(run.menu));
-  record('走查 8：生成中输入框下面一行的范围和思考按钮不可用（aria-disabled，仍能 Tab 到），范围按钮悬停的第三行'
-    + '"Can’t switch models until the response finishes"、Effort 悬停的第二行"Can’t change effort until the response '
-    + 'finishes"，读屏的描述里也是', run.start?.running === true && run.start.model?.unavailable
+  record('走查 8：生成中输入框下面一行的思考按钮不可用（aria-disabled，仍能 Tab 到），范围按钮可用（2026-10-26 起能打开菜单'
+    + '切 Task mode），范围按钮悬停的第三行"Can’t switch models until the response finishes"、Effort 悬停的第二行'
+    + '"Can’t change effort until the response finishes"，读屏的描述里也是', run.start?.running === true
+    && run.start.model && !run.start.model.unavailable
     && run.start.model.tip[2] === MODEL_BUSY && run.start.model.described.endsWith(`. ${MODEL_BUSY}`)
     && run.start.thinking?.unavailable && run.start.thinking.tip[1] === NOTE.effortBusy
     && run.start.thinking.described === NOTE.effortBusy, JSON.stringify(run.start));
@@ -1273,6 +1275,52 @@ async function counterExamples(ctx) {
   await untrustedSkill(ctx);
 }
 
+// ---------- 内置工具的开关（2026-10-26，负责人走查 M12） ----------
+
+/** @brief settings.json 去掉 defaultTools 之后的其余字段（看开关没有动别的字段）。 */
+function otherSettings(value) {
+  const { defaultTools: _tools, ...rest } = value ?? {};
+  return JSON.stringify(rest);
+}
+
+/**
+ * @brief 负责人走查 M12（docs/v0/screens/tools.md"内置工具"）：Customize → Built-in tools 里打开 ls：开关开着、这个会话里
+ *        仍是"Not enabled"，复制出的 settings.json 的 defaultTools 有 "+ls"、别的字段不变；工具页的"New session"建的会话里
+ *        ls 是"Enabled"，真实模型用 ls 列出项目文件：一张"List"卡、Done、没有批准卡（模型没有调用 ls 时记 KNOWN：模型行为）。
+ *        最后把开关关回去，defaultTools 回到原样。
+ */
+async function itemToolSwitch(ctx) {
+  const { page } = ctx;
+  const file = join(ctx.agentDir, 'settings.json');
+  const before = readJson(file);
+  await openToolsSection(page, 'builtin');
+  const row = page.locator('[data-testid="tool-row"][data-tool="ls"]');
+  const on = await flip(page, row, true);
+  const state = await row.locator('.tools-state').innerText();
+  const after = readJson(file);
+  await shot(page, 't-ls-on');
+  record('M12：内置工具里打开 ls：开关开着、这个会话里仍是"Not enabled"；settings.json 的 defaultTools 有 "+ls"，别的字段不变',
+    on.settled && on.checked === 'true' && !on.error && state === 'Not enabled'
+    && (after?.defaultTools ?? []).includes('+ls') && otherSettings(after) === otherSettings(before),
+  JSON.stringify({ on, state, before: before?.defaultTools ?? null, after: after?.defaultTools ?? null }));
+  await clickNewSession(page, toolsNewSession(page));
+  const info = await toolInfo(page, 'ls');
+  await backToChat(page);
+  const turn = await sendTurn(page, PROMPTS.ls);
+  const card = await lastToolCard(page);
+  const listed = card?.title.startsWith('List') ?? false;
+  record('M12：新会话的工具页里 ls 是"Enabled"', info?.active === 'true' && info.state === 'Enabled', JSON.stringify(info));
+  record('M12：真实模型在新会话里用 ls 列出文件：一张"List"卡、Done，没有批准卡（模型没调用 ls 时记 KNOWN）',
+    listed && card.status === 'done' && turn.cards.length === 0, JSON.stringify({ card, cards: turn.cards }), !listed);
+  await shot(page, 't-ls-call');
+  await openToolsSection(page, 'builtin');
+  const off = await flip(page, row, false);
+  await backToChat(page);
+  record('M12：关回 ls 之后 settings.json 的 defaultTools 回到原样', off.settled
+    && JSON.stringify(readJson(file)?.defaultTools ?? null) === JSON.stringify(before?.defaultTools ?? null),
+  JSON.stringify(readJson(file)?.defaultTools ?? null));
+}
+
 // ---------- 执行 ----------
 
 /**
@@ -1299,19 +1347,20 @@ const ctx = { conn, root, project: makeProject(root, 'm6-walk', PROJECT_SKILL),
   untrusted: makeProject(root, 'm6-untrusted', UNTRUSTED_SKILL), pageErrors: [], skillDisabled: false };
 ctx.agentsFiles = projectAgentsFiles(ctx.project);
 ctx.userData = scratchUserData(source);
-// 测试准备（synthetic test setup，§14.1）：给两个临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
-ctx.providers = allowRealProject(ctx.userData, [ctx.project, ctx.untrusted]);
+// 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组
+ctx.providers = useRealGroup(ctx.userData);
 ctx.agentDir = join(ctx.userData, 'pi');
 try {
   await start(ctx);
   await openFolder(ctx, ctx.project, 'Trust workspace');
-  const items = { 1: item1, 2: item2, 3: item3, 4: item4, 5: item5, 6: item6, 7: item7, 8: item8, c: counterExamples };
+  const items = { 1: item1, 2: item2, 3: item3, 4: item4, 5: item5, 6: item6, 7: item7, 8: item8, c: counterExamples,
+    t: itemToolSwitch };
   for (const [item, fn] of Object.entries(items)) {
     if (!wanted(item)) continue;
     try {
       await fn(ctx);
     } catch (error) {
-      record(`${item === 'c' ? '反例' : `走查 ${item}`}：流程`, false, oneLine(error, 400));
+      record(`${{ c: '反例', t: 'M12' }[item] ?? `走查 ${item}`}：流程`, false, oneLine(error, 400));
       await shot(ctx.page, `${item}-error`);
       await recover(ctx.page);
     }

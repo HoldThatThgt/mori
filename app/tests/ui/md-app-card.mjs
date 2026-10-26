@@ -1,5 +1,5 @@
 // 一键拉取模型 App 层：提供商卡、探针第 0 步与模型行（docs/specs/model-discovery.md §13.2；状态表与标识见
-// docs/v1/screens/models-settings.md "卡上的 Fetch models""Models 行与档案摘要""模型表单（Edit）"）。
+// docs/v1/screens/models-settings.md "卡上的 Fetch models""Models 行""模型表单（Edit）"）。
 // 真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint/server.mjs，synthetic），逐条检查：
 //   MD-10 卡上的 Fetch models 用 §5.1 选的已保存 key（端点日志里 key 末 4 位；第一个 key 被限流或被拒时用第二个）；
 //         拉取中按钮不可用；清单开着时卡上的按钮不可用、没有 Detected 一行；已加入的行标 Added、不能勾也不能改；
@@ -14,8 +14,8 @@
 //         POST 自己的 /api/show）；Ollama 只有训练窗口时报告的窗口为 null；Ollama 报告的窗口让有效窗口变小；一次加入
 //         3 个模型时列表只读一次、每个档案都有种类与 meta，期间点 Fetch models 再点 Cancel 不取消探针；没有 meta 的旧档案
 //         照样读、不重新探测；读版本每个提供商一次、不发 §4.2 的详情请求；localai、tensorrt 形状（旧档案写的是 vllm）
-//         认出后重新探测一次、不显示 Cancel test…。
-//   MD-13 没报告的窗口与输出写 (not reported)；§8 表五行提示各自的显示条件与 Use 的改动（窗口改小时 Max output 一起改，
+//         认出后重新探测一次（2026-10-26 起模型行没有 Cancel test…，不再查）。
+//   MD-13 没报告、值仍是默认值的窗口与输出写 (default)，用 Edit 改了就不写（2026-10-26，负责人走查 M6）；§8 表五行提示各自的显示条件与 Use 的改动（窗口改小时 Max output 一起改，
 //         Max output 小于 N 时不改；-alwaysthink 给第四行，服务报告了思考或接口不是 openai-completions 时没有第四行）；
 //         Use 立即保存、不带思考强度、之后重新探测；旧档案只显示第四行。
 //   MD-06（已有提供商）models.discover 用 §5.1 选的 key（端点日志）；key 不回到界面（拉取结果、models.get、页面 DOM
@@ -163,7 +163,10 @@ async function firstFetch(env) {
   return open.value;
 }
 
-/** @brief 清单开着时：卡上的按钮不可用、没有 Detected、Added 的行锁住、Not listed 一行（§6.5）。 */
+/**
+ * @brief 清单开着时：卡上的按钮不可用、没有 Detected，也没有 Name、API type、More settings 与 Network zone、Added 的行锁住、
+ *        Not listed 一行（§6.5；models-settings.md“卡上的 Fetch models”的拉取后）。
+ */
 async function openChecklist(env, state) {
   const { page } = env.ctx;
   record('MD-10 while the card’s checklist is open, the card’s "Fetch models" is disabled',
@@ -171,6 +174,9 @@ async function openChecklist(env, state) {
   const anywhere = await page.getByTestId('detected-server').count();
   record('MD-10 the card’s checklist shows no "Detected: …" line', state?.detected === 0 && anywhere === 0,
     brief({ inCard: state?.detected, anywhere }));
+  record('MD-10 the card’s checklist has no Name, API type or More settings, and no Network zone (2026-10-26)',
+    state?.checklist === true && Array.isArray(state.extras) && state.extras.length === 0,
+  brief({ checklist: state?.checklist, extras: state?.extras }));
   const coder = state?.rows.find((row) => row.id === 'fake-coder');
   record('MD-10 a model already in the provider is marked "Added" and locked: not picked, pick box and every field '
     + 'disabled', Boolean(coder?.added && coder.tags.includes('added:Added') && coder.picked === false
@@ -269,9 +275,10 @@ async function addTwo(env) {
       fetch: closed.value?.fetch }));
   const done = await waitProfiles(page, ['cardp/fake-new-a', 'cardp/fake-new-b'], verified, 120000);
   const probes = ['fake-new-a', 'fake-new-b'].map((id) => probeLines(env.fakes.card, since, id).length);
-  record('MD-10 the added models start probing at once: "Verifying…" on both rows, probe requests for each, then '
-    + 'Verified', rows.every((row) => row?.tool === 'verifying') && probes.every((n) => n > 0) && done.ok,
-  brief({ rows: rows.map((row) => row?.tool), probes, done: done.ok }));
+  record('MD-10 the added models start probing at once: "Verifying…" on both rows (data-probe verifying, status line '
+    + 'verifying), probe requests for each, then verified', rows.every((row) => row?.tool === 'verifying'
+    && row.status === 'verifying') && probes.every((n) => n > 0) && done.ok,
+  brief({ rows: rows.map((row) => [row?.tool, row?.status]), probes, done: done.ok }));
 }
 
 /** @brief Edit 里没设过强度的模型显示 config.get 的 defaultThinkingLevel；没改就不写（§5.4）。 */
@@ -536,8 +543,7 @@ const SWAPPED = ['lai/lai-model', 'trt/trt-model'];
 function shapesSetup() {
   const providers = Object.entries(SHAPES).map(([id, [port, , models]]) => providerOf(id, `Shape ${id}`, port,
     models.map((model) => modelOf(model))));
-  const profiles = ['lai', 'trt'].map((id) => oldProfile(baseOf(SHAPES[id][0]), modelOf(SHAPES[id][2][0]),
-    { cancel: true }));
+  const profiles = ['lai', 'trt'].map((id) => oldProfile(baseOf(SHAPES[id][0]), modelOf(SHAPES[id][2][0])));
   return { userData: seedUserData({ providers, profiles }), profiles };
 }
 
@@ -593,28 +599,27 @@ function ollamaSingle(env) {
   count('/api/show') === 3 && count('/api/tags') > 0 && count('/api/ps') > 0, brief(paths));
 }
 
-/** @brief Ollama 报告的窗口让有效窗口变小（§7.2）；只有训练窗口的那一行写 (not reported)、没有窗口的提示（§8）。 */
+/**
+ * @brief Ollama 报告的窗口让有效窗口变小（§7.2，看档案；2026-10-26 起模型行不列 Context）；只有训练窗口的那一行窗口是
+ *        训练窗口、不是 Mori 的默认值，不标 (default)，也没有窗口的提示（§8）。
+ */
 async function ollamaWindows(env, views) {
   const { page } = env.ctx;
   const effective = (ref) => views[ref]?.context.effective;
-  const shown = await Promise.all(['olla/olla-ps', 'olla/olla-ctx', 'olla/olla-train']
-    .map((ref) => modelRowState(page, ref)));
   record('MD-12 an Ollama reported window lowers the effective window: configured 131,072 → olla-ps 8,192, olla-ctx '
-    + '16,384 (profile and the row’s Context); olla-train stays 131,072', effective('olla/olla-ps') === 8192
-    && effective('olla/olla-ctx') === 16384 && effective('olla/olla-train') === W
-    && shown.map((row) => row?.context).join() === `8192,16384,${W}`,
-  brief({ effective: ['olla/olla-ps', 'olla/olla-ctx', 'olla/olla-train'].map(effective),
-    rows: shown.map((row) => row?.context) }));
-  const train = shown[2];
-  record('MD-13 the Ollama model with only a trained window shows "(not reported)" for its window and no "Server '
-    + 'reports a context window" hint', Boolean(train?.notReported.includes('contextWindow')
-    && train.meta?.includes('Context window: 131,072 (not reported)') && !train.hints.some((hint) => hint.kind
-    === 'context')), brief(train));
+    + '16,384 (profile); olla-train stays 131,072', effective('olla/olla-ps') === 8192
+    && effective('olla/olla-ctx') === 16384 && effective('olla/olla-train') === W,
+  brief({ effective: ['olla/olla-ps', 'olla/olla-ctx', 'olla/olla-train'].map(effective) }));
+  const train = await modelRowState(page, 'olla/olla-train');
+  record('MD-13 the Ollama model with only a trained window shows its window 131,072 without "(default)" (the trained '
+    + 'window is not Mori’s default) and no "Server reports a context window" hint', Boolean(train?.meta?.includes(
+    'Context window: 131,072 · ')) && same(train.defaults, []) && !train.hints.some((hint) => hint.kind === 'context'),
+  brief(train));
 }
 
-/** @brief localai、tensorrt：读版本认出种类变了，各重新探测一次，不再显示 Cancel test…（§3.3、§7.2、§7.3）。 */
+/** @brief localai、tensorrt：读版本认出种类变了，各重新探测一次（§3.3、§7.2、§7.3）。 */
 async function swappedKinds(env, swapped) {
-  const { page, userData } = env.ctx;
+  const { userData } = env.ctx;
   const views = swapped.value;
   const stored = env.profiles.map((seed) => storedProfile(userData, seed.baseUrl, seed.modelId));
   const probes = ['lai', 'trt'].map((id) => probeLines(env.fakes[id], 0).length);
@@ -624,10 +629,6 @@ async function swappedKinds(env, swapped) {
     && SWAPPED.every((ref) => views[ref].server.version === 'unknown') && stored.every((item, i) => item
     && item.probedAt > env.profiles[i].probedAt && item.key.endsWith('|unknown')) && probes.every((n) => n > 0),
   brief({ servers: SWAPPED.map((ref) => views[ref]?.server), keys: stored.map((item) => item?.key), probes }));
-  const rows = await Promise.all([...SWAPPED, 'sg/sg-model'].map((ref) => modelRowState(page, ref)));
-  record('MD-12 re-identified localai and tensorrt models show no "Cancel test…" (the sglang model still does)',
-    rows[0]?.cancelTest === false && rows[1]?.cancelTest === false && rows[2]?.cancelTest === true,
-    brief(rows.map((row) => row?.cancelTest)));
 }
 
 /** @brief 重新启动后的读版本：每个提供商一次、不发 §4.2 的详情请求；localai、tensorrt 不再重新探测（§7.3）。 */
@@ -839,19 +840,46 @@ function hintsSetup() {
 const kindsOf = (row) => row?.hints.map((hint) => hint.kind) ?? null;
 const hintText = (row, kind) => row?.hints.find((hint) => hint.kind === kind)?.text ?? null;
 
-/** @brief 没报告的窗口与输出写 (not reported)，只标没报告的那一项（§8）。 */
-function notReportedRows(rows) {
+/** 模型行"(default)"的悬停说明（models-settings.md "Models 行"，2026-10-26 负责人走查 M6） */
+const DEFAULT_TITLE = 'The server didn’t report this, so Mori used a default. Use Edit to set the real value.';
+
+/** @brief 没报告、值仍是默认值的窗口与输出写 (default)，只标这样的那一项（§8，2026-10-26 改）。 */
+function defaultRows(rows) {
   const typed = rows['ht/typed-a'];
-  record('MD-13 a model whose server reports neither window nor max output shows "Context window: 128,000 (not '
-    + 'reported)" and "Max output: 16,384 (not reported)"', Boolean(typed?.meta?.includes('Context window: 128,000 '
-    + '(not reported)') && typed.meta.includes('Max output: 16,384 (not reported)'))
-    && same(typed.notReported, ['contextWindow', 'maxTokens']), brief(typed));
-  const win = rows['hv/win-big'];
-  const richB = rows['hr/rich-b'];
-  record('MD-13 "(not reported)" marks only what the server did not report: win-big only Max output (window reported), '
-    + 'rich-b neither', same(win?.notReported, ['maxTokens']) && Boolean(win.meta?.includes('Context window: 131,072 '
-    + '· Max output: 65,536 (not reported)')) && same(richB?.notReported, []),
-  brief({ win: win && [win.meta, win.notReported], richB: richB && [richB.meta, richB.notReported] }));
+  record('MD-13 a model whose server reports neither window nor max output and keeps the defaults shows "Context '
+    + 'window: 128,000 (default)" and "Max output: 16,384 (default)", each with the hover explanation',
+  Boolean(typed?.meta?.includes('Context window: 128,000 (default)') && typed.meta.includes('Max output: 16,384 '
+    + '(default)')) && same(typed.defaults, ['contextWindow', 'maxTokens'])
+    && typed.defaultTitles.every((title) => title === DEFAULT_TITLE), brief(typed));
+  const [seen, win, richB] = ['hv/seen-alwaysthink', 'hv/win-big', 'hr/rich-b'].map((ref) => rows[ref]);
+  record('MD-13 "(default)" marks only unreported values that still equal the default: seen-alwaysthink only Max '
+    + 'output (16,384 is the default for its reported 65,536 window); win-big nothing (its unreported Max output is '
+    + '65,536, not the default); rich-b nothing (both reported)', same(seen?.defaults, ['maxTokens'])
+    && Boolean(seen.meta?.includes('Max output: 16,384 (default)')) && same(win?.defaults, [])
+    && Boolean(win.meta?.includes('Max output: 65,536 · ') || win.meta?.endsWith('Max output: 65,536'))
+    && same(richB?.defaults, []), brief({ seen: seen && [seen.meta, seen.defaults], win: win && [win.meta,
+    win.defaults], richB: richB && [richB.meta, richB.defaults] }));
+}
+
+/**
+ * @brief 用 Edit 改了默认的 Max output 之后不再标 (default)，窗口仍是默认值的照标（§8，2026-10-26：只在值仍是默认值时标）。
+ *        typed-a 的 Max output 改成 8,000，Save 后等配置与行。
+ */
+async function defaultAfterEdit(env) {
+  const { page, userData } = env.ctx;
+  await modelRow(page, 'ht/typed-a').locator('[data-action="edit"]').click();
+  const form = cardOf(page, 'ht').getByTestId('model-form');
+  await form.waitFor({ timeout: 10000 });
+  await form.getByLabel('Max output', { exact: true }).fill('8000');
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  await form.waitFor({ state: 'detached', timeout: 15000 });
+  const saved = await poll(() => providerIn(configOf(userData), 'ht')?.models[0]?.maxTokens, (value) => value === 8000,
+    10000);
+  const row = await poll(() => modelRowState(page, 'ht/typed-a'), (state) => same(state?.defaults, ['contextWindow']),
+    10000);
+  record('MD-13 after Edit sets typed-a’s Max output to 8,000 its "(default)" goes away; the window, still 128,000, '
+    + 'keeps it', saved.ok && row.ok && Boolean(row.value.meta?.includes('Max output: 8,000 ·')
+    || row.value.meta?.endsWith('Max output: 8,000')), brief({ saved: saved.value, row: row.value }));
 }
 
 /** @brief §8 表五行的显示条件（正反两面）与顺序。 */
@@ -911,13 +939,13 @@ function hintAbsences(env, rows, views) {
     respHints: kindsOf(rows['hp/resp-model']) }));
 }
 
-/** @brief 旧档案（没有 meta）只显示第四行、没有 (not reported)（§8）。 */
+/** @brief 旧档案（没有 meta）只显示第四行、没有 (default)（§8）。 */
 function oldProfileHints(rows, views) {
   const old = rows['hv/old-think'];
   const view = views['hv/old-think'];
-  record('MD-13 an old profile without meta shows only hint row 4 and no "(not reported)" (old-think: reported null, '
+  record('MD-13 an old profile without meta shows only hint row 4 and no "(default)" (old-think: reported null, '
     + 'although the old profile’s window 65,536 differs from the configured 100,000)', same(kindsOf(old),
-    ['thinking-seen']) && same(old?.notReported, []) && view?.reported === null && view?.context.reported === 65536,
+    ['thinking-seen']) && same(old?.defaults, []) && view?.reported === null && view?.context.reported === 65536,
   brief({ row: old, reported: view?.reported, context: view?.context }));
 }
 
@@ -1019,10 +1047,11 @@ async function hintsStep() {
     const rows = Object.fromEntries(await Promise.all(refs.map(async (ref) => [ref, await modelRowState(ctx.page,
       ref)])));
     const views = (await modelsInfo(ctx.page))?.profiles ?? {};
-    notReportedRows(rows);
+    defaultRows(rows);
     hintConditions(rows);
     hintAbsences(env, rows, views);
     oldProfileHints(rows, views);
+    await defaultAfterEdit(env);
     await hintUses(env);
     await editMedium(env);
   } catch (error) {

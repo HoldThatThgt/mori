@@ -8,7 +8,7 @@
   "MD-07",
   "MD-13"
  ],
- "recorded": "2026-10-23",
+ "recorded": "2026-10-26",
  "address": [
   "http://127.0.0.1:4864/v1",
   "http://127.0.0.1:4865/v1",
@@ -22,10 +22,10 @@
   "No API key was entered: the commands carry no key and the fixture stores no request headers",
   "Synthetic endpoints: http://127.0.0.1:4864/v1 FAKE_MODELS=fake-coder,bad id; http://127.0.0.1:4865/v1 FAKE_MODELS=,; http://127.0.0.1:4863/v1 FAKE_LIST_SHAPE=ollama FAKE_MODELS=olla-ps,olla-ctx,olla-train (tests/fake-endpoint/server.mjs); lowering the Context window of olla-ps before Add and the Use click are synthetic"
  ],
- "recordedAt": "2026-10-23T13:44:06.575Z",
+ "recordedAt": "2026-10-26T14:56:40.120Z",
  "steps": [
   {
-   "t": 2,
+   "t": 1,
    "command": {
     "type": "session.list"
    }
@@ -44,11 +44,11 @@
    }
   },
   {
-   "t": 5,
+   "t": 4,
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-md-record-data-7oPohr\\pi",
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-md-record-data-KjBVkW\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -65,11 +65,11 @@
    }
   },
   {
-   "t": 8,
+   "t": 7,
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-md-record-data-7oPohr\\pi",
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-md-record-data-KjBVkW\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -101,7 +101,6 @@
         "baseUrl": "http://127.0.0.1:4862/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -119,12 +118,7 @@
        }
       ],
       "groups": [],
-      "normalDefault": "legacy/fake-legacy",
-      "allowedZones": [
-       "local",
-       "intranet"
-      ],
-      "projectZones": {}
+      "normalDefault": "legacy/fake-legacy"
      },
      "profiles": {
       "legacy/fake-legacy": {
@@ -166,17 +160,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       }
      },
@@ -184,11 +178,7 @@
      "thinkingDefaults": {
       "legacy/fake-legacy": null
      },
-     "zoneSuggestions": {
-      "legacy": "local"
-     },
      "migration": null,
-     "projects": [],
      "loadError": null,
      "reserved": [
       "mori",
@@ -282,6 +272,7 @@
         "image": false,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -301,6 +292,7 @@
         "image": false,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": "the ID contains spaces",
        "added": false
@@ -324,7 +316,7 @@
    }
   },
   {
-   "t": 42,
+   "t": 40,
    "result": {
     "type": "models.discover",
     "value": {
@@ -346,7 +338,7 @@
    }
   },
   {
-   "t": 44,
+   "t": 42,
    "command": {
     "type": "models.discover",
     "target": {
@@ -358,7 +350,7 @@
    }
   },
   {
-   "t": 67,
+   "t": 63,
    "result": {
     "type": "models.discover",
     "value": {
@@ -389,6 +381,7 @@
         "image": true,
         "family": true
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -408,6 +401,7 @@
         "image": true,
         "family": true
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -429,6 +423,7 @@
         "image": true,
         "family": true
        },
+       "catalog": null,
        "hints": [
         "trained_window"
        ],
@@ -442,7 +437,7 @@
    }
   },
   {
-   "t": 71,
+   "t": 66,
    "command": {
     "type": "models.saveProvider",
     "id": null,
@@ -450,7 +445,6 @@
      "name": "127.0.0.1:4863",
      "baseUrl": "http://127.0.0.1:4863/v1",
      "api": "openai-completions",
-     "zone": "local",
      "concurrency": 4,
      "compat": {}
     },
@@ -489,7 +483,7 @@
    }
   },
   {
-   "t": 120,
+   "t": 87,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -535,17 +529,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -587,16 +581,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -612,7 +606,7 @@
    }
   },
   {
-   "t": 121,
+   "t": 88,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -658,17 +652,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -710,16 +704,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -762,16 +756,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -814,16 +808,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -849,7 +843,7 @@
    }
   },
   {
-   "t": 121,
+   "t": 88,
    "result": {
     "type": "models.saveProvider",
     "value": {
@@ -859,13 +853,13 @@
    }
   },
   {
-   "t": 123,
+   "t": 90,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 127,
+   "t": 92,
    "result": {
     "type": "models.get",
     "value": {
@@ -880,7 +874,6 @@
         "baseUrl": "http://127.0.0.1:4862/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -903,7 +896,6 @@
         "baseUrl": "http://127.0.0.1:4863/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -941,12 +933,7 @@
        }
       ],
       "groups": [],
-      "normalDefault": "legacy/fake-legacy",
-      "allowedZones": [
-       "local",
-       "intranet"
-      ],
-      "projectZones": {}
+      "normalDefault": "legacy/fake-legacy"
      },
      "profiles": {
       "legacy/fake-legacy": {
@@ -988,17 +975,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -1040,16 +1027,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1092,16 +1079,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1144,16 +1131,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -1165,12 +1152,7 @@
       "127-0-0-1-4863/olla-ctx": null,
       "127-0-0-1-4863/olla-train": null
      },
-     "zoneSuggestions": {
-      "legacy": "local",
-      "127-0-0-1-4863": "local"
-     },
      "migration": null,
-     "projects": [],
      "loadError": null,
      "reserved": [
       "mori",
@@ -1221,7 +1203,7 @@
    }
   },
   {
-   "t": 135,
+   "t": 100,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -1267,17 +1249,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -1319,16 +1301,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1371,16 +1353,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1423,16 +1405,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -1458,7 +1440,7 @@
    }
   },
   {
-   "t": 341,
+   "t": 196,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -1504,17 +1486,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -1556,16 +1538,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1608,16 +1590,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1660,16 +1642,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -1695,7 +1677,7 @@
    }
   },
   {
-   "t": 343,
+   "t": 198,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -1741,17 +1723,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -1793,16 +1775,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1845,16 +1827,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -1897,16 +1879,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -1932,7 +1914,7 @@
    }
   },
   {
-   "t": 456,
+   "t": 310,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -1978,17 +1960,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -2030,16 +2012,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2082,16 +2064,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2134,16 +2116,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -2169,7 +2151,7 @@
    }
   },
   {
-   "t": 458,
+   "t": 314,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -2215,17 +2197,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -2267,16 +2249,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2319,16 +2301,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2371,16 +2353,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -2406,7 +2388,7 @@
    }
   },
   {
-   "t": 579,
+   "t": 435,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -2452,17 +2434,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -2504,16 +2486,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2556,16 +2538,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2608,16 +2590,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -2643,7 +2625,7 @@
    }
   },
   {
-   "t": 581,
+   "t": 437,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -2689,17 +2671,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -2741,16 +2723,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2793,16 +2775,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -2845,16 +2827,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -2880,7 +2862,7 @@
    }
   },
   {
-   "t": 595,
+   "t": 450,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -2926,17 +2908,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -2978,16 +2960,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3030,16 +3012,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3082,16 +3064,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -3117,7 +3099,7 @@
    }
   },
   {
-   "t": 953,
+   "t": 811,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -3163,17 +3145,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -3215,16 +3197,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3267,16 +3249,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3319,16 +3301,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -3354,7 +3336,7 @@
    }
   },
   {
-   "t": 969,
+   "t": 827,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -3400,17 +3382,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -3452,16 +3434,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3504,16 +3486,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3556,16 +3538,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -3591,7 +3573,7 @@
    }
   },
   {
-   "t": 971,
+   "t": 828,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -3637,17 +3619,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -3689,16 +3671,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3741,16 +3723,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3793,16 +3775,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -3828,7 +3810,7 @@
    }
   },
   {
-   "t": 1064,
+   "t": 922,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -3874,17 +3856,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -3926,16 +3908,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -3978,16 +3960,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4030,16 +4012,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -4065,7 +4047,7 @@
    }
   },
   {
-   "t": 1066,
+   "t": 923,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -4111,17 +4093,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -4163,16 +4145,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4215,16 +4197,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4267,16 +4249,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -4302,7 +4284,7 @@
    }
   },
   {
-   "t": 1079,
+   "t": 937,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -4348,17 +4330,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -4400,16 +4382,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4452,16 +4434,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4504,16 +4486,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -4539,7 +4521,7 @@
    }
   },
   {
-   "t": 1248,
+   "t": 1110,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -4585,17 +4567,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -4637,16 +4619,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4689,16 +4671,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": null,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4741,16 +4723,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -4776,7 +4758,7 @@
    }
   },
   {
-   "t": 1249,
+   "t": 1111,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -4822,17 +4804,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -4874,16 +4856,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -4926,22 +4908,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -4983,16 +4965,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       }
@@ -5018,7 +5000,7 @@
    }
   },
   {
-   "t": 1251,
+   "t": 1113,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -5064,17 +5046,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -5116,16 +5098,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -5168,22 +5150,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -5225,22 +5207,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -5260,7 +5242,7 @@
    }
   },
   {
-   "t": 1252,
+   "t": 1115,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -5306,17 +5288,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -5358,16 +5340,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -5410,22 +5392,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -5467,22 +5449,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -5497,7 +5479,7 @@
    }
   },
   {
-   "t": 2786,
+   "t": 2658,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -5543,17 +5525,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -5595,16 +5577,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -5647,22 +5629,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -5704,22 +5686,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -5734,7 +5716,7 @@
    }
   },
   {
-   "t": 2880,
+   "t": 2751,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -5780,17 +5762,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -5832,16 +5814,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -5884,22 +5866,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -5941,22 +5923,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -5971,7 +5953,7 @@
    }
   },
   {
-   "t": 3067,
+   "t": 2938,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -6017,17 +5999,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -6069,16 +6051,16 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": null,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": null,
+       "catalog": null,
        "probedAt": null,
        "suite": 1
       },
@@ -6121,22 +6103,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -6178,22 +6160,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -6208,7 +6190,7 @@
    }
   },
   {
-   "t": 3069,
+   "t": 2941,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -6254,17 +6236,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -6306,22 +6288,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": 8192,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -6363,22 +6345,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -6420,22 +6402,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -6444,17 +6426,17 @@
    }
   },
   {
-   "t": 3208,
+   "t": 3158,
    "command": {
     "type": "config.get"
    }
   },
   {
-   "t": 3209,
+   "t": 3159,
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-md-record-data-7oPohr\\pi",
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-md-record-data-KjBVkW\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -6465,13 +6447,13 @@
    }
   },
   {
-   "t": 3211,
+   "t": 3161,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 3213,
+   "t": 3162,
    "result": {
     "type": "models.get",
     "value": {
@@ -6486,7 +6468,6 @@
         "baseUrl": "http://127.0.0.1:4862/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -6509,7 +6490,6 @@
         "baseUrl": "http://127.0.0.1:4863/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -6547,12 +6527,7 @@
        }
       ],
       "groups": [],
-      "normalDefault": "legacy/fake-legacy",
-      "allowedZones": [
-       "local",
-       "intranet"
-      ],
-      "projectZones": {}
+      "normalDefault": "legacy/fake-legacy"
      },
      "profiles": {
       "legacy/fake-legacy": {
@@ -6594,17 +6569,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -6646,22 +6621,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 4096,
         "reported": 8192,
-        "effective": 4096,
-        "truncation": "unknown"
+        "effective": 4096
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -6703,22 +6678,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -6760,22 +6735,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -6786,12 +6761,7 @@
       "127-0-0-1-4863/olla-ctx": null,
       "127-0-0-1-4863/olla-train": null
      },
-     "zoneSuggestions": {
-      "legacy": "local",
-      "127-0-0-1-4863": "local"
-     },
      "migration": null,
-     "projects": [],
      "loadError": null,
      "reserved": [
       "mori",
@@ -6842,7 +6812,7 @@
    }
   },
   {
-   "t": 3220,
+   "t": 3171,
    "command": {
     "type": "models.saveModel",
     "providerId": "127-0-0-1-4863",
@@ -6859,7 +6829,7 @@
    }
   },
   {
-   "t": 3264,
+   "t": 3188,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -6905,17 +6875,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -6957,22 +6927,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 8192,
         "reported": 8192,
-        "effective": 8192,
-        "truncation": "unknown"
+        "effective": 8192
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -7014,22 +6984,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -7071,22 +7041,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -7101,7 +7071,7 @@
    }
   },
   {
-   "t": 3264,
+   "t": 3188,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -7147,17 +7117,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -7199,22 +7169,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 8192,
         "reported": 8192,
-        "effective": 8192,
-        "truncation": "unknown"
+        "effective": 8192
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -7256,22 +7226,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -7313,22 +7283,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -7343,7 +7313,7 @@
    }
   },
   {
-   "t": 3264,
+   "t": 3188,
    "result": {
     "type": "models.saveModel",
     "value": {
@@ -7352,13 +7322,13 @@
    }
   },
   {
-   "t": 3266,
+   "t": 3190,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 3269,
+   "t": 3193,
    "result": {
     "type": "models.get",
     "value": {
@@ -7373,7 +7343,6 @@
         "baseUrl": "http://127.0.0.1:4862/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -7396,7 +7365,6 @@
         "baseUrl": "http://127.0.0.1:4863/v1",
         "compat": {},
         "concurrency": 4,
-        "zone": "local",
         "keys": [],
         "nextKeyNumber": 1,
         "models": [
@@ -7434,12 +7402,7 @@
        }
       ],
       "groups": [],
-      "normalDefault": "legacy/fake-legacy",
-      "allowedZones": [
-       "local",
-       "intranet"
-      ],
-      "projectZones": {}
+      "normalDefault": "legacy/fake-legacy"
      },
      "profiles": {
       "legacy/fake-legacy": {
@@ -7481,17 +7444,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -7533,22 +7496,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 8192,
         "reported": 8192,
-        "effective": 8192,
-        "truncation": "unknown"
+        "effective": 8192
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -7590,22 +7553,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -7647,22 +7610,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -7673,12 +7636,7 @@
       "127-0-0-1-4863/olla-ctx": null,
       "127-0-0-1-4863/olla-train": null
      },
-     "zoneSuggestions": {
-      "legacy": "local",
-      "127-0-0-1-4863": "local"
-     },
      "migration": null,
-     "projects": [],
      "loadError": null,
      "reserved": [
       "mori",
@@ -7729,7 +7687,7 @@
    }
   },
   {
-   "t": 3274,
+   "t": 3196,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -7775,17 +7733,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -7827,22 +7785,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 8192,
         "reported": 8192,
-        "effective": 8192,
-        "truncation": "unknown"
+        "effective": 8192
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -7884,22 +7842,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -7941,22 +7899,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -7971,7 +7929,7 @@
    }
   },
   {
-   "t": 3517,
+   "t": 3438,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -8017,17 +7975,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -8069,22 +8027,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 8192,
         "reported": 8192,
-        "effective": 8192,
-        "truncation": "unknown"
+        "effective": 8192
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -8126,22 +8084,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -8183,22 +8141,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -8213,7 +8171,7 @@
    }
   },
   {
-   "t": 3874,
+   "t": 3797,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -8259,17 +8217,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -8311,22 +8269,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 8192,
         "reported": 8192,
-        "effective": 8192,
-        "truncation": "unknown"
+        "effective": 8192
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -8368,22 +8326,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -8425,22 +8383,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -8455,7 +8413,7 @@
    }
   },
   {
-   "t": 3998,
+   "t": 3921,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -8501,17 +8459,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -8553,22 +8511,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 8192,
         "reported": 8192,
-        "effective": 8192,
-        "truncation": "unknown"
+        "effective": 8192
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -8610,22 +8568,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -8667,22 +8625,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -8697,7 +8655,7 @@
    }
   },
   {
-   "t": 5697,
+   "t": 5637,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -8743,17 +8701,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -8795,22 +8753,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 8192,
         "reported": 8192,
-        "effective": 8192,
-        "truncation": "unknown"
+        "effective": 8192
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -8852,22 +8810,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -8909,22 +8867,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -8939,7 +8897,7 @@
    }
   },
   {
-   "t": 5788,
+   "t": 5730,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -8985,17 +8943,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -9037,22 +8995,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 8192,
         "reported": 8192,
-        "effective": 8192,
-        "truncation": "unknown"
+        "effective": 8192
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -9094,22 +9052,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -9151,22 +9109,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -9181,7 +9139,7 @@
    }
   },
   {
-   "t": 5975,
+   "t": 5918,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -9227,17 +9185,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -9279,22 +9237,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 8192,
         "reported": 8192,
-        "effective": 8192,
-        "truncation": "unknown"
+        "effective": 8192
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763042353,
+       "catalog": null,
+       "probedAt": 1793026596014,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -9336,22 +9294,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -9393,22 +9351,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },
@@ -9423,7 +9381,7 @@
    }
   },
   {
-   "t": 5977,
+   "t": 5919,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -9469,17 +9427,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792763035051,
+       "catalog": null,
+       "probedAt": 1793026590715,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ps": {
@@ -9521,22 +9479,22 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": true,
-        "replay": "not_required"
+        "replay": "not_required",
+        "off_refused": false
        },
        "context": {
         "declared": 8192,
         "reported": 8192,
-        "effective": 8192,
-        "truncation": "unknown"
+        "effective": 8192
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 8192,
         "maxTokens": null,
         "reasoning": true,
         "image": false
        },
-       "probedAt": 1792763045261,
+       "catalog": null,
+       "probedAt": 1793026598993,
        "suite": 1
       },
       "127-0-0-1-4863/olla-ctx": {
@@ -9578,22 +9536,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 16384,
         "reported": 16384,
-        "effective": 16384,
-        "truncation": "unknown"
+        "effective": 16384
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": 16384,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040535,
+       "catalog": null,
+       "probedAt": 1793026594186,
        "suite": 1
       },
       "127-0-0-1-4863/olla-train": {
@@ -9635,22 +9593,22 @@
        "reasoning": {
         "field": "none",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 131072,
         "reported": null,
-        "effective": 131072,
-        "truncation": "unknown"
+        "effective": 131072
        },
-       "cancel_verified": "unknown",
        "reported": {
         "contextWindow": null,
         "maxTokens": null,
         "reasoning": false,
         "image": false
        },
-       "probedAt": 1792763040537,
+       "catalog": null,
+       "probedAt": 1793026594189,
        "suite": 1
       }
      },

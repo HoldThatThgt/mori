@@ -369,6 +369,18 @@ test('TB-18 C tags parse into task_handoff arguments (§7.5)', () => {
     'next "mori" is not one of: none');
 });
 
+test('TB-18 C evidence takes any separator between the numbers (M13: "#3、#4" was refused once); open items stay '
+  + 'one per line', () => {
+  const form = hf.taskForm('T1', NEXT);
+  const evidence = (inside) => argsOf(hf.parseForm(form, 'C', '<conclusion>x</conclusion><outcome>done</outcome>'
+    + `<open_items>a, b\nc</open_items><evidence>${inside}</evidence>`));
+  assert.deepEqual(evidence('#3、#4、#6\n#14, #15; [#18] 24').evidence, ['#3', '#4', '#6', '#14', '#15', '[#18]', '24']);
+  assert.deepEqual(evidence('#3、#4').open_items, ['a, b', 'c'], 'open items are not split on commas');
+  assert.deepEqual(evidence('(#7) #8').evidence, ['#7', '#8']);
+  assert.deepEqual(evidence('#3 Read a.ts').evidence, ['#3', 'Read', 'a', 'ts'],
+    'words are kept as items, so the evidence check refuses them as before');
+});
+
 test('TB-18 close and forced request_close C tags parse per §7.5', () => {
   const close = hf.closeForm('T2', NEXT);
   assert.deepEqual(argsOf(hf.parseForm(close, 'C',

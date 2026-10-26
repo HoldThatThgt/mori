@@ -6,6 +6,9 @@
 // 另查 app.asar 的 node_modules 里没有 mermaid 和它的依赖（mermaid 是 devDependencies，构建时打进 out/renderer）。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先填 Base URL 和 API key、Fetch models，再在清单里勾
 // fake-coder（page.mjs）；错的 key 在拉取时就是列表错误 rejected，手填模型 ID 后继续。
+// 2026-10-26（WP-02，负责人走查 M7 与 WP-01 的观察）：401 之后什么都不改再测，请求照样发出（规格 §8.3，MP-41 的 App 侧）；
+// 读表单下方的结果不再白等 30 秒（page.mjs textNow）；模型行没有档案摘要，tool calling 读行上的 data-probe，出错时点状态行的
+// "Verify again"。
 // 2026-10-26（负责人走查 M27，docs/v0/screens/window.md）：关掉窗口改为藏进系统托盘，原来"运行中关闭窗口：程序退出"
 // 一项改为：关掉窗口不退出、命令照常运行、第一次弹气泡；再启动一次只叫出窗口；点托盘图标回到窗口；托盘菜单"Exit"
 // 先问（确认框经 tray-helpers.mjs 换掉，按测试给的按钮回答），选"Quit anyway"后有序退出、不留下命令进程。
@@ -26,7 +29,7 @@ import { dirname, join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
 import { startNetWatch } from './net-watch.mjs';
 import { describeProcesses, sleepProcessIds as testSleeps } from './lib.mjs';
-import { pageHelpers, showStep } from './page.mjs';
+import { pageHelpers, showStep, textNow } from './page.mjs';
 import {
   APP_MENU, appMenu, balloonCalls, clickFileExit, clickTrayIcon, clickTrayItem, closeWindow, exitFromTray, findTray,
   launchSecond, messageBoxes, NOTICE_MARKER, NOTICE_TEXT, NOTICE_TITLE, QUIT_DETAIL, recordBalloons, stubMessageBox, TRAY_ITEMS,
@@ -53,17 +56,35 @@ function record(name, ok, detail = '', known = false) {
   console.log(`${label} ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-/** @brief 启动合成端点，等它开始监听。 */
+/** 合成端点每个请求的 JSON 日志行（对话请求带 model、status、probe，规格 §14.1） */
+const fakeLog = [];
+
+/** @brief 启动合成端点，等它开始监听；之后它的 JSON 日志行记进 fakeLog。 */
 function startFakeEndpoint() {
   const child = spawn(process.execPath, [join(appRoot, 'tests/fake-endpoint/server.mjs')], {
     env: { ...process.env, FAKE_PORT: String(port), FAKE_CHUNK_DELAY_MS: '15', FAKE_REQUIRE_KEY: testKey },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
+  let rest = '';
   return new Promise((resolveStart) => {
     child.stdout.on('data', (chunk) => {
+      const lines = (rest + String(chunk)).split('\n');
+      rest = lines.pop();
+      for (const line of lines) if (line.startsWith('{')) fakeLog.push(line);
       if (String(chunk).includes('synthetic endpoint on')) resolveStart(child);
     });
   });
+}
+
+/** @brief 合成端点收到的、不是探针的对话请求里 HTTP 状态为 status 的条数（测试连接的请求就是这种）。 */
+function chatRequests(status) {
+  return fakeLog.map((line) => {
+    try {
+      return JSON.parse(line);
+    } catch {
+      return {};
+    }
+  }).filter((entry) => entry.model && entry.probe === false && entry.status === status).length;
 }
 
 /** @brief 准备一个带 README 的临时项目和独立的数据目录。 */
@@ -86,16 +107,42 @@ function prepareDirs() {
 async function saveAndTest(page, apiKey) {
   const h = pageHelpers(page);
   const form = page.getByTestId('connection-form');
-  const fetch = await h.fillConnection({ name: 'Mori endpoint', baseUrl: `http://127.0.0.1:${port}/v1`, zone: 'local',
+  const fetch = await h.fillConnection({ name: 'Mori endpoint', baseUrl: `http://127.0.0.1:${port}/v1`,
     apiKey, modelId: 'fake-coder' });
   const row = form.locator('[data-testid="discovered-row"][data-model="fake-coder"]');
   const listed = { rows: await row.count(), picked: await row.locator('input[name="pick"]:checked').count(),
     typed: await row.locator('[data-testid="row-tag"][data-kind="entered"]').count() };
-  const previous = await form.getByTestId('form-message').innerText().catch(() => null);
+  // 2026-10-26（WP-02）：表单下方还没有结果时不等（原来 innerText 白等 Playwright 的默认 30 秒，首次启动两步各约 30 秒）
+  const previous = await textNow(form.getByTestId('form-message'));
   const since = Date.now();
   await form.locator('[data-action="test"]').click();
   const text = oneLine(await h.testResult(previous, 60000));
   return { ok: text.startsWith('Connected'), text, fetch, listed, since };
+}
+
+/**
+ * @brief 测试失败之后什么都不改再点 Test connection（规格 §8.3 的 2026-10-26 补，MP-41 的 App 侧，结果不计入覆盖检查）：
+ *        请求照样发到合成端点，结果仍是 401 的原文。改之前模型池记下的 auth 挡住这次测试，请求不发出，结果是
+ *        "Connection failed: Connection error."。两次结果文字一样，所以按合成端点日志里多了一条不是探针的 401 请求来认，
+ *        再等 Test connection 回到可用、读表单下方的结果。
+ */
+async function retestUnchanged(page) {
+  const form = page.getByTestId('connection-form');
+  const before = chatRequests(401);
+  const started = Date.now();
+  await form.locator('[data-action="test"]').click();
+  while (chatRequests(401) === before && Date.now() - started < 15000) await sleep(100);
+  const sent = chatRequests(401) - before;
+  await page.waitForFunction(() => {
+    const button = document.querySelector('[data-testid="connection-form"] [data-action="test"]');
+    return button?.textContent === 'Test connection'
+      && Boolean(document.querySelector('[data-testid="connection-form"] [data-testid="form-message"]'));
+  }, null, { timeout: 15000 }).catch(() => {});
+  const text = oneLine(await textNow(form.getByTestId('form-message')) ?? '');
+  record('MP-41 首次启动测试失败（401）后什么都不改再点 Test connection：请求照样发到合成端点，结果仍是 401 原文'
+    + '（不是不发请求的"Connection failed: Connection error."）', sent === 1 && text.includes('401')
+    && !text.includes('Connection error'), `合成端点多收到 ${sent} 个 401 的测试请求；${text.slice(0, 160)}；`
+    + `${Date.now() - started} ms`);
 }
 
 /**
@@ -130,6 +177,7 @@ async function connect(app, page, userData, project) {
     !wrong.ok && /^(Connection failed|Failed)/.test(wrong.text) && wrong.text.includes('401')
       && wrong.fetch?.state === 'list-error' && wrong.fetch.kind === 'rejected',
     `${JSON.stringify(wrong.fetch)}；${wrong.text.slice(0, 160)}`);
+  await retestUnchanged(page);
   const literal = await saveAndTest(page, testKey);
   // model-discovery.md §13.4：换回对的 key 后 Fetch models 拿到列表，fake-coder 是在清单里勾的（不是手填的）
   const { listed } = literal;
@@ -189,22 +237,26 @@ async function addressChange(page, userData) {
   await verifiedAgain(page);
 }
 
-/** @brief 等 mori-endpoint/fake-coder 的档案回到已验证（探针出错时点 Verify 再等）。 */
+/**
+ * @brief 等 mori-endpoint/fake-coder 的档案回到已验证；探针出错（tool calling 没验证）时点模型行状态行的"Verify again"再等。
+ *        2026-10-26（负责人走查 M7，models-settings.md "Models 行"）：模型行没有档案摘要和常显的 Verify，tool calling 的状态读
+ *        行上的 data-probe。
+ */
 async function verifiedAgain(page) {
   const row = page.locator('[data-testid="model-row"][data-model="mori-endpoint/fake-coder"]');
-  const state = () => row.locator('[data-testid="profile"] [data-field="tool_calling"]').getAttribute('data-value');
+  const state = () => row.getAttribute('data-probe');
   const settle = () => page.waitForFunction(() => {
-    const value = document.querySelector('[data-testid="model-row"][data-model="mori-endpoint/fake-coder"] '
-      + '[data-field="tool_calling"]')?.dataset.value;
+    const value = document.querySelector('[data-testid="model-row"][data-model="mori-endpoint/fake-coder"]')
+      ?.dataset.probe;
     return value === 'verified' || value === 'failed' || value === 'unverified';
   }, null, { timeout: 120000 });
   await settle();
   if (await state() !== 'verified') {
-    await row.locator('[data-action="verify"]').click();
+    await row.locator('[data-testid="probe-status"] [data-action="verify"]').click();
     await sleep(500);
     await settle();
   }
-  record('改回地址、加回 key 后档案为已验证', await state() === 'verified', `tool_calling=${await state()}`);
+  record('改回地址、加回 key 后档案为已验证', await state() === 'verified', `data-probe=${await state()}`);
 }
 
 /** @brief 模型运行的命令读不到 key：key 只在 pi 的内存里，不在环境变量里。 */

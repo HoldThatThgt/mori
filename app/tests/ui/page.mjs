@@ -5,6 +5,7 @@
 // 操作（范围用选择器给出：首次启动表单、Add provider 表单或一张提供商卡）。
 // 2026-10-26（负责人走查 M2，first-run.md "测试成功之后：主窗口"）：测试连接成功就关掉首次启动表单、进入主窗口，
 // "Connected · …"在主窗口 Open a folder 提示里（CONNECTED）；表单下方没有探针状态了，waitProbes 经进程桥读 models.get。
+// 2026-10-26（WP-02）：点 Test connection 之前读表单下方的结果用 textNow（不在时不等，原来白等 Playwright 的默认 30 秒）。
 // 2026-10-26 走查 M18（docs/v0/screens/chat.md"步骤组"）：一轮里的思考块与工具卡在正文跟在后面或这一轮结束时折成一行
 // "{n} steps"，卡不显示（仍在页面里，读状态、标题照常）；要点卡、展开卡或量卡的样子之前先 showStep，读这一行用 stepsState。
 
@@ -21,6 +22,17 @@ export const CONNECTED = '[data-testid="open-folder"] [data-testid="connected"]'
 export const PROVIDER_FORM = '[data-testid="provider-form"]';
 /** @brief 一张提供商卡的选择器（卡上的清单在卡里，models-settings.md "卡上的清单"）。 */
 export const cardScope = (provider) => `[data-testid="provider-card"][data-provider="${provider}"]`;
+
+/**
+ * @brief locator 此刻的 textContent；元素不在时为 null，不等它出现。Playwright 的 innerText 会等元素出现，最多到默认时限
+ *        30 秒：首次启动点 Test connection 之前表单下方多半还没有结果，原来那样读就白等 30 秒（2026-10-26 WP-02 查出的
+ *        m0-smoke 首次启动两步各约 30 秒）。读 textContent 而不是 innerText：调用方拿它和之后在页面里读到的
+ *        textContent 比较（testResult、testConnection），两边要是同一个属性，否则换行与连续空白不同时旧结果会被当成新的。
+ */
+export async function textNow(locator) {
+  if (await locator.count() === 0) return null;
+  return locator.first().textContent({ timeout: 1000 }).catch(() => null);
+}
 
 /** 拉取之后清单、列表错误与命令失败的原文（§6.1–§6.3）：拉取前先把已有的标为旧的，只认新出现的 */
 const FETCH_OUTCOMES = '[data-testid="checklist"], [data-testid="list-error"], [data-testid="form-message"]';
@@ -132,7 +144,7 @@ export function probeState(profile, since = 0) {
 }
 
 /**
- * @brief 经进程桥读 models.get（只读查询，lib.mjs 的 allowProjectsLive 同样经 window.mori.request），返回 ref 的探针状态
+ * @brief 经进程桥读 models.get（只读查询，经 window.mori.request），返回 ref 的探针状态
  *        （probeState，since 同它）与档案的 status（ready / error / probing；没有档案时为 null，probing 只在从未完成
  *        探测、正在探测时出现）；ref 为 null 时取第一个提供商的第一个模型（首次启动只有一个提供商，第一个模型就是测试的那个）。
  */
@@ -283,13 +295,13 @@ export function pageHelpers(page) {
     /**
      * @brief 填首次启动表单（v1，docs/v1/screens/first-run.md；model-discovery.md §6.6、§13.4）：先填 Base URL 和
      *        API key；它们改了，或表单还没拉取过时，Fetch models（fetchIn，拉取后改 Base URL 或 key 会回到开始，所以
-     *        改了就再拉一次）；之后填 Name、选区域，在清单里只勾要的模型（pickIn：清单里没有的用 Add a model ID 手填）。
+     *        改了就再拉一次）；之后填 Name，在清单里只勾要的模型（pickIn：清单里没有的用 Add a model ID 手填）。
+     *        2026-10-26 起表单没有网络区域（负责人走查 M3）。
      *        不给的字段不碰；apiKey 为 null 时不碰 key 输入框。contextWindow、reasoning 改的是第一个模型那一行。
      * @param modelId 要勾的模型（只有一个时）；models 给出时用 models（模型 id 或 pickIn 的 spec，按勾选顺序）
-     * @param zone 网络区域 local / intranet / public（测试一律选 Local，除非要测公网）
      * @return 这次拉取的结果（fetchIn）；没有拉取时为 null
      */
-    async fillConnection({ name, baseUrl, apiKey, modelId, models, contextWindow, zone, reasoning }) {
+    async fillConnection({ name, baseUrl, apiKey, modelId, models, contextWindow, reasoning }) {
       const form = page.getByTestId('connection-form');
       const field = (label) => form.getByLabel(label, { exact: true });
       const setText = async (label, value) => {
@@ -302,7 +314,6 @@ export function pageHelpers(page) {
       const fetched = await form.locator('[data-testid="checklist"], [data-testid="list-error"]').count() > 0;
       const fetch = urlChanged || keyChanged || !fetched ? await fetchIn(page, FIRST_RUN_FORM) : null;
       if (name !== undefined) await field('Name').fill(name);
-      if (zone !== undefined) await form.locator(`input[name="zone"][value="${zone}"]`).check();
       const specs = models ?? (modelId === undefined ? null : [modelId]);
       if (specs) {
         const [first, ...rest] = specs.map((spec) => (typeof spec === 'string' ? { id: spec } : spec));
@@ -314,7 +325,7 @@ export function pageHelpers(page) {
     },
     /**
      * @brief 首次启动：Base URL 和 API key → Fetch models → 勾模型（默认 fake-coder；合成端点列出两行、类型不明，
-     *        默认都不勾，§13.4）→ Name → 区域（默认 Local）→ Test connection → 成功时表单关掉、进入主窗口
+     *        默认都不勾，§13.4）→ Name → Test connection → 成功时表单关掉、进入主窗口
      *        （first-run.md "测试成功之后：主窗口"），再等测试的那个模型这次保存引起的探针跑完（waitProbes，经进程桥，
      *        since 取点 Test connection 之前的时刻，之前存下的旧档案不算；规格 §14.4）。
      *        返回测试结果文字（成功时是主窗口 Open a folder 提示里的"Connected · …"，否则是表单里的原文）、是否成功、
@@ -322,15 +333,15 @@ export function pageHelpers(page) {
      *        （服务没列出，行上标"Entered by you"，§6.4；在点 Test connection 之前读，成功后表单就不在了）。
      *        名称默认 "Mori endpoint"，生成的提供商 id 为 mori-endpoint（同 v0 的连接 id，现有测试的模型全名不变）。
      */
-    async firstRun({ name = 'Mori endpoint', baseUrl, apiKey, modelId = 'fake-coder', models, zone = 'local',
+    async firstRun({ name = 'Mori endpoint', baseUrl, apiKey, modelId = 'fake-coder', models,
       contextWindow, reasoning, probeTimeout = 180000 } = {}) {
       const form = page.getByTestId('connection-form');
       await form.waitFor({ timeout: 60000 });
-      const fetch = await h.fillConnection({ name, baseUrl, apiKey, modelId, models, zone, contextWindow, reasoning });
+      const fetch = await h.fillConnection({ name, baseUrl, apiKey, modelId, models, contextWindow, reasoning });
       const typed = await form.locator('[data-testid="discovered-row"]').evaluateAll((rows) => rows
         .filter((row) => row.querySelector('input[name="pick"]')?.checked
           && row.querySelector('[data-testid="row-tag"][data-kind="entered"]')).map((row) => row.dataset.model));
-      const previous = await form.getByTestId('form-message').innerText().catch(() => null);
+      const previous = await textNow(form.getByTestId('form-message'));
       const since = Date.now();
       await form.locator('[data-action="test"]').click();
       const text = await h.testResult(previous, 180000);

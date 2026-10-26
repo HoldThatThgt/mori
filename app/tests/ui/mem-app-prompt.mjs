@@ -25,7 +25,7 @@ import { MEM_PROMPT_ROLES, MEM_PROMPT_TEXT, mergedAgentsMd } from '../fake-endpo
 import { appRoot, arg } from './lib.mjs';
 import { stubFolder } from './m3-helpers.mjs';
 import { openToolsSection } from './m6-helpers.mjs';
-import { toolRows } from './m6-tools-helpers.mjs';
+import { TOOL_REASONS, toolRows } from './m6-tools-helpers.mjs';
 import {
   appLogLines, bridge, brief, clickTeamSwitch, closeTbApp, contentText, instanceFiles, messagesOf, missingSteps,
   newSession, openProject, paneSel, poll, readJsonl, reopenSession, restartTbApp, scenarioRequests, seedTeamUserData,
@@ -577,7 +577,7 @@ function promptSections(ctx, who, reqs, count1) {
 
 // ---------- 步骤 toolsPage：工具页上 memory 的来源 ----------
 
-/** @brief MEM-11：工具页（Customize → 内置工具）上 memory 那一行的来源写 Mori。 */
+/** @brief MEM-11：工具页（Customize → 内置工具）上 memory 那一行的来源写 Mori，没有开关，下面一行原因（2026-10-26，WP-08）。 */
 async function toolsPage(ctx) {
   const who = ctx.main;
   if (!who) throw new Error('the prompt step did not run');
@@ -587,8 +587,10 @@ async function toolsPage(ctx) {
   await ctx.page.locator('[data-testid="tools-page"] .topbar button', { hasText: 'Back to app' }).click();
   await ctx.page.locator(`.pane-slot:not([hidden]) ${paneSel(who.tab)}`).waitFor({ timeout: 10000 });
   const row = rows.find((item) => item.name === 'memory');
-  record('MEM-11 the Tools page lists the memory tool with source "Mori" (like the TaskBoard tools)',
-    row?.tag === 'Mori', brief(rows.map((item) => `${item.name}|${item.tag}|${item.state}`)));
+  record('MEM-11 the Tools page lists the memory tool with source "Mori" (like the TaskBoard tools), no switch, and '
+    + 'the line "Mori turns this on for the main agent." under it', row?.tag === 'Mori' && row.checked === null
+    && JSON.stringify(row.notes) === JSON.stringify([TOOL_REASONS.memory]),
+  brief(rows.map((item) => `${item.name}|${item.tag}|${item.state}|${item.notes.join(' ')}`)));
 }
 
 // ---------- 步骤 snapshot：会话打开时定下、记忆页的条目进 prompt ----------
@@ -785,8 +787,9 @@ function splitPatches(who, req, t) {
   const teamProblems = firstTeam ? identityProblems(firstTeam) : ['no request'];
   const offProblems = firstOff ? identityProblems(firstOff) : ['no request'];
   record('MEM-02 split config, team mode turned on: the dialog\'s first run has <tools> equal to the built-in tools in '
-    + 'its request (read only, no shell rule); the next runs in team mode (wake-up, second message) write no patch',
-  teamProblems.length === 0 && listedTools(parsePrompt(firstTeam.system).tools)?.join() === 'read'
+    + 'its request (read and ls: chat writes no tools, TaskBoard spec §8.1; no shell rule); the next runs in team '
+    + 'mode (wake-up, second message) write no patch',
+  teamProblems.length === 0 && listedTools(parsePrompt(firstTeam.system).tools)?.join() === 'read,ls'
     && t.n4 === t.n2, brief({ teamProblems, tools: firstTeam?.tools, n2: t.n2, n4: t.n4 }));
   record('MEM-02 split config, team mode turned off again: the first run\'s <tools> lists read, bash, edit, write as '
     + 'sent (with the bash rule); the second off-mode run writes no patch', offProblems.length === 0

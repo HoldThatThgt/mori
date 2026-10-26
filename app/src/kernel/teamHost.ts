@@ -18,7 +18,7 @@ import type { TrustDecision } from './trust';
 /** @brief memory 工具的名字（记忆规格 §7.1）：mori-memory 注册它，批准扩展免批准（§7.5），Team 按 §7.6 追加它。 */
 export const MEMORY_TOOL = 'memory';
 
-/** @brief 停止一次运行的原因（§9.4 第 0 行）：你按了 Stop team、你停止了对话的回复、撤销需求。 */
+/** @brief 停止一次运行的原因（§9.4 第 0 行）：你按了 Stop agents、你停止了对话的回复、撤销需求。 */
 export type StopReason = 'user' | 'dialog' | 'cancel';
 
 /** @brief 一条用户消息（或程序投递到用户会话的消息）和它的引用芯片。 */
@@ -204,7 +204,7 @@ export interface TeamLike {
   /** @brief 协作模式下的一条用户消息（§5.3）：排进待判断队列，判断完经 host.dialogStart / dialogQueue 交给对话。 */
   onUserPrompt(item: HeldItem, behavior: PromptBehavior | undefined, team: 'once' | undefined): void;
   /**
-   * @brief 以 /team 发出、照 v0 交给对话的扩展命令（§5.1、§5.3）：关闭模式下先进入 once；会话表在它兑现后再交给对话。
+   * @brief 以 /task 发出、照 v0 交给对话的扩展命令（§5.1、§5.3）：关闭模式下先进入 once；会话表在它兑现后再交给对话。
    * @return 模式改好之后兑现，从不拒绝
    */
   enterOnce(): Promise<void>;

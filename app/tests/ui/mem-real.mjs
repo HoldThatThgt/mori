@@ -2,7 +2,7 @@
 // 真正的 Mori 对负责人的两个真实模型（默认 DeepSeek 与 GLM），全部经界面操作。这台机器没有带 key 的数据目录，交付时
 // 未运行（§0 第 4 条），由负责人用数据目录跑。
 // 准备（synthetic test setup，见 tb-real-helpers.mjs、mem-real-helpers.mjs）：复制数据目录（只复制加密的文件，不读 key，
-// 不写来源目录）；分组 [DeepSeek, GLM] 为默认范围（对话用它）；临时项目授权公网；两个提供商的地址改指本机 4795 端口的
+// 不写来源目录）；分组 [DeepSeek, GLM] 为默认范围（对话用它）；两个提供商的地址改指本机 4795 端口的
 // 转发代理（只记请求体，不记请求头），用来读请求的 system 与工具；增强的 Model range 在设置对话框里选第二个提供商（GLM），
 // 两个真实模型都用到。
 // 三个驱动，共用一个只有 README 的临时项目（关闭模式、Ask each time；出现的批准卡都点 Allow once）：
@@ -29,7 +29,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { allowProjectsLive, appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
+import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
   approvalCardsOf, bridge, brief, closeTbApp, contentText, kernelEvents, liveInfo, newSession, openProject, paneSel,
   paneState, readJsonl, sendMessage, showTab, startTbApp, userSession,
@@ -127,11 +127,10 @@ async function say(who, text) {
   return waitIdleAnswering(who);
 }
 
-/** @brief 新的只有 README 的临时项目：经进程桥授权公网（synthetic test setup），点 Open folder… 打开它。 */
+/** @brief 新的只有 README 的临时项目，点 Open folder… 打开它。 */
 async function newProject() {
   const project = readmeProject();
   ctx.roots.push(resolve(project, '..'));
-  await allowProjectsLive(ctx.page, [project]);
   return { project, tab: await openProject(ctx, project) };
 }
 
@@ -1020,9 +1019,8 @@ async function main() {
   }
   mkdirSync(shots, { recursive: true });
   record(`MEM-34 real setup: two real providers ${refOf(ctx.found.first)} and ${refOf(ctx.found.second)} with saved `
-    + 'keys and confirmed zones', true, `${ctx.found.first.name} (${ctx.found.first.zone}), ${ctx.found.second.name} `
-    + `(${ctx.found.second.zone})`);
-  const data = prepareRealData(source, ctx.found, [], PROXY);
+    + 'keys', true, `${ctx.found.first.name}, ${ctx.found.second.name}`);
+  const data = prepareRealData(source, ctx.found, PROXY);
   ctx.userData = data.userData;
   try {
     ctx.proxy = await startForwardProxy(PROXY, data.routes);

@@ -326,7 +326,7 @@ pi 的文档指引（`docs` 段）不出现。pi 的这些函数没有导出，`
 ### 5.4 预算之外的段
 
 proposal §5.2：工具定义（作为 API 的 `tools` 参数）、技能列表、工作目录、`APPEND_SYSTEM.md`、协作模式的席位说明与角色 `agent.md` 正文、工作卡都不算在 2500 里，本文不管它们的长度。
-平行 Agent 附录 A 各段按字符数 ÷ 4 约 34–292 token（proposal §13 说的“约 150–250”是估计），照旧在 `addendum` 里。
+平行 Agent 附录 A 各段按字符数 ÷ 4 约 34–292 token（proposal §13 说的“约 150–250”是估计），照旧在 `addendum` 里。（2026-10-26 注：TaskBoard 规格附录 A 加了谁看得到什么与各自的边界（负责人走查 M26），现在约 35–413 token，合并会话的 `mori_team` 段（共用段加立项段）约 650 token。）
 
 ## 6. 记忆模块
 
@@ -809,7 +809,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 | 依据 | 跳到哪里 | 跳不过去时 |
 | --- | --- | --- |
 | `session` + `entry`，会话在侧栏里 | 打开那个会话（已归档的先恢复，同 M7），在对话流里找到含这个条目的那一轮（用户消息、助手回复或其中的工具调用）并高亮（同 M7 的时长）；2026-10-26 走查 M18 起，那条消息里有块在折起的步骤组里时（一轮结束后思考块与工具卡折成一行 `{n} steps`），先展开那些组再滚动、高亮（docs/v0/screens/chat.md“步骤组”） | 会话已删除：`Session deleted`；条目不在当前分支：`This message is no longer in the session.`；会话列表还没读好或读取失败、会话也没打开时同 M7：`Sessions are still loading. Try again in a moment.` / `Couldn’t load sessions, so the original session can’t be opened.` / `The original session isn’t in your session list.`，再点时清掉；读会话文件出其他错时显示原因 |
-| `session` 是 TaskBoard 实例会话 | 不能打开（实例会话不进侧栏）：`This is a team task’s session, which can’t be opened.` | — |
+| `session` 是 TaskBoard 实例会话 | 不能打开（实例会话不进侧栏）：`This is a background agent’s session, which can’t be opened.`（2026-10-26 改，原为 team task’s session：实例会话也可能是立项、结案、临时提问的） | — |
 | `feedback` | 反馈文件还在：跳到那条反馈的来源（M7 的回复、选区、文件三种跳法）；文件不在：`The feedback file was removed.` | 同 M7 的各条 |
 | `entry` 为 `null`（分开时立项记的，那时消息还没写进用户会话） | 打开会话，不定位：`Opened the session; the exact message wasn’t recorded.` | 同第一行 |
 
@@ -832,7 +832,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 `Project` 时，分节上面一块 `data-testid="memory-enhance"`：
 
 - 开关 `Enhancement`（`enhance-switch`，`role="switch"`，`aria-checked`），右边状态行（`enhance-status`）与按钮 `Run now`（`enhance-run`）、`Settings…`（`enhance-settings`）。
-  开关失败时开关下面一行 `Couldn’t change enhancement: <原因>`，开关回到 `info.enabled`（同协作开关）。
+  开关失败时开关下面一行 `Couldn’t change enhancement: <原因>`，开关回到 `info.enabled`（同模型菜单里的 Task mode 一行）。
 - 状态行（`enhance.get` 的结果；时间按本地时间 `<Mon D> <hh:mm>`；token 不到 1000 写 `<n> tokens`，1000 起写 `<n>k tokens`，四舍五入到整数）：
 
   | 状态 | 文字 |
@@ -853,7 +853,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
   - `Model range`（`enhance-model`）：组、提供商、模型（同设置页 Defaults 的下拉，不提供 `None`）；
   - `Effort`（`enhance-effort`）：pi 的七档（同输入框下面一行 Effort 按钮的文字）。按所选范围的第一个候选（同 §9.1 取默认强度的规则）：那个模型没标 Supports thinking 时不可用，悬停 `This model isn’t marked “Supports thinking”`（同顶栏）；
     （2026-10-24 注：所选范围在 `enhance.get` 的 `noOffPicks` 里（第一个候选的档案 `reasoning.off_refused`，§8）时不列 Off；已经存成 Off 的照存（不改写 `thinking`），显示为 Minimal（增强会话经虚拟模型路由，pi 按实际模型把 Off 提到 Minimal，用的就是它）；见 [model-providers.md](model-providers.md) §7.7。）
-  - `Team mode`：勾选框 `Run with team mode`（`enhance-team`），下面一行 `Uses this project’s agents in .mori/agents.`（临时）；
+  - `Task mode`（2026-10-26 前叫 `Team mode`，负责人走查 M21）：勾选框 `Run in task mode`（`enhance-team`；原为 `Run with team mode`），下面一行 `Uses this project’s agents in .mori/agents.`（临时）；
   - `Daily time`：`<input type="time">`（`enhance-time`），下面一行 `Runs once a day at this time. Conversations before it count as the previous day.`（临时）；清空时 `Save` 显示 `Choose a time.`、不发命令；
   - `Save`（`enhance-save`）、`Cancel`；保存失败时显示 `Couldn’t save the enhancement settings: <原因>`、不关闭。
 - 收到 `mori.enhance_progress` 时重读 `enhance.get`（只在记忆页开着、项目相同时）。
@@ -1070,7 +1070,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 | MEM-08 | 修订记录 | 一次工具调用、一次记忆页保存/删除/移动、一次回滚、一次增强运行各一条；移动写进两层；frontmatter 的 `kinds`、`counts`；列表时间倒序、最多 200 条；详情有每处改动的前后原文与依据或说明；记忆页修改与移动的 `## Revisions` 行与 `Note:` 为 §3.2 的固定文字；detail 含单独一行 `~~~~` 时修订能正确解析、回滚后文件与 `before` 逐字相同；增强写入进行中记忆页保存，按调用顺序写入；修订文件写失败时返回 `The revision wasn’t written: …`、条目改动保留；列表行的 `Running`、`Failed`、`Rollback` 标记与 `No changes`；增强运行的详情有 `Day <Mon D> · <n> sessions · <m> feedback · <k> tokens` | 单元、App |
 | MEM-09 | 回滚 | 新增被回滚为删除、删除被回滚为恢复（加在末尾）、修改恢复原文与 `source`；提升、放回被回滚：条目回到原层（加在末尾、同名加后缀、`source` 恢复），目标层不再有它，回滚移动的修订写进两层、可以再回滚；之后又被改过时整次拒绝、原因写出那次修订，界面 `Couldn’t roll back: …`；超出预算时拒绝；回滚写一条 `Rollback` 修订、可以再回滚；运行中的修订不能回滚；水位不动 | 单元、App |
 | MEM-10 | 对话里记 | 主 Agent 的 `memory save` 记事实（默认本项目，`layer: user` 写用户级）、记规则（本项目对应的那一份）；`asked: true` 时 `source: user`，没给或为 `false` 时 `source: agent`，记忆页标 `Added by Mori`（2026-10-26）；`update` 改一条并追加修订行（改 `learned` 条目后：`asked` 为真时 `user`，否则 `agent`；不给 `asked` 改 `user` 条目仍为 `user`）、`forget` 删一条；依据记下原话与说这句话的那条用户消息（不是前一条），`Jump to source` 定位到它；分开时立项实例 `save` 的依据是用户会话文件、`entry` 为 `null`；同一 abstract 的事实在两层各有一条时，不给 `layer` 的 `update` 报 `Pass layer.`，给了只改那一条；不出批准卡（`free`）；工具卡标题按 §7.5、完成后有 `View in Memory` 并打开到那一条，`forget` 卡打开 `Revisions` 选中那次，失败的卡没有按钮；重新打开会话后卡片仍有按钮 | 单元、App、回放、真实 |
-| MEM-11 | 协作模式下谁有工具 | §7.2 `agent` 与 `—` 两行：关闭模式主 Agent 有（基座与写了 `tools` 的对话角色都有）；分开时对话请求里没有、调用得到 `Tool memory not found`、什么都没写；合并会话有；分开时立项实例有；结案、task、临时提问、订阅的请求里没有；回到关闭模式后又有；工具页上 `memory` 的来源是 `Mori` | 单元、App |
+| MEM-11 | 协作模式下谁有工具 | §7.2 `agent` 与 `—` 两行：关闭模式主 Agent 有（基座与写了 `tools` 的对话角色都有）；分开时对话请求里没有、调用得到 `Tool memory not found`、什么都没写；合并会话有；分开时立项实例有；结案、task、临时提问、订阅的请求里没有；回到关闭模式后又有；工具页上 `memory` 的来源是 `Mori`（2026-10-26 起没有开关，下面一行 `Mori turns this on for the main agent.`，负责人走查 M12） | 单元、App |
 | MEM-12 | 工具的错误 | §7.4 每一行的原文，带第二行的那几行第二行等于附录 A.4；两份说明等于附录 A.2、A.3；按 abstract 匹配与按 id 匹配；字段长度与 abstract 多行；`agent` 不能写用户级规则；`enhance` 不能改 `user` 条目、别的种类、别的层；`enhance` 的 `save`、`update`、`forget` 缺依据报 `evidence is required for <action>.`，带 `kind` 报 `kind is only for move.`；`move` 缺 `entry`、`kind`、`note` 报缺字段（2026-10-26） | 单元 |
 | MEM-13 | 记忆目录写保护 | 普通会话里 `write`、`edit` 写 `<userData>/memory` 下（相对路径、`/c/…`、`~`、`@` 前缀、只是大小写不同的路径）被拒绝并给出原文、文件不变；`<userData>` 下前缀相同的兄弟目录与别处照常（经批准） | 单元、App |
 | MEM-14 | 记忆页 | 左栏 `Memory` 在 `Review` 原来的位置、没有 `Review`；`User`/`Project` 跟随焦点会话的项目（分屏换焦点、没有会话时不可用），换项目后回到上次看的分节；六个分节；↑↓ 在行之间移动；没有条目时 `No entries yet.`；用量与 `Last change`；新增、编辑、删除（确认框）、提升、放回；编辑 `Learned` 条目后标 `You said`；Mori 记的条目（`source: agent`）行与详情标 `Added by Mori`，编辑后标 `You said`（2026-10-26）；表单的三句提示（空、201 字符、4001 字符的 Details）不发命令；有未保存的编辑时选另一行出离开确认框、`Keep editing` 保留编辑；详情的各块；反向链接；收到 `mori.memory_changed` 时当前分节与开着的详情刷新（列表与滚动位置保留），条目被删后详情关闭，运行结束后 Revisions 的 `Running` 变为结束状态 | App、回放 |

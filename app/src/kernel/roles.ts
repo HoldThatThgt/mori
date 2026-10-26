@@ -23,6 +23,9 @@ export const AGENTS_DIR = '.mori/agents';
 /** @brief 角色文件的 tools 里可以写的 pi 工具名（§4.1）。 */
 export const PI_TOOL_NAMES: readonly string[] = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'powershell'];
 
+/** @brief pi 设置没有 defaultTools 时默认启用的工具（pi core/settings-manager.js DEFAULT_TOOL_NAMES）。 */
+export const PI_DEFAULT_TOOLS: readonly string[] = ['read', 'bash', 'edit', 'write'];
+
 /** @brief 基座的白名单里代表全部 MCP 工具的写法（§4.2、§8.2：基座写 mcp__*）。 */
 export const ALL_MCP_TOOLS = 'mcp__*';
 
@@ -534,14 +537,19 @@ export function roleTools(role: RoleDef, baseDefaults: readonly string[]): strin
   return [...new Set(role.tools ?? [...baseDefaults, ALL_MCP_TOOLS])];
 }
 
+/** @brief 读取类总有的列目录工具（§8.1）。 */
+const LIST_TOOL = 'ls';
+
 /**
- * @brief “角色工具中的读取类”（§8.1）：角色的工具与 READ_ONLY_TOOLS 的交集，不含 MCP 工具；
- *        没写 tools 的取默认工具与它的交集（默认设置下只有 read）。
+ * @brief “角色工具中的读取类”（§8.1）：角色的工具（没写 tools 的取默认工具）与 READ_ONLY_TOOLS 的交集，不含 MCP 工具，
+ *        再加上 ls（2026-10-26，M13：只读的助手要能列出文件夹，不靠猜文件名；写了 tools 的角色同样加；
+ *        pi 的 ls 只用 node:fs，离线可用），默认设置下是 read、ls。
  * @param role 角色
  * @param baseDefaults pi 设置的默认工具
  */
 export function readClassTools(role: RoleDef, baseDefaults: readonly string[]): string[] {
-  return [...new Set((role.tools ?? baseDefaults).filter((name) => READ_ONLY_TOOLS.includes(name)))];
+  const own = (role.tools ?? baseDefaults).filter((name) => READ_ONLY_TOOLS.includes(name));
+  return [...new Set([...own, LIST_TOOL])];
 }
 
 /**

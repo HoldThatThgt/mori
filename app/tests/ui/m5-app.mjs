@@ -1,8 +1,8 @@
 // M5 整机测试：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint，synthetic），
 // 覆盖分屏与会话引用（docs/v0/screens/split.md、session-refs.md；方案第 7 节 M5 走查 1–6 与反例）：
 // 分屏（菜单与键盘、拖到中栏左右半边、拖已在中栏的会话只切焦点、侧栏点会话换掉焦点所在的一栏、Ctrl+N、两栏各自发消息和批准、
-// Esc 只停焦点所在的一栏、F8 与右栏跟随焦点、点另一栏的右栏开关、协作开关、"Close pane"不落空
-// （toggleOther、teamOther、closeKeeps）、分屏中线的拖动 / 方向键 / 双击 / 保存、放不下时右栏先收起和浮出、
+// Esc 只停焦点所在的一栏、F8 与右栏跟随焦点、点另一栏的右栏开关、"Close pane"不落空
+// （toggleOther、closeKeeps；2026-10-26 协作开关移进模型菜单，teamOther 去掉）、分屏中线的拖动 / 方向键 / 双击 / 保存、放不下时右栏先收起和浮出、
 // 最小窗口、关闭一栏不停止生成、设置页来回、归档删除时这一栏关闭）；会话引用（拖进输入框、菜单"Attach as context"与不可用的情况、
 // 只用键盘、芯片与预览、改范围、内容不含思考和工具输出、模型收到引用块、mori.ref 条目、跳回原会话、改名、重启后、
 // 原会话已删除、引用正在生成的会话、没有可引用的内容、超过 2 万字默认最近 5 轮、草稿里的芯片、预览的标题不被压矮、
@@ -56,8 +56,8 @@ const SPLIT_WIDTHS = [280, 300, 340, 341, 370, 400, 401, 460, 461, 490];
 const SPLIT_DRAFT = 'plain 窄栏里排队的字';
 /** 从文字框按 Tab 先后停到的这一行的四项（models.md"位置"） */
 const ROW_PATH = 'permission-button,model-button,thinking-button,usage';
-/** 选择范围按钮悬停的第二行：首次启动建的提供商名和区域 */
-const APP_OPTS = { modelTip: 'Mori endpoint · Local' };
+/** 选择范围按钮悬停的第二行：首次启动建的提供商名（2026-10-26 起不带区域） */
+const APP_OPTS = { modelTip: 'Mori endpoint' };
 /** 很长的会话名（中英文都有），预览的标题一行放不下 */
 const LONG_NAME = 'A very long session name that keeps going so the preview heading cannot fit it on a single line'
   + ' · 很长的会话名，用来看预览的标题放不下时截断加省略号、不折行';
@@ -176,7 +176,7 @@ const focusedTitle = async (page) => (await splitState(page)).focusedTitle;
 async function setup(ctx) {
   const { app, page, h } = ctx;
   ctx.defaultSize = await windowSize(ctx);
-  // v1（规格 §14.4）：首次启动填英文表单、区域选 Local，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
+  // v1（规格 §14.4）：首次启动填英文表单，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
   await h.setupFirstRun({ baseUrl, apiKey: testKey });
   await stubFolder(app, ctx.project);
   await page.getByRole('button', { name: OPEN_FOLDER }).first().click();
@@ -336,50 +336,6 @@ async function setOwnRight(page, side, open) {
   await composerAt(page, side).click();
   const toggle = rightToggle(page, side);
   if ((await toggle.getAttribute('aria-pressed')) !== String(open)) await toggle.click();
-}
-
-/** @brief 此刻 side 那一栏：是否焦点所在、协作开关的模式（data-mode），以及两栏的宽。 */
-async function teamFacts(page, side) {
-  const facts = await page.evaluate((css) => {
-    const slot = document.querySelector(css);
-    return { focused: slot?.dataset.focused === 'true',
-      mode: slot?.querySelector('[data-testid="team-switch"]')?.dataset.mode ?? null };
-  }, slotSelector(side));
-  return { ...facts, widths: (await splitState(page)).slots.map((s) => s.width) };
-}
-
-/**
- * @brief 点另一栏的协作开关（split.md"右栏开关"：顶栏右边一组的按钮用鼠标主键按下时都到点完才切焦点）：右边那一栏自己的
- *        右栏开关关着，左栏有焦点、右栏开着；用鼠标点一下右边那一栏的协作开关：这一下不落空（切到"Team: On"）、焦点切到
- *        右边那一栏、右栏随之关上（两栏变宽，说明按下就切的话开关会被挤走）；再点一下回到"Team: Off"；最后把右边那一栏
- *        自己的右栏打开，不影响后面的步骤。
- */
-async function teamOther(ctx) {
-  const { page } = ctx;
-  await setOwnRight(page, 'right', false);
-  await setOwnRight(page, 'left', true);
-  await page.getByTestId('right-panel').waitFor({ timeout: 5000 });
-  await sleep(300);
-  const before = await teamFacts(page, 'right');
-  const teamSwitch = paneAt(page, 'right').getByTestId('team-switch');
-  await teamSwitch.click();
-  await page.waitForFunction((css) => document.querySelector(`${css} [data-testid="team-switch"]`)
-    ?.dataset.mode !== 'off', slotSelector('right'), { timeout: 5000 }).catch(() => {});
-  await sleep(300);
-  const clicked = await teamFacts(page, 'right');
-  await teamSwitch.click();
-  await page.waitForFunction((css) => document.querySelector(`${css} [data-testid="team-switch"]`)
-    ?.dataset.mode === 'off', slotSelector('right'), { timeout: 5000 }).catch(() => {});
-  const back = await teamFacts(page, 'right');
-  record('分屏：左栏有焦点、右栏开着、右边那一栏自己的右栏关着时，用鼠标点右边那一栏的协作开关一下：切到"Team: On"（这一下'
-    + '没有点空）、焦点切到右边那一栏、两栏随右栏关上变宽；再点一下回到"Team: Off"', !before.focused
-    && before.mode === 'off' && clicked.mode === 'always' && clicked.focused
-    && clicked.widths.every((width, index) => width > before.widths[index] + 50) && back.mode === 'off',
-  JSON.stringify({ before, clicked, back }));
-  // 回到 toggleOther 结束时的样子（右边那一栏有焦点、它自己的右栏开着），后面的 divider 从这里开始
-  await setOwnRight(page, 'right', true);
-  await page.getByTestId('right-panel').waitFor({ timeout: 5000 });
-  await sleep(500);
 }
 
 /** @brief 此刻 side 那一栏的右栏开关：这一栏是否焦点所在、开关是否按下、焦点是否在开关上，右栏在不在、写了什么，两栏的宽。 */
@@ -689,7 +645,7 @@ async function splitRows(ctx) {
 
 /**
  * @brief splitRows 的后半：右栏 279px（.pane-slot 280px）生成中有字；两栏各一个圆环；两栏停下后空闲时左栏 280px、
- *        右栏 279px 打开范围菜单（收到这一行的宽，项名截短时有省略号，区域完整）、Effort 菜单、权限菜单和圆环详情。
+ *        右栏 279px 打开范围菜单（收到这一行的宽，项名截短时有省略号）、Effort 菜单、权限菜单和圆环详情。
  */
 async function splitRight(ctx) {
   const { page } = ctx;
@@ -709,7 +665,7 @@ async function splitRight(ctx) {
     idle.push(...(await popoverChecks(page, slotSelector(side), ['model', 'effort', 'permission', 'ring']))
       .map((problem) => `${side} ${width}px ${problem}`));
   }
-  record('分屏 280px / 279px 空闲：范围菜单收到这一行的宽（项名截短有省略号、区域完整）、Effort 菜单往上打开、右边对齐'
+  record('分屏 280px / 279px 空闲：范围菜单收到这一行的宽（项名截短有省略号）、Effort 菜单往上打开、右边对齐'
     + '自己的按钮或左边贴这一行左端，权限菜单左对齐，圆环详情右对齐，都在这一栏里', idle.length === 0, idle.join('; '));
   await page.locator('[data-resize="split"]').dblclick();
   await composerAt(page, 'right').click();
@@ -1012,8 +968,8 @@ async function headingFit(ctx) {
  * @brief 顶栏里会话名的地方（chat.md"顶栏"；composer-pickers.md"测试要改的地方"新加的检查第 1 条）：很长的会话名（headingFit
  *        改过名的 ctx.long）在右栏；1280 宽窗口分屏各一半（约 500px）、460 / 401 / 400 / 321 / 320 / 280px、右边一栏最窄
  *        279px（.pane-slot 280px）、800×600 分屏（约 370px），以及 800 宽窗口右栏打开时的单栏（300px）：会话名要么完整、
- *        要么占满剩下的地方（项目名先收到 40px）；460px 时至少 253px、280px 和 279px 时至少 168px（顶栏有
- *        协作开关，≤ 600px 时只有状态点，算出的是 258、173、172px，留 5、5、4px）；
+ *        要么占满剩下的地方（项目名先收到 40px）；460px 时至少 253px、280px 和 279px 时至少 168px（2026-10-26 前顶栏还有
+ *        协作开关，≤ 600px 时只有状态点，算出的是 258、173、172px，留 5、5、4px；去掉开关后会话名更宽，这几个下限照旧）；
  *        ≤ 400px 时两个图标按钮 28px、内边距比宽时小；≤ 320px 不显示项目名和 ›。
  *        要用 longSource、headingFit 建和改名的会话，用 --only 时要一起选。
  */
@@ -1189,7 +1145,7 @@ async function effortAt280(page) {
   `${seen.join(' / ')} ${bad.join('; ')}`);
 }
 
-const steps = { setup, menuSplit, dragAndPlace, twoPanes, followFocus, toggleOther, teamOther, divider, crampedRight,
+const steps = { setup, menuSplit, dragAndPlace, twoPanes, followFocus, toggleOther, divider, crampedRight,
   splitExpand, splitRows, closeKeeps, dragReference, jumpBack, keyboardReference, restart, runningSource, longSource,
   headingFit, titleRoomCheck, deleteSource, fontSizes, effortWidths };
 

@@ -2,11 +2,13 @@
 // M4：你的消息上方显示引用，每轮回复末尾一行操作，点引用回到原位置时滚过去高亮（docs/v0/screens/selection.md）。
 // M6：pi 展开的技能命令缩成一行"Skill · 名字"加参数，可以展开看正文（docs/v0/screens/slash.md）。
 // v1：换模型与重建的一行、No model available 卡（docs/v1/screens/model-chat.md）；错误卡不再有"Go to settings"。
-// 平行 Agent（docs/v1/screens/team-stream.md）：回执、进展摘要（挂在回复下面、回复操作之上），程序投递不显示。
+// 平行 Agent（docs/v1/screens/team-stream.md）：回执、进展摘要（挂在回复下面、回复操作之上），程序投递不显示；
+// 模式改变的一行提示（docs/v1/screens/team-switch.md）。
 // 2026-10-26 走查 M18：一轮里正文之间的思考块与工具卡是步骤组，正文跟在后面或这一轮结束时折成一行"{n} steps"；
 // 跳转进折起的组时先展开它（docs/v0/screens/chat.md"步骤组"）。
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { modeNoticeText } from '../../../shared/team';
 import { putBack, putBackQuoted } from '../state/actions';
 import { PAGE_SIZE, rebuildText, startIndexFor, switchText } from '../state/model';
 import type { Item, ToolCall } from '../state/model';
@@ -139,6 +141,9 @@ const ItemView = memo(function ItemView({ item, tools, cwd, tabKey, steps, onSte
         data-summary={String(item.summary)}>{rebuildText(item.model, item.summary)}</div>;
     case 'unavailable':
       return <UnavailableCard candidates={item.candidates} tabKey={tabKey} />;
+    case 'team-mode':
+      return <div className="notice" data-testid="notice" data-kind="team-mode" data-mode={item.mode}>
+        {modeNoticeText(item.mode)}</div>;
     case 'receipt':
       return <Receipt receipt={item.receipt} />;
     case 'progress':

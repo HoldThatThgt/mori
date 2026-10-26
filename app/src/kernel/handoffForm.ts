@@ -413,13 +413,21 @@ function checkTask(form: HandoffForm, value: unknown): string | null | { error: 
   return id !== '' ? id : { error: 'task must be a task id like T1' };
 }
 
-/** @brief 标签里每行一项的列表；空标签为 null。 */
-function tagLines(text: string, name: string): string[] | null {
+/** @brief 标签里按 separator 分开的列表，去掉空项；空标签为 null。 */
+function tagItems(text: string, name: string, separator: RegExp): string[] | null {
   const content = tagContent(text, name);
   if (content === null) return null;
-  const lines = content.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== '');
-  return lines.length ? lines : null;
+  const items = content.split(separator).map((item) => item.trim()).filter((item) => item !== '');
+  return items.length ? items : null;
 }
+
+/** @brief 未结事项：每行一项（§7.5）。 */
+const LINE_SEPARATOR = /\r?\n/;
+/**
+ * @brief 证据的编号之间可以用任何分隔符（换行、逗号、顿号、空格等，§7.5，2026-10-26 M13）：字母、数字、_、#、[、] 之外的
+ *        字符都算分隔；分出来不是编号的词照 §7.3 算不合格。
+ */
+const EVIDENCE_SEPARATOR = /[^A-Za-z0-9_#[\]]+/;
 
 /** @brief C 级回复读出的字段（§7.5 的标签；没有的标签不出现）。 */
 function tagFields(form: HandoffForm, text: string): Record<string, unknown> {
@@ -427,8 +435,8 @@ function tagFields(form: HandoffForm, text: string): Record<string, unknown> {
     outcome: tagContent(text, 'outcome') };
   if (form.kind !== 'request_close') data.next = tagContent(text, 'next');
   if (form.kind === 'task') {
-    data.open_items = tagLines(text, 'open_items');
-    data.evidence = tagLines(text, 'evidence');
+    data.open_items = tagItems(text, 'open_items', LINE_SEPARATOR);
+    data.evidence = tagItems(text, 'evidence', EVIDENCE_SEPARATOR);
   }
   return data;
 }

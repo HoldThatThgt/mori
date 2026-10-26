@@ -22,9 +22,6 @@ export const NOTE = {
   starting: 'Starting…',
 };
 
-/** 区域在悬停说明里的写法（model-menu.md） */
-export const ZONE_TEXT = { local: 'Local', intranet: 'Intranet', public: 'Public' };
-
 /** 截短的几项最窄多宽：[宽于 340px 时, ≤ 340px 时]（models.md"窄栏"的"放不下"） */
 export const LEAST = { permission: [44, 40], model: [40, 36], thinking: [40, 36], wait: [48, 48] };
 
@@ -32,11 +29,10 @@ export const LEAST = { permission: [44, 40], model: [40, 36], thinking: [40, 36]
 export const least = (kind, w) => LEAST[kind][w <= 340 ? 1 : 0];
 
 /**
- * @brief 范围按钮读屏的描述（composer-pickers.md"悬停和读屏的描述"）：悬停第二行（" · "换成", "），不可用时加". <原因>"。
- * @param line2 悬停第二行（"<提供商名> · <区域>"或"No model can run in this session"）
+ * @brief 范围按钮读屏的描述（composer-pickers.md"悬停和读屏的描述"）：悬停第二行，不可用时加". <原因>"。
+ * @param line2 悬停第二行（"<提供商名>"或"No model can run in this session"；2026-10-26 起不带区域）
  */
-export const rangeDescription = (line2, reason = null) => `${line2.replace(/ · /g, ', ')}`
-  + `${reason ? `. ${reason}` : ''}`;
+export const rangeDescription = (line2, reason = null) => `${line2}${reason ? `. ${reason}` : ''}`;
 
 /**
  * @brief 范围按钮的读屏名（models.md"选择范围按钮"）："Model range: <按钮文字>"，按钮文字里的" · "换成", "（读屏名里不用
@@ -232,7 +228,7 @@ export const placeBrief = (geo) => (geo ? JSON.stringify({
 
 /**
  * @brief paneCss 那一栏开着的范围菜单里每一项：范围、名字（.switch-text）此刻的宽和全文的宽、是不是 text-overflow:
- *        ellipsis，区域标记（.pick-zone）此刻的宽和全文的宽，悬停说明（title）。菜单不在时为 null。
+ *        ellipsis，悬停说明（title）。菜单不在时为 null。
  */
 export function menuItemFacts(page, paneCss = PANE) {
   return page.evaluate((selector) => {
@@ -250,8 +246,7 @@ export function menuItemFacts(page, paneCss = PANE) {
     const fact = (el) => (el ? { text: el.textContent, width: el.getBoundingClientRect().width, full: measure(el),
       ellipsis: getComputedStyle(el).textOverflow === 'ellipsis' } : null);
     return [...menu.querySelectorAll('[role="menuitemradio"]')].map((item) => ({ pick: item.dataset.pick,
-      title: item.getAttribute('title'), label: fact(item.querySelector('.switch-text')),
-      zone: fact(item.querySelector('.pick-zone')) }));
+      title: item.getAttribute('title'), label: fact(item.querySelector('.switch-text')) }));
   }, paneCss);
 }
 

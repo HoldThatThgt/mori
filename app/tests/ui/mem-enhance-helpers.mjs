@@ -297,7 +297,7 @@ export const enhanceGet = (ctx, cwd) => bridge(ctx, { type: 'enhance.get', cwd }
 /**
  * @brief 按测试写好的模型设置（synthetic）另算 enhance.get 的 effortPicks（规格 §8、§9.1、§10.4）：每个分组、提供商、
  *        `<provider>/<model>` 展开后的第一个候选是否标了 Supports thinking，键按分组 → 提供商 → 模型的顺序。
- *        只适用于每个候选都过第 1–3 步静态校验的设置（tbProvider 的区域 local、tbProfile 已验证），这时第一个候选
+ *        只适用于每个候选都过第 1–3 步静态校验的设置（tbProfile 已验证），这时第一个候选
  *        就是展开后的第一个；没有项目配置（.mori/models.json）缩小分组。
  * @param providers tbProvider 的列表
  * @param groups 分组 [{ id, members }]
@@ -549,6 +549,22 @@ export async function waitStatus(ctx, want, timeout = 30000) {
 export function switchState(ctx) {
   return ctx.page.getByTestId('enhance-switch').evaluate((el) => ({ checked: el.getAttribute('aria-checked'),
     disabled: el.disabled, title: el.getAttribute('title') }));
+}
+
+/**
+ * @brief 开关中（enhance.set 还没返回，memory-enhance.md“开关中”）：开关变为不可用的那一刻记下 aria-checked 与
+ *        disabled，结果在 window.__enhancePending（没看到时为 null）。在点开关之前调用。
+ */
+export function watchSwitchPending(ctx) {
+  return ctx.page.getByTestId('enhance-switch').evaluate((el) => {
+    window.__enhancePending = null;
+    const observer = new MutationObserver(() => {
+      if (!el.disabled || window.__enhancePending) return;
+      window.__enhancePending = { checked: el.getAttribute('aria-checked'), disabled: el.disabled };
+      observer.disconnect();
+    });
+    observer.observe(el, { attributes: true, attributeFilter: ['disabled'] });
+  });
 }
 
 /** @brief 点开关，等它可用且 aria-checked 为 want（等不到时照常返回）。 */

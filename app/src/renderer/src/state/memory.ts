@@ -53,7 +53,7 @@ export const SOURCE_LABEL: Readonly<Record<EntrySource, string>> = { user: 'You 
 const CRASHED_TEXT = 'Mori’s background process crashed. Restart it to continue.';
 
 /** @brief 依据是 TaskBoard 实例会话时的说明（§10.2）。 */
-const TEAM_SESSION_TEXT = 'This is a team task’s session, which can’t be opened.';
+const TEAM_SESSION_TEXT = 'This is a background agent’s session, which can’t be opened.';
 
 /** 反馈依据的文件已经不在（§10.2） */
 const FEEDBACK_REMOVED = 'The feedback file was removed.';

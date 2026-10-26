@@ -17,13 +17,15 @@
 //          动作记录是"Open Customize → Instructions"（2026-10-26）。
 //   另有原 m7-app.mjs 里 composer-pickers 加的 F8 检查（docs/v0/composer-pickers.md"测试要改的地方"新检查第 9 条）：
 //          会话里按的报告有"Model range""Effort""Pane width"、各项先后；设置页、记忆页、Customize 页上"Pane width: None"。
-// 用法（在 app/ 下，out/ 是当前的构建）：node tests/ui/mem-app-settings.mjs [--exe <Mori.exe 路径>]
-// 结果写到 test-results/mem-app-settings(-packaged).json，截图在 test-results/mem-app-settings(-packaged)/。
+// 用法（在 app/ 下，out/ 是当前的构建）：node tests/ui/mem-app-settings.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
+// 结果写到 test-results/mem-app-settings(-packaged).json（--only 时 mem-partial-app-settings…，不计入覆盖检查），
+// 截图在 test-results/mem-app-settings(-packaged)/。
 // 端口（§14.1 的 4700–4799 里分给本套件的 4760–4769）：合成端点 4760。
 // 测试准备（synthetic test setup）：数据目录里按 v1-switch-helpers.seedUserData 写好一个本机提供商与已验证的档案
 // （不跑探针）；手写进数据目录的报告、反馈记录与 M7 时期的 mori.review 标记都是 synthetic（seedReports、seedFeedback、
 // M7_MARKS），内容里也写明了。主进程的 shell.openPath、shell.showItemInFolder 和 dialog.showSaveDialog 经 app.evaluate
-// 换成只记下参数的版本（不真的打开资源管理器或保存对话框）。各步骤按顺序依赖前一步留下的报告和标记，所以不提供 --only。
+// 换成只记下参数的版本（不真的打开资源管理器或保存对话框）。各步骤按顺序依赖前一步留下的报告和标记：--only 只跑列出的
+// 几步（setup 总是跑，测试分层第 2 条，2026-10-26 加），它们依赖的前面几步要一起列出。
 
 import { createHash } from 'node:crypto';
 import {
@@ -42,6 +44,7 @@ import { modelOf, providerOf, seedUserData, startEndpoint, stopEndpoint } from '
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
+const only = arg('only')?.split(',').filter(Boolean) ?? null;
 const shots = join(appRoot, `test-results/mem-app-settings${suffix}`);
 mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder(exePath ?? 'dev build');
@@ -694,8 +697,7 @@ async function setup(ctx) {
   mkdirSync(join(ctx.userData, 'pi'), { recursive: true });
   // 测试准备（synthetic test setup）：一个本机提供商（合成端点上的一个模型）、已验证的档案（不跑探针），默认范围是它。
   const provider = providerOf(PROVIDER, 'Memory settings endpoint', PORT, [modelOf(MODEL)]);
-  seedUserData(ctx.userData, { version: 1, providers: [provider], groups: [], normalDefault: PROVIDER,
-    allowedZones: ['local', 'intranet'], projectZones: {} }, {}, {});
+  seedUserData(ctx.userData, { version: 1, providers: [provider], groups: [], normalDefault: PROVIDER }, {});
   await startApp(ctx);
   ctx.tab = await openProject(ctx, ctx.project, { trust: true });
   record('MEM-28 setup: Mori starts with the seeded model settings and opens a session (no model request)',
@@ -1661,6 +1663,7 @@ mkdirSync(exportDir, { recursive: true });
 const ctx = { root, project, userData, exportDir, logs: [], pageErrors: [], small: [], smallChecked: [], reports: [] };
 try {
   for (const [name, step] of Object.entries(steps)) {
+    if (only && name !== 'setup' && !only.includes(name)) continue;
     console.log(`[mem-app-settings] step ${name}`);
     try {
       await step(ctx);
@@ -1678,4 +1681,4 @@ try {
 }
 console.log(`[mem-app-settings] project in ${project}; data in ${userData}`);
 await sleep(200);
-process.exitCode = write(`mem-app-settings${suffix}.json`) ? 0 : 1;
+process.exitCode = write(`${only ? 'mem-partial-app-settings' : 'mem-app-settings'}${suffix}.json`) ? 0 : 1;

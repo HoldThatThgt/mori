@@ -2,14 +2,14 @@
 // （tests/fake-endpoint/server.mjs，synthetic，端口 4800–4819），逐条检查 docs/specs/model-discovery.md §13.2 这些条目的
 // "通过条件"（状态表与标识见 docs/v1/screens/models-settings.md 的 Add provider、清单、列表错误、Add a model ID）：
 //   MD-07 清单：默认勾选的三种情况（typed 的 embedding 行不勾、只有一个模型时勾上、多个类型不明时都不勾）；Select all 与
-//         Clear selection 只作用于显示着的、能勾的行（过滤框开着时）；Not reported（改值后仍在）、Not a chat model、
+//         Clear selection 只作用于显示着的、能勾的行（过滤框开着时）；Default（只在值仍是默认值时）、Not a chat model、
 //         Can’t add this model、两种提示；空列表的一句；改窗口时 Max output 随之变、错误时 Add 不可用；超过 20 行时的
 //         过滤框（不分大小写，被藏起来的勾选行照样加入）；Add 的按钮文字随勾选数变；
 //   MD-08 手填一行：拿到列表、列表错误（nolist、401）时都能手填加入，列表错误时手填的行列在错误下面；id 检查与重复；
-//         Entered by you 与 Not reported；
+//         Entered by you 与 Default；
 //   MD-09 加入新提供商：开始只有 Base URL、API key、Fetch models；拉取中两个框只读、关闭表单会取消拉取；预填的 Name、
-//         API type、Network zone 可改；FAKE_NO_V1_ROOT 换框并写说明、nolist 只换框；改 Base URL 或 key 清掉清单；再拉一次
-//         不覆盖改过的 Name、API type、区域，改过的 API type 作为 target.api 发出；Add 一次写入全部勾选的模型（顺序同清单）、
+//         API type 可改；FAKE_NO_V1_ROOT 换框并写说明、nolist 只换框；改 Base URL 或 key 清掉清单；再拉一次
+//         不覆盖改过的 Name、API type，改过的 API type 作为 target.api 发出；Add 一次写入全部勾选的模型（顺序同清单）、
 //         全部开始探针；保存失败时本次新存的 key 被删除；More settings 的并发与兼容选项保存进配置；Fetch cancelled；
 //         Adding… 时两个框只读、Fetch models 不可用；
 //         界面细节（docs/v1/discovery-checks.md A16–A19）：改 Base URL 也清掉 Fetch cancelled，改 Base URL 或 key 清掉
@@ -17,13 +17,15 @@
 //         （A17）；清单表头为 §6.2 的列名、最高 440px 的滚动框与固定的表头、数字框为 inputMode numeric 的文字框、
 //         不能加入的行只有勾选框不可用、Fetch models 不是主按钮（A18）；拉取中 fetch-status 为没有文字的 role=status（A19）；
 //   MD-06 发现命令（App，新提供商）：新提供商的 key 只用于这次读取（合成端点日志的末 4 位），配置、档案、日志、Fetch 后
-//         按 F8 保存的报告里都没有；每个请求 15 秒时限（FAKE_LIST_DELAY_MS 16000）；不按项目区域过滤。
+//         按 F8 保存的报告里都没有；每个请求 15 秒时限（FAKE_LIST_DELAY_MS 16000）。
 // 准备（synthetic test setup）：数据目录里先写好 model-config.json 与 model-profiles.json（md-form-helpers.mjs 的
-// seedUserData：一个已有的提供商 seed，allowedZones 为空），不经首次启动表单；之后全部经界面操作。发出的命令（target.api、
+// seedUserData：一个已有的提供商 seed），不经首次启动表单；之后全部经界面操作。发出的命令（target.api、
 // models.discoverCancel、models.saveProvider）从预加载脚本的隔离环境里记下（md-form-helpers.mjs 的命令记录，key 只记末 4 位）。
 // 用法（在 app/ 下，先构建）：node tests/ui/md-app-form.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/md-app-form(-packaged).json；--only 时写 md-partial-app-form(-packaged).json（不计入覆盖检查）。
 // 出错时的截图在 test-results/md-app-form(-packaged)/。key 都是测试自己生成的合成值，与任何真实服务无关。
+// 2026-10-26（WP-02，负责人走查 M1、M6）：清单的"Not reported"改为"Default"，只在值仍是默认值时标（改成别的值就不标、
+// 改回又标）；trained_window 的提示改短；More settings 的兼容选项五个、上面一行说明。
 
 import { chmodSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -95,7 +97,7 @@ const TEXT = {
   notChat: 'Not a chat model',
   spaces: 'Can’t add this model: the ID contains spaces',
   noTools: 'The server doesn’t list tool support for this model.',
-  trained: 'Trained context window. Ollama may use a smaller one; run the long-input test after adding.',
+  trained: 'Trained context window. Ollama may use a smaller one.',
   empty: 'The server didn’t list any models.',
   stillAdd: 'You can still add model IDs below.',
   noList: 'This server doesn’t list its models.',
@@ -108,6 +110,9 @@ const TEXT = {
   compat: 'Endpoint needs max_tokens instead of max_completion_tokens',
   cost: 'Each model is verified with up to 13 short requests.',
   header: 'API key contains characters that cannot be sent in a header',
+  compatHint: 'Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this '
+    + 'server rejects requests.',
+  defaultTitle: 'The server didn’t report this, so Mori used a default. Change it if you know the real value.',
 };
 /** 清单表的表头：§6.2 每行的各列（勾选框一列没有文字） */
 const COLUMNS = ['', 'Model ID', 'Context window', 'Max output', 'Supports thinking', 'Image input'];
@@ -121,8 +126,8 @@ const ctx = { userData: seedUserData(), exePath, logs: [], pageErrors: [] };
 const rowIn = (state, id) => state?.rows.find((row) => row.id === id) ?? null;
 /** @brief 表单状态里的行 id 与勾选，例如 "a+ b-"。 */
 const picks = (state) => (state?.rows ?? []).map((row) => `${row.id}${row.picked ? '+' : '-'}`).join(' ');
-/** @brief 表单里没有拉取后的字段（回到开始）：没有 Name、API type、区域、清单、列表错误、Add a model ID、底部。 */
-const atStart = (state) => Boolean(state) && state.name === null && state.api === null && state.zoneCount === 0
+/** @brief 表单里没有拉取后的字段（回到开始）：没有 Name、API type、清单、列表错误、Add a model ID、底部。 */
+const atStart = (state) => Boolean(state) && state.name === null && state.api === null
   && !state.checklist && state.listError === null && state.manual === null && state.more === null
   && state.add === null && state.cost === null && state.detected === null && state.rows.length === 0;
 /** @brief 配置里的一个提供商。 */
@@ -151,7 +156,7 @@ async function startState() {
   await openAddProvider(page);
   const s0 = await formState(page);
   record('MD-09 start: the Add provider form shows only Base URL, API key (password box, placeholder "Optional"), '
-    + 'Fetch models (below the API key) and Cancel; no Name, API type, Network zone, checklist, More settings or Add',
+    + 'Fetch models (below the API key) and Cancel; no Name, API type, checklist, More settings or Add',
   s0?.title === 'Add provider' && JSON.stringify(s0.labels) === '["Base URL","API key"]' && atStart(s0)
     && s0.baseUrl?.placeholder === 'http://host:8000/v1' && s0.baseUrl.value === ''
     && s0.apiKey?.type === 'password' && s0.apiKey.placeholder === 'Optional' && s0.fetch?.text === 'Fetch models'
@@ -312,19 +317,21 @@ async function defaultPicks() {
 }
 
 /**
- * @brief typed 形状的行没有窗口（server.mjs 开头）：服务列出的行 Context window 与 Max output 都是默认值、都标
- *        Not reported；改了窗口两个标记都留着，Max output 随窗口变。
+ * @brief typed 形状的行没有窗口（server.mjs 开头）：服务列出的行 Context window 与 Max output 都是默认值、都标 Default
+ *        （带悬停说明）；窗口改成 20000 后它不再是默认值、不标，Max output 随窗口变成 10000、仍是默认值、照标
+ *        （2026-10-26，负责人走查 M6）。
  * @param typed 拉取 typed 端点后的表单状态
  */
 async function unreportedWindow(typed) {
   const one = rowIn(typed, 'chat-one');
   await setSize(ctx.page, 'chat-one', 'contextWindow', 20000);
   const edited = rowIn(await formState(ctx.page), 'chat-one');
-  const both = '["contextWindow:Not reported","maxTokens:Not reported"]';
-  record('MD-07 Not reported on a listed row without a reported window: 128000 / 16384 both "Not reported"; after the '
-    + 'window is edited to 20000 both markers stay and Max output follows it (10000)', one?.window === '128000'
-    && one.max === '16384' && JSON.stringify(one.notReported) === both && edited?.window === '20000'
-    && edited.max === '10000' && JSON.stringify(edited.notReported) === both, brief({ one, edited }));
+  record('MD-07 Default on a listed row without a reported window: 128000 / 16384 both "Default" with the hover '
+    + 'explanation; after the window is edited to 20000 only the Max output, which follows it (10000), is still '
+    + '"Default"', one?.window === '128000' && one.max === '16384'
+    && JSON.stringify(one.defaults) === '["contextWindow:Default","maxTokens:Default"]'
+    && one.defaultTitles.every((title) => title === TEXT.defaultTitle) && edited?.window === '20000'
+    && edited.max === '10000' && JSON.stringify(edited.defaults) === '["maxTokens:Default"]', brief({ one, edited }));
 }
 
 /** @brief 再点 Fetch models：清单、勾选和手填的行都从头来（MD-09）。 */
@@ -341,21 +348,24 @@ async function refetchFromScratch() {
 
 // ---------- MD-07：标记、提示、改值 ----------
 
-/** @brief Not reported（改值后仍在）、改窗口时 Max output 随之变、字段错误时 Add 不可用。 */
+/** @brief Default（改成别的值就不标、改回又标）、改窗口时 Max output 随之变、字段错误时 Add 不可用。 */
 async function markersAndEdits() {
   const { page } = ctx;
   await openAddProvider(page);
   const s = (await fetchWith(ctx, urlFor('plain'), '')).state;
   const coder = rowIn(s, 'fake-coder');
-  record('MD-07 Not reported: a listed window (vLLM max_model_len) has no marker; the unreported Max output shows '
-    + '"Not reported" with the default 16384', coder?.window === '131072' && coder.max === '16384'
-    && JSON.stringify(coder.notReported) === '["maxTokens:Not reported"]', brief(coder));
+  record('MD-07 Default: a listed window (vLLM max_model_len) has no marker; the unreported Max output shows '
+    + '"Default" with the default 16384', coder?.window === '131072' && coder.max === '16384'
+    && JSON.stringify(coder.defaults) === '["maxTokens:Default"]', brief(coder));
   await setSize(page, 'fake-coder', 'maxTokens', 4096);
   await setSize(page, 'fake-coder', 'contextWindow', 100000);
   const edited = rowIn(await formState(page), 'fake-coder');
-  record('MD-07 "Not reported" stays after you edit the value; an edited Max output no longer follows the window',
-    edited?.max === '4096' && edited.window === '100000'
-    && JSON.stringify(edited.notReported) === '["maxTokens:Not reported"]', brief(edited));
+  await setSize(page, 'fake-coder', 'maxTokens', 16384);
+  const back = rowIn(await formState(page), 'fake-coder');
+  record('MD-07 "Default" goes away when you edit the value (4096) and an edited Max output no longer follows the '
+    + 'window (100000); typing the default 16384 back shows "Default" again (2026-10-26)', edited?.max === '4096'
+    && edited.window === '100000' && JSON.stringify(edited.defaults) === '[]' && back?.max === '16384'
+    && JSON.stringify(back.defaults) === '["maxTokens:Default"]', brief({ edited, back }));
   await setPicked(page, 'fake-coder', true);
   await setPicked(page, 'fake-slow', true);
   await setSize(page, 'fake-slow', 'contextWindow', 'abc');
@@ -363,10 +373,10 @@ async function markersAndEdits() {
   await setSize(page, 'fake-slow', 'contextWindow', 8000);
   const follow = await formState(page);
   record('MD-07 a ticked row with a field error makes Add unavailable ("Context window must be a whole number above '
-    + '0."); a valid window makes the untouched Max output follow it (min(16384, window/2) = 4000, "Not reported")',
+    + '0."); a valid window makes the untouched Max output follow it (min(16384, window/2) = 4000, "Default")',
   rowIn(badWindow, 'fake-slow')?.errors.contextWindow === TEXT.window && badWindow.add.disabled
-    && rowIn(follow, 'fake-slow')?.max === '4000' && rowIn(follow, 'fake-slow').notReported.includes(
-      'maxTokens:Not reported') && !follow.add.disabled && follow.add.text === 'Add 2 models',
+    && rowIn(follow, 'fake-slow')?.max === '4000' && rowIn(follow, 'fake-slow').defaults.includes(
+      'maxTokens:Default') && !follow.add.disabled && follow.add.text === 'Add 2 models',
   brief({ bad: rowIn(badWindow, 'fake-slow'), add: badWindow.add, follow: rowIn(follow, 'fake-slow') }));
   await setSize(page, 'fake-slow', 'maxTokens', 9000);
   const tooBig = await formState(page);
@@ -380,24 +390,24 @@ async function markersAndEdits() {
   await richFollow();
 }
 
-/** @brief rich：报告的窗口与输出上限没有 Not reported；改小窗口时 Max output 退回默认值并标 Not reported。 */
+/** @brief rich：报告的窗口与输出上限没有 Default；改小窗口时 Max output 退回默认值并标 Default。 */
 async function richFollow() {
   const { page } = ctx;
   const s = (await fetchWith(ctx, urlFor('rich'))).state;
   const a = rowIn(s, 'rich-a');
   const b = rowIn(s, 'rich-b');
-  record('MD-07 reported values (rich shape): window 131072 and Max output 8192 have no "Not reported"; thinking and '
+  record('MD-07 reported values (rich shape): window 131072 and Max output 8192 have no "Default"; thinking and '
     + 'image follow the server (rich-a ticked both, rich-b neither)', a?.window === '131072' && a.max === '8192'
-    && a.notReported.length === 0 && a.reasoning && a.image && b?.notReported.length === 0 && !b.reasoning && !b.image,
+    && a.defaults.length === 0 && a.reasoning && a.image && b?.defaults.length === 0 && !b.reasoning && !b.image,
   brief({ a, b }));
   await setSize(page, 'rich-a', 'contextWindow', 8000);
   const small = rowIn(await formState(page), 'rich-a');
   await setSize(page, 'rich-a', 'contextWindow', 100000);
   const large = rowIn(await formState(page), 'rich-a');
   record('MD-07 Max output follows an edited window: below the reported 8192 it falls back to the default (4000) and '
-    + 'shows "Not reported"; above it the reported 8192 comes back without the marker', small?.max === '4000'
-    && JSON.stringify(small.notReported) === '["maxTokens:Not reported"]' && large?.max === '8192'
-    && large.notReported.length === 0, brief({ small, large }));
+    + 'shows "Default"; above it the reported 8192 comes back without the marker', small?.max === '4000'
+    && JSON.stringify(small.defaults) === '["maxTokens:Default"]' && large?.max === '8192'
+    && large.defaults.length === 0, brief({ small, large }));
   await hintsAndUnusable();
 }
 
@@ -407,7 +417,7 @@ async function hintsAndUnusable() {
   const o = (await fetchWith(ctx, urlFor('ollama'))).state;
   const [a, b, c] = ['llama-a', 'llama-b', 'llama-c'].map((id) => rowIn(o, id));
   record('MD-07 hints (ollama shape): llama-b shows "The server doesn’t list tool support for this model."; llama-c '
-    + 'shows "Trained context window. Ollama may use a smaller one; run the long-input test after adding."; llama-a '
+    + 'shows "Trained context window. Ollama may use a smaller one."; llama-a '
     + 'has none', a?.hints.length === 0 && a.window === '8192' && JSON.stringify(b?.hints) === JSON.stringify(
     [{ kind: 'no_tools', text: TEXT.noTools }]) && b.window === '16384' && JSON.stringify(c?.hints)
     === JSON.stringify([{ kind: 'trained_window', text: TEXT.trained }]) && c.window === '131072', brief({ a, b, c }));
@@ -606,7 +616,7 @@ async function enterDoesNothing() {
 
 // ---------- MD-08：手填一行 ----------
 
-/** @brief 拿到列表时：id 检查与重复、Entered by you 与 Not reported、默认值、可以加多个。 */
+/** @brief 拿到列表时：id 检查与重复、Entered by you 与 Default、默认值、可以加多个。 */
 async function manualWithList() {
   const { page } = ctx;
   await openAddProvider(page);
@@ -629,19 +639,19 @@ async function manualWithList() {
   await typeManual(page, 'my-model');
   const after = await formState(page);
   const row = rowIn(after, 'my-model');
-  record('MD-08 Add to list appends a ticked row "Entered by you" with 128000 / 16384 both "Not reported", thinking '
+  record('MD-08 Add to list appends a ticked row "Entered by you" with 128000 / 16384 both "Default", thinking '
     + 'and image unticked; the box clears, several can be added, and an entered id counts as a duplicate',
   JSON.stringify(after.rows.map((r) => r.id)) === '["fake-coder","fake-slow","my-model","my-model-2"]' && row?.picked
     && row.tags.some((t) => t.kind === 'entered' && t.text === 'Entered by you') && row.chat === 'unknown'
-    && row.window === '128000' && row.max === '16384' && JSON.stringify(row.notReported)
-    === '["contextWindow:Not reported","maxTokens:Not reported"]' && !row.reasoning && !row.image
+    && row.window === '128000' && row.max === '16384' && JSON.stringify(row.defaults)
+    === '["contextWindow:Default","maxTokens:Default"]' && !row.reasoning && !row.image
     && after.manual.error === TEXT.idDup && after.add.text === 'Add 2 models', brief({ rows: picks(after), row,
     manual: after.manual }));
   await setSize(page, 'my-model', 'contextWindow', 20000);
   const changed = rowIn(await formState(page), 'my-model');
-  record('MD-08 an entered row can be edited: after a window change both "Not reported" markers stay and Max output '
-    + 'follows the window (min(16384, 10000) = 10000)', changed?.window === '20000' && changed.max === '10000'
-    && JSON.stringify(changed.notReported) === '["contextWindow:Not reported","maxTokens:Not reported"]',
+  record('MD-08 an entered row can be edited: after a window change (20000, no longer the default) only the Max '
+    + 'output, which follows it (min(16384, 10000) = 10000), keeps "Default"', changed?.window === '20000'
+    && changed.max === '10000' && JSON.stringify(changed.defaults) === '["maxTokens:Default"]',
   brief(changed));
   await closeForm(page);
 }
@@ -696,7 +706,7 @@ async function manualErrors() {
 
 // ---------- MD-09：预填、再拉一次、target.api ----------
 
-/** @brief FAKE_NO_V1_ROOT：Base URL 换成 …/v1 并写说明；Name、API type、Network zone 预填且可改；改 API type 不清掉清单。 */
+/** @brief FAKE_NO_V1_ROOT：Base URL 换成 …/v1 并写说明；Name、API type 预填且可改；改 API type 不清掉清单。 */
 async function prefillAndEdit() {
   const { page } = ctx;
   await openAddProvider(page);
@@ -707,25 +717,24 @@ async function prefillAndEdit() {
     + 'Detected: vLLM 0.10.1', s.baseUrl.value === urlFor('nov1') && s.note === `Updated to ${urlFor('nov1')} so the `
     + 'model list loads.' && s.detected?.text === 'Detected: vLLM 0.10.1' && s.detected.kind === 'vllm'
     && picks(s) === 'v1-model+', brief({ base: s.baseUrl.value, note: s.note, detected: s.detected }));
-  record('MD-09 after the fetch Name, API type and Network zone are prefilled (host:port, OpenAI-compatible, Local); '
+  record('MD-09 after the fetch Name and API type are prefilled (host:port, OpenAI-compatible); '
     + 'the first fetch sends target.api null', s.name?.value === hostFor('nov1')
-    && s.api?.value === 'openai-completions' && s.zone === 'local' && first.entry?.command.target.api === null
+    && s.api?.value === 'openai-completions' && first.entry?.command.target.api === null
     && first.entry.command.target.kind === 'new',
-  brief({ name: s.name, api: s.api?.value, zone: s.zone, target: first.entry?.command.target }));
+  brief({ name: s.name, api: s.api?.value, target: first.entry?.command.target }));
   await setName('Prefill Edited');
   await field(page, 'API type').selectOption('anthropic-messages');
-  await page.locator(`${FORM} input[name="zone"][value="intranet"]`).check();
   const edited = await formState(page);
-  record('MD-09 the prefilled Name, API type and Network zone are editable; changing the API type keeps the checklist '
+  record('MD-09 the prefilled Name and API type are editable; changing the API type keeps the checklist '
     + 'and its ticks', edited.name.value === 'Prefill Edited' && edited.api.value === 'anthropic-messages'
-    && edited.zone === 'intranet' && picks(edited) === 'v1-model+' && edited.checklist,
-  brief({ name: edited.name.value, api: edited.api.value, zone: edited.zone, picks: picks(edited) }));
+    && picks(edited) === 'v1-model+' && edited.checklist,
+  brief({ name: edited.name.value, api: edited.api.value, picks: picks(edited) }));
   const again = await fetchNow(ctx);
   const a = again.state;
-  record('MD-09 Fetch models again keeps your edited Name, API type and zone and sends the edited API type as '
+  record('MD-09 Fetch models again keeps your edited Name and API type and sends the edited API type as '
     + 'target.api', again.entry?.command.target.api === 'anthropic-messages' && a.name?.value === 'Prefill Edited'
-    && a.api?.value === 'anthropic-messages' && a.zone === 'intranet' && a.checklist,
-  brief({ target: again.entry?.command.target, name: a.name?.value, api: a.api?.value, zone: a.zone }));
+    && a.api?.value === 'anthropic-messages' && a.checklist,
+  brief({ target: again.entry?.command.target, name: a.name?.value, api: a.api?.value }));
   await addressAndKeyEdits();
 }
 
@@ -747,10 +756,10 @@ async function addressAndKeyEdits() {
   const keyed = await formState(page);
   record('MD-09 editing the API key after a fetch clears the checklist the same way', t.checklist && atStart(keyed),
     brief({ before: t.checklist, after: keyed.checklist }));
-  record('MD-09 after the address change the next fetch still keeps the edited Name, API type and zone (target.api '
+  record('MD-09 after the address change the next fetch still keeps the edited Name and API type (target.api '
     + 'anthropic-messages)', third.entry?.command.target.api === 'anthropic-messages' && t.name?.value
-    === 'Prefill Edited' && t.api?.value === 'anthropic-messages' && t.zone === 'intranet',
-  brief({ target: third.entry?.command.target, name: t.name?.value, api: t.api?.value, zone: t.zone }));
+    === 'Prefill Edited' && t.api?.value === 'anthropic-messages',
+  brief({ target: third.entry?.command.target, name: t.name?.value, api: t.api?.value }));
   await closeForm(page);
   await openAddProvider(page);
   const p = (await fetchWith(ctx, urlFor('plain'), '')).state;
@@ -779,10 +788,11 @@ async function fillAddForm() {
   await field(page, 'Concurrency per key').fill('7');
   await page.locator(`${FORM} .compat-checks label`).filter({ hasText: TEXT.compat }).locator('input').check();
   const s = await formState(page);
-  record('MD-09 More settings: folded at first; opened it has Concurrency per key 4 and the six compatibility options '
-    + '(unticked, OpenAI-compatible); 0 shows "Use a whole number from 1 to 64." and blocks Add', folded?.open === false
-    && opened?.open === true && opened.concurrency?.value === '4' && JSON.stringify(opened.compat)
-    === JSON.stringify(Array(6).fill(false)) && bad.fieldErrors.concurrency === TEXT.concurrency && bad.add.disabled
+  record('MD-09 More settings: folded at first; opened it has Concurrency per key 4, the hint line and the five '
+    + 'compatibility options (unticked, OpenAI-compatible; 2026-10-26); 0 shows "Use a whole number from 1 to 64." and '
+    + 'blocks Add', folded?.open === false && opened?.open === true && opened.concurrency?.value === '4'
+    && opened.compatHint === TEXT.compatHint && JSON.stringify(opened.compat) === JSON.stringify(Array(5).fill(false))
+    && bad.fieldErrors.concurrency === TEXT.concurrency && bad.add.disabled
     && s.more.concurrency?.value === '7' && !s.add.disabled && s.add.text === 'Add 3 models' && s.cost === TEXT.cost,
   brief({ folded, opened, bad: bad.fieldErrors, add: s.add, more: s.more, cost: s.cost }));
   return s;
@@ -827,7 +837,7 @@ async function addProvider() {
   brief({ order, rows, verifying: seen.verifying, probed: probed.value }));
 }
 
-/** @brief 配置里的新提供商：名称、地址、区域、More settings 的并发与兼容选项、第一个 key、模型的值与顺序。 */
+/** @brief 配置里的新提供商：名称、地址、More settings 的并发与兼容选项、第一个 key、模型的值与顺序。 */
 function checkSavedProvider(provider, refsBefore) {
   const refs = credentialRefs(ctx.userData);
   const models = provider?.models ?? [];
@@ -836,10 +846,11 @@ function checkSavedProvider(provider, refsBefore) {
     + 'model-config.json',
     provider?.concurrency === 7 && JSON.stringify(provider.compat) === '{"maxTokensField":"max_tokens"}',
     brief({ concurrency: provider?.concurrency, compat: provider?.compat }));
-  record('MD-09 the saved provider: name "Form Add", the fetched address, OpenAI-compatible, Local, the key as "Key 1" '
+  record('MD-09 the saved provider: name "Form Add", the fetched address, OpenAI-compatible, no zone, the key as '
+    + '"Key 1" '
     + '(credentials.json gets its ref), models with the checklist values (entered row 128000 / 16384)',
   provider?.name === 'Form Add' && provider.baseUrl === urlFor('add') && provider.api === 'openai-completions'
-    && provider.zone === 'local' && provider.keys.length === 1 && provider.keys[0].label === 'Key 1'
+    && !('zone' in provider) && provider.keys.length === 1 && provider.keys[0].label === 'Key 1'
     && refs.includes(provider.keys[0].ref) && !refsBefore.includes(provider.keys[0].ref)
     && byId['add-a']?.contextWindow === 131072 && byId['add-a'].maxTokens === 16384 && byId['add-c']?.contextWindow
     === 128000 && byId['add-c'].maxTokens === 16384 && models.every((m) => m.family === '' && !m.reasoning),
@@ -860,9 +871,8 @@ async function failedSave() {
   await openAddProvider(page);
   await fetchWith(ctx, urlFor('fail'), KEY.fail);
   await setName('Fail Save');
-  // 预填的 API type 与区域改过后照样保存（MD-09"预填且可改"，最后一条检查看配置）
+  // 预填的 API type 改过后照样保存（MD-09"预填且可改"，最后一条检查看配置）
   await field(page, 'API type').selectOption('openai-responses');
-  await page.locator(`${FORM} input[name="zone"][value="intranet"]`).check();
   const file = join(userData, 'model-config.json');
   const before = readText(file);
   const refsBefore = credentialRefs(userData);
@@ -891,10 +901,10 @@ async function failedSave() {
   const closed = await clickAdd();
   const saved = await poll(() => providerIn('fail-save'), Boolean, 10000);
   record('MD-09 after the file is writable again the same form saves: the provider and its key ref are stored, with '
-    + 'the API type and zone you changed (OpenAI Responses, Intranet)', closed && saved.ok
+    + 'the API type you changed (OpenAI Responses)', closed && saved.ok
     && credentialRefs(userData).includes(saved.value.keys[0]?.ref) && saved.value.api === 'openai-responses'
-    && saved.value.zone === 'intranet' && saved.value.name === 'Fail Save',
-  brief({ keys: saved.value?.keys, api: saved.value?.api, zone: saved.value?.zone }));
+    && saved.value.name === 'Fail Save',
+  brief({ keys: saved.value?.keys, api: saved.value?.api }));
 }
 
 // ---------- MD-09：改 Base URL 或 key 清掉的文字（A16） ----------
@@ -989,7 +999,7 @@ async function saveErrorCleared() {
   await closeForm(page);
 }
 
-// ---------- MD-06：key、F8、时限、区域 ----------
+// ---------- MD-06：key、F8、时限 ----------
 
 /** @brief 新提供商的 key 只用于这次读取：列表请求带它，不存盘、不进 F8 报告；关掉表单后不留着。 */
 async function keyOnlyForFetch() {
@@ -1041,23 +1051,6 @@ async function requestTimeout() {
   await closeForm(page);
 }
 
-/** @brief 不按项目区域过滤：没有任何默认允许的区域，选 Public 再拉取，照样拿到列表。 */
-async function notZoneFiltered() {
-  const { page } = ctx;
-  await openAddProvider(page);
-  await fetchWith(ctx, urlFor('plain'), '');
-  await page.locator(`${FORM} input[name="zone"][value="public"]`).check();
-  const since = Date.now();
-  const again = await fetchNow(ctx);
-  const config = configOf(ctx.userData);
-  record('MD-06 discovery is not filtered by zone: with no zone allowed by default (allowedZones []) and Public '
-    + 'chosen, Fetch models still reads the list', JSON.stringify(config?.allowedZones) === '[]'
-    && again.state.zone === 'public' && again.state.checklist && again.state.rows.length === 2
-    && again.entry?.result?.listError === null && listLines(eps.plain, since).length > 0,
-  brief({ allowed: config?.allowedZones, zone: again.state.zone, result: again.entry?.result }));
-  await closeForm(page);
-}
-
 // ---------- 运行 ----------
 
 /** 步骤：名字 → [函数, 出错时记的编号] */
@@ -1066,7 +1059,7 @@ const STEPS = {
   markers: [markersAndEdits, 'MD-07'], filter: [filterBox, 'MD-07'], look: [checklistLookAndButtons, 'MD-07'],
   manual: [manualWithList, 'MD-08'], manualErrors: [manualErrors, 'MD-08'], prefill: [prefillAndEdit, 'MD-09'],
   add: [addProvider, 'MD-09'], failedSave: [failedSave, 'MD-09'], cleared: [cancelThenEditUrl, 'MD-09'],
-  keyOnly: [keyOnlyForFetch, 'MD-06'], timeout: [requestTimeout, 'MD-06'], zones: [notZoneFiltered, 'MD-06'],
+  keyOnly: [keyOnlyForFetch, 'MD-06'], timeout: [requestTimeout, 'MD-06'],
 };
 
 /** @brief 跑一个步骤；出错时记一条失败（编号开头）并截图，关掉还开着的表单。 */

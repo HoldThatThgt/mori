@@ -164,7 +164,7 @@ function stubOpenPath({ shell }, fail) {
  */
 async function setup(ctx) {
   const { app, page, h } = ctx;
-  // v1（规格 §14.4）：首次启动填英文表单、区域选 Local，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
+  // v1（规格 §14.4）：首次启动填英文表单，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
   await h.setupFirstRun({ baseUrl, apiKey: testKey });
   await stubFolder(app, ctx.project);
   await page.getByRole('button', { name: OPEN_FOLDER }).first().click();

@@ -74,7 +74,7 @@ proposal §6.2 的“记忆 · 改了 1 条”就是这张卡：标题写动作�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 内置工具列表 | `tools.get` 的 `tools`（跟随的会话里注册了 `memory` 时，§7.6） | 一行 `memory`，来源 `Mori`（同 TaskBoard 工具，`resources.ts` 对 `<inline:mori-memory>` 的处理）；状态按这个会话启用了没有（`Enabled` / `Not enabled`，例如协作模式分开时的对话会话是 `Not enabled`） | 展开看说明 |
+| 内置工具列表 | `tools.get` 的 `tools`（跟随的会话里注册了 `memory` 时，§7.6） | 一行 `memory`，来源 `Mori`（同 TaskBoard 工具，`resources.ts` 对 `<inline:mori-memory>` 的处理）；状态按这个会话启用了没有（`Enabled` / `Not enabled`，例如协作模式分开时的对话会话是 `Not enabled`）；没有开关，下面一行 `Mori turns this on for the main agent.`（2026-10-26，负责人走查 M12，[../../v0/screens/tools.md](../../v0/screens/tools.md)"内置工具"） | 展开看说明 |
 
 ### 记忆目录的写保护（§7.7）
 

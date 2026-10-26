@@ -1,7 +1,8 @@
-// 协作开关与 /team（docs/specs/parallel-agents-taskboard.md §5.1、§13.1；docs/v1/screens/team-switch.md）：
-// 顶栏开关的三种点击、输入框里 /team on、/team off、/team <文字> 的识别，以及 session.setTeam 的请求与失败的一行。
-// 请求期间开关保持原来的文字、不可用；返回后以后台进程给出的协作状态为准（之后的 mori.team_state 同样）。
-// 停止全部 Agent（Stop team）在 actions.ts，与停止对话的回复放在一起。
+// Task mode 开关与 /task（docs/specs/parallel-agents-taskboard.md §5.1、§13.1；docs/v1/screens/team-switch.md）：
+// 模型菜单里 Task mode 一行的三种点击、输入框里 /task on、/task off、/task <文字> 的识别（2026-10-26 由 /team 改名，
+// 没有别名），以及 session.setTeam 的请求与失败的一行。
+// 请求期间这一行保持原来的样子、不可用；返回后以后台进程给出的协作状态为准（之后的 mori.team_state 同样）。
+// 停止全部 Agent（Stop agents）在 actions.ts，与停止对话的回复放在一起。
 
 import { create, type StoreApi } from 'zustand';
 import type { TeamCommandResults } from '../../../shared/protocol';
@@ -26,32 +27,32 @@ function setEntry<T>(store: StoreApi<Record<string, T>>, key: string, value: T |
   }, true);
 }
 
-/** @brief 输入框里按 Enter 时原文里的 /team（§5.1）。 */
+/** @brief 输入框里按 Enter 时原文里的 /task（§5.1）。 */
 export type TeamCommand =
-  /** 不是 /team：照普通消息发送 */
+  /** 不是 /task：照普通消息发送 */
   | { kind: 'none' }
-  /** 只有 /team：不发送，输入框不变 */
+  /** 只有 /task：不发送，输入框不变 */
   | { kind: 'bare' }
-  /** /team on、/team off：不发消息，发 session.setTeam */
+  /** /task on、/task off：不发消息，发 session.setTeam */
   | {
     kind: 'switch';
     /** 打开或关掉 */
     mode: TeamSwitch;
   }
-  /** /team <文字>：去掉前缀，以 team: 'once' 发出 */
+  /** /task <文字>：去掉前缀，以 team: 'once' 发出 */
   | {
     kind: 'once';
-    /** 去掉 /team 前缀之后的文字 */
+    /** 去掉 /task 前缀之后的文字 */
     text: string;
   };
 
-/** /team 和它后面的部分；/teamwork、/teams 不是 /team */
-const TEAM_PREFIX = /^\s*\/team(?=\s|$)([\s\S]*)$/i;
-/** /team on、/team off：不区分大小写，前后可以有空白 */
+/** /task 和它后面的部分；/tasks、/taskboard 不是 /task */
+const TEAM_PREFIX = /^\s*\/task(?=\s|$)([\s\S]*)$/i;
+/** /task on、/task off：不区分大小写，前后可以有空白 */
 const TEAM_SWITCH_WORD = /^(on|off)$/i;
 
 /**
- * @brief 认出输入框原文里的 /team（在引用芯片拼进消息之前，所以带芯片也能用，§5.1）。
+ * @brief 认出输入框原文里的 /task（在引用芯片拼进消息之前，所以带芯片也能用，§5.1）。
  * @param draft 输入框里你写的字
  */
 export function parseTeamCommand(draft: string): TeamCommand {
@@ -67,19 +68,19 @@ export function parseTeamCommand(draft: string): TeamCommand {
 /**
  * @brief 这条消息是不是先由立项判断、而立项不在对话会话里（分开时，§5.3）：协作模式下，或带 team: 'once'；
  *        对话与立项是同一个角色时（合并会话）照普通发送。
- * @param once 以 /team <文字> 发出
+ * @param once 以 /task <文字> 发出
  */
 export function decidesFirst(tab: Tab, once: boolean): boolean {
   const { mode, holders } = tab.team;
   return (mode !== 'off' || once) && holders.dialog !== holders.create;
 }
 
-/** @brief 开关点击之后要的模式（§13.1）：off → on；always → off（不能回到 off 时后台进程给出 once）；once → on。 */
+/** @brief Task mode 一行点击之后要的模式（§13.1）：off → on；always → off（不能回到 off 时后台进程给出 once）；once → on。 */
 export function nextSwitch(mode: TeamMode): TeamSwitch {
   return mode === 'always' ? 'off' : 'on';
 }
 
-/** @brief 切换失败：开关下方一行原文，10 秒后自动消失（期间又失败时以最新的为准）。 */
+/** @brief 切换失败：一行原文（TeamSwitch.tsx 的 TeamErrorNote、TeamErrorLine），10 秒后自动消失（期间又失败时以最新的为准）。 */
 function showTeamError(key: string, message: string): void {
   setEntry(useTeamError, key, message);
   setTimeout(() => {
@@ -94,8 +95,8 @@ function teamOf(result: TeamCommandResults['session.setTeam']): TeamState {
 }
 
 /**
- * @brief 开关或 /team on、/team off（session.setTeam）：返回的协作状态记到会话上；失败时开关回到原来的模式，
- *        下方一行原文。请求期间开关不可用。
+ * @brief Task mode 一行或 /task on、/task off（session.setTeam）：返回的协作状态记到会话上；失败时回到原来的模式，
+ *        显示一行原文。请求期间这一行不可用。
  */
 export async function setTeam(key: string, mode: TeamSwitch): Promise<void> {
   const sessionId = useApp.getState().tabs.find((tab) => tab.key === key)?.sessionId;
@@ -113,7 +114,7 @@ export async function setTeam(key: string, mode: TeamSwitch): Promise<void> {
   }
 }
 
-/** @brief 点了顶栏的协作开关；不需要确认（§13.1）。 */
+/** @brief 点了模型菜单里的 Task mode 一行；不需要确认（§13.1）。 */
 export function toggleTeam(key: string): void {
   const tab = useApp.getState().tabs.find((item) => item.key === key);
   if (tab) void setTeam(key, nextSwitch(tab.team.mode));

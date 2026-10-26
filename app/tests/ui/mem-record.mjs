@@ -7,7 +7,7 @@
 // 补发：进入页面、换层、换分节、选中、写入之后、详情里的 [[slug]]；收到 mori.memory_changed、mori.enhance_progress 时按
 // 界面的规则重读（进度之后等 300 毫秒再读，后台进程在那之前已放下跑完的那一项）。回放桥按参数配对回答它们
 // （harness/replay.js 的 KEYED）。
-// 准备（synthetic test setup）：model-config.json 只有一个本机区域的提供商 MEM（fake-coder；fake-think 标支持思考；
+// 准备（synthetic test setup）：model-config.json 只有一个本机地址的提供商 MEM（fake-coder；fake-think 标支持思考；
 // fake-coder-404，合成端点对它回 404），默认范围 mem/fake-coder，档案直接给出已验证（tb-helpers.mjs seedTeamUserData，
 // 跳过探针）；增强会话的回复来自增强脚本（FAKE_ENHANCE_SCRIPT，tests/fake-endpoint/enhance.mjs，synthetic），依据是录制里
 // 那个会话的会话文件与你那条消息的条目 id；mem-settings 另有一个 enhance.json 写坏的项目（synthetic）。用户会话的回复全部

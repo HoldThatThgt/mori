@@ -9,13 +9,15 @@
 // 请求里的思考参数从合成端点的日志行读。
 // 场景（每个用一个新的数据目录和自己的合成端点，可以用 --only 只跑其中几个）：
 //   probe（MP-38）：经设置页的 Add provider 加 fake-coder-nooff（OpenRouter 前缀地址、勾 Supports thinking），档案与模型行、
-//     点 Verify 后同样的结果且第 2 步真的重新测了；经卡上的 Fetch models 加 fake-coder-thinklong（普通地址、勾 Supports
-//     thinking），模型行"Couldn’t verify: Stopped at the probe output limit before answering"、Tool calling 仍为 Verified；
-//     经卡上的 Fetch models 加 fake-coder-alwaysthink（普通地址、勾 Supports thinking），思考关不掉但 Off 没被拒绝
-//     （can_disable 为假、off_refused 为假），模型行没有 Thinking 一项。
+//     再跑一次自动探针（经进程桥发 models.verify）后同样的结果且第 2 步真的重新测了；经卡上的 Fetch models 加
+//     fake-coder-thinklong（普通地址、勾 Supports thinking），档案出错"Stopped at the probe output limit before answering"、
+//     tool calling 仍验证通过，模型行没有状态行；经卡上的 Fetch models 加 fake-coder-alwaysthink（普通地址、勾 Supports
+//     thinking），思考关不掉但 Off 没被拒绝（can_disable 为假、off_refused 为假），模型行没有"Thinking can’t be turned off"。
 //   effort（MP-39）：输入框下面一行的 Effort 菜单（没有标记的模型仍有 Off、Off 时不带思考参数；fake-coder-nooff 没有 Off、
-//     有说明；原来是 Off 的会话显示 Minimal、请求带 minimal、没有 400）、模型行的 Test（带 medium）、模型表单（Edit）的
-//     Default effort for new sessions、默认强度是 Off 的新会话、增强设置对话框的 Effort。
+//     有说明；原来是 Off 的会话显示 Minimal、请求带 minimal、没有 400）、提供商卡的 Test connection（带 medium）、模型表单
+//     （Edit）的 Default effort for new sessions、默认强度是 Off 的新会话、增强设置对话框的 Effort。
+// 2026-10-26（WP-02，负责人走查 M7，models-settings.md "Models 行"）：模型行没有档案摘要、Verify 与 Test；"Thinking can’t be
+//   turned off"在说明一行最后（data-field="thinking_off"），tool calling 读行上的 data-probe，状态行只在模型不能用时有。
 // 用法（在 app/ 下，先 npx electron-vite build）：
 //   node tests/ui/v1-models-app-nooff.mjs [--exe <Mori.exe 路径>] [--only probe,effort]
 // 结果写到 test-results/v1-models-app-nooff(-packaged).json，截图在 test-results/v1-models-app-nooff(-packaged)/。
@@ -50,13 +52,12 @@ const ALWAYSTHINK = 'fake-coder-alwaysthink';
 /** 本套件的模型全名（提供商 id 由名称生成：Router → router；plain 由测试准备写好） */
 const REF = { plain: 'plain/fake-coder', nooff: `router/${NOOFF}`, thinklong: `plain/${THINKLONG}`,
   alwaysthink: `plain/${ALWAYSTHINK}` };
-/** 档案摘要多的一项（models-settings.md"档案摘要"，ui-strings.md） */
-const THINKING_OFF_TEXT = 'Thinking: Can’t be turned off';
+/** 模型行说明一行最后的一段（models-settings.md "Models 行"，2026-10-26 起；原来是档案摘要的"Thinking: Can’t be turned off"） */
+const THINKING_OFF_TEXT = 'Thinking can’t be turned off';
 /** Effort 菜单底部的说明（model-menu.md"思考关不掉"） */
 const OFF_NOTE = 'This model can’t turn thinking off.';
-/** 停在探针输出上限的说明（§7.7）与模型行上的写法 */
+/** 停在探针输出上限的说明（§7.7） */
 const LIMIT_DETAIL = 'Stopped at the probe output limit before answering';
-const LIMIT_TEXT = `Couldn’t verify: ${LIMIT_DETAIL}`;
 /** 合成端点 "plain" 的回复 */
 const PLAIN_REPLY = '这是一段只有文字的回复，用来测试流式输出。';
 /** 测试连接结果的开头（models-settings.md"测试结果的文字"） */
@@ -153,16 +154,20 @@ async function toChat(page) {
 /** @brief 设置页 Models 分节里的一个模型行。 */
 const modelRow = (page, ref) => page.locator(`[data-testid="model-row"][data-model="${ref}"]`);
 
-/** @brief 模型行的档案摘要（各项按页面上的顺序，data-value 与文字）、探针出错的文字；没有这一行时为 null。 */
+/**
+ * @brief 模型行此刻的样子（models-settings.md "Models 行"，2026-10-26 起没有档案摘要）：行上的 data-probe、说明一行、
+ *        说明一行里"Thinking can’t be turned off"的文字（没有时为 null）、状态行（data-state 与文字，没有时为 null）；
+ *        没有这一行时为 null。
+ */
 function profileRow(page, ref) {
   return page.evaluate((target) => {
     const row = document.querySelector(`[data-testid="model-row"][data-model="${target}"]`);
     if (!row) return null;
-    const items = [...row.querySelectorAll('[data-testid="profile"] [data-field]')];
-    return { order: items.map((item) => item.dataset.field),
-      fields: Object.fromEntries(items.map((item) => [item.dataset.field, { value: item.dataset.value,
-        text: item.textContent }])),
-      probeError: row.querySelector('[data-testid="probe-error"]')?.textContent ?? null };
+    const meta = row.querySelector('.model-meta');
+    const status = row.querySelector('[data-testid="probe-status"]');
+    return { probe: row.dataset.probe ?? null, meta: meta?.textContent ?? '',
+      thinkingOff: meta?.querySelector('[data-field="thinking_off"]')?.textContent ?? null,
+      status: status && { state: status.dataset.state, text: status.textContent } };
   }, ref);
 }
 
@@ -260,8 +265,8 @@ async function step(ctx, label, fn) {
 // ---------- 场景 probe：思考关不掉的判定与输出上限（MP-38 App） ----------
 
 /**
- * @brief 设置页里新建提供商（Add provider 表单，model-discovery.md §6.1、§13.4）：Base URL → Fetch models → Name、区域
- *        Local → 清单里只勾 specs（pickIn，可以改 Supports thinking）→ Add N models，等表单关掉。返回拉取的结果。
+ * @brief 设置页里新建提供商（Add provider 表单，model-discovery.md §6.1、§13.4）：Base URL → Fetch models → Name
+ *        → 清单里只勾 specs（pickIn，可以改 Supports thinking）→ Add N models，等表单关掉。返回拉取的结果。
  */
 async function addProviderUi(page, { name, baseUrl, specs }) {
   await page.locator('[data-action="add-provider"]').click();
@@ -269,7 +274,6 @@ async function addProviderUi(page, { name, baseUrl, specs }) {
   await form.getByLabel('Base URL', { exact: true }).fill(baseUrl);
   const fetched = await fetchIn(page, PROVIDER_FORM);
   await form.getByLabel('Name', { exact: true }).fill(name);
-  await form.locator('input[name="zone"][value="local"]').check();
   await pickIn(page, PROVIDER_FORM, specs);
   await form.locator('[data-action="add-models"]').click();
   await form.waitFor({ state: 'detached', timeout: 20000 });
@@ -284,15 +288,12 @@ const offRefusedProfile = (profile) => profile?.status === 'ready' && profile.to
   && profile.reasoning?.off_refused === true && profile.reasoning.can_disable === false
   && profile.tier?.a?.outcome === 'not_applicable' && profile.tier.level !== 'A';
 /**
- * @brief 模型行多了 Thinking 一项、放在 Reasoning field 后面 Cancel 前面，没有探针出错，Handoff tier 不是 A
- *        （models-settings.md"档案摘要""思考关不掉"）；Tool calling 已是 Verified（不是 Verifying… / Re-verifying…），
+ * @brief 模型行说明一行的最后是"Thinking can’t be turned off"（data-field="thinking_off"），tool calling 已验证
+ *        （data-probe 为 verified，不是 verifying / reverifying），没有状态行（models-settings.md "Models 行""思考关不掉"）；
  *        即探测结束后的样子。
  */
-const offRefusedRow = (row) => row?.fields.thinking_off?.value === 'refused'
-  && row.fields.thinking_off.text === THINKING_OFF_TEXT && row.probeError === null
-  && row.fields.tool_calling?.value === 'verified' && Boolean(row.fields.tier) && row.fields.tier.value !== 'A'
-  && row.order.indexOf('thinking_off') === row.order.indexOf('reasoning') + 1
-  && row.order.indexOf('cancel') === row.order.indexOf('thinking_off') + 1;
+const offRefusedRow = (row) => row?.thinkingOff === THINKING_OFF_TEXT
+  && row.meta.endsWith(` · ${THINKING_OFF_TEXT}`) && row.probe === 'verified' && row.status === null;
 
 /**
  * @brief 一组自动探针之后 fake-coder-nooff 的两条检查：档案（models.get）与模型行。
@@ -304,9 +305,8 @@ async function offRefusedChecks(page, profile, when) {
   brief({ status: profile?.status, error: profile?.error, tool: profile?.tool_calling?.state,
     reasoning: profile?.reasoning, tier: profile?.tier }));
   const row = await rowWhen(page, REF.nooff, offRefusedRow);
-  record(`MP-38 fake-coder-nooff ${when}: the settled model row (Tool calling "Verified") shows data-field=`
-    + `"thinking_off" data-value="refused" "${THINKING_OFF_TEXT}" right after Reasoning field and before Cancel, `
-    + 'Handoff tier not A, and no probe-error', offRefusedRow(row), brief(row));
+  record(`MP-38 fake-coder-nooff ${when}: the settled model row (data-probe verified) ends its line with `
+    + `" · ${THINKING_OFF_TEXT}" (data-field="thinking_off") and has no status line`, offRefusedRow(row), brief(row));
 }
 
 /** @brief Add provider 加入 fake-coder-nooff（OpenRouter 前缀地址、勾 Supports thinking），自动探测后的档案与模型行。 */
@@ -333,21 +333,26 @@ async function addNoOffStep(ctx, ep) {
   lineBrief(lines));
 }
 
-/** @brief 点 Verify：同样的结果，合成端点的日志里这次又有一个第 2 步关闭思考的 400。 */
+/**
+ * @brief 再跑一次自动探针：同样的结果，合成端点的日志里这次又有一个第 2 步关闭思考的 400。2026-10-26 起能用的模型行上没有
+ *        Verify（models-settings.md "Models 行"），所以经进程桥发 models.verify（第 0–7 步，同拒绝启动卡的 Verify now 与
+ *        状态行的 Verify again）。
+ */
 async function verifyNoOffStep(ctx, ep) {
   const { page } = ctx;
   await toModels(page);
   const before = (await modelsInfo(page)).profiles[REF.nooff]?.probedAt ?? 0;
   const mark = ep.log.length;
-  await modelRow(page, REF.nooff).locator('[data-action="verify"]').click();
+  const sent = await page.evaluate((command) => window.mori.request(command),
+    { type: 'models.verify', refs: [REF.nooff] });
   const profiles = await waitProfiles(page, [REF.nooff], (profile) => finished(profile)
     && profile.probedAt > before);
-  await offRefusedChecks(page, profiles[REF.nooff], 'after Verify');
+  await offRefusedChecks(page, profiles[REF.nooff], 'after models.verify');
   const lines = linesOf(ep, mark, NOOFF, true);
   const refused = lines.filter((line) => line.status === 400 && line.effort === 'none');
-  record('MP-38 Verify re-tests step 2 on the unmarked copy: after the click the fake endpoint logs a new explicit-off '
-    + '400 (effort none) for fake-coder-nooff, and the other probe requests carry an effort',
-  refused.length === 1 && lines.filter((line) => line.status !== 400)
+  record('MP-38 models.verify re-tests step 2 on the unmarked copy: the fake endpoint logs a new explicit-off 400 '
+    + '(effort none) for fake-coder-nooff, and the other probe requests carry an effort', sent?.error === null
+    && refused.length === 1 && lines.filter((line) => line.status !== 400)
     .every((line) => line.status === 200 && line.effort !== null && line.effort !== 'none'), lineBrief(lines));
 }
 
@@ -359,28 +364,27 @@ async function thinkLongStep(ctx, ep) {
   const added = await cardAddModels(page, 'plain', [{ id: THINKLONG, reasoning: true }]);
   if (added.error !== null) throw new Error(`add ${REF.thinklong}: ${added.error}`);
   const profile = (await waitProfiles(page, [REF.thinklong], finished))[REF.thinklong];
-  const row = await rowWhen(page, REF.thinklong, (item) => item.probeError !== null);
-  record('MP-38 fake-coder-thinklong (plain address, Supports thinking) added on the card: the row shows '
-    + `"${LIMIT_TEXT}" (data-testid="probe-error")`, row?.probeError === LIMIT_TEXT && profile.status === 'error'
-    && profile.error === LIMIT_DETAIL, brief({ row, status: profile.status, error: profile.error }));
-  record('MP-38 fake-coder-thinklong: Tool calling is still "Verified" (row data-value verified, profile verified), '
-    + 'no Thinking item', row?.fields.tool_calling?.value === 'verified'
-    && row.fields.tool_calling.text === 'Tool calling: Verified' && profile.tool_calling.state === 'verified'
-    && !row.fields.thinking_off && profile.reasoning.off_refused === false,
-  brief({ fields: row?.fields, tool: profile.tool_calling, reasoning: profile.reasoning }));
+  const row = await rowWhen(page, REF.thinklong, (item) => item.probe === 'verified');
+  record('MP-38 fake-coder-thinklong (plain address, Supports thinking) added on the card: the profile is error with '
+    + `"${LIMIT_DETAIL}"`, profile.status === 'error' && profile.error === LIMIT_DETAIL,
+  brief({ status: profile.status, error: profile.error }));
+  record('MP-38 fake-coder-thinklong: tool calling is still verified (profile and the row\'s data-probe), so the model '
+    + 'is usable and the row shows no status line and no "Thinking can’t be turned off" (2026-10-26)',
+  row?.probe === 'verified' && row.status === null && row.thinkingOff === null
+    && profile.tool_calling.state === 'verified' && profile.reasoning.off_refused === false,
+  brief({ row, tool: profile.tool_calling, reasoning: profile.reasoning }));
   const lines = linesOf(ep, mark, THINKLONG, true);
   record('MP-38 fake-coder-thinklong: its probes were answered (no HTTP error), so the error is the output limit',
     lines.length > 0 && lines.every((line) => line.status === 200), lineBrief(lines));
 }
 
-/** @brief 模型行的档案摘要已出来、Tool calling 不在探测中（探测结束后的样子）。 */
-const settledRow = (row) => Boolean(row.fields.reasoning)
-  && !['verifying', 'reverifying'].includes(row.fields.tool_calling?.value);
+/** @brief 模型行的 tool calling 不在探测中（data-probe 不是 verifying、reverifying，探测结束后的样子）。 */
+const settledRow = (row) => Boolean(row.probe) && !['verifying', 'reverifying'].includes(row.probe);
 
 /**
  * @brief 卡上的 Fetch models 加入 fake-coder-alwaysthink（普通地址、勾 Supports thinking）：思考关不掉但 Off 没被拒绝
- *        （§7.7 第 2 步表第 2 行：can_disable 为假、off_refused 为假），模型行没有 Thinking 一项（models-settings.md
- *        "档案摘要"：为假时没有这一项），用来把 off_refused 与 can_disable 为假分开。
+ *        （§7.7 第 2 步表第 2 行：can_disable 为假、off_refused 为假），模型行说明一行里没有"Thinking can’t be turned off"
+ *        （models-settings.md "Models 行"：为假时没有），用来把 off_refused 与 can_disable 为假分开。
  */
 async function alwaysThinkStep(ctx, ep) {
   const { page } = ctx;
@@ -393,8 +397,8 @@ async function alwaysThinkStep(ctx, ep) {
   record('MP-38 fake-coder-alwaysthink (plain address, Supports thinking): thinking can\'t be disabled but Off is not '
     + 'refused (profile can_disable false, off_refused false), and its settled row has no data-field="thinking_off"',
   profile.reasoning.can_disable === false && profile.reasoning.off_refused === false && Boolean(row)
-    && settledRow(row) && !row.fields.thinking_off && !row.order.includes('thinking_off'),
-  brief({ reasoning: profile.reasoning, status: profile.status, fields: row?.fields }));
+    && settledRow(row) && row.thinkingOff === null && !row.meta.includes(THINKING_OFF_TEXT),
+  brief({ reasoning: profile.reasoning, status: profile.status, row }));
   const lines = linesOf(ep, mark, ALWAYSTHINK, true);
   record('MP-38 fake-coder-alwaysthink: the plain address sends no explicit off, so none of its probe requests was '
     + 'refused (all 200)', lines.length > 0 && lines.every((line) => line.status === 200), lineBrief(lines));
@@ -474,18 +478,22 @@ async function chooseThinkingCurrent(page) {
   await sleep(500);
 }
 
-/** @brief 模型行的 Test（connection.test）：带 medium、成功。 */
+/**
+ * @brief 提供商卡 router 的 Test connection（connection.test，测它的第一个模型 fake-coder-nooff）：带 medium、成功。
+ *        2026-10-26 起模型行没有 Test（models-settings.md "Models 行"）。
+ */
 async function testConnectionStep(ctx, ep) {
   const { page } = ctx;
   await toModels(page);
   const mark = ep.log.length;
-  const row = modelRow(page, REF.nooff);
-  await row.locator('[data-action="test"]').click();
-  const result = row.getByTestId('model-test');
+  const card = page.locator('[data-testid="provider-card"][data-provider="router"]');
+  await card.locator('[data-action="test-provider"]').click();
+  const result = card.getByTestId('test-result');
   await until(async () => TEST_DONE.test((await result.innerText().catch(() => '')).trim()), 120000, 300);
   const text = (await result.innerText().catch(() => '')).trim();
   const lines = linesOf(ep, mark, NOOFF, false);
-  record('MP-39 Test on the fake-coder-nooff row succeeds ("Connected…") and its request carries "effort":"medium" '
+  record('MP-39 Test connection on the Router card (its first model fake-coder-nooff) succeeds ("Connected…") and its '
+    + 'request carries "effort":"medium" '
     + '(fake log, status 200)', text.startsWith('Connected') && lines.length > 0
     && lines.every((line) => line.effort === 'medium' && line.status === 200),
   `${oneLine(text, 120)}; ${lineBrief(lines)}`);

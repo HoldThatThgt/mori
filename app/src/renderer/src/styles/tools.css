@@ -162,6 +162,12 @@ button.tools-row-main, summary.tools-row-main { cursor: pointer; }
 .tools-row-actions { display: flex; flex-wrap: wrap; gap: 14px; }
 .tools-page .text-link.danger { color: var(--color-danger); }
 
+/* 内置工具：左边名字等（展开看完整说明），右边开关（只有 pi 的内置工具有），下面的说明占满一行 */
+.tools-tool-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; }
+.tools-tool-row > .tools-tool { grid-row: 1; grid-column: 1; min-width: 0; }
+.tools-tool-row > .tools-switch { grid-row: 1; grid-column: 2; margin-top: 4px; }
+.tools-tool-row > .tools-row-note, .tools-tool-row > .form-message { grid-column: 1 / -1; }
+
 /* 内置工具：展开看完整说明 */
 .tools-tool summary { list-style: none; }
 .tools-tool summary::-webkit-details-marker { display: none; }

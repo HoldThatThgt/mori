@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, realProviders, scratchUserData, sleep,
+  appRoot, arg, createRecorder, launch, oneLine, realProviders, scratchUserData, sleep, useRealGroup,
 } from './lib.mjs';
 import { composerRow, rowProblems, rowSummary } from './m1-layout.mjs';
 import { rowOf, stubFolder, waitReady, waitStatus } from './m3-helpers.mjs';
@@ -171,7 +171,7 @@ async function item1(ctx) {
 /**
  * @brief 分屏后两栏的输入框下面一行（chat.md"输入框下面一行"、models.md"窄栏"）：权限、真实的选择范围（分组时
  *        "<分组> · <模型 id>"，常比 200px 的上限长）、Effort、圆环、"Send"不换行、不超出输入框，按这一栏的宽度收紧、
- *        截短的先后对（先截模型 id、再截范围名），读屏名和悬停第一行是全文，悬停第二行是"<提供商名> · <区域>"。
+ *        截短的先后对（先截模型 id、再截范围名），读屏名和悬停第一行是全文，悬停第二行是"<提供商名>"。
  */
 async function splitRows(page) {
   const bad = [];
@@ -403,8 +403,8 @@ requireConnection(source);
 const root = mkdtempSync(join(tmpdir(), 'mori-m5-real-'));
 const ctx = { project: makeProject(root), pageErrors: [] };
 ctx.userData = scratchUserData(source);
-// 测试准备（synthetic test setup，§14.1）：给临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
-allowRealProject(ctx.userData, ctx.project);
+// 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组
+useRealGroup(ctx.userData);
 try {
   await start(ctx);
   const items = { 1: item1, 2: item2, 3: item3, 4: item4, 5: item5, 6: item6, c: counterExample };

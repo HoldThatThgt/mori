@@ -28,12 +28,10 @@ export type SettingsSection = 'models' | 'issues';
 
 /** @brief 打开 设置 → Models 时要落到的位置（拒绝启动卡、说明卡、范围菜单）。 */
 export interface ModelsTarget {
-  /** 滚到这个提供商的卡；focus 为 zones 时是要确认区域的提供商 */
+  /** 滚到这个提供商的卡 */
   providerId?: string;
-  /** keys：焦点在这个提供商的 Keys 第一行；zones：区域未确认的那几行；project：Project access 的这个项目 */
-  focus?: 'keys' | 'zones' | 'project';
-  /** focus 为 project 时的项目文件夹（按 §4.1 规范化后比较） */
-  projectPath?: string;
+  /** keys：焦点在这个提供商的 Keys 第一行 */
+  focus?: 'keys';
 }
 
 /** @brief 设置页的状态（只在界面里，不跨重启保存）。 */
@@ -246,8 +244,8 @@ export async function runTest(target: TestTarget): Promise<{ ok: boolean; notice
 }
 
 /**
- * @brief 设置页里的一次测试：结果写在 key 指定的位置（提供商卡、key 行、模型行）。同一时刻只测一个。
- * @param key 位置，例如 provider:<id>、key:<ref>、model:<provider>/<id>
+ * @brief 设置页里的一次测试：结果写在 key 指定的位置（提供商卡、key 行；2026-10-26 起模型行没有 Test）。同一时刻只测一个。
+ * @param key 位置：provider:<id> 或 key:<ref>
  */
 export async function testAt(key: string, target: TestTarget): Promise<void> {
   if (useSettings.getState().testing !== null) return;

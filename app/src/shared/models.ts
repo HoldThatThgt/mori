@@ -21,14 +21,6 @@ export const API_TYPE_LABELS: Readonly<Record<ApiType, string>> = Object.freeze(
 export const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 
-/** @brief 网络区域（§4.3）：本机、内网、公网。 */
-export const ZONES = ['local', 'intranet', 'public'] as const;
-export const ZoneSchema = z.enum(ZONES);
-export type Zone = z.infer<typeof ZoneSchema>;
-
-/** @brief 所有项目默认允许的区域只能取这两个；公网只能按项目授权（§4.1 allowedZones）。 */
-export const DEFAULT_ZONES = ['local', 'intranet'] as const;
-
 /** @brief 每个 key 的并发上限与每个提供商的 key 数（§12）；kernel/modelTimings.ts 引用同一份。 */
 export const MODEL_LIMITS = Object.freeze({
   /** 新提供商每个 key 的并发上限 */
@@ -85,6 +77,8 @@ export const PickSchema = z.string().regex(PICK_PATTERN, 'Not a model range name
 
 /**
  * @brief 兼容选项（§4.1）：只能写 v0 COMPAT_OPTIONS 的六个字段，值同 v0（勾选时写入的那个值），只对 openai-completions 生效。
+ *        supportsStrictMode 从 2026-10-26 起没有勾选框（负责人走查 M1：pi 1.3.0 默认就不发 strict，勾不勾都一样，
+ *        模型层规格 §9.1 的 2026-10-26 注），留在 schema 里只为已经存着它的配置照样读得出；编译照旧交给 pi。
  */
 export const CompatSchema = z.strictObject({
   /** 端点不支持 developer 角色 */
@@ -102,43 +96,43 @@ export const CompatSchema = z.strictObject({
 });
 export type Compat = z.infer<typeof CompatSchema>;
 
+/** @brief 有勾选框的兼容选项字段（2026-10-26 起不含 supportsStrictMode，见 CompatSchema）。 */
+export type CompatField = Exclude<keyof Compat, 'supportsStrictMode'>;
+
 /** @brief 一个兼容选项：勾选时把 compat[field] 写成 value，取消勾选时删除该字段；界面文字见 COMPAT_LABELS、COMPAT_HINTS。 */
 export interface CompatOption {
   /** 表单里的标识 */
   id: string;
   /** pi compat 字段名 */
-  field: keyof Compat;
+  field: CompatField;
   /** 勾选时写入的值 */
   value: boolean | string;
 }
 
-/** @brief OpenAI 兼容端点的兼容选项，登记在 docs/v0/defaults.md。 */
+/** @brief OpenAI 兼容端点的兼容选项，登记在 docs/v0/defaults.md（2026-10-26 起五个，见 CompatSchema）。 */
 export const COMPAT_OPTIONS: readonly CompatOption[] = [
   { id: 'noDeveloperRole', field: 'supportsDeveloperRole', value: false },
   { id: 'noStore', field: 'supportsStore', value: false },
   { id: 'maxTokens', field: 'maxTokensField', value: 'max_tokens' },
   { id: 'noStreamUsage', field: 'supportsUsageInStreaming', value: false },
-  { id: 'noStrict', field: 'supportsStrictMode', value: false },
   { id: 'toolResultName', field: 'requiresToolResultName', value: true },
 ];
 
 /** @brief 兼容选项的界面文字（§9.1，沿用 english-ui 的标签），按 compat 字段名索引。 */
-export const COMPAT_LABELS: Readonly<Record<keyof Compat, string>> = Object.freeze({
+export const COMPAT_LABELS: Readonly<Record<CompatField, string>> = Object.freeze({
   supportsDeveloperRole: 'Endpoint doesn’t support the developer role',
   supportsStore: 'Endpoint doesn’t accept the store field',
   maxTokensField: 'Endpoint needs max_tokens instead of max_completion_tokens',
   supportsUsageInStreaming: 'Endpoint doesn’t report usage while streaming',
-  supportsStrictMode: 'Endpoint doesn’t support strict mode for tool parameters',
   requiresToolResultName: 'Tool results must include the tool name',
 });
 
 /** @brief 兼容选项勾选框下的说明（§9.1，沿用 english-ui），按 compat 字段名索引。 */
-export const COMPAT_HINTS: Readonly<Record<keyof Compat, string>> = Object.freeze({
+export const COMPAT_HINTS: Readonly<Record<CompatField, string>> = Object.freeze({
   supportsDeveloperRole: 'Sends the system prompt with the system role instead',
   supportsStore: 'Leaves store out of requests',
   maxTokensField: 'Older endpoints don’t recognize max_completion_tokens',
   supportsUsageInStreaming: 'Doesn’t send stream_options, so the context usage shown will be inaccurate',
-  supportsStrictMode: 'Leaves strict out of tool definitions',
   requiresToolResultName: 'Some endpoints require a name field on tool result messages',
 });
 
@@ -191,8 +185,6 @@ export const ProviderSchema = z.strictObject({
   /** 提供商 id，建好后不能改 */
   id: IdSchema,
   ...providerFields,
-  /** 网络区域；只有迁移来、还没确认的提供商为 null（§4.5） */
-  zone: ZoneSchema.nullable(),
   /** key，顺序就是使用顺序；没有 key 时请求不带认证头 */
   keys: z.array(ProviderKeySchema).max(MODEL_LIMITS.maxKeys),
   /** 下一个新 key 的编号，只增不减 */
@@ -216,18 +208,10 @@ export const GroupSchema = z.strictObject({
 });
 export type ModelGroup = z.infer<typeof GroupSchema>;
 
-/** @brief 所有项目默认允许的区域：local、intranet 的子集，不重复。 */
-export const AllowedZonesSchema = z.array(z.enum(DEFAULT_ZONES)).refine(distinct, 'Zones must not repeat');
-
-/** @brief 一组区域，不重复。 */
-export const ZoneListSchema = z.array(ZoneSchema).refine(distinct, 'Zones must not repeat');
-
-/** @brief 规范化的项目路径：绝对路径、全部小写、/ 分隔、无结尾 /（§4.1 projectZones）。 */
-export const ProjectPathSchema = z.string().min(1).refine(
-  (path) => !path.includes('\\') && path === path.toLowerCase() && (path === '/' || !path.endsWith('/')),
-  'Project path must be normalized');
-
-/** @brief 用户级模型配置 model-config.json。 */
+/**
+ * @brief 用户级模型配置 model-config.json。严格校验：2026-10-26 删掉的网络区域字段（zone、allowedZones、projectZones）
+ *        按未知字段报错（负责人走查 M3，不写兼容代码，§4.1“启动时配置读不出”）。
+ */
 export const ModelConfigSchema = z.strictObject({
   /** 文件格式版本 */
   version: z.literal(1),
@@ -237,10 +221,6 @@ export const ModelConfigSchema = z.strictObject({
   groups: z.array(GroupSchema),
   /** 新会话的默认选择范围；没有时为 null */
   normalDefault: PickSchema.nullable(),
-  /** 所有项目默认允许的区域 */
-  allowedZones: AllowedZonesSchema,
-  /** 本机按项目授权：规范化的项目路径 → 在 allowedZones 之外额外允许的区域 */
-  projectZones: z.record(ProjectPathSchema, ZoneListSchema),
 });
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 
@@ -253,62 +233,13 @@ export function addressChangeText(count: number): string {
     : `Changing the base URL removes this provider’s ${count} saved keys. Add them again after saving.`;
 }
 
-// ---- 区域建议（§12）：后台进程（models.get 的 zoneSuggestions）与界面（表单的预选）共用 ----
-
-/** @brief 点分十进制的 IPv4 地址（URL 已把 127.1、0x7f.1 等写法规范化成这种形式）。 */
-const IPV4_PATTERN = /^\d{1,3}(\.\d{1,3}){3}$/;
-
-/** @brief URL 规范化后的 IPv4 映射 IPv6 地址 ::ffff:hhhh:hhhh（不带方括号）。 */
-const IPV4_MAPPED_PATTERN = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/;
-
-/** @brief IPv4 地址的区域建议：127/8 本机；10/8、172.16/12、192.168/16、169.254/16 内网。 */
-function ipv4Zone(host: string): Zone {
-  const [a, b] = host.split('.').map(Number);
-  if (a === 127) return 'local';
-  const intranet = a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
-    || (a === 169 && b === 254);
-  return intranet ? 'intranet' : 'public';
-}
-
-/** @brief IPv6 地址（不带方括号，已由 URL 规范化）的区域建议：::1 本机；fc00::/7、fe80::/10 内网；IPv4 映射的按 IPv4。 */
-function ipv6Zone(host: string): Zone {
-  if (host === '::1') return 'local';
-  const mapped = IPV4_MAPPED_PATTERN.exec(host);
-  if (mapped) {
-    const [high, low] = [parseInt(mapped[1], 16), parseInt(mapped[2], 16)];
-    return ipv4Zone([high >> 8, high & 0xff, low >> 8, low & 0xff].join('.'));
-  }
-  const first = host.startsWith('::') ? 0 : parseInt(host.split(':')[0], 16);
-  const intranet = (first & 0xfe00) === 0xfc00 || (first & 0xffc0) === 0xfe80;
-  return intranet ? 'intranet' : 'public';
-}
-
-/**
- * @brief 按地址建议区域（§12）：回环地址（127/8、::1、localhost）→ local；10/8、172.16/12、192.168/16、169.254/16、
- *        fc00::/7、fe80::/10、.local 与不含点的主机名 → intranet；IPv4 映射的 IPv6 地址按其中的 IPv4 判断；
- *        其余 → public。只是预选建议，由你确认。
- * @param baseUrl 提供商地址；不是合法 URL 时按"其余"给 public
- */
-export function suggestZone(baseUrl: string): Zone {
-  let host: string;
-  try {
-    host = new URL(baseUrl).hostname.toLowerCase();
-  } catch {
-    return 'public';
-  }
-  if (host.startsWith('[')) return ipv6Zone(host.slice(1, -1));
-  if (IPV4_PATTERN.test(host)) return ipv4Zone(host);
-  const bare = host.replace(/\.$/, '');
-  if (bare === 'localhost') return 'local';
-  return bare.endsWith('.local') || !bare.includes('.') ? 'intranet' : 'public';
-}
-
 // ---- 项目配置 <project>/.mori/models.json（§4.3），只能收紧 ----
 
-/** @brief 项目配置：缩小区域、把用户的分组缩小到它的一部分。分组与成员是否存在由后台进程判断。 */
+/**
+ * @brief 项目配置：把用户的分组缩小到它的一部分（2026-10-26 起只有 groups，原来的 allowedZones 按未知字段报错）。
+ *        分组与成员是否存在由后台进程判断。
+ */
 export const ProjectModelsFileSchema = z.strictObject({
-  /** 与用户级的结果取交集 */
-  allowedZones: ZoneListSchema.optional(),
   /** 用户分组 id → 这个项目里用到的成员（用户分组的成员，或某个提供商成员下的模型）；列表不能为空（§4.3） */
   groups: z.record(z.string(), z.array(PickSchema).min(1, 'A group needs at least one member')
     .refine(distinct, 'Group members must not repeat')).optional(),
@@ -322,7 +253,7 @@ export type ProjectModelsFile = z.infer<typeof ProjectModelsFileSchema>;
  *        （平行 Agent 规格 §12.2、§12.9），不会恢复。
  */
 export const EXCLUSION_REASONS = [
-  'missing', 'zone_unconfirmed', 'zone_blocked', 'probing', 'unverified', 'failed', 'requires_unmet', 'same_family',
+  'missing', 'probing', 'unverified', 'failed', 'requires_unmet', 'same_family',
   'rate_limited', 'auth', 'quota', 'connection', 'not_found', 'timeout', 'held', 'tried', 'earlier', 'no_handover',
 ] as const;
 export type ExclusionReason = (typeof EXCLUSION_REASONS)[number];
@@ -354,9 +285,6 @@ function withUntil(base: string, joiner: string, until: number | null): string {
 export const REASON_TEXTS = Object.freeze({
   /** removed 为真：回复进行中被删除（§4.7） */
   missing: (removed = false): string => (removed ? 'removed from your model settings' : 'not in your model settings'),
-  zone_unconfirmed: (): string => 'network zone not confirmed',
-  /** zone：被排除的提供商所在区域 */
-  zone_blocked: (zone: Zone): string => `zone ${zone} is not allowed for this project`,
   probing: (): string => 'verifying…',
   unverified: (): string => 'tool calling not verified yet',
   failed: (): string => 'tool calling failed verification',
@@ -418,7 +346,7 @@ export interface CandidateExclusion {
   ref: string;
   /** 原因代码 */
   reason: ModelReason;
-  /** 原因的说明（§5.3 界面文字所需的细节，例如恢复时刻、区域、原文） */
+  /** 原因的说明（§5.3 界面文字所需的细节，例如恢复时刻、原文） */
   detail: string;
 }
 
@@ -432,10 +360,10 @@ export type BlockedKind = (typeof BLOCKED_KINDS)[number];
 
 /**
  * @brief 拒绝启动卡上的操作（§4.6）；check_agents 是 Check again（平行 Agent 规格 §4.4），
- *        turn_off_team 是协作模式下代替 change_model 的 Turn off team mode（平行 Agent 规格 §5.1、§12.11）。
+ *        turn_off_team 是协作模式下代替 change_model 的 Turn off task mode（平行 Agent 规格 §5.1、§12.11）。
  */
 export const BLOCKED_ACTIONS = [
-  'verify', 'allow_zone', 'confirm_zone', 'change_model', 'open_settings', 'check_agents', 'turn_off_team',
+  'verify', 'change_model', 'open_settings', 'check_agents', 'turn_off_team',
 ] as const;
 export type BlockedAction = (typeof BLOCKED_ACTIONS)[number];
 
@@ -451,10 +379,6 @@ export interface ModelBlocked {
   actions: BlockedAction[];
   /** Verify now 要探测的候选（unverified 的） */
   verifyRefs: string[];
-  /** Allow <区域> for this project 的区域；没有这个操作时为 null */
-  zone: Zone | null;
-  /** Confirm zone 要确认区域的提供商 id */
-  zoneProviders: string[];
   /** agents_invalid 时卡上逐条列出的问题（平行 Agent 规格 §4.4 表的写法，<file>: …）；其他种类为空 */
   problems: string[];
 }
@@ -474,7 +398,7 @@ export interface ModelState {
   /** 当前模型标了支持思考 */
   reasoning: boolean;
   /**
-   * 对话会话在协作模式下为真（平行 Agent 规格 §12.11）：范围按钮只显示正在用的模型、不能打开菜单，
+   * 对话会话在协作模式下为真（平行 Agent 规格 §12.11）：模型按钮显示“Task mode · <正在用的模型 id>”、菜单里没有范围的几节，
    * session.setPick 被拒绝，session.pickOptions 返回空
    */
   pickLocked: boolean;
@@ -540,6 +464,21 @@ export interface ReportedValues {
   image: boolean | null;
 }
 
+/**
+ * @brief 服务没报告、按服务地址取自 pi 自带模型表的值（model-discovery.md §4.4、§7.2，2026-10-26 负责人走查回答 1）：
+ *        只有服务没报告的项；模型行的“(from pi)”与 pi 的三种提示按它。
+ */
+export interface CatalogValues {
+  /** pi 的提供商显示名（例如 Z.AI）：标记的悬停说明与提示里写它 */
+  provider: string;
+  /** pi 的窗口；服务报告了窗口时为 null */
+  contextWindow: number | null;
+  /** pi 的最大输出；服务报告了、或 pi 的不小于这一行的窗口时为 null */
+  maxTokens: number | null;
+  /** pi 说支持思考，服务没报告思考支持 */
+  reasoning: boolean;
+}
+
 /** @brief 推理内容的字段名：openai-completions 为前四种之一，另两种接口为 native。 */
 export type ReasoningField = 'reasoning_content' | 'reasoning' | 'reasoning_text' | 'none' | 'native';
 
@@ -570,17 +509,18 @@ export interface ProfileView {
      */
     off_refused: boolean;
   };
-  /** 窗口：配置声明的、服务报告的（没有时为 null）、有效的；长输入是否被静默截断 */
-  context: {
-    declared: number; reported: number | null; effective: number; truncation: 'unknown' | 'none' | 'silent';
-  };
-  /** 断开后服务端是否停止（第 9 步） */
-  cancel_verified: boolean | 'unknown';
+  /** 窗口：配置声明的、服务报告的（没有时为 null）、有效的（两者中较小的） */
+  context: { declared: number; reported: number | null; effective: number };
   /**
-   * 第 0 步读到的服务报告的值（model-discovery.md §7.2）：模型行的“(not reported)”与“Server reports …”提示按它；
+   * 第 0 步读到的服务报告的值（model-discovery.md §7.2）：模型行的“(default)”与“Server reports …”提示按它；
    * 档案没有 meta（旧档案）或还没有档案时为 null
    */
   reported: ReportedValues | null;
+  /**
+   * 按配置的地址与模型 id 取自 pi 自带模型表、服务没报告的值（model-discovery.md §7.2，2026-10-26）：不存在档案里，
+   * 每次拼视图时查；reported 为 null、地址没对上 pi 的条目、一项都没取时为 null
+   */
+  catalog: CatalogValues | null;
   /** 最近一次探测完成的时刻（ms）；从未完成时为 null */
   probedAt: number | null;
   /** 探针套件版本 */
@@ -617,14 +557,26 @@ export interface MigrationNotice {
 
 const sessionId = z.string().min(1);
 const providerRef = z.string().min(1);
-const delta = z.union([z.literal(-1), z.literal(1)]);
+/** 移动的格数（§9.5，2026-10-26 负责人走查 M5）：不为 0 的整数，往前为负；一次拖动放下是一条命令 */
+const delta = z.number().int().refine((value) => value !== 0, 'delta must not be 0');
 
-/** @brief 提供商表单：新建、修改、首次启动共用；id 由后台进程按名称生成，区域必须选。 */
-export const ProviderFormSchema = z.strictObject({ ...providerFields, zone: ZoneSchema });
+/**
+ * @brief 把第 from 项移到第 to 项，其余各项次序不变（§9.1“拖动排序”）：设置页按它先显示新顺序，后台进程按它写配置。
+ * @param items 原来的列表（不改动它）
+ * @param from 被移动的那一项的位置
+ * @param to 移到的位置（按移动之后的列表算）
+ * @return 新的列表
+ */
+export function movedItems<T>(items: readonly T[], from: number, to: number): T[] {
+  const next = [...items];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+/** @brief 提供商表单：新建、修改、首次启动共用；id 由后台进程按名称生成。 */
+export const ProviderFormSchema = z.strictObject(providerFields);
 export type ProviderForm = z.infer<typeof ProviderFormSchema>;
-
-/** @brief 探针的种类：自动的第 0–7 步、需要同意的长输入（第 8 步）或取消（第 9 步）。 */
-export const PROBE_TESTS = ['auto', 'long_input', 'cancel'] as const;
 
 /** @brief 一次加入的模型（model-discovery.md §5.4）：1 个以上，按清单顺序；id 是否重复由后台进程判断。 */
 const AddedModelsSchema = z.array(ProviderModelSchema).min(1);
@@ -681,15 +633,12 @@ export const ModelCommandSchemas = [
   z.object({ type: z.literal('models.saveGroup'), id: IdSchema, members: GroupMembersSchema, creating: z.boolean() }),
   /** 删除分组；dryRun 同上 */
   z.object({ type: z.literal('models.deleteGroup'), id: z.string().min(1), dryRun: z.boolean() }),
-  z.object({ type: z.literal('models.setDefaults'), normalDefault: PickSchema.nullable(),
-    allowedZones: AllowedZonesSchema }),
-  /** 本机按项目授权：在 allowedZones 之外为这个项目额外允许的区域 */
-  z.object({ type: z.literal('models.setProjectZones'), path: z.string().min(1), zones: ZoneListSchema }),
-  z.object({ type: z.literal('models.confirmZone'), providerId: providerRef, zone: ZoneSchema }),
+  z.object({ type: z.literal('models.setDefaults'), normalDefault: PickSchema.nullable() }),
   z.object({ type: z.literal('models.dismissMigration') }),
   /** 重新读配置文件（配置读不出时的 Reload） */
   z.object({ type: z.literal('models.reload') }),
-  z.object({ type: z.literal('models.verify'), refs: z.array(z.string().min(1)).min(1), tests: z.enum(PROBE_TESTS) }),
+  /** 对这些模型跑自动探针第 0–7 步（§7.4、§9.5） */
+  z.object({ type: z.literal('models.verify'), refs: z.array(z.string().min(1)).min(1) }),
   /** 这个会话换选择范围（写一条 mori.pick，不改 normalDefault） */
   z.object({ type: z.literal('session.setPick'), sessionId, pick: PickSchema }),
   /** 范围菜单的每一项，按这个会话的项目做静态校验（只读，§9.2） */
@@ -713,30 +662,14 @@ export interface KeyStatus {
   until: number | null;
 }
 
-/** @brief Project access 的一个项目（§9.1、§9.5 models.get 的 projects）。 */
-export interface ProjectAccess {
-  /** 规范化的项目路径 */
-  path: string;
-  /** 本机为这个项目在 allowedZones 之外额外授权的区域（model-config.json 的 projectZones[path]） */
-  zones: Zone[];
-  /** 项目配置 .mori/models.json 写的 allowedZones（排除了的区域的勾选框不可用）；没写、没有文件或文件无效时为 null */
-  projectZones: Zone[] | null;
-  /** 项目配置 .mori/models.json 的错误原文（§4.3）；有效或没有文件时为 null */
-  projectConfig: string | null;
-}
-
 /** @brief models.get / models.reload 的结果。 */
 export interface ModelsInfo extends ModelsResult {
   /** 用户级配置；key 只有 ref 与 label。读不出时为 null */
   config: ModelConfig | null;
   /** 档案：<provider>/<model> → 档案 */
   profiles: Record<string, ProfileView>;
-  /** 按地址建议的区域（§12）：提供商 id → 区域 */
-  zoneSuggestions: Record<string, Zone>;
   /** 迁移说明；没有或已 Dismiss 时为 null */
   migration: MigrationNotice | null;
-  /** 已知项目（侧栏里的项目）的授权 */
-  projects: ProjectAccess[];
   /** model-config.json 读不出时的路径与原文；没有时为 null */
   loadError: string | null;
   /** 不能用作提供商或分组 id 的名字（mori 和 pi 内置的提供商 id） */
@@ -767,8 +700,6 @@ export interface PickOption {
   kind: 'group' | 'provider' | 'model';
   /** 菜单文字：分组写 id，提供商写名称，模型写模型 id */
   label: string;
-  /** 展开后的候选涉及的区域，按 local、intranet、public 的顺序；区域未确认的提供商不计入 */
-  zones: Zone[];
   /** 展开后的全部候选都被本会话的静态校验排除（变淡，仍可以选） */
   excluded: boolean;
   /** excluded 时每个候选一行“<provider>/<model> — <原因>”；否则为 null */
@@ -788,11 +719,11 @@ export type DiscoverHint = 'no_tools' | 'trained_window';
 export interface DiscoveredModel {
   /** 服务列表里的 id，原样 */
   id: string;
-  /** 报告值或默认值（128000） */
+  /** 报告值、取自 pi 模型表的值（§4.4）或默认值（128000） */
   contextWindow: number;
-  /** 报告值或默认值（16384 与窗口一半中较小的），总是小于 contextWindow */
+  /** 报告值、取自 pi 模型表的值或默认值（16384 与窗口一半中较小的），总是小于 contextWindow */
   maxTokens: number;
-  /** 支持思考：报告值，没报告时为 false */
+  /** 支持思考：报告值，没报告时 pi 模型表说支持为 true，否则为 false */
   reasoning: boolean;
   /** 图片输入：报告值，没报告时为 false */
   image: boolean;
@@ -805,6 +736,11 @@ export interface DiscoveredModel {
    * family 有值为真
    */
   reported: { contextWindow: boolean; maxTokens: boolean; reasoning: boolean; image: boolean; family: boolean };
+  /**
+   * 服务没报告、取自 pi 自带模型表的项（§4.4，2026-10-26；清单写 From pi）：provider 为 pi 的提供商显示名，三项为真时
+   * 上面同名的值来自 pi；一项都没取时为 null
+   */
+  catalog: { provider: string; contextWindow: boolean; maxTokens: boolean; reasoning: boolean } | null;
   /** 清单行的提示 */
   hints: DiscoverHint[];
   /** 不能加入的原因（the ID is empty、the ID contains spaces）；能加入为 null */
@@ -888,8 +824,6 @@ export interface ModelCommandResults {
   'models.saveGroup': ModelsResult;
   'models.deleteGroup': DeleteResult;
   'models.setDefaults': ModelsResult;
-  'models.setProjectZones': ModelsResult;
-  'models.confirmZone': ModelsResult;
   'models.dismissMigration': ModelsResult;
   'models.verify': ModelsResult;
   'session.setPick': ModelState & ModelsResult;
@@ -915,7 +849,7 @@ export type ModelEvent =
     detail: string;
     /** 有被隐藏的过程（显示 "The new model redoes this reply."） */
     hidden: boolean;
-    /** 没能确认旧请求已停下就换的（§5.7 cancel_verified 为 unknown，提示注明 Couldn’t confirm it stopped） */
+    /** 发出后超时、等满 held 后换的：没能确认旧请求已停下（§5.7，提示注明 Couldn’t confirm it stopped） */
     unconfirmed: boolean;
     /** 换模型的时刻（ms） */
     at: number;

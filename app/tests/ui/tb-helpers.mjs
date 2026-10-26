@@ -5,8 +5,9 @@
 // - 数据目录（synthetic test setup）：model-config.json、model-profiles.json（跳过探针，直接给出写入等级 A/B/C/没有、
 //   能否关思考、模型族、并发）、pi 的 settings.json 与 trust.json；
 // - 角色文件：临时项目的 .mori/agents/<name>.md，正文带合成端点认角色用的 MORI-ROLE-<name>；
-// - App：启动、关掉、用同一个数据目录重新启动；打开文件夹拿到就绪的会话；发消息（Enter / Ctrl+Enter、/team）、
-//   协作开关；读会话 id 与会话文件、board.json、实例会话文件、后台进程的事件；等回执、进展摘要、task 行、批准卡；
+// - App：启动、关掉、用同一个数据目录重新启动；打开文件夹拿到就绪的会话；发消息（Enter / Ctrl+Enter、/task）、
+//   模型菜单里的 Task mode 一行（2026-10-26 前是顶栏的协作开关）；读会话 id 与会话文件、board.json、实例会话文件、
+//   后台进程的事件；等回执、进展摘要、task 行、批准卡、模式提示；
 //   等用户会话与整个协作都空闲（TeamState.busy 为假）；
 // - 结果文件：test-results/tb-app-<suite>(-packaged).json；--only 时写 tb-partial-app-<suite>(-packaged).json（不计入覆盖检查）；
 //   --exe 指向打包好的 Mori.exe。检查名以 TB 编号开头（调用方保证）。
@@ -208,7 +209,7 @@ export function tbModel(id, { family = '', contextWindow = 128000, maxTokens = 1
  * @param opts { concurrency（默认 4）, name }
  */
 export function tbProvider(id, port, models, { concurrency = 4, name = id.toUpperCase() } = {}) {
-  return { id, name, api: 'openai-completions', baseUrl: baseOf(port), zone: 'local', compat: {}, concurrency,
+  return { id, name, api: 'openai-completions', baseUrl: baseOf(port), compat: {}, concurrency,
     keys: [], nextKeyNumber: 1, models };
 }
 
@@ -223,10 +224,9 @@ const step = (outcome) => ({ outcome, detail: null });
  *        而 canDisable 不为 true）。键与指纹按 kernel/modelProfiles.ts 的写法算，启动时不重新探测。
  * @param baseUrl 提供商地址
  * @param model tbModel 的结果
- * @param opts { tier: 'A'|'B'|'C'|null（默认 'A'）, canDisable: true|false|'unknown'（默认 true）, bPass,
- *              cancel（cancel_verified，默认 true） }
+ * @param opts { tier: 'A'|'B'|'C'|null（默认 'A'）, canDisable: true|false|'unknown'（默认 true）, bPass }
  */
-export function tbProfile(baseUrl, model, { tier = 'A', canDisable = true, bPass, cancel = true } = {}) {
+export function tbProfile(baseUrl, model, { tier = 'A', canDisable = true, bPass } = {}) {
   const key = [baseUrl, 'openai-completions', model.id, FAKE_VERSION].join('|');
   const fingerprint = JSON.stringify([key, model.contextWindow, model.maxTokens, model.reasoning, model.input, []]);
   const b = bPass ?? (tier === 'B' || (tier === 'A' && canDisable !== true));
@@ -237,13 +237,12 @@ export function tbProfile(baseUrl, model, { tier = 'A', canDisable = true, bPass
   return {
     key, fingerprint, baseUrl, api: 'openai-completions', modelId: model.id,
     auto: { server: { kind: 'vllm', version: FAKE_VERSION }, reported: null, field: 'none', steps },
-    longInput: null, cancel: { step: step('pass'), verified: cancel },
     probedAt: Date.now(), suite: 1,
   };
 }
 
 /**
- * @brief 写数据目录（synthetic test setup）：model-config.json（全部本机区域）、model-profiles.json（每个模型一份
+ * @brief 写数据目录（synthetic test setup）：model-config.json（全部本机地址）、model-profiles.json（每个模型一份
  *        tbProfile，选项按 profiles[<provider>/<model>]）、pi/settings.json，以及要信任的项目（pi/trust.json）。
  * @param userData 数据目录
  * @param setup { providers（tbProvider 的列表）, groups（[{ id, members }]，默认无）, normalDefault（默认第一个提供商）,
@@ -252,8 +251,7 @@ export function tbProfile(baseUrl, model, { tier = 'A', canDisable = true, bPass
 export function seedTeamUserData(userData, setup) {
   const { providers, groups = [], profiles = {}, piSettings = {}, trusted = [] } = setup;
   mkdirSync(join(userData, 'pi'), { recursive: true });
-  const config = { version: 1, providers, groups, normalDefault: setup.normalDefault ?? providers[0].id,
-    allowedZones: ['local', 'intranet'], projectZones: {} };
+  const config = { version: 1, providers, groups, normalDefault: setup.normalDefault ?? providers[0].id };
   writeFileSync(join(userData, 'model-config.json'), `${JSON.stringify(config, null, 2)}\n`);
   const list = [];
   const seen = new Set();
@@ -313,6 +311,9 @@ export function writeRole(project, role) {
 
 /** @brief 写一组角色文件（writeRole），返回文件路径。 */
 export const writeRoles = (project, roles) => roles.map((role) => writeRole(project, role));
+
+/** 关闭模式的工作卡里“工具是 Agent 的、不让用户调”那一行的开头（§8.3，M26） */
+export const OFF_CARD_TOOLS = "Tools are yours, not the user's: never ask the user to call a tool";
 
 /**
  * @brief 分开的配置（proposal §6.2）：chat 持有对话，planner 持有立项与结案，executor、reviewer 做 task；
@@ -512,42 +513,85 @@ export async function waitTeamIdle(ctx, who, { timeout = 120000, stableMs = 1500
 
 /**
  * @brief 在某个会话的输入框里写字并按键发送。
- * @param text 原文（/team 的写法由调用方写进文字，或用 opts.team）
- * @param opts { key：'Enter'（默认）或 'Control+Enter'（插话）, team：为真时在前面加 "/team " }
+ * @param text 原文（/task 的写法由调用方写进文字，或用 opts.team）
+ * @param opts { key：'Enter'（默认）或 'Control+Enter'（插话）, team：为真时在前面加 "/task "（2026-10-26 由 /team 改） }
  */
 export async function sendMessage(ctx, tab, text, { key = 'Enter', team = false } = {}) {
   await showTab(ctx, tab);
   const box = ctx.page.locator(`${paneSel(tab)} .composer textarea`);
-  await box.fill(team ? `/team ${text}` : text);
+  await box.fill(team ? `/task ${text}` : text);
   await box.press(key);
 }
 
+/** @brief 这一栏输入框下面一行的模型按钮（docs/v1/screens/model-menu.md）。 */
+export const modelButtonSel = (tab) => `${paneSel(tab)} [data-testid="model-button"]`;
+/** @brief 这一栏的模型菜单。 */
+export const modelMenuSel = (tab) => `${paneSel(tab)} [data-testid="model-menu"]`;
+/** @brief 这一栏模型菜单里的 Task mode 一行（docs/v1/screens/team-switch.md）。 */
+export const taskRowSel = (tab) => `${modelMenuSel(tab)} [data-testid="team-switch"]`;
+
 /**
- * @brief 这个会话的协作开关此刻的样子：{ mode（data-mode）, checked（aria-checked）, text（宽栏的文字 .team-text）,
- *        label（读屏名称 aria-label）, title（悬停）, disabled, dot（是否是窄栏只显示状态点的样子） }。
+ * @brief 这个会话的协作模式此刻在模型按钮上的样子（2026-10-26 WP-09 起开关在模型菜单里，不打开菜单时读按钮，
+ *        team-switch.md“模型按钮上的模式”）：{ mode（data-team-mode）, text（按钮上的字，用 textContent：两段是
+ *        flex 的项，innerText 会在中间断行）, label（读屏名称）, title（悬停）, locked（data-locked，pickLocked）,
+ *        disabled（aria-disabled） }。没有模型按钮时（第一次打开中、打开失败）等到超时报错。
  */
 export function teamSwitch(ctx, tab) {
-  return ctx.page.locator(`${paneSel(tab)} [data-testid="team-switch"]`).evaluate((el) => {
-    const dot = el.querySelector('.team-dot');
-    return { mode: el.dataset.mode, checked: el.getAttribute('aria-checked'),
-      text: el.querySelector('.team-text')?.textContent ?? el.textContent, label: el.getAttribute('aria-label'),
-      title: el.getAttribute('title'), disabled: el.disabled,
-      dot: dot ? getComputedStyle(dot).display !== 'none' : false };
-  });
+  return ctx.page.locator(modelButtonSel(tab)).evaluate((el) => ({
+    mode: el.dataset.teamMode ?? null, text: el.textContent.trim(), label: el.getAttribute('aria-label'),
+    title: el.getAttribute('title'), locked: el.dataset.locked === 'true',
+    disabled: el.getAttribute('aria-disabled') === 'true' }));
+}
+
+/** @brief 打开这一栏的模型菜单（已经开着时不动），等 Task mode 一行出现。 */
+export async function openModelMenu(ctx, tab) {
+  if (!(await ctx.page.locator(modelMenuSel(tab)).count())) await ctx.page.locator(modelButtonSel(tab)).click();
+  await ctx.page.locator(taskRowSel(tab)).waitFor({ timeout: 10000 });
 }
 
 /**
- * @brief 点协作开关，等 data-mode 变成 want（不给时只等它变化）。
+ * @brief 关上这一栏的模型菜单：开着时再点一下模型按钮（不按 Esc：菜单已经自己关上时，焦点不在文字框里按 Esc 也可能
+ *        停掉回复）。
+ */
+export async function closeModelMenu(ctx, tab) {
+  const menu = ctx.page.locator(modelMenuSel(tab));
+  if (await menu.count()) await ctx.page.locator(modelButtonSel(tab)).click();
+  await menu.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+}
+
+/**
+ * @brief 打开模型菜单读 Task mode 一行（team-switch.md“Task mode 一行”）：{ mode（data-mode）, checked（aria-checked）,
+ *        role, label（读屏名称）, hint（第二行，没有时 null）, described（读屏的描述）, disabled（disabled 或
+ *        aria-disabled：切换中只有后者）, focused（焦点在它上面） }。
+ * @param opts { keepOpen：为真时读完不关菜单 }
+ */
+export async function taskModeRow(ctx, tab, { keepOpen = false } = {}) {
+  await openModelMenu(ctx, tab);
+  const row = await ctx.page.locator(taskRowSel(tab)).evaluate((el) => {
+    const ids = (el.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+    return { mode: el.dataset.mode, checked: el.getAttribute('aria-checked'), role: el.getAttribute('role'),
+      label: el.getAttribute('aria-label'), hint: el.querySelector('[data-testid="team-hint"]')?.textContent ?? null,
+      described: ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' '),
+      disabled: el.disabled || el.getAttribute('aria-disabled') === 'true', focused: document.activeElement === el };
+  });
+  if (!keepOpen) await closeModelMenu(ctx, tab);
+  return row;
+}
+
+/**
+ * @brief 在模型菜单里点 Task mode 一行，等模型按钮的 data-team-mode 变成 want（不给时只等它变化）；之后关上菜单。
+ * @param opts { keepOpen：为真时点完不关菜单（看菜单不关、焦点留在这一行） }
  * @return 点之后的 teamSwitch 状态
  */
-export async function clickTeamSwitch(ctx, tab, want = null) {
-  const sel = `${paneSel(tab)} [data-testid="team-switch"]`;
+export async function clickTeamSwitch(ctx, tab, want = null, { keepOpen = false } = {}) {
   const before = await teamSwitch(ctx, tab);
-  await ctx.page.locator(sel).click();
+  await openModelMenu(ctx, tab);
+  await ctx.page.locator(taskRowSel(tab)).click();
   await ctx.page.waitForFunction(({ css, old, target }) => {
-    const mode = document.querySelector(css)?.dataset.mode;
+    const mode = document.querySelector(css)?.dataset.teamMode;
     return target ? mode === target : mode !== old;
-  }, { css: sel, old: before.mode, target: want }, { timeout: 10000 });
+  }, { css: modelButtonSel(tab), old: before.mode, target: want }, { timeout: 10000 });
+  if (!keepOpen) await closeModelMenu(ctx, tab);
   return teamSwitch(ctx, tab);
 }
 
@@ -796,6 +840,23 @@ export function transcriptItems(ctx, tab) {
 }
 
 /**
+ * @brief 某个会话面板对话流里的模式提示（§13.11，docs/v1/screens/team-switch.md）：按先后 [{ mode（data-mode）, text,
+ *        before（它后面第一条你的消息的文字，没有时为 null） }]。
+ */
+export function modeNoticesOf(ctx, tab) {
+  return ctx.page.locator(`${paneSel(tab)} [data-testid="transcript"]`).evaluate((root) => {
+    const items = [...root.querySelectorAll('[data-item]')];
+    return items.flatMap((el, at) => {
+      const notice = el.querySelector('[data-kind="team-mode"]');
+      if (!notice) return [];
+      const next = items.slice(at + 1).find((item) => item.dataset.item === 'user');
+      return [{ mode: notice.dataset.mode, text: notice.textContent.trim(),
+        before: next ? next.textContent.replace(/\s+/g, ' ').trim() : null }];
+    });
+  });
+}
+
+/**
  * @brief 某个会话面板里的批准卡：[{ request（data-request）, tool, agent（data-agent）, task（data-task）,
  *        attribution（归属行文字）, title }]。
  */
@@ -868,7 +929,7 @@ export function toolCardsOf(ctx, tab) {
 
 /**
  * @brief 把某条回复里的一段文字作为引用芯片放进输入框（真的拖鼠标选中 → 选区浮层"Attach as context"，docs/v0/screens/quotes.md），
- *        等输入框上方多出一个芯片；/team 的识别在芯片拼进消息之前（§5.1），所以带芯片发 /team 也能用。
+ *        等输入框上方多出一个芯片；/task 的识别在芯片拼进消息之前（§5.1），所以带芯片发 /task 也能用。
  * @param text 回复里的原文（在最后一条含它的回复里选）
  * @return 输入框上方的芯片数
  */

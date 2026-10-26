@@ -3,6 +3,8 @@
 // 2026-10-24（§7.7，MP-38 单元层）：auto.offRefused 写出、读回后仍为真并编译出“没有 Off”的标记；没有这一项的旧档案
 // 照读、off_refused 为假、不重新探测（PROBE_SUITE 不变）；reasoningOf 三种接口都给 off_refused，第 2 步被拒判为 fail
 // 时 can_disable 为假。档案与配置都是 synthetic。
+// 2026-10-26（负责人走查 M7，规格 §7.2）：长输入、取消两步删掉，原 MP-11 的用例同删；带这两步结果（longInput、cancel）
+// 的旧档案读的时候丢掉这两项、其余不变，不重新探测，下一次写文件时不再写出（MP-12）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,7 +46,7 @@ function autoResults(overrides = {}, steps = {}) {
 
 /** 一个档案。 */
 function stored(t = target(), auto = autoResults(), now = 5000) {
-  return P.buildProfile({ target: t, auto, previous: undefined, now });
+  return P.buildProfile({ target: t, auto, now });
 }
 
 // ---- 档案键与指纹（§7.1） ----
@@ -150,25 +152,11 @@ test('MP-10 reasoning: completions uses the observed field and steps 2 and 4; ot
     { field: 'native', can_disable: 'unknown', replay: 'not_required', off_refused: false });
 });
 
-test('MP-11 context: effective is the smaller of declared and reported; silent truncation lowers it', () => {
+test('MP-10 context: effective is the smaller of declared and reported', () => {
   const model = target({}, { contextWindow: 131072 }).model;
-  assert.deepEqual(P.contextOf(model, 65536, null),
-    { declared: 131072, reported: 65536, effective: 65536, truncation: 'unknown' });
-  assert.deepEqual(P.contextOf(model, null, null),
-    { declared: 131072, reported: null, effective: 131072, truncation: 'unknown' });
-  const none = { step: pass, truncation: 'none', limit: null };
-  assert.equal(P.contextOf(model, 65536, none).effective, 65536);
-  assert.equal(P.contextOf(model, 65536, none).truncation, 'none');
-  const silent = { step: pass, truncation: 'silent', limit: 32768 };
-  assert.deepEqual(P.contextOf(model, 65536, silent),
-    { declared: 131072, reported: 65536, effective: 32768, truncation: 'silent' });
-  assert.equal(P.contextOf(model, 65536, { ...silent, limit: 0 }).effective, 0);
-});
-
-test('MP-11 cancel_verified comes from step 9 and is unknown until it runs', () => {
-  assert.equal(P.cancelVerifiedOf(null), 'unknown');
-  assert.equal(P.cancelVerifiedOf({ step: pass, verified: true }), true);
-  assert.equal(P.cancelVerifiedOf({ step: pass, verified: false }), false);
+  assert.deepEqual(P.contextOf(model, 65536), { declared: 131072, reported: 65536, effective: 65536 });
+  assert.deepEqual(P.contextOf(model, null), { declared: 131072, reported: null, effective: 131072 });
+  assert.deepEqual(P.contextOf(model, 262144), { declared: 131072, reported: 262144, effective: 131072 });
 });
 
 test('MP-10 status is error with the first error text when a step had no result', () => {
@@ -176,13 +164,11 @@ test('MP-10 status is error with the first error text when a step had no result'
   const broken = stored(target(), autoResults({}, { call: error('500 Internal Server Error'), result: notRun,
     a: error('later') }));
   assert.deepEqual(P.statusOf(broken), { status: 'error', error: '500 Internal Server Error' });
-  const cancelError = P.withCancel(stored(), { step: error('503'), verified: 'unknown' }, 6000);
-  assert.deepEqual(P.statusOf(cancelError), { status: 'error', error: '503' });
 });
 
 test('MP-10 profile view for a stored profile', () => {
   const t = target({}, { input: ['text', 'image'] });
-  const view = P.profileView(t, stored(t), false);
+  const view = P.profileView(t, stored(t), false, null);
   assert.equal(view.status, 'ready');
   assert.deepEqual(view.server, { kind: 'vllm', version: '0.10.1' });
   assert.deepEqual(view.tool_calling, { state: 'verified', call: pass, result: pass });
@@ -191,8 +177,7 @@ test('MP-10 profile view for a stored profile', () => {
   assert.equal(view.structured_output, 'verified');
   assert.equal(view.vision, 'unverified');
   assert.deepEqual(view.reasoning, { field: 'none', can_disable: 'unknown', replay: 'unknown', off_refused: false });
-  assert.deepEqual(view.context, { declared: 131072, reported: 65536, effective: 65536, truncation: 'unknown' });
-  assert.equal(view.cancel_verified, 'unknown');
+  assert.deepEqual(view.context, { declared: 131072, reported: 65536, effective: 65536 });
   assert.equal(view.probedAt, 5000);
   assert.equal(view.suite, P.PROBE_SUITE);
 });
@@ -202,12 +187,12 @@ test('MP-10 profile view for a stored profile', () => {
 test('MP-12 never-verified model is probing while running and unverified otherwise', () => {
   assert.equal(P.toolCallingState(undefined, true), 'probing');
   assert.equal(P.toolCallingState(undefined, false), 'unverified');
-  const view = P.profileView(target({ api: 'anthropic-messages' }), undefined, true);
+  const view = P.profileView(target({ api: 'anthropic-messages' }), undefined, true, null);
   assert.equal(view.status, 'probing');
   assert.equal(view.tool_calling.state, 'unverified');
   assert.equal(view.tier.b.outcome, 'not_applicable');
   assert.equal(view.probedAt, null);
-  assert.equal(P.profileView(target(), undefined, false), null);
+  assert.equal(P.profileView(target(), undefined, false, null), null);
 });
 
 test('MP-09 a profile left unverified by an error counts as never verified: probing while running', () => {
@@ -215,7 +200,7 @@ test('MP-09 a profile left unverified by an error counts as never verified: prob
   assert.equal(P.toolCallingOf(errored.auto.steps.call, errored.auto.steps.result), 'unverified');
   assert.equal(P.toolCallingState(errored, true), 'probing');
   assert.equal(P.toolCallingState(errored, false), 'unverified');
-  assert.equal(P.profileView(target(), errored, true).tool_calling.state, 'unverified');
+  assert.equal(P.profileView(target(), errored, true, null).tool_calling.state, 'unverified');
 });
 
 test('MP-12 while re-verifying, the old results stay in use for selection and display', () => {
@@ -223,33 +208,17 @@ test('MP-12 while re-verifying, the old results stay in use for selection and di
   assert.equal(P.toolCallingState(verified, true), 'verified');
   const failed = stored(target(), autoResults({}, { call: fail, result: notRun }));
   assert.equal(P.toolCallingState(failed, true), 'failed');
-  assert.equal(P.profileView(target(), verified, true).status, 'ready');
-  assert.equal(P.profileView(target({}, { contextWindow: 65536 }), verified, true).tool_calling.state, 'verified');
+  assert.equal(P.profileView(target(), verified, true, null).status, 'ready');
+  assert.equal(P.profileView(target({}, { contextWindow: 65536 }), verified, true, null).tool_calling.state,
+    'verified');
 });
 
-test('MP-12 a new probe keeps step 8/9 results only while the profile key (server version) is the same', () => {
-  const first = P.withCancel(P.withLongInput(stored(), { step: pass, truncation: 'silent', limit: 1000 }, 6000),
-    { step: pass, verified: true }, 7000);
-  assert.equal(first.probedAt, 7000);
-  const same = P.buildProfile({ target: target(), auto: autoResults(), previous: first, now: 8000 });
-  assert.deepEqual(same.longInput, first.longInput);
-  assert.deepEqual(same.cancel, first.cancel);
-  const newer = P.buildProfile({ target: target(), now: 9000, previous: first,
+test('MP-12 a probe result with a newer server version is stored under the new key', () => {
+  const newer = P.buildProfile({ target: target(), now: 9000,
     auto: autoResults({ server: { kind: 'vllm', version: '0.11.0' } }) });
-  assert.equal(newer.longInput, null);
-  assert.equal(newer.cancel, null);
   assert.equal(newer.key, 'http://127.0.0.1:4319/v1|openai-completions|fake-coder|0.11.0');
+  assert.equal(newer.probedAt, 9000);
   assert.equal(P.needsProbe(target(), newer), false);
-});
-
-test('MP-11 a long-input error keeps the earlier truncation result', () => {
-  const silent = P.withLongInput(stored(), { step: pass, truncation: 'silent', limit: 1000 }, 6000);
-  const errored = P.withLongInput(silent, { step: error('Connection error.'), truncation: null, limit: null }, 7000);
-  assert.equal(errored.longInput.truncation, 'silent');
-  assert.equal(errored.longInput.limit, 1000);
-  assert.deepEqual(P.statusOf(errored), { status: 'error', error: 'Connection error.' });
-  const fresh = P.withLongInput(stored(), { step: error('x'), truncation: null, limit: null }, 7000);
-  assert.equal(P.contextOf(target().model, 65536, fresh.longInput).truncation, 'unknown');
 });
 
 // ---- model-profiles.json ----
@@ -283,7 +252,7 @@ test('MP-12 tolerant load: missing file, bad JSON, wrong shape and invalid entri
 
 /** 一个 ProfileBook：ref → 配置里的目标。 */
 function book(path, targets) {
-  return new P.ProfileBook({ path, resolve: (ref) => targets[ref] ?? null });
+  return new P.ProfileBook({ path, resolve: (ref) => targets[ref] ?? null, catalog: () => null });
 }
 
 test('MP-12 ProfileBook saves one profile per server model, replacing older versions, and reloads it', async () => {
@@ -292,7 +261,7 @@ test('MP-12 ProfileBook saves one profile per server model, replacing older vers
   const profiles = book(path, targets);
   await profiles.load();
   await profiles.save(stored());
-  const upgraded = P.buildProfile({ target: target(), previous: profiles.lookup(target()), now: 9000,
+  const upgraded = P.buildProfile({ target: target(), now: 9000,
     auto: autoResults({ server: { kind: 'vllm', version: '0.11.0' } }) });
   await profiles.save(upgraded);
   const again = book(path, targets);
@@ -301,6 +270,26 @@ test('MP-12 ProfileBook saves one profile per server model, replacing older vers
   assert.equal(again.lookupRef('copy/fake-coder').key, upgraded.key, 'two providers on one server share a profile');
   assert.equal((await P.readProfiles(path)).length, 1);
 });
+
+test('MP-12 a profile written before 2026-10-26 with step 8/9 results reads without them and is kept as it is',
+  async () => {
+    // synthetic 的旧档案：2026-10-26 以前长输入、取消两步（规格 §7.2 的 2026-10-26 改）的结果
+    const old = { ...stored(), longInput: { step: pass, truncation: 'silent', limit: 1000 },
+      cancel: { step: pass, verified: true } };
+    const path = tempPath();
+    writeFileSync(path, JSON.stringify({ version: 1, profiles: [old] }));
+    const [read] = await P.readProfiles(path);
+    assert.deepEqual(read, stored(), 'the two old fields are dropped, everything else is unchanged');
+    assert.equal(P.needsProbe(target(), read), false, 'no new probe because of them');
+    const profiles = book(path, { 'local/fake-coder': target(), 'local/new': target({}, { id: 'new' }) });
+    await profiles.load();
+    assert.deepEqual(P.profileView(target(), profiles.lookupRef('local/fake-coder'), false, null).context,
+      { declared: 131072, reported: 65536, effective: 65536 }, 'the effective window ignores the old truncation');
+    await profiles.save(stored(target({}, { id: 'new' })));
+    const written = readFileSync(path, 'utf8');
+    assert.ok(!written.includes('longInput') && !written.includes('"cancel"'), 'the next write leaves them out');
+    assert.equal((await P.readProfiles(path)).length, 2);
+  });
 
 test('MP-12 ProfileBook: toolCallingFor and views follow the re-verifying rule', async () => {
   const targets = { 'local/fake-coder': target(), 'local/new': target({}, { id: 'new' }) };
@@ -356,10 +345,9 @@ function refusedAuto(api) {
 
 /** 只有 t 这个模型的配置（提供商 or，没有 key，synthetic）。 */
 function configOf(t) {
-  const provider = { id: 'or', name: 'OpenRouter', api: t.api, baseUrl: t.baseUrl, zone: 'local', compat: t.compat,
+  const provider = { id: 'or', name: 'OpenRouter', api: t.api, baseUrl: t.baseUrl, compat: t.compat,
     concurrency: 4, keys: [], nextKeyNumber: 1, models: [t.model] };
-  return { version: 1, providers: [provider], groups: [], normalDefault: NOOFF_REF, allowedZones: ['local'],
-    projectZones: {} };
+  return { version: 1, providers: [provider], groups: [], normalDefault: NOOFF_REF };
 }
 
 /** 照 modelLayer.ts 的 profileLookup：按 ProfileBook 里这个模型的档案给编译项（compileFlagsOf）。 */
@@ -387,7 +375,7 @@ test('MP-38 profiles: auto.offRefused true is written, read back still true, and
       assert.deepEqual(read, profile, api);
       assert.equal(read.auto.offRefused, true, `${api}: the schema keeps offRefused`);
       assert.deepEqual(P.compileFlagsOf(api, read.auto), { replayRequired: false, offRefused: true }, api);
-      const view = P.profileView(t, read, false);
+      const view = P.profileView(t, read, false, null);
       assert.deepEqual([view.status, view.reasoning.off_refused, view.reasoning.can_disable], ['ready', true, false],
         `${api}: a refused step 2 is not an error`);
       assert.ok(!JSON.stringify(view).includes('Thinking can’t be turned off'),

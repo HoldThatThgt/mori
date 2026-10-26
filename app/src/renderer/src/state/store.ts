@@ -71,7 +71,7 @@ export interface Tab extends ModelState {
   approval: ApprovalState;
   /**
    * 协作状态（平行 Agent 规格 §13.10）：会话信息、mori.team_state 与 session.setTeam 的结果；
-   * 后台进程退出后保留最后知道的模式（开关照它显示、不可用，team-switch.md）
+   * 后台进程退出后保留最后知道的模式（模型按钮照它显示、不可用，team-switch.md）
    */
   team: TeamState;
   /** 这个用户会话的 TaskBoard 视图：会话信息与 mori.board（进展摘要、右栏的说明） */
