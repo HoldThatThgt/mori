@@ -3,7 +3,8 @@
 // 没跟踪、也没被忽略的文件（git ls-files --others --exclude-standard）：每一行。只看 app/src 与 app/tests，
 // 不看 app/tests/fixtures/（录下的服务数据，不是这次写的代码）。没改过的旧代码里本来就有这些词，所以只看新加的行；
 // 只有行尾 CR 变了的行（例如编辑器把整个文件从 LF 换成 CRLF）不算新加的行（--ignore-cr-at-eol）。
-// 标记见 MARKERS（四个英文标记与一个中文标记，英文的不分大小写）；模式里用字符类，这个文件自己的模式不会认出自己。
+// 标记见 MARKERS（四个英文标记、一个中文标记与六个中文说法，英文的不分大小写；中文说法是 2026-10-26 按 AGENTS.md
+// “不留未完成项，不做规格外的东西”加的，注释用中文，推迟也会用中文写）；模式里用字符类，这个文件自己的模式不会认出自己。
 // FLAG_FILES 的三个文件实现"跳过的与标为待办的测试算失败"（单元报告器的严格模式与覆盖检查，§13.3），那里全小写的
 // 英文"待办"一词是 node --test 的标记名（data 的字段名），不算推迟的标记；大写或大小写混写的照查，另外四个标记也照查。
 // 每个命中打印一行 "<文件>:<行号>: <内容>"（文件相对仓库根目录），最后一行 "PASS <编号> md-markers: …" 或
@@ -51,6 +52,7 @@ const MARKERS = [
   { pattern: /\bnot[\s_-]*implem[e]nted/i, flagName: null },
   { pattern: /\bl[a]ter\b/i, flagName: null },
   { pattern: /待[实]现/, flagName: null },
+  { pattern: /留[到]后续|以[后]再做|交[给]下一个包|交[给]后面的包|暂[不]实现|占[位]实现/, flagName: null },
 ];
 /** 实现"跳过的与标为待办的测试算失败"的文件：那里全小写的英文"待办"一词是 node --test 的标记名（相对仓库根目录） */
 const FLAG_FILES = new Set([
