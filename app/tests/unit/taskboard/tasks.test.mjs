@@ -110,7 +110,8 @@ test('TB-82 board.readTask gives the prompt, dependencies with status, messages 
     const long = `Fixed the blank page. ${'The cause was a missing route. '.repeat(15)}`.trim();
     await beginRun(host, start);
     const message = host.entry('U.t1.executor').api.tools.get('agent_message');
-    await message.execute('m1', message.prepareArguments({ to: 'T1', text: '| step | result |\n| - | - |\n| 1 | ok |' }),
+    const table = '| step | result |\n| - | - |\n| 1 | ok |';
+    await message.execute('m1', message.prepareArguments({ to: 'T1', text: table }),
       undefined, undefined, {});
     await finishRun(host, start, [{ calls: [{ name: 'bash', args: { command: 'npm test' }, result: 'ok' }] },
       { calls: [{ name: 'task_handoff', args: { conclusion: long, outcome: 'done', evidence: ['#1'],
@@ -131,7 +132,8 @@ test('TB-82 board.readTask gives the prompt, dependencies with status, messages 
     assert.deepEqual(baton.routedTo, { kind: 'close' });
     assert.deepEqual(baton.session, { role: 'executor', turns: [1, 1] });
     const check = team.readTask('T2');
-    assert.deepEqual(check.dependsOn, [{ id: 'T1', title: 'Find and fix', status: B.findTask(team.board, 'T1').status }]);
+    assert.deepEqual(check.dependsOn, [{ id: 'T1', title: 'Find and fix',
+      status: B.findTask(team.board, 'T1').status }]);
     assert.equal(check.readOnly, true);
   });
 
@@ -223,7 +225,7 @@ test('TB-84 readTask and readSession leave board.json and the session files unch
 test('TB-84 board.readSession reports a missing session, task or request in the spec words', async () => {
   const { team } = await setup(SPLIT, 'A');
   addTask(team, { dependsOn: [] });
-  addTask(team, { title: 'Later', dependsOn: ['T1'] });
+  addTask(team, { title: 'Next one', dependsOn: ['T1'] });
   await assert.rejects(team.readSession({ kind: 'task', task: 'T2', role: 'reviewer' }),
     { message: 'reviewer has no session on T2.' });
   await assert.rejects(team.readSession({ kind: 'task', task: 'T2', role: 'mori' }),
@@ -291,7 +293,8 @@ test('TB-89 stopping drops the queue of that instance, ends waits on it and keep
   // T1 正在运行，它留在队列里，停止时清掉，等的一方以 Stopped by the user. 结束。
   let settled = null;
   team.enqueue([...team.lanes.values()].find((lane) => lane.id === 'U.t1.executor'), team.delivery('agent_message',
-    { from: 'reviewer', text: 'Which file?' }, { kind: 'message' }, { waiter: { settle: (text) => { settled = text; } } }));
+    { from: 'reviewer', text: 'Which file?' }, { kind: 'message' },
+    { waiter: { settle: (text) => { settled = text; } } }));
   await team.stopTask('T1');
   assert.equal(settled, 'Stopped by the user.');
   assert.equal(B.findTask(team.board, 'T1').status, 'stopped');

@@ -1,13 +1,16 @@
 // 对话流里的协作（docs/specs/parallel-agents-taskboard.md §13.2、§13.3；docs/v1/screens/team-stream.md）：
 // 回执的一行，与每个需求一块的进展摘要。摘要的位置来自 mori.progress，内容来自会话的 TaskBoard 视图（mori.board、
 // 会话信息），文字都由 shared/team.ts 用需求和 task 的标题、当前在做什么、每一棒的结论拼出来；时长每秒更新。
+// task 行与标题行右端的图标按钮打开右栏的 Background tasks（§13.13.1）。
 
 import { useState } from 'react';
 import {
   chainText, durationText, receiptText, requestStateText, roleLabel, taskPhaseText, type BoardView,
   type ReceiptEntryData, type RequestView, type TaskStatus, type TaskView, type TeamHolders,
 } from '../../../shared/team';
+import { openTasks } from '../state/backgroundTasks';
 import { useApp } from '../state/store';
+import { Icon } from '../icons';
 import { useNow } from './ToolCard';
 
 /** 已结束的 task：折叠时不列（§13.3） */
@@ -31,21 +34,27 @@ interface ProgressContext {
   holders: TeamHolders;
   /** 会话的工作目录（当前在做什么里的路径） */
   cwd: string;
+  /** 会话在界面里的标识（打开右栏的 Background tasks） */
+  tabKey: string;
 }
 
 /**
  * @brief task 的一行：`T1 <title> · <role> · <当前在做什么>[ · <模型提示>]`。持有者为空（pending、终态）或交到结案时
- *        省略角色段（结案的角色已写在状态里，team-stream.md）；展开时下面一行交接链。
+ *        省略角色段（结案的角色已写在状态里，team-stream.md）；展开时下面一行交接链。这一行是按钮：打开右栏到这个 task
+ *        的视图（§13.13.1）。
  */
 function TaskRow({ task, context, expanded }: { task: TaskView; context: ProgressContext; expanded: boolean }) {
   const role = task.holder !== null && task.phase !== 'with_close' ? ` · ${roleLabel(task.holder)}` : '';
   const doing = taskPhaseText(task, context.view, context.holders, context.cwd);
   const note = task.modelNote ? ` · ${task.modelNote}` : '';
+  const link = `Open ${task.id} ${task.title} in Background tasks`;
   return (
     <>
-      <div className="progress-task" data-testid="progress-task" data-task={task.id} data-phase={task.phase}>
+      <button type="button" className="progress-task" data-testid="progress-task" data-task={task.id}
+        data-phase={task.phase} data-action="open-in-tasks" aria-label={link} title={link}
+        onClick={() => openTasks(context.tabKey, { level: 'task', task: task.id })}>
         {`${task.id} ${task.title}${role} · ${doing}${note}`}
-      </div>
+      </button>
       {expanded && task.chain.length > 0 && (
         <div className="progress-chain" data-testid="progress-chain" data-task={task.id}>{chainText(task.chain)}</div>
       )}
@@ -63,7 +72,13 @@ function ProgressBody({ request, context }: { request: RequestView; context: Pro
   const tasks = open ? request.tasks : request.tasks.filter((task) => !ENDED.includes(task.status));
   return (
     <div className="progress-summary" data-testid="progress" data-request={request.no} data-state={request.state}>
-      <button className="progress-title" aria-expanded={open} onClick={() => setOpen(!open)}>{title}</button>
+      <div className="progress-head">
+        <button className="progress-title" aria-expanded={open} onClick={() => setOpen(!open)}>{title}</button>
+        <button type="button" className="icon-button progress-open" data-action="open-in-tasks"
+          data-request={request.no} aria-label={`Open Request ${request.no} in Background tasks`}
+          title={`Open Request ${request.no} in Background tasks`} onClick={() => openTasks(context.tabKey,
+            { level: 'list', highlight: { request: request.no, nonce: Date.now() } })}><Icon name="right" /></button>
+      </div>
       {tasks.map((task) => <TaskRow key={task.id} task={task} context={context} expanded={open} />)}
       {open && request.ruledOut.length > 0 && (
         <div className="progress-ruled-out" data-testid="progress-ruled-out">
@@ -85,5 +100,5 @@ export function ProgressSummary({ request, tabKey }: { request: number; tabKey: 
   const cwd = useApp((state) => state.tabs.find((tab) => tab.key === tabKey)?.cwd ?? '');
   const found = view?.requests.find((item) => item.no === request);
   if (!view || !holders || !found) return null;
-  return <ProgressBody request={found} context={{ view, holders, cwd }} />;
+  return <ProgressBody request={found} context={{ view, holders, cwd, tabKey }} />;
 }

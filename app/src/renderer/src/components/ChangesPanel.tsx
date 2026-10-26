@@ -2,10 +2,13 @@
 // docs/v0/screens/changes.md）。照 Claude 桌面版：按文件折叠的 diff 列表，文件行上有打开文件的按钮。
 // 只列对话流里的编辑与写入；后台实例改过文件时列表上方写明它们不在这里（docs/v1/screens/team-blocked.md "右栏"）。
 
+import { showRightTab } from '../state/backgroundTasks';
 import type { ToolCall, Transcript } from '../state/model';
 import { openFile } from '../state/quotes';
 import type { Tab } from '../state/store';
+import { tasksShown } from '../state/taskList';
 import { Icon } from '../icons';
+import { BackgroundTasks } from './BackgroundTasks';
 import { Diff } from './Diff';
 import { FileViewer } from './FileViewer';
 import { PanelExpand } from './PanelExpand';
@@ -61,18 +64,18 @@ function Change({ tool, index }: { tool: ToolCall; index: number }) {
   );
 }
 
-/** @brief 改动列表。 */
-function ChangesList({ tab, onClose }: { tab: Tab; onClose: () => void }) {
+/** @brief 改动列表；有页签时（平行 Agent 规格 §13.13.1）没有自己的标题行。 */
+function ChangesList({ tab, onClose, tabbed }: { tab: Tab; onClose: () => void; tabbed: boolean }) {
   const files = collectChanges(tab.transcript, tab.cwd);
   // 后台实例改的文件不在列表里（平行 Agent 规格 §13.12）：有实例改过文件时写明，列表为空时只有这一句。
   const teamEdited = tab.board.teamEdited;
   return (
     <>
-      <div className="panel-header">
+      {!tabbed && <div className="panel-header">
         <Icon name="file" /><span className="panel-title">This session’s changes</span>
         <PanelExpand tab={tab} />
         <button className="icon-button" onClick={onClose} aria-label="Close panel"><Icon name="close" /></button>
-      </div>
+      </div>}
       <div className="panel-body" data-testid="changes">
         {teamEdited && <p className="panel-note" data-testid="team-changes-note">
           Changes made by team tasks aren’t listed here.</p>}
@@ -98,10 +101,47 @@ function ChangesList({ tab, onClose }: { tab: Tab; onClose: () => void }) {
   );
 }
 
-/** @brief 右栏：改动列表或文件阅读器（按会话记住显示哪一个）。 */
-export function RightPanel({ tab, onClose }: { tab: Tab; onClose: () => void }) {
+/** @brief Changes 一栏：改动列表或文件阅读器（按会话记住显示哪一个）。 */
+function ChangesSide({ tab, onClose, tabbed }: { tab: Tab; onClose: () => void; tabbed: boolean }) {
   const view = tab.rightView;
-  if (view.kind === 'changes') return <ChangesList tab={tab} onClose={onClose} />;
+  if (view.kind === 'changes') return <ChangesList tab={tab} onClose={onClose} tabbed={tabbed} />;
   return <FileViewer key={tab.key} tab={tab} view={view} version={changeCount(tab.transcript, tab.cwd, view.path)}
-    onClose={onClose} />;
+    onClose={onClose} tabbed={tabbed} />;
+}
+
+/**
+ * @brief 页签那一行（平行 Agent 规格 §13.13.1）：Changes、Background tasks（Claude 右栏两栏的名字），右端“Expand” /
+ *        “Collapse”与关闭；在列表、task 的视图、会话里都在顶部。
+ */
+function PanelTabs({ tab, onClose }: { tab: Tab; onClose: () => void }) {
+  const tasks = tab.rightTab === 'tasks';
+  const tabButton = (which: 'changes' | 'tasks', label: string) => (
+    <button type="button" role="tab" className="panel-tab" data-testid="right-tab" data-tab={which}
+      aria-selected={(which === 'tasks') === tasks} onClick={() => showRightTab(tab.key, which)}>{label}</button>
+  );
+  return (
+    <div className="panel-header panel-tabs">
+      <div role="tablist" aria-label="Right panel" className="panel-tablist">
+        {tabButton('changes', 'Changes')}
+        {tabButton('tasks', 'Background tasks')}
+      </div>
+      <PanelExpand tab={tab} />
+      <button className="icon-button" onClick={onClose} aria-label="Close panel"><Icon name="close" /></button>
+    </div>
+  );
+}
+
+/**
+ * @brief 右栏。这个会话的 TaskBoard 有需求、或协作模式打开时顶部是两个页签（§13.13.1）；否则与 v0 相同（TB-03）：
+ *        改动列表或文件阅读器。
+ */
+export function RightPanel({ tab, onClose }: { tab: Tab; onClose: () => void }) {
+  if (!tasksShown(tab.board, tab.team.mode)) return <ChangesSide tab={tab} onClose={onClose} tabbed={false} />;
+  return (
+    <>
+      <PanelTabs tab={tab} onClose={onClose} />
+      {tab.rightTab === 'tasks' ? <BackgroundTasks tab={tab} />
+        : <ChangesSide tab={tab} onClose={onClose} tabbed />}
+    </>
+  );
 }

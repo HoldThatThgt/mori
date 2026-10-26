@@ -159,6 +159,8 @@ function describeTeamCommand(command: Command): string | null {
     case 'session.setTeam': return `Team ${command.mode}`;
     case 'session.recheckAgents': return 'Check agent files';
     case 'session.stopTeam': return 'Stop team';
+    // Background tasks（§13.13.6）：board.readTask、board.readSession 是只读查询，不记
+    case 'session.stopTask': return `Stop task ${command.task}`;
     default: return describeMemoryCommand(command);
   }
 }

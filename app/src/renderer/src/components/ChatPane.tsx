@@ -22,6 +22,7 @@ import { Composer, QueueArea } from './Composer';
 import { PaneTitle } from './PaneTitle';
 import { QuestionCard } from './QuestionCard';
 import { StageLine } from './StageLine';
+import { TasksButton } from './TasksButton';
 import { TeamSwitch } from './TeamSwitch';
 import { Transcript } from './Transcript';
 
@@ -231,7 +232,10 @@ export function ChatPane({ tab, ...pane }: PaneProps & { tab: Tab }) {
       <Transcript tab={tab} />
       <div className="composer-area">
         <KernelBanner kernel={kernel} tab={tab} />
-        <StageLine transcript={tab.transcript} cwd={tab.cwd} seatRoles={seatRolesOf(tab.team)} />
+        <div className="stage-row">
+          <StageLine transcript={tab.transcript} cwd={tab.cwd} seatRoles={seatRolesOf(tab.team)} />
+          <TasksButton tab={tab} rightOpen={pane.rightOpen} onToggleRight={focus.toggle} />
+        </div>
         <ApprovalCard tab={tab} />
         <QuestionCard tab={tab} />
         <QueueArea tab={tab} />

@@ -61,7 +61,7 @@
 | 可以停止 | 同列表 | 标题右边 `Stop this task` | 停止 |
 | 有依赖 | `dependsOn` | `Depends on`，每个依赖一行 `T2 <title> · <状态>`（状态同卡片的当前在做什么，已结束时为 `Done` / `Failed` / `Cancelled`） | 点一行：打开那个 task 的视图（`Back` 仍回到列表） |
 | 有留给 task 的消息 | `messages` | `Messages`，按时间，每条一行 `<from> · hh:mm`，下面是全文按 Markdown（表格照常；WP-13 合入后 mermaid 同对话流）；`<from>` 是角色名（基座 `Mori`） | — |
-| 有交接 | `handoffs` | `Handoffs`，按先后，每一棒：头一行 `#<n> <role> · <结果> → <去向>`（下表）；结论全文（Markdown）；有时 `Open items` 每条一行、`Evidence` 每条一行 `✓ #3 Run npm test` / `✗ #4 …`、`Suggested next: <role>`；有会话位置时 `View transcript` | `View transcript`：打开这个角色在这个 task 上的会话；结案写的一棒打开结案会话 |
+| 有交接 | `handoffs` | `Handoffs`，按先后，每一棒：头一行 `#<n> <role> · <结果> → <去向>`（下表）；结论全文（Markdown）；有时 `Open items` 每条一行、`Evidence` 每条一行 `✓ #3 Run npm test` / `✗ #4 …`、`Suggested next: <role>`；有会话位置时、或结案会话写的一棒 `View transcript`（结案的交接不记会话位置） | `View transcript`：打开这个角色在这个 task 上的会话；结案写的一棒打开结案会话 |
 | 程序写的一棒 | `outcome` 为 null，`role` 为 `mori` | 头一行的结果写 `PROGRAM_HANDOFF_LINES` 的文字：`#2 Mori · no handoff → <close role> (closing)` | — |
 | task 在运行 | 这个 task 的 `TaskView` 在 `mori.board` 里变了 | 重新读 `board.readTask`，最多每秒一次；第二行随 `mori.board` 实时更新 | — |
 | 读不到 | `error` | `Couldn’t load T1: <原文>` | `Retry`、`Back` |

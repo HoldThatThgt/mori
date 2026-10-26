@@ -7,6 +7,8 @@
 //   ask：关闭模式下让对话用 agent_message 问 reviewer 一个问题（临时提问）。
 //   team：/team 让 executor 修好失败的测试（只改 sum.js）并跑 npm test、reviewer 复核；“Ask each time”，出现的后台批准卡都允许。
 //   approval：“Ask each time”下 /team 让 executor 运行 node --version（task 跑命令，出后台批准卡），允许。
+//   stop（TB-89，§13.13.7）：Allow all，/team 让 executor 运行一个 30 秒的命令；它运行时在右栏的 Background tasks 里点
+//     Stop this task，再发一条消息让立项把它交回，等需求到终态。
 // 检查只断言程序保证的事（§17.1 的列表）：回执与 board.json 的写入一一对应；每个交接的证据编号都在那个实例会话里；
 // 对话会话的请求里没有写入类工具；后台批准卡写明角色与 task；每个实例的每次运行结束后 task 处于 §9.4 规定的状态，
 // 每个 task 到了终态、waiting_user 或交给结案；进展摘要的需求与 task 标题等于 board.json 里的，task 行的当前在做什么等于
@@ -14,16 +16,17 @@
 // 回答的内容、用了哪个模型）只写进结果的 note。前提没满足（对话没调 agent_message、没出批准卡、需求 15 分钟内没到终态）
 // 时最多重跑 2 次，记在 note 里；仍不满足按失败。15 分钟只是驱动脚本的时限。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs real）：
-//   MORI_APP_DIR=.tb-runs/real node tests/ui/tb-real.mjs --source <数据目录> [--exe <Mori.exe>] [--only ask,team,approval]
+//   MORI_APP_DIR=.tb-runs/real node tests/ui/tb-real.mjs --source <数据目录> [--exe <Mori.exe>]
+//     [--only ask,team,approval,stop]
 // 结果写到 test-results/tb-real(-packaged).json（--only 时 tb-partial-real…，不计入覆盖检查），截图在 test-results/tb-real/。
 
 import { mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { allowProjectsLive, appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
-  approvalCardsOf, bridge, captureOrder, closeTbApp, contentText, customOf, instanceFiles, kernelEvents, liveInfo,
-  messagesOf, openProject, paneSel, paneState, phasesOf, readBoard, readJsonl, receiptsOf, sendMessage, startTbApp,
-  userSession, waitTeamIdle, watchTaskPhases,
+  allowAll, approvalCardsOf, bridge, captureOrder, closeTbApp, contentText, customOf, instanceFiles, kernelEvents,
+  liveInfo, messagesOf, openProject, paneSel, paneState, phasesOf, poll, readBoard, readJsonl, receiptsOf,
+  sendMessage, startTbApp, userSession, waitTeamIdle, watchTaskPhases,
 } from './tb-helpers.mjs';
 import {
   approvalProblems, ASK_FORBIDDEN, chatRequests, evidenceProblems, prepareRealData, progressProblems, PROMPTS,
@@ -267,6 +270,82 @@ function cardChecks(name, cards, { board, instances, note }) {
   }
 }
 
+// ---------- TB-89 停止一个 task ----------
+
+/** @brief 这个用户会话里正在跑 bash 的 task（board.get 的视图）；没有时为 null。 */
+async function runningCommand(ctx, who) {
+  const view = await bridge(ctx, { type: 'board.get', sessionId: who.sessionId });
+  return view.requests.flatMap((r) => r.tasks).find((t) => t.phase === 'running' && t.current?.toolName === 'bash')
+    ?? null;
+}
+
+/** @brief 等需求都到终态、协作空闲（连续 3 秒）；15 分钟到了就结束。返回需求是否都到了终态。 */
+async function untilEnded(ctx, who) {
+  let calm = null;
+  while (Date.now() - who.since < DRIVE_MS) {
+    const board = readBoard(ctx, who.sessionId);
+    const ended = board?.requests.length > 0 && board.requests.every((r) => r.status !== 'open');
+    calm = (await idleNow(ctx, who)) ? calm ?? Date.now() : null;
+    if (calm && Date.now() - calm > (ended ? 3000 : 60000)) return ended;
+    await sleep(500);
+  }
+  return false;
+}
+
+/**
+ * @brief stop（TB-89）：Allow all，/team 让 executor 运行 30 秒的命令；它运行时在 Background tasks 里点 Stop this task，
+ *        停下后等 5 秒，再发一条消息让立项交回，等需求到终态。
+ */
+async function stopDrive(ctx, project) {
+  const tab = await openProject(ctx, project);
+  await allowAll(ctx, tab);
+  const since = Date.now();
+  await sendMessage(ctx, tab, PROMPTS.STOP, { team: true });
+  const who = { tab, ...(await userSession(ctx, tab)), since, project };
+  const task = await poll(() => runningCommand(ctx, who), 5 * 60 * 1000, 300);
+  if (!task) return { who, unmet: 'no task ran a command within 5 minutes' };
+  await ctx.page.locator(`${paneSel(tab)} [data-testid="tasks-button"]`).click();
+  await ctx.page.locator(`[data-testid="bg-task"][data-task="${task.id}"] [data-action="stop-task"]`).click();
+  const stoppedAt = Date.now();
+  const stopped = await poll(() => {
+    const board = readBoard(ctx, who.sessionId);
+    return board?.tasks.find((t) => t.id === task.id)?.status === 'stopped' ? board : null;
+  }, 30000, 200);
+  await sleep(5000);
+  const quiet = chatRequests(ctx.proxy, { since: stoppedAt + 1000, cwd: project })
+    .filter((r) => r.info.kind === 'task' && r.info.task === task.id).length;
+  await shot(ctx, `stop-${tab}`);
+  await sendMessage(ctx, tab, PROMPTS.HAND_BACK);
+  const ended = await untilEnded(ctx, who);
+  const files = instanceFiles(ctx, who.sessionId).filter((i) => i.id.includes(`.${task.id.toLowerCase()}.`));
+  const back = files.some((i) => messagesOf(i.entries, 'user').some((m) => contentText(m.content)
+    .startsWith(`[Mori] ${task.id} is back with you.`)));
+  const unmet = !stopped ? `${task.id} did not become stopped` : !back ? `the planner did not hand ${task.id} back`
+    : !ended ? 'the request did not reach a terminal state' : null;
+  return { who, task: task.id, stopped, quiet, files, unmet, ms: Date.now() - since };
+}
+
+/** @brief stop 的检查（TB-89）：只断言程序保证的事。 */
+async function stopChecks(ctx, take, notes) {
+  const { who, task, stopped, quiet, files } = take;
+  const at = stopped?.tasks.find((t) => t.id === task);
+  const board = readBoard(ctx, who.sessionId);
+  const note = `${notes.join('; ')}${notes.length ? '; ' : ''}model: ${brief({ ms: take.ms,
+    tasks: board?.tasks.map((t) => [t.id, t.status, t.handoffs.map((h) => `${h.from}:${h.outcome ?? h.reason}`)
+      .join(' → ')]), requests: board?.requests.map((r) => [r.no, r.status]) }, 2000)}`;
+  record(`TB-89 real stop: Stop this task on the running ${task} makes it stopped (stopReason user, holder kept) with `
+    + 'no program handoff, and its instance sends no request until it is handed back',
+  at?.stopReason === 'user' && at.holder?.kind === 'role' && at.handoffs.every((h) => h.reason === null || h.reason
+    !== 'error') && quiet === 0, `${brief({ at: at && { status: at.status, stopReason: at.stopReason,
+    holder: at.holder }, quiet })} — ${note}`);
+  record(`TB-89 real stop: handed back, ${task} continues in the same instance session (one session file for it, `
+    + `the delivery "[Mori] ${task} is back with you.")`, files?.length === 1,
+  `${brief(files?.map((i) => i.id))} — ${note}`);
+  const unsettled = unsettledTasks(board);
+  record('TB-89 real stop: afterwards every task ended, waits for the user or is with close', unsettled.length === 0
+    && (board?.tasks.length ?? 0) > 0, `${brief(unsettled)} — ${note}`);
+}
+
 // ---------- 执行 ----------
 
 /** 驱动：名字、做一次、核对、前提没满足时记失败的编号 */
@@ -277,6 +356,7 @@ const DRIVES = [
   { name: 'approval', ids: ['TB-34', 'TB-45'], drive: (ctx, p) => teamDrive(ctx, p, PROMPTS.APPROVAL),
     check: (ctx, take, notes) => teamChecks(ctx, 'approval', take, notes),
     unmet: (take) => take.cards.length === 0 ? 'no background approval card appeared' : null },
+  { name: 'stop', ids: ['TB-89'], drive: stopDrive, check: stopChecks },
 ];
 
 /** @brief 跑一个驱动：前提没满足时换一个新项目重跑，最多 ATTEMPTS 次；然后核对最后一次。 */

@@ -1,0 +1,102 @@
+/* 右栏的 Background tasks（docs/specs/parallel-agents-taskboard.md §13.13；docs/v1/screens/team-tasks.md）：照 Claude 桌面版
+   右栏 Background tasks 的样子——页签、两节、任务卡（标题一行，下面一行次要的说明），已结束的卡片用次要色。 */
+
+/* 页签那一行：页签在左，"Expand"与关闭在右 */
+.panel-tabs { gap: 4px; padding-left: 10px; }
+.panel-tablist { display: flex; gap: 2px; min-width: 0; }
+.panel-tab {
+  padding: 5px 10px;
+  border-radius: var(--radius-m);
+  color: var(--color-muted);
+  font-size: var(--fs-body);
+  white-space: nowrap;
+}
+.panel-tab[aria-selected='true'] { background: var(--color-surface); color: var(--color-text); font-weight: 600; }
+
+/* 阶段行：阶段文字在左，按钮在右（对话不在回复时只有按钮） */
+.stage-row { display: flex; align-items: center; min-width: 0; }
+.stage-row > .stage-line { flex: 1; min-width: 0; }
+.tasks-button {
+  margin: 0 8px 8px auto;
+  padding: 2px 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.tasks-button[aria-pressed='true'] { border-color: var(--color-accent); color: var(--color-accent); }
+
+/* 列表 */
+.bg-body { display: flex; flex-direction: column; gap: 10px; }
+.bg-section { display: flex; flex-direction: column; gap: 6px; }
+.bg-section-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  text-align: left;
+}
+.bg-section-head svg { width: 12px; height: 12px; }
+.bg-task {
+  position: relative;
+  padding: 8px 36px 8px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  font-size: var(--fs-small);
+}
+.bg-task.jump-flash { background: #fff1c4; }
+.bg-task-open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+}
+.bg-task-title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.bg-task-line { color: var(--color-muted); overflow-wrap: anywhere; }
+.bg-task.finished .bg-task-title, .bg-task.finished .bg-task-line { color: var(--color-faint); }
+.bg-stop { position: absolute; top: 6px; right: 6px; }
+.bg-task-head .bg-stop { position: static; margin-left: auto; }
+.bg-task-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; }
+.bg-link { white-space: nowrap; }
+.bg-error { margin-top: 4px; color: var(--color-danger); overflow-wrap: anywhere; }
+.bg-error-detail { margin: 4px 0; white-space: pre-wrap; font-size: var(--fs-small); }
+
+/* task 的视图与会话 */
+.bg-back-row { display: flex; }
+.bg-task-head { display: flex; align-items: flex-start; gap: 8px; }
+.bg-line { color: var(--color-prose); overflow-wrap: anywhere; font-size: var(--fs-small); }
+.bg-part { display: flex; flex-direction: column; gap: 4px; }
+.bg-label { margin: 0; color: var(--color-muted); font-size: var(--fs-small); font-weight: 600; }
+.bg-dep { text-align: left; }
+.bg-message, .bg-handoff {
+  padding: 8px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  overflow-wrap: anywhere;
+}
+.bg-message + .bg-message, .bg-handoff + .bg-handoff { margin-top: 6px; }
+.bg-handoff-head { color: var(--color-text); font-weight: 600; font-size: var(--fs-small); }
+.bg-list { margin: 0; padding-left: 18px; font-size: var(--fs-small); }
+.bg-model { font-size: var(--fs-small); }
+.bg-entries { display: flex; flex-direction: column; gap: 12px; }
+.bg-doing { margin: 0; }
+
+/* 进展摘要里通往 Background tasks 的链接（§13.13.1）：task 行是按钮，标题行右端一个图标按钮 */
+.progress-head { display: flex; align-items: flex-start; gap: 6px; }
+.progress-head .progress-title { flex: 1; min-width: 0; }
+.progress-open { flex-shrink: 0; }
+button.progress-task { display: block; width: 100%; text-align: left; font-size: inherit; }
+button.progress-task:hover { background: transparent; text-decoration: underline; }

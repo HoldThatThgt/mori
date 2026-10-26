@@ -81,7 +81,8 @@ test('TB-81 one session role gives View transcript; several give View transcript
   assert.deepEqual(L.transcriptButtons(task('T1')), []);
   assert.deepEqual(L.transcriptButtons(task('T1', { sessionRoles: ['mori'] })), [{ of: { kind: 'task', task: 'T1',
     role: 'mori' }, label: 'View transcript', aria: 'View transcript for Mori on T1' }]);
-  assert.deepEqual(L.transcriptButtons(task('T1', { sessionRoles: ['executor', 'reviewer'] })).map((item) => item.label),
+  const two = L.transcriptButtons(task('T1', { sessionRoles: ['executor', 'reviewer'] }));
+  assert.deepEqual(two.map((item) => item.label),
     ['View transcript (executor)', 'View transcript (reviewer)']);
 });
 
@@ -97,7 +98,8 @@ test('TB-82 a handoff head reads #n role · outcome → route in the §15 words'
     [baton({ outcome: 'continue', routedTo: { kind: 'role', role: 'reviewer' } }), '#1 executor · Continue → reviewer'],
     [baton({ outcome: 'dead_end', routedTo: { kind: 'role', role: 'mori' } }), '#1 executor · Dead end → Mori'],
     [baton({ outcome: 'blocked' }), '#1 executor · Blocked → planner (closing)'],
-    [baton({ outcome: 'need_user', routedTo: { kind: 'create' } }), '#1 executor · Needs your decision → planner (planning)'],
+    [baton({ outcome: 'need_user', routedTo: { kind: 'create' } }),
+      '#1 executor · Needs your decision → planner (planning)'],
     [baton({ outcome: 'pass' }), '#1 executor · Pass → planner (closing)'],
     [baton({ outcome: 'fail', routedTo: { kind: 'role', role: 'executor' } }), '#1 executor · Fail → executor'],
     [baton({ n: 3, role: 'planner', byClose: true, outcome: 'close_done', routedTo: { kind: 'end', status: 'done' } }),
@@ -105,7 +107,8 @@ test('TB-82 a handoff head reads #n role · outcome → route in the §15 words'
     [baton({ role: 'planner', byClose: true, outcome: 'close_failed', routedTo: { kind: 'end', status: 'failed' } }),
       '#1 planner · Closed as failed → Failed'],
     [baton({ n: 2, role: 'mori', outcome: null, reason: 'no_handoff' }), '#2 Mori · no handoff → planner (closing)'],
-    [baton({ role: 'mori', outcome: null, reason: 'close_undecided' }), '#1 Mori · close didn’t decide → planner (closing)'],
+    [baton({ role: 'mori', outcome: null, reason: 'close_undecided' }),
+      '#1 Mori · close didn’t decide → planner (closing)'],
   ];
   for (const [item, want] of cases) assert.equal(L.handoffHead(item, HOLDERS), want);
 });
@@ -116,7 +119,8 @@ test('TB-82 evidence, dependency and message lines', () => {
   const view = board([task('T1', { status: 'done', phase: 'done' }), task('T2', { phase: 'running',
     current: { toolName: 'read', args: { path: 'D:\\work\\src\\a.ts' } } })]);
   assert.equal(L.dependencyLine({ id: 'T1', title: 'Task T1', status: 'done' }, context(view)), 'T1 Task T1 · Done');
-  assert.match(L.dependencyLine({ id: 'T2', title: 'Task T2', status: 'active' }, context(view)), /^T2 Task T2 · Read /);
+  assert.match(L.dependencyLine({ id: 'T2', title: 'Task T2', status: 'active' }, context(view)),
+    /^T2 Task T2 · Read /);
   const at = new Date(2026, 9, 26, 9, 5).getTime();
   assert.equal(L.messageHead({ from: 'mori', text: 'x', at }), 'Mori · 09:05');
   assert.deepEqual(L.closeButton(1, HOLDERS), { of: { kind: 'close', request: 1 }, label: 'View transcript (closing)',

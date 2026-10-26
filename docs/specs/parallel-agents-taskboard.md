@@ -1171,7 +1171,8 @@ interface TaskView {
     程序写的一棒结果写 `PROGRAM_HANDOFF_LINES` 的文字（`no handoff` 等）；
   - 结论全文（Markdown）；`Open items` 每条一行；`Evidence` 每条一行 `✓ #3 Run npm test` 或 `✗ #4 …`（标题是交接时记下的 `title`）；
     `Suggested next: <role>`（`suggestedNext`，有时）；
-  - 这一棒有会话位置（`session` 不为 null）时 `View transcript`（打开这个角色在这个 task 上的会话）；结案会话写的一棒打开这个需求的结案会话。
+  - 这一棒有会话位置（`session` 不为 null）时 `View transcript`（打开这个角色在这个 task 上的会话）；结案会话写的一棒总有 `View transcript`，
+    打开这个需求的结案会话（结案的交接不记会话位置）；程序写的一棒没有会话位置时没有这个按钮。
 - 内容来自 `board.readTask`：打开时读一次；之后这个 task 的 `TaskView` 在 `mori.board` 里变了时重新读，最多每秒一次（§15）。
   读不到时 `Couldn’t load T1: <原文>` 与 `Retry`。
 
@@ -1371,7 +1372,7 @@ interface TaskDetail {
 | `app/src/renderer/` | §13：协作开关、回执与进展摘要、批准卡归属与后台卡的队列、模型按钮锁定、阶段行与 `Stop team`、`/team` 识别、待判断的消息与排队区、`wake` 条目与回合、历史条目、工具卡标题、拒绝启动卡、侧栏状态与归档删除的判断（`sessionRows.ts`、`projects.ts`、`actions.ts`）、权限菜单说明、F8（`actionLog.ts`、`IssueDialog.tsx`） |
 | `app/tests/` | §17 |
 | `app/package.json` | 脚本 `test:tb-unit`、`test:taskboard` |
-| Background tasks（2026-10-26） | `docs/v1/screens/team-tasks.md`（新）、`docs/v1/screens/team-stream.md`（进展摘要的链接）、`docs/v1/screens/README.md`；`docs/v0/ui-strings.md`、`docs/v1/defaults.md`、`docs/v1/team-checks.md`；`kernel/teamView.ts`、`teamTools.ts`、`sessions.ts`、`commands.ts`、`team.ts`（`TaskView`、`RequestView` 的新字段；停止一个 task）；`shared/team.ts`、`shared/protocol.ts`；界面 `BackgroundTasks.tsx`（新）、`ChangesPanel.tsx`（页签）、`App.tsx`、`state/store.ts`（右栏的视图）、`TeamStream.tsx`、`StageLine.tsx` 或 `ChatPane.tsx`（阶段行按钮）、`ModelMenu.tsx`（`See background tasks`）、`Transcript.tsx`（对话流的条目给只读会话复用）、`actionLog.ts`；`tests/ui/harness/replay.js`（两个只读查询）、`tests/ui/tb-record.mjs` 与 `tests/fixtures/tb/stop-task.json`、`tests/ui/tb-real.mjs`（TB-89） |
+| Background tasks（2026-10-26） | `docs/v1/screens/team-tasks.md`（新）、`docs/v1/screens/team-stream.md`（进展摘要的链接）、`docs/v1/screens/README.md`；`docs/v0/ui-strings.md`、`docs/v1/defaults.md`、`docs/v1/team-checks.md`；`kernel/teamView.ts`、`teamTools.ts`、`sessions.ts`、`commands.ts`、`team.ts`（`TaskView`、`RequestView` 的新字段；停止一个 task）；`shared/team.ts`、`shared/protocol.ts`；界面 `BackgroundTasks.tsx`（新，列表）、`BackgroundTask.tsx`（新，task 的视图）、`BackgroundTranscript.tsx`（新，实例的会话）、`BackgroundParts.tsx`（新，共用的部分）、`TasksButton.tsx`（新，阶段行按钮）、`state/backgroundTasks.ts`（新，操作）、`state/taskList.ts`（新，纯函数）、`styles/tasks.css`（新）、`ChangesPanel.tsx`（页签）、`FileViewer.tsx`（有页签时不重复“Expand”与关闭）、`App.tsx`（浮在上层时打开）、`state/store.ts`（右栏的页签与这一栏的状态）、`state/quotes.ts`（打开文件回到 Changes）、`TeamStream.tsx`（进展摘要的链接）、`ChatPane.tsx`（阶段行那一行）、`ModelMenu.tsx`（`See background tasks`，WP-09 之后）、`Transcript.tsx`（导出 `ItemView` 给只读会话复用）、`actionLog.ts`；测试 `tests/unit/taskboard/tasks.test.mjs`、`taskList.test.mjs`、`tests/ui/tb-app-tasks.mjs`、`tb-tasks-helpers.mjs`、`tb-app-tasks-owner.mjs`（TB-88）、`tests/fake-endpoint/scenarios/tasks.mjs`、`tests/ui/harness/replay.js`（两个只读查询）、`tests/ui/tb-replay.mjs`（TB-87、TB-89）、`tests/ui/tb-record.mjs` 与 `tests/fixtures/tb/stop-task.json`、`tests/ui/tb-real.mjs`（TB-89）、`tests/unit/taskboard/spec-coverage.test.mjs`（编号不再只到 TB-57） |
 
 ## 17. 验收
 

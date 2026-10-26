@@ -84,8 +84,8 @@ function UserMessage({ item, cwd, tabKey }: { item: Extract<Item, { kind: 'user'
   );
 }
 
-/** @brief 对话流中的一项。 */
-const ItemView = memo(function ItemView(
+/** @brief 对话流中的一项；Background tasks 的只读会话（BackgroundTranscript.tsx）也用它画。 */
+export const ItemView = memo(function ItemView(
   { item, tools, cwd, tabKey }: { item: Item; tools: Record<string, ToolCall>; cwd: string; tabKey: string },
 ) {
   switch (item.kind) {
