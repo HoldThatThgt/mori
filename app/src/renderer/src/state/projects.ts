@@ -83,12 +83,15 @@ function withoutMark(marks: AppState['rowMarks'], file: string | null): AppState
   return rest;
 }
 
-/** @brief 加入一个会话并切到它：side 为空时放进焦点所在的那一栏，否则在这一侧分屏打开（docs/v0/screens/split.md）。 */
+/**
+ * @brief 加入一个会话并切到它：side 为空时放进焦点所在的那一栏，否则在这一侧分屏打开（docs/v0/screens/split.md）。
+ *        首次启动测试成功的"Connected · …"只显示到有会话放进中栏为止（docs/v1/screens/first-run.md），这里清掉。
+ */
 function addTab(tab: Tab, side?: Side): void {
   useApp.setState((state) => {
     const next = { ...state, tabs: [...state.tabs, tab] };
     return { tabs: next.tabs, ...(side ? placeInSplit(next, tab.key, side) : showInFocused(next, tab.key)),
-      view: 'chat' };
+      view: 'chat', connected: null };
   });
 }
 
@@ -107,7 +110,6 @@ export async function createSessionIn(cwd: string): Promise<void> {
     const info = await request<SessionInfo>({ type: 'session.create', cwd, trust });
     updateTab(tab.key, (current) => withInfo({ ...current,
       transcript: withNotices(current.transcript, info.extensionNotices) }, info));
-    useApp.setState({ firstRun: false });
   } catch (error) {
     markFailed(tab.key, 'session.create', error);
   }

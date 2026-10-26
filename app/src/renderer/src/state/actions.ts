@@ -22,7 +22,7 @@ import { isShown, modelStateOf, sameFile, tabByFile, tabBySession, updateTab, us
 export async function loadConfig(): Promise<void> {
   try {
     const config = await request<ConfigInfo>({ type: 'config.get' });
-    // 首次启动只在第一次读取时判断；首次启动页里保存连接后仍停在首次启动，直到测试成功并打开文件夹。
+    // 首次启动只在第一次读取时判断；首次启动页里保存连接后仍停在首次启动，直到测试连接成功（FirstRunForm 把它置为假）。
     useApp.setState((state) => ({ config, configError: null,
       firstRun: state.config === null ? config.firstRun : state.firstRun }));
   } catch (error) {

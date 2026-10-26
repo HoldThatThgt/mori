@@ -3,12 +3,15 @@
 // - 合成端点（tests/fake-endpoint/server.mjs，synthetic）：一个端口一种行为（4840–4859），收集列表、详情与对话请求的
 //   JSON 日志行（带收到的时刻 t）；
 // - 列表门（synthetic test setup，见 startListGate）：列表请求一律 401，其余请求原样转发给合成端点；可以让探针第 1 步
-//   的请求得到 400（制造“探针出错”）；
+//   与第 3 步（tool calling）的请求得到 400（制造“探针出错”，tool calling 因此没有验证）；
 // - App：启动、关闭，收集主进程与后台进程的输出和页面 console；经 CDP 在 preload 的隔离环境里给 MessagePort 的
 //   postMessage 包一层，记下发出的命令摘要（window.mori 被 contextBridge 冻结，页面里包不了；key 只记末 4 位）；
 // - 表单：填 Base URL 与 API key、Fetch models 并等它返回、一次读出表单与清单的全部状态、改清单的行、Test connection 与
-//   它的结果、记录按钮与探针状态的变化；首次启动卡片的宽度，以及经 CDP 模拟比 720px 窄的视口；
-// - 会话：首次启动表单的 Open folder… 之后新会话的范围（模型按钮的 data-pick）与发送。
+//   它的结果（成功时表单关掉，结果在主窗口的 Open a folder 提示里，readMain）、记录按钮的变化；首次启动卡片的宽度，
+//   以及经 CDP 模拟比 720px 窄的视口；
+// - 探针：经进程桥读 models.get 的档案（page.mjs readProbe；2026-10-26 起首次启动表单下方没有探针状态）；
+// - 会话：首次启动测试成功后，主窗口 Open a folder 提示的 Open folder… 之后新会话的范围（模型按钮的 data-pick）、
+//   拒绝启动卡的每一次变化（watchCards）与发送。
 // 只读页面和磁盘、发界面操作，不改 Mori 的源码；key 都是测试自己生成的合成值，与任何真实服务无关。
 
 import { spawn } from 'node:child_process';
@@ -16,6 +19,7 @@ import http from 'node:http';
 import { join } from 'node:path';
 import { appRoot, launch, oneLine, sleep } from './lib.mjs';
 import { PANE, stubFolder, waitReady } from './m3-helpers.mjs';
+import { readProbe } from './page.mjs';
 
 export { oneLine, sleep };
 
@@ -119,10 +123,15 @@ export const plainChats = (endpoint, since = 0) => chatLogs(endpoint, since).fil
 export const GATE_MESSAGE = 'You have insufficient permissions for this operation. Missing scopes: api.model.read.';
 /** 列表门回答列表请求的 401 响应体（原文，§5.2 的 listError.detail 就是它） */
 export const GATE_BODY = JSON.stringify({ error: { message: GATE_MESSAGE, type: 'invalid_request_error' } });
-/** 列表门让探针第 1 步失败时的原文（synthetic） */
+/** 列表门让探针第 1、3 步失败时的原文（synthetic） */
 export const GATE_PROBE_MESSAGE = 'Synthetic probe failure from the list gate';
-/** 探针第 1 步的提示（合成端点 server.mjs 开头注释里的“第 1、2 步”原文） */
-const PROBE_READY = 'Reply with the single word: ready.';
+/**
+ * 列表门让它失败的探针提示（kernel/probes.ts 的 PROBE_PROMPTS）：第 1 步（ready）与第 3 步（weather）。
+ * 只拒绝第 1 步时第 3、4 步照样通过，tool calling 是 verified，会话不会被拒绝；第 3 步也拒绝，tool calling 才是
+ * unverified（first-run.md “打开文件夹之后”的“探针出错”：卡上 tool calling not verified yet 与 Verify now）
+ */
+const GATE_PROBE_PROMPTS = ['Reply with the single word: ready.',
+  'Use the tool to get the weather for Paris for the next 3 days.'];
 
 /** @brief 读完请求体。 */
 async function readBody(req) {
@@ -157,7 +166,8 @@ function keyTail(req) {
 
 /**
  * @brief 启动列表门（synthetic test setup）：GET 路径以 /models 结尾的请求一律 401（GATE_MESSAGE）；gate.probeFail
- *        为真时，最后一条消息是探针第 1 步提示的对话请求得到 400（GATE_PROBE_MESSAGE）；其余原样转发给 upstream。
+ *        为真时，带探针第 1 步或第 3 步提示（GATE_PROBE_PROMPTS）的对话请求得到 400（GATE_PROBE_MESSAGE）；
+ *        其余原样转发给 upstream。
  *        每个请求记一行 { t, method, path, key（末 4 位）, answered（gate / forward） }。
  */
 export function startListGate(port, upstream) {
@@ -167,7 +177,8 @@ export function startListGate(port, upstream) {
       const raw = await readBody(req);
       const path = (req.url ?? '').split('?')[0];
       const list = req.method === 'GET' && path.endsWith('/models');
-      const probe = req.method === 'POST' && gate.probeFail && String(raw).includes(PROBE_READY);
+      const probe = req.method === 'POST' && gate.probeFail
+        && GATE_PROBE_PROMPTS.some((prompt) => String(raw).includes(prompt));
       gate.logs.push({ t: Date.now(), method: req.method, path, key: keyTail(req),
         answered: list || probe ? 'gate' : 'forward' });
       if (list) {
@@ -364,8 +375,8 @@ function readListInPage() {
 }
 
 /**
- * 在页面里执行：表单底部（More settings、探针代价、Test connection）、表单下方的探针状态与 Open folder…，以及 order：
- * 出现了的区块在文档里的先后是否同 §6.1、§6.6 的顺序。表单不在时为 null。
+ * 在页面里执行：表单底部（More settings、探针代价、Test connection），以及 order：出现了的区块在文档里的先后是否同
+ * §6.1、§6.6 的顺序。表单不在时为 null。2026-10-26 起表单下方没有探针状态与 Open folder…（first-run.md）。
  */
 function readFootInPage() {
   const form = document.querySelector('[data-testid="connection-form"]');
@@ -382,7 +393,6 @@ function readFootInPage() {
     byLabel('API type'), one('input[name="zone"]'), one('[data-testid="checklist"], [data-testid="list-error"]'),
     one('[data-testid="manual-model"]'), one('[data-testid="more-settings"]'), one('[data-testid="probe-cost-note"]'),
     one('[data-action="test"]')].filter(Boolean);
-  const probe = document.querySelector('[data-testid="probe-status"]');
   return {
     moreSettings: Boolean(one('[data-testid="more-settings"]')),
     probeCost: one('[data-testid="probe-cost-note"]')?.textContent ?? null,
@@ -391,11 +401,31 @@ function readFootInPage() {
     cancelButtons: [...form.querySelectorAll('button')].filter((b) => b.textContent === 'Cancel')
       .map((b) => b.dataset.action ?? ''),
     order: blocks.every((block, index) => index === 0 || after(blocks[index - 1], block)), blocks: blocks.length,
-    probeStatus: probe && { state: probe.dataset.state, text: probe.textContent },
-    verify: Boolean(probe?.querySelector('[data-action="verify"]')),
-    openFolder: Boolean(document.querySelector('[data-testid="open-folder"]')),
   };
 }
+
+/**
+ * 在页面里执行：首次启动表单在不在、侧栏在不在（三栏布局），以及主窗口的 Open a folder 提示（first-run.md
+ * "测试成功之后：主窗口"）：标题、标题下面"Connected · …"一行（没有时为 null）与它是否紧跟在标题后、是不是成功的颜色、
+ * 说明、有没有 Open folder…。没有提示时 prompt 为 null。
+ */
+function readMainInPage() {
+  const prompt = document.querySelector('[data-testid="open-folder"]');
+  const line = prompt?.querySelector('[data-testid="connected"]') ?? null;
+  const heading = prompt?.querySelector('h2') ?? null;
+  return {
+    form: Boolean(document.querySelector('[data-testid="connection-form"]')),
+    sidebar: Boolean(document.querySelector('[data-testid="sidebar"]')),
+    prompt: prompt && { heading: heading?.textContent ?? null, connected: line?.textContent ?? null,
+      underHeading: Boolean(line && heading?.nextElementSibling === line),
+      tone: line?.classList.contains('ok') ?? false,
+      hint: prompt.querySelector('p.muted')?.textContent ?? null,
+      open: [...prompt.querySelectorAll('button')].some((button) => button.textContent === 'Open folder…') },
+  };
+}
+
+/** @brief 首次启动表单、侧栏与主窗口的 Open a folder 提示（readMainInPage）。 */
+export const readMain = (page) => page.evaluate(readMainInPage);
 
 /**
  * @brief 读出首次启动表单的全部状态（上半部分、清单、底部三段合在一起）；表单不在时为 null。
@@ -536,12 +566,16 @@ export const compatBox = (page, label) => page.locator(`${FORM} [data-testid="mo
 /** 测试连接的结果文字（含保存失败）的开头（state/settings.ts 的 testMessage、FirstRunForm.tsx） */
 const RESULT_TEXT = /^(Connected|Connection failed|Test cancelled|Couldn[’']t save|Couldn[’']t test)/;
 
-/** @brief 表单底部那一条测试结果文字；没有时为 null。 */
-export const resultText = (state) => state?.messages.find((text) => RESULT_TEXT.test(text)) ?? null;
+/**
+ * @brief 测试结果文字：表单关掉、进入了主窗口时是 Open a folder 提示里的"Connected · …"（waitTestResult 的 handedOver），
+ *        否则是表单底部那一条结果文字；没有时为 null。
+ */
+export const resultText = (state) => (state?.handedOver ? state.main.prompt?.connected ?? null
+  : state?.messages?.find((text) => RESULT_TEXT.test(text)) ?? null);
 
 /**
- * 在页面里执行：用 MutationObserver 记下 Test connection 按钮、两个框、Fetch models、测试的 Cancel 与探针状态的每一次
- * 变化（“Saving…”“Verifying tool calling…”可能只持续几十毫秒，轮询抓不到）。
+ * 在页面里执行：用 MutationObserver 记下 Test connection 按钮、两个框、Fetch models、测试的 Cancel 与主窗口的
+ * "Connected · …"一行的每一次变化（“Saving…”可能只持续几十毫秒，轮询抓不到）。
  */
 function watchInPage() {
   window.__mdSamples = [];
@@ -550,12 +584,12 @@ function watchInPage() {
     const form = document.querySelector('[data-testid="connection-form"]');
     const testButton = form?.querySelector('[data-action="test"]');
     const inputs = form ? [...form.querySelectorAll('input')] : [];
-    const probe = document.querySelector('[data-testid="probe-status"]');
+    const line = document.querySelector('[data-testid="open-folder"] [data-testid="connected"]');
     const now = { test: testButton?.textContent ?? null, testDisabled: testButton?.disabled ?? null,
       readOnly: inputs.slice(0, 2).map((item) => item.readOnly),
       fetchDisabled: form?.querySelector('[data-action="fetch-models"]')?.disabled ?? null,
       testCancel: Boolean(form?.querySelector('[data-action="test-cancel"]')),
-      probe: probe?.dataset.state ?? null, probeText: probe?.textContent ?? null };
+      connected: line?.textContent ?? null };
     const last = window.__mdSamples.at(-1);
     if (!last || JSON.stringify(last) !== JSON.stringify(now)) window.__mdSamples.push(now);
   };
@@ -565,7 +599,7 @@ function watchInPage() {
     characterData: true });
 }
 
-/** @brief 开始记录按钮与探针状态的变化（watchInPage）。 */
+/** @brief 开始记录按钮与"Connected · …"一行的变化（watchInPage）。 */
 export const watchStates = (page) => page.evaluate(watchInPage);
 /** @brief 记录到的变化。 */
 export const watchedStates = (page) => page.evaluate(() => window.__mdSamples ?? []);
@@ -582,10 +616,21 @@ export async function clickTest(ctx) {
     5000, 50);
 }
 
-/** @brief 等测试连接结束（按钮回到 Test connection 且有结果文字），返回读出的表单。 */
+/**
+ * @brief 等测试连接结束。成功时首次启动表单关掉、进入主窗口（first-run.md "测试成功"）：返回 { handedOver: true, main }
+ *        （main 为 readMain，resultText 取其中的"Connected · …"）；失败、已取消、保存失败时表单留着：返回读出的表单
+ *        （按钮回到 Test connection 且有结果文字），另带 handedOver: false 与 main。
+ */
 export async function waitTestResult(page, timeout = 120000) {
-  const settled = (state) => resultText(state) !== null && state.test?.text === 'Test connection';
-  return (await poll(() => readForm(page), settled, timeout, 150)).value;
+  const read = async () => {
+    const main = await readMain(page);
+    if (!main.form && main.prompt?.connected) return { handedOver: true, main };
+    const form = await readForm(page);
+    return form && { ...form, handedOver: false, main };
+  };
+  const settled = (state) => Boolean(state) && (state.handedOver
+    || (resultText(state) !== null && state.test?.text === 'Test connection'));
+  return (await poll(read, settled, timeout, 150)).value;
 }
 
 /** @brief 点 Test connection 并等它结束；返回读出的表单。 */
@@ -594,22 +639,51 @@ export async function testConnection(ctx, timeout = 120000) {
   return waitTestResult(ctx.page, timeout);
 }
 
-/** @brief 等探针状态不再是 verifying（或等到 want），返回读出的表单。 */
-export async function waitProbe(page, want = null, timeout = 120000) {
-  const done = (state) => Boolean(state?.probeStatus) && (want ? state.probeStatus.state === want
-    : state.probeStatus.state !== 'verifying');
-  return (await poll(() => readForm(page), done, timeout, 200)).value;
+/**
+ * @brief 经进程桥等 ref（<provider>/<model>）的探针状态（page.mjs readProbe：verifying / verified / failed / error）
+ *        不再是 verifying（或等到 want），返回最后读到的状态。
+ * @param since 点 Test connection（保存）之前的时刻：首次启动的保存会重新探测勾选的模型，重新探测期间 models.get 给的
+ *        仍是旧档案，完成时刻早于 since 的档案算还在验证（page.mjs probeState）；0 只用于从未探测过的模型
+ * @param want 要等到的状态；null 表示不再是 verifying 就行
+ */
+export async function waitProbe(page, ref, { since = 0, want = null, timeout = 120000 } = {}) {
+  const done = (state) => (want ? state === want : state !== 'verifying');
+  return (await poll(async () => (await readProbe(page, ref, since)).state, done, timeout, 300)).value;
 }
 
 // ---------- 打开文件夹之后 ----------
 
 /**
- * @brief 首次启动表单的 Open folder…（选文件夹对话框直接返回 folder），等新会话就绪（问信任时选信任），
- *        返回模型按钮的 data-pick（新会话的范围）。
+ * 在页面里执行：用 MutationObserver 记下当前一栏拒绝启动卡的每一次变化（kind 与主文字；没有卡为 null），
+ * “Verifying <模型>…”可能只持续几秒，轮询容易错过。
  */
-export async function openFolderFromForm(ctx, folder) {
+function watchCardsInPage(selector) {
+  window.__mdCards = [];
+  window.__mdCardObserver?.disconnect();
+  const sample = () => {
+    const card = document.querySelector(selector);
+    const now = card ? { kind: card.dataset.kind, title: card.querySelector('.model-card-title')?.textContent ?? '' }
+      : null;
+    if (JSON.stringify(window.__mdCards.at(-1) ?? null) !== JSON.stringify(now)) window.__mdCards.push(now);
+  };
+  window.__mdCardObserver = new MutationObserver(sample);
+  window.__mdCardObserver.observe(document.body, { subtree: true, childList: true, characterData: true,
+    attributes: true });
+}
+
+/** @brief 开始记录拒绝启动卡的变化（watchCardsInPage）。 */
+export const watchCards = (page) => page.evaluate(watchCardsInPage, CARD);
+/** @brief 记录到的拒绝启动卡（按出现的先后，第一项之前没有卡；null 表示那时没有卡）。 */
+export const watchedCards = (page) => page.evaluate(() => (window.__mdCards ?? []).filter(Boolean));
+
+/**
+ * @brief 主窗口 Open a folder 提示的 Open folder…（首次启动测试成功之后；选文件夹对话框直接返回 folder），先开始记录
+ *        拒绝启动卡的变化（watchCards），等新会话就绪（问信任时选信任），返回模型按钮的 data-pick（新会话的范围）。
+ */
+export async function openFolderFromPrompt(ctx, folder) {
   const { page } = ctx;
   await stubFolder(ctx.app, folder);
+  await watchCards(page);
   await page.locator('[data-testid="open-folder"] button').click();
   await page.locator(PANE).waitFor({ timeout: 30000 });
   const trust = page.getByTestId('trust-dialog');

@@ -91,7 +91,8 @@ async function item1(ctx) {
     contextWindow: connection.contextWindow });
   const note = await page.getByTestId('zone-public-note').innerText().catch(() => '');
   await page.getByTestId('connection-form').locator('[data-action="test"]').click();
-  const result = await h.formMessage(null, { test: true, timeout: 180000 });
+  // 测试失败时结果留在表单上；万一端点不要 key 而连上了，表单关掉、结果在主窗口（first-run.md），也照样读到结果再判
+  const result = await h.testResult(null, 180000);
   record('1 区域 Public 时说明"Public providers must be allowed per project…"；key 栏留空时测试连接失败（请求不带认证头，'
     + '真实端点的原文）', note.startsWith('Public providers must be allowed per project')
     && /^(Connection failed|Failed)/.test(result), `拉取：${JSON.stringify(fetched)}；${oneLine(note)}；${oneLine(result)}`);

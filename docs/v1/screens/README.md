@@ -43,7 +43,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | 文件 | 内容 | 取代 v0 的 |
 | --- | --- | --- |
 | [models-settings.md](models-settings.md) | 设置 → Models：迁移说明、区域未确认与 Confirm zone、Defaults、Providers（提供商卡、提供商表单的 Base URL 与 API key → Fetch models → 清单 → Add、清单、列表错误、Add a model ID、More settings、卡片上的 Fetch models 与 Not listed by the server、Keys、Models 行与 not reported、Server reports … 提示与 Use、模型表单（只剩 Edit）、档案摘要、需要同意的探针）、Groups、Project access、删除与改地址的确认、配置读不出（拉取模型的部分按发现规格） | [v0 settings.md](../../v0/screens/settings.md)“Connections and models” |
-| [first-run.md](first-run.md) | 首次启动表单（Base URL 与 API key → Fetch models → 清单、Name、API type、网络区域、Add a model ID、More settings 里的兼容选项（只在 OpenAI-compatible 时显示）、探针代价一句；拉取中两个框只读、再拉一次、保存后用内存里的 key 再拉取；没有关闭表单的 Cancel）、Test connection（先保存勾选的全部模型，再测第一个勾选的）、这个模型的探针状态、默认范围（一个模型时是它，多个时是提供商）、Public 的说明、迁移失败（按规格与发现规格 §5.4、§6.1、§6.6） | [v0 connection.md](../../v0/screens/connection.md) 的表单与首次启动 |
+| [first-run.md](first-run.md) | 首次启动表单（Base URL 与 API key → Fetch models → 清单、Name、API type、网络区域、Add a model ID、More settings 里的兼容选项（只在 OpenAI-compatible 时显示）、探针代价一句；拉取中两个框只读、再拉一次、保存后用内存里的 key 再拉取；没有关闭表单的 Cancel）、Test connection（先保存勾选的全部模型，再测第一个勾选的；成功就进入主窗口，2026-10-26 起表单下方没有探针状态）、默认范围（一个模型时是它，多个时是提供商）、Public 的说明、迁移失败（按规格与发现规格 §5.4、§6.1、§6.6） | [v0 connection.md](../../v0/screens/connection.md) 的表单与首次启动 |
 | [model-menu.md](model-menu.md) | 输入框下面一行的选择范围按钮与菜单、按当前模型的思考强度菜单、准备中与生成中不可用 | [v0 models.md](../../v0/screens/models.md) |
 | [model-chat.md](model-chat.md) | 换模型与重建的提示、阶段行（等模型、等它停下、排队、重试、重建）、准备中、No model available 卡、拒绝启动卡、v0 错误卡的规则 | [v0 chat.md](../../v0/screens/chat.md) 的阶段行重试、错误卡“Go to settings”、v0 的模型按钮 |
 | [team-switch.md](team-switch.md) | 顶栏的协作开关（Off / On / Until done、窄栏、不可用）、`/team on`、`/team off`、`/team <文字>`、只有 `/team`，模式怎样变 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的顶栏与输入框 |
@@ -140,7 +140,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `field-error`（`data-field`） | 提供商表单、模型表单、首次启动表单的字段错误 | models-settings.md、first-run.md |
 | `form-message` | 表单的结果文字（沿用 v0） | models-settings.md、first-run.md |
 | `data-action="test-cancel"` | 三处测试与首次启动测试中的“Cancel” | models-settings.md、first-run.md |
-| `connection-form`、`first-run-loading`、`migration-error`、`zone-public-note`、`probe-status`、`open-folder` | 首次启动（`connection-form`、`open-folder` 沿用 v0） | first-run.md |
+| `connection-form`、`first-run-loading`、`migration-error`、`zone-public-note`、`open-folder`、`connected` | 首次启动（`connection-form`、`open-folder` 沿用 v0；`open-folder` 是主窗口的 Open a folder 提示，`connected` 是其中测试成功的结果；2026-10-26 起没有 `probe-status`） | first-run.md |
 | `data-action="fetch-models"`、`data-action="fetch-cancel"`、`fetch-status`（`data-state` 为 `fetching` / `cancelled`）；拉取中 Base URL、API key 输入框的 `readonly`；`data-action="close-form"` | 提供商表单、首次启动表单与提供商卡上的 Fetch models（卡上的取代 `data-action="add-model"`）、拉取中的 Cancel、拉取的状态、拉取中只读的两个框（发现规格 §6.1、§6.5）；提供商表单与卡上清单底部关闭用的 Cancel（拉取中照样可用；首次启动没有） | models-settings.md、first-run.md |
 | `detected-server`（`data-kind` 为 `ServerKind`）、`base-url-note` | 认出的服务（卡上的清单不显示）、Base URL 换成建议值的说明（只在拿到列表时，发现规格 §6.1 第 3 项） | models-settings.md、first-run.md |
 | `list-error`（`data-kind` 为 `rejected` / `unreachable` / `no_list` / `invalid`） | 列表错误（发现规格 §6.3） | models-settings.md、first-run.md |

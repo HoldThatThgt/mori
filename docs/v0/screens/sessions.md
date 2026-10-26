@@ -109,7 +109,7 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 中栏没有会话 | 启动后还没点开会话；或当前会话被删除 | "Open a folder"、"Open folder…"；侧栏有会话时说明"Pick a session on the left to continue, or open a folder to start a new session."（取代 connection.md"等你选文件夹"里"已有连接"的情况；首次启动测试成功后仍用 connection.md 的文字） | Open folder…；点左侧会话；Ctrl+N |
+| 中栏没有会话 | 启动后还没点开会话；或当前会话被删除 | "Open a folder"、"Open folder…"；侧栏有会话时说明"Pick a session on the left to continue, or open a folder to start a new session."（取代 connection.md"等你选文件夹"里"已有连接"的情况；首次启动测试成功后仍用 connection.md 的文字，v1 起标题下面另有一行"Connected · …"，见 v1/screens/first-run.md） | Open folder…；点左侧会话；Ctrl+N |
 | 打开文件夹 | 你在系统对话框里选了文件夹 | 新会话出现在该项目下（名为"New session"）并成为当前会话，按钮位置"Starting…"；需要时先弹信任询问（见下） | 输入 |
 | 新会话（Ctrl+N，或收起的图标栏上的 +） | 你的操作 | 在当前会话所在的项目里新建一个会话并切过去，焦点在输入框；没有当前会话时等于"Open folder…"；在设置页按时也回到会话面板 | 输入 |
 | 在某个项目里新建（项目行的 +） | 你点了项目行右端的 + | 在这个项目里新建一个会话并切过去，焦点在输入框；见"项目行的 +" | 输入 |

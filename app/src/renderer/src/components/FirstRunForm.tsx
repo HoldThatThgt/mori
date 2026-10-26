@@ -2,20 +2,16 @@
 // 先填 Base URL 和 API key，Fetch models 之后预填 Name、API type、Network zone，在清单里勾选模型（拉取的状态、清单与
 // 其中的视图和 Add provider 共用 settings/Checklist.tsx）。"Test connection"有改动时先保存（models.firstRun：一次写入
 // 提供商、勾选的全部模型、key 和 normalDefault；同一张表单再次保存时带上次的 providerId 整体替换，§5.4），再测第一个
-// 勾选的模型；成功后显示"Open folder…"和表单下方这个模型的探针状态。表单卸载时拉取还在进行就先发
-// models.discoverCancel（useFetch），内存里的 key 一起丢掉；内存里的 key 只在 Base URL 框与保存的提供商是同一个
-// origin 时使用（§6.6，2026-10-23 负责人决定）。
+// 勾选的模型；成功后首次启动结束，进入主窗口，结果文字在 Open a folder 提示里显示一次（2026-10-26 负责人走查 M2，
+// first-run.md "测试成功之后：主窗口"；探针在后台照样跑，进度在会话的拒绝启动卡上）；失败、已取消时表单留着。
+// 表单卸载时拉取还在进行就先发 models.discoverCancel（useFetch），内存里的 key 一起丢掉；内存里的 key 只在 Base URL 框
+// 与保存的提供商是同一个 origin 时使用（§6.6，2026-10-23 负责人决定）。
 
 import { useRef, useState } from 'react';
-import type {
-  DiscoverResult, ModelsResult, ProfileView, ProviderForm, ProviderModel, ProviderSaved,
-} from '../../../shared/models';
-import { openFolder } from '../state/projects';
+import type { DiscoverResult, ProviderForm, ProviderModel, ProviderSaved } from '../../../shared/models';
 import { describe, request } from '../state/bridge';
-import { cancelTest, runTest, useProfile, type Notice } from '../state/settings';
+import { cancelTest, runTest, type Notice } from '../state/settings';
 import { useApp } from '../state/store';
-import { Icon } from '../icons';
-import { folderName } from './ChatPane';
 import {
   BaseUrlNote, ChecklistView, DetectedLine, FetchRow, MoreSettings, ProbeCostNote, useChecklist, useNewFetch,
 } from './settings/Checklist';
@@ -31,60 +27,6 @@ type Phase = 'idle' | 'saving' | 'testing';
 
 /** 新提供商还没有模型：Add a model ID 只和清单里的行比重复（§6.4） */
 const NO_MODELS: readonly string[] = [];
-
-/** @brief 探针状态与文字：验证中、已验证、验证失败（detail 取第 3、4 步里判定不通过的那一步）。 */
-function probeText(profile: ProfileView | null, running: boolean): { state: string; text: string } {
-  if (running || !profile || profile.status === 'probing' || profile.tool_calling.state === 'unverified') {
-    return { state: 'verifying', text: 'Verifying tool calling…' };
-  }
-  if (profile.tool_calling.state === 'verified') return { state: 'verified', text: 'Tool calling verified' };
-  const { call, result } = profile.tool_calling;
-  const detail = [call, result].find((step) => step.outcome === 'fail')?.detail ?? '';
-  return { state: 'failed', text: `Tool calling failed verification: ${detail}. Mori needs tool calling for the main`
-    + ' agent; pick another model or check the server’s tool-call settings.' };
-}
-
-/** @brief 表单下方的探针状态（first-run.md "探针状态"）；探针出错时"Couldn't verify"与"Verify again"。 */
-function ProbeStatus({ modelRef }: { modelRef: string }) {
-  const { profile, running } = useProfile(modelRef);
-  const [error, setError] = useState<string | null>(null);
-  async function verify() {
-    try {
-      const result = await request<ModelsResult>({ type: 'models.verify', refs: [modelRef], tests: 'auto' });
-      setError(result.error);
-    } catch (failure) {
-      setError(describe('models.verify', failure));
-    }
-  }
-  if (!running && profile?.status === 'error') {
-    return (
-      <div className="probe-status" data-testid="probe-status" data-state="error">
-        <p className="form-message error">Couldn’t verify: {profile.error}</p>
-        <button className="button compact" data-action="verify" onClick={() => void verify()}>Verify again</button>
-        {error && <p className="form-message error" role="alert">{error}</p>}
-      </div>
-    );
-  }
-  const { state, text } = probeText(profile, running);
-  const tone = state === 'failed' ? 'error' : state === 'verified' ? 'ok' : 'info';
-  return <p className={`form-message ${tone}`} data-testid="probe-status" data-state={state}>{text}</p>;
-}
-
-/** @brief 测试成功后的"Open folder…"：正在打开时显示文件夹名，失败时显示原文。 */
-function OpenFolder() {
-  const tabs = useApp((state) => state.tabs);
-  const last = tabs[tabs.length - 1];
-  const opening = last?.phase === 'opening';
-  return (
-    <div className="first-run-open" data-testid="open-folder">
-      <button className="button primary" disabled={opening} onClick={() => void openFolder()}>
-        <Icon name="folder" />Open folder…
-      </button>
-      {opening && <p className="muted">Opening {folderName(last.cwd)}…</p>}
-      {last?.phase === 'failed' && <p className="form-message error">Failed to open session: {last.error}</p>}
-    </div>
-  );
-}
 
 // ---- 保存与测试（§5.4、§6.6） ----
 
@@ -143,8 +85,17 @@ async function firstRun(providerId: string | null, provider: ProviderForm, model
 }
 
 /**
+ * @brief 测试连接成功（first-run.md "测试成功"）：首次启动结束，进入三栏布局（表单随之卸载），结果文字带到主窗口的
+ *        Open a folder 提示里显示一次（2026-10-26 负责人走查 M2）。
+ * @param text 测试结果文字（"Connected · …"）
+ */
+function handOver(text: string): void {
+  useApp.setState({ firstRun: false, connected: text });
+}
+
+/**
  * @brief 保存与测试（first-run.md "保存中"到"测试成功"）：表单有改动时先保存（从没保存过也算），
- *        再对第一个勾选的模型跑 connection.test（§6.6）。
+ *        再对第一个勾选的模型跑 connection.test（§6.6）；成功时进入主窗口，失败、已取消时结果文字留在表单上。
  * @param draft 提供商草稿
  * @param secret API key 框的值
  * @param clearSecret 保存成功后清空 API key 框（不算你改了 key，表单不回到开始）
@@ -155,8 +106,6 @@ function useSaveAndTest(draft: ProviderDraft, secret: string, clearSecret: () =>
   const kept = useRef<string | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState<Notice | null>(null);
-  /** 测试成功的模型（<provider>/<model>）：表单下方显示它的探针状态与 Open folder…；没有时为 null */
-  const [tested, setTested] = useState<string | null>(null);
   async function save(models: ProviderModel[]): Promise<string | null> {
     const provider = toProviderForm(draft);
     const payload = JSON.stringify({ provider, models });
@@ -179,21 +128,15 @@ function useSaveAndTest(draft: ProviderDraft, secret: string, clearSecret: () =>
   /** @param models 勾选的行（至少一行），测第一个（§6.6） */
   async function test(models: ProviderModel[]) {
     setMessage(null);
-    setTested(null);
     const providerId = await save(models);
     if (providerId === null) return;
     setPhase('testing');
-    const modelId = models[0].id;
-    const outcome = await runTest({ providerId, modelId });
+    const outcome = await runTest({ providerId, modelId: models[0].id });
     setPhase('idle');
-    setMessage(outcome.notice);
-    setTested(outcome.ok ? `${providerId}/${modelId}` : null);
+    if (outcome.ok) handOver(outcome.notice.text);
+    else setMessage(outcome.notice);
   }
-  const clear = () => {
-    setMessage(null);
-    setTested(null);
-  };
-  return { saved, keptKey: () => kept.current, phase, message, tested, test, clear };
+  return { saved, keptKey: () => kept.current, phase, message, test, clear: () => setMessage(null) };
 }
 
 // ---- 表单 ----
@@ -296,12 +239,12 @@ function AfterFetch({ state, result }: { state: FirstRunState; result: DiscoverR
 
 /**
  * @brief 首次启动表单（§6.6）：开始只有 Base URL、API key、Fetch models；拉取中两个框只读、旁边拉取的 Cancel；
- *        拉取后其余字段、清单与 Test connection；测试成功后表单下方是测试的那个模型的探针状态与 Open folder…。
+ *        拉取后其余字段、清单与 Test connection；测试成功后整个表单换成主窗口（handOver）。
  */
 export function FirstRunForm() {
   const migrationError = useApp((state) => state.config?.migrationError ?? null);
   const state = useFirstRun();
-  const { form, fetcher, run } = state;
+  const { form, fetcher } = state;
   const errors = shownErrors(state.errors, form.touched);
   const locked = fetcher.fetching || state.busy;
   return (
@@ -321,8 +264,6 @@ export function FirstRunForm() {
           onFetch={state.fetchModels} />
         {fetcher.result && <AfterFetch state={state} result={fetcher.result} />}
       </form>
-      {run.tested && <ProbeStatus modelRef={run.tested} />}
-      {run.tested && <OpenFolder />}
     </>
   );
 }

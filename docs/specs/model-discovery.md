@@ -346,6 +346,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
   API type 不是 OpenAI-compatible 时不显示 More settings；区域选 Public 时的说明不变。
 - 底部一句“Each model is verified with up to 13 short requests.”（同 §6.1 第 8 项），下面是按钮“Test connection”：勾选数为 0 时不可用。
   表单有改动时先保存（`models.firstRun`，`models` 为勾选的行），再对**第一个勾选的模型**跑 `connection.test`。结果文字、Open folder…、探针状态都同现在，探针状态说的是这个模型。
+  （2026-10-26 改，负责人走查 M2：测试成功就关掉表单、进入主窗口，结果文字在主窗口的 Open a folder 提示里显示一次；表单下方不再有 Open folder… 与探针状态，探针进度在打开文件夹后会话的拒绝启动卡上；测试失败、已取消、保存失败时同现在。见 docs/v1/screens/first-run.md“测试成功之后：主窗口”。）
 - 再次保存同一张表单：带上次的 `providerId` 整体替换（§5.4）。
 - 保存后 API key 框清空、占位“Saved. Leave empty to keep it.”（同现在）。表单把这张表单里最后填过的 key 留在内存里：之后再拉取而框是空的时，用它作为 `keySecret`；
   它不显示、框空时保存不再发送（照旧保留已存的 key），表单关闭就丢掉。
@@ -517,7 +518,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 | MD-08 | 手填一行 | 拿到列表和列表错误（`nolist`、401）时都能手填加入，列表错误时手填的行列在错误下面；id 检查与重复；Entered by you 与 Not reported | App |
 | MD-09 | 加入新提供商 | 开始只有 Base URL、API key、Fetch models；拉取中两个框只读，关闭表单会取消拉取；拉取后 Name、API type、Network zone 预填且可改；`FAKE_NO_V1_ROOT=1` 时 Base URL 换成 `/v1` 并显示说明，`nolist` 时只换框不写说明；拉取后改 Base URL 或 key 清掉清单，再拉一次时你改过的 Name、API type、区域不被覆盖、改过的 API type 作为 `target.api` 发出；Add 一次写入全部勾选的模型（一次编译，顺序同清单），全部开始探针；保存失败时本次新存的 key 被删除；More settings 里的并发与兼容选项保存进配置；Fetch cancelled | App |
 | MD-10 | 已有提供商拉取 | 卡上的 Fetch models 用已保存的 key（合成端点日志里 key 末 4 位对得上）；清单打开时卡上的按钮不可用、不显示 Detected；已加入的行标 Added、不能勾；`notListed` 一行；`models.addModels` 加在末尾并开始探针；重复 id 整次拒绝、配置不变；卡上没有旧的 Add model；`models.saveModel` 没有 `adding`，Edit 里没设过强度的模型显示 `defaultThinkingLevel` | App |
-| MD-11 | 首次启动 | 填地址和 key → Fetch → 勾一个模型 → Test connection → 探针状态 → Open folder，默认范围是这个模型；勾两个时默认范围是提供商，Test connection 测第一个；有探针代价的一句、没有关闭表单的 Cancel；保存后改地址再拉取用内存里的 key（`FAKE_REQUIRE_KEY` 下不出 `rejected`；地址只改路径、origin 不变；改到另一个 origin 时拉取不带内存里的 key、占位回到 Optional（2026-10-23 负责人决定，§6.6））；再次保存整体替换，配置里仍只有一个提供商；列表错误时手填仍可完成 | App |
+| MD-11 | 首次启动 | 填地址和 key → Fetch → 勾一个模型 → Test connection → 进入主窗口（Open a folder 提示里一行“Connected · …”）→ Open folder（探针进度在会话的拒绝启动卡上，2026-10-26 按负责人走查 M2 改写），默认范围是这个模型；勾两个时默认范围是提供商，Test connection 测第一个；有探针代价的一句、没有关闭表单的 Cancel；保存后改地址再拉取用内存里的 key（`FAKE_REQUIRE_KEY` 下不出 `rejected`；地址只改路径、origin 不变；改到另一个 origin 时拉取不带内存里的 key、占位回到 Optional（2026-10-23 负责人决定，§6.6））；再次保存（测试失败或已取消之后）整体替换，配置里仍只有一个提供商；列表错误时手填仍可完成 | App |
 | MD-12 | 第 0 步与档案 | 第 0 步经读取器得出种类、窗口与 `meta`（`sglang`、`ollama`、`rich` 三种形状）；Ollama 只有训练窗口时 `reported` 窗口为 null；一次加入 3 个模型时列表只读一次、每个档案都有种类与 `meta`，期间点 Fetch models 或 Cancel 不取消探针；没有 `meta` 的旧档案照样读、不重新探测；Ollama 有报告窗口后有效窗口取较小的；读版本每个提供商一次，合成端点日志里没有 §4.2 的路径（`ollama` 形状：没有 `/api/tags`、`/api/ps`、`/api/show`；`sglang`：没有 `/model_info`）；`localai`、`tensorrt` 形状认出后重新探测一次、不显示 Cancel test… | 单元、App |
 | MD-13 | 模型行提示 | 没报告的窗口与输出写 not reported；§8 表的每一行的显示条件与 Use 的改动（窗口改小时 Max output 一起改；`-alwaysthink` 给第四行）；Use 后重新探测；旧档案只显示第四行 | App、回放 |
 | MD-14 | 真实端点 | DeepSeek：列表读出窗口、输出上限、思考、图片，与官方文档一致，勾选加入后探针完成；OpenRouter：几百个模型的清单可过滤，加入一个；GLM：拿到列表或显示列表错误，手填 `GLM-5.3` 后加入并完成探针；录下 §13.1 的真实样本与回放 fixture | 真实 |
@@ -570,3 +571,5 @@ App 结果写 `md-app-existing.json`，回放结果写 `md-replay-existing.json`
 TaskBoard 与记忆的 App 测试直接写 `model-config.json` 准备配置，不填首次启动表单，也不发 `models.saveProvider`、`models.firstRun`、
 `models.saveModel`；它们要改的只有上面 `tb-helpers.mjs`、`v1-switch-helpers.mjs` 两个 helper：合成端点现在也给列表与详情请求打
 JSON 行（§13.1），收集时跳过带 `path` 的行。
+
+（2026-10-26 注，负责人走查 M2：首次启动测试成功就进入主窗口，表单下方的探针状态与 Open folder… 删掉。`page.mjs` 的 `firstRun` 改为成功时读主窗口 Open a folder 提示里的 `connected`、失败时读表单的 `form-message`，`waitProbes` 经进程桥读 `models.get` 的档案；`md-app-firstrun.mjs` 里要留在表单上的保存（内存里的 key、再次保存）改为测试失败之后（`-404` 后缀的模型），探针状态的检查移到会话的拒绝启动卡；改法逐条见 docs/v1/walkthrough-1026/WP-01.md。）

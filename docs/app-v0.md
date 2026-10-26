@@ -143,7 +143,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   API key 由 Mori 用系统加密（Windows 上是 DPAPI，绑定当前用户）保存在本机，不写进 `models.json`，也不放进环境变量；
   启动时解密后只交给 pi 放在内存里，模型运行的命令读不到它。不再支持 `$环境变量名` 这种命令行时代的写法。
 - "Test connection"：按钮变为"Testing…"，可以取消。成功时显示首字耗时，失败时显示错误原文。
-- 测试成功后进入"Open folder…"。
+- 测试成功后进入"Open folder…"。（2026-10-26 起测试成功就进入主窗口，中栏是"Open a folder"提示，标题下面显示一次测试结果，见 [v1/screens/first-run.md](v1/screens/first-run.md)）
 - 同一张表单也是设置页"Connections and models"里的连接，以及错误卡上"Go to settings"打开的地方。
 - 后台还没准备好时，输入框可以打字但不能发送，显示"Starting…"。
 
