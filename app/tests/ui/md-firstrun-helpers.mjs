@@ -352,7 +352,7 @@ function readListInPage() {
       maxTokens: field('maxTokens').value, reasoning: field('reasoning').checked, image: field('image').checked,
       tags: all('[data-testid="row-tag"]', element).map((t) => ({ kind: t.dataset.kind, text: t.textContent })),
       hints: all('[data-testid="row-hint"]', element).map((t) => t.dataset.kind),
-      notReported: all('[data-testid="not-reported"]', element).map((t) => `${t.dataset.field}:${t.textContent}`),
+      defaults: all('[data-testid="default-value"]', element).map((t) => `${t.dataset.field}:${t.textContent}`),
       errors: all('[data-testid="field-error"]', element).map((e) => `${e.dataset.field}:${e.textContent}`),
       afterListError: listError ? after(listError, element) : null };
   };

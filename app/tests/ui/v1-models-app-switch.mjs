@@ -623,14 +623,18 @@ async function probeAfterConversation(ctx) {
   await uiVerified(ctx, 'q19p/fake-coder-q19new');
 }
 
-/** @brief MP-19：设置页的模型行显示 Tool calling: Verified。 */
+/**
+ * @brief MP-19：设置页里加入的模型验证通过：行上的 data-probe 为 verified，没有状态行（2026-10-26 起模型行没有档案摘要，
+ *        能用的模型不显示状态行，models-settings.md "Models 行"）。
+ */
 async function uiVerified(ctx, ref) {
   const { page } = ctx;
   await keyRows(ctx, ref.split('/')[0]);
-  const value = await page.locator(`[data-testid="model-row"][data-model="${ref}"] [data-field="tool_calling"]`)
-    .getAttribute('data-value', { timeout: 10000 }).catch(() => null);
-  record('MP-19 after the queued probes the Models row of the added model shows "Tool calling: Verified"',
-    value === 'verified', `tool_calling=${value}`);
+  const row = page.locator(`[data-testid="model-row"][data-model="${ref}"]`);
+  const value = await row.getAttribute('data-probe', { timeout: 10000 }).catch(() => null);
+  const status = await row.getByTestId('probe-status').count();
+  record('MP-19 after the queued probes the Models row of the added model is verified (data-probe) with no status line',
+    value === 'verified' && status === 0, `data-probe=${value}; status lines ${status}`);
   await backToChat(ctx);
 }
 

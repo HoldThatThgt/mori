@@ -47,8 +47,8 @@
 | Network zone | `zone` | 必选；Local / Intranet / Public；拉取后界面用 `shared/models.ts` 的 `suggestZone` 按 Base URL 框里的地址（可能已换成建议的地址）预选建议值（发现规格 §3.4，§12 的规则）。你在这张表单里选过之后，再拉取不覆盖；没选过时每次拉取重新预选（发现规格 §6.1） |
 | 清单（Models (N)） | `models`：勾选的行，按清单顺序 | 行、勾选、标记、提示、改值的检查、过滤框都见 [models-settings.md](models-settings.md)“清单”（发现规格 §6.2）。其中：Select all、Clear selection 只作用于显示着的、能勾的行；行数（含手填的行）超过 20 时有过滤框，按 id 子串过滤、不分大小写，被藏起来的勾选行照样保存；“Not reported”在你改了值之后仍在；列表为空（`models` 为空、`listError` 为 null）时“Models (0)”，下面一句“The server didn’t list any models.”，再下面是 Add a model ID。首次启动里没有“Added”的行（`added` 只对已有提供商）。Family 不显示，按结果的 `family` 原样保存 |
 | 列表错误 | — | 没拿到列表时代替清单，见状态表“列表错误”。手填的行列在错误一句下面，样子同清单的行；没有“Models (N)”标题、Select all、Clear selection 和过滤框（发现规格 §6.3） |
-| Add a model ID | 加进清单末尾的一行 | Model ID 输入框和“Add to list”；id 按 §4.1 检查，与清单里的行重复时“Model IDs must be unique within a provider.”；加进来的行勾上、标“Entered by you”，Context window、Max output 取默认值并标“Not reported”（发现规格 §6.4） |
-| More settings | `compat` 的六个字段 | 点开后只有 Compatibility options（每个勾选框是 §9.1 的标签，下面一行小字说明，沿用 english-ui）；首次启动没有 Concurrency per key；API type 不是 OpenAI-compatible 时不显示 More settings（发现规格 §6.6） |
+| Add a model ID | 加进清单末尾的一行 | Model ID 输入框和“Add to list”；id 按 §4.1 检查，与清单里的行重复时“Model IDs must be unique within a provider.”；加进来的行勾上、标“Entered by you”，Context window、Max output 取默认值并标“Default”（发现规格 §6.4；2026-10-26 改，原来是“Not reported”，只在值仍是默认值时标，见 models-settings.md“清单的行”） |
+| More settings | `compat` 的字段 | 点开后只有 Compatibility options（每个勾选框是 §9.1 的标签，下面一行小字说明，沿用 english-ui；2026-10-26 改（负责人走查 M1）：同 Edit provider，图例下面先一行说明“Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this server rejects requests.”，勾选框只剩五个，见 models-settings.md“提供商表单：Edit”）；首次启动没有 Concurrency per key；API type 不是 OpenAI-compatible 时不显示 More settings（发现规格 §6.6） |
 | 探针代价 | — | Test connection 上方一句“Each model is verified with up to 13 short requests.”（发现规格 §6.6、§11；proposal §12 第 5 条）；拿到列表和列表错误时都有 |
 | Test connection | — | 拉取后出现在表单底部（代替提供商表单底部的 Add 与 Cancel）；见状态表 |
 
@@ -80,7 +80,7 @@
 | 保存后改到别的 origin | 保存过之后你把 Base URL 改成另一个 origin（协议、主机或端口不同），API key 框是空的（2026-10-23 负责人决定，发现规格 §6.6） | API key 的占位为“Optional”（不是“Saved. Leave empty to keep it.”）；Fetch models 不带内存里的 key（`keySecret` 为 null，要 key 的服务报 `rejected`），因为这时保存会按 §4.1 删除已存的 key；改回保存时的 origin 后占位与内存里的 key 恢复；带着不同的 origin、框空着保存之后内存里的 key 丢掉，占位为“Optional”（Base URL 框已是新保存的 origin 也一样） | 在 API key 框填 key；同拉取中 |
 | 测试中 | 保存成功后（或表单没改动时）`connection.test`（`{ providerId, modelId: 第一个勾选的模型 }`，发现规格 §6.6） | 按钮“Testing…”（临时，走查时可以改），旁边“Cancel”；没有 30 秒总时限：排队按 §8.2，每次尝试按首个内容的时限（120 秒），`server` 不重试 | Cancel（`connection.testCancel`） |
 | 测试已取消 | `connection.test` 返回已取消 | “Test cancelled”（临时，走查时可以改）；表单留着，不进入主窗口 | 再次测试 |
-| 测试失败 | `connection.test` 返回 `error` | “Connection failed: <原文>”（§9.1；没有原文时“Connection failed: No response”）；表单留着，不进入主窗口 | 修改，再 Test connection |
+| 测试失败 | `connection.test` 返回 `error` | “Connection failed: <原文>”（§9.1；没有原文时“Connection failed: No response”）；表单留着，不进入主窗口。（2026-10-26 补，规格 §8.3：什么都不改再点 Test connection 照样把请求发给服务，结果是服务这一次的回答，例如又是“Connection failed: 401: …”或“… 404 …”；原来模型池记下的 `auth`、`not_found` 挡住这次测试，结果是不发请求的“Connection failed: Connection error.”。） | 修改，再 Test connection；或不改再测 |
 | 测试成功 | `connection.test` 返回成功 | 表单关闭，进入三栏布局（下面“测试成功之后：主窗口”）；结果文字“Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>”（§9.1），显示在主窗口的 Open a folder 提示里；不等探针跑完（2026-10-26 负责人走查 M2） | 见“测试成功之后：主窗口” |
 | 再次保存同一张表单 | 保存过、测试没有成功（失败、已取消）之后你改了字段或勾选，再点 Test connection | `models.firstRun` 带上次的 `providerId`：整体替换这个提供商和它的全部模型（换成这次勾选的行），`normalDefault` 按这次的勾选数重写，不新建第二个提供商（发现规格 §5.4、MP-33）；这次勾选的模型重新开始探针；测试的是这次第一个勾选的模型 | — |
 

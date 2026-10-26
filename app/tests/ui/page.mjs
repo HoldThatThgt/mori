@@ -5,6 +5,7 @@
 // 操作（范围用选择器给出：首次启动表单、Add provider 表单或一张提供商卡）。
 // 2026-10-26（负责人走查 M2，first-run.md "测试成功之后：主窗口"）：测试连接成功就关掉首次启动表单、进入主窗口，
 // "Connected · …"在主窗口 Open a folder 提示里（CONNECTED）；表单下方没有探针状态了，waitProbes 经进程桥读 models.get。
+// 2026-10-26（WP-02）：点 Test connection 之前读表单下方的结果用 textNow（不在时不等，原来白等 Playwright 的默认 30 秒）。
 
 import { sleep } from './lib.mjs';
 
@@ -19,6 +20,16 @@ export const CONNECTED = '[data-testid="open-folder"] [data-testid="connected"]'
 export const PROVIDER_FORM = '[data-testid="provider-form"]';
 /** @brief 一张提供商卡的选择器（卡上的清单在卡里，models-settings.md "卡上的清单"）。 */
 export const cardScope = (provider) => `[data-testid="provider-card"][data-provider="${provider}"]`;
+
+/**
+ * @brief locator 此刻的文字；元素不在时为 null，不等它出现。Playwright 的 innerText 会等元素出现，最多到默认时限 30 秒：
+ *        首次启动点 Test connection 之前表单下方多半还没有结果，原来那样读就白等 30 秒（2026-10-26 WP-02 查出的 m0-smoke
+ *        首次启动两步各约 30 秒）。
+ */
+export async function textNow(locator) {
+  if (await locator.count() === 0) return null;
+  return locator.first().innerText({ timeout: 1000 }).catch(() => null);
+}
 
 /** 拉取之后清单、列表错误与命令失败的原文（§6.1–§6.3）：拉取前先把已有的标为旧的，只认新出现的 */
 const FETCH_OUTCOMES = '[data-testid="checklist"], [data-testid="list-error"], [data-testid="form-message"]';
@@ -269,7 +280,7 @@ export function pageHelpers(page) {
       const typed = await form.locator('[data-testid="discovered-row"]').evaluateAll((rows) => rows
         .filter((row) => row.querySelector('input[name="pick"]')?.checked
           && row.querySelector('[data-testid="row-tag"][data-kind="entered"]')).map((row) => row.dataset.model));
-      const previous = await form.getByTestId('form-message').innerText().catch(() => null);
+      const previous = await textNow(form.getByTestId('form-message'));
       const since = Date.now();
       await form.locator('[data-action="test"]').click();
       const text = await h.testResult(previous, 180000);

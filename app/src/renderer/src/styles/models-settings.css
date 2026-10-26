@@ -139,11 +139,11 @@ fieldset.mf-row > legend + .mf-control { grid-column: 2; }
 .checklist-model { min-width: 140px; overflow-wrap: anywhere; }
 .mf-grid .checklist-table input:not([type='checkbox']) { width: 96px; padding: 4px 6px; font-size: var(--fs-small); }
 .checklist-table input[type='checkbox'] { margin-top: 6px; }
-.checklist-table .row-note, .checklist-table .not-reported, .checklist-table .field-error { display: block; }
+.checklist-table .row-note, .checklist-table .default-value, .checklist-table .field-error { display: block; }
 .row-note { margin-top: 2px; color: var(--color-muted); }
 .row-note[data-kind='unusable'] { color: var(--color-danger); }
 .row-note[data-testid='row-hint'] { color: var(--color-warn); }
-.not-reported { margin-top: 2px; color: var(--color-faint); }
+.default-value { margin-top: 2px; color: var(--color-faint); }
 .list-error { display: grid; gap: 4px; }
 .list-error p { margin: 0; }
 .list-error p:first-child { color: var(--color-danger); overflow-wrap: anywhere; }
@@ -160,23 +160,13 @@ fieldset.mf-row > legend + .mf-control { grid-column: 2; }
 .key-form input { width: 180px; }
 .key-form .form-message { flex-basis: 100%; }
 
-/* Models 行与档案摘要 */
+/* Models 行（2026-10-26 起没有档案摘要；状态行只在模型不能用时有，models-settings.md "Models 行"） */
 .model-info { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
 .model-id { font-family: var(--font-mono); overflow-wrap: anywhere; }
 .model-meta { color: var(--color-muted); font-size: var(--fs-small); }
-.profile {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 14px;
-  margin-top: 4px;
-  color: var(--color-muted);
-  font-size: var(--fs-small);
-}
-.profile b { color: var(--color-prose); font-weight: 500; }
-.profile-item[data-field='tool_calling'][data-value='failed'] b { color: var(--color-danger); }
-.profile-item[data-field='tool_calling'][data-value='verified'] b { color: var(--color-ok); }
-.profile-warn { color: var(--color-warn); }
-.profile .form-message { flex-basis: 100%; margin: 0; }
+.model-meta [data-testid='default-value'] { cursor: help; }
+.probe-line { margin-top: 4px; }
+.probe-problem { color: var(--color-danger); font-size: var(--fs-small); overflow-wrap: anywhere; }
 
 /* Groups */
 .group-id { font-family: var(--font-mono); font-weight: 500; }

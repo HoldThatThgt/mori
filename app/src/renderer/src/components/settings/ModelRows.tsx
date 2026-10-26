@@ -1,105 +1,66 @@
-// 提供商卡里的 Models（§7、§9.1）：每行模型 id、窗口、最大输出、模型族、支持思考与档案摘要；服务没报告的窗口与
-// 最大输出标“(not reported)”，报告值与配置不一致时一行提示和 Use（docs/specs/model-discovery.md §8）；
-// Verify、需要你同意的两种探针、上移下移、Edit、Delete、Test。模型表单只有 Edit（拉取规格 §6.5），卡上的清单放在
-// 这一块的末尾。状态表见 docs/v1/screens/models-settings.md "Models 行与档案摘要""需要你同意的探针"。
+// 提供商卡里的 Models（§9.1）：每行模型 id 与一行说明（窗口、最大输出、模型族、支持思考，思考关不掉时最后加
+// “Thinking can’t be turned off”）；服务没报告、值仍是 Mori 默认值的窗口与最大输出标“(default)”，报告值与配置不一致时
+// 一行提示和 Use（docs/specs/model-discovery.md §8）；模型不能用（tool calling 没验证通过）时一行状态与 Verify again；
+// 上移下移、Edit、Delete。模型表单只有 Edit（拉取规格 §6.5），卡上的清单放在这一块的末尾。
+// 状态表见 docs/v1/screens/models-settings.md “Models 行”（2026-10-26 负责人走查 M6、M7、M8：档案摘要、Verify、
+// 需要你同意的两种探针和行上的 Test 删掉；探针第 0–7 步照旧自动跑，选择器、编译与 TaskBoard 照旧读档案）。
 
 import { useState, type ReactNode } from 'react';
 import {
-  unreportedMaxTokens, type ApiType, type ModelCommand, type ModelProvider, type ProfileView, type ProviderModel,
-  type ReportedValues, type ServerKind,
+  UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens, type ApiType, type ModelCommand, type ModelProvider,
+  type ProfileView, type ProviderModel, type ReportedValues,
 } from '../../../../shared/models';
-import { testAt, useProfile, writeModels } from '../../state/settings';
-import {
-  DeleteDialog, ModelDialog, MoveButtons, TestButton, TestNotice, thousands, useDeleteFlow,
-} from './common';
+import { useProfile, writeModels } from '../../state/settings';
+import { DeleteDialog, MoveButtons, thousands, useDeleteFlow } from './common';
 import { ModelEditor } from './ModelEditor';
 
-/** 能跑取消探针的服务（§7.3 第 9 步；拉取规格 §7.2：改认为 localai、tensorrt 的不再显示 Cancel test…） */
-const CANCEL_SERVERS: readonly ServerKind[] = ['vllm', 'sglang', 'llamacpp'];
-
-/** @brief 档案摘要的一项：名称、文字与 data-value。 */
-function Item({ field, label, value, text }: { field: string; label: string; value: string; text: string }) {
-  return <span className="profile-item" data-field={field} data-value={value}>{label}: <b>{text}</b></span>;
-}
+// ---- tool calling 的状态（§7.4；models-settings.md “Models 行”的状态行） ----
 
 /**
- * @brief Tool calling 的状态（§7.4）：从未验证过的（没有档案，或档案里不是 verified、failed，例如上次出错）
- *        探测中为 Verifying…，验证过的重新探测为 Re-verifying…。
+ * @brief 行上的 data-probe（给界面测试读）：从未验证过的（没有档案，或档案里不是 verified、failed，例如上次出错）探测中为
+ *        verifying，验证过的重新探测为 reverifying；否则为档案的 tool_calling.state。
  */
-function toolCalling(profile: ProfileView | null, running: boolean): { value: string; text: string } {
+function probeState(profile: ProfileView | null, running: boolean): string {
   const state = profile?.tool_calling.state;
   const verified = profile !== null && profile.status !== 'probing' && (state === 'verified' || state === 'failed');
-  if (running && verified) return { value: 'reverifying', text: 'Re-verifying…' };
-  if (running || !profile || profile.status === 'probing') return { value: 'verifying', text: 'Verifying…' };
-  const texts = { verified: 'Verified', unverified: 'Not verified', failed: 'Failed' } as const;
-  return { value: profile.tool_calling.state, text: texts[profile.tool_calling.state] };
+  if (running && verified) return 'reverifying';
+  if (running || !profile || profile.status === 'probing') return 'verifying';
+  return profile.tool_calling.state;
+}
+
+/** @brief 状态行：验证中、验证失败（第 3、4 步判定为不通过）或探针出错（tool calling 因出错没有验证）。 */
+interface StatusLine {
+  /** data-state：verifying、failed、error */
+  state: 'verifying' | 'failed' | 'error';
+  /** 一行文字 */
+  text: string;
 }
 
 /**
- * @brief 档案摘要（§9.1）；探针出错时"Couldn't verify: <原文>"，静默截断时告警。思考关不掉的模型
- *        （reasoning.off_refused，§7.7）在 Reasoning field 后、Cancel 前多一项"Thinking: Can’t be turned off"。
+ * @brief 状态行（models-settings.md “Models 行”）：只在模型不能用时有，即 tool calling 没验证通过（选择器第 3 步按它排除，
+ *        §5.3），或从没完成过验证。tool calling 验证通过的模型（重新验证中、其他步出错的）没有状态行。
+ * @return 状态行；能用的模型为 null
  */
-function ProfileSummary({ modelRef }: { modelRef: string }) {
-  const { profile, running } = useProfile(modelRef);
-  const tool = toolCalling(profile, running);
-  const cancel = profile?.cancel_verified ?? 'unknown';
-  const cancelText = cancel === 'unknown' ? 'Unknown' : cancel ? 'Verified' : 'Not verified';
-  return (
-    <div className="profile" data-testid="profile">
-      <Item field="tool_calling" label="Tool calling" value={tool.value} text={tool.text} />
-      {profile && (
-        <>
-          <Item field="tier" label="Handoff tier" value={profile.tier.level ?? 'none'}
-            text={profile.tier.level ?? '—'} />
-          <Item field="context" label="Context" value={String(profile.context.effective)}
-            text={thousands(profile.context.effective)} />
-          <Item field="reasoning" label="Reasoning field" value={profile.reasoning.field}
-            text={profile.reasoning.field} />
-          {/* §7.7：第 2 步的说明只存在档案里，这里只写这一项；为假时没有它 */}
-          {profile.reasoning.off_refused && (
-            <Item field="thinking_off" label="Thinking" value="refused" text="Can’t be turned off" />
-          )}
-          <Item field="cancel" label="Cancel" value={String(cancel)} text={cancelText} />
-        </>
-      )}
-      {profile?.context.truncation === 'silent' && (
-        <span className="profile-warn" data-testid="truncation-warning">Silently truncates long input</span>
-      )}
-      {profile?.status === 'error' && !running && (
-        <p className="form-message error" data-testid="probe-error">Couldn’t verify: {profile.error}</p>
-      )}
-    </div>
-  );
+function statusLine(profile: ProfileView | null, running: boolean): StatusLine | null {
+  if (profile !== null && profile.status !== 'probing' && profile.tool_calling.state === 'verified') return null;
+  if (running || !profile || profile.status === 'probing') return { state: 'verifying', text: 'Verifying…' };
+  if (profile.tool_calling.state === 'failed') {
+    const { call, result } = profile.tool_calling;
+    const detail = [call, result].find((step) => step.outcome === 'fail')?.detail;
+    return { state: 'failed', text: `Tool calling failed verification${detail ? `: ${detail}` : ''}` };
+  }
+  return { state: 'error', text: `Couldn’t verify${profile.error ? `: ${profile.error}` : ''}` };
 }
 
-/** @brief 需要你同意的探针：长输入（第 8 步）或取消（第 9 步）的确认框。 */
-function ConsentDialog({ kind, model, effective, onClose }: {
-  kind: 'long-input' | 'cancel-test'; model: string; effective: number; onClose: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const id = model.slice(model.indexOf('/') + 1);
-  const half = Math.round(effective * 0.5);
-  const most = Math.round(effective * 0.9);
-  async function run() {
-    setBusy(true);
-    const tests = kind === 'long-input' ? 'long_input' : 'cancel';
-    const result = await writeModels({ type: 'models.verify', refs: [model], tests });
-    setBusy(false);
-    if (result.error === null) onClose();
-    else setError(result.error);
-  }
-  const text = kind === 'long-input'
-    ? `Sends two requests of about ${thousands(half)} and ${thousands(most)} tokens (about ${thousands(half + most)}`
-      + ' tokens in all) to check whether long input is silently truncated.'
-    : 'Sends one request for a long reply, disconnects after the first output, and reads the server’s metrics'
-      + ' to see whether the request stopped.';
-  const title = kind === 'long-input' ? `Run the long-input test on ${id}?` : `Run the cancel test on ${id}?`;
+/** @brief 状态行的一行：文字，失败与出错时后面一个 Verify again（models.verify，第 0–7 步）。 */
+function ProbeLine({ line, busy, onVerify }: { line: StatusLine; busy: boolean; onVerify: () => void }) {
   return (
-    <ModelDialog testId="confirm-dialog" kind={kind} title={title} confirmLabel="Run test" tone="primary" busy={busy}
-      error={error} onConfirm={() => void run()} onCancel={onClose}>
-      <p>{text}</p>
-    </ModelDialog>
+    <div className="row-actions probe-line" data-testid="probe-status" data-state={line.state}>
+      <span className={line.state === 'verifying' ? 'muted' : 'probe-problem'}>{line.text}</span>
+      {line.state !== 'verifying' && (
+        <button className="button compact" data-action="verify" disabled={busy} onClick={onVerify}>Verify again</button>
+      )}
+    </div>
   );
 }
 
@@ -170,12 +131,57 @@ function HintLine({ hint, busy, onUse }: { hint: ModelHint; busy: boolean; onUse
   );
 }
 
-/** @brief 服务没报告这一项（拉取规格 §8）：接在数字后面的“ (not reported)”。 */
-function NotReported({ field }: { field: 'contextWindow' | 'maxTokens' }) {
-  return <>{' '}<span data-testid="not-reported" data-field={field}>(not reported)</span></>;
+// ---- 模型行 ----
+
+/** “(default)”的悬停说明（models-settings.md “Models 行”，临时，走查时可以改） */
+const DEFAULT_TITLE = 'The server didn’t report this, so Mori used a default. Use Edit to set the real value.';
+
+/** @brief 接在数字后面的“ (default)”（拉取规格 §8，2026-10-26 改）：服务没报告、值仍是 Mori 的默认值。 */
+function DefaultMark({ field }: { field: 'contextWindow' | 'maxTokens' }) {
+  return <>{' '}<span data-testid="default-value" data-field={field} title={DEFAULT_TITLE}>(default)</span></>;
 }
 
-// ---- 模型行 ----
+/**
+ * @brief 标“(default)”的两项：档案有报告值、这一项没报告，而且配置的值仍等于默认值（窗口 128000；Max output 为 16384 与
+ *        配置窗口一半中较小的，同清单与拉取规格 §11）。你用 Edit 改成别的值就不再标。
+ * @param reported 档案里服务报告的值；旧档案或还没有档案时为 null（都不标）
+ */
+function defaultsOf(model: ProviderModel, reported: ReportedValues | null): { window: boolean; max: boolean } {
+  return {
+    window: reported?.contextWindow === null && model.contextWindow === UNREPORTED_CONTEXT_WINDOW,
+    max: reported?.maxTokens === null && model.maxTokens === unreportedMaxTokens(model.contextWindow),
+  };
+}
+
+/**
+ * @brief 模型行的说明：窗口、最大输出、模型族（为空时不显示）、支持思考（勾了时显示）、思考关不掉（档案的
+ *        reasoning.off_refused，§7.7；重新验证中按旧档案）；数字是配置的值，仍是默认值时后面写 (default)。
+ */
+function ModelMeta({ model, profile }: { model: ProviderModel; profile: ProfileView | null }) {
+  const marks = defaultsOf(model, profile?.reported ?? null);
+  return (
+    <span className="model-meta">
+      Context window: {thousands(model.contextWindow)}{marks.window && <DefaultMark field="contextWindow" />}
+      {' · '}Max output: {thousands(model.maxTokens)}{marks.max && <DefaultMark field="maxTokens" />}
+      {model.family && ` · Family: ${model.family}`}{model.reasoning && ' · Supports thinking'}
+      {profile?.reasoning.off_refused && (
+        <>{' · '}<span data-field="thinking_off">Thinking can’t be turned off</span></>
+      )}
+    </span>
+  );
+}
+
+/** @brief 一行模型的立即保存（Verify again、上移下移、提示的 Use）：保存中按钮不可用，失败时原文写在这一行里。 */
+function useRowSave() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function run(command: ModelCommand) {
+    setBusy(true);
+    setError((await writeModels(command)).error);
+    setBusy(false);
+  }
+  return { busy, error, run };
+}
 
 /** @brief 一行模型的参数。 */
 export interface ModelRowProps {
@@ -189,82 +195,42 @@ export interface ModelRowProps {
   onEdit: () => void;
 }
 
-/**
- * @brief 模型行的说明：窗口、最大输出、模型族（为空时不显示）、支持思考（勾了时显示）。档案的 reported 不为 null、
- *        其中窗口或输出上限为 null 时，那个数字后面写 (not reported)；数字是配置的值（拉取规格 §8）。
- * @param reported 档案里服务报告的值；旧档案或还没有档案时为 null（不标 not reported）
- */
-function ModelMeta({ model, reported }: { model: ProviderModel; reported: ReportedValues | null }) {
-  return (
-    <span className="model-meta">
-      Context window: {thousands(model.contextWindow)}
-      {reported !== null && reported.contextWindow === null && <NotReported field="contextWindow" />}
-      {' · '}Max output: {thousands(model.maxTokens)}
-      {reported !== null && reported.maxTokens === null && <NotReported field="maxTokens" />}
-      {model.family && ` · Family: ${model.family}`}{model.reasoning && ' · Supports thinking'}
-    </span>
-  );
-}
-
-/** @brief 一行模型的立即保存（Verify、上移下移、提示的 Use）：保存中按钮不可用，失败时原文写在这一行里。 */
-function useRowSave() {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  async function run(command: ModelCommand) {
-    setBusy(true);
-    setError((await writeModels(command)).error);
-    setBusy(false);
-  }
-  return { busy, error, run };
-}
-
 /** @brief 一行模型。 */
 export function ModelRow({ provider, model, index, onEdit }: ModelRowProps) {
   const ref = `${provider.id}/${model.id}`;
-  const { profile } = useProfile(ref);
+  const { profile, running } = useProfile(ref);
   const { busy, error, run } = useRowSave();
-  const [consent, setConsent] = useState<'long-input' | 'cancel-test' | null>(null);
   const flow = useDeleteFlow((dryRun) => ({ type: 'models.deleteModel', providerId: provider.id, modelId: model.id,
     dryRun }));
   // 拉取规格 §8：Use 立即保存按表改过的模型，不带 thinkingLevel；指纹变了由后台进程重新探测（模型层规格 §7.4）
   const use = (changed: ProviderModel) => void run({ type: 'models.saveModel', providerId: provider.id,
     model: changed });
-  const at = `model:${ref}`;
+  const line = statusLine(profile, running);
   return (
-    <li className="model-row" data-testid="model-row" data-model={ref}>
+    <li className="model-row" data-testid="model-row" data-model={ref} data-probe={probeState(profile, running)}>
       <div className="row-line">
         <span className="model-info"><span className="model-id">{model.id}</span>
-          <ModelMeta model={model} reported={profile?.reported ?? null} /></span>
+          <ModelMeta model={model} profile={profile} /></span>
         <span className="row-actions">
-          <button className="button compact" data-action="verify" disabled={busy}
-            onClick={() => void run({ type: 'models.verify', refs: [ref], tests: 'auto' })}>Verify</button>
-          <button className="button compact" data-action="long-input" onClick={() => setConsent('long-input')}>
-            Long-input test…</button>
-          {profile && CANCEL_SERVERS.includes(profile.server.kind) && <button className="button compact"
-            data-action="cancel-test" onClick={() => setConsent('cancel-test')}>Cancel test…</button>}
           <MoveButtons index={index} count={provider.models.length} busy={busy} actions={['up', 'down']}
             onMove={(delta) => void run({ type: 'models.moveModel', providerId: provider.id, modelId: model.id,
               delta })} />
           <button className="button compact" data-action="edit" onClick={onEdit}>Edit</button>
           <button className="button compact danger" data-action="delete" onClick={() => void flow.start()}>
             Delete…</button>
-          <TestButton at={at} label="Test" action="test"
-            onTest={() => void testAt(at, { providerId: provider.id, modelId: model.id })} />
         </span>
       </div>
       {modelHints(provider.api, model, profile).map((hint) => (
         <HintLine key={hint.kind} hint={hint} busy={busy} onUse={() => use(hint.model)} />))}
-      <ProfileSummary modelRef={ref} />
-      <TestNotice at={at} testId="model-test" />
+      {line && <ProbeLine line={line} busy={busy}
+        onVerify={() => void run({ type: 'models.verify', refs: [ref], tests: 'auto' })} />}
       {error && <p className="form-message error" role="alert">{error}</p>}
-      {consent && <ConsentDialog kind={consent} model={ref} onClose={() => setConsent(null)}
-        effective={profile?.context.effective ?? model.contextWindow} />}
       <DeleteDialog flow={flow} kind="delete-model" title={`Delete model ${model.id}?`} />
     </li>
   );
 }
 
-/** @brief Models 一块的参数（拉取规格 §6.5：模型表单只有 Edit，没有新建；卡上的清单放在这一块的末尾）。 */
+/** @brief Models 一块的参数（拉取规格 §6.5：模型表单只有 Edit，没有新建；卡上的清单在这一块的末尾）。 */
 export interface ModelRowsProps {
   /** 所在的提供商 */
   provider: ModelProvider;

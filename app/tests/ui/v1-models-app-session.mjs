@@ -18,6 +18,9 @@
 // 测试里的 key 都是合成的测试值（synthetic），与任何真实服务无关。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：MP-10 加模型改为卡上 Fetch models → 勾选或手填 → Add 1 model
 // （page.mjs cardAddModels）；合成端点的列表、详情请求的日志行（带 path）不算对话请求。
+// 2026-10-26（WP-02，负责人走查 M7、M8，models-settings.md "Models 行"）：模型行没有档案摘要和需要同意的探针的按钮。
+// MP-10 的等级、推理字段读 models.get 的档案，tool calling 读档案与行上的 data-probe、判定失败的状态行；MP-11 经进程桥发
+// models.verify（tests long_input / cancel）、读档案（这一条由 WP-04 删除）；MP-12 的重新验证看行上的 data-probe。
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -278,15 +281,18 @@ async function settingsShown(page) {
     scroll: Math.round(document.querySelector('.settings-body')?.scrollTop ?? 0) }));
 }
 
-/** @brief 模型行的档案摘要、告警、按钮。 */
+/**
+ * @brief 模型行此刻的样子（models-settings.md "Models 行"，2026-10-26 起没有档案摘要）：行上的 data-probe（tool calling 的
+ *        验证状态）、说明一行、状态行（data-state 与文字，没有时为 null）、行里的按钮。行不在时为 null。
+ */
 function profileRow(page, ref) {
   return page.evaluate((target) => {
     const row = document.querySelector(`[data-testid="model-row"][data-model="${target}"]`);
     if (!row) return null;
-    const items = [...row.querySelectorAll('[data-testid="profile"] [data-field]')];
-    return { fields: Object.fromEntries(items.map((item) => [item.dataset.field, { value: item.dataset.value,
-      text: item.textContent }])), warning: row.querySelector('[data-testid="truncation-warning"]')?.textContent ?? null,
-    actions: [...row.querySelectorAll('[data-action]')].map((item) => item.dataset.action) };
+    const status = row.querySelector('[data-testid="probe-status"]');
+    return { probe: row.dataset.probe ?? null, meta: row.querySelector('.model-meta')?.textContent ?? '',
+      status: status && { state: status.dataset.state, text: status.textContent },
+      actions: [...row.querySelectorAll('[data-action]')].map((item) => item.dataset.action) };
   }, ref);
 }
 
@@ -306,7 +312,7 @@ async function addModelUi(page, providerId, spec) {
 /**
  * @brief 在页面里装一个 MutationObserver，DOM 每次变化时按 kind 记一个快照（与上一个相同时不记），抓只持续一瞬间的状态。
  * @param kind stage：阶段行的 data-kind、文字和此刻的用户消息条数；card：拒绝启动卡的 kind；
- *        tool：ref 那一行的 Tool calling；thinking：Effort 按钮的 data-reasoning 与是否不可用（aria-disabled 为 true 且
+ *        tool：ref 那一行的 data-probe（tool calling 的验证状态）；thinking：Effort 按钮的 data-reasoning 与是否不可用（aria-disabled 为 true 且
  *        不是切换中，composer-pickers.md C1；按钮不再真的 disabled）
  */
 async function watch(page, kind, ref = null) {
@@ -319,8 +325,7 @@ async function watch(page, kind, ref = null) {
           + `${pane().querySelectorAll('[data-testid="user-message"]').length}`;
       },
       card: () => pane()?.querySelector('[data-testid="blocked-card"]')?.dataset.kind ?? 'none',
-      tool: () => document.querySelector(`[data-testid="model-row"][data-model="${target}"] [data-field="tool_calling"]`)
-        ?.dataset.value,
+      tool: () => document.querySelector(`[data-testid="model-row"][data-model="${target}"]`)?.dataset.probe,
       thinking: () => {
         const button = pane()?.querySelector('[data-testid="thinking-button"]');
         return button && `${button.dataset.reasoning}|`
@@ -669,40 +674,51 @@ async function configInvalidScenario(ctx) {
 
 // ---------- 场景：探针与档案（MP-10） ----------
 
-/** 加进 pv 的模型与期望的档案摘要（合成端点的后缀各关掉一项探针能力） */
+/** 加进 pv 的模型与期望的档案（合成端点的后缀各关掉一项探针能力） */
 const PROBE_MODELS = [
-  { id: 'fake-coder-notools', expect: { tool_calling: 'failed' }, texts: { tool_calling: 'Failed' } },
-  { id: 'fake-coder-nochoice', expect: { tool_calling: 'verified', tier: 'B', reasoning: 'none' },
-    texts: { tier: 'B' } },
-  { id: 'fake-coder-noschema', expect: { tool_calling: 'verified', tier: 'A' }, texts: { tier: 'A' } },
-  { id: 'fake-coder-nochoice-noschema', expect: { tool_calling: 'verified', tier: 'C' }, texts: { tier: 'C' } },
+  { id: 'fake-coder-notools', expect: { tool_calling: 'failed' } },
+  { id: 'fake-coder-nochoice', expect: { tool_calling: 'verified', tier: 'B', reasoning: 'none' } },
+  { id: 'fake-coder-noschema', expect: { tool_calling: 'verified', tier: 'A' } },
+  { id: 'fake-coder-nochoice-noschema', expect: { tool_calling: 'verified', tier: 'C' } },
   { id: 'fake-coder-replay', reasoning: true, expect: { tool_calling: 'verified', tier: 'A',
-    reasoning: 'reasoning_content' }, texts: { reasoning: 'reasoning_content', tool_calling: 'Verified' } },
+    reasoning: 'reasoning_content' } },
 ];
 
-/** @brief 档案摘要的一项是否符合期望（data-value 与显示的文字）。 */
-function rowMatches(row, spec) {
-  const valuesOk = Object.entries(spec.expect).every(([field, value]) => row?.fields[field]?.value === value);
-  const textsOk = Object.entries(spec.texts).every(([field, text]) => row?.fields[field]?.text.endsWith(`: ${text}`));
-  return valuesOk && textsOk;
+/**
+ * @brief 档案与模型行是否符合期望：等级、推理字段读档案（models.get）；tool calling 读档案与行上的 data-probe，判定失败的行
+ *        有状态行"Tool calling failed verification: …"，验证通过的行没有状态行（models-settings.md "Models 行"）。
+ */
+function rowMatches(view, row, expect) {
+  const facts = { tool_calling: view?.tool_calling.state, tier: view?.tier.level, reasoning: view?.reasoning.field };
+  const profileOk = Object.entries(expect).every(([field, value]) => facts[field] === value);
+  const line = expect.tool_calling === 'failed'
+    ? row?.status?.state === 'failed' && row.status.text.startsWith('Tool calling failed verification: ')
+    : row?.status === null;
+  return profileOk && row?.probe === expect.tool_calling && line;
 }
 
-/** @brief 加模型后自动探测，Models 行显示正确的 Tool calling、Handoff tier、Reasoning field。 */
+/** @brief 档案与行的要点（检查的 detail）。 */
+const rowFactsOf = (view, row) => JSON.stringify({ tool: view?.tool_calling.state, tier: view?.tier.level,
+  field: view?.reasoning.field, probe: row?.probe, status: row?.status });
+
+/** @brief 加模型后自动探测：档案的 tool calling、等级、推理字段正确，模型行的 data-probe 与状态行随 tool calling。 */
 async function probeRowsStep(ctx) {
   const { page } = ctx;
   await openModels(page);
   for (const spec of PROBE_MODELS) await addModelUi(page, 'pv', spec);
   const refs = PROBE_MODELS.map((spec) => `pv/${spec.id}`);
-  const profiles = await waitProfiles(page, refs, finished, 240000);
+  const profiles = await waitProfiles(page, [...refs, 'pv/fake-coder'], finished, 240000);
   const base = await profileRow(page, 'pv/fake-coder');
-  record('MP-10 pv/fake-coder: Tool calling Verified, Handoff tier A, Reasoning field none',
-    rowMatches(base, { expect: { tool_calling: 'verified', tier: 'A', reasoning: 'none' }, texts: {} }),
-    JSON.stringify(base?.fields));
+  record('MP-10 pv/fake-coder: tool calling verified, handoff tier A, reasoning field none (profile); the row is '
+    + 'verified with no status line', rowMatches(profiles['pv/fake-coder'], base, { tool_calling: 'verified',
+    tier: 'A', reasoning: 'none' }), rowFactsOf(profiles['pv/fake-coder'], base));
   for (const spec of PROBE_MODELS) {
-    const row = await profileRow(page, `pv/${spec.id}`);
+    const ref = `pv/${spec.id}`;
+    const row = await profileRow(page, ref);
     const shown = Object.entries(spec.expect).map(([field, value]) => `${field}=${value}`).join(', ');
-    record(`MP-10 pv/${spec.id}: added in Settings → Models, probed automatically; row shows ${shown}`,
-      rowMatches(row, spec), JSON.stringify(row?.fields));
+    record(`MP-10 ${ref}: added in Settings → Models, probed automatically; profile ${shown}, the row's data-probe `
+      + 'and status line follow tool calling', rowMatches(profiles[ref], row, spec.expect),
+    rowFactsOf(profiles[ref], row));
   }
   const replay = profiles['pv/fake-coder-replay']?.reasoning;
   record('MP-10 pv/fake-coder-replay: profile reasoning.replay is required', replay?.replay === 'required',
@@ -750,69 +766,53 @@ async function probesScenario(ctx) {
 const probeLines = (ep) => ep.log.filter((line) => line.probe).length;
 
 /**
- * @brief 在模型行上点需要同意的探针：run 为假时在确认框点 Cancel；为真时点 Run test，等档案的 probedAt 变化。
- * @return 确认框的文字、之后的档案、这期间合成端点多了几条探针请求
+ * @brief 经进程桥发需要同意的探针（models.verify，tests 为 long_input 或 cancel），等档案的 probedAt 变化。
+ *        2026-10-26（负责人走查 M7）：设置页的两个按钮与确认框删掉，界面上没有入口；后台进程的这两步留到 WP-04 删除，
+ *        这里只经进程桥查它们还照规格判定（MP-11 由 WP-04 一并删除）。
+ * @return 命令的错误、之后的档案、这期间合成端点多了几条探针请求、模型行此刻的样子
  */
-async function consent(ctx, ep, ref, action, run) {
+async function consent(ctx, ep, ref, tests) {
   const { page } = ctx;
-  const row = page.locator(`[data-testid="model-row"][data-model="${ref}"]`);
   const before = (await modelsInfo(page)).profiles[ref]?.probedAt ?? 0;
   const lines = probeLines(ep);
-  await row.locator(`[data-action="${action}"]`).click();
-  const dialog = page.locator(`[data-testid="confirm-dialog"][data-kind="${action}"]`);
-  await dialog.waitFor({ timeout: 5000 });
-  const text = await dialog.innerText();
-  if (!run) {
-    await dialog.locator('[data-role="cancel"]').click();
-    await dialog.waitFor({ state: 'detached', timeout: 5000 });
-    await sleep(2500);
-    return { text, added: probeLines(ep) - lines };
-  }
-  await dialog.locator('.dialog-actions button:not([data-role="cancel"])').click();
-  await dialog.waitFor({ state: 'detached', timeout: 10000 });
+  const result = await page.evaluate((command) => window.mori.request(command),
+    { type: 'models.verify', refs: [ref], tests });
   const profiles = await waitProfiles(page, [ref], (profile) => (profile?.probedAt ?? 0) > before, 240000);
   await sleep(500);
-  return { text, profile: profiles[ref], added: probeLines(ep) - lines, row: await profileRow(page, ref) };
+  return { error: result?.error ?? null, profile: profiles[ref], added: probeLines(ep) - lines,
+    row: await profileRow(page, ref) };
 }
 
-/** @brief 长输入探针：确认前不跑；不截断的模型 truncation none；-truncate 判出静默截断并告警。 */
+/** @brief 长输入探针（经进程桥）：不截断的模型 truncation none；-truncate 判出静默截断，有效窗口降下；行上没有告警。 */
 async function longInputStep(ctx, e1) {
-  const cancelled = await consent(ctx, e1, 'lp/fake-coder', 'long-input', false);
-  record('MP-11 long-input: the confirm dialog states about 4,096 + 7,373 tokens; Cancel sends nothing',
-    cancelled.text.includes('Run the long-input test on fake-coder?') && cancelled.text.includes('4,096')
-    && cancelled.text.includes('7,373') && cancelled.added === 0, `${oneLine(cancelled.text, 200)}; +${cancelled.added}`);
-  const plain = await consent(ctx, e1, 'lp/fake-coder', 'long-input', true);
-  record('MP-11 long-input: runs only after "Run test"; a model that keeps long input stays truncation none',
-    plain.added >= 2 && plain.profile.context.truncation === 'none' && plain.profile.context.effective === 8192
-    && plain.row.warning === null, `+${plain.added} probes, ${JSON.stringify(plain.profile.context)}`);
-  const cut = await consent(ctx, e1, 'lp/fake-coder-truncate', 'long-input', true);
-  record('MP-11 long-input: -truncate is judged silent, the row warns "Silently truncates long input"',
-    cut.profile.context.truncation === 'silent' && cut.row.warning === 'Silently truncates long input'
-    && Number(cut.row.fields.context?.value) < 8192, `${JSON.stringify(cut.profile.context)} warning=${cut.row.warning}`);
+  const plain = await consent(ctx, e1, 'lp/fake-coder', 'long_input');
+  record('MP-11 long-input (models.verify through the bridge): a model that keeps long input stays truncation none',
+    plain.error === null && plain.added >= 2 && plain.profile.context.truncation === 'none'
+    && plain.profile.context.effective === 8192, `+${plain.added} probes, ${JSON.stringify(plain.profile.context)}`);
+  const cut = await consent(ctx, e1, 'lp/fake-coder-truncate', 'long_input');
+  record('MP-11 long-input: -truncate is judged silent and the effective window drops; the Models row shows no '
+    + 'warning and no status line (2026-10-26)', cut.profile.context.truncation === 'silent'
+    && cut.profile.context.effective < 8192 && cut.row?.status === null && !/truncat/i.test(cut.row.meta),
+  `${JSON.stringify(cut.profile.context)} row=${JSON.stringify(cut.row)}`);
 }
 
-/** @brief 取消探针：确认前不跑；/metrics 回落为 Verified，-nocancel 为 Not verified，没有指标为 Unknown。 */
+/** @brief 取消探针（经进程桥）：/metrics 回落为 true，-nocancel 为 false，没有指标为 unknown；行上没有 Cancel test…。 */
 async function cancelStep(ctx, e1, e2) {
   const row = await profileRow(ctx.page, 'lp/fake-coder');
-  record('MP-11 cancel: "Cancel test…" is offered for the vLLM server', row.actions.includes('cancel-test'),
-    row.actions.join(','));
-  const cancelled = await consent(ctx, e1, 'lp/fake-coder', 'cancel-test', false);
-  record('MP-11 cancel: the confirm dialog explains the test; Cancel sends nothing',
-    cancelled.text.includes('Run the cancel test on fake-coder?') && cancelled.added === 0,
-    `${oneLine(cancelled.text, 160)}; +${cancelled.added}`);
-  const ok = await consent(ctx, e1, 'lp/fake-coder', 'cancel-test', true);
-  record('MP-11 cancel: metrics fall back after disconnect → cancel_verified true, row "Cancel: Verified"',
-    ok.added >= 1 && ok.profile.cancel_verified === true && ok.row.fields.cancel?.text.endsWith(': Verified'),
-    `+${ok.added} ${JSON.stringify(ok.row.fields.cancel)}`);
-  const stuck = await consent(ctx, e1, 'lp/fake-coder-nocancel', 'cancel-test', true);
-  record('MP-11 cancel: -nocancel → cancel_verified false, row "Cancel: Not verified"',
-    stuck.profile.cancel_verified === false && stuck.row.fields.cancel?.text.endsWith(': Not verified'),
-    JSON.stringify(stuck.row.fields.cancel));
-  const blind = await consent(ctx, e2, 'nm/fake-coder', 'cancel-test', true);
+  record('MP-11 the Models row has no "Long-input test…", "Cancel test…", "Verify" or "Test" (2026-10-26)',
+    Boolean(row) && !['long-input', 'cancel-test', 'verify', 'test'].some((action) => row.actions.includes(action)),
+    row?.actions.join(','));
+  const ok = await consent(ctx, e1, 'lp/fake-coder', 'cancel');
+  record('MP-11 cancel: metrics fall back after disconnect → cancel_verified true',
+    ok.error === null && ok.added >= 1 && ok.profile.cancel_verified === true,
+    `+${ok.added} ${ok.profile.cancel_verified}`);
+  const stuck = await consent(ctx, e1, 'lp/fake-coder-nocancel', 'cancel');
+  record('MP-11 cancel: -nocancel → cancel_verified false', stuck.profile.cancel_verified === false,
+    String(stuck.profile.cancel_verified));
+  const blind = await consent(ctx, e2, 'nm/fake-coder', 'cancel');
   // consent 等到档案的 probedAt 变化才返回，即取消探针确实跑过；没有指标时不必再发长输出请求。
-  record('MP-11 cancel: FAKE_NO_METRICS=1 → the test runs and gives cancel_verified unknown, row "Cancel: Unknown"',
-    blind.profile.cancel_verified === 'unknown' && blind.row.fields.cancel?.text.endsWith(': Unknown'),
-    `+${blind.added} probe requests, ${JSON.stringify(blind.row.fields.cancel)}`);
+  record('MP-11 cancel: FAKE_NO_METRICS=1 → the test runs and gives cancel_verified unknown',
+    blind.profile.cancel_verified === 'unknown', `+${blind.added} probe requests, ${blind.profile.cancel_verified}`);
 }
 
 /** @brief 场景 consent（MP-11）。 */
@@ -860,8 +860,8 @@ async function windowChangeStep(ctx, ep) {
   await form.waitFor({ state: 'detached', timeout: 15000 });
   await until(() => page.evaluate(() => (window.__seen ?? []).includes('reverifying')), 10000, 200);
   const tools = await seen(page);
-  record('MP-12 changing the context window re-probes the model: Tool calling shows Re-verifying…',
-    tools.includes('reverifying'), tools.join(' > '));
+  record('MP-12 changing the context window re-probes the model: the row’s data-probe goes to reverifying (a '
+    + 'verified model shows no status line, 2026-10-26)', tools.includes('reverifying'), tools.join(' > '));
   await backToChat(page);
   await watch(page, 'card');
   await sendTurn(page, 'plain during re-verify');

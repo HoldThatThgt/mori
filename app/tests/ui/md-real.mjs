@@ -311,7 +311,7 @@ function docProblems(row, doc) {
   return [
     row.contextWindow !== String(doc.contextWindow) ? `Context window ${row.contextWindow}` : null,
     row.maxTokens !== String(doc.maxTokens) ? `Max output ${row.maxTokens}` : null,
-    row.notReported.length ? `Not reported on ${row.notReported.join(', ')}` : null,
+    row.defaults.length ? `Default on ${row.defaults.join(', ')}` : null,
     row.reasoning !== doc.reasoning ? `Supports thinking ${onOff(row.reasoning)}` : null,
     row.image !== doc.image ? `Image input ${onOff(row.image)}` : null,
   ].filter(Boolean);
@@ -361,7 +361,7 @@ function deepseekResultProblems(result, rows) {
 
 /**
  * @brief 只勾文档的一个模型，把它的 Context window 改小：Max output 按 §4.3 跟着变（报告的输出上限小于新窗口时用它，
- *        否则为 16384 与新窗口一半中较小的并标 Not reported），窗口仍是报告值，按钮“Add 1 model”。
+ *        否则为 16384 与新窗口一半中较小的并标 Default），窗口仍是报告值，按钮“Add 1 model”。
  * @return 加入时这一行的值
  */
 async function lowerAndPick(card, doc) {
@@ -371,15 +371,15 @@ async function lowerAndPick(card, doc) {
   await rowOf(card, doc.id).locator('input[data-field="contextWindow"]').fill(String(lowered));
   const rows = await readRows(card);
   const row = rows.find((item) => item.id === doc.id);
-  const reported = before.notReported.includes('maxTokens') ? null : Number(before.maxTokens);
+  const reported = before.defaults.includes('maxTokens') ? null : Number(before.maxTokens);
   const keep = reported !== null && reported < lowered;
   const wantMax = keep ? reported : unreportedMax(lowered);
   const picked = rows.filter((item) => item.picked).map((item) => item.id);
   const { add } = await fetchedState(card);
   record(`MD-14 real DeepSeek: after Clear selection, ticking ${doc.id} and lowering its Context window to ${lowered}, `
-    + `Max output follows §4.3 (${wantMax}${keep ? '' : ', Not reported'}), the window stays reported, only it is `
+    + `Max output follows §4.3 (${wantMax}${keep ? '' : ', Default'}), the window stays reported, only it is `
     + 'ticked and the button reads "Add 1 model"', row.contextWindow === String(lowered)
-    && row.maxTokens === String(wantMax) && same(row.notReported, keep ? [] : ['maxTokens']) && same(picked, [doc.id])
+    && row.maxTokens === String(wantMax) && same(row.defaults, keep ? [] : ['maxTokens']) && same(picked, [doc.id])
     && add?.text === 'Add 1 model' && !add.disabled, brief({ row, picked, add }));
   return { ...row, lowered };
 }
@@ -423,8 +423,8 @@ async function addDeepSeek(card, { provider, doc, row, family, configured }) {
   const state = await pollFor(() => modelRowState(modelRowOf(card, ref)), settled, 10000);
   const text = `Server reports a context window of ${thousands(doc.contextWindow)}.`;
   record(`MD-14 real DeepSeek: after the probes the model row of ${ref} shows one hint "${text}" with Use (its window `
-    + 'was lowered in the checklist) and no "(not reported)"', !['verifying', 'reverifying', null].includes(state.tool)
-    && same(state.hints, [{ kind: 'context', text }]) && state.notReported.length === 0, brief(state));
+    + 'was lowered in the checklist) and no "(default)"', !['verifying', 'reverifying', null].includes(state.tool)
+    && same(state.hints, [{ kind: 'context', text }]) && state.defaults.length === 0, brief(state));
   return [...(saved ? [] : [`the models appended to ${provider.id} are ${brief(appended, 300)}`]), ...problems];
 }
 
@@ -615,7 +615,7 @@ function glmResultProblems(result, state, rows) {
 /**
  * @brief GLM-5.3 那一行（手填或服务列出的）：只有它勾着、按钮 Add 1 model。服务列出了它时，在 Add a model ID 里手填它
  *        得到重复的错误、Add to list 不可用（§6.4）；手填的行在列表错误下面（§6.3）或在清单末尾（§6.4），标 Entered by
- *        you、默认值且 Not reported、思考与图片不勾。
+ *        you、默认值且标 Default、思考与图片不勾。
  * @param seen { row, listed, picked, add, typed（服务列出时手填之后的 manualState）, placed（行的位置对） }
  */
 function glmRowProblems({ row, listed, picked, add, typed, placed }) {
@@ -632,8 +632,8 @@ function glmRowProblems({ row, listed, picked, add, typed, placed }) {
   if (row.contextWindow !== String(UNREPORTED_WINDOW) || row.maxTokens !== String(unreportedMax(UNREPORTED_WINDOW))) {
     problems.push(`values ${row.contextWindow} / ${row.maxTokens}`);
   }
-  if (!same([...row.notReported].sort(), ['contextWindow', 'maxTokens'])) {
-    problems.push(`Not reported ${row.notReported}`);
+  if (!same([...row.defaults].sort(), ['contextWindow', 'maxTokens'])) {
+    problems.push(`Default ${row.defaults}`);
   }
   if (row.reasoning || row.image) problems.push('Supports thinking or Image input is on');
   return problems;

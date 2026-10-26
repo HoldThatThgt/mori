@@ -85,6 +85,8 @@ export const PickSchema = z.string().regex(PICK_PATTERN, 'Not a model range name
 
 /**
  * @brief 兼容选项（§4.1）：只能写 v0 COMPAT_OPTIONS 的六个字段，值同 v0（勾选时写入的那个值），只对 openai-completions 生效。
+ *        supportsStrictMode 从 2026-10-26 起没有勾选框（负责人走查 M1：pi 1.3.0 默认就不发 strict，勾不勾都一样，
+ *        模型层规格 §9.1 的 2026-10-26 注），留在 schema 里只为已经存着它的配置照样读得出；编译照旧交给 pi。
  */
 export const CompatSchema = z.strictObject({
   /** 端点不支持 developer 角色 */
@@ -102,43 +104,43 @@ export const CompatSchema = z.strictObject({
 });
 export type Compat = z.infer<typeof CompatSchema>;
 
+/** @brief 有勾选框的兼容选项字段（2026-10-26 起不含 supportsStrictMode，见 CompatSchema）。 */
+export type CompatField = Exclude<keyof Compat, 'supportsStrictMode'>;
+
 /** @brief 一个兼容选项：勾选时把 compat[field] 写成 value，取消勾选时删除该字段；界面文字见 COMPAT_LABELS、COMPAT_HINTS。 */
 export interface CompatOption {
   /** 表单里的标识 */
   id: string;
   /** pi compat 字段名 */
-  field: keyof Compat;
+  field: CompatField;
   /** 勾选时写入的值 */
   value: boolean | string;
 }
 
-/** @brief OpenAI 兼容端点的兼容选项，登记在 docs/v0/defaults.md。 */
+/** @brief OpenAI 兼容端点的兼容选项，登记在 docs/v0/defaults.md（2026-10-26 起五个，见 CompatSchema）。 */
 export const COMPAT_OPTIONS: readonly CompatOption[] = [
   { id: 'noDeveloperRole', field: 'supportsDeveloperRole', value: false },
   { id: 'noStore', field: 'supportsStore', value: false },
   { id: 'maxTokens', field: 'maxTokensField', value: 'max_tokens' },
   { id: 'noStreamUsage', field: 'supportsUsageInStreaming', value: false },
-  { id: 'noStrict', field: 'supportsStrictMode', value: false },
   { id: 'toolResultName', field: 'requiresToolResultName', value: true },
 ];
 
 /** @brief 兼容选项的界面文字（§9.1，沿用 english-ui 的标签），按 compat 字段名索引。 */
-export const COMPAT_LABELS: Readonly<Record<keyof Compat, string>> = Object.freeze({
+export const COMPAT_LABELS: Readonly<Record<CompatField, string>> = Object.freeze({
   supportsDeveloperRole: 'Endpoint doesn’t support the developer role',
   supportsStore: 'Endpoint doesn’t accept the store field',
   maxTokensField: 'Endpoint needs max_tokens instead of max_completion_tokens',
   supportsUsageInStreaming: 'Endpoint doesn’t report usage while streaming',
-  supportsStrictMode: 'Endpoint doesn’t support strict mode for tool parameters',
   requiresToolResultName: 'Tool results must include the tool name',
 });
 
 /** @brief 兼容选项勾选框下的说明（§9.1，沿用 english-ui），按 compat 字段名索引。 */
-export const COMPAT_HINTS: Readonly<Record<keyof Compat, string>> = Object.freeze({
+export const COMPAT_HINTS: Readonly<Record<CompatField, string>> = Object.freeze({
   supportsDeveloperRole: 'Sends the system prompt with the system role instead',
   supportsStore: 'Leaves store out of requests',
   maxTokensField: 'Older endpoints don’t recognize max_completion_tokens',
   supportsUsageInStreaming: 'Doesn’t send stream_options, so the context usage shown will be inaccurate',
-  supportsStrictMode: 'Leaves strict out of tool definitions',
   requiresToolResultName: 'Some endpoints require a name field on tool result messages',
 });
 

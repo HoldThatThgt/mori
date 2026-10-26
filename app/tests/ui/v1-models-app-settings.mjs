@@ -26,6 +26,9 @@
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动与 Add provider 是 Base URL 和 API key → Fetch models →
 // 在清单里勾模型（page.mjs fetchIn、pickIn）；卡上加模型是 Fetch models → 勾选 → Add 1 model（cardAddModels）；
 // 兼容选项在拉取后的 More settings 里；MP-24、MP-33 的检查照这个流程。合成端点的列表、详情请求的日志行（带 path）不算对话请求。
+// 2026-10-26（WP-02，负责人走查 M1、M7）：兼容选项五个、上面一行说明，卡上的"Compatibility options"只对 OpenAI-compatible
+// （settingsEdits 另写一个 Anthropic Messages 的提供商看卡）；模型行的 tool calling 读行上的 data-probe，探针出错读状态行
+// probe-status；点 Test connection 之前读表单结果不等（page.mjs textNow）。
 
 import { spawn } from 'node:child_process';
 import {
@@ -35,8 +38,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import { activeFile, ctrlN, openRow, PANE, paneCount, stubFolder, waitPanes, waitReady } from './m3-helpers.mjs';
+import { poll, readJson, readText } from './md-card-helpers.mjs';
 import { readMain, waitProbe } from './md-firstrun-helpers.mjs';
-import { cardAddModels, CONNECTED, fetchIn, FIRST_RUN_FORM, pickIn, PROVIDER_FORM } from './page.mjs';
+import { cardAddModels, CONNECTED, fetchIn, FIRST_RUN_FORM, pickIn, PROVIDER_FORM, textNow } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -88,26 +92,7 @@ const fakes = {};
 
 // ---------- 通用 ----------
 
-/** @brief 反复读 read()，直到 test 通过或超时；返回是否通过和最后读到的值。 */
-async function poll(read, test, timeout = 30000, step = 200) {
-  const deadline = Date.now() + timeout;
-  let value = await read();
-  while (!test(value) && Date.now() < deadline) {
-    await sleep(step);
-    value = await read();
-  }
-  return { ok: Boolean(test(value)), value };
-}
-
-/** @brief 读 JSON 文件；不存在或读不出时为 null。 */
-function readJson(path) {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    return null;
-  }
-}
-const readText = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : null);
+// poll、readJson、readText 用 md-card-helpers.mjs 的（同一个写法，2026-10-26 WP-02 为文件行数挪走）
 const writeJson = (path, value) => {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
@@ -331,9 +316,8 @@ function dialogInfo(dialog) {
     cascade: [...box.querySelectorAll('[data-testid="cascade"] li')].map((li) => li.textContent) }));
 }
 
-/** @brief 模型行的 Tool calling 状态（data-value）。 */
-const toolCalling = (page, ref) => modelRow(page, ref).locator('[data-field="tool_calling"]').getAttribute('data-value')
-  .catch(() => null);
+/** @brief 模型行上 tool calling 的验证状态（data-probe，models-settings.md "Models 行"；取值同原来档案摘要的 Tool calling）。 */
+const toolCalling = (page, ref) => modelRow(page, ref).getAttribute('data-probe', { timeout: 5000 }).catch(() => null);
 const waitVerified = (page, ref, timeout = 60000) => poll(() => toolCalling(page, ref), (v) => v === 'verified',
   timeout, 300);
 
@@ -392,7 +376,7 @@ async function fillFirstRun(page, { name, baseUrl, secret, modelId }) {
  */
 async function testConnection(page) {
   const form = page.locator(FIRST_RUN_FORM);
-  const before = await form.getByTestId('form-message').textContent().catch(() => null);
+  const before = await textNow(form.getByTestId('form-message'));
   await form.locator('[data-action="test"]').click();
   const read = () => page.evaluate(({ connected, root }) => document.querySelector(connected)?.textContent
     ?? document.querySelector(`${root} [data-testid="form-message"]`)?.textContent ?? null,
@@ -1067,7 +1051,9 @@ async function invalidProjects(ctx, projects) {
 async function settingsEdits() {
   const userData = tempDir('mori-v1s-edits-');
   const project = makeProject(tempDir('mori-v1s-edits-proj-'), 'proj');
-  writeJson(configFile(userData), zonesConfig(PORT.edits)); // synthetic test setup
+  // synthetic test setup：MP-06 的三个提供商，再加一个接口为 Anthropic Messages 的（compatOptions 看它的卡）
+  const zones = zonesConfig(PORT.edits);
+  writeJson(configFile(userData), { ...zones, providers: [...zones.providers, ANTHROPIC_SEED] });
   let ctx;
   try {
     ctx = await startApp(userData);
@@ -1157,7 +1143,20 @@ async function editProvider(ctx) {
     && verified.ok, String(verified.value));
 }
 
-/** 兼容选项勾选框的标签与下面一行说明（§9.1，shared/models.ts COMPAT_LABELS、COMPAT_HINTS），按表单里的顺序 */
+/**
+ * settingsEdits 里接口不是 OpenAI-compatible 的提供商（synthetic test setup）：地址是本机 9 号端口，连不上、不发到合成端点；
+ * 只用来看卡上没有"Compatibility options"一行（models-settings.md "提供商卡"，2026-10-26）
+ */
+const ANTHROPIC_SEED = { ...seedProvider('anth', 'Anth E', 9, 'local'), api: 'anthropic-messages' };
+
+/** 兼容选项上面的一行说明（models-settings.md "提供商表单：Edit"，2026-10-26 负责人走查 M1） */
+const COMPAT_HINT = 'Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if '
+  + 'this server rejects requests.';
+
+/**
+ * 兼容选项勾选框的标签与下面一行说明（§9.1，shared/models.ts COMPAT_LABELS、COMPAT_HINTS），按表单里的顺序；
+ * 2026-10-26 起没有"Endpoint doesn’t support strict mode for tool parameters"
+ */
 const COMPAT_TEXTS = [
   ['Endpoint doesn’t support the developer role', 'Sends the system prompt with the system role instead'],
   ['Endpoint doesn’t accept the store field', 'Leaves store out of requests'],
@@ -1165,12 +1164,12 @@ const COMPAT_TEXTS = [
     'Older endpoints don’t recognize max_completion_tokens'],
   ['Endpoint doesn’t report usage while streaming',
     'Doesn’t send stream_options, so the context usage shown will be inaccurate'],
-  ['Endpoint doesn’t support strict mode for tool parameters', 'Leaves strict out of tool definitions'],
   ['Tool results must include the tool name', 'Some endpoints require a name field on tool result messages'],
 ];
 
 /**
- * @brief Add provider 表单的兼容选项：六个勾选框各有标签和一行说明；API type 不是 OpenAI-compatible 时不显示。不保存。
+ * @brief Add provider 表单的兼容选项：上面一行说明，五个勾选框各有标签和一行说明；API type 不是 OpenAI-compatible 时
+ *        都不显示。不保存。提供商卡上的"Compatibility options"只对 OpenAI-compatible 的卡（2026-10-26，负责人走查 M1）。
  *        一键拉取模型（model-discovery.md §6.1 第 7 项、§13.4）：兼容选项在拉取之后的"More settings"里，先 Fetch models
  *        再点开它。
  */
@@ -1187,16 +1186,24 @@ async function compatOptions(ctx) {
     const span = label.querySelector('span');
     return [span?.firstChild?.textContent ?? '', span?.querySelector('small')?.textContent ?? ''];
   }));
+  const hint = await textNow(form.getByTestId('compat-hint'));
   const api = form.getByLabel('API type', { exact: true });
   await api.selectOption('anthropic-messages');
-  const hidden = await rows.count();
+  const hidden = await rows.count() + await form.getByTestId('compat-hint').count();
   await api.selectOption('openai-completions');
   const back = await rows.count();
   await form.locator('[data-action="close-form"]').click();
   await form.waitFor({ state: 'detached', timeout: 5000 });
-  record('MP-24 Add provider: each compatibility option shows its label and a hint line (english-ui wording); '
-    + 'the options are hidden for other API types', JSON.stringify(shown) === JSON.stringify(COMPAT_TEXTS)
-    && hidden === 0 && back === COMPAT_TEXTS.length, JSON.stringify({ shown, hidden, back }));
+  record('MP-24 Add provider: a hint line above the compatibility options, then the five options each with its label '
+    + 'and a hint line (english-ui wording; no strict-mode option); all hidden for other API types',
+  JSON.stringify(shown) === JSON.stringify(COMPAT_TEXTS) && hint === COMPAT_HINT && hidden === 0
+    && back === COMPAT_TEXTS.length, JSON.stringify({ shown, hint, hidden, back }));
+  const cards = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll(
+    '[data-testid="provider-card"]')].map((card) => [card.dataset.provider,
+    card.querySelector('[data-testid="provider-compat"]')?.textContent ?? null])));
+  record('MP-24 provider cards show "Compatibility options" only for OpenAI-compatible providers: Local A "None"; '
+    + 'Anth E (Anthropic Messages) has no such row', cards.loc === 'None' && 'anth' in cards && cards.anth === null,
+  JSON.stringify(cards));
 }
 
 /** @brief Keys：加、上移、删（不是最后一个时不确认）、删最后一个（确认、Cancel、Remove）；明文不回到界面。 */
@@ -1910,9 +1917,9 @@ async function migrationFailure() {
 
 // ---------- MP-10：加 key、删 key 后重新探测 ----------
 
-/** @brief 模型行显示探针出错（"Couldn't verify: …"）且不在探测中。 */
+/** @brief 模型行显示探针出错（状态行"Couldn't verify: …"，models-settings.md "Models 行"）且不在探测中。 */
 const probeFailed = async (page, ref) => (await toolCalling(page, ref)) === 'unverified'
-  && modelRow(page, ref).getByTestId('probe-error').isVisible().catch(() => false);
+  && modelRow(page, ref).locator('[data-testid="probe-status"][data-state="error"]').isVisible().catch(() => false);
 
 /** @brief 合成端点 since 之后收到的、带这个 key 的请求（探针或对话）。 */
 const requestsWith = (fake, key, since) => fake.chats.filter((chat) => chat.key === last4(key) && chat.at >= since);

@@ -1,4 +1,4 @@
-// Providers：每个提供商一张卡（名称、地址、接口类型、区域、并发上限、兼容选项；Keys 与 Models），
+// Providers：每个提供商一张卡（名称、地址、接口类型、区域、并发上限、兼容选项（只对 OpenAI-compatible）；Keys 与 Models），
 // 卡上 Edit、Delete、Test connection、Fetch models（docs/specs/model-discovery.md §6.5：用已保存的 key 拉取，
 // 在卡里 Models 一块的末尾打开清单，按"Add N models"发 models.addModels）；节底部 Add provider。
 // 表单就地打开，同一时刻只开一张：提供商表单、模型表单（只有 Edit）或卡上的清单（§9.1、§6.5）。
@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  API_TYPE_LABELS, COMPAT_LABELS, type Compat, type DiscoverResult, type ModelProvider,
+  API_TYPE_LABELS, COMPAT_LABELS, COMPAT_OPTIONS, type Compat, type DiscoverResult, type ModelProvider,
 } from '../../../../shared/models';
 import { testAt, writeModels } from '../../state/settings';
 import {
@@ -27,9 +27,9 @@ type OpenForm =
   | { kind: 'fetch'; providerId: string }
   | null;
 
-/** @brief 勾了的兼容选项的英文说明，逗号分隔；没有时"None"。 */
+/** @brief 勾了的兼容选项的标签，逗号分隔，按表单里的顺序；没有时"None"（存着的 supportsStrictMode 没有勾选框，不列）。 */
 function compatText(compat: Compat): string {
-  const fields = Object.keys(compat) as (keyof Compat)[];
+  const fields = COMPAT_OPTIONS.map((option) => option.field).filter((field) => compat[field] !== undefined);
   return fields.length ? fields.map((field) => COMPAT_LABELS[field]).join(', ') : 'None';
 }
 
@@ -43,7 +43,10 @@ function ProviderFieldsView({ provider }: { provider: ModelProvider }) {
       <dd data-testid="provider-zone" data-zone={provider.zone ?? 'unconfirmed'}>
         {provider.zone ? ZONE_LABELS[provider.zone] : 'Not confirmed'}</dd>
       <dt>Concurrency per key</dt><dd>{provider.concurrency}</dd>
-      <dt>Compatibility options</dt><dd>{compatText(provider.compat)}</dd>
+      {/* 2026-10-26 负责人走查 M1：兼容选项只对 OpenAI-compatible，同表单（models-settings.md "提供商卡"） */}
+      {provider.api === 'openai-completions' && (
+        <><dt>Compatibility options</dt><dd data-testid="provider-compat">{compatText(provider.compat)}</dd></>
+      )}
     </dl>
   );
 }
