@@ -3,6 +3,7 @@
 // 扩展询问卡上的按钮和输入框），回放桥核对界面发出的每条命令（文件夹、会话文件、信任回答、名字、询问的回答）
 // 都与录制时一致；再按 docs/v0/screens/sessions.md 与 extension-ui.md 的状态表检查侧栏、顶栏、横幅和对话流。
 // M1/M2 的回放检查仍由 m1-replay、m2-replay 负责。
+// loading 用回放桥的 holdList（测试控制：压住启动时的 session.list，回答仍是录制的结果）看"Loading sessions…"那一刻。
 // 用法（在 app/ 下）：node tests/ui/m3-replay.mjs [--only two-projects,trust-deny]
 // 结果写到 test-results/m3-replay.json；截图在 test-results/m3-replay/。
 
@@ -130,6 +131,48 @@ async function finish(page, h, name, fx) {
 async function sendAndWait(page, h, text) {
   await h.send(text);
   await untilIdle(page);
+}
+
+// ---------- 正在读取 ----------
+
+/** @brief 左栏此刻的样子：会话树上的说明、"Open folder…"、名字里有"New session"的按钮、项目行的 +、会话行数。 */
+const sidebarNow = (page) => page.evaluate(() => {
+  const sidebar = document.querySelector('[data-testid="sidebar"]');
+  const folder = document.querySelector('[data-testid="nav-open-folder"]');
+  return { note: document.querySelector('[data-testid="session-tree"] .sidebar-note')?.textContent ?? null,
+    folder: folder ? { shown: folder.getClientRects().length > 0, disabled: folder.disabled } : null,
+    newSession: [...sidebar.querySelectorAll('button')]
+      .map((button) => `${button.getAttribute('aria-label') ?? ''} ${button.textContent}`)
+      .filter((text) => text.includes('New session')),
+    pluses: sidebar.querySelectorAll('[data-testid="project-new-session"]').length,
+    rows: sidebar.querySelectorAll('.session-item').length };
+});
+
+/**
+ * @brief 正在读取（sessions.md"项目 → 会话树"）：回放桥压住启动时的 session.list（URL 带 holdList=1，是测试控制，回答仍是
+ *        录制的结果），会话树只显示"Loading sessions…"；可做的只有"Open folder…"（在、能用），左栏没有名字里有
+ *        "New session"的按钮，也没有项目行和它的 +。放开后说明消失，列出录制开头的会话，名字里有"New session"的只有
+ *        项目行的 +（"New session in <文件夹名>"）。不发命令，不用 finish。
+ */
+async function loadingCheck(page) {
+  const fx = readFixture('rename-unopened');
+  const [start] = valuesOf(fx, 'session.list');
+  await page.goto(`${pathToFileURL(join(outDir, 'index.html')).href}?fixture=rename-unopened&holdList=1`);
+  await page.getByTestId('session-tree').waitFor({ state: 'attached', timeout: 20000 });
+  const shown = await page.waitForFunction(() => document.querySelector('[data-testid="session-tree"] .sidebar-note')
+    ?.textContent === 'Loading sessions…', null, { timeout: 10000 }).then(() => true, () => false);
+  const loading = await sidebarNow(page);
+  await shot(page, 'loading');
+  await page.evaluate(() => window.__replay.releaseList());
+  await page.waitForFunction(() => !document.querySelector('.sidebar-note'), null, { timeout: 20000 });
+  const ready = await sidebarNow(page);
+  record('loading：启动时 session.list 还没返回，会话树只显示"Loading sessions…"；可做的只有"Open folder…"（在、能用），'
+    + '左栏没有"New session"按钮，也没有项目行的 +', shown && loading.note === 'Loading sessions…'
+    && loading.folder?.shown === true && loading.folder.disabled === false && loading.newSession.length === 0
+    && loading.pluses === 0 && loading.rows === 0, JSON.stringify(loading));
+  record('loading：列表返回后说明消失，列出录制开头的会话；名字里有"New session"的只有项目行的 +', ready.note === null
+    && ready.rows === start.length && ready.pluses > 0 && ready.newSession.length === ready.pluses
+    && ready.newSession.every((text) => text.startsWith('New session in ')), JSON.stringify(ready));
 }
 
 // ---------- 两个文件夹各两个会话 ----------
@@ -263,6 +306,11 @@ async function deleteCheck(page, h) {
   record('delete：先在后台进程关闭会话（session.close），再由主进程永久删除会话文件；侧栏不再有它，'
     + '中栏回到"打开一个文件夹"', bridge.deleted.length === 1 && bridge.deleted[0] === created.sessionFile
     && await page.getByTestId('open-folder').isVisible(), JSON.stringify(bridge.deleted));
+  const after = await page.waitForFunction(() => document.activeElement?.dataset?.testid === 'nav-open-folder', null,
+    { timeout: 3000 }).then(() => 'nav-open-folder', () => page.evaluate(() => document.activeElement?.dataset?.testid
+    ?? document.activeElement?.tagName ?? null));
+  record('delete：删的是侧栏里唯一的会话（再没有会话行），焦点落在左栏的"Open folder…"（nav-open-folder）',
+    after === 'nav-open-folder', String(after));
   await finish(page, h, 'delete', fx);
 }
 
@@ -598,9 +646,10 @@ async function extUiCheck(page, h) {
   await finish(page, h, 'ext-ui', fx);
 }
 
-const checks = { 'two-projects': twoProjects, rename: renameOpen, 'rename-unopened': renameUnopened,
-  delete: deleteCheck, 'trust-deny': trustDeny, 'trust-allow': trustAllow, 'trust-remembered': trustRemembered,
-  background, archive: archiveCheck, reattach: reattachCheck, 'ext-ui': extUiCheck };
+const checks = { loading: loadingCheck, 'two-projects': twoProjects, rename: renameOpen,
+  'rename-unopened': renameUnopened, delete: deleteCheck, 'trust-deny': trustDeny, 'trust-allow': trustAllow,
+  'trust-remembered': trustRemembered, background, archive: archiveCheck, reattach: reattachCheck,
+  'ext-ui': extUiCheck };
 
 await buildHarness();
 const app = await electron.launch({ args: [join(harnessDir, 'main.cjs')], cwd: appRoot,

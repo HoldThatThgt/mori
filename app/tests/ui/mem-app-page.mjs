@@ -889,13 +889,47 @@ async function formDelete(ctx) {
     state.last?.label === `Last change ${today()} · Deleted 1`, brief(state.last));
 }
 
-/** @brief 表单、编辑、离开确认、删除。 */
+/**
+ * @brief 有未保存的编辑时点项目 A 行上的 +，选 Discard（docs/v0/screens/sessions.md"项目行的 +"点了 +：在记忆页点时也回到
+ *        会话面板）：离开记忆页，在项目 A 里新建会话并切过去，焦点在输入框；条目文件不变。
+ */
+async function leavePlus(ctx) {
+  const { page } = ctx;
+  const file = join(baseOf(ctx, 'p1'), 'entries', 'answer-first.md');
+  const saved = readText(file);
+  await selectRow(page, 'answer-first');
+  await page.getByTestId('memory-edit').click();
+  await page.getByTestId('memory-form').waitFor({ timeout: 5000 });
+  await fillForm(page, { abstract: 'Typed before a project’s +, not saved' });
+  const before = await page.locator('.pane-slot').count();
+  const groups = page.locator('[data-testid="session-tree"] .project-group');
+  const index = await groups.evaluateAll((items, want) => items.findIndex((group) => group.dataset.cwd
+    .replace(/\//g, '\\').toLowerCase() === want), ctx.p1.replace(/\//g, '\\').toLowerCase());
+  await groups.nth(index).getByTestId('project-new-session').click();
+  const asked = await page.getByTestId('leave-dialog').waitFor({ timeout: 3000 }).then(() => true, () => false);
+  if (asked) await page.getByTestId('leave-dialog').getByRole('button', { name: 'Discard', exact: true }).click();
+  const left = await poll(async () => (await page.getByTestId('memory-page').count()) === 0
+    && (await page.locator('.pane-slot').count()) === before + 1, 15000, 100);
+  const now = await poll(() => page.evaluate(() => {
+    const pane = document.querySelector('.pane-slot[data-focused="true"]:not([hidden])');
+    const row = document.querySelector('.session-item.active');
+    const ready = pane && !pane.querySelector('[data-testid="not-ready"]');
+    return ready && document.activeElement === pane.querySelector('.composer textarea')
+      ? { cwd: row?.closest('.project-group')?.dataset.cwd ?? null, title: row?.textContent ?? '' } : null;
+  }), 15000, 100);
+  record('MEM-14 with unsaved edits, a project’s + asks first; Discard leaves the Memory page and starts a new session '
+    + 'in that project (focus in its input box); the entry file is unchanged', index >= 0 && asked && Boolean(left)
+    && samePath(now?.cwd, ctx.p1) && readText(file) === saved, brief({ index, asked, left, now }));
+}
+
+/** @brief 表单、编辑、离开确认、删除；有未保存的编辑时点项目行的 + 选 Discard。 */
 async function form(ctx) {
   await formChecks(ctx);
   await formSave(ctx);
   await formEdit(ctx);
   await leaveDialog(ctx);
   await formDelete(ctx);
+  await leavePlus(ctx);
 }
 
 // ---------- 提升与放回（MEM-14、MEM-08、MEM-09、MEM-07） ----------

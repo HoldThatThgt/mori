@@ -19,6 +19,8 @@
 // settings.json 读不出；输入框下面一行的窄栏（2026-10-21 起选择范围、Effort、权限按钮从顶栏移到这一行，
 // docs/v0/composer-pickers.md：按 680 / 600 / 460 / 400 / 340px 分档，范围按钮任何宽度最长 200px，菜单往上打开）；
 // Effort 按钮悬停两行、读屏的描述是第二行；新页面没有小于 12px 的字；页面没有报错。
+// 项目行的 +（docs/v0/screens/sessions.md"项目行的 +"，2026-10-26 WP-06）：窄窗口下浮动展开的左栏里有未保存的改动时选
+// "Keep editing"，浮动的左栏不收起（floatingKeep）；设置页里点它回到会话面板、在这个项目里新建（plusFromSettings）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m6-app-settings.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m6-app-settings(-packaged).json，截图在 test-results/m6-app-settings(-packaged)/。
@@ -31,8 +33,8 @@ import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, sleep } from './lib.mjs';
 import {
-  activeFile, archivedState, chooseMenuItem, clickOpenFolder, ctrlN, expandArchived, PANE, paneOf, rowOf, settle,
-  stubFolder, until, waitIdle, waitReady,
+  activeFile, archivedState, chooseMenuItem, clickOpenFolder, ctrlN, expandArchived, PANE, paneOf, resizeMain,
+  restoreMain, rowOf, settle, stubFolder, until, waitIdle, waitReady,
 } from './m3-helpers.mjs';
 import {
   buttonState, colorStack, contrastOf, fitPane, LEVEL_TEXT, menuGone, menuInside, modelRow, NOTE, ROW, rowState,
@@ -888,6 +890,7 @@ async function agentsLeave(ctx) {
   record('放弃改动之后重新打开 AGENTS.md：编辑框是保存过的内容（草稿已丢弃）', ctx.reopened.length >= 4
     && ctx.reopened.every(Boolean), JSON.stringify(ctx.reopened));
   await sameEntry(ctx);
+  await floatingKeep(ctx);
   await dragOntoCustomize(ctx);
   await cancelledLeave(ctx);
   await archivedLeave(ctx);
@@ -909,6 +912,65 @@ async function sameEntry(ctx) {
   record('有未保存的改动时再点左栏"Customize"、点当前分节"Instructions"：不弹确认框，留在这一节，改动还在',
     dialog === 0 && now.tools && now.section === 'agents' && state.editor === `${ctx.agentsSaved}未保存的草稿\n`
     && state.status === 'Unsaved changes', JSON.stringify({ dialog, now, status: state.status }));
+}
+
+/**
+ * @brief 窄窗口下浮动展开的左栏里、有未保存的改动时点项目行的 +，选"Keep editing"（sessions.md"项目行的 +"点了 +）：
+ *        什么都不变，浮动的左栏也不收起；留在 Customize 的 Instructions，改动还在，没有新建会话。最后收起左栏、改回窗口大小。
+ */
+async function floatingKeep(ctx) {
+  const { app, page } = ctx;
+  await makeDirty(ctx);
+  const bounds = await app.evaluate(resizeMain, { width: 900, height: 700 });
+  try {
+    await page.waitForFunction(() => innerWidth < 1024 && document.querySelector('[data-testid="sidebar"]')
+      ?.classList.contains('collapsed'), null, { timeout: 5000 });
+    await page.locator('.rail-toggle').click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="sidebar"]')?.classList.contains('floating'),
+      null, { timeout: 3000 });
+    const before = await whereNow(page);
+    await page.getByTestId('project-new-session').first().click();
+    const dialog = await dialogState(page, 'leave-dialog').catch(() => null);
+    await page.getByTestId('leave-dialog').getByRole('button', { name: 'Keep editing', exact: true }).click();
+    await page.getByTestId('leave-dialog').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+    await settle(page);
+    const floating = await page.getByTestId('sidebar').evaluate((el) => el.classList.contains('floating'));
+    const now = await whereNow(page);
+    const state = await agentsState(page);
+    record('窄窗口下浮动展开的左栏里、有未保存的改动时点项目行的 +：先问；选"继续编辑"什么都不变，浮动的左栏也不收起'
+      + '（留在 Instructions，改动还在，没有新建会话）', dialog?.title === LEAVE_TITLE && floating && now.tools
+      && now.section === 'agents' && now.panes === before.panes && state.editor === `${ctx.agentsSaved}未保存的草稿\n`,
+    JSON.stringify({ dialog: dialog?.title ?? null, floating, now, before: before.panes }));
+    if (floating) await page.locator('.rail-toggle').click();
+  } finally {
+    await app.evaluate(restoreMain, bounds);
+    await page.waitForFunction(() => innerWidth >= 1024 && !document.querySelector('[data-testid="sidebar"]')
+      ?.classList.contains('collapsed'), null, { timeout: 5000 }).catch(() => {});
+  }
+}
+
+/**
+ * @brief 设置页里点项目行的 +（sessions.md"项目行的 +"点了 +：在设置页点时也回到会话面板）：离开设置页，在这个项目里
+ *        新建会话并切过去，名为"New session"，焦点在输入框。只用 firstRun 打开的会话（项目行在会话树里）。
+ */
+async function plusFromSettings(ctx) {
+  const { page } = ctx;
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
+  const before = await whereNow(page);
+  await page.getByTestId('project-new-session').first().click();
+  await page.waitForFunction((n) => !document.querySelector('[data-testid="settings-page"]')
+    && document.querySelectorAll('.pane-slot').length === n, before.panes + 1, { timeout: 15000 }).catch(() => {});
+  await waitReady(page).catch(() => {});
+  const focused = await page.waitForFunction((pane) => document.activeElement
+    === document.querySelector(`${pane} .composer textarea`), PANE, { timeout: 2000 }).then(() => true, () => false);
+  const now = await whereNow(page);
+  const row = await page.locator('.session-item.active').first().evaluate((el) => ({
+    title: el.querySelector('.session-label')?.textContent ?? '', cwd: el.closest('.project-group')?.dataset.cwd }))
+    .catch(() => null);
+  record('设置页里点项目行的 +：离开设置页回到会话面板，在这个项目里新建会话并切过去（名为"New session"），焦点在输入框',
+    before.settings && !now.settings && !now.tools && now.panes === before.panes + 1 && samePath(row?.cwd, ctx.project)
+    && row.title === 'New session' && focused, JSON.stringify({ before, now, row, focused }));
 }
 
 /** @brief 草稿还在时（旧的做法）撤销改动，免得后面的步骤一离开就弹确认框。 */
@@ -1430,7 +1492,7 @@ async function fontSizes(ctx) {
 
 const steps = { firstRun, settingsList, thinkingUnsupported, markReasoning, thinkingLevels, unmarkReasoning, agentsUser,
   agentsPrompt, agentsLeave, agentsOverride, agentsFailures, agentsNoProjectFile, agentsKernelExit, brokenSettings,
-  narrowRow, reopen, fontSizes };
+  narrowRow, reopen, plusFromSettings, fontSizes };
 
 const fake = await startFakeEndpoint(port, testKey);
 const { root, project } = makeProject();

@@ -13,7 +13,9 @@
 // 不信任时保存的会话信任后重新打开也有扩展的工具、后台进程层面的反例）；草稿（切换、设置页、重启）；
 // 状态（生成中、有新结果、等你批准、出错、后台进程退出与重新载入）；窄窗口的图标栏圆点与浮动左栏；
 // 项目行的 +（2026-10-26 起取代左栏顶部的"New session"：读屏名、不是 Tab 停靠点、淡色与悬停、在另一个项目里新建、
-// 浮动左栏里点了收起、左栏很窄时仍在、后台进程退出时不可用）；
+// 浮动左栏里点了收起、左栏很窄时仍在、后台进程退出时不可用；状态表各行补的检查在 m3-app-plus.mjs：一直显示、
+// --color-faint 与悬停的颜色和底色、项目行不变高、文件夹名很长时先截名字、"Starting…"时照常可用、后台进程退出时变淡、
+// 需要时先问信任；收起的图标栏上的七个图标按钮、点图标栏的 +、没有当前会话时等于"Open folder…"）；
 // Ctrl+N 不起作用的情况（菜单、信任询问、浮动左栏、按住不放、输入框下面一行的菜单；圆环详情不算）；
 // 输入框下面一行（2026-10-21 从顶栏移来，docs/v0/composer-pickers.md"测试要改的地方"）：Shift+Tab 回会话树 5 次、
 // 从文字框 Tab 的顺序、空闲时各按钮的悬停与读屏的描述、新会话的空圆环和悬停提示、有用量时圆环的读屏名和悬停、
@@ -28,6 +30,7 @@
 //   node tests/ui/m3-app.mjs --only 步骤1,步骤2       只跑这几步（setup 总是跑；测试分层第 2 条）。步骤前后相依（信任的一串
 //                                                    要先 trustAsk、trustDeny、restartDeleted；m3-app-live 的步骤用前面建的会话；
 //                                                    扩展询问的步骤要带上 extOpen），按 steps 的顺序把它依赖的步骤一起写上
+//                                                    （各步骤的说明里写了用到谁）
 // 结果写到 test-results/m3-app.json（文件名带 -packaged 后缀区分），截图在 test-results/m3-app/。
 // 删除文件失败：测试用 Win32 CreateFileW 拿住会话文件、不给 FILE_SHARE_DELETE（m3-helpers.mjs holdFile），
 // 主进程删除时报 EBUSY；放开后再删成功。选文件夹对话框经 dialog.showOpenDialog 直接返回文件夹；
@@ -44,12 +47,16 @@ import {
   activeFile, allRows, answerTrustDialog, archivedState, blockedBy, chooseMenuItem, clickOpenFolder, composerRow,
   ctrlN, EFFORT_BUSY, expandArchived, findByName, focusInfo, hasDraft, holdFile, kernelOpen, lastReply, liveInfo,
   menuItems, menuText, MODEL_BUSY, noteSmallText, openMenuByKey, openMenuByMouse, openRow, PANE, paneCount, paneOf,
-  prefillOf, rangeBlockedBy, recycleBinNames, renameClosed, renameView, ROW_MENUS, ROW_REASONS, ROW_TAB_ORDER, rowLog,
-  rowOf, rowState, rowWhen, samePath, savedArchived, savedDrafts, sendWait, sessionGone, sessionNames,
-  shownWithin, startDelete, startRename, stoppedCount, stubFolder, titleOf, topTitle, treeState, trustRecord,
-  until, usable, usageOk, waitArchivedToggle, waitComposerFocus, waitIdle, waitPanes, waitReady, waitRowTitle,
-  waitRunning, waitStatus, watchRow,
+  prefillOf, rangeBlockedBy, recycleBinNames, renameClosed, renameView, resizeMain, restoreMain, ROW_MENUS, ROW_REASONS,
+  ROW_TAB_ORDER, rowLog, rowOf, rowState, rowWhen, samePath, savedArchived, savedDrafts, sendWait, sessionGone,
+  sessionNames, shownWithin, startDelete, startRename, stoppedCount, stubFolder, titleOf, topTitle, treeState,
+  trustRecord, until, usable, usageOk, waitArchivedToggle, waitComposerFocus, waitIdle, waitPanes, waitReady,
+  waitRowTitle, waitRunning, waitStatus, watchRow,
 } from './m3-helpers.mjs';
+import {
+  clickPlus, longProjectName, plusButtons, plusColor, plusHover, plusLook, plusOf, plusTrust, plusWhileStarting,
+  railButtons, railNoSession, railPlus, saveInDelta, sidebarTo,
+} from './m3-app-plus.mjs';
 import { OPEN_FOLDER, pageHelpers, showStep } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -170,34 +177,22 @@ function makeExtensionProject(root, name) {
   return { project, marker };
 }
 
-/** @brief 本次测试用的全部文件夹；eta 带询问用的项目扩展（m3-app-live.mjs）。 */
+/**
+ * @brief 本次测试用的全部文件夹；eta 带询问用的项目扩展（m3-app-live.mjs）；long 的文件夹名很长（43 个字符，左栏 180px
+ *        时项目名放不下，m3-app-plus.mjs longProjectName）。
+ */
 function prepareFolders() {
   const root = mkdtempSync(join(tmpdir(), 'mori-m3-app-'));
-  const folders = { alpha: makeProject(root, 'alpha'), beta: makeProject(root, 'beta'), eta: makeProject(root, 'eta') };
+  const folders = { alpha: makeProject(root, 'alpha'), beta: makeProject(root, 'beta'), eta: makeProject(root, 'eta'),
+    long: makeProject(root, 'long-project-folder-name-for-the-plus-check') };
   writeAskExtension(folders.eta);
   const trust = {};
   for (const name of ['gamma', 'delta', 'epsilon', 'zeta']) trust[name] = makeExtensionProject(root, name);
   return { root, folders, trust };
 }
 
-// ---------- 主进程里运行的函数（经 app.evaluate 序列化，只能用参数里的 electron 模块和 process） ----------
-
-/** @brief 把主窗口改成 width×height（外框），返回改之前的位置和大小。 */
-function resizeMain({ BrowserWindow }, { width, height }) {
-  const windows = BrowserWindow.getAllWindows();
-  const main = windows.find((window) => window.webContents.getURL().includes('index.html')) ?? windows[0];
-  const bounds = main.getBounds();
-  if (main.isMaximized()) main.unmaximize();
-  main.setSize(width, height);
-  return bounds;
-}
-
-/** @brief 恢复主窗口的位置和大小。 */
-function restoreMain({ BrowserWindow }, bounds) {
-  const windows = BrowserWindow.getAllWindows();
-  const main = windows.find((window) => window.webContents.getURL().includes('index.html')) ?? windows[0];
-  main.setBounds(bounds);
-}
+// ---------- 主进程里运行的函数（经 app.evaluate 序列化，只能用参数里的 electron 模块和 process；改窗口大小的
+// resizeMain、restoreMain 在 m3-helpers.mjs） ----------
 
 /** @brief 让主窗口失去焦点，返回之后它是否还有焦点。 */
 function blurMain({ BrowserWindow }) {
@@ -1019,8 +1014,8 @@ async function archiveActive(ctx) {
 }
 
 /**
- * @brief 第二次重启后：R 仍在"Archived 1"；展开、悬停；菜单"Unarchive""Delete…"，选"Unarchive"回到项目下
- *        （不打开）。
+ * @brief 第二次重启（restartDeleted；整套跑时 plusAfterRestart 又重启一次）后：R 仍在"Archived 1"；展开、悬停；
+ *        菜单"Unarchive""Delete…"，选"Unarchive"回到项目下（不打开）。
  */
 async function archiveRestore(ctx) {
   const { page } = ctx;
@@ -1120,18 +1115,6 @@ async function statusRunning(ctx) {
     JSON.stringify(await rowState(page, A1)));
 }
 
-/** @brief 按 ← / → 把左栏分隔线挪到 want（每次 20px），最多 10 次；返回挪到的宽度。 */
-async function sidebarTo(page, want) {
-  const divider = page.locator('[data-resize="sidebar"]');
-  await divider.focus();
-  for (let presses = 0; presses < 10; presses += 1) {
-    const value = Number(await divider.getAttribute('aria-valuenow'));
-    if (value === want) return value;
-    await page.keyboard.press(value > want ? 'ArrowLeft' : 'ArrowRight');
-  }
-  return Number(await divider.getAttribute('aria-valuenow'));
-}
-
 /**
  * @brief 左栏和会话文件为 file 的会话行此刻的样子：宽度、内容放不下的会话行和项目行、状态文字和圆点、
  *        这一行所在项目的 + 是否显示并且在项目行和左栏之内。
@@ -1175,7 +1158,10 @@ async function narrowSidebar(ctx, file) {
     && narrow.overflow.length === 0, JSON.stringify({ wide, narrow }));
 }
 
-/** @brief 不可见的会话等你批准：行显示"Needs approval"；回去拒绝这张卡。 */
+/**
+ * @brief 不可见的会话等你批准：行显示"Needs approval"；左栏拉到 180px 时的会话行和项目行（narrowSidebar、
+ *        文件夹名很长的项目行 longProjectName）；回去拒绝这张卡。用 buildTree 的 A1、keyboardPath 的 K。
+ */
 async function statusApproval(ctx) {
   const { page } = ctx;
   const { A1, K } = ctx.files;
@@ -1189,6 +1175,7 @@ async function statusApproval(ctx) {
     JSON.stringify(row));
   await noteSmallText(ctx, 'status approval');
   await narrowSidebar(ctx, K);
+  await longProjectName(ctx);
   await openRow(page, K);
   await ctx.h.textarea.press('Alt+3');
   await paneOf(page).getByTestId('approval-card').waitFor({ state: 'detached', timeout: 10000 });
@@ -1268,6 +1255,8 @@ async function statusKernelExit(ctx) {
     + '"后台进程已退出，先重新载入"', error && pluses.length > 0
     && pluses.every((plus) => plus.disabled === true && plus.tip === CRASHED_TIP) && await folder.isDisabled()
     && tip === CRASHED_TIP, `${JSON.stringify(await rowState(page, A1))}；+ ${JSON.stringify(pluses)}；提示 ${tip}`);
+  record('后台进程意外退出：每个项目行的 + 变淡（opacity 小于 1）', pluses.length > 0
+    && pluses.every((plus) => plus.opacity < 1), JSON.stringify(pluses.map((plus) => plus.opacity)));
   await exitedRow(ctx, before);
   await shot(page, '12-kernel-exit');
   const away = `${ctx.files.F}.away`;
@@ -1283,6 +1272,8 @@ async function statusKernelExit(ctx) {
     cleared && back.length > 0
       && back.every((plus) => plus.disabled === false && plus.tip === `New session in ${plus.name}`),
     JSON.stringify({ row: await rowState(page, A1), plus: back }));
+  record('重新载入之后项目行的 + 不再变淡（opacity 为 1）', back.length > 0 && back.every((plus) => plus.opacity === 1),
+    JSON.stringify(back.map((plus) => plus.opacity)));
   await retryFailed(ctx);
   await waitReady(page);
 }
@@ -1391,54 +1382,14 @@ async function retryFailed(ctx) {
     usable(row?.permission) && usable(row.model) && usable(row.thinking) && Boolean(row.usage), JSON.stringify(row));
 }
 
-// ---------- 项目行的 +（sessions.md"项目行的 +"） ----------
-
-/**
- * @brief 会话树里每个项目行和它的 +：工作目录、项目行的文字和悬停，+ 的读屏名、悬停、tabIndex、是否不可用、
- *        图标颜色、离项目行右边几 px。
- */
-function plusButtons(page) {
-  return page.evaluate(() => [...document.querySelectorAll('[data-testid="session-tree"] .project-group')]
-    .map((group) => {
-      const heading = group.querySelector('.project-heading');
-      const plus = heading?.querySelector('[data-testid="project-new-session"]');
-      const right = (el) => el.getBoundingClientRect().right;
-      return { cwd: group.dataset.cwd, name: heading?.textContent?.trim() ?? '',
-        headingTip: heading?.getAttribute('title') ?? '', label: plus?.getAttribute('aria-label') ?? null,
-        tip: plus?.getAttribute('title') ?? null, tabIndex: plus?.tabIndex ?? null, disabled: plus?.disabled ?? null,
-        color: plus ? getComputedStyle(plus.querySelector('svg')).color : null,
-        gap: plus ? Math.round(right(heading) - right(plus)) : null };
-    }));
-}
-
-/** @brief 工作目录为 folder 的项目行上的 +。 */
-async function plusOf(page, folder) {
-  const index = (await treeState(page)).findIndex((group) => samePath(group.cwd, folder));
-  if (index < 0) throw new Error(`no project row for ${folder}`);
-  return page.locator('[data-testid="session-tree"] .project-group').nth(index).getByTestId('project-new-session');
-}
-
-/** @brief + 图标此刻的颜色。 */
-const plusColor = (plus) => plus.evaluate((el) => getComputedStyle(el.querySelector('svg')).color);
-
-/**
- * @brief 点 folder 项目行上的 +，等新会话加入并就绪；返回新会话的行（当前会话那一行）、焦点是否在输入框、
- *        会话面板多了几个。
- */
-async function clickPlus(page, folder) {
-  const before = await paneCount(page);
-  await (await plusOf(page, folder)).click();
-  await waitPanes(page, before + 1);
-  await waitReady(page);
-  const row = await rowState(page, await activeFile(page));
-  return { row, focused: await waitComposerFocus(page), added: await paneCount(page) - before };
-}
+// ---------- 项目行的 +（sessions.md"项目行的 +"；读项目行与 + 的小工具和补的检查在 m3-app-plus.mjs） ----------
 
 /**
  * @brief 展开的左栏（宽窗口）：每个项目行右端一个 +，读屏名和悬停"New session in <文件夹名>"，tabIndex 为 -1（不是 Tab
  *        停靠点，键盘用 Ctrl+N），项目行的文字仍只有文件夹名、悬停仍是完整路径；左栏顶部没有"New session"按钮；
- *        + 平时淡色、悬停时变深。点另一个项目（alpha；当前会话是 floatingPlus 在 beta 新建的）的 +：在 alpha 新建会话、
- *        放进中栏并切过去，名为"New session"，焦点在输入框。
+ *        + 平时淡色、悬停时变深（plusLook：一直显示、--color-faint、项目行不变高；plusHover：正文颜色、底色同别的图标按钮）。
+ *        点另一个项目（alpha；当前会话在 beta：整套跑时是 narrowWindow 的 railPlus 在 beta 新建的，只跑 buildTree 时是 B2）
+ *        的 +：在 alpha 新建会话、放进中栏并切过去，名为"New session"，焦点在输入框。
  */
 async function projectPlus(ctx) {
   const { page } = ctx;
@@ -1453,6 +1404,7 @@ async function projectPlus(ctx) {
     && ['alpha', 'beta'].every((name) => pluses.some((plus) => plus.name === name))
     && !top.some((label) => /New session/.test(label)),
   JSON.stringify({ pluses, top }));
+  await plusLook(ctx);
   const plus = await plusOf(page, alpha);
   await page.mouse.move(0, 0);
   const muted = await plusColor(plus);
@@ -1461,6 +1413,7 @@ async function projectPlus(ctx) {
   await page.mouse.move(0, 0);
   record('项目行的 +：平时淡色，鼠标移上去时变深', Boolean(muted) && Boolean(hover) && muted !== hover,
     JSON.stringify({ muted, hover }));
+  await plusHover(ctx, plus);
   const current = await rowState(page, await activeFile(page));
   const made = await clickPlus(page, alpha);
   record('点另一个项目（alpha）行上的 +：在 alpha 新建一个会话并切过去，名为"New session"，焦点在输入框',
@@ -1471,7 +1424,11 @@ async function projectPlus(ctx) {
 
 // ---------- 窄窗口与 Ctrl+N ----------
 
-/** @brief 窄窗口：图标栏、"Open sidebar"按钮上的圆点、浮动左栏开着时 Ctrl+N 不起作用、点会话后浮动左栏收起。 */
+/**
+ * @brief 窄窗口：图标栏（railButtons：七个图标按钮）、"Open sidebar"按钮上的圆点、浮动左栏开着时 Ctrl+N 不起作用、
+ *        点会话后浮动左栏收起、浮动左栏里点项目行的 +（floatingPlus）、收起时点图标栏的 +（railPlus）。
+ *        用 buildTree 的 A1、keyboardPath 的 K、renamePrefill 给 A1 起的名字。
+ */
 async function narrowWindow(ctx) {
   const { app, page } = ctx;
   const { A1, K } = ctx.files;
@@ -1493,6 +1450,7 @@ async function narrowWindow(ctx) {
     && label === 'Open sidebar (a session has unread results)',
     `收起 ${collapsed}，树可见 ${treeShown}，圆点 ${dot}，名称 ${label}`);
   await shot(page, '13-narrow-rail');
+  await railButtons(ctx);
   await page.locator('.rail-toggle').click();
   await page.waitForFunction(() => document.querySelector('[data-testid="sidebar"]')?.classList.contains('floating'),
     null, { timeout: 3000 });
@@ -1506,6 +1464,7 @@ async function narrowWindow(ctx) {
   const active = await page.locator('.pane-slot:not([hidden]) [data-testid="session-title"]').innerText();
   record('窄窗口：浮动展开的左栏里打开或切换会话后，左栏自动收起', closed && active === NAMES.A1, `顶栏 ${active}`);
   await floatingPlus(ctx);
+  await railPlus(ctx);
   await app.evaluate(restoreMain, ctx.bounds);
   ctx.bounds = null;
   // 窗口宽了之后 React 才在下一次提交里把左栏展开（innerWidth 先变）：等到展开，下一步 projectPlus 读的才是展开的左栏。
@@ -1605,6 +1564,18 @@ async function restartDeleted(ctx) {
 }
 
 /**
+ * @brief 重启之后的两个 +（sessions.md"新会话（Ctrl+N，或收起的图标栏上的 +）""项目行的 +"）：先在 delta 存一个会话再重启
+ *        （本次信任的回答清空）；没有当前会话时点收起的图标栏上的 +（railNoSession），再点 delta 行上的 +，先问信任
+ *        （plusTrust）。只用 setup 和这一步自己建的会话。
+ */
+async function plusAfterRestart(ctx) {
+  await saveInDelta(ctx);
+  await relaunch(ctx);
+  await railNoSession(ctx);
+  await plusTrust(ctx);
+}
+
+/**
  * @brief 重启后打开 gamma 里保存的会话：再问一次；勾"Remember my choice"选"Trust workspace"：扩展运行、
  *        工具可用、批准卡、结果。
  */
@@ -1680,7 +1651,7 @@ async function zetaRemembered(ctx) {
     && banner.startsWith(UNTRUSTED) && banner.includes(how) && !existsSync(marker), `横幅 ${banner}`);
 }
 
-/** @brief 第三次重启：打开 gamma 的会话不再询问，扩展照常加载；改过的名字仍在。 */
+/** @brief 再重启一次（整套跑时是第四次，plusAfterRestart 多重启一次）：打开 gamma 的会话不再询问，扩展照常加载；改过的名字仍在。 */
 async function trustRemembered(ctx) {
   const { marker } = ctx.trust.gamma;
   rmSync(marker, { force: true });
@@ -1740,8 +1711,8 @@ const steps = {
   renamePrefill, renameEsc, renameEmpty, renameEscRunning, renameBlur, drafts, restartTree, restartOpen, renameUnopened,
   trustAsk, trustDeny, trustEsc, trustRememberDeny, trustCounterexample, deleteCancel, deleteConfirm, deleteRunning,
   deleteUnsaved, deleteFail, archiveActive, statusRunning, statusApproval, statusError, statusKernelExit, narrowWindow,
-  projectPlus, ctrlNRepeat, ctrlNMenus, restartDeleted, archiveRestore, archiveOpen, archiveDelete, trustAgain,
-  zetaRemembered, trustRemembered, ...liveSteps,
+  projectPlus, plusWhileStarting, ctrlNRepeat, ctrlNMenus, restartDeleted, plusAfterRestart, archiveRestore,
+  archiveOpen, archiveDelete, trustAgain, zetaRemembered, trustRemembered, ...liveSteps,
 };
 
 const fake = await startFakeEndpoint();
@@ -1762,7 +1733,7 @@ try {
     }
   }
 } finally {
-  // 只跑几步（--only）时，那几步没有量左栏的字号就不记这一条
+  // 只跑几步（--only）时，那几步没有量左栏的字号就不记这一条（量的是 buildTree、statusRunning 等）
   if (!only || ctx.smallChecked.length > 0) {
     record('左栏（和会话菜单）没有小于 12px 的文字', ctx.small.length === 0 && ctx.smallChecked.length > 0,
       `检查于 ${ctx.smallChecked.join('、')}；${ctx.small.slice(0, 5).join('; ')}`);
