@@ -142,7 +142,7 @@
 
 | 层 | 结果 |
 | --- | --- |
-| 单元 | `npm run test:sa-unit` 25/26（SA-10 的按工具拼的那一句等 WP-10，见下）；`test:tb-unit` 334/334、`test:mem-unit` 239/239（普通模式多了 `subagent` 的几处期望已改）；`npm run test:unit` 只差 spec-ids 等 SA-10 之外各层写好后才过；`npm run check` 通过 |
+| 单元 | `npm run test:sa-unit` 24/25（SA-10 的按工具拼的那一句等 WP-10，见下）；`test:tb-unit` 334/334、`test:mem-unit` 239/239（普通模式多了 `subagent` 的几处期望已改）；`npm run test:unit` 463/463（含 spec-ids 与 MP-38）；`npm run check` 通过 |
 | App（合成端点，`sa-app.mjs`，端口 4970/4971） | 40/41：SA-10 等 WP-10 |
 | 回放（`sa-replay.mjs`） | 13/13：从真实 DeepSeek 会话录的 `tests/fixtures/sa/sa-subagent.json`（`tb-record.mjs` 的 sa-subagent），加 m1 的两个录制 |
 | 真实模型（`sa-real.mjs`，代理 4972） | DeepSeek 与 GLM 各跑只读的三路分工与通用 subagent 跑命令（带归属的批准卡）：程序保证的各项全部通过。GLM 的命令驱动重跑了 2 次：第一次提供商连不上，第二次 500 overloaded；第三次它先发了一次格式坏的工具参数（pi 拒绝），再照正确的写法重试 |
