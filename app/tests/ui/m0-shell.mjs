@@ -9,6 +9,7 @@
 // --real：用走查数据目录的复制（只复制密文文件，不读 key）和情形 A 的环境，让真实模型跑一条 bash 命令。
 // 用法（在 app/ 下，先 npx electron-vite build）：
 //   node tests/ui/m0-shell.mjs [--exe <Mori.exe>]                          结果 test-results/m0-shell(-packaged).json
+//   node tests/ui/m0-shell.mjs --only A                                     只跑列出的合成情形（A、B；测试分层第 2 条）
 //   node tests/ui/m0-shell.mjs --real --source <走查数据目录> [--exe …]     结果 test-results/m0-shell-real(-packaged).json
 
 import { spawnSync } from 'node:child_process';
@@ -27,6 +28,8 @@ const PORT = 4390;
 const KEY = 'synthetic-test-key';
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const real = process.argv.includes('--real');
+/** --only：只跑列出的合成情形（A、B），没给时两种都跑 */
+const only = arg('only')?.split(',');
 const source = arg('source');
 const recorder = createRecorder(exePath ?? 'dev build');
 const { record } = recorder;
@@ -190,7 +193,10 @@ async function synthetic() {
   }
   const fake = await startFakeEndpoint(PORT, KEY);
   try {
-    await syntheticCase('A', git.root, [join(git.root, 'cmd')], gitLine(git.root, 'from git\\.exe on PATH'));
+    if (!only || only.includes('A')) {
+      await syntheticCase('A', git.root, [join(git.root, 'cmd')], gitLine(git.root, 'from git\\.exe on PATH'));
+    }
+    if (only && !only.includes('B')) return;
     if (git.registryRoot) {
       const expected = gitLine(git.registryRoot, 'from the Git for Windows registry key');
       await syntheticCase('B', git.registryRoot, [], expected);
