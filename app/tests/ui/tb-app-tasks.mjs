@@ -26,7 +26,7 @@ import {
   teamDir, tempProject, tempUserData, userSession, waitApprovalCard, waitTeamIdle, writeRoles,
 } from './tb-helpers.mjs';
 import {
-  bgCards, bgTabs, clickBack, clickCard, clickTab, issueReport, openTranscript, panelOpen, tasksButton,
+  actionsAfter, bgCards, bgTabs, clickBack, clickCard, clickTab, issueReport, openTranscript, panelOpen, tasksButton,
   taskViewOf, transcriptOf, waitCard, waitTaskView, waitTranscript, watchMoments, momentsSeen,
 } from './tb-tasks-helpers.mjs';
 import { openMenuByMouse } from './m3-helpers.mjs';
@@ -258,9 +258,10 @@ async function progressLinks(ctx, who) {
   iconLabel === 'Open Request 1 in Background tasks' && flashed > 0 && expanded === rows?.expanded,
   brief({ iconLabel, flashed, expanded, before: rows?.expanded }));
   const report = await issueReport(ctx, who.tab, 'Background tasks entries');
+  const since = actionsAfter(report.actions, 'Send (team): Fix the login page');
   const wanted = ['Open background tasks', 'Open T3 in Background tasks'];
   record('TB-80 F8 records "Open background tasks" and "Open T3 in Background tasks"',
-    wanted.every((line) => report.actions.some((item) => item.includes(line))), brief(report.actions.slice(-8)));
+    wanted.every((line) => since.some((item) => item.includes(line))), brief(since));
 }
 
 // ---------- TB-81 列表 ----------
@@ -615,7 +616,13 @@ async function readonly(ctx) {
 async function reload(ctx) {
   const who = await flowSession(ctx);
   await openList(ctx, who);
-  const before = await bgCards(ctx);
+  // 单独跑这一步时 task 还在变（T4 刚开始等写入锁）：等一秒内两次读到的列表相同再记下
+  const cardKeys = (cards) => cards.map((card) => [card.task, card.section, card.phase]);
+  const before = await poll(async () => {
+    const first = await bgCards(ctx);
+    await sleep(1000);
+    return same(cardKeys(first), cardKeys(await bgCards(ctx))) ? first : null;
+  }, 20000) ?? await bgCards(ctx);
   await ctx.page.reload();
   await ctx.page.waitForFunction(() => Boolean(window.mori), null, { timeout: 30000 });
   const tab = await reopenSession(ctx, who.sessionFile);
@@ -630,8 +637,7 @@ async function reload(ctx) {
   await openList(ctx, ctx.flow);
   const after = await bgCards(ctx);
   record('TB-85 after Ctrl+R and reopening the session, the list is the same',
-    Boolean(tabs) && same(after.map((card) => [card.task, card.section, card.phase]),
-      before.map((card) => [card.task, card.section, card.phase])), brief({ before: before.length, after }));
+    Boolean(tabs) && same(cardKeys(after), cardKeys(before)), brief({ before: cardKeys(before), after: cardKeys(after) }));
   await clickCard(ctx, 'T1');
   const view = await waitTaskView(ctx, 'T1');
   await openTranscript(ctx, '[data-testid="bg-task-view"] .bg-task-links', 'executor');
@@ -792,9 +798,10 @@ async function narrow(ctx) {
   try {
     await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 700));
     await sleep(500);
-    // 浮在上层：分屏放不下时是 .floating，内容区窄于 800px 时是 layout.css 的媒体查询，两种都是 position: absolute
+    // 浮在上层：分屏放不下时是 .floating，内容区窄于 800px 时是 layout.css 的媒体查询，两种都是 position: absolute。
+    // 阶段行按钮回到 Background tasks 上次在的那一层（列表、task 的视图或会话，都是 .bg-body）
     const floating = () => ctx.page.locator('[data-testid="right-panel"]').evaluate((el) => getComputedStyle(el)
-      .position === 'absolute' && Boolean(el.querySelector('[data-testid="bg-tasks"]'))).catch(() => false);
+      .position === 'absolute' && Boolean(el.querySelector('.bg-body'))).catch(() => false);
     await ctx.page.locator(`${paneSel(who.tab)} [data-testid="tasks-button"]`).click();
     const byButton = await poll(floating, 5000, 100);
     await ctx.page.locator('[data-testid="right-panel"] [aria-label="Close panel"]').first().click();
@@ -882,8 +889,9 @@ async function menu(ctx) {
     && menuGone && tabs.find((tab) => tab.tab === 'tasks')?.selected === 'true',
   brief({ item, replying, still, menuGone, tabs }));
   const report = await issueReport(ctx, who.tab, 'See background tasks');
+  const since = actionsAfter(report.actions, 'Send (team): Look at the menu');
   record('TB-80 F8 records "Open background tasks" for the model menu item',
-    report.actions.some((line) => line.includes('Open background tasks')), brief(report.actions.slice(-4)));
+    since.some((line) => line.includes('Open background tasks')), brief(since));
 }
 
 // ---------- TB-83 实例会话里的步骤组（WP-14 之后） ----------
@@ -899,7 +907,8 @@ function stepGroups(ctx) {
 
 /**
  * @brief 实例会话里一轮结束后的步骤折叠同对话流（§13.13.4，WP-14 合入后；docs/v0/screens/chat.md“步骤组”）：做完的 T1 会话里
- *        思考与工具卡折成一行 “▸ <n> steps”，点开看到工具卡；运行中的 T3 正在做的那一组全部显示。
+ *        思考与工具卡折成一行 “<n> steps”（前面的 ▸ / ▾ 是样式画的，不在文字里），点开看到工具卡；运行中的 T3 正在做的
+ *        那一组全部显示。
  */
 async function folding(ctx) {
   const who = await flowSession(ctx);
@@ -907,17 +916,18 @@ async function folding(ctx) {
   await openTranscript(ctx, '[data-testid="bg-task"][data-task="T1"] .bg-task-links', null);
   await waitTranscript(ctx, 'task');
   const folded = await stepGroups(ctx);
-  record('TB-83 a finished instance session folds its steps as the chat does: one line "▸ <n> steps" '
+  const label = /^[\d,]+ steps?( · [\d,]+ failed)?$/;
+  record('TB-83 a finished instance session folds its steps as the chat does: one line "<n> steps" '
     + '(aria-expanded false) and no tool card showing',
-  folded?.groups.length > 0 && folded.groups.every((group) => group.expanded === 'false'
-    && /^▸ \d+ steps?( · \d+ failed)?$/.test(group.text)) && folded.visibleTools === 0, brief(folded));
+  folded?.groups.length > 0 && folded.groups.every((group) => group.expanded === 'false' && label.test(group.text))
+    && folded.visibleTools === 0, brief(folded));
   if (folded?.groups.length) {
     await ctx.page.locator('[data-testid="bg-transcript"] [data-testid="step-group"]').first().click();
   }
   const opened = await stepGroups(ctx);
-  record('TB-83 clicking the line expands the group ("▾ <n> steps", aria-expanded true) and its tool cards show',
-    opened?.groups[0]?.expanded === 'true' && opened.groups[0].text.startsWith('▾ ') && opened.visibleTools > 0,
-    brief(opened));
+  record('TB-83 clicking the line expands the group (aria-expanded true, same "<n> steps") and its tool cards show',
+    opened?.groups[0]?.expanded === 'true' && opened.groups[0].text === folded?.groups[0]?.text
+    && opened.visibleTools > 0, brief(opened));
   await clickBack(ctx);
   await openTranscript(ctx, '[data-testid="bg-task"][data-task="T3"] .bg-task-links', null);
   await waitTranscript(ctx, 'task');
@@ -930,7 +940,7 @@ async function folding(ctx) {
 // ---------- TB-82、TB-83、TB-89：读不到、停不了 ----------
 
 /**
- * @brief 后台进程退出之后的三种失败（之后的请求都失败；restart 一步重启 App）：停止的那一行 Couldn’t stop T1: …、
+ * @brief 后台进程退出之后的三种失败（之后的请求都失败；检查完重启 App）：停止的那一行 Couldn’t stop T1: …、
  *        task 视图的 Couldn’t load T1: … 与 Retry、会话的 Failed to read session transcript 与原文和 Retry。
  */
 async function errors(ctx) {
@@ -948,6 +958,17 @@ async function errors(ctx) {
     first?.line.endsWith(' · <1 min') && ticked?.phase === first.phase, brief({ first: first?.line,
       ticked: ticked?.line }));
   await killTbKernel(ctx);
+  try {
+    await afterCrash(ctx);
+  } finally {
+    // 后台进程已经退出：重启 App，后面的步骤（restart）照常打开项目；之前的会话面板都失效了
+    ctx.flow = null;
+    await restartTbApp(ctx);
+  }
+}
+
+/** @brief 后台进程退出之后：停止、task 的视图与会话各自显示错误（errors 的后半）。 */
+async function afterCrash(ctx) {
   await sleep(1000);
   await ctx.page.locator('[data-testid="bg-task"][data-task="T1"] [data-action="stop-task"]').click();
   const stop = await waitCard(ctx, 'T1', (card) => card.error !== null, 10000);

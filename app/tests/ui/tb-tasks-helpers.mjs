@@ -154,6 +154,15 @@ function section(md, title) {
   return lines.slice(start + 1, end < 0 ? undefined : end).map((line) => line.trim()).filter(Boolean);
 }
 
+/**
+ * @brief Recent activity 里最后一行含 marker 之后的各行（Recent activity 记整个 App 最近 30 个操作，前面步骤的同名操作也在里面；
+ *        检查只看这一步发出消息之后的）。没有含 marker 的行时为空。
+ */
+export function actionsAfter(actions, marker) {
+  const at = actions.findLastIndex((line) => line.includes(marker));
+  return at < 0 ? [] : actions.slice(at + 1);
+}
+
 /** @brief 在这个会话里按 F8、写两句、保存，读保存的 Markdown：“Current view”与“Recent activity”的各行。 */
 export async function issueReport(ctx, tab, what) {
   await showTab(ctx, tab);
