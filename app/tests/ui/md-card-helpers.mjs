@@ -265,7 +265,9 @@ export const modelRow = (page, ref) => page.locator(`[data-testid="model-row"][d
 /**
  * @brief 一张提供商卡此刻的样子：卡头的 Fetch models（文字、是否不可用）、拉取中的 Cancel、拉取的状态、清单、列表错误、
  *        Detected 一行的个数、Not listed 一行、清单的行（勾选、标记、提示、输入框是否不可用）、Add 按钮、卡里的原文、
- *        卡上 Add model 按钮的个数、模型行的顺序、卡里任何地方有没有"Fetch cancelled"这句。卡不在时为 null。
+ *        卡上 Add model 按钮的个数、模型行的顺序、卡里任何地方有没有"Fetch cancelled"这句、卡上清单里出现的
+ *        Name、API type、More settings、Network zone（extras，models-settings.md“卡上的 Fetch models”：都不该有）。
+ *        卡不在时为 null。
  */
 export function cardState(page, id) {
   return page.evaluate((providerId) => {
@@ -297,6 +299,9 @@ export function cardState(page, id) {
       addModel: card.querySelectorAll('[data-action="add-model"]').length,
       models: [...card.querySelectorAll('[data-testid="model-row"]')].map((row) => row.dataset.model),
       cancelledText: card.textContent.includes('Fetch cancelled'),
+      extras: [...card.querySelectorAll('.card-checklist label, .card-checklist summary')].map(text)
+        .filter((label) => ['Name', 'API type', 'More settings', 'Network zone'].includes(label))
+        .concat([...card.querySelectorAll('.card-checklist input[name="zone"]')].map(() => 'zone radio')),
     };
   }, id);
 }

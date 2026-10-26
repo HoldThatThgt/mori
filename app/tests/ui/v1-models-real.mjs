@@ -714,8 +714,8 @@ try {
   const data = await dataSource(ctx);
   dir = data.dir;
   found = findRealProviders(readJson(join(dir, 'model-config.json')), data.ids);
-  record(`MP-27 setup: two real providers ${found.first.id} and ${found.second.id} and a key on the first`, true,
-    `${found.first.name}, ${found.second.name}`
+  record(`MP-27 setup: two real providers ${found.first.id} and ${found.second.id} and a key on the first`,
+    found.first.id !== found.second.id && found.first.keys.length > 0, `${found.first.name}, ${found.second.name}`
     + `${ctx.keyMode ? `; key mode: data dir built through the UI in ${dir}` : ''}`);
 } catch (error) {
   record('MP-27 setup: the data dir has two real providers (spec §14.1)', false, errorLine(error, 600));

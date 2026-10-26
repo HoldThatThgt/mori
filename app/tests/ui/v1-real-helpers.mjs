@@ -75,7 +75,8 @@ export function scratchModelData(source) {
 const looksLike = (provider, pattern) => pattern.test(`${provider.id} ${provider.name} ${provider.baseUrl}`);
 
 /**
- * @brief 找到两个真实提供商：首选（默认 DeepSeek）与第二个（默认 GLM）；--first / --second 可以直接给提供商 id。
+ * @brief 找到两个真实提供商：首选（默认 DeepSeek）与第二个（默认 GLM）；--first / --second 可以直接给提供商 id
+ *        （两个不能是同一个）。
  * @return { first, second }（model-config.json 里的提供商对象，不含 key 明文——配置里本来就只有 ref）
  */
 export function findRealProviders(config, { first, second } = {}) {
@@ -89,6 +90,7 @@ export function findRealProviders(config, { first, second } = {}) {
     throw new Error(`No second real provider (${second ?? 'GLM'}) in model-config.json; providers: ${ids}. `
       + 'MP-27 needs two real providers (spec §14.1): add the second one in Mori first.');
   }
+  if (a === b) throw new Error(`--first and --second both name ${a.id}; MP-27 needs two real providers (§14.1)`);
   if (a.keys.length === 0) throw new Error(`${a.id} has no key; the fault method needs its key (§14.1)`);
   return { first: a, second: b };
 }

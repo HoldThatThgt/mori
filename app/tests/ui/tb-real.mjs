@@ -307,8 +307,9 @@ const ctx = { exePath, pageErrors: [], appLog: [], projects: [] };
 try {
   if (!source) throw new Error('Missing --source <Mori data dir with the two real providers>');
   ctx.found = realProvidersOf(source);
-  record(`TB-45 real setup: two real providers ${refOf(ctx.found.first)} and ${refOf(ctx.found.second)}`, true,
-    `${ctx.found.first.name}, ${ctx.found.second.name}`);
+  const { first, second } = ctx.found;
+  record(`TB-45 real setup: two real providers ${refOf(first)} and ${refOf(second)}`, first.id !== second.id,
+    `${first.name}, ${second.name}`);
 } catch (error) {
   record('TB-45 real setup: the data dir has two real providers (model spec §14.1)', false, oneLine(error, 600));
 }
