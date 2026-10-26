@@ -155,6 +155,22 @@ function section(md, title) {
 }
 
 /**
+ * @brief locator 指的卡（第一个）在会话视图（bg-transcript）里折起的步骤组里时，点那一组的 "{n} steps" 把它展开；不在
+ *        折起的组里时什么都不做。同 page.mjs 的 showStep，只是找摘要行的范围是会话视图（不是对话流）。
+ */
+export async function showBgStep(locator) {
+  const row = await locator.first().evaluateHandle((element) => {
+    const step = element.closest('[data-step-group]');
+    if (!step?.hidden) return null;
+    return element.closest('[data-testid="bg-transcript"]')
+      ?.querySelector(`[data-testid="step-group"][data-group="${CSS.escape(step.dataset.stepGroup)}"]`) ?? null;
+  });
+  const button = row.asElement();
+  if (button) await button.click();
+  await row.dispose();
+}
+
+/**
  * @brief Recent activity 里最后一行含 marker 之后的各行（Recent activity 记整个 App 最近 30 个操作，前面步骤的同名操作也在里面；
  *        检查只看这一步发出消息之后的）。没有含 marker 的行时为空。
  */

@@ -6,8 +6,8 @@
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs tasks）：
 //   MORI_APP_DIR=.tb-runs/tasks node tests/ui/tb-app-tasks.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 步骤：plain、empty、entries、list、taskview、transcript、folding、tabs、keys、stop、readonly、reload、narrow、approval、
-// outcomes、noactivity、menu、errors、restart（entries 到 narrow 共用一个会话，按这个顺序；folding 要 WP-14 的步骤组，
-// 合并之前失败；errors 让后台进程退出，检查完重启 App；restart 最后跑，也重启 App）。
+// outcomes、noactivity、menu、errors、restart（entries 到 narrow 共用一个会话，按这个顺序；
+// errors 让后台进程退出，检查完重启 App；restart 最后跑，也重启 App）。
 // 每一步覆盖 docs/v1/screens/team-tasks.md 状态表的哪几行，见 docs/v1/team-checks.md“状态表的每一行与用例”。
 // 结果写到 test-results/tb-app-tasks(-packaged).json（--only 时 tb-partial-app-tasks…），截图在 test-results/tb-app-tasks/。
 // 端口（§17.3：tb-app-tasks*.mjs 用 4950–4959）：合成端点 4950，记录代理 4951。
@@ -26,8 +26,8 @@ import {
   teamDir, tempProject, tempUserData, userSession, waitApprovalCard, waitTeamIdle, writeRoles,
 } from './tb-helpers.mjs';
 import {
-  actionsAfter, bgCards, bgTabs, clickBack, clickCard, clickTab, issueReport, openTranscript, panelOpen, tasksButton,
-  taskViewOf, transcriptOf, waitCard, waitTaskView, waitTranscript, watchMoments, momentsSeen,
+  actionsAfter, bgCards, bgTabs, clickBack, clickCard, clickTab, issueReport, openTranscript, panelOpen, showBgStep,
+  tasksButton, taskViewOf, transcriptOf, waitCard, waitTaskView, waitTranscript, watchMoments, momentsSeen,
 } from './tb-tasks-helpers.mjs';
 import { openMenuByMouse } from './m3-helpers.mjs';
 import { waitSplit } from './m5-helpers.mjs';
@@ -838,7 +838,10 @@ async function tabs(ctx) {
   await waitTaskView(ctx, 'T1');
   await openTranscript(ctx, '[data-testid="bg-task-view"] .bg-task-links', 'executor');
   await waitTranscript(ctx, 'task');
-  await ctx.page.locator('[data-testid="bg-transcript"] [data-testid="tool-path"]').first().click();
+  // 运行结束的会话里工具卡折在 "{n} steps" 里：先展开那一组
+  const path = ctx.page.locator('[data-testid="bg-transcript"] [data-testid="tool-path"]').first();
+  await showBgStep(path);
+  await path.click();
   await ctx.page.locator('[data-testid="file-viewer"]').waitFor({ timeout: 10000 });
   const viewer = await ctx.page.locator('[data-testid="right-panel"]').evaluate((panel) => ({
     tab: panel.querySelector('[data-testid="right-tab"][aria-selected="true"]')?.dataset.tab,
@@ -894,7 +897,7 @@ async function menu(ctx) {
     since.some((line) => line.includes('Open background tasks')), brief(since));
 }
 
-// ---------- TB-83 实例会话里的步骤组（WP-14 之后） ----------
+// ---------- TB-83 实例会话里的步骤组 ----------
 
 /** @brief 会话视图里的步骤组：[{ text, expanded }] 与看得见的工具卡数。 */
 function stepGroups(ctx) {
@@ -906,7 +909,7 @@ function stepGroups(ctx) {
 }
 
 /**
- * @brief 实例会话里一轮结束后的步骤折叠同对话流（§13.13.4，WP-14 合入后；docs/v0/screens/chat.md“步骤组”）：做完的 T1 会话里
+ * @brief 实例会话里一轮结束后的步骤折叠同对话流（§13.13.4；docs/v0/screens/chat.md“步骤组”）：做完的 T1 会话里
  *        思考与工具卡折成一行 “<n> steps”（前面的 ▸ / ▾ 是样式画的，不在文字里），点开看到工具卡；运行中的 T3 正在做的
  *        那一组全部显示。
  */

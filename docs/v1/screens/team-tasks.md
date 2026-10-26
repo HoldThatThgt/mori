@@ -83,7 +83,7 @@
 | --- | --- | --- | --- |
 | 读取中 | `board.readSession` 还没返回 | 顶部 `Back`；标题 `<role> · T1 <title>`，结案会话 `<close role> · Request 1 (closing)`；下面 `Loading…` | `Back` |
 | 还没有条目 | `entries` 里没有消息 | `No activity yet`（Claude 原句） | `Back` |
-| 读到了 | `entries` | 第一行 `Model <provider>/<model>`（最后一条助手消息的 `provider`、`model`）；然后照对话流画：投递（`[Mori] …`）是用户一侧的气泡，助手正文按 Markdown，思考折叠为 `Thought process`，工具卡照 v0（展开看 Input / Output，证据编号 `[#n]` 在输出原文里），换模型的一行照 model-chat.md；一轮结束后的步骤折叠同对话流（WP-14 合入后） | 展开工具卡、思考；复制代码；`Back` |
+| 读到了 | `entries` | 第一行 `Model <provider>/<model>`（最后一条助手消息的 `provider`、`model`）；然后照对话流画：投递（`[Mori] …`）是用户一侧的气泡，助手正文按 Markdown，思考折叠为 `Thought process`，工具卡照 v0（展开看 Input / Output，证据编号 `[#n]` 在输出原文里），换模型的一行照 model-chat.md；一轮结束后的步骤折叠同对话流（`{n} steps`，v0 chat.md“步骤组”；实例在运行时最后一轮全部显示） | 展开工具卡、思考，点 `{n} steps` 展开或折起；复制代码；`Back` |
 | 实例在运行 | `running` 为真 | 还没有结果的工具调用显示 `Running…`（不是 `Interrupted`）；最后一行是这个 task 卡片的当前在做什么；这个 task 的 `TaskView` 变了时重新读，最多每秒一次，读到新内容时你在底部就跟随 | 同上 |
 | 运行结束 | `running` 变为假 | 停在最后的样子，不再重新读 | 同上 |
 | 读不出 | `error` | `Failed to read session transcript`（Claude 原句），下一行原文 | `Retry`、`Back` |

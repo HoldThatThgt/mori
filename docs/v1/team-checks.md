@@ -191,6 +191,11 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
   `spec-coverage.test.mjs`（前 59 个是 TB-01–TB-59，TB-80–TB-89 一段，编号不重复）、`tb-real*.mjs`、`tb-replay.mjs`、规格与
   这份记录，两边都留）：回放与录制里 stop-task 一段改用 `/task`（`/team` 不再是命令）；`test:unit` 461/461，
   `test:tb-unit` 373/373。Background tasks 里基座的名字照旧写 `Mori`，见上面“你不在时按推荐定下的”#5。
+- 合进 `app-v0` 的 WP-14 之后（20ebd07；冲突只在 `Transcript.tsx`：取 WP-14 的 `ItemView`（加了 `steps`、`onSteps`），仍导出给
+  会话视图用）：会话视图的步骤照对话流折叠（`BackgroundTranscript.tsx` 用 `turns.ts` 的 `stepGroups`、`itemSteps`，实例在运行时
+  最后一轮全部显示，你的展开、收起只在这次打开里有效）；`tabs` 一步要点会话里工具卡上的路径，先用 `showBgStep`
+  （`tb-tasks-helpers.mjs`，同 `page.mjs` 的 `showStep`，范围是会话视图）展开那一组。`test:unit` 473/473（WP-14 加了 12 项），
+  `test:tb-unit` 373/373。
 
 ### 测试（AGENTS.md 测试分层，每次改动的那几层）
 
@@ -203,17 +208,17 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
 | `tb-app-tasks.mjs --only` | plain、empty、entries、list、taskview、transcript、tabs、keys、stop、readonly、reload、narrow、approval、outcomes、noactivity、errors、restart 每一步最近一次都通过（2026-10-26 为状态表的每一行补了 tabs、narrow、outcomes、noactivity 四步与各步里的检查，见下面的表）；WP-09 之后 `--only plain,empty,entries,stop,readonly,menu` 全部通过（含 menu 与 readonly 最后一项）；folding 等 WP-14（下面）（分几次跑，端口 4950–4951；结果是 `tb-partial-app-tasks.json`，不计入覆盖检查） |
 | 整套 `tb-app-tasks.mjs`（a37dbbf 之后跑一次） | 75 项通过、6 项失败：等 WP-14 的 `folding` 两项、等 WP-09 的 `menu` 一项与 `readonly` 最后一项，另外两项是用例的问题（`narrow`、`restart`，上面“实现”最后一条），改了之后 `--only reload,narrow,errors,restart` 与 `--only entries,menu` 跑过：除了等 WP-09 的 `menu` 两项都通过 |
 | 整套 `tb-app-tasks.mjs`（WP-10 合入后，8f50a42 之上） | 80 项通过、2 项失败：只剩等 WP-14 的 `folding` 两项（还没有步骤组）；WP-09 的 `menu` 与 `readonly` 最后一项、上一次的 `narrow`、`restart` 都通过 |
+| `tb-app-tasks.mjs --only folding`、`--only tabs`（WP-14 合入后） | 都通过（folding 三项；tabs 三项，先展开折起的组再点路径） |
 | `tb-replay --only stop-task`（TB-89） | 六项都通过：停之前卡片在 `Running`、有 `Stop this task`，点它发出录制里的 `session.stopTask`；之后在 `Finished`、`Stopped`；交回后回到 `Running`、最后在 `Finished`；界面发出的命令与录制一致；页面没有错误 |
-| `tb-app-tasks-owner.mjs`（TB-88） | 通过：`Finished` 里 T6–T1 全是 Done、没有 `Running`；T2 3 条、T5 1 条、T6 2 条消息全文（T6 两条含表格）；T1–T6 与结案会话都能打开，T4（约 1 MB）的会话 261 ms 显示完；没有发模型请求。只复制那条会话的文件与 `teams/<id>`，没有读 `credentials.json`、`pi/auth.json` |
+| `tb-app-tasks-owner.mjs`（TB-88） | 通过：`Finished` 里 T6–T1 全是 Done、没有 `Running`；T2 3 条、T5 1 条、T6 2 条消息全文（T6 两条含表格）；T1–T6 与结案会话都能打开，T4（约 1 MB）的会话 261 ms 显示完（WP-14 合入、会话视图折叠之后再跑一次，照样通过，206 ms）；没有发模型请求。只复制那条会话的文件与 `teams/<id>`，没有读 `credentials.json`、`pi/auth.json` |
 | `npm run test:quick` | a37dbbf 之后通过：4/4，87 秒（m0-smoke 31、tb-replay 14、mem-replay 17、m1-replay 16 项）；WP-09 之后通过：4/4，81 秒 |
 | 整套 `tb-app-tasks*.mjs`、`tb-replay`、TB-46 汇总、`spec-coverage --spec taskboard` | 负责人要求推送前的完整回归里跑（测试分层第 3 条）；两个 `tb-app-tasks*.mjs` 已加进 `npm run test:taskboard` |
 
 ### 等别的包的（包一合并就做）
 
 - WP-09（模型菜单里的 Task mode）：做完了（上面“实现”最后一条），`menu` 与 `readonly` 最后一项通过。
-- WP-14（一轮结束后折叠步骤）：实例会话里的步骤照对话流折叠（§13.13.4）。`folding` 一步已写好（做完的 T1 会话折成
-  “<n> steps”（aria-expanded 为 false；▸ / ▾ 是 WP-14 用样式画的，不在文字里）、点开看到工具卡；运行中的 T3 那一组全部
-  显示），现在跑前两项失败（还没有步骤组），第三项通过。
+- WP-14（一轮结束后折叠步骤）：做完了（上面“实现”最后一条）。`folding` 三项都通过：做完的 T1 会话一行 `3 steps`
+  （aria-expanded 为 false，▸ / ▾ 是样式画的）、没有看得见的工具卡；点开后三张工具卡都在；运行中的 T3 没有折起的一行。
 - WP-10（发给模型的文字）：合进来了（8f50a42）。TB-89 的 fixture `tests/fixtures/tb/stop-task.json` 录好了（10fb133，
   `MORI_APP_DIR=.tb-runs/real node tests/ui/tb-record.mjs --source %TEMP%mori-real-data --only stop-task`，负责人的
   DeepSeek 与 GLM，第一次就录成，2104 步），`tb-replay --only stop-task` 六项都通过。还没做的：`tb-real.mjs --only stop`——
@@ -260,7 +265,7 @@ TB-88 的在 `tests/ui/tb-app-tasks-owner.mjs`（整套就是一步）；检查�
 | team-tasks 结果与去向 | `close_done`、`close_failed`；`→ Done` | `taskview`：“TB-82 the close session's baton: "#2 planner · Closed as done → Done" …”；`outcomes`：同上（Closed as failed） |
 | team-tasks 实例的会话 | 读取中 | `transcript`：“TB-83 while board.readSession has not answered, the transcript shows Back, the title … and "Loading…"” |
 | team-tasks 实例的会话 | 还没有条目 | `noactivity`：“TB-83 a task stopped while its instance session was still being created has an open session with no message: its transcript shows "No activity yet"” |
-| team-tasks 实例的会话 | 读到了 | `transcript`：“TB-83 the T1 transcript: …”、“TB-83 the transcript has no message box, reply actions or approval card”、“TB-83 selecting text in the transcript shows no selection popover …”；`folding`（WP-14 之后）：“TB-83 a finished instance session folds its steps as the chat does …”；`tb-app-tasks-owner.mjs`：“TB-88 the transcripts of T1–T6 and the closing session open …” |
+| team-tasks 实例的会话 | 读到了 | `transcript`：“TB-83 the T1 transcript: …”、“TB-83 the transcript has no message box, reply actions or approval card”、“TB-83 selecting text in the transcript shows no selection popover …”；`folding`：“TB-83 a finished instance session folds its steps as the chat does …”；`tb-app-tasks-owner.mjs`：“TB-88 the transcripts of T1–T6 and the closing session open …” |
 | team-tasks 实例的会话 | 实例在运行 | `transcript`：“TB-83 the running T3 transcript is marked running; its last line is what the task is doing”；`approval`：“TB-83 while T1 waits for approval its transcript shows the call as "Running…" …”；`outcomes`：“TB-83 a transcript opened while its instance runs is read again when the task changes …”；`folding`：“TB-83 the running T3 session shows its current group in full …” |
 | team-tasks 实例的会话 | 运行结束 | `outcomes`：“TB-83 a transcript opened after its run ended stays as it was while that role runs again (no re-read)” |
 | team-tasks 实例的会话 | 读不出 | `errors`：“TB-83 a transcript that cannot be read shows "Failed to read session transcript", the error and Retry” |
