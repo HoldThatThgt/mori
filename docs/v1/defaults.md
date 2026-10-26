@@ -125,3 +125,19 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 探针代价的说明 | “Each model is verified with up to 13 short requests.”（自动探针第 1–7 步最多 13 个请求） | `app/src/renderer/src/components/settings/`（Add provider 和卡上清单的底部，Add 按钮上方；首次启动表单在 Test connection 上方，规格 §6.6） | proposal §12 第 5 条：加入的模型全部自动跑探针，清单底部写明代价；在公网云上会花一点额度 | 探针步骤变化（`PROBE_SUITE` 改版）时 |
 | 清单的默认勾选 | 服务报告是聊天模型（`chat` 为真）的勾上，报告不是的不勾；不报告类型（`chat` 为 null）时，能加入的行只有一行就勾上，否则都不勾；Added、不能加入的行不勾 | `app/src/renderer/src/components/settings/Checklist.tsx` | proposal 已定（§12 第 1、4 条）：只按服务报告的类型判断，不按名字猜；OpenAI 这类不报告类型的列表里混着 embedding、语音和图片模型，全勾会加入不能对话的模型，所以只有一个时才勾，其余用 Select all | 你走查清单、常要手动 Select all 或取消勾选时 |
 | 列表地址最多试 3 次 | 没有 Anthropic 提示时最多 2 个（`<base>/models`；base 不以 `/v<数字>` 结尾时再试 `<base>/v1/models`）；有 Anthropic 提示时最多 3 个（`<base>/v1/models?limit=1000`、前缀 + `/models`、前缀 + `/v1/models`；主机是 `api.anthropic.com` 时只有第一个）；已有提供商不整理地址：`openai-*` 只试 `<baseUrl>/models`，`anthropic-messages` 同有 Anthropic 提示时的三个（前缀取 `baseUrl` 路径里 `anthropic` 那一段之前的部分；主机是 `api.anthropic.com` 或路径里没有这一段时只试第一个）；拿到列表、401/403 或连接失败、超时即停 | `app/src/kernel/discoverRead.ts`（列表地址的计划） | 补 `/v1`、去掉 `anthropic` 那一段对应 proposal §5.1、§5.3 写的两种常见填法（一键拉取模型 proposal 要求的功能，不算 fallback）；不再往下猜更多路径；认证失败和连不上时换地址也没用 | 遇到列表在别的路径上的服务时 |
+
+## 普通模式的 subagent 工具
+
+来源：[普通模式的 subagent 工具规格](../specs/subagent.md) §10；检查记录见 [team-checks.md](team-checks.md) 的“普通模式的 subagent 工具”一节。
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 一次调用的 subagent 数 | 1–4 | `app/src/shared/subagent.ts` | 与每个 key 的默认并发 4、TaskBoard 同时运行的 task 上限 4 一致；更多的分到下一次调用 | 你走查时觉得不够 |
+| 一次回复的 subagent 上限 | 8（替换原来关闭模式下 `agent_message` 每回合 5 条） | `app/src/shared/subagent.ts` | 够分两批（看一遍、再核对一遍）；防止弱模型一直开下去停不下来 | 走查中碰到上限时 |
+| `description` / `prompt` 长度 | 1–80 / 1–8000 字符 | `app/src/shared/subagent.ts` | 描述是卡片上的一行（同 task 标题 80）；提示要能把背景写全，比 Agent 消息的 4000 宽一些 | 你走查时 |
+| 结果里每个回复的长度 | 16000 字符，超出截掉并注明 | `app/src/kernel/subagent.ts` | 4 个回复合计不超过约 16000 token，小窗口的模型也放得下 | 内网小窗口模型上看到效果时 |
+| 调度类别 | `task`：一个 key 上最多占（并发上限 − 1）个槽位，不排队超时 | `app/src/kernel/team.ts`（`schedClassOf`） | 留一个槽位给你别的对话（team-checks #34）；`conversation` 类别等槽位超过 60 秒会换模型或失败 | 拿到内网端点、知道它的并发时 |
+| 进展的合并发送间隔 | 250 毫秒 | `app/src/kernel/subagent.ts` | 同 `mori.board`：工具调用很密时不刷屏 | — |
+| 行里失败原因的显示长度 | 80 字符，悬停看全文 | `app/src/renderer/src/components/SubagentCard.tsx` | 一行放得下 | 你走查时 |
+| 卡片的展开 | 执行中展开，结束时收起一次 | `app/src/renderer/src/components/SubagentCard.tsx` | 执行中看得到每个 subagent 在做什么；结束后只占一行（走查 M18 要的“结束后折起来”） | 你走查时 |
+| 界面文字 | 规格 §7、[subagent-card.md](screens/subagent-card.md) | `app/src/shared/subagent.ts`、`app/src/renderer/src/` | 照 Claude 桌面版的用词 | 你走查时 |
