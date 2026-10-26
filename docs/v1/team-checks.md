@@ -231,7 +231,8 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
     `See background tasks`；`ag-app.mjs` 的 AG-08 改了名字，customize-agents 的检查记录里引用它的六处跟着改。
   - #13：`stop` 改成从卡片停、一直留在列表里到交回（中间不重新挂载 T3 的停止按钮），从 task 的视图停挪到 `approval`。按审查的
     要求临时换回旧的写法验了一次：界面这一项仍通过——mori.board 要等 board.json 写出才发，停止的回复在合成端点上总是先到，
-    界面上造不出“回复晚到”的那一种；换回旧写法时会失败的是单元 `taskList.test.mjs` 的 TB-89（`stopReplyState`），它守住这一种；
+    不在后台进程里加钩子，界面上造不出“回复晚到”的那一种；换回旧写法时会失败的是单元 `taskList.test.mjs` 的 TB-89
+    （`stopReplyState`），由它守住这一种（走查修复会话 2026-10-26 同意）；
     界面这一项守住交回后按钮可用，名字改成照它实际看的写。
   - #14：切换的那一刻在记录里放一个标记，之后视图一变就记；临时去掉 `key={tab.key}` 验了一次：失败（`["alpha","switch","alpha","beta"]`），
     加回去通过（`["alpha","switch","none","beta"]`）。
@@ -241,7 +242,7 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
     加 team-blocked 锁定一行。新 7：回复进行中的按钮用 `waitButton` 等。新 8：`liveview` 和视图第一次读到的比（少于三棒）。
     新 9：TB-89 的单元测试去掉只读回测试自己写的东西的两条，留下 host.aborts 的两次。新 10：这一轮只用 `--only` 跑改过的用例。
   - 结果：`npm run check` 通过，`test:unit` 481/481，`test:tb-unit` 378/378，`tb-app-tasks --only stop,readonly,approval,liveview,sessions,menu`
-    26 项都通过；`tb-app-models --only sel` 与 `test:quick` 等共用端口。
+    26 项都通过；拿到共用端口之后（ecad0e5）`tb-app-models --only sel` 7 项都通过，`npm run test:quick` 4/4（82 秒）。
 
 ### 测试（AGENTS.md 测试分层，每次改动的那几层）
 
