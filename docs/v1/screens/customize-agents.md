@@ -79,8 +79,9 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 菜单打开 | WP-09 之后的模型菜单 | Task mode 那一行下面 `Manage agents`（`data-action="manage-agents"`）；Task mode 开、关时都有 | 点：关菜单，打开 Customize 并选中 Agents；操作记录 `Open Customize → Agents` |
-| Task mode 打开 | `pickLocked` | 模型那一节变灰、悬停 `Task mode picks the model for each agent`（WP-09）；`Manage agents` 照常可用 | 同上 |
+| 菜单打开 | WP-09 之后的模型菜单 | Task mode 一行（与它的失败行）之后、`Manage models` 之前一项 `Manage agents`（`role="menuitem"`，`data-action="manage-agents"`，在 `.task-mode-group` 里） | 点或 Enter：关菜单，打开 Customize 并选中 Agents，跟随这个会话；操作记录 `Open Customize → Agents` |
+| Task mode 打开 | `pickLocked` | 菜单没有三节（WP-09）：说明 `Task mode picks the model for each agent`、Task mode 一行、`Manage agents`、`Manage models`；`Manage agents` 照常可用 | 同上 |
+| 回复进行中 | 准备中或生成中，`pickLocked` 为假 | 三节的项不可用、说明 `Can’t switch models until the response finishes`（WP-09）；`Manage agents` 照常可用 | 同上 |
 
 ## 反例
 

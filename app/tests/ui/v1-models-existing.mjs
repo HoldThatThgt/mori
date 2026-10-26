@@ -164,7 +164,8 @@ const SUITE_LISTS = {
     replay: [...MEMORY_LISTS.replay, MEM_UNIT_CHECK, suite('mem-replay', false)],
   },
   agents: {
-    app: ['tb-app-roles', 'm6-app-tools', 'm6-app-settings', 'mem-app-settings'].map((name) => suite(name, true)),
+    app: ['tb-app-roles', 'tb-app-models', 'm6-app-tools', 'm6-app-settings', 'mem-app-settings']
+      .map((name) => suite(name, true)),
     replay: [suite('m6-replay', false)],
   },
 };

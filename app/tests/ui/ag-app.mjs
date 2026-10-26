@@ -22,8 +22,9 @@ import { until } from './m3-helpers.mjs';
 import { openToolsSection } from './m6-helpers.mjs';
 import { saveIssueReport } from './md-form-helpers.mjs';
 import {
-  bridge, brief, clickTeamSwitch, closeTbApp, openProject, paneSel, showTab, sleep, startTbApp, startTbEndpoint,
-  stopTbEndpoint, tbRecorder, teamStateOf, userSession,
+  bridge, brief, clickTeamSwitch, closeModelMenu, closeTbApp, modelButtonSel, modelMenuSel, openModelMenu, openProject,
+  paneSel, sendMessage, showTab, sleep, startTbApp, startTbEndpoint, stopTbEndpoint, tbRecorder, teamStateOf,
+  userSession,
 } from './tb-helpers.mjs';
 
 const args = agArgs();
@@ -629,49 +630,99 @@ async function deleteFailure() {
 
 // ---------- AG-08 Manage agents ----------
 
-/** @brief 打开 tab 一栏的模型菜单，返回 Manage agents 是否在 Task mode 那一行之后、是否可用。 */
+/** 菜单最后的四项（model-menu.md）：说明、Task mode 一行、Manage agents、Manage models */
+const MENU_TAIL = ['model-menu-note', 'team-switch', 'manage-agents', 'manage-models'];
+/** 有三节时菜单的顺序 */
+const MENU_FULL = ['groups', 'providers', 'models', ...MENU_TAIL];
+/** Task mode 下菜单的说明（WP-09） */
+const TASK_PICKS = 'Task mode picks the model for each agent';
+/** 回复进行中菜单的说明（WP-09） */
+const BUSY_NOTE = 'Can’t switch models until the response finishes';
+
+/**
+ * @brief 打开 tab 一栏的模型菜单，读 Manage agents：节、说明、Task mode 一行与两个 Manage 按文档顺序排的样子，它是否在
+ *        `.task-mode-group` 里、读屏角色、文字、可用与否，菜单说明的文字，范围项的个数与是否都不可用。
+ */
 async function manageItem(tab) {
-  await ctx.page.locator(`${paneSel(tab)} [data-testid="model-button"]`).click();
-  const menu = ctx.page.getByTestId('model-menu');
-  await menu.waitFor({ timeout: 5000 });
-  return menu.evaluate((root) => {
+  await openModelMenu(ctx, tab);
+  return ctx.page.locator(modelMenuSel(tab)).evaluate((root) => {
+    const marks = root.querySelectorAll('[data-section], [data-testid="model-menu-note"], [data-testid="team-switch"],'
+      + ' [data-action="manage-agents"], [data-action="manage-models"]');
     const item = root.querySelector('[data-action="manage-agents"]');
-    const task = [...root.querySelectorAll('*')].find((el) => el.children.length === 0
-      && el.textContent.trim() === 'Task mode');
-    const after = Boolean(item && task && (task.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING));
-    return { present: Boolean(item), text: item?.textContent ?? null, after,
-      disabled: item ? item.disabled || item.getAttribute('aria-disabled') === 'true' : null };
+    const radios = [...root.querySelectorAll('[role="menuitemradio"]')];
+    return { order: [...marks].map((el) => el.dataset.section ?? el.dataset.testid ?? el.dataset.action),
+      grouped: item?.parentElement?.classList.contains('task-mode-group') ?? false,
+      role: item?.getAttribute('role') ?? null, text: item?.textContent ?? null,
+      disabled: item ? item.disabled || item.getAttribute('aria-disabled') === 'true' : null,
+      note: root.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null,
+      radios: radios.length, radiosOff: radios.length > 0 && radios.every((radio) => radio.disabled) };
   });
 }
 
-/** @brief 点 Manage agents：关菜单，Customize 打开并选中 Agents，跟随这个会话。 */
-async function clickManage() {
-  await ctx.page.getByTestId('model-menu').locator('[data-action="manage-agents"]').click();
+/** @brief Manage agents 那一项本身：在 Task mode 一组里、是菜单项、文字、可用。 */
+const goodItem = (item) => item.grouped && item.role === 'menuitem' && item.text === 'Manage agents' && !item.disabled;
+
+/**
+ * @brief 点 Manage agents（byKey 时焦点放到它上面按 Enter）：关菜单，Customize 打开并选中 Agents，跟随这个会话。
+ * @return { current（选中的分节）, follow（跟随的会话那一行）, menuGone }
+ */
+async function useManage(tab, byKey) {
+  const item = ctx.page.locator(`${modelMenuSel(tab)} [data-action="manage-agents"]`);
+  if (byKey) {
+    await item.focus();
+    await ctx.page.keyboard.press('Enter');
+  } else {
+    await item.click();
+  }
   await ctx.page.getByTestId('agents-page').waitFor({ timeout: 10000 });
   const seen = await customizeSections(ctx.page);
   const follow = await ctx.page.getByTestId('tools-follow').textContent();
-  const menuGone = !(await ctx.page.getByTestId('model-menu').isVisible().catch(() => false));
+  const menuGone = (await ctx.page.locator(modelMenuSel(tab)).count()) === 0;
   return { current: seen.current, follow, menuGone };
 }
 
-/** @brief Task mode 关和开时，模型菜单里 Task mode 那一行下面都有 Manage agents，点了落在 Agents。 */
+/** @brief 打开 Customize › Agents 的结果是这个会话的 Agents 一节。 */
+const landed = (used) => used?.current === 'roles' && used.menuGone
+  && used.follow.startsWith(projects.team.split(/[\\/]/).pop());
+
+/** @brief Task mode 关和开时，模型菜单里 Task mode 一行与 Manage models 之间都有 Manage agents，点或 Enter 落在 Agents。 */
 async function manageAgents() {
   const tab = await tabOf('team');
-  const folder = projects.team.split(/[\\/]/).pop();
   const off = await manageItem(tab);
-  const offClick = off.present ? await clickManage() : null;
-  record('AG-08 with Task mode off the model menu has Manage agents under the Task mode row; it opens Customize › '
-    + 'Agents for this session', off.present && off.after && off.text === 'Manage agents'
-    && offClick?.current === 'roles' && offClick.menuGone && offClick.follow.startsWith(folder),
-  brief({ off, offClick }));
+  const offUse = off.text ? await useManage(tab, false) : null;
+  record('AG-08 with Task mode off the model menu has Manage agents under the Task mode row, above Manage models; '
+    + 'clicking it opens Customize › Agents for this session', goodItem(off)
+    && JSON.stringify(off.order) === JSON.stringify(MENU_FULL) && landed(offUse), brief({ off, offUse }));
   await tabOf('team');
-  await clickTeamSwitch(ctx, tab, true);
+  await clickTeamSwitch(ctx, tab, 'always');
+  await ctx.page.waitForFunction((css) => document.querySelector(css)?.dataset.locked === 'true',
+    modelButtonSel(tab), { timeout: 10000 }).catch(() => {});
   const on = await manageItem(tab);
-  const onClick = on.present && !on.disabled ? await clickManage() : null;
-  record('AG-08 with Task mode on Manage agents is still there and usable', on.present && on.after && !on.disabled
-    && onClick?.current === 'roles', brief({ on, onClick }));
+  const onUse = on.text ? await useManage(tab, true) : null;
+  record('AG-08 with Task mode on the menu is the note, the Task mode row, Manage agents and Manage models; '
+    + 'Enter on Manage agents opens Customize › Agents', goodItem(on) && on.note === TASK_PICKS
+    && JSON.stringify(on.order) === JSON.stringify(MENU_TAIL) && landed(onUse), brief({ on, onUse }));
   await tabOf('team');
-  await clickTeamSwitch(ctx, tab, false);
+  await clickTeamSwitch(ctx, tab, 'off');
+  await duringReply(tab);
+}
+
+/** @brief 回复进行中（合成端点对含 slow 的消息先等 8 秒）：范围项不可用，Manage agents 照常可用。 */
+async function duringReply(tab) {
+  const pane = paneSel(tab);
+  await sendMessage(ctx, tab, 'Reply slow please');
+  await ctx.page.waitForFunction((css) => document.querySelector(css)?.dataset.running === 'true',
+    pane, { timeout: 10000 }).catch(() => {});
+  const busy = await manageItem(tab);
+  const busyUse = busy.text ? await useManage(tab, false) : null;
+  record('AG-08 during a reply the range items are unavailable but Manage agents is there and opens Customize › '
+    + 'Agents', goodItem(busy) && busy.note === BUSY_NOTE && busy.radiosOff
+    && JSON.stringify(busy.order) === JSON.stringify(MENU_FULL) && landed(busyUse), brief({ busy, busyUse }));
+  await tabOf('team');
+  await ctx.page.waitForFunction((css) => {
+    const element = document.querySelector(css);
+    return element?.dataset.running !== 'true' && element?.dataset.sending !== 'true';
+  }, pane, { timeout: 30000 }).catch(() => {});
 }
 
 // ---------- AG-09 展开的内容 ----------
@@ -761,8 +812,8 @@ async function activity() {
   await ctx.page.getByTestId('agent-delete-dialog').waitFor({ state: 'detached', timeout: 10000 });
   const tab = await tabOf('team');
   const item = await manageItem(tab);
-  if (item.present) await clickManage();
-  else await ctx.page.keyboard.press('Escape');
+  if (item.text) await useManage(tab, false);
+  else await closeModelMenu(ctx, tab);
   const report = await saveIssueReport(ctx.page, 'Agents activity check', 'Recent activity lists the agent actions');
   const lines = report.md.split(/\r?\n/);
   const has = (text) => lines.some((line) => line.includes(text));

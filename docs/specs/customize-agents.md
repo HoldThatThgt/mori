@@ -274,10 +274,13 @@ seats: [close]
 
 ### 6.6 模型菜单的 Manage agents
 
-- WP-09 之后模型菜单里有 Task mode 那一行；它下面加一项 `Manage agents`（`data-action="manage-agents"`），Task mode 开和关时都显示。
-  与 `Manage models` 一样只是跳到另一页，不加 “…”。
+- WP-09 之后模型菜单里有 Task mode 那一行（`.task-mode-group` 里，下面是切换失败的一行）；这一组的最后加一项
+  `Manage agents`（`role="menuitem"`，`data-action="manage-agents"`），在 Task mode 一行与它的失败行之后、`Manage models` 之前。
+  菜单的三种样子（一般、回复进行中、Task mode）里都有，都可用。与 `Manage models` 一样只是跳到另一页，不加 “…”。
 - 点了：关掉菜单，打开 Customize 并选中 Agents 一节（跟随的就是这个会话）。
-- Task mode 下模型那一节变灰、悬停 `Task mode picks the model for each agent`（WP-09），这一项就在旁边，可以直接去看每个 agent 用哪个模型。
+- Task mode（`pickLocked`）下菜单没有三节，第一项是说明 `Task mode picks the model for each agent`，下面是 Task mode 一行、
+  `Manage agents`、`Manage models`（WP-09 的样子，[model-menu.md](../v1/screens/model-menu.md)“协作模式的菜单”；2026-10-26
+  合入 WP-09 时照它改，原来写的“模型那一节变灰”不再适用），可以从这里直接去看每个 agent 用哪个模型。
 
 ## 7. 临时默认值
 
@@ -346,10 +349,10 @@ seats: [close]
 | AG-05 | 保存的校验 | 名字不合规则、为 `mori`、像编号、与别的文件重名、`<name>.md` 已存在、说明为空或超过 200 字符、职责已被别的文件认领：都不写文件，显示对应的问题；别的文件有问题不挡保存；`file` 带 `..` 或不在目录里被拒绝 | 单元、App |
 | AG-06 | 编辑 | 预填现在的值；保存后文件名不变，`requires`、`differ_from`、`subscribe` 原样保留；文件头有注释时显示提示；文件在别处删掉后保存得到 `This agent file no longer exists.` | 单元、App |
 | AG-07 | 删除 | 确认框的文字；Cancel 不删；Delete 删掉文件、列表更新；文件已经不在也算成功 | 单元、App |
-| AG-08 | Manage agents | 模型菜单 Task mode 那一行下面有 `Manage agents`（Task mode 开、关都有）；点后打开 Customize 并选中 Agents，跟随这个会话 | App |
+| AG-08 | Manage agents | 模型菜单 Task mode 那一行下面、`Manage models` 上面有 `Manage agents`（Task mode 开、关和回复进行中都有、都可用）；点后关菜单，打开 Customize 并选中 Agents，跟随这个会话 | App |
 | AG-09 | 展开的内容 | §6.3 每一块：两种 Models 写法、Model needs 的白话与 handoff tier 的说明、Tools 的两种写法与 `all MCP tools`、Other settings、Prompt、File 与操作 | 单元、App |
 | AG-10 | 操作记录 | F8 的 Recent activity 有 `Save agent <name>`、`Delete agent <name>`、`Open Customize → Agents` | App |
-| AG-11 | 现有功能不退步 | 每一步：`npm run test:unit`、`test:tb-unit`、`npm run test:quick` 通过；`parseRoleFiles` 拆出 `inspectRoleFiles` 之后对同样的文件结果不变（单元）；推送前的完整回归：`node tests/ui/v1-models-existing.mjs --id AG-11` 跑这一节改到的现有界面套件——App 层 `tb-app-roles`、`m6-app-tools`、`m6-app-settings`、`mem-app-settings` 与 WP-09 改过的模型菜单套件，记进 `ag-app-existing.json`；回放层 `m6-replay`，记进 `ag-replay-existing.json`（App 层的结果只在这时写） | 单元、App |
+| AG-11 | 现有功能不退步 | 每一步：`npm run test:unit`、`test:tb-unit`、`npm run test:quick` 通过；`parseRoleFiles` 拆出 `inspectRoleFiles` 之后对同样的文件结果不变（单元）；推送前的完整回归：`node tests/ui/v1-models-existing.mjs --id AG-11` 跑这一节改到的现有界面套件——App 层 `tb-app-roles`、`tb-app-models`（WP-09 的模型菜单套件，TB-38 的菜单项多了 `Manage agents`）、`m6-app-tools`、`m6-app-settings`、`mem-app-settings`，记进 `ag-app-existing.json`；回放层 `m6-replay`，记进 `ag-replay-existing.json`（App 层的结果只在这时写） | 单元、App |
 
 ### 9.3 不留未完成项
 

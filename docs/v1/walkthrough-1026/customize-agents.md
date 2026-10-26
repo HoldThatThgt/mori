@@ -3,7 +3,8 @@
 依据：2026-10-26 负责人走查 M20（"I can't find team mode setup panel, where can I setup model for each role and add extra agent?"，
 [../walkthrough-1026-checks.md](../walkthrough-1026-checks.md)）、负责人批准的 [Customize › Agents 规格](../../specs/customize-agents.md)
 与状态表 [../screens/customize-agents.md](../screens/customize-agents.md)。分支 `v1-customize-agents`，从本地 `app-v0` 开出，
-合入过 WP-07（`58138cc`）、WP-08（`3aa835c`）、WP-21（不留未完成项，`f613281`）与 WP-02（`10624c6`）；没有推送，没有合进 `app-v0`。
+合入过 WP-07（`58138cc`）、WP-08（`3aa835c`）、WP-21（不留未完成项，`f613281`）、WP-02（`10624c6`）、
+WP-05（`34fa29a`）与 WP-09（`e55b28b`）；没有推送，没有合进 `app-v0`。
 
 ## 改了什么、为什么
 
@@ -24,6 +25,11 @@
   `inspectRoleFiles`（`parseRoleFiles` 用它，结果不变）、`readRoleFiles`、`nameProblems`；`roleFiles.ts` 写文件全文（只用 JSON
   写法，不加依赖）；`selector.ts` 导出 `staticExclusion` 与 `pickItems`（范围菜单的顺序与文字）；`sessions.ts` 的 `sessionPick`。
   对应方案第 6 节第 7 件（平行 Agent 与 TaskBoard）。
+- **模型菜单的 Manage agents**（WP-09 合入后做）：Task mode 一组（`.task-mode-group`）的最后、`Manage models` 之前一项
+  `Manage agents`，菜单的三种样子（一般、回复进行中、Task mode）都有；点或 Enter 关菜单，打开 Customize 并选中 Agents
+  （`openTools('Open Customize → Agents', 'roles')`）。规格 §6.6 原来写 Task mode 下“模型那一节变灰”，WP-09 的菜单是
+  没有三节，照 WP-09 改（WP-09 的记录也这样说）。TaskBoard 规格 §12.11、§13.1、TB-38 与 team-switch.md 写到 Task mode
+  菜单里有什么的地方加上 `Manage agents`（带日期的注）；TB-38 的检查（`tb-app-models.mjs`）照改，AG-11 的预设加上这个套件。
 - **TaskBoard 规格 §4.1、§4.4**：角色文件的 `tools` 可以写 `mcp__*`（全部 MCP 工具，同基座的白名单写法），给表单的
   All MCP tools 用（临时，已问负责人，见下面“等负责人定的”）。
 
@@ -36,14 +42,17 @@
 | --- | --- | --- |
 | 检查与构建 | `npm run check`、`npx electron-vite build` | 通过 |
 | 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334；合入 WP-02 之后 33/33、475/475、334/334；合入 WP-05（app-v0 `34fa29a`）之后 33/33、465/465、334/334 |
-| App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`；为行与用例表补的用例再跑 `--only AG-01,AG-02,AG-04,AG-07,AG-09` 与 `--only AG-04`。端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”）；AG-08 没有跑（等 WP-09）。合入 WP-05 之后再跑第一条命令：44 条通过，失败的仍只有 AG-10 那一条。改用 WP-03 的拖动排序之后跑 `--only AG-04`：11 条全部通过 |
+| App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`；为行与用例表补的用例再跑 `--only AG-01,AG-02,AG-04,AG-07,AG-09` 与 `--only AG-04`。端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”）；AG-08 没有跑（等 WP-09）。合入 WP-05 之后再跑第一条命令：44 条通过，失败的仍只有 AG-10 那一条。改用 WP-03 的拖动排序之后跑 `--only AG-04`：11 条全部通过。合入 WP-09、做完 Manage agents 之后跑 `--only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-08,AG-09,AG-10`：49 条全部通过，没有失败 |
 | 快速集 `npm run test:quick` | 没有跑：走查会话要求第二波集成方占着快速集的端口时不跑，集成时跑 | — |
 | 完整回归、覆盖检查 | 按规则只在负责人要求推送前跑（`npm run test:agents`、`v1-models-existing.mjs --id AG-11`） | — |
 | 回放、真实模型 | 不做：这一节不改发给模型的文字、工具、批准或会话事件（规格 §9.1）；`mcp__*` 在角色文件里与基座的白名单是同一个写法 | — |
 
 改到的现有套件（只改了期望的分节列表，没有运行，留给推送前的 AG-11）：`m6-app-tools.mjs`（有会话时的分节、Skills 的 ↓
 落在 Agents、Tab 走 14 步）、`m6-app-settings.mjs`、`m6-replay.mjs`；单元 `taskboard/roles.test.mjs`（`mcp__*` 合格）、
-`taskboard/spec-coverage.test.mjs`（规格名多了 agents），都已通过。
+`taskboard/spec-coverage.test.mjs`（规格名多了 agents），都已通过。合入 WP-09 后又改了 `tb-app-models.mjs` 的 TB-38
+（Task mode 菜单的项多了 `manage-agents`），加进 AG-11 的预设；它改写了一条检查，按测试分层第 2 条用 `--only sel` 跑
+（结果见上表）。`tb-app-roles.mjs` 的 TB-53 只看菜单最后三个直接子元素（说明、`.task-mode-group`、`manage-models`），
+`Manage agents` 在 `.task-mode-group` 里，不影响它。
 
 合入 WP-05（网络区域删掉，2026-10-26）：`selector.ts` 的冲突只在注释，保留 `pickItems` 的拆分、用 app-v0 的“第 1、3 步”；
 这一节的代码、规格和单元测试里“第 1–3 步”改成“第 1、3 步”，单元测试的静态输入去掉 `zoneOf`、`allowedZones`。
@@ -99,8 +108,13 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 | [customize-agents](../screens/customize-agents.md) | 删除 · 删除中 | `ag-app.mjs --only AG-07`：“AG-07 while deleting, the dialog says "Deleting…" and its buttons are unavailable” |
 | [customize-agents](../screens/customize-agents.md) | 删除 · 已删除 | `ag-app.mjs --only AG-07`：“AG-07 Delete removes the file and its row” |
 | [customize-agents](../screens/customize-agents.md) | 删除 · 删除失败 | `ag-app.mjs --only AG-07`：“AG-07 a failed delete keeps the dialog open with "Couldn’t delete: <text>"” |
-| [customize-agents](../screens/customize-agents.md) | 模型菜单的 Manage agents · 菜单打开 | `ag-app.mjs --only AG-08`：“AG-08 with Task mode off the model menu has Manage agents under the Task mode row; it opens Customize › Agents for this session”（**等 WP-09**，用例已写好、现在失败） |
-| [customize-agents](../screens/customize-agents.md) | 模型菜单的 Manage agents · Task mode 打开 | `ag-app.mjs --only AG-08`：“AG-08 with Task mode on Manage agents is still there and usable”（**等 WP-09**） |
+| [customize-agents](../screens/customize-agents.md) | 模型菜单的 Manage agents · 菜单打开 | `ag-app.mjs --only AG-08`：“AG-08 with Task mode off the model menu has Manage agents under the Task mode row, above Manage models; clicking it opens Customize › Agents for this session”；“AG-08 with Task mode on the menu is the note, the Task mode row, Manage agents and Manage models; Enter on Manage agents opens Customize › Agents”；`ag-app.mjs --only AG-10`：“AG-10 Recent activity has "Open Customize → Agents" after Manage agents” |
+| [customize-agents](../screens/customize-agents.md) | 模型菜单的 Manage agents · Task mode 打开 | `ag-app.mjs --only AG-08`：“AG-08 with Task mode on the menu is the note, the Task mode row, Manage agents and Manage models; Enter on Manage agents opens Customize › Agents” |
+| [customize-agents](../screens/customize-agents.md) | 模型菜单的 Manage agents · 回复进行中（新加） | `ag-app.mjs --only AG-08`：“AG-08 during a reply the range items are unavailable but Manage agents is there and opens Customize › Agents” |
+| [model-menu](../screens/model-menu.md) | 菜单（加 Manage agents） | `ag-app.mjs --only AG-08`：“AG-08 with Task mode off the model menu has Manage agents under the Task mode row, above Manage models; clicking it opens Customize › Agents for this session” |
+| [model-menu](../screens/model-menu.md) | 协作模式的菜单（加 Manage agents） | `ag-app.mjs --only AG-08`：“AG-08 with Task mode on the menu is the note, the Task mode row, Manage agents and Manage models; Enter on Manage agents opens Customize › Agents”；`tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads … the Task mode row (focused), Manage agents and Manage models — no Groups/Providers/Models …” |
+| [model-menu](../screens/model-menu.md) | 回复进行中的菜单（加 Manage agents） | `ag-app.mjs --only AG-08`：“AG-08 during a reply the range items are unavailable but Manage agents is there and opens Customize › Agents” |
+| [model-menu](../screens/model-menu.md) | Manage agents（新加） | `ag-app.mjs --only AG-08`：“AG-08 with Task mode off the model menu has Manage agents under the Task mode row, above Manage models; clicking it opens Customize › Agents for this session”；“AG-08 with Task mode on the menu is the note, the Task mode row, Manage agents and Manage models; Enter on Manage agents opens Customize › Agents”；“AG-08 during a reply the range items are unavailable but Manage agents is there and opens Customize › Agents”；`ag-app.mjs --only AG-10`：“AG-10 Recent activity has "Open Customize → Agents" after Manage agents” |
 | [customize-agents](../screens/customize-agents.md) | 反例 · 已经打开的会话不变 | `ag-app.mjs --only AG-04`：“AG-04 the session already open still has its old agents; a new session has reviewer, holding Plans requests” |
 | [customize-agents](../screens/customize-agents.md) | 反例 · 不显示此刻的状态 | `ag-app.mjs --only AG-02`：“AG-02 expanded, every candidate shows Ready or the selector’s reason, exactly as roles.get gives them” |
 | [customize-agents](../screens/customize-agents.md) | 反例 · 写出的文件不带 Mori 的标记 | `ag-app.mjs --only AG-04`：“AG-04 the file .mori/agents/reviewer.md is written exactly as §5.1 says” |
@@ -109,8 +123,7 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 
 ## 没有做完的
 
-- **AG-08 模型菜单的 Manage agents**：要放在 WP-09 加的 Task mode 那一行下面，WP-09 还没合进 `app-v0`。测试已经写好
-  （`ag-app.mjs` 的 AG-08、AG-10 的第二条），WP-09 一合入就做，同时改 `docs/v1/screens/model-menu.md`。
+- 没有。AG-08 模型菜单的 Manage agents 原来列在这里（等 WP-09），WP-09 合入后做完，用例全部通过（见上）。
 
 表单的拖动列表已经做完：WP-03 先合入（经 app-v0 `34fa29a` 进来），这一节改用它的 `settings/Reorder.tsx`，自己的拖动列表删掉
 （见上面“统一拖动排序”）。
