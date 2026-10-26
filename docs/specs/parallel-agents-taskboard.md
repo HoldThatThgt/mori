@@ -203,7 +203,7 @@ models: [strong]
 这个项目里有对话持有者以外的角色时，对话 Agent 多一个 `agent_message`，可以临时问别的角色一个问题（§10.1）。
 没有别的角色（只有基座）时，与 v0 完全相同。模型按你在输入框下面一行选的范围（统一模型提供商规格 §5）。
 
-**用过 Task mode 之后**（2026-10-26，负责人走查 M22）：这个用户会话的 TaskBoard 上有需求时，关闭模式下对话会话另外启用两个只读工具 `board_read`、`read_session`（§6.3），每次请求带关闭模式的工作卡（§8.3：`Task mode: off`、只能自己做、最近的需求），所以模型知道模式关了、没有登记需求和建 task 的工具，又能读到任务的结果（task 的最后一段回复在 `read_session` 里，留给 task 的消息在 `board_read` 里）。登记需求、建 task、交接、撤销等工具仍只在协作模式下有。TaskBoard 上没有需求（没用过协作模式，或只是打开又关掉）时与 v0 完全相同（TB-03）。
+**用过 Task mode 之后**（2026-10-26，负责人走查 M22）：这个用户会话的 TaskBoard 上有需求时，关闭模式下对话会话另外启用两个只读工具 `board_read`、`read_session`（§6.3），每次请求带关闭模式的工作卡（§8.3：`Task mode: off`、只能自己做、工具是 Agent 的而不是用户的（自己读、把用户要的写进回复，M26）、最近的需求），所以模型知道模式关了、没有登记需求和建 task 的工具，又能读到任务的结果（task 的最后一段回复在 `read_session` 里，留给 task 的消息在 `board_read` 里）。登记需求、建 task、交接、撤销等工具仍只在协作模式下有。TaskBoard 上没有需求（没用过协作模式，或只是打开又关掉）时与 v0 完全相同（TB-03）。
 
 关闭模式下对话持有者是基座时，后台进程不重新设置启用的工具（pi 从会话记录恢复工具、Mori 补上后注册的扩展工具，都照 v0），只在有别的角色时启用 `agent_message`、TaskBoard 上有需求时启用 `board_read`、`read_session`；
 对话持有者是写了 `tools` 的角色时，每次运行开始前用 `setActiveToolsByName` 设成角色的工具（有别的角色时加 `agent_message`，TaskBoard 上有需求时加那两个只读工具）。
@@ -277,7 +277,7 @@ models: [strong]
 
 ### 5.5 对话 Agent 在协作模式下
 
-- 只传话（proposal §3、规则 2）：协作模式下对话会话启用的工具 = 它的读取类工具（§8.1：`read`、`grep`、`find`、`ls` 中它有的；基座总有 `ls`）+ `board_read`、`read_session`、`agent_message`；
+- 只传话（proposal §3、规则 2）：协作模式下对话会话启用的工具 = 它的读取类工具（§8.1：`read`、`grep`、`find` 中它有的，再加上总有的 `ls`）+ `board_read`、`read_session`、`agent_message`；
   合并会话再加立项的工具（§6.3）。
 - 不在启用的工具里的调用由 pi 拒绝（`Tool <name> not found`）。会话之后注册的工具（例如 MCP 服务连上）在运行中可能被启用（§14.6 T-T2），所以 `mori-team` 的 `tool_call` 处理器另外拒绝这次运行开始时算出的集合之外的调用：
   协作模式下理由 `Task mode is on: the dialog agent only relays; the work is done in tasks.`；关闭模式下拒绝写了 `tools` 的对话角色 `tools` 之外的调用（基座不受影响）。
@@ -567,7 +567,7 @@ proposal §6.4：
 | 订阅 | 订阅者 | 每次时刻命中一条，只读 | 订阅的时刻命中（§9.5） | 角色工具中的读取类 | `background` |
 
 - **读取类工具**：`read`、`grep`、`find`、`ls`（v0 免批准的那四个，`READ_ONLY_TOOLS`）。“角色工具中的读取类”是角色的工具与它的交集，不含 MCP 工具；
-  基座（和没写 `tools`、与基座相同的角色）的读取类是它的默认工具与它的交集，再加上 `ls`，默认设置下是 `read`、`ls`（2026-10-26，负责人走查 M13：原来只有 `read`，只读的 task 只能猜文件名；pi 的 `ls` 只用 node:fs，离线可用；`grep`、`find` 要 rg、fd，不加）。写了 `tools` 的角色照它写的。
+  基座（和没写 `tools`、与基座相同的角色）的读取类是它的默认工具与它的交集。不论写没写 `tools`，读取类都再加上 `ls`：基座默认设置下是 `read`、`ls`，写了 `tools: [read, bash, edit, write]` 的角色是 `read`、`ls`（2026-10-26，负责人走查 M13，走查记录“按推荐定下的”：“只读助手总有 `ls`”：原来只有 `read`，只读的 task 只能猜文件名；pi 的 `ls` 只用 node:fs，离线可用；`grep`、`find` 要 rg、fd，不加）。写了 `tools` 的角色的非只读 task 仍照它写的。
 - 立项、结案会话也只用读取类工具：立项、结案做决定，动手的事在 task 里做，同一时间只有 task 写工作区（proposal 规则 3、8）。
 - 会话从不丢弃：每条会话都存在 §3 的目录里；“新开”只是模型上下文从头开始（proposal §9）。
 - 同一个角色可以同时在几个 task 上各有一个实例（proposal §6.5），受 §9.2 的上限约束。
@@ -613,7 +613,7 @@ proposal §4、§10：程序每次请求前钉在上下文末尾的一小段大�
 | 立项（分开时） | `Task mode: <on/until done>` · `Open requests:` 每个需求一行，下面每个未结束的 task 一行 · `Waiting for a user decision:` 每个 `waiting_user` task 一行（问题、提问的角色、是否已问过你） · `Stopped:` 每个已停止的 task 一行（停止原因、`holder`） · `Questions:` 需求级问题 |
 | 对话（协作模式，分开时） | `Task mode: …` · `Open requests:` 每个一行 · `For this message <create role> decided: <决定>; their note: "<最后一段文字>"`（或 `couldn't decide: <原因>`；“this message”是这次请求上下文里最后一条你的消息，已经交给 pi 排队、还没送进上下文的消息的决定不写；扩展命令开始的运行写 `No decision: started by /<command>`） |
 | 合并会话（协作模式） | 立项的各行 + 对话的 `Task mode` 行 |
-| 对话（关闭模式，TaskBoard 上有需求） | `Task mode: off` · `You do the work yourself with your own tools; requests and tasks can't be created until the user turns task mode on.` · `Earlier requests (board_read and read_session still work; read_session shows a task's final reply):` 最近 5 个需求每个一行 `- Request 1: <title> · <status>`，更早的写在它们前面一行 `- N earlier requests: board_read {}`（2026-10-26，M22） |
+| 对话（关闭模式，TaskBoard 上有需求） | `Task mode: off` · `You do the work yourself with your own tools; requests and tasks can't be created until the user turns task mode on.` · `Tools are yours, not the user's: never ask the user to call a tool or to open a session or the board; read it yourself (board_read, read_session) and put what the user needs in your reply.`（与附录 A 协作模式对话段的同一句，M26：用户不调工具） · `Earlier requests (board_read and read_session still work; read_session shows a task's final reply):` 最近 5 个需求每个一行 `- Request 1: <title> · <status>`，更早的写在它们前面一行 `- N earlier requests: board_read {}`（2026-10-26，M22） |
 | 临时提问、订阅（协作模式下） | `Request 1: <title> · <status>`（有关的需求一行）；关闭模式下没有卡片 |
 
 - 用户补充写进需求之后，这个需求下所有实例的下一次请求就带着它（proposal §6.3“正在做的实例下一步就看到”），不需要插话。
@@ -1270,7 +1270,7 @@ interface TaskView {
 | TB-06 | 立项的决定 | 一次判断一种决定，另一类被拒绝；没做决定按直接回答；`task_create` 在本次没登记或补充之前被拒绝；立项出错时已做的写入有效、对话的工作卡含 `couldn't decide: <原因>`；新需求没有 task 时投递一次提醒，仍没有时唤醒结案；程序唤醒的回合里 `request_submit`、`request_cancel` 被拒绝；分开时立项运行中再来的两条消息各自一次判断 | 单元、App |
 | TB-07 | 用户原话照记 | 默认记下这条消息全文；`quote` 必须是你说过的原文；程序唤醒的回合缺 `quote` 被拒绝 | 单元、App |
 | TB-08 | 回执 | 三种写入各有回执，文字按 §13.2（含 120 字符截断）；立项没写入就没有回执；分开时回执紧跟用户消息、在对话回复之前；合并会话时在那次工具调用之后、工具结果之前；程序唤醒回合的回执在写入时的末尾；撤回时回执在撤回时写；实时与重新打开顺序相同；对话回复中判断完的消息被“撤回”后，它的回执与 `mori.progress` 写在末尾 | App、回放、真实 |
-| TB-09 | 对话只传话 | 协作模式下对话会话的请求里没有写入和命令类工具，回到 `off` 后恢复成之前的一组；一个 MCP 服务在会话打开之后才连上时，对话调用这个 MCP 工具得到 §5.5 的理由，调用 `bash`、`edit` 被拒绝（不在启用的工具里，pi 回 `Tool bash not found`），文件不变、没有批准卡；立项、结案会话的请求里只有读取类与它们的 TaskBoard 工具；对话的工作卡带立项的决定与最后一段文字；协作模式下基座对话的读取类是 `read`、`ls`（§8.1）；关闭模式下 `chat.md` 写 `tools: [read]` 时请求里没有 `bash`、`edit`、`write`，调用它们被拒绝；协作模式下退出 App、重新打开、关掉协作模式后，请求里又有 `bash`、`edit`、`write`，TaskBoard 上有需求时另有 `board_read`、`read_session`（§5.2、TB-59）（2026-10-22 注：上面各组工具另按提示词分层与记忆规格 §7.6 加 `memory`：关闭模式的对话（含 `tools: [read]`）与分开时的立项有，协作模式分开时的对话与结案没有，见它的 §14.4） | App |
+| TB-09 | 对话只传话 | 协作模式下对话会话的请求里没有写入和命令类工具，回到 `off` 后恢复成之前的一组；一个 MCP 服务在会话打开之后才连上时，对话调用这个 MCP 工具得到 §5.5 的理由，调用 `bash`、`edit` 被拒绝（不在启用的工具里，pi 回 `Tool bash not found`），文件不变、没有批准卡；立项、结案会话的请求里只有读取类与它们的 TaskBoard 工具；对话的工作卡带立项的决定与最后一段文字；协作模式下对话的读取类总有 `ls`：基座是 `read`、`ls`，写了 `tools` 的角色是它写的读取类加 `ls`（§8.1）；关闭模式下 `chat.md` 写 `tools: [read]` 时请求里没有 `bash`、`edit`、`write`，调用它们被拒绝；协作模式下退出 App、重新打开、关掉协作模式后，请求里又有 `bash`、`edit`、`write`，TaskBoard 上有需求时另有 `board_read`、`read_session`（§5.2、TB-59）（2026-10-22 注：上面各组工具另按提示词分层与记忆规格 §7.6 加 `memory`：关闭模式的对话（含 `tools: [read]`）与分开时的立项有，协作模式分开时的对话与结案没有，见它的 §14.4） | App |
 | TB-10 | 合并会话 | 只有一条会话、一次回合、没有立项会话文件；回执在工具执行时出现；程序唤醒立项的投递进用户会话且不显示；`reply_via_dialog` 在程序唤醒的回合里被拒绝；同一次运行里的插话各算一次判断；立项段在协作模式下出现在 system prompt、关闭模式下没有；程序投递到用户会话不开始用户消息的判断（结案请它建 task 时 `task_create` 不要求先记原话）；默认配置下 `need_user` 只有一次不显示的投递、只问一次；项目有 `.pi/SYSTEM.md` 时协作模式的请求里仍有立项段（2026-10-22 注：`SYSTEM.md` 不再进 system prompt，请求以 Mori 的身份段开头，见提示词分层与记忆规格 §4.3、§14.4） | App |
 | TB-11 | 立项看着整个对话 | 投递带自上次以来的对话（含关闭模式的对话）、不含工具调用和思考；超过上限时去掉最早的并注明；重新打开后从 `mori.create_cursor` 继续 | 单元、App |
 | TB-12 | TaskBoard 持久化 | `board.json` 原子写出、编号不复用、终态不能改；重新打开会话后 TaskBoard、回执、进展摘要都在 | 单元、App |
@@ -1279,13 +1279,13 @@ interface TaskView {
 | TB-15 | 一回合一次交接 | task 实例交接之后同一运行里的调用被拒绝且带 terminate，端点最多再收到一次请求、其中的调用全部被拒绝；结案会话一次运行里关闭 T1、T2 并关闭需求 | 单元、App |
 | TB-16 | 证据 | task 实例的工具结果带 `#n`、写进会话文件、重新打开后继续编号；不存在、别的会话的编号被拒绝并列出最近 5 个；`done`、`pass` 没有 `ok` 的证据被拒绝；`fail` 引用失败的命令被接受；证据记下标题与 `ok` | 单元、App |
 | TB-17 | 改过代码不能给自己写通过 | 有过成功 `edit` 或 `write` 的实例写 `pass` 被拒绝；只跑过命令的实例可以 | 单元、App |
-| TB-18 | 强制填写 | 没交接时按等级强制填写：A 的请求带 `tool_choice` 与只给这个工具的 `strict` 和严格 schema、关闭思考；A 但不能关思考时按 B 或 C；B 带 json_schema；C 请求不改、按标签解析；强制运行里其他调用被拒绝并结束；填出来的交接去向是结案、`next` 记为建议；格式错误再投递一次，端点日志里恰好两次强制写法的请求，之后交结案；没有等级时直接交结案；第一个请求失败换模型后按新模型的等级；结案的 A 级强制填写在端点日志里恰好一次强制请求；task 实例 A 级强制填写被证据规则拒绝后同一运行里没有第二次强制请求；结案与强制关闭的 C 级标签按 §7.5 解析；C 级 `<evidence>` 的编号之间用任何分隔符（`#3、#4`、`#3, #4`、`[#3] [#4]`）都认，分出来不是编号的词不合格 | 单元、App |
+| TB-18 | 强制填写 | 没交接时按等级强制填写：A 的请求带 `tool_choice` 与只给这个工具的 `strict` 和严格 schema、关闭思考；A 但不能关思考时按 B 或 C；B 带 json_schema；C 请求不改、按标签解析；强制运行里其他调用被拒绝并结束；填出来的交接去向是结案、`next` 记为建议；格式错误再投递一次，端点日志里恰好两次强制写法的请求，之后交结案；没有等级时直接交结案；第一个请求失败换模型后按新模型的等级；结案的 A 级强制填写在端点日志里恰好一次强制请求；task 实例 A 级强制填写被证据规则拒绝后同一运行里没有第二次强制请求；结案与强制关闭的 C 级标签按 §7.5 解析；C 级 `<evidence>` 的编号之间用任何分隔符（`#3、#4`、`#3, #4`、`[#3] [#4]`）都认，分出来不是编号的词不合格（分隔符这一句只在单元层核对：`forced.test.mjs`；App 层的 C 级用例仍是每行一项） | 单元、App |
 | TB-19 | 兜底交给结案 | §7.4 表的每一行：没交接、出错、候选耗尽、依赖失败；结案没处理时强制填写后交给立项；运行中才交给结案的 task 不算没处理 | App |
 | TB-20 | 需要用户拿主意 | `need_user` → 立项被唤醒 → 对话问你（投递不显示）→ 你的回答经立项记为补充并交回 → 提问的那个实例的会话继续、工作卡里有补充；reviewer 提问时交回 reviewer；立项回合什么都没做时程序请对话问你、摘要显示 `Needs your decision`；默认配置（合并会话）下 `need_user` 只问你一次 | App |
 | TB-21 | 每个 task 一组实例 | executor → reviewer → executor 继续同一条会话；新 task 新开会话；同一角色同时在两个 task 上各有一个实例 | App |
 | TB-22 | 同时运行上限 | 第 5 个实例排队、显示 `Queued`，前面的结束后按先后开始 | 单元、App |
 | TB-23 | 写入排队 | 两个写 task 不同时运行，第二个显示 `Waiting to change files (T1)`；写 task 交给评审期间锁不释放；结束后释放；只读 task 与写 task 并行 | 单元、App |
-| TB-24 | 只读 task | 只读 task 的实例请求里没有写入、命令和 MCP 工具，基座（与没写 `tools` 的角色）的只读 task、立项、结案、临时提问有 `read`、`ls`（§8.1）；`read_only` 不能改 | 单元、App |
+| TB-24 | 只读 task | 只读 task 的实例请求里没有写入、命令和 MCP 工具，只读 task、立项、结案、临时提问、订阅的读取类总有 `ls`：基座（与没写 `tools` 的角色）是 `read`、`ls`，写了 `tools` 的角色是它写的读取类加 `ls`（§8.1）；`read_only` 不能改 | 单元、App |
 | TB-25 | 依赖 | 依赖没完成不交出去；完成后交给被指派的角色，工作卡带依赖最后一棒的结论与关闭结论；依赖失败交结案；建 task 时依赖已失败直接交结案；成环、跨需求、指向自己被拒绝 | 单元、App |
 | TB-26 | 补充到达正在做的实例 | 实例运行中 `request_update`：它的下一次请求的工作卡里有这条原话，没有插话消息 | App |
 | TB-27 | 留给 task 的消息 | 发到 task 的消息出现在当前和下一个实例的工作卡里，不唤醒任何人；结束的 task 被拒绝 | 单元、App |
@@ -1320,7 +1320,7 @@ interface TaskView {
 | TB-56 | 待判断的消息 | 对话回复中发的三条消息按顺序判断，排队区标 `Waiting for <create role>`；判断后 Enter 为排队、Ctrl+Enter 为插话；判断结束时对话已空闲则开始新的回复；“撤回”带回还没开始判断的消息；以 `/` 开头的扩展命令不经立项；对话在为别的消息准备中时判断完的消息排在它之后；提示词模板的展开文字出现在立项的投递里、需求记原文；扩展命令用 `sendUserMessage` 开始的运行的工作卡有 `No decision` 行 | App |
 | TB-57 | 右栏与后台改动 | task 改过文件后右栏显示 `Changes made by team tasks aren’t listed here.`、列表为空时不显示“本会话还没有改动”；没有 TaskBoard 时与 v0 相同 | App |
 | TB-58 | 模式改变的提示 | 每次模式改变对话流里一行（§13.11）：`Task mode on`、`Task mode on until done`、`Task mode off`；`/task <文字>` 进入时在你的消息之前；运行中关掉时在当前这条助手消息之后；`once` 自动结束时一行 `Task mode off`；重新打开后位置与实时相同；没有 `mori.team` 条目的会话没有这一行（2026-10-26，M13） | 单元、App、回放 |
-| TB-59 | 关掉之后回看 | TaskBoard 上有需求、模式为 `off` 时：对话的请求里有 `board_read`、`read_session`，没有 `request_submit`、`request_update`、`request_cancel`、`task_create`、`task_edit`、`reply_via_dialog`；请求末尾的工作卡第一行 `Task mode: off`、列出最近的需求；`read_session` 读得到 task 的最后一段回复，`board_read {task}` 读得到留给 task 的消息；App 重启、重新打开后同样（工具在打开时注册）；TaskBoard 上没有需求时与 v0 相同（TB-03）（2026-10-26，M22） | 单元、App、真实 |
+| TB-59 | 关掉之后回看 | TaskBoard 上有需求、模式为 `off` 时：对话的请求里有 `board_read`、`read_session`，没有 `request_submit`、`request_update`、`request_cancel`、`task_create`、`task_edit`、`reply_via_dialog`；请求末尾的工作卡第一行 `Task mode: off`、有“工具是 Agent 的”那一行（`Tools are yours, not the user's: …`，M26）、列出最近的需求；`read_session` 读得到 task 的最后一段回复，`board_read {task}` 读得到留给 task 的消息；App 重启、重新打开后同样（工具在打开时注册）；TaskBoard 上没有需求时与 v0 相同（TB-03）（2026-10-26，M22） | 单元、App、真实 |
 
 ### 17.3 不留未完成项
 

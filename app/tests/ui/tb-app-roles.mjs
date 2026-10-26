@@ -30,7 +30,7 @@ import { fitPane, openToolsSection, resizeWindow } from './m6-helpers.mjs';
 import { toolRows } from './m6-tools-helpers.mjs';
 import {
   allowAll, bridge, brief, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents,
-  killTbKernel, messagesOf, missingSteps, newSession, openProject, paneSel, paneState, poll,
+  killTbKernel, messagesOf, missingSteps, newSession, OFF_CARD_TOOLS, openProject, paneSel, paneState, poll,
   progressOf, readBoard, readJsonl, receiptsOf, reopenSession, restartTbApp, scenarioLines, scenarioRequests,
   seedTeamUserData, sendMessage, showTab, sleep, shot, startTbApp, startTbEndpoint, stopTbEndpoint, suiteArgs,
   SPLIT_ROLES, tbModel, tbProvider, tbRecorder, teamStateOf, teamSwitch, tempProject, tempUserData, userSession,
@@ -886,8 +886,9 @@ function dialogTools(ctx, obs) {
     mode: obs.modeAfter }));
   const offCard = last[0]?.messages.filter((m) => m.role === 'user').map((m) => contentText(m.content)).at(-1) ?? '';
   record('TB-59 split roles: back in off mode after the request closed, chat\'s request ends with the off-mode work '
-    + 'card ("Task mode: off", request 1 listed) and has no create tool', offCard.startsWith('<mori-work-card>\n'
-    + 'Task mode: off\n') && /\n- Request 1: .* · done\n/.test(offCard)
+    + 'card ("Task mode: off", the line that tools are the agent\'s and never the user\'s, request 1 listed) and has '
+    + 'no create tool', offCard.startsWith('<mori-work-card>\nTask mode: off\n')
+    && offCard.includes(`\n${OFF_CARD_TOOLS}`) && /\n- Request 1: .* · done\n/.test(offCard)
     && !(last[0]?.tools ?? []).some((name) => name.startsWith('request_') || name.startsWith('task_')),
   brief(offCard));
   const card = teamReqs.find((request) => request.info.k === 2);

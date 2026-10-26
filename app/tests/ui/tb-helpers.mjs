@@ -315,6 +315,9 @@ export function writeRole(project, role) {
 /** @brief 写一组角色文件（writeRole），返回文件路径。 */
 export const writeRoles = (project, roles) => roles.map((role) => writeRole(project, role));
 
+/** 关闭模式的工作卡里“工具是 Agent 的、不让用户调”那一行的开头（§8.3，M26） */
+export const OFF_CARD_TOOLS = "Tools are yours, not the user's: never ask the user to call a tool";
+
 /**
  * @brief 分开的配置（proposal §6.2）：chat 持有对话，planner 持有立项与结案，executor、reviewer 做 task；
  *        tools 不写（与基座相同），正文带各自的 MORI-ROLE 标记。

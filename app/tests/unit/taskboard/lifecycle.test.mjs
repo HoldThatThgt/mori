@@ -81,7 +81,7 @@ test('TB-51 a user-session delivery queued during a reply the Team does not trac
   delivery.resolve();
 });
 
-test('TB-05 /team /<command> in off mode enters once before the command goes to the dialog', async () => {
+test('TB-05 /task /<command> in off mode enters once before the command goes to the dialog', async () => {
   const { team, state } = await setup(SPLIT, null, { commands: ['deploy'] });
   assert.equal(team.takesPrompt('/deploy now', 'once'), false, 'the command still goes to the dialog directly');
   await team.enterOnce();
@@ -292,6 +292,7 @@ test('TB-59 turned off after a request, the merged dialog keeps board_read and r
   assert.ok(active.includes('board_read') && active.includes('read_session'), active.join());
   assert.ok(!active.some((name) => CREATE_ONLY.includes(name) || name === 'agent_message'), active.join());
   assert.match(userCard(user), /^<mori-work-card>\nTask mode: off\nYou do the work yourself with your own tools; /);
+  assert.match(userCard(user), /\nTools are yours, not the user's: never ask the user to call a tool or to open a /);
   assert.match(userCard(user), /\n- Request 1: List the files · cancelled\n<\/mori-work-card>$/);
 });
 
@@ -326,6 +327,22 @@ test('TB-58 every mode change sends mori.team_mode with its mori.team entry, in 
   const events = host.events.filter((event) => event.type === 'mori.team_mode').map((event) => event.mode);
   assert.deepEqual(events, ['always', 'once', 'off']);
   assert.deepEqual(customs(user, 'mori.team').map((data) => data.mode), events);
+});
+
+test('TB-58 turned off while the dialog outputs an assistant message: the entry and the notice event wait for the '
+  + 'end of that message, so the notice goes after it', async () => {
+  const { team, host, user } = await setup(MERGED);
+  await team.setMode('on');
+  const modes = () => host.events.filter((event) => event.type === 'mori.team_mode').map((event) => event.mode);
+  user.spec.onEvent({ type: 'message_start', message: { role: 'assistant', content: [] } });
+  await team.setMode('off');
+  assert.equal(team.info().team.mode, 'off');
+  assert.deepEqual(modes(), ['always'], 'no notice while the message is being written');
+  assert.deepEqual(customs(user, 'mori.team').map((data) => data.mode), ['always']);
+  user.spec.onEvent({ type: 'message_end', message: { role: 'assistant', content: [], stopReason: 'stop' } });
+  await Promise.resolve();
+  assert.deepEqual(modes(), ['always', 'off']);
+  assert.deepEqual(customs(user, 'mori.team').map((data) => data.mode), ['always', 'off']);
 });
 
 test('TB-29 without role files the dialog reads the base agent\'s task session without naming the role; only the '

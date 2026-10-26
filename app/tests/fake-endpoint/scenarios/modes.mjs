@@ -40,6 +40,8 @@ export const MODES_TEXT = {
   lookbackList: 'LOOKBACK-LIST: README.md, src/a.ts',
   /** tb-modes-lookback：关闭模式下问那份清单的消息 */
   lookbackAsk: 'Where is the full list? tb-scenario:tb-modes-lookback',
+  /** tb-modes-runoff：对话第一个请求流出的长文字（约 1000 个分块，流出要几秒；开关在它流出时关掉，TB-58 的提示在它之后） */
+  runOffText: `Reading the README now. ${'Still reading the README. '.repeat(80)}`.trim(),
 };
 
 /** @brief 协作模式下（分开时）对话 chat 的回复：k = 1..n 各一句，overrides 另写。 */
@@ -109,9 +111,10 @@ export const SCENARIOS = {
     planner({ 1: [say('Answer directly.')] }), chatTeam({ 2: [say('Team reply.')] }),
   ],
   // TB-05 协作模式的运行中关掉：这次运行的第二个请求仍是协作模式的工具、工作卡与段。
+  // TB-58：第一个请求先流出几秒的长文字，开关在它流出时关掉，模式提示等这条助手消息结束才加。
   'tb-modes-runoff': [
     planner({ 1: [say('Direct answer.')] }),
-    chatTeam({ 1: [together(wait(5000), call('read', { path: 'README.md' })), say('Read it.')] }),
+    chatTeam({ 1: [together(say(MODES_TEXT.runOffText), call('read', { path: 'README.md' })), say('Read it.')] }),
     chatOff({ 2: [say('Off reply.')] }),
   ],
   // TB-06、TB-07、TB-08：一次判断一种决定、先记原话；立项判断第一条时又来两条，各自一次判断；没做决定按直接回答。

@@ -836,8 +836,9 @@ function dialogCardLines(ctx: DialogCardContext): string[] {
 export const OFF_CARD_REQUESTS = 5;
 
 /**
- * @brief 关闭模式下用户会话的卡片（§5.2、§8.3）：写明 Task mode 关着、只剩两个只读工具，列出最近的需求（不写 task，
- *        要看结果用 board_read、read_session）；TaskBoard 上没有需求时没有行（没有卡片，与 v0 相同）。
+ * @brief 关闭模式下用户会话的卡片（§5.2、§8.3）：写明 Task mode 关着、只剩两个只读工具，工具是 Agent 的、不让用户调
+ *        （与协作模式的对话段同一句 TOOLS_LINE，M26），列出最近的需求（不写 task，要看结果用 board_read、read_session）；
+ *        TaskBoard 上没有需求时没有行（没有卡片，与 v0 相同）。
  */
 function offCardLines(ctx: CardBase): string[] {
   const requests = ctx.board.requests;
@@ -848,6 +849,7 @@ function offCardLines(ctx: CardBase): string[] {
     `Task mode: ${MODE_WORDS.off}`,
     "You do the work yourself with your own tools; requests and tasks can't be created until the user turns task "
       + 'mode on.',
+    TOOLS_LINE,
     "Earlier requests (board_read and read_session still work; read_session shows a task's final reply):",
     ...(earlier > 0 ? [`- ${plural(earlier, 'earlier request')}: board_read {}`] : []),
     ...recent.map((request) => `- Request ${request.no}: ${request.title} · ${request.status}`),

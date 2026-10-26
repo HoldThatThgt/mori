@@ -173,8 +173,9 @@ async function cap(ctx) {
   const early = ['T5', 'T6'].map((task) => spanOf(ctx, scenario, { kind: 'task', task }).count);
   const rows = (await progressOf(ctx, who.tab))[0]?.tasks.map((row) => `${row.task}:${row.phase}`) ?? [];
   record('TB-22 with four task instances running, the fifth and sixth read "Queued" and send no request: '
-    + '"T5 Read 5 · Mori · Queued", "T6 Read 6 · Mori · Queued" while T1–T4 each have a request in flight',
-  t5 === 'T5 Read 5 · Mori · Queued' && t6 === 'T6 Read 6 · Mori · Queued' && running.every((n) => n > 0)
+    + '"T5 Read 5 · Queued", "T6 Read 6 · Queued" (no role files: no role segment, §13.3) while T1–T4 each have a '
+    + 'request in flight',
+  t5 === 'T5 Read 5 · Queued' && t6 === 'T6 Read 6 · Queued' && running.every((n) => n > 0)
     && same(early, [0, 0]), brief({ t5, t6, running, early, rows }));
   await settle(ctx, who, 90000);
   capOrder(ctx, who, scenario, await phasesOf(ctx, who.tab, who.since));
@@ -321,9 +322,10 @@ async function readOnly(ctx) {
   const t2 = scenarioRequests(ctx.ep, scenario, { agent: 'executor', kind: 'task', task: 'T2' });
   const forbidden = (tools) => tools.filter((name) => WRITE_TOOLS.includes(name) || name.startsWith('mcp__'));
   record('TB-24 every request of the read-only task\'s instance has no write, command or MCP tool (only read tools '
-    + 'and its TaskBoard tools), while the write task of the same role has bash, edit, write and the MCP tool '
-    + `${MCP_ECHO}`,
-  t2.length >= 3 && t2.every((request) => forbidden(request.tools).length === 0 && request.tools.includes('read'))
+    + 'and its TaskBoard tools; executor lists its tools without ls and still has read and ls, §8.1), while the '
+    + `write task of the same role has bash, edit, write and the MCP tool ${MCP_ECHO}`,
+  t2.length >= 3 && t2.every((request) => forbidden(request.tools).length === 0
+    && ['read', 'ls'].every((name) => request.tools.includes(name)))
     && t1.length >= 1 && ['bash', 'edit', 'write', MCP_ECHO].every((name) => t1[0].tools.includes(name)),
   brief({ t2: t2.map((request) => request.tools), t1: t1[0]?.tools }));
   readOnlyEdit(ctx, who, scenario, t2);

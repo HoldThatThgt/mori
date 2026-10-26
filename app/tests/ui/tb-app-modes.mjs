@@ -18,8 +18,8 @@ import { MODES_TEXT } from '../fake-endpoint/scenarios/modes.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
 import {
   appLogLines, brief, captureOrder, clickTeamSwitch, closeTbApp, contentText, customOf, instanceFiles,
-  instanceSuffix, kernelEvents, liveInfo, messagesOf, missingSteps, modeNoticesOf, newSession, openSessionIn, orderOf,
-  paneSel,
+  instanceSuffix, kernelEvents, liveInfo, messagesOf, missingSteps, modeNoticesOf, newSession, OFF_CARD_TOOLS,
+  openSessionIn, orderOf, paneSel,
   paneState, poll, quoteChipsOf, quoteReply, readBoard, readJsonl, receiptsOf, reopenSession, restartTbApp,
   scenarioLines, scenarioRequests, seedTeamUserData, sendMessage, shot, showTab, sleep, SPLIT_ROLES, startTbApp,
   startTbEndpoint, stopTbEndpoint, suiteArgs, tbModel, tbProvider, tbRecorder, teamSwitch, tempProject, tempUserData,
@@ -572,13 +572,22 @@ async function runOn(ctx) {
   brief({ first: shapeOf(first), second: shapeOf(second), late: (second?.t ?? 0) - clickAt, next: shapeOf(next) }));
 }
 
-/** @brief 协作模式的运行中关掉（脚本 tb-modes-runoff）：这次运行不变，下一条按关闭模式。 */
+/**
+ * @brief 协作模式的运行中关掉（脚本 tb-modes-runoff）：这次运行不变，下一条按关闭模式。开关在对话第一条助手消息
+ *        流出时关掉（等它在对话流里出现，长文字流出要几秒），模式提示等这条消息结束才加（TB-58）。
+ */
 async function runOff(ctx) {
   const scenario = 'tb-modes-runoff';
   const who = await begin(ctx, ctx.split, `Run off test tb-scenario:${scenario}`, { on: true });
+  ctx.flow.runOff = who;
   await waitLine(ctx, scenario, { agent: 'chat', kind: 'team-dialog', k: 1, j: 0 });
+  const head = MODES_TEXT.runOffText.slice(0, 23);
+  const streaming = await poll(async () => (await paneState(ctx.page, who.tab))?.assistants
+    .some((text) => text.includes(head)), 20000, 20);
   const clickAt = Date.now();
   const sw = await clickTeamSwitch(ctx, who.tab, 'off');
+  const midStream = (await paneState(ctx.page, who.tab))?.running === true
+    && !resultsOf(userEntries(who), 'read').length;
   await settle(ctx, who, 60000);
   await sendMessage(ctx, who.tab, 'Now back in off mode');
   await settle(ctx, who, 60000);
@@ -589,6 +598,26 @@ async function runOff(ctx) {
     + 'team-dialog section; the next message runs with bash, edit, write again and no card',
   sw.mode === 'off' && teamShape(second) && second.t > clickAt && offShape(next),
   brief({ second: shapeOf(second), late: (second?.t ?? 0) - clickAt, next: shapeOf(next) }));
+  await runOffNotice(ctx, who, { head, streaming, midStream });
+}
+
+/**
+ * @brief TB-58：运行中关掉时 Task mode off 一行紧跟在当时正在流出的助手消息之后，这一轮之后的部分（Read it.）接在它下面，
+ *        你的下一条消息在它们之后；Task mode on 在第一条消息之前。
+ * @param obs { head（第一条助手消息的开头）, streaming（点击前它已出现）, midStream（点击后还没有 read 的结果） }
+ */
+async function runOffNotice(ctx, who, obs) {
+  const items = (await transcriptItems(ctx, who.tab)).filter((item) => ['user', 'assistant', 'team-mode']
+    .includes(item.kind));
+  const at = items.findIndex((item) => item.kind === 'team-mode' && item.text === NOTICE.off);
+  const notices = (await modeNoticesOf(ctx, who.tab)).map((item) => [item.mode, item.before?.slice(0, 12)]);
+  record('TB-58 turned off while the dialog\'s assistant message was streaming: "Task mode off" sits right after that '
+    + 'message, the rest of the turn ("Read it.") comes after the line, then your next message; "Task mode on" is '
+    + 'before the first message', obs.streaming && obs.midStream && at > 0 && items[at - 1].kind === 'assistant'
+    && items[at - 1].text.includes(obs.head) && items[at + 1]?.kind === 'assistant'
+    && items[at + 1].text.includes('Read it.') && items[at + 2]?.kind === 'user'
+    && same(notices, [['always', 'Run off test'], ['off', 'Now back in ']]),
+  brief({ ...obs, notices, items: items.map((item) => `${item.kind}:${item.text.slice(0, 30)}`) }));
 }
 
 // ---------- TB-06、TB-07、TB-08：立项的决定 ----------
@@ -1146,11 +1175,14 @@ async function mergedReceipts(ctx) {
 
 // ---------- TB-59：关掉 Task mode 之后回看（合并会话，脚本 tb-modes-lookback） ----------
 
-/** @brief 关闭模式下对话的一个请求是回看的样子：有两个只读工具、没有立项工具、有写入工具、工作卡写 Task mode: off。 */
+/**
+ * @brief 关闭模式下对话的一个请求是回看的样子：有两个只读工具、没有立项工具、有写入工具、工作卡写 Task mode: off
+ *        与“工具是 Agent 的”那一行（M26）。
+ */
 const lookbackShape = (request) => request !== undefined && request.info.kind === 'dialog'
   && ['board_read', 'read_session', ...WRITE_TOOLS].every((name) => request.tools.includes(name))
   && !request.tools.some((name) => CREATE_ONLY.includes(name) || name === 'agent_message')
-  && cardOf(request).startsWith(`${CARD_OPEN}\nTask mode: off\n`)
+  && cardOf(request).startsWith(`${CARD_OPEN}\nTask mode: off\n`) && cardOf(request).includes(`\n${OFF_CARD_TOOLS}`)
   && cardOf(request).includes('- Request 1: List the files · done') && !request.system.includes(SHARED_PART);
 
 /**
@@ -1169,7 +1201,8 @@ async function lookback(ctx) {
   const read = resultsOf(userEntries(who), 'read_session')[0] ?? null;
   record('TB-59 after the request closed and task mode went back to off, the merged dialog\'s next request has '
     + 'board_read and read_session (and its own bash, edit, write) but no create tools, and ends with the off-mode '
-    + 'work card "Task mode: off" listing request 1', offBefore === 'off' && lookbackShape(asked),
+    + 'work card "Task mode: off" (with the line that tools are the agent\'s, never the user\'s) listing request 1',
+  offBefore === 'off' && lookbackShape(asked),
   brief({ offBefore, tools: asked?.tools, card: cardOf(asked) }));
   const task = requestAt(ctx, scenario, { agent: 'mori', kind: 'task', k: 1, j: 0 });
   record('TB-24 the base agent\'s read-only task can list folders: T1\'s request has read and ls and no write, '
@@ -1203,7 +1236,7 @@ async function lookbackAfterRestart(ctx, who) {
 
 /** @brief 重启 App，重新打开各步的会话：开关沿用最后的模式（TB-05），回执与进展摘要的顺序与实时相同（TB-08），TB-11。 */
 async function restart(ctx) {
-  const named = ['once', 'switching', 'decide', 'error', 'withdraw', 'template', 'merged', 'lookback']
+  const named = ['once', 'switching', 'runOff', 'decide', 'error', 'withdraw', 'template', 'merged', 'lookback']
     .filter((name) => ctx.flow[name]);
   const before = new Map();
   for (const name of named) {

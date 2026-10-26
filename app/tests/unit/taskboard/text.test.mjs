@@ -425,13 +425,16 @@ test('TB-30 ask and subscription cards have the related request line only', () =
   assert.equal(workCard('ask', { board, holders, request: null }), null);
 });
 
-test('TB-59 TB-30 the off-mode card of a session whose board has requests: Task mode off, own tools only, the '
-  + 'latest five requests (earlier ones as one board_read line); no requests, no card', () => {
+test('TB-59 TB-30 the off-mode card of a session whose board has requests: Task mode off, own tools only, tools are '
+  + "the agent's and never the user's (M26), the latest five requests (earlier ones as one board_read line); no "
+  + 'requests, no card', () => {
   assert.equal(workCard('off', { board: { requests: [], tasks: [] }, holders }), null);
   const head = [
     'Task mode: off',
     "You do the work yourself with your own tools; requests and tasks can't be created until the user turns task "
       + 'mode on.',
+    "Tools are yours, not the user's: never ask the user to call a tool or to open a session or the board; read it "
+      + 'yourself (board_read, read_session) and put what the user needs in your reply.',
     "Earlier requests (board_read and read_session still work; read_session shows a task's final reply):",
   ];
   const two = { requests: [request(1, { status: 'done' }), request(2, { title: 'Docs' })], tasks: [] };
@@ -674,7 +677,7 @@ const toolResultEntry = (toolCallId) => ({ type: 'message', id: nextId(),
   message: { role: 'toolResult', toolCallId, toolName: 'read', content: [{ type: 'text', text: 'file body' }],
     isError: false } });
 
-/** @brief 一个用户会话：关闭模式下的一问一答，/team 消息与对话的回复（含工具调用与思考），一次程序投递与汇报。 */
+/** @brief 一个用户会话：关闭模式下的一问一答，/task 消息与对话的回复（含工具调用与思考），一次程序投递与汇报。 */
 function userSession() {
   const entries = [
     { type: 'custom', id: nextId(), customType: 'mori.pick', data: { pick: 'fake' } },

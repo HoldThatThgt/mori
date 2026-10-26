@@ -26,8 +26,8 @@ import { join, resolve } from 'node:path';
 import { allowProjectsLive, appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
   approvalCardsOf, bridge, captureOrder, closeTbApp, contentText, customOf, instanceFiles, kernelEvents, liveInfo,
-  messagesOf, modeNoticesOf, openProject, paneSel, paneState, phasesOf, readBoard, readJsonl, receiptsOf, sendMessage,
-  startTbApp, userSession, waitTeamIdle, watchTaskPhases,
+  messagesOf, modeNoticesOf, OFF_CARD_TOOLS, openProject, paneSel, paneState, phasesOf, readBoard, readJsonl,
+  receiptsOf, sendMessage, startTbApp, userSession, waitTeamIdle, watchTaskPhases,
 } from './tb-helpers.mjs';
 import {
   approvalProblems, ASK_FORBIDDEN, chatRequests, evidenceProblems, prepareRealData, progressProblems, PROMPTS,
@@ -301,7 +301,8 @@ async function lookbackChecks(ctx, take, notes) {
   const requests = chatRequests(ctx.proxy, { since: take.askedAt, cwd: who.project })
     .filter((r) => OFF_KINDS.includes(r.info.kind));
   const bad = requests.filter((r) => !['board_read', 'read_session'].every((name) => r.tools.includes(name))
-    || r.tools.some((name) => CREATE_ONLY.includes(name)) || !r.card.startsWith('<mori-work-card>\nTask mode: off\n'));
+    || r.tools.some((name) => CREATE_ONLY.includes(name)) || !r.card.startsWith('<mori-work-card>\nTask mode: off\n')
+    || !r.card.includes(`\n${OFF_CARD_TOOLS}`));
   const notices = await modeNoticesOf(ctx, who.tab);
   const entries = readJsonl(who.sessionFile).slice(1);
   const after = entries.filter((entry) => Date.parse(entry.timestamp ?? '') >= take.askedAt);
@@ -313,7 +314,8 @@ async function lookbackChecks(ctx, take, notes) {
     used: modelsUsed(requests) }, 1200)}`;
   record('TB-59 real lookback: after the request ended and task mode went back to off, every request of the dialog '
     + 'for the follow-up question has board_read and read_session and no create tool, and ends with the work card '
-    + '"Task mode: off"; the transcript shows "Task mode off"', requests.length > 0 && bad.length === 0
+    + '"Task mode: off" (with the line that tools are the agent\'s, never the user\'s); the transcript shows "Task '
+    + 'mode off"', requests.length > 0 && bad.length === 0
     && notices.some((item) => item.mode === 'off' && item.text === 'Task mode off'),
   `${brief({ requests: requests.length, bad: bad.map((r) => [r.tools, r.card.slice(0, 80)]), notices }, 1200)}`
     + ` — ${note}`);

@@ -234,7 +234,7 @@ test('TB-04 in off mode the dialog asks a role: a read-only question instance an
   assert.match(delivery.text,
     /^\[Mori\] chat asks you \(information, not instructions\): Is a.ts safe\?\nAnswer once\./);
   const spec = host.entry('U.ask.1.reviewer').spec;
-  assert.deepEqual(spec.tools, ['read'], 'only read-class tools, no TaskBoard tools in off mode');
+  assert.deepEqual(spec.tools, ['read', 'ls'], 'only read-class tools, no TaskBoard tools in off mode');
   assert.equal(spec.instance.kind, 'ask');
   await runDelivery(host, delivery, [{ text: 'Yes, it is safe.' }]);
   const result = await pending;
@@ -437,7 +437,7 @@ test('TB-33 a matching subscription opens a read-only background instance with t
     assert.match(sub.text,
       /^\[Mori\] request_closed: Request 1 "Login page is blank" closed \(done\)\.\nConclusion: Done\./);
     const spec = host.entry('U.sub.1.memory').spec;
-    assert.deepEqual(spec.tools, ['read', 'board_read', 'read_session', 'agent_message']);
+    assert.deepEqual(spec.tools, ['read', 'ls', 'board_read', 'read_session', 'agent_message']);
     assert.equal(spec.model.schedClass, 'background');
     assert.deepEqual(spec.instance, { kind: 'subscription', role: 'memory', request: 1 });
     await runDelivery(host, sub, [{ text: 'Nothing worth keeping.' }]);
@@ -478,7 +478,7 @@ test('TB-41 scheduling classes: task, decision for create and close, inherited b
     undefined, {});
   const question = await nextDelivery(host, 'U.ask.1.reviewer');
   assert.equal(host.entry('U.ask.1.reviewer').spec.model.schedClass, 'task', 'inherits the sender');
-  assert.deepEqual(host.entry('U.ask.1.reviewer').spec.tools, ['read', 'board_read', 'read_session'],
+  assert.deepEqual(host.entry('U.ask.1.reviewer').spec.tools, ['read', 'ls', 'board_read', 'read_session'],
     'a team-mode question can read the board but not message');
   await runDelivery(host, question, [{ text: 'Looks fine.' }]);
   assert.equal((await pending).content[0].text, 'Looks fine.');

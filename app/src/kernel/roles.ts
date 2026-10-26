@@ -534,19 +534,19 @@ export function roleTools(role: RoleDef, baseDefaults: readonly string[]): strin
   return [...new Set(role.tools ?? [...baseDefaults, ALL_MCP_TOOLS])];
 }
 
-/** @brief 基座的读取类总有的列目录工具（§8.1）。 */
+/** @brief 读取类总有的列目录工具（§8.1）。 */
 const LIST_TOOL = 'ls';
 
 /**
- * @brief “角色工具中的读取类”（§8.1）：角色的工具与 READ_ONLY_TOOLS 的交集，不含 MCP 工具；
- *        没写 tools 的（基座与和它相同的角色）取默认工具与它的交集，再加上 ls（2026-10-26，M13：只读的助手要能列出
- *        文件夹，不靠猜文件名；pi 的 ls 只用 node:fs，离线可用），默认设置下是 read、ls。
+ * @brief “角色工具中的读取类”（§8.1）：角色的工具（没写 tools 的取默认工具）与 READ_ONLY_TOOLS 的交集，不含 MCP 工具，
+ *        再加上 ls（2026-10-26，M13：只读的助手要能列出文件夹，不靠猜文件名；写了 tools 的角色同样加；
+ *        pi 的 ls 只用 node:fs，离线可用），默认设置下是 read、ls。
  * @param role 角色
  * @param baseDefaults pi 设置的默认工具
  */
 export function readClassTools(role: RoleDef, baseDefaults: readonly string[]): string[] {
   const own = (role.tools ?? baseDefaults).filter((name) => READ_ONLY_TOOLS.includes(name));
-  return [...new Set(role.tools === null ? [...own, LIST_TOOL] : own)];
+  return [...new Set([...own, LIST_TOOL])];
 }
 
 /**
