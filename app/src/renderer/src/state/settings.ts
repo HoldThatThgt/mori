@@ -13,7 +13,7 @@ import type { EventEnvelope, GlobalEventEnvelope, TestResult } from '../../../sh
 import { recordAction } from './actionLog';
 import { describe, request } from './bridge';
 import { guardLeave } from './leaveGuard';
-import { activeTab, useApp } from './store';
+import { useApp } from './store';
 
 /** @brief 一行结果文字。 */
 export interface Notice {
@@ -23,8 +23,8 @@ export interface Notice {
   text: string;
 }
 
-/** @brief 设置页的分节：Models、AGENTS.md、UI issues（docs/specs/memory.md §10.8）。 */
-export type SettingsSection = 'models' | 'agents' | 'issues';
+/** @brief 设置页的分节：Models、UI issues（docs/specs/memory.md §10.8；AGENTS.md 2026-10-26 起在 Customize）。 */
+export type SettingsSection = 'models' | 'issues';
 
 /** @brief 打开 设置 → Models 时要落到的位置（拒绝启动卡、说明卡、范围菜单）。 */
 export interface ModelsTarget {
@@ -167,7 +167,7 @@ export function showSettingsSection(section: SettingsSection): void {
 
 /**
  * @brief 打开 设置 → Models，并落到 target 指定的位置（不带时停在顶部）。拒绝启动卡、说明卡、范围菜单调用。
- *        AGENTS.md 有未保存的改动时先问。
+ *        有未保存的改动时先问（Customize 的 Instructions（AGENTS.md）、记忆页的表单）。
  */
 export function openModelsSettings(target: ModelsTarget = {}): void {
   guardLeave(() => {
@@ -185,10 +185,9 @@ export function clearTarget(nonce: number): void {
   if (useSettings.getState().target?.nonce === nonce) useSettings.setState({ target: null });
 }
 
-/** @brief 换到另一节；AGENTS.md 有未保存的改动时先问。 */
+/** @brief 换到另一节（设置页里没有会登记离开检查的编辑器，不用问）。 */
 export function selectSection(section: SettingsSection): void {
-  if (useSettings.getState().section === section) return;
-  guardLeave(() => useSettings.setState({ section }));
+  if (useSettings.getState().section !== section) useSettings.setState({ section });
 }
 
 /** @brief 全局事件：档案与探针进度、key 的不可用记录（§9.5，信封的 sessionId 为 null）。 */
@@ -276,19 +275,3 @@ useApp.subscribe((state) => {
   migrationChecked = true;
   if (state.config.migratedNow && !state.firstRun && state.view === 'chat') openModelsSettings();
 });
-
-// ---- AGENTS.md 一节用 ----
-
-/** @brief 焦点会话（AGENTS.md 一节列出它的项目加载的文件）。 */
-export interface FocusedSession {
-  /** pi 会话 id */
-  sessionId: string;
-  /** 工作目录 */
-  cwd: string;
-}
-
-/** @brief 当前会话（分屏时焦点所在的那一栏）；还没打开好或没有时为 null。 */
-export function focusedSession(): FocusedSession | null {
-  const tab = activeTab();
-  return tab?.phase === 'ready' && tab.sessionId ? { sessionId: tab.sessionId, cwd: tab.cwd } : null;
-}

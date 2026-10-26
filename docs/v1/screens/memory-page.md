@@ -115,14 +115,14 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 有未保存的改动时离开 | 表单里的字与打开表单时不同（临时，走查时可以改），你做了下面列出的任一操作 | 确认框（`leave-dialog`，同设置页 AGENTS.md 的确认框与焦点规则，标题由登记的检查给出）：标题 `Discard changes to this entry?`（临时，规格 §12），说明 `Your edits haven’t been saved. Leaving now discards them.`，按钮 `Discard`、`Keep editing`；焦点在 `Keep editing`，Esc 等于 `Keep editing` | Discard；Keep editing |
+| 有未保存的改动时离开 | 表单里的字与打开表单时不同（临时，走查时可以改），你做了下面列出的任一操作 | 确认框（`leave-dialog`，同 Customize 的 Instructions（用户级 AGENTS.md，2026-10-26 前在设置页）的确认框与焦点规则，标题由登记的检查给出）：标题 `Discard changes to this entry?`（临时，规格 §12），说明 `Your edits haven’t been saved. Leaving now discards them.`，按钮 `Discard`、`Keep editing`；焦点在 `Keep editing`，Esc 等于 `Keep editing` | Discard；Keep editing |
 | Discard | 你点了 `Discard` | 表单关闭、丢掉改动，然后照常做你刚才的操作 | — |
 | Keep editing | 你点了 `Keep editing` 或按 Esc | 留在表单，什么都不变（你点的会话不打开、已归档的不恢复），焦点回到表单 | 继续编辑 |
 | 跟随的项目变了时 Keep editing | 分屏换焦点等让跟随的项目改变，你在确认框选了 `Keep editing` | 页面留在原来的项目；表单关闭（保存或 `Cancel`）之后再跟随焦点会话的项目（临时，走查时可以改） | 继续编辑 |
 | 没有改动 | 表单里的字与打开时相同 | 不问，直接做 | — |
 
 要先问的操作（§10.1）：换右栏内容的操作（选另一行、`New entry`、换层、换分节、详情里的 `[[slug]]` 与 `Linked from`、`History` 与 `Last change` 的链接、关闭详情）、
-`Jump to source`、`Edit in Settings`，以及已有的离开入口（`Back to app`；侧栏的会话、项目行的 +（2026-10-26 起取代 `New session`）、`Open folder…`、`Customize`、`Settings`、Ctrl+N，同设置页 AGENTS.md 的列表；
+`Jump to source`、`Edit in Customize`（2026-10-26 改，原来是 `Edit in Settings`），以及已有的离开入口（`Back to app`；侧栏的会话、项目行的 +（2026-10-26 起取代 `New session`）、`Open folder…`、`Customize`、`Settings`、Ctrl+N，同 Customize 的 Instructions 的列表；
 分屏换焦点导致跟随的项目改变）。`Linked from` 与关闭详情两项是本表加的（临时，走查时可以改）。
 
 ## 删除
@@ -179,16 +179,16 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 读取中 | `agents.get` 还没返回 | `Loading…`（临时，走查时可以改） | — |
-| 读取失败 | `agents.get` 报错 | 原文（同设置页 AGENTS.md 节的“读取失败”，临时，走查时可以改） | 换分节再回来 |
-| 用户级一行 | `agents.get` 的 `effectivePath`、`userTokens` | 第一行（`memory-agent-file`）：agentDir 里生效的那个文件的路径、`<n> tokens`（1 时 `1 token`）；`Edit in Settings` | Edit in Settings：打开设置页的 AGENTS.md 节（有未保存的编辑时先问） |
-| 用户级没有生效的文件 | `effectivePath` 为 null | 第一行写 `No user-level AGENTS.md`（临时，走查时可以改），仍有 `Edit in Settings` | Edit in Settings |
-| 项目的文件（`Project`） | `agents.get { sessionId: 跟随的会话 }` 的 `loaded`，按 pi 的顺序 | 每个文件一行（`memory-agent-file`）：路径、`<n> tokens`；`Open in default app`（同设置页） | Open in default app |
-| `User` 层 | — | 只列用户级那一行 | Edit in Settings |
-| 合计 | `agents.get` 的 `total`（没有会话时就是 `userTokens`） | 下面一行 `<total> / 500 tokens`（`memory-agent-total`；合计等于各行之和） | — |
-| 超出 | `total` > 500 | 合计为警告色，加 `Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short.`（不截断仓库里的文件，proposal §5.2） | 编辑文件 |
+| 读取失败 | `agents.get` 报错 | 原文（同 Customize 的 Instructions 一节的“读取失败”，临时，走查时可以改） | 换分节再回来 |
+| 用户级一行 | `agents.get` 的 `effectivePath`、`userTokens` | 第一行（`memory-agent-file`）：agentDir 里生效的那个文件的路径、`<n> tokens`（1 时 `1 token`，1000 起按千分位写，2026-10-26 改）；`Edit in Customize`（2026-10-26 改） | Edit in Customize：打开 Customize，落在最后一节 Instructions（有未保存的编辑时先问；操作记录 `Open Customize → Instructions`） |
+| 用户级没有生效的文件 | `effectivePath` 为 null | 第一行写 `No user-level AGENTS.md`（临时，走查时可以改），仍有 `Edit in Customize` | Edit in Customize |
+| 项目的文件（`Project`） | `agents.get { sessionId: 跟随的会话 }` 的 `loaded`，按 pi 的顺序 | 每个文件一行（`memory-agent-file`）：路径、`<n> tokens`；`Open in default app`（同 Customize 的 Instructions 一节） | Open in default app |
+| `User` 层 | — | 只列用户级那一行 | Edit in Customize |
+| 合计 | `agents.get` 的 `total`（没有会话时就是 `userTokens`） | 下面一行 `<total> / 2,000 tokens`（2026-10-26 改：原来是 500；数字按千分位写）（`memory-agent-total`；合计等于各行之和） | — |
+| 超出 | `total` > 2000（负责人 2026-10-26 定，`AGENTS_LIMIT`） | 合计为警告色，加 `Over 2,000 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short.`（不截断仓库里的文件，proposal §5.2） | 编辑文件 |
 
 - token 用 `estimateMemoryTokens`，每个文件单独算，文字是 pi 加载结果里的内容（已去 BOM），不含 pi 加的开头一句与包装标签（§10.3）。
-- `AGENT` 不是记忆：没有用量一行、`New entry`、详情；记忆页不编辑 AGENTS.md（用户级到设置页编辑，项目的文件在默认程序里打开）。
+- `AGENT` 不是记忆：没有用量一行、`New entry`、详情；记忆页不编辑 AGENTS.md（用户级到 Customize 编辑，项目的文件在默认程序里打开）。
 
 ## Revisions
 
@@ -229,7 +229,7 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 已在记忆页 | 后台进程退出 | 页面保留最后读到的内容（退出时还没返回的 `memory.list`、`memory.get`、`memory.revisions`、`agents.get`、`enhance.get` 不把列表、详情、状态行换成错误；标题旁的 `Loading…` 去掉）；所有操作不可用（换层、换分节、选行、`New entry`、`Edit`、`Save`、`Delete…`、移动、`Jump to source`、`Edit in Settings`、增强一块、回滚），悬停 `Mori’s background process crashed. Restart it to continue.`；页面顶部是已有的全局退出横幅（`Mori’s background process crashed · Unfinished responses were interrupted` 与 `Restart`，同 M7 工作回顾），不另加 | `Restart`；`Back to app`（照常可用，临时，走查时可以改） |
+| 已在记忆页 | 后台进程退出 | 页面保留最后读到的内容（退出时还没返回的 `memory.list`、`memory.get`、`memory.revisions`、`agents.get`、`enhance.get` 不把列表、详情、状态行换成错误；标题旁的 `Loading…` 去掉）；所有操作不可用（换层、换分节、选行、`New entry`、`Edit`、`Save`、`Delete…`、移动、`Jump to source`、`Edit in Customize`、增强一块、回滚），悬停 `Mori’s background process crashed. Restart it to continue.`；页面顶部是已有的全局退出横幅（`Mori’s background process crashed · Unfinished responses were interrupted` 与 `Restart`，同 M7 工作回顾），不另加 | `Restart`；`Back to app`（照常可用，临时，走查时可以改） |
 | 编辑中退出 | 同上 | 表单和文字保留，`Save` 不可用 | — |
 | 重新连上 | 你点了 `Restart`，后台进程重新连上 | 重读当前层、分节和开着的详情；在 `Project` 时先等跟随的会话打开好（同 Customize） | 照常 |
 
@@ -285,7 +285,7 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 | 列表 | `memory-list`；行 `memory-row`（`data-id`、`data-source`）；读不出来的 `memory-broken` |
 | 条目详情 | `aside.right-panel[data-testid="memory-detail"]`；`memory-evidence`、`memory-jump`、`memory-jump-status`、`memory-backlinks`、`memory-history`、`memory-error`；按钮 `memory-edit`、`memory-delete`、`memory-move` |
 | 表单 | `memory-form`，内含 `memory-abstract`、`memory-details`、`memory-save` |
-| 离开确认 | `data-testid="leave-dialog"`（沿用设置页 AGENTS.md） |
+| 离开确认 | `data-testid="leave-dialog"`（沿用 AGENTS.md 一节的，v0 起） |
 | 删除确认框 | 规格没给标识：`role="dialog"`，按标题文字找 |
 | AGENT | `memory-agent-file`、`memory-agent-total` |
 | Revisions | 行 `revision-row`（`data-id`）；详情 `revision-detail`；`revision-rollback` |

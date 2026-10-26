@@ -56,4 +56,5 @@ Customize 页（工具页，M6）的入口"Customize"在"Open folder…"下面�
   （v1：见 docs/specs/model-providers.md §9.1："Connections and models"分节改为"Models"，状态表见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)）。
   Customize 页（工具页，M6）外框相同，见 [tools.md](tools.md)；工作回顾（Review，M7）顶部相同，详情放在右栏，见 [review.md](review.md)
   （v1：见 docs/specs/memory.md §10.1、§10.8：由记忆页（Memory）取代，顶部与右栏相同；设置页左边在"AGENTS.md"下面加第三节"UI issues"，在这一节时右栏可以打开）。
+  （2026-10-26 改：负责人走查 M4，"AGENTS.md"挪到 Customize 的最后一节"Instructions"，设置页只剩"Models""UI issues"，见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)。）
 - 会话面板保持挂载、只隐藏，所以返回后滚动位置、草稿、展开状态都在。

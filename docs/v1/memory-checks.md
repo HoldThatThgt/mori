@@ -31,6 +31,15 @@
 
 proposal §16 “默认做法”一列全部照做（规格开头说明）；§16 最后一段交给规格的参数登记在 [defaults.md](defaults.md) 的“提示词分层与记忆”一节。
 
+## 负责人的决定（2026-10-26 走查）
+
+走查记录 [walkthrough-1026-checks.md](walkthrough-1026-checks.md)，这一包的检查记录 [walkthrough-1026/WP-07.md](walkthrough-1026/WP-07.md)。两条都是负责人的决定，不是临时默认值（不登记在 defaults.md）。
+
+| # | 负责人原话 | 现在的做法 |
+| --- | --- | --- |
+| M4 | the AGENTS.md should put in customize rather setting | 用户级 AGENTS.md 的编辑器连同项目加载的文件、token 数，从设置页挪到 Customize 的最后一节 `Instructions`（2026-10-26 负责人定名与位置；跟随 Customize 的会话、不等 `tools.get`）；设置页只剩 Models、UI issues；记忆页 AGENT 的链接改为 `Edit in Customize`（规格 §10.3、§10.8，状态表 [customize-agents-md.md](screens/customize-agents-md.md)） |
+| M15 | budget for AGENT.md is too short, expand to 2000tokens | 提醒线由 500 改为 2000（`shared/memory.ts` 的 `AGENTS_LIMIT`，记忆四种的 `MEMORY_LIMIT` 仍是 500）；仍然只是提醒，比的是全部加载文件的合计，什么都不截断（模型本来就拿到全文）；数字按千分位写（规格 §10.3，proposal §5.2 的 2026-10-26 注） |
+
 ## 规格的评审与改动
 
 - 规格草稿经过一轮五个角度的对抗评审（偏离 proposal、在 pi 与现有代码上能否实现、完整与可测、内部一致、界面文字），71 条意见核实后保留 59 条，全部改进规格

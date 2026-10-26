@@ -17,8 +17,11 @@ export const NO_PROJECT_HOVER = 'Open a session to see this project’s memory.'
 /** 离开编辑的确认框（§10.1，标题临时） */
 export const LEAVE_TITLE = 'Discard changes to this entry?';
 export const LEAVE_TEXT = 'Your edits haven’t been saved. Leaving now discards them.';
-/** AGENTS.md 超出时的说明（§10.3） */
-export const AGENTS_OVER = 'Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short.';
+/** AGENTS.md 合计的提醒线与超出时的说明（§10.3；2026-10-26 负责人走查 M15 由 500 改为 2000） */
+export const AGENTS_LIMIT = 2000;
+export const AGENTS_OVER = 'Over 2,000 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short.';
+/** @brief 数字按千分位写（同界面的 thousands：token 数与合计 1000 起带逗号）。 */
+export const thousands = (value) => value.toLocaleString('en-US');
 /** 反馈表单的两种底部说明（§10.7） */
 export const FEEDBACK_ON = 'Saved as evidence for this project’s daily enhancement. To have Mori act on it now, use '
   + '“Attach as context” instead.';

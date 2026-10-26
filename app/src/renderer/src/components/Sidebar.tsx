@@ -57,7 +57,7 @@ function SidebarNav({ collapsed }: { collapsed: boolean }) {
         aria-label="Open folder…" data-testid="nav-open-folder" disabled={exited}>
         <Icon name="folder" /><span className="nav-label">Open folder…</span>
       </button>
-      <button className={`nav-item${view === 'tools' ? ' active' : ''}`} onClick={openTools}
+      <button className={`nav-item${view === 'tools' ? ' active' : ''}`} onClick={() => openTools()}
         title={unavailable ?? 'Customize'} aria-label="Customize" data-testid="nav-tools" disabled={exited}>
         <Icon name="tools" /><span className="nav-label">Customize</span>
       </button>

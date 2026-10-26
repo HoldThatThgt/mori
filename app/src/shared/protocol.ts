@@ -204,8 +204,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.setThinking'), sessionId, level: z.enum(THINKING_LEVELS) }),
   /** 这个会话的提示词模板和技能命令 */
   z.object({ type: z.literal('session.commands'), sessionId }),
-  // ---- M6：AGENTS.md（docs/v0/screens/settings.md） ----
-  /** 用户级 AGENTS.md 和焦点会话加载的文件；没有会话时不带 sessionId */
+  // ---- M6：AGENTS.md（2026-10-26 起在 Customize，docs/v1/screens/customize-agents-md.md） ----
+  /** 用户级 AGENTS.md 和跟随的会话（Customize、记忆页）加载的文件；没有会话时不带 sessionId */
   z.object({ type: z.literal('agents.get'), sessionId: sessionId.optional() }),
   /** 写 <agentDir>/AGENTS.md */
   z.object({ type: z.literal('agents.save'), content: z.string() }),
@@ -273,7 +273,7 @@ export interface SlashCommand {
   argumentHint: string | null;
 }
 
-/** @brief agents.get 的结果（docs/v0/screens/settings.md "AGENTS.md"）。 */
+/** @brief agents.get 的结果（Customize 的 Instructions 一节，docs/v1/screens/customize-agents-md.md）。 */
 export interface AgentsInfo {
   /** 用户级文件 <agentDir>/AGENTS.md */
   userPath: string;

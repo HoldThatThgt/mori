@@ -24,7 +24,7 @@ proposal §16 的“默认做法”一列就是本文的做法；§16 最后一�
   增强任务维护它负责的那一种，并把 Mori 记的条目移到该在的种类（§6.9、§7；2026-10-26 改）；
 - 后台进程命令 `memory.*`、`enhance.*` 与两个事件（§8）；
 - 增强模式：每个项目的开关与设置、每天的时刻与补跑、读当天结束的会话、水位、三个看不见的会话依次跑、依据核对、整次运行一条修订、失败重试、新会话顶部的提示（§9）；
-- 记忆页替换左栏的工作回顾；反馈作为增强的依据；F8 界面问题挪到设置页；AGENTS.md 的 token 数与超出标记（§10）；
+- 记忆页替换左栏的工作回顾；反馈作为增强的依据；F8 界面问题挪到设置页；AGENTS.md 的 token 数与超出标记（§10）（2026-10-26 改：AGENTS.md 一节从设置页挪到 Customize 的 Instructions 一节，提醒线 2,000，§10.3）；
 - 现有测试随之调整（§14.4）。
 
 **不做**（proposal 明确不要的）：
@@ -117,7 +117,7 @@ proposal §16 的“默认做法”一列就是本文的做法；§16 最后一�
 
 ```text
 <userData>/
-  pi/AGENTS.md                                   用户级 AGENT（pi 原有，在设置页编辑）
+  pi/AGENTS.md                                   用户级 AGENT（pi 原有，在 Customize 编辑；2026-10-26 前在设置页）
   memory/
     user/                                        用户级
       MEMORY.md  TASTE.md  STRATEGY.md  REVIEW.md   索引
@@ -757,7 +757,7 @@ win32 的 `relative` 不分大小写、统一 `/` 与 `\`，所以只是大小�
 
 ## 10. 界面
 
-每屏的状态表在 [v1/screens/](../v1/screens/) 的 `memory-page.md`、`memory-enhance.md`、`memory-chat.md` 与 `settings-issues.md`（AGENTS.md 第 1 条），本节只定行为与原文。
+每屏的状态表在 [v1/screens/](../v1/screens/) 的 `memory-page.md`、`memory-enhance.md`、`memory-chat.md`、`settings-issues.md` 与 `customize-agents-md.md`（2026-10-26 加）（AGENTS.md 第 1 条），本节只定行为与原文。
 没有 Claude 桌面版对应的地方是本文定的，标“（临时）”的文字登记在 §12，走查时可以改。界面加的前缀只在界面里：内核的 `error` 只有原因（§8）。
 
 ### 10.1 记忆页
@@ -795,9 +795,9 @@ proposal §11：左栏“工作回顾”换成“记忆”，沿用 M7 的三级
   新增的条目 `source: user`、谁是 `You`，种类按当前分节、层按当前的 `User`/`Project`（事实也一样：关于你本人、跨项目的写用户级，proposal §4）。
   - 表单 `noValidate`；按 `Save` 时先查，有问题时在字段下方显示、不发命令：`Abstract is required.`（去掉首尾空白后为空）、`Abstract must be at most 200 characters.`、
     `Details must be at most 4,000 characters.`。内核的 `memory.save` 再按同样的规则查，返回同样的句子作为 `error`。
-  - 有未保存的改动时离开先问（同设置页 AGENTS.md 的确认框与焦点规则，标题由登记的检查给出）：标题 `Discard changes to this entry?`（临时），说明
+  - 有未保存的改动时离开先问（同 AGENTS.md 一节的确认框与焦点规则，标题由登记的检查给出；2026-10-26 起那一节是 Customize 的 Instructions）：标题 `Discard changes to this entry?`（临时），说明
     `Your edits haven’t been saved. Leaving now discards them.`，按钮 `Discard`、`Keep editing`。要先问的操作：换右栏内容的操作（选另一行、`New entry`、换层、换分节、详情里的 `[[slug]]`、
-    `History`/`Last change` 链接）、`Jump to source`、`Edit in Settings`，以及已有的离开入口（`Back to app`、侧栏、分屏换焦点导致跟随的项目改变）。
+    `History`/`Last change` 链接）、`Jump to source`、`Edit in Customize`（2026-10-26 前是 `Edit in Settings`），以及已有的离开入口（`Back to app`、侧栏、分屏换焦点导致跟随的项目改变）。
 - **数据**：页面打开、换层、换分节、焦点换到另一个项目时清空并读（不显示别的项目的结果）。收到这一层的 `mori.memory_changed` 时重读当前分节：前四节（`kinds` 含这一种时）读 `memory.list`，
   `Revisions` 读 `memory.revisions`；重读时保留上一次的列表、选中和滚动位置，标题旁显示 `Loading…`（同 M7）。详情开着、不在编辑时一起重读（条目读 `memory.get`，修订读 `memory.revisions { id }`）；
   结果为 `null` 时关闭详情，焦点回到列表。编辑中不重读，表单和文字保留；保存时以最后一次写入为准，前后两次写入都留在 `Revisions` 里，可以回滚。
@@ -818,12 +818,13 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 ### 10.3 AGENT
 
 - 记忆页的 `AGENT` 节（proposal §11）：列出这个项目加载的 AGENTS.md（用户级在前，然后按 pi 的顺序），每个文件一行（`memory-agent-file`）：路径、`<n> tokens`（1 时 `1 token`）；
-  下面一行合计 `<total> / 500 tokens`（`memory-agent-total`），超出时警告色并加 `Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short.`（proposal §5.2：不截断仓库里的文件）。
-  用户级的一行有 `Edit in Settings`（打开设置页的 AGENTS.md 节）；项目的文件有 `Open in default app`（同设置页）。`User` 层时只列用户级。
+  下面一行合计 `<total> / 2,000 tokens`（`memory-agent-total`），超出时警告色并加 `Over 2,000 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short.`（proposal §5.2：不截断仓库里的文件）。
+  用户级的一行有 `Edit in Customize`（打开 Customize，落在 Instructions 一节）；项目的文件有 `Open in default app`（同那一节）。`User` 层时只列用户级。
+  （2026-10-26 改，负责人走查 M4、M15：提醒线由 500 改为 `shared/memory.ts` 的 `AGENTS_LIMIT` = 2000，与记忆四种的 `MEMORY_LIMIT`（仍是 500）分开，是负责人的决定、不是临时默认值；仍然只是提醒、比的是全部加载文件的合计，什么都不截断；token 数与合计 1000 起按千分位写（`2,099 tokens`、`2,099 / 2,000 tokens`）；`Edit in Settings` 改为 `Edit in Customize`。）
 - 数据：`agents.get { sessionId }` 的 `loaded` 改为 `{ path, tokens }[]`，另有 `userTokens` 与 `total`。token 用 §6.3 的 `estimateMemoryTokens`，每个文件单独算，文字取 pi 加载结果里的 `content`
   （`getAgentsFiles()` / `loadProjectContextFiles()` 的那一项，已去 BOM），不含 pi 加的开头一句、`<project_instructions path=…>` 包装和 `<project_context>` 标签；`userTokens` 是 agentDir 里生效的
-  那个文件（`effectivePath`，没有时为 0）的 token 数；`total` = `userTokens` + `loaded` 各项 `tokens` 之和（没有会话时为 `userTokens`），超过 500 的警告按 `total` 判断。
-- 设置页 AGENTS.md 节（M6）：同样的 token 数与警告（proposal §5.2“超了在设置页和记忆页标出来”），写在单独的元素里：生效文件那一行 `data-testid="agents-tokens"`，每个加载文件那一行 `.agents-tokens`，
+  那个文件（`effectivePath`，没有时为 0）的 token 数；`total` = `userTokens` + `loaded` 各项 `tokens` 之和（没有会话时为 `userTokens`），超过提醒线（2026-10-26 起 2000，原来 500）的警告按 `total` 判断。
+- AGENTS.md 一节（M6 时在设置页，2026-10-26 起是 Customize 的最后一节 `Instructions`，跟随 Customize 的会话、不等 `tools.get`，状态表 [customize-agents-md.md](../v1/screens/customize-agents-md.md)）：同样的 token 数与警告（proposal §5.2“超了在设置页和记忆页标出来”），写在单独的元素里：生效文件那一行 `data-testid="agents-tokens"`，每个加载文件那一行 `.agents-tokens`，
   警告 `data-testid="agents-over"`；`agents-effective` 与 `.agents-path` 的文字不变（m6 的套件按原文和路径读它们）。
 
 ### 10.4 增强（本项目）
@@ -884,13 +885,14 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 ### 10.8 设置页：UI issues 与 AGENTS.md
 
 - 设置页左侧加第三节 `UI issues`（`data-section="issues"`），在 `AGENTS.md` 下面（proposal §11：F8 不是记忆，挪到设置页）。
+  （2026-10-26 改：AGENTS.md 挪到 Customize 后设置页只有 `Models`、`UI issues` 两节，`UI issues` 在 `Models` 下面。）
 - 内容沿用 M7 的“UI issues”：列表（时间倒序、`Resolve`/`Reopen`、`Hide resolved`、未处理数）、右栏详情（What went wrong、What you expected、截图与放大、Current view、Recent activity、Versions、
   `Show in Explorer`）、`Export as Markdown…`、`Open folder`，文字与 M7 相同（[v0/screens/review.md](../v0/screens/review.md) 的 UI issues 部分），只是放在设置页里：
   设置页在这一节时右栏可以打开（同记忆页、M7 的右栏宽度与分隔线）。已处理的标记仍在本机界面状态（`localStorage` 的 `mori.review`，只用 `ui-issues/` 开头的键，原有标记照用）。
   M7 的 `review-*` 测试标识改名为 `issues-*`。
 - 进入设置页默认仍是 `Models`；从 F8 来的 `View in Settings` 直接进 `UI issues` 并选中那一条。
 - 主进程的 `mori:review-*` 通道去掉反馈部分、改名 `mori:issues-*`（列表、截图、导出、显示导出文件、显示记录、打开文件夹）；读的仍是 `<userData>/ui-issues`。
-- AGENTS.md 节的 token 数与警告见 §10.3。
+- AGENTS.md 节的 token 数与警告见 §10.3（2026-10-26 起这一节在 Customize）。
 
 ### 10.9 F8
 
@@ -909,7 +911,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 `memory-list`、`memory-row`（`data-id`、`data-source`）、`memory-broken`、`memory-detail`、`memory-edit`、`memory-delete`、`memory-move`、`memory-evidence`、`memory-jump`、`memory-jump-status`、
 `memory-backlinks`、`memory-history`、`memory-error`、`memory-form`（内含 `memory-abstract`、`memory-details`、`memory-save`）、`memory-enhance`、`enhance-switch`、`enhance-status`、`enhance-run`、
 `enhance-settings`、`enhance-dialog`（内含 `enhance-model`、`enhance-effort`、`enhance-team`、`enhance-time`、`enhance-save`）、`revision-row`（`data-id`）、`revision-detail`、`revision-rollback`、
-`memory-agent-file`、`memory-agent-total`、`memory-notice`、`memory-notice-view`、`tool-memory-view`、`feedback-note`、`feedback-saved`、`issue-open-settings`、`agents-tokens`、`agents-over`；
+`memory-agent-file`、`memory-agent-total`、`memory-notice`、`memory-notice-view`、`tool-memory-view`、`feedback-note`、`feedback-saved`、`issue-open-settings`、`agents-tokens`、`agents-over`（2026-10-26 起在 Customize 的 `agents-section` 里）；
 设置页沿用 M7 的标识改名为 `issues-*`。
 
 ## 11. 在 pi 上的落点
@@ -1073,7 +1075,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 | MEM-13 | 记忆目录写保护 | 普通会话里 `write`、`edit` 写 `<userData>/memory` 下（相对路径、`/c/…`、`~`、`@` 前缀、只是大小写不同的路径）被拒绝并给出原文、文件不变；`<userData>` 下前缀相同的兄弟目录与别处照常（经批准） | 单元、App |
 | MEM-14 | 记忆页 | 左栏 `Memory` 在 `Review` 原来的位置、没有 `Review`；`User`/`Project` 跟随焦点会话的项目（分屏换焦点、没有会话时不可用），换项目后回到上次看的分节；六个分节；↑↓ 在行之间移动；没有条目时 `No entries yet.`；用量与 `Last change`；新增、编辑、删除（确认框）、提升、放回；编辑 `Learned` 条目后标 `You said`；Mori 记的条目（`source: agent`）行与详情标 `Added by Mori`，编辑后标 `You said`（2026-10-26）；表单的三句提示（空、201 字符、4001 字符的 Details）不发命令；有未保存的编辑时选另一行出离开确认框、`Keep editing` 保留编辑；详情的各块；反向链接；收到 `mori.memory_changed` 时当前分节与开着的详情刷新（列表与滚动位置保留），条目被删后详情关闭，运行结束后 Revisions 的 `Running` 变为结束状态 | App、回放 |
 | MEM-15 | 依据回到原位置 | §10.2 表的每一行；跳转未完成时离开记忆页，跳转被取消、不切会话、不显示状态 | App |
-| MEM-16 | AGENT 与设置页的 token | 记忆页 AGENT 列出加载的文件与 token、合计等于各行之和、对已知内容的文件等于 `estimateMemoryTokens(内容)`、超过 500 的警告；设置页 AGENTS.md 节同样的 token（`agents-tokens`）与警告（`agents-over`），`agents-effective` 的文字不变；`agents.get` 的新字段 | 单元、App |
+| MEM-16 | AGENT 与 AGENTS.md 一节的 token | 记忆页 AGENT 列出加载的文件与 token、合计等于各行之和、对已知内容的文件等于 `estimateMemoryTokens(内容)`、超过 2000 的警告（2026-10-26 改：原来 500，数字按千分位写）；`Edit in Customize` 打开 Customize 的 Instructions 一节；那一节同样的 token（`agents-tokens`）与警告（`agents-over`），`agents-effective` 的文字不变；`agents.get` 的新字段 | 单元、App |
 | MEM-17 | 增强设置 | 开关打开时取默认范围与思考强度、`time` 04:00、`since` 为当天；对话框四项保存进 `enhance.json`；范围的第一个候选不支持思考时 `Effort` 不可用；清空时间时 `Choose a time.`；没有默认范围时状态行提示选模型、不跑；关掉时排着的去掉、正在跑的停止并记失败；关掉再打开保留 `pick`/`thinking`/`team`/`time`、`since` 为再次打开那天；`enhance.json` 读不出 → 按关、`enhance.get` 带 `error`、记忆页显示 `Couldn’t read the enhancement settings: …`；开关与对话框失败的文字 | 单元、App、回放 |
 | MEM-18 | 日子与定时 | §9.2 的日界（含 03:59/04:00 两侧）；该跑的日子（补跑多天、`since` 之前不跑、失败的日子之后不跑）；改了 `time`（单元：往后改并跨过现在，例 `doneThrough` 10-22、10-23 10:00 把 04:00 改为 23:00，10-23 23:00 跑 10-22，已读的会话只列 10-23 04:00 之后新增的部分，10-23 白天新建的会话也列出；往前改时没有重复列出）；只有一个定时器且设在最早的项目时刻、到点排队并设下一个；启动时补跑（App：`time` 04:00，`doneThrough` 为前天、会话在昨天，启动后跑昨天）；到点自动跑（App：启动前写 `enhance.json`，`time` = 现在 + 1 分钟、`doneThrough` = 现在所属日子（按这个 `time`）的前一天、会话消息落在现在所属的日子里；启动时没有该跑的日子，到点后跑这一天、修订 `done`） | 单元、App |
 | MEM-19 | 读哪些会话与反馈 | 只列工作目录相同、片段里有用户或助手消息的会话；正在生成的不列、水位不动，没有水位的会话在 D 跑时在生成、D+1 的运行列出它、片段从它 D 的内容开始（D+1 没有新消息也一样）；片段从水位之后到日界；水位条目找不到时从 `since` 那天开始；第二天接着聊只列新增部分；关掉几天再打开，关着那几天的条目不在片段里；有 TaskBoard 时列出目录；增强会话自己不在里面；行号是物理行（中间有一行坏的 JSON 时，列出的起止行与 `read` 工具读到的那几个条目的行一致）；反馈按 `cwd`、`createdAt`、`feedbackSeen` 选；没有会话时跳过（`skipped`、`doneThrough` 推进、没有修订、`last` 为 `skipped`） | 单元、App |
@@ -1120,8 +1122,8 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 | `tests/ui/tb-replay.mjs` | TB-03 的回放列表去掉 m7 的两个片段 |
 | `tests/ui/v1-models-existing.mjs` | 套件列表去掉 m7；TB-46 的模型层覆盖检查带 `--allow-missing-real`；加 `--id MEM-35`（见下） |
 | `tests/ui/harness/replay.js`、`main.jsx` | 只读查询加 §8 的四个（按 §8 的参数配对与取法，不用 `latestResult`）；`reviewStubs` 改为 `issuesStubs`（只有 UI issues）；`main.jsx` 去掉 `fixtures/m7`、加 `fixtures/mem`；`agents.get` 的旧录制与 `m6Empty` 的空结果缺 `userTokens`、`total` 时补上（`userTokens` 按录下的 `content` 估算，`content` 为 `null` 时 0；`total` 等于 `userTokens`；`loaded` 中的字符串补为 `{ path, tokens: 0 }`），代码里注明 synthetic |
-| `tests/ui/m6-app-settings.mjs` | 设置页左侧的分节多了 `UI issues`（数量与顺序的检查）；AGENTS.md 节的比较不变（token 数在 `agents-tokens`）。`v1-models-app-settings.mjs` 没有分节数量的检查，不用改 |
-| `tests/ui/m6-replay.mjs`、`m6-real.mjs` | 不变（`agents-effective` 的文字不变） |
+| `tests/ui/m6-app-settings.mjs` | 设置页左侧的分节多了 `UI issues`（数量与顺序的检查）；AGENTS.md 节的比较不变（token 数在 `agents-tokens`）（2026-10-26 改：AGENTS.md 的步骤改从 Customize 进，设置页只剩 `Models`、`UI issues`，见 v1/walkthrough-1026/WP-07.md）。`v1-models-app-settings.mjs` 没有分节数量的检查，不用改 |
+| `tests/ui/m6-replay.mjs`、`m6-real.mjs` | 不变（`agents-effective` 的文字不变）（2026-10-26 改：AGENTS.md 的步骤改从 Customize 进，`m6-app-tools.mjs` 的分节列表加 `agents`，见 v1/walkthrough-1026/WP-07.md） |
 | `tests/ui/m6-app-tools.mjs` | MCP 保存后的 `New session`：新会话的项目名改读顶栏的 `.chat-project`、会话名读 `session-title`，不读空状态的标题。项目里那个连不上的 MCP 服务让 pi 在会话打开后几百毫秒发 `MCP servers need attention`，对话流有了这一项空状态就不显示；它与读取只差几毫秒，记忆之前的构建在这台机器上同样会失败（实测，检查记录） |
 | `tests/ui/m4-app.mjs`（走查 4 生成中选字、浮层开着时的 Esc）、`m4-helpers.mjs` | 生成中拖选前先把那句话滚到眼前，等跟随自己滚到底（直到那句话下面至少还有 90px），再往上滚到它在视野中间（至少 60px），拖选时不再滚动（`textPoints`、`dragSelect` 加可选的 `scroll`，默认照旧滚到视野中间）；断言不变。原来拖选时把那句话滚到视野中间，那里离底部不到 24px，跟随恢复；或者往上滚时跟随记下的“自动滚到底的位置”还是按住鼠标之前的，往上滚不算离开底部。两种情况下按下鼠标之前流入的字都会把对话流滚到底、拖到别的行：记忆之前的构建（HEAD）同样偶尔失败，是原有的时序竞争 |
 | `tests/spec-coverage.mjs` | 加 `--spec memory`（编号 `MEM-`、§14.2、文件前缀 `mem-`）；`tests/unit/taskboard/spec-coverage.test.mjs` 里 “expected model or taskboard” 的原文随之改 |
