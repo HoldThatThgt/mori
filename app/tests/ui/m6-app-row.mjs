@@ -1142,6 +1142,8 @@ async function blockedKeepsMenu(ctx) {
  *        起不关，项变为不可用；
  *        开着权限菜单时排队的消息开始新的一轮 → 不关；开着"Queue"的下拉时清空草稿 → 关，焦点回到文字框；拒绝启动卡出现、
  *        消失 → 范围菜单不关（blockedKeepsMenu）。发出后进入准备中 → 范围菜单不关、项不可用，在 preparing 里查。
+ *        生成中范围的项之下能用的是 Task mode 一行、Manage agents（合入 Customize › Agents 之后总有）和 Manage models；
+ *        没有需求、Task mode 关着，没有 See background tasks（model-menu.md"回复进行中的菜单"）。
  */
 async function autoClose(ctx) {
   const { page, h } = ctx;
@@ -1158,8 +1160,9 @@ async function autoClose(ctx) {
     .every((item) => !item.disabled), null, { timeout: 5000 }).catch(() => {});
   const idle = await rangeMenuLook(page);
   record('开着范围菜单时生成开始：打勾的项仍打勾（aria-checked="true"）、和别的项一样不可用；↑ ↓ 跳过不可用的项（焦点只在'
-    + ' Task mode 一行和"Manage models"之间）；这一轮结束时菜单仍开着，项恢复可用、说明换回"Applies to this session only. …"',
-  model?.checkedDisabled === true && arrows.every((name) => ['team-switch', 'manage-models'].includes(name))
+    + ' Task mode 一行、"Manage agents"和"Manage models"之间）；这一轮结束时菜单仍开着，项恢复可用、说明换回'
+    + '"Applies to this session only. …"', model?.checkedDisabled === true
+    && arrows.every((name) => ['team-switch', 'manage-agents', 'manage-models'].includes(name))
     && arrows.includes('manage-models') && idle?.open && idle.disabled === 0 && idle.items > 0
     && idle.note?.startsWith('Applies to this session only.') === true, JSON.stringify({ model, arrows, idle }));
   if (await page.getByTestId('model-menu').count()) await page.keyboard.press('Escape');

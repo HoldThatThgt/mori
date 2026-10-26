@@ -565,9 +565,11 @@ async function menuStaysOpen(ctx, tab) {
   const look = () => menu.evaluate((el) => ({ sections: el.querySelectorAll('[data-section]').length,
     note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null,
     tail: [...el.children].slice(-3).map((child) => child.dataset.testid ?? child.dataset.action ?? child.className),
+    tasks: Boolean(el.querySelector('[data-action="see-background-tasks"]')),
     focused: document.activeElement?.dataset.testid ?? null }));
   await clickTeamSwitch(ctx, tab, 'always', { keepOpen: true });
-  await poll(async () => (await look()).sections === 0, 10000);
+  // 打开后 Task mode 一行下面有 See background tasks（协作模式下总有，model-menu.md“协作模式的菜单”）
+  await poll(async () => { const now = await look(); return now.sections === 0 && now.tasks; }, 10000);
   const on = { open: await menu.count(), ...await look() };
   on.arrows = await menuArrows(ctx, ['ArrowDown', 'ArrowUp']);
   await watchPending(ctx, tab);
@@ -593,8 +595,9 @@ async function menuStaysOpen(ctx, tab) {
     && same(on.tail, order) && off.focused === 'team-switch' && same(off.enter, ['always', 'off'])
     && closed.open === 0 && closed.focus === 'model-button', brief({ on, off, closed }));
   record('TB-53 after a click on the Task mode row ↑ ↓ move between the usable items of the open menu (team-switch.md, '
-    + 'the row after a click): in task mode (no range items) ↓ goes to "Manage models" and ↑ back to the row; '
-    + 'off, ↑ goes to the last range item and ↓ back to the row', same(on.arrows, ['manage-models', 'team-switch'])
+    + 'the row after a click): in task mode (no range items) ↓ goes to "See background tasks" and ↑ back to the '
+    + 'row; off, ↑ goes to the last range item and ↓ back to the row',
+  same(on.arrows, ['see-background-tasks', 'team-switch'])
     && same(off.arrows, ['menuitemradio', 'team-switch']), brief({ on: on.arrows, off: off.arrows }));
   await pendingChecks(ctx, tab);
 }

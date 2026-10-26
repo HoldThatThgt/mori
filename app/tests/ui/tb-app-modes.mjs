@@ -656,7 +656,9 @@ async function runOn(ctx) {
   const pane = await paneState(ctx.page, who.tab);
   await openModelMenu(ctx, who.tab);
   const during = await menuLook(ctx, who.tab);
-  const arrows = await menuArrows(ctx, ['ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp']);
+  // 关闭模式、没有需求：范围的项之下是 Task mode 一行、Manage agents、Manage models（model-menu.md"回复进行中的菜单"）；
+  // ↓ 三次走到底再回到这一行，↑ 一次回绕到 Manage models
+  const arrows = await menuArrows(ctx, ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowUp']);
   const clickAt = Date.now();
   const sw = await clickTeamSwitch(ctx, who.tab, 'always');
   record('TB-53 during a reply the model menu opens (2026-10-26, §13.1): the range items are listed but all disabled, '
@@ -665,8 +667,8 @@ async function runOn(ctx) {
     && during.note === BUSY_NOTE && during.row && during.focused === 'team-switch' && sw.mode === 'always',
   brief({ running: pane.running, during, sw }));
   record('TB-53 during a reply ↑ ↓ in the model menu skip the disabled range items (team-switch.md, a reply in '
-    + 'progress): the focus only moves between the Task mode row and "Manage models", wrapping at the ends',
-  same(arrows, ['manage-models', 'team-switch', 'manage-models', 'team-switch']), brief(arrows));
+    + 'progress): the focus only moves between the Task mode row, "Manage agents" and "Manage models", wrapping at '
+    + 'the ends', same(arrows, ['manage-agents', 'manage-models', 'team-switch', 'manage-models']), brief(arrows));
   const busy = await busyCommands(ctx, who);
   await settle(ctx, who, 60000);
   await sendMessage(ctx, who.tab, 'Now in team mode');
@@ -743,8 +745,8 @@ async function runOffNotice(ctx, who, obs) {
 
 /**
  * @brief 协作模式锁定的模型按钮在回复进行中（准备中或生成中，team-blocked.md“锁定、准备中或生成中”）：不 aria-disabled，
- *        悬停两行（按钮文字、Task mode 的说明）；打开的菜单第一项是说明，下面只有 Task mode 一行和 Manage models，
- *        没有范围的项；读完关上菜单。
+ *        悬停两行（按钮文字、Task mode 的说明）；打开的菜单第一项是说明，下面只有 Task mode 一行、See background tasks
+ *        （协作模式下总有）、Manage agents 和 Manage models（model-menu.md“协作模式的菜单”），没有范围的项；读完关上菜单。
  * @param when 检查名里写的时机
  */
 async function lockedBusy(ctx, tab, when) {
@@ -757,10 +759,13 @@ async function lockedBusy(ctx, tab, when) {
     buttons: [...el.querySelectorAll('button')].map((item) => item.dataset.testid ?? item.dataset.action ?? '') }));
   await closeModelMenu(ctx, tab);
   record(`TB-53 the locked task-mode model button ${when}: not aria-disabled, hover two lines (its text and `
-    + `"${TASK_PICKS}"); its menu opens with that note first, then only the Task mode row and Manage models (no range `
-    + 'item)', sw.locked && !sw.disabled && same(sw.title?.split('\n'), [sw.text, TASK_PICKS])
+    + `"${TASK_PICKS}"); its menu opens with that note first, then only the Task mode row, See background tasks, `
+    + 'Manage agents and Manage models (no range item)', sw.locked && !sw.disabled
+    && same(sw.title?.split('\n'), [sw.text, TASK_PICKS])
     && sw.text.startsWith('Task mode · ') && menu.first === 'model-menu-note' && menu.note === TASK_PICKS
-    && menu.radios === 0 && same(menu.buttons, ['team-switch', 'manage-models']), brief({ sw, menu }));
+    && menu.radios === 0
+    && same(menu.buttons, ['team-switch', 'see-background-tasks', 'manage-agents', 'manage-models']),
+  brief({ sw, menu }));
 }
 
 // ---------- TB-06、TB-07、TB-08：立项的决定 ----------
