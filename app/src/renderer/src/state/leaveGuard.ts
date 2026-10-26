@@ -1,7 +1,9 @@
-// 离开有未保存改动的页面之前先问你（docs/v0/screens/settings.md "离开时有未保存的改动"）：
-// 编辑器有未保存的改动时登记一个检查；切换页面、会话或设置分节的入口都先经过这里，你选"Discard"才离开。
-// 确认框的标题与说明由登记的检查给出（设置页的 AGENTS.md、记忆页的条目表单，docs/specs/memory.md §10.1）。
-// 只在界面里：关闭 Mori 窗口时不问。
+// 离开有未保存改动的页面之前先问你（docs/v1/screens/customize-agents-md.md "离开时有未保存的改动"）：
+// 编辑器有未保存的改动时登记一个检查；切换页面、会话或 Customize 分节的入口都先经过这里，你选"Discard"才离开
+// （2026-10-26 起设置页换分节不经过这里，设置页里没有会登记检查的编辑器）。
+// 确认框的标题与说明由登记的检查给出（Customize 的 Instructions（AGENTS.md）、记忆页的条目表单，docs/specs/memory.md §10.1）。
+// 只在界面里：关闭 Mori 窗口时不问（2026-10-26 起关掉窗口只是藏进系统托盘，改动留着；
+// 托盘或 File 菜单的"Exit"退出时也不问这件事）。
 
 import { create } from 'zustand';
 

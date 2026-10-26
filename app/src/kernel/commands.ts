@@ -7,7 +7,9 @@ import { removeMcpServer, saveMcpServer, setMcpDirect, setMcpEnabled } from './m
 import { handleMemoryCommand } from './memoryCommands';
 import { handleModelsCommand, isModelsCommand } from './modelCommands';
 import { loadPi } from './pi';
-import { addPackage, readTools, removePackage, setPackageEnabled, toggleResource } from './resources';
+import {
+  addPackage, readTools, removePackage, setDefaultTool, setPackageEnabled, toggleResource,
+} from './resources';
 import {
   abort, answerApproval, answerQuestion, boardView, clearQueue, closeSession, createSession, forgetApproval,
   listSessions, openSession, prompt, readSession, recheckAgents, renameSession, sessionCommands, sessionPickOptions,
@@ -36,6 +38,8 @@ async function handleToolsCommand(command: Command): Promise<unknown> {
       return readTools(command.sessionId);
     case 'resource.toggle':
       return toggleResource(command.sessionId, command.kind, command.path, command.enabled);
+    case 'tools.setDefault':
+      return setDefaultTool(command.sessionId, command.name, command.enabled);
     case 'package.add':
       return addPackage(command.path);
     case 'package.setAll':

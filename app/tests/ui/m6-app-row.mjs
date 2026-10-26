@@ -5,7 +5,8 @@
 // 圆环（还没有消息时为空、"Context window"和详情里的说明；有用量时悬停"Context ≈ …k / …k (N%)"、读屏名称
 // "Usage: Context approximately … of … tokens (N%)"、读屏的描述没有"/"、没有 title；详情的打开、Esc、点外面、Tab 移走；
 // 键盘焦点时显示悬停提示，Esc 先关详情、再藏提示、第三次才停止生成；开着时用量刷新详情跟着变；生成开始时不关；
-// ≥ 75%、≥ 90% 的颜色，有填充时底圈是 --color-line、空圆环是 --color-faint；1,000,000 和 999,950 的窗口写成"1M"）；
+// ≥ 75%、≥ 90% 的颜色，有填充时底圈是 --color-line、空圆环是 --color-faint；1,000,000 和 999,950 的窗口写成"1M"；
+// 2026-10-26 起详情里的分项：有 MCP 服务时的"MCP tools"、关掉自动压缩时没有"Autocompact buffer"，WP-12）；
 // 生成中（范围、Effort 仍能 Tab 到、不开菜单、悬停的行和读屏的描述是原因）；切换中两个按钮都带 data-pending；
 // 准备中（v1：被限流的提供商，"Waiting for a model"）这一行在各档的样子（单栏 300–930px，分屏 279 / 280px）、单个"Queue"、
 // 原因与占位文字；
@@ -49,6 +50,7 @@ import {
   waitVerified, watchRows,
 } from './m6-helpers.mjs';
 import { fetchIn, pageHelpers, pickIn, PROVIDER_FORM } from './page.mjs';
+import { partsBrief, partsProblems, readParts } from './ring-parts.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -298,7 +300,8 @@ function usedProblems(ring, contextWindow) {
 /**
  * @brief 发一条消息后的圆环（S1）：data-tokens 是 pi 给的数、data-percent 四舍五入；读屏名称"Usage: Context approximately
  *        … of 128,000 tokens (N%)"、描述里没有"/"、没有 title；悬停提示"Context ≈ …k / 128k (N%)"；底圈 --color-line、
- *        填充强调色；点开详情（左边"Context window"，右边 summary，4px 的条是强调色）；点外面关闭、Shift+Tab 移走也关闭。
+ *        填充强调色；点开详情（左边"Context window"，右边 summary，下面是分段条和分项，见 recordParts）；点外面关闭、
+ *        Shift+Tab 移走也关闭。
  */
 async function ringUsed(ctx) {
   const { page } = ctx;
@@ -310,6 +313,7 @@ async function ringUsed(ctx) {
   await page.locator(RING).click();
   await page.getByTestId('usage-details').waitFor({ timeout: 5000 });
   const open = await ringState(page);
+  recordParts(await readParts(page, PANE), open);
   await noteSmall(ctx, '圆环详情（有用量）', '[data-testid="usage-details"]');
   await shot(page, 'ring-used-details');
   await paneOf(page).getByTestId('transcript').click({ position: { x: 10, y: 10 } });
@@ -325,11 +329,27 @@ async function ringUsed(ctx) {
     === colors['--color-line'].stroke && used.fill?.stroke === colors['--color-accent'].stroke,
   JSON.stringify({ base: used?.base, fill: used?.fill, line: colors['--color-line'],
     accent: colors['--color-accent'] }));
-  record(`点开详情：左边"Context window"，右边"${texts.summary}"，下面一条 4px 的条（强调色）；点外面（对话流）关闭；`
-    + 'Shift+Tab 把焦点移到 Effort 按钮也关闭', open?.details?.text.includes('Context window')
-    && open.details.text.includes(texts.summary) && open.details.bars.includes(colors['--color-accent'].background)
+  record(`点开详情：左边"Context window"，右边"${texts.summary}"，下面是分段条（不再是一条圆环颜色的条，没有强调色）；`
+    + '点外面（对话流）关闭；Shift+Tab 把焦点移到 Effort 按钮也关闭', open?.details?.text.includes('Context window')
+    && open.details.text.includes(texts.summary) && open.details.bars.length > 1
+    && !open.details.bars.includes(colors['--color-accent'].background)
     && outside && tabbed.gone && tabbed.focus === 'thinking-button', JSON.stringify({ details: open?.details, outside,
     tabbed }));
+}
+
+/**
+ * @brief 有用量时详情里的分项（models.md"详情里的分项"）：这个套件有 5 个合成 MCP 服务（30 个 direct 工具）、
+ *        关掉了 pi 的自动压缩、窗口 128,000，所以有"MCP tools"一行、没有"Autocompact buffer"，Free space = 128,000 − tokens；
+ *        顺序、Claude 的名字、"≈ …"和一位小数的百分比、Messages 是 tokens 减去前五项、条与各行同序同色、段间 2px、
+ *        圆环的读屏描述是各行、详情里没有能停焦点的东西（焦点留在圆环）。
+ */
+function recordParts(seen, open) {
+  const problems = partsProblems(seen, { window: WINDOW, reserve: null,
+    has: ['systemPrompt', 'systemTools', 'mcpTools', 'freeSpace'], lacks: ['autocompactBuffer'] });
+  record('分项：有 MCP 服务时有"MCP tools"一行，关掉自动压缩时没有"Autocompact buffer"，Free space = 128,000 − tokens；'
+    + '固定顺序、Claude 的名字、"≈ …"和一位小数的百分比；Messages = tokens − 前五项；条与各行同序同色、段间 2px；'
+    + '圆环的读屏描述是各行；详情里没有能停焦点的东西，焦点留在圆环', problems.length === 0 && Boolean(open?.focused),
+  `${problems.join('; ')} | ${partsBrief(seen)} | ${seen?.desc}`);
 }
 
 /**

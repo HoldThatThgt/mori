@@ -204,8 +204,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.setThinking'), sessionId, level: z.enum(THINKING_LEVELS) }),
   /** 这个会话的提示词模板和技能命令 */
   z.object({ type: z.literal('session.commands'), sessionId }),
-  // ---- M6：AGENTS.md（docs/v0/screens/settings.md） ----
-  /** 用户级 AGENTS.md 和焦点会话加载的文件；没有会话时不带 sessionId */
+  // ---- M6：AGENTS.md（2026-10-26 起在 Customize，docs/v1/screens/customize-agents-md.md） ----
+  /** 用户级 AGENTS.md 和跟随的会话（Customize、记忆页）加载的文件；没有会话时不带 sessionId */
   z.object({ type: z.literal('agents.get'), sessionId: sessionId.optional() }),
   /** 写 <agentDir>/AGENTS.md */
   z.object({ type: z.literal('agents.save'), content: z.string() }),
@@ -220,6 +220,12 @@ export const CommandSchema = z.discriminatedUnion('type', [
     path: z.string().min(1),
     enabled: z.boolean(),
   }),
+  /**
+   * pi 内置工具在新会话里默认启用与否（2026-10-26，负责人走查 M12）：写用户级 settings.json 的 defaultTools；
+   * name 是 pi 的内置工具名，sessionId 是跟随的会话（受信任项目的设置改了这个工具时拒绝）
+   */
+  z.object({ type: z.literal('tools.setDefault'), sessionId: sessionId.optional(), name: z.string().min(1),
+    enabled: z.boolean() }),
   /** 添加本地包（写进用户级设置的 packages） */
   z.object({ type: z.literal('package.add'), path: z.string().min(1) }),
   /** 停用整个包（四类都写成 []）或启用整个包（去掉过滤）；source 是设置里写的 */
@@ -273,7 +279,7 @@ export interface SlashCommand {
   argumentHint: string | null;
 }
 
-/** @brief agents.get 的结果（docs/v0/screens/settings.md "AGENTS.md"）。 */
+/** @brief agents.get 的结果（Customize 的 Instructions 一节，docs/v1/screens/customize-agents-md.md）。 */
 export interface AgentsInfo {
   /** 用户级文件 <agentDir>/AGENTS.md */
   userPath: string;
@@ -287,6 +293,14 @@ export interface AgentsInfo {
   userTokens: number;
   /** userTokens 加 loaded 各项之和；超过 500 时界面标出来 */
   total: number;
+}
+
+/** @brief pi 的一个内置工具在新会话里的默认（Customize 内置工具的开关，docs/v0/screens/tools.md"内置工具"）。 */
+export interface DefaultToolState {
+  /** 新会话默认启用：用户级 settings.json 的 defaultTools 按 pi 的规则选出的；受信任项目的设置改了它时按合并后的 */
+  enabled: boolean;
+  /** 开关不可用的原因（受信任项目的 .pi/settings.json 改了它）；可以开关时为 null */
+  readOnly: string | null;
 }
 
 /** @brief 工具页的一个工具（pi getAllTools 的一项，不含 hidden）。 */
@@ -303,6 +317,8 @@ export interface ToolEntry {
   source: 'builtin' | 'extension' | 'mcp' | 'package' | 'other';
   /** 来源的说明：扩展的路径、MCP 服务名、包的来源；内置工具为空串 */
   sourceLabel: string;
+  /** pi 的 8 个内置工具在新会话里的默认（开关）；别的工具为 null */
+  byDefault: DefaultToolState | null;
 }
 
 /** @brief 工具页的一个资源（DefaultPackageManager.resolve 的一项）。 */
@@ -468,6 +484,29 @@ export interface SavedSession {
   live: LiveStatus | null;
 }
 
+/**
+ * @brief 上下文用量的分项（docs/v0/screens/models.md"详情里的分项"）：每项的 token 数。前五项是 Mori 对当前系统提示词
+ *        和工具说明的估算，Messages 是用量减去它们，Autocompact buffer 是 pi 的设置值，Free space 是窗口里余下的。
+ */
+export interface ContextBreakdown {
+  /** 系统提示词里除 Memory files、Skills 以外的分节和不分节的正文 */
+  systemPrompt: number;
+  /** 发给模型的工具说明，MCP 服务的除外 */
+  systemTools: number;
+  /** MCP 服务的工具说明 */
+  mcpTools: number;
+  /** AGENTS.md（project_context 分节）和记忆的四个分节 */
+  memoryFiles: number;
+  /** 技能列表（skills 分节） */
+  skills: number;
+  /** 用量减去上面五项，不小于 0 */
+  messages: number;
+  /** pi 自动压缩留出的 token 数；关掉了自动压缩时为 null */
+  autocompactBuffer: number | null;
+  /** 窗口减去用量和留出的，不小于 0 */
+  freeSpace: number;
+}
+
 /** @brief session.create / session.open 的结果；模型状态（范围、当前模型、拒绝启动、思考强度）见 ModelState。 */
 export interface SessionInfo extends ModelState {
   /** pi 会话 id */
@@ -492,6 +531,8 @@ export interface SessionInfo extends ModelState {
   tools: string[];
   /** 上下文用量（pi getContextUsage） */
   contextUsage: ContextUsage | null;
+  /** 上下文用量的分项；没有用量、还没有消息或刚压缩完时为 null */
+  contextBreakdown: ContextBreakdown | null;
   /** 批准设置；新建和重新打开的会话都是"Ask each time" */
   approval: ApprovalState;
   /** 协作状态（平行 Agent 规格 §13.10） */
@@ -605,6 +646,8 @@ export interface SessionContent {
 export interface SessionState {
   /** 上下文用量；pi 不知道时为 null */
   contextUsage: ContextUsage | null;
+  /** 上下文用量的分项；没有用量、还没有消息或刚压缩完时为 null */
+  contextBreakdown: ContextBreakdown | null;
 }
 
 /** @brief session.clearQueue 的结果：被撤回的消息。 */

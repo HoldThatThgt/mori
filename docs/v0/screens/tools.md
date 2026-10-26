@@ -7,13 +7,14 @@
 | 项 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 入口 | — | 左栏"Open folder…"下面的"Customize"（收起为图标栏时是图标按钮）；工具页打开时高亮 | 打开工具页 |
-| 顶部 | — | "Back to app"；标题"Customize"；跟随的会话："<项目名> · <会话名>"，或"No open session. Only user-level skills and plugins are listed." | Back to app（恢复分屏、滚动位置、草稿，与设置页相同） |
-| 分节 | — | 照 Claude 桌面版的设置页：左边分节列表（读屏名称"Customize page sections"）"Built-in tools""Skills""MCP""Plugins"，右边内容；没有打开的会话时"Built-in tools""MCP"不出现 | 切换分节 |
+| 顶部 | — | "Back to app"；标题"Customize"；跟随的会话："<项目名> · <会话名>"，或"No open session. Only user-level skills and plugins are listed."（2026-10-26 改："No open session. Only user-level skills, plugins, and instructions are listed."） | Back to app（恢复分屏、滚动位置、草稿，与设置页相同） |
+| 分节 | — | 照 Claude 桌面版的设置页：左边分节列表（读屏名称"Customize page sections"）"Built-in tools""Skills""MCP""Plugins"，右边内容；没有打开的会话时"Built-in tools""MCP"不出现（2026-10-26 改：负责人走查 M4，最后一节是"Instructions"（用户级 AGENTS.md，从设置页挪来；负责人定名与位置），没有会话时也在；从侧栏进入仍落在第一节，从记忆页的 Edit in Customize 进入落在它；状态表见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)） | 切换分节 |
 | 改动何时生效 | pi 只在会话创建时读这些配置（m6-checks.md） | 页面顶部一行"Changes apply to new sessions. Sessions already open aren’t affected."和"New session"按钮（在跟随的项目里新建，等于 Ctrl+N） | New session |
-| 读取中 / 读取失败 | `tools.get` | "Loading…" / 原文和"Retry" | Retry |
+| 读取中 / 读取失败 | `tools.get` | "Loading…" / 原文和"Retry"（2026-10-26：只在内置工具、技能、MCP、插件四节；Instructions 一节不等它，读取失败时照常可用） | Retry |
+| 离开与换分节（2026-10-26 加） | Instructions 一节有未保存的改动 | 换分节（点、↑ ↓）、离开工具页都先出 AGENTS.md 的离开确认框（同 customize-agents-md.md）；点当前分节、已经在工具页时点左栏"Customize"什么都不变 | Discard；Keep editing |
 
-**跟随哪个会话**：当前会话（分屏时焦点所在的那一栏），即打开工具页之前中栏的那个会话；会话还在打开中时等它打开。工具页开着时在侧栏归档或删除了它，跟到剩下的那一栏；没有剩下的就当作没有打开的会话
-（顶部"No open session. Only user-level skills and plugins are listed."）。工具页打开期间侧栏点别的会话会回到会话页（同设置页）。
+**跟随哪个会话**：当前会话（分屏时焦点所在的那一栏），即打开工具页之前中栏的那个会话；会话还在打开中时等它打开（2026-10-26 加：Instructions 一节不等，先列出用户级，项目的文件等它打开好再读）。工具页开着时在侧栏归档或删除了它，跟到剩下的那一栏；没有剩下的就当作没有打开的会话
+（顶部"No open session. Only user-level skills and plugins are listed."，2026-10-26 改为"No open session. Only user-level skills, plugins, and instructions are listed."）。工具页打开期间侧栏点别的会话会回到会话页（同设置页）。
 读取用 `tools.get`（带这个会话的 sessionId），每次进入工具页、
 每次启停或添加之后重新读取；不监视文件。
 
@@ -23,10 +24,33 @@
 
 ## 内置工具（只在有会话时）
 
+2026-10-26 改（负责人走查 M12"why so many not-enabled tools? why can't I enable them?"，回答 3）：pi 的 8 个内置工具各有一个开关，
+存为 pi 设置的 `defaultTools`，对新会话生效；其余的行没有开关，下面一行写为什么。检查记录
+[../../v1/walkthrough-1026/WP-08.md](../../v1/walkthrough-1026/WP-08.md)。
+
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 列表 | `tools.get` 的 `tools`：pi `session.getAllTools()`，不含 `hidden`；`active` 来自 `getActiveToolNames()` | 每个工具一行：名字、来源（"Built-in" / "Extension <路径>" / "MCP · <服务>" / "Plugin <包>"；Mori 批准扩展不注册工具）、状态（"Enabled"，或"Not enabled"：注册了但没有给模型）、说明的第一行（协作模式：见 docs/specs/parallel-agents-taskboard.md §6.3：项目有别的角色、或用过协作模式的会话另列出 `mori-team` 注册的 11 个 TaskBoard 工具 `board_read`、`read_session`、`agent_message`、`task_handoff`、`request_submit`、`request_update`、`request_cancel`、`task_create`、`task_edit`、`reply_via_dialog`、`request_close`，来源显示 `Mori`；它们默认不启用，按协作模式启用（§5.2、§5.5）；没有角色、没用过协作模式的会话不列出，与 v0 相同） | 展开看完整说明 |
-| 说明 | — | 标题下一行"All tools in this session. Only enabled tools are available to the model." | — |
+| 列表 | `tools.get` 的 `tools`：pi `session.getAllTools()`，不含 `hidden`；`active` 来自 `getActiveToolNames()` | 每个工具一行：名字、来源（"Built-in" / "Extension <路径>" / "MCP · <服务>" / "Plugin <包>" / "Mori"；Mori 批准扩展不注册工具）、状态（"Enabled"，或"Not enabled"：注册了但没有给这个会话的模型）、说明的第一行；pi 的内置工具行右边一个开关，其余的行下面一行原因（见下面两行）。pi 总是注册全部 8 个内置工具（`read`、`bash`、`edit`、`write`、`grep`、`find`、`ls`、`powershell`），默认只启用前 4 个。Mori 的 TaskBoard 工具（docs/specs/parallel-agents-taskboard.md §6.3）：项目有别的角色、或用过 Task mode 的会话另列出 `mori-team` 给用户会话注册的那一组，来源 `Mori`：对话与立项合并（只有基座，或一个角色持有两项）时 9 个（`board_read`、`read_session`、`agent_message`、`request_submit`、`request_update`、`request_cancel`、`task_create`、`task_edit`、`reply_via_dialog`），分开时 3 个（`board_read`、`read_session`、`agent_message`）；`task_handoff`、`request_close` 只在实例会话里，不在这里列出（2026-10-26 改：原来写 11 个，与代码和 TB-03 不符）。它们默认不启用，按模式启用（§5.2、§5.5）；没有角色、没用过 Task mode 的会话不列出。"Enabled"是这个会话上一轮运行时的样子：开关 Task mode 之后要到下一条消息开始才变（team.ts `beforeUserRun`） | 展开看完整说明 |
+| 说明 | — | 标题下一行"All tools in this session. Only enabled tools are available to the model. Switches apply to new sessions." | — |
+| pi 内置工具的开关 | `tools.get` 的 `tools[].byDefault`：用户级 `<agentDir>\settings.json` 里的 `defaultTools`（文件里的值，`getGlobalSettings()`；不含 Mori 只放在内存里的设置，例如没有 bash 时的 `-bash`、`+powershell`，方案第 6 节"Shell"）按 pi 的规则算出的新会话默认工具；没写 `defaultTools` 时是 `read`、`bash`、`edit`、`write` | 开关（`role="switch"`，读屏名称"Enable tool <名字>"）开着 = 新会话默认把它给模型；与同一行的"Enabled / Not enabled"（这个会话）是两回事 | 开、关 |
+| 按了开关 | `tools.setDefault { sessionId, name, enabled }`：后台进程在 pi 自己的文件锁里读改写 `settings.json`，只改 `defaultTools`，其他字段原样保留；写成 pi 的 `+名字` / `-名字`（相对 pi 的默认 `read`、`bash`、`edit`、`write`，先 `-` 后 `+`，例如 `["+ls"]`、`["-bash", "+powershell"]`），与默认相同时去掉这一项 | 开关立刻变过去，写完重新读取；这一行的"Enabled / Not enabled"不变（开着的会话不变，页面顶部"Changes apply to new sessions. Sessions already open aren’t affected."）；之后新建的会话（含重启后重新打开的会话）里它是"Enabled"，发给模型的工具与 system prompt 的工具清单、规则随之变 | 再按 |
+| 写入失败 | 命令报错：`settings.json` 不是 JSON 或不是对象（原文带文件路径）、拿不到文件锁 | 这一行下面"Couldn’t save: "+ 原文；开关回到原来的样子；文件不变 | 改好文件后再按 |
+| 本项目的设置改了它 | 受信任项目的 `.pi\settings.json` 也写了 `defaultTools`（pi 把 `+` / `-` 的写法接在用户级后面，普通工具名的写法整个代替），合并后这个工具与只按用户级时不同 | 开关显示合并后的样子、不可用，下面一行"Turned on in this project’s .pi/settings.json. To change it, edit that file."（关掉时"Turned off in …"，同技能）；合并后没变的工具照常可以开关 | — |
+| `grep`、`find` | — | 下面一行"Needs rg.exe in <agentDir>\bin or on PATH. Mori doesn’t download it."（`find` 是 fd.exe）。不检查有没有：Mori 让 pi 离线运行（`PI_OFFLINE`），pi 不下载它们，没有时调用失败，工具卡写 pi 的原文"ripgrep (rg) is not available and could not be downloaded"或"fd is not available and could not be downloaded" | — |
+| 不是 pi 内置工具的行 | 来源与工具名 | 没有开关，下面一行原因：TaskBoard 工具"Mori turns this on and off with Task mode."；`memory`"Mori turns this on for the main agent."（记忆规格 §7.6）；MCP 的工具"Turn its server on or off in MCP."；插件的工具"Turn it on or off in Plugins."；扩展文件的工具"Set by this extension. To change it, edit the extension file." | — |
+
+开关还管这几件事（2026-10-26，WP-08）：
+
+- **Task mode 的助手**：Task mode 的基座工具就是这里的默认工具（`sessions.ts` 把 `getDefaultTools()` 交给 Team 作 `baseTools`）。
+  没写 `tools` 的角色文件用它们（`roleTools`）；只读的助手（立项、结案、临时提问、订阅、只读的 task，以及 Task mode 下的对话）
+  用其中的读取类（`readClassTools`：与 `read`、`grep`、`find`、`ls` 的交集），所以打开 `ls`、`grep`、`find` 也给了它们。
+  轮次记录定的"只读助手总有 `ls`"由 WP-10 做（之后 `ls` 的开关只影响别的会话）。
+- **批准**：`grep`、`find`、`ls` 是只读工具，不出批准卡（方案 5.7）；`powershell` 同 `bash` 要批准。
+- **发给模型的文字**：每个启用的工具在 system prompt 的工具清单（`<tools>`）与规则（`<rules>`）里有 pi 给它的说明；
+  打开 `grep`、`find`、`ls` 中任一个时，规则里不再有"Use bash for file operations like ls, rg, find"这一条
+  （pi 1.3.0 `system-prompt.js`，记忆规格的 `memoryText.ts` 照写）。
+- **没有 bash 时**：Mori 只在内存里放 `-bash`、`+powershell`（方案第 6 节"Shell"），接在文件里的 `defaultTools` 后面；
+  开关读写的是文件里的值，所以那时 `bash` 的开关开着、新会话里它仍是"Not enabled"。
 
 ## 技能
 
@@ -106,13 +130,14 @@ HTTP 服务第一次有会话用时才连、最后一个会话关闭后断开；
 | MCP 进程状态 | Claude 桌面版设置 → 开发者里每个本地服务显示 running / failed 和失败原文；Mori 每个服务一行"Running · Used by N sessions""Starting…""Failed: <原文第一行>"（完整原文在"Full error"里展开看），来源是共享服务表 |
 | MCP 进程共用 | Claude 桌面版每个本地服务整个 App 一个进程，启动 App 时起、退出时关；Mori 同样（用户级服务，[../m6-mcp-shared.md](../m6-mcp-shared.md)） |
 | 改了 MCP 配置之后 | Claude 桌面版改了本地 MCP 配置要重启才生效；Mori 对新建的会话生效、界面明说；旧进程没有会话用了才关 |
+| 内置工具的开关（2026-10-26） | Claude 桌面版的 Customize 只有 Skills、Connectors、Plugins，没有内置工具的列表，没有对应；开关的样子和读屏名称照技能、MCP 一节（"Enable tool <名字>"） |
 
 ## 界面测试用的标识
 
 | 元素 | 标识 |
 | --- | --- |
-| 工具页 | `data-testid="tools-page"`；左栏入口 `data-testid="nav-tools"`；分节按钮 `button[data-section]`（`builtin` / `skills` / `mcp` / `plugins`） |
-| 内置工具 | `[data-testid="tool-row"][data-tool]`，`data-active` |
+| 工具页 | `data-testid="tools-page"`；左栏入口 `data-testid="nav-tools"`；分节按钮 `button[data-section]`（`builtin` / `skills` / `mcp` / `plugins`；2026-10-26 加最后一节 `agents`（Instructions），这一节的标识见 customize-agents-md.md） |
+| 内置工具 | `[data-testid="tool-row"][data-tool]`，`data-active`；pi 内置工具行的开关 `role="switch"`（2026-10-26）；行下面的原因、`grep` / `find` 的说明和本项目设置的说明都是 `.tools-row-note`，写入失败是 `.form-message.error` |
 | 技能 | `[data-testid="skill-row"][data-name]`，`data-scope`（`user` / `project` / `package`），开关 `role="switch"` |
 | MCP | `[data-testid="mcp-row"][data-server]`，`data-scope`（`user` / `project`；同名的服务可能各有一行）；工具名 `data-testid="mcp-tools"`；进程状态 `data-testid="mcp-process"`，`data-state`（`starting` / `running` / `failed`；`shared` 为 null 时没有这个元素）；错误 `data-testid="mcp-error"`；pi 不会加载的原因 `data-testid="mcp-problem"`；"Switch to direct calls" `data-testid="mcp-direct"`；表单 `data-testid="mcp-form"`，JSON `data-testid="mcp-json"` |
 | 插件 | `[data-testid="package-card"][data-source]`；资源行 `[data-testid="package-resource"][data-kind][data-path]` |

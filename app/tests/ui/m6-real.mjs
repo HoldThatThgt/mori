@@ -2,7 +2,8 @@
 // 状态表见 docs/v0/screens/settings.md、models.md、tools.md、slash.md；pi 的行为见 docs/v0/m6-checks.md。
 // 脚本不接触 key：只把走查数据目录里 Mori 加密保存的密文（credentials.json 与 Local State）复制到临时目录
 // （lib.mjs scratchUserData），之后也不打开它们（"添加模型不改 key"只比较 credentials.json 的修改时间和大小）。
-// 像负责人一样操作界面：设置页里添加模型、编辑模型、写 AGENTS.md；输入框下面一行换范围和思考强度（2026-10-21 起这几个按钮
+// 像负责人一样操作界面：设置页里添加模型、编辑模型，Customize 里写 AGENTS.md（2026-10-26 从设置页挪来，是 Customize 的
+// 最后一节 Instructions）；输入框下面一行换范围和思考强度（2026-10-21 起这几个按钮
 // 从顶栏移到这一行，docs/v0/composer-pickers.md；走查 8 最后在分屏的一栏里再换一次）；工具页里启停技能、用表单添加
 // MCP 服务、添加本地包并按资源启停；输入框打 "/"；批准卡点"Allow once"。系统的选文件夹对话框经 app.evaluate 换成直接
 // 返回测试文件夹。项目技能和项目的 CLAUDE.md、用户级技能和提示词模板、MCP 服务（tests/mcp-server）、pi 包
@@ -11,7 +12,8 @@
 // 旁边另有 Mori 一侧的检查（写进的文件、会话文件里的记录、界面状态）。每一轮都检查确实发出并有了回复（没有错误卡），
 // 发不出去时这一项的流程记为 FAIL，不会被当成模型行为。
 // 用法（在 app/ 下，先 npm run build）：
-//   node tests/ui/m6-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,5,6,7,8,c]
+//   node tests/ui/m6-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,5,6,7,8,c,t]
+// t（2026-10-26，负责人走查 M12）：Customize 的内置工具里打开 ls，新会话里真实模型用 ls 列出文件（只跑它：--only t）。
 // 结果写到 test-results/m6-real(-packaged).json，截图在 test-results/m6-real(-packaged)/。
 // v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；测试准备在复制出的配置里给两个临时项目
 // 授权公网、默认范围设为 [DeepSeek, GLM] 的分组。走查 1 改为在 设置 → Models 里给首选提供商加模型（等它的探针跑完）、
@@ -81,6 +83,7 @@ const PROMPTS = {
   packageCall: '请调用 package_hello 工具（不需要参数），然后用一句话告诉我它返回了什么。',
   reason1: '笼子里有鸡和兔共 35 只，脚共 94 只。鸡兔各几只？只给出答案，不要调用任何工具。',
   reason2: '一个数加上它的一半等于 45，这个数是多少？只给出答案，不要调用任何工具。',
+  ls: '请调用 ls 工具（不要用 bash 或 read）列出当前文件夹里的文件，然后用一句话告诉我有哪些文件。',
 };
 
 // ---------- 测试文件（synthetic） ----------
@@ -194,7 +197,7 @@ async function clickNewSession(page, button) {
 /** @brief 工具页顶部"改动何时生效"一行里的"New session"。 */
 const toolsNewSession = (page) => page.locator('.tools-notice').getByRole('button', { name: 'New session' });
 
-/** @brief 从左栏打开设置页，切到 section（models / agents）。 */
+/** @brief 从左栏打开设置页，切到 section（models）。 */
 async function openSettings(page, section = 'models') {
   await page.getByTestId('sidebar').getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
@@ -462,13 +465,18 @@ async function item1(ctx) {
 
 // ---------- 走查 2：用户级 AGENTS.md ----------
 
-/** @brief 打开设置页 AGENTS.md 一节，等读完；返回用户级的路径、编辑框、生效的文件，和项目级的标题、说明、文件。 */
+/**
+ * @brief 从左栏进入 Customize 再点最后一节 Instructions（用户级 AGENTS.md），等读完；返回用户级的路径、编辑框、生效的文件，和项目级的标题、说明、
+ *        文件。
+ */
 async function agentsState(page) {
-  await openSettings(page, 'agents');
-  await page.waitForFunction(() => document.querySelector('[data-testid="agents-editor"]')?.disabled === false, null,
-    { timeout: 15000 });
+  await page.getByTestId('nav-tools').click();
+  await page.locator('[data-testid="tools-nav"] button[data-section="agents"]').click();
+  await page.getByTestId('tools-page').getByTestId('agents-section').waitFor({ timeout: 10000 });
+  await page.waitForFunction(() => document.querySelector('[data-testid="agents-editor"]')?.disabled === false
+    && document.querySelector('[data-testid="agents-loaded"] .agents-files'), null, { timeout: 15000 });
   return page.evaluate(() => {
-    const section = document.querySelector('.settings-section[data-section="agents"]');
+    const section = document.querySelector('[data-testid="agents-section"]');
     const loaded = section?.querySelector('[data-testid="agents-loaded"]');
     return { path: section?.querySelector('.agents-user .agents-path')?.textContent ?? '',
       value: section?.querySelector('[data-testid="agents-editor"]')?.value ?? null,
@@ -476,15 +484,15 @@ async function agentsState(page) {
       effective: section?.querySelector('[data-testid="agents-effective"]')?.textContent ?? null,
       title: loaded?.querySelector('h3')?.textContent ?? '', note: loaded?.querySelector('.muted')?.textContent ?? '',
       files: [...(loaded?.querySelectorAll('.agents-files .agents-path') ?? [])].map((item) => item.textContent),
-      empty: loaded?.querySelector('.settings-empty')?.textContent ?? null };
+      empty: loaded?.querySelector('.tools-empty')?.textContent ?? null };
   });
 }
 
-/** @brief 设置页 AGENTS.md 一节：先读出样子，再写进编辑框并保存；返回看到的。 */
+/** @brief Customize 的 Instructions 一节：先读出样子，再写进编辑框并保存；返回看到的。 */
 async function saveAgents(ctx) {
   const { page } = ctx;
   const before = await agentsState(page);
-  const section = page.locator('.settings-section[data-section="agents"]');
+  const section = page.getByTestId('agents-section');
   const editor = page.getByTestId('agents-editor');
   await editor.click();
   await editor.fill(PROMPTS.agents);
@@ -497,7 +505,7 @@ async function saveAgents(ctx) {
   return { before, dirty, effective };
 }
 
-/** @brief 走查 2 的设置页部分：文件不存在时的样子、保存、生效的文件、项目级列表。 */
+/** @brief 走查 2 的 Customize 部分：文件不存在时的样子、保存、生效的文件、项目级列表。 */
 function recordAgents(ctx, seen) {
   const file = join(ctx.agentDir, 'AGENTS.md');
   const written = existsSync(file) ? readFileSync(file, 'utf8') : null;
@@ -505,7 +513,7 @@ function recordAgents(ctx, seen) {
   const { before } = seen;
   record('走查 2：AGENTS.md 一节：路径 <agentDir>\\AGENTS.md，"还没有这个文件，保存后创建"，编辑框是空的；改了之后"有未保存的改动"',
     samePath(before.path, file) && before.missing && before.value === '' && seen.dirty === 1, JSON.stringify(before));
-  record('走查 2：保存后"已保存 · 新建的会话才会读到"，文件写入；设置页标出生效的文件"生效中：<agentDir>\\AGENTS.md"',
+  record('走查 2：保存后"已保存 · 新建的会话才会读到"，文件写入；Customize 标出生效的文件"生效中：<agentDir>\\AGENTS.md"',
     written === PROMPTS.agents && seen.effective.startsWith('In effect: ') && samePath(path, file),
     JSON.stringify({ effective: seen.effective, written }));
   record('走查 2：项目级"m6-walk 加载的文件"：列出焦点会话按 pi 规则加载的文件（测试项目的 CLAUDE.md），说明会话打开时读取',
@@ -514,7 +522,7 @@ function recordAgents(ctx, seen) {
     JSON.stringify({ title: before.title, files: before.files, expected: ctx.agentsFiles, note: before.note }));
 }
 
-/** @brief 走查 2：用户级 AGENTS.md 要求以"收到"开头；设置页标出生效的文件；新会话的第一条回复照做。 */
+/** @brief 走查 2：用户级 AGENTS.md 要求以"收到"开头；Customize 标出生效的文件；新会话的第一条回复照做。 */
 async function item2(ctx) {
   const { page } = ctx;
   const seen = await saveAgents(ctx);
@@ -1265,6 +1273,52 @@ async function counterExamples(ctx) {
   await untrustedSkill(ctx);
 }
 
+// ---------- 内置工具的开关（2026-10-26，负责人走查 M12） ----------
+
+/** @brief settings.json 去掉 defaultTools 之后的其余字段（看开关没有动别的字段）。 */
+function otherSettings(value) {
+  const { defaultTools: _tools, ...rest } = value ?? {};
+  return JSON.stringify(rest);
+}
+
+/**
+ * @brief 负责人走查 M12（docs/v0/screens/tools.md"内置工具"）：Customize → Built-in tools 里打开 ls：开关开着、这个会话里
+ *        仍是"Not enabled"，复制出的 settings.json 的 defaultTools 有 "+ls"、别的字段不变；工具页的"New session"建的会话里
+ *        ls 是"Enabled"，真实模型用 ls 列出项目文件：一张"List"卡、Done、没有批准卡（模型没有调用 ls 时记 KNOWN：模型行为）。
+ *        最后把开关关回去，defaultTools 回到原样。
+ */
+async function itemToolSwitch(ctx) {
+  const { page } = ctx;
+  const file = join(ctx.agentDir, 'settings.json');
+  const before = readJson(file);
+  await openToolsSection(page, 'builtin');
+  const row = page.locator('[data-testid="tool-row"][data-tool="ls"]');
+  const on = await flip(page, row, true);
+  const state = await row.locator('.tools-state').innerText();
+  const after = readJson(file);
+  await shot(page, 't-ls-on');
+  record('M12：内置工具里打开 ls：开关开着、这个会话里仍是"Not enabled"；settings.json 的 defaultTools 有 "+ls"，别的字段不变',
+    on.settled && on.checked === 'true' && !on.error && state === 'Not enabled'
+    && (after?.defaultTools ?? []).includes('+ls') && otherSettings(after) === otherSettings(before),
+  JSON.stringify({ on, state, before: before?.defaultTools ?? null, after: after?.defaultTools ?? null }));
+  await clickNewSession(page, toolsNewSession(page));
+  const info = await toolInfo(page, 'ls');
+  await backToChat(page);
+  const turn = await sendTurn(page, PROMPTS.ls);
+  const card = await lastToolCard(page);
+  const listed = card?.title.startsWith('List') ?? false;
+  record('M12：新会话的工具页里 ls 是"Enabled"', info?.active === 'true' && info.state === 'Enabled', JSON.stringify(info));
+  record('M12：真实模型在新会话里用 ls 列出文件：一张"List"卡、Done，没有批准卡（模型没调用 ls 时记 KNOWN）',
+    listed && card.status === 'done' && turn.cards.length === 0, JSON.stringify({ card, cards: turn.cards }), !listed);
+  await shot(page, 't-ls-call');
+  await openToolsSection(page, 'builtin');
+  const off = await flip(page, row, false);
+  await backToChat(page);
+  record('M12：关回 ls 之后 settings.json 的 defaultTools 回到原样', off.settled
+    && JSON.stringify(readJson(file)?.defaultTools ?? null) === JSON.stringify(before?.defaultTools ?? null),
+  JSON.stringify(readJson(file)?.defaultTools ?? null));
+}
+
 // ---------- 执行 ----------
 
 /**
@@ -1297,13 +1351,14 @@ ctx.agentDir = join(ctx.userData, 'pi');
 try {
   await start(ctx);
   await openFolder(ctx, ctx.project, 'Trust workspace');
-  const items = { 1: item1, 2: item2, 3: item3, 4: item4, 5: item5, 6: item6, 7: item7, 8: item8, c: counterExamples };
+  const items = { 1: item1, 2: item2, 3: item3, 4: item4, 5: item5, 6: item6, 7: item7, 8: item8, c: counterExamples,
+    t: itemToolSwitch };
   for (const [item, fn] of Object.entries(items)) {
     if (!wanted(item)) continue;
     try {
       await fn(ctx);
     } catch (error) {
-      record(`${item === 'c' ? '反例' : `走查 ${item}`}：流程`, false, oneLine(error, 400));
+      record(`${{ c: '反例', t: 'M12' }[item] ?? `走查 ${item}`}：流程`, false, oneLine(error, 400));
       await shot(ctx.page, `${item}-error`);
       await recover(ctx.page);
     }

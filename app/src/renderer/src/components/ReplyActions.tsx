@@ -11,8 +11,8 @@ import { turnSource, type ReplyTurn } from '../state/turns';
 import { Icon } from '../icons';
 import { focusComposer } from './SelectionPopover';
 
-/** "Copied"停留的毫秒数 */
-const COPIED_MS = 2000;
+/** "Copied"停留的毫秒数（阅读器的"Path copied to clipboard."也用它） */
+export const COPIED_MS = 2000;
 
 /** @brief 复制按钮：成功时短暂显示"Copied"，失败时旁边显示"Copy failed"。 */
 function CopyButton({ text }: { text: string }) {

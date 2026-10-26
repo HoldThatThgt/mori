@@ -70,18 +70,21 @@ test('MEM-16 agents.get lists each loaded file with its tokens; total is the sum
   assert.equal(info.total, info.userTokens + info.loaded[0].tokens + info.loaded[1].tokens);
 });
 
-test('MEM-16 the effective user-level file decides userTokens (CLAUDE.md when no AGENTS.md); none → 0; over 500',
+test('MEM-16 the effective user-level file decides userTokens (CLAUDE.md when no AGENTS.md); none → 0; over 2,000',
   async (t) => {
     const s = scenario(t);
     const cwd = s.project('shop');
-    const big = 'word '.repeat(420);
+    // 2026-10-26（负责人走查 M15）：提醒线是 AGENTS_LIMIT 2000，与记忆四种的 MEMORY_LIMIT 500 分开。
+    assert.equal(shared.AGENTS_LIMIT, 2000);
+    assert.equal(shared.MEMORY_LIMIT, 500);
+    const big = 'word '.repeat(1700);
     put(join(cwd, 'AGENTS.md'), big);
     focusedSession(cwd, s.agentDir);
     const none = await agents.readAgents('synthetic-session');
     assert.equal(none.effectivePath, null);
     assert.equal(none.userTokens, 0);
     assert.equal(none.total, expectedTokens(big));
-    assert.ok(none.total > 500, 'the total the page and Settings compare with 500');
+    assert.ok(none.total > shared.AGENTS_LIMIT, 'the total the Memory page and Customize compare with 2,000');
     put(join(s.agentDir, 'CLAUDE.md'), 'Claude rules.');
     const claude = await agents.readAgents('synthetic-session');
     assert.equal(claude.effectivePath, join(s.agentDir, 'CLAUDE.md'));

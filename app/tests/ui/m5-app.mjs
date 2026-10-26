@@ -11,6 +11,8 @@
 // 窄栏里的样子、截短、往上打开的菜单、"Queue for later"（splitRows）；Effort 是支持思考的强度时 280px 的一栏（effortWidths，
 // 另起一次 Mori，首次启动时勾上 Supports thinking）；F8 报告的"Model range""Effort""Pane width"（左右两栏各按一次）；
 // 最小窗口时两栏的输入框下面一行。
+// 2026-10-26 走查 M23（WP-13）：分屏时右栏的"Expand" / "Collapse"、F8 的"Open · Expanded"、展开时换到右栏关着的会话
+// 不会是空白（splitExpand）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m5-app.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m5-app(-packaged).json，截图在 test-results/m5-app(-packaged)/。
@@ -529,6 +531,53 @@ async function crampedRight(ctx) {
   record('最小窗口 800×600：两栏的输入框下面一行（权限、选择范围、Effort、圆环、发送）按约 370px 一栏收紧，不换行、'
     + '截短的先后对、读屏名和悬停对', rows.length === 0, rows.join('; '));
   await shot(page, '3-wide-again');
+}
+
+/** @brief 此刻右栏是否展开（.app 的 data-right-expanded）、中栏的显示方式、右栏和左栏的宽、窗口宽、焦点在哪一栏。 */
+function expandFacts(page) {
+  return page.evaluate(() => {
+    const box = (css) => Math.round(document.querySelector(css)?.getBoundingClientRect().width ?? 0);
+    const center = document.querySelector('.center');
+    return { expanded: document.querySelector('.app')?.dataset.rightExpanded ?? null,
+      center: center ? getComputedStyle(center).display : null, panel: box('[data-testid="right-panel"]'),
+      sidebar: box('[data-testid="sidebar"]'), width: innerWidth,
+      focused: document.querySelector('.pane-slot[data-focused="true"]')?.dataset.side ?? null,
+      button: document.querySelector('[data-testid="right-panel"] .panel-expand')?.getAttribute('aria-label') ?? null };
+  });
+}
+
+/**
+ * @brief split.md"右栏展开"（2026-10-26 走查 M23）：分屏、右边那一栏的右栏开着、左边那一栏的关着，点"Expand"：两栏一起藏起、
+ *        右栏占满左栏右边；F8 的"Right panel"是"Open · Expanded"；点侧栏里左边那一栏的会话行：焦点切过去，它的右栏关着，
+ *        两栏照常显示（不会是空白）；再点右边那一栏的会话行：又是展开的；"Collapse"回到两栏。
+ */
+async function splitExpand(ctx) {
+  const { page } = ctx;
+  await setOwnRight(page, 'left', false);
+  await setOwnRight(page, 'right', true);
+  await page.getByTestId('right-panel').waitFor({ timeout: 5000 });
+  const keys = (await splitState(page)).slots.map((slot) => slot.key);
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Expand', exact: true }).click();
+  const expanded = await expandFacts(page);
+  const report = await saveIssue(ctx, 'M23 分屏时展开右栏');
+  await page.locator(`.session-item[data-row="${keys[0]}"]`).first().click();
+  await sleep(400);
+  const onLeft = { ...await expandFacts(page), slots: (await splitState(page)).slots.map((slot) => slot.width) };
+  await page.locator(`.session-item[data-row="${keys[1]}"]`).first().click();
+  await sleep(400);
+  const onRight = await expandFacts(page);
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Collapse', exact: true }).click();
+  const collapsed = { ...await expandFacts(page), slots: (await splitState(page)).slots.map((slot) => slot.width) };
+  record('分屏时"Expand"：两栏一起藏起，右栏占满左栏右边；F8 写"Right panel: Open · Expanded"',
+    expanded.expanded === 'true' && expanded.center === 'none' && Math.abs(expanded.panel - (expanded.width
+      - expanded.sidebar)) <= 1 && expanded.button === 'Collapse' && report.includes('- Right panel: Open · Expanded'),
+  JSON.stringify({ expanded, field: report.split('\n').find((line) => line.startsWith('- Right panel:')) }));
+  record('展开时点侧栏里另一栏（右栏关着）的会话：焦点切过去，两栏照常显示、没有右栏；再点回来又是展开的；"Collapse"回到两栏',
+    onLeft.focused === 'left' && onLeft.expanded === null && onLeft.center !== 'none' && onLeft.panel === 0
+    && onLeft.slots.every((width) => width >= 280) && onRight.focused === 'right' && onRight.expanded === 'true'
+    && collapsed.expanded === null && collapsed.slots.length === 2 && collapsed.slots.every((width) => width >= 280),
+  JSON.stringify({ onLeft, onRight, collapsed }));
+  await shot(page, '3-expand');
 }
 
 /**
@@ -1121,8 +1170,8 @@ async function effortAt280(page) {
 }
 
 const steps = { setup, menuSplit, dragAndPlace, twoPanes, followFocus, toggleOther, teamOther, divider, crampedRight,
-  splitRows, closeKeeps, dragReference, jumpBack, keyboardReference, restart, runningSource, longSource, headingFit,
-  titleRoomCheck, deleteSource, fontSizes, effortWidths };
+  splitExpand, splitRows, closeKeeps, dragReference, jumpBack, keyboardReference, restart, runningSource, longSource,
+  headingFit, titleRoomCheck, deleteSource, fontSizes, effortWidths };
 
 const fake = await startFakeEndpoint();
 const { root, project } = makeProject();

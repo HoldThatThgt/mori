@@ -4,6 +4,8 @@
 // 会话打开时文件夹"没有要信任的内容"的，之后可能出现了项目配置，这里照新会话的判断重新算（decideTrust）。
 // 启停照搬 pi config 的写法（resourceToggles.ts），写完重新 resolve 确认生效；包的添加、移除用 pi 的
 // addSourceToSettings / removeSourceFromSettings。不是本地文件夹的包（npm / git）只读，只能移除。
+// pi 的 8 个内置工具的开关（2026-10-26，负责人走查 M12）读写用户级 settings.json 的 defaultTools（defaultTools.ts）：
+// 读的是文件里的值（getGlobalSettings），不含 Mori 只放在内存里的设置（shell.ts 没有 bash 时的 -bash、+powershell）。
 
 import { readFile, stat } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
@@ -11,20 +13,20 @@ import type {
   AgentSession, DefaultPackageManager, PackageSource, ResolvedPaths, ResolvedResource, SettingsManager, ToolInfo,
 } from '@earendil-works/pi-coding-agent';
 import {
-  RESOURCE_KINDS, type PackageEntry, type ProjectTrust, type ResourceEntry, type ResourceKind, type SaveResult,
-  type ToolEntry, type ToolsInfo,
+  RESOURCE_KINDS, type DefaultToolState, type PackageEntry, type ProjectTrust, type ResourceEntry, type ResourceKind,
+  type SaveResult, type ToolEntry, type ToolsInfo,
 } from '../shared/protocol';
-import { readMcpServers } from './mcpConfig';
+import { toolDefaults, writeDefaultTool } from './defaultTools';
+import { isMcpTool, readMcpServers } from './mcpConfig';
 import { MEMORY_EXTENSION_PATH } from './memoryExtension';
-import { loadPi, type Pi } from './pi';
+import { createSettingsManager, loadPi, type Pi } from './pi';
 import { togglePackageResource, toggleTopLevelResource, type ToggleContext } from './resourceToggles';
+import { PI_TOOL_NAMES } from './roles';
 import { sessionContext, TEAM_EXTENSION_PATH, type SessionContext } from './sessions';
 import { decideTrust } from './trust';
 
 /** 技能正文最多交给界面的字符数 */
 const BODY_LIMIT = 20_000;
-/** pi 的 MCP 扩展注册的工具的来源路径 */
-const MCP_PATH = 'builtin:mcp';
 /** 不能在这里启停的原因（界面文字）：项目设置停用了这个用户级资源 */
 const DISABLED_BY_PROJECT = 'Turned off in this project’s .pi/settings.json. To change it, edit that file.';
 /** 项目设置启用了这个用户级资源 */
@@ -68,7 +70,7 @@ interface Views {
 
 /** @brief 用一份设置 resolve 一次。 */
 async function resolveView(pi: Pi, cwd: string, agentDir: string, projectTrusted: boolean): Promise<View> {
-  const settings = pi.SettingsManager.create(cwd, agentDir, { projectTrusted });
+  const settings = await createSettingsManager(cwd, agentDir, { projectTrusted });
   const manager = new pi.DefaultPackageManager({ cwd, agentDir, settingsManager: settings });
   return { settings, manager, paths: await manager.resolve(async () => 'skip') };
 }
@@ -228,7 +230,7 @@ function skillDiagnostics(views: Views): string[] {
 function toolSource(tool: ToolInfo): Pick<ToolEntry, 'source' | 'sourceLabel'> {
   const { path, origin, source } = tool.sourceInfo;
   const server = tool.namespace?.aliases?.[0] ?? tool.namespace?.name ?? '';
-  if (path === MCP_PATH) return { source: 'mcp', sourceLabel: server };
+  if (isMcpTool(tool)) return { source: 'mcp', sourceLabel: server };
   if (path.startsWith('builtin:')) return { source: 'builtin', sourceLabel: '' };
   if (origin === 'package') return { source: 'package', sourceLabel: source };
   if (path === TEAM_EXTENSION_PATH || path === MEMORY_EXTENSION_PATH) {
@@ -238,12 +240,30 @@ function toolSource(tool: ToolInfo): Pick<ToolEntry, 'source' | 'sourceLabel'> {
   return { source: 'extension', sourceLabel: path };
 }
 
-/** @brief 会话注册的工具（不含 hidden），按 pi 的顺序。 */
-function toolEntries(session: AgentSession): ToolEntry[] {
+/**
+ * @brief pi 的 8 个内置工具在新会话里的默认（开关）：用户级 settings.json 里的 defaultTools 选出的可以开关；受信任项目的
+ *        .pi/settings.json 也写了 defaultTools、合并后与只按用户级不同的工具按合并后的显示，只读（同技能的写法）。
+ *        都读文件里的值（getGlobalSettings / getProjectSettings），不含 Mori 只放在内存里的设置。
+ */
+function defaultStates(views: Views): Map<string, DefaultToolState> {
+  const user = views.user.settings.getGlobalSettings().defaultTools;
+  const project = views.shown === views.user ? undefined : views.shown.settings.getProjectSettings().defaultTools;
+  const states = new Map<string, DefaultToolState>();
+  for (const [name, { enabled, byProject }] of toolDefaults(user, project)) {
+    const byProjectText = enabled ? ENABLED_BY_PROJECT : DISABLED_BY_PROJECT;
+    states.set(name, { enabled, readOnly: byProject ? byProjectText : null });
+  }
+  return states;
+}
+
+/** @brief 会话注册的工具（不含 hidden），按 pi 的顺序；pi 的内置工具带上新会话的默认（states）。 */
+function toolEntries(session: AgentSession, states: Map<string, DefaultToolState>): ToolEntry[] {
   const active = new Set(session.getActiveToolNames());
-  return session.getAllTools().filter((tool) => tool.exposure !== 'hidden').map((tool) => ({
-    name: tool.name, description: tool.description, active: active.has(tool.name), exposure: tool.exposure,
-    ...toolSource(tool) }));
+  return session.getAllTools().filter((tool) => tool.exposure !== 'hidden').map((tool) => {
+    const source = toolSource(tool);
+    return { name: tool.name, description: tool.description, active: active.has(tool.name), exposure: tool.exposure,
+      ...source, byDefault: source.source === 'builtin' ? states.get(tool.name) ?? null : null };
+  });
 }
 
 /**
@@ -253,7 +273,7 @@ function toolEntries(session: AgentSession): ToolEntry[] {
 async function mcpInfo(context: SessionContext, trusted: boolean): Promise<NonNullable<ToolsInfo['mcp']>> {
   const { servers, errors } = await readMcpServers(context.cwd, trusted);
   const tools = context.session.getAllTools()
-    .filter((tool) => tool.sourceInfo.path === MCP_PATH && tool.exposure !== 'hidden');
+    .filter((tool) => isMcpTool(tool) && tool.exposure !== 'hidden');
   return { errors, servers: servers.map((server) => ({ ...server,
     tools: tools.filter((tool) => tool.namespace?.aliases?.includes(server.name)).map((tool) => tool.name) })) };
 }
@@ -268,7 +288,7 @@ export async function readTools(sessionId?: string): Promise<ToolsInfo> {
     cwd: context?.cwd ?? null,
     // 工具页的信任（toolsTrust）；界面只分信任与否（不信任和没有回答一样显示）
     projectTrust: views.trust,
-    tools: context ? toolEntries(context.session) : null,
+    tools: context ? toolEntries(context.session, defaultStates(views)) : null,
     skills: views.shown.paths.skills.flatMap((item) => entries.get(`skills:${item.path}`) ?? []),
     packages: packageEntries(views, entries),
     mcp: context ? await mcpInfo(context, views.trust === 'trusted') : null,
@@ -320,13 +340,28 @@ export async function toggleResource(sessionId: string | undefined, kind: Resour
 }
 
 /**
+ * @brief pi 的一个内置工具在新会话里默认启用与否（Customize 内置工具的开关）：写用户级 settings.json 的 defaultTools
+ *        （defaultTools.ts writeDefaultTool，在 pi 的文件锁里只改这一项）。不是 pi 的内置工具、或受信任项目的设置改了它
+ *        （开关只读）时拒绝。
+ * @param sessionId 跟随的会话；没有时只看用户级设置
+ */
+export async function setDefaultTool(sessionId: string | undefined, name: string,
+  enabled: boolean): Promise<SaveResult> {
+  if (!PI_TOOL_NAMES.includes(name)) throw new Error(`Not a built-in pi tool: ${name}`);
+  const views = await resolveViews(sessionId);
+  if (defaultStates(views).get(name)?.readOnly) throw new Error(`${name} is read-only in Customize`);
+  await writeDefaultTool(views.agentDir, name, enabled);
+  return { error: null };
+}
+
+/**
  * @brief 用户级设置和包管理器。包管理器的工作目录取 agentDir：pi 按工作目录解析传入的本地来源、按 agentDir 解析
  *        用户级设置里写的来源，这样设置里写的相对来源原样传进去也能对上。
  */
 async function userPackages(): Promise<{ settings: SettingsManager; manager: DefaultPackageManager }> {
   const pi = await loadPi();
   const agentDir = pi.getAgentDir();
-  const settings = pi.SettingsManager.create(agentDir, agentDir, { projectTrusted: false });
+  const settings = await createSettingsManager(agentDir, agentDir, { projectTrusted: false });
   return { settings, manager: new pi.DefaultPackageManager({ cwd: agentDir, agentDir, settingsManager: settings }) };
 }
 

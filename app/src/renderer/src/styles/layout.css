@@ -52,7 +52,7 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 
 .app { position: relative; display: flex; height: 100vh; }
 
-/* 左栏；是尺寸容器，很窄时收起会话行的状态文字和 "Ctrl+N"（本文件末尾的 @container） */
+/* 左栏；是尺寸容器，很窄时收起会话行的状态文字（本文件末尾的 @container） */
 .sidebar {
   position: relative;
   display: flex;
@@ -83,6 +83,7 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
   font-size: var(--fs-body);
 }
 .nav-item svg { color: #757b84; }
+/* 收起为图标栏时最上面的 +（展开的左栏里没有它，新会话从项目行的 +） */
 .nav-item.primary { background: #e9eef9; color: #315dad; font-weight: 500; }
 .nav-item.primary svg { color: var(--color-accent); }
 .nav-item.active { background: var(--color-accent-tint); color: #283a60; }
@@ -100,6 +101,11 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 }
 .project-heading svg { width: 15px; height: 15px; color: #9197a1; }
 .project-heading span, .session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 项目行右端的 +（sessions.md"项目行的 +"）：一直显示，淡色，悬停时变深；上下负边距让项目行不变高，
+   项目名放不下时先截项目名 */
+.project-heading .project-new { width: 24px; height: 24px; margin: -4px -6px -4px auto; border-radius: 6px; }
+.project-heading .project-new svg { color: var(--color-faint); }
+.project-heading .project-new:not(:disabled):hover svg { color: var(--color-text); }
 .session-item {
   display: flex;
   align-items: center;
@@ -157,8 +163,6 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 .rename-error { margin: 4px 4px 2px; color: var(--color-danger); font-size: var(--fs-small); line-height: 1.5; }
 .sidebar-note { margin: 0; padding: 4px 12px 8px; color: var(--color-faint); font-size: var(--fs-small); }
 .sidebar-note.error { display: grid; gap: 4px; justify-items: start; color: var(--color-danger); }
-.nav-hint { margin-left: auto; color: var(--color-faint); font-size: var(--fs-small); font-weight: 400; }
-.sidebar.collapsed .nav-hint { display: none; }
 /* 收起为图标栏时"Open sidebar"按钮上的状态点：不在中栏显示的会话里最要紧的状态 */
 .rail-toggle { position: relative; }
 .rail-dot { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; }
@@ -180,6 +184,7 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 .global-banner .banner { margin: 0; }
 
 /* 右栏 */
+/* 右栏是尺寸容器：很窄时阅读器顶部的"← Changes"只剩箭头（quotes.css 的 @container） */
 .right-panel {
   position: relative;
   display: flex;
@@ -189,7 +194,11 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
   min-width: 0;
   border-left: 1px solid var(--color-line);
   background: var(--color-canvas);
+  container-type: inline-size;
 }
+/* 右栏展开（"Expand"，docs/v0/screens/layout.md"右栏展开"）：中栏藏起（会话面板保持挂载），右栏占满左栏右边 */
+.app[data-right-expanded] .center { display: none; }
+.app[data-right-expanded] .right-panel { flex: 1 1 auto; width: auto; }
 .panel-header {
   display: flex;
   align-items: center;
@@ -202,6 +211,7 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 }
 .panel-header > svg { width: 15px; color: #8291a6; }
 .panel-header .icon-button { margin-left: auto; }
+.panel-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
 
 /* 分隔线（demo/resize.css） */
@@ -246,10 +256,11 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
     max-width: calc(100vw - var(--rail-width));
     box-shadow: -10px 0 35px #20365612;
   }
+  /* 浮在上层时没有"Expand"（只在贴在右边时起作用） */
+  .panel-expand { display: none; }
 }
 /* 侧栏窄于 220px（最窄 180px；默认宽度 220px 时仍显示文字）：会话行只显示状态圆点，220px 时 "Needs approval"
-   给会话名留约 44px，再窄就不够了；文字只是看不见，仍在会话行的读屏名里，悬停圆点看 title。
-   "New session" 后面的 "Ctrl+N" 藏起来，不折行 */
+   给会话名留约 44px，再窄就不够了；文字只是看不见，仍在会话行的读屏名里，悬停圆点看 title */
 @container (max-width: 219px) {
   .session-status { position: relative; }
   .session-status-text {
@@ -260,7 +271,6 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .nav-hint { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

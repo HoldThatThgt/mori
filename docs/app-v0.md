@@ -72,6 +72,13 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 外壳选 **Electron 44.9**（自带 Node 24.22，满足 pi 要求的 ≥22.19）+ electron-vite + electron-builder NSIS，不签名。
 前端用 **React 19 + TypeScript + zustand**；Markdown 用 streamdown，代码高亮用 shiki，diff 用 @pierre/diffs，
 长列表用 virtua。这些依赖都要在 M0 确认能离线打包，不能运行时从 CDN 拉取。
+（2026-10-26 走查 M16 加：mermaid 图用 **mermaid 11.17.2**（锁精确版本），第一次遇到图时才载入（单独的代码块，打包在程序里，
+不联网），经 streamdown 的自定义渲染接口接上，见 [v0/screens/chat.md](v0/screens/chat.md)"图"。它放在 `devDependencies`：
+只在渲染进程里用，构建时由 Vite 打进 `out/renderer`；electron-builder 会把每个生产依赖的 `node_modules` 另外打进 `app.asar`，
+放在 `dependencies` 时会多带 mermaid 和它的 112 个依赖（磁盘上约 130MB，多半是 source map），程序里没有任何地方载入它们。
+`app.asar` 改前 149,536,141 字节、安装包 141,528,594 字节（app-v0 在 2026-10-26 01:18 的构建）；集成时（2026-10-26，
+合进当时的 app-v0 后打包）`app.asar` 156,325,955 字节（多 6,789,814，含其间合进的别的包）、安装包 142,569,816 字节
+（多 1,041,222）；`m0-smoke --exe` 查过 `app.asar` 的 `node_modules` 里没有 mermaid 和它的依赖。）
 
 ## 4. 谁负责什么
 
@@ -94,6 +101,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | 记忆与记忆页（2026-10-22 加） | **Mori**（记忆模块、memory 工具，[specs/memory.md](specs/memory.md) §3、§6、§7） | 记忆页（"Memory"）替换工作回顾：浏览、编辑、移动、回滚；对话里的 memory 工具卡 |
 | 增强任务（2026-10-22 加） | **Mori**（每个项目的开关与每天的时刻、全应用串行的队列、看不见的会话，[specs/memory.md](specs/memory.md) §9） | 记忆页本项目顶部的开关、状态行、"Run now"、"Enhancement settings"；新会话顶部的提示 |
 | 离线安装、进程桥 | **Mori** | — |
+| 窗口、系统托盘与退出（2026-10-26 加） | **Mori**（主进程，照 Claude 桌面版：关掉窗口留在托盘、单实例、有会话正在生成时退出先问，[v0/screens/window.md](v0/screens/window.md)） | 托盘图标与菜单（"Show App"、"Exit"）、应用菜单的 File → Exit、第一次关窗口的气泡、退出前的确认框 |
 
 **pi 没有、v0 也不补的能力**（以后真用起来缺了再加）：
 
@@ -117,9 +125,15 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **三栏**沿用 demo 的视觉和 `resize.js`。CSS 抽成约 30 个 token，字号同时重排：
   正文和输入框 13–14px，辅助文字（时间、来源、徽标）不小于 12px，demo 中 8–11px 的一律上调。
 - **调宽**：分隔线可拖动，方向键每次 20px，双击恢复默认，宽度重启后保留。左栏可收起为图标栏。
+  （2026-10-26 走查 M23：右栏没有上限，拖到中栏只剩 300px 为止；右栏顶部照 Claude 加"Expand" / "Collapse"，展开时中栏藏起、右栏占满，
+  见 [v0/screens/layout.md](v0/screens/layout.md)。）
 - **窄窗口**：窄于 1024px 时左栏自动收起，窄于 800px 时右栏浮在上层；最小窗口 800×600。
+- **关掉窗口**（2026-10-26 改，照 Claude 桌面版，[v0/screens/window.md](v0/screens/window.md)）：窗口藏进系统托盘，会话照常运行，后台进程不关；
+  第一次关时托盘气泡说明"Mori runs in the system tray"。点托盘图标、托盘菜单"Show App"或再次启动 Mori 回到窗口；
+  托盘菜单"Exit"或菜单栏的 File → Exit 才退出，有会话正在生成时先问（"Mori is still working"、"Quit anyway"）。
+  M0 起"关掉窗口即退出"不再成立。
 - **左栏**：
-  - "New session"作主按钮（Ctrl+N），"Open folder…"。
+  - "New session"作主按钮（Ctrl+N），"Open folder…"。（2026-10-26 改：主按钮去掉，照 Claude 桌面版每个项目行右端一个 +，在这个项目里新建；Ctrl+N 不变；收起的图标栏保留一个 +。见 [v0/screens/sessions.md](v0/screens/sessions.md)"项目行的 +"。）
   - 导航：工具（Customize）、工作回顾（Review）。（2026-10-22 改：工作回顾换成记忆（"Memory"），见 [specs/memory.md](specs/memory.md) §10.1。）
   - 项目→会话树。
   - 底部："Settings"和"Report a UI issue (F8)"。
@@ -143,7 +157,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   API key 由 Mori 用系统加密（Windows 上是 DPAPI，绑定当前用户）保存在本机，不写进 `models.json`，也不放进环境变量；
   启动时解密后只交给 pi 放在内存里，模型运行的命令读不到它。不再支持 `$环境变量名` 这种命令行时代的写法。
 - "Test connection"：按钮变为"Testing…"，可以取消。成功时显示首字耗时，失败时显示错误原文。
-- 测试成功后进入"Open folder…"。
+- 测试成功后进入"Open folder…"。（2026-10-26 起测试成功就进入主窗口，中栏是"Open a folder"提示，标题下面显示一次测试结果，见 [v1/screens/first-run.md](v1/screens/first-run.md)）
 - 同一张表单也是设置页"Connections and models"里的连接，以及错误卡上"Go to settings"打开的地方。
 - 后台还没准备好时，输入框可以打字但不能发送，显示"Starting…"。
 
@@ -213,7 +227,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   - 拒绝（"Deny"），可以写理由（"Tell the model why (optional)"），理由会作为工具结果回给模型。
 - **焦点**：卡片出现时不抢输入框焦点，没有默认按钮，Enter 不会批准。
   用 Tab 或 Alt+1 / Alt+2 / Alt+3 选择；焦点在卡片上时 Esc 等于拒绝。
-- **提醒**：窗口不在前台时任务栏闪烁。
+- **提醒**：窗口不在前台时任务栏闪烁。（2026-10-26 加：窗口藏在托盘里时先以最小化的样子放回任务栏再闪烁，[v0/screens/window.md](v0/screens/window.md)）
 - **权限菜单**（输入框下面一行的左端；2026-10-21 前在顶栏）：
   - 按钮只有文字（"Ask each time ▾" / "Allow all ▾"，"Allow all"用警示色），没有图标；窄时模式名截断，全名在悬停说明和读屏名里。
   - 只作用于当前会话；新会话都从"Ask each time"开始。（2026-10-21：作用于这个会话的全部 Agent，菜单说明改为"Applies to all agents in this session. New sessions start at Ask each time."，后台实例的批准卡标出角色和 task，[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) §11）
@@ -243,6 +257,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - 列出本会话编辑或写入过的文件，点开按时间顺序显示每次编辑的 diff；写入显示新内容。
   列表顶部注明："Only edits and writes are listed. Files changed by commands aren’t included."
 - 点工具卡或改动列表里的文件路径，打开只读阅读器；也可以用系统默认编辑器打开（"Open in default app"）。
+  （2026-10-26 走查 M24、M25：Markdown 文件默认显示渲染后的预览，可切到源码（"View source" / "Preview"）；点阅读器顶部的路径复制完整路径，
+  见 [v0/screens/changes.md](v0/screens/changes.md)。）
 - 没有改动时默认收起；手动打开时显示"No changes yet."。
 - 文件已不存在时显示"File not found"；二进制或超过 1MB 的文件显示"Preview unavailable"。
 - 分屏时右栏跟随焦点所在的一侧。
@@ -288,12 +304,19 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   输入框下的 Effort 按钮按会话切换思考强度（"Effort: High"；2026-10-21 前在顶栏）；模型不支持思考时这一项不可选，并说明原因。
 - **用户级 AGENTS.md**：编辑 `<agentDir>/AGENTS.md`，标出当前实际生效的是哪个文件。有未保存改动时离开，先询问。
   （2026-10-22 加：每个文件的 token 数，合计超过 500 时标出来、不截断，见 [specs/memory.md](specs/memory.md) §10.3。）
+  （2026-10-26 改：负责人走查 M4、M15，这一项挪到工具页（Customize）的最后一节 `Instructions`，见 5.13；提醒线改为 2,000。）
 - **界面问题**（"UI issues"，2026-10-22 加）：工作回顾里的 F8 报告列表与详情挪到这里，在 AGENTS.md 下面，见 [specs/memory.md](specs/memory.md) §10.8。
+  （2026-10-26 起 AGENTS.md 不在设置页，界面问题在 Models 下面。）
 
 ### 5.13 工具页（Customize）
 
 - 跟随当前焦点会话的项目。没有打开的会话时，只列 Skill 和 Plugin。
+- **Instructions（用户级 AGENTS.md）**（2026-10-26 从设置页挪来，负责人走查 M4；负责人定名 Instructions、放在最后一节）：没有会话时也在，标题下第一行说明它就是每个会话都读的 AGENTS.md；编辑与列出项目加载的文件同 5.12 原来的一项，合计超过 2,000 token 时标出来、不截断（M15），见 [v1/screens/customize-agents-md.md](v1/screens/customize-agents-md.md)。
 - **内置工具**：当前会话注册的全部工具，标出是否启用和来源。
+  （2026-10-26 加，负责人走查 M12、回答 3：pi 的 8 个内置工具各有一个开关，存为用户级 pi 设置的 `defaultTools`
+  （`+名字` / `-名字`，在 pi 的文件锁里只改这一项），对新会话生效，页面上写明；Mori、MCP、插件和扩展的工具没有开关，
+  下面一行写由谁开关；`grep`、`find` 写明要 rg.exe / fd.exe（在 `<agentDir>\bin` 或 PATH 上，Mori 离线运行 pi、不下载）。
+  见 [v0/screens/tools.md](v0/screens/tools.md)"内置工具"。）
 - **Skill**：pi 找到的全部技能（含已停用的），显示来源（用户级 / 本项目）、用途和正文，可以启停。
 - **MCP**：
   - "Add"表单（名称、命令、参数、环境变量），另有"Edit as JSON"；写入 pi 的 `mcp.json`，启停即 `enabled`。
@@ -333,7 +356,10 @@ v0 只汇总和导出，不做定时回顾和候选整理。
 app/
   src/shared/protocol.ts     Mori 自己的命令（zod 校验）；pi 事件只 import 类型，不重新定义
   src/main/
-    index.ts                 窗口、菜单；utilityProcess.fork 启动后台进程，退出时通知界面
+    index.ts                 窗口、菜单；utilityProcess.fork 启动后台进程，退出时通知界面；单实例；关窗口藏起、真正退出时
+                             有序关闭后台进程（2026-10-26 改：原来是关窗口即退出）
+    tray.ts                  系统托盘与退出（2026-10-26 加）：图标与菜单、应用菜单（File → Exit）、第一次关窗口的气泡、
+                             有会话正在生成时退出先问
     feedback.ts              反馈与 F8（截图用 capturePage；不依赖 pi，后台进程退出也能记录）
     credentials.ts           API key 用系统加密保存；启动时解密后经进程通道交给后台进程
   src/preload/               contextBridge 暴露 window.mori，用 MessagePort 直连后台进程
@@ -378,6 +404,7 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
 - 引用来源用 pi 的自定义条目（`appendCustomEntry("mori.ref", …)`）写进会话文件，它不进入模型上下文。
 - 会话内容只存一份，就是 pi 的会话文件（2026-10-21：协作模式另存 `<userData>/teams/<会话 id>/` 下的 TaskBoard 和各实例的 pi 会话文件）。Mori 自己只保存：界面状态（栏宽、分屏、各会话草稿、已归档的会话列表）、
   反馈和 F8 报告，以及加密后的 API key（`<userData>/credentials.json`）。
+  （2026-10-26 加：空的标记文件 `<userData>/tray-notice-shown`，第一次关窗口的托盘气泡显示过之后写下，[v0/screens/window.md](v0/screens/window.md)。）
   （2026-10-22 加：记忆 `<userData>/memory/`：条目、修订记录、增强设置与水位、增强任务的会话文件，见 [specs/memory.md](specs/memory.md) §3。）
 - API key：主进程用 Electron safeStorage 加密保存；启动时解密，经进程通道交给后台进程，
   后台进程用 pi 的 `setRuntimeApiKey` 只放在内存里。key 不进 `models.json`，也不进任何进程的环境变量。
@@ -403,9 +430,25 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
   按 pi 1.3.0 包里的文件路径载入，pi 升级时复查。
 - **扩展界面**：`bindExtensions` 时传入 Mori 实现的界面上下文，把通知、确认、选择、输入转给界面；
   其余能力按 pi RPC 模式的范围不实现。MCP 的错误原文就是从通知里来的。
-- **Shell**：不传 `shellPath`，靠 pi 自己的查找顺序（先找 Program Files 下的 Git Bash）。
-  Git Bash 装在别处时，把 `shellPath` 写进 pi 的 `settings.json`；
-  没有 bash 时写 `defaultTools: ["-bash", "+powershell"]`。
+- **Shell**（2026-10-26 改，负责人走查 M28"bash not usable in mori"）：pi 自己按设置里的 `shellPath`、
+  `%ProgramFiles%\Git\bin\bash.exe`（及 `%ProgramFiles(x86)%` 下的）、PATH 上的 `bash.exe` 的顺序找；
+  Git for Windows 装在别处、PATH 上只有 `<Git>\cmd`（安装程序的默认选项）时它找不到，每条命令都报"No bash shell found"。
+  后台进程每次启动查一次（`kernel/shell.ts`），照 Claude Code 的做法补上 pi 找不到的情形：
+  1. 用户级 pi 设置里已有 `shellPath`，或 pi 自己能找到 bash，就不动。
+  2. 否则对 `where git.exe` 的每个结果，按 `<Git>\cmd\git.exe`、`<Git>\bin\git.exe`、`<Git>\mingw64\bin\git.exe`
+     推出 Git 的目录，`<Git>\bin\bash.exe` 存在就用它；都不行再读 Git for Windows 注册表的 `InstallPath`
+     （先 `HKLM\SOFTWARE\GitForWindows`，后 `HKCU` 的同名键），用其下的 `bin\bash.exe`。
+     `where.exe`、`reg.exe` 按 `System32` 下的绝对路径调用，不依赖 PATH。
+  3. 找到的路径只放进内存：Mori 建的每一份 pi 设置（`pi.ts` 的 `createSettingsManager`）都 `applyOverrides({ shellPath })`，
+     不写你的 `settings.json`。哪里都没有 bash 时同样只在内存里放 `defaultTools: ["-bash", "+powershell"]`，
+     新会话用 powershell 代替 bash。这份设置（用户级或受信任项目的）已有 `shellPath` 时两样都不放。
+     （2026-10-26：pi 把这两项接在文件里的 `defaultTools` 后面；Customize 的内置工具开关只读写文件里的值，见 5.13。）
+  4. 结果记一行英文日志（`[kernel] shell: …`）；没有 bash 时记为错误。
+
+  pi 的 `SettingsManager` 在 `reload()`、`save()` 时按文件重新合并设置，内存里的覆盖随之丢掉；资源加载器的 `reload()`
+  会调 `settingsManager.reload()`，而 bash 工具在建会话时（`AgentSession._buildRuntime`）取 `shellPath`、建好后不再读。
+  所以建会话时在资源加载器 `reload()` 之后、`createAgentSession` 之前再放一次（`sessions.ts` 的 `loadResources`）；
+  会话中途 pi 自己 `save()` 不影响已建好的 bash 工具。Mori 不调 `session.reload()`。
 - **模型**（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §4.4、§7、§11：Mori 的模型配置编译到 pi；探针和模型池经 pi-ai 的 fetch 选项发请求）：保存 `models.json` 后调用 `modelRegistry.refresh()`，用 `getError()` 显示配置错误；
   "Test connection"用 `modelRegistry.streamSimple` 发一条短消息，测到第一个文字增量的时间。不自己发 HTTP 请求。
 - **启停**：列表来自 `DefaultPackageManager.resolve()`（每项带启用状态和来源）。
@@ -435,7 +478,7 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
 | M3 项目与会话 | 侧栏项目→会话树；新建、改名、归档、删除、恢复；右键菜单；项目信任弹窗；状态点；按会话保存草稿；扩展的询问（从 M6 提前）；界面重新加载后接上后台进程里的会话（2026-10-19 加） | — | 1. 打开两个文件夹，各建两个会话并各发一条消息：侧栏按项目分组，会话名取第一条消息的前 20 个字<br>2. 只用键盘：Ctrl+N 新建，Shift+F10 打开右键菜单改名<br>3. 改名后重启 App：名字和完整对话都在<br>4. 归档一个会话：侧栏移到"Archived"，可以恢复；删除一个会话：确认后永久删除，重启后不再出现；正在生成的会话不能归档或删除（2026-10-19 改）<br>5. 打开带 `.pi/extensions` 的仓库：先弹信任询问；选"Don’t trust"后该扩展注册的工具不出现；勾"Remember my choice"后重启不再询问<br>6. 在 A 写半句话，切到 B 再回 A，草稿还在；重启后也在<br>7. 不可见的会话生成完成时，侧栏显示"Unread"，点开后消失<br><br>反例：打开带 `.pi/extensions` 的仓库，任何情况下都不会不经询问就加载扩展 |
 | M4 改动与选区 | 右栏改动列表与 diff；只读文件阅读器；选区"Attach as context"（问 Mori）与"Feedback"；回复下的"Copy"、"Attach message as context"、"Give feedback" | — | 1. 让它改两个文件：右栏列出两个文件，点开按时间显示每次编辑的 diff，顶部注明命令改动不在此列<br>2. 点工具卡里的文件路径打开阅读器；删掉这个文件再点，显示"File not found"<br>3. 在阅读器里选一段点"Attach as context"：输入框出现带来源的芯片；发送后点芯片回到原位置；重启后仍能点回<br>4. 流式输出时选中一句话点"Feedback"：选区不被打断；提交后提示"Saved · View in Review"（2026-10-22 改：只提示"Saved"，见 [specs/memory.md](specs/memory.md) §10.7），当前会话没有新消息<br>5. 不用鼠标选字，用回复下的"Attach message as context"完成同样的引用<br><br>反例：原文已变化时，芯片保留当时的原文并提示"Source changed" |
 | M5 分屏与会话引用 | 左右分屏；拖会话引用；右键菜单的"Open in split view"和"Attach as context" | — | 1. 把会话 B 拖到 A 的右侧：放下前出现"Drop to open in split view on the right"；两边各自发消息、各自批准<br>2. 在左栏按 Esc 只停止左栏；F8 和右栏跟随焦点所在的一栏<br>3. 拖动分屏中线调整比例<br>4. 把会话 C 拖进输入框：预览按"Turn N"标出内容和总字数；改成第 3–5 轮后发送<br>5. 点消息里的引用跳回 C；C 改名后仍有效；C 删除后芯片显示"Session deleted"，原文仍可查看<br>6. 用右键菜单完成同样的分屏和引用<br><br>反例：关闭分屏不停止正在生成的会话；预览里没有按钮文字等界面文字 |
-| M6 设置与工具页 | 多个模型与切换；思考强度（Effort）；用户级 AGENTS.md；工具页（Customize：内置工具、Skill、MCP、Plugin）；输入框 "/" 补全 | pi 如何在 prompt 中展开 "/名称"；MCP 扩展的通知在 SDK 下能否拿到 | 1. 加第二个模型，在顶栏切换（2026-10-21 改到输入框下方一行，v1 起是选择范围菜单），新回复来自新模型<br>2. 在用户级 AGENTS.md 写"每次回答以'收到'开头"：新会话的第一条回复符合；设置页标出生效的文件<br>3. 在已信任项目的 `.pi/skills` 放一个技能：工具页出现并标"Project"；停用后 `settings.json` 出现与 `pi config` 相同的条目，新会话问"你能用哪些技能"时没有它<br>4. 用表单添加一个 stdio MCP 服务：保存后看到它注册的工具名；调用它的工具会出批准卡<br>5. MCP 服务的命令写错：看到 pi 给出的错误原文<br>6. 添加一个本地文件夹的 pi 包：列出包内资源，可以按资源启停<br>7. 输入 "/"：列出提示词模板和技能命令<br>8. 把模型标为"Supports thinking"，顶栏切到"High"（2026-10-21 改到输入框下方一行的 Effort 按钮）：回复带思考内容；切到"Off"：不再有思考内容<br><br>反例：模型没标"Supports thinking"时，思考强度不可选；项目未信任时项目技能不出现；没有注册任何工具的 MCP 服务不显示"Connected" |
+| M6 设置与工具页 | 多个模型与切换；思考强度（Effort）；用户级 AGENTS.md；工具页（Customize：内置工具、Skill、MCP、Plugin）；输入框 "/" 补全 | pi 如何在 prompt 中展开 "/名称"；MCP 扩展的通知在 SDK 下能否拿到 | 1. 加第二个模型，在顶栏切换（2026-10-21 改到输入框下方一行，v1 起是选择范围菜单），新回复来自新模型<br>2. 在用户级 AGENTS.md 写"每次回答以'收到'开头"：新会话的第一条回复符合；设置页标出生效的文件（2026-10-26 起这一项在 Customize）<br>3. 在已信任项目的 `.pi/skills` 放一个技能：工具页出现并标"Project"；停用后 `settings.json` 出现与 `pi config` 相同的条目，新会话问"你能用哪些技能"时没有它<br>4. 用表单添加一个 stdio MCP 服务：保存后看到它注册的工具名；调用它的工具会出批准卡<br>5. MCP 服务的命令写错：看到 pi 给出的错误原文<br>6. 添加一个本地文件夹的 pi 包：列出包内资源，可以按资源启停<br>7. 输入 "/"：列出提示词模板和技能命令<br>8. 把模型标为"Supports thinking"，顶栏切到"High"（2026-10-21 改到输入框下方一行的 Effort 按钮）：回复带思考内容；切到"Off"：不再有思考内容<br><br>反例：模型没标"Supports thinking"时，思考强度不可选；项目未信任时项目技能不出现；没有注册任何工具的 MCP 服务不显示"Connected" |
 | M7 工作回顾（Review） | 反馈收件箱（Feedback）、界面问题收件箱（UI issues）、"Resolved"、导出；一键导出安装包（2026-10-21 加）（2026-10-22 改：工作回顾由记忆页替换，走查 1–4 不再做，见 [specs/memory.md](specs/memory.md) §10、§14.4） | — | 1. M4 起写的反馈都在，点开跳回原位置<br>2. M2 起的 F8 报告都在"UI issues"里，带截图<br>3. 点"Resolve"标为已处理后，可以用"Hide resolved"筛掉<br>4. 两类都能导出为 Markdown（"Export as Markdown…"）<br>5. 双击 `build-installer.cmd`：结束时打开 `release\`，里面是安装包；任何一步失败时停下并说明哪一步 |
 
 界面改为英文之后（第 11 节"显示语言"，不兼容旧的中文记录），M4 走查 3、M5 走查 5、M7 走查 1–2 要用英文构建新建的会话、
@@ -494,6 +537,8 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
    退路是同一入口改用 `ELECTRON_RUN_AS_NODE` 子进程。
 6. **pi 每周多次发布，有已知问题**：锁定版本，只在 `src/kernel/` 里使用 pi。
    已知问题包括 #9361（加载扩展时 shellPath 可能被忽略）和 #9129（命令超时留下孤儿进程），M0 时检查。
+   （2026-10-26 按 pi 1.3.0 源码复查 #9361：写在 `settings.json` 里的 `shellPath` 在资源加载器 `reload()` 后照常生效；
+   用 `applyOverrides` 放进内存的会被这次 `reload()` 丢掉，Mori 在建会话前再放一次，见第 6 节"Shell"。）
 
 ## 11. 决定与待确认的问题
 

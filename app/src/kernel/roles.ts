@@ -23,6 +23,9 @@ export const AGENTS_DIR = '.mori/agents';
 /** @brief 角色文件的 tools 里可以写的 pi 工具名（§4.1）。 */
 export const PI_TOOL_NAMES: readonly string[] = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'powershell'];
 
+/** @brief pi 设置没有 defaultTools 时默认启用的工具（pi core/settings-manager.js DEFAULT_TOOL_NAMES）。 */
+export const PI_DEFAULT_TOOLS: readonly string[] = ['read', 'bash', 'edit', 'write'];
+
 /** @brief 基座的白名单里代表全部 MCP 工具的写法（§4.2、§8.2：基座写 mcp__*）。 */
 export const ALL_MCP_TOOLS = 'mcp__*';
 

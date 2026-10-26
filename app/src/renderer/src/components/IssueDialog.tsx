@@ -115,6 +115,12 @@ function splitFields(state: AppState): IssueField[] {
   return [{ label: 'Split view', value: `${names} (focus in the ${focus} pane)` }];
 }
 
+/** @brief "Right panel"：Open / Closed，右栏展开时 Open · Expanded（docs/v0/screens/f8.md）。 */
+function rightPanelText(): string {
+  if (!document.querySelector(RIGHT_PANEL)) return 'Closed';
+  return document.querySelector('.app[data-right-expanded]') ? 'Open · Expanded' : 'Open';
+}
+
 /** @brief "Current view"：界面状态与窗口、栏宽。 */
 function currentView(): IssueField[] {
   const state = useApp.getState();
@@ -123,7 +129,7 @@ function currentView(): IssueField[] {
     { label: 'Page', value: pageName(state) },
     ...tabFields(state),
     ...splitFields(state),
-    { label: 'Right panel', value: document.querySelector(RIGHT_PANEL) ? 'Open' : 'Closed' },
+    { label: 'Right panel', value: rightPanelText() },
     { label: 'Window size', value: `${window.innerWidth}×${window.innerHeight}` },
     { label: 'Pane width', value: paneWidth(state) },
     { label: 'Sidebar width', value: columnWidth('[data-testid="sidebar"]', layout.sidebar) },

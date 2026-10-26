@@ -2,7 +2,7 @@
 // 覆盖 docs/v0/screens/tools.md 与方案第 7 节 M6 走查 3–6 和反例：
 // 入口（左栏"Open folder…"下面、收起后的图标栏、高亮）、没有会话时只有技能和插件、跟随的会话（还在打开中时等它、分屏时
 // 焦点所在的一栏）、读取中 / 读取失败与重新读取、返回会话（分屏、焦点、滚动位置、草稿）、工具页开着时点左栏别的会话、
-// 新建会话、不监视文件；内置工具（启用的正是发给模型的、扩展的来源和两行说明）；
+// 新建会话、不监视文件；内置工具（启用的正是发给模型的、扩展的来源和两行说明、开关与原因；开关的写入见 m6-app-tool-switches）；
 // 技能（没有技能、来源标记、展开看正文和路径、用系统编辑器打开、收起、与 pi config 相同的写入——逐步对照
 // tests/fixtures/m6/pi-config-toggles.json、写入失败与再试、本项目设置停用 / 启用的用户级技能只读、技能的问题列表、
 // 未信任项目的技能不列出、停用后新会话的"/"和系统提示里没有它、设置里另有同一项的别的写法时"启停没有生效"）；
@@ -22,9 +22,9 @@
 // 布局与 tests/ui/m6-pi-config.mjs 相同（prepareLayout、STEPS）：MORI_USER_DATA=<根>/data，agentDir=<根>/data/pi。
 // 合成的东西：端点、MCP 服务（tests/mcp-server）、pi 包（tests/pi-package 的副本）、下面写的技能和配置文件都是 synthetic。
 // 用法（在 app/ 下，先 npm run build）：
-//   node tests/ui/m6-app-tools.mjs [--exe <Mori.exe 路径>]
+//   node tests/ui/m6-app-tools.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m6-app-tools(-packaged).json，截图在 test-results/m6-app-tools(-packaged)/；全部通过时删掉临时目录。
-// 各步骤按顺序依赖前一步留下的配置（pi config 的对照是累积的），所以不提供 --only。
+// 各步骤依赖前一步留下的配置（pi config 的对照是累积的）；--only 只跑列出的步骤（setup 总是跑），只有 entry 能单独跑。
 
 import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync,
@@ -39,10 +39,14 @@ import {
 import { composerAt, paneAt, sendAt, splitState, waitPaneIdle, waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import { openToolsSection, slashItems, startFakeEndpoint } from './m6-helpers.mjs';
 import { prepareLayout, STEPS } from './m6-pi-config.mjs';
-import { mcpRows, packageCards, skillRows, toolRows, toolsHead } from './m6-tools-helpers.mjs';
+import {
+  BUILTIN_LEAD, expectedNotes, mcpRows, packageCards, PI_DEFAULT_TOOLS, PI_TOOLS, skillRows, toolRows, toolsHead,
+  toolsSeen, watchTools,
+} from './m6-tools-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
+const only = arg('only')?.split(',');
 const suffix = exePath ? '-packaged' : '';
 const port = 4362;
 const baseUrl = `http://127.0.0.1:${port}/v1`;
@@ -59,7 +63,9 @@ const fixture = JSON.parse(readFileSync(join(appRoot, 'tests/fixtures/m6/pi-conf
 const MCP_SERVER = join(appRoot, 'tests', 'mcp-server', 'server.mjs');
 /** 添加本地包后设置里写的来源（相对 agentDir） */
 const PKG_SOURCE = '..\\..\\pkg';
-const NO_SESSION = 'No open session. Only user-level skills and plugins are listed.';
+// 2026-10-26（负责人走查 M4）：用户级 AGENTS.md 从设置页挪来，是 Customize 的最后一节 Instructions，没有会话时也在。
+const NO_SESSION = 'No open session. Only user-level skills, plugins, and instructions are listed.';
+const WITH_SESSION = ['builtin', 'skills', 'mcp', 'plugins', 'agents'];
 const NOTICE = 'Changes apply to new sessions. Sessions already open aren’t affected.';
 const TRUST_NOTE = 'This workspace isn’t trusted, so its skills and settings aren’t listed';
 const DISABLED_BY_PROJECT = 'Turned off in this project’s .pi/settings.json. To change it, edit that file.';
@@ -404,37 +410,6 @@ async function clickOpenInEditor(ctx, scope) {
 }
 
 /**
- * @brief 开始记录工具页有没有显示过"Loading…"（MutationObserver：只出现一两帧，轮询抓不到），
- *        以及有没有出现过读取失败、"New session"不可用（跟随的会话还在打开中）。
- */
-function watchTools(page) {
-  return page.evaluate(() => {
-    window.__toolsSeen = { loading: false, error: false, opening: false };
-    window.__toolsObserver?.disconnect();
-    window.__toolsObserver = new MutationObserver(() => {
-      const root = document.querySelector('[data-testid="tools-page"]');
-      if (!root) return;
-      const seen = window.__toolsSeen;
-      if ([...root.querySelectorAll('.tools-empty[role="status"]')].some((p) => p.textContent === 'Loading…')) {
-        seen.loading = true;
-      }
-      if (root.querySelector('[data-testid="tools-error"]')) seen.error = true;
-      const button = [...root.querySelectorAll('.tools-notice button')]
-        .find((b) => b.textContent.includes('New session'));
-      if (button?.disabled) seen.opening = true;
-    });
-    window.__toolsObserver.observe(document.body, { subtree: true, childList: true, attributes: true,
-      characterData: true });
-  });
-}
-
-/** @brief watchTools 开始之后看到的。 */
-const toolsSeen = (page) => page.evaluate(() => {
-  window.__toolsObserver?.disconnect();
-  return window.__toolsSeen;
-});
-
-/**
  * @brief 表单里文字为 label 的那一栏的输入框。不用 getByLabel：React 挂载 textarea 时把初值写成它的文字内容，
  *        有初值的 textarea（例如"Back to form"之后的参数）按标签全文匹配不到。
  */
@@ -522,8 +497,9 @@ async function noSession(ctx) {
   await noSkills(ctx);
   await openToolsSection(page, 'skills');
   const head = await toolsHead(page);
-  record('没有打开的会话：分节只有"技能""插件"，顶部"返回会话"、标题"工具"、"没有打开的会话：只列出技能和插件（用户级）"，'
-    + '下面一行说明和"新建会话"', panes === 0 && same(head.sections, ['skills', 'plugins']) && head.follow === NO_SESSION
+  record('没有打开的会话：分节只有"技能""插件""Instructions"，顶部"返回会话"、标题"工具"、没有会话的说明，'
+    + '下面一行说明和"新建会话"', panes === 0 && same(head.sections, ['skills', 'plugins', 'agents'])
+    && head.follow === NO_SESSION
     && head.title === 'Customize' && head.back && head.notice === NOTICE && head.newSession,
   JSON.stringify({ panes, ...head, text: undefined }));
   const skills = await skillRows(page);
@@ -543,8 +519,8 @@ async function noSession(ctx) {
 }
 
 /**
- * @brief 跟随的会话还在打开中时进入工具页：点左栏的会话（从磁盘打开，要一会儿），马上点"Customize"。
- *        工具页跟随它、等它打开好再读取（不读错、不报错），之后列出它注册的工具。
+ * @brief 跟随的会话还在打开中时进入工具页：点左栏的会话（从磁盘打开，要一会儿），马上点"Customize"（落在第一节
+ *        "Built-in tools"）。工具页跟随它、等它打开好再读取（不读错、不报错，这一节先是"Loading…"），之后列出它注册的工具。
  *        打开得太快、没赶上"打开中"时，只检查最后的样子（细节里写明有没有赶上）。
  */
 async function followOpening(ctx) {
@@ -558,9 +534,9 @@ async function followOpening(ctx) {
   const seen = await toolsSeen(page);
   const head = await toolsHead(page);
   const tools = (await toolRows(page)).map((tool) => tool.name);
-  record('会话还在打开中时点"工具"：工具页跟随它（"project · <会话名>"、四个分节），等它打开好再读取，'
+  record('会话还在打开中时点"工具"：工具页跟随它（"project · <会话名>"、五个分节），等它打开好再读取，'
     + `列出它注册的工具，没有出现读取失败（${seen.opening ? '赶上了打开中："新建会话"那时不可用' : '没赶上打开中'}）`,
-  head.follow === `project · ${ctx.p1Title}` && same(head.sections, ['builtin', 'skills', 'mcp', 'plugins'])
+  head.follow === `project · ${ctx.p1Title}` && same(head.sections, WITH_SESSION)
     && tools.includes('read') && !seen.error && seen.loading, JSON.stringify({ seen, follow: head.follow, tools }));
   await backToChat(page);
   await waitReady(page);
@@ -650,15 +626,17 @@ async function entry(ctx) {
   const draft = '草稿：去工具页再回来之后还在';
   await h.textarea.fill(draft);
   await watchTools(page);
+  await page.getByTestId('nav-tools').click();
+  const landed = await page.getByTestId('tools-page').waitFor({ timeout: 10000 }).then(() => toolsHead(page));
   await openToolsSection(page, 'builtin');
   const seen = await toolsSeen(page);
   const head = await toolsHead(page);
   const place = await navPlace(page);
   const lit = await page.getByTestId('nav-tools').evaluate((element) => element.classList.contains('active'));
-  record('有会话时：左栏"打开文件夹…"下面的"工具"高亮；分节"内置工具""技能""MCP""插件"；顶部"返回会话"、标题"工具"、'
-    + '"project · <会话名>"、说明一行和"新建会话"', lit && place.text === 'Customize' && place.below
-    && place.labels.indexOf('Customize') === place.labels.indexOf('Open folder…') + 1
-    && same(head.sections, ['builtin', 'skills', 'mcp', 'plugins']) && head.current === 'builtin' && head.back
+  record('有会话时：左栏"打开文件夹…"下面的"工具"高亮；分节"内置工具""技能""MCP""插件""Instructions"，进入时落在'
+    + '"内置工具"；顶部"返回会话"、标题"工具"、"project · <会话名>"、说明一行和"新建会话"', lit && place.text === 'Customize'
+    && place.below && place.labels.indexOf('Customize') === place.labels.indexOf('Open folder…') + 1
+    && landed?.current === 'builtin' && same(head.sections, WITH_SESSION) && head.current === 'builtin' && head.back
     && head.title === 'Customize' && head.follow === `project · ${title}` && head.notice === NOTICE && head.newSession
     && !head.trust, JSON.stringify({ title, place, ...head, text: undefined }));
   record('进入工具页先显示"正在读取…"，tools.get 读完换成内容（没有读取失败）', seen.loading && !seen.error
@@ -673,17 +651,22 @@ async function entry(ctx) {
   await railEntry(ctx);
 }
 
-/** @brief "Built-in tools"一节：read、bash、edit、write 的行，说明一行，展开看完整说明。 */
+/** @brief "Built-in tools"一节：pi 工具的行和开关、别的行的原因、说明一行、启用的正是发给模型的、展开看完整说明。 */
 async function builtinRows(ctx) {
   const { page } = ctx;
   const tools = await toolRows(page);
-  const core = ['read', 'bash', 'edit', 'write'].map((name) => tools.find((tool) => tool.name === name));
+  const pi = PI_TOOLS.map((name) => tools.find((tool) => tool.name === name));
   const lead = await page.locator('[data-testid="tools-page"] .tools-lead').innerText();
-  record('内置工具：read、bash、edit、write 各一行，来源"内置"、状态"启用"（data-active）、说明的第一行；'
-    + '标题下"当前会话注册的全部工具。启用的才会给模型。"', core.every((tool) => tool && tool.active === 'true'
-    && tool.tag === 'Built-in' && tool.state === 'Enabled' && tool.desc)
-    && lead === 'All tools in this session. Only enabled tools are available to the model.',
-  JSON.stringify(tools));
+  record('内置工具：pi 的 8 个工具各一行，来源"Built-in"、有说明的第一行和开关"Enable tool <名字>"；read、bash、edit、write '
+    + '"Enabled"、开关开着，grep、find、ls、powershell 开关关着；标题下"… Switches apply to new sessions."',
+  pi.every((tool) => tool && tool.tag === 'Built-in' && tool.desc && tool.label === `Enable tool ${tool.name}`
+    && tool.checked === PI_DEFAULT_TOOLS.includes(tool.name) && !tool.disabled)
+    && PI_DEFAULT_TOOLS.every((name) => tools.find((tool) => tool.name === name)?.state === 'Enabled')
+    && lead === BUILTIN_LEAD, JSON.stringify(tools));
+  const notes = tools.map((tool) => ({ name: tool.name, notes: tool.notes, want: expectedNotes(tool, ctx.agentDir),
+    sw: tool.checked !== null }));
+  record('没有开关的行（Mori、插件、MCP、扩展的工具）下面一行原因；grep、find 下面写要 rg.exe / fd.exe 和 <agentDir>\\bin',
+    notes.every((row) => same(row.notes, row.want) && row.sw === PI_TOOLS.includes(row.name)), JSON.stringify(notes));
   const inactive = tools.filter((tool) => tool.active === 'false');
   record(`注册了但没有给模型的工具标"未启用"（这个会话里有 ${inactive.length} 个），启用的标"启用"`,
     tools.every((tool) => tool.state === (tool.active === 'true' ? 'Enabled' : 'Not enabled')),
@@ -1721,7 +1704,7 @@ async function keyboard(ctx) {
   record('分节列表里 ↓ ↑ 切换分节，焦点跟着走', down.current === 'mcp' && down.focus === 'mcp' && up.current === 'skills'
     && up.focus === 'skills', JSON.stringify({ down, up }));
   await page.getByTestId('tools-page').getByRole('button', { name: 'Back to app' }).focus();
-  const walk = await tabWalk(page, 12);
+  const walk = await tabWalk(page, 13);
   record('技能一节：从"返回会话"按 Tab 走到"新建会话"、分节按钮、技能行和它的开关', walk.some((f) => f.text.includes('New session'))
     && walk.some((f) => f.section === 'mcp') && walk.some((f) => f.role === 'switch' && f.inTools)
     && walk.some((f) => f.text.includes('user-skill')), JSON.stringify(walk));
@@ -1815,12 +1798,17 @@ async function readFailure(ctx) {
   broken.packages = [...(broken.packages ?? []), {}];
   writeFileSync(file, `${JSON.stringify(broken, null, 2)}\n`);
   try {
-    await page.getByTestId('nav-tools').click();
+    await openToolsSection(page, 'agents');
+    const agents = { editor: await page.getByTestId('agents-editor').isEnabled(),
+      errors: await page.getByTestId('tools-error').count() };
+    // 回到内置工具一节：读取失败的原文在这里，下面"重新读取"之后看的是内置工具的行。
+    await page.locator('[data-testid="tools-nav"] button[data-section="builtin"]').click();
     await page.getByTestId('tools-error').waitFor({ timeout: 15000 });
     const text = await page.getByTestId('tools-error').innerText();
     const sections = await page.locator('[data-testid="tools-page"] .tools-content h2').count();
-    record('读取失败（用户级 settings.json 的 packages 里有一项写坏了）：显示 pi 报的原文和"重新读取"，没有各节的内容',
-      text.includes('startsWith') && text.includes('Retry') && sections === 0, text);
+    record('读取失败（用户级 settings.json 的 packages 里有一项写坏了）：内置工具一节显示 pi 报的原文和"重新读取"，没有各节的'
+      + '内容；Instructions 一节不等 tools.get，照常可编辑、没有这句原文', text.includes('startsWith') && text.includes('Retry')
+      && sections === 0 && agents.editor && agents.errors === 0, JSON.stringify({ text, agents }));
     await shot(page, '7-read-failure');
     await noteSmall(ctx, '读取失败');
   } finally {
@@ -1957,14 +1945,14 @@ async function archiveFollow(ctx) {
   await waitFollow(page, `override · ${left}`);
   const after = await toolsHead(page);
   record('工具页开着时在侧栏归档它跟随的会话（分屏右边的 p1）：工具页还开着，跟到剩下的一栏（"override · <它的名字>"），'
-    + '仍有四个分节', before === `project · ${right}` && after?.follow === `override · ${left}`
-    && same(after.sections, ['builtin', 'skills', 'mcp', 'plugins']), JSON.stringify({ before, after: after?.follow,
+    + '仍有五个分节', before === `project · ${right}` && after?.follow === `override · ${left}`
+    && same(after.sections, WITH_SESSION), JSON.stringify({ before, after: after?.follow,
     sections: after?.sections }));
   await chooseMenuItem(page, ctx.overrideFile, 'Archive');
   await waitFollow(page, NO_SESSION);
   const none = await toolsHead(page);
-  record(`再归档剩下的 override（没有剩下的一栏）：工具页变成"${NO_SESSION}"，只有技能和插件两节`,
-    none?.follow === NO_SESSION && same(none.sections, ['skills', 'plugins']),
+  record(`再归档剩下的 override（没有剩下的一栏）：工具页变成"${NO_SESSION}"，只有技能、插件和 Instructions 三节`,
+    none?.follow === NO_SESSION && same(none.sections, ['skills', 'plugins', 'agents']),
     JSON.stringify({ follow: none?.follow, sections: none?.sections }));
   await shot(page, '11-archive-follow');
   await backToChat(page);
@@ -1985,6 +1973,7 @@ const layout = makeLayout();
 const ctx = { ...layout, pageErrors: [], small: [], smallChecked: [], baseline: {} };
 try {
   for (const [name, step] of Object.entries(steps)) {
+    if (only && name !== 'setup' && !only.includes(name)) continue;
     try {
       await step(ctx);
     } catch (error) {

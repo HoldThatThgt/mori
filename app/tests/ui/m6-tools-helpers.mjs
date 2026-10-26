@@ -1,5 +1,6 @@
-// m6-app-tools.mjs 用的工具页读取（docs/v0/screens/tools.md 的标识）：外框、内置工具、技能、MCP、插件各节的行。
-// 只读页面，不记录检查结果（检查结果由调用方记录）。
+// m6-app-tools.mjs 用的工具页读取（docs/v0/screens/tools.md 的标识）：外框、内置工具、技能、MCP、插件各节的行，
+// 以及记下有没有出现过读取中、读取失败、跟随的会话还在打开中的 watchTools / toolsSeen（2026-10-26 从 m6-app-tools.mjs
+// 挪来，那个文件不超过 2000 行）。只读页面，不记录检查结果（检查结果由调用方记录）。
 
 /** @brief 工具页的外框：分节、当前分节、跟随的会话、说明、信任说明、整页文字；不在工具页时为 null。 */
 export function toolsHead(page) {
@@ -37,14 +38,67 @@ export function skillRows(page) {
   });
 }
 
-/** @brief "Built-in tools"一节的行。 */
+/**
+ * @brief "Built-in tools"一节的行。name、active、tag、state、desc 是 v0 起就有的五项（TB-03 与对照构建比较的只有它们，
+ *        v0Fields）；2026-10-26（WP-08）加：开关 checked、disabled、label（读屏名称；没有开关的行三项都是 null），
+ *        行下面的说明 notes（.tools-row-note，按顺序），写入失败的原文 error（没有时为空串）。
+ */
 export function toolRows(page) {
   return page.evaluate(() => {
     const text = (element) => element?.textContent?.trim() ?? '';
-    return [...document.querySelectorAll('[data-testid="tool-row"]')].map((row) => ({
-      name: row.dataset.tool, active: row.dataset.active, tag: text(row.querySelector('.tools-tag')),
-      state: text(row.querySelector('.tools-state')), desc: text(row.querySelector('.tools-row-desc')) }));
+    return [...document.querySelectorAll('[data-testid="tool-row"]')].map((row) => {
+      const sw = row.querySelector('[role="switch"]');
+      return { name: row.dataset.tool, active: row.dataset.active, tag: text(row.querySelector('.tools-tag')),
+        state: text(row.querySelector('.tools-state')), desc: text(row.querySelector('.tools-row-desc')),
+        checked: sw ? sw.getAttribute('aria-checked') === 'true' : null, disabled: sw ? sw.disabled : null,
+        label: sw?.getAttribute('aria-label') ?? null, notes: [...row.querySelectorAll('.tools-row-note')].map(text),
+        error: text(row.querySelector('.form-message.error')) };
+    });
   });
+}
+
+/** @brief toolRows 的一行里 v0 起就有的五项（TB-03 与没有 TaskBoard 的对照构建比较的部分）。 */
+export const v0Fields = ({ name, active, tag, state, desc }) => ({ name, active, tag, state, desc });
+
+/** 内置工具一节标题下的说明（tools.md"内置工具"；2026-10-26 加最后一句） */
+export const BUILTIN_LEAD = 'All tools in this session. Only enabled tools are available to the model. '
+  + 'Switches apply to new sessions.';
+/** pi 的 8 个内置工具（各有开关）与 pi 默认启用的 4 个（没写 defaultTools 时） */
+export const PI_TOOLS = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'powershell'];
+export const PI_DEFAULT_TOOLS = ['read', 'bash', 'edit', 'write'];
+/** Mori 的 TaskBoard 工具（docs/specs/parallel-agents-taskboard.md §6.3） */
+const TASKBOARD_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit',
+  'request_update', 'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close'];
+/** 没有开关的行下面的原因（tools.md"内置工具"最后一行） */
+export const TOOL_REASONS = {
+  task: 'Mori turns this on and off with Task mode.',
+  memory: 'Mori turns this on for the main agent.',
+  mcp: 'Turn its server on or off in MCP.',
+  plugin: 'Turn it on or off in Plugins.',
+  extension: 'Set by this extension. To change it, edit the extension file.',
+};
+
+/** @brief grep、find 下面的说明（要 rg.exe / fd.exe）；别的工具为 null。agentDir 是界面上写出的 pi 配置目录。 */
+export function toolNeeds(name, agentDir) {
+  const program = { grep: 'rg.exe', find: 'fd.exe' }[name];
+  return program ? `Needs ${program} in ${agentDir}\\bin or on PATH. Mori doesn’t download it.` : null;
+}
+
+/**
+ * @brief 一行工具下面应有的说明（不含本项目设置的只读原因与写入失败）：pi 内置工具只有 grep、find 有；其余按来源，
+ *        Mori 的按工具名（TaskBoard 工具、memory）。
+ * @param row toolRows 的一行（name、tag）
+ * @param agentDir 界面上写出的 pi 配置目录
+ */
+export function expectedNotes(row, agentDir) {
+  if (row.tag === 'Built-in') return [toolNeeds(row.name, agentDir)].filter(Boolean);
+  if (row.tag === 'Mori') {
+    if (TASKBOARD_TOOLS.includes(row.name)) return [TOOL_REASONS.task];
+    return row.name === 'memory' ? [TOOL_REASONS.memory] : [];
+  }
+  if (row.tag.startsWith('MCP · ')) return [TOOL_REASONS.mcp];
+  if (row.tag.startsWith('Plugin ')) return [TOOL_REASONS.plugin];
+  return row.tag.startsWith('Extension ') ? [TOOL_REASONS.extension] : [];
 }
 
 /**
@@ -105,3 +159,34 @@ export function packageCards(page) {
     }));
   });
 }
+
+/**
+ * @brief 开始记录工具页有没有显示过"Loading…"（MutationObserver：只出现一两帧，轮询抓不到），
+ *        以及有没有出现过读取失败、"New session"不可用（跟随的会话还在打开中）。
+ */
+export function watchTools(page) {
+  return page.evaluate(() => {
+    window.__toolsSeen = { loading: false, error: false, opening: false };
+    window.__toolsObserver?.disconnect();
+    window.__toolsObserver = new MutationObserver(() => {
+      const root = document.querySelector('[data-testid="tools-page"]');
+      if (!root) return;
+      const seen = window.__toolsSeen;
+      if ([...root.querySelectorAll('.tools-empty[role="status"]')].some((p) => p.textContent === 'Loading…')) {
+        seen.loading = true;
+      }
+      if (root.querySelector('[data-testid="tools-error"]')) seen.error = true;
+      const button = [...root.querySelectorAll('.tools-notice button')]
+        .find((b) => b.textContent.includes('New session'));
+      if (button?.disabled) seen.opening = true;
+    });
+    window.__toolsObserver.observe(document.body, { subtree: true, childList: true, attributes: true,
+      characterData: true });
+  });
+}
+
+/** @brief watchTools 开始之后看到的。 */
+export const toolsSeen = (page) => page.evaluate(() => {
+  window.__toolsObserver?.disconnect();
+  return window.__toolsSeen;
+});

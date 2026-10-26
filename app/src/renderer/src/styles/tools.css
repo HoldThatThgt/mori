@@ -61,6 +61,46 @@
 .tools-inner > .form-message { margin: 0 0 10px; }
 .tools-inner > .form-message .text-link { margin-left: 10px; }
 
+/* Instructions 一节（用户级 AGENTS.md，docs/v1/screens/customize-agents-md.md；2026-10-26 从设置页挪来）：用户级编辑器、项目加载的文件、
+   token 数与警告（docs/specs/memory.md §10.3） */
+.agents-section h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+.agents-section > .form-message.error { margin: 0 0 12px; }
+.agents-user, .agents-project { margin-top: 18px; }
+.agents-user > .muted, .agents-project > .muted { margin: 0 0 8px; }
+.agents-path {
+  margin: 0;
+  color: var(--color-prose);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+.agents-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 6px; }
+.agents-effective { color: var(--color-ok); font-size: var(--fs-small); overflow-wrap: anywhere; }
+.agents-effective.warn { color: var(--color-warn); }
+.agents-line .agents-open-error, .agents-files .agents-open-error { flex-basis: 100%; margin: 0; }
+.agents-editor {
+  display: block;
+  width: 100%;
+  min-height: 260px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-canvas);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  resize: vertical;
+}
+.agents-editor:focus { outline: 2px solid #b8c9eb; outline-offset: 0; }
+.agents-editor:disabled { background: var(--color-surface); }
+.agents-user .form-actions { align-items: center; }
+.agents-user .agents-status { margin: 0; }
+.agents-files { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.agents-files li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.agents-token-count, .agents-tokens { color: var(--color-muted); font-size: var(--fs-small); white-space: nowrap; }
+.agents-over { margin: 12px 0 0; color: var(--color-warn); }
+
 /* 一行：名字、来源、说明，右边开关；停用的行变淡 */
 .tools-list { margin: 0 0 12px; padding: 0; list-style: none; }
 .tools-row { padding: 8px 0; border-bottom: 1px solid var(--color-line); }
@@ -121,6 +161,12 @@ button.tools-row-main, summary.tools-row-main { cursor: pointer; }
 .tools-warn .text-link { margin-left: 8px; }
 .tools-row-actions { display: flex; flex-wrap: wrap; gap: 14px; }
 .tools-page .text-link.danger { color: var(--color-danger); }
+
+/* 内置工具：左边名字等（展开看完整说明），右边开关（只有 pi 的内置工具有），下面的说明占满一行 */
+.tools-tool-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; }
+.tools-tool-row > .tools-tool { grid-row: 1; grid-column: 1; min-width: 0; }
+.tools-tool-row > .tools-switch { grid-row: 1; grid-column: 2; margin-top: 4px; }
+.tools-tool-row > .tools-row-note, .tools-tool-row > .form-message { grid-column: 1 / -1; }
 
 /* 内置工具：展开看完整说明 */
 .tools-tool summary { list-style: none; }

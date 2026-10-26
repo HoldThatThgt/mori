@@ -3,7 +3,8 @@
 // 运行时不读 models.json（docs/specs/model-providers.md §4.4 第 1 步）：提供商与模型由模型层编译进来（modelCompile.ts）。
 // API key 不交给 pi：pi 里只有一个不保密的占位 key，真正的 key 在模型池的内存里，由它在发请求时写进认证头（§4.4、§8.4）。
 
-import type { ModelRuntime } from '@earendil-works/pi-coding-agent';
+import type { ModelRuntime, SettingsManager } from '@earendil-works/pi-coding-agent';
+import { applyShell, findShell } from './shell';
 
 export type Pi = typeof import('@earendil-works/pi-coding-agent');
 
@@ -50,8 +51,23 @@ export async function getRuntime(): Promise<ModelRuntime> {
   return rt;
 }
 
-/** @brief 用户级设置（`<agentDir>/settings.json`）：思考强度、按模型的新会话思考强度等。 */
-export async function globalSettings() {
+/**
+ * @brief Mori 建的每一份 pi 设置都经这里：照 pi 的 SettingsManager.create 读文件，再把这次启动找到的 bash
+ *        放进内存里的设置（shell.ts applyShell，方案第 6 节"Shell"），不写 settings.json。
+ * @param cwd 读哪个项目的 `.pi/settings.json`；只看用户级时传 agentDir
+ * @param agentDir pi 的配置目录
+ * @param options.projectTrusted 是否读项目设置（pi 的同名选项，不给时为 true）
+ */
+export async function createSettingsManager(cwd: string, agentDir: string,
+  options: { projectTrusted?: boolean } = {}): Promise<SettingsManager> {
   const pi = await loadPi();
-  return pi.SettingsManager.create(pi.getAgentDir(), pi.getAgentDir());
+  const settings = pi.SettingsManager.create(cwd, agentDir, options);
+  applyShell(settings, await findShell(pi));
+  return settings;
+}
+
+/** @brief 用户级设置（`<agentDir>/settings.json`）：思考强度、按模型的新会话思考强度等。 */
+export async function globalSettings(): Promise<SettingsManager> {
+  const pi = await loadPi();
+  return createSettingsManager(pi.getAgentDir(), pi.getAgentDir());
 }

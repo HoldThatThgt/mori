@@ -23,6 +23,7 @@ import {
   previewHeading, previewState, reportField, reportLabels, sendAt, sentSessionRefs, slotSelector, splitState,
   viewProblems, waitPaneIdle, waitPaneReady, waitPreview, waitSessionChip, waitSplit,
 } from './m5-helpers.mjs';
+import { exitFromTray } from './tray-helpers.mjs';
 
 const source = arg('source');
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -76,11 +77,12 @@ async function start(ctx) {
   await sleep(1500);
 }
 
-/** @brief 重启：关掉窗口（Mori 有序退出），再用同一个数据目录启动。 */
+/**
+ * @brief 重启：托盘菜单"Exit"（Mori 有序退出；2026-10-26 起关掉窗口只是藏进托盘，docs/v0/screens/window.md），
+ *        再用同一个数据目录启动。20 秒没退出时由测试关闭。
+ */
 async function restart(ctx) {
-  const exited = new Promise((done) => ctx.app.process().once('exit', () => done(true)));
-  await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {});
-  if (!await Promise.race([exited, sleep(20000).then(() => false)])) await ctx.app.close().catch(() => {});
+  if (!await exitFromTray(ctx.app, 20000)) await ctx.app.close().catch(() => {});
   await start(ctx);
 }
 

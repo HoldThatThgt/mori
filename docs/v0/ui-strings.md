@@ -25,6 +25,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | --- | --- | --- | --- |
 | 会话 | session / Sessions | Session、Sessions | 会话列表的读屏名 "Sessions"，菜单 "Session actions" |
 | 新会话 / 新建会话 | New session | New session | 负责人定；按钮、标题的默认值、操作记录都用它 |
+| 在这个项目里新建会话（项目行的 +） | New session in <folder> | New session in {folder} | 项目行右端 + 的读屏名和悬停，<folder> 是项目行显示的文件夹名（2026-10-26，负责人走查 M9）；操作记录仍写 "New session" |
 | 项目 / 项目文件夹 | project / project folder | — | 作用范围标签 "Project"，正文 "this project" |
 | 打开文件夹… | Open folder… | Open folder… | 弹出选择器，所以带 "…"；选择器的标题 "Select a folder"（Claude 有这条）、按钮 "Select folder"，与 "Add plugin from folder…" 共用（`main/index.ts` 的 `mori:pick-folder`） |
 | 轮 / 本轮 / 第 N 轮 | turn / the current turn / Turn N、turns a–b | # turn、after the current turn | 负责人定；句中小写 "turns 3–4" |
@@ -55,6 +56,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 一栏（分屏的一边） | pane | pane、Close pane | |
 | 左栏 / 侧栏 | sidebar | Sidebar | |
 | 右栏 | right panel | panel、Close panel | |
+| 右栏占满 / 回到原宽度（2026-10-26） | Expand / Collapse | Expand、Collapse（pane 上的图标按钮） | 读屏名和悬停说明都用这两个词；Claude 的快捷键 "Expand or collapse pane" 没有照搬 |
 | 引用（动作：选区浮层的按钮、会话菜单、回复下的按钮、拖到输入框） | Attach as context / Attach message as context / Drop to attach as context | Attach as context、Attach message as context | 负责人定：整个引用功能在界面上用 Claude 的 context 说法。Claude 的 Code 标签页把"把消息、选区、会话带进下一条消息"叫这个（"Right-click a message or select text → Attach as context"） |
 | 引用（芯片、预览） | Context · …（芯片、读取中的芯片、预览标题）/ Remove context / Cancel attaching “<name>” / Not attached / the attached text | Attached context | 负责人定；读屏名在 "Context" 后用冒号（"Context: src/a.ts · lines 3–5, jump to source"、"Remove context: …"）。给模型的文字不变，仍是 "Quoting …:" 和 "[Quote] …"。工作回顾里反馈记录的 "Quoted text" 是反馈针对的原文，不属于这个功能，不改 |
 | 问 Mori | Attach as context | Attach as context | 负责人定：选区浮层的按钮与会话菜单同一个词；操作记录 "Attach as context (file)" / "Attach as context (response)" |
@@ -70,10 +72,10 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 记忆 | Memory | — | v1（docs/specs/memory.md §1、§10.1）：左栏入口（在原来 Review 的位置）、页标题、F8 的 Page、操作记录 "Open Memory"；四种条目的统称 |
 | 事实（种类） | Facts | — | 记忆页的分节；工具结果里同样写 "Facts"（"Saved to Facts (user level): …"）（记忆规格 §1、§7.4） |
 | 三种规则（种类名） | TASTE / STRATEGY / REVIEW | — | 名字，全大写照 proposal，句子里不改写（"Running STRATEGY enhancement…"）；"REVIEW" 是一种条目，不是工作回顾的 "Review"（记忆规格 §1） |
-| AGENT（记忆页的分节） | AGENT | — | 列出这个项目加载的 AGENTS.md；文件名照写 AGENTS.md（记忆规格 §10.3） |
+| AGENT（记忆页的分节） | AGENT | — | 列出这个项目加载的 AGENTS.md；文件名照写 AGENTS.md（记忆规格 §10.3）；用户级那一行的链接 Edit in Customize（2026-10-26 改，原来 Edit in Settings），合计 "<total> / 2,000 tokens" |
 | 修订记录 | Revisions | — | 记忆页的分节；条目详情里改过它的记录叫 "History"（记忆规格 §10.1、§10.5） |
 | 增强模式 / 增强任务 | Enhancement（开关、对话框 "Enhancement settings"）/ enhancement（句子里） | — | "Running TASTE enhancement…"、"Created Oct 23 by enhancement"；操作记录 "Turn on enhancement <cwd>"（记忆规格 §1、§8、§10.4） |
-| 你说的 / 它学的 | You said / Learned | — | 条目行右边的标记、详情的第二行；在记忆页新增或修改后都是 "You said"（记忆规格 §1、§10.1） |
+| 你说的 / Mori 记的 / 它学的 | You said / Added by Mori / Learned | Added by Claude（Mori 记的那一个） | 条目行右边的标记、详情的第二行；在记忆页新增或修改后都是 "You said"；"Added by Mori" 是主 Agent 没被要求时主动记的（2026-10-26，记忆规格 §0 第 5 条、§1、§10.1）；增强任务第一条消息里写小写 "you said" / "added by Mori" / "learned" |
 | 记忆的层（用户级 / 本项目） | User / Project（分段按钮）；user-level / user level / this project（句子里） | 见 "用户级 / 本项目" | 同 "用户级 / 本项目" 一行：形容词写 "user-level entries"，名词写 "Move to user level"、"(user level)"（记忆规格 §1、§7.4） |
 | 删除（记忆条目） | Delete…（详情里的按钮）/ Delete（确认框的按钮）/ Deleting… / Deleted（修订里的改动、工具结果 "Deleted from …"） | Delete…、Delete、Deleting… | 同 "删除 / 移除" 一行；memory 工具的动作名是 forget，界面、修订和工具结果一律写 Delete 一族，不写 "Forget"（"Forget" 只用于权限菜单）（记忆规格 §1、§10.1） |
 | 提升 / 放回 | Move to user level / Move to this project | — | 详情里的按钮与操作记录同一句；修订里的改动、说明和条目的 Revisions 行写过去式 "Moved to user level" / "Moved to this project"（记忆规格 §1、§3.2、§3.3、§8） |
@@ -96,7 +98,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 设置 | Settings / Open settings | Settings、Open settings | 卡片和思考强度菜单里打开 Settings → Models 的按钮都叫 "Open settings"，范围菜单里是 "Manage models"；v0 错误卡上的 "Go to settings" v1 已删除（规格 §9.3） |
 | 返回会话 | Back to app | Back to app | 设置、Customize、Review 三页的返回按钮，操作记录同（v1：见 docs/specs/memory.md §10.1：Review 换成 Memory） |
 | 工具（页） | Customize（导航、页标题、F8 的 Page、操作记录 "Open Customize"） | Customize | Claude 开关技能、插件、连接器的页面叫 Customize；Claude 单独的 "Tools" 不是页名。分节标题 Built-in tools / Skills / Plugins / MCP 不变 |
-| 内置工具 | Built-in tools | Built-in | |
+| 内置工具 | Built-in tools | Built-in | 2026-10-26 起 pi 的 8 个内置工具各有开关（读屏名称 "Enable tool <名字>"，同 "Enable skill <名字>"），文字见下面 Customize 页一节 |
 | 技能 | skill / Skills | Skills、Skill | |
 | 插件 / 包 | plugin / Plugins | Plugins、Add plugin | 只有讲 pi 包格式时写 "pi package" |
 | 扩展 / 提示词 / 主题 | Extensions / Prompt templates / Themes | Extensions、Themes | 提示词与 "/" 列表同叫 prompt templates；开关的读屏名和操作记录用单数（Enable extension x、Enable prompt template x） |
@@ -111,7 +113,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 选择范围 | model range / Default model range for new sessions / No model range | — | 分组、提供商或模型（规格 §1）；输入框下面一行的范围按钮读屏名 "Model range: <按钮上的字>"（字里的 " · " 换成 ", "：“Model range: fast, deepseek-chat”），菜单的读屏名 "Model range" |
 | 网络区域 | network zone / Network zone / Local / Intranet / Public | — | 标签、单选、勾选框和标记写 Local / Intranet / Public；句子里写区域代码（"Allow public for this project"、"zone public is not allowed for this project"） |
 | 项目授权 | Project access / Allowed: … | — | 设置 → Models 的一节：按项目在 "Allowed zones for all projects" 之外另外允许的区域 |
-| 验证（探针） | Verify / Verifying… / Re-verifying… / Verify again / Verify now | — | 结果写在档案摘要的 "Tool calling: Verified / Not verified / Failed"；首次启动表单下方 "Verifying tool calling…" / "Tool calling verified" |
+| 验证（探针） | Verify / Verifying… / Re-verifying… / Verify again / Verify now | — | 结果写在档案摘要的 "Tool calling: Verified / Not verified / Failed"（2026-10-26 起首次启动表单下方不再有 "Verifying tool calling…" / "Tool calling verified"，见 v1/screens/first-run.md） |
 | 服务地址 / 接口类型 / 模型 ID | base URL / API type / model ID | Gateway base URL、Model ID | |
 | 测试连接 | Test connection / Test / Testing… | Test connection、Testing… | 提供商卡和首次启动表单用 "Test connection"，Keys 的行和模型行用 "Test" |
 | 连接成功 / 连接失败 | Connected · … / Connection failed: … | Connected · {latency}ms、Connection failed: {error} | 毫秒和秒一样不加空格（120ms、5s） |
@@ -129,10 +131,12 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 对新建的会话生效 | Applies to new sessions | Applies to new sessions. | |
 | 已经打开的会话 | sessions already open | — | |
 | 扩展的询问 | An extension needs your input | An integration needs your input | |
-| subagent（普通模式的 `subagent` 工具开出的只读 Agent） | agent / agents（卡片）；工具页的名字 Subagent | Running agent、Running {count, plural, one {# agent} other {# agents}}、Ran agent、Ran {count} agents、Subagent | 卡片标题：进行中 "Running agent" / "Running 3 agents"，开过之后 "Ran agent" / "Ran 3 agents"，没开就结束 "Run agent" / "Run 3 agents"（"Run" 一种是 Mori 照 Claude 的 "run an agent" 写的）。给模型的文字里叫 subagent（[subagent 规格](../specs/subagent.md) §1） |
+| subagent（普通模式的 `subagent` 工具开出的 Agent，只读或通用） | agent / agents（卡片）；工具页的名字 Subagent | Running agent、Running {count, plural, one {# agent} other {# agents}}、Ran agent、Ran {count} agents、Subagent | 卡片标题：进行中 "Running agent" / "Running 3 agents"，开过之后 "Ran agent" / "Ran 3 agents"，没开就结束 "Run agent" / "Run 3 agents"（"Run" 一种是 Mori 照 Claude 的 "run an agent" 写的）。给模型的文字里叫 subagent（[subagent 规格](../specs/subagent.md) §1） |
 | 工具调用次数 | 1 tool use / 12 tool uses | {count, plural, one {# tool use} other {# tool uses}} | subagent 卡片的每一行；0 次时不写 |
 | 进度 | 1 of 3 done | {done} of {total} agents done | subagent 卡片执行中的状态，后面接秒数："1 of 3 done · 12s" |
 | subagent 的提示 / 回复 | Agent prompt / Response | Agent prompt、Response | 展开一行后的两段 |
+| 系统托盘 | system tray | system tray（"Claude runs in the system tray"） | 2026-10-26 加（WP-20，[screens/window.md](screens/window.md)） |
+| 退出 | Exit（托盘菜单的项）；quit（句子和按钮：right-click to quit、Quit anyway、Quitting now…） | Exit（Windows 托盘菜单）、Quit anyway、Quitting now will interrupt that work. | 照 Claude 在 Windows 上的写法：菜单项是 "Exit"，说明和按钮里是 quit。2026-10-26 加 |
 
 ## 按屏的固定说法
 
@@ -140,9 +144,10 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 
 | 中文 | 英文 |
 | --- | --- |
-| 新会话 / 打开文件夹… / 工具 / 工作回顾 / 报告界面问题（F8） / 设置 | New session / Open folder… / Customize / Review / Report a UI issue (F8) / Settings（v1：见 docs/specs/memory.md §10.1：Review 换成 Memory） |
+| 新会话 / 打开文件夹… / 工具 / 工作回顾 / 报告界面问题（F8） / 设置 | New session / Open folder… / Customize / Review / Report a UI issue (F8) / Settings（v1：见 docs/specs/memory.md §10.1：Review 换成 Memory）（2026-10-26 起展开的左栏顶部没有 New session，只在收起的图标栏上有一个 +，读屏名 "New session (Ctrl+N)"，见 screens/sessions.md"左栏"） |
+| 项目行的 + | New session in <folder>（不可用时悬停 Mori’s background process crashed. Restart it to continue.） |
 | 展开侧栏 / 收起侧栏 | Open sidebar / Close sidebar（收起时带状态："Open sidebar (a session needs approval)"、"(a session needs input)"、"(a session has an error)"、"(a session has unread results)"） |
-| 后台进程退出后导航不可用的提示 | Mori’s background process crashed. Restart it to continue. |
+| 后台进程退出后导航不可用的提示 | Mori’s background process crashed. Restart it to continue.（2026-10-26：Customize › Instructions 的项目一栏在后台进程退出时也写这一句） |
 | 正在读取会话… / 读取会话列表失败：… / 重试 | Loading sessions… / Couldn’t load sessions: … / Retry |
 | 已归档 N | Archived N |
 | 会话行状态：等你批准 / 等你回答 / 生成中 / 出错 / 有新结果 | Needs approval / Needs input / Running / Error / Unread |
@@ -160,9 +165,9 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 中文 | 英文 |
 | --- | --- |
 | 新会话的标题 | New session |
-| 空白页 | Pick a session on the left to continue, or open a folder to start a new session. / Open a folder / Choose a project folder to start a session. / Opening <folder>… |
+| 空白页 | Pick a session on the left to continue, or open a folder to start a new session. / Open a folder / Choose a project folder to start a session. / Opening <folder>…（v1：2026-10-26 起首次启动测试成功后进入这一页，标题 Open a folder 下面一行测试结果 "Connected · …"，打开会话之前只显示这一次，见 v1/screens/first-run.md） |
 | 首次启动 | 整窗的首次启动表单 "Connect a model"，文字见下面 "首次启动" 一节（v1 没有 v0 测试成功后的标题 "Connected"） |
-| 上下文 | 圆环（2026-10-21 起，照 Claude 的 usage ring）：悬停 "Context ≈ 53.8k / 128k (42%)"（Claude 的 "Context {summary}"，summary 是 "≈ " + "{used} / {max} ({pct}%)"；Claude 对估算的数加 "≈ "，pi 的数都是估算；百分比四舍五入，不写 "<1%"）；读屏名 "Usage: Context approximately 53,760 of 128,000 tokens (42%)"（Claude 的 "Usage: {parts}"，" / " 换成 " of "）；详情左边 "Context window"、右边同悬停的 summary "≈ 53.8k / 128k (42%)"，下面一条进度条；还没有消息时悬停和读屏名 "Context window"，详情里条的位置是 "Send a message to see context usage."（Claude 原句，也是读屏的描述）；刚压缩过同样是 "Context window"，那句换成 Mori 的 "Just compacted. Context usage shows after the next response."。原来的 "Context 42%" / "Context —" / "About … tokens" 不再用。不用的 Claude 字串："{percent}% used"（套餐用量）、"{used} of {cap} tokens used"（组织的 Token limit 卡片） |
+| 上下文 | 圆环（2026-10-21 起，照 Claude 的 usage ring）：悬停 "Context ≈ 53.8k / 128k (42%)"（Claude 的 "Context {summary}"，summary 是 "≈ " + "{used} / {max} ({pct}%)"；Claude 对估算的数加 "≈ "，pi 的数都是估算；百分比四舍五入，不写 "<1%"）；读屏名 "Usage: Context approximately 53,760 of 128,000 tokens (42%)"（Claude 的 "Usage: {parts}"，" / " 换成 " of "）；详情左边 "Context window"、右边同悬停的 summary "≈ 53.8k / 128k (42%)"，下面一条分段条和分项（2026-10-26 起，WP-12；Claude 桌面版用量浮层里的分项名，System prompt、MCP tools、Memory files、Skills、Messages 在 Claude 的字串表里，System tools、Autocompact buffer、Free space 是 Claude Code /context 给的数据，Claude 原样显示）：System prompt / System tools / MCP tools / Memory files / Skills / Messages / Autocompact buffer / Free space，每行 "≈ 1.1k"（Autocompact buffer 不加 "≈ "）和占窗口的百分比 "0.1%"（一位小数，同 Claude）；读屏的描述 "System prompt approximately 505 tokens (0.4%), …, Autocompact buffer 16,384 tokens (12.8%), Free space approximately 96,256 tokens (75.2%)"；还没有消息时悬停和读屏名 "Context window"，详情里条的位置是 "Send a message to see context usage."（Claude 原句，也是读屏的描述）；刚压缩过同样是 "Context window"，那句换成 Mori 的 "Just compacted. Context usage shows after the next response."。原来的 "Context 42%" / "Context —" / "About … tokens" 不再用。不用的 Claude 字串："{percent}% used"（套餐用量）、"{used} of {cap} tokens used"（组织的 Token limit 卡片）、"Compact session"、"Compacts automatically at {pct}%"、"Compacts automatically when full"、"Last updated {time}. Send a message to refresh."、"Loading context breakdown…"、"See detailed breakdown"、"Custom agents"、"Other"（Mori 的分项不超过八项，不合并） |
 | 后台进程意外退出 | Mori’s background process crashed · Unfinished responses were interrupted / Restart / Restarting… |
 | 输入框不能发送时 | Mori’s background process crashed / Restarting… / Starting… / Session didn’t open |
 | 打开失败 | Failed to open session: … |
@@ -174,6 +179,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 阶段行：等待模型响应 / 思考中 / 生成中 | Waiting for the model… 12s / Thinking… 5s / Responding…（会话定的，待负责人确认；不用 Claude 的 "Writing…"） |
 | 阶段行：工具 / 重试 / 压缩 | <工具卡标题> 8s（如 "Run npm test 8s"）/ Retrying (1/3) · <错误原文> / Compacting session… |
 | 对话流里 | Thought process / Thinking… / Copy code / Compacted session / Stopped · Changes made so far stay as they are / Extension: … / Skill · <name> / Expand / Collapse |
+| mermaid 图（2026-10-26） | 读屏名 Mermaid diagram（Claude 的原词，`role="img"`）；画不出来时就是普通代码块，没有另外的文字（照 Claude；不用 Streamdown 自带的 "Mermaid Error: " / "Show Code" / "Loading diagram..."） |
 | 滚动 | Scroll up to load earlier messages / Jump to latest |
 | 错误卡 | Put your last message back in the message box（v1 删掉了 v0 的 "Go to settings"，规格 §9.3：模型的问题由换模型的一行、No model available 卡或拒绝启动卡说明） |
 | 模型层的卡片 | No model available / <provider>/<model> — <原因> / Open settings；拒绝启动卡：Verifying <provider>/<model>… / This session can’t start: no model fits. / No default model range; pick one. / <name> is not in your model settings.（第二行 "Used by this session’s model range."）/ .mori/models.json: <原文> / Model settings can’t be read: <原文>，按钮 Verify now / Allow <zone> for this project / Confirm zone / Change model… / Open settings。换模型的一行、阶段行等见 [v1/screens/model-chat.md](../v1/screens/model-chat.md) |
@@ -227,6 +233,8 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | N 次 / 第 N 次 · 修改 | 1 change（N changes）/ Change N · Edit（Write） |
 | 写入的内容 | File content |
 | 阅读器 | Loading… / File not found / Source changed · Attached text: / Preview unavailable · Binary file / Preview unavailable · This is a folder / Couldn’t read this file: … / Reload file / Open in default app / Close panel |
+| 阅读器顶部（2026-10-26） | 路径按钮的读屏名 Copy path <完整路径>（Claude 的 "Copy path {path}"），悬停是完整路径；复制后 Path copied to clipboard.（Claude 的原句）；失败 Copy failed（同回复下的 "Copy"，也是 Claude 的原词）/ Markdown 文件：View source（预览时）、Preview（看源码时），都是 Claude 文件面板的原词 / Expand、Collapse / 右栏窄于 320px 时 "← Changes" 只剩箭头，读屏名仍是 Changes |
+| Markdown 预览里的图片 | Image not available（Streamdown 自带，也是 Claude 的原词） |
 
 ### 首次启动
 
@@ -241,8 +249,8 @@ v1 的首次启动表单（[v1/screens/first-run.md](../v1/screens/first-run.md)
 | 拉取（v1：见 docs/specs/model-discovery.md §6.6） | Fetch models / Fetching models… / Cancel（拉取中的，`models.discoverCancel`）/ Fetch cancelled / Detected: <服务种类> <版本> / Updated to <url> so the model list loads.（只在拿到了列表时）；规则同下面 "设置" 的拉取；清单、列表错误、Add a model ID 和 More settings 的文字同下面 "设置"（More settings 里只有 Compatibility options） |
 | 选了 Public | Public providers must be allowed per project. You’ll be asked when you open a folder. |
 | 按钮 | Test connection / Saving… / Testing… / Cancel；保存失败 "Couldn’t save: …"；测试结果同下面 "设置"（v1：见 docs/specs/model-discovery.md §6.6：Test connection 上方一句 Each model is verified with up to 13 short requests.；没有勾选的模型时 Test connection 不可用；先保存勾选的模型，再测第一个勾选的模型；这里的 Cancel 是测试中的 Cancel，没有关闭表单的 Cancel） |
-| 探针状态 | Verifying tool calling… / Tool calling verified / Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings. / Couldn’t verify: … / Verify again（v1：见 docs/specs/model-providers.md §7.7：出错原文可能是 Stopped at the probe output limit before answering，见下面 "设置" 的 "探针各步的说明"） |
-| 测试成功之后 | Open folder… / Opening <folder>… / Failed to open session: … |
+| 探针状态 | 2026-10-26 起首次启动没有探针状态（负责人走查 M2，见 v1/screens/first-run.md）：原来表单下方的 Verifying tool calling… / Tool calling verified / Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings. / Couldn’t verify: … / Verify again 从首次启动删掉；验证进度看会话的拒绝启动卡（"Verifying <model>…"、"This session can’t start: no model fits."，见 v1/screens/model-chat.md） |
+| 测试成功之后 | 进入主窗口的空白页（上面 "会话" 一节）：Open a folder / Connected · …（测试结果，标题下面一行，只显示一次）/ Choose a project folder to start a session. / Open folder… / Opening <folder>… / Failed to open session: … |
 
 ### 设置
 
@@ -251,7 +259,7 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 
 | 中文 | 英文 |
 | --- | --- |
-| 页头 | Back to app / Settings；左侧分节 Models / AGENTS.md（读屏名 "Settings sections"）（v1：见 docs/specs/memory.md §10.8：左侧分节为 Models / AGENTS.md / UI issues；UI issues 的文字同下面 "工作回顾" 一节的 UI issues 部分） |
+| 页头 | Back to app / Settings；左侧分节 Models / AGENTS.md（读屏名 "Settings sections"）（v1：见 docs/specs/memory.md §10.8：左侧分节为 Models / AGENTS.md / UI issues；UI issues 的文字同下面 "工作回顾" 一节的 UI issues 部分）（2026-10-26 改：AGENTS.md 挪到 Customize，左侧分节为 Models / UI issues） |
 | Models 分节 | 标题 Models；从上到下：迁移说明、区域未确认、Defaults、Providers、Groups、Project access / Loading… / 配置读不出 "Couldn’t read model settings: <路径>: <原文>" 和 Retry |
 | 迁移说明 | Imported your model settings from models.json / Imported: <name>, … / Renamed provider <from> to <id> / Dropped <subject>: <reason> / Add the API key again for: <name>, … / Kept the saved key for: <name>, …; the key written in models.json was ignored. / Dismiss |
 | 区域未确认 | Confirm the network zone of these providers. Sessions don’t use them until you do. / <name> · <base URL> / Confirm zone…；对话框 Confirm network zone / Confirm / Cancel |
@@ -283,16 +291,18 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 | 范围菜单 | 按钮 "<范围名> · <当前模型 id>"（范围是模型时只写模型 id；没有当前模型时只写范围名）/ No model range；按钮在输入框下面一行，读屏名 "Model range: <按钮文字>"（" · " 换成 ", "）；悬停三行：第一行按钮文字，第二行 "<provider name> · <区域>"（没有当前模型时 "No model can run in this session"），不可用时第三行原因（准备中、生成中 "Can’t switch models until the response finishes"）；菜单和切换失败的一行从输入框下面一行往上打开；菜单 Groups / Providers / Models（Models 按提供商分小节），每项右边标区域（"Local · Public"，未确认时 "Zone not confirmed"；每项的读屏名只有名字，区域写进读屏的描述，用逗号："Local, Public"，被排除时再加 ". <原因>"）/ Applies to this session only. New sessions use the default range from Settings. / Manage models；换不了时 "Couldn’t change the model range: …" |
 | 思考强度菜单 | Effort: High / Unavailable / Applies to this session only. Set each model’s default for new sessions in Settings. / Open settings / This model can’t turn thinking off.（v1：见 docs/specs/model-providers.md §7.7、§9.2：菜单底部，当前模型支持思考而它可选的强度里没有 Off 时；这时菜单没有 Off，会话原来是 Off 的按钮显示 "Effort: Minimal"）；不支持思考：This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”. |
 | 发送、停止、排队（只有图标时） | 读屏名 "Send" / "Stop" / "Queue" / "More send options"（都是 Claude 原词）；悬停 "Send (Enter)"、"Stop response (Esc)"、"Queue for later (Enter)"（Claude 的 "Queue for later"；原来是 "Send after the current turn (Enter)"）；▾ 菜单里 "Steer"，≤ 400px 时加上 "Queue for later"：项的名字只有文字，快捷键是旁边的提示（"Enter"、"Ctrl+Enter"，`aria-hidden`，另放在 `aria-keyshortcuts`），不写成 "Queue · Enter" |
-| AGENTS.md | User / In effect: <path> / <path> takes precedence, so what you write here has no effect. / <path> is in effect now. After you save, this AGENTS.md is loaded instead. / Save / Discard changes / Unsaved changes / Saved · Applies to new sessions / Open in default app（v1：见 docs/specs/memory.md §10.3：生效的文件和每个加载的文件旁写 token 数 "<n> tokens"（1 时 "1 token"），合计超过 500 时警告 "Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short."） |
-| 离开确认 | Discard changes to AGENTS.md? / Your edits haven’t been saved. Leaving now discards them. / Discard / Keep editing |
 
 ### Customize 页（工具页）和 "/" 列表
 
 | 中文 | 英文 |
 | --- | --- |
 | 页头 | Back to app / Customize（分节导航的读屏名 "Customize page sections"：Claude 的 "Customize sections" 是另一个命令）/ Changes apply to new sessions. Sessions already open aren’t affected. / New session |
-| 分节 | Built-in tools / Skills / Plugins（MCP 服务一节 "MCP"） |
+| 分节 | Built-in tools / Skills / Plugins（MCP 服务一节 "MCP"）/ Instructions（2026-10-26 加，最后一节，用户级 AGENTS.md 从设置页挪来；负责人定名 Instructions，同 Claude 桌面版的 Instructions / Global instructions / User instructions，不叫 AGENTS.md） |
+| 没有会话时的顶部 | No open session. Only user-level skills and plugins are listed.（2026-10-26 改为 No open session. Only user-level skills, plugins, and instructions are listed.） |
+| Instructions（用户级 AGENTS.md） | 标题 Instructions；第一行 Instructions here are saved in the AGENTS.md file that every session reads. Use this for preferences, conventions, or context that Mori should always know.（2026-10-26，照 Claude 桌面版 Global instructions 的说明 "Instructions here apply to all Cowork sessions. Use this for preferences, conventions, or context that Claude should always know."）/ User / Changes apply to new sessions only; sessions already open don’t change.（2026-10-26 改：去掉前面的 Every session reads this file.，挪到第一行）/ In effect: <path> / <path> takes precedence, so what you write here has no effect. / <path> is in effect now. After you save, this AGENTS.md is loaded instead. / Save / Discard changes / Unsaved changes / Saved · Applies to new sessions / Open in default app（v1：见 docs/specs/memory.md §10.3：生效的文件和每个加载的文件旁写 token 数 "<n> tokens"（1 时 "1 token"），合计超过 500 时警告 "Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short."）（2026-10-26 改：这一节从设置页挪到 Customize，叫 Instructions；提醒线改为 2,000："Over 2,000 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short."；token 数 1000 起按千分位写 "2,099 tokens"；项目的文件在会话打开中时 "Loading…"；重新读取失败时顶部 "Couldn’t load AGENTS.md: <原文>"） |
+| 离开确认 | Discard changes to AGENTS.md? / Your edits haven’t been saved. Leaving now discards them. / Discard / Keep editing |
 | 状态 | Enabled / Not enabled / Running · Used by 1 session（N sessions）/ Running · Not in use / Starting… / Failed: … |
+| 内置工具（2026-10-26，负责人走查 M12） | 标题下一行 All tools in this session. Only enabled tools are available to the model. Switches apply to new sessions.（原来没有最后一句）/ pi 内置工具的开关读屏名称 Enable tool <名字> / grep、find 下面一行 Needs rg.exe in <agentDir>\bin or on PATH. Mori doesn’t download it.（find 为 fd.exe；<agentDir> 写实际路径，"on PATH" 是 Claude 的说法 "Leave unset to find it on PATH."）/ 没有开关的行的原因：Mori turns this on and off with Task mode.（TaskBoard 工具；用 Task mode，不写 team mode）/ Mori turns this on for the main agent.（memory）/ Turn its server on or off in MCP.（MCP 的工具）/ Turn it on or off in Plugins.（插件的工具）/ Set by this extension. To change it, edit the extension file.（扩展文件的工具）/ 本项目设置改了它时同技能：Turned on（off）in this project’s .pi/settings.json. To change it, edit that file. / 写入失败 Couldn’t save: <原文>。Claude 桌面版的 Customize 没有内置工具列表，这几句没有对应的原文 |
 | 作用范围 | User / Project |
 | MCP | Edit / Edit as JSON / Remove…（确认框里是 Remove）/ Removing… / Remove MCP server “<name>”? / Saved · Only new sessions will connect to it / No MCP servers yet / Add / This server is set to “codemode”. Mori only supports direct calls, so the model can’t call its tools. / Switch to direct calls / Name is required. |
 | 插件 | Extensions / Skills / Prompt templates / Themes / Enable all / Disable all / Remove…（确认框里是 Remove）/ Add plugin from folder… / Adding… / Plugins must be local folders that include their dependencies. Nothing is downloaded. / No plugins yet / Folder not found / Not used by Mori / Remove plugin “<path>”? |
@@ -309,6 +319,19 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 | 说明 | Includes a screenshot, the current view, and your recent activity. Saved on this computer and never sent to the model. |
 | 按钮和结果 | Save / Saving… / Cancel / Saved to <file> / Show in Explorer / View in Review / Close（v1：见 docs/specs/memory.md §10.9："View in Review" 改为 "View in Settings"，打开设置页的 UI issues 并选中这一条） |
 | 错误 | Couldn’t capture a screenshot: … / Couldn’t save the report: … |
+
+### 系统托盘与退出（主进程，2026-10-26 加，[screens/window.md](screens/window.md)）
+
+| 中文 | 英文 | Claude 的键和原文 |
+| --- | --- | --- |
+| 托盘图标的悬停说明 | Mori | 应用名（`setToolTip(app.getName())`） |
+| 托盘菜单：打开窗口 / 退出 | Show App / Exit | `DQTgg21B7g` "Show App"、`7fdcqxofEs` "Exit"（Claude 的 Windows 托盘菜单只有这两项，登录后中间多两行用量） |
+| 应用菜单（菜单栏） | File（只有 Exit）/ Edit / View / Window | `EfdnINFnIz` "File"、`7fdcqxofEs` "Exit"、`/PgA81GVOD` "Edit"、`LCWUQ/4Fu6` "View"、`1HUTYwndT2` "Window"；Edit、View、Window 和它们的项是 Electron 的菜单角色自带的英文，Mori 不另写（2026-10-26 审查修正加） |
+| 第一次关窗口的气泡：标题 | Mori runs in the system tray | `QlSoWmoIH3` "Claude runs in the system tray" |
+| 第一次关窗口的气泡：正文 | Mori runs in the background even when you close the window. Click the Mori icon in the system tray to reopen the app, or right-click to quit. | `pYqTQaQNu2`，把 Claude 换成 Mori |
+| 退出前的确认框：标题 | Mori is still working | `kdoUubpNNW` "Claude is still working" |
+| 退出前的确认框：说明 | Mori is working in 1 session. Quitting now will interrupt that work. / Mori is working in N sessions. Quitting now will interrupt that work. | `V9Eb08nwTF`（复数，按 `n === 1` 选） |
+| 退出前的确认框：按钮 | Quit anyway / Cancel | `j17BCr6YjW` "Quit anyway"、`47FYwba+bI` "Cancel"；Claude 中间还有 `71dtHvbhEs` "Wait for Claude"，Mori 不做（[../v1/walkthrough-1026/WP-20.md](../v1/walkthrough-1026/WP-20.md) 决定 4） |
 
 ### 工作回顾
 
@@ -392,7 +415,7 @@ Assistant: <回复正文>
 - Pending requests: 0
 - Permission mode: Ask each time / Allow all
 - Split view: Left: <名字> · Right: <名字> (focus in the left pane)
-- Right panel: Open / Closed
+- Right panel: Open / Open · Expanded / Closed（Expanded 是 2026-10-26 加的）
 - Window size: 1280×800
 - Pane width: 740px（焦点所在那一栏；不在会话页时 None）
 - Sidebar width: 260px（收起时 Hidden (saved width 260px)；被收紧时 220px (saved width 260px)）
@@ -462,11 +485,11 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 | 引用 | Attach as context (file) / Attach as context (response) / Attach session as context / Open file / Open file from attached context / Jump to response from attached context / Jump to session from attached context |
 | 反馈 | Copy response / Give feedback on response / Give feedback on selection |
 | 扩展询问 | Extension question: answered / Extension question: cancelled |
-| 设置 | Open settings（侧栏的 Settings）/ Open Settings → Models（卡片和菜单里的按钮；带落点时加 " (keys)"、" (zones)"、" (project)"）/ Save user-level AGENTS.md |
+| 设置 | Open settings（侧栏的 Settings）/ Open Settings → Models（卡片和菜单里的按钮；带落点时加 " (keys)"、" (zones)"、" (project)"）/ Save user-level AGENTS.md（2026-10-26 起在 Customize › Instructions 里保存） |
 | 首次启动、设置 → Models | Save first-run provider <name>（第一次保存，还没有 id）/ Save first-run provider <id> / Add provider <name> / Save provider <id> / Delete provider <id> / Add model <provider>/<id> / Save model <provider>/<id> / Delete model <provider>/<id> / Move model <provider>/<id> -1（上移；下移是 1）/ Add key <provider> / Remove key <ref> / Move key <ref> -1（1）/ Create group <id> / Save group <id> / Delete group <id> / Set defaults <默认范围，没有时 None> · <允许的区域，空格分隔> / Set project zones <path> · <区域，空格分隔> / Confirm zone <provider> · <zone> / Dismiss migration notice / Reload model settings / Verify <provider>/<id> (auto)（拒绝启动卡的 Verify now 可能带多个模型，空格分隔；需要你同意的探针是 (long_input)、(cancel)）；删除的确认框打开时算连带改动的那一次不记；从不记 key 的明文（v1：见 docs/specs/model-discovery.md §5.5：另有 Fetch models <host>（新提供商：Add provider 表单和首次启动表单）/ Fetch models <provider>（卡上）/ Cancel fetch models / Add models <provider> · <条数>；Add provider 仍记 "Add provider <name>"；`models.saveModel` 去掉了 `adding`、不再加模型，界面上也没有新建模型的表单，"Add model <provider>/<id>" 这一行删掉；模型表单的 Edit 和模型行的 Use 发的都是 `models.saveModel`，记 "Save model <provider>/<id>"） |
 | 测试连接 | Test connection <provider>/<id>（Keys 的行的 Test 加 " with key <ref>"）/ Cancel connection test |
 | 输入框下面一行 | Set model range <范围> / Change effort for this session: <level>（<level> 是 pi 的取值，如 high、xhigh） |
-| Customize 页 | Open Customize / Enable（Disable）<单数的类别> <path>（Enable skill …、Disable extension …、Enable prompt template …）/ Enable all in plugin（Disable all in plugin）<source> / Add plugin from folder <path> / Remove plugin <source> / Save MCP server <name> / Enable（Disable）MCP server <name> / Remove MCP server <name> / Switch MCP server <name> to direct calls |
+| Customize 页 | Open Customize / Enable（Disable）<单数的类别> <path>（Enable skill …、Disable extension …、Enable prompt template …）/ Enable all in plugin（Disable all in plugin）<source> / Add plugin from folder <path> / Remove plugin <source> / Save MCP server <name> / Enable（Disable）MCP server <name> / Remove MCP server <name> / Switch MCP server <name> to direct calls（2026-10-26：从记忆页 AGENT 的 Edit in Customize 进来时 Open Customize → Instructions）/ Enable（Disable）tool <name>（2026-10-26，内置工具的开关） |
 | 工作回顾 | Open Review / View in Review / Review: Feedback / View record: UI issues / Resolve / Reopen / Hide resolved / Show resolved / Export: Feedback / Open folder: UI issues / Show record in Explorer / Jump to source from Review（v1：见 docs/specs/memory.md §8：这一行由记忆页的动作记录替换：Open Memory、Memory: <层或分节>、View in Memory、Dismiss memory notice、Jump to source from Memory、F8 的 View in Settings，以及命令的 Save memory entry、Roll back revision、Turn on enhancement <cwd> 等，全文见规格 §8；设置页的 UI issues 沿用 View record: UI issues、Resolve、Reopen、Hide resolved、Show resolved、Export: UI issues、Open folder: UI issues、Show record in Explorer；Review: Feedback、Export: Feedback 不再有） |
 | 其他 | Report a UI issue / Restart background process |
 
@@ -475,9 +498,10 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 ## 实现时要一起改的地方
 
 - 复数：标 `"plural": true` 的条目要按数量选单复数（导出条数、隐藏条数、改动次数、字数、MCP 服务的会话数、已完成的轮数、模型数、剩余秒数）。
-  （v1：见 docs/specs/memory.md §10.3–§10.5：另有 token 数 "1 token" / "<n> tokens"（记忆页 AGENT 节、设置页 AGENTS.md、修订详情）和修订详情的会话数 "1 session" / "<n> sessions"；
+  （v1：见 docs/specs/memory.md §10.3–§10.5：另有 token 数 "1 token" / "<n> tokens"（记忆页 AGENT 节、设置页 AGENTS.md（2026-10-26 起在 Customize › Instructions，1000 起按千分位写）、修订详情）和修订详情的会话数 "1 session" / "<n> sessions"；
   增强状态行与修订详情里 1000 起写 "<n>k tokens"（四舍五入到整数）；"<m> feedback" 不分单复数。）
   （v1：见 docs/specs/model-discovery.md §6.1：清单底部的 "Add 1 model" / "Add N models"；"Models (N)" 只有数字、不分单复数。）
+  （2026-10-26 加：托盘"Exit"的确认框 "Mori is working in 1 session." / "… in N sessions."，`main/tray.ts`。）
 - `ToolsPlugins.tsx` 的开关读屏名要单数（Enable extension x），需要一张单数的分类名表 `KIND_ONE`（extension / skill / prompt template / theme，放在 `shared/protocol.ts` 的 `RESOURCE_KINDS` 旁边）；分节标题仍用复数。`actionLog.ts:93` 的操作记录也用这张表（`command.kind` 是 pi 的复数键）。
 - `Sidebar.tsx:66` 收起侧栏时的读屏名要一张小写分句的表 `RAIL_TEXT`（a session needs approval / a session needs input / a session has an error / a session has unread results），不再拼 `STATUS_TEXT`。
 - `ChatPane.tsx:50` 上下文用量的读屏名自己拼（"Context usage 42%, about 53,760 of 128,000 tokens"），不再复用悬停说明 `detail`。（2026-10-21 起被 [composer-pickers.md](composer-pickers.md) 取代：用量改成圆环，读屏名 "Usage: Context approximately … of … tokens (N%)"；这里留作记录）
@@ -493,7 +517,7 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 - `tests/check.mjs` 加一项：`src/` 里 .ts/.tsx 的字符串、模板字符串、正则字面量和 JSX 文本（用 TypeScript 语法树找），以及去掉注释后的 .html、.css 不能有中文（含中文标点、全角字符和假名），报 "<文件>:<行> contains Chinese text: …"；注释不查。
 - 仓库根目录 `build-installer.cmd` 的输出只用英文：去掉文件末尾的中文提示和失败时切到 65001 用 `findstr` 取出它们的代码。仍要切到 437：实测控制台是 936（中文 Windows 的默认）时，cmd 会把含中文的 REM 注释拆开、把半句当命令执行；65001 和 437 下不切也正常。只在开头 `chcp 437` 还不够（electron-builder 启动的 PowerShell 会把控制台的输出代码页改成 65001，从 936 启动的 cmd 之后又读错），所以脚本记下原代码页、切到 437 后用新的 cmd 重新运行自己，结束时恢复原代码页（见 [english-ui-checks.md](english-ui-checks.md) "测试中发现并已修正的问题"第 5 条）。
 - 顶栏宽度：（2026-10-21 起被 [composer-pickers.md](composer-pickers.md) 取代：按钮移到输入框下面一行，阈值重新定；这里留作记录）`chat.css` 的 `@container` 阈值（720 / 600 / 480 / 400px）和 `models.css` 里思考按钮的档位是按中文字宽估的，要用英文重新量（"Effort: Unavailable"、"Extra high ▾"、"Ask each time"、"Allow all"、"Context 100%"；最窄是分屏每栏 280px、中栏 300px），并改那段注释。按 Segoe UI 12px 量，280px 一栏里 "Ask each time" + "High" 已经超出约 15px，所以 400px 以下权限按钮只显示盾牌图标（"Allow all" 保留警告色），模式名放进读屏名 "Permission mode: <模式>"（悬停说明不带模式名，是 "Set the permission mode for this session"）；按钮上的模式名包在 `.permission-text` 里，窄栏时由 `chat.css` 藏起。实际改成的阈值：760px 以下权限按钮去掉图标（`models.css` 里模型按钮 120px 的上限仍在 720px）；660px 以下不显示项目名和 ›（分屏 690px 起，`split.css`）；600px 以下内边距收小、菜单贴右；500px 以下不显示上下文用量；400px 以下权限按钮只显示盾牌。思考按钮的档位（`models.css` 720 / 600 / 400px）不变。工具卡的标题至少留 56px，徽标放不下时截断加省略号。
-- 侧栏宽度：侧栏最窄 180px（`state/layout.ts` LIMITS）时，"Needs approval" 只给会话名留约 4px，"New session Ctrl+N" 会折行。侧栏做成 size container，窄于 220px（`@container (max-width: 219px)`；1024–1150px 宽窗口的默认宽度 220px 时仍显示文字，会话名留约 44px）会话行只显示状态圆点（状态文字 `.session-status-text` 用 clip 藏起，仍在读屏名里；title 在状态圆点上，不在会话行上），并隐藏 `.nav-hint`。
+- 侧栏宽度：侧栏最窄 180px（`state/layout.ts` LIMITS）时，"Needs approval" 只给会话名留约 4px，"New session Ctrl+N" 会折行（2026-10-26 起左栏没有这个按钮和 `.nav-hint` 了，项目行的 + 不折行，见 screens/sessions.md"项目行的 +"）。侧栏做成 size container，窄于 220px（`@container (max-width: 219px)`；1024–1150px 宽窗口的默认宽度 220px 时仍显示文字，会话名留约 44px）会话行只显示状态圆点（状态文字 `.session-status-text` 用 clip 藏起，仍在读屏名里；title 在状态圆点上，不在会话行上），并隐藏 `.nav-hint`。
 - 其他宽度：设置页左侧导航 180px 改成 200px（"Connections and models" 不折行）；设置页 760px 以下连接表单的标签放到输入框上面（已保存的 key 的提示 "Saved and encrypted · Re-enter it if you change the base URL" 约 350px，在 96px 标签列旁放不下；分节导航仍到 620px 才横排）（v1 已删掉连接表单和这句提示，分节名改为 "Models"）；Customize 页 MCP 表单的标签列 84px 改成 132px（"Environment variables"、"Server config (JSON)" 不折行）；工具卡状态 `max-width: max(60%, 140px)`（"Waiting for your approval"、"Denied · You pressed Stop" 在分屏 280px 一栏里不截断）；会话右键菜单 `width: max-content`（"Attach as context" + "This is the current session" 约 280px，右边放不下时由 `SessionMenu` 往左挪，不被挤得折行）；会话菜单的项目名和不可用原因（`.menu-hint`）之间留 16px。
 - 其他写出固定格式或界面文字的文档要跟着改（说明文字仍用中文；改成本文 "Mori 写出的文字的完整格式" 里的英文，或直接指向这一节）：
   - 引用和会话引用：`defaults.md:42`（引用块开头）、`:49`（字数含 "Turn N" 标题）、`:50`（"Turn N"、"User:"、"Assistant:"、"[Tool]"、"[Quote]"）、`:51`（"约 X 字" 改成 "~N characters"）；`screens/selection.md:61`；`screens/session-refs.md:19-51`、`:28`（"~N characters"）、`:65`（芯片 "Context · <会话名> · turns 3–8 · ~3,200 characters"）、`:80`（预览顶部的轮次范围和字数）。

@@ -13,6 +13,7 @@
     "dist": "npm run check && electron-vite build && electron-builder --win nsis --publish never",
     "dist:dir": "npm run check && electron-vite build && electron-builder --win dir --publish never",
     "smoke": "electron-vite build && node tests/ui/m0-smoke.mjs",
+    "test:quick": "electron-vite build && node tests/ui/quick.mjs",
     "test:replay": "node tests/ui/m1-replay.mjs",
     "test:app": "electron-vite build && node tests/ui/m1-app.mjs",
     "test:m2-app": "electron-vite build && node tests/ui/m2-app.mjs",
@@ -61,6 +62,7 @@
     "electron-builder": "26.17.0",
     "electron-vite": "5.0.0",
     "esbuild": "0.25.12",
+    "mermaid": "11.17.2",
     "playwright-core": "1.64.1",
     "typescript": "5.9.3",
     "vite": "7.3.7"

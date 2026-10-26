@@ -21,7 +21,8 @@ const STRATEGY_RUN = Object.freeze({ kind: 'enhance', task: 'strategy' });
 const AGENT_FORM = 'Correct form: memory {"action":"save","kind":"fact","abstract":"<one line>","quote":"<the user\'s '
   + 'words>"}; update needs "entry", "note" and "quote"; forget needs "entry" and "note"';
 const ENHANCE_FORM = 'Correct form: memory {"action":"update","entry":"<id>","note":"<why>","evidence":[{"session":'
-  + '"<listed session file>","entry":"<line id>"}]}; save needs "abstract"; every action needs "evidence"';
+  + '"<listed session file>","entry":"<line id>"}]}; save needs "abstract"; save, update and forget need "evidence"; '
+  + 'move needs "entry", "kind" and "note"';
 /** §7.4 的规则原文 */
 const USER_RULES = 'TASTE, STRATEGY, and REVIEW are saved to this project; only you can change user-level entries on '
   + 'the Memory page.';
@@ -61,6 +62,18 @@ test('MEM-12 a missing required field reads “<field> is required for <action>.
     [{ action: 'save', abstract: 'A', evidence: EVIDENCE }, null],
     [{ action: 'update', entry: 'e', note: 'Seen again', evidence: EVIDENCE }, null],
     [{ action: 'forget', entry: 'e', note: 'n', evidence: EVIDENCE }, null],
+    // 2026-10-26（§7.1、§6.9）：依据在执行时查；move 要 entry、kind、note，不要依据；kind 只给 move
+    [{ action: 'save', abstract: 'A' }, 'evidence is required for save.'],
+    [{ action: 'update', entry: 'e', note: 'n' }, 'evidence is required for update.'],
+    [{ action: 'forget', entry: 'e', note: 'n' }, 'evidence is required for forget.'],
+    [{ action: 'move', kind: 'fact', note: 'n' }, 'entry is required for move.'],
+    [{ action: 'move', entry: 'e', note: 'n' }, 'kind is required for move.'],
+    [{ action: 'move', entry: 'e', kind: 'fact' }, 'note is required for move.'],
+    [{ action: 'move', entry: 'e', kind: 'fact', note: 'x'.repeat(601) }, 'note must be 1–600 characters.'],
+    [{ action: 'move', entry: 'e', kind: 'fact', note: 'n' }, null],
+    [{ action: 'move', entry: 'e', kind: 'fact', note: 'n', evidence: EVIDENCE }, null],
+    [{ action: 'save', abstract: 'A', kind: 'strategy', evidence: EVIDENCE }, 'kind is only for move.'],
+    [{ action: 'forget', entry: 'e', note: 'n', kind: 'fact', evidence: EVIDENCE }, 'kind is only for move.'],
   ];
   for (const [args, error] of enhanceCases) {
     assert.equal(R.toolFieldError(args, STRATEGY_RUN), error, JSON.stringify(args));
@@ -186,7 +199,57 @@ test('MEM-21 the rule: enhancement writes only this project’s learned entries 
     }
     assert.equal(R.writeRefusal(caller, { layer: 'user', kind: task, source: 'learned' }),
       OTHER_KIND(task.toUpperCase()));
+    assert.equal(R.writeRefusal(caller, { layer: 'project', kind: task, source: 'agent' }), null,
+      `${task}: an entry added by Mori can be changed (2026-10-26)`);
   }
+});
+
+test('MEM-38 the move rule: only entries added by Mori, in this project, with this run’s kind at one end', () => {
+  const run = { kind: 'enhance', task: 'taste' };
+  const move = (over) => R.writeRefusal(run, { layer: 'project', kind: 'fact', source: 'agent', abstract: 'A',
+    ...over });
+  assert.equal(move({ toKind: 'taste' }), null, 'into TASTE');
+  assert.equal(move({ kind: 'taste', toKind: 'fact' }), null, 'out of TASTE into Facts');
+  assert.equal(move({ kind: 'taste', toKind: 'review' }), null, 'out of TASTE into REVIEW');
+  assert.equal(move({ toKind: 'strategy' }), OTHER_KIND('TASTE'), 'neither end is TASTE');
+  assert.equal(move({ toKind: 'taste', layer: 'user' }), OTHER_KIND('TASTE'), 'the user level');
+  assert.equal(move({ toKind: 'taste', source: 'user' }), USER_ENTRY('A'));
+  assert.equal(move({ toKind: 'taste', source: 'learned' }),
+    '“A” wasn’t added by Mori; only entries added by Mori can be moved.');
+  assert.equal(move({ kind: 'taste', toKind: 'taste' }), '“A” is already in TASTE.');
+  assert.equal(R.writeRefusal(run, { layer: 'project', kind: 'fact', source: 'agent' }), OTHER_KIND('TASTE'),
+    'without a move a fact added by Mori is still another kind');
+});
+
+test('MEM-10 the source after a write: the page makes you said; asked makes you said; otherwise added by Mori, '
+  + 'except that Mori never takes an entry you said away; enhancement keeps it (new ones are learned)', () => {
+  const run = { kind: 'enhance', task: 'review' };
+  assert.equal(R.sourceAfter(null, false, 'learned'), 'user');
+  assert.equal(R.sourceAfter(null, false, null), 'user');
+  assert.equal(R.sourceAfter(AGENT, true, null), 'user');
+  assert.equal(R.sourceAfter(AGENT, false, null), 'agent');
+  assert.equal(R.sourceAfter(AGENT, true, 'learned'), 'user');
+  assert.equal(R.sourceAfter(AGENT, false, 'learned'), 'agent');
+  assert.equal(R.sourceAfter(AGENT, false, 'agent'), 'agent');
+  assert.equal(R.sourceAfter(AGENT, false, 'user'), 'user');
+  assert.equal(R.sourceAfter(run, false, null), 'learned');
+  assert.equal(R.sourceAfter(run, false, 'agent'), 'agent');
+  assert.equal(R.sourceAfter(run, false, 'learned'), 'learned');
+});
+
+test('MEM-38 the enhancement scope adds this project’s entries added by Mori of every kind', () => {
+  const all = [...ALL, C('project', 'fact', 'mori-fact', 'Conclusion first', 'agent'),
+    C('user', 'taste', 'mori-user', 'User level by Mori', 'agent')];
+  const scope = R.matchScope({ kind: 'enhance', task: 'taste' }, all);
+  assert.deepEqual(scope.candidates.map((item) => item.id), ['short', 'mori-fact'],
+    'this project’s TASTE entries and this project’s entries added by Mori');
+  assert.ok(scope.others.some((item) => item.id === 'mori-user'), 'the user level stays outside');
+  const found = R.matchEntry({ kind: 'enhance', task: 'taste' }, 'Conclusion first', undefined, scope.candidates,
+    scope.others);
+  assert.equal(found.match.id, 'mori-fact');
+  const none = R.matchEntry({ kind: 'enhance', task: 'taste' }, 'zzz', undefined, scope.candidates, scope.others);
+  assert.equal(none.error, 'No entry matches “zzz”. Entries you can change: project/mori-fact: Conclusion first',
+    'entries the user wrote are not offered; the fact added by Mori is');
 });
 
 test('MEM-21 an enhancement run changes only this project’s learned entries of its kind; refusals write nothing',

@@ -18,10 +18,13 @@
 
 | 视图 | 顶部 | 内容 |
 | --- | --- | --- |
-| 改动 | "This session’s changes"、关闭（×，读屏名"Close panel"） | 改动列表 |
-| 文件 | "← Changes"（回到改动列表）、文件路径（工作目录之内显示相对路径，省略号截断，悬停显示完整路径）、"Reload file"、"Open in default app"、关闭（×，"Close panel"） | 文件阅读器 |
+| 改动 | "This session’s changes"、"Expand" / "Collapse"（2026-10-26 走查 M23，见 [layout.md](layout.md)"右栏展开"）、关闭（×，读屏名"Close panel"） | 改动列表 |
+| 文件 | "← Changes"（回到改动列表）、文件路径（工作目录之内显示相对路径，省略号截断，悬停显示完整路径；2026-10-26 走查 M25 起是按钮，点它复制完整路径，读屏名"Copy path <完整路径>"）、Markdown 文件的"View source" / "Preview"（2026-10-26 走查 M24）、"Reload file"、"Open in default app"、"Expand" / "Collapse"、关闭（×，"Close panel"） | 文件阅读器 |
 
 照 Claude 桌面版：点工具调用里的文件路径，右侧打开这个文件的只读预览，带"Open in {editor}"；预览和改动列表在同一个右栏里切换，× 关闭右栏。
+2026-10-26 走查起又照 Claude 的文件面板加了三件：标题里的路径是复制按钮（"Copy path {path}"，复制完整路径，提示"Path copied to clipboard."）；
+`.md`、`.mdx`、`.markdown` 文件默认显示渲染后的预览，顶部按钮在"View source"（预览时）和"Preview"（看源码时）之间切换，跳到某一行（引用芯片）时用源码；
+顶部"Expand" / "Collapse"让右栏占满或回到原来的宽度。
 
 ## 改动列表
 
@@ -46,9 +49,11 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 读取中 | 你点了文件路径、"Open"、"Reload file"或引用芯片 | "Loading…" | 返回改动（"← Changes"）、关闭 |
-| 显示 | 文件存在、是文本（前 8KB 没有 0 字节）、不超过 1MB | 行号和内容，只读；按扩展名语法高亮（超过 200KB 的不高亮，临时默认值）；长行不折行，横向滚动 | 用鼠标选中文字（浮层见 selection.md）；滚动；"Reload file"；"Open in default app"；返回改动；关闭 |
-| 跳到引用 | 你点了一个文件引用芯片（selection.md） | 滚到引用的行，这几行高亮，直到下一次跳转或重新读取 | 同上 |
+| 读取中 | 你点了文件路径、"Open"、"Reload file"或引用芯片 | "Loading…"；顶部的路径按钮不可用（还没有解析出的完整路径） | 返回改动（"← Changes"）、关闭 |
+| 显示 | 文件存在、是文本（前 8KB 没有 0 字节）、不超过 1MB | 行号和内容，只读；按扩展名语法高亮（超过 200KB 的不高亮，临时默认值）；长行不折行，横向滚动 | 用鼠标选中文字（浮层见 selection.md）；滚动；"Reload file"；"Open in default app"；复制路径；返回改动；关闭 |
+| 显示 Markdown 预览（2026-10-26 走查 M24） | 文件名以 `.md`、`.mdx`、`.markdown` 结尾（不分大小写）、能显示、不超过 200KB（临时默认值，与高亮的上限相同），这一次打开不是从引用芯片或"Jump to source"来的 | 与对话流同样渲染的 Markdown（标题、列表、表格、代码块高亮、mermaid 图，见 [chat.md](chat.md)"图"），没有行号；顶部按钮"View source"（代码图标）。图片和链接同对话流：远程图片不加载（窗口的内容安全策略），相对路径的图片显示"Image not available"，点链接不跳转 | 用鼠标选中文字：浮层照常，引用的是选区碰到的段落、列表项、表格行、标题或整个代码块对应的源码行（selection.md"预览里的选区"）；"View source"；滚动；"Reload file"（仍是预览）；其余同上 |
+| 显示 Markdown 源码 | 同上，你点了"View source"；或这一次是从引用芯片、"Jump to source"打开的；或文件超过 200KB（没有预览按钮） | 同"显示"（行号和内容）；顶部按钮"Preview"（眼睛图标，超过 200KB 时没有） | "Preview"；其余同"显示"。用哪一种按每次打开定：再打开（点路径、"Open"、芯片）时重新按上面的规则选，"Reload file"和本会话改了文件后的自动重读保持当前这一种 |
+| 跳到引用 | 你点了一个文件引用芯片（selection.md） | 滚到引用的行，这几行高亮，直到下一次跳转或重新读取；Markdown 文件也用源码视图 | 同上 |
 | 原文已变化 | 引用的原文在文件里找不到了（selection.md） | 顶部提示"Source changed · Attached text:"和原文；滚到原来的行 | 同上 |
 | 文件已被删除或移动 | 路径不存在 | "File not found"和完整路径 | "Reload file"；返回改动；关闭 |
 | 无法预览：二进制 | 前 8KB 里有 0 字节 | "Preview unavailable · Binary file" | "Open in default app" |
@@ -58,6 +63,8 @@
 | 系统编辑器打开失败 | `shell.openPath` 返回的错误 | 顶部下方一行"Couldn’t open this file with the default app: "加原文 | 再试 |
 | 会被运行的文件 | 扩展名在 `PATHEXT` 里，或是常见的脚本、快捷方式、安装包（.bat、.ps1、.py、.lnk、.msi 等） | 不打开（Windows 会运行它），改为在资源管理器里选中它，顶部下方一行"Opening this kind of file would run it, so it’s selected in File Explorer instead. Open it in an editor." | — |
 | 网络路径 | 解析出的路径是 `\\主机\共享\…` | 不读也不打开（访问它会让 Windows 向那台主机认证）："Couldn’t read this file: "加原文 | — |
+| 复制路径（2026-10-26 走查 M25） | 你点了顶部的路径（读取中以外的任何状态，包括"File not found"和各种"Preview unavailable"） | 主进程按上面的规则解析出的完整路径（例如 `D:\code\Har-GUI\README.md`）写进剪贴板（`mori:copy-text`）；顶部下方一行"Path copied to clipboard."（`role="status"`），约 2 秒后消失（同"Copied"）。读取失败、网络路径时复制的是工具参数里的路径原文（没有解析出的路径） | 再点一次 |
+| 复制路径失败 | 主进程写剪贴板失败 | 顶部下方一行"Copy failed"（`role="alert"`，同回复下的"Copy"），记错误日志；换文件或再点时清掉 | 再点一次 |
 
 ## 打开阅读器的入口
 
@@ -77,3 +84,5 @@
 - 阅读器里不能改文件，也没有保存按钮。
 - 删掉的文件不显示上次读到的旧内容；换一个文件打开时不先显示上一个文件。
 - 点"Open in default app"不会运行模型写的脚本或程序。
+- Markdown 预览不加载远程图片、不跳转链接、不运行文件里的 HTML 脚本（与对话流同样渲染，HTML 经过清理）；预览里选中文字引用的是源码行，不是渲染后的文字。
+- 右栏展开时会话面板不被卸载：收起后草稿、滚动位置都在。
