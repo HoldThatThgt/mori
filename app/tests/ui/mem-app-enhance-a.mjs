@@ -1225,15 +1225,17 @@ async function refilePage(ctx, x) {
   const row = ctx.page.locator(`[data-testid="memory-row"][data-id="${REFILE_SLUG.rule}"]`);
   await row.waitFor({ timeout: 10000 });
   const tag = await row.locator('.memory-tag').textContent();
+  // 换到 Revisions 之后这一行就不在页面上了，先读它的 data-source
+  const source = await row.getAttribute('data-source');
   await ctx.page.getByTestId('memory-section-revisions').click();
   await ctx.page.locator(`[data-testid="revision-row"][data-id="${x.revision?.id}"]`).click();
   await ctx.page.getByTestId('revision-detail').locator('.memory-change-title').first().waitFor({ timeout: 10000 });
   const titles = await ctx.page.getByTestId('revision-detail').locator('.memory-change-title').allTextContents();
   record('MEM-38 on the Memory page the moved rule is in TASTE marked “Added by Mori”, and the run’s revision shows '
     + '“Changed · Facts → TASTE · <abstract>” and “Changed · TASTE → Facts · <abstract>”',
-  tag === 'Added by Mori' && await row.getAttribute('data-source') === 'agent'
+  tag === 'Added by Mori' && source === 'agent'
     && same(titles.map((text) => text.trim()), [`Changed · Facts → TASTE · ${REFILE.rule.abstract}`,
-      `Changed · TASTE → Facts · ${REFILE.fact.abstract}`]), brief({ tag, titles }));
+      `Changed · TASTE → Facts · ${REFILE.fact.abstract}`]), brief({ tag, source, titles }));
 }
 
 /** @brief Roll back this revision：两条回到原来的种类，文件与运行前逐字相同。 */
