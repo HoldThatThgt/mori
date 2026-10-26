@@ -182,6 +182,20 @@ test('AG-03 a problem file’s view has no description: only its name, file, pat
   }
 });
 
+test('AG-03 every "can’t read the header" line uses the curly apostrophe, like the rest of the problem lines', async () => {
+  const { cwd, setup } = project({ 'list.md': '---\n- name\n---\n', 'yaml.md': '---\nname: a: b\n---\n',
+    'none.md': 'No header.' });
+  try {
+    const { info } = await commands.rolesInfoIn(setup);
+    const lines = info.agents.flatMap((agent) => agent.problems);
+    assert.equal(lines.length, 3);
+    assert.ok(lines.every((line) => line.startsWith('can’t read the header: ')), lines.join('\n'));
+    assert.ok(lines.includes('can’t read the header: it must be "field: value" lines'));
+  } finally {
+    cleanup(cwd);
+  }
+});
+
 test('AG-03 a folder that can’t be read gives the error text instead of a list', async () => {
   const { cwd, setup } = project();
   try {

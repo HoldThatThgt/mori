@@ -342,7 +342,7 @@ function readHeader(text: string, parse: RoleDeps['parseFrontmatter']):
   } catch (error) {
     return { problem: `can’t read the header: ${firstLine(error)}` };
   }
-  if (!isMapping(parsed.frontmatter)) return { problem: 'can\'t read the header: it must be "field: value" lines' };
+  if (!isMapping(parsed.frontmatter)) return { problem: 'can’t read the header: it must be "field: value" lines' };
   if (Object.keys(parsed.frontmatter).length === 0) {
     return { problem: "can’t read the header: no header between --- lines" };
   }

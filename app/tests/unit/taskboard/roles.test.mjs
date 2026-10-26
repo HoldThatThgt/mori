@@ -125,7 +125,7 @@ test('TB-01 §4.4 row: the header can not be read (YAML error, no frontmatter)',
   assert.deepEqual(problemsOf('Just a body, no header.'), [NO_HEADER]);
   assert.deepEqual(problemsOf('---\nname: x\ndescription: d\n'), [NO_HEADER]);
   assert.deepEqual(problemsOf('---\n- name\n---\n'),
-    ['.mori/agents/a.md: can\'t read the header: it must be "field: value" lines']);
+    ['.mori/agents/a.md: can’t read the header: it must be "field: value" lines']);
   const unreadable = roles.parseRoleFiles([{ file: '.mori/agents/b.md', readError: 'EACCES: permission denied' }],
     deps);
   assert.deepEqual(unreadable.problems, [".mori/agents/b.md: can’t read the header: EACCES: permission denied"]);

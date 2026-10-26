@@ -41,7 +41,7 @@ WP-05（`34fa29a`）、WP-09（`e55b28b`）与第二波的 WP-10、WP-14（`d07c
 | 层 | 跑了什么 | 结果 |
 | --- | --- | --- |
 | 检查与构建 | `npm run check`、`npx electron-vite build` | 通过 |
-| 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334；合入 WP-02 之后 33/33、475/475、334/334；合入 WP-05（app-v0 `34fa29a`）之后 33/33、465/465、334/334；合入 WP-10、WP-14（app-v0 `d07cc41`）之后 33/33、477/477、350/350；评审修正之后 40/40、477/477、350/350 |
+| 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334；合入 WP-02 之后 33/33、475/475、334/334；合入 WP-05（app-v0 `34fa29a`）之后 33/33、465/465、334/334；合入 WP-10、WP-14（app-v0 `d07cc41`）之后 33/33、477/477、350/350；评审修正之后 40/40、477/477、350/350；改了直引号之后 41/41、477/477、350/350 |
 | App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`；为行与用例表补的用例再跑 `--only AG-01,AG-02,AG-04,AG-07,AG-09` 与 `--only AG-04`。端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”）；AG-08 没有跑（等 WP-09）。合入 WP-05 之后再跑第一条命令：44 条通过，失败的仍只有 AG-10 那一条。改用 WP-03 的拖动排序之后跑 `--only AG-04`：11 条全部通过。合入 WP-09、做完 Manage agents 之后跑 `--only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-08,AG-09,AG-10`：49 条全部通过，没有失败。AG-04 的拖动排序检查加上下半边那一次之后再跑 `--only AG-04`：11 条全部通过。合入 WP-10、WP-14 之后再跑 `--only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-08,AG-09,AG-10`：50 条全部通过，没有失败。评审修正之后再跑同一条命令：58 条全部通过；`switchProject` 一条另在去掉修正（`ToolsPage.tsx` 的 key）时跑过一次，它失败（表单与展开的 planner 带到了另一个项目），修正放回后通过 |
 | 快速集 `npm run test:quick`；`tb-app-models.mjs --only sel`（TB-38） | 两者用共用的端口（m0-smoke 的 4319、TaskBoard 的 4600 段），按走查会话的安排在第二波结束、再合一次 `app-v0`（`d07cc41`）之后跑，前后告诉了走查会话 | 快速集 4/4 通过（85 秒：m0-smoke 31、tb-replay 17、mem-replay 17、m1-replay 16）；`--only sel` 7 条全部通过，TB-38 的 Task mode 菜单项是 `team-switch`、`manage-agents`、`manage-models` |
 | 改到的现有套件（`--only`，合并前走查会话要求） | `m6-app-settings.mjs --only agentsUser`（4361）；`m6-app-tools.mjs --only noSession,entry,keyboard` 与 `--only noSession,entry,overrideProject,archiveFollow`（4362）；`m6-replay.mjs --only project-skill`；`v1-models-app-reorder.mjs --only handles,models,keys,members,cross,editor,inplace,failure`（4944） | 16/16；26 条通过 1 条失败、33 条通过 1 条失败；10/10；19/19。改过的检查全部通过。两条失败都不是改过的检查，是 `--only` 跳过了它们依赖的 MCP 步骤（这个套件各步骤依赖前一步，只有 entry 能单独跑）：keyboard 的“MCP 一节：Tab 走到服务的开关……”没有服务可走（只有 Add），overrideProject 的“项目覆盖了用户级服务 x 的 enabled……”没有用户级的 x。整套在推送前的 AG-11 里跑 |
@@ -96,6 +96,8 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 | 15 | `m6-app-tools.mjs` 2001 行 | 并一行条件、一行注释，1999 行，检查不变 | — |
 | 16 | `FormValues`、`FormStatus`、`OpenForm`、`RowProps`、`Deleting` 的成员没有说明 | 每个成员加中文 `/** */` | — |
 | 17 | 重复的配置：表单自己的 200 与 `mcp__*` | 用 `TEXT_LIMITS.roleDescription`；`ALL_MCP_TOOLS` 放到 `shared/roles.ts`，表单、`toolsText` 与 `kernel/roles.ts` 都用它 | 单元 AG-06 那一条也查 `ALL_MCP_TOOLS === "mcp__*"` |
+
+另（走查会话在评审之后要求，负责人的规则是不留已知的缺陷）：`kernel/roles.ts` 的 `can't read the header: it must be "field: value" lines` 用的是直引号，同类的问题行都是 ’，这一节的行上会显示它，改成 ’。用例：单元“AG-03 every "can’t read the header" line uses the curly apostrophe, like the rest of the problem lines”（先跑出失败），TaskBoard 单元“TB-01 §4.4 row: the header can not be read (YAML error, no frontmatter)”的期望照改。
 
 测试时发现的：模型档案按地址与模型 id 认，所以 kx 与 zg 用同一个地址时 kx/glm-4.6 与 zg/glm-4.6 共用一份档案，AG-02 的两条因此失败；kx 改用另一个端口（4960）。这是模型层原来的设计，不是这次的问题。
 
