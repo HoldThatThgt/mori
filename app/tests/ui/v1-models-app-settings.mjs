@@ -44,7 +44,7 @@ import { readMain, waitProbe } from './md-firstrun-helpers.mjs';
 import { cardAddModels, CONNECTED, fetchIn, FIRST_RUN_FORM, pickIn, PROVIDER_FORM, textNow } from './page.mjs';
 import {
   cardText, chatsOf, choosePick, dialogInfo, filesUnder, menuPicks, paneReply, sendOnly, sendText, startFake, stopFake,
-  TEXTAREA, trySend, waitCard, waitReply,
+  testOnce, TEXTAREA, trySend, waitCard, waitReply,
 } from './v1-settings-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -1699,22 +1699,12 @@ const keyState = (page, id, ref) => providerCard(page, id)
   .locator(`[data-testid="key-row"][data-ref="${ref}"] [data-testid="key-state"]`)
   .textContent({ timeout: 1000 }).catch(() => null);
 
-/**
- * @brief 点一次卡上的 Test connection，等合成端点多收到一条 requests() 里的请求、按钮回到“Test connection”、卡上有结果；
- *        返回多出的请求数、结果文字与从点击到出结果的毫秒数。
- * @param requests () => 这次测试会发到的请求（不是探针的）
- */
-async function testCardOnce(page, providerId, requests) {
-  const card = providerCard(page, providerId);
-  const before = requests().length;
-  const startedAt = Date.now();
-  await card.locator('[data-action="test-provider"]').click();
-  const done = await poll(async () => ({ sent: requests().length - before,
-    button: await card.locator('[data-action="test-provider"]').textContent().catch(() => ''),
-    result: await textNow(card.getByTestId('test-result')) }), (s) => s.sent >= 1 && s.button === 'Test connection'
-    && /^(Connected|Connection failed)/.test(s.result ?? ''), 30000, 100);
-  return { ...done.value, ms: Date.now() - startedAt };
-}
+/** @brief 点一次卡上的 Test connection（testOnce；requests 为 null 时端点停着、不等请求）。 */
+const testCardOnce = (page, providerId, requests) => testOnce(providerCard(page, providerId),
+  { action: 'test-provider', label: 'Test connection', result: 'test-result' }, requests);
+/** @brief 点一次 Keys 一行的“Test”（testOnce；requests 为 null 时端点停着、不等请求）。 */
+const testKeyOnce = (row, requests) => testOnce(row, { action: 'key-test', label: 'Test', result: 'key-test' },
+  requests);
 
 /**
  * @brief 提供商卡的“失败后再测”（models-settings.md “提供商卡”，规格 §8.3）：kr#1（错的 key）记为 Rejected 之后什么都不改，
@@ -1729,7 +1719,7 @@ async function retestCard(ctx) {
   record('MP-41 provider card, retest after a failure (§8.3): with key 1 recorded as "Rejected", pressing Test '
     + 'connection twice without changing anything sends a request with that key each time and shows the server’s '
     + 'answer each time ("Connection failed: 401 …", not "Connection error."); the second test does not wait',
-  rejected === 'Rejected' && tries.every((t) => t.sent === 1 && t.result.startsWith('Connection failed: ')
+  rejected === 'Rejected' && tries.every((t) => t.sent === 1 && t.result?.startsWith('Connection failed: ')
     && t.result.includes('401') && !t.result.includes('Connection error.')) && tries[1].ms < 5000,
   JSON.stringify({ rejected, tries }));
   await restartFake('reprobe', { FAKE_KEYS: [KEY.right, KEY.wrong].join(',') });
@@ -1737,7 +1727,7 @@ async function retestCard(ctx) {
   const cleared = await poll(() => keyState(page, 'kr', 'kr#1'), (state) => state === null, 10000);
   record('MP-41 provider card: once the server takes key 1 (synthetic: the endpoint restarted with it), Test '
     + 'connection uses it, shows "Connected · …" and clears its "Rejected" record', fixed.sent === 1
-    && fixed.result.startsWith('Connected · ') && cleared.ok, JSON.stringify({ fixed, state: cleared.value }));
+    && fixed.result?.startsWith('Connected · ') && cleared.ok, JSON.stringify({ fixed, state: cleared.value }));
 }
 
 /**
@@ -1786,43 +1776,85 @@ async function keyReprobe() {
   }
 }
 
-// ---------- MP-41：测试连接总是发出，成功时清除模型的 not_found（规格 §8.3 的 2026-10-26 补） ----------
+// ---------- MP-41：测试连接总是发出，成功时清除提供商的 connection 与模型的 not_found（规格 §8.3 的 2026-10-26 补） ----------
+
+/** 连接失败后提供商不可用的时间（规格 §12 connectionCooldownMs 的临时默认值，kernel/modelTimings.ts） */
+const CONNECTION_COOLDOWN_MS = 30000;
+/** 候选都在等 connection 恢复时阶段行的写法（model-chat.md“等模型”，§5.3 第 4 步的界面文字） */
+const WAITING_CONNECTION = /^Waiting for a model · can’t connect until \d\d:\d\d:\d\d/;
+/** testRecords、keyTestRecords 的模型 fake-coder-404 收到的不是探针的请求（测试的与会话的；端点重启后读新的进程） */
+const recordRequests = () => fakes.records.chats.filter((chat) => !chat.probe && chat.model === 'fake-coder-404');
 
 /**
- * @brief 模型的 not_found（models-settings.md “提供商卡”的“失败后再测”）：fake-coder-404 的提供商（合成端点对不是探针的
- *        请求回 404）。Test connection 失败（404）后什么都不改再测：照样发出、又是 404 的原文。把端点重启为照常回答
- *        （FAKE_SERVE_404，synthetic test setup：服务修好了），再测：“Connected · …”，并清除这个模型的 not_found：
- *        打开文件夹，范围就是它的新会话照常发送，端点收到这一轮的请求。
+ * @brief 提供商的 connection 与模型的 not_found 之下再测（规格 §8.3）：端点停掉（synthetic test setup：服务连不上）后点一次
+ *        测试，失败，提供商记下 connection——当前一栏的会话（模型记着 not_found，还没发过）发出后整轮在等（阶段行
+ *        “Waiting for a model · can’t connect until …”）；端点以 FAKE_SERVE_404 重新启动（服务修好了）后再点一次。设置页开着时
+ *        调用，结束时停在会话页；返回各项（testKey 是修好后那次测试请求的 key 末 4 位），由调用方记录。
+ * @param test (requests) => 点一次测试（testCardOnce 或 testKeyOnce）
+ */
+async function downThenFixed(ctx, test) {
+  const { page } = ctx;
+  await stopFake(fakes.records);
+  const downAt = Date.now();
+  const down = await test(null);
+  await backToChat(page);
+  const before = await sendOnly(page, 'plain after the failed test');
+  const waiting = await poll(() => paneReply(page), (s) => WAITING_CONNECTION.test(s.stage ?? ''), 15000, 100);
+  await openSettings(page);
+  fakes.records = await startFake(PORT.records, { FAKE_SERVE_404: '1' });
+  const since = Date.now();
+  const fixed = await test(recordRequests);
+  const testKey = recordRequests().find((chat) => chat.at >= since && !(chat.tools?.length > 0))?.key ?? null;
+  await backToChat(page);
+  const reply = await waitReply(page, before, 60000);
+  const served = recordRequests().find((chat) => chat.at >= since && chat.tools?.length > 0) ?? null;
+  return { down, waited: waiting.ok, stage: waiting.value?.stage ?? null, fixed, testKey, reply, served,
+    ms: served ? served.at - downAt : null };
+}
+
+/** @brief downThenFixed 修好之后的那次测试发出并成功，等着的那一轮在 connection 自己到期之前至少 5 秒就发出并得到回答。 */
+const fixedInTime = (run) => run.fixed.sent >= 1 && run.fixed.result?.startsWith('Connected · ')
+  && Boolean(run.reply?.text.includes(REPLY)) && run.served?.status === 200 && run.ms !== null
+  && run.ms < CONNECTION_COOLDOWN_MS - 5000;
+/** @brief downThenFixed 的结果摘要（检查的 detail）。 */
+const runBrief = (run) => JSON.stringify({ down: run.down.result, stage: run.stage, fixed: run.fixed,
+  testKey: run.testKey, reply: oneLine(run.reply?.error ?? run.reply?.text ?? ''), status: run.served?.status ?? null,
+  ms: run.ms });
+
+/**
+ * @brief 卡上的 Test connection（models-settings.md “提供商卡”的“失败后再测”）：fake-coder-404 的提供商（合成端点对不是探针的
+ *        请求回 404）。Test connection 失败（404）后什么都不改再测：照样发出、又是 404 的原文。打开文件夹，范围就是它的新会话
+ *        没有被拒绝启动；再经 downThenFixed：端点停掉时测试失败、这一轮在等 connection，端点修好后测试成功并清除这个模型的
+ *        not_found 与提供商的 connection（2026-10-26 补，复核：原来界面上只查了 not_found，清 connection 只在单元层）。
  */
 async function testRecords() {
   const userData = tempDir('mori-v1s-records-');
   const project = makeProject(tempDir('mori-v1s-records-proj-'), 'proj');
   writeJson(configFile(userData), seedConfig({ providers: [seedProvider('nf', 'Not Found', PORT.records,
     ['fake-coder-404'])], normalDefault: 'nf' }));
-  const requests = () => fakes.records.chats.filter((chat) => !chat.probe && chat.model === 'fake-coder-404');
   let ctx;
   try {
     ctx = await startApp(userData);
     const { page } = ctx;
     await openSettings(page);
     await waitVerified(page, 'nf/fake-coder-404', 90000);
-    const tries = [await testCardOnce(page, 'nf', requests), await testCardOnce(page, 'nf', requests)];
+    const tries = [await testCardOnce(page, 'nf', recordRequests), await testCardOnce(page, 'nf', recordRequests)];
     record('MP-41 a 404 on Test connection does not stop the next one: pressing it again without changing anything '
       + 'sends the request again and shows the server’s 404 text again', tries.every((t) => t.sent === 1
-      && t.result.startsWith('Connection failed: ') && t.result.includes('404')), JSON.stringify(tries));
-    await restartFake('records', { FAKE_SERVE_404: '1' });
-    const fixed = await testCardOnce(page, 'nf', requests);
+      && t.result?.startsWith('Connection failed: ') && t.result.includes('404')), JSON.stringify(tries));
     await backToChat(page);
     await openFolder(ctx, project);
     const card = await waitCard(page, (s) => s === null, 15000);
-    const since = Date.now();
-    const reply = card.ok ? await sendText(ctx, 'plain after the server was fixed') : null;
-    const sent = requests().filter((chat) => chat.at >= since);
-    record('MP-41 after the server is fixed (synthetic: the endpoint restarted to serve the -404 model) Test '
-      + 'connection shows "Connected · …" and clears the model’s not_found: a new session on it is not blocked, '
-      + 'sends, and the server gets the request', fixed.result.startsWith('Connected · ') && card.ok
-      && Boolean(reply?.text.includes(REPLY)) && sent.some((chat) => chat.status === 200),
-    JSON.stringify({ fixed, card: cardText(card.value), reply: oneLine(reply?.text ?? ''), sent: sent.length }));
+    await openSettings(page);
+    const run = await downThenFixed(ctx, (requests) => testCardOnce(page, 'nf', requests));
+    record('MP-41 provider card: with the endpoint stopped Test connection fails ("Connection failed: …") and the '
+      + 'provider is recorded as unreachable: the session’s turn waits with "Waiting for a model · can’t connect '
+      + 'until hh:mm:ss"', run.down.result?.startsWith('Connection failed: ') && run.waited, runBrief(run));
+    record('MP-41 after the server is fixed (synthetic: the endpoint started again serving the -404 model) Test '
+      + 'connection shows "Connected · …" and clears the model’s not_found and the provider’s connection: the new '
+      + 'session on it is not blocked, and its waiting turn goes out and is answered well before the connection '
+      + `record would run out (${CONNECTION_COOLDOWN_MS / 1000} s after the failed test)`, card.ok && fixedInTime(run),
+    `card: ${cardText(card.value)}; ${runBrief(run)}`);
   } catch (error) {
     record('MP-41 testRecords: flow', false, oneLine(error, 400));
     await shot(ctx, 'testRecords-error');
@@ -1833,94 +1865,51 @@ async function testRecords() {
 
 // ---------- MP-41：Keys 一行的“Test”同样不看任何不可用记录，成功后清除提供商的 connection 与模型的 not_found（U17） ----------
 
-/** 连接失败后提供商不可用的时间（规格 §12 connectionCooldownMs 的临时默认值，kernel/modelTimings.ts） */
-const CONNECTION_COOLDOWN_MS = 30000;
-/** 候选都在等 connection 恢复时阶段行的写法（model-chat.md“等模型”，§5.3 第 4 步的界面文字） */
-const WAITING_CONNECTION = /^Waiting for a model · can’t connect until \d\d:\d\d:\d\d/;
-/** keyTestRecords 的模型 fake-coder-404 收到的不是探针的请求（Test 的与会话的；端点重启后读新的进程） */
-const keyRequests = () => fakes.records.chats.filter((chat) => !chat.probe && chat.model === 'fake-coder-404');
-
-/**
- * @brief 点一次 Keys 一行的“Test”，等按钮回到“Test”、行下有结果（Connected / Connection failed）：requests 不为 null 时
- *        等合成端点多收到一条 requests() 里的请求；为 null 时（端点停着，收不到请求）等结果文字与点之前的不同。
- *        返回多出的请求数与结果文字。
- * @param row 这一行 key（key-row）
- * @param requests () => 这次测试会发到的请求；端点停着时为 null
- */
-async function testKeyOnce(row, requests) {
-  const count = () => (requests ? requests().length : 0);
-  const before = { sent: count(), result: await textNow(row.getByTestId('key-test')) };
-  await row.locator('[data-action="key-test"]').click();
-  const done = await poll(async () => ({ sent: count() - before.sent,
-    button: await row.locator('[data-action="key-test"]').textContent().catch(() => ''),
-    result: await textNow(row.getByTestId('key-test')) }), (s) => s.button === 'Test'
-    && /^(Connected|Connection failed)/.test(s.result ?? '') && (requests ? s.sent >= 1 : s.result !== before.result),
-  30000, 100);
-  return done.value;
-}
-
 /**
  * @brief 模型的 not_found 之下（models-settings.md Keys 的“Test 中”，U17）：第一次 Test 得到 404，模型记下 not_found——
  *        会话发出时整轮停在“model not found on the server”、端点收不到请求（记录确实在）；这时什么都不改再点 Test，照样带
- *        这个 key 发出、又是 404 的原文。之后另开一个会话（还没发过）留给 keyTestConnection。
+ *        这个 key 马上发出（不等）、又是 404 的原文。之后另开一个会话（还没发过）留给 keyTestConnection。
  */
 async function keyTestNotFound(ctx, row, projects) {
   const { page } = ctx;
-  const first = await testKeyOnce(row, keyRequests);
+  const first = await testKeyOnce(row, recordRequests);
   await backToChat(page);
   await openFolder(ctx, projects[0]);
   const since = Date.now();
   const blocked = await sendText(ctx, 'plain while the model is not found');
-  const sent = keyRequests().filter((chat) => chat.at >= since).length;
+  const sent = recordRequests().filter((chat) => chat.at >= since).length;
   record('MP-41 Keys row "Test" (U17), the record is there: a first Test gets the server’s 404 ("Connection failed: '
     + '404 …") and the model is recorded as not found: a session on it ends the turn with "model not found on the '
-    + 'server" and the server gets no request', first.sent === 1 && first.result.startsWith('Connection failed: ')
+    + 'server" and the server gets no request', first.sent === 1 && first.result?.startsWith('Connection failed: ')
     && first.result.includes('404') && Boolean(blocked?.error?.includes('model not found on the server')) && sent === 0,
   JSON.stringify({ first, blocked: oneLine(blocked?.error ?? blocked?.text ?? ''), sent }));
   await openFolder(ctx, projects[1]);
   await openSettings(page);
-  const again = await testKeyOnce(row, keyRequests);
-  const keyed = keyRequests().at(-1)?.key ?? null;
+  const again = await testKeyOnce(row, recordRequests);
+  const keyed = recordRequests().at(-1)?.key ?? null;
   record('MP-41 Keys row "Test" ignores the model’s not_found (models-settings.md Keys "Test 中", U17): pressed again '
-    + 'without changing anything it sends the request with this key and shows the server’s 404 text again, not '
-    + '"Connection error."', again.sent === 1 && again.result.startsWith('Connection failed: ')
-    && again.result.includes('404') && !again.result.includes('Connection error.') && keyed === last4(KEY.keyTest),
-  JSON.stringify({ again, keyed }));
+    + 'without changing anything it sends the request with this key at once (the result within 5 s) and shows the '
+    + 'server’s 404 text again, not "Connection error."', again.sent === 1 && again.ms < 5000
+    && again.result?.startsWith('Connection failed: ') && again.result.includes('404')
+    && !again.result.includes('Connection error.') && keyed === last4(KEY.keyTest), JSON.stringify({ again, keyed }));
 }
 
 /**
- * @brief 提供商的 connection 与模型的 not_found 之下（models-settings.md Keys 的“Test 结果”，规格 §8.3，U17）：端点停掉后
- *        Test 失败，提供商记下 connection——另开的会话发出后整轮在等（阶段行“Waiting for a model · can’t connect until …”）。
- *        端点以 FAKE_SERVE_404 重新启动（synthetic test setup：服务修好了），Test 在两条记录之下照样发出、成功，并清除两条：
- *        等着的那一轮在 connection 自己到期（停掉后点 Test 起 30 秒）之前就发出并得到回答。
+ * @brief 提供商的 connection 与模型的 not_found 之下（models-settings.md Keys 的“Test 结果”，规格 §8.3，U17）：经 downThenFixed，
+ *        端点停掉后 Test 失败、另开的会话这一轮在等 connection；端点修好后 Test 在两条记录之下照样带这个 key 发出、成功，
+ *        并清除两条：等着的那一轮在 connection 自己到期（停掉后点 Test 起 30 秒）之前就发出并得到回答。
  */
 async function keyTestConnection(ctx, row) {
-  const { page } = ctx;
-  await stopFake(fakes.records);
-  const downAt = Date.now();
-  const down = await testKeyOnce(row, null);
-  await backToChat(page);
-  const before = await sendOnly(page, 'plain after the key test');
-  const waiting = await poll(() => paneReply(page), (s) => WAITING_CONNECTION.test(s.stage ?? ''), 15000, 100);
+  const run = await downThenFixed(ctx, (requests) => testKeyOnce(row, requests));
   record('MP-41 with the endpoint stopped the Keys row "Test" fails ("Connection failed: …") and the provider is '
     + 'recorded as unreachable: a new session’s turn waits with "Waiting for a model · can’t connect until hh:mm:ss"',
-  down.result.startsWith('Connection failed: ') && waiting.ok, JSON.stringify({ down, stage: waiting.value?.stage }));
-  await openSettings(page);
-  fakes.records = await startFake(PORT.records, { FAKE_SERVE_404: '1' });
-  const since = Date.now();
-  const fixed = await testKeyOnce(row, keyRequests);
-  await backToChat(page);
-  const reply = await waitReply(page, before, 60000);
-  const served = keyRequests().find((chat) => chat.at >= since && chat.tools?.length > 0) ?? null;
-  const ms = served ? served.at - downAt : null;
+  run.down.result?.startsWith('Connection failed: ') && run.waited, runBrief(run));
   record('MP-41 Keys row "Test" ignores the provider’s connection and the model’s not_found, and on success clears '
     + 'both (models-settings.md Keys "Test 结果", §8.3, U17): with the endpoint back (synthetic: restarted serving '
     + 'the -404 model) it sends with this key and shows "Connected · …"; the waiting turn then goes out and is '
     + 'answered well before the connection record would run out '
-    + `(${CONNECTION_COOLDOWN_MS / 1000} s after the failed Test)`,
-  fixed.sent >= 1 && fixed.result.startsWith('Connected · ') && Boolean(reply?.text.includes(REPLY))
-    && served?.status === 200 && ms !== null && ms < CONNECTION_COOLDOWN_MS - 5000,
-  JSON.stringify({ fixed, reply: oneLine(reply?.error ?? reply?.text ?? ''), status: served?.status ?? null, ms }));
+    + `(${CONNECTION_COOLDOWN_MS / 1000} s after the failed Test)`, fixedInTime(run)
+    && run.testKey === last4(KEY.keyTest), runBrief(run));
 }
 
 /**

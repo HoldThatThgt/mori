@@ -1,7 +1,8 @@
 // v1-models-app-settings.mjs 用的合成端点与页面读取（2026-10-26 为文件行数从套件挪来，写法不变；新加的只有 paneReply
-// 与 sendOnly，给“发出后先看阶段行、过一会儿再等回复”的一步用）：启动合成端点并收集请求日志、当前一栏的拒绝启动卡、
-// 发送与读回复、被拒绝时试着发送、范围菜单、对话框的文字、文件夹下的文件。只读页面或启动子进程，不记录检查结果
-// （检查结果由套件记录）。标识见 docs/v1/screens/models-settings.md、model-chat.md、model-menu.md。
+// 与 sendOnly，给“发出后先看阶段行、过一会儿再等回复”的一步用，以及卡上的 Test connection 与 Keys 一行的 Test 共用的
+// testOnce）：启动合成端点并收集请求日志、当前一栏的拒绝启动卡、发送与读回复、被拒绝时试着发送、范围菜单、点一次测试、
+// 对话框的文字、文件夹下的文件。只操作页面或启动子进程，不记录检查结果（检查结果由套件记录）。标识见
+// docs/v1/screens/models-settings.md、model-chat.md、model-menu.md。
 
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
@@ -9,6 +10,7 @@ import { join } from 'node:path';
 import { appRoot, sleep } from './lib.mjs';
 import { PANE } from './m3-helpers.mjs';
 import { poll } from './md-card-helpers.mjs';
+import { textNow } from './page.mjs';
 
 /** 当前一栏的输入框 */
 export const TEXTAREA = '.pane-slot:not([hidden]) .composer textarea';
@@ -147,6 +149,29 @@ export async function menuPicks(page) {
     .evaluateAll((items) => items.map((item) => item.dataset.pick));
   await page.keyboard.press('Escape');
   return picks;
+}
+
+// ---------- 设置页的测试（models-settings.md “测试结果的文字”） ----------
+
+/**
+ * @brief 点一次测试按钮（卡上的 Test connection 或 Keys 一行的 Test），等按钮回到原来的文字、结果是“Connected …”或
+ *        “Connection failed …”：requests 不为 null 时还要等合成端点多收到一条 requests() 里的请求；为 null 时（端点停着，
+ *        收不到请求）等结果文字与点之前的不同。返回多出的请求数、按钮与结果的文字、从点击到出结果的毫秒数。
+ * @param scope 按钮与结果所在的块（提供商卡或 key 行）
+ * @param test 这种测试：action 是按钮的 data-action，label 是按钮平时的文字，result 是结果的 data-testid
+ * @param requests () => 这次测试会发到的请求（不是探针的）；端点停着时为 null
+ */
+export async function testOnce(scope, test, requests) {
+  const count = () => (requests ? requests().length : 0);
+  const button = scope.locator(`[data-action="${test.action}"]`);
+  const before = { sent: count(), result: await textNow(scope.getByTestId(test.result)) };
+  const startedAt = Date.now();
+  await button.click();
+  const done = await poll(async () => ({ sent: count() - before.sent,
+    button: await button.textContent().catch(() => ''), result: await textNow(scope.getByTestId(test.result)) }),
+  (s) => s.button === test.label && /^(Connected|Connection failed)/.test(s.result ?? '')
+    && (requests ? s.sent >= 1 : s.result !== before.result), 30000, 100);
+  return { ...done.value, ms: Date.now() - startedAt };
 }
 
 /** @brief 对话框的标题、全文和连带改动列表。 */

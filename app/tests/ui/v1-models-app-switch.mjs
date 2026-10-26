@@ -16,7 +16,8 @@
 // 放在 longBatch 一步里同时进行；429 的恢复用 FAKE_LIMIT_MS 给的短 Retry-After。
 // 步骤之间互不依赖（各用自己的提供商和会话），只有 reopen15 依赖 redo15、reopen18 依赖 longBatch（--only 只写前者时
 // 一起跑）。2026-10-26 补：reopen18（重启后打开 -hang 的会话，换模型的条目照样写“Couldn’t confirm it stopped”）；authKey 里
-// 只改名称与并发上限后 key 的记录仍在（MP-29，models-settings.md 反例）。
+// 只改名称与并发上限后 key 的记录仍在（MP-29，models-settings.md 反例），以及 key 1 有记录时卡上的 Test connection 用第一个
+// 没有记录的 key（MP-41，models-settings.md “提供商卡”的“失败后再测”）。
 // 2026-10-26（WP-04，负责人走查 M7 决定 1）：取消测试删掉，档案没有 cancel_verified；MP-18 只剩“等满 2 分钟再换”，
 // 原来按 cancel_verified 为 true、false 分的两组情形与它们的端点（-nocancel、FAKE_NO_METRICS）删掉。
 
@@ -804,6 +805,7 @@ async function authKey(ctx) {
   record('MP-29 the rejected key is remembered: the next reply goes straight to key 2',
     same(secondLines.map((line) => `${line.status}:${line.key}`), [`200:${tail(K.good29)}`]),
     brief(lineBrief(secondLines)));
+  await cardFirstFreeKey(ctx);
   await nameKeepsRecords(ctx, tab);
   await bridge(ctx, { type: 'models.removeKey', providerId: 'au29', ref: ctx.refs.au29[0] });
   const readded = await bridge(ctx, { type: 'models.addKey', providerId: 'au29', label: 'Key 3', secret: K.bad29 });
@@ -1464,6 +1466,31 @@ async function nameKeepsRecords(ctx, tab) {
     && rows[0]?.text === 'Rejected' && same(lines.map((line) => `${line.status}:${line.key}`),
     [`200:${tail(K.good29)}`]), brief({ error: saved.error, rows, lines: lineBrief(lines) }));
   await saveProvider(ctx, 'au29', {});
+}
+
+/**
+ * @brief 提供商卡的“失败后再测”（models-settings.md “提供商卡”，规格 §8.3；2026-10-26 补，复核：原来只在单元层）：au29 的
+ *        key 1 记为 Rejected、key 2 没有记录时点卡上的 Test connection，用第一个没有记录的 key——只发出一次、只带 key 2
+ *        （不先试 key 1），结果“Connected · …”，key 1 仍是 Rejected（成功只清用到的 key 的记录）。
+ */
+async function cardFirstFreeKey(ctx) {
+  const { page } = ctx;
+  await keyRows(ctx, 'au29');
+  const card = page.locator('[data-testid="provider-card"][data-provider="au29"]');
+  const since = Date.now();
+  await card.locator('[data-action="test-provider"]').click();
+  const result = await poll(async () => {
+    const text = await card.getByTestId('test-result').textContent({ timeout: 1000 }).catch(() => '');
+    return /^(Connected|Connection failed)/.test(text ?? '') ? text : null;
+  }, 30000);
+  const rows = await keyRows(ctx, 'au29');
+  await backToChat(ctx);
+  const lines = chatLogs(ctx, M('au29'), since);
+  record('MP-41 provider card Test connection uses the first key without a record (§8.3, models-settings.md provider '
+    + 'card "retest after a failure"): with key 1 "Rejected" and key 2 clear it sends once, with key 2 only, shows '
+    + '"Connected · …", and key 1 stays "Rejected"', /^Connected · /.test(result ?? '')
+    && same(lines.map((line) => `${line.status}:${line.key}`), [`200:${tail(K.good29)}`])
+    && rows[0]?.state === 'auth' && rows[1]?.state === null, brief({ result, lines: lineBrief(lines), rows }));
 }
 
 // ---------- 主流程 ----------
