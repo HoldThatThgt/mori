@@ -157,15 +157,15 @@ export function permissionTipProblems(control, mode, reason) {
 
 /**
  * @brief 选择范围按钮的悬停和读屏与 reason（不可用的原因；能用时为 null）的规定不符的地方（composer-pickers.md
- *        "v1 之后的调整"的悬停表）：悬停第一行是按钮文字，读屏名"Model range: <按钮文字>"（" · "换成", "）；第二行"<提供商名> · <区域>"或
- *        "No model can run in this session"；不可用时第三行是原因；读屏的描述是第二行（" · "换成", "）加". <原因>"；
+ *        "v1 之后的调整"的悬停表）：悬停第一行是按钮文字，读屏名"Model range: <按钮文字>"（" · "换成", "）；第二行"<提供商名>"或
+ *        "No model can run in this session"（2026-10-26 起不带区域）；不可用时第三行是原因；读屏的描述是第二行加". <原因>"；
  *        不可用时 aria-disabled、没有 data-pending、仍能 Tab 到。
  */
 export function rangeTipProblems(control, reason) {
   if (!control) return ['no model range button in the message box row'];
   const { lines } = control;
-  const zone = (lines[1] ?? '').replace(/ · /g, ', ');
-  const want = reason ? `${zone}. ${reason}` : zone;
+  const where = lines[1] ?? '';
+  const want = reason ? `${where}. ${reason}` : where;
   return failed([
     [lines[0] === control.text && control.label === `Model range: ${control.text?.replace(/ · /g, ', ')}`,
       `title line 1 "${lines[0]}", text "${control.text}", name "${control.label}"`],

@@ -53,8 +53,8 @@ const RESTARTED_NOTE = 'Restarted · Queued messages, pending approvals, and “
 /** 还没有消息、刚压缩完时圆环的描述和详情里的说明（models.md"上下文用量（圆环）"） */
 const EMPTY_NOTE = 'Send a message to see context usage.';
 const COMPACTED_NOTE = 'Just compacted. Context usage shows after the next response.';
-/** 选择范围按钮悬停的第二行：首次启动建的提供商名和区域 */
-const APP_OPTS = { modelTip: 'Mori endpoint · Local' };
+/** 选择范围按钮悬停的第二行：首次启动建的提供商名（2026-10-26 起不带区域） */
+const APP_OPTS = { modelTip: 'Mori endpoint' };
 /** pi 不自动压缩（改小上下文窗口看圆环的颜色时，不让压缩把用量清掉） */
 const NO_COMPACTION = { compaction: { enabled: false } };
 /** 量圆环时新会话的第一条消息（同一个项目、同一句话，第一次回复之后的用量相同） */
@@ -353,7 +353,7 @@ async function shortRange({ app, page, h }) {
   const row = await composerRow(page);
   const idle = stateProblems(row, 'idle', APP_OPTS);
   record('范围：范围按钮"o3"（约 46px）时 930px、680px 空闲打开范围菜单（宽 300px）：往上打开、右边对齐范围按钮、'
-    + '不伸出这一行和会话面板；按钮可用、悬停第二行"Mori endpoint · Local"', menus.length === 0 && idle.length === 0
+    + '不伸出这一行和会话面板；按钮可用、悬停第二行"Mori endpoint"', menus.length === 0 && idle.length === 0
     && row?.items.model?.content === 'o3', `${menus.join('; ')} ${idle.join('; ')} ${rowSummary(row)}`);
   await chooseRange(page, 'mori-endpoint/fake-coder');
   await setPaneWidth(page, app, 930);
@@ -365,7 +365,7 @@ async function shortRange({ app, page, h }) {
  */
 async function cancelFormTest({ page, h }) {
   const form = page.getByTestId('connection-form');
-  await h.fillConnection({ name: 'Mori endpoint', baseUrl, zone: 'local', apiKey: testKey, modelId: 'fake-slow' });
+  await h.fillConnection({ name: 'Mori endpoint', baseUrl, apiKey: testKey, modelId: 'fake-slow' });
   await form.locator('[data-action="test"]').click();
   const testing = await form.getByRole('button', { name: 'Testing…' }).waitFor({ timeout: 15000 })
     .then(() => true, () => false);
@@ -581,7 +581,7 @@ async function layoutRestart({ page, h, app, project, userData }) {
 }
 
 /**
- * @brief 用新的数据目录启动 Mori（pi 的设置另加 options.settings），首次启动填好合成端点的连接（区域 Local；
+ * @brief 用新的数据目录启动 Mori（pi 的设置另加 options.settings），首次启动填好合成端点的连接（
  *        options.contextWindow、options.reasoning 给出时填进表单），等探针跑完（不通过时报错），打开 project。
  *        options.agents 给出时写成用户级的 <agentDir>/AGENTS.md（synthetic）。
  * @param prefix 临时数据目录的前缀

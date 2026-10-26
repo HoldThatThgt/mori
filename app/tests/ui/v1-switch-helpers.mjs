@@ -138,7 +138,7 @@ export function modelOf(id, { contextWindow = 128000, maxTokens = 16384, reasoni
 
 /** @brief 一个提供商的配置：key 不写在这里（启动后经 models.addKey 加，密文由 Mori 自己加密保存）。 */
 export function providerOf(id, name, port, models, { concurrency = 4 } = {}) {
-  return { id, name, api: 'openai-completions', baseUrl: baseOf(port), zone: 'local', compat: {}, concurrency,
+  return { id, name, api: 'openai-completions', baseUrl: baseOf(port), compat: {}, concurrency,
     keys: [], nextKeyNumber: 1, models };
 }
 

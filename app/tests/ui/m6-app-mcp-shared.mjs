@@ -396,7 +396,7 @@ async function startup(ctx) {
     procs: procs.map((row) => ({ ...row, direct: row.parent === ctx.kernel })) }));
   record('1 启动：服务日志里只有一次 initialize（共享服务自己握手一次）', initializes(ctx.logs.shared) === 1,
     `initialize × ${initializes(ctx.logs.shared)}`);
-  // v1（规格 §14.4）：首次启动填英文表单、区域选 Local，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
+  // v1（规格 §14.4）：首次启动填英文表单，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
   await ctx.h.setupFirstRun({ baseUrl, apiKey: testKey });
 }
 

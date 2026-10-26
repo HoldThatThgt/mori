@@ -5,11 +5,11 @@
 // - key 方式：不给 --source，环境变量 MD_REAL_DEEPSEEK_KEY、MD_REAL_GLM_KEY、MD_REAL_OPENROUTER_KEY 都有值（地址
 //   MD_REAL_DEEPSEEK_URL 默认 https://api.deepseek.com，MD_REAL_GLM_URL 默认 https://api.z.ai/api/anthropic）。脚本一启动就
 //   把这几个变量读进内存并从 process.env 删掉，之后启动的 Mori 与 md-replay.mjs 拿不到。然后只经界面建一个新的数据目录：
-//   首次启动表单填 DeepSeek 的 Base URL 与 API key → Fetch models → 只勾 DEEPSEEK_DOCS 里服务列出的第一个模型 → Network
-//   zone 选 Public → Test connection（连上，等它的探针跑完）；重新打开 Mori，设置 → Models → Add provider：GLM（Base URL 与
-//   key → Fetch models → 清单或列表错误 → 服务没列出 GLM-5.3 时用 Add a model ID 手填 → Public → Add）与 OpenRouter
+//   首次启动表单填 DeepSeek 的 Base URL 与 API key → Fetch models → 只勾 DEEPSEEK_DOCS 里服务列出的第一个模型 →
+//   Test connection（连上，等它的探针跑完）；重新打开 Mori，设置 → Models → Add provider：GLM（Base URL 与
+//   key → Fetch models → 清单或列表错误 → 服务没列出 GLM-5.3 时用 Add a model ID 手填 → Add）与 OpenRouter
 //   （https://openrouter.ai/api/v1 与 key → Detected: OpenRouter → 只勾第一个免费的、服务列出工具支持的模型
-//   （freeToolRow：id 以 ":free" 结尾，行上没有 no_tools 提示），探针不花钱 → Public → Add），等它们的探针跑完再关掉。
+//   （freeToolRow：id 以 ":free" 结尾，行上没有 no_tools 提示），探针不花钱 → Add），等它们的探针跑完再关掉。
 //   key 只输进 Mori 自己的密码框（输入之前核对框的 type 是 password，不是时不输入、记一条失败），由 Mori 加密保存；
 //   这三步各记一条“MD-14 real setup”检查。之后把这个目录当作 --source 的数据目录跑下面的驱动（卡上的 Fetch models 用
 //   保存的 key）。检查的名字与 detail、结果文件、fixture 写出之前都把 key 换成 ***（fixture 里出现 key 时另记为问题、
@@ -832,7 +832,7 @@ async function setupFirstRun(userData) {
   const problems = firstRunProblems(run, keyEnv.urls.deepseek);
   record('MD-14 real setup: first run with DeepSeek (Base URL typed, API key typed into its password field): Fetch '
     + `models opens the checklist with "Detected: DeepSeek"; with only ${doc?.id ?? 'a documented model'} ticked and `
-    + 'zone Public, Test connection saves the provider (the Base URL host, OpenAI-compatible, Public, one saved key, '
+    + 'Test connection saves the provider (the Base URL host, OpenAI-compatible, one saved key, '
     + 'only that model), connects, and its probes finish with tool calling verified', problems.length === 0,
   brief({ problems, ids: run.rows.map((row) => row.id), picked, text: run.text, provider: providerBrief(provider) }));
   await closeApp();
@@ -863,7 +863,7 @@ async function setupProviders(userData) {
   record(`MD-14 real setup: Add provider for GLM (${keyEnv.urls.glm} and its API key in the password field): Fetch `
     + 'models shows the model list with "Detected: Anthropic-compatible server" (or a list error without a Detected '
     + `line); ${GLM_MANUAL_ID} is entered with Add a model ID (or ticked when the server lists it) and Add saves the `
-    + 'provider (the Base URL host, its API type, Public, one saved key) with only it', glmProblems.length === 0,
+    + 'provider (the Base URL host, its API type, one saved key) with only it', glmProblems.length === 0,
   brief({ problems: glmProblems, detected: glm.state.detected,
     listError: glm.state.listError, title: glm.state.title, ids: glm.rows.map((row) => row.id).slice(0, 40),
     provider: providerBrief(glm.provider) }));
@@ -873,7 +873,7 @@ async function setupProviders(userData) {
   record(`MD-14 real setup: Add provider for OpenRouter (${OPENROUTER_BASE} and its API key in the password field): `
     + 'Fetch models opens the checklist with "Detected: OpenRouter"; the first free model with tool support (id '
     + 'ending ":free", no tool-support hint) is ticked alone and Add saves the provider (openrouter.ai, '
-    + 'OpenAI-compatible, Public, one saved key) with only it', freeProblems.length === 0, brief({
+    + 'OpenAI-compatible, one saved key) with only it', freeProblems.length === 0, brief({
     problems: freeProblems, title: free.state.title, picked: free.picked, provider: providerBrief(free.provider) }));
   await shot('setup-providers');
   for (const added of [glm, free].filter((item) => item.provider && item.picked)) {

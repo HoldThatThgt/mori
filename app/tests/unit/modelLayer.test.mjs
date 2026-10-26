@@ -1,4 +1,4 @@
-// kernel/modelLayer.ts 的单元测试：保存改地址时 key 先撤下（§4.1）、项目配置无效时不放宽（§4.3）、
+// kernel/modelLayer.ts 的单元测试：保存改地址时 key 先撤下（§4.1）、项目配置无效时没有候选（§4.3）、
 // credentials.json 读不出时不迁移（§4.5）、启动时对没有档案的模型自动探测（§7.4）。pi 的运行时是替身（synthetic），文件写在临时目录，key 都是测试用的假值。
 
 import { test } from 'node:test';
@@ -16,7 +16,7 @@ const RESERVED = mc.reservedIds(['openai']);
 /** §4.1 形状的提供商 p（synthetic），带一个 key p#1。 */
 function provider(overrides = {}) {
   return {
-    id: 'p', name: 'P', api: 'openai-completions', baseUrl: 'http://127.0.0.1:9000/p', zone: 'local', compat: {},
+    id: 'p', name: 'P', api: 'openai-completions', baseUrl: 'http://127.0.0.1:9000/p', compat: {},
     concurrency: 4, keys: [{ ref: 'p#1', label: 'Key 1' }], nextKeyNumber: 2,
     models: [
       { id: 'm1', family: '', contextWindow: 1000, maxTokens: 100, reasoning: false, input: ['text'] },
@@ -28,8 +28,7 @@ function provider(overrides = {}) {
 
 /** 只有提供商 p 的配置。 */
 function configWith(p = provider()) {
-  return { version: 1, providers: [p], groups: [], normalDefault: 'p/m1', allowedZones: ['local', 'intranet'],
-    projectZones: {} };
+  return { version: 1, providers: [p], groups: [], normalDefault: 'p/m1' };
 }
 
 /** pi 运行时的替身：记下注册的提供商；hooks.refresh 在每次刷新时调用。 */
@@ -122,19 +121,18 @@ test('MP-24 a save that pi rejects puts the withdrawn key back', async (t) => {
     [['http://127.0.0.1:9000/p/chat/completions', 'Bearer sk-old-SECRET']]);
 });
 
-test('MP-07 an invalid .mori/models.json allows no zone and expands to no candidate', async (t) => {
+test('MP-07 an invalid .mori/models.json expands to no candidate; the context has no zone fields', async (t) => {
   quiet(t);
   const { layer } = scratchLayer({ config: configWith() });
   await layer.load({ 'p#1': 'sk-x' }, ['p#1'], null);
   const project = mkdtempSync(join(tmpdir(), 'mori-project-'));
   const valid = await layer.projectContext(project);
-  assert.deepEqual(valid.allowedZones, ['local', 'intranet']);
+  assert.deepEqual(valid, { project: null, projectError: null });
   assert.deepEqual(layer.expandPickIn(valid, 'p'), ['p/m1', 'p/m2']);
   mkdirSync(join(project, '.mori'));
-  writeFileSync(join(project, '.mori', 'models.json'), '{ "allowedZones": ');
+  writeFileSync(join(project, '.mori', 'models.json'), '{ "groups": ');
   const invalid = await layer.projectContext(project);
   assert.notEqual(invalid.projectError, null);
-  assert.deepEqual(invalid.allowedZones, []);
   assert.deepEqual(layer.expandPickIn(invalid, 'p'), []);
   assert.equal(layer.staticBase(invalid).projectError, invalid.projectError);
 });

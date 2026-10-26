@@ -121,11 +121,11 @@ export function modelOf(id, { contextWindow = 131072, maxTokens = 8192, reasonin
 }
 
 /**
- * @brief 一个提供商的配置：本机区域，没有 key（启动后经 models.addKey 加，密文由 Mori 自己加密保存）。
+ * @brief 一个提供商的配置：本机地址，没有 key（启动后经 models.addKey 加，密文由 Mori 自己加密保存）。
  * @param api 接口（默认 openai-completions）
  */
 export function providerOf(id, name, port, models, api = 'openai-completions') {
-  return { id, name, api, baseUrl: baseOf(port), zone: 'local', compat: {}, concurrency: 4,
+  return { id, name, api, baseUrl: baseOf(port), compat: {}, concurrency: 4,
     keys: [], nextKeyNumber: 1, models };
 }
 
@@ -164,8 +164,7 @@ export function oldProfile(baseUrl, model, opts = {}) {
 export function seedUserData(setup) {
   const userData = mkdtempSync(join(tmpdir(), 'mori-md-card-'));
   mkdirSync(join(userData, 'pi'), { recursive: true });
-  const config = { version: 1, providers: setup.providers, groups: [], normalDefault: setup.normalDefault ?? null,
-    allowedZones: ['local', 'intranet'], projectZones: {} };
+  const config = { version: 1, providers: setup.providers, groups: [], normalDefault: setup.normalDefault ?? null };
   writeFileSync(join(userData, 'model-config.json'), `${JSON.stringify(config, null, 2)}\n`);
   const profiles = { version: 1, profiles: setup.profiles ?? [] };
   writeFileSync(join(userData, 'model-profiles.json'), `${JSON.stringify(profiles, null, 2)}\n`);

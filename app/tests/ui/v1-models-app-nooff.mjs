@@ -265,8 +265,8 @@ async function step(ctx, label, fn) {
 // ---------- 场景 probe：思考关不掉的判定与输出上限（MP-38 App） ----------
 
 /**
- * @brief 设置页里新建提供商（Add provider 表单，model-discovery.md §6.1、§13.4）：Base URL → Fetch models → Name、区域
- *        Local → 清单里只勾 specs（pickIn，可以改 Supports thinking）→ Add N models，等表单关掉。返回拉取的结果。
+ * @brief 设置页里新建提供商（Add provider 表单，model-discovery.md §6.1、§13.4）：Base URL → Fetch models → Name
+ *        → 清单里只勾 specs（pickIn，可以改 Supports thinking）→ Add N models，等表单关掉。返回拉取的结果。
  */
 async function addProviderUi(page, { name, baseUrl, specs }) {
   await page.locator('[data-action="add-provider"]').click();
@@ -274,7 +274,6 @@ async function addProviderUi(page, { name, baseUrl, specs }) {
   await form.getByLabel('Base URL', { exact: true }).fill(baseUrl);
   const fetched = await fetchIn(page, PROVIDER_FORM);
   await form.getByLabel('Name', { exact: true }).fill(name);
-  await form.locator('input[name="zone"][value="local"]').check();
   await pickIn(page, PROVIDER_FORM, specs);
   await form.locator('[data-action="add-models"]').click();
   await form.waitFor({ state: 'detached', timeout: 20000 });

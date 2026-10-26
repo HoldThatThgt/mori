@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, realProviders, scratchUserData, sleep,
+  appRoot, arg, createRecorder, launch, oneLine, realProviders, scratchUserData, sleep, useRealGroup,
 } from './lib.mjs';
 import { activeFile, openRow, paneOf, stubFolder, waitIdle, waitReady } from './m3-helpers.mjs';
 import {
@@ -290,8 +290,8 @@ requireConnection(source);
 const root = mkdtempSync(join(tmpdir(), 'mori-m4-real-'));
 const ctx = { project: makeProject(root), pageErrors: [] };
 ctx.userData = scratchUserData(source);
-// 测试准备（synthetic test setup，§14.1）：给临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
-allowRealProject(ctx.userData, ctx.project);
+// 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组
+useRealGroup(ctx.userData);
 try {
   await start(ctx);
   const items = { 1: item1, 2: item2, 3: item3, 4: item4, 5: item5, c: counterExample };

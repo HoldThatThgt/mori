@@ -356,10 +356,9 @@ function refusedAuto(api) {
 
 /** 只有 t 这个模型的配置（提供商 or，没有 key，synthetic）。 */
 function configOf(t) {
-  const provider = { id: 'or', name: 'OpenRouter', api: t.api, baseUrl: t.baseUrl, zone: 'local', compat: t.compat,
+  const provider = { id: 'or', name: 'OpenRouter', api: t.api, baseUrl: t.baseUrl, compat: t.compat,
     concurrency: 4, keys: [], nextKeyNumber: 1, models: [t.model] };
-  return { version: 1, providers: [provider], groups: [], normalDefault: NOOFF_REF, allowedZones: ['local'],
-    projectZones: {} };
+  return { version: 1, providers: [provider], groups: [], normalDefault: NOOFF_REF };
 }
 
 /** 照 modelLayer.ts 的 profileLookup：按 ProfileBook 里这个模型的档案给编译项（compileFlagsOf）。 */

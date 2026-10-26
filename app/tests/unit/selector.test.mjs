@@ -18,9 +18,9 @@ function model(id) {
 }
 
 /** 一个提供商配置项。 */
-function provider(id, zone, modelIds) {
+function provider(id, modelIds) {
   return {
-    id, name: id.toUpperCase(), api: 'openai-completions', baseUrl: `http://${id}.test`, zone, compat: {},
+    id, name: id.toUpperCase(), api: 'openai-completions', baseUrl: `http://${id}.test`, compat: {},
     concurrency: 4, keys: [], nextKeyNumber: 1, models: modelIds.map(model),
   };
 }
@@ -29,9 +29,9 @@ function provider(id, zone, modelIds) {
 function config() {
   return {
     providers: [
-      provider('local', 'local', ['qwen', 'llama', 'phi']),
-      provider('glm', 'public', ['glm-4.6', 'glm-4.5']),
-      provider('ds', 'public', ['chat', 'reasoner']),
+      provider('local', ['qwen', 'llama', 'phi']),
+      provider('glm', ['glm-4.6', 'glm-4.5']),
+      provider('ds', ['chat', 'reasoner']),
     ],
     groups: [
       { id: 'cloud', members: ['ds/reasoner', 'glm', 'ds'] },
@@ -41,17 +41,15 @@ function config() {
 }
 
 /**
- * 选择器输入：默认全部存在、区域 local 且允许、tool_calling 已验证、可用。
+ * 选择器输入：默认全部存在、tool_calling 已验证、可用（2026-10-26 起没有区域，输入里也没有）。
  * @param candidates 候选
- * @param over 覆盖的字段；zones / tools / avail 为按 ref 的表
+ * @param over 覆盖的字段；tools / avail 为按 ref 的表
  */
 function input(candidates, over = {}) {
-  const { zones = {}, tools = {}, avail = {}, missing = [], ...rest } = over;
+  const { tools = {}, avail = {}, missing = [], ...rest } = over;
   return {
     candidates,
     exists: (ref) => !missing.includes(ref),
-    zoneOf: (ref) => (ref in zones ? zones[ref] : 'local'),
-    allowedZones: ['local', 'intranet'],
     toolCalling: (ref) => tools[ref] ?? 'verified',
     availability: (ref) => avail[ref] ?? { available: true },
     now: 1_000_000,
@@ -155,18 +153,10 @@ test('MP-30 step 1 missing, and the removed-during-reply text', () => {
   ]);
 });
 
-test('MP-06 step 2: unconfirmed zone, then zone not allowed for the project', () => {
-  const result = select(input(ABC, { zones: { 'p/a': null, 'p/b': 'public' } }));
-  assert.equal(result.model, 'p/c');
-  assert.deepEqual(result.excluded, [
-    { ref: 'p/a', reason: 'zone_unconfirmed', detail: 'network zone not confirmed' },
-    { ref: 'p/b', reason: 'zone_blocked', detail: 'zone public is not allowed for this project' },
-  ]);
-});
-
-test('MP-06 a public provider passes once the project allows public', () => {
-  const result = select(input(ABC, { zones: { 'p/a': 'public' }, allowedZones: ['local', 'public'] }));
-  assert.equal(result.model, 'p/a');
+test('MP-06 no network zones: the selector input has no zone step (no zoneOf, no allowed zones); every existing, '
+  + 'verified candidate passes the static check', () => {
+  assert.deepEqual(select(input(['ds/chat', 'glm/glm-4.6'])), { model: 'ds/chat', excluded: [] });
+  assert.deepEqual(selectStatic(input(['glm/glm-4.5', 'ds/chat'])), { model: 'glm/glm-4.5', excluded: [] });
 });
 
 test('MP-09 step 3: probing, unverified and failed tool calling are excluded with their texts', () => {
@@ -197,7 +187,7 @@ test('MP-29 step 4: each availability reason with its UI text', () => {
 
 test('MP-20 the first failing step is the reason, not a later step', () => {
   const result = select(input(['p/a'], {
-    missing: ['p/a'], zones: { 'p/a': 'public' }, avail: { 'p/a': { available: false, reason: 'auth', until: null } },
+    missing: ['p/a'], avail: { 'p/a': { available: false, reason: 'auth', until: null } },
   }));
   assert.equal(result.excluded[0].reason, 'missing');
   const second = select(input(['p/a'], {
@@ -291,7 +281,7 @@ test('MP-21 handover is checked at the reply start too, and a rebuild error text
 });
 
 test('MP-36 route() checks only steps 1 and 4 for the current model', () => {
-  const base = input(['p/a'], { zones: { 'p/a': 'public' }, tools: { 'p/a': 'failed' } });
+  const base = input(['p/a'], { tools: { 'p/a': 'failed' } });
   assert.equal(checkCurrent(base, 'p/a'), null);
   const gone = input(['p/a'], { missing: ['p/a'], removedRefs: new Set(['p/a']) });
   assert.deepEqual(checkCurrent(gone, 'p/a'),
@@ -306,7 +296,7 @@ test('MP-36 route() checks only steps 1 and 4 for the current model', () => {
 function check(candidates, over = {}) {
   const base = input(candidates ?? [], over);
   return staticCheck({
-    configError: null, projectError: null, pick: 'cloud', projectZones: null, ...base, candidates, ...over,
+    configError: null, projectError: null, pick: 'cloud', ...base, candidates, ...over,
   });
 }
 
@@ -334,41 +324,20 @@ test('MP-09 no_candidate with Verify now only when an unverified candidate exist
   assert.deepEqual(failed.verifyRefs, []);
 });
 
-test('MP-09 Allow zone when a candidate is zone_blocked and the project config does not exclude it', () => {
-  const { blocked } = check(['g/a', 'p/b'], { zones: { 'g/a': 'public' }, tools: { 'p/b': 'failed' } });
+test('MP-06 no network zones: the blocked card offers only Verify now, Change model… and Open settings and carries no '
+  + 'zone fields', () => {
+  const tools = { 'ds/chat': 'unverified', 'glm/glm-4.6': 'failed' };
+  const { blocked } = check(['ds/chat', 'glm/glm-4.6'], { tools });
   assert.equal(blocked.kind, 'no_candidate');
-  assert.equal(blocked.zone, 'public');
-  assert.deepEqual(blocked.actions, ['allow_zone', 'change_model', 'open_settings']);
-});
-
-test('MP-06 no Allow zone when .mori/models.json excludes that zone', () => {
-  const { blocked } = check(['g/a', 'i/b'], {
-    zones: { 'g/a': 'public', 'i/b': 'intranet' }, allowedZones: ['local'], projectZones: ['local', 'intranet'],
-  });
-  assert.equal(blocked.zone, 'intranet');
-  const none = check(['g/a'], { zones: { 'g/a': 'public' }, projectZones: ['local'] }).blocked;
-  assert.equal(none.zone, null);
-  assert.deepEqual(none.actions, ['change_model', 'open_settings']);
-});
-
-test('MP-09 Confirm zone lists each provider with an unconfirmed zone once', () => {
-  const { blocked } = check(['m/a', 'm/b', 'n/c'], { zones: { 'm/a': null, 'm/b': null, 'n/c': null } });
-  assert.deepEqual(blocked.zoneProviders, ['m', 'n']);
-  assert.deepEqual(blocked.actions, ['confirm_zone', 'change_model', 'open_settings']);
-});
-
-test('MP-09 all three optional actions appear in table order', () => {
-  const { blocked } = check(['m/a', 'g/b', 'p/c'], {
-    zones: { 'm/a': null, 'g/b': 'public' }, tools: { 'p/c': 'unverified' },
-  });
-  assert.deepEqual(blocked.actions, ['verify', 'allow_zone', 'confirm_zone', 'change_model', 'open_settings']);
+  assert.deepEqual(blocked.actions, ['verify', 'change_model', 'open_settings']);
+  assert.deepEqual(Object.keys(blocked).sort(), ['actions', 'candidates', 'detail', 'kind', 'problems', 'verifyRefs']);
 });
 
 test('MP-09 no_pick when the session has no model range', () => {
   const { blocked, first } = check(null, { pick: null });
   assert.equal(first, null);
   assert.deepEqual(blocked, { kind: 'no_pick', detail: '', candidates: [], actions: ['change_model', 'open_settings'],
-    verifyRefs: [], zone: null, zoneProviders: [], problems: [] });
+    verifyRefs: [], problems: [] });
 });
 
 test('MP-30 pick_missing names the missing range', () => {
@@ -395,23 +364,14 @@ test('MP-01 config_invalid wins over everything else', () => {
 
 // ---- §9.2 范围菜单各项（session.pickOptions） ----
 
-/** 菜单各项的输入：区域取配置里提供商的区域，项目只允许 local、intranet。 */
+/** 菜单各项的输入：全部存在、tool_calling 已验证（over 覆盖）。 */
 function menuInput(over = {}) {
-  const cfg = config();
-  const zoneOfProvider = Object.fromEntries(cfg.providers.map((p) => [p.id, p.zone]));
-  const { zones = {}, ...rest } = over;
-  return {
-    config: cfg,
-    exists: () => true,
-    zoneOf: (ref) => {
-      const id = providerOf(ref);
-      return id in zones ? zones[id] : zoneOfProvider[id];
-    },
-    allowedZones: ['local', 'intranet'],
-    toolCalling: () => 'verified',
-    ...rest,
-  };
+  return { config: config(), exists: () => true, toolCalling: () => 'verified', ...over };
 }
+
+/** glm 的模型 tool calling 判定不通过，ds 的还没验证，其余已验证。 */
+const glmFailsDsUnverified = (ref) => (providerOf(ref) === 'glm' ? 'failed'
+  : providerOf(ref) === 'ds' ? 'unverified' : 'verified');
 
 test('MP-23 menu lists groups, then providers, then models per provider, labelled id / name / model id', () => {
   const options = pickOptions(menuInput());
@@ -424,50 +384,47 @@ test('MP-23 menu lists groups, then providers, then models per provider, labelle
   ]);
 });
 
-test('MP-23 each item shows the zones of its candidates in Local, Intranet, Public order', () => {
-  const byPick = Object.fromEntries(pickOptions(menuInput()).map((o) => [o.pick, o.zones]));
-  assert.deepEqual(byPick.mixed, ['local', 'public']);
-  assert.deepEqual(byPick.cloud, ['public']);
-  assert.deepEqual(byPick.local, ['local']);
-  assert.deepEqual(byPick['ds/chat'], ['public']);
-  const unconfirmed = Object.fromEntries(pickOptions(menuInput({ zones: { glm: null } })).map((o) => [o.pick, o]));
-  assert.deepEqual(unconfirmed.glm.zones, [], 'an unconfirmed zone is not listed');
-  assert.deepEqual(unconfirmed.mixed.zones, ['local']);
+test('MP-06 no network zones: menu items carry only pick, kind, label, excluded and reason', () => {
+  for (const option of pickOptions(menuInput())) {
+    assert.deepEqual(Object.keys(option).sort(), ['excluded', 'kind', 'label', 'pick', 'reason'], option.pick);
+  }
 });
 
 test('MP-23 items whose candidates all fail the static check are excluded with one line per candidate', () => {
-  const byPick = Object.fromEntries(pickOptions(menuInput({ zones: { glm: null } })).map((o) => [o.pick, o]));
+  const options = pickOptions(menuInput({ toolCalling: glmFailsDsUnverified }));
+  const byPick = Object.fromEntries(options.map((o) => [o.pick, o]));
   assert.equal(byPick.mixed.excluded, false);
   assert.equal(byPick.mixed.reason, null);
   assert.equal(byPick.local.excluded, false);
   assert.equal(byPick.cloud.excluded, true);
   assert.equal(byPick.cloud.reason, [
-    'ds/reasoner — zone public is not allowed for this project',
-    'glm/glm-4.6 — network zone not confirmed',
-    'glm/glm-4.5 — network zone not confirmed',
-    'ds/chat — zone public is not allowed for this project',
+    'ds/reasoner — tool calling not verified yet',
+    'glm/glm-4.6 — tool calling failed verification',
+    'glm/glm-4.5 — tool calling failed verification',
+    'ds/chat — tool calling not verified yet',
   ].join('\n'));
-  assert.equal(byPick['glm/glm-4.5'].reason, 'glm/glm-4.5 — network zone not confirmed');
+  assert.equal(byPick['glm/glm-4.5'].reason, 'glm/glm-4.5 — tool calling failed verification');
   const tools = pickOptions(menuInput({ toolCalling: (ref) => (ref === 'local/qwen' ? 'unverified' : 'verified') }));
   const qwen = tools.find((o) => o.pick === 'local/qwen');
   assert.deepEqual([qwen.excluded, qwen.reason], [true, 'local/qwen — tool calling not verified yet']);
   assert.equal(tools.find((o) => o.pick === 'local').excluded, false, 'other local models still pass');
 });
 
-test('MP-23 the menu follows the project: allowed zones and .mori/models.json group narrowing', () => {
-  const open = pickOptions(menuInput({ allowedZones: ['local', 'intranet', 'public'] }));
-  assert.equal(open.every((o) => !o.excluded), true);
-  const narrowed = pickOptions(menuInput({ projectGroups: { mixed: ['glm/glm-4.5'] } }));
+test('MP-23 the menu follows the project\'s .mori/models.json group narrowing', () => {
+  assert.equal(pickOptions(menuInput()).every((o) => !o.excluded), true);
+  const glmFails = (ref) => (providerOf(ref) === 'glm' ? 'failed' : 'verified');
+  const open = pickOptions(menuInput({ toolCalling: glmFails }));
+  assert.equal(open.find((o) => o.pick === 'mixed').excluded, false);
+  const narrowed = pickOptions(menuInput({ toolCalling: glmFails, projectGroups: { mixed: ['glm/glm-4.5'] } }));
   const mixed = narrowed.find((o) => o.pick === 'mixed');
-  assert.deepEqual([mixed.zones, mixed.excluded], [['public'], true]);
+  assert.deepEqual([mixed.excluded, mixed.reason], [true, 'glm/glm-4.5 — tool calling failed verification']);
 });
 
 // ---- §5.8 候选耗尽 ----
 
 test('MP-20 recovering reasons are probing, rate_limited, connection, timeout and held', () => {
   assert.deepEqual([...RECOVERING_REASONS].sort(), ['connection', 'held', 'probing', 'rate_limited', 'timeout']);
-  const never = ['missing', 'zone_unconfirmed', 'zone_blocked', 'unverified', 'failed', 'auth', 'quota', 'not_found',
-    'tried', 'earlier', 'no_handover'];
+  const never = ['missing', 'unverified', 'failed', 'auth', 'quota', 'not_found', 'tried', 'earlier', 'no_handover'];
   assert.equal(canRecover(never.map((reason) => ({ ref: 'p/a', reason, detail: '' }))), false);
   for (const reason of RECOVERING_REASONS) assert.equal(canRecover([{ ref: 'p/a', reason, detail: '' }]), true);
 });

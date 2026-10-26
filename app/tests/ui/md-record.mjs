@@ -23,7 +23,7 @@
 //     结束，回到设置页（olla-ps 有 "Server reports a context window of 8,192."，olla-train 的窗口服务没报告），
 //     点这条提示的 Use（models.saveModel 与之后的 models.get），录下之后后台进程转发的 mori.profiles：olla-ps 先在
 //     running 里（重新探测，行上的 data-probe 为 reverifying；2026-10-26 起界面不写 Re-verifying…），最后完成。
-// 准备（synthetic test setup）：数据目录里一个本机区域的提供商 Legacy endpoint（legacy/fake-legacy，合成端点 4862 的
+// 准备（synthetic test setup）：数据目录里一个本机地址的提供商 Legacy endpoint（legacy/fake-legacy，合成端点 4862 的
 // vllm 默认形状，列表为 fake-legacy、fake-coder），档案是一键拉取模型之前的写法（没有 auto.meta，推理字段
 // reasoning_content，已验证；model-discovery.md §7.2、§8 的旧档案），默认范围 legacy/fake-legacy；它让 App 不进首次启动，
 // 回放时设置页从录下的 models.get 开始。
@@ -120,13 +120,13 @@ const bare = (url) => url.trim().replace(/\/+$/, '');
 
 /**
  * @brief Add provider 拉取后预填、没改过任何字段时的提供商表单（§6.1 第 3、4 项；fields.tsx toProviderForm）：
- *        建议的 Base URL 与填的不同时换进框，Name、API type 取结果，区域为 zone（suggestZone 的建议值），
+ *        建议的 Base URL 与填的不同时换进框，Name、API type 取结果，
  *        Concurrency per key 为默认的 4，兼容选项为空。
  * @param typed Base URL 框里填的地址
  */
-function providerFormOf(typed, result, zone) {
+function providerFormOf(typed, result) {
   const baseUrl = bare(result.baseUrl) !== bare(typed) ? result.baseUrl : typed;
-  return { name: result.name.trim(), baseUrl: baseUrl.trim(), api: result.api, zone, concurrency: 4, compat: {} };
+  return { name: result.name.trim(), baseUrl: baseUrl.trim(), api: result.api, concurrency: 4, compat: {} };
 }
 
 /**
@@ -201,7 +201,7 @@ function driver(state) {
     /** Add：models.saveProvider（API key 空着时不带 keySecret），成功后重新 models.get（writeModels） */
     async add(typed, result, rows) {
       const saved = await d.cmd({ type: 'models.saveProvider', id: null,
-        provider: providerFormOf(typed, result, 'local'), models: rows.filter((row) => row.picked).map(toModel) });
+        provider: providerFormOf(typed, result), models: rows.filter((row) => row.picked).map(toModel) });
       if (saved.error !== null) throw new Error(`models.saveProvider failed: ${saved.error}`);
       await d.cmd({ type: 'models.get' });
       return saved.providerId;
@@ -510,8 +510,7 @@ function seedUserData() {
   mkdirSync(join(userData, 'pi'), { recursive: true });
   const model = modelOf(LEGACY.model);
   const config = { version: 1, providers: [providerOf(LEGACY.provider, LEGACY.name, LEGACY.port, [model])],
-    groups: [], normalDefault: `${LEGACY.provider}/${LEGACY.model}`, allowedZones: ['local', 'intranet'],
-    projectZones: {} };
+    groups: [], normalDefault: `${LEGACY.provider}/${LEGACY.model}` };
   writeFileSync(join(userData, 'model-config.json'), `${JSON.stringify(config, null, 2)}\n`);
   const old = profileOf(baseOf(LEGACY.port), model);
   old.auto.field = 'reasoning_content';

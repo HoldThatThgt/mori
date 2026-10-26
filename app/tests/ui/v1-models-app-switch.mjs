@@ -138,14 +138,13 @@ const SUMMARY_SYSTEM = 'You are a context summarization assistant.';
 /** 阶段行里的 hh:mm:ss */
 const CLOCK = '\\d\\d:\\d\\d:\\d\\d';
 
-/** @brief 测试准备（synthetic test setup）：用户级配置，全部本机区域，默认范围 okd。 */
+/** @brief 测试准备（synthetic test setup）：用户级配置，全部本机地址，默认范围 okd。 */
 function buildConfig() {
   const providers = PROVIDERS.map(([id, port, opts = {}]) => providerOf(id, id.toUpperCase(), port,
     [modelOf(M(id), { contextWindow: opts.window, maxTokens: opts.maxTokens, reasoning: opts.reasoning })],
     { concurrency: opts.concurrency }));
   const groups = Object.entries(GROUPS).map(([id, members]) => ({ id, members }));
-  return { version: 1, providers, groups, normalDefault: 'okd', allowedZones: ['local', 'intranet'],
-    projectZones: {} };
+  return { version: 1, providers, groups, normalDefault: 'okd' };
 }
 
 /** @brief 测试准备：cancel_verified 按提供商给出（其余档案没跑过取消探针）。 */
@@ -339,7 +338,7 @@ function saveProvider(ctx, id, changes) {
   const [, port, opts = {}] = PROVIDERS.find(([pid]) => pid === id);
   const current = providerOf(id, id.toUpperCase(), port, [], { concurrency: opts.concurrency });
   const provider = { name: current.name, api: current.api, baseUrl: current.baseUrl, compat: {},
-    concurrency: current.concurrency, zone: 'local', ...changes };
+    concurrency: current.concurrency, ...changes };
   return bridge(ctx, { type: 'models.saveProvider', id, provider });
 }
 
@@ -1299,9 +1298,9 @@ async function compactionNoModel(ctx) {
   const helper = await sessionWith(ctx, 'y20');
   await sendWait(ctx, helper, 'plain MP20 cool y20');
   // 测试准备：默认范围暂时改成 g20c，新会话的虚拟模型按它的第一个候选（小窗口）注册（§11.1），建好后改回。
-  await bridge(ctx, { type: 'models.setDefaults', normalDefault: 'g20c', allowedZones: ['local', 'intranet'] });
+  await bridge(ctx, { type: 'models.setDefaults', normalDefault: 'g20c' });
   const tab = await newSession(ctx);
-  await bridge(ctx, { type: 'models.setDefaults', normalDefault: 'okd', allowedZones: ['local', 'intranet'] });
+  await bridge(ctx, { type: 'models.setDefaults', normalDefault: 'okd' });
   const since = Date.now();
   const text = `plain MP20 compaction ${'filler words for the context usage '.repeat(500)}`;
   await send(ctx, tab, text);

@@ -145,7 +145,7 @@ function deepseekAnswer() {
 
 /** 一个提供商的配置（synthetic）：一个勾了 Supports thinking 的模型。 */
 function providerOf(id, baseUrl, modelId) {
-  return { id, name: id, api: 'openai-completions', baseUrl, zone: 'local', compat: {}, concurrency: 1, keys: [],
+  return { id, name: id, api: 'openai-completions', baseUrl, compat: {}, concurrency: 1, keys: [],
     nextKeyNumber: 1, models: [{ id: modelId, family: '', contextWindow: 131072, maxTokens: 16384, reasoning: true,
       input: ['text'] }] };
 }
@@ -155,8 +155,7 @@ function providerOf(id, baseUrl, modelId) {
  * （注册内容加提供商的 id 与地址）。auto 为 undefined 即还没有档案。
  */
 function compiledModel(provider, auto) {
-  const config = { version: 1, providers: [provider], groups: [], normalDefault: null,
-    allowedZones: ['local', 'intranet', 'public'], projectZones: {} };
+  const config = { version: 1, providers: [provider], groups: [], normalDefault: null };
   const lookup = (p) => profiles.compileFlagsOf(p.api, auto);
   const input = compiler.compileInputs(config, lookup, MODEL_TIMINGS.placeholderApiKey).get(provider.id);
   return { ...input.models[0], provider: provider.id, baseUrl: provider.baseUrl };

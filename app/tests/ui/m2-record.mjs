@@ -11,7 +11,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  allowProjectsLive, allowRealProject, appRoot, arg, launch, oneLine, prepareProject, realProviders, scratchUserData,
+  appRoot, arg, launch, oneLine, prepareProject, realProviders, scratchUserData, useRealGroup,
 } from './lib.mjs';
 
 const source = arg('source');
@@ -333,8 +333,6 @@ async function runScenario(page, scenario, context) {
   const { project, root } = prepareProject('mori-m2-record-');
   let steps;
   try {
-    // 测试准备（synthetic test setup，§14.1）：这个临时项目授权公网
-    await allowProjectsLive(page, project);
     steps = await recordInPage(page, scenario.body, { ...context, cwd: project, ...prompts });
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -389,8 +387,8 @@ function connectionInfo(dir) {
 // 先读连接信息：数据目录不对时在复制密文之前就失败；复制之后的每一步都在 try 里，出错也会删掉临时目录。
 const context = connectionInfo(source);
 const userData = scratchUserData(source);
-// 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组；项目建好后再授权公网
-allowRealProject(userData, []);
+// 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组
+useRealGroup(userData);
 let app = null;
 try {
   app = await launch({ exePath, userData });

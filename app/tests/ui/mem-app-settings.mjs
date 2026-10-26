@@ -694,8 +694,7 @@ async function setup(ctx) {
   mkdirSync(join(ctx.userData, 'pi'), { recursive: true });
   // 测试准备（synthetic test setup）：一个本机提供商（合成端点上的一个模型）、已验证的档案（不跑探针），默认范围是它。
   const provider = providerOf(PROVIDER, 'Memory settings endpoint', PORT, [modelOf(MODEL)]);
-  seedUserData(ctx.userData, { version: 1, providers: [provider], groups: [], normalDefault: PROVIDER,
-    allowedZones: ['local', 'intranet'], projectZones: {} }, {}, {});
+  seedUserData(ctx.userData, { version: 1, providers: [provider], groups: [], normalDefault: PROVIDER }, {}, {});
   await startApp(ctx);
   ctx.tab = await openProject(ctx, ctx.project, { trust: true });
   record('MEM-28 setup: Mori starts with the seeded model settings and opens a session (no model request)',

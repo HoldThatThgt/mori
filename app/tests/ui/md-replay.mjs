@@ -178,9 +178,6 @@ function metaStart(model, reported) {
     + `${fmt(model.maxTokens)}${nr('maxTokens')}`;
 }
 
-/** @brief §3.4：区域的建议值里本测试用到的两种：127.x 为本机，其余公网主机为 Public（§12）。 */
-const zoneOf = (url) => (new URL(url).hostname.startsWith('127.') ? 'local' : 'public');
-
 // ---------- 录制 ----------
 
 /** @brief 读一个录制文件。 */
@@ -415,8 +412,7 @@ async function openrouterAdd(page, scope, result, picked) {
   const typed = pairs(readFixture('md-openrouter').steps, 'models.discover')[0].command.target.baseUrl;
   const models = result.models.filter((m) => picked.includes(m.id) || m.id === target.id)
     .map((m) => modelOf(m, m.id === target.id ? { maxTokens: value } : {}));
-  const provider = { name: result.name, baseUrl: typed, api: result.api, zone: zoneOf(typed), concurrency: 4,
-    compat: {} };
+  const provider = { name: result.name, baseUrl: typed, api: result.api, concurrency: 4, compat: {} };
   record(`MD-07 replay md-openrouter: Add sends models.saveProvider with all ${models.length} ticked rows in list `
     + 'order (also those hidden by the filter, the changed Max output included) and the prefilled provider; the form '
     + 'closes', closed && command?.type === 'models.saveProvider' && command.id === null

@@ -26,7 +26,7 @@ function fetchFailed(code) {
 /** §4.1 形状的提供商（synthetic）。 */
 function provider(overrides = {}) {
   return {
-    id: 'p', name: 'P', api: 'openai-completions', baseUrl: 'http://127.0.0.1:9000/v1', zone: 'local',
+    id: 'p', name: 'P', api: 'openai-completions', baseUrl: 'http://127.0.0.1:9000/v1',
     compat: { supportsStore: false }, concurrency: 4, keys: [], nextKeyNumber: 1,
     models: [
       { id: 'a', family: '', contextWindow: 1000, maxTokens: 100, reasoning: false, input: ['text'] },
@@ -239,9 +239,9 @@ test('MP-29 address, API type and compat changes clear endpoint records', () => 
   assert.equal(providerChange(base, provider({ compat: {} })).endpoint, true);
 });
 
-test('MP-29 name, concurrency, zone, keys and model order changes clear nothing', () => {
+test('MP-29 name, concurrency, keys and model order changes clear nothing', () => {
   const base = provider();
-  const next = provider({ name: 'Renamed', concurrency: 1, zone: 'public', keys: [{ ref: 'p#1', label: 'Key 1' }],
+  const next = provider({ name: 'Renamed', concurrency: 1, keys: [{ ref: 'p#1', label: 'Key 1' }],
     nextKeyNumber: 2, models: [...base.models].reverse() });
   assert.deepEqual(providerChange(base, next), { endpoint: false, changedModels: [] });
   const reordered = provider({ compat: { supportsStore: false } });

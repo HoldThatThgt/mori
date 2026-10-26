@@ -1,5 +1,5 @@
 // shared/models.ts 的单元测试：§5.3 原因文字、§9.1 的英文标签、配置与项目配置的单字段校验、自定义条目的类型名、
-// §12 区域建议、§9.5 命令的参数。
+// §9.5 命令的参数；MP-06 没有网络区域（2026-10-26，负责人走查 M3）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,15 +18,13 @@ function sampleConfig() {
     version: 1,
     providers: [{
       id: 'deepseek-2', name: 'DeepSeek', api: 'openai-completions', baseUrl: 'https://api.deepseek.com',
-      zone: 'public', compat: { maxTokensField: 'max_tokens' }, concurrency: 4,
+      compat: { maxTokensField: 'max_tokens' }, concurrency: 4,
       keys: [{ ref: 'deepseek-2#1', label: 'Key 1' }], nextKeyNumber: 2,
       models: [{ id: 'deepseek-chat', family: 'deepseek', contextWindow: 131072, maxTokens: 8192,
         reasoning: false, input: ['text'] }],
     }],
     groups: [{ id: 'cloud', members: ['deepseek-2/deepseek-chat', 'glm'] }],
     normalDefault: 'cloud',
-    allowedZones: ['local', 'intranet'],
-    projectZones: { 'd:/work/tool': ['public'] },
   };
 }
 
@@ -68,10 +66,30 @@ test('MP-13 tried wraps the inner reason without until; earlier names the reply 
   assert.equal(REASON_TEXTS.earlier(), 'skipped at the start of this reply');
 });
 
-test('MP-06 zone reasons name the blocked zone', () => {
-  assert.equal(REASON_TEXTS.zone_blocked('public'), 'zone public is not allowed for this project');
-  assert.equal(REASON_TEXTS.zone_blocked('intranet'), 'zone intranet is not allowed for this project');
-  assert.equal(REASON_TEXTS.zone_unconfirmed(), 'network zone not confirmed');
+test('MP-06 no network zones: no zone reason codes, blocked-card actions or zone exports', () => {
+  assert.equal(models.EXCLUSION_REASONS.some((code) => code.startsWith('zone')), false);
+  assert.equal(Object.keys(REASON_TEXTS).some((code) => code.startsWith('zone')), false);
+  assert.equal(models.BLOCKED_ACTIONS.some((action) => action.includes('zone')), false);
+  for (const name of ['ZONES', 'ZoneSchema', 'DEFAULT_ZONES', 'suggestZone']) {
+    assert.equal(models[name], undefined, name);
+  }
+});
+
+test('MP-06 no network zones: the config, the provider form and the project file reject the zone fields', () => {
+  const config = sampleConfig();
+  config.providers[0].zone = 'public';
+  config.allowedZones = ['local', 'intranet'];
+  config.projectZones = {};
+  const result = models.ModelConfigSchema.safeParse(config);
+  assert.equal(result.success, false);
+  assert.deepEqual(result.error.issues.map((issue) => [issue.code, issue.path, issue.keys]), [
+    ['unrecognized_keys', ['providers', 0], ['zone']],
+    ['unrecognized_keys', [], ['allowedZones', 'projectZones']],
+  ]);
+  const form = { name: 'P', api: 'openai-completions', baseUrl: 'http://127.0.0.1:9/v1', compat: {}, concurrency: 4 };
+  assert.equal(models.ProviderFormSchema.safeParse(form).success, true);
+  assert.equal(models.ProviderFormSchema.safeParse({ ...form, zone: 'local' }).success, false, 'zone in the form');
+  assert.equal(models.ProjectModelsFileSchema.safeParse({ allowedZones: ['local'] }).success, false, 'project file');
 });
 
 test('MP-29 auth, quota and not_found texts', () => {
@@ -158,7 +176,6 @@ test('MP-01 config schema rejects single-field violations and points at the loca
     ['unknown provider field', (c) => { c.providers[0].apiKey = 'x'; }, ['providers', 0]],
     ['maxTokens not below window', (c) => { c.providers[0].models[0].maxTokens = 131072; },
       ['providers', 0, 'models', 0, 'maxTokens']],
-    ['public in allowedZones', (c) => { c.allowedZones = ['local', 'public']; }, ['allowedZones', 1]],
     ['nextKeyNumber below 1', (c) => { c.providers[0].nextKeyNumber = 0; }, ['providers', 0, 'nextKeyNumber']],
     ['key ref with a space', (c) => { c.providers[0].keys[0].ref = 'a b'; }, ['providers', 0, 'keys', 0, 'ref']],
     ['provider id uppercase', (c) => { c.providers[0].id = 'DeepSeek'; }, ['providers', 0, 'id']],
@@ -171,9 +188,6 @@ test('MP-01 config schema rejects single-field violations and points at the loca
     ['repeated group member', (c) => { c.groups[0].members = ['glm', 'glm']; }, ['groups', 0, 'members']],
     ['duplicate model id', (c) => { c.providers[0].models.push({ ...c.providers[0].models[0] }); },
       ['providers', 0, 'models']],
-    ['non-normalized project path', (c) => { c.projectZones = { 'D:\\work': ['public'] }; }, ['projectZones']],
-    ['project path not all lowercase', (c) => { c.projectZones = { 'd:/Work/Tool': ['public'] }; }, ['projectZones']],
-    ['project path with a trailing slash', (c) => { c.projectZones = { 'd:/work/': ['public'] }; }, ['projectZones']],
   ];
   for (const [name, mutate, path] of cases) {
     const config = sampleConfig();
@@ -187,42 +201,17 @@ test('MP-01 config schema rejects single-field violations and points at the loca
 
 test('MP-07 project config schema accepts the §4.3 example and rejects bad shapes', () => {
   const schema = models.ProjectModelsFileSchema;
-  assert.equal(schema.safeParse({ allowedZones: ['local'], groups: { cloud: ['glm/glm-4.6'] } }).success, true);
+  assert.equal(schema.safeParse({ groups: { cloud: ['glm/glm-4.6'] } }).success, true);
   assert.equal(schema.safeParse({}).success, true);
-  assert.equal(schema.safeParse({ allowedZones: ['local'], providers: [] }).success, false, 'unknown field');
+  assert.equal(schema.safeParse({ groups: {}, providers: [] }).success, false, 'unknown field');
   assert.equal(schema.safeParse({ groups: { cloud: [] } }).success, false, 'empty group list');
   assert.equal(schema.safeParse({ groups: { cloud: ['glm', 'glm'] } }).success, false, 'repeated member');
-  assert.equal(schema.safeParse({ allowedZones: ['moon'] }).success, false, 'unknown zone');
 });
 
 test('MP-15 session custom entry types', () => {
   assert.deepEqual({ ...models.MODEL_ENTRY_TYPES },
     { pick: 'mori.pick', modelSwitch: 'mori.model_switch', rebuild: 'mori.rebuild',
       taskRestart: 'mori.task_restart' });
-});
-
-test('MP-08 zone suggestion: loopback is local', () => {
-  for (const url of ['http://127.0.0.1:8000/v1', 'http://127.5.6.7/', 'http://127.1/', 'http://[::1]:11434',
-    'http://localhost:1234', 'http://LOCALHOST./v1', 'http://[::ffff:127.0.0.1]:8000/v1']) {
-    assert.equal(models.suggestZone(url), 'local', url);
-  }
-});
-
-test('MP-08 zone suggestion: private ranges, link-local, fc00::/7, fe80::/10, .local and dotless hosts are intranet',
-  () => {
-    for (const url of ['http://10.1.2.3/v1', 'http://172.16.0.1/', 'http://172.31.255.255/', 'http://192.168.1.10:8000',
-      'http://169.254.10.1/', 'http://[fd12:3456::1]:8000/v1', 'http://[fc00::1]/', 'http://[fe80::1]/',
-      'http://[febf::1]/', 'http://[::ffff:192.168.1.10]/', 'http://[::ffff:a01:203]/', 'http://gpu-box.local/v1',
-      'http://gpu-box:8000/v1']) {
-      assert.equal(models.suggestZone(url), 'intranet', url);
-    }
-  });
-
-test('MP-08 zone suggestion: everything else is public', () => {
-  for (const url of ['https://api.deepseek.com', 'http://172.32.0.1/', 'http://172.15.0.1/', 'http://11.0.0.1/',
-    'http://[2001:db8::1]/', 'http://[fec0::1]/', 'http://[::ffff:8.8.8.8]/', 'http://[::2]/', 'not a url']) {
-    assert.equal(models.suggestZone(url), 'public', url);
-  }
 });
 
 /** 按 ModelCommandSchemas 里 type 对应的那个 schema 校验一条命令。 */

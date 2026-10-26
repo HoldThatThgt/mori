@@ -43,7 +43,7 @@ import {
   menuItems, menuText, MODEL_BUSY, noteSmallText, openMenuByKey, openMenuByMouse, openRow, PANE, paneCount, paneOf,
   prefillOf, rangeBlockedBy, recycleBinNames, renameClosed, renameView, ROW_MENUS, ROW_REASONS, ROW_TAB_ORDER, rowLog,
   rowOf, rowState, rowWhen, samePath, savedArchived, savedDrafts, sendWait, sessionGone, sessionNames,
-  shownWithin, spoken, startDelete, startRename, stoppedCount, stubFolder, titleOf, topTitle, treeState, trustRecord,
+  shownWithin, startDelete, startRename, stoppedCount, stubFolder, titleOf, topTitle, treeState, trustRecord,
   until, usable, usageOk, waitArchivedToggle, waitComposerFocus, waitIdle, waitPanes, waitReady, waitRowTitle,
   waitRunning, waitStatus, watchRow,
 } from './m3-helpers.mjs';
@@ -93,8 +93,8 @@ const CRASHED_TIP = 'Mori’s background process crashed. Restart it to continue
 /** 开着时 Esc 先关它们的浮层（含输入框下面一行的菜单和圆环详情） */
 const OVERLAYS = ['session-menu', 'rename-input', 'delete-dialog', 'trust-dialog', 'confirm-dialog', 'issue-dialog',
   'permission-menu', 'model-menu', 'thinking-menu', 'usage-details'].map((id) => `[data-testid="${id}"]`).join(', ');
-/** 首次启动写下的提供商（page.mjs firstRun 的默认名称、区域 Local）和模型：选择范围按钮的字和悬停第二行 */
-const RANGE = { text: 'fake-coder', current: 'mori-endpoint/fake-coder', where: 'Mori endpoint · Local' };
+/** 首次启动写下的提供商（page.mjs firstRun 的默认名称）和模型：选择范围按钮的字和悬停第二行 */
+const RANGE = { text: 'fake-coder', current: 'mori-endpoint/fake-coder', where: 'Mori endpoint' };
 /** 能用时悬停的第二行（ui-strings.md"权限按钮""选择范围、Effort 按钮的悬停"） */
 const ROW_TIPS = { ask: 'Change the permission mode', effort: 'Set the effort level for this session',
   unsupported: 'This model isn’t marked “Supports thinking”' };
@@ -235,7 +235,7 @@ async function relaunch(ctx) {
 /** @brief 首次启动：填连接、测试成功、打开 alpha；新会话在侧栏和顶栏都叫"New session"。 */
 async function setup(ctx) {
   const { app, page, h } = ctx;
-  // v1（规格 §14.4）：首次启动填英文表单、区域选 Local，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
+  // v1（规格 §14.4）：首次启动填英文表单，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
   await h.setupFirstRun({ baseUrl, apiKey: testKey });
   await stubFolder(app, ctx.folders.alpha);
   await page.getByRole('button', { name: OPEN_FOLDER }).first().click();
@@ -393,8 +393,8 @@ async function rowTabOrder(ctx) {
 /**
  * @brief 空闲时三个按钮能用（不带 aria-disabled，composer-pickers.md C1），悬停按行（C2）、读屏的描述只有第二行
  *        （"我自己定的"第 18 条）：权限"Permission mode: Ask each time" / "Change the permission mode"，按钮里只有模式名一段字
- *        和 ▾（没有盾牌图标）；选择范围按钮读屏名"Model range: fake-coder"，悬停"fake-coder" / "Mori endpoint · Local"，
- *        描述"Mori endpoint, Local"；Effort 读屏名"Effort: <强度>"，按钮的字带"Effort: "前缀，悬停第一行是全名、第二行是说明。
+ *        和 ▾（没有盾牌图标）；选择范围按钮读屏名"Model range: fake-coder"，悬停"fake-coder" / "Mori endpoint"，
+ *        描述"Mori endpoint"；Effort 读屏名"Effort: <强度>"，按钮的字带"Effort: "前缀，悬停第一行是全名、第二行是说明。
  */
 function idleTips(row) {
   const { permission, model, thinking } = row ?? {};
@@ -404,10 +404,10 @@ function idleTips(row) {
     && permission.icons <= 1 && same(permission.tip, [permission.label, ROW_TIPS.ask])
     && permission.described === ROW_TIPS.ask, JSON.stringify(permission));
   record('选择范围按钮（空闲）：能用，读屏名"Model range: fake-coder"，按钮的字"fake-coder"，悬停两行"fake-coder" / '
-    + '"Mori endpoint · Local"，读屏的描述"Mori endpoint, Local"（只有第二行，" · "换成", "），data-current 是当前模型',
+    + '"Mori endpoint"，读屏的描述"Mori endpoint"（只有第二行），data-current 是当前模型',
   usable(model) && model.label === `Model range: ${RANGE.text}` && model.text === RANGE.text && Boolean(model.pick)
     && model.current === RANGE.current && same(model.tip, [RANGE.text, RANGE.where])
-    && model.described === spoken(RANGE.where), JSON.stringify(model));
+    && model.described === RANGE.where, JSON.stringify(model));
   const second = thinking?.reasoning === 'false' ? ROW_TIPS.unsupported : ROW_TIPS.effort;
   record('Effort 按钮（空闲）：能用，读屏名"Effort: <强度>"，按钮的字带"Effort: "前缀，悬停两行（第一行是全名，第二行'
     + '"Set the effort level for this session"，不支持思考时"This model isn’t marked “Supports thinking”"），读屏的描述只有第二行',
@@ -1195,8 +1195,8 @@ async function statusApproval(ctx) {
 
 /**
  * @brief 生成中输入框下面一行（models.md"不可用时、按钮消失时的焦点"）：权限按钮和圆环可用；选择范围按钮
- *        不可用（aria-disabled，仍能 Tab 到），悬停三行"fake-coder" / "Mori endpoint · Local" / "Can’t switch models until the
- *        response finishes"，描述"Mori endpoint, Local. Can’t switch models until the response finishes"；Effort 不可用，
+ *        不可用（aria-disabled，仍能 Tab 到），悬停三行"fake-coder" / "Mori endpoint" / "Can’t switch models until the
+ *        response finishes"，描述"Mori endpoint. Can’t switch models until the response finishes"；Effort 不可用，
  *        悬停第一行仍是全名，第二行和读屏的描述"Can’t change effort until the response finishes"。
  */
 function busyRow(row) {
@@ -1278,7 +1278,7 @@ async function statusKernelExit(ctx) {
   await waitReady(page);
 }
 
-/** @brief 这一行的三个按钮都在、都不可用，原因都是 reason（选择范围按钮悬停第二行仍是提供商和区域）。 */
+/** @brief 这一行的三个按钮都在、都不可用，原因都是 reason（选择范围按钮悬停第二行仍是提供商名）。 */
 const rowBlocked = (row, reason) => Boolean(row) && blockedBy(row.permission, reason)
   && rangeBlockedBy(row.model, RANGE.where, reason) && blockedBy(row.thinking, reason);
 
@@ -1316,7 +1316,7 @@ async function exitedRow(ctx, before) {
   const row = await rowWhen(page, (now) => now.menus.length === 0 && now.model?.unavailable === true);
   record('后台进程退出：输入框下面一行开着的权限菜单关闭，焦点回到权限按钮；权限、选择范围、Effort 不可用（aria-disabled，'
     + '仍能 Tab 到），原因"Mori’s background process crashed"（权限、Effort 悬停第二行，范围按钮悬停第三行，读屏的描述；'
-    + '范围按钮的描述前面仍是提供商和区域）；按钮位置也是这句；圆环保留最后一次的用量', row?.menus.length === 0
+    + '范围按钮的描述前面仍是提供商名）；按钮位置也是这句；圆环保留最后一次的用量', row?.menus.length === 0
     && row.focus === 'permission-button' && row.notReady === crashed && rowBlocked(row, crashed)
     && Boolean(before?.usage) && row.usage?.tokens === before.usage.tokens, JSON.stringify(row));
   const clicks = [];
