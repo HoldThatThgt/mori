@@ -66,7 +66,7 @@
 | 最近一次修订 | `memory.list` 的 `last` 不为 null | 同一行 `Last change <Mon D> · Added 1, changed 1`（`memory-last-change`；日期取 `last.time`；计数为 0 的不写，都为 0 时 `No changes`） | 点它：切到 `Revisions` 选中那一次（有未保存的编辑时先问） |
 | 没有修订 | `last` 为 null | 不写 `Last change` | — |
 | `New entry` | — | 同一行按钮 `New entry`（`memory-new`） | 打开新增表单（下面“编辑与新增”；有未保存的编辑时先问） |
-| 列表 | `memory.list` 的 `entries` | `memory-list` 里每条一行（`memory-row`，`data-id` 为 id，`data-source` 为 `user` / `learned`）：abstract；右边 `You said` 或 `Learned` 与修改日期 `<Mon D>`（取 `modified` 的日期）；顺序就是进 prompt 的顺序 | ↑ ↓ 在行之间移动焦点（同 M7）；Enter 或点击选中，右栏打开详情（有未保存的编辑时先问） |
+| 列表 | `memory.list` 的 `entries` | `memory-list` 里每条一行（`memory-row`，`data-id` 为 id，`data-source` 为 `user` / `agent` / `learned`）：abstract；右边 `You said`、`Added by Mori`（Mori 主动记的，照 Claude 的 `Added by Claude`；2026-10-26，规格 §0 第 5 条）或 `Learned` 与修改日期 `<Mon D>`（取 `modified` 的日期）；顺序就是进 prompt 的顺序 | ↑ ↓ 在行之间移动焦点（同 M7）；Enter 或点击选中，右栏打开详情（有未保存的编辑时先问） |
 | 选中 | 你选了一行 | 这一行高亮；右栏是它的详情 | — |
 | 读不出来的条目 | `memory.list` 的 `broken` | 每个一行（`memory-broken`）：第一行 `Couldn’t read the entry <文件名>`，下一行是原因；不能选中（规格 §10.1）；排在条目之后（临时，走查时可以改）；不进 prompt | — |
 | 没有条目 | `entries` 与 `broken` 都为空 | `No entries yet.` | `New entry` |
@@ -82,7 +82,7 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 读取中 | `memory.get` 还没返回 | `aside.right-panel[data-testid="memory-detail"]` 里 `Loading…`（临时，走查时可以改） | — |
-| 标题 | `memory.get` 的 `entry` | 标题是 abstract；右上角 ×，读屏名称 `Close details`（同 M7，临时，走查时可以改）；下面一行 `<KIND> · <User\|Project> · <You said\|Learned> · Created <Mon D> by <you\|Mori\|enhancement> · Modified <Mon D> by <you\|Mori\|enhancement>`（`created`、`modified` 里的 `You`、`Mori`、`Enhancement` 分别写 `you`、`Mori`、`enhancement`） | 关闭（×，有未保存的编辑时先问） |
+| 标题 | `memory.get` 的 `entry` | 标题是 abstract；右上角 ×，读屏名称 `Close details`（同 M7，临时，走查时可以改）；下面一行 `<KIND> · <User\|Project> · <You said\|Added by Mori\|Learned> · Created <Mon D> by <you\|Mori\|enhancement> · Modified <Mon D> by <you\|Mori\|enhancement>`（`created`、`modified` 里的 `You`、`Mori`、`Enhancement` 分别写 `you`、`Mori`、`enhancement`） | 关闭（×，有未保存的编辑时先问） |
 | `Evidence` | `entry.evidence` | 小标题 `Evidence`，块 `memory-evidence`；每项一行：`<Mon D> · Session “<title>”: “<quote>”` 或 `<Mon D> · Feedback: “<quote>”`（没有 `quote` 时去掉 `: “…”`；`<title>` 先按 `session` 在侧栏找到会话、用现在的名字，找不到时用存下的 `title`），后面 `Jump to source`（`memory-jump`，下面“依据回到原位置”） | Jump to source |
 | 没有依据 | `evidence` 为空（例如你在记忆页写的） | `No evidence recorded.` | — |
 | `Details` | `entry.details` | 小标题 `Details`；按 Markdown 渲染；`[[slug]]` 渲染成链接（同层先找，找不到再找另一层）；找不到时显示原文、不可点 | 点链接：在详情里打开那一条；中栏换到它所在的层与分节并选中它（临时，走查时可以改）；有未保存的编辑时先问 |
@@ -105,7 +105,7 @@
 | 新增 | 你点了 `New entry` | 右栏打开空的同一个表单；种类按当前分节、层按当前的 `User` / `Project`（事实也一样）；中栏的选中去掉（临时，走查时可以改） | 编辑；Save；Cancel |
 | 表单检查 | 你点了 `Save` | 有问题时在字段下方显示、不发命令：`Abstract is required.`（去掉首尾空白后为空）、`Abstract must be at most 200 characters.`、`Details must be at most 4,000 characters.` | 修改 |
 | 保存中 | `memory.save` 还没返回 | `Save` 不可用（临时，走查时可以改） | — |
-| 已保存（编辑） | `memory.save { cwd, layer, kind, id, abstract, detail }` 返回 `error: null` | 表单关闭，详情按新内容重读：`Learned` 的条目变为 `You said`（`source: user`，§6.4）；`History` 多一行 `<Mon D> · You: Edited on the Memory page`；`Revisions` 多一条 `You · Changed <KIND>: …`（§6.5）；F8 记 `Edit memory entry` | — |
+| 已保存（编辑） | `memory.save { cwd, layer, kind, id, abstract, detail }` 返回 `error: null` | 表单关闭，详情按新内容重读：`Learned`、`Added by Mori` 的条目变为 `You said`（`source: user`，§6.4）；`History` 多一行 `<Mon D> · You: Edited on the Memory page`；`Revisions` 多一条 `You · Changed <KIND>: …`（§6.5）；F8 记 `Edit memory entry` | — |
 | 已保存（新增） | 同上，不带 `id`；结果的 `id` | 新条目加在列表末尾（`You said`），选中它，右栏是它的详情；`Revisions` 多一条 `You · Added <KIND>: …`；F8 记 `Save memory entry` | — |
 | 保存失败 | 结果的 `error` | 详情顶部 `Couldn’t save: <原因>`（`memory-error`），表单与文字保留 | 修改后再 Save；Cancel |
 | Cancel | 你点了 `Cancel` | 不问（`Cancel` 不在规格 §10.1 要先问的操作里），丢掉表单里的字：编辑时回到详情，新增时右栏关闭 | — |
@@ -200,7 +200,7 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 | 没有修订 | `revisions` 为空 | `No revisions yet.`（临时，走查时可以改） | — |
 | 读取中 / 重读 / 读取失败 | 同前四节 | 同前四节：`Loading…`；`Couldn’t load memory: <原因>` | 同前四节 |
 | 详情 | `memory.revisions { cwd, layer, id }` 的 `revision` | 右栏 `revision-detail`：标题；一行时间与谁 `<Mon D> <hh:mm> · <You\|Mori\|Enhancement\|Rollback>`（写法临时，走查时可以改）；增强运行另有一行 `Day <Mon D> · <n> sessions · <m> feedback · <k> tokens`（单数 `1 session`、`1 token`；token 写法同增强状态行：不到 1000 写 `<n> tokens`，1000 起写 `<n>k tokens`）；运行中（`run.tokens` 为 null）时不写 token 那一段（临时，走查时可以改） | 关闭 |
-| 每处改动 | `revision.changes` | 每处一块：`<Added\|Changed\|Deleted\|Moved> · <KIND> · <abstract>`；下一行是依据（`Evidence: <原文>`）或说明（`Note: <原文>`），有时才显示；改动前后的对照（M4 的 diff 组件比较 `before` 与 `after` 两份 detail 文件；新增时前面为空，删除时后面为空，移动时前面是原层、后面是目标层的文件） | 展开、收起对照（同 M4，临时，走查时可以改） |
+| 每处改动 | `revision.changes` | 每处一块：`<Added\|Changed\|Deleted\|Moved> · <KIND> · <abstract>`（增强任务把 Mori 记的条目移到另一种时 `Changed · <原 KIND> → <目标 KIND> · <abstract>`，对照里 `kind:` 一行不同、`## Revisions` 多一行 `Moved from <KIND> to <KIND>: …`；2026-10-26，规格 §6.9）；下一行是依据（`Evidence: <原文>`）或说明（`Note: <原文>`），有时才显示；改动前后的对照（M4 的 diff 组件比较 `before` 与 `after` 两份 detail 文件；新增时前面为空，删除时后面为空，移动时前面是原层、后面是目标层的文件） | 展开、收起对照（同 M4，临时，走查时可以改） |
 | `Notes` | `revision.notes`（增强运行最后一条回复） | 小标题 `Notes`，按 Markdown 渲染；没有时不显示 | — |
 | `Roll back this revision` | — | 按钮 `Roll back this revision`（`revision-rollback`）；一键，不确认（proposal §6.4） | 点击：`memory.rollback { cwd, layer, id }` |
 | 不能回滚 | `status` 为 `running`；或 `counts` 全为 0（没有改动） | 按钮不可用（规格没给悬停文字） | — |

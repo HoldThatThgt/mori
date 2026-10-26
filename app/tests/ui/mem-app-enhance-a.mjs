@@ -53,7 +53,7 @@ const WRITE_REFUSED = 'Enhancement runs can only change memory, with the memory 
 const NAMES = ['s1-settings', 's2-reenable', 's3-nodefault', 's4-broken', 's5-noentry', 't1-turnoff', 'r1-runnow',
   'n1-notice',
   'n2-failnotice', 'f1-endpoint', 'hx-untrusted', 'hx-trusted', 'h3-badpick', 'h4-badroles', 'w1-evidence',
-  'v1-onerun', 'o1-offdays', 'o1-offdays-other', 'mh-hold', 'mq-team', 'm1-sched'];
+  'v1-onerun', 'o1-offdays', 'o1-offdays-other', 'mh-hold', 'mq-team', 'm1-sched', 'x1-refile'];
 
 // ---------- 小工具 ----------
 
@@ -954,7 +954,7 @@ async function evidenceSecondRun(ctx, w) {
   const results = toolResultsOf(file?.entries ?? []).map((r) => r.text.split('\n')[0]);
   const want = ['Updated TASTE (this project): Learned taste one, refined',
     '“User taste rule” is an entry the user wrote; it’s read-only for enhancement. Mention the conflict in your final '
-    + 'reply.', 'This run maintains this project’s TASTE entries only.', 'Validation failed for tool "memory":',
+    + 'reply.', 'This run maintains this project’s TASTE entries only.', 'evidence is required for save.',
     'Evidence 1 isn’t from this run’s material: session not listed.',
     `Evidence 1 isn’t from this run’s material: entry zzzz0000 not in ${w.seed.file}.`,
     'Evidence 1 isn’t from this run’s material: feedback not listed.'];
@@ -964,8 +964,9 @@ async function evidenceSecondRun(ctx, w) {
     results[0] === want[0] && one?.abstract === 'Learned taste one, refined' && one.source === 'learned', brief(one));
   record('MEM-21 changing an entry the user wrote and an entry of another kind is refused with the §7.4 texts',
     same(results.slice(1, 3), want.slice(1, 3)), brief(results.slice(1, 3)));
-  record('MEM-21 missing evidence (schema), a session not listed, an entry id not in the file and feedback not '
-    + 'listed are all refused, and nothing was written', same(results.slice(3, 7), want.slice(3, 7))
+  record('MEM-21 missing evidence (“evidence is required for save.”, 2026-10-26), a session not listed, an entry id '
+    + 'not in the file and feedback not listed are all refused, and nothing was written',
+  same(results.slice(3, 7), want.slice(3, 7))
     && !list.entries.some((e) => /^(No evidence|Bad )/.test(e.abstract)) && list.entries.length === 3,
   brief({ results: results.slice(3, 7), entries: list.entries.map((e) => e.abstract) }));
 }
@@ -1169,6 +1170,93 @@ async function sched(ctx) {
     brief(requests.map((q) => [q.kind, q.model, q.effort])));
 }
 
+// ---------- MEM-38：增强把 Mori 记的条目移到该在的种类（2026-10-26，§6.9） ----------
+
+/** 主 Agent 主动记下的两条（不给 asked，合成端点按 call tool: memory 调用，synthetic）：放错了种类 */
+const REFILE = {
+  rule: { action: 'save', kind: 'fact', abstract: 'Answer with the conclusion first',
+    quote: 'just give me the conclusion first' },
+  fact: { action: 'save', kind: 'taste', abstract: 'The staging database is PostgreSQL 15',
+    quote: 'staging runs PostgreSQL 15' },
+};
+/** 两条的 slug（§6.2） */
+const REFILE_SLUG = { rule: 'answer-with-the-conclusion-first', fact: 'the-staging-database-is-postgresql-15' };
+
+/** @brief 对话里让主 Agent 主动记两条（放错了种类），打开增强，TASTE 任务把两条各自移走（一进一出），Run now。 */
+async function refileRun(ctx, x) {
+  x.tab = await openSessionIn(ctx, x.cwd);
+  for (const args of [REFILE.rule, REFILE.fact]) await chatOnce(ctx, x.tab, `call tool: memory ${JSON.stringify(args)}`);
+  writeScript(SCRIPT, { ...quietScript('@x1-refile'), 'taste@x1-refile': [
+    mem({ action: 'move', entry: REFILE_SLUG.rule, kind: 'taste', note: 'How to talk, not a fact' }),
+    mem({ action: 'move', entry: REFILE.fact.abstract, kind: 'fact', note: 'A fact, not a taste' }),
+    say('Refiled two entries added by Mori.')] });
+  await openMemoryProject(ctx, x.tab);
+  await clickSwitch(ctx, true);
+  await clickRunNow(ctx, x.cwd);
+  x.revision = (await runRevisions(ctx, x.cwd, { task: 'taste' }))[0] ?? null;
+}
+
+/** @brief 盘上与修订：两条都换了种类、仍是 Mori 记的；Revisions 行；修订一节 Changed、种类两端、kinds 含两种。 */
+async function refileFiles(ctx, x) {
+  const [facts, tastes] = [await memoryList(ctx, x.cwd, 'fact'), await memoryList(ctx, x.cwd, 'taste')];
+  const rule = (await memoryGet(ctx, x.cwd, REFILE_SLUG.rule)).entry;
+  const fact = (await memoryGet(ctx, x.cwd, REFILE_SLUG.fact)).entry;
+  const day = monthDay(todayOf());
+  record('MEM-38 the TASTE run moved the rule added by Mori from Facts into TASTE and the fact added by Mori from '
+    + 'TASTE to Facts: same ids, still added by Mori, each one out of its old index and in the new one, with a '
+    + '“Moved from <KIND> to <KIND>: <note>” Revisions line', rule?.kind === 'taste' && fact?.kind === 'fact'
+    && rule.source === 'agent' && fact.source === 'agent'
+    && same(tastes.entries.map((e) => e.id), [REFILE_SLUG.rule]) && same(facts.entries.map((e) => e.id),
+      [REFILE_SLUG.fact])
+    && rule.history.at(-1) === `${day} · Enhancement: Moved from Facts to TASTE: How to talk, not a fact`
+    && fact.history.at(-1) === `${day} · Enhancement: Moved from TASTE to Facts: A fact, not a taste`,
+  brief({ rule: rule && [rule.kind, rule.source, rule.history], fact: fact && [fact.kind, fact.source] }));
+  const changes = x.revision?.changes.map((c) => [c.action, c.fromKind, c.kind, c.to?.slug]) ?? [];
+  record('MEM-38 the run has one revision with two Changed sections from one kind to the other, kinds fact and '
+    + 'taste, counts changed 2', same(changes, [['changed', 'fact', 'taste', REFILE_SLUG.rule],
+    ['changed', 'taste', 'fact', REFILE_SLUG.fact]]) && same(x.revision.kinds, ['fact', 'taste'])
+    && same(x.revision.counts, { added: 0, changed: 2, deleted: 0, moved: 0 }), brief({ changes, rev: x.revision
+    && { kinds: x.revision.kinds, counts: x.revision.counts } }));
+}
+
+/** @brief 记忆页：TASTE 里那一行标 Added by Mori；Revisions 里这次运行的两块写 Changed · <原> → <目标> · <abstract>。 */
+async function refilePage(ctx, x) {
+  await ctx.page.getByTestId('memory-section-taste').click();
+  const row = ctx.page.locator(`[data-testid="memory-row"][data-id="${REFILE_SLUG.rule}"]`);
+  await row.waitFor({ timeout: 10000 });
+  const tag = await row.locator('.memory-tag').textContent();
+  await ctx.page.getByTestId('memory-section-revisions').click();
+  await ctx.page.locator(`[data-testid="revision-row"][data-id="${x.revision?.id}"]`).click();
+  await ctx.page.getByTestId('revision-detail').locator('.memory-change-title').first().waitFor({ timeout: 10000 });
+  const titles = await ctx.page.getByTestId('revision-detail').locator('.memory-change-title').allTextContents();
+  record('MEM-38 on the Memory page the moved rule is in TASTE marked “Added by Mori”, and the run’s revision shows '
+    + '“Changed · Facts → TASTE · <abstract>” and “Changed · TASTE → Facts · <abstract>”',
+  tag === 'Added by Mori' && await row.getAttribute('data-source') === 'agent'
+    && same(titles.map((text) => text.trim()), [`Changed · Facts → TASTE · ${REFILE.rule.abstract}`,
+      `Changed · TASTE → Facts · ${REFILE.fact.abstract}`]), brief({ tag, titles }));
+}
+
+/** @brief Roll back this revision：两条回到原来的种类，文件与运行前逐字相同。 */
+async function refileRollback(ctx, x) {
+  await ctx.page.getByTestId('revision-rollback').click();
+  const back = await waitFor(async () => (await memoryGet(ctx, x.cwd, REFILE_SLUG.rule)).entry?.kind === 'fact'
+    && (await memoryGet(ctx, x.cwd, REFILE_SLUG.fact)).entry?.kind === 'taste', 15000);
+  const files = x.revision?.changes.map((c) => readFileSync(join(memProjectDir(ctx.userData, x.cwd), 'entries',
+    `${c.to.slug}.md`), 'utf8') === c.before) ?? [];
+  record('MEM-38 Roll back this revision puts both entries back in their kinds with the files exactly as before the run',
+    back && files.length === 2 && files.every(Boolean), brief({ back, files }));
+}
+
+/** @brief MEM-38 步骤（项目 x1-refile）。 */
+async function refile(ctx) {
+  const x = { cwd: ctx.p['x1-refile'] };
+  await refileRun(ctx, x);
+  await refileFiles(ctx, x);
+  await refilePage(ctx, x);
+  await refileRollback(ctx, x);
+  await backToApp(ctx);
+}
+
 // ---------- 收尾 ----------
 
 /** @brief MEM-19：本套件里每次增强运行列出的会话文件都在 <userData>\pi\sessions 下（增强会话自己从不在里面）。 */
@@ -1196,6 +1284,7 @@ const steps = {
   oneRevision: [oneRevision, ['MEM-22']],
   offDays: [offDays, ['MEM-19']],
   sched: [sched, ['MEM-32']],
+  refile: [refile, ['MEM-38']],
 };
 
 const ctx = { userData: tempUserData('mori-mem-enh-a-data-'), exePath: args.exePath, pageErrors: [] };

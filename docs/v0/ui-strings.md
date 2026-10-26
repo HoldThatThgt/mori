@@ -73,7 +73,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | AGENT（记忆页的分节） | AGENT | — | 列出这个项目加载的 AGENTS.md；文件名照写 AGENTS.md（记忆规格 §10.3） |
 | 修订记录 | Revisions | — | 记忆页的分节；条目详情里改过它的记录叫 "History"（记忆规格 §10.1、§10.5） |
 | 增强模式 / 增强任务 | Enhancement（开关、对话框 "Enhancement settings"）/ enhancement（句子里） | — | "Running TASTE enhancement…"、"Created Oct 23 by enhancement"；操作记录 "Turn on enhancement <cwd>"（记忆规格 §1、§8、§10.4） |
-| 你说的 / 它学的 | You said / Learned | — | 条目行右边的标记、详情的第二行；在记忆页新增或修改后都是 "You said"（记忆规格 §1、§10.1） |
+| 你说的 / Mori 记的 / 它学的 | You said / Added by Mori / Learned | Added by Claude（Mori 记的那一个） | 条目行右边的标记、详情的第二行；在记忆页新增或修改后都是 "You said"；"Added by Mori" 是主 Agent 没被要求时主动记的（2026-10-26，记忆规格 §0 第 5 条、§1、§10.1）；增强任务第一条消息里写小写 "you said" / "added by Mori" / "learned" |
 | 记忆的层（用户级 / 本项目） | User / Project（分段按钮）；user-level / user level / this project（句子里） | 见 "用户级 / 本项目" | 同 "用户级 / 本项目" 一行：形容词写 "user-level entries"，名词写 "Move to user level"、"(user level)"（记忆规格 §1、§7.4） |
 | 删除（记忆条目） | Delete…（详情里的按钮）/ Delete（确认框的按钮）/ Deleting… / Deleted（修订里的改动、工具结果 "Deleted from …"） | Delete…、Delete、Deleting… | 同 "删除 / 移除" 一行；memory 工具的动作名是 forget，界面、修订和工具结果一律写 Delete 一族，不写 "Forget"（"Forget" 只用于权限菜单）（记忆规格 §1、§10.1） |
 | 提升 / 放回 | Move to user level / Move to this project | — | 详情里的按钮与操作记录同一句；修订里的改动、说明和条目的 Revisions 行写过去式 "Moved to user level" / "Moved to this project"（记忆规格 §1、§3.2、§3.3、§8） |

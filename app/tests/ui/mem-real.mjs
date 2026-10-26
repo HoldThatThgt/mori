@@ -7,15 +7,19 @@
 // 两个真实模型都用到。
 // 三个驱动，共用一个只有 README 的临时项目（关闭模式、Ask each time；出现的批准卡都点 Allow once）：
 //   dialog：新会话里依次说 “The intranet model is at 10.0.0.9, note it.” 与 “From now on, start every answer with the
-//           conclusion.”，等主 Agent 用 memory 工具记下事实与规则。
+//           conclusion.”，再说一个不带“记一下”的长期事实（PROMPTS.STATED）与一句纠正（PROMPTS.CORRECT），等主 Agent 用
+//           memory 工具记下（2026-10-26，§0 第 5 条：主动记的算 Mori 记的，source agent）。
 //   page：记忆页 Project → TASTE → New entry 写一条（synthetic 文字），Ctrl+N 新会话发一句，看它第一条请求的 system。
 //   enhance：记忆页打开增强、Settings… 选第二个提供商、对话会话里再发一句纠正（给增强的材料）、Run now，等三个任务都结束；
 //            之后新会话看第一条请求的 system，再在 Revisions 里回滚一次有改动的运行。
-// 检查只断言程序保证的事（§14.1）：memory 工具的调用写出合格的条目与修订、source 为 user、依据是说这句话的那条用户消息；
+// 检查只断言程序保证的事（§14.1）：memory 工具的调用写出合格的条目与修订、source 与调用给的 asked 一致（为真时 user，
+// 否则 agent；改一条 user 条目而没给 asked 时仍为 user）、依据是说这句话的那条用户消息；
 // 新会话请求的 system 里有记忆页写的那条（四个分节等于盘上的条目）；增强运行结束、修订 done 或跳过、一次运行一条修订、
+// 只改这一种的 learned 与 agent 条目、移到另一种的只有 agent 条目且一端是这一种（§6.9）、
 // Notes 是最后一条回复、每处改动的依据都在列出的范围内、增强会话里没有成功的 write/edit、水位推进到片段的最后一个条目、
-// 之后的新会话用新版、Roll back this revision 恢复整次。模型写了什么（abstract、种类、层、回复、token）只写进 note。
-// 前提没满足（模型没用 memory 记下、请求没发出、增强运行失败、三次运行都没有改动）时最多重跑 2 次，记在 note 里；
+// 之后的新会话用新版、Roll back this revision 恢复整次。模型写了什么（abstract、种类、层、给没给 asked、移没移、回复、
+// token）只写进 note。
+// 前提没满足（四句话里有一句模型没用 memory 记下、请求没发出、增强运行失败、三次运行都没有改动）时最多重跑 2 次，记在 note 里；
 // 仍不满足按失败。
 // --source 缺失、不存在、不合格（缺 model-config.json、credentials.json、Local State，找不到两个提供商，提供商没有 key）时
 // 立即以退出码 1 结束、不写结果文件：test-results 里有了失败的 mem-real.json，覆盖检查带 --allow-missing-real 时也会按失败算。
@@ -297,6 +301,16 @@ function agentEvidenceProblems(ev, { item, entries, who }) {
   return problems;
 }
 
+/**
+ * @brief 调用之后条目应有的来源（§6.4，2026-10-26）：asked 为真时 user；否则 save 为 agent，update 时 user 条目仍为 user、
+ *        其余为 agent。
+ */
+function wantSource(item, change) {
+  if (item.args.asked === true) return 'user';
+  const before = item.args.action === 'update' ? parseFront(change.before)?.front.source : null;
+  return before === 'user' ? 'user' : 'agent';
+}
+
 /** @brief 一节的前后原文按动作（save：前空后为合格的 detail；update：前后都有、依据追加一项；forget：后空、Note 为原因）。 */
 function blockProblems(action, change, ctx2) {
   const { item, kind } = ctx2;
@@ -305,7 +319,7 @@ function blockProblems(action, change, ctx2) {
     return change.note === flat(item.args.note ?? '').trim() || change.note === flat(item.args.note ?? '')
       ? problems : [...problems, `Note "${change.note}"`];
   }
-  const problems = detailProblems(change.after, { kind, source: 'user', by: 'Mori',
+  const problems = detailProblems(change.after, { kind, source: wantSource(item, change), by: 'Mori',
     created: action === 'save' ? 'Mori' : undefined });
   const before = action === 'save' ? [] : parseFront(change.before)?.front.evidence ?? null;
   if (action === 'save' && change.before !== '') problems.push('save: before must be empty');
@@ -351,28 +365,42 @@ function callProblems(item, ctx2) {
   return problems.map((problem) => `${action} ${d.layer}/${d.entry}: ${problem}`);
 }
 
-/** @brief 这一轮（某句话）引起的、成功的 save：kind 在 kinds 里，引起它的用户消息含 text。 */
-function turnSave(entries, calls, text, kinds) {
-  return calls.find((item) => succeeded(item) && item.args.action === 'save'
+/** @brief 这一轮（某句话）引起的、成功的写入：动作在 actions 里、kind 在 kinds 里，引起它的用户消息含 text。 */
+function turnWrite(entries, calls, text, kinds, actions = ['save']) {
+  return calls.find((item) => succeeded(item) && actions.includes(item.args.action)
     && kinds.includes(item.result.details?.kind)
     && entryText(entries, userEntryBefore(entries, item.entry)).includes(text)) ?? null;
 }
 
-/** @brief dialog 的一次：新项目、新会话，依次说事实与规则。 */
+/**
+ * @brief dialog 的四句（§14.1）：说的话、要记下的种类、算数的动作。主动记的两句（2026-10-26）也接受 update：
+ *        模型可能改一条已有的条目而不新增；纠正可能被记成任何一种（放错种类由增强重新归类，§6.9）。
+ */
+const DIALOG_STEPS = [
+  { key: 'fact', text: PROMPTS.FACT, kinds: ['fact'], actions: ['save'], what: 'the fact (note it)' },
+  { key: 'rule', text: PROMPTS.RULE, kinds: TASKS, actions: ['save'], what: 'the rule (from now on)' },
+  { key: 'stated', text: PROMPTS.STATED, kinds: ['fact'], actions: ['save', 'update'],
+    what: 'the fact stated without "note it"' },
+  { key: 'correct', text: PROMPTS.CORRECT, kinds: ['fact', ...TASKS], actions: ['save', 'update'],
+    what: 'the correction' },
+];
+
+/** @brief dialog 的一次：新项目、新会话，依次说四句。 */
 async function dialogOnce() {
   const { project, tab } = await newProject();
   const since = Date.now();
   await sendMessage(ctx, tab, PROMPTS.FACT);
   const who = await sessionOf(tab, since, project);
-  const idle = [await waitIdleAnswering(who), await say(who, PROMPTS.RULE)];
+  const idle = [await waitIdleAnswering(who)];
+  for (const step of DIALOG_STEPS.slice(1)) idle.push(await say(who, step.text));
   adopt(who);
   const entries = readJsonl(who.sessionFile).slice(1);
   const calls = memoryCalls(entries);
-  const saves = { fact: turnSave(entries, calls, PROMPTS.FACT, ['fact']),
-    rule: turnSave(entries, calls, PROMPTS.RULE, TASKS) };
+  const saves = Object.fromEntries(DIALOG_STEPS.map((step) => [step.key,
+    turnWrite(entries, calls, step.text, step.kinds, step.actions)]));
+  const missing = DIALOG_STEPS.filter((step) => !saves[step.key]).map((step) => step.what);
   const unmet = idle.includes(false) ? `the dialog did not settle within ${DRIVE_MS / 60000} minutes`
-    : !saves.fact ? 'the agent did not save the fact with the memory tool'
-      : !saves.rule ? 'the agent did not save the rule with the memory tool' : null;
+    : missing.length ? `the agent did not write with the memory tool after ${missing.join(', ')}` : null;
   return { who, entries, calls, saves, unmet };
 }
 
@@ -391,21 +419,23 @@ async function dialogChecks(take, notes) {
   const { who, entries, calls, saves } = take;
   const latest = latestCalls(calls);
   const latestOf = (item) => latest.get(`${item.result.details?.layer}/${item.result.details?.entry}`);
-  const note = noteOf(notes, { calls: calls.map((c) => [c.args.action, c.args.kind, c.args.layer, c.args.abstract,
-    c.result ? oneLine(contentText(c.result.content), 160) : 'no result']), cards: who.cards.map((c) => c.tool) });
-  for (const [key, what, layer] of [['fact', 'fact', null], ['rule', 'rule', 'project']]) {
-    const item = saves[key];
-    const problems = item ? callProblems(item, { entries, who, latest: latestOf(item) }) : [`no save for the ${what}`];
-    if (item && layer && item.result.details?.layer !== layer) {
+  const asked = Object.fromEntries(DIALOG_STEPS.map((step) => [step.key, saves[step.key]?.args.asked ?? null]));
+  const note = noteOf(notes, { asked, askedExpected: { fact: true, rule: true, stated: false, correct: false },
+    calls: calls.map((c) => [c.args.action, c.args.kind, c.args.layer, c.args.asked, c.args.abstract,
+      c.result ? oneLine(contentText(c.result.content), 160) : 'no result']), cards: who.cards.map((c) => c.tool) });
+  for (const step of DIALOG_STEPS) {
+    const item = saves[step.key];
+    const problems = item ? callProblems(item, { entries, who, latest: latestOf(item) }) : [`no write for ${step.what}`];
+    if (item && item.result.details?.kind !== 'fact' && item.result.details?.layer !== 'project') {
       problems.push(`the rule went to ${item.result.details?.layer}`);
     }
-    recordAll(['MEM-10', 'MEM-34'], `real dialog: the main agent's memory save of the ${what} writes a well-formed `
-      + `entry (source user, created by Mori${layer ? ', this project' : ''}), its index line and one "Mori · Added" `
-      + 'revision (done, one Added section whose after block is the entry file), and its evidence is the user\'s '
-      + 'quote with this session file and the id of the user message that said it', problems.length === 0,
-    detail(problems, note));
+    recordAll(['MEM-10', 'MEM-34'], `real dialog: the main agent's memory ${item?.args.action ?? 'save'} of `
+      + `${step.what} writes a well-formed entry (source user when the call gave asked: true, otherwise agent; `
+      + 'modified by Mori; a rule in this project), its index line and one "Mori ·" revision (done, one section whose '
+      + 'after block is the entry file), and its evidence is the user\'s quote with this session file and the id of '
+      + 'the user message that said it', problems.length === 0, detail(problems, note));
   }
-  const others = calls.filter((item) => succeeded(item) && item !== saves.fact && item !== saves.rule);
+  const others = calls.filter((item) => succeeded(item) && !Object.values(saves).includes(item));
   if (others.length) {
     const problems = others.flatMap((item) => callProblems(item, { entries, who, latest: latestOf(item) }));
     recordAll(['MEM-10', 'MEM-34'], `real dialog: every other successful memory call (${others.length}: `
@@ -580,8 +610,10 @@ function runHeadProblems(run) {
     problems.push(`layers ${JSON.stringify(front.layers)}`);
   }
   const kinds = front.kinds ?? [];
-  if (!kinds.every((kind) => kind === run.task) || (changedCount(run) > 0 && kinds.length !== 1)) {
-    problems.push(`kinds ${JSON.stringify(kinds)}`);
+  const wantKinds = KIND_ORDER.filter((kind) => kind === run.task || run.rev.changes
+    .some((c) => sectionKinds(c.kind).moved && [sectionKinds(c.kind).from, sectionKinds(c.kind).to].includes(kind)));
+  if (JSON.stringify(kinds) !== JSON.stringify(wantKinds)) {
+    problems.push(`kinds ${JSON.stringify(kinds)}, want ${JSON.stringify(wantKinds)} (the task and both ends of moves)`);
   }
   const r = front.run ?? {};
   if (r.task !== run.task || r.day !== run.day || typeof r.tokens !== 'number') {
@@ -615,39 +647,63 @@ function endProblems(runs, json) {
   return problems;
 }
 
+/** 种类的顺序（修订的 kinds，§9.8：Facts、TASTE、STRATEGY、REVIEW） */
+const KIND_ORDER = ['fact', 'taste', 'strategy', 'review'];
+
 /**
- * @brief 一次运行一条修订（§9.8）：成功的 memory 调用都记在这条修订里；每个条目一节（before 是运行前的文件，最后一次运行的
- *        after 是现在的文件）；先加后删的不出现；只改本项目这一种的 learned 条目。
- * @param last 这个任务最后一次完成的运行
+ * @brief 修订一节的种类（§3.3）：一种的名字，或移到另一种的 `<原> → <目标>`（§6.9，2026-10-26）。
+ * @return { from, to（种类；认不出时 null）, moved }
  */
-function sectionProblems(run, last) {
+function sectionKinds(label) {
+  const [fromLabel, toLabel = fromLabel] = String(label).split(' → ');
+  const kindOf = (text) => KIND_ORDER.find((kind) => KIND_LABEL[kind] === text) ?? null;
+  return { from: kindOf(fromLabel), to: kindOf(toLabel), moved: toLabel !== fromLabel };
+}
+
+/**
+ * @brief 一节（§3.3、§6.4、§6.9）：动作与种类（这个任务的一种，移动时一端是它、只有 Changed）、before 是运行前的文件、
+ *        前后原文的种类与来源（新增的为 learned；改的为 learned 或 agent；移动的只有 agent）；是改它的最后一次运行时，
+ *        现在的文件与索引行等于 after。
+ */
+function changeProblems(run, c, current) {
+  const problems = [];
+  const { from, to, moved } = sectionKinds(c.kind);
+  if (!from || !to || ![from, to].includes(run.task) || !['Added', 'Changed', 'Deleted'].includes(c.action)
+    || (moved && c.action !== 'Changed')) problems.push(`section ${c.action} · ${c.kind} · ${c.slug}`);
+  if (c.before !== (run.snapshot[c.slug] ?? '')) problems.push(`${c.slug}: before is not the file before the run`);
+  if ((c.action === 'Added') !== (c.before === '') || (c.action === 'Deleted') !== (c.after === '')) {
+    problems.push(`${c.slug}: ${c.action} with before/after ${Boolean(c.before)}/${Boolean(c.after)}`);
+  }
+  const sources = moved ? ['agent'] : c.action === 'Added' ? ['learned'] : ['learned', 'agent'];
+  for (const [text, kind] of [[c.before, from], [c.after, to]].filter(([text]) => text)) {
+    const front = parseFront(text)?.front;
+    if (front?.kind !== kind || !sources.includes(front?.source)) {
+      problems.push(`${c.slug}: ${front?.kind}/${front?.source}`);
+    }
+  }
+  if (current) problems.push(...currentProblems(ctx.dirs.project, c.after ? to : from, c.slug, c.after));
+  return problems;
+}
+
+/**
+ * @brief 一次运行一条修订（§9.8）：成功的 memory 调用都记在这条修订里；每个条目一节（changeProblems；改它的最后一次运行
+ *        的 after 是现在的文件）；先加后删的不出现。
+ * @param lastTouch 条目 → 改到它的最后一次完成的运行（不分任务：移动可以让后一个任务的运行改到前一个改过的条目）
+ */
+function sectionProblems(run, lastTouch) {
   const problems = [];
   const changes = run.rev?.changes ?? [];
   const slugs = changes.map((c) => c.slug);
   if (new Set(slugs).size !== slugs.length) problems.push(`an entry has more than one section: ${slugs.join(', ')}`);
-  for (const c of changes) {
-    if (c.kind !== KIND_LABEL[run.task] || !['Added', 'Changed', 'Deleted'].includes(c.action)) {
-      problems.push(`section ${c.action} · ${c.kind} · ${c.slug}`);
-    }
-    if (c.before !== (run.snapshot[c.slug] ?? '')) problems.push(`${c.slug}: before is not the file before the run`);
-    if ((c.action === 'Added') !== (c.before === '') || (c.action === 'Deleted') !== (c.after === '')) {
-      problems.push(`${c.slug}: ${c.action} with before/after ${Boolean(c.before)}/${Boolean(c.after)}`);
-    }
-    for (const text of [c.before, c.after].filter(Boolean)) {
-      const front = parseFront(text)?.front;
-      if (front?.kind !== run.task || front?.source !== 'learned') {
-        problems.push(`${c.slug}: ${front?.kind}/${front?.source}`);
-      }
-    }
-    if (run === last) problems.push(...currentProblems(ctx.dirs.project, run.task, c.slug, c.after));
-  }
+  for (const c of changes) problems.push(...changeProblems(run, c, lastTouch.get(c.slug) === run));
   const calls = run.session ? memoryCalls(run.session.entries).filter(succeeded) : [];
   const elsewhere = calls.filter((item) => item.result.details?.revision !== run.revision);
   if (elsewhere.length) problems.push(`${elsewhere.length} successful memory calls name another revision`);
   const touched = new Set(calls.map((item) => item.result.details?.entry));
   for (const slug of slugs.filter((s) => !touched.has(s))) problems.push(`${slug}: a section without a memory call`);
   for (const slug of [...touched].filter((s) => !slugs.includes(s))) {
-    const left = run === last && existsSync(join(ctx.dirs.project, 'entries', `${slug}.md`));
+    const lastRun = lastTouch.get(slug);
+    const left = (lastRun === undefined || lastRun === run) && existsSync(join(ctx.dirs.project, 'entries', `${slug}.md`));
     if (run.snapshot[slug] !== undefined || left) {
       problems.push(`${slug}: changed by the run but has no section`);
     }
@@ -773,18 +829,22 @@ async function enhanceChecks(runs, notes, since) {
   const done = runs.filter((r) => r.phase === 'done');
   const lastDone = Object.fromEntries(TASKS.map((task) => [task, done.filter((r) => r.task === task).at(-1) ?? null]));
   const status = await ctx.page.getByTestId('enhance-status').textContent({ timeout: 2000 }).catch(() => null);
-  const note = noteOf(notes, { status, runs: runs.map((r) => [r.attempt, r.task, r.day, r.phase, r.error,
+  const moves = done.flatMap((r) => (r.rev?.changes ?? []).filter((c) => sectionKinds(c.kind).moved)
+    .map((c) => `${r.task}: ${c.kind} ${c.slug}`));
+  const note = noteOf(notes, { status, moves, runs: runs.map((r) => [r.attempt, r.task, r.day, r.phase, r.error,
     r.rev?.front?.counts, r.rev?.front?.run?.tokens, r.material?.sessions.length, oneLine(r.rev?.notes ?? '', 160)]) });
   const ids = ['MEM-22', 'MEM-34'];
   const ended = endProblems(runs, json);
   recordAll(ids, 'real enhance: every task\'s last run ended done or skipped (enhance.json last and running agree), '
     + 'and each done run has its revision: done, by Enhancement, "<KIND> enhancement · <Mon D>", this project only, '
     + 'run task, day, tokens, sessions and feedback as listed', ended.length === 0, detail(ended, note));
-  const sections = done.flatMap((run) => sectionProblems(run, lastDone[run.task]));
+  const lastTouch = new Map(done.flatMap((run) => (run.rev?.changes ?? []).map((c) => [c.slug, run])));
+  const sections = done.flatMap((run) => sectionProblems(run, lastTouch));
   recordAll(ids, 'real enhance: one revision per run: every successful memory call of the run names that revision, '
     + 'each entry has one section (before = the file before the run, after = the file after it; entries added then '
-    + 'deleted left out), counts follow the sections, and only this project\'s learned entries of the task\'s kind '
-    + 'changed', sections.length === 0 && done.length > 0, detail(done.length ? sections : ['no done run'], note));
+    + 'deleted left out), counts follow the sections, only this project\'s learned and added-by-Mori entries of the '
+    + 'task\'s kind changed, and moves are of entries added by Mori with the task\'s kind at one end (§6.9)',
+  sections.length === 0 && done.length > 0, detail(done.length ? sections : ['no done run'], note));
   const replies = done.flatMap(notesProblems);
   recordAll(ids, 'real enhance: each done run\'s revision (with or without changes) has the run\'s last reply as Notes',
     replies.length === 0 && done.length > 0, detail(done.length ? replies : ['no done run'], note));
@@ -876,9 +936,11 @@ async function rollbackCheck(runs, note) {
   }
   for (const c of target.rev.changes) {
     const now = readText(join(ctx.dirs.project, 'entries', `${c.slug}.md`));
-    const listed = readIndex(ctx.dirs.project, target.task).some((item) => item.slug === c.slug);
-    if (c.before === '' ? now !== null || listed : now !== c.before || !listed) {
-      problems.push(`${c.slug} is not back to its before block`);
+    const { from, to, moved } = sectionKinds(c.kind);
+    const listed = readIndex(ctx.dirs.project, c.before === '' ? to : from).some((item) => item.slug === c.slug);
+    const stayed = moved && readIndex(ctx.dirs.project, to).some((item) => item.slug === c.slug);
+    if (c.before === '' ? now !== null || listed : now !== c.before || !listed || stayed) {
+      problems.push(`${c.slug} is not back to its before block${moved ? ` in ${KIND_LABEL[from]}` : ''}`);
     }
   }
   recordAll(ids, name, problems.length === 0, detail(problems, `${target.task} ${target.revision} `

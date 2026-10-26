@@ -37,6 +37,9 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export const PROMPTS = {
   FACT: 'The intranet model is at 10.0.0.9, note it.',
   RULE: 'From now on, start every answer with the conclusion.',
+  // 2026-10-26（§0 第 5 条）：不说“记一下”的长期事实与一句纠正，看主 Agent 会不会主动记
+  STATED: 'For context: our staging database is PostgreSQL 15 on db-stage.internal, and we only deploy on Thursdays.',
+  CORRECT: 'No tables in your answers, please: I read them in a narrow terminal. Use short bullet lists instead.',
   HELLO: 'Say hello in one short sentence. Do not call any tools.',
   AFTER: 'Say good morning in one short sentence. Do not call any tools.',
   // 给增强任务的材料（你纠正回复的写法），每次运行前在对话会话里发一句

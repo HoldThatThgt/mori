@@ -116,8 +116,9 @@ export const lastChangeText = (row) => `Last change ${monthDay(localDate(Date.pa
 export function metaText(entry) {
   const who = (stamp) => ({ You: 'you', Mori: 'Mori', Enhancement: 'enhancement' })[stamp.split(' · ')[1]]
     ?? stamp.split(' · ')[1];
+  const source = { user: 'You said', agent: 'Added by Mori', learned: 'Learned' }[entry.source] ?? entry.source;
   return `${KIND[entry.kind]} · ${entry.layer === 'user' ? 'User' : 'Project'} · `
-    + `${entry.source === 'user' ? 'You said' : 'Learned'} · Created ${monthDay(entry.created)} by `
+    + `${source} · Created ${monthDay(entry.created)} by `
     + `${who(entry.created)}`
     + ` · Modified ${monthDay(entry.modified)} by ${who(entry.modified)}`;
 }
