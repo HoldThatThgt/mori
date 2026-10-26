@@ -75,7 +75,7 @@ v0 的警示行 `This file is outside the working directory` 去掉，换成下�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 工作路径里的调用 | `scope` 为 `inside`，`targets` 为空 | 没有原因行；第二个按钮按工具名：`Allow “Run commands” for this session`（小字 `You won’t be asked again for commands in this session, unless Mori detects a write outside the working directory or to a protected path.`）、`Allow “Edit files” for this session` / `Allow “Write files” for this session`（小字 `You won’t be asked again for “Edit files” in this session, except outside the working directory or in protected paths.`，Write files 同理）、其他工具 `Allow “<label>” for this session`（小字 `You won’t be asked again for “<label>” in this session.`） | Alt+1；Alt+2 按工具名放行；Alt+3 |
+| 工作路径里的调用 | `scope` 为 `inside`，`targets` 为空 | 没有原因行；第二个按钮按工具名：`Allow “Run commands” for this session`（小字 `You won’t be asked again for commands in this session, unless Mori can’t analyze a command or detects that it writes outside the working directory or to a protected path, or changes to a folder outside it.`）、`Allow “Edit files” for this session` / `Allow “Write files” for this session`（小字 `You won’t be asked again for “Edit files” in this session, except outside the working directory or in protected paths.`，Write files 同理）、其他工具 `Allow “<label>” for this session`（小字 `You won’t be asked again for “<label>” in this session.`） | Alt+1；Alt+2 按工具名放行；Alt+3 |
 | 写到工作路径外 | `targets` 里 `reason: 'outside'` | 原因行 `Writes outside the working directory: <path>`（后台进程给的真实路径，长了折行），警示色 | 同下面按 `allowDirs` 的两行 |
 | 写受保护路径 | `reason: 'protected'` | 原因行 `Protected path: <path>`；删掉工作路径本身时同样写（`<path>` 是工作路径） | Alt+1；Alt+3；没有第二个按钮，Alt+2 不起作用 |
 | 看不出写到哪里 | `reason: 'unresolved'` | 原因行 `Writes to a path Mori can’t resolve: <text>`（命令里的原文，如 `$OUT/a.log`） | 同上，没有第二个按钮 |
@@ -102,6 +102,7 @@ v0 的警示行 `This file is outside the working directory` 去掉，换成下�
 | 从会话记录载入的程序拒绝 | 工具结果 `isError` 且以 `DENIAL_PREFIXES` 之一开头 | 同上；没有放行标签（同 v0） | 同上 |
 | 预告与实际不同 | 第二个 `mori.tool_gate`（[规格 §6.14](../../specs/file-system-permissions.md)） | 还在 `Waiting for your approval`、没有挂着的卡时变 `Running…` 并按新的 `gate` 标出（同 v0）；新的 `gate` 是 `ask` 时等随后的批准请求 | — |
 | 预告放行、实际要批准 | 预告 `full` / `session` / `dir` 之后收到这次调用的 `mori.approval_request` | `Waiting for your approval`，预告时标上的放行标签去掉 | — |
+| `.work` 建不起来 | 预告 `full` / `session` / `free`，随后 `tool_execution_end`（`isError`，输出以 `Mori couldn't prepare .work in the working directory` 开头，[规格 §7.10](../../specs/file-system-permissions.md)） | `Denied · Mori couldn't prepare .work…`（40 字截断加“…”，悬停看全文）；预告时标上的放行标签去掉，没有 `tool-badge` | 展开看完整原文（原因：`.work` 是文件、只读文件夹等） |
 
 ## F8 报告与操作记录
 

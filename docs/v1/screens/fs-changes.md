@@ -15,7 +15,8 @@
 | `workspace.status { sessionId }` 的结果、`mori.workspace_status` 事件 | `WorkspaceStatus`（[规格 §3.5](../../specs/file-system.md)）：`git`（`ok` / `old` 带 `version`，`missing`）、`repo`（`RepoInfo`：`toplevel`、`hasCommit` 等，[规格 §3.4](../../specs/file-system.md)）、`branch`（`head`、`oid`、`upstream`、`ahead`、`behind`）、`files`（`path`、`from`、`group`、`code`，最多 500 条）、`total`、`truncated`、`error`、`snapshots`（`state`、`reason`、`error`、`skipped`、`skippedTotal`，和嵌套 git 仓库的路径 `nested`（最多 20 个）与总数 `nestedTotal`：快照里 mode 160000 的条目，相对工作路径，[规格 §4.4、§5.3](../../specs/file-system.md)） |
 | 会话文件里的 `mori.turn_changes` 条目（`session.open` 给出的当前分支）与 `mori.turn_changes` 事件 | `run` 记录（`round`、`start`、`end`）与 `changes` 记录（`round`、`base`、`head`、`files` 的 `path`/`status`/`added`/`removed`、`total`、`agents`、`overlap`）（[规格 §4.6](../../specs/file-system.md)） |
 | `snapshots.diff { sessionId, round, path }` 的结果 | `patch`、`binary`、`truncated`、`error` |
-| 当前分支上你的消息（条目，与实时的 `mori.entry_id`）和 `mori.wake` 条目 | 轮的编号 `Turn <n>`（第几条你的消息，`[Mori]` 投递不算；会话引用的 Turn N 把投递也算进去，协作模式下两边可能不同，[规格 §5.3](../../specs/file-system.md)）和标题（这条消息的第一行） |
+| 当前分支上你的消息（条目，与实时的 `mori.entry_id`）和 `mori.wake` 条目 | 轮的编号 `Turn <n>`（第几条你的消息，`[Mori]` 投递不算；会话引用的 Turn N 用同一个计数，[规格 §5.3](../../specs/file-system.md)）和标题（这条消息的第一行） |
+| `mori.snapshot_stage` 事件 | `active`：用户会话自己的运行在等运行开始的快照（[规格 §4.5](../../specs/file-system.md)） |
 | 右栏这一栏的宽度 | 这一栏不宽于 600 px 时顶栏不显示 `+N −M`（[规格 §5.4](../../specs/file-system.md)） |
 | 你的操作 | 打开、关闭右栏；`Refresh`；点 `+N −M`；点 git 状态里的文件；点 This session 的文件行或 `Open`；切换会话；窗口回到前台 |
 
@@ -32,6 +33,12 @@
 | 恢复了对话 | `rewind` 结果的 `entries` | 按新的当前分支重算，丢掉的轮不再计入 | 同上 |
 | 没装 git、git 太低 | `WorkspaceStatus.git` 不是 `ok` | 不显示 | — |
 | 窄栏 | 这一栏不宽于 600 px | 不显示（同 `Team: …` 在窄栏只剩状态点，平行 Agent 规格 §13.1） | 用 `Toggle changes` |
+
+## 阶段行：运行开始的快照
+
+| 状态 | 来源 | 必须可见 | 可做的操作 |
+| --- | --- | --- | --- |
+| 等运行开始的快照 | `mori.snapshot_stage { active: true }`，到 `{ active: false }` 或 `agent_start` 为止（发出消息之后、模型开始回复之前；只为用户会话自己的运行，后台实例不改阶段行） | 阶段行（对话流下方，同模型层的等待）转圈与 `Taking a snapshot… · <秒数>`（`data-kind="snapshot"`），秒数从这次等待开始计；有批准卡、询问时照现在让给它们；通常一秒内，大仓库的第一张可到几十秒 | Stop（[规格 §4.5](../../specs/file-system.md)“停止”：结束快照的 git 进程，这次没有 code restore） |
 
 ## 右栏的外框
 
@@ -50,7 +57,7 @@
 | git 仓库 | `git.state: 'ok'`，`repo` 不为 null | 下一节“git 状态” | 见下一节 |
 | 不是 git 仓库 | `git.state: 'ok'`，`repo` 为 null，`error` 为 null | 一行 `Not a git repository`，下面文字按钮 `Initialize git…`；下半部分 This session 照常 | `Initialize git…` 打开确认框（fs-worktree.md） |
 | 没装 git | `git.state: 'missing'` | 整个右栏正文只有一行 `Git is required to track changes and rewind.`（照 Claude 的提示，proposal §13 第 19 条）；没有 This session，没有 v0 的编辑与写入列表 | `Refresh`（装好 git 后点它就能用，[规格 §3.2](../../specs/file-system.md)） |
-| git 版本太低 | `git.state: 'old'` | 整个正文只有一行 `Git 2.31 or later is required to track changes and rewind (found <version>).` | `Refresh` |
+| git 版本太低 | `git.state: 'old'` | 整个正文只有一行 `Git 2.32 or newer is required to track changes and rewind (found <version>).` | `Refresh` |
 | 认不出仓库 | `git.state: 'ok'`，`repo` 为 null，`error` 不为 null（例如 `detected dubious ownership`、工作路径不存在） | 一行 `Couldn’t read git status: <error>`（不显示 `Not a git repository`，也没有 `Initialize git…`）；下半部分 This session 照常 | `Refresh` |
 
 ## git 状态
@@ -150,6 +157,7 @@
 | 元素 | 标识 |
 | --- | --- |
 | 顶栏的行数 | `data-testid="lines-indicator"`，`data-added`、`data-removed` |
+| 阶段行：运行开始的快照 | 现有的阶段行元素，`data-kind="snapshot"` |
 | 右栏正文 | `data-testid="changes"`（沿用 v0） |
 | Refresh | `data-testid="changes-refresh"`，刷新中 `data-busy` |
 | git 状态 | `data-testid="git-status"`；分支行 `git-branch`；组 `git-group`（`data-group`：`conflicted`、`staged`、`unstaged`、`untracked`）；文件行 `git-file`（`data-path`、`data-code`） |

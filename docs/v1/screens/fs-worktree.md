@@ -53,7 +53,7 @@ worktree 放在哪里、从哪里切出（[规格 §11.2](../../specs/file-syste
 | 建 worktree 中 | 你在开关打开时发送：`session.prompt { worktree: true }` 还没返回 | 你的消息先显示在对话流里（同现在）；阶段行 `Creating worktree…`（转圈）；Stop 不可用；输入框下一行的按钮、顶栏的协作开关不可用，悬停 `Creating worktree…`；输入框能打字、不能发送（临时，走查时可以改）；侧栏这一行状态 “Running”；右栏的 git 状态停在建之前的样子（这期间不读，切到它、窗口回到前台也不读） | 打字；切到别的会话（建 worktree 继续） |
 | 建好、消息已发出 | 结果带 `session`；随后后台进程发的 `mori.workspace_status` | 同一个标签：阶段行换成平常的（等模型、回复中）；开关不再出现；权限按钮与 Allowed for this session（同一份批准状态）、范围、Effort、会话名、协作模式都保持你发送前选的（[规格 §11.5.4](../../specs/file-system.md)）；顶栏项目名仍是主文件夹名，悬停是 worktree 路径；侧栏这一行仍在主文件夹那一组，会话名后多出分支标签 `mori/<名字>`；右栏的 git 状态换成 worktree 的（分支 `mori/<名字>`）；带了文件引用时，你的消息上方仍是芯片、气泡里只有你写的字 | 照常对话 |
 | 建 worktree 失败 | `mori.prompt_error`（`Couldn’t create the worktree: <原因>`） | 先显示的消息撤回；文字和引用芯片回到输入框；对话流里一张错误卡，写这句原文，不带 “Put your last message back in the message box”；开关仍打开 | 改好后再发；关掉开关再发（在原文件夹里） |
-| 失败的原因 | 同上 | `<原因>` 是这几种之一或 git 的原文：`Git is required to create a worktree.`、`This folder isn’t a git repository.`、`This repository has no commits yet.`、`This session already has messages.`、`This session is still running. Stop it first.`、`<路径> already exists.`；被拒绝启动时同现在（不加 `Couldn’t create the worktree: ` 前缀） | — |
+| 失败的原因 | 同上 | `<原因>` 是这几种之一或 git 的原文：`Git is required to create a worktree.`、`This folder isn’t a git repository.`、`This repository has no commits yet.`、`This session already has messages.`、`This session is still running. Stop it first.`、`<路径> already exists.`、`The folder <sub> isn’t committed yet, so a worktree can’t start there. Commit it first.`（在仓库的子文件夹里开、那个子文件夹还没提交时）、`This repository sets core.worktree, so Mori can’t create a worktree here. Move it to the main worktree’s config.worktree first.`（这两种什么都没改）；被拒绝启动时同现在（不加 `Couldn’t create the worktree: ` 前缀） | — |
 | 建好了、消息没能发出 | 结果带 `session`，之后的 `mori.prompt_error` / 没有可用模型的卡（同现在） | 同现在的准备中失败；会话已经在 worktree 里，开关不再出现 | 照常再发（在 worktree 里） |
 | 在原文件夹也重建不起来 | `session.prompt` 命令失败 | 对话流里错误卡带 “Put your last message back in the message box”；同 sessions.md “新建或打开失败”：横幅 `Failed to open session: <原文>`，会话行 “Error” | 放回消息；再点会话行在原文件夹重新建；Delete… |
 | 建 worktree 中又发命令 | 你在侧栏改名等 | 那个操作失败，原文 `The worktree is still being created.`（改名框里 `Couldn’t rename this session: The worktree is still being created.`） | 等建好 |
@@ -66,7 +66,7 @@ worktree 放在哪里、从哪里切出（[规格 §11.2](../../specs/file-syste
 | 进行中 | 你点了 `Initialize git`：`workspace.initGit` 还没返回 | 按钮文字 `Initializing…`，两个按钮不可用；Esc 不起作用 | — |
 | 成功 | `workspace.initGit` 返回；随后 `mori.workspace_status` | 对话框关闭；输入框下一行的 `Initialize git…` 换成 `Worktree` 开关（还没发消息时）；右栏换成 git 状态（fs-changes.md） | 打开开关；照常对话 |
 | 失败 | `workspace.initGit` 报错 | 对话框里 `Couldn’t initialize git: <原因>`；按钮恢复可用 | 再点 `Initialize git` 重试；Cancel |
-| 失败的原因 | 同上 | 这几种之一或 git 的原文：`Git needs your name and email for the first commit. Set user.name and user.email with git config --global, then try again.`（这时什么都没做）、`This folder is already a git repository.`、`This session is still running. Stop it first.`、`Git is required to initialize a repository.`、认仓库出错的原文（例如 `detected dubious ownership …`，这时什么都没做）；`git init` 之后才失败时仓库留着，变成“还没有提交的 git 仓库”（开关和按钮都不显示，右栏照随后的 `mori.workspace_status` 显示） | — |
+| 失败的原因 | 同上 | 这几种之一或 git 的原文：`Git needs your name and email for the first commit. Set user.name and user.email with git config --global, then try again.`（这时什么都没做）、`This folder is already a git repository.`、`This session is still running. Stop it first.`、`Git is required to initialize a repository.`、认仓库出错的原文（例如 `detected dubious ownership …`，这时什么都没做）、超时时的 `timed out after 120 seconds`；`git init` 之后才失败时 Mori 删掉它刚建的 `.git`，失败后文件夹里没有 `.git`，可以再点 `Initialize git` 重试（输入框下一行与右栏仍是“不是 git 仓库”） | — |
 | 同一文件夹里别的开着的会话 | 同一个 `mori.workspace_status`（[规格 §3.5](../../specs/file-system.md) 发给这个工作路径上所有开着的用户会话） | 一起换成 `Worktree` 开关（还没发消息的）与 git 状态；开在它的子文件夹里的会话在它们下次读状态时（例如切到它）才变 | — |
 
 ## 侧栏与顶栏
@@ -86,10 +86,10 @@ worktree 放在哪里、从哪里切出（[规格 §11.2](../../specs/file-syste
 | 归档 worktree 会话 | 你选了 “Archive”：`worktrees.list`、`session.close`、记进已归档列表，然后 `worktrees.cleanUp { force: false }` | 同 sessions.md “归档”：不确认，行移到 “Archived”；worktree 干净时删掉（连同 `.work/` 里的草稿和被忽略的文件），分支留着；有改动、正被别的开着的会话用着、删除失败时留着；这几种情况界面上都不另外提示（临时，走查时可以改） | — |
 | 恢复 | 你选了 “Unarchive” | 同 sessions.md；不动磁盘，worktree 在打开时检出（下一节） | — |
 | 点已归档的 worktree 会话 | 你的操作：恢复并打开 | 同下一节“打开 worktree 不在的会话” | — |
-| 删除确认框，正在读 worktree | 你选了 “Delete…”，会话是 worktree 里的会话：`worktrees.list` 还没返回 | 同 sessions.md 的删除确认框，说明后面多一行 `Checking its worktree…`；Delete 可用 | Delete；Cancel 或 Esc |
+| 删除确认框，正在读 worktree | 你选了 “Delete…”，会话是 worktree 里的会话：`worktrees.list` 还没返回 | 同 sessions.md 的删除确认框，说明后面多一行 `Checking its worktree…`；Delete 不可用（`aria-disabled`），直到 `worktrees.list` 返回或失败（[规格 §11.9.5](../../specs/file-system.md)） | Cancel 或 Esc |
 | 有拥有的 worktree，干净 | `worktrees.list`：`exists`、`changes: false`、`inUse: false` | 多一句 `Its worktree “<名字>” will also be deleted. The branch <branch> is kept.` | 同上 |
 | 有拥有的 worktree，有改动 | `changes: true` | 多一句 `Its worktree “<名字>” and the uncommitted changes in it will also be deleted. The branch <branch> is kept.` | 同上 |
-| 读不出有没有改动 | `changes: null`（`exists` 为真）或 `worktrees.list` 失败 | 多一句 `Its worktree “<名字>” will also be deleted, with any uncommitted changes in it. The branch <branch> is kept.` | 同上 |
+| 读不出有没有改动 | `changes: null`（`exists` 为真）或 `worktrees.list` 失败（这时名字、分支取 `worktreeOf(cwd)`） | 多一句 `Its worktree “<名字>” will also be deleted, with any uncommitted changes in it. The branch <branch> is kept.`；Delete 可用 | Delete（`worktrees.list` 失败时按有拥有的 worktree 删：`worktrees.cleanUp { paths: [worktreeOf(cwd).path], force: true }`）；Cancel 或 Esc |
 | 别的开着的会话在用 | `inUse: true` | 多一句 `Its worktree “<名字>” is kept because another open session uses it.` | 同上 |
 | 没装 git | `worktrees.list` 的 `git: false`，有这一项、`exists` 为真 | 多一句 `Its worktree “<名字>” is kept because Git is required to delete it.`；点 Delete 只删会话，worktree 文件夹留着（临时，走查时可以改） | 同上 |
 | 没有拥有的 worktree，或它已经不在 | `worktrees.list` 没有这一项，或 `exists: false` | 同 sessions.md，不加句子 | 同上 |
@@ -109,6 +109,9 @@ worktree 放在哪里、从哪里切出（[规格 §11.2](../../specs/file-syste
 | 仓库根不在了 | 同上 | 横幅 `Failed to open session: Project folder not found: <R>`（worktree 所在仓库的根，[规格 §11.2](../../specs/file-system.md) 的 R） | 同上 |
 | 没装 git | 同上 | 横幅 `Failed to open session: Git is required to restore this session’s worktree.` | 同上 |
 | 分支正在别的 worktree 里检出 | 同上 | 横幅 `Failed to open session: ` 加 git 的原文 | 同上 |
+| 检出超时 | 同上（`worktree add` 超过 120 秒，建了一半的已清掉，分支留着） | 横幅 `Failed to open session: Restoring the worktree timed out after 120 seconds.` | 同上 |
+| 留下锁着的登记 | 上一次检出被结束，`.git/worktrees/<名字>/locked` 还在、文件夹不在 | 同“检出中”“检出成功”：先清掉那条登记再检出，不另外提示 | 照常对话 |
+| 文件夹在、git 里没有它的登记 | `session.open` 报错（例如删 worktree 时只删了登记、文件夹留下） | 横幅 `Failed to open session: The worktree folder <path> exists but isn’t registered with git. Move or delete it, then open this session again.`；Mori 不删那个文件夹 | 移走或删掉文件夹后再点；Delete… |
 
 ## 设置页：Storage → Worktrees
 

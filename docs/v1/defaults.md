@@ -135,8 +135,9 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 默认值 | 取值 | 位置 | 理由 | 何时复查 |
 | --- | --- | --- | --- | --- |
 | **§3–§5 git、快照与 Rewind** | | | | |
-| git 最低版本 | 2.31 | `kernel/git.ts` | `rev-parse --path-format=absolute` 从 2.31 起；`restore`（2.23）、`--pathspec-from-file`（2.26）都更早；本机 2.55 | 遇到装着 2.31 以前 git 的机器时；要用更新的 git 选项时 |
+| git 最低版本 | 2.32 | `kernel/git.ts` | `GIT_CONFIG_GLOBAL` 从 2.32 起（Git for Windows RelNotes 2.32.0），内部仓库的隔离靠它（§3.3、§4.1）；`rev-parse --path-format=absolute`（2.31）、`restore`（2.23）、`--pathspec-from-file`（2.26）都更早；本机 2.55 | 遇到装着 2.32 以前 git 的机器时；要用更新的 git 选项时 |
 | 找 git 的位置 | `PATH` 里每个目录下的 `git.exe`，然后 `C:\Program Files\Git\cmd\git.exe` | `kernel/git.ts` | Mori 不自带 git；Git for Windows 默认装在这里，pi 找 Git Bash 也看 Program Files（`app/node_modules/@earendil-works/pi-coding-agent/dist/utils/shell.js:69-73`） | 遇到 git 装在别处的机器时 |
+| 找 git 的环境变量 | `MORI_GIT_PATH`：有值时只试这一个路径，文件不存在为 `missing` | `kernel/git.ts` | App 测试要能做出没装 git（开发机都装着 Git for Windows）；照 `MORI_USER_DATA` 的写法，只给测试用 | — |
 | 没找到 git 时再找 | 每次 `workspace.status` 命令（只看文件是否存在） | `kernel/git.ts` | 装好 git 后点 Refresh 就能用；别处不重找，不起多余的进程 | 你走查时觉得装好 git 后还要点 Refresh 不方便时 |
 | git 进程超时 | `--version` 5 秒；`rev-parse`、`status`、给界面的 `diff` 10 秒；快照与恢复里每个进程 120 秒；删除会话的 `prune` 300 秒 | `kernel/git.ts` | status 实测 0.13 秒，10 秒足够大仓库；快照的第一次 `add` 在 2 万个文件时约 50 秒（u-a8 按 3 万个 76 秒推算），120 秒留余量 | 量过公司仓库的快照耗时（FS-21）时；大仓库上 git 常超时时 |
 | git 输出上限 | `status` 4 MB；其他 16 MB；stderr 64 KB | `kernel/git.ts` | 限内存；status 默认把未跟踪目录收成一行，4 MB 约 5 万条 | 大仓库的 git 状态常被截断时 |
@@ -155,7 +156,9 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 大文件说明 | 列出前 20 个 | `kernel/snapshots.ts`、右栏 | 说明哪些文件 Rewind 不会恢复；限长度 | 你走查时 |
 | 嵌套仓库的说明 | 树变了时 `git ls-tree -r -z` 找 mode 160000 的条目，`nested` 最多 20 个、`nestedTotal` 记全部；This session 上方一行 `Changes inside nested repositories aren’t tracked: <路径>, <路径>`，多于 20 个时接 ` and <n> more` | `kernel/snapshots.ts`、右栏 | 写规格时定的第 8 条只说列出这些路径；条数上限同大文件说明 | 你走查时 |
 | 文件数暂停之后 | 每个快照点重新数，降到上限内自动恢复，从新的基准开始 | `kernel/snapshots.ts` | proposal 只说暂停、说明原因；加了 `.gitignore` 就恢复，不另加按钮 | 你走查时觉得要一个手动恢复的按钮时 |
-| 快照超时 | 暂停到后台进程重启 | `kernel/snapshots.ts` | 每次运行开始都等 120 秒不如停下说明 | 量过公司仓库的快照耗时（FS-21）时；快照常超时时 |
+| 快照超时 | 某个 git 进程超过 120 秒：这一张 `error`（`a snapshot step took longer than 2 minutes`），下一个快照点续做；同一工作路径连续 3 张都超时才暂停到后台进程重启 | `kernel/snapshots.ts` | 分批后超时只丢一批，续做能完成；连续 3 次才停，避免每次运行开始都白等 120 秒 | 量过公司仓库的快照耗时（FS-21）时；快照常超时时 |
+| 分批加入的条数 | 新文件多于 2000 个时每批 2000 条，一批一个 git 进程，每批都写进 index | `kernel/snapshots.ts` | 一次 `add -A` 被结束时一点进度都不留；u-a8 实测 3 万个文件 76 秒，2000 个一批远在 120 秒内 | 量过公司仓库的快照耗时（FS-21）时；分批之后仍常超时时 |
+| 嵌套工作路径的 overlap | 包含或被包含的工作路径上同时有运行时记 `overlap: true` | `kernel/snapshots.ts` | proposal §13 第 17 条只写同一文件夹；嵌套文件夹的会话写的文件同样进这个会话的快照，不标就会在 Rewind 时不问被覆盖 | 你走查嵌套文件夹里的会话时 |
 | 增强会话与它的实例 | 不拍快照，不进 `active` | `kernel/snapshots.ts` | 没有右栏、不能 Rewind（记忆规格 §9.6）；它们的改动按别人改的算：你空闲时改的不记，在这个会话最近一张快照之后改的 Rewind 时列为 `changed`；和你的会话同时运行时改的记进那一段、不标 `overlap`（同外部程序改的） | 你走查增强、看到它的改动记进你的会话时 |
 | 由 custom 消息开始的运行 | 没有起始消息、没有 `run` 记录；改动归你最近的消息 | `kernel/timeline.ts` | `before_agent_start` 的 `messageType: 'custom'`；不这样，运行中插话的消息会被当成起始消息 | pi 升级、`before_agent_start` 的 `messageType` 变化时 |
 | 进行中的运行的开始快照 | `refs/mori/s/<会话 id>/run/<提交>` 保住，写 `run` 记录时换掉 | `kernel/snapshots.ts` | 只改了 gitlink 的段不写记录，开始快照可能没有 ref，被别的会话删除时的 `prune` 删掉 | — |
@@ -172,7 +175,8 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | `mori-snapshots` 的位置 | `mori-approval` 之后、`mcp` 之前，必需 | `kernel/sessions.ts` | 没有它就没有快照，Rewind 会恢复错；同其他必需扩展 | Mori 的 inline extension 顺序变化时 |
 | 整理的命令 | `git prune --expire=now`（不 `gc`） | `kernel/snapshots.ts` | 对象本来就是散的（`gc.auto=0`），prune 快且不重新打包 | 内部仓库因此明显变大时（FS-21） |
 | This session 的顺序 | 新的轮在上；轮里按文件第一次出现 | 右栏 | 最近的改动最常看 | 你走查时 |
-| 轮的编号 `Turn <n>` | 当前分支上第几条你的消息，不算 `[Mori]` 投递 | 右栏、Rewind 通知 | 轮只挂在你的消息上；会话引用现在把投递也算进去，协作模式下两边编号可能不同 | 会话引用的编号规则变化时；你走查协作模式时 |
+| 轮的编号 `Turn <n>` | 当前分支上第几条你的消息，不算 `[Mori]` 投递；会话引用的 Turn N 用同一个计数（`turnNumbers`，投递的内容接到前一轮里） | 右栏、Rewind 通知、会话引用 | 轮只挂在你的消息上；两处一个编号，右栏的 Turn 3 与引用芯片的 Turn 3 指同一条消息 | 会话引用的编号规则变化时；你走查协作模式时 |
+| 运行开始的快照的阶段行 | `Taking a snapshot… · <秒数>`，只为用户会话自己的运行显示 | `kernel/snapshots.ts`、`StageLine.tsx` | proposal 没给；第一张可到几十秒，发出消息后阶段行不能一片空白；照模型层等待的写法 | 你走查时 |
 | Rewind 通知的文字 | `Restored code to before turn <n> · Undo` 等（§5.9、fs-rewind.md），不用 proposal §5.3 图里的 `… before this message` | 对话流 | 通知在对话流末尾，恢复对话后那条消息也不在了，“this message”指不到 | 你走查时 |
 | 这条消息恰是叶子时恢复对话 | 导航到它的父条目；父条目是 user 消息、`custom_message` 或没有时失败 | `kernel/rewind.ts` | pi 对“已在目标上”什么都不做（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:3240-3243`） | pi 升级、`navigateTree` 的行为变化时 |
 | Rewind 进行中再 Rewind | 拒绝，`This session is already rewinding.` | `kernel/rewind.ts` | 第二次要基于第一次的结果算计划 | 你走查时 |
@@ -205,6 +209,7 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 答错了选项时的命令错误 | `Allow for this session doesn’t apply to writes outside the working directory or to protected paths.`；`This request can’t be allowed by folder.`；`Give either toolName or dir.` | `kernel/approval.ts`、`kernel/sessions.ts` | 界面按请求只给对的按钮，这几条只在界面与后台进程不一致时出现 | — |
 | 原因行 `unresolved`、`leaves` 的写法 | `Writes to a path Mori can’t resolve: <text>`、`Runs outside the working directory: <path 或 text>` | `renderer/src/components/ApprovalCard.tsx` | proposal §6 只给了 outside 与 protected 两种；看不出目标、换了目录时显示的是原文而不是路径，要另一种说法 | 你走查时 |
 | 命令在 Ask each time 下 | 总是问（scope 为 `inside` 时可按工具名放行），哪怕目标只在 `.work` | `kernel/approval.ts` | 命令能做的不只认出的写入；proposal 的“写 `.work` 不问”指 `edit`、`write` | 命令语料统计（FS-55）之后；你走查时觉得问得太多 |
+| 按工具名放行命令的小字 | `You won’t be asked again for commands in this session, unless Mori can’t analyze a command or detects that it writes outside the working directory or to a protected path, or changes to a folder outside it.` | `renderer/src/components/ApprovalCard.tsx` | 列出放行之后仍出卡的全部情况（§7.8 分析不了；§6.4 写到外面、受保护路径、换到外面），按下之后又出卡时与刚读到的承诺一致 | 你走查时；命令语料统计（FS-55）之后 |
 | 卡上的目标行 | 最多 5 行，多的写 `and {n} more` | `renderer/src/components/ApprovalCard.tsx` | 一条命令可能有很多目标，卡不能撑满一栏 | 你走查时 |
 | 拒绝原文里列的目标 | 每种最多 5 个，多的写 `and <n> more` | `kernel/approval.ts` | 同上，控制工具结果的长度 | 你走查时 |
 | 没人能批时的拒绝原文 | §6.15 | `kernel/approval.ts`（开头 `Denied by Mori: ` 在 `shared/workspace.ts` 的 `DENIAL_PREFIXES`） | proposal 没给原文 | 内网模型对英文说明理解不好时 |
@@ -244,7 +249,10 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | `.work` 建不起来（是文件、只读文件夹、没有权限） | 挡下这次调用并说明原因，记错误日志 | `approval.ts` | proposal 没说；照 AGENTS 第 6 条遇到阻塞就停下来报告，不静默换路线；另一种做法（照常跑、TEMP 不改，在工具结果里说明）是换路线的 fallback，不采用。这样这个文件夹里的命令都跑不了，直到你改名或删掉那个 `.work` | 遇到真实的 `.work` 建不起来、你想让命令照常跑时 |
 | `.work/.gitignore` | 内容 `*\n`；只在没有时写（`wx`），从不覆盖 | `workspace.ts` | proposal §4；你改过的保留 | — |
 | 工作路径不在时 | `ensureWork` 什么都不建 | `workspace.ts` | 不把删掉的 worktree 重新建出来 | — |
-| 设哪些变量 | TEMP、TMP、TMPDIR，都指到 `<工作路径>\.work\tmp`；先删掉各种大小写写法 | `workspace.ts` `workEnv` | proposal 写 TEMP / TMP；TMPDIR 是 Git Bash 的 `mktemp` 与 Python 先看的（本机实测） | 遇到别的程序不看 TEMP、TMP、TMPDIR，临时文件仍写到外面时 |
+| 设哪些变量 | TEMP、TMP、TMPDIR，都指到 `<工作路径>\.work\tmp`；先删掉各种大小写写法；另去掉 CDPATH 的各种大小写写法（不设新值） | `workspace.ts` `workEnv` | proposal 写 TEMP / TMP；TMPDIR 是 Git Bash 的 `mktemp` 与 Python 先看的（本机实测）；继承的 CDPATH 会让 bash 的 `cd 相对名` 换到别处，§7.7 的解析就不准 | 遇到别的程序不看 TEMP、TMP、TMPDIR，临时文件仍写到外面时 |
+| 命令自己改了 TEMP、TMP、TMPDIR、PWD | 这条命令里（含之后嵌套的 shell、eval 文字）这个名字看不出来（`variable`）：开头的赋值、`env -i` / `-u`、export、只有赋值、PowerShell 的 `$env:` 都算 | `commandScan.ts` | `vars` 是 `spawnHook` 设的值，命令改掉之后不再对（Git Bash、pwsh 实测写到了工作路径外）；偏严，严格说只有嵌套文字看到开头赋值的新值 | 命令语料统计（FS-55）之后 |
+| 命令里设了 CDPATH | 之后 bash 的 `cd` / `pushd` 操作数不以 `/`、`\`、`.`、`~`、盘符开头时目录看不出来；`unset CDPATH` 不恢复 | `commandScan.ts` | bash 对这种操作数先查 CDPATH（Git Bash 实测换到了工作路径外）；偏严，写法少见 | 命令语料统计（FS-55）之后 |
+| PowerShell 外部程序参数里的 cmd.exe 元字符 | 去掉 PowerShell 引号后不含空白、却含 `>` `<` `\|` `&` 的参数，与 `--%`，解析失败 | `commandScan.ts` | `.cmd` / `.bat` 垫片（npm、npx、tsc 等）由 cmd.exe 再解析一遍（pwsh 实测 `npm.cmd --version '>' ..\x` 写出文件）；看不出命令名是不是垫片，按文字从严，§7.13 统计后再定 | 命令语料统计（FS-55）之后；你走查时觉得问得太多 |
 | 换掉的工具 | `bash`、`powershell` 用 `customTools` 换，`defaultActive: false`，工具页来源仍为 Built-in | `workspace.ts` `shellTools`、`resources.ts` `toolSource` | 启用与显示与内置工具相同（§7.11 的核实） | pi 升级、内置的 bash、powershell 工具或 `customTools` 变化时 |
 | `.work` 的清理 | 不清理，不设上限 | — | proposal §9 第 5 条没有后台清理；草稿在里面；工作路径在 OneDrive 里时，命令的临时文件也会被同步 | `.work` 明显变大、或 OneDrive 的同步负担明显时 |
 | 解析失败的日志 | `[kernel] command not analyzed (<shell>): <reason>`，不写命令原文 | `approval.ts` | 语料统计与排查用 | — |
@@ -320,7 +328,10 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 归档时删 worktree 的结果 | 不显示，只记日志 | `projects.ts` `archiveSession` | 归档不确认（方案 5.3）；留下的在设置页能看到 | 你走查时觉得归档也要说明时 |
 | 删除时 worktree 正被别的开着的会话用 | 不删 worktree，照常删会话，确认框写明 | `deleteSession`、`worktrees.cleanUp` | 删了会让那个会话的工具全部失败 | 你走查时 |
 | “干净”的判断 | `git --no-optional-locks status --porcelain` 为空；被忽略的文件（`.work/`、`node_modules`）不算，删 worktree 时一起删 | `worktrees.list`、`cleanUp` | 与 `git worktree remove` 自己的判断相同（实测） | git 升级、`git worktree remove` 的判断变化时 |
-| 恢复 worktree | 先 `git worktree prune`，再 `worktree add <path> <branch>`；按 `worktreeOf(cwd)`，不要求 `mori.worktree` | `openFromFile` | 实测手工删掉的 worktree 不 prune 就 add 不上；同一 worktree 里另开的会话也能打开 | git 升级时 |
+| 恢复 worktree | 登记里还有它（含 `locked` 的）时先 `worktree remove --force --force` 再 `prune`，然后 `worktree add <path> <branch>`（120 s；失败时清掉建了一半的，不删分支）；文件夹在而登记没有时打开失败、不替你删；按 `worktreeOf(cwd)`，不要求 `mori.worktree` | `openFromFile` | 实测手工删掉的 worktree 不清登记就 add 不上，`prune` 不删锁着的登记；同一 worktree 里另开的会话也能打开 | git 升级时 |
+| 删 worktree 后文件夹还在 | `fs.rm` 递归删掉（Node 不跟进联接）；仍在则 `removed: false` 与原文 | `worktrees.cleanUp` | 实测里面有目录联接时 `git worktree remove --force` 只删登记；留下的文件夹让这个会话再也恢复不了 | git 升级时 |
+| 共用配置里有 `core.worktree` | 不建 worktree，说明原因，什么都不改 | `createWorktree` | 实测这时链接出去的 worktree 以主文件夹为工作树，Agent 在里面提交的是主文件夹；挪配置是你的仓库的事 | 遇到这样的仓库、你想让 Mori 替你挪配置时 |
+| Initialize git 中途失败 | 结束 git 后删掉本次 `git init` 建的 `.git`，文件夹回到之前；本来就有 `.git` 时不删 | `initGit` | 被结束的 `git add` 在你的新仓库里留下 `index.lock`，仓库留着你就得自己清锁；那个 `.git` 里只有 git 写的文件 | 你走查时 |
 | 界面的本次信任回答 | 按 `projectFolder(cwd)` 记（记住到 `trust.json` 的照 pi，不改） | `renderer/src/state/trust.ts` | proposal §13 第 11 条没列信任；在主文件夹回答过，同一次运行里不再为它的 worktree 问 | pi 的信任规则变化时 |
 | 侧栏分支标签 | 建 worktree 时的分支名（从路径推出），不读 git；空间不够时先截断分支标签 | `SessionTree.tsx` | 不为侧栏调 git；右栏有实时的分支 | 你在 worktree 里常切分支、标签对不上时 |
 | 设置页的位置 | 新的一节 `Storage`，排在 `General` 之后，块名 `Worktrees` | `SettingsPage.tsx`、`settings/StorageSection.tsx` | 照 Claude 的 Settings > Storage；When you’re away 在 `General`（§9.6），两节都留 | 设置页再加节时；你走查设置页时 |

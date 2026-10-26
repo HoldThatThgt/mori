@@ -258,7 +258,7 @@ proposal §13 第 1 条：写到外面的卡上可以放行目标文件所在的
 
 | 请求 | 按钮 | 下方小字 |
 | --- | --- | --- |
-| scope `inside`，命令 | `Allow “Run commands” for this session` | `You won’t be asked again for commands in this session, unless Mori detects a write outside the working directory or to a protected path.` |
+| scope `inside`，命令 | `Allow “Run commands” for this session` | `You won’t be asked again for commands in this session, unless Mori can’t analyze a command or detects that it writes outside the working directory or to a protected path, or changes to a folder outside it.`（列出放行之后仍出卡的全部情况：§7.8 分析不了，§6.4 的 `outside`、`protected`、`unresolved`、`leaves`；§17） |
 | scope `inside`，`edit` / `write` | `Allow “Edit files” for this session` / `Allow “Write files” for this session` | `You won’t be asked again for “Edit files” in this session, except outside the working directory or in protected paths.`（Write files 同理） |
 | scope `inside`，其他工具 | `Allow “<服务> · <工具>” for this session` / 原名（同现在 `app/src/renderer/src/components/approvalLabel.ts:10-16`） | `You won’t be asked again for “<label>” in this session.`（同现在） |
 | `allowDirs` 有一个 | `Allow writes to <目录> for this session` | `You won’t be asked again in this session for writes directly in this folder (not its subfolders).` |
@@ -316,13 +316,16 @@ proposal §13 第 1 条：写到外面的卡上可以放行目标文件所在的
 | `NARROWING_LEADS` 的五个开头各接 `: `（`Not allowed for this task: ` 等） | §8.3、§8.4，收窄 | `Denied · <原文>` |
 | `RELAY_ONLY` 整句 | §8.3，协作模式下的对话会话与合并会话 | `Denied · <原文>` |
 | `REJECTED_AWAY_PREFIX`（`The user was away and didn't answer within `） | §9.4，你不在、批准卡到时 | `Denied · No answer while you were away` |
+| `Mori couldn't prepare .work in the working directory` | §7.10，`ensureWork` 失败、放行的调用被挡下 | `Denied · <原文>`，没有放行标签 |
 | `ASK_DECLINED_TEXT` 整句 | §10.6，你拒绝回答提问 | `Denied · You declined to answer` |
 | `ASK_STOPPED_TEXT` 整句 | §10.6，提问时你按了停止 | `Stopped`：不算拒绝，`addToolResult` 与 `ABORTED_TOOL` 一样算已停止 |
 
   `app/src/renderer/src/state/model.ts:292-297` 的 `parseRejection` 在三种你的原文之后按这张表认：以其中之一开头时返回表里的理由（前三行为原文全文），工具卡显示 `Denied · <理由>`
   （40 字截断，悬停看全文，同现在）。这样从会话记录载入（`app/src/renderer/src/state/history.ts:68`）和实时都显示 Denied。
 - 实时：不出卡的拒绝没有 `mori.approval_end`，pi 只发 `tool_execution_end`（`isError`）。`state/transcript.ts` 的 `applyToolExecution` 在 `isError` 且输出被 `parseRejection` 认作程序拒绝时，
-  状态记为 `rejected`、理由为原文（停止中的调用仍按现在记 `stopped`）。
+  状态记为 `rejected`、理由为原文，**并清掉 `allowedBy`**（停止中的调用仍按现在记 `stopped`）。这一条也管“预告放行、处理器放行之后又被 `ensureWork` 挡下”的调用（§7.10）：
+  工具卡在 `tool_execution_start` 时已按预告标了 `Full access` / `Allowed for this session`，不另发 `mori.tool_gate { gate: 'deny' }`（卡已是 `running`，
+  `applyToolGate` 不理它，`app/src/renderer/src/state/transcript.ts:206-213`），由这条规则去掉标签、记为 `Denied`。
 
 ### 6.16 身份段里的权限句
 
@@ -480,7 +483,7 @@ PowerShell 的 `{` 没有闭合是解析失败（§7.8）。
 | 注释 | 词首的 `#` 到行尾；`<# … #>` |
 | 操作符 | `\|`、`&&`、`\|\|`（7 才有；5.1 报语法错，同样当分隔符）、`;`、语句开头的 `&`（调用）与 `.`（点源）、语句末尾的 `&`（7 的后台作业）、`(`、`)`、`{`、`}`、`@(`、`$(`、`@{`、`,`（数组）、`=` `+=` 等（赋值） |
 | 重定向操作符 | `>` `>>` `n>` `n>>`（n 为 1–6）`*>` `*>>`；`n>&1`、`n>&2`、`*>&1` 是合并，不是目标；`<` 在 PowerShell 里是保留的、整段脚本不运行 → 解析失败（§7.8） |
-| `--%` | 停止解析：到换行或 `\|` 为止按空白切成普通词（双引号只分组） |
+| `--%` | 解析失败（§7.8 的 `stop-parsing token`）：之后到行尾的文字原样交给程序，程序是 `.cmd` / `.bat` 垫片时由 cmd.exe 再解析一遍，`>`、`\|`、`&` 又成了重定向与命令连接（pwsh 7.6 实测 `npm.cmd --version --% > ..\x` 写出了文件） |
 | 语句 | 关键字语句（`if elseif else switch foreach for while do until try catch finally trap function filter param begin process end return throw break continue exit class enum`）：跳过关键字，`( … )` 按管道分析，`{ … }` 按语句列表分析；赋值 `左值 = 管道`；其余是管道 |
 | 管道的一节 | 以裸词、`&`、`.` 开头是**命令**；以 `$`、引号、数字、`(`、`[`、`@` 开头是**表达式**。表达式不是命令，但其中的 `$( )`、`@( )`、`( )`、脚本块 `{ }` 照样分析 |
 | 脚本块 | 任何地方的 `{ … }`（`ForEach-Object { }`、`Invoke-Command -ScriptBlock { }`、`& { }`）都当作会被执行，就地分析；`@{ … }` 哈希表的值同样分析 |
@@ -494,19 +497,24 @@ PowerShell 的 `{` 没有闭合是解析失败（§7.8）。
 
 | 写法 | 处理 |
 | --- | --- |
-| 开头的赋值 `名字=值`（可以几个） | 不是命令；值里的命令替换照样分析。`GIT_DIR=`、`GIT_WORK_TREE=` 只作用于这一条命令（§7.7）。只有赋值、没有命令时是 shell 变量赋值：`TEMP`、`TMP`、`TMPDIR`、`PWD` 从此看不出来；`GIT_DIR`、`GIT_WORK_TREE` 按 export 处理（偏严） |
-| `export`、`declare -x`、`local`、`readonly`、`typeset` 带 `名字=值` | 同上一行“只有赋值”；`unset 名字` 清掉 `GIT_DIR` / `GIT_WORK_TREE` |
+| 开头的赋值 `名字=值`（可以几个） | 不是命令；值里的命令替换照样分析。其中 `TEMP=`、`TMP=`、`TMPDIR=`、`PWD=`（任何值）让这个名字在这条简单命令里看不出来（`variable`），包括它经包装、嵌套 shell（`bash -c`、`pwsh -c`、`eval`、`xargs`、`find -exec`）时里面分析的全部文字（偏严：bash 先展开本条命令的词再放入临时赋值，严格说只有嵌套文字看到新值；`PWD` 会被子 bash 重设，一并算只是多问）；`CDPATH=` 见表下的 CDPATH 一条；`GIT_DIR=`、`GIT_WORK_TREE=` 只作用于这一条命令（§7.7）。只有赋值、没有命令时是 shell 变量赋值：`TEMP`、`TMP`、`TMPDIR`、`PWD` 从此看不出来；`GIT_DIR`、`GIT_WORK_TREE` 按 export 处理（偏严） |
+| `export`、`declare -x`、`local`、`readonly`、`typeset` 带 `名字=值` | 同上一行“只有赋值”（`CDPATH=` 同样见表下）；`unset 名字` 清掉 `GIT_DIR` / `GIT_WORK_TREE` |
 | `read 名字…`、`for 名字 in …`、`select 名字 in …` 用到 `TEMP`、`TMP`、`TMPDIR`、`PWD` | 这个名字从此看不出来 |
 | 包装命令 | 去掉它和它的选项，后面的词是真正的命令（见下表） |
 | 命令名有看不出来的部分（`$CC -o out main.c`、`"$(which tool)" x`） | 解析失败（the command name comes from a variable or substitution）。命令名是已知变量（`$TMPDIR/x.sh`）时照常 |
 | 命令名带路径或 `.exe` | 比较名字时去掉路径和 `.exe`（`/usr/bin/rm`、`rm.exe` 都是 `rm`） |
 | 命令名的大小写 | 一律不分大小写比较：Windows 的文件系统不分，Git Bash 按 PATH 找外部程序时 `RM`、`Cp` 跑的就是 `rm`、`cp`（本机实测 `RM --version`）。bash 的内建命令其实区分（`CD ..` 报 command not found），按不分算只会多问。§7.3 的保留字仍区分大小写（`IF` 不是 `if`） |
 
+**CDPATH**：bash 的 `cd` / `pushd` 对不以 `/`、`.`、`..` 开头的操作数先查 CDPATH，CDPATH 里的目录优先于当前目录（Git Bash 实测 `CDPATH=<外面> cd evil` 换到了外面）。
+命令里出现 `CDPATH=`（开头的赋值、`export` 这类、`env` 的 `名字=值`，或 PowerShell 的 `$env:CDPATH = …`）之后，这条命令（含之后嵌套的 bash 文字）里
+bash 的 `cd` / `pushd` 操作数不以 `/`、`\`、`.`、`~`、盘符开头时目录看不出来（text 为操作数）；`unset CDPATH` 不恢复（偏严）。
+用户环境里本来就有的 CDPATH 由 `workEnv` 去掉（§7.11），所以没有这些写法时照 §7.7 按当前目录解析。
+
 **包装命令**
 
 | 包装 | 跳过的选项 | 之后 |
 | --- | --- | --- |
-| `env` | `-i` `-0` `--ignore-environment` `--null`；带值 `-u` `--unset`；然后的 `名字=值` 同开头的赋值。`-C` `--chdir` `-S` `--split-string` 解析失败（unsupported option） | 真正的命令；没有命令时只打印，算只读 |
+| `env` | `-i` `-0` `--ignore-environment` `--null`；带值 `-u` `--unset`；然后的 `名字=值` 同开头的赋值（含 `CDPATH=`）。`-i`、`--ignore-environment` 让 TEMP、TMP、TMPDIR、PWD 在这条命令（含嵌套文字）里都看不出来（Git Bash 实测 `env -i bash -c '… "$TMPDIR/x"'` 写到了 `C:\Program Files\Git\x`）；`-u` / `--unset` 的值是这四个名字之一时同样。`-C` `--chdir` `-S` `--split-string` 解析失败（unsupported option） | 真正的命令；没有命令时只打印，算只读 |
 | `command` | `-p`；`-v`、`-V` 只打印，没有命令 | 真正的命令 |
 | `builtin`、`nohup`、`time` (`-p`) | — | 真正的命令 |
 | `exec` | `-c` `-l`；带值 `-a` | 真正的命令；只有重定向时（`exec > log`）记重定向 |
@@ -516,6 +524,9 @@ PowerShell 的 `{` 没有闭合是解析失败（§7.8）。
 | `find … -exec`、`-execdir`、`-ok`、`-okdir` | 从这个词到 `;`（`\;` 或 `';'`）或 `+` 之间是一条命令 | 这条命令照常分析；其中的 `{}` 看不出来（`input`）。`find` 自己不是写法（`-delete`、`-fprint` 认不出，§7.5 末尾） |
 
 **嵌套的 shell 与 eval**：文字按对应 shell 的规则分析，起点是当时的当前目录，里面的 `cd` 不影响外面；写入和 leave 合进外面的结果。
+嵌套文字继承外面当时“看不出来的变量”集合（TEMP、TMP、TMPDIR、PWD，与是否设过 CDPATH），两种 shell 之间也继承（PowerShell 的 `$env:` 名字不分大小写）：
+`export TMPDIR=..` 之后的 `bash -c '… $TMPDIR …'`、`$env:TEMP = 'x'` 之后的 `pwsh -c '… $env:TEMP …'` 或 `bash -c '… $TEMP …'` 里的目标都按 `variable`
+（Git Bash 与 pwsh 7.6 实测这些写法都写到了工作路径外）。
 
 | 写法 | 处理 |
 | --- | --- |
@@ -537,6 +548,13 @@ PowerShell 的 `{` 没有闭合是解析失败（§7.8）。
 
 **PowerShell 的命令名**：不分大小写；去掉模块限定（`Microsoft.PowerShell.Management\Remove-Item`）和 `.exe`；先按别名换成 cmdlet 全名（§7.5）。
 `sed`、`touch`、`ln` 在 PowerShell 里不是别名，是外部程序，PowerShell 一侧不认它们（§7.5 末尾）。
+
+**PowerShell 里外部程序的参数**：命令不是 cmdlet、别名、函数、关键字（外部程序，含 `& 名字` 调用；纯函数不查系统，所以名字是 `动词-名词` 形状（恰好一个 `-`，两边都是字母）、
+是 §7.5 或 §7.7 名单里的别名、或是这条命令里定义的函数时算 cmdlet 与函数，以 `.ps1` 结尾的脚本在 PowerShell 里运行、也不算，其余都算外部程序）时，某个参数去掉 PowerShell 引号后不含空白、却含 `>`、`<`、`|`、`&` 之一
+→ 解析失败（§7.8 的 `cmd.exe metacharacter in an argument`）。程序是 `.cmd` / `.bat` 垫片时 PowerShell 把这样的参数不带引号传过去，cmd.exe 再解析一遍，
+它们又成了重定向与命令连接（pwsh 7.6、`$PSNativeCommandArgumentPassing = Windows` 实测：`npm.cmd --version '>' ..\x` 写出了 `..\x`）；含空白的参数 PowerShell 带引号传递，
+cmd.exe 不再解析，照常。Mori 看不出命令名会解析成 .exe 还是 .cmd 垫片（裸词 `npm` 在本机解析成 `npm.ps1`，`npm.cmd`、`code`、`gradlew` 解析成 .cmd），所以按文字从严；
+原生 .exe 收到 `'>'` 时并不写文件（`where.exe cmd '>' x`），同样算失败，只是多问一次。`--%` 见 §7.3。
 
 ### 7.5 认得出的写法
 
@@ -616,6 +634,7 @@ PowerShell 在表达式里也认重定向：`if ($a > 5) { }` 会写文件 `5`�
 `git clone`、`git worktree add`、`git archive -o`、`curl -o`、`wget -O`、`tar -x`、`unzip`、`dd of=`、`install`、`rsync`、`find -delete`、`find -fprint`、`sort -o`、`make -C`、`tar -C`、
 `cmd /c`、PowerShell 里的外部 `sed`、`touch`、`ln`，以及 `Invoke-WebRequest -OutFile`、`Export-Csv`、`Clear-Content`、`Set-Item`、`New-TemporaryFile`、`Start-Process`、
 .NET 方法（`[IO.File]::WriteAllText(...)`）。§7.13 的语料统计之后再决定名单要不要加（proposal §14）。
+`.cmd` / `.bat` 垫片的参数由 cmd.exe 再解析，Mori 只按文字从严拦下含元字符的参数与 `--%`（§7.4、§7.8）。
 
 ### 7.6 目标的解析与看不出来的目标
 
@@ -632,7 +651,7 @@ PowerShell 在表达式里也认重定向：`if ($a > 5) { }` 会写文件 `5`�
 | 以 `/` 开头、不是 UNC | 见上面两行 | 是 | 当前目录所在盘的根下 |
 | UNC `//server/share/x`、`\\server\share\x` | 是 | 是 | 它自己 |
 | `~`、`~/x`、`~\x` 在路径开头（bash：不在引号里，`~user` 同样；PowerShell：引号里也算，`~` 由提供程序展开，本机实测 `Resolve-Path '~'` 是用户目录） | 是 | 是 | null（`home`）：proposal §5.1 把 `~` 列为看不出来，照 Claude |
-| 已知变量 `$TEMP` `$TMP` `$TMPDIR` `${TEMP}`（bash 区分大小写）；`$env:TEMP` `$env:TMP` `$env:TMPDIR` `${env:TEMP}`（PowerShell 不分大小写） | 是 | 是 | `vars` 里的值（`<工作路径>\.work\tmp`）；同一条命令里先被赋过值（`export TMPDIR=..`、`$env:TEMP = 'x'`）之后为 null（`variable`） |
+| 已知变量 `$TEMP` `$TMP` `$TMPDIR` `${TEMP}`（bash 区分大小写）；`$env:TEMP` `$env:TMP` `$env:TMPDIR` `${env:TEMP}`（PowerShell 不分大小写） | 是 | 是 | `vars` 里的值（`<工作路径>\.work\tmp`）；同一条命令里先被赋过值（`export TMPDIR=..`、`$env:TEMP = 'x'`）之后为 null（`variable`，含之后嵌套文字里的引用；开头的赋值、`env -i` / `-u` 见 §7.4） |
 | `$PWD`、`${PWD}`（PowerShell 的 `$pwd` 同样） | 是 | 是 | 当前目录（当前目录看不出来时为 null） |
 | 其他变量：`$OUT`、`$HOME`、`$1`、`$@`、`${x:-y}`、`$env:USERPROFILE`、`$x.y`、`$x[0]` | 是 | 是 | null（`variable`）。`$HOME` 与 `~` 同值，一样算看不出来 |
 | 命令替换与子表达式：`$(…)`、`` `…` ``、`$((…))`、PowerShell 的 `$(…)` `@(…)` `(…)` 做参数值 | 是 | 是 | null（`substitution`）；里面的命令照常分析 |
@@ -649,7 +668,7 @@ PowerShell 在表达式里也认重定向：`if ($a > 5) { }` 会写文件 `5`�
 
 | 写法 | 新的当前目录 |
 | --- | --- |
-| bash `cd 目录`、`pushd 目录`（`-L` `-P` `-e` `-@` `--` 跳过） | 按 §7.6 解析；看不出来时为“看不出来” |
+| bash `cd 目录`、`pushd 目录`（`-L` `-P` `-e` `-@` `--` 跳过） | 按 §7.6 解析；看不出来时为“看不出来”；命令里设过 CDPATH 之后、操作数不以 `/`、`\`、`.`、`~`、盘符开头时也看不出来（§7.4 的 CDPATH 一条） |
 | bash `cd`（没有参数，去 HOME）、`cd -`、`cd` 带两个以上操作数、`pushd`（没有参数）、`pushd +N` / `-N`、`popd +N` | 看不出来；cd 没有参数时 text 为 `~` |
 | bash `popd` | 回到这条命令里上一次 `pushd` 前的目录；栈空时看不出来 |
 | PowerShell `Set-Location`（`cd` `chdir` `sl`）、`Push-Location`（`pushd`）`-Path` / `-LiteralPath` / 位置 0 | 按 §7.6 解析；`-StackName` 带值、`-PassThru` 开关 |
@@ -706,6 +725,8 @@ worktree 会话里 `git -C <主文件夹> merge …` 就是这样出卡的（pro
 | `encoded command` | `-EncodedCommand` |
 | `unsupported option <选项>` | `env -C`、`env -S`、PowerShell 的 `-WorkingDirectory` 与不认识的选项 |
 | `PowerShell has no < redirection` | PowerShell 里的 `<`（整段脚本不会运行） |
+| `stop-parsing token` | PowerShell 的 `--%`（§7.3） |
+| `cmd.exe metacharacter in an argument` | PowerShell 里外部程序的参数去掉引号后不含空白、且含 `>` `<` `\|` `&`（§7.4） |
 | `nested too deeply` | 括号、替换、嵌套 shell、eval 合计嵌套超过 32 层 |
 | `the command is too long` | 命令文字超过 1,000,000 个字符（嵌套的文字是它的一部分，不另算） |
 
@@ -714,7 +735,7 @@ worktree 会话里 `git -C <主文件夹> merge …` 就是这样出卡的（pro
 ### 7.9 单元测试表
 
 `tests/unit/filesystem/scan-bash.test.mjs`、`scan-powershell.test.mjs` 逐行跑下面两张表，测试名以所属的验收编号和行号开头（例如 `FS-42 B12 …`，验收条目见 §19）；
-一行属于两个条目时（B34、B76–B78、B80–B85、B106、B108、B114、S47、S50），用同一份期望各跑一次，名字分别以两个编号开头
+一行属于两个条目时（B34、B42a–B42c、B76–B78、B80–B85、B106、B108、B114、S24a、S47、S50、S58–S60），用同一份期望各跑一次，名字分别以两个编号开头
 （例如 `FS-47 B76 …`、`FS-49 B76 …`：覆盖检查只认名字开头的那一个编号）。
 记号：工作路径 P = `C:\w\proj`；`vars` 的 TEMP、TMP、TMPDIR 都是 T = `C:\w\proj\.work\tmp`；W = `C:\w`。
 `写 形式 路径`，删除加“删”，`into` 为真加“入”（没标的都是 false）；看不出来写 `?原因`；`离 形式 目录 命令`；`败 原因`；`无` 表示 `ok: true` 且两个列表都空。`⏎` 是换行，`⇥` 是 tab。
@@ -766,6 +787,9 @@ worktree 会话里 `git -C <主文件夹> merge …` 就是这样出卡的（pro
 | B40 | `echo > $OUT; echo > "$HOME/x"; echo > ${1}.txt; echo > ${X:-y}` | 写 `>` ?variable（四条） |
 | B41 | `echo > $TMPDIR/x.log; echo > "${TEMP}/y"; echo > $TMP` | 写 `>` T\x.log；写 `>` T\y；写 `>` T |
 | B42 | `export TMPDIR=../t; echo > $TMPDIR/x` | 写 `>` ?variable |
+| B42a | `TMPDIR=../t bash -c 'echo > $TMPDIR/x'` | 写 `>` ?variable |
+| B42b | `env -i bash -c 'echo > $TMPDIR/x'; env -u TMPDIR bash -c 'echo > $TMPDIR/y'` | 写 `>` ?variable；写 `>` ?variable（两条，text 不同不去重） |
+| B42c | `export TMPDIR=../t; bash -c 'echo > $TMPDIR/x'` | 写 `>` ?variable |
 | B43 | `echo > $PWD/x; cd src && echo > "$PWD/y"` | 写 `>` P\x；写 `>` P\src\y |
 | B44 | `rm *.log; cp a {b,c}; rm 'a*b'; touch x?` | 写 `rm` ?glob 删；写 `cp` ?glob；写 `rm` `P\a*b` 删；写 `touch` ?glob |
 | B45 | ``echo > $(date +%s).log; echo > `pwd`/x; echo > $((1+1))`` | 写 `>` ?substitution（三条） |
@@ -829,6 +853,8 @@ worktree 会话里 `git -C <主文件夹> merge …` 就是这样出卡的（pro
 | B103 | `cd - && make` | 离 `cd` ?（text `-`）`make` |
 | B104 | `pushd ../x && make && popd && make` | 离 `pushd` W\x `make` |
 | B105 | `cd .. && bash -c 'rm -f a'` | 写 `rm` W\a 删；离 `cd` W `rm` |
+| B105a | `export CDPATH=..; cd src && touch x; CDPATH=.. cd lib && make` | 写 `touch` ?directory；离 `cd` ?（text `src`）`touch`；离 `cd` ?（text `lib`）`make` |
+| B105b | `CDPATH=.. cd ./src && touch x` | 写 `touch` P\src\x（以 `.` 开头不查 CDPATH）；离 `cd` P\src `touch`（§6.4 丢掉） |
 | B106 | `git -C .. status; git -C .. log --oneline; git -C sub commit -m x` | 离 `git -C` P\sub `git commit`（§6.4 丢掉） |
 | B107 | `git -C .. commit -m x` | 离 `git -C` W `git commit` |
 | B108 | `git -C .. diff > d.patch` | 写 `>` P\d.patch |
@@ -871,6 +897,7 @@ worktree 会话里 `git -C <主文件夹> merge …` 就是这样出卡的（pro
 | S22 | `Out-File $out; Out-File "$env:TEMP\x.txt"; Out-File $env:tmp\y; Out-File "${env:TMPDIR}\z"` | 写 `Out-File` ?variable；T\x.txt；T\y；T\z |
 | S23 | `Out-File "$HOME\x"; Out-File ~\x; Out-File "$PWD\x"; Out-File $pwd\y` | 写 `Out-File` ?variable；?home；P\x；P\y |
 | S24 | `$env:TEMP = 'D:\t'; Out-File $env:TEMP\x` | 写 `Out-File` ?variable |
+| S24a | `$env:TEMP = 'D:\t'; pwsh -c 'Out-File $env:TEMP\x'` | 写 `Out-File` ?variable |
 | S25 | `Out-File "$(Get-Date -f yyyy).log"; Out-File (Join-Path $PWD x)` | 写 `Out-File` ?substitution（两条） |
 | S26 | `Remove-Item Env:\FOO; New-Item HKCU:\Software\X; Set-Content Temp:\x y; Remove-Item FileSystem::C:\w\x` | 写 `Remove-Item` ?provider 删；写 `New-Item` ?provider；写 `Set-Content` ?provider；写 `Remove-Item` W\x 删 |
 | S27 | `Out-File C:x.txt; Out-File \x.txt; Out-File /y.txt; Out-File \\srv\s\z` | 写 `Out-File` ?drive-relative；C:\x.txt；C:\y.txt；`\\srv\s\z` |
@@ -904,7 +931,9 @@ worktree 会话里 `git -C <主文件夹> merge …` 就是这样出卡的（pro
 | S55 | `Out-File .work\notes.md; New-TemporaryFile; [IO.File]::WriteAllText('..\x', 'y'); Invoke-WebRequest u -OutFile ..\z` | 写 `Out-File` P\.work\notes.md |
 | S56 | `Microsoft.PowerShell.Management\Remove-Item ..\x; Remove-Item a -WhatIf` | 写 `Remove-Item` W\x 删；写 `Remove-Item` P\a 删 |
 | S57 | `cmd /c "del ..\x"; sed -i 's/a/b/' f; touch g` | 无 |
-| S58 | `npm run build --% > ..\x`（`--%` 之后是普通词） | 无 |
+| S58 | `npm run build --% > ..\x` | 败 stop-parsing token |
+| S59 | `npm run build '>' ..\x; npm run build '2>..\e'; .\t.cmd 'a\|b'` | 败 cmd.exe metacharacter in an argument |
+| S60 | `git log --format='%h\|%s'` | 败 cmd.exe metacharacter in an argument（偏严，§7.13 语料统计后再定；`where.exe cmd '>' x` 原生不写文件，同样算失败） |
 
 ### 7.10 `.work` 的建立
 
@@ -928,6 +957,7 @@ worktree 会话里 `git -C <主文件夹> merge …` 就是这样出卡的（pro
 5. 其他错误（只读文件夹、没有权限）→ 失败，原因是 Node 的错误原文。
 
 失败时路径闸不放行这次调用（临时默认值，§17），返回 `{ block: true, reason }`，原文见 §14；后台进程记 `[kernel] couldn't prepare .work in <cwd>: <原因>`。
+原文的开头在 `DENIAL_PREFIXES` 里（§6.15、§12），工具卡显示 `Denied · Mori couldn't prepare .work…`，预告时标上的放行标签按 §6.15 的实时规则去掉。
 
 **`.gitignore` 的效果**：`*` 也忽略 `.gitignore` 自己，所以整个 `.work/` 不出现在 `git status`、`git status -uall`、`git add -A`、`git clean -nd` 里（本机 git 2.55 实测）。
 快照另按 §4 总是排除 `.work/`，不靠这个文件。不是 git 仓库的文件夹也写它（以后 Initialize git 时就已经在了）。
@@ -950,7 +980,8 @@ worktree 会话里 `git -C <主文件夹> merge …` 就是这样出卡的（pro
 export function workTmp(cwd: string): string;
 /** @brief commandScan 认得的变量值（§7.2）：TEMP、TMP、TMPDIR → workTmp(cwd)。 */
 export function workVars(cwd: string): Record<'TEMP' | 'TMP' | 'TMPDIR', string>;
-/** @brief spawnHook：env 的副本里去掉 TEMP、TMP、TMPDIR 的各种大小写写法，再设成 workTmp(context.cwd)；command、cwd 不变。 */
+/** @brief spawnHook：env 的副本里去掉 TEMP、TMP、TMPDIR 的各种大小写写法，再设成 workTmp(context.cwd)；
+ *        同时去掉 CDPATH 的各种大小写写法（不设新值）；command、cwd 不变。 */
 export function workEnv(context: BashSpawnContext): BashSpawnContext;
 /** @brief 换掉 pi 内置的 bash、powershell：同样的定义加上 spawnHook，defaultActive 为 false。 */
 export function shellTools(pi: Pi, cwd: string, settings: SettingsManager): ToolDefinition[];
@@ -981,7 +1012,9 @@ export function shellTools(pi: Pi, cwd: string, settings: SettingsManager): Tool
 - **Git Bash 的 `/tmp` 不跟着变**：本机实测从 Node 起 Git Bash、env 里 TEMP、TMP、TMPDIR 都指到 `.work\tmp` 时，`cygpath -w /tmp` 仍是 `C:\Users\<你>\AppData\Local\Temp`
   （`mount` 显示 `/tmp` 是 `usertemp`）。
   所以身份段告诉模型用 TEMP / TMPDIR 而不是 `/tmp`，commandScan 也把 `/tmp/…` 算看不出来（§7.6）。
-- HOME、PATH 等其他变量不改。
+- **去掉 CDPATH**：bash 的 `cd` / `pushd` 对不以 `/`、`.`、`..` 开头的操作数先查 CDPATH，继承你环境里的 CDPATH 会让 §7.7 按当前目录解析的结果与实际不符
+  （`scanCommand` 不读环境变量，无从得知）。`workEnv` 去掉它的各种大小写写法，不设新值；命令自己设的 CDPATH 由 §7.4 处理。`workVars` 不变。
+- 除 TEMP、TMP、TMPDIR（设值）与 CDPATH（去掉）外，HOME、PATH 等其他变量不改。
 
 ### 7.12 告诉模型
 
@@ -1136,6 +1169,8 @@ proposal §4“收窄”、§5.5、§9 第 1 条、§12 第 4 条、§13 第 3�
 - **`Team.narrowingFor(lane)`** → `Narrowing | null`：用户会话见上；实例为 `{ owner: lane.kind, limits: lane.limits }`，`limits` 为空时 `null`。
 - **到路径闸**：一个用户会话仍只有一份 `ApprovalPolicy`（模式、Allow for this session、按目录放行，§6），对话会话与全部实例共用；收窄是每个 `ApprovalGate` 自己的一层：
   - `GateOutput`（`app/src/kernel/approval.ts:50-63`）加 `narrowing?: () => Narrowing | null`：路径闸第 2 步每次调用时取（§6.1 的判断顺序；预告 `announce` 用同一个判断，所以也调它），省略时不收窄；
+    另加 `kind: 'user' | InstanceKind`（同 `SessionSetup.kind`，§9.2 用它选到时原文的最后一句；`createEntry` 建 gate 时写 `{ ...setup.gate, kind: setup.kind, send }`，`startUser` 与 `instanceSetup` 都不用改）。
+    不从 `narrowing()?.owner` 推断会话种类：`limits` 为空的 task 实例（最常见的）`narrowingFor` 返回 null；
   - 实例：`InstanceSpec` 加 `narrowing: Narrowing | null`（`app/src/kernel/team.ts:1052-1071` 的 `instanceSpec` 填 `narrowingFor(lane)`），`instanceSetup`（`app/src/kernel/instances.ts:62-72`）把它包成 `narrowing: () => spec.narrowing` 放进 `gate`；
   - 用户会话：`TeamLike`（`app/src/kernel/teamHost.ts:193-244`）加 `userNarrowing(): Narrowing | null`（= `narrowingFor(this.user)`）；`startUser`（`app/src/kernel/sessions.ts:510-513`）的 `gate` 写
     `{ prefix: '', narrowing: () => team?.userNarrowing() ?? null }`（同那里 `seats` 的写法，`team` 在后面赋值）；角色文件有问题、没有 Team 时为 `null`。
@@ -1289,6 +1324,8 @@ interface AwayItem {
   sessionId: string;
   /** 请求 id：approval-<n>、<实例的 pi 会话 id>:approval-<n>、ask-<n>、question-<n> */
   requestId: string;
+  /** 发起请求的会话种类（批准卡取自 GateOutput.kind；提问卡与扩展询问为 'user'）：到时原文与提醒的最后一句按它选（§9.4、§9.8） */
+  kind: 'user' | InstanceKind;
   /**
    * @brief 到时：按默认答案结束这个请求（§9.4）。
    * @param timeout 当时的时长
@@ -1298,10 +1335,13 @@ interface AwayItem {
 }
 ```
 
-- `ApprovalGate.request` 挂起时登记，`finish` 时注销（不论怎么结束）。`GateOutput` 加两项：`userSessionId`（用户会话的 gate 为自己的会话 id，
+- **先发请求事件，再登记**：`ApprovalGate.request`、`askQuestion.ts`、`ExtensionUi.ask` 都先发出请求事件（`mori.approval_request`，或经 `onRequest` 由 Team 同步发
+  `mori.team_approval_request`，`app/src/kernel/team.ts:1337-1345`；`mori.question_request`；`mori.ui_request`），再向 away.ts 登记；登记时发出的 `mori.away_timer`
+  因此总在请求事件之后到达界面。界面对不认识的 `requestId` 的 `mori.away_timer` 忽略（`LiveSnapshot.awayTimers` 不受影响）。`finish` 时注销（不论怎么结束）。
+- `GateOutput` 加三项：`kind`（§8.5，登记时抄进 `AwayItem.kind`，away.ts 拼原文时不必回头找 gate）；`userSessionId`（用户会话的 gate 为自己的会话 id，
   `app/src/kernel/sessions.ts:511` 建；实例为 `spec.owner`，`app/src/kernel/instances.ts:65` 建）；`handedOff?(): boolean`（只有实例有：这次运行里已经成功交接，
   读 `lane.run.handedOff`，`app/src/kernel/team.ts:1525`；Team 在实例的设置 `InstanceSpec` 里给出，同 §8.5 的 `narrowing`，`instanceSetup`（`app/src/kernel/instances.ts:62-72`）放进 `gate`；§9.8 用）。
-- `askQuestion.ts`、`ExtensionUi.ask` 同样在挂起时登记、结束时注销。三种请求 id 前缀不同（`approval-`、`ask-`、`question-`），在一个用户会话的信封上不会重名。
+- `askQuestion.ts`、`ExtensionUi.ask` 同样在发出请求事件之后登记、结束时注销。三种请求 id 前缀不同（`approval-`、`ask-`、`question-`），在一个用户会话的信封上不会重名。
 - away.ts 自己不 import 会话模块：`startAway({ userData, emit, record })` 由 `kernel/index.ts` 在 `start` 时调用，`emit` 是 `index.ts` 的广播，
   `record(userSessionId, decision)` 是 `sessions.ts` 导出的写记录函数（§9.7）。
 
@@ -1312,7 +1352,7 @@ away.ts 只有一份全局状态（后台进程里只有一个窗口）：`focus
 | 时刻 | 做什么 |
 | --- | --- |
 | 登记一项，`focused` 为真 | 只记下，不计时（窗口在前台时卡片一直等，同现在） |
-| 登记一项，`focused` 为假，时长不是 Never | 立刻开始计时：`deadline = Date.now() + 时长`，`setTimeout(expire, 时长)`，在 `userSessionId` 的信封上发 `mori.away_timer { requestId, deadline }` |
+| 登记一项，`focused` 为假，时长不是 Never | 立刻开始计时：`deadline = Date.now() + 时长`，`setTimeout(expire, 时长)`，在 `userSessionId` 的信封上发 `mori.away_timer { requestId, deadline }`（登记在请求事件之后，所以它晚于那张卡到达，§9.2） |
 | `setFocus(false)`（从真变假） | 对每个登记的项开始计时，规则同上；所有项的 `deadline` 相同 |
 | `setFocus(true)`（从假变真） | 清掉全部计时器；对每个正在计时的项发 `mori.away_timer { requestId, deadline: null }`。卡片接着等 |
 | 再次 `setFocus(false)` | 从头计时（不接着上次剩下的时间：proposal §5.2“切回 Mori，计时清零”） |
@@ -1332,7 +1372,7 @@ away.ts 只有一份全局状态（后台进程里只有一个窗口）：`focus
 | 请求 | `expire()` 做什么 | 回给谁的原文 |
 | --- | --- | --- |
 | 用户会话自己的批准卡 | `gate.finish(requestId, 'reject', 'away', 原文)`；`ApprovalEndBy` 加 `'away'`（`app/src/shared/protocol.ts:655`） | pi 把 `reason` 作为工具结果回给模型（`app/src/kernel/approval.ts:216-217`）：自动拒绝的原文（用户会话写进最后的总结，见 §14） |
-| 后台实例的批准卡 | 同上，结束事件经 `GateOutput.onEnd` 交给 Team，Team 照常发 `mori.team_approval_end { by: 'away' }`（`app/src/kernel/team.ts:1348-1352`） | 回给那个实例的模型：task 实例、结案会话用“写进交接”的那一句，其他实例（立项、临时提问、订阅）用“写进最后的总结”的那一句 |
+| 后台实例的批准卡 | 同上，结束事件经 `GateOutput.onEnd` 交给 Team，Team 照常发 `mori.team_approval_end { by: 'away' }`（`app/src/kernel/team.ts:1348-1352`） | 回给那个实例的模型。最后一句按 `GateOutput.kind`（经 `AwayItem.kind`）选：`task`、`close` 用 “Mention it in your handoff.”，`user`、`create`、`ask`、`subscription` 用 “Mention it in your final summary.”；不从 `narrowing()?.owner` 推断（`limits` 为空时它是 null） |
 | 提问卡 | 每个问题按 `recommended` 回答（`auto: true`），`mori.question_end { by: 'away' }`（§10.5） | 工具结果：提问卡到时的原文（§14） |
 | 扩展询问卡 | `ExtensionUi.finish(requestId, null)`：同现在的取消，确认为 false，选择、输入为空（`app/src/kernel/extensionUi.ts:91-97、126-134`） | 回给扩展，不回给模型 |
 
@@ -1444,6 +1484,8 @@ interface AwayDecision {
 
 清单里的批准行：`- Denied <工具名>`，`edit`、`write` 加 `: <path>`，`bash`、`powershell` 加 `: <command 的第一行，截到 80 字符，截掉时加 …>`。
 提问行：每个问题一行 `- Used your recommended option for "<question>": <label>`。
+提醒最后一句按清单里记下的 `AwayItem.kind` 选（同 §9.4）：`task`、`close` 为 `Don't retry the denied calls. Mention all of these in your handoff.`，
+`user`、`create`、`ask`、`subscription` 为 `… in your final summary.`（§14）；不从 `narrowing()?.owner` 推断。
 
 ### 9.9 界面
 

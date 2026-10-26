@@ -111,6 +111,7 @@
 - 恢复代码不删除这个会话没记下的文件（你自己新建的、跳过的大文件），也不动嵌套 git 仓库里的文件，不用 `git clean`。
 - 你在这个会话空闲时（两轮之间）改的文件，之后这个会话又跑过一轮，再 Rewind 到更早的消息时会被覆盖，不进冲突列表；Undo 能找回（[规格 §17](../../specs/file-system.md)）。
 - 有 Agent 在运行（包括只有后台 Agent 在运行）时不能 Rewind，也不能 Undo。
+- 在 `<R>/app` 里开的会话同时运行时改的文件，在 `<R>` 的会话里 Rewind 时列为 `Another session was running`（`overlap`），不会不问就被覆盖（[规格 §4.5](../../specs/file-system.md)）。
 - TaskBoard 的需求、task、交接不随 Rewind 回退；有还开着的需求时，对话不能回到它登记之前，但代码可以恢复。
 - `Never mind`、Esc、Cancel 不改任何东西。
 

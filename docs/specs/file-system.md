@@ -95,9 +95,12 @@
 - 工作路径里有还没有提交的嵌套 git 仓库时快照失败（git 不收它：`'<dir>/' does not have a commit checked out`），直到它有了提交或被加进 `.gitignore`（§4.4）。
 - 在 pi 设置的默认工具（`defaultTools`）里加了工具之后，之前存下的会话恢复出来的工具缺这一项，按 §8.6 拒绝打开，提示仍是 “This session was saved by an older version of Mori and can’t be opened.”。
 - 命令分析不是沙箱：程序自己写到别处看不到；MCP 与扩展工具在 Full access 下不分析。
+- `.cmd` / `.bat` 垫片（npm、npx、tsc 等）的参数由 cmd.exe 再解析一遍，Mori 只按文字从严拦下含 cmd.exe 元字符的参数与 PowerShell 的 `--%`（file-system-permissions.md §7.4、§7.8）。
 - 第一条消息还没写盘时 Mori 退出，已经建好的 worktree 留在磁盘上，设置页的 Clean up worktrees 列不出来（你自己 `git worktree remove`）。
 - 后台进程重启时重建还没写盘的 worktree 会话（`app/src/renderer/src/state/projects.ts:281-301`），它没有 `mori.worktree` 条目，归档、删除时不再处理那个 worktree。
-- 仓库共享配置里已有 `core.worktree` 时，Mori 不挪它就打开 `extensions.worktreeConfig`；打开后旧版本的 git 读不了这个仓库（Claude 也这样做）。
+- 共用配置里有 `core.worktree` 的仓库（`git init/clone --separate-git-dir` 的旧写法或手工设置）不能建 worktree（§11.5.3）。
+- 同时运行两个 Mori 实例（例如双击两次快捷方式）时两个后台进程共用快照目录，同一工作路径的快照会互相干扰（段的归属、`refs/mori/last`、启动时的陈旧锁清理），不另加机制；
+  主进程没有单实例锁（`app/src/main` 里没有 `requestSingleInstanceLock`），与现有的会话、设置、TaskBoard 文件共用的问题相同。
 
 ## 1. 术语与代码名
 
@@ -151,20 +154,20 @@
 
 | 组件 | 文件 | 做什么 |
 | --- | --- | --- |
-| 工作区模块 | `kernel/git.ts`（新） | 找 git、运行 git：不经 shell、环境副本（去掉 `GIT_*`）、内部仓库的隔离配置与固定 `-c`、超时、输出上限、按键排队；从不改 `process.env`（§3.2、§3.3） |
+| 工作区模块 | `kernel/git.ts`（新） | 找 git（含测试用的 `MORI_GIT_PATH`）、运行 git：不经 shell、环境副本（去掉 `GIT_*`）、内部仓库的隔离配置（含写出 `gitconfig`）与固定 `-c`、超时、输出上限、按键排队；`spawn` 与找 git 的候选从模块参数传入（单元测试注入替身）；从不改 `process.env`（§3.2、§3.3） |
 | 重建 worktree 会话 | `kernel/worktreeSession.ts`（新） | `startInWorktree`：记下要沿用的设置、关掉旧的、按原 id 在 worktree 里建会话并写 `mori.worktree`、用传入的 `startUser` 带原来的 `ApprovalPolicy` 启动、按顺序设回设置；失败时撤掉 worktree 与分支并在原文件夹重建（§11.5.4、§11.5.7） |
 | 工作区模块 | `kernel/workspace.ts`（新） | `repoInfo`、`status`（解析用 `timeline.ts`；500 条、去抖、同一时刻一个、发给同路径的用户会话）（§3.4、§3.5）；`.work`：`WORK_DIR`、`workTmp`、`workVars`、`workEnv`、`ensureWork`、`shellTools`（§7.10、§7.11）；`worktreeName`、`createWorktree`（含失败的清理）、`restoreWorktree`、`listWorktrees`、`cleanUpWorktrees`、按行读会话文件里的 `mori.worktree`、`initGit`（§11） |
 | 快照模块 | `kernel/snapshots.ts`（新） | 内部仓库与归属、快照作业与 `SnapshotState`（含嵌套仓库）、按工作路径的队列与时间线、inline extension `mori-snapshots`、`mori.turn_changes`、ref 与整理、`snapshots.diff`、`snapshots.drop`（§4、§5.3） |
 | 快照模块 | `kernel/timeline.ts`（新，纯函数） | 段的归属与轮的解析、porcelain v2 解析、`info/exclude` 的生成与转义、`--raw --numstat` 解析、文件集合与冲突、保留时选出要删的轮（单元测试直接喂数据） |
 | 快照模块 | `kernel/rewind.ts`（新） | Rewind 与 Undo：检查、保险快照、恢复、`navigateTree`、再记一次 `mori.pick`、`mori.rewind`、协作模式的需求检查（§5.5–§5.10）。`snapshots.ts` 放不下它们，所以与 `timeline.ts` 分开 |
 | 路径闸 | `kernel/pathGate.ts`（新，纯函数；只有 `realTarget` 碰文件系统，`lstat`、`realpath` 从参数传入） | 从 `app/src/kernel/memoryExtension.ts:129-182` 移来的 `resolveToCwd`、`insideDir`（改照 pi 的 `getCwdRelativePath`，导出给 `limits.ts`）；另导出“是不是同一个路径”的比较（`path.win32.relative` 为空，不分大小写、统一 `/` 与 `\`），给 `commandScan.ts` 判断当前目录是不是工作路径本身（§7.2）；`realTarget`；段名比较；`PROTECTED_DIRS`、`PROTECTED_FILES`；`classifyTarget`（含 `remove`、`into`）、`callKind`、`classifyCall`（命令调 `commandScan.ts`，最多 100 个目标）；`DUTY_TOOLS`（§6.2–§6.5） |
-| 路径闸 | `kernel/approval.ts` | `gateFor(toolName)` 换成按 §6.1 判断顺序的 `decide(call)`；`ApprovalPolicy`：构造选项 `{ mode?, canAsk? }`、`allowedDirs`、`allowDirs(dirs)`、`forgetDir(dir)`、`promptMode()`、`setMode('full')` 只放行 scope `inside` 的挂起请求；`ApprovalGate`：`Pending` 记 scope、targets、allowDirs，`requests()` 带上，`answer` 处理 `allowDir`，`announce` 带 `args`，更正规则，停止中只放过 `duty`、`read`，分类出错的处理，放行命令与写 `.work` 之前 `await ensureWork`；`GateOutput` 加 `cwd`、`narrowing`、`userSessionId`、`handedOff`；挂起时向 `away.ts` 登记、结束时注销，到时按 `'away'` 拒绝；工厂加 `agent_before_settle` 处理器；`FREE_TOOLS` 拆成 `DUTY_TOOLS` 与 `READ_ONLY_TOOLS`；文件头注释改写（§6、§7.10、§8.5、§9） |
+| 路径闸 | `kernel/approval.ts` | `gateFor(toolName)` 换成按 §6.1 判断顺序的 `decide(call)`；`ApprovalPolicy`：构造选项 `{ mode?, canAsk? }`、`allowedDirs`、`allowDirs(dirs)`、`forgetDir(dir)`、`promptMode()`、`setMode('full')` 只放行 scope `inside` 的挂起请求；`ApprovalGate`：`Pending` 记 scope、targets、allowDirs，`requests()` 带上，`answer` 处理 `allowDir`，`announce` 带 `args`，更正规则，停止中只放过 `duty`、`read`，分类出错的处理，放行命令与写 `.work` 之前 `await ensureWork`；`GateOutput` 加 `cwd`、`narrowing`、`userSessionId`、`handedOff`、`kind`；发出请求事件之后向 `away.ts` 登记（带 `kind`）、结束时注销，到时按 `'away'` 拒绝；工厂加 `agent_before_settle` 处理器；`FREE_TOOLS` 拆成 `DUTY_TOOLS` 与 `READ_ONLY_TOOLS`；文件头注释改写（§6、§7.10、§8.5、§9） |
 | 命令分析 | `kernel/commandScan.ts`（新，纯函数） | `scanCommand` 与类型；两种 shell 的词法与语法、前缀与嵌套、写法表、`READ_ONLY_COMMANDS`、路径解析、换目录规则、上限常量；超过 2000 行时拆出 `commandScanBash.ts`、`commandScanPs.ts`，入口不变（§7） |
 | 收窄 | `kernel/limits.ts`（新，纯函数，不载入 pi） | `Limits`、`NO_LIMITS`、`PROGRAM_LIMITS`、`TEAM_DIALOG_LIMITS`、`Narrowing`、`parseLimits`、`askLimits`、`limitsText`、`checkLimits`（§8.2–§8.4） |
 | 无人应答 | `kernel/away.ts`（新） | 焦点、时长与 `away.json`、登记与计时（可注入的时钟、`MORI_AWAY_TIMEOUT_MS`）、`mori.away_timer`、到时之后的记录、按会话的提醒清单与 `reminder()`（§9） |
-| 无人应答 | `kernel/extensionUi.ts` | `ask` 登记、`finish` 注销；到时按取消结束并记录（§9.4） |
+| 无人应答 | `kernel/extensionUi.ts` | `ask` 在发出 `mori.ui_request` 之后登记、`finish` 注销；到时按取消结束并记录（§9.4） |
 | 提问 | `kernel/askQuestion.ts`（新） | inline extension `mori-question`、工具定义与说明、执行时校验、挂起的提问 `ask-<n>`、答复与拒绝、停止与关闭、交给 `away.ts`、结果原文、分开时的转发回调（§10） |
-| 会话 | `kernel/sessions.ts` | 注册 `mori-snapshots`（必需，`mori-approval` 之后、`mcp` 之前）与 `mori-question`（只在用户会话、不是看不见的会话；mori-memory 之后、mori-approval 之前；不是必需）；`createEntry` 传 `cwd`、`customTools: shellTools(pi, args.cwd, setup.settings)`；`forward` 的 `announce` 传 `event.args`、`agent_settled` 时清提醒清单；增强会话的 `userApproval` 为 `{ mode: 'full', canAsk: false }`；`startUser` 的 gate 带 `narrowing`、`userSessionId`；重新打开时在 `refreshTools` 之前检查恢复出来的工具，缺 pi 默认工具时拒绝打开（§8.6；`refreshTools` 本身不变）；`forgetApproval` 收 `{ toolName } \| { dir }`；快照模块的登记与注销、`settleRun`、`stopRun`（快照、提问）、`release`、正在 Rewind 时 `prompt` 拒绝、`shutdownSessions` 后等队列、Rewind 用的 `navigateTree`；`snapshot` 加 `awayTimers`、`asks`；`liveStatus` 计入提问；`answerAsk`；导出 `record`；`promptEntry` 遇 `worktree` 走 `startInWorktree`、`creatingWorktree`、`UserStart.approval`、`Entry.worktree`、`describeEntry`、`openFromFile` 先恢复 worktree |
+| 会话 | `kernel/sessions.ts` | 注册 `mori-snapshots`（必需，`mori-approval` 之后、`mcp` 之前）与 `mori-question`（只在用户会话、不是看不见的会话；mori-memory 之后、mori-approval 之前；不是必需）；`createEntry` 传 `cwd`、建 gate 时加 `kind`（`{ ...setup.gate, kind: setup.kind, send }`，§9.2）、`customTools: shellTools(pi, args.cwd, setup.settings)`；`forward` 的 `announce` 传 `event.args`、`agent_settled` 时清提醒清单；增强会话的 `userApproval` 为 `{ mode: 'full', canAsk: false }`；`startUser` 的 gate 带 `narrowing`、`userSessionId`；重新打开时在 `refreshTools` 之前检查恢复出来的工具，缺 pi 默认工具时拒绝打开（§8.6；`refreshTools` 本身不变）；`forgetApproval` 收 `{ toolName } \| { dir }`；快照模块的登记与注销、`settleRun`、`stopRun`（快照、提问；在 `rejectForStop` 之后、`session.abort()` 之前通知快照模块）、`release`（`await session.abort()` 之前先通知快照模块结束这个会话等着的开始快照作业，§4.5）、正在 Rewind 时 `prompt` 拒绝、`shutdownSessions` 后等队列、Rewind 用的 `navigateTree`；`snapshot` 加 `awayTimers`、`asks`；`liveStatus` 计入提问；`answerAsk`；导出 `record`；`promptEntry` 遇 `worktree` 走 `startInWorktree`、`creatingWorktree`、`UserStart.approval`、`Entry.worktree`、`describeEntry`、`openFromFile` 先恢复 worktree |
 | 会话 | `kernel/commands.ts` | `workspace.status`、`snapshots.diff`、`snapshots.drop`、`rewind`、`rewind.undo`、`approval.forget` 的两种参数、`away.get`、`away.set`、`question.answer`、`workspace.initGit`、`worktrees.list`、`worktrees.cleanUp`；`session.prompt` 传 `worktree` |
 | 会话 | `kernel/index.ts` | `start` 消息的 `snapshotsDir` 与 `startAway`；`window_focus`（调 `away.setFocus`、记日志）；`shutdown` 时等快照队列 |
 | 会话 | `kernel/instances.ts`、`kernel/resources.ts` | `instanceSetup` 把 `narrowing`、`userSessionId: spec.owner`、Team 给的 `handedOff` 放进 gate；`toolSource` 把 `source === 'sdk'` 算内置（导出给单元测试）、`<inline:mori-question>` 写 Mori（§7.11、§10.1） |
@@ -185,7 +188,7 @@
 | 界面 | `components/QuestionCard.tsx`、`AskCard.tsx`（新）、`StageLine.tsx` | 提问卡、倒计时、阶段行 `Waiting for your answer` 与 `Creating worktree…`（§9.9、§10.4、§11.5.6） |
 | 界面 | `components/SettingsPage.tsx`、`settings/GeneralSection.tsx`（新）、`settings/StorageSection.tsx`（新） | `General`（When you’re away，§9.6）与 `Storage`（Clean up worktrees，§11.10）两节 |
 | 界面 | `components/WorktreeToggle.tsx`（新）、`Composer.tsx`、`InitGitDialog.tsx`（新）、`icons.tsx`、`sessionRows.ts`、`SessionTree.tsx`、`SessionEdits.tsx`、`BlockedCard.tsx` | Worktree 开关与 Initialize git…、确认框、图标 `branch`；按主文件夹分组、分支标签、删除确认框的 worktree 一句、allow_zone 的项目路径（§11.4、§11.7、§11.9、§11.11） |
-| 界面 | `state/history.ts`、`state/model.ts`、`state/transcript.ts` | 读 `mori.turn_changes`、`mori.rewind`、`mori.away_decision` 条目与事件；`PendingApproval` 加 `scope`、`targets`、`allowDirs`，`allowedBy` 为 `'session' \| 'dir' \| 'full' \| null`，`parseRejection` 认 `DENIAL_PREFIXES`；挂起的卡带 `deadline`；提问的挂起与工具卡状态；不出卡的程序拒绝记为 `rejected` |
+| 界面 | `state/history.ts`、`state/model.ts`、`state/transcript.ts` | 读 `mori.turn_changes`、`mori.rewind`、`mori.away_decision` 条目与事件；`PendingApproval` 加 `scope`、`targets`、`allowDirs`，`allowedBy` 为 `'session' \| 'dir' \| 'full' \| null`，`parseRejection` 认 `DENIAL_PREFIXES`；挂起的卡带 `deadline`；提问的挂起与工具卡状态；不出卡的程序拒绝记为 `rejected` 并清掉 `allowedBy`（§6.15）；`mori.snapshot_stage` 的阶段行（§13）；`turnNumbers`（`state/sessionRefs.ts` 的 `sessionTurns` 也用它，§5.3） |
 | 界面 | `state/workspace.ts`（新）、`state/rewind.ts`（新）、`state/worktrees.ts`（新）、`state/store.ts` | 每个会话的 `WorkspaceStatus` 与刷新时机、This session 的归组、Rewind 菜单的可用性与调用（§5）；开关、Initialize git、清理的动作，`Tab.worktreeOn`、`Tab.creatingWorktree`（§11） |
 | 界面 | `state/actions.ts`、`state/projects.ts`、`state/actionLog.ts`、`state/settings.ts`、`state/trust.ts`、`state/memory.ts` | 删除会话后 `snapshots.drop`、Rewind 后 `putBackQuoted`；`setApprovalMode`、`forgetApproval`；`mori.question_request` 时 `requestAttention`；`send()` 带 `worktree`、`refsInto`、`markFailed`（改成导出）；归档、删除调 `worktrees.*`；操作记录（§12）；When you’re away；本次信任回答与记忆页跟随按 `projectFolder` |
 | 界面 | `styles/chat.css`、`styles/tokens.css` | `.permission-button.all` → `.full`；`:358` 的 `margin-left: auto` 移到开关后面那一项，≤ 460px 时开关只剩图标；注释里的 “Allow all” 改 “Full access” |
@@ -208,9 +211,11 @@
 
 ### 3.2 找 git（`kernel/git.ts`）
 
+0. 环境变量 `MORI_GIT_PATH` 有值时（测试用，照 `MORI_USER_DATA` 的写法，§17）只试这一个路径：文件不存在就是 `missing`，不再看下面的位置。
 1. 依次找：`process.env.PATH` 里每个目录下的 `git.exe`（只看文件是否存在，不起进程）；然后 `C:\Program Files\Git\cmd\git.exe`。第一个存在的就是它。
+   候选列表与起进程的 `spawn` 从模块参数传入（默认就是上面这些与 `node:child_process.spawn`），单元测试据此注入替身（FS-01、FS-02）。
 2. 找到后跑一次 `git --version`（§3.3 的方式，5 秒），解析 `git version X.Y.Z…`：
-   - 版本 ≥ 2.31（`rev-parse --path-format` 从 2.31 起；`restore` 2.23、`--pathspec-from-file` 2.26 都更早）→ `{ state: 'ok', path, version }`；
+   - 版本 ≥ 2.32（`GIT_CONFIG_GLOBAL` 从 2.32 起，§3.3 内部仓库的隔离靠它，Git for Windows 的 RelNotes 2.32.0；`rev-parse --path-format` 2.31、`restore` 2.23、`--pathspec-from-file` 2.26 都更早）→ `{ state: 'ok', path, version }`；
    - 更低 → `{ state: 'old', version }`；
    - 没找到、或 `--version` 失败、超时 → `{ state: 'missing' }`（失败原文写日志）。
 3. 结果在后台进程里记住。`ok` 一直用到后台进程退出；`missing`、`old` 时，每次 `workspace.status` 命令（打开、切换会话、点 Refresh，§3.5）都再找一次，
@@ -245,7 +250,9 @@ interface GitResult { code: number | null; stdout: Buffer; stderr: string; timed
   路径、pathspec 里有空格、引号、中文都不用转义。Windows 命令行有 32K 字符的上限，路径可能很多时：
   - `add`、`restore` 用 `--pathspec-from-file=- --pathspec-file-nul` 经 stdin 传；
   - `diff`、`ls-files`、`ls-tree` 不认这个选项（本规格复核时在 2.55 上实测：`unknown option`），改为不带 pathspec 列全、在 Mori 里取交集；
-    只有 §4.4 第 3 步的大文件候选作参数传，每批命令行不超过 30000 字符。
+    只有 §4.4 第 4 步的大文件候选作参数传，每批命令行不超过 30000 字符。
+
+  `spawn` 从模块参数传入（默认 `node:child_process.spawn`）：FS-01、FS-02 的替身进程与 FS-03、FS-06 的失败用例据此注入（§19.1）。
 - **环境**：`process.env` 的副本，去掉所有以 `GIT_` 开头的变量（不分大小写），再加 `LC_ALL=C`（git 的提示固定英文，§3.4 要按原文判断“不是仓库”）、
   `GIT_TERMINAL_PROMPT=0`。内部仓库的调用另加 `GIT_CONFIG_NOSYSTEM=1`、`GIT_CONFIG_GLOBAL=<快照目录>\gitconfig`（§4.1）。
   **从不改 `process.env`**：否则 pi 的 bash、PowerShell 工具和 MCP 服务都会继承这些变量（proposal §3）。
@@ -378,6 +385,8 @@ interface WorkspaceStatus {
   本机 2.55 的文档说是 system、global、command 三种范围（`git-config` 的 SCOPES），较早的版本（2.35.2 起有这一项）只认 system、global，
   所以写在这个全局文件里，各版本都认。这样不是 git 仓库的工作路径属于别的 Windows 账户时快照照样能拍；是 git 仓库、而你的 git 因为
   `detected dubious ownership` 拒绝它时，`repoInfo` 是错误（§3.4 第 2 步），排除规则问不了你的 git（§4.3），这一张快照失败，`error` 为那句原文（§4.4 第 1 步）。
+  每次内部仓库调用（`isolated: true`）之前检查 `<快照目录>\gitconfig`，不存在就写出（`writeFile` 带 `wx`，不覆盖；没有 `<快照目录>` 就建）：
+  文件不存在时 git 静默忽略 `GIT_CONFIG_GLOBAL` 指向的文件，`safe.directory = *` 就等于没写。`GIT_CONFIG_GLOBAL` 从 2.32 起才有，所以最低版本是 2.32（§3.2）。
 - **建立**（这个工作路径第一次拍快照时）：`git init --quiet`（§3.3 内部仓库的方式；git 会在内部仓库的 config 里写 `core.worktree`，但每次调用都显式传 `--work-tree`，不靠它），
   写 `mori.json`，再写 `info/attributes`：
   ```
@@ -386,7 +395,7 @@ interface WorkspaceStatus {
   `info/attributes` 优先于工作路径里的 `.gitattributes`：快照按字节原样存、原样恢复，不做换行转换、不跑过滤器（LFS 文件存成指针原文）、不转编码。
   否则 `* text=auto eol=lf` 一类设置会让 Rewind 把 CRLF 文件写成 LF（本规格起草时复测：没有这个文件时快照里的 CRLF 变成 LF；有它时存进去、恢复出来都是 CRLF）。
   `diff` 属性不动，二进制照常认出来。
-- **陈旧的锁**：Mori 是内部仓库唯一的写入者，作业又按工作路径排队（§4.5），所以每个内部仓库在这次后台进程里的第一个作业开始前，删掉 `index.lock`、
+- **陈旧的锁**：同一个后台进程里 Mori 是内部仓库唯一的写入者（两个实例同时运行的情况见 §0“已知的限制”），作业又按工作路径排队（§4.5），所以每个内部仓库在这次后台进程里的第一个作业开始前，删掉 `index.lock`、
   `packed-refs.lock` 和 `refs/` 下的 `*.lock`（上次被强行结束时留下的），记一行日志。内部仓库的 git 进程被 Mori 结束（超时、§4.5 的停止）之后，
   同样先删掉这些锁再做下一个作业：被结束的 `git add` 会留下 `index.lock`，不删的话之后每张快照都失败。
 - 这个目录里只有 git 自己的文件和上面三个文件；会话文件里的记录（§4.6）不放这里。
@@ -426,16 +435,21 @@ interface WorkspaceStatus {
 
 ### 4.4 拍一张快照
 
-一个“快照作业”在这个工作路径的队列里依次做（§4.5），任何一步失败都停下：
+一个“快照作业”在这个工作路径的队列里依次做（§4.5），任何一步失败都停下。下面的上限（单个文件 10 MB、20000 个新文件、分批的 2000 条、每个 git 进程 120 秒）
+是 `snapshots.ts` 的参数（测试用，单元测试传很小的值，§19.1），默认见 §17：
 
-1. 第一次时建立（§4.1）；生成 `info/exclude`（§4.3）。是不是仓库按这一刻的 `repoInfo`；`repoInfo` 是错误（§3.4 第 2 步）时这一张失败，`error` 为它的原文。
+1. 第一次时建立（§4.1）：“第一次”= 内部仓库目录里没有 `HEAD` 文件；这时 `git init`、写 `mori.json` 与 `info/attributes`，并把这个工作路径的 `last` 置为 null。
+   生成 `info/exclude`（§4.3）。是不是仓库按这一刻的 `repoInfo`；`repoInfo` 是错误（§3.4 第 2 步）时这一张失败，`error` 为它的原文。
 2. **列出新文件**：内部仓库 `git ls-files -z --others --exclude-standard`，得到这次 `add` 会新加的文件 N。
-3. **大文件**：对 N 里的每个文件 `stat`，大于 10 MB 的是候选；是 git 仓库时，把候选作参数交给你的 git `--literal-pathspecs ls-files -z --`
+3. **文件数**：N 多于 20000 个，或第 2 步的输出被 16 MB 的上限截断（`truncated`，那已远多于 20000 个）→ 这个工作路径**暂停快照**（`paused`），不拍这一张，
+   也不做下面的 `stat`，原因 `Snapshots are paused for this folder: more than 20,000 new files would be added. Add generated folders to .gitignore to resume.`。
+4. **大文件**：对 N 里的每个文件异步 `stat`（`fs.promises`，不阻塞后台进程），大于 10 MB 的是候选；是 git 仓库时，把候选作参数交给你的 git `--literal-pathspecs ls-files -z --`
    （`ls-files` 不认 `--pathspec-from-file`，按 §3.3 分批）看哪些已被你跟踪，
    **已跟踪的不跳过**；其余的跳过（proposal §13 第 14 条“单个未跟踪文件超过 10 MB 不进快照”）。跳过的写进 `skipped`（界面列出前 20 个）。
-4. **文件数**：N 去掉跳过的多于 20000 个 → 这个工作路径**暂停快照**（`paused`），不拍这一张，原因
-   `Snapshots are paused for this folder: more than 20,000 new files would be added. Add generated folders to .gitignore to resume.`。
-5. `git add -A --pathspec-from-file=- --pathspec-file-nul`，stdin 为 `.` 加每个跳过文件的 `:(literal,exclude)<路径>`（没有跳过的文件时直接 `add -A -- .`）。
+5. **加入**：N 去掉跳过的多于 2000 个时先分批加：每批不超过 2000 条路径，经 `git --literal-pathspecs add --pathspec-from-file=- --pathspec-file-nul` 交给一个 git 进程
+   （每个进程 120 秒），每批都写进内部仓库的 index；某一批超时 → 这一张到此为止，按下面的“超时”处理，已进 index 的批次留着，下一个快照点第 2 步的
+   `ls-files --others` 只列剩下的。都成功后（或 N 不多于 2000 个时直接）`git add -A --pathspec-from-file=- --pathspec-file-nul`，stdin 为 `.` 加每个跳过文件的
+   `:(literal,exclude)<路径>`（没有跳过的文件时直接 `add -A -- .`），收尾处理改动与删除。
 6. `git write-tree` → 树 T。T 等于上一张快照的树 → 这一张就是上一张（不建新提交，`oid` 相同）。
 7. 否则 `git commit-tree T -m "Mori snapshot"` → 提交 S（没有父提交）；再 `git ls-tree -r -z T` 找出 mode 160000 的条目（工作路径里嵌套的 git 仓库，§4.2），
    写进 `nested`（树没变时沿用上一张的）。
@@ -461,9 +475,11 @@ interface SnapshotState {
 }
 ```
 
-- **暂停之后**：每个快照点（运行开始、结束）仍做第 1–4 步重新数（暂停时 Rewind 不恢复代码，§5.6 第 1 步，所以不在这里数）；降到 20000 以内就恢复（`on`），这一张作为新的基准（§4.5 的“上一张”清空，暂停期间的改动不记）。
-- **超时**：任何一步超过 120 秒 → 暂停，原因 `Snapshots are paused for this folder: a snapshot took longer than 2 minutes. They resume when Mori restarts.`；
-  到后台进程重启前不再试（每次都等 120 秒太久）。
+- **暂停之后**：因文件数暂停时，每个快照点（运行开始、结束）仍做第 1–3 步重新数（暂停时 Rewind 不恢复代码，§5.6 第 1 步，所以不在这里数）；降到 20000 以内就恢复（`on`），这一张作为新的基准（§4.5 的“上一张”清空，暂停期间的改动不记）。
+- **超时**：某个 git 进程超过 120 秒 → 结束它（§4.1 随后删掉它留下的锁），这一张 `error`，原文 `a snapshot step took longer than 2 minutes`，不暂停，
+  “上一张”清空（同下面的其他失败），下一个快照点续做（第 5 步已进 index 的批次不用重加）；同一工作路径**连续 3 张**都超时才 `paused`，原因
+  `Snapshots are paused for this folder: a snapshot took longer than 2 minutes. They resume when Mori restarts.`，到后台进程重启前不再试（每次运行开始都白等 120 秒太久）。
+  中间有一张成功（或因别的原因失败）就重新数。
 - **其他失败**（git 报错、磁盘满）：这一张没拍成，`error` 为原文，记错误日志；“上一张”清空，下一个快照点照常再试。
   工作路径里有还没有提交的嵌套 git 仓库（例如 Agent 在子目录里刚 `git init`）时第 5 步的 `add` 就这样失败（本机 2.55 实测：
   `error: 'sub/' does not have a commit checked out`、`fatal: adding files failed`），`error` 为 `'sub/' does not have a commit checked out`；
@@ -475,7 +491,7 @@ interface SnapshotState {
   | Mori 仓库（844 个文件进快照） | 第一张 | 2.8 秒（u-a8）/ 4.4 秒（复测，含忽略列表与新文件列表） |
   | Mori 仓库 | 之后每张（没有改动） | 0.57–0.9 秒（u-a8）/ 0.72 秒（复测） |
   | Mori 仓库 | 内部仓库大小（散对象） | 15 MB |
-  | `app/node_modules`（30,385 个文件，不排除） | 第一次 `add -A` / 带自动 gc 的提交 | 76 秒 / 54 秒（自动 gc 已关，§3.3；这种文件夹会在第 4 步暂停） |
+  | `app/node_modules`（30,385 个文件，不排除） | 第一次 `add -A` / 带自动 gc 的提交 | 76 秒 / 54 秒（自动 gc 已关，§3.3；这种文件夹会在第 3 步暂停） |
   | `app/node_modules` | 之后每次 `add` 加 `write-tree` | 0.26–1.59 秒 |
 
   公司仓库上的耗时、协作模式下快照的次数要在真实层量一次（FS-21，proposal §14）。
@@ -491,7 +507,7 @@ interface SnapshotState {
 
 | pi 事件 | 做什么 | 等不等 |
 | --- | --- | --- |
-| `before_agent_start` | 记下这一刻用户会话的叶子（`sessionManager.getLeafId()`；不一定等于 `entry.runStart`（`app/src/kernel/sessions.ts:990`）：准备中模型层的重建、pi 在处理器之前做的压缩（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:1452-1455`）都可能写下条目）和事件的 `messageType`（`'user'`：由一条 user 消息开始；`'custom'`：由扩展的 `sendMessage(…, { triggerTurn })` 开始，没有起始消息，`app/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/types.d.ts:727-742`），排一个“运行开始”的快照作业，**等它做完**再返回；这个工作路径是 `off`、`paused`（并且这次重新数仍超过上限）时不拍，只登记这次运行 | 等。pi 依次 await 每个处理器（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/runner.js:1130-1142`），工具在这之后才执行，所以快照一定在这次运行的任何改动之前 |
+| `before_agent_start` | 记下这一刻用户会话的叶子（`sessionManager.getLeafId()`；不一定等于 `entry.runStart`（`app/src/kernel/sessions.ts:990`）：准备中模型层的重建、pi 在处理器之前做的压缩（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:1452-1455`）都可能写下条目）和事件的 `messageType`（`'user'`：由一条 user 消息开始；`'custom'`：由扩展的 `sendMessage(…, { triggerTurn })` 开始，没有起始消息，`app/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/types.d.ts:727-742`），排一个“运行开始”的快照作业，**等它做完**再返回；这个工作路径是 `off`、`paused`（因文件数暂停的，这次重新数仍超过上限；因连续超时暂停的，到重启为止，§4.4）时不拍，只登记这次运行。用户会话自己的运行在排作业之前在它的信封上发 `mori.snapshot_stage { active: true }`，作业做完、失败、被停止或不拍（`off`、`paused`）时发 `{ active: false }`，界面的阶段行这期间显示 `Taking a snapshot… · <秒数>`（§13、fs-changes.md；排在别的作业后面等的时间也算在内）；实例的运行不发（同实例的批准卡不改对话的阶段行） | 等。pi 依次 await 每个处理器（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/runner.js:1130-1142`），工具在这之后才执行，所以快照一定在这次运行的任何改动之前 |
 | `agent_settled` | 排一个“运行结束”的快照作业 | 不等：处理器同步返回，不推迟 pi 发给界面的 `agent_settled`（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:684-702`）。同一工作路径的下一次运行开始要排在它后面，顺序不会乱 |
 | `tool_execution_end` | §3.5 的去抖刷新 | — |
 
@@ -499,6 +515,10 @@ interface SnapshotState {
   这次 `prompt()` 结束时（用户会话在 `settleRun`，`app/src/kernel/sessions.ts:872-877`；实例在 Team 等它 prompt 结束的地方）把这次运行从“在运行”里去掉，不拍结束快照。
 - **停止**：运行开始的快照还没做完时这次运行被停止（你按停止，`stopRun`，`app/src/kernel/sessions.ts:1109-1123`；Team 停止实例时同样经它的中止入口通知快照模块），快照模块结束这个作业的 git 进程，这次运行没有开始快照（也就没有 code restore），
   也不登记进 `active`、不拍结束快照：pi 在 `agent_start` 处就中止，第一次请求都不发（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:711-714`），没有工具执行。别人的作业不受影响。
+  通知的位置与顺序：`stopRun` 在 `rejectForStop` 之后、`session.abort()` 之前；`release`（关闭会话、`shutdownSessions`、Team 的 `closeInstance`、建会话失败的收拾都经过它，
+  `app/src/kernel/sessions.ts:782-794`）在 `await session.abort()` 之前先通知快照模块结束这个会话正在等的开始快照作业。必须由 Mori 通知：pi 的 `abort()` 要等
+  `waitForIdle()`（`agent-session.js:1942-1954`），运行停在 `before_agent_start` 时 `_isAgentRunActive` 已经为真（`:1392-1398`），而 `ctx.signal` 在这里是
+  `agent.signal`（`:2789`），运行还没开始时为 undefined，快照模块靠它学不到中止；不通知的话 `abort()` 要等 `git add` 跑完，退出时超过主进程的 3 秒上限。
 - **有序退出**：`shutdownSessions`（`app/src/kernel/sessions.ts:1612-1622`）之后等所有工作路径的队列做完（被中止的运行的结束快照），仍受主进程 3 秒的上限
   （`app/src/main/kernel-process.ts:12`）；没做完的记录就没有（崩溃时同样），不报错。
 
@@ -535,7 +555,9 @@ interface ActiveRun {
    得到改动的文件（mode 160000、120000 的去掉）。这一段是 Rewind / Undo 的恢复（保险快照到恢复后快照，§5.7）时，再去掉这次恢复动过的文件（恢复集合 R）：
    它们是恢复，不是谁的改动；其余的文件是同一工作路径上别的会话这时还在跑时改的，照常记给它们。
 3. **记给谁**：`active` 里涉及的每个用户会话各记一条（同一个会话不论有几个运行都只记一次），记进它这一段的“轮”（下面）；`agents` 是这个会话在 `active` 里的那些运行的 `agent`；
-   涉及的用户会话多于一个时 `overlap: true`（这个会话自己的后台实例不算别的会话，proposal §5.3）。
+   涉及的用户会话多于一个，**或**这一刻别的工作路径上有运行在 `active` 里、而那个工作路径包含这个工作路径或在它里面（用 `insideDir` 比两边的 cwd，不读文件；
+   两个方向都算，例如 `<R>` 与 `<R>\app`）→ `overlap: true`。这个会话自己的后台实例不算别的会话（proposal §5.3）。嵌套的工作路径各有自己的时间线，
+   在 `<R>\app` 里开的会话写的文件也进 `<R>` 的快照，不标的话在 `<R>` 的会话里 Rewind 时会被不问就覆盖（§17）。
 4. **更新**：这一张是谁的开始就把它加进 `active`，是谁的结束就去掉；然后给每个还在 `active` 里的用户会话记下新一段的开始
    `open[user] = { leaf: 它这时的叶子, own: 这一张是它自己由 user 消息开始的运行（own.byUser）的开始 }`。
    例外：这个会话自己由 user 消息开始的运行在进行、而它的起始消息还没写下（当前分支上 `own.leaf` 之后还没有 role 为 user 的消息条目，例如运行刚开始时一个实例恰好结束），
@@ -614,7 +636,10 @@ interface ChangesRecord {
   作业在 git 进程退出后的回调里写，不会插进 pi 写消息的同步代码与它之后的微任务之间（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:765-772`、`app/src/kernel/entries.ts:100`、`app/src/kernel/team.ts:1276`），
   所以不影响补条目 id 和 `mori.wake`。实例会话的段也写进用户会话的文件（proposal §8）。
 - 重新打开会话时，界面从 `session.open` 的当前分支条目里读出它们（同 `mori.receipt`，`app/src/renderer/src/state/history.ts`），与实时收到的事件相同。
-- 只写打开着的用户会话；没有文件改动的段不写。
+- **写到哪个会话文件**：快照模块登记一次运行时记下用户会话的 `SessionManager` 对象本身（用户会话自己的运行取 `before_agent_start` 的 `ctx.sessionManager`；
+  实例的运行记它 owner 的，即用户会话在快照模块里登记时给出的那一个），记录经它 `appendCustomEntry` 写入。不经过 ctx：会话 `dispose()` 之后扩展的 ctx 失效
+  （`agent-session.js:1007`），而 `SessionManager` 用 `appendFileSync` 写（`session-manager.js:812`），`dispose()` 不碰它。所以会话已从表里释放（有序退出时
+  `shutdownSessions` 先 `sessions.clear()` 再 `release`，§4.5）之后做完的结束快照仍写进文件、不发事件；增强会话不写。没有文件改动的段不写。
 
 ### 4.7 保留与整理
 
@@ -622,12 +647,14 @@ interface ChangesRecord {
   Rewind 与 Undo 用到的提交在 `refs/mori/s/<会话 id>/rewind/<mori.rewind 条目 id>/<提交>`；进行中的运行的开始快照在 `refs/mori/s/<会话 id>/run/<提交>`
   （§4.5“运行记录”；运行结束时删掉，崩溃时留到删除会话）；`refs/mori/last` 指向时间线的上一张（防止整理时被删）。
   同一个提交可以被几个会话、几轮各自引用。全部在内部仓库里，你的仓库里没有新的 ref（proposal §3）。
-- **每个会话保留最近 100 轮**（proposal §13 第 16 条，照 Claude）：每写一条 `run` 记录时，按会话文件里 `mori.turn_changes` 出现的先后列出不同的 `round`（所有分支），
+- **每个会话保留最近 100 轮**（proposal §13 第 16 条，照 Claude；轮数是 `snapshots.ts` 的参数，测试用，默认见 §17）：每写一条 `run` 记录时，按会话文件里 `mori.turn_changes` 出现的先后列出不同的 `round`（所有分支），
   多于 100 个时删掉最早那些轮的 ref（`for-each-ref` 列出、`update-ref --stdin` 删）。会话文件里的记录不删：This session 照常列出这些轮，点开 diff、Rewind 到它们时报
   `Mori keeps snapshots for the last 100 turns of a session. This turn’s snapshots were removed.`。`rewind/`、`run/` 下的 ref 不算轮，留到删除会话。
 - **删除会话**：界面在 `mori:delete-session` 成功后（`app/src/main/index.ts:118`）发 `snapshots.drop { sessionId, cwd }`；排进那个工作路径的队列：
   删掉 `refs/mori/s/<会话 id>/` 下的全部 ref；`refs/mori/s/` 下已经没有 ref、也没有打开的用户会话在用这个工作路径时，删掉整个内部仓库目录；
   否则 `git prune --expire=now`（只删不可达的散对象，比 `gc` 快，不重新打包）。没装 git 时只删不了 ref，不报错（目录留着）。
+  删掉内部仓库目录后，这个工作路径在内存里的 `Timeline` 一并丢掉（`last` 为 null、`open`/`active` 为空：这时本来没有打开的用户会话），
+  下一张快照从“第一次”开始（§4.4 第 1 步），不会拿已被删掉的 `last.oid` 当作“树没变”的上一张。
 - 没有后台整理、没有定时清理（proposal §9 第 5 条）；归档不动快照。
 
 ## 5. 右栏 This session 与 Rewind
@@ -644,7 +671,7 @@ interface ChangesRecord {
 | git 仓库 | git 状态（§5.2） | This session（§5.3） |
 | 不是 git 仓库 | `Not a git repository` 和 `Initialize git…`（§11，[fs-worktree.md](../v1/screens/fs-worktree.md)） | This session |
 | 没装 git（`missing`） | 只有 `Git is required to track changes and rewind.`（proposal §13 第 19 条，不再列编辑和写入） | 无 |
-| git 版本太低（`old`） | 只有 `Git 2.31 or later is required to track changes and rewind (found <version>).` | 无 |
+| git 版本太低（`old`） | 只有 `Git 2.32 or newer is required to track changes and rewind (found <version>).` | 无 |
 | 认不出仓库（`repo` 为 null、`error` 不为 null，§3.4 第 2 步） | `Couldn’t read git status: <原文>`（不写 `Not a git repository`，没有 `Initialize git…`） | This session |
 
 - 原来的 `Only edits and writes are listed. Files changed by commands aren’t included.` 和 `Changes made by team tasks aren’t listed here.` 都去掉；
@@ -672,7 +699,10 @@ interface ChangesRecord {
 数据全部来自当前分支上的 `mori.turn_changes`（条目和实时事件），界面自己归组，不再向后台进程要列表。
 
 - **按轮**：每个有 `changes` 记录的轮一组，新的轮在上（§17）。组标题 `Turn <n> · <你那条消息的第一行>`：`n` 是这条消息在当前分支上是第几条你的消息
-  （不算 `[Mori]` 投递；会话引用的 Turn N 现在把投递也算进去（`app/src/renderer/src/state/sessionRefs.ts:78-91`），所以协作模式下两边的编号可能不同，§17），第一行太长时省略号截断，悬停看全文。
+  （不算 `[Mori]` 投递，即 `mori.wake` 指向的 user 消息），第一行太长时省略号截断，悬停看全文。
+  `n` 与会话引用的 Turn N 共用一个计数：纯函数 `turnNumbers(entries)`（`state/model.ts`，跳过 `mori.wake` 指向的 user 消息）。会话引用的 `sessionTurns`
+  （`app/src/renderer/src/state/sessionRefs.ts:78-91`，现在把投递也算一轮）改用它：`mori.wake` 指向的消息的 `User:` 几行接到前一轮里，不另起一轮，内容不丢
+  （前面没有轮时同第一条你的消息之前的回复，不算在任何一轮里）。这样右栏、Rewind 通知与会话引用的预览、芯片（`Turn 3 · ~1,200 characters`、`turns 3–4`）里同一个编号指同一条消息。
 - **组里的文件**：这一轮各条记录里的文件合并，按第一次出现的先后。每行：
   - 状态字母（悬停 `Added` / `Modified` / `Deleted`）：这一轮里第一次出现时是 A → 开始前没有；最后一次是 D → 现在没有；两者都没有 → M；开始前没有、现在也没有（建了又删）→ D；
   - 路径（相对工作路径）；
@@ -747,10 +777,11 @@ interface ChangesRecord {
 ### 5.7 恢复代码
 
 1. `git ls-tree -r -z --name-only <B>`（在工作路径里跑，路径相对工作路径）读出 B 的全部文件，与 R 求交得到 R 里在 B 中存在的文件 E。
-2. E：`git --literal-pathspecs restore --source=<B> --worktree --pathspec-from-file=- --pathspec-file-nul`（只改工作区，不碰你的 index；本规格起草时复测：删掉的文件也恢复了）。
+2. R − E（B 里没有、是后来新建的）：逐个 `fs.rm`（不递归；已经不在的跳过）。**先删再恢复**：Windows 不分大小写，R 里可能同时有 `README.md`（B 里有，记录里是 D）
+   和 `Readme.md`（后来新建，A），先恢复再删会把刚恢复的文件删掉（复核时在 2.55 上实测；同一段里的改名内部仓库只记 `M`，所以只有跨快照的删、建才这样）。
+   留下的空目录不删。**不用 `git clean`**：没有记下的文件（你自己新建的、跳过的大文件、嵌套仓库里的）一律不动。
+3. E：`git --literal-pathspecs restore --source=<B> --worktree --pathspec-from-file=- --pathspec-file-nul`（只改工作区，不碰你的 index；本规格起草时复测：删掉的文件也恢复了）。
    整批失败（例如一个文件被别的程序锁着）时逐个再试，失败的记进 `failed`。
-3. R − E（B 里没有、是后来新建的）：逐个 `fs.rm`（不递归；已经不在的跳过）。留下的空目录不删。**不用 `git clean`**：没有记下的文件（你自己新建的、跳过的大文件、
-   嵌套仓库里的）一律不动。
 4. **恢复后快照** Q：在同一个作业里再拍一张。P 到 Q 这一段里 R 的文件是这次恢复，**不记给任何人**；同一工作路径上别的用户会话这时还在跑时，
    这一段里其余的文件照常记给它们（§4.5 第 2 步）。时间线照常往后走。
 5. 写 ref：`rewind/<条目 id>/` 下的 P、Q。条目 id 要等 §5.9 写下 `mori.rewind` 才有，所以 ref 在写条目之后建（同一个作业里）。
@@ -764,7 +795,9 @@ interface ChangesRecord {
   §5.5 的检查已经排除这两种情况。
 - M 恰好是当前叶子（它之后什么都没写下，例如后台进程在写下回复之前崩溃）时 pi 什么都不做（`:3240-3243`）：这时改为传 M 的父条目。父条目是助手消息、
   自定义条目时 pi 把叶子设到它；是 user 消息、`custom_message`（pi 会再退一步）或没有父条目时，恢复对话失败，原文 `This message has no reply to rewind.`
-  （只恢复对话时命令失败；同时恢复代码时进 `warning`，见下一条）。
+  （只恢复对话时命令失败；同时恢复代码时进 `warning`，见下一条）。父条目的类型在调用 pi 之前用 `sessionManager.getEntry(M.parentId)` 判断，不靠 pi 的返回。
+  这条路上 pi 的返回里没有 `editorText`（目标不是 user 消息，`:3336-3348` 的最后一个分支），`rewind.ts` 自己取 M 的正文放进结果的 `editorText`：字符串正文原样，
+  数组取 text 块拼接（把 `app/src/kernel/modelContext.ts:289` 的 `contentText` 导出复用；pi 的 `contentText` 不从包根导出）。
 - **再记一次选择范围**（写规格时定的第 7 条，验收 FS-25）：`navigateTree` 成功后，在新的当前分支末尾把这个会话现在的模型选择范围再记一条 `mori.pick`
   （写法同 `app/src/kernel/modelSession.ts:795` 的 `writeEntry`），然后才写 `mori.rewind`（§5.9）。打开会话时范围按当前分支最后一条 `mori.pick` 读
   （`app/src/kernel/modelSession.ts:804-808`，经 `customEntries` 读 `getBranch()`，`:1106-1110`）；不再记一次的话，最后一条可能留在丢掉的分支上，重新打开会话时范围变成更早的那一条。
@@ -810,11 +843,12 @@ interface RewindRecord {
   1. 再拍一张保险快照 P'；
   2. 集合 U = `git diff --name-only -z --no-renames <safety> <post>`（那次恢复实际改了的文件，不受记录里 200 条的限制）；
   3. 冲突 = U 里在 `post` 之后又变了的（`git diff --name-only -z --no-renames <post> <P'>` 与 U 取交集），原因 `changed`；冲突的处理同 §5.6 第 5、6 步；
-  4. 从 `safety` 恢复：U（冲突选了 `skip` 时去掉冲突）里 `safety` 有的 `git restore --source=<safety>`，没有的删掉；再拍 Q'；P' 到 Q' 这一段同 §5.7 第 4 步
-     （恢复动过的文件不记给任何人）；
+  4. 从 `safety` 恢复：U（冲突选了 `skip` 时去掉冲突）里 `safety` 没有的先删掉，再把 `safety` 有的 `git restore --source=<safety>`（先删再恢复，同 §5.7 第 2 步的理由）；
+     再拍 Q'；P' 到 Q' 这一段同 §5.7 第 4 步（恢复动过的文件不记给任何人）；
   5. 那次 Rewind 恢复了对话（`from` 不为 null）：`navigateTree(from)`（`from` 是当时的叶子，通常是 `mori.turn_changes` 等自定义条目或助手消息，pi 把叶子设到它；
      万一是 user 消息或 `custom_message`，pi 会回到它之前（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:3336-3345`），这时不导航，只恢复代码，`warning` 为
      `Couldn’t restore the conversation: Mori can’t return to where it was before the rewind.`）；导航成功后同 §5.8 再记一条 `mori.pick`；
+     这里的目标不是 user 消息，pi 不返回 `editorText`，Undo 结果的 `editorText` 为 null（输入框不变，fs-rewind.md）；
   6. 写 `kind: 'undo'` 的记录（在 Undo 之后的叶子上）。
 - 结果与 `rewind` 相同（§5.11）。之后不再提供 Undo（不做 Redo）。
 
@@ -992,14 +1026,17 @@ export function projectFolder(cwd: string): string;
 | 会话空闲：不在准备中、不在运行，Team 不忙（同 `closeSession` 的检查，`app/src/kernel/sessions.ts:810-816`） | `This session is still running. Stop it first.`（现有原文 `GENERATING`） |
 | §3 的 `git.state` 为 `ok` | `Git is required to create a worktree.` |
 | cwd 在 git 仓库里（`repoInfo` 不为 null、没有错误），HEAD 有提交 | `This folder isn’t a git repository.` / `This repository has no commits yet.` / `repoInfo` 的错误原文 |
+| 工作路径是仓库的子文件夹时，`<sub>` 在切出点的树里：`git cat-file -e <切出点>:<sub 用 / 写>` 退出码 0（还没提交的子文件夹检出后不存在，会话会建在一个不存在的 cwd 上） | `The folder <sub> isn’t committed yet, so a worktree can’t start there. Commit it first.` |
 
 看不见的增强会话不经界面的命令（`requireEntry` 不认它，`app/src/kernel/sessions.ts:740-751`），它的 `promptEntry` 也从不带 `worktree`，不另查。
 
-#### 11.5.3 git 步骤（`kernel/workspace.ts` 的 `createWorktree(cwd, ownText, timeoutMs = 120_000)`，按顺序）
+#### 11.5.3 git 步骤（`kernel/workspace.ts` 的 `createWorktree(cwd, ownText, timeoutMs = 120_000)`，按顺序；超时从参数传入，测试用，默认见 §17）
 
-1. `repoInfo(cwd)`（§3）取仓库根；按 §11.2 算 R、`<sub>`、名字、路径、分支，切出点 `git rev-parse --verify HEAD^{commit}`。
+1. `repoInfo(cwd)`（§3）取仓库根；按 §11.2 算 R、`<sub>`、名字、路径、分支，切出点 `git rev-parse --verify HEAD^{commit}`。然后两项检查，不满足时不做任何 git 改动，按 §11.5.7 失败：
+   - 工作路径是子文件夹时，§11.5.2 表最后一行的 `git cat-file -e <切出点>:<sub>`；
+   - `git config --local --get core.worktree`（共用的 `.git/config`，在会话 cwd 里跑）有值 → 原因 `This repository sets core.worktree, so Mori can’t create a worktree here. Move it to the main worktree’s config.worktree first.`
+     （复核时在 2.55 上实测：这时链接出去的 worktree 以主文件夹为工作树，在里面 `add`、`commit` 改的是主文件夹和它的 index，连 `.mori/worktrees/<名字>` 都会被当成嵌套仓库提交）。
 2. `git config --get extensions.worktreeConfig` 不是 `true` 时 `git config extensions.worktreeConfig true`（写共用的 `.git/config`；Claude 桌面版同样，u-a8 事实 96）。
-   共用配置里已有 `core.worktree` 时不挪它（git 文档要求先挪到 `config.worktree`）；打开之后旧版本的 git 读不了这个仓库（§0 已知的限制）。
 3. `git rev-parse --path-format=absolute --git-path info/exclude`（从 worktree 里跑也指向共用的 common dir，u-a8 事实 85）；文件里没有一行（去掉首尾空白后）等于
    `.mori/worktrees/` 时在末尾加这一行（没有 `info` 目录就建）。写法照 Claude 的 `.claude/worktrees/`（u-a8 事实 84）。在 `worktree add` 之前做，主文件夹的 git 状态里从不出现它。
 4. `git -c core.longpaths=true worktree add -b mori/<名字> <路径> <切出点>`（实测：不带 `-c` 时长路径检出失败，§11.1）。超时 120 s（临时默认值）。
@@ -1067,7 +1104,7 @@ worktree 里那个文件可能不同（没提交的改动不带过来）；点�
 
 | 失败在哪一步 | 会话 | 界面 |
 | --- | --- | --- |
-| §11.5.2 的检查（被拒绝启动时同现在，不加前缀）、§11.5.3 的 git 步骤 | 没动：仍是原文件夹里那个空闲的会话；建了一半的 worktree 和分支已撤掉 | 旧会话发 `mori.prompt_error { message: 'Couldn’t create the worktree: <原因或 git 原文>', text, refs, running: false, queued: [] }`：你的消息撤回，文字和芯片回到输入框，一张错误卡显示这句；开关仍然开着 |
+| §11.5.2 的检查（被拒绝启动时同现在，不加前缀）、§11.5.3 第 1 步的两项检查（`The folder <sub> isn’t committed yet…`、`This repository sets core.worktree…`）与 git 步骤 | 没动：仍是原文件夹里那个空闲的会话；建了一半的 worktree 和分支已撤掉 | 旧会话发 `mori.prompt_error { message: 'Couldn’t create the worktree: <原因或 git 原文>', text, refs, running: false, queued: [] }`：你的消息撤回，文字和芯片回到输入框，一张错误卡显示这句；开关仍然开着 |
 | §11.5.4 重建（必需的扩展没加载上等） | 按 §11.5.3 的清理撤掉刚建的 worktree 和分支，在原文件夹按原 id 再建一次（同样沿用设置），由它发上面那条 `mori.prompt_error`；结果的 `session` 是它的信息 | 同上 |
 | 在原文件夹也建不起来 | 命令失败，后台进程里没有这个会话了 | `send()` 照现有的命令失败处理（错误卡带 “Put your last message back in the message box”，`app/src/renderer/src/state/actions.ts:115-119`），并把标签标成打开失败（`markFailed`，`app/src/renderer/src/state/projects.ts:94-97`，改成导出）：横幅 `Failed to open session: <原文>`，会话行 Error；再点会话行时按现有的 `reopen` 在原文件夹新建（`app/src/renderer/src/state/projects.ts:281-302`：会话文件不在、也没有你的消息时新建）。界面不分辨原因：带 `worktree: true` 的 `session.prompt` 只在这一种情况下命令失败（其余各行都由事件报告、命令照常返回），命令失败就按这一行处理 |
 | 重建之后（准备中出错、没有可用模型、扩展命令接手没开始运行） | 已在 worktree 里，同现在的准备中失败；你的消息没能写进会话时，会话仍没保存，但已经有自己的 worktree | 同现在；开关不再出现（§11.4） |
@@ -1133,7 +1170,7 @@ proposal §13 第 11 条：worktree 会话的记忆、增强、反馈、模型�
   | --- | --- |
   | `sessionFile` | 拥有它的会话 |
   | `path`、`branch`、`mainFolder` | 同 `mori.worktree` |
-  | `exists` | 文件夹还在 |
+  | `exists` | 文件夹还在（只说文件夹；登记在不在以 `git -C <R> worktree list --porcelain` 为准） |
   | `changes` | 有未提交或未跟踪的文件（`git --no-optional-locks status --porcelain` 不为空；被忽略的文件不算）；不在、没装 git、读不出时为 null |
   | `inUse` | 除拥有它的会话（和它的实例）之外，有开着的会话的工作路径是它或在它里面 |
 
@@ -1142,7 +1179,10 @@ proposal §13 第 11 条：worktree 会话的记忆、增强、反馈、模型�
   2. 文件夹不在：`reason: 'missing'`；
   3. 有开着的会话的工作路径是它或在它里面：`reason: 'in_use'`，不删；
   4. `force: false` 且 `changes`：`reason: 'changes'`，不删；
-  5. `git -c core.longpaths=true worktree remove [--force] <path>`（实测：不带 `-c` 会留下长路径的文件）。分支从不删。失败时 `error` 为 git 原文，记日志。
+  5. `git -c core.longpaths=true worktree remove [--force --force] <path>`（实测：不带 `-c` 会留下长路径的文件）：`force: true` 时带两个 `--force`
+     （锁着的登记也能删，§11.1 实测；`force: false` 一个都不带）。分支从不删。失败时 `error` 为 git 原文，记日志。
+  6. `remove` 成功后 `<path>` 还在（里面有目录联接时 git 只删登记、联接与文件夹留着，复核时在 2.55 上实测，例如 Agent 做的 `mklink /J node_modules …`）→
+     `fs.rm(path, { recursive: true, force: true })`（Node 的递归删除不跟进联接，不碰联接指向的目录，实测）；仍在则 `removed: false`、`error` 为原文。
 
   `.work/` 和 `node_modules` 等被忽略的文件不算改动，删 worktree 时一起删掉（实测）。两个命令都只在你操作时调用，不在后台扫（proposal §9 第 5 条）。
 
@@ -1158,13 +1198,23 @@ proposal §13 第 11 条：worktree 会话的记忆、增强、反馈、模型�
 
 #### 11.9.4 打开 worktree 不在的会话
 
-`openFromFile`（`app/src/kernel/sessions.ts:627-635`）在报 `Project folder not found` 之前：`worktreeOf(cwd)` 不为 null、它的 `path`（worktree 根）不在时，按 `path`、`branch` 恢复
-（不要求有 `mori.worktree`，所以在同一个 worktree 里另开的会话也能把它带回来）。worktree 根在、只是 cwd 那个子文件夹不在时照现在报 `Project folder not found: <cwd>`。
+`openFromFile`（`app/src/kernel/sessions.ts:627-635`）在报 `Project folder not found` 之前，`worktreeOf(cwd)` 不为 null 时按它的 `path`（worktree 根）分三种
+（不要求有 `mori.worktree`，所以在同一个 worktree 里另开的会话也能把它带回来）：
+
+- 文件夹不在（登记可能还在：手工删掉的，或 `worktree add` 被结束时留下 `locked` 的）→ 按 `path`、`branch` 恢复，下面第 1–4 步；
+- 文件夹在，而 `git -C <R> worktree list --porcelain` 里没有它（路径比较同 §11.9.1 第 1 步）→ 打开失败，原文
+  `The worktree folder <path> exists but isn’t registered with git. Move or delete it, then open this session again.`（不替你删：里面可能有 `.git` 文件丢了的未提交改动）；
+  没装 git 时不查登记，照常打开；
+- 文件夹在、登记也在 → 不恢复；只是 cwd 那个子文件夹不在时照现在报 `Project folder not found: <cwd>`。
 
 1. R 不在 → `Project folder not found: <R>`（现有写法）；没装 git → `Git is required to restore this session’s worktree.`；
-2. `git -C <R> worktree prune`（实测：手工删掉的 worktree 仍有登记，不先 prune 就 add 不上）；
+2. `git -C <R> worktree list --porcelain` 里有这个 `path`（文件夹不在；含登记目录里带 `locked` 的，`worktree add` 被结束时留下）→ 先
+   `git -C <R> worktree remove --force --force <path>`（实测：不锁的、文件夹已删的登记同样删掉；`prune` 不删锁着的登记），再 `git -C <R> worktree prune`
+   （实测：手工删掉的 worktree 仍有登记，不先清掉就 add 不上）；
 3. `git -C <R> -c core.longpaths=true worktree add <path> <branch>`（不带 `-b`，照 Claude：会话恢复时把分支重新检出，u-a7 事实 33）；
    分支不在 → `The branch <branch> no longer exists, so this session’s worktree can’t be restored.`；分支在别的 worktree 里检出着 → git 原文；
+   超时 120 s（§17 worktree 的超时）；失败或超时时按 §11.5.3 清理的第 1–3 步（`remove --force --force`、`prune`、文件夹还在就删掉），**不**做第 4 步删分支
+   （它不是这次建的），再报打开失败，原文为 git 原文或 `Restoring the worktree timed out after 120 seconds.`；
 4. §11.5.3 第 5、6 步（`config.worktree` 的 `core.longpaths`、`ensureWork`）；然后照常打开。
 
 信任：界面在 `session.open` 之前的 `trust.check` 是对着还不在的文件夹问的，看不到 worktree 里的 `.pi/`（`hasTrustRequiringProjectResources` 为假，不问）。
@@ -1180,6 +1230,8 @@ proposal §13 第 11 条：worktree 会话的记忆、增强、反馈、模型�
 
 1. 确认框打开时，会话是 worktree 里的会话就 `worktrees.list { sessionFiles: [它] }`；确认框在原来的说明后面加一句（原文见屏幕表 fs-worktree.md）：
    拥有的 worktree 在且干净 / 有改动 / 读不出 / 正被别的开着的会话用着 / 没装 git（结果 `git: false`）各一种写法；没有拥有的 worktree、或它已经不在时不加（proposal §13 第 12 条）。
+   列表返回前 Delete 不可用（`aria-disabled`）；`worktrees.list` 失败时按屏幕表“读不出”那一句显示（名字、分支取 `worktreeOf(cwd)`）并让 Delete 可用，
+   点 Delete 时按有拥有的 worktree、`changes: null` 处理（`worktrees.cleanUp { paths: [worktreeOf(cwd).path], force: true }`；它自己会报 `in_use` 与 git 的错误）。
 2. 点 Delete：照旧先关闭会话；有要删的 worktree（在、不是正被别的会话用着、`git` 为真）时 `worktrees.cleanUp { paths: [它], force: true }`；
    没装 git 时不删 worktree、照常删会话（临时默认值：会话总能删；worktree 留在磁盘上，确认框写明）；
    结果有 `error` 时停下，确认框显示 `Couldn’t delete this session: <原文>`，会话文件还在（会话已关闭，同现在“已关闭、删除文件失败”那一行）；
@@ -1213,11 +1265,13 @@ proposal §13 第 11 条：worktree 会话的记忆、增强、反馈、模型�
    `Git needs your name and email for the first commit. Set user.name and user.email with git config --global, then try again.`（临时默认值：不替你用别的名字提交）；
 4. `git init`（默认分支名按你的 git 配置 `init.defaultBranch`）；
 5. §7.10 的 `ensureWork(cwd)`（`.work/.gitignore`；§7.10 在不是 git 仓库的文件夹里本来也写它，这里补上被删掉的情况），所以 `.work/` 不进第一次提交；
-6. `git add -A`（按 `.gitignore`；超时 120 s）；
+6. `git add -A`（按 `.gitignore`；超时 120 s，同 `createWorktree` 从参数传入，测试用）；
 7. `git commit --allow-empty -m "Initial commit"`（空文件夹也有第一个提交，之后才能开 Worktree；超时 120 s）。
 
-第 4 步之后失败：不撤销，仓库留着（是“还没有提交的 git 仓库”，两样都不显示，等你自己提交）；原因是 git 原文。结果 `{ initialized: true }`，失败时命令报错，
-确认框显示 `Couldn’t initialize git: <原因>`。
+第 4 步之前记下 `<cwd>/.git` 在不在（第 2 步 `repoInfo` 为 null 时它一般不在；在的话是认不出的残骸，不动它）。第 4 步起任何一步失败或超时：结束 git 进程后，
+`.git` 是本次 `git init` 建的就整个删掉（`fs.rm` 递归；里面只有 git 自己写的文件，没有你的数据；被结束的 `git add` 留下的 `index.lock` 也一起删掉），
+文件夹回到 Initialize 之前，确认框里可以再试；本来就有 `.git` 时不删，只报错。`ensureWork` 建的 `.work/` 留着（无害）。原因是 git 原文；超时时为
+`timed out after 120 seconds`。结果 `{ initialized: true }`，失败时命令报错，确认框显示 `Couldn’t initialize git: <原因>`。
 
 **之后**：后台进程为这个工作路径读一次 git 状态（§3.5，成功、失败都读）：输入框下一行换成 `Worktree` 开关，右栏显示 git 状态。
 §3.5 把结果发给这个工作路径上所有开着的用户会话，所以同一文件夹里别的开着的会话一起变；开在它的子文件夹里的会话是别的工作路径，在它们下次读状态时（§3.5 的时机）变过来。
@@ -1247,6 +1301,7 @@ Initialize git 在两次运行之间做，它和第一次提交都不算哪一�
 | `rewind` | 界面 → 后台 | `{ sessionId, entryId, code: boolean, conversation: boolean, conflictChoice?: { action: 'overwrite' \| 'skip', token: string } }` → `RewindResult`；`code`、`conversation` 至少一个为真 | §5.6–§5.11 |
 | `rewind.undo` | 界面 → 后台 | `{ sessionId, undoId: string, conflictChoice? }` → `RewindResult`；`undoId` 是 `mori.rewind` 的条目 id | §5.9 |
 | `mori.turn_changes` | 后台 → 界面（用户会话的信封）；也是会话条目 | `RunRecord \| ChangesRecord`，事件与条目相同 | §4.6 |
+| `mori.snapshot_stage` | 后台 → 界面（用户会话的信封；只为用户会话自己的运行发） | `{ type, active: boolean }`：运行开始的快照作业排进队列前 `true`，做完、失败、被停止或不拍时 `false`；界面按模型层等待的做法显示阶段行 `Taking a snapshot… · <秒数>` | §4.5、§13 |
 | `mori.rewind` | 后台 → 界面；也是会话条目 | 事件 `{ type, entryId, record: RewindRecord }`；条目 `RewindRecord` | §5.9 |
 | `mori.pick`（模型层现有的条目） | 会话条目 | 载荷不变；恢复对话、Undo 回到原来的分支之后在新的当前分支末尾再写一条 | §5.8 |
 | `RepoInfo`、`WorkspaceStatus`、`SnapshotState`、`RunRecord`、`ChangesRecord`、`RewindRecord`、`RewindResult` | 类型（`shared/workspace.ts`） | 见各节 | §3.4、§3.5、§4.4、§4.6、§5.9、§5.11 |
@@ -1304,6 +1359,7 @@ Initialize git 在两次运行之间做，它和第一次提交都不算哪一�
 | `Not allowed for this task: `、`Not allowed for this question: `、`Not allowed while deciding requests: `、`Not allowed while closing a request: `、`Not allowed in a subscription: `（`NARROWING_LEADS` 的五个开头各接 `: `） | §8.3、§8.4，收窄 | `Denied · <原文>` |
 | `RELAY_ONLY` 整句：`Team mode is on: the dialog agent only relays; the work is done in tasks.` | §8.3，协作模式下的对话会话与合并会话 | `Denied · <原文>` |
 | `REJECTED_AWAY_PREFIX`：`The user was away and didn't answer within ` | §9.4，你不在、批准卡到时 | `Denied · No answer while you were away` |
+| `Mori couldn't prepare .work in the working directory` | §7.10，`ensureWork` 失败、放行的调用被挡下 | `Denied · <原文>`，没有放行标签 |
 | `ASK_DECLINED_TEXT` 整句：`The user declined to answer your questions. Stop what you are doing and wait for the user to tell you how to proceed.` | §10.6，你拒绝回答提问 | `Denied · You declined to answer` |
 | `ASK_STOPPED_TEXT` 整句：`Not answered: the user stopped the run.` | §10.6，提问时你按了停止、会话关闭 | `Stopped`：不算拒绝，`addToolResult` 与 `ABORTED_TOOL` 一样算已停止 |
 
@@ -1330,7 +1386,12 @@ Initialize git 在两次运行之间做，它和第一次提交都不算哪一�
 3. 其余各项（范围、Effort 等）不变。
 
 **其他位置**：顶栏 `Toggle changes` 左边的 `+N −M`（§5.4）；右栏 Changes（§5.1）；你的消息上的 `Rewind`（§5.5）；批准卡的原因行与倒计时（§6.13、§9.9）；
-提问卡（§10.4）；一轮末尾的 Decided while you were away（§9.9）；侧栏 worktree 会话的分支标签（§11.7）。
+提问卡（§10.4）；一轮末尾的 Decided while you were away（§9.9）；侧栏 worktree 会话的分支标签（§11.7）；
+阶段行在运行开始的快照期间（`agent_start` 之前）显示 `Taking a snapshot… · <秒数>`（§4.5，fs-changes.md）：`mori.snapshot_stage` 照 `applyModelWait` 的做法交给
+`startModelStage(state, 'snapshot', 'Taking a snapshot…', now)` / `endModelStage(state, 'snapshot')`（`app/src/renderer/src/state/transcript.ts:388-396`；
+`ModelStage.kind` 加 `'snapshot'`，`app/src/renderer/src/state/model.ts:171`）。`StageLine.tsx:17-21` 的 `modelStageShown` 已经要求 `running || sending` 且没有批准卡、询问，
+`applySettled`、`dropPending` 已经清掉它，`agent_start` 另外清掉 kind `snapshot`；阶段行 `data-kind="snapshot"`。
+[model-chat.md](../v1/screens/model-chat.md)“准备中”一节加注：这段等待显示（§18）。
 
 **设置页**：左边的分节在 Models、AGENTS.md、UI issues 之后加两节：
 
@@ -1377,8 +1438,8 @@ The sections after the project information hold what Mori has learned with this 
 | `limitsText` 的各段（按这个顺序，`; ` 连接） | `no file changes or commands` / `no commands` / `writes limited to <p1>, <p2> and .work/` / `no MCP or extension tools` | 上一行 |
 | 收窄的拒绝 | `<开头>: <规则文字>.`（开头 §8.3，规则文字 §8.4），例如 `Not allowed for this task: no file changes or commands.`、`Not allowed for this question: no MCP or extension tools.`、`Not allowed for this task: writes are limited to src/ and .work/; docs/a.md is outside them.`、`Not allowed while closing a request: no file changes or commands.`；对话会话与合并会话为整句 `RELAY_ONLY`（原文不变） | 越界的调用（工具结果） |
 | `limits` 校验的原因（第二行是这个工具的 Correct form） | `limits.write_paths: "<p>" must be relative to the working directory.` / `limits.write_paths: "<p>" is outside the working directory.` / `limits.write_paths: "<p>" is the whole working directory; leave write_paths out.` | `task_create`、`agent_message` 的 `limits` 不合格 |
-| 自动拒绝 | `The user was away and didn't answer within 5 minutes, so this was denied. Don't retry it. Mention it in your final summary.`；task 实例、结案会话最后一句为 `Mention it in your handoff.`；时长按当时的设置写 `60 seconds` / `5 minutes` / `10 minutes` | 批准卡到时，作为这次调用的工具结果 |
-| 提醒 | `[Mori] The user was away, so Mori decided these without them during this turn:`，每项一行（`- Denied bash: npm publish`、`- Used your recommended option for "Which database should I use?": PostgreSQL`），最后 `Don't retry the denied calls. Mention all of these in your final summary.`（task 实例、结案会话为 `… in your handoff.`） | `agent_before_settle`，一次运行一次（§9.8） |
+| 自动拒绝 | `The user was away and didn't answer within 5 minutes, so this was denied. Don't retry it. Mention it in your final summary.`；task 实例、结案会话（`GateOutput.kind` 为 `task`、`close`）最后一句为 `Mention it in your handoff.`；时长按当时的设置写 `60 seconds` / `5 minutes` / `10 minutes` | 批准卡到时，作为这次调用的工具结果 |
+| 提醒 | `[Mori] The user was away, so Mori decided these without them during this turn:`，每项一行（`- Denied bash: npm publish`、`- Used your recommended option for "Which database should I use?": PostgreSQL`），最后 `Don't retry the denied calls. Mention all of these in your final summary.`（task 实例、结案会话为 `… in your handoff.`，按 `AwayItem.kind`，§9.8） | `agent_before_settle`，一次运行一次（§9.8） |
 | `ask_user_question` 的说明 | `Ask the user 1-4 questions, each with 2-4 options, and wait for the answers. Use it when you need the user's decision or preference to go on: a choice between approaches, a missing requirement, or which of several things they meant. Don't use it for what you can find out yourself, or to ask permission to run a tool. The user can always type their own answer instead of picking an option, so don't add an "Other" option. Set recommended to the label of the option you would pick; if the user is away and doesn't answer in time, Mori uses it and tells you.` | 用户会话每次请求的 `tools` 参数 |
 | `ask_user_question` 的参数说明 | `questions`：`The questions, 1-4, shown together on one card in this order.` / `question`：`The full question, ending with a question mark.` / `header`：`A short tag for the question, at most 12 characters, e.g. Database.` / `options`：`2-4 options.` / `label`：`What the user picks, in a few words.` / `description`：`What this option means, or what happens if the user picks it.` / `multiSelect`：`true if the user may pick more than one option.` / `recommended`：`The label of the option you recommend; it must be one of the labels.` | 同上 |
 | 结果：你提交 / 你不在 | `User has answered your questions: "Which database should I use?"="PostgreSQL", "Which parts?"="API, CLI". You can now continue with the user's answers in mind.` / `The user was away and didn't answer within 5 minutes, so your recommended options were used: "Which database should I use?"="PostgreSQL". Continue with them, and mention this in your final summary.` | 你在卡上提交 / 提问卡到时（时长按设置） |
@@ -1421,7 +1482,7 @@ The sections after the project information hold what Mori has learned with this 
 - **不监视、不轮询**：`kernel/git.ts`、`workspace.ts`、`snapshots.ts` 里没有 `fs.watch`、`watchFile`、`setInterval`；git 状态只在 §3.5 的时机读，工具执行完的读去抖 500 毫秒、
   同一时刻一个；快照只在运行前后拍，同一个工作路径同一时刻一个作业；worktree 与快照的清理只在你操作时做（§3.5、§4.5、§11.9）。
 - **计时有上限**：每张挂起的卡一个 `setTimeout`；每个 pi 会话的工具调用按顺序执行，所以一个会话同一时刻至多一张批准卡或提问卡（§9.3）。
-- **快照的上限**：单个未跟踪文件 10 MB、一次加入 20000 个文件、每个 git 进程 120 秒；记录里的文件 500 个；diff 1 MB；冲突与恢复的列表各 200 条；git 状态 500 条（§17）。
+- **快照的上限**：单个未跟踪文件 10 MB、一次加入 20000 个文件（多于 2000 个时每 2000 条一个 git 进程，大文件的 `stat` 是异步的）、每个 git 进程 120 秒；记录里的文件 500 个；diff 1 MB；冲突与恢复的列表各 200 条；git 状态 500 条（§17）。
 - **路径闸碰文件系统的上限**：词法上在工作路径外的目标不碰文件系统，所以 `\\主机\共享\…` 这类网络路径不会让 Windows 去连那台主机、送出凭据（只有工作路径本身在网络上时才会碰网络）；
   一个目标最多“段数”次 `lstat` 和一次 `realpath`，一个调用最多解析 100 个写入目标；现算、不缓存（§6.3）。
 - **命令分析是纯函数**：不读文件、不读环境变量；命令文字最多 1,000,000 个字符、嵌套 32 层，1 MB 一次不超过 200 ms；解析失败的日志不写命令原文（§7.8）。
@@ -1457,8 +1518,9 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | 项 | 值 | 位置 | 理由 |
 | --- | --- | --- | --- |
 | **§3–§5 git、快照与 Rewind** | | | |
-| git 最低版本 | 2.31 | `kernel/git.ts` | `rev-parse --path-format=absolute` 从 2.31 起；`restore`（2.23）、`--pathspec-from-file`（2.26）都更早；本机 2.55 |
+| git 最低版本 | 2.32 | `kernel/git.ts` | `GIT_CONFIG_GLOBAL` 从 2.32 起（Git for Windows RelNotes 2.32.0），内部仓库的隔离靠它（§3.3、§4.1）；`rev-parse --path-format=absolute`（2.31）、`restore`（2.23）、`--pathspec-from-file`（2.26）都更早；本机 2.55 |
 | 找 git 的位置 | `PATH` 里每个目录下的 `git.exe`，然后 `C:\Program Files\Git\cmd\git.exe` | `kernel/git.ts` | Mori 不自带 git；Git for Windows 默认装在这里，pi 找 Git Bash 也看 Program Files（`app/node_modules/@earendil-works/pi-coding-agent/dist/utils/shell.js:69-73`） |
+| 找 git 的环境变量 | `MORI_GIT_PATH`：有值时只试这一个路径，文件不存在为 `missing` | `kernel/git.ts` | App 测试要能做出没装 git（开发机都装着 Git for Windows）；照 `MORI_USER_DATA` 的写法，只给测试用 |
 | 没找到 git 时再找 | 每次 `workspace.status` 命令（只看文件是否存在） | `kernel/git.ts` | 装好 git 后点 Refresh 就能用；别处不重找，不起多余的进程 |
 | git 进程超时 | `--version` 5 秒；`rev-parse`、`status`、给界面的 `diff` 10 秒；快照与恢复里每个进程 120 秒；删除会话的 `prune` 300 秒 | `kernel/git.ts` | status 实测 0.13 秒，10 秒足够大仓库；快照的第一次 `add` 在 2 万个文件时约 50 秒（u-a8 按 3 万个 76 秒推算），120 秒留余量 |
 | git 输出上限 | `status` 4 MB；其他 16 MB；stderr 64 KB | `kernel/git.ts` | 限内存；status 默认把未跟踪目录收成一行，4 MB 约 5 万条 |
@@ -1477,7 +1539,9 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | 大文件说明 | 列出前 20 个 | `kernel/snapshots.ts`、右栏 | 说明哪些文件 Rewind 不会恢复；限长度 |
 | 嵌套仓库的说明 | 树变了时 `git ls-tree -r -z` 找 mode 160000 的条目，`nested` 最多 20 个、`nestedTotal` 记全部；This session 上方一行 `Changes inside nested repositories aren’t tracked: <路径>, <路径>`，多于 20 个时接 ` and <n> more` | `kernel/snapshots.ts`、右栏 | 写规格时定的第 8 条只说列出这些路径；条数上限同大文件说明 |
 | 文件数暂停之后 | 每个快照点重新数，降到上限内自动恢复，从新的基准开始 | `kernel/snapshots.ts` | proposal 只说暂停、说明原因；加了 `.gitignore` 就恢复，不另加按钮 |
-| 快照超时 | 暂停到后台进程重启 | `kernel/snapshots.ts` | 每次运行开始都等 120 秒不如停下说明 |
+| 快照超时 | 某个 git 进程超过 120 秒：这一张 `error`（`a snapshot step took longer than 2 minutes`），下一个快照点续做；同一工作路径连续 3 张都超时才暂停到后台进程重启 | `kernel/snapshots.ts` | 分批后超时只丢一批，续做能完成；连续 3 次才停，避免每次运行开始都白等 120 秒 |
+| 分批加入的条数 | 新文件多于 2000 个时每批 2000 条，一批一个 git 进程，每批都写进 index | `kernel/snapshots.ts` | 一次 `add -A` 被结束时一点进度都不留；u-a8 实测 3 万个文件 76 秒，2000 个一批远在 120 秒内 |
+| 嵌套工作路径的 overlap | 包含或被包含的工作路径上同时有运行时记 `overlap: true` | `kernel/snapshots.ts` | proposal §13 第 17 条只写同一文件夹；嵌套文件夹的会话写的文件同样进这个会话的快照，不标就会在 Rewind 时不问被覆盖 |
 | 增强会话与它的实例 | 不拍快照，不进 `active` | `kernel/snapshots.ts` | 没有右栏、不能 Rewind（记忆规格 §9.6）；它们的改动按别人改的算：你空闲时改的不记，在这个会话最近一张快照之后改的 Rewind 时列为 `changed`；和你的会话同时运行时改的记进那一段、不标 `overlap`（同外部程序改的） |
 | 由 custom 消息开始的运行 | 没有起始消息、没有 `run` 记录；改动归你最近的消息 | `kernel/timeline.ts` | `before_agent_start` 的 `messageType: 'custom'`；不这样，运行中插话的消息会被当成起始消息 |
 | 进行中的运行的开始快照 | `refs/mori/s/<会话 id>/run/<提交>` 保住，写 `run` 记录时换掉 | `kernel/snapshots.ts` | 只改了 gitlink 的段不写记录，开始快照可能没有 ref，被别的会话删除时的 `prune` 删掉 |
@@ -1494,7 +1558,8 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | `mori-snapshots` 的位置 | `mori-approval` 之后、`mcp` 之前，必需 | `kernel/sessions.ts` | 没有它就没有快照，Rewind 会恢复错；同其他必需扩展 |
 | 整理的命令 | `git prune --expire=now`（不 `gc`） | `kernel/snapshots.ts` | 对象本来就是散的（`gc.auto=0`），prune 快且不重新打包 |
 | This session 的顺序 | 新的轮在上；轮里按文件第一次出现 | 右栏 | 最近的改动最常看 |
-| 轮的编号 `Turn <n>` | 当前分支上第几条你的消息，不算 `[Mori]` 投递 | 右栏、Rewind 通知 | 轮只挂在你的消息上；会话引用现在把投递也算进去，协作模式下两边编号可能不同 |
+| 轮的编号 `Turn <n>` | 当前分支上第几条你的消息，不算 `[Mori]` 投递；会话引用的 Turn N 用同一个计数（`turnNumbers`，投递的内容接到前一轮里） | 右栏、Rewind 通知、会话引用 | 轮只挂在你的消息上；两处一个编号，右栏的 Turn 3 与引用芯片的 Turn 3 指同一条消息 |
+| 运行开始的快照的阶段行 | `Taking a snapshot… · <秒数>`，只为用户会话自己的运行显示 | `kernel/snapshots.ts`、`StageLine.tsx` | proposal 没给；第一张可到几十秒，发出消息后阶段行不能一片空白；照模型层等待的写法 |
 | Rewind 通知的文字 | `Restored code to before turn <n> · Undo` 等（§5.9、fs-rewind.md），不用 proposal §5.3 图里的 `… before this message` | 对话流 | 通知在对话流末尾，恢复对话后那条消息也不在了，“this message”指不到 |
 | 这条消息恰是叶子时恢复对话 | 导航到它的父条目；父条目是 user 消息、`custom_message` 或没有时失败 | `kernel/rewind.ts` | pi 对“已在目标上”什么都不做（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:3240-3243`） |
 | Rewind 进行中再 Rewind | 拒绝，`This session is already rewinding.` | `kernel/rewind.ts` | 第二次要基于第一次的结果算计划 |
@@ -1527,6 +1592,7 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | 答错了选项时的命令错误 | `Allow for this session doesn’t apply to writes outside the working directory or to protected paths.`；`This request can’t be allowed by folder.`；`Give either toolName or dir.` | `kernel/approval.ts`、`kernel/sessions.ts` | 界面按请求只给对的按钮，这几条只在界面与后台进程不一致时出现 |
 | 原因行 `unresolved`、`leaves` 的写法 | `Writes to a path Mori can’t resolve: <text>`、`Runs outside the working directory: <path 或 text>` | `renderer/src/components/ApprovalCard.tsx` | proposal §6 只给了 outside 与 protected 两种；看不出目标、换了目录时显示的是原文而不是路径，要另一种说法 |
 | 命令在 Ask each time 下 | 总是问（scope 为 `inside` 时可按工具名放行），哪怕目标只在 `.work` | `kernel/approval.ts` | 命令能做的不只认出的写入；proposal 的“写 `.work` 不问”指 `edit`、`write` |
+| 按工具名放行命令的小字 | `You won’t be asked again for commands in this session, unless Mori can’t analyze a command or detects that it writes outside the working directory or to a protected path, or changes to a folder outside it.` | `renderer/src/components/ApprovalCard.tsx` | 列出放行之后仍出卡的全部情况（§7.8 分析不了；§6.4 写到外面、受保护路径、换到外面），按下之后又出卡时与刚读到的承诺一致 |
 | 卡上的目标行 | 最多 5 行，多的写 `and {n} more` | `renderer/src/components/ApprovalCard.tsx` | 一条命令可能有很多目标，卡不能撑满一栏 |
 | 拒绝原文里列的目标 | 每种最多 5 个，多的写 `and <n> more` | `kernel/approval.ts` | 同上，控制工具结果的长度 |
 | 没人能批时的拒绝原文 | §6.15 | `kernel/approval.ts`（开头 `Denied by Mori: ` 在 `shared/workspace.ts` 的 `DENIAL_PREFIXES`） | proposal 没给原文 |
@@ -1566,7 +1632,10 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | `.work` 建不起来（是文件、只读文件夹、没有权限） | 挡下这次调用并说明原因，记错误日志 | `approval.ts` | proposal 没说；照 AGENTS 第 6 条遇到阻塞就停下来报告，不静默换路线；另一种做法（照常跑、TEMP 不改，在工具结果里说明）是换路线的 fallback，不采用。这样这个文件夹里的命令都跑不了，直到你改名或删掉那个 `.work` |
 | `.work/.gitignore` | 内容 `*\n`；只在没有时写（`wx`），从不覆盖 | `workspace.ts` | proposal §4；你改过的保留 |
 | 工作路径不在时 | `ensureWork` 什么都不建 | `workspace.ts` | 不把删掉的 worktree 重新建出来 |
-| 设哪些变量 | TEMP、TMP、TMPDIR，都指到 `<工作路径>\.work\tmp`；先删掉各种大小写写法 | `workspace.ts` `workEnv` | proposal 写 TEMP / TMP；TMPDIR 是 Git Bash 的 `mktemp` 与 Python 先看的（本机实测） |
+| 设哪些变量 | TEMP、TMP、TMPDIR，都指到 `<工作路径>\.work\tmp`；先删掉各种大小写写法；另去掉 CDPATH 的各种大小写写法（不设新值） | `workspace.ts` `workEnv` | proposal 写 TEMP / TMP；TMPDIR 是 Git Bash 的 `mktemp` 与 Python 先看的（本机实测）；继承的 CDPATH 会让 bash 的 `cd 相对名` 换到别处，§7.7 的解析就不准 |
+| 命令自己改了 TEMP、TMP、TMPDIR、PWD | 这条命令里（含之后嵌套的 shell、eval 文字）这个名字看不出来（`variable`）：开头的赋值、`env -i` / `-u`、export、只有赋值、PowerShell 的 `$env:` 都算 | `commandScan.ts` | `vars` 是 `spawnHook` 设的值，命令改掉之后不再对（Git Bash、pwsh 实测写到了工作路径外）；偏严，严格说只有嵌套文字看到开头赋值的新值 |
+| 命令里设了 CDPATH | 之后 bash 的 `cd` / `pushd` 操作数不以 `/`、`\`、`.`、`~`、盘符开头时目录看不出来；`unset CDPATH` 不恢复 | `commandScan.ts` | bash 对这种操作数先查 CDPATH（Git Bash 实测换到了工作路径外）；偏严，写法少见 |
+| PowerShell 外部程序参数里的 cmd.exe 元字符 | 去掉 PowerShell 引号后不含空白、却含 `>` `<` `\|` `&` 的参数，与 `--%`，解析失败 | `commandScan.ts` | `.cmd` / `.bat` 垫片（npm、npx、tsc 等）由 cmd.exe 再解析一遍（pwsh 实测 `npm.cmd --version '>' ..\x` 写出文件）；看不出命令名是不是垫片，按文字从严，§7.13 统计后再定 |
 | 换掉的工具 | `bash`、`powershell` 用 `customTools` 换，`defaultActive: false`，工具页来源仍为 Built-in | `workspace.ts` `shellTools`、`resources.ts` `toolSource` | 启用与显示与内置工具相同（§7.11 的核实） |
 | `.work` 的清理 | 不清理，不设上限 | — | proposal §9 第 5 条没有后台清理；草稿在里面；工作路径在 OneDrive 里时，命令的临时文件也会被同步 |
 | 解析失败的日志 | `[kernel] command not analyzed (<shell>): <reason>`，不写命令原文 | `approval.ts` | 语料统计与排查用 |
@@ -1642,7 +1711,10 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | 归档时删 worktree 的结果 | 不显示，只记日志 | `projects.ts` `archiveSession` | 归档不确认（方案 5.3）；留下的在设置页能看到 |
 | 删除时 worktree 正被别的开着的会话用 | 不删 worktree，照常删会话，确认框写明 | `deleteSession`、`worktrees.cleanUp` | 删了会让那个会话的工具全部失败 |
 | “干净”的判断 | `git --no-optional-locks status --porcelain` 为空；被忽略的文件（`.work/`、`node_modules`）不算，删 worktree 时一起删 | `worktrees.list`、`cleanUp` | 与 `git worktree remove` 自己的判断相同（实测） |
-| 恢复 worktree | 先 `git worktree prune`，再 `worktree add <path> <branch>`；按 `worktreeOf(cwd)`，不要求 `mori.worktree` | `openFromFile` | 实测手工删掉的 worktree 不 prune 就 add 不上；同一 worktree 里另开的会话也能打开 |
+| 恢复 worktree | 登记里还有它（含 `locked` 的）时先 `worktree remove --force --force` 再 `prune`，然后 `worktree add <path> <branch>`（120 s；失败时清掉建了一半的，不删分支）；文件夹在而登记没有时打开失败、不替你删；按 `worktreeOf(cwd)`，不要求 `mori.worktree` | `openFromFile` | 实测手工删掉的 worktree 不清登记就 add 不上，`prune` 不删锁着的登记；同一 worktree 里另开的会话也能打开 |
+| 删 worktree 后文件夹还在 | `fs.rm` 递归删掉（Node 不跟进联接）；仍在则 `removed: false` 与原文 | `worktrees.cleanUp` | 实测里面有目录联接时 `git worktree remove --force` 只删登记；留下的文件夹让这个会话再也恢复不了 |
+| 共用配置里有 `core.worktree` | 不建 worktree，说明原因，什么都不改 | `createWorktree` | 实测这时链接出去的 worktree 以主文件夹为工作树，Agent 在里面提交的是主文件夹；挪配置是你的仓库的事 |
+| Initialize git 中途失败 | 结束 git 后删掉本次 `git init` 建的 `.git`，文件夹回到之前；本来就有 `.git` 时不删 | `initGit` | 被结束的 `git add` 在你的新仓库里留下 `index.lock`，仓库留着你就得自己清锁；那个 `.git` 里只有 git 写的文件 |
 | 界面的本次信任回答 | 按 `projectFolder(cwd)` 记（记住到 `trust.json` 的照 pi，不改） | `renderer/src/state/trust.ts` | proposal §13 第 11 条没列信任；在主文件夹回答过，同一次运行里不再为它的 worktree 问 |
 | 侧栏分支标签 | 建 worktree 时的分支名（从路径推出），不读 git；空间不够时先截断分支标签 | `SessionTree.tsx` | 不为侧栏调 git；右栏有实时的分支 |
 | 设置页的位置 | 新的一节 `Storage`，排在 `General` 之后，块名 `Worktrees` | `SettingsPage.tsx`、`settings/StorageSection.tsx` | 照 Claude 的 Settings > Storage；When you’re away 在 `General`（§9.6），两节都留 |
@@ -1669,9 +1741,11 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | `app/package.json` | 脚本 `test:fs-unit`（`node --test --test-reporter=./tests/unit/fs-reporter.mjs "tests/unit/filesystem/*.test.mjs"`）、`test:filesystem`（§19.3）；`test:min` 在 `test:md-unit` 之后加 `npm run test:fs-unit` |
 | `docs/specs/parallel-agents-taskboard.md` | §0 第 18 行“临时提问与订阅的只读实例”；§4.1 `tools` 一行与例子里的 `tools: [read]`、§4.3“角色文件只是说明和工具清单”、§4.4 工具那一行；§5.1 `mori.team { mode, tools? }`；§5.2“能不能改文件取决于它的工具配置”与 `setActiveToolsByName`；§5.5 整节（工具不变、程序收窄、`RELAY_ONLY` 在路径闸、职责工具按模式，对话与免批准工具加 `ask_user_question`）；§5.6、§8.5、附录 A 的 `ask_user`、`relay`、`create_need_user` 加选项行；§6.1 `readOnly`；§6.3 `task_create`、`agent_message` 两行与“工具在会话建立时固定”，交接单加 `options`、`recommended`（§7.2 同）；§6.4“是否只读”；§7.7 第 3 步：答复也可能来自提问卡的转发；§8.1–§8.3 的工具一列、白名单、工作卡 task 行；§9.2 写 task 的定义；§9.5 订阅只读；§10.1 两处“只读”与 `agent_message` 的参数；§11.1 Allow all、§11.2 免批准的工具（加 `memory`、`ask_user_question`，读取另归一类）、§11.3 后台卡带原因行、同样计时、你不在时按拒绝处理；§13.10 的 `teamEdited`、§13.12：后台实例改的文件列在 This session；§14.1、§14.3（`tool_call` 一行；钩子表加 `mori-approval` 的 `agent_before_settle`）、§14.6 T-T2 括号里的说明；§17.1 真实层两条；§17.2 TB-01、03、04、05、09、10、13、23、24、30、33、34、44、45、49、57（§19.4）；第 96、111 行 `<project>/.mori/agents`：worktree 会话从主文件夹读（§11.7）。各处注明对应的 §6、§8、§9、§10、§11 |
 | `docs/proposals/parallel-agents-taskboard.md` | 第 88 行 `tools: [read]`、第 97 行“它能不能改文件，取决于它的工具配置”、第 116、309、352 行“只读实例”、第 222 行“（只读）”、第 237–238 行“程序据此不给它写入工具”、第 296 行“是否只读”：工具不再开关，改为收窄 `limits`（§8） |
-| `docs/specs/memory.md` | §0 第 31 行“命令和 MCP 一律自动执行”：写到外面或受保护路径的命令直接拒绝（§8.10）；§2 表的 TaskBoard 一行与“批准”一行（`all` → `full`、没人能批，§6.11）；§3 第 126 行与 §9.5 第 632、639 行：先取 `projectFolder(cwd)`（§11.7）；§7.2 第 428 行、§7.6 第 504 行“含只读 task”→“含 `write: false` 的 task”；§7.6 第 500–503 行按 §8.6 的职责工具表，旁注 `ask_user_question` 与 `memory` 同为按席位给的工具（§10.1）；§7.7（第 510 行一带）：路径解析移到 `pathGate.ts`、`..notes` 这种名字改算在里面（§6.3），最后一句加“命令的写入目标改由路径闸分析，MCP 仍不分析”（§7）；§9.6 第 654 行（`all` → `full`）与第 672–674 行（写到外面的命令直接拒绝）；附录 A.1：text 块第二行之后加 §14 的 `.work` 一行（块里只放原文，MEM-01 按 `specBlock('### A.1')` 逐字读），第二句按模式三种（§6.16），注写在块外；MEM-11 去掉“写了 `tools` 的对话角色”，MEM-20 加“写到外面的命令直接被拒绝、不出卡”，MEM-31“含只读 task”，MEM-28 加注：设置页的分节由三节变为五节，多 `General`、`Storage`（它的 App 测试 `mem-app-settings.mjs:713-715` 断言分节，§19.4；2026-10-26 注：见 file-system-permissions.md §9.6、file-system.md §11.10）；§14.4 `tb-app-roles.mjs`（TB-09）一行的 `tools: [read]` 集合去掉 |
+| `docs/specs/memory.md` | §0 第 31 行“命令和 MCP 一律自动执行”：写到外面或受保护路径的命令直接拒绝（§8.10）；§2 表的 TaskBoard 一行与“批准”一行（`all` → `full`、没人能批，§6.11）；§3 第 126 行与 §9.5 第 632、639 行：先取 `projectFolder(cwd)`（§11.7）；§7.2 第 428 行、§7.6 第 504 行“含只读 task”→“含 `write: false` 的 task”；§7.6 第 500–503 行按 §8.6 的职责工具表，旁注 `ask_user_question` 与 `memory` 同为按席位给的工具（§10.1）；§7.7（第 510 行一带）：路径解析移到 `pathGate.ts`、`..notes` 这种名字改算在里面（§6.3），最后一句加“命令的写入目标改由路径闸分析，MCP 仍不分析”（§7）；§9.6 第 654 行（`all` → `full`）与第 672–674 行（写到外面的命令直接拒绝）；附录 A.1：text 块第二行之后加 §14 的 `.work` 一行（块里只放原文，MEM-01 按 `specBlock('### A.1')` 逐字读），第二句按模式三种（§6.16），注写在块外；MEM-11 去掉“写了 `tools` 的对话角色”，MEM-20 加“写到外面的命令直接被拒绝、不出卡”，MEM-31“含只读 task”、它的不合格角色文件改用 `seats: [nowhere]`（问题行随之变，§19.4），MEM-11 的单元测试（`core-team.test.mjs:58-73`）按 §19.4 改期望，MEM-28 加注：设置页的分节由三节变为五节，多 `General`、`Storage`（它的 App 测试 `mem-app-settings.mjs:713-715` 断言分节，§19.4；2026-10-26 注：见 file-system-permissions.md §9.6、file-system.md §11.10）；§14.4 `tb-app-roles.mjs`（TB-09）一行的 `tools: [read]` 集合去掉 |
 | `docs/specs/model-providers.md` | 第 131 行 `projectZones` 的键与 §4.3 的 `<project>/.mori/models.json`：项目路径先取 `projectFolder`（§11.7）；`mori.pick` 一处：恢复对话、Undo 回到原来的分支之后在新的当前分支末尾再记一条（§5.8，写规格时定的第 7 条） |
-| `docs/v0/ui-strings.md` | 第 47 行改写（Full access 代替 Allow all，说明它不是 Claude 的 Bypass permissions、也不是 Codex 的 Full access）；第 187–198、388、453–454 行的 Allow all 换掉；第 220 行 `This session’s changes` 改 `Changes`（读屏名 `Toggle changes` 不变），第 221 行去掉 `Only edits and writes are listed. Files changed by commands aren’t included.`；术语表加：Changes、This session、Rewind 与菜单四项、No code restore、Undo、Overwrite / Skip these files、Git is required to …（track changes and rewind、create a worktree、initialize a repository、restore this session’s worktree、clean up worktrees）、Not a git repository、Staged / Unstaged / Untracked / Conflicts、Up to date、No uncommitted changes、Turn <n>、`Changes inside nested repositories aren’t tracked: …`；Full access 的确认框与悬停说明、原因行五种、按目录放行的按钮与小字、`Writes to <目录>`、三种按工具名放行的小字；`Couldn’t analyze this command: <reason>`、`(paths from input)`、`(unrecognized parameters of <cmdlet>)`；你不在 = away（When you’re away、You’re away · …）、Decided while you were away；提问卡的 Recommended、Other、Submit、`Denied · You declined to answer`、`Waiting for your answer`、`Ask · <headers>`；Worktree、Initialize git… / Initialize git / Initializing…、Creating worktree…、Checking its worktree…、Clean up worktrees… / Clean up / Cleaning up…、General、Storage；`Couldn’t create the worktree: …`、`Couldn’t initialize git: …`、`Couldn’t load worktrees: …`、`Couldn’t delete <branch>: …`（原文见屏幕表） |
+| `docs/v0/ui-strings.md` | 第 47 行改写（Full access 代替 Allow all，说明它不是 Claude 的 Bypass permissions、也不是 Codex 的 Full access）；第 187–198、388、453–454 行的 Allow all 换掉；第 220 行 `This session’s changes` 改 `Changes`（读屏名 `Toggle changes` 不变），第 221 行去掉 `Only edits and writes are listed. Files changed by commands aren’t included.`；术语表加：Changes、This session、Rewind 与菜单四项、No code restore、Undo、Overwrite / Skip these files、Git is required to …（track changes and rewind、create a worktree、initialize a repository、restore this session’s worktree、clean up worktrees）、Not a git repository、Staged / Unstaged / Untracked / Conflicts、Up to date、No uncommitted changes、Turn <n>、`Changes inside nested repositories aren’t tracked: …`；Full access 的确认框与悬停说明、原因行五种、按目录放行的按钮与小字、`Writes to <目录>`、三种按工具名放行的小字；`Couldn’t analyze this command: <reason>`、`(paths from input)`、`(unrecognized parameters of <cmdlet>)`；你不在 = away（When you’re away、You’re away · …）、Decided while you were away；提问卡的 Recommended、Other、Submit、`Denied · You declined to answer`、`Waiting for your answer`、`Ask · <headers>`；Worktree、Initialize git… / Initialize git / Initializing…、Creating worktree…、Checking its worktree…、Clean up worktrees… / Clean up / Cleaning up…、General、Storage；`Couldn’t create the worktree: …`、`Couldn’t initialize git: …`、`Couldn’t load worktrees: …`、`Couldn’t delete <branch>: …`（原文见屏幕表）；`Git 2.32 or newer is required to track changes and rewind (found <version>).`、`Taking a snapshot…`、`This repository sets core.worktree, …`、`The folder <sub> isn’t committed yet, …`、`The worktree folder <path> exists but isn’t registered with git. …`、`Restoring the worktree timed out after 120 seconds.`；“会话引用的内容”一节：Turn N 与右栏的 `Turn <n>` 用同一个计数，`[Mori]` 投递接到前一轮里（§5.3） |
+| `docs/v0/screens/session-refs.md` | 第 28、65、80 行一带的 Turn N：与右栏 This session 的 `Turn <n>` 同一个计数，`mori.wake` 指向的投递不另起一轮、它的 `User:` 几行接到前一轮里（§5.3） |
+| `docs/v1/screens/model-chat.md` | “准备中”一节加注：选完模型之后、`agent_start` 之前，用户会话等运行开始的快照时阶段行显示 `Taking a snapshot… · <秒数>`（§4.5、§13，fs-changes.md） |
 | `docs/v0/screens/approval.md` | “哪些调用要批准”、`mori.tool_gate` 的值、`approval.setMode`、警示行 “This file is outside the working directory”、Allow all 的工具卡标签、权限菜单与确认框：见 §6 与 fs-permissions.md；“拒绝的固定写法”表加你不在、到时一行，“选项”后注明卡上的倒计时（§9.4） |
 | `docs/v0/screens/changes.md` | “改动列表”一节与反例第 1 条：见 fs-changes.md；文件阅读器部分不变（重读依据见 §5.1） |
 | `docs/v0/screens/sessions.md` | 第 155 行“Mori 没有 worktree，不涉及”改写为 §11.9 的归档、删除、重新检出；“项目 → 会话树”与会话行：按 `projectFolder(cwd)` 分组、分支标签（§11.7）；删除确认框、“新建或打开失败”：worktree 的一句与恢复失败的原文（§11.9）；“项目信任”的“本次回答过”按主文件夹（§11.7） |
@@ -1689,15 +1763,17 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 
 | 层 | 位置 | 说明 |
 | --- | --- | --- |
-| 单元 | `tests/unit/filesystem/*.test.mjs`（`node --test`，经 esbuild 打包内核模块；报告器 `tests/unit/fs-reporter.mjs` 写 `fs-unit.json`，用严格模式：跳过的、标为待办的测试与套件自己的失败都记为失败，同 `md-reporter.mjs`） | 纯函数与模块：git 的运行（替身进程与真实 git）、`repoInfo`、porcelain v2、`timeline.ts` 的段与轮、内部仓库与快照（真实 git，临时目录里 synthetic 的仓库）、Rewind 的计划与恢复；`pathGate.ts`（与 pi 的解析逐个比较、联接、注入计数的 `lstat` / `realpath`）、判断顺序；`scan-bash.test.mjs`、`scan-powershell.test.mjs`（§7.9 的两张表）、`work.test.mjs`；`limits.ts`；`away.ts`（注入的时钟）、`askQuestion.ts`；`worktree.test.mjs`（真实 git） |
+| 单元 | `tests/unit/filesystem/*.test.mjs`（`node --test`，经 esbuild 打包内核模块；报告器 `tests/unit/fs-reporter.mjs` 写 `fs-unit.json`，用严格模式：跳过的、标为待办的测试与套件自己的失败都记为失败，同 `md-reporter.mjs`） | 纯函数与模块：git 的运行（替身进程经注入的 `spawn` 与找 git 的候选，§3.2、§3.3；以及真实 git）、`repoInfo`、porcelain v2、`timeline.ts` 的段与轮、内部仓库与快照（真实 git，临时目录里 synthetic 的仓库）、Rewind 的计划与恢复；`pathGate.ts`（与 pi 的解析逐个比较、联接、注入计数的 `lstat` / `realpath`）、判断顺序；`scan-bash.test.mjs`、`scan-powershell.test.mjs`（§7.9 的两张表）、`work.test.mjs`；`limits.ts`；`away.ts`（注入的时钟）、`askQuestion.ts`；`worktree.test.mjs`（真实 git） |
 | 合成端点 | `tests/fake-endpoint/`（synthetic） | 用现有的关键词与脚本模式驱动 bash、edit、write、`ask_user_question` 与后台实例的调用；脚本里的 `read_only` 改为 `limits`（§19.4）；附录 A 各段的第一句不变，所以认会话种类的 `SEGMENT_SENTENCES` 不变 |
-| App | `tests/ui/` 下按屏幕与模块分的八个套件：`fs-app-changes.mjs`（FS-05、06、08–14、20、22、23、26）、`fs-app-rewind.mjs`（FS-15–19、24、25）、`fs-app-gate.mjs`（FS-34–39）、`fs-app-work.mjs`（FS-53、54）、`fs-app-team.mjs`（FS-57、59–62、65、66、68）、`fs-app-away.mjs`（FS-69–81）、`fs-app-question.mjs`（FS-83、84、86–90）、`fs-app-worktree.mjs`（FS-98–107、109–112） | Electron + 合成端点，逐条验收；`MORI_USER_DATA` 与 `MORI_SNAPSHOTS_DIR` 指到测试目录；只有测你不在的套件（`fs-app-away.mjs`，FS-69–81）设很短的 `MORI_AWAY_TIMEOUT_MS`，其余 fs-app 套件启动后先 `away.set { timeout: 'never' }`（同 §19.4）；测试项目在临时目录里（是不是 git 仓库按条目） |
-| 回放 | `tests/ui/fs-replay.mjs`，fixture 在 `tests/fixtures/filesystem/`（`harness/main.jsx` 加载这个目录） | `fs-real.mjs` 从真实会话录下（`work-scratch.json`：FS-54；`full-outside.json`：FS-36，FS-114 的 Full access 写到外面；`away-reminder.json`：FS-78，FS-114 的自动拒绝与提醒）：批准卡的原因行、`Denied`、提醒不显示；回放桥的 `workspace.status` 用标明 synthetic 的合成结果（§19.4） |
-| 真实 | `tests/ui/fs-real.mjs --source <你的数据目录>`（各部分共用） | FS-21、FS-40、FS-54、FS-55、FS-67、FS-82、FS-93、FS-113、FS-114；只断言程序保证的事，模型写了什么写进 note |
+| App | `tests/ui/` 下按屏幕与模块分的八个套件：`fs-app-changes.mjs`（FS-05、06、08–14、20、22、23、26）、`fs-app-rewind.mjs`（FS-15–19、24、25）、`fs-app-gate.mjs`（FS-34–39）、`fs-app-work.mjs`（FS-53、54）、`fs-app-team.mjs`（FS-57、59–62、65、66、68）、`fs-app-away.mjs`（FS-69–81）、`fs-app-question.mjs`（FS-83、84、86–90）、`fs-app-worktree.mjs`（FS-98–107、109–112） | Electron + 合成端点，逐条验收；`MORI_USER_DATA` 与 `MORI_SNAPSHOTS_DIR` 指到测试目录；只有测你不在的套件（`fs-app-away.mjs`，FS-69–81）设很短的 `MORI_AWAY_TIMEOUT_MS`，其余 fs-app 套件启动后先 `away.set { timeout: 'never' }`（同 §19.4）；测试项目在临时目录里（是不是 git 仓库按条目）；FS-13、15、23、98、106、107 里“没装 git”的步骤另起一个 App，`env: { MORI_GIT_PATH: <临时目录里不存在的路径> }`（§3.2 第 0 步），开发机装着 Git for Windows 也能得到 `missing` |
+| 回放 | `tests/ui/fs-replay.mjs`，fixture 在 `tests/fixtures/filesystem/`（`harness/main.jsx` 加载这个目录） | `fs-real.mjs` 从真实会话录下（`work-scratch.json`：FS-54；`full-outside.json`：FS-36，FS-114 的 Full access 写到外面；`away-reminder.json`：FS-78，FS-114 的自动拒绝与提醒）：批准卡的原因行、`Denied`、提醒不显示；回放桥的 `workspace.status` 用标明 synthetic 的合成结果（§19.4）；`git` 为 `old` 的界面（FS-13）在这一层测：fs-replay 让合成的 `workspace.status` 返回 `git: { state: 'old', version: '2.31.0' }`，断言 `Git 2.32 or newer …` 一行与 `data-state="old"` |
+| 真实 | `tests/ui/fs-real.mjs --source <你的数据目录> [--repo <第二个仓库>]`（各部分共用） | FS-21、FS-40、FS-54、FS-55、FS-67、FS-82、FS-93、FS-113、FS-114；只断言程序保证的事，模型写了什么写进 note |
 
-**与 AGENTS.md“测试分层”的关系**：每个任务只跑 `npm run test:min`，它加上 `test:fs-unit`（§18）；用真实 git 的单元测试（FS-03、FS-06、FS-07、FS-08、FS-97 等）
-合计不超过 20 秒，20001 个文件的用例只建文件、数完即停，不 `add`；FS-97 的超时用例建 2 万个文件的仓库，并进去时量一次，超出时改用更小的仓库加更短的超时，
-`test:min` 整套仍不超过 2 分钟。App、回放、真实、`spec-coverage` 与 `npm run test:filesystem` 不在任务里跑，交付说明列为未验证，留到负责人要求推送前的完整测试；
+**与 AGENTS.md“测试分层”的关系**：每个任务只跑 `npm run test:min`，它加上 `test:fs-unit`（§18）；现有的 `test:min` 本机实测 86 秒，留给 `test:fs-unit` 的约 30 秒，
+所以用真实 git 的单元测试（FS-03、FS-06、FS-07、FS-08、FS-20、FS-97 等）合计不超过 20 秒。为此快照与 worktree 的上限都是参数，默认为 §17 的值、测试传很小的值：
+`snapshots.ts` 的单个文件上限（10 MB）、新文件数上限（20000）、分批条数（2000）、每个 git 进程的超时（120 秒）、保留的轮数（100），`createWorktree` 与 `initGit` 的超时（120 秒）
+（§4.4、§4.7、§11.5.3、§11.11）。用例按“比注入的上限多一个”写，不建 2 万个文件、不拍 101 轮（起草时量过：建 2 万个文件 57 秒、`add -A` 58 秒，10 个文件上 101 轮 24 秒）。
+实现时把 `test:fs-unit` 与 `test:min` 实测的总时长写进 `docs/v1/fs-checks.md`（前者 ≤ 20 秒，后者 ≤ 2 分钟）。App、回放、真实、`spec-coverage` 与 `npm run test:filesystem` 不在任务里跑，交付说明列为未验证，留到负责人要求推送前的完整测试；
 录 fixture 与真实模型走查要做（§14 改了模型看到的文字），由你用数据目录跑 `fs-real.mjs`。
 
 ### 19.2 验收条目
@@ -1706,29 +1782,29 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 
 | 编号 | 条目 | 通过条件 | 层 |
 | --- | --- | --- | --- |
-| FS-01 | 找 git | PATH 里的 `git.exe` 优先于 Program Files；都没有为 `missing`；`--version` 失败为 `missing`；2.30 为 `old`；`missing` 时下一次 `workspace.status` 再找，放上一个可用的 git 后变为 `ok`；`ok` 之后不再找 | 单元 |
-| FS-02 | 运行 git | 子进程环境没有任何 `GIT_*`（父进程设了 `GIT_DIR`、`GIT_INDEX_FILE`、`Git_Work_Tree` 也没有），有 `LC_ALL=C`；内部仓库的调用带固定的 `--git-dir`、`--work-tree`、5 个 `-c`、`GIT_CONFIG_NOSYSTEM`、`GIT_CONFIG_GLOBAL`；用户仓库的调用不带这些 `-c`；`process.env` 前后相同；超时与输出上限结束进程并标记；同一个键的两个调用不重叠、不同键并行 | 单元 |
-| FS-03 | 认仓库 | 真实的临时仓库：仓库根、子文件夹（`toplevel` 为仓库根）、链接出去的 worktree（`isWorktree` 为真、`commonDir` 是主检出的 `.git`）、没有提交、不是仓库（`repo: null`）、`safe.directory` 拒绝时为错误原文而不是“不是仓库” | 单元 |
+| FS-01 | 找 git | 候选与 `spawn` 注入替身（§3.2）：PATH 里的 `git.exe` 优先于 Program Files；都没有为 `missing`；`--version` 失败为 `missing`；2.31 为 `old`、2.32 为 `ok`；`MORI_GIT_PATH` 有值时只试它，不存在为 `missing`；`missing` 时下一次 `workspace.status` 再找，放上一个可用的 git 后变为 `ok`；`ok` 之后不再找 | 单元 |
+| FS-02 | 运行 git | 子进程环境没有任何 `GIT_*`（父进程设了 `GIT_DIR`、`GIT_INDEX_FILE`、`Git_Work_Tree` 也没有），有 `LC_ALL=C`；内部仓库的调用带固定的 `--git-dir`、`--work-tree`、5 个 `-c`、`GIT_CONFIG_NOSYSTEM`、`GIT_CONFIG_GLOBAL`，调用前 `<快照目录>\gitconfig` 不在时被写出、已有的不被覆盖；用户仓库的调用不带这些 `-c`；`process.env` 前后相同；超时与输出上限结束进程并标记；同一个键的两个调用不重叠、不同键并行 | 单元 |
+| FS-03 | 认仓库 | 真实的临时仓库：仓库根、子文件夹（`toplevel` 为仓库根）、链接出去的 worktree（`isWorktree` 为真、`commonDir` 是主检出的 `.git`）、没有提交、不是仓库（`repo: null`）；替身 git（注入的 `spawn`，§3.3）对 `rev-parse` 返回退出码 128 与 stderr `fatal: detected dubious ownership in repository at '<cwd>'` 时，`repoInfo` 是错误、原文为去掉 `fatal: ` 的那一行，而不是“不是仓库” | 单元 |
 | FS-04 | git 状态的解析 | porcelain v2 的 `1`、`2`（含 NUL 分隔的原路径）、`u`、`?` 行；同一文件既暂存又未暂存为两条；`(initial)`、`(detached)`、有上游没有 `branch.ab`；500 条上限与 `total`；输出上限截断到完整的条；超时为 `error`；路径相对仓库根（在子文件夹里也是） | 单元 |
 | FS-05 | 刷新时机 | §3.5 每个时机各发生一次读；连续 5 个 bash 调用在 500 毫秒内只读一次；读的过程中再请求只多读一次，命令的结果晚于它发出的时刻；同路径的两个打开的会话都收到 `mori.workspace_status`；`kernel/git.ts`、`workspace.ts`、`snapshots.ts` 里没有 `fs.watch`、`watchFile`、`setInterval` | 单元、App |
-| FS-06 | 内部仓库 | 单元用真实 git：位置按 `MORI_SNAPSHOTS_DIR`、编码同 `projectDirName`；工作路径里没有新的 `.git`、你的仓库 `git for-each-ref` 不多任何 ref、index 与 `git status` 前后相同；`mori.json` 归属冲突时 `off` 与原文；`info/attributes` 生效：`.gitattributes` 写 `* text=auto eol=lf` 时 CRLF 文件 Rewind 后逐字节相同；隔离的配置生效：测试用的全局配置设 `core.autocrlf=true`、`filter.lfs.required=true`（没有 lfs 程序）时快照照常、恢复逐字节相同；留下的 `index.lock` 在第一个作业前被删掉；是 git 仓库而你的 git 报 `dubious ownership` 时这一张失败、`error` 为原文 | 单元、App |
+| FS-06 | 内部仓库 | 单元用真实 git：位置按 `MORI_SNAPSHOTS_DIR`、编码同 `projectDirName`；工作路径里没有新的 `.git`、你的仓库 `git for-each-ref` 不多任何 ref、index 与 `git status` 前后相同；`mori.json` 归属冲突时 `off` 与原文；`info/attributes` 生效：`.gitattributes` 写 `* text=auto eol=lf` 时 CRLF 文件 Rewind 后逐字节相同；隔离的配置生效：测试用的全局配置设 `core.autocrlf=true`、`filter.lfs.required=true`（没有 lfs 程序）时快照照常、恢复逐字节相同；留下的 `index.lock` 在第一个作业前被删掉；（单元：注入的 `spawn` 只对用户仓库的 `rev-parse` 返回 FS-03 的 dubious ownership，其余交给真实 git）`repoInfo` 报错时这一张快照失败、`snapshots.error` 为原文；这一句 App 层不测（Windows 上让目录归别的账户要管理员权限，界面显示 `error` 由 FS-13“读失败的原文”覆盖） | 单元、App |
 | FS-07 | 排除与 git status 一致 | 用真实 git：仓库根、子文件夹（仓库根 `.gitignore` 忽略的 `node_modules` 在子文件夹里也不进快照）、`info/exclude`、全局 `core.excludesFile` 的规则都生效；被 `add -f` 跟踪又匹配忽略的文件进快照；`.work/`、`.mori/worktrees/` 总被排除；非仓库的五个默认目录在任何一层被排除；名字里有 `[`、`]`、开头有 `#`、`!` 的被忽略文件按字面排除（`*`、`?` 在 Windows 的文件名里不能有）；一个目录眼下全被忽略、之后有了不被忽略的文件时，下一张快照收进那个文件；整个工作路径被忽略时快照为空 | 单元 |
-| FS-08 | 上限与暂停 | 11 MB 的未跟踪新文件不进快照、在 `skipped` 里，界面说明；已被你跟踪的 11 MB 文件照样进；20001 个新文件时 `paused` 与原文、不拍；加 `.gitignore` 后下一个快照点恢复，暂停期间的改动不记；超时（测试里把上限调小）后暂停到重启；其他失败为 `error`，下一次照常 | 单元、App |
+| FS-08 | 上限与暂停 | 单元按 §19.1 注入上限（单个文件 1 KB、新文件 20 个、分批 5 条）：比单个文件上限大的未跟踪新文件不进快照、在 `skipped` 里；已被你跟踪的同样大的文件照样进；21 个新文件时 `paused` 与原文、不拍、不对 N 做 `stat`；`ls-files --others` 的输出被截断（把输出上限调小）时同样 `paused`、不 `stat`；加 `.gitignore` 后下一个快照点恢复，暂停期间的改动不记；新文件多于分批条数时分批加入，某一批超时（超时调小）为 `error`（`a snapshot step took longer than 2 minutes`）、已加的批次留在内部仓库的 index、下一个快照点续做完成，连续 3 张超时后 `paused` 与原文；其他失败为 `error`，下一次照常。App 用真实大小（11 MB 的文件、20001 个空文件，只数不加；App 不在 `test:min` 里）看 This session 的两种说明 | 单元、App |
 | FS-09 | 时间线与归属 | 单元为 `timeline.ts` 的纯函数：§4.5 的例子逐行；空闲段不记；树没变不建提交；一次运行里插话的消息只拿到它之后开始的段；程序投递开始的运行归你最近的消息；`messageType: 'custom'` 开始、中途有插话的运行：插话之前的段归你之前最近的消息，插话的消息没有 `run`；运行开始时起始消息还没写下、恰有实例结束时，那一段仍归起始消息（叶子已被别的条目移动过也一样）；`before_agent_start` 之后没开始运行的不留在 `active`；同一工作路径的作业不重叠（两个会话同时开始时快照依次拍） | 单元、App |
-| FS-10 | 运行记录 | 你的消息开始的运行写一条 `run`，`round` 是这条消息、`start` 是运行开始前的快照（运行里第一次写文件之前的内容）；`[Mori]` 投递、扩展发起的运行不写；运行进行中开始快照有 `run/` 下的 ref，写下 `run` 后它没了、轮下有 ref；运行开始的快照做完之前按停止，这次没有 `run`、快照的 git 进程被结束、没有结束快照、`active` 里没有它，下一次运行的快照照常（没有留下 `index.lock`）；排队、插话的消息没有 `run` | App |
-| FS-11 | 一轮的改动记录 | bash 命令改的、写的、删的文件都在（`echo x > a.txt`、`rm b.txt`、新建）；A/M/D 与行数；二进制为 null；嵌套仓库与符号链接不列；501 个文件的段 `files` 500 条、`total` 501；协作模式下 task 改的文件记进用户会话、`agents` 有 `<角色> (T1)`；两个用户会话同时运行时两边都 `overlap: true`；条目与事件相同，重新打开会话后 This session 不变 | 单元、App |
-| FS-12 | This session | fs-changes.md 的 This session 各状态：按轮、新的在上、`Turn <n> · <第一行>`、文件行（字母、路径、行数、Agent、Open）、点开 diff（`snapshots.diff`，git 的 patch 在 `Diff.tsx` 里正确显示）、二进制与没有差别、重叠与没列全的说明、快照暂停与大文件的说明、`No changes yet.`；阅读器在新的一段记到打开的文件时重读；这个会话第一次收到 `mori.turn_changes`（`changes`）时右栏自动打开到 Changes，你手动关过之后再收到也不打开；只恢复代码之后那些轮照样列出，恢复对话之后丢掉的轮不再列出 | App |
-| FS-13 | git 状态界面 | fs-changes.md 的三种文件夹状态与 `old`；分支行各写法；四个分组；点文件打开阅读器；Refresh；`No uncommitted changes`；超过 500 条的说明；读失败的原文；没装 git 时没有 `+N −M` 与 Rewind | App |
+| FS-10 | 运行记录 | 你的消息开始的运行写一条 `run`，`round` 是这条消息、`start` 是运行开始前的快照（运行里第一次写文件之前的内容）；`[Mori]` 投递、扩展发起的运行不写；运行进行中开始快照有 `run/` 下的 ref，写下 `run` 后它没了、轮下有 ref；运行开始的快照做完之前按停止，这次没有 `run`、快照的 git 进程被结束、没有结束快照、`active` 里没有它，下一次运行的快照照常（没有留下 `index.lock`）；这时关闭会话同样立刻结束那个 git 进程（`release` 先通知，§4.5），不等它跑完；排队、插话的消息没有 `run`；运行开始的快照期间阶段行为 `Taking a snapshot… · <秒数>`（`data-kind="snapshot"`），`agent_start` 之后换成平常的阶段，实例的运行不改阶段行 | App |
+| FS-11 | 一轮的改动记录 | bash 命令改的、写的、删的文件都在（`echo x > a.txt`、`rm b.txt`、新建）；A/M/D 与行数；二进制为 null；嵌套仓库与符号链接不列；501 个文件的段 `files` 500 条、`total` 501；协作模式下 task 改的文件记进用户会话、`agents` 有 `<角色> (T1)`；两个用户会话同时运行时两边都 `overlap: true`；在 `<R>` 与 `<R>/app` 开的两个会话同时运行时两边的记录也都 `overlap: true`；条目与事件相同，重新打开会话后 This session 不变 | 单元、App |
+| FS-12 | This session | fs-changes.md 的 This session 各状态：按轮、新的在上、`Turn <n> · <第一行>`、文件行（字母、路径、行数、Agent、Open）、点开 diff（`snapshots.diff`，git 的 patch 在 `Diff.tsx` 里正确显示）、二进制与没有差别、重叠与没列全的说明、快照暂停与大文件的说明、`No changes yet.`；阅读器在新的一段记到打开的文件时重读；这个会话第一次收到 `mori.turn_changes`（`changes`）时右栏自动打开到 Changes，你手动关过之后再收到也不打开；只恢复代码之后那些轮照样列出，恢复对话之后丢掉的轮不再列出；协作模式下（有 `[Mori]` 投递）组标题的 `Turn <n>` 与会话引用预览的 `Turn N`、芯片的 `turns a–b` 指同一条消息 | App |
+| FS-13 | git 状态界面 | App：fs-changes.md 的三种文件夹状态（没装 git 用 `MORI_GIT_PATH`，§19.1）；分支行各写法；四个分组；点文件打开阅读器；Refresh；`No uncommitted changes`；超过 500 条的说明；读失败的原文；没装 git 时没有 `+N −M` 与 Rewind。回放：`old`（fs-replay 合成 `version: '2.31.0'`）只有 `Git 2.32 or newer is required to track changes and rewind (found 2.31.0).` 一行、`data-state="old"`，没有 This session | App、回放 |
 | FS-14 | 命令和后台 Agent 改的都在 | 合成端点让对话 Agent 用 bash 改文件：This session 列出它；协作模式下 task 用 edit 和 bash 改文件：列出、标出 Agent；不再有 `Only edits and writes…` 与 `Changes made by team tasks aren’t listed here.`（替代 TB-57） | App |
-| FS-15 | Rewind 菜单 | fs-rewind.md 的菜单四种情况；排队、插话的消息有 `No code restore`；运行中（含只有后台实例在运行、有待判断的消息）按钮不可点、悬停 `Still running`；没装 git 没有 Rewind；`[Mori]` 消息没有 Rewind；键盘：Tab 到按钮、Enter 打开、方向键、Esc 关掉焦点回来 | App |
-| FS-16 | 计划与冲突 | 文件集合是这一轮起的并集（不含别的会话独自改的文件）；最近一张快照之后你在编辑器里改过的文件列为 `changed`；与另一个用户会话同时运行时改的列为 `overlap`；Overwrite 全部恢复；Skip these files 冲突的保持原样；Cancel 什么都不改；两次调用之间又多了冲突时重新列出、不恢复 | 单元、App |
-| FS-17 | 恢复代码 | 改过的、删掉的文件回到这条消息之前的内容；这条消息之后新建的文件被删；你自己新建、没有被记下的文件不动（不 `git clean`）；你的 index、HEAD、分支不变；一个文件被锁时其余照常恢复、它进 `failed`；P、Q 两张快照与 ref 存在；P→Q 这一段里恢复的文件没有记给任何会话；同一文件夹的另一个会话在 P、Q 之间改的别的文件记给那个会话；保险快照失败时什么都不改、原文正确 | 单元、App |
+| FS-15 | Rewind 菜单 | fs-rewind.md 的菜单四种情况；排队、插话的消息有 `No code restore`；运行中（含只有后台实例在运行、有待判断的消息）按钮不可点、悬停 `Still running`；没装 git（`MORI_GIT_PATH`）没有 Rewind；`[Mori]` 消息没有 Rewind；键盘：Tab 到按钮、Enter 打开、方向键、Esc 关掉焦点回来 | App |
+| FS-16 | 计划与冲突 | 文件集合是这一轮起的并集（不含别的会话独自改的文件）；最近一张快照之后你在编辑器里改过的文件列为 `changed`；与另一个用户会话同时运行时改的列为 `overlap`，在 `<R>/app` 里开的会话同时运行时改的文件在 `<R>` 的会话里 Rewind 时同样列为 `overlap`；Overwrite 全部恢复；Skip these files 冲突的保持原样；Cancel 什么都不改；两次调用之间又多了冲突时重新列出、不恢复 | 单元、App |
+| FS-17 | 恢复代码 | 改过的、删掉的文件回到这条消息之前的内容；这条消息之后新建的文件被删；你自己新建、没有被记下的文件不动（不 `git clean`）；你的 index、HEAD、分支不变；一个文件被锁时其余照常恢复、它进 `failed`；P、Q 两张快照与 ref 存在；P→Q 这一段里恢复的文件没有记给任何会话；同一文件夹的另一个会话在 P、Q 之间改的别的文件记给那个会话；保险快照失败时什么都不改、原文正确；第 1 轮删 `README.md`、第 2 轮新建 `Readme.md`，Rewind 到第 1 轮之前后 `README.md` 存在且内容为原来的，`Readme.md` 不在（Undo 同样先删再恢复） | 单元、App |
 | FS-18 | 恢复对话 | `navigateTree` 后当前分支在这条消息之前，对话流按新分支显示；这条消息的文字和引用芯片回到输入框（草稿之前）；第一条消息上恢复对话后对话为空；这条消息恰是叶子（后面什么都没有）时按 §5.8 处理；TaskBoard 不变；有未关闭的需求在这条消息之后登记时两个恢复对话的选项不可选、原文正确，`Restore code` 仍可用；后台进程同样拒绝 | App |
 | FS-19 | Undo | 恢复了代码的 Rewind 之后有 Undo；Undo 把文件回到 Rewind 之前，恢复过对话的同时回到原来的分支；Rewind 之后你改过的文件进冲突；发一条消息、再 Rewind 一次之后没有 Undo；只恢复对话的没有 Undo；Undo 之后没有 Redo | App |
-| FS-20 | 保留与整理 | 101 轮后最早一轮的 ref 被删、记录还在，点它的 diff 与 Rewind 到它报整理原文；删除会话后它的 ref 没了；没有别的会话时内部仓库目录被删，有时 `prune` 后别的会话的快照仍可 Rewind；归档不动快照 | 单元、App |
-| FS-21 | 实测与资源 | 在 Mori 仓库与一个公司仓库上量：第一张与之后每张的耗时、内部仓库大小；协作模式下一个需求（立项、两个 task、结案）里快照的次数与总耗时；结果写进检查记录 | 真实 |
+| FS-20 | 保留与整理 | 单元把保留的轮数注入为 3（§19.1）：第 4 轮写下后最早一轮的 ref 被删、记录还在，它的 diff 与 Rewind 到它报整理原文；App 不建 101 轮：整理原文在 This session 与 Rewind 里的显示，用 `git update-ref -d` 手工删掉内部仓库里一轮的 ref 做出；删除会话后它的 ref 没了；没有别的会话时内部仓库目录被删，有时 `prune` 后别的会话的快照仍可 Rewind；删掉文件夹上最后一个会话后，在同一次后台进程里新建会话、改一个文件：`run` 记录的 `start`、`end` 都是内部仓库里存在的提交（`git cat-file -e`），This session 正常列出；归档不动快照 | 单元、App |
+| FS-21 | 实测与资源 | `fs-real.mjs` 记一条 `FS-21 …` 检查：在 Mori 仓库（`appRoot/..`）与 `--repo` 给的仓库上各拍三张快照，全部成功即通过；第一张与之后每张的耗时、内部仓库大小写进 detail；没给 `--repo` 时只量 Mori 仓库，detail 写明；协作模式下的量法与 FS-67 共用一次运行，`refs/mori` 下的提交数与快照总耗时写进 detail；数字抄进 `docs/v1/fs-checks.md` | 真实 |
 | FS-22 | 退出与崩溃 | 有序退出时被中止的运行的结束快照做完、记录写下；强行结束后台进程后重启：没有报错、上一次没写的记录不存在、陈旧的锁被清掉、新的运行照常拍快照 | App |
-| FS-23 | 顶栏 `+N −M` | fs-changes.md 顶栏各状态：数字等于当前分支上 `changes` 记录的 `added`、`removed` 之和（二进制不计）；新的一段记进来随即更新；只恢复代码不变、恢复对话后按新分支重算；为 0、没装 git、git 太低、这一栏不宽于 600 px 时不显示；点它打开右栏到 Changes（打开的是阅读器时切回）；读屏名单复数正确；`Toggle changes` 悬停为 `Changes` | App |
+| FS-23 | 顶栏 `+N −M` | fs-changes.md 顶栏各状态：数字等于当前分支上 `changes` 记录的 `added`、`removed` 之和（二进制不计）；新的一段记进来随即更新；只恢复代码不变、恢复对话后按新分支重算；为 0、没装 git（`MORI_GIT_PATH`）、这一栏不宽于 600 px 时不显示，git 太低时不显示在回放层看（同 FS-13 的合成结果）；点它打开右栏到 Changes（打开的是阅读器时切回）；读屏名单复数正确；`Toggle changes` 悬停为 `Changes` | App、回放 |
 | FS-24 | 进行中与动作记录 | Rewind、Undo 进行中：对话流末尾 `Rewinding…` / `Undoing…`，发送按钮不可用；这时 `session.prompt` 被拒绝、原文 `This session is rewinding. Send your message when it’s done.`；再发 `rewind` 被拒绝、原文 `This session is already rewinding.`；动作记录有 `Refresh changes`、`Rewind: <菜单项>`、`Rewind conflicts: Overwrite` / `Skip these files` / `Cancel`、`Undo rewind` | 单元、App |
 | FS-25 | Rewind 后再记一次 `mori.pick` | 会话：在范围 A 下发你的消息 M1（让它改一个文件，有 code restore），M1 这一轮之后把范围改成 B（`mori.pick` B 写在 M1 之后），再发 M2（同样改一个文件）。分别在两个这样的会话里对 M1 做 Restore conversation 和 Restore code and conversation：新的当前分支末尾、`mori.rewind` 之前有一条值为 B 的 `mori.pick`；关闭并重新打开会话，范围是 B；Restore code and conversation 那个会话 Undo 回到原来的分支后，末尾同样有一条值为 B 的 `mori.pick`；对 M2 只做 Restore code 时不写 `mori.pick` | App |
 | FS-26 | 嵌套 git 仓库的说明 | 单元用真实 git：工作路径里有两个嵌套的 git 仓库（一个子模块，一个不是子模块、已有提交的独立仓库）：它们里面文件的改动不在 This session，Rewind 不恢复；`WorkspaceStatus.snapshots.nested` 是这两个路径（相对工作路径）；This session 上方一行 `Changes inside nested repositories aren’t tracked: <路径>, <路径>`；去掉嵌套仓库后下一张快照起没有这一行；21 个时列出 20 个并接 ` and 1 more`；工作路径里再加一个还没有提交的嵌套仓库时，这一张快照失败，`snapshots.error` 为 git 原文（`'<dir>/' does not have a commit checked out`），This session 显示 `Couldn’t take a snapshot: <原文>`；给它提交之后下一张恢复 | 单元、App |
@@ -1749,18 +1825,18 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | FS-41 | 目标上限 | 命令有 101 个可解析的写入目标时只解析前 100 个；第 101 个起记作理由为 `unresolved` 的目标，请求的 scope 为 `outside`、`allowDirs` 为空（卡上的 `and {n} more` 在 FS-36 里） | 单元 |
 | FS-42 | bash 的切分与结构 | §7.9 的 B1–B13、B34、B46–B61、B89 逐行与期望相同 | 单元 |
 | FS-43 | bash 的写法 | B14–B33、B118 逐行相同（含“入”）；§7.5 Git Bash 表的每个命令、每个带值选项与“只用 `=`”的长选项至少一行；“落进目录”的每种情形至少一行，`cp a ../b` 的 `into` 为 false | 单元 |
-| FS-44 | bash 的目标解析与看不出来的目标 | B34–B45、B85、B91 逐行相同；§7.6 表里 bash 一列的每种写法至少一行 | 单元 |
-| FS-45 | PowerShell 的切分、结构与写法 | S1–S21、S37–S46、S55–S58 逐行相同（含“入”）；§7.5 PowerShell 表的每个 cmdlet、每个别名（含只有 5.1 的 `sc`）、每个目标参数与位置至少一行 | 单元 |
-| FS-46 | PowerShell 的目标解析与看不出来的目标 | S22–S27 逐行相同；§7.6 表里 PowerShell 一列的每种写法至少一行 | 单元 |
-| FS-47 | 前缀、包装、嵌套与 eval | B62–B85、S47–S51 逐行相同；§7.4 三张表的每一行至少一行 | 单元 |
-| FS-48 | 换目录与只读命令 | B92–B114、S28–S36 逐行相同；§7.7 只读名单的每个名字各跑一次 `cd .. && <名字>`（PowerShell 为 `cd ..; <名字>`）都没有 leave，名单外的 `npm`、`make`、`./x.sh`、`git commit`、`xxd a b` 与带条件的反例（`find . -delete`、`sort -o x`、`tree -o x`、`uniq a b`、`git branch new`、`git config a b`、`git log --output=x`）都有 | 单元 |
-| FS-49 | 解析失败、上限与纯函数 | B76–B78、B80–B84、B86–B88、B115、B116、S47、S50、S52–S54 逐行相同；§7.8 表的每个 reason 至少一行；B117 去重；同一输入在改过 `process.env.TEMP`、`HOME` 与当前目录之后结果相同；1 MB 的命令一次分析不超过 200 ms（本机） | 单元 |
+| FS-44 | bash 的目标解析与看不出来的目标 | B34–B45（含 B42a–B42c）、B85、B91 逐行相同；§7.6 表里 bash 一列的每种写法至少一行 | 单元 |
+| FS-45 | PowerShell 的切分、结构与写法 | S1–S21、S37–S46、S55–S60 逐行相同（含“入”）；§7.5 PowerShell 表的每个 cmdlet、每个别名（含只有 5.1 的 `sc`）、每个目标参数与位置至少一行 | 单元 |
+| FS-46 | PowerShell 的目标解析与看不出来的目标 | S22–S27（含 S24a）逐行相同；§7.6 表里 PowerShell 一列的每种写法至少一行 | 单元 |
+| FS-47 | 前缀、包装、嵌套与 eval | B62–B85、B42a–B42c、S24a、S47–S51 逐行相同；§7.4 三张表的每一行至少一行 | 单元 |
+| FS-48 | 换目录与只读命令 | B92–B114（含 B105a、B105b）、S28–S36 逐行相同；§7.7 只读名单的每个名字各跑一次 `cd .. && <名字>`（PowerShell 为 `cd ..; <名字>`）都没有 leave，名单外的 `npm`、`make`、`./x.sh`、`git commit`、`xxd a b` 与带条件的反例（`find . -delete`、`sort -o x`、`tree -o x`、`uniq a b`、`git branch new`、`git config a b`、`git log --output=x`）都有 | 单元 |
+| FS-49 | 解析失败、上限与纯函数 | B76–B78、B80–B84、B86–B88、B115、B116、S47、S50、S52–S54、S58–S60 逐行相同；§7.8 表的每个 reason 至少一行；B117 去重；同一输入在改过 `process.env.TEMP`、`HOME` 与当前目录之后结果相同；1 MB 的命令一次分析不超过 200 ms（本机） | 单元 |
 | FS-50 | git 自己的写入不算 | B90、B106、B108、B114：git 子命令从不出现在 `writes` 里，worktree 会话里 `git commit` 无、`git -C <主文件夹> merge` 有 leave | 单元 |
 | FS-51 | `ensureWork` | 临时目录里（synthetic）：没有 `.work` 时建出 `.work/`、内容为 `*\n` 的 `.gitignore`、`.work/tmp`；再调一次不变；已有的 `.gitignore`（内容不同）不被覆盖；删掉 `.work/tmp` 后再调会补上；工作路径不在时什么都不建；`.work` 是文件、`.work/tmp` 是文件时返回 §7.10 的原因；装了 git 时建在仓库里之后 `git status --porcelain -uall` 为空 | 单元 |
-| FS-52 | `spawnHook` 与工具替换 | `workEnv`：env 里 `Temp`、`TMP`、`tmpdir` 等写法都去掉，TEMP、TMP、TMPDIR 为 `workTmp(cwd)`，其余变量与 command、cwd 不变，传进来的 env 对象没被改；`workVars` 与它同值；`shellTools` 传入记下参数的 `pi`（synthetic）与设了 `shellCommandPrefix`、`shellPath` 的设置：返回名为 `bash`、`powershell` 的两个定义，`defaultActive` 为 false，`createBashToolDefinition` 收到这两个值和 `spawnHook: workEnv`，`createPowerShellToolDefinition` 只收到 `spawnHook`；`toolSource` 对 `source: 'sdk'` 返回 builtin | 单元 |
-| FS-53 | App 里的 `.work` 与临时目录 | 合成端点驱动：新项目打开会话、只调读取工具，项目里没有 `.work`；Ask each time 下拒绝第一个 bash 调用之后仍没有；第一次放行的 bash 调用 `cygpath -w "$TEMP" "$TMP" "$TMPDIR" "$(mktemp)"` 的四行都在 `<项目>\.work\tmp` 下，`.work/.gitignore` 为 `*`；`defaultTools` 含 powershell 时 `[IO.Path]::GetTempPath()` 同样；输出超过截断上限的命令，`Full output:` 的路径不在 `<项目>\.work` 下（是后台进程的 `os.tmpdir()`，它的 TEMP 没变）；git 仓库项目跑过命令后 `git status --porcelain` 为空；写 `.work/n.md` 的 write 调用之前 `.gitignore` 已在；`.work` 是文件时 bash 的工具结果是 §14 的原文、日志里有 `couldn't prepare .work`；分析不了的命令（`echo "abc`）出卡，日志有 `command not analyzed (bash): unclosed quote`、没有命令原文；TaskBoard 的 task 实例里 `cygpath -w "$TMPDIR"` 同样在 `.work\tmp`；工具页 bash、powershell 显示 Built-in；新会话启用的 pi 内置工具仍是 read、bash、edit、write（另有 `memory`、`ask_user_question`），重新打开的会话不多出 powershell | App |
+| FS-52 | `spawnHook` 与工具替换 | `workEnv`：env 里 `Temp`、`TMP`、`tmpdir` 等写法都去掉，TEMP、TMP、TMPDIR 为 `workTmp(cwd)`；env 里的 `CDPATH`、`cdpath`、`CdPath` 都被去掉，且没有新设；其余变量与 command、cwd 不变，传进来的 env 对象没被改；`workVars` 与它同值；`shellTools` 传入记下参数的 `pi`（synthetic）与设了 `shellCommandPrefix`、`shellPath` 的设置：返回名为 `bash`、`powershell` 的两个定义，`defaultActive` 为 false，`createBashToolDefinition` 收到这两个值和 `spawnHook: workEnv`，`createPowerShellToolDefinition` 只收到 `spawnHook`；`toolSource` 对 `source: 'sdk'` 返回 builtin | 单元 |
+| FS-53 | App 里的 `.work` 与临时目录 | 合成端点驱动：新项目打开会话、只调读取工具，项目里没有 `.work`；Ask each time 下拒绝第一个 bash 调用之后仍没有；第一次放行的 bash 调用 `cygpath -w "$TEMP" "$TMP" "$TMPDIR" "$(mktemp)"` 的四行都在 `<项目>\.work\tmp` 下，`.work/.gitignore` 为 `*`；`defaultTools` 含 powershell 时 `[IO.Path]::GetTempPath()` 同样；输出超过截断上限的命令，`Full output:` 的路径不在 `<项目>\.work` 下（是后台进程的 `os.tmpdir()`，它的 TEMP 没变）；git 仓库项目跑过命令后 `git status --porcelain` 为空；写 `.work/n.md` 的 write 调用之前 `.gitignore` 已在；`.work` 是文件时 bash 的工具结果是 §14 的原文、日志里有 `couldn't prepare .work`，工具卡是 `Denied · Mori couldn't prepare .work…`（Full access 下预告过 `full` 也一样）、没有 `tool-badge`；分析不了的命令（`echo "abc`）出卡，日志有 `command not analyzed (bash): unclosed quote`、没有命令原文；TaskBoard 的 task 实例里 `cygpath -w "$TMPDIR"` 同样在 `.work\tmp`；工具页 bash、powershell 显示 Built-in；新会话启用的 pi 内置工具仍是 read、bash、edit、write（另有 `memory`、`ask_user_question`），重新打开的会话不多出 powershell | App |
 | FS-54 | 告诉模型 `.work` | 单元：`identityText('ask' \| 'full' \| 'none')` 的第三行都与 §14 逐字相同；App：请求的 system 里有这一行；真实：DeepSeek 上让模型“写一个统计行数的临时脚本并运行”，脚本写在 `.work/` 下，录成 `work-scratch.json`；回放这个 fixture 时 Ask each time 下写进 `.work` 的 write 不出卡（§6） | 单元、App、真实、回放 |
-| FS-55 | 命令语料统计 | §7.13 的数字写进文件系统的检查记录`docs/v1/fs-checks.md`，不含命令原文；解析失败的比例与按 reason 的分布在记录里 | 真实 |
+| FS-55 | 命令语料统计 | `fs-real.mjs` 记一条 `FS-55 …` 检查：对 `tests/fixtures/**` 与 `<数据目录>/sessions` 里的每个 bash、powershell 调用跑 `scanCommand`，没有抛错即通过；§7.13 的数字写进 detail（不含命令原文），再抄进文件系统的检查记录 `docs/v1/fs-checks.md`；解析失败的比例与按 reason 的分布在记录里 | 真实 |
 | FS-56 | `limits` 的解析 | `true` 与不写相同；`limits` 里的键名写法归一、未知键丢掉；`write: false` 时去掉 `commands`、`write_paths`；`write_paths` 归一（`\` → `/`、末尾 `/`、去重、去掉被包含的项）；绝对路径、`~` 开头、出界、整个工作路径各得到 §8.2 的原文、两行格式、TaskBoard 不变；`agent_message` 的 `limits` 不合格时不开实例、不计入条数上限；空列表与 11 项由 pi 的校验拒绝；`task_edit` 的 schema 没有 `limits`；`task_create` 的 schema 没有 `read_only`、`limits` 不必填 | 单元 |
 | FS-57 | 谁受什么收窄 | §8.3 表每一行：task 只按自己的 `limits`（分开时的立项、合并会话建的 task 都不带上建它的会话的收窄）；临时提问总是 `write: false`，协作模式下对话发起的带 `mcp: false`、task 发起的不带它没有的项、`agent_message.limits` 写 `write: true` 不能放宽；关闭模式下主 Agent 发起的只有 `{ write: false }`；立项、结案、订阅 `{ write: false }`；协作模式下对话与合并会话 `{ write: false, mcp: false }` 按运行开始时的模式（运行中关掉协作模式，这次运行仍受限、下一次不受限）；关闭模式的主 Agent 不受限；`agent_message.limits` 发到 task、进座位会话时不用 | 单元、App |
 | FS-58 | 检查与拒绝原文 | §8.4 表每一行与 §8.3 每种开头：`write: false` 拒绝 `edit`、`write`、写 `.work`、只有 `ls`、`git status` 的 `bash` 命令，不拒绝 pi 的 `ls`、`read` 工具；`commands: false` 只拒绝命令；`mcp: false` 拒绝 MCP 工具和扩展工具；`write_paths` 外的 `edit`、命令写入目标拒绝，看不出的目标（`$OUT/a`）、`cd .. && npm i` 也拒绝，`.work/` 与列表里的照常、大小写不同（`SRC/a.ts` 对 `src/`）算在里面；读取工具从不被拒绝；原文里的目标在工作路径里是相对路径、外面是绝对路径 | 单元 |
@@ -1775,9 +1851,9 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | FS-67 | 真实模型 | 真实模型在协作模式下处理一个要读和要改的请求：立项写的 `limits` 按 §8.2 归一后存进 `board.json`；每个被收窄拒绝的调用的工具结果是 §8.4 的原文、没有批准卡、目标文件不变；对话 Agent 的写入、命令调用都得到 `RELAY_ONLY`；模型写了什么 `limits`、有没有被拒绝的调用只写进 note | 真实 |
 | FS-68 | 工具被裁过的旧会话拒绝打开 | synthetic 会话文件，最后一次请求前声明的工具（system 消息的 `toolsAdded` / `toolsRemoved`，§8.6）只有 `read`、`board_read`、`read_session`、`agent_message`（模仿旧版本协作模式下的运行）：重新打开时 `session.open` 失败，界面显示 `Failed to open session: This session was saved by an older version of Mori and can’t be opened.`、会话行 Error（同“新建或打开失败”）；没有补工具，会话文件没被改写；声明的工具含全部默认工具、不含 `memory` 与 TaskBoard 工具的会话照常打开（只比默认工具）；pi 设置的 `defaultTools` 为 `["read","bash"]` 时，声明只有 `read`、`bash` 的会话照常打开（按设置比） | App |
 | FS-69 | 焦点消息 | 窗口 `blur`、`minimize` 发 `focused: false`，`focus`、`restore`（且没最小化）发 `true`；值不变时不发（后台进程日志里 `[kernel] window focus:` 的行数与变化次数相同）；页面重新加载、Restart 后台进程后各补发一次当前值 | App |
-| FS-70 | 只在不在前台时计时 | 窗口在前台时挂着的卡超过时长仍在、没有 `mori.away_timer`；失焦时每张挂着的卡收到同一个 `deadline`；失焦时新到的卡立即收到 `deadline = 到达时刻 + 时长`；切回时每张收到 `deadline: null`；再失焦从头计（单元用注入的时钟，App 用 `MORI_AWAY_TIMEOUT_MS`） | 单元、App |
+| FS-70 | 只在不在前台时计时 | 窗口在前台时挂着的卡超过时长仍在、没有 `mori.away_timer`；失焦时每张挂着的卡收到同一个 `deadline`；失焦时新到的卡立即收到 `deadline = 到达时刻 + 时长`，`mori.away_timer` 在对应的请求事件（`mori.approval_request`、`mori.team_approval_request`、`mori.question_request`、`mori.ui_request`）之后到达；切回时每张收到 `deadline: null`；再失焦从头计（单元用注入的时钟，App 用 `MORI_AWAY_TIMEOUT_MS`） | 单元、App |
 | FS-71 | 批准卡到时拒绝 | 用户会话的卡到时：`mori.approval_end { by: 'away' }`，工具结果为 §14 的原文（时长按设置），工具卡 `Denied · No answer while you were away`，重新打开会话后同样；`mori.away_decision`（`kind: 'approval'`、`agent: null`）事件与会话条目各一条；用一个 `write`（`content` 超过 300 字符）的卡到时验证：记录的 `args` 里没有 `content`、`edits`，其余每个字符串不超过 300 字符 | 单元、App |
-| FS-72 | 后台实例的卡到时 | `mori.team_approval_end { by: 'away' }`；实例拿到“写进交接”的原文（task 实例）；`mori.away_decision` 写在用户会话文件里，`agent` 带角色与 task；用户会话正在输出时条目写在这条助手消息之后 | 单元、App |
+| FS-72 | 后台实例的卡到时 | `mori.team_approval_end { by: 'away' }`；实例拿到“写进交接”的原文（task 实例，含没有 `limits` 的 task；结案会话同样），立项、临时提问、订阅拿到“写进最后的总结”的那一句（按 `GateOutput.kind`）；`mori.away_decision` 写在用户会话文件里，`agent` 带角色与 task；用户会话正在输出时条目写在这条助手消息之后 | 单元、App |
 | FS-73 | 提问卡到时 | 每个问题按 `recommended` 回答，`mori.question_end { by: 'away' }`，工具结果为 §14“结果：你提交 / 你不在”一行里你不在的那句原文（时长按设置）；记录带 `answers` | 单元、App |
 | FS-74 | 扩展询问到时 | 确认得到 false、选择与输入得到空；`mori.ui_end`；记录 `kind: 'extension'`、`title`；提醒里没有它 | 单元、App |
 | FS-75 | Never | 设成 Never 后失焦再久也不发 `mori.away_timer`、不自动处理 | 单元、App |
@@ -1802,21 +1878,21 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | FS-94 | worktree 名字 | 英文句子、带附加符号的、全是中文的、只有引用芯片的、超长的第一个词、带引用块的消息，名字都符合 §11.2；后缀是 6 个十六进制字符；撞名时换后缀，3 次都撞上时报 `<路径> already exists.` | 单元 |
 | FS-95 | `worktreeOf` / `projectFolder` | §11.3 表里四行与大小写不同的 `.MORI\Worktrees` 都对；结果保留 cwd 的写法；对 §11.5 建出的每个 worktree，`worktreeOf(新 cwd)` 与 `mori.worktree` 的 path、branch、mainFolder 相同 | 单元 |
 | FS-96 | 建 worktree 的 git 步骤 | 临时仓库里 `createWorktree`：分支 `mori/<名字>` 指向切出点；路径在 `<R>/.mori/worktrees/`；`extensions.worktreeConfig=true`；`config.worktree` 有 `core.longpaths=true`、共用配置里没有；exclude 里 `.mori/worktrees/` 只有一行（建两次也只一行）；主文件夹 `git status` 不出现它；worktree 里有 `.work/.gitignore`；含超过 260 个字符路径的仓库也检出成功 | 单元 |
-| FS-97 | 建 worktree 失败的清理 | 让 `worktree add` 失败（切出点无效；超时：单元测试直接调 `createWorktree` 并传很短的超时（参数默认 120 s），在一个检出所需时间超过传入超时的仓库里检出中途被结束，仓库大小按 §19.1：先试 2 万个文件，`test:min` 超时就改用更小的仓库和更短的超时）：都没有留下 worktree 文件夹、`git worktree list` 里的登记和 `mori/<名字>` 分支；配置与 exclude 行留着 | 单元 |
-| FS-98 | 开关与 Initialize git… 的出现 | 有提交的仓库：`Worktree` 开关、默认关，紧跟在权限按钮之后；没有提交的仓库：两样都没有；不是 git 仓库：`Initialize git…`；`repoInfo` 出错：两样都没有；没装 git（同 FS-13 让 `git.state` 为 `missing` 的做法）：两样都没有；有了你的消息、发送中、会话拥有 worktree、“Starting…”时：都没有；在 worktree 会话里 Ctrl+N 的新会话：有开关；这一栏 ≤ 460px 时只剩图标、读屏名仍是 `Worktree`，这一行不换行、不超出（同 m1-layout 的 `layoutProblems`）；开关的开、关在操作记录里为 `Turn on worktree`、`Turn off worktree` | App |
+| FS-97 | 建 worktree 失败的清理 | 让 `worktree add` 失败（切出点无效；超时：单元测试直接调 `createWorktree`，在 50 个文件的临时仓库上传 `timeoutMs: 1`，或经注入的 `spawn` 让 `worktree add` 换成先睡一会儿再退出的替身进程（§3.3，同 FS-02 测超时的做法）；不论进程在哪一刻被结束都要清干净）：都没有留下 worktree 文件夹、`git worktree list` 里的登记和 `mori/<名字>` 分支；配置与 exclude 行留着。设了 `core.worktree` 的临时仓库上 `createWorktree` 失败，原文 `This repository sets core.worktree, so Mori can’t create a worktree here. Move it to the main worktree’s config.worktree first.`，`git worktree list --porcelain`、`git branch` 与共用配置前后相同；子文件夹 `<sub>` 只有未跟踪文件时同样不改任何东西（原文见 FS-111） | 单元 |
+| FS-98 | 开关与 Initialize git… 的出现 | 有提交的仓库：`Worktree` 开关、默认关，紧跟在权限按钮之后；没有提交的仓库：两样都没有；不是 git 仓库：`Initialize git…`；`repoInfo` 出错：两样都没有；没装 git（`MORI_GIT_PATH` 指到不存在的路径，§19.1）：两样都没有；有了你的消息、发送中、会话拥有 worktree、“Starting…”时：都没有；在 worktree 会话里 Ctrl+N 的新会话：有开关；这一栏 ≤ 460px 时只剩图标、读屏名仍是 `Worktree`，这一行不换行、不超出（同 m1-layout 的 `layoutProblems`）；开关的开、关在操作记录里为 `Turn on worktree`、`Turn off worktree` | App |
 | FS-99 | 第一条消息建 worktree | 打开开关后发消息：阶段行 `Creating worktree…`；结果里同一个 `sessionId`、同一个标签；cwd 是 worktree；会话文件在 `--<worktree 编码>--` 目录下、含一条 `mori.worktree`；消息照常发出、模型的回复照常显示；发消息前选的 Full access、范围、Effort、协作模式、会话名在新会话里都还在；建 worktree 中改名、发消息被拒绝（`The worktree is still being created.`）；带一个工作路径里的文件引用发出时：引用块显示成芯片（不露出原文），`mori.ref` 条目里的 `path` 在 worktree 里，发给模型的全文与不开 worktree 时相同 | App |
 | FS-100 | 建 worktree 失败 | 让 git 步骤失败：消息撤回，文字与芯片回到输入框，错误卡 `Couldn’t create the worktree: <原因>`，开关仍开着，会话仍在原文件夹、仍空闲；改好后再发能成功；单元（`startInWorktree` 用注入后会抛错的 `startUser`）：重建失败时刚建的 worktree 文件夹、登记和 `mori/<名字>` 分支都撤掉，会话在原文件夹按原 id 重建，`ApprovalPolicy` 是同一个对象，事件为同一句 `mori.prompt_error`；两次都失败时 `session.prompt` 命令失败；App：重建之后准备中失败（没有可用模型）时会话已在 worktree 里，开关不再出现 | 单元、App |
 | FS-101 | 侧栏与顶栏 | worktree 会话（开着的、没开着的、重启后的）在主文件夹那一组里，行上有分支标签；组名是主文件夹名；顶栏项目名是主文件夹名；已归档行的悬停是 `<主文件夹名> · <会话名> · <分支>`；子文件夹会话的 worktree 会话归在那个子文件夹的组里 | App |
 | FS-102 | 按主文件夹算项目 | worktree 会话：`memory` 工具写进主文件夹的项目记忆（不报 `This project’s memory folder belongs to …`），`project.json` 记主文件夹，`mori.memory_changed` 的 `cwd` 是主文件夹；记忆页跟着 worktree 会话时 Project 一层是主文件夹、写的是主文件夹名；增强读主文件夹和它的 worktree 里的会话与反馈；Project access 只列主文件夹（会话列表里有 worktree 会话时也不多一项）；`.mori/models.json` 与 `.mori/agents` 从主文件夹读（worktree 里没有这两个文件时也生效）；在主文件夹回答过信任后同一次运行里 worktree 会话不再问；不在 worktree 里的会话结果与现在相同 | 单元、App |
 | FS-103 | worktree 里读 pi 的配置 | worktree 会话的 AGENTS.md 页列出的是 worktree 里的 AGENTS.md；主文件夹里没提交的 `.pi/` 设置在 worktree 会话里不生效 | App |
 | FS-104 | 归档 | 干净的 worktree 在归档后被删掉（连同 `.work/` 里的草稿），分支还在；有未提交文件的留着；被别的开着的会话用着的留着；都不弹确认 | App |
-| FS-105 | 打开 worktree 不在的会话 | 归档后恢复并打开：从分支重新检出，会话照常打开、能继续对话；手工删掉文件夹后打开也一样；分支被删后打开：`Failed to open session: The branch <branch> no longer exists, so this session’s worktree can’t be restored.`，会话行 Error，Delete… 可用 | App |
-| FS-106 | 删除 | 确认框：干净、有改动、读不出、被别的会话用着、没装 git 五种写法与屏幕表一致；没有拥有的 worktree 时与现在相同；确认后 worktree 被删（有改动也删），分支还在，会话文件被删；没装 git 时会话文件被删、worktree 文件夹还在；删 worktree 失败时会话文件还在、确认框显示原文 | App |
-| FS-107 | 设置页 Clean up worktrees | 只列出已归档会话留下、还在的 worktree 和它们有没有改动；没有时 `No worktrees are left from archived sessions.`，按钮不可用；确认后全部删掉，分支和会话还在；有改动的也删掉；被开着的会话用着的不删、标 `In use by an open session`；操作记录有 `Clean up worktrees` | App |
-| FS-108 | `worktrees.cleanUp` 只删 Mori 的 worktree | 传主文件夹、`.claude/worktrees/x`、不在 `git worktree list` 里的 `.mori/worktrees/y`、任意文件夹：都不删，返回 `error`；`force: false` 时有改动的不删 | 单元 |
-| FS-109 | Initialize git | 确认框文字与焦点；确认后：仓库建好，`.work/` 不在第一次提交里，按 `.gitignore` 提交，空文件夹也有一个提交；输入框下一行换成 `Worktree` 开关；没设 user.name 时什么都没做、显示原因；运行中拒绝；已经是仓库时拒绝；从右栏 `Not a git repository` 下的 `Initialize git…` 打开的是同一个确认框；同一文件夹里另一个开着的会话随即显示 git 状态和 `Worktree` 开关；第一次提交失败（测试用的全局配置设 `core.hooksPath` 指向一个总是失败的 pre-commit）时 `.git` 留着、确认框显示 `Couldn’t initialize git: <原因>`、输入框下一行两样都不显示；之后的快照里不再有被 `.gitignore` 忽略的文件，没写进 `.gitignore` 的 `node_modules` 进快照；操作记录有 `Initialize git` | 单元、App |
+| FS-105 | 打开 worktree 不在的会话 | 归档后恢复并打开：从分支重新检出，会话照常打开、能继续对话；手工删掉文件夹后打开也一样；分支被删后打开：`Failed to open session: The branch <branch> no longer exists, so this session’s worktree can’t be restored.`，会话行 Error，Delete… 可用；手工在 `.git/worktrees/<名字>/` 写 `locked`、删掉文件夹后打开能恢复；worktree 里有目录联接（`mklink /J`）时归档清掉后文件夹不在、联接指向的目录内容不变，再打开能检出；文件夹在而登记没有（`git worktree remove` 之后手工放回文件夹）时 `Failed to open session: The worktree folder <path> exists but isn’t registered with git. Move or delete it, then open this session again.`，文件夹没被删 | App |
+| FS-106 | 删除 | 确认框：干净、有改动、读不出、被别的会话用着、没装 git（`MORI_GIT_PATH`）五种写法与屏幕表一致；`worktrees.list` 返回前 Delete 不可点、返回后可点；单元（`state/worktrees.ts` 的删除流程，注入的命令让 `worktrees.list` 失败，同 `tests/unit/taskboard/stream.test.mjs` 打包界面状态模块的做法）：确认框显示“读不出”那一句、Delete 可用，点了发 `worktrees.cleanUp { paths: [worktreeOf(cwd).path], force: true }`；没有拥有的 worktree 时与现在相同；确认后 worktree 被删（有改动也删），分支还在，会话文件被删；没装 git 时会话文件被删、worktree 文件夹还在；删 worktree 失败时会话文件还在、确认框显示原文 | 单元、App |
+| FS-107 | 设置页 Clean up worktrees | 只列出已归档会话留下、还在的 worktree 和它们有没有改动；没有时 `No worktrees are left from archived sessions.`，按钮不可用；确认后全部删掉，分支和会话还在；有改动的也删掉；被开着的会话用着的不删、标 `In use by an open session`；没装 git（`MORI_GIT_PATH`）时 `Git is required to clean up worktrees.`、没有列表和按钮；操作记录有 `Clean up worktrees` | App |
+| FS-108 | `worktrees.cleanUp` 只删 Mori 的 worktree | 传主文件夹、`.claude/worktrees/x`、不在 `git worktree list` 里的 `.mori/worktrees/y`、任意文件夹：都不删，返回 `error`；`force: false` 时有改动的不删；`force: true` 能删登记目录里带 `locked` 的 worktree；worktree 里有目录联接时删完文件夹不在、联接指向的目录内容不变 | 单元 |
+| FS-109 | Initialize git | 确认框文字与焦点；确认后：仓库建好，`.work/` 不在第一次提交里，按 `.gitignore` 提交，空文件夹也有一个提交；输入框下一行换成 `Worktree` 开关；没设 user.name 时什么都没做、显示原因；运行中拒绝；已经是仓库时拒绝；从右栏 `Not a git repository` 下的 `Initialize git…` 打开的是同一个确认框；同一文件夹里另一个开着的会话随即显示 git 状态和 `Worktree` 开关；第一次提交失败（测试用的全局配置设 `core.hooksPath` 指向一个总是失败的 pre-commit）时 `.git` 被删掉、确认框显示 `Couldn’t initialize git: <原因>`、输入框下一行仍是 `Initialize git…`，去掉那个 hook 后再点 Initialize git 成功；单元直接调 `initGit` 传很短的超时，在有大量文件的临时文件夹里失败后文件夹里没有 `.git`、没有 `index.lock`，再调一次（默认超时）成功；原来就有认不出的 `.git` 时失败也不删它；之后的快照里不再有被 `.gitignore` 忽略的文件，没写进 `.gitignore` 的 `node_modules` 进快照；操作记录有 `Initialize git` | 单元、App |
 | FS-110 | 在 worktree 会话里再开 worktree | Ctrl+N 的新会话打开开关后发消息：新 worktree 在同一个 `<R>/.mori/worktrees/` 下（不嵌套），从原 worktree 的 HEAD 切出，原 worktree 里没提交的改动不在新的里面；两个会话都在主文件夹那一组 | App |
-| FS-111 | 子文件夹 | 在 `<仓库>/app` 打开的会话开 worktree：worktree 在 `<仓库>/.mori/worktrees/<名字>`，工作路径是其中的 `app`，主文件夹是 `<仓库>/app` | 单元、App |
+| FS-111 | 子文件夹 | 在 `<仓库>/app` 打开的会话开 worktree：worktree 在 `<仓库>/.mori/worktrees/<名字>`，工作路径是其中的 `app`，主文件夹是 `<仓库>/app`；`<仓库>/app` 只有未跟踪文件时开 worktree 失败，原文 `The folder app isn’t committed yet, so a worktree can’t start there. Commit it first.`，仓库的 worktree 登记与分支不变 | 单元、App |
 | FS-112 | 不在后台清理 | 准备一个归档时留下的、有改动的 worktree，和一个文件夹被手工删掉的 worktree 会话；重启 Mori、打开和切换别的会话、跑完一轮、窗口切走再切回之后：前者的文件夹还在，后者仍在 `git worktree list --porcelain` 里（标 `prunable`，没被 prune）；之后打开那个会话才检出，进设置页点 Clean up 才删前者 | App |
 | FS-113 | 真实模型在 worktree 里工作 | Full access 下，真实模型在 worktree 会话里改一个文件并提交：不出卡，主文件夹的文件不变；你说“合并到主分支”时出批准卡，`scope` 为 `outside`（命令换到工作路径外，§7），允许后合并进主文件夹，主文件夹的 `git log` 有那个提交 | 真实 |
 | FS-114 | 真实模型走查 | 用你的数据目录跑 `tests/ui/fs-real.mjs`（数据目录与模型同记忆规格 §14.1、一键拉取模型规格 MD-14）：改过的身份段（三种模式各一次运行，请求里的身份段与 §14 逐字相同）；`ask_user_question`（关闭模式与协作模式分开时各一次：卡、推荐项、工具结果的原文）；自动拒绝与提醒（`MORI_AWAY_TIMEOUT_MS` 很短、窗口失焦：工具结果与提醒的原文、只多一次请求）；Full access 下写到外面的卡（原因行、scope、拒绝后文件没被写）。只断言程序保证的事，模型说了什么写进 note（模型自己的表现见 FS-40、FS-54、FS-67、FS-82、FS-93、FS-113）；录下 §19.1 的回放 fixture | 真实 |
@@ -1826,6 +1902,8 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 
 `tests/spec-coverage.mjs` 加规格 `filesystem`：读本文 §19.2（编号 `FS-n`），层的结果文件为 `fs-unit.json`（单元）、`fs-app*.json`（App，含 `-existing`）、`fs-replay*.json`（回放，含 `-existing`）、
 `fs-real.json`（真实），`fs-partial-*.json` 不计入；带跳过或待办标记的检查一律不算通过。
+`app/src`、`app/tests` 里新加的界面文字、日志与注释不能含 `tests/md-markers.mjs` 认作推迟标记的词（`TODO`、`FIXME`、`not implemented`、整词 `later`、`待实现`，不分大小写），
+否则 FS-115 的 md-markers 一项失败；所以 `old` 那一行写作 `Git 2.32 or newer is required …`（§5.1）。
 
 `npm run test:filesystem` 依次跑 `test:fs-unit`、构建、§19.1 的八个 App 套件、`fs-replay.mjs`、`node tests/ui/v1-models-existing.mjs --id FS-115`，最后
 `node tests/spec-coverage.mjs --spec filesystem --allow-missing-real`，即 package.json 里写
@@ -1854,14 +1932,14 @@ App 结果写 `fs-app-existing.json`，回放结果写 `fs-replay-existing.json`
 | `tests/ui/m6-helpers.mjs:952-961` 的 `topProblems`（顶栏按钮名单只许 `Toggle changes`、`Close pane`） | 名单允许 `Toggle changes` 左边多一个 `lines-indicator`（读屏名 `Changes in this session: …`）；宽于 600 px 时会话名的最小宽度按多出的按钮重算（team-switch.md“窄栏”的算法） |
 | 用到 `Toggle changes` 的套件（m1–m3、m5、m6、mem-app-settings、tb-app-misc、v1-models-row-helpers） | 读屏名不变，不用改；右栏标题 `This session’s changes` 只在 `ChangesPanel.tsx`、`ChatPane.tsx` 里，测试不按它找 |
 | `tests/ui/lib.mjs`、`m0-real.mjs`、`m0-smoke.mjs`、`m6-app-mcp-shared.mjs`、`m6-app-tools.mjs`、`m6-pi-config.mjs` 等设 `MORI_USER_DATA` 的启动处 | 同时设 `MORI_SNAPSHOTS_DIR` 到测试目录，测试不往真的 `%LOCALAPPDATA%` 写 |
-| `tests/ui/harness/replay.js` | `workspace.status` 加合成结果（synthetic，标明）：`git: ok`、`repo: null`、快照 `on`、没有文件；`snapshots.diff`、`rewind` 不在回放里出现；`withDefaults`（`:60-70`）合成的会话信息加 synthetic 的 `approval.allowedDirs: []`、`worktree: null`、`live.awayTimers: []`、`live.asks: []`（同现有 `teamInfo` 的做法，只补界面字段，不补模型看到的内容）；`emptyBoard()`（`:84-86`）去掉 `teamEdited`；`sameCommand` 的 `approval.forget`（`:388-389`，现在只比 `toolName`）同时比 `dir` |
-| `tests/unit/taskboard/platform.test.mjs:47-139`（TB-34） | 处理器的 `ctx` 带 `cwd`（临时目录）；`policy.gateFor(name)` 的断言改成对调用判断；`setMode('all')` 改 `'full'`，并按 FS-33 只放行 scope `inside` 的请求；Allow for this session 的用例用工作路径里的命令；读取与 TaskBoard 工具免批准的用例不变，免批准的集合加 `ask_user_question`（MEM-10 同）；`ApprovalEndBy` 多了 `'away'`，原有断言不变，加 FS-71 的单元用例 |
+| `tests/ui/harness/replay.js` | `workspace.status` 加进 `QUERIES`（`:335`，不占回放顺序；m6-replay 也从这里读只读查询的名单），给合成结果（synthetic，标明）：`git: ok`、`repo: null`、快照 `on`、没有文件（fs-replay 可以换成 `old`，§19.1）；`snapshots.drop` 照 `models.discoverCancel`（`:765-766`）直接应答 `{ error: null }`、记在 `status.drops`、不占回放顺序（m3-replay 的 `delete` 用例在 `mori:delete-session` 之后发它，`:240-266`），否则 `replayCommand`（`:722-734`）记 `replay mismatch`；`snapshots.diff`、`rewind`、`rewind.undo`、`workspace.initGit`、`worktrees.*` 不在现有录制里出现，只在新的 fs fixture 用到时再加；`withDefaults`（`:60-70`）合成的会话信息加 synthetic 的 `approval.allowedDirs: []`、`worktree: null`、`live.awayTimers: []`、`live.asks: []`（同现有 `teamInfo` 的做法，只补界面字段，不补模型看到的内容）；`emptyBoard()`（`:84-86`）去掉 `teamEdited`；`sameCommand` 的 `approval.forget`（`:388-389`，现在只比 `toolName`）同时比 `dir` |
+| `tests/unit/taskboard/platform.test.mjs:47-139`（TB-34） | 处理器的 `ctx` 带 `cwd`（临时目录）；`policy.gateFor(name)` 的断言改成对调用判断；`setMode('all')` 改 `'full'`，`:97` 的期望改为 `{ mode: 'full', allowed: [], allowedDirs: [] }`，并按 FS-33 只放行 scope `inside` 的请求；Allow for this session 的用例用工作路径里的命令；读取与 TaskBoard 工具免批准的用例不变，免批准的集合加 `ask_user_question`（MEM-10 同）；`ApprovalEndBy` 多了 `'away'`，原有断言不变，加 FS-71 的单元用例 |
 | `tests/unit/memory/text-guard.test.mjs:82-91`（MEM-13） | `insideDir`、`resolveToCwd` 改从 `pathGate.ts` 取 |
 | `tests/unit/memory/text-identity.test.mjs:45、54-55、116、152`（MEM-01） | `IDENTITY_TEXT` 改为 `identityText('ask')`，`renderIdentity` 带 `'ask'`；`A1` 是 `specBlock('### A.1')` 从记忆规格附录 A.1 的 text 块读出的（`tests/unit/memory/text-helpers.mjs:228-233`），块里加上 `.work` 一行后跟着变；加 `full`、`none` 两条 |
 | `tests/ui/mem-app-prompt.mjs:60-73`、`tests/ui/tb-app-flow.mjs:46、390`（MEM-01、MEM-02、TB-10） | 测试里抄写的身份段在第二行之后加 `.work` 一行（Ask each time 的权限句不变）；`mem-app-prompt` 加一步 Full access 下的身份句（FS-39）；工具段检查（默认工具 read、bash、edit、write，bash 的规则）不改、必须照样通过，只是用户会话启用的工具多了 `ask_user_question`：断言工具清单（`<tools>` 与请求的 `tools` 参数）的地方加上它，分开时对话的那一组也加上 |
 | `tests/fixtures/mem/mem-enhance.json`、`mem-feedback.json`、`mem-notice.json`、`mem-tool.json` | 身份段变了（`.work` 一行；`mem-enhance.json` 的第二行换成没人能批那一句），按 AGENTS.md 重录 |
-| `tests/ui/m2-app.mjs` | `OUTSIDE_TEXT`（`:67`、`:178`）与 `approval-outside` 改为原因行（`approval-scope`），外面路径的用例（`:1169-1187`）断言 `Writes outside the working directory: <真实路径>` 和按目录放行的按钮，`:1179-1184` 的 `docs/../../m2-up.md` 解析后仍在外面，断言改为原因行里的解析后路径；Allow all 的步骤（`:288`、`:347-354`、`:792-853`、`:1689-1728`）改成 Full access：确认框原文、`Full access` 标签、Full access 下写到外面仍出卡、新会话不继承；`:659` 的小字 `You won’t be asked again for any command in this session.` 改为新写法；任务栏闪烁检查不变（提问卡闪烁由 FS-89 测） |
-| `tests/ui/m2-helpers.mjs`、`m2-replay.mjs`、`m2-real.mjs`、`m2-record.mjs`、`tests/fixtures/m2/*.json` | 切模式的帮助函数改 Full access；`all-mode.json`、`pending-to-all.json` 改录为 Full access（文件名改 `full-mode.json`、`pending-to-full.json`）；其余带 `mori.approval_request` 的重录（载荷多了 `scope` 等字段） |
+| `tests/ui/m2-app.mjs` | `OUTSIDE_TEXT`（`:67`、`:178`）与 `approval-outside` 改为原因行（`approval-scope`），外面路径的用例（`:1169-1187`）断言 `Writes outside the working directory: <真实路径>` 和按目录放行的按钮，`:1179-1184` 的 `docs/../../m2-up.md` 解析后仍在外面，断言改为原因行里的解析后路径；Allow all 的步骤（`:288`、`:347-354`、`:792-853`、`:1689-1728`）改成 Full access：确认框原文、`Full access` 标签、Full access 下写到外面仍出卡、新会话不继承；`:659` 的小字 `You won’t be asked again for any command in this session.` 改为 §6.13 命令那一句（§17“按工具名放行命令的小字”）；`:1154` 的 “Write files” 小字改为 §6.13 的 `You won’t be asked again for “Write files” in this session, except outside the working directory or in protected paths.`（Edit files 同理）；任务栏闪烁检查不变（提问卡闪烁由 FS-89 测） |
+| `tests/ui/m2-helpers.mjs`、`m2-replay.mjs`、`m2-real.mjs`、`m2-record.mjs`、`tests/fixtures/m2/*.json` | 切模式的帮助函数改 Full access；`all-mode.json`、`pending-to-all.json` 改录为 Full access（文件名改 `full-mode.json`、`pending-to-full.json`）；其余带 `mori.approval_request` 的重录（载荷多了 `scope` 等字段）；`m2-replay.mjs:343-344` 的 `optionProblems` 的 `hint` 按工具分三种（命令用 §6.13 命令那句，`edit`、`write` 用带 except 的那句，其他工具不变）；`m2-real.mjs:308` 的命令小字同改 |
 | `tests/fixtures/m3/ext-ui.json`、`trust-allow.json`、`trust-remembered.json`，`m4/edit-two.json`、`quote-changed.json`、`write-delete.json`，`m5/split-approvals.json`、`split-esc.json`，`m6/mcp.json`、`plugin.json`、`slash.json`；`tests/ui/m1-record.mjs:101` | 都带 `mori.approval_request`（没有 `scope`、`targets`、`allowDirs`）：分别用 `m3-record.mjs`、`m4-record.mjs`、`m5-record.mjs`、`m6-record.mjs` 重录，m3–m6 的回放用新 fixture 通过；`m1-record.mjs:101` 的 `approval.setMode { mode: 'all' }` 改为 `'full'`（新的 schema 不收 `'all'`） |
 | `tests/fixtures/tb/tb-approval.json`、`tb-ask.json`、`tb-receipts.json`、`tb-team.json`，`tests/ui/tb-record.mjs`、`tb-replay.mjs`、`tb-helpers.mjs`、`tb-app-stop.mjs`、`tb-real.mjs` | 录下的请求带工具定义与事件：`task_create`、`agent_message`、`task_handoff` 的 schema，实例与协作模式对话的工具列表，用户会话多了 `ask_user_question`，附录 A 的段、工作卡，`mori.team_approval_request` 的新字段，`gate: 'all'` / `by: 'all'`：用真实模型重录（`tb-record.mjs`），`tb-replay.mjs` 用新的 fixture 通过；帮助函数里的 Allow all 改 Full access；TB-34、TB-35 的断言改用新标签；别的 fixture 里没有 TaskBoard 工具的定义，不受影响 |
 | `tests/ui/page.mjs`、`m1-layout.mjs`、`m5-app.mjs`、`m6-app-row.mjs`、`m6-app-bands.mjs`、`m6-app-slash.mjs`、`m6-helpers.mjs`、`m0-real.mjs`、`m1-record.mjs`、`mem-replay.mjs` | 量宽度、找按钮时用的 `Allow all` 字串改 `Full access`（窄栏截断的量法照旧；`Full access` 比 `Allow all` 宽，按 `docs/v0/composer-pickers.md` 的量法在 280px 一栏重量一次）；`m1-layout.mjs:355`、`m6-helpers.mjs:269` 的 `NOTES.all` 与 `m2-helpers.mjs:22` 的说明 `Edits, writes, and commands will run without asking.` 改为 §17 的 `Edits, writes, and commands inside the working directory run without asking.` |
@@ -1872,7 +1950,7 @@ App 结果写 `fs-app-existing.json`，回放结果写 `fs-replay-existing.json`
 | 跑过 bash 调用后列出或比较项目文件夹内容的 App / 真实测试 | 项目里会多出 `.work/`，这类检查要排除它。起草时查过 `app/tests/ui` 里的 `readdirSync`：m5-app、m6-app-bands、m6-app-row 读的是报告目录，mem-app-prompt 读的是记忆目录，都不受影响；实现时再 grep 一遍读会话 cwd 的地方 |
 | 跑真实 git 的测试项目（右栏、TaskBoard 的写入锁） | `.work/.gitignore` 让 `git status` 不变；不用改，回归时确认 |
 | TB-01（`tests/unit/taskboard/roles.test.mjs:65-120`、`:190-203`，`tests/ui/tb-app-roles.mjs` 的 `fields`、`fieldNames`） | 平行 Agent 规格 §4.4 表的工具那一行去掉；写了 `tools` 的文件按“未知字段”一行（`unknown field "tools"`）；读出全部字段的检查去掉 `tools` |
-| 写了 `tools:` 的 synthetic 角色文件：`tests/unit/taskboard/teamHarness.mjs:22`（reviewer.md；模块载入时断言 `SPLIT.problems` 为空，不改的话引用它的 taskboard 的 align、flow、lifecycle、runEnd、team 与 memory 的 core-team、text-callers、text-helpers、text-sections 单元测试文件全部载入失败）、`team.test.mjs:415`（memory.md）、`roles.test.mjs:273`（`unknown tool "shell"`）、`tests/unit/memory/text-sections.test.mjs:286-300`（MEM-02 的 chat.md `tools: [read]`）、`tests/ui/tb-app-roles.mjs:579-582` 的 `problemRows`、`tests/ui/mem-app-prompt.mjs:783-800` 的 readonly 步骤（MEM-02、MEM-11） | 去掉这些文件里的 `tools:` 行；`problemRows` 的 `unknown tool`、`TaskBoard tool` 两行换成一行 `unknown field "tools"`；`roles.test.mjs:273` 的期望改为 `unknown field "tools"`；text-sections 与 mem-app-prompt 里 `chat.md tools: [read]` 的用例删掉（由 FS-61 覆盖），记忆规格 MEM-02 同步注明 |
+| 写了 `tools:` 的 synthetic 角色文件：`tests/unit/taskboard/teamHarness.mjs:22`（reviewer.md；模块载入时断言 `SPLIT.problems` 为空，不改的话引用它的 taskboard 的 align、flow、lifecycle、runEnd、team 与 memory 的 core-team、text-callers、text-helpers、text-sections 单元测试文件全部载入失败）、`team.test.mjs:415`（memory.md）、`roles.test.mjs:273`（`unknown tool "shell"`）、`tests/unit/memory/text-sections.test.mjs:286-300`（MEM-02 的 chat.md `tools: [read]`）、`tests/ui/tb-app-roles.mjs:579-582` 的 `problemRows`、`tests/ui/mem-app-prompt.mjs:783-800` 的 readonly 步骤（MEM-02、MEM-11）、`tests/ui/tb-app-sched.mjs:85` 的 `mcpProject`（executor 写了 `tools: [...]`，MCP 工具改由 `.pi/mcp.json` 照常给）、`tests/unit/taskboard/roles.test.mjs:54-60` 的 `teamOf62()`（chat、planner、reviewer 写了 `tools:`，第 311、352、364、399、411、457 行的六处调用都用它，期望里随之没有 tools 字段）、`tests/ui/tb-app-roles.mjs:755-756` 的 `FIELD_ROLES`（planner、executor，上一行已含） | 去掉这些文件里的 `tools:` 行；`problemRows` 的 `unknown tool`、`TaskBoard tool` 两行换成一行 `unknown field "tools"`；`roles.test.mjs:273` 的期望改为 `unknown field "tools"`；text-sections 与 mem-app-prompt 里 `chat.md tools: [read]` 的用例删掉（由 FS-61 覆盖），记忆规格 MEM-02 同步注明 |
 | `tests/unit/taskboard/roles.test.mjs:386-450`（TB-24、TB-09、TB-03、TB-04、TB-33 对 `toolAllowlist`、`dialogTools` 的断言） | 改测 `instanceTools`：五种实例都是默认工具 + `mcp__*` + 它的 TaskBoard 工具，关闭模式的临时提问没有 TaskBoard 工具；`dialogTools` 的断言改测 §8.6 职责工具的表（`applyDutyTools` 在 `team.test.mjs` 里测）；另加 worktree 路径从主文件夹读 `.mori/agents` 的用例 |
 | TB-03（`tests/ui/tb-app-roles.mjs` 的 `withoutMemoryTool`、`withoutMemoryRow`，`:281-284`；`v0Compare`，`:344-360`） | 请求的 `tools` 与工具页的行在比较前除 memory 外同样去掉 `ask_user_question`（用户会话一直启用它，§10.1） |
 | TB-04（`tests/ui/tb-app-ask.mjs` 的 `WRITE_TOOLS` 与 `banned`，`:44`、`:179`） | “新开只读实例（请求里没有 `bash`、`edit`、`write`、`agent_message`）”改为：请求里有默认工具、没有 `agent_message`，调用 `edit`、`bash` 得到 `Not allowed for this question: no file changes or commands.`、文件不变 |
@@ -1888,9 +1966,13 @@ App 结果写 `fs-app-existing.json`，回放结果写 `fs-replay-existing.json`
 | TB-49（`tests/unit/taskboard/tools.test.mjs`） | `task_create` 的 Correct form 按 §14；`:53` 的 `read_only: true` 改为 `limits`；`:129` 的参数顺序改为 `request`、`title`、`description`、`assignee`、`limits`、`depends_on` |
 | 平行 Agent 规格 §6.3 的 `task_handoff` schema 测试（`tests/unit/taskboard/*` 里的 schema 快照、§7.5 的严格 schema） | schema 多了 `options`、`recommended`；严格 schema 多两个可为 null 的字段；C 级标签不变 |
 | `tests/unit/taskboard/board.test.mjs`、`route.test.mjs`、`team.test.mjs`、`teamHarness.mjs`、`flow.test.mjs`、`lifecycle.test.mjs`、`runEnd.test.mjs`、`text.test.mjs` | 构造 task 的 `readOnly` 改为 `limits`（`readOnly: true` → `limits: { write: false }`，`false` 改为 `limits: {}`）；`loadBoard` 加旧文件的一项（FS-63） |
-| `tests/unit/taskboard/team.test.mjs:75`、`lifecycle.test.mjs:283-284`（`teamEdited`）；`team.test.mjs:509-525`（TB-44 的启用工具，`:519`）、`:529-538`（TB-09 的 `guardCall`）；`tests/unit/memory/text-sections.test.mjs:264-284`（MEM-02、MEM-04，`:273`）；`tests/unit/memory/text-callers.test.mjs:57-59`（MEM-10） | 删掉 `teamEdited` 的断言（改由 FS-14 测）；TB-44 的期望改为默认工具加 `board_read`、`read_session`、`agent_message`；TB-09 的这条改测路径闸第 2 步：对话会话的 gate 带 `TEAM_DIALOG_LIMITS` 时 bash 得到 `RELAY_ONLY`；text-sections 改为 `on.requestTools.includes('bash')` 为真、只多职责工具；MEM-10 改为对 `memory` 调用 `decide` 得到 `free` |
+| `tests/unit/taskboard/team.test.mjs:75`、`lifecycle.test.mjs:283-284`（`teamEdited`；同文件 `:240-262` 的两条 TB-09 见下面另一行）；`team.test.mjs:509-525`（TB-44 的启用工具，`:519`）、`:529-538`（TB-09 的 `guardCall`）；`tests/unit/memory/text-sections.test.mjs:264-284`（MEM-02、MEM-04，`:273`）；`tests/unit/memory/text-callers.test.mjs:57-59`（MEM-10） | 删掉 `teamEdited` 的断言（改由 FS-14 测）；TB-44 的期望改为默认工具加 `board_read`、`read_session`、`agent_message`；TB-09 的这条改测路径闸第 2 步：对话会话的 gate 带 `TEAM_DIALOG_LIMITS` 时 bash 得到 `RELAY_ONLY`；text-sections 改为 `on.requestTools.includes('bash')` 为真、只多职责工具；MEM-10 改为对 `memory` 调用 `decide` 得到 `free` |
 | `tests/unit/memory/text-callers.test.mjs` | 第 113 行“分开时对话调用 `memory` 得到 `RELAY_ONLY`”改为：`memory` 是职责工具，不被收窄拒绝；协作模式分开时它不在启用的工具里（pi 回 `Tool memory not found`，App 层的 MEM-11 已覆盖）；`CHAT_READ`（`chat.md` 写 `tools: [read]`，`:91-97` 定义、`:104-106` 断言）这一组去掉：这样的文件现在按 `agents_invalid` 拒绝启动；第 171 行构造 task 的 `readOnly` 改为 `limits` |
 | `tests/ui/mem-app-team.mjs`（MEM-31） | “只读 task”的判断改读 `board.json` 的 `limits.write` |
+| `tests/ui/mem-app-team.mjs:75-76`、`:584-587`（MEM-31 的不合格角色文件） | `BAD_ROLE` 写的是 `tools: ['read', 'hammer']`，FS-61 之后问题行变成 `unknown field "tools"`：`BAD_ROLE` 改为另一种不合格的头 `seats: ['nowhere']`，`BAD_PROBLEM` 改为 `.mori/agents/bad.md: unknown seat "nowhere"`（`app/src/kernel/roles.ts:220` 的写法），检查名里的 “an unknown tool” 改 “an unknown seat”；记忆规格 MEM-31 同步注明 |
+| `tests/unit/taskboard/lifecycle.test.mjs:240-262`（TB-09 两条） | `teamEntries` 只写 `{ mode }`；`prepareUser` 先把启用的工具设成 `OFF_SET + agent_message`（新版本存下的会话；恢复出裁过的一组由 sessions.ts 按 FS-68 拒绝，不在 team.ts）；断言两种模式下 `before_agent_start` 之后碰文件的工具不变（`OFF_SET` 都在），最后一条 `mori.team` 条目深等于 `{ mode: 'always' }` |
+| `tests/unit/memory/core-team.test.mjs:58-73`（MEM-11） | 协作模式分开时 `startUserRun` 之后 `getActiveTools()` 排序后等于 `[...OFF_SET, 'board_read', 'read_session', 'agent_message']`（不启用 `memory`，§8.6 的表、记忆规格 §7.6），对话经路径闸调 `bash` 得到 `RELAY_ONLY`；`setMode('off')` 之后等于 `[...OFF_SET, 'agent_message', 'memory']`（不变）；`teamEntries` 不再写 `tools`；记忆规格 MEM-11 同步注明 |
+| 会话引用的 Turn N（`app/src/renderer/src/state/sessionRefs.ts`，§5.3）与 `tests/fixtures/m5/ref-*.json` | 模型看到的引用文字只在会话里有 `mori.wake` 条目时变；现有的四个 `ref-*.json` 里没有 `mori.wake`（复核时 grep 为 0），不重录；`tb-app-*` 的协作模式套件加一项：会话引用芯片的 `turns a–b` 与 This session 的组编号一致（FS-12） |
 | `tests/fake-endpoint/scripts.mjs:146`、`scenarios/ask.mjs`、`flow.mjs` 及其余带 `read_only` 的脚本 | `read_only: true` 改为 `limits: { write: false }`，`read_only: false` 去掉；不改的话 `prepareToolArgs` 丢掉 `read_only`，只读 task 变成写 task，排队与写入锁的检查会变 |
 | `tests/ui/m2-app.mjs`、`tb-app-*.mjs`、`m3` 的扩展询问测试（含 `ext-ui-card`） | 窗口在测试里可能不在前台：卡都在默认 5 分钟内答完，不受影响；等卡超过几分钟的测试启动时 `away.set { timeout: 'never' }`；卡的排序合并了提问卡，只有扩展询问时行为不变。不改断言 |
 | 现有回放的 fixture | 现有录制里没有 `agent_before_settle` 的提醒，只有新录的 `fs-replay` fixture 用到；现有回放不变 |
