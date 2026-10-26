@@ -29,9 +29,11 @@ model-selection panel”、M21 “team mode should be task mode”，WP-09）：
 
 ## Task mode 一行
 
-位置：输入框下面一行的模型按钮打开的菜单（model-menu.md）里，范围的几节和菜单的说明之下、“Manage models”之上（§13.1）。菜单往上打开，
-这一行离按钮最近的是“Manage models”，其次就是它（Claude 的模型菜单里 Fast mode 一行的位置）。`pickLocked` 时菜单只有说明
-`Task mode picks the model for each agent`、这一行和“Manage models”（§12.11）。分屏时每一栏的模型菜单各有一行，作用于这一栏的会话。
+位置：输入框下面一行的模型按钮打开的菜单（model-menu.md）里，范围的几节和菜单的说明之下、`See background tasks`、“Manage agents”与“Manage models”之上（§13.1）。`See background tasks`（会话的 TaskBoard 有需求或协作模式打开时，§13.13.1）、“Manage agents”与这一行同在 `.task-mode-group` 里
+（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条
+“Manage agents 在模型菜单里一直显示”）。菜单往上打开，离按钮最近的是“Manage models”，再上面是“Manage agents”，然后是 `See background tasks`（有的时候），再上面就是它
+（Claude 的模型菜单里 Fast mode 一行的位置）。`pickLocked` 时菜单只有说明 `Task mode picks the model for each agent`、这一行、
+`See background tasks`、“Manage agents”和“Manage models”（§12.11）。分屏时每一栏的模型菜单各有一行，作用于这一栏的会话。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |

@@ -29,7 +29,8 @@ import { stubFolder } from './m3-helpers.mjs';
 import { openToolsSection } from './m6-helpers.mjs';
 import { TOOL_REASONS, toolRows } from './m6-tools-helpers.mjs';
 import {
-  appLogLines, bridge, brief, clickTeamSwitch, closeTbApp, contentText, instanceFiles, messagesOf, missingSteps,
+  appLogLines, bridge, brief, clickTeamSwitch, closeTbApp, contentText, expectedHandoff, instanceFiles, messagesOf,
+  missingSteps,
   newSession, openProject, paneSel, poll, readJsonl, reopenSession, restartTbApp, scenarioRequests, seedTeamUserData,
   sendMessage, shot, showTab, sleep, startTbApp, startTbEndpoint, stopTbEndpoint, tbModel, tbProvider, tbRecorder,
   teamSwitch, tempProject, tempUserData, userSession, waitTeamIdle, writeRole, writeRoles,
@@ -69,14 +70,23 @@ const IDENTITY_TEXT = [
     + 'the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> '
     + 'what is true about the user and this project. Follow them unless the user says otherwise.',
 ].join('\n');
-/** 附录 A.1.1（HANDOFF_TEXT，2026-10-26）：这次运行有交出去的工具时接在 A.1 第三行末尾，中间一个空格（§4.1） */
-const HANDOFF_TEXT = 'Tasks you create and questions you send to other agents are worked on by agents that don\'t see '
-  + '<facts>: write the facts they need into the task description or the question.';
-/** 有它们之一时身份段带 A.1.1（§4.1） */
+/** 有它们之一时身份段带附录 A.1.1 那一句（§4.1；那一句按有的工具拼，tb-helpers expectedHandoff） */
 const HANDOFF_TOOLS = ['task_create', 'agent_message', 'subagent'];
-/** 身份段的开头两种（§4.1：IDENTITY_TEXT［加 A.1.1］之后空一行是 <tools>） */
-const HEAD = `${IDENTITY_TEXT}\n\n<tools>\n`;
-const HANDOFF_HEAD = `${IDENTITY_TEXT} ${HANDOFF_TEXT}\n\n<tools>\n`;
+/** 身份段里 <tools> 的开头（§4.1：IDENTITY_TEXT［加 A.1.1］之后空一行是 <tools>） */
+const TOOLS_OPEN = '\n\n<tools>\n';
+
+/**
+ * @brief 身份段的开头：IDENTITY_TEXT，没有交出去的活那一句时直接空一行 <tools>，有时中间一个空格加那一句。
+ * @return { handoff（那一句；没有时为 null）, length（到 <tools> 的内容开始的长度） }；不是这样开头时为 null
+ */
+function identityHead(text) {
+  if (typeof text !== 'string' || !text.startsWith(IDENTITY_TEXT)) return null;
+  const at = text.indexOf(TOOLS_OPEN, IDENTITY_TEXT.length);
+  if (at < 0) return null;
+  const between = text.slice(IDENTITY_TEXT.length, at);
+  if (between !== '' && (!between.startsWith(' ') || between.includes('\n'))) return null;
+  return { handoff: between === '' ? null : between.slice(1), length: at + TOOLS_OPEN.length };
+}
 const TOOLS_TO_RULES = '\n</tools>\n\n<rules>\n';
 const RULES_END = '\n</rules>';
 /** pi 自己的身份句与文档指引（§4.1：不出现） */
@@ -301,7 +311,7 @@ function splitSections(rest) {
  */
 function parsePrompt(system) {
   if (typeof system !== 'string') return null;
-  const head = [HEAD, HANDOFF_HEAD].find((each) => system.startsWith(each));
+  const head = identityHead(system);
   if (!head) return null;
   const toolsEnd = system.indexOf(TOOLS_TO_RULES, head.length);
   if (toolsEnd < 0) return null;
@@ -311,7 +321,8 @@ function parsePrompt(system) {
   const identity = system.slice(0, rulesEnd + RULES_END.length);
   const sections = splitSections(system.slice(identity.length));
   if (!sections) return null;
-  return { identity, handoff: head === HANDOFF_HEAD, tools: system.slice(head.length, toolsEnd),
+  return { identity, handoff: head.handoff !== null, handoffText: head.handoff,
+    tools: system.slice(head.length, toolsEnd),
     rules: system.slice(rulesStart, rulesEnd).split('\n'), sections };
 }
 
@@ -342,13 +353,15 @@ function identityProblems(item) {
   if (!parsed) return [`does not start with appendix A.1 + <tools>/<rules>: ${item.system.slice(0, 80)}`];
   const bad = [];
   const names = listedTools(parsed.tools);
-  const want = item.tools.filter((name) => BUILTIN_TOOLS.includes(name));
+  const builtins = item.tools.filter((name) => BUILTIN_TOOLS.includes(name));
+  // 有 promptSnippet 的 Mori 工具也列在 <tools> 里：subagent（docs/specs/subagent.md §6.1）；memory、TaskBoard 的工具没有
+  const want = [...builtins, ...item.tools.filter((name) => name === 'subagent')];
   if (names === null) bad.push(`<tools> format: ${parsed.tools.slice(0, 120)}`);
   else if (!sameSet(names, want)) bad.push(`<tools> ${names.join(',')} vs request ${item.tools.join(',')}`);
-  const shell = shellRuleFor(want);
+  const shell = shellRuleFor(builtins);
   const shellLines = parsed.rules.filter((line) => Object.values(SHELL_RULE).includes(line.slice(2)));
   if (shell === null ? shellLines.length > 0 : !(shellLines.length === 1 && parsed.rules[0] === `- ${shell}`)) {
-    bad.push(`shell rule ${JSON.stringify(shellLines)} for ${want.join(',')}`);
+    bad.push(`shell rule ${JSON.stringify(shellLines)} for ${builtins.join(',')}`);
   }
   if (!parsed.rules.every((line) => line.startsWith('- ')) || !same(parsed.rules.slice(-2), FIXED_RULES)) {
     bad.push(`rules ${JSON.stringify(parsed.rules.slice(-3))}`);
@@ -357,9 +370,9 @@ function identityProblems(item) {
     || parsed.sections.some((section) => section.name === 'docs' || section.name === 'tools')) {
     bad.push('pi identity sentence or docs present');
   }
-  const handoff = item.tools.some((name) => HANDOFF_TOOLS.includes(name));
-  if (parsed.handoff !== handoff) bad.push(`appendix A.1.1 ${parsed.handoff ? 'present' : 'missing'} with tools `
-    + item.tools.join(','));
+  const sentence = expectedHandoff(item.tools);
+  if (parsed.handoffText !== sentence) bad.push(`appendix A.1.1 ${JSON.stringify(parsed.handoffText)} with tools `
+    + `${item.tools.join(',')} (expected ${JSON.stringify(sentence)})`);
   return bad;
 }
 
@@ -545,9 +558,11 @@ function promptIdentity(ctx, who, first, reqs) {
   const problems = first ? identityProblems(first) : ['no request'];
   const listed = parsed ? listedTools(parsed.tools) : null;
   record('MEM-01 a main-agent request\'s system starts with appendix A.1, then <tools> and <rules> (no pi identity '
-    + 'sentence, no docs); with the default tools <tools> lists read, bash, edit, write with the fixed last line, '
-    + '<rules> opens with the bash rule and ends with the two fixed rules; memory is sent as a tool but not listed',
-  problems.length === 0 && same(listed, ['read', 'bash', 'edit', 'write']) && first.tools.includes('memory'),
+    + 'sentence, no docs); with the default tools <tools> lists read, bash, edit, write and subagent (normal mode, '
+    + 'subagent spec §2) with the fixed last line, <rules> opens with the bash rule and ends with the two fixed rules; '
+    + 'memory is sent as a tool but not listed',
+  problems.length === 0 && same(listed, ['read', 'bash', 'edit', 'write', 'subagent'])
+    && first.tools.includes('memory'),
   brief({ problems, listed, tools: first?.tools, rules: parsed?.rules }));
   const tokens = parsed ? estimateTokens(parsed.identity) : null;
   record(`MEM-01 with the default tools the identity section actually sent is at most ${LIMIT} tokens (§6.3 estimate)`,
@@ -789,7 +804,7 @@ function splitInstances(ctx, who) {
     const want = seat ? expectedSections(seat, layers) : null;
     return { id: file.id.slice(who.sessionId.length + 1), kind: meta?.kind, seat,
       ok: Boolean(seat && got && same(got.memory, want)
-        && [HEAD, HANDOFF_HEAD].some((head) => got.preamble?.startsWith(head))),
+        && identityHead(got.preamble) !== null),
       got: got?.memory.map((s) => s.name) };
   });
   const kinds = new Set(view.map((item) => item.kind));
@@ -836,9 +851,9 @@ function splitPatches(who, req, t) {
     + 'mode (wake-up, second message) write no patch',
   teamProblems.length === 0 && listedTools(parsePrompt(firstTeam.system).tools)?.join() === 'read,ls'
     && t.n4 === t.n2, brief({ teamProblems, tools: firstTeam?.tools, n2: t.n2, n4: t.n4 }));
-  record('MEM-02 split config, team mode turned off again: the first run\'s <tools> lists read, bash, edit, write as '
-    + 'sent (with the bash rule); the second off-mode run writes no patch', offProblems.length === 0
-    && sameSet(listedTools(parsePrompt(firstOff.system).tools) ?? [], ['read', 'bash', 'edit', 'write'])
+  record('MEM-02 split config, team mode turned off again: the first run\'s <tools> lists read, bash, edit, write and '
+    + 'subagent as sent (with the bash rule); the second off-mode run writes no patch', offProblems.length === 0
+    && sameSet(listedTools(parsePrompt(firstOff.system).tools) ?? [], ['read', 'bash', 'edit', 'write', 'subagent'])
     && t.n6 === t.n5, brief({ offProblems, tools: firstOff?.tools, n5: t.n5, n6: t.n6 }));
   record('MEM-04 each team-mode switch writes exactly one section patch at the start of the next run (on: dialog only '
     + 'taste; off: all four again) and the user session file\'s sections equal the last request\'s',
@@ -848,7 +863,7 @@ function splitPatches(who, req, t) {
 
 // ---------- 步骤 readonly：关闭模式下 chat.md 写 tools: [read] ----------
 
-/** @brief chat.md 写 tools: [read] 的关闭模式对话（关键词模式）：<tools> 只有 read、没有 shell 规则、有 memory。 */
+/** @brief chat.md 写 tools: [read] 的关闭模式对话（关键词模式）：<tools> 只有 read 与 subagent、没有 shell 规则、有 memory。 */
 async function readonly(ctx) {
   const who = { tab: await openProject(ctx, ctx.readonly) };
   const s1 = await send(ctx, who, 'plain question one');
@@ -857,10 +872,11 @@ async function readonly(ctx) {
   const n2 = systemCount(who.sessionFile);
   const reqs = requestsOf(ctx, s1, (info) => info.role === 'chat' && info.kind === 'off-dialog');
   const problems = reqs[0] ? identityProblems(reqs[0]) : ['no request'];
-  record('MEM-02 off mode with chat.md "tools: [read]": the first run\'s <tools> lists only read, as in the request\'s '
-    + 'tools, and <rules> has no shell rule; the second run writes no patch', problems.length === 0
-    && sameSet(reqs[0].tools, ['read', 'agent_message', 'memory'])
-    && listedTools(parsePrompt(reqs[0].system).tools)?.join() === 'read' && n1 === 1 && n2 === 1,
+  // 普通模式另有 subagent（docs/specs/subagent.md §2：Task mode 关闭时总有，对话持有者写了 tools: [read] 时也有）
+  record('MEM-02 off mode with chat.md "tools: [read]": the first run\'s <tools> lists only read and subagent, as in '
+    + 'the request\'s tools, and <rules> has no shell rule; the second run writes no patch', problems.length === 0
+    && sameSet(reqs[0].tools, ['read', 'agent_message', 'memory', 'subagent'])
+    && listedTools(parsePrompt(reqs[0].system).tools)?.join() === 'read,subagent' && n1 === 1 && n2 === 1,
   brief({ problems, tools: reqs[0]?.tools, n1, n2 }));
   record('MEM-11 off mode with chat.md "tools: [read]": the dialog holder still has the memory tool (Mori adds it '
     + 'after the role\'s tools)', reqs.length >= 2 && reqs.every((item) => item.tools.includes('memory')),

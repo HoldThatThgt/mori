@@ -112,11 +112,13 @@ fieldset.mf-row > legend + .mf-control { grid-column: 2; }
 .reorder-handle svg { width: 14px; height: 14px; }
 .reorder-handle:hover:not([aria-disabled='true']) { color: var(--color-text); background: var(--color-hover); }
 .reorder-handle[aria-disabled='true'] { cursor: default; opacity: 0.5; }
-.row-list > li[data-dragging='true'], .member-list > li[data-dragging='true'] { opacity: 0.45; }
-.row-list > li[data-drop='before'], .member-list > li[data-drop='before'] {
+/* Customize › Agents 表单的模型列表（.agent-model-list）用同一份拖动排序 */
+.row-list > li[data-dragging='true'], .member-list > li[data-dragging='true'],
+.agent-model-list > li[data-dragging='true'] { opacity: 0.45; }
+.row-list > li[data-drop='before'], .member-list > li[data-drop='before'], .agent-model-list > li[data-drop='before'] {
   box-shadow: inset 0 2px 0 var(--color-accent);
 }
-.row-list > li[data-drop='after'], .member-list > li[data-drop='after'] {
+.row-list > li[data-drop='after'], .member-list > li[data-drop='after'], .agent-model-list > li[data-drop='after'] {
   box-shadow: inset 0 -2px 0 var(--color-accent);
 }
 .visually-hidden {

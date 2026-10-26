@@ -114,7 +114,8 @@ export function openFile(tabKey: string, path: string, ref: QuoteRef | null = nu
   recordAction(ref ? 'Open file from attached context' : 'Open file');
   jumpNonce += 1;
   const jump = ref ? { ref, nonce: jumpNonce } : null;
-  updateTab(tabKey, (tab) => ({ ...tab, rightOpen: true,
+  // 文件阅读器属于 Changes 一栏（平行 Agent 规格 §13.13.1）
+  updateTab(tabKey, (tab) => ({ ...tab, rightOpen: true, rightTab: 'changes',
     rightView: { kind: 'file', path, jump, nonce: jumpNonce } }));
 }
 

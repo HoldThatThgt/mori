@@ -511,8 +511,9 @@ function menuNow(ctx, tab) {
 }
 
 /**
- * @brief 协作模式下的模型按钮（2026-10-26 起能打开菜单，§12.11）：样子；点击打开的菜单只有说明、Task mode 一行和
- *        Manage models，焦点在 Task mode 一行上；Esc 关上；焦点在按钮上按 Enter 同样打开。
+ * @brief 协作模式下的模型按钮（2026-10-26 起能打开菜单，§12.11）：样子；点击打开的菜单只有说明、Task mode 一行、
+ *        See background tasks、Manage agents 和 Manage models，焦点在 Task mode 一行上；Esc 关上；焦点在按钮上按 Enter
+ *        同样打开。
  */
 async function lockedView(ctx, who) {
   const button = await modelButton(ctx, who.tab);
@@ -571,19 +572,23 @@ async function sel(ctx) {
   selThinking(ctx, who, lock);
 }
 
-/** @brief TB-38：协作模式下模型按钮显示“Task mode · <模型 id>”、菜单只有说明与 Task mode 一行、setPick 被拒绝、pickOptions 为空。 */
+/**
+ * @brief TB-38：协作模式下模型按钮显示“Task mode · <模型 id>”、菜单只有说明、Task mode 一行、See background tasks、
+ *        Manage agents 与 Manage models、setPick 被拒绝、pickOptions 为空。
+ */
 function selLocked(ctx, who, lock) {
   const lines2 = lock.button.title?.split('\n') ?? [];
   record('TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" (chat\'s model in '
     + 'use; data-locked, still a menu button) with hover "Task mode · fake-other" / "Task mode picks the model for '
     + 'each agent"; clicking it opens a menu with only that note (first, no separator line above it), the Task mode '
-    + 'row (focused) and Manage models — no Groups/Providers/Models; Enter on the button opens it too (2026-10-26, '
-    + '§12.11)',
+    + 'row (focused), See background tasks, Manage agents and Manage models — no Groups/Providers/Models; Enter on '
+    + 'the button opens it too (2026-10-26, §12.11, §13.13.1; Manage agents from customize-agents.md §6.6)',
   lock.mode === 'once' && lock.button.locked && lock.button.text === 'Task mode · fake-other'
     && lines2[0] === 'Task mode · fake-other' && lines2[1] === LOCKED_TITLE && lock.button.popup === 'menu'
     && lock.clicked?.sections === 0 && lock.clicked.radios === 0 && lock.clicked.note === LOCKED_TITLE
     && lock.clicked.noteFirst && lock.clicked.noteLine === '0px'
-    && same(lock.clicked.items, ['team-switch', 'manage-models']) && lock.clicked.focused === 'team-switch'
+    && same(lock.clicked.items, ['team-switch', 'see-background-tasks', 'manage-agents', 'manage-models'])
+    && lock.clicked.focused === 'team-switch'
     && lock.afterEnter === 1 && lock.t1 === 'active', brief(lock));
   record('TB-38 task mode: "Manage models" in the locked model menu opens Settings › Models (team-blocked.md, locked; '
     + 'the same as Manage models in model-menu.md), and Back to app returns to the session', lock.manage.opened

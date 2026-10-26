@@ -9,6 +9,9 @@
 //   taskboard  docs/specs/parallel-agents-taskboard.md §17.2（§17.3），编号 TB-n
 //   memory     docs/specs/memory.md §14.2（§14.3），编号 MEM-n
 //   discovery  docs/specs/model-discovery.md §13.2（§13.3），编号 MD-n
+//   subagent   docs/specs/subagent.md §14.3（§14.1），编号 SA-n
+//   agents     docs/specs/customize-agents.md §9.2（§9.3），编号 AG-n：单元 ag-unit.json（ag-reporter.mjs，严格模式），
+//              App ag-app*.json（含 -existing），回放 ag-replay*.json（含 -existing），--only 写的 ag-partial-*.json 不计入
 // 层由结果文件决定（模型层 §14.3，TaskBoard §17.3，记忆 §14.3，一键拉取模型 §13.3）：
 //   层    model                                       taskboard                           memory
 //   单元  v1-unit.json（tests/unit/reporter.mjs）      tb-unit.json（tb-reporter.mjs）     mem-unit.json（mem-reporter.mjs）
@@ -17,7 +20,9 @@
 //   真实  v1-models-real.json                         tb-real.json                        mem-real.json
 //   discovery：单元 md-unit.json（md-reporter.mjs，严格模式），App md-app*.json（含 -existing），
 //   回放 md-replay*.json（含 -existing），真实 md-real.json。
-// TaskBoard 的 tb-partial-*.json、记忆的 mem-partial-*.json、一键拉取模型的 md-partial-*.json（--only 只跑一部分时写的）
+//   subagent：单元 sa-unit.json（sa-reporter.mjs，严格模式），App sa-app*.json，回放 sa-replay*.json，真实 sa-real.json。
+// TaskBoard 的 tb-partial-*.json、记忆的 mem-partial-*.json、一键拉取模型的 md-partial-*.json、subagent 的 sa-partial-*.json
+//（--only 只跑一部分时写的）
 // 不计入任何层。
 // 只认开发构建的结果；--packaged 时 App 与真实层改读带 -packaged 的结果文件（v1-models-app*-packaged.json、
 // v1-models-real-packaged.json；tb-app*-packaged.json、tb-real-packaged.json；mem-app*-packaged.json、
@@ -27,7 +32,8 @@
 // 检查算缺口（2026-10-26 负责人的规则“不做规格没写的东西”，AGENTS.md）：规格没写的东西不该有测试，编号写错的测试也不算数。
 // --allow-missing-real：真实层的结果文件还不存在时把真实层记为 pending、不算失败（负责人走查之前用）；最终一遍不能带它。
 // 用法（在 app/ 下）：
-//   node tests/spec-coverage.mjs [--spec model|taskboard|memory|discovery] [--packaged] [--allow-missing-real]
+//   node tests/spec-coverage.mjs [--spec model|taskboard|memory|discovery|subagent|agents]
+//     [--packaged] [--allow-missing-real]
 // 退出码：全部覆盖为 0，有缺口为 1，规格名不认识、规格表或结果文件读不出为 2。
 // 下面的函数导出给 tests/unit/taskboard/spec-coverage.test.mjs 检查；直接运行时才做检查。
 // 记忆规格的 --spec memory 在这台机器上带 --allow-missing-real 运行（真实层由负责人用数据目录跑，记忆规格 §0 第 4 条）。
@@ -80,9 +86,25 @@ export const SPECS = {
     strayLabel: 'an MD id',
     files: { unit: 'md-unit.json', app: 'md-app', replay: 'md-replay', real: 'md-real', partial: 'md-partial-' },
   },
+  subagent: {
+    path: 'docs/specs/subagent.md',
+    section: '14.3',
+    row: /^\|\s*SA-\d+\s*\|/,
+    prefix: 'SA',
+    strayLabel: 'an SA id',
+    files: { unit: 'sa-unit.json', app: 'sa-app', replay: 'sa-replay', real: 'sa-real', partial: 'sa-partial-' },
+  },
+  agents: {
+    path: 'docs/specs/customize-agents.md',
+    section: '9.2',
+    row: /^\|\s*AG-\d+\s*\|/,
+    prefix: 'AG',
+    strayLabel: 'an AG id',
+    files: { unit: 'ag-unit.json', app: 'ag-app', replay: 'ag-replay', real: 'ag-real', partial: 'ag-partial-' },
+  },
 };
 
-/** @brief 规格名的列表文字："model, taskboard, memory or discovery"（规格名不认识时的提示）。 */
+/** @brief 规格名的列表文字："model, taskboard, memory, discovery, subagent or agents"（规格名不认识时的提示）。 */
 export function specNames() {
   const names = Object.keys(SPECS);
   return names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names.at(-1)}` : names.join('');

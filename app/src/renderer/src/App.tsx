@@ -253,17 +253,19 @@ function useRightPanel(tab: Tab | undefined, view: View, cramped: boolean) {
   const split = useApp((state) => state.split);
   const [floatRight, setFloatRight] = useState(false);
   const splitId = split?.join('|') ?? '';
-  const opened = useRef(new Map<string, number>());
+  const opened = useRef(new Map<string, string>());
   const fileNonce = tab?.rightView.kind === 'file' ? tab.rightView.nonce : 0;
+  // 进展摘要的链接、模型菜单打开 Background tasks 也算（平行 Agent 规格 §13.13.1：浮在上层时同右栏开关）
+  const openKey = `${fileNonce}:${tab?.tasks.opened ?? 0}`;
   useEffect(() => setFloatRight(false), [cramped, splitId, view]);
-  // 每一栏上次看到的"打开文件"次数：同一栏里变了才是刚打开了文件（换到另一栏不算）。放在上面那个 effect 之后，
-  // 从记忆页回到会话的同一次更新里先收起再浮出。
+  // 每一栏上次看到的"打开文件"与打开 Background tasks 的次数：同一栏里变了才是刚打开了（换到另一栏不算）。放在上面那个
+  // effect 之后，从记忆页回到会话的同一次更新里先收起再浮出。
   useEffect(() => {
     if (!tab) return;
     const before = opened.current.get(tab.key);
-    opened.current.set(tab.key, fileNonce);
-    if (cramped && before !== undefined && before !== fileNonce && fileNonce > 0) setFloatRight(true);
-  }, [tab?.key, fileNonce]);
+    opened.current.set(tab.key, openKey);
+    if (cramped && before !== undefined && before !== openKey && openKey !== '0:0') setFloatRight(true);
+  }, [tab?.key, openKey]);
   const openFor = (item: Tab) => (cramped ? floatRight && item.key === tab?.key : item.rightOpen ?? hasChanges(item));
   const toggle = (item: Tab) => {
     const open = openFor(item);

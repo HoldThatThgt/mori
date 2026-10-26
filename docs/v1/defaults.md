@@ -61,11 +61,20 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 模型按钮上的模式（2026-10-26，WP-09） | 协作模式下 `Task mode · <当前模型 id>`（没有当前模型时 `Task mode`），跟着 `TeamState.mode`（不等 `pickLocked`）；悬停第二行 `Task mode picks the model for each agent` | `app/src/renderer/src/components/ModelMenu.tsx` | M10 的推荐选项“Text on the button”：开关不在顶栏后，不打开菜单也要看得出模式；放不下时先截模型 id、再截 `Task mode`（同范围按钮） | 你走查时觉得太长、想要图标时 |
 | 回复进行中的模型菜单（2026-10-26，WP-09） | 能打开；范围的项不可用（`disabled`），说明换成 `Can’t switch models until the response finishes`；Task mode 一行可用 | `app/src/renderer/src/components/ModelMenu.tsx` | M10 的推荐选项：§13.1 本来允许回复中切换模式，开关进菜单后菜单要能打开 | 你走查时 |
 | Task mode 切换失败那一行（2026-10-26，WP-09） | `Couldn’t change task mode: <原文>`；菜单开着时在 Task mode 一行下面，关着时从输入框下面一行往上弹出（同换范围失败）；10 秒后或下次切换时消失 | `app/src/renderer/src/components/TeamSwitch.tsx`、`app/src/renderer/src/state/teamActions.ts` | 原来在顶栏开关下面；菜单开着时往上弹出的一行会被菜单挡住 | 你走查时 |
-| 给 `conversation`、`decision` 留的槽位 | 每个 key 1 个（`task`、`background` 最多占并发上限 − 1；并发上限为 1 时不留） | `app/src/kernel/modelPool.ts` | 严格优先不打断已经发出的请求；不留的话 4 个 task 占满默认的 4 个槽位，对话和立项等到超时 | 拿到内网端点、知道它的并发时 |
+| 给 `conversation`、`decision` 留的槽位 | 每个 key 1 个（`task`、`background` 最多占并发上限 − 1；并发上限为 1 时不留；普通模式 subagent 的类别 `subagent` 不受它约束，subagent 规格 §5.4） | `app/src/kernel/modelPool.ts` | 严格优先不打断已经发出的请求；不留的话 4 个 task 占满默认的 4 个槽位，对话和立项等到超时 | 拿到内网端点、知道它的并发时 |
 | 命令与界面名 | 命令 `/task`、`/task on`、`/task off`（2026-10-26 由 `/team` 改，负责人走查 M21，没有别名；给模型的文字叫 task mode）；界面 `Task mode`、`Turn off task mode`、`Stop agents`（2026-10-26 负责人走查 M21，原为 `Team`、`Turn off team mode`、`Stop team`） | `app/src/renderer/src/`（命令 `state/teamActions.ts`）；给模型的文字 `app/src/kernel/boardText.ts` | 命令是 proposal 的暂定名，`/task off` 为派生；界面名按负责人的回答 | 你走查时 |
 | 改名后的几句界面文字（2026-10-26，WP-09，覆盖补测时登记） | 右栏说明 `Changes made by other agents aren’t listed here.`（原为 `Changes made by team tasks aren’t listed here.`）；记忆页里打不开的会话 `This is a background agent’s session, which can’t be opened.`（原为 `This is a team task’s session, …`）；会话打不开的横幅 `The TaskBoard extension failed to load: <原文>`（原为 `The team extension failed to load: …`） | `app/src/renderer/src/components/ChangesPanel.tsx`、`state/memory.ts`（`TEAM_SESSION_TEXT`）；`app/src/kernel/sessions.ts`（`requiredExtension`） | 负责人只说“team mode should be task mode”（M21），这几句的写法是 WP-09 按推荐定的：右栏那句与 subagent 规格 §7.6 同一句（实例会话也可能是立项、结案、临时提问的，不只是 task），横幅叫扩展的名字；规格 §13.12、TB-57、TB-43 与 memory.md 只说意思，没给措辞 | 你走查时 |
 | 关闭模式的工作卡列出的需求 | 最近 5 个；更早的写成一行 `N earlier requests: board_read {}` | `app/src/kernel/boardText.ts`（`OFF_CARD_REQUESTS`） | 关掉 Task mode 之后每次请求都带这张卡，列太多费 token；更早的用 `board_read {}` 看得到（2026-10-26，WP-10） | 你走查时 |
 | 基座的一句话说明 | `General-purpose agent with the default tools` | `app/src/shared/team.ts`（`BASE_ROLE_DESCRIPTION`） | 基座没有角色文件，`next`、`assignee` 的说明与附加段的“Other roles”要一句话；规格没给 | 你走查时 |
+| Background tasks 的页签出现的条件（2026-10-26） | 会话的 TaskBoard 有需求，或协作模式不是 off；否则右栏与原来相同 | `app/src/renderer/src/components/ChangesPanel.tsx` | 没用过协作模式的会话保持 v0 的样子（TB-03）；模式打开、还没有需求时能看到 Background tasks 在哪 | 你走查时 |
+| 阶段行按钮的计数（2026-10-26） | 有 pending、active、waiting_user 的 task 时 “{n} running tasks”（这几种的个数），否则 “{n} tasks finished”（全部 task 数，含 stopped） | `app/src/renderer/src/state/taskList.ts`（`tasksButtonText`） | Claude 的按钮按“还在跑 / 都结束了”两种写；Mori 的 stopped 不会自己再开始，算在结束一边 | 你走查时 |
+| Background tasks 两节的顺序与折叠（2026-10-26） | Running 按编号从小到大，Finished 按编号从大到小；Finished 默认展开，可以折叠 | `app/src/renderer/src/state/taskList.ts`（`taskSections`）、`app/src/renderer/src/components/BackgroundTasks.tsx` | Running 照拆分的先后读；刚结束的在 Finished 最上面；负责人选了 Claude 的两节 | 你走查时 |
+| task 视图与运行中会话的重新读取（2026-10-26） | 这个 task 的 TaskView 在 mori.board 里变了时重新读，最多每秒一次 | `app/src/renderer/src/state/taskList.ts`（`REREAD_MS`、`rereadWait`） | 实例每次工具调用都会改 TaskView（最多每 250 毫秒一次）；会话文件可能有 1 MB（Har-GUI 的 T4），每秒一次足够跟上又不反复传大块 | 你走查时觉得慢；会话很大时 |
+| 交接的结果与去向的英文（2026-10-26） | Continue、Dead end、Blocked、Needs your decision、Done、Pass、Fail、Closed as done、Closed as failed；→ <role>、→ <close role> (closing)、→ <create role> (planning)、→ Done、→ Failed | `app/src/renderer/src/state/taskList.ts`（`OUTCOME_TEXT`、`routeText`） | 规格以前只在 board_read（给模型）里写结果的代码；界面要人话，Claude 没有对应 | 你走查时 |
+| Background tasks 里基座的名字（2026-10-26，负责人不在时按推荐定） | 项目没有角色文件时也照 §13.13 写 `Mori`（卡片第二行、task 视图、交接的头一行与去向、会话标题）；进展摘要照 WP-10 的 #64 不写 | `app/src/renderer/src/state/taskList.ts` | #64 只管进展摘要；Background tasks 一栏本身说明这些是后台的 task，谁拿着它是要看的事实；不写的话 §15 还要一套不带角色的去向（team-checks.md Background tasks #5） | 你确认 #64 时 |
+| 程序写的一棒的 View transcript（2026-10-26，审查 #2） | 实例跑过之后程序写的一棒（no handoff、error、no model）头一行写 `Mori`，`View transcript` 打开那个实例的会话：按这一棒记下的会话文件找出实例的角色（开着的实例按它的文件，没开着的按 knownFiles），不改 board.json 的格式 | `app/src/kernel/teamView.ts`（`handoffDetail`）、`app/src/kernel/team.ts`（`instanceRole`） | 头一行写谁交出这一棒（程序），会话要看的是实例做了什么；不改格式，已有的 board.json（例如负责人 Har-GUI 那次）照样对（team-checks.md Background tasks #6） | 你走查时 |
+| 模型菜单 Task mode 那一段的先后（2026-10-26，customize-agents 合入后） | Task mode 一行、它的失败行、`See background tasks`（有需求或协作模式打开时）、`Manage agents`，再下面 `Manage models` | `app/src/renderer/src/components/ModelMenu.tsx` | 两个 “Manage …” 挨着，都是去别的页；`See background tasks` 看的是 Task mode 的状态，挨着 Task mode 一行（team-checks.md Background tasks #10） | 你走查时 |
+| 分屏时点没有焦点那一栏的 `{n} running tasks`（2026-10-26，审查 #15） | 同右栏开关：鼠标主键按下时不切焦点，这一下点完（或在别处松开）才切到那一栏 | `app/src/renderer/src/components/ChatPane.tsx`（`isTopBarAction`）；[split.md](../v0/screens/split.md)“右栏开关” | 按下就切的话右栏先换成那一栏的状态、两栏变宽，按钮被挤走，这一下点空；同右栏开关的例外 | 你走查分屏时 |
 | board.json、AGENTS.md、model-config.json、模型档案改名替换被别的进程挡住时的重试 | 最多 10 次，第 n 次前等 n × 20 毫秒（合计不到 1 秒），只对 EPERM、EACCES、EBUSY | `app/src/kernel/renameRetry.ts`（`renameReplacing`） | Windows 上目标文件正被别的进程打开（杀毒、索引）时改名会失败，这一次写出就丢了，要等下一次写入才补上；App 测试每 20 毫秒读一次 board.json 时碰到过，设置页连着上移、删除 key 时 model-config.json 也碰到过（2026-10-22） | 你走查时 |
 | 程序注入的文字 | 英文（规格附录 A、§8.5） | `app/src/kernel/boardText.ts` | 与 pi 默认的 system prompt 同语言 | 内网模型对英文说明理解不好时 |
 | 界面文字 | 规格 §13 | `app/src/renderer/src/` | 英文，Claude 桌面版的写法 | 你走查时 |
@@ -110,6 +119,27 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | Mori 主动改一条“你说的”（2026-10-26） | 仍是 `You said`；`asked` 为假时只把 `learned` 改为 `agent` | `app/src/kernel/memoryRules.ts` `sourceAfter` | Mori 自己改不该把你说的条目交给增强 | 你走查时 |
 | 增强把 Mori 记的条目移到另一种（2026-10-26，规格 §6.9） | 只移本项目 `agent` 条目、这次运行的种类是一端；不要求依据；slug 不变（`<kind>-<日期>-<4 位>` 里的旧种类名照留）；加在目标种类末尾，回滚回到原种类末尾 | `app/src/kernel/memory.ts`（`update` 带目标种类）、`app/src/kernel/memoryRules.ts`（`writeRefusal`、`mergeRunChange`）、`app/src/kernel/memoryTool.ts`（`move`） | 移动不改条目的内容，你的原话与原来的依据都在；要求新依据会让前几天记的条目永远移不动；改 slug 要改文件名和 `[[slug]]` 链接 | 你走查重新归类、觉得移动也该带依据时 |
 
+## Customize › Agents
+
+来源：[Customize › Agents 规格](../specs/customize-agents.md) §7（2026-10-26，走查 M20）；状态表 [screens/customize-agents.md](screens/customize-agents.md)。
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 三项职责的界面文字 | `Talks to you`（dialog）、`Plans requests`（create）、`Closes requests`（close） | `app/src/shared/roles.ts` | 界面不讲 seat 这个行话；用这个职责做什么来叫它 | 你走查 Agents 一节时 |
+| 候选能用的文字 | `Ready` | `app/src/shared/roles.ts` | 只是静态检查通过，不说 “Available”（那要看此刻的限流与连接） | 同上 |
+| 要求的白话 | `Fills in handoff forms (verified)`、`Handoff tier B or better`、`Structured output (verified)`、`Image input`、`Context window of at least N tokens` | `app/src/shared/roles.ts` | 词表（TaskBoard 规格 §4.1）是文件的写法，界面写白话；原因原文仍照选择器 | 同上 |
+| 分节位置 | Skills 之后 | `app/src/renderer/src/components/ToolsPage.tsx` | Claude 的插件详情里 Agents 排在 Skills、Commands 之后；也让它不挨着 Instructions（AGENTS.md）一节 | 同上 |
+| 新文件的写法 | `description` 写 JSON 字符串；列表单行 `[a, b]`，含字母、数字、下划线、`._/-` 以外字符的项写 JSON 字符串，YAML 会读成 null、布尔或数字的值（`true`、`302`、`1e3` 等，`name` 也一样）同样写 JSON 字符串（2026-10-26 评审）；`subscribe` 写 JSON | `app/src/kernel/roleFiles.ts` | JSON 是 YAML 的子集，不用新增 YAML 依赖，读回与手写的文件同一个解析器 | 你想要更像手写的格式时 |
+| 编辑时的文件名 | 不随名字改 | `app/src/kernel/roleCommands.ts` | 手写的文件名可以和 name 不同；改名只改 name，不挪文件 | 同上 |
+| 删除 | 直接删除，不进回收站 | `app/src/kernel/roleCommands.ts` | 同删除会话（照 Claude：确认后永久删除） | 同上 |
+| 编辑时文件头的注释 | 不保留，表单上方提示 | `app/src/kernel/roleFiles.ts` | JSON 写法写不出注释；按字段重写比逐行修补简单 | 你的文件里常写注释时 |
+| 本节的说明与空状态 | 规格 §6.1、§6.2 的文字 | `app/src/renderer/src/components/ToolsAgents.tsx` | 规格没给的界面文字 | 你走查时 |
+| All MCP tools 写进文件的样子 | `mcp__*`（全部 MCP 工具；TaskBoard 规格 §4.1 为它放开） | `app/src/kernel/roles.ts`（tools 的校验） | 与基座的白名单同一个写法，以后加的 MCP 服务也算在内；另两个做法是表单不提供它，或按此刻的服务各写一个 `mcp__<服务>__*`（2026-10-26 已问负责人） | 负责人回答时 |
+| 表单没有勾选框的工具写法（2026-10-26 评审，推荐，负责人不在时照用） | 不显示、不改，勾或取消别的项时原样留着，保存时写在列表后面（例如 `tools: [read, grep, "mcp__github__*"]`） | `app/src/shared/roles.ts`（`toolsToggled`）、`app/src/renderer/src/components/ToolsAgentForm.tsx` | TaskBoard 规格 §4.1 允许按服务写 MCP 工具；表单只给全部 MCP 工具一个勾选框，原来勾选时按勾选框重排会悄悄丢掉它们。另两个做法：给每个这样的写法加一个勾选框（新的界面行），或保存前提示会去掉 | 你走查 Agents 一节、或要在表单里选单个 MCP 服务时 |
+| Add model range 的节（2026-10-26 评审，推荐，负责人不在时照用） | Groups、Providers，再按提供商各一节 `Models · <提供商名称>`，顺序同模型菜单；没有项的节不出现 | `app/src/shared/roles.ts`（`rangeGroups`）、`app/src/renderer/src/components/ToolsAgentForm.tsx` | 模型菜单的 Models 一节按提供商分小节；`<optgroup>` 不能套，拼成一个节名。原来只有一个 Models 节、只写模型 id，同名的模型分不出是哪个提供商的。另一个写法：节名只写提供商名称 | 你走查时 |
+| 范围展开不出模型时的一句话（2026-10-26 评审，推荐，负责人不在时照用） | `No model can run this agent`（同全部不能用）；`No model range picked` 只在没写 models、会话又没有范围时 | `app/src/shared/roles.ts`（`modelLine`） | 例如项目的 `.mori/models.json` 读不出时会话有范围、候选却为空，原来误报 “No model range picked”。另一个做法：再加一句专门的话 | 你走查时 |
+| Only these 一个都没勾时的 Save（2026-10-26 核对，推荐，负责人不在时照用） | 文件里有表单外保留的条目（例如 `mcp__github__*`）时仍可用，保存后 `tools` 只有这些条目；没有时不可用 | `app/src/renderer/src/components/ToolsAgentForm.tsx`（`canSave`） | 保留的条目就是这个 agent 的工具，为了能保存逼人勾一个会改掉文件。另一个做法：只看勾选框，一个都没勾就不能保存 | 你走查时 |
+
 ## 一键拉取模型
 
 来源：[一键拉取模型规格](../specs/model-discovery.md) §11，另加清单的默认勾选（§6.2）与列表地址的试法（§3.2）；位置是规格 §2 定下的代码落点，时长放在 `app/src/kernel/modelTimings.ts`。
@@ -134,3 +164,21 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 探针代价的说明 | “Each model is verified with up to 13 short requests.”（自动探针第 1–7 步最多 13 个请求） | `app/src/renderer/src/components/settings/`（Add provider 和卡上清单的底部，Add 按钮上方；首次启动表单在 Test connection 上方，规格 §6.6） | proposal §12 第 5 条：加入的模型全部自动跑探针，清单底部写明代价；在公网云上会花一点额度 | 探针步骤变化（`PROBE_SUITE` 改版）时 |
 | 清单的默认勾选 | 服务报告是聊天模型（`chat` 为真）的勾上，报告不是的不勾；不报告类型（`chat` 为 null）时，能加入的行只有一行就勾上，否则都不勾；Added、不能加入的行不勾 | `app/src/renderer/src/components/settings/Checklist.tsx` | proposal 已定（§12 第 1、4 条）：只按服务报告的类型判断，不按名字猜；OpenAI 这类不报告类型的列表里混着 embedding、语音和图片模型，全勾会加入不能对话的模型，所以只有一个时才勾，其余用 Select all | 你走查清单、常要手动 Select all 或取消勾选时 |
 | 列表地址最多试 3 次 | 没有 Anthropic 提示时最多 2 个（`<base>/models`；base 不以 `/v<数字>` 结尾时再试 `<base>/v1/models`）；有 Anthropic 提示时最多 3 个（`<base>/v1/models?limit=1000`、前缀 + `/models`、前缀 + `/v1/models`；主机是 `api.anthropic.com` 时只有第一个）；已有提供商不整理地址：`openai-*` 只试 `<baseUrl>/models`，`anthropic-messages` 同有 Anthropic 提示时的三个（前缀取 `baseUrl` 路径里 `anthropic` 那一段之前的部分；主机是 `api.anthropic.com` 或路径里没有这一段时只试第一个）；拿到列表、401/403 或连接失败、超时即停 | `app/src/kernel/discoverRead.ts`（列表地址的计划） | 补 `/v1`、去掉 `anthropic` 那一段对应 proposal §5.1、§5.3 写的两种常见填法（一键拉取模型 proposal 要求的功能，不算 fallback）；不再往下猜更多路径；认证失败和连不上时换地址也没用 | 遇到列表在别的路径上的服务时 |
+
+## 普通模式的 subagent 工具
+
+来源：[普通模式的 subagent 工具规格](../specs/subagent.md) §10；检查记录见 [team-checks.md](team-checks.md) 的“普通模式的 subagent 工具”一节。
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 一次调用、一次回复的 subagent 数 | 不设上限 | — | 负责人 2026-10-26 定（“as many as main agent want”）；同时在途的请求只受每个 key 的并发设置约束 | 走查中碰到一次开太多、内存或上下文吃紧时 |
+| `description` / `prompt` 长度 | 1–80 / 1–8000 字符 | `app/src/shared/subagent.ts` | 描述是卡片上的一行（同 task 标题 80）；提示要能把背景写全，比 Agent 消息的 4000 宽一些 | 你走查时 |
+| 结果里每个回复的长度 | 16000 字符，超出截掉并注明 | `app/src/kernel/subagent.ts` | 每个回复约 4000 token 以内；几个回复一起进主 Agent 的上下文，小窗口的模型也放得下 | 内网小窗口模型上看到效果时 |
+| 调度类别 | `subagent`：严格优先排在 `decision` 之后、`task` 之前；不受“留一个槽位”的限制；不排队超时 | `app/src/kernel/modelPool.ts`、`app/src/kernel/team.ts`（`schedClassOf`） | 负责人 2026-10-26 定“用满并发设置”；`conversation` 类别等槽位超过 60 秒会换模型或失败，subagent 多于槽位时要能排队等 | 拿到内网端点、知道它的并发时 |
+| 进展的合并发送间隔 | 250 毫秒 | `app/src/kernel/subagent.ts` | 同 `mori.board`：工具调用很密时不刷屏 | — |
+| 行里失败原因的显示长度 | 80 字符，悬停看全文 | `app/src/shared/subagent.ts`（`SUBAGENT_LIMITS.failure`、`failureText`）、`app/src/renderer/src/components/subagentView.ts` | 一行放得下 | 你走查时 |
+| 卡片的展开 | 执行中展开，结束时收起一次 | `app/src/renderer/src/components/SubagentCard.tsx` | 执行中看得到每个 subagent 在做什么；结束后只占一行（走查 M18 要的“结束后折起来”） | 你走查时 |
+| 界面文字 | 规格 §7、[subagent-card.md](screens/subagent-card.md) | `app/src/shared/subagent.ts`、`app/src/renderer/src/` | 照 Claude 桌面版的用词 | 你走查时 |
+| 原来的准则（什么时候用、每个 prompt 要能单独看懂）放在哪里 | 并进工具的说明第三行，不写 `promptGuidelines`（规格 §6.1、§6.4） | `app/src/kernel/subagent.ts`（`SUBAGENT_DESCRIPTION`） | 说明在工具定义里，不算身份段；这样默认工具下的普通模式身份段正好 500 token，守住记忆规格的上限（MEM-01）；Claude Code 也把这类指引写在工具说明里。另外两种：保留准则（普通模式 549 token，超过上限）；缩短准则（522 token，仍超过） | 你回来看时（2026-10-26 你不在，按推荐定；记录在 team-checks.md“要你决定的”第 1 条） |
+| 交出去的活那一句（身份段，记忆规格附录 A.1.1） | 按这次运行启用的 `task_create`、`agent_message`、`subagent` 拼（规格 §6.4）；同时有 `task_create` 与 `agent_message` 的会话（Task mode 的合并会话、分开时的立项）与 WP-11 逐字相同，Task mode 下只有 `agent_message` 的（分开时的对话，task、结案、订阅实例）改为只说问题的那一句 | `app/src/kernel/memoryText.ts`（`handoffText`） | 固定的句子在普通模式下说的是不存在的工具，模型会把事实写进卡上的标题而不是 `prompt`。另外两种：照旧用固定的句子；普通模式不加这一句 | 你回来看时（2026-10-26 你不在，按推荐定；记录在 team-checks.md“要你决定的”第 2 条） |
+| `role` 参数的写法（有别的角色时） | 字符串，不写枚举；说明里列出角色（规格 §3.1）；写错的角色由 §3.3 的检查给出两行错误 | `app/src/kernel/subagent.ts`（`subagentSchema`） | 有枚举时 pi 在执行前就以 `Validation failed for tool "subagent"` 拒绝，§3.3 的原因与 `Correct form` 到不了模型（2026-10-26 审查）。另一种：保留枚举，改由 pi 的校验报错（文字是 pi 的，没有 `Correct form`） | 你回来看时（2026-10-26 你不在，按推荐定；记录在 team-checks.md“要你决定的”第 3 条） |

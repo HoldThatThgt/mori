@@ -133,10 +133,11 @@ export interface AttemptRecord {
 
 /**
  * @brief 模型池的调度类别（§8.2；平行 Agent 规格 §12.10），严格优先：conversation（对话会话、合并会话）
- *        > decision（分开时的立项、结案会话）> task（task 实例）> background（订阅、探针）；临时提问继承发送方的类别。
- *        排队超时只对 conversation、decision 生效。
+ *        > decision（分开时的立项、结案会话）> subagent（普通模式的 subagent，docs/specs/subagent.md §5.4）
+ *        > task（task 实例）> background（订阅、探针）；临时提问继承发送方的类别。
+ *        排队超时只对 conversation、decision 生效；subagent 不留槽位、不超时。
  */
-export type SchedClass = 'conversation' | 'decision' | 'task' | 'background';
+export type SchedClass = 'conversation' | 'decision' | 'subagent' | 'task' | 'background';
 
 /**
  * @brief 角色的一项能力要求（平行 Agent 规格 §4.1 requires、§12.2）：词表解析后的样子，选择器第 3 步逐项判定。

@@ -37,9 +37,13 @@ function expectLayers(spec, packaged, cases) {
 
 test('TB-46 spec-coverage reads every TB row of §17.2 with its layers', () => {
   const items = parseSpecTable(taskboard, readFileSync(specPathOf(taskboard), 'utf8'));
-  assert.deepEqual(items.map((item) => item.id),
-    Array.from({ length: 59 }, (_, i) => `TB-${String(i + 1).padStart(2, '0')}`), 'TB-58, TB-59 added 2026-10-26');
+  const ids = items.map((item) => item.id);
+  assert.deepEqual(ids.slice(0, 59), Array.from({ length: 59 }, (_, i) => `TB-${String(i + 1).padStart(2, '0')}`),
+    'TB-58, TB-59 added 2026-10-26');
   assert.deepEqual([...items.find((item) => item.id === 'TB-59').layers].sort(), ['app', 'real', 'unit']);
+  // 2026-10-26 起的走查包各用一段编号（§17.3）：Background tasks 是 TB-80–TB-89
+  assert.deepEqual(ids.filter((id) => /^TB-8\d$/.test(id)), Array.from({ length: 10 }, (_, i) => `TB-${80 + i}`));
+  assert.equal(new Set(ids).size, ids.length, 'every id once');
   const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
   assert.deepEqual(layersOf('TB-46'), ['app', 'replay']);
   assert.deepEqual(layersOf('TB-45'), ['real']);
@@ -314,6 +318,7 @@ test('TB-46 spec-coverage exits 2 for an unknown --spec', () => {
   const run = spawnSync(process.execPath, [join(appRoot, 'tests/spec-coverage.mjs'), '--spec', 'board'],
     { cwd: appRoot, encoding: 'utf8' });
   assert.equal(run.status, 2);
-  assert.match(run.stderr, /unknown --spec "board" \(expected model, taskboard, memory or discovery\)/);
+  assert.match(run.stderr,
+    /unknown --spec "board" \(expected model, taskboard, memory, discovery, subagent or agents\)/);
   assert.equal(run.stdout, '');
 });

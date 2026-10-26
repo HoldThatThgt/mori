@@ -81,7 +81,7 @@ const LEAVE_TEXT = 'Your edits haven’t been saved. Leaving now discards them.'
 const INTRO = 'Instructions here are saved in the AGENTS.md file that every session reads. Use this for preferences, '
   + 'conventions, or context that Mori should always know.';
 /** 有会话时 Customize 的分节（data-section 与文字） */
-const WITH_SESSION = 'builtin:Built-in tools,skills:Skills,mcp:MCP,plugins:Plugins,agents:Instructions';
+const WITH_SESSION = 'builtin:Built-in tools,skills:Skills,roles:Agents,mcp:MCP,plugins:Plugins,agents:Instructions';
 /** 后台进程退出后 Instructions 一节项目一栏的说明 */
 const CRASHED = 'Mori’s background process crashed. Restart it to continue.';
 /** 后台进程退出后命令失败的原文（preload：`Mori’s background process crashed (exit code <n>)`） */
@@ -681,7 +681,7 @@ async function agentsUser(ctx) {
   ctx.before = await ctrlN(page);
   await watchStates(page, 'agents');
   const nav = await enterCustomize(page);
-  record('Customize 的分节（2026-10-26 负责人定）：有会话时 Built-in tools、Skills、MCP、Plugins、Instructions'
+  record('Customize 的分节（2026-10-26 负责人定）：有会话时 Built-in tools、Skills、Agents、MCP、Plugins、Instructions'
     + '（用户级 AGENTS.md 是最后一节）；左栏进入时落在第一节 Built-in tools', nav?.current === 'builtin'
     && nav.sections.join() === WITH_SESSION, JSON.stringify(nav));
   await page.locator('[data-testid="tools-nav"] button[data-section="agents"]').click();

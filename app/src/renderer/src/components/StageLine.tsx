@@ -1,11 +1,13 @@
 // 阶段行：由 pi 事件推出（见 docs/v0/screens/chat.md），本轮结束后隐藏。模型层的等待（等模型、等它停下、重建、排队、
 // 原地重试，docs/v1/screens/model-chat.md "阶段行"）进行时取代"Waiting for the model…"，准备中也显示。
 // 协作（docs/v1/screens/team-stop.md "阶段行"）：分开时立项判断你刚发的消息、对话还没在运行时显示
-// "<create role> is deciding… · 4s"；后台实例的批准卡不改变阶段行。
+// "<create role> is deciding… · 4s"；后台实例的批准卡不改变阶段行，普通模式的 subagent 的批准卡除外（它是这次回复的一部分，
+// 同主 Agent 自己的批准写 "Waiting for your approval"，docs/specs/subagent.md §7.1）。
 
 import { roleLabel } from '../../../shared/team';
 import { pendingPrompt, type Transcript } from '../state/model';
-import { seconds, useNow } from './ToolCard';
+import { seconds } from './duration';
+import { useNow } from './ToolCard';
 import { toolTitleText } from './toolTitle';
 
 /** @brief 已经过的秒数，写作 "12s"。 */
@@ -34,15 +36,16 @@ function decidingText(transcript: Transcript, now: number): string | null {
 }
 
 /**
- * @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"Waiting for your approval"，其次有挂起的扩展询问时
- *        "Waiting for your answer"，都不显示"Responding…"或工具的"<标题> Ns"。模型层的等待写作"<文字> · 12s"，
+ * @brief 阶段文字；没有阶段时为 null。有挂起的批准（含普通模式 subagent 的后台批准卡）时总是"Waiting for your approval"，
+ *        其次有挂起的扩展询问时"Waiting for your answer"，都不显示"Responding…"或工具的"<标题> Ns"。模型层的等待写作"<文字> · 12s"，
  *        从这次等待开始计时。
  * @param seatRoles 工具标题里 agent_message 的 Message / Ask（toolTitle）
  */
 export function stageText(transcript: Transcript, cwd: string, now: number,
   seatRoles: readonly string[] = []): string | null {
   const stage = transcript.stage;
-  if (transcript.running && transcript.approvals.length > 0) return 'Waiting for your approval';
+  if (transcript.running && (transcript.approvals.length > 0
+    || transcript.teamApprovals.some((item) => item.subagent !== null))) return 'Waiting for your approval';
   // 扩展命令等不经过一轮运行的询问也要看得到。
   if (transcript.questions.length > 0) return 'Waiting for your answer';
   const model = transcript.modelStage;

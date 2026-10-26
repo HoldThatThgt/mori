@@ -67,7 +67,7 @@ const MCP_SERVER = join(appRoot, 'tests', 'mcp-server', 'server.mjs');
 const PKG_SOURCE = '..\\..\\pkg';
 // 2026-10-26（负责人走查 M4）：用户级 AGENTS.md 从设置页挪来，是 Customize 的最后一节 Instructions，没有会话时也在。
 const NO_SESSION = 'No open session. Only user-level skills, plugins, and instructions are listed.';
-const WITH_SESSION = ['builtin', 'skills', 'mcp', 'plugins', 'agents'];
+const WITH_SESSION = ['builtin', 'skills', 'roles', 'mcp', 'plugins', 'agents']; // roles：2026-10-26 走查 M20 加
 const NOTICE = 'Changes apply to new sessions. Sessions already open aren’t affected.';
 const TRUST_NOTE = 'This workspace isn’t trusted, so its skills and settings aren’t listed';
 const DISABLED_BY_PROJECT = 'Turned off in this project’s .pi/settings.json. To change it, edit that file.';
@@ -500,7 +500,7 @@ async function followOpening(ctx) {
   const seen = await toolsSeen(page);
   const head = await toolsHead(page);
   const tools = (await toolRows(page)).map((tool) => tool.name);
-  record('会话还在打开中时点"工具"：工具页跟随它（"project · <会话名>"、五个分节），等它打开好再读取，'
+  record('会话还在打开中时点"工具"：工具页跟随它（"project · <会话名>"、六个分节），等它打开好再读取，'
     + `列出它注册的工具，没有出现读取失败（${seen.opening ? '赶上了打开中："新建会话"那时不可用' : '没赶上打开中'}）`,
   head.follow === `project · ${ctx.p1Title}` && same(head.sections, WITH_SESSION)
     && tools.includes('read') && !seen.error && seen.loading, JSON.stringify({ seen, follow: head.follow, tools }));
@@ -1687,10 +1687,10 @@ async function keyboard(ctx) {
   const down = { current: (await toolsHead(page)).current, focus: (await focusDescriptor(page)).section };
   await page.keyboard.press('ArrowUp');
   const up = { current: (await toolsHead(page)).current, focus: (await focusDescriptor(page)).section };
-  record('分节列表里 ↓ ↑ 切换分节，焦点跟着走', down.current === 'mcp' && down.focus === 'mcp' && up.current === 'skills'
-    && up.focus === 'skills', JSON.stringify({ down, up }));
+  record('分节列表里 ↓ ↑ 切换分节，焦点跟着走（Skills 的下一节是 Agents）', down.current === 'roles' && down.focus === 'roles'
+    && up.current === 'skills' && up.focus === 'skills', JSON.stringify({ down, up }));
   await page.getByTestId('tools-page').getByRole('button', { name: 'Back to app' }).focus();
-  const walk = await tabWalk(page, 13);
+  const walk = await tabWalk(page, 14);
   record('技能一节：从"返回会话"按 Tab 走到"新建会话"、分节按钮、技能行和它的开关', walk.some((f) => f.text.includes('New session'))
     && walk.some((f) => f.section === 'mcp') && walk.some((f) => f.role === 'switch' && f.inTools)
     && walk.some((f) => f.text.includes('user-skill')), JSON.stringify(walk));
@@ -1931,7 +1931,7 @@ async function archiveFollow(ctx) {
   await waitFollow(page, `override · ${left}`);
   const after = await toolsHead(page);
   record('工具页开着时在侧栏归档它跟随的会话（分屏右边的 p1）：工具页还开着，跟到剩下的一栏（"override · <它的名字>"），'
-    + '仍有五个分节', before === `project · ${right}` && after?.follow === `override · ${left}`
+    + '仍有六个分节', before === `project · ${right}` && after?.follow === `override · ${left}`
     && same(after.sections, WITH_SESSION), JSON.stringify({ before, after: after?.follow,
     sections: after?.sections }));
   await chooseMenuItem(page, ctx.overrideFile, 'Archive');

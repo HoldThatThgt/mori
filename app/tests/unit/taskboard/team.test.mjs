@@ -208,6 +208,8 @@ test('TB-34 an instance approval becomes a card on the user envelope with role a
       toolName: 'bash', args: { command: 'rm -rf build' } });
     const card = host.events.find((event) => event.type === 'mori.team_approval_request');
     assert.deepEqual([card.role, card.task, card.taskTitle], ['executor', 'T1', 'Find and fix']);
+    // 只有普通模式的 subagent 的卡带 description（docs/specs/subagent.md §7.4）；task 实例的为 null，不改阶段行
+    assert.equal(card.subagent, null);
     assert.equal(team.info().teamApprovals.length, 1);
     assert.equal(team.live().teamApproval, true);
     assert.equal(team.answerApproval('U.t1.executor:approval-1', 'allow'), true);
@@ -523,7 +525,8 @@ test('TB-44 the user session section mori_team follows the mode: off with other 
     solo.user.api.handlers.get('before_agent_start')({ type: 'before_agent_start',
       systemPromptOptions: { sections: empty } });
     assert.deepEqual(empty, {}, 'off mode without other roles writes nothing (v0)');
-    assert.equal(solo.user.api.tools.size, 0, 'and registers no tools');
+    assert.deepEqual([...solo.user.api.tools.keys()], ['subagent'],
+      'and registers no TaskBoard tools; only subagent (docs/specs/subagent.md §2)');
   });
 
 test('TB-09 in team mode the dialog session refuses calls outside the tools of this run', async () => {

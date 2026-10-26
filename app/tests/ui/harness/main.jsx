@@ -35,6 +35,8 @@ const globbed = {
   ...import.meta.glob('../../fixtures/v1/*.json', { eager: true, import: 'default' }),
   // 平行 Agent（docs/specs/parallel-agents-taskboard.md §17.4）：TaskBoard 的录制；文件夹为空或还没有时同样是空对象
   ...import.meta.glob('../../fixtures/tb/*.json', { eager: true, import: 'default' }),
+  // 普通模式的 subagent 工具（docs/specs/subagent.md §14.1）：tb-record.mjs 从真实会话录下；文件夹还没有时同样是空对象
+  ...import.meta.glob('../../fixtures/sa/*.json', { eager: true, import: 'default' }),
   // 记忆（docs/specs/memory.md §14.1）：从真实的 App 对合成端点录下（synthetic）；文件夹为空或还没有时同样是空对象
   ...import.meta.glob('../../fixtures/mem/*.json', { eager: true, import: 'default' }),
   // 一键拉取模型（docs/specs/model-discovery.md §13.1）：md-record.mjs 从真实的 App 录下（各文件的 source 写明 real 或

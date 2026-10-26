@@ -295,9 +295,10 @@ interface HeaderActions {
  *        "Reload file"、"Open in default app"、"Expand" / "Collapse"、关闭。
  * @param path 主进程解析出的完整路径；读取中、读取失败时是工具参数里的原文
  * @param mode 当前视图；不能预览时为 null（没有切换按钮）
+ * @param tabbed 右栏有 Changes / Background tasks 页签：“Expand”与关闭在页签那一行，这里不重复（平行 Agent 规格 §13.13.1）
  */
-function ViewerHeader({ tab, path, read, mode, actions }: {
-  tab: Tab; path: string; read: FileRead | null; mode: ViewMode | null; actions: HeaderActions;
+function ViewerHeader({ tab, path, read, mode, actions, tabbed }: {
+  tab: Tab; path: string; read: FileRead | null; mode: ViewMode | null; actions: HeaderActions; tabbed: boolean;
 }) {
   const external = useOpenExternal(path, tab.cwd);
   const copy = useCopyPath(path);
@@ -314,8 +315,9 @@ function ViewerHeader({ tab, path, read, mode, actions }: {
           <Icon name="refresh" /></button>
         <button className="icon-button" onClick={() => void external.open()} disabled={read?.status === 'missing'}
           aria-label="Open in default app" title="Open in default app"><Icon name="external" /></button>
-        <PanelExpand tab={tab} />
-        <button className="icon-button" onClick={actions.close} aria-label="Close panel"><Icon name="close" /></button>
+        {!tabbed && <PanelExpand tab={tab} />}
+        {!tabbed && <button className="icon-button" onClick={actions.close} aria-label="Close panel">
+          <Icon name="close" /></button>}
       </div>
       <HeaderNotes opened={external.opened} copy={copy.state} />
     </>
@@ -326,8 +328,8 @@ function ViewerHeader({ tab, path, read, mode, actions }: {
  * @brief 文件阅读器。
  * @param version 本会话对这个文件完成的编辑和写入次数：变了就重新读
  */
-export function FileViewer({ tab, view, version, onClose }: {
-  tab: Tab; view: FileView; version: number; onClose: () => void;
+export function FileViewer({ tab, view, version, onClose, tabbed = false }: {
+  tab: Tab; view: FileView; version: number; onClose: () => void; tabbed?: boolean;
 }) {
   const [reloads, setReloads] = useState(0);
   const read = useFileRead(view.path, tab.cwd, `${view.nonce}:${version}:${reloads}`);
@@ -336,7 +338,8 @@ export function FileViewer({ tab, view, version, onClose }: {
   const actions = { reload: () => setReloads((count) => count + 1), close: onClose, setMode };
   return (
     <>
-      <ViewerHeader tab={tab} path={read?.path ?? view.path} read={read} mode={mode} actions={actions} />
+      <ViewerHeader tab={tab} path={read?.path ?? view.path} read={read} mode={mode} actions={actions}
+        tabbed={tabbed} />
       <div className="panel-body file-body" data-testid="file-viewer">
         {read?.status !== 'ok' ? <FileState read={read} />
           : mode === 'preview' ? <FilePreview tab={tab} read={read} />

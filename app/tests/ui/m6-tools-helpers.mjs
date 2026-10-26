@@ -74,6 +74,7 @@ const TASKBOARD_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_ha
 export const TOOL_REASONS = {
   task: 'Mori turns this on and off with Task mode.',
   memory: 'Mori turns this on for the main agent.',
+  subagent: 'Mori turns this on when Task mode is off.',
   mcp: 'Turn its server on or off in MCP.',
   plugin: 'Turn it on or off in Plugins.',
   extension: 'Set by this extension. To change it, edit the extension file.',
@@ -87,7 +88,7 @@ export function toolNeeds(name, agentDir) {
 
 /**
  * @brief 一行工具下面应有的说明（不含本项目设置的只读原因与写入失败）：pi 内置工具只有 grep、find 有；其余按来源，
- *        Mori 的按工具名（TaskBoard 工具、memory）。
+ *        Mori 的按工具名（TaskBoard 工具、memory、subagent：docs/specs/subagent.md §2）。
  * @param row toolRows 的一行（name、tag）
  * @param agentDir 界面上写出的 pi 配置目录
  */
@@ -95,6 +96,7 @@ export function expectedNotes(row, agentDir) {
   if (row.tag === 'Built-in') return [toolNeeds(row.name, agentDir)].filter(Boolean);
   if (row.tag === 'Mori') {
     if (TASKBOARD_TOOLS.includes(row.name)) return [TOOL_REASONS.task];
+    if (row.name === 'subagent') return [TOOL_REASONS.subagent];
     return row.name === 'memory' ? [TOOL_REASONS.memory] : [];
   }
   if (row.tag.startsWith('MCP · ')) return [TOOL_REASONS.mcp];

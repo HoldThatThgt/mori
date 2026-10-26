@@ -305,6 +305,10 @@ const MEMORY_TOOL = 'memory';
 /** @brief 请求体的工具定义去掉 memory（记忆规格 §14.4：TB-03 在全部比较之前去掉它）。 */
 const withoutMemoryTool = (body) => (body?.tools ?? []).filter((tool) => (tool.function?.name ?? tool.name)
   !== MEMORY_TOOL);
+/** 工具页 subagent 那一行下面的原因（subagent 规格 §2） */
+const SUBAGENT_REASON = 'Mori turns this on when Task mode is off.';
+/** @brief subagent 的定义里每一项有 role（有别的角色时，subagent 规格 §3.1）。 */
+const subagentRole = (tool) => Boolean(tool?.function?.parameters?.properties?.tasks?.items?.properties?.role);
 /** @brief 工具页的行去掉 memory 那一行（记忆规格 §14.4）。 */
 const withoutMemoryRow = (rows) => rows.filter((row) => row.name !== MEMORY_TOOL);
 /** @brief pi 的 8 个内置工具行都有开关，没写 defaultTools 时开着的正是 read、bash、edit、write（tools.md，WP-08）。 */
@@ -371,22 +375,28 @@ async function v0same(ctx) {
 /** @brief TB-03 没有角色文件：请求、工具页、没有实例与 teams 文件、对话流；TB-02 没有文件时全是 mori。 */
 async function v0Compare(ctx, who, request, tools) {
   const base = ctx.v0.request;
-  const kept = withoutMemoryTool(request?.body);
+  const subagent = toolDef(request, 'subagent');
+  const kept = withoutMemoryTool(request?.body).filter((tool) => tool !== subagent);
   const system = comparable(request?.system);
-  record('TB-03 off mode without role files: the tool list sent to the model is byte-identical to v0 (the pre-'
-    + 'TaskBoard build, same project and config) once memory is left out, and so is the system prompt after the '
-    + 'identity part with the taste, strategy, review and facts sections left out (memory spec §14.4)',
-  request !== undefined && JSON.stringify(kept) === JSON.stringify(base.body.tools)
+  record('TB-03 off mode without role files: normal mode differs from v0 only by subagent — once memory is left out '
+    + 'the tool list is the v0 list (the pre-TaskBoard build, same project and config) plus the subagent definition '
+    + '(with its description, no role), and the system prompt after the identity part (whose <tools> lists subagent) '
+    + 'with the taste, strategy, review and facts sections left out is the v0 one (memory spec §14.4, subagent spec '
+    + '§2)', request !== undefined && JSON.stringify(kept) === JSON.stringify(base.body.tools)
+    && Boolean(subagent?.function?.description) && !subagentRole(subagent)
     && system !== null && system === comparable(baseSystem(ctx)),
   brief({ tools: toolNames(request?.body), baseTools: toolNames(base.body), system: system?.length,
     baseSystem: comparable(baseSystem(ctx))?.length, head: request?.system.slice(0, 60) }));
-  const rows = withoutMemoryRow(tools.rows);
+  const rows = withoutMemoryRow(tools.rows).filter((row) => row.name !== 'subagent');
+  const row = tools.rows.find((item) => item.name === 'subagent');
   record('TB-03 off mode without role files: the Tools page rows (name, source, on/off, description) are the same as '
-    + 'in v0 once the memory row is left out (memory spec §14.4); since 2026-10-26 (WP-08) the eight pi rows also '
-    + 'have a switch, on for read, bash, edit and write', rows.length > 0
-    && same(rows.map(v0Fields), ctx.v0.tools.rows.map(v0Fields)) && builtinSwitches(rows),
-  brief({ tb: tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}|${row.checked}`),
-    v0: ctx.v0.tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`) }));
+    + 'in v0 once the memory row is left out (memory spec §14.4), plus one subagent row from Mori with no switch and '
+    + 'the line "Mori turns this on when Task mode is off." (subagent spec §2); since 2026-10-26 (WP-08) the eight pi '
+    + 'rows also have a switch, on for read, bash, edit and write', rows.length > 0
+    && same(rows.map(v0Fields), ctx.v0.tools.rows.map(v0Fields)) && builtinSwitches(rows) && row?.tag === 'Mori'
+    && row.checked === null && same(row.notes, [SUBAGENT_REASON]),
+  brief({ tb: tools.rows.map((item) => `${item.name}|${item.tag}|${item.state}|${item.checked}`),
+    v0: ctx.v0.tools.rows.map((item) => `${item.name}|${item.tag}|${item.state}`) }));
   const files = filesUnder(join(ctx.userData, 'teams'));
   record('TB-03 off mode without role files: no instance is created (no instance session, the endpoint got exactly '
     + 'one request for the message) and there is no file under <userData>/teams',
@@ -408,7 +418,8 @@ async function v0Compare(ctx, who, request, tools) {
 /** @brief TB-03 有别的角色（只有 executor.md）：只多 agent_message 与它的说明段；工具页列出 TaskBoard 工具、来源 Mori。 */
 async function v0Roles(ctx, who, request, tools) {
   const base = ctx.v0.request;
-  const kept = withoutMemoryTool(request?.body);
+  const subagent = toolDef(request, 'subagent');
+  const kept = withoutMemoryTool(request?.body).filter((tool) => tool !== subagent);
   const names = kept.map((tool) => tool.function?.name ?? tool.name);
   const extraTool = toolDef(request, 'agent_message');
   const rest = kept.filter((tool) => tool !== extraTool);
@@ -417,15 +428,16 @@ async function v0Roles(ctx, who, request, tools) {
   const added = system !== null && v0System !== null && system.startsWith(v0System)
     ? system.slice(v0System.length) : null;
   record('TB-03 off mode with another role (executor.md): with memory left out (memory spec §14.4) the request '
-    + 'differs from v0 only by agent_message — the tool list is the v0 list plus the agent_message definition (with '
-    + 'its description) at the end, and the system prompt after the identity part (without the memory sections) is '
-    + 'the v0 one plus the mori_team section holding the off-mode dialog segment that explains it',
-  JSON.stringify(rest) === JSON.stringify(base.body.tools) && names.at(-1) === 'agent_message'
-    && Boolean(extraTool?.function?.description) && added === `\n\n<mori_team>\n${OFF_SEGMENT}\n</mori_team>`,
-  brief({ names, added }));
-  const rows = withoutMemoryRow(tools.rows);
+    + 'differs from v0 only by subagent (whose schema now has role) and agent_message — the tool list is the v0 list '
+    + 'plus the agent_message definition (with its description) at the end, and the system prompt after the identity '
+    + 'part (without the memory sections) is the v0 one plus the mori_team section holding the off-mode dialog '
+    + 'segment that explains it', JSON.stringify(rest) === JSON.stringify(base.body.tools)
+    && names.at(-1) === 'agent_message' && Boolean(extraTool?.function?.description) && subagentRole(subagent)
+    && added === `\n\n<mori_team>\n${OFF_SEGMENT}\n</mori_team>`, brief({ names, added }));
+  const rows = withoutMemoryRow(tools.rows).filter((row) => row.name !== 'subagent');
   const mori = rows.filter((row) => row.tag === 'Mori');
   const others = rows.filter((row) => row.tag !== 'Mori');
+  const subRow = tools.rows.find((row) => row.name === 'subagent');
   const userTools = TEAM_TOOLS.filter((name) => !['task_handoff', 'request_close'].includes(name));
   record('TB-03 off mode with another role: with the memory row left out, the Tools page lists the TaskBoard tools of '
     + 'the user session (board_read … reply_via_dialog) with source "Mori" — only agent_message on, no switch, and the '
@@ -434,7 +446,8 @@ async function v0Roles(ctx, who, request, tools) {
   same(mori.map((row) => row.name).sort(), [...userTools].sort())
     && mori.every((row) => (row.name === 'agent_message') === (row.active === 'true') && row.checked === null
       && same(row.notes, [TOOL_REASONS.task]))
-    && same(others.map(v0Fields), ctx.v0.tools.rows.map(v0Fields)) && builtinSwitches(others),
+    && same(others.map(v0Fields), ctx.v0.tools.rows.map(v0Fields)) && builtinSwitches(others)
+    && subRow?.tag === 'Mori' && same(subRow.notes, [SUBAGENT_REASON]),
   brief(tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}|${row.notes.join(' ')}`)));
   const team = await teamStateOf(ctx, who.sessionFile);
   record('TB-02 only executor.md: every seat is held by mori and the only role file is executor',
@@ -1008,12 +1021,12 @@ function dialogTools(ctx, obs) {
   const last = offReqs.filter((request) => request.info.k === 4);
   record('TB-09 in task mode the dialog session\'s requests have no write or command tool (only read, ls, '
     + 'board_read, read_session, agent_message); back in off mode the requests have the set from before task mode '
-    + '(read, bash, edit, write, agent_message, and memory: memory spec §7.6) plus board_read and read_session '
-    + '(the board has a request now, TB-59)', teamReqs.length >= 2
+    + '(read, bash, edit, write, agent_message, memory: memory spec §7.6, and subagent: subagent spec §2) plus '
+    + 'board_read and read_session (the board has a request now, TB-59)', teamReqs.length >= 2
     && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'ls', 'read',
       'read_session']))
     && first.length === 1 && last.length === 1
-    && same(sortedTools(first[0]), ['agent_message', 'bash', 'edit', 'memory', 'read', 'write'])
+    && same(sortedTools(first[0]), ['agent_message', 'bash', 'edit', 'memory', 'read', 'subagent', 'write'])
     && same(sortedTools(last[0]), [...sortedTools(first[0]), 'board_read', 'read_session'].sort())
     && obs.modeAfter === 'off',
   brief({ team: teamReqs.map(sortedTools), off1: first.map(sortedTools), off4: last.map(sortedTools),

@@ -3,6 +3,7 @@
 // 2026-10-26 负责人走查 M12）；别的工具没有开关，下面一行写由谁开关。
 
 import type { DefaultToolState, ToolEntry } from '../../../shared/protocol';
+import { SUBAGENT_TOOL } from '../../../shared/subagent';
 import { isTeamTool } from '../../../shared/team';
 import { useApp } from '../state/store';
 import { defaultToolCommand, useChange } from '../state/tools';
@@ -17,6 +18,7 @@ const MORI_SOURCE = 'Mori';
 const NOTES = {
   task: 'Mori turns this on and off with Task mode.',
   memory: 'Mori turns this on for the main agent.',
+  subagent: 'Mori turns this on when Task mode is off.',
   mcp: 'Turn its server on or off in MCP.',
   plugin: 'Turn it on or off in Plugins.',
   extension: 'Set by this extension. To change it, edit the extension file.',
@@ -38,9 +40,13 @@ function toolSource(tool: ToolEntry): string {
   }
 }
 
-/** @brief Mori 自己的工具的原因：TaskBoard 的工具随 Task mode，memory 给主 Agent；别的为 null。 */
+/**
+ * @brief Mori 自己的工具的原因：TaskBoard 的工具随 Task mode，memory 给主 Agent，subagent 在 Task mode 关闭时
+ *        （docs/specs/subagent.md §2）；别的为 null。
+ */
 function moriNote(tool: ToolEntry): string | null {
   if (tool.sourceLabel !== MORI_SOURCE) return null;
+  if (tool.name === SUBAGENT_TOOL) return NOTES.subagent;
   if (isTeamTool(tool.name)) return NOTES.task;
   return tool.name === MEMORY_TOOL ? NOTES.memory : null;
 }

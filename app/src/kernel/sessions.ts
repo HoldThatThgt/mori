@@ -27,8 +27,8 @@ import type {
   SessionInfo, SessionState, SlashCommand, ThinkingLevel, TrustAnswer,
 } from '../shared/protocol';
 import {
-  emptyBoard, noDeciding, soloTeamState, type BoardView, type InstanceKind, type PromptBehavior, type TeamState,
-  type TeamSwitch,
+  emptyBoard, noDeciding, soloTeamState, type BoardView, type InstanceKind, type PromptBehavior, type SessionOf,
+  type TaskDetail, type TeamState, type TeamSwitch,
 } from '../shared/team';
 import { ApprovalPolicy, type ApprovalGate, type GateOutput } from './approval';
 import { contextBreakdown } from './contextBreakdown';
@@ -110,6 +110,8 @@ interface Entry {
   openedAt: number;
   /** 正在执行的工具开始执行的时刻（ms），按 toolCallId */
   toolStarts: Map<string, number>;
+  /** 正在执行的工具最后一次 tool_execution_update 的 partialResult，按 toolCallId（docs/specs/subagent.md §9.2） */
+  toolPartials: Map<string, unknown>;
   /** 扩展在打开过程中发的通知 */
   notices: ExtensionNotice[];
   /** 模型层的会话接线 */
@@ -194,12 +196,14 @@ function forward(entry: Entry, event: AgentSessionEvent): void {
     entry.toolStarts.set(event.toolCallId, Date.now());
     entry.gate.announce(event.toolCallId, event.toolName);
   }
+  if (event.type === 'tool_execution_update') entry.toolPartials.set(event.toolCallId, event.partialResult);
   if (!entry.onEvent) entry.emit({ kind: 'event', sessionId, event: slimEvent(event) });
   if (event.type === 'message_end' && !entry.onEvent) {
     supplementEntry(entry.session, sessionId, entry.refs, event.message, entry.emit);
   }
   if (event.type === 'tool_execution_end') {
     entry.toolStarts.delete(event.toolCallId);
+    entry.toolPartials.delete(event.toolCallId);
     entry.gate.noteToolEnd(event.toolCallId);
   }
   // 一段结束（§5.2）：pi 每次运行结束发一次 agent_settled（K13）。
@@ -442,7 +446,8 @@ async function createEntry(args: StartArgs, setup: SessionSetup, model: ModelSes
       onError: (error) => console.error(`[kernel] extension error ${error.extensionPath}: ${error.error}`),
     });
     const entry: Entry = { session, gate, ui, cwd: args.cwd, running: false, openedAt: Date.now(),
-      toolStarts: new Map(), notices: ui.ready(), model, preparing: null, trust: setup.trust, extensionErrors,
+      toolStarts: new Map(), toolPartials: new Map(), notices: ui.ready(), model, preparing: null, trust: setup.trust,
+      extensionErrors,
       refs: new PendingRefs(), runStart: undefined, kind: setup.kind, owner: setup.owner, team: null, stop: null,
       emit: args.emit, onEvent: setup.onEvent, headless, memoryNotice: null };
     sessions.set(sessionId, entry);
@@ -577,7 +582,7 @@ function liveStatus(entry: Entry): LiveStatus {
 export function snapshot(entry: Entry): LiveSnapshot {
   const { session } = entry;
   const runningTools = [...session.state.pendingToolCalls].map((toolCallId) => ({ toolCallId,
-    startedAt: entry.toolStarts.get(toolCallId) ?? Date.now() }));
+    startedAt: entry.toolStarts.get(toolCallId) ?? Date.now(), partial: entry.toolPartials.get(toolCallId) ?? null }));
   return { running: soloRunning(entry), preparing: entry.preparing !== null && !session.isStreaming,
     streaming: session.state.streamingMessage ?? null, runningTools,
     approvals: entry.gate.requests(), questions: entry.ui.requests(), steering: [...session.getSteeringMessages()],
@@ -769,6 +774,11 @@ export interface SessionContext {
   trusted: boolean;
   /** 文件夹的信任状态（与会话信息的 projectTrust 相同） */
   projectTrust: ProjectTrust;
+}
+
+/** @brief 打开着的会话的模型范围（Customize › Agents 的候选来源，docs/specs/customize-agents.md §4.2）；没有时为 null。 */
+export function sessionPick(sessionId: string): ModelPick | null {
+  return requireEntry(sessionId).model.state().pick;
 }
 
 /** @brief 取出打开着的会话的只读信息；没有这个会话时报错。 */
@@ -1275,6 +1285,50 @@ export async function setTeamMode(sessionId: string, mode: TeamSwitch): Promise<
 export function boardView(sessionId: string): BoardView & { error: null } {
   const entry = requireEntry(sessionId);
   return { ...(entry.team?.info().board ?? emptyBoard()), error: null };
+}
+
+/** @brief 没有 Team 时（角色文件有问题）的 task 与需求都不存在（§13.13.3、§13.13.4）。 */
+function missingText(of: SessionOf): string {
+  return of.kind === 'task' ? `${of.task} does not exist.` : `Request ${of.request} does not exist.`;
+}
+
+/** @brief board.readTask（只读，§13.13.3）：一个 task 的详情；不能读时 error 为原文。 */
+export function readBoardTask(sessionId: string,
+  task: string): { task: TaskDetail; error: null } | { task: null; error: string } {
+  const team = requireEntry(sessionId).team;
+  try {
+    if (!team) throw new Error(missingText({ kind: 'task', task, role: '' }));
+    return { task: team.readTask(task), error: null };
+  } catch (error) {
+    console.error(`[kernel] board.readTask ${task} failed: ${(error as Error).message}`);
+    return { task: null, error: (error as Error).message };
+  }
+}
+
+/** @brief board.readSession（只读，§13.13.4）：task 实例会话或结案会话；不能读时 error 为原文。 */
+export async function readBoardSession(sessionId: string,
+  of: SessionOf): Promise<{ entries: unknown[]; running: boolean; error: string | null }> {
+  const team = requireEntry(sessionId).team;
+  try {
+    if (!team) throw new Error(missingText(of));
+    return { ...(await team.readSession(of)), error: null };
+  } catch (error) {
+    console.error(`[kernel] board.readSession ${JSON.stringify(of)} failed: ${(error as Error).message}`);
+    return { entries: [], running: false, error: (error as Error).message };
+  }
+}
+
+/** @brief session.stopTask（§13.13.7）：停止一个 task；不能停时 error 为原文。 */
+export async function stopBoardTask(sessionId: string, task: string): Promise<{ error: string | null }> {
+  const team = requireEntry(sessionId).team;
+  try {
+    if (!team) throw new Error(missingText({ kind: 'task', task, role: '' }));
+    await team.stopTask(task);
+    return { error: null };
+  } catch (error) {
+    console.error(`[kernel] session.stopTask ${task} failed: ${(error as Error).message}`);
+    return { error: (error as Error).message };
+  }
 }
 
 /**

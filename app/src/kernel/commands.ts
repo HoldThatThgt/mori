@@ -7,13 +7,15 @@ import { removeMcpServer, saveMcpServer, setMcpDirect, setMcpEnabled } from './m
 import { handleMemoryCommand } from './memoryCommands';
 import { handleModelsCommand, isModelsCommand } from './modelCommands';
 import { loadPi } from './pi';
+import { deleteRole, getRoles, saveRole } from './roleCommands';
 import {
   addPackage, readTools, removePackage, setDefaultTool, setPackageEnabled, toggleResource,
 } from './resources';
 import {
   abort, answerApproval, answerQuestion, boardView, clearQueue, closeSession, createSession, forgetApproval,
-  listSessions, openSession, prompt, readSession, recheckAgents, renameSession, sessionCommands, sessionPickOptions,
-  sessionState, setApprovalMode, setSessionPick, setSessionThinking, setTeamMode, stopTeam,
+  listSessions, openSession, prompt, readBoardSession, readBoardTask, readSession, recheckAgents, renameSession,
+  sessionCommands, sessionPickOptions, sessionState, setApprovalMode, setSessionPick, setSessionThinking, setTeamMode,
+  stopBoardTask, stopTeam,
 } from './sessions';
 import { checkTrust } from './trust';
 
@@ -28,6 +30,16 @@ async function handleAgentsCommand(command: Command): Promise<unknown> {
       return saveAgents(command.content);
     default:
       return undefined;
+  }
+}
+
+/** @brief Customize › Agents 的命令（docs/specs/customize-agents.md §4、§5）；不是这三种时返回 undefined。 */
+async function handleRolesCommand(command: Command): Promise<unknown> {
+  switch (command.type) {
+    case 'roles.get': return getRoles(command.sessionId);
+    case 'roles.save': return saveRole(command.sessionId, command.file, command.agent);
+    case 'roles.delete': return deleteRole(command.sessionId, command.file);
+    default: return undefined;
   }
 }
 
@@ -90,6 +102,9 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
     case 'board.get': return boardView(command.sessionId);
     case 'session.recheckAgents': return recheckAgents(command.sessionId);
     case 'session.stopTeam': return stopTeam(command.sessionId);
+    case 'board.readTask': return readBoardTask(command.sessionId, command.task);
+    case 'board.readSession': return readBoardSession(command.sessionId, command.of);
+    case 'session.stopTask': return stopBoardTask(command.sessionId, command.task);
     default: return undefined;
   }
 }
@@ -109,6 +124,8 @@ export async function handleCommand(command: Command, emit: Emit): Promise<unkno
   if (agents !== undefined) return agents;
   const tools = await handleToolsCommand(command);
   if (tools !== undefined) return tools;
+  const roles = await handleRolesCommand(command);
+  if (roles !== undefined) return roles;
   // 记忆与增强（docs/specs/memory.md §8）：在会话命令之前
   const memory = await handleMemoryCommand(command);
   if (memory !== undefined) return memory;

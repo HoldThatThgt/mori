@@ -295,7 +295,8 @@ test('MEM-02 off mode with chat.md tools: [read]: <tools> matches the request to
     const { run } = await teamSession(t, load);
     const first = run();
     assertToolsMatch(first, 'chat tools: [read]');
-    assert.deepEqual([...first.requestTools].sort(), ['agent_message', 'memory', 'read']);
+    // 普通模式另有 subagent（docs/specs/subagent.md §2）
+    assert.deepEqual([...first.requestTools].sort(), ['agent_message', 'memory', 'read', 'subagent']);
     assert.equal(piPrompt.diffSystemPromptSections(first.rendered, run().rendered), undefined, 'no patch next run');
   });
 

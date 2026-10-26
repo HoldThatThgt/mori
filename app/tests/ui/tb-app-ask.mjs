@@ -14,7 +14,7 @@
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ASK_TEXT } from '../fake-endpoint/scenarios/ask.mjs';
-import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
+import { SEGMENT_SENTENCES, SHARED_SENTENCE } from '../fake-endpoint/scripts.mjs';
 import {
   appLogLines, brief, closeTbApp, contentText, customOf, instanceFiles, instanceSuffix, lineBrief,
   messagesOf, missingSteps, openSessionIn, paneState, poll, readBoard, readJsonl, scenarioLines, scenarioRequests,
@@ -177,15 +177,19 @@ function offAskInstance(ctx, who, said) {
   const memory = instanceOf(ctx, who, 'ask.1.memory');
   const requests = scenarioRequests(ctx.ep, 'tb-ask-off', { agent: 'memory', kind: 'ask' });
   const banned = [...WRITE_TOOLS, 'agent_message'];
+  // 共用段第一句里 <role> 之后的固定部分；关闭模式没有 TaskBoard，临时提问不带共用段（附录 A，subagent 规格 §5.1）
+  const shared = SHARED_SENTENCE.slice(SHARED_SENTENCE.indexOf(',') + 2);
   record('TB-04 off mode: agent_message to memory opens a new read-only ask instance — session ask.1.memory under '
     + 'teams/<id>/sessions whose first entry is mori.instance { kind: ask, role: memory }, every request has the ask '
-    + 'segment and only the read tools read and ls (no bash, edit, write or agent_message, although memory has '
-    + 'bash/edit/write: it writes no tools, so it has the base tools, §8.1)',
+    + 'segment but no TaskBoard shared segment (appendix A) and only the read tools read and ls (no bash, edit, write '
+    + 'or agent_message, although memory has bash/edit/write: it writes no tools, so it has the base tools, §8.1)',
   memory !== null && memory.first?.customType === 'mori.instance' && memory.first.data?.kind === 'ask'
     && memory.first.data.role === 'memory' && requests.length === 2
-    && requests.every((item) => same(item.tools, ['read', 'ls']) && item.system.includes(SEGMENT_SENTENCES.ask))
+    && requests.every((item) => same(item.tools, ['read', 'ls']) && item.system.includes(SEGMENT_SENTENCES.ask)
+      && !item.system.includes(shared))
     && !requests.some((item) => item.tools.some((name) => banned.includes(name))),
-  brief({ file: memory?.id, first: memory?.first, tools: requests.map((item) => item.tools) }));
+  brief({ file: memory?.id, first: memory?.first, tools: requests.map((item) => item.tools),
+    shared: requests.map((item) => item.system.includes(shared)) }));
   const lines = scenarioLines(ctx.ep, 'tb-ask-off', { agent: 'memory', kind: 'ask' });
   const given = memory ? deliveries(memory.entries) : [];
   const last = memory ? messagesOf(memory.entries, 'assistant').at(-1) : null;

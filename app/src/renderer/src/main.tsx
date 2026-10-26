@@ -23,6 +23,7 @@ import './styles/issues-page.css';
 import './styles/memory.css';
 import './styles/slash.css';
 import './styles/team.css';
+import './styles/tasks.css';
 
 connectKernel();
 reportBusySessions();

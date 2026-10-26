@@ -22,6 +22,8 @@
 //     切换失败的一行在菜单里与输入框下面一行上方（synthetic：回放桥 failNext 让 session.setTeam 失败，不占回放顺序）。
 //   TB-58（tb-ask、tb-team）：每次模式改变对话流里一行（Task mode on / on until done / off），/task 进入时在你的消息之前，
 //     重新打开后一样（2026-10-26；录制要在这之后重录，才有 mori.team_mode 事件）。
+//   TB-87：回放桥把 Background tasks 的 board.readTask、board.readSession 列为只读查询，现有录制照常回放。
+//   TB-89（stop-task）：在 Background tasks 的卡片上点 Stop this task，卡片移到 Finished、显示 Stopped；交回后回到 Running。
 // 录制文件还不存在时，每个对应编号记一条失败"<编号> replay fixture missing"（不造假录制）。
 // 用法（在 app/ 下）：node tests/ui/tb-replay.mjs [--only tb-team,m1/readme]
 // 结果写到 test-results/tb-replay.json（--only 时 tb-partial-replay.json，不计入覆盖检查）；截图在 test-results/tb-replay/。
@@ -934,10 +936,12 @@ async function approvalFixture(page, fx) {
   await untilPlayed(page, second, 'the first turn');
   await page.waitForFunction((pane) => document.querySelector(pane)?.dataset.running === 'false', PANE,
     { timeout: 30000 });
+  await watchStage(page);
   await typeAndSend(page, commands[second].text);
   await untilPlayed(page, commands.findIndex((c) => c.type === 'approval.answer'), 'the progress turn');
   await page.waitForFunction((pane) => document.querySelector(pane)?.dataset.running === 'false', PANE,
     { timeout: 30000 });
+  const stages = await page.evaluate(() => window.__tbStages);
   const settled = await page.locator(css).count();
   await page.locator(PANE).locator('.composer textarea').focus();
   await page.keyboard.press('Alt+1');
@@ -948,7 +952,27 @@ async function approvalFixture(page, fx) {
   const seen = await watched(page);
   await shot(page, 'tb-approval');
   approvalAfter(seen, { settled, gone, asked, steps, id });
+  record('TB-34 replay tb-approval: a TaskBoard background card leaves the stage line alone — while the progress turn '
+    + 'runs with the task\'s card pending the stage line never reads "Waiting for your approval" (only a normal-mode '
+    + 'subagent\'s card does, subagent spec §7.1)', settled === 1 && stages.length > 0
+    && !stages.includes('Waiting for your approval'), stages.join(' | '));
   await finish(page, 'TB-34', 'tb-approval', steps);
+}
+
+/** @brief 从现在起记下这一栏阶段行出现过的每段文字（MutationObserver），放在 window.__tbStages。 */
+function watchStage(page) {
+  return page.evaluate((pane) => {
+    const seen = [];
+    let last = '';
+    const scan = () => {
+      const now = document.querySelector(`${pane} [data-testid="stage"]`)?.textContent ?? '';
+      if (now && now !== last) seen.push(now);
+      last = now;
+    };
+    new MutationObserver(scan).observe(document.body, { subtree: true, childList: true, characterData: true });
+    scan();
+    window.__tbStages = seen;
+  }, PANE);
 }
 
 /** @brief Open folder…、/task，等第一张后台卡与它的 task 行，查卡、task 行、侧栏与权限菜单。 */
@@ -1018,6 +1042,80 @@ function approvalAfter(seen, { settled, gone, asked, steps, id }) {
   JSON.stringify(seen.cards));
 }
 
+// ---------- TB-89：停止一个 task（stop-task） ----------
+
+/** @brief 在页面里记下 Background tasks 每张卡片的变化（task|节|phase|第二行），结果在 window.__bgSeen。 */
+function watchCards(page) {
+  return page.evaluate(() => {
+    if (window.__bgSeen) return;
+    window.__bgSeen = [];
+    const last = new Map();
+    new MutationObserver(() => {
+      for (const card of document.querySelectorAll('[data-testid="bg-task"]')) {
+        const section = card.closest('[data-testid="bg-section"]')?.dataset.section ?? '';
+        const value = `${section}|${card.dataset.phase}|${card.querySelector('.bg-task-line')?.textContent ?? ''}`;
+        if (last.get(card.dataset.task) === value) continue;
+        last.set(card.dataset.task, value);
+        window.__bgSeen.push({ task: card.dataset.task, section, phase: card.dataset.phase,
+          line: card.querySelector('.bg-task-line')?.textContent ?? '' });
+      }
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+  });
+}
+
+/** @brief 打开右栏的 Background tasks（点阶段行按钮），等列表出现。 */
+async function openTasksPanel(page) {
+  if (!(await page.locator('[data-testid="bg-tasks"]').count())) {
+    await page.locator(`${PANE} [data-testid="tasks-button"]`).click({ timeout: 30000 });
+  }
+  await page.locator('[data-testid="bg-tasks"]').waitFor({ timeout: 10000 });
+}
+
+/**
+ * @brief 照录制在界面里做（stop-task）：Open folder…、Allow all、/task <文字>、在 Background tasks 的卡片上点
+ *        Stop this task（界面发出 session.stopTask）、发交回的消息。
+ */
+async function stopTaskRun(page, fx) {
+  const steps = await load(page, fx);
+  await watchCards(page);
+  const commands = commandsOf(steps);
+  const seen = { before: null };
+  for (const [i, command] of commands.entries()) {
+    await untilPlayed(page, i, `segment ${i} before ${command.type}`);
+    if (command.type === 'session.create') await openFolder(page);
+    else if (command.type === 'approval.setMode') await allowAll(page);
+    else if (command.type === 'session.prompt') {
+      await typeAndSend(page, command.team === 'once' ? `/task ${command.text}` : command.text);
+    } else if (command.type === 'session.stopTask') {
+      await openTasksPanel(page);
+      const card = page.locator(`[data-testid="bg-task"][data-task="${command.task}"]`);
+      seen.before = { phase: await card.getAttribute('data-phase'),
+        stop: await card.locator('[data-action="stop-task"]').count() };
+      await card.locator('[data-action="stop-task"]').click();
+    } else throw new Error(`no UI step for ${command.type}`);
+  }
+  await untilPlayed(page, commands.length, 'the whole stop-task run');
+  await sleep(800);
+  const task = commands.find((c) => c.type === 'session.stopTask')?.task ?? null;
+  return { steps, task, seen, cards: await page.evaluate(() => window.__bgSeen) };
+}
+
+/** @brief stop-task 的检查（TB-89 回放层）。 */
+async function stopTaskFixture(page, fx) {
+  const { steps, task, seen, cards } = await stopTaskRun(page, fx);
+  const mine = cards.filter((item) => item.task === task);
+  const stoppedAt = mine.findIndex((item) => item.section === 'finished' && item.phase === 'stopped');
+  record('TB-89 replay stop-task: before the stop the task\'s card is in Running with "Stop this task"; clicking it '
+    + 'sends the recorded session.stopTask', ['starting', 'running', 'approval', 'queued', 'lock_wait']
+    .includes(seen.before?.phase) && seen.before.stop === 1, JSON.stringify(seen.before));
+  record('TB-89 replay stop-task: after the recorded board update the card is in Finished as "Stopped"',
+    stoppedAt >= 0 && mine[stoppedAt].line.includes('Stopped'), JSON.stringify(mine.slice(0, 8)));
+  record('TB-89 replay stop-task: handed back by the next message, the card returns to Running and ends in Finished',
+    stoppedAt >= 0 && mine.slice(stoppedAt).some((item) => item.section === 'running')
+      && mine.at(-1)?.section === 'finished', JSON.stringify(mine.slice(stoppedAt, stoppedAt + 6)));
+  await finish(page, 'TB-89', 'stop-task', steps);
+}
+
 // ---------- 执行 ----------
 
 /** 每个 TaskBoard 录制：名字、覆盖的编号、检查 */
@@ -1026,6 +1124,7 @@ const TB_FIXTURES = [
   { name: 'tb-team', ids: ['TB-08', 'TB-37', 'TB-53', 'TB-58'], run: teamFixture },
   { name: 'tb-receipts', ids: ['TB-08', 'TB-37'], run: receiptsFixture },
   { name: 'tb-approval', ids: ['TB-34', 'TB-37'], run: approvalFixture },
+  { name: 'stop-task', ids: ['TB-89'], run: stopTaskFixture },
 ];
 
 /** @brief 跑一组检查；出错时记一条失败；之后记这一组的页面错误。 */
@@ -1040,6 +1139,11 @@ async function guarded(page, errors, { id, label: name }, run) {
   const mine = unexpectedErrors(errors.slice(before));
   record(`${id} replay ${name}: the page has no errors`, mine.length === 0, mine.slice(0, 5).join(' | '));
 }
+
+// TB-87：Background tasks 的两个只读命令是回放桥的只读查询，现有的录制照常回放（下面 TB-03 与各录制的检查）
+record('TB-87 replay harness: board.readTask and board.readSession are read-only queries of the replay bridge '
+  + '(QUERIES), so recordings without them replay unchanged', QUERIES.includes('board.readTask')
+  && QUERIES.includes('board.readSession'), QUERIES.join(', '));
 
 const chosenTb = TB_FIXTURES.filter((f) => !only || only.includes(f.name));
 const chosen03 = TB03.filter(([dir, name]) => !only || only.includes(`${dir}/${name}`));

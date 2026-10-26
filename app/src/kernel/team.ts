@@ -6,18 +6,19 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type {
   AgentSessionEvent, BeforeAgentStartEvent, ExtensionAPI, ExtensionFactory, ToolCallEventResult, ToolResultEvent,
   ToolResultEventResult,
 } from '@earendil-works/pi-coding-agent';
 import { REASON_TEXTS, isUntilReason, plainReasonText, type ModelEvent, type ModelPick } from '../shared/models';
 import type { ApprovalDecision, KernelEvent, SessionInfo } from '../shared/protocol';
+import { SUBAGENT_TOOL } from '../shared/subagent';
 import {
-  BASE_ROLE, TEAM_ENTRY_TYPES, TEAM_TOOLS, TeamEntrySchema, seatRolesOf, type DecidingMessage, type PromptBehavior,
-  type ReceiptEntryData, type RoleSummary, type TeamApprovalEnd, type TeamApprovalRequest, type TeamDeciding,
-  type TeamHolders, type TeamMode, type TeamState, type TeamSwitch, type TeamToolName, type TitleContext,
-  type ToolCallBrief, type WakeKind, type InstanceKind,
+  BASE_ROLE, TEAM_ENTRY_TYPES, TEAM_TOOLS, TeamEntrySchema, canStopTask, seatRolesOf, type DecidingMessage,
+  type PromptBehavior, type ReceiptEntryData, type RoleSummary, type SessionOf, type TaskDetail, type TeamApprovalEnd,
+  type TeamApprovalRequest, type TeamDeciding, type TeamHolders, type TeamMode, type TeamState, type TeamSwitch,
+  type TeamToolName, type TitleContext, type ToolCallBrief, type WakeKind, type InstanceKind,
 } from '../shared/team';
 import {
   applyRestartRecovery, findRequest, findTask, isTaskEnded, liveTaskIds, loadBoard, markAsked, markStopped, newBoard,
@@ -40,6 +41,9 @@ import {
   dialogTools, findRole, hasOtherRoles, matchesToolEntries, roleCandidates, toolAllowlist, type RoleDef,
 } from './roles';
 import { messageText, turnCount, type SessionEntryLike } from './sessionReader';
+import {
+  editedFiles, noteSubagentApproval, noteSubagentModel, noteSubagentTool, subagentSegment, subagentTool, subagentTools,
+} from './subagent';
 import { teamExtension, type TeamHooks } from './teamExtension';
 import { UserFlow, missingProgress } from './teamFlow';
 import {
@@ -50,8 +54,10 @@ import {
   LANE_IDS, hasQueued, laneActive, newLane, takeBatch, type DeliveryMeta, type Lane, type TeamDelivery,
 } from './teamLanes';
 import { STOPPED_BY_USER, runEnded, runStarted, startUserJudgment } from './teamRuns';
-import { runTool } from './teamTools';
-import { BOARD_EVENT_INTERVAL_MS, Throttle, boardEdited, boardView, handedOver, type TaskLive } from './teamView';
+import { readBackgroundSession, runTool } from './teamTools';
+import {
+  BOARD_EVENT_INTERVAL_MS, Throttle, boardEdited, boardView, handedOver, taskDetail, type TaskLive,
+} from './teamView';
 import type { Board, BoardWake, BoardWrite, DeliveryCause, ScheduleWait, Subscriber } from './teamTypes';
 
 /** @brief 用户会话 system prompt 的自定义段名（§8.5，同 pi 内置 MCP 扩展的 mcp_servers 段）。 */
@@ -480,9 +486,13 @@ export class Team implements TeamLike {
     return this.flow.deciding();
   }
 
-  /** @brief 除对话这次运行之外还有 Agent 在运行或排队，或有待判断的消息（TeamState.background）。 */
+  /**
+   * @brief 除对话这次运行之外还有 Agent 在运行或排队，或有待判断的消息（TeamState.background）；普通模式的 subagent 是对话
+   *        这次回复的一部分，不算（docs/specs/subagent.md §7.5）。
+   */
   background(): boolean {
     for (const lane of this.lanes.values()) {
+      if (lane.subagent) continue;
       if (lane === this.user ? hasQueued(lane) : laneActive(lane)) return true;
     }
     return this.deciding.length > 0 || this.waitingSubs.length > 0 || this.waiting.length > 0;
@@ -567,7 +577,52 @@ export class Team implements TeamLike {
       const info = this.taskLive(task.id);
       if (info) live.set(task.id, info);
     }
-    return boardView(this.board, { holders: this.holders, waiting: this.waiting, live, teamEdited: this.teamEdited });
+    return boardView(this.board, { holders: this.holders, waiting: this.waiting, live, teamEdited: this.teamEdited,
+      hasSession: (of) => this.hasSession(of) });
+  }
+
+  /**
+   * @brief 一条实例会话有没有（Background tasks 的 View transcript，§13.13）：开着，或会话文件已写盘（pi 在第一条助手
+   *        消息之后才写，§14.5）。
+   * @param of task 上某个角色的 task 实例会话，或一个需求的结案会话
+   */
+  hasSession(of: SessionOf): boolean {
+    const ids = of.kind === 'task' ? LANE_IDS.task(this.userId, of.task, of.role)
+      : LANE_IDS.close(this.userId, of.request);
+    if (this.host.entry(ids.id)) return true;
+    const file = this.lanes.get(ids.key)?.file ?? this.knownFiles.get(ids.id) ?? null;
+    return file !== null && existsSync(file);
+  }
+
+  /**
+   * @brief board.readTask（§13.13.3，只读）：一个 task 的详情。
+   * @param id task 编号
+   * @return 详情；没有这个 task 时抛出 T9 does not exist.
+   */
+  readTask(id: string): TaskDetail {
+    const detail = taskDetail(this.board, id, (task, file) => this.instanceRole(task, file));
+    if (!detail) throw new Error(`${id} does not exist.`);
+    return detail;
+  }
+
+  /**
+   * @brief 一个实例会话文件是这个 task 上哪个角色的（程序写的一棒的 View transcript，§13.13.3）：开着的实例按它的文件，
+   *        没开着的按 knownFiles（id 为 <用户>.<task>.<角色>）；按文件名比，不比目录的写法。
+   * @return 不是这个 task 的实例会话时为 null
+   */
+  private instanceRole(task: string, file: string): string | null {
+    const name = basename(file);
+    const lane = [...this.lanes.values()].find((item) => item.kind === 'task' && item.task === task
+      && item.file !== null && basename(item.file) === name);
+    if (lane) return lane.role;
+    const prefix = LANE_IDS.task(this.userId, task, '').id;
+    const known = [...this.knownFiles].find(([id, path]) => id.startsWith(prefix) && basename(path) === name);
+    return known ? known[0].slice(prefix.length) : null;
+  }
+
+  /** @brief board.readSession（§13.13.4，只读）：见 teamTools.readBackgroundSession。 */
+  readSession(of: SessionOf): ReturnType<typeof readBackgroundSession> {
+    return readBackgroundSession(this, of);
   }
 
   /** @brief 一个 task 此刻的运行状态：持有它的角色的实例（没有时取这个 task 上最近有提示的实例）。 */
@@ -652,13 +707,16 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief 打开会话时：这个 TaskBoard 的 task 实例会话里有没有成功的 edit、write（§13.10 teamEdited、§13.12）。
+   * @brief 打开会话时：这个 TaskBoard 的 task 实例会话、普通模式 subagent 的会话（临时提问的会话，只读的没有 edit、write）
+   *        里有没有成功的 edit、write（§13.10 teamEdited、§13.12；docs/specs/subagent.md §9.3）。
    *        交接的 authorFamilies 记不下被停止、撤销、重启前没交接的那一棒，所以读实例会话文件。
    */
   private async instancesEdited(): Promise<boolean> {
     const prefix = `${this.userId}.`;
     for (const [id, file] of this.knownFiles) {
-      if (id.startsWith(prefix) && /^t\d+\./.test(id.slice(prefix.length)) && await sessionEdited(file)) return true;
+      if (id.startsWith(prefix) && /^(?:t\d+|ask\.\d+)\./.test(id.slice(prefix.length)) && await sessionEdited(file)) {
+        return true;
+      }
     }
     return false;
   }
@@ -1049,19 +1107,23 @@ export class Team implements TeamLike {
     lane.cursor = undefined;
   }
 
-  /** @brief 建或开一个实例会话的设置（§8.1、§8.2、§8.5、§12）。 */
+  /**
+   * @brief 建或开一个实例会话的设置（§8.1、§8.2、§8.5、§12）；普通模式的 subagent 用它自己的工具与 subagent 段，
+   *        关闭模式下的临时提问只有临时提问段，两者都不带共用段（docs/specs/subagent.md §5.1、§5.3）。
+   */
   private instanceSpec(lane: Lane): InstanceSpec {
     const role = this.roleOf(lane.role);
     const kind = lane.kind === 'user' ? 'create' : lane.kind;
-    const appendPrompt = [role.body, ...segments(kind, { role: role.name, roles: this.summaries,
-      holders: this.holders, request: lane.request ?? undefined })].filter((part) => part.trim() !== '');
+    const own = lane.subagent ? [subagentSegment(lane.readOnly)] : segments(kind, { role: role.name,
+      roles: this.summaries, holders: this.holders, request: lane.request ?? undefined, team: lane.team });
+    const appendPrompt = [role.body, ...own].filter((part) => part.trim() !== '');
     const instance = {
       kind, role: role.name, ...(kind === 'task' && lane.task ? { task: lane.task } : {}),
       ...((kind === 'close' || kind === 'subscription') && lane.request !== null ? { request: lane.request } : {}),
     };
     return {
       id: lane.id, dir: this.sessionsDir, parentSession: this.userSessionFile(), cwd: this.args.cwd, kind, instance,
-      tools: [...toolAllowlist(role, kind, lane.readOnly, this.args.baseTools, lane.team), ...this.memoryTools(kind)],
+      tools: [...this.laneTools(lane, role, kind), ...this.memoryTools(kind)],
       appendPrompt, teamExtension: teamExtension(this.laneHooks(lane)), model: this.modelOptions(lane, role),
       trust: this.args.trust, approval: this.args.approval, memory: { enhance: this.args.enhance }, owner: this.userId,
       onEvent: (event) => this.laneEvent(lane, event),
@@ -1069,6 +1131,18 @@ export class Team implements TeamLike {
       onApprovalRequest: (request) => this.onApprovalRequest(lane, request),
       onApprovalEnd: (end) => this.onApprovalEnd(end),
     };
+  }
+
+  /**
+   * @brief 实例的 pi 工具白名单（§8.1）：roles.ts toolAllowlist；普通模式的 subagent 为 subagentTools
+   *        （docs/specs/subagent.md §5.3）。
+   * @param lane 实例
+   * @param role 它的角色
+   * @param kind 实例的种类
+   */
+  private laneTools(lane: Lane, role: RoleDef, kind: InstanceKind): string[] {
+    if (lane.subagent) return subagentTools(role, lane.readOnly, this.args.baseTools);
+    return toolAllowlist(role, kind, lane.readOnly, this.args.baseTools, lane.team);
   }
 
   /**
@@ -1142,10 +1216,12 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief 调度类别（§12.10）：task、订阅、立项与结案；临时提问继承发送方的类别。
-   *        增强会话的对话是 background（记忆规格 §9.6），从它发出的临时提问随之为 background。
+   * @brief 调度类别（§12.10）：task、订阅、立项与结案；临时提问继承发送方的类别，普通模式的 subagent 为 subagent
+   *        （docs/specs/subagent.md §5.4）。增强会话的对话是 background（记忆规格 §9.6），从它发出的临时提问随之为
+   *        background。
    */
   private schedClassOf(lane: Lane): SchedClass {
+    if (lane.subagent) return 'subagent';
     switch (lane.kind) {
       case 'task': return 'task';
       case 'subscription': return 'background';
@@ -1214,11 +1290,11 @@ export class Team implements TeamLike {
         return;
       case 'tool_execution_start':
         lane.current = toolBrief(event.toolName, event.args);
+        if (lane.subagent) noteSubagentTool(lane.subagent, lane.current);
         this.emitBoard();
         return;
       case 'tool_execution_end':
-        if (lane.kind === 'task' && !event.isError && (event.toolName === 'edit' || event.toolName === 'write')
-          && !this.teamEdited) {
+        if ((lane.kind === 'task' || lane.subagent) && editedFiles(event) && !this.teamEdited) {
           // 右栏的说明随 TaskBoard 视图更新（§13.12）：第一次改过文件时就发，不等下一次别的变化
           this.teamEdited = true;
           this.emitBoard();
@@ -1321,6 +1397,7 @@ export class Team implements TeamLike {
 
   /** @brief 实例的模型层事件：最近一条换模型、等待的提示写进这个 task 的 modelNote（§12.12）。 */
   private onModelEvent(lane: Lane, event: ModelEvent): void {
+    if (lane.subagent) noteSubagentModel(lane.subagent, event);
     if (event.type === 'mori.model_switch') {
       lane.modelNote = `Switched model: ${event.from} → ${event.to} · ${plainReasonText(event.reason, event.detail)}`;
     } else if (event.type === 'mori.model_wait' && event.active && event.kind === 'model') {
@@ -1335,19 +1412,28 @@ export class Team implements TeamLike {
 
   // ---- 后台批准卡（§11.3） ----
 
-  /** @brief 实例要批准：补上角色与 task，在用户会话的信封上出卡。 */
+  /**
+   * @brief 实例要批准：补上角色与 task（普通模式的 subagent 补上它的 description，那一行显示等你批准，
+   *        docs/specs/subagent.md §7.4），在用户会话的信封上出卡。
+   */
   private onApprovalRequest(lane: Lane, request: InstanceApprovalRequest): void {
     const task = lane.task === null ? undefined : findTask(this.board, lane.task);
-    const card: TeamApprovalRequest = { ...request, role: lane.role, task: lane.task, taskTitle: task?.title ?? null };
+    const card: TeamApprovalRequest = { ...request, role: lane.role, task: lane.task, taskTitle: task?.title ?? null,
+      subagent: lane.subagent?.row.description ?? null };
     this.approvals.set(request.requestId, { request: card, instance: lane.id });
+    if (lane.subagent) noteSubagentApproval(lane.subagent, true);
     this.host.emitUser(this.userId, { type: 'mori.team_approval_request', ...card });
     this.emitBoard();
     this.emitState();
   }
 
-  /** @brief 实例的批准请求结束。 */
+  /** @brief 实例的批准请求结束；普通模式的 subagent 没有别的挂着的卡时那一行回到执行中。 */
   private onApprovalEnd(end: TeamApprovalEnd): void {
+    const instance = this.approvals.get(end.requestId)?.instance;
     if (!this.approvals.delete(end.requestId)) return;
+    const lane = [...this.lanes.values()].find((item) => item.id === instance);
+    const pending = [...this.approvals.values()].some((item) => item.instance === instance);
+    if (lane?.subagent && !pending) noteSubagentApproval(lane.subagent, false);
     this.host.emitUser(this.userId, { type: 'mori.team_approval_end', ...end });
     this.emitBoard();
   }
@@ -1381,6 +1467,8 @@ export class Team implements TeamLike {
         this.userApi = api;
         const saved = this.args.restored ? savedTeamEntry(this.args.userSessionFile) : null;
         if (hasOtherRoles(this.roles) || (saved !== null && saved.mode !== 'off')) this.registerUserTools();
+        // 普通模式的 subagent 工具（docs/specs/subagent.md §2）：总是注册、默认不启用；增强会话没有
+        if (!this.args.enhance) api.registerTool(subagentTool(this));
       },
       card: (messages) => this.cardText(this.user, messages),
       toolCall: (event) => this.guardCall(this.user, event.toolName),
@@ -1437,8 +1525,9 @@ export class Team implements TeamLike {
     if (mode !== 'off' || readers.length > 0) this.registerUserTools();
     const listed = dialogTools(this.args.roles, mode !== 'off', this.args.baseTools);
     const registered = api.getAllTools().map((tool) => tool.name);
+    const subagent = mode === 'off' && !this.args.enhance ? [SUBAGENT_TOOL] : [];
     if (listed !== null) {
-      const entries = mode === 'off' || this.merged ? [...listed, MEMORY_TOOL, ...readers] : listed;
+      const entries = mode === 'off' || this.merged ? [...listed, MEMORY_TOOL, ...readers, ...subagent] : listed;
       api.setActiveTools(registered.filter((name) => matchesToolEntries(entries, name)));
       return entries;
     }
@@ -1448,7 +1537,7 @@ export class Team implements TeamLike {
       : [...restoring, ...active.filter((name) => !this.wasTeamActive(name))]);
     this.offRestore = null;
     if (hasOtherRoles(this.roles)) wanted.add('agent_message');
-    for (const name of readers) wanted.add(name);
+    for (const name of [...readers, ...subagent]) wanted.add(name);
     // 恢复记下的那一组时 memory 也在关闭模式那一组里（记忆规格 §7.6）：记下的 tools 早于记忆功能时不含它
     if (restoring !== null) wanted.add(MEMORY_TOOL);
     const next = [...wanted].filter((name) => registered.includes(name));
@@ -1649,13 +1738,43 @@ export class Team implements TeamLike {
     this.emitState();
   }
 
-  /** @brief 丢弃一个会话的投递队列（Stop agents，§8.2、§11.4）。 */
-  private dropQueue(lane: Lane): void {
+  /**
+   * @brief 停止一个 task（Stop this task，§13.13.7）：Stop agents 只作用于这个 task。清空它的实例会话的投递队列（等回复的
+   *        以 Stopped by the user. 结束），task 变为 stopped（stopReason user，持有者保留，写入锁照旧持有），停止这个实例的
+   *        运行（原因 user；挂起的批准由会话表按拒绝处理）。别的会话照常；不写回执、不投递、模式不变。
+   * @param id task 编号
+   * @return 停下之后兑现；不能停时抛出 T1 isn't running.，没有这个 task 时抛出 T1 does not exist.
+   */
+  async stopTask(id: string): Promise<void> {
+    const task = findTask(this.board, id);
+    if (!task) throw new Error(`${id} does not exist.`);
+    const view = this.view().requests.flatMap((request) => request.tasks).find((item) => item.id === id);
+    if (!view || !canStopTask(view) || task.holder?.kind !== 'role') throw new Error(`${id} isn't running.`);
+    const lane = this.lanes.get(LANE_IDS.task(this.userId, id, task.holder.role).key) ?? null;
+    if (lane) this.dropQueue(lane, `Stop task ${id}`);
+    this.write((board) => ({ board: markStopped(board, [id], 'user'), error: null }));
+    console.log(`[kernel] ${this.userId}: stopped ${id} (${task.holder.role})`);
+    if (lane) {
+      await this.stopLane(lane, 'user');
+      // 停止时正在处理运行结束（§9.4）：处理完之后不再留下投递
+      await lane.settling;
+      this.dropQueue(lane, `Stop task ${id}`);
+    }
+    this.emitBoard();
+    this.emitState();
+  }
+
+  /**
+   * @brief 丢弃一个会话的投递队列（Stop agents、Stop this task，§8.2、§11.4、§13.13.7）。
+   * @param lane 会话
+   * @param by 日志里写的来由
+   */
+  private dropQueue(lane: Lane, by = 'Stop team'): void {
     const dropped = [...lane.solo, ...lane.queue];
     lane.solo = [];
     lane.queue = [];
     for (const item of dropped) {
-      console.log(`[kernel] ${lane.id}: Stop team dropped a delivery (${item.cause.kind})`);
+      console.log(`[kernel] ${lane.id}: ${by} dropped a delivery (${item.cause.kind})`);
       item.meta.waiter?.settle(STOPPED_BY_USER, true);
       const asked = item.meta.asked;
       if (asked) this.write((board) => ({ board: markAsked(board, asked, false), error: null }));

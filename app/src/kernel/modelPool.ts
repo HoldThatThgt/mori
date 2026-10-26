@@ -122,8 +122,13 @@ export class ModelUnavailableError extends Error {
 
 /** 无 key 的提供商在占用表里的键（§8.1）。 */
 const PSEUDO_SLOT = '';
-/** 队列排序：conversation > decision > task > background，严格优先（§8.2，平行 Agent 规格 §12.10）。 */
-const CLASS_RANK: Readonly<Record<SchedClass, number>> = { conversation: 0, decision: 1, task: 2, background: 3 };
+/**
+ * 队列排序：conversation > decision > subagent > task > background，严格优先（§8.2，平行 Agent 规格 §12.10；
+ * subagent 见 docs/specs/subagent.md §5.4：不在 CAPPED_CLASSES、QUEUE_TIMEOUT_CLASSES 里，用满并发、等到有槽位为止）。
+ */
+const CLASS_RANK: Readonly<Record<SchedClass, number>> = {
+  conversation: 0, decision: 1, subagent: 2, task: 3, background: 4,
+};
 /** 排队超时（换模型）只对这两类生效；task、background 排队等槽位是常态，不超时（平行 Agent 规格 §12.10）。 */
 const QUEUE_TIMEOUT_CLASSES: ReadonlySet<SchedClass> = new Set<SchedClass>(['conversation', 'decision']);
 /**

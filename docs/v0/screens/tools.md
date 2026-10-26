@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | 入口 | — | 左栏"Open folder…"下面的"Customize"（收起为图标栏时是图标按钮）；工具页打开时高亮 | 打开工具页 |
 | 顶部 | — | "Back to app"；标题"Customize"；跟随的会话："<项目名> · <会话名>"，或"No open session. Only user-level skills and plugins are listed."（2026-10-26 改："No open session. Only user-level skills, plugins, and instructions are listed."） | Back to app（恢复分屏、滚动位置、草稿，与设置页相同） |
-| 分节 | — | 照 Claude 桌面版的设置页：左边分节列表（读屏名称"Customize page sections"）"Built-in tools""Skills""MCP""Plugins"，右边内容；没有打开的会话时"Built-in tools""MCP"不出现（2026-10-26 改：负责人走查 M4，最后一节是"Instructions"（用户级 AGENTS.md，从设置页挪来；负责人定名与位置），没有会话时也在；从侧栏进入仍落在第一节，从记忆页的 Edit in Customize 进入落在它；状态表见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)） | 切换分节 |
+| 分节 | — | 照 Claude 桌面版的设置页：左边分节列表（读屏名称"Customize page sections"）"Built-in tools""Skills""MCP""Plugins"，右边内容；没有打开的会话时"Built-in tools""MCP"不出现（2026-10-26 改：负责人走查 M4，最后一节是"Instructions"（用户级 AGENTS.md，从设置页挪来；负责人定名与位置），没有会话时也在；从侧栏进入仍落在第一节，从记忆页的 Edit in Customize 进入落在它；状态表见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)）（2026-10-26：Skills 之后加 "Agents"，同样只在有会话时出现，见 [../../v1/screens/customize-agents.md](../../v1/screens/customize-agents.md)） | 切换分节 |
 | 改动何时生效 | pi 只在会话创建时读这些配置（m6-checks.md） | 页面顶部一行"Changes apply to new sessions. Sessions already open aren’t affected."和"New session"按钮（在跟随的项目里新建，等于 Ctrl+N） | New session |
 | 读取中 / 读取失败 | `tools.get` | "Loading…" / 原文和"Retry"（2026-10-26：只在内置工具、技能、MCP、插件四节；Instructions 一节不等它，读取失败时照常可用） | Retry |
 | 离开与换分节（2026-10-26 加） | Instructions 一节有未保存的改动 | 换分节（点、↑ ↓）、离开工具页都先出 AGENTS.md 的离开确认框（同 customize-agents-md.md）；点当前分节、已经在工具页时点左栏"Customize"什么都不变 | Discard；Keep editing |
@@ -40,7 +40,7 @@
 | 本项目的设置改了它：悬停（2026-10-26 补） | 同上一行（`byDefault.readOnly`） | 不可用的开关悬停提示与下面一行同一句（"Turned on in this project’s .pi/settings.json. To change it, edit that file." / "Turned off in …"，同技能的开关）；可以开关的开关没有悬停提示 | — |
 | 操作记录（2026-10-26 补） | `tools.setDefault`（[f8.md](f8.md)"Recent activity"记发给后台进程的命令） | F8 报告的"Recent activity"每按一次开关记一条"Enable tool <名字>"或"Disable tool <名字>"（[../ui-strings.md](../ui-strings.md)"操作记录"，同"Enable skill <名字>"） | — |
 | `grep`、`find` | — | 下面一行"Needs rg.exe in <agentDir>\bin or on PATH. Mori doesn’t download it."（`find` 是 fd.exe）。不检查有没有：Mori 让 pi 离线运行（`PI_OFFLINE`），pi 不下载它们，没有时调用失败，工具卡写 pi 的原文"ripgrep (rg) is not available and could not be downloaded"或"fd is not available and could not be downloaded" | — |
-| 不是 pi 内置工具的行 | 来源与工具名 | 没有开关，下面一行原因：TaskBoard 工具"Mori turns this on and off with Task mode."；`memory`"Mori turns this on for the main agent."（记忆规格 §7.6）；MCP 的工具"Turn its server on or off in MCP."；插件的工具"Turn it on or off in Plugins."；扩展文件的工具"Set by this extension. To change it, edit the extension file." | — |
+| 不是 pi 内置工具的行 | 来源与工具名 | 没有开关，下面一行原因：TaskBoard 工具"Mori turns this on and off with Task mode."；`memory`"Mori turns this on for the main agent."（记忆规格 §7.6）；`subagent`"Mori turns this on when Task mode is off."（docs/specs/subagent.md §2）；MCP 的工具"Turn its server on or off in MCP."；插件的工具"Turn it on or off in Plugins."；扩展文件的工具"Set by this extension. To change it, edit the extension file." | — |
 
 开关还管这几件事（2026-10-26，WP-08）：
 

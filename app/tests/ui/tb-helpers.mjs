@@ -669,6 +669,31 @@ export const messagesOf = (entries, role = null) => entries.filter((entry) => en
 export const customOf = (entries, type) => entries.filter((entry) => entry.type === 'custom'
   && entry.customType === type).map((entry) => entry.data);
 
+// ---------- 身份段里交出去的活那一句（记忆规格附录 A.1.1、subagent 规格 §6.4，测试里独立实现） ----------
+
+/** 交出去的工具与那一句里它的两部分，按表的顺序 */
+const HANDOFF_PARTS = [
+  ['task_create', 'tasks you create', 'the task description'],
+  ['agent_message', 'questions you send to other agents', 'the question'],
+  ['subagent', 'prompts you give subagents', 'the prompt'],
+];
+
+/** @brief A、A and B、A, B and C。 */
+const joinList = (items, word) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} ${word} `
+  + `${items.at(-1)}`);
+
+/**
+ * @brief 这些工具时身份段第三行末尾应有的那一句；都没有交出去的工具时为 null。
+ * @param tools 请求里的工具名
+ */
+export function expectedHandoff(tools) {
+  const parts = HANDOFF_PARTS.filter(([tool]) => tools.includes(tool));
+  if (parts.length === 0) return null;
+  const who = joinList(parts.map((part) => part[1]), 'and');
+  return `${who[0].toUpperCase()}${who.slice(1)} are worked on by agents that don't see <facts>: write the facts they `
+    + `need into ${joinList(parts.map((part) => part[2]), 'or')}.`;
+}
+
 // ---------- 后台进程的事件（captureEvents 记在 window.__mp） ----------
 
 /**
@@ -921,11 +946,13 @@ export async function recentActions(ctx, tab, what = 'TB-01 check of the recent 
 
 /**
  * @brief 某个会话面板里的批准卡：[{ request（data-request）, tool, agent（data-agent）, task（data-task）,
+ *        subagent（data-subagent，普通模式的 subagent 的 description，docs/specs/subagent.md §7.4）,
  *        attribution（归属行文字）, title }]。
  */
 export function approvalCardsOf(ctx, tab) {
   return ctx.page.locator(`${paneSel(tab)} [data-testid="approval-card"]`).evaluateAll((els) => els.map((el) => ({
     request: el.dataset.request, tool: el.dataset.tool, agent: el.dataset.agent ?? null, task: el.dataset.task ?? null,
+    subagent: el.dataset.subagent ?? null,
     attribution: el.querySelector('[data-testid="approval-attribution"]')?.textContent ?? null,
     title: el.querySelector('[data-testid="approval-title"]')?.textContent ?? '' })));
 }

@@ -53,6 +53,10 @@ export const PROMPTS = {
   SUPPLEMENT: 'One more constraint for request 1, in my own words: when the slow job finishes, report the exact line '
     + 'it printed and how long it took, and do not change any file in this project.',
   CANCEL: 'Please cancel request 1; I no longer need the slow job.',
+  // TB-89（Stop this task，§13.13.7）：task 运行一个 30 秒的命令时停下它，再让立项交回
+  STOP: 'Have executor run the command `node -e "setTimeout(() => console.log(\'stop job done\'), 30000)"` in this '
+    + 'project and tell me what it prints. It takes about 30 seconds.',
+  HAND_BACK: 'I stopped T1 by mistake. Hand T1 back to the same role so it continues where it stopped.',
   /** TB-59 回看：只读的 task 列出文件，结果放在它的最后一段回复里 */
   LOOKBACK: 'Have executor list every file in this project, one line per file with its size, as a read-only task. '
     + 'I only need the list; do not change any file.',

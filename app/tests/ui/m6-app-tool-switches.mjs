@@ -347,19 +347,23 @@ async function rows(ctx) {
   await backToChat(page);
 }
 
-/** @brief 别的行：Mori 的 TaskBoard 工具与 memory、MCP、插件、扩展的工具各有，没有开关、下面一行原因。 */
+/**
+ * @brief 别的行：Mori 的 TaskBoard 工具、memory 与 subagent（docs/specs/subagent.md §2）、MCP、插件、扩展的工具各有，
+ *        没有开关、下面一行原因。
+ */
 function reasonRows(ctx, list) {
   const pick = (fn) => list.filter(fn).map((row) => ({ name: row.name, tag: row.tag, checked: row.checked,
     notes: row.notes, ok: row.checked === null && same(row.notes, expectedNotes(row, ctx.agentDir)) }));
   const groups = {
-    task: pick((row) => row.tag === 'Mori' && row.name !== 'memory'),
+    task: pick((row) => row.tag === 'Mori' && row.name !== 'memory' && row.name !== 'subagent'),
     memory: pick((row) => row.name === 'memory'),
+    subagent: pick((row) => row.name === 'subagent'),
     mcp: pick((row) => row.tag === `MCP · ${MCP_NAME}`),
     plugin: pick((row) => row.tag === `Plugin ${PKG_SOURCE}`),
     extension: pick((row) => row.name === EXT_TOOL),
   };
   record('M12 没有开关的行：TaskBoard 工具"Mori turns this on and off with Task mode."、memory "Mori turns this on for the '
-    + 'main agent."、MCP 的工具"Turn its server on or off in MCP."、插件的工具"Turn it on or off in Plugins."、扩展的工具'
+    + 'main agent."、subagent "Mori turns this on when Task mode is off."、MCP 的工具"Turn its server on or off in MCP."、插件的工具"Turn it on or off in Plugins."、扩展的工具'
     + '"Set by this extension. To change it, edit the extension file."，每种至少一行',
   Object.values(groups).every((rowsOf) => rowsOf.length > 0 && rowsOf.every((row) => row.ok))
     && groups.task.every((row) => same(row.notes, [TOOL_REASONS.task])), JSON.stringify(groups));

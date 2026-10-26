@@ -27,7 +27,7 @@ pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AG
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| Customize 的分节 | 跟随的会话 | 左侧分节列表最后一节 `Instructions`（`data-section="agents"`）：有会话时 `Built-in tools`、`Skills`、`MCP`、`Plugins`、`Instructions`；没有会话时 `Skills`、`Plugins`、`Instructions`（这一节不需要会话）（2026-10-26 负责人定） | 切换分节（点、Tab、↑ ↓，同 v0） |
+| Customize 的分节 | 跟随的会话 | 左侧分节列表最后一节 `Instructions`（`data-section="agents"`）：有会话时 `Built-in tools`、`Skills`、`Agents`（2026-10-26 加，[customize-agents.md](customize-agents.md)）、`MCP`、`Plugins`、`Instructions`；没有会话时 `Skills`、`Plugins`、`Instructions`（这一节不需要会话）（2026-10-26 负责人定） | 切换分节（点、Tab、↑ ↓，同 v0） |
 | 从侧栏进入 Customize | 你点了侧栏 `Customize` | 落在第一节（有会话时 `Built-in tools`，没有时 `Skills`，同 v0），不记上次离开时在哪一节；操作记录 `Open Customize` | — |
 | 从记忆页进入 Customize | 你点了记忆页 `AGENT` 的 `Edit in Customize` | 落在 `Instructions`；操作记录 `Open Customize → Instructions` | — |
 | 已经在 Customize 时点侧栏 `Customize` | — | 什么都不变：不问、不重新读、留在当前分节（同记忆页的 `Memory`） | — |

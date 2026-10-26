@@ -18,7 +18,8 @@ import { join } from 'node:path';
 import { FLOW_TEXT } from '../fake-endpoint/scenarios/flow.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
 import {
-  allowAll, appLogLines, boardViewOf, brief, captureOrder, closeTbApp, contentText, customOf, instanceFiles,
+  allowAll, appLogLines, boardViewOf, brief, captureOrder, closeTbApp, contentText, customOf, expectedHandoff,
+  instanceFiles,
   instanceSuffix, kernelEvents, lineBrief, messagesOf, missingSteps, openSessionIn, orderOf, paneSel, paneState,
   phasesOf, poll, progressOf, readBoard, readJsonl, receiptsOf, reopenSession, restartTbApp, scenarioLines,
   scenarioRequests, seedTeamUserData, sendMessage, setProgressOpen, shot, showTab, sleep, SPLIT_ROLES, startTbApp,
@@ -58,13 +59,14 @@ const IDENTITY_TEXT = [
     + 'the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> '
     + 'what is true about the user and this project. Follow them unless the user says otherwise.',
 ].join('\n');
-/** 附录 A.1.1（2026-10-26）：请求的工具里有 task_create、agent_message 或 subagent 时接在 A.1 第三行末尾（记忆规格 §4.1） */
-const HANDOFF_TEXT = 'Tasks you create and questions you send to other agents are worked on by agents that don\'t see '
-  + '<facts>: write the facts they need into the task description or the question.';
-const HANDOFF_TOOLS = ['task_create', 'agent_message', 'subagent'];
-/** @brief 这个请求的身份段开头：A.1，有交出去的工具时加一个空格与 A.1.1，然后空一行是 <tools>。 */
-const identityHead = (item) => `${IDENTITY_TEXT}${item.tools.some((name) => HANDOFF_TOOLS.includes(name))
-  ? ` ${HANDOFF_TEXT}` : ''}\n\n<tools>\n`;
+/**
+ * @brief 这个请求的身份段开头：A.1，有交出去的工具时加一个空格与按这些工具拼的那一句（记忆规格附录 A.1.1，
+ *        tb-helpers expectedHandoff），然后空一行是 <tools>。
+ */
+const identityHead = (item) => {
+  const handoff = expectedHandoff(item.tools);
+  return `${IDENTITY_TEXT}${handoff === null ? '' : ` ${handoff}`}\n\n<tools>\n`;
+};
 /** TaskBoard 的工具名（§6.3） */
 const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit', 'request_update',
   'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close'];

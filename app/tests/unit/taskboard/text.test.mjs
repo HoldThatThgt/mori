@@ -11,6 +11,8 @@ import { loadKernelModule } from '../load.mjs';
 import * as scripts from '../../fake-endpoint/scripts.mjs';
 
 const text = await loadKernelModule('src/kernel/boardText.ts');
+/** 普通模式的 subagent 段在它自己的模块里（docs/specs/subagent.md §6.1），合成端点同样认它（§14.1） */
+const subagent = await loadKernelModule('src/kernel/subagent.ts');
 const { workCard, boardReadText, deliveryText, segments, userSessionSection, createCatchUp, withCatchUp } = text;
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
@@ -84,12 +86,16 @@ const cardLines = (card) => card.text.split('\n').slice(1, -1);
 
 test('TB-44 the first sentence of every segment equals the synthetic endpoint\'s SEGMENT_SENTENCES', () => {
   const first = (segment) => /^.*?\.(?=\s|$)/.exec(segment)?.[0];
-  assert.deepEqual(Object.keys(text.SEGMENTS).sort(), Object.keys(scripts.SEGMENT_SENTENCES).sort());
+  const endpoint = Object.keys(scripts.SEGMENT_SENTENCES).filter((kind) => kind !== 'subagent');
+  assert.deepEqual(Object.keys(text.SEGMENTS).sort(), endpoint.sort());
   for (const kind of text.SEGMENT_KINDS) {
     assert.equal(first(text.SEGMENTS[kind]), scripts.SEGMENT_SENTENCES[kind], kind);
   }
+  assert.equal(first(subagent.subagentSegment(true)), scripts.SEGMENT_SENTENCES.subagent, 'subagent');
   assert.equal(first(text.SHARED_SEGMENT), scripts.SHARED_SENTENCE);
-  assert.deepEqual([...text.SEGMENT_KINDS], scripts.KIND_ORDER);
+  assert.deepEqual([...text.SEGMENT_KINDS], scripts.KIND_ORDER.filter((kind) => kind !== 'subagent'));
+  assert.equal(scripts.KIND_ORDER.indexOf('subagent'), scripts.KIND_ORDER.indexOf('task') + 1,
+    'subagent is recognized right after the task segment (subagent spec §14.1)');
   assert.equal(text.WORK_CARD_OPEN, scripts.WORK_CARD_OPEN);
   assert.equal(text.WORK_CARD_CLOSE, scripts.WORK_CARD_CLOSE);
   assert.equal(text.RESTART_PREFIX, scripts.RESTART_PREFIX);
