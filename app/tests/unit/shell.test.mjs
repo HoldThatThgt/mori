@@ -1,9 +1,14 @@
 // kernel/shell.ts 的单元测试（负责人走查 M28 "bash not usable in mori"，docs/app-v0.md 第 6 节"Shell"）：
 // pi 找不到 bash 时照 Claude Code 的做法从 git.exe 的位置和 Git for Windows 的注册表找 Git Bash；找到的路径与
-// "没有 bash 时用 powershell"只放进内存里的 pi 设置。外部查询（where、reg、文件、pi 的查找）与 pi 的设置都是替身（synthetic）。
+// "没有 bash 时用 powershell"只放进内存里的 pi 设置。外部查询（where、reg、文件、pi 的查找）都是替身（synthetic）；
+// pi 的设置除最后一条用 pi 真实的 SettingsManager（临时目录）外也是替身。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { SettingsManager } from '@earendil-works/pi-coding-agent';
 import { loadKernelModule } from './load.mjs';
 
 const { resolveShell, gitRoot, parseInstallPath, applyShell, describeShell, NO_BASH_TOOLS } =
@@ -127,3 +132,28 @@ test('M28 shell: the log line says what was found and where it came from, in Eng
   assert.equal(describeShell({ kind: 'none' }),
     'shell: no bash found (pi lookup, git.exe on PATH, Git for Windows registry); new sessions use powershell');
 });
+
+// 用 pi 真实的 SettingsManager（临时目录里的 settings.json）核对：Mori 之后写设置（这里是按模型的思考强度）时
+// shellPath 不会被写进文件；pi 的 save 与 reload 都按文件重新合并、丢掉内存里的覆盖（#9361 的复查）。
+test('M28 shell: with pi\'s real settings the next save keeps shellPath out of settings.json; save and reload drop it',
+  async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mori-shell-settings-'));
+    const bash = { kind: 'git', shellPath: 'D:\\Git\\bin\\bash.exe', from: 'git.exe' };
+    try {
+      writeFileSync(join(dir, 'settings.json'), JSON.stringify({ defaultThinkingLevel: 'low' }));
+      const settings = SettingsManager.create(dir, dir, { projectTrusted: false });
+      applyShell(settings, bash);
+      assert.equal(settings.getShellPath(), bash.shellPath, 'the override is what pi reads');
+      settings.setModelThinkingLevel('synthetic-provider', 'synthetic-model', 'high');
+      await settings.flush();
+      const file = JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8'));
+      assert.deepEqual(file, { defaultThinkingLevel: 'low',
+        modelThinkingLevels: { 'synthetic-provider/synthetic-model': 'high' } });
+      assert.equal(settings.getShellPath(), undefined, 'pi save re-merges from the files (#9361)');
+      applyShell(settings, bash);
+      await settings.reload();
+      assert.equal(settings.getShellPath(), undefined, 'pi reload drops in-memory overrides (#9361)');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
