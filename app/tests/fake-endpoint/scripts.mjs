@@ -10,7 +10,8 @@
 // 认会话：键为（角色，种类，task）。
 //   - 角色：system 里第一个 "MORI-ROLE-<名字>"（测试写进 .mori/agents/<名字>.md 的正文），没有时为 BASE_ROLE（基座）。
 //   - 种类：system 里按 KIND_ORDER 的优先级找附录 A 各段固定的第一句（SEGMENT_SENTENCES；不要求在行首，<…> 只匹配
-//     固定的部分）：close（结案段）、task（task 实例段）、ask（临时提问段）、subscription（订阅段）、
+//     固定的部分）：close（结案段）、task（task 实例段）、subagent（普通模式的 subagent 段，docs/specs/subagent.md
+//     §6.1、§14.1）、ask（临时提问段）、subscription（订阅段）、
 //     merged-create（合并会话的立项段）、create（分开时的立项段）、team-dialog（协作模式的对话段）、
 //     off-dialog（关闭模式的对话段）；都没有时为 DEFAULT_KIND（关闭模式的对话，与 v0 相同）。
 //   - task：工作卡里 "You are <role> on T<n>" 一行的 T<n>；没有时为 null。
@@ -19,8 +20,9 @@
 //   - 投递 = 剩下的 user 消息（工具结果是 tool 角色，不算）；以 RESTART_PREFIX 开头的是 restart 投递，另外计数。
 //   - 投递序号 k：最后一次投递是 restart 时为 "restart-<这是第几次 restart>"，否则为不是 restart 的投递数（从 1 起）。
 //   - 第几步 j：最后一次投递之后的 assistant 消息数（从 0 起）。
-// 脚本：SCENARIOS[名字] 是会话条目的列表 { role, kind, task?, deliveries: { <k>: [步骤…] } }。按角色与种类取第一个
-//   匹配的条目（条目写了 task 时 task 也要相同）；deliveries[k] 里第 j 个回复步骤回答这次请求。
+// 脚本：SCENARIOS[名字] 是会话条目的列表 { role, kind, task?, match?, deliveries: { <k>: [步骤…] } }。按角色与种类取
+//   第一个匹配的条目（条目写了 task 时 task 也要相同；写了 match 时最后一次投递里要有这段文字，同一次调用开出的几个
+//   subagent 角色与种类相同，按各自提示里的关键词分开，subagent 规格 §14.1）；deliveries[k] 里第 j 个回复步骤回答这次请求。
 // 步骤（用下面的构造函数写）：
 //   - say(text)：只回文字（没有工具调用，这次运行就此结束）。
 //   - think(text)：一段思考（reasoning_content，先于文字与调用流出）；与 say、call 用 together 合成一个回复。
@@ -50,7 +52,8 @@
 // 日志：server.mjs 给每个对话请求的 JSON 日志行另加 logFields 的字段：agent（角色）、kind、task、scenario（不是脚本模式时
 //   为 null）、k、j、tools（请求里的工具名）、toolChoice（指定的函数名或 tool_choice 字符串，没有时为 null）、
 //   format（response_format.type，没有时为 null）、calls（回复里调用的工具名）。
-// App 测试要用的场景写在 scenarios/<套件>.mjs（导出 SCENARIOS，步骤用 steps.mjs 的构造函数），这里并入；
+// App 测试要用的场景写在 scenarios/<套件>.mjs（导出 SCENARIOS，步骤用 steps.mjs 的构造函数），这里并入（subagent 规格的
+// 场景在 scenarios/sa.mjs，名字以 "sa-" 开头）；
 // 不是脚本模式的增强会话另有增强脚本（enhance.mjs，docs/specs/memory.md §14.1）；
 // 下面 tb-selfcheck-* 三个由 selfcheck.mjs 使用。
 
@@ -73,6 +76,7 @@ export const SHARED_SENTENCE = "You are <role>, one of several agents that work 
 export const SEGMENT_SENTENCES = {
   close: 'You close request <n>.',
   task: 'You work on one task of the TaskBoard.',
+  subagent: 'You are a subagent: the main agent gave you one task and waits for your final reply.',
   ask: 'Another agent asked you one question.',
   subscription: 'You were woken by a moment you subscribed to.',
   'merged-create': 'You talk to the user and you decide what happens with every user message in task mode.',
@@ -82,8 +86,8 @@ export const SEGMENT_SENTENCES = {
   'off-dialog': 'You can ask another role one question with agent_message; it answers once and cannot change files.',
 };
 /** 认种类的优先级（§17.1） */
-export const KIND_ORDER = ['close', 'task', 'ask', 'subscription', 'merged-create', 'create', 'team-dialog',
-  'off-dialog'];
+export const KIND_ORDER = ['close', 'task', 'subagent', 'ask', 'subscription', 'merged-create', 'create',
+  'team-dialog', 'off-dialog'];
 /** 都没有时的种类：关闭模式的对话 */
 export const DEFAULT_KIND = 'dialog';
 /** 没有 MORI-ROLE 标记时的角色：基座 */
@@ -398,7 +402,8 @@ function handoffOutput(item, body, flags, info) {
 /** @brief 这个会话、这次投递的步骤列表；没有时为 null。 */
 function stepsOf(info) {
   const entries = SCENARIOS[info.scenario] ?? [];
-  const entry = entries.find((e) => e.role === info.role && e.kind === info.kind && (!e.task || e.task === info.task));
+  const entry = entries.find((e) => e.role === info.role && e.kind === info.kind && (!e.task || e.task === info.task)
+    && (!e.match || (info.last ?? '').includes(e.match)));
   return entry?.deliveries[info.k] ?? null;
 }
 

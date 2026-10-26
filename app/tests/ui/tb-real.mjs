@@ -218,6 +218,19 @@ async function askChecks(ctx, take, notes) {
       + 'sidebar nor in session.list', asks.length > 0 && hidden, `${brief({ asks: asks.map((i) => i.file) }, 600)}`);
   }
   askAnswer(ctx, { asks, calls, requests, note });
+  const roleParams = subagentRoleParams(ctx, who);
+  record('TB-04 real ask: off mode with other roles the dialog\'s requests also carry subagent, whose role parameter '
+    + 'is a plain string without an enum (subagent spec §3.1), and the model still asks the role with agent_message',
+  roleParams.length > 0 && roleParams.every((param) => param?.type === 'string' && param.enum === undefined)
+    && calls.length > 0, `${brief({ roleParams: roleParams.slice(0, 1) }, 600)} — ${note}`);
+}
+
+/** @brief 这个驱动开始以后发出的请求里 subagent 工具的 role 参数（每个带 subagent 的请求一个；没写 role 时为 null）。 */
+function subagentRoleParams(ctx, who) {
+  return ctx.proxy.captures.filter((item) => item.t >= who.since && item.method === 'POST')
+    .flatMap((item) => (item.body?.tools ?? []).filter((tool) => (tool.function?.name ?? tool.name) === 'subagent'))
+    .map((tool) => (tool.function?.parameters ?? tool.input_schema ?? tool.parameters)
+      ?.properties?.tasks?.items?.properties?.role ?? null);
 }
 
 /** @brief TB-04：回答成为工具结果、回答完就结束（一次运行）、请求发给被问角色的模型（models ∩ 对话的范围）。 */

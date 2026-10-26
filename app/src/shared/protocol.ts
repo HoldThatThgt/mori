@@ -611,8 +611,11 @@ export interface LiveSnapshot {
   preparing: boolean;
   /** 正在生成、还没写进会话文件的助手回复（pi 的 state.streamingMessage）；没有时为 null */
   streaming: unknown;
-  /** 正在执行的工具调用（pi 的 state.pendingToolCalls）和开始执行的时刻（ms） */
-  runningTools: Array<{ toolCallId: string; startedAt: number }>;
+  /**
+   * 正在执行的工具调用（pi 的 state.pendingToolCalls）、开始执行的时刻（ms）与最后一次 tool_execution_update 的
+   * partialResult（没有时为 null；subagent 的卡片重新载入时用，docs/specs/subagent.md §9.2）
+   */
+  runningTools: Array<{ toolCallId: string; startedAt: number; partial: unknown }>;
   /** 挂起的批准请求 */
   approvals: ApprovalRequestInfo[];
   /** 挂起的扩展询问 */

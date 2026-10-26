@@ -250,9 +250,9 @@ kind: strategy
 proposal §4：“我是谁、工具怎么用、批准怎么走”，约 500 token，由 Mori 随版本给出。由三部分顺序拼成，中间空一行：
 
 1. `IDENTITY_TEXT`（附录 A.1，英文，固定）：Mori 的身份句、批准怎么走、四个分节的含义；这次运行启用的工具（§4.2 的 `selectedTools`）里有
-   `task_create`、`agent_message` 或 `subagent` 时，第三行末尾再加一个空格和附录 A.1.1 的 `HANDOFF_TEXT`（交出去的活要把事实写进去），没有时不加
-   （2026-10-26，负责人走查 M17：这句话原来每个会话都有，在没有这些工具的会话里让模型去找不存在的工具。`subagent` 是走查里计划的普通模式工具，还没有实现，
-   名字先列进条件）；
+   `task_create`、`agent_message` 或 `subagent` 时，第三行末尾再加一个空格和附录 A.1.1 那一句（交出去的活要把事实写进去，按有的工具拼），没有时不加
+   （2026-10-26，负责人走查 M17：这句话原来每个会话都有，在没有这些工具的会话里让模型去找不存在的工具；普通模式的 `subagent`，见
+   [subagent 规格](subagent.md) §6.4）；
 2. `<tools>…</tools>`：与 pi `system-prompt.js:84-86` 相同的工具清单：这次运行声明的工具（`selectedTools` 去掉 `hiddenTools`）中有 `toolSnippets` 的，
    每行 `- <name>: <snippet>`，没有时 `(none)`；最后一行 `In addition to the tools above, you may have access to other custom tools depending on the project.`；
 3. `<rules>…</rules>`：与 pi `buildRules`（`system-prompt.js:31-66`）相同的规则：先 shell 的文件操作规则（`bash` 或 `powershell` 在声明的工具里、`grep`、`find`、`ls` 都不在时，
@@ -282,7 +282,8 @@ pi 的文档指引（`docs` 段）不出现。pi 的这些函数没有导出，`
 ### 4.4 量
 
 身份段在默认工具（`read`、`bash`、`edit`、`write`）下 ≤ 500 token（§6.3 的估算），单元测试在开发时量（MEM-01）。启用的扩展工具带 `promptSnippet`、`promptGuidelines` 时会多出来，
-那部分不由 Mori 控制，也不截断。默认工具下没有附录 A.1.1 那一句；有它的会话（协作模式、关闭模式下有别的角色）启用的本来就不是默认工具。
+那部分不由 Mori 控制，也不截断。普通模式的会话总有 `subagent`（[subagent 规格](subagent.md) §2）：默认工具下的普通模式另有它在 `<tools>` 里的一行和
+附录 A.1.1 那一句（`Prompts you give subagents …`），正好 500 token（subagent 规格 §6.4；它没有 `promptGuidelines`）。
 
 ## 5. 每个会话拿到什么
 
@@ -295,7 +296,7 @@ pi 的文档指引（`docs` 段）不出现。pi 的这些函数没有导出，`
 | 对话兼立项 | 用户会话，模式不为 `off`，合并会话 | ✓ | ✓ | | ✓ |
 | 立项（`create`） | 实例会话 `kind === 'create'` | ✓ | ✓ | | ✓ |
 | 结案（`close`） | 实例会话 `kind === 'close'` | | | ✓ | |
-| subagent（`sub`） | 实例会话 `kind` 为 `task`、`ask`（含关闭模式的临时提问）、`subscription` | | ✓ | ✓ | |
+| subagent（`sub`） | 实例会话 `kind` 为 `task`、`ask`（含关闭模式的临时提问与普通模式 `subagent` 工具开的 subagent）、`subscription` | | ✓ | ✓ | |
 
 - 纯函数 `memoryAssemble.ts`：`kindsFor(identity) → MemoryKind[]`，`identity` 为 `{ seats: Set<'main'|'dialog'|'create'|'close'|'sub'> }`，结果是各身份那一行的并集（proposal §5.1“兼任按会话取并集”）。
 - 角色文件有问题的用户会话（没有 Team，`agents_invalid`）按主 Agent 处理（它不能发送，这一行只决定读到什么）。
@@ -1153,10 +1154,19 @@ Tool calls other than reading and searching may wait for the user's approval. A 
 The sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise.
 ```
 
-### A.1.1 交出去的活（`HANDOFF_TEXT`，2026-10-26）
+### A.1.1 交出去的活（`handoffText`，2026-10-26）
 
 这次运行启用的工具里有 `task_create`、`agent_message` 或 `subagent` 时，接在 A.1 第三行末尾，中间一个空格（§4.1）。原来是 A.1 第三行的最后一句，写作
-“questions you send with agent_message”；拿出来后改成不点工具名，这样有 `subagent`（还没有实现）时同样成立。
+“questions you send with agent_message”；拿出来后改成不点工具名。按这次运行有的工具拼（[subagent 规格](subagent.md) §6.4）：各取下表的一行、按表的顺序，
+主语两项用 ` and `、三项 `A, B and C`，首字母大写；写进哪里两项用 ` or `、三项 `X, Y or Z`。
+
+| 工具 | 谁接手（主语） | 写进哪里 |
+| --- | --- | --- |
+| `task_create` | `tasks you create` | `the task description` |
+| `agent_message` | `questions you send to other agents` | `the question` |
+| `subagent` | `prompts you give subagents` | `the prompt` |
+
+`task_create` 与 `agent_message`（Task mode 立项的会话，`HANDOFF_TEXT`）时是：
 
 ```text
 Tasks you create and questions you send to other agents are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.

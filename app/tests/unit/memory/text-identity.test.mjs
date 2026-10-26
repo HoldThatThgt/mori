@@ -60,10 +60,17 @@ test('MEM-01 the handoff sentence (appendix A.1.1) ends the third line only when
   + 'subagent is among this run\'s tools', () => {
   assert.equal(K.text.HANDOFF_TEXT, A11);
   assert.ok(!A1.includes(A11) && !A1.includes('agent_message'), 'A.1 itself no longer has the sentence');
-  for (const name of ['task_create', 'agent_message', 'subagent']) {
+  const rest = "are worked on by agents that don't see <facts>: write the facts they need into";
+  // 按有的工具拼（附录 A.1.1 的表）：一个工具时只有它那一部分；task_create 与 agent_message 时是 A.1.1 的原文
+  const one = { task_create: `Tasks you create ${rest} the task description.`,
+    agent_message: `Questions you send to other agents ${rest} the question.`,
+    subagent: `Prompts you give subagents ${rest} the prompt.` };
+  for (const [name, sentence] of Object.entries(one)) {
     const identity = K.text.renderIdentity(inputOf([...DEFAULT_TOOLS, name]));
-    assert.ok(identity.startsWith(`${A1} ${A11}\n\n<tools>\n`), `${name}: A.1, a space, A.1.1, then <tools>`);
+    assert.ok(identity.startsWith(`${A1} ${sentence}\n\n<tools>\n`), `${name}: A.1, a space, its part, then <tools>`);
   }
+  assert.ok(K.text.renderIdentity(inputOf(['read', 'task_create', 'agent_message'])).startsWith(`${A1} ${A11}\n`),
+    'task_create and agent_message: the A.1.1 sentence word for word');
   for (const tools of [DEFAULT_TOOLS, ['read', 'board_read', 'read_session'], ['read', 'request_close']]) {
     const identity = K.text.renderIdentity(inputOf(tools));
     assert.ok(identity.startsWith(`${A1}\n\n<tools>\n`) && !identity.includes(A11), `${tools.join('+')}: no sentence`);

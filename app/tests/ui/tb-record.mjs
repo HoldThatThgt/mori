@@ -17,6 +17,8 @@
 //     等那一轮结束（卡不清掉）再允许；之后的卡一律允许。
 //   stop-task（TB-89）：Allow all 下 /task 让 executor 跑一个 30 秒的命令；它运行时发 session.stopTask（Stop this task），
 //     再发一条消息让立项把它交回，等需求到终态。
+//   sa-subagent（docs/specs/subagent.md SA-11、SA-14、SA-17）：普通模式、没有角色文件，主 Agent 用 subagent 开两个
+//     （只读的读 README.md，通用的跑 node --version，后台批准卡允许）；重启后打开同一个会话。fixture 在 tests/fixtures/sa。
 // 录完先核对场景要的东西真的发生了（check）；模型没照做时（例如没调 agent_message、需求没到终态）最多重录 2 次，
 // 仍不符合时不写进 fixtures，写到 test-results/tb-record/<名字>.rejected.json。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs real）：
@@ -406,8 +408,81 @@ const stopScenario = {
   },
 };
 
+/** 普通模式的 subagent 工具的录制（docs/specs/subagent.md §14.1）：fixture 放在 tests/fixtures/sa */
+const SA_FIXTURES = join(appRoot, 'tests/fixtures/sa');
+/** sa-subagent 的驱动消息（英文：给模型的） */
+const SA_PROMPT = 'Use the subagent tool to run two subagents at the same time: a read-only one (read_only: true) that '
+  + 'reads README.md and reports its first line, and a general one (read_only: false) that runs the command '
+  + '`node --version` in this project and reports the version it prints. Do not do either yourself. Then tell me both '
+  + 'results in one sentence.';
+
+/** 一张后台批准卡挂着多久再允许（像人看一眼再点；subagent 的进展最多每 250 毫秒发一次，这样录下“等你批准”的那一行） */
+const CARD_READ_MS = 1500;
+
+/** @brief 一边等 work() 做完，一边允许这期间到来的每张后台批准卡（每张挂满 CARD_READ_MS 再允许）。 */
+async function answerWhile(d, sessionId, work) {
+  const answered = new Set();
+  const seen = new Map();
+  const watcher = (async () => {
+    while (!answered.done) {
+      for (const item of await pendingApprovals(d, sessionId, answered)) {
+        if (!seen.has(item.requestId)) seen.set(item.requestId, Date.now());
+        if (Date.now() - seen.get(item.requestId) >= CARD_READ_MS) await allow(d, sessionId, item.requestId, answered);
+      }
+      await sleep(250);
+    }
+  })();
+  try {
+    await work();
+  } finally {
+    answered.done = true;
+    await watcher.catch(() => {});
+  }
+}
+
+/**
+ * @brief sa-subagent（SA-11、SA-14、SA-17）：普通模式、没有角色文件，主 Agent 用 subagent 开两个（只读的读 README.md，
+ *        通用的跑 node --version，出后台批准卡、允许）；之后重启，打开同一个会话（{ restart: true } 之后的一段）。
+ */
+const subagentScenario = {
+  name: 'sa-subagent', covers: 'SA-11, SA-14, SA-17', dir: SA_FIXTURES, noRoles: true,
+  description: 'Normal mode without role files: the main agent is told to run two subagents with the subagent tool — '
+    + 'a read-only one that reads README.md and a general one that runs node --version (its command waits for the '
+    + 'background approval card, which is allowed). Then Mori restarts and the same session is opened again.',
+  async run(d, ctx) {
+    await d.start();
+    const s = await d.create(ctx.cwd);
+    await answerWhile(d, s.sessionId, () => d.say(s, SA_PROMPT));
+    await ctx.restart('Quit and start again (no configuration change)');
+    await d.start();
+    await d.cmd({ type: 'session.open', sessionFile: s.sessionFile });
+  },
+  check(steps) {
+    const before = partOf(steps, 'before');
+    const after = partOf(steps, 'after');
+    const id = values(before, 'session.create')[0]?.sessionId;
+    const end = eventsOf(before, id, 'tool_execution_end').find((e) => e.toolName === 'subagent');
+    const rows = end?.result?.details?.agents ?? [];
+    const updates = eventsOf(before, id, 'tool_execution_update').filter((e) => e.toolName === 'subagent');
+    const waiting = updates.some((e) => e.partialResult?.details?.agents?.some((row) => row.phase === 'approval'));
+    const asked = eventsOf(before, id, 'mori.team_approval_request');
+    const opened = values(after, 'session.open')[0];
+    const reopened = (opened?.entries ?? []).some((e) => e.type === 'message' && e.message?.role === 'toolResult'
+      && e.message.toolName === 'subagent' && Array.isArray(e.message.details?.agents));
+    return [...common(before), ...need(failures(after).length === 0, `failed after: ${failures(after)}`),
+      ...need(rows.length === 2 && rows.some((row) => row.readOnly) && rows.some((row) => !row.readOnly),
+        `subagent rows ${JSON.stringify(rows.map((row) => [row.readOnly, row.phase]))}`),
+      ...need(rows.every((row) => row.phase === 'done'), 'not every subagent is done'),
+      ...need(updates.length > 1, `${updates.length} progress updates`),
+      ...need(asked.some((a) => a.subagent !== null && a.task === null), 'no attributed approval card'),
+      ...need(waiting, 'no progress update with a row waiting for approval'),
+      ...need(after.length > 0 && reopened, 'the reopened session has no subagent result with details')];
+  },
+};
+
 /** 录制的场景 */
-const scenarios = [askScenario, teamScenario, receiptsScenario, approvalScenario, stopScenario];
+const scenarios = [askScenario, teamScenario, receiptsScenario, approvalScenario, stopScenario,
+  subagentScenario];
 
 // ---------- 执行 ----------
 
@@ -435,13 +510,14 @@ async function restartMori(state, note) {
  */
 async function recordOnce(scenario, found) {
   const cwd = sumProject(`mori-tb-record-${scenario.name}-`);
-  writeRealRoles(cwd, found);
+  if (!scenario.noRoles) writeRealRoles(cwd, found);
   const { userData } = prepareRealData(source, found);
   const state = { userData, app: null, page: null, kept: [] };
   const ctx = { ...found, cwd, state, notes: [`Setup (synthetic test setup, spec §17.1 / model spec §14.1): copied `
     + `the encrypted data files; group ${TB_GROUP} = [${found.first.id}, ${found.second.id}] is the default range; `
-    + 'role files executor and reviewer (models: '
-    + `[${found.second.id}]) in .mori/agents; the base agent holds dialog, create and close`] };
+    + `${scenario.noRoles ? 'no role files (the base agent only)'
+      : `role files executor and reviewer (models: [${found.second.id}]) in .mori/agents; the base agent holds `
+      + 'dialog, create and close'}`] };
   ctx.restart = (note) => restartMori(state, note);
   try {
     await startMori(state);
@@ -482,7 +558,7 @@ function writeFixture(scenario, take, tries) {
     + 'hand.', name: scenario.name, description: scenario.description, covers: scenario.covers,
   endpoint: ctx.first.baseUrl, model: refOf(ctx.first), models: { first: refOf(ctx.first), second: refOf(ctx.second),
     group: TB_GROUP }, notes, recordedAt: new Date().toISOString(), steps };
-  const dir = problems.length ? rejectedDir : outDir;
+  const dir = problems.length ? rejectedDir : arg('out') ? outDir : scenario.dir ?? outDir;
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${scenario.name}${problems.length ? '.rejected' : ''}.json`),
     `${JSON.stringify(fixture, null, 1)}\n`);

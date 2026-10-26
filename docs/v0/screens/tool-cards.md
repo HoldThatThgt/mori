@@ -31,6 +31,7 @@
 | `task_edit`（同上） | `task` | `Edit T1` |
 | `reply_via_dialog`（同上） | — | `Answer directly` |
 | `request_close`（同上） | `request` | `Close request 1` |
+| `subagent`（普通模式：见 docs/specs/subagent.md §7.1，卡片另见 [subagent-card.md](../../v1/screens/subagent-card.md)） | `tasks` 的项数 | 进行中 `Running agent` / `Running 3 agents`，开过之后 `Ran …`，没开就结束 `Run …`；没有 v0 的 Input、Output 两段 |
 | 其他 | — | 原名 |
 | 参数还没写完 | `toolcall_delta` 期间参数解析不出 | 按工具名给动词，例如"Run …"；未知工具显示原名 |
 

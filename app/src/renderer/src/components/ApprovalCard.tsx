@@ -225,9 +225,13 @@ interface CardRequest {
   team: TeamApprovalRequest | null;
 }
 
-/** @brief 后台卡的归属行（§11.3）：<role> · T1 · <task title>，没有 task 时 <role>；基座显示 Mori。 */
+/**
+ * @brief 后台卡的归属行（§11.3）：<role> · T1 · <task title>，没有 task 时 <role>；基座显示 Mori。普通模式的 subagent
+ *        为 <Role> · <description>（docs/specs/subagent.md §7.4，例如 Mori · Fix the retry loop）。
+ */
 function attributionText(team: TeamApprovalRequest): string {
   const role = roleLabel(team.role);
+  if (team.subagent !== null) return `${role} · ${team.subagent}`;
   return team.task === null ? role : `${role} · ${team.task} · ${team.taskTitle ?? ''}`;
 }
 
@@ -257,7 +261,8 @@ function Card({ tabKey, cwd, request, more }: {
   return (
     <div ref={ref} className="approval-card" role="group" aria-label={`Waiting for your approval: ${titleText}`}
       data-testid="approval-card" data-tool={approval.toolName} data-request={approval.requestId}
-      data-agent={team?.role} data-task={team?.task ?? undefined} onKeyDown={onKeyDown}>
+      data-agent={team?.role} data-task={team?.task ?? undefined} data-subagent={team?.subagent ?? undefined}
+      onKeyDown={onKeyDown}>
       {team && <div className="approval-attribution" data-testid="approval-attribution">{attributionText(team)}</div>}
       <div className="approval-head">
         <span className="approval-title" data-testid="approval-title">

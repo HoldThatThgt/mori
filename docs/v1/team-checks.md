@@ -347,3 +347,150 @@ TB-88 的在 `tests/ui/tb-app-tasks-owner.mjs`（整套就是一步）；检查�
 没有验证的（开发阶段只跑了检查、构建与单元测试）：界面套件里新加和改过的用例、重录的回放 fixture、真实模型的 `lookback` 与 `team` 两个驱动
 都要等集成阶段跑（命令见 WP-10 的记录）；模型读到这些新的边界后会不会照做（自己读 task 的回复、完整交给你、不让你调工具、task 不用
 `agent_message` 交付）只能在真实模型上看，测试只断言程序保证的事，模型怎么做写进 note。
+
+## 普通模式的 subagent 工具（2026-10-26，负责人走查 M17）
+
+依据：[subagent 规格](../specs/subagent.md)（TaskBoard 规格的增补），状态表 [subagent-card.md](screens/subagent-card.md)，临时默认值
+[defaults.md](defaults.md) 的“普通模式的 subagent 工具”一节。分支 `v1-subagent`（worktree `D:\code\mori\.claude\worktrees\wizardly-albattani-b7cb94`，
+`app\node_modules` 是指向 `D:\code\mori\app\node_modules` 的联接），合过本地 `app-v0` 的 `f613281`；本地提交，没有推送，没有合进 `app-v0`。
+
+### 负责人的回答（2026-10-26）
+
+1. 照 Claude Code：每个 subagent 由主 Agent 选只读（像 Explore）或通用（像 general-purpose，照权限模式批准，卡头写明是哪个 subagent）；角色带自己的工具。
+2. Task mode 关闭时总有（没有角色文件也有）。
+3. 一次调用、一次回复都不设条数上限；全部同时开始，用满 key 并发设置的全部槽位，多出来的排队、不超时（新的调度类别 `subagent`）。
+4. 保留普通模式下的 `agent_message`。
+
+### 状态（随各包合并更新；最后一次 2026-10-26，合过本地 `app-v0` 的 `25d06fb`，即 WP-10、WP-14 与 customize-agents）
+
+第二轮审查之后（2026-10-26，8 条；合过本地 `app-v0` 的 `25d06fb`，即 customize-agents）：TaskBoard 的后台卡不改阶段行有了用例
+（`tb-replay --only tb-approval` 的 `TB-34 replay tb-approval: a TaskBoard background card leaves the stage line alone …`；对 e7c332b 的旧 fixture
+跑这一条失败、对重录的通过；单元 TB-34 另查 task 实例的卡 `subagent` 为 `null`）；`role` 不写枚举是给模型的变化，真实模型那一层用
+`tb-real --only ask`（`sa-real` 的项目没有角色文件，发不出带 `role` 的 schema；关闭模式、有别的角色的对话是最窄的一个）：新加的
+`TB-04 real ask: off mode with other roles the dialog's requests also carry subagent, whose role parameter is a plain string without an enum …`
+通过，模型照旧用 `agent_message` 问角色。结果：`npm run check` 通过；`test:unit` 481/481、`test:tb-unit` 350/350、`test:sa-unit` 29/29、
+`test:mem-unit` 239/239、`test:md-unit` 222/222、`test:ag-unit` 42/42、合成端点自检 184/184；`tb-replay --only tb-approval` 8/8；
+真实 `tb-real --only ask` 9/9；`npm run test:quick` 4/4（84 秒）。
+
+审查之后（2026-10-26，walkthrough-fixes 会话转来的 14 条，先写测试再改）：阶段行在普通模式 subagent 的批准卡挂着时写 `Waiting for your approval`
+（`StageLine.tsx`；TaskBoard 的后台卡仍不改阶段行）；`role` 不写枚举（“要你决定的”第 3 条）；秒数文字合进 `components/duration.ts`；
+`tb-approval` 用今天的程序从真实会话重录（批准请求带 `subagent: null`，`tb-replay --only tb-approval` 7/7）；新加或补全的用例：
+准备中（`sa-replay`）、等待执行（`sa-app --only queued`，新的合成脚本 `sa-queued`）、阶段行等你批准（`sa-app --only approval`、`sa-replay`）、
+被拒绝的卡按参数画的行与 Agent prompt、停止后的 `Ran 2 agents`、有别的角色时写错的角色（`sa-app --only roles`）、Task mode 下的合并会话没有
+`subagent`（单元 SA-01 与 `sa-app --only normal`）、MEM-02 readonly 的期望补上 `subagent`（`mem-app-prompt.mjs` 在合 WP-10 时是自动合并，
+没有冲突，这一条是审查时补的）。结果：`npm run check` 通过；`test:unit` 477/477、`test:tb-unit` 350/350、`test:sa-unit` 29/29、
+`test:mem-unit` 239/239、`test:md-unit` 222/222、合成端点自检 184/184；`sa-app --only normal,parallel,queued,approval,stop,roles` 全过、
+`sa-replay` 16/16；用共用端口的：`npm run test:quick` 4/4（82 秒）、`tb-app-roles --only v0same` 11/11（改写后的 TB-03）、
+`mem-app-prompt --only prompt,merged,split,readonly` 与 `--only prompt,snapshot,merged`（`merged` 要先跑 `snapshot`）全过（MEM-01 实测 500 token、
+MEM-02 readonly 过）、真实模型 `tb-real --only team` 10/10：这次运行里 task 实例（`t1.executor`、`t1.reviewer`、`t2.reviewer`）与结案实例的
+会话文件里是只说问题的那一句，合并会话里是 WP-11 那一句。
+
+合 WP-14 时做的：`sa-app`、`sa-replay` 点开或读一张 subagent 卡之前先用 `tests/ui/page.mjs` 的 `showStep` 点开它所在的步骤组（一轮结束后卡片在
+折起的组里）。合并后 `test:unit` 477/477、`test:tb-unit` 350/350、`test:sa-unit` 28/28、`test:mem-unit` 239/239、`test:md-unit` 222/222、
+合成端点自检 184/184、`npm run check` 通过；整套 `sa-app` 43/43、`sa-replay` 14/14（SA-11 折进 `1 step`、展开那一行时卡片是收起的，两层都过）。
+
+合 WP-10 时做的（同一次集成）：只读 subagent 改用 `roles.ts` 的 `readClassTools`（WP-10 起总有 `ls`），删掉本分支自己加的那一份；
+关闭模式的临时提问（`agent_message` 开的）不带共用段（`boardText.ts` 的 `segments`，`team.ts` 传 `lane.team`）；TaskBoard 规格照本规格 §11 改了
+§0、§5.2、§8.1、§8.5、§11.3、§12.1、§12.10、§13.8、§13.12、§17.2 TB-03 与附录 A；`tb-app-ask` 的 TB-04 第一条另查请求里没有共用段。
+tb fixture 里录到的 system prompt：`tb-approval`、`tb-receipts`、`tb-team` 录的都是 Task mode 的合并会话（有 `task_create` 与 `agent_message`，
+那一句与 WP-11 逐字相同），不用重录；`tb-ask` 录的是关闭模式、有别的角色的对话（有 `agent_message`、没有 `task_create`），用今天的文字从真实
+DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Questions you send to other agents and prompts you give subagents …”），
+`tb-replay --only tb-ask` 10/10。合并后 `test:unit` 465/465、`test:tb-unit` 350/350（TB-59 的两条期望补上普通模式的 `subagent`）、
+`test:sa-unit` 28/28、`test:mem-unit` 239/239、`test:md-unit` 222/222、合成端点自检 184/184；`sa-app --only normal,parallel` 21/22、
+`sa-replay` 13/14（没过的都是 SA-11 折进 `<n> steps`，等 WP-14）。
+
+用共用端口的（第二波做完后，walkthrough-fixes 会话排到本分支时跑，合过 WP-10 与 WP-14 之后）：`npm run test:quick` 4/4（89 秒）；
+`tb-app-ask --only offAsk` 10/10（含 TB-04 新加的一项：请求里没有共用段）；`tb-app-roles --only fields` 13/13（TB-09 合并时改的期望）；
+真实模型 `tb-real --only ask` 8/8（DeepSeek 与 GLM；关闭模式的临时提问少了共用段，给模型的文字变了）。
+
+合 WP-10 之前的结果：
+
+| 层 | 结果 |
+| --- | --- |
+| 单元 | `npm run test:sa-unit` 26/28：没过的两条是先写好的 WP-10 部分（只读 subagent 经 Task mode 只读实例的同一个函数拿到 `ls`；关闭模式的临时提问不带共用段）；`test:unit` 485/485（含 spec-ids、MP-38）、`test:tb-unit` 334/334、`test:mem-unit` 239/239、合成端点自检 194/194；`npm run check` 通过 |
+| App（合成端点，`sa-app.mjs`，端口 4970/4971） | 42/43：没过的是 SA-11 折进 `<n> steps`（等 WP-14） |
+| 回放（`sa-replay.mjs`） | 13/14：没过的同上（等 WP-14）；fixture `tests/fixtures/sa/sa-subagent.json` 用新的给模型的文字从真实 DeepSeek 会话重录（批准卡挂 1.5 秒再允许，录下“等你批准”的那一行） |
+| 真实模型（`sa-real.mjs`，代理 4972） | 22/22：DeepSeek 与 GLM 各跑只读的三路分工与通用 subagent 跑命令（带归属的批准卡），没有重跑 |
+| 给模型的文字变了、覆盖它的别的用例（`--only`） | `mem-app-prompt`（prompt、snapshot、merged、split、restart）34/34，MEM-01 实测普通模式身份段 500 token；`tb-app-roles`（v0same、fields）21/21，TB-03 已改写为“v0 加 subagent”；`tb-app-flow`（sysmd）里身份段那一条通过（同一次的 TB-12、TB-37 是要整套样本的汇总检查，只跑 sysmd 时没有样本）；`m6-app-tool-switches`（setup、rows）6/6；`tb-app-misc`（changes、plainChanges）6/6；真实模型 `tb-real --only ask` 8/8、`mem-real --only dialog,page` 17/17 |
+
+### 状态表的行与用例（2026-10-26 负责人定：屏的规格由走查对照这张表核对）
+
+本分支新增或改动的状态表行，每行对应的界面用例（套件与 `--only` 的步骤名、检查名的开头）。SA 编号的验收由 spec-ids 与覆盖检查管。
+
+| 屏 | 行 | 用例 |
+| --- | --- | --- |
+| [subagent-card.md](screens/subagent-card.md) 卡片 | 准备中 | `sa-replay`（sa-subagent）`SA-11 replay sa-subagent: while the arguments stream in the card is open with "Preparing…" …`（`Running agents`，之后按已收到的项数；每项一行、状态空着） |
+| 同上 | 等待执行 | `sa-app --only queued` `SA-11 a subagent call behind a command that waits for approval in the same reply reads "Running 2 agents" · "Queued" …` |
+| 同上 | 阶段行：有 subagent 等你批准时 `Waiting for your approval` | `sa-app --only approval` `SA-12 while a general subagent's approval card is pending the stage line reads "Waiting for your approval" …`；`sa-replay` `SA-11 replay sa-subagent: while the general subagent's approval card is pending the stage line reads …` |
+| 同上 | 执行中（标题、`<d> of <n> done · <s>`、展开、阶段行） | `sa-app --only parallel` `SA-11 while running the card is open …`、`SA-11 the stage line reads …`；`sa-replay` 同名 |
+| 同上 | 结束（`Ran <n> agents · Done · <s>`、收起一次；`Done · 1 failed`） | `sa-app --only parallel` `SA-11 when the call ends the card collapses once …`；`--only roles` `SA-11 a role row reads …` |
+| 同上 | 全部失败（`Failed`） | `sa-app --only roles` `SA-11 when every subagent failed the card reads "Ran agent" · "Failed" …` |
+| 同上 | 被拒绝（`Run <n> agents · Failed · <原因>`；按参数画出各行，状态空着；点开一行只有 Agent prompt） | `sa-app --only parallel` `SA-03 the refused call's card reads "Run agent" …`、`SA-03 the refused call's card has one row per task drawn from its arguments …`；`--only roles` `SA-03 with other roles an unknown role reaches the §3.3 check …` |
+| 同上 | 已停止（`Ran <n> agents` · `Stopped`） | `sa-app --only stop` `SA-13 stopping the reply stops every subagent … the title reads "Ran 2 agents"` |
+| 同上 | 已中断 | `sa-app --only kill` `SA-14 when the background process exits …` |
+| 同上 | 重新打开（已结束；没有结果的按参数画） | `sa-app --only kill` `SA-14 reopening an ended call …`、`SA-14 reopened after a restart …`；`sa-replay` `SA-14 replay sa-subagent: reopened …` |
+| 同上 | 界面重新载入（执行中） | `sa-app --only reload` `SA-14 after Ctrl+R the running card comes back …`、`SA-14 after the reload the card keeps updating …` |
+| 同上 | 一轮结束后折进 `<n> steps`（WP-14） | `sa-app --only parallel` `SA-11 after the turn the subagent card is one step of it …`；`sa-replay` `SA-11 replay sa-subagent: after the turn …` |
+| subagent-card.md 每一行 | 开始了、还没调用工具（`Starting`）；执行中（工具标题） | `sa-app --only parallel` `SA-11 while running …` |
+| 同上 | 在等模型的槽位（`Waiting for <提供商>`、`Switched model …`） | `sa-app --only slots` `SA-06 a subagent waiting for a slot shows "Waiting for SAM" …`；`Switched model` 的文字在单元 `SA-06 a row's note follows the model layer …` |
+| 同上 | 等你批准 | `sa-app --only approval` `SA-12 a general subagent running a command shows …`；`sa-replay` `SA-11 replay sa-subagent: while running …`（含 Waiting for your approval） |
+| 同上 | 正常结束；点开一行（`Agent prompt`、`Response`） | `sa-app --only parallel` `SA-11 each row: …`、`SA-11 opening a row shows …`；`sa-replay` `SA-11 replay sa-subagent: opening a row …` |
+| 同上 | 失败（80 字符截断、悬停全文） | `sa-app --only roles` `SA-11 a role row reads …` |
+| 同上 | 被停止；中断 | `sa-app --only stop` `SA-13 …`；`--only kill` `SA-14 when the background process exits …` |
+| subagent-card.md 右栏；[changes.md](../v0/screens/changes.md) 两行；[team-blocked.md](screens/team-blocked.md) 两行（说明改为 `Changes made by other agents aren’t listed here.`） | 通用 subagent 改过文件；没有 Agent 改过文件 | `sa-app --only edits` `SA-15 a read-only subagent does not set the note …`；task 改过文件的两行 `tb-app-misc --only changes` `TB-57 …`（期望的文字已改） |
+| [team-approvals.md](screens/team-approvals.md) | 后台实例要批准（归属 `<Role> · <description>`、`data-subagent`）；界面重新载入 | `sa-app --only approval` `SA-12 a general subagent running a command shows …`、`SA-12 allowed with Alt+1 …`、`SA-12 choosing "Allow bash for this session" …`；`--only reload` `SA-12 the pending approval card of a subagent is still there after the reload …`；`sa-real` `SA-12 real command on …` |
+| [tools.md](../v0/screens/tools.md) | 不是 pi 内置工具的行（`subagent` 的原因） | `sa-app --only normal` `SA-01 Customize › Tools has a subagent row …`；`m6-app-tool-switches --only setup,rows` `M12 没有开关的行 …`；`tb-app-roles --only v0same` `TB-03 off mode without role files: the Tools page rows …` |
+| [tool-cards.md](../v0/screens/tool-cards.md) | 标题对照表的 `subagent` 一行 | `sa-app --only parallel` 的 `SA-11 while running the card is open …`（Running）、`SA-11 when the call ends the card collapses once …`（Ran）、`SA-03 the refused call's card reads "Run agent" …`（Run） |
+
+### 等别的包合并之后做的
+
+- WP-10：做完了（见上面“状态”），用共用端口的几项也跑过了。
+- WP-14：做完了（见上面“状态”）。
+
+### 要你决定的（2026-10-26 你不在：照“unattended mode, pick recommended option for questions and log them”按推荐做了，等你回来看）
+
+1. **原来的准则放在哪里**（规格 §6.1、§6.4）
+   - 问题：普通模式的会话从此总有 `subagent`；原来那条准则（什么时候用、每个 prompt 要能单独看懂）放进身份段，默认工具下的普通模式
+     身份段会到 549 token，超过记忆规格的 500 上限（MEM-01）。
+   - 选项：① 准则的话并进工具说明的第三行，不写 `promptGuidelines`（500 token）；② 保留准则（549，超上限）；③ 缩短准则（522，仍超上限）。
+   - 选了：①（推荐），登记为临时默认值（[defaults.md](defaults.md) 的“原来的准则……放在哪里”一行）。
+   - 实现：`app/src/kernel/subagent.ts`（`SUBAGENT_DESCRIPTION`；`subagentTool` 不带 `promptGuidelines`）。
+   - 测试：单元 `SA-10 normal mode (default tools with subagent on) keeps the identity section within 500 tokens …`
+     （`tests/unit/subagent/identity.test.mjs`）；App `sa-app --only normal` `SA-17 normal mode = v0 + subagent …`（请求里没有准则、
+     工具说明里有这几句），`mem-app-prompt --only prompt` `MEM-01 with the default tools the identity section actually sent is at most
+     500 tokens …`（实测 500）。
+2. **交出去的活那一句怎么写**（规格 §6.4、记忆规格附录 A.1.1）
+   - 问题：WP-11 的那一句是固定的，只说 task 与问题；普通模式只有 `subagent` 时，它让模型去找不存在的工具，或把事实写进卡上的
+     `description` 而不是 `prompt`。
+   - 选项：① 按这次运行启用的 `task_create`、`agent_message`、`subagent` 拼，Task mode 的文字与 WP-11 逐字相同；② 照旧用固定的句子；
+     ③ 普通模式不加这一句，只靠工具说明里的“Each subagent starts with no context except the prompt you write”。
+   - 选了：①（推荐，walkthrough-fixes 会话转达“现在就写”），登记为临时默认值（[defaults.md](defaults.md) 的“交出去的活那一句”一行）。
+   - 2026-10-26 无人值守时按推荐改为：那一句跟着会话实际有的工具，同时有 `task_create` 与 `agent_message` 的会话（Task mode 的合并会话、
+     分开时的立项）与 WP-11 逐字相同；Task mode 下只有 `agent_message`、没有 `task_create` 的（分开时的对话，task、结案、订阅实例）是只说问题的
+     那一句 `Questions you send to other agents are worked on by agents that don't see <facts>: write the facts they need into the question.`（U31）。
+     另一种做法请你定：Task mode 的每个会话都照 WP-11 那一句逐字不变（只在普通模式按工具拼）。
+   - 实现：`app/src/kernel/memoryText.ts`（`HANDOFF_PARTS`、`handoffText`；`HANDOFF_TEXT` 由它拼出）。
+   - 测试：单元 `SA-10 the sentence lists only the handoff tools of this run, in §6.4 order`、`MEM-01 the handoff sentence (appendix A.1.1)
+     ends the third line only when …`；App `mem-app-prompt --only prompt,snapshot,merged,split,restart`、`tb-app-flow --only sysmd`
+     （期望的句子由 `tests/ui/tb-helpers.mjs` 的 `expectedHandoff` 另行拼出）；真实 `mem-real --only dialog,page`、`tb-real --only ask`、
+     `sa-real`；U31 的范围：真实 `tb-real --only team` 10/10（task 实例 `t1.executor`、`t1.reviewer`、`t2.reviewer` 与结案实例的会话文件里是
+     只说问题的那一句，合并会话里是 WP-11 那一句）。
+
+3. **有别的角色时 `role` 写不写枚举**（规格 §3.1、§3.3；2026-10-26 审查发现）
+   - 问题：写了枚举时，写错的角色在执行前就被 pi 的 schema 校验以 `Validation failed for tool "subagent"` 拒绝，§3.3 的原因（列出可用的
+     角色）与 `Correct form` 到不了模型。
+   - 选项：① 不写枚举，说明里列出角色，写错的由 §3.3 的检查拒绝；② 保留枚举，接受 pi 的校验文字。
+   - 选了：①（推荐，walkthrough-fixes 会话转达），登记为临时默认值（[defaults.md](defaults.md) 的“`role` 参数的写法”一行）。
+   - 实现：`app/src/kernel/subagent.ts`（`subagentSchema`）。
+   - 测试：单元 `SA-02 with other roles role is a plain string (no enum …`；App `sa-app --only roles` `SA-03 with other roles an unknown role
+     reaches the §3.3 check (role has no enum) …`（模型收到的两行逐字、不开实例、`teams/` 下不多写文件、端点没有它的请求）。
+
+### 未验证
+
+- **负责人走查**：没做。
+- **安装包**：只在开发构建上跑过，没有跑 `--exe`。
+- **同时很多 subagent**：并发 4 的 key 上 6 个在合成端点上验证过；更多的同时会话（超过 6 个）没有测量（同 TaskBoard 规格 §14.6）。
+- **通用 subagent 同时改同一个文件**：没有隔离也没有写入锁（规格 §0 不做），互相覆盖的情形没有测试。
+- **右栏不列 subagent 改的文件**：只显示一句说明（规格 §0 不做、§7.6）。
+- **Task mode 下分开时的对话那一句**：改为只说问题的那一句，真实模型没有跑到：`tb-real` 的设置里基座持有对话、立项与结案（合并会话），
+  走不到分开时的对话；合成端点上 `tb-app-flow`、`mem-app-prompt --only split` 的期望由 `expectedHandoff` 另行拼出，跑过。

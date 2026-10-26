@@ -1,5 +1,5 @@
 // 提示词分层与记忆的文字（docs/specs/memory.md §4、§5.2、§7.1、§7.4、附录 A、附录 B）：身份段（IDENTITY_TEXT，有交出去的
-// 工具时加 HANDOFF_TEXT，再加上按 pi 的规则渲染的工具清单与工具准则）、四个分节的文字、memory 工具的说明与 Correct form、
+// 工具时加 handoffText 那一句，再加上按 pi 的规则渲染的工具清单与工具准则）、四个分节的文字、memory 工具的说明与 Correct form、
 // 增强任务的第一条消息。纯函数，时刻由
 // 参数给出（第一条消息里的 hh:mm 是本机时间）。给模型看的文字是英文（§0）。
 // 合成端点（tests/fake-endpoint/enhance.mjs）按 firstLine 的开头 `You are running Mori's daily <KIND> enhancement` 认出
@@ -27,16 +27,35 @@ export const IDENTITY_TEXT = [
 ].join('\n');
 
 /**
- * @brief 交出去的活要把事实写进去（附录 A.1.1，2026-10-26）：这次运行有 HANDOFF_TOOLS 之一时接在 A.1 第三行末尾。
+ * 交出去的工具与那一句里它的两部分（附录 A.1.1，docs/specs/subagent.md §6.4），按这个顺序：谁接手（主语）、写进哪里。
+ * 立项建 task、对话或 task 问别的角色、普通模式的主 Agent 开 subagent
  */
-export const HANDOFF_TEXT = 'Tasks you create and questions you send to other agents are worked on by agents that '
-  + "don't see <facts>: write the facts they need into the task description or the question.";
+const HANDOFF_PARTS: readonly { tool: string; who: string; where: string }[] = [
+  { tool: 'task_create', who: 'tasks you create', where: 'the task description' },
+  { tool: 'agent_message', who: 'questions you send to other agents', where: 'the question' },
+  { tool: 'subagent', who: 'prompts you give subagents', where: 'the prompt' },
+];
+
+/** @brief 列表的英文连法：A、A and B、A, B and C（joiner 为 and 或 or）。 */
+function listText(items: readonly string[], joiner: string): string {
+  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} ${joiner} ${items.at(-1)}`;
+}
 
 /**
- * 有它们之一时身份段带 HANDOFF_TEXT（§4.1）：立项建 task、对话或 task 问别的角色。subagent 是负责人走查 M17 计划的
- * 普通模式工具，还没有实现，名字按走查的要求先列在条件里（规格 §4.1）
+ * @brief 交出去的活要把事实写进去（附录 A.1.1，2026-10-26）：按这次运行启用的工具里有的 HANDOFF_PARTS 拼成一句，
+ *        接在 A.1 第三行末尾；都没有时为 null。task_create 与 agent_message 时就是 HANDOFF_TEXT。
+ * @param selectedTools 这次运行启用的工具
  */
-const HANDOFF_TOOLS: readonly string[] = ['task_create', 'agent_message', 'subagent'];
+export function handoffText(selectedTools: readonly string[]): string | null {
+  const parts = HANDOFF_PARTS.filter((part) => selectedTools.includes(part.tool));
+  if (parts.length === 0) return null;
+  const who = listText(parts.map((part) => part.who), 'and');
+  return `${who[0].toUpperCase()}${who.slice(1)} are worked on by agents that don't see <facts>: write the facts `
+    + `they need into ${listText(parts.map((part) => part.where), 'or')}.`;
+}
+
+/** @brief Task mode 的那一句（task_create 与 agent_message，附录 A.1.1 的原文）。 */
+export const HANDOFF_TEXT = handoffText(['task_create', 'agent_message']) as string;
 
 /** @brief 渲染工具清单与工具准则的输入：pi 的 BuildSystemPromptOptions 里对应的字段（§4.1、§4.2）。 */
 export interface ToolPromptInput {
@@ -113,14 +132,14 @@ export function renderRulesSection(input: ToolPromptInput): string {
 }
 
 /**
- * @brief 身份段全文（§4.1），作为 pi 的 customPrompt：IDENTITY_TEXT（这次运行启用的工具里有 HANDOFF_TOOLS 之一时第三行
- *        末尾加一个空格和 HANDOFF_TEXT）、`<tools>…</tools>`、`<rules>…</rules>`，中间空一行；
+ * @brief 身份段全文（§4.1），作为 pi 的 customPrompt：IDENTITY_TEXT（这次运行启用的工具里有交出去的工具时第三行
+ *        末尾加一个空格和 handoffText 那一句）、`<tools>…</tools>`、`<rules>…</rules>`，中间空一行；
  *        两个标签的写法与 pi 包装自己的段相同（system-prompt.js:115-119）。
  * @param input 这次运行的工具
  */
 export function renderIdentity(input: ToolPromptInput): string {
-  const handoff = input.selectedTools.some((name) => HANDOFF_TOOLS.includes(name));
-  const head = handoff ? `${IDENTITY_TEXT} ${HANDOFF_TEXT}` : IDENTITY_TEXT;
+  const handoff = handoffText(input.selectedTools);
+  const head = handoff === null ? IDENTITY_TEXT : `${IDENTITY_TEXT} ${handoff}`;
   return `${head}\n\n<tools>\n${renderToolsSection(input)}\n</tools>\n\n`
     + `<rules>\n${renderRulesSection(input)}\n</rules>`;
 }
