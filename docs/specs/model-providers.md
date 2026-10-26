@@ -666,8 +666,8 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 
 ### 9.2 选择范围按钮与思考强度（输入框下面一行）
 
-- 协作模式下（`ModelState.pickLocked`，平行 Agent 规格 §12.11）模型按钮只显示正在用的模型，不能打开菜单。
-- 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名（2026-10-26 改，负责人走查 M3：原来是提供商名和区域）。生成中或准备中按钮不可用，悬停“Can’t switch models until the response finishes”。
+- 协作模式下（平行 Agent 规格 §12.11、§13.1，2026-10-26 WP-09 改）模型按钮显示“Task mode · <正在用的模型 id>”，菜单照常能打开：`ModelState.pickLocked` 时没有三节，只有说明 `Task mode picks the model for each agent`、Task mode 一行和“Manage models”。
+- 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名（2026-10-26 改，负责人走查 M3：原来是提供商名和区域）。生成中或准备中按钮仍可用（2026-10-26 WP-09 改），悬停的最后一行是“Can’t switch models until the response finishes”；打开的菜单里三节的项不可用、说明换成同一句，只能切 Task mode。
 - 菜单分三节：Groups、Providers、Models（按提供商分组）。每项只写名字（2026-10-26 改，负责人走查 M3：不再标区域）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session only. New sessions use the default range from Settings.”与“Manage models”。
 - 思考强度菜单沿用 v0，可选强度取当前模型（实际模型）的。当前模型不支持思考时的说明（它指向的设置页改了）：“This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”.”
   （2026-10-24 补：思考关不掉的模型的 `thinkingLevels` 没有 `off`，菜单里没有 Off，底部加一句“This model can’t turn thinking off.”；会话原来是 Off 的显示为 Minimal（pi 收紧后的强度），见 §7.7。）
@@ -766,7 +766,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 | 规则 | 依据 | 落点 |
 | --- | --- | --- |
 | 子 Agent 按自己的 `models`、`requires` 选，只能落在用户为主 Agent 选的范围里（两者展开后的交集，顺序按子 Agent 的候选）；没有交集时这次提问失败并说明原因（子 Agent = 普通模式下对话 Agent 临时去问的只读实例） | proposal §5 | §12.1、§10.1 |
-| 协作模式下用户不选，范围按钮只显示正在用的模型；按做这个 task 的角色的 `models`、`requires` 选，基座与没写 `models` 的角色用会话的选择范围 | proposal §5 | §12.1、§12.11 |
+| 协作模式下用户不选，模型按钮显示“Task mode · <正在用的模型 id>”（2026-10-26 WP-09；原为只显示正在用的模型）；按做这个 task 的角色的 `models`、`requires` 选，基座与没写 `models` 的角色用会话的选择范围 | proposal §5 | §12.1、§12.11 |
 | `.mori/agents/*.md` 的 `models`（每项是一个选择范围）与 `requires`（`tool_calling`、`protocol_write`、`protocol_write>=B`、`structured_output`、`vision`、`context>=N`）。判定用 §7.2 的档案字段：`tool_calling`、`protocol_write`、`structured_output` 必须已验证；`vision` 为 `unverified`（配置声明了图像输入）即满足；`context>=N` 比较 `effective` | proposal §4、§6 | §4.1、§12.2 |
 | Agent 定义引用的名字不存在时拒绝启动，说明缺哪一项、哪个 Agent 用到它 | proposal §6 | §4.4、§12.3 |
 | 继续已有的对话、立项、结案会话，或交回同一角色的 task 会话时模型变了：按本规格 §6.2 判断能否转写，不能就按 §6.3 重建 | proposal §9 | §12.6 |

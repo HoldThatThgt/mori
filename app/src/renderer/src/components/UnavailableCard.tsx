@@ -37,7 +37,7 @@ function openFor(candidates: CandidateExclusion[]): void {
 }
 
 /**
- * @brief No model available 卡。协作模式下（这个会话的模型按钮锁定）Open settings 旁多一个 Turn off team mode
+ * @brief No model available 卡。协作模式下（这个会话的模型按钮锁定）Open settings 旁多一个 Turn off task mode
  *        （平行 Agent 规格 §12.11），按开关的规则关掉协作模式（可能变为做完为止，docs/v1/screens/team-blocked.md）。
  */
 export function UnavailableCard({ candidates, tabKey }: { candidates: CandidateExclusion[]; tabKey: string }) {
@@ -54,7 +54,7 @@ export function UnavailableCard({ candidates, tabKey }: { candidates: CandidateE
         {locked && (
           <button className="button compact" data-action="turn-off-team"
             onClick={() => { setProblem(null); void turnOffTeam(tabKey).then(setProblem); }}>
-            Turn off team mode</button>
+            Turn off task mode</button>
         )}
       </div>
     </div>

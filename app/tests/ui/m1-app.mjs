@@ -181,14 +181,15 @@ async function firstRunPassed({ page, h, userData }, wrong) {
 
 /**
  * @brief 准备中（v1，chat.md"输入框下面一行"准备中，models.md"不可用时、按钮消失时的焦点"）：发了第一条消息、pi 还没开始时
- *        按钮位置是"Stop"；选择范围和 Effort 不可用（aria-disabled），原因是"Can’t switch models until the response
- *        finishes"（范围按钮悬停第三行）、"Can’t change effort until the response finishes"；权限和圆环可用；占位文字
+ *        按钮位置是"Stop"；Effort 不可用（aria-disabled），选择范围按钮可用（2026-10-26 起能打开菜单切 Task mode），
+ *        原因是"Can’t switch models until the response finishes"（范围按钮悬停第三行）、"Can’t change effort until the
+ *        response finishes"；权限和圆环可用；占位文字
  *        "Enter to queue · Shift+Enter for new line"。seen 是 watchRows 抓到的状态。
  */
 function preparingRow(seen) {
   const row = seenWith(seen, 'preparing');
   const problems = [...layoutProblems(row), ...stateProblems(row, 'preparing', APP_OPTS)];
-  record('对话：准备中（发了消息、pi 还没开始）按钮位置是"Stop"，选择范围和 Effort 不可用（aria-disabled）、原因对，'
+  record('对话：准备中（发了消息、pi 还没开始）按钮位置是"Stop"，Effort 不可用（aria-disabled）、选择范围按钮可用、原因对，'
     + '权限和圆环可用，占位文字"Enter to queue · Shift+Enter for new line"', problems.length === 0,
   `${problems.join('; ')} ${rowSummary(row)}`);
 }

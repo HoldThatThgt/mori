@@ -77,7 +77,7 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 回复中候选耗尽 | `mori.model_unavailable`（`firstRequest: false`）；包括 `held` 等满后选不到（MP-18） | 一张说明卡，标题“No model available”；每个候选一行“<provider>/<model> — <原因>”；“Open settings”（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时另有 `Turn off team mode`，见 [team-blocked.md](team-blocked.md)） | Open settings |
+| 回复中候选耗尽 | `mori.model_unavailable`（`firstRequest: false`）；包括 `held` 等满后选不到（MP-18） | 一张说明卡，标题“No model available”；每个候选一行“<provider>/<model> — <原因>”；“Open settings”（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时另有 `Turn off task mode`，见 [team-blocked.md](team-blocked.md)） | Open settings |
 | 段开始时候选耗尽 | `mori.model_unavailable`（`firstRequest: true`） | 同上；消息已撤回（上节） | Open settings |
 | 同一次回复的 pi 错误 | 随后 pi 的 `message_end`（`stopReason: 'error'`，`errorMessage` 为 §5.8 的说明） | 不再显示 v0 的错误卡（一次失败只显示一张卡） | — |
 | Open settings | 你点了它 | 设置 → Models，滚到第一个被排除候选的提供商卡；原因是 `auth`、`quota` 时焦点在它的 Keys | — |
@@ -103,7 +103,7 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 | 操作 | 来源 | 结果 |
 | --- | --- | --- |
 | Verify now（`verify`） | 你点了它：`models.verify`（`{ refs: blocked.verifyRefs }`；2026-10-26 改：去掉 `tests: 'auto'`，规格 §9.5） | `mori.model_state` 变为 `verifying`（没有 Verify now）；探针结束后自动重新校验，通过时卡消失 |
-| Change model…（`change_model`）（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时不提供，换成 `Turn off team mode`（`turn_off_team`）：`session.setTeam { mode: 'off' }`，直接回到 `off`，§5.1） | 你点了它 | 打开这一栏输入框下面一行的范围菜单（model-menu.md；往上打开，盖住这张卡；Esc 或选了以后焦点在范围按钮） |
+| Change model…（`change_model`）（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时不提供，换成 `Turn off task mode`（`turn_off_team`）：`session.setTeam { mode: 'off' }`，直接回到 `off`，§5.1） | 你点了它 | 打开这一栏输入框下面一行的范围菜单（model-menu.md；往上打开，盖住这张卡；Esc 或选了以后焦点在范围按钮） |
 | Open settings（`open_settings`） | 你点了它 | 设置 → Models，停在顶部 |
 
 被拒绝启动时：

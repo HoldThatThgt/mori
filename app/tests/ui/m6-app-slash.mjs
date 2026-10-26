@@ -9,8 +9,8 @@
 // 与提示词模板（气泡是展开后的全文）；会话没有任何模板和技能（Enter 照常发送）、只列这个会话加载了的（启用的、信任的项目里的）、
 // 关闭 enableSkillCommands 时不列技能、读取失败显示原文（synthetic 做法：在后台进程里关掉会话而界面不知道）、
 // 后台进程退出 / 重新载入中 / 会话重新打开中不出列表，就绪后照常出列表；
-// 布局（2026-10-21 起选择范围（v1）、Effort、权限按钮和上下文用量圆环在输入框下面一行，顶栏只剩"项目名 › 会话名"、协作开关和
-// 这一栏的按钮，docs/v0/composer-pickers.md；chat.md"顶栏""输入框下面一行"、models.md"窄栏"）：1280 宽单栏、1400 宽右栏开
+// 布局（2026-10-21 起选择范围（v1）、Effort、权限按钮和上下文用量圆环在输入框下面一行，顶栏只剩"项目名 › 会话名"和
+// 这一栏的按钮（协作开关 2026-10-26 移进模型菜单），docs/v0/composer-pickers.md；chat.md"顶栏""输入框下面一行"、models.md"窄栏"）：1280 宽单栏、1400 宽右栏开
 // （面板约 690px）、800×600 打开右栏（约 300px）、1280 和 1200 宽分屏（右栏关 / 开，最窄 280px）、800×600 分屏；各档的
 // 上沿和下沿（分屏时拖中线凑出 279–681px，单栏 930 / 761 / 740 / 490 / 300px），生成中有字、生成中、空闲、拒绝启动
 // （no_pick）、后台进程退出、重新载入中、Restart 之后重新打开中、第一次打开中、打开失败：顶栏不溢出不裁切、会话名有地方
@@ -20,8 +20,8 @@
 // 菜单、圆环详情和"Queue"的下拉往上打开、在这一栏和窗口里、按 models.md 对齐，280px 时范围菜单收到这一行的宽；
 // ≤ 400px 时用键盘走"More send options"排队；"Medium""High""Allow all"各走一次 280px（"Allow all"对比度 ≥ 4.5:1）；
 // 拒绝启动卡的"Change model…"打开这一行的范围菜单；F8 的"Pane width""Model range""Effort"；聊天页没有小于 12px 的字；
-// 从新会话的文字框 Tab 依次到权限 → 范围 → Effort → 圆环，Shift+Tab 回到会话树的次数（应为 6 次：M6 是 8 次，
-// TaskBoard 加了协作开关是 9 次，权限、思考强度、模型三个按钮移到文字框后面）。
+// 从新会话的文字框 Tab 依次到权限 → 范围 → Effort → 圆环，Shift+Tab 回到会话树的次数（应为 5 次：M6 是 8 次，
+// TaskBoard 加了协作开关是 9 次，权限、思考强度、模型三个按钮移到文字框后面是 6 次，2026-10-26 协作开关移进模型菜单）。
 // 与原设计不同（v1 做不到，按最接近的做）：思考强度"Extra high"在 v1 里没有途径打开（v1 的模型配置不写 thinkingLevelMap，
 // pi 的 getSupportedThinkingLevels 只给 off–high），所以 280px 的这一项改用"High"；"Unavailable"仍是最宽的写法、各档都走。
 // 为了最挤的情况，布局检查前把会话 A、C 的范围换成提供商（按钮"Mori endpoint · <很长的模型 id>"）。
@@ -831,7 +831,7 @@ function recordRunning(state, final) {
 // 布局检查共用的常量和小工具、各档的边界和拒绝启动两节在 m6-app-bands.mjs。
 
 /**
- * @brief 1280 宽单栏（右栏关，会话 A）：顶栏只有会话名、协作开关和右栏开关；这一行各项都完整显示（> 680px 一档）；菜单往上打开、
+ * @brief 1280 宽单栏（右栏关，会话 A）：顶栏只有会话名和右栏开关；这一行各项都完整显示（> 680px 一档）；菜单往上打开、
  *        在面板里；各种浮层打开时没有小于 12px 的字。
  */
 async function wideLayout(ctx) {
@@ -841,7 +841,7 @@ async function wideLayout(ctx) {
   const report = await layoutReport(page);
   const pane = report.panes[0];
   const range = await rangeLabels(page);
-  recordBars('1280 宽单栏（面板宽于 680px）：顶栏只有项目名 › 会话名、协作开关和右栏开关；输入框下面一行从左到右权限（"Ask each time ▾"，'
+  recordBars('1280 宽单栏（面板宽于 680px）：顶栏只有项目名 › 会话名和右栏开关；输入框下面一行从左到右权限（"Ask each time ▾"，'
     + '没有图标）、范围按钮（最长 200px，长模型 ID 截在 200px）、"Effort: <强度> ▾"、圆环、带文字的"Send"，间距 8px；'
     + '不溢出、不裁切，会话名完整', report, 1, pane?.width > 680 && pane.controls.model?.width >= RANGE_MAX - 1);
   record(`范围按钮在这一行里（不在顶栏）：读屏名称"${MODEL_LABEL}"；悬停第一行是按钮文字、第二行"${MODEL_TIP}"；读屏的描述`
@@ -909,10 +909,10 @@ const openingProblems = (rows) => rows.filter((row) => row.kinds.join() !== KIND
 
 /**
  * @brief Ctrl+N 新建会话 C：第一次打开中（"Starting…"）这一行只有权限按钮和说明（chat.md"后台正在启动"）；打开后从文字框
- *        按 Tab 依次是权限 → 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）；Shift+Tab 回到会话树是 6 次（右栏开关 →
- *        协作开关 → 左栏分隔线 → 底部两个按钮 → 会话行）：M6 是 8 次，TaskBoard 在顶栏加了协作开关
+ *        按 Tab 依次是权限 → 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）；Shift+Tab 回到会话树是 5 次（右栏开关 →
+ *        左栏分隔线 → 底部两个按钮 → 会话行；2026-10-26 前顶栏还有协作开关，是 6 次）：M6 是 8 次，TaskBoard 在顶栏加了协作开关
  *        （parallel-agents-taskboard.md §13.1，一个真正可以聚焦的按钮）是 9 次，2026-10-21 起权限、思考强度和模型三个按钮
- *        移到了文字框后面。ctrlN 等到会话打开好才返回（打开中协作开关不可用、不在 Tab 路径上）。
+ *        移到了文字框后面。ctrlN 等到会话打开好才返回。
  *        之后在 C 里发一条长消息（分屏的布局检查用它）。
  */
 async function shiftTabPath(ctx) {
@@ -942,9 +942,9 @@ async function shiftTabPath(ctx) {
   record('Tab：从新会话的文字框往后依次是权限 → 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）', focused
     && forward.slice(0, 4).join() === 'permission-button,model-button,thinking-button,usage'
     && forward[4] !== 'Send', `路径：${forward.join(' → ')}`);
-  record(`Shift+Tab：从新会话的输入框按 ${landed?.presses ?? '12+'} 次回到会话树（应为 6 次：右栏开关 → 协作开关 → `
-    + '左栏分隔线 → 底部两个按钮 → 会话行；权限、范围、Effort 在文字框后面，不在这条路上），落在新会话行', focused
-    && landed?.presses === 6 && path[0] === 'Toggle changes' && path[1] === 'team-switch'
+  record(`Shift+Tab：从新会话的输入框按 ${landed?.presses ?? '12+'} 次回到会话树（应为 5 次：右栏开关 → `
+    + '左栏分隔线 → 底部两个按钮 → 会话行；顶栏没有协作开关；权限、范围、Effort 在文字框后面，不在这条路上），落在新会话行',
+  focused && landed?.presses === 5 && path[0] === 'Toggle changes' && !path.includes('team-switch')
     && samePath(landed.focus.file, ctx.c),
   `路径：${path.join(' → ')}`);
   await h.send(LONG_NAME_MESSAGE);
@@ -990,7 +990,7 @@ async function splitLayout(ctx) {
   await resizeTo(ctx, 1280, 800);
   await splitOpen(page, ctx.c);
   const wide = await layoutReport(page);
-  recordBars('1280 宽分屏、右栏关（每栏约 510px，460–600px）：两栏顶栏有项目名 › 会话名、协作开关（只有状态点）、右栏开关和"Close pane"；这一行'
+  recordBars('1280 宽分屏、右栏关（每栏约 510px，460–600px）：两栏顶栏有项目名 › 会话名、右栏开关和"Close pane"；这一行'
     + '"Send"只有图标，Effort 只显示强度，三个按钮带 ▾；不溢出、不裁切', wide, 2,
   wide.panes.every((pane) => pane.width > 460 && pane.width <= 600));
   await shot(page, 'layout-1280-split');

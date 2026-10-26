@@ -174,7 +174,7 @@ export async function stop(key: string): Promise<void> {
 }
 
 /**
- * @brief Stop team（平行 Agent 规格 §11.4、§13.6）：停止这个会话的全部 Agent；结果里的待判断消息按发送顺序放回输入框。
+ * @brief Stop agents（平行 Agent 规格 §11.4、§13.6）：停止这个会话的全部 Agent；结果里的待判断消息按发送顺序放回输入框。
  *        对话在回复时“已停止”一行由它的 agent_settled 写（按停止处理）；对话没在回复时命令返回后写一行。
  */
 export async function stopTeam(key: string): Promise<void> {
@@ -464,7 +464,7 @@ export function handleKernelExit(): void {
     rowMarks: { ...state.rowMarks, ...Object.fromEntries(state.saved.sessions.filter((item) => item.live?.running
       && !state.tabs.some((tab) => sameFile(tab.sessionFile, item.sessionFile)))
       .map((item) => [item.sessionFile, 'error' as const])) },
-    // 协作：后台的 Agent、批准卡和待判断的消息随后台进程一起没了；开关保留最后知道的模式（team-switch.md）。
+    // 协作：后台的 Agent、批准卡和待判断的消息随后台进程一起没了；模型按钮保留最后知道的模式（team-switch.md）。
     tabs: state.tabs.map((tab) => ({ ...tab, sessionId: null,
       interrupted: tab.interrupted || tab.transcript.running || tab.transcript.sending,
       team: { ...tab.team, busy: false, background: false },

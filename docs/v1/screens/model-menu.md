@@ -21,7 +21,7 @@
 ## 选择范围按钮
 
 “<范围名>”：分组写 id，提供商写名称（§9.2），模型范围不写范围名。
-（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 为真时按钮只显示正在用的模型、不能打开菜单，悬停 `Team mode picks the model for each agent`；`session.setPick` 被拒绝，`session.pickOptions` 返回空；回到 `off` 后范围仍是你最后选的。见 [team-blocked.md](team-blocked.md)）
+（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11，2026-10-26 负责人走查 M10、M21 改：协作模式下按钮显示“Task mode · <正在用的模型 id>”和 ▾，仍能打开菜单，菜单里是说明 `Task mode picks the model for each agent`、Task mode 一行和“Manage models”（下面“菜单”）；`session.setPick` 被拒绝，`session.pickOptions` 返回空；回到 `off` 后范围仍是你最后选的。按钮上的模式见 [team-switch.md](team-switch.md)“模型按钮上的模式”，拒绝启动见 [team-blocked.md](team-blocked.md)）
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
@@ -34,13 +34,16 @@
 | 悬停 | — | 有当前模型时“<提供商名>”（例如“DeepSeek”；2026-10-26 改：原来后面还有“ · <区域>”）；没有当前模型时“No model can run in this session”（都是临时，走查时可以改）；这是悬停的第二行，第一行是按钮文字，不可用时第三行是原因（v0 models.md“选择范围按钮”） | — |
 | 段内换了模型 | `mori.model_state`（段内换模型后，§9.5） | “<范围名> · <新模型 id>” | — |
 | 段结束 | `mori.model_state`（段结束） | 回到静态校验后的第一个候选 | — |
-| 准备中 / 生成中 | 会话在准备中或本轮运行中 | 按钮不可用（`aria-disabled`），悬停第三行“Can’t switch models until the response finishes”（§9.2；悬停的三行见 v0 models.md“选择范围按钮”） | 停止后再切 |
+| 准备中 / 生成中 | 会话在准备中或本轮运行中 | 2026-10-26 起按钮可用（不带 `aria-disabled`），可以打开菜单切 Task mode（team-switch.md；负责人走查 M10 的推荐选项）；悬停第三行仍是“Can’t switch models until the response finishes”（§9.2；悬停的三行见 v0 models.md“选择范围按钮”），读屏的描述同样带这一句；菜单里范围的项不可用（下面“菜单”） | 打开菜单；停止后再换范围 |
 
 ## 菜单
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 菜单（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时打不开） | 你点了按钮 | 三节，节名“Groups”“Providers”“Models”；Groups 的项写分组 id，Providers 的项写提供商名称，Models 按提供商分小节（小节名是提供商名称），项写模型 id；每项只写名字（2026-10-26 改：右侧的区域标记删掉）；当前范围（`pick`）打勾；底部说明“Applies to this session only. New sessions use the default range from Settings.”，最后一项“Manage models” | ↑ ↓、Enter 选择；Esc、点外面关闭 |
+| 菜单 | 你点了按钮 | 三节，节名“Groups”“Providers”“Models”；Groups 的项写分组 id，Providers 的项写提供商名称，Models 按提供商分小节（小节名是提供商名称），项写模型 id；每项只写名字（2026-10-26 改：右侧的区域标记删掉）；当前范围（`pick`）打勾；三节下面是说明“Applies to this session only. New sessions use the default range from Settings.”，再下面是 Task mode 一行（team-switch.md），最后一项“Manage models” | ↑ ↓、Enter 选择；Esc、点外面关闭 |
+| 协作模式的菜单（2026-10-26） | `ModelState.pickLocked` 为真 | 没有三节；说明 `Task mode picks the model for each agent`（同按钮悬停的第二行，在说明的位置；它是菜单的第一项，上面不画分隔线），下面是 Task mode 一行和“Manage models”；打开时焦点在 Task mode 一行上（没有打勾的范围项） | 切 Task mode；Manage models；Esc |
+| 回复进行中的菜单（2026-10-26） | 准备中或生成中，`pickLocked` 为假 | 三节照常列出，但每项不可用（`disabled`，↑ ↓ 跳过，打勾的项仍打勾）；说明换成“Can’t switch models until the response finishes”；Task mode 一行和“Manage models”可用；打开时焦点在 Task mode 一行上。回复在菜单开着时开始：项变为不可用，焦点原来在某一项上的移到 Task mode 一行；回复结束时项恢复可用 | 切 Task mode；Manage models；Esc |
+| 换范围之后 | 你选了一项 | 菜单关闭，焦点回到按钮（下面“切换中”） | — |
 | 被排除的项 | 这一项展开后的全部候选都被本会话的静态校验排除（§9.2） | 这一项变淡，悬停写原因：每个候选一行“<provider>/<model> — <原因>”（原因用 §5.3 的界面文字，例如“tool calling not verified yet”“tool calling failed verification”；行的写法临时，走查时可以改）；仍可以选（选了以后由拒绝启动卡说明）。（2026-10-26 补，负责人走查 M3 带出的：原因同时是这一项读屏的描述（`aria-describedby`）；能选的项没有读屏的描述，原来每项都描述区域，例如“Local, Public”） | 选择 |
 | 某一节为空 | 配置里没有分组（或没有提供商与模型） | 这一节不显示（临时，走查时可以改）；全空时只有底部说明与“Manage models” | — |
 | 切换中 | 你选了一项，`session.setPick` 还没返回 | 菜单关闭；按钮显示新的范围、不可用（`data-pending="true"`） | — |
@@ -74,7 +77,7 @@ v0 的“ (deleted)”不再出现：范围指向不存在的名字时由拒绝�
 ## 反例
 
 - 在输入框下改范围不改设置里的 Default model range；新会话仍用设置里的默认范围。
-- 准备中（消息已显示、还没开始生成）不能改范围和思考强度。
+- 准备中（消息已显示、还没开始生成）不能改范围和思考强度（2026-10-26 起范围菜单能打开，只是项不可用，只能切 Task mode）。
 - 菜单列出配置里的全部分组、提供商、模型，不只“有 key 的”（v0 只列 pi 能用的模型；没有 key 的提供商照样能用，§4.1）。
 - 被排除的项变淡但仍可以选。
 - 改了范围后，正在进行的那一段不受影响，下一段才按新范围选。
@@ -95,6 +98,9 @@ v0 的“ (deleted)”不再出现：范围指向不存在的名字时由拒绝�
 （2026-10-24，§7.7 给了文字，没给位置与点选的细节）“This model can’t turn thinking off.”放在原来的底部说明下面、单独一行，
 不是菜单项、不能聚焦（临时，走查时可以改）；会话是 Off 而显示 Minimal 时点 Minimal 不发 `session.setThinking`（它已经是显示的当前强度，
 同 v0 点当前项），会话仍记 Off（临时，走查时可以改）。
+（2026-10-26，WP-09）回复进行中范围菜单能打开（负责人走查 M10 的推荐选项），项用 `disabled`（↑ ↓ 跳过）而不是藏起来，说明换成
+“Can’t switch models until the response finishes”；协作模式的菜单把说明 `Task mode picks the model for each agent` 放在原来说明的位置；
+这两种菜单打开时焦点在 Task mode 一行上（都是临时，走查时可以改）。
 
 ## 需要规格回答
 
@@ -107,7 +113,8 @@ v0 的“ (deleted)”不再出现：范围指向不存在的名字时由拒绝�
 | 元素 | 标识 |
 | --- | --- |
 | 选择范围按钮 | 每一栏输入框下面一行（`.composer-bottom`）里 `data-testid="model-button"`（沿用 v0），`data-pick` 为 `pick`（没有时不带），`data-current` 为 `current`（没有时不带），切换中 `data-pending="true"`；悬停的描述元素 `data-testid="model-tip"`（在按钮外面） |
-| 菜单 | `data-testid="model-menu"`（沿用 v0）；节 `[data-section]`（`groups` / `providers` / `models`）；项 `role="menuitemradio"`，`data-pick` 为这一项的选择范围字符串（2026-10-26：`data-zone` 与区域标记 `.pick-zone` 删掉），被排除的带 `data-excluded="true"`；底部说明 `data-testid="model-menu-note"`；“Manage models” `data-action="manage-models"` |
+| 菜单 | `data-testid="model-menu"`（沿用 v0）；节 `[data-section]`（`groups` / `providers` / `models`）；项 `role="menuitemradio"`，`data-pick` 为这一项的选择范围字符串（2026-10-26：`data-zone` 与区域标记 `.pick-zone` 删掉），被排除的带 `data-excluded="true"`，回复进行中 `disabled`；说明 `data-testid="model-menu-note"`（三种文字：一般、回复进行中、协作模式，都是这一个元素）；Task mode 一行 `data-testid="team-switch"`（team-switch.md）；“Manage models” `data-action="manage-models"` |
+| 按钮上的模式（2026-10-26） | 选择范围按钮的 `data-team-mode`（`off` / `once` / `always`），`pickLocked` 时 `data-locked="true"` |
 | 切换失败 | `data-testid="pick-error"` |
 | 思考按钮与菜单 | 同 v0：`data-testid="thinking-button"`（`data-level`、`data-reasoning`，切换中 `data-pending="true"`）、`data-testid="thinking-menu"`；不支持思考时的“Open settings” `data-action="open-settings"` |
 | 强度项（2026-10-24 写明） | `thinking-menu` 里 `role="menuitemradio"`、`data-level` 为强度（现有代码）；思考关不掉时没有 `[data-level="off"]`；会话是 Off 而当前模型没有 Off 时按钮 `data-level="minimal"`、`[data-level="minimal"]` 的 `aria-checked="true"` |
