@@ -427,7 +427,7 @@ interface SubagentRow {
 | 层 | 位置 | 结果文件 |
 | --- | --- | --- |
 | 单元 | `tests/unit/subagent/*.test.mjs`（`node --test`，经 esbuild 打包内核模块，同 TaskBoard） | `sa-unit.json` |
-| App | `tests/ui/sa-app.mjs`（Electron + 合成端点的脚本模式，TaskBoard 规格 §17.1；端口在 4600–4699 里取一段，与 tb 套件不同时跑） | `sa-app*.json` |
+| App | `tests/ui/sa-app.mjs`（Electron + 合成端点的脚本模式，TaskBoard 规格 §17.1；端口 4970–4979（walkthrough-fixes 会话分给本规格的一段，2026-10-26）） | `sa-app*.json` |
 | 回放 | `tests/ui/sa-replay.mjs`，fixture `tests/fixtures/sa/*.json` 从真实会话录（`tb-record.mjs` 加 subagent 一种） | `sa-replay*.json` |
 | 真实模型 | `tests/ui/sa-real.mjs --source <你的数据目录>`（复用 `tb-real-helpers.mjs` 与 team-checks #38 的转发代理）：DeepSeek 与 GLM | `sa-real.json` |
 
