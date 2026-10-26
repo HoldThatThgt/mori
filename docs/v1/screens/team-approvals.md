@@ -38,7 +38,7 @@ Needs approval，本会话已允许 = Allowed for this session，每次询问 = 
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 后台实例要批准 | `mori.team_approval_request` | 停在用户会话那一栏的输入框上方（分屏时在这个会话所在的那一栏）；内容与 v0 的卡相同（按工具：修改、写入、运行命令、MCP、其他；路径在项目文件夹之外、不可见控制字符的警示同 v0，路径按用户会话的工作目录判断，实例与它相同）；卡头多一行归属 `<role> · T1 · <task title>`，没有 task 时 `<role>`（§11.3） | Alt+1 允许一次；Alt+2 本会话不再询问；Alt+3 拒绝（同 v0） |
+| 后台实例要批准 | `mori.team_approval_request` | 停在用户会话那一栏的输入框上方（分屏时在这个会话所在的那一栏）；内容与 v0 的卡相同（按工具：修改、写入、运行命令、MCP、其他；路径在项目文件夹之外、不可见控制字符的警示同 v0，路径按用户会话的工作目录判断，实例与它相同）；卡头多一行归属 `<role> · T1 · <task title>`，没有 task 时 `<role>`（§11.3）；普通模式的通用 subagent 为 `<Role> · <description>`，例如 `Mori · Fix the retry loop`（[subagent 规格](../../specs/subagent.md) §7.4） | Alt+1 允许一次；Alt+2 本会话不再询问；Alt+3 拒绝（同 v0） |
 | 卡片出现时 | 同上 | 不抢焦点，焦点留在输入框，在输入框里按 Enter 仍是发送、排队，不会批准（同 v0） | Tab 到卡上 |
 | 几张卡同时挂着 | 对话自己的请求与各个实例的请求 | 一次显示一张；排序：对话 Agent 自己的卡在前，后台实例的卡在后，各按到达顺序（§11.3）；卡头“还有 N 张”计入全部挂着的卡；正在显示的卡不会被后到的卡替换，后到的对话卡排在其余后台卡之前（临时，走查时可以改） | 处理完当前这张，下一张接着出现 |
 | 允许一次 | 你选了“允许一次”：`approval.answer`；随后 `mori.team_approval_end`（允许） | 卡片消失；焦点在卡上时回到输入框；进展摘要这一行从 `Waiting for your approval` 变为当前在做什么（随 `mori.board`） | — |
@@ -97,7 +97,7 @@ Needs approval，本会话已允许 = Allowed for this session，每次询问 = 
 
 | 元素 | 标识 |
 | --- | --- |
-| 批准卡 | `data-testid="approval-card"`（沿用 v0），`data-request` 为 `requestId`（后台卡是 `<实例 id>:<编号>`），`data-tool` 为工具名；后台卡另有 `data-agent`（`role`，基座为 `mori`）、`data-task`（task 编号，没有 task 时不带）（§11.3） |
+| 批准卡 | `data-testid="approval-card"`（沿用 v0），`data-request` 为 `requestId`（后台卡是 `<实例 id>:<编号>`），`data-tool` 为工具名；后台卡另有 `data-agent`（`role`，基座为 `mori`）、`data-task`（task 编号，没有 task 时不带）（§11.3）、`data-subagent`（普通模式的 subagent 的 description，不是 subagent 时不带；subagent 规格 §7.4） |
 | 归属行 | 卡里 `data-testid="approval-attribution"`（本表定，临时） |
 | 卡上的选项、理由框、“还有 N 张” | 沿用 v0：`approval-allow`、`approval-allow-session`、`approval-reject`、`approval-reason`、`approval-more` |
 | 侧栏状态 | `[data-testid="session-status"][data-status="approval"]`、`data-testid="rail-status"`（沿用 v0） |
