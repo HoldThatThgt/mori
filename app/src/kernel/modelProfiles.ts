@@ -356,8 +356,9 @@ function storedView(target: ProfileTarget, stored: StoredProfile): ProfileView {
 }
 
 /**
- * @brief 界面看到的档案（§7.2、§7.4）：有档案时按档案（重新探测期间仍是旧结果，界面按 running 显示 Re-verifying…）；
- *        从未完成探测、正在探测时为 probing；两者都不是时为 null（界面显示未验证）。
+ * @brief 界面看到的档案（§7.2、§7.4）：有档案时按档案（重新探测期间仍是旧结果，界面按 running 把行的 data-probe 设为
+ *        reverifying，tool calling 验证过的模型不显示状态行，§9.1）；从未完成探测、正在探测时为 probing；两者都不是时为
+ *        null（界面的状态行为“Couldn’t verify”加 Verify again）。
  * @param running 这个模型正在探测
  */
 export function profileView(target: ProfileTarget, stored: StoredProfile | undefined,

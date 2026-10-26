@@ -432,7 +432,7 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 | `probedAt`、`suite` | 时间、探针套件版本 | — |
 
 能力三态：已验证、未验证、验证失败（proposal §4）。本规格里关键能力 `tool_calling` 必须已验证才满足（§5.3 第 3 步）；
-`protocol_write`、`structured_output`、`vision`、`context` 在设置页显示，供 §10 的 Agent 定义使用。
+`protocol_write`、`structured_output`、`vision`、`context` 在设置页显示，供 §10 的 Agent 定义使用。（2026-10-26 注，负责人走查 M7：设置页的模型行不再列档案的各项，这几项只留在档案里，由选择器按 Agent 定义的 `requires` 检查；拒绝启动卡与说明卡照旧写出不满足的原因，例如“handoff tier C is below B”。）
 
 ### 7.3 探针
 
@@ -467,10 +467,11 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 ### 7.4 什么时候跑
 
 - 自动（第 0–7 步）：后台进程启动时，对还没有档案的模型（上次探测没跑完 App 就关了）；添加或修改模型或提供商之后（加 key、删 key 也算修改提供商：这个提供商里档案不是已验证或验证失败的模型重新探测）；迁移之后；首次启动表单保存之后；指纹或服务版本变化之后。
-- 你点“Verify”、或拒绝启动卡上的“Verify now”之后。
+- 你点“Verify”、或拒绝启动卡上的“Verify now”之后。（2026-10-26 注：模型行上常显的“Verify”删掉，只在 tool calling 没验证通过时，模型行的状态行带“Verify again”，发同样的 `models.verify`，见 §9.1。）
 - 需要你同意（第 8、9 步）：只在设置页模型行上点“Long-input test…”或“Cancel test…”并确认之后；确认框写明大约多少 token（第 8 步按有效窗口的 50% + 90% 估算）。
+  （2026-10-26 注，负责人走查 M7：这两个按钮与确认框从设置页删掉，界面上不再能发起第 8、9 步；后台进程里的这两步、`models.verify` 的 `tests: 'long_input' | 'cancel'` 和 §5.7 按 `cancel_verified` 分的三种处理由下一包（WP-04）删除。）
 - 同一个模型同时只跑一组探针；新的一组开始时取消旧的。
-- 从未验证过的模型（档案里 `tool_calling` 不是 `verified` 或 `failed`，包括上次因出错为 `unverified` 的）探测中为 `probing`；验证过的模型重新探测期间，选择仍按旧结果，设置页显示“Re-verifying…”，结果出来后替换。
+- 从未验证过的模型（档案里 `tool_calling` 不是 `verified` 或 `failed`，包括上次因出错为 `unverified` 的）探测中为 `probing`；验证过的模型重新探测期间，选择仍按旧结果，设置页显示“Re-verifying…”，结果出来后替换。（2026-10-26 注：设置页不再写“Re-verifying…”，tool calling 验证过的模型重新探测时模型行没有状态行，§9.1。）
 - 探针结束时重新做所有会话的静态校验，发 `mori.profiles`；档案的 `reasoning.replay` 变了时按 §4.4 重新编译这个提供商（不保存配置），下一个请求起生效。
   （2026-10-24 补：`reasoning.off_refused` 变了时同样重新编译这个提供商，§7.7。）
 - 探针请求属于 `background` 类别：不受排队超时限制，一直等到有槽位（取消探针、删除模型时出队）；每一步的时限从真正发出时算起。
@@ -509,7 +510,7 @@ OpenRouter 的原文是 `Reasoning is mandatory for this endpoint and cannot be 
 | 400 或 422 | 出错或没有正文 | 出错（同原来），`can_disable: unknown`；说明：`medium` 出错时用它的说明（含下面输出上限那一句），`medium` 没出错但没有正文时用 `off` 的原文 |
 | 连接错误、其他 4xx、5xx、超时 | — | 出错（同原来） |
 
-- 第 2 步的说明（含“Thinking can’t be turned off: <原文>”）只存在档案（`model-profiles.json`）第 2 步的结果里，`ProfileView` 不带，界面不显示；设置页看到的是档案摘要的“Thinking: Can’t be turned off”（同第 5、6 步的说明今天也只存不显示）。
+- 第 2 步的说明（含“Thinking can’t be turned off: <原文>”）只存在档案（`model-profiles.json`）第 2 步的结果里，`ProfileView` 不带，界面不显示；设置页看到的是档案摘要的“Thinking: Can’t be turned off”（同第 5、6 步的说明今天也只存不显示）。（2026-10-26 注：档案摘要删掉，改为模型行说明一行最后的“Thinking can’t be turned off”，§9.1。）
 - 档案里存 `auto.offRefused: boolean`：在 `modelProfiles.ts` 的 `StoredProfileSchema` 的 `auto` 里加 `offRefused: z.boolean().optional()`（不加的话读回时会被丢掉）。可选字段，旧档案读作 `false`，不重新探测，`PROBE_SUITE` 不变；`ProfileView.reasoning` 加 `off_refused`。
 
 **探针各步用的模型与强度**：
@@ -544,13 +545,13 @@ OpenRouter 的原文是 `Reasoning is mandatory for this endpoint and cannot be 
 - **换模型后重发**（§11.2 第 2.3 步）：思考强度用会话的强度按新模型收紧后的值（`clampThinkingLevel`，与路由一致）；收紧后是 `off` 才不传。
 - **测试连接**：`reasoning: true` 的模型带 `medium`（同第 1 步），否则不带；这样第一次探测之前的测试连接也不发“关闭思考”。
 - **界面**（§9.1、§9.2）：
-  - 模型行的档案摘要在 `off_refused` 时加一项“Thinking: Can’t be turned off”；
+  - 模型行的档案摘要在 `off_refused` 时加一项“Thinking: Can’t be turned off”（2026-10-26 注：改为模型行说明一行最后的“ · Thinking can’t be turned off”，§9.1）；
   - 输入框下面一行的 Effort 菜单（§9.2）按 `thinkingLevels` 列出，没有 Off；当前模型支持思考而 `thinkingLevels` 里没有 `off` 时，菜单底部加一句“This model can’t turn thinking off.”；
   - 模型表单（Edit）的 Default effort for new sessions：这个模型的档案 `off_refused` 时不列 Off；已经存成 Off 的照存，显示为 Minimal（pi 用的就是它）。
   - 增强设置的 Effort（记忆规格 §10.4）：`enhance.get` 的结果 `EnhanceInfo` 加 `noOffPicks: ModelPick[]`，是第一个候选（按记忆规格 §9.1 的取法，同 `effortPicks`）的档案 `reasoning.off_refused` 为真的那些范围（没有档案按假）；
     `effortPicks` 不变（录下的回放 fixture 照样有效）。所选范围在 `noOffPicks` 里时 Effort 不列 Off；已经存成 Off 的照存，显示为 Minimal。
     要改的：`shared/memory.ts`（`EnhanceInfo`）、`kernel/enhance.ts`（算 `noOffPicks`，用 `ModelLayer.profileOf`）、`renderer/.../MemoryEnhance.tsx`；记忆规格 §8 的 `enhance.get` 一行与 §10.4 加 2026-10-24 注。
-- **已经验证失败的模型**：不自动重新探测（不加迁移）；模型行照旧显示“Couldn’t verify: <原文>”（这里是服务回的 400）和 Verify，点一次即按本节重新测。
+- **已经验证失败的模型**：不自动重新探测（不加迁移）；模型行照旧显示“Couldn’t verify: <原文>”（这里是服务回的 400）和 Verify，点一次即按本节重新测。（2026-10-26 注：这类模型 tool calling 没验证，模型行的状态行照样写“Couldn’t verify: <原文>”，按钮是“Verify again”，§9.1。）
 
 **不做**：不读服务列表里的标记（OpenRouter 的 `reasoning.mandatory`、Anthropic 的 `capabilities.thinking.types.disabled.supported`）；
 不按模型名判断；被拒后不在同一次请求里换个强度重发（那是 fallback）；不改 TaskBoard 的写法选择。
@@ -594,6 +595,8 @@ OpenRouter 的原文是 `Reasoning is mandatory for this endpoint and cannot be 
 一个模型**可用** = 它的提供商不在 `connection`，它自己不在上述状态，并且提供商至少有一个 key 不在 `rate_limited`、`auth`、`quota`。
 没有 key 的提供商把 §8.1 的“无 key”当作它唯一的 key：429、401/403、额度错误同样记在它上面，按上表恢复；`auth`、`quota` 在加了 key、或地址、接口、兼容选项改变时清除。
 key 的“Test”（§9.1）和用它的“Test connection”不看这个 key 的记录，直接发出；成功时清除它的 `rate_limited`、`auth`、`quota` 并重新做静态校验。
+（2026-10-26 补，负责人走查 WP-01 的观察：首次启动里一次 404 失败后什么都不改再点 Test connection，结果是“Connection failed: Connection error.”、请求没有发出——模型池按上表给这个模型记了 `not_found`，不带 key 的 Test connection 按“可用”判断，不可用就不发；401 之后同样被 key 的 `auth` 挡住。测试是你点的，要报告服务这一次的真实回答，失败也不能让下一次测试等或不发。）
+测试连接与 key 的“Test”（`connection.test`）**不看任何不可用记录**：提供商的 `connection`、模型的 `not_found`、`timeout`、`held`、key 的记录都不挡它，总是发出（排队按 §8.2，同原来）。不带 key 时按顺序用第一个没有记录的 key，全部 key（或“无 key”）都有记录时用第一个；得到 401、429、额度错误时照原来换到下一个没有记录的 key（§5.5），没有就报告这一次的结果。失败照常写记录（会话照旧按记录挑模型）；成功时清除用到的 key 的 `rate_limited`、`auth`、`quota`，以及提供商的 `connection` 和这个模型的 `not_found`（测试刚证明它们不成立）；`timeout`、`held` 不清（§5.7 等的是旧请求停下，测试成功不能说明这一点）。会话、压缩与探针的请求不变。
 槽位满不算不可用（排队）。记录只在内存里，后台进程重启后清空。只改提供商的名称、并发上限、区域或模型列表不清除记录。
 
 ### 8.4 发请求用的 fetch
@@ -622,19 +625,21 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 - **Defaults**：
   - Default model range for new sessions：下拉，按分组、提供商、模型分三节；可以为空（“None”）。
   - Allowed zones for all projects：Local、Intranet 两个勾选框；说明“Public providers can only be allowed per project, below.”。
-- **Providers**：每个提供商一张卡：名称、地址、接口类型、区域、每个 key 的并发上限、兼容选项；“Edit”、“Delete…”、“Test connection”（用第一个可用的 key 测第一个模型，结果文字同 v0）。
+- **Providers**：每个提供商一张卡：名称、地址、接口类型、区域、每个 key 的并发上限、兼容选项（2026-10-26 注，负责人走查 M1：只在接口为 `openai-completions` 时有这一行，同表单）；“Edit”、“Delete…”、“Test connection”（用第一个可用的 key 测第一个模型，结果文字同 v0）。
   - **Keys**：每行标签、“Saved”、当前记录（“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有时不显示）、上移、下移、“Test”（用这个 key 测提供商的第一个模型，结果显示在这一行下面；成功时清除记录，§8.3）、“Remove”（只剩一个 key 时“Remove…”）。“Add key”：一行内联表单，Label（默认“Key <n>”）、Secret（密码框）、“Save”/“Cancel”，新 key 加在末尾。
     key 的明文不能查看也不能改：换 key = 加新的再删旧的。删最后一个 key 时确认“Requests to <name> will be sent without an API key.”。没有 key 时说明“Requests are sent without an API key.”。
   - **Models**：每行模型 id、窗口、最大输出、模型族、支持思考；档案摘要：Tool calling（Verified / Not verified / Failed / Verifying… / Re-verifying…）、Handoff tier（A / B / C / —）、Context（有效窗口；截断时告警“Silently truncates long input”）、Reasoning field、Cancel（Verified / Not verified / Unknown）；探针出错时“Couldn’t verify: <原文>”。
     （2026-10-24 补：`reasoning.off_refused` 时加一项“Thinking: Can’t be turned off”；Test connection 对勾了 Supports thinking 的模型带 `medium`；模型表单的 Default effort for new sessions 对这类模型不列 Off，见 §7.7。）
     操作：“Verify”、“Long-input test…”、“Cancel test…”（只对 vLLM、SGLang、llama.cpp）、上移、下移、“Edit”、“Delete…”、“Test”。
+    （2026-10-26 注，负责人走查 M7、M8：模型行只留模型 id、说明一行（窗口、最大输出、模型族、支持思考，`off_refused` 时最后加“ · Thinking can’t be turned off”）、“Use”的提示和一行状态；档案摘要（Tool calling、Handoff tier、Context、Reasoning field、Cancel）、截断告警、“Verify”、“Long-input test…”、“Cancel test…”、“Test”都删掉，操作只剩上移、下移、“Edit”、“Delete…”。状态行只在模型不能用时有：从没完成过验证、正在验证时“Verifying…”；tool calling 判定为不通过时“Tool calling failed verification: <detail>”，没验证（第 3、4 步出错）时“Couldn’t verify: <原文>”，没有档案又不在探测（探针抛错、档案没建成、探针没能开始）时“Couldn’t verify”，这几种带“Verify again”（`models.verify`，`tests: 'auto'`）。tool calling 验证通过的模型（重新验证中、其他步出错的）没有状态行。测试连接留在提供商卡的“Test connection”和 Keys 的“Test”。服务没报告、值仍等于 Mori 默认值的窗口与最大输出标“(default)”，见 [model-discovery.md](model-discovery.md) §8。状态表见 docs/v1/screens/models-settings.md“Models 行”。）
     （2026-10-23 注：行上按档案的 `reported` 加“(not reported)”和“Server reports …”等提示与“Use”，见 [model-discovery.md](model-discovery.md) §8。）
   - 模型表单：Model ID（编辑时只读，沿用 v0）、Context window、Max output（新建默认 16384 与窗口一半中较小的）、Family（可空）、Supports thinking、Image input、Default effort for new sessions（只在支持思考时；写 pi 设置的 `modelThinkingLevels`，沿用 v0）。
     （2026-10-23 注：模型表单只剩 Edit（“Edit model · <provider name>”），卡上的“Add model”换成“Fetch models”，见 [model-discovery.md](model-discovery.md) §6.5。）
   - 提供商表单：Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Network zone（Local / Intranet / Public，按 §12 的规则预选建议值）、Concurrency per key、兼容选项；新建时还有第一个 key 和第一个模型。改地址的 origin 时按 §4.1 删除 key 并确认。
     新提供商保存失败时，删除本次新存的 key。兼容选项沿用 english-ui 的标签与说明，每个勾选框是标签加下面一行说明：“Endpoint doesn’t support the developer role”（“Sends the system prompt with the system role instead”）、“Endpoint doesn’t accept the store field”（“Leaves store out of requests”）、“Endpoint needs max_tokens instead of max_completion_tokens”（“Older endpoints don’t recognize max_completion_tokens”）、“Endpoint doesn’t report usage while streaming”（“Doesn’t send stream_options, so the context usage shown will be inaccurate”）、“Endpoint doesn’t support strict mode for tool parameters”（“Leaves strict out of tool definitions”）、“Tool results must include the tool name”（“Some endpoints require a name field on tool result messages”）；提供商卡上的“Compatibility options”只列标签。
+    （2026-10-26 注，负责人走查 M1：兼容选项的图例下面加一行说明“Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this server rejects requests.”（pi 按地址认出 DeepSeek 等服务、自己调整请求；首次启动表单同）；“Endpoint doesn’t support strict mode for tool parameters”一项删掉：pi 1.3.0 默认就不发 strict，探针要 strict 时自己加（§7.3），勾不勾都一样。§4.1 的 `compat.supportsStrictMode` 照样能写在配置里、读得出，编译照旧交给 pi，界面不显示、保存时原样保留，不加迁移；从 v0 迁移时它不再算兼容选项，同其他不认识的字段一样丢弃并列在说明里（§4.5）。）
     （2026-10-23 注：新建时改为 Base URL、API key → Fetch models → 清单 → Add，Concurrency per key 与兼容选项收进 More settings，没有“第一个模型”；Edit provider 不变，见 [model-discovery.md](model-discovery.md) §6.1。）
-  - 测试结果（Test connection、Test）：“Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>”；失败时“Connection failed: <原文>”；“Cancel”取消。
+  - 测试结果（Test connection、Test；2026-10-26 注：失败后再测照样发出，§8.3 的 2026-10-26 补）：“Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>”；失败时“Connection failed: <原文>”；“Cancel”取消。
   - 确认对话框“Confirm zone…”：提供商名称与地址，Local / Intranet / Public 单选（预选建议值），“Confirm”/“Cancel”。
 - **Groups**：每个分组一行：id、有序的成员（“DeepSeek · all models” 或 “DeepSeek · deepseek-chat”），成员可以加入、去掉、上移、下移；“New group”、“Delete…”。
   - New group：输入 id（规则同提供商 id；错误“<id> is already used by a provider or group.”、“Use lowercase letters, digits, and hyphens.”）。
@@ -966,8 +971,8 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-07 | 项目配置 | 未知字段、坏 JSON、不存在的分组、不属于用户分组的项都让会话按 `project_config` 拒绝启动并显示原因 | 单元、App |
 | MP-08 | 从 v0 迁移 | 全部 provider 迁入；key 沿用原 `ref`；手写明文 key 加密保存、密文优先；`$ENV`、不支持的接口、丢弃的兼容字段、不合格的模型、改写的 id（含冲突与保留 id）列在说明里；默认模型成为默认范围；`modelThinkingLevels` 复制到新键；区域建议按 §12；区域未确认的提供商在确认前被排除；迁移后改 `models.json` 不再生效；说明 Dismiss 后不再显示；迁移失败时不写配置；迁移后这次启动停在 设置 → Models | 单元、App |
 | MP-09 | 会话启动校验 | §4.6 表中每种结果的卡片文字与操作；“Verify now”跑完探针后自动解除；全部在验证中时显示 verifying、没有 Verify now；被拒绝时发送不可用，后台进程也拒绝 | App、回放 |
-| MP-10 | 档案与探针 | 添加模型后自动跑第 0–7 步；合成端点上 `tool_calling`、A/B/C 等级（各后缀分别降级）、推理字段、`replay`、`can_disable`、`server` 判定正确；三种接口的请求写法按 §7.3 的表；探针走 `background` 类别；新的一组探针开始时旧的被取消；`anthropic-messages` 上 A、C 都不通过时 `tier: null`（§7.5）；`-replay` 模型探测完成后不保存配置，下一条消息里别的模型带工具调用的助手消息带有 `reasoning_content`（合成端点日志）；三种接口的请求写法在单元层用替身 fetch 检查 | 单元、App |
-| MP-11 | 需要同意的探针 | 长输入与取消探针只在确认后运行；静默截断被判出并告警；`/metrics` 回落时 `cancel_verified` 为真，不回落为假，没有指标为 `unknown`；`-nocancel` 为 `false`，`FAKE_NO_METRICS=1` 为 `unknown` | App |
+| MP-10 | 档案与探针 | （2026-10-26 注：App 层读 `models.get` 的档案，模型行只看 `data-probe` 与状态行，§9.1；`fake-coder-notools` 的状态行带“Verify again”，点它重新跑第 0–7 步：行变为 `reverifying`、状态行“Verifying…”不带按钮，合成端点收到新的探针请求，结束后回到 `failed` 并再带“Verify again”；探针出错的状态行同样带“Verify again”；对话占着槽位时加的模型，从行出现到验证通过一直是“Verifying…”，不出现“Couldn’t verify”；没有档案又不在探测时状态行是“Couldn’t verify”加“Verify again”，界面测试造不出这种档案，在单元层查 `probeStatus.ts`）添加模型后自动跑第 0–7 步；合成端点上 `tool_calling`、A/B/C 等级（各后缀分别降级）、推理字段、`replay`、`can_disable`、`server` 判定正确；三种接口的请求写法按 §7.3 的表；探针走 `background` 类别；新的一组探针开始时旧的被取消；`anthropic-messages` 上 A、C 都不通过时 `tier: null`（§7.5）；`-replay` 模型探测完成后不保存配置，下一条消息里别的模型带工具调用的助手消息带有 `reasoning_content`（合成端点日志）；三种接口的请求写法在单元层用替身 fetch 检查 | 单元、App |
+| MP-11 | 需要同意的探针 | （2026-10-26 注：设置页的两个按钮与确认框删掉，App 层经进程桥发 `models.verify`（`tests` 为 `long_input`、`cancel`）、读档案，不再查确认框与告警；整条由 WP-04 删除）长输入与取消探针只在确认后运行；静默截断被判出并告警；`/metrics` 回落时 `cancel_verified` 为真，不回落为假，没有指标为 `unknown`；`-nocancel` 为 `false`，`FAKE_NO_METRICS=1` 为 `unknown` | App |
 | MP-12 | 指纹与版本 | 改窗口或服务版本变化后重新探测；重新探测期间旧结果继续用于选择、已打开的会话仍可发送；版本接口连不上时档案不变 | 单元、App |
 | MP-13 | 粘性与回到首选 | 段内换到第二候选后一直用它；首选在段开始时不可用、段内恢复后第二候选又失败，换到第三个而不是首选；下一段首选可用时用回首选；第二条消息的第一次请求沿用段开始时（§11.4）选的模型；插话（含在最后一条回答之后送达的）不开始新段；溢出恢复后 `tried` 保留；回放层覆盖界面上的换模型提示与回到首选 | 单元、App、回放 |
 | MP-14 | 第一个请求就失败 | 首选 401（错的 key）：同一个请求发给第二候选，对话流有换模型提示，没有错误卡 | App、回放 |
@@ -994,9 +999,10 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-35 | 思考强度 | 第一个候选是推理模型时新会话按它的按模型默认强度开始，请求带思考参数；换到不支持思考的模型时 pi 收紧；Effort 菜单的可选强度随当前模型；把强度改成 high 后关闭再打开会话，仍是 high；段内从非推理模型换到推理模型后 Effort 菜单的强度变为可选 | App |
 | MP-36 | 回复进行中改配置 | 回复中删除它正在用的提供商：下一个请求换到下一个候选并提示；改它的兼容选项：本段继续用它；当前模型在段内被另一个会话造成冷却：下一个请求不发出就换模型 | App |
 | MP-37 | 现有功能不退步 | §14.4 的全部现有测试通过（2026-10-22 注：m7 的 App 与回放由提示词分层与记忆规格 §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放） | App、回放 |
-| MP-38 | 思考关不掉的判定（2026-10-24 补，§7.7） | 单元：第 2 步表里每一行的判定与说明（400、422、`medium` 出错或没有正文、其他错误）；本组第 2 步判出 `off_refused` 时第 3、4、6、7 步用 `medium`、第 5 步不适用、第 7 步照跑；第 1–7 步用没有标记的副本，有标记的模型这一次判出能关闭时第 3–7 步发 `off`；第 8、9 步按档案选强度；回复停在输出上限、只有思考时为出错（`-thinklong`），第 8 步不记 `silent`；带 `auto.offRefused: true` 的档案写出、读回后仍为真并编译出标记；没有 `offRefused` 的旧档案照读、不重新探测；其他模型的判定不变：`fake-coder`，以及地址含 `deepseek.com` 的 `openai-completions` 模型（替身 fetch：`thinking.type: "disabled"` 时 200、没有思考）为 `can_disable: true`、`off_refused: false`、编译后没有标记。App：`fake-coder-nooff`（OpenRouter 前缀地址、勾 Supports thinking）加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`，模型行有“Thinking: Can’t be turned off”，点 Verify 后仍是同样的结果；`fake-coder-thinklong`（普通地址、勾 Supports thinking）加入后模型行为“Couldn’t verify: Stopped at the probe output limit before answering”，Tool calling 仍为 Verified | 单元、App |
-| MP-39 | 没有 Off 的标记（2026-10-24 补，§7.7） | 单元：`off_refused` 编译成 `thinkingLevelMap: { off: null }`（三种接口都写在模型上）、变了时重新编译这个提供商；换模型后重发的强度按新模型收紧；`enhance.get` 的 `noOffPicks` 按第一个候选的档案给出。App（`fake-coder-nooff`）：输入框下面一行的 Effort 菜单没有 Off、有“This model can’t turn thinking off.”；会话原来是 Off 的显示 Minimal，发出的请求 `effort` 为 `minimal`、合成端点没有回 400；测试连接发出的 `effort` 为 `medium` 且成功；模型表单（Edit）与增强设置的 Effort 不列 Off；没有标记的模型（`fake-coder`）菜单仍有 Off、Off 时不带思考参数 | 单元、App |
+| MP-38 | 思考关不掉的判定（2026-10-24 补，§7.7） | 单元：第 2 步表里每一行的判定与说明（400、422、`medium` 出错或没有正文、其他错误）；本组第 2 步判出 `off_refused` 时第 3、4、6、7 步用 `medium`、第 5 步不适用、第 7 步照跑；第 1–7 步用没有标记的副本，有标记的模型这一次判出能关闭时第 3–7 步发 `off`；第 8、9 步按档案选强度；回复停在输出上限、只有思考时为出错（`-thinklong`），第 8 步不记 `silent`；带 `auto.offRefused: true` 的档案写出、读回后仍为真并编译出标记；没有 `offRefused` 的旧档案照读、不重新探测；其他模型的判定不变：`fake-coder`，以及地址含 `deepseek.com` 的 `openai-completions` 模型（替身 fetch：`thinking.type: "disabled"` 时 200、没有思考）为 `can_disable: true`、`off_refused: false`、编译后没有标记。App：`fake-coder-nooff`（OpenRouter 前缀地址、勾 Supports thinking）加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`，模型行有“Thinking: Can’t be turned off”，点 Verify 后仍是同样的结果；`fake-coder-thinklong`（普通地址、勾 Supports thinking）加入后模型行为“Couldn’t verify: Stopped at the probe output limit before answering”，Tool calling 仍为 Verified（2026-10-26 改，§9.1：模型行说明一行最后有“Thinking can’t be turned off”，经进程桥再发一次 `models.verify` 后仍是同样的结果；`fake-coder-thinklong` 的档案为 `error`、说明“Stopped at the probe output limit before answering”，tool calling 仍为 `verified`，模型能用，模型行没有状态行） | 单元、App |
+| MP-39 | 没有 Off 的标记（2026-10-24 补，§7.7） | 单元：`off_refused` 编译成 `thinkingLevelMap: { off: null }`（三种接口都写在模型上）、变了时重新编译这个提供商；换模型后重发的强度按新模型收紧；`enhance.get` 的 `noOffPicks` 按第一个候选的档案给出。App（`fake-coder-nooff`）：输入框下面一行的 Effort 菜单没有 Off、有“This model can’t turn thinking off.”；会话原来是 Off 的显示 Minimal，发出的请求 `effort` 为 `minimal`、合成端点没有回 400；测试连接（2026-10-26 注：提供商卡的 Test connection，模型行没有 Test 了）发出的 `effort` 为 `medium` 且成功；模型表单（Edit）与增强设置的 Effort 不列 Off；没有标记的模型（`fake-coder`）菜单仍有 Off、Off 时不带思考参数 | 单元、App |
 | MP-40 | 真实的思考关不掉的模型（2026-10-24 补，§7.7） | 你的 OpenRouter key：`recursive/flint-v1.0:free` 经设置页加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`；`liquid/lfm-2.5-2.6b:free` 加入后 `tool_calling: verified`、`off_refused: true`，且等级 B 或第 6 步出错为“Stopped at the probe output limit before answering”（只能是出错，不能是不通过）（2026-10-24 负责人改，原来只写“等级 B”：lfm 在 `medium` 下第 6 步的思考长度不定，在 256 token 的探针上限上有时答完（B 级）、有时只有思考就停下（按本节的输出上限规则为出错，第 7 步不跑，等级为空）；这一条要验证的是必须思考的模型变得可用，探针上限不调，见 [v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：实现与检查”）；会话里选不到 Off，原来是 Off 的会话正常回答；测试连接成功 | 真实 |
+| MP-41 | 测试连接总是发出（2026-10-26 补，§8.3） | 单元：key 都在 `auth`（或 `rate_limited`、`quota`）、提供商在 `connection`、模型在 `not_found`、`timeout`、`held` 时，测试连接的请求（`connection.test` 用的 fetch）照样发出，会话的请求照旧不发；不带 key 时用第一个没有记录的 key，全部有记录时用第一个 key，401 后照样换到没有记录的 key；失败照常写记录；成功时清除用到的 key 的记录、提供商的 `connection` 与这个模型的 `not_found`，`timeout`、`held` 留着 | 单元 |
 
 ### 14.3 不留未完成项
 
@@ -1034,4 +1040,5 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 `npm run smoke`、`test:app`、`test:m1-app`…`test:m7-app`、各回放测试都通过，MP-37 才算通过。
 （2026-10-22 注：`test:m7-app`、`test:m7-replay` 由 [提示词分层与记忆规格](memory.md) §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放。）
 （2026-10-23 注：MP-01、MP-10、MP-24、MP-33 的条目文字不变，测试按一键拉取的流程写：首次启动、Add provider 和卡上加模型都走 Fetch models 与清单（或手填一行），见 [model-discovery.md](model-discovery.md) §13.4。）
+（2026-10-26 注，负责人走查 M1、M6、M7、M8（WP-02）：模型行没有档案摘要、Verify、Test 与需要同意的探针，现有测试改读行的 `data-probe`（取代 `data-field="tool_calling"`）、状态行 `probe-status` 与 `models.get` 的档案；`m1-app.mjs` 设置页里取消测试改用提供商卡的 Test connection（先把 `fake-slow` 移到第一个）；`m0-smoke.mjs` 读表单结果时不再等 Playwright 的默认 30 秒（表单下方还没有结果时不等），并加一项“401 之后什么都不改再测，请求照样发出”（MP-41 的 App 侧，结果不计入覆盖检查）。逐条见 docs/v1/walkthrough-1026/WP-02.md。）
 （2026-10-26 注：MP-33 的条目文字按“测试成功就进入主窗口”改写（负责人走查 M2，docs/v1/screens/first-run.md）：探针状态的检查从表单下方移到会话的拒绝启动卡与 `models.get` 的档案，改模型再测放在测试失败之后。）

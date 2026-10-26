@@ -6,7 +6,7 @@ import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type Reac
 import {
   API_TYPE_LABELS, API_TYPES, COMPAT_HINTS, COMPAT_LABELS, COMPAT_OPTIONS, ConcurrencySchema, MODEL_LIMITS,
   ProviderFormSchema, suggestZone, THINKING_LEVELS, UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens, ZONES,
-  type ApiType, type Compat, type ProviderForm, type ProviderModel, type ThinkingLevel, type Zone,
+  type ApiType, type Compat, type CompatField, type ProviderForm, type ProviderModel, type ThinkingLevel, type Zone,
 } from '../../../../shared/models';
 import { FieldError, ZONE_LABELS } from './common';
 
@@ -267,12 +267,22 @@ export function ZoneRadios({ value, onChange, note }: {
   );
 }
 
-/** @brief 兼容选项（只在 API type 为 openai-completions 时显示）：六个勾选框，标签和下面一行说明用 §9.1 的英文。 */
+/**
+ * 兼容选项上面的一行说明（2026-10-26 负责人走查 M1，models-settings.md "提供商表单：Edit"，临时，走查时可以改）：
+ * pi 按地址认出 DeepSeek 等服务、自己调整请求，所以拉取模型不会也不必勾这些选项
+ */
+const COMPAT_NOTE = 'Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if '
+  + 'this server rejects requests.';
+
+/**
+ * @brief 兼容选项（只在 API type 为 openai-completions 时显示）：上面一行说明，五个勾选框，标签和下面一行说明用 §9.1 的英文。
+ *        value 里没有勾选框的字段（存着的 supportsStrictMode）原样留着。
+ */
 export function CompatChecks({ api, value, onChange }: {
   api: ApiType; value: Compat; onChange: (compat: Compat) => void;
 }) {
   if (api !== 'openai-completions') return null;
-  function toggle(field: keyof Compat, on: boolean, written: boolean | string) {
+  function toggle(field: CompatField, on: boolean, written: boolean | string) {
     const { [field]: _removed, ...rest } = value;
     onChange(on ? { ...rest, [field]: written } : rest);
   }
@@ -280,6 +290,7 @@ export function CompatChecks({ api, value, onChange }: {
     <fieldset className="mf-row compat-checks">
       <legend>Compatibility options</legend>
       <div className="mf-control">
+        <p className="field-hint" data-testid="compat-hint">{COMPAT_NOTE}</p>
         {COMPAT_OPTIONS.map((option) => (
           <label key={option.id} className="check-row">
             <input type="checkbox" checked={value[option.field] !== undefined}

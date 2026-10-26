@@ -102,15 +102,17 @@ test('MP-19 queue_timeout text states the waited seconds', () => {
   assert.equal(REASON_TEXTS.queue_timeout(1_500), 'waited 2 s for a free slot');
 });
 
-test('MP-01 compat and API type labels cover every config value with the §9.1 English text', () => {
-  assert.deepEqual(Object.keys(models.COMPAT_LABELS).sort(), Object.keys(models.CompatSchema.shape).sort());
-  assert.deepEqual(Object.keys(models.COMPAT_HINTS).sort(), Object.keys(models.CompatSchema.shape).sort());
+/** 有勾选框的兼容字段：CompatSchema 的字段去掉 supportsStrictMode（2026-10-26 负责人走查 M1，§9.1 的 2026-10-26 注） */
+const SHOWN_COMPAT = Object.keys(models.CompatSchema.shape).filter((field) => field !== 'supportsStrictMode').sort();
+
+test('MP-01 compat and API type labels cover every compat field that has a box with the §9.1 English text', () => {
+  assert.deepEqual(Object.keys(models.COMPAT_LABELS).sort(), SHOWN_COMPAT);
+  assert.deepEqual(Object.keys(models.COMPAT_HINTS).sort(), SHOWN_COMPAT);
   assert.deepEqual(Object.entries(models.COMPAT_LABELS), [
     ['supportsDeveloperRole', 'Endpoint doesn’t support the developer role'],
     ['supportsStore', 'Endpoint doesn’t accept the store field'],
     ['maxTokensField', 'Endpoint needs max_tokens instead of max_completion_tokens'],
     ['supportsUsageInStreaming', 'Endpoint doesn’t report usage while streaming'],
-    ['supportsStrictMode', 'Endpoint doesn’t support strict mode for tool parameters'],
     ['requiresToolResultName', 'Tool results must include the tool name'],
   ]);
   assert.deepEqual(Object.entries(models.COMPAT_HINTS), [
@@ -118,7 +120,6 @@ test('MP-01 compat and API type labels cover every config value with the §9.1 E
     ['supportsStore', 'Leaves store out of requests'],
     ['maxTokensField', 'Older endpoints don’t recognize max_completion_tokens'],
     ['supportsUsageInStreaming', 'Doesn’t send stream_options, so the context usage shown will be inaccurate'],
-    ['supportsStrictMode', 'Leaves strict out of tool definitions'],
     ['requiresToolResultName', 'Some endpoints require a name field on tool result messages'],
   ]);
   assert.deepEqual(Object.keys(models.API_TYPE_LABELS), [...models.API_TYPES]);
@@ -127,9 +128,9 @@ test('MP-01 compat and API type labels cover every config value with the §9.1 E
   assert.equal(models.API_TYPE_LABELS['anthropic-messages'], 'Anthropic Messages');
 });
 
-test('MP-01 compat options carry only field and value, one per compat field; text lives in COMPAT_LABELS/HINTS', () => {
-  assert.deepEqual(models.COMPAT_OPTIONS.map((option) => option.field).sort(),
-    Object.keys(models.CompatSchema.shape).sort());
+test('MP-01 compat options carry only field and value, one per compat field with a box; text lives in '
+  + 'COMPAT_LABELS/HINTS', () => {
+  assert.deepEqual(models.COMPAT_OPTIONS.map((option) => option.field).sort(), SHOWN_COMPAT);
   for (const option of models.COMPAT_OPTIONS) {
     assert.deepEqual(Object.keys(option).sort(), ['field', 'id', 'value']);
     assert.equal(models.CompatSchema.shape[option.field].safeParse(option.value).success, true);
@@ -140,6 +141,11 @@ test('MP-01 protocol no longer exports the v0 connection form schemas', async ()
   const protocol = await loadKernelModule('src/shared/protocol.ts');
   for (const name of ['EndpointSchema', 'ModelFormSchema', 'ConnectionSchema']) assert.equal(name in protocol, false);
   assert.deepEqual(protocol.COMPAT_OPTIONS, models.COMPAT_OPTIONS);
+});
+
+test('MP-01 a saved compat with supportsStrictMode (no box since 2026-10-26) still loads', () => {
+  assert.equal(models.CompatSchema.safeParse({ supportsStrictMode: false, supportsStore: false }).success, true);
+  assert.equal(models.CompatSchema.safeParse({ supportsStrictMode: true }).success, false);
 });
 
 test('MP-01 config schema accepts the §4.1 example', () => {

@@ -20,10 +20,10 @@
 //      setup，连同复制出的档案里它们的档案，见 v1-real-helpers.mjs prepareNoOff）。
 //   1. 设置 → Models：卡上的 Fetch models（或 Add provider：https://openrouter.ai/api/v1，key 只输进 Mori 的密码框，输入前
 //      核对框的 type 是 password；区域 Public）→ 过滤、勾上两个模型 → Add 2 models。
-//   2. 等它们的探针跑完：flint 档案 ready、tool_calling verified、off_refused 为真，模型行有 "Thinking: Can’t be turned off"；
+//   2. 等它们的探针跑完：flint 档案 ready、tool_calling verified、off_refused 为真，模型行说明一行末尾有 " · Thinking can’t be turned off"；
 //      lfm tool_calling verified、off_refused 为真，等级 B 或第 6 步出错为 "Stopped at the probe output limit before
 //      answering"（只能是出错，不能是不通过；§14.2 MP-40 的 2026-10-24 负责人改）。
-//   3. flint 模型行的 Test（测试连接）成功。
+//   3. 经进程桥对 flint 发 connection.test（测试连接，2026-10-26 起模型行没有 Test）成功。
 //   4. 原来是 Off 的会话：新会话在默认范围里由首选（DeepSeek，有 Off 的模型）开始，Effort 菜单里选 Off；再把范围换成 flint：
 //      Effort 按钮显示 Minimal，菜单没有 Off、有 "This model can’t turn thinking off."；发一条消息，flint 正常回答（会话文件里
 //      助手消息的 provider / model），没有错误卡。
@@ -58,7 +58,7 @@ import {
   firstRunDeepSeek, firstRunProblems, glmAddProblems, injectWrongKey, KEY_MODE_URLS, leaveSettings, NO_OFF_MODELS,
   NO_OFF_NOTE, noOffAddProblems, openModelsSettings, openNewSession, openProjectFolder, OPENROUTER_KEY_VAR,
   openRouterProblems, prepareNoOff, prepareRealConfig, PROBE_MS, profileProblems, providerBrief, rangeButton, readJson,
-  restoreFirstKey, scratchModelData, sourceProblems, switchNotices, takeEnvSecret, TEST_GROUP, testModelRow,
+  restoreFirstKey, scratchModelData, sourceProblems, switchNotices, takeEnvSecret, TEST_GROUP, testModelBridge,
   THINKING_OFF_TEXT, thinkingOffItem, thinkingRecorded, waitProfiles,
 } from './v1-real-helpers.mjs';
 import { pickers, ZONE_TEXT } from './v1-models-row-helpers.mjs';
@@ -152,7 +152,7 @@ async function sendAndWait(ctx, text, timeout = 600000) {
 /** @brief 一轮的实际模型（去重，按出现顺序）。 */
 const refsOf = (messages) => [...new Set(messages.map((message) => message.ref))];
 
-/** @brief 设置 → Models：两个模型的档案合理（models.get），模型行的档案摘要显示 Tool calling: Verified。 */
+/** @brief 设置 → Models：两个模型的档案合理（models.get），模型行上的 data-probe 为 verified（2026-10-26 起没有档案摘要）。 */
 async function probes(ctx) {
   const info = await waitProfiles(ctx.page, [ctx.firstRef, ctx.secondRef]);
   await openModelsSettings(ctx.page);
@@ -160,12 +160,11 @@ async function probes(ctx) {
     const problems = profileProblems(info.profiles[ref], provider.models[0].contextWindow);
     const row = ctx.page.locator(`[data-testid="model-row"][data-model="${ref}"]`);
     await row.scrollIntoViewIfNeeded();
-    const shown = await row.locator('[data-field="tool_calling"]').getAttribute('data-value', { timeout: 10000 })
-      .catch(() => null);
+    const shown = await row.getAttribute('data-probe', { timeout: 10000 }).catch(() => null);
     const p = info.profiles[ref];
     record(`MP-27 probe results for ${ref} are plausible: probed, tool calling verified, a handoff tier, `
       + 'an effective window within the declared one, a known reasoning field and server kind; the Models row '
-      + 'shows "Verified"',
+      + 'is verified (data-probe)',
     problems.length === 0 && shown === 'verified', JSON.stringify({ problems, shown, server: p?.server,
       tier: p?.tier?.level, context: p?.context, reasoning: p?.reasoning, cancel: p?.cancel_verified }));
   }
@@ -383,11 +382,11 @@ async function noOffProbes(ctx) {
   const [flint, lfm] = [noOffRef(ctx, 'flint'), noOffRef(ctx, 'lfm')];
   const a = (await waitProfiles(ctx.page, [flint], PROBE_MS)).profiles[flint];
   // 界面收到同一个 mori.profiles 之后才重画模型行：最多等 10 秒
-  const shown = await pollFor(() => thinkingOffItem(ctx.page, flint), (item) => item?.value === 'refused', 10000);
+  const shown = await pollFor(() => thinkingOffItem(ctx.page, flint), (item) => item !== null, 10000);
   record(`MP-40 ${flint}: after Add its probes finish with status ready, tool calling verified and `
-    + `reasoning.off_refused true, and its model row shows "${THINKING_OFF_TEXT}"`, a?.status === 'ready'
-    && a.tool_calling?.state === 'verified' && a.reasoning?.off_refused === true && shown?.value === 'refused'
-    && shown.text === THINKING_OFF_TEXT, JSON.stringify({ profile: noOffBrief(a), shown }));
+    + `reasoning.off_refused true, and its model row's line ends with "${THINKING_OFF_TEXT}"`, a?.status === 'ready'
+    && a.tool_calling?.state === 'verified' && a.reasoning?.off_refused === true && shown?.text === THINKING_OFF_TEXT,
+  JSON.stringify({ profile: noOffBrief(a), shown }));
   const b = await lfmProfile(ctx, lfm);
   await shot(ctx.page, '07-nooff-probed');
   record(`MP-40 ${lfm}: after Add its probes finish with tool calling verified, reasoning.off_refused true, and `
@@ -411,17 +410,18 @@ function lfmTierOk(profile) {
 }
 
 /**
- * @brief MP-40 测试连接：flint 模型行的 Test（§7.7：勾了 Supports thinking 的模型带 medium）成功。
+ * @brief MP-40 测试连接：flint 的 connection.test（§7.7：勾了 Supports thinking 的模型带 medium）成功。2026-10-26 起
+ *        模型行没有 Test、提供商卡的 Test connection 只测第一个模型，所以经进程桥发同一个命令（testModelBridge）。
  *        在探针之后点：这时没有 Off 的标记已编译进 flint，所以这一条只核对 MP-40 的"测试连接成功"；测试连接发的是
  *        medium，由 MP-39 的 App 层在合成端点的请求日志里核对（effort 为 medium 且成功）。
  *        不在探针跑完之前抢着点：探针同时在发请求，免费模型每天有请求上限；key 方式下 flint 的探针建目录时就跑完了。
  */
 async function noOffTest(ctx) {
   const flint = noOffRef(ctx, 'flint');
-  const text = await testModelRow(ctx.page, flint);
+  const result = await testModelBridge(ctx.page, flint);
   await shot(ctx.page, '08-nooff-test');
-  record(`MP-40 Test connection on ${flint} (the Test on its model row) succeeds: "Connected · …"`,
-    Boolean(text?.startsWith('Connected')), text ?? 'no test result within 180 s');
+  record(`MP-40 Test connection on ${flint} (connection.test through the bridge) succeeds`, result?.ok === true,
+    JSON.stringify(result));
 }
 
 /**
