@@ -500,7 +500,7 @@ test('TB-18 the synthetic endpoint\'s A, B and C handoffs agree with the forms',
 
 test('TB-18 the synthetic endpoint\'s close and forced request_close tags agree with the forms', () => {
   const close = hf.closeForm('T1', NEXT);
-  const closeHint = user(`[Mori] T1 was handed to you and you didn't decide. Hand it off now.\n${
+  const closeHint = user(`[Mori] T1 was handed to you and you didn’t decide. Hand it off now.\n${
     hf.formatHint(close, 'C')}`);
   const base = [CLOSE_SYSTEM, user('[Mori] T1 was handed to you: done.'), said('Looking.'), closeHint];
   const decided = endpointReply({ messages: [...base, CLOSE_CARD] });

@@ -62,7 +62,7 @@ const TIER_ROLES = [
 /** 程序给的固定文字（§7.1、§7.3、§7.5、§7.6、§8.5） */
 const HANDED_OFF = (task) => `You handed off ${task}; stop here.`;
 const FORCED_TASK = (task) => `[Mori] Your turn ended without task_handoff. Hand off ${task} now.`;
-const FORCED_CLOSE = (task) => `[Mori] ${task} was handed to you and you didn't decide. Hand it off now.`;
+const FORCED_CLOSE = (task) => `[Mori] ${task} was handed to you and you didn’t decide. Hand it off now.`;
 const RETRY = '[Mori] Your handoff could not be used: ';
 const ONLY_FORM = 'Only task_handoff works in this turn; call it now.';
 const NEEDS_EVIDENCE = (outcome) => `${outcome} needs evidence: the number of a tool result that shows it works.`;
@@ -498,11 +498,11 @@ function needUserAnswer(ctx, who) {
   const lines = linesOf(ctx, 'tb-handoff-need', 'planner', 'create').filter((line) => line.k === 3);
   record('TB-20 your answer goes through create: planner records it with request_update (a supplement) and hands T1 '
     + 'back with task_edit; the asking executor\'s own session continues (one t1.executor file: "You are executor on '
-    + 'T1", then "T1 is back with you. The user answered; see User\'s words.") and its next request\'s work card '
+    + 'T1", then "T1 is back with you. The user answered; see User’s words.") and its next request\'s work card '
     + 'lists the supplement under User\'s words; T1 then finishes',
   same(lines.map((line) => line.calls), [['request_update'], ['task_edit'], []])
     && words.at(-1) === `supplement:${HANDOFF_TEXT.needAnswer}` && deliveries.length === 2
-    && deliveries[1].startsWith("[Mori] T1 is back with you.\nThe user answered; see User's words.")
+    && deliveries[1].startsWith('[Mori] T1 is back with you.\nThe user answered; see User’s words.')
     && card.includes('<mori-work-card>') && card.includes("User's words:")
     && card.includes(`"${HANDOFF_TEXT.needAnswer}"`) && taskOf(board, 'T1')?.status === 'done',
   brief({ calls: lines.map((line) => line.calls), words, deliveries: deliveries.map((t) => t.slice(0, 70)),
@@ -612,7 +612,7 @@ async function depFail(ctx) {
   const lines = linesOf(ctx, 'tb-handoff-depfail', 'planner', 'close');
   const forced = forcedLines(lines);
   record('TB-18 close\'s A-tier forced fill makes exactly one forced request: close\'s first run did not decide T1, '
-    + 'delivery 2 is "[Mori] T1 was handed to you and you didn\'t decide. Hand it off now." with tool_choice '
+    + 'delivery 2 is "[Mori] T1 was handed to you and you didn’t decide. Hand it off now." with tool_choice '
     + 'task_handoff and strict only on it; that single request decides T1 (close_failed) and ends the run',
   forced.length === 1 && forced[0].k === 2 && forced[0].toolChoice === 'task_handoff'
     && same(forced[0].strictTools, ['task_handoff']) && lines.filter((line) => line.k === 2).length === 1

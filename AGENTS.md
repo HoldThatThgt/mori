@@ -107,7 +107,7 @@ doesn't describe." 对所有会话、子 Agent 和工作流里的 Agent 都适�
 
 | 命令 | 作用 |
 | --- | --- |
-| `npm run check` | 类型检查 + 静态检查（禁用词、行宽；字符串、正则、JSX 文本和 .html / .css 里不能有中文，注释不查） |
+| `npm run check` | 类型检查 + 静态检查（禁用词；每行、每函数（行数与入参）、每文件的上限，见“工程约束”；`app/src` 的字符串、正则、JSX 文本和 .html / .css 里不能有中文；`app/src` 的字符串和 JSX 文本里撇号用排版符号 ’，只给模型看、从不显示的文字等例外见 `tests/apostrophes.mjs`；注释不查） |
 | `npm run smoke` | 构建后用合成端点跑冒烟测试 |
 | `npm run test:quick` | 构建后跑界面快速集（冒烟测试加三段回放，不超过 2 分钟）；每次改动跑这个，不跑下面的整套 |
 | `npm run dist` | 检查、构建并生成 NSIS 安装包 |

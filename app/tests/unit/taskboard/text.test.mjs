@@ -192,7 +192,7 @@ test('TB-44 every §8.5 delivery starts with [Mori] and has the fixed wording', 
   };
   for (const [kind, [args, expected]] of Object.entries(cases)) assert.equal(deliveryText(kind, args), expected, kind);
   assert.equal(deliveryText('task_back', { task: 'T3', latest, reason: text.USER_ANSWERED }),
-    "[Mori] T3 is back with you.\nThe user answered; see User's words.");
+    '[Mori] T3 is back with you.\nThe user answered; see User’s words.');
   assert.match(deliveryText('create_need_user', { task: 'T3', question: 'q', from: 'mori', merged: true }),
     /otherwise ask the user in your reply\.$/);
   assert.equal(text.joinDeliveries(['[Mori] a', '[Mori] b']), '[Mori] a\n\n[Mori] b');
@@ -250,7 +250,7 @@ test('TB-18 forced fill and format retry texts follow §7.5 for each tier', () =
   assert.ok(deliveryText('forced_fill', { target: task, form: { tier: 'C', next: [] } }).endsWith('Leave next empty.'));
   const close = deliveryText('forced_fill', { target: { kind: 'close', task: 'T2' }, form: { tier: 'C',
     next: ['executor', 'reviewer'] } });
-  assert.ok(close.startsWith("[Mori] T2 was handed to you and you didn't decide. Hand it off now.\n"));
+  assert.ok(close.startsWith('[Mori] T2 was handed to you and you didn’t decide. Hand it off now.\n'));
   assert.ok(close.includes('<conclusion>…</conclusion><outcome>close_done|close_failed|continue|need_user</outcome>'
     + '<next>…</next>'));
   assert.ok(close.endsWith('Fill next only for continue; it can be: executor, reviewer.'));

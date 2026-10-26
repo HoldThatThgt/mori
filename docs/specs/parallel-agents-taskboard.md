@@ -517,7 +517,7 @@ proposal §6.6：交接缺失或出错，程序都交给结案 Agent。
 
 统一模型提供商规格 §10：“填交接单按当前模型的写入等级”。用在 §7.4 的 `no_handoff`、`close_undecided` 和 §7.6 的强制关闭。
 
-1. 程序在这个实例会话里投递一次（新的一次运行），消息为 `[Mori] Your turn ended without task_handoff. Hand off T1 now.`（结案：`[Mori] T1 was handed to you and you didn't decide. Hand it off now.`），
+1. 程序在这个实例会话里投递一次（新的一次运行），消息为 `[Mori] Your turn ended without task_handoff. Hand off T1 now.`（结案：`[Mori] T1 was handed to you and you didn’t decide. Hand it off now.`），
    消息里写明这一次要怎么填（下表）。这次运行里：
    - 除 `task_handoff`（强制关闭时为 `request_close`）之外的调用都被拒绝并结束运行（`{ block, reason, terminate: true }`）；
    - `task_handoff`（`request_close`）不论成功还是在执行时被拒绝，结果都带 `terminate: true`，这一批之后运行结束（结案会话也一样）；被拒绝的错误原文交给第 3 步；
@@ -665,7 +665,7 @@ proposal §4、§10：程序每次请求前钉在上下文末尾的一小段大�
 | 投递 | 文字（要点） |
 | --- | --- |
 | task 交给一个角色（第一次） | `[Mori] You are <role> on T1 (request 1). Start work. The work card at the end of the context has the request and the task. Call task_handoff when your part is done.` |
-| task 交回这个角色 | `[Mori] T1 is back with you.` + 最新一棒（编号、角色、结果、结论、未结事项）或交回的原因（`The user answered; see User's words.`） |
+| task 交回这个角色 | `[Mori] T1 is back with you.` + 最新一棒（编号、角色、结果、结论、未结事项）或交回的原因（`The user answered; see User’s words.`） |
 | 交给结案 | `[Mori] T1 was handed to you: <原因>.` + 最新一棒；或 `[Mori] All tasks of request 1 have ended. Close it with request_close, or ask <create role> for more tasks with agent_message.`；或 `[Mori] Request 1 has no tasks.` |
 | 立项：需要用户拿主意 | `[Mori] T3 needs a decision from the user: <问题> (from <role>).` + 两种做法（§7.7） |
 | 立项：用户消息 | 自上次以来的对话（§8.4）+ `[Mori] New user message: <原文>` + `Make exactly one decision for it.` |
@@ -680,6 +680,8 @@ proposal §4、§10：程序每次请求前钉在上下文末尾的一小段大�
 | 对话：问你拿主意 | `[Mori] T3 needs a decision from the user: <问题>. Ask the user.` |
 | 强制填写、格式重试 | §7.5 |
 | task 中途换模型 | §12.4 |
+
+（2026-10-26 注，U37：task 实例与结案会话收到的投递在 Background tasks 的只读会话里显示（§13.13.4），撇号用 ’（[ui-strings.md](../v0/ui-strings.md) 写法约定）；立项、对话、临时提问、订阅收到的投递和工作卡不显示，照原样。）
 
 ## 9. 唤醒与调度
 

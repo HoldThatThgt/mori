@@ -169,8 +169,8 @@ const AGENT_DESCRIPTION = [
   'Save, update or delete an entry in Mori’s memory. Entries go into the system prompt of new sessions.',
   'Save on your own, without being asked: a fact when the user states something durable that future sessions will '
     + 'need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the '
-    + 'user asked you to remember it or to follow it from now on (for example "the intranet model is now at '
-    + '10.0.0.9, note it" or "from now on, give the conclusion first").',
+    + 'user asked you to remember it or to follow it from now on (for example “the intranet model is now at '
+    + '10.0.0.9, note it” or “from now on, give the conclusion first”).',
   'kind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to '
     + 'talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.',
   'Facts go to this project unless they are about the user personally or apply to every project (layer user). '

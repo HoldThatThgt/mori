@@ -427,7 +427,7 @@ const CLOSE_SYSTEM = sys('You review and close. MORI-ROLE-planner tb-scenario:tb
 const CLOSE_CARD = card('You are planner, closing request 1.', 'Request 1: Fix the login page', 'With you:',
   '- T1 Find and fix: done');
 const CLOSE_START = user('[Mori] T1 was handed to you: done.');
-const CLOSE_FORCED = user("[Mori] T1 was handed to you and you didn't decide. Hand it off now.\nAnswer as "
+const CLOSE_FORCED = user('[Mori] T1 was handed to you and you didn’t decide. Hand it off now.\nAnswer as '
   + '<conclusion>…</conclusion><outcome>close_done|close_failed|continue|need_user</outcome><next>…</next>');
 const CLOSE_REQUEST = user('[Mori] Request 1 has no open tasks and planner didn’t close it. Close it now.\n'
   + `Answer as ${CLOSE_REQUEST_TAGS}<conclusion>…</conclusion>`);

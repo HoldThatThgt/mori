@@ -64,6 +64,9 @@ test('MEM-12 the Correct form lines are appendix A.4 word for word', () => {
 
 test('MEM-12 the tool descriptions are appendix A.2 and A.3 (with <KIND>) word for word', () => {
   assert.equal(K.text.toolDescription(AGENT), specBlock('### A.2'));
+  // A.2 也显示在 Customize › Tools：引号用 “ ”、撇号用 ’（U30、U38），没有直引号和直撇号
+  assert.match(K.text.toolDescription(AGENT), /“the intranet model is now at 10\.0\.0\.9, note it”/);
+  assert.doesNotMatch(K.text.toolDescription(AGENT), /["']/);
   for (const [task, kind] of [['taste', 'TASTE'], ['strategy', 'STRATEGY'], ['review', 'REVIEW']]) {
     assert.equal(K.text.toolDescription({ kind: 'enhance', task }), specBlock('### A.3').replaceAll('<KIND>', kind));
   }

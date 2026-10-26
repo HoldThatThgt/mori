@@ -1175,11 +1175,11 @@ Tasks you create and questions you send to other agents are worked on by agents 
 ### A.2 memory 工具的说明（`agent` 调用方）
 
 2026-10-26 改（§0 第 5 条）：第二行原来只在你说“记一下”或给出“以后都…”的规则时记，现在主动记，`asked` 分出你要它记的；第五行加了“已有的条目改那一条”。
-撇号用 ’（2026-10-26，U30，docs/v0/ui-strings.md）：这段说明也显示在 Customize › Tools 里；A.3 只给增强会话，照原样。
+撇号用 ’（2026-10-26，U30，docs/v0/ui-strings.md），引号用 “ ”（2026-10-26，U38）：这段说明也显示在 Customize › Tools 里；A.3 只给增强会话，照原样。
 
 ```text
 Save, update or delete an entry in Mori’s memory. Entries go into the system prompt of new sessions.
-Save on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example "the intranet model is now at 10.0.0.9, note it" or "from now on, give the conclusion first").
+Save on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example “the intranet model is now at 10.0.0.9, note it” or “from now on, give the conclusion first”).
 kind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.
 Facts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.
 Don’t save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).
