@@ -9,7 +9,7 @@
 //   TB-04（tb-ask）：关闭模式下对话的 agent_message 是一张 "Ask reviewer" 工具卡，回答就是它的结果；没有回执、进展摘要、
 //     批准卡，侧栏里只有用户会话。
 //   TB-08（tb-team、tb-receipts）：三种回执的文字（§13.2，补充的原话超过 120 字符截断）与录下的写入一一对应；合并会话里
-//     在写它的那张工具卡下面；重新打开后顺序相同。
+//     在写它的那张工具卡下面；重新打开后顺序相同；一轮的步骤折成"{n} steps"时卡收起、回执照常显示（2026-10-26 走查 M18）。
 //   TB-37（tb-team、tb-receipts、tb-approval）：进展摘要的位置、标题行与 task 行（用录下的 TaskBoard 视图独立算出文字）、
 //     当前在做什么（§13.8 的标题规则）、需求状态的先后、关闭后 Done / Cancelled、时长停住、没有 task 行、结论与交接链；
 //     重新打开后一致；
@@ -38,6 +38,7 @@ import { build } from 'vite';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
 import { PICK_ERROR, placeProblems, popupBox } from './m6-helpers.mjs';
+import { expandSteps, foldSteps, showStep, stepsState } from './page.mjs';
 import { modeNoticesOf, progressOf, receiptsOf, setProgressOpen, transcriptItems } from './tb-helpers.mjs';
 import { expectedTitle, label } from './tb-real-helpers.mjs';
 
@@ -386,6 +387,7 @@ async function askChecks(page, steps) {
   const answer = resultText(eventsOf(steps, 'tool_execution_end', id).find((e) => e.toolName === 'agent_message'));
   const card = page.locator(`${PANE} [data-testid="tool-card"]`).filter({ hasText: `Ask ${call.args.to}` });
   const cards = await page.locator(`${PANE} [data-testid="tool-card"] .tool-title`).allTextContents();
+  await showStep(card);
   await card.first().locator('summary').click();
   const body = await card.first().locator('.tool-body').innerText().catch(() => '');
   const reply = (await page.locator(`${PANE} [data-testid="assistant"]`).last().innerText()).trim();
@@ -766,12 +768,46 @@ async function teamReopen(page, fx, before, notices) {
   await finish(page, 'TB-37', 'tb-team after the restart', steps);
 }
 
+/**
+ * @brief TB-08（2026-10-26 走查 M18，docs/v0/screens/chat.md"步骤组"）：一轮结束后思考块与工具卡折成"{n} steps"，写回执的
+ *        工具卡跟着收起，回执照常显示（页面里仍紧跟在它的卡后面，snap.inside 已查），进展摘要不在组里、一直显示（§13.2）；
+ *        点开全部步骤组后卡都显示、回执与进展摘要不变；最后折回去，后面的 TB-37 检查和截图看的是默认折起的样子。
+ *        TB-58 的模式提示（"Task mode on/off"）不是助手回复、结束一组：折起、展开、折回时都显示，不在任何步骤组里。
+ * @param snap streamSnapshot 的结果（回执与进展摘要的个数）
+ */
+async function foldedReceipts(page, name, snap) {
+  const count = snap.receipts.length;
+  const blocks = snap.collapsed.length;
+  const folded = await stepsState(page, PANE);
+  await expandSteps(page, PANE);
+  const opened = await stepsState(page, PANE);
+  await foldSteps(page, PANE);
+  const refolded = await stepsState(page, PANE);
+  const summaries = (state) => state.progress.shown === blocks && state.progress.hidden === 0;
+  record(`TB-08 replay ${name}: when a finished turn's thinking and tool cards fold into "<n> steps" rows (button, `
+    + 'aria-expanded false) the tool cards that wrote receipts are hidden with them, but every receipt and every '
+    + 'progress summary stays visible; expanding the rows shows the cards with the same receipts and summaries, and '
+    + 'folding them again hides the cards', folded.rows.length > 0
+    && folded.rows.every((row) => row.expanded === 'false' && /^\d+ steps?( · \d+ failed)?$/.test(row.text))
+    && folded.cards.shown === 0 && folded.receipts.hidden === 0 && folded.receipts.shown === count && count > 0
+    && blocks > 0 && summaries(folded) && opened.cards.hidden === 0 && opened.receipts.shown === count
+    && summaries(opened) && refolded.cards.shown === 0 && refolded.rows.every((row) => row.expanded === 'false'),
+  oneLine(JSON.stringify({ folded, opened, refolded }), 1500));
+  const notices = (state) => state.modeNotices.hidden === 0 && state.modeNotices.grouped === 0
+    && state.modeNotices.shown === folded.modeNotices.shown;
+  record(`TB-58 replay ${name}: the Task mode notice lines stay visible and outside every step group while the `
+    + 'steps are folded, expanded and folded again (a notice is not an assistant reply, so it ends a group)',
+  folded.modeNotices.shown > 0 && notices(folded) && notices(opened) && notices(refolded),
+  JSON.stringify([folded, opened, refolded].map((state) => state.modeNotices)));
+}
+
 /** @brief tb-team 的全部检查。 */
 async function teamFixture(page, fx) {
   const { steps, states } = await teamRun(page, fx);
   const snap = await streamSnapshot(page);
   await shot(page, 'tb-team');
   teamReceipts(steps, snap);
+  await foldedReceipts(page, 'tb-team', snap);
   await teamProgress(page, steps, snap);
   await teamSwitchChecks(page, steps, states);
   const notices = await teamNotices(page, steps);
@@ -848,6 +884,7 @@ async function receiptsFixture(page, fx) {
   const snap = await streamSnapshot(page);
   await shot(page, 'tb-receipts');
   await receiptKinds(page, steps, snap);
+  await foldedReceipts(page, 'tb-receipts', snap);
   await receiptsProgress(page, steps, snap);
   await finish(page, 'TB-08', 'tb-receipts', steps);
 }

@@ -23,7 +23,7 @@ import {
   composerRow, hoverRing, layoutProblems, ringColorProblems, ringState, ringTextProblems, rowProblems, rowSummary,
   smallText, stateProblems,
 } from './m1-layout.mjs';
-import { pageHelpers } from './page.mjs';
+import { pageHelpers, showStep } from './page.mjs';
 
 const source = arg('source');
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -200,6 +200,7 @@ async function item3({ page, h }) {
   record('3 反例：失败的命令显示"失败 · 退出码"，不显示"完成"', failCard?.status === 'failed' && /^Failed/.test(failCard.text),
     JSON.stringify(failCard));
   const index = cards.indexOf(sleepCard);
+  await showStep(page.getByTestId('tool-card').nth(index));
   await page.getByTestId('tool-card').nth(index).locator('summary').click();
   await page.getByTestId('tool-card').nth(index).locator('.tool-body').waitFor();
   const body = await page.getByTestId('tool-card').nth(index).innerText();

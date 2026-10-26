@@ -199,6 +199,20 @@
   white-space: pre-wrap;
 }
 
+/* 步骤组的摘要行（docs/v0/screens/chat.md"步骤组"）：同思考块的标题行；▸ / ▾ 不进读屏名（content 的替代文字为空） */
+.step-group {
+  display: block;
+  width: fit-content;
+  margin: 0 0 10px;
+  padding: 0;
+  color: var(--color-faint);
+  font-size: var(--fs-small);
+  text-align: left;
+}
+.step-group:not(:disabled):hover { background: transparent; color: var(--color-muted); }
+.step-group::before { content: '▸ ' / ''; }
+.step-group[aria-expanded='true']::before { content: '▾ ' / ''; }
+
 /* 工具卡 */
 .tool-card {
   margin: 0 0 10px;
