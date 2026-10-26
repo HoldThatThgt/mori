@@ -187,6 +187,10 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
   `See background tasks`（`ModelMenu.tsx`，条件同页签，点了关上菜单、经 `openTasks` 打开右栏，回复进行中也能用）；
   照 WP-09 的界面文字把用例名、规格与记录里的 `Stop team` 改为 `Stop agents`、team mode 改为 task mode，F8 的
   `Send (team): …` 改为 `Send (task mode): …`。
+- 合进 `app-v0` 的 WP-10 之后（8f50a42；冲突在 `TeamStream.tsx`（WP-10 的 `named` 与这里的 `tabKey` 都留）、
+  `spec-coverage.test.mjs`（前 59 个是 TB-01–TB-59，TB-80–TB-89 一段，编号不重复）、`tb-real*.mjs`、`tb-replay.mjs`、规格与
+  这份记录，两边都留）：回放与录制里 stop-task 一段改用 `/task`（`/team` 不再是命令）；`test:unit` 461/461，
+  `test:tb-unit` 373/373。Background tasks 里基座的名字照旧写 `Mori`，见上面“你不在时按推荐定下的”#5。
 
 ### 测试（AGENTS.md 测试分层，每次改动的那几层）
 
@@ -198,6 +202,8 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
 | `npm run test:tb-unit` | 359/359（WP-09 之后；新：`tasks.test.mjs` 14 项、`taskList.test.mjs` 9 项） |
 | `tb-app-tasks.mjs --only` | plain、empty、entries、list、taskview、transcript、tabs、keys、stop、readonly、reload、narrow、approval、outcomes、noactivity、errors、restart 每一步最近一次都通过（2026-10-26 为状态表的每一行补了 tabs、narrow、outcomes、noactivity 四步与各步里的检查，见下面的表）；WP-09 之后 `--only plain,empty,entries,stop,readonly,menu` 全部通过（含 menu 与 readonly 最后一项）；folding 等 WP-14（下面）（分几次跑，端口 4950–4951；结果是 `tb-partial-app-tasks.json`，不计入覆盖检查） |
 | 整套 `tb-app-tasks.mjs`（a37dbbf 之后跑一次） | 75 项通过、6 项失败：等 WP-14 的 `folding` 两项、等 WP-09 的 `menu` 一项与 `readonly` 最后一项，另外两项是用例的问题（`narrow`、`restart`，上面“实现”最后一条），改了之后 `--only reload,narrow,errors,restart` 与 `--only entries,menu` 跑过：除了等 WP-09 的 `menu` 两项都通过 |
+| 整套 `tb-app-tasks.mjs`（WP-10 合入后，8f50a42 之上） | 80 项通过、2 项失败：只剩等 WP-14 的 `folding` 两项（还没有步骤组）；WP-09 的 `menu` 与 `readonly` 最后一项、上一次的 `narrow`、`restart` 都通过 |
+| `tb-replay --only stop-task`（TB-89） | 六项都通过：停之前卡片在 `Running`、有 `Stop this task`，点它发出录制里的 `session.stopTask`；之后在 `Finished`、`Stopped`；交回后回到 `Running`、最后在 `Finished`；界面发出的命令与录制一致；页面没有错误 |
 | `tb-app-tasks-owner.mjs`（TB-88） | 通过：`Finished` 里 T6–T1 全是 Done、没有 `Running`；T2 3 条、T5 1 条、T6 2 条消息全文（T6 两条含表格）；T1–T6 与结案会话都能打开，T4（约 1 MB）的会话 261 ms 显示完；没有发模型请求。只复制那条会话的文件与 `teams/<id>`，没有读 `credentials.json`、`pi/auth.json` |
 | `npm run test:quick` | a37dbbf 之后通过：4/4，87 秒（m0-smoke 31、tb-replay 14、mem-replay 17、m1-replay 16 项）；WP-09 之后通过：4/4，81 秒 |
 | 整套 `tb-app-tasks*.mjs`、`tb-replay`、TB-46 汇总、`spec-coverage --spec taskboard` | 负责人要求推送前的完整回归里跑（测试分层第 3 条）；两个 `tb-app-tasks*.mjs` 已加进 `npm run test:taskboard` |
@@ -208,9 +214,10 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
 - WP-14（一轮结束后折叠步骤）：实例会话里的步骤照对话流折叠（§13.13.4）。`folding` 一步已写好（做完的 T1 会话折成
   “<n> steps”（aria-expanded 为 false；▸ / ▾ 是 WP-14 用样式画的，不在文字里）、点开看到工具卡；运行中的 T3 那一组全部
   显示），现在跑前两项失败（还没有步骤组），第三项通过。
-- WP-10（发给模型的文字）：TB-89 的 fixture `tests/fixtures/tb/stop-task.json`（`tb-record.mjs --only stop-task`）与
-  `tb-real.mjs --only stop`，脚本都已写好；WP-10 改了模型读的文字，在它之前录的要重录，所以等它。在那之前 `tb-replay` 的
-  TB-89 记 “replay fixture missing”。
+- WP-10（发给模型的文字）：合进来了（8f50a42）。TB-89 的 fixture `tests/fixtures/tb/stop-task.json` 录好了（10fb133，
+  `MORI_APP_DIR=.tb-runs/real node tests/ui/tb-record.mjs --source %TEMP%mori-real-data --only stop-task`，负责人的
+  DeepSeek 与 GLM，第一次就录成，2104 步），`tb-replay --only stop-task` 六项都通过。还没做的：`tb-real.mjs --only stop`——
+  它的转发代理在 4690（TaskBoard 共用的 4600 段），走查修复会话要等第二波都合完才让用这些端口，那时跑。
 
 ### 状态表的每一行与用例（AGENTS.md“不留未完成项”第 4 条，2026-10-26）
 
