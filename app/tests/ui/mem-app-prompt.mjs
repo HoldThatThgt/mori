@@ -340,13 +340,15 @@ function identityProblems(item) {
   if (!parsed) return [`does not start with appendix A.1 + <tools>/<rules>: ${item.system.slice(0, 80)}`];
   const bad = [];
   const names = listedTools(parsed.tools);
-  const want = item.tools.filter((name) => BUILTIN_TOOLS.includes(name));
+  const builtins = item.tools.filter((name) => BUILTIN_TOOLS.includes(name));
+  // 有 promptSnippet 的 Mori 工具也列在 <tools> 里：subagent（docs/specs/subagent.md §6.1）；memory、TaskBoard 的工具没有
+  const want = [...builtins, ...item.tools.filter((name) => name === 'subagent')];
   if (names === null) bad.push(`<tools> format: ${parsed.tools.slice(0, 120)}`);
   else if (!sameSet(names, want)) bad.push(`<tools> ${names.join(',')} vs request ${item.tools.join(',')}`);
-  const shell = shellRuleFor(want);
+  const shell = shellRuleFor(builtins);
   const shellLines = parsed.rules.filter((line) => Object.values(SHELL_RULE).includes(line.slice(2)));
   if (shell === null ? shellLines.length > 0 : !(shellLines.length === 1 && parsed.rules[0] === `- ${shell}`)) {
-    bad.push(`shell rule ${JSON.stringify(shellLines)} for ${want.join(',')}`);
+    bad.push(`shell rule ${JSON.stringify(shellLines)} for ${builtins.join(',')}`);
   }
   if (!parsed.rules.every((line) => line.startsWith('- ')) || !same(parsed.rules.slice(-2), FIXED_RULES)) {
     bad.push(`rules ${JSON.stringify(parsed.rules.slice(-3))}`);
