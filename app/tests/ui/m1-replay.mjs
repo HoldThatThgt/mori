@@ -19,6 +19,7 @@ import {
   seenWith, setDraftKeepingFocus, setPaneWidth, SINGLE, stateProblems, tabPath, watchRows,
 } from './m1-layout.mjs';
 import { pageHelpers } from './page.mjs';
+import { readParts } from './ring-parts.mjs';
 
 const only = arg('only')?.split(',');
 const harnessDir = join(appRoot, 'tests/ui/harness');
@@ -144,7 +145,11 @@ async function emptyRing(page, h) {
 async function usedRing(page) {
   const hovered = await hoverRing(page);
   const opened = await openRingDetails(page);
+  const parts = await readParts(page, SINGLE);
   await page.keyboard.press('Escape');
+  record('readme：录制早于分项（session.state 里没有 contextBreakdown），按没有：有用量时详情只有第一行，没有分段条和分项，'
+    + '圆环没有读屏描述（models.md"回放旧的录制"）', parts?.open && parts.rows.length === 0
+    && parts.segments.length === 0 && parts.desc === '' && hovered?.desc === null, JSON.stringify(parts));
   record('readme：输入框下面一行的圆环显示上下文用量：读屏名"Usage: Context approximately 2,130 of 1,000,000 tokens (0%)"，'
     + '悬停"Context ≈ 2.1k / 1M (0%)"（1,000,000 写成 1M，不到 0.5% 写 0%），详情里同一个数，描述里没有"/"',
   hovered?.label === 'Usage: Context approximately 2,130 of 1,000,000 tokens (0%)'

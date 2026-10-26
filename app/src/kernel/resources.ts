@@ -14,7 +14,7 @@ import {
   RESOURCE_KINDS, type PackageEntry, type ProjectTrust, type ResourceEntry, type ResourceKind, type SaveResult,
   type ToolEntry, type ToolsInfo,
 } from '../shared/protocol';
-import { readMcpServers } from './mcpConfig';
+import { isMcpTool, readMcpServers } from './mcpConfig';
 import { MEMORY_EXTENSION_PATH } from './memoryExtension';
 import { loadPi, type Pi } from './pi';
 import { togglePackageResource, toggleTopLevelResource, type ToggleContext } from './resourceToggles';
@@ -23,8 +23,6 @@ import { decideTrust } from './trust';
 
 /** 技能正文最多交给界面的字符数 */
 const BODY_LIMIT = 20_000;
-/** pi 的 MCP 扩展注册的工具的来源路径 */
-const MCP_PATH = 'builtin:mcp';
 /** 不能在这里启停的原因（界面文字）：项目设置停用了这个用户级资源 */
 const DISABLED_BY_PROJECT = 'Turned off in this project’s .pi/settings.json. To change it, edit that file.';
 /** 项目设置启用了这个用户级资源 */
@@ -228,7 +226,7 @@ function skillDiagnostics(views: Views): string[] {
 function toolSource(tool: ToolInfo): Pick<ToolEntry, 'source' | 'sourceLabel'> {
   const { path, origin, source } = tool.sourceInfo;
   const server = tool.namespace?.aliases?.[0] ?? tool.namespace?.name ?? '';
-  if (path === MCP_PATH) return { source: 'mcp', sourceLabel: server };
+  if (isMcpTool(tool)) return { source: 'mcp', sourceLabel: server };
   if (path.startsWith('builtin:')) return { source: 'builtin', sourceLabel: '' };
   if (origin === 'package') return { source: 'package', sourceLabel: source };
   if (path === TEAM_EXTENSION_PATH || path === MEMORY_EXTENSION_PATH) {
@@ -253,7 +251,7 @@ function toolEntries(session: AgentSession): ToolEntry[] {
 async function mcpInfo(context: SessionContext, trusted: boolean): Promise<NonNullable<ToolsInfo['mcp']>> {
   const { servers, errors } = await readMcpServers(context.cwd, trusted);
   const tools = context.session.getAllTools()
-    .filter((tool) => tool.sourceInfo.path === MCP_PATH && tool.exposure !== 'hidden');
+    .filter((tool) => isMcpTool(tool) && tool.exposure !== 'hidden');
   return { errors, servers: servers.map((server) => ({ ...server,
     tools: tools.filter((tool) => tool.namespace?.aliases?.includes(server.name)).map((tool) => tool.name) })) };
 }

@@ -3,8 +3,8 @@
 
 import { create } from 'zustand';
 import {
-  DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextUsage, type ModelState, type ProjectTrust,
-  type QuoteRef, type SavedSession,
+  DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextBreakdown, type ContextUsage, type ModelState,
+  type ProjectTrust, type QuoteRef, type SavedSession,
 } from '../../../shared/protocol';
 import { emptyBoard, soloTeamState, type BoardView, type TeamState } from '../../../shared/team';
 import type { MemoryNotice } from '../../../shared/memory';
@@ -65,6 +65,8 @@ export interface Tab extends ModelState {
   extensionErrors: string[];
   /** 上下文用量 */
   contextUsage: ContextUsage | null;
+  /** 上下文用量的分项（圆环的详情，docs/v0/screens/models.md"详情里的分项"）；与 contextUsage 一起刷新 */
+  contextBreakdown: ContextBreakdown | null;
   /** 批准设置（权限与"Allowed for this session"），以后台进程返回的为准 */
   approval: ApprovalState;
   /**
@@ -188,9 +190,10 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
     activity: Date.now(), unseen: false, interrupted: false, projectTrust: 'none', trustRemembered: false,
     trustSaveError: null, extensionErrors: [], pick: null, current: null, blocked: null,
     thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, pickLocked: false, contextUsage: null,
-    approval: DEFAULT_APPROVAL, team: soloTeamState(false), board: emptyBoard(), transcript: emptyTranscript, draft: '',
-    draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
-    refPending: [], memoryNotice: null, phase: 'opening', error: null, ...fields };
+    contextBreakdown: null, approval: DEFAULT_APPROVAL, team: soloTeamState(false), board: emptyBoard(),
+    transcript: emptyTranscript, draft: '', draftRefs: [], startIndex: 0, rightOpen: null,
+    rightView: { kind: 'changes' }, transcriptJump: null, refPending: [], memoryNotice: null, phase: 'opening',
+    error: null, ...fields };
 }
 
 /**
