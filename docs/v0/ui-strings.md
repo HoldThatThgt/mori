@@ -55,6 +55,11 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 一栏（分屏的一边） | pane | pane、Close pane | |
 | 左栏 / 侧栏 | sidebar | Sidebar | |
 | 右栏 | right panel | panel、Close panel | |
+| 后台任务（右栏的一栏） | Background tasks（页签、标题）/ Changes（另一个页签） | Background tasks、Changes | 2026-10-26 加（TaskBoard 规格 §13.13）：右栏两栏的名字照 Claude；只在有需求或协作模式打开时出现页签，否则右栏仍是 "This session’s changes" |
+| 实例的会话（只读） | transcript / View transcript / 读屏名 View transcript for <role> on T1 | View transcript、View transcript for {description} | Claude 打开子 Agent 会话的按钮；结案会话的读屏名 "View transcript for <close role> on Request 1" |
+| 交接 | Handoffs（task 视图的分节）/ #<n> <role> · <结果> → <去向> | — | Mori 自己的词（proposal 的 handoff）；结果与去向的英文见 TaskBoard 规格 §15 |
+| task 的说明 | Prompt | Prompt | 立项写的 task 说明（`description`）；Claude 把子 Agent 收到的那段叫 prompt |
+| 留给 task 的消息 | Messages | Messages | |
 | 引用（动作：选区浮层的按钮、会话菜单、回复下的按钮、拖到输入框） | Attach as context / Attach message as context / Drop to attach as context | Attach as context、Attach message as context | 负责人定：整个引用功能在界面上用 Claude 的 context 说法。Claude 的 Code 标签页把"把消息、选区、会话带进下一条消息"叫这个（"Right-click a message or select text → Attach as context"） |
 | 引用（芯片、预览） | Context · …（芯片、读取中的芯片、预览标题）/ Remove context / Cancel attaching “<name>” / Not attached / the attached text | Attached context | 负责人定；读屏名在 "Context" 后用冒号（"Context: src/a.ts · lines 3–5, jump to source"、"Remove context: …"）。给模型的文字不变，仍是 "Quoting …:" 和 "[Quote] …"。工作回顾里反馈记录的 "Quoted text" 是反馈针对的原文，不属于这个功能，不改 |
 | 问 Mori | Attach as context | Attach as context | 负责人定：选区浮层的按钮与会话菜单同一个词；操作记录 "Attach as context (file)" / "Attach as context (response)" |
@@ -222,6 +227,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | N 次 / 第 N 次 · 修改 | 1 change（N changes）/ Change N · Edit（Write） |
 | 写入的内容 | File content |
 | 阅读器 | Loading… / File not found / Source changed · Attached text: / Preview unavailable · Binary file / Preview unavailable · This is a folder / Couldn’t read this file: … / Reload file / Open in default app / Close panel |
+| Background tasks（2026-10-26，TaskBoard 规格 §13.13） | 页签 Changes / Background tasks；阶段行按钮 1 running task（{n} running tasks）/ 1 task finished（{n} tasks finished），悬停 Show this session’s background tasks（Claude 原句）；进展摘要的链接 Open T1 <title> in Background tasks / Open Request 1 in Background tasks（Claude 的 "Open {name} in Background tasks"）；空 Background tasks appear here（Claude 原句）；节头 Request 1 · <title>，下一行 <状态> · <时长>；Question: … / Conclusion / Ruled out；卡片 T1 <title>、<role> · <在做什么> · <时长>、Depends on T1, T2、View transcript（多个角色时 View transcript (<role>)）；task 的视图 Back / · Read-only / Request 1 · <title> / Prompt / Depends on / Messages（每条 <from> · hh:mm）/ Handoffs / Open items / Evidence（✓ #3 Run npm test）/ Suggested next: <role> / Loading… / Couldn’t load T1: … / Retry；会话 <role> · T1 <title> / <close role> · Request 1 (closing) / Model <provider>/<model>（Claude 的 "Model {model}"）/ Running… / No activity yet（Claude 原句）/ Failed to read session transcript（Claude 原句）/ Retry |
 
 ### 首次启动
 
@@ -463,6 +469,7 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 | 输入框下面一行 | Set model range <范围> / Change effort for this session: <level>（<level> 是 pi 的取值，如 high、xhigh） |
 | Customize 页 | Open Customize / Enable（Disable）<单数的类别> <path>（Enable skill …、Disable extension …、Enable prompt template …）/ Enable all in plugin（Disable all in plugin）<source> / Add plugin from folder <path> / Remove plugin <source> / Save MCP server <name> / Enable（Disable）MCP server <name> / Remove MCP server <name> / Switch MCP server <name> to direct calls |
 | 工作回顾 | Open Review / View in Review / Review: Feedback / View record: UI issues / Resolve / Reopen / Hide resolved / Show resolved / Export: Feedback / Open folder: UI issues / Show record in Explorer / Jump to source from Review（v1：见 docs/specs/memory.md §8：这一行由记忆页的动作记录替换：Open Memory、Memory: <层或分节>、View in Memory、Dismiss memory notice、Jump to source from Memory、F8 的 View in Settings，以及命令的 Save memory entry、Roll back revision、Turn on enhancement <cwd> 等，全文见规格 §8；设置页的 UI issues 沿用 View record: UI issues、Resolve、Reopen、Hide resolved、Show resolved、Export: UI issues、Open folder: UI issues、Show record in Explorer；Review: Feedback、Export: Feedback 不再有） |
+| Background tasks（TaskBoard 规格 §13.13.6） | Open background tasks / Open T1 in Background tasks / View transcript: T1 · <role> / View transcript: Request 1 · closing |
 | 其他 | Report a UI issue / Restart background process |
 
 "Feedback"、"UI issues" 是分节名（大写开头），所以放在冒号后面，不嵌进句子中间。
