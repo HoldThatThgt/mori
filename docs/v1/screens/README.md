@@ -54,7 +54,8 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | [memory-page.md](memory-page.md) | 记忆页：左栏 `Memory`、`User` ｜ `Project` 与跟随的项目、六个分节、用量与 `Last change`、列表与读不出来的条目、条目详情（Evidence、Details 与 `[[slug]]`、Linked from、History）、编辑与新增、离开确认、删除、移动、依据回到原位置、AGENT、Revisions 与回滚、数据何时读、后台进程退出 | [v0 review.md](../../v0/screens/review.md)（工作回顾，M7）的入口、页面、反馈部分与回到原位置；[v0 layout.md](../../v0/screens/layout.md) 左栏的“Review” |
 | [memory-enhance.md](memory-enhance.md) | 记忆页 `Project` 顶部的增强：开关、状态行（规格 §10.4 的每一种）、`Run now`、`Enhancement settings` 对话框、进度事件 | 新增（v0 没有对应的屏） |
 | [memory-chat.md](memory-chat.md) | memory 工具卡（标题、免批准、`View in Memory`、失败）、工具页的 `memory` 行、记忆目录的写保护、新会话顶部的提示、反馈表单的说明与 `Saved` | 补充 [v0 tool-cards.md](../../v0/screens/tool-cards.md)、[v0 tools.md](../../v0/screens/tools.md)；取代 [v0 selection.md](../../v0/screens/selection.md)“反馈”的底部说明与 `Saved · View in Review` |
-| [settings-issues.md](settings-issues.md) | 设置 → `UI issues`（列表、详情与截图、Hide resolved、导出、打开文件夹）、F8 的 `View in Settings` 与 `Page`、设置 → AGENTS.md 的 token 数与超出标记 | [v0 review.md](../../v0/screens/review.md) 的 UI issues 部分与主进程通道；[v0 f8.md](../../v0/screens/f8.md) 的 `View in Review`；补充 [v0 settings.md](../../v0/screens/settings.md) 的 AGENTS.md 节 |
+| [settings-issues.md](settings-issues.md) | 设置 → `UI issues`（列表、详情与截图、Hide resolved、导出、打开文件夹）、F8 的 `View in Settings` 与 `Page`（2026-10-26 改：AGENTS.md 的 token 数随 AGENTS.md 挪到 Customize，见下一行） | [v0 review.md](../../v0/screens/review.md) 的 UI issues 部分与主进程通道；[v0 f8.md](../../v0/screens/f8.md) 的 `View in Review` |
+| [customize-agents-md.md](customize-agents-md.md) | Customize → `AGENTS.md`（2026-10-26 负责人走查 M4、M15）：第一节、跟随 Customize 的会话、不等 `tools.get`；用户级编辑器、项目加载的文件、token 数与 2,000 token 的提醒线、离开确认；记忆页的 `Edit in Customize` | [v0 settings.md](../../v0/screens/settings.md) 的 AGENTS.md 节；补充 [v0 tools.md](../../v0/screens/tools.md) 的外框 |
 
 时刻 `hh:mm:ss` 一律是本地时间（24 小时制，`shared/models.ts` 的 `formatClock`），由事件里的毫秒时刻（`until`）换算。
 记忆的几张表里日期写 `<Mon D>`（例如 `Oct 22`），时间写 `<Mon D> <hh:mm>`（本地时间，24 小时制，`shared/memory.ts` 的 `monthDay`、`monthDayTime`）。
@@ -68,7 +69,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
   模型按钮生成中的悬停规格 §9.2 已给英文（“Can’t switch models until the response finishes”）；思考强度菜单（强度名、
   “Effort: High”、生成中的悬停）、v0 错误卡的“Put your last message back in the message box”、“Stopped · …”
   “Compacted session”、排队区的“Queued”都是 english-ui 定的英文（v0/ui-strings.md）。
-- 设置页左侧的分节按钮写“Models”（规格 §9.1 的叫法），“AGENTS.md”分节与“Back to app”不变。
+- 设置页左侧的分节按钮写“Models”（规格 §9.1 的叫法），“Back to app”不变（2026-10-26 改：“AGENTS.md”分节挪到 Customize，见 customize-agents-md.md）。
 - 思考关不掉的模型的文字按规格 §7.7 原文（2026-10-24 补丁）：档案摘要“Thinking: Can’t be turned off”、Effort 菜单底部“This model can’t turn thinking off.”，
   探针出错的说明“Stopped at the probe output limit before answering”（同其他出错原文，出现在“Couldn’t verify: …”后面）；
   第 2 步的说明“Thinking can’t be turned off: <原文>”只存在档案文件（`model-profiles.json`）里，界面不显示（[v0/ui-strings.md](../../v0/ui-strings.md) 设置一节）。
@@ -175,4 +176,4 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `memory-enhance`、`enhance-switch`、`enhance-status`、`enhance-run`、`enhance-settings`、`enhance-dialog`（`enhance-model`、`enhance-effort`、`enhance-team`、`enhance-time`、`enhance-save`）；`enhance-error` | 增强一块与设置对话框（`enhance-error` 该文件定，临时） | memory-enhance.md |
 | `tool-memory-view`、`memory-notice`、`memory-notice-view`、`feedback-note`、`feedback-saved` | 工具卡的 View in Memory、新会话提示、反馈表单（提示里 `Dismiss` 的 `data-action="dismiss"` 该文件定，临时） | memory-chat.md |
 | `settings-nav` 的 `button[data-section="issues"]`；`issues-*`（由 M7 的 `review-*` 改名）；`issue-open-settings` | 设置页的 UI issues、F8 的 View in Settings | settings-issues.md |
-| `agents-tokens`、`.agents-tokens`、`agents-over` | 设置页 AGENTS.md 节的 token 数与超出标记 | settings-issues.md |
+| `tools-nav` 的 `button[data-section="agents"]`、`agents-section`、`agents-tokens`、`.agents-tokens`、`agents-over` | Customize 的 AGENTS.md 一节、它的 token 数与超出标记（2026-10-26 从设置页挪来） | customize-agents-md.md |

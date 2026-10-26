@@ -496,18 +496,24 @@ export function handleKernelReady(): void {
 }
 
 /**
- * @brief 打开设置页（侧栏）。从工具页（Customize）过来时不用问（有未保存改动的编辑器只在设置页里）。
- *        卡片与范围菜单里打开 Settings → Models 的按钮用 settings.ts 的 openModelsSettings。
+ * @brief 打开设置页（侧栏）。已经在设置页时直接调用（设置页里没有会登记离开检查的编辑器），从别的页面过来时侧栏先经过
+ *        guardLeave（Customize 的 AGENTS.md、记忆页的表单有未保存的改动时先问）。卡片与范围菜单里打开 Settings → Models
+ *        的按钮用 settings.ts 的 openModelsSettings。
  */
 export function openSettings(): void {
   recordAction('Open settings');
   useApp.setState({ view: 'settings' });
 }
 
-/** @brief 打开工具页（Customize，docs/v0/screens/tools.md）；从有未保存改动的设置页过来时先问。 */
-export function openTools(): void {
+/**
+ * @brief 打开工具页（Customize，docs/v0/screens/tools.md），落在第一节 AGENTS.md；已经在工具页时什么都不做（同记忆页的
+ *        Memory）；有未保存的改动（记忆页的表单）时先问。
+ * @param action 操作记录：侧栏是 `Open Customize`，记忆页 AGENT 的 Edit in Customize 是 `Open Customize → AGENTS.md`
+ */
+export function openTools(action = 'Open Customize'): void {
+  if (useApp.getState().view === 'tools') return;
   guardLeave(() => {
-    recordAction('Open Customize');
+    recordAction(action);
     useApp.setState({ view: 'tools' });
   });
 }

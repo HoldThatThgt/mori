@@ -1,27 +1,45 @@
-// 设置页的"AGENTS.md"（docs/v0/screens/settings.md）：用户级 AGENTS.md 的编辑器（有未保存的改动时离开先问），
-// 和焦点会话的项目加载了哪些文件（只列出，可以用"Open in default app"打开）。
-// 每个文件的 token 数与合计超过 500 的警告（docs/specs/memory.md §10.3）写在单独的元素里，路径与生效说明的文字不变。
+// Customize 的"AGENTS.md"一节（docs/v1/screens/customize-agents-md.md；2026-10-26 负责人走查 M4 从设置页挪来）：
+// 用户级 AGENTS.md 的编辑器（有未保存的改动时离开先问），和 Customize 跟随的会话的项目加载了哪些文件（只列出，可以用
+// "Open in default app"打开）。每个文件的 token 数与合计超过 AGENTS_LIMIT 的警告（docs/specs/memory.md §10.3）写在单独的
+// 元素里，路径与生效说明的文字不变。这一节不读 tools.get，不受它的读取中与读取失败影响。
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { MEMORY_LIMIT } from '../../../shared/memory';
+import { AGENTS_LIMIT } from '../../../shared/memory';
 import type { AgentsInfo } from '../../../shared/protocol';
 import { describe, request } from '../state/bridge';
 import { setLeaveGuard, useLeave } from '../state/leaveGuard';
-import { focusedSession, type FocusedSession, type Notice } from '../state/settings';
+import type { Notice } from '../state/settings';
 import { folderName } from './ChatPane';
+import { thousands } from './settings/common';
 
 /** 有未保存的改动时离开确认框的标题 */
 const LEAVE_TITLE = 'Discard changes to AGENTS.md?';
 /** 有未保存的改动时离开确认框的说明 */
 export const LEAVE_TEXT = 'Your edits haven’t been saved. Leaving now discards them.';
 
-/** @brief AGENTS.md 合计超过上限时的警告（§10.3，设置页与记忆页的 AGENT 节共用）。 */
-export const AGENTS_OVER_TEXT = `Over ${MEMORY_LIMIT} tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep `
-  + 'prompts short.';
+/** @brief AGENTS.md 合计超过提醒线时的警告（§10.3，Customize 与记忆页的 AGENT 节共用）。 */
+export const AGENTS_OVER_TEXT = `Over ${thousands(AGENTS_LIMIT)} tokens. Mori doesn’t shorten AGENTS.md; edit the `
+  + 'files to keep prompts short.';
 
-/** @brief 一个文件的 token 数：`<n> tokens`，1 时 `1 token`（§10.3）。 */
+/** @brief 一个文件的 token 数：`<n> tokens`（1000 起按千分位写），1 时 `1 token`（§10.3）。 */
 export function tokenCount(count: number): string {
-  return count === 1 ? '1 token' : `${count} tokens`;
+  return count === 1 ? '1 token' : `${thousands(count)} tokens`;
+}
+
+/** @brief AGENTS.md 一节跟随的项目：Customize 跟随的会话。 */
+export interface AgentsProject {
+  /** pi 会话 id；会话还在打开中时为 null（打开好后重新读取） */
+  sessionId: string | null;
+  /** 会话的工作目录（标题里写它的文件夹名） */
+  cwd: string;
+}
+
+/** @brief 读到的 AGENTS.md 信息与读它时带的会话。 */
+interface AgentsRead {
+  /** agents.get 的结果；还没读到时为 null */
+  info: AgentsInfo | null;
+  /** 读这份结果时带的会话 id；没带会话时为 null */
+  readFor: string | null;
 }
 
 /** @brief 保存的状态。 */
@@ -32,22 +50,34 @@ function parentDir(path: string): string {
   return path.replace(/[\\/][^\\/]*$/, '');
 }
 
-/** @brief 读取 AGENTS.md 的信息（agents.get，带焦点会话）；load 重新读取，已有信息时失败只记日志。 */
-function useAgentsInfo(session: FocusedSession | null) {
-  const [info, setInfo] = useState<AgentsInfo | null>(null);
+/**
+ * @brief 读取 AGENTS.md 的信息（agents.get，带跟随的会话）；跟随的会话换了时重新读取，只有最后一次读取的结果生效。
+ *        失败时记下原文，之前读到的内容留着（编辑框里没保存的字不丢）。setContent 在保存成功后先记下新内容。
+ */
+function useAgentsInfo(sessionId: string | null) {
+  const [read, setRead] = useState<AgentsRead>({ info: null, readFor: null });
   const [error, setError] = useState<string | null>(null);
+  const latest = useRef(0);
   const load = useCallback(async () => {
+    latest.current += 1;
+    const current = latest.current;
     try {
-      setInfo(await request<AgentsInfo>({ type: 'agents.get', sessionId: session?.sessionId }));
+      const info = await request<AgentsInfo>({ type: 'agents.get', sessionId: sessionId ?? undefined });
+      if (current !== latest.current) return;
+      setRead({ info, readFor: sessionId });
       setError(null);
     } catch (failure) {
-      setError(describe('agents.get', failure));
+      const message = describe('agents.get', failure);
+      if (current === latest.current) setError(message);
     }
-  }, [session]);
+  }, [sessionId]);
   useEffect(() => {
     void load();
   }, [load]);
-  return { info, setInfo, error, load };
+  const setContent = useCallback((content: string) => {
+    setRead((current) => (current.info ? { ...current, info: { ...current.info, content } } : current));
+  }, []);
+  return { ...read, error, load, setContent };
 }
 
 /**
@@ -170,9 +200,9 @@ function EffectiveFile({ info }: { info: AgentsInfo }) {
   );
 }
 
-/** @brief 合计超过上限时的警告（§10.3）；没有超过时不显示。 */
+/** @brief 合计超过提醒线时的警告（§10.3）；没有超过时不显示。 */
 function AgentsOver({ total }: { total: number }) {
-  if (total <= MEMORY_LIMIT) return null;
+  if (total <= AGENTS_LIMIT) return null;
   return <p className="form-message agents-over" role="status" data-testid="agents-over">{AGENTS_OVER_TEXT}</p>;
 }
 
@@ -210,9 +240,37 @@ function UserAgents({ info, onSaved }: { info: AgentsInfo | null; onSaved: (cont
   );
 }
 
-/** @brief 项目级（只列出）：焦点会话的资源加载器实际加载的文件与各自的 token 数，不含 agentDir 里的那个。 */
-function ProjectAgents({ session, loaded }: { session: FocusedSession | null; loaded: AgentsInfo['loaded'] }) {
-  if (!session || !loaded) {
+/** @brief 项目加载的文件：说明、每个文件一行路径与 token 数（可以用"Open in default app"打开），没有时说明没有。 */
+function LoadedFiles({ loaded, cwd }: { loaded: NonNullable<AgentsInfo['loaded']>; cwd: string }) {
+  return (
+    <>
+      <p className="muted">
+        Read when the session opens. If you change a file later, only new sessions pick it up. Project files can’t be
+        edited here.
+      </p>
+      {loaded.length === 0 && <p className="tools-empty">This project doesn’t load an AGENTS.md or CLAUDE.md</p>}
+      <ul className="agents-files">
+        {loaded.map((file) => (
+          <li key={file.path}>
+            <span className="agents-path">{file.path}</span>
+            <span className="agents-tokens">{tokenCount(file.tokens)}</span>
+            <OpenInEditor path={file.path} cwd={cwd} />
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/**
+ * @brief 项目级（只列出）：跟随的会话的资源加载器实际加载的文件与各自的 token 数，不含 agentDir 里的那个。
+ *        会话还在打开中、或最近读到的不是这个会话的结果时，标题下"Loading…"；没有跟随的会话时说明怎样才看得到。
+ * @param readFor 读到的 loaded 是哪个会话的（没带会话时为 null）
+ */
+function ProjectAgents({ project, readFor, loaded }: {
+  project: AgentsProject | null; readFor: string | null; loaded: AgentsInfo['loaded'];
+}) {
+  if (!project) {
     return (
       <div className="agents-project" data-testid="agents-loaded">
         <h3>Files loaded by the project</h3>
@@ -220,46 +278,35 @@ function ProjectAgents({ session, loaded }: { session: FocusedSession | null; lo
       </div>
     );
   }
+  const current = project.sessionId !== null && project.sessionId === readFor ? loaded : null;
   return (
     <div className="agents-project" data-testid="agents-loaded">
-      <h3>Files loaded by {folderName(session.cwd)}</h3>
-      <p className="muted">
-        Read when the session opens. If you change a file later, only new sessions pick it up. Project files can’t be
-        edited here.
-      </p>
-      {loaded.length === 0 && <p className="settings-empty">This project doesn’t load an AGENTS.md or CLAUDE.md</p>}
-      <ul className="agents-files">
-        {loaded.map((file) => (
-          <li key={file.path}>
-            <span className="agents-path">{file.path}</span>
-            <span className="agents-tokens">{tokenCount(file.tokens)}</span>
-            <OpenInEditor path={file.path} cwd={session.cwd} />
-          </li>
-        ))}
-      </ul>
+      <h3>Files loaded by {folderName(project.cwd)}</h3>
+      {current ? <LoadedFiles loaded={current} cwd={project.cwd} /> : <p className="muted" role="status">Loading…</p>}
     </div>
   );
 }
 
-/** @brief "AGENTS.md"一节：每次换到这一节时重新读取；读取失败时显示原文。 */
-export function AgentsSection() {
-  const [session] = useState(focusedSession);
-  const { info, setInfo, error, load } = useAgentsInfo(session);
+/**
+ * @brief "AGENTS.md"一节：每次换到这一节时重新读取，跟随的会话换了时再读；读取失败时在顶部显示原文（第一次就失败时
+ *        没有编辑框，之后的失败留着读到过的内容）。
+ * @param project Customize 跟随的会话；没有时为 null
+ */
+export function AgentsSection({ project }: { project: AgentsProject | null }) {
+  const sessionId = project?.sessionId ?? null;
+  const { info, readFor, error, load, setContent } = useAgentsInfo(sessionId);
   // 保存后先记下内容，再重新读取（新建文件后生效的文件可能变了）。
   const onSaved = (content: string) => {
-    setInfo((current) => current && { ...current, content });
+    setContent(content);
     void load();
   };
   return (
-    <div className="settings-section" data-section="agents">
+    <div className="agents-section" data-testid="agents-section">
       <h2>AGENTS.md</h2>
-      {error && !info ? <p className="form-message error" role="alert">Couldn’t load AGENTS.md: {error}</p> : (
-        <>
-          <UserAgents info={info} onSaved={onSaved} />
-          {info && <ProjectAgents session={session} loaded={info.loaded} />}
-          {info && <AgentsOver total={info.total} />}
-        </>
-      )}
+      {error && <p className="form-message error" role="alert">Couldn’t load AGENTS.md: {error}</p>}
+      {(info || !error) && <UserAgents info={info} onSaved={onSaved} />}
+      {info && <ProjectAgents project={project} readFor={readFor} loaded={info.loaded} />}
+      {info && readFor === sessionId && <AgentsOver total={info.total} />}
     </div>
   );
 }

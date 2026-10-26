@@ -59,7 +59,9 @@ const fixture = JSON.parse(readFileSync(join(appRoot, 'tests/fixtures/m6/pi-conf
 const MCP_SERVER = join(appRoot, 'tests', 'mcp-server', 'server.mjs');
 /** 添加本地包后设置里写的来源（相对 agentDir） */
 const PKG_SOURCE = '..\\..\\pkg';
-const NO_SESSION = 'No open session. Only user-level skills and plugins are listed.';
+// 2026-10-26（负责人走查 M4）：AGENTS.md 从设置页挪来，是 Customize 的第一节，没有会话时也在。
+const NO_SESSION = 'No open session. Only AGENTS.md and user-level skills and plugins are listed.';
+const WITH_SESSION = ['agents', 'builtin', 'skills', 'mcp', 'plugins'];
 const NOTICE = 'Changes apply to new sessions. Sessions already open aren’t affected.';
 const TRUST_NOTE = 'This workspace isn’t trusted, so its skills and settings aren’t listed';
 const DISABLED_BY_PROJECT = 'Turned off in this project’s .pi/settings.json. To change it, edit that file.';
@@ -522,8 +524,9 @@ async function noSession(ctx) {
   await noSkills(ctx);
   await openToolsSection(page, 'skills');
   const head = await toolsHead(page);
-  record('没有打开的会话：分节只有"技能""插件"，顶部"返回会话"、标题"工具"、"没有打开的会话：只列出技能和插件（用户级）"，'
-    + '下面一行说明和"新建会话"', panes === 0 && same(head.sections, ['skills', 'plugins']) && head.follow === NO_SESSION
+  record('没有打开的会话：分节只有"AGENTS.md""技能""插件"，顶部"返回会话"、标题"工具"、没有会话的说明，'
+    + '下面一行说明和"新建会话"', panes === 0 && same(head.sections, ['agents', 'skills', 'plugins'])
+    && head.follow === NO_SESSION
     && head.title === 'Customize' && head.back && head.notice === NOTICE && head.newSession,
   JSON.stringify({ panes, ...head, text: undefined }));
   const skills = await skillRows(page);
@@ -543,8 +546,8 @@ async function noSession(ctx) {
 }
 
 /**
- * @brief 跟随的会话还在打开中时进入工具页：点左栏的会话（从磁盘打开，要一会儿），马上点"Customize"。
- *        工具页跟随它、等它打开好再读取（不读错、不报错），之后列出它注册的工具。
+ * @brief 跟随的会话还在打开中时进入工具页：点左栏的会话（从磁盘打开，要一会儿），马上点"Customize"（落在 AGENTS.md），
+ *        再点"Built-in tools"。工具页跟随它、等它打开好再读取（不读错、不报错，这一节先是"Loading…"），之后列出它注册的工具。
  *        打开得太快、没赶上"打开中"时，只检查最后的样子（细节里写明有没有赶上）。
  */
 async function followOpening(ctx) {
@@ -552,7 +555,7 @@ async function followOpening(ctx) {
   await watchTools(page);
   await rowOf(page, ctx.p1).first().click();
   await page.getByTestId('nav-tools').click();
-  await page.getByTestId('tools-page').waitFor({ timeout: 10000 });
+  await page.getByTestId('tools-page').locator('[data-testid="tools-nav"] button[data-section="builtin"]').click();
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="tool-row"]').length > 0, null,
     { timeout: 30000 });
   const seen = await toolsSeen(page);
@@ -560,7 +563,7 @@ async function followOpening(ctx) {
   const tools = (await toolRows(page)).map((tool) => tool.name);
   record('会话还在打开中时点"工具"：工具页跟随它（"project · <会话名>"、四个分节），等它打开好再读取，'
     + `列出它注册的工具，没有出现读取失败（${seen.opening ? '赶上了打开中："新建会话"那时不可用' : '没赶上打开中'}）`,
-  head.follow === `project · ${ctx.p1Title}` && same(head.sections, ['builtin', 'skills', 'mcp', 'plugins'])
+  head.follow === `project · ${ctx.p1Title}` && same(head.sections, WITH_SESSION)
     && tools.includes('read') && !seen.error && seen.loading, JSON.stringify({ seen, follow: head.follow, tools }));
   await backToChat(page);
   await waitReady(page);
@@ -650,19 +653,21 @@ async function entry(ctx) {
   const draft = '草稿：去工具页再回来之后还在';
   await h.textarea.fill(draft);
   await watchTools(page);
+  await page.getByTestId('nav-tools').click();
+  const landed = await page.getByTestId('tools-page').waitFor({ timeout: 10000 }).then(() => toolsHead(page));
   await openToolsSection(page, 'builtin');
   const seen = await toolsSeen(page);
   const head = await toolsHead(page);
   const place = await navPlace(page);
   const lit = await page.getByTestId('nav-tools').evaluate((element) => element.classList.contains('active'));
-  record('有会话时：左栏"打开文件夹…"下面的"工具"高亮；分节"内置工具""技能""MCP""插件"；顶部"返回会话"、标题"工具"、'
-    + '"project · <会话名>"、说明一行和"新建会话"', lit && place.text === 'Customize' && place.below
-    && place.labels.indexOf('Customize') === place.labels.indexOf('Open folder…') + 1
-    && same(head.sections, ['builtin', 'skills', 'mcp', 'plugins']) && head.current === 'builtin' && head.back
+  record('有会话时：左栏"打开文件夹…"下面的"工具"高亮；分节"AGENTS.md""内置工具""技能""MCP""插件"，进入时落在"AGENTS.md"；'
+    + '顶部"返回会话"、标题"工具"、"project · <会话名>"、说明一行和"新建会话"', lit && place.text === 'Customize'
+    && place.below && place.labels.indexOf('Customize') === place.labels.indexOf('Open folder…') + 1
+    && landed?.current === 'agents' && same(head.sections, WITH_SESSION) && head.current === 'builtin' && head.back
     && head.title === 'Customize' && head.follow === `project · ${title}` && head.notice === NOTICE && head.newSession
     && !head.trust, JSON.stringify({ title, place, ...head, text: undefined }));
-  record('进入工具页先显示"正在读取…"，tools.get 读完换成内容（没有读取失败）', seen.loading && !seen.error
-    && !head.text.includes('Loading…'), JSON.stringify(seen));
+  // 落在 AGENTS.md 后 tools.get 可能在点"Built-in tools"之前就读完："Loading…"由 followOpening 检查（会话打开中，一定看得到）。
+  record('tools.get 读完换成内容（没有读取失败）', !seen.error && !head.text.includes('Loading…'), JSON.stringify(seen));
   await builtinRows(ctx);
   await backToChat(page);
   const back = { file: await activeFile(page), draft: await h.textarea.inputValue(),
@@ -1721,7 +1726,7 @@ async function keyboard(ctx) {
   record('分节列表里 ↓ ↑ 切换分节，焦点跟着走', down.current === 'mcp' && down.focus === 'mcp' && up.current === 'skills'
     && up.focus === 'skills', JSON.stringify({ down, up }));
   await page.getByTestId('tools-page').getByRole('button', { name: 'Back to app' }).focus();
-  const walk = await tabWalk(page, 12);
+  const walk = await tabWalk(page, 13);
   record('技能一节：从"返回会话"按 Tab 走到"新建会话"、分节按钮、技能行和它的开关', walk.some((f) => f.text.includes('New session'))
     && walk.some((f) => f.section === 'mcp') && walk.some((f) => f.role === 'switch' && f.inTools)
     && walk.some((f) => f.text.includes('user-skill')), JSON.stringify(walk));
@@ -1815,12 +1820,16 @@ async function readFailure(ctx) {
   broken.packages = [...(broken.packages ?? []), {}];
   writeFileSync(file, `${JSON.stringify(broken, null, 2)}\n`);
   try {
-    await page.getByTestId('nav-tools').click();
+    await openToolsSection(page, 'agents');
+    const agents = { editor: await page.getByTestId('agents-editor').isEnabled(),
+      errors: await page.getByTestId('tools-error').count() };
+    await page.locator('[data-testid="tools-nav"] button[data-section="skills"]').click();
     await page.getByTestId('tools-error').waitFor({ timeout: 15000 });
     const text = await page.getByTestId('tools-error').innerText();
     const sections = await page.locator('[data-testid="tools-page"] .tools-content h2').count();
-    record('读取失败（用户级 settings.json 的 packages 里有一项写坏了）：显示 pi 报的原文和"重新读取"，没有各节的内容',
-      text.includes('startsWith') && text.includes('Retry') && sections === 0, text);
+    record('读取失败（用户级 settings.json 的 packages 里有一项写坏了）：技能一节显示 pi 报的原文和"重新读取"，没有各节的'
+      + '内容；AGENTS.md 一节不等 tools.get，照常可编辑、没有这句原文', text.includes('startsWith') && text.includes('Retry')
+      && sections === 0 && agents.editor && agents.errors === 0, JSON.stringify({ text, agents }));
     await shot(page, '7-read-failure');
     await noteSmall(ctx, '读取失败');
   } finally {
@@ -1957,14 +1966,14 @@ async function archiveFollow(ctx) {
   await waitFollow(page, `override · ${left}`);
   const after = await toolsHead(page);
   record('工具页开着时在侧栏归档它跟随的会话（分屏右边的 p1）：工具页还开着，跟到剩下的一栏（"override · <它的名字>"），'
-    + '仍有四个分节', before === `project · ${right}` && after?.follow === `override · ${left}`
-    && same(after.sections, ['builtin', 'skills', 'mcp', 'plugins']), JSON.stringify({ before, after: after?.follow,
+    + '仍有五个分节', before === `project · ${right}` && after?.follow === `override · ${left}`
+    && same(after.sections, WITH_SESSION), JSON.stringify({ before, after: after?.follow,
     sections: after?.sections }));
   await chooseMenuItem(page, ctx.overrideFile, 'Archive');
   await waitFollow(page, NO_SESSION);
   const none = await toolsHead(page);
-  record(`再归档剩下的 override（没有剩下的一栏）：工具页变成"${NO_SESSION}"，只有技能和插件两节`,
-    none?.follow === NO_SESSION && same(none.sections, ['skills', 'plugins']),
+  record(`再归档剩下的 override（没有剩下的一栏）：工具页变成"${NO_SESSION}"，只有 AGENTS.md、技能和插件三节`,
+    none?.follow === NO_SESSION && same(none.sections, ['agents', 'skills', 'plugins']),
     JSON.stringify({ follow: none?.follow, sections: none?.sections }));
   await shot(page, '11-archive-follow');
   await backToChat(page);

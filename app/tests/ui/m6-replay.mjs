@@ -11,6 +11,8 @@
 // v1（docs/specs/model-providers.md §14.4）：m6/model-switch.json、m6/thinking.json 与它们的检查删去（v1 不再有 model.save、
 // session.setModel；换范围由 v1-models 的回放覆盖）；思考强度改由 fixtures/v1/thinking.json（m6-record.mjs 用 v1 录制）
 // 回放，这个录制还没有时那一项记 KNOWN；设置页分节导航的检查改到 Models 分节（放在 agents-md 里）。
+// 2026-10-26（负责人走查 M4）：AGENTS.md 一节从设置页挪到 Customize 的第一节（docs/v1/screens/customize-agents-md.md），
+// agents-md 从 Customize 进，分节导航的检查改成 Customize 的 AGENTS.md ↔ Skills，离开的入口改用侧栏的 Settings。
 // 按钮状态的读法（composer-pickers.md"测试要改的地方"C1、C2）："不可用"读 aria-disabled（没有 data-pending），"切换中"读
 // data-pending；悬停按行分开（范围按钮三行、Effort 两行），读屏的描述读 aria-describedby 指向的元素。thinking 回放里另走一次
 // 换范围失败（回放桥 failNext 让这一条 session.setPick 失败，synthetic，不占回放顺序）和点开上下文用量圆环（不发命令）。
@@ -203,6 +205,16 @@ async function openSettings(page, section) {
   return landed;
 }
 
+/** @brief 进入 Customize（侧栏"Customize"；2026-10-26 起落在第一节 AGENTS.md）。 */
+async function openCustomize(page) {
+  await page.getByTestId('nav-tools').click();
+  await page.getByTestId('tools-page').waitFor({ timeout: 10000 });
+}
+
+/** @brief Customize 分节列表里当前（aria-current）的一节；没有时为 null。 */
+const toolsCurrent = (page) => page.locator('[data-testid="tools-nav"] button[aria-current="page"]')
+  .getAttribute('data-section', { timeout: 3000 }).catch(() => null);
+
 /** @brief 设置页顶部的"Back to app"；有会话时等它就绪。 */
 async function leaveSettings(page, session = true) {
   await page.getByTestId('settings-page').getByRole('button', { name: 'Back to app' }).click();
@@ -307,14 +319,17 @@ function lastToolCard(page) {
     title: card.querySelector('.tool-verb')?.textContent ?? card.textContent.slice(0, 40) })).catch(() => null);
 }
 
-/** @brief 设置页分节列表用 ↑ ↓ 切换：↓ 到"AGENTS.md"，↑ 回到"Models"；当前分节 aria-current，焦点跟着走。 */
-async function settingsNavKeys(page) {
+/**
+ * @brief Customize 分节列表用 ↑ ↓ 切换（没有会话时 AGENTS.md、Skills、Plugins）：↓ 到"Skills"，↑ 回到"AGENTS.md"；
+ *        当前分节 aria-current，焦点跟着走。
+ */
+async function customizeNavKeys(page) {
   const focusedSection = () => page.evaluate(() => document.activeElement?.dataset.section ?? null);
-  await page.locator('[data-testid="settings-nav"] button[data-section="models"]').focus();
+  await page.locator('[data-testid="tools-nav"] button[data-section="agents"]').focus();
   await page.keyboard.press('ArrowDown');
-  const down = { current: await currentSection(page), focused: await focusedSection() };
+  const down = { current: await toolsCurrent(page), focused: await focusedSection() };
   await page.keyboard.press('ArrowUp');
-  const up = { current: await currentSection(page), focused: await focusedSection() };
+  const up = { current: await toolsCurrent(page), focused: await focusedSection() };
   return { down, up };
 }
 
@@ -514,7 +529,7 @@ function agentsView(page) {
     effective: document.querySelector('[data-testid="agents-effective"]')?.textContent ?? null,
     status: document.querySelector('.agents-status')?.textContent ?? null,
     loaded: document.querySelector('[data-testid="agents-loaded"]')?.textContent ?? null,
-    editors: document.querySelectorAll('[data-section="agents"] textarea').length,
+    editors: document.querySelectorAll('[data-testid="agents-section"] textarea').length,
   }));
 }
 
@@ -533,11 +548,11 @@ const agentsReady = (page) => page.waitForFunction(() => document.querySelector(
   ?.disabled === false, null, { timeout: 10000 });
 
 /**
- * @brief 有未保存的改动时点侧栏的"Customize"：先问"Discard changes to AGENTS.md?"，焦点在"Keep editing"；Esc 等于继续编辑，
- *        留在设置页、焦点回到编辑框。
+ * @brief 有未保存的改动时点侧栏的"Settings"：先问"Discard changes to AGENTS.md?"，焦点在"Keep editing"；Esc 等于继续编辑，
+ *        留在 Customize、焦点回到编辑框（2026-10-26 前这一节在设置页，入口是"Customize"）。
  */
 async function leaveUnsaved(page) {
-  await page.getByTestId('nav-tools').click();
+  await sideButton(page, 'Settings').click();
   const dialog = page.getByTestId('leave-dialog');
   await dialog.waitFor({ timeout: 5000 }).catch(() => {});
   const asked = await dialogView(dialog).catch(() => null);
@@ -546,10 +561,10 @@ async function leaveUnsaved(page) {
   const after = await page.evaluate(() => ({ settings: Boolean(document.querySelector('[data-testid="settings-page"]')),
     tools: Boolean(document.querySelector('[data-testid="tools-page"]')),
     editorFocused: document.activeElement?.dataset.testid === 'agents-editor' }));
-  record('agents-md：有未保存的改动时点侧栏"工具"先问"放弃对 AGENTS.md 的改动？"（"你改的内容还没有保存。"），焦点在"继续编辑"；'
-    + 'Esc 等于继续编辑：留在设置页，焦点回到编辑框', asked?.title === 'Discard changes to AGENTS.md?'
+  record('agents-md：有未保存的改动时点侧栏"设置"先问"放弃对 AGENTS.md 的改动？"（"你改的内容还没有保存。"），焦点在"继续编辑"；'
+    + 'Esc 等于继续编辑：留在 Customize，焦点回到编辑框', asked?.title === 'Discard changes to AGENTS.md?'
     && asked.text === 'Your edits haven’t been saved. Leaving now discards them.' && asked.focused === 'Keep editing'
-    && after.settings && !after.tools
+    && after.tools && !after.settings
     && after.editorFocused, JSON.stringify({ asked, after }));
 }
 
@@ -566,20 +581,19 @@ async function revertAgents(page, content) {
     && reverted.status === null && !reverted.save && !reverted.revert, JSON.stringify({ clean, dirty, reverted }));
 }
 
-/** @brief 有未保存的改动时点侧栏"Customize"，在确认框里选"Discard"：照常离开到工具页；回来时编辑框是读到的内容。 */
+/** @brief 有未保存的改动时点侧栏"Settings"，在确认框里选"Discard"：照常离开到设置页；回来时编辑框是读到的内容。 */
 async function discardAgents(page, content) {
   await page.getByTestId('agents-editor').fill(content);
-  await page.getByTestId('nav-tools').click();
+  await sideButton(page, 'Settings').click();
   const dialog = page.getByTestId('leave-dialog');
   await dialog.waitFor({ timeout: 5000 });
   await dialog.getByRole('button', { name: 'Discard', exact: true }).click();
-  const left = await page.getByTestId('tools-page').waitFor({ timeout: 10000 }).then(() => true, () => false);
-  await toolsButton(page, 'Back to app').click();
-  await page.getByTestId('tools-page').waitFor({ state: 'detached', timeout: 10000 });
-  await openSettings(page, 'agents');
+  const left = await page.getByTestId('settings-page').waitFor({ timeout: 10000 }).then(() => true, () => false);
+  await leaveSettings(page, false);
+  await openCustomize(page);
   await agentsReady(page);
   const back = await agentsEditor(page);
-  record('agents-md：确认框里选"放弃改动"：照常离开到工具页；再回到 AGENTS.md 时编辑框是读到的内容（空）、没有未保存的改动',
+  record('agents-md：确认框里选"放弃改动"：照常离开到设置页；再回到 AGENTS.md 时编辑框是读到的内容（空）、没有未保存的改动',
     left && back.value === '' && back.status === null && !back.save, JSON.stringify({ left, back }));
 }
 
@@ -596,25 +610,26 @@ async function saveAgentsByKey(page, content) {
   return { dirty, statuses, after: await agentsView(page), editor: await agentsEditor(page) };
 }
 
-/** @brief 走查 2 的前半：设置页 AGENTS.md 一节写"每次回答以'收到'开头"并保存；撤销、离开确认、放弃改动、Ctrl+S。 */
+/** @brief 走查 2 的前半：Customize 的 AGENTS.md 一节写"每次回答以'收到'开头"并保存；撤销、离开确认、放弃改动、Ctrl+S。 */
 async function writeAgents(page, fx) {
   const save = commandOf(fx, 'agents.save');
   const [empty, saved] = resultsOf(fx, 'agents.get');
-  await openSettings(page, 'models');
-  await page.getByTestId('models-section').waitFor({ timeout: 10000 });
-  const keys = await settingsNavKeys(page);
-  record('agents-md：设置页分节列表用 ↓ 换到"AGENTS.md"、↑ 回到"Models"，当前分节高亮（aria-current）、焦点跟着走',
-    keys.down.current === 'agents' && keys.down.focused === 'agents' && keys.up.current === 'models'
-    && keys.up.focused === 'models', JSON.stringify(keys));
   await watch(page, '.agents-user');
-  await page.locator('[data-testid="settings-nav"] button[data-section="agents"]').click();
+  await openCustomize(page);
   await agentsReady(page);
   const loading = await watched(page);
-  record('agents-md：换到"AGENTS.md"时先"正在读取…"、编辑框不可用，读完后编辑框可用',
-    loading[0]?.text.includes('Loading…') && loading[0].disabled === true && loading.at(-1).disabled === false
-    && !loading.at(-1).text.includes('Loading…'), JSON.stringify(loading));
+  const landed = await toolsCurrent(page);
+  record('agents-md：进入 Customize 落在"AGENTS.md"（2026-10-26 从设置页挪来），先"正在读取…"、编辑框不可用，读完后编辑框可用',
+    landed === 'agents' && loading[0]?.text.includes('Loading…') && loading[0].disabled === true
+    && loading.at(-1).disabled === false && !loading.at(-1).text.includes('Loading…'),
+  JSON.stringify({ landed, loading }));
+  const keys = await customizeNavKeys(page);
+  record('agents-md：Customize 分节列表用 ↓ 换到"Skills"、↑ 回到"AGENTS.md"，当前分节高亮（aria-current）、焦点跟着走',
+    keys.down.current === 'skills' && keys.down.focused === 'skills' && keys.up.current === 'agents'
+    && keys.up.focused === 'agents', JSON.stringify(keys));
+  await agentsReady(page);
   const before = await agentsView(page);
-  record('agents-md：设置页 AGENTS.md：文件不存在时显示路径和"还没有这个文件，保存后创建"、说明只对之后新建的会话生效；'
+  record('agents-md：Customize 的 AGENTS.md：文件不存在时显示路径和"还没有这个文件，保存后创建"、说明只对之后新建的会话生效；'
     + '没有会话时项目级说明"打开一个会话后…"', before.user.includes(empty.userPath)
     && before.user.includes('This file doesn’t exist yet. Saving creates it.') && before.effective === null
     && before.user.includes('Changes apply to new sessions only; sessions already open don’t change.')
@@ -643,13 +658,14 @@ async function agentsMd(page, h) {
   await say(page, promptsOf(fx)[0].text);
   const reply = (await replies(page)).at(-1);
   record('agents-md：新会话的第一条回复以"收到"开头', reply?.text.startsWith('收到') === true, reply?.text.slice(0, 60));
-  await openSettings(page, 'agents');
+  await openCustomize(page);
   await page.getByTestId('agents-effective').waitFor({ timeout: 10000 });
-  const view = { ...await agentsView(page), section: await currentSection(page),
+  await page.getByTestId('agents-loaded').locator('h3', { hasText: 'Files loaded by ' }).waitFor({ timeout: 10000 });
+  const view = { ...await agentsView(page), section: await toolsCurrent(page),
     value: await page.getByTestId('agents-editor').inputValue() };
   const latest = resultsOf(fx, 'agents.get').at(-1);
   const project = resultsOf(fx, 'session.create')[0].cwd.split('\\').pop();
-  record('agents-md：有会话时设置页（"AGENTS.md"一节高亮）编辑框里是文件内容、仍标"生效中：<路径>"；项目级列出'
+  record('agents-md：有会话时进入 Customize（落在"AGENTS.md"）编辑框里是文件内容、仍标"生效中：<路径>"；项目级列出'
     + '"<项目名> 加载的文件"和"会话打开时读取…"，没有时"这个项目没有加载 AGENTS.md 或 CLAUDE.md"；反例：项目级没有编辑框',
   view.section === 'agents' && view.value === commandOf(fx, 'agents.save').content
     && view.effective === `In effect: ${latest.effectivePath}` && Array.isArray(latest.loaded)
@@ -659,7 +675,9 @@ async function agentsMd(page, h) {
     && view.editors === 1,
   JSON.stringify(view));
   await shot(page, 'agents-md');
-  await leaveSettings(page);
+  await toolsButton(page, 'Back to app').click();
+  await page.getByTestId('tools-page').waitFor({ state: 'detached', timeout: 10000 });
+  await waitPaneReady(page, 'focused');
   await finish(page, 'agents-md', commandsOf(fx).length);
 }
 
@@ -754,10 +772,12 @@ async function disableProjectSkill(page, fx) {
   await openToolsSection(page, 'skills');
   const loading = (await watched(page)).map((item) => item.text);
   const frame = await toolsFrame(page);
-  record('project-skill：侧栏"工具"在"打开文件夹…"下面，工具页打开时高亮、先"正在读取…"；顶部"返回会话"、标题"工具"；'
-    + '有会话时分节是内置工具、技能、MCP、插件', frame.highlighted && frame.after === 'Open folder…' && frame.title === 'Customize'
-    && frame.back && frame.sections.join() === 'Built-in tools,Skills,MCP,Plugins' && frame.current === 'skills'
-    && loading[0] === 'Loading…' && !loading.at(-1).includes('Loading…'), JSON.stringify({ frame, loading }));
+  record('project-skill：侧栏"工具"在"打开文件夹…"下面，工具页打开时高亮、落在"AGENTS.md"、先"正在读取…"；顶部"返回会话"、'
+    + '标题"工具"；有会话时分节是 AGENTS.md、内置工具、技能、MCP、插件', frame.highlighted && frame.after === 'Open folder…'
+    && frame.title === 'Customize' && frame.back
+    && frame.sections.join() === 'AGENTS.md,Built-in tools,Skills,MCP,Plugins' && frame.current === 'skills'
+    && loading[0]?.startsWith('AGENTS.md') && loading[0].includes('Loading…') && !loading.at(-1).includes('Loading…'),
+  JSON.stringify({ frame, loading }));
   const before = await rowState(page.locator(css));
   const head = await page.getByTestId('tools-page').locator('.topbar, .tools-notice').allInnerTexts();
   const detail = await expandSkill(page, css);
@@ -883,16 +903,16 @@ async function addMcpServer(page, h, save, { first, json }) {
   return seen;
 }
 
-/** @brief 没有打开的会话时的工具页：顶部说明只列出技能和插件，分节里没有"Built-in tools""MCP"。 */
+/** @brief 没有打开的会话时的工具页：顶部说明只列出 AGENTS.md、技能和插件，分节里没有"Built-in tools""MCP"。 */
 async function toolsWithoutSession(page) {
   await page.getByTestId('nav-tools').click();
   await page.getByTestId('tools-page').waitFor({ timeout: 10000 });
   const view = { follow: await page.getByTestId('tools-follow').innerText(),
     sections: await page.locator('[data-testid="tools-nav"] button[data-section]').evaluateAll((items) => items
       .map((item) => item.dataset.section)) };
-  record('mcp：没有打开的会话时工具页说明"没有打开的会话：只列出技能和插件（用户级）"，分节只有技能、插件（没有内置工具和 MCP）',
-    view.follow === 'No open session. Only user-level skills and plugins are listed.'
-    && view.sections.join() === 'skills,plugins',
+  record('mcp：没有打开的会话时工具页说明"没有打开的会话：只列出 AGENTS.md、技能和插件（用户级）"，分节只有 AGENTS.md、技能、插件'
+    + '（没有内置工具和 MCP）', view.follow === 'No open session. Only AGENTS.md and user-level skills and plugins are listed.'
+    && view.sections.join() === 'agents,skills,plugins',
     JSON.stringify(view));
   await toolsButton(page, 'Back to app').click();
 }

@@ -2,7 +2,8 @@
 // 状态表见 docs/v0/screens/settings.md、models.md、tools.md、slash.md；pi 的行为见 docs/v0/m6-checks.md。
 // 脚本不接触 key：只把走查数据目录里 Mori 加密保存的密文（credentials.json 与 Local State）复制到临时目录
 // （lib.mjs scratchUserData），之后也不打开它们（"添加模型不改 key"只比较 credentials.json 的修改时间和大小）。
-// 像负责人一样操作界面：设置页里添加模型、编辑模型、写 AGENTS.md；输入框下面一行换范围和思考强度（2026-10-21 起这几个按钮
+// 像负责人一样操作界面：设置页里添加模型、编辑模型，Customize 里写 AGENTS.md（2026-10-26 从设置页挪来，是 Customize 的
+// 第一节）；输入框下面一行换范围和思考强度（2026-10-21 起这几个按钮
 // 从顶栏移到这一行，docs/v0/composer-pickers.md；走查 8 最后在分屏的一栏里再换一次）；工具页里启停技能、用表单添加
 // MCP 服务、添加本地包并按资源启停；输入框打 "/"；批准卡点"Allow once"。系统的选文件夹对话框经 app.evaluate 换成直接
 // 返回测试文件夹。项目技能和项目的 CLAUDE.md、用户级技能和提示词模板、MCP 服务（tests/mcp-server）、pi 包
@@ -194,7 +195,7 @@ async function clickNewSession(page, button) {
 /** @brief 工具页顶部"改动何时生效"一行里的"New session"。 */
 const toolsNewSession = (page) => page.locator('.tools-notice').getByRole('button', { name: 'New session' });
 
-/** @brief 从左栏打开设置页，切到 section（models / agents）。 */
+/** @brief 从左栏打开设置页，切到 section（models）。 */
 async function openSettings(page, section = 'models') {
   await page.getByTestId('sidebar').getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
@@ -462,13 +463,17 @@ async function item1(ctx) {
 
 // ---------- 走查 2：用户级 AGENTS.md ----------
 
-/** @brief 打开设置页 AGENTS.md 一节，等读完；返回用户级的路径、编辑框、生效的文件，和项目级的标题、说明、文件。 */
+/**
+ * @brief 从左栏进入 Customize（落在 AGENTS.md 一节），等读完；返回用户级的路径、编辑框、生效的文件，和项目级的标题、说明、
+ *        文件。
+ */
 async function agentsState(page) {
-  await openSettings(page, 'agents');
-  await page.waitForFunction(() => document.querySelector('[data-testid="agents-editor"]')?.disabled === false, null,
-    { timeout: 15000 });
+  await page.getByTestId('nav-tools').click();
+  await page.getByTestId('tools-page').getByTestId('agents-section').waitFor({ timeout: 10000 });
+  await page.waitForFunction(() => document.querySelector('[data-testid="agents-editor"]')?.disabled === false
+    && document.querySelector('[data-testid="agents-loaded"] .agents-files'), null, { timeout: 15000 });
   return page.evaluate(() => {
-    const section = document.querySelector('.settings-section[data-section="agents"]');
+    const section = document.querySelector('[data-testid="agents-section"]');
     const loaded = section?.querySelector('[data-testid="agents-loaded"]');
     return { path: section?.querySelector('.agents-user .agents-path')?.textContent ?? '',
       value: section?.querySelector('[data-testid="agents-editor"]')?.value ?? null,
@@ -476,15 +481,15 @@ async function agentsState(page) {
       effective: section?.querySelector('[data-testid="agents-effective"]')?.textContent ?? null,
       title: loaded?.querySelector('h3')?.textContent ?? '', note: loaded?.querySelector('.muted')?.textContent ?? '',
       files: [...(loaded?.querySelectorAll('.agents-files .agents-path') ?? [])].map((item) => item.textContent),
-      empty: loaded?.querySelector('.settings-empty')?.textContent ?? null };
+      empty: loaded?.querySelector('.tools-empty')?.textContent ?? null };
   });
 }
 
-/** @brief 设置页 AGENTS.md 一节：先读出样子，再写进编辑框并保存；返回看到的。 */
+/** @brief Customize 的 AGENTS.md 一节：先读出样子，再写进编辑框并保存；返回看到的。 */
 async function saveAgents(ctx) {
   const { page } = ctx;
   const before = await agentsState(page);
-  const section = page.locator('.settings-section[data-section="agents"]');
+  const section = page.getByTestId('agents-section');
   const editor = page.getByTestId('agents-editor');
   await editor.click();
   await editor.fill(PROMPTS.agents);
@@ -497,7 +502,7 @@ async function saveAgents(ctx) {
   return { before, dirty, effective };
 }
 
-/** @brief 走查 2 的设置页部分：文件不存在时的样子、保存、生效的文件、项目级列表。 */
+/** @brief 走查 2 的 Customize 部分：文件不存在时的样子、保存、生效的文件、项目级列表。 */
 function recordAgents(ctx, seen) {
   const file = join(ctx.agentDir, 'AGENTS.md');
   const written = existsSync(file) ? readFileSync(file, 'utf8') : null;
@@ -505,7 +510,7 @@ function recordAgents(ctx, seen) {
   const { before } = seen;
   record('走查 2：AGENTS.md 一节：路径 <agentDir>\\AGENTS.md，"还没有这个文件，保存后创建"，编辑框是空的；改了之后"有未保存的改动"',
     samePath(before.path, file) && before.missing && before.value === '' && seen.dirty === 1, JSON.stringify(before));
-  record('走查 2：保存后"已保存 · 新建的会话才会读到"，文件写入；设置页标出生效的文件"生效中：<agentDir>\\AGENTS.md"',
+  record('走查 2：保存后"已保存 · 新建的会话才会读到"，文件写入；Customize 标出生效的文件"生效中：<agentDir>\\AGENTS.md"',
     written === PROMPTS.agents && seen.effective.startsWith('In effect: ') && samePath(path, file),
     JSON.stringify({ effective: seen.effective, written }));
   record('走查 2：项目级"m6-walk 加载的文件"：列出焦点会话按 pi 规则加载的文件（测试项目的 CLAUDE.md），说明会话打开时读取',
@@ -514,7 +519,7 @@ function recordAgents(ctx, seen) {
     JSON.stringify({ title: before.title, files: before.files, expected: ctx.agentsFiles, note: before.note }));
 }
 
-/** @brief 走查 2：用户级 AGENTS.md 要求以"收到"开头；设置页标出生效的文件；新会话的第一条回复照做。 */
+/** @brief 走查 2：用户级 AGENTS.md 要求以"收到"开头；Customize 标出生效的文件；新会话的第一条回复照做。 */
 async function item2(ctx) {
   const { page } = ctx;
   const seen = await saveAgents(ctx);

@@ -59,6 +59,12 @@ export const LAYER_PROSE: Readonly<Record<MemoryLayer, string>> = Object.freeze(
 /** @brief 每种的上限：用户级与本项目两份加起来（proposal §5.2）。 */
 export const MEMORY_LIMIT = 500;
 
+/**
+ * @brief AGENTS.md 合计的提醒线（§10.3；负责人 2026-10-26 定，proposal §5.2 的注）：用户级与项目加载的全部文件的
+ *        token 合计超过它时，界面标出来；只是提醒，不截断、不拒绝保存。
+ */
+export const AGENTS_LIMIT = 2000;
+
 /** @brief 规格 §12 的数值（临时默认值，登记在 docs/v1/defaults.md）。 */
 export const MEMORY_DEFAULTS = Object.freeze({
   /** abstract 最长（一行） */

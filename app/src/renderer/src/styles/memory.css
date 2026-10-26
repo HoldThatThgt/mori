@@ -278,10 +278,6 @@
 .memory-agent-total { margin: 0; color: var(--color-muted); font-size: var(--fs-small); line-height: 1.6; }
 .memory-agent-total.memory-over { color: var(--color-warn); }
 
-/* 设置页 AGENTS.md 节的 token 数与警告（§10.3） */
-.agents-token-count, .agents-tokens { color: var(--color-muted); font-size: var(--fs-small); white-space: nowrap; }
-.agents-over { margin: 12px 0 0; color: var(--color-warn); }
-
 /* 中栏较窄 */
 @container (max-width: 560px) {
   .memory-controls, .memory-enhance { padding-left: 16px; }
