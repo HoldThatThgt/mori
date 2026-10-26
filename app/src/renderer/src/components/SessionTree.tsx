@@ -1,10 +1,13 @@
-// 左栏的项目 → 会话树（docs/v0/screens/sessions.md）：会话行的状态、键盘（整棵树一个 Tab 停靠点，↑ ↓ Home End 移动，
-// Enter 打开）、右键菜单（右键、菜单键、Shift+F10）、改名框、删除确认框，以及底部的"Archived"。行的数据在 sessionRows.ts。
+// 左栏的项目 → 会话树（docs/v0/screens/sessions.md）：项目行和它右端的 +（在这个项目里新建会话）、会话行的状态、
+// 键盘（整棵树一个 Tab 停靠点，↑ ↓ Home End 移动，Enter 打开）、右键菜单（右键、菜单键、Shift+F10）、改名框、
+// 删除确认框，以及底部的"Archived"。行的数据在 sessionRows.ts。
 
 import { useState } from 'react';
 import { describe } from '../state/bridge';
 import { guardLeave } from '../state/leaveGuard';
-import { archiveSession, loadSessions, openSaved, restoreSession, retryOpen, showChat } from '../state/projects';
+import {
+  archiveSession, loadSessions, newSessionIn, openSaved, restoreSession, retryOpen, showChat,
+} from '../state/projects';
 import { referenceSession } from '../state/refActions';
 import { focusComposer, openInSplit } from '../state/split';
 import { useApp } from '../state/store';
@@ -15,11 +18,14 @@ import { dragProps, useDragging } from './SessionDrag';
 import { SessionMenu, type MenuAction } from './SessionMenu';
 import { buildRows, groupRows, isUnsaved, rowStatus, STATUS_TEXT, type Row } from './sessionRows';
 
-/** @brief 把焦点放到某个会话行；找不到时放到"New session"。 */
+/** 后台进程退出后左栏各入口的悬停说明（Sidebar 的导航同用） */
+export const CRASHED_HINT = 'Mori’s background process crashed. Restart it to continue.';
+
+/** @brief 把焦点放到某个会话行；找不到时放到左栏的"Open folder…"。 */
 function focusRow(id: string | null): void {
   requestAnimationFrame(() => {
     const row = id ? document.querySelector<HTMLElement>(`.session-item[data-row="${CSS.escape(id)}"]`) : null;
-    (row ?? document.querySelector<HTMLElement>('[data-testid="new-session"]'))?.focus();
+    (row ?? document.querySelector<HTMLElement>('[data-testid="nav-open-folder"]'))?.focus();
   });
 }
 
@@ -128,16 +134,49 @@ function useTreeRows() {
   return { groups, shelved, rows, activeRow, others };
 }
 
-/** @brief 一个项目：项目行和它的会话行（正在改名的那一行换成改名框）。others 为分屏另一栏的会话。 */
-function ProjectGroup({ cwd, rows, activeRow, others, tabStop, renaming, onRenamed, ...handlers }: RowHandlers & {
-  cwd: string; rows: Row[]; activeRow: Row | undefined; others: string[]; tabStop: string | undefined;
-  renaming: string | null; onRenamed: (row: Row, keepFocus: boolean) => void;
-}) {
+/**
+ * @brief 项目行：文件夹名（悬停是完整路径）和右端的 +（"New session in <文件夹名>"）。+ 一直显示，只能用鼠标点
+ *        （不是 Tab 停靠点，键盘用 Ctrl+N），后台进程退出后不可用；onNew 在点 + 时以这个项目的文件夹调用。
+ */
+function ProjectHeading({ cwd, onNew }: { cwd: string; onNew: (cwd: string) => void }) {
+  const exited = useApp((state) => state.kernel === 'exited');
+  const label = `New session in ${folderName(cwd)}`;
+  return (
+    <div className="project-heading" title={cwd}>
+      <Icon name="folder" /><span>{folderName(cwd)}</span>
+      <button className="icon-button project-new" data-testid="project-new-session" aria-label={label}
+        title={exited ? CRASHED_HINT : label} tabIndex={-1} disabled={exited} onClick={() => onNew(cwd)}>
+        <Icon name="plus" />
+      </button>
+    </div>
+  );
+}
+
+/** @brief 一个项目要显示的东西，和项目行、会话行上的操作。 */
+interface GroupProps extends RowHandlers {
+  /** 项目的文件夹（会话的工作目录） */
+  cwd: string;
+  /** 项目下的会话行，从新到旧 */
+  rows: Row[];
+  /** 当前会话那一行；不在会话页时为 undefined */
+  activeRow: Row | undefined;
+  /** 分屏另一栏的会话 */
+  others: string[];
+  /** 整棵树的 Tab 停靠点那一行的标识 */
+  tabStop: string | undefined;
+  /** 正在改名的那一行的标识；没有时为 null */
+  renaming: string | null;
+  /** 改名框关闭；keepFocus 为真时焦点回到这一行 */
+  onRenamed: (row: Row, keepFocus: boolean) => void;
+  /** 项目行的 +：在这个项目里新建会话 */
+  onNew: (cwd: string) => void;
+}
+
+/** @brief 一个项目：项目行和它的会话行（正在改名的那一行换成改名框）。 */
+function ProjectGroup({ cwd, rows, activeRow, others, tabStop, renaming, onRenamed, onNew, ...handlers }: GroupProps) {
   return (
     <div className="project-group" role="group" aria-label={folderName(cwd)} data-cwd={cwd}>
-      <div className="project-heading" title={cwd}>
-        <Icon name="folder" /><span>{folderName(cwd)}</span>
-      </div>
+      <ProjectHeading cwd={cwd} onNew={onNew} />
       {rows.map((row) => (renaming === row.id
         ? <RenameInput key={row.id} row={row} onDone={(keep) => onRenamed(row, keep)} />
         : <SessionRow key={row.id} row={row} active={row === activeRow} tabStop={row.id === tabStop}
@@ -230,20 +269,25 @@ function useTreeActions(onNavigate: () => void) {
   return { menu, setMenu, renaming, setRenaming, deleting, setDeleting, focused, setFocused, problem, handlers, act };
 }
 
-/** @brief 项目 → 会话树与已归档。onNavigate 在打开或切换会话后调用（浮动的左栏据此收起）。 */
+/** @brief 项目 → 会话树与已归档。onNavigate 在打开、切换或新建会话后调用（浮动的左栏据此收起）。 */
 export function SessionTree({ onNavigate }: { onNavigate: () => void }) {
   const { groups, shelved, rows, activeRow, others } = useTreeRows();
   const { menu, setMenu, renaming, setRenaming, deleting, setDeleting, focused, setFocused, problem, handlers, act }
     = useTreeActions(onNavigate);
   const menuRow = menu ? rows.find((row) => row.id === menu.id) : undefined;
   const tabStop = rows.find((row) => row.id === focused)?.id ?? activeRow?.id ?? rows[0]?.id;
+  // 项目行的 +：同点会话行，确认可以离开后收起浮动的左栏、焦点进新会话的输入框。
+  const onNew = (cwd: string) => newSessionIn(cwd, () => {
+    onNavigate();
+    focusComposer();
+  });
   return (
     <div className="session-tree" role="tree" aria-label="Sessions" data-testid="session-tree"
       onBlur={(event) => !event.currentTarget.contains(event.relatedTarget) && setFocused(null)}>
       <ListNote problem={problem} />
       {groups.map((group) => (
         <ProjectGroup key={group.cwd} cwd={group.cwd} rows={group.rows} activeRow={activeRow} others={others}
-          tabStop={tabStop}
+          tabStop={tabStop} onNew={onNew}
           renaming={renaming} {...handlers} onRenamed={(row, keep) => {
             setRenaming(null);
             if (keep) focusRow(row.id);

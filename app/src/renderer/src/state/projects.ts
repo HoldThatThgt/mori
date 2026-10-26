@@ -118,13 +118,29 @@ export async function openFolder(): Promise<void> {
   if (cwd) await createSessionIn(cwd);
 }
 
-/** @brief "New session"（Ctrl+N）：在当前会话所在的项目里新建；没有当前会话时等于"Open folder…"。 */
+/**
+ * @brief Ctrl+N、收起的图标栏上的 +、Customize 的"New session"：在当前会话所在的项目里新建；没有当前会话时等于
+ *        "Open folder…"。
+ */
 export async function newSession(): Promise<void> {
   if (!(await leaveAllowed())) return;
   recordAction('New session');
   const current = activeTab();
   if (current) await createSessionIn(current.cwd);
   else await openFolder();
+}
+
+/**
+ * @brief 项目行的 +（"New session in <folder>"，docs/v0/screens/sessions.md"项目行的 +"）：先过离开确认，再在这个项目里
+ *        新建会话、放进焦点所在的那一栏。leaving 在确认可以离开之后、新建之前调用（浮动的左栏据此收起）；
+ *        你选"Keep editing"时什么都不做。
+ */
+export function newSessionIn(cwd: string, leaving: () => void): void {
+  guardLeave(() => {
+    recordAction('New session');
+    leaving();
+    void createSessionIn(cwd);
+  });
 }
 
 /**
