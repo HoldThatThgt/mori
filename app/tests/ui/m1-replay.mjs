@@ -7,6 +7,8 @@
 // 2026-10-26 补测（WP-13 状态表各行的用例）：正在画的空框、生成中"Copy code"不可用、图居中与按比例缩小、颜色取 token
 // （mermaid）；mermaid 载入失败时都显示代码（mermaid-fail，挪走回放页面的 mermaid 代码块文件）；停在代码块中间
 // （mermaid-stop，synthetic-mermaid-stop-line / -label）。
+// 2026-10-26 补（U14）：生成中那段正文里的代码块"Copy code"不可用、高过 400px 的跟着往下滚，在块里上滚后不再跟、
+// 滚回底部接着跟，结束后恢复（code-stream，synthetic-code-stream）；停止后"Copy code"可用（mermaid-stop）。
 // 用法（在 app/ 下）：node tests/ui/m1-replay.mjs [--only readme,stop]
 // 结果写到 test-results/m1-replay.json；截图在 test-results/m1-replay/。
 
@@ -1006,7 +1008,8 @@ const waitDrawn = (page) => page.waitForFunction(() => [...document.querySelecto
 const MERMAID_TYPES = [/^flowchart/, /^sequence$/, /^class/, /^state/, /^gantt$/, /^pie$/];
 
 /**
- * @brief chat.md"正在画"与"代码块还在写"的"Copy code"（2026-10-26 补测）：写完的代码块先是一个空框（读屏名
+ * @brief chat.md"正在画"与"代码块还在写"的"Copy code"（2026-10-26 补测；U14 起写在"生成中那段正文里的代码块"，
+ *        跟着往下滚见 codeStreamCheck）：写完的代码块先是一个空框（读屏名
  *        "Mermaid diagram"、aria-busy="true"、至少 96px 高、还没有 SVG），之后同一个位置的框里画出了图；这段正文还在
  *        生成时（有一个没写完的 mermaid 代码块的那些时刻）回复里的代码块（ts 和 mermaid）"Copy code"都不可用，
  *        回复结束后都可用（ts 一个、画不出来的三个）。
@@ -1190,16 +1193,105 @@ async function mermaidStopCheck(page, h) {
   record('mermaid：停在代码块中间、截在一整行边之后：结束后没有"没写完"的代码块，按写完处理画成图（只有写出来的两个节点）',
     line.open === 0 && line.stopped === 1 && line.hosts.length === 1 && drawn.svg && drawn.text.includes('写完的边')
     && line.code.length === 0, JSON.stringify({ ...line, text: undefined }));
-  record('mermaid：停在代码块中间、截在节点标签中间：画不出来，是带"Copy code"的普通代码块，不显示错误原文',
-    label.open === 0 && label.stopped === 1 && label.hosts.length === 0 && label.code.length === 1
-    && label.code[0].copy && label.code[0].tail.includes('B["写到一半') && !/error|syntax/i.test(label.text),
+  record('mermaid：停在代码块中间、截在节点标签中间：画不出来，是带"Copy code"的普通代码块，不显示错误原文；'
+    + '停止后"Copy code"可用（chat.md"生成中那段正文里的代码块"：这段不再生成）',
+  label.open === 0 && label.stopped === 1 && label.hosts.length === 0 && label.code.length === 1
+    && label.code[0].copy && label.copies.length === 1 && label.copies[0] === false
+    && label.code[0].tail.includes('B["写到一半') && !/error|syntax/i.test(label.text),
   JSON.stringify({ ...label, text: undefined }));
   record('mermaid-stop：回放命令与录制一致', line.errors.length === 0 && label.errors.length === 0,
     [...line.errors, ...label.errors].join('; '));
 }
 
+/** synthetic-code-stream 里长代码块的第一行（认出它的代码块） */
+const LONG_FIRST = 'const row01 = 1;';
+/** synthetic-code-stream 的三个停顿：长代码块写完这一行时回放停 2.5 秒（harness/main.jsx CODE_PAUSE_AFTER） */
+const CODE_PAUSES = ['const row30 = 30;', 'const row45 = 45;', 'const row60 = 60;'];
+
+/**
+ * @brief 回复里的代码块：各自的"Copy code"是否不可用（copies）；长代码块（第一行 LONG_FIRST）是否标为没写完（open），
+ *        它的滚动区域（code-block-body）的 scrollTop（top）、scrollHeight（height）、clientHeight（view）和离底部的
+ *        距离（gap）。
+ */
+function codeScroll(page) {
+  return page.evaluate((first) => {
+    const prose = document.querySelector('.pane-slot:not([hidden]) [data-testid="assistant"]');
+    const blocks = [...(prose?.querySelectorAll('[data-streamdown="code-block"]') ?? [])];
+    const long = blocks.find((block) => block.querySelector('pre')?.textContent.includes(first));
+    const body = long?.querySelector('[data-streamdown="code-block-body"]');
+    const copy = (block) => block.querySelector('[data-streamdown="code-block-copy-button"]');
+    return { blocks: blocks.length, open: Boolean(long?.hasAttribute('data-incomplete')),
+      copies: blocks.map((block) => copy(block)?.disabled ?? null),
+      top: body ? Math.round(body.scrollTop) : -1, height: body?.scrollHeight ?? 0, view: body?.clientHeight ?? 0,
+      gap: body ? Math.round(body.scrollHeight - body.clientHeight - body.scrollTop) : -1 };
+  }, LONG_FIRST);
+}
+
+/**
+ * @brief 等长代码块写到 line（回放在那里停 2.5 秒），再等 400ms（跟随底部的滚动在下一帧、高亮是异步的），
+ *        返回此刻的 codeScroll。
+ */
+async function atPause(page, line) {
+  await page.waitForFunction(({ first, last }) => [...document.querySelectorAll('.pane-slot:not([hidden]) '
+    + '[data-testid="assistant"] [data-streamdown="code-block"] pre')]
+    .some((pre) => pre.textContent.includes(first) && pre.textContent.includes(last)),
+  { first: LONG_FIRST, last: line }, { timeout: 20000 });
+  await sleep(400);
+  return codeScroll(page);
+}
+
+/**
+ * @brief 把长代码块的滚动区域滚到顶部或底部（同你在块里滚动：Streamdown 只看这个元素的 scroll 事件），
+ *        等 300ms 让 scroll 事件送到。
+ */
+async function scrollLong(page, toTop) {
+  await page.evaluate(({ first, top }) => {
+    const pre = [...document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="assistant"] '
+      + '[data-streamdown="code-block"] pre')].find((item) => item.textContent.includes(first));
+    const body = pre?.closest('[data-streamdown="code-block-body"]');
+    body?.scrollTo({ top: top ? 0 : body.scrollHeight, behavior: 'instant' });
+  }, { first: LONG_FIRST, top: toTop });
+  await sleep(300);
+}
+
+/** @brief 每个代码块都有"Copy code"，且都不可用（disabled 为 true）或都可用（false）。 */
+const copiesAre = (state, disabled) => state.copies.length === 2 && state.copies.every((value) => value === disabled);
+
+/**
+ * @brief chat.md"生成中那段正文里的代码块"（2026-10-26 补，U14，synthetic-code-stream）：一段短代码块（写完的）和一段
+ *        60 行的长代码块。长代码块写到第 30 行（停顿 A）：块最高 400px、在块里滚动，已经滚到块的底部，两个代码块的
+ *        "Copy code"都不可用；这时在块里滚到顶部，写到第 45 行（停顿 B）时仍在顶部（不再跟），再滚回底部，写到第
+ *        60 行（停顿 C）时又在底部（接着跟）；回复结束后两个"Copy code"都可用，长代码块不再标为没写完、停在原来的位置。
+ */
+async function codeStreamCheck(page, h) {
+  await h.load('synthetic-code-stream', { speed: 1, maxGap: 3000 });
+  await h.textarea.fill(MARKDOWN_PROMPT);
+  await h.textarea.press('Enter');
+  const followed = await atPause(page, CODE_PAUSES[0]);
+  await scrollLong(page, true);
+  const left = await atPause(page, CODE_PAUSES[1]);
+  await scrollLong(page, false);
+  const resumed = await atPause(page, CODE_PAUSES[2]);
+  await h.idle();
+  await sleep(400);
+  const ended = await codeScroll(page);
+  record('code-stream：这段正文还在生成时，高过 400px 的代码块在块里滚动（最高 400px）、随写入滚到块的底部；'
+    + '这段正文里的代码块（写完的短代码块和还在写的长代码块）"Copy code"都不可用', followed.open
+    && followed.blocks === 2 && followed.view > 300 && followed.view <= 400 && followed.height > followed.view + 100
+    && followed.top > 0 && followed.gap <= 2 && copiesAre(followed, true), JSON.stringify(followed));
+  record('code-stream：生成中在代码块里往上滚了（离底部超过 8px）就不再跟着往下滚；滚回底部后接着跟（"Copy code"仍不可用）',
+    left.open && left.top <= 2 && left.height >= followed.height + 200 && resumed.open && resumed.gap <= 2
+    && resumed.height >= left.height + 200 && copiesAre(left, true) && copiesAre(resumed, true),
+  JSON.stringify({ left, resumed }));
+  record('code-stream：回复结束后两个代码块的"Copy code"都可用，长代码块不再标为没写完、停在结束时的位置（底部，没有跳回顶部）',
+    !ended.open && ended.blocks === 2 && copiesAre(ended, false) && ended.top > 0 && ended.top >= resumed.top - 30
+    && ended.gap <= 2, JSON.stringify(ended));
+  record('code-stream：回放命令与录制一致', (await h.replayErrors()).length === 0, (await h.replayErrors()).join('; '));
+  await page.screenshot({ path: join(shots, 'code-stream.png') });
+}
+
 const checks = { readme: readmeCheck, markdown: markdownCheck, mermaid: mermaidCheck, 'mermaid-fail': mermaidFailCheck,
-  'mermaid-stop': mermaidStopCheck, 'command-fail': commandFailCheck, edit: editCheck,
+  'mermaid-stop': mermaidStopCheck, 'code-stream': codeStreamCheck, 'command-fail': commandFailCheck, edit: editCheck,
   'queue-steer': queueSteerCheck, 'two-tools-steer': twoToolsCheck, stop: stopCheck, bands: bandsCheck,
   'open-failed': openFailedCheck,
   // v1：m1/no-key.json 与它的检查删去（v1 里没有 key 的提供商请求不带认证头，没有这种情形，§14.4）
