@@ -10,7 +10,7 @@
 | --- | --- |
 | `roles.get { sessionId }`（每次进入这一节、每次保存或删除之后） | `RolesInfo`：项目根、`.mori/agents` 的路径、会话的模型范围 `pick`、三项职责的持有者、全部问题行、agent 列表（第一个是 Mori）、表单可选的模型范围与工具 |
 | `roles.save { sessionId, file, agent }` 的结果 | 新的 `RolesInfo` 与写出的文件，或 `error`（问题行，每条一行） |
-| `roles.delete { sessionId, file }` 的结果 | 新的 `RolesInfo`，或 `error` |
+| `roles.delete { sessionId, file, name }` 的结果 | 新的 `RolesInfo`，或 `error` |
 | 跟随的会话 | 同 tools.md：当前会话（分屏时焦点所在的那一栏）；没有会话时这一节不出现 |
 | 你的操作 | 点行、New agent、Edit、Open in default app、Delete…；模型菜单里的 Manage agents |
 

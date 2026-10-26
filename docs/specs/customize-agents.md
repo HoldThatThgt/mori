@@ -85,7 +85,7 @@ WP-08（Customize 的内置工具开关）、WP-09（模型菜单里的 Task mod
 ### 4.1 命令与结果
 
 `roles.get { sessionId }`（只读）：读跟随的会话所在项目的 `.mori/agents/*.md`（与 `loadRoles` 同样只读这一层、按文件名排序），每次进入这一节、
-每次保存或删除之后读一次；不监视文件。返回 `RolesInfo`：
+每次保存或删除之后读一次；不监视文件。结果 `{ info: RolesInfo, error: null }`；目录读不出时 `{ info: null, error: <原文> }`（§4.3）。`RolesInfo`：
 
 ```ts
 interface RolesInfo {
@@ -167,9 +167,9 @@ seats: [close]
 
 - 字段顺序同 TaskBoard 规格 §4.1 的表：`name`、`description`、`tools`、`models`、`requires`、`seats`、`differ_from`、`subscribe`，
   没有的不写。`description` 总写成 JSON 字符串（YAML 认得，冒号、引号、`#` 都不用另外转义）；列表写成单行的 `[a, b]`，
-  每项只含字母、数字和 `._/-` 时原样写，否则写成 JSON 字符串；`subscribe` 写成 JSON（YAML 的子集）。换行用 `\n`，UTF-8，不加 BOM。
+  每项只含字母、数字和 `._/-` 与下划线时原样写，否则写成 JSON 字符串；`subscribe` 写成 JSON（YAML 的子集）。换行用 `\n`，UTF-8，不加 BOM。
   不新增依赖：写法只用 JSON，读回用 pi 的 `parseFrontmatter`。
-- 结果 `{ info: RolesInfo, file: string, error: null }` 或 `{ error }`。
+- 结果 `{ info: RolesInfo, file: string, error: null }`；不写文件时 `{ info: null, file: null, error }`（§5.2 的问题，每条一行）。
 
 ### 5.2 校验：写之前用同一套规则
 
@@ -191,7 +191,7 @@ seats: [close]
 
 ### 5.4 `roles.delete`
 
-`roles.delete { sessionId, file }`：`file` 的检查同 §5.2；删除这个文件（不进回收站，同删除会话），返回新的 `RolesInfo`。
+`roles.delete { sessionId, file, name }`：`file` 的检查同 §5.2；删除这个文件（不进回收站，同删除会话），结果 `{ info: RolesInfo, error: null }`，失败时 `{ info: null, error: <原文> }`。`name` 是这个 agent 的名字，只用于操作记录（§5.6）。
 文件已经不在时也算成功（列表本来就要更新）。
 
 ### 5.5 对已经打开的会话
@@ -256,7 +256,7 @@ seats: [close]
 | Name | 文本框 | `Lowercase letters, digits, and -. The file is saved as .mori/agents/<name>.md.`（编辑时 `The file name stays <file>.`） |
 | Description | 文本框（≤ 200 字符，显示 `n/200`） | `Other agents read this when they decide who does what.` |
 | Jobs | 三个勾选框 `Talks to you`、`Plans requests`、`Closes requests` | `Leave all off for an agent that only works on tasks. Jobs no agent takes stay with Mori.`；被别的文件认领的那一项不可用，旁边写 `<name> does this` |
-| Models | 单选 `Same as the session’s model range` / `Use these, in order`；选后者时一个有序列表与 `Add model range`（下拉：Groups、Providers、Models 三节，同模型菜单的顺序与文字） | 列表拖动排序（同 Settings › Models 的列表，WP-03），每项有移除按钮；列表为空时不能保存 |
+| Models | 单选 `Same as the session’s model range` / `Use these, in order`；选后者时一个有序列表与 `Add model range`（下拉：Groups、Providers、Models 三节，同模型菜单的顺序与文字） | 列表拖动排序：把一项拖到另一项上，它就排到那一项的位置（WP-03 还没合入，先用这一节自己的拖动列表；WP-03 合入后与 Settings › Models 的列表用同一个组件），每项有移除按钮；列表为空时不能保存 |
 | Tools | 单选 `Same as Mori` / `Only these`；选后者时 `piTools` 每个一个勾选框，再加 `All MCP tools` | 一个都不勾时不能保存 |
 | Prompt | 多行文本框 | `What this agent does and how. Added to its system prompt.` |
 
@@ -324,7 +324,7 @@ seats: [close]
 - 每一步：`npm run check`、构建、`npm run test:ag-unit` 与 `npm run test:unit`（改了 `roles.ts` 或 `selector.ts` 时再加
   `npm run test:tb-unit`），然后 `npm run test:quick`，再用 `node tests/ui/ag-app.mjs --only <编号,…>` 只跑这一步新增或改写的
   用例。不跑整个 `ag-app`，不跑 `tb-app-roles`、`m6-app-tools` 等整套，不跑覆盖检查。`ag-app.mjs` 因此要支持 `--only`
-  （按编号选用例，结果写到 `ag-app-partial.json`，覆盖检查不认它）。
+  （按编号选用例，结果写到 `ag-partial-app.json`，覆盖检查不认它）。
 - 推送到远端之前（负责人要求时）：完整回归里加上整个 `ag-app`、AG-11 的现有套件与 `spec-coverage --spec agents`，
   即 `npm run test:agents`。
 - 每次界面套件运行前后照约定告诉走查会话（端口 4960–4969）。
@@ -345,11 +345,11 @@ seats: [close]
 | AG-08 | Manage agents | 模型菜单 Task mode 那一行下面有 `Manage agents`（Task mode 开、关都有）；点后打开 Customize 并选中 Agents，跟随这个会话 | App |
 | AG-09 | 展开的内容 | §6.3 每一块：两种 Models 写法、Model needs 的白话与 handoff tier 的说明、Tools 的两种写法与 `all MCP tools`、Other settings、Prompt、File 与操作 | 单元、App |
 | AG-10 | 操作记录 | F8 的 Recent activity 有 `Save agent <name>`、`Delete agent <name>`、`Open Customize → Agents` | App |
-| AG-11 | 现有功能不退步 | 每一步：`npm run test:unit`、`test:tb-unit`、`npm run test:quick` 通过；推送前的完整回归：`tb-app-roles`、`m6-app-tools`、WP-07 与 WP-09 改过的套件通过（App 层的结果只在这时写） | 单元、App |
+| AG-11 | 现有功能不退步 | 每一步：`npm run test:unit`、`test:tb-unit`、`npm run test:quick` 通过；`parseRoleFiles` 拆出 `inspectRoleFiles` 之后对同样的文件结果不变（单元）；推送前的完整回归：`node tests/ui/v1-models-existing.mjs --id AG-11` 跑这一节改到的现有界面套件——App 层 `tb-app-roles`、`m6-app-tools`、`m6-app-settings`、`mem-app-settings` 与 WP-09 改过的模型菜单套件，记进 `ag-app-existing.json`；回放层 `m6-replay`，记进 `ag-replay-existing.json`（App 层的结果只在这时写） | 单元、App |
 
 ### 9.3 不留未完成项
 
 `tests/spec-coverage.mjs --spec agents` 读 §9.2 的编号和每条的“层”，再读 `test-results/` 里 `ag-` 开头的结果文件
-（`ag-unit.json` 为单元，`ag-app*.json` 为 App，`--only` 写的 `ag-app-partial.json` 不算），规则同其他规格。
+（`ag-unit.json` 为单元，`ag-app*.json` 为 App（含 `ag-app-existing.json`），`--only` 写的 `ag-partial-` 开头的文件不算），规则同其他规格。单元测试的报告器 `tests/unit/ag-reporter.mjs`（严格模式，同 `tb-reporter.mjs`）。
 `npm run test:agents` 依次跑单元、构建、整个 App、AG-11 的现有套件，最后运行覆盖检查；它跑整套界面测试，只在推送到远端
 之前跑（§9.1），平时只跑 `test:ag-unit`。

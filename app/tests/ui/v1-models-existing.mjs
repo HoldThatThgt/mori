@@ -30,6 +30,10 @@
 //     MD-15 的 spec-coverage-model 带 sameAs，结果同时记在 spec-coverage 的名字下，另写时按名字找到它。
 //     模型层、TaskBoard 与记忆的真实层（MP-27；TB-04、TB-08、TB-34、TB-37、TB-45；MEM-05、MEM-10、MEM-22、MEM-34）
 //     本轮没有重跑，交付说明列为未验证。
+//   AG-11（docs/specs/customize-agents.md §9.2）：套件列表 agents，只有 Customize › Agents 改到的现有界面套件：App 层
+//     tb-app-roles、m6-app-tools、m6-app-settings、mem-app-settings 记进 ag-app-existing.json；回放层 m6-replay 记进
+//     ag-replay-existing.json。不跑单元测试与覆盖检查（单元层由 npm run test:ag-unit，覆盖检查是 npm run test:agents 的
+//     最后一步）。
 // 各套件自己的结果文件照旧写（m1-app.json 等）；这里另把每个套件的输出存到 test-results/<日志目录>/<脚本名>.log
 // （MP-37 为 v1-models-existing，TB-46 为 tb-existing，MEM-35 为 mem-existing，MD-15 为 md-existing；脚本名里的 ":"
 // 换成 "-"），失败时检查的细节里带它打印的 FAIL 行（md-markers 另带命中的行）。
@@ -37,9 +41,9 @@
 // tb-build-base 只建 .tb-runs/base 的对照版）。现有套件用固定端口（4319–4371、4500–4559、4600–4799；一键拉取模型的
 // 套件用 4800–4899），不要和别的现有套件同时跑。
 // 用法（在 app/ 下）：
-//   node tests/ui/v1-models-existing.mjs [--id MP-37|TB-46|MEM-35|MD-15] [--only m0-smoke,m1-replay]
+//   node tests/ui/v1-models-existing.mjs [--id MP-37|TB-46|MEM-35|MD-15|AG-11] [--only m0-smoke,m1-replay]
 //     [--exe <Mori.exe>] [--app-file <名字.json>] [--replay-file <名字.json>]
-//     [--suites models|taskboard|memory|discovery] [--with-unit] [--with-coverage]
+//     [--suites models|taskboard|memory|discovery|agents] [--with-unit] [--with-coverage]
 // --app-file、--replay-file、--suites 换掉编号的默认值；--with-unit、--with-coverage 加上 test:unit 与模型层的覆盖检查
 // （TB-46、MEM-35、MD-15 默认带；MD-15 的模型层覆盖检查即 spec-coverage-model）。
 // --only 用脚本名或附加检查的名字（例如 --id MD-15 --only md-markers 只跑标记检查）。
@@ -149,6 +153,7 @@ const MEMORY_LISTS = {
  *        models 为模型层 §14.4 的套件；taskboard 为 TaskBoard §17.4 的 TB-46：再加模型层的 App 与回放套件；
  *        memory 为记忆规格 §14.4 的 MEM-35：再加 TB-03 的对照构建、TaskBoard 的 App 套件、单元与回放；
  *        discovery 为一键拉取模型规格 §13.3 的 MD-15：memory 再加记忆的 App 套件、test:mem-unit 与 mem-replay。
+ *        agents 为 Customize › Agents 规格 §9.2 的 AG-11：这一节改到的现有界面套件。
  */
 const SUITE_LISTS = {
   models: { app: APP_SUITES, replay: REPLAY_SUITES },
@@ -157,6 +162,10 @@ const SUITE_LISTS = {
   discovery: {
     app: [...MEMORY_LISTS.app, ...MEM_APP_SUITES],
     replay: [...MEMORY_LISTS.replay, MEM_UNIT_CHECK, suite('mem-replay', false)],
+  },
+  agents: {
+    app: ['tb-app-roles', 'm6-app-tools', 'm6-app-settings', 'mem-app-settings'].map((name) => suite(name, true)),
+    replay: [suite('m6-replay', false)],
   },
 };
 
@@ -183,6 +192,8 @@ const PRESETS = {
     tail: [MODEL_COVERAGE_CHECK, TB_COVERAGE_CHECK, MEM_COVERAGE_CHECK, MARKER_CHECK],
     also: [{ id: 'MP-37', before: MODEL_COVERAGE_CHECK }, { id: 'TB-46', before: TB_COVERAGE_CHECK },
       { id: 'MEM-35', before: MEM_COVERAGE_CHECK }] },
+  'AG-11': { appFile: 'ag-app-existing.json', replayFile: 'ag-replay-existing.json',
+    partial: 'ag-partial-existing-', logDir: 'ag-existing', suites: 'agents', withUnit: false, tail: [], also: [] },
 };
 
 /** @brief 参数不认识时打印原因并以退出码 2 结束。 */
