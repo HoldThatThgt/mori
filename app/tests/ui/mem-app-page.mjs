@@ -783,11 +783,15 @@ async function leaveDialog(ctx) {
   await leaveOthers(ctx);
 }
 
-/** @brief 别的离开入口同样先问（分节、New entry、Back to app、侧栏的会话），Esc 等于 Keep editing；Discard 照常去做。 */
+/**
+ * @brief 别的离开入口同样先问（分节、New entry、Back to app、项目行的 +、侧栏的会话），Esc 等于 Keep editing；
+ *        Discard 照常去做。
+ */
 async function leaveOthers(ctx) {
   const { page } = ctx;
   const ways = [['section', page.getByTestId('memory-section-strategy')], ['new', page.getByTestId('memory-new')],
     ['back', page.locator('[data-testid="memory-page"] .topbar button', { hasText: 'Back to app' })],
+    ['plus', page.getByTestId('project-new-session').first()],
     ['sidebar', page.locator(`.session-item[data-row="${ctx.b1}"]`)]];
   const results = [];
   for (const [name, locator] of ways) {
@@ -801,7 +805,7 @@ async function leaveOthers(ctx) {
     if (!onPage) break;
   }
   record('MEM-14 the other ways out ask the same way before leaving the edit (a section, New entry, Back to app, a '
-    + 'session in the sidebar), and Esc keeps editing', results.length === ways.length
+    + 'project’s +, a session in the sidebar), and Esc keeps editing', results.length === ways.length
     && results.every((item) => item.asked && item.kept && item.onPage), brief(results));
   if (!results.every((item) => item.onPage)) throw new Error(`left the Memory page without asking: ${brief(results)}`);
   const file = readText(join(baseOf(ctx, 'p1'), 'entries', 'reply-style.md'));
