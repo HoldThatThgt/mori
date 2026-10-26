@@ -70,11 +70,12 @@ test('MD-12 an old profile without meta loads, is not probed again and has repor
   assert.deepEqual(back, old);
   assert.equal(back.suite, P.PROBE_SUITE, 'PROBE_SUITE is unchanged');
   assert.equal(P.needsProbe(target(), back), false, 'no probe again because meta is missing');
-  const view = P.profileView(target(), back, false);
+  const view = P.profileView(target(), back, false, null);
   assert.equal(view.reported, null);
   assert.equal(view.context.reported, 65536, 'the window still comes from auto.reported');
   // ProfileBook 读同一个文件：同样不探测、reported 为 null
-  const book = new P.ProfileBook({ path, resolve: (ref) => (ref === 'local/fake-coder' ? target() : null) });
+  const book = new P.ProfileBook({ path, resolve: (ref) => (ref === 'local/fake-coder' ? target() : null),
+    catalog: () => null });
   await book.load();
   assert.equal(book.views(['local/fake-coder'])['local/fake-coder'].reported, null);
 });
@@ -139,15 +140,16 @@ test('MD-12 server.kind accepts every §3.3 kind; an unknown kind or a bad meta 
 
 test('MD-12 ProfileView.reported: null while a new model is probing, the stored values for a new profile',
   async () => {
-    assert.equal(P.profileView(target(), undefined, true).reported, null, 'probing without a profile');
-    const fresh = P.profileView(target(), stored(), false);
+    assert.equal(P.profileView(target(), undefined, true, null).reported, null, 'probing without a profile');
+    const fresh = P.profileView(target(), stored(), false, null);
     assert.deepEqual(fresh.reported, { contextWindow: 65536, maxTokens: 8192, reasoning: true, image: false });
     const nothing = stored(auto({ reported: null, meta: { maxTokens: null, reasoning: null, image: null } }));
-    assert.deepEqual(P.profileView(target(), nothing, false).reported,
+    assert.deepEqual(P.profileView(target(), nothing, false, null).reported,
       { contextWindow: null, maxTokens: null, reasoning: null, image: null }, 'a new profile with nothing reported');
     // 重新验证期间按旧结果显示（模型层规格 §7.4）：reported 也是档案里的
-    assert.deepEqual(P.profileView(target(), stored(), true).reported, fresh.reported);
-    assert.equal(P.profileView(target(), stored(auto()), true).reported, null, 'an old profile while re-verifying');
+    assert.deepEqual(P.profileView(target(), stored(), true, null).reported, fresh.reported);
+    assert.equal(P.profileView(target(), stored(auto()), true, null).reported, null,
+      'an old profile while re-verifying');
     assert.deepEqual(P.reportedOf(auto({ meta: META })), fresh.reported);
     assert.equal(P.reportedOf(auto()), null);
   });
@@ -156,12 +158,12 @@ test('MD-12 the ProfileBook views give reported per ref and keep meta through sa
   const path = tempPath();
   const targets = { 'local/fake-coder': target(), 'local/old': target({ id: 'old' }),
     'local/new': target({ id: 'new' }) };
-  const book = new P.ProfileBook({ path, resolve: (ref) => targets[ref] ?? null });
+  const book = new P.ProfileBook({ path, resolve: (ref) => targets[ref] ?? null, catalog: () => null });
   await book.load();
   await book.save(stored());
   await book.save(stored(auto(), targets['local/old']));
   book.setRunning('local/new', 0, 8);
-  const again = new P.ProfileBook({ path, resolve: (ref) => targets[ref] ?? null });
+  const again = new P.ProfileBook({ path, resolve: (ref) => targets[ref] ?? null, catalog: () => null });
   await again.load();
   again.setRunning('local/new', 0, 8);
   const views = again.views(Object.keys(targets));

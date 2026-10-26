@@ -12,6 +12,12 @@ import {
 } from './rules-helpers.mjs';
 
 const P = await loadKernelModule('src/kernel/modelProfiles.ts');
+const C = await loadKernelModule('src/kernel/piCatalog.ts');
+await C.loadCatalog();
+
+/** @brief 同模型层（modelLayer.ts profileOf）拼档案视图：pi 的条目按 target 的地址与 id 查好传进去。 */
+const layerView = (target, stored, running) => P.profileView(target, stored, running,
+  C.catalogEntry(target.baseUrl, target.model.id));
 
 /** 手写的条目（synthetic）：同 pi 的 Z.AI 条目给 glm-5.3 的值 */
 const ENTRY = Object.freeze({ provider: 'Z.AI', contextWindow: 1000000, maxTokens: 131072, reasoning: true });
@@ -147,15 +153,15 @@ test('MD-16 §7.2 the profile view\'s catalog has pi\'s values only for what ste
   + 'profile (no meta), before any profile, or at an address pi does not know', () => {
   const target = zaiTarget();
   const none = { maxTokens: null, reasoning: null, image: null };
-  assert.deepEqual(P.profileView(target, zaiProfile(target, { meta: none }), false).catalog,
+  assert.deepEqual(layerView(target, zaiProfile(target, { meta: none }), false).catalog,
     { provider: 'Z.AI', contextWindow: 1000000, maxTokens: 131072, reasoning: true });
   const partly = zaiProfile(target, { reported: 200000, meta: { maxTokens: 64000, reasoning: null, image: null } });
-  assert.deepEqual(P.profileView(target, partly, false).catalog,
+  assert.deepEqual(layerView(target, partly, false).catalog,
     { provider: 'Z.AI', contextWindow: null, maxTokens: null, reasoning: true });
-  assert.equal(P.profileView(target, zaiProfile(target), false).catalog, null);
-  assert.equal(P.profileView(target, undefined, true).catalog, null);
+  assert.equal(layerView(target, zaiProfile(target), false).catalog, null);
+  assert.equal(layerView(target, undefined, true).catalog, null);
   const other = { ...target, baseUrl: 'https://llm.example.test/v1' };
-  assert.equal(P.profileView(other, zaiProfile(other, { meta: none }), false).catalog, null);
+  assert.equal(layerView(other, zaiProfile(other, { meta: none }), false).catalog, null);
 });
 
 test('MD-16 §7.2 values from pi\'s model list are not reported values: with a catalog window the effective window is '
@@ -164,12 +170,12 @@ test('MD-16 §7.2 values from pi\'s model list are not reported values: with a c
   const none = { maxTokens: null, reasoning: null, image: null };
   // 配置仍是默认值 128000，pi 的窗口 1,000,000：有效窗口不取 pi 的
   const target = zaiTarget();
-  const view = P.profileView(target, zaiProfile(target, { meta: none }), false);
+  const view = layerView(target, zaiProfile(target, { meta: none }), false);
   assert.equal(view.catalog.contextWindow, 1000000);
   assert.deepEqual([view.context.declared, view.context.reported, view.context.effective], [128000, null, 128000]);
   // 服务报告了 200000：有效窗口是配置与报告中较小的，pi 的值不参与
   const big = zaiTarget({ contextWindow: 1000000 });
-  const reported = P.profileView(big, zaiProfile(big, { reported: 200000, meta: none }), false);
+  const reported = layerView(big, zaiProfile(big, { reported: 200000, meta: none }), false);
   assert.equal(reported.catalog.contextWindow, null);
   assert.deepEqual([reported.context.declared, reported.context.reported, reported.context.effective],
     [1000000, 200000, 200000]);

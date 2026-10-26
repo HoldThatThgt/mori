@@ -15,7 +15,7 @@ import {
 } from './discoverRead';
 import type { ServerMeta, ServerRead, VersionRead } from './modelProfiles';
 import type { ModelTimings } from './modelTimings';
-import { catalogEntry } from './piCatalog';
+import { catalogEntry, loadCatalog } from './piCatalog';
 
 // ---- 常量（§11，登记在 docs/v1/defaults.md “一键拉取模型”；请求的时限在 modelTimings.ts） ----
 
@@ -803,6 +803,7 @@ export class DiscoverReader {
     const rows = parent ? [row, parent] : [row];
     const set = await readDetails(ctx, { read: scoped, rows, bodies, single: modelId });
     const ids = new Set(rows.map(rowId));
+    await loadCatalog();
     const models = buildModels(scoped, { ...set, rows: set.rows.filter((item) => ids.has(rowId(item))) },
       target.base, []);
     return serverRead(read.kind, version, models.find((model) => model.id === modelId) ?? null);
@@ -857,6 +858,7 @@ export class DiscoverReader {
     const rows = read.listed.rows.slice(0, LIST_MAX);
     const set = await readDetails(ctx, { read: scoped, rows, bodies, single: null });
     const listedIds = new Set(read.listed.rows.map(rowId));
+    await loadCatalog();
     return {
       ...empty, server: { kind: read.kind, version }, baseUrl: read.listed.attempt.suggestedBase,
       anthropicShape: read.listed.anthropicShape, models: buildModels(scoped, set, request.base, request.configured),

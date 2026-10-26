@@ -15,10 +15,9 @@ import {
   type ApiType, type Capability, type CatalogValues, type Compat, type ProbeProgress, type ProbeStepResult,
   type ProfileView, type ProviderModel, type ReasoningField, type ReportedValues, type ServerKind,
 } from '../shared/models';
-import { fromCatalog } from './discoverRead';
+import { fromCatalog, type CatalogEntry } from './discoverRead';
 import type { CompileFlags } from './modelCompile';
 import type { ModelRef, ToolCallingState } from './modelTypes';
-import { catalogEntry } from './piCatalog';
 import { renameReplacing } from './renameRetry';
 
 /** @brief 探针套件版本（§7.2 suite）；探针的请求或判定改变时加 1。 */
@@ -274,12 +273,13 @@ export function reportedOf(auto: AutoResults): ReportedValues | null {
 }
 
 /**
- * @brief catalog（model-discovery.md §4.4、§7.2，2026-10-26）：按配置的地址与模型 id 查 pi 自带的模型表，只取第 0 步
- *        没读到的项（规则同读取器，discoverRead.ts fromCatalog）；不存在档案里，每次拼视图时查。
+ * @brief catalog（model-discovery.md §4.4、§7.2，2026-10-26）：pi 自带模型表里按配置的地址与模型 id 对上的条目，只取第 0 步
+ *        没读到的项（规则同读取器，discoverRead.ts fromCatalog）；不存在档案里，每次拼视图时由模型层查好传进来。
+ * @param entry 对上的条目（piCatalog.ts catalogEntry）；没有时为 null
  * @param reported 第 0 步读到的报告值；为 null（旧档案）时不取，同模型行不标 (default)
  */
-export function catalogOf(target: ProfileTarget, reported: ReportedValues | null): CatalogValues | null {
-  return reported === null ? null : fromCatalog(catalogEntry(target.baseUrl, target.model.id), reported);
+export function catalogOf(entry: CatalogEntry | null, reported: ReportedValues | null): CatalogValues | null {
+  return reported === null ? null : fromCatalog(entry, reported);
 }
 
 /** @brief status：第 0–7 步至少一步出错没有结果为 error（附第一条原文），否则 ready。 */
@@ -316,8 +316,8 @@ function probingView(target: ProfileTarget): ProfileView {
   };
 }
 
-/** @brief 已有档案的 ProfileView；vision 与 declared 窗口取当前配置。 */
-function storedView(target: ProfileTarget, stored: StoredProfile): ProfileView {
+/** @brief 已有档案的 ProfileView；vision 与 declared 窗口取当前配置，entry 见 profileView。 */
+function storedView(target: ProfileTarget, stored: StoredProfile, entry: CatalogEntry | null): ProfileView {
   const { steps } = stored.auto;
   const reported = reportedOf(stored.auto);
   return {
@@ -331,7 +331,7 @@ function storedView(target: ProfileTarget, stored: StoredProfile): ProfileView {
     reasoning: reasoningOf(target.api, stored.auto),
     context: contextOf(target.model, stored.auto.reported),
     reported,
-    catalog: catalogOf(target, reported),
+    catalog: catalogOf(entry, reported),
     probedAt: stored.probedAt,
     suite: stored.suite,
   };
@@ -342,10 +342,11 @@ function storedView(target: ProfileTarget, stored: StoredProfile): ProfileView {
  *        reverifying，tool calling 验证过的模型不显示状态行，§9.1）；从未完成探测、正在探测时为 probing；两者都不是时为
  *        null（界面的状态行为“Couldn’t verify”加 Verify again）。
  * @param running 这个模型正在探测
+ * @param entry pi 自带模型表里按 target 的地址与 id 对上的条目（piCatalog.ts catalogEntry，§4.4）；没有时为 null
  */
 export function profileView(target: ProfileTarget, stored: StoredProfile | undefined,
-  running: boolean): ProfileView | null {
-  if (stored) return storedView(target, stored);
+  running: boolean, entry: CatalogEntry | null): ProfileView | null {
+  if (stored) return storedView(target, stored, entry);
   return running ? probingView(target) : null;
 }
 
@@ -500,6 +501,11 @@ export interface ProfileBookOptions {
    * @return 配置里没有时为 null
    */
   resolve(ref: ModelRef): ProfileTarget | null;
+  /**
+   * @brief pi 自带模型表里按 target 的地址与 id 对上的条目（model-discovery.md §4.4，档案视图的 catalog）。
+   * @return 没有对上时为 null
+   */
+  catalog(target: ProfileTarget): CatalogEntry | null;
 }
 
 /** @brief 全部档案与正在跑的探针：读写 model-profiles.json，给选择器和界面查询。 */
@@ -594,7 +600,7 @@ export class ProfileBook {
       const target = find(ref);
       if (!target) continue;
       const stored = byModel.get(serverModelId(target.baseUrl, target.api, target.model.id));
-      const view = profileView(target, stored, this.isRunning(ref));
+      const view = profileView(target, stored, this.isRunning(ref), this.options.catalog(target));
       if (view) out[ref] = view;
     }
     return out;

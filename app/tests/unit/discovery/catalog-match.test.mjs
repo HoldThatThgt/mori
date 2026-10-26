@@ -4,12 +4,14 @@
 // 943,718；Amazon Bedrock 的 us.zai.glm-5.3 为 1,000,000 / 128,000；Cloudflare Workers AI 的 @cf/zai-org/glm-5.3 为
 // 1,048,576 / 1,048,576；opencode.ai 下 OpenCode Zen 与 OpenCode Go 的 glm-5.3 相同、minimax-m3 不同。
 // 地址里的主机名 *.example.test 是保留的测试域名，不发请求（catalogEntry 不发请求）。
+// pi-ai 只提供 ESM，后台进程（CJS）动态加载它：先 loadCatalog，再同步查（2026-10-26 集成时改）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadKernelModule } from '../load.mjs';
 
-const { catalogEntry } = await loadKernelModule('src/kernel/piCatalog.ts');
+const { catalogEntry, loadCatalog } = await loadKernelModule('src/kernel/piCatalog.ts');
+await loadCatalog();
 
 /** 负责人的 z.ai 提供商的地址（Anthropic 接口） */
 const ZAI = 'https://api.z.ai/api/anthropic';
@@ -76,4 +78,16 @@ test('MD-16 §4.4 an address that is not an http(s) URL matches nothing', () => 
   assert.equal(catalogEntry('', 'glm-5.3'), null);
   assert.equal(catalogEntry('ftp://api.z.ai/', 'glm-5.3'), null);
   assert.equal(catalogEntry('api.z.ai', 'glm-5.3'), null);
+});
+
+test('MD-16 §4.4 pi\'s model list is loaded with a dynamic import before it is read: catalogEntry before loadCatalog '
+  + 'throws, loadCatalog returns the same promise every time', async () => {
+  // 新的一份模块（没有加载过）：模型层与拉取命令都先等 loadCatalog，顺序错了要报错，不当作“pi 不认得”
+  const fresh = await loadKernelModule('src/kernel/piCatalog.ts');
+  assert.throws(() => fresh.catalogEntry(ZAI, 'glm-5.3'), /not loaded/);
+  assert.equal(fresh.catalogEntry('api.z.ai', 'glm-5.3'), null);
+  const first = fresh.loadCatalog();
+  assert.equal(fresh.loadCatalog(), first);
+  await first;
+  assert.deepEqual(fresh.catalogEntry(ZAI, 'glm-5.3'), ZAI_GLM);
 });
