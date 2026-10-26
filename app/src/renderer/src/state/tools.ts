@@ -89,6 +89,15 @@ export function toggleCommand(kind: ResourceKind, path: string, enabled: boolean
   return { type: 'resource.toggle', kind, path, enabled, ...(sessionId ? { sessionId } : {}) };
 }
 
+/**
+ * @brief pi 的一个内置工具在新会话里默认启用与否的命令（写用户级 settings.json 的 defaultTools）；带上跟随的会话，
+ *        后台进程据此看受信任项目的设置有没有改它。
+ */
+export function defaultToolCommand(name: string, enabled: boolean): Command {
+  const sessionId = useTools.getState().sessionId;
+  return { type: 'tools.setDefault', name, enabled, ...(sessionId ? { sessionId } : {}) };
+}
+
 /** @brief 一行或一张卡上一次改动的状态。 */
 export interface Change {
   /** 命令还没结束（含之后的重新读取） */

@@ -12,6 +12,8 @@
 // 范围（model-range：在 Models 里加模型、在输入框下面一行的范围菜单里选）与思考强度（thinking）两个场景写到 tests/fixtures/v1/；
 // v0 的 model-switch 场景删去（v1 没有 model.save、session.setModel）。
 // MCP 场景用 tests/mcp-server/server.mjs（synthetic，本地 stdio 服务），插件场景用 tests/pi-package（synthetic 包）的副本。
+// tool-switch（2026-10-26，负责人走查 M12）：在 Customize 的内置工具里打开 ls（tools.setDefault 写复制出的 settings.json），
+// 新会话里真实模型用 ls 列出文件。
 
 import { cpSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -46,6 +48,7 @@ const prompts = {
   PACKAGE_CALL: '请调用 package_hello 工具（不需要参数），然后用一句话告诉我它返回了什么。',
   SLASH_SKILL: '/skill:m6-hello',
   SLASH_TEMPLATE: '/m6-summary README.md',
+  LS_CALL: '请调用 ls 工具（不要用 bash 或 read）列出当前文件夹里的文件，然后用一句话告诉我有哪些文件。',
 };
 
 /** @brief 写一个技能文件夹。 */
@@ -379,10 +382,42 @@ const slash = { name: 'slash', description: '用户级技能 m6-hello 和提示�
   } };
 
 /**
+ * @brief tool-switch（负责人走查 M12，docs/v0/screens/tools.md"内置工具"）：会话 a 的 Customize 里打开 ls 的开关
+ *        （tools.setDefault，之后重新读取：开关开着，a 里仍是 Not enabled）；工具页的"New session"建的会话 b 里 ls 是
+ *        Enabled，真实模型调用 ls（只读工具，不出批准卡）列出文件；最后读 b 的工具页。
+ */
+const toolSwitch = { name: 'tool-switch', description: '会话 a 的 Customize → Built-in tools 里打开 ls 的开关（写 settings.json'
+    + ' 的 defaultTools）；新会话 b 里 ls 是 Enabled，模型调用 ls 列出文件（不出批准卡）',
+  phases: [{ page: async (rec, args) => {
+    await args.list(rec);
+    const a = await args.create(rec, args.cwd);
+    await rec.cmd({ type: 'tools.get', sessionId: a.sessionId });
+    await rec.cmd({ type: 'tools.setDefault', sessionId: a.sessionId, name: 'ls', enabled: true });
+    await rec.cmd({ type: 'tools.get', sessionId: a.sessionId });
+    const b = await args.create(rec, args.cwd);
+    await args.say(rec, b, args.LS_CALL);
+    await rec.cmd({ type: 'tools.get', sessionId: b.sessionId });
+  } }],
+  check: (steps) => {
+    const [a, b] = values(steps, 'session.create');
+    const [before, after, last] = values(steps, 'tools.get');
+    const ls = (info) => info?.tools?.find((tool) => tool.name === 'ls');
+    const starts = eventsOf(steps, 'tool_execution_start').filter((e) => e.sessionId === b?.sessionId
+      && e.event.toolName === 'ls');
+    const ends = eventsOf(steps, 'tool_execution_end').filter((e) => e.sessionId === b?.sessionId
+      && e.event.toolName === 'ls');
+    return [...common(steps), ...need(ls(before)?.byDefault?.enabled === false, 'ls is off before the switch'),
+      ...need(ls(after)?.byDefault?.enabled === true && ls(after)?.active === false, 'switched on, a unchanged'),
+      ...need(ls(last)?.active === true && Boolean(a), 'ls is enabled in the new session'),
+      ...need(starts.length > 0 && ends.every((e) => !e.event.isError), `ls calls ${starts.length}`),
+      ...need(eventsOf(steps, 'mori.approval_request').length === 0, 'no approval card')];
+  } };
+
+/**
  * @brief 录制的场景：phases 依次执行（page 在页面里录，node 在 node 里做）。check 在录完后核对；dir 是写到的目录
  *        （没有时是 tests/fixtures/m6）。
  */
-const scenarios = [modelRange, thinking, agentsMd, projectSkill, mcp, plugin, slash];
+const scenarios = [modelRange, thinking, agentsMd, projectSkill, mcp, plugin, slash, toolSwitch];
 
 // ---------- 执行 ----------
 

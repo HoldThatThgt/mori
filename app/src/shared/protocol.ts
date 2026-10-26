@@ -220,6 +220,12 @@ export const CommandSchema = z.discriminatedUnion('type', [
     path: z.string().min(1),
     enabled: z.boolean(),
   }),
+  /**
+   * pi 内置工具在新会话里默认启用与否（2026-10-26，负责人走查 M12）：写用户级 settings.json 的 defaultTools；
+   * name 是 pi 的内置工具名，sessionId 是跟随的会话（受信任项目的设置改了这个工具时拒绝）
+   */
+  z.object({ type: z.literal('tools.setDefault'), sessionId: sessionId.optional(), name: z.string().min(1),
+    enabled: z.boolean() }),
   /** 添加本地包（写进用户级设置的 packages） */
   z.object({ type: z.literal('package.add'), path: z.string().min(1) }),
   /** 停用整个包（四类都写成 []）或启用整个包（去掉过滤）；source 是设置里写的 */
@@ -289,6 +295,14 @@ export interface AgentsInfo {
   total: number;
 }
 
+/** @brief pi 的一个内置工具在新会话里的默认（Customize 内置工具的开关，docs/v0/screens/tools.md"内置工具"）。 */
+export interface DefaultToolState {
+  /** 新会话默认启用：用户级 settings.json 的 defaultTools 按 pi 的规则选出的；受信任项目的设置改了它时按合并后的 */
+  enabled: boolean;
+  /** 开关不可用的原因（受信任项目的 .pi/settings.json 改了它）；可以开关时为 null */
+  readOnly: string | null;
+}
+
 /** @brief 工具页的一个工具（pi getAllTools 的一项，不含 hidden）。 */
 export interface ToolEntry {
   /** 工具名 */
@@ -303,6 +317,8 @@ export interface ToolEntry {
   source: 'builtin' | 'extension' | 'mcp' | 'package' | 'other';
   /** 来源的说明：扩展的路径、MCP 服务名、包的来源；内置工具为空串 */
   sourceLabel: string;
+  /** pi 的 8 个内置工具在新会话里的默认（开关）；别的工具为 null */
+  byDefault: DefaultToolState | null;
 }
 
 /** @brief 工具页的一个资源（DefaultPackageManager.resolve 的一项）。 */

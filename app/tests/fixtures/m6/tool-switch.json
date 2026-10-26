@@ -1,0 +1,3765 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/m6-record.mjs; do not edit by hand.",
+ "name": "tool-switch",
+ "description": "会话 a 的 Customize → Built-in tools 里打开 ls 的开关（写 settings.json 的 defaultTools）；新会话 b 里 ls 是 Enabled，模型调用 ls 列出文件（不出批准卡）",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "recordedAt": "2026-10-26T10:42:43.053Z",
+ "steps": [
+  {
+   "t": 0,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 1106,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 1106,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m6-record-2woqFZ\\m6-tool-switch"
+   }
+  },
+  {
+   "t": 1109,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 1109,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m6-record-2woqFZ\\m6-tool-switch"
+   }
+  },
+  {
+   "t": 1244,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-22f2-7022-a201-26d31d15c87d",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 1245,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-22f2-7022-a201-26d31d15c87d",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 1247,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a177ce-22f2-7022-a201-26d31d15c87d",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m6-record-2woqFZ\\m6-tool-switch",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-kd04CX\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m6-record-2woqFZ-m6-tool-switch--\\2026-10-26T10-42-40-499Z_01a177ce-22f2-7022-a201-26d31d15c87d.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "memory"
+     ],
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "contextBreakdown": null,
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     },
+     "team": {
+      "mode": "off",
+      "holders": {
+       "dialog": "mori",
+       "create": "mori",
+       "close": "mori"
+      },
+      "roles": [],
+      "busy": false,
+      "background": false
+     },
+     "board": {
+      "requests": [],
+      "teamEdited": false
+     },
+     "teamApprovals": [],
+     "deciding": {
+      "role": "mori",
+      "since": null,
+      "queue": []
+     },
+     "memoryNotice": null
+    }
+   }
+  },
+  {
+   "t": 1247,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a177ce-22f2-7022-a201-26d31d15c87d"
+   }
+  },
+  {
+   "t": 1252,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m6-record-2woqFZ\\m6-tool-switch",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": false,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": false,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": false,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": false,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "memory",
+       "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example \"the intranet model is now at 10.0.0.9, note it\" or \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+       "active": true,
+       "exposure": "direct",
+       "source": "other",
+       "sourceLabel": "Mori",
+       "byDefault": null
+      }
+     ],
+     "skills": [],
+     "packages": [],
+     "mcp": {
+      "errors": [],
+      "servers": []
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 1252,
+   "command": {
+    "type": "tools.setDefault",
+    "sessionId": "01a177ce-22f2-7022-a201-26d31d15c87d",
+    "name": "ls",
+    "enabled": true
+   }
+  },
+  {
+   "t": 1259,
+   "result": {
+    "type": "tools.setDefault",
+    "value": {
+     "error": null
+    }
+   }
+  },
+  {
+   "t": 1259,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a177ce-22f2-7022-a201-26d31d15c87d"
+   }
+  },
+  {
+   "t": 1274,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m6-record-2woqFZ\\m6-tool-switch",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": false,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": false,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": false,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "memory",
+       "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example \"the intranet model is now at 10.0.0.9, note it\" or \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+       "active": true,
+       "exposure": "direct",
+       "source": "other",
+       "sourceLabel": "Mori",
+       "byDefault": null
+      }
+     ],
+     "skills": [],
+     "packages": [],
+     "mcp": {
+      "errors": [],
+      "servers": []
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 1274,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m6-record-2woqFZ\\m6-tool-switch"
+   }
+  },
+  {
+   "t": 1275,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 1275,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m6-record-2woqFZ\\m6-tool-switch"
+   }
+  },
+  {
+   "t": 1318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 1318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 1319,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m6-record-2woqFZ\\m6-tool-switch",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-kd04CX\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m6-record-2woqFZ-m6-tool-switch--\\2026-10-26T10-42-40-662Z_01a177ce-2396-7022-a201-26d5cf95a361.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "ls",
+      "memory"
+     ],
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "contextBreakdown": null,
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     },
+     "team": {
+      "mode": "off",
+      "holders": {
+       "dialog": "mori",
+       "create": "mori",
+       "close": "mori"
+      },
+      "roles": [],
+      "busy": false,
+      "background": false
+     },
+     "board": {
+      "requests": [],
+      "teamEdited": false
+     },
+     "teamApprovals": [],
+     "deciding": {
+      "role": "mori",
+      "since": null,
+      "queue": []
+     },
+     "memoryNotice": null
+    }
+   }
+  },
+  {
+   "t": 1319,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "text": "请调用 ls 工具（不要用 bash 或 read）列出当前文件夹里的文件，然后用一句话告诉我有哪些文件。"
+   }
+  },
+  {
+   "t": 1321,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1322,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true,
+     "held": false
+    }
+   }
+  },
+  {
+   "t": 1327,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 1327,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 1327,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 1328,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- ls: List directory contents\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m6-record-2woqFZ/m6-tool-switch\n</cwd>"
+      },
+      "timestamp": 1793011360711,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "ls",
+        "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Directory to list (default: current directory)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of entries to return (default: 500)"
+          }
+         }
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example \"the intranet model is now at 10.0.0.9, note it\" or \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          },
+          "asked": {
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 1328,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- ls: List directory contents\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m6-record-2woqFZ/m6-tool-switch\n</cwd>"
+      },
+      "timestamp": 1793011360711,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "ls",
+        "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Directory to list (default: current directory)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of entries to return (default: 500)"
+          }
+         }
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example \"the intranet model is now at 10.0.0.9, note it\" or \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          },
+          "asked": {
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 1329,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请调用 ls 工具（不要用 bash 或 read）列出当前文件夹里的文件，然后用一句话告诉我有哪些文件。"
+       }
+      ],
+      "timestamp": 1793011360711
+     }
+    }
+   }
+  },
+  {
+   "t": 1329,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "请调用 ls 工具（不要用 bash 或 read）列出当前文件夹里的文件，然后用一句话告诉我有哪些文件。"
+       }
+      ],
+      "timestamp": 1793011360711
+     }
+    }
+   }
+  },
+  {
+   "t": 1331,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "67f7d8ab",
+     "time": 1793011360711,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 1484,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 0,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1488,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 0,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1492,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-22f2-7022-a201-26d31d15c87d",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1493,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1495,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-22f2-7022-a201-26d31d15c87d",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1495,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1497,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-22f2-7022-a201-26d31d15c87d",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1497,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1498,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-22f2-7022-a201-26d31d15c87d",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1498,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1498,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-22f2-7022-a201-26d31d15c87d",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1499,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1572,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 1639,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 1,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2187,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "I"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793011360843,
+      "responseId": "d44e1522-5db1-4e0c-b5f5-961cebdbe4cc"
+     }
+    }
+   }
+  },
+  {
+   "t": 2187,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 2187,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "I"
+     }
+    }
+   }
+  },
+  {
+   "t": 2223,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "'ll"
+     }
+    }
+   }
+  },
+  {
+   "t": 2224,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " list"
+     }
+    }
+   }
+  },
+  {
+   "t": 2224,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 2224,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " current"
+     }
+    }
+   }
+  },
+  {
+   "t": 2224,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " folder"
+     }
+    }
+   }
+  },
+  {
+   "t": 2224,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " with"
+     }
+    }
+   }
+  },
+  {
+   "t": 2224,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 2235,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " ls"
+     }
+    }
+   }
+  },
+  {
+   "t": 2235,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " tool"
+     }
+    }
+   }
+  },
+  {
+   "t": 2235,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 2282,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102"
+     }
+    }
+   }
+  },
+  {
+   "t": 2282,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102"
+     }
+    }
+   }
+  },
+  {
+   "t": 2283,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{",
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102"
+     }
+    }
+   }
+  },
+  {
+   "t": 2283,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102"
+     }
+    }
+   }
+  },
+  {
+   "t": 2284,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "path",
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102"
+     }
+    }
+   }
+  },
+  {
+   "t": 2284,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102"
+     }
+    }
+   }
+  },
+  {
+   "t": 2284,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ": ",
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102"
+     }
+    }
+   }
+  },
+  {
+   "t": 2325,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102"
+     }
+    }
+   }
+  },
+  {
+   "t": 2325,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ".",
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102"
+     }
+    }
+   }
+  },
+  {
+   "t": 2325,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102"
+     }
+    }
+   }
+  },
+  {
+   "t": 2325,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "}",
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102"
+     }
+    }
+   }
+  },
+  {
+   "t": 2328,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 2328,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "ls",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102",
+      "args": {
+       "path": "."
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 2328,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "I'll list the current folder with the ls tool."
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_JeiNBmJrdBGuS9hLTec70102",
+        "name": "ls",
+        "arguments": {
+         "path": "."
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1964,
+       "output": 46,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 2010,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793011360843,
+      "responseId": "d44e1522-5db1-4e0c-b5f5-961cebdbe4cc",
+      "rawStopReason": "tool_calls",
+      "durationMs": 871,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 2329,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "53f0aec7",
+     "time": 1793011360843,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 2329,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102",
+     "toolName": "ls",
+     "gate": "free"
+    }
+   }
+  },
+  {
+   "t": 2329,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102",
+     "toolName": "ls",
+     "args": {
+      "path": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 2329,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 2333,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102",
+     "toolName": "ls",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "README.md\nsrc/"
+       }
+      ]
+     },
+     "isError": false,
+     "durationMs": 2
+    }
+   }
+  },
+  {
+   "t": 2333,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102",
+      "toolName": "ls",
+      "content": [
+       {
+        "type": "text",
+        "text": "README.md\nsrc/"
+       }
+      ],
+      "isError": false,
+      "durationMs": 2,
+      "timestamp": 1793011361719
+     }
+    }
+   }
+  },
+  {
+   "t": 2333,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102",
+      "toolName": "ls",
+      "content": [
+       {
+        "type": "text",
+        "text": "README.md\nsrc/"
+       }
+      ],
+      "isError": false,
+      "durationMs": 2,
+      "timestamp": 1793011361719
+     }
+    }
+   }
+  },
+  {
+   "t": 2334,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "I'll list the current folder with the ls tool."
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_JeiNBmJrdBGuS9hLTec70102",
+        "name": "ls",
+        "arguments": {
+         "path": "."
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 1964,
+       "output": 46,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 2010,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793011360843,
+      "responseId": "d44e1522-5db1-4e0c-b5f5-961cebdbe4cc",
+      "rawStopReason": "tool_calls",
+      "durationMs": 871,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102",
+       "toolName": "ls",
+       "content": [
+        {
+         "type": "text",
+         "text": "README.md\nsrc/"
+        }
+       ],
+       "isError": false,
+       "durationMs": 2,
+       "timestamp": 1793011361719
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2334,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361"
+   }
+  },
+  {
+   "t": 2334,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 2342,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2014,
+      "contextWindow": 1000000,
+      "percent": 0.20140000000000002
+     },
+     "contextBreakdown": {
+      "systemPrompt": 470,
+      "memoryFiles": 0,
+      "skills": 0,
+      "systemTools": 1302,
+      "mcpTools": 0,
+      "messages": 242,
+      "autocompactBuffer": 16384,
+      "freeSpace": 981602
+     }
+    }
+   }
+  },
+  {
+   "t": 2716,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 3,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3075,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Just",
+        "thinkingSignature": "reasoning_content"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793011361722,
+      "responseId": "305df7b9-e821-4282-8537-f4942a3878ba"
+     }
+    }
+   }
+  },
+  {
+   "t": 3075,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3075,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Just"
+     }
+    }
+   }
+  },
+  {
+   "t": 3176,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " report"
+     }
+    }
+   }
+  },
+  {
+   "t": 3188,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 3208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "当前"
+     }
+    }
+   }
+  },
+  {
+   "t": 3208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "文件夹"
+     }
+    }
+   }
+  },
+  {
+   "t": 3208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "里"
+     }
+    }
+   }
+  },
+  {
+   "t": 3208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "有一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 3222,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 3237,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "README"
+     }
+    }
+   }
+  },
+  {
+   "t": 3237,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": ".md"
+     }
+    }
+   }
+  },
+  {
+   "t": 3237,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 3237,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3237,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "文件"
+     }
+    }
+   }
+  },
+  {
+   "t": 3252,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "和一个"
+     }
+    }
+   }
+  },
+  {
+   "t": 3252,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 3252,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "src"
+     }
+    }
+   }
+  },
+  {
+   "t": 3253,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "/"
+     }
+    }
+   }
+  },
+  {
+   "t": 3253,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 3253,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3265,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "目录"
+     }
+    }
+   }
+  },
+  {
+   "t": 3265,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "。"
+     }
+    }
+   }
+  },
+  {
+   "t": 3265,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3265,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 3265,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Just report.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "当前文件夹里有一个 `README.md` 文件和一个 `src/` 目录。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 235,
+       "output": 22,
+       "cacheRead": 1792,
+       "cacheWrite": 0,
+       "reasoning": 3,
+       "totalTokens": 2049,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1793011361722,
+      "responseId": "305df7b9-e821-4282-8537-f4942a3878ba",
+      "rawStopReason": "stop",
+      "durationMs": 929,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 3266,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "5b1041b2",
+     "time": 1793011361722,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3266,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Just report.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "text",
+        "text": "当前文件夹里有一个 `README.md` 文件和一个 `src/` 目录。"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 235,
+       "output": 22,
+       "cacheRead": 1792,
+       "cacheWrite": 0,
+       "reasoning": 3,
+       "totalTokens": 2049,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1793011361722,
+      "responseId": "305df7b9-e821-4282-8537-f4942a3878ba",
+      "rawStopReason": "stop",
+      "durationMs": 929,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 3266,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361"
+   }
+  },
+  {
+   "t": 3266,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- ls: List directory contents\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m6-record-2woqFZ/m6-tool-switch\n</cwd>"
+       },
+       "timestamp": 1793011360711,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "ls",
+         "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Directory to list (default: current directory)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of entries to return (default: 500)"
+           }
+          }
+         }
+        },
+        {
+         "name": "memory",
+         "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example \"the intranet model is now at 10.0.0.9, note it\" or \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "action": {
+            "type": "string",
+            "enum": [
+             "save",
+             "update",
+             "forget"
+            ]
+           },
+           "kind": {
+            "type": "string",
+            "enum": [
+             "fact",
+             "taste",
+             "strategy",
+             "review"
+            ]
+           },
+           "layer": {
+            "type": "string",
+            "enum": [
+             "user",
+             "project"
+            ]
+           },
+           "entry": {
+            "type": "string"
+           },
+           "abstract": {
+            "type": "string"
+           },
+           "detail": {
+            "type": "string"
+           },
+           "note": {
+            "type": "string"
+           },
+           "quote": {
+            "type": "string"
+           },
+           "asked": {
+            "type": "boolean"
+           }
+          },
+          "required": [
+           "action"
+          ]
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "请调用 ls 工具（不要用 bash 或 read）列出当前文件夹里的文件，然后用一句话告诉我有哪些文件。"
+        }
+       ],
+       "timestamp": 1793011360711
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "I'll list the current folder with the ls tool."
+        },
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_JeiNBmJrdBGuS9hLTec70102",
+         "name": "ls",
+         "arguments": {
+          "path": "."
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 1964,
+        "output": 46,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 2010,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1793011360843,
+       "responseId": "d44e1522-5db1-4e0c-b5f5-961cebdbe4cc",
+       "rawStopReason": "tool_calls",
+       "durationMs": 871,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_JeiNBmJrdBGuS9hLTec70102",
+       "toolName": "ls",
+       "content": [
+        {
+         "type": "text",
+         "text": "README.md\nsrc/"
+        }
+       ],
+       "isError": false,
+       "durationMs": 2,
+       "timestamp": 1793011361719
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "Just report.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "text",
+         "text": "当前文件夹里有一个 `README.md` 文件和一个 `src/` 目录。"
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 235,
+        "output": 22,
+        "cacheRead": 1792,
+        "cacheWrite": 0,
+        "reasoning": 3,
+        "totalTokens": 2049,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1793011361722,
+       "responseId": "305df7b9-e821-4282-8537-f4942a3878ba",
+       "rawStopReason": "stop",
+       "durationMs": 929,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 3267,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 3267,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 3267,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 3267,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 3267,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 3268,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2049,
+      "contextWindow": 1000000,
+      "percent": 0.2049
+     },
+     "contextBreakdown": {
+      "systemPrompt": 470,
+      "memoryFiles": 0,
+      "skills": 0,
+      "systemTools": 1302,
+      "mcpTools": 0,
+      "messages": 277,
+      "autocompactBuffer": 16384,
+      "freeSpace": 981567
+     }
+    }
+   }
+  },
+  {
+   "t": 3270,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 3270,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 3301,
+   "command": {
+    "type": "tools.get",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361"
+   }
+  },
+  {
+   "t": 3303,
+   "result": {
+    "type": "tools.get",
+    "value": {
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m6-record-2woqFZ\\m6-tool-switch",
+     "projectTrust": "none",
+     "tools": [
+      {
+       "name": "read",
+       "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "bash",
+       "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "powershell",
+       "description": "Execute a PowerShell command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": false,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "edit",
+       "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "write",
+       "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "grep",
+       "description": "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": false,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "find",
+       "description": "Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).",
+       "active": false,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": false,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "ls",
+       "description": "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).",
+       "active": true,
+       "exposure": "direct",
+       "source": "builtin",
+       "sourceLabel": "",
+       "byDefault": {
+        "enabled": true,
+        "readOnly": null
+       }
+      },
+      {
+       "name": "memory",
+       "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example \"the intranet model is now at 10.0.0.9, note it\" or \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+       "active": true,
+       "exposure": "direct",
+       "source": "other",
+       "sourceLabel": "Mori",
+       "byDefault": null
+      }
+     ],
+     "skills": [],
+     "packages": [],
+     "mcp": {
+      "errors": [],
+      "servers": []
+     },
+     "diagnostics": []
+    }
+   }
+  },
+  {
+   "t": 3518,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a177ce-2396-7022-a201-26d5cf95a361",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 3587,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 4,
+       "of": 8
+      }
+     ]
+    }
+   }
+  }
+ ]
+}
