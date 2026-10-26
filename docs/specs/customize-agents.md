@@ -289,7 +289,7 @@ seats: [close]
 | `docs/v1/screens/model-menu.md` | Task mode 一行下面的 “Manage agents” |
 | `docs/v0/ui-strings.md` | 术语表与 Customize 页的固定说法（§1、§6） |
 | `docs/v1/defaults.md` | 新的一节（§7） |
-| `AGENTS.md` | 仓库结构里加本规格；常用命令加 `npm run test:agents` |
+| `AGENTS.md` | 仓库结构里加本规格；常用命令加 `npm run test:ag-unit` 与 `npm run test:agents`，并把 `test:agents` 列进“只在推送到远端之前跑”的那句 |
 | `app/src/kernel/` | `roles.ts`、`selector.ts`（改），`roleFiles.ts`、`roleCommands.ts`（新），`commands.ts`（接命令） |
 | `app/src/shared/` | `roles.ts`（新）、`protocol.ts` |
 | `app/src/renderer/` | `ToolsAgents.tsx`、`ToolsAgentForm.tsx`、`state/roles.ts`（新）；`ToolsPage.tsx`、`ModelMenu.tsx`、`actionLog.ts`、样式 |
@@ -305,6 +305,16 @@ seats: [close]
 | 单元 | `tests/unit/agents/*.test.mjs`（`node --test`，同 TaskBoard 的打包方式） | 写法与读回、逐个文件的检查、路径检查、候选与原因、白话文字 |
 | App | `tests/ui/ag-app.mjs` | Electron + 合成端点；项目与 `.mori/agents` 由测试写好，模型配置与档案按 `v1-switch-helpers.seedUserData`（synthetic，不跑探针）；端口 4960–4969（2026-10-26 与走查会话约定，其他套件不用） |
 | 回放、真实模型 | 不做 | 这一节不改发给模型的文字、工具、批准或会话事件：写出的是 TaskBoard 规格早就支持的角色文件，角色进会话的路径由 TB-01、TB-02、TB-38 覆盖（AGENTS.md 完成顺序第 2 条：只改界面与文件时可以跳过，检查记录写明） |
+
+什么时候跑什么，按 AGENTS.md“测试分层”（2026-10-26 改）：
+
+- 每一步：`npm run check`、构建、`npm run test:ag-unit` 与 `npm run test:unit`（改了 `roles.ts` 或 `selector.ts` 时再加
+  `npm run test:tb-unit`），然后 `npm run test:quick`，再用 `node tests/ui/ag-app.mjs --only <编号,…>` 只跑这一步新增或改写的
+  用例。不跑整个 `ag-app`，不跑 `tb-app-roles`、`m6-app-tools` 等整套，不跑覆盖检查。`ag-app.mjs` 因此要支持 `--only`
+  （按编号选用例，结果写到 `ag-app-partial.json`，覆盖检查不认它）。
+- 推送到远端之前（负责人要求时）：完整回归里加上整个 `ag-app`、AG-11 的现有套件与 `spec-coverage --spec agents`，
+  即 `npm run test:agents`。
+- 每次界面套件运行前后照约定告诉走查会话（端口 4960–4969）。
 
 ### 9.2 验收条目
 
@@ -322,9 +332,11 @@ seats: [close]
 | AG-08 | Manage agents | 模型菜单 Task mode 那一行下面有 `Manage agents`（Task mode 开、关都有）；点后打开 Customize 并选中 Agents，跟随这个会话 | App |
 | AG-09 | 展开的内容 | §6.3 每一块：两种 Models 写法、Model needs 的白话与 handoff tier 的说明、Tools 的两种写法与 `all MCP tools`、Other settings、Prompt、File 与操作 | 单元、App |
 | AG-10 | 操作记录 | F8 的 Recent activity 有 `Save agent <name>`、`Delete agent <name>` | App |
-| AG-11 | 现有功能不退步 | `tb-unit`、`tb-app-roles`、`m6-app-tools`、WP-07 与 WP-09 改过的套件、`npm run test:unit` 通过 | 单元、App |
+| AG-11 | 现有功能不退步 | 每一步：`npm run test:unit`、`test:tb-unit`、`npm run test:quick` 通过；推送前的完整回归：`tb-app-roles`、`m6-app-tools`、WP-07 与 WP-09 改过的套件通过（App 层的结果只在这时写） | 单元、App |
 
 ### 9.3 不留未完成项
 
 `tests/spec-coverage.mjs --spec agents` 读 §9.2 的编号和每条的“层”，再读 `test-results/` 里 `ag-` 开头的结果文件
-（`ag-unit.json` 为单元，`ag-app*.json` 为 App），规则同其他规格。`npm run test:agents` 依次跑单元、构建、App、AG-11 的现有套件，最后运行覆盖检查。
+（`ag-unit.json` 为单元，`ag-app*.json` 为 App，`--only` 写的 `ag-app-partial.json` 不算），规则同其他规格。
+`npm run test:agents` 依次跑单元、构建、整个 App、AG-11 的现有套件，最后运行覆盖检查；它跑整套界面测试，只在推送到远端
+之前跑（§9.1），平时只跑 `test:ag-unit`。
