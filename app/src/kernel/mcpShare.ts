@@ -182,7 +182,8 @@ async function loadModules(): Promise<Modules> {
 
 /**
  * @brief 载入共享连接要用的模块（只载入一次）；会话注册 MCP 扩展之前、启动共享服务之前调用。
- *        载入失败时记录错误并抛出（之后每次都抛同一个错误，不退回 pi 原来的传输）。
+ *        载入失败时记录错误并抛出（之后每次都抛同一个错误，不退回 pi 原来的传输）；错误原文写的是 pi 的函数名，
+ *        撇号照原样。
  */
 export async function loadMcpShare(): Promise<void> {
   loading ??= loadModules().then((loaded) => {

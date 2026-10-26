@@ -18,7 +18,7 @@ const K = await loadMemoryKernel();
 const AGENT = Object.freeze({ kind: 'agent' });
 const STRATEGY_RUN = Object.freeze({ kind: 'enhance', task: 'strategy' });
 /** 附录 A.4 的两行（逐字） */
-const AGENT_FORM = 'Correct form: memory {"action":"save","kind":"fact","abstract":"<one line>","quote":"<the user\'s '
+const AGENT_FORM = 'Correct form: memory {"action":"save","kind":"fact","abstract":"<one line>","quote":"<the user’s '
   + 'words>"}; update needs "entry", "note" and "quote"; forget needs "entry" and "note"';
 const ENHANCE_FORM = 'Correct form: memory {"action":"update","entry":"<id>","note":"<why>","evidence":[{"session":'
   + '"<listed session file>","entry":"<line id>"}]}; save needs "abstract"; save, update and forget need "evidence"; '

@@ -34,7 +34,7 @@ const THINKING = 'Synthetic reasoning before answering.';
 const SHOWS = {
   noTasksOff: 'There are no tasks when task mode is off.',
   turnCap: 'Message limit reached: at most 5 questions per turn.',
-  ownSession: "You can't send a message to your own session.",
+  ownSession: 'You can’t send a message to your own session.',
   whichRequest: 'Say which request (request: N).',
   stillRunning: '(still running)',
   abandoned: '(abandoned after a model switch)',
@@ -295,7 +295,7 @@ function seatsRefusals(ctx, who, files) {
     && closer[0].text === `planner replied: ${ASK_TEXT.plannerAnswersCloser}`, brief({ planner: planner[3], closer }));
   const self = planner[0];
   record('TB-28 a session cannot message itself: planner (create only) sending to planner from its create session is '
-    + 'refused with "You can\'t send a message to your own session."; to closer without request it is refused with '
+    + 'refused with "You can’t send a message to your own session."; to closer without request it is refused with '
     + '"Say which request (request: N)."', self?.error === true && self.first === SHOWS.ownSession
     && planner[1]?.error === true && planner[1].first === SHOWS.whichRequest
     && planner[2]?.text === 'Delivered to closer.', brief(planner.slice(0, 3)));

@@ -95,8 +95,8 @@ test('TB-19 a close delivery that never starts still handles the task handed to 
     (await nextDelivery(host, 'U.close.1')).resolve();
     const task = await until(() => B.findTask(team.board, 'T1')?.status === 'waiting_user'
       && B.findTask(team.board, 'T1'), 'T1 handed to create');
-    assert.deepEqual([task.handoffs.at(-1).reason, task.question], ['close_undecided', "planner didn't decide on T1"]);
-    assert.match((await nextDelivery(host, 'U.create')).text, /planner didn't decide on T1/);
+    assert.deepEqual([task.handoffs.at(-1).reason, task.question], ['close_undecided', 'planner didn’t decide on T1']);
+    assert.match((await nextDelivery(host, 'U.create')).text, /planner didn’t decide on T1/);
   });
 
 test('TB-40 TB-31 close with no model, woken because every task ended: the request question goes to create',
@@ -149,7 +149,7 @@ test('TB-31 the "no new tasks" re-wake waives the check on messages to create on
     assert.equal(B.findRequest(team.board, 1).closeRetry, true);
     await runDelivery(host, close, [{ text: 'Nothing to add.' }]);
     create = await nextAfter(host, 'U.create', create);
-    assert.match(create.text, /Request 1 has no open tasks and planner didn't close it/);
+    assert.match(create.text, /Request 1 has no open tasks and planner didn’t close it/);
     assert.equal(B.findRequest(team.board, 1).closeRetry, false, 'the waiver is used by that one turn');
     await runDelivery(host, create, [{ calls: [{ name: 'task_create', args: { request: 1, title: 'More',
       description: 'One more part', assignee: 'executor', read_only: false } }] }, { text: 'Created T2.' }]);

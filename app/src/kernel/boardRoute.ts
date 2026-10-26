@@ -191,7 +191,7 @@ function seatRoute(input: MessageRouteInput, role: string): { route: MessageRout
 function checkedRoute(input: MessageRouteInput, role: string, route: MessageRoute): MessageRouteResult {
   const { sender } = input;
   if (route.kind === 'create' || route.kind === 'close') {
-    if (route.session === sender.session) return refused("You can't send a message to your own session.");
+    if (route.session === sender.session) return refused('You can’t send a message to your own session.');
     if (waitsFor(input.waits, route.session, sender.session)) {
       return refused(`${roleLabel(role)} is waiting for you; reply instead of asking.`);
     }

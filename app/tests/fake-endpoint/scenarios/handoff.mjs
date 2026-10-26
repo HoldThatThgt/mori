@@ -350,7 +350,7 @@ export const SCENARIOS = {
   ],
 
   // TB-19 结案没处理（§7.4 最后一行）：结案的运行没决定 T1 → 强制填写两次都格式错误 → T1 交给立项（need_user，
-  // 问题为 planner didn't decide on T1）→ 立项什么都不做 → 程序请对话问你。
+  // 问题为 planner didn’t decide on T1）→ 立项什么都不做 → 程序请对话问你。
   'tb-handoff-undecided': [
     { role: 'planner', kind: 'create', deliveries: {
       1: [submit('A read for close'), task('Simple read', 'executor'), say('Registered request 1.')],

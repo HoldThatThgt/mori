@@ -248,7 +248,7 @@ test('TB-28 a session cannot message itself; another seat session of the same ro
   const holders = { dialog: 'chat', create: 'mori', close: 'reviewer' };
   const close1 = { kind: 'close', role: 'reviewer', request: 1, session: 'close:1' };
   assert.equal(R.routeAgentMessage(message({ holders, sender: close1, to: 'reviewer' })).error,
-    "You can't send a message to your own session.");
+    'You can’t send a message to your own session.');
   assert.deepEqual(R.routeAgentMessage(message({ holders, sender: close1, to: 'reviewer', request: 2 })).route,
     { kind: 'close', request: 2, session: 'close:2' });
   const merged = { dialog: 'mori', create: 'mori', close: 'mori' };
@@ -257,7 +257,7 @@ test('TB-28 a session cannot message itself; another seat session of the same ro
   assert.equal(R.routeAgentMessage(message({ holders: merged, sender: closeOfMori, to: 'mori' })).error, null);
   const userToCreate = R.routeAgentMessage(message({ holders: { ...merged, close: 'reviewer' }, sender: user,
     to: 'mori' }));
-  assert.equal(userToCreate.error, "You can't send a message to your own session.");
+  assert.equal(userToCreate.error, 'You can’t send a message to your own session.');
 });
 
 test('TB-28 a seat session that waits (directly or indirectly) for the sender is refused', () => {

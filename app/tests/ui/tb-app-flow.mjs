@@ -45,7 +45,7 @@ const MERGED_SENTENCE = SEGMENT_SENTENCES['merged-create'];
 const SHARED_PART = "one of several agents that work together on Mori's TaskBoard.";
 /** 程序给的固定文字（§5.4、§6.2、§8.5） */
 const TALK_DIRECTLY = 'You talk to the user directly; say it in your reply.';
-const RECORD_FIRST = "Record the user's words first (request_submit or request_update).";
+const RECORD_FIRST = 'Record the user’s words first (request_submit or request_update).';
 const MERGED_REPLY = 'Noted: no collaboration needed. Answer the user in your reply.';
 const NEED_DECISION = '[Mori] T1 needs a decision from the user';
 /** 身份段的第一部分（docs/specs/memory.md 附录 A.1）：system prompt 总是以它开头，SYSTEM.md 不用（§4.3） */
@@ -372,7 +372,7 @@ async function steer(ctx) {
   const receipts = (await receiptsOf(ctx, who.tab)).map((item) => `${item.kind}:${item.text}`);
   const board = readBoard(ctx, who.sessionId);
   record('TB-10 merged session: a steer sent during the same run is its own judgment — it reaches the model in the '
-    + 'same run (k=2 of the same context); in that judgment task_create first is refused with "Record the user\'s '
+    + 'same run (k=2 of the same context); in that judgment task_create first is refused with "Record the user’s '
     + 'words first…", request_update (another kind of decision) is accepted with your steer as the quote, then '
     + 'task_create works; receipts: registered and added',
   inRun && lines.some((line) => line.k === 2) && creates.length === 3 && creates[1].isError === true

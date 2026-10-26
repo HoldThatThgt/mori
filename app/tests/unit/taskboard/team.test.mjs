@@ -302,8 +302,8 @@ test('TB-31 when close leaves an ended request open (no write tier), create gets
   assert.match(ended.text, /^\[Mori\] All tasks of request 1 have ended\. Close it with request_close/);
   await runDelivery(host, ended, [{ text: 'Nothing to add.' }]);
   const create = await nextDelivery(host, 'U.create');
-  assert.match(create.text, /\[Mori\] Request 1 has no open tasks and planner didn't close it\./);
-  assert.equal(B.findRequest(team.board, 1).question, "Request 1 has no open tasks and planner didn't close it");
+  assert.match(create.text, /\[Mori\] Request 1 has no open tasks and planner didn’t close it\./);
+  assert.equal(B.findRequest(team.board, 1).question, 'Request 1 has no open tasks and planner didn’t close it');
 });
 
 test('TB-35 Stop team stops every agent with reason user; the stopped run does nothing more', async () => {

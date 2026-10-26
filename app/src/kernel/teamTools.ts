@@ -153,7 +153,7 @@ async function readSession(team: Team, lane: Lane, args: Record<string, unknown>
       seatRoles: seatRolesOf({ mode: team.mode, holders: team.holders }) }));
   } catch (error) {
     console.error(`[kernel] read_session ${task} ${role} failed: ${(error as Error).message}`);
-    return failed(`Cannot read ${roleLabel(role)}'s session on ${task}: ${(error as Error).message}`);
+    return failed(`Cannot read ${roleLabel(role)}’s session on ${task}: ${(error as Error).message}`);
   }
 }
 

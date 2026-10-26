@@ -124,7 +124,7 @@ export interface UserWords {
 }
 
 /** @brief quote 不是用户说过的原文（§5.4）。 */
-export const QUOTE_MISMATCH = "quote must be the user's exact words";
+export const QUOTE_MISMATCH = 'quote must be the user’s exact words';
 
 /** @brief 程序唤醒的回合没有“这次的用户消息”，必须给出 quote（§5.4）。 */
 export const QUOTE_REQUIRED = 'quote is required: this turn has no user message.';
@@ -731,9 +731,9 @@ function programReasonText(reason: ProgramHandoffInput['reason'], role: string):
   const who = roleLabel(role);
   switch (reason) {
     case 'no_handoff': return `${who} ended without a handoff`;
-    case 'error': return `${who}'s run ended with an error`;
+    case 'error': return `${who}’s run ended with an error`;
     case 'no_model': return `no model available for ${who}`;
-    case 'close_undecided': return `${who} didn't decide`;
+    case 'close_undecided': return `${who} didn’t decide`;
   }
 }
 
@@ -743,7 +743,7 @@ function programReasonText(reason: ProgramHandoffInput['reason'], role: string):
  * @param task task 编号
  */
 export function closeUndecidedQuestion(closeRole: string, task: string): string {
-  return `${roleLabel(closeRole)} didn't decide on ${task}`;
+  return `${roleLabel(closeRole)} didn’t decide on ${task}`;
 }
 
 /**
@@ -760,7 +760,7 @@ export function closeNoModelQuestion(closeRole: string): string {
  * @param closeRole 结案持有者
  */
 export function notClosedQuestion(request: number, closeRole: string): string {
-  return `Request ${request} has no open tasks and ${roleLabel(closeRole)} didn't close it`;
+  return `Request ${request} has no open tasks and ${roleLabel(closeRole)} didn’t close it`;
 }
 
 // ---- 结案的回合结束（§7.4 最后一行、§7.6） ----
@@ -948,7 +948,7 @@ const DECISION_OF: Partial<Record<TeamToolName, DecisionKind>> = {
 };
 
 /** @brief task_create、task_edit 在本次判断还没记下用户的话时被拒绝（§5.4）。 */
-export const RECORD_FIRST = "Record the user's words first (request_submit or request_update).";
+export const RECORD_FIRST = 'Record the user’s words first (request_submit or request_update).';
 
 /** @brief 程序唤醒的立项回合里 request_submit、request_cancel 被拒绝（§5.4）。 */
 export const USER_MESSAGE_ONLY = 'Only a user message can register or cancel a request.';

@@ -42,9 +42,9 @@ const TEAM_DIALOG = SEGMENT_SENTENCES['team-dialog'];
 const OFF_DIALOG = SEGMENT_SENTENCES['off-dialog'];
 const SHARED_PART = "one of several agents that work together on Mori's TaskBoard.";
 /** 程序给的固定文字（§5.4、§8.4、§8.5） */
-const RECORD_FIRST = "Record the user's words first (request_submit or request_update).";
+const RECORD_FIRST = 'Record the user’s words first (request_submit or request_update).';
 const USER_ONLY = 'Only a user message can register or cancel a request.';
-const QUOTE_MISMATCH = "quote must be the user's exact words";
+const QUOTE_MISMATCH = 'quote must be the user’s exact words';
 const QUOTE_REQUIRED = 'quote is required: this turn has no user message.';
 const CATCH_UP = "Conversation since your last turn (the user's words are exact):";
 const NEW_MESSAGE = '[Mori] New user message: ';
@@ -710,7 +710,7 @@ async function decideRules(ctx, who, create) {
     && reply[1].text.includes('This message already has a decision: supplement (request_update)')
     && update.length === 1 && !update[0].error, brief({ submit, cancel, reply, update }));
   record('TB-06 task_create before request_submit or request_update in this judgment is refused with "Record the '
-    + 'user\'s words first…"; after request_submit it works', tasks.length === 3 && tasks[0].error
+    + 'user’s words first…"; after request_submit it works', tasks.length === 3 && tasks[0].error
     && tasks[0].text.includes(RECORD_FIRST) && !tasks[1].error && !tasks[2].error, brief(tasks));
   const board = readBoard(ctx, who.sessionId);
   const words = board?.requests[0]?.words ?? [];
@@ -808,8 +808,8 @@ async function errorProgramTurn(ctx, who, create) {
     update[0]?.error === true && update[0].text.includes(QUOTE_REQUIRED), brief(update[0]));
   const words = readBoard(ctx, who.sessionId)?.requests[0]?.words ?? [];
   const original = MODES_TEXT.longMessage.slice(MODES_TEXT.longMessage.indexOf('Plan the'));
-  record('TB-07 quote must be the user\'s exact words: words the user never said are refused ("quote must be the '
-    + 'user\'s exact words"); a fragment of your message written with single spaces is accepted and recorded with '
+  record('TB-07 quote must be the user’s exact words: words the user never said are refused ("quote must be the '
+    + 'user’s exact words"); a fragment of your message written with single spaces is accepted and recorded with '
     + 'your own spacing', update[1]?.error === true && update[1].text.includes(QUOTE_MISMATCH)
     && update[2]?.error === false && words[1]?.text === original, brief({ update, words }));
 }

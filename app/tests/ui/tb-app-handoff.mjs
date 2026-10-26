@@ -69,7 +69,7 @@ const NEEDS_EVIDENCE = (outcome) => `${outcome} needs evidence: the number of a 
 const ALL_ENDED = '[Mori] All tasks of request 1 have ended. Close it with request_close';
 const FORCED_REQUEST = '[Mori] All tasks of request 1 have ended and it is still open. '
   + 'Close it now with request_close.';
-const NOT_CLOSED = "Request 1 has no open tasks and planner didn't close it";
+const NOT_CLOSED = 'Request 1 has no open tasks and planner didn’t close it';
 
 // ---------- 小工具 ----------
 
@@ -633,12 +633,12 @@ async function undecided(ctx) {
   const create = deliveriesIn(instance(ctx, who, 'create'));
   const wakes = await wakesOf(ctx, who);
   record('TB-19 row "close did not decide": close\'s run ends without deciding T1 → forced fill (two forced requests: '
-    + 'the fill and its retry, both malformed) → T1 goes to create as need_user with the question "planner didn\'t '
+    + 'the fill and its retry, both malformed) → T1 goes to create as need_user with the question "planner didn’t '
     + 'decide on T1" (holder close, program baton reason close_undecided); create is woken and, doing nothing, '
     + 'Mori asks the dialog to ask you', forced.length === 2 && same(forced.map((line) => line.k), [2, 3])
-    && t1?.status === 'waiting_user' && t1.holder?.kind === 'close' && t1.question === "planner didn't decide on T1"
+    && t1?.status === 'waiting_user' && t1.holder?.kind === 'close' && t1.question === 'planner didn’t decide on T1'
     && baton?.routedTo.kind === 'create' && create.some((text) => text.includes("[Mori] T1 needs a decision from the "
-    + "user: planner didn't decide on T1 (from close:planner)."))
+    + 'user: planner didn’t decide on T1 (from close:planner).'))
     && wakes.some((wake) => wake.kind === 'ask_user'),
   brief({ forced: lineBrief(forced), t1: t1 && [t1.status, t1.holder, t1.question], chain: chainOf(t1),
     wakes: wakes.map((w) => w.kind) }));
@@ -914,8 +914,8 @@ async function forceClose(ctx) {
   const create = deliveriesIn(instance(ctx, who, 'create'));
   record('TB-31 when close does not close the request it is closed by force; still not closed, create gets the '
     + 'request-level question: close delivery 2 "All tasks of request 1 have ended…", forced close 3 (tool_choice '
-    + 'request_close) and its retry 4, then the request\'s question "Request 1 has no open tasks and planner didn\'t '
-    + 'close it" and create gets "[Mori] Request 1 has no open tasks and planner didn\'t close it."',
+    + 'request_close) and its retry 4, then the request\'s question "Request 1 has no open tasks and planner didn’t '
+    + 'close it" and create gets "[Mori] Request 1 has no open tasks and planner didn’t close it."',
   close[1]?.startsWith(ALL_ENDED) && close[2]?.startsWith(FORCED_REQUEST)
     && close[3]?.startsWith('[Mori] Your request_close could not be used: ') && close.length === 4
     && same(forcedLines(lines).map((line) => [line.k, line.toolChoice]), [[3, 'request_close'], [4, 'request_close']])

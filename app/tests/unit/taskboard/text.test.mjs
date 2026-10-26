@@ -175,8 +175,8 @@ test('TB-44 every §8.5 delivery starts with [Mori] and has the fixed wording', 
       '[Mori] T3 needs a decision from the user: Keep the old API? (from reviewer).\nIf what the user already said '
       + 'answers it, record their words with request_update (quote) and hand T3 back with task_edit; otherwise ask '
       + 'the user with reply_via_dialog.'],
-    create_question: [{ question: "Request 1 has no open tasks and planner didn't close it" },
-      "[Mori] Request 1 has no open tasks and planner didn't close it."],
+    create_question: [{ question: 'Request 1 has no open tasks and planner didn’t close it' },
+      '[Mori] Request 1 has no open tasks and planner didn’t close it.'],
     relay: [{ createRole: 'planner', note: 'T1 is waiting for the build.' },
       '[Mori] planner asks you to tell the user: T1 is waiting for the build.'],
     ask_user: [{ subject: 'T3', question: 'Keep the old API?' },
@@ -357,7 +357,7 @@ test('TB-30 close card: With you, Tasks with evidence and open items, Ruled out,
 
 test('TB-30 create card: mode, open requests with unfinished tasks, waiting, stopped, questions', () => {
   const board = {
-    requests: [request(1), request(2, { title: 'Docs', question: "Request 2 has no open tasks and planner didn't "
+    requests: [request(1), request(2, { title: 'Docs', question: 'Request 2 has no open tasks and planner didn’t '
       + 'close it', asked: true }), request(3, { title: 'Old', status: 'done' })],
     tasks: [
       task('T1', { status: 'waiting_user', holder: { kind: 'role', role: 'reviewer' }, question: 'Keep the API?' }),
@@ -383,7 +383,7 @@ test('TB-30 create card: mode, open requests with unfinished tasks, waiting, sto
     'Stopped:',
     '- T2 Logout: stopped by the user; held by executor',
     'Questions:',
-    "- Request 2: Request 2 has no open tasks and planner didn't close it (asked the user)",
+    '- Request 2: Request 2 has no open tasks and planner didn’t close it (asked the user)',
   ]);
   const restart = { requests: [request(1)], tasks: [task('T6', { status: 'stopped', stopReason: 'restart',
     holder: { kind: 'close' }, holderReason: 'role writer no longer exists' }), task('T7', { status: 'waiting_user',
@@ -584,7 +584,7 @@ test('TB-13 board_read with request: words with times verbatim, ruled out, quest
     'Request 1 · Login page is blank · open · 1 h 12 min',
     'Goal: The login page renders again',
     'Acceptance: npm test passes',
-    "User's words:",
+    'User’s words:',
     `- [${hhmm(T0)}] "The login page is blank, fix it"`,
     `- [${hhmm(T0 + 3 * MIN)}] "Also check logout"`,
     `- [${hhmm(T0 + 7 * MIN)}] "Keep the old logo"`,
@@ -651,7 +651,7 @@ test('TB-13 task phases in board_read come from the scheduler, or from the board
   assert.deepEqual(lines.slice(2), [
     '  T1 Find and fix · reviewer · waiting for a user decision (asked the user)',
     '  T2 Find and fix · executor · stopped (Mori restarted)',
-    "  T3 Find and fix · executor · waiting for the user's approval",
+    '  T3 Find and fix · executor · waiting for the user’s approval',
   ]);
 });
 

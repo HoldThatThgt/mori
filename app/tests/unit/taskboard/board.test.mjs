@@ -105,7 +105,7 @@ test("TB-06 task_create and task_edit need the user's words recorded first in th
   const fresh = B.startJudgment(true, false);
   assert.equal(B.judgmentError(fresh, 'task_create', false), B.RECORD_FIRST);
   assert.equal(B.judgmentError(fresh, 'task_edit', false), B.RECORD_FIRST);
-  assert.equal(B.RECORD_FIRST, "Record the user's words first (request_submit or request_update).");
+  assert.equal(B.RECORD_FIRST, 'Record the user’s words first (request_submit or request_update).');
   const replied = B.noteJudgment(fresh, 'reply_via_dialog', false, null);
   assert.equal(B.judgmentError(replied, 'task_create', false), B.RECORD_FIRST);
   for (const tool of ['request_submit', 'request_update']) {
@@ -182,7 +182,7 @@ test('TB-07 request_submit and request_update record the whole user message by d
   assert.equal(B.findRequest(board, 1).words.length, 1, 'the input board is not changed');
 });
 
-test("TB-07 quote must be the user's exact words; runs of whitespace compare as one space", () => {
+test('TB-07 quote must be the user’s exact words; runs of whitespace compare as one space', () => {
   const board = submit(B.newBoard());
   const words = { message: 'ok go', history: ['First message', MESSAGE] };
   const loose = ok(B.updateRequest(board, { request: 1, quote: 'Please fix it and keep the old API.' }, words, 5000));
@@ -192,7 +192,7 @@ test("TB-07 quote must be the user's exact words; runs of whitespace compare as 
   for (const quote of ['keep the new API', 'Please fixit', '', '   ']) {
     refused(board, B.updateRequest(board, { request: 1, quote }, words, 5000), B.QUOTE_MISMATCH);
   }
-  assert.equal(B.QUOTE_MISMATCH, "quote must be the user's exact words");
+  assert.equal(B.QUOTE_MISMATCH, 'quote must be the user’s exact words');
   const submitted = B.submitRequest(B.newBoard(), { title: 'X', goal: 'Y', acceptance: null, quote: 'never said' },
     words, 1000);
   assert.equal(submitted.error, B.QUOTE_MISMATCH);
@@ -427,7 +427,7 @@ test('TB-14 handoff fields follow §7.2: conclusion 1–600, at most 10 open ite
 
 test('TB-14 program handoffs (§7.4): a task instance falls back to close, the close session to create', () => {
   for (const [reason, text] of [['no_handoff', 'executor ended without a handoff'],
-    ['error', "executor's run ended with an error"], ['no_model', 'no model available for executor']]) {
+    ['error', 'executor’s run ended with an error'], ['no_model', 'no model available for executor']]) {
     const input = { task: 'T1', reason, conclusion: `  ${'z'.repeat(700)} `, holder: { kind: 'role', role: 'executor' },
       session: null, authorFamilies: [] };
     const result = ok(B.recordProgramHandoff(oneTask(), input, 3000));
@@ -438,7 +438,7 @@ test('TB-14 program handoffs (§7.4): a task instance falls back to close, the c
   }
   const withClose = ok(handoff(oneTask(), 'executor', 'T1', 'done')).board;
   const question = B.closeUndecidedQuestion('planner', 'T1');
-  assert.equal(question, "planner didn't decide on T1");
+  assert.equal(question, 'planner didn’t decide on T1');
   assert.equal(B.closeNoModelQuestion('mori'), 'Mori can’t run: no model available');
   const input = { task: 'T1', reason: 'close_undecided', conclusion: question, holder: { kind: 'close' }, session: null,
     authorFamilies: [] };
@@ -705,7 +705,7 @@ test('TB-31 a request-level question wakes create, is asked once and shows as ne
   board = ok(closeHandoff(board, 'T1', 'close_done')).board;
   assert.deepEqual(B.requestsAwaitingClose(board), [1]);
   const question = B.notClosedQuestion(1, 'planner');
-  assert.equal(question, "Request 1 has no open tasks and planner didn't close it");
+  assert.equal(question, 'Request 1 has no open tasks and planner didn’t close it');
   const asking = B.setRequestQuestion(board, 1, question);
   assert.deepEqual(route.wakesAfter(board, asking), [{ kind: 'create_question', request: 1 }]);
   const request = (b) => B.findRequest(b, 1);

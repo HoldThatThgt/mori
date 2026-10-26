@@ -157,7 +157,10 @@ test('TB-49 every TaskBoard tool has the §6.3 parameters in order and an Englis
   };
   for (const [name, keys] of Object.entries(expected)) {
     assert.deepEqual(Object.keys(T.toolSchema(name, info('create', 'planner')).properties), keys, name);
-    assert.match(T.toolDescription(name, info('create', 'planner')), /^[A-Z][\x20-\x7e]+$/, name);
+    const description = T.toolDescription(name, info('create', 'planner'));
+    // 撇号用排版符号 ’（docs/v0/ui-strings.md）：说明也显示在 Customize › Tools 里
+    assert.match(description, /^[A-Z][\x20-\x7e’]+$/, name);
+    assert.doesNotMatch(description, /[A-Za-z]'[A-Za-z]/, name);
   }
 });
 

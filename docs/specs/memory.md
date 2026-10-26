@@ -1165,14 +1165,15 @@ Tasks you create and questions you send to other agents are worked on by agents 
 ### A.2 memory 工具的说明（`agent` 调用方）
 
 2026-10-26 改（§0 第 5 条）：第二行原来只在你说“记一下”或给出“以后都…”的规则时记，现在主动记，`asked` 分出你要它记的；第五行加了“已有的条目改那一条”。
+撇号用 ’（2026-10-26，U30，docs/v0/ui-strings.md）：这段说明也显示在 Customize › Tools 里；A.3 只给增强会话，照原样。
 
 ```text
-Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.
+Save, update or delete an entry in Mori’s memory. Entries go into the system prompt of new sessions.
 Save on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example "the intranet model is now at 10.0.0.9, note it" or "from now on, give the conclusion first").
 kind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.
 Facts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.
-Don't save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).
-abstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.
+Don’t save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).
+abstract is the one line that goes into the prompt; detail says how to read it and when it doesn’t apply; quote is the user’s words.
 To change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.
 ```
 
@@ -1191,7 +1192,9 @@ This run must not change any file except through this tool. Commands and MCP too
 
 ### A.4 Correct form
 
-- `agent`：`memory {"action":"save","kind":"fact","abstract":"<one line>","quote":"<the user's words>"}; update needs "entry", "note" and "quote"; forget needs "entry" and "note"`
+`agent` 一行是你会话里 memory 工具出错时的第二行（显示在工具卡里），占位里的撇号用 ’（2026-10-26，U30）；JSON 的引号照原样。
+
+- `agent`：`memory {"action":"save","kind":"fact","abstract":"<one line>","quote":"<the user’s words>"}; update needs "entry", "note" and "quote"; forget needs "entry" and "note"`
 - `enhance:<task>`：`memory {"action":"update","entry":"<id>","note":"<why>","evidence":[{"session":"<listed session file>","entry":"<line id>"}]}; save needs "abstract"; save, update and forget need "evidence"; move needs "entry", "kind" and "note"`
 
 ## 附录 B：增强任务的第一条消息

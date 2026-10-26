@@ -1531,7 +1531,7 @@ export class Team implements TeamLike {
     if (!run) return undefined;
     if (lane === this.user) {
       if (run.allowed === null || matchesToolEntries(run.allowed, toolName)) return undefined;
-      const reason = run.mode !== 'off' ? RELAY_ONLY : `${toolName} is not one of ${lane.role}'s tools.`;
+      const reason = run.mode !== 'off' ? RELAY_ONLY : `${toolName} is not one of ${lane.role}’s tools.`;
       return { block: true, reason };
     }
     return guardToolCall({ handedOff: run.handedOff, forcedTool: run.forced?.form.tool ?? null }, toolName);

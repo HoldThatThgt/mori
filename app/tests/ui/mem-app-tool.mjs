@@ -69,7 +69,7 @@ const JUMP = {
 };
 /** 附录 A.4 agent 调用方的 Correct form（§7.4 第二行） */
 const CORRECT_FORM = 'Correct form: memory {"action":"save","kind":"fact","abstract":"<one line>",'
-  + '"quote":"<the user\'s words>"}; update needs "entry", "note" and "quote"; forget needs "entry" and "note"';
+  + '"quote":"<the user’s words>"}; update needs "entry", "note" and "quote"; forget needs "entry" and "note"';
 /** 合成端点 "plain" 的回复（replies.mjs） */
 const PLAIN_REPLY = '这是一段只有文字的回复，用来测试流式输出。';
 

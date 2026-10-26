@@ -15,7 +15,7 @@ import type { Snapshot } from './memoryRules';
 
 // ---- 身份段（§4、附录 A.1） ----
 
-/** @brief 身份段的第一部分（附录 A.1）：身份句、批准怎么走、四个分节的含义。 */
+/** @brief 身份段的第一部分（附录 A.1）：身份句、批准怎么走、四个分节的含义。只给模型看，撇号照原样。 */
 export const IDENTITY_TEXT = [
   "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code "
     + "and write files to get the user's work done.",
@@ -28,6 +28,7 @@ export const IDENTITY_TEXT = [
 
 /**
  * @brief 交出去的活要把事实写进去（附录 A.1.1，2026-10-26）：这次运行有 HANDOFF_TOOLS 之一时接在 A.1 第三行末尾。
+ *        只给模型看，撇号照原样。
  */
 export const HANDOFF_TEXT = 'Tasks you create and questions you send to other agents are worked on by agents that '
   + "don't see <facts>: write the facts they need into the task description or the question.";
@@ -146,7 +147,7 @@ export function memorySections(snapshot: Snapshot, kinds: readonly MemoryKind[])
 
 /** agent 调用方的说明（附录 A.2；2026-10-26 改为主动记，asked 分出你要它记的，§0 第 5 条） */
 const AGENT_DESCRIPTION = [
-  "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.",
+  'Save, update or delete an entry in Mori’s memory. Entries go into the system prompt of new sessions.',
   'Save on your own, without being asked: a fact when the user states something durable that future sessions will '
     + 'need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the '
     + 'user asked you to remember it or to follow it from now on (for example "the intranet model is now at '
@@ -155,16 +156,16 @@ const AGENT_DESCRIPTION = [
     + 'talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.',
   'Facts go to this project unless they are about the user personally or apply to every project (layer user). '
     + 'taste, strategy and review always go to this project.',
-  "Don't save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry "
+  'Don’t save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry '
     + 'already says (update that entry instead).',
-  "abstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote "
-    + "is the user's words.",
+  'abstract is the one line that goes into the prompt; detail says how to read it and when it doesn’t apply; quote '
+    + 'is the user’s words.',
   'To change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry '
     + '(add layer when the same entry is in both layers), and say why in note.',
 ].join('\n');
 
 /**
- * @brief enhance:<task> 调用方的说明（附录 A.3），`<KIND>` 填这个任务的名字。
+ * @brief enhance:<task> 调用方的说明（附录 A.3），`<KIND>` 填这个任务的名字。只给增强会话，撇号照原样。
  * @param kind 种类的名字（KIND_LABEL）
  */
 function enhanceDescription(kind: string): string {
@@ -196,7 +197,7 @@ export function toolDescription(caller: MemoryCaller): string {
 
 /** 每种调用方的正确写法（附录 A.4） */
 const CORRECT_FORM_USAGE: Readonly<Record<MemoryCaller['kind'], string>> = Object.freeze({
-  agent: `memory {"action":"save","kind":"fact","abstract":"<one line>","quote":"<the user's words>"}; update needs `
+  agent: `memory {"action":"save","kind":"fact","abstract":"<one line>","quote":"<the user’s words>"}; update needs `
     + '"entry", "note" and "quote"; forget needs "entry" and "note"',
   enhance: 'memory {"action":"update","entry":"<id>","note":"<why>","evidence":[{"session":"<listed session file>",'
     + '"entry":"<line id>"}]}; save needs "abstract"; save, update and forget need "evidence"; move needs "entry", '
@@ -268,7 +269,7 @@ export interface FirstMessageInput {
   used: number;
 }
 
-/** @brief 每个任务的任务段（附录 B，proposal §10.3）。 */
+/** @brief 每个任务的任务段（附录 B，proposal §10.3）。只给增强会话，撇号照原样。 */
 export const TASK_PARAGRAPH: Readonly<Record<EnhanceTask, string>> = Object.freeze({
   taste: 'You maintain how Mori talks with the user: how to present information, and how to understand the real goal '
     + "behind what they say. Evidence is the user's words only: corrections, repeated or follow-up questions, "
@@ -283,7 +284,7 @@ export const TASK_PARAGRAPH: Readonly<Record<EnhanceTask, string>> = Object.free
     + 'The agent saying it verified something is not evidence.',
 });
 
-/** 第二行：不许改文件（附录 B；§9.6 协作模式下经工作卡的 User's words 交给 task 实例） */
+/** 第二行：不许改文件（附录 B；§9.6 协作模式下经工作卡的 User's words 交给 task 实例）。只给模型看，撇号照原样 */
 const NO_CHANGES_LINE = "Don't change any file. Commands and MCP tools run without approval: never use them to change "
   + 'anything; change memory only with the memory tool.';
 
@@ -296,7 +297,7 @@ const SOURCE_TEXT: Readonly<Record<EntrySource, string>> = Object.freeze({ user:
   learned: 'learned' });
 
 /**
- * @brief 第一条消息的第一句（附录 B），合成端点按它的开头认出增强会话（§14.1）。
+ * @brief 第一条消息的第一句（附录 B），合成端点按它的开头认出增强会话（§14.1）。只给增强会话，撇号照原样。
  * @param task 任务
  * @param cwd 项目的工作目录
  */
@@ -371,7 +372,7 @@ function fullEntryLines(details: FirstMessageInput['details']): string[] {
   });
 }
 
-/** How to work 的六条（附录 B；2026-10-26 加了 Mori 记的条目与移到另一种，§6.9） */
+/** How to work 的六条（附录 B；2026-10-26 加了 Mori 记的条目与移到另一种，§6.9）。只给增强会话，撇号照原样 */
 function howToWork(kind: string, used: number): string[] {
   return [
     `- Produce a new version of this project's ${kind} list, not a few additions: go through every current entry `
@@ -396,7 +397,7 @@ function howToWork(kind: string, used: number): string[] {
 
 /**
  * @brief 增强任务的第一条消息（附录 B）：第一句与日子、不许改文件的第二行、任务段、这次的材料（会话、反馈）、
- *        现有条目（两层三种的 abstract、本项目这一种的 detail）、怎么做。
+ *        现有条目（两层三种的 abstract、本项目这一种的 detail）、怎么做。只给增强会话，撇号照原样。
  * @param input 这次运行的材料
  */
 export function firstMessage(input: FirstMessageInput): string {

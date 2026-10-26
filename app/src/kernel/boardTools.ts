@@ -134,7 +134,7 @@ function messageSchema(): JsonSchema {
   }, ['to', 'text']);
 }
 
-/** @brief 立项持有者的六个工具的 schema（§6.3）。 */
+/** @brief 立项持有者的六个工具的 schema（§6.3）。参数说明只给模型看，撇号照原样。 */
 function createSchemas(roles: readonly RoleDef[]): Record<string, JsonSchema> {
   const quote = text("The user's exact words to record; defaults to the whole user message being decided.");
   return {
@@ -231,15 +231,15 @@ function handoffDescription(info: ToolSessionInfo): string {
 const DESCRIPTIONS: Readonly<Record<Exclude<TeamToolName, 'agent_message' | 'task_handoff'>, string>> = {
   board_read: 'Read the TaskBoard: without arguments the whole board; with request one request in detail; with task '
     + 'one task and all its handoffs. Read-only; it wakes nobody.',
-  read_session: "Read a role's session on a task as plain text: each turn's delivery, replies, tool calls with their "
+  read_session: 'Read a role’s session on a task as plain text: each turn’s delivery, replies, tool calls with their '
     + 'result numbers, and handoffs. Long sessions start with a table of contents; page with from and to.',
-  request_submit: "Register a new request for the user's message: a one-line title, the goal and optionally the "
-    + "acceptance. The user's words are recorded exactly; then split it with task_create.",
-  request_update: "Record the user's supplement or constraint on a request in the user's exact words.",
+  request_submit: 'Register a new request for the user’s message: a one-line title, the goal and optionally the '
+    + 'acceptance. The user’s words are recorded exactly; then split it with task_create.',
+  request_update: 'Record the user’s supplement or constraint on a request in the user’s exact words.',
   request_cancel: 'Cancel a request the user no longer wants: its agents stop and its open tasks are cancelled.',
   task_create: 'Create a task of a request for one role: title, what to do, assignee, read_only (true unless it must '
     + 'run commands or change files) and depends_on (tasks of the same request that must be done first).',
-  task_edit: "Change a task's title, description, assignee or dependencies. A task that waits for a user decision or "
+  task_edit: 'Change a task’s title, description, assignee or dependencies. A task that waits for a user decision or '
     + 'was stopped is handed back by task_edit.',
   reply_via_dialog: 'No collaboration needed: the dialog agent answers the user directly. In a turn woken by the '
     + 'program, note asks the dialog agent to tell the user something.',

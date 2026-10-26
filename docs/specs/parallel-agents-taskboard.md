@@ -251,7 +251,7 @@ models: [strong]
 | 不需要协作 | `reply_via_dialog` | — |
 
 - 一次判断里，第一个决定类工具定下这次的决定；之后调用另一类决定的工具被拒绝：`This message already has a decision: <kind>`。同一类可以多次调用（例如登记两个需求、补充到两个需求）。
-- `task_create`、`task_edit` 只能在这次判断里已经调过 `request_submit` 或 `request_update` 之后用（保证用户的话先记到需求上），否则拒绝：`Record the user's words first (request_submit or request_update).`。
+- `task_create`、`task_edit` 只能在这次判断里已经调过 `request_submit` 或 `request_update` 之后用（保证用户的话先记到需求上），否则拒绝：`Record the user’s words first (request_submit or request_update).`。
   例外：只把 `stopped`、`waiting_user` 的 task 交回、不改其他字段的 `task_edit`（例如你说“继续”）不受这条限制，这次判断记为“补充”，没有回执。
 - 判断结束时没有做任何决定：按“不需要协作”处理（proposal §6.3）。判断的回合出错、选不到模型、被停止以外的中止：已经做出的写入照常有效（回执照写），
   没做任何决定时按“不需要协作”处理；对话的工作卡写明 `<create role> couldn't decide: <原因>`。
@@ -273,7 +273,7 @@ models: [strong]
 
 **用户原话照记**：`request_submit`、`request_update` 记下的原话默认就是这次判断的用户消息全文（你输入的原文，程序填写）；
 参数 `quote` 可以给出别的原话（例如 proposal §6.4 里立项 Agent 用你之前说过的话），程序核对它是这个用户会话里某条用户消息的原文片段（比较时把连续空白当作一个空格），
-不是就拒绝：`quote must be the user's exact words`。程序唤醒的回合里没有“这次的用户消息”，`quote` 必须给出。
+不是就拒绝：`quote must be the user’s exact words`。程序唤醒的回合里没有“这次的用户消息”，`quote` 必须给出。
 
 ### 5.5 对话 Agent 在协作模式下
 
@@ -500,7 +500,7 @@ proposal §6.6：交接缺失或出错，程序都交给结案 Agent。
 | 运行以出错结束（模型层换模型之后仍失败） | 程序写一棒交给结案，结论是错误原文 | `error` |
 | 候选耗尽（统一模型提供商规格 §5.8 等完之后） | 同上，结论是各候选被排除的原因 | `no_model` |
 | 依赖的 task 以 `failed` 结束 | 等依赖的 task 不交给 `assignee`，交给结案 | `dependency_failed` |
-| 结案会话的运行结束时，这次运行开始前就交给它的 task 还有没处理的（运行中才交来的留给下一次运行） | 对每个这样的 task 强制填写一次（§7.5，结案的交接单）；填不出来，交给立项（`need_user`，问题为 `<close role> didn't decide on T1`） | `close_undecided` |
+| 结案会话的运行结束时，这次运行开始前就交给它的 task 还有没处理的（运行中才交来的留给下一次运行） | 对每个这样的 task 强制填写一次（§7.5，结案的交接单）；填不出来，交给立项（`need_user`，问题为 `<close role> didn’t decide on T1`） | `close_undecided` |
 
 - 被你停止、被撤销不是兜底（§9.4）；task 中途换模型（§12.4）也不是：实例在新模型上继续。
 - 程序写的一棒：`from: 'mori'`、`outcome: null`、`reason` 如上，同样出现在 `board_read` 和进展摘要里（交接链写作 `Mori: no handoff` 等，§13.3）。
@@ -539,7 +539,7 @@ proposal §6.6：交接缺失或出错，程序都交给结案 Agent。
 - 结案用 `task_handoff { task, … }` 逐个处理交给它的 task：关闭为完成或失败、改派、交给立项；用 `request_close` 关闭需求；需要更多 task 时用 `agent_message` 发给立项持有者（proposal §11）。
 - `request_close` 只在这个需求下全部 task 已结束时可用（否则拒绝并列出未结束的 task）；没有 task 的需求也可以关闭。写下状态和结论、`closedAt`，清掉 `question`。
 - 结案在“全部已结束”或“没有 task”而被唤醒的回合结束时，需求仍开着、没有新的未结束的 task，并且结案在这个需求上发给立项的消息都已处理完（立项收到它的那次运行已结束；还没处理完时等立项，立项没建新 task 时按 §5.4 兜底表第 3 行再唤醒结案一次，那次不再看这一条）：
-  程序强制关闭一次（§7.5 第 4 步）；仍没有关闭，需求的 `question` = `Request 1 has no open tasks and <close role> didn't close it`，唤醒立项（问题在投递里），立项通常请对话 Agent 问你；立项也没处理时按 §5.4 兜底表第 2 行问你。
+  程序强制关闭一次（§7.5 第 4 步）；仍没有关闭，需求的 `question` = `Request 1 has no open tasks and <close role> didn’t close it`，唤醒立项（问题在投递里），立项通常请对话 Agent 问你；立项也没处理时按 §5.4 兜底表第 2 行问你。
   立项解决后用 `agent_message { to: <结案角色>, request: 1 }` 发进这个需求的结案会话，或 `task_create` 建新 task；结案会话下一次运行开始时清掉 `question`、`asked`。
 - **需求关闭**之后：唤醒对话 Agent 去向你汇报（§5.6 `request_closed`；投递文字带状态、结论、已排除的方案和各 task 的结局与最后一棒的结论）；检查订阅（§9.5）；
   这个需求的结案会话和 task 实例在空闲后关闭（会话文件保留）。
