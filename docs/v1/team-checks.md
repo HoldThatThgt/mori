@@ -124,3 +124,45 @@
 - **TB-47** 只走到了“新模型的上下文里没有别的模型的工具调用”这一支；“带压缩摘要”那一支没有出现（pi 判断不需要压缩）。
 - **规格 §14.6 最后一段**：超过 6 个并发会话、带 MCP 与技能时的表现没有测量。
 - 技能命令的展开立项看不到（pi 没有导出，规格 §5.3 写明的已知限制）。
+
+## 普通模式的 subagent 工具（2026-10-26，负责人走查 M17）
+
+依据：[subagent 规格](../specs/subagent.md)（TaskBoard 规格的增补），状态表 [subagent-card.md](screens/subagent-card.md)，临时默认值
+[defaults.md](defaults.md) 的“普通模式的 subagent 工具”一节。分支 `v1-subagent`（worktree `D:\code\mori\.claude\worktrees\wizardly-albattani-b7cb94`，
+`app\node_modules` 是指向 `D:\code\mori\app\node_modules` 的联接），合过本地 `app-v0` 的 `f613281`；本地提交，没有推送，没有合进 `app-v0`。
+
+### 负责人的回答（2026-10-26）
+
+1. 照 Claude Code：每个 subagent 由主 Agent 选只读（像 Explore）或通用（像 general-purpose，照权限模式批准，卡头写明是哪个 subagent）；角色带自己的工具。
+2. Task mode 关闭时总有（没有角色文件也有）。
+3. 一次调用、一次回复都不设条数上限；全部同时开始，用满 key 并发设置的全部槽位，多出来的排队、不超时（新的调度类别 `subagent`）。
+4. 保留普通模式下的 `agent_message`。
+
+### 状态（随各包合并更新）
+
+| 层 | 结果 |
+| --- | --- |
+| 单元 | `npm run test:sa-unit` 25/26（SA-10 的按工具拼的那一句等 WP-10，见下）；`test:tb-unit` 334/334、`test:mem-unit` 239/239（普通模式多了 `subagent` 的几处期望已改）；`npm run test:unit` 只差 spec-ids 等 SA-10 之外各层写好后才过；`npm run check` 通过 |
+| App（合成端点，`sa-app.mjs`，端口 4970/4971） | 40/41：SA-10 等 WP-10 |
+| 回放（`sa-replay.mjs`） | 13/13：从真实 DeepSeek 会话录的 `tests/fixtures/sa/sa-subagent.json`（`tb-record.mjs` 的 sa-subagent），加 m1 的两个录制 |
+| 真实模型（`sa-real.mjs`，代理 4972） | DeepSeek 与 GLM 各跑只读的三路分工与通用 subagent 跑命令（带归属的批准卡）：程序保证的各项全部通过。GLM 的命令驱动重跑了 2 次：第一次提供商连不上，第二次 500 overloaded；第三次它先发了一次格式坏的工具参数（pi 拒绝），再照正确的写法重试 |
+| 改了期望的别的套件（只用 `--only`） | `mem-app-prompt`（prompt、snapshot、merged、split、restart）33/34：MEM-01 的身份段实际 562 token（见下）；`m6-app-tool-switches`（setup、rows）6/6；`tb-app-roles`（fields）12/12 |
+
+### 等别的包合并之后做的
+
+- WP-10：身份段里交出去的活那一句按工具拼（规格 §6.4；SA-10、记忆规格 §4.1 与附录 A.1.1 的文字）；TB-03 改写为“普通模式与 v0 的差别只有 `subagent`”；
+  TaskBoard 规格 §11 列的各行；关闭模式的临时提问（`agent_message` 开的）不带共用段。
+- WP-14：一轮结束后 subagent 的卡随其他步骤折进 `<n> steps`（SA-11 的最后一项）。
+
+### 要你决定的
+
+- **身份段的大小**（规格 §6.4，已经问过）：普通模式的会话从此总有 `subagent`，身份段多出它在 `<tools>` 里的一行（17 token）、准则（48）和交出去的那一句。
+  实测默认工具下的普通模式 562 token，超过记忆规格的 500。推荐：准则的话并进工具的说明（不在身份段里），去掉准则；加上按工具拼的那一句后正好 500。
+
+### 未验证
+
+- **负责人走查**：没做。
+- **安装包**：只在开发构建上跑过，没有跑 `--exe`。
+- **同时很多 subagent**：并发 4 的 key 上 6 个在合成端点上验证过；更多的同时会话（超过 6 个）没有测量（同 TaskBoard 规格 §14.6）。
+- **通用 subagent 同时改同一个文件**：没有隔离也没有写入锁（规格 §0 不做），互相覆盖的情形没有测试。
+- **右栏不列 subagent 改的文件**：只显示一句说明（规格 §0 不做、§7.6）。
