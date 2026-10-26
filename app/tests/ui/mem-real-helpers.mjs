@@ -308,8 +308,8 @@ export function toolCallsOf(entries, names) {
       .map((call) => ({ call, args: call.arguments ?? {}, result: results.get(call.id) ?? null, entry })));
 }
 
-/** memory 工具参数的键（§7.1）与依据每一项的键 */
-const MEMORY_KEYS = ['action', 'kind', 'layer', 'entry', 'abstract', 'detail', 'note', 'quote', 'evidence'];
+/** memory 工具参数的键（§7.1；asked 是 2026-10-26 加的，§6.4）与依据每一项的键 */
+const MEMORY_KEYS = ['action', 'kind', 'layer', 'entry', 'abstract', 'detail', 'note', 'quote', 'evidence', 'asked'];
 const EVIDENCE_KEYS = ['session', 'entry', 'feedback', 'quote'];
 
 /**
