@@ -109,7 +109,8 @@ test('SA-01 the merged session in Task mode (the base holds dialog, create and c
   const guard = user.api.handlers.get('tool_call')({ type: 'tool_call', toolName: 'subagent', input: {} });
   assert.equal(guard?.block, true, 'refused by the tool_call guard if it is enabled during the run');
   const base = roles.findRole(BASE.roles, 'mori');
-  for (const [kind, readOnly] of [['create', false], ['close', false], ['task', false], ['task', true], ['ask', true]]) {
+  const kinds = [['create', false], ['close', false], ['task', false], ['task', true], ['ask', true]];
+  for (const [kind, readOnly] of kinds) {
     const tools = roles.toolAllowlist(base, kind, readOnly, ['read', 'bash', 'edit', 'write'], true);
     assert.ok(!tools.includes('subagent'), `${kind}${readOnly ? ' (read-only)' : ''}: ${tools.join(', ')}`);
   }

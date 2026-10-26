@@ -93,7 +93,7 @@ export interface SubagentTask {
   role?: string;
 }
 
-/** @brief role 的枚举：基座 mori 在最前，其余按角色文件的顺序（含对话持有者，§3.1）。 */
+/** @brief 可用的角色名（§3.3 的检查与错误里的列表）：基座 mori 在最前，其余按角色文件的顺序（含对话持有者，§3.1）。 */
 export function subagentRoleNames(roles: readonly RoleDef[]): string[] {
   return [BASE_ROLE, ...roles.map((role) => role.name).filter((name) => name !== BASE_ROLE)];
 }

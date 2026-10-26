@@ -255,16 +255,19 @@ DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Question
 2. **交出去的活那一句怎么写**（规格 §6.4、记忆规格附录 A.1.1）
    - 问题：WP-11 的那一句是固定的，只说 task 与问题；普通模式只有 `subagent` 时，它让模型去找不存在的工具，或把事实写进卡上的
      `description` 而不是 `prompt`。
-   - 选项：① 按这次运行启用的 `task_create`、`agent_message`、`subagent` 拼：同时有 `task_create` 与 `agent_message` 的会话（Task mode 的
-     合并会话、分开时的立项）与 WP-11 逐字相同，Task mode 下只有 `agent_message` 的（分开时的对话，task、结案、订阅实例）改为只说问题的那一句；
-     ② 照旧用固定的句子；
+   - 选项：① 按这次运行启用的 `task_create`、`agent_message`、`subagent` 拼，Task mode 的文字与 WP-11 逐字相同；② 照旧用固定的句子；
      ③ 普通模式不加这一句，只靠工具说明里的“Each subagent starts with no context except the prompt you write”。
    - 选了：①（推荐，walkthrough-fixes 会话转达“现在就写”），登记为临时默认值（[defaults.md](defaults.md) 的“交出去的活那一句”一行）。
+   - 2026-10-26 无人值守时按推荐改为：那一句跟着会话实际有的工具，同时有 `task_create` 与 `agent_message` 的会话（Task mode 的合并会话、
+     分开时的立项）与 WP-11 逐字相同；Task mode 下只有 `agent_message`、没有 `task_create` 的（分开时的对话，task、结案、订阅实例）是只说问题的
+     那一句 `Questions you send to other agents are worked on by agents that don't see <facts>: write the facts they need into the question.`（U31）。
+     另一种做法请你定：Task mode 的每个会话都照 WP-11 那一句逐字不变（只在普通模式按工具拼）。
    - 实现：`app/src/kernel/memoryText.ts`（`HANDOFF_PARTS`、`handoffText`；`HANDOFF_TEXT` 由它拼出）。
    - 测试：单元 `SA-10 the sentence lists only the handoff tools of this run, in §6.4 order`、`MEM-01 the handoff sentence (appendix A.1.1)
      ends the third line only when …`；App `mem-app-prompt --only prompt,snapshot,merged,split,restart`、`tb-app-flow --only sysmd`
      （期望的句子由 `tests/ui/tb-helpers.mjs` 的 `expectedHandoff` 另行拼出）；真实 `mem-real --only dialog,page`、`tb-real --only ask`、
-     `sa-real`。
+     `sa-real`；U31 的范围：真实 `tb-real --only team` 10/10（task 实例 `t1.executor`、`t1.reviewer`、`t2.reviewer` 与结案实例的会话文件里是
+     只说问题的那一句，合并会话里是 WP-11 那一句）。
 
 3. **有别的角色时 `role` 写不写枚举**（规格 §3.1、§3.3；2026-10-26 审查发现）
    - 问题：写了枚举时，写错的角色在执行前就被 pi 的 schema 校验以 `Validation failed for tool "subagent"` 拒绝，§3.3 的原因（列出可用的

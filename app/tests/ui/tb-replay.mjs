@@ -901,10 +901,12 @@ async function approvalFixture(page, fx) {
   await untilPlayed(page, second, 'the first turn');
   await page.waitForFunction((pane) => document.querySelector(pane)?.dataset.running === 'false', PANE,
     { timeout: 30000 });
+  await watchStage(page);
   await typeAndSend(page, commands[second].text);
   await untilPlayed(page, commands.findIndex((c) => c.type === 'approval.answer'), 'the progress turn');
   await page.waitForFunction((pane) => document.querySelector(pane)?.dataset.running === 'false', PANE,
     { timeout: 30000 });
+  const stages = await page.evaluate(() => window.__tbStages);
   const settled = await page.locator(css).count();
   await page.locator(PANE).locator('.composer textarea').focus();
   await page.keyboard.press('Alt+1');
@@ -915,7 +917,27 @@ async function approvalFixture(page, fx) {
   const seen = await watched(page);
   await shot(page, 'tb-approval');
   approvalAfter(seen, { settled, gone, asked, steps, id });
+  record('TB-34 replay tb-approval: a TaskBoard background card leaves the stage line alone — while the progress turn '
+    + 'runs with the task\'s card pending the stage line never reads "Waiting for your approval" (only a normal-mode '
+    + 'subagent\'s card does, subagent spec §7.4)', settled === 1 && stages.length > 0
+    && !stages.includes('Waiting for your approval'), stages.join(' | '));
   await finish(page, 'TB-34', 'tb-approval', steps);
+}
+
+/** @brief 从现在起记下这一栏阶段行出现过的每段文字（MutationObserver），放在 window.__tbStages。 */
+function watchStage(page) {
+  return page.evaluate((pane) => {
+    const seen = [];
+    let last = '';
+    const scan = () => {
+      const now = document.querySelector(`${pane} [data-testid="stage"]`)?.textContent ?? '';
+      if (now && now !== last) seen.push(now);
+      last = now;
+    };
+    new MutationObserver(scan).observe(document.body, { subtree: true, childList: true, characterData: true });
+    scan();
+    window.__tbStages = seen;
+  }, PANE);
 }
 
 /** @brief Open folder…、/task，等第一张后台卡与它的 task 行，查卡、task 行、侧栏与权限菜单。 */

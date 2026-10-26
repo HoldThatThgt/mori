@@ -490,7 +490,7 @@ interface SubagentRow {
 | 编号 | 条目 | 通过条件 | 层 |
 | --- | --- | --- | --- |
 | SA-01 | 什么时候有 | 普通模式的用户会话的请求里有 `subagent`（没有角色文件、只有基座时也有；对话持有者写了 `tools: [read]` 时也有）；Task mode 下的运行没有（含合并会话），运行中被启用时调用被拒绝；立项、结案、task、临时提问、subagent 自己、增强会话的请求里都没有；工具页有一行 `subagent`，来源 `Mori`，没有开关，行下面的原因按 §2；有别的角色时 `agent_message` 仍在 | 单元、App |
-| SA-02 | 定义与归一 | schema 按 §3.1（`role` 只在有别的角色时出现，枚举基座在前、含对话持有者）；说明、`<tools>` 里的一行逐字按 §6.1（有、没有别的角色两种），没有 `promptGuidelines`；§3.2 的每一种写法归一后相同；`subagent_type` 被丢掉 | 单元 |
+| SA-02 | 定义与归一 | schema 按 §3.1（`role` 只在有别的角色时出现，是字符串、不写枚举，说明里列出角色；§3.3 列出的角色基座在前、含对话持有者）；说明、`<tools>` 里的一行逐字按 §6.1（有、没有别的角色两种），没有 `promptGuidelines`；§3.2 的每一种写法归一后相同；`subagent_type` 被丢掉 | 单元 |
 | SA-03 | 执行时的检查 | §3.3 表的每一行：错误两行、文字逐字（有别的角色时写错的角色也到这一项，不被 schema 校验先拦下）；被拒绝的调用不开实例、不写 `teams/` 下的文件；一次调用 6 个、同一次回复里再调用一次 3 个都照常开出（没有条数上限） | 单元、App |
 | SA-04 | 同时运行 | 3 个 subagent 的请求在端点日志里时间重叠（不是一个接一个）；每个 subagent 一条新会话（id `….ask.<n>.<role>`、`mori.instance` 的 `kind` 为 `ask`、`parentSession` 指向用户会话），不在侧栏；运行结束后实例关闭、文件保留；结果按参数顺序 | App、真实 |
 | SA-05 | 工具 | 只读 subagent 的请求里只有 `read`、`ls`（在 Built-in tools 打开 `grep`、`find` 时加上它们）；通用的基座 subagent 的请求里的工具与基座相同（默认设置下 `read`、`bash`、`edit`、`write`，加上直接调用方式的 MCP 工具）；写了 `tools: [read, bash]` 的角色的通用 subagent 只有这两个、只读时只有 `read`、`ls`；都没有 `memory`、`agent_message`、`subagent`、TaskBoard 的工具 | 单元、App、真实 |
