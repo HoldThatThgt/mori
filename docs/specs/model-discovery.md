@@ -237,10 +237,13 @@ z.ai 的条目），不按模型名猜；仍是猜的值标 "(default)"。”
     §7.7）。
 - 取自 pi 的值**不是**服务报告的：`reported` 照旧为假，结果另记 `catalog`（§5.2）；档案的 `reported`、`meta`（§7.2）仍只记
   服务报告的。有效窗口仍是配置与服务报告中较小的（模型层规格 §7.2），pi 的值不参与。
-- 不发请求、不读文件：模型表是 pi 安装包里的数据，后台进程第一次用时按 origin 建一次索引，之后只查（§9 的“不缓存”说的是
-  服务的结果，不是这份数据）。
-- 代码：`kernel/piCatalog.ts` 建索引、查条目（`catalogEntry`）；取哪几项是 `discoverRead.ts` 的纯函数 `fromCatalog`，
-  读取器（§4.1、§5.2）与档案视图（§7.2）共用。
+- 不发请求、不读文件：模型表是 pi 安装包里的数据，后台进程加载一次、按 origin 建一次索引，之后只查（§9 的“不缓存”说的是
+  服务的结果，不是这份数据）。pi-ai 只提供 ESM、后台进程入口是 CJS，所以同加载 pi 本身一样动态 import（2026-10-26 集成时
+  改：静态 import 编成 `require`，后台进程一启动就退出）：模型层启动（`ModelLayer.load`）与读取器查表之前先等它加载完；
+  没加载完就查是调用顺序错了，报错，不当作“pi 不认得”。
+- 代码：`kernel/piCatalog.ts` 加载（`loadCatalog`）、建索引、查条目（`catalogEntry`）；取哪几项是 `discoverRead.ts` 的
+  纯函数 `fromCatalog`，读取器（§4.1、§5.2）与档案视图（§7.2）共用；档案视图要的条目由模型层查好传给 `profileView`
+  （`modelProfiles.ts` 不 import pi-ai）。
 
 ## 5. 命令
 

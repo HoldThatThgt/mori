@@ -55,7 +55,8 @@
 // 依赖合成端点的场景（按地址两次 Add provider、typed 列表、§8 的五种提示、Legacy 卡），保存的 key 只能经卡上的
 // Fetch models（kind provider）使用，真实的 DeepSeek 录不出那个场景。md-replay.mjs 回放 ui/ 里全部 md-*-card.json
 // （MD-07、MD-13）；这里写下卡上的录制之后接着跑 node tests/ui/md-replay.mjs（不带 --only，全部录制；它重写
-// test-results/md-replay.json），把结果记成一条"MD-14 real replay"检查：真实录制能回放。
+// test-results/md-replay.json），把结果记成一条"MD-14 real replay"检查：真实录制能回放。2026-10-26（测试分层第 2 条）：
+// md-real 带 --only 时只回放这次写下的卡上录制（md-replay.mjs --only <这些录制>，结果在 md-partial-replay.json）。
 // 第二次启动（record，录响应体样本，§13.1“真实录制”）：另一份复制出的数据目录里 DeepSeek、GLM 的地址改指本机
 // 127.0.0.1:4881 的转发代理（/p/<提供商 id><原来的路径>），代理把请求原样转发到原来的 origin：请求头（含 key）与响应头
 // 原样转发、都不存；只给列表请求（GET、路径以 /models 结尾）留一份响应体，存“状态 + 响应体”（响应体里出现请求带的 key
@@ -121,8 +122,9 @@ const DUPLICATE = 'Model IDs must be unique within a provider.';
 const CARD_DRIVES = ['deepseek', 'glm', 'glm-pi'];
 /** md-replay.mjs 跑完的时限：几份录制，其中 OpenRouter 的清单有几百行 */
 const REPLAY_MS = 20 * 60 * 1000;
-/** 回放层的结果文件（md-replay.mjs 不带 --only 时写） */
-const REPLAY_RESULT = join(appRoot, 'test-results/md-replay.json');
+/** 回放层的结果文件：md-replay.mjs 不带 --only 时写前一个，带 --only 时写后一个 */
+const REPLAY_RESULTS = { all: join(appRoot, 'test-results/md-replay.json'),
+  partial: join(appRoot, 'test-results/md-partial-replay.json') };
 /** key 方式的 key 的环境变量（三个都要有值） */
 const KEY_VARS = { deepseek: 'MD_REAL_DEEPSEEK_KEY', glm: 'MD_REAL_GLM_KEY', openrouter: 'MD_REAL_OPENROUTER_KEY' };
 /**
@@ -1486,24 +1488,28 @@ async function recordRun() {
 }
 
 /**
- * @brief 写下卡上的回放录制之后跑 node tests/ui/md-replay.mjs（不带 --only：全部录制，含这次写下的；§13.1 回放层），
- *        读它写的 test-results/md-replay.json，记一条 MD-14 检查：退出码为 0、结果文件是这次写的、这次写下的每份录制
- *        都有检查、全部检查都通过。这次一份都没写下（核对不通过，写到了 rejected）时记一条失败，不跑。
+ * @brief 写下卡上的回放录制之后跑 node tests/ui/md-replay.mjs（§13.1 回放层）：md-real 不带 --only 时不带 --only（全部
+ *        录制，含这次写下的，结果 test-results/md-replay.json）；带 --only 时只回放这次写下的（--only <录制>，结果
+ *        md-partial-replay.json；测试分层第 2 条，2026-10-26）。读它写的结果，记一条 MD-14 检查：退出码为 0、结果文件是
+ *        这次写的、这次写下的每份录制都有检查、全部检查都通过。这次一份都没写下（核对不通过，写到了 rejected）时记一条
+ *        失败，不跑。
  */
 function replayCheck() {
   const written = ctx.cardFixtures;
-  const name = 'MD-14 real replay: node tests/ui/md-replay.mjs replays every recording, including the card recordings '
-    + `this run wrote (${written.join(', ') || 'none'}), and all its checks pass`;
+  const name = 'MD-14 real replay: node tests/ui/md-replay.mjs replays the card recordings this run wrote '
+    + `(${written.join(', ') || 'none'}; every recording when md-real runs without --only), and all its checks pass`;
   if (written.length === 0) {
     record(name, false, 'no card recording was written by this run (see the MD-14 real record checks)');
     return;
   }
+  const args = only ? ['--only', written.join(',')] : [];
+  const result = only ? REPLAY_RESULTS.partial : REPLAY_RESULTS.all;
   const started = Date.now();
-  console.log('[md-real] replaying the recordings: node tests/ui/md-replay.mjs');
-  const run = spawnSync(process.execPath, [join(appRoot, 'tests/ui/md-replay.mjs')], { cwd: appRoot,
+  console.log(`[md-real] replaying the recordings: node tests/ui/md-replay.mjs ${args.join(' ')}`);
+  const run = spawnSync(process.execPath, [join(appRoot, 'tests/ui/md-replay.mjs'), ...args], { cwd: appRoot,
     stdio: 'inherit', timeout: REPLAY_MS });
-  const fresh = existsSync(REPLAY_RESULT) && statSync(REPLAY_RESULT).mtimeMs >= started;
-  const checks = fresh ? readJson(REPLAY_RESULT).checks : [];
+  const fresh = existsSync(result) && statSync(result).mtimeMs >= started;
+  const checks = fresh ? readJson(result).checks : [];
   // 卡上录制的检查名里有" <录制名>"（md-replay.mjs 的 card 检查）；md-glm 的检查不含" md-glm-card"
   const missing = written.filter((item) => !checks.some((check) => check.name.includes(` ${item}`)));
   const failed = checks.filter((check) => !check.ok).map((check) => check.name);
