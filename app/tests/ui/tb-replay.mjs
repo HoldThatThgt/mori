@@ -1,6 +1,6 @@
 // 平行 Agent 与 TaskBoard 的回放测试（docs/specs/parallel-agents-taskboard.md §17.1、§17.2 的回放层）：在 Electron 里载入
 // 真正的界面，用回放进程桥（tests/ui/harness）回放从真实会话录下的 tests/fixtures/tb/*.json（tb-record.mjs 录制，模型是
-// 负责人的 DeepSeek 与 GLM），以及 m1–m6 的一组录制。测试像你一样操作（Open folder…、发录制里的消息、/team、点协作开关、
+// 负责人的 DeepSeek 与 GLM），以及 m1–m6 的一组录制。测试像你一样操作（Open folder…、发录制里的消息、/task、点协作开关、
 // 权限菜单、批准卡上的 Alt+1），回放桥核对界面发出的每条命令都与录制一致；再按 docs/v1/screens/team-*.md 检查界面：
 //   TB-03：m1–m6 的录制在合成的空 TeamState/BoardView 下照常回放：开关一直是 Team: Off，没有回执、进展摘要、Stop team
 //     （m7 的录制随工作回顾删除，docs/specs/memory.md §14.4）。
@@ -16,6 +16,8 @@
 //     侧栏等你批准；对话一轮结束不清掉卡；Alt+1 允许；TaskBoard 工具从不出卡；权限菜单的说明。
 //   TB-53（tb-ask、tb-team）：三种文字与悬停、aria-checked、三种点击（off → always → off、once → always → once）、
 //     打开中与后台进程退出时不可用、窄栏（不宽于 600px）只显示状态点、做完为止在汇报的那一轮结束时回到 Team: Off。
+//   TB-58（tb-ask、tb-team）：每次模式改变对话流里一行（Task mode on / on until done / off），/task 进入时在你的消息之前，
+//     重新打开后一样（2026-10-26；录制要在这之后重录，才有 mori.team_mode 事件）。
 // 录制文件还不存在时，每个对应编号记一条失败"<编号> replay fixture missing"（不造假录制）。
 // 用法（在 app/ 下）：node tests/ui/tb-replay.mjs [--only tb-team,m1/readme]
 // 结果写到 test-results/tb-replay.json（--only 时 tb-partial-replay.json，不计入覆盖检查）；截图在 test-results/tb-replay/。
@@ -29,7 +31,7 @@ import { _electron as electron } from 'playwright-core';
 import { build } from 'vite';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
-import { progressOf, receiptsOf, setProgressOpen, transcriptItems } from './tb-helpers.mjs';
+import { modeNoticesOf, progressOf, receiptsOf, setProgressOpen, transcriptItems } from './tb-helpers.mjs';
 import { expectedTitle, label } from './tb-real-helpers.mjs';
 
 const only = arg('only')?.split(',');
@@ -46,6 +48,8 @@ const SWITCH = {
   always: { text: 'Team: On', title: 'Messages go to Mori first', checked: 'true' },
   once: { text: 'Team: Until done', title: 'Team mode ends when open requests are done', checked: 'true' },
 };
+/** 对话流里模式提示的文字（§13.11，TB-58） */
+const NOTICE = { always: 'Task mode on', once: 'Task mode on until done', off: 'Task mode off' };
 /** 权限菜单的说明（§11.1） */
 const PERMISSION_NOTE = 'Applies to all agents in this session. New sessions start at Ask each time.';
 /** TaskBoard 的工具（§6.3），从不出卡 */
@@ -422,24 +426,33 @@ async function exitedSwitch(page) {
     after.disabled && after.text === before.text && !before.disabled, JSON.stringify({ before, after }));
 }
 
+/** @brief TB-58（tb-ask）：开关点了两次（off → always → off），对话流末尾两行 Task mode on、Task mode off。 */
+async function askNotices(page) {
+  const notices = await modeNoticesOf(ctxOf(page), await paneTab(page));
+  record('TB-58 replay tb-ask: the two clicks add "Task mode on" then "Task mode off" at the end of the transcript '
+    + '(no message after them)', JSON.stringify(notices.map((item) => [item.mode, item.text, item.before]))
+    === JSON.stringify([['always', NOTICE.always, null], ['off', NOTICE.off, null]]), JSON.stringify(notices));
+}
+
 /** @brief tb-ask 的全部检查。 */
 async function askFixture(page, fx, app) {
   const steps = await askRun(page, fx);
   await askChecks(page, steps);
   await askSwitch(page, steps);
+  await askNotices(page);
   await narrowSwitch(page, app);
   await exitedSwitch(page);
 }
 
 // ---------- TB-08、TB-37、TB-53：tb-team ----------
 
-/** @brief tb-team 重启前的一段：Allow all、/team、登记后点开关两次，等全部放完；返回观察到的东西。 */
+/** @brief tb-team 重启前的一段：Allow all、/task、登记后点开关两次，等全部放完；返回观察到的东西。 */
 async function teamRun(page, fx) {
   const steps = await load(page, fx, { part: 'before' });
   const prompt = commandsOf(steps).find((c) => c.type === 'session.prompt');
   await openFolder(page);
   await allowAll(page);
-  await typeAndSend(page, `/team ${prompt.text}`);
+  await typeAndSend(page, `/task ${prompt.text}`);
   await page.locator(`${PANE} [data-testid="receipt"][data-kind="registered"]`).first().waitFor({ timeout: 120000 });
   const sw = page.locator(`${PANE} [data-testid="team-switch"]`);
   const states = [await switchNow(page)];
@@ -536,7 +549,8 @@ async function teamProgress(page, steps, snap) {
   const holders = created.team.holders;
   const boards = boardsOf(steps);
   const seen = await watched(page);
-  const order = snap.order;
+  // 模式提示（TB-58）不算：录制时点开关的时刻可能落在回复与摘要之间
+  const order = snap.order.filter((kind) => kind !== 'team-mode');
   const progress = order.findIndex((kind) => kind.startsWith('progress1'));
   const reply = progress - 1;
   record('TB-37 replay tb-team: the progress summary hangs right under the reply of the turn that registered the '
@@ -580,22 +594,38 @@ function teamClosed(board, snap, holders, cwd) {
   oneLine(JSON.stringify({ title, collapsed, open, chains }), 1500));
 }
 
-/** @brief TB-53 tb-team：/team 进入做完为止；once → always → once（需求还开着）；汇报那一轮结束时回到 Team: Off。 */
+/** @brief TB-53 tb-team：/task 进入做完为止；once → always → once（需求还开着）；汇报那一轮结束时回到 Team: Off。 */
 async function teamSwitchChecks(page, steps, states) {
   const final = await switchNow(page);
   const modes = resultsOf(steps, 'session.setTeam').map((v) => v.mode);
-  record('TB-53 replay tb-team: "/team <text>" turns the switch to "Team: Until done" (hover "Team mode ends when open '
+  record('TB-53 replay tb-team: "/task <text>" turns the switch to "Team: Until done" (hover "Team mode ends when open '
     + 'requests are done", aria-checked true); a click sends session.setTeam on → "Team: On"; a click with the '
     + 'request still open sends session.setTeam off and the switch shows "Team: Until done", not "Team: Off"',
   states.map((s) => s.mode).join() === 'once,always,once' && states.every((s) => sameSwitch(s, SWITCH[s.mode]))
     && modes.join() === 'always,once', JSON.stringify({ states, modes }));
   record('TB-53 replay tb-team: once the request is done and the report turn ends, the switch returns to "Team: Off" '
-    + 'by itself (mori.team_state), without a line in the transcript',
+    + 'by itself (mori.team_state)',
   final.mode === 'off' && sameSwitch(final, SWITCH.off), JSON.stringify(final));
 }
 
-/** @brief tb-team 重启后：打开同一个会话，回执、进展摘要与条目的先后与重启前相同（TB-08、TB-37）。 */
-async function teamReopen(page, fx, before) {
+/**
+ * @brief TB-58（tb-team）：/task 进入时一行 Task mode on until done 在你的消息之前；两次点击 Task mode on、
+ *        Task mode on until done；汇报那一轮结束 Task mode off。
+ * @return 看到的模式提示（重新打开后比较）
+ */
+async function teamNotices(page, steps) {
+  const notices = await modeNoticesOf(ctxOf(page), await paneTab(page));
+  const prompt = commandsOf(steps).find((c) => c.type === 'session.prompt');
+  record('TB-58 replay tb-team: "Task mode on until done" right before the message sent with /task, then '
+    + '"Task mode on" and "Task mode on until done" for the two clicks, and "Task mode off" when the report turn ends',
+  JSON.stringify(notices.map((item) => [item.mode, item.text])) === JSON.stringify(['once', 'always', 'once', 'off']
+    .map((mode) => [mode, NOTICE[mode]])) && (notices[0]?.before ?? '').includes(prompt.text.slice(0, 30)),
+  oneLine(JSON.stringify(notices), 800));
+  return notices;
+}
+
+/** @brief tb-team 重启后：打开同一个会话，回执、进展摘要、模式提示与条目的先后与重启前相同（TB-08、TB-37、TB-58）。 */
+async function teamReopen(page, fx, before, notices) {
   const steps = await load(page, fx, { part: 'after' });
   const open = commandsOf(steps).find((c) => c.type === 'session.open');
   await rowOf(page, open.sessionFile).click();
@@ -614,6 +644,10 @@ async function teamReopen(page, fx, before) {
   JSON.stringify(after.collapsed) === JSON.stringify(before.collapsed)
     && JSON.stringify(after.expanded) === JSON.stringify(before.expanded),
   oneLine(JSON.stringify({ before: before.collapsed, after: after.collapsed }), 1500));
+  const reopened = await modeNoticesOf(ctxOf(page), await paneTab(page));
+  record('TB-58 replay tb-team reopened: the mode notices read and sit as before the restart (from the mori.team '
+    + 'entries)', notices.length === 4 && JSON.stringify(reopened) === JSON.stringify(notices),
+  oneLine(JSON.stringify({ before: notices, after: reopened }), 1000));
   await finish(page, 'TB-37', 'tb-team after the restart', steps);
 }
 
@@ -625,13 +659,14 @@ async function teamFixture(page, fx) {
   teamReceipts(steps, snap);
   await teamProgress(page, steps, snap);
   await teamSwitchChecks(page, steps, states);
+  const notices = await teamNotices(page, steps);
   await finish(page, 'TB-08', 'tb-team before the restart', steps);
-  await teamReopen(page, fx, snap);
+  await teamReopen(page, fx, snap, notices);
 }
 
 // ---------- TB-08、TB-37：tb-receipts ----------
 
-/** @brief tb-receipts：Allow all，照录制发三条消息（/team、补充、撤销），每条之前等上一轮放完、对话空闲。 */
+/** @brief tb-receipts：Allow all，照录制发三条消息（/task、补充、撤销），每条之前等上一轮放完、对话空闲。 */
 async function receiptsRun(page, fx) {
   const steps = await load(page, fx);
   const commands = commandsOf(steps);
@@ -642,7 +677,7 @@ async function receiptsRun(page, fx) {
     await untilPlayed(page, i, `segment ${i}`);
     await page.waitForFunction((pane) => document.querySelector(pane)?.dataset.running === 'false', PANE,
       { timeout: 30000 });
-    await typeAndSend(page, command.team === 'once' ? `/team ${command.text}` : command.text);
+    await typeAndSend(page, command.team === 'once' ? `/task ${command.text}` : command.text);
   }
   await untilPlayed(page, commands.length, 'the whole tb-receipts run');
   await sleep(800);
@@ -704,7 +739,7 @@ async function receiptsFixture(page, fx) {
 
 // ---------- TB-34、TB-37：tb-approval ----------
 
-/** @brief tb-approval：/team 之后等后台批准卡；查卡、进展摘要与侧栏；问进展那一轮结束后卡还在；Alt+1 允许。 */
+/** @brief tb-approval：/task 之后等后台批准卡；查卡、进展摘要与侧栏；问进展那一轮结束后卡还在；Alt+1 允许。 */
 async function approvalFixture(page, fx) {
   const steps = await load(page, fx);
   const id = resultsOf(steps, 'session.create')[0].sessionId;
@@ -733,10 +768,10 @@ async function approvalFixture(page, fx) {
   await finish(page, 'TB-34', 'tb-approval', steps);
 }
 
-/** @brief Open folder…、/team，等第一张后台卡与它的 task 行，查卡、task 行、侧栏与权限菜单。 */
+/** @brief Open folder…、/task，等第一张后台卡与它的 task 行，查卡、task 行、侧栏与权限菜单。 */
 async function approvalFirst(page, commands, event, css) {
   await openFolder(page);
-  await typeAndSend(page, `/team ${commands.find((c) => c.type === 'session.prompt').text}`);
+  await typeAndSend(page, `/task ${commands.find((c) => c.type === 'session.prompt').text}`);
   await page.locator(css).waitFor({ timeout: 120000 });
   const rowCss = `${PANE} [data-testid="progress-task"][data-task="${event.task}"][data-phase="approval"]`;
   await page.locator(rowCss).waitFor({ timeout: 30000 }).catch(() => {});
@@ -804,8 +839,8 @@ function approvalAfter(seen, { settled, gone, asked, steps, id }) {
 
 /** 每个 TaskBoard 录制：名字、覆盖的编号、检查 */
 const TB_FIXTURES = [
-  { name: 'tb-ask', ids: ['TB-04', 'TB-53'], run: askFixture },
-  { name: 'tb-team', ids: ['TB-08', 'TB-37', 'TB-53'], run: teamFixture },
+  { name: 'tb-ask', ids: ['TB-04', 'TB-53', 'TB-58'], run: askFixture },
+  { name: 'tb-team', ids: ['TB-08', 'TB-37', 'TB-53', 'TB-58'], run: teamFixture },
   { name: 'tb-receipts', ids: ['TB-08', 'TB-37'], run: receiptsFixture },
   { name: 'tb-approval', ids: ['TB-34', 'TB-37'], run: approvalFixture },
 ];

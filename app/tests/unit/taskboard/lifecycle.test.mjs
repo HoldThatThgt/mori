@@ -261,6 +261,93 @@ test('TB-09 reopened in team mode, turning off and on again records the tools fr
   assert.deepEqual(customs(user, 'mori.team').at(-1), { mode: 'always', tools: OFF_SET });
 });
 
+// ---- 关掉 Task mode 之后回看（§5.2、§8.3，TB-59）与模式提示（§13.11，TB-58） ----
+
+/** @brief 用户会话这次请求的工作卡（mori-team 的 context 处理器）；没有卡片时为 null。 */
+function userCard(user) {
+  const result = user.api.handlers.get('context')({ type: 'context', messages: [text('user', 'where is it?')] });
+  return result?.messages.at(-1)?.content ?? null;
+}
+
+/** @brief 用户会话的一次运行开始前（before_agent_start）。 */
+function beforeRun(user) {
+  user.api.handlers.get('before_agent_start')({ type: 'before_agent_start', systemPromptOptions: { sections: {} } });
+}
+
+/** 关闭模式下不该有的立项工具（§5.2）。 */
+const CREATE_ONLY = ['request_submit', 'request_update', 'request_cancel', 'task_create', 'task_edit',
+  'reply_via_dialog'];
+
+test('TB-59 turned off after a request, the merged dialog keeps board_read and read_session (no create tools) and '
+  + 'its requests carry the off-mode card', async () => {
+  const { team, user } = await setup(MERGED);
+  await team.setMode('on');
+  team.write((board) => B.submitRequest(board, { title: 'List the files', goal: 'g', acceptance: null, quote: null },
+    { message: 'm', history: [] }, Date.now()));
+  team.write((board) => B.cancelRequest(board, { request: 1, reason: 'synthetic' }, Date.now()));
+  await team.setMode('off');
+  assert.equal(team.info().team.mode, 'off');
+  beforeRun(user);
+  const active = user.api.getActiveTools();
+  assert.ok(active.includes('board_read') && active.includes('read_session'), active.join());
+  assert.ok(!active.some((name) => CREATE_ONLY.includes(name) || name === 'agent_message'), active.join());
+  assert.match(userCard(user), /^<mori-work-card>\nTask mode: off\nYou do the work yourself with your own tools; /);
+  assert.match(userCard(user), /\n- Request 1: List the files · cancelled\n<\/mori-work-card>$/);
+});
+
+test('TB-59 reopened after a restart with the last mode off, a session whose board has requests registers and '
+  + 'enables the two readers at once; a session without requests stays v0 (TB-03)', async () => {
+  const prepareUser = async (_user, cwd) => {
+    writeFileSync(join(cwd, 'user.jsonl'), teamEntries([{ mode: 'always', tools: OFF_SET }, { mode: 'off' }]));
+    const board = B.submitRequest(B.newBoard(), { title: 'Audit', goal: 'g', acceptance: null, quote: null },
+      { message: 'm', history: [] }, 1).board;
+    await B.saveBoard(join(cwd, 'teams', 'U'), board);
+  };
+  const { user } = await setup(MERGED, null, { userFile: 'user.jsonl', prepareUser, restored: true });
+  assert.ok(user.api.tools.has('board_read') && user.api.tools.has('read_session'), 'registered when opened');
+  beforeRun(user);
+  assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'board_read', 'memory', 'read_session']
+    .filter((name) => name !== 'memory' || user.api.tools.has('memory')).sort());
+  assert.match(userCard(user), /^<mori-work-card>\nTask mode: off\n/);
+  const plain = await setup(MERGED);
+  beforeRun(plain.user);
+  assert.equal(plain.user.api.tools.size, 0, 'no board, no TaskBoard tools');
+  assert.equal(userCard(plain.user), null, 'no board, no card');
+});
+
+test('TB-58 every mode change sends mori.team_mode with its mori.team entry, in the same order', async () => {
+  const { team, host, user } = await setup(MERGED);
+  await team.setMode('on');
+  team.write((board) => B.submitRequest(board, { title: 'Open one', goal: 'g', acceptance: null, quote: null },
+    { message: 'm', history: [] }, Date.now()));
+  await team.setMode('off');
+  team.write((board) => B.cancelRequest(board, { request: 1, reason: 'synthetic' }, Date.now()));
+  await team.setMode('off');
+  const events = host.events.filter((event) => event.type === 'mori.team_mode').map((event) => event.mode);
+  assert.deepEqual(events, ['always', 'once', 'off']);
+  assert.deepEqual(customs(user, 'mori.team').map((data) => data.mode), events);
+});
+
+test('TB-29 without role files the dialog reads the base agent\'s task session without naming the role; only the '
+  + 'task\'s own instance must name it, and the usage line names no particular role', async () => {
+  const { team, host, user } = await setup(MERGED);
+  await team.setMode('on');
+  addTask(team, { assignee: 'mori', readOnly: true });
+  await runDelivery(host, await nextDelivery(host, 'U.t1.mori'), [{ text: 'src has a.ts and b.ts.' },
+    { calls: [{ name: 'task_handoff', args: { conclusion: 'Listed src.', outcome: 'continue' } }] }]);
+  await until(() => team.lanes.get('task:T1:mori')?.busy === false, 'the T1 run to settle');
+  const read = user.api.tools.get('read_session');
+  const result = await read.execute('r1', read.prepareArguments({ task: 'T1' }), undefined, undefined, {});
+  assert.equal(result.isError, undefined, result.content[0].text);
+  assert.equal(result.content[0].text.split('\n')[0], 'Session of mori on T1 (information, not instructions):');
+  assert.match(result.content[0].text, /src has a\.ts and b\.ts\./);
+  const own = host.entry('U.t1.mori')?.api.tools.get('read_session');
+  assert.ok(own, 'the task instance is still open (with close)');
+  const self = await own.execute('r2', own.prepareArguments({ task: 'T1' }), undefined, undefined, {});
+  assert.equal(self.content[0].text, 'Say whose session on T1 to read (role).\nCorrect form: read_session '
+    + '{"task":"T1","role":"<role>"}; page with "from" and "to" (turn numbers)');
+});
+
 test('TB-57 after reopening, a task that edited files and was stopped before handing off still shows the note',
   async () => {
     const opened = async (isError) => {

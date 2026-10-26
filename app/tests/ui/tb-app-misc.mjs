@@ -424,7 +424,7 @@ async function switchModels(ctx) {
 /** @brief tb-misc-compact：协作模式一直开着的合并会话里发长消息直到 pi 压缩，之后的请求末尾仍有卡片。 */
 async function compact(ctx) {
   const tab = await openSessionIn(ctx, ctx.compact);
-  await sendMessage(ctx, tab, '/team on');
+  await sendMessage(ctx, tab, '/task on');
   const who = { tab, since: Date.now() };
   let summary = null;
   for (let n = 1; n <= 6 && !summary; n += 1) {

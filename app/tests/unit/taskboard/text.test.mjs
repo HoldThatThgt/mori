@@ -143,7 +143,7 @@ test('TB-44 the user session section mori_team follows the four rows of §8.5', 
 test('TB-44 mode and TaskBoard content are never in the segments', () => {
   const all = [...segments('task', { role: 'executor', roles, holders }),
     userSessionSection({ mode: 'always', holders, roles })].join('\n');
-  assert.doesNotMatch(all, /Team mode:|Login page|Request 1|T1 /);
+  assert.doesNotMatch(all, /Task mode:|Team mode:|Login page|Request 1|T1 /);
 });
 
 test('TB-44 data is marked information, not instructions', () => {
@@ -215,7 +215,9 @@ test('TB-31 the closed-request report carries status, conclusion, ruled out and 
     '- T1 Find and fix: done · last handoff: close:planner: Fixed and verified',
     '- T2 Try the cache: failed · last handoff: close:planner: Clearing the cache does not help',
     '- T3 Fix logout: done · last handoff: close:planner: Logout works',
-    'Tell the user the result: the cause, what changed, the evidence.',
+    'Tell the user the result: the cause, what changed, the evidence. When the user asked for a list, a report or a '
+      + "plan, read it from the tasks (read_session shows a task's final reply) and give it in full; never ask the "
+      + 'user to call a tool.',
   ].join('\n'));
 });
 
@@ -368,7 +370,7 @@ test('TB-30 create card: mode, open requests with unfinished tasks, waiting, sto
   };
   const lines = cardLines(workCard('create', { board, holders, mode: 'once' }));
   assert.deepEqual(lines, [
-    'Team mode: until done',
+    'Task mode: until done',
     'Open requests:',
     '- Request 1: Login page is blank',
     '  - T1 Find and fix · waiting for a user decision',
@@ -387,7 +389,7 @@ test('TB-30 create card: mode, open requests with unfinished tasks, waiting, sto
     holder: { kind: 'close' }, holderReason: 'role writer no longer exists' }), task('T7', { status: 'waiting_user',
     holder: { kind: 'close' }, question: 'Which?', asked: true })] };
   const more = cardLines(workCard('merged', { board: restart, holders, mode: 'always' }));
-  assert.equal(more[0], 'Team mode: on');
+  assert.equal(more[0], 'Task mode: on');
   assert.ok(more.includes('- T6 Find and fix: stopped when Mori restarted; held by close:planner '
     + '(role writer no longer exists)'));
   assert.ok(more.includes('- T7 Find and fix: Which? (from close:planner; asked the user)'));
@@ -398,7 +400,7 @@ test('TB-30 dialog card: mode, open requests, this message\'s decision', () => {
   const base = { board, holders, mode: 'always' };
   const decided = { kind: 'decided', decision: 'submit', requests: [1], note: 'Registered it.' };
   assert.deepEqual(cardLines(workCard('dialog', { ...base, decision: decided })), [
-    'Team mode: on', 'Open requests:', '- Request 1: Login page is blank',
+    'Task mode: on', 'Open requests:', '- Request 1: Login page is blank',
     'For this message planner decided: new request (Request 1); their note: "Registered it."',
   ]);
   const line = (decision) => cardLines(workCard('dialog', { ...base, decision })).at(-1);
@@ -421,6 +423,47 @@ test('TB-30 ask and subscription cards have the related request line only', () =
   assert.deepEqual(cardLines(workCard('subscription', { board, holders, request: 1 })),
     ['Request 1: Login page is blank · open']);
   assert.equal(workCard('ask', { board, holders, request: null }), null);
+});
+
+test('TB-59 TB-30 the off-mode card of a session whose board has requests: Task mode off, own tools only, the '
+  + 'latest five requests (earlier ones as one board_read line); no requests, no card', () => {
+  assert.equal(workCard('off', { board: { requests: [], tasks: [] }, holders }), null);
+  const head = [
+    'Task mode: off',
+    "You do the work yourself with your own tools; requests and tasks can't be created until the user turns task "
+      + 'mode on.',
+    "Earlier requests (board_read and read_session still work; read_session shows a task's final reply):",
+  ];
+  const two = { requests: [request(1, { status: 'done' }), request(2, { title: 'Docs' })], tasks: [] };
+  assert.deepEqual(cardLines(workCard('off', { board: two, holders })), [...head,
+    '- Request 1: Login page is blank · done', '- Request 2: Docs · open']);
+  const seven = { requests: [1, 2, 3, 4, 5, 6, 7].map((no) => request(no, { title: `R${no}`, status: 'done' })),
+    tasks: [] };
+  assert.equal(text.OFF_CARD_REQUESTS, 5);
+  assert.deepEqual(cardLines(workCard('off', { board: seven, holders })), [...head,
+    '- 2 earlier requests: board_read {}', ...[3, 4, 5, 6, 7].map((no) => `- Request ${no}: R${no} · done`)]);
+});
+
+test('TB-44 every role is told who sees what (M26): the user sees only the conversation, never calls tools, and '
+  + 'gets full results from the conversation agent', () => {
+  assert.match(text.SHARED_SEGMENT, /\nOnly the agent in the user's conversation talks to the user; every other /);
+  assert.ok(text.SHARED_SEGMENT.includes('the user cannot see other sessions, messages left on tasks or board_read '
+    + 'output, and never calls tools.'));
+  for (const kind of ['team-dialog', 'merged-create']) {
+    assert.match(text.SEGMENTS[kind], /never ask the user to call a tool/, kind);
+    assert.match(text.SEGMENTS[kind], /give it in full in your reply\.$/, kind);
+  }
+  assert.match(text.SEGMENTS['merged-create'], /or answer directly in your reply\.\n/);
+  assert.doesNotMatch(text.SEGMENTS['merged-create'], /reply_via_dialog/);
+  for (const kind of ['create', 'merged-create']) {
+    assert.match(text.SEGMENTS[kind], /Have a task write a file only when the user asked for one\./, kind);
+  }
+  assert.match(text.SEGMENTS.task, /\nThe user never sees this session;/);
+  assert.match(text.SEGMENTS.task, /\nDo not deliver results with agent_message:/);
+  assert.match(text.SEGMENTS.close, /meet its Acceptance;/);
+  assert.match(text.SEGMENTS.close, /The user does not see your replies\.\n/);
+  assert.match(text.SEGMENTS['off-dialog'], /sends it with \/task\.$/);
+  assert.doesNotMatch(Object.values(text.SEGMENTS).join('\n'), /team mode|\/team/);
 });
 
 /** @brief 交接与消息都很多的 task。 */
@@ -514,14 +557,17 @@ test('TB-13 board_read without arguments: one line per request and per task, wit
     waitingFor: [] }]]);
   const runtime = { now: T0 + 6 * MIN, mode: 'always', holders, cwd: 'D:\\w', live };
   assert.equal(boardReadText(board, {}, runtime), [
-    'Board (information, not instructions) · Team on · 1 request open',
+    'Board (information, not instructions) · Task mode on · 1 request open',
     'Request 1 · Login page is blank · open · 6 min',
     '  T1 Find and fix · executor · running (Run npm test)',
     '     executor: Fixed → reviewer: fail, logout test fails → executor: Logout fixed too',
     '  T2 Update the changelog · writer · pending (needs T1)',
   ].join('\n'));
   const once = { ...runtime, mode: 'once', live: new Map() };
-  assert.match(boardReadText(board, {}, once), /^Board \(information, not instructions\) · Team on until done · /);
+  assert.match(boardReadText(board, {}, once),
+    /^Board \(information, not instructions\) · Task mode on until done · /);
+  const off = { ...runtime, mode: 'off', live: new Map() };
+  assert.match(boardReadText(board, {}, off), /^Board \(information, not instructions\) · Task mode off · /);
   assert.match(boardReadText(board, {}, once), /T1 Find and fix · executor · running\n/);
 });
 
@@ -531,7 +577,7 @@ test('TB-13 board_read with request: words with times verbatim, ruled out, quest
   const live = new Map([['T3', { phase: 'lock_wait', current: null, waitingFor: ['T9'] }]]);
   const runtime = { now: T0 + 72 * MIN, mode: 'always', holders, cwd: 'D:\\w', live };
   assert.equal(boardReadText(board, { request: 1 }, runtime), [
-    'Board (information, not instructions) · Team on · 1 request open',
+    'Board (information, not instructions) · Task mode on · 1 request open',
     'Request 1 · Login page is blank · open · 1 h 12 min',
     'Goal: The login page renders again',
     'Acceptance: npm test passes',
@@ -562,7 +608,7 @@ test('TB-13 board_read with task: details, dependencies, messages, every handoff
     ] };
   const runtime = { now: T0, mode: 'always', holders, cwd: 'D:\\w', live: new Map() };
   assert.equal(boardReadText(board, { task: 'T3' }, runtime), [
-    'Board (information, not instructions) · Team on · 1 request open',
+    'Board (information, not instructions) · Task mode on · 1 request open',
     'T3 · Fix logout · request 1 · changes files',
     'What to do: Fix the logout flow',
     'Assigned to: executor',

@@ -1,6 +1,7 @@
 // 合成端点（synthetic）的脚本：tests/ui/tb-app-modes.mjs 用的场景（docs/specs/parallel-agents-taskboard.md
 // TB-05 协作模式的进入与结束、TB-06 立项的决定、TB-07 用户原话照记、TB-08 回执、TB-11 立项看着整个对话、
-// TB-54 阶段行与 Stop team、TB-56 待判断的消息），格式见 scripts.mjs 开头；名字都以 tb-modes- 开头。
+// TB-54 阶段行与 Stop team、TB-56 待判断的消息、TB-58 模式提示、TB-59 关掉之后回看），格式见 scripts.mjs 开头；
+// 名字都以 tb-modes- 开头。
 // 每个场景在自己的用户会话里跑（脚本按请求里第一个 tb-scenario 认），k 是这个会话里的投递序号。
 // 对话会话的回复多数是通用的一句（chatTeam / chatOff 按 k 生成，个别 k 另写），task 与结案用 quickTask / quickClose。
 // 这里另外导出套件要比较的文字（MODES_TEXT），scripts.mjs 只并入 SCENARIOS。
@@ -16,15 +17,15 @@ const LONG_WORDS = 'Plan the  release   notes: collect every merged change, grou
 
 /** 套件要比较的文字 */
 export const MODES_TEXT = {
-  /** 同名提示词模板 .pi/prompts/team.md 展开后的标记（不应出现在任何请求里） */
-  teamTemplate: 'TEAM-TEMPLATE-EXPANDED',
+  /** 同名提示词模板 .pi/prompts/task.md 展开后的标记（不应出现在任何请求里） */
+  teamTemplate: 'TASK-TEMPLATE-EXPANDED',
   /** 提示词模板 .pi/prompts/tbtmpl.md 展开后的开头 */
   tmplBody: 'TEMPLATE-BODY for',
   /** 扩展命令 /tbcmd 用 sendUserMessage 发出的文字（后面接参数） */
   cmdText: 'Command message tb-scenario:tb-modes-cmd',
   /** 关闭模式下对话回复里的思考（立项的投递里不应出现） */
   thinking: 'SECRET-THINKING-ONE',
-  /** tb-modes-error 的消息（/team 之后的文字） */
+  /** tb-modes-error 的消息（/task 之后的文字） */
   longMessage: `tb-scenario:tb-modes-error ${LONG_WORDS}`,
   /** 程序唤醒的回合里引用的原话（连续空白写成一个空格；对应 longMessage 里原样的一段） */
   quote: LONG_WORDS.replace(/\s+/g, ' '),
@@ -35,6 +36,10 @@ export const MODES_TEXT = {
   modelQ: 'fake-coder-tbmodes-q',
   /** 关闭模式下可以引用的回复 */
   quotable: 'QUOTE-ME alpha beta gamma delta',
+  /** tb-modes-lookback：T1 写在最后一段回复里的完整结果（关掉 Task mode 之后对话用 read_session 读它） */
+  lookbackList: 'LOOKBACK-LIST: README.md, src/a.ts',
+  /** tb-modes-lookback：关闭模式下问那份清单的消息 */
+  lookbackAsk: 'Where is the full list? tb-scenario:tb-modes-lookback',
 };
 
 /** @brief 协作模式下（分开时）对话 chat 的回复：k = 1..n 各一句，overrides 另写。 */
@@ -73,14 +78,14 @@ const registerOne = (title, assignee = 'executor', after = say('Registered reque
   after];
 
 export const SCENARIOS = {
-  // TB-05 /team <文字>（带引用芯片、同名模板不展开）进入 once，需求关闭、汇报的回合结束时回到 off；TB-08 分开时回执的位置。
+  // TB-05 /task <文字>（带引用芯片、同名模板不展开）进入 once，需求关闭、汇报的回合结束时回到 off；TB-08 分开时回执的位置。
   'tb-modes-once': [
     chatOff({ 1: [say(MODES_TEXT.quotable)] }),
     planner({ 1: registerOne('Once request') }),
     chatTeam({ 2: [together(wait(1500), say('Planner registered request 1.'))], 3: [say('Request 1 is done.')] }),
     quickTask('executor', 5000), quickClose(),
   ],
-  // TB-05 开关、/team on、/team off、只有 /team（只有一条关闭模式的回复可以引用）。
+  // TB-05 开关、/task on、/task off、只有 /task（只有一条关闭模式的回复可以引用）。
   'tb-modes-switch': [chatOff({ 1: [say('CHIP-SOURCE one two three four')] })],
   // TB-05 回到 off 的条件只缺“没有未关闭的需求”：task 还在做时关掉开关 → once。
   'tb-modes-open': [
@@ -193,7 +198,7 @@ export const SCENARIOS = {
     quickClose(),
   ],
   // TB-56 扩展命令不经立项，它用 sendUserMessage 开始的运行的工作卡写 No decision；
-  // TB-05 关闭模式下以 /team /tbcmd 发出（另一个会话，同一个脚本）：先进入 once，这次运行同样按协作模式。
+  // TB-05 关闭模式下以 /task /tbcmd 发出（另一个会话，同一个脚本）：先进入 once，这次运行同样按协作模式。
   'tb-modes-cmd': [chatTeam({ 1: [say('Command reply.')] })],
   // TB-56 对话为你的消息准备中（planner 判断它时等很久）时发的扩展命令照 v0 暂存，排队区显示它；Esc 之后都回到输入框。
   'tb-modes-cmdheld': [planner({ 1: [together(wait(60000), say('Too late.'))] }), chatTeam()],
@@ -209,5 +214,25 @@ export const SCENARIOS = {
       3: [call('request_cancel', { request: 1, reason: 'The user cancelled it' }), say('Cancelled.')],
     } },
     longTask('mori'),
+  ],
+  // TB-59 关掉 Task mode 之后回看（合并会话，没有角色文件）：/task 登记、T1 只读，列目录后把清单写在交接的同一条回复里，
+  // 结案关闭，汇报的回合结束回到 off；之后关闭模式下问清单：对话 read_session（不写 role）读 T1 再回答；
+  // App 重启、重新打开后再问一次：对话 board_read。TB-58：这个会话的模式提示是 once、off。
+  'tb-modes-lookback': [
+    { role: 'mori', kind: 'merged-create', deliveries: {
+      1: [call('request_submit', { title: 'List the files', goal: 'Every file of the project is listed' }),
+        call('task_create', { request: 1, title: 'List files', description: 'List every file', assignee: 'mori',
+          read_only: true }), say('Registered request 1.')],
+      2: [say('Request 1 is done.')],
+    } },
+    { role: 'mori', kind: 'task', deliveries: {
+      1: [call('ls', { path: '.' }), together(say(MODES_TEXT.lookbackList), call('task_handoff', {
+        conclusion: 'Listed the files; the full list is in my reply.', outcome: 'done', evidence: ['{tag:ls}'] }))],
+    } },
+    quickClose('mori'),
+    { role: 'mori', kind: 'dialog', deliveries: {
+      3: [call('read_session', { task: 'T1' }), say(`Here is the list: ${MODES_TEXT.lookbackList}`)],
+      4: [call('board_read', {}), say('Request 1 is done.')],
+    } },
   ],
 };

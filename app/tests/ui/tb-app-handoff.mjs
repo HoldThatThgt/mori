@@ -148,7 +148,7 @@ async function startApp(ctx) {
 }
 
 /**
- * @brief 在 project 里开一个新会话（可先切到全部允许），用 /team 发第一条消息；返回 { tab, sessionId, sessionFile, since }。
+ * @brief 在 project 里开一个新会话（可先切到全部允许），用 /task 发第一条消息；返回 { tab, sessionId, sessionFile, since }。
  */
 async function begin(ctx, project, text, { allow = false } = {}) {
   const tab = await openSessionIn(ctx, project);

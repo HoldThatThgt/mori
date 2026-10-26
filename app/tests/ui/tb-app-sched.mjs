@@ -119,7 +119,7 @@ async function setup(ctx) {
   await watchTaskPhases(ctx);
 }
 
-/** @brief 在 project 里开一个新会话，发第一条消息（默认带 /team）；返回 { tab, sessionId, sessionFile, since }。 */
+/** @brief 在 project 里开一个新会话，发第一条消息（默认带 /task）；返回 { tab, sessionId, sessionFile, since }。 */
 async function begin(ctx, project, text, { team = true } = {}) {
   const tab = await openSessionIn(ctx, project);
   const since = Date.now();

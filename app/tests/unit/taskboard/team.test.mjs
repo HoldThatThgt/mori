@@ -241,7 +241,7 @@ test('TB-04 in off mode the dialog asks a role: a read-only question instance an
   assert.equal(result.content[0].text, 'Yes, it is safe.');
   await until(() => !host.entry('U.ask.1.reviewer'), 'the question instance to close');
   const task = await ask.execute('c2', ask.prepareArguments({ to: 'T1', text: 'note' }), undefined, undefined, {});
-  assert.match(task.content[0].text, /^There are no tasks when team mode is off\./);
+  assert.match(task.content[0].text, /^There are no tasks when task mode is off\./);
 });
 
 // ---- TB-20 需要用户拿主意、TB-31 结案与关闭、TB-35 停止 ----
@@ -515,7 +515,7 @@ test('TB-44 the user session section mori_team follows the mode: off with other 
     await team.setMode('on');
     user.api.handlers.get('before_agent_start')({ type: 'before_agent_start', systemPromptOptions: { sections } });
     assert.match(sections.mori_team, /^You are chat, one of several agents/);
-    assert.match(sections.mori_team, /\n\nYou are the only agent that talks to the user, and in team mode you relay;/);
+    assert.match(sections.mori_team, /\n\nYou are the only agent that talks to the user, and in task mode you relay;/);
     assert.deepEqual(user.api.getActiveTools(), ['read', 'board_read', 'read_session', 'agent_message'],
       'team mode: the dialog only relays (§5.5)');
     const solo = await setup(roles.parseRoleFiles([], deps));
@@ -533,7 +533,7 @@ test('TB-09 in team mode the dialog session refuses calls outside the tools of t
   team.onUserEvent({ type: 'agent_start' });
   const guard = user.api.handlers.get('tool_call');
   assert.deepEqual(guard({ type: 'tool_call', toolName: 'bash', toolCallId: 'x', input: {} }), { block: true,
-    reason: 'Team mode is on: the dialog agent only relays; the work is done in tasks.' });
+    reason: 'Task mode is on: the dialog agent only relays; the work is done in tasks.' });
   assert.equal(guard({ type: 'tool_call', toolName: 'board_read', toolCallId: 'y', input: {} }), undefined);
   team.onUserEvent({ type: 'agent_settled' });
 });

@@ -238,7 +238,7 @@ async function openIn(ctx, project, { pick = null, allow = false } = {}) {
   return who;
 }
 
-/** @brief 开一个新会话并发第一条消息（默认带 /team）；who.since 是发送前的时刻。 */
+/** @brief 开一个新会话并发第一条消息（默认带 /task）；who.since 是发送前的时刻。 */
 async function begin(ctx, project, text, opts = {}) {
   const who = await openIn(ctx, project, opts);
   who.since = Date.now();
@@ -507,7 +507,7 @@ async function lockedView(ctx, who) {
     thinking: await thinkingButton(ctx, who.tab) };
 }
 
-/** @brief 选范围 tbm/fake-b、思考强度 high，/team 之后在 T1 运行时看锁定的按钮与 setPick，结束后回到 off 再发一条。 */
+/** @brief 选范围 tbm/fake-b、思考强度 high，/task 之后在 T1 运行时看锁定的按钮与 setPick，结束后回到 off 再发一条。 */
 async function sel(ctx) {
   const who = await openIn(ctx, ctx.p.sel, { pick: 'tbm/fake-b' });
   await chooseLevel(ctx, who.tab, 'high');

@@ -383,7 +383,8 @@ const TASK_BOARD = ['board_read', 'read_session', 'agent_message', 'task_handoff
 const CREATE_BOARD = ['board_read', 'read_session', 'agent_message', 'request_submit', 'request_update',
   'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog'];
 
-test('TB-24 read-only task keeps only the read tools: no write, command or MCP tools', () => {
+test('TB-24 read-only task keeps only the read tools: no write, command or MCP tools; the base agent always lists '
+  + 'folders (ls)', () => {
   const load = roles.parseRoleFiles([roleFile('executor.md',
     header('executor', 'tools: [read, bash, edit, write, grep, mcp__docs__*]'))], deps);
   const executor = roles.findRole(load.roles, 'executor');
@@ -392,7 +393,11 @@ test('TB-24 read-only task keeps only the read tools: no write, command or MCP t
     ['read', 'bash', 'edit', 'write', 'grep', 'mcp__docs__*', ...TASK_BOARD]);
   const base = roles.findRole(load.roles, 'mori');
   assert.deepEqual(roles.toolAllowlist(base, 'task', false, DEFAULTS, true), [...DEFAULTS, 'mcp__*', ...TASK_BOARD]);
-  assert.deepEqual(roles.toolAllowlist(base, 'task', true, DEFAULTS, true), ['read', ...TASK_BOARD]);
+  assert.deepEqual(roles.toolAllowlist(base, 'task', true, DEFAULTS, true), ['read', 'ls', ...TASK_BOARD]);
+  assert.deepEqual(roles.toolAllowlist(base, 'task', true, ['read', 'ls', 'grep'], true),
+    ['read', 'ls', 'grep', ...TASK_BOARD], 'ls is not listed twice');
+  assert.deepEqual(roles.readClassTools(executor, DEFAULTS), ['read', 'grep'], 'a role with tools gets only what it '
+    + 'wrote');
 });
 
 test('TB-09 create and close sessions get only read tools and their TaskBoard tools', () => {
@@ -404,7 +409,7 @@ test('TB-09 create and close sessions get only read tools and their TaskBoard to
   const base = roles.findRole(list, 'mori');
   assert.deepEqual(roles.toolAllowlist(base, 'create', false, ['read', 'bash', 'ls', 'find'], true),
     ['read', 'ls', 'find', ...CREATE_BOARD]);
-  assert.deepEqual(roles.readClassTools(base, DEFAULTS), ['read']);
+  assert.deepEqual(roles.readClassTools(base, DEFAULTS), ['read', 'ls']);
 });
 
 test('TB-09 dialog in team mode only relays: read tools + board_read, read_session, agent_message', () => {
@@ -412,7 +417,7 @@ test('TB-09 dialog in team mode only relays: read tools + board_read, read_sessi
   assert.deepEqual(roles.dialogTools(split, true, DEFAULTS), ['read', 'grep', 'board_read', 'read_session',
     'agent_message']);
   const merged = roles.parseRoleFiles([], deps);
-  assert.deepEqual(roles.dialogTools(merged, true, DEFAULTS), ['read', ...CREATE_BOARD]);
+  assert.deepEqual(roles.dialogTools(merged, true, DEFAULTS), ['read', 'ls', ...CREATE_BOARD]);
   assert.deepEqual(roles.dialogTools(split, false, DEFAULTS), ['read', 'bash', 'edit', 'grep', 'agent_message']);
   const chatRead = single('chat', 'seats: [dialog]', 'tools: [read]');
   assert.deepEqual(roles.dialogTools(chatRead, false, DEFAULTS), ['read', 'agent_message']);
@@ -441,7 +446,7 @@ test('TB-04 an ad-hoc question instance is read-only and has no agent_message', 
   assert.deepEqual(roles.toolAllowlist(memory, 'ask', false, DEFAULTS, true), ['read', 'find', 'board_read',
     'read_session']);
   const base = roles.findRole(load.roles, 'mori');
-  assert.deepEqual(roles.toolAllowlist(base, 'ask', false, DEFAULTS, false), ['read']);
+  assert.deepEqual(roles.toolAllowlist(base, 'ask', false, DEFAULTS, false), ['read', 'ls']);
 });
 
 test('TB-33 a subscription instance is read-only and can only leave messages', () => {
