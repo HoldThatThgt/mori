@@ -299,6 +299,11 @@ export interface TeamApprovalRequest {
   task: string | null;
   /** 那个 task 的标题；没有 task 时为 null */
   taskTitle: string | null;
+  /**
+   * 普通模式的 subagent 工具开出的实例：那个 subagent 的 description（卡头写 <Role> · <description>，
+   * docs/specs/subagent.md §7.4）；task 实例与 Task mode 的临时提问为 null
+   */
+  subagent: string | null;
   /** pi 的 toolCallId */
   toolCallId: string;
   /** 工具名 */

@@ -2,6 +2,7 @@
 // 会话的键与 pi 会话 id、投递队列（程序投递合并、单独占一次运行的强制填写与换模型继续）、一次运行里程序要记下的事。
 // 这里是类型与纯函数；状态的变化由 team.ts、teamRuns.ts、teamTools.ts 做。
 
+import type { SubagentRow } from '../shared/subagent';
 import type { WakeKind, InstanceKind, TeamMode, ToolCallBrief } from '../shared/team';
 import type { FillTarget } from './boardText';
 import { closeSessionKey, createSessionKey, mergeDeliveries, taskSessionKey } from './boardRoute';
@@ -21,6 +22,14 @@ export interface Waiter {
    * @param error 是否失败
    */
   settle(text: string, error: boolean): void;
+}
+
+/** @brief 普通模式的 subagent 工具开出的临时提问实例的一行（docs/specs/subagent.md §4、§9.1）。 */
+export interface SubagentSlot {
+  /** 这个 subagent 的状态（Team 在实例的事件里就地更新） */
+  row: SubagentRow;
+  /** @brief 这一行变了（合并发送进展）。 */
+  changed(): void;
 }
 
 /** @brief 一次强制填写（§7.5）：表单、投递里写明的对象、第几次（格式重试最多 1 次）。 */
@@ -159,6 +168,8 @@ export interface Lane {
   parent: string | null;
   /** 临时提问：等回答的发送方；其他为 null */
   asker: Waiter | null;
+  /** 普通模式的 subagent 工具开出的临时提问：它的一行；其他为 null */
+  subagent: SubagentSlot | null;
   /** 分开时的立项会话：上一次投递带到的用户会话条目（mori.create_cursor）；还没读出时为 undefined */
   cursor: string | null | undefined;
   /** 分开时的立项会话：这次投递带到的用户会话条目，开始运行时写成 mori.create_cursor（§8.4）；没有时为 undefined */
@@ -175,7 +186,7 @@ export function newLane(fields: Pick<Lane, 'key' | 'id' | 'kind' | 'role' | 'tas
     ...fields, file: null, open: false, queue: [], solo: [], busy: false, started: false, inflight: [],
     startUnavailable: null, settling: null, run: null, stop: null,
     current: null, modelNote: null, tagNext: null, batonStart: null, sentThisTurn: 0, parent: null, asker: null,
-    cursor: undefined, pendingCursor: undefined,
+    subagent: null, cursor: undefined, pendingCursor: undefined,
   };
 }
 

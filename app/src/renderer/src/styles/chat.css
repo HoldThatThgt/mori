@@ -285,6 +285,36 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* subagent 的工具卡（docs/v1/screens/subagent-card.md）：标题下面每个 subagent 一行，标签在左、状态在右；
+   点一行展开 Agent prompt 与 Response。行的状态与卡片的状态同色 */
+.subagent-rows { padding: 2px 12px 8px; border-top: 1px solid var(--color-line); }
+.subagent-row summary { padding: 5px 0; }
+.subagent-row + .subagent-row { border-top: 1px solid var(--color-line); }
+.subagent-label {
+  flex: 1;
+  min-width: 56px;
+  overflow: hidden;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subagent-state {
+  flex-shrink: 0;
+  max-width: 60%;
+  overflow: hidden;
+  color: var(--color-faint);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subagent-row.phase-running .subagent-state, .subagent-row.phase-starting .subagent-state {
+  color: var(--color-accent);
+}
+.subagent-row.phase-done .subagent-state { color: var(--color-ok); }
+.subagent-row.phase-failed .subagent-state { color: var(--color-danger); }
+.subagent-row.phase-approval .subagent-state, .subagent-row.phase-stopped .subagent-state,
+.subagent-row.phase-interrupted .subagent-state { color: var(--color-warn); }
+.subagent-body { padding: 0 0 8px; }
 .tool-diff, .change-diff {
   margin-top: 10px;
   overflow: auto;

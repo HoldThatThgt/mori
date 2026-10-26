@@ -15,6 +15,7 @@ import {
 } from '../../../shared/team';
 import {
   blocksFromContent, contentText, emptyTranscript, messageTime, parseRejection, pushItem, resultMemory, resultPatch,
+  resultSubagent,
   type ToolCall, type Transcript,
 } from './model';
 import { addModeNotice, attachReceipt, RECEIPT_TOOLS } from './teamEvents';
@@ -69,7 +70,7 @@ function addToolResult(state: Transcript, message: Message): Transcript {
   const failed = ABORTED_TOOL.test(output) ? 'stopped' as const : 'failed' as const;
   const status = rejected ? 'rejected' as const : message.isError ? failed : 'done' as const;
   const done = { ...tool, status, output, patch: resultPatch(message), memory: resultMemory(message),
-    reason: rejected?.reason ?? null };
+    subagent: resultSubagent(message), reason: rejected?.reason ?? null };
   return { ...state, tools: { ...state.tools, [id]: done } };
 }
 
@@ -222,7 +223,10 @@ export function withTeamInfo(state: Transcript, info: SessionInfo): Transcript {
   return { ...state, teamApprovals: [...info.teamApprovals], deciding };
 }
 
-/** @brief 最后一条助手回复里还没有结果的调用：正在执行的标"Running…"（从开始执行的时刻计时），其余"Queued"。 */
+/**
+ * @brief 最后一条助手回复里还没有结果的调用：正在执行的标"Running…"（从开始执行的时刻计时），其余"Queued"；
+ *        subagent 的卡片按快照里最后一次进展恢复每一行（docs/specs/subagent.md §8.2）。
+ */
 function resumeTools(state: Transcript, running: LiveSnapshot['runningTools']): Transcript {
   const last = state.items.findLast((item) => item.kind === 'assistant');
   if (last?.kind !== 'assistant') return state;
@@ -230,8 +234,10 @@ function resumeTools(state: Transcript, running: LiveSnapshot['runningTools']): 
   for (const block of last.blocks) {
     const tool = block.type === 'tool' ? tools[block.id] : undefined;
     if (tool?.status !== 'interrupted') continue;
-    const started = running.find((item) => item.toolCallId === tool.id)?.startedAt ?? null;
-    tools[tool.id] = { ...tool, status: started === null ? 'queued' : 'running', startedAt: started };
+    const live = running.find((item) => item.toolCallId === tool.id);
+    const started = live?.startedAt ?? null;
+    tools[tool.id] = { ...tool, status: started === null ? 'queued' : 'running', startedAt: started,
+      subagent: resultSubagent(live?.partial) ?? tool.subagent };
   }
   return { ...state, tools };
 }

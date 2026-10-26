@@ -102,8 +102,8 @@ test('MEM-11 user session: off mode has memory (base holder and a chat role with
     assert.ok(base.begin().includes('memory'), 'off mode, dialog held by the base: pi keeps memory on');
     base.settle();
     const chat = await teamWith(t, CHAT_READ);
-    assert.deepEqual([...chat.begin()].sort(), ['agent_message', 'memory', 'read'],
-      'off mode, chat.md writes tools: [read]: memory is added like agent_message');
+    assert.deepEqual([...chat.begin()].sort(), ['agent_message', 'memory', 'read', 'subagent'],
+      'off mode, chat.md writes tools: [read]: memory is added like agent_message (and subagent, subagent spec §2)');
     chat.settle();
     await chat.team.setMode('on');
     const split = chat.begin();

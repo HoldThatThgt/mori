@@ -60,7 +60,7 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 模型按钮上的模式（2026-10-26，WP-09） | 协作模式下 `Task mode · <当前模型 id>`（没有当前模型时 `Task mode`），跟着 `TeamState.mode`（不等 `pickLocked`）；悬停第二行 `Task mode picks the model for each agent` | `app/src/renderer/src/components/ModelMenu.tsx` | M10 的推荐选项“Text on the button”：开关不在顶栏后，不打开菜单也要看得出模式；放不下时先截模型 id、再截 `Task mode`（同范围按钮） | 你走查时觉得太长、想要图标时 |
 | 回复进行中的模型菜单（2026-10-26，WP-09） | 能打开；范围的项不可用（`disabled`），说明换成 `Can’t switch models until the response finishes`；Task mode 一行可用 | `app/src/renderer/src/components/ModelMenu.tsx` | M10 的推荐选项：§13.1 本来允许回复中切换模式，开关进菜单后菜单要能打开 | 你走查时 |
 | Task mode 切换失败那一行（2026-10-26，WP-09） | `Couldn’t change task mode: <原文>`；菜单开着时在 Task mode 一行下面，关着时从输入框下面一行往上弹出（同换范围失败）；10 秒后或下次切换时消失 | `app/src/renderer/src/components/TeamSwitch.tsx`、`app/src/renderer/src/state/teamActions.ts` | 原来在顶栏开关下面；菜单开着时往上弹出的一行会被菜单挡住 | 你走查时 |
-| 给 `conversation`、`decision` 留的槽位 | 每个 key 1 个（`task`、`background` 最多占并发上限 − 1；并发上限为 1 时不留） | `app/src/kernel/modelPool.ts` | 严格优先不打断已经发出的请求；不留的话 4 个 task 占满默认的 4 个槽位，对话和立项等到超时 | 拿到内网端点、知道它的并发时 |
+| 给 `conversation`、`decision` 留的槽位 | 每个 key 1 个（`task`、`background` 最多占并发上限 − 1；并发上限为 1 时不留；普通模式 subagent 的类别 `subagent` 不受它约束，subagent 规格 §5.4） | `app/src/kernel/modelPool.ts` | 严格优先不打断已经发出的请求；不留的话 4 个 task 占满默认的 4 个槽位，对话和立项等到超时 | 拿到内网端点、知道它的并发时 |
 | 命令与界面名 | 命令 `/task`、`/task on`、`/task off`（2026-10-26 由 `/team` 改，负责人走查 M21，没有别名；给模型的文字叫 task mode）；界面 `Task mode`、`Turn off task mode`、`Stop agents`（2026-10-26 负责人走查 M21，原为 `Team`、`Turn off team mode`、`Stop team`） | `app/src/renderer/src/`（命令 `state/teamActions.ts`）；给模型的文字 `app/src/kernel/boardText.ts` | 命令是 proposal 的暂定名，`/task off` 为派生；界面名按负责人的回答 | 你走查时 |
 | 关闭模式的工作卡列出的需求 | 最近 5 个；更早的写成一行 `N earlier requests: board_read {}` | `app/src/kernel/boardText.ts`（`OFF_CARD_REQUESTS`） | 关掉 Task mode 之后每次请求都带这张卡，列太多费 token；更早的用 `board_read {}` 看得到（2026-10-26，WP-10） | 你走查时 |
 | 基座的一句话说明 | `General-purpose agent with the default tools` | `app/src/shared/team.ts`（`BASE_ROLE_DESCRIPTION`） | 基座没有角色文件，`next`、`assignee` 的说明与附加段的“Other roles”要一句话；规格没给 | 你走查时 |
@@ -153,3 +153,21 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 探针代价的说明 | “Each model is verified with up to 13 short requests.”（自动探针第 1–7 步最多 13 个请求） | `app/src/renderer/src/components/settings/`（Add provider 和卡上清单的底部，Add 按钮上方；首次启动表单在 Test connection 上方，规格 §6.6） | proposal §12 第 5 条：加入的模型全部自动跑探针，清单底部写明代价；在公网云上会花一点额度 | 探针步骤变化（`PROBE_SUITE` 改版）时 |
 | 清单的默认勾选 | 服务报告是聊天模型（`chat` 为真）的勾上，报告不是的不勾；不报告类型（`chat` 为 null）时，能加入的行只有一行就勾上，否则都不勾；Added、不能加入的行不勾 | `app/src/renderer/src/components/settings/Checklist.tsx` | proposal 已定（§12 第 1、4 条）：只按服务报告的类型判断，不按名字猜；OpenAI 这类不报告类型的列表里混着 embedding、语音和图片模型，全勾会加入不能对话的模型，所以只有一个时才勾，其余用 Select all | 你走查清单、常要手动 Select all 或取消勾选时 |
 | 列表地址最多试 3 次 | 没有 Anthropic 提示时最多 2 个（`<base>/models`；base 不以 `/v<数字>` 结尾时再试 `<base>/v1/models`）；有 Anthropic 提示时最多 3 个（`<base>/v1/models?limit=1000`、前缀 + `/models`、前缀 + `/v1/models`；主机是 `api.anthropic.com` 时只有第一个）；已有提供商不整理地址：`openai-*` 只试 `<baseUrl>/models`，`anthropic-messages` 同有 Anthropic 提示时的三个（前缀取 `baseUrl` 路径里 `anthropic` 那一段之前的部分；主机是 `api.anthropic.com` 或路径里没有这一段时只试第一个）；拿到列表、401/403 或连接失败、超时即停 | `app/src/kernel/discoverRead.ts`（列表地址的计划） | 补 `/v1`、去掉 `anthropic` 那一段对应 proposal §5.1、§5.3 写的两种常见填法（一键拉取模型 proposal 要求的功能，不算 fallback）；不再往下猜更多路径；认证失败和连不上时换地址也没用 | 遇到列表在别的路径上的服务时 |
+
+## 普通模式的 subagent 工具
+
+来源：[普通模式的 subagent 工具规格](../specs/subagent.md) §10；检查记录见 [team-checks.md](team-checks.md) 的“普通模式的 subagent 工具”一节。
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 一次调用、一次回复的 subagent 数 | 不设上限 | — | 负责人 2026-10-26 定（“as many as main agent want”）；同时在途的请求只受每个 key 的并发设置约束 | 走查中碰到一次开太多、内存或上下文吃紧时 |
+| `description` / `prompt` 长度 | 1–80 / 1–8000 字符 | `app/src/shared/subagent.ts` | 描述是卡片上的一行（同 task 标题 80）；提示要能把背景写全，比 Agent 消息的 4000 宽一些 | 你走查时 |
+| 结果里每个回复的长度 | 16000 字符，超出截掉并注明 | `app/src/kernel/subagent.ts` | 每个回复约 4000 token 以内；几个回复一起进主 Agent 的上下文，小窗口的模型也放得下 | 内网小窗口模型上看到效果时 |
+| 调度类别 | `subagent`：严格优先排在 `decision` 之后、`task` 之前；不受“留一个槽位”的限制；不排队超时 | `app/src/kernel/modelPool.ts`、`app/src/kernel/team.ts`（`schedClassOf`） | 负责人 2026-10-26 定“用满并发设置”；`conversation` 类别等槽位超过 60 秒会换模型或失败，subagent 多于槽位时要能排队等 | 拿到内网端点、知道它的并发时 |
+| 进展的合并发送间隔 | 250 毫秒 | `app/src/kernel/subagent.ts` | 同 `mori.board`：工具调用很密时不刷屏 | — |
+| 行里失败原因的显示长度 | 80 字符，悬停看全文 | `app/src/shared/subagent.ts`（`SUBAGENT_LIMITS.failure`、`failureText`）、`app/src/renderer/src/components/subagentView.ts` | 一行放得下 | 你走查时 |
+| 卡片的展开 | 执行中展开，结束时收起一次 | `app/src/renderer/src/components/SubagentCard.tsx` | 执行中看得到每个 subagent 在做什么；结束后只占一行（走查 M18 要的“结束后折起来”） | 你走查时 |
+| 界面文字 | 规格 §7、[subagent-card.md](screens/subagent-card.md) | `app/src/shared/subagent.ts`、`app/src/renderer/src/` | 照 Claude 桌面版的用词 | 你走查时 |
+| 原来的准则（什么时候用、每个 prompt 要能单独看懂）放在哪里 | 并进工具的说明第三行，不写 `promptGuidelines`（规格 §6.1、§6.4） | `app/src/kernel/subagent.ts`（`SUBAGENT_DESCRIPTION`） | 说明在工具定义里，不算身份段；这样默认工具下的普通模式身份段正好 500 token，守住记忆规格的上限（MEM-01）；Claude Code 也把这类指引写在工具说明里。另外两种：保留准则（普通模式 549 token，超过上限）；缩短准则（522 token，仍超过） | 你回来看时（2026-10-26 你不在，按推荐定；记录在 team-checks.md“要你决定的”第 1 条） |
+| 交出去的活那一句（身份段，记忆规格附录 A.1.1） | 按这次运行启用的 `task_create`、`agent_message`、`subagent` 拼（规格 §6.4）；同时有 `task_create` 与 `agent_message` 的会话（Task mode 的合并会话、分开时的立项）与 WP-11 逐字相同，Task mode 下只有 `agent_message` 的（分开时的对话，task、结案、订阅实例）改为只说问题的那一句 | `app/src/kernel/memoryText.ts`（`handoffText`） | 固定的句子在普通模式下说的是不存在的工具，模型会把事实写进卡上的标题而不是 `prompt`。另外两种：照旧用固定的句子；普通模式不加这一句 | 你回来看时（2026-10-26 你不在，按推荐定；记录在 team-checks.md“要你决定的”第 2 条） |
+| `role` 参数的写法（有别的角色时） | 字符串，不写枚举；说明里列出角色（规格 §3.1）；写错的角色由 §3.3 的检查给出两行错误 | `app/src/kernel/subagent.ts`（`subagentSchema`） | 有枚举时 pi 在执行前就以 `Validation failed for tool "subagent"` 拒绝，§3.3 的原因与 `Correct form` 到不了模型（2026-10-26 审查）。另一种：保留枚举，改由 pi 的校验报错（文字是 pi 的，没有 `Correct form`） | 你回来看时（2026-10-26 你不在，按推荐定；记录在 team-checks.md“要你决定的”第 3 条） |

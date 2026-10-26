@@ -139,6 +139,10 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 对新建的会话生效 | Applies to new sessions | Applies to new sessions. | |
 | 已经打开的会话 | sessions already open | — | |
 | 扩展的询问 | An extension needs your input | An integration needs your input | |
+| subagent（普通模式的 `subagent` 工具开出的 Agent，只读或通用） | agent / agents（卡片）；工具页的名字 Subagent | Running agent、Running {count, plural, one {# agent} other {# agents}}、Ran agent、Ran {count} agents、Subagent | 卡片标题：进行中 "Running agent" / "Running 3 agents"，开过之后 "Ran agent" / "Ran 3 agents"，没开就结束 "Run agent" / "Run 3 agents"（"Run" 一种是 Mori 照 Claude 的 "run an agent" 写的）。给模型的文字里叫 subagent（[subagent 规格](../specs/subagent.md) §1） |
+| 工具调用次数 | 1 tool use / 12 tool uses | {count, plural, one {# tool use} other {# tool uses}} | subagent 卡片的每一行；0 次时不写 |
+| 进度 | 1 of 3 done | {done} of {total} agents done | subagent 卡片执行中的状态，后面接秒数："1 of 3 done · 12s" |
+| subagent 的提示 / 回复 | Agent prompt / Response | Agent prompt、Response | 展开一行后的两段 |
 | 系统托盘 | system tray | system tray（"Claude runs in the system tray"） | 2026-10-26 加（WP-20，[screens/window.md](screens/window.md)） |
 | 退出 | Exit（托盘菜单的项）；quit（句子和按钮：right-click to quit、Quit anyway、Quitting now…） | Exit（Windows 托盘菜单）、Quit anyway、Quitting now will interrupt that work. | 照 Claude 在 Windows 上的写法：菜单项是 "Exit"，说明和按钮里是 quit。2026-10-26 加 |
 
@@ -201,6 +205,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | --- | --- |
 | 工具卡标题 | Read src/a.ts · lines 10–29 / Read src/a.ts · from line 10 / Run npm test / Edit src/a.ts / Write src/a.ts / Search / Find / List |
 | 工具卡状态 | 见术语表；失败的命令 "Failed · Exit code 1" |
+| subagent 卡片（[subagent-card.md](../v1/screens/subagent-card.md)） | 标题 Running 3 agents / Ran 3 agents / Run 3 agents；状态 1 of 3 done · 12s / Done · 48s / Done · 1 failed · 48s / Failed / Stopped / Interrupted；每一行 Starting / Waiting for DeepSeek / Waiting for your approval / Read src/a.ts / Done / Failed · … / Stopped，"· reviewer"、"· Read-only"、"· 12 tool uses"；展开一行 Agent prompt、Response；批准卡的归属 "Mori · Fix the retry loop"；右栏 Changes made by other agents aren’t listed here.；工具页那一行下面的原因 Mori turns this on when Task mode is off. |
 | 标签 | Allowed for this session / Allow all |
 | 批准卡标题（bash） | Run a command |
 | 批准卡按钮 | Allow once / Allow “Run commands” for this session / Deny |

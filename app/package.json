@@ -30,6 +30,8 @@
     "test:unit": "node --test --test-reporter=./tests/unit/reporter.mjs \"tests/unit/*.test.mjs\"",
     "test:tb-unit": "node --test --test-reporter=./tests/unit/tb-reporter.mjs \"tests/unit/taskboard/*.test.mjs\"",
     "test:mem-unit": "node --test --test-reporter=./tests/unit/mem-reporter.mjs \"tests/unit/memory/*.test.mjs\"",
+    "test:sa-unit": "node --test --test-reporter=./tests/unit/sa-reporter.mjs \"tests/unit/subagent/*.test.mjs\"",
+    "test:subagent": "npm run test:sa-unit && electron-vite build && node tests/ui/sa-app.mjs && node tests/ui/sa-replay.mjs && node tests/spec-coverage.mjs --spec subagent",
     "test:md-unit": "node --test --test-reporter=./tests/unit/md-reporter.mjs \"tests/unit/discovery/*.test.mjs\"",
     "test:taskboard": "npm run test:tb-unit && electron-vite build && node tests/ui/tb-build-base.mjs && node tests/ui/tb-app-roles.mjs && node tests/ui/tb-app-modes.mjs && node tests/ui/tb-app-flow.mjs && node tests/ui/tb-app-ask.mjs && node tests/ui/tb-app-handoff.mjs && node tests/ui/tb-app-sched.mjs && node tests/ui/tb-app-models.mjs && node tests/ui/tb-app-stop.mjs && node tests/ui/tb-app-misc.mjs && node tests/ui/tb-replay.mjs && node tests/ui/v1-models-existing.mjs --id TB-46 && node tests/spec-coverage.mjs --spec taskboard",
     "test:v1-models": "npm run test:unit && electron-vite build && node tests/ui/v1-models-app-settings.mjs && node tests/ui/v1-models-app-reorder.mjs && node tests/ui/v1-models-app-switch.mjs && node tests/ui/v1-models-app-session.mjs && node tests/ui/v1-models-app-nooff.mjs && node tests/ui/v1-models-replay.mjs && node tests/ui/v1-models-existing.mjs && node tests/spec-coverage.mjs",

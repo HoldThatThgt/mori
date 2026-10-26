@@ -545,19 +545,23 @@ export interface SegmentContext {
   holders: TeamHolders;
   /** 结案会话的需求编号（<n>）；其他种类不用 */
   request?: number;
+  /** 临时提问在协作模式下建立；false 为关闭模式下的临时提问（没有 TaskBoard，不带共用段）。其他种类不用 */
+  team?: boolean;
 }
 
 /**
  * @brief 实例会话（分开时的立项、结案、task、临时提问、订阅）system prompt 附加段里程序注入的段（§8.5）：
- *        共用段，然后这个种类的段；角色正文由调用方放在它们之前。会话建立时决定，之后不变。
+ *        共用段，然后这个种类的段；角色正文由调用方放在它们之前。会话建立时决定，之后不变。关闭模式下的临时提问
+ *        （普通模式的 agent_message）只有临时提问段（附录 A，docs/specs/subagent.md §5.1）。
  * @param kind 实例的种类
- * @param ctx 角色、角色列表、持有者、结案的需求编号
- * @return [共用段, 种类的段]
+ * @param ctx 角色、角色列表、持有者、结案的需求编号、临时提问是否在协作模式下建立
+ * @return [共用段, 种类的段]；关闭模式下的临时提问为 [种类的段]
  */
 export function segments(kind: InstanceKind, ctx: SegmentContext): string[] {
   const own = fillTemplate(SEGMENTS[INSTANCE_SEGMENTS[kind]], {
     '<create role>': ctx.holders.create, '<n>': String(ctx.request ?? ''),
   });
+  if (kind === 'ask' && ctx.team === false) return [own];
   return [sharedSegment(ctx.role, ctx.roles), own];
 }
 

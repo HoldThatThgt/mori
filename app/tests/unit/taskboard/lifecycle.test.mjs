@@ -246,7 +246,8 @@ test('TB-09 reopened in off mode after a team-mode run, the dialog gets back its
     };
     const { user } = await setup(SPLIT, null, { userFile: 'user.jsonl', prepareUser });
     user.api.handlers.get('before_agent_start')({ type: 'before_agent_start', systemPromptOptions: { sections: {} } });
-    assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'agent_message'].sort());
+    // 普通模式另有 subagent（docs/specs/subagent.md §2：Task mode 关闭时总有）
+    assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'agent_message', 'subagent'].sort());
   });
 
 test('TB-09 reopened in team mode, turning off and on again records the tools from before team mode', async () => {
@@ -307,12 +308,14 @@ test('TB-59 reopened after a restart with the last mode off, a session whose boa
   const { user } = await setup(MERGED, null, { userFile: 'user.jsonl', prepareUser, restored: true });
   assert.ok(user.api.tools.has('board_read') && user.api.tools.has('read_session'), 'registered when opened');
   beforeRun(user);
-  assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'board_read', 'memory', 'read_session']
+  // 普通模式另有 subagent（docs/specs/subagent.md §2：Task mode 关闭时总有）
+  assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'board_read', 'memory', 'read_session', 'subagent']
     .filter((name) => name !== 'memory' || user.api.tools.has('memory')).sort());
   assert.match(userCard(user), /^<mori-work-card>\nTask mode: off\n/);
   const plain = await setup(MERGED);
   beforeRun(plain.user);
-  assert.equal(plain.user.api.tools.size, 0, 'no board, no TaskBoard tools');
+  assert.deepEqual([...plain.user.api.tools.keys()], ['subagent'],
+    'no board, no TaskBoard tools (only subagent: subagent spec §2)');
   assert.equal(userCard(plain.user), null, 'no board, no card');
 });
 
