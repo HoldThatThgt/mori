@@ -245,29 +245,28 @@ async function callCard(ctx, text) {
 }
 
 /**
- * @brief 开始记录 name 那一行的开关有没有不可用过（MutationObserver 记 disabled 的增删：写入加重新读取只有几十毫秒，
- *        轮询抓不到）。
+ * @brief 开始记录 name 那一行的开关第一次不可用时的样子（MutationObserver 记 disabled 加上的那一刻的 aria-checked：
+ *        写入加重新读取只有几十毫秒，轮询抓不到；回调在下一个任务之前运行，那时开关还不可用）。
  */
 function watchBusy(page, name) {
   return page.evaluate((tool) => {
-    window.__switchBusy = false;
+    window.__switchBusy = null;
     window.__switchObserver?.disconnect();
     const mine = (node) => node instanceof Element && node.getAttribute('role') === 'switch'
       && node.closest('[data-testid="tool-row"]')?.dataset.tool === tool;
-    // 加上 disabled 时 target 带着它；去掉时 oldValue 不是 null（原来有）
-    const seen = (item) => mine(item.target) && (item.target.hasAttribute('disabled') || item.oldValue !== null);
     window.__switchObserver = new MutationObserver((records) => {
-      if (records.some(seen)) window.__switchBusy = true;
+      const added = records.find((item) => mine(item.target) && item.target.hasAttribute('disabled'));
+      if (added && window.__switchBusy === null) window.__switchBusy = added.target.getAttribute('aria-checked');
     });
     window.__switchObserver.observe(document.querySelector('[data-testid="tools-page"]'), { subtree: true,
-      attributes: true, attributeFilter: ['disabled'], attributeOldValue: true });
+      attributes: true, attributeFilter: ['disabled'] });
   }, name);
 }
 
-/** @brief watchBusy 开始之后那个开关有没有不可用过。 */
+/** @brief watchBusy 开始之后那个开关第一次不可用时的 aria-checked（"true" / "false"）；一直没有不可用过时为 null。 */
 const busySeen = (page) => page.evaluate(() => {
   window.__switchObserver?.disconnect();
-  return window.__switchBusy === true;
+  return window.__switchBusy;
 });
 
 /** @brief Markdown 里"## 标题"下的各行（去掉首尾空白，不含空行）。 */
@@ -411,7 +410,7 @@ async function turnOn(ctx) {
 
 /**
  * @brief 关掉 bash（["-bash"]，再打开 ls 是 ["-bash", "+ls"]）；关掉 ls、再打开 bash 时 defaultTools 去掉。每按一次，写入与
- *        重新读取结束前那一行的开关不可用、之后可用；F8 的"Recent activity"按顺序记下这四次（2026-10-26 补）。
+ *        重新读取结束前那一行的开关已是按下后的样子、不可用，之后可用；F8 的"Recent activity"按顺序记下这四次（2026-10-26 补）。
  */
 async function turnOff(ctx) {
   resetDefaults(ctx);
@@ -432,8 +431,9 @@ async function turnOff(ctx) {
   record('M12 关掉 bash 写 ["-bash"]，再打开 ls 写 ["-bash", "+ls"]（先 - 后 +），关掉 ls 回到 ["-bash"]，打开 bash 后'
     + '与 pi 的默认相同、defaultTools 这一项去掉；别的字段和键的顺序一直不变', seen.every((item) => item.ok),
   JSON.stringify(seen));
-  record('M12 写入中（2026-10-26 补）：每按一次开关，写完并重新读取之前这一行的开关不可用，读完后照常可用',
-    seen.every((item) => item.busy === true && item.disabled === false), JSON.stringify(seen));
+  record('M12 写入中（2026-10-26 补）：每按一次开关，写完并重新读取之前这一行的开关已经是按下后的样子、不可用，'
+    + '读完后照常可用', seen.every((item) => item.busy === String(item.want) && item.disabled === false),
+  JSON.stringify(seen));
   await backToChat(page);
   const activity = await recentActivity(page);
   const switches = activity.filter((text) => /^(Enable|Disable) tool /.test(text));

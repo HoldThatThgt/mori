@@ -7,7 +7,7 @@
 //          你的消息（不是前一条）并能 Jump to source 定位到它、View in Memory 打开到那一条（forget 卡打开 Revisions 选中
 //          那一次，失败的卡没有按钮）、重新打开会话后卡片仍有按钮、分开时立项实例记的依据 entry 为 null、
 //          同一 abstract 在两层时不给 layer 报 Pass layer.、给了只改那一条；没给 asked 的 save 与 update 记成 Mori 记的
-//          （update 改 Learned 的条目后标 Added by Mori，改 You said 的条目仍是 You said；2026-10-26，WP-11）；
+//          （update 改 Learned、Added by Mori 的条目后标 Added by Mori，改 You said 的条目仍是 You said；2026-10-26，WP-11）；
 //   MEM-15 依据回到原位置（§10.2 表的每一行：会话开着、没开着、已归档、助手回复与工具结果里的条目、会话已删除（列表里
 //          没有、文件被删、重启后会话列表还在读）、条目不在当前分支（分叉之后、不存在的 id）、读会话文件出别的错、
 //          TaskBoard 实例会话、反馈（回复、选区、文件三种跳法与文件已不在）、entry 为 null；跳转未完成时离开记忆页
@@ -125,6 +125,11 @@ const CALLS = [
     detail: 'At most ten lines; code blocks do not count.', note: 'The user tightened the length',
     quote: 'keep replies under ten lines, code blocks do not count' }, verb: 'Update memory',
   result: `Updated TASTE (this project): ${SEEDED.refine.abstract}` },
+  // 同上：没给 asked 的 update 改 Mori 自己记的那条（corrected），之后仍是 agent
+  { key: 'retold', args: { action: 'update', entry: 'No tables in answers',
+    detail: 'No tables; short bullet lists read better in a narrow terminal.', note: 'The user said why',
+    quote: 'tables wrap badly in my narrow terminal' }, verb: 'Update memory',
+  result: 'Updated TASTE (this project): No tables in answers' },
 ];
 /** 第一条消息（会话名取它） */
 const WARMUP = 'plain MEM-10 warm-up';
@@ -266,11 +271,15 @@ function sourceFileChecks(ctx) {
     && stated.front.evidence?.[0]?.entry === said && stated.front.evidence[0].quote === 'our staging database runs '
       + 'PostgreSQL 15', brief({ stated: stated?.front, corrected: corrected?.front.source, said }));
   const refined = readDetail(project, SEEDED.refine.slug);
-  const call = CALLS.find((item) => item.key === 'refined').args;
-  record('MEM-10 an update without asked changes a Learned entry into one added by Mori (2026-10-26, §6.4): source '
-    + 'agent, Details replaced, modified today · Mori, the user’s words appended as evidence',
-  refined?.front.source === 'agent' && refined.details === call.detail && refined.front.modified === `${TODAY} · Mori`
-    && refined.front.evidence?.at(-1)?.quote === call.quote, brief(refined?.front));
+  const retold = readDetail(project, SLUG.corrected);
+  const changed = (entry, key) => entry?.front.source === 'agent'
+    && entry.details === CALLS.find((item) => item.key === key).args.detail
+    && entry.front.modified === `${TODAY} · Mori`
+    && entry.front.evidence?.at(-1)?.quote === CALLS.find((item) => item.key === key).args.quote;
+  record('MEM-10 an update without asked changes a Learned entry into one added by Mori, and an entry added by Mori '
+    + 'stays added by Mori (2026-10-26, §6.4): source agent, Details replaced, modified today · Mori, the user’s '
+    + 'words appended as evidence', changed(refined, 'refined') && changed(retold, 'retold'),
+  brief({ refined: refined?.front, retold: retold?.front }));
 }
 
 /** @brief MEM-10：每次调用一张卡，标题（§7.5）、状态、View in Memory 只在完成的卡上；结果原文（§7.4）。 */
@@ -514,22 +523,28 @@ async function sourceView(ctx) {
 }
 
 /**
- * @brief memory-chat.md“完成（主动记的）”（2026-10-26 补，§6.4）：View in Memory 打开没给 asked 的 update 改过的 Learned 条目，
- *        行标 Added by Mori、详情一行写 Added by Mori；没给 asked 的 update 改的 You said 条目（bothUser）仍是 You said。
+ * @brief memory-chat.md“完成（主动记的）”（2026-10-26 补，§6.4）：View in Memory 打开没给 asked 的 update 改过的 Learned 条目
+ *        与 Mori 记的条目，行标 Added by Mori、详情一行写 Added by Mori；没给 asked 的 update 改的 You said 条目（bothUser）
+ *        仍是 You said。
  */
 async function updateSourceView(ctx) {
-  const refined = { scope: 'project', section: 'taste', entry: SEEDED.refine.slug, title: SEEDED.refine.abstract };
   const at = (key) => CALLS.findIndex((call) => call.key === key);
-  const got = (await viewFromCard(ctx, at('refined'), (now) => landedOn(now, refined))).view;
-  const row = got.rows.find((item) => item.id === SEEDED.refine.slug);
-  const kept = (await viewFromCard(ctx, at('bothUser'), (now) => landedOn(now, VIEW_CASES.bothUser))).view;
-  const said = kept.rows.find((item) => item.id === SEEDED.both.slug);
+  const open = async (key, want) => {
+    const view = (await viewFromCard(ctx, at(key), (now) => landedOn(now, want))).view;
+    const row = view.rows.find((item) => item.id === want.entry);
+    return { landed: landedOn(view, want), source: row?.source, tag: row?.tag, meta: view.entryMeta ?? '' };
+  };
+  const tasteOf = (entry, title) => ({ scope: 'project', section: 'taste', entry, title });
+  const refined = await open('refined', tasteOf(SEEDED.refine.slug, SEEDED.refine.abstract));
+  const retold = await open('retold', tasteOf(SLUG.corrected, 'No tables in answers'));
+  const said = await open('bothUser', VIEW_CASES.bothUser);
+  const byMori = (got) => got.landed && got.source === 'agent' && got.tag === 'Added by Mori'
+    && got.meta.startsWith('TASTE · Project · Added by Mori · ');
   record('MEM-10 View in Memory on the card of an update without asked opens the Learned entry it changed, now '
-    + 'marked “Added by Mori” (data-source agent) with the detail line “TASTE · Project · Added by Mori · …”; the '
-    + 'You said entry updated without asked (user level) is still marked “You said”', landedOn(got, refined)
-    && row?.source === 'agent' && row.tag === 'Added by Mori'
-    && (got.entryMeta ?? '').startsWith('TASTE · Project · Added by Mori · ') && landedOn(kept, VIEW_CASES.bothUser)
-    && said?.source === 'user' && said.tag === 'You said', brief({ row, meta: got.entryMeta, said }));
+    + 'marked “Added by Mori” (data-source agent) with the detail line “TASTE · Project · Added by Mori · …”; an '
+    + 'entry added by Mori and updated without asked stays “Added by Mori”; the You said entry updated without '
+    + 'asked (user level) is still marked “You said”', byMori(refined) && byMori(retold) && said.landed
+    && said.source === 'user' && said.tag === 'You said', brief({ refined, retold, said }));
 }
 
 // ---------- MEM-10、MEM-15：依据定位到说这句话的那条消息 ----------
