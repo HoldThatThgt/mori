@@ -79,6 +79,9 @@ WP-08（Customize 的内置工具开关）、WP-09（模型菜单里的 Task mod
 
 - 后台进程只在 `roles.save`、`roles.delete` 里写这个目录，别处仍然只读；写入先写临时文件再改名（`writeFileAtomic`）。
 - 写出的文件就是一个普通的角色文件：会话打开时按 TaskBoard 规格 §4.3、§4.4 读和校验，与手写的没有区别。
+- 表单 Tools 的 `All MCP tools` 写 `mcp__*`（全部 MCP 工具，同基座的白名单写法）。TaskBoard 规格 §4.1 原来只认
+  `mcp__<服务>__…`，2026-10-26 为这个勾选框加上 `mcp__*`（临时，§7；另两个做法：表单不提供 All MCP tools，或按此刻的
+  MCP 服务各写一个 `mcp__<服务>__*`，等负责人定）。
 
 ## 4. 读：`roles.get`
 
@@ -289,6 +292,7 @@ seats: [close]
 | 新文件的字段写法 | §5.1：`description` 写 JSON 字符串，列表单行，`subscribe` 写 JSON |
 | 编辑时文件名 | 不随名字改 |
 | 删除 | 直接删除，不进回收站 |
+| All MCP tools 的写法 | `mcp__*`（TaskBoard 规格 §4.1 为它放开，§3） |
 | 本节的说明与空状态文字 | §6.1、§6.2 |
 
 ## 8. 要改的文件

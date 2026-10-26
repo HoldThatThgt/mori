@@ -115,7 +115,7 @@
 | --- | --- | --- |
 | `name` | 是 | `^[a-z0-9][a-z0-9-]{0,39}$`，在这个项目的角色里唯一；不能是 `mori`（基座），也不能像 task 或需求编号（`^(t\|r)?[0-9]+$`） |
 | `description` | 是 | 一句话（≤ 200 字符）；别的 Agent 在工作卡、`board_read` 和交接单“下一棒”的说明里看到它 |
-| `tools` | 否 | pi 工具名（`read`、`bash`、`edit`、`write`、`grep`、`find`、`ls`、`powershell`）与 MCP 工具，MCP 写 `mcp__<服务>__<工具>` 或 `mcp__<服务>__*`；不写时与基座相同（§4.2）。TaskBoard 的工具由程序按 §6.3 加，写在这里算错误 |
+| `tools` | 否 | pi 工具名（`read`、`bash`、`edit`、`write`、`grep`、`find`、`ls`、`powershell`）与 MCP 工具，MCP 写 `mcp__<服务>__<工具>` 或 `mcp__<服务>__*`，全部 MCP 工具写 `mcp__*`（同基座的白名单写法；2026-10-26 加，Customize › Agents 表单的 All MCP tools，customize-agents.md §5.1，临时）；不写时与基座相同（§4.2）。TaskBoard 的工具由程序按 §6.3 加，写在这里算错误 |
 | `models` | 否 | 有序候选，每项是一个选择范围（分组、提供商或 `<provider>/<model>`，统一模型提供商规格 §5.1）；不写时用用户会话的选择范围 |
 | `requires` | 否 | 能力要求，词表与判定按统一模型提供商规格 §10：`tool_calling`、`protocol_write`、`protocol_write>=B`、`structured_output`、`vision`、`context>=N`；总是隐含 `tool_calling`（所有实例都要用工具） |
 | `seats` | 否 | `dialog`、`create`、`close` 的子集 |
@@ -163,7 +163,7 @@ models: [strong]
 | `name` 重复、为 `mori`、像编号 | `<file>: name "<name>" is already used by <other file>` / `is reserved for the base agent` / `looks like a task or request number` |
 | 权限值不在词表 | `<file>: unknown seat "<seat>"` |
 | 权限已被另一个文件认领 | `<file>: seat "<seat>" is also claimed by <other file>` |
-| 工具名不认识（不是 pi 的工具名，也不是 `mcp__<服务>__<工具或 *>` 的写法），或写了 TaskBoard 的工具 | `<file>: unknown tool "<tool>"` / `"<tool>" is added by Mori; remove it` |
+| 工具名不认识（不是 pi 的工具名，也不是 `mcp__*` 或 `mcp__<服务>__<工具或 *>` 的写法），或写了 TaskBoard 的工具 | `<file>: unknown tool "<tool>"` / `"<tool>" is added by Mori; remove it` |
 | `models` 引用的名字不在你的模型设置里（统一模型提供商规格 §10） | `<file>: "<name>" is not in your model settings (models[<i>])` |
 | `requires` 不在词表、`context>=N` 的 N 不是正整数 | `<file>: unknown requirement "<req>"` |
 | `differ_from` 不是 `author` | `<file>: differ_from can only be "author"` |

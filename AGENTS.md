@@ -13,7 +13,7 @@
   - `src/renderer/` 界面。
   - `tests/` 合成端点、冒烟测试、预检脚本、静态检查。
 - `docs/app-v0.md` 方案；`docs/v0/` 每个里程碑的检查记录与临时默认值。
-- `docs/specs/` 构建规格：proposal 的实现说明；`docs/v1/` 模型层（[docs/specs/model-providers.md](docs/specs/model-providers.md)）、一键拉取模型（[docs/specs/model-discovery.md](docs/specs/model-discovery.md)，检查记录 `docs/v1/discovery-checks.md`，临时默认值在 `docs/v1/defaults.md`）、平行 Agent（[docs/specs/parallel-agents-taskboard.md](docs/specs/parallel-agents-taskboard.md)）与记忆（[docs/specs/memory.md](docs/specs/memory.md)）的检查记录、状态表与临时默认值。
+- `docs/specs/` 构建规格：proposal 的实现说明；`docs/v1/` 模型层（[docs/specs/model-providers.md](docs/specs/model-providers.md)）、一键拉取模型（[docs/specs/model-discovery.md](docs/specs/model-discovery.md)，检查记录 `docs/v1/discovery-checks.md`，临时默认值在 `docs/v1/defaults.md`）、平行 Agent（[docs/specs/parallel-agents-taskboard.md](docs/specs/parallel-agents-taskboard.md)；在 Customize 里设 agent 按 [docs/specs/customize-agents.md](docs/specs/customize-agents.md)，检查记录 `docs/v1/walkthrough-1026/customize-agents.md`）与记忆（[docs/specs/memory.md](docs/specs/memory.md)）的检查记录、状态表与临时默认值。
 - `demo/` 早期故事板，已冻结，只作视觉参考。
 - `docs/proposal.md` 与 `docs/proposals/` 是原设计，部分规则本轮暂停，见 v0 方案第 9 节；agent-lifecycle、agent-communication、agent-collaboration 已被平行 Agent 与 TaskBoard Proposal 第四版取代。
 
@@ -97,8 +97,10 @@ doesn't describe." 对所有会话、子 Agent 和工作流里的 Agent 都适�
 | `npm run test:memory` | 提示词分层与记忆的单元、App、回放测试和现有套件，最后检查规格 §14 的每一条都有通过的结果 |
 | `npm run test:md-unit` | 一键拉取模型的单元测试（`node --test`，跳过的与 todo 的测试算失败） |
 | `npm run test:discovery` | 一键拉取模型的单元、App、回放测试和现有套件，最后检查规格 §13 的每一条都有通过的结果（真实层 MD-14 由你跑 `md-real.mjs`） |
+| `npm run test:ag-unit` | Customize › Agents 的单元测试（`node --test`，跳过的与 todo 的测试算失败） |
+| `npm run test:agents` | Customize › Agents 的单元、App 测试和现有套件（`v1-models-existing.mjs --id AG-11`），最后检查规格 §9.2 的每一条都有通过的结果 |
 
-`test:v1-models`、`test:taskboard`、`test:memory`、`test:discovery` 和 `test:m6-app` 跑的是整套界面测试，只在推送到远端之前跑
+`test:v1-models`、`test:taskboard`、`test:memory`、`test:discovery`、`test:agents` 和 `test:m6-app` 跑的是整套界面测试，只在推送到远端之前跑
 （见"测试分层"第 3 条）；平时只跑其中的单元测试脚本。
 
 本机访问不了 `registry.npmjs.org`，`app/.npmrc` 使用 npmmirror；安装 Electron 前设 `ELECTRON_MIRROR`，见 `app/README.md`。

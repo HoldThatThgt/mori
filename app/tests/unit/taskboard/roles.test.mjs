@@ -188,11 +188,11 @@ test('TB-01 §4.4 row: unknown seat; seat also claimed by another file', () => {
 });
 
 test('TB-01 §4.4 row: unknown tool; TaskBoard tools are added by Mori', () => {
-  const allowed = [...roles.PI_TOOL_NAMES, 'mcp__docs__search', 'mcp__docs__*', 'mcp__my_server__get-page'];
+  const allowed = [...roles.PI_TOOL_NAMES, 'mcp__docs__search', 'mcp__docs__*', 'mcp__my_server__get-page', 'mcp__*'];
   assert.deepEqual(problemsOf(roleFile('a.md', header('a', `tools: [${allowed.join(', ')}]`)).text), []);
-  assert.deepEqual(fieldProblems('tools: [read, shell, Read, mcp__*, mcp__docs__se*]'), [
+  assert.deepEqual(fieldProblems('tools: [read, shell, Read, mcp__, mcp__docs__se*]'), [
     '.mori/agents/a.md: unknown tool "shell"', '.mori/agents/a.md: unknown tool "Read"',
-    '.mori/agents/a.md: unknown tool "mcp__*"', '.mori/agents/a.md: unknown tool "mcp__docs__se*"',
+    '.mori/agents/a.md: unknown tool "mcp__"', '.mori/agents/a.md: unknown tool "mcp__docs__se*"',
   ]);
   assert.deepEqual(problemsOf(roleFile('a.md', header('a', 'tools: [read, task_handoff, board_read]')).text), [
     '.mori/agents/a.md: "task_handoff" is added by Mori; remove it',

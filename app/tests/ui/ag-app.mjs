@@ -164,7 +164,7 @@ async function modelLines() {
     watcher: ['none', 'No model can run this agent'] };
   const seen = Object.fromEntries(snap.rows.map((row) => [row.name, [row.models?.state, row.models?.text]]));
   record('AG-02 the model line: all ready names the first model, some can’t run counts them, none says so',
-    info?.pick === 'deepseek' && JSON.stringify(seen) === JSON.stringify(want), brief({ pick: info?.pick, seen }));
+    info?.pick === 'ds' && JSON.stringify(seen) === JSON.stringify(want), brief({ pick: info?.pick, seen }));
   const mismatched = [];
   for (const agent of info.agents) {
     await setExpanded(ctx.page, agent.name, true);
@@ -194,7 +194,7 @@ async function problemFiles() {
   const snap = await agentsSnapshot(ctx.page);
   const shown = snap.rows.flatMap((row) => row.problems);
   record('AG-03 the warning above the list, and the rows’ problem lines are exactly the "Fix the agent files" card’s',
-    snap.invalid === INVALID && Array.isArray(card) && card.length >= 3
+    snap.invalid === INVALID && Array.isArray(card) && card.length === 2
       && JSON.stringify(shown) === JSON.stringify(card),
     brief({ invalid: snap.invalid, card, shown }));
   const alpha = rowOf(snap, 'alpha');
@@ -243,25 +243,25 @@ async function fillReviewer() {
   await setCheck(page, 'agent-jobs-field', 'Plans requests', true);
   await form.getByRole('radio', { name: 'Use these, in order' }).check();
   const emptyList = await formSnapshot(page);
-  await addModelRange(page, 'glm/glm-4.6');
+  await addModelRange(page, 'zg/glm-4.6');
   await addModelRange(page, 'strong');
   const added = (await formSnapshot(page)).modelList;
   const list = form.getByTestId('agent-model-list');
-  await list.locator('li[data-pick="strong"]').dragTo(list.locator('li[data-pick="glm/glm-4.6"]'));
+  await list.locator('li[data-pick="strong"]').dragTo(list.locator('li[data-pick="zg/glm-4.6"]'));
   const dragged = (await formSnapshot(page)).modelList;
   await form.getByRole('radio', { name: 'Only these' }).check();
   const noTools = await formSnapshot(page);
   for (const tool of ['read', 'grep', 'All MCP tools']) await setCheck(page, 'agent-tools-field', tool, true);
   await form.getByLabel('Prompt', { exact: true }).fill('Review the diff.\nRun the tests.');
   record('AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool',
-    emptyList.saveDisabled === true && JSON.stringify(added) === '["glm/glm-4.6","strong"]'
-    && JSON.stringify(dragged) === '["strong","glm/glm-4.6"]' && noTools.saveDisabled === true,
+    emptyList.saveDisabled === true && JSON.stringify(added) === '["zg/glm-4.6","strong"]'
+    && JSON.stringify(dragged) === '["strong","zg/glm-4.6"]' && noTools.saveDisabled === true,
   brief({ emptyList: emptyList.saveDisabled, added, dragged, noTools: noTools.saveDisabled }));
 }
 
 /** @brief 写出的文件（§5.1）。 */
 const REVIEWER_FILE = ['---', 'name: reviewer', 'description: "Reviews the change: runs \\"tests\\""',
-  'tools: [read, grep, "mcp__*"]', 'models: [strong, glm/glm-4.6]', 'seats: [create]', '---', '', 'Review the diff.',
+  'tools: [read, grep, "mcp__*"]', 'models: [strong, zg/glm-4.6]', 'seats: [create]', '---', '', 'Review the diff.',
   'Run the tests.', ''].join('\n');
 
 /** @brief New agent：表单、保存、写出的文件、已经打开的会话不变、新会话有它。 */
@@ -328,12 +328,13 @@ async function trySave(name, description = 'Some agent') {
 
 /** @brief 名字的规则、重名、文件已存在：不写文件，表单留着你写的，下面 Couldn’t save: 和问题行。 */
 async function refusedSaves() {
+  writeAgentFile(projects.edit, 'rev.md', { name: 'taken', description: 'Its name differs from its file name' });
   await openAgents('edit');
   const before = agentFileList();
   await openNewForm();
   const cases = [['mori', 'name "mori" is reserved for the base agent'],
-    ['planner', 'name "planner" is already used by .mori/agents/planner.md'],
-    ['commented', 'A file named .mori/agents/commented.md already exists.']];
+    ['taken', 'name "taken" is already used by .mori/agents/rev.md'],
+    ['planner', 'A file named .mori/agents/planner.md already exists.']];
   const seen = [];
   for (const [name, line] of cases) {
     const form = await trySave(name);
@@ -343,12 +344,13 @@ async function refusedSaves() {
     + 'the form keeps what you typed and no file is written', seen.every((item) => item.ok && item.kept)
     && JSON.stringify(agentFileList()) === JSON.stringify(before), brief(seen));
   await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Cancel' }).click();
+  removeAgent('edit', 'rev.md');
 }
 
 /** @brief edit 项目 .mori/agents 里的文件名。 */
 function agentFileList() {
-  return ['commented.md', 'helper.md', 'planner.md', 'reviewer.md', 'zz-broken.md'].filter((file) => agentExists('edit',
-    file));
+  return ['commented.md', 'helper.md', 'planner.md', 'rev.md', 'reviewer.md', 'zz-broken.md']
+    .filter((file) => agentExists('edit', file));
 }
 
 /** @brief Save 不可用的几种情况，说明的计数与 200 字的上限，被认领的职责。 */
@@ -402,7 +404,7 @@ async function othersProblems() {
 /** @brief edit 项目的 commented.md（文件头有注释，带 requires、differ_from、subscribe）。 */
 function writeCommented() {
   writeAgentFile(projects.edit, 'commented.md', { name: 'commented', description: 'Written by hand', tools: ['read'],
-    models: ['deepseek'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] },
+    models: ['ds'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] },
   'Hand-written prompt.', 'hand-written header');
 }
 
@@ -421,7 +423,7 @@ async function editAgent() {
   const form = await openEdit('commented');
   record('AG-06 Edit fills the form with the file’s values and warns that the header’s comments go',
     form?.mode === 'edit' && form.name === 'commented' && form.description === 'Written by hand'
-    && form.modelsChoice === 'list' && JSON.stringify(form.modelList) === '["deepseek"]' && form.toolsChoice === 'only'
+    && form.modelsChoice === 'list' && JSON.stringify(form.modelList) === '["ds"]' && form.toolsChoice === 'only'
     && JSON.stringify(form.tools.filter((tool) => tool.checked).map((tool) => tool.label)) === '["read"]'
     && form.prompt === 'Hand-written prompt.' && form.comments === COMMENTS
     && form.nameHint === 'The file name stays .mori/agents/commented.md.', brief(form));
@@ -434,7 +436,7 @@ async function editAgent() {
   record('AG-06 Save keeps the file name and writes requires, differ_from and subscribe back unchanged, without '
     + 'comments', JSON.stringify(parsed.frontmatter) === JSON.stringify({ name: 'hand', description: 'Edited in Mori',
       tools: ['read'],
-      models: ['deepseek'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] })
+      models: ['ds'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] })
     && !agentText('edit', 'commented.md').includes('#') && !agentExists('edit', 'hand.md')
     && rowOf(await agentsSnapshot(ctx.page), 'hand')?.saved === SAVED, brief(parsed));
 }
@@ -552,7 +554,8 @@ async function expansion() {
   record('AG-09 Mori: the session’s model range, Same as Mori with the default tools, no File block',
     JSON.stringify(mori?.blocks) === '["models","tools","prompt"]'
     && mori.modelsHeading === `Same as the session’s model range (${info.pick})`
-    && mori.tools === 'Same as Mori: read, bash, edit, write, and all MCP tools' && mori.prompt === 'No prompt',
+    && mori.tools === `Same as Mori: ${[...info.baseTools, 'and all MCP tools'].join(', ')}`
+    && mori.prompt === 'No prompt',
   brief(mori));
   record('AG-09 an agent with its own models, a handoff tier need, its tools, its prompt and its file',
     JSON.stringify(checker?.blocks) === '["models","needs","tools","prompt","file"]'

@@ -162,11 +162,12 @@ function missingExclusion(input: Pick<SelectorInput, 'removedRefs'>, ref: ModelR
 
 /**
  * @brief 第 1–3 步（静态）：名字在配置里、区域已确认且允许、tool_calling 已验证，再按角色的能力要求与要避开的模型族。
+ *        Customize › Agents 逐个候选判断也用它（docs/specs/customize-agents.md §4.2）。
  * @param input 选择器输入
  * @param ref 候选
  * @return 第一个不满足的条件；都满足为 null
  */
-function staticExclusion(input: StaticSelectorInput, ref: ModelRef): CandidateExclusion | null {
+export function staticExclusion(input: StaticSelectorInput, ref: ModelRef): CandidateExclusion | null {
   if (!input.exists(ref)) {
     return missingExclusion(input, ref);
   }
@@ -492,19 +493,29 @@ function pickOption(input: PickOptionsInput, item: Pick<PickOption, 'pick' | 'ki
 }
 
 /**
- * @brief 范围菜单的各项（§9.2）：先全部分组（文字为 id），再全部提供商（文字为名称），再按提供商列出模型（文字为模型 id），
- *        各按配置里的顺序；每项标出展开后候选涉及的区域，全部候选都被本会话的静态校验排除时标为 excluded 并给出原因。
- * @param input 配置、项目配置的分组缩小与这个会话的第 1–3 步输入
+ * @brief 范围菜单各项的范围、种类与文字（§9.2）：先全部分组（文字为 id），再全部提供商（文字为名称），再按提供商列出模型
+ *        （文字为模型 id），各按配置里的顺序。Customize › Agents 表单的 Add model range 用同一份（customize-agents.md §6.4）。
+ * @param config 用户级配置
  */
-export function pickOptions(input: PickOptionsInput): PickOption[] {
-  const { groups, providers } = input.config;
-  const items: Pick<PickOption, 'pick' | 'kind' | 'label'>[] = [
+export function pickItems(
+  config: Pick<ModelConfig, 'providers' | 'groups'>,
+): Pick<PickOption, 'pick' | 'kind' | 'label'>[] {
+  const { groups, providers } = config;
+  return [
     ...groups.map((group) => ({ pick: group.id, kind: 'group' as const, label: group.id })),
     ...providers.map((provider) => ({ pick: provider.id, kind: 'provider' as const, label: provider.name })),
     ...providers.flatMap((provider) => provider.models.map((model) => ({
       pick: `${provider.id}/${model.id}`, kind: 'model' as const, label: model.id }))),
   ];
-  return items.map((item) => pickOption(input, item));
+}
+
+/**
+ * @brief 范围菜单的各项（§9.2）：pickItems 的顺序；每项标出展开后候选涉及的区域，全部候选都被本会话的静态校验排除时
+ *        标为 excluded 并给出原因。
+ * @param input 配置、项目配置的分组缩小与这个会话的第 1–3 步输入
+ */
+export function pickOptions(input: PickOptionsInput): PickOption[] {
+  return pickItems(input.config).map((item) => pickOption(input, item));
 }
 
 // ---- 候选耗尽（§5.8） ----

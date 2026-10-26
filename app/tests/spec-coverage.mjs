@@ -92,7 +92,7 @@ export const SPECS = {
   },
 };
 
-/** @brief 规格名的列表文字："model, taskboard, memory or discovery"（规格名不认识时的提示）。 */
+/** @brief 规格名的列表文字："model, taskboard, memory, discovery or agents"（规格名不认识时的提示）。 */
 export function specNames() {
   const names = Object.keys(SPECS);
   return names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names.at(-1)}` : names.join('');

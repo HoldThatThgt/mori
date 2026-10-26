@@ -116,11 +116,12 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 候选能用的文字 | `Ready` | `app/src/shared/roles.ts` | 只是静态检查通过，不说 “Available”（那要看此刻的限流与连接） | 同上 |
 | 要求的白话 | `Fills in handoff forms (verified)`、`Handoff tier B or better`、`Structured output (verified)`、`Image input`、`Context window of at least N tokens` | `app/src/shared/roles.ts` | 词表（TaskBoard 规格 §4.1）是文件的写法，界面写白话；原因原文仍照选择器 | 同上 |
 | 分节位置 | Skills 之后 | `app/src/renderer/src/components/ToolsPage.tsx` | Claude 的插件详情里 Agents 排在 Skills、Commands 之后；也让它不挨着 Instructions（AGENTS.md）一节 | 同上 |
-| 新文件的写法 | `description` 写 JSON 字符串；列表单行 `[a, b]`，含字母、数字、`._/-` 以外字符的项写 JSON 字符串；`subscribe` 写 JSON | `app/src/kernel/roleFiles.ts` | JSON 是 YAML 的子集，不用新增 YAML 依赖，读回与手写的文件同一个解析器 | 你想要更像手写的格式时 |
+| 新文件的写法 | `description` 写 JSON 字符串；列表单行 `[a, b]`，含字母、数字、下划线、`._/-` 以外字符的项写 JSON 字符串；`subscribe` 写 JSON | `app/src/kernel/roleFiles.ts` | JSON 是 YAML 的子集，不用新增 YAML 依赖，读回与手写的文件同一个解析器 | 你想要更像手写的格式时 |
 | 编辑时的文件名 | 不随名字改 | `app/src/kernel/roleCommands.ts` | 手写的文件名可以和 name 不同；改名只改 name，不挪文件 | 同上 |
 | 删除 | 直接删除，不进回收站 | `app/src/kernel/roleCommands.ts` | 同删除会话（照 Claude：确认后永久删除） | 同上 |
 | 编辑时文件头的注释 | 不保留，表单上方提示 | `app/src/kernel/roleFiles.ts` | JSON 写法写不出注释；按字段重写比逐行修补简单 | 你的文件里常写注释时 |
 | 本节的说明与空状态 | 规格 §6.1、§6.2 的文字 | `app/src/renderer/src/components/ToolsAgents.tsx` | 规格没给的界面文字 | 你走查时 |
+| All MCP tools 写进文件的样子 | `mcp__*`（全部 MCP 工具；TaskBoard 规格 §4.1 为它放开） | `app/src/kernel/roles.ts`（tools 的校验） | 与基座的白名单同一个写法，以后加的 MCP 服务也算在内；另两个做法是表单不提供它，或按此刻的服务各写一个 `mcp__<服务>__*`（2026-10-26 已问负责人） | 负责人回答时 |
 
 ## 一键拉取模型
 

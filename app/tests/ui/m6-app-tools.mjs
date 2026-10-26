@@ -65,7 +65,8 @@ const MCP_SERVER = join(appRoot, 'tests', 'mcp-server', 'server.mjs');
 const PKG_SOURCE = '..\\..\\pkg';
 // 2026-10-26（负责人走查 M4）：用户级 AGENTS.md 从设置页挪来，是 Customize 的最后一节 Instructions，没有会话时也在。
 const NO_SESSION = 'No open session. Only user-level skills, plugins, and instructions are listed.';
-const WITH_SESSION = ['builtin', 'skills', 'mcp', 'plugins', 'agents'];
+// 2026-10-26（走查 M20）：Skills 之后加 Agents（roles，docs/specs/customize-agents.md §6.1），只在有会话时。
+const WITH_SESSION = ['builtin', 'skills', 'roles', 'mcp', 'plugins', 'agents'];
 const NOTICE = 'Changes apply to new sessions. Sessions already open aren’t affected.';
 const TRUST_NOTE = 'This workspace isn’t trusted, so its skills and settings aren’t listed';
 const DISABLED_BY_PROJECT = 'Turned off in this project’s .pi/settings.json. To change it, edit that file.';
@@ -1701,10 +1702,11 @@ async function keyboard(ctx) {
   const down = { current: (await toolsHead(page)).current, focus: (await focusDescriptor(page)).section };
   await page.keyboard.press('ArrowUp');
   const up = { current: (await toolsHead(page)).current, focus: (await focusDescriptor(page)).section };
-  record('分节列表里 ↓ ↑ 切换分节，焦点跟着走', down.current === 'mcp' && down.focus === 'mcp' && up.current === 'skills'
+  record('分节列表里 ↓ ↑ 切换分节，焦点跟着走（Skills 的下一节是 Agents）', down.current === 'roles' && down.focus === 'roles'
+    && up.current === 'skills'
     && up.focus === 'skills', JSON.stringify({ down, up }));
   await page.getByTestId('tools-page').getByRole('button', { name: 'Back to app' }).focus();
-  const walk = await tabWalk(page, 13);
+  const walk = await tabWalk(page, 14);
   record('技能一节：从"返回会话"按 Tab 走到"新建会话"、分节按钮、技能行和它的开关', walk.some((f) => f.text.includes('New session'))
     && walk.some((f) => f.section === 'mcp') && walk.some((f) => f.role === 'switch' && f.inTools)
     && walk.some((f) => f.text.includes('user-skill')), JSON.stringify(walk));

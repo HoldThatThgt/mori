@@ -29,17 +29,17 @@ export function agArgs() {
   return { suite: 'ag-app', exePath, only, file, shots };
 }
 
-/** @brief 提供商与模型（synthetic）：deepseek/deepseek-chat 写入等级 A；glm/glm-4.6 等级 C、窗口 32768；glm/glm-4.5 等级 A。 */
+/** @brief 提供商与模型（synthetic）：ds/deepseek-chat 写入等级 A；zg/glm-4.6 等级 C、窗口 32768；zg/glm-4.5 等级 A。 */
 export function seedAgentsUserData() {
   const userData = tempUserData('mori-ag-data-');
-  const deepseek = tbProvider('deepseek', PORTS.proxy, [tbModel('deepseek-chat')], { name: 'DeepSeek' });
-  const glm = tbProvider('glm', PORTS.proxy, [tbModel('glm-4.6', { contextWindow: 32768 }), tbModel('glm-4.5')],
+  const deepseek = tbProvider('ds', PORTS.proxy, [tbModel('deepseek-chat')], { name: 'DeepSeek' });
+  const glm = tbProvider('zg', PORTS.proxy, [tbModel('glm-4.6', { contextWindow: 32768 }), tbModel('glm-4.5')],
     { name: 'GLM' });
   seedTeamUserData(userData, {
     providers: [deepseek, glm],
-    groups: [{ id: 'strong', members: ['deepseek/deepseek-chat', 'glm/glm-4.6'] }],
-    normalDefault: 'deepseek',
-    profiles: { 'glm/glm-4.6': { tier: 'C' } },
+    groups: [{ id: 'strong', members: ['ds/deepseek-chat', 'zg/glm-4.6'] }],
+    normalDefault: 'ds',
+    profiles: { 'zg/glm-4.6': { tier: 'C' } },
   });
   return userData;
 }
@@ -80,8 +80,8 @@ export function prepareAgentProjects() {
   writeAgentFile(team, 'checker.md', { name: 'checker', description: 'Checks the work: runs "tests"\nand reports',
     tools: ['read', 'grep'], models: ['strong'], requires: ['protocol_write>=B'] }, 'Check the diff.\nRun the tests.');
   writeAgentFile(team, 'planner.md', { name: 'planner', description: 'Splits each request and closes it',
-    models: ['deepseek'], seats: ['create', 'close'] }, 'Plan the work.');
-  writeAgentFile(team, 'tiny.md', { name: 'tiny', description: 'Only runs on glm-4.6', models: ['glm/glm-4.6'],
+    models: ['ds'], seats: ['create', 'close'] }, 'Plan the work.');
+  writeAgentFile(team, 'tiny.md', { name: 'tiny', description: 'Only runs on glm-4.6', models: ['zg/glm-4.6'],
     requires: ['protocol_write>=B'] }, 'Tiny.');
   writeAgentFile(team, 'watcher.md', { name: 'watcher', description: 'Wakes up when a request closes',
     tools: ['read', 'mcp__*'], models: ['strong'], requires: ['context>=65536', 'vision'], differ_from: 'author',
@@ -94,7 +94,7 @@ export function prepareAgentProjects() {
   const edit = tempProject('mori-ag-edit-');
   writeAgentFile(edit, 'planner.md', { name: 'planner', description: 'Closes requests', seats: ['close'] }, 'Plan.');
   writeAgentFile(edit, 'commented.md', { name: 'commented', description: 'Written by hand', tools: ['read'],
-    models: ['deepseek'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] },
+    models: ['ds'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] },
   'Hand-written prompt.', 'hand-written header');
   return { team, broken, empty, edit };
 }

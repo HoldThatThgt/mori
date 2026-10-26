@@ -1,5 +1,6 @@
 // 工具页（标题"Customize"，docs/v0/screens/tools.md）：中栏换成工具页，顶部"Back to app"、标题和跟随的会话，
-// 下面一行说明改动对新建的会话生效；左边分节（Built-in tools、Skills、MCP、Plugins、Instructions），右边这一节的内容。
+// 下面一行说明改动对新建的会话生效；左边分节（Built-in tools、Skills、Agents、MCP、Plugins、Instructions），右边这一节的内容。
+// Agents（这个项目的 agent，docs/specs/customize-agents.md §6）只在有会话时出现，自己读 roles.get，不等 tools.get。
 // Instructions（用户级 AGENTS.md，2026-10-26 从设置页挪来，docs/v1/screens/customize-agents-md.md）是最后一节：
 // 没有会话时也在，不等 tools.get；记忆页的 Edit in Customize 落在它，侧栏进入落在第一节；换分节时有未保存的改动先问。
 // 跟随的是当前会话（分屏时焦点所在的那一栏）；工具页开着时在侧栏归档或删除了它，跟到剩下的那一栏。
@@ -14,6 +15,7 @@ import { useApp, type AppState } from '../state/store';
 import { loadTools, resetTools, useTools, useToolsNav, type ToolsSection } from '../state/tools';
 import { Icon } from '../icons';
 import { AgentsSection } from './AgentsSection';
+import { AgentsRolesSection } from './ToolsAgents';
 import { folderName, sessionTitle } from './ChatPane';
 import { BuiltinSection } from './ToolsBuiltin';
 import { McpSection } from './ToolsMcp';
@@ -21,18 +23,18 @@ import { PluginsSection } from './ToolsPlugins';
 import { SkillsSection } from './ToolsSkills';
 
 /** @brief 读 tools.get 的四节。 */
-type InfoSection = Exclude<ToolsSection, 'agents'>;
-/** @brief 工具页的分节：读 tools.get 的四节和 Instructions（agents，自己读 agents.get）。 */
+type InfoSection = Exclude<ToolsSection, 'agents' | 'roles'>;
+/** @brief 工具页的分节：读 tools.get 的四节、Agents（roles，自己读 roles.get）和 Instructions（agents，自己读 agents.get）。 */
 type Section = ToolsSection;
 
 /** 分节的文字 */
 const SECTION_TEXT: Record<Section, string> = {
-  builtin: 'Built-in tools', skills: 'Skills', mcp: 'MCP', plugins: 'Plugins', agents: 'Instructions',
+  builtin: 'Built-in tools', skills: 'Skills', roles: 'Agents', mcp: 'MCP', plugins: 'Plugins', agents: 'Instructions',
 };
 
 /** 有会话时的分节，按列表顺序 */
-const WITH_SESSION: Section[] = ['builtin', 'skills', 'mcp', 'plugins', 'agents'];
-/** 没有会话时的分节（内置工具和 MCP 只在有会话时才有） */
+const WITH_SESSION: Section[] = ['builtin', 'skills', 'roles', 'mcp', 'plugins', 'agents'];
+/** 没有会话时的分节（内置工具、Agents 和 MCP 只在有会话时才有） */
 const WITHOUT_SESSION: Section[] = ['skills', 'plugins', 'agents'];
 
 /** 没有跟随的会话时顶部的说明 */
@@ -131,15 +133,22 @@ function InfoContent({ section, tabKey }: { section: InfoSection; tabKey: string
   );
 }
 
-/** @brief 右边：Instructions 一节（不等 tools.get），或读 tools.get 的一节。 */
+/** @brief 右边一节的内容：Instructions 与 Agents（不等 tools.get），或读 tools.get 的一节。 */
+function SectionBody({ section, followed }: { section: Section; followed: Followed | null }) {
+  if (section === 'agents') {
+    return <AgentsSection project={followed && { sessionId: followed.sessionId, cwd: followed.cwd }} />;
+  }
+  if (section === 'roles') return <AgentsRolesSection sessionId={followed?.sessionId ?? null} />;
+  return <InfoContent section={section} tabKey={followed?.key ?? null} />;
+}
+
+/** @brief 右边：换分节时从头显示。 */
 function ToolsContent({ section, followed }: { section: Section; followed: Followed | null }) {
   // 换分节时从头显示（滚动位置、展开的行和表单都不带到别的分节）。
   return (
     <div className="tools-content" key={section}>
       <div className="tools-inner">
-        {section === 'agents'
-          ? <AgentsSection project={followed && { sessionId: followed.sessionId, cwd: followed.cwd }} />
-          : <InfoContent section={section} tabKey={followed?.key ?? null} />}
+        <SectionBody section={section} followed={followed} />
       </div>
     </div>
   );
