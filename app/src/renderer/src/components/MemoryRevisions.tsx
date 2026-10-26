@@ -9,8 +9,9 @@ import {
   type RevisionDetail, type RevisionRow, type RevisionRun,
 } from '../../../shared/memory';
 import { rollbackRevision, selectRevision, useMemory, useUnavailable } from '../state/memory';
+import { Markdown } from './Markdown';
 import { moveMenuFocus } from './menu';
-import { LoadError, MemoryMarkdown, unavailableTitle } from './MemoryCommon';
+import { LoadError, unavailableTitle } from './MemoryCommon';
 
 /** 改动前后的对照：上下合并、长行折行（同 Diff.tsx，M4） */
 const DIFF_OPTIONS = { diffStyle: 'unified', overflow: 'wrap' } as const;
@@ -125,7 +126,7 @@ function RevisionBody({ revision }: { revision: RevisionDetail }) {
       {revision.notes !== null && (
         <section className="memory-block">
           <h3 className="memory-label">Notes</h3>
-          <div className="memory-details"><MemoryMarkdown text={revision.notes} /></div>
+          <div className="memory-details"><Markdown text={revision.notes} /></div>
         </section>
       )}
       <div className="memory-actions">

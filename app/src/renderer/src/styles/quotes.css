@@ -158,16 +158,25 @@
 .file-header .icon-button { margin-left: 0; }
 .back-link { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; font-size: var(--fs-small); }
 .back-link svg { width: 14px; height: 14px; }
+/* 标题里的路径是按钮（2026-10-26 走查 M25）：点它复制完整路径；看起来仍是一行路径 */
 .file-path {
+  display: block;
   flex: 1;
   min-width: 0;
+  padding: 3px 6px;
   overflow: hidden;
+  border-radius: var(--radius-s);
   font-family: var(--font-mono);
   font-size: var(--fs-small);
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.panel-error { margin: 8px 16px 0; font-size: var(--fs-small); }
+.panel-error, .panel-status { margin: 8px 16px 0; font-size: var(--fs-small); }
+/* 右栏窄于 320px：顶部的"← Changes"只剩箭头（读屏名仍是"Changes"），给路径留地方 */
+@container (max-width: 319px) {
+  .back-link .back-text { display: none; }
+}
 .file-body { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .file-state { margin: 16px; font-size: var(--fs-body); }
 .file-path-full { font-family: var(--font-mono); overflow-wrap: anywhere; }
@@ -186,6 +195,8 @@
   white-space: pre-wrap;
 }
 .file-scroll { flex: 1; min-height: 0; overflow: auto; }
+/* Markdown 预览（2026-10-26 走查 M24）：与对话流同样的 .prose */
+.file-preview { padding: 14px 18px 24px; }
 .file-content {
   width: max-content;
   min-width: 100%;

@@ -623,13 +623,13 @@ async function copyPath(ctx) {
   await page.getByTestId('path-copied').waitFor({ timeout: 3000 }).catch(() => {});
   const copied = { text: await clipboardText(app), state: await viewerState(page) };
   await sleep(2600);
-  const later = await viewerState(page);
+  const faded = await viewerState(page);
   record('复制路径：路径是按钮（读屏名"Copy path <完整路径>"、悬停完整路径），读取中不可用；点它把完整路径放进剪贴板，'
     + '下方"Path copied to clipboard."约 2 秒后消失', before?.pathLabel.toLowerCase() === `copy path ${full}`.toLowerCase()
     && before.fullPath.toLowerCase() === full.toLowerCase() && before.path === 'docs/guide.md'
     && loading.length > 0 && loading.every(Boolean) && copied.text.toLowerCase() === full.toLowerCase()
-    && copied.state?.copied === 'Path copied to clipboard.' && later?.copied === '',
-  JSON.stringify({ before, loading, copied, later: later?.copied }));
+    && copied.state?.copied === 'Path copied to clipboard.' && faded?.copied === '',
+  JSON.stringify({ before, loading, copied, faded: faded?.copied }));
   const missing = await openFromCard(page, 'Write', 'docs/new.md', false);
   await page.getByTestId('file-path').click();
   await page.getByTestId('path-copied').waitFor({ timeout: 3000 }).catch(() => {});

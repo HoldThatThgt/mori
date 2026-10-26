@@ -39,6 +39,8 @@
   max-width: calc(100vw - var(--rail-width));
   box-shadow: -10px 0 35px #20365612;
 }
+/* 浮在上层时没有"Expand"（只在贴在右边时起作用，docs/v0/screens/layout.md"右栏展开"） */
+.right-panel.floating .panel-expand { display: none; }
 
 /* 放下提示：盖在目标上的一层，不挡住拖放 */
 .drop-hint {

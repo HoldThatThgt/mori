@@ -26,7 +26,13 @@ export const PANE_MIN = 280;
 export const NARROW_WIDTH = 1024;
 /** 收起后的图标栏宽度 */
 export const RAIL_WIDTH = 60;
-const LIMITS = { sidebar: { min: 180, max: 360 }, workspace: { min: 260, max: 800 } } as const;
+/** 左栏最窄的宽度 */
+export const SIDEBAR_MIN = 180;
+/**
+ * 两条分隔线的范围。右栏没有上限，只受"给中栏留出 centerMin"限制（2026-10-26 走查 M23，docs/v0/screens/layout.md
+ * "分隔线"：原来的 800px 上限去掉，占满用"Expand"）
+ */
+const LIMITS = { sidebar: { min: SIDEBAR_MIN, max: 360 }, workspace: { min: 260, max: Infinity } } as const;
 
 /** @brief 当前窗口宽度下的默认宽度（双击恢复）。 */
 export function defaultWidth(kind: DividerKind, windowWidth = window.innerWidth): number {

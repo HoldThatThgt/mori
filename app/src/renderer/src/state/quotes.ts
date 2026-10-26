@@ -123,6 +123,12 @@ export function showChanges(tabKey: string): void {
   updateTab(tabKey, (tab) => ({ ...tab, rightView: { kind: 'changes' } }));
 }
 
+/** @brief 右栏的"Expand" / "Collapse"（docs/v0/screens/layout.md"右栏展开"）。 */
+export function setRightExpanded(tabKey: string, expanded: boolean): void {
+  recordAction(expanded ? 'Expand right panel' : 'Collapse right panel');
+  updateTab(tabKey, (tab) => ({ ...tab, rightExpanded: expanded }));
+}
+
 /** @brief 这条助手回复所在一轮的开头（你的消息）的下标：载入时从这里开始，让这一轮完整可见。 */
 function turnStart(transcript: Transcript, index: number): number {
   for (let current = index; current >= 0; current -= 1) {

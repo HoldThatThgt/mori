@@ -87,6 +87,11 @@ export interface Tab extends ModelState {
   /** 右栏的视图 */
   rightView: RightView;
   /**
+   * 右栏展开（"Expand"，docs/v0/screens/layout.md"右栏展开"）：只在这个会话的右栏开着、贴在右边时起作用；
+   * 只在内存里，关上右栏时取消
+   */
+  rightExpanded: boolean;
+  /**
    * 等对话流处理的"Jump to source"（回复里的引用、会话引用的原会话）；itemKey 是要跳到的那一项，
    * keys 为要高亮的各项（会话引用的几轮）；没有时按引用的范围高亮
    */
@@ -189,7 +194,8 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
     trustSaveError: null, extensionErrors: [], pick: null, current: null, blocked: null,
     thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, pickLocked: false, contextUsage: null,
     approval: DEFAULT_APPROVAL, team: soloTeamState(false), board: emptyBoard(), transcript: emptyTranscript, draft: '',
-    draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
+    draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, rightExpanded: false,
+    transcriptJump: null,
     refPending: [], memoryNotice: null, phase: 'opening', error: null, ...fields };
 }
 
