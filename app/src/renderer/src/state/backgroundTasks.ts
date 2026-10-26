@@ -7,7 +7,7 @@ import type { TeamCommandResults } from '../../../shared/protocol';
 import { roleLabel, type SessionOf } from '../../../shared/team';
 import { recordAction } from './actionLog';
 import { describe, request } from './bridge';
-import { updateTab, useApp, type RightTab, type TasksAt, type TasksBack } from './store';
+import { updateTab, useApp, type RightTab, type Tab, type TasksAt, type TasksBack } from './store';
 
 /** @brief 操作记录里打开一条会话的写法（§13.13.6）：`View transcript: T1 · <role>` / `View transcript: Request 1 · closing`。 */
 function transcriptAction(of: SessionOf): string {
@@ -57,6 +57,16 @@ export function setFinishedOpen(tabKey: string, open: boolean): void {
   updateTab(tabKey, (tab) => ({ ...tab, tasks: { ...tab.tasks, finishedOpen: open } }));
 }
 
+/**
+ * @brief 读与停止用的会话 id。后台进程退出后会话没有 id，命令照发：进程桥在退出之后对任何命令都以原文失败
+ *        （“Mori’s background process crashed (exit code 1)”），视图显示它与 Retry（§13.13.3、§13.13.4、§13.13.7）。
+ *        会话还在打开时为 null：等它打开之后再读。
+ */
+export function commandSession(tab: Tab): string | null {
+  if (tab.sessionId) return tab.sessionId;
+  return useApp.getState().kernel === 'exited' ? '' : null;
+}
+
 /** @brief board.readTask（只读，不记操作）。 */
 export function readTask(sessionId: string, task: string): Promise<TeamCommandResults['board.readTask']> {
   return request<TeamCommandResults['board.readTask']>({ type: 'board.readTask', sessionId, task });
@@ -87,13 +97,14 @@ export const stopKey = (tabKey: string, task: string): string => `${tabKey}|${ta
  */
 export async function stopTask(tabKey: string, task: string): Promise<void> {
   const tab = useApp.getState().tabs.find((item) => item.key === tabKey);
-  if (!tab?.sessionId) return;
+  const sessionId = tab ? commandSession(tab) : null;
+  if (sessionId === null) return;
   const key = stopKey(tabKey, task);
   useStopState.setState({ [key]: { stopping: true, error: null } });
   let error: string | null;
   try {
-    error = (await request<TeamCommandResults['session.stopTask']>({ type: 'session.stopTask',
-      sessionId: tab.sessionId, task })).error;
+    error = (await request<TeamCommandResults['session.stopTask']>({ type: 'session.stopTask', sessionId,
+      task })).error;
   } catch (thrown) {
     error = describe('session.stopTask', thrown);
   }

@@ -88,7 +88,8 @@ export function taskViewOf(ctx) {
         head: el.querySelector('.bg-handoff-head')?.textContent ?? '', text: el.textContent,
         evidence: [...el.querySelectorAll('.bg-line')].map((line) => line.textContent),
         transcript: Boolean(el.querySelector('[data-action="view-transcript"]')) })),
-      loading: root.textContent.includes('Loading…'), error: root.querySelector('.bg-error')?.textContent ?? null,
+      loading: root.textContent.includes('Loading…'),
+      error: root.querySelector('.bg-read-error')?.textContent ?? null,
     };
   }, null, { timeout: 2000 }).catch(() => null);
 }
@@ -119,7 +120,8 @@ export function transcriptOf(ctx) {
     tools: [...root.querySelectorAll('[data-testid="tool-card"]')].map((el) => ({
       title: el.querySelector('.tool-title')?.textContent ?? '', status: el.dataset.status })),
     doing: root.querySelector('.bg-doing .stage-text')?.textContent ?? null,
-    empty: root.textContent.includes('No activity yet'), error: root.querySelector('.bg-error')?.textContent ?? null,
+    empty: root.textContent.includes('No activity yet'),
+    error: root.querySelector('.bg-read-error')?.textContent ?? null,
     loading: root.textContent.includes('Loading…'), composer: Boolean(root.querySelector('textarea')),
     replyActions: Boolean(root.querySelector('[data-testid="reply-actions"]')),
     approval: Boolean(root.querySelector('[data-testid="approval-card"]')),

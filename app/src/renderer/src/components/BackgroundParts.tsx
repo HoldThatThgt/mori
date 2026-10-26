@@ -107,7 +107,7 @@ export function BackRow({ tab, back }: { tab: Tab; back: TasksBack }) {
 /** @brief 读不到时的原文与 Retry。 */
 export function ReadError({ text, detail, onRetry }: { text: string; detail: string | null; onRetry: () => void }) {
   return (
-    <div className="bg-error" role="alert">
+    <div className="bg-error bg-read-error" role="alert">
       <div>{text}</div>
       {detail && <pre className="bg-error-detail">{detail}</pre>}
       <button type="button" className="text-link" data-action="retry" onClick={onRetry}>Retry</button>

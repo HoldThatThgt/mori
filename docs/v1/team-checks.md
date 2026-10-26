@@ -149,7 +149,47 @@
 
 ### 状态
 
-规格与状态表负责人 2026-10-26 确认；实现要等走查修复会话把 WP-09、WP-10、WP-14 合进本地 `app-v0` 之后再开始。
+规格与状态表负责人 2026-10-26 确认。2026-10-26 负责人的新规则（AGENTS.md“不留未完成项，不做规格外的东西”）之后不再等：
+不依赖 WP-09、WP-10、WP-14 的部分现在做完，依赖的部分在那个包合并之后做（下面“等别的包的”）。
 
 测试按 AGENTS.md 测试分层（2026-10-26 改，规格 §17.3 最后一条）：每次改动只跑 check、构建、单元、`test:quick` 和新用例的 `--only`；
 fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `tb-app-tasks*.mjs` 与覆盖检查留到负责人要求推送前的完整回归。
+
+### 实现（2026-10-26）
+
+- 后台进程（ad3e55d）：`board.readTask`、`board.readSession`、`session.stopTask`；`TaskView` 加 `createdAt`、`closedAt`、`dependsOn`、
+  `sessionRoles`，`RequestView` 加 `closeSession`；`read_session` 与 `board.readSession` 共用一个读法（开着取内存里的分支，
+  没开着用 pi 的纯读取路径读文件）；停止一个 task 是 Stop team 只作用于这个 task（清它的投递队列、等它的以
+  `Stopped by the user.` 结束、`stopped` 且持有者保留、写入锁照旧）。
+- 界面（748d9f3 与之后一次提交）：右栏的 `Changes` / `Background tasks` 页签、`Running` / `Finished` 列表、task 的视图、只读的
+  实例会话与结案会话（复用对话流的 `ItemView`）、阶段行的 `{n} running tasks` 按钮、进展摘要的两种链接、`Stop this task`、
+  F8 的操作记录；回放桥把两个只读命令当作只读查询。
+- 做的时候补进规格与状态表的（都在 M14 和负责人的回答之内）：结案会话写的一棒总有 `View transcript`（结案的交接不记会话位置）；
+  有页签时 `Expand` / `Collapse` 与关闭只在页签那一行（WP-13 之后）；后台进程退出后读与停止照发、显示进程桥的原文与 `Retry`；
+  TB-88 的套件改名 `tb-app-tasks-owner.mjs`（`spec-ids` 把名字含 `real` 的界面测试算真实层）；TB-46 的单元测试不再要求编号只到 TB-57。
+
+### 测试（AGENTS.md 测试分层，每次改动的那几层）
+
+| 层 | 结果 |
+| --- | --- |
+| `npm run check` | 通过 |
+| 构建 | `node tests/ui/tb-build.mjs tasks` 通过 |
+| `npm run test:unit` | 461/461（含 `spec-ids`：TB-80–TB-89 列出的每一层都有测试；MP-38：新加的行里没有推迟实现的标记） |
+| `npm run test:tb-unit` | 357/357（新：`tasks.test.mjs` 14 项、`taskList.test.mjs` 9 项） |
+| `tb-app-tasks.mjs --only` | plain、empty、entries、list、taskview、transcript、keys、stop、readonly、reload、approval、errors、restart 每一步最近一次都通过（分几次跑，端口 4950–4951；结果是 `tb-partial-app-tasks.json`，不计入覆盖检查） |
+| `tb-app-tasks-owner.mjs`（TB-88） | 通过：`Finished` 里 T6–T1 全是 Done、没有 `Running`；T2 3 条、T5 1 条、T6 2 条消息全文（T6 两条含表格）；T1–T6 与结案会话都能打开，T4（约 1 MB）的会话 261 ms 显示完；没有发模型请求。只复制那条会话的文件与 `teams/<id>`，没有读 `credentials.json`、`pi/auth.json` |
+| `npm run test:quick` | 没跑：走查第二波的集成会话占着快速集的端口（走查修复会话 2026-10-26 的要求），合进 `app-v0` 时跑 |
+| 整套 `tb-app-tasks*.mjs`、`tb-replay`、TB-46 汇总、`spec-coverage --spec taskboard` | 负责人要求推送前的完整回归里跑（测试分层第 3 条） |
+
+### 等别的包的（包一合并就做）
+
+- WP-09（模型菜单里的 Task mode）：`See background tasks`（TB-80）。用例 `tb-app-tasks.mjs` 的 `menu` 一步已写好，现在不跑。
+- WP-14（一轮结束后折叠步骤）：实例会话里的步骤照对话流折叠（§13.13.4）。
+- WP-10（发给模型的文字）：TB-89 的 fixture `tests/fixtures/tb/stop-task.json`（`tb-record.mjs --only stop-task`）与
+  `tb-real.mjs --only stop`，脚本都已写好；WP-10 改了模型读的文字，在它之前录的要重录，所以等它。在那之前 `tb-replay` 的
+  TB-89 记 “replay fixture missing”。
+
+### 没有验证的
+
+- `No activity yet` 只在单元层：界面里只有实例会话刚建好、pi 还没写下投递的那一瞬间是这样，App 测试造不出稳定的这一刻。
+- 真实桌面上的样子（间距、颜色、窄栏）：截图在 `test-results/tb-app-tasks/`，留给负责人走查。

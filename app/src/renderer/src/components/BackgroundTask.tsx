@@ -4,7 +4,7 @@
 
 import { useCallback, useState } from 'react';
 import { roleLabel, type TaskDetail } from '../../../shared/team';
-import { readTask, showTasksAt } from '../state/backgroundTasks';
+import { commandSession, readTask, showTasksAt } from '../state/backgroundTasks';
 import type { Tab } from '../state/store';
 import {
   closeButton, dependencyLine, evidenceLine, handoffHead, messageHead, type TaskContext,
@@ -99,13 +99,15 @@ export function BackgroundTask({ tab, task }: { tab: Tab; task: string }) {
   const context = taskContext(tab);
   const now = useNow(listed?.task.closedAt === null);
   const load = useCallback(() => {
-    if (!tab.sessionId) return;
-    readTask(tab.sessionId, task).then((result) => setRead(result.error || !result.task
+    const sessionId = commandSession(tab);
+    if (sessionId === null) return;
+    readTask(sessionId, task).then((result) => setRead(result.error || !result.task
       ? { status: 'error', error: result.error ?? `${task} does not exist.` }
       : { status: 'ready', detail: result.task }),
     (error: unknown) => setRead({ status: 'error', error: error instanceof Error ? error.message : String(error) }));
   }, [tab.sessionId, task]);
-  useThrottledRead(JSON.stringify(listed?.task ?? null), load);
+  // 会话重新打开（后台进程重启）之后也重新读
+  useThrottledRead(JSON.stringify([tab.sessionId, listed?.task ?? null]), load);
   const detail = read.status === 'ready' ? read.detail : null;
   const readOnly = detail?.readOnly ?? false;
   return (

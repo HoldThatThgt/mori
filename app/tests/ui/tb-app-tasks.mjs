@@ -5,8 +5,8 @@
 //   TB-86 界面文字与键盘、TB-87 现有功能不退步、TB-89 停止一个 task。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs tasks）：
 //   MORI_APP_DIR=.tb-runs/tasks node tests/ui/tb-app-tasks.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
-// 步骤：plain、empty、entries、list、taskview、transcript、keys、stop、readonly、reload、approval、menu、restart
-// （entries 到 reload 共用一个会话，按这个顺序；restart 最后跑，重启 App）。
+// 步骤：plain、empty、entries、list、taskview、transcript、keys、stop、readonly、reload、approval、menu、errors、restart
+// （entries 到 reload 共用一个会话，按这个顺序；errors 让后台进程退出，restart 最后跑，重启 App）。
 // 结果写到 test-results/tb-app-tasks(-packaged).json（--only 时 tb-partial-app-tasks…），截图在 test-results/tb-app-tasks/。
 // 端口（§17.3：tb-app-tasks*.mjs 用 4950–4959）：合成端点 4950，记录代理 4951。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里写好一个本机提供商（写入等级 A、能关思考，跳过探针）；
@@ -18,9 +18,9 @@ import {
   TASKS_CONCLUSION, TASKS_MESSAGE, TASKS_OPEN_ITEM,
 } from '../fake-endpoint/scenarios/tasks.mjs';
 import {
-  allowAll, bridge, brief, closeTbApp, instanceFiles, missingSteps, openSessionIn, paneSel, paneState, poll,
-  progressOf, readBoard, reopenSession, restartTbApp, scenarioLines, seedTeamUserData, sendMessage, shot, showTab,
-  sleep, SPLIT_ROLES, startTbApp, startTbEndpoint, stopTbEndpoint, suiteArgs, tbModel, tbProvider, tbRecorder,
+  allowAll, bridge, brief, closeTbApp, instanceFiles, killTbKernel, missingSteps, openSessionIn, paneSel, paneState,
+  poll, progressOf, readBoard, reopenSession, restartTbApp, scenarioLines, seedTeamUserData, sendMessage, shot,
+  showTab, sleep, SPLIT_ROLES, startTbApp, startTbEndpoint, stopTbEndpoint, suiteArgs, tbModel, tbProvider, tbRecorder,
   teamDir, tempProject, tempUserData, userSession, waitApprovalCard, waitTeamIdle, writeRoles,
 } from './tb-helpers.mjs';
 import {
@@ -608,6 +608,46 @@ async function menu(ctx) {
   brief({ text, menuGone, tabs }));
 }
 
+// ---------- TB-82、TB-83、TB-89：读不到、停不了 ----------
+
+/**
+ * @brief 后台进程退出之后的三种失败（之后的请求都失败；restart 一步重启 App）：停止的那一行 Couldn’t stop T1: …、
+ *        task 视图的 Couldn’t load T1: … 与 Retry、会话的 Failed to read session transcript 与原文和 Retry。
+ */
+async function errors(ctx) {
+  const project = tempProject('mori-tb-tasks-errors-');
+  writeRoles(project, SPLIT_ROLES);
+  const who = await begin(ctx, project, `Read slowly ${tag('restart')}`);
+  await poll(() => scenarioLines(ctx.ep, 'tb-tasks-restart', { agent: 'executor', kind: 'task', task: 'T1' })
+    .some((line) => line.j === 2), 60000);
+  await dialogIdle(ctx, who);
+  await openList(ctx, who);
+  await killTbKernel(ctx);
+  await sleep(1000);
+  await ctx.page.locator('[data-testid="bg-task"][data-task="T1"] [data-action="stop-task"]').click();
+  const stop = await waitCard(ctx, 'T1', (card) => card.error !== null, 10000);
+  record('TB-89 a stop that fails shows "Couldn’t stop T1: <the error>" under the card',
+    stop?.error?.startsWith('Couldn’t stop T1: ') && stop.error.length > 'Couldn’t stop T1: '.length, brief(stop));
+  await clickCard(ctx, 'T1');
+  const view = await poll(async () => {
+    const value = await taskViewOf(ctx);
+    return value?.error ? value : null;
+  }, 10000);
+  const retry = await ctx.page.locator('[data-testid="bg-task-view"] [data-action="retry"]').count();
+  record('TB-82 a task view that cannot be read shows "Couldn’t load T1: <the error>" and Retry',
+    view?.error?.startsWith('Couldn’t load T1: ') && retry === 1, brief({ error: view?.error, retry }));
+  await clickBack(ctx);
+  await openTranscript(ctx, '[data-testid="bg-task"][data-task="T1"] .bg-task-links', null);
+  const read = await poll(async () => {
+    const value = await transcriptOf(ctx);
+    return value?.error ? value : null;
+  }, 10000);
+  const again = await ctx.page.locator('[data-testid="bg-transcript"] [data-action="retry"]').count();
+  record('TB-83 a transcript that cannot be read shows "Failed to read session transcript", the error and Retry',
+    read?.error?.startsWith('Failed to read session transcript') && read.error.length > 40 && again === 1,
+    brief({ error: read?.error, again }));
+}
+
 // ---------- TB-85 重启 ----------
 
 /** @brief App 重启之后非终态的 task 显示 Stopped (Mori restarted)，在 Finished，会话从文件读出（TB-85）。 */
@@ -632,7 +672,7 @@ async function restart(ctx) {
 // ---------- 主流程 ----------
 
 const steps = { plain, empty, entries, list, taskview, transcript, keys, stop, readonly, reload, approval, menu,
-  restart };
+  errors, restart };
 
 const ctx = { userData: tempUserData('mori-tb-tasks-data-'), exePath: args.exePath, pageErrors: [] };
 try {

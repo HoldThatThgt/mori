@@ -124,7 +124,9 @@
 
 规格没给、本表定的（都是临时，走查时可以改）：`Finished` 按编号从大到小；依赖一行的状态文字；读取中的 `Loading…`；
 会话读到新内容时在底部就跟随；重新打开后右栏回到 `Changes`；停止中按钮不可用；进展摘要标题行的链接用引用跳转的高亮；
-有页签时 `Expand` / `Collapse`、`Close panel` 只在页签那一行（文件阅读器那一行不重复，WP-13 合入后加）。
+有页签时 `Expand` / `Collapse`、`Close panel` 只在页签那一行（文件阅读器那一行不重复，WP-13 合入后加）；
+后台进程退出后（会话没有 id）读与停止照发，进程桥以原文失败，视图显示 `Couldn’t load T1: Mori’s background process crashed (exit code 1)`
+等与 `Retry`（不停在 `Loading…`）；`Running` 的节头只是一行字，`Finished` 的节头是按钮。
 
 ## 界面测试用的标识
 

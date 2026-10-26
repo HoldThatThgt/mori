@@ -6,7 +6,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { SessionEntry } from '../../../shared/protocol';
 import type { SessionOf } from '../../../shared/team';
-import { readSession } from '../state/backgroundTasks';
+import { commandSession, readSession } from '../state/backgroundTasks';
 import type { Tab, TasksBack } from '../state/store';
 import { doingText, modelLine, noActivity, sessionTranscript, transcriptTitle } from '../state/taskList';
 import { BackRow, ReadError, findListed, taskContext, useThrottledRead } from './BackgroundParts';
@@ -64,8 +64,9 @@ export function BackgroundTranscript({ tab, of, back }: { tab: Tab; of: SessionO
   const listed = of.kind === 'task' ? findListed(tab.board, of.task) : null;
   const request = tab.board.requests.find((item) => item.no === (of.kind === 'close' ? of.request : -1));
   const load = useCallback(() => {
-    if (!tab.sessionId) return;
-    readSession(tab.sessionId, of).then((result) => setRead(result.error
+    const sessionId = commandSession(tab);
+    if (sessionId === null) return;
+    readSession(sessionId, of).then((result) => setRead(result.error
       ? { status: 'error', error: result.error }
       : { status: 'ready', entries: result.entries, running: result.running }),
     (error: unknown) => setRead({ status: 'error', error: error instanceof Error ? error.message : String(error) }));
@@ -73,7 +74,7 @@ export function BackgroundTranscript({ tab, of, back }: { tab: Tab; of: SessionO
   }, [tab.sessionId]);
   // 运行中（或还没有条目）时随这个 task（结案会话：这个需求）的视图重新读；运行结束后停在最后的样子
   const live = read.status === 'loading' || (read.status === 'ready' && (read.running || noActivity(read.entries)));
-  useThrottledRead(JSON.stringify(listed?.task ?? request ?? null), load, live);
+  useThrottledRead(JSON.stringify([tab.sessionId, listed?.task ?? request ?? null]), load, live);
   const running = read.status === 'ready' && read.running;
   return (
     <div className="panel-body bg-body" data-testid="bg-transcript" data-kind={of.kind}
