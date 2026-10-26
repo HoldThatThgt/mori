@@ -2,6 +2,7 @@
 // （和 Ollama 的 POST /api/show），每个请求限时、限量、不跟随重定向，服务原文里的 key 换成 ***；
 // 合并同一个提供商同时进行的列表与种类判断，限制每个 origin 同时进行的请求。
 // models.discover 命令同一时刻只有一次、可取消；探针第 0 步（单模型模式）与读版本共用这个读取器，但不被命令取消。
+// 服务没报告的窗口、最大输出、是否支持思考按服务地址取 pi 自带的模型表（§4.4，2026-10-26；查表在 piCatalog.ts）。
 
 import type { ApiType, DiscoverListError, DiscoverResult, DiscoveredModel, ServerKind } from '../shared/models';
 import {
@@ -14,6 +15,7 @@ import {
 } from './discoverRead';
 import type { ServerMeta, ServerRead, VersionRead } from './modelProfiles';
 import type { ModelTimings } from './modelTimings';
+import { catalogEntry } from './piCatalog';
 
 // ---- 常量（§11，登记在 docs/v1/defaults.md “一键拉取模型”；请求的时限在 modelTimings.ts） ----
 
@@ -637,16 +639,21 @@ async function readDetails(ctx: Ctx, scope: DetailScope): Promise<DetailSet> {
 }
 
 /**
- * @brief 发现的模型（§4.1、§4.3、§5.2）：每行合并详情后读，LoRA 行用 parent 的窗口，再补默认值。
+ * @brief 发现的模型（§4.1、§4.3、§4.4、§5.2）：每行合并详情后读，LoRA 行用 parent 的窗口，服务没报告的项取 pi 自带的
+ *        模型表（按 base 的 origin 与这一行的 id），再补默认值。
+ * @param base 读的服务的地址（ReadTarget.base）
  * @param configured 已有提供商配置里的模型 id（added）
  */
-function buildModels(read: ListRead & { listed: Listed }, set: DetailSet,
+function buildModels(read: ListRead & { listed: Listed }, set: DetailSet, base: string,
   configured: readonly string[]): DiscoveredModel[] {
   const ctx = { kind: read.kind, anthropicShape: read.listed.anthropicShape };
   const rows = set.rows.slice(0, LIST_MAX);
-  const values = parentWindows(read.kind, rows, rows.map((row) => readRow(row, ctx, set.details.get(rowId(row)))));
+  const catalogs = rows.map((row) => catalogEntry(base, rowId(row)));
+  const values = parentWindows(read.kind, rows, rows.map((row, index) => readRow(row, ctx,
+    set.details.get(rowId(row)), catalogs[index]?.contextWindow ?? null)));
   return rows.map((row, index) => finalizeModel(rowId(row), values[index], {
     trained: set.details.get(rowId(row))?.trained === true, added: configured.includes(rowId(row)),
+    catalog: catalogs[index],
   }));
 }
 
@@ -796,7 +803,8 @@ export class DiscoverReader {
     const rows = parent ? [row, parent] : [row];
     const set = await readDetails(ctx, { read: scoped, rows, bodies, single: modelId });
     const ids = new Set(rows.map(rowId));
-    const models = buildModels(scoped, { ...set, rows: set.rows.filter((item) => ids.has(rowId(item))) }, []);
+    const models = buildModels(scoped, { ...set, rows: set.rows.filter((item) => ids.has(rowId(item))) },
+      target.base, []);
     return serverRead(read.kind, version, models.find((model) => model.id === modelId) ?? null);
   }
 
@@ -851,7 +859,7 @@ export class DiscoverReader {
     const listedIds = new Set(read.listed.rows.map(rowId));
     return {
       ...empty, server: { kind: read.kind, version }, baseUrl: read.listed.attempt.suggestedBase,
-      anthropicShape: read.listed.anthropicShape, models: buildModels(scoped, set, request.configured),
+      anthropicShape: read.listed.anthropicShape, models: buildModels(scoped, set, request.base, request.configured),
       truncated: read.listed.truncated, notListed: request.configured.filter((id) => !listedIds.has(id)),
     };
   }

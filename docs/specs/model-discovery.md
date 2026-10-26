@@ -7,6 +7,10 @@
 本文给出临时默认值，登记在 [v1/defaults.md](../v1/defaults.md) 的“一键拉取模型”一节（§11）。检查记录、实测结果与未验证项在
 [v1/discovery-checks.md](../v1/discovery-checks.md)。
 
+2026-10-26 改（负责人走查回答 1，[WP-15](../v1/walkthrough-1026/WP-15.md)）：服务没报告的窗口、最大输出与是否支持思考，
+按服务地址从 pi 自带的模型表取（§0 第 2 条、§4.4）；清单与模型行标出取自 pi 的值（§6.2、§8），验收 MD-16、MD-17。
+改动的段落都标了“2026-10-26”。
+
 本文扩展 [统一模型提供商构建规格](model-providers.md)（下称“模型层规格”）：配置、编译、选择器、模型池、探针的判定都不变；
 本文改到的模型层规格条目在那边注明“（2026-10-23 注：见 model-discovery.md §n）”。在 [app-v0](../app-v0.md) §6“后台进程只做八件事”里属于第 6 件（模型层）。
 
@@ -20,12 +24,18 @@
 - 一次加入多个模型：`models.saveProvider`、`models.firstRun` 收多个模型，新命令 `models.addModels`（§5.4）；
 - 探针第 0 步改用读取器，档案记下服务报告的输出上限、思考、图片（§7）；
 - 模型行上的“not reported”和“Server reports …”提示与一键采用（§8）；
+- 服务没报告的窗口、最大输出、是否支持思考按服务地址取 pi 自带的模型表，清单与模型行标出（§4.4、§6.2、§8；2026-10-26，负责人走查回答 1）；
 - 现有测试随之调整（§13.4）。
 
 **已定的**（proposal §12，2026-10-23）：
 
 1. 拉取后先列出清单再加入；不是全部直接加入。
 2. 字段只用服务报告的值，没报告的用默认值并标出；不查 pi 自带的模型目录，不按模型名猜。
+   （2026-10-26 改，负责人走查回答 1，推翻上面的“不查 pi 自带的模型目录”：“模型列表只给名字时（z.ai），上下文窗口、
+   最大输出和是否支持思考按服务地址从 pi 自带的模型表取（api.z.ai 取 z.ai 的条目），不按模型名猜；仍是猜的值标
+   "(default)"。”现在：先用服务报告的值；服务没报告的窗口、最大输出、是否支持思考，pi 按地址认得这个服务（同一个 origin）
+   并且有这个 id 时取 pi 的条目，标“From pi”（§4.4）；再没有的用默认值并标“Default”/“(default)”。从不只按模型名对：
+   同一个 id 在 OpenRouter、Bedrock、Cloudflare 上是别的条目、上限不同。proposal §12 第 2 条同日改。）
 3. API type 自动识别，认不出才让你选，结果可以改。
 4. 服务不报告类型时：只有一个模型就勾上，多个都不勾，提供 Select all（proposal §12 第 4 条）。
 5. 加入的模型全部自动跑探针，清单底部写明代价（第 5 条）。
@@ -53,6 +63,7 @@
 | 清单 | checklist，`settings/Checklist.tsx` | §6.2 |
 | 列表请求 | list request | 读模型列表的那个 GET（§3.2） |
 | 详情请求 | extra request | 按种类再读的接口（§4.2） |
+| pi 自带的模型表（2026-10-26） | catalog，`kernel/piCatalog.ts` | pi-ai 内置提供商的模型条目，按服务地址的 origin 查（§4.4）；界面写“pi’s model list” |
 
 ## 2. 组件与代码落点
 
@@ -64,7 +75,8 @@
 | 命令 | `kernel/modelCommands.ts` | `models.discover`、`models.discoverCancel`、`models.addModels`；`saveProvider`、`firstRun` 收多个模型；`saveModel` 只改不加（§5） |
 | 探针第 0 步 | `kernel/probes.ts` | `detectServer`、`judgeServer` 改为调用读取器的单模型模式（§7.1）；`propsWindow`、`versionField`、`getJson` 移到 `discoverRead.ts`、`modelDiscover.ts` |
 | 时长 | `kernel/modelTimings.ts` | 发现请求的时限（§11） |
-| 档案 | `kernel/modelProfiles.ts` | `auto.meta` 与 `ProfileView.reported`（§7.2）；`ServerKind` 的 zod 枚举 |
+| 档案 | `kernel/modelProfiles.ts` | `auto.meta` 与 `ProfileView.reported`（§7.2）；`ServerKind` 的 zod 枚举；`ProfileView.catalog`（§7.2，2026-10-26） |
+| pi 的模型表（2026-10-26） | `kernel/piCatalog.ts`（新） | 按 origin 建 pi 内置模型条目的索引、按地址加 id 查（§4.4）；发现代码里只有它 import pi-ai 的运行时。取哪几项的规则在 `discoverRead.ts`（`fromCatalog`），读取器（§5）与档案视图（§7.2）共用 |
 | 进程桥 | `shared/models.ts` | `ServerKind`、`SERVER_KIND_LABELS`、`DiscoveredModel`、`DiscoverResult`、新命令与改动的命令 schema（§5） |
 | 界面 | `renderer/src/components/settings/ProviderForm.tsx`、`Checklist.tsx`（新）、`ModelRows.tsx`、`Providers.tsx`、`FirstRunForm.tsx`；`state/settings.ts`、`state/actionLog.ts` | §6、§8；screens 见 [models-settings.md](../v1/screens/models-settings.md)、[first-run.md](../v1/screens/first-run.md) |
 
@@ -168,6 +180,9 @@
 - vLLM、SGLang 的 LoRA 行（`parent` 不为 null 且没有窗口）用 `parent` 那一行的窗口。
 - `reported` 逐个字段记：`contextWindow`、`maxTokens` 有服务报告的值为真；`reasoning`、`image` 有服务报告的值或明确报告“没有”为真；`family` 有值为真。
 - 工具支持只作提示，不进配置，探针照旧判定（模型层规格 §7.3 第 3、4 步）。
+- （2026-10-26 改，负责人走查回答 1：`contextWindow`、`maxTokens`、`reasoning` 三行“没报告时”先按 §4.4 取 pi 自带的模型表，
+  没取到才是这一列的默认值；`maxTokens` 的“不小于 `contextWindow`”在服务没报告窗口、窗口取自 pi 时按 pi 的窗口比。
+  `reported` 不变：取自 pi 的项仍为假。）
 
 ### 4.2 按种类合并详情
 
@@ -191,6 +206,41 @@
 
 - 模型 id 不符合模型层规格 §4.1（空、含空白）的行照样列出，但不能勾选，`unusable` 写原因。
 - `maxTokens` 最后再检查一次：不小于窗口时按“没报告”重新取默认值（你在清单里改了窗口后，界面按同样的规则检查，§6.2）。
+
+### 4.4 pi 自带的模型表（2026-10-26，负责人走查回答 1，WP-15）
+
+负责人原话：“模型列表只给名字时（z.ai），上下文窗口、最大输出和是否支持思考按服务地址从 pi 自带的模型表取（api.z.ai 取
+z.ai 的条目），不按模型名猜；仍是猜的值标 "(default)"。”
+
+- **模型表**：pi-ai 1.3.0 的内置提供商（`@earendil-works/pi-ai/providers/all` 的 `builtinProviders()`，按 pi 列出的顺序）
+  各自 `getModels()` 给出的聊天模型条目；每个条目有 pi 给这个服务发请求用的 `baseUrl`，以及 `id`、`contextWindow`、
+  `maxTokens`、`reasoning`。pi 没有“地址 → 提供商”的查询（它按地址调整请求时，`openai-completions` 的 `detectCompat`
+  看的也是 `baseUrl` 里的主机），所以按条目自己的 `baseUrl` 认服务。`baseUrl` 不是 http(s) URL 的条目（Azure 的条目没有
+  地址）、窗口或最大输出不是正整数的条目不算；带占位的地址照常只比 origin（Cloudflare 的账户 id 在路径里，Google Vertex
+  的 `{location}` 在主机里，不会与真实的地址相同）。
+- **对上**：提供商的地址与条目的 `baseUrl` 是同一个 origin（协议、主机、端口），并且模型 id 与条目的 `id` 完全相同
+  （区分大小写）。路径与 API type 不比：z.ai 的 Anthropic 地址 `https://api.z.ai/api/anthropic` 与 pi 的 Z.AI 条目
+  （`https://api.z.ai/api/coding/paas/v4`，OpenAI 兼容）是同一个 origin，glm-5.3 取 Z.AI 的条目（1,000,000、131,072、
+  支持思考）。提供商的地址：新提供商为 §3.1 整理后的 base，已有提供商与档案视图（§7.2）为配置里的 `baseUrl`；
+  §3.2 补 `/v1` 不改 origin。
+- **从不只按名字**：别的地址上同名的模型（OpenRouter、Bedrock、Cloudflare 上的 GLM-5.3）取那个地址自己的条目，没有时
+  不取，从不取 Z.AI 的；pi 不认得的地址（自建的 vLLM、公司的 One API / New API 网关、OpenRouter 式的聚合服务）上，
+  列表里的 id 与 pi 某个条目相同也不取。
+- **一个 origin 下几个条目都是这个 id**（pi 的几个提供商共用一个 origin，例如 opencode.ai 的 OpenCode Zen 与 OpenCode Go）：
+  三项（窗口、最大输出、是否支持思考）都相同时取，提供商名用 pi 列出的第一个；不同时都不取，按没报告。
+- **取哪几项**：只取回答里的三项，并且只取服务没报告的那一项（§4.1 的 `reported` 为假；服务明确报告“没有思考”时不取）：
+  - 窗口：条目的 `contextWindow`；
+  - 最大输出：条目的 `maxTokens`，只在它小于这一行最后的窗口（服务报告的或取自 pi 的）时取，否则按 §4.3 取默认值；
+  - 支持思考：条目的 `reasoning` 为真时取（勾上）；为假时同没报告（不勾），不算取了。
+  - 不取：图片输入（回答没说）、模型族、是不是聊天模型、价格，以及 pi 的兼容选项与思考档位（`thinkingLevelMap`：pi 的
+    Z.AI 条目是 OpenAI 兼容地址、没有 Off，z.ai 的 Anthropic 地址却能关掉思考；能不能关仍由探针第 2 步判定，模型层规格
+    §7.7）。
+- 取自 pi 的值**不是**服务报告的：`reported` 照旧为假，结果另记 `catalog`（§5.2）；档案的 `reported`、`meta`（§7.2）仍只记
+  服务报告的。有效窗口仍是配置与服务报告中较小的（模型层规格 §7.2），pi 的值不参与。
+- 不发请求、不读文件：模型表是 pi 安装包里的数据，后台进程第一次用时按 origin 建一次索引，之后只查（§9 的“不缓存”说的是
+  服务的结果，不是这份数据）。
+- 代码：`kernel/piCatalog.ts` 建索引、查条目（`catalogEntry`）；取哪几项是 `discoverRead.ts` 的纯函数 `fromCatalog`，
+  读取器（§4.1、§5.2）与档案视图（§7.2）共用。
 
 ## 5. 命令
 
@@ -231,11 +281,15 @@ interface DiscoveredModel {
   family: string;
   chat: boolean | null;            // 服务报告的类型；不报告为 null
   reported: { contextWindow: boolean; maxTokens: boolean; reasoning: boolean; image: boolean; family: boolean };
+  // 2026-10-26（§4.4）：取自 pi 模型表的项与 pi 的提供商名（例如 Z.AI）；一项都没取时为 null
+  catalog: { provider: string; contextWindow: boolean; maxTokens: boolean; reasoning: boolean } | null;
   hints: ('no_tools' | 'trained_window')[];
   unusable: string | null;         // 不能加入的原因（§4.3）；能加入为 null
   added: boolean;                  // 只对已有提供商：这个 id 已在配置里
 }
 ```
+
+（2026-10-26 注：`contextWindow`、`maxTokens`、`reasoning` 是报告值、取自 pi 的值（§4.4，`catalog` 里为真的项）或默认值。）
 
 `listError.detail`：`rejected`、`invalid` 为服务的原文（最多 §11 的长度，没有原文时为状态行）；`unreachable` 为连接错误或“Timed out after 15s”；`no_list` 为空字符串。
 
@@ -312,6 +366,11 @@ Claude 桌面版没有添加模型的界面，这里的交互没有可照的对�
 - “Not reported”只说明服务有没有报告这一项，你改了值也留着（同 proposal §9 对模型行的说法）；Max output 因 §4.3 退回默认值时也写。
   （2026-10-26 改，负责人走查 M6“"(not reported)" — what does it mean?”：标记只说明“这个数是 Mori 猜的”，改成“Default”，你把值改成别的就不写、改回默认值又写；Max output 因 §4.3 退回默认值时照样写。这推翻了 proposal 第 176 行“默认值或你改过的值都标”的说法。）
 - Model ID 不能改（就是服务的 id）。Family 不显示，按 `family` 原样保存，之后在 Edit 里改。
+- （2026-10-26 补，负责人走查回答 1，§4.4）**From pi**：取自 pi 模型表的项（`catalog` 里为真的）旁边写“From pi”：Context window、
+  Max output 在框里的值仍等于取来的值时写，Supports thinking 在仍勾着时写；悬停说明“The server didn’t report this, so Mori used
+  pi’s model list for <provider>. Change it if you know the real value.”（<provider> 为 `catalog.provider`）。改成别的值就不写，
+  改回又写；同时满足 Default 的条件时只写 From pi。改窗口时没改过的 Max output 按 §4.3 跟着变：服务报告的输出上限小于新窗口时
+  用它；否则取自 pi 的输出上限小于新窗口时用它（写 From pi）；否则为默认值（写 Default）。
 
 ### 6.3 列表错误
 
@@ -331,6 +390,8 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 
 - 一行：Model ID 输入框和“Add to list”。id 按模型层规格 §4.1 检查，与清单里的行、已有提供商里的模型重复时“Model IDs must be unique within a provider.”。
 - 加进清单末尾，勾上，标“Entered by you”；Context window、Max output 取默认值并标“Not reported”，Supports thinking、Image input 不勾，可以改。可以加多个。（2026-10-26 改：标“Default”，规则同 §6.2。）
+  （2026-10-26 补，§4.4：手填的行不查 pi 的模型表：清单在界面里，不为手填的 id 再问后台进程；加入后模型行按 §8 的后三行
+  提示 pi 的值。）
 
 ### 6.5 卡片上的 Fetch models
 
@@ -367,12 +428,20 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 - 得出 `server: { kind, version }`、`reported`（窗口）和 `meta`（§7.2）。
 - 每个请求的时限用 §11 的发现时限（原来是 120 秒的探针步时限）。
 - 第 0 步仍不计入短请求；拿不到列表时 `server.kind` 照 §3.3 第 6 步能判断的判断，判断不了为 `unknown`，`reported` 与 `meta` 的各项为 null。
+- （2026-10-26 注，§4.4）第 0 步只读服务，`reported` 与 `meta` 只记服务报告的值；读这个模型的行时按 §4.1 的改法用 pi 的窗口判断
+  服务报告的输出上限算不算报告。pi 的值不写进档案，由档案视图按第 0 步的报告值补（§7.2 `catalog`）。
 
 ### 7.2 档案
 
 - `StoredProfile.auto` 加可选字段 `meta: { maxTokens: number | null; reasoning: boolean | null; image: boolean | null }`：第 0 步按 §4.1 读到的报告值，没报告为 null（`reasoning`、`image` 明确报告“没有”时为 false）。没有这个字段的旧档案照样读，不重新探测，`PROBE_SUITE` 不变。
 - `server.kind` 的 zod 枚举换成 §3.3 的全部种类；旧值都在其中。
 - `ProfileView` 加 `reported: { contextWindow: number | null; maxTokens: number | null; reasoning: boolean | null; image: boolean | null } | null`：`contextWindow` 同 `context.reported`；档案没有 `meta` 时整个为 null。
+- （2026-10-26，负责人走查回答 1，§4.4）`ProfileView` 加 `catalog: { provider: string; contextWindow: number | null;
+  maxTokens: number | null; reasoning: boolean } | null`：拼档案视图时按配置的 `baseUrl` 与模型 id 查 pi 的模型表，只取
+  `reported` 里为 null 的项（`maxTokens` 只在小于“服务报告的窗口，没有时 pi 的窗口”时取；`reasoning` 只在条目为真、
+  `reported.reasoning` 为 null 时为真），规则同 §4.4（`fromCatalog`）。`reported` 为 null（旧档案、还没有档案）、没对上条目、
+  一项都没取时为 null。不写进 `model-profiles.json`（模型表不用发请求，每次拼视图时查），所以 2026-10-26 以前的档案不重新
+  探测也有它，`PROBE_SUITE` 不变。
 - **训练窗口不记作报告**：Ollama 的窗口只有来自 `/api/ps` 或 Modelfile 的 `num_ctx` 时才写进 `reported`（`context.reported`）；只读到训练窗口时为 null，
   模型行因此写 not reported，也不出“Server reports a context window of …”去把窗口改回训练窗口（proposal §12 第 8 条：训练窗口不是 Ollama 实际用的窗口）。清单里训练窗口照 §4.2 算报告值并带 `trained_window` 提示。
 - 有效窗口的算法不变（模型层规格 §7.2）。Ollama 有了报告的窗口后，它的有效窗口可能变小。
@@ -406,8 +475,19 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 | `reported.reasoning` 为真、配置没勾 Supports thinking | “The server says this model supports thinking.” | 勾上 Supports thinking |
 | 接口为 `openai-completions`、档案的推理字段不是 `none`、配置没勾 Supports thinking、`reported.reasoning` 不为真 | “This model returned thinking content.” | 勾上 Supports thinking |
 | `reported.image` 为真、配置没勾 Image input | “The server says this model accepts images.” | 勾上 Image input |
+| （2026-10-26）`catalog.contextWindow` 不为 null、不等于配置的窗口，并且配置的窗口仍是默认值 128000 | “pi’s model list for <provider> has a context window of <N>.” | 同第一行 |
+| （2026-10-26）`catalog.maxTokens` 不为 null、不等于配置的值、小于配置的窗口，并且配置的 Max output 仍是默认值（16384 与配置窗口一半中较小的） | “pi’s model list for <provider> has max output of <N>.” | Max output 改为 N |
+| （2026-10-26）`catalog.reasoning` 为真、配置没勾 Supports thinking | “pi’s model list for <provider> says this model supports thinking.” | 勾上 Supports thinking |
 
 第四行只看档案的推理字段（`reported` 为 null 时把“`reported.reasoning` 不为真”当作成立）。数字按千分位写（同模型行）。
+
+（2026-10-26 补，负责人走查回答 1，§4.4、§7.2；<provider> 为 `catalog.provider`）：
+- **取自 pi**：档案的 `catalog` 有这一项、并且配置的值等于它时，窗口、Max output 的数字后面写“ (from pi)”，Supports thinking 勾着时
+  它后面写“ (from pi)”，例如“Context window: 1,000,000 (from pi)”；悬停说明“The server didn’t report this, so Mori used pi’s model
+  list for <provider>. Use Edit to set the real value.”。用 Edit 改成别的值就不再标，改回又标；同时满足“(default)”的条件时只写
+  “(from pi)”。
+- 表的后三行只在配置的值仍是 Mori 的默认值时出现：你设过的值不提示改成 pi 的。它们给清单里手填的行（§6.4）、2026-10-26 以前
+  加入的模型用。第四行另要求 `catalog.reasoning` 不为真（同一件事只提示一条）。
 
 ## 9. 安全与资源
 
@@ -462,6 +542,12 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 | `app/tests/` | §13 |
 | `app/package.json` | 脚本 `test:md-unit`、`test:discovery` |
 
+（2026-10-26，负责人走查回答 1，WP-15）另改：`docs/proposals/model-discovery.md` §12 第 2 条（与 §4、§6、§9 的注）；本文 §0、§1、§2、
+§4.1、§4.4、§5.2、§6.2、§6.4、§7.1、§7.2、§8、§13；`docs/v1/screens/models-settings.md`、`first-run.md`、`docs/v0/ui-strings.md`、
+`docs/v1/defaults.md`；`app/src/kernel/piCatalog.ts`（新）、`discoverRead.ts`、`modelDiscover.ts`、`modelProfiles.ts`；
+`app/src/shared/models.ts`（`DiscoveredModel.catalog`、`ProfileView.catalog`）；界面 `settings/Checklist.tsx`、`ModelRows.tsx`，
+纯函数 `settings/modelHints.ts`（新，模型行的标记与提示）与 `settings/format.ts`（新，千分位，原来在 `common.tsx`）。
+
 ## 13. 验收
 
 ### 13.1 测试分层
@@ -471,8 +557,8 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 | 单元 | `tests/unit/discovery/*.test.mjs`（`node --test`，`tests/unit/md-reporter.mjs`），经 esbuild 打包内核模块 | `discoverRead.ts` 的全部规则；`modelDiscover.ts` 用替身 fetch 检查请求顺序、认证头、限时、限量、取消、隐去 key；档案的读写 |
 | 合成端点 | `tests/fake-endpoint/server.mjs`（synthetic） | 见下面的“合成端点的行为” |
 | App | `tests/ui/md-app-*.mjs` | Electron + 合成端点 |
-| 回放 | `tests/ui/md-replay.mjs`，`tests/fixtures/discovery/ui/*.json` | 从真实发现录制：DeepSeek、OpenRouter 的清单与 GLM 的列表错误（或清单）；DeepSeek 加入后（清单里把一个模型的 Context window 改小）设置页的 `models.get` 与 `mori.profiles`（含 `reported`），给模型行提示用 |
-| 真实 | `tests/ui/md-real.mjs` | 你的数据目录里的 DeepSeek、GLM，加 OpenRouter |
+| 回放 | `tests/ui/md-replay.mjs`，`tests/fixtures/discovery/ui/*.json` | 从真实发现录制：DeepSeek、OpenRouter 的清单与 GLM 的列表错误（或清单）；DeepSeek 加入后（清单里把一个模型的 Context window 改小）设置页的 `models.get` 与 `mori.profiles`（含 `reported`），给模型行提示用。（2026-10-26）z.ai 卡上的清单（pi 的 Z.AI 条目给出的值）与加入一个这样的模型后的模型行：`md-glm-pi-card.json`，由 `md-real.mjs --only glm-pi` 录 |
+| 真实 | `tests/ui/md-real.mjs` | 你的数据目录里的 DeepSeek、GLM，加 OpenRouter；（2026-10-26）驱动 `glm-pi`：z.ai 卡上取自 pi 的值与加入（MD-17） |
 
 **响应体样本**（`tests/fixtures/discovery/bodies/`）：
 
@@ -525,6 +611,8 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 | MD-13 | 模型行提示 | 没报告的窗口与输出写 not reported（2026-10-26 改为“(default)”：只在值仍等于默认值时，§8；Ollama 只有训练窗口的不标）；§8 表的每一行的显示条件与 Use 的改动（窗口改小时 Max output 一起改；`-alwaysthink` 给第四行）；Use 后重新探测；旧档案只显示第四行 | App、回放 |
 | MD-14 | 真实端点 | DeepSeek：列表读出窗口、输出上限、思考、图片，与官方文档一致，勾选加入后探针完成；OpenRouter：几百个模型的清单可过滤，加入一个；GLM：拿到列表或显示列表错误，手填 `GLM-5.3` 后加入并完成探针；录下 §13.1 的真实样本与回放 fixture | 真实 |
 | MD-15 | 现有功能不退步 | §13.4 改过的现有测试与模型层规格 §14.4 的全部现有套件通过 | App、回放 |
+| MD-16 | 按地址取 pi 的模型表（2026-10-26，负责人走查回答 1） | §4.4：`https://api.z.ai/api/anthropic` 的 glm-5.3 对上 pi 的 Z.AI 条目（1,000,000、131,072、支持思考），没有条目的 id（glm-4.5）不对上；路径、API type 不比；协议或端口不同不算同一个 origin；id 区分大小写（GLM-5.3 不对上）；pi 不认得的主机（自建服务、公司网关）上的 glm-5.3 不取；OpenRouter 式的聚合服务：openrouter.ai 上的 `glm-5.3` 不取，`z-ai/glm-5.3` 取 OpenRouter 自己的条目（1,048,576、943,718），从不取 Z.AI 的；同名的 GLM-5.3 在 Bedrock、Cloudflare 的地址上取各自的条目，不是 Z.AI 的；一个 origin 下几个条目不一致时不取（opencode.ai 的 minimax-m3），一致时取、提供商名为 pi 列出的第一个（opencode.ai 的 glm-5.3）；只取服务没报告的项（服务报告了窗口的行只取最大输出与思考，明确报告没有思考的不取）；最大输出不小于这一行的窗口时不取；图片、模型族、是不是聊天模型不取；只报告了输出上限的行按 pi 的窗口判断它算不算报告。读取器：录下的 z.ai 列表（`glm-models-1.json`）对 `https://api.z.ai/api/anthropic` 的结果里 pi 有条目的行取 pi 的三项、`reported` 为假、`catalog` 写明取了哪几项与 Z.AI，其余行默认值、`catalog` 为 null；DeepSeek 样本一项不取；第 0 步的 `reported` 与 `meta` 仍只有服务报告的。档案视图：`catalog` 只有 `reported` 里为 null 的项，旧档案、还没有档案时为 null | 单元 |
+| MD-17 | 取自 pi 的值的标记与提示（2026-10-26） | 单元：模型行的“(from pi)”只在配置的值等于 `catalog` 的值时（窗口、Max output、Supports thinking），同时是默认值时只写它，悬停写 `catalog.provider`；§8 表的后三行只在配置仍是默认值时出现，Use 改的值同表，第四行与 pi 的思考提示不同时出现。回放（`md-glm-pi-card`）：卡上清单里取自 pi 的项写“From pi”、悬停写提供商，没取的写 Default；改窗口后不写、改回又写，Max output 跟着在 pi 的值与默认值之间变；加入后的模型行写“(from pi)”、没有 pi 的提示；录制不存在或没有取自 pi 的值时记失败。真实（`md-real.mjs --only glm-pi`）：z.ai 卡上 Fetch models 的每一行按测试自己读的 pi 模型表算出该显示的值与标记（pi 的 Z.AI 条目有的行显示 pi 的三项和 From pi，其余 Default）；只勾 glm-5.3-flash 加入，配置里是 pi 的值，探针跑完，模型行写“(from pi)”、没有 pi 的提示；录成 `md-glm-pi-card.json` | 单元、回放、真实 |
 
 ### 13.3 不留未完成项
 
@@ -575,4 +663,10 @@ TaskBoard 与记忆的 App 测试直接写 `model-config.json` 准备配置，�
 JSON 行（§13.1），收集时跳过带 `path` 的行。
 
 （2026-10-26 注，负责人走查 M1、M6、M7（WP-02）：清单与模型行的“Not reported”“(not reported)”改为“Default”“(default)”（标识 `default-value` 取代 `not-reported`），只在值仍是默认值时写；`md-app-form`、`md-app-firstrun`、`md-app-card`、`md-replay` 与几个 helper 随之改，模型行的 Tool calling 改读行的 `data-probe`，`md-app-card` 删掉“不显示 Cancel test…”与读行上 Context 的两处，`trained_window` 提示的文字改短，MD-09 的兼容选项改为五个加一行说明。逐条见 docs/v1/walkthrough-1026/WP-02.md。）
+（2026-10-26 注，负责人走查回答 1（WP-15）：读取器的单元测试按 §4.4 改了期望：录下的列表里 pi 认得地址、有这个 id 的行取 pi 的值
+（`tests/unit/discovery/` 里用 Anthropic、z.ai、OpenRouter 样本的几处）；回放与真实层的清单行、模型行比较加上“From pi”“(from pi)”与
+pi 的三种提示（`md-replay.mjs`、`md-real.mjs`、`md-real-helpers.mjs`），回放桥合成的档案补 `catalog: null`
+（`harness/replay.js`）。`md-glm-card.json`、`md-openrouter.json` 是改动之前录的（没有 `catalog`）：z.ai 的清单与 OpenRouter
+没报告输出上限的几行在新的后台进程下会取 pi 的值，集成时分别用 `md-real.mjs --only glm`、`md-record.mjs --only md-openrouter`
+重录。逐条见 docs/v1/walkthrough-1026/WP-15.md。）
 （2026-10-26 注，负责人走查 M2：首次启动测试成功就进入主窗口，表单下方的探针状态与 Open folder… 删掉。`page.mjs` 的 `firstRun` 改为成功时读主窗口 Open a folder 提示里的 `connected`、失败时读表单的 `form-message`，`waitProbes` 经进程桥读 `models.get` 的档案；`md-app-firstrun.mjs` 里要留在表单上的保存（内存里的 key、再次保存）改为测试失败之后（`-404` 后缀的模型），探针状态的检查移到会话的拒绝启动卡；改法逐条见 docs/v1/walkthrough-1026/WP-01.md。）

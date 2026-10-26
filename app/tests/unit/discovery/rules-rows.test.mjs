@@ -4,9 +4,12 @@
 // 逐条路径的行是手写的（synthetic，依据规格 §4.1 的表），种类样本在 tests/fixtures/discovery/bodies/。
 // DeepSeek 样本的期望按样本的每一行独立推算（MD-14 的录制把手写的样本换成真实列表）；同一份推算也用于 MD-12 的
 // 第 0 步（§7.1、§7.2 单模型模式），那一条因此也在这个文件里。
+// 2026-10-26（§4.4，WP-15）：OpenRouter 样本里服务没报告输出上限的行取 pi 的模型表里 openrouter.ai 的条目（测试自己从
+// pi-ai 读，PI_OPENROUTER_MAX），推算照这一条改。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { builtinProviders } from '@earendil-works/pi-ai/providers/all';
 import {
   SCENARIOS, discoverScenario, discoverWith, modelOf, newRequest, providerRequest, readModel, readerWith, rules, sample,
   table,
@@ -409,8 +412,10 @@ test('MD-03 §4.1 reported is set field by field', () => {
     { contextWindow: false, maxTokens: true, reasoning: false, image: true, family: false });
   assert.deepEqual(readModel({ id: 'm', supports_reasoning: false, details: { family: 'qwen3' } }).reported,
     { contextWindow: false, maxTokens: false, reasoning: true, image: false, family: true });
-  assert.deepEqual(Object.keys(readModel({ id: 'm' })).sort(), ['added', 'chat', 'contextWindow', 'family', 'hints',
-    'id', 'image', 'maxTokens', 'reasoning', 'reported', 'unusable']);
+  // catalog（§5.2，2026-10-26）：取自 pi 模型表的项；readModel 不查 pi 的模型表，为 null
+  assert.deepEqual(Object.keys(readModel({ id: 'm' })).sort(), ['added', 'catalog', 'chat', 'contextWindow', 'family',
+    'hints', 'id', 'image', 'maxTokens', 'reasoning', 'reported', 'unusable']);
+  assert.equal(readModel({ id: 'm' }).catalog, null);
 });
 
 // ---- §4.3 ----
@@ -603,15 +608,25 @@ function positive(value) {
   return Number.isSafeInteger(number) && number > 0 ? number : null;
 }
 
-/** 按 §4.1 独立推算 OpenRouter 一行应读出的值（只用这份样本有的路径）。 */
+/**
+ * pi 的模型表里 openrouter.ai 的条目的最大输出（§4.4，按 id；同一个 id 有几个条目时取 pi 列出的第一个）：OpenRouter 样本
+ * 每一行都报告了窗口与思考支持，服务没报告最大输出的行取它（小于窗口时）
+ */
+const PI_OPENROUTER_MAX = new Map(builtinProviders().flatMap((provider) => provider.getModels())
+  .filter((model) => URL.canParse(model.baseUrl) && new URL(model.baseUrl).origin === 'https://openrouter.ai')
+  .reverse().map((model) => [model.id, model.maxTokens]));
+
+/** 按 §4.1、§4.4 独立推算 OpenRouter 一行应读出的值（只用这份样本有的路径）。 */
 function openrouterExpected(row) {
   const reported = positive(row.context_length) ?? positive(row.top_provider?.context_length);
   const window = reported ?? 128000;
   const max = positive(row.top_provider?.max_completion_tokens);
   const params = row.supported_parameters.map((word) => word.toLowerCase());
   const outputs = row.architecture.output_modalities.map((word) => word.toLowerCase());
+  const piMax = PI_OPENROUTER_MAX.get(row.id) ?? null;
+  const unreported = piMax !== null && piMax < window ? piMax : unreportedMax(window);
   return {
-    contextWindow: window, maxTokens: max !== null && max < window ? max : unreportedMax(window),
+    contextWindow: window, maxTokens: max !== null && max < window ? max : unreported,
     reasoning: (typeof row.reasoning === 'object' && row.reasoning !== null) || params.includes('reasoning')
       || params.includes('thinking'),
     image: row.architecture.input_modalities.map((word) => word.toLowerCase()).includes('image'),

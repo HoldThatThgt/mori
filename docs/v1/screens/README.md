@@ -148,10 +148,11 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `checklist`、`data-action="select-all"`、`data-action="clear-selection"`、`checklist-filter`、`checklist-truncated` | 清单、Select all、Clear selection、过滤框、“Showing the first 1,000 models.”（发现规格 §6.2） | models-settings.md、first-run.md |
 | `discovered-row`（`data-model`；`data-chat` 为 `true` / `false` / `unknown`；`data-added="true"`、`data-unusable="true"`）、行的勾选框 `input[name="pick"]`；行内输入框的 `data-field` 为 `contextWindow`、`maxTokens`、`reasoning`、`image`（`settings/fields.tsx` 模型字段的名字，同字段错误的 `data-field`） | 清单的行（`data-added` 只在提供商卡的清单里） | models-settings.md、first-run.md |
 | `default-value`（`data-field`）、`row-tag`（`data-kind` 为 `not-chat` / `added` / `unusable` / `entered`）、`row-hint`（`data-kind` 为 `no_tools` / `trained_window`） | 清单行的 Default、标记与提示；`default-value` 也用在 Models 行的“(default)”（2026-10-26 起取代 `not-reported`，只在值仍是默认值时有） | models-settings.md、first-run.md |
+| `pi-value`（`data-field` 为 `contextWindow` / `maxTokens` / `reasoning`，悬停说明在 `title`） | 取自 pi 自带模型表的值：清单行的“From pi”、Models 行的“(from pi)”（2026-10-26，负责人走查回答 1，WP-15，发现规格 §4.4） | models-settings.md、first-run.md |
 | `manual-model`（Model ID 输入框 `data-field="id"`）、`data-action="add-to-list"` | Add a model ID 一行与 Add to list（发现规格 §6.4） | models-settings.md、first-run.md |
 | `more-settings`、`probe-cost-note` | More settings（首次启动里只有兼容选项，API type 不是 OpenAI-compatible 时不显示）、探针代价的说明（提供商表单与卡上清单的底部，首次启动在 Test connection 上方，发现规格 §6.1 第 8 项、§6.6） | models-settings.md、first-run.md |
 | `data-action="add-models"`、`not-listed` | 清单底部的 Add 按钮（Add 1 model / Add N models）、卡片清单下的 Not listed by the server（发现规格 §6.5） | models-settings.md |
-| `model-hint`（`data-kind` 为 `context` / `max-output` / `reasoning` / `thinking-seen` / `image`）、`data-action="use-reported"` | Models 行的 Server reports … 提示与 Use（发现规格 §8） | models-settings.md |
+| `model-hint`（`data-kind` 为 `context` / `max-output` / `reasoning` / `thinking-seen` / `image`，2026-10-26 加 `pi-context` / `pi-max-output` / `pi-reasoning`）、`data-action="use-reported"` | Models 行的 Server reports … 与 pi’s model list … 提示与 Use（发现规格 §8） | models-settings.md |
 | `model-button`、`model-menu`、`model-menu-note`、`pick-error` | 输入框下面一行的范围按钮与菜单（前两个沿用 v0） | model-menu.md |
 | `thinking-button`、`thinking-menu` | 思考强度（沿用 v0） | model-menu.md |
 | `thinking-off-note` | 思考强度菜单底部的“This model can’t turn thinking off.”：当前模型支持思考而 `thinkingLevels` 里没有 `off` 时（规格 §7.7、§9.2，2026-10-24 补丁） | model-menu.md |

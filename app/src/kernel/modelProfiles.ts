@@ -3,6 +3,8 @@
 // 档案描述的是服务端上的模型（地址、接口、模型 id、服务版本），所以按这几项存，不按 Mori 的提供商 id 存。
 // 一键拉取模型（docs/specs/model-discovery.md §7.2、§7.3）：auto.meta 记第 0 步读到的报告值，ProfileView.reported
 // 给模型行的提示；server.kind 为 §3.3 的全部种类；versionChanged 按读版本的结果（种类、版本）判断要不要重新探测。
+// ProfileView.catalog（§4.4、§7.2，2026-10-26）：拼视图时按配置的地址与 id 查 pi 自带的模型表，只取第 0 步没读到的项，
+// 不写进档案。
 // 适配层（§7.6、§7.7）：auto.offRefused 记第 2 步判出的“关闭思考被拒”，compileFlagsOf 给编译用的档案项。
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -10,11 +12,13 @@ import { dirname } from 'node:path';
 import { z } from 'zod';
 import {
   SERVER_KINDS,
-  type ApiType, type Capability, type Compat, type ProbeProgress, type ProbeStepResult, type ProfileView,
-  type ProviderModel, type ReasoningField, type ReportedValues, type ServerKind,
+  type ApiType, type Capability, type CatalogValues, type Compat, type ProbeProgress, type ProbeStepResult,
+  type ProfileView, type ProviderModel, type ReasoningField, type ReportedValues, type ServerKind,
 } from '../shared/models';
+import { fromCatalog } from './discoverRead';
 import type { CompileFlags } from './modelCompile';
 import type { ModelRef, ToolCallingState } from './modelTypes';
+import { catalogEntry } from './piCatalog';
 import { renameReplacing } from './renameRetry';
 
 /** @brief 探针套件版本（§7.2 suite）；探针的请求或判定改变时加 1。 */
@@ -300,6 +304,15 @@ export function reportedOf(auto: AutoResults): ReportedValues | null {
   return { contextWindow: auto.reported, maxTokens: meta.maxTokens, reasoning: meta.reasoning, image: meta.image };
 }
 
+/**
+ * @brief catalog（model-discovery.md §4.4、§7.2，2026-10-26）：按配置的地址与模型 id 查 pi 自带的模型表，只取第 0 步
+ *        没读到的项（规则同读取器，discoverRead.ts fromCatalog）；不存在档案里，每次拼视图时查。
+ * @param reported 第 0 步读到的报告值；为 null（旧档案）时不取，同模型行不标 (default)
+ */
+export function catalogOf(target: ProfileTarget, reported: ReportedValues | null): CatalogValues | null {
+  return reported === null ? null : fromCatalog(catalogEntry(target.baseUrl, target.model.id), reported);
+}
+
 /** @brief status：至少一步出错没有结果为 error（附第一条原文），否则 ready。 */
 export function statusOf(stored: StoredProfile): { status: 'ready' | 'error'; error: string | null } {
   const steps = [...Object.values(stored.auto.steps), stored.longInput?.step, stored.cancel?.step];
@@ -328,8 +341,9 @@ function probingView(target: ProfileTarget): ProfileView {
     reasoning: reasoningOf(target.api, null),
     context: contextOf(target.model, null, null),
     cancel_verified: 'unknown',
-    // model-discovery.md §7.2：还没有档案，没有报告值
+    // model-discovery.md §7.2：还没有档案，没有报告值，也不取 pi 的模型表
     reported: null,
+    catalog: null,
     probedAt: null,
     suite: PROBE_SUITE,
   };
@@ -338,6 +352,7 @@ function probingView(target: ProfileTarget): ProfileView {
 /** @brief 已有档案的 ProfileView；vision 与 declared 窗口取当前配置。 */
 function storedView(target: ProfileTarget, stored: StoredProfile): ProfileView {
   const { steps } = stored.auto;
+  const reported = reportedOf(stored.auto);
   return {
     ...statusOf(stored),
     server: stored.auto.server,
@@ -349,7 +364,8 @@ function storedView(target: ProfileTarget, stored: StoredProfile): ProfileView {
     reasoning: reasoningOf(target.api, stored.auto),
     context: contextOf(target.model, stored.auto.reported, stored.longInput),
     cancel_verified: cancelVerifiedOf(stored.cancel),
-    reported: reportedOf(stored.auto),
+    reported,
+    catalog: catalogOf(target, reported),
     probedAt: stored.probedAt,
     suite: stored.suite,
   };

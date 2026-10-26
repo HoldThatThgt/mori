@@ -120,9 +120,12 @@ test('TB-46 spec-coverage maps mem- result files to layers (partial files never 
 
 test('TB-46 spec-coverage reads every MD row of model-discovery §13.2 with its layers', () => {
   const items = parseSpecTable(discovery, readFileSync(specPathOf(discovery), 'utf8'));
+  // MD-16、MD-17：2026-10-26 负责人走查回答 1（按地址取 pi 自带的模型表，WP-15）
   assert.deepEqual(items.map((item) => item.id),
-    Array.from({ length: 15 }, (_, i) => `MD-${String(i + 1).padStart(2, '0')}`));
+    Array.from({ length: 17 }, (_, i) => `MD-${String(i + 1).padStart(2, '0')}`));
   const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
+  assert.deepEqual(layersOf('MD-16'), ['unit']);
+  assert.deepEqual(layersOf('MD-17'), ['real', 'replay', 'unit']);
   assert.deepEqual(layersOf('MD-01'), ['unit']);
   assert.deepEqual(layersOf('MD-06'), ['app', 'unit']);
   assert.deepEqual(layersOf('MD-07'), ['app', 'replay']);

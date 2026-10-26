@@ -542,6 +542,21 @@ export interface ReportedValues {
   image: boolean | null;
 }
 
+/**
+ * @brief 服务没报告、按服务地址取自 pi 自带模型表的值（model-discovery.md §4.4、§7.2，2026-10-26 负责人走查回答 1）：
+ *        只有服务没报告的项；模型行的“(from pi)”与 pi 的三种提示按它。
+ */
+export interface CatalogValues {
+  /** pi 的提供商显示名（例如 Z.AI）：标记的悬停说明与提示里写它 */
+  provider: string;
+  /** pi 的窗口；服务报告了窗口时为 null */
+  contextWindow: number | null;
+  /** pi 的最大输出；服务报告了、或 pi 的不小于这一行的窗口时为 null */
+  maxTokens: number | null;
+  /** pi 说支持思考，服务没报告思考支持 */
+  reasoning: boolean;
+}
+
 /** @brief 推理内容的字段名：openai-completions 为前四种之一，另两种接口为 native。 */
 export type ReasoningField = 'reasoning_content' | 'reasoning' | 'reasoning_text' | 'none' | 'native';
 
@@ -583,6 +598,11 @@ export interface ProfileView {
    * 档案没有 meta（旧档案）或还没有档案时为 null
    */
   reported: ReportedValues | null;
+  /**
+   * 按配置的地址与模型 id 取自 pi 自带模型表、服务没报告的值（model-discovery.md §7.2，2026-10-26）：不存在档案里，
+   * 每次拼视图时查；reported 为 null、地址没对上 pi 的条目、一项都没取时为 null
+   */
+  catalog: CatalogValues | null;
   /** 最近一次探测完成的时刻（ms）；从未完成时为 null */
   probedAt: number | null;
   /** 探针套件版本 */
@@ -790,11 +810,11 @@ export type DiscoverHint = 'no_tools' | 'trained_window';
 export interface DiscoveredModel {
   /** 服务列表里的 id，原样 */
   id: string;
-  /** 报告值或默认值（128000） */
+  /** 报告值、取自 pi 模型表的值（§4.4）或默认值（128000） */
   contextWindow: number;
-  /** 报告值或默认值（16384 与窗口一半中较小的），总是小于 contextWindow */
+  /** 报告值、取自 pi 模型表的值或默认值（16384 与窗口一半中较小的），总是小于 contextWindow */
   maxTokens: number;
-  /** 支持思考：报告值，没报告时为 false */
+  /** 支持思考：报告值，没报告时 pi 模型表说支持为 true，否则为 false */
   reasoning: boolean;
   /** 图片输入：报告值，没报告时为 false */
   image: boolean;
@@ -807,6 +827,11 @@ export interface DiscoveredModel {
    * family 有值为真
    */
   reported: { contextWindow: boolean; maxTokens: boolean; reasoning: boolean; image: boolean; family: boolean };
+  /**
+   * 服务没报告、取自 pi 自带模型表的项（§4.4，2026-10-26；清单写 From pi）：provider 为 pi 的提供商显示名，三项为真时
+   * 上面同名的值来自 pi；一项都没取时为 null
+   */
+  catalog: { provider: string; contextWindow: boolean; maxTokens: boolean; reasoning: boolean } | null;
   /** 清单行的提示 */
   hints: DiscoverHint[];
   /** 不能加入的原因（the ID is empty、the ID contains spaces）；能加入为 null */
