@@ -44,9 +44,7 @@ const resultsDir = join(appRoot, 'test-results');
  * @brief 各规格的覆盖检查参数。
  *        path 相对仓库根目录；section 为验收条目表所在小节的编号；row 认出条目行；prefix 为编号前缀（用于提示）；
  *        strayLabel 为不计入的检查的说明；files 为各层结果文件的名字（unit、real 为全名与不带 .json 的名字，
- *        app、replay 为前缀，partial 为不计入任何层的前缀，没有时为 null）；unitGlob 为单元测试文件（相对 app/，
- *        只认 "<目录>*.test.mjs"，不往下一层找），package.json 里用写 files.unit 的报告器跑它的脚本写的是同一串
- *        （tests/unit/spec-ids.test.mjs 查这一点，并按它认单元层的测试）。
+ *        app、replay 为前缀，partial 为不计入任何层的前缀，没有时为 null）。
  */
 export const SPECS = {
   model: {
@@ -55,7 +53,6 @@ export const SPECS = {
     row: /^\|\s*MP-\d+\s*\|/,
     prefix: 'MP',
     strayLabel: 'an MP id',
-    unitGlob: 'tests/unit/*.test.mjs',
     files: { unit: 'v1-unit.json', app: 'v1-models-app', replay: 'v1-models-replay', real: 'v1-models-real',
       partial: null },
   },
@@ -65,7 +62,6 @@ export const SPECS = {
     row: /^\|\s*TB-\d+\s*\|/,
     prefix: 'TB',
     strayLabel: 'a TB id',
-    unitGlob: 'tests/unit/taskboard/*.test.mjs',
     files: { unit: 'tb-unit.json', app: 'tb-app', replay: 'tb-replay', real: 'tb-real', partial: 'tb-partial-' },
   },
   memory: {
@@ -74,7 +70,6 @@ export const SPECS = {
     row: /^\|\s*MEM-\d+\s*\|/,
     prefix: 'MEM',
     strayLabel: 'a MEM id',
-    unitGlob: 'tests/unit/memory/*.test.mjs',
     files: { unit: 'mem-unit.json', app: 'mem-app', replay: 'mem-replay', real: 'mem-real', partial: 'mem-partial-' },
   },
   discovery: {
@@ -83,7 +78,6 @@ export const SPECS = {
     row: /^\|\s*MD-\d+\s*\|/,
     prefix: 'MD',
     strayLabel: 'an MD id',
-    unitGlob: 'tests/unit/discovery/*.test.mjs',
     files: { unit: 'md-unit.json', app: 'md-app', replay: 'md-replay', real: 'md-real', partial: 'md-partial-' },
   },
 };

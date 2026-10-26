@@ -10,7 +10,7 @@
 // 而界面只在有会话时才有"MCP"一节，所以前面补一个先打开的会话，在它的工具页里添加，再"New session"建出录制里的会话。
 // v1（docs/specs/model-providers.md §14.4）：m6/model-switch.json、m6/thinking.json 与它们的检查删去（v1 不再有 model.save、
 // session.setModel；换范围由 v1-models 的回放覆盖）；思考强度改由 fixtures/v1/thinking.json（m6-record.mjs 用 v1 录制）
-// 回放，这个录制还没有时那一项记 KNOWN；设置页分节导航的检查改到 Models 分节（放在 agents-md 里）。
+// 回放，这个录制还没有时那一项记失败；设置页分节导航的检查改到 Models 分节（放在 agents-md 里）。
 // 2026-10-26（负责人走查 M4）：AGENTS.md 一节从设置页挪到 Customize 的最后一节 Instructions
 // （docs/v1/screens/customize-agents-md.md），agents-md 从 Customize 进，分节导航的检查改成 Customize 的
 // Instructions ↔ Plugins，离开的入口改用侧栏的 Settings。
@@ -18,7 +18,7 @@
 // data-pending；悬停按行分开（范围按钮三行、Effort 两行），读屏的描述读 aria-describedby 指向的元素。thinking 回放里另走一次
 // 换范围失败（回放桥 failNext 让这一条 session.setPick 失败，synthetic，不占回放顺序）和点开上下文用量圆环（不发命令）。
 // 2026-10-26（负责人走查 M12）：内置工具一节每行另看开关与行下面的说明（与录制的 tools.get 的 byDefault 对照）；
-// tool-switch 回放 Customize 里打开 ls 的开关、新会话里模型调用 ls（fixtures/m6/tool-switch.json，还没有录时记 KNOWN）。
+// tool-switch 回放 Customize 里打开 ls 的开关、新会话里模型调用 ls（fixtures/m6/tool-switch.json，还没有录时记失败）。
 // 用法（在 app/ 下）：node tests/ui/m6-replay.mjs [--only thinking,slash]
 // 结果写到 test-results/m6-replay.json；截图在 test-results/m6-replay/。
 
