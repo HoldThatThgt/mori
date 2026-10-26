@@ -1377,6 +1377,16 @@ async function stepsHistoryChoice(page, id) {
     && reopened[0].expanded === 'false' && reopened[0].id === id, JSON.stringify({ opened, reopened }));
   await page.getByTestId('step-group').click();
   const scrollable = (await stepsPlace(page)).scrollable;
+  // 展开后对话流跟着滚到底（Transcript.tsx useFollow 在 ResizeObserver 里滚）：等它滚到底、离顶部超过 TOP_SLACK（40px），
+  // 且相邻两帧的高度不变（不会再跟着滚），再滚到顶部。否则设 scrollTop = 0 时它还在 0、没有 scroll 事件，或者同一帧里
+  // ResizeObserver 又把它跟到底部，都不会载入更早的
+  await page.evaluate(() => { window.__stepsHeight = -1; });
+  await page.waitForFunction(() => {
+    const element = document.querySelector('[data-testid="transcript"]');
+    const same = window.__stepsHeight === element.scrollHeight;
+    window.__stepsHeight = element.scrollHeight;
+    return same && element.scrollTop > 40 && element.scrollHeight - element.clientHeight - element.scrollTop <= 2;
+  }, null, { polling: 'raf', timeout: 5000 }).catch(() => {});
   await page.getByTestId('transcript').evaluate((element) => { element.scrollTop = 0; });
   await page.locator('[data-item="user"]').first().waitFor({ timeout: 5000 }).catch(() => {});
   const kept = { ...(await stepsState(page)), ...(await stepsPlace(page)) };
