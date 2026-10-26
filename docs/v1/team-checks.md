@@ -179,8 +179,9 @@ DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Question
 `test:sa-unit` 28/28、`test:mem-unit` 239/239、`test:md-unit` 222/222、合成端点自检 184/184；`sa-app --only normal,parallel` 21/22、
 `sa-replay` 13/14（没过的都是 SA-11 折进 `<n> steps`，等 WP-14）。
 
-还没跑的（用共用端口，第二波做完后按 walkthrough-fixes 会话排的顺序跑）：`npm run test:quick`；`tb-app-ask --only offAsk`（TB-04 新加的一项）、
-`tb-app-roles --only fields`（TB-09 合并时改的期望）；真实模型 `tb-real --only ask`（关闭模式的临时提问少了共用段，给模型的文字变了；代理在 4690）。
+用共用端口的（第二波做完后，walkthrough-fixes 会话排到本分支时跑，合过 WP-10 与 WP-14 之后）：`npm run test:quick` 4/4（89 秒）；
+`tb-app-ask --only offAsk` 10/10（含 TB-04 新加的一项：请求里没有共用段）；`tb-app-roles --only fields` 13/13（TB-09 合并时改的期望）；
+真实模型 `tb-real --only ask` 8/8（DeepSeek 与 GLM；关闭模式的临时提问少了共用段，给模型的文字变了）。
 
 合 WP-10 之前的结果：
 
@@ -221,7 +222,7 @@ DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Question
 
 ### 等别的包合并之后做的
 
-- WP-10：做完了（见上面“状态”）；用共用端口的三项 `--only` 与真实模型的一项等端口空出来再跑。
+- WP-10：做完了（见上面“状态”），用共用端口的几项也跑过了。
 - WP-14：做完了（见上面“状态”）。
 
 ### 要你决定的（2026-10-26 你不在：照“unattended mode, pick recommended option for questions and log them”按推荐做了，等你回来看）
