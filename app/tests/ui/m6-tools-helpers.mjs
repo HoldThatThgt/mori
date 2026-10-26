@@ -1,6 +1,7 @@
 // m6-app-tools.mjs 用的工具页读取（docs/v0/screens/tools.md 的标识）：外框、内置工具、技能、MCP、插件各节的行，
 // 以及记下有没有出现过读取中、读取失败、跟随的会话还在打开中的 watchTools / toolsSeen（2026-10-26 从 m6-app-tools.mjs
-// 挪来，那个文件不超过 2000 行）。只读页面，不记录检查结果（检查结果由调用方记录）。
+// 挪来，那个文件不超过 2000 行；同样挪来的还有键盘的焦点与 Tab：focusDescriptor、tabWalk，小于 12px 的字：toolsSmallText，
+// 和 canon）、Instructions 一节的项目一栏（agentsLoaded）。只读页面，不记录检查结果（检查结果由调用方记录）。
 
 /** @brief 工具页的外框：分节、当前分节、跟随的会话、说明、信任说明、整页文字；不在工具页时为 null。 */
 export function toolsHead(page) {
@@ -190,3 +191,55 @@ export const toolsSeen = (page) => page.evaluate(() => {
   window.__toolsObserver?.disconnect();
   return window.__toolsSeen;
 });
+
+/** @brief 焦点所在的元素的简短描述（2026-10-26 从 m6-app-tools.mjs 挪来，那个文件不超过 2000 行）。 */
+export function focusDescriptor(page) {
+  return page.evaluate(() => {
+    const el = document.activeElement;
+    return { tag: el?.tagName?.toLowerCase() ?? null, role: el?.getAttribute?.('role') ?? null,
+      label: el?.getAttribute?.('aria-label') ?? null, text: (el?.textContent ?? '').trim().slice(0, 40),
+      section: el?.dataset?.section ?? null, inTools: Boolean(el?.closest?.('[data-testid="tools-page"]')) };
+  });
+}
+
+/** @brief 从当前焦点按 Tab count 次，返回每次的焦点（同上，从 m6-app-tools.mjs 挪来）。 */
+export async function tabWalk(page, count) {
+  const seen = [];
+  for (let index = 0; index < count; index += 1) {
+    await page.keyboard.press('Tab');
+    seen.push(await focusDescriptor(page));
+  }
+  return seen;
+}
+
+/**
+ * @brief Instructions 一节（docs/v1/screens/customize-agents-md.md）的项目一栏：标题、每个文件的路径，以及编辑框是否可用；
+ *        不在这一节时为 null。
+ */
+export function agentsLoaded(page) {
+  return page.evaluate(() => {
+    const loaded = document.querySelector('[data-testid="agents-loaded"]');
+    if (!document.querySelector('[data-testid="agents-section"]')) return null;
+    return { title: loaded?.querySelector('h3')?.textContent ?? null,
+      files: [...(loaded?.querySelectorAll('.agents-files .agents-path') ?? [])].map((el) => el.textContent),
+      editable: document.querySelector('[data-testid="agents-editor"]')?.disabled === false };
+  });
+}
+
+/** @brief 工具页（和开着的移除确认框）里小于 12px 的文字（2026-10-26 从 m6-app-tools.mjs 挪来）。 */
+export function toolsSmallText(page) {
+  const selector = '[data-testid="tools-page"] *, [data-testid="remove-dialog"] *';
+  return page.evaluate((css) => [...document.querySelectorAll(css)]
+    .filter((element) => element.getClientRects().length > 0
+      && [...element.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim()))
+    .filter((element) => parseFloat(getComputedStyle(element).fontSize) < 12)
+    .map((element) => `${element.tagName.toLowerCase()}.${element.className} ${getComputedStyle(element).fontSize} `
+      + `"${element.textContent.trim().slice(0, 20)}"`), selector);
+}
+
+/** @brief 对象的键排好序之后的值（只比内容、不比键的顺序时用；同上，从 m6-app-tools.mjs 挪来）。 */
+export function canon(value) {
+  if (Array.isArray(value)) return value.map(canon);
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canon(value[key])]));
+}

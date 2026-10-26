@@ -16,7 +16,8 @@
 // 没有这一行；Mori 启动时起服务、会话之间共用一个进程、退出时关掉等由 m6-app-mcp-shared.mjs 负责））；
 // 插件（添加本地包不复制文件、添加失败、按资源启停、停用 / 启用整个包、移除、包里扩展的工具与批准卡、包里没有资源、本项目的包、
 // 未信任项目的包和扩展不列出、不是本地文件夹的 npm 包只能移除）；
-// 工具页开着时归档它跟随的会话（跟到剩下的一栏，或"No open session"）；
+// 工具页开着时归档它跟随的会话（跟到剩下的一栏，或"No open session"）；没有信任的项目里 Instructions 一节照常列出它的
+// AGENTS.md（2026-10-26 补，docs/v1/screens/customize-agents-md.md"不信任"）；
 // 键盘（Tab 走到开关和按钮、↑ ↓ 切分节、Esc 关表单和确认框）；没有小于 12px 的字；页面没有报错。
 // "Open in default app"只在主进程的 shell.openPath 换成记录路径之后才点（不真的打开编辑器）。
 // 布局与 tests/ui/m6-pi-config.mjs 相同（prepareLayout、STEPS）：MORI_USER_DATA=<根>/data，agentDir=<根>/data/pi。
@@ -24,7 +25,8 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m6-app-tools.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m6-app-tools(-packaged).json，截图在 test-results/m6-app-tools(-packaged)/；全部通过时删掉临时目录。
-// 各步骤依赖前一步留下的配置（pi config 的对照是累积的）；--only 只跑列出的步骤（setup 总是跑），只有 entry 能单独跑。
+// 各步骤依赖前一步留下的配置（pi config 的对照是累积的）；--only 只跑列出的步骤（setup 总是跑），只有 entry 与
+// untrustedAgents 能单独跑。
 
 import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync,
@@ -40,8 +42,8 @@ import { composerAt, paneAt, sendAt, splitState, waitPaneIdle, waitPaneReady, wa
 import { openToolsSection, slashItems, startFakeEndpoint } from './m6-helpers.mjs';
 import { prepareLayout, STEPS } from './m6-pi-config.mjs';
 import {
-  BUILTIN_LEAD, expectedNotes, mcpRows, packageCards, PI_DEFAULT_TOOLS, PI_TOOLS, skillRows, toolRows, toolsHead,
-  toolsSeen, watchTools,
+  agentsLoaded, BUILTIN_LEAD, canon, expectedNotes, focusDescriptor, mcpRows, packageCards, PI_DEFAULT_TOOLS, PI_TOOLS,
+  skillRows, tabWalk, toolRows, toolsHead, toolsSeen, toolsSmallText, watchTools,
 } from './m6-tools-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
@@ -165,6 +167,8 @@ function makeLayout() {
     { mcpServers: { untrustedsrv: { command: 'node', args: [MCP_SERVER], exposure: 'direct' } } });
   writeJson(join(untrusted, '.pi', 'settings.json'), { packages: [PKG_SOURCE] });
   writeExtension(untrusted, 'untrusted-ext.ts', 'untrusted_hello', 'Synthetic tool of an untrusted project.');
+  // AGENTS.md 不受信任控制：Instructions 一节照常列出它（customize-agents-md.md"不信任"，2026-10-26 补）。
+  writeFileSync(join(untrusted, 'AGENTS.md'), '# Untrusted project rules (synthetic)\n');
   const override = join(root, 'override');
   const extFile = writeExtension(override, 'multi-line.ts', MULTI_TOOL, MULTI_DESC);
   const userSkill = join(layout.agentDir, 'skills', 'user-skill', 'SKILL.md');
@@ -335,17 +339,6 @@ async function callAndAllow(ctx, text) {
   return { tool, title, result };
 }
 
-/** @brief 工具页（和开着的移除确认框）里小于 12px 的文字。 */
-function toolsSmallText(page) {
-  const selector = '[data-testid="tools-page"] *, [data-testid="remove-dialog"] *';
-  return page.evaluate((css) => [...document.querySelectorAll(css)]
-    .filter((element) => element.getClientRects().length > 0
-      && [...element.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim()))
-    .filter((element) => parseFloat(getComputedStyle(element).fontSize) < 12)
-    .map((element) => `${element.tagName.toLowerCase()}.${element.className} ${getComputedStyle(element).fontSize} `
-      + `"${element.textContent.trim().slice(0, 20)}"`), selector);
-}
-
 /** @brief 记下此刻工具页里小于 12px 的文字（最后统一判断）。 */
 async function noteSmall(ctx, where) {
   const small = await toolsSmallText(ctx.page);
@@ -353,35 +346,8 @@ async function noteSmall(ctx, where) {
   ctx.smallChecked.push(where);
 }
 
-/** @brief 焦点所在的元素的简短描述。 */
-function focusDescriptor(page) {
-  return page.evaluate(() => {
-    const el = document.activeElement;
-    return { tag: el?.tagName?.toLowerCase() ?? null, role: el?.getAttribute?.('role') ?? null,
-      label: el?.getAttribute?.('aria-label') ?? null, text: (el?.textContent ?? '').trim().slice(0, 40),
-      section: el?.dataset?.section ?? null, inTools: Boolean(el?.closest?.('[data-testid="tools-page"]')) };
-  });
-}
-
-/** @brief 从当前焦点按 Tab count 次，返回每次的焦点。 */
-async function tabWalk(page, count) {
-  const seen = [];
-  for (let index = 0; index < count; index += 1) {
-    await page.keyboard.press('Tab');
-    seen.push(await focusDescriptor(page));
-  }
-  return seen;
-}
-
 /** @brief 两个值的 JSON 相同（顺序也算）。 */
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
-
-/** @brief 对象的键排好序之后的值（只比内容、不比键的顺序时用）。 */
-function canon(value) {
-  if (Array.isArray(value)) return value.map(canon);
-  if (value === null || typeof value !== 'object') return value;
-  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canon(value[key])]));
-}
 
 /**
  * @brief 主进程的 shell.openPath 换成只记下路径（不真的打开外部编辑器）；返回替换是否生效。
@@ -1692,6 +1658,24 @@ async function untrustedProject(ctx) {
     && !tools.includes('untrusted_hello'), tools.join(', '));
 }
 
+/**
+ * @brief 没有信任的项目里的 Instructions 一节（2026-10-26 补，customize-agents-md.md"不信任"）：顶部仍有信任说明，这一节照常
+ *        列出项目加载的文件。接在 untrustedProject 后面时工具页还开着、跟随 untrusted；单独跑（--only）时先不信任地打开它。
+ */
+async function untrustedAgents(ctx) {
+  const { page } = ctx;
+  if (!(await toolsHead(page))?.follow.startsWith('untrusted · ')) await openFolder(ctx, ctx.untrusted, 'Don’t trust');
+  await openToolsSection(page, 'agents');
+  await page.waitForFunction(() => document.querySelector('[data-testid="agents-loaded"] .agents-files li'), null,
+    { timeout: 15000 }).catch(() => {});
+  const agents = { trust: (await toolsHead(page)).trust, ...await agentsLoaded(page) };
+  record('没有信任的项目时 Instructions 一节（2026-10-26 补）：顶部仍有"This workspace isn’t trusted, so its skills and '
+    + 'settings aren’t listed"，这一节照常列出项目加载的文件（"Files loaded by untrusted"和 <untrusted>\\AGENTS.md）',
+  agents.trust === TRUST_NOTE && agents.title === 'Files loaded by untrusted' && agents.editable
+    && agents.files.some((path) => resolve(path).toLowerCase() === join(ctx.untrusted, 'AGENTS.md').toLowerCase()),
+  JSON.stringify(agents));
+}
+
 /** @brief 键盘：分节列表的 ↑ ↓；从"Back to app"按 Tab 走到分节、开关和按钮。 */
 async function keyboard(ctx) {
   const { page } = ctx;
@@ -1965,8 +1949,8 @@ async function fontSizes(ctx) {
 }
 
 const steps = { setup, noSession, entry, skills, splitFollow, plugins, mcpList, mcpForm, mcpEdits, mcpSession,
-  mcpProblems, mcpProblemFix, mcpBroken, overrideProject, mcpSameName, untrustedProject, keyboard, readFailure,
-  writeFailure, lateConfig, toggleOverridden, remotePackage, archiveFollow, fontSizes };
+  mcpProblems, mcpProblemFix, mcpBroken, overrideProject, mcpSameName, untrustedProject, untrustedAgents, keyboard,
+  readFailure, writeFailure, lateConfig, toggleOverridden, remotePackage, archiveFollow, fontSizes };
 
 const fake = await startFakeEndpoint(port, testKey);
 const layout = makeLayout();

@@ -7,7 +7,7 @@
 //          （列表与滚动位置保留、编辑中不重读、条目被删后详情关闭），运行结束后 Revisions 的 Running 变为结束状态；
 //          跟随的会话还在打开时 Project 保留已有列表、New entry 等它，User 照常读、New entry 可用；
 //   MEM-16 AGENT 与 Customize 的 Instructions 一节（用户级 AGENTS.md，2026-10-26 从设置页挪来）的 token、合计与超出说明（2,000），
-//          Edit in Customize，agents.get 的新字段；
+//          Edit in Customize，agents.get 的新字段；用户级一行的千分位、没有生效的文件、读取失败（2026-10-26 补）；
 //   MEM-07 预算的 App 部分：用量（含中日韩字符）、恰好 500 允许、501 拒绝且什么都没写、写用户级超出某个项目、移动与回滚
 //          同样检查、删除不受限、手改超出时 Over the limit 且全部进 prompt；
 //   MEM-08 修订记录的 App 部分：记忆页一次保存、删除、移动、回滚各一条，移动写进两层，kinds、counts，列表时间倒序且最多
@@ -17,7 +17,8 @@
 //          source 恢复、写进两层、可以再回滚），之后又被改过时整次拒绝并写出那次修订，超出预算拒绝，Rollback 修订可以
 //          再回滚，运行中的不能回滚，水位不动；
 //   MEM-33 后台进程退出时：入口、页面操作、View in Memory、提示的 View 不可用（同样的悬停），只有已有的全局横幅，
-//          开着的删除确认框关闭（Restart 后不自己再打开），Restart 后重读，反馈说明按没开。
+//          开着的删除确认框关闭（Restart 后不自己再打开），Restart 后重读，反馈说明按没开；停在 AGENT 时
+//          Edit in Customize 不可用（2026-10-26 补）。
 // 用法（在 app/ 下，out/ 已是当前构建）：node tests/ui/mem-app-page.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/mem-app-page(-packaged).json（--only 时 mem-partial-app-page…，不计入覆盖检查），截图与 App 日志在
 // test-results/mem-app-page/。步骤按顺序依赖前面的状态，--only 只用于调试。
@@ -26,7 +27,7 @@
 // AGENTS.md、修订记录、enhance.json 按 §3、§9.1 的格式由测试写好；增强脚本文件由测试在运行前写好；第四个临时项目
 // 带一个加载要等 10 秒的项目扩展（让会话停在“正在启动…”）。
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { appRoot, arg } from './lib.mjs';
@@ -74,8 +75,11 @@ const today = () => monthDay(localDate(Date.now()));
 
 // ---------- 测试数据（synthetic test setup） ----------
 
-/** AGENTS.md：用户级（含中日韩字符）、项目 A（超过 2,000 token，2026-10-26 提醒线由 500 改为 2000）、项目 B（1 token） */
-const USER_AGENTS = '# User rules\n\nAnswer in English. 注释用中文。\n';
+/**
+ * AGENTS.md：用户级（含中日韩字符；2026-10-26 补：写到 1,000 token 以上，用户级一行也按千分位写，项目 B 的合计仍不超过
+ * 2,000）、项目 A（超过 2,000 token，2026-10-26 提醒线由 500 改为 2000）、项目 B（1 token）
+ */
+const USER_AGENTS = `# User rules\n\nAnswer in English. 注释用中文。\n${'Prefer short, direct answers. '.repeat(140)}\n`;
 const P1_AGENTS = `# Project A\n\n${'Keep functions short and name them clearly. '.repeat(190)}\n项目说明。\n`;
 const P2_AGENTS = 'abc';
 /** 条目的 abstract */
@@ -366,10 +370,12 @@ async function nav(ctx) {
   const agent = await memoryState(page);
   const tokens = estimate(USER_AGENTS);
   record('MEM-16 AGENT with no session lists only the user-level AGENTS.md: its path, "<n> tokens" equal to '
-    + '§6.3 of its content, Edit in Customize, and the total "<n> / 2,000 tokens"', agent.agentFiles.length === 1
+    + '§6.3 of its content (over 1,000, so with a thousands comma), Edit in Customize, and the total '
+    + '"<n> / 2,000 tokens"', agent.agentFiles.length === 1 && tokens >= 1000
     && samePath(agent.agentFiles[0].path, join(ctx.userData, 'pi', 'AGENTS.md'))
-    && agent.agentFiles[0].tokens === `${tokens} tokens` && agent.agentFiles[0].buttons.some((button) => button.label
-      === 'Edit in Customize') && agent.agentTotal === `${tokens} / 2,000 tokens` && !agent.agentTotalOver,
+    && agent.agentFiles[0].tokens === `${thousands(tokens)} tokens` && agent.agentFiles[0].buttons.some((button) =>
+      button.label === 'Edit in Customize') && agent.agentTotal === `${thousands(tokens)} / 2,000 tokens`
+    && !agent.agentTotalOver,
   brief({ files: agent.agentFiles, total: agent.agentTotal, tokens }));
   await chooseSection(page, 'facts');
   await backToApp(page);
@@ -1346,7 +1352,7 @@ async function agentSection(ctx) {
   await chooseScope(page, 'user');
   const user = await memoryState(page);
   record('MEM-16 on User, AGENT lists only the user-level file and the total is its tokens',
-    user.agentFiles.length === 1 && user.agentTotal === `${estimate(USER_AGENTS)} / 2,000 tokens`,
+    user.agentFiles.length === 1 && user.agentTotal === `${thousands(estimate(USER_AGENTS))} / 2,000 tokens`,
   brief(user.agentFiles));
   await page.locator('[data-testid="memory-agent-file"] button', { hasText: 'Edit in Customize' }).click();
   const opened = await page.locator('[data-testid="tools-page"] [data-testid="agents-section"]')
@@ -1386,7 +1392,7 @@ async function customizeChecks(ctx) {
     join(resolve(folder), 'AGENTS.md')))];
   record('MEM-16 Customize › Instructions shows the same token counts in their own elements: agents-tokens after the '
     + 'effective file (whose text stays “In effect: <path>”), .agents-tokens on each loaded file',
-  samePath(a.effective, `In effect: ${userPath}`) && a.tokens === `${estimate(USER_AGENTS)} tokens`
+  samePath(a.effective, `In effect: ${userPath}`) && a.tokens === `${thousands(estimate(USER_AGENTS))} tokens`
     && own(a, ctx.p1) === `${thousands(estimate(P1_AGENTS))} tokens` && own(b, ctx.p2) === '1 token'
     && a.paths.every((path) => !/token/.test(path)), brief({ a, b }));
   const sum = (state) => tokensIn(state.tokens) + state.counts.reduce((total, item) => total + tokensIn(item), 0);
@@ -1404,9 +1410,56 @@ async function customizeChecks(ctx) {
     userTokens: info.userTokens, total: info.total }));
 }
 
+/**
+ * @brief 记忆页 AGENT 的用户级没有生效的文件与读取失败（memory-page.md"AGENT"，2026-10-26 补）。测试准备（synthetic）：
+ *        先把 <agentDir>\AGENTS.md 挪开（agentDir 里也没有 CLAUDE.md）：第一行 No user-level AGENTS.md，仍有 Edit in
+ *        Customize，点它落在 Customize › Instructions；再在原处放一个同名文件夹：AGENT 显示 Couldn’t load AGENTS.md: 加原文
+ *        （role=alert）；改回去后换分节再回来，列表恢复。
+ */
+async function agentFileStates(ctx) {
+  const { page } = ctx;
+  const file = join(ctx.userData, 'pi', 'AGENTS.md');
+  const away = `${file}.away`;
+  renameSync(file, away);
+  let none = null;
+  let failed = null;
+  try {
+    await goMemory(page, 'user', 'agent');
+    none = { row: (await memoryState(page)).agentFiles[0] ?? null };
+    await page.locator('[data-testid="memory-agent-file"] button', { hasText: 'Edit in Customize' }).click();
+    await page.getByTestId('tools-page').waitFor({ timeout: 10000 }).catch(() => {});
+    none.current = await page.locator('[data-testid="tools-nav"] [aria-current="page"]').getAttribute('data-section',
+      { timeout: 3000 }).catch(() => null);
+    mkdirSync(file);
+    await goMemory(page, 'user', 'agent');
+    failed = { ...(await memoryState(page)), role: await page.locator('.memory-load-error').getAttribute('role',
+      { timeout: 3000 }).catch(() => null) };
+  } finally {
+    rmSync(file, { recursive: true, force: true });
+    renameSync(away, file);
+  }
+  const prefix = 'Couldn’t load AGENTS.md: ';
+  record('MEM-16 with no user-level AGENTS.md in effect, AGENT’s first row says “No user-level AGENTS.md” and still '
+    + 'has Edit in Customize, which opens Customize on its Instructions section',
+  none.row?.none === 'No user-level AGENTS.md' && none.row.path === null
+    && none.row.buttons.some((item) => item.label === 'Edit in Customize' && !item.disabled)
+    && none.current === 'agents', brief(none));
+  record('MEM-16 when agents.get fails (<agentDir>\\AGENTS.md is a folder), AGENT shows “Couldn’t load AGENTS.md: '
+    + '<the reason>” (role=alert, the same sentence as Customize › Instructions) instead of the list',
+  failed.role === 'alert' && failed.loadError?.startsWith(prefix) && failed.loadError.length > prefix.length
+    && failed.agentFiles.length === 0, brief({ error: failed.loadError, files: failed.agentFiles }));
+  await chooseSection(page, 'facts');
+  await chooseSection(page, 'agent');
+  const back = await memoryState(page);
+  record('MEM-16 after the file is put back, switching sections and back lists the user-level file again',
+    back.loadError === null && back.agentFiles[0]?.tokens === `${thousands(estimate(USER_AGENTS))} tokens`,
+  brief({ error: back.loadError, files: back.agentFiles }));
+}
+
 /** @brief AGENT 与 Customize 的 Instructions 一节。 */
 async function agents(ctx) {
   await agentSection(ctx);
+  await agentFileStates(ctx);
   await customizeChecks(ctx);
 }
 
@@ -1778,6 +1831,27 @@ async function stillOpening(ctx) {
     === 'project' && ready.newEntry?.disabled === false && await paneWait(page, ctx.d1) === null, brief(ready));
 }
 
+/**
+ * @brief 停在记忆页 AGENT 时结束后台进程（memory-page.md"后台进程退出时"，2026-10-26 补）：用户级一行的 Edit in Customize
+ *        退出前可用，退出后不可用、悬停是退出的说明；之后 Restart。只用 User 层（不需要会话），--only crashAgent 能单独跑。
+ */
+async function killOnAgent(ctx) {
+  const { page } = ctx;
+  await goMemory(page, 'user', 'agent');
+  const edit = async () => (await memoryState(page)).agentFiles[0]?.buttons
+    .find((item) => item.label === 'Edit in Customize') ?? null;
+  const live = await edit();
+  killTbKernel(ctx);
+  await page.locator('.global-banner [data-testid="kernel-exit"]').waitFor({ timeout: 20000 });
+  await sleep(300);
+  const dead = await edit();
+  record('MEM-33 on AGENT, Edit in Customize is available before the exit and becomes unavailable with the hover '
+    + '“Mori’s background process crashed. Restart it to continue.” after it', live?.disabled === false
+    && crashedControl(dead), brief({ live, dead }));
+  await page.locator('.global-banner [data-testid="kernel-exit"] button', { hasText: 'Restart' }).click();
+  await waitRestarted(page);
+}
+
 /** @brief 后台进程退出。 */
 async function crash(ctx) {
   await killInChat(ctx);
@@ -1791,7 +1865,7 @@ const steps = {
   nav: ['MEM-14', nav], follow: ['MEM-14', follow], overLimit: ['MEM-07', overLimit], detail: ['MEM-14', detail],
   refresh: ['MEM-14', refresh], form: ['MEM-14', form], move: ['MEM-09', move], budget: ['MEM-07', budget],
   rollback: ['MEM-09', rollback], markers: ['MEM-08', markers], agents: ['MEM-16', agents], run: ['MEM-14', run],
-  crash: ['MEM-33', crash], opening: ['MEM-14', stillOpening],
+  crash: ['MEM-33', crash], crashAgent: ['MEM-33', killOnAgent], opening: ['MEM-14', stillOpening],
 };
 
 const ctx = { userData: tempUserData('mori-mem-page-data-'), exePath: args.exePath, pageErrors: [] };
