@@ -38,8 +38,8 @@ const SLOW = 4652;
 const SLOW_DELAY_MS = 100000;
 /** 合成端点认的思考字段（server.mjs REASONING_FIELDS） */
 const REASONING_FIELDS = ['reasoning_effort', 'reasoning', 'thinking', 'enable_thinking'];
-/** 协作模式下模型按钮的悬停（§12.11） */
-const LOCKED_TITLE = 'Team mode picks the model for each agent';
+/** 协作模式下模型按钮悬停的第二行、菜单里的说明（§12.11，2026-10-26 改） */
+const LOCKED_TITLE = 'Task mode picks the model for each agent';
 /** 要求交接写入等级 B 以上（§12.2） */
 const NEED_B = ['protocol_write>=B'];
 
@@ -490,20 +490,38 @@ async function checkReserve(ctx, r) {
 
 // ---------- TB-38：选择、锁定的模型按钮、思考强度（tb-models-sel） ----------
 
-/** @brief 协作模式下的模型按钮：样子，点击与 Enter 都不打开菜单。 */
+/**
+ * @brief 开着的模型菜单此刻的样子：范围的节与项有几个、说明的文字、从上到下的按钮（标识或动作）、焦点在哪个标识上。
+ */
+function menuNow(ctx, tab) {
+  return ctx.page.locator(`${paneSel(tab)} [data-testid="model-menu"]`).evaluate((el) => ({
+    sections: el.querySelectorAll('[data-section]').length,
+    radios: el.querySelectorAll('[role="menuitemradio"]').length,
+    note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null,
+    items: [...el.querySelectorAll('button')].map((item) => item.dataset.testid ?? item.dataset.action ?? ''),
+    focused: document.activeElement?.dataset.testid ?? null }));
+}
+
+/**
+ * @brief 协作模式下的模型按钮（2026-10-26 起能打开菜单，§12.11）：样子；点击打开的菜单只有说明、Task mode 一行和
+ *        Manage models，焦点在 Task mode 一行上；Esc 关上；焦点在按钮上按 Enter 同样打开。
+ */
 async function lockedView(ctx, who) {
   const button = await modelButton(ctx, who.tab);
   const locator = ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-button"]`);
-  // aria-disabled 的按钮 Playwright 会一直等它可用；照样点一下（force 只跳过等待，仍是真实的鼠标点击）。
-  await locator.click({ force: true, timeout: 5000 });
-  await sleep(300);
-  const afterClick = await ctx.page.getByTestId('model-menu').count();
+  const menu = ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-menu"]`);
+  await locator.click();
+  await menu.waitFor({ timeout: 5000 }).catch(() => {});
+  const clicked = (await menu.count()) ? await menuNow(ctx, who.tab) : null;
+  await ctx.page.keyboard.press('Escape');
+  await menu.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   await locator.focus();
   await ctx.page.keyboard.press('Enter');
-  await sleep(300);
-  const afterEnter = await ctx.page.getByTestId('model-menu').count();
+  await menu.waitFor({ timeout: 5000 }).catch(() => {});
+  const afterEnter = await menu.count();
   await ctx.page.keyboard.press('Escape');
-  return { button, afterClick, afterEnter, mode: (await teamSwitch(ctx, who.tab)).mode,
+  await menu.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+  return { button, clicked, afterEnter, mode: (await teamSwitch(ctx, who.tab)).mode,
     thinking: await thinkingButton(ctx, who.tab) };
 }
 
@@ -529,14 +547,20 @@ async function sel(ctx) {
   selThinking(ctx, who, lock);
 }
 
-/** @brief TB-38：协作模式下输入框下面一行的模型按钮只显示模型、setPick 被拒绝、pickOptions 为空。 */
+/** @brief TB-38：协作模式下模型按钮显示“Task mode · <模型 id>”、菜单只有说明与 Task mode 一行、setPick 被拒绝、pickOptions 为空。 */
 function selLocked(ctx, who, lock) {
-  record('TB-38 team mode: the model button in the message-box row only shows the model in use (data-locked, text '
-    + '"fake-other" = chat\'s model, no menu marker, hover "Team mode picks the model for each agent"); clicking it or '
-    + 'pressing Enter opens no menu', lock.mode === 'once' && lock.button.locked && lock.button.text === 'fake-other'
-    && lock.button.title === LOCKED_TITLE && lock.button.popup === null && lock.afterClick === 0
-    && lock.afterEnter === 0 && lock.t1 === 'active', brief(lock));
-  record('TB-38 team mode: session.setPick is refused with "Team mode picks the model for each agent" and '
+  const lines2 = lock.button.title?.split('\n') ?? [];
+  record('TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" (chat\'s model in '
+    + 'use; data-locked, still a menu button) with hover "Task mode · fake-other" / "Task mode picks the model for '
+    + 'each '
+    + 'agent"; clicking it opens a menu with only that note, the Task mode row (focused) and Manage models — no '
+    + 'Groups/Providers/Models; Enter on the button opens it too (2026-10-26, §12.11)',
+  lock.mode === 'once' && lock.button.locked && lock.button.text === 'Task mode · fake-other'
+    && lines2[0] === 'Task mode · fake-other' && lines2[1] === LOCKED_TITLE && lock.button.popup === 'menu'
+    && lock.clicked?.sections === 0 && lock.clicked.radios === 0 && lock.clicked.note === LOCKED_TITLE
+    && same(lock.clicked.items, ['team-switch', 'manage-models']) && lock.clicked.focused === 'team-switch'
+    && lock.afterEnter === 1 && lock.t1 === 'active', brief(lock));
+  record('TB-38 task mode: session.setPick is refused with "Task mode picks the model for each agent" and '
     + 'session.pickOptions returns no options', lock.refused.error?.includes(LOCKED_TITLE) === true
     && lock.options.error === null && lock.options.value?.error === null && lock.options.value?.options.length === 0,
   brief({ refused: lock.refused, options: lock.options }));
@@ -563,7 +587,7 @@ function selOff(ctx, who, unlocked) {
   const firstUser = entries.findIndex((entry) => entry.type === 'message' && entry.message.role === 'user');
   const lastPick = entries.findLastIndex((entry) => entry.type === 'custom' && entry.customType === 'mori.pick');
   const off = lines(ctx, 'tb-models-sel', { agent: 'chat', since: who.offAt });
-  record('TB-38 back in off mode the range is unchanged: when the request closes Team: Until done returns to off, '
+  record('TB-38 back in off mode the range is unchanged: when the request closes task mode (once) returns to off, '
     + 'the model button is a range menu again on tbm/fake-b, no mori.pick was written in team mode (all before the '
     + 'first message, last one tbm/fake-b), and the next off-mode reply is on fake-b',
   unlocked.mode === 'off' && !unlocked.button.locked && unlocked.button.popup === 'menu'
@@ -606,9 +630,9 @@ async function fam(ctx) {
     t2?.handoffs[0]?.authorFamilies], status: board?.requests[0]?.status }));
 }
 
-// ---------- TB-38：协作模式下被拒绝启动，Turn off team mode（tb-models-zone） ----------
+// ---------- TB-38：协作模式下被拒绝启动，Turn off task mode（tb-models-zone） ----------
 
-/** @brief chat 的模型所在区域被收回：拒绝启动卡上没有 Change model、有 Turn off team mode；点后回到 off、T1 stopped。 */
+/** @brief chat 的模型所在区域被收回：拒绝启动卡上没有 Change model、有 Turn off task mode；点后回到 off、T1 stopped。 */
 async function zone(ctx) {
   const grant = await tryBridge(ctx, { type: 'models.setProjectZones', path: ctx.p.zone, zones: ['public'] });
   const who = await begin(ctx, ctx.p.zone, 'Start long work tb-scenario:tb-models-zone');
@@ -625,17 +649,18 @@ async function zone(ctx) {
   const board = readBoard(ctx, who.sessionId);
   const after = { card: await blockedCard(ctx, who.tab), button: await modelButton(ctx, who.tab),
     progress: (await progressOf(ctx, who.tab))[0] };
-  record('TB-38 in team mode the blocked card of the dialog session has no "Change model…": with chat\'s only model '
+  record('TB-38 in task mode the blocked card of the dialog session has no "Change model…": with chat\'s only model '
     + 'in a zone no longer allowed for the project, the card (no_candidate, tbz/fake-zone zone_blocked) offers '
-    + '"Turn off team mode" and Open settings instead',
+    + '"Turn off task mode" and Open settings instead (the model button reads "Task mode · fake-zone")',
   grant.error === null && revoke.error === null && card?.kind === 'no_candidate'
     && card.actions.includes('turn-off-team')
     && !card.actions.includes('change-model') && card.candidates.some((c) => c.ref === 'tbz/fake-zone'
-    && c.reason === 'zone_blocked') && modeBefore === 'once' && before.locked && before.text === 'fake-zone',
+    && c.reason === 'zone_blocked') && modeBefore === 'once' && before.locked
+    && before.text === 'Task mode · fake-zone',
   brief({ card, modeBefore, before, grant: grant.error, revoke: revoke.error }));
   const t1 = taskOf(board, 'T1');
   const exec = lines(ctx, 'tb-models-zone', { agent: 'executor' });
-  record('TB-38 Turn off team mode on the blocked card goes straight to off although request 1 is still open, and '
+  record('TB-38 Turn off task mode on the blocked card goes straight to off although request 1 is still open, and '
     + 'the task of the open request becomes stopped ("Stopped", request state Stopped, no new task request); the '
     + 'model button unlocks and the card goes away (off mode uses your range)',
   started !== null && off && stopped !== null && t1?.status === 'stopped' && t1.stopReason === 'user'

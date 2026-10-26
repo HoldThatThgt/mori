@@ -403,7 +403,8 @@ async function twoToolsCheck(page, h) {
 
 /**
  * @brief 生成中（录制在等界面的下一条命令，一直在生成）：从文字框 Tab 依次是权限 → 选择范围 → Effort → 圆环 → "Queue" →
- *        ▾ → "Stop"（models.md"位置"）；范围按钮和 Effort 不可用（aria-disabled）但能 Tab 到，读屏描述和悬停是原因。
+ *        ▾ → "Stop"（models.md"位置"）；Effort 不可用（aria-disabled）但能 Tab 到，范围按钮可用（2026-10-26 起能打开菜单
+ *        切 Task mode），两者的读屏描述和悬停都写原因。
  */
 async function runningKeys(page) {
   const path = await tabPath(page, `${SINGLE} .composer textarea`, (name) => name === 'Stop', 8);
@@ -411,8 +412,9 @@ async function runningKeys(page) {
   const problems = stateProblems(row, 'running', OPTS);
   record('stop：生成中有字时从文字框按 Tab 依次是权限 → 选择范围 → Effort → 圆环 → "Queue" → ▾ → "Stop"',
     path.join() === `${ROW_PATH},Queue,More send options,Stop`, path.join(' → '));
-  record('stop：生成中范围按钮和 Effort 不可用（aria-disabled、仍能 Tab 到），原因"Can’t switch models until the response '
-    + 'finishes"（范围按钮悬停第三行，描述"replay, Local. …"）、"Can’t change effort until the response finishes"；'
+  record('stop：生成中 Effort 不可用（aria-disabled、仍能 Tab 到）、范围按钮可用（能打开菜单切 Task mode），原因"Can’t '
+    + 'switch models until the response finishes"（范围按钮悬停第三行，描述"replay, Local. …"）、"Can’t change effort '
+    + 'until the response finishes"；'
     + '权限和圆环可用', problems.length === 0, problems.join('; '));
 }
 

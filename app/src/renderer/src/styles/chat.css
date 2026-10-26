@@ -717,7 +717,7 @@
 }
 /* 文字框下面一行按会话面板的宽度分档，单栏、分屏相同（models.md"窄栏"；每档按最挤的情况估的宽度见
    docs/v0/composer-pickers.md"宽度估算"）。每一档也包含比它宽的各档的改动；再放不下时按上面的 flex-shrink 截短 */
-/* Stop team（协作模式下后台有 Agent）≤ 760px 就只有图标（32px，名字在 aria-label 和悬停说明里）：带字时约 110px，
+/* Stop agents（协作模式下后台有 Agent）≤ 760px 就只有图标（32px，名字在 aria-label 和悬停说明里）：带字时约 110px，
    601–708px 的一栏最挤时（生成中有字、"Effort: Unavailable"）会把模式名截到只剩一两个字母，违反"宽于 400px 时不截
    模式名"（models.md"窄栏"） */
 @container (max-width: 760px) {
@@ -727,7 +727,7 @@
 @container (max-width: 680px) {
   .composer-bottom .thinking-prefix { display: none; }
 }
-/* 有 Stop team 时"Queue"从 520px 起就收起（只留 ▾，菜单里多出"Queue for later"），比没有时的 400px 早：Stop team 多占
+/* 有 Stop agents 时"Queue"从 520px 起就收起（只留 ▾，菜单里多出排队的那一项），比没有时的 400px 早：Stop agents 多占
    约 36–40px，401–426px 和 461–482px 的一栏最挤时会截模式名（models.md"窄栏"） */
 @container (max-width: 520px) {
   .composer-bottom:has(> .stop-team-button) .queue-main { display: none; }
@@ -737,7 +737,7 @@
   }
   .composer-bottom:has(> .stop-team-button) .send-menu .queue-later { display: flex; }
 }
-/* "Send"、"Stop"、"Queue"和 Stop team（team.css）只有图标（名字在 aria-label 和悬停说明里），各 32px，▾ 24px */
+/* "Send"、"Stop"、"Queue"和 Stop agents（team.css）只有图标（名字在 aria-label 和悬停说明里），各 32px，▾ 24px */
 @container (max-width: 600px) {
   .composer-bottom .send-text { display: none; }
   .composer-bottom .queue-icon { display: block; }
@@ -767,8 +767,8 @@
   .composer-bottom :is(.permission-button, .model-button, .thinking-button) { padding-right: 4px; padding-left: 4px; }
   .composer-bottom > .permission { min-width: 40px; }
   .composer-bottom > :is(.model-switch, .thinking-switch) { min-width: 36px; }
-  /* 有 Stop team 时（后台有 Agent）收起排队的按钮（"Queue ▾"的 ▾、准备中的"Queue"）：Enter 照样排队、Ctrl+Enter
-     插话（输入框的提示写着），280px 一栏的这一行才放得下 Stop team 和"Stop"（models.md"窄栏"）；藏起时焦点在里面的
+  /* 有 Stop agents 时（后台有 Agent）收起排队的按钮（"Queue ▾"的 ▾、准备中的"Queue"）：Enter 照样排队、Ctrl+Enter
+     插话（输入框的提示写着），280px 一栏的这一行才放得下 Stop agents 和"Stop"（models.md"窄栏"）；藏起时焦点在里面的
      回到文字框（rowMenu.ts useHiddenFallback） */
   .composer-bottom:has(> .stop-team-button) > :is(.split-button, .queue-button) { display: none; }
 }

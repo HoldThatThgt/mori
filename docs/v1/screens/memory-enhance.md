@@ -33,10 +33,10 @@ token 数不到 1000 写 `<n> tokens`（1 时 `1 token`），1000 起写 `<n>k t
 | --- | --- | --- | --- |
 | 读取中 | 进入 `Project`（打开记忆页、换层、跟随的项目改变）时发的 `enhance.get` 还没返回 | 开关 `Enhancement`；状态行留空（离开 `Project` 之前读到的状态、`Couldn’t run enhancement: …` 都不留）；开关、`Run now`、`Settings…` 不可用（临时，走查时可以改） | — |
 | 已读到 | `enhance.get` 的结果 | 开关 `Enhancement`（`enhance-switch`，`role="switch"`，`aria-checked` 为 `info.enabled`）；右边状态行（`enhance-status`，下一节）；按钮 `Run now`（`enhance-run`）、`Settings…`（`enhance-settings`） | 开关；Run now；Settings… |
-| 开关中 | 你点了开关，`enhance.set { cwd, enabled }` 还没返回 | 开关保持原来的状态、不可用（同协作开关的“切换中”，临时，走查时可以改） | — |
+| 开关中 | 你点了开关，`enhance.set { cwd, enabled }` 还没返回 | 开关保持原来的状态、不可用（同模型菜单里 Task mode 一行的“切换中”，临时，走查时可以改） | — |
 | 打开了 | `enhance.set` 返回 `{ error: null, info }` | 开关按 `info.enabled`；状态行按 `info`（下一节），例如第一次打开、设置里有默认范围时 `On · Next run <Mon D> <hh:mm>`，没有默认范围时 `On · Choose a model in enhancement settings`；F8 记 `Turn on enhancement <cwd>` | — |
 | 关掉了 | 同上 | 开关关；状态行是关的那一行；这个项目排着的项去掉，正在跑的那一次停止并记失败（原因 `Enhancement was turned off`），已写入的改动留在条目里，可以用那条修订回滚（§9.4、§9.6）；F8 记 `Turn off enhancement <cwd>` | — |
-| 开关失败 | `enhance.set` 返回 `error` | 开关下面一行 `Couldn’t change enhancement: <原因>`，开关回到 `info.enabled`（同协作开关）；这一行在下次点开关或 10 秒后消失（同 team-switch.md，临时，走查时可以改） | 再点 |
+| 开关失败 | `enhance.set` 返回 `error` | 开关下面一行 `Couldn’t change enhancement: <原因>`，开关回到 `info.enabled`（同 Task mode 一行）；这一行在下次点开关或 10 秒后消失（同 team-switch.md，临时，走查时可以改） | 再点 |
 | 后台进程退出 | 界面的后台进程状态 | 保留最后读到的状态行（退出时还没返回的 `enhance.get` 不把它换成 `Couldn’t read the enhancement settings: …`）；开关、`Run now`、`Settings…` 不可用，悬停 `Mori’s background process crashed. Restart it to continue.`（§10.10） | — |
 | 重新连上 | 你点了 `Restart` | 跟随的会话打开好之后重读 `enhance.get` | 照常 |
 
@@ -93,7 +93,7 @@ token 数不到 1000 写 `<n> tokens`（1 时 `1 token`），1000 起写 `<n>k t
 | `Effort` 没有范围 | 下拉没有选中范围，或所选范围不在 `effortPicks` 里（取不到候选） | 下拉不可用，悬停 `Choose a model first.`；保持原来的值（临时，走查时可以改） | 选一个范围 |
 | `Effort` 没有 Off（2026-10-24 补，模型层规格 §7.7、§9.1） | `effortPicks[<所选范围>]` 为真，且所选范围在 `info.noOffPicks` 里（`effortPicks` 为假时按“`Effort` 不可用”，不看 `noOffPicks`） | 下拉不列 `Off`（不是变淡），从 `Minimal` 起，其余同 `Effort`；没有悬停说明（模型层规格只给了输入框下面一行的 Effort 菜单那一句，临时，走查时可以改） | 选一档 |
 | 存的是 Off、第一个候选没有 Off（2026-10-24 补，模型层规格 §7.7） | 草稿的强度是 `off`（`info.thinking` 为 `off`，或草稿是 Off 时改选了这样的范围），所选范围同上一行（在 `noOffPicks` 里） | 下拉显示 `Minimal`（增强会话经虚拟模型路由，pi 按实际模型把 Off 提到 Minimal，用的就是它）；不动 `Effort` 就保存时照存：`enhance.set` 带 `thinking: 'off'`；改选第一个候选有 Off 的范围时显示回 `Off` | 选另一档 |
-| `Team mode` | `info.team` | 标签 `Team mode`；勾选框 `Run with team mode`（`enhance-team`），下面一行 `Uses this project’s agents in .mori/agents.`（临时，规格 §12） | 勾选 |
+| `Task mode`（2026-10-26 前叫 `Team mode`） | `info.team` | 标签 `Task mode`；勾选框 `Run in task mode`（`enhance-team`；原为 `Run with team mode`，负责人走查 M21），下面一行 `Uses this project’s agents in .mori/agents.`（临时，规格 §12） | 勾选 |
 | `Daily time` | `info.time` | 标签 `Daily time`；`<input type="time">`（`enhance-time`），下面一行 `Runs once a day at this time. Conversations before it count as the previous day.`（临时，规格 §12） | 改时间 |
 | 时间清空 | 你清空了时间框、点了 `Save` | 显示 `Choose a time.`，不发命令 | 填时间 |
 | 保存中 | `enhance.set { cwd, pick, thinking, team, time }` 还没返回（没选范围时不带 `pick`，临时，走查时可以改） | `Save` 不可用（临时，走查时可以改） | — |

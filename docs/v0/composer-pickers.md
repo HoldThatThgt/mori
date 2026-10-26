@@ -756,6 +756,10 @@ fixture 内容不变（v1 的 `fixtures/v1/*.json` 也不重录）；这是有�
 
 ## TaskBoard 合入之后（2026-10-22）
 
+> 2026-10-26 负责人走查 M10、M21（WP-09，[../v1/walkthrough-1026/WP-09.md](../v1/walkthrough-1026/WP-09.md)）：协作开关从顶栏移进模型菜单（Task mode 一行），
+> 不宽于 600px 时的状态点去掉，Shift+Tab 回会话树回到 5 次；协作模式下模型按钮变为"Task mode · <模型 id>"，"Stop team"改名"Stop agents"。
+> 下面量的顶栏宽度、开关宽度和 Stop team 的宽度是那之前的，这一行在 WP-09 合入时重新量（`m6-app-bands`、`m1-layout`、`tb-app-stop` 的 rowFit）。
+
 这一步把 composer-pickers rebase 到合并了 TaskBoard 的 `app-v0`（`046a9ca`）上。按上面"给 TaskBoard 留的位置"，协作开关
 （`TeamSwitch.tsx`，`data-testid="team-switch"`，`role="switch"`）是顶栏右边一组（`.topbar-actions`）的第一个，在
 "Toggle changes"前面；顶栏从左到右是"项目名 › 会话名"、协作开关、右栏开关、分屏时的"Close pane"。

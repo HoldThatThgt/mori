@@ -51,7 +51,7 @@
 | 菜单 | 你点了按钮，或点了拒绝启动卡的"Change model…" | v1 model-menu.md"菜单"（Groups、Providers、Models 三节，区域，被排除的变淡，当前范围打勾，底部"Applies to this session only. New sessions use the default range from Settings."，最后一项"Manage models"打开 设置 → Models）；往上打开，宽 min(300px, 这一行的宽)（见"菜单的位置与键盘"） | ↑ ↓、Enter 选择；Esc 关闭；点外面关闭 |
 | 切换中 | 你选了一项，`session.setPick` 还没返回 | 按钮显示你选的范围、不可用（`aria-disabled`、`data-pending="true"`，变淡，焦点留在按钮上）；悬停只有第一行；Effort 这时也不可用、也带 `data-pending`（两个按钮共用一个切换中的值） | — |
 | 已切换 / 切换失败 | `session.setPick` 的结果 | v1 model-menu.md；失败时"Couldn’t change the model range: <原文>"从这一行往上弹出、右边对齐按钮，下次打开菜单或 10 秒后消失 | — |
-| 准备中、生成中 | 发了消息到本轮结束（`sending` 或 `running`） | 按钮不可用（`aria-disabled`）；悬停第三行和读屏描述的后半"Can’t switch models until the response finishes"（第一、二行不变）；开着的菜单关闭 | 停止后再改 |
+| 准备中、生成中 | 发了消息到本轮结束（`sending` 或 `running`） | 2026-10-26 起按钮可用、菜单能打开（为了在回复中切 Task mode，负责人走查 M10，[../../v1/screens/model-menu.md](../../v1/screens/model-menu.md)“回复进行中的菜单”）：不带 `aria-disabled`；悬停第三行和读屏描述的后半仍是"Can’t switch models until the response finishes"（第一、二行不变）；菜单里范围的项不可用，开着的菜单不关（原来：按钮不可用、开着的菜单关闭） | 打开菜单切 Task mode；停止后再改范围 |
 | 后台进程退出、重新载入中 | 同 chat.md"后台进程退出" | 按钮不可用；第三行和读屏描述的后半是按钮位置的说明："Mori’s background process crashed"，重新载入中"Restarting…"；开着的菜单关闭 | "Restart" |
 
 v0 的"No models available"、" (deleted)"和"Default"标记不再出现：没有能用的模型、范围指向不存在的名字（`pick_missing`）时，
@@ -187,10 +187,11 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 
 | 浮层 | 生成开始（准备中、生成中） | 不能发送（后台进程退出、重新载入、打开中、打开失败） | 其他 |
 | --- | --- | --- | --- |
-| 范围菜单、Effort 菜单 | 关闭（按钮不可用） | 关闭 | 按钮消失时（打开失败；没有当前模型时的 Effort）跟着关 |
+| 范围菜单 | 不关（2026-10-26 起；范围的项变为不可用，只有 Task mode 一行和“Manage models”能用） | 关闭 |
+| Effort 菜单 | 关闭（按钮不可用） | 关闭 | 按钮消失时（打开失败；没有当前模型时的 Effort）跟着关 |
 | 权限菜单 | 不关（生成中仍可用，同原来） | 关闭（原来不关，一起改） | — |
 | 圆环详情 | 不关 | 不关（圆环保留最后的用量） | 只在圆环消失时（打开失败、pi 返回空）跟着关 |
-| "Queue"的下拉 | — | 关闭（按钮消失） | 清空草稿或本轮结束、"Queue ▾"消失时跟着关；≤ 340px 时 Stop team 出现、"Queue ▾"收起时也关（见"窄栏""最窄"） |
+| "Queue"的下拉 | — | 关闭（按钮消失） | 清空草稿或本轮结束、"Queue ▾"消失时跟着关；≤ 340px 时 Stop agents 出现、"Queue ▾"收起时也关（见"窄栏""最窄"） |
 | 换范围失败那一行 | 不关 | 不关 | 打开范围菜单时、10 秒后消失（v1） |
 
 ## 不可用时、按钮消失时的焦点
@@ -199,8 +200,8 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
   点了不开菜单。能用时不带 `aria-disabled`（`aria-disabled={x ? true : undefined}`，同 v1；不写"false"，
   测试等的是这个属性不在）。权限、Effort 不可用的原因同时是悬停说明的第二行和读屏的描述，代替原来的第二行；范围按钮的原因是悬停的
   第三行（第二行仍是提供商和区域），读屏的描述是第二行加". "加原因：
-  - 准备中、生成中（只有范围按钮、Effort）："Can’t switch models until the response finishes"（范围按钮的第三行）、
-    "Can’t change effort until the response finishes"；
+  - 准备中、生成中（只有范围按钮、Effort）："Can’t switch models until the response finishes"（范围按钮的第三行；2026-10-26 起
+    范围按钮这时不再不可用，这一行只说明菜单里的项为什么不可用）、"Can’t change effort until the response finishes"；
   - 后台进程退出："Mori’s background process crashed"；重新载入中："Restarting…"；
   - 打开中（第一次打开时只有权限按钮，Restart 之后的重新打开范围按钮、Effort、权限三个都在，Effort 要有 `current`）："Starting…"；
   - 打开失败（只有权限按钮）："Session didn’t open"。
@@ -211,7 +212,7 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
   权限按钮要加 `[aria-disabled='true']` 的样式（现在只有 `:disabled` 和 `:not(:disabled):hover`）。
 - 焦点所在的这一行的按钮消失时，焦点移到这一栏的文字框（不落到 `body`，否则下一次 Tab 从页面开头走）：
   打开失败时的范围按钮、Effort 按钮；本轮结束时的"Stop"、"Queue"、▾；清空草稿时的"Queue"、▾；
-  发出消息时的"Send"（准备中换成"Stop"）；消失的圆环；≤ 340px 时 Stop team 出现、因此收起的"Queue ▾"和准备中的"Queue"
+  发出消息时的"Send"（准备中换成"Stop"）；消失的圆环；≤ 340px 时 Stop agents 出现、因此收起的"Queue ▾"和准备中的"Queue"
   （`display: none`，`rowMenu.ts` 的 `useHiddenFallback`）。菜单里有焦点的项随菜单关闭消失时，焦点按上面的表回到按钮，按钮也消失时回到文字框。
   Restart 之后重新打开中按钮还在（不可用），焦点留在原来的按钮上。
 
@@ -231,13 +232,13 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 宽 | 会话面板宽于 680px | 权限"Ask each time ▾"；选择范围按钮（最长 200px，任何宽度都是这个上限）；"Effort: High ▾"；圆环；带文字的"Send"、"Stop"、"Queue ▾"；间距 8px | 全部 |
-| 稍窄 | ≤ 760px | 协作模式下的 Stop team 只显示图标（32px，读屏名"Stop team"、悬停"Stop all agents in this session"），比"Send"、"Stop"早：带字时约 110px，601–708px 的面板最挤时（生成中有字、"Effort: Unavailable"）会把模式名截到只剩一两个字母（2026-10-22 最终审查后 `tb-app-stop` 量出来的） | 同上 |
+| 稍窄 | ≤ 760px | 协作模式下的 Stop agents 只显示图标（32px，读屏名"Stop agents"、悬停"Stop all agents in this session"），比"Send"、"Stop"早：带字时约 110px，601–708px 的面板最挤时（生成中有字、"Effort: Unavailable"）会把模式名截到只剩一两个字母（2026-10-22 最终审查后 `tb-app-stop` 量出来的；那时叫"Stop team"，2026-10-26 改名为"Stop agents"、模型按钮在协作模式下变为"Task mode · <模型 id>"，这一档和下面"有 Stop agents、≤ 520px"在 WP-09 合入时重新量） | 同上 |
 | 较窄 | ≤ 680px | Effort 按钮只显示强度："High ▾"、"Unavailable ▾" | 同上 |
-| 窄 | ≤ 600px | "Send"、"Stop"、"Queue"只显示图标（Stop team 从 760px 起已经只有图标）（"Send"是圆形的强调色按钮，"Stop"是圆形按钮，"Queue"用新图标 `queue`、连着它的 ▾），名字在读屏名里："Send"（悬停"Send (Enter)"）、"Stop"（悬停"Stop response (Esc)"）、"Queue"（悬停"Queue for later (Enter)"）、▾"More send options"。"Send"、"Stop"、"Queue"各 32px 宽，▾ 24px（原来 32px）。顶栏的协作开关在同一档只剩状态点（[chat.md](chat.md)"顶栏"） | 同上 |
-| 有 Stop team、≤ 520px | 协作模式下后台有 Agent，会话面板 ≤ 520px | 生成中有字时"Queue"就收起，只留 ▾（菜单里多出"Queue for later"），同下面"很窄"一档，只是更早：Stop team 多占约 36–40px，不收的话 401–426px 和 461–482px 的面板最挤时（"Effort: Unavailable"）会截模式名（2026-10-22 最终审查后 `tb-app-stop` 量出来的）；焦点在"Queue"上时回到文字框 | 同"很窄" |
+| 窄 | ≤ 600px | "Send"、"Stop"、"Queue"只显示图标（Stop agents 从 760px 起已经只有图标）（"Send"是圆形的强调色按钮，"Stop"是圆形按钮，"Queue"用新图标 `queue`、连着它的 ▾），名字在读屏名里："Send"（悬停"Send (Enter)"）、"Stop"（悬停"Stop response (Esc)"）、"Queue"（悬停"Queue for later (Enter)"）、▾"More send options"。"Send"、"Stop"、"Queue"各 32px 宽，▾ 24px（原来 32px）。顶栏的协作开关在同一档只剩状态点（[chat.md](chat.md)"顶栏"） | 同上 |
+| 有 Stop agents、≤ 520px | 协作模式下后台有 Agent，会话面板 ≤ 520px | 生成中有字时"Queue"就收起，只留 ▾（菜单里多出"Queue for later"），同下面"很窄"一档，只是更早：Stop agents 多占约 36–40px，不收的话 401–426px 和 461–482px 的面板最挤时（"Effort: Unavailable"）会截模式名（2026-10-22 最终审查后 `tb-app-stop` 量出来的）；焦点在"Queue"上时回到文字框 | 同"很窄" |
 | 更窄 | ≤ 460px | 权限、范围、Effort 按钮去掉 ▾，这一行的间距收小到 4px；这一行按钮的键盘焦点环离按钮 1px（全局是 2px，间距只有 4px 时环碰到旁边的按钮、被后面的按钮盖住一截） | 同上 |
 | 很窄 | ≤ 400px | 生成中、输入框有字时，"Queue"按钮收起，只留 ▾"More send options"，它的菜单里是"Queue for later"（快捷键提示 Enter）和"Steer"（快捷键提示 Ctrl+Enter）；"Stop"留在原位。准备中有字时的"Queue"只有一个按钮（不能插话，没有 ▾），不收起（32px） | 点 ▾ 选；Enter 排队、Ctrl+Enter 插话、Esc 停止照旧 |
-| 最窄 | ≤ 340px | "Send"、"Stop"（和 Stop team）的图标按钮 28px（原来 32px），准备中的"Queue"也收到 28px；权限、范围、Effort 按钮的左右内边距 4px（原来 6px）。协作模式下后台有 Agent（有 Stop team）时，生成中有字的"Queue ▾"（这一档只剩 ▾）和准备中有字的"Queue"收起，Stop team 和"Stop"留着（2026-10-22 最终审查后定，见下面的估算）；焦点在收起的按钮上时回到文字框，开着的"Queue"下拉关上 | 同上；有 Stop team 时 Enter 排队、Ctrl+Enter 插话（输入框的提示写着），没有点的按钮 |
+| 最窄 | ≤ 340px | "Send"、"Stop"（和 Stop agents）的图标按钮 28px（原来 32px），准备中的"Queue"也收到 28px；权限、范围、Effort 按钮的左右内边距 4px（原来 6px）。协作模式下后台有 Agent（有 Stop agents）时，生成中有字的"Queue ▾"（这一档只剩 ▾）和准备中有字的"Queue"收起，Stop agents 和"Stop"留着（2026-10-22 最终审查后定，见下面的估算）；焦点在收起的按钮上时回到文字框，开着的"Queue"下拉关上 | 同上；有 Stop agents 时 Enter 排队、Ctrl+Enter 插话（输入框的提示写着），没有点的按钮 |
 | 放不下 | 这一行的内容比这一行宽（任何一档） | 依次截短，前一项到最窄才轮到下一项：① 不能发送时的说明（"Mori’s background process crashed"、"Starting…"等，最窄 48px，悬停说明和横幅里有全文）；② 选择范围按钮（最窄 40px，≤ 340px 时 36px）：先截当前模型 id（连同它前面的" · "，`.range-model`），截完了才截范围名（`.range-scope`；范围是模型时只有模型 id 一段）；③ 权限的模式名（最窄 44px，≤ 340px 时 40px）；④ Effort 的强度（最窄 40px，≤ 340px 时 36px）。截短处是省略号"…"，前面留几个字母由 Chromium 决定（量到最窄的权限是"Ask …"、"Allo…"），测试不比字面。最窄的数在 ≤ 460px（没有 ▾）时字有 28–32px；宽于 460px 时有 ▾，同样的最窄里字只剩约 8–14px（范围按钮约 8px），但最挤时也截不到那里。各项都是这一行的直接子项，`flex-shrink` 相邻差 1e5 以上（composer-pickers.md"宽度估算"）。不换行、不超出输入框；圆环、"Send" / "Stop" / ▾ 不收 | 同上 |
 
 - 截短只是样式：按钮的文字（textContent）仍是全文，读屏名也是全文（"Permission mode: Ask each time"、"Model range: fast, deepseek-chat"、
@@ -248,12 +249,12 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
   放得下常见的"<提供商名> · <模型 id>"（约 170–195px）；≤ 400px 起最挤时才截模式名；
   280px 一栏最挤时是截短的模式名（权限 40px）、范围按钮 36px、截短的强度（Effort 约 52px；准备中有字时 48px，
   旁边是 28px 的"Queue"）、圆环、▾、"Stop"，三个按钮都不窄于最窄。空闲、Effort 是"High"时，280px 也能显示完整的"Ask each time"（范围按钮约 41px）。
-- 协作模式下后台有 Agent 时这一行多一个 Stop team（宽于 760px 时带字，约 110px，之后同"Stop"）。不收起排队的按钮的话，分屏
+- 协作模式下后台有 Agent 时这一行多一个 Stop agents（宽于 760px 时带字，约 110px，之后同"Stop"）。不收起排队的按钮的话，分屏
   280–295px 一栏、生成中、输入框有字时这一行会超出约 16px（三个按钮已到最窄：权限 40 + 范围 36 + Effort 36 + 圆环 26 + ▾ 24
-  + Stop team 28 + "Stop" 28 + 6 个 4px 的间距 = 242px，这一行约 226px）；准备中有字时（单个 28px 的"Queue"）超出约 20px。
-  所以 ≤ 340px 有 Stop team 时收起排队的按钮（"最窄"一行），最挤时是 214px，280px 一栏放得下、还有约 12px。
+  + Stop agents 28 + "Stop" 28 + 6 个 4px 的间距 = 242px，这一行约 226px）；准备中有字时（单个 28px 的"Queue"）超出约 20px。
+  所以 ≤ 340px 有 Stop agents 时收起排队的按钮（"最窄"一行），最挤时是 214px，280px 一栏放得下、还有约 12px。
   `tb-app-stop` 的 TB-54 在单栏 930–300px（每条边界的两侧）和分屏右栏 296 / 281 / 280 / 279px 量过（锁定的模型按钮、
-  Stop team 的宽和只有图标、宽于 400px 模式名不截、≤ 340px 收起、不换行不溢出）。没选的做法：把 Stop team 收进 ▾（准备中没有 ▾，还要另一种做法）。
+  Stop agents 的宽和只有图标、宽于 400px 模式名不截、≤ 340px 收起、不换行不溢出）。没选的做法：把 Stop agents 收进 ▾（准备中没有 ▾，还要另一种做法）。
 
 "Queue"的下拉里各项的名字只有文字（"Queue for later"、"Steer"），快捷键是旁边的 `.menu-hint`（`aria-hidden`），
 另放在 `aria-keyshortcuts`（"Enter"、"Control+Enter"）里，读屏名里没有" · "。

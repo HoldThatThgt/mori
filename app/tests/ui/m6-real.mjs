@@ -1085,7 +1085,7 @@ async function askWithThinking(ctx) {
     settings: readJson(join(ctx.agentDir, 'settings.json')) };
 }
 
-/** @brief 走查 8 后半的检查：新会话的默认强度、生成中按钮不可用、高 / 关两次回复。 */
+/** @brief 走查 8 后半的检查：新会话的默认强度、生成中思考按钮不可用（范围按钮可用）、高 / 关两次回复。 */
 function recordThinkingRun(ctx, run) {
   record('走查 8：新会话的思考强度是设置里的默认"低"；菜单列出关、最低、低、中、高，"低"打勾，说明只作用于这个会话',
     run.initial === 'low' && run.menu.text === 'Effort: Low' && run.menu.reasoning === 'true'
@@ -1093,9 +1093,10 @@ function recordThinkingRun(ctx, run) {
     && run.menu.items.every((item) => !item.disabled) && run.menu.checked === 'low'
     && run.menu.note === 'Applies to this session only. Set each model’s default for new sessions in Settings.',
     JSON.stringify(run.menu));
-  record('走查 8：生成中输入框下面一行的范围和思考按钮不可用（aria-disabled，仍能 Tab 到），范围按钮悬停的第三行'
-    + '"Can’t switch models until the response finishes"、Effort 悬停的第二行"Can’t change effort until the response '
-    + 'finishes"，读屏的描述里也是', run.start?.running === true && run.start.model?.unavailable
+  record('走查 8：生成中输入框下面一行的思考按钮不可用（aria-disabled，仍能 Tab 到），范围按钮可用（2026-10-26 起能打开菜单'
+    + '切 Task mode），范围按钮悬停的第三行"Can’t switch models until the response finishes"、Effort 悬停的第二行'
+    + '"Can’t change effort until the response finishes"，读屏的描述里也是', run.start?.running === true
+    && run.start.model && !run.start.model.unavailable
     && run.start.model.tip[2] === MODEL_BUSY && run.start.model.described.endsWith(`. ${MODEL_BUSY}`)
     && run.start.thinking?.unavailable && run.start.thinking.tip[1] === NOTE.effortBusy
     && run.start.thinking.described === NOTE.effortBusy, JSON.stringify(run.start));

@@ -25,6 +25,8 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m3-app.mjs                         测开发构建
 //   node tests/ui/m3-app.mjs --exe <Mori.exe 路径>   测打包后的程序
+//   node tests/ui/m3-app.mjs --only 步骤1,步骤2       只跑这几步（setup、buildTree 总是跑：别的步骤都用它建的会话树；
+//                                                    测试分层第 2 条）
 // 结果写到 test-results/m3-app.json（文件名带 -packaged 后缀区分），截图在 test-results/m3-app/。
 // 删除文件失败：测试用 Win32 CreateFileW 拿住会话文件、不给 FILE_SHARE_DELETE（m3-helpers.mjs holdFile），
 // 主进程删除时报 EBUSY；放开后再删成功。选文件夹对话框经 dialog.showOpenDialog 直接返回文件夹；
@@ -50,6 +52,7 @@ import {
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
+const only = arg('only')?.split(',');
 const suffix = exePath ? '-packaged' : '';
 const port = 4324;
 const baseUrl = `http://127.0.0.1:${port}/v1`;
@@ -318,12 +321,12 @@ async function shiftTabIntoTree(page) {
 }
 
 /**
- * @brief 走查 2：Ctrl+N（焦点在输入框）→ Shift+Tab 6 次（顶栏的右栏开关、协作开关，左栏分隔线、左栏底部的
+ * @brief 走查 2：Ctrl+N（焦点在输入框）→ Shift+Tab 5 次（顶栏的右栏开关，左栏分隔线、左栏底部的
  *        两个按钮）回到会话树，落在新会话行；整棵树一个 Tab 停靠点。2026-10-21 起权限、选择范围、Effort 按钮和上下文用量在
  *        输入框下面一行、文字框之后（composer-pickers.md），不在这条路上（原来是 8 次，路径里依次有顶栏的权限、思考强度和
- *        模型按钮；那一项检查的行为被去掉了，改成下面"不经过输入框下面一行"）。TaskBoard 的协作开关是顶栏右边一组的第一个
- *        （parallel-agents-taskboard.md §13.1，一个真正可以聚焦的按钮），多一个停靠点（会话还在打开时它不可用、不在 Tab
- *        路径上；ctrlN 等到会话打开好才返回，所以次数是确定的）。
+ *        模型按钮；那一项检查的行为被去掉了，改成下面"不经过输入框下面一行"）。TaskBoard 的协作开关 2026-10-22 起是顶栏右边一组的
+ *        第一个（多一个停靠点，6 次），2026-10-26 移进输入框下面一行的模型菜单（parallel-agents-taskboard.md §13.1，
+ *        WP-09），又是 5 次；ctrlN 等到会话打开好才返回，所以次数是确定的。
  */
 async function keyboardPath(ctx) {
   const { page } = ctx;
@@ -334,13 +337,13 @@ async function keyboardPath(ctx) {
     && k.title === NEW_SESSION && samePath(k.cwd, ctx.folders.beta) && composer, JSON.stringify(k));
   const entered = await shiftTabIntoTree(page);
   // 2026-10-21 起顶栏只有会话名、协作开关、右栏开关（分屏时"Close pane"），权限、选择范围、Effort 移到输入框下面一行：
-  // 9 次（M6 的 8 次加 TaskBoard 的协作开关）改为 6 次。
-  record('走查 2：从新会话的输入框 Shift+Tab 6 次回到会话树，落在新会话行（中间不在别的会话行停）',
-    samePath(entered.focus.file, ctx.files.K) && entered.presses === 6,
+  // 9 次（M6 的 8 次加 TaskBoard 的协作开关）改为 6 次；2026-10-26 协作开关移进模型菜单（WP-09），5 次。
+  record('走查 2：从新会话的输入框 Shift+Tab 5 次回到会话树，落在新会话行（中间不在别的会话行停）',
+    samePath(entered.focus.file, ctx.files.K) && entered.presses === 5,
     `按了 ${entered.presses} 次：${entered.path.join(' → ')}；焦点：${JSON.stringify(entered.focus)}`);
-  record('走查 2：Shift+Tab 的路径是顶栏的右栏开关 → 协作开关 → 左栏分隔线 → 左栏底部的两个按钮 → 会话行（sessions.md'
-    + ' 写的路径，加上协作开关），不经过输入框下面一行的权限、选择范围、Effort 按钮和圆环',
-  entered.path[0] === 'Toggle changes' && entered.testids[1] === 'team-switch' && entered.roles[2] === 'separator'
+  record('走查 2：Shift+Tab 的路径是顶栏的右栏开关 → 左栏分隔线 → 左栏底部的两个按钮 → 会话行（sessions.md'
+    + ' 写的路径；顶栏没有协作开关），不经过输入框下面一行的权限、选择范围、Effort 按钮和圆环',
+  entered.path[0] === 'Toggle changes' && entered.roles[1] === 'separator' && !entered.testids.includes('team-switch')
     && entered.inRow.every((inside) => !inside) && !entered.testids.some((id) => ROW_TAB_ORDER.includes(id)),
   `路径：${entered.path.join(' → ')}；data-testid：${entered.testids.map((id) => id ?? '—').join(' → ')}`);
   const stops = (await allRows(page)).filter((row) => row.tabIndex === 0);
@@ -1100,7 +1103,7 @@ async function statusRunning(ctx) {
   await openRow(page, A1);
   await ctx.h.send('wait 4s');
   await waitRunning(page);
-  busyRow(await rowWhen(page, (row) => row.model?.unavailable === true && row.thinking?.unavailable === true, 2000));
+  busyRow(await rowWhen(page, (row) => row.thinking?.unavailable === true, 2000));
   await openRow(page, K);
   const running = await rowState(page, A1);
   record('状态：切走后生成中的会话行显示"生成中"（圆点加文字，跟在会话名右边）', running?.status === 'running'
@@ -1194,16 +1197,21 @@ async function statusApproval(ctx) {
 // ---------- 输入框下面一行：生成中（composer-pickers.md 新检查第 6 条） ----------
 
 /**
- * @brief 生成中输入框下面一行（models.md"不可用时、按钮消失时的焦点"）：权限按钮和圆环可用；选择范围按钮
- *        不可用（aria-disabled，仍能 Tab 到），悬停三行"fake-coder" / "Mori endpoint · Local" / "Can’t switch models until the
- *        response finishes"，描述"Mori endpoint, Local. Can’t switch models until the response finishes"；Effort 不可用，
- *        悬停第一行仍是全名，第二行和读屏的描述"Can’t change effort until the response finishes"。
+ * @brief 生成中输入框下面一行（models.md"不可用时、按钮消失时的焦点"）：权限按钮和圆环可用；选择范围按钮 2026-10-26 起
+ *        可用（能打开菜单切 Task mode，model-menu.md"回复进行中的菜单"），悬停三行仍是"fake-coder" /
+ *        "Mori endpoint · Local" / "Can’t switch models until the response finishes"，描述"Mori endpoint, Local. Can’t
+ *        switch models until the response finishes"；Effort 不可用，悬停第一行仍是全名，第二行和读屏的描述
+ *        "Can’t change effort until the response finishes"。
  */
 function busyRow(row) {
-  record('生成中：权限按钮和圆环可用；选择范围按钮不可用（aria-disabled，没有 data-pending），悬停第三行和读屏描述的后半'
-    + '"Can’t switch models until the response finishes"（第一、二行不变）；Effort 不可用，悬停第二行和读屏的描述'
-    + '"Can’t change effort until the response finishes"', usable(row?.permission) && Boolean(row.usage)
-    && rangeBlockedBy(row.model, RANGE.where, MODEL_BUSY) && blockedBy(row.thinking, EFFORT_BUSY),
+  const range = row?.model;
+  record('生成中：权限按钮和圆环可用；选择范围按钮可用（不带 aria-disabled、没有 data-pending：能打开菜单切 Task mode），'
+    + '悬停第三行和读屏描述的后半仍是"Can’t switch models until the response finishes"（第一、二行不变）；Effort 不可用，'
+    + '悬停第二行和读屏的描述"Can’t change effort until the response finishes"', usable(row?.permission)
+    && Boolean(row.usage) && Boolean(range) && !range.unavailable && !range.pending
+    && range.tip?.[1] === RANGE.where && range.tip?.[2] === MODEL_BUSY
+    && range.described === `${RANGE.where.replace(/ · /g, ', ')}. ${MODEL_BUSY}`
+    && blockedBy(row.thinking, EFFORT_BUSY),
   JSON.stringify(row && { permission: row.permission, model: row.model, thinking: row.thinking, usage: row.usage }));
 }
 
@@ -1742,6 +1750,7 @@ const ctx = { userData, root, folders, trust, files: {}, pageErrors: [], small: 
 await startApp(ctx);
 try {
   for (const [name, step] of Object.entries(steps)) {
+    if (only && !['setup', 'buildTree'].includes(name) && !only.includes(name)) continue;
     try {
       await step(ctx);
     } catch (error) {

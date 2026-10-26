@@ -115,7 +115,7 @@ async function pressInComposer(ctx, tab, key) {
   await ctx.page.keyboard.press(key);
 }
 
-/** @brief 点这个会话的 Stop team。 */
+/** @brief 点这个会话的 Stop agents。 */
 const clickStopTeam = (ctx, tab) => ctx.page.locator(`${paneSel(tab)} [data-testid="stop-team"]`)
   .click({ timeout: 10000 });
 
@@ -436,11 +436,11 @@ async function approveAll(ctx, who) {
   brief({ endE, later, t2, t3, tasks: taskBrief(board), cards: requests.length }));
 }
 
-// ---------- TB-35：Stop team（脚本 tb-stop-team） ----------
+// ---------- TB-35：Stop agents（脚本 tb-stop-team） ----------
 
 /**
  * @brief 布好停止前的样子（T1 批准卡、T2 交给结案在处理、T3 等 planner 的回复、T4 排在结案队列、第二条消息待判断），
- *        按 Stop team，检查停止的结果；之后交回 T3、撤销需求。
+ *        按 Stop agents，检查停止的结果；之后交回 T3、撤销需求。
  */
 async function teamStop(ctx) {
   const who = await begin(ctx, ctx.split, `Do several things ${tag('team')}`);
@@ -453,7 +453,7 @@ async function teamStop(ctx) {
   const queued = await waitBoard(ctx, sid, (board) => taskOf(board, 'T2')?.holder?.kind === 'close'
     && taskOf(board, 'T4')?.holder?.kind === 'close', 40000);
   if (!ready || !queued || !(await waitReply(ctx, who, 'Planner registered it.'))) {
-    throw new Error('the state before Stop team was not reached');
+    throw new Error('the state before Stop agents was not reached');
   }
   const msg2 = 'Also update the docs';
   await sendMessage(ctx, who.tab, msg2);
@@ -473,10 +473,11 @@ async function teamStop(ctx) {
   await teamHandBack(ctx, who, obs);
 }
 
-/** @brief TB-35：Stop team 之后全部停下、批准按拒绝、消息回到输入框、等回复的以 Stopped by the user. 结束、task 停下。 */
+/** @brief TB-35：Stop agents 之后全部停下、批准按拒绝、消息回到输入框、等回复的以 Stopped by the user. 结束、task 停下。 */
 async function teamStopChecks(ctx, who, obs) {
   const sid = who.sessionId;
-  record('TB-35 Stop team stops every agent: right after it the session is not busy and nothing runs in the background '
+  record('TB-35 Stop agents stops every agent: right after it the session is not busy and nothing runs in the '
+    + 'background '
     + '(TeamState busy and background false), the dialog is not sending (its pending bubble is gone), and no agent '
     + 'sends another request', !obs.info.team.busy && !obs.info.team.background && !obs.pane.running
     && !obs.pane.sending && !obs.pane.users.includes(obs.msg2) && obs.lines.length === 0,
@@ -485,10 +486,10 @@ async function teamStopChecks(ctx, who, obs) {
   const end = (await teamApprovalEvents(ctx, sid)).ends.find((item) => item.requestId === obs.cardId);
   const bash = resultTexts(ctx, sid, 't1.executor', 'bash');
   const shown = await ctx.page.locator(cardSel(who.tab, obs.cardId)).count();
-  record('TB-35 Stop team rejects the pending approvals: T1\'s card ends reject by stop and disappears, T1\'s bash '
+  record('TB-35 Stop agents rejects the pending approvals: T1\'s card ends reject by stop and disappears, T1\'s bash '
     + `result is "${REJECTED_BY_STOP}"`, end?.decision === 'reject' && end.by === 'stop' && shown === 0
     && bash[0]?.text === REJECTED_BY_STOP, brief({ end, bash, shown }));
-  record('TB-35 Stop team puts the deciding message back into the input box and empties the queue area',
+  record('TB-35 Stop agents puts the deciding message back into the input box and empties the queue area',
     obs.deciding && obs.pane.draft === obs.msg2 && obs.pane.queue.length === 0 && obs.info.deciding.queue.length === 0,
     brief({ deciding: obs.deciding, draft: obs.pane.draft, queue: obs.pane.queue }));
   const asked = resultTexts(ctx, sid, 't3.reviewer', 'agent_message');
@@ -498,7 +499,7 @@ async function teamStopChecks(ctx, who, obs) {
     && asked[0].text.replace(/^\[#\d+\] /, '') === STOPPED_BY_USER && asked[0].error, brief({ asked }));
   const tasks = ['T1', 'T2', 'T3', 'T4'].map((id) => ({ id, before: taskOf(obs.before, id),
     after: taskOf(obs.after, id) }));
-  record('TB-35 Stop team makes the running tasks and the tasks with close (T2 being processed, T4 queued) stopped '
+  record('TB-35 Stop agents makes the running tasks and the tasks with close (T2 being processed, T4 queued) stopped '
     + 'with stopReason user and their holders kept (executor, close, reviewer, close)',
   tasks.every((item) => item.after?.status === 'stopped' && item.after.stopReason === 'user'
     && same(item.after.holder, item.before?.holder)) && same(tasks.map((item) => item.after?.holder?.kind),
@@ -506,25 +507,26 @@ async function teamStopChecks(ctx, who, obs) {
     stop: item.after?.stopReason, holder: item.after?.holder }))));
   const errors = obs.after.tasks.flatMap((task) => task.handoffs.filter((h) => h.reason === 'error')
     .map((h) => `${task.id}#${h.n}`));
-  record('TB-35 Stop team writes no handoff with reason error (no run ended by the stop is treated as a failure)',
+  record('TB-35 Stop agents writes no handoff with reason error (no run ended by the stop is treated as a failure)',
     errors.length === 0, brief({ errors, batons: taskBrief(obs.after) }));
   await teamStopQuiet(ctx, who, obs);
 }
 
 /** @brief TB-35：停止之后端点没有新的请求、不自动重新开始；结案与程序唤醒的立项没有后续动作，投递队列清空。 */
 async function teamStopQuiet(ctx, who, obs) {
-  record('TB-35 after Stop team the endpoint gets no new request (8 s) and nothing restarts by itself: the TaskBoard '
+  record('TB-35 after Stop agents the endpoint gets no new request (8 s) and nothing restarts by itself: the TaskBoard '
     + 'stays as the stop left it and the tasks stay stopped', obs.lines.length === 0 && same(obs.after, obs.later),
   brief({ lines: lineBrief(obs.lines), tasks: taskBrief(obs.later) }));
   const dropped = appLogLines(ctx, `${who.sessionId}.close.1: Stop team dropped a delivery`, obs.stopAt);
   const closeLater = obs.lines.filter((line) => line.agent === 'planner');
-  record('TB-35 Stop team during a close run (T2) and a program-woken create run (agent_message from the reviewer): no '
+  record('TB-35 Stop agents during a close run (T2) and a program-woken create run (agent_message from the reviewer): '
+    + 'no '
     + 'forced fill, forced close or fallback delivery follows (no planner request after the stop), and the queued '
     + 'delivery of T4 to the close session is dropped (logged)', closeLater.length === 0 && dropped.length >= 1,
   brief({ dropped, closeLater: lineBrief(closeLater) }));
 }
 
-/** @brief TB-35 合并会话：回复中又发、已交给 pi 排队的消息，Stop team 把它放回输入框，排队区清空，之后不再发出。 */
+/** @brief TB-35 合并会话：回复中又发、已交给 pi 排队的消息，Stop agents 把它放回输入框，排队区清空，之后不再发出。 */
 async function teamStopQueued(ctx) {
   const who = await begin(ctx, ctx.merged, `Queue then stop ${tag('piqueue')}`);
   if (!(await waitLine(ctx, 'tb-stop-piqueue', { agent: 'mori', kind: 'task', task: 'T1' }, 40000))) {
@@ -541,14 +543,14 @@ async function teamStopQueued(ctx) {
   const pane = await paneState(ctx.page, who.tab);
   const lines = scenarioLines(ctx.ep, 'tb-stop-piqueue', { since: stopAt + 300 });
   const sent = messagesOf(readJsonl(who.sessionFile), 'user').some((m) => textOfMessage(m).includes(msg2));
-  record('TB-35 Stop team takes back the message in pi\'s queue (merged session, sent during the reply): it is back '
+  record('TB-35 Stop agents takes back the message in pi\'s queue (merged session, sent during the reply): it is back '
     + 'in the input box, the queue area is empty, and it is never sent (no request in 6 s, not in the session file)',
   queued && pane.draft === msg2 && pane.queue.length === 0 && lines.length === 0 && !sent,
   brief({ queued, draft: pane.draft, queue: pane.queue, lines: lineBrief(lines), sent }));
 }
 
 /**
- * @brief Stop team 时对话在为第一条消息准备中（立项在判断它），第二条在等判断（脚本 tb-stop-stopprep）：
+ * @brief Stop agents 时对话在为第一条消息准备中（立项在判断它），第二条在等判断（脚本 tb-stop-stopprep）：
  *        两条按发送顺序回到输入框，之后没有请求。
  */
 async function teamStopPreparing(ctx) {
@@ -570,7 +572,7 @@ async function teamStopPreparing(ctx) {
   await sleep(6000);
   const pane = await paneState(ctx.page, who.tab);
   const lines = scenarioLines(ctx.ep, 'tb-stop-stopprep', { since: stopAt + 300 });
-  record('TB-35 Stop team while the dialog prepares for your first message (planner judging it) and a second one '
+  record('TB-35 Stop agents while the dialog prepares for your first message (planner judging it) and a second one '
     + 'waits: both are back in the input box in sending order, the pending bubble and the queue area are empty, and '
     + 'no request follows (6 s)', ready !== null && pane.draft === `${first}\n\n${second}` && !pane.sending
     && !pane.users.some((text) => text.includes('Prepare then stop')) && pane.queue.length === 0
@@ -578,11 +580,11 @@ async function teamStopPreparing(ctx) {
     lines: lineBrief(lines) }));
 }
 
-/** @brief TB-35：F8 的"Recent activity"记 Stop team。 */
+/** @brief TB-35：F8 的"Recent activity"记 Stop agents。 */
 async function teamStopIssue(ctx, who) {
-  const report = await issueReport(ctx, who.tab, 'Stop team check');
-  const lines = report.actions.filter((line) => line.endsWith(' Stop team'));
-  record('TB-35 F8 records the click as "Stop team" in the recent actions', lines.length === 1,
+  const report = await issueReport(ctx, who.tab, 'Stop agents check');
+  const lines = report.actions.filter((line) => line.endsWith(' Stop agents'));
+  record('TB-35 F8 records the click as "Stop agents" in the recent actions', lines.length === 1,
     brief({ path: report.path, lines, tail: report.actions.slice(-4) }));
 }
 
@@ -598,7 +600,7 @@ async function teamHandBack(ctx, who, obs) {
   const deliveries = reviewer ? messagesOf(reviewer.entries, 'user').length : 0;
   const line = findLine(ctx, 'tb-stop-team', { agent: 'reviewer', kind: 'task', task: 'T3', k: 2, since });
   const board = readBoard(ctx, sid);
-  record('TB-35 after Stop team a task_edit hand-back continues the original session: T3 (stopped while the reviewer '
+  record('TB-35 after Stop agents a task_edit hand-back continues the original session: T3 (stopped while the reviewer '
     + 'held it) goes back to the reviewer in the same t3.reviewer session (second delivery, k=2) and ends done',
   same(files, ['t3.reviewer']) && deliveries === 2 && line !== null && taskOf(board, 'T3')?.status === 'done'
     && taskOf(obs.after, 'T3')?.holder?.role === 'reviewer', brief({ files, deliveries, line: line && lineBrief([line]),
@@ -796,7 +798,7 @@ async function reloadBackground(ctx, who, reloadAt, msg2) {
 
 // ---------- TB-42：归档、删除与关闭（脚本 tb-stop-del） ----------
 
-/** @brief 只有后台在运行、有待判断的消息时不能归档删除（后台进程同样拒绝）；Stop team 之后删除，实例一起关闭。 */
+/** @brief 只有后台在运行、有待判断的消息时不能归档删除（后台进程同样拒绝）；Stop agents 之后删除，实例一起关闭。 */
 async function deleteStep(ctx) {
   const who = await begin(ctx, ctx.del, `Background job ${tag('del')}`);
   const sid = who.sessionId;
@@ -843,7 +845,7 @@ async function deleteAndCheck(ctx, who) {
   const shut = probe.filter((item) => item.t >= deleteAt).map((item) => item.id);
   const enabled = ['Archive', 'Delete…']
     .every((label) => menu.find((item) => item.label === label)?.disabled === false);
-  record('TB-42 closing a session closes its instance sessions: deleting it after Stop team released the open T1 '
+  record('TB-42 closing a session closes its instance sessions: deleting it after Stop agents released the open T1 '
     + 'executor and create instances (session_shutdown) together with the user session',
   enabled && open.every((id) => files.includes(id) && shut.includes(id)) && shut.includes(sid),
   brief({ enabled, files, shut }));
@@ -1032,10 +1034,10 @@ async function fitRight(page, target) {
 
 /**
  * @brief TB-54 与 composer-pickers：协作模式下 T1 executor 在后台、对话在回复、输入框里有字时，这一行在单栏 930–300px、
- *        分屏右边一栏 296–279px 都放得下（m6-helpers paneProblems 的 teamTyped：锁定的模型按钮在范围按钮的位置、
- *        不窄于最窄、截短带"…"；宽于 400px 时模式名不截；Stop team 在"Stop"前，> 760px 带字、≤ 760px 只有图标 32px、
- *        ≤ 340px 28px；≤ 520px 时"Queue"收起只留 ▾；
- *        ≤ 340px 时"Queue ▾"收起）；最后用键盘按 Stop team，它消失、焦点回到文字框。
+ *        分屏右边一栏 296–279px 都放得下（m6-helpers paneProblems 的 teamTyped：协作模式下的模型按钮"Task mode · <模型 id>"
+ *        在范围按钮的位置（2026-10-26 起带 ▾、可以打开菜单）、不窄于最窄、先截模型 id 再截"Task mode"、截短带"…"；
+ *        宽于 400px 时模式名不截；Stop agents 在"Stop"前，> 760px 带字、≤ 760px 只有图标 32px、≤ 340px 28px；≤ 520px 时"Queue"收起只留 ▾；
+ *        ≤ 340px 时"Queue ▾"收起）；最后用键盘按 Stop agents，它消失、焦点回到文字框。
  */
 async function rowFit(ctx) {
   const other = await begin(ctx, ctx.review, `Other pane ${tag('row2')}`, { team: false });
@@ -1075,34 +1077,35 @@ async function rowSweep(ctx, who, other) {
   return { single, split };
 }
 
-/** @brief rowFit 的检查：各宽度没有问题且到了要的宽度；再用键盘按 Stop team，它消失、焦点回到文字框。 */
+/** @brief rowFit 的检查：各宽度没有问题且到了要的宽度；再用键盘按 Stop agents，它消失、焦点回到文字框。 */
 async function rowFitChecks(ctx, who, { single, split }) {
   const off = (samples) => samples.filter((s) => s.problems.length > 0 || Math.abs(s.width - s.want) >= 1);
   const fine = (samples) => off(samples).length === 0;
   // 记录里先放有问题的样子（记录的说明有长度上限），再放每个宽度这一行的几项
   const detail = (samples) => brief({ off: off(samples), all: samples.map((s) => `${s.width}:${s.items}`) });
   record('TB-54 composer row with an agent in the background while the dialog replies and the input box has a draft '
-    + '(single pane 930 to 300px, both sides of every band edge): one line inside the message box; the locked model '
-    + 'button sits where the range button was (at least 40px, 36px at 340px or narrower, cut with an ellipsis); the '
-    + 'mode name is not cut above 400px; Stop team comes before Stop, with its text above 760px, icon only (32px) at '
+    + '(single pane 930 to 300px, both sides of every band edge): one line inside the message box; the task-mode model '
+    + 'button "Task mode · <model id>" sits where the range button was (at least 40px, 36px at 340px or narrower, the '
+    + 'model id cut first, with an ellipsis); the '
+    + 'mode name is not cut above 400px; Stop agents comes before Stop, with its text above 760px, icon only (32px) at '
     + '760px or narrower and 28px at 340px or narrower; "Queue" folds into its menu button at 520px or narrower and '
     + 'both fold away at 340px or narrower',
   fine(single), detail(single));
   record('TB-54 the same row in split view, this session in the right pane at 296/281/280/279px: one line, nothing '
-    + 'outside the row (permission, range, Effort, ring, Stop team and Stop fit; "Queue" and its menu button folded '
+    + 'outside the row (permission, range, Effort, ring, Stop agents and Stop fit; "Queue" and its menu button folded '
     + 'away)', fine(split), detail(split));
   const pane = ctx.page.locator(paneSel(who.tab));
-  // 关掉一栏后 focusComposer 下一帧才把焦点放进文字框：等它落定再把焦点放到 Stop team 上
+  // 关掉一栏后 focusComposer 下一帧才把焦点放进文字框：等它落定再把焦点放到 Stop agents 上
   await sleep(500);
   await pane.getByTestId('stop-team').focus();
   const onButton = await pane.getByTestId('stop-team').evaluate((el) => el === document.activeElement);
-  if (!onButton) throw new Error('focus did not stay on Stop team');
+  if (!onButton) throw new Error('focus did not stay on Stop agents');
   await ctx.page.keyboard.press('Enter');
   const gone = await pane.getByTestId('stop-team').waitFor({ state: 'detached', timeout: 15000 })
     .then(() => true, () => false);
   const focus = await poll(() => ctx.page.evaluate((css) => document.activeElement
     === document.querySelector(`${css} .composer textarea`), paneSel(who.tab)), 1000, 50);
-  record('TB-54 Stop team pressed with the keyboard: it stops the team, the button disappears and focus goes back to '
+  record('TB-54 Stop agents pressed with the keyboard: it stops the team, the button disappears and focus goes back to '
     + 'the text box (models.md)', gone && Boolean(focus), brief({ gone, focus }));
   await pane.locator('.composer textarea').fill('');
   await settle(ctx, who, 30000);

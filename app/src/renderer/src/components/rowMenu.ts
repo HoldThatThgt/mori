@@ -65,10 +65,10 @@ export function useFocusFallback(element: React.RefObject<HTMLElement | null>, t
 }
 
 /**
- * @brief Stop team 出现时 chat.css 可能把 root 里的排队按钮藏起（≤ 340px，models.md"窄栏"，display: none）：这时先调
+ * @brief Stop agents 出现时 chat.css 可能把 root 里的排队按钮藏起（≤ 340px，models.md"窄栏"，display: none）：这时先调
  *        onHidden（root 自己被藏起时，例如关上"Queue"的下拉），焦点在一个藏起的元素上时放回这一栏的文字框
  *        （不让它掉到 body 上；浮层还开着时 focusComposer 等它关上）。
- * @param stopTeam Stop team 是否显示（tab.team.background）
+ * @param stopTeam Stop agents 是否显示（tab.team.background）
  */
 export function useHiddenFallback(root: React.RefObject<HTMLElement | null>, tabKey: string, stopTeam: boolean,
   onHidden?: () => void): void {

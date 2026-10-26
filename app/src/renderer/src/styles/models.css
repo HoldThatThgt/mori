@@ -49,6 +49,17 @@
 .switch-menu .menu-note { padding-top: 8px; border-top: 1px solid var(--color-line); }
 /* 思考关不掉的模型（规格 §7.7）：Effort 菜单底部说明下面另起一行的那句，不另起一节 */
 .switch-menu .menu-note + .menu-note { padding-top: 0; border-top: 0; }
+/* 模型菜单里的 Task mode 一行（docs/v1/screens/team-switch.md）：说明之下另起一组，名字和第二行在左，开关的样子在右
+   （同 Customize 的开关 .tools-switch，tools.css；这里只是样子，不另算控件）；切换失败的一行在它下面，用警示色 */
+.task-mode-group { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--color-line); }
+.menu .task-mode-item { align-items: center; }
+.task-mode-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.task-mode-hint { color: var(--color-faint); font-size: var(--fs-small); overflow-wrap: anywhere; }
+.task-mode-item .tools-switch { display: inline-block; }
+.menu .task-mode-item[aria-checked='true'] .tools-switch { background-color: var(--color-accent); }
+.task-mode-item[aria-checked='true'] .tools-switch-knob { transform: translateX(14px); }
+.task-mode-item:disabled { cursor: default; opacity: .6; }
+.switch-menu .task-mode-group .team-error { margin-top: 0; padding-top: 0; border-top: 0; color: var(--color-danger); }
 /* 范围菜单的三节（Groups、Providers、Models）；每项右侧标区域（不收短），名字放不下时截断，全名在悬停说明里；
    本会话静态校验排除的项变淡，仍可以选 */
 .pick-section + .pick-section { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--color-line); }

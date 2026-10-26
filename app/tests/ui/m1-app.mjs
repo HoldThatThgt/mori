@@ -12,6 +12,8 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m1-app.mjs                         测开发构建
 //   node tests/ui/m1-app.mjs --exe <Mori.exe 路径>   测打包后的程序
+//   node tests/ui/m1-app.mjs --only 步骤1,步骤2       只跑这几步（firstRun 总是跑；layoutRestart 是循环之后的布局重启、
+//                                                    圆环与崩溃几步，要跑时写上它；测试分层第 2 条）
 // 结果写到 test-results/m1-app.json（文件名带 -packaged 后缀区分），截图在 test-results/m1-app/。
 
 import { execFileSync, spawn } from 'node:child_process';
@@ -31,6 +33,7 @@ import { pageHelpers } from './page.mjs';
 import { partsBrief, partsProblems, readParts } from './ring-parts.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
+const only = arg('only')?.split(',');
 const suffix = exePath ? '-packaged' : '';
 const port = 4321;
 const baseUrl = `http://127.0.0.1:${port}/v1`;
@@ -173,14 +176,15 @@ async function firstRunPassed({ page, h, userData }, wrong) {
 
 /**
  * @brief 准备中（v1，chat.md"输入框下面一行"准备中，models.md"不可用时、按钮消失时的焦点"）：发了第一条消息、pi 还没开始时
- *        按钮位置是"Stop"；选择范围和 Effort 不可用（aria-disabled），原因是"Can’t switch models until the response
- *        finishes"（范围按钮悬停第三行）、"Can’t change effort until the response finishes"；权限和圆环可用；占位文字
+ *        按钮位置是"Stop"；Effort 不可用（aria-disabled），选择范围按钮可用（2026-10-26 起能打开菜单切 Task mode），
+ *        原因是"Can’t switch models until the response finishes"（范围按钮悬停第三行）、"Can’t change effort until the
+ *        response finishes"；权限和圆环可用；占位文字
  *        "Enter to queue · Shift+Enter for new line"。seen 是 watchRows 抓到的状态。
  */
 function preparingRow(seen) {
   const row = seenWith(seen, 'preparing');
   const problems = [...layoutProblems(row), ...stateProblems(row, 'preparing', APP_OPTS)];
-  record('对话：准备中（发了消息、pi 还没开始）按钮位置是"Stop"，选择范围和 Effort 不可用（aria-disabled）、原因对，'
+  record('对话：准备中（发了消息、pi 还没开始）按钮位置是"Stop"，Effort 不可用（aria-disabled）、选择范围按钮可用、原因对，'
     + '权限和圆环可用，占位文字"Enter to queue · Shift+Enter for new line"', problems.length === 0,
   `${problems.join('; ')} ${rowSummary(row)}`);
 }
@@ -730,6 +734,7 @@ const steps = { firstRun, firstMessage, ringParts, copyCode, cancelTest, shortRa
   kernelExit };
 try {
   for (const [name, step] of Object.entries(steps)) {
+    if (only && name !== 'firstRun' && !only.includes(name)) continue;
     try {
       await step(ctx);
     } catch (error) {
@@ -737,12 +742,14 @@ try {
       await page.screenshot({ path: join(shots, `${name}-error.png`) }).catch(() => {});
     }
   }
-  Object.assign(ctx, await layoutRestart(ctx));
-  app = ctx.app;
-  page = ctx.page;
-  await app.close().catch(() => {});
-  await ringRuns(ctx);
-  await mainKilled(ctx).catch((error) => record('崩溃：流程', false, oneLine(error, 400)));
+  if (!only || only.includes('layoutRestart')) {
+    Object.assign(ctx, await layoutRestart(ctx));
+    app = ctx.app;
+    page = ctx.page;
+    await app.close().catch(() => {});
+    await ringRuns(ctx);
+    await mainKilled(ctx).catch((error) => record('崩溃：流程', false, oneLine(error, 400)));
+  }
 } catch (error) {
   record('布局重启：流程', false, oneLine(error, 400));
 } finally {

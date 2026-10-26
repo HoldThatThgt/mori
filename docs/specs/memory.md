@@ -809,7 +809,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 | 依据 | 跳到哪里 | 跳不过去时 |
 | --- | --- | --- |
 | `session` + `entry`，会话在侧栏里 | 打开那个会话（已归档的先恢复，同 M7），在对话流里找到含这个条目的那一轮（用户消息、助手回复或其中的工具调用）并高亮（同 M7 的时长） | 会话已删除：`Session deleted`；条目不在当前分支：`This message is no longer in the session.`；会话列表还没读好或读取失败、会话也没打开时同 M7：`Sessions are still loading. Try again in a moment.` / `Couldn’t load sessions, so the original session can’t be opened.` / `The original session isn’t in your session list.`，再点时清掉；读会话文件出其他错时显示原因 |
-| `session` 是 TaskBoard 实例会话 | 不能打开（实例会话不进侧栏）：`This is a team task’s session, which can’t be opened.` | — |
+| `session` 是 TaskBoard 实例会话 | 不能打开（实例会话不进侧栏）：`This is a background agent’s session, which can’t be opened.`（2026-10-26 改，原为 team task’s session：实例会话也可能是立项、结案、临时提问的） | — |
 | `feedback` | 反馈文件还在：跳到那条反馈的来源（M7 的回复、选区、文件三种跳法）；文件不在：`The feedback file was removed.` | 同 M7 的各条 |
 | `entry` 为 `null`（分开时立项记的，那时消息还没写进用户会话） | 打开会话，不定位：`Opened the session; the exact message wasn’t recorded.` | 同第一行 |
 
@@ -832,7 +832,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 `Project` 时，分节上面一块 `data-testid="memory-enhance"`：
 
 - 开关 `Enhancement`（`enhance-switch`，`role="switch"`，`aria-checked`），右边状态行（`enhance-status`）与按钮 `Run now`（`enhance-run`）、`Settings…`（`enhance-settings`）。
-  开关失败时开关下面一行 `Couldn’t change enhancement: <原因>`，开关回到 `info.enabled`（同协作开关）。
+  开关失败时开关下面一行 `Couldn’t change enhancement: <原因>`，开关回到 `info.enabled`（同模型菜单里的 Task mode 一行）。
 - 状态行（`enhance.get` 的结果；时间按本地时间 `<Mon D> <hh:mm>`；token 不到 1000 写 `<n> tokens`，1000 起写 `<n>k tokens`，四舍五入到整数）：
 
   | 状态 | 文字 |
@@ -853,7 +853,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
   - `Model range`（`enhance-model`）：组、提供商、模型（同设置页 Defaults 的下拉，不提供 `None`）；
   - `Effort`（`enhance-effort`）：pi 的七档（同输入框下面一行 Effort 按钮的文字）。按所选范围的第一个候选（同 §9.1 取默认强度的规则）：那个模型没标 Supports thinking 时不可用，悬停 `This model isn’t marked “Supports thinking”`（同顶栏）；
     （2026-10-24 注：所选范围在 `enhance.get` 的 `noOffPicks` 里（第一个候选的档案 `reasoning.off_refused`，§8）时不列 Off；已经存成 Off 的照存（不改写 `thinking`），显示为 Minimal（增强会话经虚拟模型路由，pi 按实际模型把 Off 提到 Minimal，用的就是它）；见 [model-providers.md](model-providers.md) §7.7。）
-  - `Team mode`：勾选框 `Run with team mode`（`enhance-team`），下面一行 `Uses this project’s agents in .mori/agents.`（临时）；
+  - `Task mode`（2026-10-26 前叫 `Team mode`，负责人走查 M21）：勾选框 `Run in task mode`（`enhance-team`；原为 `Run with team mode`），下面一行 `Uses this project’s agents in .mori/agents.`（临时）；
   - `Daily time`：`<input type="time">`（`enhance-time`），下面一行 `Runs once a day at this time. Conversations before it count as the previous day.`（临时）；清空时 `Save` 显示 `Choose a time.`、不发命令；
   - `Save`（`enhance-save`）、`Cancel`；保存失败时显示 `Couldn’t save the enhancement settings: <原因>`、不关闭。
 - 收到 `mori.enhance_progress` 时重读 `enhance.get`（只在记忆页开着、项目相同时）。

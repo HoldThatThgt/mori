@@ -573,14 +573,15 @@ function reasonProblems(name, item, reason) {
 
 /**
  * @brief 选择范围按钮（悬停三行，composer-pickers.md"v1 之后的调整"）：第二行"<提供商名> · <区域>"（expected 给出时等于它，
- *        字串或正则；没有当前模型时"No model can run in this session"），不可用时第三行是 reason；读屏的描述是第二行
- *        （" · "换成", "）加不可用时的". <原因>"，由按钮外面的 model-tip 给出。
+ *        字串或正则；没有当前模型时"No model can run in this session"），有原因时第三行是 reason；读屏的描述是第二行
+ *        （" · "换成", "）加". <原因>"，由按钮外面的 model-tip 给出。只在不能发送时（blocking 不为 null）aria-disabled：
+ *        2026-10-26 起准备中、生成中按钮可用（能打开菜单切 Task mode），原因仍在第三行（docs/v1/screens/model-menu.md）。
  */
-function modelProblems(model, reason, expected) {
+function modelProblems(model, reason, expected, blocking) {
   if (!model) return [];
   const out = [];
   const tip = lines(model);
-  if (model.ariaDisabled !== (reason === null ? null : 'true')) out.push(`model aria-disabled=${model.ariaDisabled}`);
+  if (model.ariaDisabled !== (blocking === null ? null : 'true')) out.push(`model aria-disabled=${model.ariaDisabled}`);
   if (model.disabled) out.push('model range button uses disabled (should be aria-disabled)');
   if (model.pending) out.push(`model data-pending=${model.pending}`);
   const zoneOk = expected instanceof RegExp ? expected.test(tip[1] ?? '') : expected ? tip[1] === expected
@@ -638,7 +639,7 @@ export function stateProblems(row, state, { ring = true, modelTip = null } = {})
   }
   out.push(...reasonProblems('permission', perm, reason));
   out.push(...reasonProblems('effort', effort, busy ? BUSY.effort : reason));
-  out.push(...modelProblems(model, busy ? BUSY.model : reason, modelTip));
+  out.push(...modelProblems(model, busy ? BUSY.model : reason, modelTip, reason));
   out.push(...hoverProblems(row, reason, busy ? BUSY.effort : reason));
   if (perm?.all && perm.contrast < 4.5) out.push(`“Allow all” text contrast ${perm.contrast}:1`);
   return out;

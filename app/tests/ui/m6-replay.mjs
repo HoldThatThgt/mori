@@ -508,10 +508,11 @@ async function thinking(page, h) {
     && !high.thinkingUnavailable, JSON.stringify(highSeen));
   const [hard, easy] = promptsOf(fx);
   const { running, reply: withThinking } = await reason(page, hard.text);
-  record('thinking：生成中输入框下面一行的范围和思考按钮都不可用（aria-disabled，没有 data-pending），范围按钮悬停第三行'
-    + '"Can’t switch models until the response finishes"（第一、二行不变）、Effort 悬停第二行"Can’t change effort until the '
-    + 'response finishes"；读屏的描述：范围按钮是第二行加". "加原因，Effort 只有原因', running.inRow
-    && running.modelUnavailable && running.modelTip[2] === NOTE.modelBusy && running.modelTip.length === 3
+  record('thinking：生成中输入框下面一行的思考按钮不可用（aria-disabled，没有 data-pending），范围按钮可用（2026-10-26 起'
+    + '能打开菜单切 Task mode）；范围按钮悬停第三行"Can’t switch models until the response finishes"（第一、二行不变）、'
+    + 'Effort 悬停第二行"Can’t change effort until the response finishes"；读屏的描述：范围按钮是第二行加". "加原因，'
+    + 'Effort 只有原因', running.inRow && !running.modelUnavailable && running.modelTip[2] === NOTE.modelBusy
+    && running.modelTip.length === 3
     && running.modelDescribed === rangeDescription(running.modelTip) && running.thinkingUnavailable
     && running.thinkingTip[1] === NOTE.effortBusy && running.thinkingDescribed === NOTE.effortBusy,
   JSON.stringify(running));

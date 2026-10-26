@@ -62,8 +62,8 @@ export function describeCommand(command: Command): string | null {
     case 'ui.answer':
       return command.value === null ? 'Extension question: cancelled' : 'Extension question: answered';
     case 'session.prompt': {
-      // 带 team: 'once'（/team <文字>）的发送记 Send (team)（平行 Agent 规格 §13.10）。
-      if (command.team === 'once') return `Send (team): ${preview(command.text)}`;
+      // 带 team: 'once'（/team <文字>）的发送记 Send (task mode)（平行 Agent 规格 §13.10，2026-10-26 改）。
+      if (command.team === 'once') return `Send (task mode): ${preview(command.text)}`;
       const how = command.behavior === 'steer' ? 'Steer' : command.behavior === 'followUp' ? 'Queue' : 'Send';
       return `${how}: ${preview(command.text)}`;
     }
@@ -155,9 +155,9 @@ function describeModelCommand(command: Command): string | null {
 /** @brief 平行 Agent 与 TaskBoard 的命令（§13.10）的摘要；board.get 是只读查询，不记。 */
 function describeTeamCommand(command: Command): string | null {
   switch (command.type) {
-    case 'session.setTeam': return `Team ${command.mode}`;
+    case 'session.setTeam': return `Task mode ${command.mode}`;
     case 'session.recheckAgents': return 'Check agent files';
-    case 'session.stopTeam': return 'Stop team';
+    case 'session.stopTeam': return 'Stop agents';
     default: return describeMemoryCommand(command);
   }
 }

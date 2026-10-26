@@ -1,53 +1,6 @@
 /* 平行 Agent 与 TaskBoard 的界面（docs/specs/parallel-agents-taskboard.md §13；docs/v1/screens/team-*.md）：
-   顶栏的协作开关（这一栏不宽于 600px 时只有状态点）、回执、进展摘要、后台批准卡的归属行、待判断的消息、Stop team。 */
-
-/* 协作开关：与权限按钮同一外观；打开（always、once）时用强调色 */
-.team-switch-wrap { position: relative; flex-shrink: 0; }
-.team-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-radius: var(--radius-s);
-  background: var(--color-surface);
-  color: var(--color-muted);
-  font-size: var(--fs-small);
-  white-space: nowrap;
-}
-.team-switch[aria-checked='true'] {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-strong);
-  font-weight: 500;
-}
-.team-switch:disabled { cursor: default; opacity: .6; }
-/* 状态点：只在窄栏显示；off 为空心，always 与 once 为实心（临时，team-switch.md "窄栏"） */
-.team-dot { display: none; width: 7px; height: 7px; border: 1.5px solid currentColor; border-radius: 50%; }
-.team-switch[aria-checked='true'] .team-dot { background: currentColor; }
-.team-error {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 5;
-  width: max-content;
-  /* 不超出这一栏（顶栏是容器，cqw 按这一栏的宽度算） */
-  max-width: min(320px, 90cqw);
-  padding: 4px 8px;
-  border-radius: var(--radius-s);
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
-  font-size: var(--fs-small);
-}
-/* 窄栏（team-switch.md "窄栏"）：这一栏不宽于 600px 时开关只显示状态点（约 19px 宽）。顶栏只有"项目名 › 会话名"、
-   开关、右栏开关和分屏时的"Close pane"（chat.css），按很长的会话名、项目名收到 40px 算会话名的地方：最宽的
-   "Team: Until done"（约 105px）宽于 600px 时会话名至少还有约 315px（分屏 601px；单栏 601px 约 335px），
-   和 1280 宽分屏（约 510px）里只有状态点时差不多（约 307px）；不宽于 600px 时只有状态点，460px 一栏约 258px、
-   280px 约 173px（docs/v0/composer-pickers.md"TaskBoard 合入之后"）。阈值与输入框下面一行发送组只剩图标的一档
-   相同（600px，chat.css；docs/v1/defaults.md）。 */
-@container (max-width: 600px) {
-  .team-switch { min-height: 22px; padding: 3px 6px; }
-  .team-text { display: none; }
-  .team-dot { display: block; }
-}
+   回执、进展摘要、后台批准卡的归属行、待判断的消息、Stop agents。模型菜单里的 Task mode 一行在 models.css
+   （2026-10-26 前是顶栏的协作开关，这里有它的样式和窄栏的状态点）。 */
 
 /* 回执：对话流里的一行；合并会话里在工具卡下面 */
 .receipt {
@@ -91,6 +44,6 @@
   overflow-wrap: anywhere;
 }
 
-/* 待判断的消息与 Stop team */
+/* 待判断的消息与 Stop agents */
 .queue-area li[data-deciding='true'] .queue-kind { white-space: nowrap; }
 .stop-team-button { border-radius: 999px; color: var(--color-danger); }

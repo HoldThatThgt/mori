@@ -80,7 +80,9 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 删除（记忆条目） | Delete…（详情里的按钮）/ Delete（确认框的按钮）/ Deleting… / Deleted（修订里的改动、工具结果 "Deleted from …"） | Delete…、Delete、Deleting… | 同 "删除 / 移除" 一行；memory 工具的动作名是 forget，界面、修订和工具结果一律写 Delete 一族，不写 "Forget"（"Forget" 只用于权限菜单）（记忆规格 §1、§10.1） |
 | 提升 / 放回 | Move to user level / Move to this project | — | 详情里的按钮与操作记录同一句；修订里的改动、说明和条目的 Revisions 行写过去式 "Moved to user level" / "Moved to this project"（记忆规格 §1、§3.2、§3.3、§8） |
 | 增强用的模型 | Model range | — | 增强设置对话框的字段，同 "选择范围" 一行；下拉同设置页 Defaults，不提供 None（记忆规格 §10.4） |
-| 以协作模式运行增强 | Run with team mode | — | 增强设置对话框 "Team mode" 下的勾选框（记忆规格 §10.4） |
+| 以协作模式运行增强 | Run in task mode（2026-10-26 起，原为 Run with team mode） | — | 增强设置对话框 "Task mode" 下的勾选框（记忆规格 §10.4） |
+| 协作模式（平行 Agent 的模式） | Task mode（模型菜单里的一行、模型按钮上的 "Task mode · <模型 id>"、增强对话框的分组名）/ task mode（句子里："Turn off task mode"、"Couldn’t change task mode: …"） | Fast mode（模型菜单里的开关：位置和控件的对应，意思不同） | 2026-10-26 负责人走查 M21 定（"team mode should be task mode"），原为 Team / team mode；不用 Claude 没发布的 coordinator mode。输入的命令 `/team` 和发给模型的文字不在 WP-09 改（WP-10）；代码名（`TeamMode`、`team-switch` 等）不变。和 TaskBoard 的 task（T1、T2…）同一个词：模式就是"把工作分成 task 交给别的 agent" |
+| 停止全部 Agent | Stop agents（悬停 "Stop all agents in this session"） | All background agents stopped（停止后的提示，Mori 不用） | 2026-10-26 起，原为 Stop team；它停这个会话的全部 agent（对话、立项、结案、task、临时提问），所以不叫 Stop tasks |
 | 回滚这次修订 | Roll back this revision（按钮）/ Rollback（列表的标记、修订的谁）/ Rolled back: <标题>（修订标题）/ Couldn’t roll back: … | — | 一键，不确认；操作记录 "Roll back revision"（记忆规格 §6.5、§8、§10.5） |
 | 在记忆页查看 | View in Memory | — | memory 工具卡状态行后面的按钮；新会话提示的按钮写 "View"，操作记录两者都写 "View in Memory"（记忆规格 §7.5、§8、§10.6） |
 | 在设置页查看（F8） | View in Settings | — | F8 保存后的按钮，取代 "View in Review"，打开设置页的 UI issues 并选中这一条（记忆规格 §10.9） |
@@ -343,6 +345,22 @@ Feedback 一节和反馈的空列表、详情、导出不再有。依据的 "Jum
 | 回不到原位置 | Session deleted / This response is no longer in the session. / The session wasn’t saved, so there’s no source to jump to. / Mori’s background process crashed. Restart it to continue. / Sessions are still loading. Try again in a moment. / The original session isn’t in your session list. |
 | 报告详情各节 | What went wrong / What you expected / Screenshot / Current view / Recent activity / Versions |
 
+### 平行 Agent 与 TaskBoard（2026-10-26 加，WP-09）
+
+状态表见 [../v1/screens/team-switch.md](../v1/screens/team-switch.md)、team-blocked.md、team-stop.md；规格 [../specs/parallel-agents-taskboard.md](../specs/parallel-agents-taskboard.md) §13。
+
+| 中文 | 英文 |
+| --- | --- |
+| 模型菜单里的开关 | Task mode；打开时第二行 Messages go to <create role> first（一直打开）/ Until done · Ends when open requests are done（做完为止） |
+| 模型按钮（协作模式） | Task mode · <模型 id>（没有当前模型时 Task mode）；读屏名 Model: Task mode, <模型 id>；悬停第二行 Task mode picks the model for each agent |
+| 模型菜单的说明 | Applies to this session only. New sessions use the default range from Settings.（一般）/ Can’t switch models until the response finishes（回复进行中）/ Task mode picks the model for each agent（协作模式） |
+| 切换失败 | Couldn’t change task mode: <原文> |
+| 拒绝启动卡、说明卡的按钮 | Turn off task mode |
+| 停止全部 Agent | Stop agents（悬停 Stop all agents in this session） |
+| 右栏的说明 | Changes made by other agents aren’t listed here.（与 subagent 规格同一句） |
+| 记忆页里打不开的会话 | This is a background agent’s session, which can’t be opened. |
+| 会话打不开（扩展没载入） | The TaskBoard extension failed to load: <原文>（原为 The team extension …） |
+
 ## Mori 写出的文字的完整格式
 
 下面这些文字会被别处的代码按原样解析或拼回（标 "解析"），写的一方和读的一方必须用完全相同的字串。
@@ -486,6 +504,8 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 | Customize 页 | Open Customize / Enable（Disable）<单数的类别> <path>（Enable skill …、Disable extension …、Enable prompt template …）/ Enable all in plugin（Disable all in plugin）<source> / Add plugin from folder <path> / Remove plugin <source> / Save MCP server <name> / Enable（Disable）MCP server <name> / Remove MCP server <name> / Switch MCP server <name> to direct calls（2026-10-26：从记忆页 AGENT 的 Edit in Customize 进来时 Open Customize → Instructions） |
 | 工作回顾 | Open Review / View in Review / Review: Feedback / View record: UI issues / Resolve / Reopen / Hide resolved / Show resolved / Export: Feedback / Open folder: UI issues / Show record in Explorer / Jump to source from Review（v1：见 docs/specs/memory.md §8：这一行由记忆页的动作记录替换：Open Memory、Memory: <层或分节>、View in Memory、Dismiss memory notice、Jump to source from Memory、F8 的 View in Settings，以及命令的 Save memory entry、Roll back revision、Turn on enhancement <cwd> 等，全文见规格 §8；设置页的 UI issues 沿用 View record: UI issues、Resolve、Reopen、Hide resolved、Show resolved、Export: UI issues、Open folder: UI issues、Show record in Explorer；Review: Feedback、Export: Feedback 不再有） |
 | 其他 | Report a UI issue / Restart background process |
+
+| Task mode（2026-10-26 起，原为 Team on / Team off / Send (team): … / Stop team） | Task mode on / Task mode off（模型菜单里的一行、`/team on`、`/team off`、Turn off task mode）/ Send (task mode): <摘要>（`/team <文字>`）/ Stop agents / Check agent files |
 
 "Feedback"、"UI issues" 是分节名（大写开头），所以放在冒号后面，不嵌进句子中间。
 

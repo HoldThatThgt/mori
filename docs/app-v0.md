@@ -244,7 +244,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **停止**：
   - Esc 先关闭最上层的浮层、菜单或对话框；没有浮层且焦点在这个会话时才停止。
   - 停止时先把排队消息放回输入框，再停止生成。有批准卡时按拒绝处理。
-  - 停止后显示"Stopped · Changes made so far stay as they are"。（2026-10-21：协作模式下停止只停对话这一回合，后台 Agent 由 `Stop team` 停止，[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) §11.4）
+  - 停止后显示"Stopped · Changes made so far stay as they are"。（2026-10-21：协作模式下停止只停对话这一回合，后台 Agent 由 `Stop agents` 停止，[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) §11.4）
 - **错误**：都显示原文，来源有三种：发送时就失败（例如找不到模型或 key）、模型回复出错、自动重试最终失败。
   - 原文里有 401、unauthorized 或 api key 字样时，附"Go to settings"（这条文字匹配登记为临时默认值）。（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §9.3 删除：认证类错误由模型层换 key、换模型或给出说明卡）
   - 其他错误附"Put your last message back in the message box"，由你决定是否再发。
@@ -579,8 +579,8 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
   悬停说明、读屏名和点开的详情里有原来"Context 12%"和"About 15,360 / 128,000 tokens"的信息（用 Claude 的写法，估算的数前面加"≈"，
   见 [v0/screens/models.md](v0/screens/models.md)）。权限按钮照 Claude 的模式选择只有文字、任何宽度都没有盾牌图标，
   窄时模式名截断加"…"（全名在悬停说明和读屏名里），即使模型按钮因此更挤；"Allow all"保留警示色和文字。
-  顶栏只留会话名（"项目名 › 会话名"）和这一栏的按钮（TaskBoard 的协作开关、"Toggle changes"、分屏时"Close pane"；协作开关
-  ≤ 600px 时只有状态点，2026-10-22 合入时定），让分屏时的会话名有地方显示
+  顶栏只留会话名（"项目名 › 会话名"）和这一栏的按钮（"Toggle changes"、分屏时"Close pane"；TaskBoard 的协作开关 2026-10-22
+  合入时也在这里，2026-10-26 负责人走查 M10 后移进模型菜单，叫 Task mode），让分屏时的会话名有地方显示
   （原来 460px 的一栏里只剩约 2 个字母）。设计说明见 [v0/composer-pickers.md](v0/composer-pickers.md)；不加后台进程命令，事件和命令不变，所以有意不重录 fixture。
   合并 v1 之后搬进这一行的是选择范围按钮（"<范围名> · <当前模型 id>"），截短时先截模型 id；上限 200px
   （2026-10-21 合并时改，原来 160 / 120px）；其余按推荐定的见 composer-pickers.md"v1 之后的调整"。
