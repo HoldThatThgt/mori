@@ -261,13 +261,13 @@ seats: [close]
 | Description | 文本框（≤ 200 字符，显示 `n/200`） | `Other agents read this when they decide who does what.` |
 | Jobs | 三个勾选框 `Talks to you`、`Plans requests`、`Closes requests` | `Leave all off for an agent that only works on tasks. Jobs no agent takes stay with Mori.`；被别的文件认领的那一项不可用，旁边写 `<name> does this` |
 | Models | 单选 `Same as the session’s model range` / `Use these, in order`；选后者时一个有序列表与 `Add model range`（下拉：Groups、Providers，再按提供商各一节 `Models · <提供商名称>`——模型菜单的 Models 一节按提供商分小节，下拉的节不能套节，所以拼成一个节名；没有项的节不出现；顺序与文字同模型菜单，2026-10-26 评审，临时，§7） | 列表拖动排序用 Settings › Models 的同一份（WP-03 的 `settings/Reorder.tsx`，状态表 [models-settings.md](../v1/screens/models-settings.md) “拖动排序”）：两项以上时每项左端一个拖动柄（读屏名 `Reorder <范围>`，悬停 `Drag or use the arrow keys to reorder`），拖到另一项的上半边排到它前面、下半边排到它后面，焦点在柄上时上、下方向键移一格，移动后读屏播报 `<范围> was dropped at position <n> of <count>.`；移动只改表单，Save 时才写文件，保存中柄不响应。Mori 只留这一份拖动排序（2026-10-26 走查会话定：后合入的一方统一，WP-03 先合入，这一节改用它的组件，原来自己的拖动列表删掉）。每项有移除按钮；列表为空时不能保存 |
-| Tools | 单选 `Same as Mori` / `Only these`；选后者时 `piTools` 每个一个勾选框，再加 `All MCP tools` | 一个都不勾时不能保存；文件里有表单没有勾选框的写法（例如 `mcp__github__*`、`mcp__fs__read_file`，TaskBoard 规格 §4.1 允许）时不显示，勾或取消别的项时原样留着，保存时写在列表后面（2026-10-26 评审，临时，§7） |
+| Tools | 单选 `Same as Mori` / `Only these`；选后者时 `piTools` 每个一个勾选框，再加 `All MCP tools` | 一个都不勾、也没有表单外保留的条目时不能保存（有这样的条目时它们就是写进文件的工具，2026-10-26 核对，临时，§7）；文件里有表单没有勾选框的写法（例如 `mcp__github__*`、`mcp__fs__read_file`，TaskBoard 规格 §4.1 允许）时不显示，勾或取消别的项时原样留着，保存时写在列表后面（2026-10-26 评审，临时，§7） |
 | Prompt | 多行文本框 | `What this agent does and how. Added to its system prompt.` |
 
 - 按钮 `Save`（保存中 `Saving…`）、`Cancel`。保存成功：表单收起，列表重新读，新的或改过的那一行展开并显示 `Saved · Applies to new sessions`。
 - 保存失败：表单保留你写的，下面 `Couldn’t save:` 加 §5.2 的问题（每条一行）；没有写文件。
 - 编辑时预填文件现在的值；`headerComments` 为真时表单上方 §5.3 的提示。
-- 跟随的会话换到另一个项目（例如分屏时归档跟随的那一栏）时这一节从头显示：表单、展开的行与 `Saved` 都不带过去，Save 不会写到另一个项目（2026-10-26 评审）。
+- 跟随的会话换到另一个项目（例如分屏时归档跟随的那一栏）时这一节从头显示：表单、展开的行与 `Saved` 都不带过去，Save 不会写到另一个项目；表单有改动也一样，不问离开确认，直接收起、什么都不写（2026-10-26 评审）。
 
 ### 6.5 Delete…
 
@@ -301,6 +301,7 @@ seats: [close]
 | 表单没有勾选框的工具写法 | 不显示、原样保留，保存时写在列表后面（§6.4 Tools） |
 | Add model range 的节 | Groups、Providers、每个提供商一节 `Models · <提供商名称>`，没有项的节不出现（§6.4 Models） |
 | 范围展开不出模型时的一句话 | `No model can run this agent`（§6.2） |
+| Only these 一个都没勾时的 Save | 有表单外保留的条目时仍可用，没有时不可用（§6.4 Tools） |
 | 本节的说明与空状态文字 | §6.1、§6.2 |
 
 ## 8. 要改的文件

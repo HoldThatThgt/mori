@@ -50,6 +50,8 @@ const DELETE_TEXT = '.mori/agents/reviewer.md will be permanently deleted. This 
   + 'open aren’t affected.';
 const LEAVE_TEXT = 'Your edits haven’t been saved. Leaving now discards them.';
 const ALL_JOBS = 'Talks to you · Plans requests · Closes requests';
+/** Only these 的 pi 工具，按顺序（状态表“选工具”的 8 个，roles.ts 的 PI_TOOL_NAMES） */
+const PI_TOOLS = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'powershell'];
 /** 表单各字段下面的说明（§6.4）：Name、Description、Jobs、Prompt */
 const HINTS = ['Lowercase letters, digits, and -. The file is saved as .mori/agents/<name>.md.',
   'Other agents read this when they decide who does what.',
@@ -407,8 +409,9 @@ async function fillReviewer(menu, piTools) {
   await form.getByRole('radio', { name: 'Only these' }).check();
   const noTools = await formSnapshot(page);
   const labels = noTools.tools.map((tool) => tool.label);
-  record('AG-04 Only these has a box for every pi tool, then All MCP tools', piTools.length > 0
-    && JSON.stringify(labels) === JSON.stringify([...piTools, 'All MCP tools']), brief({ labels, piTools }));
+  record('AG-04 Only these has a box for each of the eight pi tools (read, bash, edit, write, grep, find, ls, '
+    + 'powershell), then All MCP tools', JSON.stringify(piTools) === JSON.stringify(PI_TOOLS)
+    && JSON.stringify(labels) === JSON.stringify([...PI_TOOLS, 'All MCP tools']), brief({ labels, piTools }));
   for (const tool of ['read', 'grep', 'All MCP tools']) await setCheck(page, 'agent-tools-field', tool, true);
   await form.getByLabel('Prompt', { exact: true }).fill('Review the diff.\nRun the tests.');
   record('AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool',
@@ -520,11 +523,11 @@ async function leaveBack() {
 }
 
 /**
- * @brief Customize 跟随的会话换到另一个项目（分屏左边 edit、右边 team 有焦点，Customize › Agents 跟随 team；在侧栏归档
- *        team 后跟随左边的 edit，同 m6-app-tools 的 archiveFollow）：没改过的表单与展开的行不带过去（两个项目都有
- *        .mori/agents/planner.md），Save 不会写到另一个项目。归档的 team 会话之后由 tabOf 重新打开。
+ * @brief Customize 跟随的会话换到另一个项目：分屏左边 edit、右边 team 有焦点，Customize › Agents 跟随 team；prepare 之后
+ *        在侧栏归档 team，跟随左边的 edit（同 m6-app-tools 的 archiveFollow）。归档的 team 会话之后由 tabOf 重新打开。
+ * @return { before, after（agentsSnapshot）, asked（归档后是否出了离开确认框） }
  */
-async function switchProject() {
+async function archiveFollowed(prepare) {
   const { page } = ctx;
   const teamTab = await tabOf('team');
   await sendMessage(ctx, teamTab, 'Hello');
@@ -541,8 +544,7 @@ async function switchProject() {
   await openToolsSection(page, 'roles');
   await page.waitForFunction(() => document.querySelector('[data-testid="agent-row"][data-name="checker"]'), null,
     { timeout: 30000 });
-  await openNewForm();
-  await setExpanded(page, 'planner', true);
+  await prepare();
   const before = await agentsSnapshot(page);
   await chooseMenuItem(page, team, 'Archive');
   delete tabs.team;
@@ -550,12 +552,37 @@ async function switchProject() {
   await page.waitForFunction((name) => document.querySelector('[data-testid="tools-follow"]')?.textContent
     .startsWith(name) && document.querySelector('[data-testid="agent-row"][data-name="commented"]'), folder,
   { timeout: 15000 }).catch(() => {});
-  const after = await agentsSnapshot(page);
+  const asked = (await page.getByTestId('leave-dialog').count()) > 0;
+  return { before, after: await agentsSnapshot(page), asked };
+}
+
+/** @brief 换到另一个项目时，没改过的表单与展开的行不带过去（两个项目都有 .mori/agents/planner.md）。 */
+async function switchProject() {
+  const { before, after } = await archiveFollowed(async () => {
+    await openNewForm();
+    await setExpanded(ctx.page, 'planner', true);
+  });
   record('AG-04 when Customize follows a session in another project, the open form and open rows don’t carry over',
     before?.form === 'new' && rowOf(before, 'planner')?.expanded === 'true' && rowOf(before, 'checker') !== null
     && rowOf(after, 'commented') !== null && after.form === null && rowOf(after, 'planner')?.expanded === 'false',
   brief({ before: before?.form, after: { form: after?.form, rows: after?.rows.map((row) => [row.name,
     row.expanded]) } }));
+  await leaveCustomize();
+}
+
+/** @brief 改过的表单也一样：换到另一个项目时不问，表单收起，两个项目都没有写出文件（状态表“跟随的会话”）。 */
+async function switchProjectDirty() {
+  const { before, after, asked } = await archiveFollowed(async () => {
+    await openNewForm();
+    const form = ctx.page.getByTestId('agent-form');
+    await form.getByLabel('Name', { exact: true }).fill('unsaved');
+    await form.getByLabel('Description', { exact: true }).fill('Never saved');
+  });
+  const written = ['team', 'edit'].filter((key) => existsSync(join(projects[key], '.mori', 'agents', 'unsaved.md')));
+  record('AG-04 a form with unsaved edits is dropped too when Customize follows a session in another project: no '
+    + '"Discard this agent?", and nothing is written', before?.form === 'new' && !asked && after?.form === null
+    && rowOf(after, 'commented') !== null && written.length === 0, brief({ before: before?.form, asked,
+    after: after?.form, written }));
   await leaveCustomize();
 }
 
@@ -696,6 +723,9 @@ async function editKeepsServerTools() {
   await openAgents('edit');
   const form = await openEdit('servers');
   const ticked = form?.tools.filter((tool) => tool.checked).map((tool) => tool.label);
+  await setCheck(ctx.page, 'agent-tools-field', 'read', false);
+  const kept = await formSnapshot(ctx.page);
+  await setCheck(ctx.page, 'agent-tools-field', 'read', true);
   await setCheck(ctx.page, 'agent-tools-field', 'grep', true);
   await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Save', exact: true }).click();
   await ctx.page.getByTestId('agent-form').waitFor({ state: 'detached', timeout: 10000 });
@@ -706,6 +736,17 @@ async function editKeepsServerTools() {
     && JSON.stringify(parseFrontmatter(text).frontmatter.tools) === '["read","grep","mcp__github__*"]',
   brief({ ticked, text }));
   removeAgent('edit', 'servers.md');
+  writeAgentFile(projects.edit, 'plain.md', { name: 'plain', description: 'Only reads', tools: ['read'] });
+  await openAgents('edit');
+  await openEdit('plain');
+  await setCheck(ctx.page, 'agent-tools-field', 'read', false);
+  const empty = await formSnapshot(ctx.page);
+  await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Cancel' }).click();
+  removeAgent('edit', 'plain.md');
+  const none = (snap) => snap?.tools.every((tool) => !tool.checked);
+  record('AG-06 with no box ticked, Save stays available while the file keeps an entry the form has no box for '
+    + '(mcp__github__*), and is unavailable without one', none(kept) && kept.saveDisabled === false && none(empty)
+    && empty.saveDisabled === true, brief({ kept: kept?.saveDisabled, empty: empty?.saveDisabled }));
 }
 
 /**
@@ -887,6 +928,19 @@ async function duringReply(tab) {
   }, pane, { timeout: 30000 }).catch(() => {});
 }
 
+/**
+ * @brief 配置里没有提供商了（删掉全部提供商，同 设置 → Models 的 Delete…；变空的分组跟着删掉）：模型菜单没有三节，
+ *        只有说明、Task mode 一行、Manage agents 与 Manage models（model-menu.md“某一节为空”）。放在套件最后：之后没有模型。
+ */
+async function emptyConfigMenu() {
+  const tab = await tabOf('team');
+  for (const id of ['ds', 'zg', 'kx']) await bridge(ctx, { type: 'models.deleteProvider', id, dryRun: false });
+  const item = await manageItem(tab);
+  await closeModelMenu(ctx, tab);
+  record('AG-08 with no providers left the model menu has no sections, only the note, the Task mode row, Manage agents '
+    + 'and Manage models', goodItem(item) && JSON.stringify(item.order) === JSON.stringify(MENU_TAIL), brief(item));
+}
+
 // ---------- AG-09 展开的内容 ----------
 
 /** @brief 换掉主进程的 shell.openPath，只记下路径。 */
@@ -987,18 +1041,19 @@ async function activity() {
 
 // ---------- 运行 ----------
 
-/** 编号 → 这一步的函数，按运行的顺序 */
+/** 编号 → 这一步的函数，按运行的顺序（AG-08 的 emptyConfigMenu 删掉全部提供商，单独排在最后） */
 const STEPS = [
   ['AG-01', [noSessionSections, listRows, emptyProject, loadingAndFailure]],
   ['AG-09', [expansion, openFailure]],
   ['AG-02', [modelLines, noRange, unexpandedRange]],
   ['AG-08', [manageAgents]],
   ['AG-03', [problemFiles]],
-  ['AG-04', [createAgent, leaveUnsaved, leaveOther, leaveBack, switchProject]],
+  ['AG-04', [createAgent, leaveUnsaved, leaveOther, leaveBack, switchProject, switchProjectDirty]],
   ['AG-05', [refusedSaves, saveDisabled, othersProblems]],
   ['AG-06', [editAgent, editKeepsServerTools, editUnreadableFile, editDeletedFile]],
   ['AG-07', [deleteAgent, deleteFailure]],
   ['AG-10', [activity]],
+  ['AG-08', [emptyConfigMenu]],
 ];
 
 /** @brief 跑一个函数；抛错时记一条失败（检查名以编号开头），截图。 */

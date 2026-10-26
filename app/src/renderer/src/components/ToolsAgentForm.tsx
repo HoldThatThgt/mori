@@ -48,7 +48,10 @@ export function draftOf(values: FormValues): AgentDraft {
     body: values.prompt };
 }
 
-/** @brief Save 可用：有名字、说明，按顺序的列表不为空，Only these 至少勾了一个（状态表“不能保存”）。 */
+/**
+ * @brief Save 可用：有名字、说明，按顺序的列表不为空，Only these 的列表不为空——勾了至少一个，或有表单外原样保留的条目
+ *        （例如 mcp__github__*，状态表“不能保存”，临时）。
+ */
 export function canSave(values: FormValues): boolean {
   return values.name.trim() !== '' && values.description.trim() !== ''
     && (values.models === 'session' || values.modelList.length > 0)
@@ -151,7 +154,7 @@ function ModelsField({ values, set, ranges, saving }: {
             && set({ modelList: [...values.modelList, event.target.value] })}>
             <option value="">Add model range</option>
             {rangeGroups(ranges).map((group) => (
-              <optgroup key={group.label} label={group.label}>
+              <optgroup key={group.key} label={group.label}>
                 {group.ranges.map((range) => (
                   <option key={range.pick} value={range.pick} disabled={values.modelList.includes(range.pick)}>
                     {range.label}</option>))}

@@ -45,7 +45,7 @@
 | 回复进行中的菜单（2026-10-26） | 准备中或生成中，`pickLocked` 为假 | 三节照常列出，但每项不可用（`disabled`，↑ ↓ 跳过，打勾的项仍打勾）；说明换成“Can’t switch models until the response finishes”；Task mode 一行、“Manage agents”和“Manage models”可用；打开时焦点在 Task mode 一行上。回复在菜单开着时开始：项变为不可用，焦点原来在某一项上的移到 Task mode 一行；回复结束时项恢复可用 | 切 Task mode；Manage agents；Manage models；Esc |
 | 换范围之后 | 你选了一项 | 菜单关闭，焦点回到按钮（下面“切换中”） | — |
 | 被排除的项 | 这一项展开后的全部候选都被本会话的静态校验排除（§9.2） | 这一项变淡，悬停写原因：每个候选一行“<provider>/<model> — <原因>”（原因用 §5.3 的界面文字，例如“tool calling not verified yet”“tool calling failed verification”；行的写法临时，走查时可以改）；仍可以选（选了以后由拒绝启动卡说明） | 选择 |
-| 某一节为空 | 配置里没有分组（或没有提供商与模型） | 这一节不显示（临时，走查时可以改）；全空时只有底部说明与“Manage models” | — |
+| 某一节为空 | 配置里没有分组（或没有提供商与模型） | 这一节不显示（临时，走查时可以改）；全空时（例如删掉了全部提供商）只有底部说明、Task mode 一行、“Manage agents”与“Manage models”（2026-10-26 改：WP-09 起总有 Task mode 一行；Manage agents 依据负责人 2026-10-26 批准的 Customize › Agents 规格 §6.6） | — |
 | 切换中 | 你选了一项，`session.setPick` 还没返回 | 菜单关闭；按钮显示新的范围、不可用（`data-pending="true"`） | — |
 | 已切换 | `session.setPick` 返回 `ModelState` | 按钮按新的 `ModelState` 显示；后台进程写一条 `mori.pick`、重新做静态校验，下一段起生效；被拒绝启动时出现拒绝启动卡，可以发送时卡消失（model-chat.md） | — |
 | 切换失败 | `session.setPick` 返回 `error` | 按钮回到原来的范围；从输入框下面一行往上弹出一行“Couldn’t change the model range: <原文>”，下次打开菜单或 10 秒后消失（临时，走查时可以改） | — |

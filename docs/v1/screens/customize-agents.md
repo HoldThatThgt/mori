@@ -11,7 +11,7 @@
 | `roles.get { sessionId }`（每次进入这一节、每次保存或删除之后） | `RolesInfo`：项目根、`.mori/agents` 的路径、会话的模型范围 `pick`、三项职责的持有者、全部问题行、agent 列表（第一个是 Mori）、表单可选的模型范围与工具 |
 | `roles.save { sessionId, file, agent }` 的结果 | 新的 `RolesInfo` 与写出的文件，或 `error`（问题行，每条一行） |
 | `roles.delete { sessionId, file, name }` 的结果 | 新的 `RolesInfo`，或 `error` |
-| 跟随的会话 | 同 tools.md：当前会话（分屏时焦点所在的那一栏）；没有会话时这一节不出现；跟随的会话换到另一个项目（例如分屏时归档跟随的那一栏）时这一节从头显示：表单、展开的行与 `Saved` 都不带过去（2026-10-26 评审） |
+| 跟随的会话 | 同 tools.md：当前会话（分屏时焦点所在的那一栏）；没有会话时这一节不出现；跟随的会话换到另一个项目（例如分屏时归档跟随的那一栏）时这一节从头显示：表单、展开的行与 `Saved` 都不带过去；表单有改动也一样，不问 `Discard this agent?`，直接收起，什么都不写（2026-10-26 评审） |
 | 你的操作 | 点行、New agent、Edit、Open in default app、Delete…；模型菜单里的 Manage agents |
 
 ## 分节与列表
@@ -61,7 +61,7 @@
 | Jobs 被别人认领 | `holders` 里这一项是另一个文件的 agent | 那个勾选框不可用，旁边 `<name> does this` | — |
 | 选模型 | 你选了 `Use these, in order` | 有序列表、每项的移除按钮、`Add model range` 下拉（Groups、Providers，再按提供商各一节 `Models · <提供商名称>`，没有项的节不出现；文字与顺序同模型菜单，2026-10-26 评审，临时）；拖动排序同 Settings › Models（[models-settings.md](models-settings.md) “拖动排序”，同一个组件）：两项以上时每项左端一个拖动柄（读屏名 `Reorder <范围>`，悬停 `Drag or use the arrow keys to reorder`），拖动中放下处那一项上沿或下沿一条线、被拖的项变淡，移动后读屏播报 `<范围> was dropped at position <n> of <count>.`；移动只改表单，不写文件 | 添加；移除；拖到另一项的上半边（排到它前面）或下半边（后面）；焦点在柄上按上、下方向键移一格，焦点留在柄上 |
 | 选工具 | 你选了 `Only these` | 8 个 pi 工具与 `All MCP tools` 的勾选框；文件里表单没有勾选框的写法（例如 `mcp__github__*`）不显示，勾或取消别的项时原样留着，保存时写在列表后面（2026-10-26 评审，临时） | 勾选 |
-| 不能保存 | Name 或 Description 为空、`Use these, in order` 的列表为空、`Only these` 一个都没勾 | Save 不可用 | — |
+| 不能保存 | Name 或 Description 为空、`Use these, in order` 的列表为空、`Only these` 一个都没勾也没有表单外保留的条目（例如 `mcp__github__*`；有这样的条目时它们就是写进文件的工具，2026-10-26 核对，临时） | Save 不可用 | — |
 | 保存中 | `roles.save` 还没返回 | Save 变为 `Saving…`，表单不可改 | — |
 | 保存失败 | `roles.save` 返回 `error` | 表单保留你写的；下面 `Couldn’t save:` 和问题行（每条一行），例如 `name "reviewer" is already used by .mori/agents/rev.md`、`A file named .mori/agents/reviewer.md already exists.`、`This agent file no longer exists.`、编辑时文件头读不出的 `can’t read the header: <原文>`（不改文件） | 改后再存 |
 | 有改动时离开 | 换分节、Back to app、打开别的表单、点侧栏的会话 | 确认框 `Discard this agent?` / `Your edits haven’t been saved. Leaving now discards them.`（同 AGENTS.md 编辑器的离开确认） | Discard；Keep editing |

@@ -127,6 +127,7 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 表单没有勾选框的工具写法（2026-10-26 评审，推荐，负责人不在时照用） | 不显示、不改，勾或取消别的项时原样留着，保存时写在列表后面（例如 `tools: [read, grep, "mcp__github__*"]`） | `app/src/shared/roles.ts`（`toolsToggled`）、`app/src/renderer/src/components/ToolsAgentForm.tsx` | TaskBoard 规格 §4.1 允许按服务写 MCP 工具；表单只给全部 MCP 工具一个勾选框，原来勾选时按勾选框重排会悄悄丢掉它们。另两个做法：给每个这样的写法加一个勾选框（新的界面行），或保存前提示会去掉 | 你走查 Agents 一节、或要在表单里选单个 MCP 服务时 |
 | Add model range 的节（2026-10-26 评审，推荐，负责人不在时照用） | Groups、Providers，再按提供商各一节 `Models · <提供商名称>`，顺序同模型菜单；没有项的节不出现 | `app/src/shared/roles.ts`（`rangeGroups`）、`app/src/renderer/src/components/ToolsAgentForm.tsx` | 模型菜单的 Models 一节按提供商分小节；`<optgroup>` 不能套，拼成一个节名。原来只有一个 Models 节、只写模型 id，同名的模型分不出是哪个提供商的。另一个写法：节名只写提供商名称 | 你走查时 |
 | 范围展开不出模型时的一句话（2026-10-26 评审，推荐，负责人不在时照用） | `No model can run this agent`（同全部不能用）；`No model range picked` 只在没写 models、会话又没有范围时 | `app/src/shared/roles.ts`（`modelLine`） | 例如项目的 `.mori/models.json` 读不出时会话有范围、候选却为空，原来误报 “No model range picked”。另一个做法：再加一句专门的话 | 你走查时 |
+| Only these 一个都没勾时的 Save（2026-10-26 核对，推荐，负责人不在时照用） | 文件里有表单外保留的条目（例如 `mcp__github__*`）时仍可用，保存后 `tools` 只有这些条目；没有时不可用 | `app/src/renderer/src/components/ToolsAgentForm.tsx`（`canSave`） | 保留的条目就是这个 agent 的工具，为了能保存逼人勾一个会改掉文件。另一个做法：只看勾选框，一个都没勾就不能保存 | 你走查时 |
 
 ## 一键拉取模型
 

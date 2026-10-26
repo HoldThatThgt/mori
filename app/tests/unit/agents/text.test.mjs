@@ -53,6 +53,19 @@ test('AG-04 Add model range: Groups, Providers, then one Models · <provider nam
     assert.deepEqual(roles.rangeGroups([]), []);
   });
 
+test('AG-04 Add model range: two providers with the same name get two groups with distinct keys (by provider id)',
+  () => {
+    const ranges = [{ pick: 'a1', kind: 'provider', label: 'Same' }, { pick: 'a2', kind: 'provider', label: 'Same' },
+      { pick: 'a1/x', kind: 'model', label: 'x' }, { pick: 'a2/x', kind: 'model', label: 'x' }];
+    const groups = roles.rangeGroups(ranges);
+    assert.deepEqual(groups.map((group) => [group.key, group.label, group.ranges.map((range) => range.pick)]), [
+      ['providers', 'Providers', ['a1', 'a2']], ['models:a1', 'Models · Same', ['a1/x']],
+      ['models:a2', 'Models · Same', ['a2/x']]]);
+    assert.equal(new Set(groups.map((group) => group.key)).size, groups.length);
+    assert.deepEqual(roles.rangeGroups([{ pick: 'strong', kind: 'group', label: 'strong' }]).map((group) => group.key),
+      ['groups']);
+  });
+
 test('AG-06 ticking a tool keeps entries the form has no box for (mcp__github__*), after the boxes in their order',
   () => {
     const options = ['read', 'bash', 'grep', roles.ALL_MCP_TOOLS];

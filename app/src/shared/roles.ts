@@ -244,6 +244,8 @@ export function toolsToggled(list: readonly string[], options: readonly string[]
 
 /** @brief Add model range 下拉的一节（`<optgroup>`）。 */
 export interface RangeGroup {
+  /** 节的键：groups、providers，或 models:<提供商 id>（提供商名称可以重复，id 不会，同 ModelMenu 按 id 分小节） */
+  key: string;
   /** 节名：Groups、Providers，或 Models · <提供商名称> */
   label: string;
   /** 这一节的范围，按 ranges 的顺序 */
@@ -261,14 +263,17 @@ const providerIdOf = (pick: string) => pick.slice(0, pick.indexOf('/'));
  */
 export function rangeGroups(ranges: readonly RoleRange[]): RangeGroup[] {
   const nameOf = (id: string) => ranges.find((range) => range.kind === 'provider' && range.pick === id)?.label ?? id;
-  const groups: RangeGroup[] = [{ label: 'Groups', ranges: ranges.filter((range) => range.kind === 'group') },
-    { label: 'Providers', ranges: ranges.filter((range) => range.kind === 'provider') }];
+  const groups: RangeGroup[] = [
+    { key: 'groups', label: 'Groups', ranges: ranges.filter((range) => range.kind === 'group') },
+    { key: 'providers', label: 'Providers', ranges: ranges.filter((range) => range.kind === 'provider') }];
   const byProvider = new Map<string, RoleRange[]>();
   for (const range of ranges.filter((item) => item.kind === 'model')) {
     const id = providerIdOf(range.pick);
     byProvider.set(id, [...(byProvider.get(id) ?? []), range]);
   }
-  for (const [id, models] of byProvider) groups.push({ label: `Models · ${nameOf(id)}`, ranges: models });
+  for (const [id, models] of byProvider) {
+    groups.push({ key: `models:${id}`, label: `Models · ${nameOf(id)}`, ranges: models });
+  }
   return groups.filter((group) => group.ranges.length > 0);
 }
 

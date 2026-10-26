@@ -41,8 +41,8 @@ WP-05（`34fa29a`）、WP-09（`e55b28b`）与第二波的 WP-10、WP-14（`d07c
 | 层 | 跑了什么 | 结果 |
 | --- | --- | --- |
 | 检查与构建 | `npm run check`、`npx electron-vite build` | 通过 |
-| 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334；合入 WP-02 之后 33/33、475/475、334/334；合入 WP-05（app-v0 `34fa29a`）之后 33/33、465/465、334/334；合入 WP-10、WP-14（app-v0 `d07cc41`）之后 33/33、477/477、350/350；评审修正之后 40/40、477/477、350/350；改了直引号之后 41/41、477/477、350/350 |
-| App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`；为行与用例表补的用例再跑 `--only AG-01,AG-02,AG-04,AG-07,AG-09` 与 `--only AG-04`。端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”）；AG-08 没有跑（等 WP-09）。合入 WP-05 之后再跑第一条命令：44 条通过，失败的仍只有 AG-10 那一条。改用 WP-03 的拖动排序之后跑 `--only AG-04`：11 条全部通过。合入 WP-09、做完 Manage agents 之后跑 `--only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-08,AG-09,AG-10`：49 条全部通过，没有失败。AG-04 的拖动排序检查加上下半边那一次之后再跑 `--only AG-04`：11 条全部通过。合入 WP-10、WP-14 之后再跑 `--only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-08,AG-09,AG-10`：50 条全部通过，没有失败。评审修正之后再跑同一条命令：58 条全部通过；`switchProject` 一条另在去掉修正（`ToolsPage.tsx` 的 key）时跑过一次，它失败（表单与展开的 planner 带到了另一个项目），修正放回后通过 |
+| 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334；合入 WP-02 之后 33/33、475/475、334/334；合入 WP-05（app-v0 `34fa29a`）之后 33/33、465/465、334/334；合入 WP-10、WP-14（app-v0 `d07cc41`）之后 33/33、477/477、350/350；评审修正之后 40/40、477/477、350/350；改了直引号之后 41/41、477/477、350/350；第二次核对之后 42/42、477/477、350/350 |
+| App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`；为行与用例表补的用例再跑 `--only AG-01,AG-02,AG-04,AG-07,AG-09` 与 `--only AG-04`。端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”）；AG-08 没有跑（等 WP-09）。合入 WP-05 之后再跑第一条命令：44 条通过，失败的仍只有 AG-10 那一条。改用 WP-03 的拖动排序之后跑 `--only AG-04`：11 条全部通过。合入 WP-09、做完 Manage agents 之后跑 `--only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-08,AG-09,AG-10`：49 条全部通过，没有失败。AG-04 的拖动排序检查加上下半边那一次之后再跑 `--only AG-04`：11 条全部通过。合入 WP-10、WP-14 之后再跑 `--only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-08,AG-09,AG-10`：50 条全部通过，没有失败。评审修正之后再跑同一条命令：58 条全部通过；`switchProject` 一条另在去掉修正（`ToolsPage.tsx` 的 key）时跑过一次，它失败（表单与展开的 planner 带到了另一个项目），修正放回后通过。第二次核对之后先跑 `--only AG-02,AG-04,AG-06,AG-08`：31 条全部通过；再跑 AG-01–AG-10 全部（AG-08 的 emptyConfigMenu 删掉全部提供商，排在最后）：61 条全部通过 |
 | 快速集 `npm run test:quick`；`tb-app-models.mjs --only sel`（TB-38） | 两者用共用的端口（m0-smoke 的 4319、TaskBoard 的 4600 段），按走查会话的安排在第二波结束、再合一次 `app-v0`（`d07cc41`）之后跑，前后告诉了走查会话 | 快速集 4/4 通过（85 秒：m0-smoke 31、tb-replay 17、mem-replay 17、m1-replay 16）；`--only sel` 7 条全部通过，TB-38 的 Task mode 菜单项是 `team-switch`、`manage-agents`、`manage-models`。评审修正与直引号之后（`4bfda45`）走查会话给了端口，再跑快速集：4/4 通过（85 秒，m0-smoke 31、tb-replay 17、mem-replay 17、m1-replay 16） |
 | 改到的现有套件（`--only`，合并前走查会话要求） | `m6-app-settings.mjs --only agentsUser`（4361）；`m6-app-tools.mjs --only noSession,entry,keyboard` 与 `--only noSession,entry,overrideProject,archiveFollow`（4362）；`m6-replay.mjs --only project-skill`；`v1-models-app-reorder.mjs --only handles,models,keys,members,cross,editor,inplace,failure`（4944） | 16/16；26 条通过 1 条失败、33 条通过 1 条失败；10/10；19/19。改过的检查全部通过。两条失败都不是改过的检查，是 `--only` 跳过了它们依赖的 MCP 步骤（这个套件各步骤依赖前一步，只有 entry 能单独跑）：keyboard 的“MCP 一节：Tab 走到服务的开关……”没有服务可走（只有 Add），overrideProject 的“项目覆盖了用户级服务 x 的 enabled……”没有用户级的 x。整套在推送前的 AG-11 里跑 |
 | 评审修正改到的现有套件 | `m6-app-tools.mjs` 只把 keyboard 一条检查的条件并成一行、把一行注释并到常量后面（检查的名字与条件不变，评审 15，文件 1999 行）；`v1-models-existing.mjs` 的 AG-11 预设加上 TB-03 的对照构建（评审 7）。两个都用 `node --check` 与 `npm run check` 查过，没有再跑：前者不改任何检查，后者只在推送前的 AG-11 里跑 | — |
@@ -86,7 +86,7 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 | 2 | Add model range 与模型菜单不一致：模型只有一节、只写 id，空节也画出来 | `rangeGroups`：Groups、Providers，每个提供商一节 `Models · <提供商名称>`，空节不画（推荐，临时默认值） | 单元 “AG-04 Add model range: Groups, Providers, then one Models · <provider name> per provider; empty ones left out”；App “AG-04 Add model range has the model menu’s sections and words: …”（App 的数据目录加了第三个提供商 kx，与 zg 有同一个模型 id glm-4.6） |
 | 3 | 另外五份文档写 Task mode 菜单时没有 Manage agents | team-blocked.md“锁定”、model-menu.md、model-providers.md、v0 models.md“范围菜单”、v0 chat.md“选择范围（v1）”都加上，日期注同 TaskBoard 规格 §12.11 | 见行与用例表 |
 | 4 | 有问题的文件那一行显示了说明（§4.1 只有名字、文件、路径、问题） | `fileView` 给有问题的文件空说明 | 单元 “AG-03 a problem file’s view has no description: only its name, file, path and problems”；App “AG-03 a problem file’s row has no description, …” |
-| 6 | 行与用例表说覆盖了、检查里没有断言的：Remove、下拉的节、Only these 的工具 | AG-04 加三条检查 | “AG-04 each range in the list has a Remove button; …”、“AG-04 Add model range has the model menu’s sections and words: …”、“AG-04 Only these has a box for every pi tool, then All MCP tools” |
+| 6 | 行与用例表说覆盖了、检查里没有断言的：Remove、下拉的节、Only these 的工具 | AG-04 加三条检查 | “AG-04 each range in the list has a Remove button; …”、“AG-04 Add model range has the model menu’s sections and words: …”、“AG-04 Only these has a box for each of the eight pi tools (read, bash, edit, write, grep, find, ls, powershell), then All MCP tools” |
 | 7 | AG-11 的预设跑 tb-app-roles 却没有 TB-03 的对照构建 | `SUITE_LISTS.agents.app` 前面加 `TB_BASE`；文件头注释与规格 §9.2 AG-11 照改 | 推送前的 AG-11 |
 | 9 | AGENTS.md 测试分层第 3 条没有 `ag-*` | 加上 | — |
 | 10 | 原样写的 `null`、`true`、`1e3`、`0x1f` 等读回不是字符串，名字叫 `true` 的 agent 存不了 | `roleFiles.ts` 的 `NOT_A_STRING`：pi 的 yaml（YAML 1.2 core）会读成 null、布尔、数字的写法和单独的 `-` 写成 JSON 字符串；规格 §5.1 照改 | 单元 “AG-04 values YAML would read as null, a boolean or a number are quoted and read back as the same strings”、“AG-04 a name YAML would read as a boolean or null is saved and read back as that name” |
@@ -101,6 +101,20 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 
 测试时发现的：模型档案按地址与模型 id 认，所以 kx 与 zg 用同一个地址时 kx/glm-4.6 与 zg/glm-4.6 共用一份档案，AG-02 的两条因此失败；kx 改用另一个端口（4960）。这是模型层原来的设计，不是这次的问题。
 
+## 第二次核对（2026-10-26）
+
+走查会话又独立核对了一遍：17 条都是真的修正，每条都有去掉修正就失败的用例；另找出 5 条小问题，这里改完。
+
+| # | 问题 | 改法 | 用例 |
+| --- | --- | --- | --- |
+| 1 | 下拉的节按节名做 React 的 key，提供商名称可以重复 | `RangeGroup` 加 `key`（`groups`、`providers`、`models:<提供商 id>`），表单按它 | 单元 “AG-04 Add model range: two providers with the same name get two groups with distinct keys (by provider id)”（先跑出失败） |
+| 2 | 评审 1 之后 Only these 一个都没勾、只剩表单外保留的条目时 Save 仍可用，状态表与 §6.4 没写 | 按推荐保留这个行为（保留的条目就是工具，逼人勾一个会改掉文件）；状态表“不能保存”、§6.4 Tools、§7 写明，登记临时默认值 | App “AG-06 with no box ticked, Save stays available while the file keeps an entry the form has no box for (mcp__github__*), and is unavailable without one” |
+| 3 | Only these 的检查拿 roles.get 的 piTools 比，没有钉住 8 个名字 | 检查写死状态表的 8 个（PI_TOOL_NAMES） | “AG-04 Only these has a box for each of the eight pi tools (read, bash, edit, write, grep, find, ls, powershell), then All MCP tools” |
+| 4 | model-menu.md“某一节为空”说全空时只有说明与 Manage models | 改成说明、Task mode 一行、Manage agents 与 Manage models | App “AG-08 with no providers left the model menu has no sections, only the note, the Task mode row, Manage agents and Manage models”（删掉全部提供商） |
+| 5 | 跟随的会话换项目时，改过的表单不问就丢掉，没有用例 | 行为不变（§6.4“从头显示”，更安全）；状态表“跟随的会话”与 §6.4 写明“不问、直接收起、什么都不写” | App “AG-04 a form with unsaved edits is dropped too when Customize follows a session in another project: no "Discard this agent?", and nothing is written” |
+
+共享与内核代码只改了 `RangeGroup`（加一个字段），按走查会话的说法不重跑快速集。
+
 ## 状态表的行与用例（AGENTS.md“不留未完成项”第 4 条）
 
 这个分支新加的状态表 [../screens/customize-agents.md](../screens/customize-agents.md) 的每一行，和改过的别的状态表的行。
@@ -108,7 +122,7 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 
 | 屏 | 行 | 用例（套件与 --only 名、检查名） |
 | --- | --- | --- |
-| [customize-agents](../screens/customize-agents.md) | 外框 · 跟随的会话（评审 12 加：换到另一个项目时从头显示） | `ag-app.mjs --only AG-04`：“AG-04 when Customize follows a session in another project, the open form and open rows don’t carry over” |
+| [customize-agents](../screens/customize-agents.md) | 外框 · 跟随的会话（评审 12 加：换到另一个项目时从头显示） | `ag-app.mjs --only AG-04`：“AG-04 when Customize follows a session in another project, the open form and open rows don’t carry over”；“AG-04 a form with unsaved edits is dropped too when Customize follows a session in another project: no "Discard this agent?", and nothing is written” |
 | [customize-agents](../screens/customize-agents.md) | 分节与列表 · 分节 | `ag-app.mjs --only AG-01`：“AG-01 with no open session Customize has no Agents section (Skills, Plugins, Instructions)”；“AG-01 with a session the sections are Built-in tools, Skills, Agents, MCP, Plugins, Instructions” |
 | [customize-agents](../screens/customize-agents.md) | 分节与列表 · 读取中 | `ag-app.mjs --only AG-01`：“AG-01 entering Agents shows Loading… until the list is read” |
 | [customize-agents](../screens/customize-agents.md) | 分节与列表 · 读取失败 | `ag-app.mjs --only AG-01`：“AG-01 a .mori/agents folder that can’t be read shows "Couldn’t load agents: <text>" and Retry”；“AG-01 after the folder is fixed, Retry lists its agents” |
@@ -134,8 +148,8 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 | [customize-agents](../screens/customize-agents.md) | 表单 · 文件头有注释 | `ag-app.mjs --only AG-06`：“AG-06 Edit fills the form with the file’s values and warns that the header’s comments go” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · Jobs 被别人认领 | `ag-app.mjs --only AG-05`：“AG-05 a job another file claims can’t be ticked and says who does it”；新建表单里的那一项见“表单 · 新建” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 选模型 | `ag-app.mjs --only AG-04`：“AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool”；“AG-04 the model list reorders as in Settings › Models: a Reorder handle from two items; dropped on the top half of an item it goes before it, on the bottom half after it, with the line there; arrow keys keep focus; each move is announced”；“AG-04 Add model range has the model menu’s sections and words: Groups, Providers, then Models · <provider> for each provider; the same model id under two providers is listed under each”；“AG-04 each range in the list has a Remove button; removing one takes it out of the list and makes it available in Add model range again” |
-| [customize-agents](../screens/customize-agents.md) | 表单 · 选工具 | `ag-app.mjs --only AG-04`：“AG-04 Only these has a box for every pi tool, then All MCP tools”；“AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool”；“AG-04 the file .mori/agents/reviewer.md is written exactly as §5.1 says”；`ag-app.mjs --only AG-06`：“AG-06 an MCP entry the form has no box for (mcp__github__*) isn’t shown and stays in the file after Save” |
-| [customize-agents](../screens/customize-agents.md) | 表单 · 不能保存 | `ag-app.mjs --only AG-05`：“AG-05 Save is unavailable without a name, a description, a model in the list or a tool; the description stops at 200 characters with an n/200 count” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 选工具 | `ag-app.mjs --only AG-04`：“AG-04 Only these has a box for each of the eight pi tools (read, bash, edit, write, grep, find, ls, powershell), then All MCP tools”；“AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool”；“AG-04 the file .mori/agents/reviewer.md is written exactly as §5.1 says”；`ag-app.mjs --only AG-06`：“AG-06 an MCP entry the form has no box for (mcp__github__*) isn’t shown and stays in the file after Save” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 不能保存 | `ag-app.mjs --only AG-05`：“AG-05 Save is unavailable without a name, a description, a model in the list or a tool; the description stops at 200 characters with an n/200 count”；`ag-app.mjs --only AG-06`：“AG-06 with no box ticked, Save stays available while the file keeps an entry the form has no box for (mcp__github__*), and is unavailable without one”（第二次核对改了这一行） |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 保存中 | `ag-app.mjs --only AG-04`：“AG-04 while saving, the button reads "Saving…" and the form can’t be changed” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 保存失败 | `ag-app.mjs --only AG-05`：“AG-05 a reserved name, a name another file uses and an existing <name>.md are refused with those lines; the form keeps what you typed and no file is written”；`ag-app.mjs --only AG-06`：“AG-06 saving an edit after the file was deleted elsewhere says "This agent file no longer exists."”；“AG-06 saving an edit after the file’s header broke elsewhere says "can’t read the header: …" and leaves the file as it is” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 有改动时离开 | `ag-app.mjs --only AG-04`：“AG-04 leaving a changed form asks "Discard this agent?"; Keep editing keeps it, Discard leaves”；“AG-04 with a changed form, opening another agent’s Edit or another session in the sidebar asks first; Keep editing keeps the form”；“AG-04 Back to app with a changed form asks "Discard this agent?" too; Discard goes back to the session” |
@@ -150,6 +164,7 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 | [model-menu](../screens/model-menu.md) | 协作模式的菜单（加 Manage agents） | `ag-app.mjs --only AG-08`：“AG-08 with Task mode on the menu is the note, the Task mode row, Manage agents and Manage models; Enter on Manage agents opens Customize › Agents”；`tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads … the Task mode row (focused), Manage agents and Manage models — no Groups/Providers/Models …” |
 | [model-menu](../screens/model-menu.md) | 回复进行中的菜单（加 Manage agents） | `ag-app.mjs --only AG-08`：“AG-08 during a reply the range items are unavailable but Manage agents is there and opens Customize › Agents” |
 | [model-menu](../screens/model-menu.md) | Manage agents（新加） | `ag-app.mjs --only AG-08`：“AG-08 with Task mode off the model menu has Manage agents under the Task mode row, above Manage models; clicking it opens Customize › Agents for this session”；“AG-08 with Task mode on the menu is the note, the Task mode row, Manage agents and Manage models; Enter on Manage agents opens Customize › Agents”；“AG-08 during a reply the range items are unavailable but Manage agents is there and opens Customize › Agents”；`ag-app.mjs --only AG-10`：“AG-10 Recent activity has "Open Customize → Agents" after Manage agents” |
+| [model-menu](../screens/model-menu.md) | 某一节为空（第二次核对：全空时还有 Task mode 一行与 Manage agents） | `ag-app.mjs --only AG-08`：“AG-08 with no providers left the model menu has no sections, only the note, the Task mode row, Manage agents and Manage models” |
 | [team-blocked](../screens/team-blocked.md) | 锁定（评审 3：菜单与操作加 Manage agents） | `ag-app.mjs --only AG-08`：“AG-08 with Task mode on the menu is the note, the Task mode row, Manage agents and Manage models; Enter on Manage agents opens Customize › Agents”；`tb-app-models.mjs --only sel`：TB-38 的 Task mode 菜单一条（菜单项 `team-switch`、`manage-agents`、`manage-models`） |
 | [v0 models](../../v0/screens/models.md) | 关闭与重开 · 范围菜单（评审 3：回复进行中 Manage agents 也能用） | `ag-app.mjs --only AG-08`：“AG-08 during a reply the range items are unavailable but Manage agents is there and opens Customize › Agents” |
 | [v0 chat](../../v0/screens/chat.md) | 选择范围（v1）（评审 3：协作模式的菜单加 Manage agents） | `ag-app.mjs --only AG-08`：“AG-08 with Task mode on the menu is the note, the Task mode row, Manage agents and Manage models; Enter on Manage agents opens Customize › Agents” |
@@ -208,6 +223,14 @@ after"），每个问题按推荐做完、登记临时默认值，记在这里�
   - 做在：`shared/roles.ts` 的 `modelLine`（多了 `pick` 参数）、`ToolsAgents.tsx`。
   - 测在：单元 “AG-02 the model line: "No model range picked" only without models and without a session range”、“AG-02 the model line: a range that names no model is "No model can run this agent", not "No model range picked"”；App `--only AG-02` “AG-02 a range that names no model (the project’s .mori/models.json can’t be read) gives "No model can run this agent", not "No model range picked"”。
   - 改成 (2) 时：加这句话（先写状态表与 §7），改 `modelLine` 与这几条用例。
+
+- **Only these 一个都没勾时的 Save（第二次核对 2）**
+  - 问题：文件里有表单外保留的条目（例如 `mcp__github__*`），勾选框一个都没勾时，Save 能不能用？
+  - 选项：(1) 能用，保存后 `tools` 只有这些条目；(2) 只看勾选框，一个都没勾就不能保存。
+  - 选了：(1)，走查会话按推荐定的。临时默认值“Only these 一个都没勾时的 Save”；规格 §6.4 Tools、§7，状态表“不能保存”。
+  - 做在：`components/ToolsAgentForm.tsx` 的 `canSave`（行为本来就是这样，只改了注释）。
+  - 测在：App `ag-app.mjs --only AG-06` “AG-06 with no box ticked, Save stays available while the file keeps an entry the form has no box for (mcp__github__*), and is unavailable without one”。
+  - 改成 (2) 时：`canSave` 只数勾选框里的项，这条用例的期望照改。
 
 （拖动排序的放法不在这里：走查会话按推荐定了两处都用 WP-03 的规则，上半边插在前面、下半边插在后面，这一节已经照做，见上面
 “统一拖动排序”与状态表“选模型”。）
