@@ -292,8 +292,8 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 | 已满 8 个 | `keys` 有 8 个 | Add key 不可用，旁边“A provider can have at most 8 keys.”（临时，走查时可以改） | — |
 | 保存 key | `models.addKey` 返回 `ref` | 新行加在末尾，显示“Saved”；内联表单关闭 | — |
 | 保存 key 失败 | 返回 `error` | 行内原文，Secret 保留在框里 | 修改；Cancel |
-| Test 中 | 你点了某行的“Test”：`connection.test`（`{ providerId, modelId: 第一个模型, keyRef }`），不看这个 key 的记录直接发出 | 这一行下方“Testing…”与“Cancel” | Cancel |
-| Test 结果 | `connection.test` 返回 | 结果显示在这一行下面，文字同提供商的 Test connection；成功时这一行的记录消失（§8.3），打开的会话重新做静态校验 | — |
+| Test 中 | 你点了某行的“Test”：`connection.test`（`{ providerId, modelId: 第一个模型, keyRef }`），不看任何不可用记录、直接发出：这个 key 的记录、提供商的 connection、这个模型的 `not_found`、`timeout`、`held` 都不挡它，上一次失败之后什么都不改再点也照样发出、不等（同提供商卡的 Test connection，下面“测试结果的文字”与规格 §8.3；2026-10-26 补，U17：原来只写“不看这个 key 的记录”） | 这一行下方“Testing…”与“Cancel” | Cancel |
+| Test 结果 | `connection.test` 返回 | 结果显示在这一行下面，文字同提供商的 Test connection；失败照常写记录；成功时这一行的记录消失，另外清除提供商的 connection 与这个模型的 `not_found`（`timeout`、`held` 留着；§8.3；2026-10-26 补，U17：原来只写这一行的记录），打开的会话重新做静态校验，会话的请求不再被这两条记录挡住 | — |
 | 移动（2026-10-26 改（M5）） | 一次放下或一次方向键：`models.moveKey`（`delta` 为移动的格数），立即保存，见“拖动排序” | 新顺序（就是使用顺序）；失败时回到原顺序，原文在 Keys 列表下面 | — |
 | Remove（不是最后一个） | 你点了“Remove” | 不确认，直接 `models.removeKey`；行消失 | — |
 | Remove 最后一个 | 你点了最后一个 key 的“Remove…” | 确认框，文字见下 | Remove；Cancel |

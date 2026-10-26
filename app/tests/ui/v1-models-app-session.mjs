@@ -696,6 +696,35 @@ function rowMatches(view, row, expect) {
 const rowFactsOf = (view, row) => JSON.stringify({ tool: view?.tool_calling.state, tier: view?.tier.level,
   field: view?.reasoning.field, probe: row?.probe, status: row?.status });
 
+/** @brief 判定失败的那一步（第 3、4 步里不通过的那一步）在档案里的说明；没有时为 null。 */
+const failDetail = (view) => [view?.tool_calling.call, view?.tool_calling.result]
+  .find((item) => item?.outcome === 'fail')?.detail ?? null;
+
+/**
+ * @brief 加模型后自动探测的两条补充（2026-10-26 补，独立核对 WP-02 的用例表）：models-settings.md “Models 行”的“验证失败”——
+ *        判定失败的两行，状态行文字正好是“Tool calling failed verification: ”加档案里判定失败那一步的说明（同探针出错一行的
+ *        逐字比较）；反例“兼容选项不因 Fetch models 或探针自动勾上”——这几个模型探测完（有的不支持 tool_choice、不认 schema、
+ *        总在思考），pv 的兼容选项没有被勾上：配置里 compat 仍为空，卡上“Compatibility options”写“None”。
+ */
+async function probeRowExtras(ctx, profiles) {
+  const { page } = ctx;
+  for (const ref of ['pv/fake-coder-notools', 'pv/fake-coder-alwaysthink-notools']) {
+    const detail = failDetail(profiles[ref]);
+    const text = await page.locator(`[data-testid="model-row"][data-model="${ref}"] [data-testid="probe-status"] span`)
+      .first().textContent({ timeout: 2000 }).catch(() => null);
+    record(`MP-10 ${ref}: the status line reads exactly "Tool calling failed verification: <detail>", where <detail> `
+      + 'is the profile’s detail of the failing step (3 or 4)', Boolean(detail)
+      && text === `Tool calling failed verification: ${detail}`, JSON.stringify({ detail, text }));
+  }
+  const compat = { stored: readConfig(ctx).providers.find((item) => item.id === 'pv')?.compat ?? null,
+    shown: await page.locator('[data-testid="provider-card"][data-provider="pv"] [data-testid="provider-compat"]')
+      .textContent({ timeout: 2000 }).catch(() => null) };
+  record('MP-10 the probes tick no compatibility option (models-settings.md counter-examples): after the pv models '
+    + 'finish probing (among them no tool_choice, no schema, thinking always on) its compat is still empty and the '
+    + 'card shows "Compatibility options" "None"', same(compat.stored, {}) && compat.shown === 'None',
+  JSON.stringify(compat));
+}
+
 /** @brief 加模型后自动探测：档案的 tool calling、等级、推理字段正确，模型行的 data-probe 与状态行随 tool calling。 */
 async function probeRowsStep(ctx) {
   const { page } = ctx;
@@ -731,6 +760,7 @@ async function probeRowsStep(ctx) {
     && layout.hint.use === 'Use' && layout.status?.state === 'failed'
     && layout.status.text.startsWith('Tool calling failed verification: ') && layout.status.button === 'Verify again',
   JSON.stringify(layout));
+  await probeRowExtras(ctx, profiles);
   await backToChat(page);
 }
 

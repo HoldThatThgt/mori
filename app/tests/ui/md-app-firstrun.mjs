@@ -462,13 +462,21 @@ async function listedRefetch(ctx) {
   await setName(page, 'Fake first run');
   await openMoreSettings(page);
   // first-run.md“More settings”（2026-10-26 改，WP-02 负责人走查 M1）：兼容选项上面一行说明，只剩五个勾选框、没有 strict mode
-  const more = await page.locator(`${FORM} [data-testid="more-settings"]`).evaluate((root) => ({
-    hint: root.querySelector('[data-testid="compat-hint"]')?.textContent ?? null,
-    labels: [...root.querySelectorAll('.compat-checks label.check-row span')]
-      .map((span) => span.firstChild?.textContent ?? '') }));
+  // 位置（2026-10-26 补，独立核对）：说明在每个勾选框之前（DOM 先后），画面上它的下沿不低于第一个勾选框的上沿
+  const more = await page.locator(`${FORM} [data-testid="more-settings"]`).evaluate((root) => {
+    const hint = root.querySelector('[data-testid="compat-hint"]');
+    const boxes = [...root.querySelectorAll('.compat-checks label.check-row')];
+    const top = Math.min(...boxes.map((box) => box.getBoundingClientRect().top));
+    return { hint: hint?.textContent ?? null,
+      labels: boxes.map((box) => box.querySelector('span')?.firstChild?.textContent ?? ''),
+      before: Boolean(hint) && boxes.every((box) => hint.compareDocumentPosition(box)
+        & Node.DOCUMENT_POSITION_FOLLOWING),
+      above: Boolean(hint) && boxes.length > 0 && hint.getBoundingClientRect().bottom <= top + 0.5 };
+  });
   record('MD-11 More settings of the first-run form: the hint line "Mori already adjusts requests for well-known '
-    + 'services such as DeepSeek. …" above exactly five compatibility options, no strict-mode option (2026-10-26)',
-  more.hint === TEXT.compatHint && more.labels.length === 5 && more.labels.includes(TEXT.compat)
+    + 'services such as DeepSeek. …" above exactly five compatibility options (before them in the page and above the '
+    + 'first one on screen), no strict-mode option (2026-10-26)', more.hint === TEXT.compatHint
+    && more.labels.length === 5 && more.labels.includes(TEXT.compat) && more.before && more.above
     && !more.labels.some((label) => label.includes('strict mode')), brief(more));
   await compatBox(page, TEXT.compat).check();
   await setApi(page, 'openai-responses');

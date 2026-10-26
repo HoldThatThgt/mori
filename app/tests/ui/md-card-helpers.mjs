@@ -346,6 +346,7 @@ export function modelRowState(page, ref) {
         text: text(el.querySelector('.muted')), use: Boolean(el.querySelector('[data-action="use-reported"]')) })),
       tool: row.dataset.probe ?? null,
       status: row.querySelector('[data-testid="probe-status"]')?.dataset.state ?? null,
+      statusText: text(row.querySelector('[data-testid="probe-status"] span')),
       error: text(row.querySelector('.form-message.error')),
     };
   }, ref);
