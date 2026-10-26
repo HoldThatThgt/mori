@@ -31,7 +31,8 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 `mori.team_deciding`、`mori.team_approval_request`、`mori.team_approval_end`）、命令的结果（`session.setTeam`、`board.get`、`session.recheckAgents`、
 `session.stopTeam`、`session.clearQueue` 的 `texts`；`session.prompt` 的 `team: 'once'`、`approval.answer` 的后台 `requestId`）、
 `SessionInfo` 与 `LiveSnapshot` 的 `team`、`board`、`teamApprovals`、`deciding`，`LiveStatus` 的 `teamBusy`、`teamApproval`，
-`ModelState` 的 `pickLocked` 与 `blocked.kind` 的 `agents_invalid`，会话文件里的 `mori.receipt`、`mori.progress`、`mori.wake`（`mori.team` 不显示）。
+`ModelState` 的 `pickLocked` 与 `blocked.kind` 的 `agents_invalid`，会话文件里的 `mori.receipt`、`mori.progress`、`mori.wake`（`mori.team` 不显示）；
+2026-10-26 起另有 `board.readTask`、`board.readSession` 的结果（`TaskDetail`；实例会话的 `entries` 与 `running`，team-tasks.md）。
 `memory-*.md` 与 `settings-issues.md` 另有记忆规格 §8 的来源：命令的结果（`memory.list`、`memory.get`、`memory.save`、`memory.delete`、`memory.move`、
 `memory.revisions`、`memory.rollback`、`enhance.get`、`enhance.set`、`enhance.run`；`error` 只有原因，界面加前缀；
 `enhance.get` 的结果和 `enhance.set` 的 `info` 都是 `EnhanceInfo`，2026-10-24 起含 `noOffPicks: ModelPick[]`：第一个候选（按记忆规格 §9.1 的取法，同 `effortPicks`）
@@ -51,6 +52,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | [team-stream.md](team-stream.md) | 回执、进展摘要（位置、折叠与展开、需求状态、task 的 phase 文字、交接链）、不显示的程序投递与回合、合并会话里立项工具的卡、重新打开 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的对话流 |
 | [team-approvals.md](team-approvals.md) | 后台实例的批准卡与归属、和对话自己的卡怎样排、全部允许与本会话不再询问作用于全部 Agent、权限菜单说明、侧栏状态、F8 计数 | 补充 [v0 approval.md](../../v0/screens/approval.md) |
 | [team-stop.md](team-stop.md) | 待判断的消息（`<create role> is deciding…`、排队区的 `Waiting for <create role>`、撤回）、Esc 与 `Stop agents`、回到输入框的文字、侧栏“Running”、正在生成时不能归档删除 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的排队区与停止、[model-chat.md](model-chat.md) 的准备中、[v0 sessions.md](../../v0/screens/sessions.md) 的状态与归档删除 |
+| [team-tasks.md](team-tasks.md) | 右栏的 Background tasks（2026-10-26 加）：`Changes` / `Background tasks` 页签、阶段行的 `{n} running tasks` 按钮、进展摘要里的链接、模型菜单的 `See background tasks`、Running / Finished 两节与 task 卡、task 的视图（Prompt、Messages、Handoffs）、只读的实例会话（Model 一行、运行中、No activity yet、读不出）、`Stop this task` | 补充 [v0 changes.md](../../v0/screens/changes.md) 的右栏、[team-stream.md](team-stream.md) 的进展摘要 |
 | [team-blocked.md](team-blocked.md) | `agents_invalid` 的拒绝启动卡（§4.4 的每一行、Check again）、`Turn off task mode`、协作模式下的模型按钮、右栏的后台改动说明 | 补充 [model-chat.md](model-chat.md) 的拒绝启动卡、[model-menu.md](model-menu.md) 的按钮、[v0 changes.md](../../v0/screens/changes.md) |
 | [memory-page.md](memory-page.md) | 记忆页：左栏 `Memory`、`User` ｜ `Project` 与跟随的项目、六个分节、用量与 `Last change`、列表与读不出来的条目、条目详情（Evidence、Details 与 `[[slug]]`、Linked from、History）、编辑与新增、离开确认、删除、移动、依据回到原位置、AGENT、Revisions 与回滚、数据何时读、后台进程退出 | [v0 review.md](../../v0/screens/review.md)（工作回顾，M7）的入口、页面、反馈部分与回到原位置；[v0 layout.md](../../v0/screens/layout.md) 左栏的“Review” |
 | [memory-enhance.md](memory-enhance.md) | 记忆页 `Project` 顶部的增强：开关、状态行（规格 §10.4 的每一种）、`Run now`、`Enhancement settings` 对话框、进度事件 | 新增（v0 没有对应的屏） |
@@ -169,6 +171,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `blocked-card[data-kind="agents_invalid"]`、`agent-problem`；`data-action="check-agents"`、`data-action="turn-off-team"` | 角色文件的拒绝启动卡、问题行、Check again、Turn off task mode（`agent-problem` 该文件定，临时） | team-blocked.md |
 | `model-button` 的 `data-locked="true"` | 协作模式下锁定的模型按钮（该文件定，临时） | team-blocked.md |
 | `team-changes-note` | 右栏的后台改动说明 | team-blocked.md |
+| `right-tab`（`data-tab`）、`tasks-button`、`bg-tasks`、`bg-section`、`bg-task`、`bg-task-view`、`bg-message`、`bg-handoff`、`bg-transcript`；`data-action` 的 `view-transcript`、`stop-task`、`open-in-tasks`、`see-background-tasks`、`back`、`retry` | 右栏的 Background tasks（规格 §13.13.6） | team-tasks.md |
 | `nav-memory`、`memory-page`、`memory-scope-user`、`memory-scope-project`、`memory-section-<facts\|taste\|strategy\|review\|agent\|revisions>` | 记忆页的入口、页面、层与分节（记忆规格 §10.11） | memory-page.md |
 | `memory-usage`、`memory-last-change`、`memory-new`、`memory-list`、`memory-row`（`data-id`、`data-source`）、`memory-broken` | 前四节的用量与列表 | memory-page.md |
 | `memory-detail`、`memory-evidence`、`memory-jump`、`memory-jump-status`、`memory-backlinks`、`memory-history`、`memory-error`、`memory-edit`、`memory-delete`、`memory-move` | 条目详情 | memory-page.md |

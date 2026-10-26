@@ -27,8 +27,8 @@ import type {
   SessionInfo, SessionState, SlashCommand, ThinkingLevel, TrustAnswer,
 } from '../shared/protocol';
 import {
-  emptyBoard, noDeciding, soloTeamState, type BoardView, type InstanceKind, type PromptBehavior, type TeamState,
-  type TeamSwitch,
+  emptyBoard, noDeciding, soloTeamState, type BoardView, type InstanceKind, type PromptBehavior, type SessionOf,
+  type TaskDetail, type TeamState, type TeamSwitch,
 } from '../shared/team';
 import { ApprovalPolicy, type ApprovalGate, type GateOutput } from './approval';
 import { contextBreakdown } from './contextBreakdown';
@@ -1285,6 +1285,50 @@ export async function setTeamMode(sessionId: string, mode: TeamSwitch): Promise<
 export function boardView(sessionId: string): BoardView & { error: null } {
   const entry = requireEntry(sessionId);
   return { ...(entry.team?.info().board ?? emptyBoard()), error: null };
+}
+
+/** @brief 没有 Team 时（角色文件有问题）的 task 与需求都不存在（§13.13.3、§13.13.4）。 */
+function missingText(of: SessionOf): string {
+  return of.kind === 'task' ? `${of.task} does not exist.` : `Request ${of.request} does not exist.`;
+}
+
+/** @brief board.readTask（只读，§13.13.3）：一个 task 的详情；不能读时 error 为原文。 */
+export function readBoardTask(sessionId: string,
+  task: string): { task: TaskDetail; error: null } | { task: null; error: string } {
+  const team = requireEntry(sessionId).team;
+  try {
+    if (!team) throw new Error(missingText({ kind: 'task', task, role: '' }));
+    return { task: team.readTask(task), error: null };
+  } catch (error) {
+    console.error(`[kernel] board.readTask ${task} failed: ${(error as Error).message}`);
+    return { task: null, error: (error as Error).message };
+  }
+}
+
+/** @brief board.readSession（只读，§13.13.4）：task 实例会话或结案会话；不能读时 error 为原文。 */
+export async function readBoardSession(sessionId: string,
+  of: SessionOf): Promise<{ entries: unknown[]; running: boolean; error: string | null }> {
+  const team = requireEntry(sessionId).team;
+  try {
+    if (!team) throw new Error(missingText(of));
+    return { ...(await team.readSession(of)), error: null };
+  } catch (error) {
+    console.error(`[kernel] board.readSession ${JSON.stringify(of)} failed: ${(error as Error).message}`);
+    return { entries: [], running: false, error: (error as Error).message };
+  }
+}
+
+/** @brief session.stopTask（§13.13.7）：停止一个 task；不能停时 error 为原文。 */
+export async function stopBoardTask(sessionId: string, task: string): Promise<{ error: string | null }> {
+  const team = requireEntry(sessionId).team;
+  try {
+    if (!team) throw new Error(missingText({ kind: 'task', task, role: '' }));
+    await team.stopTask(task);
+    return { error: null };
+  } catch (error) {
+    console.error(`[kernel] session.stopTask ${task} failed: ${(error as Error).message}`);
+    return { error: (error as Error).message };
+  }
 }
 
 /**

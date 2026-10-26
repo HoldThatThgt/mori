@@ -139,6 +139,9 @@ const KEYED = {
   'memory.revisions': (command) => [command.cwd ?? null, command.layer, command.id ?? null],
   'enhance.get': (command) => [command.cwd ?? null],
   'models.discover': discoverKey,
+  // Background tasks 的两个只读查询（平行 Agent 规格 §13.13.3、§13.13.4）：按 task、按读哪一条会话
+  'board.readTask': (command) => [command.task],
+  'board.readSession': (command) => [command.of],
 };
 
 /**
@@ -181,6 +184,11 @@ function keyedEmpty(command) {
       return command.id === undefined || command.id === null ? { revisions: [], error: null }
         : { revision: null, error: null };
     case 'models.discover': return discoverMissing(command);
+    // synthetic：录制里没有这个 task 或这条会话的读取，测试不该用到
+    case 'board.readTask':
+      return { task: null, error: `synthetic: no board.readTask ${command.task} in the recording` };
+    case 'board.readSession':
+      return { entries: [], running: false, error: 'synthetic: no board.readSession like this in the recording' };
     default: return enhanceOff(command.cwd);
   }
 }
@@ -336,7 +344,7 @@ function fileReader(steps) {
 /** 不占回放顺序的只读查询（m6-replay.mjs 也从这里读；tb-replay.mjs、v1-models-replay.mjs 按文字读这一行） */
 export const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
   'agents.get', 'session.commands', 'models.get', 'session.pickOptions', 'board.get', 'memory.list', 'memory.get',
-  'memory.revisions', 'enhance.get', 'models.discover'];
+  'memory.revisions', 'enhance.get', 'models.discover', 'board.readTask', 'board.readSession'];
 
 /** @brief models.* 的写命令：回放桥直接应答（v1ModelWrite；models.discoverCancel 另记），不占回放顺序。 */
 const answeredWrite = (type) => type.startsWith('models.') && !QUERIES.includes(type);
@@ -796,6 +804,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
           status.queries.push(command);
           return Promise.resolve(withAgentTokens(latestResult(command.type, m6Empty(command.type))));
         case 'memory.list': case 'memory.get': case 'memory.revisions': case 'enhance.get':
+        case 'board.readTask': case 'board.readSession':
           status.queries.push(command);
           return keyedResult(command);
         case 'connection.save': return Promise.resolve({ error: null });

@@ -125,6 +125,236 @@
 - **规格 §14.6 最后一段**：超过 6 个并发会话、带 MCP 与技能时的表现没有测量。
 - 技能命令的展开立项看不到（pi 没有导出，规格 §5.3 写明的已知限制）。
 
+## Background tasks（2026-10-26，负责人走查 M14）
+
+规格 §13.13，状态表 [team-tasks.md](screens/team-tasks.md)。分支 `v1-bg-tasks`，worktree `D:\code\mori\.claude\worktrees\intelligent-yalow-360565`，从本地 `app-v0` 的 63cf4a9 开出。
+验收编号 TB-80–TB-89（TB-58–TB-79 留给同一轮走查的其他包）。
+
+### 负责人定的（2026-10-26）
+
+| # | 问题 | 负责人的选择 | 推荐的是 |
+| --- | --- | --- | --- |
+| 1 | 列表怎么分 | 照 Claude 分 `Running` / `Finished`；需求的结论、已排除的方案不在列表里 | 按需求分节 |
+| 2 | 从哪里打开 | 四个都要：阶段行的 `{n} running tasks` 按钮、进展摘要里的链接、右栏的 `Changes` / `Background tasks` 页签、模型菜单的 `See background tasks` | 前三个 |
+| 3 | 每个 task 的停止按钮 | 加 `Stop this task`（新的会话命令 `session.stopTask`，所以要录 fixture、跑真实模型，TB-89） | 这次不加 |
+| 4 | 能打开谁的会话 | task 实例与每个需求的结案会话 | 同左 |
+
+### 按推荐定下的（负责人没单独回答的）
+
+- 不加 `/tasks`：与 M21 改名后的 `/task` 只差一个字母。
+- 不做 Claude 的 `Clear finished tasks`：TaskBoard 是持久的，Agent 还要读这些 task。
+- 两个只读命令 `board.readTask`（task 的详情，小，常常重新读）与 `board.readSession`（实例会话，可能 1 MB，只在打开时读），没有并成一个。
+- 停止一个 task 不通知立项（同 `Stop agents`）：立项在下一次运行的工作卡里看到它，你的下一条消息照常先到立项。
+- 页签只在有需求或协作模式打开时出现；没用过协作模式的会话右栏与原来相同（TB-03）。
+
+### 你不在时按推荐定下的（2026-10-26，负责人不在、按推荐做，待你确认）
+
+| # | 问题 | 选项 | 选了 | 在哪里做、怎么测 |
+| --- | --- | --- | --- | --- |
+| 5 | WP-10 的 #64 让进展摘要在项目没有角色文件时不写角色名（到处写 `Mori` 看起来像对话 Agent 自己在做，M13）；Background tasks 的卡片第二行、task 视图、交接的头一行、会话标题要不要也不写 | A. 照 §13.13 的写法，基座照写 `Mori`（`Request 1 · Mori · Done · 3 min`、`#1 Mori · Done → Mori (closing)`）；B. 同 #64，没有角色文件时省略角色（`Request 1 · Done · 3 min`，去向另要一套不带角色的写法，如 `→ closing`） | A：#64 只管进展摘要（给模型的 `board_read` 也照写角色名）；Background tasks 一栏本身就说明这些是后台的 task，“谁拿着它”在这里是要看的事实；B 要给 §15 加不带角色的去向写法。你定了 #64 也要用在这里时，只是 `taskList.ts` 里多一个 `named`（同 `TeamStream.tsx`） | `app/src/renderer/src/state/taskList.ts`（`cardParts`、`handoffHead`、`routeText`、`transcriptTitle`）；`taskList.test.mjs` 的 TB-81（卡片的角色是 `Mori`、`View transcript for Mori on T1`）、TB-82（`#2 Mori · no handoff → planner (closing)`、`→ Mori`）、TB-83（会话标题 `Mori · T1 …`）；登记在 [defaults.md](defaults.md)“Background tasks 里基座的名字” |
+| 6 | 审查 #2：程序写的一棒（实例跑过之后）的 View transcript 打开 `mori` 的会话，有角色文件时报 `Mori has no session on T1.` | A. 写交接时把实例的角色记进 board.json（审查推荐）；B. 读的时候按这一棒记下的会话文件找出它是哪个角色的 | B：不改 board.json 的格式（已有的 board.json，例如负责人 Har-GUI 那次，照样对），不加兼容的字段；开着的实例按它的文件、没开着的按 knownFiles（`<用户>.<task>.<角色>`）比文件名；头一行仍写 `Mori` | `app/src/kernel/teamView.ts`（`handoffDetail`）、`team.ts`（`instanceRole`）；单元 `tasks.test.mjs` 的 TB-82（`session.role` 是 executor，读得到），界面 `program`：“TB-83 a baton the program writes after the instance ran …” |
+| 7 | 审查 #6：TB-82 “打开着的 task 视图随 TaskView 重新读，最多每秒一次”放在哪里测 | A. 在 `outcomes` 里一直开着 T1 的视图（审查推荐），节奏数页面里的 board.readTask；B. 另起一步 `liveview`（自己的场景），节奏挪进纯函数做单元测试 | B：`outcomes` 的 `rereads` 要在同一段时间里开着 executor 的会话，两者冲突；`window.mori` 是 contextBridge 给的、冻结的，页面里包不了 request 来数次数 | `tests/ui/tb-app-tasks.mjs` 的 `liveview`（场景 `tb-tasks-live`）；`app/src/renderer/src/state/taskList.ts` 的 `rereadWait`（`BackgroundParts.tsx` 的 `useThrottledRead` 用它）与 `taskList.test.mjs` 的 TB-82 |
+| 8 | 审查 #15：分屏时点没有焦点那一栏的 `{n} running tasks` 会点空 | 同右栏开关的例外（点完才切焦点）；或不处理 | 同右栏开关的例外，登记临时默认值 | `ChatPane.tsx`（`isTopBarAction`）、[split.md](../v0/screens/split.md)“右栏开关”、[defaults.md](defaults.md)；界面 `sessions`：“TB-80 in split view, clicking the stage-line button of the pane without focus works …” |
+| 9 | 审查 #9：TB-88 的消息全文怎么比 | A. 去掉 Markdown 后逐词按先后比（审查推荐）；B. 只比头尾各 80 个字 | 都不完全：中文没有空格、表格的格在 textContent 里连在一起，逐词比会把“位置机制”当成一个词。选的是比 A 更严的整段比：原文去掉 mermaid 块（画成图）、链接地址、代码块开头一行，只留字母（数字不比：有序列表的序号是样式画的，段落里的“13.”不是列表、照原样显示），要整段在视图那一条（去掉 mermaid 图）的文字里 | `tests/ui/tb-app-tasks-owner.mjs`（`shownLetters`、`mismatch`）：T2 3 条、T5 1 条、T6 2 条都整段对得上 |
+| 10 | customize-agents 合入后，模型菜单 Task mode 那一段里 `See background tasks` 与 `Manage agents` 谁在前（两份规格各自写“Task mode 一行之后”，这个包原来写“最后一项”） | A. Task mode 一行、`See background tasks`、`Manage agents`、`Manage models`（走查修复会话的推荐）；B. `Manage agents` 在前 | A：两个 “Manage …” 挨着，都是去别的页；customize-agents.md §6.6 的“这一组的最后加一项 Manage agents”仍成立；这里把“最后一项”改成“Task mode 一行之后” | `ModelMenu.tsx`；`tb-app-models --only sel` 的 TB-38（team-switch、see-background-tasks、manage-agents、manage-models）、`ag-app --only AG-08`（Task mode 打开时的顺序）、`tb-app-tasks --only menu`（紧跟 Task mode 一行、下面是 Manage agents）；登记在 [defaults.md](defaults.md)“模型菜单 Task mode 那一段的先后” |
+
+### 状态
+
+规格与状态表负责人 2026-10-26 确认。2026-10-26 负责人的新规则（AGENTS.md“不留未完成项，不做规格外的东西”）之后不再等：
+不依赖 WP-09、WP-10、WP-14 的部分现在做完，依赖的部分在那个包合并之后做（下面“等别的包的”）。
+
+测试按 AGENTS.md 测试分层（2026-10-26 改，规格 §17.3 最后一条）：每次改动只跑 check、构建、单元、`test:quick` 和新用例的 `--only`；
+fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `tb-app-tasks*.mjs` 与覆盖检查留到负责人要求推送前的完整回归。
+
+### 实现（2026-10-26）
+
+- 后台进程（ad3e55d）：`board.readTask`、`board.readSession`、`session.stopTask`；`TaskView` 加 `createdAt`、`closedAt`、`dependsOn`、
+  `sessionRoles`，`RequestView` 加 `closeSession`；`read_session` 与 `board.readSession` 共用一个读法（开着取内存里的分支，
+  没开着用 pi 的纯读取路径读文件）；停止一个 task 是 Stop agents（2026-10-26 前叫 Stop team）只作用于这个 task（清它的投递队列、等它的以
+  `Stopped by the user.` 结束、`stopped` 且持有者保留、写入锁照旧）。
+- 界面（748d9f3 与之后一次提交）：右栏的 `Changes` / `Background tasks` 页签、`Running` / `Finished` 列表、task 的视图、只读的
+  实例会话与结案会话（复用对话流的 `ItemView`）、阶段行的 `{n} running tasks` 按钮、进展摘要的两种链接、`Stop this task`、
+  F8 的操作记录；回放桥把两个只读命令当作只读查询。
+- 做的时候补进规格与状态表的（都在 M14 和负责人的回答之内）：结案会话写的一棒总有 `View transcript`（结案的交接不记会话位置）；
+  有页签时 `Expand` / `Collapse` 与关闭只在页签那一行（WP-13 之后）；后台进程退出后读与停止照发、显示进程桥的原文与 `Retry`；
+  TB-88 的套件叫 `tb-app-tasks-owner.mjs`（结果 `tb-app-tasks-owner.json`，计入 App 层）；TB-46 的单元测试不再要求编号只到 TB-57。
+- 合进 `app-v0` 的 531419c（加严的 `spec-ids`）与 WP-02 之后（af541d2）：`npm run check` 通过，`test:unit` 481/481（TaskBoard 的四项
+  `spec-ids` 都通过：每层都有测试、编号都在表里、没有空的或总是通过的测试、npm 脚本跑全部 App 与回放套件），`test:tb-unit` 357/357，构建通过；
+  这次合并没有改到 Background tasks 的文件，界面用例没有重跑。
+- 合进 `app-v0` 的 WP-03、WP-04、WP-05、WP-15 之后（a37dbbf，冲突只在 `package.json`：保留这里的 `test:taskboard` 与 `app-v0`
+  的 `test:v1-models`）：`test:unit` 461/461（WP-04、WP-05 删掉了探针与网络区域的 20 项），`test:quick` 通过，再跑了一次整套
+  `tb-app-tasks.mjs`（下面“测试”）。整套跑出的四处用例问题都在用例里，界面没有改：`narrow` 只认列表（前一步 `reload` 停在会话里，
+  阶段行按钮回到上次那一层，改成三层都算）；`errors` 让后台进程退出后没有重启 App，`restart` 打不开项目（改成检查完重启）；
+  `reload` 单独跑时 T4 还在变（改成一秒内两次读到相同再记下）；`entries`、`menu` 的 F8 检查会被前面步骤记下的同名操作满足
+  （Recent activity 记整个 App 最近 30 个操作；改成只看这一步发出消息之后的）。
+- 合进 `app-v0` 的 WP-09 之后（90ed309；冲突在 `team.ts`、`ChatPane.tsx`、`actionLog.ts`、`tb-replay.mjs`、规格与
+  `screens/README.md`，两边都留：WP-09 的改名与这里的 §13.13、TB-80–TB-89）：模型菜单 Task mode 那一段的最后一项
+  `See background tasks`（`ModelMenu.tsx`，条件同页签，点了关上菜单、经 `openTasks` 打开右栏，回复进行中也能用）；
+  照 WP-09 的界面文字把用例名、规格与记录里的 `Stop team` 改为 `Stop agents`、team mode 改为 task mode，F8 的
+  `Send (team): …` 改为 `Send (task mode): …`。
+- 合进 `app-v0` 的 WP-10 之后（8f50a42；冲突在 `TeamStream.tsx`（WP-10 的 `named` 与这里的 `tabKey` 都留）、
+  `spec-coverage.test.mjs`（前 59 个是 TB-01–TB-59，TB-80–TB-89 一段，编号不重复）、`tb-real*.mjs`、`tb-replay.mjs`、规格与
+  这份记录，两边都留）：回放与录制里 stop-task 一段改用 `/task`（`/team` 不再是命令）；`test:unit` 461/461，
+  `test:tb-unit` 373/373。Background tasks 里基座的名字照旧写 `Mori`，见上面“你不在时按推荐定下的”#5。
+- 合进 `app-v0` 的 WP-14 之后（20ebd07；冲突只在 `Transcript.tsx`：取 WP-14 的 `ItemView`（加了 `steps`、`onSteps`），仍导出给
+  会话视图用）：会话视图的步骤照对话流折叠（`BackgroundTranscript.tsx` 用 `turns.ts` 的 `stepGroups`、`itemSteps`，实例在运行时
+  最后一轮全部显示，你的展开、收起只在这次打开里有效）；`tabs` 一步要点会话里工具卡上的路径，先用 `showBgStep`
+  （`tb-tasks-helpers.mjs`，同 `page.mjs` 的 `showStep`，范围是会话视图）展开那一组。`test:unit` 473/473（WP-14 加了 12 项），
+  `test:tb-unit` 373/373。
+- 审查（2026-10-26，1e3d21e 的 15 条，每条都先写测试）：
+  - #1、#5：协作模式下的模型菜单也有 `See background tasks`：规格 §12.11、§13.1、TB-38，model-menu.md 的三行与标识表，
+    team-switch.md，`ModelMenu.tsx` 开头的注释；TB-38 的检查（`tb-app-models.mjs` 的 `sel`）期望的项是 team-switch、
+    see-background-tasks、manage-models（customize-agents 合入后按合在一起的菜单再改）。
+  - #2：程序写的一棒的会话角色，见上面 #6。#3、#4、#12 的文字：文件阅读器那一行“不再重复 Expand / Collapse 与 Close panel
+    （其余按钮同 v0 changes.md）”、进展摘要标题行的图标按钮“滚到这个需求的第一个 task、卡片短暂高亮”、消息里的 mermaid 画成图。
+  - #13：停止的回复晚于 mori.board 到时不再把按钮设回不可用（`taskList.ts` 的 `stopReplyState`，`backgroundTasks.ts` 用它）。
+  - #14：右栏的 Background tasks 按会话建（`ChangesPanel.tsx` 的 `key={tab.key}`），切到另一个会话不留着上一个会话读到的。
+  - #15：见上面 #8。#16：`board.readTask` 失败时记错误日志。#18：交接的 View transcript 用详情里的需求号；
+    `board.readTask` 的结果是 `{ task; error: null } | { task: null; error }`，界面不再自己编“does not exist.”。
+  - #6、#7、#8、#9、#10、#11、#12 的用例：见下面“测试”与“状态表的每一行与用例”。
+  - 结果：`npm run check` 通过，`test:unit` 473/473，`test:tb-unit` 377/377（新：TB-82 两项、TB-84、TB-89 两项）；
+    整套 `tb-app-tasks.mjs` 跑过一次（96 项通过，1 项是新用例自己的问题：项目没有模板与技能时“/”的列表本来就没有项，
+    改成列表打开、没有 tasks 之后 `--only plain,liveview` 通过）；`tb-app-tasks-owner.mjs` 5 项都通过。
+    `tb-app-models --only sel` 与 `test:quick` 用共用端口，等走查修复会话的“go”。
+- 合进 `app-v0` 的 customize-agents 之后（25d06fb；冲突在 `ModelMenu.tsx`、`tb-app-models.mjs`、规格、model-menu.md、team-switch.md，
+  两项都留）：菜单的先后见上面 #10；规格 §12.11、§13.1、§13.13.1、TB-38，model-menu.md、team-switch.md、team-blocked.md 与
+  customize-agents.md §6.6 都写两项；`ModelMenu` 里三个“关上菜单再去”的处理合成一个 `thenClose`（函数不超过 50 行）；
+  `ag-app.mjs` 的 AG-08 在 Task mode 打开时的顺序里加上 `see-background-tasks`。`npm run check` 通过，`test:unit` 477/477，
+  `test:tb-unit` 377/377，`ag-app --only AG-08` 四项都通过，`tb-app-tasks --only menu`、`--only stop,readonly` 都通过
+  （`readonly` 要和 `stop` 一起跑：它等全部 task 结束，单独跑时 T3 一直在等）。拿到共用端口之后（e44c3da）：
+  `tb-app-models --only sel` 五项都通过（TB-38：Task mode 下的菜单是说明、Task mode 一行、See background tasks、Manage agents、
+  Manage models），`npm run test:quick` 4/4（86 秒）。
+- 合进 `app-v0` 的 subagent 之后（edcb486、74d9223；冲突只在 `tb-record.mjs`，stop-task 与 sa-subagent 两个场景都留）。
+- 独立检查（2026-10-26，1e3d21e..e44c3da：3 处没改全、13 处新的）：
+  - #1、#5 没改全的菜单列举：customize-agents.md（屏）、v0 chat.md、v0 models.md（回复进行中能用的项）、team-blocked.md 锁定一行的
+    操作、model-menu.md 全空的菜单、model-providers.md、customize-agents.md §6.6 与 `tb-app-models.mjs` 的 `lockedView` 注释都加上
+    `See background tasks`；`ag-app.mjs` 的 AG-08 改了名字，customize-agents 的检查记录里引用它的六处跟着改。
+  - #13：`stop` 改成从卡片停、一直留在列表里到交回（列表一直挂着；T3 的卡片从 Running 移到 Finished 再移回来时重新挂载，
+    停止状态在 `useStopState` 里、不随卡片），从 task 的视图停挪到 `approval`。按审查的
+    要求临时换回旧的写法验了一次：界面这一项仍通过——mori.board 要等 board.json 写出才发，停止的回复在合成端点上总是先到，
+    不在后台进程里加钩子，界面上造不出“回复晚到”的那一种；换回旧写法时会失败的是单元 `taskList.test.mjs` 的 TB-89
+    （`stopReplyState`），由它守住这一种（走查修复会话 2026-10-26 同意）；
+    界面这一项看交回后按钮可用，名字只写这一件。
+  - #14：切换的那一刻在记录里放一个标记（与点侧栏那一行在同一次 evaluate 里，最终检查 4），之后视图一变就记；临时去掉 `key={tab.key}` 验了一次：失败（`["alpha","switch","alpha","beta"]`），
+    加回去通过（`["alpha","switch","none","beta"]`）。
+  - 新 1：单元 TB-82 “after the session is reopened, a program baton's session is found from the instance files on disk”（knownFiles
+    那一支；临时让那一支找不到时失败）。新 2：§13.13.3、team-tasks.md“程序写的一棒”写明头一行写 Mori、会话是实例的，登记临时默认值。
+    新 3：§13.13.3 去掉“WP-13 合入后”。新 4：两处超过 120 字符的行。新 5：`readonly` 拆出 `afterModeOff`。新 6：状态表的每一行与用例
+    加 team-blocked 锁定一行。新 7：回复进行中的按钮用 `waitButton` 等。新 8：`liveview` 和视图第一次读到的比（少于三棒）。
+    新 9：TB-89 的单元测试去掉只读回测试自己写的东西的两条，留下 host.aborts 的两次。新 10：这一轮只用 `--only` 跑改过的用例。
+  - 结果：`npm run check` 通过，`test:unit` 481/481，`test:tb-unit` 378/378，`tb-app-tasks --only stop,readonly,approval,liveview,sessions,menu`
+    26 项都通过；拿到共用端口之后（ecad0e5）`tb-app-models --only sel` 7 项都通过，`npm run test:quick` 4/4（82 秒）。
+- 最终检查（2026-10-26，ecad0e5）：customize-agents 检查记录里两处 TB-38 的引用改成四项；全空的菜单在协作模式打开时也有
+  `See background tasks`，加在 `ag-app.mjs` AG-08 的 emptyConfigMenu（“AG-08 with no providers left and Task mode on …”），
+  v0 models.md、v0 chat.md、customize-agents.md 屏改过的几行在“状态表的每一行与用例”里各有用例；#13 的说法改正（T3 的卡片在
+  Running、Finished 之间移动时会重新挂载，停止状态在 `useStopState` 里），检查名去掉括号里的那一句；#14 的标记与切换放进同一次
+  evaluate。`npm run check` 通过，`test:unit` 481/481，`test:tb-unit` 378/378，`ag-app --only AG-08` 五项、
+  `tb-app-tasks --only stop,sessions` 都通过。
+
+### 测试（AGENTS.md 测试分层，每次改动的那几层）
+
+| 层 | 结果 |
+| --- | --- |
+| `npm run check` | 通过 |
+| 构建 | `node tests/ui/tb-build.mjs tasks` 通过 |
+| `npm run test:unit` | 461/461（含 `spec-ids`：TB-80–TB-89 列出的每一层都有测试；MP-38：新加的行里没有推迟实现的标记） |
+| `npm run test:tb-unit` | 359/359（WP-09 之后；新：`tasks.test.mjs` 14 项、`taskList.test.mjs` 9 项） |
+| `tb-app-tasks.mjs --only` | plain、empty、entries、list、taskview、transcript、tabs、keys、stop、readonly、reload、narrow、approval、outcomes、noactivity、errors、restart 每一步最近一次都通过（2026-10-26 为状态表的每一行补了 tabs、narrow、outcomes、noactivity 四步与各步里的检查，见下面的表）；WP-09 之后 `--only plain,empty,entries,stop,readonly,menu` 全部通过（含 menu 与 readonly 最后一项）；folding 等 WP-14（下面）（分几次跑，端口 4950–4951；结果是 `tb-partial-app-tasks.json`，不计入覆盖检查） |
+| 整套 `tb-app-tasks.mjs`（a37dbbf 之后跑一次） | 75 项通过、6 项失败：等 WP-14 的 `folding` 两项、等 WP-09 的 `menu` 一项与 `readonly` 最后一项，另外两项是用例的问题（`narrow`、`restart`，上面“实现”最后一条），改了之后 `--only reload,narrow,errors,restart` 与 `--only entries,menu` 跑过：除了等 WP-09 的 `menu` 两项都通过 |
+| 整套 `tb-app-tasks.mjs`（WP-10 合入后，8f50a42 之上） | 80 项通过、2 项失败：只剩等 WP-14 的 `folding` 两项（还没有步骤组）；WP-09 的 `menu` 与 `readonly` 最后一项、上一次的 `narrow`、`restart` 都通过 |
+| 整套 `tb-app-tasks.mjs`（WP-14 合入后，4a32d4f） | 82 项全部通过，没有失败（端口 4950–4951；结果 `tb-app-tasks.json`） |
+| `tb-app-tasks.mjs --only folding`、`--only tabs`（WP-14 合入后） | 都通过（folding 三项；tabs 三项，先展开折起的组再点路径） |
+| `tb-replay --only stop-task`（TB-89） | 六项都通过：停之前卡片在 `Running`、有 `Stop this task`，点它发出录制里的 `session.stopTask`；之后在 `Finished`、`Stopped`；交回后回到 `Running`、最后在 `Finished`；界面发出的命令与录制一致；页面没有错误 |
+| `tb-app-tasks-owner.mjs`（TB-88） | 通过：`Finished` 里 T6–T1 全是 Done、没有 `Running`；T2 3 条、T5 1 条、T6 2 条消息全文（T6 两条含表格）；T1–T6 与结案会话都能打开，T4（约 1 MB）的会话 261 ms 显示完（WP-14 合入、会话视图折叠之后再跑一次，照样通过，206 ms）；没有发模型请求。只复制那条会话的文件与 `teams/<id>`，没有读 `credentials.json`、`pi/auth.json` |
+| `npm run test:quick` | a37dbbf 之后通过：4/4，87 秒（m0-smoke 31、tb-replay 14、mem-replay 17、m1-replay 16 项）；WP-09 之后通过：4/4，81 秒；第二波合完之后（29d28a9）通过：4/4，87 秒（tb-replay 18、m0-smoke 31、mem-replay 17、m1-replay 16 项） |
+| `tb-real.mjs --only stop`（TB-89 真实层，29d28a9） | 通过：负责人的 DeepSeek 与 GLM（复制的 `mori-real-data`，不读 key）；运行中的 T1 点 `Stop this task` 后是 `stopped`（`stopReason: user`、持有者 executor 保留）、没有程序写的交接，交回之前它的实例没有发请求；交回后在同一个实例会话里继续（只有一个会话文件，有 `[Mori] T1 is back with you.`）、做完到结案、需求 `done`；之后没有悬着的 task；页面没有错误、代理转发了每个请求；用时 55 秒。结果是 `tb-partial-real.json`（--only），计入真实层的在推送前的完整回归里产生 |
+| 整套 `tb-app-tasks*.mjs`、`tb-replay`、TB-46 汇总、`spec-coverage --spec taskboard` | 负责人要求推送前的完整回归里跑（测试分层第 3 条）；两个 `tb-app-tasks*.mjs` 已加进 `npm run test:taskboard` |
+
+### 等别的包的（包一合并就做）
+
+- WP-09（模型菜单里的 Task mode）：做完了（上面“实现”最后一条），`menu` 与 `readonly` 最后一项通过。
+- WP-14（一轮结束后折叠步骤）：做完了（上面“实现”最后一条）。`folding` 三项都通过：做完的 T1 会话一行 `3 steps`
+  （aria-expanded 为 false，▸ / ▾ 是样式画的）、没有看得见的工具卡；点开后三张工具卡都在；运行中的 T3 没有折起的一行。
+- WP-10（发给模型的文字）：合进来了（8f50a42）。TB-89 的 fixture `tests/fixtures/tb/stop-task.json` 录好了（10fb133，
+  `MORI_APP_DIR=.tb-runs/real node tests/ui/tb-record.mjs --source %TEMP%mori-real-data --only stop-task`，负责人的
+  DeepSeek 与 GLM，第一次就录成，2104 步），`tb-replay --only stop-task` 六项都通过；第二波合完、拿到共用端口之后
+  `tb-real.mjs --only stop` 也跑了（下面“测试”）。
+
+### 状态表的每一行与用例（AGENTS.md“不留未完成项”第 4 条，2026-10-26）
+
+这个包新加的状态表是 [team-tasks.md](screens/team-tasks.md)（全部是新的），另在 [team-stream.md](screens/team-stream.md) 加了一条注
+（进展摘要的 task 行与标题行通往 Background tasks）；[screens/README.md](screens/README.md) 只加了索引，没有状态行。
+“来源”“界面测试用的标识”两张表不是状态，用到它们的用例见下面各行。用例都在 `tests/ui/tb-app-tasks.mjs`（`--only` 写步骤名），
+TB-88 的在 `tests/ui/tb-app-tasks-owner.mjs`（整套就是一步）；检查名写开头，全文在套件里。
+
+| 屏 | 行 | 用例（套件与 --only 名、检查名） |
+| --- | --- | --- |
+| team-tasks 入口 | 会话没有需求、协作模式 `off` | `plain`：“TB-80 a session with no request and task mode off: the right panel is as before …”、“TB-80 the model menu of a session with no request and task mode off has no "See background tasks"” |
+| team-tasks 入口 | 有需求，或协作模式打开 | `empty`：“TB-80 task mode on with no request: the right panel has the tabs Changes and Background tasks …”；`tabs`：“TB-80 with the tabs, Changes shows the changes list without its own …”、“TB-80 the file viewer belongs to Changes …”（审查 #3 改了名字：它自己那一行不再重复 Expand / Collapse 与 Close panel）、“TB-80 back on Background tasks the panel is where you left it …”；`sessions`：“TB-80 the tab is kept per session …”；`keys`：“TB-86 the tabs are role="tab" with aria-selected inside a tablist …”；`menu`：“TB-80 the model menu's Task mode part has "See background tasks" right after the Task mode row …” |
+| team-tasks 入口 | TaskBoard 上有 task | `entries`：“TB-80 the stage-line button shows while the dialog is not replying …”、“TB-80 on the Changes tab the button is not pressed …”；`stop`：“TB-81 with every task ended the stage-line button reads "4 tasks finished"”；`keys`：“TB-86 the stage-line button's hover is Claude's …”；`menu`：“TB-80 the stage-line button shows while the dialog is replying ("1 running task")”；`tabs`：“TB-80 after Close panel the stage-line button reopens Background tasks at the layer you left …” |
+| team-tasks 入口 | 右栏开着且在 `Background tasks` | `entries`：“TB-80 clicking it opens the right panel at Background tasks; the button is pressed” |
+| team-tasks 入口 | 进展摘要（team-stream.md） | `entries`：“TB-80 a task row of the progress summary is a button …”、“TB-80 the title row has an icon button …”、“TB-80 F8 records "Open background tasks" …” |
+| team-tasks 入口 | 窄窗口、分屏放不下 | `narrow`：“TB-80 when the split cannot fit the right panel, the stage-line button and a progress-summary link open Background tasks floating …”；分屏放得下时点没有焦点那一栏的按钮：`sessions`：“TB-80 in split view, clicking the stage-line button of the pane without focus works …” |
+| team-tasks 列表 | 还没有 task | `empty`：“TB-81 with the tabs but no task yet, Background tasks shows "Background tasks appear here"” |
+| team-tasks 列表 | 有没结束的 task | `list`：“TB-81 Running holds T3, T4 by id; Finished holds T2, T1 …” |
+| team-tasks 列表 | 有结束或停下的 task | `list`：同上、“TB-81 hovering "Request 1" shows the request title; Finished cards are in the secondary color”、“TB-81 the Finished header folds the section …”；`stop`：“TB-89 "Stop this task" … moves T3 to Finished as "Stopped" …” |
+| team-tasks 列表 | 一节没有 task | `tb-app-tasks-owner.mjs`：“TB-88 the owner's Har-GUI board: Finished lists T6–T1, all Done, and there is no Running section”（审查 #9：只有一个 `data-section="finished"` 的节）；`empty`：同“还没有 task” |
+| team-tasks 列表 | task 卡 | `list`：“TB-81 a card is "T1 <title>" over "Request 1 · <role> · <what it is doing> · <duration>" …” |
+| team-tasks 列表 | task 有依赖 | `list`：“TB-81 T2 shows "Depends on T1" …” |
+| team-tasks 列表 | task 有实例会话 | `list`：同上（一个角色时就写 View transcript）；`outcomes`：“TB-81 a task two roles worked on has "View transcript (executor)" and "View transcript (reviewer)" …” |
+| team-tasks 列表 | task 可以停止 | `list`：“TB-81 the stoppable cards (T3 running, T4 waiting for the lock) have "Stop this task" …” |
+| team-tasks 列表 | 交回的 task | `stop`：“TB-89 handed back by your next message (task_edit), T3 returns to Running …” |
+| team-tasks 列表 | 实时更新 | `stop`：“TB-89 "Stop this task" … moves T3 to Finished …”；`errors`：“TB-81 the duration on a running card updates by itself (no board change) …” |
+| team-tasks task 的视图 | 打开、读取中 | `taskview`：“TB-82 while board.readTask has not answered, the view shows Back, the title from the TaskView and "Loading…"” |
+| team-tasks task 的视图 | 读到了 | `taskview`：“TB-82 the T1 view: …”、“TB-82 Prompt shows the description in full as Markdown …”、“TB-82 Back returns to the list at the same scroll position”；`sessions`：“TB-82 two sessions both at their T1 view: switching to the other shows its own T1 at once …”；`keys`：“TB-86 in a task view, Tab from the Background tasks tab passes the tab row's buttons and lands on Back” |
+| team-tasks task 的视图 | 结案会话已建立 | `taskview`：“TB-82 the T1 view: … "View transcript (closing)"”；`transcript`：“TB-83 "View transcript (closing)" opens the close session …” |
+| team-tasks task 的视图 | 可以停止 | `entries`：“TB-80 a task row of the progress summary … (the running T3 has "Stop this task" next to its title)”；`approval`：“TB-89 "Stop this task" in the task view …” |
+| team-tasks task 的视图 | 有依赖 | `taskview`：“TB-82 the T2 view has "Depends on" …”、“TB-82 a dependency opens that task's view; Back returns to the list” |
+| team-tasks task 的视图 | 有留给 task 的消息 | `taskview`：“TB-82 Messages lists the message left on T1 …”、“TB-82 a mermaid block in a message is drawn as a diagram, as in the chat”；`tb-app-tasks-owner.mjs`：“TB-88 the task views hold the full messages …” |
+| team-tasks task 的视图 | 有交接 | `taskview`：“TB-82 the first handoff: …”、“TB-82 the close session's baton: …”；`outcomes`：“TB-82 a written next that does not take effect shows as "Suggested next: reviewer"”；`transcript`：“TB-83 a handoff's "View transcript" opens that role's session …” |
+| team-tasks task 的视图 | 程序写的一棒 | `outcomes`：“TB-82 a baton the program writes reads "#1 Mori · dependency failed → planner (closing)" …”；`program`：“TB-83 a baton the program writes after the instance ran ("#1 Mori · no handoff → planner (closing)") opens that instance's session …” |
+| team-tasks task 的视图 | task 在运行 | `liveview`：“TB-82 an open task view is read again when the task changes, without reopening it: it first showed fewer than three batons …”；`approval`：“TB-89 "Stop this task" in the task view …: … the view's second line turns to "Stopped" live …”；最多每秒一次：单元 `taskList.test.mjs` 的 “TB-82 an open view re-reads when the task changes, at most once a second …”（`rereadWait`） |
+| team-tasks task 的视图 | 读不到 | `errors`：“TB-82 a task view that cannot be read shows "Couldn’t load T1: <the error>" and Retry” |
+| team-tasks 结果与去向 | `continue`、`dead_end`、`blocked`、`fail`；`→ <role>`、`→ Failed` | `outcomes`：“TB-82 the handoff heads use the §15 words …” |
+| team-tasks 结果与去向 | `need_user`；`→ <create role> (planning)` | `outcomes`：“TB-82 need_user reads "Needs your decision → planner (planning)"” |
+| team-tasks 结果与去向 | `done`、`pass`；`→ <close role> (closing)` | `taskview`：“TB-82 the first handoff: "#1 executor · Done → planner (closing)" …”、“TB-82 a pass reads "#1 reviewer · Pass → planner (closing)"” |
+| team-tasks 结果与去向 | `close_done`、`close_failed`；`→ Done` | `taskview`：“TB-82 the close session's baton: "#2 planner · Closed as done → Done" …”；`outcomes`：同上（Closed as failed） |
+| team-tasks 实例的会话 | 读取中 | `transcript`：“TB-83 while board.readSession has not answered, the transcript shows Back, the title … and "Loading…"” |
+| team-tasks 实例的会话 | 还没有条目 | `noactivity`：“TB-83 a task stopped while its instance session was still being created has an open session with no message: its transcript shows "No activity yet"” |
+| team-tasks 实例的会话 | 读到了 | `transcript`：“TB-83 the T1 transcript: …”、“TB-83 the transcript has no message box, reply actions or approval card”、“TB-83 selecting text in the transcript shows no selection popover …”；`folding`：“TB-83 a finished instance session folds its steps as the chat does …”；`transcript`：“TB-80 F8 records "View transcript: T1 · executor" and "View transcript: Request 1 · closing"”；`tb-app-tasks-owner.mjs`：“TB-88 the transcripts of T1–T6 and the closing session open …” |
+| team-tasks 实例的会话 | 实例在运行 | `transcript`：“TB-83 the running T3 transcript is marked running; its last line is what the task is doing”；`approval`：“TB-83 while T1 waits for approval its transcript shows the call as "Running…" …”；`outcomes`：“TB-83 a transcript opened while its instance runs is read again when the task changes …”、“TB-83 a running transcript you are at the bottom of stays at the bottom when it is read again”；`folding`：“TB-83 the running T3 session shows its current group in full …” |
+| team-tasks 实例的会话 | 运行结束 | `outcomes`：“TB-83 a transcript opened after its run ended stays as it was while that role runs again (no re-read)” |
+| team-tasks 实例的会话 | 读不出 | `errors`：“TB-83 a transcript that cannot be read shows "Failed to read session transcript", the error and Retry” |
+| team-tasks 停止一个 task | 可以停止 | `list`：“TB-81 the stoppable cards …”；`entries`：同 task 的视图的“可以停止” |
+| team-tasks 停止一个 task | 停止中 | `approval`：“TB-89 "Stop this task" in the task view (no confirmation): the button is disabled while stopping …”；`stop`：“TB-89 "Stop this task" on a card (no confirmation): the button is disabled while stopping, then the card moves to Finished as "Stopped" …” |
+| team-tasks 停止一个 task | 停下了 | `stop`：“TB-89 "Stop this task" … moves T3 to Finished as "Stopped" …”、“TB-89 after the stop the progress summary row of T3 reads "Stopped" and Stop agents still shows …”；`approval`：“TB-89 stopping a task that waits for approval: its card is rejected and goes away …” |
+| team-tasks 停止一个 task | 停不了 | `errors`：“TB-89 a stop that fails shows "Couldn’t stop T1: <the error>" under the card”；`stop`：“TB-89 a task that cannot be stopped gives "T1 isn't running." …” |
+| team-tasks 停止一个 task | 写 task 停下后 | `stop`：“TB-89 the write lock stays with the stopped T3: T4 shows "Waiting to change files (T3, stopped)"” |
+| team-tasks 停止一个 task | 交回 | `stop`：“TB-89 handed back by your next message (task_edit), T3 returns to Running and continues the same instance session …”、“TB-89 after the hand-back T3's card has "Stop this task" again and it is enabled …”；停止的回复晚到：单元 `taskList.test.mjs` 的 “TB-89 the stop reply keeps the button disabled only while …” |
+| team-tasks 关闭、重新打开、重启、删除 | 协作模式关掉之后 | `readonly`：“TB-84 after task mode is turned off the tabs, the list and the views stay”、“TB-84 after task mode is turned off the model menu still has "See background tasks"” |
+| team-tasks 关闭、重新打开、重启、删除 | 重新打开会话、界面重新载入 | `reload`：“TB-85 after reopening, the right panel opens at Changes …”、“TB-85 after Ctrl+R and reopening the session, the list is the same”、“TB-85 the task view and the transcript open the same after reloading” |
+| team-tasks 关闭、重新打开、重启、删除 | App 重启之后 | `restart`：“TB-85 after an App restart the running T1 is in Finished as "Stopped (Mori restarted)" …” |
+| team-tasks 关闭、重新打开、重启、删除 | 删除会话 | `restart`：“TB-85 deleting the session takes its Background tasks with it: the panel is gone and teams/<id> is deleted” |
+| team-stream 内容 | task 行与标题行通往 Background tasks（2026-10-26 的注；审查 #4 改了标题行图标按钮的说法） | `entries`：同 team-tasks 入口的“进展摘要”（“TB-80 the title row has an icon button … highlights that request's tasks”） |
+| model-menu 状态 | 菜单（审查 #1：Task mode 一行之后接 `See background tasks`） | `menu`：“TB-80 the model menu's Task mode part has "See background tasks" right after the Task mode row …”；`plain`：“TB-80 the model menu of a session with no request and task mode off has no "See background tasks"” |
+| model-menu 状态 | 协作模式的菜单（审查 #1、#5） | `tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" … the Task mode row (focused), See background tasks, Manage agents and Manage models …”（customize-agents 合入后的顺序；e44c3da 上通过） |
+| model-menu 状态 | 回复进行中的菜单（审查 #1） | `menu`：“TB-80 the model menu's Task mode part has "See background tasks" right after the Task mode row (a menu item, above Manage agents), usable while a reply is running …” |
+| team-switch 位置 | Task mode 一行与 `See background tasks`、“Manage agents”、“Manage models”的先后（审查 #1；customize-agents 合入后见上面 #10） | 同 model-menu 的两行（`menu` 的 placed、TB-38 的 items）；`ag-app.mjs --only AG-08`：“AG-08 with Task mode on the menu is the note, the Task mode row, See background tasks, Manage agents and Manage models …” |
+| model-menu 状态 | 某一节为空（全空时有需求或协作模式打开还有 `See background tasks`，最终检查 2） | `ag-app.mjs --only AG-08`：“AG-08 with no providers left and Task mode on, the menu is the note, the Task mode row, See background tasks, Manage agents and Manage models” |
+| v0 models 状态 | 回复进行中范围菜单里能用的项（v0 models.md，加 `See background tasks`） | `menu`：“TB-80 the model menu's Task mode part has "See background tasks" right after the Task mode row (a menu item, above Manage agents), usable while a reply is running …” |
+| v0 chat 顶栏与输入框 | 选择范围（v1）：协作模式下的菜单（v0 chat.md，加 `See background tasks`） | `tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" … the Task mode row (focused), See background tasks, Manage agents and Manage models …” |
+| customize-agents 状态 | Task mode 打开（customize-agents.md 屏，加 `See background tasks`） | `ag-app.mjs --only AG-08`：“AG-08 with Task mode on the menu is the note, the Task mode row, See background tasks, Manage agents and Manage models …” |
+| team-blocked 锁定 | 打开的菜单与可做的操作（审查 #1：加 `See background tasks`） | `tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" … the Task mode row (focused), See background tasks, Manage agents and Manage models …” |
+| team-tasks task 的视图 | 程序写的一棒的 View transcript（独立检查 2：头一行写 Mori、打开实例的会话） | `program`：“TB-83 a baton the program writes after the instance ran ("#1 Mori · no handoff → planner (closing)") opens that instance's session …”；会话重新打开之后：单元 `tasks.test.mjs` 的 “TB-82 after the session is reopened, a program baton's session is found from the instance files on disk” |
+| split 右栏 | 右栏开关（审查 #15：阶段行的 `{n} running tasks` 同样点完才切焦点） | `sessions`：“TB-80 in split view, clicking the stage-line button of the pane without focus works …” |
+
+“反例”一节的各条：只读与不投递是 `readonly` 的 “TB-84 after opening every task view and transcript …”；停止不影响别的 task 是 `stop`
+（T4 照常、Stop agents 仍在），对话的回复照常是单元 `tasks.test.mjs` 的 “TB-89 the dialog reply runs on …”；只有 task 与结案两种会话是 `readonly` 的 “TB-84 board.readSession reports …”；读不到别的会话的 TaskBoard 是 `readonly` 的 “TB-84 another session's id cannot read this TaskBoard …”与单元 “TB-84 a session reads only its own TaskBoard …”；没有需求时看不到是 `plain`；不加 `/tasks` 是 `plain` 的 “TB-80 there is no /tasks command …”、“TB-80 "/tasks …" is sent as an ordinary message …”。
+
+### 没有验证的
+
+- 真实桌面上的样子（间距、颜色、窄栏）：截图在 `test-results/tb-app-tasks/`，留给负责人走查。
+
 ## 2026-10-26 负责人走查之后（WP-10：Task mode 给模型的文字、关掉之后回看、角色边界）
 
 依据：[走查记录](walkthrough-1026-checks.md) 的 M13、M21（给模型的部分）、M22、M26；这一包的记录见 [WP-10](walkthrough-1026/WP-10.md)。

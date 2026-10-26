@@ -9,7 +9,8 @@ import {
 import { MemoryCommandSchemas, type MemoryGlobalEvent, type MemoryNotice } from './memory';
 import { RoleCommandSchemas } from './roles';
 import {
-  TEAM_SWITCH, type BoardView, type TeamApprovalRequest, type TeamDeciding, type TeamEvent, type TeamState,
+  TASK_ID_PATTERN, TEAM_SWITCH, type BoardView, type TaskDetail, type TeamApprovalRequest, type TeamDeciding,
+  type TeamEvent, type TeamState,
 } from './team';
 
 // 界面只经这里引用 pi 的类型。
@@ -257,6 +258,18 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.recheckAgents'), sessionId }),
   /** Stop agents（session.stopTeam）：停止这个用户会话的全部 Agent（§11.4） */
   z.object({ type: z.literal('session.stopTeam'), sessionId }),
+  /** Background tasks 的 task 视图：一个 task 的详情（只读，§13.13.3） */
+  z.object({ type: z.literal('board.readTask'), sessionId, task: z.string().regex(TASK_ID_PATTERN) }),
+  /** Background tasks 的会话：task 实例会话或结案会话（只读，§13.13.4） */
+  z.object({
+    type: z.literal('board.readSession'), sessionId,
+    of: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('task'), task: z.string().regex(TASK_ID_PATTERN), role: z.string().min(1) }),
+      z.object({ kind: z.literal('close'), request: z.number().int().positive() }),
+    ]),
+  }),
+  /** Stop this task：停止一个 task（§13.13.7） */
+  z.object({ type: z.literal('session.stopTask'), sessionId, task: z.string().regex(TASK_ID_PATTERN) }),
   // ---- v1：提示词分层与记忆（docs/specs/memory.md §8） ----
   ...MemoryCommandSchemas,
   // ---- Customize › Agents（docs/specs/customize-agents.md §4、§5） ----
@@ -806,6 +819,12 @@ export interface TeamCommandResults {
   'session.recheckAgents': SessionInfo & TeamResult;
   /** texts：回到输入框的待判断消息，按发送顺序（§11.4） */
   'session.stopTeam': { texts: string[] } & TeamResult;
+  /** task：这个 task 的详情；读不到时 task 为 null、error 是原文（§13.13.3） */
+  'board.readTask': { task: TaskDetail; error: null } | { task: null; error: string };
+  /** entries：会话的当前分支；running：实例正在运行（§13.13.4） */
+  'board.readSession': { entries: SessionEntry[]; running: boolean } & TeamResult;
+  /** 只有 error（§13.13.7） */
+  'session.stopTask': TeamResult;
 }
 
 /** @brief 转发给界面的事件。 */

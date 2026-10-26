@@ -15,6 +15,8 @@
 //     再发一条撤销：三种回执都有，需求以 cancelled 结束。
 //   tb-approval（TB-34）：“Ask each time”下 /task 让 executor 运行 node --version：后台实例的批准卡出现后先发一条问进展的消息，
 //     等那一轮结束（卡不清掉）再允许；之后的卡一律允许。
+//   stop-task（TB-89）：Allow all 下 /task 让 executor 跑一个 30 秒的命令；它运行时发 session.stopTask（Stop this task），
+//     再发一条消息让立项把它交回，等需求到终态。
 //   sa-subagent（docs/specs/subagent.md SA-11、SA-14、SA-17）：普通模式、没有角色文件，主 Agent 用 subagent 开两个
 //     （只读的读 README.md，通用的跑 node --version，后台批准卡允许）；重启后打开同一个会话。fixture 在 tests/fixtures/sa。
 // 录完先核对场景要的东西真的发生了（check）；模型没照做时（例如没调 agent_message、需求没到终态）最多重录 2 次，
@@ -360,6 +362,52 @@ async function answerUntilDone(d, sessionId, answered) {
   }
 }
 
+/**
+ * @brief stop-task（TB-89，§13.13.7）：Allow all 下 /task 让 executor 跑一个 30 秒的命令；它运行时像界面一样发
+ *        session.stopTask（Background tasks 卡片上的 Stop this task），停下之后再发一条消息让立项把它交回，等需求到终态。
+ */
+const stopScenario = {
+  name: 'stop-task', covers: 'TB-89',
+  description: 'Allow all, then "/task" asks executor to run a 30-second command. While the task runs, Stop this task '
+    + '(session.stopTask) stops only that task: it becomes stopped with its holder kept and its instance stops. '
+    + 'A second message asks the planner to hand it back; the task continues in the same instance session and the '
+    + 'request runs to a terminal state.',
+  async run(d, ctx) {
+    await d.start();
+    const s = await d.create(ctx.cwd);
+    await d.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'all' });
+    await d.cmd({ type: 'session.prompt', sessionId: s.sessionId, text: PROMPTS.STOP, team: 'once' });
+    let task = null;
+    await d.until(async () => {
+      task = (await d.last(s.sessionId, 'mori.board'))?.requests.flatMap((r) => r.tasks)
+        .find((t) => t.phase === 'running' && t.current?.toolName === 'bash') ?? null;
+      return task !== null;
+    }, 'a task to run a command');
+    await d.cmd({ type: 'session.stopTask', sessionId: s.sessionId, task: task.id });
+    await d.until(async () => (await d.last(s.sessionId, 'mori.board'))?.requests.flatMap((r) => r.tasks)
+      .find((t) => t.id === task.id)?.status === 'stopped', `${task.id} to be stopped`);
+    await d.until(async () => (await d.count(s.sessionId, 'agent_start'))
+      === (await d.count(s.sessionId, 'agent_settled')), 'the dialog to be idle');
+    await sleep(3000);
+    await d.say(s, PROMPTS.HAND_BACK);
+    await teamDone(d, s.sessionId);
+  },
+  check(steps) {
+    const id = values(steps, 'session.create')[0]?.sessionId;
+    const stopAt = steps.findIndex((x) => x.command?.type === 'session.stopTask');
+    const task = steps[stopAt]?.command?.task;
+    const result = steps.slice(stopAt).find((x) => x.result?.type === 'session.stopTask')?.result.value;
+    const views = eventsOf(steps, id, 'mori.board').map((b) => b.requests.flatMap((r) => r.tasks)
+      .find((t) => t.id === task)?.status);
+    const stopped = views.indexOf('stopped');
+    return [...common(steps),
+      ...need(stopAt >= 0 && result?.error === null, `session.stopTask ${JSON.stringify(result)}`),
+      ...need(stopped >= 0, `${task} never stopped`),
+      ...need(stopped >= 0 && views.slice(stopped).includes('active'), `${task} was not handed back`),
+      ...closedProblems(steps, id)];
+  },
+};
+
 /** 普通模式的 subagent 工具的录制（docs/specs/subagent.md §14.1）：fixture 放在 tests/fixtures/sa */
 const SA_FIXTURES = join(appRoot, 'tests/fixtures/sa');
 /** sa-subagent 的驱动消息（英文：给模型的） */
@@ -433,7 +481,8 @@ const subagentScenario = {
 };
 
 /** 录制的场景 */
-const scenarios = [askScenario, teamScenario, receiptsScenario, approvalScenario, subagentScenario];
+const scenarios = [askScenario, teamScenario, receiptsScenario, approvalScenario, stopScenario,
+  subagentScenario];
 
 // ---------- 执行 ----------
 

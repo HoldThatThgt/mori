@@ -21,7 +21,7 @@ import { LANE_IDS, newLane, type DeliveryMeta, type Lane, type Waiter } from './
 import { STOPPED_BY_USER, batonOf } from './teamRuns';
 import type { MessageRoute, MessageSender } from './teamTypes';
 import {
-  TEAM_ENTRY_TYPES, TEXT_LIMITS, roleLabel, seatRolesOf, type HandoffOutcome, type TeamToolName,
+  TEAM_ENTRY_TYPES, TEXT_LIMITS, roleLabel, seatRolesOf, type HandoffOutcome, type SessionOf, type TeamToolName,
 } from '../shared/team';
 
 /** @brief 成功。 */
@@ -131,6 +131,47 @@ async function readClosedSession(team: Team, file: string): Promise<SessionEntry
   return pi.SessionManager.inMemory(team.args.cwd, undefined, entries).getBranch() as SessionEntryLike[];
 }
 
+/** @brief 一条实例会话的当前分支：开着时取内存里的，没开着时读文件。 */
+interface SessionRead {
+  /** 当前分支的条目 */
+  entries: SessionEntryLike[];
+  /** 实例正在运行（这次投递已经开始运行） */
+  running: boolean;
+}
+
+/**
+ * @brief 读一条实例会话（read_session 与 board.readSession 共用，§10.2、§13.13.4）。
+ * @param ids 会话的键与 pi 会话 id（LANE_IDS）
+ * @return 没开着、也没有会话文件时为 null；读文件失败时抛错
+ */
+async function sessionAt(team: Team, ids: { key: string; id: string }): Promise<SessionRead | null> {
+  const target = team.lanes.get(ids.key);
+  const open = target?.open === true && team.host.entry(ids.id) !== null;
+  const file = target?.file ?? team.knownFiles.get(ids.id) ?? null;
+  if (!open && file === null) return null;
+  const entries = open && target ? team.branchOf(target) : await readClosedSession(team, file as string);
+  return { entries, running: target?.busy === true && target.started };
+}
+
+/**
+ * @brief board.readSession（§13.13.4，只读）：一个 task 上某个角色的 task 实例会话，或一个需求的结案会话；不写文件、
+ *        不改 TaskBoard、不唤醒任何会话。
+ * @param of 读哪一条
+ * @return 条目与是否在运行；task、需求或会话不存在时抛出 §13.13.4 的原文
+ */
+export async function readBackgroundSession(team: Team, of: SessionOf): Promise<SessionRead> {
+  if (of.kind === 'task' && !findTask(team.board, of.task)) throw new Error(`${of.task} does not exist.`);
+  if (of.kind === 'close' && !findRequest(team.board, of.request)) {
+    throw new Error(`Request ${of.request} does not exist.`);
+  }
+  const ids = of.kind === 'task' ? LANE_IDS.task(team.userId, of.task, of.role)
+    : LANE_IDS.close(team.userId, of.request);
+  const read = team.hasSession(of) ? await sessionAt(team, ids) : null;
+  if (read) return read;
+  throw new Error(of.kind === 'task' ? `${roleLabel(of.role)} has no session on ${of.task}.`
+    : `Request ${of.request} has no closing session.`);
+}
+
 /**
  * @brief read_session：读这块 TaskBoard 上某个 task、某个角色的 task 实例会话（整理过的文本，第一行标明是资料）；
  *        读不到对话、立项、结案、临时提问、订阅的会话。实例正在运行时只给已完成的回合。
@@ -140,14 +181,10 @@ async function readSession(team: Team, lane: Lane, args: Record<string, unknown>
   if (!findTask(team.board, task)) return refused(`${task} does not exist.`);
   const role = str(args, 'role')?.trim().toLowerCase() || defaultReadRole(team, task, lane);
   if (role === null) return refused(`Say whose session on ${task} to read (role).`);
-  const ids = LANE_IDS.task(team.userId, task, role);
-  const target = team.lanes.get(ids.key);
-  const open = target?.open === true && team.host.entry(ids.id) !== null;
-  const file = target?.file ?? team.knownFiles.get(ids.id) ?? null;
-  if (!open && file === null) return refused(`${roleLabel(role)} has no session on ${task}.`);
   try {
-    const entries = open && target ? team.branchOf(target) : await readClosedSession(team, file as string);
-    const running = target?.busy === true && target.started;
+    const read = await sessionAt(team, LANE_IDS.task(team.userId, task, role));
+    if (read === null) return refused(`${roleLabel(role)} has no session on ${task}.`);
+    const { entries, running } = read;
     return ok(readSessionText(entries, { task, role, from: int(args, 'from') ?? undefined,
       to: int(args, 'to') ?? undefined, running, cwd: team.args.cwd,
       seatRoles: seatRolesOf({ mode: team.mode, holders: team.holders }) }));

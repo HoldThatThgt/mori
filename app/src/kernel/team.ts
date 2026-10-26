@@ -6,7 +6,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type {
   AgentSessionEvent, BeforeAgentStartEvent, ExtensionAPI, ExtensionFactory, ToolCallEventResult, ToolResultEvent,
   ToolResultEventResult,
@@ -15,10 +15,10 @@ import { REASON_TEXTS, isUntilReason, plainReasonText, type ModelEvent, type Mod
 import type { ApprovalDecision, KernelEvent, SessionInfo } from '../shared/protocol';
 import { SUBAGENT_TOOL } from '../shared/subagent';
 import {
-  BASE_ROLE, TEAM_ENTRY_TYPES, TEAM_TOOLS, TeamEntrySchema, seatRolesOf, type DecidingMessage, type PromptBehavior,
-  type ReceiptEntryData, type RoleSummary, type TeamApprovalEnd, type TeamApprovalRequest, type TeamDeciding,
-  type TeamHolders, type TeamMode, type TeamState, type TeamSwitch, type TeamToolName, type TitleContext,
-  type ToolCallBrief, type WakeKind, type InstanceKind,
+  BASE_ROLE, TEAM_ENTRY_TYPES, TEAM_TOOLS, TeamEntrySchema, canStopTask, seatRolesOf, type DecidingMessage,
+  type PromptBehavior, type ReceiptEntryData, type RoleSummary, type SessionOf, type TaskDetail, type TeamApprovalEnd,
+  type TeamApprovalRequest, type TeamDeciding, type TeamHolders, type TeamMode, type TeamState, type TeamSwitch,
+  type TeamToolName, type TitleContext, type ToolCallBrief, type WakeKind, type InstanceKind,
 } from '../shared/team';
 import {
   applyRestartRecovery, findRequest, findTask, isTaskEnded, liveTaskIds, loadBoard, markAsked, markStopped, newBoard,
@@ -54,8 +54,10 @@ import {
   LANE_IDS, hasQueued, laneActive, newLane, takeBatch, type DeliveryMeta, type Lane, type TeamDelivery,
 } from './teamLanes';
 import { STOPPED_BY_USER, runEnded, runStarted, startUserJudgment } from './teamRuns';
-import { runTool } from './teamTools';
-import { BOARD_EVENT_INTERVAL_MS, Throttle, boardEdited, boardView, handedOver, type TaskLive } from './teamView';
+import { readBackgroundSession, runTool } from './teamTools';
+import {
+  BOARD_EVENT_INTERVAL_MS, Throttle, boardEdited, boardView, handedOver, taskDetail, type TaskLive,
+} from './teamView';
 import type { Board, BoardWake, BoardWrite, DeliveryCause, ScheduleWait, Subscriber } from './teamTypes';
 
 /** @brief 用户会话 system prompt 的自定义段名（§8.5，同 pi 内置 MCP 扩展的 mcp_servers 段）。 */
@@ -575,7 +577,52 @@ export class Team implements TeamLike {
       const info = this.taskLive(task.id);
       if (info) live.set(task.id, info);
     }
-    return boardView(this.board, { holders: this.holders, waiting: this.waiting, live, teamEdited: this.teamEdited });
+    return boardView(this.board, { holders: this.holders, waiting: this.waiting, live, teamEdited: this.teamEdited,
+      hasSession: (of) => this.hasSession(of) });
+  }
+
+  /**
+   * @brief 一条实例会话有没有（Background tasks 的 View transcript，§13.13）：开着，或会话文件已写盘（pi 在第一条助手
+   *        消息之后才写，§14.5）。
+   * @param of task 上某个角色的 task 实例会话，或一个需求的结案会话
+   */
+  hasSession(of: SessionOf): boolean {
+    const ids = of.kind === 'task' ? LANE_IDS.task(this.userId, of.task, of.role)
+      : LANE_IDS.close(this.userId, of.request);
+    if (this.host.entry(ids.id)) return true;
+    const file = this.lanes.get(ids.key)?.file ?? this.knownFiles.get(ids.id) ?? null;
+    return file !== null && existsSync(file);
+  }
+
+  /**
+   * @brief board.readTask（§13.13.3，只读）：一个 task 的详情。
+   * @param id task 编号
+   * @return 详情；没有这个 task 时抛出 T9 does not exist.
+   */
+  readTask(id: string): TaskDetail {
+    const detail = taskDetail(this.board, id, (task, file) => this.instanceRole(task, file));
+    if (!detail) throw new Error(`${id} does not exist.`);
+    return detail;
+  }
+
+  /**
+   * @brief 一个实例会话文件是这个 task 上哪个角色的（程序写的一棒的 View transcript，§13.13.3）：开着的实例按它的文件，
+   *        没开着的按 knownFiles（id 为 <用户>.<task>.<角色>）；按文件名比，不比目录的写法。
+   * @return 不是这个 task 的实例会话时为 null
+   */
+  private instanceRole(task: string, file: string): string | null {
+    const name = basename(file);
+    const lane = [...this.lanes.values()].find((item) => item.kind === 'task' && item.task === task
+      && item.file !== null && basename(item.file) === name);
+    if (lane) return lane.role;
+    const prefix = LANE_IDS.task(this.userId, task, '').id;
+    const known = [...this.knownFiles].find(([id, path]) => id.startsWith(prefix) && basename(path) === name);
+    return known ? known[0].slice(prefix.length) : null;
+  }
+
+  /** @brief board.readSession（§13.13.4，只读）：见 teamTools.readBackgroundSession。 */
+  readSession(of: SessionOf): ReturnType<typeof readBackgroundSession> {
+    return readBackgroundSession(this, of);
   }
 
   /** @brief 一个 task 此刻的运行状态：持有它的角色的实例（没有时取这个 task 上最近有提示的实例）。 */
@@ -1691,13 +1738,43 @@ export class Team implements TeamLike {
     this.emitState();
   }
 
-  /** @brief 丢弃一个会话的投递队列（Stop agents，§8.2、§11.4）。 */
-  private dropQueue(lane: Lane): void {
+  /**
+   * @brief 停止一个 task（Stop this task，§13.13.7）：Stop agents 只作用于这个 task。清空它的实例会话的投递队列（等回复的
+   *        以 Stopped by the user. 结束），task 变为 stopped（stopReason user，持有者保留，写入锁照旧持有），停止这个实例的
+   *        运行（原因 user；挂起的批准由会话表按拒绝处理）。别的会话照常；不写回执、不投递、模式不变。
+   * @param id task 编号
+   * @return 停下之后兑现；不能停时抛出 T1 isn't running.，没有这个 task 时抛出 T1 does not exist.
+   */
+  async stopTask(id: string): Promise<void> {
+    const task = findTask(this.board, id);
+    if (!task) throw new Error(`${id} does not exist.`);
+    const view = this.view().requests.flatMap((request) => request.tasks).find((item) => item.id === id);
+    if (!view || !canStopTask(view) || task.holder?.kind !== 'role') throw new Error(`${id} isn't running.`);
+    const lane = this.lanes.get(LANE_IDS.task(this.userId, id, task.holder.role).key) ?? null;
+    if (lane) this.dropQueue(lane, `Stop task ${id}`);
+    this.write((board) => ({ board: markStopped(board, [id], 'user'), error: null }));
+    console.log(`[kernel] ${this.userId}: stopped ${id} (${task.holder.role})`);
+    if (lane) {
+      await this.stopLane(lane, 'user');
+      // 停止时正在处理运行结束（§9.4）：处理完之后不再留下投递
+      await lane.settling;
+      this.dropQueue(lane, `Stop task ${id}`);
+    }
+    this.emitBoard();
+    this.emitState();
+  }
+
+  /**
+   * @brief 丢弃一个会话的投递队列（Stop agents、Stop this task，§8.2、§11.4、§13.13.7）。
+   * @param lane 会话
+   * @param by 日志里写的来由
+   */
+  private dropQueue(lane: Lane, by = 'Stop team'): void {
     const dropped = [...lane.solo, ...lane.queue];
     lane.solo = [];
     lane.queue = [];
     for (const item of dropped) {
-      console.log(`[kernel] ${lane.id}: Stop team dropped a delivery (${item.cause.kind})`);
+      console.log(`[kernel] ${lane.id}: ${by} dropped a delivery (${item.cause.kind})`);
       item.meta.waiter?.settle(STOPPED_BY_USER, true);
       const asked = item.meta.asked;
       if (asked) this.write((board) => ({ board: markAsked(board, asked, false), error: null }));

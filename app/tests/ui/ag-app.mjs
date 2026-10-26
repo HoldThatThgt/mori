@@ -835,6 +835,8 @@ async function deleteFailure() {
 
 /** 菜单最后的四项（model-menu.md）：说明、Task mode 一行、Manage agents、Manage models */
 const MENU_TAIL = ['model-menu-note', 'team-switch', 'manage-agents', 'manage-models'];
+/** Task mode 打开时菜单的顺序：Task mode 一行与 Manage agents 之间是 See background tasks（平行 Agent 规格 §13.13.1） */
+const MENU_TASK = ['model-menu-note', 'team-switch', 'see-background-tasks', 'manage-agents', 'manage-models'];
 /** 有三节时菜单的顺序 */
 const MENU_FULL = ['groups', 'providers', 'models', ...MENU_TAIL];
 /** Task mode 下菜单的说明（WP-09） */
@@ -843,14 +845,15 @@ const TASK_PICKS = 'Task mode picks the model for each agent';
 const BUSY_NOTE = 'Can’t switch models until the response finishes';
 
 /**
- * @brief 打开 tab 一栏的模型菜单，读 Manage agents：节、说明、Task mode 一行与两个 Manage 按文档顺序排的样子，它是否在
+ * @brief 打开 tab 一栏的模型菜单，读 Manage agents：节、说明、Task mode 一行、See background tasks（有的时候）与两个
+ *        Manage 按文档顺序排的样子，它是否在
  *        `.task-mode-group` 里、读屏角色、文字、可用与否，菜单说明的文字，范围项的个数与是否都不可用。
  */
 async function manageItem(tab) {
   await openModelMenu(ctx, tab);
   return ctx.page.locator(modelMenuSel(tab)).evaluate((root) => {
     const marks = root.querySelectorAll('[data-section], [data-testid="model-menu-note"], [data-testid="team-switch"],'
-      + ' [data-action="manage-agents"], [data-action="manage-models"]');
+      + ' [data-action="see-background-tasks"], [data-action="manage-agents"], [data-action="manage-models"]');
     const item = root.querySelector('[data-action="manage-agents"]');
     const radios = [...root.querySelectorAll('[role="menuitemradio"]')];
     return { order: [...marks].map((el) => el.dataset.section ?? el.dataset.testid ?? el.dataset.action),
@@ -902,9 +905,9 @@ async function manageAgents() {
     modelButtonSel(tab), { timeout: 10000 }).catch(() => {});
   const on = await manageItem(tab);
   const onUse = on.text ? await useManage(tab, true) : null;
-  record('AG-08 with Task mode on the menu is the note, the Task mode row, Manage agents and Manage models; '
-    + 'Enter on Manage agents opens Customize › Agents', goodItem(on) && on.note === TASK_PICKS
-    && JSON.stringify(on.order) === JSON.stringify(MENU_TAIL) && landed(onUse), brief({ on, onUse }));
+  record('AG-08 with Task mode on the menu is the note, the Task mode row, See background tasks, Manage agents and '
+    + 'Manage models; Enter on Manage agents opens Customize › Agents', goodItem(on) && on.note === TASK_PICKS
+    && JSON.stringify(on.order) === JSON.stringify(MENU_TASK) && landed(onUse), brief({ on, onUse }));
   await tabOf('team');
   await clickTeamSwitch(ctx, tab, 'off');
   await duringReply(tab);
@@ -939,6 +942,14 @@ async function emptyConfigMenu() {
   await closeModelMenu(ctx, tab);
   record('AG-08 with no providers left the model menu has no sections, only the note, the Task mode row, Manage agents '
     + 'and Manage models', goodItem(item) && JSON.stringify(item.order) === JSON.stringify(MENU_TAIL), brief(item));
+  // 同样全空、协作模式打开时（model-menu.md“某一节为空”）：Task mode 一行之后还有 See background tasks（平行 Agent 规格 §13.13.1）
+  await clickTeamSwitch(ctx, tab, 'always');
+  const on = await manageItem(tab);
+  await closeModelMenu(ctx, tab);
+  await clickTeamSwitch(ctx, tab, 'off');
+  record('AG-08 with no providers left and Task mode on, the menu is the note, the Task mode row, See background tasks, '
+    + 'Manage agents and Manage models', goodItem(on) && JSON.stringify(on.order) === JSON.stringify(MENU_TASK),
+  brief(on));
 }
 
 // ---------- AG-09 展开的内容 ----------

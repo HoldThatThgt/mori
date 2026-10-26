@@ -6,7 +6,7 @@ import {
   DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextBreakdown, type ContextUsage, type ModelState,
   type ProjectTrust, type QuoteRef, type SavedSession,
 } from '../../../shared/protocol';
-import { emptyBoard, soloTeamState, type BoardView, type TeamState } from '../../../shared/team';
+import { emptyBoard, soloTeamState, type BoardView, type SessionOf, type TeamState } from '../../../shared/team';
 import type { MemoryNotice } from '../../../shared/memory';
 import { loadArchived } from './archive';
 import { emptyTranscript, type Transcript } from './model';
@@ -31,6 +31,38 @@ export type RightView =
     /** 每次打开加一，同一个文件再打开时重新读取 */
     nonce: number;
   };
+
+/** @brief 右栏有页签时选的是哪一栏（docs/specs/parallel-agents-taskboard.md §13.13.1）。 */
+export type RightTab = 'changes' | 'tasks';
+
+/** @brief 从会话视图回到哪一层（§13.13.4：打开它的那一层）。 */
+export type TasksBack = { level: 'list' } | { level: 'task'; task: string };
+
+/** @brief Background tasks 这一栏在哪一层（§13.13.2–§13.13.4）。 */
+export type TasksAt =
+  | {
+    level: 'list';
+    /** 进展摘要标题行的链接打开时：滚到这个需求的第一个 task 并高亮；nonce 每次加一 */
+    highlight: { request: number; nonce: number } | null;
+  }
+  | { level: 'task'; task: string }
+  | {
+    level: 'transcript';
+    /** 读哪一条会话 */
+    of: SessionOf;
+    /** Back 回到哪一层 */
+    back: TasksBack;
+  };
+
+/** @brief Background tasks 这一栏的状态（只在内存里，不跨重新打开）。 */
+export interface TasksPanel {
+  /** 在哪一层 */
+  at: TasksAt;
+  /** Finished 一节展开着（默认展开） */
+  finishedOpen: boolean;
+  /** 被入口（阶段行按钮之外的进展摘要链接、模型菜单）打开的次数：右栏浮在上层时据此浮出 */
+  opened: number;
+}
 
 /**
  * @brief 一个打开的会话。模型状态（ModelState 的各项：选择范围 pick、当前模型 current、拒绝启动 blocked、思考强度）
@@ -86,8 +118,12 @@ export interface Tab extends ModelState {
   startIndex: number;
   /** 右栏是否打开；null 表示跟随"有没有改动" */
   rightOpen: boolean | null;
-  /** 右栏的视图 */
+  /** 右栏的视图（Changes 一栏：改动列表或文件阅读器） */
   rightView: RightView;
+  /** 右栏有页签时选的是哪一栏；没有页签时不起作用（§13.13.1） */
+  rightTab: RightTab;
+  /** Background tasks 这一栏（§13.13） */
+  tasks: TasksPanel;
   /**
    * 右栏展开（"Expand"，docs/v0/screens/layout.md"右栏展开"）：只在这个会话的右栏开着、贴在右边时起作用；
    * 只在内存里，关上右栏时取消
@@ -202,8 +238,9 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
     thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, pickLocked: false, contextUsage: null,
     contextBreakdown: null, approval: DEFAULT_APPROVAL, team: soloTeamState(false), board: emptyBoard(),
     transcript: emptyTranscript, draft: '', draftRefs: [], startIndex: 0, rightOpen: null,
-    rightView: { kind: 'changes' }, rightExpanded: false, transcriptJump: null, refPending: [], memoryNotice: null,
-    phase: 'opening', error: null, ...fields };
+    rightView: { kind: 'changes' }, rightTab: 'changes',
+    tasks: { at: { level: 'list', highlight: null }, finishedOpen: true, opened: 0 }, rightExpanded: false,
+    transcriptJump: null, refPending: [], memoryNotice: null, phase: 'opening', error: null, ...fields };
 }
 
 /**

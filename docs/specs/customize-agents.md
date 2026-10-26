@@ -281,6 +281,7 @@ seats: [close]
   菜单的三种样子（一般、回复进行中、Task mode）里都有，都可用。与 `Manage models` 一样只是跳到另一页，不加 “…”。
 - 点了：关掉菜单，打开 Customize 并选中 Agents 一节（跟随的就是这个会话）。
 - Task mode（`pickLocked`）下菜单没有三节，第一项是说明 `Task mode picks the model for each agent`，下面是 Task mode 一行、
+  `See background tasks`（平行 Agent 规格 §13.13.1，协作模式下总有，在 Task mode 一行与 `Manage agents` 之间）、
   `Manage agents`、`Manage models`（WP-09 的样子，[model-menu.md](../v1/screens/model-menu.md)“协作模式的菜单”；2026-10-26
   合入 WP-09 时照它改，原来写的“模型那一节变灰”不再适用），可以从这里直接去看每个 agent 用哪个模型。
 

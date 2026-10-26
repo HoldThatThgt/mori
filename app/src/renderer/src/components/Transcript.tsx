@@ -113,8 +113,8 @@ function sameItem(before: ItemProps, after: ItemProps): boolean {
     && JSON.stringify(before.steps) === JSON.stringify(after.steps);
 }
 
-/** @brief 对话流中的一项。 */
-const ItemView = memo(function ItemView({ item, tools, cwd, tabKey, steps, onSteps }: ItemProps) {
+/** @brief 对话流中的一项；Background tasks 的只读会话（BackgroundTranscript.tsx）也用它画。 */
+export const ItemView = memo(function ItemView({ item, tools, cwd, tabKey, steps, onSteps }: ItemProps) {
   switch (item.kind) {
     case 'user':
       return <UserMessage item={item} cwd={cwd} tabKey={tabKey} />;
