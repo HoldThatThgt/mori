@@ -95,6 +95,63 @@ export const SCENARIOS = {
     } },
   ],
 
+  // team-tasks.md“task 的视图”：交接的结果与去向、程序写的一棒、建议的下一棒、两个角色的 View transcript，以及运行中的会话
+  // 随 TaskView 重新读、运行结束的不再重新读。T1（只读）：executor continue → reviewer（等 8 秒）fail → executor dead_end →
+  // reviewer（等 8 秒）blocked → 结案 close_failed；T2：executor need_user（立项不做决定，对话问你）；T3 依赖 T1：T1 失败后
+  // 程序写一棒交给结案，结案 close_failed；T4：executor 带 next 以 done 交接（next 不生效，成为建议），结案 close_done。
+  'tb-tasks-outcomes': [
+    { role: 'planner', kind: 'create', deliveries: {
+      1: [call('request_submit', { title: 'Try every outcome', goal: 'Each outcome shows in the task view' }),
+        call('task_create', readTask('Chain of batons', 'executor')),
+        call('task_create', readTask('Ask the user', 'executor')),
+        call('task_create', readTask('After the chain', 'executor', { depends_on: ['T1'] })),
+        call('task_create', readTask('Quick read', 'executor')),
+        say('Registered request 1 with four tasks.')],
+      2: [say('The user decides this one.')],
+    } },
+    { role: 'chat', kind: 'team-dialog', deliveries: {
+      1: [say('Planner registered it.')], 2: [say('Which database should T2 use?')],
+    } },
+    { role: 'executor', kind: 'task', task: 'T1', deliveries: {
+      1: [call('read', { path: 'README.md' }),
+        call('task_handoff', { task: '{task}', conclusion: 'Ready for review', outcome: 'continue',
+          next: 'reviewer' })],
+      2: [call('task_handoff', { task: '{task}', conclusion: 'No way forward from here', outcome: 'dead_end',
+        next: 'reviewer' })],
+    } },
+    { role: 'reviewer', kind: 'task', task: 'T1', deliveries: {
+      1: [together(wait(8000), call('task_handoff', { task: '{task}', conclusion: 'The change is wrong',
+        outcome: 'fail', next: 'executor' }))],
+      2: [together(wait(8000), call('task_handoff', { task: '{task}', conclusion: 'Blocked on the database',
+        outcome: 'blocked' }))],
+    } },
+    { role: 'executor', kind: 'task', task: 'T2', deliveries: {
+      1: [call('task_handoff', { task: '{task}', conclusion: 'Which database should I use?', outcome: 'need_user' })],
+    } },
+    { role: 'executor', kind: 'task', task: 'T4', deliveries: {
+      1: [call('read', { path: 'README.md' }),
+        call('task_handoff', { task: '{task}', conclusion: 'README read', outcome: 'done', next: 'reviewer',
+          evidence: ['{tag:read}'] })],
+    } },
+    { role: 'planner', kind: 'close', deliveries: {
+      1: closeTask('Read', 'T4 closed.'),
+      2: [call('task_handoff', { task: '{task}', conclusion: 'Closing as failed', outcome: 'close_failed' }),
+        say('T1 failed.')],
+      3: [call('task_handoff', { task: '{task}', conclusion: 'Nothing to do without T1', outcome: 'close_failed' }),
+        say('T3 failed.')],
+    } },
+  ],
+
+  // team-tasks.md“实例的会话”的“还没有条目”：这个项目的扩展让会话 8 秒才建好（tb-app-tasks.mjs 的 noactivity，synthetic）；
+  // T1 的实例会话还在建的时候套件停下它，投递不发出，会话里没有消息。T1 的步骤不应被用到（停得晚了才会有请求）。
+  'tb-tasks-idle': [
+    { role: 'planner', kind: 'create', deliveries: {
+      1: [call('request_submit', { title: 'Start slowly', goal: 'A task stopped before its first delivery' }),
+        call('task_create', readTask('Start slowly', 'executor')), say('Registered request 1.')],
+    } },
+    { role: 'chat', kind: 'team-dialog', deliveries: { 1: [say('Planner registered it.')] } },
+  ],
+
   // TB-80（WP-09 之后）：立项登记一个 task 后，对话的回复等 10 秒才开始写；套件在回复进行中打开模型菜单，点
   // See background tasks。T1（只读）读一个文件后等很久（之后的步骤让后台进程退出、重启 App）。
   'tb-tasks-menu': [

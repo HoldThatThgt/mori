@@ -5,15 +5,16 @@
 //   TB-86 界面文字与键盘、TB-87 现有功能不退步、TB-89 停止一个 task。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs tasks）：
 //   MORI_APP_DIR=.tb-runs/tasks node tests/ui/tb-app-tasks.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
-// 步骤：plain、empty、entries、list、taskview、transcript、folding、keys、stop、readonly、reload、approval、menu、errors、
-// restart（entries 到 reload 共用一个会话，按这个顺序；folding 要 WP-14 的步骤组、menu 要 WP-09 的模型菜单，合并之前
-// 这两步失败；errors 让后台进程退出，restart 最后跑，重启 App）。
+// 步骤：plain、empty、entries、list、taskview、transcript、folding、tabs、keys、stop、readonly、reload、narrow、approval、
+// outcomes、noactivity、menu、errors、restart（entries 到 narrow 共用一个会话，按这个顺序；folding 要 WP-14 的步骤组、
+// menu 与 readonly 的最后一项要 WP-09 的模型菜单，合并之前失败；errors 让后台进程退出，restart 最后跑，重启 App）。
+// 每一步覆盖 docs/v1/screens/team-tasks.md 状态表的哪几行，见 docs/v1/team-checks.md“状态表的每一行与用例”。
 // 结果写到 test-results/tb-app-tasks(-packaged).json（--only 时 tb-partial-app-tasks…），截图在 test-results/tb-app-tasks/。
 // 端口（§17.3：tb-app-tasks*.mjs 用 4950–4959）：合成端点 4950，记录代理 4951。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里写好一个本机提供商（写入等级 A、能关思考，跳过探针）；
 // 三个临时项目：分开配置（chat / planner / executor / reviewer）两个、没有角色文件一个。同一时刻只开一个 App。
 
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   TASKS_CONCLUSION, TASKS_MESSAGE, TASKS_OPEN_ITEM,
@@ -26,8 +27,10 @@ import {
 } from './tb-helpers.mjs';
 import {
   bgCards, bgTabs, clickBack, clickCard, clickTab, issueReport, openTranscript, panelOpen, tasksButton,
-  taskViewOf, transcriptOf, waitCard, waitTaskView, waitTranscript,
+  taskViewOf, transcriptOf, waitCard, waitTaskView, waitTranscript, watchMoments, momentsSeen,
 } from './tb-tasks-helpers.mjs';
+import { openMenuByMouse } from './m3-helpers.mjs';
+import { waitSplit } from './m5-helpers.mjs';
 
 const args = suiteArgs('tasks');
 const { record, finish } = tbRecorder(args);
@@ -37,6 +40,8 @@ const PORT = 4950;
 const PROXY = 4951;
 /** 合成端点上的模型（synthetic）：写入等级 A、能关思考 */
 const MODEL = 'fake-coder-tbtasks';
+/** 慢启动扩展等待的毫秒数（noactivity：实例会话建好之前停下 task） */
+const SLOW_START_MS = 8000;
 /** 程序给的固定文字（§11.3 停止时挂着的卡回给模型的、§11.6 重启） */
 const REJECTED_BY_STOP = 'Rejected: the user stopped the run.';
 const RESTARTED = 'Stopped (Mori restarted)';
@@ -48,15 +53,38 @@ const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 
 // ---------- 准备与会话 ----------
 
-/** @brief 测试准备（synthetic test setup）：三个临时项目、数据目录、合成端点。 */
+/**
+ * @brief 写一个 synthetic 项目扩展（.pi/extensions/slow-start.ts）：marker 文件在的时候，这个项目的每个会话（用户会话与
+ *        实例会话）要 SLOW_START_MS 才建好。noactivity 一步在实例会话还在建的时候停下 task（team-tasks.md“还没有条目”）。
+ */
+function writeSlowStart(project, marker) {
+  mkdirSync(join(project, '.pi', 'extensions'), { recursive: true });
+  writeFileSync(join(project, '.pi', 'extensions', 'slow-start.ts'), [
+    '// synthetic: written by tests/ui/tb-app-tasks.mjs (noactivity);',
+    '// sessions of this project start slowly while the marker file exists.',
+    "import { existsSync } from 'node:fs';",
+    '',
+    'export default async function () {',
+    `  if (!existsSync(${JSON.stringify(marker)})) return;`,
+    `  await new Promise((resolve) => setTimeout(resolve, ${SLOW_START_MS}));`,
+    '}',
+    '',
+  ].join('\n'));
+}
+
+/** @brief 测试准备（synthetic test setup）：四个临时项目（一个带慢启动扩展、受信任）、数据目录、合成端点。 */
 async function setup(ctx) {
   ctx.split = tempProject('mori-tb-tasks-split-');
   writeRoles(ctx.split, SPLIT_ROLES);
   ctx.split2 = tempProject('mori-tb-tasks-split2-');
   writeRoles(ctx.split2, SPLIT_ROLES);
   ctx.plain = tempProject('mori-tb-tasks-plain-');
+  ctx.idle = tempProject('mori-tb-tasks-idle-');
+  writeRoles(ctx.idle, SPLIT_ROLES);
+  ctx.slowMarker = join(ctx.idle, '..', 'slow-start.on');
+  writeSlowStart(ctx.idle, ctx.slowMarker);
   ctx.ep = await startTbEndpoint(PORT, PROXY);
-  seedTeamUserData(ctx.userData, { providers: [tbProvider('tbtasks', PROXY, [tbModel(MODEL)])] });
+  seedTeamUserData(ctx.userData, { providers: [tbProvider('tbtasks', PROXY, [tbModel(MODEL)])], trusted: [ctx.idle] });
   await startTbApp(ctx);
 }
 
@@ -149,6 +177,12 @@ async function plain(ctx) {
     + 'no tabs) and the stage line has no tasks button',
   header?.includes('This session’s changes') && tabs.length === 0 && button === null, brief({ header, tabs, button }));
   record('TB-87 the right panel of a session without a TaskBoard keeps the v0 header', header !== null, brief(header));
+  await ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-button"]`).click();
+  await ctx.page.locator('[data-testid="model-menu"]').waitFor({ timeout: 5000 });
+  const item = await ctx.page.locator('[data-testid="model-menu"] [data-action="see-background-tasks"]').count();
+  await ctx.page.keyboard.press('Escape');
+  record('TB-80 the model menu of a session with no request and team mode off has no "See background tasks"',
+    item === 0, brief(item));
 }
 
 /** @brief 分开配置的会话打开协作模式、还没有需求：两个页签，Background tasks 下是空的提示，阶段行没有按钮。 */
@@ -208,9 +242,11 @@ async function progressLinks(ctx, who) {
   const label = await row.getAttribute('aria-label').catch(() => null);
   await row.click();
   const view = await waitTaskView(ctx, 'T3');
+  const stop = await ctx.page.locator('[data-testid="bg-task-view"] .bg-task-head [data-action="stop-task"]').count();
   record('TB-80 a task row of the progress summary is a button "Open T3 Long change in Background tasks" that opens '
-    + 'the right panel at that task\'s view',
-  label === 'Open T3 Long change in Background tasks' && view?.task === 'T3', brief({ label, view: view?.title }));
+    + 'the right panel at that task\'s view (the running T3 has "Stop this task" next to its title)',
+  label === 'Open T3 Long change in Background tasks' && view?.task === 'T3' && stop === 1,
+  brief({ label, view: view?.title, stop }));
   const icon = ctx.page.locator(`${paneSel(who.tab)} [data-action="open-in-tasks"][data-request="1"]`);
   const iconLabel = await icon.getAttribute('aria-label').catch(() => null);
   await icon.click();
@@ -266,8 +302,13 @@ async function list(ctx) {
 async function taskview(ctx) {
   const who = await flowSession(ctx);
   await openList(ctx, who);
+  await watchMoments(ctx);
   await clickCard(ctx, 'T1');
   const t1 = await waitTaskView(ctx, 'T1', (view) => view.handoffs.length >= 2);
+  const { loading } = await momentsSeen(ctx);
+  record('TB-82 while board.readTask has not answered, the view shows Back, the title from the TaskView and '
+    + '"Loading…"', loading.some((item) => item.kind === 'bg-task-view' && item.back
+    && item.title.startsWith('T1 Find the cause')), brief(loading));
   record('TB-82 the T1 view: "T1 Find the cause · Read-only", the card line, "Request 1 · Fix the login page", '
     + '"View transcript" and "View transcript (closing)"',
   t1?.title === 'T1 Find the cause · Read-only' && t1.request === 'Request 1 · Fix the login page'
@@ -288,7 +329,9 @@ async function taskview(ctx) {
       && TASKS_MESSAGE.startsWith('Check these files'), brief(message));
   await clickBack(ctx);
   await clickCard(ctx, 'T2');
-  const t2 = await waitTaskView(ctx, 'T2');
+  const t2 = await waitTaskView(ctx, 'T2', (view) => view.handoffs.length >= 1);
+  record('TB-82 a pass reads "#1 reviewer · Pass → planner (closing)"',
+    t2?.handoffs[0]?.head === '#1 reviewer · Pass → planner (closing)', brief(t2?.handoffs.map((item) => item.head)));
   record('TB-82 the T2 view has "Depends on" with "T1 Find the cause · Done"; clicking it opens T1, Back goes to '
     + 'the list',
     same(t2?.deps, ['T1 Find the cause · Done']), brief(t2?.deps));
@@ -329,8 +372,13 @@ async function transcript(ctx) {
   await openList(ctx, who);
   await clickCard(ctx, 'T1');
   await waitTaskView(ctx, 'T1');
+  await watchMoments(ctx);
   await openTranscript(ctx, '[data-testid="bg-task-view"] .bg-task-links', 'executor');
   const t1 = await waitTranscript(ctx, 'task');
+  const { loading } = await momentsSeen(ctx);
+  record('TB-83 while board.readSession has not answered, the transcript shows Back, the title '
+    + '"executor · T1 Find the cause" and "Loading…"', loading.some((item) => item.kind === 'bg-transcript'
+    && item.back && item.title === 'executor · T1 Find the cause'), brief(loading));
   record('TB-83 the T1 transcript: title "executor · T1 Find the cause", first line "Model tbtasks/<model>", the '
     + 'delivery as a user bubble, then the replies with their tool cards (read, task_handoff)',
   t1?.title === 'executor · T1 Find the cause' && t1.model === `Model tbtasks/${MODEL}`
@@ -440,8 +488,24 @@ async function stop(ctx) {
   await openList(ctx, who);
   const since = Date.now();
   const before = scenarioLines(ctx.ep, 'tb-tasks-flow', { agent: 'executor', kind: 'task', task: 'T3' }).length;
-  await ctx.page.locator('[data-testid="bg-task"][data-task="T3"] [data-action="stop-task"]').click();
+  // 从 task 的视图停：视图的第二行随 mori.board 实时变为 Stopped，停止按钮停止中不可用、停下后没有
+  await clickCard(ctx, 'T3');
+  await waitTaskView(ctx, 'T3');
+  await watchMoments(ctx);
+  await ctx.page.locator('[data-testid="bg-task-view"] .bg-task-head [data-action="stop-task"]').click();
+  const view = await waitTaskView(ctx, 'T3', (item) => item.line.includes(' · Stopped · '));
+  const { stopping } = await momentsSeen(ctx);
+  const left = await ctx.page.locator('[data-testid="bg-task-view"] [data-action="stop-task"]').count();
+  record('TB-89 "Stop this task" in the task view (no confirmation): the button is disabled while stopping, then the '
+    + 'view\'s second line turns to "Stopped" live and the button goes away',
+  stopping && Boolean(view) && left === 0, brief({ stopping, line: view?.line, left }));
+  await clickBack(ctx);
   const stopped = await waitCard(ctx, 'T3', (card) => card.section === 'finished' && card.phase === 'stopped');
+  const row = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="progress-task"][data-task="T3"]`)
+    .textContent().catch(() => '');
+  const stopAll = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="stop-team"]`).count();
+  record('TB-89 after the stop the progress summary row of T3 reads "Stopped" and Stop team still shows (T4 still '
+    + 'waits for the lock)', row.includes('Stopped') && stopAll === 1, brief({ row, stopAll }));
   const board = readBoard(ctx, who.sessionId);
   const t3 = taskOf(board, 'T3');
   record('TB-89 "Stop this task" (no confirmation) moves T3 to Finished as "Stopped"; board.json has T3 stopped '
@@ -449,6 +513,12 @@ async function stop(ctx) {
   stopped?.line.includes('Stopped') && t3?.status === 'stopped' && t3.stopReason === 'user'
     && t3.holder?.role === 'executor' && t3.handoffs.every((handoff) => handoff.reason !== 'error'),
   brief({ line: stopped?.line, t3: t3 && { status: t3.status, stopReason: t3.stopReason, holder: t3.holder } }));
+  await stopEffects(ctx, who, before);
+  await handBack(ctx, who, since);
+}
+
+/** @brief 停下之后（TB-89）：写入锁仍归 T3、端点不再收到 T3 的请求、F8 记下、不能停与不存在的 task 的原文。 */
+async function stopEffects(ctx, who, before) {
   const t4 = await waitCard(ctx, 'T4', (card) => card.line.includes('Waiting to change files (T3, stopped)'));
   record('TB-89 the write lock stays with the stopped T3: T4 shows "Waiting to change files (T3, stopped)"',
     Boolean(t4), brief(t4?.line));
@@ -462,7 +532,6 @@ async function stop(ctx) {
   const missing = await bridge(ctx, { type: 'session.stopTask', sessionId: who.sessionId, task: 'T9' });
   record('TB-89 a task that cannot be stopped gives "T1 isn\'t running."; a missing one "T9 does not exist."',
     refused?.error === "T1 isn't running." && missing?.error === 'T9 does not exist.', brief({ refused, missing }));
-  await handBack(ctx, who, since);
 }
 
 /** @brief 你的下一条消息到立项，task_edit 交回 T3：继续原来的会话，卡片回到 Running，之后做完（TB-89）。 */
@@ -532,6 +601,12 @@ async function readonly(ctx) {
   const off = { tabs: await bgTabs(ctx), cards: await bgCards(ctx) };
   record('TB-84 after team mode is turned off the tabs, the list and the views stay', off.tabs.length === 2
     && off.cards.length === 4, brief(off));
+  // WP-09 之后：模型菜单里那一项的条件同页签，关掉之后仍在（之前协作模式的那一段还不在模型菜单里，这一项失败）
+  await ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-button"]`).click({ timeout: 5000 }).catch(() => {});
+  const item = await menuItem(ctx);
+  await ctx.page.keyboard.press('Escape');
+  record('TB-84 after team mode is turned off the model menu still has "See background tasks"',
+    item?.text === 'See background tasks', brief(item));
 }
 
 // ---------- TB-85 重新打开、重新载入 ----------
@@ -545,11 +620,13 @@ async function reload(ctx) {
   await ctx.page.waitForFunction(() => Boolean(window.mori), null, { timeout: 30000 });
   const tab = await reopenSession(ctx, who.sessionFile);
   ctx.flow = { ...who, tab };
-  await ctx.page.locator(`${paneSel(tab)} [data-testid="tasks-button"]`).click({ timeout: 15000 });
+  await ctx.page.locator(`${paneSel(tab)} button[aria-label="Toggle changes"]`).click({ timeout: 15000 });
   const tabs = await poll(async () => {
     const list = await bgTabs(ctx);
     return list.length === 2 ? list : null;
   }, 15000);
+  record('TB-85 after reopening, the right panel opens at Changes (which tab was chosen is not kept across reopening)',
+    tabs?.find((item) => item.tab === 'changes')?.selected === 'true', brief(tabs));
   await openList(ctx, ctx.flow);
   const after = await bgCards(ctx);
   record('TB-85 after Ctrl+R and reopening the session, the list is the same',
@@ -589,6 +666,186 @@ async function approval(ctx) {
   record('TB-89 stopping a task that waits for approval: its card is rejected and goes away, the tool result is '
     + `"${REJECTED_BY_STOP}", the task is Stopped`,
   Boolean(card) && gone && Boolean(stopped) && Boolean(result), brief({ card: Boolean(card), gone, stopped, result }));
+}
+
+// ---------- team-tasks.md：交接的结果与去向、程序写的一棒、重新读（outcomes） ----------
+
+/** @brief 等 board.json 里这个 task 的棒数到 n。 */
+const batons = (ctx, who, id, n, timeout = 60000) => waitBoard(ctx, who,
+  (board) => (taskOf(board, id)?.handoffs.length ?? 0) >= n, `${id} with ${n} batons`, timeout);
+
+/**
+ * @brief 运行结束的会话不再重新读、运行中的随 TaskView 重新读（team-tasks.md“实例的会话”的“运行结束”“实例在运行”）：
+ *        T1 交给 reviewer、reviewer 等 8 秒时打开 executor 的会话；executor 再做一棒之后它仍是打开时的样子。
+ *        reviewer 第二次等 8 秒时打开它的会话：运行中，它交接之后重新读，是结束的样子。
+ */
+async function rereads(ctx, who) {
+  await clickCard(ctx, 'T1');
+  await waitTaskView(ctx, 'T1');
+  await openTranscript(ctx, '[data-testid="bg-task-view"] .bg-task-links', 'executor');
+  const ended = await waitTranscript(ctx, 'task');
+  await batons(ctx, who, 'T1', 3);
+  await sleep(1500);
+  const stale = await transcriptOf(ctx);
+  record('TB-83 a transcript opened after its run ended stays as it was while that role runs again (no re-read)',
+    ended?.running === 'false' && stale?.tools.length === ended.tools.length
+      && stale.items.length === ended.items.length, brief({ ended: ended?.tools, stale: stale?.tools }));
+  await clickBack(ctx);
+  await waitTaskView(ctx, 'T1');
+  await openTranscript(ctx, '[data-testid="bg-task-view"] .bg-task-links', 'reviewer');
+  const live = await waitTranscript(ctx, 'task');
+  const after = await poll(async () => {
+    const view = await transcriptOf(ctx);
+    return view?.running === 'false' ? view : null;
+  }, 30000, 200);
+  record('TB-83 a transcript opened while its instance runs is read again when the task changes: running, then '
+    + 'ended with the new handoff', live?.running === 'true' && after?.tools.length > live.tools.length,
+  brief({ live: live?.tools, after: after?.tools }));
+  await clickBack(ctx);
+  await clickBack(ctx);
+}
+
+/** @brief 四个 task 的视图里交接的头一行与 T4 的建议（team-tasks.md“task 的视图”的表）。 */
+async function outcomeViews(ctx) {
+  const views = {};
+  for (const id of ['T1', 'T2', 'T3', 'T4']) {
+    await clickCard(ctx, id);
+    views[id] = await waitTaskView(ctx, id);
+    await clickBack(ctx);
+  }
+  const heads = (id) => views[id]?.handoffs.map((item) => item.head) ?? [];
+  record('TB-82 the handoff heads use the §15 words: Continue → reviewer, Fail → executor, Dead end → reviewer, '
+    + 'Blocked → planner (closing), Closed as failed → Failed', same(heads('T1'), ['#1 executor · Continue → reviewer',
+    '#2 reviewer · Fail → executor', '#3 executor · Dead end → reviewer', '#4 reviewer · Blocked → planner (closing)',
+    '#5 planner · Closed as failed → Failed']), brief(heads('T1')));
+  record('TB-82 need_user reads "Needs your decision → planner (planning)"',
+    same(heads('T2'), ['#1 executor · Needs your decision → planner (planning)']), brief(heads('T2')));
+  record('TB-82 a baton the program writes reads "#1 Mori · dependency failed → planner (closing)" and has no '
+    + '"View transcript" (no session position)', heads('T3')[0] === '#1 Mori · dependency failed → planner (closing)'
+    && views.T3.handoffs[0].transcript === false && heads('T3')[1] === '#2 planner · Closed as failed → Failed',
+  brief(views.T3?.handoffs));
+  record('TB-82 a written next that does not take effect shows as "Suggested next: reviewer"',
+    heads('T4')[0] === '#1 executor · Done → planner (closing)'
+      && views.T4.handoffs[0].text.includes('Suggested next: reviewer'), brief(views.T4?.handoffs));
+}
+
+/** @brief 交接的各种结果与去向、程序写的一棒、建议的下一棒、两个角色的 View transcript、重新读（scenarios 的 outcomes）。 */
+async function outcomes(ctx) {
+  const project = tempProject('mori-tb-tasks-outcomes-');
+  writeRoles(project, SPLIT_ROLES);
+  const who = await begin(ctx, project, `Try every outcome ${tag('outcomes')}`, { allow: true });
+  await batons(ctx, who, 'T1', 1);
+  await openList(ctx, who);
+  await rereads(ctx, who);
+  await settle(ctx, who, 120000);
+  const card = await waitCard(ctx, 'T1');
+  const label = await ctx.page.locator('[data-testid="bg-task"][data-task="T1"] [data-action="view-transcript"]'
+    + '[data-role="reviewer"]').getAttribute('aria-label').catch(() => null);
+  record('TB-81 a task two roles worked on has "View transcript (executor)" and "View transcript (reviewer)" '
+    + '(screen reader name "View transcript for reviewer on T1")', same(card?.links, ['View transcript (executor)',
+    'View transcript (reviewer)']) && label === 'View transcript for reviewer on T1', brief({ card, label }));
+  await outcomeViews(ctx);
+}
+
+// ---------- team-tasks.md“实例的会话”的“还没有条目”（noactivity） ----------
+
+/**
+ * @brief 实例会话还在建的时候停下 task（慢启动扩展，synthetic）：投递不发出，会话开着、里面没有消息，View transcript 打开后
+ *        是 No activity yet。
+ */
+async function noactivity(ctx) {
+  const tab = await openSessionIn(ctx, ctx.idle, { trust: true });
+  writeFileSync(ctx.slowMarker, 'on\n');
+  try {
+    await sendMessage(ctx, tab, `Start slowly ${tag('idle')}`, { team: true });
+    const who = { tab, ...(await userSession(ctx, tab)) };
+    await openList(ctx, who);
+    const starting = await waitCard(ctx, 'T1', (card) => card.phase === 'starting' && card.links.length === 0,
+      SLOW_START_MS * 3);
+    await ctx.page.locator('[data-testid="bg-task"][data-task="T1"] [data-action="stop-task"]').click();
+    const card = await waitCard(ctx, 'T1', (item) => item.phase === 'stopped' && item.links.length === 1,
+      SLOW_START_MS * 2);
+    await openTranscript(ctx, '[data-testid="bg-task"][data-task="T1"] .bg-task-links', null);
+    const view = await waitTranscript(ctx, 'task');
+    record('TB-83 a task stopped while its instance session was still being created has an open session with no '
+      + 'message: its transcript shows "No activity yet"', Boolean(starting) && Boolean(card) && view?.empty
+      && view.items.length === 0, brief({ starting: starting?.line, card: card?.line, view }));
+    await clickBack(ctx);
+  } finally {
+    rmSync(ctx.slowMarker, { force: true });
+  }
+}
+
+// ---------- team-tasks.md“入口”的“窄窗口、分屏放不下”（narrow） ----------
+
+/** @brief 窗口 800 宽、分屏放不下右栏时：阶段行按钮与进展摘要的链接都把 Background tasks 浮在上层打开。 */
+async function narrow(ctx) {
+  const who = await flowSession(ctx);
+  await closedPanel(ctx, who);
+  const other = await openSessionIn(ctx, ctx.plain);
+  const otherFile = (await userSession(ctx, other)).sessionFile;
+  await showTab(ctx, who.tab);
+  const { menu: rowMenu } = await openMenuByMouse(ctx.page, otherFile);
+  await rowMenu.getByRole('menuitem', { name: 'Open in split view' }).click();
+  await waitSplit(ctx.page);
+  const size = await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getSize());
+  try {
+    await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(800, 700));
+    await sleep(500);
+    // 浮在上层：分屏放不下时是 .floating，内容区窄于 800px 时是 layout.css 的媒体查询，两种都是 position: absolute
+    const floating = () => ctx.page.locator('[data-testid="right-panel"]').evaluate((el) => getComputedStyle(el)
+      .position === 'absolute' && Boolean(el.querySelector('[data-testid="bg-tasks"]'))).catch(() => false);
+    await ctx.page.locator(`${paneSel(who.tab)} [data-testid="tasks-button"]`).click();
+    const byButton = await poll(floating, 5000, 100);
+    await ctx.page.locator('[data-testid="right-panel"] [aria-label="Close panel"]').first().click();
+    await ctx.page.locator(`${paneSel(who.tab)} [data-action="open-in-tasks"][data-request="1"]`).click();
+    const byLink = await poll(floating, 5000, 100);
+    record('TB-80 when the split cannot fit the right panel, the stage-line button and a progress-summary link open '
+      + 'Background tasks floating over the panes', byButton === true && byLink === true, brief({ byButton, byLink }));
+  } finally {
+    await ctx.app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setSize(w, h), size);
+    await ctx.page.locator(`${paneSel(other)} [data-testid="close-pane"]`).click().catch(() => {});
+    await waitSplit(ctx.page, false).catch(() => {});
+  }
+}
+
+// ---------- team-tasks.md“入口”的页签那一行（tabs） ----------
+
+/** @brief 页签那一行：Changes 下与原来相同（没有自己的标题行）；切页签时展开不变；文件阅读器属于 Changes。 */
+async function tabs(ctx) {
+  const who = await flowSession(ctx);
+  await openList(ctx, who);
+  const expanded = () => ctx.page.locator('.app[data-right-expanded]').count();
+  await ctx.page.locator('[data-testid="right-panel"] .panel-tabs .panel-expand').click();
+  const before = await expanded();
+  await clickTab(ctx, 'changes');
+  const changes = { expanded: await expanded(),
+    list: await ctx.page.locator('[data-testid="right-panel"] [data-testid="changes"]').count(),
+    header: (await ctx.page.locator('[data-testid="right-panel"]').textContent()).includes('This session’s changes') };
+  record('TB-80 with the tabs, Changes shows the changes list without its own "This session’s changes" row, and '
+    + 'switching tabs keeps Expand', before === 1 && changes.expanded === 1 && changes.list === 1 && !changes.header,
+  brief({ before, changes }));
+  await ctx.page.locator('[data-testid="right-panel"] .panel-tabs .panel-expand').click();
+  await clickTab(ctx, 'tasks');
+  await clickCard(ctx, 'T1');
+  await waitTaskView(ctx, 'T1');
+  await openTranscript(ctx, '[data-testid="bg-task-view"] .bg-task-links', 'executor');
+  await waitTranscript(ctx, 'task');
+  await ctx.page.locator('[data-testid="bg-transcript"] [data-testid="tool-path"]').first().click();
+  await ctx.page.locator('[data-testid="file-viewer"]').waitFor({ timeout: 10000 });
+  const viewer = await ctx.page.locator('[data-testid="right-panel"]').evaluate((panel) => ({
+    tab: panel.querySelector('[data-testid="right-tab"][aria-selected="true"]')?.dataset.tab,
+    fileRow: panel.querySelectorAll('.file-header .panel-expand, .file-header [aria-label="Close panel"]').length,
+    back: Boolean(panel.querySelector('.file-header .back-link')),
+    tabRow: panel.querySelectorAll('.panel-tabs .panel-expand, .panel-tabs [aria-label="Close panel"]').length }));
+  record('TB-80 the file viewer belongs to Changes: a path in a transcript opens it under the Changes tab, its row has '
+    + 'only "← Changes" and the path, and Expand and Close panel stay on the tab row', viewer.tab === 'changes'
+    && viewer.fileRow === 0 && viewer.back && viewer.tabRow === 2, brief(viewer));
+  await clickTab(ctx, 'tasks');
+  const layer = await ctx.page.locator('[data-testid="bg-transcript"]').count();
+  record('TB-80 back on Background tasks the panel is where you left it (the transcript)', layer === 1, brief(layer));
+  await clickBack(ctx);
+  await clickBack(ctx);
 }
 
 // ---------- TB-80 模型菜单（WP-09 之后） ----------
@@ -684,6 +941,12 @@ async function errors(ctx) {
     .some((line) => line.j === 2), 60000);
   await dialogIdle(ctx, who);
   await openList(ctx, who);
+  // 时长每秒更新：T1 一直在等（没有新的 mori.board），卡片上的时长自己从 <1 min 走到 1 min
+  const first = await waitCard(ctx, 'T1');
+  const ticked = await waitCard(ctx, 'T1', (card) => card.line.endsWith(' · 1 min'), 75000);
+  record('TB-81 the duration on a running card updates by itself (no board change): "<1 min", then "1 min"',
+    first?.line.endsWith(' · <1 min') && ticked?.phase === first.phase, brief({ first: first?.line,
+      ticked: ticked?.line }));
   await killTbKernel(ctx);
   await sleep(1000);
   await ctx.page.locator('[data-testid="bg-task"][data-task="T1"] [data-action="stop-task"]').click();
@@ -729,12 +992,27 @@ async function restart(ctx) {
   record(`TB-85 after an App restart the running T1 is in Finished as "${RESTARTED}" and its transcript is read `
     + 'from the file',
   card?.line.includes(RESTARTED) && read?.items.some((item) => item.kind === 'assistant'), brief({ card, read }));
+  await deleteSession(ctx, who);
+}
+
+/** @brief 删除这个会话（菜单 → Delete… → 确认）：Background tasks 随会话没有了，teams/<id> 一并删除（TB-85）。 */
+async function deleteSession(ctx, who) {
+  const row = ctx.page.locator(`.session-item[data-file=${JSON.stringify(who.sessionFile)}]`).first();
+  await row.click({ button: 'right', position: { x: 40, y: 10 } });
+  await ctx.page.getByTestId('session-menu').getByRole('menuitem', { name: 'Delete…' }).click();
+  await ctx.page.getByTestId('delete-dialog').getByRole('button', { name: 'Delete', exact: true }).click();
+  await row.waitFor({ state: 'detached', timeout: 20000 });
+  await ctx.page.getByTestId('delete-dialog').waitFor({ state: 'detached', timeout: 20000 });
+  const panel = await ctx.page.locator('[data-testid="bg-tasks"], [data-testid="bg-transcript"]').count();
+  const dir = existsSync(teamDir(ctx, who.sessionId));
+  record('TB-85 deleting the session takes its Background tasks with it: the panel is gone and teams/<id> is deleted',
+    panel === 0 && !dir, brief({ panel, dir }));
 }
 
 // ---------- 主流程 ----------
 
-const steps = { plain, empty, entries, list, taskview, transcript, folding, keys, stop, readonly, reload, approval,
-  menu, errors, restart };
+const steps = { plain, empty, entries, list, taskview, transcript, folding, tabs, keys, stop, readonly, reload,
+  narrow, approval, outcomes, noactivity, menu, errors, restart };
 
 const ctx = { userData: tempUserData('mori-tb-tasks-data-'), exePath: args.exePath, pageErrors: [] };
 try {

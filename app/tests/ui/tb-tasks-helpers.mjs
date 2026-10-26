@@ -171,3 +171,34 @@ export async function issueReport(ctx, tab, what) {
   await dialog.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   return { path, view: section(md, 'Current view'), actions: section(md, 'Recent activity') };
 }
+
+/**
+ * @brief 在页面里记下一闪而过的状态（team-tasks.md 的“读取中”“停止中”）：task 的视图与会话出现过 Loading… 时它们的
+ *        标题（window.__bgLoading，每项 { kind, title, back }），停止按钮出现过不可用（window.__bgStopping）。
+ *        每次调用清空记下的。
+ */
+export function watchMoments(ctx) {
+  return ctx.page.evaluate(() => {
+    window.__bgLoading = [];
+    window.__bgStopping = false;
+    if (window.__bgMoments) return;
+    window.__bgMoments = new MutationObserver(() => {
+      if (document.querySelector('[data-action="stop-task"]:disabled')) window.__bgStopping = true;
+      for (const css of ['[data-testid="bg-task-view"]', '[data-testid="bg-transcript"]']) {
+        const root = document.querySelector(css);
+        if (!root || !root.textContent.includes('Loading…')) continue;
+        const title = root.querySelector('.bg-task-head .bg-task-title, :scope > .bg-task-title')?.textContent ?? '';
+        const entry = { kind: root.dataset.testid, title, back: Boolean(root.querySelector('[data-action="back"]')) };
+        if (!window.__bgLoading.some((item) => item.kind === entry.kind && item.title === entry.title)) {
+          window.__bgLoading.push(entry);
+        }
+      }
+    });
+    window.__bgMoments.observe(document.body, { subtree: true, childList: true, attributes: true,
+      characterData: true });
+  });
+}
+
+/** @brief watchMoments 记下的：{ loading, stopping }。 */
+export const momentsSeen = (ctx) => ctx.page.evaluate(() => ({ loading: window.__bgLoading ?? [],
+  stopping: window.__bgStopping === true }));

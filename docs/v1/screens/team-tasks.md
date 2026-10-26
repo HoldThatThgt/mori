@@ -105,7 +105,7 @@
 
 | 状态 | 来源 | 必须可见 |
 | --- | --- | --- |
-| 协作模式关掉之后 | `mode` 为 `off`，`requests` 不为空 | 页签、阶段行按钮、模型菜单那一项、列表照常；task 的视图与会话照常能打开；停止照常（还在运行的 task） |
+| 协作模式关掉之后 | `mode` 为 `off`，`requests` 不为空 | 页签、阶段行按钮、模型菜单那一项、列表照常；task 的视图与会话照常能打开（还有 task 在运行时关不到 `off`，只到 `once`（规格 §5.1），所以这时没有可以停的 task） |
 | 重新打开会话、界面重新载入 | `SessionInfo.board` / `LiveSnapshot.board`；两个只读命令 | 与之前相同；右栏回到 `Changes`（右栏的视图不跨重新打开） |
 | App 重启之后 | `board.json`；会话从文件读 | 非终态的 task 显示 `Stopped (Mori restarted)`（§11.6），在 `Finished`；会话照常能打开 |
 | 删除会话 | 主进程删除 `teams/<id>`（§11.5） | 这一栏随会话没有了 |
