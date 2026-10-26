@@ -1121,6 +1121,8 @@ interface TaskView {
 - **右栏的页签**：这个会话的 `BoardView` 有需求、或协作模式不是 `off` 时，右栏顶部的 “This session’s changes” 换成两个页签
   `Changes`、`Background tasks`（Claude 右栏两栏的名字；`role="tablist"`，页签 `role="tab"`、`aria-selected`）。点页签切换；
   选的是哪一栏按会话记住（同右栏现在的视图，不跨重新打开）。文件阅读器仍属于 `Changes`。两样都没有时右栏与现在完全相同（TB-03）。
+  页签那一行一直在右栏顶部（列表、task 的视图、会话里都在），右端是 `Expand` / `Collapse` 与 `Close panel`
+  （WP-13 加的展开，docs/v0/screens/layout.md“右栏展开”）；切页签时展开状态不变。有页签时文件阅读器自己那一行只留 `← Changes` 与路径。
 - **阶段行右端的按钮**（Claude 输入框上方状态行里的那个）：TaskBoard 上有 task 时显示，对话在不在回复都显示。
   有没结束的 task（`pending`、`active`、`waiting_user`）时写 `1 running task` / `{n} running tasks`，否则 `1 task finished` / `{n} tasks finished`
   （`stopped` 算在这里，§15）；悬停 `Show this session’s background tasks`；右栏开着且在 `Background tasks` 时 `aria-pressed` 为真。
