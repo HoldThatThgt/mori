@@ -751,7 +751,7 @@ export function closeUndecidedQuestion(closeRole: string, task: string): string 
  * @param closeRole 结案持有者
  */
 export function closeNoModelQuestion(closeRole: string): string {
-  return `${roleLabel(closeRole)} can't run: no model available`;
+  return `${roleLabel(closeRole)} can’t run: no model available`;
 }
 
 /**

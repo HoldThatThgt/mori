@@ -408,7 +408,7 @@ function endCloseRetry(team: Team, run: LaneRun, request: number): void {
 }
 
 /**
- * @brief 结案选不到模型（§12.5）：交给它的 task 交给立项（need_user，问题为 <close role> can't run: no model available）；
+ * @brief 结案选不到模型（§12.5）：交给它的 task 交给立项（need_user，问题为 <close role> can’t run: no model available）；
  *        为“全部已结束”或“没有 task”被唤醒、需求仍开着且没有未结束的 task 时，这句话作为需求级问题交给立项（§7.6）。
  */
 function closeNoModel(team: Team, lane: Lane, run: LaneRun): void {

@@ -584,268 +584,309 @@ function failedModelWrite(control, status, command) {
   return { error: message };
 }
 
+// ---------- 回放桥本身：createReplayBridge 建一份共用状态（replayState），下面的函数按它回答界面的命令 ----------
+
+/** @brief 等 ms 毫秒（回放两步之间的间隔）。 */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
- * @brief 创建回放进程桥。
- * @param fixture 录制文件内容
- * @param options.speed 加速倍数
- * @param options.maxGap 两个事件之间最多等待的毫秒数（加速后）
- * @param options.part 录制里有重启时：重启前（before）或重启后（after）的一段；不给时回放全部
- * @param options.holdList 为真时 session.list 的回答等测试调用 control.releaseList()（listGate）
+ * @brief 回放桥的状态（control.status）。played：已经放完的段数（每条命令之后、下一条命令之前算一段）；played 等于
+ *        cursor 时回放桥在等界面的下一条命令。
  */
-export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = null, holdList = false } = {}) {
-  const steps = partOf(fixture.steps, part);
-  const gate = listGate(holdList);
-  const marks = boundaries(steps);
-  const listeners = { event: new Set(), exit: new Set(), ready: new Set() };
-  // played：已经放完的段数（每条命令之后、下一条命令之前算一段）；played 等于 cursor 时回放桥在等界面的下一条命令。
-  const status = { cursor: 0, played: 0, clock: 0, exited: false, exitCode: null, errors: [], commands: [], queries: [],
+function newStatus() {
+  return { cursor: 0, played: 0, clock: 0, exited: false, exitCode: null, errors: [], commands: [], queries: [],
     playing: Promise.resolve(), idle: true, attention: 0, busySessions: [], captures: 0, dialogAtCapture: [],
     issues: [], shown: [], deleted: [], reads: [], opened: [], copied: [], feedback: [], failed: [], issueLists: 0,
     issueShots: [], exports: [], exportShown: [], recordShown: [], folders: 0, modelWrites: [], discoverCancels: 0 };
-  const { f8, feedback, stubs } = desktopStubs(status, steps);
-  const created = steps.find((step) => step.result?.type === 'session.create')?.result.value;
-  // synthetic：v1 的设置页（models.get）读到的 key；models.addKey / removeKey 的应答改它（v1ModelWrite）
-  const models = { keys: [{ ref: `${(fixture.model ?? FALLBACK_MODEL).split('/')[0]}#1`, label: 'Key 1' }],
-    nextKeyNumber: 2, writes: status.modelWrites };
-  const saved = { connection: { name: 'replay', baseUrl: fixture.endpoint, api: 'openai-completions', apiKey: '',
+}
+
+/**
+ * @brief synthetic：m6Config 用的已保存连接，按录制的端点和模型拼出（M1–M5 的录制里没有 config.get 的结果）。
+ * @param created 录制里 session.create 的结果（取上下文窗口；没有时 128000）
+ */
+function savedConnection(fixture, created) {
+  return { connection: { name: 'replay', baseUrl: fixture.endpoint, api: 'openai-completions', apiKey: '',
     modelId: fixture.model.split('/').pop(), contextWindow: created?.contextUsage?.contextWindow ?? 128000,
     compat: [] }, keySaved: true };
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  /** @brief 回放一段：从 start 到 end（不含），在命令结果的位置 resolve。 */
-  async function play(start, end, commandType, resolve) {
-    let previous = steps[start].t;
-    let resolved = false;
-    for (let index = start + 1; index < end; index += 1) {
-      if (status.exited) return;
-      const step = steps[index];
-      const gap = Math.min(maxGap, Math.max(0, (step.t - previous) / speed));
-      previous = step.t;
-      if (gap > 0) await sleep(gap);
-      status.clock = step.t;
-      if (step.envelope) {
-        for (const listener of listeners.event) listener(withEventDefaults(structuredClone(step.envelope), fixture));
-      }
-      if (step.result && !resolved && step.result.type === commandType) {
-        resolved = true;
-        resolve(step.result);
-      }
-    }
-    if (!resolved) resolve({ type: commandType, value: null });
-  }
-
-  /** @brief 回答 session.state：录制时在这个时刻之后收到的第一个结果（录制器也是在 turn_end 后请求的）。 */
-  function stateResult() {
-    const results = steps.filter((step) => step.result?.type === 'session.state');
-    const next = results.find((step) => step.t >= status.clock) ?? results.at(-1);
-    return next?.result.value ?? { contextUsage: created?.contextUsage ?? null };
-  }
-
-  /**
-   * @brief 回答 session.list：界面现在所在的这一段（上一条已回放的命令之后、下一条命令之前）里录下的最后一个结果，
-   *        这一段没有时取更早的；还没回放任何命令时就是录制开头的那个（启动时的列表）。按段而不按回放时钟取，
-   *        界面在一条命令之后马上读列表（例如删除之后）时也能拿到这一段录下的结果。
-   */
-  function listResult() {
-    return latestResult('session.list', []);
-  }
-
-  /**
-   * @brief 只读查询的结果：界面现在所在的这一段（及之前）录下的最后一个成功结果（M6：config.get、tools.get、agents.get、
-   *        session.commands 与 session.list 同样取）；没录过时用 fallback。
-   */
-  function latestResult(type, fallback) {
-    const end = marks[status.cursor] ?? steps.length;
-    const found = steps.slice(0, end).filter((step) => step.result?.type === type && !step.result.error);
-    return structuredClone(found.at(-1)?.result.value ?? fallback);
-  }
-
-  /** 每一步之前录制里改配置的 models.* 写命令条数（configWrite；modelsResult 用） */
+/** @brief 每一步之前录制里改配置的 models.* 写命令条数（configWrite；modelsResult 用）。 */
+function writesBeforeSteps(steps) {
   const writesBefore = [];
   steps.reduce((count, step, index) => {
     writesBefore[index] = count;
     return count + (step.command && configWrite(step.command.type) ? 1 : 0);
   }, 0);
+  return writesBefore;
+}
 
-  /**
-   * @brief 回答 models.get、models.reload（model-discovery.md §13.4：录制里有时先用录制的）：界面所在这一段（及之前）
-   *        录下的成功结果里，录制里它之前的写命令条数不超过界面已发的写命令条数的最后一个；没有时用 fallback。
-   *        录制里没有写命令时与 latestResult 相同。
-   */
-  function modelsResult(type, fallback) {
-    const end = marks[status.cursor] ?? steps.length;
-    const sent = status.modelWrites.filter((command) => configWrite(command.type)).length;
-    const found = steps.slice(0, end).filter((step, index) => step.result?.type === type && !step.result.error
-      && writesBefore[index] <= sent);
-    return structuredClone(found.at(-1)?.result.value ?? fallback);
-  }
-
-  /** 按参数配对的只读查询的结果（§8）：{ index, step, key }，key 为它之前最近一条同类型命令的参数 */
-  const keyedSteps = steps.flatMap((step, index) => {
+/** @brief 按参数配对的只读查询的结果（§8）：{ index, step, key }，key 为它之前最近一条同类型命令的参数。 */
+function keyedStepsOf(steps) {
+  return steps.flatMap((step, index) => {
     const type = step.result?.type;
     if (!Object.hasOwn(KEYED, type ?? '')) return [];
     const asked = steps.slice(0, index).findLast((item) => item.command?.type === type)?.command;
     return asked ? [{ index, step, key: JSON.stringify(KEYED[type](asked)) }] : [];
   });
+}
 
-  /**
-   * @brief 回答按参数配对的只读查询（§8）：参数相同、录在当前这一段结束之前的结果里，取回放时刻当时或之后录下的第一个；
-   *        没有时取其中最后一个；都没有时为合成的空结果。录下的是失败时以它的原文失败。
-   */
-  function keyedResult(command) {
-    const end = marks[status.cursor] ?? steps.length;
-    const key = JSON.stringify(KEYED[command.type](command));
-    const matching = keyedSteps.filter((item) => item.index < end && item.step.result.type === command.type
-      && item.key === key);
-    const pick = matching.find((item) => item.step.t >= status.clock) ?? matching.at(-1);
-    if (!pick) return Promise.resolve(keyedEmpty(command));
-    if (pick.step.result.error) return Promise.reject(new Error(pick.step.result.error));
-    return Promise.resolve(withNoOffPicks(command.type, structuredClone(pick.step.result.value)));
-  }
+/**
+ * @brief 回放桥的共用状态，下面回答命令的函数都读写它（参数名 replay）。
+ *        steps：回放的步骤（partOf）；marks：其中界面主动发出的命令的下标（boundaries）；gate：holdList 的测试控制
+ *        （listGate）；created：录制里 session.create 的结果；models：synthetic，v1 的设置页（models.get）读到的 key，
+ *        models.addKey / removeKey 的应答改它（v1ModelWrite）；saved：m6Config 用的连接；trustTaken、readTaken：每个
+ *        文件夹已经取走的 trust.check 结果数、每个会话文件已经取走的 session.read 结果数；control 在
+ *        createReplayBridge 末尾填上（replayControl）。
+ * @param options createReplayBridge 的选项（已补上默认值）
+ */
+function replayState(fixture, { speed, maxGap, part, holdList }) {
+  const steps = partOf(fixture.steps, part);
+  const status = newStatus();
+  const created = steps.find((step) => step.result?.type === 'session.create')?.result.value;
+  return { fixture, steps, speed, maxGap, status, created, gate: listGate(holdList), marks: boundaries(steps),
+    listeners: { event: new Set(), exit: new Set(), ready: new Set() },
+    models: { keys: [{ ref: `${(fixture.model ?? FALLBACK_MODEL).split('/')[0]}#1`, label: 'Key 1' }],
+      nextKeyNumber: 2, writes: status.modelWrites },
+    saved: savedConnection(fixture, created), writesBefore: writesBeforeSteps(steps), keyedSteps: keyedStepsOf(steps),
+    trustTaken: new Map(), readTaken: new Map(), control: null };
+}
 
-  /** 每个文件夹已经取走的 trust.check 结果数 */
-  const trustTaken = new Map();
-
-  /** @brief 录制里某个文件夹的 trust.check 结果，按顺序。 */
-  function trustResults(cwd) {
-    return steps.filter((step, index) => step.result?.type === 'trust.check'
-      && steps.slice(0, index).reverse().find((s) => s.command?.type === 'trust.check')?.command.cwd === cwd);
-  }
-
-  /** @brief 回答 trust.check：同一文件夹按录制顺序取结果，取完后重复最后一个；没录过时"不用问"。 */
-  function trustResult(cwd) {
-    const recorded = trustResults(cwd);
-    const taken = trustTaken.get(cwd) ?? 0;
-    trustTaken.set(cwd, taken + 1);
-    const step = recorded[Math.min(taken, recorded.length - 1)];
-    return structuredClone(step?.result.value ?? { ask: false, readError: null });
-  }
-
-  /** 每个会话文件已经取走的 session.read 结果数 */
-  const readTaken = new Map();
-
-  /**
-   * @brief 回答 session.read：同一会话文件按录制顺序取结果，取完后重复最后一个。
-   *        synthetic：没录过的会话文件按"Session file not found: <文件>"回答（与后台进程的原文相同），测试不该用到。
-   */
-  function readResult(sessionFile) {
-    const recorded = steps.filter((step, index) => step.result?.type === 'session.read'
-      && steps.slice(0, index).reverse().find((s) => s.command?.type === 'session.read')?.command.sessionFile
-        === sessionFile);
-    const taken = readTaken.get(sessionFile) ?? 0;
-    readTaken.set(sessionFile, taken + 1);
-    const step = recorded[Math.min(taken, recorded.length - 1)];
-    if (!step || step.result.error) {
-      return Promise.reject(new Error(step?.result.error ?? `Session file not found: ${sessionFile}`));
+/** @brief 回放一段：从 start 到 end（不含），在命令结果的位置 resolve。 */
+async function play(replay, start, end, commandType, resolve) {
+  const { steps, status, listeners, fixture } = replay;
+  let previous = steps[start].t;
+  let resolved = false;
+  for (let index = start + 1; index < end; index += 1) {
+    if (status.exited) return;
+    const step = steps[index];
+    const gap = Math.min(replay.maxGap, Math.max(0, (step.t - previous) / replay.speed));
+    previous = step.t;
+    if (gap > 0) await sleep(gap);
+    status.clock = step.t;
+    if (step.envelope) {
+      for (const listener of listeners.event) listener(withEventDefaults(structuredClone(step.envelope), fixture));
     }
-    return Promise.resolve(structuredClone(step.result.value));
-  }
-
-  /** @brief 系统选文件夹对话框的结果：下一条命令是 package.add 时是它的文件夹（M6），否则是下一条 session.create 的文件夹。 */
-  function nextFolder() {
-    const next = marks[status.cursor] === undefined ? null : steps[marks[status.cursor]].command;
-    if (next?.type === 'package.add') return next.path;
-    const index = marks.slice(status.cursor).find((mark) => steps[mark].command.type === 'session.create');
-    return index === undefined ? created?.cwd ?? null : steps[index].command.cwd;
-  }
-
-  /** @brief 按录制回放一条界面命令。control.failNext 有值时（synthetic）这一条直接以它失败，不占回放顺序。 */
-  function replayCommand(command) {
-    if (control.failNext) {
-      const message = control.failNext;
-      control.failNext = null;
-      status.failed.push(command);
-      return Promise.reject(new Error(message));
+    if (step.result && !resolved && step.result.type === commandType) {
+      resolved = true;
+      resolve(step.result);
     }
-    const index = marks[status.cursor];
-    const expected = index === undefined ? null : steps[index].command;
-    status.commands.push(command);
-    if (!expected || !sameCommand(expected, command)) {
-      const message = `replay mismatch: expected ${JSON.stringify(expected)}, got ${JSON.stringify(command)}`;
-      status.errors.push(message);
-      return Promise.reject(new Error(message));
-    }
-    status.cursor += 1;
-    const end = marks[status.cursor] ?? steps.length;
-    return new Promise((resolve, reject) => {
-      status.idle = false;
-      status.playing = status.playing.then(() => play(index, end, command.type, (result) => {
-        if (result.error) reject(new Error(result.error));
-        else resolve(withDefaults(command.type, result.value, fixture));
-      })).finally(() => {
-        status.played += 1;
-        status.idle = status.cursor >= marks.length;
-      });
+  }
+  if (!resolved) resolve({ type: commandType, value: null });
+}
+
+/** @brief 回答 session.state：录制时在这个时刻之后收到的第一个结果（录制器也是在 turn_end 后请求的）。 */
+function stateResult(replay) {
+  const results = replay.steps.filter((step) => step.result?.type === 'session.state');
+  const next = results.find((step) => step.t >= replay.status.clock) ?? results.at(-1);
+  return next?.result.value ?? { contextUsage: replay.created?.contextUsage ?? null };
+}
+
+/**
+ * @brief 回答 session.list：界面现在所在的这一段（上一条已回放的命令之后、下一条命令之前）里录下的最后一个结果，
+ *        这一段没有时取更早的；还没回放任何命令时就是录制开头的那个（启动时的列表）。按段而不按回放时钟取，
+ *        界面在一条命令之后马上读列表（例如删除之后）时也能拿到这一段录下的结果。
+ */
+function listResult(replay) {
+  return latestResult(replay, 'session.list', []);
+}
+
+/**
+ * @brief 只读查询的结果：界面现在所在的这一段（及之前）录下的最后一个成功结果（M6：config.get、tools.get、agents.get、
+ *        session.commands 与 session.list 同样取）；没录过时用 fallback。
+ */
+function latestResult(replay, type, fallback) {
+  const { steps, marks, status } = replay;
+  const end = marks[status.cursor] ?? steps.length;
+  const found = steps.slice(0, end).filter((step) => step.result?.type === type && !step.result.error);
+  return structuredClone(found.at(-1)?.result.value ?? fallback);
+}
+
+/**
+ * @brief 回答 models.get、models.reload（model-discovery.md §13.4：录制里有时先用录制的）：界面所在这一段（及之前）
+ *        录下的成功结果里，录制里它之前的写命令条数不超过界面已发的写命令条数的最后一个；没有时用 fallback。
+ *        录制里没有写命令时与 latestResult 相同。
+ */
+function modelsResult(replay, type, fallback) {
+  const { steps, marks, status } = replay;
+  const end = marks[status.cursor] ?? steps.length;
+  const sent = status.modelWrites.filter((command) => configWrite(command.type)).length;
+  const found = steps.slice(0, end).filter((step, index) => step.result?.type === type && !step.result.error
+    && replay.writesBefore[index] <= sent);
+  return structuredClone(found.at(-1)?.result.value ?? fallback);
+}
+
+/**
+ * @brief 回答按参数配对的只读查询（§8）：参数相同、录在当前这一段结束之前的结果里，取回放时刻当时或之后录下的第一个；
+ *        没有时取其中最后一个；都没有时为合成的空结果。录下的是失败时以它的原文失败。
+ */
+function keyedResult(replay, command) {
+  const end = replay.marks[replay.status.cursor] ?? replay.steps.length;
+  const key = JSON.stringify(KEYED[command.type](command));
+  const matching = replay.keyedSteps.filter((item) => item.index < end && item.step.result.type === command.type
+    && item.key === key);
+  const pick = matching.find((item) => item.step.t >= replay.status.clock) ?? matching.at(-1);
+  if (!pick) return Promise.resolve(keyedEmpty(command));
+  if (pick.step.result.error) return Promise.reject(new Error(pick.step.result.error));
+  return Promise.resolve(withNoOffPicks(command.type, structuredClone(pick.step.result.value)));
+}
+
+/** @brief 录制里某个文件夹的 trust.check 结果，按顺序。 */
+function trustResults(steps, cwd) {
+  return steps.filter((step, index) => step.result?.type === 'trust.check'
+    && steps.slice(0, index).reverse().find((s) => s.command?.type === 'trust.check')?.command.cwd === cwd);
+}
+
+/** @brief 回答 trust.check：同一文件夹按录制顺序取结果，取完后重复最后一个；没录过时"不用问"。 */
+function trustResult(replay, cwd) {
+  const recorded = trustResults(replay.steps, cwd);
+  const taken = replay.trustTaken.get(cwd) ?? 0;
+  replay.trustTaken.set(cwd, taken + 1);
+  const step = recorded[Math.min(taken, recorded.length - 1)];
+  return structuredClone(step?.result.value ?? { ask: false, readError: null });
+}
+
+/**
+ * @brief 回答 session.read：同一会话文件按录制顺序取结果，取完后重复最后一个。
+ *        synthetic：没录过的会话文件按"Session file not found: <文件>"回答（与后台进程的原文相同），测试不该用到。
+ */
+function readResult(replay, sessionFile) {
+  const { steps } = replay;
+  const recorded = steps.filter((step, index) => step.result?.type === 'session.read'
+    && steps.slice(0, index).reverse().find((s) => s.command?.type === 'session.read')?.command.sessionFile
+      === sessionFile);
+  const taken = replay.readTaken.get(sessionFile) ?? 0;
+  replay.readTaken.set(sessionFile, taken + 1);
+  const step = recorded[Math.min(taken, recorded.length - 1)];
+  if (!step || step.result.error) {
+    return Promise.reject(new Error(step?.result.error ?? `Session file not found: ${sessionFile}`));
+  }
+  return Promise.resolve(structuredClone(step.result.value));
+}
+
+/** @brief 系统选文件夹对话框的结果：下一条命令是 package.add 时是它的文件夹（M6），否则是下一条 session.create 的文件夹。 */
+function nextFolder(replay) {
+  const { steps, marks, status } = replay;
+  const next = marks[status.cursor] === undefined ? null : steps[marks[status.cursor]].command;
+  if (next?.type === 'package.add') return next.path;
+  const index = marks.slice(status.cursor).find((mark) => steps[mark].command.type === 'session.create');
+  return index === undefined ? replay.created?.cwd ?? null : steps[index].command.cwd;
+}
+
+/** @brief 按录制回放一条界面命令。control.failNext 有值时（synthetic）这一条直接以它失败，不占回放顺序。 */
+function replayCommand(replay, command) {
+  const { control, status, steps, marks } = replay;
+  if (control.failNext) {
+    const message = control.failNext;
+    control.failNext = null;
+    status.failed.push(command);
+    return Promise.reject(new Error(message));
+  }
+  const index = marks[status.cursor];
+  const expected = index === undefined ? null : steps[index].command;
+  status.commands.push(command);
+  if (!expected || !sameCommand(expected, command)) {
+    const message = `replay mismatch: expected ${JSON.stringify(expected)}, got ${JSON.stringify(command)}`;
+    status.errors.push(message);
+    return Promise.reject(new Error(message));
+  }
+  status.cursor += 1;
+  const end = marks[status.cursor] ?? steps.length;
+  return new Promise((resolve, reject) => {
+    status.idle = false;
+    status.playing = status.playing.then(() => play(replay, index, end, command.type, (result) => {
+      if (result.error) reject(new Error(result.error));
+      else resolve(withDefaults(command.type, result.value, replay.fixture));
+    })).finally(() => {
+      status.played += 1;
+      status.idle = status.cursor >= marks.length;
     });
-  }
+  });
+}
 
-  /**
-   * @brief 回放桥直接回答的 models.* 命令（不占回放顺序）：读取（models.get、models.reload 按 modelsResult）、
-   *        拉取（models.discover 按参数配对，model-discovery.md §13.4）、取消拉取与写命令（v1ModelWrite）；
-   *        别的命令为 null。
-   */
-  function modelsAnswer(command) {
-    switch (command.type) {
-      case 'models.get':
-      case 'models.reload':
-        status.queries.push(command);
-        return Promise.resolve(modelsResult(command.type, v1ModelsInfo(fixture,
-          created?.contextUsage?.contextWindow ?? 128000, models)));
-      case 'models.discover':
-        status.queries.push(command);
-        return keyedResult(command);
-      case 'models.discoverCancel':
-        status.discoverCancels += 1;
-        return Promise.resolve({ error: null });
-      default:
-        if (!MODEL_WRITES.has(command.type)) return null;
-        return Promise.resolve(control.failModelWrite ? failedModelWrite(control, status, command)
-          : v1ModelWrite(command, models));
-    }
+/**
+ * @brief 回放桥直接回答的 models.* 命令（不占回放顺序）：读取（models.get、models.reload 按 modelsResult）、
+ *        拉取（models.discover 按参数配对，model-discovery.md §13.4）、取消拉取与写命令（v1ModelWrite）；
+ *        别的命令为 null。
+ */
+function modelsAnswer(replay, command) {
+  const { status, control } = replay;
+  switch (command.type) {
+    case 'models.get':
+    case 'models.reload':
+      status.queries.push(command);
+      return Promise.resolve(modelsResult(replay, command.type, v1ModelsInfo(replay.fixture,
+        replay.created?.contextUsage?.contextWindow ?? 128000, replay.models)));
+    case 'models.discover':
+      status.queries.push(command);
+      return keyedResult(replay, command);
+    case 'models.discoverCancel':
+      status.discoverCancels += 1;
+      return Promise.resolve({ error: null });
+    default:
+      if (!MODEL_WRITES.has(command.type)) return null;
+      return Promise.resolve(control.failModelWrite ? failedModelWrite(control, status, command)
+        : v1ModelWrite(command, replay.models));
   }
+}
 
-  const bridge = {
-    request(command) {
-      if (status.exited) return Promise.reject(crashed(status.exitCode));
-      const answered = modelsAnswer(command);
-      if (answered) return answered;
-      switch (command.type) {
-        case 'config.get': return Promise.resolve(v1Config(latestResult('config.get', m6Config(fixture, saved))));
-        case 'session.pickOptions':
-          status.queries.push(command);
-          return Promise.resolve(latestResult(command.type, v1PickOptions(fixture)));
-        case 'board.get':
-          // synthetic：录制里没有 board.get 时是空的 TaskBoard（没用过协作模式的会话）
-          status.queries.push(command);
-          return Promise.resolve(latestResult(command.type, { ...emptyBoard(), error: null }));
-        case 'tools.get':
-        case 'session.commands':
-          status.queries.push(command);
-          return Promise.resolve(latestResult(command.type, m6Empty(command.type)));
-        case 'agents.get':
-          status.queries.push(command);
-          return Promise.resolve(withAgentTokens(latestResult(command.type, m6Empty(command.type))));
-        case 'memory.list': case 'memory.get': case 'memory.revisions': case 'enhance.get':
-          status.queries.push(command);
-          return keyedResult(command);
-        case 'connection.save': return Promise.resolve({ error: null });
-        case 'connection.testCancel': return Promise.resolve({ cancelled: false });
-        case 'connection.test':
-          return Promise.resolve({ ok: true, cancelled: false, firstTokenMs: 1, totalMs: 2, text: 'ok', thinking: false,
-            error: null });
-        case 'session.state': return Promise.resolve(stateResult());
-        case 'session.list':
-          status.queries.push(command);
-          return gate.wait ? gate.wait.then(() => listResult()) : Promise.resolve(listResult());
-        case 'trust.check':
-          status.queries.push(command);
-          return Promise.resolve(trustResult(command.cwd));
-        case 'session.read':
-          status.queries.push(command);
-          return readResult(command.sessionFile);
-        default: return replayCommand(command);
-      }
-    },
+/**
+ * @brief 回放桥直接回答、不占回放顺序的其余命令：只读查询（QUERIES 里 models.* 以外的）和连接页的
+ *        connection.save、connection.test、connection.testCancel；别的命令为 null（按录制回放）。
+ */
+function queryAnswer(replay, command) {
+  const { status, fixture } = replay;
+  switch (command.type) {
+    case 'config.get':
+      return Promise.resolve(v1Config(latestResult(replay, 'config.get', m6Config(fixture, replay.saved))));
+    case 'session.pickOptions':
+      status.queries.push(command);
+      return Promise.resolve(latestResult(replay, command.type, v1PickOptions(fixture)));
+    case 'board.get':
+      // synthetic：录制里没有 board.get 时是空的 TaskBoard（没用过协作模式的会话）
+      status.queries.push(command);
+      return Promise.resolve(latestResult(replay, command.type, { ...emptyBoard(), error: null }));
+    case 'tools.get':
+    case 'session.commands':
+      status.queries.push(command);
+      return Promise.resolve(latestResult(replay, command.type, m6Empty(command.type)));
+    case 'agents.get':
+      status.queries.push(command);
+      return Promise.resolve(withAgentTokens(latestResult(replay, command.type, m6Empty(command.type))));
+    case 'memory.list': case 'memory.get': case 'memory.revisions': case 'enhance.get':
+      status.queries.push(command);
+      return keyedResult(replay, command);
+    case 'connection.save': return Promise.resolve({ error: null });
+    case 'connection.testCancel': return Promise.resolve({ cancelled: false });
+    case 'connection.test':
+      return Promise.resolve({ ok: true, cancelled: false, firstTokenMs: 1, totalMs: 2, text: 'ok', thinking: false,
+        error: null });
+    case 'session.state': return Promise.resolve(stateResult(replay));
+    case 'session.list':
+      status.queries.push(command);
+      return replay.gate.wait ? replay.gate.wait.then(() => listResult(replay)) : Promise.resolve(listResult(replay));
+    case 'trust.check':
+      status.queries.push(command);
+      return Promise.resolve(trustResult(replay, command.cwd));
+    case 'session.read':
+      status.queries.push(command);
+      return readResult(replay, command.sessionFile);
+    default: return null;
+  }
+}
+
+/**
+ * @brief bridge.request：后台进程退出后拒绝；models.* 由 modelsAnswer 回答，其余直接回答的由 queryAnswer 回答，
+ *        别的按录制回放（replayCommand）。
+ */
+function answerRequest(replay, command) {
+  if (replay.status.exited) return Promise.reject(crashed(replay.status.exitCode));
+  return modelsAnswer(replay, command) ?? queryAnswer(replay, command) ?? replayCommand(replay, command);
+}
+
+/** @brief bridge 里后台进程的事件、退出、就绪的监听与重启（重启后 50 毫秒通知就绪）。 */
+function kernelHooks(replay) {
+  const { listeners, status } = replay;
+  return {
     onEvent(listener) { listeners.event.add(listener); return () => listeners.event.delete(listener); },
     onKernelExit(listener) { listeners.exit.add(listener); return () => listeners.exit.delete(listener); },
     onKernelReady(listener) {
@@ -858,18 +899,25 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
       setTimeout(() => { for (const listener of listeners.ready) listener(); }, 50);
       return Promise.resolve();
     },
-    pickFolder() { return Promise.resolve(nextFolder()); },
-    ...stubs,
-    ...issuesStubs(status, fixture, steps),
   };
-  const control = {
+}
+
+/**
+ * @brief 测试控制对象（window.__replay，不是录制的内容）：状态、F8 与保存反馈的控制、failNext、failModelWrite、
+ *        releaseList 与 exit。
+ * @param f8 desktopStubs 的截图与保存控制
+ * @param feedback desktopStubs 的保存反馈控制
+ */
+function replayControl(replay, f8, feedback) {
+  const { status, listeners } = replay;
+  return {
     status,
     f8,
     feedback,
     /** synthetic：下一条界面命令直接以这段原文失败（测发送时就失败）；null 表示照常回放 */
     failNext: null,
     /** 测试控制：放开 holdList 压住的 session.list（没有压住时什么都不做） */
-    releaseList: gate.release,
+    releaseList: replay.gate.release,
     /** synthetic（2026-10-26 补）：下一条 models.* 写命令以这段原文失败（failedModelWrite）；null 表示照常应答 */
     failModelWrite: null,
     /** @brief 模拟后台进程退出。 */
@@ -879,5 +927,27 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
       for (const listener of listeners.exit) listener(code);
     },
   };
-  return { bridge, control };
+}
+
+/**
+ * @brief 创建回放进程桥。
+ * @param fixture 录制文件内容
+ * @param options.speed 加速倍数
+ * @param options.maxGap 两个事件之间最多等待的毫秒数（加速后）
+ * @param options.part 录制里有重启时：重启前（before）或重启后（after）的一段；不给时回放全部
+ * @param options.holdList 为真时 session.list 的回答等测试调用 control.releaseList()（listGate）
+ * @return { bridge：代替 preload 的 window.mori, control：测试控制 window.__replay（replayControl） }
+ */
+export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = null, holdList = false } = {}) {
+  const replay = replayState(fixture, { speed, maxGap, part, holdList });
+  const { f8, feedback, stubs } = desktopStubs(replay.status, replay.steps);
+  const bridge = {
+    request(command) { return answerRequest(replay, command); },
+    ...kernelHooks(replay),
+    pickFolder() { return Promise.resolve(nextFolder(replay)); },
+    ...stubs,
+    ...issuesStubs(replay.status, fixture, replay.steps),
+  };
+  replay.control = replayControl(replay, f8, feedback);
+  return { bridge, control: replay.control };
 }

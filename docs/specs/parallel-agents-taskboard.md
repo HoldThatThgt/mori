@@ -890,7 +890,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
 | task 实例 | §7.4 `no_model` 交给结案 |
 | 立项（判断用户消息） | 按“不需要协作”，对话的工作卡写明 `couldn't decide: no model available` |
 | 立项（程序唤醒） | 唤醒对话转告你：`[Mori] <create role> can't run: no model available (<原因>). Tell the user.`（§5.6 `ask_user`） |
-| 结案 | 交给它的 task 交给立项（`need_user`，问题为 `<close role> can't run: no model available`） |
+| 结案 | 交给它的 task 交给立项（`need_user`，问题为 `<close role> can’t run: no model available`） |
 | 对话 | 统一模型提供商规格 §9.3 的说明卡（不变） |
 | 临时提问 | 发送方的工具结果报错，列出原因 |
 | 订阅 | 记在它自己的会话里，不另外处理 |

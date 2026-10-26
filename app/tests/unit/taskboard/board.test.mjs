@@ -439,7 +439,7 @@ test('TB-14 program handoffs (§7.4): a task instance falls back to close, the c
   const withClose = ok(handoff(oneTask(), 'executor', 'T1', 'done')).board;
   const question = B.closeUndecidedQuestion('planner', 'T1');
   assert.equal(question, "planner didn't decide on T1");
-  assert.equal(B.closeNoModelQuestion('mori'), "Mori can't run: no model available");
+  assert.equal(B.closeNoModelQuestion('mori'), 'Mori can’t run: no model available');
   const input = { task: 'T1', reason: 'close_undecided', conclusion: question, holder: { kind: 'close' }, session: null,
     authorFamilies: [] };
   const asked = ok(B.recordProgramHandoff(withClose, input, 5000));

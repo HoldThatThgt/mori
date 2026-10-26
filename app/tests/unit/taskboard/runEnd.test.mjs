@@ -111,9 +111,26 @@ test('TB-40 TB-31 close with no model, woken because every task ended: the reque
       candidates: [{ ref: 'fake/model', detail: 'rate limited' }] });
     ended.resolve();
     const create = await nextDelivery(host, 'U.create');
-    assert.match(create.text, /planner can't run: no model available/);
-    assert.equal(B.findRequest(team.board, 1).question, "planner can't run: no model available");
+    assert.match(create.text, /planner can’t run: no model available/);
+    assert.equal(B.findRequest(team.board, 1).question, 'planner can’t run: no model available');
     assert.equal(B.findRequest(team.board, 1).status, 'open');
+  });
+
+test('TB-40 close with no model before its run starts: the task handed to it goes to create as need_user (§12.5)',
+  async () => {
+    const { team, host } = await setup();
+    addTask(team);
+    await runDelivery(host, await nextDelivery(host, 'U.t1.executor'), workThen('done'));
+    const close = await nextDelivery(host, 'U.close.1');
+    host.entry('U.close.1').spec.model.onUnavailable({ firstRequest: true,
+      candidates: [{ ref: 'fake/model', detail: 'rate limited' }] });
+    close.resolve();
+    const task = await until(() => B.findTask(team.board, 'T1')?.status === 'waiting_user'
+      && B.findTask(team.board, 'T1'), 'T1 handed to create');
+    // 界面上显示的问题用排版撇号（docs/v0/ui-strings.md 第 12 条）
+    assert.deepEqual([task.handoffs.at(-1).from, task.handoffs.at(-1).reason, task.question],
+      ['mori', 'no_model', 'planner can’t run: no model available']);
+    assert.match((await nextDelivery(host, 'U.create')).text, /T1 needs a decision from the user/);
   });
 
 test('TB-31 the "no new tasks" re-wake waives the check on messages to create once; a later ask is waited for',

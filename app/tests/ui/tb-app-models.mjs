@@ -903,7 +903,7 @@ async function cwake(ctx) {
     last: pane.assistants.at(-1) }));
 }
 
-/** @brief 结案选不到模型：交给它的 task 交给立项（need_user，问题为 closer can't run: no model available）。 */
+/** @brief 结案选不到模型：交给它的 task 交给立项（need_user，问题为 closer can’t run: no model available）。 */
 async function closer(ctx) {
   const who = await begin(ctx, ctx.p.closer, 'Close it tb-scenario:tb-models-closer');
   await settle(ctx, who, 60000);
@@ -913,10 +913,10 @@ async function closer(ctx) {
   const woken = scenarioRequests(ctx.ep, 'tb-models-closer', { agent: 'planner', kind: 'create' })
     .filter((item) => item.info.k === 2);
   record('TB-40 close with no model: closer\'s only model answers 404; T1 that was handed to it goes to planner as '
-    + 'need_user with the question "closer can\'t run: no model available" (program baton from mori, reason '
+    + 'need_user with the question "closer can’t run: no model available" (program baton from mori, reason '
     + 'no_model, T1 waiting_user) and planner is woken with "[Mori] T1 needs a decision from the user"',
   closeLines.length >= 1 && closeLines.every((line) => line.status === 404) && t1?.status === 'waiting_user'
-    && t1.question === "closer can't run: no model available" && baton?.from === 'mori' && baton.reason === 'no_model'
+    && t1.question === 'closer can’t run: no model available' && baton?.from === 'mori' && baton.reason === 'no_model'
     && baton.routedTo.kind === 'create' && woken.length >= 1
     && woken[0].info.last.includes('[Mori] T1 needs a decision from the user'),
   brief({ close: closeLines.map((line) => line.status), t1: t1 && [t1.status, t1.question], baton: baton && [baton.from,
