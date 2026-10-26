@@ -18,7 +18,10 @@ import { STOPPED_BY_USER } from './teamRuns';
 
 // ---- 给模型的文字（§6） ----
 
-/** @brief 工具的说明（§6.1）。 */
+/**
+ * @brief 工具的说明（§6.1）。第三行带着原来准则（promptGuidelines）的话：什么时候用、每个 prompt 要能单独看懂；准则不写，
+ *        身份段因此保持在 500 token 以内（§6.4，临时默认值登记在 docs/v1/defaults.md）。
+ */
 export const SUBAGENT_DESCRIPTION = [
   'Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt '
     + 'you write: say what to look at, what to find out or change, and what to report back. The result is each '
@@ -27,8 +30,9 @@ export const SUBAGENT_DESCRIPTION = [
     + 'approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user\'s '
     + 'approval), and it works in the same folder as you and the other subagents, so never give two subagents changes '
     + 'to the same files.',
-  "Use it to split work into independent parts; do small or tightly connected work yourself. Subagents can't ask the "
-    + 'user questions or start subagents.',
+  'Use it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each '
+    + "prompt so it stands alone; do small or tightly connected work yourself. Subagents can't ask the user questions "
+    + 'or start subagents.',
 ].join('\n');
 
 /** @brief 有别的角色时说明末尾加的一句（§6.1）。 */
@@ -38,9 +42,6 @@ export const SUBAGENT_ROLE_SENTENCE = 'role picks who does it: mori (general-pur
 /** @brief `<tools>` 里的一行（promptSnippet，§6.1）。 */
 export const SUBAGENT_SNIPPET = 'Run subagents in parallel and get their final replies';
 
-/** @brief 准则（promptGuidelines，§6.1）。 */
-export const SUBAGENT_GUIDELINE = 'Use subagent when the user asks for subagents or parallel agents, or when work '
-  + 'splits into independent parts; write each prompt so it stands alone, and use read_only for reading and analysis.';
 
 /** @brief 执行时错误的第二行（§3.3）。 */
 export const SUBAGENT_USAGE = 'Correct form: subagent {"tasks":[{"description":"Map the capture loop",'
@@ -417,7 +418,6 @@ export function subagentTool(team: Team): ToolDefinition {
     label: 'Subagent',
     description: subagentToolDescription(team.roles),
     promptSnippet: SUBAGENT_SNIPPET,
-    promptGuidelines: [SUBAGENT_GUIDELINE],
     parameters: schema as unknown as ToolDefinition['parameters'],
     prepareArguments: (raw: unknown) => normalizeSubagentArgs(raw) as never,
     defaultActive: false,

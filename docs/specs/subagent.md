@@ -178,21 +178,23 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
 
 全部英文。`<…>` 由程序填写。
 
-### 6.1 工具的说明、清单一行与准则；subagent 段
+### 6.1 工具的说明与清单一行；subagent 段
 
 **说明**（`ToolDefinition.description`）：
 
 ```text
 Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent's final reply, in order.
 Set read_only: true when a subagent only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user's approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.
-Use it to split work into independent parts; do small or tightly connected work yourself. Subagents can't ask the user questions or start subagents.
+Use it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can't ask the user questions or start subagents.
 ```
 
 有别的角色时末尾加一句：`role picks who does it: mori (general-purpose, the default) or a role from the project's .mori/agents, which brings its own tools.`
 
 **`<tools>` 里的一行**（`promptSnippet`，记忆规格 §4.1 按 pi 的规则渲染）：`subagent: Run subagents in parallel and get their final replies`
 
-**准则**（`promptGuidelines`，一条）：`Use subagent when the user asks for subagents or parallel agents, or when work splits into independent parts; write each prompt so it stands alone, and use read_only for reading and analysis.`
+**没有准则**（不写 `promptGuidelines`）：原来的一条准则（什么时候用、每个 prompt 要能单独看懂）并进上面说明的第三行。说明在工具定义里，不在身份段里，
+所以身份段保持在记忆规格的 500 token 以内（§6.4；2026-10-26 临时默认值，按 walkthrough-fixes 会话转达的推荐做法，问题已交给负责人，
+另外两种做法见 [v1/defaults.md](../v1/defaults.md)）。
 
 **subagent 段**（§5.1；第一句固定，合成端点用它认出这种会话，TaskBoard 规格 §17.1）：
 
@@ -256,9 +258,9 @@ Stopped by the user.
 - 普通模式、没有别的角色：`Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.`；
 - 普通模式、有别的角色：`Questions you send to other agents and prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the question or the prompt.`
 
-预算：记忆规格 §4 的“默认工具下身份段 ≤ 500 token”仍按 `read`、`bash`、`edit`、`write` 量（MEM-01）。普通模式的会话从此总有 `subagent`，
-身份段多出它在 `<tools>` 里的一行、它的准则与这一句（WP-11 实测默认工具 454 token、加 `agent_message` 497）；实测数写进检查记录，超出 500 时
-先缩短 §6.1 的准则，再问负责人。
+预算：记忆规格 §4 的“默认工具下身份段 ≤ 500 token”（MEM-01 量实际发出的请求）。普通模式的会话从此总有 `subagent`，身份段多出它在 `<tools>`
+里的一行（17 token）与这一句（30）：默认工具下的普通模式正好 500 token（WP-11 实测默认工具 454）。原来还有一条准则（48），会到 549；
+它的话并进了工具的说明（§6.1，临时默认值）。
 
 普通模式、有别的角色时的 `mori_team` 段（TaskBoard 规格附录 A“对话段（关闭模式、有别的角色时）”）不变（`agent_message` 保留；命令名按 WP-10 改为 `/task`）。
 
@@ -388,6 +390,7 @@ interface SubagentRow {
 | 行里失败原因的显示长度 | 80 字符 |
 | 卡片的展开 | 执行中展开，结束时收起一次 |
 | 工具页那一行下面的原因 | `Mori turns this on when Task mode is off.`（句式照 WP-08） |
+| 原来的准则放在哪里 | 并进工具的说明第三行，不写 `promptGuidelines`（§6.1、§6.4；另外两种：保留准则、普通模式 549 token；缩短准则，522 token） |
 | 界面文字 | §7 |
 
 ## 11. 对其他规格与文档的改动
@@ -404,7 +407,7 @@ interface SubagentRow {
 | 同 §12.10 | 类别加 `subagent`（顺序、不留槽位、不排队超时，本规格 §5.4）；“临时提问继承发送方的类别”后加“（普通模式的 subagent 除外）” |
 | 同 §13.8 | 加一行 `subagent` → 见本规格 §7.1 |
 | 同 §13.12 | 说明的文字改为 `Changes made by other agents aren’t listed here.`，subagent 改的文件同样算（本规格 §7.6） |
-| 同 §17.2 TB-03 | 改为“普通模式与 v0 的差别只有 `subagent`”：没有角色文件、没用过 Task mode 时，发给模型的工具列表 = v0 的加 `subagent`（另按记忆规格加 `memory`），system prompt = v0 的加 `subagent` 在 `<tools>` 里的一行与它的准则（按记忆规格 §14.4 去掉身份段与记忆分节后比较）；工具页多一行 `subagent`（来源 `Mori`）；主 Agent 第一次调用 `subagent` 之前不建实例、`<userData>/teams` 下没有文件；有别的角色时另多 `agent_message`（和它的说明），`subagent` 的 schema 多 `role`；其余不变 |
+| 同 §17.2 TB-03 | 改为“普通模式与 v0 的差别只有 `subagent`”：没有角色文件、没用过 Task mode 时，发给模型的工具列表 = v0 的加 `subagent`（另按记忆规格加 `memory`），system prompt = v0 的加 `subagent` 在 `<tools>` 里的一行（按记忆规格 §14.4 去掉身份段与记忆分节后比较）；工具页多一行 `subagent`（来源 `Mori`）；主 Agent 第一次调用 `subagent` 之前不建实例、`<userData>/teams` 下没有文件；有别的角色时另多 `agent_message`（和它的说明），`subagent` 的 schema 多 `role`；其余不变 |
 | 同附录 A | “临时提问段”注明普通模式的 subagent 不用它；加“subagent 段”指向本规格 §6.1；关闭模式的临时提问不带共用段 |
 | `docs/specs/memory.md` §4.1 第 1 条、§4 的预算一段、附录 A.1.1、§5.1 | 身份段那一句按 §6.4 的表拼（去掉“`subagent` 还没有实现”的说明）；预算一段里“默认工具下没有附录 A.1.1 那一句”改为“普通模式的会话有 `subagent`，所以有这一句”；`sub` 身份的说明里加普通模式的 subagent |
 | `docs/v0/screens/tool-cards.md` | 标题对照表加 `subagent` 一行，指向 [subagent-card.md](../v1/screens/subagent-card.md) |
@@ -482,7 +485,7 @@ interface SubagentRow {
 | 编号 | 条目 | 通过条件 | 层 |
 | --- | --- | --- | --- |
 | SA-01 | 什么时候有 | 普通模式的用户会话的请求里有 `subagent`（没有角色文件、只有基座时也有；对话持有者写了 `tools: [read]` 时也有）；Task mode 下的运行没有（含合并会话），运行中被启用时调用被拒绝；立项、结案、task、临时提问、subagent 自己、增强会话的请求里都没有；工具页有一行 `subagent`，来源 `Mori`，没有开关，行下面的原因按 §2；有别的角色时 `agent_message` 仍在 | 单元、App |
-| SA-02 | 定义与归一 | schema 按 §3.1（`role` 只在有别的角色时出现，枚举基座在前、含对话持有者）；说明、`<tools>` 里的一行、准则逐字按 §6.1（有、没有别的角色两种）；§3.2 的每一种写法归一后相同；`subagent_type` 被丢掉 | 单元 |
+| SA-02 | 定义与归一 | schema 按 §3.1（`role` 只在有别的角色时出现，枚举基座在前、含对话持有者）；说明、`<tools>` 里的一行逐字按 §6.1（有、没有别的角色两种），没有 `promptGuidelines`；§3.2 的每一种写法归一后相同；`subagent_type` 被丢掉 | 单元 |
 | SA-03 | 执行时的检查 | §3.3 表的每一行：错误两行、文字逐字；被拒绝的调用不开实例、不写 `teams/` 下的文件；一次调用 6 个、同一次回复里再调用一次 3 个都照常开出（没有条数上限） | 单元、App |
 | SA-04 | 同时运行 | 3 个 subagent 的请求在端点日志里时间重叠（不是一个接一个）；每个 subagent 一条新会话（id `….ask.<n>.<role>`、`mori.instance` 的 `kind` 为 `ask`、`parentSession` 指向用户会话），不在侧栏；运行结束后实例关闭、文件保留；结果按参数顺序 | App、真实 |
 | SA-05 | 工具 | 只读 subagent 的请求里只有 `read`、`ls`（在 Built-in tools 打开 `grep`、`find` 时加上它们）；通用的基座 subagent 的请求里的工具与基座相同（默认设置下 `read`、`bash`、`edit`、`write`，加上直接调用方式的 MCP 工具）；写了 `tools: [read, bash]` 的角色的通用 subagent 只有这两个、只读时只有 `read`、`ls`；都没有 `memory`、`agent_message`、`subagent`、TaskBoard 的工具 | 单元、App、真实 |
@@ -490,7 +493,7 @@ interface SubagentRow {
 | SA-07 | 候选与角色 | 基座的 subagent 按会话的范围选；角色的 subagent 按角色的 `models` 与对话范围的交集、顺序按角色，system prompt 里有角色正文；交集为空时只有那一个失败，原因列出每个候选被排除的原因，其余照常 | 单元、App |
 | SA-08 | subagent 的 system prompt 与投递 | 以身份段开头，记忆分节只有 `strategy`、`review`；附加段是角色正文 + §6.1 的 subagent 段（只读、通用两种写法），没有 TaskBoard 的共用段；投递按 §6.2；请求末尾没有工作卡 | 单元、App |
 | SA-09 | 主 Agent 拿到的结果 | 按 §6.3：标题行、每项的状态、只读标记与工具次数、空回复 `(no reply)`、超过 16000 字符截断并注明、失败与停止的原因；全部失败时 `isError`；`details` 与界面的行一致 | 单元、App |
-| SA-10 | 身份段 | 那一句按 §6.4 的表拼：只有 `subagent`、`agent_message` 加 `subagent`、`task_create` 加 `agent_message`（与 WP-11 的文字逐字相同）三种逐字；单个工具各一种；Task mode 的运行里没有 subagent 那一项；默认工具下仍 ≤ 500 token，普通模式实际的身份段 token 数写进检查记录 | 单元、App |
+| SA-10 | 身份段 | 那一句按 §6.4 的表拼：只有 `subagent`、`agent_message` 加 `subagent`、`task_create` 加 `agent_message`（与 WP-11 的文字逐字相同）三种逐字；单个工具各一种；Task mode 的运行里没有 subagent 那一项；默认工具下的普通模式（启用 `subagent`）身份段 ≤ 500 token | 单元、App |
 | SA-11 | 工具卡 | 状态表 subagent-card.md 的每一行：标题的三种写法与单复数、状态文字（`Preparing…`、`Queued`、`<d> of <n> done`、`Done · 1 failed · …`、`Failed`、`Failed · <原因>`、`Stopped`、`Interrupted`）、每一行的状态（`Starting`、`Waiting for …`、`Waiting for your approval`、工具标题、`Done`、`Failed · …`、`Stopped`）、` · Read-only`、`<k> tool uses` 的单复数、点一行看到 `Agent prompt` 与 `Response`；执行中展开、结束时收起一次；没有 `Input`、`Output`；阶段行 `Running <n> agents <秒数>`；一轮结束后在 `<n> steps` 里 | App、回放 |
 | SA-12 | 批准 | “每次询问”下通用 subagent 跑命令时用户会话那一栏出批准卡，卡头 `<Role> · <description>`、`data-subagent`，那一行显示 `Waiting for your approval`、侧栏显示等你批准；Alt+1 允许后它继续；拒绝的理由成为它的工具结果；在卡上选本会话不再询问后其他 subagent 之后的同名工具不再问；“Allow all” 下不出卡；只读 subagent 从不出卡；停止回复时挂起的卡按停止拒绝；重新载入后卡还在 | App、真实 |
 | SA-13 | 停止 | 停止回复时全部 subagent 停止，行与卡片为 `Stopped`，之后端点没有它们的请求；输入框旁从不出现 `Stop agents`；一个 subagent 出错只影响它那一行 | App |

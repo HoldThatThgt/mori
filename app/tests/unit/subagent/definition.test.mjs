@@ -70,7 +70,10 @@ test('SA-02 the description, the <tools> line and the guideline are §6.1 word f
   const sentence = /有别的角色时末尾加一句：`([^`]+)`/.exec(SPEC)?.[1];
   assert.equal(S.subagentToolDescription(WITH_ROLES.roles), `${specText('6.1', 0)}\n${sentence}`);
   assert.equal(`subagent: ${S.SUBAGENT_SNIPPET}`, specInline('`<tools>` 里的一行'));
-  assert.equal(S.SUBAGENT_GUIDELINE, specInline('准则'));
+  const def = S.subagentTool({ roles: BASE.roles });
+  assert.equal(def.promptGuidelines, undefined, 'no guideline: its words are in the description (§6.1, §6.4)');
+  assert.equal(def.promptSnippet, S.SUBAGENT_SNIPPET);
+  assert.equal(def.description, specText('6.1', 0));
 });
 
 test('SA-02 every §3.2 form normalizes to the same arguments; unknown keys such as subagent_type are dropped', () => {

@@ -143,3 +143,4 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 行里失败原因的显示长度 | 80 字符，悬停看全文 | `app/src/renderer/src/components/SubagentCard.tsx` | 一行放得下 | 你走查时 |
 | 卡片的展开 | 执行中展开，结束时收起一次 | `app/src/renderer/src/components/SubagentCard.tsx` | 执行中看得到每个 subagent 在做什么；结束后只占一行（走查 M18 要的“结束后折起来”） | 你走查时 |
 | 界面文字 | 规格 §7、[subagent-card.md](screens/subagent-card.md) | `app/src/shared/subagent.ts`、`app/src/renderer/src/` | 照 Claude 桌面版的用词 | 你走查时 |
+| 原来的准则（什么时候用、每个 prompt 要能单独看懂）放在哪里 | 并进工具的说明第三行，不写 `promptGuidelines`（规格 §6.1、§6.4） | `app/src/kernel/subagent.ts`（`SUBAGENT_DESCRIPTION`） | 说明在工具定义里，不算身份段；这样默认工具下的普通模式身份段正好 500 token，守住记忆规格的上限（MEM-01）；Claude Code 也把这类指引写在工具说明里。另外两种：保留准则（普通模式 549 token，超过上限）；缩短准则（522 token，仍超过） | 负责人回答之后（问题已经交给负责人，2026-10-26） |

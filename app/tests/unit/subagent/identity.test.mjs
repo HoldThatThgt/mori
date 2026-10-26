@@ -11,8 +11,8 @@ const K = await loadTextKernel();
 const S = await loadKernelModule('src/kernel/subagent.ts');
 const A1 = specBlock('### A.1');
 const CWD = 'D:\\shop';
-/** subagent 工具在 <tools> 与 <rules> 里的一行与准则（§6.1） */
-const SUBAGENT = { name: 'subagent', promptSnippet: S.SUBAGENT_SNIPPET, promptGuidelines: [S.SUBAGENT_GUIDELINE] };
+/** subagent 工具的定义（§6.1）：<tools> 里的一行；没有准则 */
+const SUBAGENT = S.subagentTool({ roles: [] });
 
 /** @brief 一种输入：pi 的实际形状，这次启用 selectedTools。 */
 function inputOf(selectedTools) {
@@ -42,12 +42,17 @@ test('SA-10 the sentence lists only the handoff tools of this run, in §6.4 orde
   assert.equal(handoffOf(DEFAULT_TOOLS), null, 'none of them: no sentence');
 });
 
-test('SA-10 the default tools stay within 500 tokens; the normal-mode identity size is measured', () => {
+test('SA-10 normal mode (default tools with subagent on) keeps the identity section within 500 tokens; the '
+  + 'guidance is in the tool description, not a guideline', () => {
   const plain = K.shared.estimateMemoryTokens(K.text.renderIdentity(inputOf(DEFAULT_TOOLS)));
-  assert.ok(plain <= 500, `default tools: ${plain} tokens`);
   const normal = K.shared.estimateMemoryTokens(K.text.renderIdentity(inputOf([...DEFAULT_TOOLS, 'subagent'])));
-  const roles = K.shared.estimateMemoryTokens(K.text.renderIdentity(inputOf([...DEFAULT_TOOLS, 'agent_message',
-    'subagent'])));
-  console.log(`[sa-unit] identity tokens: default ${plain}, normal mode ${normal}, normal mode with roles ${roles}`);
+  console.log(`[sa-unit] identity tokens: default ${plain}, normal mode ${normal}`);
+  assert.ok(plain <= 500, `default tools: ${plain} tokens`);
+  assert.ok(normal <= 500, `normal mode with subagent: ${normal} tokens`);
   assert.ok(normal > plain, 'the normal-mode identity lists subagent');
+  assert.equal(SUBAGENT.promptGuidelines, undefined, 'no guideline in <rules>');
+  for (const words of ['when the user asks for subagents or parallel agents', 'to split work into independent parts',
+    'write each prompt so it stands alone']) {
+    assert.ok(SUBAGENT.description.includes(words), `the description carries "${words}"`);
+  }
 });

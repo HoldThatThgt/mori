@@ -27,7 +27,8 @@ import { stubFolder } from './m3-helpers.mjs';
 import { openToolsSection } from './m6-helpers.mjs';
 import { TOOL_REASONS, toolRows } from './m6-tools-helpers.mjs';
 import {
-  appLogLines, bridge, brief, clickTeamSwitch, closeTbApp, contentText, instanceFiles, messagesOf, missingSteps,
+  appLogLines, bridge, brief, clickTeamSwitch, closeTbApp, contentText, expectedHandoff, instanceFiles, messagesOf,
+  missingSteps,
   newSession, openProject, paneSel, poll, readJsonl, reopenSession, restartTbApp, scenarioRequests, seedTeamUserData,
   sendMessage, shot, showTab, sleep, startTbApp, startTbEndpoint, stopTbEndpoint, tbModel, tbProvider, tbRecorder,
   teamSwitch, tempProject, tempUserData, userSession, waitTeamIdle, writeRole, writeRoles,
@@ -67,14 +68,23 @@ const IDENTITY_TEXT = [
     + 'the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> '
     + 'what is true about the user and this project. Follow them unless the user says otherwise.',
 ].join('\n');
-/** 附录 A.1.1（HANDOFF_TEXT，2026-10-26）：这次运行有交出去的工具时接在 A.1 第三行末尾，中间一个空格（§4.1） */
-const HANDOFF_TEXT = 'Tasks you create and questions you send to other agents are worked on by agents that don\'t see '
-  + '<facts>: write the facts they need into the task description or the question.';
-/** 有它们之一时身份段带 A.1.1（§4.1） */
+/** 有它们之一时身份段带附录 A.1.1 那一句（§4.1；那一句按有的工具拼，tb-helpers expectedHandoff） */
 const HANDOFF_TOOLS = ['task_create', 'agent_message', 'subagent'];
-/** 身份段的开头两种（§4.1：IDENTITY_TEXT［加 A.1.1］之后空一行是 <tools>） */
-const HEAD = `${IDENTITY_TEXT}\n\n<tools>\n`;
-const HANDOFF_HEAD = `${IDENTITY_TEXT} ${HANDOFF_TEXT}\n\n<tools>\n`;
+/** 身份段里 <tools> 的开头（§4.1：IDENTITY_TEXT［加 A.1.1］之后空一行是 <tools>） */
+const TOOLS_OPEN = '\n\n<tools>\n';
+
+/**
+ * @brief 身份段的开头：IDENTITY_TEXT，没有交出去的活那一句时直接空一行 <tools>，有时中间一个空格加那一句。
+ * @return { handoff（那一句；没有时为 null）, length（到 <tools> 的内容开始的长度） }；不是这样开头时为 null
+ */
+function identityHead(text) {
+  if (typeof text !== 'string' || !text.startsWith(IDENTITY_TEXT)) return null;
+  const at = text.indexOf(TOOLS_OPEN, IDENTITY_TEXT.length);
+  if (at < 0) return null;
+  const between = text.slice(IDENTITY_TEXT.length, at);
+  if (between !== '' && (!between.startsWith(' ') || between.includes('\n'))) return null;
+  return { handoff: between === '' ? null : between.slice(1), length: at + TOOLS_OPEN.length };
+}
 const TOOLS_TO_RULES = '\n</tools>\n\n<rules>\n';
 const RULES_END = '\n</rules>';
 /** pi 自己的身份句与文档指引（§4.1：不出现） */
@@ -299,7 +309,7 @@ function splitSections(rest) {
  */
 function parsePrompt(system) {
   if (typeof system !== 'string') return null;
-  const head = [HEAD, HANDOFF_HEAD].find((each) => system.startsWith(each));
+  const head = identityHead(system);
   if (!head) return null;
   const toolsEnd = system.indexOf(TOOLS_TO_RULES, head.length);
   if (toolsEnd < 0) return null;
@@ -309,7 +319,8 @@ function parsePrompt(system) {
   const identity = system.slice(0, rulesEnd + RULES_END.length);
   const sections = splitSections(system.slice(identity.length));
   if (!sections) return null;
-  return { identity, handoff: head === HANDOFF_HEAD, tools: system.slice(head.length, toolsEnd),
+  return { identity, handoff: head.handoff !== null, handoffText: head.handoff,
+    tools: system.slice(head.length, toolsEnd),
     rules: system.slice(rulesStart, rulesEnd).split('\n'), sections };
 }
 
@@ -357,9 +368,9 @@ function identityProblems(item) {
     || parsed.sections.some((section) => section.name === 'docs' || section.name === 'tools')) {
     bad.push('pi identity sentence or docs present');
   }
-  const handoff = item.tools.some((name) => HANDOFF_TOOLS.includes(name));
-  if (parsed.handoff !== handoff) bad.push(`appendix A.1.1 ${parsed.handoff ? 'present' : 'missing'} with tools `
-    + item.tools.join(','));
+  const sentence = expectedHandoff(item.tools);
+  if (parsed.handoffText !== sentence) bad.push(`appendix A.1.1 ${JSON.stringify(parsed.handoffText)} with tools `
+    + `${item.tools.join(',')} (expected ${JSON.stringify(sentence)})`);
   return bad;
 }
 
@@ -748,7 +759,7 @@ function splitInstances(ctx, who) {
     const want = seat ? expectedSections(seat, layers) : null;
     return { id: file.id.slice(who.sessionId.length + 1), kind: meta?.kind, seat,
       ok: Boolean(seat && got && same(got.memory, want)
-        && [HEAD, HANDOFF_HEAD].some((head) => got.preamble?.startsWith(head))),
+        && identityHead(got.preamble) !== null),
       got: got?.memory.map((s) => s.name) };
   });
   const kinds = new Set(view.map((item) => item.kind));
