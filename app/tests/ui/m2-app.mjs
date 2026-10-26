@@ -22,6 +22,8 @@
 // 审查修正（同日）：窗口藏着时后台进程意外退出，Mori 不退出、托盘图标还在，回到窗口后看到横幅和"Restart"。
 // 状态表各行的用例（同日，WP-20 记录"状态表各行的用例"）：关窗口前已经在等的批准卡回来后还在、Alt+1 照常批准
 // （closeKeepsCard）；两个会话都在生成时托盘"Exit"的确认框说明是复数（quitTwoSessions）。
+// U10 的两个异常分支（同日，docs/v0/defaults.md）：写不进标记文件时每次关窗口都弹气泡（noticeUnwritable）；确认框弹不出来时
+// "Exit"什么都不做（exitNoDialog）。主进程的错误日志从它的标准错误读。
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -34,8 +36,10 @@ import {
 } from './m2-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 import {
-  clickTrayIcon, clickTrayItem, closeWindow, findTray, messageBoxes, offScreen, onScreen, quitDetail, recordBalloons,
-  stubMessageBox, waitMessageBoxes, waitWindow, windowState,
+  ASK_ERROR, balloonCalls, clickTrayIcon, clickTrayItem, closeWindow, collectMainLog, failMarkerWrites,
+  failMessageBoxOnce, findTray, isNotice, MARKER_ERROR, markerAttempts, messageBoxes, NOTICE_MARKER, NOTICE_TITLE,
+  offScreen, onScreen, quitDetail, recordBalloons, restoreMarkerWrites, restoreMessageBox, stubMessageBox, waitLogCount,
+  waitMessageBoxes, waitWindow, windowState,
 } from './tray-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -1547,6 +1551,74 @@ async function closeKeepsCard({ app, page, h }) {
   }
 }
 
+/**
+ * @brief 写不进标记文件时（U10，docs/v0/defaults.md"写不进第一次关窗口的标记文件"）：主进程写 tray-notice-shown 的
+ *        writeFileSync 换成抛出 EPERM 的版本（synthetic，别的文件照常写）；这次运行的第一次、第二次关窗口都弹同样的气泡，
+ *        每次记一条错误日志，标记文件没有写下。要在这次运行第一次关窗口之前跑（steps 里排在 hiddenFlash 前面）。
+ */
+async function noticeUnwritable({ app, userData, log }) {
+  const marker = join(userData, NOTICE_MARKER);
+  const fresh = !existsSync(marker);
+  await recordBalloons(app);
+  const before = (await balloonCalls(app)).length;
+  const from = log.length;
+  await failMarkerWrites(app);
+  try {
+    for (const [index, which] of ['第一次', '第二次'].entries()) {
+      await closeWindow(app);
+      const hidden = await waitWindow(app, offScreen, 5000);
+      const balloons = (await balloonCalls(app)).slice(before);
+      const errors = await waitLogCount(log, from, MARKER_ERROR, index + 1);
+      const attempts = await markerAttempts(app);
+      record(`写不进标记文件时${which}关窗口（这次运行里）：窗口藏进托盘，照样弹气泡"${NOTICE_TITLE}"，记一条错误日志`
+        + '"cannot write …"，标记文件没有写下', (fresh || index > 0) && hidden.ok && balloons.length === index + 1
+        && balloons.every(isNotice) && attempts === index + 1 && errors === index + 1 && !existsSync(marker),
+      JSON.stringify({ fresh, hidden: hidden.state, balloons, attempts, errors }));
+      await findTray(app);
+      await clickTrayIcon(app);
+      await waitWindow(app, onScreen, 5000);
+    }
+  } finally {
+    await restoreMarkerWrites(app).catch((error) => console.error(`[m2-app] restore writeFileSync failed: ${error}`));
+    await app.evaluate(showMain).catch((error) => console.error(`[m2-app] show the window failed: ${error}`));
+  }
+}
+
+/**
+ * @brief 确认框弹不出来时（U10，docs/v0/defaults.md"退出前的确认框弹不出来"）：有会话在生成时点托盘"Exit"，这一次
+ *        dialog.showMessageBox 返回失败（synthetic）：Mori 记错误日志，什么都不做——不退出，窗口和托盘图标都在，回复照常生成。
+ */
+async function exitNoDialog({ app, page, h, log }) {
+  let exited = false;
+  const onExit = () => { exited = true; };
+  app.process().once('exit', onExit);
+  try {
+    await h.send('wait 8s');
+    await waitRunning(page);
+    // 界面数变了才经 mori:busy-sessions 告诉主进程，等它到
+    await sleep(500);
+    const from = log.length;
+    await failMessageBoxOnce(app);
+    await findTray(app);
+    await clickTrayItem(app, 'Exit');
+    const errors = await waitLogCount(log, from, ASK_ERROR, 1);
+    await sleep(1500);
+    const alive = !exited && app.process().exitCode === null;
+    const rejected = alive ? await restoreMessageBox(app) : null;
+    const tray = alive ? await findTray(app) : null;
+    const window = alive ? await windowState(app) : null;
+    const running = alive ? await paneOf(page).getAttribute('data-running') : null;
+    record('有会话在生成时点托盘"Exit"、确认框弹不出来：记一条错误日志"cannot ask before quitting"，什么都不做——Mori 不退出，'
+      + '窗口和托盘图标都在，回复照常生成', alive && rejected === 1 && errors === 1 && Boolean(tray?.tray)
+      && Boolean(tray.items?.includes('Exit')) && Boolean(window && onScreen(window)) && running === 'true',
+    JSON.stringify({ alive, rejected, errors, tray, window, running }));
+  } finally {
+    app.process().off('exit', onExit);
+    await restoreMessageBox(app).catch((error) => console.error(`[m2-app] restore showMessageBox failed: ${error}`));
+  }
+  await waitIdle(page, 30000);
+}
+
 /** @brief 等当前会话面板开始生成（data-running）。 */
 function waitRunning(page) {
   return page.waitForFunction((selector) => document.querySelector(selector)?.dataset.running === 'true', PANE,
@@ -1889,8 +1961,9 @@ const steps = {
   setup, readNoCard, editCard, editApprove, rejectReason, longReason, allowSession, permissionMenu, oneOverlay,
   newSessionAsks, allowAll, pendingToAll, escStop, escInCard, escMenuFirst, twoCommands, cardClosesOverlays,
   queuedTurnKeepsMenu, keyGuards, usageNotBlocking, buttonGoneFocus, writeCard, writeOutside, hiddenChars, followCard,
-  minWindow, minWindowMenu, taskbarFlash, hiddenFlash, hiddenKernelExit, closeKeepsCard, saveKeyAgain, f8Save,
-  f8EscWhileSaving, f8EscKeepsRunning, f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit, quitTwoSessions,
+  minWindow, minWindowMenu, taskbarFlash, noticeUnwritable, hiddenFlash, hiddenKernelExit, closeKeepsCard, saveKeyAgain,
+  f8Save, f8EscWhileSaving, f8EscKeepsRunning, f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit,
+  quitTwoSessions, exitNoDialog,
 };
 
 const fake = await startFakeEndpoint();
@@ -1900,7 +1973,8 @@ const app = await launch({ exePath, userData });
 const page = await app.firstWindow();
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(error.message));
-const ctx = { app, page, h: pageHelpers(page), project, userData, issue: null, request: null };
+const log = collectMainLog(app);
+const ctx = { app, page, h: pageHelpers(page), project, userData, log, issue: null, request: null };
 try {
   for (const [name, step] of Object.entries(steps)) {
     if (only && name !== 'setup' && !only.includes(name)) continue;

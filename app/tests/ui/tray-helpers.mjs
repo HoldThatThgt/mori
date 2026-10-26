@@ -5,6 +5,8 @@
 // src/ 里没有给测试用的入口。下面带 electron 模块参数的函数经 app.evaluate 序列化到主进程里运行，只能用参数和全局对象。
 // 2026-10-26（WP-20 状态表各行的用例）：悬停说明与右键菜单经 tray-hook.cjs（开发构建启动时 -r 载入）记下的调用读出；
 // 确认框可以先不回答（holdMessageBox，测"确认框开着时又点 Exit"）；主窗口的状态多了位置和大小，focus 的调用可以数。
+// 2026-10-26（U10，两个异常分支的临时默认值）：写标记文件可以让它失败（failMarkerWrites），确认框可以让它下一次弹不出来
+// （failMessageBoxOnce），都是测试里换掉主进程的函数（synthetic）；主进程的错误日志从它的标准错误读（collectMainLog）。
 
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -18,6 +20,9 @@ export const TRAY_HOOK = resolve(import.meta.dirname, 'tray-hook.cjs');
 export const NOTICE_TITLE = 'Mori runs in the system tray';
 export const NOTICE_TEXT = 'Mori runs in the background even when you close the window. '
   + 'Click the Mori icon in the system tray to reopen the app, or right-click to quit.';
+/** @brief 记下的气泡是第一次关窗口的提示（info 图标、标题、正文都对）。 */
+export const isNotice = (balloon) => balloon?.iconType === 'info' && balloon.title === NOTICE_TITLE
+  && balloon.content === NOTICE_TEXT;
 /** 第一次关窗口的提示显示过之后写下的标记文件（在数据目录里） */
 export const NOTICE_MARKER = 'tray-notice-shown';
 /** 托盘菜单的项（分隔线写作"—"） */
@@ -229,6 +234,107 @@ export async function waitMessageBoxes(app, count, timeoutMs = 5000) {
     boxes = await messageBoxes(app);
   }
   return boxes;
+}
+
+/** 写不进标记文件时 Mori 记的错误日志（tray.ts noticeOnce 的 catch），带 g 用来数 */
+export const MARKER_ERROR = /\[main\] cannot write [^\r\n]*tray-notice-shown: /g;
+/** 确认框弹不出来时 Mori 记的错误日志（tray.ts confirmQuit 的 catch），带 g 用来数 */
+export const ASK_ERROR = /\[main\] cannot ask before quitting: /g;
+
+/** @brief 收集 Mori 主进程的标准错误（主进程的 console.error 写在这里），返回按到达顺序的分块。 */
+export function collectMainLog(app) {
+  const chunks = [];
+  app.process().stderr?.on('data', (chunk) => chunks.push(String(chunk)));
+  return chunks;
+}
+
+/** @brief 每 100 毫秒数一次 chunks 从第 from 块起 pattern（带 g）出现的次数，直到不少于 count 或超时；返回最后数到的。 */
+export async function waitLogCount(chunks, from, pattern, count, timeoutMs = 3000) {
+  const deadline = Date.now() + timeoutMs;
+  const counted = () => chunks.slice(from).join('').match(pattern)?.length ?? 0;
+  let seen = counted();
+  while (seen < count && Date.now() < deadline) {
+    await sleep(100);
+    seen = counted();
+  }
+  return seen;
+}
+
+/**
+ * @brief 主进程里（synthetic）：把 node:fs 的 writeFileSync 换成对文件名是 name 的路径抛出 EPERM（同 Node 写不进文件时的
+ *        错误）、其余照常写的版本，数这样的尝试；已经换过时不再换。Mori 的主进程打包成 CommonJS，经 require("node:fs")
+ *        的对象调用 writeFileSync，换掉这个对象上的方法就换到了它。
+ */
+function installMarkerFailure(_electron, name) {
+  if (globalThis.__moriMarkerFail) return;
+  const fs = process.getBuiltinModule('node:fs');
+  const { basename } = process.getBuiltinModule('node:path');
+  const state = { original: fs.writeFileSync, attempts: 0 };
+  globalThis.__moriMarkerFail = state;
+  fs.writeFileSync = function writeFileSync(file, ...rest) {
+    if (typeof file !== 'string' || basename(file) !== name) return state.original.call(this, file, ...rest);
+    state.attempts += 1;
+    throw Object.assign(new Error(`EPERM: operation not permitted, open '${file}'`),
+      { code: 'EPERM', syscall: 'open', path: file });
+  };
+}
+
+/** @brief 主进程里：换回原来的 writeFileSync，返回期间写标记文件的尝试次数（没有换过时为 0）。 */
+function removeMarkerFailure() {
+  const state = globalThis.__moriMarkerFail;
+  if (!state) return 0;
+  process.getBuiltinModule('node:fs').writeFileSync = state.original;
+  delete globalThis.__moriMarkerFail;
+  return state.attempts;
+}
+
+/** @brief 让 Mori 写不进标记文件 tray-notice-shown（别的文件照常写），直到 restoreMarkerWrites。 */
+export function failMarkerWrites(app) {
+  return app.evaluate(installMarkerFailure, NOTICE_MARKER);
+}
+
+/** @brief failMarkerWrites 之后 Mori 试着写标记文件的次数。 */
+export function markerAttempts(app) {
+  return app.evaluate(() => globalThis.__moriMarkerFail?.attempts ?? 0);
+}
+
+/** @brief 换回原来的 writeFileSync，返回期间写标记文件的尝试次数。 */
+export function restoreMarkerWrites(app) {
+  return app.evaluate(removeMarkerFailure);
+}
+
+/**
+ * @brief 主进程里（synthetic）：下一次 dialog.showMessageBox 返回失败的 Promise（同确认框弹不出来），同时换回原来的版本
+ *        （之前 stubMessageBox 换过的就是那个），数失败的次数；已经换过时不再换。
+ */
+function installBoxFailure({ dialog }) {
+  if (globalThis.__moriBoxFail) return;
+  const state = { original: dialog.showMessageBox, rejected: 0 };
+  globalThis.__moriBoxFail = state;
+  dialog.showMessageBox = () => {
+    dialog.showMessageBox = state.original;
+    state.rejected += 1;
+    return Promise.reject(new Error('synthetic: the message box could not be shown'));
+  };
+}
+
+/** @brief 主进程里：换回原来的 dialog.showMessageBox，返回失败的次数（没有换过时为 0）。 */
+function removeBoxFailure({ dialog }) {
+  const state = globalThis.__moriBoxFail;
+  if (!state) return 0;
+  dialog.showMessageBox = state.original;
+  delete globalThis.__moriBoxFail;
+  return state.rejected;
+}
+
+/** @brief 让下一次确认框弹不出来（dialog.showMessageBox 返回失败），之后的照常。 */
+export function failMessageBoxOnce(app) {
+  return app.evaluate(installBoxFailure);
+}
+
+/** @brief 换回原来的 dialog.showMessageBox，返回 failMessageBoxOnce 之后确认框弹不出来的次数。 */
+export function restoreMessageBox(app) {
+  return app.evaluate(removeBoxFailure);
 }
 
 /** @brief 主进程里：主窗口（加载 Mori 页面的那个）的状态；没有时为 null。 */
