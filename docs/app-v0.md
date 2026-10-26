@@ -72,6 +72,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 外壳选 **Electron 44.9**（自带 Node 24.22，满足 pi 要求的 ≥22.19）+ electron-vite + electron-builder NSIS，不签名。
 前端用 **React 19 + TypeScript + zustand**；Markdown 用 streamdown，代码高亮用 shiki，diff 用 @pierre/diffs，
 长列表用 virtua。这些依赖都要在 M0 确认能离线打包，不能运行时从 CDN 拉取。
+（2026-10-26 走查 M16 加：mermaid 图用 **mermaid 11.17.2**（锁精确版本），第一次遇到图时才载入（单独的代码块，打包在程序里，
+不联网），经 streamdown 的自定义渲染接口接上，见 [v0/screens/chat.md](v0/screens/chat.md)"图"。）
 
 ## 4. 谁负责什么
 
@@ -117,6 +119,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **三栏**沿用 demo 的视觉和 `resize.js`。CSS 抽成约 30 个 token，字号同时重排：
   正文和输入框 13–14px，辅助文字（时间、来源、徽标）不小于 12px，demo 中 8–11px 的一律上调。
 - **调宽**：分隔线可拖动，方向键每次 20px，双击恢复默认，宽度重启后保留。左栏可收起为图标栏。
+  （2026-10-26 走查 M23：右栏没有上限，拖到中栏只剩 300px 为止；右栏顶部照 Claude 加"Expand" / "Collapse"，展开时中栏藏起、右栏占满，
+  见 [v0/screens/layout.md](v0/screens/layout.md)。）
 - **窄窗口**：窄于 1024px 时左栏自动收起，窄于 800px 时右栏浮在上层；最小窗口 800×600。
 - **左栏**：
   - "New session"作主按钮（Ctrl+N），"Open folder…"。
@@ -243,6 +247,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - 列出本会话编辑或写入过的文件，点开按时间顺序显示每次编辑的 diff；写入显示新内容。
   列表顶部注明："Only edits and writes are listed. Files changed by commands aren’t included."
 - 点工具卡或改动列表里的文件路径，打开只读阅读器；也可以用系统默认编辑器打开（"Open in default app"）。
+  （2026-10-26 走查 M24、M25：Markdown 文件默认显示渲染后的预览，可切到源码（"View source" / "Preview"）；点阅读器顶部的路径复制完整路径，
+  见 [v0/screens/changes.md](v0/screens/changes.md)。）
 - 没有改动时默认收起；手动打开时显示"No changes yet."。
 - 文件已不存在时显示"File not found"；二进制或超过 1MB 的文件显示"Preview unavailable"。
 - 分屏时右栏跟随焦点所在的一侧。
