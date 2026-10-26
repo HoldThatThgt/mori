@@ -6,8 +6,8 @@
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs tasks）：
 //   MORI_APP_DIR=.tb-runs/tasks node tests/ui/tb-app-tasks.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 步骤：plain、empty、entries、list、taskview、transcript、folding、tabs、keys、stop、readonly、reload、narrow、approval、
-// outcomes、noactivity、menu、errors、restart（entries 到 narrow 共用一个会话，按这个顺序；folding 要 WP-14 的步骤组、
-// menu 与 readonly 的最后一项要 WP-09 的模型菜单，合并之前失败；errors 让后台进程退出，restart 最后跑，重启 App）。
+// outcomes、noactivity、menu、errors、restart（entries 到 narrow 共用一个会话，按这个顺序；folding 要 WP-14 的步骤组，
+// 合并之前失败；errors 让后台进程退出，检查完重启 App；restart 最后跑，也重启 App）。
 // 每一步覆盖 docs/v1/screens/team-tasks.md 状态表的哪几行，见 docs/v1/team-checks.md“状态表的每一行与用例”。
 // 结果写到 test-results/tb-app-tasks(-packaged).json（--only 时 tb-partial-app-tasks…），截图在 test-results/tb-app-tasks/。
 // 端口（§17.3：tb-app-tasks*.mjs 用 4950–4959）：合成端点 4950，记录代理 4951。
@@ -173,7 +173,7 @@ async function plain(ctx) {
     .catch(() => null);
   const tabs = await bgTabs(ctx);
   const button = await tasksButton(ctx, who.tab);
-  record('TB-80 a session with no request and team mode off: the right panel is as before ("This session’s changes", '
+  record('TB-80 a session with no request and task mode off: the right panel is as before ("This session’s changes", '
     + 'no tabs) and the stage line has no tasks button',
   header?.includes('This session’s changes') && tabs.length === 0 && button === null, brief({ header, tabs, button }));
   record('TB-87 the right panel of a session without a TaskBoard keeps the v0 header', header !== null, brief(header));
@@ -181,7 +181,7 @@ async function plain(ctx) {
   await ctx.page.locator('[data-testid="model-menu"]').waitFor({ timeout: 5000 });
   const item = await ctx.page.locator('[data-testid="model-menu"] [data-action="see-background-tasks"]').count();
   await ctx.page.keyboard.press('Escape');
-  record('TB-80 the model menu of a session with no request and team mode off has no "See background tasks"',
+  record('TB-80 the model menu of a session with no request and task mode off has no "See background tasks"',
     item === 0, brief(item));
 }
 
@@ -189,7 +189,7 @@ async function plain(ctx) {
 async function empty(ctx) {
   const tab = await openSessionIn(ctx, ctx.split2);
   const who = { tab, ...(await userSession(ctx, tab)) };
-  // 经进程桥打开协作模式（开关的位置由 WP-09 改到模型菜单，这里不点界面上的开关）
+  // 经进程桥打开协作模式（不点模型菜单里的 Task mode 一行：这一步只看右栏）
   await bridge(ctx, { type: 'session.setTeam', sessionId: who.sessionId, mode: 'on' });
   await ctx.page.locator(`${paneSel(tab)} button[aria-label="Toggle changes"]`).click();
   const tabs = await poll(async () => {
@@ -199,7 +199,7 @@ async function empty(ctx) {
   await clickTab(ctx, 'tasks');
   const text = await ctx.page.locator('[data-testid="bg-tasks"]').textContent({ timeout: 5000 }).catch(() => null);
   const button = await tasksButton(ctx, tab);
-  record('TB-80 team mode on with no request: the right panel has the tabs Changes and Background tasks '
+  record('TB-80 task mode on with no request: the right panel has the tabs Changes and Background tasks '
     + '(role tab, aria-selected), and the stage line has no tasks button (no task yet)',
   same(tabs.map((item) => [item.tab, item.text, item.role]), [['changes', 'Changes', 'tab'],
     ['tasks', 'Background tasks', 'tab']]) && button === null, brief({ tabs, button }));
@@ -258,7 +258,7 @@ async function progressLinks(ctx, who) {
   iconLabel === 'Open Request 1 in Background tasks' && flashed > 0 && expanded === rows?.expanded,
   brief({ iconLabel, flashed, expanded, before: rows?.expanded }));
   const report = await issueReport(ctx, who.tab, 'Background tasks entries');
-  const since = actionsAfter(report.actions, 'Send (team): Fix the login page');
+  const since = actionsAfter(report.actions, 'Send (task mode): Fix the login page');
   const wanted = ['Open background tasks', 'Open T3 in Background tasks'];
   record('TB-80 F8 records "Open background tasks" and "Open T3 in Background tasks"',
     wanted.every((line) => since.some((item) => item.includes(line))), brief(since));
@@ -505,7 +505,7 @@ async function stop(ctx) {
   const row = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="progress-task"][data-task="T3"]`)
     .textContent().catch(() => '');
   const stopAll = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="stop-team"]`).count();
-  record('TB-89 after the stop the progress summary row of T3 reads "Stopped" and Stop team still shows (T4 still '
+  record('TB-89 after the stop the progress summary row of T3 reads "Stopped" and Stop agents still shows (T4 still '
     + 'waits for the lock)', row.includes('Stopped') && stopAll === 1, brief({ row, stopAll }));
   const board = readBoard(ctx, who.sessionId);
   const t3 = taskOf(board, 'T3');
@@ -600,13 +600,13 @@ async function readonly(ctx) {
     brief({ bad: bad?.error, none: none?.error }));
   await bridge(ctx, { type: 'session.setTeam', sessionId: who.sessionId, mode: 'off' });
   const off = { tabs: await bgTabs(ctx), cards: await bgCards(ctx) };
-  record('TB-84 after team mode is turned off the tabs, the list and the views stay', off.tabs.length === 2
+  record('TB-84 after task mode is turned off the tabs, the list and the views stay', off.tabs.length === 2
     && off.cards.length === 4, brief(off));
-  // WP-09 之后：模型菜单里那一项的条件同页签，关掉之后仍在（之前协作模式的那一段还不在模型菜单里，这一项失败）
+  // 模型菜单里那一项的条件同页签，协作模式关掉之后仍在
   await ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-button"]`).click({ timeout: 5000 }).catch(() => {});
   const item = await menuItem(ctx);
   await ctx.page.keyboard.press('Escape');
-  record('TB-84 after team mode is turned off the model menu still has "See background tasks"',
+  record('TB-84 after task mode is turned off the model menu still has "See background tasks"',
     item?.text === 'See background tasks', brief(item));
 }
 
@@ -855,7 +855,7 @@ async function tabs(ctx) {
   await clickBack(ctx);
 }
 
-// ---------- TB-80 模型菜单（WP-09 之后） ----------
+// ---------- TB-80 模型菜单 ----------
 
 /** @brief 模型菜单里 See background tasks 那一项：{ text, role, last（是 Task mode 那一段的最后一项） }；没有时为 null。 */
 function menuItem(ctx) {
@@ -867,7 +867,7 @@ function menuItem(ctx) {
 }
 
 /**
- * @brief 模型菜单 Task mode 那一段的最后一项 See background tasks（WP-09 把协作模式移进模型菜单之后）：回复进行中也能用，
+ * @brief 模型菜单 Task mode 那一段的最后一项 See background tasks（WP-09 起协作模式在模型菜单里）：回复进行中也能用，
  *        点它关上菜单、打开右栏到 Background tasks（TB-80）。
  */
 async function menu(ctx) {
@@ -876,7 +876,7 @@ async function menu(ctx) {
   const who = await begin(ctx, project, `Look at the menu ${tag('menu')}`);
   await waitBoard(ctx, who, (board) => board.tasks.length === 1, 'T1');
   const replying = await poll(async () => (await paneState(ctx.page, who.tab))?.running === true, 10000, 100);
-  // WP-09 之前协作模式下模型按钮是锁定的、点不开：这一项记为失败（下面的 record），不在这里抛出
+  // 点不开或没有这一项时记为失败（下面的 record），不在这里抛出
   await ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-button"]`).click({ timeout: 5000 }).catch(() => {});
   const item = await menuItem(ctx);
   if (item) await ctx.page.locator('[data-testid="model-menu"] [data-action="see-background-tasks"]').click();
@@ -889,7 +889,7 @@ async function menu(ctx) {
     && menuGone && tabs.find((tab) => tab.tab === 'tasks')?.selected === 'true',
   brief({ item, replying, still, menuGone, tabs }));
   const report = await issueReport(ctx, who.tab, 'See background tasks');
-  const since = actionsAfter(report.actions, 'Send (team): Look at the menu');
+  const since = actionsAfter(report.actions, 'Send (task mode): Look at the menu');
   record('TB-80 F8 records "Open background tasks" for the model menu item',
     since.some((line) => line.includes('Open background tasks')), brief(since));
 }

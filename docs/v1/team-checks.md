@@ -159,7 +159,7 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
 
 - 后台进程（ad3e55d）：`board.readTask`、`board.readSession`、`session.stopTask`；`TaskView` 加 `createdAt`、`closedAt`、`dependsOn`、
   `sessionRoles`，`RequestView` 加 `closeSession`；`read_session` 与 `board.readSession` 共用一个读法（开着取内存里的分支，
-  没开着用 pi 的纯读取路径读文件）；停止一个 task 是 Stop team 只作用于这个 task（清它的投递队列、等它的以
+  没开着用 pi 的纯读取路径读文件）；停止一个 task 是 Stop agents（2026-10-26 前叫 Stop team）只作用于这个 task（清它的投递队列、等它的以
   `Stopped by the user.` 结束、`stopped` 且持有者保留、写入锁照旧）。
 - 界面（748d9f3 与之后一次提交）：右栏的 `Changes` / `Background tasks` 页签、`Running` / `Finished` 列表、task 的视图、只读的
   实例会话与结案会话（复用对话流的 `ItemView`）、阶段行的 `{n} running tasks` 按钮、进展摘要的两种链接、`Stop this task`、
@@ -176,6 +176,11 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
   阶段行按钮回到上次那一层，改成三层都算）；`errors` 让后台进程退出后没有重启 App，`restart` 打不开项目（改成检查完重启）；
   `reload` 单独跑时 T4 还在变（改成一秒内两次读到相同再记下）；`entries`、`menu` 的 F8 检查会被前面步骤记下的同名操作满足
   （Recent activity 记整个 App 最近 30 个操作；改成只看这一步发出消息之后的）。
+- 合进 `app-v0` 的 WP-09 之后（90ed309；冲突在 `team.ts`、`ChatPane.tsx`、`actionLog.ts`、`tb-replay.mjs`、规格与
+  `screens/README.md`，两边都留：WP-09 的改名与这里的 §13.13、TB-80–TB-89）：模型菜单 Task mode 那一段的最后一项
+  `See background tasks`（`ModelMenu.tsx`，条件同页签，点了关上菜单、经 `openTasks` 打开右栏，回复进行中也能用）；
+  照 WP-09 的界面文字把用例名、规格与记录里的 `Stop team` 改为 `Stop agents`、team mode 改为 task mode，F8 的
+  `Send (team): …` 改为 `Send (task mode): …`。
 
 ### 测试（AGENTS.md 测试分层，每次改动的那几层）
 
@@ -184,17 +189,16 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
 | `npm run check` | 通过 |
 | 构建 | `node tests/ui/tb-build.mjs tasks` 通过 |
 | `npm run test:unit` | 461/461（含 `spec-ids`：TB-80–TB-89 列出的每一层都有测试；MP-38：新加的行里没有推迟实现的标记） |
-| `npm run test:tb-unit` | 357/357（新：`tasks.test.mjs` 14 项、`taskList.test.mjs` 9 项） |
-| `tb-app-tasks.mjs --only` | plain、empty、entries、list、taskview、transcript、tabs、keys、stop、readonly、reload、narrow、approval、outcomes、noactivity、errors、restart 每一步最近一次都通过（2026-10-26 为状态表的每一行补了 tabs、narrow、outcomes、noactivity 四步与各步里的检查，见下面的表）；folding、menu 与 readonly 最后一项等 WP-14、WP-09（下面）（分几次跑，端口 4950–4951；结果是 `tb-partial-app-tasks.json`，不计入覆盖检查） |
+| `npm run test:tb-unit` | 359/359（WP-09 之后；新：`tasks.test.mjs` 14 项、`taskList.test.mjs` 9 项） |
+| `tb-app-tasks.mjs --only` | plain、empty、entries、list、taskview、transcript、tabs、keys、stop、readonly、reload、narrow、approval、outcomes、noactivity、errors、restart 每一步最近一次都通过（2026-10-26 为状态表的每一行补了 tabs、narrow、outcomes、noactivity 四步与各步里的检查，见下面的表）；WP-09 之后 `--only plain,empty,entries,stop,readonly,menu` 全部通过（含 menu 与 readonly 最后一项）；folding 等 WP-14（下面）（分几次跑，端口 4950–4951；结果是 `tb-partial-app-tasks.json`，不计入覆盖检查） |
 | 整套 `tb-app-tasks.mjs`（a37dbbf 之后跑一次） | 75 项通过、6 项失败：等 WP-14 的 `folding` 两项、等 WP-09 的 `menu` 一项与 `readonly` 最后一项，另外两项是用例的问题（`narrow`、`restart`，上面“实现”最后一条），改了之后 `--only reload,narrow,errors,restart` 与 `--only entries,menu` 跑过：除了等 WP-09 的 `menu` 两项都通过 |
 | `tb-app-tasks-owner.mjs`（TB-88） | 通过：`Finished` 里 T6–T1 全是 Done、没有 `Running`；T2 3 条、T5 1 条、T6 2 条消息全文（T6 两条含表格）；T1–T6 与结案会话都能打开，T4（约 1 MB）的会话 261 ms 显示完；没有发模型请求。只复制那条会话的文件与 `teams/<id>`，没有读 `credentials.json`、`pi/auth.json` |
-| `npm run test:quick` | a37dbbf 之后通过：4/4，87 秒（m0-smoke 31、tb-replay 14、mem-replay 17、m1-replay 16 项） |
+| `npm run test:quick` | a37dbbf 之后通过：4/4，87 秒（m0-smoke 31、tb-replay 14、mem-replay 17、m1-replay 16 项）；WP-09 之后通过：4/4，81 秒 |
 | 整套 `tb-app-tasks*.mjs`、`tb-replay`、TB-46 汇总、`spec-coverage --spec taskboard` | 负责人要求推送前的完整回归里跑（测试分层第 3 条）；两个 `tb-app-tasks*.mjs` 已加进 `npm run test:taskboard` |
 
 ### 等别的包的（包一合并就做）
 
-- WP-09（模型菜单里的 Task mode）：`See background tasks`（TB-80）。`tb-app-tasks.mjs` 的 `menu` 一步已写好（Task mode 那一段的
-  最后一项、回复进行中也能用、F8 记 `Open background tasks`），现在跑是失败：协作模式下模型按钮锁定、点不开（2026-10-26 跑过一次）。
+- WP-09（模型菜单里的 Task mode）：做完了（上面“实现”最后一条），`menu` 与 `readonly` 最后一项通过。
 - WP-14（一轮结束后折叠步骤）：实例会话里的步骤照对话流折叠（§13.13.4）。`folding` 一步已写好（做完的 T1 会话折成
   “<n> steps”（aria-expanded 为 false；▸ / ▾ 是 WP-14 用样式画的，不在文字里）、点开看到工具卡；运行中的 T3 那一组全部
   显示），现在跑前两项失败（还没有步骤组），第三项通过。
@@ -211,8 +215,8 @@ TB-88 的在 `tests/ui/tb-app-tasks-owner.mjs`（整套就是一步）；检查�
 
 | 屏 | 行 | 用例（套件与 --only 名、检查名） |
 | --- | --- | --- |
-| team-tasks 入口 | 会话没有需求、协作模式 `off` | `plain`：“TB-80 a session with no request and team mode off: the right panel is as before …”、“TB-80 the model menu of a session with no request and team mode off has no "See background tasks"” |
-| team-tasks 入口 | 有需求，或协作模式打开 | `empty`：“TB-80 team mode on with no request: the right panel has the tabs Changes and Background tasks …”；`tabs`：“TB-80 with the tabs, Changes shows the changes list without its own …”、“TB-80 the file viewer belongs to Changes …”、“TB-80 back on Background tasks the panel is where you left it …”；`keys`：“TB-86 the tabs are role="tab" with aria-selected inside a tablist …”；`menu`（WP-09 之后）：“TB-80 the model menu's Task mode part ends with "See background tasks" …” |
+| team-tasks 入口 | 会话没有需求、协作模式 `off` | `plain`：“TB-80 a session with no request and task mode off: the right panel is as before …”、“TB-80 the model menu of a session with no request and task mode off has no "See background tasks"” |
+| team-tasks 入口 | 有需求，或协作模式打开 | `empty`：“TB-80 task mode on with no request: the right panel has the tabs Changes and Background tasks …”；`tabs`：“TB-80 with the tabs, Changes shows the changes list without its own …”、“TB-80 the file viewer belongs to Changes …”、“TB-80 back on Background tasks the panel is where you left it …”；`keys`：“TB-86 the tabs are role="tab" with aria-selected inside a tablist …”；`menu`：“TB-80 the model menu's Task mode part ends with "See background tasks" …” |
 | team-tasks 入口 | TaskBoard 上有 task | `entries`：“TB-80 the stage-line button shows while the dialog is not replying …”、“TB-80 on the Changes tab the button is not pressed …”；`stop`：“TB-81 with every task ended the stage-line button reads "4 tasks finished"”；`keys`：“TB-86 the stage-line button's hover is Claude's …” |
 | team-tasks 入口 | 右栏开着且在 `Background tasks` | `entries`：“TB-80 clicking it opens the right panel at Background tasks; the button is pressed” |
 | team-tasks 入口 | 进展摘要（team-stream.md） | `entries`：“TB-80 a task row of the progress summary is a button …”、“TB-80 the title row has an icon button …”、“TB-80 F8 records "Open background tasks" …” |
@@ -249,18 +253,18 @@ TB-88 的在 `tests/ui/tb-app-tasks-owner.mjs`（整套就是一步）；检查�
 | team-tasks 实例的会话 | 读不出 | `errors`：“TB-83 a transcript that cannot be read shows "Failed to read session transcript", the error and Retry” |
 | team-tasks 停止一个 task | 可以停止 | `list`：“TB-81 the stoppable cards …”；`entries`：同 task 的视图的“可以停止” |
 | team-tasks 停止一个 task | 停止中 | `stop`：“TB-89 "Stop this task" in the task view (no confirmation): the button is disabled while stopping …” |
-| team-tasks 停止一个 task | 停下了 | `stop`：“TB-89 "Stop this task" … moves T3 to Finished as "Stopped" …”、“TB-89 after the stop the progress summary row of T3 reads "Stopped" and Stop team still shows …”；`approval`：“TB-89 stopping a task that waits for approval: its card is rejected and goes away …” |
+| team-tasks 停止一个 task | 停下了 | `stop`：“TB-89 "Stop this task" … moves T3 to Finished as "Stopped" …”、“TB-89 after the stop the progress summary row of T3 reads "Stopped" and Stop agents still shows …”；`approval`：“TB-89 stopping a task that waits for approval: its card is rejected and goes away …” |
 | team-tasks 停止一个 task | 停不了 | `errors`：“TB-89 a stop that fails shows "Couldn’t stop T1: <the error>" under the card”；`stop`：“TB-89 a task that cannot be stopped gives "T1 isn't running." …” |
 | team-tasks 停止一个 task | 写 task 停下后 | `stop`：“TB-89 the write lock stays with the stopped T3: T4 shows "Waiting to change files (T3, stopped)"” |
 | team-tasks 停止一个 task | 交回 | `stop`：“TB-89 handed back by your next message (task_edit), T3 returns to Running and continues the same instance session …” |
-| team-tasks 关闭、重新打开、重启、删除 | 协作模式关掉之后 | `readonly`：“TB-84 after team mode is turned off the tabs, the list and the views stay”、“TB-84 after team mode is turned off the model menu still has "See background tasks"”（WP-09 之后） |
+| team-tasks 关闭、重新打开、重启、删除 | 协作模式关掉之后 | `readonly`：“TB-84 after task mode is turned off the tabs, the list and the views stay”、“TB-84 after task mode is turned off the model menu still has "See background tasks"” |
 | team-tasks 关闭、重新打开、重启、删除 | 重新打开会话、界面重新载入 | `reload`：“TB-85 after reopening, the right panel opens at Changes …”、“TB-85 after Ctrl+R and reopening the session, the list is the same”、“TB-85 the task view and the transcript open the same after reloading” |
 | team-tasks 关闭、重新打开、重启、删除 | App 重启之后 | `restart`：“TB-85 after an App restart the running T1 is in Finished as "Stopped (Mori restarted)" …” |
 | team-tasks 关闭、重新打开、重启、删除 | 删除会话 | `restart`：“TB-85 deleting the session takes its Background tasks with it: the panel is gone and teams/<id> is deleted” |
 | team-stream 内容 | task 行与标题行通往 Background tasks（2026-10-26 的注） | `entries`：同 team-tasks 入口的“进展摘要” |
 
 “反例”一节的各条：只读与不投递是 `readonly` 的 “TB-84 after opening every task view and transcript …”；停止不影响别的 task 是 `stop`
-（T4 照常、Stop team 仍在）；只有 task 与结案两种会话是 `readonly` 的 “TB-84 board.readSession reports …”；没有需求时看不到是 `plain`。
+（T4 照常、Stop agents 仍在）；只有 task 与结案两种会话是 `readonly` 的 “TB-84 board.readSession reports …”；没有需求时看不到是 `plain`。
 
 ### 没有验证的
 

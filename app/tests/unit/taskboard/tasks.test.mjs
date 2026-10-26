@@ -237,7 +237,7 @@ test('TB-84 board.readSession reports a missing session, task or request in the 
   await assert.rejects(team.readSession({ kind: 'close', request: 9 }), { message: 'Request 9 does not exist.' });
 });
 
-test('TB-84 the read commands keep working after team mode is turned off', async () => {
+test('TB-84 the read commands keep working after task mode is turned off', async () => {
   const { team, host } = await setup(SPLIT, 'A');
   await team.setMode('on');
   addTask(team, { readOnly: true });

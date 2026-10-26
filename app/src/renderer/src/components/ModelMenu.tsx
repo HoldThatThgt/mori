@@ -3,7 +3,8 @@
 // 当前范围打勾；只作用于这个会话，新会话用设置里的默认范围。菜单的各项取自 session.pickOptions。
 // 菜单里还有 Task mode 一行（TeamSwitch.tsx，docs/v1/screens/team-switch.md；2026-10-26 负责人走查 M10、M21 从顶栏移来）：
 // 协作模式下按钮显示"Task mode · <模型 id>"，菜单只有说明、这一行和"Manage models"；回复进行中菜单也能打开，三节的项
-// 不可用，只能切 Task mode。开关、位置和焦点的行为在 rowMenu.ts；思考强度按钮（ThinkingMenu.tsx）、权限按钮（PermissionMenu.tsx）相同。
+// 不可用，只能切 Task mode。Task mode 那一段的最后一项是 "See background tasks"（平行 Agent 规格 §13.13.1，条件同右栏的页签），
+// 回复进行中也能用。开关、位置和焦点的行为在 rowMenu.ts；思考强度按钮（ThinkingMenu.tsx）、权限按钮（PermissionMenu.tsx）相同。
 
 import { useEffect, useId, useRef } from 'react';
 import type { PickOption } from '../../../shared/models';
@@ -11,8 +12,10 @@ import {
   clearPickError, loadPickOptions, setPick, usePendingSwitch, usePickError, usePickOptions, useRangeMenuRequest,
   type PendingSwitch,
 } from '../state/modelActions';
+import { openTasks } from '../state/backgroundTasks';
 import { openModelsSettings } from '../state/settings';
 import type { Tab } from '../state/store';
+import { tasksShown } from '../state/taskList';
 import { Icon } from '../icons';
 import { firstMenuItem, moveMenuFocus } from './menu';
 import { useRowMenu, useRowPlacement, type RowMenu } from './rowMenu';
@@ -191,6 +194,8 @@ interface PickPanelProps {
   onChoose: (pick: string) => void;
   /** 点了"Manage models" */
   onManage: () => void;
+  /** 点了"See background tasks" */
+  onSeeTasks: () => void;
 }
 
 /**
@@ -216,11 +221,12 @@ function noteOf(tab: Tab, busy: boolean): string {
 }
 
 /**
- * @brief 菜单：三节（pickLocked 时没有）、说明、Task mode 一行与切换失败的一行、"Manage models"。打开时焦点在当前范围上，
+ * @brief 菜单：三节（pickLocked 时没有）、说明、Task mode 一行与切换失败的一行、"See background tasks"（有需求或协作模式
+ *        打开时，§13.13.1）、"Manage models"。打开时焦点在当前范围上，
  *        没有可用的当前范围时在 Task mode 一行上。各部分的位置固定，范围的几节换成说明时 Task mode 一行还是同一个元素，
  *        焦点留在它上面。
  */
-function PickPanel({ menu, tab, options, busy, onChoose, onManage }: PickPanelProps) {
+function PickPanel({ menu, tab, options, busy, onChoose, onManage, onSeeTasks }: PickPanelProps) {
   useFocusCurrent(menu);
   useBusyRefocus(menu, busy);
   const locked = tab.pickLocked;
@@ -235,6 +241,8 @@ function PickPanel({ menu, tab, options, busy, onChoose, onManage }: PickPanelPr
       <div className="task-mode-group">
         <TeamSwitch tab={tab} />
         <TeamErrorNote tab={tab} />
+        {tasksShown(tab.board, tab.team.mode) && <button role="menuitem" data-action="see-background-tasks"
+          onClick={onSeeTasks}>See background tasks</button>}
       </div>
       <button role="menuitem" data-action="manage-models" onClick={onManage}>Manage models</button>
     </div>
@@ -344,6 +352,11 @@ export function ModelMenu({ tab, unavailable }: { tab: Tab; unavailable: string 
     openModelsSettings();
   }
 
+  function seeTasks() {
+    menu.setOpen(false);
+    openTasks(tab.key, null);
+  }
+
   return (
     <div className="model-switch" ref={menu.root}>
       <button ref={menu.button} className="model-button" data-testid="model-button" aria-haspopup="menu"
@@ -361,7 +374,7 @@ export function ModelMenu({ tab, unavailable }: { tab: Tab; unavailable: string 
       <PickError tab={tab} button={menu.button} />
       {!menu.open && <TeamErrorLine tab={tab} button={menu.button} />}
       {menu.open && <PickPanel menu={panel} tab={tab} options={options} busy={busy} onChoose={choose}
-        onManage={manage} />}
+        onManage={manage} onSeeTasks={seeTasks} />}
     </div>
   );
 }

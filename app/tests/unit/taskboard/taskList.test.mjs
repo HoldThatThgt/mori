@@ -29,12 +29,12 @@ const context = (view) => ({ view, holders: HOLDERS, cwd: 'D:\\work' });
 
 // ---- TB-81 列表 ----
 
-test('TB-81 the tabs show when the board has a request or team mode is on, not otherwise', () => {
+test('TB-81 the tabs show when the board has a request or task mode is on, not otherwise', () => {
   const empty = { requests: [], teamEdited: false };
   assert.equal(L.tasksShown(empty, 'off'), false);
   assert.equal(L.tasksShown(empty, 'always'), true);
   assert.equal(L.tasksShown(empty, 'once'), true);
-  assert.equal(L.tasksShown(board([]), 'off'), true, 'after team mode is turned off');
+  assert.equal(L.tasksShown(board([]), 'off'), true, 'after task mode is turned off');
 });
 
 test('TB-81 Running lists pending, active and waiting_user by id; Finished the rest, stopped included, newest first',

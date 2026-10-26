@@ -152,7 +152,7 @@ export const SCENARIOS = {
     { role: 'chat', kind: 'team-dialog', deliveries: { 1: [say('Planner registered it.')] } },
   ],
 
-  // TB-80（WP-09 之后）：立项登记一个 task 后，对话的回复等 10 秒才开始写；套件在回复进行中打开模型菜单，点
+  // TB-80：立项登记一个 task 后，对话的回复等 10 秒才开始写；套件在回复进行中打开模型菜单，点
   // See background tasks。T1（只读）读一个文件后等很久（之后的步骤让后台进程退出、重启 App）。
   'tb-tasks-menu': [
     { role: 'planner', kind: 'create', deliveries: {
