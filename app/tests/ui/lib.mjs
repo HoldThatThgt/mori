@@ -135,6 +135,24 @@ export function createRecorder(target) {
 }
 
 /**
+ * @brief 系统剪贴板现在能不能用：经主进程的 clipboard 写进 text 再读回。会话锁屏时（LogonUI 在运行）Windows 拒绝
+ *        所有进程打开剪贴板，读回的是空的，与 Mori 无关（docs/v0/english-ui-checks.md 第二轮，
+ *        docs/v1/walkthrough-1026/regression.md）。读回一致时剪贴板里留着 text，调用方把它当"剪贴板原来的内容"。
+ * @param app Playwright 的 ElectronApplication
+ * @param text 写进剪贴板的文字
+ * @return 能用时 null；不能用时 { locked: 会话是否锁屏（LogonUI 在运行）, detail: 说明的一行 }
+ */
+export async function clipboardBlocked(app, text) {
+  await app.evaluate(({ clipboard }, value) => clipboard.writeText(value), text);
+  const back = await app.evaluate(({ clipboard }) => clipboard.readText());
+  if (back === text) return null;
+  const locked = execFileSync('tasklist', ['/FI', 'IMAGENAME eq LogonUI.exe', '/NH'], { encoding: 'utf8' })
+    .includes('LogonUI.exe');
+  return { locked, detail: `system clipboard unusable: wrote "${text}", read back "${back}"; `
+    + `LogonUI running (session locked): ${locked}${locked ? ' (environment, not Mori)' : ''}` };
+}
+
+/**
  * @brief 找到后台进程（utilityProcess）的 PID。Playwright 在 Windows 上经 cmd.exe 启动程序，所以要在整棵进程树里找。
  *        与 m0-smoke.mjs 相同。
  */

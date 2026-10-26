@@ -27,8 +27,8 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
-  appRoot, arg, createRecorder, killKernel, launch, mainPid, oneLine, prepareProject, processTree, sleep,
-  sleepProcessIds, stillAlive, waitGone,
+  appRoot, arg, clipboardBlocked, createRecorder, killKernel, launch, mainPid, oneLine, prepareProject, processTree,
+  sleep, sleepProcessIds, stillAlive, waitGone,
 } from './lib.mjs';
 import {
   composerRow, focusName, hoverRing, layoutProblems, openRingDetails, pendingProblems, popoverChecks,
@@ -291,18 +291,26 @@ async function ringMessages({ page, h }, before) {
     && Boolean(opened?.focused), `${problems.join('; ')} | ${partsBrief(seen)} | ${seen?.desc}`);
 }
 
-/** @brief 代码块上的"Copy code"：代码进系统剪贴板（Mori 只放行自己页面写剪贴板这一项权限）。 */
+/**
+ * @brief 代码块上的"Copy code"：代码进系统剪贴板（Mori 只放行自己页面写剪贴板这一项权限）。
+ *        先确认系统剪贴板能用；会话锁屏时剪贴板谁都用不了，记 KNOWN（这台机器此时造不出的环境），没锁屏却用不了记失败。
+ */
 async function copyCode({ app, page, h }) {
+  const name = '代码块：点"复制代码"后代码进系统剪贴板';
   await h.send('code block 给我一段代码');
   await h.idle();
-  await app.evaluate(({ clipboard }) => clipboard.writeText('剪贴板原来的内容'));
+  const blocked = await clipboardBlocked(app, '剪贴板原来的内容');
+  if (blocked) {
+    record(name, false, blocked.detail, blocked.locked);
+    return;
+  }
   await page.getByRole('button', { name: 'Copy code' }).last().click();
   let copied = '';
   for (let tries = 0; tries < 10 && !copied.includes('export function add'); tries += 1) {
     await sleep(200);
     copied = await app.evaluate(({ clipboard }) => clipboard.readText());
   }
-  record('代码块：点"复制代码"后代码进系统剪贴板', copied.includes('export function add(a: number, b: number): number {')
+  record(name, copied.includes('export function add(a: number, b: number): number {')
     && copied.includes('return a + b;') && !copied.includes('下面是一段代码'), oneLine(copied));
 }
 
