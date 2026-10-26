@@ -90,6 +90,12 @@
 //   - -thinklong（2026-10-24 补，§7.7、§14.1；只对探针，第 1–7 步）：开了思考时只流式返回一段超过 256 token 的思考
 //     （probes.mjs 的 THINKLONG_THINKING，超过 1100 字，每块 64 字），没有正文和工具调用，以 finish_reason "length"
 //     结束（测探针的输出上限规则）；没开思考时照常回答探针。不是探针的请求不受影响。
+//   - -toollong（2026-10-26 补，只对探针第 3、4 步）：不论开没开思考，都同 -thinklong 那样只回很长的思考、以 "length"
+//     结束（tool calling 因出错没有验证，测模型行“Couldn’t verify: Stopped at the probe output limit before answering”）。
+//   - -offlong、-offsilent（2026-10-26 补，与 -nooff 一起用）：-nooff 拒绝了这个模型一次带“关闭思考”的第 1、2 步提示后，
+//     它下一次开着思考的第 1、2 步提示（探针第 2 步的 medium）：-offlong 同 -thinklong；-offsilent 只回一段思考、正常结束、
+//     没有正文（probes.mjs 的 afterRefusedOff；测规格 §7.7 第 2 步表第 4 行“关不掉、开思考也没答上”）。被拒的记录只用
+//     一次，第 1 步（在第 2 步的 off 之前）与之后的组照常回答。
 //
 // 认证（只对列表请求与 /chat/completions；列表以外的发现请求不查 key。下面的“key”是 Authorization: Bearer 的值，
 // 列表请求没有 Bearer 时取 x-api-key）：
@@ -172,14 +178,16 @@
 // 工具调用 id："call_fake_<端口>_<进程启动时刻>_<进程内计数>"，并行的请求之间、端点重启前后都不重复。
 // 其他环境变量：FAKE_PORT（默认 4319）、FAKE_CHUNK_DELAY_MS（默认 20）、FAKE_FIRST_DELAY_MS（默认 0）、
 //   FAKE_ENHANCE_SCRIPT（增强脚本文件，见 enhance.mjs）；发现用的 FAKE_LIST_SHAPE、FAKE_NO_V1_ROOT、FAKE_LIST_DELAY_MS 见上。
+//   FAKE_SERVE_404=1（2026-10-26 补）：-404 的模型照常回答（测“先 404、服务修好之后”：重新启动端点时带上它，规格 §8.3
+//   测试连接成功后清除 not_found）。
 // 2026-10-26（负责人走查 M7，规格 §14.1）：探针第 8、9 步删掉，第 8 步的暗号、第 9 步的长输出、-truncate、-nocancel、
 //   GET /metrics 与 FAKE_NO_METRICS 随之删掉；/metrics 现在同其他没有的接口一样是 404。
 
 import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { contentText, isSummaryRequest, planReply, summaryReply } from './replies.mjs';
-import { NOOFF_ERROR_BODY, NOOFF_STATUS, noOffRejected, probeReply, probeStep, replayRejected, requestedEffort,
-  thinkingOn } from './probes.mjs';
+import { NOOFF_ERROR_BODY, NOOFF_STATUS, afterRefusedOff, noOffRejected, probeReply, probeStep, replayRejected,
+  requestedEffort, thinkingOn } from './probes.mjs';
 import { logFields, scriptReply, sessionOf, withoutWorkCards } from './scripts.mjs';
 import { enhanceKindOf, enhanceReply } from './enhance.mjs';
 import { LIST_SHAPES, detailAnswer, isListPath, listAnswer, listServed } from './discovery.mjs';
@@ -209,6 +217,8 @@ const config = {
   noV1Root: env.FAKE_NO_V1_ROOT === '1',
   /** 列表请求等这么久再回 */
   listDelayMs: Number(env.FAKE_LIST_DELAY_MS ?? 0),
+  /** -404 的模型照常回答（服务修好了） */
+  serve404: env.FAKE_SERVE_404 === '1',
 };
 
 if (!LIST_SHAPES.includes(config.shape)) {
@@ -228,12 +238,14 @@ const state = {
   reasonedCalls: new Set(),
   /** 下一个工具调用 id 的进程内计数 */
   nextCallId: 1,
+  /** -nooff 刚拒绝了带“关闭思考”的第 1、2 步提示的模型 id（-offlong、-offsilent 的下一次 medium 用一次） */
+  refusedOff: new Set(),
 };
 /** 工具调用 id 的前缀：端口与进程启动时刻，端点重启或多个端点之间也不重复 */
 const callIdPrefix = `call_fake_${port}_${Date.now().toString(36)}`;
 
 const SUFFIXES = new Set(['notools', 'nochoice', 'noschema', 'replay', '404', '400', 'hang', 'stall', 'alwaysthink',
-  'nooff', 'thinklong']);
+  'nooff', 'thinklong', 'toollong', 'offlong', 'offsilent']);
 const NO_KEY = 'none';
 const SLOW_MS = 8000;
 const UNLIMITED_RETRY_AFTER_S = 60;
@@ -431,7 +443,7 @@ function readJson(req) {
 
 /** @brief 不是探针的请求按 -404、-400、-hang、-stall 处理；处理了返回 true。 */
 function nonProbeSuffix(res, body, flags, log) {
-  if (flags.has('404')) {
+  if (flags.has('404') && !config.serve404) {
     log(404);
     sendJson(res, 404, errorBody(`The model \`${body.model}\` does not exist.`, 'NotFoundError', 404));
     return true;
@@ -488,6 +500,18 @@ function assignCallIds(reply, flags) {
   }
 }
 
+/**
+ * @brief 探针的回复：-nooff 刚拒绝过这个模型的“关闭思考”时，下一次开着思考的第 1、2 步提示按 -offlong、-offsilent 回
+ *        （记录只用一次）；其余同 probes.mjs 的 probeReply。
+ */
+function probePlan(step, body, flags) {
+  if (step === 1 && thinkingOn(body) && state.refusedOff.delete(body.model)) {
+    const reply = afterRefusedOff(flags);
+    if (reply) return reply;
+  }
+  return probeReply(step, body, flags);
+}
+
 /** @brief 处理一个对话请求。 */
 async function handleChat(req, res) {
   const body = await readJson(req);
@@ -508,9 +532,11 @@ async function handleChat(req, res) {
     sendJson(res, failure.status, failure.body, failure.headers);
   };
   const early = keyFailure(bearer(req), true) ?? noOff ?? replay;
+  // 2026-10-26 补：-nooff 拒绝了第 1、2 步的“关闭思考”，记下这个模型（-offlong、-offsilent 的下一次 medium 用）
+  if (early !== null && early === noOff && step === 1) state.refusedOff.add(body.model);
   if (early) return fail(early);
   if (step === 0 && nonProbeSuffix(res, body, flags, log)) return;
-  const plan = step > 0 ? { reply: probeReply(step, body, flags) } : conversationPlan(body, flags, info);
+  const plan = step > 0 ? { reply: probePlan(step, body, flags) } : conversationPlan(body, flags, info);
   if (plan.failure) return fail(plan.failure);
   const { reply } = plan;
   // -alwaysthink：不论请求带不带思考参数都先回一段思考（探针、对话、压缩请求都一样），已有思考的回复不变；

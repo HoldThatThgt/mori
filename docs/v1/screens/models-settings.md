@@ -575,7 +575,9 @@ Default effort for new sessions 的选项随之变（显示的 Off 换成 Minima
 状态行放在提示下面，“Verifying…”用说明一行的颜色，失败与出错用错误的颜色，“Verify again”是紧跟在文字后面的小按钮；
 tool calling 验证通过、其他步出错的模型不显示状态行；“Tool calling failed verification: <detail>”只用原来首次启动那一句的前半（不带
 “Mori needs tool calling for the main agent; …”）；兼容选项图例下面一行说明“Mori already adjusts requests for well-known services such as
-DeepSeek. Check an option only if this server rejects requests.”（提供商表单、首次启动表单共用）；存着的 `supportsStrictMode` 在卡上不列。
+DeepSeek. Check an option only if this server rejects requests.”（提供商表单、首次启动表单共用）；存着的 `supportsStrictMode` 在卡上不列；
+卡上的“Compatibility options”按表单里的顺序列（不按配置里键的先后）；状态行没有说明时：判定失败的那一步没有说明写“Tool calling failed
+verification”（不带冒号），出错的档案没有原文写“Couldn’t verify”（这两条 2026-10-26 补登记，模型层屏的覆盖审查）。
 
 负责人走查回答 1 另定的（2026-10-26，WP-15，都是临时，走查时可以改）：清单里取自 pi 的值旁边写“From pi”（与“Default”同样的小字），
 模型行写“ (from pi)”；悬停说明清单为“The server didn’t report this, so Mori used pi’s model list for <provider>.
@@ -587,9 +589,11 @@ Use Edit to set the real value.”（2026-10-26 审查后改，见“取自 pi�
 负责人走查 M5 另定的（2026-10-26，WP-03，都是临时，走查时可以改；登记在 [v1/defaults.md](../defaults.md)“拖动排序”）：
 三个列表都改拖动（诊断的推荐）；柄在行的左端，只有一行时没有；读屏名、悬停与播报用 Claude 的“Reorder {name}”“Drag or use the arrow keys
 to reorder”“{name} was dropped at position {position} of {count}.”；方向键一次移一格就保存（不做 Claude 的“拿起、移动、放下”键盘模式），
-焦点留在移动的那一行的柄上；鼠标在一行的上半边插在前面、下半边插在后面，线是那一行上沿或下沿 2px 的强调色；被拖的行变淡，拖着的影子是
-整行；保存中柄不响应（不设 `disabled`，焦点不丢）；Models、Keys 移动失败的原文在列表下面（原来在那一行里）；行的按钮靠右，左边是柄与
-行的文字（Keys 的“Saved”和记录紧跟在标签后面，原来分散在一行里）。
+焦点留在移动的那一行的柄上；鼠标在一行的上半边插在前面、下半边插在后面，线是那一行上沿或下沿 2px 的强调色；被拖的行变淡（不透明度 0.45），
+拖着的影子是整行；保存中柄不响应（不设 `disabled`，只设 `aria-disabled`，焦点不丢），这时柄半透明（0.5）、鼠标是默认的；柄是六个点的图标、
+淡色（`--color-faint`），悬停变深（`--color-text`）并有一块 `--color-hover` 的底（2026-10-26 补登记，模型层屏的覆盖审查）；
+Models、Keys 移动失败的原文在列表下面（原来在那一行里）；行的按钮靠右，左边是柄与行的文字（Keys 的“Saved”和记录紧跟在标签后面，
+原来分散在一行里）。
 
 ## 需要规格回答
 

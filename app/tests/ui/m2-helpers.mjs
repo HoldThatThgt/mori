@@ -331,7 +331,9 @@ export async function allowedOverflow(page, pane, count) {
 /**
  * @brief 用 MutationObserver 记下输入框下面一行每次变化后的样子（window.__m2Row）：权限、范围、Effort 按钮
  *        （elementProbes 的 control）、有没有圆环、按钮位置的说明、这一行的高度、权限菜单和圆环详情开没开、
- *        焦点所在元素的 data-testid。变化才记。
+ *        焦点所在元素的 data-testid。变化才记。焦点移动不是 DOM 变化，另听 focusin、focusout（事件之后再记，这时
+ *        activeElement 已经是新的；2026-10-26 补：Restart 之后测试把焦点放到权限按钮上时这一行可能已经不再变化，原来只记到
+ *        点 Restart 那一刻焦点为 null 的样子，m2-app escStop 的“焦点留在权限按钮上”因此失败）。
  * @param pane 会话面板的选择器
  */
 export async function watchRow(page, pane) {
@@ -355,6 +357,14 @@ export async function watchRow(page, pane) {
     window.__m2RowObserver = new MutationObserver(note);
     window.__m2RowObserver.observe(document.body,
       { subtree: true, childList: true, characterData: true, attributes: true });
+    const afterFocus = () => setTimeout(note, 0);
+    window.__m2RowFocus?.();
+    document.addEventListener('focusin', afterFocus, true);
+    document.addEventListener('focusout', afterFocus, true);
+    window.__m2RowFocus = () => {
+      document.removeEventListener('focusin', afterFocus, true);
+      document.removeEventListener('focusout', afterFocus, true);
+    };
     note();
   }, pane);
 }
@@ -363,6 +373,8 @@ export async function watchRow(page, pane) {
 export function rowLog(page) {
   return page.evaluate(() => {
     window.__m2RowObserver?.disconnect();
+    window.__m2RowFocus?.();
+    window.__m2RowFocus = null;
     return window.__m2Row ?? [];
   });
 }

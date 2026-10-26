@@ -13,6 +13,10 @@
 //     fake-coder-thinklong（普通地址、勾 Supports thinking），档案出错"Stopped at the probe output limit before answering"、
 //     tool calling 仍验证通过，模型行没有状态行；经卡上的 Fetch models 加 fake-coder-alwaysthink（普通地址、勾 Supports
 //     thinking），思考关不掉但 Off 没被拒绝（can_disable 为假、off_refused 为假），模型行没有"Thinking can’t be turned off"。
+//     2026-10-26 补（models-settings.md “Models 行”的出错写法）：fake-coder-toollong（第 3、4 步停在输出上限）的状态行
+//     “Couldn’t verify: Stopped at the probe output limit before answering”；router 上的 -offlong、-offsilent（关闭思考被拒、
+//     开思考的 medium 出错或没有正文）的状态行与没有“Thinking can’t be turned off”；最后重启 Mori，把 fake-coder-nooff 的
+//     档案改成补丁之前的样子：状态行“Couldn’t verify: <400 原文>”，点 Verify again 后按 §7.7 重新测并通过。
 //   effort（MP-39）：输入框下面一行的 Effort 菜单（没有标记的模型仍有 Off、Off 时不带思考参数；fake-coder-nooff 没有 Off、
 //     有说明；原来是 Off 的会话显示 Minimal、请求带 minimal、没有 400）、提供商卡的 Test connection（带 medium）、模型表单
 //     （Edit）的 Default effort for new sessions、默认强度是 Off 的新会话、增强设置对话框的 Effort。
@@ -25,7 +29,7 @@
 // 启动前写进数据目录的 model-config.json 与 pi/settings.json 是 synthetic test setup（测试准备），代码里逐处注明；
 // 这里的提供商都没有 key。
 
-import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
@@ -49,9 +53,19 @@ const PORT = { effort: 4900, probe: 4901 };
 const NOOFF = 'fake-coder-nooff';
 const THINKLONG = 'fake-coder-thinklong';
 const ALWAYSTHINK = 'fake-coder-alwaysthink';
+/**
+ * 2026-10-26 补（synthetic，server.mjs 开头）：第 3、4 步停在输出上限；-nooff 拒绝关闭思考后第 2 步的 medium 停在输出上限
+ * 或只有思考、没有正文
+ */
+const TOOLLONG = 'fake-coder-toollong';
+const OFFLONG = 'fake-coder-nooff-offlong';
+const OFFSILENT = 'fake-coder-nooff-offsilent';
 /** 本套件的模型全名（提供商 id 由名称生成：Router → router；plain 由测试准备写好） */
 const REF = { plain: 'plain/fake-coder', nooff: `router/${NOOFF}`, thinklong: `plain/${THINKLONG}`,
-  alwaysthink: `plain/${ALWAYSTHINK}` };
+  alwaysthink: `plain/${ALWAYSTHINK}`, toollong: `plain/${TOOLLONG}`, offlong: `router/${OFFLONG}`,
+  offsilent: `router/${OFFSILENT}` };
+/** -nooff 拒绝时服务原文里的一句（server.mjs 的 NOOFF_MESSAGE，2026-10-24 在 OpenRouter 上录下） */
+const NOOFF_MESSAGE = 'Reasoning is mandatory for this endpoint and cannot be disabled.';
 /** 模型行说明一行最后的一段（models-settings.md "Models 行"，2026-10-26 起；原来是档案摘要的"Thinking: Can’t be turned off"） */
 const THINKING_OFF_TEXT = 'Thinking can’t be turned off';
 /** Effort 菜单底部的说明（model-menu.md"思考关不掉"） */
@@ -404,12 +418,123 @@ async function alwaysThinkStep(ctx, ep) {
     + 'refused (all 200)', lines.length > 0 && lines.every((line) => line.status === 200), lineBrief(lines));
 }
 
+/** @brief 状态行是出错的一类、文字正好是 text、带“Verify again”，行的 data-probe 为 unverified。 */
+const errorRow = (row, text) => row?.probe === 'unverified' && row.status?.state === 'error'
+  && row.status.text === `${text}Verify again`;
+
+/**
+ * @brief 停在探针输出上限、是第 3、4 步（models-settings.md “停在探针输出上限”，2026-10-26 补）：卡上的 Fetch models 加入
+ *        fake-coder-toollong（普通地址、没勾 Supports thinking；合成端点第 3、4 步只回很长的思考、以 length 结束）：档案的
+ *        tool calling 为 unverified、error 为“Stopped at the probe output limit before answering”，行的状态行
+ *        “Couldn’t verify: Stopped at the probe output limit before answering”带 Verify again。
+ */
+async function toolLongStep(ctx) {
+  const { page } = ctx;
+  await toModels(page);
+  const added = await cardAddModels(page, 'plain', [{ id: TOOLLONG }]);
+  if (added.error !== null) throw new Error(`add ${REF.toollong}: ${added.error}`);
+  const profile = (await waitProfiles(page, [REF.toollong], finished))[REF.toollong];
+  const row = await rowWhen(page, REF.toollong, settledRow);
+  record('MP-38 fake-coder-toollong (steps 3 and 4 stop at the probe output limit): tool calling is unverified with '
+    + `the error "${LIMIT_DETAIL}", and the row's status line reads "Couldn’t verify: ${LIMIT_DETAIL}" with `
+    + '"Verify again"',
+  profile.tool_calling.state === 'unverified' && profile.status === 'error' && profile.error === LIMIT_DETAIL
+    && errorRow(row, `Couldn’t verify: ${LIMIT_DETAIL}`), brief({ tool: profile.tool_calling, error: profile.error,
+    row }));
+}
+
+/**
+ * @brief 关不掉、开思考也没答上（models-settings.md 那一行，规格 §7.7 第 2 步表第 4 行，2026-10-26 补）：卡上的 Fetch models
+ *        给 router（OpenRouter 前缀地址）加入两个勾 Supports thinking 的模型：-offlong 第 2 步的 medium 停在输出上限，
+ *        -offsilent 第 2 步的 medium 只有思考、没有正文。两者第 2 步都出错、没判出 off_refused（can_disable unknown），
+ *        之后关闭思考的第 3 步被拒，tool calling 没验证：状态行“Couldn’t verify: <说明>”（-offlong 是输出上限那一句，
+ *        -offsilent 是 off 被拒的原文“400 …”），说明一行没有“Thinking can’t be turned off”。
+ */
+async function offFailedStep(ctx) {
+  const { page } = ctx;
+  await toModels(page);
+  const added = await cardAddModels(page, 'router', [{ id: OFFLONG, reasoning: true },
+    { id: OFFSILENT, reasoning: true }]);
+  if (added.error !== null) throw new Error(`add ${OFFLONG}, ${OFFSILENT}: ${added.error}`);
+  const profiles = await waitProfiles(page, [REF.offlong, REF.offsilent], finished);
+  const unjudged = (profile) => profile.reasoning.off_refused === false && profile.reasoning.can_disable === 'unknown'
+    && profile.tool_calling.state !== 'verified' && profile.status === 'error';
+  const long = { profile: profiles[REF.offlong], row: await rowWhen(page, REF.offlong, settledRow) };
+  record('MP-38 fake-coder-nooff-offlong (off refused, the medium request of step 2 stops at the output limit): no '
+    + `off_refused (can_disable unknown), tool calling not verified, the status line reads "Couldn’t verify: `
+    + `${LIMIT_DETAIL}" with "Verify again" and the line has no "${THINKING_OFF_TEXT}"`, unjudged(long.profile)
+    && long.profile.error === LIMIT_DETAIL && errorRow(long.row, `Couldn’t verify: ${LIMIT_DETAIL}`)
+    && long.row.thinkingOff === null, brief({ reasoning: long.profile.reasoning, error: long.profile.error,
+    row: long.row }));
+  const silent = { profile: profiles[REF.offsilent], row: await rowWhen(page, REF.offsilent, settledRow) };
+  const raw = silent.profile.error ?? '';
+  record('MP-38 fake-coder-nooff-offsilent (off refused, the medium request of step 2 has no text): no off_refused, '
+    + 'tool calling not verified, the status line reads "Couldn’t verify: <the off request’s raw 400 text>" with '
+    + `"Verify again" and the line has no "${THINKING_OFF_TEXT}"`, unjudged(silent.profile) && raw.startsWith('400')
+    && raw.includes(NOOFF_MESSAGE) && errorRow(silent.row, `Couldn’t verify: ${raw}`)
+    && silent.row.thinkingOff === null,
+  brief({ reasoning: silent.profile.reasoning, error: raw, row: silent.row }));
+}
+
+/** 补丁之前的第 2 步：关闭思考被拒算出错时说明的前缀（§7.7 之后是不通过，说明为这个前缀加 off 的原文） */
+const OFF_REFUSED_PREFIX = 'Thinking can’t be turned off: ';
+
+/**
+ * @brief 补丁之前验证失败的这类模型（models-settings.md 那一行，2026-10-24 补，2026-10-26 改为状态行）：关掉 Mori，把
+ *        router/fake-coder-nooff 的档案改成补丁之前的样子（synthetic test setup：没有 auto.offRefused，第 2 步关闭思考被 400
+ *        拒绝算出错、第 3 步同样出错；键、指纹与服务版本不动，启动时不重新探测），再启动：行 data-probe 为 unverified、
+ *        状态行“Couldn’t verify: <400 原文>”带 Verify again、说明一行没有“Thinking can’t be turned off”、没有提示。点
+ *        Verify again 后按 §7.7 重新测（合成端点多一个 effort none 的 400），状态行消失、行为 verified、说明一行以
+ *        “ · Thinking can’t be turned off”结尾。
+ */
+async function prePatchStep(ctx, ep) {
+  await stopApp(ctx);
+  const raw = prePatchProfile(ctx, ep);
+  await startApp(ctx);
+  const { page } = ctx;
+  await toModels(page);
+  const before = await rowWhen(page, REF.nooff, settledRow);
+  const hints = await modelRow(page, REF.nooff).locator('[data-testid="model-hint"]').count();
+  record('MP-38 a fake-coder-nooff profile from before the patch (no auto.offRefused, step 2’s 400 counted as an '
+    + 'error) is not re-probed at launch: the row is unverified with the status line "Couldn’t verify: <the 400 '
+    + `text>" and "Verify again", no "${THINKING_OFF_TEXT}" and no hint`, raw.startsWith('400')
+    && errorRow(before, `Couldn’t verify: ${raw}`) && before.thinkingOff === null && hints === 0,
+  brief({ raw, before, hints }));
+  const mark = ep.log.length;
+  await modelRow(page, REF.nooff).locator('[data-testid="probe-status"] [data-action="verify"]').click();
+  const after = await rowWhen(page, REF.nooff, offRefusedRow);
+  const refused = linesOf(ep, mark, NOOFF, true).filter((line) => line.status === 400 && line.effort === 'none');
+  record('MP-38 "Verify again" on that row tests again under §7.7 (a new explicit-off 400 on the fake endpoint): the '
+    + `status line goes away, the row is verified and its line ends with " · ${THINKING_OFF_TEXT}"`,
+  offRefusedRow(after) && refused.length === 1, brief({ after, lines: lineBrief(linesOf(ep, mark, NOOFF, true)) }));
+}
+
+/**
+ * @brief 测试准备（synthetic test setup）：把数据目录里 router/fake-coder-nooff 的档案改成补丁之前的样子（去掉 auto.offRefused；
+ *        第 2 步与第 3 步为出错、说明是 off 被拒的原文，第 4 步没跑），键、指纹、服务与其余各步照旧。
+ * @return 写进去的 400 原文（从现在的第 2 步说明里去掉“Thinking can’t be turned off: ”）
+ */
+function prePatchProfile(ctx, ep) {
+  const file = join(ctx.userData, 'model-profiles.json');
+  const data = JSON.parse(readFileSync(file, 'utf8'));
+  const stored = data.profiles.find((item) => item.modelId === NOOFF && item.baseUrl === routerUrl(ep.port));
+  if (!stored) throw new Error('no stored profile for router/fake-coder-nooff');
+  const raw = String(stored.auto.steps.thinking.detail ?? '').replace(OFF_REFUSED_PREFIX, '');
+  delete stored.auto.offRefused;
+  stored.auto.steps.thinking = { outcome: 'error', detail: raw };
+  stored.auto.steps.call = { outcome: 'error', detail: raw };
+  stored.auto.steps.result = { outcome: 'not_run', detail: 'Step 3 did not produce a valid call' };
+  writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
+  return raw;
+}
+
 /** @brief 场景 probe（MP-38）。 */
 async function probeScenario(ctx) {
   const ep = await startEndpoint(ctx, PORT.probe, {
-    FAKE_MODELS: `fake-coder,${NOOFF},${THINKLONG},${ALWAYSTHINK}` }, { proxy: false });
+    FAKE_MODELS: `fake-coder,${NOOFF},${THINKLONG},${ALWAYSTHINK},${TOOLLONG},${OFFLONG},${OFFSILENT}` },
+  { proxy: false });
   // synthetic test setup：一个普通地址的提供商 plain（fake-coder，没勾 Supports thinking）作为默认范围；
-  // 要测的两个模型都经界面加入。
+  // 要测的模型都经界面加入。
   seedConfig(ctx, { providers: [provider('plain', 'Plain', ep.url, [model('fake-coder')])], normalDefault: 'plain' });
   await startApp(ctx);
   await waitProfiles(ctx.page, [REF.plain]);
@@ -417,6 +542,10 @@ async function probeScenario(ctx) {
   await step(ctx, 'verify nooff', () => verifyNoOffStep(ctx, ep));
   await step(ctx, 'thinklong', () => thinkLongStep(ctx, ep));
   await step(ctx, 'alwaysthink', () => alwaysThinkStep(ctx, ep));
+  await step(ctx, 'toollong', () => toolLongStep(ctx));
+  await step(ctx, 'off failed', () => offFailedStep(ctx));
+  // 最后：要重启 Mori
+  await step(ctx, 'pre-patch profile', () => prePatchStep(ctx, ep));
 }
 
 // ---------- 场景 effort：没有 Off 的标记（MP-39 App） ----------

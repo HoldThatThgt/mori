@@ -41,7 +41,7 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 菜单（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时打不开） | 你点了按钮 | 三节，节名“Groups”“Providers”“Models”；Groups 的项写分组 id，Providers 的项写提供商名称，Models 按提供商分小节（小节名是提供商名称），项写模型 id；每项只写名字（2026-10-26 改：右侧的区域标记删掉）；当前范围（`pick`）打勾；底部说明“Applies to this session only. New sessions use the default range from Settings.”，最后一项“Manage models” | ↑ ↓、Enter 选择；Esc、点外面关闭 |
-| 被排除的项 | 这一项展开后的全部候选都被本会话的静态校验排除（§9.2） | 这一项变淡，悬停写原因：每个候选一行“<provider>/<model> — <原因>”（原因用 §5.3 的界面文字，例如“tool calling not verified yet”“tool calling failed verification”；行的写法临时，走查时可以改）；仍可以选（选了以后由拒绝启动卡说明） | 选择 |
+| 被排除的项 | 这一项展开后的全部候选都被本会话的静态校验排除（§9.2） | 这一项变淡，悬停写原因：每个候选一行“<provider>/<model> — <原因>”（原因用 §5.3 的界面文字，例如“tool calling not verified yet”“tool calling failed verification”；行的写法临时，走查时可以改）；仍可以选（选了以后由拒绝启动卡说明）。（2026-10-26 补，负责人走查 M3 带出的：原因同时是这一项读屏的描述（`aria-describedby`）；能选的项没有读屏的描述，原来每项都描述区域，例如“Local, Public”） | 选择 |
 | 某一节为空 | 配置里没有分组（或没有提供商与模型） | 这一节不显示（临时，走查时可以改）；全空时只有底部说明与“Manage models” | — |
 | 切换中 | 你选了一项，`session.setPick` 还没返回 | 菜单关闭；按钮显示新的范围、不可用（`data-pending="true"`） | — |
 | 已切换 | `session.setPick` 返回 `ModelState` | 按钮按新的 `ModelState` 显示；后台进程写一条 `mori.pick`、重新做静态校验，下一段起生效；被拒绝启动时出现拒绝启动卡，可以发送时卡消失（model-chat.md） | — |

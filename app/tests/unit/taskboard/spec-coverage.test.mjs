@@ -91,7 +91,8 @@ test('TB-46 spec-coverage keeps the model layer rules when --spec is not given',
   assert.deepEqual(layersOf('MP-38'), ['app', 'unit']);
   assert.deepEqual(layersOf('MP-39'), ['app', 'unit']);
   assert.deepEqual(layersOf('MP-40'), ['real']);
-  assert.deepEqual(layersOf('MP-41'), ['unit']);
+  // 2026-10-26（模型层屏的覆盖审查）：MP-41 加了 App 层（提供商卡的失败后再测、修好后清除 not_found）
+  assert.deepEqual(layersOf('MP-41'), ['app', 'unit']);
 });
 
 test('TB-46 spec-coverage reads every MEM row of memory §14.2 with its layers', () => {
@@ -123,12 +124,14 @@ test('TB-46 spec-coverage maps mem- result files to layers (partial files never 
 
 test('TB-46 spec-coverage reads every MD row of model-discovery §13.2 with its layers', () => {
   const items = parseSpecTable(discovery, readFileSync(specPathOf(discovery), 'utf8'));
-  // MD-16、MD-17：2026-10-26 负责人走查回答 1（按地址取 pi 自带的模型表，WP-15）
+  // MD-16、MD-17：2026-10-26 负责人走查回答 1（按地址取 pi 自带的模型表，WP-15）；MD-18：2026-10-26 模型层屏的覆盖审查
+  // （没有档案的模型行的回放）
   assert.deepEqual(items.map((item) => item.id),
-    Array.from({ length: 17 }, (_, i) => `MD-${String(i + 1).padStart(2, '0')}`));
+    Array.from({ length: 18 }, (_, i) => `MD-${String(i + 1).padStart(2, '0')}`));
   const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
   assert.deepEqual(layersOf('MD-16'), ['unit']);
   assert.deepEqual(layersOf('MD-17'), ['real', 'replay', 'unit']);
+  assert.deepEqual(layersOf('MD-18'), ['replay']);
   assert.deepEqual(layersOf('MD-01'), ['unit']);
   assert.deepEqual(layersOf('MD-06'), ['app', 'unit']);
   assert.deepEqual(layersOf('MD-07'), ['app', 'replay']);

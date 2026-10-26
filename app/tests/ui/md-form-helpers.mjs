@@ -338,6 +338,8 @@ function readRowInPage(tr, text) {
     reasoning: num('reasoning').checked, image: num('image').checked,
     defaults: [...tr.querySelectorAll('[data-testid="default-value"]')]
       .map((el) => `${el.dataset.field}:${text(el)}`),
+    // 取自 pi 的标记“From pi”的 data-field（2026-10-26 补，WP-15）
+    pis: [...tr.querySelectorAll('[data-testid="pi-value"]')].map((el) => el.dataset.field),
     defaultTitles: [...tr.querySelectorAll('[data-testid="default-value"]')].map((el) => el.title),
     errors: Object.fromEntries([...tr.querySelectorAll('[data-testid="field-error"]')]
       .map((el) => [el.dataset.field, text(el)])),
@@ -408,6 +410,9 @@ function readFormInPage(parts) {
       compatHint: text(more.querySelector('[data-testid="compat-hint"]')) } : null,
     cost: text(form.querySelector('[data-testid="probe-cost-note"]')),
     add: button('add-models'), close: button('close-form'),
+    // 2026-10-26 起没有网络区域（负责人走查 M3）：区域单选的个数、表单里有没有“Network zone”这几个字（都该没有）
+    zone: { radios: form.querySelectorAll('input[name="zone"]').length,
+      words: form.textContent.includes('Network zone') },
     message: text(message),
     fieldErrors: Object.fromEntries([...form.querySelectorAll('[data-testid="field-error"]')]
       .filter((el) => !el.closest('[data-testid="discovered-row"]')).map((el) => [el.dataset.field, text(el)])),

@@ -551,9 +551,28 @@ async function crashCheck(env) {
     const boxes = exited ? [] : await messageBoxes(app).catch((error) => `cannot read: ${oneLine(error)}`);
     record('后台进程意外退出后点托盘"Exit"：不问，Mori 10 秒内退出', exited, JSON.stringify({ exited, boxes }));
   } finally {
-    // 没退出时强行结束：Playwright 的 close 也走 app.quit()，退不出时会一直等下去
-    if (!exited) app.process().kill();
+    // 没退出时强行结束整个进程树：Playwright 的 close 也走 app.quit()，退不出时会一直等下去
+    if (!exited) killTree(app.process().pid);
   }
+}
+
+/** @brief 结束一个进程和它的全部子进程（taskkill /T /F）；已经退出时什么也不做。 */
+function killTree(pid) {
+  try {
+    execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+  } catch {
+    // 进程已经退出
+  }
+}
+
+/**
+ * @brief 关掉 Mori：先正常关（Playwright 的 app.close() 走 app.quit()），ms 毫秒内没关掉就结束整个进程树。前面的步骤失败时
+ *        Mori 可能退不出（例如后台进程没起来），app.close() 会一直等下去，这个 node 进程和 Mori 的窗口就留在桌面上
+ *        （2026-10-26 补，WP-15 集成时看到）。
+ */
+async function closeOrKill(app, ms = 15000) {
+  const closed = await Promise.race([app.close().then(() => true, () => false), sleep(ms).then(() => false)]);
+  if (!closed) killTree(app.process().pid);
 }
 
 /** 只在渲染进程里用、构建时由 Vite 打进 out/renderer 的 mermaid 和它的依赖（devDependencies），不该出现在 app.asar 里 */
@@ -633,7 +652,7 @@ try {
 } finally {
   net.stop();
   results.log = log.join('').slice(-4000);
-  if (!closed) await app.close().catch(() => {});
+  if (!closed) await closeOrKill(app);
 }
 try {
   await crashCheck(env);

@@ -880,6 +880,30 @@ async function defaultAfterEdit(env) {
   record('MD-13 after Edit sets typed-a’s Max output to 8,000 its "(default)" goes away; the window, still 128,000, '
     + 'keeps it', saved.ok && row.ok && Boolean(row.value.meta?.includes('Max output: 8,000 ·')
     || row.value.meta?.endsWith('Max output: 8,000')), brief({ saved: saved.value, row: row.value }));
+  await defaultBack(env);
+}
+
+/**
+ * @brief 改回默认值又标（models-settings.md “Models 行”的“默认值”，2026-10-26 补）：再用 Edit 把 typed-a 的 Max output 改回
+ *        16,384（窗口 128,000 时的默认值），Save 后这一项又写“(default)”，悬停说明照旧。
+ */
+async function defaultBack(env) {
+  const { page, userData } = env.ctx;
+  await modelRow(page, 'ht/typed-a').locator('[data-action="edit"]').click();
+  const form = cardOf(page, 'ht').getByTestId('model-form');
+  await form.waitFor({ timeout: 10000 });
+  await form.getByLabel('Max output', { exact: true }).fill('16384');
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  await form.waitFor({ state: 'detached', timeout: 15000 });
+  const saved = await poll(() => providerIn(configOf(userData), 'ht')?.models[0]?.maxTokens,
+    (value) => value === 16384, 10000);
+  const row = await poll(() => modelRowState(page, 'ht/typed-a'), (state) => same(state?.defaults,
+    ['contextWindow', 'maxTokens']), 10000);
+  record('MD-13 setting typed-a’s Max output back to the default 16,384 with Edit shows "Max output: 16,384 (default)" '
+    + 'again, with the hover explanation', saved.ok && row.ok
+    && Boolean(row.value.meta?.includes('Max output: 16,384 (default)'))
+    && row.value.defaultTitles.every((title) => title === DEFAULT_TITLE),
+  brief({ saved: saved.value, row: row.value }));
 }
 
 /** @brief §8 表五行的显示条件（正反两面）与顺序。 */

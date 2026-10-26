@@ -1016,8 +1016,11 @@ async function main() {
     return 1;
   }
   mkdirSync(shots, { recursive: true });
-  record(`MEM-34 real setup: two real providers ${refOf(ctx.found.first)} and ${refOf(ctx.found.second)} with saved `
-    + 'keys', true, `${ctx.found.first.name}, ${ctx.found.second.name}`);
+  // 2026-10-26 补：真的条件（同 v1-models-real.mjs 的 MP-27 与 tb-real.mjs 的 TB-45），不写死通过
+  const { first, second } = ctx.found;
+  record(`MEM-34 real setup: two real providers ${refOf(first)} and ${refOf(second)} with saved keys`,
+    first.id !== second.id && first.keys.length > 0 && second.keys.length > 0,
+    `${first.name} (${first.keys.length} key(s)), ${second.name} (${second.keys.length} key(s))`);
   const data = prepareRealData(source, ctx.found, PROXY);
   ctx.userData = data.userData;
   try {

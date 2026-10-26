@@ -42,6 +42,7 @@ import {
   seedPiSettings, seedV0Session, startEndpoint, talk,
 } from './v1-models-session-setup.mjs';
 import { cardAddModels } from './page.mjs';
+import { reportActions } from './md-card-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -582,6 +583,12 @@ async function projectConfigStep(ctx) {
   const shown = await settingsShown(page);
   record('MP-09 project_config: "Open settings" opens Settings → Models at the top', shown.models && shown.scroll === 0,
     JSON.stringify(shown));
+  // f8.md“Recent activity”（2026-10-26 补，负责人走查 M3）：卡上的 Open settings 记“Open Settings → Models”，
+  // 不再有“ (zones)”“ (project)”的落点（只有 No model available 卡在 key 的原因时带“ (keys)”）
+  const opens = (await reportActions(page, 'Open settings check')).filter((line) => line.startsWith('Open Settings'));
+  record('MP-09 the F8 report’s recent activity records each "Open settings" on a blocked card (no_pick, '
+    + 'no_candidate, project_config) as "Open Settings → Models", never with " (zones)" or " (project)" (2026-10-26)',
+  opens.length >= 3 && opens.every((line) => line === 'Open Settings → Models'), JSON.stringify(opens));
   await backToChat(page);
 }
 
@@ -647,7 +654,30 @@ const PROBE_MODELS = [
   { id: 'fake-coder-nochoice-noschema', expect: { tool_calling: 'verified', tier: 'C' } },
   { id: 'fake-coder-replay', reasoning: true, expect: { tool_calling: 'verified', tier: 'A',
     reasoning: 'reasoning_content' } },
+  // 2026-10-26 补：总在思考（推理字段 reasoning_content，没勾 Supports thinking → 提示“This model returned thinking
+  // content.”）又不调工具（tool calling 判定不通过 → 状态行），查提示与状态行在行里的位置
+  { id: 'fake-coder-alwaysthink-notools', expect: { tool_calling: 'failed', reasoning: 'reasoning_content' } },
 ];
+
+/**
+ * @brief 一行里说明一行、某种提示与状态行的先后与上下（models-settings.md “Models 行”：提示在说明一行下面、状态行上面，
+ *        状态行在提示下面）：三块在文档里依次排列，画面上一块在另一块下方；另读提示的文字与 Use、状态行的文字与按钮。
+ */
+function rowLayout(page, ref, hintKind) {
+  return page.evaluate(({ key, kind }) => {
+    const row = document.querySelector(`[data-testid="model-row"][data-model="${key}"]`);
+    const meta = row?.querySelector('.model-meta');
+    const hint = row?.querySelector(`[data-testid="model-hint"][data-kind="${kind}"]`);
+    const line = row?.querySelector('[data-testid="probe-status"]');
+    const after = (a, b) => Boolean(a && b) && Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const below = (a, b) => Boolean(a && b) && b.getBoundingClientRect().top >= a.getBoundingClientRect().bottom - 0.5;
+    return { order: after(meta, hint) && after(hint, line), placed: below(meta, hint) && below(hint, line),
+      hint: hint && { text: hint.querySelector('.muted')?.textContent ?? '',
+        use: hint.querySelector('[data-action="use-reported"]')?.textContent ?? null },
+      status: line && { state: line.dataset.state, text: line.querySelector('span')?.textContent ?? '',
+        button: line.querySelector('[data-action="verify"]')?.textContent ?? null } };
+  }, { key: ref, kind: hintKind });
+}
 
 /**
  * @brief 档案与模型行是否符合期望：等级、推理字段读档案（models.get）；tool calling 读档案与行上的 data-probe，判定失败的行
@@ -693,6 +723,14 @@ async function probeRowsStep(ctx) {
   const replay = profiles['pv/fake-coder-replay']?.reasoning;
   record('MP-10 pv/fake-coder-replay: profile reasoning.replay is required', replay?.replay === 'required',
     JSON.stringify(replay));
+  const layout = await rowLayout(page, 'pv/fake-coder-alwaysthink-notools', 'thinking-seen');
+  record('MP-10 pv/fake-coder-alwaysthink-notools: the hint "This model returned thinking content." with Use sits '
+    + 'under the description line and above the status line "Tool calling failed verification: …" with "Verify '
+    + 'again" (models-settings.md "Models 行": hints below the description, the status line below the hints)',
+  layout.order && layout.placed && layout.hint?.text === 'This model returned thinking content.'
+    && layout.hint.use === 'Use' && layout.status?.state === 'failed'
+    && layout.status.text.startsWith('Tool calling failed verification: ') && layout.status.button === 'Verify again',
+  JSON.stringify(layout));
   await backToChat(page);
 }
 
@@ -727,6 +765,10 @@ async function verifyAgainStep(ctx, ep) {
     + 'with the status line "Verifying…" and no button, the endpoint gets new probe requests, and the row settles '
     + 'back to failed with "Verify again"', states.includes('reverifying|verifying||Verifying…') && probes.length > 0
     && settled === true, `${probes.length} probe requests; ${states.join(' > ')}`);
+  // f8.md“Recent activity”与 ui-strings“操作记录”（2026-10-26，WP-04）：models.verify 记“Verify <ref>”，不再带“ (auto)”
+  const verifies = (await reportActions(page, 'Verify again check')).filter((line) => line.startsWith('Verify'));
+  record(`MP-10 ${ref}: the F8 report’s recent activity records the click as "Verify ${ref}" (no " (auto)", `
+    + '2026-10-26)', same(verifies, [`Verify ${ref}`]), JSON.stringify(verifies));
   await backToChat(page);
 }
 
@@ -846,12 +888,35 @@ async function versionStep(ctx, endpoint) {
     `tool calling ${view?.tool_calling.state}`);
 }
 
+/**
+ * @brief 启动时的探针（models-settings.md “Models 行”的“没有档案、不在探测”：启动时探针在界面读到档案之前开始，平常看不到
+ *        这一态；2026-10-26 补，WP-02 记录的“只按代码推出”）：从没探测过的 fp/fake-coder，启动后马上装上记录并打开设置 →
+ *        Models（每个请求等 1.5 秒，这时第一组探针还在跑），从这一行出现到验证通过只有“Verifying…”，从来不是
+ *        “Couldn’t verify”。
+ */
+async function startupProbeStep(ctx) {
+  const { page } = ctx;
+  await watch(page, 'tool', 'fp/fake-coder');
+  await openModels(page);
+  await waitProfiles(page, ['fp/fake-coder'], verified, 180000);
+  await until(() => profileRow(page, 'fp/fake-coder').then((row) => row?.probe === 'verified'), 10000, 100);
+  const states = await seen(page);
+  const shown = ['verifying|verifying||Verifying…', 'verified|||'];
+  record('MP-10 at launch, a model that was never probed shows only "Verifying…" (data-probe verifying) from the '
+    + 'moment its row appears in Settings → Models until it is verified, never "Couldn’t verify"', same(states, shown),
+  states.join(' > '));
+  // 还没有打开会话：只等设置页关上（backToChat 还要等会话就绪）
+  await page.getByRole('button', { name: 'Back to app', exact: true }).click();
+  await page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 10000 });
+}
+
 /** @brief 场景 fingerprint（MP-12）。 */
 async function fingerprintScenario(ctx) {
   // 每个请求先等 1.5 秒：一组探针要十几秒，回复只要两秒，测"重新探测期间仍可发送"。
   const ep = await startEndpoint(ctx, PORT, { FAKE_FIRST_DELAY_MS: '1500', FAKE_SERVER_VERSION: '0.10.1' });
   seedConfig(ctx, { providers: [provider('fp', 'FP Provider', ep.url, [model('fake-coder')])], normalDefault: 'fp' });
   await startApp(ctx);
+  await step(ctx, 'startup probe', () => startupProbeStep(ctx), 'MP-10');
   await waitProfiles(ctx.page, ['fp/fake-coder'], verified, 180000);
   await openProject(ctx, makeProject(ctx, 'proj'));
   await step(ctx, 'window change', () => windowChangeStep(ctx, ep));
@@ -1152,6 +1217,8 @@ async function readMenu(page) {
     items: [...element.querySelectorAll('[role="menuitemradio"]')].map((item) => ({ pick: item.dataset.pick,
       label: item.querySelector('.switch-text')?.textContent, zoneMark: Boolean(item.querySelector('.pick-zone'))
         || 'zone' in item.dataset,
+      described: item.hasAttribute('aria-describedby') ? (item.getAttribute('aria-describedby') ?? '').split(/\s+/)
+        .filter(Boolean).map((id) => document.getElementById(id)?.textContent ?? '').join(' ') : null,
       checked: item.getAttribute('aria-checked') === 'true', excluded: item.dataset.excluded === 'true',
       title: item.title, section: item.closest('[data-section]')?.dataset.section })),
     providerNames: [...element.querySelectorAll('.model-group-name')].map((item) => item.textContent),
@@ -1200,6 +1267,14 @@ async function menuStep(ctx) {
   record('MP-06 the range menu items carry no zone mark (no .pick-zone, no data-zone); each shows only its name',
     menu.items.length > 0 && menu.items.every((item) => !item.zoneMark), JSON.stringify(menu.items
       .map((item) => [item.pick, item.label, item.zoneMark])));
+  // model-menu.md“被排除的项”（2026-10-26 补，负责人走查 M3）：读屏的描述只有被排除时的原因，原来每项都描述区域
+  const excluded = menu.items.filter((item) => item.excluded);
+  record('MP-06 range menu items have a screen-reader description only when excluded, and it is the reason (the '
+    + 'hover text, e.g. "pn/pn-notools — tool calling failed verification"); items that can be chosen have none '
+    + '(no zone description)', excluded.length === 3 && excluded.every((item) => item.described === item.title
+    && item.described.includes('tool calling failed verification'))
+    && menu.items.filter((item) => !item.excluded).every((item) => item.described === null),
+  JSON.stringify(menu.items.map((item) => [item.pick, item.excluded, item.described])));
   record('MP-23 menu: the current range ticked, bottom note and "Manage models"',
     byPick.g1?.checked
     && menu.note === 'Applies to this session only. New sessions use the default range from Settings.'
@@ -1288,6 +1363,10 @@ async function defaultStep(ctx) {
   const s4 = await pickers(page);
   record('MP-23 a new session uses the new default range', s4.pick === 'p3' && s4.text === 'Provider Three · m3',
     JSON.stringify(s4));
+  // f8.md“Recent activity”（2026-10-26 补，负责人走查 M3）：默认范围的改动只记范围，不带“ · <区域>”
+  const actions = (await reportActions(page, 'Defaults check')).filter((line) => line.startsWith('Set defaults'));
+  record('MP-24 the F8 report’s recent activity records the Defaults change as "Set defaults p3" (no " · <zone>", '
+    + '2026-10-26)', same(actions, ['Set defaults p3']), JSON.stringify(actions));
 }
 
 /** @brief v0 的旧会话：打开后以最后一条助手消息的模型为范围，并记下 mori.pick。 */

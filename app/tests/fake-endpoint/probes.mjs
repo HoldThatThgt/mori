@@ -9,6 +9,10 @@
 //     时回 400，响应体逐字节为 NOOFF_ERROR_BODY（2026-10-24 在 OpenRouter 上录下的原文）。
 //   - -thinklong（只对探针）：开了思考时回一段超过 256 token 的思考（THINKLONG_THINKING），没有正文，
 //     finish_reason 为 "length"（回复的 finishReason）；没开思考时照常回答。
+// 2026-10-26 补（synthetic，models-settings.md“Models 行”的出错写法）：
+//   - -toollong（只对探针第 3、4 步）：不论开没开思考都同 -thinklong 那样回，tool calling 因出错没有验证。
+//   - -offlong、-offsilent（与 -nooff 一起用）：-nooff 拒绝了一次带“关闭思考”的第 1、2 步提示之后，这个模型下一次开着思考的
+//     第 1、2 步提示（第 2 步的 medium）：-offlong 同 -thinklong；-offsilent 只回一段思考、正常结束（afterRefusedOff）。
 // 2026-10-26（负责人走查 M7）：探针第 8、9 步删掉，第 8 步的暗号、第 9 步的长输出与 -truncate 随之删掉。
 
 import { contentText } from './replies.mjs';
@@ -114,8 +118,29 @@ function probeAnswer(step, body, flags) {
   return text('<summary>The sky is clear today.</summary><outcome>ok</outcome>');
 }
 
+/** @brief 只有一段超过 256 token 的思考、以输出上限结束的回复（-thinklong、-toollong、-offlong）。 */
+const longThinking = () => ({ thinking: THINKLONG_THINKING, text: '', toolCalls: [], finishReason: THINKLONG_FINISH,
+  thinkingPiece: THINKLONG_PIECE });
+
 /**
- * @brief 探针的回复：开了思考时附一段 reasoning_content；-thinklong 开了思考时只回一段很长的思考，以输出上限结束（§7.7）。
+ * @brief -offlong、-offsilent（2026-10-26 补，synthetic；models-settings.md“关不掉、开思考也没答上”，规格 §7.7 第 2 步表
+ *        第 4 行）：-nooff 拒绝了这个模型一次带“关闭思考”的第 1、2 步提示之后，它下一次开着思考的第 1、2 步提示（第 2 步的
+ *        medium）的回复。-offlong 只回超过 256 token 的思考、以 length 结束（第 2 步出错，“Stopped at the probe output
+ *        limit before answering”）；-offsilent 只回一段思考、正常结束（没有正文，第 2 步用 off 被拒的原文出错）。
+ *        server.mjs 记下被拒的模型，只用一次。
+ * @param flags 模型 id 的后缀集合
+ * @return 回复；两个后缀都没有时为 null（照常回答）
+ */
+export function afterRefusedOff(flags) {
+  if (flags.has('offlong')) return longThinking();
+  if (flags.has('offsilent')) return { thinking: PROBE_THINKING, text: '', toolCalls: [] };
+  return null;
+}
+
+/**
+ * @brief 探针的回复：开了思考时附一段 reasoning_content；-thinklong 开了思考时只回一段很长的思考，以输出上限结束（§7.7）；
+ *        -toollong（2026-10-26 补，synthetic）第 3、4 步不论开没开思考都这样回（tool calling 因出错没有验证，
+ *        models-settings.md“停在探针输出上限”的第 3、4 步那一支）。
  * @param step 探针第几步（probeStep 的结果，大于 0）
  * @param body 请求体
  * @param flags 模型 id 的后缀集合
@@ -123,10 +148,8 @@ function probeAnswer(step, body, flags) {
  *         thinkingPiece?（思考每个分块的字数，没有时为 4） }
  */
 export function probeReply(step, body, flags) {
-  if (flags.has('thinklong') && thinkingOn(body)) {
-    return { thinking: THINKLONG_THINKING, text: '', toolCalls: [], finishReason: THINKLONG_FINISH,
-      thinkingPiece: THINKLONG_PIECE };
-  }
+  if (flags.has('thinklong') && thinkingOn(body)) return longThinking();
+  if (flags.has('toollong') && (step === 3 || step === 4)) return longThinking();
   const reply = probeAnswer(step, body, flags);
   if (thinkingOn(body)) reply.thinking = PROBE_THINKING;
   return reply;

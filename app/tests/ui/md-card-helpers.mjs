@@ -351,6 +351,25 @@ export function modelRowState(page, ref) {
   }, ref);
 }
 
+/**
+ * @brief 在当前页面按 F8 保存一份 UI issue 报告，返回报告“## Recent activity”一节的操作记录（每行“- <时刻> <动作>”去掉
+ *        时刻，从早到晚；docs/v0/screens/f8.md、ui-strings.md“操作记录”）。读报告文件；保存不了时抛错。
+ * @param what “What went wrong”里填的字
+ */
+export async function reportActions(page, what = 'Model settings check') {
+  await page.keyboard.press('F8');
+  const dialog = page.getByTestId('issue-dialog');
+  await dialog.getByTestId('issue-what').fill(what);
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  const saved = page.getByTestId('issue-saved');
+  await saved.waitFor({ timeout: 15000 });
+  const path = /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
+  await page.keyboard.press('Escape');
+  const text = (path && readText(path)) || '';
+  const section = text.split(/^## /m).find((part) => part.startsWith('Recent activity')) ?? '';
+  return section.split(/\r?\n/).map((line) => /^- \S+ (.+)$/.exec(line)?.[1]).filter(Boolean);
+}
+
 /** @brief 页面里能看到的全部文字：整个 DOM 的 HTML 加上每个输入框此刻的值（值不一定在 HTML 属性里）。 */
 export function pageDump(page) {
   return page.evaluate(() => [document.documentElement.outerHTML,

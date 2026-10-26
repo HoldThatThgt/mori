@@ -40,6 +40,8 @@
 // { error: null }，记在 status.discoverCancels，不算写命令。models.get、models.reload 录制里有时先用录制的：在界面所在
 // 这一段（及之前）录下的结果里，取"录制里它之前的 models.* 写命令条数"不超过界面已发的写命令条数（status.modelWrites）
 // 的最后一个（modelsResult）；录制里没有写命令时就是原来的这一段最后一个结果，都没有时才按 fixture.model 合成。
+// 2026-10-26 补（synthetic）：control.failModelWrite 有值时下一条 models.* 写命令以它为原文失败（{ error }，只用一次，
+// 记在 status.failed），测设置页把写命令的原文写在发起的地方（md-replay.mjs 的模型行 Verify again）。
 // m6-replay.mjs 从这里读只读查询的列表（QUERIES）；tb-replay.mjs、v1-models-replay.mjs 按文字读那一行。
 
 /** 截图返回的 1×1 PNG */
@@ -770,8 +772,20 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
         status.discoverCancels += 1;
         return Promise.resolve({ error: null });
       default:
-        return MODEL_WRITES.has(command.type) ? Promise.resolve(v1ModelWrite(command, models)) : null;
+        if (!MODEL_WRITES.has(command.type)) return null;
+        return Promise.resolve(control.failModelWrite ? failedModelWrite(command) : v1ModelWrite(command, models));
     }
+  }
+
+  /**
+   * @brief synthetic（2026-10-26 补）：control.failModelWrite 有值时这一条 models.* 写命令以它为原文失败（{ error }，同后台
+   *        进程拒绝一条写命令），只用一次；记在 status.failed，不进 status.modelWrites、不改回放桥的配置。
+   */
+  function failedModelWrite(command) {
+    const message = control.failModelWrite;
+    control.failModelWrite = null;
+    status.failed.push(command);
+    return { error: message };
   }
 
   const bridge = {
@@ -838,6 +852,11 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     feedback,
     /** synthetic：下一条界面命令直接以这段原文失败（测发送时就失败）；null 表示照常回放 */
     failNext: null,
+    /**
+     * synthetic（2026-10-26 补）：下一条 models.* 写命令以这段原文失败（返回 { error }，测设置页把写命令的原文写在发起的
+     * 地方，例如模型行 Verify again 的命令本身出错）；null 表示照常应答
+     */
+    failModelWrite: null,
     /** @brief 模拟后台进程退出。 */
     exit(code = 1) {
       status.exited = true;

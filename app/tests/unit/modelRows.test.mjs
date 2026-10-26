@@ -51,3 +51,15 @@ test('MP-10 Models row: a verified model has no status line, also while re-verif
     assert.deepEqual(statusLine(failed, false),
       { state: 'failed', text: 'Tool calling failed verification: no tool call in the reply' });
   });
+
+// 2026-10-26 补（WP-02 的覆盖审查）：状态行在没有说明时的两种写法（docs/v1/defaults.md“模型行的状态行没有说明时”，临时默认值）
+test('MP-10 Models row: a failed verification whose failing step has no detail reads "Tool calling failed '
+  + 'verification" without a colon; an unverified profile without an error reads "Couldn’t verify"', () => {
+  const failed = { status: 'ready', error: null,
+    tool_calling: { state: 'failed', call: step('fail', null), result: step('not_run') } };
+  assert.equal(probeState(failed, false), 'failed');
+  assert.deepEqual(statusLine(failed, false), { state: 'failed', text: 'Tool calling failed verification' });
+  const silent = profile('error', 'unverified', null);
+  assert.equal(probeState(silent, false), 'unverified');
+  assert.deepEqual(statusLine(silent, false), { state: 'error', text: 'Couldn’t verify' });
+});

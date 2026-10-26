@@ -845,7 +845,7 @@ async function wideLayout(ctx) {
     + '没有图标）、范围按钮（最长 200px，长模型 ID 截在 200px）、"Effort: <强度> ▾"、圆环、带文字的"Send"，间距 8px；'
     + '不溢出、不裁切，会话名完整', report, 1, pane?.width > 680 && pane.controls.model?.width >= RANGE_MAX - 1);
   record(`范围按钮在这一行里（不在顶栏）：读屏名称"${MODEL_LABEL}"；悬停第一行是按钮文字、第二行"${MODEL_TIP}"；读屏的描述`
-    + `"${MODEL_DESCRIBED}"（第二行，" · "换成", "），描述元素（model-tip）在按钮外面`, range.inRow && !range.inTopbar
+    + `"${MODEL_DESCRIBED}"（第二行，2026-10-26 起只有提供商名），描述元素（model-tip）在按钮外面`, range.inRow && !range.inTopbar
     && range.text === MODEL_ID && range.name === MODEL_LABEL && range.lines.join('|') === `${MODEL_ID}|${MODEL_TIP}`
     && range.described === MODEL_DESCRIBED && range.tipOutside === true, JSON.stringify(range));
   await shot(page, 'layout-1280');

@@ -94,6 +94,8 @@ const TEXT = {
   noList: 'This server doesn’t list its models.',
   emptyList: 'The server didn’t list any models.',
   compat: 'Endpoint needs max_tokens instead of max_completion_tokens',
+  compatHint: 'Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this '
+    + 'server rejects requests.',
   idSpaces: 'Model ID must be non-empty and contain no spaces.',
   idUnique: 'Model IDs must be unique within a provider.',
   migration: 'Couldn’t import your previous model settings: ',
@@ -459,6 +461,15 @@ async function listedRefetch(ctx) {
   const { page } = ctx;
   await setName(page, 'Fake first run');
   await openMoreSettings(page);
+  // first-run.md“More settings”（2026-10-26 改，WP-02 负责人走查 M1）：兼容选项上面一行说明，只剩五个勾选框、没有 strict mode
+  const more = await page.locator(`${FORM} [data-testid="more-settings"]`).evaluate((root) => ({
+    hint: root.querySelector('[data-testid="compat-hint"]')?.textContent ?? null,
+    labels: [...root.querySelectorAll('.compat-checks label.check-row span')]
+      .map((span) => span.firstChild?.textContent ?? '') }));
+  record('MD-11 More settings of the first-run form: the hint line "Mori already adjusts requests for well-known '
+    + 'services such as DeepSeek. …" above exactly five compatibility options, no strict-mode option (2026-10-26)',
+  more.hint === TEXT.compatHint && more.labels.length === 5 && more.labels.includes(TEXT.compat)
+    && !more.labels.some((label) => label.includes('strict mode')), brief(more));
   await compatBox(page, TEXT.compat).check();
   await setApi(page, 'openai-responses');
   const since = Date.now();

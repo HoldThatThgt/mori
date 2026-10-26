@@ -160,15 +160,22 @@ async function sendAndWait(ctx, text, timeout = 600000) {
 /** @brief 一轮的实际模型（去重，按出现顺序）。 */
 const refsOf = (messages) => [...new Set(messages.map((message) => message.ref))];
 
-/** @brief 设置 → Models：两个模型的档案合理（models.get），模型行上的 data-probe 为 verified（2026-10-26 起没有档案摘要）。 */
+/**
+ * @brief 设置 → Models：两个模型的档案合理（models.get），模型行上的 data-probe 为 verified（2026-10-26 起没有档案摘要）。
+ *        启动时读到的服务种类与复制来的档案不同时 Mori 按拉取规格 §7.3 重新探测（行的 data-probe 为 reverifying，档案的
+ *        status 仍是 ready）：先等行不在探测中（最多 5 分钟），再读一次档案（2026-10-26 补，WP-05 记录的“早就有的失败”）。
+ */
 async function probes(ctx) {
-  const info = await waitProfiles(ctx.page, [ctx.firstRef, ctx.secondRef]);
+  await waitProfiles(ctx.page, [ctx.firstRef, ctx.secondRef]);
   await openModelsSettings(ctx.page);
+  const settled = (value) => value !== null && !['verifying', 'reverifying'].includes(value);
   for (const [provider, ref] of [[ctx.first, ctx.firstRef], [ctx.second, ctx.secondRef]]) {
-    const problems = profileProblems(info.profiles[ref], provider.models[0].contextWindow);
     const row = ctx.page.locator(`[data-testid="model-row"][data-model="${ref}"]`);
     await row.scrollIntoViewIfNeeded();
-    const shown = await row.getAttribute('data-probe', { timeout: 10000 }).catch(() => null);
+    const shown = await pollFor(() => row.getAttribute('data-probe', { timeout: 10000 }).catch(() => null), settled,
+      300000, 2000);
+    const info = await modelsGet(ctx.page);
+    const problems = profileProblems(info.profiles[ref], provider.models[0].contextWindow);
     const p = info.profiles[ref];
     record(`MP-27 probe results for ${ref} are plausible: probed, tool calling verified, a handoff tier, `
       + 'an effective window within the declared one, a known reasoning field and server kind; the Models row '
